@@ -29,6 +29,9 @@ interface Entry {
   html?: string;
 }
 
+// 酒馆插件目录不走酒馆助手构建流程。
+const IGNORED_ENTRY_DIRECTORIES = new Set([path.normalize('src/顶部工具栏插件')]);
+
 function parse_entry(script_file: string) {
   const html = path.join(path.dirname(script_file), 'index.html');
   if (fs.existsSync(html)) {
@@ -48,10 +51,18 @@ function common_path(lhs: string, rhs: string) {
   return lhs_parts.join(path.sep);
 }
 
+function should_ignore_entry(script_file: string) {
+  const normalized_dir = path.normalize(path.dirname(script_file));
+  return [...IGNORED_ENTRY_DIRECTORIES].some(
+    ignored_dir => normalized_dir === ignored_dir || normalized_dir.startsWith(`${ignored_dir}${path.sep}`),
+  );
+}
+
 function glob_script_files() {
   const results: string[] = [];
 
   fs.globSync(`{示例,src}/**/index.{ts,tsx,js,jsx}`)
+    .filter(file => !should_ignore_entry(file))
     .filter(
       file => process.env.CI !== 'true' || !fs.readFileSync(path.join(import.meta.dirname, file)).includes('@no-ci'),
     )
