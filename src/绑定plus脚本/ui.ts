@@ -3,57 +3,58 @@
  */
 
 import YAML from 'yaml';
-import { createScriptIdDiv, destroyScriptIdDiv, deteleportStyle, teleportStyle } from '../util/script';
+import { createScriptIdDiv, teleportStyle } from '../../util/script';
 import {
+  applyPersonaPlusBindings,
+  applyPresetPromptEnabledSnapshot,
+  buildContextBindingTarget,
+  composePersonaDescription,
+  deleteBindingGroup,
+  deleteContextBinding,
   extractBaseDescriptionFromComposed,
-  getBindingPlusThemePresets,
+  findContextBinding,
   findPersonaByAvatarId,
+  getBindingPlusThemePresets,
   getCurrentPersonaFromDOM,
-  loadBindingPlusTheme,
-  loadDefaultPresetPromptIds,
-  loadDefaultWorldbookEnabledEntryUids,
-  getPersonaDefaultEnabledTraitIds,
+  getDefaultPresetName,
   getPersonaActivationState,
+  getPersonaDefaultEnabledTraitIds,
   getPersonaListFromDOM,
+  getPlusBindingCatalog,
+  getPresetPromptStableId,
   getRuntimeContext,
   getRuntimeContextDebugInfo,
+  getWorldbookEntryCatalog,
+  loadBindingGroups,
+  loadBindingPlusTheme,
+  loadContextBindings,
+  loadDefaultPresetPromptIds,
+  loadDefaultWorldbookEnabledEntryUids,
   loadPersonaAdvancedConfig,
   loadPersonaBaseDescription,
   loadPersonaSnapshots,
   loadPersonaTraits,
+  mergeBindingGroupResources,
+  probePlusBindingInterfaces,
   recordPersonaSnapshot,
+  resetBindingPlusTheme,
+  resolveBindingPlusThemeTokens,
   restoreLastPersonaSnapshot,
   runCompatibilitySelfCheck,
+  saveBindingPlusTheme,
+  saveDefaultPresetPromptIds,
+  saveDefaultWorldbookEnabledEntryUids,
   savePersonaAdvancedConfig,
   savePersonaBaseDescription,
   savePersonaDefaultEnabledTraitIds,
   savePersonaTraits,
   selectPersonaInParentUI,
-  composePersonaDescription,
-  applyPresetPromptEnabledSnapshot,
-  applyPersonaPlusBindings,
-  buildContextBindingTarget,
-  deleteBindingGroup,
-  deleteContextBinding,
-  findContextBinding,
-  getDefaultPresetName,
-  getPlusBindingCatalog,
-  getPresetPromptStableId,
-  getWorldbookEntryCatalog,
-  loadBindingGroups,
-  loadContextBindings,
-  mergeBindingGroupResources,
-  probePlusBindingInterfaces,
-  resetBindingPlusTheme,
-  resolveBindingPlusThemeTokens,
   setDefaultPresetName,
-  saveBindingPlusTheme,
-  saveDefaultPresetPromptIds,
-  saveDefaultWorldbookEnabledEntryUids,
   summarizeContextBindingResources,
   upsertBindingGroup,
   upsertContextBinding,
 } from './handlers';
+import { injectStyles, styles } from './styles';
 import {
   BindingGroup,
   BindingPlusThemePreset,
@@ -81,7 +82,6 @@ import {
   PersonaRuntimeContext,
   PersonaTrait,
 } from './types';
-import { injectStyles, styles } from './styles';
 
 const PANEL_EVENT_NAMESPACE = '.persona-panel-events';
 let contextWatcherTimer: ReturnType<typeof setInterval> | null = null;
@@ -91,6 +91,8 @@ let lastCompatibilityReport: CompatibilityCheckReport | null = null;
 let lastPlusProbeReport: PersonaPlusProbeReport | null = null;
 let plusEventBridgeStarted = false;
 let lastObservedContext: PersonaRuntimeContext | null = null;
+let panelStyleDestroy: (() => void) | null = null;
+let $panelContainer: JQuery<HTMLDivElement> | null = null;
 let activeDetailPage: DetailPageKey = 'persona';
 let personaSearchKeyword = '';
 let activeBindingScope: 'chat' | 'character' = 'character';
@@ -209,7 +211,7 @@ const PLUS_EVENT_DEFINITIONS: Array<Pick<PersonaPlusEventState, 'key' | 'label' 
   },
 ];
 
-let plusEventStates: Record<string, PersonaPlusEventState> = createInitialPlusEventStates();
+const plusEventStates: Record<string, PersonaPlusEventState> = createInitialPlusEventStates();
 
 function escapeHtml(text: string): string {
   return text
@@ -2153,7 +2155,7 @@ function parsePersonaBatchImport(text: string): ImportedPersonaYamlPayload {
     throw new Error('请先粘贴 YAML 或 JSON 内容');
   }
 
-  const looksLikeJson = /^[\[{]/.test(normalizedText);
+  const looksLikeJson = /^[[{]/.test(normalizedText);
   if (looksLikeJson) {
     try {
       return parsePersonaJsonImport(normalizedText);
@@ -3601,11 +3603,13 @@ export function showPanel(): void {
   bindingPlusDrawerOpen = false;
   personaFolderDrawerOpen = false;
 
-  teleportStyle();
+  panelStyleDestroy?.();
+  panelStyleDestroy = teleportStyle().destroy;
 
-  const $container = createScriptIdDiv();
-  $container.html(createPanelHtml());
-  $('body', parentDoc).append($container);
+  $panelContainer?.remove();
+  $panelContainer = createScriptIdDiv();
+  $panelContainer.html(createPanelHtml());
+  $('body', parentDoc).append($panelContainer);
 
   bindPanelEvents();
   renderBindingPlusThemeSection();
@@ -3629,8 +3633,10 @@ export function hidePanel(): void {
 
   $(window.parent).off(PANEL_EVENT_NAMESPACE);
 
-  destroyScriptIdDiv();
-  deteleportStyle();
+  $panelContainer?.remove();
+  $panelContainer = null;
+  panelStyleDestroy?.();
+  panelStyleDestroy = null;
 
   if ($button.length) {
     $button.removeClass('active');
