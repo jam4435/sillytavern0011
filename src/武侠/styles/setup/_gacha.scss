@@ -1,0 +1,244 @@
+// =========================================
+// Setup Screen - 抽卡系统
+// =========================================
+
+.gacha-section {
+  margin-bottom: 1.5rem;
+
+  &.trait-gacha {
+    .gacha-pools {
+      grid-template-columns: repeat(3, 1fr);
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+      }
+    }
+  }
+}
+
+.gacha-pools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+
+  @media (max-width: 600px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 400px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gacha-pool {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  transition: all 0.3s ease;
+
+  &:hover:not(.disabled) {
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.04);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  &.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+
+    .gacha-btn {
+      cursor: not-allowed;
+    }
+  }
+
+  // 品阶颜色
+  &.rank-粗浅 {
+    border-left: 3px solid rgba(150, 150, 150, 0.5);
+  }
+
+  &.rank-传家 {
+    border-left: 3px solid rgba(100, 180, 100, 0.5);
+  }
+
+  &.rank-上乘 {
+    border-left: 3px solid rgba(100, 150, 220, 0.5);
+  }
+
+  &.rank-镇派 {
+    border-left: 3px solid rgba(160, 100, 200, 0.5);
+  }
+
+  &.rank-绝世 {
+    border-left: 3px solid rgba(220, 160, 60, 0.5);
+  }
+
+  &.rank-传说 {
+    border-left: 3px solid rgba(255, 100, 100, 0.5);
+  }
+
+  // 天赋抽卡池颜色
+  &.positive {
+    border-left: 3px solid rgba(80, 180, 80, 0.5);
+  }
+
+  &.negative {
+    border-left: 3px solid rgba(220, 80, 80, 0.5);
+  }
+
+  &.mixed {
+    border-left: 3px solid rgba(160, 120, 200, 0.5);
+  }
+
+  .pool-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .pool-rank {
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    font-weight: 500;
+
+    &.rank-粗浅 {
+      color: #a0a0a0;
+    }
+    &.rank-传家 {
+      color: #80c080;
+    }
+    &.rank-上乘 {
+      color: #80b0e0;
+    }
+    &.rank-镇派 {
+      color: #c080e0;
+    }
+    &.rank-绝世 {
+      color: #e0c050;
+    }
+    &.rank-传说 {
+      color: #ff8080;
+    }
+
+    &.positive {
+      color: #80d080;
+    }
+    &.negative {
+      color: #ff8080;
+    }
+    &.mixed {
+      color: #c0a0e0;
+    }
+  }
+
+  .pool-count {
+    font-size: 0.75rem;
+    color: var(--stone-500);
+  }
+
+  .pool-cost {
+    font-size: 0.85rem;
+    color: var(--stone-400);
+    margin-bottom: 0.75rem;
+
+    .cost-value {
+      font-weight: bold;
+      color: #ffd780;
+    }
+
+    .free-tag {
+      color: #80d080;
+      font-weight: bold;
+    }
+  }
+}
+
+.gacha-btn {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  background: linear-gradient(135deg, rgba(180, 130, 60, 0.25), rgba(140, 100, 40, 0.15));
+  border: 1px solid rgba(200, 160, 80, 0.4);
+  border-radius: 4px;
+  color: #ffd780;
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.5s ease;
+  }
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(200, 150, 80, 0.35), rgba(160, 120, 60, 0.25));
+    box-shadow: 0 0 20px rgba(200, 160, 80, 0.3);
+    transform: translateY(-1px);
+
+    &::before {
+      transform: translateX(100%);
+    }
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--stone-500);
+  }
+
+  // 天赋抽卡按钮特殊样式
+  &.positive-btn {
+    background: linear-gradient(135deg, rgba(80, 180, 80, 0.25), rgba(60, 140, 60, 0.15));
+    border-color: rgba(100, 200, 100, 0.4);
+    color: #80d080;
+
+    &:hover:not(:disabled) {
+      background: linear-gradient(135deg, rgba(100, 200, 100, 0.35), rgba(80, 160, 80, 0.25));
+      box-shadow: 0 0 20px rgba(80, 180, 80, 0.3);
+    }
+  }
+
+  &.negative-btn {
+    background: linear-gradient(135deg, rgba(220, 80, 80, 0.2), rgba(180, 60, 60, 0.1));
+    border-color: rgba(240, 100, 100, 0.4);
+    color: #ff8080;
+
+    &:hover:not(:disabled) {
+      background: linear-gradient(135deg, rgba(240, 100, 100, 0.3), rgba(200, 80, 80, 0.2));
+      box-shadow: 0 0 20px rgba(220, 80, 80, 0.3);
+    }
+  }
+
+  &.mixed-btn {
+    background: linear-gradient(135deg, rgba(160, 100, 200, 0.25), rgba(120, 80, 160, 0.15));
+    border-color: rgba(180, 120, 220, 0.4);
+    color: #c0a0e0;
+
+    &:hover:not(:disabled) {
+      background: linear-gradient(135deg, rgba(180, 120, 220, 0.35), rgba(140, 100, 180, 0.25));
+      box-shadow: 0 0 20px rgba(160, 100, 200, 0.3);
+    }
+  }
+}
+
+// 天赋抽卡池响应式
+.trait-pools {
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr !important;
+  }
+}

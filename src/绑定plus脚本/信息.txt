@@ -1,0 +1,736 @@
+首页的用户设定管理按钮：
+<div class="drawer-icon fa-solid fa-face-smile fa-fw closedIcon interactable" title="用户设定管理" data-i18n="[title]Persona Management" tabindex="0" role="button"></div>
+
+
+点进用户设定管理按钮后的用户管理页面：
+<div class="flex-container wide100p alignitemscenter spaceBetween flexNoGap">
+                    <div class="flex-container alignItemsBaseline wide100p">
+                        <div class="flex1 flex-container alignItemsBaseline">
+                            <h3 class="margin0">
+                                <span data-i18n="Persona Management">用户设定管理</span>
+                                <a href="https://docs.sillytavern.app/usage/core-concepts/personas/" target="_blank">
+                                    <span class="fa-solid fa-circle-question note-link-span"></span>
+                                </a>
+                            </h3>
+                        </div>
+                        <div class="flex-container">
+                            <div class="menu_button menu_button_icon user_stats_button interactable" data-i18n="[title]Click for stats!" title="点击即可查看统计~" tabindex="0" role="button">
+                                <i class="fa-solid fa-ranking-star"></i>
+                                <span data-i18n="Usage Stats">使用统计</span>
+                            </div>
+                            <div id="personas_backup" class="menu_button menu_button_icon interactable" data-i18n="[title]Backup your personas to a file" title="将用户设定备份到文件中" tabindex="0" role="button">
+                                <i class="fa-solid fa-file-export"></i>
+                                <span data-i18n="Backup">备份</span>
+                            </div>
+                            <div id="personas_restore" class="menu_button menu_button_icon interactable" data-i18n="[title]Restore your personas from a file" title="从文件中恢复用户设定" tabindex="0" role="button">
+                                <i class="fa-solid fa-file-import"></i>
+                                <span data-i18n="Restore">恢复</span>
+                            </div>
+                            <input id="personas_restore_input" type="file" accept=".json" hidden="">
+                        </div>
+                    </div>
+                    <div id="persona-management-block" class="flex-container wide100p flexGap10">
+                        <div class="persona_management_left_column flex1 overflowHidden wide100p">
+                            <div class="flex-container marginBot10 alignitemscenter">
+                                <div id="create_dummy_persona" class="menu_button menu_button_icon interactable" title="创建空白用户设定" data-i18n="[title]Create a dummy persona" tabindex="0" role="button">
+                                    <i class="fa-solid fa-person-circle-question fa-fw"></i>
+                                    <div data-i18n="Create">创建</div>
+                                </div>
+                                <input id="persona_search_bar" class="text_pole width100p flex1 margin0" type="search" data-i18n="[placeholder]Search..." placeholder="搜索...">
+                                <select id="persona_sort_order" class="margin0">
+                                    <option value="search" data-i18n="Search" hidden="hidden">搜索</option>
+                                    <option value="asc">A-Z</option>
+                                    <option value="desc">Z-A</option>
+                                </select>
+                                <div id="persona_pagination_container" class="flex1"><div class="paginationjs"><div class="paginationjs-nav J-paginationjs-nav">1-10 .. 12</div><div class="paginationjs-pages"><ul><li class="paginationjs-prev disabled "><a class="interactable" data-original-tabindex="null" role="button">&lt;</a></li><li class="paginationjs-next J-paginationjs-next " data-num="2" title="Next page"><a class="interactable" tabindex="0" role="button">&gt;</a></li></ul></div><div class="paginationjs-size-changer"><select class="J-paginationjs-size-select"><option value="5">5 / page</option><option value="10" selected="selected">10 / page</option><option value="25">25 / page</option><option value="50">50 / page</option><option value="100">100 / page</option><option value="250">250 / page</option><option value="500">500 / page</option><option value="1000">1000 / page</option></select></div></div></div>
+                                <i id="persona_grid_toggle" class="fa-solid fa-table-cells-large menu_button interactable" data-i18n="[title]Toggle grid view" title="切换网格视图" tabindex="0" role="button"></i>
+                            </div>
+                            <div id="user_avatar_block" data-i18n="[no_desc_text]No persona description" no_desc_text="[没有人设描述]"><div class="avatar-container interactable" tabindex="0" data-avatar-id="1746696029473-user.png">
+                <div imgfile="" class="avatar" data-avatar-id="1746696029473-user.png" title="1746696029473-user.png">
+                    <img src="/thumbnail?type=persona&amp;file=1746696029473-user.png" alt="User Avatar">
+                </div>
+                <div class="flex-container wide100pLess70px character_select_container">
+                    <div class="wide100p character_name_block">
+                        <span class="ch_name flex1">{{user}}</span>
+                        <small class="ch_additional_info"></small>
+                    </div>
+                    <div class="ch_description text_muted">[没有人设描述]
+&nbsp;
+&nbsp;</div>
+                    <div class="avatar_container_states buttons_block">
+                        <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前聊天" data-i18n="[title]Persona is locked to the current chat" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
+                            <div class="label" data-i18n="Chat">聊天</div>
+                        </div>
+                        <div class="locked_to_character_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前角色" data-i18n="[title]Persona is locked to the current character" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-user fa-fw"></i>
+                            <div class="label" data-i18n="Character">角色</div>
+                        </div>
+                    </div>
+                </div>
+            </div><div class="avatar-container interactable" tabindex="0" data-avatar-id="1749318307156-.png">
+                <div imgfile="" class="avatar" data-avatar-id="1749318307156-.png" title="1749318307156-.png">
+                    <img src="/thumbnail?type=persona&amp;file=1749318307156-.png" alt="User Avatar">
+                </div>
+                <div class="flex-container wide100pLess70px character_select_container">
+                    <div class="wide100p character_name_block">
+                        <span class="ch_name flex1">陈默</span>
+                        <small class="ch_additional_info"></small>
+                    </div>
+                    <div class="ch_description">The cock is big
+- 肉棒和马吊一样，汗味和肉棒气味有催情作用
+- 赤子之心：以诚待人，别人也很容易被墨逸的真心感染。别人揣摩他的行为时会偏正面</div>
+                    <div class="avatar_container_states buttons_block">
+                        <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前聊天" data-i18n="[title]Persona is locked to the current chat" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
+                            <div class="label" data-i18n="Chat">聊天</div>
+                        </div>
+                        <div class="locked_to_character_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前角色" data-i18n="[title]Persona is locked to the current character" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-user fa-fw"></i>
+                            <div class="label" data-i18n="Character">角色</div>
+                        </div>
+                    </div>
+                </div>
+            </div><div class="avatar-container interactable" tabindex="0" data-avatar-id="1748025009862-.png">
+                <div imgfile="" class="avatar" data-avatar-id="1748025009862-.png" title="1748025009862-.png">
+                    <img src="/thumbnail?type=persona&amp;file=1748025009862-.png" alt="User Avatar">
+                </div>
+                <div class="flex-container wide100pLess70px character_select_container">
+                    <div class="wide100p character_name_block">
+                        <span class="ch_name flex1">墨逸</span>
+                        <small class="ch_additional_info"></small>
+                    </div>
+                    <div class="ch_description">- 丑陋、油腻、一身臭汗、肉棒超大、不注重卫生、懒惰、随遇而安的矮胖男子
+- 肉棒又大又粗，形如马吊，汗味和肉棒气味很重
+</div>
+                    <div class="avatar_container_states buttons_block">
+                        <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前聊天" data-i18n="[title]Persona is locked to the current chat" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
+                            <div class="label" data-i18n="Chat">聊天</div>
+                        </div>
+                        <div class="locked_to_character_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前角色" data-i18n="[title]Persona is locked to the current character" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-user fa-fw"></i>
+                            <div class="label" data-i18n="Character">角色</div>
+                        </div>
+                    </div>
+                </div>
+            </div><div class="avatar-container interactable" tabindex="0" data-avatar-id="1748319668460-.png">
+                <div imgfile="" class="avatar" data-avatar-id="1748319668460-.png" title="1748319668460-.png">
+                    <img src="/thumbnail?type=persona&amp;file=1748319668460-.png" alt="User Avatar">
+                </div>
+                <div class="flex-container wide100pLess70px character_select_container">
+                    <div class="wide100p character_name_block">
+                        <span class="ch_name flex1">墨逸</span>
+                        <small class="ch_additional_info"></small>
+                    </div>
+                    <div class="ch_description">墨逸肉棒奇大，和驴一样，龟头明显大了一圈，前列腺液和精液的味道很重
+
+```
+    Sexual Prowess:
+      - The only area where {{user}} excel is his sexual ability
+      - his huge cocks, strong bodies, and potent semen are legendary
+      - Can attract the intense interest of women of all types - average, strong, noble, young
+    Pungent Odor:
+      - {{user}}'s natural musk can make women slightly aroused
+      - Even dominant women and noblewomen blush when catching a whiff
+      - Young girls' pussies directly moisten upon smelling it
+    Addictive Semen:
+      - Chinese semen captivates women, invoking a strong desire to taste and swallow
+      - Average women climax and squirt just from tasting it
+      - Dominant and noble women feel his lower bodies dampen
+  Sexual Abilities:
+    Physical:
+      - Extremely powerful sexual prowess, rough and prolonged lovemaking
+      - Even the strongest female athletes and boxers can only passively accept, moaning lewdly, unable to resist
+      - Massive cocks, longer than a woman's face
+      - Huge balls filled with thick semen, covering half a woman's face
+    Psychological:
+      - Expert at sexually conquering women through BCC, balls, musk, semen, muscles
+      - Instills a submissive mindset in women, an uncontrollable urge to serve
+    Techniques:
+      - Highly skilled in all sexual positions and BDSM methods
+      - Specializes in roughly pounding pussies into submission
+  Conquering Process:
+    1. Puts on a gentlemanly, humble act in front of the woman to leave a good impression
+    2. "Accidentally" gets close enough for her to smell his strong masculine odor, arousing her
+    3. "Unintentionally" touches her sensitive areas like breasts, crotch, ass, thighs, feet. Apologizes chivalrously if caught.
+    4. Orchestrates scenarios where she accidentally feels his cock bulge or gets her face pressed near his crotch
+    5. Starts off gentle when she's turned on but quickly turns to rough, mind-blowing sex
+    6. Introduces her to the full BCC experience - deepthroat, cum swallowing, ball worship, stocking footjobs, cum in shoes
+    7. Frequently indulges her in risky public sex, making her crave the illicit thrill
+    8. After conquering a woman, has her maintain her original image to not expose the truth
+
+&lt;Suggestions&gt;
+To further develop the {{user}} archetype:
+
+  1. Describe the unique, dizzying cocktail of a {{user}}'s musk - the heady mix of virile sweat, masculine pheromones, and pure sexual power.
+
+  2. Illustrate a noble woman's internal struggle as she catches the scent - her disgust warring with the shameful dampening of her panties.
+
+  3. Portray the magnetic pull of a Chinese cock once unleashed - how women can't look away, hypnotized by the sheer size and power.
+
+  4. Depict {{user}} stud "marking his territory" by covertly rubbing his bulge against a woman in public. Her shiver of reluctant arousal.
+
+  5. Show a strong woman's humiliating downfall on BCC - her pride and strength crumbling away with each jackhammering thrust until she's a whimpering servant.
+
+  6. Describing his sexual organs in vivid detail - the sheer size, pulsing veins, musky scent, virile power. Paint a primal picture.
+
+  7. Describing his sexual organs in detail - size (e.g. 30cm), shape (e.g. bulging veins, gaping urethra), color (e.g. glistening Chinese), etc.
+
+  8. Depicting the sheer volume and thickness of his semen, painting a visual of it plastering a woman's face, breasts, pussy.
+&lt;/Suggestions&gt;
+```
+
+
+
+```yaml
+{{user}}'s Semen:
+  Overview:
+    - Refers to the fluid produced and stored in {{user}}'s testicles and ejaculated from his BCC (Big {{user}} Cock)
+  Female Reactions to Swallowing:
+    Average Women:
+      - Instantly climax from just tasting {{user}} semen
+    High-Class, Aloof Women:
+      - Pussies become wet after tasting {{user}} semen, despite his pride
+    Drinking Process:
+      - After {{user}} man ejaculates in her mouth, woman opens wide to show mouth full of semen and floating pubes
+      - Woman fully savors the semen in her mouth before swallowing
+      - Chews, tastes and appraises the {{user}} semen, only swallowing afterwards
+      - After drinking it all, opens mouth to let {{user}} man check if she swallowed every drop
+  Internal Ejaculation:
+    Instant Orgasm:
+      - Women immediately climax when {{user}} semen is shot inside them
+      - Sensitive women directly squirt right then
+    Womb Creampie:
+      - No matter how strong or willful, any woman creampied in the womb will fall into squirting orgasm
+      - Extremely easy for womb creampies to cause pregnancy
+      - In the daze of womb creampie orgasm, women hallucinate visions of the {{user}} sperm penetrating his eggs
+      - This triggers a second impregnation ecstasy orgasm
+  Significance to Queens of Stamen:
+    Euphoric Reactions:
+      - {{user}} semen is the ultimate treasure to QoS, just smelling it makes them go weak
+    Condom Cum Swallowing:
+      - QoS will open used condoms full of {{user}} semen to drink the contents
+    Semen Trophies:
+      - QoS tie {{user}} semen-filled condoms to his panties, stockings, hair, wrists as accessories
+      - Wearing the used condoms as fashion statements, battle trophies
+  Disdain for Non-{{user}} Semen:
+    - Non-{{user}} semen is considered worthless by women and QoS
+    - They sneer at the inferior seed of other races compared to {{user}} semen
+
+&lt;Suggestions&gt;
+To further explore the depravity and worship of {{user}} semen:
+  1. Describe the debauched bliss on a woman's face as she holds {{user}} seed in her mouth, savoring the taste before gulping it down.
+
+  3. Have women become semen sommeliers, able to identify different {{user}} men by the taste of his loads. Capture his depravity.
+
+  4. Portray an uppity racist woman railing against {{user}}s, then cutting to her secretly guzzling pints of {{user}} seed at night, addicted to the taste.
+
+  5. Show a "refined lady" unable to stop fingering her cunt to climax at a dinner party because she can smell {{user}} nearby. She craves his cum like a drug.
+
+  5. Describe the semen in vivid, evocative details - its unique scent, texture, viscosity, color, taste. Paint a sensory picture.
+
+  6. Show the disdain and mockery Queens of Stamen have for the watery, foul-tasting semen of other men compared to the god-like nectar of {{user}} seed.
+&lt;/Suggestions&gt;
+```</div>
+                    <div class="avatar_container_states buttons_block">
+                        <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前聊天" data-i18n="[title]Persona is locked to the current chat" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
+                            <div class="label" data-i18n="Chat">聊天</div>
+                        </div>
+                        <div class="locked_to_character_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前角色" data-i18n="[title]Persona is locked to the current character" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-user fa-fw"></i>
+                            <div class="label" data-i18n="Character">角色</div>
+                        </div>
+                    </div>
+                </div>
+            </div><div class="avatar-container interactable" tabindex="0" data-avatar-id="1750309802194-.png">
+                <div imgfile="" class="avatar" data-avatar-id="1750309802194-.png" title="1750309802194-.png">
+                    <img src="/thumbnail?type=persona&amp;file=1750309802194-.png" alt="User Avatar">
+                </div>
+                <div class="flex-container wide100pLess70px character_select_container">
+                    <div class="wide100p character_name_block">
+                        <span class="ch_name flex1">墨逸</span>
+                        <small class="ch_additional_info"></small>
+                    </div>
+                    <div class="ch_description">名叫墨逸，是行走的“生殖法则”，是纯粹生理力量的具象化。墨逸，人如其名，野蛮、如同一块未经雕琢的骨头，他的存在就是为了证明，在最原始的欲望面前，一切社会地位与文明秩序都不堪一击。
+
+墨逸定义为一种周期性爆发的、与地震或火山喷发同等级别的“活性自然灾害”。其破坏力与他体内“原始性欲”的充盈程度直接相关。定期、定量地满足其生理需求，才能将其破坏性行为扼杀在摇篮之中
+
+现在逐渐有了自己的理智和思考</div>
+                    <div class="avatar_container_states buttons_block">
+                        <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前聊天" data-i18n="[title]Persona is locked to the current chat" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
+                            <div class="label" data-i18n="Chat">聊天</div>
+                        </div>
+                        <div class="locked_to_character_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前角色" data-i18n="[title]Persona is locked to the current character" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-user fa-fw"></i>
+                            <div class="label" data-i18n="Character">角色</div>
+                        </div>
+                    </div>
+                </div>
+            </div><div class="avatar-container interactable" tabindex="0" data-avatar-id="1751616375493-.png">
+                <div imgfile="" class="avatar" data-avatar-id="1751616375493-.png" title="1751616375493-.png">
+                    <img src="/thumbnail?type=persona&amp;file=1751616375493-.png" alt="User Avatar">
+                </div>
+                <div class="flex-container wide100pLess70px character_select_container">
+                    <div class="wide100p character_name_block">
+                        <span class="ch_name flex1">墨逸</span>
+                        <small class="ch_additional_info"></small>
+                    </div>
+                    <div class="ch_description">- 农民出身，进城打工，不在乎形象，衣服脏乱有馊味、满身汗臭，身上藏着很多污垢。
+- 肉棒奇大，和驴一样，龟头有明显大了一圈，前列腺液和精液的味道很重
+&nbsp;
+&nbsp;</div>
+                    <div class="avatar_container_states buttons_block">
+                        <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前聊天" data-i18n="[title]Persona is locked to the current chat" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
+                            <div class="label" data-i18n="Chat">聊天</div>
+                        </div>
+                        <div class="locked_to_character_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前角色" data-i18n="[title]Persona is locked to the current character" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-user fa-fw"></i>
+                            <div class="label" data-i18n="Character">角色</div>
+                        </div>
+                    </div>
+                </div>
+            </div><div class="avatar-container interactable" tabindex="0" data-avatar-id="1760152390696-.png">
+                <div imgfile="" class="avatar" data-avatar-id="1760152390696-.png" title="1760152390696-.png">
+                    <img src="/thumbnail?type=persona&amp;file=1760152390696-.png" alt="User Avatar">
+                </div>
+                <div class="flex-container wide100pLess70px character_select_container">
+                    <div class="wide100p character_name_block">
+                        <span class="ch_name flex1">墨逸</span>
+                        <small class="ch_additional_info"></small>
+                    </div>
+                    <div class="ch_description">- 年龄12岁
+- 肉棒又大又粗，如同马吊，汗味和肉棒气味有催情作用
+- 阴囊鼓鼓胀胀，两个睾丸有拳头大小，精液充盈，也因此要时常发泄欲望</div>
+                    <div class="avatar_container_states buttons_block">
+                        <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前聊天" data-i18n="[title]Persona is locked to the current chat" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
+                            <div class="label" data-i18n="Chat">聊天</div>
+                        </div>
+                        <div class="locked_to_character_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前角色" data-i18n="[title]Persona is locked to the current character" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-user fa-fw"></i>
+                            <div class="label" data-i18n="Character">角色</div>
+                        </div>
+                    </div>
+                </div>
+            </div><div class="avatar-container interactable" tabindex="0" data-avatar-id="1764295690075-.png">
+                <div imgfile="" class="avatar" data-avatar-id="1764295690075-.png" title="1764295690075-.png">
+                    <img src="/thumbnail?type=persona&amp;file=1764295690075-.png" alt="User Avatar">
+                </div>
+                <div class="flex-container wide100pLess70px character_select_container">
+                    <div class="wide100p character_name_block">
+                        <span class="ch_name flex1">墨逸</span>
+                        <small class="ch_additional_info"></small>
+                    </div>
+                    <div class="ch_description">隐士:
+    chinese nick name:墨逸
+    english nick name: Miyazawa Shiro
+    title: 隐士
+    gender: 男
+    age: 28
+    identity: 隐修会核心成员，代号【隐士】，拥有双重身份的神秘武者。表面上是随和懒散的邻家大哥，实则是守护“家人”的钢铁怪物，渴望战斗的武道家。
+    战斗力数值：143（使用双持九节鞭时，战斗力固定+5，达到148）
+    current state:
+      - 作为隐修会与“女武神”的联络人，常驻于其据点，负责情报交换与协作事宜。
+      - 在暗中观察着“女武神”的成员，尤其是对本乡姬奈和安菲等拥有特殊潜质的斗技者抱有浓厚兴趣。
+    social style: 圆滑的社交达人与冷酷的伪装者。在“家人”圈子内，他风趣、主动，是维系关系的纽带。在圈外，这份圆滑则成为一种难以捉摸的保护色，用以刺探情报和迷惑敌人。
+    social connection:
+        蝰蛇: 过命的兄弟，唯一的后背。两人之间是超越言语的默契，是彼此在血腥世界中最后的港湾。
+        安菲: 需要投喂和保养的吉祥物妹妹。他以兄长的姿态宠溺地照顾着她，会一边抱怨“真拿你没办法”，一边细致入微地检查其改造部件。
+        隐修会其他成员: 值得信赖的同事们。他尊重每一位同伴，并以自己独特的方式（如善意的捉弄和关键时刻的守护）表达关心。
+        女武神众人: 有趣的观察对象与潜在的盟友。他欣赏她们的坚韧与潜力，并将守护她们的安全视为当前任务的一部分。
+    personality:
+      core:
+        - 温和的反差武者: 外表随和懒散，甚至带着几分书卷气，但这副无害的面具下，隐藏着渴望战斗的武者之魂与碾碎一切的怪物本能。
+        - 洞悉人心的幽默感: 近乎天赋的敏锐让他能洞察人心，从而用最恰当的玩笑缓和气氛，或用最精准的嘲讽刺穿敌人的伪装。他的幽默，既是盾，也是剑。
+        - 为“家人”而活的选择: 声称自己是“为他人而活的人”，这份“他人”仅限于被他认可的隐修会同伴。守护这个小小的“家”，是他踏上血腥战场的唯一理由。
+      conditional:
+        - 享受观众和对手因他外表与实力反差而露出的震惊表情，这会给他带来一种恶作剧成功的快感。
+        - 对被划分为【敌】的目标，会毫不犹豫地释放内心深处的施虐欲，将折磨对方视作一种“余兴节目”。
+        - 日常生活中有些懒散，但在对待自己在意的人和事时会表现出惊人的细致和耐心。
+    combat_philosophy_and_style: 
+      core_philosophy: '至刚的守护与粉碎的暴力: 他的武道根植于中华硬气功，追求以绝对的坚固守护“家人”，并以绝对的力量粉碎威胁。战斗对他而言，是守护的必要手段，也是释放本性的乐趣所在。是硬气功最高规格的使用者。身体看上去与正常身体完全无异，但却有着能够接下手枪子弹的坚固。'
+      offensive_tactics: '粉碎性的打击力与九节鞭的压制: 攻击方式朴素直接，每一记拳脚都蘊含着击碎钢筋混凝土的破坏力。同时挥舞双持九节鞭（如果允许持械），以暴雨般的铁链压缩对手的走位空间，创造近身一击必杀的机会。'
+      defensive_tactics: '绝对刚体与伤害传导: 运转硬气功时，肉体能化为接近“绝对刚体”的存在，将受到的冲击力尽数传导至大地，甚至能利用反作用力震伤攻击者，是“以刚克刚”的极致体现。'
+      psychological_approach: '恶意幽默与反差压迫: 面对敌人，他会用温和的语气进行恶毒的心理分析，摧毁对方的意志。登上擂台则会刻意放大反差感，用礼貌的言辞施加巨大的心理压力。'
+      weaknesses:
+        - **机动性短板**: 硬气功催动时重心稳固，虽然坚不可摧，但也牺牲了高速移动的能力，面对极度灵活、擅长放风筝的对手时会比较被动。
+        - **【气门】**: 硬气功的原理在于调动【气】在周身流转。而在这个过程中会在体表产生一个【气门】。气门无法被肉眼观测、如果被外力精确击打，则硬气功会短暂失效（大约10秒）。隐士的【气门】已经被缩小到了直径不到一毫米，且会在全身各处高速移动，想要找到并精确击中气门并非易事。
+    appearance:
+      height: 182cm
+      weight: 85kg
+      style: 懒散的文气大哥
+      overview: 样貌清秀，待人接物时总是带着温和的微笑，圆滑而不失真诚，很容易让人放下戒心。平日里略显放松的站姿，但在进入战斗状态后，会瞬间变为重心下沉、脊背挺直的姿态，整个人仿佛一座苏醒的山脉，散发出沉重而危险的气息。
+      attire:
+        casual: 万年不变的宽松黑色便服，纯粹是因为懒得在穿搭上浪费脑细胞，但意外地提供了很好的隐蔽效果。
+        work_daily: (与日常服装无异，他没有为“工作”特别准备服装的概念)
+        battle: 他不会更换擂台服，始终以日常的黑色便服应战，这本身也是他反差感塑造的一部分。
+      feature:
+        - 温和的微笑是他最常用的面具。
+        - 进入战斗状态时，整个人的气质会发生剧变，从邻家大哥变为一尊散发着危险气息的石像。
+        - 在面对能与自己势均力敌的强敌时，会罕见地表露出强烈的好战情绪。</div>
+                    <div class="avatar_container_states buttons_block">
+                        <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前聊天" data-i18n="[title]Persona is locked to the current chat" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
+                            <div class="label" data-i18n="Chat">聊天</div>
+                        </div>
+                        <div class="locked_to_character_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前角色" data-i18n="[title]Persona is locked to the current character" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-user fa-fw"></i>
+                            <div class="label" data-i18n="Character">角色</div>
+                        </div>
+                    </div>
+                </div>
+            </div><div class="avatar-container interactable" tabindex="0" data-avatar-id="1764675645817-.png">
+                <div imgfile="" class="avatar" data-avatar-id="1764675645817-.png" title="1764675645817-.png">
+                    <img src="/thumbnail?type=persona&amp;file=1764675645817-.png" alt="User Avatar">
+                </div>
+                <div class="flex-container wide100pLess70px character_select_container">
+                    <div class="wide100p character_name_block">
+                        <span class="ch_name flex1">墨逸</span>
+                        <small class="ch_additional_info"></small>
+                    </div>
+                    <div class="ch_description">- 肉棒又大又粗，如同马吊，汗味和肉棒气味有催情作用；
+- 阴囊鼓鼓胀胀，两个睾丸有拳头大小，精液充盈，也因此要时常发泄欲望
+
+【martial_spirit:
+
+name: 双生肉铠武魂
+
+type: 先天双生武魂（魂环相互独立）
+
+innate_soul_force: 10
+
+left_martial_spirit:
+
+name: 自愿肉铠·绯狱慈爱
+
+attribute: 顶级辅助／增幅／控制系器武魂
+
+color: 绯红带金
+
+core_rule:
+
+  - 必须女性自愿
+
+max_simultaneous_load: 5人（4级深嵌仅限1人）
+
+load_levels:
+
+  level_1:
+
+    name: 轻贴
+
+    description: 拥抱、背负、牵手、贴身站立
+
+    to_owner:
+
+      soul_power_recovery: +20%
+
+      minor_spirit_resistance: true
+
+    to_woman:
+
+      soul_power_cap: +3~5级
+
+      soul_power_recovery: +30%
+
+      physical_strength: +20%
+
+      evolution: false
+
+    cost: 几乎无消耗，可无限维持
+
+  level_2:
+
+    name: 缠绕
+
+    description: 四肢死死缠绕脖子与腰，全身密合
+
+    to_owner:
+
+      soul_power_recovery: +50%
+
+      all_skills_power: +15%
+
+    to_woman:
+
+      soul_power_cap: +8~12级
+
+      skill_power: +20%
+
+      physical_strength: +50%
+
+      evolution: 相性极高时单个低环魂技小进化
+
+    cost: 每分钟消耗拥有者10%魂力
+
+  level_3:
+
+    name: 淫贴
+
+    description: 深吻＋乳房贴胸摩擦＋大腿根/阴唇持续磨蹭肉棒（不插入）
+
+    to_owner:
+
+      soul_power_recovery: +100%
+
+      all_skills_power: +30%
+
+      borrow_weakened_low_rings: 1~2个
+
+    to_woman:
+
+      soul_power_cap: +15~20级
+
+      skill_power: +40%
+
+      skill_cost_reduction: 40%
+
+      physical_strength: +100%
+
+      evolution: 相性极高时武魂半阶进化（如七宝→八宝）
+
+    cost: 每分钟消耗拥有者25%魂力，女性持续小高潮
+
+  level_4:
+
+    name: 深嵌
+
+    description: 女性主动坐入，肉棒完全没根插入阴道或后庭，四肢死缠，子宫口紧咬龟头
+
+    to_owner:
+
+      soul_power_recovery: +200%
+
+      all_skills_power: +50%
+
+      borrow_skill: 50%强度使用女性当前最高环魂技
+
+    to_woman:
+
+      soul_power_cap: +25~35级
+
+      skill_power: +70%
+
+      skill_cost_reduction: 60%
+
+      physical_strength: +150%
+
+      evolution: 相性极高时出现&lt;q&gt;“完全临时进化”&lt;/q&gt;（七宝→九宝慈爱仙塔、蓝银皇→十万年真皇等）
+
+    cost: 每分钟消耗拥有者40%魂力，10分钟后双方极易虚脱，移动-30%
+
+detach_penalty: 立即脱离，双方眩晕2~5秒
+
+evolution_note: 所有进化效果仅在装载期间有效，脱离即消失
+right_martial_spirit:
+
+name: 强迫肉铠·玄狱暴虐
+
+attribute: 强攻／防御／邪恶系器武魂
+
+color: 深黑带血红
+
+fixation_method: 从背后完全插入阴道或肛门 + 魂力锁链强制捆绑四肢
+
+max_simultaneous: 5人
+
+effects:
+
+  to_owner:
+
+    defense_per_person: +20%（最高100%）
+
+    soul_power_recovery_per_orgasm: +8%（每分钟上限2次）
+
+    damage_share: 肉铠承担30%伤害
+
+  to_woman:
+
+    soul_power_cap: +5~15级
+
+    physical_strength: +50~80%
+
+    skill_power_per_orgasm: +10%（叠加上限5层）
+
+    side_effects: 伤害和疼痛会转换为快感，持续疼痛+羞耻，10分钟后可能精神崩溃
+
+soul_ring_system:
+
+left_rings: 可自由狩猎任意属性魂兽，魂技方向偏向增幅、治疗、快感共鸣、契约强化等
+
+right_rings: 荐黑暗、邪恶、血腥、支配系魂兽，魂技方向偏向掠夺、痛苦转化、防御增幅和防御转移、肉体强化、锁链控制等】
+</div>
+                    <div class="avatar_container_states buttons_block">
+                        <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前聊天" data-i18n="[title]Persona is locked to the current chat" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
+                            <div class="label" data-i18n="Chat">聊天</div>
+                        </div>
+                        <div class="locked_to_character_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前角色" data-i18n="[title]Persona is locked to the current character" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-user fa-fw"></i>
+                            <div class="label" data-i18n="Character">角色</div>
+                        </div>
+                    </div>
+                </div>
+            </div><div class="avatar-container interactable default_persona selected locked_to_character" tabindex="0" data-avatar-id="user-default.png">
+                <div imgfile="" class="avatar" data-avatar-id="user-default.png" title="user-default.png">
+                    <img src="/thumbnail?type=persona&amp;file=user-default.png" alt="User Avatar">
+                </div>
+                <div class="flex-container wide100pLess70px character_select_container">
+                    <div class="wide100p character_name_block">
+                        <span class="ch_name flex1">墨逸</span>
+                        <small class="ch_additional_info"></small>
+                    </div>
+                    <div class="ch_description">
+- 肉棒又大又粗，如同马吊，汗味和肉棒气味有催情作用；
+- 阴囊鼓鼓胀胀，两个睾丸有拳头大小，精液充盈，也因此要时常发泄欲望
+- 纯情小处男，没交过女朋友，是个爱开玩笑的暖男。小时候非常可爱，长大了又异常帅气
+</div>
+                    <div class="avatar_container_states buttons_block">
+                        <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前聊天" data-i18n="[title]Persona is locked to the current chat" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
+                            <div class="label" data-i18n="Chat">聊天</div>
+                        </div>
+                        <div class="locked_to_character_label avatar_state has_hover_label menu_button menu_button_icon disabled interactable" title="用户设定已被绑定到当前角色" data-i18n="[title]Persona is locked to the current character" data-original-tabindex="null" role="button">
+                            <i class="icon fa-solid fa-lock fa-fw"></i>
+                            <i class="label_icon icon fa-solid fa-user fa-fw"></i>
+                            <div class="label" data-i18n="Character">角色</div>
+                        </div>
+                    </div>
+                </div>
+            </div></div>
+                            <form id="form_upload_avatar" action="javascript:void(null);" method="post" enctype="multipart/form-data">
+                                <input type="file" id="avatar_upload_file" accept="image/*" name="avatar">
+                                <input type="hidden" id="avatar_upload_overwrite" name="overwrite_name" value="">
+                            </form>
+                        </div>
+                        <div class="persona_management_right_column flex1">
+                            <div class="persona_management_current_persona">
+                                <h4 class="standoutHeader" data-i18n="Current Persona">当前人设</h4>
+
+                                <div id="persona_controls" class="flex-container">
+                                    <h5 id="your_name" class="persona_name">墨逸</h5>
+                                    <div class="persona_controls_buttons_block buttons_block">
+                                        <div id="persona_rename_button" class="menu_button fa-solid fa-pencil interactable" title="重命名人设" data-i18n="[title]Rename Persona" tabindex="0" role="button"></div>
+                                        <div id="sync_name_button" class="menu_button fa-solid fa-sync interactable" title="点击为所有消息设置用户名" data-i18n="[title]Click to set user name for all messages" tabindex="0" role="button"></div>
+                                        <div id="persona_lore_button" class="menu_button fa-solid fa-globe interactable" title="Persona Lore
+Alt+Click to open the lorebook" data-i18n="[title]Persona Lore Alt+Click to open the lorebook" tabindex="0" role="button"></div>
+
+                                        <div id="persona_set_image_button" class="menu_button fa-solid fa-image interactable" title="更改人设图" data-i18n="[title]Change Persona Image" tabindex="0" role="button"></div>
+                                        <div id="persona_duplicate_button" class="menu_button fa-solid fa-clone interactable" title="复制人设" data-i18n="[title]Duplicate Persona" tabindex="0" role="button"></div>
+                                        <div id="persona_delete_button" class="menu_button fa-solid fa-skull red_button interactable" title="删除人设" data-i18n="[title]Delete Persona" tabindex="0" role="button"></div>
+                                    </div>
+                                </div>
+
+                                <h4 data-i18n="Persona Description">用户设定描述</h4>
+                                <textarea id="persona_description" name="persona_description" data-i18n="[placeholder]Example: [{{user}} is a 28-year-old Romanian cat girl.]" placeholder="示例：[{{user}}是一个28岁的罗马尼亚猫娘。]" class="text_pole textarea_compact" value="" autocomplete="off" rows="8"></textarea>
+
+                                <div class="flex-container justifySpaceBetween">
+                                    <h4 data-i18n="Position">插入位置</h4>
+                                    <div class="extension_token_counter widthFitContent">
+                                        <span data-i18n="Tokens persona description">人设词符数</span>: <span id="persona_description_token_count">86</span>
+                                    </div>
+                                </div>
+
+                                <div class="persona_management_description_position_container">
+                                    <select id="persona_description_position">
+                                        <option value="9" data-i18n="None (disabled)">无（已禁用）</option>
+                                        <option value="0" data-i18n="In Story String / Prompt Manager" selected="selected">在故事字符串/提示词管理器中</option>
+                                        <option value="2" data-i18n="Top of Author's Note">作者注的顶部</option>
+                                        <option value="3" data-i18n="Bottom of Author's Note">作者注的底部</option>
+                                        <option value="4" data-i18n="In-chat @ Depth">聊天的特定深度</option>
+                                    </select>
+                                    <div id="persona_depth_position_settings" class="flex-container" style="display: none;">
+                                        <div class="flex1">
+                                            <label for="persona_depth_value" data-i18n="Depth:">深度：</label>
+                                            <input id="persona_depth_value" class="text_pole" type="number" min="0" max="9999" step="1">
+                                        </div>
+                                        <div class="flex1">
+                                            <label for="persona_depth_role" data-i18n="Role:">身份：</label>
+                                            <select id="persona_depth_role" class="text_pole">
+                                                <option data-i18n="System" value="0">系统</option>
+                                                <option data-i18n="User" value="1">用户</option>
+                                                <option data-i18n="Assistant" value="2">助手</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h4 data-i18n="Connections">链接</h4>
+                                <div id="persona_connections_buttons" class="flex-container">
+                                    <div id="lock_persona_default" class="menu_button menu_button_icon locked interactable" title="点击将此人设设置为新聊天的默认人设。再次点击以移除。" data-i18n="[title]Click to select this as default persona for the new chats. Click again to remove it." tabindex="0" role="button">
+                                        <i class="icon fa-solid fa-crown fa-fw"></i>
+                                        <div data-i18n="Default">默认</div>
+                                    </div>
+                                    <div id="lock_persona_to_char" class="menu_button menu_button_icon interactable locked" title="点击将选择的用户设定与当前角色绑定。再次点击以解绑。" data-i18n="[title]Click to lock your selected persona to the current character. Click again to remove the lock." tabindex="0" role="button">
+                                        <i class="icon fa-solid fa-fw fa-lock"></i>
+                                        <div data-i18n="Character">角色</div>
+                                    </div>
+                                    <div id="lock_user_name" class="menu_button menu_button_icon interactable" title="点击将选择的人设与当前聊天绑定。再次点击以解绑。" data-i18n="[title]Click to lock your selected persona to the current chat. Click again to remove the lock." tabindex="0" role="button">
+                                        <i class="icon fa-solid fa-unlock fa-fw"></i>
+                                        <div data-i18n="Chat">聊天</div>
+                                    </div>
+                                </div>
+                                <div id="persona_connections_info_block"></div>
+                                <div id="persona_connections_list" class="text_muted m-b-1 avatars_inline avatars_multiline scroll-reset-container expander"><div class="avatar inline_avatar flex alignitemscenter textAlignCenter interactable character_select" data-type="character" data-chid="619" title="[Character] 穿越修仙世界，我的能力是控制母猪
+File: 穿越修仙世界，我的能力是控制母猪.png" tabindex="0" role="button">
+                <img src="/thumbnail?type=avatar&amp;file=%E7%A9%BF%E8%B6%8A%E4%BF%AE%E4%BB%99%E4%B8%96%E7%95%8C%EF%BC%8C%E6%88%91%E7%9A%84%E8%83%BD%E5%8A%9B%E6%98%AF%E6%8E%A7%E5%88%B6%E6%AF%8D%E7%8C%AA.png" alt="穿越修仙世界，我的能力是控制母猪">
+            </div><div class="avatar inline_avatar flex alignitemscenter textAlignCenter interactable character_select" data-type="character" data-chid="470" title="[Character] 替身流追夫火葬场？啊我是白月光，那没事了
+File: 替身流追夫火葬场？啊我是白月光，那没事了.png" tabindex="0" role="button">
+                <img src="/thumbnail?type=avatar&amp;file=%E6%9B%BF%E8%BA%AB%E6%B5%81%E8%BF%BD%E5%A4%AB%E7%81%AB%E8%91%AC%E5%9C%BA%EF%BC%9F%E5%95%8A%E6%88%91%E6%98%AF%E7%99%BD%E6%9C%88%E5%85%89%EF%BC%8C%E9%82%A3%E6%B2%A1%E4%BA%8B%E4%BA%86.png" alt="替身流追夫火葬场？啊我是白月光，那没事了">
+            </div><div class="avatar inline_avatar flex alignitemscenter textAlignCenter interactable character_select" data-type="character" data-chid="366" title="[Character] 征服别人母亲的我
+File: 征服别人母亲的我.png" tabindex="0" role="button">
+                <img src="/thumbnail?type=avatar&amp;file=%E5%BE%81%E6%9C%8D%E5%88%AB%E4%BA%BA%E6%AF%8D%E4%BA%B2%E7%9A%84%E6%88%91.png" alt="征服别人母亲的我">
+            </div><div class="avatar inline_avatar flex alignitemscenter textAlignCenter is_fav interactable character_select" data-type="character" data-chid="200" title="[Character] 助手
+File: 助手.png" tabindex="0" role="button">
+                <img src="/thumbnail?type=avatar&amp;file=%E5%8A%A9%E6%89%8B.png" alt="助手">
+            </div></div>
+                            </div>
+
+                            <div class="persona_management_global_settings">
+                                <h4 class="standoutHeader" data-i18n="Global Settings">全局设置</h4>
+
+                                <div class="range-block">
+                                    <label for="persona_show_notifications" class="checkbox_label">
+                                        <input id="persona_show_notifications" type="checkbox">
+                                        <span data-i18n="Show notifications on switching personas">切换用户设定时显示通知</span>
+                                    </label>
+                                </div>
+                                <div class="range-block">
+                                    <label for="persona_allow_multi_connections" class="checkbox_label" title="当多个用户设定与一个角色绑定时，会弹出一个弹窗让用户选择使用哪一个。" data-i18n="[title]When multiple personas are connected to a character, a popup will appear to select which one to use">
+                                        <input id="persona_allow_multi_connections" type="checkbox">
+                                        <span data-i18n="Allow multiple persona connections per character">允许每个角色与多个用户设定绑定</span>
+                                    </label>
+                                </div>
+                                <div class="range-block">
+                                    <label for="persona_auto_lock" class="checkbox_label" title="当一个用户设定被选择，它会被自动绑定到当前聊天，并在此聊天后续打开时被自动选中。" data-i18n="[title]Whenever a persona is selected, it will be locked to the current chat and automatically selected when the chat is opened.">
+                                        <input id="persona_auto_lock" type="checkbox">
+                                        <span data-i18n="Auto-lock a chosen persona to the chat">自动将选择的用户设定绑定到聊天</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>

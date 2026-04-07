@@ -1,0 +1,43 @@
+// =========================================
+// 墨剑录 - 主样式入口
+// =========================================
+//
+// 样式模块说明：
+// - variables.scss: 颜色、字体、尺寸等变量定义
+// - _reset.scss: CSS 重置和基础样式
+// - _layout.scss: 布局容器和背景
+// - _navigation.scss: 侧边栏导航
+// - _header.scss: 头部区域
+// - _chat.scss: 聊天界面
+// - _modal.scss: 模态框
+// - _panels.scss: 游戏面板（角色、物品栏等）
+// - _events.scss: 事件面板
+// - _screens.scss: 开始/标题屏幕
+// - _setup.scss: 设置屏幕/表单
+//
+// =========================================
+
+// 变量定义（必须最先导入）
+@import 'variables';
+
+// 基础样式
+@import 'reset';
+
+// 布局
+@import 'layout';
+
+// 组件
+@import 'navigation';
+@import 'header';
+@import 'chat';
+@import 'modal';
+@import 'panels';
+@import 'events';
+
+// 页面
+@import 'screens';
+@import 'setup/index';
+@import 'settings';
+
+// 通用组件
+@import 'toast';

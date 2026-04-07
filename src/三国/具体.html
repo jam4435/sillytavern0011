@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>魔幻三国RPG - 状态面板 (动态加载版)</title>
+    <style>
+        /* 引入两款新的艺术字体：ZCOOL KuaiLe (标题毛笔字) 和 Ma Shan Zheng (正文手写楷体) */
+		@import url('https://fonts.googleapis.com/css2?family=Long+Cang&family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;700&family=ZCOOL+KuaiLe&family=Zhi+Mang+Xing&display=swap');
+		:root {
+			/* 移除所有旧变量，换成一套全新的“水墨风”变量 */
+			--bg-color: #0a0b0d; /* 背景色保持不变 */
+			--container-bg: #1a1d23;
+			
+			/* --- 全新的水墨风色板 --- */
+			--ink-text-main: #3a2e24;      /* 主文字颜色 - 像浓墨 */
+			--ink-text-secondary: #6b5a4b; /* 次要文字颜色 - 像淡墨 */
+			--ink-accent: #8c3b32;         /* 强调色 - 像印泥的暗红色 */
+			--ink-border: rgba(58, 46, 36, 0.4); /* 边框颜色 - 淡淡的墨迹 */
+
+			/* 统一将旧变量指向新变量，或者在后续代码中直接使用新变量 */
+			--text-primary: var(--ink-text-main);
+			--text-secondary: var(--ink-text-secondary);
+			--accent-color: var(--ink-accent);
+			--border-color: var(--ink-border);
+
+			/* 卡片背景我们不再需要了，因为它是卷轴图片 */
+			--card-bg: transparent; 
+		}
+
+        * {
+            box-sizing: border-box;
+        }
+
+		body {
+			/* 将默认字体改为手写楷体 */
+			font-family: 'Ma Shan Zheng', serif;
+			font-weight: 600; /* 加粗一点让手写体更清晰 */
+			background: linear-gradient(135deg, #0a0b0d 0%, #1a1d23 50%, #0f1217 100%);
+			background-attachment: fixed;
+			color: var(--text-primary);
+			margin: 0;
+			padding: 20px;
+			display: flex;
+			justify-content: center;
+			align-items: flex-start;
+			min-height: 100vh;
+			position: relative;
+			overflow-x: hidden;
+		}
+
+		/* 这是推荐使用的版本，带有一个半透明的黑色遮罩，能更好地突出前景UI */
+		body::before {
+			content: '';
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			
+			/* 使用 background 属性叠加背景层 */
+			background: 
+				/* 第1层：半透明黑色遮罩 (0.6代表60%不透明度，您可以根据喜好调整) */
+				linear-gradient(rgba(10, 11, 13, 0.6), rgba(10, 11, 13, 0.6)),
+				/* 第2层：您的水墨画背景图片 (粘贴在这里！) */
+				url('https://raw.githubusercontent.com/jam4435/my-image-hosting/main/三国/%E6%B0%B4%E5%A2%A8%E8%83%8C%E6%99%AF.webp');
+
+			background-size: cover;          /* 让图片铺满整个屏幕 */
+			background-position: center;     /* 让图片居中显示 */
+			background-repeat: no-repeat;    /* 图片不重复 */
+			background-attachment: fixed;    /* 固定背景，滚动时不动 */
+
+			pointer-events: none;
+			z-index: -1;
+		}
+
+        .status-panel {
+            width: 100%;
+            max-width: 1000px;
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow-primary);
+            position: relative;
+        }
+
+        .status-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+            opacity: 0.8;
+        }
+		
+		/* --- ↓↓↓ 把这段代码加在这里 ↓↓↓ --- */
+        .tabs {
+            display: flex;
+            /* backdrop-filter: blur(10px); */ /* 移除冲突属性 */
+            border-bottom: 2px solid var(--accent-color);
+            position: relative;
+        }
+        /* --- ↑↑↑ 代码加在这里 ↑↑↑ --- */
+
+
+		/* --- 全新的横向卷轴导航栏样式 --- */
+
+		/* 1. 整体容器：使用单个卷轴图片作为背景 */
+		.tabs {
+			display: flex;
+			justify-content: space-around; /* 将文字均匀分布 */
+			align-items: center;       /* 垂直居中 */
+			width: 100%;
+			max-width: 800px; /* 根据图片比例调整一个最大宽度 */
+			height: 80px;              /* 根据图片高度调整 */
+			margin: 10px auto;         /* 居中并增加上下边距 */
+			padding: 0 80px;           /* 在卷轴两端留出空白，避免文字压到轴头 */
+			
+			background: url('https://raw.githubusercontent.com/jam4435/my-image-hosting/main/三国/横轴2.webp') no-repeat center center;
+			background-size: 100% 100%; /* 强制拉伸以填满容器 */
+
+			border-bottom: none; /* 移除旧的边框 */
+		}
+
+		/* 2. 禁用所有::before伪元素 */
+		.tabs::before,
+		.tab::before {
+			display: none;
+		}
+
+		/* 3. 单个标签页：现在只是纯文本容器 */
+		.tab {
+			flex: 1;
+			text-align: center;
+			cursor: pointer;
+			font-size: 1.3em;
+			color: #f5e6c8; /* 更换为明亮的米白色 */
+			font-family: 'Ma Shan Zheng', serif;
+			font-weight: 700;
+			transition: all 0.3s ease;
+			text-shadow: 0 0 3px rgba(255, 255, 255, 0.4); /* 添加浅色光晕以增强可读性 */
+			
+			/* 移除所有旧的边框和背景样式 */
+			background: none;
+			border: none;
+			height: auto;
+		}
+
+		/* 4. 激活状态的标签页 */
+		.tab.active {
+			color: #fff; /* 激活状态使用最亮的白色以保证清晰度 */
+			transform: scale(1.1);
+			text-shadow: 0 0 8px var(--ink-accent); /* 使用主题红色作为光晕来标识状态 */
+		}
+
+		/* 5. 鼠标悬停在未激活的标签页上 */
+		.tab:hover:not(.active) {
+			color: #fff; /* 悬停时变为纯白色以示区分 */
+			transform: scale(1.05);
+		}
+
+        .content-panel {
+            display: none;
+            padding: 35px;
+            animation: fadeInUp 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .content-panel.active {
+            display: block;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+		.card {
+			/* 移除旧的背景、边框和阴影，为新的卷轴样式做准备 */
+			background: transparent; /* 必须设为透明，让border-image的中间部分填充进来 */
+			position: relative;
+			transition: all 0.3s ease;
+			
+			/* --- 核心：使用 border-image 绘制卷轴 --- */
+			
+			/* 1. 定义一个边框区域，图片的各个部分将会被绘制在这里 */
+			border-style: solid;
+			border-width: 35px 120px; /* 上下边框35px，左右边框120px（这是卷轴头的宽度） */
+
+			/* 2. 关键！指定用哪张图片以及如何“切割”和应用它 */
+			border-image-source: url('https://raw.githubusercontent.com/jam4435/my-image-hosting/main/三国/%E5%8D%B7%E8%BD%B43.webp');
+			border-image-slice: 50 130 50 130 fill; /* 从图片边缘向内切割。fill是让图片中间部分填充背景 */
+			border-image-repeat: stretch; /* 拉伸图片的边缘来填充边框区域 */
+
+			/* 调整内部内容的间距，以适应新的“边框” */
+			padding: 20px 40px; 
+		}
+
+		/* 卷轴样式不需要左边的金色竖线了，所以我们直接把这个伪元素清空 */
+		.card::before {
+			display: none; 
+		}
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-primary), var(--glow-accent);
+            border-color: rgba(212, 175, 55, 0.5);
+        }
+
+		.card h3 {
+			margin-top: 0;
+			margin-bottom: 20px;
+			color: var(--text-primary); /* 标题颜色使用主墨色 */
+			font-size: 1.8em; /* 把毛笔字标题放大一点更有气势 */
+			border-bottom: 2px solid var(--ink-border); /* 细细的墨迹下划线 */
+			padding-bottom: 15px;
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			font-family: 'ZCOOL KuaiLe', cursive; /* 应用毛笔字体 */
+			font-weight: normal; /* 毛笔字不需要额外加粗 */
+		}
+
+		/* 禁用原来的星形图标 */
+		.card h3::before {
+			display: none;
+		}
+
+		/* --- 新增：用于竖向标题布局的样式 --- */
+		.card.vertical-layout {
+			display: flex;
+			align-items: stretch; /* 保持stretch，让内容区从顶部开始对齐 */
+			gap: 10px; /* 进一步减小间距 */
+			/* 核心修复：覆盖.card的默认左右内边距，为布局腾出空间 */
+			padding-left: 0px;  /* 极限减少左边距 */
+			padding-right: 10px; /* 进一步增加右边距，让内容区更宽 */
+		}
+
+		.card.vertical-layout > h3 {
+			writing-mode: vertical-rl;
+			text-orientation: mixed;
+			white-space: nowrap;
+			flex-shrink: 0;
+			
+			/* Override existing .card h3 styles */
+			font-family: 'Ma Shan Zheng', cursive; /* 改回马善政楷体 */
+			margin: auto 0; /* 核心修复：让标题在垂直方向上自动居中 */
+			border-bottom: none;
+			padding-bottom: 0;
+			padding-left: 0;
+			padding-right: 10px; /* 标题和内容的间距 */
+		}
+
+		.card.vertical-layout > div {
+			flex-grow: 1;
+			position: relative; /* 为内部绝对定位的按钮提供容器 */
+		}
+
+		#world-state-list {
+			max-height: 300px; /* 与人物关系列表高度一致 */
+			overflow-y: auto;  /* 允许内容滚动 */
+			padding-right: 10px; /* 为滚动条留出空间 */
+		}
+
+		#skills-list-container {
+			max-height: 300px; /* 设置一个最大高度 */
+			overflow-y: auto;  /* 内容超出时显示滑动条 */
+			padding-right: 10px; /* 为滑动条留出空间 */
+		}
+
+		.seal-button {
+			position: absolute;
+			top: -15px; /* 调整位置，不挤占内容空间 */
+			right: -5px;
+			width: 50px;
+			height: 50px;
+			cursor: pointer;
+			transition: transform 0.3s ease, filter 0.3s ease;
+			z-index: 10;
+		}
+		.seal-button:hover {
+			transform: scale(1.1) rotate(10deg);
+			filter: brightness(1.2);
+		}
+
+		.card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid rgba(212, 175, 55, 0.3);
+            padding-bottom: 12px;
+        }
+
+        .card-header h3 {
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        .card-header .action-btn {
+            margin-top: 0;
+            float: none;
+        }
+		.stat-item {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 12px;
+			font-size: 1.1em; /* 稍微放大正文，配合新字体 */
+			padding: 12px 0;
+			
+			/* 移除所有背景、边框和效果，只留一条底线，像是在纸上画的分割线 */
+			background: none;
+			border-radius: 0;
+			border-left: none;
+			border-bottom: 1px solid var(--ink-border);
+			transition: all 0.3s ease;
+		}
+
+		/* 移除鼠标悬停效果，或者改成更朴素的效果 */
+		.stat-item:hover {
+			background: rgba(82, 62, 48, 0.05); /* 悬停时一层极淡的墨色 */
+			border-bottom-color: var(--ink-accent);
+			transform: none; /* 移除位移 */
+		}
+
+		.stat-label {
+			color: var(--text-secondary);
+			font-weight: normal; /* 使用字体的默认粗细 */
+		}
+
+		/* 移除数值的背景框 */
+		.stat-value {
+			font-weight: bold;
+			color: var(--text-primary);
+			padding: 0;
+			background: none;
+			border-radius: 0;
+		}
+        .list-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(74, 77, 85, 0.3);
+            background: rgba(0, 0, 0, 0.1);
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .list-item:hover {
+            background: rgba(212, 175, 55, 0.05);
+            border-left-color: var(--accent-color);
+            transform: translateX(5px);
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 16px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.3s ease;
+        }
+
+        th {
+            color: var(--accent-color);
+            background: rgba(212, 175, 55, 0.1);
+            font-weight: 700;
+        }
+
+        tr:hover td {
+            background: rgba(212, 175, 55, 0.05);
+        }
+
+        .character-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-secondary);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .character-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--accent-color), rgba(212, 175, 55, 0.3));
+        }
+
+        .character-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-primary);
+            border-color: rgba(212, 175, 55, 0.4);
+        }
+
+        .character-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .character-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .character-relation {
+            font-style: italic;
+            color: var(--accent-color);
+            background: rgba(212, 175, 55, 0.1);
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .character-intimacy {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .character-description {
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+
+        .character-details {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            padding: 8px 0 12px 0;
+            border-bottom: 1px solid rgba(74, 77, 85, 0.3);
+            margin-bottom: 12px;
+            background: rgba(0, 0, 0, 0.1);
+            padding: 12px;
+            border-radius: 6px;
+        }
+
+        .character-details p {
+            margin: 6px 0;
+        }
+
+        .character-details p strong {
+            color: var(--text-primary);
+        }
+
+        .action-btn {
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            border: none;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            margin-top: 8px;
+            float: right;
+            box-shadow: 0 4px 12px rgba(106, 17, 203, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .action-btn:hover::before {
+            left: 100%;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(106, 17, 203, 0.4);
+        }
+
+        .action-btn:active {
+            transform: translateY(0);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 700px;
+            border: 2px solid var(--border-color);
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-primary);
+            animation: modalSlideIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            margin: 0;
+            color: var(--accent-color);
+            font-size: 1.4em;
+            font-weight: 700;
+        }
+
+        .modal-close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close-btn:hover {
+            color: var(--accent-color);
+            background: rgba(212, 175, 55, 0.1);
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .modal-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: var(--accent-color);
+            border-radius: 4px;
+        }
+
+        .relationship-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(201, 170, 113, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-secondary);
+            transition: all 0.3s ease;
+        }
+
+        .relationship-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-primary);
+        }
+
+        .relationship-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(201, 170, 113, 0.2);
+        }
+
+        .relationship-name {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .relationship-relation {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .relationship-body {
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .relationship-body p {
+            margin-bottom: 10px;
+        }
+
+        .favorability-bar-container {
+            width: 100%;
+            height: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            margin-top: 8px;
+            border: 1px solid #8b7355;
+            overflow: hidden;
+        }
+
+        .favorability-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8b4513, #cd853f);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .relationship-id {
+            font-size: 12px;
+            color: var(--accent-color);
+            font-weight: bold;
+            background: rgba(212, 175, 55, 0.1);
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .delete-relationship-btn {
+            background: linear-gradient(135deg, #d32f2f, #f44336);
+            border: none;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(211, 47, 47, 0.3);
+        }
+
+        .delete-relationship-btn:hover {
+            background: linear-gradient(135deg, #b71c1c, #d32f2f);
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(211, 47, 47, 0.5);
+        }
+
+        .relationship-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            margin-bottom: 25px;
+            background: rgba(201, 170, 113, 0.1);
+            border: 1px solid rgba(201, 170, 113, 0.3);
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+        }
+
+        .reorder-relationships-btn {
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(106, 17, 203, 0.3);
+        }
+
+        .reorder-relationships-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(106, 17, 203, 0.4);
+        }
+
+        .relationship-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .event-history {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid rgba(201, 170, 113, 0.2);
+        }
+
+        .event-history h4 {
+            margin: 0 0 12px 0;
+            color: var(--accent-color);
+            font-size: 1em;
+        }
+
+        .event-history ul {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .event-history ul li {
+            line-height: 1.6;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            border-left: 3px solid rgba(212, 175, 55, 0.3);
+            position: relative;
+        }
+
+        .event-history ul li::before {
+            content: '◦';
+            color: var(--accent-color);
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+  /* --- 新增：针对人物关系模态窗口的样式优化 --- */
+  #relationships-modal .relationship-card {
+  	background: rgba(20, 22, 26, 0.7);
+  	border: 1px solid var(--ink-border);
+  	box-shadow: none;
+  }
+
+  #relationships-modal .relationship-name,
+  #relationships-modal .relationship-body,
+  #relationships-modal .relationship-body p,
+  #relationships-modal .relationship-relation,
+  #relationships-modal .event-history ul li,
+  #relationships-modal .relationship-count {
+  	color: #fff; /* 统一使用纯白色 */
+  	font-family: sans-serif; /* 使用清晰的非衬线字体 */
+  }
+
+  #relationships-modal .event-history h4 {
+  	color: var(--ink-accent);
+  	font-family: sans-serif;
+  }
+
+  #relationships-modal .event-history ul li {
+  	background: rgba(0,0,0,0.3);
+  }
+
+  #relationships-modal .relationship-controls {
+  	background: rgba(20, 22, 26, 0.7);
+  	border: 1px solid var(--ink-border);
+  }
+
+        /* 响应式设计优化 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .status-panel {
+                max-width: 100%;
+            }
+            
+            .content-panel {
+                padding: 20px;
+            }
+            
+            .grid-container {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+    
+      /* --- 手机端适配：布局调整 --- */
+      .card {
+       border-width: 30px 60px; /* 减小卷轴头宽度 */
+       padding: 15px 20px;    /* 减小内部间距 */
+      }
+    
+      .card.vertical-layout {
+       display: block; /* 恢复为块级布局，取消flex */
+      }
+    
+      .card.vertical-layout > h3 {
+       writing-mode: horizontal-tb; /* 文字恢复水平方向 */
+       margin: 0 0 15px 0;         /* 恢复下边距 */
+       padding: 0 0 10px 0;        /* 恢复下内边距 */
+       border-bottom: 2px solid var(--ink-border); /* 恢复下划线 */
+       text-align: center;         /* 标题居中 */
+       font-size: 1.5em;           /* 调整字体大小 */
+      }
+            
+            .tab {
+                font-size: 1em;
+                padding: 15px 8px;
+            }
+
+   /* --- 手机端适配：导航栏优化 --- */
+   .tabs {
+   	height: 60px; /* 缩小高度 */
+   	padding: 0 40px; /* 减小左右内边距 */
+   	max-width: 100%;
+   }
+ 
+   /* --- 手机端适配：字体与间距 --- */
+   .stat-item {
+   	font-size: 1em;
+   	padding: 8px 0;
+   }
+   .list-item {
+   	font-size: 0.9em;
+   	padding: 10px 12px;
+   }
+   th, td {
+   	padding: 12px 8px;
+   	font-size: 0.9em;
+   }
+ 
+   /* --- 手机端适配：交互元素 --- */
+   .seal-button {
+   	width: 40px;
+   	height: 40px;
+   	top: -10px;
+   	right: 0;
+   }
+            
+            .modal-content {
+                width: 95%;
+                padding: 20px;
+            }
+        }
+
+        /* 增强的滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--accent-color), rgba(212, 175, 55, 0.6));
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, var(--accent-hover), var(--accent-color));
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-panel">
+    <div class="tabs">
+		<!-- 修改后 -->
+		<div class="tab active" data-panel-id="char-progression">角色成长</div>
+		<div class="tab" data-panel-id="faction-status">势力</div>
+		<div class="tab" data-panel-id="world-status">人物与天下</div>
+    </div>
+    
+    <!-- 角色成长 -->
+    <div id="char-progression" class="content-panel active">
+        <div class="grid-container">
+            <div class="card vertical-layout">
+                <h3>核心身份</h3>
+                <div>
+                    <div class="stat-item"><span class="stat-label">身份/官职</span><span id="status-identity" class="stat-value"></span></div>
+                    <div class="stat-item"><span class="stat-label">声望</span><span id="status-reputation" class="stat-value"></span></div>
+                </div>
+            </div>
+            <div class="card vertical-layout">
+                <h3>能力核心</h3>
+                <div>
+                    <div class="stat-item"><span class="stat-label">职业与等级</span><span id="status-class-level" class="stat-value"></span></div>
+                    <div class="stat-item"><span class="stat-label">龙血天赋</span><span id="status-dragon-talent" class="stat-value"></span></div>
+                </div>
+            </div>
+        </div>
+        <div class="card vertical-layout" style="margin-top: 25px;">
+            <h3>技能和专长</h3>
+            <div id="skills-list-container">
+                <ul id="status-skills-list" style="padding-left: 0; margin: 0; list-style-type: none;"></ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 势力 -->
+    <div id="faction-status" class="content-panel">
+        <div class="grid-container">
+            <div class="card vertical-layout">
+                <h3>战略资源</h3>
+                <div>
+                    <div class="stat-item"><span class="stat-label">💰 金钱</span><span id="res-money" class="stat-value"></span></div>
+                    <div class="stat-item"><span class="stat-label">🌾 粮草</span><span id="res-food" class="stat-value"></span></div>
+                </div>
+            </div>
+            <div class="card vertical-layout">
+                <h3>领地</h3>
+                <div>
+                    <ul id="faction-territories-list" style="padding-left: 0; margin: 0; list-style-type: none;"></ul>
+                </div>
+            </div>
+        </div>
+        <div class="card vertical-layout" style="margin-top: 25px;">
+            <h3>军队</h3>
+            <div id="faction-army-list">
+                 <table><thead><tr><th>部队名称</th><th>数量</th><th>兵种</th><th>状态</th></tr></thead><tbody id="faction-army-tbody"></tbody></table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 人物与天下大势 -->
+    <div id="world-status" class="content-panel">
+        <div class="card vertical-layout">
+            <h3>人物关系 (概览)</h3>
+            <div>
+                <img src="https://raw.githubusercontent.com/jam4435/my-image-hosting/main/三国/%E7%8E%89%E7%8E%BA1.webp" class="seal-button" alt="管理关系网络" onclick="GuixuManager.showRelationships()">
+                <div id="relations-character-list" style="max-height: 300px; overflow-y: auto; padding-right: 10px;">
+                    <!-- JS动态填充 -->
+                </div>
+            </div>
+        </div>
+        <div class="card vertical-layout" style="margin-top: 25px;">
+            <h3>天下大势</h3>
+            <div id="world-state-list" style="max-height: 300px; overflow-y: auto; padding-right: 10px;">
+                 <table><thead><tr><th>势力</th><th>君主</th><th>状态</th><th>关系</th></tr></thead><tbody id="world-state-tbody"></tbody></table>
+            </div>
+        </div>
+        <div class="grid-container" style="margin-top: 25px;">
+            <div class="card vertical-layout">
+                <h3>时间与年龄</h3>
+                <div>
+                    <div class="stat-item"><span class="stat-label">⏰ 当前时间</span><span id="world-time" class="stat-value"></span></div>
+                     <div class="stat-item"><span class="stat-label">👤 生理年龄</span><span id="world-age" class="stat-value"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 人物关系模态窗口 -->
+<div id="relationships-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title">🤝 人物关系管理</h2><button class="modal-close-btn" onclick="GuixuManager.closeModal('relationships-modal')">×</button></div>
+      <div class="modal-body"></div>
+    </div>
+</div>
+
+<script>
+    // =======================================================================
+    // I. 核心 API 交互与工具 (无需改动)
+    // =======================================================================
+    async function getGameData() {
+        try {
+            // 使用新的 API getVariables 获取最新消息的变量
+            const variables = await getVariables({ type: 'message', message_id: 'latest' });
+            // 新 API 中, variables 相当于旧的 message.data, 我们从中寻找 stat_data
+            if (!variables || !variables.stat_data) {
+                throw new Error("无法在消息变量中找到 stat_data。");
+            }
+            return variables.stat_data;
+        } catch (error) {
+            console.error("getGameData 失败:", error);
+            // 如果错误是因为聊天记录为空, 则返回一个空对象, 避免整个面板崩溃
+            if (error.message.includes("超出范围")) {
+                console.warn("聊天记录为空或消息无变量，将使用默认值。");
+                return {};
+            }
+            throw error;
+        }
+    }
+
+    async function saveGameData(updatedStatData) {
+        try {
+            // 使用新的 API insertOrAssignVariables 来安全地更新或插入 stat_data
+            await insertOrAssignVariables({ stat_data: updatedStatData }, { type: 'message', message_id: 'latest' });
+            
+            console.log("数据已成功保存至 SillyTavern。");
+            await initDisplay(); // 保存后重新加载显示
+        } catch (error) {
+            console.error("saveGameData 失败:", error);
+            alert(`保存数据失败: ${error.message}`);
+            throw error;
+        }
+    }
+    function SafeGetValue(obj, path, defaultValue = null) { const keys = Array.isArray(path) ? path : path.split('.'); let current = obj; for (const key of keys) { if (current === null || current === undefined || typeof current !== 'object') { return defaultValue; } current = current[key]; } return current === undefined || current === null ? defaultValue : current; }
+
+    // =======================================================================
+    // II. GuixuManager - 人物关系管理模块 (无需改动)
+    // =======================================================================
+    const GuixuManager = {
+        idToNameMap: new Map(),
+        openModal(id) { const el = document.getElementById(id); if(el) el.style.display = 'flex'; },
+        closeModal(id) { const el = document.getElementById(id); if(el) el.style.display = 'none'; },
+        async showRelationships() {
+            this.openModal('relationships-modal');
+            const body = document.querySelector('#relationships-modal .modal-body');
+            body.innerHTML = '<p>正在梳理人脉...</p>';
+            try {
+                const data = await getGameData();
+                const relObj = SafeGetValue(data, '世界.人物关系', {});
+                let relationships = Object.keys(relObj)
+                    .filter(key => key !== '$meta')
+                    .map(key => ({ name: key, ...relObj[key] }));
+                
+                relationships = this.ensureRelationshipIds(relationships);
+                
+                this.idToNameMap.clear();
+                relationships.forEach(rel => this.idToNameMap.set(rel.id, rel.name));
+                
+                body.innerHTML = this.renderFullRelationships(relationships);
+            } catch (error) {
+                body.innerHTML = `<p style="color: red;">加载失败: ${error.message}</p>`;
+            }
+        },
+        renderFullRelationships(relationships) {
+            if (!Array.isArray(relationships)) return '<p>人物关系数据格式错误。</p>';
+            const filteredRels = relationships.filter(item => typeof item === 'object');
+            if (filteredRels.length === 0) return '<p>红尘俗世，暂无纠葛。</p>';
+            const controlsHtml = `<div class="relationship-controls"><button class="reorder-relationships-btn" onclick="GuixuManager.handleReorderRelationships()">重排序ID</button><span class="relationship-count">共 ${filteredRels.length} 个人物关系</span></div>`;
+            const cardsHtml = filteredRels.map(rel => {
+                const id = rel.id ?? '未知',
+                    name = rel.name ?? '未知之人',
+                    relation = rel.relationship ?? '未知',
+                    intimacy = rel.intimacy ?? 0,
+                    description = rel.description ?? '暂无描述。';
+                const historyEvents = Array.isArray(rel.event_history) ? rel.event_history.filter(event => typeof event === 'string' && !event.startsWith('$__META')) : [];
+                const historyItems = historyEvents.length > 0 ? historyEvents.map(event => `<li>${event}</li>`).join('') : `<li><em>暂无相关事件。</em></li>`;
+                return `<div class="relationship-card" data-relationship-id="${id}"><div class="relationship-header"><span class="relationship-id">ID: ${id}</span><div><span class="relationship-name">${name}</span><span class="relationship-relation">- ${relation}</span></div><button class="delete-relationship-btn" onclick="GuixuManager.handleDeleteRelationship(${id})">✕</button></div><div class="relationship-body"><p>${description}</p><p>好感度: ${intimacy}</p><div class="favorability-bar-container"><div class="favorability-bar-fill" style="width: ${intimacy}%;"></div></div><div class="event-history"><h4>过往交集</h4><ul>${historyItems}</ul></div></div></div>`;
+            }).join('');
+            return controlsHtml + cardsHtml;
+        },
+        async handleDeleteRelationship(id) {
+            if (!confirm(`确定要删除ID为 ${id} 的人物关系吗？`)) return;
+            const characterName = this.idToNameMap.get(id);
+            if (!characterName) {
+                return alert(`删除失败: 无法找到ID为 ${id} 的角色。`);
+            }
+            try {
+                const data = await getGameData();
+                const relObj = SafeGetValue(data, '世界.人物关系', {});
+                delete relObj[characterName];
+                
+                let relationships = Object.keys(relObj)
+                    .filter(key => key !== '$meta')
+                    .map(key => ({ name: key, ...relObj[key] }));
+                
+                const reorderedRelationshipsArray = this.reorderRelationshipIds(relationships);
+                
+                const newRelObj = { '$meta': relObj['$meta'] };
+                reorderedRelationshipsArray.forEach(char => {
+                    const charName = char.name;
+                    delete char.name;
+                    newRelObj[charName] = char;
+                });
+                
+                data.世界.人物关系 = newRelObj;
+                await saveGameData(data);
+                this.showRelationships();
+            } catch (error) {
+                alert(`删除失败: ${error.message}`);
+            }
+        },
+        async handleReorderRelationships() {
+            if (!confirm(`确定要重新排序所有人物关系的ID吗？`)) return;
+            try {
+                const data = await getGameData();
+                const relObj = SafeGetValue(data, '世界.人物关系', {});
+                
+                let relationships = Object.keys(relObj)
+                    .filter(key => key !== '$meta')
+                    .map(key => ({ name: key, ...relObj[key] }));
+                
+                const reorderedRelationshipsArray = this.reorderRelationshipIds(relationships);
+                
+                const newRelObj = { '$meta': relObj['$meta'] };
+                reorderedRelationshipsArray.forEach(char => {
+                    const charName = char.name;
+                    delete char.name;
+                    newRelObj[charName] = char;
+                });
+                
+                data.世界.人物关系 = newRelObj;
+                await saveGameData(data);
+                this.showRelationships();
+            } catch (error) {
+                alert(`重排序失败: ${error.message}`);
+            }
+        },
+        ensureRelationshipIds(rels) {
+            let maxId = 0;
+            const objects = rels.filter(r => typeof r === 'object');
+            objects.forEach(rel => {
+                if (rel.id != null && rel.id > maxId) maxId = rel.id;
+            });
+            objects.forEach(rel => {
+                if (rel.id == null) rel.id = ++maxId;
+            });
+            return rels;
+        },
+        reorderRelationshipIds(rels) {
+            const objects = rels.filter(r => typeof r === 'object');
+            return objects.map((rel, i) => ({ ...rel, id: i + 1 }));
+        },
+    };
+
+    // =======================================================================
+    // III. StatusPanelManager - 状态面板渲染模块 (已修复)
+    // =======================================================================
+    const StatusPanelManager = {
+        // (修改) init 函数现在负责所有事件绑定
+        init() {
+            // 1. 绑定顶部的Tab切换按钮
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', (e) => this.switchTab(e.currentTarget));
+            });
+
+            // 2. (新增) 绑定"管理关系网络"按钮
+            const manageBtn = document.getElementById('manage-relations-btn');
+            if (manageBtn) {
+                manageBtn.addEventListener('click', () => {
+                    GuixuManager.showRelationships();
+                });
+            } else {
+                console.error("未能找到ID为 'manage-relations-btn' 的按钮。");
+            }
+        },
+        
+        switchTab(tab) { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.content-panel').forEach(p => p.classList.remove('active')); tab.classList.add('active'); document.getElementById(tab.dataset.panelId).classList.add('active'); },
+        
+        update(data) {
+            this.setText('status-identity', SafeGetValue(data, '主角.身份.0'));
+            this.setText('status-reputation', SafeGetValue(data, '主角.声望.0'));
+            this.setText('status-class-level', SafeGetValue(data, '主角.职业与等级.0'));
+            const talent = SafeGetValue(data, '主角.龙血天赋.0', null);
+            const talentEl = document.getElementById('status-dragon-talent');
+            if (talentEl) {
+                if (talent && typeof talent === 'object') {
+                    talentEl.innerHTML = `<div>${talent.name} (${talent.status})</div><div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">${talent.description}</div>`;
+                    if (talentEl.parentElement) {
+                        talentEl.parentElement.style.alignItems = 'flex-start';
+                    }
+                } else {
+                    talentEl.textContent = '未觉醒';
+                    if (talentEl.parentElement) {
+                        talentEl.parentElement.style.alignItems = 'center';
+                    }
+                }
+            }
+            this.renderSkillsList('status-skills-list', SafeGetValue(data, '主角.技能专长', {}));
+            this.setText('res-money', `${SafeGetValue(data, '势力.金钱.0', 0)} 金`);
+            this.setText('res-food', `${SafeGetValue(data, '势力.粮草.0', 0)} 石`);
+            this.renderTerritoriesList('faction-territories-list', SafeGetValue(data, '势力.领地.0', []));
+            this.renderArmyTable('faction-army-tbody', SafeGetValue(data, '势力.军队', {}));
+            const relObj = SafeGetValue(data, '世界.人物关系', {});
+            const relations = Object.keys(relObj).filter(key => key !== '$meta').map(key =>({characterName: key, ...relObj[key]}));
+            this.renderCharacterRelations('relations-character-list', relations);
+            this.renderWorldStateTable('world-state-tbody', SafeGetValue(data, '世界.天下大势', {}));
+            this.setText('world-time', SafeGetValue(data, '世界.当前时间.0'));
+            this.setText('world-age', `${SafeGetValue(data, '主角.年龄.0', '?')} 岁`);
+        },
+        
+        setText(id, value) { document.getElementById(id).textContent = value ?? 'N/A'; },
+        renderSkillsList(listId, skillsObj) { const listEl = document.getElementById(listId); if (!listEl) return; listEl.innerHTML = ''; if (typeof skillsObj !== 'object' || skillsObj === null) return; Object.keys(skillsObj).filter(key => key !== '$meta').forEach(skillName => { const skill = skillsObj[skillName]; const li = document.createElement('li'); li.className = 'list-item'; li.innerHTML = `<strong>${skillName}:</strong> ${skill.description || ''}`; listEl.appendChild(li); }); },
+        renderTerritoriesList(listId, items) { const listEl = document.getElementById(listId); if (!listEl) return; listEl.innerHTML = ''; if (!Array.isArray(items)) return; items.filter(item => typeof item === 'string' && !item.startsWith('$__META')).forEach(item => { const li = document.createElement('li'); li.className = 'list-item'; li.textContent = item; listEl.appendChild(li); }); },
+        renderArmyTable(tbodyId, armyObj) { const tbodyEl = document.getElementById(tbodyId); tbodyEl.innerHTML = ''; if (!armyObj || Object.keys(armyObj).filter(k => k !== '$meta').length === 0) { const row = tbodyEl.insertRow(); row.innerHTML = `<td colspan="4" style="text-align:center; color: var(--text-secondary);">暂无部队</td>`; return; } Object.keys(armyObj).filter(key => key !== '$meta').forEach(armyName => { const army = armyObj[armyName]; const row = tbodyEl.insertRow(); row.innerHTML = `<td>${armyName}</td><td>${army.数量}</td><td>${army.兵种类型}</td><td>${army.状态}</td>`; }); },
+        renderCharacterRelations(listId, relations) { const listEl = document.getElementById(listId); if (!listEl) return; listEl.innerHTML = ''; if (!Array.isArray(relations)) return; relations.filter(item => typeof item === 'object').forEach(rel => { const card = document.createElement('div'); card.className = 'character-card';const displayName = rel.characterName || '未知之人'; card.innerHTML = `<div class="character-header"><span class="character-name">${displayName}</span><span class="character-relation">${rel.relationship}</span></div><div class="character-details"><p><strong>种族:</strong> ${rel.race || '未知'}</p><p><strong>阵营:</strong> ${rel.faction || '未知'}</p><p><strong>职业:</strong> ${rel.class_and_level || '未知'}</p></div><div class="character-intimacy">亲密度: ${rel.intimacy}</div><p class="character-description">${rel.description}</p>`; listEl.appendChild(card); }); },
+        renderWorldStateTable(tbodyId, factionsObj) { const tbodyEl = document.getElementById(tbodyId); if (!tbodyEl) return; tbodyEl.innerHTML = ''; if (!factionsObj || Object.keys(factionsObj).filter(k => k !== '$meta').length === 0) { const row = tbodyEl.insertRow(); row.innerHTML = `<td colspan="4" style="text-align:center; color: var(--text-secondary);">天下大势暂未明朗</td>`; return; } Object.keys(factionsObj).filter(key => key !== '$meta').forEach(factionName => { const faction = factionsObj[factionName]; let relationsText = '无'; if (faction.relations && Object.keys(faction.relations).length > 0) { relationsText = Object.entries(faction.relations).map(([k, v]) => `${k}: ${v}`).join(', '); } const row = tbodyEl.insertRow(); row.innerHTML = `<td>${factionName}</td><td>${faction.ruler}</td><td>${faction.status}</td><td>${relationsText}</td>`; }); }
+    };
+
+    // =======================================================================
+    // IV. 主执行逻辑 (无需改动)
+    // =======================================================================
+    async function initDisplay() {
+        try {
+            const gameData = await getGameData();
+            StatusPanelManager.update(gameData);
+        } catch (error) {
+            console.error("状态面板加载失败:", error);
+            document.querySelector('.status-panel').innerHTML = `<div style="padding:20px; color: #bf616a; font-family: monospace;">状态加载失败: ${error.message}</div>`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        StatusPanelManager.init();
+        initDisplay();
+    });
+</script>
+</html>

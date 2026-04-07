@@ -1,0 +1,114 @@
+{
+  "attributePointCosts": [
+    {
+      "min": 0,
+      "max": 1,
+      "pointsGained": 5,
+      "costPerPoint": 5,
+      "triggeredTraitType": "negative",
+      "description": "极低属性区间（0-1）：获得5点，触发严重负面天赋"
+    },
+    {
+      "min": 2,
+      "max": 3,
+      "pointsGained": 2,
+      "costPerPoint": 2,
+      "triggeredTraitType": "negative",
+      "description": "很低属性区间（2-3）：获得2点，触发中等负面天赋"
+    },
+    {
+      "min": 4,
+      "max": 5,
+      "pointsGained": 1,
+      "costPerPoint": 1,
+      "triggeredTraitType": "negative",
+      "description": "低属性区间（4-5）：获得1点，触发中等负面天赋"
+    },
+    {
+      "min": 6,
+      "max": 8,
+      "pointsGained": -1,
+      "costPerPoint": 1,
+      "description": "基础区间（6-8）：消耗1点，无天赋触发"
+    },
+    {
+      "min": 9,
+      "max": 12,
+      "pointsGained": -1,
+      "costPerPoint": 1,
+      "description": "良好区间（9-12）：消耗1点，无天赋触发"
+    },
+    {
+      "min": 13,
+      "max": 16,
+      "pointsGained": -2,
+      "costPerPoint": 2,
+      "triggeredTraitType": "positive",
+      "description": "优秀区间（13-16）：消耗2点，触发中等正面天赋"
+    },
+    {
+      "min": 17,
+      "max": 20,
+      "pointsGained": -3,
+      "costPerPoint": 3,
+      "triggeredTraitType": "positive",
+      "description": "卓越区间（17-20）：消耗3点，触发强力正面天赋"
+    }
+  ],
+  "luckAttributePointCosts": [
+    {
+      "min": -6,
+      "max": -5,
+      "pointsGained": 5,
+      "costPerPoint": 5,
+      "triggeredTraitType": "negative",
+      "description": "极低福缘区间（-6 ~ -5）：获得5点，触发严重负面天赋"
+    },
+    {
+      "min": -4,
+      "max": -3,
+      "pointsGained": 2,
+      "costPerPoint": 2,
+      "triggeredTraitType": "negative",
+      "description": "很低福缘区间（-4 ~ -3）：获得2点，触发中等负面天赋"
+    },
+    {
+      "min": -2,
+      "max": -1,
+      "pointsGained": 1,
+      "costPerPoint": 1,
+      "triggeredTraitType": "negative",
+      "description": "低福缘区间（-2 ~ -1）：获得1点，触发中等负面天赋"
+    },
+    {
+      "min": 0,
+      "max": 2,
+      "pointsGained": -1,
+      "costPerPoint": 1,
+      "description": "基础区间（0 ~ 2）：消耗1点，无天赋触发"
+    },
+    {
+      "min": 3,
+      "max": 6,
+      "pointsGained": -1,
+      "costPerPoint": 1,
+      "description": "良好区间（3 ~ 6）：消耗1点，无天赋触发"
+    },
+    {
+      "min": 7,
+      "max": 10,
+      "pointsGained": -2,
+      "costPerPoint": 2,
+      "triggeredTraitType": "positive",
+      "description": "优秀区间（7 ~ 10）：消耗2点，触发中等正面天赋"
+    },
+    {
+      "min": 11,
+      "max": 14,
+      "pointsGained": -3,
+      "costPerPoint": 3,
+      "triggeredTraitType": "positive",
+      "description": "卓越区间（11 ~ 14）：消耗3点，触发强力正面天赋"
+    }
+  ]
+}

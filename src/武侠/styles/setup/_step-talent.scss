@@ -1,0 +1,256 @@
+// =========================================
+// Setup Screen - 步骤1: 天资选择
+// =========================================
+
+.talent-step {
+  .section-desc {
+    font-size: 0.9rem;
+    color: var(--stone-400);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+  }
+}
+
+// 天资卡片网格
+.talent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  position: relative;
+  z-index: 1;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// 天资卡片
+.talent-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(200, 160, 80, 0.08), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+
+    &::before {
+      opacity: 1;
+    }
+  }
+
+  &.selected {
+    border-color: rgba(200, 160, 80, 0.6);
+    background: rgba(180, 130, 60, 0.12);
+
+    &::before {
+      opacity: 1;
+    }
+
+    .talent-name {
+      color: #ffd780;
+    }
+
+    .talent-points {
+      background: rgba(200, 160, 80, 0.3);
+      border-color: rgba(255, 215, 140, 0.5);
+      color: #ffe0a0;
+    }
+  }
+}
+
+.talent-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.talent-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.talent-name {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  color: var(--stone-200);
+  transition: color 0.3s ease;
+}
+
+.talent-points {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  padding: 0.25rem 0.6rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--stone-400);
+  transition: all 0.3s ease;
+}
+
+.talent-desc {
+  font-size: 0.85rem;
+  color: var(--stone-500);
+  line-height: 1.5;
+  margin: 0;
+}
+
+// 已保存存档列表
+.saved-builds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.saved-build-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .build-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+  }
+
+  .build-name {
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    color: var(--stone-200);
+    flex: 1;
+  }
+
+  .build-note {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.5rem;
+    background: rgba(100, 150, 200, 0.15);
+    border-radius: 4px;
+    color: #8ab4d6;
+    font-style: italic;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .build-talent {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.5rem;
+    background: rgba(200, 160, 80, 0.15);
+    border-radius: 4px;
+    color: #c8a050;
+  }
+
+  .build-date {
+    font-size: 0.75rem;
+    color: var(--stone-600);
+  }
+
+  .build-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .load-build-btn {
+    padding: 0.4rem 0.8rem;
+    background: rgba(200, 160, 80, 0.2);
+    border: 1px solid rgba(200, 160, 80, 0.4);
+    border-radius: 4px;
+    color: #ffd780;
+    font-family: var(--font-serif);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(200, 160, 80, 0.3);
+      transform: translateY(-1px);
+    }
+  }
+
+  .edit-note-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(100, 150, 200, 0.15);
+    border: 1px solid rgba(100, 150, 200, 0.3);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(100, 150, 200, 0.25);
+      border-color: rgba(100, 150, 200, 0.5);
+      transform: scale(1.05);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+  }
+
+  .delete-build-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(220, 80, 80, 0.15);
+    border: 1px solid rgba(220, 80, 80, 0.3);
+    border-radius: 4px;
+    color: #ff8080;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(220, 80, 80, 0.25);
+      border-color: rgba(220, 80, 80, 0.5);
+      transform: scale(1.05);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+  }
+}
+
+// =========================================
+// 响应式调整
+// =========================================
+@media (max-width: 768px) {
+  .talent-grid {
+    grid-template-columns: 1fr;
+  }
+}

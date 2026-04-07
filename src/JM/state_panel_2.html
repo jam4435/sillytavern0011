@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <title>角色状态 2</title>
+    <style>
+      :root {
+        --bg-color: #121212;
+        --container-bg: #1e1e1e;
+        --text-color: #e0e0e0;
+        --text-secondary-color: #b0b0b0;
+        --accent-color: #6200ea;
+        --accent-light-color: #bb86fc;
+        --border-color: #333333;
+        --red-color: #cf6679;
+        --green-color: #03dac6;
+      }
+      body {
+        font-family: 'Noto Sans SC', sans-serif;
+        background-color: var(--bg-color);
+      }
+      .status-container {
+        background-color: var(--container-bg);
+        color: var(--text-color);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        max-width: 600px;
+        margin: auto;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid var(--border-color);
+      }
+      .portrait {
+        flex-shrink: 0;
+        margin-right: 20px;
+      }
+      .portrait img {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--border-color);
+        cursor: pointer;
+        transition: transform 0.3s;
+      }
+      .portrait img:hover {
+        transform: scale(1.1);
+      }
+      .header-info {
+        flex-grow: 1;
+      }
+      .char-name {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--accent-light-color);
+        letter-spacing: 1px;
+      }
+      .meta-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        color: var(--text-secondary-color);
+        margin-top: 8px;
+      }
+      .core-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 25px;
+      }
+      .stat-box {
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+      }
+      .stat-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-secondary-color);
+        margin-bottom: 8px;
+      }
+      .stat-value {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-color);
+      }
+      .stat-value .arrow {
+        font-size: 18px;
+        margin: 0 5px;
+      }
+      .stat-change-reason {
+        font-size: 12px;
+        color: var(--text-secondary-color);
+        margin-top: 5px;
+        font-style: italic;
+      }
+      .green {
+        color: var(--green-color);
+      }
+      .red {
+        color: var(--red-color);
+      }
+      .narrative-block,
+      .details-block {
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+      }
+      .narrative-label,
+      .details-header {
+        font-weight: 700;
+        color: var(--accent-light-color);
+        margin-bottom: 8px;
+        display: block;
+        font-size: 16px;
+      }
+      .narrative-content {
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--text-color);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      .tabs {
+        display: flex;
+        justify-content: space-around;
+        border-bottom: 2px solid var(--border-color);
+        margin-bottom: 20px;
+      }
+      .tab-button {
+        flex: 1;
+        text-align: center;
+        padding: 10px 20px;
+        cursor: pointer;
+        background: none;
+        border: none;
+        color: var(--text-secondary-color);
+        font-size: 15px;
+        font-weight: 500;
+        transition:
+          color 0.3s,
+          border-bottom 0.3s;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+      }
+      .tab-button.active {
+        color: var(--accent-light-color);
+        border-bottom-color: var(--accent-light-color);
+      }
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      .details-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .details-item {
+        display: flex;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .details-item:last-child {
+        border-bottom: none;
+      }
+      .details-label {
+        flex-basis: 120px;
+        flex-shrink: 0;
+        font-weight: 500;
+        color: var(--text-secondary-color);
+        padding-right: 15px;
+      }
+      .details-value {
+        flex-grow: 1;
+        color: var(--text-color);
+      }
+      .modifications-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+      .modifications-item {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        border: none;
+      }
+      .image-link {
+        color: var(--accent-light-color);
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .image-link:hover {
+        color: var(--accent-color);
+      }
+      .gallery-modal {
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
+      }
+      .gallery-content {
+        position: relative;
+        max-width: 90vw;
+        max-height: 90vh;
+      }
+      .gallery-image {
+        max-width: 100%;
+        max-height: 100%;
+        display: block;
+        margin: auto;
+        cursor: grab;
+        transition: transform 0.2s ease-out;
+      }
+      .gallery-image.dragging {
+        cursor: grabbing;
+      }
+      .gallery-close {
+        position: absolute;
+        top: 15px;
+        right: 35px;
+        color: #f1f1f1;
+        font-size: 40px;
+        font-weight: bold;
+        cursor: pointer;
+        z-index: 10;
+      }
+      .gallery-prev,
+      .gallery-next {
+        cursor: pointer;
+        position: absolute;
+        top: 50%;
+        width: auto;
+        padding: 16px;
+        margin-top: -22px;
+        color: white;
+        font-weight: bold;
+        font-size: 20px;
+        transition: 0.6s ease;
+        border-radius: 0 3px 3px 0;
+        user-select: none;
+      }
+      .gallery-next {
+        right: 0;
+        border-radius: 3px 0 0 3px;
+      }
+      .gallery-prev:hover,
+      .gallery-next:hover {
+        background-color: rgba(0, 0, 0, 0.8);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="jm-state-panel-2" class="status-container">
+      <!-- Content will be generated by script -->
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const panel = document.getElementById('jm-state-panel-2');
+
+        function displayError(message, details = '') {
+          console.error('[状态栏 2] ' + message, details);
+          panel.innerHTML = `<div style="color: var(--red-color); padding: 20px; font-family: monospace; white-space: pre-wrap;"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${details}</p></details></div>`;
+        }
+
+        try {
+          const rawData = `$2`;
+          const jsonData = JSON.parse(rawData.trim());
+
+          function safeGet(obj, path, defaultValue = undefined) {
+            const keys = Array.isArray(path) ? path : path.split('.');
+            let result = obj;
+            for (const key of keys) {
+              result = result?.[key];
+              if (result === undefined) return defaultValue;
+            }
+            return result;
+          }
+
+          function uniq(arr) {
+            return Array.from(new Set(arr));
+          }
+
+          const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
+          const IMAGE_INDEX_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/imageIndex.json';
+          const SYNONYMS_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/synonyms.json';
+          
+          let imageIndex = {};
+          let synonymMap = {}; // 从别名到主关键词的反向映射
+          let allKeywords = []; // 包含主关键词和所有别名的列表
+
+          let currentGalleryImages = [];
+          let currentGalleryIndex = 0;
+
+          async function fetchData() {
+            try {
+              const [imageResponse, synonymResponse] = await Promise.all([fetch(IMAGE_INDEX_URL), fetch(SYNONYMS_URL)]);
+
+              if (!imageResponse.ok) throw new Error(`图片索引加载失败: ${imageResponse.status}`);
+              imageIndex = await imageResponse.json();
+
+              if (synonymResponse.ok) {
+                const synonymData = await synonymResponse.json();
+                // 构建反向映射和关键词全集
+                for (const mainKeyword in synonymData) {
+                  synonymData[mainKeyword].forEach(alias => {
+                    synonymMap[alias] = mainKeyword;
+                  });
+                }
+                console.log('[状态栏 2] 同义词文件加载成功。');
+              } else {
+                // 如果文件不存在或加载失败，在控制台给出明确警告，但程序不中断
+                console.warn(
+                  `[状态栏 2] 警告: 同义词文件 (synonyms.json) 加载失败，状态码: ${synonymResponse.status}. 状态栏将继续运行，但无法使用别名功能。请检查文件是否存在于GitHub仓库中，并确认URL是否正确。`,
+                );
+              }
+              
+              allKeywords = [...Object.keys(imageIndex), ...Object.keys(synonymMap)];
+              return true;
+
+            } catch (error) {
+              console.error('[状态栏 2] 数据加载失败:', error);
+              displayError(
+                '核心数据加载失败',
+                `无法加载 imageIndex.json 或 synonyms.json。请检查网络连接以及浏览器控制台中的详细错误信息。错误: ${error.message}`,
+              );
+              return false;
+            }
+          }
+
+          function findImagesByKeyword(textToSearch) {
+            if (!textToSearch || typeof textToSearch !== 'string') {
+              return [];
+            }
+
+            // 1. 找到所有匹配的关键词（包括主关键词和别名）
+            let preliminaryMatches = [];
+            for (const keyword of allKeywords) {
+              if (textToSearch.includes(keyword)) {
+                preliminaryMatches.push(keyword);
+              }
+            }
+
+            // 2. 筛选提纯，移除被更长匹配项包含的短匹配项
+            const preciseMatches = preliminaryMatches.filter(shortMatch => {
+              return !preliminaryMatches.some(
+                longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch),
+              );
+            });
+
+            // 3. 将别名转换为主关键词，并获取位置
+            const mainKeywordMatches = preciseMatches.map(match => {
+              const mainKeyword = synonymMap[match] || match;
+              return { keyword: mainKeyword, index: textToSearch.indexOf(match) };
+            });
+
+            // 4. 按出现位置排序
+            mainKeywordMatches.sort((a, b) => a.index - b.index);
+
+            // 5. 按排序后的顺序合并图片数组
+            let foundImages = [];
+            for (const match of mainKeywordMatches) {
+              if (imageIndex[match.keyword]) {
+                foundImages = foundImages.concat(imageIndex[match.keyword]);
+              }
+            }
+
+            // 6. 返回去重后的最终结果
+            return uniq(foundImages);
+          }
+
+          function parseStat(statString) {
+            if (typeof statString !== 'string') return null;
+            const match = statString.match(/(\d+)\s*→\s*(\d+)\s*\((.*?)\)/);
+            if (match) {
+              return { from: match, to: match, reason: match };
+            }
+            return null;
+          }
+
+          function updatePanel(data) {
+            panel.innerHTML = `
+                        <div class="header">
+                            <div class="portrait"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="角色肖像" data-field="portrait" /></div>
+                            <div class="header-info">
+                                <div class="char-name" data-field="Name"></div>
+                                <div class="meta-info">
+                                    <span class="location">📍 <span data-field="Location"></span></span>
+                                    <span class="timestamp">🕰️ <span data-field="Time"></span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="core-stats">
+                            <div class="stat-box"><div class="stat-label">好感度</div><div class="stat-value" data-field="Affection"></div></div>
+                            <div class="stat-box"><div class="stat-label">性欲值</div><div class="stat-value" data-field="Libido"></div></div>
+                        </div>
+                        <div class="narrative-block"><span class="narrative-label">🧠 内心想法</span><p class="narrative-content" data-field="Thoughts"></p></div>
+                        <div class="narrative-block"><span class="narrative-label">📋 最近性行为</span><p class="narrative-content" data-field="RecentSex"></p></div>
+                        <div class="details-block"><div class="details-header">身体改造与束具</div><ul class="modifications-list" data-field="Modifications"></ul></div>
+                        <div class="tabs">
+                            <button class="tab-button active" data-tab="status-2">🎖️ 身份与当前状态</button>
+                            <button class="tab-button" data-tab="outfit-2">👗 服装与内衣</button>
+                            <button class="tab-button" data-tab="body-2">🩸 身体与性器细节</button>
+                        </div>
+                        <div id="status-2" class="tab-content active"><ul class="details-list">
+                            <li class="details-item"><span class="details-label">身份</span><span class="details-value" data-field="Status.Identity"></span></li>
+                            <li class="details-item"><span class="details-label">职业</span><span class="details-value" data-field="Status.Occupation"></span></li>
+                            <li class="details-item"><span class="details-label">从属</span><span class="details-value" data-field="Status.Affiliation"></span></li>
+                            <li class="details-item"><span class="details-label">气质</span><span class="details-value" data-field="Status.Temperament"></span></li>
+                            <li class="details-item"><span class="details-label">姿势</span><span class="details-value" data-field="Status.Posture"></span></li>
+                        </ul></div>
+                        <div id="outfit-2" class="tab-content"><ul class="details-list">
+                            <li class="details-item"><span class="details-label">上装</span><span class="details-value" data-field="Outfit.Top"></span></li>
+                            <li class="details-item"><span class="details-label">下装</span><span class="details-value" data-field="Outfit.Bottom"></span></li>
+                            <li class="details-item"><span class="details-label">内衣</span><span class="details-value" data-field="Outfit.Underwear"></span></li>
+                            <li class="details-item"><span class="details-label">鞋履</span><span class="details-value" data-field="Outfit.Footwear"></span></li>
+                        </ul></div>
+                        <div id="body-2" class="tab-content"><ul class="details-list">
+                            <li class="details-item"><span class="details-label">口腔</span><span class="details-value" data-field="BodyDetails.Mouth"></span></li>
+                            <li class="details-item"><span class="details-label">胸部</span><span class="details-value" data-field="BodyDetails.Breasts"></span></li>
+                            <li class="details-item"><span class="details-label">子宫与阴道</span><span class="details-value" data-field="BodyDetails.WombAndVagina"></span></li>
+                            <li class="details-item"><span class="details-label">后庭</span><span class="details-value" data-field="BodyDetails.Anus"></span></li>
+                            <li class="details-item"><span class="details-label">手部</span><span class="details-value" data-field="BodyDetails.Hands"></span></li>
+                            <li class="details-item"><span class="details-label">腿部</span><span class="details-value" data-field="BodyDetails.Legs"></span></li>
+                            <li class="details-item"><span class="details-label">足部</span><span class="details-value" data-field="BodyDetails.Feet"></span></li>
+                        </ul></div>
+                        <div id="jm-image-gallery-2" class="gallery-modal">
+                            <div class="gallery-content">
+                                <span class="gallery-close">&times;</span>
+                                <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="gallery-image" />
+                                <a class="gallery-prev">&#10094;</a>
+                                <a class="gallery-next">&#10095;</a>
+                            </div>
+                        </div>
+                    `;
+
+            document.querySelectorAll('[data-field]').forEach(el => {
+              const field = el.dataset.field;
+              const value = safeGet(data, field);
+              if (typeof value !== 'undefined' && field !== 'portrait') {
+                const parsedStat = field === 'Affection' || field === 'Libido' ? parseStat(value) : null;
+                if (parsedStat) {
+                  el.innerHTML = `<div><span class="red">${parsedStat.from}</span> <span class="arrow">→</span> <span class="green">${parsedStat.to}</span></div><div class="stat-change-reason">(${parsedStat.reason})</div>`;
+                } else if (field === 'Modifications' && Array.isArray(value)) {
+                  value.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = 'modifications-item';
+                    li.innerHTML = `<span class="details-value" data-keyword="${item}">${item}</span>`;
+                    el.appendChild(li);
+                  });
+                } else {
+                  el.textContent = value;
+                }
+              }
+            });
+          }
+
+          function updatePortrait(data) {
+            const keyword = safeGet(data, 'Status.Occupation');
+            const matchedImages = findImagesByKeyword(keyword);
+            const sortedImages = matchedImages;
+            const portraitImg = panel.querySelector('[data-field="portrait"]');
+            if (portraitImg && sortedImages.length > 0) {
+              portraitImg.src = GITHUB_BASE_URL + sortedImages;
+              portraitImg.addEventListener('click', () => openGallery(sortedImages, 0));
+            }
+          }
+
+          function linkifyModifications() {
+            panel.querySelectorAll('[data-field="Modifications"] .details-value').forEach(el => {
+              const keyword = el.dataset.keyword;
+              const matchedImages = findImagesByKeyword(keyword);
+              if (matchedImages.length > 0) {
+                const sortedImages = matchedImages;
+                el.innerHTML = `<a href="#" class="image-link">${keyword}</a>`;
+                el.querySelector('.image-link').addEventListener('click', e => {
+                  e.preventDefault();
+                  openGallery(sortedImages, 0);
+                });
+              }
+            });
+          }
+
+          function openGallery(images, startIndex) {
+            const gallery = document.getElementById('jm-image-gallery-2');
+            const prevArrow = gallery.querySelector('.gallery-prev');
+            const nextArrow = gallery.querySelector('.gallery-next');
+
+            currentGalleryImages = images;
+            currentGalleryIndex = startIndex;
+            updateGalleryImage();
+            gallery.style.display = 'flex';
+
+            // 根据图片数量决定是否显示箭头
+            if (currentGalleryImages.length <= 1) {
+              prevArrow.style.display = 'none';
+              nextArrow.style.display = 'none';
+            } else {
+              prevArrow.style.display = 'block';
+              nextArrow.style.display = 'block';
+            }
+          }
+
+          function updateGalleryImage() {
+            if (currentGalleryImages.length > 0) {
+              const galleryImage = panel.querySelector('.gallery-image');
+              galleryImage.src = GITHUB_BASE_URL + currentGalleryImages[currentGalleryIndex];
+              // 重置缩放和位置
+              galleryImage.style.transform = 'scale(1) translate(0, 0)';
+            }
+          }
+
+          function setupEventListeners() {
+            document.querySelectorAll('.tab-button').forEach(button => {
+              button.addEventListener('click', () => {
+                const targetTabId = button.dataset.tab;
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                button.classList.add('active');
+                document.getElementById(targetTabId).classList.add('active');
+              });
+            });
+            const gallery = document.getElementById('jm-image-gallery-2');
+            gallery.querySelector('.gallery-close').addEventListener('click', () => (gallery.style.display = 'none'));
+            gallery.querySelector('.gallery-prev').addEventListener('click', () => {
+              currentGalleryIndex =
+                (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
+              updateGalleryImage();
+            });
+            gallery.querySelector('.gallery-next').addEventListener('click', () => {
+              currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
+              updateGalleryImage();
+            });
+
+            // --- 新增：图片缩放和拖动功能 ---
+            const galleryImage = gallery.querySelector('.gallery-image');
+            let isDragging = false;
+            let startX,
+              startY,
+              lastX = 0,
+              lastY = 0;
+            let scale = 1;
+            let lastTouchDistance = null;
+
+            // --- 桌面端：鼠标事件 ---
+            galleryImage.addEventListener('wheel', e => {
+              e.preventDefault();
+              const rect = galleryImage.getBoundingClientRect();
+              const offsetX = e.clientX - rect.left;
+              const offsetY = e.clientY - rect.top;
+
+              const oldScale = scale;
+              scale += e.deltaY * -0.001;
+              scale = Math.min(Math.max(0.5, scale), 5);
+
+              lastX = offsetX - (offsetX - lastX) * (scale / oldScale);
+              lastY = offsetY - (offsetY - lastY) * (scale / oldScale);
+
+              updateTransform();
+            });
+
+            galleryImage.addEventListener('mousedown', e => {
+              e.preventDefault();
+              isDragging = true;
+              galleryImage.classList.add('dragging');
+              startX = e.pageX - lastX;
+              startY = e.pageY - lastY;
+            });
+
+            galleryImage.addEventListener('mouseleave', () => {
+              isDragging = false;
+              galleryImage.classList.remove('dragging');
+            });
+
+            galleryImage.addEventListener('mouseup', () => {
+              isDragging = false;
+              galleryImage.classList.remove('dragging');
+            });
+
+            galleryImage.addEventListener('mousemove', e => {
+              if (isDragging) {
+                e.preventDefault();
+                lastX = e.pageX - startX;
+                lastY = e.pageY - startY;
+                updateTransform();
+              }
+            });
+
+            galleryImage.addEventListener('dblclick', () => {
+              resetTransform();
+            });
+
+            // --- 移动端：触摸事件 ---
+            galleryImage.addEventListener('touchstart', e => {
+              if (e.touches.length === 1) {
+                isDragging = true;
+                galleryImage.classList.add('dragging');
+                startX = e.touches.pageX - lastX;
+                startY = e.touches.pageY - lastY;
+              } else if (e.touches.length === 2) {
+                isDragging = false; // 捏合时停止拖动
+                lastTouchDistance = Math.hypot(e.touches.pageX - e.touches.pageX, e.touches.pageY - e.touches.pageY);
+              }
+            });
+
+            galleryImage.addEventListener('touchend', e => {
+              isDragging = false;
+              galleryImage.classList.remove('dragging');
+              lastTouchDistance = null;
+            });
+
+            galleryImage.addEventListener('touchmove', e => {
+              e.preventDefault();
+              if (isDragging && e.touches.length === 1) {
+                lastX = e.touches.pageX - startX;
+                lastY = e.touches.pageY - startY;
+                updateTransform();
+              } else if (e.touches.length === 2 && lastTouchDistance) {
+                const rect = galleryImage.getBoundingClientRect();
+                const touch1 = { x: e.touches.pageX, y: e.touches.pageY };
+                const touch2 = { x: e.touches.pageX, y: e.touches.pageY };
+                const centerX = (touch1.x + touch2.x) / 2 - rect.left;
+                const centerY = (touch1.y + touch2.y) / 2 - rect.top;
+
+                const newTouchDistance = Math.hypot(touch1.x - touch2.x, touch1.y - touch2.y);
+
+                const oldScale = scale;
+                const scaleChange = newTouchDistance / lastTouchDistance;
+                scale *= scaleChange;
+                scale = Math.min(Math.max(0.5, scale), 5);
+                lastTouchDistance = newTouchDistance;
+
+                lastX = centerX - (centerX - lastX) * (scale / oldScale);
+                lastY = centerY - (centerY - lastY) * (scale / oldScale);
+
+                updateTransform();
+              }
+            });
+
+            function updateTransform() {
+              // 只有当缩放大于1时才应用位移
+              const canPan = scale > 1;
+              const translateX = canPan ? lastX : 0;
+              const translateY = canPan ? lastY : 0;
+              if (!canPan) {
+                lastX = 0;
+                lastY = 0;
+              }
+              galleryImage.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+            }
+
+            function resetTransform() {
+              scale = 1;
+              lastX = 0;
+              lastY = 0;
+              updateTransform();
+            }
+          }
+
+          async function main() {
+            updatePanel(jsonData);
+            const dataLoaded = await fetchData();
+            if (dataLoaded) {
+              updatePortrait(jsonData);
+              linkifyModifications();
+            } else {
+              console.warn('[状态栏 2] 无法加载图片索引，图片相关功能将不可用。');
+            }
+            setupEventListeners();
+          }
+
+          main();
+        } catch (error) {
+          displayError(
+            '脚本执行失败。这通常是由于AI输出的JSON格式不正确导致的。',
+            `错误信息: ${error.message}. 捕获到的原始数据: ${rawData}`,
+          );
+        }
+      });
+    </script>
+  </body>
+</html>

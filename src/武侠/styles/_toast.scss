@@ -1,0 +1,171 @@
+// =========================================
+// Status Toast - 顶部状态提示条
+// =========================================
+
+.status-toast {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  min-width: 200px;
+  max-width: 90vw;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0 0 8px 8px;
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    0 0 1px rgba(139, 90, 43, 0.5) inset;
+  animation: toast-slide-down 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  // 退出动画
+  &.exiting {
+    animation: toast-slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  // 加载状态样式
+  &.loading {
+    background: linear-gradient(180deg, rgba(20, 16, 14, 0.95) 0%, rgba(28, 25, 23, 0.9) 100%);
+    border: 1px solid rgba(181, 137, 80, 0.4);
+    border-top: none;
+
+    .status-toast-icon {
+      color: rgba(181, 137, 80, 0.9);
+    }
+
+    .status-toast-message {
+      color: rgba(254, 252, 232, 0.9);
+    }
+
+    // 底部金色光晕
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(181, 137, 80, 0.6) 50%, transparent 100%);
+    }
+  }
+
+  // 错误状态样式
+  &.error {
+    background: linear-gradient(180deg, rgba(60, 20, 20, 0.95) 0%, rgba(40, 15, 15, 0.9) 100%);
+    border: 1px solid rgba(220, 38, 38, 0.5);
+    border-top: none;
+
+    .status-toast-icon {
+      color: rgba(248, 113, 113, 0.9);
+    }
+
+    .status-toast-message {
+      color: rgba(254, 226, 226, 0.95);
+    }
+
+    .status-toast-close {
+      color: rgba(248, 113, 113, 0.7);
+
+      &:hover {
+        color: rgba(248, 113, 113, 1);
+        background: rgba(220, 38, 38, 0.2);
+      }
+    }
+
+    // 底部红色光晕
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(220, 38, 38, 0.6) 50%, transparent 100%);
+    }
+  }
+}
+
+.status-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.status-toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  // 旋转动画（用于加载图标）
+  .spin {
+    animation: spin 1s linear infinite;
+  }
+}
+
+.status-toast-message {
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-toast-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 0.5rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.3);
+  }
+}
+
+// =========================================
+// Animations
+// =========================================
+
+@keyframes toast-slide-down {
+  from {
+    transform: translateX(-50%) translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-slide-up {
+  from {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-50%) translateY(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

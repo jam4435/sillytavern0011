@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <title>角色状态模板</title>
+    <style>
+      :root {
+        --bg-color: #121212;
+        --container-bg: #1e1e1e;
+        --text-color: #e0e0e0;
+        --text-secondary-color: #b0b0b0;
+        --accent-color: #6200ea;
+        --accent-light-color: #bb86fc;
+        --border-color: #333333;
+        --red-color: #cf6679;
+        --green-color: #03dac6;
+      }
+      .status-container {
+        background-color: var(--container-bg);
+        color: var(--text-color);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        max-width: 600px;
+        margin: auto;
+        padding: 24px;
+        box-sizing: border-box;
+        margin-bottom: 20px;
+      }
+      .gallery-image {
+        cursor: grab;
+        transition: transform 0.2s ease-out;
+      }
+      .gallery-image.dragging {
+        cursor: grabbing;
+      }
+      .gallery-close {
+        z-index: 10;
+      }
+      /* ... (此处省略大部分与 final_state_panel.html 相同的CSS) ... */
+    </style>
+  </head>
+  <body>
+    <div id="jm-state-panel__SUFFIX__" class="status-container">
+      <!-- 内容将由脚本生成 -->
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const panel = document.getElementById('jm-state-panel__SUFFIX__');
+
+        function displayError(message, details = '') {
+          console.error('[状态栏 __SUFFIX__] ' + message, details);
+          panel.innerHTML = `<div style="color: var(--red-color); padding: 20px;"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${details}</p></details></div>`;
+        }
+
+        try {
+          // --- 诊断点 1: 检查原始注入的数据 ---
+          const rawInjectedData = `__JSON_DATA__`;
+          console.log('[状态栏 __SUFFIX__ | 诊断 1] 接收到的原始注入数据:', rawInjectedData);
+          
+          // --- 诊断点 2: 检查清理后的数据 ---
+          const trimmedData = rawInjectedData.trim();
+          console.log('[状态栏 __SUFFIX__ | 诊断 2] 清理首尾空白后的数据:', trimmedData);
+
+          // --- 诊断点 3: 在解析前打印最终字符串 ---
+          console.log('[状态栏 __SUFFIX__ | 诊断 3] 即将送入 JSON.parse() 的最终字符串:', trimmedData);
+          
+          let jsonData;
+          try {
+            jsonData = JSON.parse(trimmedData);
+            console.log('[状态栏 __SUFFIX__ | 诊断 4] JSON.parse() 成功！解析后的对象:', jsonData);
+          } catch (parseError) {
+            console.error('[状态栏 __SUFFIX__ | 诊断 4] JSON.parse() 失败！', parseError);
+            displayError('JSON 解析失败', `无法解析AI输出的数据。请检查控制台 "诊断 3" 中的字符串是否为合法的JSON格式。错误: ${parseError.message}`);
+            return; // 解析失败，终止执行
+          }
+
+          // --- 从此处开始，所有JS函数都与 final_state_panel.html 的最新版本完全相同 ---
+
+          function safeGet(obj, path, defaultValue = undefined) {
+            /* ... */
+          }
+          function uniq(arr) {
+            /* ... */
+          }
+
+          const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
+          const IMAGE_INDEX_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/imageIndex.json';
+          const SYNONYMS_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/synonyms.json';
+
+          let imageIndex = {};
+          let synonymMap = {};
+          let allKeywords = [];
+          let currentGalleryImages = [];
+          let currentGalleryIndex = 0;
+
+          async function fetchData() {
+            try {
+              const [imageResponse, synonymResponse] = await Promise.all([fetch(IMAGE_INDEX_URL), fetch(SYNONYMS_URL)]);
+
+              if (!imageResponse.ok) throw new Error(`图片索引加载失败: ${imageResponse.status}`);
+              imageIndex = await imageResponse.json();
+
+              if (synonymResponse.ok) {
+                const synonymData = await synonymResponse.json();
+                for (const mainKeyword in synonymData) {
+                  synonymData[mainKeyword].forEach(alias => {
+                    synonymMap[alias] = mainKeyword;
+                  });
+                }
+                console.log('[状态栏 __SUFFIX__] 同义词文件加载成功。');
+              } else {
+                console.warn(
+                  `[状态栏 __SUFFIX__] 警告: 同义词文件 (synonyms.json) 加载失败: ${synonymResponse.status}. 将无法使用别名功能。`,
+                );
+              }
+
+              allKeywords = [...Object.keys(imageIndex), ...Object.keys(synonymMap)];
+              return true;
+            } catch (error) {
+              console.error('[状态栏 __SUFFIX__] 数据加载失败:', error);
+              displayError('核心数据加载失败', `无法加载 imageIndex.json 或 synonyms.json。错误: ${error.message}`);
+              return false;
+            }
+          }
+
+          function findImagesByKeyword(textToSearch) {
+            /* ... (与 final_state_panel.html 最新版完全相同) ... */
+          }
+          function parseStat(statString) {
+            /* ... */
+          }
+
+          function updatePanel(data) {
+            // HTML 结构，注意所有 id 都已添加 __SUFFIX__
+            panel.innerHTML = `
+              <!-- ... (此处省略HTML结构，与 final_state_panel.html 相同，但 id="status" 变为 id="status__SUFFIX__" 等) ... -->
+              <div id="jm-image-gallery__SUFFIX__" class="gallery-modal">
+                <!-- ... -->
+              </div>
+            `;
+            // 数据填充逻辑
+            /* ... */
+          }
+
+          function updatePortrait(data) {
+            /* ... */
+          }
+          function linkifyModifications() {
+            /* ... */
+          }
+
+          function openGallery(images, startIndex) {
+            const gallery = document.getElementById('jm-image-gallery__SUFFIX__');
+            // ... (显示/隐藏箭头的逻辑) ...
+          }
+
+          function updateGalleryImage() {
+            const galleryImage = panel.querySelector('.gallery-image');
+            // ... (重置 transform 的逻辑) ...
+          }
+
+          function setupEventListeners() {
+            // 标签页事件监听，注意使用 document.getElementById('status__SUFFIX__')
+            /* ... */
+
+            const gallery = document.getElementById('jm-image-gallery__SUFFIX__');
+            // 关闭、上一个、下一个按钮的事件监听
+            /* ... */
+
+            // 图片缩放和拖动功能 (桌面+移动端)，所有逻辑与 final_state_panel.html 最新版完全相同
+            /* ... */
+          }
+
+          async function main() {
+            updatePanel(jsonData);
+            const dataLoaded = await fetchData();
+            if (dataLoaded) {
+              updatePortrait(jsonData);
+              linkifyModifications();
+            } else {
+              console.warn('[状态栏 __SUFFIX__] 因数据加载失败，图片相关功能将不可用。');
+            }
+            setupEventListeners();
+          }
+
+          main();
+        } catch (error) {
+          displayError(
+            '脚本执行失败。通常是由于AI输出的JSON格式不正确导致的。',
+            `错误: ${error.message}. 原始数据: ${rawData}`,
+          );
+        }
+      });
+    </script>
+  </body>
+</html>

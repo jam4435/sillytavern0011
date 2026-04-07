@@ -1,0 +1,142 @@
+// =========================================
+// Events Panel
+// =========================================
+
+.event-scroll-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.event-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.event-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--stone-400);
+  font-size: 0.875rem;
+  letter-spacing: 0.1em;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin: 0;
+}
+
+.event-list-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.event-compact-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  font-size: 0.9rem;
+  color: var(--stone-400);
+  line-height: 1.5;
+  padding: 0.25rem 0.5rem;
+}
+
+.event-dot {
+  width: 6px;
+  height: 6px;
+  background-color: var(--stone-600);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  margin-top: 0.5rem; // Optical alignment
+
+  &.gray {
+    background-color: var(--stone-800);
+  }
+}
+
+.event-compact-text {
+  flex: 1;
+}
+
+// Active Event Card
+.event-list-active {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.event-card-active {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(217, 119, 6, 0.3); // Amber border
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background-color: #d97706;
+  }
+}
+
+.event-active-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.event-active-title {
+  font-size: 1.25rem;
+  color: #e7e5e4;
+  font-family: var(--font-serif);
+  margin: 0;
+  letter-spacing: 0.05em;
+}
+
+.event-active-desc {
+  color: #a8a29e;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.event-active-vars {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vars-label {
+  font-size: 0.7rem;
+  color: #78716c;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.vars-content {
+  font-size: 0.85rem;
+  color: #d6d3d1;
+  font-family: monospace; // Monospace for alignment
+  white-space: pre-wrap; // Critical for newlines
+  line-height: 1.5;
+}
+
+.event-empty-box {
+  padding: 2rem;
+  text-align: center;
+  color: var(--stone-600);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  font-style: italic;
+}

@@ -1,0 +1,116 @@
+// =========================================
+// Setup Screen - 步骤6: 身份设置
+// =========================================
+
+.identity-step {
+  .section-desc {
+    font-size: 0.9rem;
+    color: var(--stone-400);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+  }
+}
+
+// 身份表单
+.identity-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    .form-label {
+      font-family: var(--font-serif);
+      font-size: 0.9rem;
+      color: var(--stone-300);
+
+      .label-hint {
+        font-size: 0.75rem;
+        color: var(--stone-500);
+        margin-left: 0.5rem;
+      }
+    }
+  }
+}
+
+// 性别切换按钮（身份页面专用）
+.gender-btn {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--stone-500);
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+
+  &:last-child {
+    border-radius: 0 4px 4px 0;
+  }
+
+  &:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--stone-300);
+  }
+
+  &.active {
+    background: rgba(200, 160, 80, 0.2);
+    border-color: rgba(200, 160, 80, 0.4);
+    color: #ffd780;
+  }
+}
+
+// 带随机按钮的输入
+.input-with-btn {
+  display: flex;
+  gap: 0.5rem;
+
+  .input-wrapper {
+    flex: 1;
+  }
+
+  .random-btn {
+    padding: 0.5rem 0.75rem;
+    background: rgba(200, 160, 80, 0.15);
+    border: 1px solid rgba(200, 160, 80, 0.3);
+    border-radius: 4px;
+    color: #c8a050;
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+
+    &:hover {
+      background: rgba(200, 160, 80, 0.25);
+      color: #ffd780;
+    }
+  }
+}
+
+// =========================================
+// 响应式调整
+// =========================================
+@media (max-width: 768px) {
+  .identity-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}

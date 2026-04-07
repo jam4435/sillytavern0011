@@ -1,0 +1,1195 @@
+// =========================================
+// Settings Panel - 设置面板样式
+// =========================================
+
+// =========================================
+// 设置面板主容器
+// =========================================
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 400px;
+}
+
+// =========================================
+// 标签页导航
+// =========================================
+
+.settings-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 1.5rem;
+}
+
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: 1px solid $stone-700;
+  color: $stone-400;
+  font-family: $font-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all $transition-normal;
+  position: relative;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: $stone-600;
+    color: $stone-300;
+  }
+
+  &.active {
+    background: rgba($amber-600, 0.1);
+    border-color: $amber-600;
+    color: $amber-600;
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: $amber-600;
+    }
+  }
+
+  svg {
+    opacity: 0.7;
+  }
+}
+
+// =========================================
+// 设置内容区域
+// =========================================
+
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  color: $stone-200;
+  font-weight: normal;
+  font-family: $font-serif;
+
+  .diamond-bullet {
+    width: 6px;
+    height: 6px;
+    background: $amber-600;
+    transform: rotate(45deg);
+    flex-shrink: 0;
+  }
+}
+
+.settings-description {
+  margin: 0 0 1rem 0;
+  font-size: 0.85rem;
+  color: $stone-500;
+  line-height: 1.5;
+}
+
+// =========================================
+// 设置行
+// =========================================
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &.settings-row-vertical {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+}
+
+.settings-label {
+  font-size: 0.9rem;
+  color: $stone-400;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.settings-control {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.settings-value {
+  min-width: 50px;
+  text-align: right;
+  font-size: 0.85rem;
+  color: $amber-600;
+  font-family: monospace;
+}
+
+// =========================================
+// 滑块控件
+// =========================================
+
+.settings-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 150px;
+  height: 4px;
+  background: $stone-800;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: $amber-600;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all $transition-fast;
+    box-shadow: 0 0 6px rgba($amber-600, 0.3);
+
+    &:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 10px rgba($amber-600, 0.5);
+    }
+  }
+
+  &::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: $amber-600;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    transition: all $transition-fast;
+    box-shadow: 0 0 6px rgba($amber-600, 0.3);
+
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+}
+
+// =========================================
+// 颜色选择器
+// =========================================
+
+.settings-color-picker {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 36px;
+  height: 36px;
+  border: 2px solid $stone-700;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+
+  &::-webkit-color-swatch-wrapper {
+    padding: 2px;
+  }
+
+  &::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
+  }
+
+  &::-moz-color-swatch {
+    border: none;
+    border-radius: 2px;
+  }
+
+  &:hover {
+    border-color: $amber-600;
+  }
+}
+
+.settings-color-input {
+  width: 90px;
+  padding: 0.5rem;
+  background: $stone-900;
+  border: 1px solid $stone-700;
+  border-radius: 4px;
+  color: $stone-300;
+  font-family: monospace;
+  font-size: 0.85rem;
+
+  &:focus {
+    outline: none;
+    border-color: $amber-600;
+  }
+}
+
+// =========================================
+// 图片上传
+// =========================================
+
+.settings-image-upload {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.settings-file-input {
+  display: none;
+}
+
+.settings-upload-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px dashed $stone-600;
+  color: $stone-400;
+  cursor: pointer;
+  transition: all $transition-normal;
+  font-size: 0.85rem;
+
+  &:hover {
+    border-color: $amber-600;
+    color: $amber-600;
+    background: rgba($amber-600, 0.05);
+  }
+}
+
+.settings-clear-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  border: 1px solid $red-500;
+  color: $red-500;
+  cursor: pointer;
+  transition: all $transition-normal;
+  font-size: 0.8rem;
+
+  &:hover {
+    background: rgba($red-500, 0.1);
+  }
+}
+
+.settings-image-preview {
+  width: 100%;
+  max-height: 150px;
+  overflow: hidden;
+  border: 1px solid $stone-700;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.settings-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: $stone-600;
+}
+
+// =========================================
+// 预览区域
+// =========================================
+
+.settings-preview {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+}
+
+.preview-label {
+  font-size: 0.75rem;
+  color: $stone-600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.75rem;
+}
+
+.preview-text {
+  font-family: $font-serif;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+// =========================================
+// 正则规则
+// =========================================
+
+.regex-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.regex-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: $stone-600;
+  gap: 0.75rem;
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+}
+
+.regex-rule-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid $stone-800;
+  padding: 0.75rem;
+  transition: all $transition-normal;
+
+  &:hover {
+    border-color: $stone-700;
+  }
+
+  &.disabled {
+    opacity: 0.5;
+
+    .regex-rule-header {
+      color: $stone-600;
+    }
+  }
+}
+
+.regex-rule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  margin: -0.5rem -0.5rem 0 -0.5rem; // 扩展点击区域
+  cursor: pointer; // 提示可点击
+  transition: background-color $transition-fast;
+  border-radius: 4px;
+  user-select: none; // 防止点击时选中文字
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  &:active {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.regex-rule-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  // 阻止头部点击事件影响此区域内的按钮
+  pointer-events: none;
+
+  & > * {
+    pointer-events: auto; // 重新启用子元素的事件
+  }
+}
+
+.regex-toggle-btn {
+  background: none;
+  border: none;
+  color: $stone-600; // 默认关闭状态颜色
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-fast;
+  border-radius: 4px;
+
+  &:hover {
+    color: $stone-400;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &.active {
+    color: $green-500; // 启用状态颜色
+
+    &:hover {
+      color: lighten($green-500, 10%);
+      background: rgba($green-500, 0.1);
+    }
+  }
+}
+
+.regex-rule-index {
+  font-size: 0.8rem;
+  color: $stone-500;
+  white-space: nowrap;
+}
+
+.regex-rule-desc {
+  font-size: 0.85rem;
+  color: $stone-400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.regex-rule-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem; // 减小间距
+}
+
+.regex-expand-btn {
+  background: none;
+  border: none;
+  color: $stone-500;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-fast;
+  border-radius: 4px;
+
+  &:hover {
+    color: $amber-600;
+    background: rgba($amber-600, 0.1);
+  }
+}
+
+.regex-delete-btn {
+  background: none;
+  border: none;
+  color: $stone-600;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: $red-500;
+  }
+}
+
+.regex-rule-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 0.5rem 0.5rem; // 调整内边距
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 0.75rem; // 与 header 分隔
+}
+
+.regex-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  label {
+    font-size: 0.75rem;
+    color: $stone-500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
+
+.regex-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: $stone-900;
+  border: 1px solid $stone-700;
+  border-radius: 4px;
+  color: $stone-200;
+  font-family: monospace;
+  font-size: 0.85rem;
+
+  &::placeholder {
+    color: $stone-600;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $amber-600;
+  }
+
+  &.invalid {
+    border-color: $red-500;
+    background: rgba($red-500, 0.05);
+  }
+}
+
+.regex-error {
+  font-size: 0.75rem;
+  color: $red-500;
+  margin-top: 0.25rem;
+}
+
+// =========================================
+// 按钮组
+// =========================================
+
+.regex-buttons-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+// =========================================
+// 添加规则按钮
+// =========================================
+
+.settings-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 120px;
+  padding: 0.75rem;
+  background: transparent;
+  border: 1px dashed $stone-700;
+  color: $stone-500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all $transition-normal;
+
+  .add-icon {
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+
+  &:hover {
+    border-color: $amber-600;
+    color: $amber-600;
+    background: rgba($amber-600, 0.05);
+  }
+}
+
+// =========================================
+// 导入酒馆正则按钮
+// =========================================
+
+.settings-import-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 140px;
+  padding: 0.75rem;
+  background: rgba($amber-600, 0.1);
+  border: 1px solid rgba($amber-600, 0.6);
+  color: $amber-600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all $transition-normal;
+
+  svg {
+    opacity: 0.8;
+  }
+
+  &:hover {
+    border-color: $amber-600;
+    color: $yellow-500;
+    background: rgba($amber-600, 0.15);
+
+    svg {
+      opacity: 1;
+    }
+  }
+
+  &:active {
+    background: rgba($amber-600, 0.2);
+  }
+}
+
+// =========================================
+// 底部操作栏
+// =========================================
+
+.settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-reset-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid $stone-700;
+  color: $stone-500;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all $transition-normal;
+
+  &:hover {
+    border-color: $red-500;
+    color: $red-500;
+    background: rgba($red-500, 0.05);
+  }
+}
+
+// =========================================
+// 调试面板
+// =========================================
+
+.debug-logs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.debug-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  color: $stone-600;
+  gap: 0.75rem;
+  text-align: center;
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+
+  .debug-hint {
+    font-size: 0.8rem;
+    color: $stone-700;
+  }
+}
+
+.debug-log-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  transition: all $transition-normal;
+
+  &:hover {
+    border-color: $stone-700;
+  }
+
+  &.user {
+    border-left: 3px solid $amber-600;
+  }
+
+  &.assistant {
+    border-left: 3px solid $green-500;
+  }
+
+  &.expanded {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.debug-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: background-color $transition-fast;
+  user-select: none;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+.debug-log-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.debug-log-type {
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+
+  &.user {
+    color: $amber-600;
+  }
+
+  &.assistant {
+    color: $green-500;
+  }
+}
+
+.debug-log-time {
+  font-size: 0.75rem;
+  color: $stone-500;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.debug-log-length {
+  font-size: 0.75rem;
+  color: $stone-600;
+  white-space: nowrap;
+}
+
+.debug-log-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.debug-expand-btn {
+  background: none;
+  border: none;
+  color: $stone-500;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-fast;
+  border-radius: 4px;
+
+  &:hover {
+    color: $amber-600;
+    background: rgba($amber-600, 0.1);
+  }
+}
+
+.debug-log-preview {
+  padding: 0.5rem 0.75rem;
+  padding-top: 0;
+  font-size: 0.8rem;
+  color: $stone-500;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.debug-log-body {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0.75rem;
+}
+
+.debug-log-content {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  padding: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+
+  pre {
+    margin: 0;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: $stone-300;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+}
+
+.debug-log-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+.debug-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  border: 1px solid $stone-700;
+  color: $stone-400;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all $transition-normal;
+  border-radius: 4px;
+
+  &:hover {
+    border-color: $amber-600;
+    color: $amber-600;
+    background: rgba($amber-600, 0.05);
+  }
+
+  &:active {
+    background: rgba($amber-600, 0.1);
+  }
+}
+
+.debug-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: $stone-500;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+// =========================================
+// 自动总结设置
+// =========================================
+
+.summary-section {
+  .settings-row {
+    flex-wrap: wrap;
+  }
+}
+
+.summary-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid $stone-700;
+  color: $stone-500;
+  cursor: pointer;
+  transition: all $transition-normal;
+  border-radius: 4px;
+
+  &:hover {
+    border-color: $stone-600;
+    color: $stone-400;
+  }
+
+  &.active {
+    border-color: $green-500;
+    color: $green-500;
+    background: rgba($green-500, 0.1);
+
+    &:hover {
+      background: rgba($green-500, 0.15);
+    }
+  }
+}
+
+.summary-subsection {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.summary-subsection-title {
+  font-size: 0.9rem;
+  color: $stone-300;
+  margin: 0 0 1rem 0;
+  font-weight: normal;
+  font-family: $font-serif;
+}
+
+// 文本输入框
+.settings-text-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem 0.75rem;
+  background: $stone-900;
+  border: 1px solid $stone-700;
+  border-radius: 4px;
+  color: $stone-200;
+  font-size: 0.85rem;
+
+  &::placeholder {
+    color: $stone-600;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $amber-600;
+  }
+}
+
+// 数字输入框
+.settings-number-input {
+  width: 80px;
+  padding: 0.5rem 0.75rem;
+  background: $stone-900;
+  border: 1px solid $stone-700;
+  border-radius: 4px;
+  color: $stone-200;
+  font-size: 0.85rem;
+  text-align: center;
+
+  &:focus {
+    outline: none;
+    border-color: $amber-600;
+  }
+
+  // 隐藏数字输入框的上下箭头
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  -moz-appearance: textfield;
+}
+
+// 下拉选择框
+.settings-select {
+  min-width: 120px;
+  padding: 0.5rem 0.75rem;
+  background: $stone-900;
+  border: 1px solid $stone-700;
+  border-radius: 4px;
+  color: $stone-200;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: $amber-600;
+  }
+
+  option {
+    background: $stone-900;
+    color: $stone-200;
+  }
+}
+
+// 行内提示
+.settings-hint-inline {
+  font-size: 0.75rem;
+  color: $stone-600;
+  margin-left: 0.5rem;
+}
+
+// 文本域
+.settings-textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 0.75rem;
+  background: $stone-900;
+  border: 1px solid $stone-700;
+  border-radius: 4px;
+  color: $stone-200;
+  font-family: monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+
+  &::placeholder {
+    color: $stone-600;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $amber-600;
+  }
+}
+
+// 重置模板按钮
+.settings-reset-template-btn {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  border: 1px solid $stone-700;
+  color: $stone-500;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all $transition-normal;
+
+  &:hover {
+    border-color: $amber-600;
+    color: $amber-600;
+  }
+}
+
+// 操作按钮组
+.summary-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.settings-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: 1px solid $stone-700;
+  color: $stone-400;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all $transition-normal;
+  border-radius: 4px;
+
+  &:hover:not(:disabled) {
+    border-color: $stone-600;
+    color: $stone-300;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &.primary {
+    background: rgba($amber-600, 0.1);
+    border-color: $amber-600;
+    color: $amber-600;
+
+    &:hover:not(:disabled) {
+      background: rgba($amber-600, 0.2);
+      color: $yellow-500;
+    }
+  }
+}
+
+// 状态显示
+.summary-status,
+.summary-result {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  margin-top: 1rem;
+}
+
+.summary-status-header,
+.summary-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.9rem;
+  color: $stone-300;
+}
+
+.summary-status-badge,
+.summary-result-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+
+  &.ok {
+    background: rgba($green-500, 0.1);
+    color: $green-500;
+  }
+
+  &.warning {
+    background: rgba($amber-600, 0.1);
+    color: $amber-600;
+  }
+
+  &.success {
+    background: rgba($green-500, 0.1);
+    color: $green-500;
+  }
+}
+
+.summary-status-body,
+.summary-result-body {
+  padding: 0.75rem;
+}
+
+.summary-status-item,
+.summary-result-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  color: $stone-400;
+
+  strong {
+    color: $stone-200;
+  }
+
+  &.success strong {
+    color: $green-500;
+  }
+
+  &.failed strong {
+    color: $red-500;
+  }
+}
+
+.summary-pending-list {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.85rem;
+  color: $stone-400;
+
+  ul {
+    margin: 0.5rem 0 0 0;
+    padding-left: 1.5rem;
+    list-style: disc;
+
+    li {
+      padding: 0.25rem 0;
+      color: $stone-300;
+    }
+  }
+}
+
+.summary-result {
+  &.success {
+    border-color: rgba($green-500, 0.3);
+  }
+
+  &.partial {
+    border-color: rgba($amber-600, 0.3);
+  }
+}

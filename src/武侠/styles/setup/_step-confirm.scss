@@ -1,0 +1,193 @@
+// =========================================
+// Setup Screen - 步骤7: 确认页面
+// =========================================
+
+.confirm-step {
+  .section-desc {
+    font-size: 0.9rem;
+    color: var(--stone-400);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+  }
+}
+
+// 角色预览（确认页面）
+.character-preview {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 1.5rem;
+
+  .preview-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 1rem;
+
+    .preview-title {
+      font-family: var(--font-serif);
+      font-size: 0.95rem;
+      color: #c8a050;
+      margin: 0 0 0.75rem 0;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  .preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+
+    .preview-item {
+      display: flex;
+      gap: 0.5rem;
+
+      .preview-label {
+        font-size: 0.85rem;
+        color: var(--stone-500);
+        min-width: 4rem;
+
+        &::after {
+          content: '：';
+        }
+      }
+
+      .preview-value {
+        font-size: 0.85rem;
+        color: var(--stone-200);
+      }
+    }
+  }
+
+  .preview-attributes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+
+    span {
+      padding: 0.3rem 0.6rem;
+      background: rgba(200, 160, 80, 0.1);
+      border: 1px solid rgba(200, 160, 80, 0.2);
+      border-radius: 4px;
+      font-size: 0.8rem;
+      color: var(--stone-300);
+    }
+  }
+
+  .preview-traits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+
+    .trait-badge {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+
+      &.positive {
+        background: rgba(80, 180, 80, 0.15);
+        color: #80d080;
+        border: 1px solid rgba(100, 200, 100, 0.3);
+      }
+
+      &.negative {
+        background: rgba(220, 80, 80, 0.15);
+        color: #ff8080;
+        border: 1px solid rgba(240, 100, 100, 0.3);
+      }
+    }
+  }
+
+  .preview-martial {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+
+    .martial-badge {
+      font-size: 0.8rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(100, 150, 220, 0.15);
+      border: 1px solid rgba(100, 150, 220, 0.3);
+      border-radius: 3px;
+      color: #80b0e0;
+    }
+
+    .empty-hint {
+      font-size: 0.8rem;
+      color: var(--stone-500);
+      font-style: italic;
+    }
+  }
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.preview-name {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: #ffd780;
+  letter-spacing: 0.1em;
+}
+
+.preview-gender {
+  font-size: 1.2rem;
+  color: var(--stone-400);
+}
+
+.preview-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.preview-row {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.9rem;
+
+  .preview-label {
+    min-width: 5rem;
+    color: var(--stone-500);
+    font-family: var(--font-serif);
+
+    &::after {
+      content: '：';
+    }
+  }
+
+  .preview-value {
+    color: var(--stone-300);
+    flex: 1;
+  }
+}
+
+// 预览区域样式
+.preview-section {
+  background: linear-gradient(135deg, rgba(180, 130, 60, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+}
+
+// =========================================
+// 响应式调整
+// =========================================
+@media (max-width: 768px) {
+  .character-preview .preview-grid {
+    grid-template-columns: 1fr;
+  }
+}

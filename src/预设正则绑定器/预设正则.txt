@@ -1,0 +1,325 @@
+// ==UserScript==
+// @name         预设与正则绑定器 (v1.5 - TavernHelper 优化版)
+// @version      1.5
+// @description  通过图形化界面，流畅地管理预设与正则的绑定规则，并支持自定义界面颜色。v1.5: 正常的选项框
+// @author       你的名字
+// ==/UserScript==
+
+(async () => {
+    // ----------------------------------------------------------------------------------
+    // 0. 检查核心依赖 (已增强)
+    // ----------------------------------------------------------------------------------
+    if (
+        typeof TavernHelper === 'undefined' ||
+        typeof TavernHelper.getLoadedPresetName !== 'function' || // 检查核心优化函数
+        typeof TavernHelper.getTavernRegexes !== 'function' ||
+        typeof TavernHelper.updateTavernRegexesWith !== 'function' ||
+        typeof TavernHelper.errorCatched !== 'function' ||
+        typeof eventOn === 'undefined' ||
+        typeof tavern_events === 'undefined' ||
+        typeof SillyTavern === 'undefined' ||
+        typeof toastr === 'undefined'
+    ) {
+        console.error('[绑定器] 核心依赖未完全加载或版本过旧，脚本无法运行。');
+        if (typeof TavernHelper !== 'undefined' && typeof TavernHelper.getLoadedPresetName !== 'function') {
+            toastr.error('您的酒馆助手版本过旧，[预设与正则绑定器] 需要更新的 TavernHelper API。请更新您的酒馆助手。', '错误', { timeOut: 10000 });
+        } else {
+            toastr.error('[预设与正则绑定器] 无法启动，缺少核心依赖。', '错误', { timeOut: 10000 });
+        }
+        return;
+    }
+
+
+    // ----------------------------------------------------------------------------------
+    // 1. 全局变量和常量定义 (无改动)
+    // ----------------------------------------------------------------------------------
+    const SCRIPT_ID_PREFIX = 'preset_regex_binder';
+    const PANEL_ID = `${SCRIPT_ID_PREFIX}-panel`;
+    const BUTTON_ID = `${SCRIPT_ID_PREFIX}-button`;
+
+    let PRESET_REGEX_BINDINGS = {};
+    let lastKnownPreset = null;
+    let UI_SETTINGS = {
+        backgroundColor: 'rgba(40, 40, 40, 0.98)',
+        fontColor: '#eeeeee'
+    };
+
+    // ----------------------------------------------------------------------------------
+    // 2. 核心后端逻辑 (已优化)
+    // ----------------------------------------------------------------------------------
+    const applyPresetRegexBindings = async () => {
+        try {
+            // [优化] 使用 TavernHelper 官方 API 获取当前加载的预设名称，比直接读取内部属性更稳定。
+            const activePresetName = TavernHelper.getLoadedPresetName();
+            if (!activePresetName || activePresetName === lastKnownPreset) return;
+
+            console.log(`[绑定器] 检测到预设变更为 "${activePresetName}"。`);
+            lastKnownPreset = activePresetName;
+
+            const rulesForPreset = PRESET_REGEX_BINDINGS[activePresetName];
+            const allManagedRegexNames = new Set();
+            Object.values(PRESET_REGEX_BINDINGS).forEach(rule => {
+                (rule.enable || []).forEach(name => allManagedRegexNames.add(name));
+                (rule.disable || []).forEach(name => allManagedRegexNames.add(name));
+            });
+
+            // TavernHelper.getTavernRegexes 的用法与新API一致
+            const currentRegexes = await TavernHelper.getTavernRegexes({ scope: 'all' });
+            let isUpdateNeeded = false;
+
+            for (const regex of currentRegexes) {
+                if (allManagedRegexNames.has(regex.script_name)) {
+                    let desiredState = false;
+                    if (rulesForPreset && rulesForPreset.enable && rulesForPreset.enable.includes(regex.script_name)) {
+                        desiredState = true;
+                    }
+                    if (regex.enabled !== desiredState) {
+                        isUpdateNeeded = true;
+                        break;
+                    }
+                }
+            }
+
+            if (isUpdateNeeded) {
+                console.log('[绑定器] 检测到正则状态需要更新，正在执行...');
+                toastr.info(`正在为预设 "${activePresetName}" 应用绑定规则...`);
+
+                // TavernHelper.updateTavernRegexesWith 的用法与新API一致
+                await TavernHelper.updateTavernRegexesWith(currentRegexes => {
+                    currentRegexes.forEach(regex => {
+                        if (allManagedRegexNames.has(regex.script_name)) {
+                            let desiredState = false;
+                            if (rulesForPreset && rulesForPreset.enable && rulesForPreset.enable.includes(regex.script_name)) {
+                                desiredState = true;
+                            }
+                            regex.enabled = desiredState;
+                        }
+                    });
+                    return currentRegexes;
+                });
+                console.log('[绑定器] 正则状态更新完成。');
+            } else {
+                console.log('[绑定器] 所有正则状态均已正确，无需执行更新。');
+            }
+
+        } catch (error) {
+            console.error('[绑定器] 执行绑定逻辑时出错:', error);
+        }
+    };
+
+    // ----------------------------------------------------------------------------------
+    // 3. UI 创建与管理 (已优化)
+    // ----------------------------------------------------------------------------------
+    const toggleBinderPanel = async () => {
+        const $panel = $(`#${PANEL_ID}`, window.parent.document);
+        if ($panel.is(':visible')) {
+            $panel.hide();
+        } else {
+            await loadSettings();
+            applyUISettings();
+            await renderUI();
+            $panel.css('display', 'flex');
+        }
+    };
+
+    const renderUI = async () => {
+        const parentDoc = window.parent.document;
+        const $settingsArea = $(`#${PANEL_ID} .settings-area`, parentDoc);
+        $settingsArea.html('<p>正在获取当前预设和正则列表...</p>');
+
+        // [优化] 使用 TavernHelper 官方 API 获取当前加载的预设名称
+        const activePresetName = TavernHelper.getLoadedPresetName();
+        if (!activePresetName) {
+            $settingsArea.html('<p>未能获取到当前激活的对话补全预设。请先在“API连接”中选择一个预设。</p>');
+            return;
+        }
+
+        try {
+            const regexes = await TavernHelper.getTavernRegexes({ scope: 'all' });
+            $settingsArea.empty();
+            $settingsArea.append(`<h4>正在配置预设: <strong>${activePresetName}</strong></h4>`);
+            $settingsArea.append('<p class="panel-desc">为当前预设设置激活时，需要开启或关闭的正则表达式。</p>');
+
+            if (!regexes || regexes.length === 0) {
+                $settingsArea.append('<p>未找到任何正则表达式脚本。</p>');
+            } else {
+                 if (!PRESET_REGEX_BINDINGS[activePresetName]) {
+                    PRESET_REGEX_BINDINGS[activePresetName] = { enable: [], disable: [] };
+                }
+                const rules = PRESET_REGEX_BINDINGS[activePresetName];
+                regexes.forEach(regex => {
+                    const regexName = regex.script_name;
+                    let currentBinding = 'ignore';
+                    if (rules.enable?.includes(regexName)) currentBinding = 'enable';
+                    else if (rules.disable?.includes(regexName)) currentBinding = 'disable';
+                    const $row = $(`<div class="setting-row"><span class="regex-name">${regexName}</span><select class="binding-select" data-regex-name="${regexName}"><option value="ignore" ${currentBinding === 'ignore' ? 'selected' : ''}>忽略 (不受控)</option><option value="enable" ${currentBinding === 'enable' ? 'selected' : ''}>开启此正则</option><option value="disable" ${currentBinding === 'disable' ? 'selected' : ''}>关闭此正则</option></select></div>`);
+                    $row.find('select').on('change', function() {
+                        const newBinding = $(this).val();
+                        const regexToUpdate = $(this).data('regex-name');
+                        rules.enable = (rules.enable || []).filter(item => item !== regexToUpdate);
+                        rules.disable = (rules.disable || []).filter(item => item !== regexToUpdate);
+                        if (newBinding === 'enable') rules.enable.push(regexToUpdate);
+                        else if (newBinding === 'disable') rules.disable.push(regexToUpdate);
+                    });
+                    $settingsArea.append($row);
+                });
+            }
+
+            const $uiSettingsSection = $(`
+                <div class="ui-settings-section">
+                    <hr>
+                    <h4>界面颜色设置 (实时预览)</h4>
+                    <div class="setting-row">
+                        <label for="${SCRIPT_ID_PREFIX}-bg-color">背景颜色</label>
+                        <input type="color" id="${SCRIPT_ID_PREFIX}-bg-color" value="${UI_SETTINGS.backgroundColor}">
+                    </div>
+                    <div class="setting-row">
+                        <label for="${SCRIPT_ID_PREFIX}-font-color">字体颜色</label>
+                        <input type="color" id="${SCRIPT_ID_PREFIX}-font-color" value="${UI_SETTINGS.fontColor}">
+                    </div>
+                </div>
+            `);
+            $settingsArea.append($uiSettingsSection);
+
+            $(`#${SCRIPT_ID_PREFIX}-bg-color`, parentDoc).on('input', function() {
+                UI_SETTINGS.backgroundColor = $(this).val();
+                applyUISettings();
+            });
+
+            $(`#${SCRIPT_ID_PREFIX}-font-color`, parentDoc).on('input', function() {
+                UI_SETTINGS.fontColor = $(this).val();
+                applyUISettings();
+            });
+
+            const $saveButton = $('<button class="save-button">保存所有设置</button>');
+            $saveButton.on('click', async () => {
+                await saveSettings();
+                toastr.success(`预设 "${activePresetName}" 的绑定规则及UI颜色已保存！`);
+                lastKnownPreset = null;
+                applyPresetRegexBindings();
+            });
+            $settingsArea.append($saveButton);
+
+        } catch (error) {
+            console.error(`[绑定器] 渲染UI失败:`, error);
+            $settingsArea.html('<p>渲染UI时发生错误，请查看控制台。</p>');
+        }
+    };
+
+    // ----------------------------------------------------------------------------------
+    // 4. 数据持久化与UI应用 (无改动)
+    // ----------------------------------------------------------------------------------
+    const applyUISettings = () => {
+        const $panel = $(`#${PANEL_ID}`, window.parent.document);
+        if ($panel.length > 0) {
+            $panel.css('--binder-bg-color', UI_SETTINGS.backgroundColor);
+            $panel.css('--binder-font-color', UI_SETTINGS.fontColor);
+        }
+    };
+
+    const saveSettings = async () => {
+        try {
+            const settingsToSave = {
+                bindings: PRESET_REGEX_BINDINGS,
+                uiSettings: UI_SETTINGS
+            };
+            SillyTavern.extensionSettings[SCRIPT_ID_PREFIX] = settingsToSave;
+            SillyTavern.saveSettingsDebounced();
+            console.log('[绑定器] 配置已保存。', settingsToSave);
+        } catch (error) {
+            console.error('[绑定器] 保存配置失败:', error);
+            toastr.error('保存配置失败，请查看控制台。');
+        }
+    };
+
+    const loadSettings = async () => {
+        try {
+            const settings = SillyTavern.extensionSettings[SCRIPT_ID_PREFIX] || {};
+
+            if (settings.uiSettings === undefined && Object.keys(settings).length > 0) {
+                console.log('[绑定器] 检测到旧版配置格式，将自动迁移。');
+                PRESET_REGEX_BINDINGS = settings ? structuredClone(settings) : {};
+            } else {
+                PRESET_REGEX_BINDINGS = settings.bindings ? structuredClone(settings.bindings) : {};
+                UI_SETTINGS = { ...UI_SETTINGS, ...(settings.uiSettings || {}) };
+            }
+
+            console.log('[绑定器] 绑定配置已加载。', PRESET_REGEX_BINDINGS);
+            console.log('[绑定器] UI配置已加载。', UI_SETTINGS);
+        } catch (error) {
+            console.error('[绑定器] 加载配置失败:', error);
+            PRESET_REGEX_BINDINGS = {};
+        }
+    };
+
+
+    // ----------------------------------------------------------------------------------
+    // 5. 初始化 (已更新版本提示)
+    // ----------------------------------------------------------------------------------
+    const init = () => {
+        const parentDoc = window.parent.document;
+        if ($(`#${PANEL_ID}-styles`, parentDoc).length === 0) {
+            const panelStyles = `
+                #${PANEL_ID} {
+                    display: none; position: fixed; top: 10vh; left: 50%; transform: translateX(-50%);
+                    width: 90vw; height: auto; max-width: 700px; max-height: 80vh;
+                    z-index: 10000; flex-direction: column; border: 1px solid #666;
+                    border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+                    background-color: var(--binder-bg-color, rgba(40, 40, 40, 0.98));
+                    color: var(--binder-font-color, #eee);
+                }
+                #${PANEL_ID} .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background-color: rgba(0,0,0,0.15); border-bottom: 1px solid rgba(255,255,255,0.1); }
+                #${PANEL_ID} .panel-header h3 { margin: 0; }
+                #${PANEL_ID} .close-button { background: none; border: none; color: inherit; font-size: 24px; cursor: pointer; opacity: 0.8; }
+                #${PANEL_ID} .close-button:hover { opacity: 1; }
+                #${PANEL_ID} .settings-area { padding: 20px; overflow-y: auto; }
+                #${PANEL_ID} .panel-desc { font-size: 0.9em; opacity: 0.8; margin-top: -10px; margin-bottom: 20px; }
+                #${PANEL_ID} .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; border-bottom: 1px solid rgba(0,0,0,0.15); }
+                #${PANEL_ID} .regex-name { flex-grow: 1; margin-right: 20px; }
+                #${PANEL_ID} .binding-select { flex-shrink: 0; width: 150px; background-color: rgba(0,0,0,0.25); color: inherit; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 5px; }
+                #${PANEL_ID} .save-button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px; float: right; }
+                #${PANEL_ID} .save-button:hover { background-color: #45a049; }
+                #${PANEL_ID} .ui-settings-section { margin-top: 20px; padding-top: 10px; }
+                #${PANEL_ID} .ui-settings-section hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 15px 0 20px; }
+                #${PANEL_ID} .ui-settings-section label { margin-right: 15px; }
+                #${PANEL_ID} input[type="color"] { min-width: 50px; height: 30px; padding: 2px; border: 1px solid rgba(255,255,255,0.2); background: transparent; cursor: pointer; border-radius: 4px; }
+            `;
+            $('head', parentDoc).append(`<style id="${PANEL_ID}-styles">${panelStyles}</style>`);
+        }
+        if ($(`#${PANEL_ID}`, parentDoc).length === 0) {
+            const panelHtml = `<div id="${PANEL_ID}"><div class="panel-header"><h3>预设与正则绑定器</h3><button class="close-button" title="关闭">×</button></div><div class="settings-area"></div></div>`;
+            $('body', parentDoc).append(panelHtml);
+            $(`#${PANEL_ID} .close-button`, parentDoc).on('click', toggleBinderPanel);
+        }
+
+        // 使用 APP_READY 事件确保在正确的时机创建按钮，而不是使用轮询
+        if (eventOn && tavern_events && tavern_events.APP_READY) {
+            eventOn(tavern_events.APP_READY, () => {
+                const $buttonContainer = $('#extensionsMenu', parentDoc);
+                if ($buttonContainer.length > 0) {
+                    if ($(`#${BUTTON_ID}`, parentDoc).length === 0) {
+                        const buttonHtml = `<div id="${BUTTON_ID}" class="list-group-item flex-container flexGap5 interactable" title="配置当前预设的正则绑定"><i class="fa-solid fa-link"></i><span>预设正则绑定器</span></div>`;
+                        $buttonContainer.append(buttonHtml);
+                        $(parentDoc).on('click', `#${BUTTON_ID}`, toggleBinderPanel);
+                    }
+                } else {
+                    console.error('[绑定器] 在 APP_READY 事件后仍未找到扩展按钮容器 #extensionsMenu。');
+                }
+            });
+        } else {
+            console.error('[绑定器] 事件系统不可用，无法监听 APP_READY 事件，按钮创建失败。');
+        }
+
+        loadSettings().then(() => {
+            applyUISettings();
+            // 使用 errorCatched 包装事件处理函数，确保插件稳定性
+            eventOn(tavern_events.SETTINGS_UPDATED, TavernHelper.errorCatched(applyPresetRegexBindings));
+            setTimeout(() => applyPresetRegexBindings(), 2000);
+            toastr.success('预设与正则绑定器 (v1.4) 已激活', '脚本加载成功');
+        });
+    };
+
+    // 执行初始化
+    init();
+
+})();

@@ -1,0 +1,37 @@
+// =========================================
+// Setup Screen 样式模块入口
+// =========================================
+//
+// 模块说明：
+// - _base.scss: 主容器、动态背景层、返回按钮、内容区域、标题、玻璃卡片
+// - _steps-indicator.scss: 步骤指示器
+// - _forms.scss: 通用表单组件（输入框、按钮、性别切换等）
+// - _step-talent.scss: 步骤1 - 天资选择
+// - _step-attributes.scss: 步骤2 - 属性分配
+// - _step-traits.scss: 步骤3 - 天赋选择
+// - _step-martial.scss: 步骤4 - 武功选择
+// - _step-origin.scss: 步骤5 - 出身选择
+// - _step-identity.scss: 步骤6 - 身份设置
+// - _step-confirm.scss: 步骤7 - 确认保存
+// - _gacha.scss: 抽卡系统
+// - _components.scss: 通知消息等通用组件
+//
+// =========================================
+
+// 基础样式
+@import 'base';
+@import 'steps-indicator';
+@import 'forms';
+
+// 各步骤样式
+@import 'step-talent';
+@import 'step-attributes';
+@import 'step-traits';
+@import 'step-martial';
+@import 'step-origin';
+@import 'step-identity';
+@import 'step-confirm';
+
+// 功能模块
+@import 'gacha';
+@import 'components';

@@ -1,0 +1,717 @@
+// =========================================
+// Setup Screen - 通用表单组件
+// 表单容器、网格、字段、输入框、性别切换、年龄滑块等
+// =========================================
+
+// =========================================
+// 表单容器
+// =========================================
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  animation: fadeSlideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// =========================================
+// 表单网格
+// =========================================
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  position: relative;
+  z-index: 1;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// =========================================
+// 表单字段
+// =========================================
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &.full-width {
+    grid-column: 1 / -1;
+  }
+}
+
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+
+  .label-text {
+    color: var(--stone-300);
+  }
+
+  .label-required {
+    color: #ff8080;
+    font-size: 0.8rem;
+  }
+
+  .label-value {
+    margin-left: auto;
+    color: #ffd780;
+    font-size: 1rem;
+    font-weight: 500;
+  }
+}
+
+// =========================================
+// 输入框样式
+// =========================================
+.input-wrapper {
+  position: relative;
+
+  .input-glow {
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(135deg, rgba(200, 160, 80, 0.3), rgba(180, 140, 60, 0.1));
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  &:focus-within .input-glow {
+    opacity: 1;
+  }
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  background: rgba(10, 9, 8, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: var(--stone-100);
+  padding: 0.75rem 1rem;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &::placeholder {
+    color: var(--stone-600);
+  }
+
+  &:focus {
+    border-color: rgba(200, 160, 80, 0.4);
+    background: rgba(15, 12, 10, 0.8);
+  }
+
+  &.error {
+    border-color: rgba(240, 100, 100, 0.5);
+
+    &:focus {
+      border-color: rgba(240, 100, 100, 0.7);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.error-text {
+  font-size: 0.75rem;
+  color: #ff6b6b;
+  margin-top: 0.25rem;
+
+  &.center {
+    text-align: center;
+  }
+}
+
+// =========================================
+// 带操作按钮的输入框
+// =========================================
+.input-with-action {
+  display: flex;
+  gap: 0.5rem;
+
+  .input-wrapper {
+    flex: 1;
+  }
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(200, 160, 80, 0.3);
+    transform: scale(1.05);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.dice-btn {
+  .dice-icon {
+    font-size: 1.3rem;
+    transition: transform 0.3s ease;
+  }
+
+  &:hover:not(:disabled) .dice-icon {
+    animation: diceShake 0.5s ease;
+  }
+}
+
+@keyframes diceShake {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-15deg);
+  }
+  50% {
+    transform: rotate(15deg);
+  }
+  75% {
+    transform: rotate(-10deg);
+  }
+}
+
+// =========================================
+// 性别切换
+// =========================================
+.gender-toggle {
+  display: flex;
+  position: relative;
+  background: rgba(10, 9, 8, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.gender-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--stone-500);
+  font-family: var(--font-serif);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
+
+  .gender-icon {
+    font-size: 1.1rem;
+    transition: transform 0.3s ease;
+  }
+
+  .gender-text {
+    font-size: 0.9rem;
+  }
+
+  &:hover:not(:disabled):not(.active) {
+    color: var(--stone-300);
+  }
+
+  &.active {
+    color: #ffd780;
+
+    .gender-icon {
+      transform: scale(1.15);
+    }
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.gender-slider {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc(50% - 4px);
+  background: linear-gradient(135deg, rgba(180, 130, 60, 0.25), rgba(140, 100, 40, 0.15));
+  border: 1px solid rgba(200, 160, 80, 0.3);
+  border-radius: 3px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+
+  &.right {
+    transform: translateX(100%);
+  }
+}
+
+// =========================================
+// 年龄滑块
+// =========================================
+.age-slider-wrapper {
+  position: relative;
+  padding: 0.5rem 0;
+}
+
+.age-slider {
+  width: 100%;
+  height: 6px;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #ffd780, #c8a050);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(200, 160, 80, 0.4);
+    transition: all 0.2s ease;
+    margin-top: -6px;
+  }
+
+  &::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 12px rgba(200, 160, 80, 0.6);
+  }
+
+  &::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #ffd780, #c8a050);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(200, 160, 80, 0.4);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.age-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 6px;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.age-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(200, 160, 80, 0.6), rgba(255, 215, 140, 0.4));
+  border-radius: 3px;
+  transition: width 0.1s ease;
+}
+
+// =========================================
+// 时间地点选择
+// =========================================
+.location-toggle {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.toggle-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  color: var(--stone-500);
+  font-family: var(--font-serif);
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  .toggle-icon {
+    font-size: 1.1rem;
+  }
+
+  .toggle-text {
+    font-size: 0.9rem;
+  }
+
+  &:hover:not(:disabled):not(.active) {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--stone-300);
+  }
+
+  &.active {
+    background: rgba(180, 130, 60, 0.15);
+    border-color: rgba(200, 160, 80, 0.4);
+    color: #ffd780;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// =========================================
+// 事件选择器
+// =========================================
+.event-selector {
+  position: relative;
+  z-index: 1;
+}
+
+.event-dropdown {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(10, 9, 8, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: var(--stone-100);
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.3s ease;
+
+  &:focus {
+    border-color: rgba(200, 160, 80, 0.4);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  option {
+    background: #1a1816;
+    color: var(--stone-100);
+    padding: 0.5rem;
+  }
+}
+
+.event-details {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.event-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  .event-date,
+  .event-location {
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    color: var(--stone-400);
+  }
+}
+
+// =========================================
+// 自定义时间地点
+// =========================================
+.custom-location {
+  position: relative;
+  z-index: 1;
+}
+
+.date-inputs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.date-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  label {
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    color: var(--stone-400);
+    min-width: 1.5rem;
+  }
+
+  input {
+    width: 80px;
+    padding: 0.5rem 0.75rem;
+    background: rgba(10, 9, 8, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    color: var(--stone-100);
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.3s ease;
+
+    &:focus {
+      border-color: rgba(200, 160, 80, 0.4);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// =========================================
+// 操作按钮
+// =========================================
+.form-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 1.5rem;
+  gap: 1rem;
+
+  &.dual {
+    justify-content: space-between;
+  }
+
+  &.triple {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+  }
+}
+
+.next-btn,
+.submit-btn,
+.back-step-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 2.5rem;
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  letter-spacing: 0.15em;
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  .btn-glow {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .btn-text {
+    position: relative;
+    z-index: 1;
+  }
+
+  .btn-arrow,
+  .btn-icon {
+    position: relative;
+    z-index: 1;
+    transition: transform 0.3s ease;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.next-btn {
+  background: linear-gradient(135deg, rgba(180, 130, 60, 0.3), rgba(140, 100, 40, 0.2));
+  border: 1px solid rgba(200, 160, 80, 0.5);
+  color: #ffd780;
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(200, 150, 80, 0.4), rgba(160, 120, 60, 0.3));
+    box-shadow: 0 0 30px rgba(200, 160, 80, 0.3);
+    transform: translateY(-2px);
+
+    .btn-glow {
+      opacity: 1;
+    }
+
+    .btn-arrow {
+      transform: translateX(5px);
+    }
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, rgba(200, 150, 80, 0.4), rgba(160, 120, 60, 0.3));
+  border: 1px solid rgba(220, 180, 100, 0.6);
+  color: #ffe0a0;
+  min-width: 180px;
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(220, 170, 100, 0.5), rgba(180, 140, 80, 0.4));
+    box-shadow:
+      0 0 40px rgba(220, 180, 100, 0.4),
+      inset 0 0 20px rgba(255, 255, 255, 0.05);
+    transform: translateY(-2px);
+
+    .btn-glow {
+      opacity: 1;
+    }
+
+    .btn-icon {
+      transform: scale(1.1);
+    }
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+
+.back-step-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--stone-400);
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--stone-200);
+    transform: translateX(-3px);
+
+    .btn-arrow {
+      transform: translateX(-5px);
+    }
+  }
+}
+
+.save-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  background: rgba(80, 180, 80, 0.15);
+  border: 1px solid rgba(100, 200, 100, 0.4);
+  border-radius: 4px;
+  color: #80d080;
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(80, 180, 80, 0.25);
+    box-shadow: 0 0 20px rgba(80, 180, 80, 0.2);
+    transform: translateY(-2px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-icon {
+    font-size: 1.1rem;
+  }
+}
+
+// =========================================
+// 响应式调整
+// =========================================
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions.dual {
+    flex-direction: column-reverse;
+    gap: 0.75rem;
+  }
+
+  .next-btn,
+  .submit-btn,
+  .back-step-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .date-inputs {
+    flex-wrap: wrap;
+  }
+}

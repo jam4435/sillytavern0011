@@ -1,0 +1,30 @@
+[
+  {
+    "id": "mortal",
+    "name": "凡人",
+    "description": "资质平平，却有一颗不甘平凡的心。起点虽低，但只要坚持，也能在江湖中闯出一片天地。",
+    "totalPoints": 30,
+    "icon": "🧑"
+  },
+  {
+    "id": "talented",
+    "name": "良才",
+    "description": "天赋尚可，略胜常人。若能勤加修炼，未必不能成就一番事业。",
+    "totalPoints": 40,
+    "icon": "⭐"
+  },
+  {
+    "id": "genius",
+    "name": "天才",
+    "description": "天资聪颖，万中无一。武学一途，对你而言如同信手拈来。",
+    "totalPoints": 55,
+    "icon": "🌟"
+  },
+  {
+    "id": "legendary",
+    "name": "绝世",
+    "description": "百年难遇的武学奇才，仿佛是为武道而生。天下武学，皆可一窥堂奥。",
+    "totalPoints": 70,
+    "icon": "✨"
+  }
+]

@@ -1,0 +1,300 @@
+[
+  {
+    "id": "shaolin_outer",
+    "name": "少林俗家弟子",
+    "icon": "🙏",
+    "description": "少林寺俗家弟子，虽未剃度出家，却也习得少林入门功夫。罗汉拳、伏虎拳皆有涉猎，功夫扎实。",
+    "category": "江湖门派",
+    "realm": "三流-小成",
+    "martial_arts": [
+      {
+        "name": "罗汉拳",
+        "mastery": "初窥门径"
+      }
+    ],
+    "items": {
+      "金疮药": {
+        "类型": "丹药",
+        "品质": "凡品",
+        "物品描述": "普通的伤药，用于治疗外伤。",
+        "数量": 3
+      }
+    }
+  },
+  {
+    "id": "wudang_outer",
+    "name": "武当记名弟子",
+    "icon": "☯️",
+    "description": "武当山记名弟子，虽非入室传人，却也习得武当入门剑法与基础内功。心性沉稳，颇有道家风范。",
+    "category": "江湖门派",
+    "realm": "三流-小成"
+  },
+  {
+    "id": "beggar_sect",
+    "name": "丐帮弟子",
+    "icon": "🍚",
+    "description": "丐帮底层弟子，虽只是无袋弟子，却也习得丐帮入门功夫。江湖经验丰富，消息灵通。",
+    "category": "江湖门派",
+    "realm": "三流-初入",
+    "items": {
+      "金疮药": {
+        "类型": "丹药",
+        "品质": "凡品",
+        "物品描述": "普通的伤药，用于治疗外伤。",
+        "数量": 2
+      },
+      "解毒散": {
+        "类型": "丹药",
+        "品质": "凡品",
+        "物品描述": "用于解除一些常见的毒素。",
+        "数量": 1
+      }
+    },
+    "martial_arts": [
+      {
+        "name": "基础医理",
+        "mastery": "初窥门径"
+      }
+    ]
+  },
+  {
+    "id": "emei_outer",
+    "name": "峨眉俗家弟子",
+    "icon": "🏔️",
+    "description": "峨眉派俗家女弟子，习得峨眉入门剑法。心思细腻，身法轻灵。",
+    "category": "江湖门派",
+    "realm": "三流-小成"
+  },
+  {
+    "id": "huashan_outer",
+    "name": "华山外门弟子",
+    "icon": "⛰️",
+    "description": "华山派外门弟子，习得华山入门剑法。虽非嫡传，却也打下了不错的剑法根基。",
+    "category": "江湖门派",
+    "realm": "三流-小成"
+  },
+  {
+    "id": "tangmen_outer",
+    "name": "唐门外门弟子",
+    "icon": "🗡️",
+    "description": "唐门外门弟子，虽未习得唐门核心暗器功夫，却也略通暗器之道，身法诡异。",
+    "category": "江湖门派",
+    "realm": "三流-小成"
+  },
+  {
+    "id": "small_sect",
+    "name": "小门派弟子",
+    "icon": "🏠",
+    "description": "江湖中某个小门派的弟子，门派虽小，却也有独到之处。习得一两手看家本领。",
+    "category": "江湖门派",
+    "realm": "三流-初入"
+  },
+  {
+    "id": "wanderer_master",
+    "name": "散修武者",
+    "icon": "🌊",
+    "description": "不属于任何门派的散修武者，四处游历，博采众长。虽无师承，却也自有一番造诣。",
+    "category": "江湖门派",
+    "realm": "三流-圆满"
+  },
+  {
+    "id": "bodyguard_guild",
+    "name": "镖局镖师",
+    "icon": "🛡️",
+    "description": "某大镖局的镖师，走南闯北，见多识广。实战经验丰富，武艺虽不精深，却胜在实用。",
+    "category": "江湖门派",
+    "realm": "三流-圆满"
+  },
+  {
+    "id": "martial_family",
+    "name": "武林世家子弟",
+    "icon": "🏯",
+    "description": "出身武林世家，自幼习武。家传武学虽非顶尖，却也颇有根基。见识广博，人脉颇广。",
+    "category": "世家豪门",
+    "realm": "三流-圆满"
+  },
+  {
+    "id": "noble_young_master",
+    "name": "豪门公子/小姐",
+    "icon": "👑",
+    "description": "出身名门望族，家财万贯。虽是文人出身，却也请过武师教导，略通拳脚。",
+    "category": "世家豪门",
+    "realm": "三流-初入"
+  },
+  {
+    "id": "general_descendant",
+    "name": "将门之后",
+    "icon": "🎖️",
+    "description": "祖上是军中宿将，家传军中武艺。刀法枪法皆有涉猎，颇具沙场气魄。",
+    "category": "世家豪门",
+    "realm": "三流-圆满"
+  },
+  {
+    "id": "medicine_family",
+    "name": "医药世家",
+    "icon": "💊",
+    "description": "出身杏林世家，精通医理药理。虽武艺平平，却对人体穴位经络了如指掌。",
+    "category": "世家豪门",
+    "realm": "三流-初入"
+  },
+  {
+    "id": "fallen_noble",
+    "name": "没落贵族",
+    "icon": "🍂",
+    "description": "曾经的名门望族，如今已然没落。家传武学仅存残篇，却也是难得的底蕴。",
+    "category": "世家豪门",
+    "realm": "三流-小成"
+  },
+  {
+    "id": "farmer",
+    "name": "农家子弟",
+    "icon": "🌾",
+    "description": "生于乡野，自幼随父母耕作。虽无富贵之资，却有一身朴实劲力，筋骨强健。",
+    "category": "平民百姓",
+    "realm": "不入流"
+  },
+  {
+    "id": "merchant",
+    "name": "商贾之后",
+    "icon": "💰",
+    "description": "家中经商，往来各地。见多识广，略通人情世故。虽无武艺，却有几分机敏。",
+    "category": "平民百姓",
+    "realm": "不入流"
+  },
+  {
+    "id": "scholar",
+    "name": "书香门第",
+    "icon": "📚",
+    "description": "诗书传家，自幼饱读诗书。虽不谙武艺，却有几分聪慧，悟性不凡。",
+    "category": "平民百姓",
+    "realm": "不入流"
+  },
+  {
+    "id": "orphan",
+    "name": "街头孤儿",
+    "icon": "🏚️",
+    "description": "自幼流浪街头，尝尽人间冷暖。练就一身察言观色的本事，身法灵活。",
+    "category": "平民百姓",
+    "realm": "不入流"
+  },
+  {
+    "id": "hunter",
+    "name": "猎户之家",
+    "icon": "🏹",
+    "description": "生于山野猎户之家，自幼随父打猎。箭术精准，身手敏捷，熟悉山林。",
+    "category": "平民百姓",
+    "realm": "三流-初入"
+  },
+  {
+    "id": "blacksmith",
+    "name": "铁匠之子",
+    "icon": "🔨",
+    "description": "家中世代打铁，自幼耳濡目染。臂力惊人，对兵器铸造略有心得。",
+    "category": "平民百姓",
+    "realm": "三流-初入"
+  },
+  {
+    "id": "fisherman",
+    "name": "渔家子弟",
+    "icon": "🎣",
+    "description": "生于江河之畔，以捕鱼为生。水性极佳，身法灵活，在水中如鱼得水。",
+    "category": "平民百姓",
+    "realm": "不入流"
+  },
+  {
+    "id": "performer",
+    "name": "走江湖卖艺人",
+    "icon": "🎪",
+    "description": "跟随父母走江湖卖艺，略通杂技功夫。身法灵巧，表演天赋极高。",
+    "category": "平民百姓",
+    "realm": "三流-初入"
+  },
+  {
+    "id": "ex_soldier",
+    "name": "退伍老兵",
+    "icon": "⚔️",
+    "description": "曾在军中效力多年，杀敌无数。军中武艺虽然粗犷，却极为实用，颇具杀伐之气。",
+    "category": "特殊身份",
+    "realm": "三流-圆满"
+  },
+  {
+    "id": "escaped_prisoner",
+    "name": "流亡罪人",
+    "icon": "⛓️",
+    "description": "曾因某事获罪，逃亡在外。在狱中习得一些下三滥的功夫，生存能力极强。",
+    "category": "特殊身份",
+    "realm": "三流-初入"
+  },
+  {
+    "id": "heir_mystery",
+    "name": "神秘遗孤",
+    "icon": "❓",
+    "description": "身世成谜，自幼被人收养。隐约记得幼时曾学过功夫，却想不起师承来历。",
+    "category": "特殊身份",
+    "realm": "三流-小成"
+  },
+  {
+    "id": "cult_escapee",
+    "name": "邪教叛逃者",
+    "icon": "👹",
+    "description": "曾是某邪教组织成员，看清真相后叛逃。习得一些诡异功夫，却也埋下隐患。",
+    "category": "特殊身份",
+    "realm": "三流-圆满"
+  },
+  {
+    "id": "royal_guard_retired",
+    "name": "退隐侍卫",
+    "icon": "🛡️",
+    "description": "曾是某王府侍卫，因故离职。习得正统护卫武艺，身手不凡。",
+    "category": "特殊身份",
+    "realm": "二流-初入"
+  },
+  {
+    "id": "assassin_reformed",
+    "name": "金盆洗手的刺客",
+    "icon": "🗡️",
+    "description": "曾是暗杀组织成员，如今金盆洗手。身法诡异，暗器精通，杀人于无形。",
+    "category": "特殊身份",
+    "realm": "二流-小成"
+  },
+  {
+    "id": "monk_returned",
+    "name": "还俗僧人",
+    "icon": "☸️",
+    "description": "曾在某寺庙出家修行，后因故还俗。佛门功夫扎实，心性沉稳。",
+    "category": "特殊身份",
+    "realm": "三流-圆满"
+  },
+  {
+    "id": "scholar_martial",
+    "name": "文武双全的书生",
+    "icon": "📖",
+    "description": "表面是文弱书生，实则暗藏武艺。以文会友，以武防身。",
+    "category": "特殊身份",
+    "realm": "三流-小成"
+  },
+  {
+    "id": "amnesia",
+    "name": "失忆之人",
+    "icon": "🌀",
+    "description": "不知何故失去记忆，对过去一无所知。身体却保留着武艺本能，似乎曾是高手。",
+    "category": "特殊身份",
+    "realm": "三流-圆满"
+  },
+  {
+    "id": "treasure_hunter",
+    "name": "寻宝猎人",
+    "icon": "💎",
+    "description": "专门探索古墓秘境的寻宝人，身手敏捷，机关暗器无所不通。",
+    "category": "特殊身份",
+    "realm": "三流-圆满"
+  },
+  {
+    "id": "custom",
+    "name": "自定义出身",
+    "icon": "✏️",
+    "description": "书写属于你自己的故事起源。可以自由设定出身背景和初始境界。",
+    "category": "自定义",
+    "realm": "三流-圆满"
+  }
+]

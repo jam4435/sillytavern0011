@@ -1,0 +1,43 @@
+// =========================================
+// Reset & Base
+// =========================================
+
+*,
+::before,
+::after {
+  box-sizing: border-box;
+  border-width: 0;
+  border-style: solid;
+  border-color: #e5e7eb;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  -moz-tab-size: 4;
+  tab-size: 4;
+  font-family: var(--font-serif);
+  font-feature-settings: normal;
+  font-variation-settings: normal;
+  width: 100%;
+  // 使用酒馆助手提供的视口高度变量，回退到 100vh
+  // 固定高度以便 flex 布局正常工作
+  height: var(--TH-viewport-height, 100vh);
+  min-height: var(--TH-viewport-height, 100vh);
+  max-height: var(--TH-viewport-height, 100vh);
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--stone-200);
+  width: 100%;
+  height: var(--TH-viewport-height, 100vh);
+  min-height: var(--TH-viewport-height, 100vh);
+  max-height: var(--TH-viewport-height, 100vh);
+  overflow: hidden;
+}

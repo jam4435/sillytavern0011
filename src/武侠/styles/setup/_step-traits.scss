@@ -1,0 +1,532 @@
+// =========================================
+// Setup Screen - 步骤3: 天赋选择
+// =========================================
+
+.traits-step {
+  .section-desc {
+    font-size: 0.9rem;
+    color: var(--stone-400);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+  }
+
+  .trait-count {
+    margin-left: auto;
+    font-size: 0.85rem;
+    padding: 0.2rem 0.6rem;
+    background: rgba(200, 160, 80, 0.15);
+    border-radius: 10px;
+    color: #c8a050;
+  }
+
+  .empty-hint {
+    text-align: center;
+    color: var(--stone-500);
+    font-size: 0.9rem;
+    padding: 1rem;
+    font-style: italic;
+  }
+}
+
+// 天赋筛选区域
+.trait-filters {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+
+  .search-wrapper {
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+  }
+
+  .trait-search {
+    width: 100%;
+    padding: 0.6rem 1rem 0.6rem 2.5rem;
+    background: rgba(10, 9, 8, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    color: var(--stone-100);
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.3s ease;
+
+    &::placeholder {
+      color: var(--stone-600);
+    }
+
+    &:focus {
+      border-color: rgba(200, 160, 80, 0.4);
+    }
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.9rem;
+    opacity: 0.5;
+  }
+}
+
+// 天赋网格
+.traits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+
+  &.locked {
+    .trait-card {
+      cursor: default;
+    }
+  }
+
+  &.selectable {
+    .trait-card {
+      cursor: pointer;
+    }
+  }
+}
+
+// 天赋卡片
+.trait-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover:not(.locked):not(.disabled) {
+    border-color: rgba(255, 255, 255, 0.12);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  &.locked {
+    opacity: 0.85;
+    border-style: dashed;
+  }
+
+  &.disabled {
+    opacity: 0.4;
+    cursor: not-allowed !important;
+  }
+
+  &.selected {
+    border-color: rgba(200, 160, 80, 0.5);
+    background: rgba(180, 130, 60, 0.1);
+
+    .trait-name {
+      color: #ffd780;
+    }
+  }
+
+  &.positive {
+    border-left: 3px solid rgba(80, 180, 80, 0.5);
+  }
+
+  &.negative {
+    border-left: 3px solid rgba(220, 80, 80, 0.5);
+  }
+
+  &.neutral {
+    border-left: 3px solid rgba(150, 150, 150, 0.5);
+  }
+
+  &.custom {
+    position: relative;
+
+    .delete-custom-trait-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(220, 80, 80, 0.2);
+      border: 1px solid rgba(220, 80, 80, 0.4);
+      border-radius: 50%;
+      color: #ff8080;
+      font-size: 0.7rem;
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: rgba(220, 80, 80, 0.4);
+        transform: scale(1.1);
+      }
+    }
+
+    &:hover .delete-custom-trait-btn {
+      opacity: 1;
+    }
+  }
+
+  .trait-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+  }
+
+  .trait-name {
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    color: var(--stone-200);
+    transition: color 0.3s ease;
+  }
+
+  .trait-cost {
+    font-size: 0.8rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-weight: 500;
+
+    &.cost {
+      background: rgba(220, 80, 80, 0.15);
+      color: #ff8080;
+    }
+
+    &.gain {
+      background: rgba(80, 180, 80, 0.15);
+      color: #80d080;
+    }
+  }
+
+  .trait-rarity {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    margin-bottom: 0.4rem;
+    display: inline-block;
+
+    &.rarity-普通 {
+      background: rgba(150, 150, 150, 0.2);
+      color: #a0a0a0;
+    }
+
+    &.rarity-稀有 {
+      background: rgba(80, 150, 220, 0.2);
+      color: #80b0e0;
+    }
+
+    &.rarity-史诗 {
+      background: rgba(160, 80, 200, 0.2);
+      color: #c080e0;
+    }
+
+    &.rarity-传说 {
+      background: rgba(220, 160, 60, 0.2);
+      color: #e0c050;
+    }
+  }
+
+  .trait-desc {
+    font-size: 0.8rem;
+    color: var(--stone-400);
+    line-height: 1.4;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .trait-effects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+
+    .effect-tag {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.4rem;
+      background: rgba(200, 160, 80, 0.15);
+      border-radius: 3px;
+      color: #c8a050;
+    }
+
+    .effect-more {
+      font-size: 0.7rem;
+      color: var(--stone-500);
+      padding: 0.15rem 0.3rem;
+    }
+  }
+
+  .trait-lock-icon {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    font-size: 0.9rem;
+    opacity: 0.6;
+  }
+}
+
+// 自定义天赋输入
+.custom-trait-input {
+  margin-top: 1rem;
+
+  .form-textarea {
+    min-height: 60px;
+  }
+}
+
+// 可选天赋滚动容器
+.traits-scroll-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  margin-right: -0.5rem;
+
+  // 自定义滚动条样式
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(200, 160, 80, 0.3);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgba(200, 160, 80, 0.5);
+    }
+  }
+}
+
+// 自定义天赋滚动容器
+.custom-traits-scroll {
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  margin-right: -0.5rem;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(200, 160, 80, 0.3);
+    border-radius: 3px;
+  }
+}
+
+// 自定义天赋列表区域
+.custom-traits-list {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+// 子标题
+.subsection-title {
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  color: var(--stone-400);
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+// 提示文字
+.hint-text {
+  font-size: 0.8rem;
+  color: var(--stone-500);
+  margin: 0 0 0.75rem 0;
+  font-style: italic;
+}
+
+// 自定义天赋表单
+.custom-trait-form {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+
+    .form-label {
+      font-family: var(--font-serif);
+      font-size: 0.85rem;
+      color: var(--stone-400);
+    }
+  }
+}
+
+// 点数消耗输入包装
+.cost-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+
+  .cost-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: var(--stone-400);
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(200, 160, 80, 0.2);
+      border-color: rgba(200, 160, 80, 0.4);
+      color: #ffd780;
+    }
+
+    &.minus:hover {
+      background: rgba(80, 180, 80, 0.2);
+      border-color: rgba(100, 200, 100, 0.4);
+      color: #80d080;
+    }
+
+    &.plus:hover {
+      background: rgba(220, 80, 80, 0.2);
+      border-color: rgba(240, 100, 100, 0.4);
+      color: #ff8080;
+    }
+  }
+
+  .cost-input {
+    width: 60px;
+    text-align: center;
+    padding: 0.4rem 0.5rem;
+
+    // 隐藏数字输入的上下箭头
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    &[type='number'] {
+      -moz-appearance: textfield;
+    }
+  }
+}
+
+// 消耗提示
+.cost-hint {
+  font-size: 0.75rem;
+  color: var(--stone-500);
+  margin-top: 0.25rem;
+  text-align: center;
+}
+
+// 自定义天赋操作按钮
+.custom-trait-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+
+  .cancel-btn {
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: var(--stone-400);
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--stone-200);
+    }
+  }
+
+  .save-trait-btn {
+    padding: 0.5rem 1.25rem;
+    background: rgba(80, 180, 80, 0.2);
+    border: 1px solid rgba(100, 200, 100, 0.4);
+    border-radius: 4px;
+    color: #80d080;
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(80, 180, 80, 0.3);
+      box-shadow: 0 0 15px rgba(80, 180, 80, 0.2);
+    }
+  }
+}
+
+// 添加自定义天赋按钮
+.add-custom-trait-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: var(--stone-400);
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 1rem;
+
+  .btn-icon {
+    font-size: 1.2rem;
+    font-weight: bold;
+    transition: transform 0.3s ease;
+  }
+
+  &:hover {
+    background: rgba(200, 160, 80, 0.1);
+    border-color: rgba(200, 160, 80, 0.4);
+    color: #ffd780;
+
+    .btn-icon {
+      transform: rotate(90deg);
+    }
+  }
+}
+
+// =========================================
+// 响应式调整
+// =========================================
+@media (max-width: 768px) {
+  .traits-grid {
+    grid-template-columns: 1fr;
+  }
+}

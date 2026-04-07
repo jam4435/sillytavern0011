@@ -1,0 +1,318 @@
+// =========================================
+// Setup Screen - 基础样式
+// 主容器、动态背景层、返回按钮、内容区域、标题、玻璃卡片
+// =========================================
+
+// 主容器
+.setup-screen {
+  position: relative;
+  width: 100%;
+  height: var(--TH-viewport-height, 100vh);
+  display: flex;
+  flex-direction: column;
+  background-color: #0a0908;
+  z-index: 100;
+  overflow: hidden;
+}
+
+// =========================================
+// 动态背景层
+// =========================================
+.setup-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.setup-bg-gradient {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(120, 80, 40, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(80, 60, 30, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 100% 100% at 50% 50%, rgba(20, 15, 10, 0.8) 0%, #0a0908 100%);
+}
+
+.setup-bg-particles {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, rgba(255, 215, 140, 0.3) 0%, transparent 100%),
+    radial-gradient(1px 1px at 30% 50%, rgba(255, 200, 120, 0.2) 0%, transparent 100%),
+    radial-gradient(1px 1px at 60% 30%, rgba(255, 220, 150, 0.25) 0%, transparent 100%),
+    radial-gradient(1px 1px at 80% 70%, rgba(255, 210, 130, 0.2) 0%, transparent 100%),
+    radial-gradient(1px 1px at 50% 80%, rgba(255, 200, 100, 0.15) 0%, transparent 100%);
+  animation: particleFloat 20s ease-in-out infinite;
+}
+
+.setup-bg-ink {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  mix-blend-mode: overlay;
+}
+
+@keyframes particleFloat {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+  25% {
+    transform: translateY(-10px) translateX(5px);
+  }
+  50% {
+    transform: translateY(-5px) translateX(-5px);
+  }
+  75% {
+    transform: translateY(-15px) translateX(3px);
+  }
+}
+
+// =========================================
+// 返回按钮
+// =========================================
+.setup-back-btn {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--stone-400);
+  padding: 0.6rem 1.2rem;
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 4px;
+
+  .back-icon {
+    font-size: 1.1rem;
+    transition: transform 0.3s ease;
+  }
+
+  .back-text {
+    letter-spacing: 0.05em;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--stone-200);
+    transform: translateX(-3px);
+
+    .back-icon {
+      transform: translateX(-3px);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+// =========================================
+// 内容区域
+// =========================================
+.setup-content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem 2rem 4rem;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  // 自定义滚动条样式
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(200, 160, 80, 0.3);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgba(200, 160, 80, 0.5);
+    }
+  }
+}
+
+// =========================================
+// 标题
+// =========================================
+.setup-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 0 2.5rem 0;
+  font-family: var(--font-display);
+
+  .title-decoration {
+    font-size: 1.8rem;
+    color: rgba(200, 160, 80, 0.4);
+
+    &.left {
+      animation: decorPulseLeft 3s ease-in-out infinite;
+    }
+
+    &.right {
+      animation: decorPulseRight 3s ease-in-out infinite;
+    }
+  }
+
+  .title-text {
+    font-size: 2.5rem;
+    color: #ffedc0;
+    letter-spacing: 0.4em;
+    text-shadow:
+      0 0 30px rgba(255, 215, 140, 0.3),
+      0 2px 10px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@keyframes decorPulseLeft {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateX(-3px);
+  }
+}
+
+@keyframes decorPulseRight {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateX(3px);
+  }
+}
+
+// =========================================
+// 玻璃拟态卡片
+// =========================================
+.glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 1.5rem 2rem;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 215, 140, 0.2) 50%, transparent 100%);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at center, rgba(200, 160, 80, 0.02) 0%, transparent 50%);
+    pointer-events: none;
+  }
+}
+
+.form-section {
+  &.glass-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      border-color: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+  }
+}
+
+// =========================================
+// 区块标题
+// =========================================
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  color: #e8d5b0;
+  margin: 0 0 1.5rem 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  position: relative;
+  z-index: 1;
+
+  .section-icon {
+    font-size: 1.2rem;
+  }
+
+  .points-badge {
+    margin-left: auto;
+    font-size: 0.85rem;
+    padding: 0.3rem 0.8rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    color: var(--stone-400);
+    transition: all 0.3s ease;
+
+    &.complete {
+      background: rgba(80, 180, 80, 0.15);
+      border-color: rgba(100, 200, 100, 0.3);
+      color: #90ee90;
+    }
+
+    &.error {
+      background: rgba(220, 80, 80, 0.15);
+      border-color: rgba(240, 100, 100, 0.3);
+      color: #ff6b6b;
+    }
+  }
+}
+
+// =========================================
+// 响应式调整
+// =========================================
+@media (max-width: 768px) {
+  .setup-content {
+    padding: 1rem 1rem 3rem;
+  }
+
+  .setup-title .title-text {
+    font-size: 1.8rem;
+    letter-spacing: 0.2em;
+  }
+
+  .glass-card {
+    padding: 1rem 1.25rem;
+  }
+}
