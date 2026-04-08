@@ -304,6 +304,19 @@ export interface PersonaPlusProbeReport {
   notes: string[];
 }
 
+export interface PersonaPlusApiConfigTestItem {
+  key: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface PersonaPlusApiConfigTestReport {
+  checkedAt: number;
+  items: PersonaPlusApiConfigTestItem[];
+  notes: string[];
+}
+
 export interface PersonaPlusEventState {
   key: string;
   label: string;

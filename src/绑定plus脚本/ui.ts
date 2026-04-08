@@ -40,6 +40,7 @@ import {
   recordPersonaSnapshot,
   resetBindingPlusTheme,
   refreshConnectionProfileCatalog,
+  runApiConfigSelfTest,
   resolveBindingPlusThemeTokens,
   restoreLastPersonaSnapshot,
   runCompatibilitySelfCheck,
@@ -64,6 +65,7 @@ import {
   BindingPlusThemeState,
   BindingPlusThemeTokens,
   CompatibilityCheckReport,
+  PersonaPlusApiConfigTestReport,
   PERSONA_BUTTON_ICON,
   PERSONA_BUTTON_ID,
   PERSONA_BUTTON_TEXT_IN_MENU,
@@ -91,6 +93,7 @@ let lastContextSignature = '';
 let baseDescDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastCompatibilityReport: CompatibilityCheckReport | null = null;
 let lastPlusProbeReport: PersonaPlusProbeReport | null = null;
+let lastApiConfigTestReport: PersonaPlusApiConfigTestReport | null = null;
 let plusEventBridgeStarted = false;
 let lastObservedContext: PersonaRuntimeContext | null = null;
 let panelStyleDestroy: (() => void) | null = null;
@@ -673,6 +676,7 @@ function createPanelHtml(): string {
                       <span>测试与诊断</span>
                       <div class="inline-actions">
                         <button class="persona-btn" id="persona-plus-refresh-btn" title="刷新 Plus 接口探测">刷新探测</button>
+                        <button class="persona-btn" id="persona-plus-api-test-btn" title="测试 API 读取与回写当前值">测试API读写</button>
                         <button class="persona-btn" id="persona-plus-test-btn" title="测试切换事件桥">测试事件</button>
                       </div>
                     </div>
@@ -691,6 +695,12 @@ function createPanelHtml(): string {
                     <div>
                       <div class="plus-probe-title">结论</div>
                       <div id="persona-plus-notes" class="persona-plus-list"></div>
+                    </div>
+                    <div>
+                      <div class="plus-probe-title">API读写测试</div>
+                      <div id="persona-plus-api-test-summary" class="text-note">未测试</div>
+                      <div id="persona-plus-api-test-details" class="persona-plus-list"></div>
+                      <div id="persona-plus-api-test-notes" class="persona-plus-list"></div>
                     </div>
                   </div>
 
@@ -3711,6 +3721,7 @@ export function showPanel(): void {
   renderRuntimeContextHeader();
   refreshCompatibilitySection();
   renderPlusBindingSection();
+  renderApiConfigSelfTestSection();
   void refreshPlusBindingSection();
   void refreshApiConnectionCatalog({ quiet: true, rerender: activeDetailPage === 'api' });
   lastContextSignature = buildContextSignature();
@@ -4173,12 +4184,65 @@ function renderPlusBindingSection(report: PersonaPlusProbeReport | null = lastPl
   }
 }
 
+function renderApiConfigSelfTestSection(report: PersonaPlusApiConfigTestReport | null = lastApiConfigTestReport): void {
+  const parentDoc = window.parent.document;
+  const $summary = $('#persona-plus-api-test-summary', parentDoc);
+  const $details = $('#persona-plus-api-test-details', parentDoc);
+  const $notes = $('#persona-plus-api-test-notes', parentDoc);
+
+  if (!$summary.length) {
+    return;
+  }
+
+  if (!report) {
+    $summary.text('未测试');
+    $details.empty();
+    $notes.empty();
+    return;
+  }
+
+  const okCount = report.items.filter(item => item.ok).length;
+  $summary.text(`结果: ${okCount}/${report.items.length} 通过 | 检测时间: ${formatTime(report.checkedAt)}`);
+
+  $details.empty();
+  report.items.forEach(item => {
+    const level = item.ok ? 'ok' : 'warn';
+    const icon = item.ok ? '✅' : '⚠️';
+    $details.append(
+      `<div class="plus-probe-item ${level}">
+        <div>${icon} ${escapeHtml(item.label)}</div>
+        <div class="plus-probe-meta">${escapeHtml(item.detail)}</div>
+      </div>`,
+    );
+  });
+
+  $notes.empty();
+  report.notes.forEach(note => {
+    $notes.append(
+      `<div class="plus-probe-item warn">
+        <div>📝 说明</div>
+        <div class="plus-probe-meta">${escapeHtml(note)}</div>
+      </div>`,
+    );
+  });
+}
+
 async function refreshPlusBindingSection(showToast: boolean = false): Promise<void> {
   const report = await probePlusBindingInterfaces();
   lastPlusProbeReport = report;
   renderPlusBindingSection(report);
   if (showToast) {
     toastr.success('Plus 接口探测已刷新');
+  }
+}
+
+async function refreshApiConfigSelfTestSection(showToast: boolean = false): Promise<void> {
+  const report = await runApiConfigSelfTest();
+  lastApiConfigTestReport = report;
+  renderApiConfigSelfTestSection(report);
+  if (showToast) {
+    const okCount = report.items.filter(item => item.ok).length;
+    toastr.success(`API读写测试完成 ${okCount}/${report.items.length}`);
   }
 }
 
@@ -6250,6 +6314,10 @@ function bindPanelEvents(): void {
 
   $('#persona-plus-refresh-btn', parentDoc).on(`click${PANEL_EVENT_NAMESPACE}`, () => {
     void refreshPlusBindingSection(true);
+  });
+
+  $('#persona-plus-api-test-btn', parentDoc).on(`click${PANEL_EVENT_NAMESPACE}`, () => {
+    void refreshApiConfigSelfTestSection(true);
   });
 
   $('#persona-plus-test-btn', parentDoc).on(`click${PANEL_EVENT_NAMESPACE}`, () => {

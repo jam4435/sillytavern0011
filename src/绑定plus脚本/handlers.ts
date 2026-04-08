@@ -27,6 +27,8 @@ import {
   PersonaContextBinding,
   PersonaContextBindingResources,
   PersonaInfo,
+  PersonaPlusApiConfigTestItem,
+  PersonaPlusApiConfigTestReport,
   PersonaPlusBindingConfig,
   PersonaPlusExtensionSettingBinding,
   PersonaPlusBindingWorldbookEntry,
@@ -2480,6 +2482,36 @@ function parseCurrentConnectionProfileResult(raw: string): string | undefined {
   return normalizeConnectionProfileName(matched ? matched[1] : firstLine);
 }
 
+function summarizeProbeText(raw: string, maxLength: number = 120): string {
+  const normalized = ensureString(raw).replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '空返回';
+  }
+  return normalized.length > maxLength ? `${normalized.slice(0, Math.max(0, maxLength - 3))}...` : normalized;
+}
+
+function parseSlashApiName(raw: string): string | undefined {
+  const firstLine = ensureString(raw).split(/\r?\n/).map(line => line.trim()).find(Boolean) || ensureString(raw).trim();
+  if (!firstLine) {
+    return undefined;
+  }
+  const matched =
+    firstLine.match(/^(?:current\s+)?api\s*:?\s*(.+)$/i) || firstLine.match(/^(?:source|main_api)\s*:?\s*(.+)$/i);
+  const candidate = stripWrappingQuotes(matched ? matched[1] : firstLine).trim();
+  return candidate || undefined;
+}
+
+function parseSlashModelName(raw: string): string | undefined {
+  const firstLine = ensureString(raw).split(/\r?\n/).map(line => line.trim()).find(Boolean) || ensureString(raw).trim();
+  if (!firstLine) {
+    return undefined;
+  }
+  const matched =
+    firstLine.match(/^(?:current\s+)?model\s*:?\s*(.+)$/i) || firstLine.match(/^(?:name)\s*:?\s*(.+)$/i);
+  const candidate = stripWrappingQuotes(matched ? matched[1] : firstLine).trim();
+  return candidate || undefined;
+}
+
 function updateConnectionProfileCatalogCache(profileNames: string[]): NamedOption[] {
   const next = uniqueStrings(profileNames)
     .map(name => normalizeConnectionProfileName(name))
@@ -2510,6 +2542,15 @@ async function readCurrentConnectionProfileName(forceRefresh: boolean = false): 
 
 export function getCachedCurrentConnectionProfileName(): string | undefined {
   return currentConnectionProfileCache.value;
+}
+
+function createApiConfigTestItem(
+  key: string,
+  label: string,
+  ok: boolean,
+  detail: string,
+): PersonaPlusApiConfigTestItem {
+  return { key, label, ok, detail };
 }
 
 export async function refreshConnectionProfileCatalog(forceProfileRefresh: boolean = true): Promise<NamedOption[]> {
@@ -3608,6 +3649,80 @@ export async function probePlusBindingInterfaces(): Promise<PersonaPlusProbeRepo
     pushPlusProbeItem(items, 'connection_profile', 'API连接 profile', false, `调用失败: ${formatProbeError(error)}`);
   }
 
+  try {
+    const currentConnectionProfile = await readCurrentConnectionProfileName(true);
+    const profileGetResult = await triggerSlash(
+      currentConnectionProfile ? `/profile-get ${quoteSlashCommandArgument(currentConnectionProfile)}` : '/profile-get',
+    );
+    pushPlusProbeItem(
+      items,
+      'slash_profile_get',
+      'Slash /profile-get',
+      true,
+      `可读；当前 profile=${currentConnectionProfile || '<None>'}；返回=${summarizeProbeText(profileGetResult)}`,
+    );
+  } catch (error) {
+    pushPlusProbeItem(items, 'slash_profile_get', 'Slash /profile-get', false, `调用失败: ${formatProbeError(error)}`);
+  }
+
+  try {
+    const apiResult = await triggerSlash('/api');
+    const currentApi = parseSlashApiName(apiResult);
+    pushPlusProbeItem(
+      items,
+      'slash_api',
+      'Slash /api',
+      true,
+      `可读；当前源=${currentApi || '未知'}；返回=${summarizeProbeText(apiResult)}；命令本身支持带参数切换。`,
+    );
+  } catch (error) {
+    pushPlusProbeItem(items, 'slash_api', 'Slash /api', false, `调用失败: ${formatProbeError(error)}`);
+  }
+
+  try {
+    const modelResult = await triggerSlash('/model');
+    const currentModel = parseSlashModelName(modelResult);
+    pushPlusProbeItem(
+      items,
+      'slash_model',
+      'Slash /model',
+      true,
+      `可读；当前模型=${currentModel || '未知'}；返回=${summarizeProbeText(modelResult)}；命令本身支持带参数切换。`,
+    );
+  } catch (error) {
+    pushPlusProbeItem(items, 'slash_model', 'Slash /model', false, `调用失败: ${formatProbeError(error)}`);
+  }
+
+  const parentWindowForApi = window.parent as Window &
+    typeof globalThis & {
+      SillyTavern?: {
+        mainApi?: unknown;
+        chatCompletionSettings?: Record<string, unknown>;
+        saveSettingsDebounced?: () => Promise<void> | void;
+      };
+    };
+  const sillyTavernApiRoot = parentWindowForApi.SillyTavern || SillyTavern;
+  const mainApiDescriptor = sillyTavernApiRoot ? Object.getOwnPropertyDescriptor(sillyTavernApiRoot, 'mainApi') : undefined;
+  const mainApiValue = sillyTavernApiRoot?.mainApi;
+  pushPlusProbeItem(
+    items,
+    'main_api_object',
+    'SillyTavern.mainApi',
+    mainApiValue !== undefined && mainApiValue !== null,
+    `可读=${mainApiValue !== undefined && mainApiValue !== null ? '是' : '否'}；当前值=${ensureStringLike(mainApiValue) || '空'}；writable=${Boolean(mainApiDescriptor?.writable)}；setter=${typeof mainApiDescriptor?.set === 'function' ? '有' : '无'}。`,
+  );
+
+  const chatCompletionSettings = sillyTavernApiRoot?.chatCompletionSettings;
+  const chatCompletionSettingKeys =
+    chatCompletionSettings && typeof chatCompletionSettings === 'object' ? Object.keys(chatCompletionSettings) : [];
+  pushPlusProbeItem(
+    items,
+    'chat_completion_settings_object',
+    'SillyTavern.chatCompletionSettings',
+    Boolean(chatCompletionSettings && typeof chatCompletionSettings === 'object'),
+    `可读=${chatCompletionSettings && typeof chatCompletionSettings === 'object' ? '是' : '否'}；键数=${chatCompletionSettingKeys.length}；frozen=${Boolean(chatCompletionSettings && Object.isFrozen(chatCompletionSettings))}；saveSettingsDebounced=${typeof sillyTavernApiRoot?.saveSettingsDebounced === 'function' ? '可用' : '不可用'}。`,
+  );
+
   if (
     typeof getScriptTrees === 'function' &&
     typeof replaceScriptTrees === 'function' &&
@@ -3821,6 +3936,119 @@ export async function probePlusBindingInterfaces(): Promise<PersonaPlusProbeRepo
     checkedAt: Date.now(),
     currentContext,
     interfaceItems: items,
+    notes,
+  };
+}
+
+export async function runApiConfigSelfTest(): Promise<PersonaPlusApiConfigTestReport> {
+  const items: PersonaPlusApiConfigTestItem[] = [];
+  const notes: string[] = [];
+  const parentWindow = window.parent as Window &
+    typeof globalThis & {
+      SillyTavern?: {
+        mainApi?: unknown;
+        chatCompletionSettings?: Record<string, unknown>;
+        saveSettingsDebounced?: () => Promise<void> | void;
+      };
+    };
+  const sillyTavernApiRoot = parentWindow.SillyTavern || SillyTavern;
+
+  try {
+    const currentProfile = await readCurrentConnectionProfileName(true);
+    const profileGetResult = await triggerSlash(
+      currentProfile ? `/profile-get ${quoteSlashCommandArgument(currentProfile)}` : '/profile-get',
+    );
+    items.push(
+      createApiConfigTestItem(
+        'profile_get_read',
+        '/profile-get 读取测试',
+        true,
+        `当前 profile=${currentProfile || '<None>'}；返回=${summarizeProbeText(profileGetResult)}`,
+      ),
+    );
+  } catch (error) {
+    items.push(
+      createApiConfigTestItem('profile_get_read', '/profile-get 读取测试', false, `调用失败: ${formatProbeError(error)}`),
+    );
+  }
+
+  try {
+    const apiResult = await triggerSlash('/api');
+    const currentApi = parseSlashApiName(apiResult);
+    if (!currentApi) {
+      throw new Error(`无法解析当前 API 源: ${summarizeProbeText(apiResult)}`);
+    }
+    await triggerSlash(`/api ${currentApi}`);
+    items.push(
+      createApiConfigTestItem(
+        'api_read_writeback',
+        '/api 回写当前值',
+        true,
+        `读取到当前源=${currentApi}；已成功回写同值。`,
+      ),
+    );
+  } catch (error) {
+    items.push(
+      createApiConfigTestItem('api_read_writeback', '/api 回写当前值', false, `调用失败: ${formatProbeError(error)}`),
+    );
+  }
+
+  try {
+    const modelResult = await triggerSlash('/model');
+    const currentModel = parseSlashModelName(modelResult);
+    if (!currentModel) {
+      throw new Error(`无法解析当前模型: ${summarizeProbeText(modelResult)}`);
+    }
+    await triggerSlash(`/model ${quoteSlashCommandArgument(currentModel)}`);
+    items.push(
+      createApiConfigTestItem(
+        'model_read_writeback',
+        '/model 回写当前值',
+        true,
+        `读取到当前模型=${currentModel}；已成功回写同值。`,
+      ),
+    );
+  } catch (error) {
+    items.push(
+      createApiConfigTestItem(
+        'model_read_writeback',
+        '/model 回写当前值',
+        false,
+        `调用失败: ${formatProbeError(error)}`,
+      ),
+    );
+  }
+
+  const mainApiDescriptor = sillyTavernApiRoot ? Object.getOwnPropertyDescriptor(sillyTavernApiRoot, 'mainApi') : undefined;
+  const mainApiValue = sillyTavernApiRoot?.mainApi;
+  items.push(
+    createApiConfigTestItem(
+      'main_api_direct',
+      'mainApi 直读状态',
+      mainApiValue !== undefined && mainApiValue !== null,
+      `当前值=${ensureStringLike(mainApiValue) || '空'}；writable=${Boolean(mainApiDescriptor?.writable)}；setter=${typeof mainApiDescriptor?.set === 'function' ? '有' : '无'}；未执行直接写入。`,
+    ),
+  );
+
+  const chatCompletionSettings = sillyTavernApiRoot?.chatCompletionSettings;
+  const chatCompletionSettingKeys =
+    chatCompletionSettings && typeof chatCompletionSettings === 'object' ? Object.keys(chatCompletionSettings) : [];
+  items.push(
+    createApiConfigTestItem(
+      'chat_completion_settings_direct',
+      'chatCompletionSettings 直读状态',
+      Boolean(chatCompletionSettings && typeof chatCompletionSettings === 'object'),
+      `键数=${chatCompletionSettingKeys.length}；frozen=${Boolean(chatCompletionSettings && Object.isFrozen(chatCompletionSettings))}；saveSettingsDebounced=${typeof sillyTavernApiRoot?.saveSettingsDebounced === 'function' ? '可用' : '不可用'}；未执行直接写入。`,
+    ),
+  );
+
+  notes.push('写入测试只对 /api 和 /model 做“回写当前值”验证，尽量避免改变当前连接状态。');
+  notes.push('mainApi / chatCompletionSettings 只做直读和可写性判断，未直接改写低层对象。');
+  notes.push('如果后续要真的修改整套连接配置，优先考虑 /profile 或 /api+/model 组合，而不是直接写 mainApi。');
+
+  return {
+    checkedAt: Date.now(),
+    items,
     notes,
   };
 }
