@@ -69,6 +69,8 @@ export interface PersonaPlusExtensionSettingBinding {
 }
 
 export interface PersonaPlusBindingConfig {
+  /** 酒馆 connection profile 名称 */
+  connectionProfileName?: string;
   presetName?: string;
   scripts?: {
     global?: string[];

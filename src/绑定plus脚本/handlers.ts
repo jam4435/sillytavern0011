@@ -353,6 +353,8 @@ type PersonaPlusAppliedState = {
   userPersonaAvatarId?: string;
   userPersonaProfileId?: string;
   userPersonaEnabledTraitIds?: string[];
+  connectionProfileName?: string;
+  connectionProfileBaseline?: string | null;
   presetName?: string;
   presetEnabledPromptIds?: string[];
   scripts: {
@@ -1251,6 +1253,7 @@ function normalizePlusBindingConfig(config: PersonaPlusBindingConfig | unknown):
 
   const source = config as PersonaPlusBindingConfig;
   const normalized: PersonaPlusBindingConfig = {
+    connectionProfileName: ensureString(source.connectionProfileName).trim() || undefined,
     presetName: ensureString(source.presetName).trim() || undefined,
     scripts: {
       global: uniqueStrings(source.scripts?.global),
@@ -1273,6 +1276,7 @@ function normalizePlusBindingConfig(config: PersonaPlusBindingConfig | unknown):
   };
 
   const hasValue = Boolean(
+    normalized.connectionProfileName ||
     normalized.presetName ||
     normalized.scripts?.global?.length ||
     normalized.scripts?.preset?.length ||
@@ -1342,6 +1346,8 @@ function getDefaultPlusAppliedState(): PersonaPlusAppliedState {
     userPersonaAvatarId: undefined,
     userPersonaProfileId: undefined,
     userPersonaEnabledTraitIds: undefined,
+    connectionProfileName: undefined,
+    connectionProfileBaseline: undefined,
     presetName: undefined,
     presetEnabledPromptIds: undefined,
     scripts: {
@@ -2041,6 +2047,11 @@ function loadPersonaPlusAppliedState(avatarId: string): PersonaPlusAppliedState 
       userPersonaAvatarId: ensureString(parsed.userPersonaAvatarId).trim() || undefined,
       userPersonaProfileId: ensureString(parsed.userPersonaProfileId).trim() || undefined,
       userPersonaEnabledTraitIds: normalizeOptionalStringArrayField(parsed as object, 'userPersonaEnabledTraitIds'),
+      connectionProfileName: ensureString(parsed.connectionProfileName).trim() || undefined,
+      connectionProfileBaseline:
+        parsed.connectionProfileBaseline === null
+          ? null
+          : ensureString(parsed.connectionProfileBaseline).trim() || undefined,
       presetName: ensureString(parsed.presetName).trim() || undefined,
       presetEnabledPromptIds: normalizeOptionalStringArrayField(parsed as object, 'presetEnabledPromptIds'),
       scripts: {
@@ -2096,6 +2107,7 @@ function isSamePlusAppliedTarget(left: PersonaPlusAppliedState, right: PersonaPl
     left.userPersonaAvatarId === right.userPersonaAvatarId &&
     left.userPersonaProfileId === right.userPersonaProfileId &&
     areOptionalStringArraysEqual(left.userPersonaEnabledTraitIds, right.userPersonaEnabledTraitIds) &&
+    left.connectionProfileName === right.connectionProfileName &&
     left.presetName === right.presetName &&
     areOptionalStringArraysEqual(left.presetEnabledPromptIds, right.presetEnabledPromptIds) &&
     JSON.stringify(left.scripts) === JSON.stringify(right.scripts) &&
@@ -2185,6 +2197,7 @@ function mergeContextBindingResources(
     userPersonaEnabledTraitIds: next.userPersonaAvatarId
       ? next.userPersonaEnabledTraitIds
       : base.userPersonaEnabledTraitIds,
+    connectionProfileName: next.connectionProfileName || base.connectionProfileName,
     presetEnabledPromptIds: next.presetName ? next.presetEnabledPromptIds : base.presetEnabledPromptIds,
     presetName: next.presetName || base.presetName,
     scripts: {
@@ -2236,6 +2249,7 @@ function buildDesiredPlusAppliedState(
   desired.userPersonaAvatarId = merged.userPersonaAvatarId;
   desired.userPersonaProfileId = undefined;
   desired.userPersonaEnabledTraitIds = merged.userPersonaAvatarId ? merged.userPersonaEnabledTraitIds : undefined;
+  desired.connectionProfileName = ensureString(merged.connectionProfileName).trim() || undefined;
   desired.presetName = merged.presetName || getDefaultPresetName() || getLoadedPresetName() || undefined;
   desired.presetEnabledPromptIds = merged.presetName ? merged.presetEnabledPromptIds : undefined;
   desired.scripts.global = uniqueStrings(merged.scripts?.global);
@@ -2261,6 +2275,9 @@ export function summarizePersonaPlusBinding(binding?: PersonaPlusBindingConfig):
   }
 
   const summaryParts: string[] = [];
+  if (normalized.connectionProfileName) {
+    summaryParts.push(`连接:${normalized.connectionProfileName}`);
+  }
   if (normalized.presetName) {
     summaryParts.push(`预设:${normalized.presetName}`);
   }
