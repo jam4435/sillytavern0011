@@ -2357,6 +2357,203 @@ type NamedOption = {
   label: string;
 };
 
+const CONNECTION_PROFILE_CACHE_TTL_MS = 5000;
+let connectionProfileCatalogCache: NamedOption[] = [];
+let connectionProfileCatalogPending: Promise<NamedOption[]> | null = null;
+let currentConnectionProfileCache: { value?: string; loadedAt: number } = {
+  value: undefined,
+  loadedAt: 0,
+};
+
+function stripWrappingQuotes(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const first = trimmed[0];
+  const last = trimmed[trimmed.length - 1];
+  if ((first === '"' && last === '"') || (first === "'" && last === "'") || (first === '`' && last === '`')) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function normalizeConnectionProfileName(value: unknown): string | undefined {
+  const normalized = stripWrappingQuotes(ensureStringLike(value)).trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  const lowered = normalized.toLowerCase();
+  if (
+    [
+      '<none>',
+      'none',
+      '(none)',
+      'null',
+      'undefined',
+      'no profile',
+      '未绑定',
+      '未设置',
+      '未选择',
+      '无',
+    ].includes(lowered)
+  ) {
+    return undefined;
+  }
+
+  return normalized;
+}
+
+function parseConnectionProfileListResult(raw: string): string[] {
+  const trimmed = ensureString(raw).trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) {
+      return uniqueStrings(parsed.map(item => normalizeConnectionProfileName(item)).filter(Boolean));
+    }
+    if (parsed && typeof parsed === 'object') {
+      const record = parsed as Record<string, unknown>;
+      const candidateKeys = ['profiles', 'names', 'list', 'items', 'data'];
+      for (const key of candidateKeys) {
+        if (Array.isArray(record[key])) {
+          return uniqueStrings(
+            safeArray<unknown>(record[key])
+              .map(item => normalizeConnectionProfileName(item))
+              .filter(Boolean),
+          );
+        }
+      }
+    }
+  } catch {
+    // noop
+  }
+
+  return uniqueStrings(
+    trimmed
+      .split(/[\r\n,]+/)
+      .map(line =>
+        normalizeConnectionProfileName(
+          line
+            .replace(/^[\s\-*•]+/, '')
+            .replace(/^\d+\.\s*/, '')
+            .trim(),
+        ),
+      )
+      .filter(Boolean),
+  );
+}
+
+function parseCurrentConnectionProfileResult(raw: string): string | undefined {
+  const trimmed = ensureString(raw).trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (typeof parsed === 'string' || parsed === null) {
+      return normalizeConnectionProfileName(parsed);
+    }
+    if (parsed && typeof parsed === 'object') {
+      const record = parsed as Record<string, unknown>;
+      const candidateKeys = ['name', 'profile', 'current', 'selected', 'value'];
+      for (const key of candidateKeys) {
+        const value = normalizeConnectionProfileName(record[key]);
+        if (value !== undefined) {
+          return value;
+        }
+      }
+    }
+  } catch {
+    // noop
+  }
+
+  const firstLine = trimmed.split(/\r?\n/).map(line => line.trim()).find(Boolean) || trimmed;
+  const matched =
+    firstLine.match(/^(?:current|selected)?\s*profile\s*:?\s*(.+)$/i) ||
+    firstLine.match(/^(?:current|selected)\s*:\s*(.+)$/i);
+  return normalizeConnectionProfileName(matched ? matched[1] : firstLine);
+}
+
+function updateConnectionProfileCatalogCache(profileNames: string[]): NamedOption[] {
+  const next = uniqueStrings(profileNames)
+    .map(name => normalizeConnectionProfileName(name))
+    .filter((name): name is string => Boolean(name))
+    .sort((left, right) => left.localeCompare(right))
+    .map(name => ({ id: name, label: name }));
+  connectionProfileCatalogCache = next;
+  return connectionProfileCatalogCache;
+}
+
+function quoteSlashCommandArgument(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+async function readCurrentConnectionProfileName(forceRefresh: boolean = false): Promise<string | undefined> {
+  const now = Date.now();
+  if (!forceRefresh && now - currentConnectionProfileCache.loadedAt < CONNECTION_PROFILE_CACHE_TTL_MS) {
+    return currentConnectionProfileCache.value;
+  }
+
+  const currentProfile = parseCurrentConnectionProfileResult(await triggerSlash('/profile'));
+  currentConnectionProfileCache = {
+    value: currentProfile,
+    loadedAt: Date.now(),
+  };
+  return currentProfile;
+}
+
+export function getCachedCurrentConnectionProfileName(): string | undefined {
+  return currentConnectionProfileCache.value;
+}
+
+export async function refreshConnectionProfileCatalog(forceProfileRefresh: boolean = true): Promise<NamedOption[]> {
+  if (connectionProfileCatalogPending) {
+    return connectionProfileCatalogPending;
+  }
+
+  connectionProfileCatalogPending = (async () => {
+    const currentProfile = forceProfileRefresh
+      ? await readCurrentConnectionProfileName(true)
+      : getCachedCurrentConnectionProfileName();
+    const listedProfiles = parseConnectionProfileListResult(await triggerSlash('/profile-list'));
+    const boundProfiles = uniqueStrings(loadContextBindings().map(binding => binding.resources.connectionProfileName));
+    return updateConnectionProfileCatalogCache([...(currentProfile ? [currentProfile] : []), ...listedProfiles, ...boundProfiles]);
+  })();
+
+  try {
+    return await connectionProfileCatalogPending;
+  } finally {
+    connectionProfileCatalogPending = null;
+  }
+}
+
+async function applyConnectionProfileSelection(profileName?: string): Promise<boolean> {
+  const normalizedProfileName = normalizeConnectionProfileName(profileName);
+  const currentProfile = await readCurrentConnectionProfileName(true);
+  if (currentProfile === normalizedProfileName) {
+    return false;
+  }
+
+  await triggerSlash(
+    normalizedProfileName ? `/profile ${quoteSlashCommandArgument(normalizedProfileName)}` : '/profile <None>',
+  );
+  currentConnectionProfileCache = {
+    value: normalizedProfileName,
+    loadedAt: Date.now(),
+  };
+  updateConnectionProfileCatalogCache([
+    ...connectionProfileCatalogCache.map(item => item.id),
+    ...(normalizedProfileName ? [normalizedProfileName] : []),
+  ]);
+  return true;
+}
+
 function flattenScriptTreeOptions(nodes: ScriptTree[], prefix: string = ''): NamedOption[] {
   const result: NamedOption[] = [];
   for (const node of nodes) {
@@ -2373,6 +2570,7 @@ function flattenScriptTreeOptions(nodes: ScriptTree[], prefix: string = ''): Nam
 }
 
 export function getPlusBindingCatalog(): {
+  connectionProfiles: NamedOption[];
   presets: NamedOption[];
   scripts: {
     global: NamedOption[];
@@ -2392,8 +2590,13 @@ export function getPlusBindingCatalog(): {
       .SillyTavern?.extensionSettings as Record<string, unknown> | undefined) ||
     (SillyTavern?.extensionSettings as Record<string, unknown> | undefined) ||
     {};
+  const boundConnectionProfiles = uniqueStrings(loadContextBindings().map(binding => binding.resources.connectionProfileName));
 
   return {
+    connectionProfiles: updateConnectionProfileCatalogCache([
+      ...connectionProfileCatalogCache.map(item => item.id),
+      ...boundConnectionProfiles,
+    ]),
     presets: getPresetNames().map(name => ({ id: name, label: name })),
     scripts: {
       global: flattenScriptTreeOptions(getScriptTrees({ type: 'global' })),
@@ -2698,6 +2901,48 @@ export async function applyPresetPromptEnabledSnapshot(
   return changed;
 }
 
+async function applyManagedConnectionProfile(
+  desiredProfileName: string | undefined,
+  previous: PersonaPlusAppliedState,
+): Promise<{ changed: boolean; connectionProfileName?: string; connectionProfileBaseline?: string | null }> {
+  const normalizedDesiredProfileName = normalizeConnectionProfileName(desiredProfileName);
+  const previousProfileName = normalizeConnectionProfileName(previous.connectionProfileName);
+  const hadPreviousManagedProfile = previousProfileName !== undefined;
+
+  if (normalizedDesiredProfileName === undefined && !hadPreviousManagedProfile) {
+    return {
+      changed: false,
+      connectionProfileName: undefined,
+      connectionProfileBaseline: undefined,
+    };
+  }
+
+  const currentProfileName = await readCurrentConnectionProfileName(true);
+  const previousBaseline =
+    previous.connectionProfileBaseline === null
+      ? null
+      : normalizeConnectionProfileName(previous.connectionProfileBaseline);
+  const connectionProfileBaseline =
+    normalizedDesiredProfileName !== undefined
+      ? previousBaseline !== undefined
+        ? previousBaseline
+        : currentProfileName ?? null
+      : undefined;
+  const targetProfileName =
+    normalizedDesiredProfileName !== undefined
+      ? normalizedDesiredProfileName
+      : previousBaseline === null
+        ? undefined
+        : previousBaseline;
+  const changed = await applyConnectionProfileSelection(targetProfileName);
+
+  return {
+    changed,
+    connectionProfileName: normalizedDesiredProfileName,
+    connectionProfileBaseline,
+  };
+}
+
 async function applyManagedPresetPromptSelection(
   desiredPresetName: string | undefined,
   desiredPromptIds: string[] | undefined,
@@ -2943,6 +3188,16 @@ export async function applyPersonaPlusBindings(
     );
   }
 
+  const connectionProfileResult = await applyManagedConnectionProfile(desired.connectionProfileName, previous);
+  if (connectionProfileResult.changed) {
+    changed = true;
+    summary.push(
+      connectionProfileResult.connectionProfileName
+        ? `连接profile -> ${connectionProfileResult.connectionProfileName}`
+        : '连接profile已恢复',
+    );
+  }
+
   let presetLoadFailed = false;
   if (desired.presetName && desired.presetName !== getLoadedPresetName()) {
     if (loadPreset(desired.presetName)) {
@@ -3032,6 +3287,8 @@ export async function applyPersonaPlusBindings(
 
   const nextState: PersonaPlusAppliedState = {
     ...desired,
+    connectionProfileName: connectionProfileResult.connectionProfileName,
+    connectionProfileBaseline: connectionProfileResult.connectionProfileBaseline,
     presetName: presetPromptResult.presetName,
     presetEnabledPromptIds: presetPromptResult.presetEnabledPromptIds,
     personaTraitBaselines: personaResult.personaTraitBaselines,
@@ -3337,6 +3594,20 @@ export async function probePlusBindingInterfaces(): Promise<PersonaPlusProbeRepo
     );
   }
 
+  try {
+    const connectionProfiles = await refreshConnectionProfileCatalog();
+    const currentConnectionProfile = await readCurrentConnectionProfileName(true);
+    pushPlusProbeItem(
+      items,
+      'connection_profile',
+      'API连接 profile',
+      true,
+      `已发现 ${connectionProfiles.length} 个 connection profile；当前=${currentConnectionProfile || '<None>'}；可通过 /profile 切换。`,
+    );
+  } catch (error) {
+    pushPlusProbeItem(items, 'connection_profile', 'API连接 profile', false, `调用失败: ${formatProbeError(error)}`);
+  }
+
   if (
     typeof getScriptTrees === 'function' &&
     typeof replaceScriptTrees === 'function' &&
@@ -3510,6 +3781,7 @@ export async function probePlusBindingInterfaces(): Promise<PersonaPlusProbeRepo
   notes.push(
     '未在类型声明里发现“按插件名直接启用/停用某个扩展”的高层切换接口，目前只确认有 extensionSettings 低层对象和安装/更新类接口。',
   );
+  notes.push('API 连接配置适合走 /profile /profile-list 这一套 connection profile 命令，不建议直接改 mainApi/chatCompletionSettings。');
 
   const currentCharacterName = typeof getCurrentCharacterName === 'function' ? getCurrentCharacterName() : null;
   if (typeof getCharacter === 'function' && currentCharacterName) {

@@ -15,6 +15,7 @@ import {
   findContextBinding,
   findPersonaByAvatarId,
   getBindingPlusThemePresets,
+  getCachedCurrentConnectionProfileName,
   getCurrentPersonaFromDOM,
   getDefaultPresetName,
   getPersonaActivationState,
@@ -38,6 +39,7 @@ import {
   probePlusBindingInterfaces,
   recordPersonaSnapshot,
   resetBindingPlusTheme,
+  refreshConnectionProfileCatalog,
   resolveBindingPlusThemeTokens,
   restoreLastPersonaSnapshot,
   runCompatibilitySelfCheck,
@@ -147,13 +149,23 @@ const BINDINGPLUS_THEME_EDITABLE_TOKENS: Array<{
   { key: 'buttonBg', label: '按钮背景' },
 ];
 
-type DetailPageKey = 'persona' | 'preset' | 'scripts' | 'regexes' | 'worldbooks' | 'groups' | 'extensions' | 'events';
+type DetailPageKey =
+  | 'persona'
+  | 'preset'
+  | 'api'
+  | 'scripts'
+  | 'regexes'
+  | 'worldbooks'
+  | 'groups'
+  | 'extensions'
+  | 'events';
 type ScopedSelectionScope = 'global' | 'preset' | 'character';
 type BindingPlusDeviceMode = 'desktop' | 'mobile';
 
 const DETAIL_PAGE_DEFINITIONS: Array<{ key: DetailPageKey; label: string }> = [
   { key: 'persona', label: '用户人设' },
   { key: 'preset', label: '预设' },
+  { key: 'api', label: 'API连接' },
   { key: 'scripts', label: '酒馆助手脚本' },
   { key: 'regexes', label: '酒馆正则' },
   { key: 'worldbooks', label: '世界书与条目' },
@@ -551,7 +563,7 @@ function createPanelHtml(): string {
             <div class="persona-sidebar-header">
               <div>
               <div class="persona-sidebar-title">绑定plus</div>
-              <div class="persona-sidebar-subtitle">把 user 人设、预设、脚本、正则、世界书等资源绑定到当前聊天 / 当前 char。</div>
+              <div class="persona-sidebar-subtitle">把 user 人设、预设、API连接、脚本、正则、世界书等资源绑定到当前聊天 / 当前 char。</div>
               </div>
             <button class="close-btn" id="persona-close-btn" title="关闭">×</button>
           </div>
@@ -633,6 +645,10 @@ function createPanelHtml(): string {
 
                 <section id="persona-page-preset" class="persona-page-panel ${activeDetailPage === 'preset' ? 'active' : ''}">
                   <div id="persona-preset-page-body"></div>
+                </section>
+
+                <section id="persona-page-api" class="persona-page-panel ${activeDetailPage === 'api' ? 'active' : ''}">
+                  <div id="persona-api-page-body"></div>
                 </section>
 
                 <section id="persona-page-scripts" class="persona-page-panel ${activeDetailPage === 'scripts' ? 'active' : ''}">
@@ -910,6 +926,12 @@ function getSidebarSectionMeta(): { title: string; note: string; placeholder: st
         note: '点击具体预设后，右侧显示哪些聊天/角色绑定在使用它。',
         placeholder: '搜索预设...',
       };
+    case 'api':
+      return {
+        title: 'API连接',
+        note: '这里绑定的是酒馆 connection profile。请先在酒馆里创建 profile，再在这里选择并绑定。',
+        placeholder: '搜索 connection profile...',
+      };
     case 'scripts':
       return {
         title: '酒馆助手脚本',
@@ -1011,6 +1033,10 @@ function contextBindingReferencesResource(
 
   if (page === 'preset') {
     return resources.presetName === selectionId;
+  }
+
+  if (page === 'api') {
+    return resources.connectionProfileName === selectionId;
   }
 
   if (page === 'scripts') {
@@ -1118,6 +1144,12 @@ function renderSidebarSecondaryList(): void {
       id: option.id,
       label: option.label,
       meta: `${getReferencedBindings('preset', option.id).length} 个绑定使用`,
+    }));
+  } else if (activeDetailPage === 'api') {
+    items = catalog.connectionProfiles.map(option => ({
+      id: option.id,
+      label: option.label,
+      meta: `${getReferencedBindings('api', option.id).length} 个绑定使用`,
     }));
   } else if (activeDetailPage === 'scripts') {
     items = [
@@ -1238,6 +1270,10 @@ function syncActiveDetailPageUi(): void {
   renderResourceDetailPages();
   renderPersonaDefaultTraitSnapshotState(getEditingAvatarId());
   applyBindingPlusLayoutState();
+
+  if (activeDetailPage === 'api') {
+    void refreshApiConnectionCatalog({ quiet: true, rerender: true });
+  }
 }
 
 function renderRuntimeContextHeader(): void {
@@ -2774,6 +2810,25 @@ function getCurrentWorldbookEnabledEntryUids(
   return undefined;
 }
 
+function createApiConnectionSelectionDetailHtml(selectionId: string): string {
+  if (!selectionId) {
+    return createEmbeddedResourceDetailHtml('未选中 connection profile', [
+      '请从左侧选择一个 connection profile',
+      '这里绑定的是酒馆 connection profile，而不是直接写裸 API URL / Key / 模型。',
+    ]);
+  }
+
+  const currentProfile = getCachedCurrentConnectionProfileName();
+  return createEmbeddedResourceDetailHtml(selectionId, [
+    `被 ${getReferencedBindings('api', selectionId).length} 个绑定使用`,
+    currentProfile
+      ? currentProfile === selectionId
+        ? '当前酒馆正在使用这个 connection profile'
+        : `当前酒馆正在使用 ${currentProfile}`
+      : '当前酒馆未选 connection profile，或尚未刷新到最新状态',
+  ]);
+}
+
 function createPresetSelectionDetailHtml(selectionId: string): string {
   if (!selectionId) {
     return createEmbeddedResourceDetailHtml('未选中预设', ['请从左侧选择一个预设']);
@@ -3042,6 +3097,30 @@ function createBindingItemSectionHtml(
       <div class="persona-binding-item-list${options.compactReferences ? ' compact' : ''}">${listHtml}</div>
     </div>
   `;
+}
+
+function renderApiBindingPage(
+  $container: JQuery<HTMLElement>,
+  _avatarId: string,
+  _catalog: PlusBindingCatalog,
+  _binding: PersonaContextBindingResources | undefined,
+): void {
+  const selectionId = activeResourceSelection.api || '';
+  const currentProfile = getCachedCurrentConnectionProfileName();
+
+  $container.html(`
+    ${createBindingItemSectionHtml('api', selectionId, {
+      detailHtml: createApiConnectionSelectionDetailHtml(selectionId),
+      compactReferences: true,
+      showSaveButton: false,
+      contentHtml: `
+      <div class="text-note">这里绑定的是酒馆 connection profile，会通过 <code>/profile</code> 切换；不直接写裸 API URL / Key / 模型。</div>
+      <div class="text-note">如果你想让整套 API 连接配置随聊天 / 角色切换，请先在酒馆里把当前连接保存成 connection profile，再在这里绑定。</div>
+      <div class="persona-hint-row">${currentProfile ? `当前 live profile: ${escapeHtml(currentProfile)}` : '当前 live profile: <None> 或尚未刷新。'}</div>
+      <div class="text-note">使用顶部“绑定到当前聊天 / 绑定到当前角色”来添加或移除当前选中的 connection profile。</div>
+    `,
+    })}
+  `);
 }
 
 function renderPresetBindingPage(
@@ -3331,6 +3410,10 @@ function createBindingGroupReadonlySectionsHtml(
         `条目快照：${traitNames.length ? `${traitNames.length} 条` : '未记录'}`,
         traitNames.length ? `条目：${traitNames.join('、')}` : '',
       ])}
+      ${createBindingGroupReadonlyBlock('API连接', [
+        resources.connectionProfileName ? `connection profile：${resources.connectionProfileName}` : '未绑定',
+        resources.connectionProfileName ? '绑定时通过 /profile 切换。' : '',
+      ])}
       ${createBindingGroupReadonlyBlock('预设', [
         resources.presetName ? `当前预设：${resources.presetName}` : '未绑定',
         resources.presetName && resources.presetEnabledPromptIds !== undefined
@@ -3531,6 +3614,7 @@ function deleteActiveBindingGroup(): void {
 
 function renderBindingPages(binding: PersonaContextBinding | null, page: DetailPageKey = activeDetailPage): void {
   const parentDoc = window.parent.document;
+  const $api = $('#persona-api-page-body', parentDoc);
   const $preset = $('#persona-preset-page-body', parentDoc);
   const $scripts = $('#persona-scripts-page-body', parentDoc);
   const $regexes = $('#persona-regexes-page-body', parentDoc);
@@ -3543,12 +3627,16 @@ function renderBindingPages(binding: PersonaContextBinding | null, page: DetailP
     return;
   }
 
-  if (!['preset', 'scripts', 'regexes', 'worldbooks'].includes(page)) {
+  if (!['api', 'preset', 'scripts', 'regexes', 'worldbooks'].includes(page)) {
     return;
   }
 
   if (!binding) {
-    if (page === 'preset') {
+    if (page === 'api') {
+      const catalog = getCachedPlusBindingCatalog();
+      renderApiBindingPage($api, '', catalog, undefined);
+      return;
+    } else if (page === 'preset') {
       const catalog = getCachedPlusBindingCatalog();
       renderPresetBindingPage($preset, '', catalog, undefined);
       return;
@@ -3565,6 +3653,10 @@ function renderBindingPages(binding: PersonaContextBinding | null, page: DetailP
   }
 
   const catalog = getCachedPlusBindingCatalog();
+  if (page === 'api') {
+    renderApiBindingPage($api, '', catalog, bindingResources);
+    return;
+  }
   if (page === 'preset') {
     renderPresetBindingPage($preset, '', catalog, bindingResources);
     return;
@@ -3620,6 +3712,7 @@ export function showPanel(): void {
   refreshCompatibilitySection();
   renderPlusBindingSection();
   void refreshPlusBindingSection();
+  void refreshApiConnectionCatalog({ quiet: true, rerender: activeDetailPage === 'api' });
   lastContextSignature = buildContextSignature();
 
   console.log('用户设定脚本: 面板已显示');
@@ -4350,6 +4443,23 @@ function getCachedPlusBindingCatalog(): PlusBindingCatalog {
   return value;
 }
 
+async function refreshApiConnectionCatalog(options: { quiet?: boolean; rerender?: boolean } = {}): Promise<boolean> {
+  try {
+    await refreshConnectionProfileCatalog();
+    invalidatePlusBindingCatalogCache();
+    if (options.rerender && activeDetailPage === 'api') {
+      renderSidebarSecondaryList();
+      renderResourceDetailPages();
+    }
+    return true;
+  } catch (error) {
+    if (!options.quiet) {
+      toastr.error(error instanceof Error ? error.message : String(error));
+    }
+    return false;
+  }
+}
+
 function renderSelectOptions(
   options: Array<{ id: string; label: string }>,
   selectedId: string | undefined,
@@ -4369,6 +4479,7 @@ function createEmptyBindingResources(): PersonaContextBindingResources {
     userPersonaAvatarId: undefined,
     userPersonaProfileId: undefined,
     userPersonaEnabledTraitIds: undefined,
+    connectionProfileName: undefined,
     presetName: undefined,
     presetEnabledPromptIds: undefined,
     scripts: {
@@ -4602,6 +4713,7 @@ function seedBindingResourcesFromCurrentSelection(
     userPersonaProfileId: resources.userPersonaProfileId,
     userPersonaEnabledTraitIds:
       resources.userPersonaEnabledTraitIds === undefined ? undefined : [...resources.userPersonaEnabledTraitIds],
+    connectionProfileName: resources.connectionProfileName,
     presetEnabledPromptIds:
       resources.presetEnabledPromptIds === undefined ? undefined : [...resources.presetEnabledPromptIds],
     presetName: resources.presetName,
@@ -4640,6 +4752,14 @@ function seedBindingResourcesFromCurrentSelection(
     if (presetId) {
       nextResources.presetName = presetId;
       nextResources.presetEnabledPromptIds = getCurrentPresetPromptSelectionIds(presetId, resources) || [];
+    }
+    return nextResources;
+  }
+
+  if (activeDetailPage === 'api') {
+    const connectionProfileName = (activeResourceSelection.api || '').trim();
+    if (connectionProfileName) {
+      nextResources.connectionProfileName = connectionProfileName;
     }
     return nextResources;
   }
@@ -4693,6 +4813,7 @@ function hasBindingResources(resources: PersonaContextBindingResources | undefin
   }
   return Boolean(
     resources.userPersonaAvatarId ||
+    resources.connectionProfileName ||
     resources.presetName ||
     resources.presetEnabledPromptIds?.length ||
     resources.scripts?.global?.length ||
@@ -4796,6 +4917,12 @@ function getCurrentSelectionDisplayLabel(): string {
     return group ? `绑定组 ${group.name}` : '当前绑定组';
   }
 
+  if (activeDetailPage === 'api') {
+    const selectionId = activeResourceSelection.api || '';
+    const option = catalog.connectionProfiles.find(item => item.id === selectionId);
+    return option?.label || selectionId || '当前API连接';
+  }
+
   if (activeDetailPage === 'extensions') {
     const selectionId = activeResourceSelection.extensions || '';
     const option = catalog.extensions.find(item => item.id === selectionId);
@@ -4848,6 +4975,24 @@ function toggleBindingResourceFromCurrentSelection(resources: PersonaContextBind
           ...resources,
           presetName: undefined,
           presetEnabledPromptIds: undefined,
+        },
+        changed: true,
+        removed: true,
+      };
+    }
+    return { resources: nextResources, changed: true, removed: false };
+  }
+
+  if (activeDetailPage === 'api') {
+    const connectionProfileName = (activeResourceSelection.api || '').trim();
+    if (!connectionProfileName) {
+      return { resources, changed: false, removed: false };
+    }
+    if (resources.connectionProfileName === connectionProfileName) {
+      return {
+        resources: {
+          ...resources,
+          connectionProfileName: undefined,
         },
         changed: true,
         removed: true,
@@ -5031,6 +5176,10 @@ async function saveSelectedProfileBinding(_avatarId: string): Promise<void> {
         currentBinding.resources.userPersonaEnabledTraitIds === undefined
           ? undefined
           : [...currentBinding.resources.userPersonaEnabledTraitIds],
+      connectionProfileName:
+        activeDetailPage === 'api'
+          ? (activeResourceSelection.api || '').trim() || undefined
+          : currentBinding.resources.connectionProfileName,
       presetName: activeDetailPage === 'preset' ? selectedPresetName || undefined : currentBinding.resources.presetName,
       presetEnabledPromptIds:
         hasPresetPromptControls && activeDetailPage === 'preset'
@@ -5432,6 +5581,12 @@ function bindPanelEvents(): void {
     });
 
   $('#persona-refresh-btn', parentDoc).on(`click${PANEL_EVENT_NAMESPACE}`, async () => {
+    if (activeDetailPage === 'api') {
+      if (await refreshApiConnectionCatalog({ quiet: false, rerender: true })) {
+        toastr.success('API连接索引已刷新');
+      }
+      return;
+    }
     invalidatePlusBindingCatalogCache();
     renderSidebarSecondaryList();
     renderResourceDetailPages();

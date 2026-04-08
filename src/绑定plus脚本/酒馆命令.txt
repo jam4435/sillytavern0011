@@ -11,3 +11,28 @@ on可以通过、off或 来选择锁定状态toggle。默认值为切换。
 使用此功能可以临时设置当前mode=temp角色的名称，即使同名角色可能已经存在（保留您当前的头像和描述）。
 #/persona-sync
 将当前聊天中的所有用户消息重新归属于当前角色及其名称
+
+API / 连接配置相关
+#/api [source?]
+切换当前连接到某个 API 源；不带参数时返回当前 API 源。
+#/api-url [api=...] [connect=true|false] (string)?
+设置当前 API 或指定 API 的连接地址。
+#/model (string)?
+设置当前 API 的模型；不带参数时返回当前模型名。
+#/preset (string)?
+设置当前 API 下正在使用的预设；不带参数时返回当前预设。
+
+Connection profile 相关
+#/profile (string)?
+切换到某个 connection profile；不带参数时返回当前 profile 名称。
+使用 <None> 可以切回“无 profile”状态。
+#/profile-list
+列出所有 connection profile 名称。
+#/profile-get (string)?
+获取当前或指定 connection profile 的详情。
+#/profile-create (string)
+用当前连接配置创建一个新的 connection profile。
+#/profile-update
+用当前连接配置更新当前已选中的 connection profile。
+
+绑定plus 对 API 连接配置的绑定，优先建议基于 connection profile 实现，而不是直接记录裸 URL / Key / Model。
