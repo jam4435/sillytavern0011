@@ -1298,11 +1298,15 @@ function normalizeContextBindingResources(
     resources && typeof resources === 'object' ? (resources as PersonaContextBindingResources) : {}
   ) as PersonaContextBindingResources;
   const plusBinding = normalizePlusBindingConfig(source) || {};
+  const userPersonaAvatarId = ensureString(source.userPersonaAvatarId).trim() || undefined;
+  const presetName = ensureString(plusBinding.presetName).trim() || undefined;
   return {
-    userPersonaAvatarId: ensureString(source.userPersonaAvatarId).trim() || undefined,
-    userPersonaProfileId: ensureString(source.userPersonaProfileId).trim() || undefined,
-    userPersonaEnabledTraitIds: normalizeOptionalStringArrayField(source, 'userPersonaEnabledTraitIds'),
-    presetEnabledPromptIds: normalizeOptionalStringArrayField(source, 'presetEnabledPromptIds'),
+    userPersonaAvatarId,
+    userPersonaProfileId: userPersonaAvatarId ? ensureString(source.userPersonaProfileId).trim() || undefined : undefined,
+    userPersonaEnabledTraitIds: userPersonaAvatarId
+      ? normalizeOptionalStringArrayField(source, 'userPersonaEnabledTraitIds')
+      : undefined,
+    presetEnabledPromptIds: presetName ? normalizeOptionalStringArrayField(source, 'presetEnabledPromptIds') : undefined,
     ...plusBinding,
   };
 }
@@ -2231,9 +2235,9 @@ function buildDesiredPlusAppliedState(
 
   desired.userPersonaAvatarId = merged.userPersonaAvatarId;
   desired.userPersonaProfileId = undefined;
-  desired.userPersonaEnabledTraitIds = merged.userPersonaEnabledTraitIds;
+  desired.userPersonaEnabledTraitIds = merged.userPersonaAvatarId ? merged.userPersonaEnabledTraitIds : undefined;
   desired.presetName = merged.presetName || getDefaultPresetName() || getLoadedPresetName() || undefined;
-  desired.presetEnabledPromptIds = merged.presetEnabledPromptIds;
+  desired.presetEnabledPromptIds = merged.presetName ? merged.presetEnabledPromptIds : undefined;
   desired.scripts.global = uniqueStrings(merged.scripts?.global);
   desired.scripts.preset = uniqueStrings(merged.scripts?.preset);
   desired.scripts.character = uniqueStrings(merged.scripts?.character);
