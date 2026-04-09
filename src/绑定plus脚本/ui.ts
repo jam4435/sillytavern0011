@@ -3633,36 +3633,54 @@ function getBindingGroupEditorRoot(): JQuery<HTMLElement> {
 }
 
 async function applyBindingGroupToCurrentScope(scope: 'chat' | 'character'): Promise<void> {
-  const selectedGroup = getSelectedBindingGroup();
-  if (!selectedGroup) {
-    toastr.warning('请先在左侧选择一个绑定组');
-    return;
-  }
+  try {
+    const selectedGroup = getSelectedBindingGroup();
+    if (!selectedGroup) {
+      toastr.warning('请先在左侧选择一个绑定组');
+      return;
+    }
 
-  const runtime = getRuntimeContext();
-  const currentBinding = getCurrentContextBinding(scope, runtime);
-  const mergedResources = mergeBindingGroupResources(
-    cloneBindingResources(currentBinding?.resources),
-    selectedGroup.resources,
-  );
-  const saved = upsertContextBinding(scope, mergedResources, runtime);
-  if (!saved) {
-    toastr.error(`应用到当前${scope === 'chat' ? '聊天' : '角色'}失败`);
-    return;
-  }
-
-  activeBindingScope = scope;
-  renderToolbarSelectionSummary();
-  renderResourceDetailPages();
-  await applyPersonaPlusBindings(getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || '', runtime, true);
-  const currentPersona = getCurrentPersonaFromDOM();
-  if (currentPersona?.avatarId) {
-    await applyComposedDescriptionForAvatar(
-      currentPersona.avatarId,
-      `应用绑定组到当前${scope === 'chat' ? '聊天' : '角色'}后自动同步`,
+    const runtime = getRuntimeContext();
+    const currentBinding = getCurrentContextBinding(scope, runtime);
+    const mergedResources = mergeBindingGroupResources(
+      cloneBindingResources(currentBinding?.resources),
+      selectedGroup.resources,
     );
+    const saved = upsertContextBinding(scope, mergedResources, runtime);
+    if (!saved) {
+      toastr.error(`应用到当前${scope === 'chat' ? '聊天' : '角色'}失败`);
+      return;
+    }
+
+    activeBindingScope = scope;
+    renderToolbarSelectionSummary();
+    renderResourceDetailPages();
+    const applied = await applyPersonaPlusBindingsWithToast(
+      getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || '',
+      runtime,
+      true,
+      `应用当前${scope === 'chat' ? '聊天' : '角色'}绑定组失败`,
+    );
+    if (!applied) {
+      return;
+    }
+    const currentPersona = getCurrentPersonaFromDOM();
+    if (currentPersona?.avatarId) {
+      const synced = await applyComposedDescriptionForAvatar(
+        currentPersona.avatarId,
+        `应用绑定组到当前${scope === 'chat' ? '聊天' : '角色'}后自动同步`,
+        {
+          errorToastTitle: `同步当前${scope === 'chat' ? '聊天' : '角色'}绑定组后的 user人设失败`,
+        },
+      );
+      if (!synced) {
+        return;
+      }
+    }
+    toastr.success(`已把绑定组「${selectedGroup.name}」应用到当前${scope === 'chat' ? '聊天' : '角色'}`);
+  } catch (error) {
+    showUiErrorToast(`应用当前${scope === 'chat' ? '聊天' : '角色'}绑定组失败`, error);
   }
-  toastr.success(`已把绑定组「${selectedGroup.name}」应用到当前${scope === 'chat' ? '聊天' : '角色'}`);
 }
 
 async function exportCurrentBindingToGroup(scope: 'chat' | 'character'): Promise<void> {
@@ -5522,14 +5540,23 @@ async function saveSelectedProfileBinding(_avatarId: string): Promise<void> {
 
   renderToolbarSelectionSummary();
   renderResourceDetailPages();
-  await applyPersonaPlusBindings(
+  const applied = await applyPersonaPlusBindingsWithToast(
     getEditingAvatarId() || getCurrentPersonaFromDOM()?.avatarId || '',
     currentContext,
     true,
+    '应用当前绑定失败',
   );
+  if (!applied) {
+    return;
+  }
   const currentPersona = getCurrentPersonaFromDOM();
   if (currentPersona?.avatarId) {
-    await applyComposedDescriptionForAvatar(currentPersona.avatarId, '保存聊天/角色绑定后自动同步');
+    const synced = await applyComposedDescriptionForAvatar(currentPersona.avatarId, '保存聊天/角色绑定后自动同步', {
+      errorToastTitle: '保存当前绑定后同步 user人设失败',
+    });
+    if (!synced) {
+      return;
+    }
   }
   toastr.success(`已保存${activeBindingScope === 'chat' ? '当前聊天' : '当前角色'}绑定`);
 }
@@ -6101,9 +6128,14 @@ function bindPanelEvents(): void {
       const toggleResult = toggleBindingResourceFromCurrentSelection(binding.resources);
       if (toggleResult.changed) {
         if (hasBindingResources(toggleResult.resources)) {
-          upsertContextBinding('chat', toggleResult.resources);
-        } else {
-          deleteContextBinding('chat');
+          const savedBinding = upsertContextBinding('chat', toggleResult.resources);
+          if (!savedBinding) {
+            toastr.error('保存当前聊天绑定失败');
+            return;
+          }
+        } else if (!deleteContextBinding('chat')) {
+          toastr.error('移除当前聊天绑定失败');
+          return;
         }
       }
       activeBindingScope = 'chat';
@@ -6158,9 +6190,14 @@ function bindPanelEvents(): void {
       const toggleResult = toggleBindingResourceFromCurrentSelection(binding.resources);
       if (toggleResult.changed) {
         if (hasBindingResources(toggleResult.resources)) {
-          upsertContextBinding('character', toggleResult.resources);
-        } else {
-          deleteContextBinding('character');
+          const savedBinding = upsertContextBinding('character', toggleResult.resources);
+          if (!savedBinding) {
+            toastr.error('保存当前角色绑定失败');
+            return;
+          }
+        } else if (!deleteContextBinding('character')) {
+          toastr.error('移除当前角色绑定失败');
+          return;
         }
       }
       activeBindingScope = 'character';
