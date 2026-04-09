@@ -1529,6 +1529,14 @@ export function initPanel() {
                     display: inline-block;
                     margin-left: 5px;
                 }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-floating-dropdown-layer {
+                    position: absolute;
+                    inset: 0;
+                    pointer-events: none;
+                    z-index: 10030;
+                    overflow: visible;
+                }
                 
                 #${LOREBOOK_PANEL_ID} .batch-toggle-dropdown {
                     display: none;
@@ -1543,6 +1551,12 @@ export function initPanel() {
                     z-index: 10000;
                     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
                     margin-top: 5px;
+                }
+
+                #${LOREBOOK_PANEL_ID} .batch-toggle-dropdown.floating-batch-dropdown {
+                    margin-top: 0;
+                    pointer-events: auto;
+                    z-index: 10031;
                 }
                 
                 #${LOREBOOK_PANEL_ID} .lorebook-batch-toggle-container.active .batch-toggle-dropdown {

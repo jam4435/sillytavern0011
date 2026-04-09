@@ -20,6 +20,7 @@ import { getActiveFilters, getFilteredEntries, getSelectedEntries, getSelectedEn
 import { openAiActionDialog } from '../ui/aiActionDialog.js';
 import { refreshAiWorkspace, resetAiWorkspace } from '../ui/aiWorkspace.js';
 import { selectDetailEntry } from '../ui/detail.js';
+import { closeFloatingBatchToggleDropdowns } from '../ui/floatingBatchDropdown.js';
 import { switchTab } from '../ui/panel.js';
 import { updateHeaderCheckboxState, updateRollbackButtonState, updateVirtualScroll } from '../ui/list.js';
 import { registerCommands } from './index.js';
@@ -513,7 +514,7 @@ async function executeBatchToggle({ $target, lorebookName, isGlobal, parentDoc, 
   }
 
   if (successCount > 0) {
-    $('.lorebook-batch-toggle-container', parentDoc).removeClass('active');
+    closeFloatingBatchToggleDropdowns(parentDoc);
     refreshList(lorebookName, isGlobal);
   }
 }
@@ -589,7 +590,7 @@ async function executeBatchTogglePatched({ $target, lorebookName, isGlobal, pare
   const aiParticipationUpdated = aiMode ? await applySelectedEntriesAiParticipation(lorebookName, aiMode) : false;
 
   if (successCount > 0 || aiParticipationUpdated) {
-    $('.lorebook-batch-toggle-container', parentDoc).removeClass('active');
+    closeFloatingBatchToggleDropdowns(parentDoc);
     refreshList(lorebookName, isGlobal);
   }
 }
@@ -602,7 +603,7 @@ async function setAiSelectedMode({ lorebookName, $actionTarget, parentDoc }) {
 
   const success = await applySelectedEntriesAiParticipation(lorebookName, aiMode);
   if (success) {
-    $('.lorebook-batch-toggle-container', parentDoc).removeClass('active');
+    closeFloatingBatchToggleDropdowns(parentDoc);
   }
 }
 
@@ -613,7 +614,7 @@ async function openAiWorkspaceMode({ lorebookName, $actionTarget, parentDoc }) {
   }
 
   const selectedCount = await openAiWorkspaceForSelectedEntries(lorebookName, modeKey);
-  $('.lorebook-batch-toggle-container', parentDoc).removeClass('active');
+  closeFloatingBatchToggleDropdowns(parentDoc);
 
   const label = modeKey === 'plan' ? '计划修改' : '直接修改';
   if (selectedCount > 0) {
@@ -641,7 +642,7 @@ async function executeAiSelection({ $target, lorebookName, parentDoc }) {
   if (selectedCount > 0) {
     window.toastr?.success(`已打开 AI ${label}，并同步 ${selectedCount} 个选中条目`);
   }
-  $('.lorebook-batch-toggle-container', parentDoc).removeClass('active');
+  closeFloatingBatchToggleDropdowns(parentDoc);
 }
 
 function selectAll({ $actionTarget, lorebookName, isGlobal, parentDoc }) {

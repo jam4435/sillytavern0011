@@ -54,6 +54,11 @@ import {
 import { toggleAllEntries } from './features/batchActions.js';
 import { createEntryHtml } from './ui/entry.js';
 import { getTabKey, isMasterDetailLayout, renderDetailPane, selectDetailEntry } from './ui/detail.js';
+import {
+  closeFloatingBatchToggleDropdowns,
+  repositionFloatingBatchToggleDropdowns,
+  toggleFloatingBatchToggleDropdown,
+} from './ui/floatingBatchDropdown.js';
 import { loadLorebookEntries, updateHeaderCheckboxState } from './ui/list.js';
 import {
   closeLorebookPanel,
@@ -883,7 +888,7 @@ export function bindEventListeners() {
   });
   $(parentDoc).on('click', () => {
     $panel.find('.sort-dropdown').hide();
-    $panel.find('.lorebook-batch-toggle-container').removeClass('active');
+    closeFloatingBatchToggleDropdowns(parentDoc);
   });
 
   // 点击外部关闭预设下拉菜单
@@ -904,16 +909,16 @@ export function bindEventListeners() {
   // Batch toggle dropdown
   $panel.on('click', '.batch-toggle-button', function (e) {
     e.stopPropagation();
-    const $container = $(this).closest('.lorebook-batch-toggle-container');
-    const wasActive = $container.hasClass('active');
-    $('.lorebook-batch-toggle-container', parentDoc).removeClass('active');
-    if (!wasActive) {
-      $container.addClass('active');
-    }
+    toggleFloatingBatchToggleDropdown($(this), parentDoc);
   });
   $panel.on('click', '.batch-toggle-dropdown', function (e) {
     e.stopPropagation();
   });
+  $(parentDoc.defaultView || window.parent || window)
+    .off('resize.lorebookBatchDropdown')
+    .on('resize.lorebookBatchDropdown', () => {
+      repositionFloatingBatchToggleDropdowns(parentDoc);
+    });
 
   $panel
     .off('keydown.masterTitleEdit')
