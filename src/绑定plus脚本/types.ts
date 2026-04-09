@@ -309,6 +309,8 @@ export interface PersonaPlusApiConfigTestItem {
   label: string;
   ok: boolean;
   detail: string;
+  rawContent?: string;
+  rawContentLabel?: string;
 }
 
 export interface PersonaPlusApiConfigTestReport {

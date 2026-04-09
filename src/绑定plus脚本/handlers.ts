@@ -2490,6 +2490,19 @@ function summarizeProbeText(raw: string, maxLength: number = 120): string {
   return normalized.length > maxLength ? `${normalized.slice(0, Math.max(0, maxLength - 3))}...` : normalized;
 }
 
+function formatJsonLikeText(raw: string): string {
+  const normalized = ensureString(raw).trim();
+  if (!normalized) {
+    return '';
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(normalized), null, 2);
+  } catch {
+    return normalized;
+  }
+}
+
 function parseSlashApiName(raw: string): string | undefined {
   const firstLine = ensureString(raw).split(/\r?\n/).map(line => line.trim()).find(Boolean) || ensureString(raw).trim();
   if (!firstLine) {
@@ -2549,8 +2562,19 @@ function createApiConfigTestItem(
   label: string,
   ok: boolean,
   detail: string,
+  options: {
+    rawContent?: string;
+    rawContentLabel?: string;
+  } = {},
 ): PersonaPlusApiConfigTestItem {
-  return { key, label, ok, detail };
+  return {
+    key,
+    label,
+    ok,
+    detail,
+    rawContent: options.rawContent,
+    rawContentLabel: options.rawContentLabel,
+  };
 }
 
 export async function refreshConnectionProfileCatalog(forceProfileRefresh: boolean = true): Promise<NamedOption[]> {
@@ -3964,6 +3988,10 @@ export async function runApiConfigSelfTest(): Promise<PersonaPlusApiConfigTestRe
         '/profile-get 读取测试',
         true,
         `当前 profile=${currentProfile || '<None>'}；返回=${summarizeProbeText(profileGetResult)}`,
+        {
+          rawContent: formatJsonLikeText(profileGetResult),
+          rawContentLabel: '/profile-get 完整返回',
+        },
       ),
     );
   } catch (error) {

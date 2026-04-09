@@ -4208,10 +4208,17 @@ function renderApiConfigSelfTestSection(report: PersonaPlusApiConfigTestReport |
   report.items.forEach(item => {
     const level = item.ok ? 'ok' : 'warn';
     const icon = item.ok ? '✅' : '⚠️';
+    const rawContentHtml = item.rawContent
+      ? `
+        <div class="plus-probe-meta">${escapeHtml(item.rawContentLabel || '完整返回')}</div>
+        <pre class="persona-json-preview">${escapeHtml(item.rawContent)}</pre>
+      `
+      : '';
     $details.append(
       `<div class="plus-probe-item ${level}">
         <div>${icon} ${escapeHtml(item.label)}</div>
         <div class="plus-probe-meta">${escapeHtml(item.detail)}</div>
+        ${rawContentHtml}
       </div>`,
     );
   });
