@@ -1601,15 +1601,15 @@ export function upsertContextBinding(
   const index = bindings.findIndex(binding => isMatchingContextBindingTarget(binding, scope, context));
 
   if (index !== -1) {
-    bindings[index] = {
+    const nextBinding: PersonaContextBinding = {
       ...bindings[index],
       targetId: targetId || legacyTargetId,
       targetName,
       resources: normalizedResources,
       updatedAt: now,
     };
-    saveContextBindings(bindings);
-    return bindings[index];
+    bindings[index] = nextBinding;
+    return saveContextBindings(bindings) ? nextBinding : null;
   }
 
   const binding: PersonaContextBinding = {
@@ -1622,8 +1622,7 @@ export function upsertContextBinding(
     updatedAt: now,
   };
   bindings.push(binding);
-  saveContextBindings(bindings);
-  return binding;
+  return saveContextBindings(bindings) ? binding : null;
 }
 
 export function deleteContextBinding(
