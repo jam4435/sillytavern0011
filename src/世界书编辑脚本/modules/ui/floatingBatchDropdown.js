@@ -52,7 +52,7 @@ function restoreDropdown($dropdown, parentDoc = getParentDoc()) {
   $dropdown.removeData('floating-owner-container').removeClass(FLOATING_BATCH_DROPDOWN_CLASS);
   resetDropdownStyles($dropdown);
 
-  if ($owner?.length && $.contains(parentDoc, $owner.get(0))) {
+  if ($owner?.length && $.contains(parentDoc.documentElement, $owner.get(0))) {
     $owner.append($dropdown);
     return;
   }
@@ -154,7 +154,7 @@ export function repositionFloatingBatchToggleDropdowns(parentDoc = getParentDoc(
   $layer.children(`.batch-toggle-dropdown.${FLOATING_BATCH_DROPDOWN_CLASS}`).each(function () {
     const $dropdown = $(this);
     const $owner = $dropdown.data('floating-owner-container');
-    if (!$owner?.length || !$.contains(parentDoc, $owner.get(0)) || !$owner.hasClass('active')) {
+    if (!$owner?.length || !$.contains(parentDoc.documentElement, $owner.get(0)) || !$owner.hasClass('active')) {
       restoreDropdown($dropdown, parentDoc);
       return;
     }
