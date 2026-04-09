@@ -15,6 +15,7 @@ import {
   findContextBinding,
   findPersonaByAvatarId,
   getBindingPlusThemePresets,
+  getApiConnectionDisplayState,
   getCachedCurrentConnectionProfileName,
   getCurrentPersonaFromDOM,
   getDefaultPresetName,
@@ -2839,6 +2840,73 @@ function createApiConnectionSelectionDetailHtml(selectionId: string): string {
   ]);
 }
 
+function renderApiLiveSummaryHtml(state: Awaited<ReturnType<typeof getApiConnectionDisplayState>>): string {
+  const lines = [
+    `当前 live profile: ${state.currentProfile || '<None>'}`,
+    `当前 live API源: ${state.currentApi || (state.currentApiError ? `读取失败: ${state.currentApiError}` : '未知')}`,
+    `当前 live 模型: ${state.currentModel || (state.currentModelError ? `读取失败: ${state.currentModelError}` : '未知')}`,
+  ];
+
+  if (state.currentProfileError) {
+    lines.push(`当前 live profile 读取失败: ${state.currentProfileError}`);
+  }
+
+  return lines.map(line => `<div class="persona-hint-row">${escapeHtml(line)}</div>`).join('');
+}
+
+async function hydrateApiBindingPage(selectionId: string): Promise<void> {
+  const parentDoc = window.parent.document;
+  const $liveSummary = $('#persona-api-live-summary', parentDoc);
+  const $profileSummary = $('#persona-api-profile-summary', parentDoc);
+  const $profileJson = $('#persona-api-profile-json', parentDoc);
+
+  if (!$liveSummary.length || !$profileSummary.length || !$profileJson.length) {
+    return;
+  }
+
+  $liveSummary.html('<div class="text-note">正在读取当前 API 连接...</div>');
+  $profileSummary.text('正在读取 profile 详情...');
+  $profileJson.text('正在读取 profile 内容...');
+
+  try {
+    const state = await getApiConnectionDisplayState(selectionId || undefined);
+    if (activeDetailPage !== 'api' || (activeResourceSelection.api || '') !== selectionId) {
+      return;
+    }
+
+    $liveSummary.html(renderApiLiveSummaryHtml(state));
+
+    if (!state.detailProfileName) {
+      $profileSummary.text('当前没有可读取的 connection profile。');
+      $profileJson.text('请选择左侧 profile，或先在酒馆里保存并切换到某个 connection profile。');
+      return;
+    }
+
+    const detailSource =
+      selectionId && selectionId === state.detailProfileName
+        ? '当前选中 profile'
+        : state.currentProfile && state.currentProfile === state.detailProfileName
+          ? '当前 live profile'
+          : '当前展示 profile';
+    $profileSummary.text(`${detailSource}: ${state.detailProfileName}`);
+
+    if (state.detailProfileError) {
+      $profileJson.text(`读取 /profile-get 失败: ${state.detailProfileError}`);
+      return;
+    }
+
+    $profileJson.text(state.detailProfileFormatted || state.detailProfileRaw || '该 profile 没有返回可展示的内容。');
+  } catch (error) {
+    if (activeDetailPage !== 'api' || (activeResourceSelection.api || '') !== selectionId) {
+      return;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    $liveSummary.html(`<div class="text-note">${escapeHtml(`读取当前 API 连接失败: ${message}`)}</div>`);
+    $profileSummary.text('读取 profile 详情失败');
+    $profileJson.text(message);
+  }
+}
+
 function createPresetSelectionDetailHtml(selectionId: string): string {
   if (!selectionId) {
     return createEmbeddedResourceDetailHtml('未选中预设', ['请从左侧选择一个预设']);
@@ -3126,11 +3194,17 @@ function renderApiBindingPage(
       contentHtml: `
       <div class="text-note">这里绑定的是酒馆 connection profile，会通过 <code>/profile</code> 切换；不直接写裸 API URL / Key / 模型。</div>
       <div class="text-note">如果你想让整套 API 连接配置随聊天 / 角色切换，请先在酒馆里把当前连接保存成 connection profile，再在这里绑定。</div>
-      <div class="persona-hint-row">${currentProfile ? `当前 live profile: ${escapeHtml(currentProfile)}` : '当前 live profile: <None> 或尚未刷新。'}</div>
+      <div class="text-note"><code>/profile-get</code> 展示的是已保存的 profile 内容；当前 live API 源和模型以下方实时读取结果为准。</div>
+      <div id="persona-api-live-summary">${currentProfile ? `<div class="persona-hint-row">${escapeHtml(`当前 live profile: ${currentProfile}`)}</div>` : '<div class="text-note">正在读取当前 API 连接...</div>'}</div>
+      <div class="persona-detail-section-title">Profile 详情</div>
+      <div class="persona-hint-row" id="persona-api-profile-summary">${selectionId ? `正在读取 ${escapeHtml(selectionId)} ...` : '未选中 profile，将尝试读取当前 live profile。'}</div>
+      <pre id="persona-api-profile-json" class="persona-json-preview">正在读取 profile 内容...</pre>
       <div class="text-note">使用顶部“绑定到当前聊天 / 绑定到当前角色”来添加或移除当前选中的 connection profile。</div>
     `,
     })}
   `);
+
+  void hydrateApiBindingPage(selectionId);
 }
 
 function renderPresetBindingPage(

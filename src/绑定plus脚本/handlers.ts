@@ -2557,6 +2557,72 @@ export function getCachedCurrentConnectionProfileName(): string | undefined {
   return currentConnectionProfileCache.value;
 }
 
+export async function getApiConnectionDisplayState(profileName?: string): Promise<{
+  currentProfile?: string;
+  currentProfileError?: string;
+  currentApi?: string;
+  currentApiError?: string;
+  currentModel?: string;
+  currentModelError?: string;
+  detailProfileName?: string;
+  detailProfileRaw?: string;
+  detailProfileFormatted?: string;
+  detailProfileError?: string;
+}> {
+  const result: {
+    currentProfile?: string;
+    currentProfileError?: string;
+    currentApi?: string;
+    currentApiError?: string;
+    currentModel?: string;
+    currentModelError?: string;
+    detailProfileName?: string;
+    detailProfileRaw?: string;
+    detailProfileFormatted?: string;
+    detailProfileError?: string;
+  } = {};
+
+  const [currentProfileResult, currentApiResult, currentModelResult] = await Promise.allSettled([
+    readCurrentConnectionProfileName(true),
+    triggerSlash('/api'),
+    triggerSlash('/model'),
+  ]);
+
+  if (currentProfileResult.status === 'fulfilled') {
+    result.currentProfile = currentProfileResult.value;
+  } else {
+    result.currentProfileError = formatProbeError(currentProfileResult.reason);
+  }
+
+  if (currentApiResult.status === 'fulfilled') {
+    result.currentApi = parseSlashApiName(currentApiResult.value) || summarizeProbeText(currentApiResult.value);
+  } else {
+    result.currentApiError = formatProbeError(currentApiResult.reason);
+  }
+
+  if (currentModelResult.status === 'fulfilled') {
+    result.currentModel = parseSlashModelName(currentModelResult.value) || summarizeProbeText(currentModelResult.value);
+  } else {
+    result.currentModelError = formatProbeError(currentModelResult.reason);
+  }
+
+  const detailProfileName = normalizeConnectionProfileName(profileName) || result.currentProfile;
+  result.detailProfileName = detailProfileName;
+  if (!detailProfileName) {
+    return result;
+  }
+
+  try {
+    const profileGetResult = await triggerSlash(`/profile-get ${quoteSlashCommandArgument(detailProfileName)}`);
+    result.detailProfileRaw = ensureString(profileGetResult).trim();
+    result.detailProfileFormatted = formatJsonLikeText(profileGetResult);
+  } catch (error) {
+    result.detailProfileError = formatProbeError(error);
+  }
+
+  return result;
+}
+
 function createApiConfigTestItem(
   key: string,
   label: string,
