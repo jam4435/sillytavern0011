@@ -238,6 +238,15 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function getUiErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return (message || '').trim() || '未知错误';
+}
+
+function showUiErrorToast(title: string, error: unknown): void {
+  toastr.error(`${title}：${getUiErrorMessage(error)}`);
+}
+
 function formatTime(timestamp: number): string {
   const d = new Date(timestamp);
   const yyyy = d.getFullYear();
@@ -1348,6 +1357,35 @@ function renderPersonaDefaultTraitSnapshotState(avatarId: string): void {
   );
 }
 
+function saveCurrentPersonaTraitsAsDefaultSnapshot(
+  avatarId: string,
+  options: {
+    announceSuccess?: boolean;
+    announceUnchanged?: boolean;
+  } = {},
+): { ok: boolean; changed: boolean; count: number } {
+  const currentTraitIds = getPersonaManualEnabledTraitIds(avatarId);
+  const savedDefaultTraitIds = getPersonaDefaultEnabledTraitIds(avatarId);
+  const changed = !areOptionalStringArraysEqual(savedDefaultTraitIds, currentTraitIds);
+  if (!changed) {
+    renderPersonaDefaultTraitSnapshotState(avatarId);
+    if (options.announceUnchanged) {
+      toastr.info('当前勾选已是默认条目状态');
+    }
+    return { ok: true, changed: false, count: currentTraitIds.length };
+  }
+
+  if (!savePersonaDefaultEnabledTraitIds(avatarId, currentTraitIds)) {
+    return { ok: false, changed: true, count: currentTraitIds.length };
+  }
+
+  renderPersonaDefaultTraitSnapshotState(avatarId);
+  if (options.announceSuccess) {
+    toastr.success(`已保存「${findPersonaByAvatarId(avatarId)?.name || avatarId}」的默认条目状态（${currentTraitIds.length} 条）`);
+  }
+  return { ok: true, changed: true, count: currentTraitIds.length };
+}
+
 function renderPresetDefaultButtonState(): void {
   const parentDoc = window.parent.document;
   const $button = $('#persona-default-preset-btn', parentDoc);
@@ -1405,6 +1443,35 @@ function renderPresetPromptDefaultSnapshotState(): void {
       ? `默认预设条目状态：${savedPromptIds.length} 条已保存，当前有未保存改动`
       : `默认预设条目状态：${savedPromptIds.length} 条已保存`,
   );
+}
+
+function saveCurrentPresetPromptsAsDefaultSnapshot(
+  presetName: string,
+  options: {
+    announceSuccess?: boolean;
+    announceUnchanged?: boolean;
+  } = {},
+): { ok: boolean; changed: boolean; count: number } {
+  const currentPromptIds = getCurrentPresetPromptSelectionIds(presetName) || [];
+  const savedPromptIds = loadDefaultPresetPromptIds(presetName);
+  const changed = !areOptionalStringArraysEqual(savedPromptIds, currentPromptIds);
+  if (!changed) {
+    renderPresetPromptDefaultSnapshotState();
+    if (options.announceUnchanged) {
+      toastr.info('当前勾选已是默认预设条目状态');
+    }
+    return { ok: true, changed: false, count: currentPromptIds.length };
+  }
+
+  if (!saveDefaultPresetPromptIds(presetName, currentPromptIds)) {
+    return { ok: false, changed: true, count: currentPromptIds.length };
+  }
+
+  renderPresetPromptDefaultSnapshotState();
+  if (options.announceSuccess) {
+    toastr.success(`已保存预设「${presetName}」的默认条目状态（${currentPromptIds.length} 条）`);
+  }
+  return { ok: true, changed: true, count: currentPromptIds.length };
 }
 
 function applyPresetPromptFilter(): void {
@@ -2406,7 +2473,10 @@ async function importPersonaYamlPayload(avatarId: string, payload: ImportedPerso
   renderPersonaTraits(avatarId);
   renderSnapshotSection(avatarId);
   renderResourceDetailPages();
-  await applyComposedDescriptionForAvatar(avatarId, '批量导入后自动同步');
+  await applyComposedDescriptionForAvatar(avatarId, '批量导入后自动同步', {
+    applyPlusBindings: false,
+    errorToastTitle: '批量导入后同步 user人设失败',
+  });
   toastr.success(
     `批量导入完成：新增条目 ${stats.createdTraits} 条，更新条目 ${stats.updatedTraits} 条，新增文件夹 ${stats.createdFolders} 个，更新文件夹 ${stats.updatedFolders} 个`,
   );
@@ -4353,33 +4423,66 @@ async function triggerPlusEventSelfTest(): Promise<void> {
   toastr.success('已触发自定义 Plus 事件测试');
 }
 
-async function applyComposedDescriptionForAvatar(avatarId: string, reason: string): Promise<void> {
-  if (!avatarId) {
-    return;
-  }
-  const parentDoc = window.parent.document;
-  const currentEditingAvatarId = getEditingAvatarId();
-
-  let baseDescription = '';
-  if (currentEditingAvatarId === avatarId) {
-    baseDescription = ($('#edit-persona-base-desc', parentDoc).val() as string | undefined) || '';
-  } else {
-    const persona = findPersonaByAvatarId(avatarId);
-    baseDescription = loadPersonaBaseDescription(avatarId, persona?.description || '');
-  }
-
-  savePersonaBaseDescription(avatarId, baseDescription);
-  const composed = await composePersonaDescription(avatarId, baseDescription);
-  await syncDescriptionToTavern(avatarId, composed, reason);
+async function applyPersonaPlusBindingsWithToast(
+  avatarId: string,
+  context: PersonaRuntimeContext,
+  force: boolean,
+  title: string,
+): Promise<boolean> {
   try {
-    const plusResult = await applyPersonaPlusBindings(avatarId);
-    if (plusResult.changed) {
-      console.info('用户设定脚本: Plus 绑定已应用', plusResult.summary);
-    }
+    await applyPersonaPlusBindings(avatarId, context, force);
+    return true;
   } catch (error) {
-    console.error('用户设定脚本: 应用 Plus 绑定失败', error);
+    console.error(`用户设定脚本: ${title}失败`, error);
+    showUiErrorToast(title, error);
+    return false;
   }
-  updateAutoStatusText(avatarId);
+}
+
+async function applyComposedDescriptionForAvatar(
+  avatarId: string,
+  reason: string,
+  options: {
+    applyPlusBindings?: boolean;
+    errorToastTitle?: string;
+  } = {},
+): Promise<boolean> {
+  if (!avatarId) {
+    return true;
+  }
+  const { applyPlusBindings = true, errorToastTitle = '同步 user人设内容失败' } = options;
+
+  try {
+    const parentDoc = window.parent.document;
+    const currentEditingAvatarId = getEditingAvatarId();
+
+    let baseDescription = '';
+    if (currentEditingAvatarId === avatarId) {
+      baseDescription = ($('#edit-persona-base-desc', parentDoc).val() as string | undefined) || '';
+    } else {
+      const persona = findPersonaByAvatarId(avatarId);
+      baseDescription = loadPersonaBaseDescription(avatarId, persona?.description || '');
+    }
+
+    savePersonaBaseDescription(avatarId, baseDescription);
+    const composed = await composePersonaDescription(avatarId, baseDescription);
+    await syncDescriptionToTavern(avatarId, composed, reason);
+
+    if (applyPlusBindings) {
+      const plusResult = await applyPersonaPlusBindings(avatarId);
+      if (plusResult.changed) {
+        console.info('用户设定脚本: Plus 绑定已应用', plusResult.summary);
+      }
+    }
+
+    updateAutoStatusText(avatarId);
+    return true;
+  } catch (error) {
+    console.error(`用户设定脚本: ${reason}失败`, error);
+    showUiErrorToast(errorToastTitle, error);
+    updateAutoStatusText(avatarId);
+    return false;
+  }
 }
 
 function updateAutoStatusText(avatarId: string): void {
@@ -4448,7 +4551,10 @@ async function addPersonaTrait(avatarId: string): Promise<void> {
     }
     renderPersonaTraits(avatarId);
     await editPersonaTrait(avatarId, newTrait.id);
-    await applyComposedDescriptionForAvatar(avatarId, '新增 trait 后自动同步');
+    await applyComposedDescriptionForAvatar(avatarId, '新增 trait 后自动同步', {
+      applyPlusBindings: false,
+      errorToastTitle: '新增条目后同步 user人设失败',
+    });
     renderSnapshotSection(avatarId);
     toastr.success('设定已添加');
   }
@@ -4467,7 +4573,10 @@ async function togglePersonaTrait(avatarId: string, traitId: string, enabled: bo
 
   if (savePersonaTraits(avatarId, traits)) {
     renderPersonaTraits(avatarId);
-    await applyComposedDescriptionForAvatar(avatarId, '切换 trait 后自动同步');
+    await applyComposedDescriptionForAvatar(avatarId, '切换 trait 后自动同步', {
+      applyPlusBindings: false,
+      errorToastTitle: '切换条目后同步 user人设失败',
+    });
     renderSnapshotSection(avatarId);
   }
 }
@@ -4527,7 +4636,10 @@ async function editPersonaTrait(avatarId: string, traitId: string): Promise<void
     traits[index].updatedAt = Date.now();
     savePersonaTraits(avatarId, traits);
     renderPersonaTraits(avatarId);
-    await applyComposedDescriptionForAvatar(avatarId, '编辑 trait 后自动同步');
+    await applyComposedDescriptionForAvatar(avatarId, '编辑 trait 后自动同步', {
+      applyPlusBindings: false,
+      errorToastTitle: '编辑条目后同步 user人设失败',
+    });
     renderSnapshotSection(avatarId);
     toastr.success('设定已保存');
     closeModal();
@@ -4558,7 +4670,10 @@ async function deletePersonaTrait(avatarId: string, traitId: string): Promise<vo
     savePersonaAdvancedConfig(avatarId, config);
 
     renderPersonaTraits(avatarId);
-    await applyComposedDescriptionForAvatar(avatarId, '删除 trait 后自动同步');
+    await applyComposedDescriptionForAvatar(avatarId, '删除 trait 后自动同步', {
+      applyPlusBindings: false,
+      errorToastTitle: '删除条目后同步 user人设失败',
+    });
     renderSnapshotSection(avatarId);
     toastr.success('设定已删除');
   }
@@ -5678,7 +5793,10 @@ async function rollbackLastSnapshot(avatarId: string): Promise<void> {
 
   renderPersonaTraits(avatarId);
   renderSnapshotSection(avatarId);
-  await applyComposedDescriptionForAvatar(avatarId, '回滚快照后自动同步');
+  await applyComposedDescriptionForAvatar(avatarId, '回滚快照后自动同步', {
+    applyPlusBindings: false,
+    errorToastTitle: '回滚快照后同步 user人设失败',
+  });
   toastr.success(`已回滚到 ${formatTime(restored.timestamp)} 的版本`);
 }
 
@@ -5739,43 +5857,53 @@ function bindPanelEvents(): void {
   });
 
   $('#persona-default-persona-btn', parentDoc).on(`click${PANEL_EVENT_NAMESPACE}`, async () => {
-    const avatarId = getEditingAvatarId();
-    if (!avatarId) {
-      toastr.warning('请先在左侧选择一个 user 人设');
-      return;
-    }
-
-    const before = findPersonaByAvatarId(avatarId);
-    if (!before) {
-      toastr.warning('未找到当前 user 人设');
-      return;
-    }
-
-    if (!before.isSelected) {
-      const switched = await selectPersonaInParentUI(avatarId);
-      if (!switched) {
-        toastr.warning('切换到目标 user 人设失败，无法调用酒馆默认人设按钮');
+    try {
+      const avatarId = getEditingAvatarId();
+      if (!avatarId) {
+        toastr.warning('请先在左侧选择一个 user 人设');
         return;
       }
+
+      const before = findPersonaByAvatarId(avatarId);
+      if (!before) {
+        toastr.warning('未找到当前 user 人设');
+        return;
+      }
+
+      if (!before.isSelected) {
+        const switched = await selectPersonaInParentUI(avatarId);
+        if (!switched) {
+          toastr.warning('切换到目标 user 人设失败，无法调用酒馆默认人设按钮');
+          return;
+        }
+      }
+
+      const $defaultButton = $('#lock_persona_default', parentDoc);
+      if (!$defaultButton.length) {
+        toastr.warning('找不到酒馆默认人设按钮');
+        return;
+      }
+
+      $defaultButton.trigger('click');
+      await new Promise(resolve => window.setTimeout(resolve, 180));
+      await renderPersonaList(true);
+      renderPersonaDefaultButtonState(avatarId);
+
+      const after = findPersonaByAvatarId(avatarId);
+      if (after?.isDefault) {
+        const snapshotResult = saveCurrentPersonaTraitsAsDefaultSnapshot(avatarId);
+        if (!snapshotResult.ok) {
+          toastr.error(`已将「${after.name || avatarId}」设为默认人设，但保存默认条目状态失败`);
+          return;
+        }
+        toastr.success(`已将「${after.name || avatarId}」设为默认人设，并同步默认条目状态（${snapshotResult.count} 条）`);
+        return;
+      }
+
+      toastr.success(`已取消「${before.name || avatarId}」的默认人设`);
+    } catch (error) {
+      showUiErrorToast('设置默认 user人设失败', error);
     }
-
-    const $defaultButton = $('#lock_persona_default', parentDoc);
-    if (!$defaultButton.length) {
-      toastr.warning('找不到酒馆默认人设按钮');
-      return;
-    }
-
-    $defaultButton.trigger('click');
-    await new Promise(resolve => window.setTimeout(resolve, 180));
-    await renderPersonaList(true);
-    renderPersonaDefaultButtonState(avatarId);
-
-    const after = findPersonaByAvatarId(avatarId);
-    toastr.success(
-      after?.isDefault
-        ? `已将「${after.name || avatarId}」设为默认人设`
-        : `已取消「${before.name || avatarId}」的默认人设`,
-    );
   });
 
   $(parentDoc)
@@ -5787,49 +5915,61 @@ function bindPanelEvents(): void {
         return;
       }
 
-      const currentTraitIds = getPersonaManualEnabledTraitIds(avatarId);
-      const savedDefaultTraitIds = getPersonaDefaultEnabledTraitIds(avatarId);
-      if (areOptionalStringArraysEqual(savedDefaultTraitIds, currentTraitIds)) {
-        renderPersonaDefaultTraitSnapshotState(avatarId);
-        toastr.info('当前勾选已是默认条目状态');
-        return;
-      }
-
       recordPersonaSnapshot(avatarId, '保存默认条目状态');
-      if (!savePersonaDefaultEnabledTraitIds(avatarId, currentTraitIds)) {
+      const snapshotResult = saveCurrentPersonaTraitsAsDefaultSnapshot(avatarId, {
+        announceSuccess: true,
+        announceUnchanged: true,
+      });
+      if (!snapshotResult.ok) {
         toastr.error('保存默认条目状态失败');
-        return;
       }
-
-      renderPersonaDefaultTraitSnapshotState(avatarId);
-      toastr.success(
-        `已保存「${findPersonaByAvatarId(avatarId)?.name || avatarId}」的默认条目状态（${currentTraitIds.length} 条）`,
-      );
     });
 
   $(parentDoc)
     .off(`click${PANEL_EVENT_NAMESPACE}`, '#persona-default-preset-btn')
     .on(`click${PANEL_EVENT_NAMESPACE}`, '#persona-default-preset-btn', async () => {
-      const presetName = (activeResourceSelection.preset || '').trim();
-      if (!presetName) {
-        toastr.warning('请先在左侧选择一个预设');
-        return;
-      }
+      try {
+        const presetName = (activeResourceSelection.preset || '').trim();
+        if (!presetName) {
+          toastr.warning('请先在左侧选择一个预设');
+          return;
+        }
 
-      const currentDefaultPreset = getDefaultPresetName();
-      const nextDefaultPreset = currentDefaultPreset === presetName ? '' : presetName;
-      if (!setDefaultPresetName(nextDefaultPreset)) {
-        toastr.error('保存默认预设失败');
-        return;
-      }
+        const currentDefaultPreset = getDefaultPresetName();
+        const nextDefaultPreset = currentDefaultPreset === presetName ? '' : presetName;
+        if (!setDefaultPresetName(nextDefaultPreset)) {
+          toastr.error('保存默认预设失败');
+          return;
+        }
 
-      renderResourceDetailPages();
-      await applyPersonaPlusBindings(
-        getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || '',
-        getRuntimeContext(),
-        true,
-      );
-      toastr.success(nextDefaultPreset ? `已将「${presetName}」设为默认预设` : `已取消默认预设「${presetName}」`);
+        let snapshotResult: { ok: boolean; changed: boolean; count: number } | null = null;
+        if (nextDefaultPreset) {
+          snapshotResult = saveCurrentPresetPromptsAsDefaultSnapshot(presetName);
+          if (!snapshotResult.ok) {
+            toastr.error(`已将「${presetName}」设为默认预设，但保存默认预设条目状态失败`);
+            return;
+          }
+        }
+
+        renderResourceDetailPages();
+        const applied = await applyPersonaPlusBindingsWithToast(
+          getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || '',
+          getRuntimeContext(),
+          true,
+          '应用默认预设失败',
+        );
+        if (!applied) {
+          return;
+        }
+
+        toastr.success(
+          nextDefaultPreset
+            ? `已将「${presetName}」设为默认预设，并同步默认预设条目状态（${snapshotResult?.count || 0} 条）`
+            : `已取消默认预设「${presetName}」`,
+        );
+      } catch (error) {
+        showUiErrorToast('设置默认预设失败', error);
+      }
     });
 
   $(parentDoc)
@@ -5841,21 +5981,13 @@ function bindPanelEvents(): void {
         return;
       }
 
-      const currentPromptIds = getCurrentPresetPromptSelectionIds(presetName) || [];
-      const savedPromptIds = loadDefaultPresetPromptIds(presetName);
-      if (areOptionalStringArraysEqual(savedPromptIds, currentPromptIds)) {
-        renderPresetPromptDefaultSnapshotState();
-        toastr.info('当前勾选已是默认预设条目状态');
-        return;
-      }
-
-      if (!saveDefaultPresetPromptIds(presetName, currentPromptIds)) {
+      const snapshotResult = saveCurrentPresetPromptsAsDefaultSnapshot(presetName, {
+        announceSuccess: true,
+        announceUnchanged: true,
+      });
+      if (!snapshotResult.ok) {
         toastr.error('保存默认预设条目状态失败');
-        return;
       }
-
-      renderPresetPromptDefaultSnapshotState();
-      toastr.success(`已保存预设「${presetName}」的默认条目状态（${currentPromptIds.length} 条）`);
     });
 
   $(parentDoc)
@@ -5953,91 +6085,117 @@ function bindPanelEvents(): void {
     });
 
   $('#persona-lock-chat-btn', parentDoc).on(`click${PANEL_EVENT_NAMESPACE}`, async () => {
-    if (activeDetailPage === 'groups') {
-      await applyBindingGroupToCurrentScope('chat');
-      return;
-    }
-
-    const binding = ensureCurrentContextBinding('chat');
-    if (!binding) {
-      toastr.warning('无法创建当前聊天绑定');
-      return;
-    }
-    const selectionLabel = truncateBindingToastLabel(getCurrentSelectionDisplayLabel());
-    const targetLabel = truncateBindingToastLabel(binding.targetName || getBindingTargetDisplay('chat'));
-    const toggleResult = toggleBindingResourceFromCurrentSelection(binding.resources);
-    if (toggleResult.changed) {
-      if (hasBindingResources(toggleResult.resources)) {
-        upsertContextBinding('chat', toggleResult.resources);
-      } else {
-        deleteContextBinding('chat');
+    try {
+      if (activeDetailPage === 'groups') {
+        await applyBindingGroupToCurrentScope('chat');
+        return;
       }
+
+      const binding = ensureCurrentContextBinding('chat');
+      if (!binding) {
+        toastr.warning('无法创建当前聊天绑定');
+        return;
+      }
+      const selectionLabel = truncateBindingToastLabel(getCurrentSelectionDisplayLabel());
+      const targetLabel = truncateBindingToastLabel(binding.targetName || getBindingTargetDisplay('chat'));
+      const toggleResult = toggleBindingResourceFromCurrentSelection(binding.resources);
+      if (toggleResult.changed) {
+        if (hasBindingResources(toggleResult.resources)) {
+          upsertContextBinding('chat', toggleResult.resources);
+        } else {
+          deleteContextBinding('chat');
+        }
+      }
+      activeBindingScope = 'chat';
+      renderToolbarSelectionSummary();
+      renderResourceDetailPages();
+      const applied = await applyPersonaPlusBindingsWithToast(
+        getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || '',
+        getRuntimeContext(),
+        true,
+        '应用当前聊天绑定失败',
+      );
+      if (!applied) {
+        return;
+      }
+      const currentPersona = getCurrentPersonaFromDOM();
+      if (currentPersona?.avatarId) {
+        const synced = await applyComposedDescriptionForAvatar(currentPersona.avatarId, '切换到当前聊天绑定后自动同步', {
+          errorToastTitle: '同步当前聊天绑定后的 user人设失败',
+        });
+        if (!synced) {
+          return;
+        }
+      }
+      if (toggleResult.changed && toggleResult.removed) {
+        toastr.success(`已从聊天「${targetLabel}」解绑「${selectionLabel}」`);
+        return;
+      }
+      if (toggleResult.changed) {
+        toastr.success(`已把「${selectionLabel}」绑定到聊天「${targetLabel}」`);
+        return;
+      }
+      toastr.success(`正在编辑聊天「${targetLabel}」的绑定`);
+    } catch (error) {
+      showUiErrorToast('绑定到当前聊天失败', error);
     }
-    activeBindingScope = 'chat';
-    renderToolbarSelectionSummary();
-    renderResourceDetailPages();
-    await applyPersonaPlusBindings(
-      getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || '',
-      getRuntimeContext(),
-      true,
-    );
-    const currentPersona = getCurrentPersonaFromDOM();
-    if (currentPersona?.avatarId) {
-      await applyComposedDescriptionForAvatar(currentPersona.avatarId, '切换到当前聊天绑定后自动同步');
-    }
-    if (toggleResult.changed && toggleResult.removed) {
-      toastr.success(`已从聊天「${targetLabel}」解绑「${selectionLabel}」`);
-      return;
-    }
-    if (toggleResult.changed) {
-      toastr.success(`已把「${selectionLabel}」绑定到聊天「${targetLabel}」`);
-      return;
-    }
-    toastr.success(`正在编辑聊天「${targetLabel}」的绑定`);
   });
 
   $('#persona-lock-char-btn', parentDoc).on(`click${PANEL_EVENT_NAMESPACE}`, async () => {
-    if (activeDetailPage === 'groups') {
-      await applyBindingGroupToCurrentScope('character');
-      return;
-    }
-
-    const binding = ensureCurrentContextBinding('character');
-    if (!binding) {
-      toastr.warning('无法创建当前角色绑定');
-      return;
-    }
-    const selectionLabel = truncateBindingToastLabel(getCurrentSelectionDisplayLabel());
-    const targetLabel = truncateBindingToastLabel(binding.targetName || getBindingTargetDisplay('character'));
-    const toggleResult = toggleBindingResourceFromCurrentSelection(binding.resources);
-    if (toggleResult.changed) {
-      if (hasBindingResources(toggleResult.resources)) {
-        upsertContextBinding('character', toggleResult.resources);
-      } else {
-        deleteContextBinding('character');
+    try {
+      if (activeDetailPage === 'groups') {
+        await applyBindingGroupToCurrentScope('character');
+        return;
       }
+
+      const binding = ensureCurrentContextBinding('character');
+      if (!binding) {
+        toastr.warning('无法创建当前角色绑定');
+        return;
+      }
+      const selectionLabel = truncateBindingToastLabel(getCurrentSelectionDisplayLabel());
+      const targetLabel = truncateBindingToastLabel(binding.targetName || getBindingTargetDisplay('character'));
+      const toggleResult = toggleBindingResourceFromCurrentSelection(binding.resources);
+      if (toggleResult.changed) {
+        if (hasBindingResources(toggleResult.resources)) {
+          upsertContextBinding('character', toggleResult.resources);
+        } else {
+          deleteContextBinding('character');
+        }
+      }
+      activeBindingScope = 'character';
+      renderToolbarSelectionSummary();
+      renderResourceDetailPages();
+      const applied = await applyPersonaPlusBindingsWithToast(
+        getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || '',
+        getRuntimeContext(),
+        true,
+        '应用当前角色绑定失败',
+      );
+      if (!applied) {
+        return;
+      }
+      const currentPersona = getCurrentPersonaFromDOM();
+      if (currentPersona?.avatarId) {
+        const synced = await applyComposedDescriptionForAvatar(currentPersona.avatarId, '切换到当前角色绑定后自动同步', {
+          errorToastTitle: '同步当前角色绑定后的 user人设失败',
+        });
+        if (!synced) {
+          return;
+        }
+      }
+      if (toggleResult.changed && toggleResult.removed) {
+        toastr.success(`已从角色「${targetLabel}」解绑「${selectionLabel}」`);
+        return;
+      }
+      if (toggleResult.changed) {
+        toastr.success(`已把「${selectionLabel}」绑定到角色「${targetLabel}」`);
+        return;
+      }
+      toastr.success(`正在编辑角色「${targetLabel}」的绑定`);
+    } catch (error) {
+      showUiErrorToast('绑定到当前角色失败', error);
     }
-    activeBindingScope = 'character';
-    renderToolbarSelectionSummary();
-    renderResourceDetailPages();
-    await applyPersonaPlusBindings(
-      getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || '',
-      getRuntimeContext(),
-      true,
-    );
-    const currentPersona = getCurrentPersonaFromDOM();
-    if (currentPersona?.avatarId) {
-      await applyComposedDescriptionForAvatar(currentPersona.avatarId, '切换到当前角色绑定后自动同步');
-    }
-    if (toggleResult.changed && toggleResult.removed) {
-      toastr.success(`已从角色「${targetLabel}」解绑「${selectionLabel}」`);
-      return;
-    }
-    if (toggleResult.changed) {
-      toastr.success(`已把「${selectionLabel}」绑定到角色「${targetLabel}」`);
-      return;
-    }
-    toastr.success(`正在编辑角色「${targetLabel}」的绑定`);
   });
 
   $('#persona-search-bar', parentDoc).on(`input${PANEL_EVENT_NAMESPACE}`, function () {
@@ -6243,7 +6401,10 @@ function bindPanelEvents(): void {
       clearTimeout(baseDescDebounceTimer);
     }
     baseDescDebounceTimer = setTimeout(() => {
-      void applyComposedDescriptionForAvatar(avatarId, '编辑基础描述后自动同步');
+      void applyComposedDescriptionForAvatar(avatarId, '编辑基础描述后自动同步', {
+        applyPlusBindings: false,
+        errorToastTitle: '编辑基础描述后同步 user人设失败',
+      });
     }, 450);
   });
 
