@@ -56,9 +56,12 @@ importers:
       lodash:
         specifier: ^4.18.1
         version: 4.18.1
+<<<<<<< HEAD
       lucide-react:
         specifier: ^1.8.0
         version: 1.8.0(react@19.2.5)
+=======
+>>>>>>> 304e8c08c9a8646568197fb30d79c23676d3a5a0
       pinia:
         specifier: ^3.0.4
         version: 3.0.4(typescript@6.0.0-dev.20250807)(vue@3.5.32(typescript@6.0.0-dev.20250807))
@@ -205,8 +208,13 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0(postcss@8.5.9)
       prettier:
+<<<<<<< HEAD
         specifier: ^3.8.1
         version: 3.8.1
+=======
+        specifier: ^3.8.2
+        version: 3.8.2
+>>>>>>> 304e8c08c9a8646568197fb30d79c23676d3a5a0
       remark:
         specifier: ^15.0.1
         version: 15.0.1
@@ -2750,11 +2758,14 @@ packages:
   lower-case@2.0.2:
     resolution: {integrity: sha512-7fm3l3NAF9WfN6W3JOmf5drwpVqX78JtoGJ3A6W0a6ZnldM41w2fV5D490psKFTpMds8TJse/eHLFFsNHHjHgg==}
 
+<<<<<<< HEAD
   lucide-react@1.8.0:
     resolution: {integrity: sha512-WuvlsjngSk7TnTBJ1hsCy3ql9V9VOdcPkd3PKcSmM34vJD8KG6molxz7m7zbYFgICwsanQWmJ13JlYs4Zp7Arw==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
+=======
+>>>>>>> 304e8c08c9a8646568197fb30d79c23676d3a5a0
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
@@ -3233,8 +3244,13 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
 
+<<<<<<< HEAD
   prettier@3.8.1:
     resolution: {integrity: sha512-UOnG6LftzbdaHZcKoPFtOcCKztrQ57WkHDeRD9t/PTQtmT0NHSeWWepj6pS0z/N7+08BHFDQVUrfmfMRcZwbMg==}
+=======
+  prettier@3.8.2:
+    resolution: {integrity: sha512-8c3mgTe0ASwWAJK+78dpviD+A8EqhndQPUBpNUIPt6+xWlIigCwfN01lWr9MAede4uqXGTEKeQWTvzb3vjia0Q==}
+>>>>>>> 304e8c08c9a8646568197fb30d79c23676d3a5a0
     engines: {node: '>=14'}
     hasBin: true
 
@@ -6703,10 +6719,13 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
+<<<<<<< HEAD
   lucide-react@1.8.0(react@19.2.5):
     dependencies:
       react: 19.2.5
 
+=======
+>>>>>>> 304e8c08c9a8646568197fb30d79c23676d3a5a0
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -7292,7 +7311,11 @@ snapshots:
 
   prelude-ls@1.2.1: {}
 
+<<<<<<< HEAD
   prettier@3.8.1: {}
+=======
+  prettier@3.8.2: {}
+>>>>>>> 304e8c08c9a8646568197fb30d79c23676d3a5a0
 
   pretty-error@4.0.0:
     dependencies:
