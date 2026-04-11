@@ -39,6 +39,10 @@ import {
 } from './features/optimizer.js';
 import { saveSortPreference } from './features/sorting.js';
 import {
+  LARGE_CONTENT_TEXTAREA_SELECTOR,
+  syncManagedLargeContentPreview,
+} from './ui/largeContentPreview.js';
+import {
   allEntriesData,
   clearFilteredEntries,
   clearSelectedEntries,
@@ -94,68 +98,19 @@ export function bindEventListeners() {
   const $editorPanel = $(`#${LOREBOOK_EDITOR_PANEL_ID}`, parentDoc);
   const floatingBubbleSelector = `#${LOREBOOK_FLOATING_BUBBLE_ID}`;
   const BUBBLE_DRAG_THRESHOLD = 4;
-  const LARGE_CONTENT_PREVIEW_THRESHOLD = 30000;
-  const LARGE_CONTENT_PREVIEW_SNIPPET_LENGTH = 1200;
-  const largeContentFieldSelector = 'textarea[data-field="content"], textarea[name="content"], textarea.entry-content-textarea';
-  const largeContentSelector = [
-    `#${LOREBOOK_PANEL_ID} ${largeContentFieldSelector}`,
-    `#${LOREBOOK_EDITOR_PANEL_ID} ${largeContentFieldSelector}`,
-  ].join(', ');
+  const largeContentFieldSelector = LARGE_CONTENT_TEXTAREA_SELECTOR;
+  const largeContentSelector = LARGE_CONTENT_TEXTAREA_SELECTOR;
   let bubbleDragState = null;
   let suppressBubbleClickUntil = 0;
   let lastViewportIsMobile = isMobile();
   let pendingViewportModeRefresh = false;
-
-  const buildLargeContentPreviewText = value => {
-    const normalized = String(value || '').replace(/\r\n/g, '\n').trim();
-    if (normalized.length <= LARGE_CONTENT_PREVIEW_SNIPPET_LENGTH) {
-      return normalized;
-    }
-
-    return `${normalized.slice(0, LARGE_CONTENT_PREVIEW_SNIPPET_LENGTH)}\n\n……（内容过长，已折叠预览）`;
-  };
-
-  const toggleLargeContentPreview = ($textarea, expanded) => {
-    if (!$textarea.length) {
-      return;
-    }
-
-    const value = String($textarea.val() ?? '');
-    const isLarge = value.length >= LARGE_CONTENT_PREVIEW_THRESHOLD;
-    const $existingPreview = $textarea.siblings('.large-content-preview-card');
-
-    if (!isLarge) {
-      $textarea.removeAttr('data-large-content-preview').removeAttr('data-large-content-expanded').show();
-      $existingPreview.remove();
-      return;
-    }
-
-    if (expanded) {
-      $textarea.attr('data-large-content-expanded', 'true').show();
-      $existingPreview.remove();
-      return;
-    }
-
-    const previewHtml = `
-      <div class="large-content-preview-card">
-        <div class="large-content-preview-text">${$('<div></div>').text(buildLargeContentPreviewText(value)).html()}</div>
-        <div class="large-content-preview-actions">
-          <button type="button" class="large-content-preview-open">展开正文</button>
-        </div>
-      </div>
-    `;
-
-    $existingPreview.remove();
-    $textarea.attr('data-large-content-preview', 'true').removeAttr('data-large-content-expanded').hide();
-    $textarea.after(previewHtml);
-  };
 
   const refreshLargeContentPreviews = root => {
     const $root = root ? $(root) : $(parentDoc);
     $root.find(largeContentSelector).each(function () {
       const $textarea = $(this);
       const expanded = $textarea.attr('data-large-content-expanded') === 'true';
-      toggleLargeContentPreview($textarea, expanded);
+      syncManagedLargeContentPreview($textarea, expanded);
     });
   };
 
@@ -488,8 +443,7 @@ export function bindEventListeners() {
     }
   });
 
-  $panel
-    .add($editorPanel)
+  $(parentDoc)
     .off('click.largeContentPreview')
     .on('click.largeContentPreview', '.large-content-preview-open', function (event) {
       event.preventDefault();
@@ -500,22 +454,28 @@ export function bindEventListeners() {
         return;
       }
 
-      toggleLargeContentPreview($textarea, true);
+      syncManagedLargeContentPreview($textarea, true);
       $textarea.trigger('focus');
     });
 
-  $panel
-    .add($editorPanel)
-    .off('focusout.largeContentPreview input.largeContentPreview')
+  $(parentDoc)
+    .off('focusout.largeContentPreview input.largeContentPreview refreshLargeContentPreview.largeContentPreview')
     .on('focusout.largeContentPreview', largeContentSelector, function () {
-      toggleLargeContentPreview($(this), false);
+      syncManagedLargeContentPreview($(this), false);
     })
     .on('input.largeContentPreview', largeContentSelector, function () {
       const $textarea = $(this);
       if ($textarea.attr('data-large-content-expanded') === 'true') {
         return;
       }
-      toggleLargeContentPreview($textarea, false);
+      syncManagedLargeContentPreview($textarea, false);
+    })
+    .on('refreshLargeContentPreview.largeContentPreview', largeContentSelector, function () {
+      const $textarea = $(this);
+      if ($textarea.attr('data-large-content-expanded') === 'true') {
+        return;
+      }
+      syncManagedLargeContentPreview($textarea, false);
     });
 
   refreshLargeContentPreviews(parentDoc);

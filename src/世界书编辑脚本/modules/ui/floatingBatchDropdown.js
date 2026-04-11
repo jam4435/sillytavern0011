@@ -66,6 +66,8 @@ function measureDropdown($dropdown) {
     visibility: 'hidden',
     left: '0px',
     top: '0px',
+    right: 'auto',
+    bottom: 'auto',
   });
 
   return {
@@ -110,6 +112,8 @@ function positionDropdown($dropdown, $button, parentDoc = getParentDoc()) {
     visibility: 'visible',
     left: `${left}px`,
     top: `${top}px`,
+    right: 'auto',
+    bottom: 'auto',
     maxHeight: `${maxHeight}px`,
     overflowY: height > maxHeight ? 'auto' : '',
   });

@@ -23,6 +23,7 @@ import {
   setDetailEntry,
 } from '../state.js';
 import { ensureNumericUID, isMobile } from '../utils.js';
+import { syncManagedTextareaContent } from './largeContentPreview.js';
 
 const DETAIL_STYLE_ID = 'enhanced-lorebook-detail-styles';
 const DETAIL_SAVE_DELAY = 250;
@@ -207,7 +208,7 @@ function hydrateDetailContentTextarea($container, content) {
   if (!$textarea.length) {
     return;
   }
-  $textarea.val(content || '');
+  syncManagedTextareaContent($textarea, content || '');
 }
 
 function renderDetailEditor(tabKey, context, entry) {
@@ -272,7 +273,7 @@ function renderDetailEditor(tabKey, context, entry) {
             <button type="button" class="detail-inline-button" data-detail-action="open-compare-editor">对比编辑</button>
           </div>
         </div>
-        <textarea class="detail-content-textarea" rows="16" data-field="content" data-save-mode="debounced" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        <textarea class="detail-content-textarea" rows="16" data-field="content" data-save-mode="debounced" data-large-content-managed="true" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
       </section>
       <details class="detail-section detail-advanced">
         <summary>高级设置</summary>
@@ -403,7 +404,7 @@ function renderCompactDetailEditor(tabKey, context, entry) {
             <button type="button" class="detail-inline-button" data-detail-action="open-compare-editor">对比编辑</button>
           </div>
         </div>
-        <textarea class="detail-content-textarea" rows="16" data-field="content" data-save-mode="debounced" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        <textarea class="detail-content-textarea" rows="16" data-field="content" data-save-mode="debounced" data-large-content-managed="true" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
       </section>
     </div>
   `);
@@ -472,7 +473,7 @@ function renderCompactDetailEditorV2(tabKey, context, entry) {
             <button type="button" class="detail-inline-button" data-detail-action="open-compare-editor">对比编辑</button>
           </div>
         </div>
-        <textarea class="detail-content-textarea" rows="16" data-field="content" data-save-mode="debounced" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        <textarea class="detail-content-textarea" rows="16" data-field="content" data-save-mode="debounced" data-large-content-managed="true" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
       </section>
       <section class="detail-section detail-keywords-panel">
         <div class="detail-row detail-row-flags">

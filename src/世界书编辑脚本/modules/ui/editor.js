@@ -1,6 +1,7 @@
 import { getLorebookEntry, getWorldbookSafe, updateWorldbookEntries } from '../api.js';
 import { LOREBOOK_EDITOR_PANEL_ID } from '../config.js';
 import { ensureNumericUID } from '../utils.js';
+import { syncManagedTextareaContent } from './largeContentPreview.js';
 
 // 显示条目编辑器
 export const showEntryEditor = async (lorebookName, entryUid, isGlobal = false) => {
@@ -39,7 +40,7 @@ export const showEntryEditor = async (lorebookName, entryUid, isGlobal = false) 
   $form.find('#entry-lorebook').val(lorebookName);
   $form.find('#entry-is-global').val(isGlobal ? 'true' : 'false');
   $form.find('#entry-comment').val(entry.name || ''); // comment -> name
-  $form.find('#entry-content').val(entry.content || '');
+  syncManagedTextareaContent($form.find('#entry-content'), entry.content || '');
   $form.find('#entry-keys').val(Array.isArray(keys) ? keys.join(', ') : '');
   $form.find('#entry-position').val(positionType);
   $form.find('#entry-depth').val(depth);
@@ -183,7 +184,7 @@ export function createEditorPanel() {
                         </div>
                         <div class="form-group">
                             <label for="entry-content">内容</label>
-                            <textarea id="entry-content" name="content" class="form-control" rows="8" required></textarea>
+                            <textarea id="entry-content" name="content" class="form-control" rows="8" data-large-content-managed="true" required></textarea>
                         </div>
                         <div class="form-row">
                             <div class="form-group half">

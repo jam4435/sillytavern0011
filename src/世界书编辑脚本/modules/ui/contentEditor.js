@@ -1,5 +1,6 @@
 import { getLorebookEntry, getWorldbookNamesSafe, getWorldbookSafe, saveEntryField } from '../api.js';
 import { ensureNumericUID, errorCatched, isMobile } from '../utils.js';
+import { syncManagedTextareaContent } from './largeContentPreview.js';
 
 const STYLE_ID = 'enhanced-content-editor-styles';
 const CONTENT_EDITOR_MODAL_ID = 'content-editor-modal';
@@ -249,13 +250,14 @@ async function ensureWorldbookEntries(lorebookName) {
 function updateVisibleEntryContent(lorebookName, entryUid, content) {
   const parentDoc = getParentDoc();
   const uid = ensureNumericUID(entryUid);
-  $(
-    `.detail-editor[data-lorebook-name="${lorebookName}"][data-entry-uid="${uid}"] .detail-content-textarea`,
-    parentDoc,
-  ).val(content);
-  $(`.lorebook-entry[data-entry-lorebook="${lorebookName}"][data-entry-uid="${uid}"] .content-textarea`, parentDoc)
-    .val(content)
-    .trigger('input');
+  syncManagedTextareaContent(
+    $(`.detail-editor[data-lorebook-name="${lorebookName}"][data-entry-uid="${uid}"] .detail-content-textarea`, parentDoc),
+    content,
+  );
+  syncManagedTextareaContent(
+    $(`.lorebook-entry[data-entry-lorebook="${lorebookName}"][data-entry-uid="${uid}"] .content-textarea`, parentDoc),
+    content,
+  );
 }
 
 function renderSingleEditor(entry) {
