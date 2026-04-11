@@ -4,7 +4,7 @@ import { getHighlightActiveEntriesSetting } from '../settings.js';
 import { isEntryCurrentDetail, isEntryExpanded, isEntrySelected } from '../state.js';
 import { ensureNumericUID, isMobile } from '../utils.js';
 import { getMasterDetailPositionLabel, isMasterDetailLayout } from './detail.js';
-import { shouldPreviewLargeContent } from './largeContentPreview.js';
+import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
 
 /* --- Create HTML for a single lorebook entry --- */
 export function createEntryHtml(entry, lorebookName, isGlobal = false) {
@@ -35,9 +35,11 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
   const delayRecursion = recursion.delay_until != null && recursion.delay_until !== false;
   const pinnedCheckedAttr = isPinned ? 'checked' : '';
   const content = entry.content || '';
-  const deferLargeContent = shouldPreviewLargeContent(content);
-  const contentTextareaValue = deferLargeContent ? '' : _.escape(content);
-  const contentTextareaDeferredAttr = deferLargeContent ? ' data-entry-content-deferred="true"' : '';
+  const contentMarkup = shouldPreviewLargeContent(content)
+    ? buildLargeContentPreviewCardHtml(content, {
+        hint: '内容过长，请使用上方按钮在全屏中查看和修改。',
+      })
+    : `<textarea class="content-textarea" rows="8" data-action="edit-content">${_.escape(content)}</textarea>`;
 
   const disabledClass = isEnabled ? '' : 'disabled-entry';
   const checkedAttr = isEnabled ? 'checked' : '';
@@ -320,7 +322,7 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
                             <span class="token-counter">0 词符</span>
                         </div>
                     </div>
-                    <textarea class="content-textarea" rows="8" data-action="edit-content" data-large-content-managed="true"${contentTextareaDeferredAttr}>${contentTextareaValue}</textarea>
+                    ${contentMarkup}
                 </div>
                 <div class="keywords-edit-area">
                     <div class="keyword-group">

@@ -22,7 +22,6 @@ import { showCompareEditor, showContentEditor } from '../ui/contentEditor.js';
 import { isMasterDetailLayout, renderDetailPane, selectDetailEntry, syncMasterRowFromState } from '../ui/detail.js';
 import { showEntryEditor } from '../ui/editor.js';
 import { toggleExpanded } from '../ui/expandManager.js';
-import { getManagedTextareaValue, syncManagedTextareaContent } from '../ui/largeContentPreview.js';
 import { updateHeaderCheckboxState, updateVirtualScroll } from '../ui/list.js';
 import { ensureNumericUID } from '../utils.js';
 import { registerCommands } from './index.js';
@@ -76,13 +75,9 @@ function expand({ $item, lorebookName, numericUid }) {
 
   // 初始化token计数
   if (newExpandedState) {
+    const entry = (allEntriesData[lorebookName] || []).find(item => ensureNumericUID(item.uid) === numericUid);
     const $textarea = $item.find('.content-textarea');
-    if ($textarea.attr('data-entry-content-deferred') === 'true' && !$textarea.data('largeContentDeferredValue')) {
-      const entry = (allEntriesData[lorebookName] || []).find(item => ensureNumericUID(item.uid) === numericUid);
-      syncManagedTextareaContent($textarea, entry?.content || '');
-      $textarea.removeAttr('data-entry-content-deferred');
-    }
-    const content = getManagedTextareaValue($textarea) || '';
+    const content = entry?.content || $textarea.val() || '';
     const $counter = $item.find('.token-counter');
     $counter.text('计算中...');
 
@@ -335,7 +330,7 @@ function editContent({ event, $target, $item, lorebookName, numericUid }) {
     saveEntryField(numericUid, lorebookName, 'content', $target.val());
   }
   if (event.type === 'input') {
-    const content = getManagedTextareaValue($target) || '';
+    const content = $target.val() || '';
     const $counter = $item.find('.token-counter');
 
     // 使用酒馆的真实tokenizer计算token数

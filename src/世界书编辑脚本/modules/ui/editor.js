@@ -1,7 +1,31 @@
 import { getLorebookEntry, getWorldbookSafe, updateWorldbookEntries } from '../api.js';
 import { LOREBOOK_EDITOR_PANEL_ID } from '../config.js';
 import { ensureNumericUID } from '../utils.js';
-import { syncManagedTextareaContent } from './largeContentPreview.js';
+import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
+
+function renderEditorContentField($form, content) {
+  const normalized = content || '';
+  const $textarea = $form.find('#entry-content');
+  const $preview = $form.find('#entry-content-preview');
+
+  if (shouldPreviewLargeContent(normalized)) {
+    $form.data('deferred-content', normalized);
+    $textarea.val('').prop('disabled', true).prop('required', false).hide();
+    $preview
+      .html(
+        buildLargeContentPreviewCardHtml(normalized, {
+          hint: '正文过长，请使用全屏编辑查看和修改。',
+          actionsHtml: '<button type="button" class="large-content-preview-open" data-editor-action="open-content-editor">全屏编辑</button>',
+        }),
+      )
+      .show();
+    return;
+  }
+
+  $form.removeData('deferred-content');
+  $textarea.val(normalized).prop('disabled', false).prop('required', true).show();
+  $preview.empty().hide();
+}
 
 // 显示条目编辑器
 export const showEntryEditor = async (lorebookName, entryUid, isGlobal = false) => {
@@ -40,7 +64,7 @@ export const showEntryEditor = async (lorebookName, entryUid, isGlobal = false) 
   $form.find('#entry-lorebook').val(lorebookName);
   $form.find('#entry-is-global').val(isGlobal ? 'true' : 'false');
   $form.find('#entry-comment').val(entry.name || ''); // comment -> name
-  syncManagedTextareaContent($form.find('#entry-content'), entry.content || '');
+  renderEditorContentField($form, entry.content || '');
   $form.find('#entry-keys').val(Array.isArray(keys) ? keys.join(', ') : '');
   $form.find('#entry-position').val(positionType);
   $form.find('#entry-depth').val(depth);
@@ -184,7 +208,8 @@ export function createEditorPanel() {
                         </div>
                         <div class="form-group">
                             <label for="entry-content">内容</label>
-                            <textarea id="entry-content" name="content" class="form-control" rows="8" data-large-content-managed="true" required></textarea>
+                            <textarea id="entry-content" name="content" class="form-control" rows="8" required></textarea>
+                            <div id="entry-content-preview" style="display:none;"></div>
                         </div>
                         <div class="form-row">
                             <div class="form-group half">

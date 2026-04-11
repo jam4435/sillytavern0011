@@ -23,7 +23,7 @@ import {
   setDetailEntry,
 } from '../state.js';
 import { ensureNumericUID, isMobile } from '../utils.js';
-import { syncManagedTextareaContent } from './largeContentPreview.js';
+import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
 
 const DETAIL_STYLE_ID = 'enhanced-lorebook-detail-styles';
 const DETAIL_SAVE_DELAY = 250;
@@ -203,12 +203,15 @@ function buildSelectOptions(options, currentValue) {
     .join('');
 }
 
-function hydrateDetailContentTextarea($container, content) {
-  const $textarea = $container.find('.detail-content-textarea');
-  if (!$textarea.length) {
-    return;
+function buildDetailContentFieldMarkup(content) {
+  const normalized = content || '';
+  if (shouldPreviewLargeContent(normalized)) {
+    return buildLargeContentPreviewCardHtml(normalized, {
+      hint: '正文过长，请使用上方的全屏编辑或对比编辑查看和修改。',
+    });
   }
-  syncManagedTextareaContent($textarea, content || '');
+
+  return `<textarea class="detail-content-textarea" rows="16" data-field="content" data-save-mode="debounced" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">${escapeHtml(normalized)}</textarea>`;
 }
 
 function renderDetailEditor(tabKey, context, entry) {
@@ -273,7 +276,7 @@ function renderDetailEditor(tabKey, context, entry) {
             <button type="button" class="detail-inline-button" data-detail-action="open-compare-editor">对比编辑</button>
           </div>
         </div>
-        <textarea class="detail-content-textarea" rows="16" data-field="content" data-save-mode="debounced" data-large-content-managed="true" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        ${buildDetailContentFieldMarkup(entry.content)}
       </section>
       <details class="detail-section detail-advanced">
         <summary>高级设置</summary>
@@ -315,7 +318,6 @@ function renderDetailEditor(tabKey, context, entry) {
       </details>
     </div>
   `);
-  hydrateDetailContentTextarea($container, entry.content);
 }
 
 function renderCompactDetailEditor(tabKey, context, entry) {
@@ -404,11 +406,10 @@ function renderCompactDetailEditor(tabKey, context, entry) {
             <button type="button" class="detail-inline-button" data-detail-action="open-compare-editor">对比编辑</button>
           </div>
         </div>
-        <textarea class="detail-content-textarea" rows="16" data-field="content" data-save-mode="debounced" data-large-content-managed="true" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        ${buildDetailContentFieldMarkup(entry.content)}
       </section>
     </div>
   `);
-  hydrateDetailContentTextarea($container, entry.content);
 }
 
 function renderCompactDetailEditorV2(tabKey, context, entry) {
@@ -473,7 +474,7 @@ function renderCompactDetailEditorV2(tabKey, context, entry) {
             <button type="button" class="detail-inline-button" data-detail-action="open-compare-editor">对比编辑</button>
           </div>
         </div>
-        <textarea class="detail-content-textarea" rows="16" data-field="content" data-save-mode="debounced" data-large-content-managed="true" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        ${buildDetailContentFieldMarkup(entry.content)}
       </section>
       <section class="detail-section detail-keywords-panel">
         <div class="detail-row detail-row-flags">
@@ -497,7 +498,6 @@ function renderCompactDetailEditorV2(tabKey, context, entry) {
       </section>
     </div>
   `);
-  hydrateDetailContentTextarea($container, entry.content);
 }
 
 function ensureDetailStyles() {
