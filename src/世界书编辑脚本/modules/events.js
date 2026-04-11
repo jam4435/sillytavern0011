@@ -428,64 +428,6 @@ export function bindEventListeners() {
     }
   });
 
-  $(parentDoc)
-    .off('click.largeContentPreview')
-    .on('click.largeContentPreview', '.large-content-preview-open', function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      const $previewCard = $(this).closest('.large-content-preview-card');
-      const $textarea = $previewCard.siblings(largeContentFieldSelector).first();
-      if (!$textarea.length) {
-        return;
-      }
-
-      syncManagedLargeContentPreview($textarea, true);
-      $textarea.trigger('focus');
-    });
-
-  $(parentDoc)
-    .off('focusout.largeContentPreview input.largeContentPreview refreshLargeContentPreview.largeContentPreview')
-    .on('focusout.largeContentPreview', largeContentSelector, function () {
-      syncManagedLargeContentPreview($(this), false);
-    })
-    .on('input.largeContentPreview', largeContentSelector, function () {
-      const $textarea = $(this);
-      if ($textarea.attr('data-large-content-expanded') === 'true') {
-        return;
-      }
-      syncManagedLargeContentPreview($textarea, false);
-    })
-    .on('refreshLargeContentPreview.largeContentPreview', largeContentSelector, function () {
-      const $textarea = $(this);
-      if ($textarea.attr('data-large-content-expanded') === 'true') {
-        return;
-      }
-      syncManagedLargeContentPreview($textarea, false);
-    });
-
-  refreshLargeContentPreviews(parentDoc);
-
-  const MutationObserverCtor = parentWin.MutationObserver || window.MutationObserver;
-  if (MutationObserverCtor) {
-    const existingObserver = $panel.data('largeContentPreviewObserver');
-    if (existingObserver) {
-      existingObserver.disconnect();
-    }
-
-    const previewObserver = new MutationObserverCtor(() => {
-      refreshLargeContentPreviews(parentDoc);
-    });
-
-    if ($panel.length) {
-      previewObserver.observe($panel.get(0), { childList: true, subtree: true });
-    }
-    if ($editorPanel.length) {
-      previewObserver.observe($editorPanel.get(0), { childList: true, subtree: true });
-    }
-
-    $panel.data('largeContentPreviewObserver', previewObserver);
-  }
-
   // 【调试】事件计数器，用于追踪展开事件
   let expandEventCounter = 0;
 
@@ -926,13 +868,36 @@ export function bindEventListeners() {
   // Editor panel events
   $editorPanel.off('click.lorebookEditorClose').on('click', '.close-button, .cancel-button', function () {
     $editorPanel.find('#entry-edit-form').trigger('reset');
+    $editorPanel.find('#entry-edit-form').removeData('deferred-content');
+    $editorPanel.find('#entry-content').prop('disabled', false).prop('required', true).show();
+    $editorPanel.find('#entry-content-preview').empty().hide();
     $editorPanel.find('.save-button').text('保存').prop('disabled', false);
     $editorPanel.find('.debug-info').hide();
     $editorPanel.hide();
   });
+  $editorPanel.off('click.lorebookEditorOpenContent').on('click', '[data-editor-action="open-content-editor"]', async function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const $form = $(this).closest('#entry-edit-form');
+    const lorebookName = `${$form.find('#entry-lorebook').val() || ''}`;
+    const entryUid = ensureNumericUID($form.find('#entry-uid').val());
+    if (!lorebookName || !Number.isFinite(entryUid)) {
+      return;
+    }
+
+    const { showContentEditor } = await import('./ui/contentEditor.js');
+    await showContentEditor(lorebookName, entryUid);
+  });
   $editorPanel.off('submit.lorebookEditorForm').on('submit', '#entry-edit-form', async function (e) {
     e.preventDefault();
     const formData = Object.fromEntries(new FormData(this));
+    if (formData.content === undefined) {
+      const deferredContent = $(this).data('deferred-content');
+      if (typeof deferredContent === 'string') {
+        formData.content = deferredContent;
+      }
+    }
     formData.uid = ensureNumericUID(formData.uid);
 
     const $saveBtn = $(this).find('.save-button');

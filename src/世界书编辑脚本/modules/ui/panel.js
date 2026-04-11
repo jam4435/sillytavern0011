@@ -485,15 +485,23 @@ export function initPanel() {
                     max-height: 10.5em;
                     overflow: hidden;
                 }
-                #${LOREBOOK_PANEL_ID} .large-content-preview-actions,
-                #${LOREBOOK_EDITOR_PANEL_ID} .large-content-preview-actions {
-                    display: flex;
-                    gap: 8px;
-                    margin-top: 10px;
-                }
-                #${LOREBOOK_PANEL_ID} .large-content-preview-open,
-                #${LOREBOOK_EDITOR_PANEL_ID} .large-content-preview-open {
-                    padding: 4px 10px;
+                 #${LOREBOOK_PANEL_ID} .large-content-preview-actions,
+                 #${LOREBOOK_EDITOR_PANEL_ID} .large-content-preview-actions {
+                      display: flex;
+                      flex-wrap: wrap;
+                      gap: 8px;
+                      margin-top: 10px;
+                  }
+                 #${LOREBOOK_PANEL_ID} .large-content-preview-hint,
+                 #${LOREBOOK_EDITOR_PANEL_ID} .large-content-preview-hint {
+                      color: rgba(255, 255, 255, 0.68);
+                      font-size: 0.84em;
+                      line-height: 1.4;
+                      margin-right: auto;
+                 }
+                 #${LOREBOOK_PANEL_ID} .large-content-preview-open,
+                 #${LOREBOOK_EDITOR_PANEL_ID} .large-content-preview-open {
+                      padding: 4px 10px;
                     border: 1px solid #666;
                     border-radius: 999px;
                     background: rgba(255, 255, 255, 0.04);

@@ -1,6 +1,8 @@
 import { getLorebookEntry, getWorldbookNamesSafe, getWorldbookSafe, saveEntryField } from '../api.js';
+import { LOREBOOK_EDITOR_PANEL_ID } from '../config.js';
+import { allEntriesData } from '../state.js';
 import { ensureNumericUID, errorCatched, isMobile } from '../utils.js';
-import { syncManagedTextareaContent } from './largeContentPreview.js';
+import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
 
 const STYLE_ID = 'enhanced-content-editor-styles';
 const CONTENT_EDITOR_MODAL_ID = 'content-editor-modal';
@@ -247,17 +249,83 @@ async function ensureWorldbookEntries(lorebookName) {
   return entries;
 }
 
+function buildInlineEntryContentMarkup(content) {
+  const normalized = normalizeText(content ?? '');
+  if (shouldPreviewLargeContent(normalized)) {
+    return buildLargeContentPreviewCardHtml(normalized, {
+      hint: '内容过长，请使用上方按钮在全屏中查看和修改。',
+    });
+  }
+
+  return `<textarea class="content-textarea" rows="8" data-action="edit-content">${escapeHtml(normalized)}</textarea>`;
+}
+
+function syncStandaloneEditorContent($form, content) {
+  const normalized = normalizeText(content ?? '');
+  const $textarea = $form.find('#entry-content');
+  const $preview = $form.find('#entry-content-preview');
+
+  if (shouldPreviewLargeContent(normalized)) {
+    $form.data('deferred-content', normalized);
+    $textarea.val('').prop('disabled', true).prop('required', false).hide();
+    $preview
+      .html(
+        buildLargeContentPreviewCardHtml(normalized, {
+          hint: '正文过长，请使用全屏编辑查看和修改。',
+          actionsHtml:
+            '<button type="button" class="large-content-preview-open" data-editor-action="open-content-editor">全屏编辑</button>',
+        }),
+      )
+      .show();
+    return;
+  }
+
+  $form.removeData('deferred-content');
+  $textarea.val(normalized).prop('disabled', false).prop('required', true).show();
+  $preview.empty().hide();
+}
+
 function updateVisibleEntryContent(lorebookName, entryUid, content) {
   const parentDoc = getParentDoc();
   const uid = ensureNumericUID(entryUid);
-  syncManagedTextareaContent(
-    $(`.detail-editor[data-lorebook-name="${lorebookName}"][data-entry-uid="${uid}"] .detail-content-textarea`, parentDoc),
-    content,
-  );
-  syncManagedTextareaContent(
-    $(`.lorebook-entry[data-entry-lorebook="${lorebookName}"][data-entry-uid="${uid}"] .content-textarea`, parentDoc),
-    content,
-  );
+  const normalized = normalizeText(content ?? '');
+  const stateEntries = allEntriesData[lorebookName] || [];
+  const stateEntry = stateEntries.find(entry => ensureNumericUID(entry.uid) === uid);
+  if (stateEntry) {
+    stateEntry.content = normalized;
+  }
+
+  const cachedEntries = compareState.entryCache.get(lorebookName);
+  if (Array.isArray(cachedEntries)) {
+    const cachedEntry = cachedEntries.find(entry => ensureNumericUID(entry.uid) === uid);
+    if (cachedEntry) {
+      cachedEntry.content = normalized;
+    }
+  }
+
+  $(`.detail-editor[data-lorebook-name="${lorebookName}"][data-entry-uid="${uid}"]`, parentDoc).each(function () {
+    const isGlobal = $(this).attr('data-is-global') === 'true';
+    import('./detail.js').then(({ renderDetailPane }) => {
+      renderDetailPane(isGlobal, { scrollIntoView: false });
+    });
+  });
+
+  $(`.lorebook-entry[data-entry-lorebook="${lorebookName}"][data-entry-uid="${uid}"] .content-edit-area`, parentDoc).each(function () {
+    const $contentArea = $(this);
+    $contentArea.find('.content-textarea, .large-content-preview-card').remove();
+    $contentArea.append(buildInlineEntryContentMarkup(normalized));
+  });
+
+  const $editorPanel = $(`#${LOREBOOK_EDITOR_PANEL_ID}`, parentDoc);
+  const $editorForm = $editorPanel.find('#entry-edit-form');
+  if (
+    $editorPanel.is(':visible') &&
+    $editorForm.length &&
+    `${$editorForm.find('#entry-lorebook').val() || ''}` === lorebookName &&
+    ensureNumericUID($editorForm.find('#entry-uid').val()) === uid
+  ) {
+    syncStandaloneEditorContent($editorForm, normalized);
+  }
 }
 
 function renderSingleEditor(entry) {
