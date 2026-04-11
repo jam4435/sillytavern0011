@@ -39,10 +39,6 @@ import {
 } from './features/optimizer.js';
 import { saveSortPreference } from './features/sorting.js';
 import {
-  LARGE_CONTENT_TEXTAREA_SELECTOR,
-  syncManagedLargeContentPreview,
-} from './ui/largeContentPreview.js';
-import {
   allEntriesData,
   clearFilteredEntries,
   clearSelectedEntries,
@@ -98,21 +94,10 @@ export function bindEventListeners() {
   const $editorPanel = $(`#${LOREBOOK_EDITOR_PANEL_ID}`, parentDoc);
   const floatingBubbleSelector = `#${LOREBOOK_FLOATING_BUBBLE_ID}`;
   const BUBBLE_DRAG_THRESHOLD = 4;
-  const largeContentFieldSelector = LARGE_CONTENT_TEXTAREA_SELECTOR;
-  const largeContentSelector = LARGE_CONTENT_TEXTAREA_SELECTOR;
   let bubbleDragState = null;
   let suppressBubbleClickUntil = 0;
   let lastViewportIsMobile = isMobile();
   let pendingViewportModeRefresh = false;
-
-  const refreshLargeContentPreviews = root => {
-    const $root = root ? $(root) : $(parentDoc);
-    $root.find(largeContentSelector).each(function () {
-      const $textarea = $(this);
-      const expanded = $textarea.attr('data-large-content-expanded') === 'true';
-      syncManagedLargeContentPreview($textarea, expanded);
-    });
-  };
 
   const refreshCurrentTabForViewportMode = async force => {
     const currentIsMobile = isMobile();
