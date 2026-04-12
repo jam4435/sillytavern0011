@@ -45,7 +45,7 @@ const SCRIPT_RULES: NamedRule[] = [
 const WORLDBOOK_ENTRY_RULES: NamedRule[] = [
   { key: 'variableGuide', label: '变量指导', query: '变量指导', mode: 'includes' },
   { key: 'outputPrompt', label: '输出提示词', query: '输出提示词', mode: 'includes' },
-  { key: 'multiStatusBar', label: '多状态栏', query: '多状态栏', mode: 'includes' },
+  { key: 'multiStatusBar', label: '多状态栏', query: '多状态栏', mode: 'exact' },
   { key: 'actionSuggestion', label: '行动建议', query: '行动建议', mode: 'includes' },
 ];
 
