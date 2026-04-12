@@ -752,7 +752,8 @@
               const normalizedValue = String(statValue)
                 .trim()
                 .replace(/（/g, '(')
-                .replace(/）/g, ')');
+                .replace(/）/g, ')')
+                .replace(/[－−—–]/g, '-');
               if (!normalizedValue) return null;
               const match = normalizedValue.match(
                 /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
