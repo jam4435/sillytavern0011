@@ -829,30 +829,6 @@ export function bindEventListeners() {
       $(this).closest('.master-entry-item').removeClass('is-editing-title');
     });
 
-  $panel.off('click.masterEntryOpenButton').on('click.masterEntryOpenButton', '.master-entry-button[data-action="open-editor"]', async function (e) {
-    if (!isMasterDetailLayout()) {
-      return;
-    }
-
-    const $item = $(this).closest('.master-entry-item');
-    if (!$item.length || !hasCommand('open-editor')) {
-      return;
-    }
-
-    await dispatchCommand('open-editor', {
-      event: e,
-      $target: $(e.target),
-      $actionTarget: $(this),
-      $panel,
-      parentDoc,
-      refreshList,
-      lorebookName: $item.data('entry-lorebook'),
-      numericUid: ensureNumericUID($item.data('entry-uid')),
-      isGlobal: $item.closest('.lorebook-entries-container').attr('data-is-global') === 'true',
-      $item,
-    });
-  });
-
   $panel.off('click.masterEntryDetail').on('click.masterEntryDetail', '.master-entry-item', async function (e) {
     if (!isMasterDetailLayout()) {
       return;
@@ -860,8 +836,9 @@ export function bindEventListeners() {
 
     const $target = $(e.target);
     if (
-      $target.closest('[data-action], input, button, label, .mini-toggle-switch, .toggle-slider, .mini-toggle-slider')
-        .length > 0
+      $target.closest(
+        '.master-entry-controls, .select-checkbox-container, .master-entry-title-edit-button, .master-entry-title-input, [data-action]:not([data-action="open-editor"]), input:not(.master-entry-title-input), label, .mini-toggle-switch, .toggle-slider, .mini-toggle-slider',
+      ).length > 0
     ) {
       return;
     }

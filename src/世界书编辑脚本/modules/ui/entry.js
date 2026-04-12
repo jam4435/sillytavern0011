@@ -101,7 +101,7 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
              data-enabled="${isEnabled}"
              data-order="${order}">
             <div class="master-entry-main">
-                <button class="master-entry-button" data-action="open-editor" type="button">
+                <button class="master-entry-button" type="button">
                     <div class="master-entry-text">
                         <span class="master-entry-title">${entryTitle}</span>
                         <span class="master-entry-meta">${_.escape(compactMasterMetaText)}</span>
@@ -153,7 +153,7 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
                     </label>
                 </div>
             </div>
-            <button class="master-entry-button" data-action="open-editor" type="button">
+            <button class="master-entry-button" type="button">
                 <div class="master-entry-main">
                     <span class="master-entry-title">${entryTitle}</span>
                     <span class="master-entry-meta">${_.escape(masterMetaText)}</span>
@@ -188,7 +188,7 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
                     </label>
                 </div>
             </div>
-            <button class="master-entry-button" data-action="open-editor" type="button">
+            <button class="master-entry-button" type="button">
                 <div class="master-entry-main">
                     <span class="master-entry-title">${entryTitle}</span>
                     <span class="master-entry-meta">${_.escape(`${isConstant ? '常驻' : '触发'} · ${positionType} · 顺序 ${order}`)}</span>
