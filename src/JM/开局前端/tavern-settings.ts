@@ -131,7 +131,7 @@ async function applyCharacterRegexSettings(api: RuntimeApi, settings: Generation
     CHARACTER_REGEX_OPTION,
   );
 
-  logMissingRules('局部正则', REGEX_RULES, matchedKeys);
+  logMissingRules('局部正则', REGEX_RULES, matchedKeys, getRelevantRegexKeys(settings));
 }
 
 async function applyCharacterScriptSettings(api: RuntimeApi, settings: GenerationSettings) {
@@ -139,7 +139,7 @@ async function applyCharacterScriptSettings(api: RuntimeApi, settings: Generatio
   const patchResult = patchScriptTrees(api.getScriptTrees(CHARACTER_SCRIPT_OPTION), desiredState);
 
   await api.updateScriptTreesWith(() => patchResult.trees, CHARACTER_SCRIPT_OPTION);
-  logMissingRules('局部脚本', SCRIPT_RULES, patchResult.matchedKeys);
+  logMissingRules('局部脚本', SCRIPT_RULES, patchResult.matchedKeys, settings.enableVariables ? ['eraVariableFramework'] : []);
 }
 
 async function applyCharacterWorldbookSettings(api: RuntimeApi, settings: GenerationSettings) {
@@ -187,7 +187,7 @@ async function applyCharacterWorldbookSettings(api: RuntimeApi, settings: Genera
     await api.updateWorldbookWith(worldbookName, () => nextWorldbook);
   }
 
-  logMissingRules('当前角色世界书条目', WORLDBOOK_ENTRY_RULES, matchedKeys);
+  logMissingRules('当前角色世界书条目', WORLDBOOK_ENTRY_RULES, matchedKeys, getRelevantWorldbookKeys(settings));
 }
 
 function patchScriptTrees(scriptTrees: ScriptTree[], desiredState: Map<string, boolean>): ScriptPatchResult {
@@ -271,11 +271,35 @@ function uniqueStrings(values: string[]) {
   return [...new Set(values.map(value => value.trim()).filter(Boolean))];
 }
 
-function logMissingRules(scope: string, rules: NamedRule[], matchedKeys: Set<string>) {
-  const missingLabels = rules.filter(rule => !matchedKeys.has(rule.key)).map(rule => rule.label);
+function logMissingRules(scope: string, rules: NamedRule[], matchedKeys: Set<string>, relevantKeys: string[]) {
+  const relevantKeySet = new Set(relevantKeys);
+  const missingLabels = rules
+    .filter(rule => relevantKeySet.has(rule.key) && !matchedKeys.has(rule.key))
+    .map(rule => rule.label);
   if (missingLabels.length === 0) {
     return;
   }
 
   console.warn(`[开局前端] ${scope}未找到以下资源: ${missingLabels.join('、')}`);
+}
+
+function getRelevantRegexKeys(settings: GenerationSettings) {
+  const keys = settings.enableVariables
+    ? ['variableStatusBar', 'openingInfoReplace', 'hideOne', 'hideTwo']
+    : [settings.useTextStatusBar ? 'textStatusBar' : 'imageStatusBar'];
+
+  if (settings.generateOptions) {
+    keys.push('optionsRegex');
+  }
+
+  return keys;
+}
+
+function getRelevantWorldbookKeys(settings: GenerationSettings) {
+  const keys = settings.enableVariables ? ['variableGuide', 'outputPrompt'] : ['multiStatusBar'];
+  if (settings.generateOptions) {
+    keys.push('actionSuggestion');
+  }
+
+  return keys;
 }
