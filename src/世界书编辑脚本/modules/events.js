@@ -829,6 +829,30 @@ export function bindEventListeners() {
       $(this).closest('.master-entry-item').removeClass('is-editing-title');
     });
 
+  $panel.off('click.masterEntryOpenButton').on('click.masterEntryOpenButton', '.master-entry-button[data-action="open-editor"]', async function (e) {
+    if (!isMasterDetailLayout()) {
+      return;
+    }
+
+    const $item = $(this).closest('.master-entry-item');
+    if (!$item.length || !hasCommand('open-editor')) {
+      return;
+    }
+
+    await dispatchCommand('open-editor', {
+      event: e,
+      $target: $(e.target),
+      $actionTarget: $(this),
+      $panel,
+      parentDoc,
+      refreshList,
+      lorebookName: $item.data('entry-lorebook'),
+      numericUid: ensureNumericUID($item.data('entry-uid')),
+      isGlobal: $item.closest('.lorebook-entries-container').attr('data-is-global') === 'true',
+      $item,
+    });
+  });
+
   $panel.off('click.masterEntryDetail').on('click.masterEntryDetail', '.master-entry-item', async function (e) {
     if (!isMasterDetailLayout()) {
       return;
