@@ -1,11 +1,18 @@
 import { byId } from './dom';
 import { handleNext, handleRandomize } from './flow';
-import { checkAllFeaturesSelected, navigateTo } from './render';
-import { createSelectionState, ensureFeatureSelections, ensureModificationSelections, updateSelection } from './state';
+import { checkAllFeaturesSelected, navigateTo, syncSettingsControls } from './render';
+import {
+  createSelectionState,
+  ensureFeatureSelections,
+  ensureGenerationSettings,
+  ensureModificationSelections,
+  updateSelection,
+} from './state';
 import type { SelectionKey, SelectionState } from './types';
 
 export function init() {
   const selections = createSelectionState();
+  syncSettingsControls(selections);
   bindBodyClickEvents(selections);
   bindInputEvents(selections);
 }
@@ -82,6 +89,8 @@ function bindBodyClickEvents(selections: SelectionState) {
 }
 
 function bindInputEvents(selections: SelectionState) {
+  bindSettingsEvents(selections);
+
   byId<HTMLInputElement>('custom-profession-input').addEventListener('input', event => {
     const value = (event.currentTarget as HTMLInputElement).value.trim();
     if (value) {
@@ -105,5 +114,32 @@ function bindInputEvents(selections: SelectionState) {
 
   byId<HTMLTextAreaElement>('custom-scene-input').addEventListener('input', event => {
     selections.customScene = (event.currentTarget as HTMLTextAreaElement).value.trim();
+  });
+}
+
+function bindSettingsEvents(selections: SelectionState) {
+  byId<HTMLInputElement>('setting-enable-variables').addEventListener('change', event => {
+    const settings = ensureGenerationSettings(selections);
+    settings.enableVariables = (event.currentTarget as HTMLInputElement).checked;
+    if (settings.enableVariables) {
+      settings.useTextStatusBar = false;
+    }
+    syncSettingsControls(selections);
+  });
+
+  byId<HTMLInputElement>('setting-use-text-status-bar').addEventListener('change', event => {
+    const settings = ensureGenerationSettings(selections);
+    if (settings.enableVariables) {
+      settings.useTextStatusBar = false;
+    } else {
+      settings.useTextStatusBar = (event.currentTarget as HTMLInputElement).checked;
+    }
+    syncSettingsControls(selections);
+  });
+
+  byId<HTMLInputElement>('setting-generate-options').addEventListener('change', event => {
+    const settings = ensureGenerationSettings(selections);
+    settings.generateOptions = (event.currentTarget as HTMLInputElement).checked;
+    syncSettingsControls(selections);
   });
 }

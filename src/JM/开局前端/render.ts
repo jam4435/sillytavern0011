@@ -1,7 +1,7 @@
 import { getFeatureSet, getModificationOptions } from './data-access';
 import { byId } from './dom';
-import { ensureFeatureSelections, ensureModificationSelections } from './state';
-import type { CardOptions, ModificationOption, SelectionState } from './types';
+import { ensureFeatureSelections, ensureGenerationSettings, ensureModificationSelections } from './state';
+import type { CardOptions, GenerationSettings, ModificationOption, SelectionState } from './types';
 
 export function navigateTo(screenId: string) {
   document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
@@ -141,6 +141,7 @@ export function renderSummary(selections: SelectionState) {
   const summaryContainer = byId<HTMLDivElement>('summary-content');
   summaryContainer.innerHTML = '';
   summaryContainer.className = 'summary-section';
+  const settings = ensureGenerationSettings(selections);
 
   const fields = {
     性别: 'gender',
@@ -173,6 +174,37 @@ export function renderSummary(selections: SelectionState) {
   if (selections.customModification) {
     summaryContainer.appendChild(createSummaryItem('补充改造', selections.customModification));
   }
+
+  summaryContainer.appendChild(createSummaryItem('变量系统', settings.enableVariables ? '开启' : '关闭'));
+  summaryContainer.appendChild(createSummaryItem('状态栏模式', getStatusBarModeLabel(settings)));
+  summaryContainer.appendChild(createSummaryItem('生成选项', settings.generateOptions ? '开启' : '关闭'));
+}
+
+export function syncSettingsControls(selections: SelectionState) {
+  const settings = ensureGenerationSettings(selections);
+  const variableInput = byId<HTMLInputElement>('setting-enable-variables');
+  const textStatusInput = byId<HTMLInputElement>('setting-use-text-status-bar');
+  const optionInput = byId<HTMLInputElement>('setting-generate-options');
+  const textStatusItem = byId<HTMLLabelElement>('setting-use-text-status-bar-item');
+  const textStatusHint = byId<HTMLSpanElement>('setting-use-text-status-bar-hint');
+
+  variableInput.checked = settings.enableVariables;
+  textStatusInput.checked = settings.useTextStatusBar;
+  optionInput.checked = settings.generateOptions;
+
+  textStatusInput.disabled = settings.enableVariables;
+  textStatusItem.classList.toggle('disabled', settings.enableVariables);
+  textStatusHint.textContent = settings.enableVariables
+    ? '关闭变量后才能切换到无图片状态栏。'
+    : '关闭图片状态栏并启用无图片状态栏。';
+}
+
+function getStatusBarModeLabel(settings: GenerationSettings) {
+  if (settings.enableVariables) {
+    return '变量状态栏';
+  }
+
+  return settings.useTextStatusBar ? '无图片状态栏' : '图片状态栏';
 }
 
 function createCard(type: string, value: string, description: string, selections: SelectionState) {

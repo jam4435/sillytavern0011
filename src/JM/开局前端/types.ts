@@ -26,6 +26,12 @@ export interface GenderConfig {
 
 export type FeatureSelections = Record<string, string>;
 
+export interface GenerationSettings {
+  enableVariables: boolean;
+  useTextStatusBar: boolean;
+  generateOptions: boolean;
+}
+
 export interface SelectionState {
   gender?: string;
   status?: string;
@@ -36,6 +42,7 @@ export interface SelectionState {
   customFeature?: string;
   customModification?: string;
   customScene?: string;
+  settings?: GenerationSettings;
   [key: string]: unknown;
 }
 

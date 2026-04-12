@@ -129,6 +129,132 @@
       .randomize-btn i {
         font-size: 32px;
       }
+      .settings-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        margin-bottom: 2rem;
+        padding: 1.1rem 1.2rem;
+        background:
+          linear-gradient(135deg, rgba(196, 58, 58, 0.08), rgba(255, 255, 255, 0)),
+          rgba(0, 0, 0, 0.18);
+        border: 1px solid rgba(196, 58, 58, 0.22);
+        border-radius: 4px;
+      }
+      .settings-panel-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        margin-bottom: 0.25rem;
+      }
+      .settings-panel-header p {
+        margin: 0;
+        color: var(--text-secondary-color);
+        line-height: 1.6;
+        font-size: 0.92rem;
+      }
+      .settings-panel-eyebrow {
+        font-family: var(--font-display);
+        font-size: 1.35rem;
+        letter-spacing: 1px;
+        color: var(--accent-color);
+      }
+      .setting-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.95rem 1rem;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 4px;
+        cursor: pointer;
+        transition:
+          border-color 0.2s ease,
+          background-color 0.2s ease,
+          transform 0.2s ease;
+      }
+      .setting-item:hover {
+        border-color: rgba(196, 58, 58, 0.42);
+        background: rgba(255, 255, 255, 0.04);
+        transform: translateY(-1px);
+      }
+      .setting-item.disabled {
+        cursor: not-allowed;
+        opacity: 0.68;
+      }
+      .setting-item.disabled:hover {
+        transform: none;
+        border-color: rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .setting-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+      .setting-title {
+        color: var(--text-color);
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      .setting-hint {
+        color: var(--text-secondary-color);
+        font-size: 0.9rem;
+        line-height: 1.55;
+      }
+      .setting-switch {
+        position: relative;
+        display: inline-flex;
+        flex-shrink: 0;
+      }
+      .setting-switch input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        border: 0;
+        clip: rect(0, 0, 0, 0);
+        overflow: hidden;
+      }
+      .setting-slider {
+        position: relative;
+        width: 52px;
+        height: 30px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition:
+          background-color 0.2s ease,
+          border-color 0.2s ease;
+      }
+      .setting-slider::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #f1f5f9;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+        transition: transform 0.2s ease;
+      }
+      .setting-switch input:checked + .setting-slider {
+        background: rgba(196, 58, 58, 0.35);
+        border-color: rgba(196, 58, 58, 0.7);
+      }
+      .setting-switch input:checked + .setting-slider::after {
+        transform: translateX(22px);
+      }
+      .setting-switch input:disabled + .setting-slider {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .setting-switch input:disabled + .setting-slider::after {
+        background: rgba(241, 245, 249, 0.65);
+      }
       .selection-grid {
         display: grid;
         gap: 1.5rem;
@@ -405,6 +531,19 @@
         .selection-grid {
           grid-template-columns: 1fr;
           gap: 1rem;
+        }
+        .settings-panel {
+          padding: 0.95rem;
+          margin-bottom: 1.5rem;
+        }
+        .setting-item {
+          padding: 0.85rem 0.9rem;
+        }
+        .setting-title {
+          font-size: 0.96rem;
+        }
+        .setting-hint {
+          font-size: 0.84rem;
         }
         .card {
           padding: 1rem;

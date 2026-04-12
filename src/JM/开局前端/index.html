@@ -14,6 +14,42 @@
           <h2>第一步：基因序列鉴定</h2>
           <p>你的染色体，决定了你生而为王，或生而为奴</p>
         </div>
+        <div class="settings-panel">
+          <div class="settings-panel-header">
+            <span class="settings-panel-eyebrow">开局设置</span>
+            <p>这些设置会在注入世界前同步到酒馆助手的局部正则、局部脚本和当前角色世界书。</p>
+          </div>
+          <label class="setting-item" for="setting-enable-variables">
+            <span class="setting-copy">
+              <span class="setting-title">是否开启变量</span>
+              <span class="setting-hint">控制变量状态栏、开局信息替换、ERA变量框架和变量相关世界书条目。</span>
+            </span>
+            <span class="setting-switch">
+              <input id="setting-enable-variables" type="checkbox" />
+              <span class="setting-slider"></span>
+            </span>
+          </label>
+          <label id="setting-use-text-status-bar-item" class="setting-item" for="setting-use-text-status-bar">
+            <span class="setting-copy">
+              <span class="setting-title">无图片状态栏</span>
+              <span id="setting-use-text-status-bar-hint" class="setting-hint">关闭图片状态栏并启用无图片状态栏。</span>
+            </span>
+            <span class="setting-switch">
+              <input id="setting-use-text-status-bar" type="checkbox" />
+              <span class="setting-slider"></span>
+            </span>
+          </label>
+          <label class="setting-item" for="setting-generate-options">
+            <span class="setting-copy">
+              <span class="setting-title">是否生成选项</span>
+              <span class="setting-hint">开启后启用选项正则，并打开当前角色世界书的行动建议条目。</span>
+            </span>
+            <span class="setting-switch">
+              <input id="setting-generate-options" type="checkbox" />
+              <span class="setting-slider"></span>
+            </span>
+          </label>
+        </div>
         <div class="selection-grid">
           <div class="card" data-type="gender" data-value="男">
             <h3>男性</h3>
