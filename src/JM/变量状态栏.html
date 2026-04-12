@@ -553,6 +553,17 @@
       const ensureString = value => (value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value));
       const ensureArray = value => (Array.isArray(value) ? value : []);
       const ensureObject = value => (_.isPlainObject(value) ? value : {});
+      const DISPLAY_TEXT_REPLACEMENTS = [['__DOT__', '.']];
+      function normalizeDisplayValue(value) {
+        if (typeof value === 'string') {
+          return DISPLAY_TEXT_REPLACEMENTS.reduce((text, [token, replacement]) => text.split(token).join(replacement), value);
+        }
+        if (Array.isArray(value)) return value.map(item => normalizeDisplayValue(item));
+        if (_.isPlainObject(value)) {
+          return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, normalizeDisplayValue(nestedValue)]));
+        }
+        return value;
+      }
       function getPanelState(panel) {
         if (!panelStates.has(panel)) {
           panelStates.set(panel, { currentGalleryImages: [], currentGalleryIndex: 0, currentGalleryBaseUrl: '', portraitClickListener: null });
@@ -620,19 +631,20 @@
       function buildPanelDataFromCharacter(name, statData) {
         const source = resolveCharacterSource(name, statData);
         if (!source) return null;
+        const normalizedSource = normalizeDisplayValue(source);
         return {
-          ...source,
-          Name: name,
-          Location: ensureString(safeGet(source, 'Location', '')),
-          Time: ensureString(safeGet(source, 'Time', '')),
-          Affection: ensureString(safeGet(source, 'Affection', '')),
-          Libido: ensureString(safeGet(source, 'Libido', '')),
-          Thoughts: ensureString(safeGet(source, 'Thoughts', '')),
-          RecentSex: ensureString(safeGet(source, 'RecentSex', '')),
-          ModificationsAndRestraints: ensureArray(safeGet(source, 'ModificationsAndRestraints', safeGet(source, 'Modifications', []))),
-          Status: ensureObject(safeGet(source, 'Status', {})),
-          Outfit: ensureObject(safeGet(source, 'Outfit', {})),
-          BodyDetails: ensureObject(safeGet(source, 'BodyDetails', {})),
+          ..._.omit(normalizedSource, ['Modifications']),
+          Name: normalizeDisplayValue(name),
+          Location: ensureString(safeGet(normalizedSource, 'Location', '')),
+          Time: ensureString(safeGet(normalizedSource, 'Time', '')),
+          Affection: ensureString(safeGet(normalizedSource, 'Affection', '')),
+          Libido: ensureString(safeGet(normalizedSource, 'Libido', '')),
+          Thoughts: ensureString(safeGet(normalizedSource, 'Thoughts', '')),
+          RecentSex: ensureString(safeGet(normalizedSource, 'RecentSex', '')),
+          ModificationsAndRestraints: ensureArray(safeGet(normalizedSource, 'ModificationsAndRestraints', safeGet(normalizedSource, 'Modifications', []))),
+          Status: ensureObject(safeGet(normalizedSource, 'Status', {})),
+          Outfit: ensureObject(safeGet(normalizedSource, 'Outfit', {})),
+          BodyDetails: ensureObject(safeGet(normalizedSource, 'BodyDetails', {})),
         };
       }
       function findImagesByKeyword(textToSearch) {
