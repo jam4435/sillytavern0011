@@ -8,13 +8,15 @@ import {
   ensureModificationSelections,
   updateSelection,
 } from './state';
-import type { SelectionState, StringSelectionKey } from './types';
+import { applyGenerationSettings } from './tavern-settings';
+import type { GenerationSettings, SelectionState, StringSelectionKey } from './types';
 
 export function init() {
   const selections = createSelectionState();
+  const syncGenerationSettings = createSettingsSyncer();
   syncSettingsControls(selections);
   bindBodyClickEvents(selections);
-  bindInputEvents(selections);
+  bindInputEvents(selections, syncGenerationSettings);
 }
 
 function bindBodyClickEvents(selections: SelectionState) {
@@ -88,8 +90,11 @@ function bindBodyClickEvents(selections: SelectionState) {
   });
 }
 
-function bindInputEvents(selections: SelectionState) {
-  bindSettingsEvents(selections);
+function bindInputEvents(
+  selections: SelectionState,
+  syncGenerationSettings: (settings: GenerationSettings) => void,
+) {
+  bindSettingsEvents(selections, syncGenerationSettings);
 
   byId<HTMLInputElement>('custom-profession-input').addEventListener('input', event => {
     const value = (event.currentTarget as HTMLInputElement).value.trim();
@@ -117,7 +122,10 @@ function bindInputEvents(selections: SelectionState) {
   });
 }
 
-function bindSettingsEvents(selections: SelectionState) {
+function bindSettingsEvents(
+  selections: SelectionState,
+  syncGenerationSettings: (settings: GenerationSettings) => void,
+) {
   byId<HTMLInputElement>('setting-enable-variables').addEventListener('change', event => {
     const settings = ensureGenerationSettings(selections);
     settings.enableVariables = (event.currentTarget as HTMLInputElement).checked;
@@ -125,6 +133,7 @@ function bindSettingsEvents(selections: SelectionState) {
       settings.useTextStatusBar = false;
     }
     syncSettingsControls(selections);
+    syncGenerationSettings({ ...settings });
   });
 
   byId<HTMLInputElement>('setting-use-text-status-bar').addEventListener('change', event => {
@@ -135,11 +144,44 @@ function bindSettingsEvents(selections: SelectionState) {
       settings.useTextStatusBar = (event.currentTarget as HTMLInputElement).checked;
     }
     syncSettingsControls(selections);
+    syncGenerationSettings({ ...settings });
   });
 
   byId<HTMLInputElement>('setting-generate-options').addEventListener('change', event => {
     const settings = ensureGenerationSettings(selections);
     settings.generateOptions = (event.currentTarget as HTMLInputElement).checked;
     syncSettingsControls(selections);
+    syncGenerationSettings({ ...settings });
   });
+}
+
+function createSettingsSyncer() {
+  let pendingSettings: GenerationSettings | null = null;
+  let syncing = false;
+
+  return function syncGenerationSettings(settings: GenerationSettings) {
+    pendingSettings = { ...settings };
+    if (syncing) {
+      return;
+    }
+
+    syncing = true;
+    void flushPendingSettings();
+  };
+
+  async function flushPendingSettings() {
+    while (pendingSettings) {
+      const nextSettings = pendingSettings;
+      pendingSettings = null;
+
+      try {
+        await applyGenerationSettings(nextSettings);
+      } catch (error) {
+        console.error('同步开局设置失败:', error);
+        alert(error instanceof Error ? error.message : '同步开局设置失败');
+      }
+    }
+
+    syncing = false;
+  }
 }
