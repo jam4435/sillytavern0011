@@ -83,7 +83,7 @@ function bindBodyClickEvents(selections: SelectionState) {
 
 function bindInputEvents(selections: SelectionState) {
   byId<HTMLInputElement>('custom-profession-input').addEventListener('input', event => {
-    const value = event.currentTarget.value.trim();
+    const value = (event.currentTarget as HTMLInputElement).value.trim();
     if (value) {
       updateSelection(selections, 'profession', value);
       document.querySelectorAll('#profession-options .card').forEach(card => card.classList.remove('selected'));
@@ -96,14 +96,14 @@ function bindInputEvents(selections: SelectionState) {
   });
 
   byId<HTMLInputElement>('custom-features-input').addEventListener('input', event => {
-    selections.customFeature = event.currentTarget.value.trim();
+    selections.customFeature = (event.currentTarget as HTMLInputElement).value.trim();
   });
 
   byId<HTMLInputElement>('custom-modification-input').addEventListener('input', event => {
-    selections.customModification = event.currentTarget.value.trim();
+    selections.customModification = (event.currentTarget as HTMLInputElement).value.trim();
   });
 
   byId<HTMLTextAreaElement>('custom-scene-input').addEventListener('input', event => {
-    selections.customScene = event.currentTarget.value.trim();
+    selections.customScene = (event.currentTarget as HTMLTextAreaElement).value.trim();
   });
 }
