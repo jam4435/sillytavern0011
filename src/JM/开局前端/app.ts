@@ -8,7 +8,7 @@ import {
   ensureModificationSelections,
   updateSelection,
 } from './state';
-import type { SelectionKey, SelectionState } from './types';
+import type { SelectionState, StringSelectionKey } from './types';
 
 export function init() {
   const selections = createSelectionState();
@@ -35,7 +35,7 @@ function bindBodyClickEvents(selections: SelectionState) {
     }
 
     if (card) {
-      const type = card.dataset.type as SelectionKey | undefined;
+      const type = card.dataset.type as StringSelectionKey | undefined;
       const value = card.dataset.value;
       if (!type || !value) return;
 

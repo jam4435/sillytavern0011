@@ -11,7 +11,7 @@ export async function submitSelections(selections: SelectionState) {
   if (typeof insertOrAssignVariables === 'function' && typeof triggerSlash === 'function') {
     try {
       await applyGenerationSettings(settings);
-      await insertOrAssignVariables({ gender: genderValue });
+      await insertOrAssignVariables({ gender: genderValue }, { type: 'chat' });
       triggerSlash([`/send ${description}`, '/trigger'].join('|'));
       renderFinalMessage({
         title: '档案已发送',

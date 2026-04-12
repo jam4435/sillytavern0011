@@ -3,8 +3,8 @@ import {
   selectionOrder,
   type FeatureSelections,
   type GenerationSettings,
-  type SelectionKey,
   type SelectionState,
+  type StringSelectionKey,
 } from './types';
 
 const defaultGenerationSettings: GenerationSettings = {
@@ -19,7 +19,7 @@ export function createSelectionState(): SelectionState {
   };
 }
 
-export function updateSelection(selections: SelectionState, type: SelectionKey, value: string) {
+export function updateSelection(selections: SelectionState, type: StringSelectionKey, value: string) {
   if (selections[type] === value) return;
 
   selections[type] = value;
@@ -27,7 +27,10 @@ export function updateSelection(selections: SelectionState, type: SelectionKey, 
   for (let i = currentIndex + 1; i < selectionOrder.length; i++) {
     const key = selectionOrder[i];
     delete selections[key];
-    maybeById<HTMLInputElement | HTMLTextAreaElement>(`custom-${key}-input`)?.value = '';
+    const input = maybeById<HTMLInputElement | HTMLTextAreaElement>(`custom-${key}-input`);
+    if (input) {
+      input.value = '';
+    }
   }
 }
 

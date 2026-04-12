@@ -19,7 +19,7 @@ type RuntimeApi = {
 };
 
 type ScriptPatchResult = {
-  trees: PartialDeep<ScriptTree>[];
+  trees: ScriptTree[];
   matchedKeys: Set<string>;
   hasEnabledManagedDescendant: boolean;
 };

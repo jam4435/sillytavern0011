@@ -63,6 +63,8 @@ export type SelectionKey =
   | 'customModification'
   | 'customScene';
 
+export type StringSelectionKey = 'gender' | 'status' | 'professionCategory' | 'profession';
+
 export const selectionOrder: SelectionKey[] = [
   'gender',
   'status',
