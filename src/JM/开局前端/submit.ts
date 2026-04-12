@@ -19,7 +19,7 @@ export async function submitSelections(selections: SelectionState) {
       });
     } catch (error) {
       console.error('执行指令时出错:', error);
-      alert('发送指令失败！');
+      alert(error instanceof Error ? error.message : '发送指令失败！');
     }
     return;
   }
