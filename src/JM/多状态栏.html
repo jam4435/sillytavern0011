@@ -755,15 +755,26 @@
                 .replace(/）/g, ')')
                 .replace(/[－−—–]/g, '-');
               if (!normalizedValue) return null;
-              const match = normalizedValue.match(
+              const rangeMatch = normalizedValue.match(
                 /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
               );
-              if (!match) return null;
-              return {
-                from: match[1],
-                to: match[2],
-                reason: match[3]?.trim() ?? '',
-              };
+              if (rangeMatch) {
+                return {
+                  mode: 'range',
+                  from: rangeMatch[1],
+                  to: rangeMatch[2],
+                  reason: rangeMatch[3]?.trim() ?? '',
+                };
+              }
+              const singleMatch = normalizedValue.match(/^([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/);
+              if (singleMatch) {
+                return {
+                  mode: 'single',
+                  value: singleMatch[1],
+                  reason: singleMatch[2]?.trim() ?? '',
+                };
+              }
+              return null;
             }
 
             function isStatField(key) {
@@ -789,7 +800,10 @@
               const parsed = parseStat(value); // parseStat 是已有的函数
               let valueHtml = '';
               if (parsed) {
-                valueHtml = `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`;
+                valueHtml =
+                  parsed.mode === 'range'
+                    ? `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`
+                    : `<div><span class="${Number(parsed.value) < 0 ? 'red' : 'green'}">${parsed.value}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`;
               } else {
                 valueHtml = String(value);
               }

@@ -682,15 +682,26 @@
           .replace(/）/g, ')')
           .replace(/[－−—–]/g, '-');
         if (!normalizedValue) return null;
-        const match = normalizedValue.match(
+        const rangeMatch = normalizedValue.match(
           /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
         );
-        if (!match) return null;
-        return {
-          from: match[1],
-          to: match[2],
-          reason: match[3]?.trim() ?? '',
-        };
+        if (rangeMatch) {
+          return {
+            mode: 'range',
+            from: rangeMatch[1],
+            to: rangeMatch[2],
+            reason: rangeMatch[3]?.trim() ?? '',
+          };
+        }
+        const singleMatch = normalizedValue.match(/^([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/);
+        if (singleMatch) {
+          return {
+            mode: 'single',
+            value: singleMatch[1],
+            reason: singleMatch[2]?.trim() ?? '',
+          };
+        }
+        return null;
       }
       function isStatField(key) {
         return key === 'Affection' || key === 'Libido';
@@ -698,7 +709,9 @@
       const renderStat = (label, value) => {
         const parsed = parseStat(value);
         const valueHtml = parsed
-          ? `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`
+          ? parsed.mode === 'range'
+            ? `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`
+            : `<div><span class="${Number(parsed.value) < 0 ? 'red' : 'green'}">${parsed.value}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`
           : String(value);
         return `<div class="stat-box"><div class="stat-label">${label}</div><div class="stat-value">${valueHtml}</div></div>`;
       };
