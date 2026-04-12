@@ -6,6 +6,7 @@ import {
   ensureFeatureSelections,
   ensureGenerationSettings,
   ensureModificationSelections,
+  persistGenerationSettings,
   updateSelection,
 } from './state';
 import { applyGenerationSettings } from './tavern-settings';
@@ -133,6 +134,7 @@ function bindSettingsEvents(
       settings.useTextStatusBar = false;
     }
     syncSettingsControls(selections);
+    persistGenerationSettings(settings);
     syncGenerationSettings({ ...settings });
   });
 
@@ -144,6 +146,7 @@ function bindSettingsEvents(
       settings.useTextStatusBar = (event.currentTarget as HTMLInputElement).checked;
     }
     syncSettingsControls(selections);
+    persistGenerationSettings(settings);
     syncGenerationSettings({ ...settings });
   });
 
@@ -151,6 +154,7 @@ function bindSettingsEvents(
     const settings = ensureGenerationSettings(selections);
     settings.generateOptions = (event.currentTarget as HTMLInputElement).checked;
     syncSettingsControls(selections);
+    persistGenerationSettings(settings);
     syncGenerationSettings({ ...settings });
   });
 }

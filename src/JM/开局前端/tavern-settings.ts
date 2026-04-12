@@ -22,6 +22,7 @@ type ScriptPatchResult = {
   trees: ScriptTree[];
   matchedKeys: Set<string>;
   hasEnabledManagedDescendant: boolean;
+  changedItems: string[];
 };
 
 const CHARACTER_REGEX_OPTION = { type: 'character', name: 'current' } as const;
@@ -34,7 +35,7 @@ const REGEX_RULES: NamedRule[] = [
   { key: 'hideTwo', label: '隐藏2', query: '隐藏2', mode: 'exact' },
   { key: 'imageStatusBar', label: '图片状态栏', query: '图片状态栏', mode: 'exact' },
   { key: 'textStatusBar', label: '无图片状态栏', query: '无图片状态栏', mode: 'exact' },
-  { key: 'optionsRegex', label: '选项正则', query: '选项正则', mode: 'exact' },
+  { key: 'optionsRegex', label: '选项', query: '选项', mode: 'exact' },
 ];
 
 const SCRIPT_RULES: NamedRule[] = [
@@ -51,9 +52,13 @@ const WORLDBOOK_ENTRY_RULES: NamedRule[] = [
 export async function applyGenerationSettings(settings: GenerationSettings) {
   const api = getRuntimeApi();
 
-  await applyCharacterRegexSettings(api, settings);
-  await applyCharacterScriptSettings(api, settings);
-  await applyCharacterWorldbookSettings(api, settings);
+  const changedRegexes = await applyCharacterRegexSettings(api, settings);
+  const changedScripts = await applyCharacterScriptSettings(api, settings);
+  const changedWorldbookEntries = await applyCharacterWorldbookSettings(api, settings);
+
+  logAppliedChanges('局部正则', changedRegexes);
+  logAppliedChanges('局部脚本', changedScripts);
+  logAppliedChanges('当前角色世界书条目', changedWorldbookEntries);
 }
 
 function getRuntimeApi(): RuntimeApi {
@@ -108,6 +113,7 @@ async function applyCharacterRegexSettings(api: RuntimeApi, settings: Generation
     ['optionsRegex', settings.generateOptions],
   ]);
   const matchedKeys = new Set<string>();
+  const changedItems: string[] = [];
 
   await api.updateTavernRegexesWith(
     regexes =>
@@ -123,6 +129,7 @@ async function applyCharacterRegexSettings(api: RuntimeApi, settings: Generation
           return regex;
         }
 
+        changedItems.push(`${regex.script_name} -> ${nextEnabled ? '开启' : '关闭'}`);
         return {
           ...regex,
           enabled: nextEnabled,
@@ -132,6 +139,7 @@ async function applyCharacterRegexSettings(api: RuntimeApi, settings: Generation
   );
 
   logMissingRules('局部正则', REGEX_RULES, matchedKeys, getRelevantRegexKeys(settings));
+  return changedItems;
 }
 
 async function applyCharacterScriptSettings(api: RuntimeApi, settings: GenerationSettings) {
@@ -140,13 +148,14 @@ async function applyCharacterScriptSettings(api: RuntimeApi, settings: Generatio
 
   await api.updateScriptTreesWith(() => patchResult.trees, CHARACTER_SCRIPT_OPTION);
   logMissingRules('局部脚本', SCRIPT_RULES, patchResult.matchedKeys, settings.enableVariables ? ['eraVariableFramework'] : []);
+  return patchResult.changedItems;
 }
 
 async function applyCharacterWorldbookSettings(api: RuntimeApi, settings: GenerationSettings) {
   const charWorldbooks = api.getCharWorldbookNames('current');
   const worldbookNames = uniqueStrings([charWorldbooks.primary || '', ...(charWorldbooks.additional || [])]);
   if (worldbookNames.length === 0) {
-    return;
+    return [];
   }
 
   const desiredState = new Map<string, boolean>([
@@ -156,6 +165,7 @@ async function applyCharacterWorldbookSettings(api: RuntimeApi, settings: Genera
     ['actionSuggestion', settings.generateOptions],
   ]);
   const matchedKeys = new Set<string>();
+  const changedItems: string[] = [];
 
   for (const worldbookName of worldbookNames) {
     const worldbook = await api.getWorldbook(worldbookName);
@@ -174,6 +184,7 @@ async function applyCharacterWorldbookSettings(api: RuntimeApi, settings: Genera
       }
 
       changed = true;
+      changedItems.push(`${worldbookName} / ${entry.name} -> ${nextEnabled ? '开启' : '关闭'}`);
       return {
         ...entry,
         enabled: nextEnabled,
@@ -188,11 +199,13 @@ async function applyCharacterWorldbookSettings(api: RuntimeApi, settings: Genera
   }
 
   logMissingRules('当前角色世界书条目', WORLDBOOK_ENTRY_RULES, matchedKeys, getRelevantWorldbookKeys(settings));
+  return changedItems;
 }
 
 function patchScriptTrees(scriptTrees: ScriptTree[], desiredState: Map<string, boolean>): ScriptPatchResult {
   const matchedKeys = new Set<string>();
   let hasEnabledManagedDescendant = false;
+  const changedItems: string[] = [];
 
   const trees = scriptTrees.map(tree => {
     if (tree.type === 'folder') {
@@ -200,6 +213,7 @@ function patchScriptTrees(scriptTrees: ScriptTree[], desiredState: Map<string, b
       const childScripts = tree.scripts as unknown as ScriptTree[];
       const childChanged = childResult.trees.some((child, index) => child !== childScripts[index]);
       childResult.matchedKeys.forEach(key => matchedKeys.add(key));
+      changedItems.push(...childResult.changedItems);
 
       if (childResult.hasEnabledManagedDescendant) {
         hasEnabledManagedDescendant = true;
@@ -232,6 +246,8 @@ function patchScriptTrees(scriptTrees: ScriptTree[], desiredState: Map<string, b
       return tree;
     }
 
+    changedItems.push(`${tree.name} -> ${nextEnabled ? '开启' : '关闭'}`);
+
     return {
       ...tree,
       enabled: nextEnabled,
@@ -242,6 +258,7 @@ function patchScriptTrees(scriptTrees: ScriptTree[], desiredState: Map<string, b
     trees,
     matchedKeys,
     hasEnabledManagedDescendant,
+    changedItems,
   };
 }
 
@@ -281,6 +298,15 @@ function logMissingRules(scope: string, rules: NamedRule[], matchedKeys: Set<str
   }
 
   console.warn(`[开局前端] ${scope}未找到以下资源: ${missingLabels.join('、')}`);
+}
+
+function logAppliedChanges(scope: string, changedItems: string[]) {
+  if (changedItems.length === 0) {
+    console.info(`[开局前端] ${scope}未发生修改`);
+    return;
+  }
+
+  console.info(`[开局前端] ${scope}已修改:`, changedItems);
 }
 
 function getRelevantRegexKeys(settings: GenerationSettings) {

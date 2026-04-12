@@ -7,6 +7,8 @@ import {
   type StringSelectionKey,
 } from './types';
 
+const GENERATION_SETTINGS_STORAGE_KEY = 'jm-opening-frontend-generation-settings-v1';
+
 const defaultGenerationSettings: GenerationSettings = {
   enableVariables: true,
   useTextStatusBar: false,
@@ -15,7 +17,7 @@ const defaultGenerationSettings: GenerationSettings = {
 
 export function createSelectionState(): SelectionState {
   return {
-    settings: createDefaultGenerationSettings(),
+    settings: loadGenerationSettings(),
   };
 }
 
@@ -50,7 +52,7 @@ export function ensureModificationSelections(selections: SelectionState): string
 
 export function ensureGenerationSettings(selections: SelectionState): GenerationSettings {
   if (!selections.settings) {
-    selections.settings = createDefaultGenerationSettings();
+    selections.settings = loadGenerationSettings();
     return selections.settings;
   }
 
@@ -77,4 +79,50 @@ function createDefaultGenerationSettings(): GenerationSettings {
   return {
     ...defaultGenerationSettings,
   };
+}
+
+function loadGenerationSettings(): GenerationSettings {
+  try {
+    const rawValue = localStorage.getItem(GENERATION_SETTINGS_STORAGE_KEY);
+    if (!rawValue) {
+      return createDefaultGenerationSettings();
+    }
+
+    const parsed = JSON.parse(rawValue) as Partial<GenerationSettings>;
+    return normalizeGenerationSettings(parsed);
+  } catch (error) {
+    console.warn('[开局前端] 读取设置缓存失败，已回退到默认设置', error);
+    return createDefaultGenerationSettings();
+  }
+}
+
+export function persistGenerationSettings(settings: GenerationSettings) {
+  try {
+    localStorage.setItem(GENERATION_SETTINGS_STORAGE_KEY, JSON.stringify(normalizeGenerationSettings(settings)));
+  } catch (error) {
+    console.warn('[开局前端] 保存设置缓存失败', error);
+  }
+}
+
+function normalizeGenerationSettings(settings?: Partial<GenerationSettings>): GenerationSettings {
+  const normalized: GenerationSettings = {
+    enableVariables:
+      typeof settings?.enableVariables === 'boolean'
+        ? settings.enableVariables
+        : defaultGenerationSettings.enableVariables,
+    useTextStatusBar:
+      typeof settings?.useTextStatusBar === 'boolean'
+        ? settings.useTextStatusBar
+        : defaultGenerationSettings.useTextStatusBar,
+    generateOptions:
+      typeof settings?.generateOptions === 'boolean'
+        ? settings.generateOptions
+        : defaultGenerationSettings.generateOptions,
+  };
+
+  if (normalized.enableVariables) {
+    normalized.useTextStatusBar = false;
+  }
+
+  return normalized;
 }
