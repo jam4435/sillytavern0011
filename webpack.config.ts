@@ -446,6 +446,7 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
             filename: path.parse(entry.html).base,
             scriptLoading: 'module',
             cache: false,
+            hash: argv.mode === 'development',
           }),
           new HtmlInlineScriptWebpackPlugin(),
           new MiniCssExtractPlugin(),
