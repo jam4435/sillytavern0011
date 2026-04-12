@@ -11,6 +11,7 @@ type NamedRule = {
 
 type RuntimeApi = {
   getCharWorldbookNames: typeof getCharWorldbookNames;
+  getScriptTrees: typeof getScriptTrees;
   getWorldbook: typeof getWorldbook;
   updateScriptTreesWith: typeof updateScriptTreesWith;
   updateTavernRegexesWith: typeof updateTavernRegexesWith;
@@ -51,29 +52,27 @@ export async function applyGenerationSettings(settings: GenerationSettings) {
   const api = getRuntimeApi();
 
   await applyCharacterRegexSettings(api, settings);
-  applyCharacterScriptSettings(api, settings);
+  await applyCharacterScriptSettings(api, settings);
   await applyCharacterWorldbookSettings(api, settings);
 }
 
 function getRuntimeApi(): RuntimeApi {
-  const helper = window.TavernHelper;
   const getCharWorldbookNamesApi =
-    helper?.getCharWorldbookNames ??
-    (typeof getCharWorldbookNames === 'function' ? getCharWorldbookNames : undefined);
-  const getWorldbookApi =
-    helper?.getWorldbook ?? (typeof getWorldbook === 'function' ? getWorldbook : undefined);
+    typeof getCharWorldbookNames === 'function' ? getCharWorldbookNames : undefined;
+  const getScriptTreesApi = typeof getScriptTrees === 'function' ? getScriptTrees : undefined;
+  const getWorldbookApi = typeof getWorldbook === 'function' ? getWorldbook : undefined;
   const updateScriptTreesWithApi =
-    helper?.updateScriptTreesWith ??
-    (typeof updateScriptTreesWith === 'function' ? updateScriptTreesWith : undefined);
+    typeof updateScriptTreesWith === 'function' ? updateScriptTreesWith : undefined;
   const updateTavernRegexesWithApi =
-    helper?.updateTavernRegexesWith ??
-    (typeof updateTavernRegexesWith === 'function' ? updateTavernRegexesWith : undefined);
+    typeof updateTavernRegexesWith === 'function' ? updateTavernRegexesWith : undefined;
   const updateWorldbookWithApi =
-    helper?.updateWorldbookWith ??
-    (typeof updateWorldbookWith === 'function' ? updateWorldbookWith : undefined);
+    typeof updateWorldbookWith === 'function' ? updateWorldbookWith : undefined;
 
   if (!getCharWorldbookNamesApi) {
     throw Error('缺少酒馆助手接口: getCharWorldbookNames');
+  }
+  if (!getScriptTreesApi) {
+    throw Error('缺少酒馆助手接口: getScriptTrees');
   }
   if (!getWorldbookApi) {
     throw Error('缺少酒馆助手接口: getWorldbook');
@@ -90,6 +89,7 @@ function getRuntimeApi(): RuntimeApi {
 
   return {
     getCharWorldbookNames: getCharWorldbookNamesApi,
+    getScriptTrees: getScriptTreesApi,
     getWorldbook: getWorldbookApi,
     updateScriptTreesWith: updateScriptTreesWithApi,
     updateTavernRegexesWith: updateTavernRegexesWithApi,
@@ -134,11 +134,11 @@ async function applyCharacterRegexSettings(api: RuntimeApi, settings: Generation
   logMissingRules('局部正则', REGEX_RULES, matchedKeys);
 }
 
-function applyCharacterScriptSettings(api: RuntimeApi, settings: GenerationSettings) {
+async function applyCharacterScriptSettings(api: RuntimeApi, settings: GenerationSettings) {
   const desiredState = new Map<string, boolean>([['eraVariableFramework', settings.enableVariables]]);
-  const patchResult = patchScriptTrees(getScriptTrees(CHARACTER_SCRIPT_OPTION), desiredState);
+  const patchResult = patchScriptTrees(api.getScriptTrees(CHARACTER_SCRIPT_OPTION), desiredState);
 
-  api.updateScriptTreesWith(() => patchResult.trees, CHARACTER_SCRIPT_OPTION);
+  await api.updateScriptTreesWith(() => patchResult.trees, CHARACTER_SCRIPT_OPTION);
   logMissingRules('局部脚本', SCRIPT_RULES, patchResult.matchedKeys);
 }
 
@@ -197,6 +197,8 @@ function patchScriptTrees(scriptTrees: ScriptTree[], desiredState: Map<string, b
   const trees = scriptTrees.map(tree => {
     if (tree.type === 'folder') {
       const childResult = patchScriptTrees(tree.scripts as unknown as ScriptTree[], desiredState);
+      const childScripts = tree.scripts as unknown as ScriptTree[];
+      const childChanged = childResult.trees.some((child, index) => child !== childScripts[index]);
       childResult.matchedKeys.forEach(key => matchedKeys.add(key));
 
       if (childResult.hasEnabledManagedDescendant) {
@@ -204,7 +206,7 @@ function patchScriptTrees(scriptTrees: ScriptTree[], desiredState: Map<string, b
       }
 
       const nextEnabled = childResult.hasEnabledManagedDescendant ? true : tree.enabled;
-      if (nextEnabled === tree.enabled && childResult.trees === (tree.scripts as unknown as PartialDeep<ScriptTree>[])) {
+      if (nextEnabled === tree.enabled && !childChanged) {
         return tree;
       }
 

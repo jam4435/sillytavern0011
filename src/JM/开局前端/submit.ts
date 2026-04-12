@@ -1,12 +1,16 @@
+import { ensureGenerationSettings } from './state';
+import { applyGenerationSettings } from './tavern-settings';
 import { queryRequired } from './dom';
 import type { FinalMessageOptions, SelectionState } from './types';
 
 export async function submitSelections(selections: SelectionState) {
   const genderValue = selections.gender === '男' ? 'man' : 'female';
   const description = buildDescription(selections);
+  const settings = ensureGenerationSettings(selections);
 
   if (typeof insertOrAssignVariables === 'function' && typeof triggerSlash === 'function') {
     try {
+      await applyGenerationSettings(settings);
       await insertOrAssignVariables({ gender: genderValue });
       triggerSlash([`/send ${description}`, '/trigger'].join('|'));
       renderFinalMessage({
