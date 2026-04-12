@@ -124,6 +124,12 @@
       .header-info {
         flex-grow: 1;
       }
+      .char-name-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
       .char-name {
         font-size: 24px;
         font-weight: 700;
@@ -254,6 +260,130 @@
       .details-value {
         flex-grow: 1;
         color: var(--text-color);
+      }
+      .inline-editable-value {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .inline-editable-value .details-value {
+        min-width: 0;
+      }
+      .edit-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-secondary-color);
+        cursor: pointer;
+        transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+      }
+      .edit-trigger:hover {
+        background: rgba(187, 134, 252, 0.16);
+        border-color: rgba(187, 134, 252, 0.32);
+        color: var(--accent-light-color);
+      }
+      .edit-trigger svg {
+        width: 14px;
+        height: 14px;
+      }
+      .jm-edit-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(4px);
+      }
+      .jm-edit-modal.visible {
+        display: flex;
+      }
+      .jm-edit-dialog {
+        width: min(420px, calc(100vw - 32px));
+        padding: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 14px;
+        background: #262626;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+      }
+      .jm-edit-title {
+        margin-bottom: 14px;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--accent-light-color);
+      }
+      .jm-edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .jm-edit-label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--text-secondary-color);
+      }
+      .jm-edit-input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.28);
+        color: var(--text-color);
+        font: inherit;
+      }
+      .jm-edit-input:focus {
+        outline: none;
+        border-color: rgba(187, 134, 252, 0.52);
+      }
+      .jm-edit-error {
+        display: none;
+        padding: 10px 12px;
+        border: 1px solid rgba(207, 102, 121, 0.35);
+        border-radius: 8px;
+        background: rgba(207, 102, 121, 0.12);
+        color: #ffd6de;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .jm-edit-error.visible {
+        display: block;
+      }
+      .jm-edit-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+      .jm-edit-button {
+        border: none;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .jm-edit-button.cancel {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-color);
+      }
+      .jm-edit-button.save {
+        background: var(--accent-light-color);
+        color: #1e1e1e;
+        font-weight: 700;
+      }
+      .jm-edit-button:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
       }
       .modifications-list {
         display: flex;
@@ -553,6 +683,7 @@
       const ensureString = value => (value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value));
       const ensureArray = value => (Array.isArray(value) ? value : []);
       const ensureObject = value => (_.isPlainObject(value) ? value : {});
+      const EDIT_PENCIL_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.21a.996.996 0 0 0 0-1.41L18.37 3.3a.996.996 0 1 0-1.41 1.41l2.34 2.33a.996.996 0 0 0 1.41 0z"/></svg>';
       const DISPLAY_TEXT_REPLACEMENTS = [['__DOT__', '.']];
       function normalizeDisplayValue(value) {
         if (typeof value === 'string') {
@@ -563,6 +694,84 @@
           return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, normalizeDisplayValue(nestedValue)]));
         }
         return value;
+      }
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+      }
+      function splitCharacterNames(rawText) {
+        return uniq(String(rawText ?? '').split(/[，,、|/]/).map(name => name.trim()).filter(Boolean));
+      }
+      function replaceDelimitedCharacterName(content, oldName, newName) {
+        const parts = String(content ?? '').split(/([，,、|/])/);
+        let replaced = false;
+        for (let index = 0; index < parts.length; index += 2) {
+          const originalPart = parts[index];
+          const trimmedPart = originalPart.trim();
+          if (trimmedPart !== oldName) continue;
+          parts[index] = originalPart.replace(trimmedPart, newName);
+          replaced = true;
+        }
+        return { content: parts.join(''), replaced };
+      }
+      function replaceCurrentCharacterNameInMessage(message, oldName, newName) {
+        let replaced = false;
+        const updatedMessage = String(message ?? '').replace(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/g, (full, tagName, content) => {
+          const result = replaceDelimitedCharacterName(content, oldName, newName);
+          if (!result.replaced) return full;
+          replaced = true;
+          return `<当前${tagName}>${result.content}</当前${tagName}>`;
+        });
+        return { message: updatedMessage, replaced };
+      }
+      function renameKeyInObject(target, oldKey, newKey, newValue) {
+        const entries = Object.entries(ensureObject(target));
+        if (oldKey !== newKey && entries.some(([key]) => key === newKey)) {
+          throw new Error(`变量中已存在人物“${newKey}”。`);
+        }
+        let found = false;
+        const nextEntries = entries.map(([key, value]) => {
+          if (key !== oldKey) return [key, value];
+          found = true;
+          return [newKey, newValue];
+        });
+        if (!found) throw new Error(`未找到人物“${oldKey}”对应的变量。`);
+        return Object.fromEntries(nextEntries);
+      }
+      function buildUpdatedStatData(statData, oldName, newName, newIdentity) {
+        const nextStatData = _.cloneDeep(ensureObject(statData));
+        if (_.has(nextStatData, ['角色数据', oldName])) {
+          const roleMap = ensureObject(_.get(nextStatData, '角色数据', {}));
+          const updatedCharacter = _.cloneDeep(ensureObject(roleMap[oldName]));
+          updatedCharacter.Status = ensureObject(updatedCharacter.Status);
+          updatedCharacter.Status.Identity = newIdentity;
+          nextStatData.角色数据 = renameKeyInObject(roleMap, oldName, newName, updatedCharacter);
+          return nextStatData;
+        }
+        if (_.has(nextStatData, oldName)) {
+          const updatedCharacter = _.cloneDeep(ensureObject(nextStatData[oldName]));
+          updatedCharacter.Status = ensureObject(updatedCharacter.Status);
+          updatedCharacter.Status.Identity = newIdentity;
+          return renameKeyInObject(nextStatData, oldName, newName, updatedCharacter);
+        }
+        throw new Error(`未找到人物“${oldName}”对应的变量。`);
+      }
+      function getLatestAssistantMessage() {
+        const messages = getChatMessages('0-{{lastMessageId}}', { role: 'assistant', hide_state: 'all' }) || [];
+        return messages.length > 0 ? messages[messages.length - 1] : null;
+      }
+      async function migratePortraitStorage(oldName, newName) {
+        if (!oldName || !newName || oldName === newName) return;
+        const oldKey = `jm_user_portrait_${oldName}`;
+        const newKey = `jm_user_portrait_${newName}`;
+        const existingPortrait = await idbHelper.get(oldKey);
+        if (!existingPortrait) return;
+        await idbHelper.set(newKey, existingPortrait);
+        await idbHelper.delete(oldKey);
       }
       function getPanelState(panel) {
         if (!panelStates.has(panel)) {
@@ -606,9 +815,9 @@
       function loadCurrentCharacterNames() {
         try {
           const latestMessage = getChatMessages(-1)?.[0]?.message ?? '';
-          const match = typeof latestMessage === 'string' ? latestMessage.match(/<当前人物>([\s\S]*?)<\/当前人物>/) : null;
+          const match = typeof latestMessage === 'string' ? latestMessage.match(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/) : null;
           if (!match) return [];
-          return uniq(match[1].split(/[，,、|/]/).map(name => name.trim()).filter(Boolean));
+          return splitCharacterNames(match[2]);
         } catch (error) {
           console.warn('[变量状态栏] 读取最新楼层失败:', error);
           return [];
@@ -736,7 +945,11 @@
             contentsHtml += `<div id="${tabId}" class="tab-content ${isActive}"><ul class="details-list">`;
             for (const subKey in data[key]) {
               const label = tabInfo.labels[subKey] || subKey;
-              contentsHtml += `<li class="details-item"><span class="details-label">${label}</span><span class="details-value">${data[key][subKey]}</span></li>`;
+              const rawValue = data[key][subKey];
+              const valueHtml = key === 'Status' && subKey === 'Identity'
+                ? `<span class="inline-editable-value"><span class="details-value">${escapeHtml(rawValue)}</span><button class="edit-trigger jm-edit-character-trigger" type="button" title="编辑名字与身份">${EDIT_PENCIL_ICON}</button></span>`
+                : `<span class="details-value">${escapeHtml(rawValue)}</span>`;
+              contentsHtml += `<li class="details-item"><span class="details-label">${label}</span>${valueHtml}</li>`;
             }
             contentsHtml += '</ul></div>';
             tabIndex++;
@@ -784,7 +997,10 @@
               <input type="file" class="jm-portrait-upload" style="display:none" accept="image/*" />
             </div>
             <div class="header-info">
-              <div class="char-name" data-field="Name"></div>
+              <div class="char-name-row">
+                <div class="char-name" data-field="Name"></div>
+                <button class="edit-trigger jm-edit-character-trigger" type="button" title="编辑名字与身份">${EDIT_PENCIL_ICON}</button>
+              </div>
               <div class="meta-info">
                 <span class="location">📍 <span data-field="Location"></span></span>
                 <span class="timestamp">🕰️ <span data-field="Time"></span></span>
@@ -803,6 +1019,26 @@
               <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="gallery-image" />
               <a class="gallery-prev">&#10094;</a>
               <a class="gallery-next">&#10095;</a>
+            </div>
+          </div>
+          <div class="jm-edit-modal" aria-hidden="true">
+            <div class="jm-edit-dialog" role="dialog" aria-modal="true" aria-label="编辑角色信息">
+              <div class="jm-edit-title">编辑角色信息</div>
+              <div class="jm-edit-form">
+                <label class="jm-edit-label">
+                  名字
+                  <input class="jm-edit-input jm-edit-name-input" type="text" />
+                </label>
+                <label class="jm-edit-label">
+                  身份
+                  <input class="jm-edit-input jm-edit-identity-input" type="text" />
+                </label>
+                <div class="jm-edit-error"></div>
+                <div class="jm-edit-actions">
+                  <button class="jm-edit-button cancel jm-edit-cancel-button" type="button">取消</button>
+                  <button class="jm-edit-button save jm-edit-save-button" type="button">保存</button>
+                </div>
+              </div>
             </div>
           </div>`;
         ['Name', 'Location', 'Time'].forEach(field => {
@@ -988,6 +1224,103 @@
           reader.readAsDataURL(file);
         };
       }
+      function toggleEditModal(panel, visible) {
+        const modal = panel.querySelector('.jm-edit-modal');
+        if (!modal) return;
+        modal.classList.toggle('visible', visible);
+        modal.setAttribute('aria-hidden', visible ? 'false' : 'true');
+      }
+      function setEditError(panel, message = '') {
+        const errorBox = panel.querySelector('.jm-edit-error');
+        if (!errorBox) return;
+        errorBox.textContent = message;
+        errorBox.classList.toggle('visible', Boolean(message));
+      }
+      function openCharacterEditor(panel, data) {
+        const nameInput = panel.querySelector('.jm-edit-name-input');
+        const identityInput = panel.querySelector('.jm-edit-identity-input');
+        if (!nameInput || !identityInput) return;
+        nameInput.value = ensureString(data.Name);
+        identityInput.value = ensureString(safeGet(data, 'Status.Identity', ''));
+        setEditError(panel, '');
+        toggleEditModal(panel, true);
+        nameInput.focus();
+        nameInput.select();
+      }
+      async function saveCharacterEdits(panel, data) {
+        const nameInput = panel.querySelector('.jm-edit-name-input');
+        const identityInput = panel.querySelector('.jm-edit-identity-input');
+        const saveButton = panel.querySelector('.jm-edit-save-button');
+        const cancelButton = panel.querySelector('.jm-edit-cancel-button');
+        if (!nameInput || !identityInput || !saveButton || !cancelButton) return;
+        const oldName = ensureString(data.Name).trim();
+        const oldIdentity = ensureString(safeGet(data, 'Status.Identity', '')).trim();
+        const newName = normalizeDisplayValue(nameInput.value.trim());
+        const newIdentity = normalizeDisplayValue(identityInput.value.trim());
+        if (!newName) {
+          setEditError(panel, '名字不能为空。');
+          nameInput.focus();
+          return;
+        }
+        setEditError(panel, '');
+        const originalVariables = _.cloneDeep(getVariables({ type: 'chat' }));
+        const originalStatData = ensureObject(_.get(originalVariables, 'stat_data', {}));
+        const nextStatData = buildUpdatedStatData(originalStatData, oldName, newName, newIdentity);
+        const nextVariables = _.cloneDeep(originalVariables);
+        nextVariables.stat_data = nextStatData;
+        const latestAssistantMessage = newName !== oldName ? getLatestAssistantMessage() : null;
+        let originalAssistantText = '';
+        let updatedAssistantText = '';
+        if (newName !== oldName) {
+          if (!latestAssistantMessage) {
+            setEditError(panel, '未找到最新 AI 回复，无法同步 <当前人物>/<当前角色> 中的名字。');
+            return;
+          }
+          originalAssistantText = ensureString(latestAssistantMessage.message);
+          const messageReplacement = replaceCurrentCharacterNameInMessage(originalAssistantText, oldName, newName);
+          if (!messageReplacement.replaced) {
+            setEditError(panel, '未在最新 AI 回复的 <当前人物>/<当前角色> 标签中找到当前名字。');
+            return;
+          }
+          updatedAssistantText = messageReplacement.message;
+        }
+        saveButton.disabled = true;
+        cancelButton.disabled = true;
+        saveButton.textContent = '保存中...';
+        try {
+          replaceVariables(nextVariables, { type: 'chat' });
+          if (latestAssistantMessage && updatedAssistantText !== originalAssistantText) {
+            await setChatMessages([{ message_id: latestAssistantMessage.message_id, message: updatedAssistantText }], { refresh: 'affected' });
+          }
+          if (newName !== oldName) {
+            const collapsedState = collapsedStateByName.get(oldName);
+            if (collapsedState !== undefined) {
+              collapsedStateByName.set(newName, collapsedState);
+              collapsedStateByName.delete(oldName);
+            }
+            await migratePortraitStorage(oldName, newName);
+          }
+          data.Name = newName;
+          data.Status = ensureObject(data.Status);
+          data.Status.Identity = newIdentity;
+          toggleEditModal(panel, false);
+          scheduleRefresh();
+        } catch (error) {
+          try {
+            replaceVariables(originalVariables, { type: 'chat' });
+            if (latestAssistantMessage && updatedAssistantText !== originalAssistantText) {
+              await setChatMessages([{ message_id: latestAssistantMessage.message_id, message: originalAssistantText }], { refresh: 'affected' });
+            }
+          } catch (rollbackError) {
+            console.error('[变量状态栏] 回滚编辑失败:', rollbackError);
+          }
+          setEditError(panel, error?.message || '保存失败，请重试。');
+        } finally {
+          saveButton.disabled = false;
+          cancelButton.disabled = false;
+          saveButton.textContent = '保存';
+        }
+      }
       function setupEventListeners(panel, data) {
         const collapseToggle = panel.querySelector('.collapse-toggle');
         if (collapseToggle) {
@@ -1121,6 +1454,32 @@
             }
           });
         }
+        panel.querySelectorAll('.jm-edit-character-trigger').forEach(trigger => {
+          trigger.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            openCharacterEditor(panel, data);
+          });
+        });
+        const editModal = panel.querySelector('.jm-edit-modal');
+        const editCancelButton = panel.querySelector('.jm-edit-cancel-button');
+        const editSaveButton = panel.querySelector('.jm-edit-save-button');
+        if (editModal) {
+          editModal.addEventListener('click', event => {
+            if (event.target === editModal) toggleEditModal(panel, false);
+          });
+        }
+        if (editCancelButton) {
+          editCancelButton.addEventListener('click', () => toggleEditModal(panel, false));
+        }
+        if (editSaveButton) {
+          editSaveButton.addEventListener('click', () => {
+            saveCharacterEdits(panel, data).catch(error => {
+              console.error('[变量状态栏] 保存角色信息失败:', error);
+              setEditError(panel, error?.message || '保存失败，请重试。');
+            });
+          });
+        }
         setupPortraitUpload(panel, data);
       }
       function persistCollapsedStates() {
@@ -1146,7 +1505,7 @@
         let rootHtml = '';
         if (missingNames.length > 0) rootHtml += renderFeedback(`未找到变量人物：${missingNames.join('、')}`, 'warning');
         if (panelDataList.length === 0) {
-          rootHtml += renderFeedback(names.length === 0 ? '未找到当前人物。请在最新楼层加入 <当前人物>人物名</当前人物>。' : '未找到当前人物对应的变量数据。');
+          rootHtml += renderFeedback(names.length === 0 ? '未找到当前人物。请在最新楼层加入 <当前人物>人物名</当前人物> 或 <当前角色>人物名</当前角色>。' : '未找到当前人物对应的变量数据。');
           root.innerHTML = rootHtml;
           return;
         }
