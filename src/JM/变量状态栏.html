@@ -632,8 +632,12 @@
         const source = resolveCharacterSource(name, statData);
         if (!source) return null;
         const normalizedSource = normalizeDisplayValue(source);
+        const mergedModifications = uniq([
+          ...ensureArray(safeGet(normalizedSource, 'ModificationsAndRestraints', [])).filter(Boolean),
+          ...ensureArray(safeGet(normalizedSource, 'Modifications', [])).filter(Boolean),
+        ]);
         return {
-          ..._.omit(normalizedSource, ['Modifications']),
+          ..._.omit(normalizedSource, ['Modifications', 'ModificationsAndRestraints']),
           Name: normalizeDisplayValue(name),
           Location: ensureString(safeGet(normalizedSource, 'Location', '')),
           Time: ensureString(safeGet(normalizedSource, 'Time', '')),
@@ -641,7 +645,7 @@
           Libido: ensureString(safeGet(normalizedSource, 'Libido', '')),
           Thoughts: ensureString(safeGet(normalizedSource, 'Thoughts', '')),
           RecentSex: ensureString(safeGet(normalizedSource, 'RecentSex', '')),
-          ModificationsAndRestraints: ensureArray(safeGet(normalizedSource, 'ModificationsAndRestraints', safeGet(normalizedSource, 'Modifications', []))),
+          ModificationsAndRestraints: mergedModifications,
           Status: ensureObject(safeGet(normalizedSource, 'Status', {})),
           Outfit: ensureObject(safeGet(normalizedSource, 'Outfit', {})),
           BodyDetails: ensureObject(safeGet(normalizedSource, 'BodyDetails', {})),
