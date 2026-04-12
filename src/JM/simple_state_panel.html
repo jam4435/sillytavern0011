@@ -131,13 +131,22 @@
             return result;
           }
 
-          function parseStat(statString) {
-            if (typeof statString !== 'string') return null;
-            const match = statString.match(/(\d+)\s*→\s*(\d+)\s*\((.*?)\)/);
-            if (match) {
-              return { from: match[1], to: match[2], reason: match[3] };
-            }
-            return null;
+          function parseStat(statValue) {
+            if (statValue === null || statValue === undefined) return null;
+            const normalizedValue = String(statValue)
+              .trim()
+              .replace(/（/g, '(')
+              .replace(/）/g, ')');
+            if (!normalizedValue) return null;
+            const match = normalizedValue.match(
+              /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
+            );
+            if (!match) return null;
+            return {
+              from: match[1],
+              to: match[2],
+              reason: match[3]?.trim() ?? '',
+            };
           }
 
           function updatePanel(data) {
@@ -170,10 +179,12 @@
               const parsedStat = parseStat(affection);
               if (parsedStat) {
                 affectionElement.innerHTML = `<span class="red">${parsedStat.from}</span> <span class="arrow">→</span> <span class="green">${parsedStat.to}</span>`;
-                const reasonElement = document.createElement('div');
-                reasonElement.className = 'affection-reason';
-                reasonElement.textContent = `(${parsedStat.reason})`;
-                affectionElement.parentNode.appendChild(reasonElement);
+                if (parsedStat.reason) {
+                  const reasonElement = document.createElement('div');
+                  reasonElement.className = 'affection-reason';
+                  reasonElement.textContent = `(${parsedStat.reason})`;
+                  affectionElement.parentNode.appendChild(reasonElement);
+                }
               } else {
                 affectionElement.textContent = affection;
               }

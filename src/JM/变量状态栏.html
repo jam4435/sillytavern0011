@@ -674,14 +674,31 @@
           el.innerHTML = originalText.replace(keywordRegex, match => (imageIndex[synonymMap[match] || match] ? `<a href="#" class="image-link" data-keyword="${match}">${match}</a>` : match));
         });
       }
-      function parseStat(statString) {
-        if (typeof statString !== 'string') return null;
-        const match = statString.match(/(\d+)\s*→\s*(\d+)\s*\((.*?)\)/);
-        return match ? { from: match[1], to: match[2], reason: match[3] } : null;
+      function parseStat(statValue) {
+        if (statValue === null || statValue === undefined) return null;
+        const normalizedValue = String(statValue)
+          .trim()
+          .replace(/（/g, '(')
+          .replace(/）/g, ')');
+        if (!normalizedValue) return null;
+        const match = normalizedValue.match(
+          /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
+        );
+        if (!match) return null;
+        return {
+          from: match[1],
+          to: match[2],
+          reason: match[3]?.trim() ?? '',
+        };
+      }
+      function isStatField(key) {
+        return key === 'Affection' || key === 'Libido';
       }
       const renderStat = (label, value) => {
         const parsed = parseStat(value);
-        const valueHtml = parsed ? `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div><div class="stat-change-reason">(${parsed.reason})</div>` : String(value);
+        const valueHtml = parsed
+          ? `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`
+          : String(value);
         return `<div class="stat-box"><div class="stat-label">${label}</div><div class="stat-value">${valueHtml}</div></div>`;
       };
       const renderNarrative = (label, value) => `<div class="narrative-block"><span class="narrative-label">${label}</span><p class="narrative-content">${String(value)}</p></div>`;
@@ -725,7 +742,7 @@
         let dynamicHtml = '';
         itemsToRender.forEach(item => {
           let type = 'narrative';
-          if (typeof item.value === 'string' && parseStat(item.value)) type = 'stat';
+          if (isStatField(item.key)) type = 'stat';
           else if (Array.isArray(item.value)) type = 'list';
           if (type === 'stat') {
             statItems.push(item);

@@ -706,13 +706,26 @@
             });
           }
 
-          function parseStat(statString) {
-            if (typeof statString !== 'string') return null;
-            const match = statString.match(/(\d+)\s*→\s*(\d+)\s*\((.*?)\)/);
-            if (match) {
-              return { from: match[1], to: match[2], reason: match[3] };
-            }
-            return null;
+          function parseStat(statValue) {
+            if (statValue === null || statValue === undefined) return null;
+            const normalizedValue = String(statValue)
+              .trim()
+              .replace(/（/g, '(')
+              .replace(/）/g, ')');
+            if (!normalizedValue) return null;
+            const match = normalizedValue.match(
+              /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
+            );
+            if (!match) return null;
+            return {
+              from: match[1],
+              to: match[2],
+              reason: match[3]?.trim() ?? '',
+            };
+          }
+
+          function isStatField(key) {
+            return key === 'Affection' || key === 'Libido';
           }
 
           // --- 新增：动态内容配置 ---
@@ -734,7 +747,7 @@
             const parsed = parseStat(value); // parseStat 是已有的函数
             let valueHtml = '';
             if (parsed) {
-              valueHtml = `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div><div class="stat-change-reason">(${parsed.reason})</div>`;
+              valueHtml = `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`;
             } else {
               valueHtml = String(value);
             }
@@ -962,7 +975,7 @@
               let value = item.value;
 
               // 自动检测UI类型
-              if (typeof value === 'string' && parseStat(value)) {
+              if (isStatField(item.key)) {
                 type = 'stat';
               } else if (Array.isArray(value)) {
                 type = 'list';

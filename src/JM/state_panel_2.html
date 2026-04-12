@@ -392,13 +392,22 @@
             return uniq(foundImages);
           }
 
-          function parseStat(statString) {
-            if (typeof statString !== 'string') return null;
-            const match = statString.match(/(\d+)\s*→\s*(\d+)\s*\((.*?)\)/);
-            if (match) {
-              return { from: match, to: match, reason: match };
-            }
-            return null;
+          function parseStat(statValue) {
+            if (statValue === null || statValue === undefined) return null;
+            const normalizedValue = String(statValue)
+              .trim()
+              .replace(/（/g, '(')
+              .replace(/）/g, ')');
+            if (!normalizedValue) return null;
+            const match = normalizedValue.match(
+              /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
+            );
+            if (!match) return null;
+            return {
+              from: match[1],
+              to: match[2],
+              reason: match[3]?.trim() ?? '',
+            };
           }
 
           function updatePanel(data) {
@@ -463,7 +472,7 @@
               if (typeof value !== 'undefined' && field !== 'portrait') {
                 const parsedStat = field === 'Affection' || field === 'Libido' ? parseStat(value) : null;
                 if (parsedStat) {
-                  el.innerHTML = `<div><span class="red">${parsedStat.from}</span> <span class="arrow">→</span> <span class="green">${parsedStat.to}</span></div><div class="stat-change-reason">(${parsedStat.reason})</div>`;
+                  el.innerHTML = `<div><span class="red">${parsedStat.from}</span> <span class="arrow">→</span> <span class="green">${parsedStat.to}</span></div>${parsedStat.reason ? `<div class="stat-change-reason">(${parsedStat.reason})</div>` : ''}`;
                 } else if (field === 'Modifications' && Array.isArray(value)) {
                   value.forEach(item => {
                     const li = document.createElement('li');
