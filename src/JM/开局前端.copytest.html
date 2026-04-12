@@ -1,0 +1,1745 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>帝国公民档案生成器</title>
+    <!-- Font Awesome is assumed to be loaded by the environment -->
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Teko:wght@400;700&family=Noto+Sans+SC:wght@300;400;700&display=swap');
+      :root {
+        --bg-color: #0a0a0c;
+        --container-bg: rgba(18, 20, 24, 0.92);
+        --border-color: #3a3f4a;
+        --text-color: #d1d5db;
+        --text-secondary-color: #8a92a1;
+        --accent-color: #c43a3a;
+        --accent-hover: #e64c4c;
+        --font-main: 'Noto Sans SC', sans-serif;
+        --font-display: 'Teko', sans-serif;
+      }
+      body {
+        font-family: var(--font-main);
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 1rem;
+        overflow: auto;
+        background-image:
+          linear-gradient(rgba(10, 10, 12, 0.85), rgba(10, 10, 12, 0.85)), url('https://i.imgur.com/8Q1ZQ5E.jpeg');
+        background-size: cover;
+        background-position: center;
+        box-sizing: border-box;
+      }
+      .generator-container {
+        background: var(--container-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+        width: 100%;
+        max-width: 700px;
+        padding: 2.5rem 3.5rem;
+        backdrop-filter: blur(8px);
+        position: relative;
+      }
+      .corner {
+        position: absolute;
+        width: 25px;
+        height: 25px;
+        border: 2px solid var(--accent-color);
+        opacity: 0.7;
+      }
+      .corner-tl {
+        top: 12px;
+        left: 12px;
+        border-right: none;
+        border-bottom: none;
+      }
+      .corner-tr {
+        top: 12px;
+        right: 12px;
+        border-left: none;
+        border-bottom: none;
+      }
+      .corner-bl {
+        bottom: 12px;
+        left: 12px;
+        border-right: none;
+        border-top: none;
+      }
+      .corner-br {
+        bottom: 12px;
+        right: 12px;
+        border-left: none;
+        border-top: none;
+      }
+      .screen {
+        display: none;
+      }
+      .screen.active {
+        display: block;
+        animation: fadeIn 0.6s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(15px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .screen-header {
+        text-align: center;
+        margin-bottom: 2.5rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 1.5rem;
+        position: relative;
+      }
+      .screen-header h2 {
+        font-family: var(--font-display);
+        font-size: 3.5rem;
+        margin: 0;
+        letter-spacing: 3px;
+        font-weight: 700;
+        text-transform: uppercase;
+        background: linear-gradient(180deg, #e6d8d8, #a8b0bd);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow:
+          0 0 10px rgba(196, 58, 58, 0.7),
+          0 0 20px rgba(196, 58, 58, 0.5);
+      }
+      .screen-header p {
+        color: var(--text-secondary-color);
+        margin: 0.5rem 0 0 0;
+        font-size: 1rem;
+      }
+      .randomize-btn {
+        position: absolute;
+        top: 50%;
+        right: 0;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: var(--text-secondary-color);
+        transition: all 0.2s ease-in-out;
+      }
+      .randomize-btn:hover {
+        color: var(--accent-hover);
+        transform: translateY(-50%) scale(1.1);
+      }
+      .randomize-btn i {
+        font-size: 32px;
+      }
+      .selection-grid {
+        display: grid;
+        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      }
+      .card {
+        background-color: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .card:hover {
+        border-color: var(--accent-hover);
+        transform: translateY(-5px);
+        box-shadow: 0 0 15px rgba(230, 76, 76, 0.3);
+      }
+      .card.selected {
+        border-color: var(--accent-color);
+        transform: translateY(-5px);
+        box-shadow: 0 0 20px rgba(196, 58, 58, 0.4);
+      }
+      .card h3 {
+        margin: 0 0 0.5rem 0;
+        color: var(--text-color);
+        font-size: 1.3rem;
+      }
+      .card p {
+        font-size: 0.9rem;
+        color: var(--text-secondary-color);
+        margin: 0;
+        line-height: 1.6;
+      }
+      .nav-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 3rem;
+      }
+      .btn {
+        font-family: var(--font-display);
+        padding: 0.7rem 2.5rem;
+        border-radius: 2px;
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        font-size: 1.5rem;
+        letter-spacing: 2px;
+        transition: all 0.2s ease;
+        background-color: transparent;
+        color: var(--text-secondary-color);
+      }
+      .btn-primary {
+        border-color: var(--accent-color);
+        color: var(--accent-color);
+      }
+      .btn:hover:not(:disabled) {
+        background-color: var(--accent-color);
+        color: var(--bg-color);
+        border-color: var(--accent-color);
+        box-shadow: 0 0 12px var(--accent-hover);
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .summary-section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--border-color);
+        border-left: 3px solid var(--accent-color);
+        border-radius: 2px;
+      }
+      .summary-label {
+        color: var(--text-secondary-color);
+      }
+      .summary-value {
+        color: var(--text-color);
+        font-weight: bold;
+        text-align: right;
+      }
+      #features-container {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+      .feature-category {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .feature-category h4 {
+        font-family: var(--font-display);
+        color: var(--text-secondary-color);
+        margin: 0;
+        font-size: 1.8rem;
+        letter-spacing: 1px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+      }
+      .feature-options-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+      .feature-option {
+        background-color: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary-color);
+        padding: 0.5rem 1.2rem;
+        border-radius: 2px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.9rem;
+      }
+      .feature-option:hover {
+        border-color: var(--accent-hover);
+        color: var(--text-color);
+      }
+      .feature-option.selected {
+        background-color: var(--accent-color);
+        border-color: var(--accent-color);
+        color: var(--bg-color);
+        font-weight: bold;
+        box-shadow: 0 0 8px rgba(196, 58, 58, 0.4);
+      }
+      .feature-option.disabled {
+        cursor: not-allowed;
+        opacity: 0.8;
+      }
+      #modification-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 0.5rem;
+        max-height: 350px;
+        overflow-y: auto;
+        padding: 0.75rem;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+      }
+      #modification-container::-webkit-scrollbar {
+        width: 8px;
+      }
+      #modification-container::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+      }
+      #modification-container::-webkit-scrollbar-thumb {
+        background-color: var(--border-color);
+        border-radius: 4px;
+      }
+      #modification-container::-webkit-scrollbar-thumb:hover {
+        background-color: var(--text-secondary-color);
+      }
+      .mod-option {
+        background-color: #2d3436;
+        color: var(--text-color);
+        border: 1px solid #4a5054;
+        border-radius: 4px;
+        padding: 0.6rem 0.4rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        font-size: 0.85rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .mod-option:hover {
+        background-color: #4a5054;
+        border-color: var(--accent-hover);
+      }
+      .mod-option.selected {
+        background-color: var(--accent-color);
+        border-color: var(--accent-hover);
+        color: var(--bg-color);
+        transform: scale(1.05);
+      }
+      .mod-option.disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        background-color: #1e2224;
+        color: #6c757d;
+      }
+      .mod-option.disabled.selected {
+        opacity: 1;
+        border-color: var(--accent-color);
+        color: var(--bg-color);
+      }
+      .required-mod-info {
+        grid-column: 1 / -1;
+        text-align: center;
+        font-size: 0.9rem;
+        color: var(--text-secondary-color);
+        margin-bottom: 0.5rem;
+        padding: 0.75rem;
+        border: 1px dashed var(--border-color);
+        background: rgba(0, 0, 0, 0.1);
+      }
+      .custom-input-container {
+        margin-top: 2.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .custom-input-container label {
+        font-family: var(--font-display);
+        color: var(--text-secondary-color);
+        font-size: 1.5rem;
+        letter-spacing: 1px;
+      }
+      .custom-input,
+      .custom-textarea {
+        width: 100%;
+        background-color: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--border-color);
+        border-radius: 2px;
+        padding: 0.8rem 1rem;
+        color: var(--text-color);
+        font-family: var(--font-main);
+        font-size: 1rem;
+        box-sizing: border-box;
+        transition: border-color 0.2s ease;
+      }
+      .custom-input:focus,
+      .custom-textarea:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        box-shadow: 0 0 8px rgba(196, 58, 58, 0.4);
+      }
+      .custom-textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+      .summary-custom-scene {
+        margin-top: 1.5rem;
+        margin-bottom: -1rem;
+      }
+      @media (max-width: 600px) {
+        body {
+          padding: 0.5rem;
+          align-items: flex-start;
+        }
+        .generator-container {
+          padding: 1.5rem 1rem;
+          width: 100%;
+          max-width: 100%;
+        }
+        .screen-header {
+          margin-bottom: 2rem;
+          padding-bottom: 1rem;
+        }
+        .screen-header h2 {
+          font-size: 2.2rem;
+          letter-spacing: 1px;
+        }
+        .screen-header p {
+          font-size: 0.9rem;
+        }
+        .randomize-btn {
+          right: 10px;
+        }
+        .randomize-btn i {
+          font-size: 28px;
+        }
+        .selection-grid {
+          grid-template-columns: 1fr;
+          gap: 1rem;
+        }
+        .card {
+          padding: 1rem;
+        }
+        .nav-buttons {
+          margin-top: 2rem;
+        }
+        .btn {
+          padding: 0.6rem 1.5rem;
+          font-size: 1.2rem;
+        }
+        .custom-input-container {
+          margin-top: 2rem;
+        }
+        .custom-input-container label {
+          font-size: 1.2rem;
+        }
+        #modification-container {
+          grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        }
+        .corner {
+          width: 20px;
+          height: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="generator-container">
+      <span class="corner corner-tl"></span>
+      <span class="corner corner-tr"></span>
+      <span class="corner corner-bl"></span>
+      <span class="corner corner-br"></span>
+
+      <div id="screen-gender" class="screen active">
+        <div class="screen-header">
+          <div class="randomize-btn" title="随机选择" data-screen-id="screen-gender">
+            <i class="fa-solid fa-dice-six"></i>
+          </div>
+          <h2>第一步：基因序列鉴定</h2>
+          <p>你的染色体，决定了你生而为王，或生而为奴</p>
+        </div>
+        <div class="selection-grid">
+          <div class="card" data-type="gender" data-value="男">
+            <h3>男性</h3>
+            <p>帝国的支配者，或是在边缘挣扎的弃民。</p>
+          </div>
+          <div class="card" data-type="gender" data-value="女">
+            <h3>女性</h3>
+            <p>帝国的财产、商品与基石。</p>
+          </div>
+        </div>
+        <div class="nav-buttons">
+          <span></span><button id="to-status" class="btn btn-primary" disabled>下一步</button>
+        </div>
+      </div>
+      <div id="screen-status" class="screen">
+        <div class="screen-header">
+          <div class="randomize-btn" title="随机选择" data-screen-id="screen-status">
+            <i class="fa-solid fa-dice-six"></i>
+          </div>
+          <h2>第二步：社会身份划分</h2>
+          <p>血脉、信仰与法规，将你焊死在金字塔的特定位置</p>
+        </div>
+        <div id="status-options"></div>
+        <div class="nav-buttons">
+          <button class="btn back-btn" data-target="screen-gender">上一步</button
+          ><button id="to-profession-or-category" class="btn btn-primary" disabled>下一步</button>
+        </div>
+      </div>
+      <div id="screen-profession-category" class="screen">
+        <div class="screen-header">
+          <div class="randomize-btn" title="随机选择" data-screen-id="screen-profession-category">
+            <i class="fa-solid fa-dice-six"></i>
+          </div>
+          <h2>第三步：选择职业大类</h2>
+          <p>你的身份决定了你能从事的工种范围</p>
+        </div>
+        <div id="profession-category-options" class="selection-grid"></div>
+        <div class="nav-buttons">
+          <button class="btn back-btn" data-target="screen-status">上一步</button
+          ><button id="to-profession" class="btn btn-primary" disabled>下一步</button>
+        </div>
+      </div>
+      <div id="screen-profession" class="screen">
+        <div class="screen-header">
+          <div class="randomize-btn" title="随机选择" data-screen-id="screen-profession">
+            <i class="fa-solid fa-dice-six"></i>
+          </div>
+          <h2>第四步：确定具体职业</h2>
+          <p>你的工作，是享受特权，或是提供服务，亦或是成为工具本身</p>
+        </div>
+        <div id="profession-options" class="selection-grid"></div>
+        <div class="custom-input-container">
+          <label for="custom-profession-input">或自定义职业:</label>
+          <input
+            type="text"
+            id="custom-profession-input"
+            class="custom-input"
+            placeholder="在此输入自定义职业名称..."
+          />
+        </div>
+        <div class="nav-buttons">
+          <button class="btn back-btn" data-target="screen-profession-category">上一步</button
+          ><button id="to-features" class="btn btn-primary" disabled>下一步</button>
+        </div>
+      </div>
+      <div id="screen-features" class="screen">
+        <div class="screen-header">
+          <div class="randomize-btn" title="随机选择" data-screen-id="screen-features">
+            <i class="fa-solid fa-dice-six"></i>
+          </div>
+          <h2>第五步：生理特征登录</h2>
+          <p>你的肉体，是武器，是工具，也是商品</p>
+        </div>
+        <div id="features-container"></div>
+        <div class="custom-input-container">
+          <label for="custom-features-input">补充生理特征 (可选):</label>
+          <input
+            type="text"
+            id="custom-features-input"
+            class="custom-input"
+            placeholder="例如：猫耳、半机械化、有发光纹路..."
+          />
+        </div>
+        <div class="nav-buttons">
+          <button class="btn back-btn" data-target="screen-profession">上一步</button
+          ><button id="to-modification" class="btn btn-primary" disabled>下一步</button>
+        </div>
+      </div>
+      <div id="screen-modification" class="screen">
+        <div class="screen-header">
+          <div class="randomize-btn" title="随机选择" data-screen-id="screen-modification">
+            <i class="fa-solid fa-dice-six"></i>
+          </div>
+          <h2>第六步：强制性身体改造</h2>
+          <p>帝国的烙印，将铭刻在你的骨肉之上</p>
+        </div>
+        <div id="modification-container"></div>
+        <div class="custom-input-container">
+          <label for="custom-modification-input">补充身体改造 (可选):</label>
+          <input
+            type="text"
+            id="custom-modification-input"
+            class="custom-input"
+            placeholder="例如：植入天使翅膀、身体水晶化..."
+          />
+        </div>
+        <div class="nav-buttons">
+          <button class="btn back-btn" data-target="screen-features">上一步</button
+          ><button id="to-summary" class="btn btn-primary">下一步</button>
+        </div>
+      </div>
+      <div id="screen-summary" class="screen">
+        <div class="screen-header">
+          <h2>最终档案确认</h2>
+          <p>警告：档案生成后，命运将无法更改</p>
+        </div>
+        <div id="summary-content"></div>
+        <div class="custom-input-container summary-custom-scene">
+          <label for="custom-scene-input">开场背景和场景自定义:</label>
+          <textarea
+            id="custom-scene-input"
+            class="custom-textarea"
+            placeholder="在此输入你希望的开场背景，例如：“在一个阴暗的地下实验室醒来...”，留空则由AI完全决定。"
+          ></textarea>
+        </div>
+        <div class="nav-buttons">
+          <button class="btn back-btn" data-target="screen-modification">上一步</button
+          ><button id="confirm-and-start" class="btn btn-primary">注入世界</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const data = {
+        gender: {
+          男: {
+            status: {
+              '未觉醒者 (帝国弃民)': {
+                professions: ['拾荒者', '黑市商人', '革命军士兵', '狂欢者军阀', '地下医生', '情报贩子', '走私客'],
+              },
+              '一级觉醒者 (帝国平民)': {
+                professions: ['帝国底层劳工', '黑帮打手', '赏金猎人', '矿工', '工厂操作员', '角斗场奴隶'],
+              },
+              '二级觉醒者 (帝国基层)': {
+                professions: ['企业低级职员', '城市协警', '女子监狱看守', '圣女教基层执事', '口袋公司产品测试员'],
+              },
+              '三级觉醒者 (帝国基石)': {
+                professions: ['帝国士兵', '帝国审讯官', '纠察内卫', '企业中层主管', '武装载具操作员', '帝国研究人员'],
+              },
+              '四级觉醒者 (帝国精英)': {
+                professions: [
+                  '帝国军官',
+                  '政府高官',
+                  '企业高管',
+                  '圣女教神父',
+                  '审判庭庭长',
+                  '口袋公司高级设计师',
+                  '贵妇性奴市场总监',
+                ],
+              },
+              '劣化人 (五级觉醒者)': {
+                professions: ['世袭贵族/皇室', '教廷主教/教皇', '阿肯托尔恐怖分子领袖', '被放逐的贵族'],
+              },
+            },
+            features: {
+              智力: ['天才', '聪慧', '平庸', '迟钝'],
+              外貌: ['俊美无俦', '相貌英俊', '面容普通', '丑陋不堪'],
+              身材: ['体格魁梧', '身材健硕', '标准体型', '瘦弱羸弱', '肥胖油腻'],
+            },
+            modifications: [
+              { name: '战斗义体植入', description: '用机械义体替换部分肢体以增强战斗能力。' },
+              { name: '皮下装甲植入', description: '在皮肤下植入轻型装甲板以提供基础防护。' },
+              { name: '合成肌肉纤维', description: '替换原有肌肉，获得超越常人的力量和耐力。' },
+              { name: '骨骼密度强化', description: '通过注入化合物或替换材料来强化骨骼，使其不易骨折。' },
+              { name: '神经强化改造', description: '改造神经系统，加快反应速度。' },
+              { name: '认知增强芯片', description: '在大脑中植入芯片，提升计算和分析能力。' },
+              { name: '阴茎增粗术', description: '通过手术增加阴茎的尺寸。' },
+              { name: '阴茎入珠', description: '在阴茎皮下植入珠子以增加性交时的刺激。' },
+              { name: '龟头形态重塑', description: '通过手术改变龟头的形状。' },
+              { name: '精巢改造(产量提升)', description: '改造睾丸以提升精子产量和质量。' },
+              { name: '电击精液改造', description: '改造精液，使其在射精时能产生微弱的电流刺激。' },
+              { name: '前列腺电极植入', description: '在前列腺植入电极，可通过外部设备触发强制高潮。' },
+              { name: '信息素控制腺体', description: '植入能分泌特殊信息素的腺体，用于影响他人情绪或行为。' },
+              { name: '圣精子勋章(被授予)', description: '由教廷授予的荣誉，其精子被认为具有神圣性。' },
+            ],
+          },
+          女: {
+            status: {
+              'A类公民 (社会职能人员)': {
+                professionCategories: {
+                  学生: { professions: ['监禁学院学生'] },
+                  上班族: { professions: ['公司白领', '医生/护士', '教师', '运动员', '空姐', '清洁工'] },
+                  政府公务员: { professions: ['女警察', '女法官', '实习公务员(慰安妇)'] },
+                  女子敬国军: { professions: ['普通敬国军', '女教官', '幼女冲锋队', '箱娘'] },
+                  圣女教信徒: { professions: ['修女', '教廷母马', '黑新娘', '托圣者', '安魂女', '守墓人'] },
+                  '家庭主妇/妻子': { professions: ['家庭主妇/妻子'] },
+                  国母级性奴: { professions: ['圣母·达维娜', '南宫婉然'] },
+                },
+              },
+              'B类奴隶 (商品)': {
+                professionCategories: {
+                  妓女: { professions: ['芭比妓女', '家庭妓女', '暗娼'] },
+                  商品化性奴: {
+                    professions: [
+                      '家用女仆 (夜蕾丝)',
+                      '女仆长 (夜蕾丝)',
+                      '宠物式幼女肉便器',
+                      '蛇犬',
+                      '便携式护理护士 (NiGa)',
+                      '蛇腰犬',
+                    ],
+                  },
+                  '工业母体/女畜': { professions: ['集中营工业母体', '生育型雌豚', '高挑淑女', '驼鹿'] },
+                  女体公共设施: { professions: ['地铁闸机', '红绿灯', '警戒犬', '壁尻', 'Anubis警戒犬'] },
+                  女体家具: {
+                    professions: [
+                      '女体沙发',
+                      '女体坐便器',
+                      '女体蹲厕',
+                      '女体灯具',
+                      '女体痰盂',
+                      '性爱床',
+                      '女体饮品加乳器',
+                    ],
+                  },
+                  实验体: { professions: ['瓶奴原料 (易爽)', '女体武器 (恶媚)', '单兵活体自慰杯', '作战女畜 (恶娼)'] },
+                },
+              },
+              'C类战俘 (特殊资产)': {
+                professions: ['乳胶战俘犬', '再塑造学员', '战争使徒 (瓦丽安娜)', '战争使徒 (瑟琳西卡)', '射击靶'],
+              },
+              反抗组织成员: { professions: ['革命军战士', '怒吼姐妹会成员'] },
+            },
+            features: {
+              外貌: ['神赐容貌', '容貌绝美', '清秀佳人', '姿色平庸', '残次品'],
+              气质: ['圣洁无垢', '高贵典雅', '温顺服从', '倔强不屈', '麻木痴傻'],
+              胸部: ['篮球巨乳', '丰满挺拔', '匀称适中', '微微隆起', '平坦如镜'],
+              臀部: ['蜜桃翘臀', '圆润饱满', '标准臀型', '略显干瘪', '平板无肉'],
+              小穴: ['一线天名器', '紧致多褶', '普通肉穴', '松弛黑木耳', '彻底损毁'],
+              屁眼: ['粉嫩雏菊', '紧致后庭', '开发适度', '破旧菊花', '撕裂脱垂'],
+            },
+            modifications: [
+              {
+                name: '脊椎炸弹植入',
+                description: '在女兵脊椎中植入炸弹作为最终控制手段。',
+                requires: ['普通敬国军', '女教官', '幼女冲锋队', '箱娘'],
+              },
+              {
+                name: '脑波雷达植入(驼鹿)',
+                description: '大脑被固定在金属脑腔内，形成不受干扰的脑波雷达，用于追踪或远程操控。',
+                requires: ['驼鹿'],
+              },
+              {
+                name: '工业母体改造',
+                description:
+                  '改造为集中营的生育机器，可同时怀2-4个胎儿；去除头骨，为暴露的大脑接入电极，以此刺激大脑引发排卵、调节孕激素水平。',
+                requires: ['集中营工业母体'],
+              },
+              {
+                name: '消化系统贯通(雌豚)',
+                description: '消化系统被改造为密闭式，只能通过肛门高压灌入流食。',
+                requires: ['生育型雌豚'],
+              },
+              {
+                name: '宫颈座植入(裁判长)',
+                description: '裁判长椅内置撞锤，通过插入阴道高速撞击“宫颈座”来发出法槌声。',
+                requires: ['裁判长'],
+              },
+              {
+                name: '全肋骨摘除(蛇腰犬)',
+                description: '截除大部分肋骨，用专业机械将腰部勒至接近脊柱的粗细，以获得极度的柔韧性。',
+                requires: ['蛇腰犬'],
+              },
+              {
+                name: '颅腔改造(自慰杯)',
+                description: '切掉大部分颅腔，只保留部分脑干以维持口交的神经反射。',
+                requires: ['单兵活体自慰杯'],
+              },
+              {
+                name: '人造阴茎移植',
+                description: '为女教官移植，用于奸淫下属，其皮鞭可贯穿整根鸡巴并挂在脖颈下',
+                requires: ['女教官'],
+              },
+              {
+                name: '马屌移植',
+                description: '被移植一根可剖开拉链的马屌，用于惩罚其他女仆。',
+                requires: ['女仆长 (夜蕾丝)'],
+              },
+              {
+                name: '折足鞋',
+                description: '将脚向后掰折到极限，用骨锁、骨钉等将脚完全固定在金属鞋子上。',
+                requires: ['运动员'],
+              },
+              {
+                name: '弧跟鞋',
+                description: '横向贯穿跟骨的托架，钢钉固定鞋跟。',
+                requires: ['运动员'],
+              },
+              {
+                name: '气管狗绳锁(战俘犬)',
+                description: '借助脖颈开口改造，狗绳直接锁在气管上，用于窒息训练和惩罚。',
+                requires: ['乳胶战俘犬'],
+              },
+              {
+                name: '腮角扩口(驮畜)',
+                description: '通过手术扩大腮角，增加奔跑时的肺部进气量。',
+                requires: ['高挑淑女', '驼鹿'],
+              },
+              {
+                name: '脑前额叶探针',
+                description: '将探针通过鼻腔和眼皮刺入大脑前额叶，进行强制记忆灌输和思想干预。',
+                requires: ['监禁学院学生'],
+              },
+              {
+                name: '乳腺溶蚀与填充',
+                description:
+                  '使用药物溶蚀乳腺，再植入医用蛆虫吃空乳房内部，最后注入营养液填充乳腔，刺激皮下脂肪堆积使乳房增大。',
+                requires: ['监禁学院学生'],
+              },
+              {
+                name: '金属高跟鞋',
+                description: '用螺钉穿透脚趾和跟骨，将双脚完全固定在金属鞋架上。',
+                requires: ['监禁学院学生'],
+              },
+              {
+                name: '膛线阴道改造',
+                description: '阴道内植入平行的硅胶条，形成螺旋状膛线，增加性交时的摩擦和快感。',
+                requires: ['芭比妓女', '家庭妓女'],
+              },
+              {
+                name: '宫颈扩张手术',
+                description: '通过手术永久性地扩张子宫颈，使阴茎可以自由出入子宫。',
+                requires: ['家庭妓女', '暗娼'],
+              },
+              {
+                name: '锁式肛塞 (消化道重组)',
+                description: '需要手术才能佩戴的巨大肛塞，链球贯穿消化道锁在喉咙上，无法正常进食。',
+                requires: [],
+              },
+              {
+                name: '钉刺高跟鞋',
+                description: '鞋跟内装钉刺，每走一步都会刺入脚掌。',
+                requires: [],
+              },
+              {
+                name: '乳胶牙齿改造',
+                description: '牙齿被替换成正反两面带有不同凸点和纹理的乳胶齿，并植入微电流刺激器和旋转磨轮。',
+                requires: ['公司白领', '实习公务员(慰安妇)'],
+              },
+              {
+                name: '口枷与面部固定器',
+                description: '用于固定面部表情和防止说话的束缚工具。',
+                requires: ['宠物式幼女肉便器'],
+              },
+              { name: '子宫纹身', description: '在子宫内壁进行艺术性或标记性纹身。', requires: ['家庭妓女', '暗娼'] },
+              {
+                name: '永久性贞操带',
+                description: '需要特殊手段才能解开的贞操带，永久固定在身上。',
+                requires: ['监禁学院学生', '家庭主妇/妻子'],
+              },
+              {
+                name: '所有权烙印',
+                description: '在皮肤上烙上代表所有者的印记。',
+                requires: [],
+              },
+              {
+                name: '奴隶编码纹身',
+                description: '在身上纹上用于识别的奴隶编码。',
+                requires: [],
+              },
+              {
+                name: '乳头/阴蒂穿刺',
+                description: '在乳头或阴蒂上进行穿刺并佩戴饰品，通常用于连接其他束缚工具。',
+                requires: ['B类奴隶 (商品)', 'C类战俘 (特殊资产)'],
+              },
+              {
+                name: '声带切除',
+                description: '通过手术切除声带，使其无法发声。',
+                requires: ['B类奴隶 (商品)', 'C类战俘 (特殊资产)'],
+              },
+              {
+                name: '产乳强化改造',
+                description: '通过激素或手术手段，强化身体的产乳能力。',
+                requires: ['集中营工业母体', '家庭女仆 (夜蕾丝)'],
+              },
+              {
+                name: '潮吹能力强化',
+                description: '通过改造强化潮吹反应，使其更频繁和剧烈。',
+                requires: ['妓女', '商品化性奴'],
+              },
+              {
+                name: '乳胶嘴唇替换',
+                description: '毁掉下颚并安装乳胶嘴唇用于口交。',
+                requires: ['乳胶战俘犬', '单兵活体自慰杯'],
+              },
+              {
+                name: '马鸣笛植入',
+                description: '在呼吸系统中植入特制马鸣笛，使其可以发出马叫声。',
+                requires: ['教廷母马'],
+              },
+              {
+                name: '眼眶蜡烛台',
+                description: '眼眶被用作烛台，点燃的蜡烛成为其“眼睛”，烛液代替泪水，从她的脸上缓缓滴落。',
+                requires: ['战争使徒 (瓦丽安娜/瑟琳西ка)'],
+              },
+              {
+                name: '乳晕雕刻',
+                description: '在乳晕上雕刻出无法永久保存的花朵形状，作为一种临时装饰。',
+                requires: ['家庭主妇/妻子', '妓女'],
+              },
+              {
+                name: '阴唇吊裙环',
+                description: '在阴唇上穿环，用于在仪式中悬挂婚纱的长裙摆。',
+                requires: ['家庭主妇/妻子'],
+              },
+              {
+                name: '骨雕艺术',
+                description: '在活体骨骼上进行鏤空雕刻，并等待其愈合形成圆润的骨纹艺术。',
+                requires: ['战争使徒 (瓦丽安娜/瑟琳西ка)'],
+              },
+              {
+                name: '高强度军用洗脑',
+                description: '对大脑造成永久性损伤，可能导致被称为"痴呆流感"的痴傻状态。',
+                requires: ['普通敬国军', '女教官', '幼女冲锋队', '箱娘'],
+              },
+              {
+                name: '幼女冲锋队武器身体锁',
+                description: '武器与身体锁死，手指被钉在扳机上，至死方休。',
+                requires: ['幼女冲锋队'],
+              },
+              { name: '驼峰乳房', description: '强化乳腺以储藏乳汁作为应急水源。', requires: ['高挑淑女'] },
+              {
+                name: '肛门拖拉锁',
+                description: '脱垂的直肠末端附加拖拉锁，用于协同搬运。',
+                requires: ['高挑淑女'],
+              },
+              {
+                name: '子宫运输改造',
+                description: '子宫被改造以收容成年体型的作战单位（如恶媚）。',
+                requires: ['作战女畜 (恶娼)'],
+              },
+              {
+                name: '肛门小穴产道化改造',
+                description: '两个穴道被手术打通，扩展为单一的巨大产道。',
+                requires: ['作战女畜 (恶娼)'],
+              },
+              {
+                name: '肛门口球',
+                description: '用于隔开肛门与外阴，并供被收容的作战单位咬住。',
+                requires: ['作战女畜 (恶娼)'],
+              },
+              {
+                name: '能量棒进食',
+                description: '肛门内插入由糖、蛋白质等合成的软胶体能量棒，以代替日常进食。',
+                requires: ['作战女畜 (恶娼)'],
+              },
+              {
+                name: '箱娘改造',
+                description: '将女性（多为残次品或超龄女性）的四肢截断，改造成便携的躯干式泄欲工具。',
+                requires: ['箱娘'],
+              },
+              {
+                name: '脖颈开口改造',
+                description: '切除颈部一大块，使食道断开并暴露，可用于灌食或反向奸污口腔。',
+                requires: ['乳胶战俘犬'],
+              },
+              {
+                name: '乳房前肢化',
+                description: '前肢断臂，通过乳孔插入乳房内，配合弹簧和金属乳箍行走，每一步都在抽插乳房。',
+                requires: ['乳胶战俘犬'],
+              },
+              { name: '后肢踩踏卵巢', description: '将卵巢作为行走时的缓冲垫。', requires: ['乳胶战俘犬'] },
+              {
+                name: '项圈与肛塞铁链连接',
+                description: '强制头部在行走时保持女犬标准的昂首姿态。',
+                requires: ['乳胶战俘犬'],
+              },
+              { name: '圣痕烙印', description: '用特殊的药水维持的烙印伤痕，用于区分修女阶级。', requires: ['修女'] },
+              { name: '马蹄改造', description: '钉入纯手工制作的金马蹄，代代相传记录功绩。', requires: ['教廷母马'] },
+              { name: '锁骨锁', description: '限制头部转动角度，使其更专注于奔跑。', requires: ['教廷母马'] },
+              {
+                name: '天平乳头锁',
+                description: '形如天平，用于锁住和解封乳头，解开后可进行乳交。',
+                requires: ['圣女教信徒'],
+              },
+              {
+                name: '妊娠期束腰',
+                description: '怀孕期间强制佩戴以维持腰围的钢筋束腰，极度痛苦且易导致流产。',
+                requires: ['家庭主妇/妻子'],
+              },
+              {
+                name: '阻胎器',
+                description: '在未获得分娩许可时，强制安装以封锁产道、防止偷生的装置。',
+                requires: ['家庭主妇/妻子'],
+              },
+              {
+                name: '额头烙印',
+                description: '额头被烙上不可消除的标志，以表明其曾对帝国政策提出异议。',
+                requires: ['反抗组织成员'],
+              },
+              {
+                name: '阴蒂滑索',
+                description: '佩戴带滑轮的特制贞操带，将其限制在固定滑索上游行，直至阴蒂被磨平。',
+                requires: ['反抗组织成员'],
+              },
+              { name: '极限隆胸', description: '植入破坏身体平衡的超大尺寸硅胶。', requires: ['芭比妓女'] },
+              { name: '烙妆', description: '将彩色化合物注入皮下形成永久性妆容。', requires: ['芭比妓女'] },
+              {
+                name: '永久足跟移植',
+                description: '将切除的肋骨移植到脚跟，形成永久性的高跟鞋。',
+                requires: ['芭比妓女'],
+              },
+              {
+                name: '卵巢扶手化',
+                description: '通过侧腹部的开洞，卵巢被拉出体外，钉到扶手上，需涂抹特制油脂以防止感染。',
+                requires: ['女法官'],
+              },
+              { name: '阴蒂签字笔插入', description: '阴蒂中插着签字笔，供助手代为签字。', requires: ['女法官'] },
+              {
+                name: '哺乳喂药改造',
+                description: '左侧肋骨替换成医用装置，通过哺乳方式给病人服药。',
+                requires: ['医生/护士'],
+              },
+              {
+                name: '刺球轮盘式肛塞',
+                description: '通过连接脚筋的金属环带动刺球在肛门内运动，以持续提供刺激。',
+                requires: ['公司白领'],
+              },
+              {
+                name: '金属颈锁',
+                description: '从小佩戴的笨重金属颈锁，用于培养奴性，可与街边、墙壁等处的公用锁桩配套使用。',
+                requires: ['监禁学院学生'],
+              },
+              { name: '束腰贞操带', description: '集腰部塑形与排泄瓶功能于一体。', requires: ['监禁学院学生'] },
+              {
+                name: '口腔小穴移植',
+                description: '口鼻切除并移植上一个全新的女性生殖器，用于提供独特的口交体验。',
+                requires: ['宠物式幼女肉便器'],
+              },
+              {
+                name: '阴蒂跳蛋植入',
+                description: '阴蒂中植入一枚可通过手机APP控制的遥控震蛋。',
+                requires: ['家用女仆 (夜蕾丝)'],
+              },
+              {
+                name: '子宫婴儿插入改造',
+                description:
+                  '腹中的女儿被改造成母体的一部分，消化道和生殖道与母亲相连。肉棒捅入子宫后，进入的就是女儿的阴道。',
+                requires: [],
+              },
+              {
+                name: '柔术折叠收纳',
+                description: '四肢向后弯折，手脚插入肛门，由贯穿身体的蝴蝶锁锁住，以便收纳在乘客扶手箱内。',
+                requires: ['空姐'],
+              },
+              {
+                name: '声带耳机化',
+                description: '耳垂内植入可延长线轴，连接声带，供客人佩戴以独享叫床声。',
+                requires: ['空姐'],
+              },
+              {
+                name: '全身气囊填充',
+                description: '摘除胃和大部分肠道，乳腔、腹腔及骨骼中植入气囊，以减轻体重。',
+                requires: ['清洁工'],
+              },
+              { name: '随身炮机', description: '固定在髋骨上，抽插强度由场外观众的支持度决定。', requires: ['运动员'] },
+              { name: '嗅觉强化', description: '代替军犬进行追踪任务。', requires: ['驼鹿'] },
+              {
+                name: '脑波操控',
+                description: '身体由后方基地通过驼鹿的脑波雷达进行远程操控。',
+                requires: ['作战女畜 (恶娼)'],
+              },
+              {
+                name: '脊刃和钩爪',
+                description: '身体本身被武器化改造，成为活体兵器。',
+                requires: ['作战女畜 (恶娼)'],
+              },
+              { name: '整容隆胸手术', description: '对外观不合格的箱娘进行强制整容。', requires: ['箱娘'] },
+              {
+                name: '头部与幼女躯干拼接',
+                description: '将成年女性头部与幼女部分躯干拼接成的畸形生命。',
+                requires: ['单兵活体自慰杯'],
+              },
+              {
+                name: '口腔安全套',
+                description: '带有尖刺，可插入牙床固定，用于多人使用时保持卫生。',
+                requires: ['单兵活体自慰杯'],
+              },
+              { name: '听觉和语言能力破坏', description: '破坏相关器官，只能通过狗绳交流。', requires: ['乳胶战俘犬'] },
+              { name: '插入式狗嘴/肛塞狗尾巴', description: '作为狗形态的装饰和束缚。', requires: ['乳胶战俘犬'] },
+              { name: '电子头盔', description: '连接警局资料库，具备夜视和气味跟踪功能。', requires: ['Anubis警戒犬'] },
+              { name: '液压假肢', description: '模拟犬类行走动作的假肢系统。', requires: ['Anubis警戒犬'] },
+              {
+                name: '口腔开孔-散热改造',
+                description: '阻止排汗，必须通过口腔快速喘息散热。',
+                requires: ['Anubis警戒犬'],
+              },
+              { name: '子宫警戒线盘', description: '子宫内装有警戒线，可拉出封锁区域。', requires: ['Anubis警戒犬'] },
+              { name: '修女皮肤制作圣经', description: '死去修女的皮肤被制作成圣经书皮。', requires: ['修女'] },
+              {
+                name: '修女苦修',
+                description: '自发选择身体某部位进行极端改造，以取悦男性作为自我救赎。',
+                requires: ['修女'],
+              },
+              {
+                name: '肋骨截除与腰部束紧',
+                description: '截除大部分肋骨，用专业机械将腰部勒至接近脊柱的粗细。',
+                requires: ['蛇腰犬'],
+              },
+              {
+                name: '肢体切除',
+                description: '身体被截肢，像神像一样被供奉。',
+                requires: ['战争使徒 (瓦丽安娜/瑟琳西ка)'],
+              },
+              {
+                name: '智脑与大脑相连',
+                description: '用于记录和转播所有前来倾诉者的痛苦感受，作为一种无伤拷问手段。',
+                requires: ['战争使徒 (瓦丽安娜/瑟琳西ка)'],
+              },
+              {
+                name: '阴蒂圣水改造',
+                description: '将自己的胚胎封入琥珀并植入阴蒂作为“恩赐”。',
+                requires: ['战争使徒 (瓦丽安娜/瑟琳西ка)'],
+              },
+              {
+                name: '活体胚胎培育容器',
+                description: '死后身体被特殊技术激活，成为持续生产高质量胚胎的容器。',
+                requires: ['战争使徒 (战争双子)'],
+              },
+              {
+                name: '蛇腰改造',
+                description: '截除大部分肋骨，胸腔和腰部一起束紧到接近脊柱粗细。',
+                requires: ['蛇腰犬'],
+              },
+              {
+                name: '割礼改造(安魂女)',
+                description: '割掉乳头、阴唇、阴蒂，烧毁阴道，以追求“纯洁”的通灵高潮来安抚亡魂。',
+                requires: ['安魂女'],
+              },
+              {
+                name: '熔金浇眼(接引者)',
+                description: '双眼被熔化的黄金浇筑，以“看到天国圣光”。',
+                requires: ['接引者'],
+              },
+              {
+                name: '钉死在墓台(守墓人)',
+                description: '被钉死在墓台上，用肛门托举起巨大的墓碑，直至死去。',
+                requires: ['守墓人'],
+              },
+              {
+                name: '共生墓葬',
+                description:
+                  '棺内安魂女通过绳索与墓台上的守墓人阴蒂环相连，安魂时的拉动可刺激守墓人高潮，以拖延墓碑下落的时间。',
+                requires: ['安魂女', '守墓人'],
+              },
+              {
+                name: '读卡器植入(地铁闸机)',
+                description: '阴蒂内植入带齿轮的读卡器，刷卡时会刺激阴蒂。',
+                requires: ['地铁闸机'],
+              },
+              {
+                name: '信号灯植入(红绿灯)',
+                description: '摘除乳腺，将球形信号灯植入乳房和脱垂的子宫内。',
+                requires: ['红绿灯'],
+              },
+              { name: '四肢截断(暗娼)', description: '为防止逃跑和反抗而进行的极端改造。', requires: ['暗娼'] },
+              {
+                name: '助手穿戴(女检察官)',
+                description: '作为拥有实权的女性公务员，必须截掉四肢，由男性助手穿戴在身前，通过阴茎插入肛门固定。',
+                requires: ['女法官'],
+              },
+              {
+                name: '工具肛塞(家庭女仆)',
+                description: '屁眼插入特制的肛塞，内部装有各种清理工具。',
+                requires: ['家用女仆 (夜蕾丝)'],
+              },
+              {
+                name: '凝胶打胎',
+                description: '遇羊水转化成凝胶，阻止羊水流出并固定胎儿，使死胎无法自然分娩。',
+                requires: ['集中营工业母体', '家庭主妇/妻子'],
+              },
+              { name: '绞锁', description: '用钢钉穿透骨骼来固定手脚的绞锁。', requires: ['监禁学院学生'] },
+              {
+                name: '仓鼠肛塞尾巴',
+                description: '每节链珠都固定着一只活仓鼠的肛塞式尾巴。',
+                requires: ['宠物式幼女肉便器'],
+              },
+              {
+                name: '仿生口鼻面具',
+                description: '在不使用时佩戴，通过插入胃部的假阳具固定，以保持面部美观。',
+                requires: ['宠物式幼女肉便器'],
+              },
+              {
+                name: '奸母胎',
+                description: '在子宫内植入一个胎儿形的机器人，可从内部高速抽插子宫和阴道。',
+                requires: [],
+              },
+              { name: '哺乳球', description: '乳房内植入可存储和混合乳汁与“辅助饮品”的球体。', requires: ['家庭主妇'] },
+              {
+                name: '双足改造',
+                description: '双足被改造成五个震动足趾，并拥有超出人体柔术极限的柔韧性。',
+                requires: ['再塑造学员'],
+              },
+              {
+                name: '记忆圣经',
+                description: '植入大脑的高价值脑机，可随时删除、修改、封锁和引导记忆。',
+                requires: ['再塑造学员'],
+              },
+              { name: '假阳具头饰', description: '将恶魔角形状的假阳具插入眼穴和耳穴作为头饰。', requires: [] },
+              {
+                name: '识别手环',
+                description: '佩戴可被手机扫描的手环，用于暴露个人信息和联系方式。',
+                requires: ['公司白领'],
+              },
+              {
+                name: '棱刺高跟鞋',
+                description: '鞋跟和鞋背带有棱刺，强迫空姐时刻绷紧双腿保持优雅站姿。',
+                requires: ['空姐'],
+              },
+              { name: '乳房挂钩', description: '乳房上穿有挂钩，用于搬运大型垃圾桶。', requires: ['清洁工'] },
+              {
+                name: '拖车肛塞',
+                description: '通过花瓣式肛塞连接单人拖车，用于运输小型垃圾桶。',
+                requires: ['清洁工'],
+              },
+              {
+                name: '口腔清洁器改造',
+                description: '包含鼻环刮齿、分叉刷毛舌、喉腔潮吹导管等多项改造，用于地面清洁。',
+                requires: ['清洁工'],
+              },
+              {
+                name: '肠道水箱',
+                description: '切除所有消化腺体，使肠道和胃成为存储清水的容器。',
+                requires: ['清洁工'],
+              },
+              {
+                name: '女体足球',
+                description: '将三四岁的幼女截肢并身体弯折成球形，制作成一次性的活体足球。',
+                requires: ['运动员'],
+              },
+              {
+                name: '母猪卵巢改造',
+                description: '通过手术改造卵巢，使其能怀上并生下真正的猪崽。',
+                requires: ['生育型雌豚'],
+              },
+              {
+                name: '飞机杯面部植入',
+                description: '脸被割开，嘴里塞入巨大的乳胶阴道，用于安抚发情的种猪。',
+                requires: ['生育型雌豚'],
+              },
+              {
+                name: '持续高潮系统',
+                description: '维生箱内置双棒式炮机，通过高频交替抽插使女性持续高潮。',
+                requires: ['便携式护理护士 (NiGa)'],
+              },
+              {
+                name: '逆向进食系统',
+                description: '通过压力泵将营养液从肛门压入肠道和胃部，消化后的废液再从口中排出。',
+                requires: ['便携式护理护士 (NiGa)'],
+              },
+              {
+                name: '代阴体系统',
+                description: '自身阴道被毁，通过插入其他被深度改造的女孩（代阴体）来提供不同类型的性服务。',
+                requires: ['圣母·达维娜'],
+              },
+              {
+                name: '生命之泉',
+                description: '移植第二颗心脏用于循环精液，并通过乳房内的网状软管系统储存，形成移动的帝国基因库。',
+                requires: ['圣母·达维娜'],
+              },
+              {
+                name: '神圣洗礼',
+                description: '双手植入复杂的电极点阵，与脑机相连，形成一个便携的洗脑装置。',
+                requires: ['圣母·达维娜'],
+              },
+              {
+                name: '乳胶皮肤',
+                description: '全身皮肤被剥光，包裹在可切换肤色与透明色的密封乳胶皮囊中。',
+                requires: ['南宫婉然'],
+              },
+              {
+                name: '脑穴改造',
+                description: '部分头骨被手术挖除，大脑封存在抗压容器内，可供脑交。',
+                requires: ['南宫婉然'],
+              },
+              {
+                name: '眼穴改造',
+                description: '眼球被替换为中空的软囊，可供阳具插入。',
+                requires: ['南宫婉然'],
+              },
+              {
+                name: '鼻穴改造',
+                description: '鼻中隔断开，可在不破坏美观的前提下满足鼻交需求。',
+                requires: ['南宫婉然'],
+              },
+              {
+                name: '耳穴改造',
+                description: '可供阳具从耳穴穿入，并从眼球后方的开孔穿出。',
+                requires: ['南宫婉然'],
+              },
+              {
+                name: '磁吸式下颌骨',
+                description: '可随时脱落以吞下任何尺寸的阳具。',
+                requires: ['南宫婉然'],
+              },
+              {
+                name: '足穴改造',
+                description: '每只脚的脚底和脚后跟各开一个可供插入的穴。',
+                requires: ['南宫婉然'],
+              },
+              {
+                name: '圣鞭“恩赐”',
+                description: '执掌教皇的圣鞭，鞭身带有尖刺小孔，可在抽打时将鞭柄内的精液注入伤口。',
+                requires: ['战争使徒 (瓦丽安娜)'],
+              },
+              {
+                name: '手脚具存',
+                description:
+                  '她的双手从大臂中部被精准地截断，双腿则是在膝盖处被切离...通过从黄金盖子下方延伸出的短链，被重新“归还”给了她',
+                requires: ['战争使徒 (瓦丽安娜)'],
+              },
+              {
+                name: '肛炉与烙铁“怜悯”',
+                description: '体内植入多层隔热的“肛炉”，用于永远保持烙铁“怜悯”的烧红状态。',
+                requires: ['战争使徒 (瑟琳西卡)'],
+              },
+            ],
+          },
+        },
+      };
+    </script>
+    <script>
+      const selections = {};
+      const selectionOrder = [
+        'gender',
+        'status',
+        'professionCategory',
+        'profession',
+        'feature',
+        'modification',
+        'customFeature',
+        'customModification',
+        'customScene',
+      ];
+
+      function getRandomElement(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+      }
+      function navigateTo(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+      }
+
+      function renderCardOptions(containerId, options, type) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        const grid = document.createElement('div');
+        grid.className = 'selection-grid';
+        if (Array.isArray(options)) {
+          options.forEach(opt => grid.appendChild(createCard(type, opt, '')));
+        } else {
+          for (const [key, value] of Object.entries(options)) {
+            grid.appendChild(createCard(type, key, value.description || ''));
+          }
+        }
+        container.appendChild(grid);
+        const nextButton = container.closest('.screen').querySelector('.btn-primary');
+        if (nextButton) {
+          if (type === 'profession' && document.getElementById('custom-profession-input').value.trim()) {
+            nextButton.disabled = false;
+          } else {
+            nextButton.disabled = !selections[type];
+          }
+        }
+      }
+
+      function createCard(type, value, description) {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.dataset.type = type;
+        el.dataset.value = value;
+        if (selections[type] === value) el.classList.add('selected');
+        const title = document.createElement('h3');
+        title.textContent = value;
+        el.appendChild(title);
+        if (description) {
+          const p = document.createElement('p');
+          p.textContent = description;
+          el.appendChild(p);
+        }
+        return el;
+      }
+
+      function renderFeaturesScreen() {
+        const container = document.getElementById('features-container');
+        container.innerHTML = '';
+        selections.feature = selections.feature || {};
+        const isDeteriorated = selections.status?.includes('劣化人');
+        const featureSet = data.gender[selections.gender].features;
+        for (const category in featureSet) {
+          const categoryDiv = document.createElement('div');
+          categoryDiv.className = 'feature-category';
+          const title = document.createElement('h4');
+          title.textContent = category;
+          categoryDiv.appendChild(title);
+          const optionsGrid = document.createElement('div');
+          optionsGrid.className = 'feature-options-grid';
+          const levels = featureSet[category];
+          levels.forEach(level => {
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'feature-option';
+            optionDiv.dataset.category = category;
+            optionDiv.dataset.value = level;
+            optionDiv.textContent = level;
+            optionsGrid.appendChild(optionDiv);
+          });
+          categoryDiv.appendChild(optionsGrid);
+          container.appendChild(categoryDiv);
+          if (isDeteriorated) {
+            const lowestLevel = levels[levels.length - 1];
+            selections.feature[category] = lowestLevel;
+            optionsGrid.querySelectorAll('.feature-option').forEach(o => o.classList.add('disabled'));
+            const selectedOpt = optionsGrid.querySelector(`[data-value="${lowestLevel}"]`);
+            if (selectedOpt) selectedOpt.classList.add('selected');
+          } else if (selections.feature[category]) {
+            const selectedOpt = optionsGrid.querySelector(`[data-value="${selections.feature[category]}"]`);
+            if (selectedOpt) selectedOpt.classList.add('selected');
+          }
+        }
+        checkAllFeaturesSelected();
+      }
+
+      function checkAllFeaturesSelected() {
+        const featureSet = data.gender[selections.gender].features;
+        const allSelected = Object.keys(featureSet).every(cat => selections.feature && selections.feature[cat]);
+        document.getElementById('to-modification').disabled = !allSelected;
+      }
+
+      function renderModificationScreen() {
+        const container = document.getElementById('modification-container');
+        container.innerHTML = '';
+        selections.modification = selections.modification || [];
+        const profession = selections.profession;
+        const allMods = data.gender[selections.gender].modifications;
+
+        // Handle required mods first
+        const requiredMods = allMods.filter(m => m.requires?.includes(profession));
+        if (requiredMods.length > 0) {
+          const info = document.createElement('div');
+          info.className = 'required-mod-info';
+          const modNames = requiredMods.map(m => `<strong>${m.name}</strong>`).join('、');
+          info.innerHTML = `根据你的职业 [${profession}]，以下改造为强制执行：${modNames}`;
+          container.appendChild(info);
+          requiredMods.forEach(mod => {
+            if (!selections.modification.includes(mod.name)) {
+              selections.modification.push(mod.name);
+            }
+          });
+        }
+
+        // Render all options
+        allMods.forEach(mod => {
+          const option = createModOption(mod);
+          const isForbidden = mod.forbids?.includes(profession);
+
+          if (isForbidden) {
+            option.classList.add('disabled');
+          } else if (requiredMods.some(rm => rm.name === mod.name)) {
+            option.classList.add('selected', 'disabled');
+          } else if (Array.isArray(selections.modification) && selections.modification.includes(mod.name)) {
+            option.classList.add('selected');
+          }
+          container.appendChild(option);
+        });
+        document.getElementById('to-summary').disabled = false;
+      }
+
+      function createModOption(mod) {
+        const opt = document.createElement('div');
+        opt.className = 'mod-option';
+        opt.dataset.value = mod.name;
+        opt.title = mod.description || mod.name;
+        opt.textContent = mod.name;
+        return opt;
+      }
+
+      function handleRandomize(screenId) {
+        const screenElement = document.getElementById(screenId);
+        if (!screenElement) return;
+        switch (screenId) {
+          case 'screen-gender':
+          case 'screen-status':
+          case 'screen-profession-category':
+            const cards = screenElement.querySelectorAll('.card:not(.disabled)');
+            if (cards.length > 0) getRandomElement(Array.from(cards)).click();
+            break;
+          case 'screen-profession':
+            document.getElementById('custom-profession-input').value = '';
+            delete selections.profession;
+            const profCards = screenElement.querySelectorAll('.card:not(.disabled)');
+            if (profCards.length > 0) getRandomElement(Array.from(profCards)).click();
+            break;
+          case 'screen-features':
+            if (selections.status?.includes('劣化人')) return;
+            document.getElementById('custom-features-input').value = '';
+            delete selections.customFeature;
+            screenElement.querySelectorAll('.feature-category').forEach(cat => {
+              const opts = cat.querySelectorAll('.feature-option:not(.disabled)');
+              if (opts.length > 0) getRandomElement(Array.from(opts)).click();
+            });
+            break;
+          case 'screen-modification':
+            document.getElementById('custom-modification-input').value = '';
+            delete selections.customModification;
+            selections.modification = selections.modification.filter(mName => {
+              const modEl = screenElement.querySelector(`.mod-option[data-value="${mName}"]`);
+              return modEl?.classList.contains('disabled');
+            });
+            const optMods = Array.from(screenElement.querySelectorAll('.mod-option:not(.disabled)'));
+            optMods.forEach(m => m.classList.remove('selected'));
+            if (optMods.length > 0) {
+              const num = 1 + Math.floor(Math.random() * Math.min(3, optMods.length));
+              const shuffled = optMods.sort(() => 0.5 - Math.random());
+              for (let i = 0; i < num; i++) shuffled[i].click();
+            }
+            break;
+        }
+      }
+
+      function updateSelection(type, value) {
+        if (selections[type] === value) return;
+        selections[type] = value;
+        const currentIndex = selectionOrder.indexOf(type);
+        for (let i = currentIndex + 1; i < selectionOrder.length; i++) {
+          // Clear all subsequent selections, including custom ones
+          const key = selectionOrder[i];
+          delete selections[key];
+          if (document.getElementById(`custom-${key}-input`)) {
+            document.getElementById(`custom-${key}-input`).value = '';
+          }
+        }
+      }
+
+      // --- SINGLE EVENT LISTENER FOR THE ENTIRE BODY ---
+      document.body.addEventListener('click', function (e) {
+        const card = e.target.closest('.card');
+        const featureOption = e.target.closest('.feature-option');
+        const modOption = e.target.closest('.mod-option');
+        const backBtn = e.target.closest('.back-btn');
+        const randomizeBtn = e.target.closest('.randomize-btn');
+        const nextBtn = e.target.closest('.btn-primary');
+
+        if (randomizeBtn) {
+          handleRandomize(randomizeBtn.dataset.screenId);
+          return;
+        }
+
+        if (card) {
+          if (card.dataset.type === 'profession') {
+            document.getElementById('custom-profession-input').value = '';
+          }
+          updateSelection(card.dataset.type, card.dataset.value);
+          card.parentElement.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          card.closest('.screen').querySelector('.btn-primary').disabled = false;
+        }
+
+        if (featureOption && !featureOption.classList.contains('disabled')) {
+          selections.feature = selections.feature || {};
+          selections.feature[featureOption.dataset.category] = featureOption.dataset.value;
+          featureOption.parentElement
+            .querySelectorAll('.feature-option')
+            .forEach(opt => opt.classList.remove('selected'));
+          featureOption.classList.add('selected');
+          checkAllFeaturesSelected();
+        }
+
+        if (modOption && !modOption.classList.contains('disabled')) {
+          selections.modification = Array.isArray(selections.modification) ? selections.modification : [];
+          const modName = modOption.dataset.value;
+          const index = selections.modification.indexOf(modName);
+          if (index > -1) {
+            selections.modification.splice(index, 1);
+            modOption.classList.remove('selected');
+          } else {
+            selections.modification.push(modName);
+            modOption.classList.add('selected');
+          }
+        }
+
+        if (backBtn) {
+          navigateTo(backBtn.dataset.target);
+        }
+        if (nextBtn && !nextBtn.disabled) {
+          handleNext(nextBtn.id);
+        }
+      });
+
+      document.getElementById('custom-profession-input').addEventListener('input', e => {
+        const value = e.target.value.trim();
+        if (value) {
+          updateSelection('profession', value);
+          document.querySelectorAll('#profession-options .card').forEach(c => c.classList.remove('selected'));
+          document.getElementById('to-features').disabled = false;
+        } else {
+          delete selections.profession;
+          document.getElementById('to-features').disabled = true;
+        }
+      });
+
+      document.getElementById('custom-features-input').addEventListener('input', e => {
+        selections.customFeature = e.target.value.trim();
+      });
+
+      document.getElementById('custom-modification-input').addEventListener('input', e => {
+        selections.customModification = e.target.value.trim();
+      });
+
+      document.getElementById('custom-scene-input').addEventListener('input', e => {
+        selections.customScene = e.target.value.trim();
+      });
+
+      async function handleNext(nextBtnId) {
+        switch (nextBtnId) {
+          case 'to-status':
+            renderCardOptions('status-options', data.gender[selections.gender].status, 'status');
+            navigateTo('screen-status');
+            break;
+          case 'to-profession-or-category':
+            const statusInfo = data.gender[selections.gender].status[selections.status];
+            if (statusInfo.professionCategories) {
+              document.querySelector('#screen-profession .back-btn').dataset.target = 'screen-profession-category';
+              renderCardOptions('profession-category-options', statusInfo.professionCategories, 'professionCategory');
+              navigateTo('screen-profession-category');
+            } else {
+              document.querySelector('#screen-profession .back-btn').dataset.target = 'screen-status';
+              renderCardOptions('profession-options', statusInfo.professions, 'profession');
+              navigateTo('screen-profession');
+            }
+            break;
+          case 'to-profession':
+            const categoryInfo =
+              data.gender[selections.gender].status[selections.status].professionCategories[
+                selections.professionCategory
+              ];
+            if (categoryInfo.professions?.length === 1) {
+              selections.profession = categoryInfo.professions[0];
+              renderFeaturesScreen();
+              navigateTo('screen-features');
+            } else {
+              renderCardOptions('profession-options', categoryInfo.professions, 'profession');
+              navigateTo('screen-profession');
+            }
+            break;
+          case 'to-features':
+            renderFeaturesScreen();
+            navigateTo('screen-features');
+            break;
+          case 'to-modification':
+            renderModificationScreen();
+            navigateTo('screen-modification');
+            break;
+          case 'to-summary':
+            const summaryContainer = document.getElementById('summary-content');
+            summaryContainer.innerHTML = '';
+            summaryContainer.className = 'summary-section';
+            const fields = {
+              性别: 'gender',
+              社会身份: 'status',
+              职业大类: 'professionCategory',
+              具体职业: 'profession',
+            };
+            for (const [label, key] of Object.entries(fields)) {
+              if (selections[key]) {
+                const item = document.createElement('div');
+                item.className = 'summary-item';
+                item.innerHTML = `<span class="summary-label">${label}</span><span class="summary-value">${selections[key]}</span>`;
+                summaryContainer.appendChild(item);
+              }
+            }
+            if (selections.feature) {
+              for (const [cat, lvl] of Object.entries(selections.feature)) {
+                const item = document.createElement('div');
+                item.className = 'summary-item';
+                item.innerHTML = `<span class="summary-label">${cat}</span><span class="summary-value">${lvl}</span>`;
+                summaryContainer.appendChild(item);
+              }
+            }
+            if (selections.customFeature) {
+              const item = document.createElement('div');
+              item.className = 'summary-item';
+              item.innerHTML = `<span class="summary-label">补充特征</span><span class="summary-value">${selections.customFeature}</span>`;
+              summaryContainer.appendChild(item);
+            }
+            if (Array.isArray(selections.modification) && selections.modification.length > 0) {
+              const item = document.createElement('div');
+              item.className = 'summary-item';
+              item.innerHTML = `<span class="summary-label">身体改造</span><span class="summary-value">${selections.modification.join(', ')}</span>`;
+              summaryContainer.appendChild(item);
+            }
+            if (selections.customModification) {
+              const item = document.createElement('div');
+              item.className = 'summary-item';
+              item.innerHTML = `<span class="summary-label">补充改造</span><span class="summary-value">${selections.customModification}</span>`;
+              summaryContainer.appendChild(item);
+            }
+            navigateTo('screen-summary');
+            break;
+          case 'confirm-and-start':
+            const genderValue = selections.gender === '男' ? 'man' : 'female';
+            let description = `创建角色：性别${selections.gender}，姓名为{{user}},身份为${selections.status}，`;
+            if (selections.professionCategory) description += `职业大类为${selections.professionCategory}，`;
+            description += `具体职业是${selections.profession}。`;
+            if (selections.feature) {
+              const featuresDesc = Object.entries(selections.feature)
+                .map(([cat, val]) => `${cat}为“${val}”`)
+                .join('，');
+              description += ` 生理特征：${featuresDesc}。`;
+            }
+            if (selections.customFeature) {
+              description += ` 补充特征：${selections.customFeature}。`;
+            }
+            if (Array.isArray(selections.modification) && selections.modification.length > 0) {
+              description += ` 并接受了以下改造：${selections.modification.join('、')}。`;
+            }
+            if (selections.customModification) {
+              description += ` 补充改造：${selections.customModification}。`;
+            }
+            if (selections.customScene) {
+              description += ` 自定义开场：${selections.customScene}`;
+            }
+            description += ' 请根据世界观，生成符合人物的身份和设定的开局。';
+
+            if (typeof insertOrAssignVariables === 'function' && typeof triggerSlash === 'function') {
+              try {
+                await insertOrAssignVariables({ gender: genderValue });
+                const commandPayload = [`/send ${description}`, '/trigger'].join('|');
+                triggerSlash(commandPayload);
+
+                const finalDiv = document.createElement('div');
+                finalDiv.style.padding = '20px';
+                finalDiv.style.textAlign = 'center';
+                const finalTitle = document.createElement('h2');
+                finalTitle.className = 'screen-header';
+                finalTitle.style.cssText = 'margin-bottom:1rem;border:none;';
+                finalTitle.textContent = '档案已发送';
+                const finalText = document.createElement('p');
+                finalText.style.color = 'var(--accent-color)';
+                finalText.style.fontSize = '1.2rem';
+                finalText.textContent = `[档案已生成并注入聊天栏...]`;
+                finalDiv.appendChild(finalTitle);
+                finalDiv.appendChild(finalText);
+                document.querySelector('.generator-container').innerHTML = '';
+                document.querySelector('.generator-container').appendChild(finalDiv);
+              } catch (error) {
+                console.error('执行指令时出错:', error);
+                alert('发送指令失败！');
+              }
+            } else {
+              console.log('--- 角色卡生成数据 ---');
+              console.log(description);
+              console.log('--------------------------');
+              console.log(
+                '错误：外部接口(insertOrAssignVariables 或 triggerSlash)未找到。如果这不是在SillyTavern等应用中加载的，请在浏览器开发者工具的控制台中查看生成的数据。',
+              );
+
+              const finalDiv = document.createElement('div');
+              finalDiv.style.padding = '20px';
+              finalDiv.style.textAlign = 'center';
+              const finalTitle = document.createElement('h2');
+              finalTitle.className = 'screen-header';
+              finalTitle.style.cssText = 'margin-bottom:1rem;border:none;';
+              finalTitle.textContent = '档案已生成';
+              const finalText = document.createElement('p');
+              finalText.style.color = 'var(--accent-color)';
+              finalText.style.fontSize = '1.2rem';
+              finalText.textContent = `[请在浏览器控制台(F12)查看数据]`;
+              finalDiv.appendChild(finalTitle);
+              finalDiv.appendChild(finalText);
+              document.querySelector('.generator-container').innerHTML = '';
+              document.querySelector('.generator-container').appendChild(finalDiv);
+            }
+            break;
+        }
+      }
+    </script>
+  </body>
+</html>
