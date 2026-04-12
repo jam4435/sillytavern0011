@@ -6,6 +6,7 @@
 
 - `index.html`：只放静态结构
 - `index.scss`：样式
+- `index.ts`：前端入口，负责加载样式并启动 `app.ts`
 - `data.ts`：职业、特征、改造等大块数据
 - `app.ts`：入口，只负责绑定事件
 - `state.ts`：选择状态与重置逻辑
@@ -15,6 +16,7 @@
 - `data-access.ts`：从 `data.ts` 读取当前步骤所需配置
 - `dom.ts`：DOM 取值辅助
 - `types.ts`：共享类型
+- `README.md`：当前目录的维护说明
 
 ## 修改建议
 
