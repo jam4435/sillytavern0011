@@ -458,7 +458,14 @@ export function bindEventListeners() {
         console.log(`[Events] expand action #${expandEventCounter}`, { entryUid, lorebookName: entryLorebookName });
       }
 
-      const $title = $target.closest('.lorebook-title');
+      let $title = $target.closest('.lorebook-title');
+      if (!$title.length) {
+        const $floatingDropdown = $target.closest('.batch-toggle-dropdown');
+        const $floatingOwner = $floatingDropdown.data('floating-owner-container');
+        if ($floatingOwner?.length) {
+          $title = $floatingOwner.closest('.lorebook-title');
+        }
+      }
       const $folder = $target.closest('.master-folder-item');
       const $item = $target.closest(`.${LOREBOOK_ENTRY_CLASS}`);
 
