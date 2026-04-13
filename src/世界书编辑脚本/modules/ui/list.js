@@ -717,6 +717,11 @@ export const loadLorebookEntries = errorCatched(async (lorebookName, $container,
       console.log(`[List] 准备渲染 ${entries.length} 个条目 (已排序和筛选)`);
     }
 
+    const parentDoc = window.parent.document;
+    const $title = $(
+      `.lorebook-title[data-lorebook-name="${lorebookName}"][data-is-global="${isGlobal ? 'true' : 'false'}"]`,
+      parentDoc,
+    );
     updateLorebookCountInfo(lorebookName, isGlobal, entries.length, currentAllEntries[lorebookName]);
 
     // 创建表头
