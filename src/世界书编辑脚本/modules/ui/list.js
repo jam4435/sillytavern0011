@@ -160,6 +160,31 @@ function getLorebookCharCount(entries) {
   return entries.reduce((sum, entry) => sum + ((entry?.content || '').length || 0), 0);
 }
 
+const lorebookTokenCountCache = new Map();
+const lorebookTokenCountRequests = new Map();
+
+function hashCountText(text = '') {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function buildLorebookTokenSignature(entries = []) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return 'empty';
+  }
+
+  return entries
+    .map(entry => {
+      const content = `${entry?.content || ''}`;
+      return `${ensureNumericUID(entry?.uid)}:${content.length}:${hashCountText(content)}`;
+    })
+    .join('|');
+}
+
 function normalizeSortableName(value) {
   if (typeof value === 'string') {
     return value;
@@ -174,8 +199,84 @@ function compareSortableNames(a, b) {
   return normalizeSortableName(a).localeCompare(normalizeSortableName(b));
 }
 
-function formatLorebookCountHtml(entryCount, charCount) {
-  return `<span class="count-line">共 ${entryCount} 个条目</span><span class="count-line">总字数 ${charCount}</span>`;
+function formatLorebookCountHtml(entryCount, tokenText) {
+  return `<span class="count-line">${entryCount}条目&nbsp;&nbsp;</span><span class="count-line">${tokenText}</span>`;
+}
+
+function getLorebookCountInfo(lorebookName, isGlobal = false, parentDoc = window.parent.document) {
+  return $(
+    `.lorebook-title[data-lorebook-name="${lorebookName}"][data-is-global="${isGlobal ? 'true' : 'false'}"] .lorebook-entries-count`,
+    parentDoc,
+  );
+}
+
+async function computeLorebookTokenText(entries = []) {
+  const combinedContent = (Array.isArray(entries) ? entries : [])
+    .map(entry => `${entry?.content || ''}`)
+    .filter(Boolean)
+    .join('\n\n');
+
+  if (!combinedContent) {
+    return '0token';
+  }
+
+  if (window.SillyTavern && typeof window.SillyTavern.getTokenCountAsync === 'function') {
+    try {
+      const tokenCount = await window.SillyTavern.getTokenCountAsync(combinedContent);
+      if (Number.isFinite(tokenCount)) {
+        return `${tokenCount}token`;
+      }
+    } catch (error) {
+      console.warn('世界书顶部 token 统计失败，保留占位。', error);
+    }
+  }
+
+  return '--token';
+}
+
+function updateLorebookCountInfo(lorebookName, isGlobal = false, entryCount, entries = []) {
+  const $countInfo = getLorebookCountInfo(lorebookName, isGlobal);
+  if (!$countInfo.length) {
+    return;
+  }
+
+  const signature = buildLorebookTokenSignature(entries);
+  const cacheKey = `${isGlobal ? 'global' : 'character'}::${lorebookName || ''}::${signature}`;
+  $countInfo
+    .attr('data-token-signature', signature)
+    .attr('data-entry-count', entryCount)
+    .html(formatLorebookCountHtml(entryCount, '--token'));
+
+  const cachedTokenText = lorebookTokenCountCache.get(cacheKey);
+  if (cachedTokenText) {
+    $countInfo.html(formatLorebookCountHtml(entryCount, cachedTokenText));
+    return;
+  }
+
+  let request = lorebookTokenCountRequests.get(cacheKey);
+  if (!request) {
+    request = computeLorebookTokenText(entries)
+      .then(tokenText => {
+        lorebookTokenCountCache.set(cacheKey, tokenText);
+        return tokenText;
+      })
+      .finally(() => {
+        lorebookTokenCountRequests.delete(cacheKey);
+      });
+    lorebookTokenCountRequests.set(cacheKey, request);
+  }
+
+  void request.then(tokenText => {
+    const $liveCountInfo = getLorebookCountInfo(lorebookName, isGlobal);
+    if (!$liveCountInfo.length) {
+      return;
+    }
+    if (($liveCountInfo.attr('data-token-signature') || '') !== signature) {
+      return;
+    }
+    const liveEntryCount = $liveCountInfo.attr('data-entry-count') || entryCount;
+    $liveCountInfo.html(formatLorebookCountHtml(liveEntryCount, tokenText));
+  });
 }
 
 function buildAiActionDropdownHtml(lorebookName, isGlobal) {
@@ -616,11 +717,7 @@ export const loadLorebookEntries = errorCatched(async (lorebookName, $container,
       console.log(`[List] 准备渲染 ${entries.length} 个条目 (已排序和筛选)`);
     }
 
-    const totalCharCount = getLorebookCharCount(currentAllEntries[lorebookName]);
-    const parentDoc = window.parent.document;
-    const $title = $(`.lorebook-title[data-lorebook-name="${lorebookName}"]`, parentDoc);
-    $title.find('.lorebook-entries-count').html(formatLorebookCountHtml(entries.length, totalCharCount));
-    $title.find('.lorebook-entries-count').html(formatLorebookCountHtml(entries.length, totalCharCount));
+    updateLorebookCountInfo(lorebookName, isGlobal, entries.length, currentAllEntries[lorebookName]);
 
     // 创建表头
     if (isMasterDetailLayout()) {
@@ -1200,7 +1297,7 @@ function createLorebookTitleSectionLegacy(lorebookName, isGlobal = false) {
   const $lorebookTitle = $('<div></div>').addClass('lorebook-title');
 
   const $titleText = $('<span></span>').addClass('lorebook-title-text').text(lorebookName);
-  const $countInfo = $('<span></span>').addClass('lorebook-entries-count').html(formatLorebookCountHtml('?', '--'));
+  const $countInfo = $('<span></span>').addClass('lorebook-entries-count').html(formatLorebookCountHtml('?', '--token'));
 
   const $sortContainer = $('<div></div>').addClass('lorebook-sort-container');
   const $sortButton = $('<button></button>').addClass('sort-display-button');
@@ -1457,7 +1554,7 @@ function createLorebookTitleSectionLegacy(lorebookName, isGlobal = false) {
 export function createLorebookTitleSection(lorebookName, isGlobal = false) {
   const $lorebookTitle = $('<div></div>').addClass('lorebook-title');
   const $titleText = $('<span></span>').addClass('lorebook-title-text').text(lorebookName);
-  const $countInfo = $('<span></span>').addClass('lorebook-entries-count').html(formatLorebookCountHtml('?', '--'));
+  const $countInfo = $('<span></span>').addClass('lorebook-entries-count').html(formatLorebookCountHtml('?', '--token'));
   const isDesktopMaster = isMasterDetailLayout();
 
   const $sortContainer = $('<div></div>').addClass('lorebook-sort-container');
@@ -1868,11 +1965,7 @@ export const updateVirtualScroll = errorCatched(async lorebookName => {
     clusterize.update(rows);
 
     // 6. 更新条目计数
-    const parentDoc = window.parent.document;
-    const $title = $(`.lorebook-title[data-lorebook-name="${lorebookName}"]`, parentDoc);
-    $title
-      .find('.lorebook-entries-count')
-      .html(formatLorebookCountHtml(filteredEntries.length, getLorebookCharCount(allEntriesData[lorebookName])));
+    updateLorebookCountInfo(lorebookName, isGlobal, filteredEntries.length, allEntriesData[lorebookName]);
 
     if (DEBUG_MODE) {
       console.log(`[无感刷新] 成功更新世界书 "${lorebookName}"，共 ${filteredEntries.length} 个条目`);
