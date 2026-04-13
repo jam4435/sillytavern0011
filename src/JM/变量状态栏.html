@@ -694,7 +694,8 @@
         else console.error(`${DEBUG_PREFIX} ${message}`, error, details);
       }
       function installDebugHooks() {
-        if (debugHooksInstalled || typeof window?.addEventListener !== 'function') return;
+        if (debugHooksInstalled) return;
+        if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
         window.addEventListener('error', event => {
           debugError('捕获到全局 error 事件。', event.error || event.message, {
             filename: event.filename,
