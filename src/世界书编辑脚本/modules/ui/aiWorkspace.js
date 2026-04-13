@@ -54,6 +54,37 @@ const isCustomSource = source => (source || '').trim() === 'custom';
 const isStreamEnabled = () => $('#ai-workspace-stream', parentDoc()).prop('checked');
 const debouncedRenderLorebookSearchResults = _.debounce(() => renderLorebookSearchResults(), 150);
 
+function buildEntryPromptSnapshot(entry = {}) {
+  return {
+    primary: Array.isArray(entry?.strategy?.keys) ? [...entry.strategy.keys] : [],
+    secondaryLogic: entry?.strategy?.keys_secondary?.logic || 'and_any',
+    secondary: Array.isArray(entry?.strategy?.keys_secondary?.keys) ? [...entry.strategy.keys_secondary.keys] : [],
+  };
+}
+
+function mapWorkspaceEntry(entry = {}) {
+  return {
+    uid: Number(entry.uid),
+    name: entry.name || '',
+    content: entry.content || '',
+    promptSnapshot: buildEntryPromptSnapshot(entry),
+  };
+}
+
+function areWorkspaceEntriesEqual(previousEntries = [], nextEntries = []) {
+  if (previousEntries.length !== nextEntries.length) {
+    return false;
+  }
+
+  return previousEntries.every((entry, index) => {
+    const nextEntry = nextEntries[index];
+    return Number(entry?.uid) === Number(nextEntry?.uid)
+      && (entry?.name || '') === (nextEntry?.name || '')
+      && (entry?.content || '') === (nextEntry?.content || '')
+      && _.isEqual(entry?.promptSnapshot || {}, nextEntry?.promptSnapshot || {});
+  });
+}
+
 function saveSettings(patch = {}) {
   const current = settings();
   const hasPlanningResultPatch = Object.prototype.hasOwnProperty.call(patch, 'planningResult');
@@ -1569,7 +1600,9 @@ function markVisibleEntriesCompat(mode) {
 }
 
 async function loadEntriesCompat(lorebookName, options = {}) {
-  const { preserveSelection = false, preserveOutputs = false } = options;
+  const { preserveSelection = false, preserveOutputs = false, invalidateOutputsOnChange = false } = options;
+  const previousEntries = Array.isArray(state.entries) ? state.entries : [];
+  const hadOutputs = Boolean(state.planningResult || state.previewResult);
 
   state.entries = [];
   if (!preserveSelection) {
@@ -1593,7 +1626,18 @@ async function loadEntriesCompat(lorebookName, options = {}) {
 
   setStatus(`正在加载世界书“${lorebookName}”的条目...`);
   const entries = await collectAiTargetEntries(lorebookName, []);
-  state.entries = entries.map(entry => ({ uid: Number(entry.uid), name: entry.name || '', content: entry.content || '' }));
+  const nextEntries = entries.map(entry => mapWorkspaceEntry(entry));
+  const entriesChanged = !areWorkspaceEntriesEqual(previousEntries, nextEntries);
+  state.entries = nextEntries;
+  let outputsInvalidated = false;
+
+  if (invalidateOutputsOnChange && preserveOutputs && entriesChanged && hadOutputs) {
+    state.planningResult = null;
+    state.previewResult = null;
+    clearPreview('检测到世界书内容已变化，已自动清空旧的规划/预览结果。');
+    renderPlanningResult(null);
+    outputsInvalidated = true;
+  }
 
   const validUidSet = new Set(state.entries.map(entry => Number(entry.uid)));
   state.selectedEntryUids = new Set(Array.from(state.selectedEntryUids).filter(uid => validUidSet.has(Number(uid))));
@@ -1608,7 +1652,11 @@ async function loadEntriesCompat(lorebookName, options = {}) {
       renderDebugInfo();
     }
   }
-  setStatus(`已加载 ${state.entries.length} 条可处理条目。`);
+  setStatus(
+    outputsInvalidated
+      ? `已加载 ${state.entries.length} 条可处理条目。检测到世界书内容已变化，已自动清空旧的规划/预览结果。`
+      : `已加载 ${state.entries.length} 条可处理条目。`,
+  );
   persist();
 }
 
@@ -1902,15 +1950,11 @@ export const refreshAiWorkspace = errorCatched(async () => {
     toggleCustomApi();
   }
 
-  const previousLorebook = currentLorebook();
   const lorebookName = await populateLorebooks();
   syncCurrentLorebookDisplay(lorebookName);
-
-  const shouldReloadEntries = !state.entries.length || state.loadedLorebookName !== lorebookName || previousLorebook !== lorebookName;
-  if (shouldReloadEntries) {
-    await loadEntriesCompat(lorebookName, { preserveSelection: true, preserveOutputs: true });
-    return;
-  }
-
-  restoreUiState();
+  await loadEntriesCompat(lorebookName, {
+    preserveSelection: true,
+    preserveOutputs: true,
+    invalidateOutputsOnChange: true,
+  });
 }, 'refreshAiWorkspace');

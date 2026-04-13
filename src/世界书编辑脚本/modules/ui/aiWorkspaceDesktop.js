@@ -63,6 +63,37 @@ function createEmptyModeState() {
   };
 }
 
+function buildEntryPromptSnapshot(entry = {}) {
+  return {
+    primary: Array.isArray(entry?.strategy?.keys) ? [...entry.strategy.keys] : [],
+    secondaryLogic: entry?.strategy?.keys_secondary?.logic || 'and_any',
+    secondary: Array.isArray(entry?.strategy?.keys_secondary?.keys) ? [...entry.strategy.keys_secondary.keys] : [],
+  };
+}
+
+function mapWorkspaceEntry(entry = {}) {
+  return {
+    uid: Number(entry.uid),
+    name: entry.name || '',
+    content: entry.content || '',
+    promptSnapshot: buildEntryPromptSnapshot(entry),
+  };
+}
+
+function areWorkspaceEntriesEqual(previousEntries = [], nextEntries = []) {
+  if (previousEntries.length !== nextEntries.length) {
+    return false;
+  }
+
+  return previousEntries.every((entry, index) => {
+    const nextEntry = nextEntries[index];
+    return Number(entry?.uid) === Number(nextEntry?.uid)
+      && (entry?.name || '') === (nextEntry?.name || '')
+      && (entry?.content || '') === (nextEntry?.content || '')
+      && _.isEqual(entry?.promptSnapshot || {}, nextEntry?.promptSnapshot || {});
+  });
+}
+
 const state = {
   worldbookNames: [],
   modelOptions: [],
@@ -1575,7 +1606,10 @@ function ensureModeLorebook(modeKey) {
   mode.lorebookName = state.worldbookNames[0] || '';
 }
 
-async function loadEntriesForMode(modeKey, { force = false, resetSelection = false, clearOutputs = false } = {}) {
+async function loadEntriesForMode(
+  modeKey,
+  { force = false, resetSelection = false, clearOutputs = false, invalidateOutputsOnChange = false } = {},
+) {
   const mode = state.modes[modeKey];
 
   if (!mode.lorebookName) {
@@ -1607,10 +1641,21 @@ async function loadEntriesForMode(modeKey, { force = false, resetSelection = fal
     invalidateModeOutputs(modeKey);
   }
 
+  const previousEntries = Array.isArray(mode.entries) ? mode.entries : [];
+  const hadOutputs = Boolean(mode.previewResult || mode.planningResult);
   setModeStatus(modeKey, `正在加载世界书“${mode.lorebookName}”的条目...`);
   const entries = await collectAiTargetEntries(mode.lorebookName, []);
-  mode.entries = entries.map(entry => ({ uid: Number(entry.uid), name: entry.name || '', content: entry.content || '' }));
+  const nextEntries = entries.map(entry => mapWorkspaceEntry(entry));
+  const entriesChanged = !areWorkspaceEntriesEqual(previousEntries, nextEntries);
+  mode.entries = nextEntries;
   mode.loadedLorebookName = mode.lorebookName;
+
+  let outputsInvalidated = false;
+  if (invalidateOutputsOnChange && entriesChanged && hadOutputs) {
+    invalidateModeOutputs(modeKey);
+    outputsInvalidated = true;
+    persistSettings({ mirrorModeKey: modeKey });
+  }
 
   const validUidSet = new Set(mode.entries.map(entry => Number(entry.uid)));
   mode.selectedEntryUids = new Set(Array.from(mode.selectedEntryUids).filter(uid => validUidSet.has(Number(uid))));
@@ -1620,7 +1665,12 @@ async function loadEntriesForMode(modeKey, { force = false, resetSelection = fal
     renderEntryList(modeKey);
     renderSelectionSummary(modeKey);
   }
-  setModeStatus(modeKey, `已加载 ${mode.entries.length} 条可处理条目。`);
+  setModeStatus(
+    modeKey,
+    outputsInvalidated
+      ? `已加载 ${mode.entries.length} 条可处理条目。检测到世界书内容已变化，已自动清空旧的规划/预览结果。`
+      : `已加载 ${mode.entries.length} 条可处理条目。`,
+  );
 }
 
 function goToStep(modeKey, targetStep) {
@@ -1856,10 +1906,13 @@ function bindEvents() {
       renderCurrentPanel();
       if (state.currentNav === 'direct' || state.currentNav === 'plan') {
         ensureModeLorebook(currentModeKey());
-        if (!state.modes[currentModeKey()].entries.length || state.modes[currentModeKey()].loadedLorebookName !== state.modes[currentModeKey()].lorebookName) {
-          await loadEntriesForMode(currentModeKey(), { force: true, resetSelection: false, clearOutputs: false });
-          renderCurrentPanel();
-        }
+        await loadEntriesForMode(currentModeKey(), {
+          force: true,
+          resetSelection: false,
+          clearOutputs: false,
+          invalidateOutputsOnChange: true,
+        });
+        renderCurrentPanel();
       }
     })
     .on('click.aiWorkspaceDesktop', '[data-ai-step]', function () {
@@ -1910,7 +1963,12 @@ function bindEvents() {
       renderCurrentPanel();
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-refresh-entries', async () => {
-      await loadEntriesForMode(currentModeKey(), { force: true, resetSelection: false, clearOutputs: false });
+      await loadEntriesForMode(currentModeKey(), {
+        force: true,
+        resetSelection: false,
+        clearOutputs: false,
+        invalidateOutputsOnChange: true,
+      });
       renderCurrentPanel();
     })
     .on('input.aiWorkspaceDesktop', '#ai-workspace-search', function () {
@@ -2121,9 +2179,10 @@ export const refreshDesktopAiWorkspace = errorCatched(async () => {
   if (state.currentNav === 'direct' || state.currentNav === 'plan') {
     const modeKey = currentModeKey();
     await loadEntriesForMode(modeKey, {
-      force: !state.modes[modeKey].entries.length || state.modes[modeKey].loadedLorebookName !== state.modes[modeKey].lorebookName,
+      force: true,
       resetSelection: false,
       clearOutputs: false,
+      invalidateOutputsOnChange: true,
     });
   }
 
