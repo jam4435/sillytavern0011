@@ -662,9 +662,11 @@ function ensureDetailStyles() {
       }
       #${LOREBOOK_PANEL_ID} .master-folder-title {
         font-weight: 600;
-        white-space: nowrap;
         overflow: hidden;
-        text-overflow: ellipsis;
+        text-overflow: var(--lorebook-name-text-overflow);
+        white-space: var(--lorebook-name-white-space);
+        overflow-wrap: var(--lorebook-name-overflow-wrap);
+        word-break: var(--lorebook-name-word-break);
       }
       #${LOREBOOK_PANEL_ID} .master-folder-meta {
         font-size: 0.78em;
@@ -735,9 +737,11 @@ function ensureDetailStyles() {
         display: block;
         min-width: 0;
         font-weight: 600;
-        white-space: nowrap;
         overflow: hidden;
-        text-overflow: ellipsis;
+        text-overflow: var(--lorebook-name-text-overflow);
+        white-space: var(--lorebook-name-white-space);
+        overflow-wrap: var(--lorebook-name-overflow-wrap);
+        word-break: var(--lorebook-name-word-break);
       }
       #${LOREBOOK_PANEL_ID} .master-entry-title-input {
         display: none;
@@ -1004,9 +1008,6 @@ function ensureDetailStyles() {
       }
       #${LOREBOOK_PANEL_ID} .lorebook-title-main .lorebook-title-text {
         min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
       }
       #${LOREBOOK_PANEL_ID} .lorebook-title.is-master-layout .lorebook-entries-count {
         font-size: 0.72em;

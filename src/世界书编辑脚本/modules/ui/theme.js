@@ -16,10 +16,24 @@ import { toggleLorebookPanel } from './panel.js';
 
 const LOREBOOK_THEME_KEY = 'enhanced-lorebook-theme';
 
+function getDefaultTheme() {
+  return {
+    bgColor: 'rgba(40, 40, 40, 0.95)',
+    textColor: '#eeeeee',
+    accentColor: '#9a7ace',
+    entryBgColor: '#333333',
+    searchInputBgColor: '#333333',
+    yamlInputBgColor: '#333333',
+    showTopbarButton: false,
+    truncateLongNames: true,
+  };
+}
+
 function applyTheme(theme) {
   try {
     const parentDoc = window.parent.document;
     const $panel = $(`#${LOREBOOK_PANEL_ID}`, parentDoc);
+    const truncateLongNames = theme?.truncateLongNames !== false;
     if ($panel.length) {
       $panel.css({
         '--panel-bg-color': theme.bgColor,
@@ -29,6 +43,11 @@ function applyTheme(theme) {
         '--search-input-bg-color': theme.searchInputBgColor,
         '--yaml-input-bg-color': theme.yamlInputBgColor,
         '--panel-border-color': '#555',
+        '--lorebook-name-white-space': truncateLongNames ? 'nowrap' : 'normal',
+        '--lorebook-name-text-overflow': truncateLongNames ? 'ellipsis' : 'clip',
+        '--lorebook-name-overflow-wrap': truncateLongNames ? 'normal' : 'anywhere',
+        '--lorebook-name-word-break': truncateLongNames ? 'normal' : 'break-word',
+        '--lorebook-title-align-items': truncateLongNames ? 'center' : 'flex-start',
       });
     }
     // 应用主题到主题设置模态框本身
@@ -63,19 +82,21 @@ function saveTheme(theme) {
 }
 
 export function loadTheme() {
+  const defaultTheme = getDefaultTheme();
   const savedTheme = localStorage.getItem(LOREBOOK_THEME_KEY);
-  if (savedTheme) {
-    return JSON.parse(savedTheme);
+  if (!savedTheme) {
+    return defaultTheme;
   }
-  return {
-    bgColor: 'rgba(40, 40, 40, 0.95)',
-    textColor: '#eeeeee',
-    accentColor: '#9a7ace',
-    entryBgColor: '#333333',
-    searchInputBgColor: '#333333',
-    yamlInputBgColor: '#333333',
-    showTopbarButton: false,
-  };
+
+  try {
+    return {
+      ...defaultTheme,
+      ...JSON.parse(savedTheme),
+    };
+  } catch (error) {
+    console.warn('角色世界书: 解析主题设置失败，已回退到默认值。', error);
+    return defaultTheme;
+  }
 }
 
 
@@ -163,6 +184,13 @@ export function initTheme() {
                    <span class="slider round"></span>
                </label>
            </div>
+           <div id="truncate-long-names-toggle-group" class="form-group">
+               <label for="truncate-long-names-toggle">过长名称省略</label>
+               <label class="switch">
+                   <input type="checkbox" id="truncate-long-names-toggle">
+                   <span class="slider round"></span>
+               </label>
+           </div>
             <div id="pc-layout-mode-group" class="form-group">
                 <label for="pc-layout-mode-select">PC 布局</label>
                 <select id="pc-layout-mode-select" class="form-control">
@@ -192,6 +220,7 @@ export function initTheme() {
     $modal.find('#highlight-active-toggle').prop('checked', getHighlightActiveEntriesSetting());
     $modal.find('#show-search-bar-toggle').prop('checked', getShowSearchBarSetting());
     $modal.find('#fullscreen-mode-toggle').prop('checked', getFullscreenModeSetting());
+    $modal.find('#truncate-long-names-toggle').prop('checked', currentTheme.truncateLongNames !== false);
     $modal.find('#pc-layout-mode-select').val(getPcLayoutModeSetting());
 
     if (typeof modalElement.showModal === 'function') {
@@ -212,6 +241,7 @@ export function initTheme() {
       searchInputBgColor: $('#search-input-bg-color-picker', parentDoc).val(),
       yamlInputBgColor: $('#yaml-input-bg-color-picker', parentDoc).val(),
       showTopbarButton: $('#topbar-button-toggle', parentDoc).is(':checked'),
+      truncateLongNames: $('#truncate-long-names-toggle', parentDoc).is(':checked'),
     };
     applyTheme(newSettings);
     saveTheme(newSettings);
@@ -220,6 +250,7 @@ export function initTheme() {
 
   $modal.on('input', 'input[type="color"]', handleSettingsChange);
   $modal.on('change', '#topbar-button-toggle', handleSettingsChange);
+  $modal.on('change', '#truncate-long-names-toggle', handleSettingsChange);
   
   // 高亮激活条目开关的事件处理
   $modal.on('change', '#highlight-active-toggle', function() {
@@ -268,15 +299,7 @@ export function initTheme() {
   });
 
   $modal.on('click', '#reset-theme-button', function () {
-    const defaultTheme = {
-      bgColor: 'rgba(40, 40, 40, 0.95)',
-      textColor: '#eeeeee',
-      accentColor: '#9a7ace',
-      entryBgColor: '#333333',
-      searchInputBgColor: '#333333',
-      yamlInputBgColor: '#333333',
-      showTopbarButton: false,
-    };
+    const defaultTheme = getDefaultTheme();
     applyTheme(defaultTheme);
     saveTheme(defaultTheme);
     updateButtonBehavior(defaultTheme);
@@ -288,6 +311,7 @@ export function initTheme() {
     $modal.find('#search-input-bg-color-picker').val(rgbaToHex(defaultTheme.searchInputBgColor));
     $modal.find('#yaml-input-bg-color-picker').val(rgbaToHex(defaultTheme.yamlInputBgColor));
     $modal.find('#topbar-button-toggle').prop('checked', defaultTheme.showTopbarButton);
+    $modal.find('#truncate-long-names-toggle').prop('checked', defaultTheme.truncateLongNames);
     
     // 重置高亮激活条目设置为默认值（关闭）
     setHighlightActiveEntriesSetting(false);

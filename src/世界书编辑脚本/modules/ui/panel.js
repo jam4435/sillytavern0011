@@ -349,6 +349,11 @@ export function initPanel() {
                     --panel-border-color: #555;
                     --panel-accent-color: #9a7ace; /* 新增：强调颜色变量 */
                     --panel-entry-bg-color: #333; /* 新增：条目背景颜色变量 */
+                    --lorebook-name-white-space: nowrap;
+                    --lorebook-name-text-overflow: ellipsis;
+                    --lorebook-name-overflow-wrap: normal;
+                    --lorebook-name-word-break: normal;
+                    --lorebook-title-align-items: center;
 
                     display: none;
                     position: fixed;
@@ -693,9 +698,15 @@ export function initPanel() {
                 }
                 
                 #${LOREBOOK_PANEL_ID} .lorebook-title-text {
-                    flex-grow: 1;
+                    flex: 1 1 auto;
+                    min-width: 0;
                     display: flex;
-                    align-items: center;
+                    align-items: var(--lorebook-title-align-items);
+                    overflow: hidden;
+                    text-overflow: var(--lorebook-name-text-overflow);
+                    white-space: var(--lorebook-name-white-space);
+                    overflow-wrap: var(--lorebook-name-overflow-wrap);
+                    word-break: var(--lorebook-name-word-break);
                 }
                 
                 /* 世界书标题展开/折叠相关样式 */
