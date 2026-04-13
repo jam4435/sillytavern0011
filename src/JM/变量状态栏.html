@@ -136,6 +136,31 @@
         color: var(--accent-light-color);
         letter-spacing: 1px;
       }
+      .inline-editable-value {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .edit-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-secondary-color);
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+      }
+      .edit-trigger:hover {
+        background: rgba(187, 134, 252, 0.16);
+        border-color: rgba(187, 134, 252, 0.32);
+        color: var(--accent-light-color);
+      }
       .meta-info {
         display: flex;
         justify-content: space-between;
@@ -260,130 +285,6 @@
       .details-value {
         flex-grow: 1;
         color: var(--text-color);
-      }
-      .inline-editable-value {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        min-width: 0;
-      }
-      .inline-editable-value .details-value {
-        min-width: 0;
-      }
-      .edit-trigger {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 26px;
-        height: 26px;
-        padding: 0;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.08);
-        color: var(--text-secondary-color);
-        cursor: pointer;
-        transition: background-color 0.2s, color 0.2s, border-color 0.2s;
-      }
-      .edit-trigger:hover {
-        background: rgba(187, 134, 252, 0.16);
-        border-color: rgba(187, 134, 252, 0.32);
-        color: var(--accent-light-color);
-      }
-      .edit-trigger svg {
-        width: 14px;
-        height: 14px;
-      }
-      .jm-edit-modal {
-        position: fixed;
-        inset: 0;
-        z-index: 1000;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 16px;
-        background: rgba(0, 0, 0, 0.55);
-        backdrop-filter: blur(4px);
-      }
-      .jm-edit-modal.visible {
-        display: flex;
-      }
-      .jm-edit-dialog {
-        width: min(420px, calc(100vw - 32px));
-        padding: 18px;
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        border-radius: 14px;
-        background: #262626;
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
-      }
-      .jm-edit-title {
-        margin-bottom: 14px;
-        font-size: 18px;
-        font-weight: 700;
-        color: var(--accent-light-color);
-      }
-      .jm-edit-form {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .jm-edit-label {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        font-size: 13px;
-        color: var(--text-secondary-color);
-      }
-      .jm-edit-input {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 10px 12px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 8px;
-        background: rgba(0, 0, 0, 0.28);
-        color: var(--text-color);
-        font: inherit;
-      }
-      .jm-edit-input:focus {
-        outline: none;
-        border-color: rgba(187, 134, 252, 0.52);
-      }
-      .jm-edit-error {
-        display: none;
-        padding: 10px 12px;
-        border: 1px solid rgba(207, 102, 121, 0.35);
-        border-radius: 8px;
-        background: rgba(207, 102, 121, 0.12);
-        color: #ffd6de;
-        font-size: 13px;
-        line-height: 1.5;
-      }
-      .jm-edit-error.visible {
-        display: block;
-      }
-      .jm-edit-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-      }
-      .jm-edit-button {
-        border: none;
-        border-radius: 8px;
-        padding: 10px 14px;
-        font: inherit;
-        cursor: pointer;
-      }
-      .jm-edit-button.cancel {
-        background: rgba(255, 255, 255, 0.1);
-        color: var(--text-color);
-      }
-      .jm-edit-button.save {
-        background: var(--accent-light-color);
-        color: #1e1e1e;
-        font-weight: 700;
-      }
-      .jm-edit-button:disabled {
-        opacity: 0.65;
-        cursor: not-allowed;
       }
       .modifications-list {
         display: flex;
@@ -669,164 +570,31 @@
       let keywordRegex = null;
       let fallbackAvatars = [];
       let refreshTimer = null;
-      const DEBUG_PREFIX = '[变量状态栏]';
-      let debugHooksInstalled = false;
 
-      function safeGet(obj, path, defaultValue) {
-        const fallbackValue = arguments.length >= 3 ? defaultValue : undefined;
+      const safeGet = (obj, path, defaultValue = undefined) => {
         const keys = Array.isArray(path) ? path : path.split('.');
         let result = obj;
         for (const key of keys) {
-          if (result === undefined || result === null) return fallbackValue;
-          result = result[key];
-          if (result === undefined) return fallbackValue;
+          result = result?.[key];
+          if (result === undefined) return defaultValue;
         }
         return result;
-      }
+      };
       const uniq = arr => Array.from(new Set(arr));
       const ensureString = value => (value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value));
       const ensureArray = value => (Array.isArray(value) ? value : []);
       const ensureObject = value => (_.isPlainObject(value) ? value : {});
-      function debugLog(message, details) {
-        if (details === undefined) console.log(`${DEBUG_PREFIX} ${message}`);
-        else console.log(`${DEBUG_PREFIX} ${message}`, details);
-      }
-      function debugError(message, error, details) {
-        if (details === undefined) console.error(`${DEBUG_PREFIX} ${message}`, error);
-        else console.error(`${DEBUG_PREFIX} ${message}`, error, details);
-      }
-      function installDebugHooks() {
-        if (debugHooksInstalled) return;
-        if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
-        window.addEventListener('error', event => {
-          debugError('捕获到全局 error 事件。', event.error || event.message, {
-            filename: event.filename,
-            lineno: event.lineno,
-            colno: event.colno,
-          });
-        });
-        window.addEventListener('unhandledrejection', event => {
-          debugError('捕获到未处理的 Promise 拒绝。', event.reason);
-        });
-        debugHooksInstalled = true;
-        debugLog('调试钩子已安装。');
-      }
-      const EDIT_PENCIL_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.21a.996.996 0 0 0 0-1.41L18.37 3.3a.996.996 0 1 0-1.41 1.41l2.34 2.33a.996.996 0 0 0 1.41 0z"/></svg>';
+      const EDIT_TRIGGER_HTML = '<button class="edit-trigger jm-edit-character-trigger" type="button" title="编辑名字与身份">&#9998;</button>';
       const DISPLAY_TEXT_REPLACEMENTS = [['__DOT__', '.']];
       function normalizeDisplayValue(value) {
         if (typeof value === 'string') {
-          let normalizedText = value;
-          for (const pair of DISPLAY_TEXT_REPLACEMENTS) {
-            const token = pair[0];
-            const replacement = pair[1];
-            normalizedText = normalizedText.split(token).join(replacement);
-          }
-          return normalizedText;
+          return DISPLAY_TEXT_REPLACEMENTS.reduce((text, [token, replacement]) => text.split(token).join(replacement), value);
         }
         if (Array.isArray(value)) return value.map(item => normalizeDisplayValue(item));
         if (_.isPlainObject(value)) {
-          const normalizedObject = {};
-          for (const key of Object.keys(value)) {
-            normalizedObject[key] = normalizeDisplayValue(value[key]);
-          }
-          return normalizedObject;
+          return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, normalizeDisplayValue(nestedValue)]));
         }
         return value;
-      }
-      function escapeHtml(value) {
-        return String(value === undefined || value === null ? '' : value)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
-      }
-      function splitCharacterNames(rawText) {
-        const parts = String(rawText === undefined || rawText === null ? '' : rawText).split(/[，,、|/]/);
-        const names = [];
-        parts.forEach(part => {
-          const name = part.trim();
-          if (name) names.push(name);
-        });
-        return uniq(names);
-      }
-      function replaceDelimitedCharacterName(content, oldName, newName) {
-        const parts = String(content === undefined || content === null ? '' : content).split(/([，,、|/])/);
-        let replaced = false;
-        for (let index = 0; index < parts.length; index += 2) {
-          const originalPart = parts[index];
-          const trimmedPart = originalPart.trim();
-          if (trimmedPart !== oldName) continue;
-          parts[index] = originalPart.replace(trimmedPart, newName);
-          replaced = true;
-        }
-        return { content: parts.join(''), replaced };
-      }
-      function replaceCurrentCharacterNameInMessage(message, oldName, newName) {
-        let replaced = false;
-        const updatedMessage = String(message === undefined || message === null ? '' : message).replace(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/g, function (full, tagName, content) {
-          const result = replaceDelimitedCharacterName(content, oldName, newName);
-          if (!result.replaced) return full;
-          replaced = true;
-          return '<当前' + tagName + '>' + result.content + '</当前' + tagName + '>';
-        });
-        return { message: updatedMessage, replaced };
-      }
-      function renameKeyInObject(target, oldKey, newKey, newValue) {
-        const entries = Object.entries(ensureObject(target));
-        if (oldKey !== newKey) {
-          for (const entry of entries) {
-            const key = entry[0];
-            if (key === newKey) {
-              throw new Error(`变量中已存在人物“${newKey}”。`);
-            }
-          }
-        }
-        let found = false;
-        const nextEntries = entries.map(entry => {
-          const key = entry[0];
-          const value = entry[1];
-          if (key !== oldKey) return [key, value];
-          found = true;
-          return [newKey, newValue];
-        });
-        if (!found) throw new Error(`未找到人物“${oldKey}”对应的变量。`);
-        const nextObject = {};
-        nextEntries.forEach(entry => {
-          nextObject[entry[0]] = entry[1];
-        });
-        return nextObject;
-      }
-      function buildUpdatedStatData(statData, oldName, newName, newIdentity) {
-        const nextStatData = _.cloneDeep(ensureObject(statData));
-        if (_.has(nextStatData, ['角色数据', oldName])) {
-          const roleMap = ensureObject(_.get(nextStatData, '角色数据', {}));
-          const updatedCharacter = _.cloneDeep(ensureObject(roleMap[oldName]));
-          updatedCharacter.Status = ensureObject(updatedCharacter.Status);
-          updatedCharacter.Status.Identity = newIdentity;
-          nextStatData.角色数据 = renameKeyInObject(roleMap, oldName, newName, updatedCharacter);
-          return nextStatData;
-        }
-        if (_.has(nextStatData, oldName)) {
-          const updatedCharacter = _.cloneDeep(ensureObject(nextStatData[oldName]));
-          updatedCharacter.Status = ensureObject(updatedCharacter.Status);
-          updatedCharacter.Status.Identity = newIdentity;
-          return renameKeyInObject(nextStatData, oldName, newName, updatedCharacter);
-        }
-        throw new Error(`未找到人物“${oldName}”对应的变量。`);
-      }
-      function getLatestAssistantMessage() {
-        const messages = getChatMessages('0-{{lastMessageId}}', { role: 'assistant', hide_state: 'all' }) || [];
-        return messages.length > 0 ? messages[messages.length - 1] : null;
-      }
-      async function migratePortraitStorage(oldName, newName) {
-        if (!oldName || !newName || oldName === newName) return;
-        const oldKey = `jm_user_portrait_${oldName}`;
-        const newKey = `jm_user_portrait_${newName}`;
-        const existingPortrait = await idbHelper.get(oldKey);
-        if (!existingPortrait) return;
-        await idbHelper.set(newKey, existingPortrait);
-        await idbHelper.delete(oldKey);
       }
       function getPanelState(panel) {
         if (!panelStates.has(panel)) {
@@ -843,11 +611,10 @@
         }
         return Math.abs(hash) % max;
       }
-      function displayRootError(message, details) {
-        const detailText = details === undefined ? '' : details;
+      function displayRootError(message, details = '') {
         if (!root) return;
-        console.error('[变量状态栏] ' + message, detailText);
-        root.innerHTML = `<div class="status-feedback error"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${detailText}</p></details></div>`;
+        console.error('[变量状态栏] ' + message, details);
+        root.innerHTML = `<div class="status-feedback error"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${details}</p></details></div>`;
       }
       async function fetchData() {
         try {
@@ -857,11 +624,6 @@
           fallbackAvatars = sharedData.fallbackAvatars;
           allKeywords = sharedData.allKeywords;
           keywordRegex = sharedData.keywordRegex;
-          debugLog('核心图片数据加载完成。', {
-            imageKeywordCount: Object.keys(imageIndex).length,
-            synonymCount: Object.keys(synonymMap).length,
-            fallbackAvatarCount: fallbackAvatars.length,
-          });
           return true;
         } catch (error) {
           console.warn('[变量状态栏] 核心图片数据加载失败，图片相关功能将退化。', error);
@@ -873,31 +635,25 @@
           return false;
         }
       }
+      function splitCharacterNames(rawText) {
+        return uniq(String(rawText ?? '').split(/[，,、|/]/).map(name => name.trim()).filter(Boolean));
+      }
       function loadCurrentCharacterNames() {
         try {
-          const latestMessages = getChatMessages(-1);
-          const latestMessageObject = Array.isArray(latestMessages) && latestMessages.length > 0 ? latestMessages[0] : null;
-          const latestMessage = latestMessageObject && latestMessageObject.message !== undefined && latestMessageObject.message !== null ? latestMessageObject.message : '';
+          const latestMessage = getChatMessages(-1)?.[0]?.message ?? '';
           const match = typeof latestMessage === 'string' ? latestMessage.match(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/) : null;
-          if (!match) {
-            debugLog('最新楼层未找到 <当前人物>/<当前角色> 标签。', { latestMessagePreview: String(latestMessage).slice(0, 200) });
-            return [];
-          }
-          const names = splitCharacterNames(match[2]);
-          debugLog('解析到当前人物列表。', { tagType: match[1], names, latestMessagePreview: String(latestMessage).slice(0, 200) });
-          return names;
+          if (!match) return [];
+          return splitCharacterNames(match[2]);
         } catch (error) {
-          debugError('读取最新楼层失败。', error);
+          console.warn('[变量状态栏] 读取最新楼层失败:', error);
           return [];
         }
       }
       function loadStatData() {
         try {
-          const statData = ensureObject(_.get(getVariables({ type: 'chat' }), 'stat_data', {}));
-          debugLog('读取到 chat.stat_data。', { topLevelKeys: Object.keys(statData).slice(0, 20), topLevelKeyCount: Object.keys(statData).length });
-          return statData;
+          return ensureObject(_.get(getVariables({ type: 'chat' }), 'stat_data', {}));
         } catch (error) {
-          debugError('读取 chat 变量失败。', error);
+          console.warn('[变量状态栏] 读取 chat 变量失败:', error);
           return {};
         }
       }
@@ -965,21 +721,19 @@
           /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
         );
         if (rangeMatch) {
-          const rangeReason = rangeMatch[3] === undefined || rangeMatch[3] === null ? '' : rangeMatch[3].trim();
           return {
             mode: 'range',
             from: rangeMatch[1],
             to: rangeMatch[2],
-            reason: rangeReason,
+            reason: rangeMatch[3]?.trim() ?? '',
           };
         }
         const singleMatch = normalizedValue.match(/^([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/);
         if (singleMatch) {
-          const singleReason = singleMatch[2] === undefined || singleMatch[2] === null ? '' : singleMatch[2].trim();
           return {
             mode: 'single',
             value: singleMatch[1],
-            reason: singleReason,
+            reason: singleMatch[2]?.trim() ?? '',
           };
         }
         return null;
@@ -1002,6 +756,77 @@
         const itemsHtml = items.map(item => `<li class="modifications-item"><span class="details-value" data-keyword="${item}">${item}</span></li>`).join('');
         return `<div class="details-block"><div class="details-header">${label}</div><ul class="modifications-list">${itemsHtml}</ul></div>`;
       }
+      function replaceDelimitedCharacterName(content, oldName, newName) {
+        const parts = String(content ?? '').split(/([，,、|/])/);
+        let replaced = false;
+        for (let index = 0; index < parts.length; index += 2) {
+          const originalPart = parts[index];
+          const trimmedPart = originalPart.trim();
+          if (trimmedPart !== oldName) continue;
+          parts[index] = originalPart.replace(trimmedPart, newName);
+          replaced = true;
+        }
+        return { content: parts.join(''), replaced };
+      }
+      function replaceCurrentCharacterNameInMessage(message, oldName, newName) {
+        let replaced = false;
+        const updatedMessage = String(message ?? '').replace(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/g, (full, tagName, content) => {
+          const result = replaceDelimitedCharacterName(content, oldName, newName);
+          if (!result.replaced) return full;
+          replaced = true;
+          return `<当前${tagName}>${result.content}</当前${tagName}>`;
+        });
+        return { message: updatedMessage, replaced };
+      }
+      function renameKeyInObject(target, oldKey, newKey, newValue) {
+        const source = ensureObject(target);
+        const nextObject = {};
+        let found = false;
+        if (oldKey !== newKey && Object.prototype.hasOwnProperty.call(source, newKey)) {
+          throw new Error(`变量中已存在人物“${newKey}”。`);
+        }
+        Object.keys(source).forEach(key => {
+          if (key === oldKey) {
+            nextObject[newKey] = newValue;
+            found = true;
+            return;
+          }
+          nextObject[key] = source[key];
+        });
+        if (!found) throw new Error(`未找到人物“${oldKey}”对应的变量。`);
+        return nextObject;
+      }
+      function buildUpdatedStatData(statData, oldName, newName, newIdentity) {
+        const nextStatData = _.cloneDeep(ensureObject(statData));
+        if (_.has(nextStatData, ['角色数据', oldName])) {
+          const roleMap = ensureObject(_.get(nextStatData, '角色数据', {}));
+          const updatedCharacter = _.cloneDeep(ensureObject(roleMap[oldName]));
+          updatedCharacter.Status = ensureObject(updatedCharacter.Status);
+          updatedCharacter.Status.Identity = newIdentity;
+          nextStatData.角色数据 = renameKeyInObject(roleMap, oldName, newName, updatedCharacter);
+          return nextStatData;
+        }
+        if (_.has(nextStatData, oldName)) {
+          const updatedCharacter = _.cloneDeep(ensureObject(nextStatData[oldName]));
+          updatedCharacter.Status = ensureObject(updatedCharacter.Status);
+          updatedCharacter.Status.Identity = newIdentity;
+          return renameKeyInObject(nextStatData, oldName, newName, updatedCharacter);
+        }
+        throw new Error(`未找到人物“${oldName}”对应的变量。`);
+      }
+      function getLatestAssistantMessage() {
+        const messages = getChatMessages('0-{{lastMessageId}}', { role: 'assistant', hide_state: 'all' }) || [];
+        return messages.length > 0 ? messages[messages.length - 1] : null;
+      }
+      async function migratePortraitStorage(oldName, newName) {
+        if (!oldName || !newName || oldName === newName) return;
+        const oldKey = `jm_user_portrait_${oldName}`;
+        const newKey = `jm_user_portrait_${newName}`;
+        const existingPortrait = await idbHelper.get(oldKey);
+        if (!existingPortrait) return;
+        await idbHelper.set(newKey, existingPortrait);
+        await idbHelper.delete(oldKey);
+      }
       function generateDynamicTabsAndContent(panel, data) {
         const excludedKeys = new Set(['Name', 'Location', 'Time', 'Affection', 'Libido', 'Thoughts', 'RecentSex', 'ModificationsAndRestraints', 'Modifications']);
         const panelKey = panel.dataset.panelKey || '0';
@@ -1017,10 +842,9 @@
             contentsHtml += `<div id="${tabId}" class="tab-content ${isActive}"><ul class="details-list">`;
             for (const subKey in data[key]) {
               const label = tabInfo.labels[subKey] || subKey;
-              const rawValue = data[key][subKey];
               const valueHtml = key === 'Status' && subKey === 'Identity'
-                ? `<span class="inline-editable-value"><span class="details-value">${escapeHtml(rawValue)}</span><button class="edit-trigger jm-edit-character-trigger" type="button" title="编辑名字与身份">${EDIT_PENCIL_ICON}</button></span>`
-                : `<span class="details-value">${escapeHtml(rawValue)}</span>`;
+                ? `<span class="inline-editable-value"><span class="details-value">${data[key][subKey]}</span>${EDIT_TRIGGER_HTML}</span>`
+                : `<span class="details-value">${data[key][subKey]}</span>`;
               contentsHtml += `<li class="details-item"><span class="details-label">${label}</span>${valueHtml}</li>`;
             }
             contentsHtml += '</ul></div>';
@@ -1071,7 +895,7 @@
             <div class="header-info">
               <div class="char-name-row">
                 <div class="char-name" data-field="Name"></div>
-                <button class="edit-trigger jm-edit-character-trigger" type="button" title="编辑名字与身份">${EDIT_PENCIL_ICON}</button>
+                ${EDIT_TRIGGER_HTML}
               </div>
               <div class="meta-info">
                 <span class="location">📍 <span data-field="Location"></span></span>
@@ -1091,26 +915,6 @@
               <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="gallery-image" />
               <a class="gallery-prev">&#10094;</a>
               <a class="gallery-next">&#10095;</a>
-            </div>
-          </div>
-          <div class="jm-edit-modal" aria-hidden="true">
-            <div class="jm-edit-dialog" role="dialog" aria-modal="true" aria-label="编辑角色信息">
-              <div class="jm-edit-title">编辑角色信息</div>
-              <div class="jm-edit-form">
-                <label class="jm-edit-label">
-                  名字
-                  <input class="jm-edit-input jm-edit-name-input" type="text" />
-                </label>
-                <label class="jm-edit-label">
-                  身份
-                  <input class="jm-edit-input jm-edit-identity-input" type="text" />
-                </label>
-                <div class="jm-edit-error"></div>
-                <div class="jm-edit-actions">
-                  <button class="jm-edit-button cancel jm-edit-cancel-button" type="button">取消</button>
-                  <button class="jm-edit-button save jm-edit-save-button" type="button">保存</button>
-                </div>
-              </div>
             </div>
           </div>`;
         ['Name', 'Location', 'Time'].forEach(field => {
@@ -1232,9 +1036,7 @@
           }
         };
         uploadInput.onchange = event => {
-          const target = event && event.target ? event.target : null;
-          const fileList = target && target.files ? target.files : null;
-          const file = fileList && fileList.length > 0 ? fileList[0] : null;
+          const file = event.target.files?.[0];
           if (!file) {
             uploadInput.value = '';
             return;
@@ -1298,46 +1100,20 @@
           reader.readAsDataURL(file);
         };
       }
-      function toggleEditModal(panel, visible) {
-        const modal = panel.querySelector('.jm-edit-modal');
-        if (!modal) return;
-        modal.classList.toggle('visible', visible);
-        modal.setAttribute('aria-hidden', visible ? 'false' : 'true');
-      }
-      function setEditError(panel, message) {
-        const nextMessage = message === undefined ? '' : message;
-        const errorBox = panel.querySelector('.jm-edit-error');
-        if (!errorBox) return;
-        errorBox.textContent = nextMessage;
-        errorBox.classList.toggle('visible', Boolean(nextMessage));
-      }
-      function openCharacterEditor(panel, data) {
-        const nameInput = panel.querySelector('.jm-edit-name-input');
-        const identityInput = panel.querySelector('.jm-edit-identity-input');
-        if (!nameInput || !identityInput) return;
-        nameInput.value = ensureString(data.Name);
-        identityInput.value = ensureString(safeGet(data, 'Status.Identity', ''));
-        setEditError(panel, '');
-        toggleEditModal(panel, true);
-        nameInput.focus();
-        nameInput.select();
-      }
-      async function saveCharacterEdits(panel, data) {
-        const nameInput = panel.querySelector('.jm-edit-name-input');
-        const identityInput = panel.querySelector('.jm-edit-identity-input');
-        const saveButton = panel.querySelector('.jm-edit-save-button');
-        const cancelButton = panel.querySelector('.jm-edit-cancel-button');
-        if (!nameInput || !identityInput || !saveButton || !cancelButton) return;
+      async function editCharacterInfo(panel, data) {
         const oldName = ensureString(data.Name).trim();
         const oldIdentity = ensureString(safeGet(data, 'Status.Identity', '')).trim();
-        const newName = normalizeDisplayValue(nameInput.value.trim());
-        const newIdentity = normalizeDisplayValue(identityInput.value.trim());
+        const promptedName = window.prompt('修改名字', oldName);
+        if (promptedName === null) return;
+        const newName = normalizeDisplayValue(promptedName.trim());
         if (!newName) {
-          setEditError(panel, '名字不能为空。');
-          nameInput.focus();
+          alert('名字不能为空。');
           return;
         }
-        setEditError(panel, '');
+        const promptedIdentity = window.prompt('修改身份', oldIdentity);
+        if (promptedIdentity === null) return;
+        const newIdentity = normalizeDisplayValue(promptedIdentity.trim());
+        if (newName === oldName && newIdentity === oldIdentity) return;
         const originalVariables = _.cloneDeep(getVariables({ type: 'chat' }));
         const originalStatData = ensureObject(_.get(originalVariables, 'stat_data', {}));
         const nextStatData = buildUpdatedStatData(originalStatData, oldName, newName, newIdentity);
@@ -1347,21 +1123,12 @@
         let originalAssistantText = '';
         let updatedAssistantText = '';
         if (newName !== oldName) {
-          if (!latestAssistantMessage) {
-            setEditError(panel, '未找到最新 AI 回复，无法同步 <当前人物>/<当前角色> 中的名字。');
-            return;
-          }
+          if (!latestAssistantMessage) throw new Error('未找到最新 AI 回复，无法同步当前人物标签。');
           originalAssistantText = ensureString(latestAssistantMessage.message);
           const messageReplacement = replaceCurrentCharacterNameInMessage(originalAssistantText, oldName, newName);
-          if (!messageReplacement.replaced) {
-            setEditError(panel, '未在最新 AI 回复的 <当前人物>/<当前角色> 标签中找到当前名字。');
-            return;
-          }
+          if (!messageReplacement.replaced) throw new Error('未在最新 AI 回复的 <当前人物>/<当前角色> 标签中找到当前名字。');
           updatedAssistantText = messageReplacement.message;
         }
-        saveButton.disabled = true;
-        cancelButton.disabled = true;
-        saveButton.textContent = '保存中...';
         try {
           replaceVariables(nextVariables, { type: 'chat' });
           if (latestAssistantMessage && updatedAssistantText !== originalAssistantText) {
@@ -1378,7 +1145,6 @@
           data.Name = newName;
           data.Status = ensureObject(data.Status);
           data.Status.Identity = newIdentity;
-          toggleEditModal(panel, false);
           scheduleRefresh();
         } catch (error) {
           try {
@@ -1389,11 +1155,7 @@
           } catch (rollbackError) {
             console.error('[变量状态栏] 回滚编辑失败:', rollbackError);
           }
-          setEditError(panel, error && error.message ? error.message : '保存失败，请重试。');
-        } finally {
-          saveButton.disabled = false;
-          cancelButton.disabled = false;
-          saveButton.textContent = '保存';
+          throw error;
         }
       }
       function setupEventListeners(panel, data) {
@@ -1417,8 +1179,17 @@
             panel.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
             panel.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             button.classList.add('active');
-            const targetTab = panel.querySelector(`#${targetTabId}`);
-            if (targetTab) targetTab.classList.add('active');
+            panel.querySelector(`#${targetTabId}`)?.classList.add('active');
+          });
+        });
+        panel.querySelectorAll('.jm-edit-character-trigger').forEach(button => {
+          button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            editCharacterInfo(panel, data).catch(error => {
+              console.error('[变量状态栏] 编辑角色信息失败:', error);
+              alert(error?.message || '保存失败，请重试。');
+            });
           });
         });
         const gallery = panel.querySelector('.jm-image-gallery');
@@ -1530,32 +1301,6 @@
             }
           });
         }
-        panel.querySelectorAll('.jm-edit-character-trigger').forEach(trigger => {
-          trigger.addEventListener('click', event => {
-            event.preventDefault();
-            event.stopPropagation();
-            openCharacterEditor(panel, data);
-          });
-        });
-        const editModal = panel.querySelector('.jm-edit-modal');
-        const editCancelButton = panel.querySelector('.jm-edit-cancel-button');
-        const editSaveButton = panel.querySelector('.jm-edit-save-button');
-        if (editModal) {
-          editModal.addEventListener('click', event => {
-            if (event.target === editModal) toggleEditModal(panel, false);
-          });
-        }
-        if (editCancelButton) {
-          editCancelButton.addEventListener('click', () => toggleEditModal(panel, false));
-        }
-        if (editSaveButton) {
-          editSaveButton.addEventListener('click', () => {
-            saveCharacterEdits(panel, data).catch(error => {
-              console.error('[变量状态栏] 保存角色信息失败:', error);
-              setEditError(panel, error && error.message ? error.message : '保存失败，请重试。');
-            });
-          });
-        }
         setupPortraitUpload(panel, data);
       }
       function persistCollapsedStates() {
@@ -1565,10 +1310,7 @@
           if (name) collapsedStateByName.set(name, panel.classList.contains('collapsed'));
         });
       }
-      function renderFeedback(message, type) {
-        const typeClass = type ? ` ${type}` : '';
-        return `<div class="status-feedback${typeClass}">${message}</div>`;
-      }
+      const renderFeedback = (message, type = '') => `<div class="status-feedback${type ? ` ${type}` : ''}">${message}</div>`;
       async function refreshPanels() {
         if (!root) return;
         persistCollapsedStates();
@@ -1581,17 +1323,11 @@
           if (panelData) panelDataList.push(panelData);
           else missingNames.push(name);
         });
-        debugLog('开始刷新面板。', {
-          names,
-          missingNames,
-          panelCount: panelDataList.length,
-        });
         let rootHtml = '';
         if (missingNames.length > 0) rootHtml += renderFeedback(`未找到变量人物：${missingNames.join('、')}`, 'warning');
         if (panelDataList.length === 0) {
-          rootHtml += renderFeedback(names.length === 0 ? '未找到当前人物。请在最新楼层加入 <当前人物>人物名</当前人物> 或 <当前角色>人物名</当前角色>。' : '未找到当前人物对应的变量数据。');
+          rootHtml += renderFeedback(names.length === 0 ? '未找到当前人物。请在最新楼层加入 <当前人物>人物名</当前人物>。' : '未找到当前人物对应的变量数据。');
           root.innerHTML = rootHtml;
-          debugLog('没有可渲染面板，已输出反馈信息。', { names, missingNames });
           return;
         }
         rootHtml += panelDataList.map((data, index) => `<div class="status-container jm-state-panel" data-panel-key="${index}" data-character-name="${data.Name}"></div>`).join('');
@@ -1603,16 +1339,12 @@
         });
         await Promise.all(panels.map((panel, index) => updatePortrait(panel, panelDataList[index]).catch(error => console.error(`[变量状态栏 ${panelDataList[index].Name}] 头像更新失败:`, error))));
         panels.forEach(panel => linkifyAllText(panel));
-        debugLog('面板刷新完成。', { renderedPanels: panelDataList.map(data => data.Name) });
       }
       function scheduleRefresh() {
         if (refreshTimer) clearTimeout(refreshTimer);
         refreshTimer = window.setTimeout(() => {
           refreshTimer = null;
-          refreshPanels().catch(error => {
-            const errorDetails = error && error.stack ? error.stack : error && error.message ? error.message : String(error);
-            displayRootError('刷新状态栏失败。', errorDetails);
-          });
+          refreshPanels().catch(error => displayRootError('刷新状态栏失败。', error?.stack || error?.message || String(error)));
         }, 150);
       }
       function setupGlobalEventListeners() {
@@ -1623,15 +1355,11 @@
         eventOn('era:writeDone', () => scheduleRefresh());
       }
       async function init() {
-        installDebugHooks();
-        debugLog('开始初始化。');
         root = document.querySelector('.jm-state-panel-list');
         if (!root) throw new Error('未找到变量状态栏根容器。');
-        debugLog('已找到根容器。');
         await fetchData();
         await refreshPanels();
         setupGlobalEventListeners();
-        debugLog('初始化完成。');
       }
       $(() => {
         errorCatched(init)();
