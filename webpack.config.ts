@@ -29,10 +29,13 @@ interface Entry {
   html?: string;
 }
 
+<<<<<<< HEAD
 // 酒馆插件目录不走酒馆助手构建流程。
 const IGNORED_ENTRY_DIRECTORIES = new Set([path.normalize('src/顶部工具栏插件')]);
 const IGNORED_ENTRY_ROOT_DIRECTORIES = new Set([path.normalize('示例')]);
 
+=======
+>>>>>>> df19bf5a213c5e38b25c07c65b47a908c4cdd7ce
 function parse_entry(script_file: string) {
   const html = path.join(path.dirname(script_file), 'index.html');
   if (fs.existsSync(html)) {
@@ -52,6 +55,7 @@ function common_path(lhs: string, rhs: string) {
   return lhs_parts.join(path.sep);
 }
 
+<<<<<<< HEAD
 function should_ignore_entry(script_file: string) {
   const normalized_file = path.normalize(script_file);
   const normalized_dir = path.normalize(path.dirname(script_file));
@@ -67,11 +71,16 @@ function should_ignore_entry(script_file: string) {
   );
 }
 
+=======
+>>>>>>> df19bf5a213c5e38b25c07c65b47a908c4cdd7ce
 function glob_script_files() {
   const results: string[] = [];
 
   fs.globSync(`{示例,src}/**/index.{ts,tsx,js,jsx}`)
+<<<<<<< HEAD
     .filter(file => !should_ignore_entry(file))
+=======
+>>>>>>> df19bf5a213c5e38b25c07c65b47a908c4cdd7ce
     .filter(
       file => process.env.CI !== 'true' || !fs.readFileSync(path.join(import.meta.dirname, file)).includes('@no-ci'),
     )
@@ -446,7 +455,10 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
             filename: path.parse(entry.html).base,
             scriptLoading: 'module',
             cache: false,
+<<<<<<< HEAD
             hash: argv.mode === 'development',
+=======
+>>>>>>> df19bf5a213c5e38b25c07c65b47a908c4cdd7ce
           }),
           new HtmlInlineScriptWebpackPlugin(),
           new MiniCssExtractPlugin(),
