@@ -746,9 +746,10 @@
             debugHooksInstalled = true;
             debugLog('调试钩子已安装。');
           }
-          function displayError(message, details = '') {
-            console.error(`${debugPrefix} ${message}`, details);
-            panel.innerHTML = `<div style="color: var(--red-color); padding: 20px; font-family: monospace; white-space: pre-wrap;"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${details}</p></details></div>`;
+          function displayError(message, details) {
+            const detailText = details === undefined ? '' : details;
+            console.error(`${debugPrefix} ${message}`, detailText);
+            panel.innerHTML = `<div style="color: var(--red-color); padding: 20px; font-family: monospace; white-space: pre-wrap;"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${detailText}</p></details></div>`;
           }
 
           try {
@@ -793,16 +794,18 @@
             const jsonData = JSON.parse(rawData.trim());
             debugLog('rawData JSON 解析成功。', {
               rawDataLength: rawData.length,
-              name: jsonData?.Name,
-              identity: jsonData?.Status?.Identity,
+              name: jsonData && jsonData.Name !== undefined ? jsonData.Name : undefined,
+              identity: jsonData && jsonData.Status && jsonData.Status.Identity !== undefined ? jsonData.Status.Identity : undefined,
             });
 
-            function safeGet(obj, path, defaultValue = undefined) {
+            function safeGet(obj, path, defaultValue) {
+              const fallbackValue = arguments.length >= 3 ? defaultValue : undefined;
               const keys = Array.isArray(path) ? path : path.split('.');
               let result = obj;
               for (const key of keys) {
-                result = result?.[key];
-                if (result === undefined) return defaultValue;
+                if (result === undefined || result === null) return fallbackValue;
+                result = result[key];
+                if (result === undefined) return fallbackValue;
               }
               return result;
             }
@@ -816,7 +819,7 @@
             }
 
             function escapeHtml(value) {
-              return String(value ?? '')
+              return String(value === undefined || value === null ? '' : value)
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
@@ -841,7 +844,7 @@
               const blocks = [];
               const stateRegex = /<(state\d+)>\s*([\s\S]*?)\s*<\/\1>/g;
               let match;
-              while ((match = stateRegex.exec(String(messageText ?? ''))) !== null) {
+              while ((match = stateRegex.exec(String(messageText === undefined || messageText === null ? '' : messageText))) !== null) {
                 try {
                   blocks.push({
                     tag: match[1],
@@ -1004,7 +1007,7 @@
                   mode: 'range',
                   from: rangeMatch[1],
                   to: rangeMatch[2],
-                  reason: rangeMatch[3]?.trim() ?? '',
+                  reason: rangeMatch[3] === undefined || rangeMatch[3] === null ? '' : rangeMatch[3].trim(),
                 };
               }
               const singleMatch = normalizedValue.match(/^([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/);
@@ -1012,7 +1015,7 @@
                 return {
                   mode: 'single',
                   value: singleMatch[1],
-                  reason: singleMatch[2]?.trim() ?? '',
+                  reason: singleMatch[2] === undefined || singleMatch[2] === null ? '' : singleMatch[2].trim(),
                 };
               }
               return null;
@@ -1181,7 +1184,7 @@
             }
 
             function updatePanel(data) {
-              debugLog('开始渲染面板。', { name: data?.Name, identity: safeGet(data, 'Status.Identity', '') });
+              debugLog('开始渲染面板。', { name: data && data.Name !== undefined ? data.Name : undefined, identity: safeGet(data, 'Status.Identity', '') });
               // 1. 设置只包含静态部分的HTML框架
               panel.innerHTML = `
                         <div class="header">
@@ -1511,7 +1514,9 @@
               };
 
               uploadInput.onchange = event => {
-                const file = event.target.files?.[0];
+                const target = event && event.target ? event.target : null;
+                const fileList = target && target.files ? target.files : null;
+                const file = fileList && fileList.length > 0 ? fileList[0] : null;
                 if (!file) {
                   uploadInput.value = '';
                   return;
@@ -1600,11 +1605,12 @@
               modal.setAttribute('aria-hidden', visible ? 'false' : 'true');
             }
 
-            function setEditError(message = '') {
+            function setEditError(message) {
+              const nextMessage = message === undefined ? '' : message;
               const errorBox = panel.querySelector('.jm-edit-error');
               if (!errorBox) return;
-              errorBox.textContent = message;
-              errorBox.classList.toggle('visible', Boolean(message));
+              errorBox.textContent = nextMessage;
+              errorBox.classList.toggle('visible', Boolean(nextMessage));
             }
 
             function openCharacterEditor() {
@@ -1638,16 +1644,17 @@
                 setEditError('无法获取当前楼层号。');
                 return;
               }
-              const currentMessage = getChatMessages(messageId)?.[0];
+              const currentMessages = getChatMessages(messageId);
+              const currentMessage = Array.isArray(currentMessages) && currentMessages.length > 0 ? currentMessages[0] : null;
               if (!currentMessage) {
                 setEditError('无法读取当前楼层正文。');
                 return;
               }
               let updatedPayload;
               try {
-                updatedPayload = buildUpdatedStateMessage(String(currentMessage.message ?? ''), jsonData, newName, newIdentity);
+                updatedPayload = buildUpdatedStateMessage(String(currentMessage.message === undefined || currentMessage.message === null ? '' : currentMessage.message), jsonData, newName, newIdentity);
               } catch (error) {
-                setEditError(error?.message || '无法定位当前状态栏对应的 <stateN>。');
+                setEditError(error && error.message ? error.message : '无法定位当前状态栏对应的 <stateN>。');
                 return;
               }
               saveButton.disabled = true;
@@ -1655,7 +1662,7 @@
               saveButton.textContent = '保存中...';
               try {
                 await setChatMessages(
-                  [{ message_id: currentMessage.message_id ?? messageId, message: updatedPayload.message }],
+                  [{ message_id: currentMessage.message_id === undefined || currentMessage.message_id === null ? messageId : currentMessage.message_id, message: updatedPayload.message }],
                   { refresh: 'affected' },
                 );
                 if (newName !== oldName) {
@@ -1667,7 +1674,7 @@
                 toggleEditModal(false);
                 if (typeof reloadIframe === 'function') reloadIframe();
               } catch (error) {
-                setEditError(error?.message || '保存失败，请重试。');
+                setEditError(error && error.message ? error.message : '保存失败，请重试。');
               } finally {
                 saveButton.disabled = false;
                 cancelButton.disabled = false;
@@ -1731,7 +1738,7 @@
                 editSaveButton.addEventListener('click', () => {
                   saveCharacterEdits().catch(error => {
                     debugError('保存角色信息失败。', error);
-                    setEditError(error?.message || '保存失败，请重试。');
+                    setEditError(error && error.message ? error.message : '保存失败，请重试。');
                   });
                 });
               }
@@ -1902,7 +1909,7 @@
             main().catch(error => {
               displayError(
                 '脚本执行失败。这通常是由于状态栏初始化或渲染阶段发生错误导致的。',
-                error?.stack || error?.message || String(error),
+                error && error.stack ? error.stack : error && error.message ? error.message : String(error),
               );
             });
           } catch (error) {
