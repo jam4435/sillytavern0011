@@ -3,6 +3,7 @@ import { LOREBOOK_EDITOR_PANEL_ID } from '../config.js';
 import { allEntriesData } from '../state.js';
 import { ensureNumericUID, errorCatched, isMobile } from '../utils.js';
 import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
+import { refreshSingleMasterEntryTokenBadge } from './masterEntryTokens.js';
 
 const STYLE_ID = 'enhanced-content-editor-styles';
 const CONTENT_EDITOR_MODAL_ID = 'content-editor-modal';
@@ -291,6 +292,7 @@ function updateVisibleEntryContent(lorebookName, entryUid, content) {
   const normalized = normalizeText(content ?? '');
   const stateEntries = allEntriesData[lorebookName] || [];
   const stateEntry = stateEntries.find(entry => ensureNumericUID(entry.uid) === uid);
+  let tokenEntry = stateEntry || null;
   if (stateEntry) {
     stateEntry.content = normalized;
   }
@@ -300,7 +302,13 @@ function updateVisibleEntryContent(lorebookName, entryUid, content) {
     const cachedEntry = cachedEntries.find(entry => ensureNumericUID(entry.uid) === uid);
     if (cachedEntry) {
       cachedEntry.content = normalized;
+      tokenEntry ||= cachedEntry;
     }
+  }
+
+  if (tokenEntry) {
+    refreshSingleMasterEntryTokenBadge(lorebookName, tokenEntry, false);
+    refreshSingleMasterEntryTokenBadge(lorebookName, tokenEntry, true);
   }
 
   $(`.detail-editor[data-lorebook-name="${lorebookName}"][data-entry-uid="${uid}"]`, parentDoc).each(function () {

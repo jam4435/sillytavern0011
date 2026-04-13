@@ -5,6 +5,7 @@ import { isEntryCurrentDetail, isEntryExpanded, isEntrySelected } from '../state
 import { ensureNumericUID, isMobile } from '../utils.js';
 import { getMasterDetailPositionLabel, isMasterDetailLayout } from './detail.js';
 import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
+import { buildMasterEntryTokenBadgeHtml } from './masterEntryTokens.js';
 
 /* --- Create HTML for a single lorebook entry --- */
 export function createEntryHtml(entry, lorebookName, isGlobal = false) {
@@ -104,7 +105,10 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
                 <button class="master-entry-button" type="button">
                     <div class="master-entry-text">
                         <span class="master-entry-title">${entryTitle}</span>
-                        <span class="master-entry-meta">${_.escape(compactMasterMetaText)}</span>
+                        <span class="master-entry-meta">
+                            <span class="master-entry-meta-primary">${_.escape(compactMasterMetaText)}</span>
+                            ${buildMasterEntryTokenBadgeHtml(entry, lorebookName, isGlobal)}
+                        </span>
                     </div>
                     <div class="master-entry-status">
                         <i class="fa-solid fa-thumbtack master-entry-pin" style="${isPinned ? '' : 'display:none;'}"></i>

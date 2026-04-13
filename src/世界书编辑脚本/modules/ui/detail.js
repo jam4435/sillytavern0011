@@ -24,6 +24,7 @@ import {
 } from '../state.js';
 import { ensureNumericUID, isMobile } from '../utils.js';
 import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
+import { refreshSingleMasterEntryTokenBadge } from './masterEntryTokens.js';
 
 const DETAIL_STYLE_ID = 'enhanced-lorebook-detail-styles';
 const DETAIL_SAVE_DELAY = 250;
@@ -147,7 +148,12 @@ export function syncMasterRowFromState(lorebookName, entryUid, isGlobal = false)
   if ($titleInput.length) {
     $titleInput.val(entry.name || '未命名条目');
   }
-  $row.find('.master-entry-meta').text(describeMasterEntryMeta(entry));
+  const $metaPrimary = $row.find('.master-entry-meta-primary');
+  if ($metaPrimary.length) {
+    $metaPrimary.text(describeMasterEntryMeta(entry));
+  } else {
+    $row.find('.master-entry-meta').text(describeMasterEntryMeta(entry));
+  }
   $row.find('[data-action="toggle-enabled"]').prop('checked', entry.enabled !== false);
   $row.find('[data-action="toggle-constant"]').prop('checked', entry.strategy?.type === 'constant');
   $row
@@ -157,6 +163,7 @@ export function syncMasterRowFromState(lorebookName, entryUid, isGlobal = false)
   $row.find('.master-entry-enabled').text(entry.enabled === false ? '已禁用' : '已启用');
   $row.find('.master-entry-enabled').toggleClass('is-disabled', entry.enabled === false);
   $row.find('.master-entry-pin').toggle(entry.pinned === true);
+  refreshSingleMasterEntryTokenBadge(lorebookName, entry, isGlobal);
 }
 
 function showSaveError(message) {
@@ -793,9 +800,36 @@ function ensureDetailStyles() {
         background: rgba(255,255,255,0.08);
       }
       #${LOREBOOK_PANEL_ID} .master-entry-meta {
-        display: block;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
         font-size: 0.82em;
-        opacity: 0.72;
+        color: color-mix(in srgb, var(--panel-text-color,#eee) 72%, transparent);
+      }
+      #${LOREBOOK_PANEL_ID} .master-entry-meta-primary {
+        min-width: 0;
+      }
+      #${LOREBOOK_PANEL_ID} .master-entry-token {
+        display: inline-flex;
+        align-items: center;
+        padding: 0 6px;
+        min-height: 18px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.06);
+        color: inherit;
+        font-size: 0.92em;
+        line-height: 1;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      #${LOREBOOK_PANEL_ID} .master-entry-token[data-token-state="pending"] {
+        opacity: 0.6;
+      }
+      #${LOREBOOK_PANEL_ID} .master-entry-token[data-token-state="fallback"] {
+        border-color: rgba(250,204,21,0.22);
+        color: color-mix(in srgb, currentColor 78%, #facc15);
       }
       #${LOREBOOK_PANEL_ID} .master-entry-status {
         display: flex;

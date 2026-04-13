@@ -37,6 +37,7 @@ import {
   restoreDetailSelection,
   syncMasterDetailSelectionInList,
 } from './detail.js';
+import { scheduleMasterEntryTokenHydration } from './masterEntryTokens.js';
 
 import { enableDragSort, getSortedEntries, loadUISort } from '../features/sorting.js';
 import { getLastTransactionMeta } from '../features/history.js';
@@ -465,6 +466,7 @@ function renderMasterDetailEntries($container, entries, lorebookName, isGlobal) 
       $content.append(createEntryHtml(segment.entry, lorebookName, isGlobal));
     });
     $container.append($content);
+    scheduleMasterEntryTokenHydration($content, entries, lorebookName, isGlobal);
   }
 
   const currentVirtualScrollers = { ...virtualScrollers };
