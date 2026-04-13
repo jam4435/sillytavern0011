@@ -41,7 +41,6 @@ import { saveSortPreference } from './features/sorting.js';
 import {
   allEntriesData,
   clearFilteredEntries,
-  clearSelectedEntries,
   getFilteredEntries,
   setSelectedEntries,
   setActiveLorebookGroup,
@@ -75,12 +74,20 @@ import { ensureNumericUID, isMobile } from './utils.js';
  * 刷新条目列表
  */
 async function refreshList(lorebookName, isGlobal) {
-  clearSelectedEntries(lorebookName);
+  const selectedUids = getSelectedEntries(lorebookName);
 
   const parentDoc = window.parent.document;
   const $entriesWrapper = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"]`, parentDoc);
   if ($entriesWrapper.is(':visible')) {
     await loadLorebookEntries(lorebookName, $entriesWrapper, isGlobal);
+    const existingUidSet = new Set(
+      (Array.isArray(allEntriesData[lorebookName]) ? allEntriesData[lorebookName] : []).map(entry => ensureNumericUID(entry.uid)),
+    );
+    setSelectedEntries(
+      lorebookName,
+      selectedUids.filter(uid => existingUidSet.has(ensureNumericUID(uid))),
+    );
+    updateHeaderCheckboxState(lorebookName, isGlobal);
   }
 }
 
