@@ -669,6 +669,8 @@
       let keywordRegex = null;
       let fallbackAvatars = [];
       let refreshTimer = null;
+      const DEBUG_PREFIX = '[变量状态栏]';
+      let debugHooksInstalled = false;
 
       const safeGet = (obj, path, defaultValue = undefined) => {
         const keys = Array.isArray(path) ? path : path.split('.');
@@ -683,6 +685,29 @@
       const ensureString = value => (value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value));
       const ensureArray = value => (Array.isArray(value) ? value : []);
       const ensureObject = value => (_.isPlainObject(value) ? value : {});
+      function debugLog(message, details) {
+        if (details === undefined) console.log(`${DEBUG_PREFIX} ${message}`);
+        else console.log(`${DEBUG_PREFIX} ${message}`, details);
+      }
+      function debugError(message, error, details) {
+        if (details === undefined) console.error(`${DEBUG_PREFIX} ${message}`, error);
+        else console.error(`${DEBUG_PREFIX} ${message}`, error, details);
+      }
+      function installDebugHooks() {
+        if (debugHooksInstalled || typeof window?.addEventListener !== 'function') return;
+        window.addEventListener('error', event => {
+          debugError('捕获到全局 error 事件。', event.error || event.message, {
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+          });
+        });
+        window.addEventListener('unhandledrejection', event => {
+          debugError('捕获到未处理的 Promise 拒绝。', event.reason);
+        });
+        debugHooksInstalled = true;
+        debugLog('调试钩子已安装。');
+      }
       const EDIT_PENCIL_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.21a.996.996 0 0 0 0-1.41L18.37 3.3a.996.996 0 1 0-1.41 1.41l2.34 2.33a.996.996 0 0 0 1.41 0z"/></svg>';
       const DISPLAY_TEXT_REPLACEMENTS = [['__DOT__', '.']];
       function normalizeDisplayValue(value) {
@@ -801,6 +826,11 @@
           fallbackAvatars = sharedData.fallbackAvatars;
           allKeywords = sharedData.allKeywords;
           keywordRegex = sharedData.keywordRegex;
+          debugLog('核心图片数据加载完成。', {
+            imageKeywordCount: Object.keys(imageIndex).length,
+            synonymCount: Object.keys(synonymMap).length,
+            fallbackAvatarCount: fallbackAvatars.length,
+          });
           return true;
         } catch (error) {
           console.warn('[变量状态栏] 核心图片数据加载失败，图片相关功能将退化。', error);
@@ -816,18 +846,25 @@
         try {
           const latestMessage = getChatMessages(-1)?.[0]?.message ?? '';
           const match = typeof latestMessage === 'string' ? latestMessage.match(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/) : null;
-          if (!match) return [];
-          return splitCharacterNames(match[2]);
+          if (!match) {
+            debugLog('最新楼层未找到 <当前人物>/<当前角色> 标签。', { latestMessagePreview: String(latestMessage).slice(0, 200) });
+            return [];
+          }
+          const names = splitCharacterNames(match[2]);
+          debugLog('解析到当前人物列表。', { tagType: match[1], names, latestMessagePreview: String(latestMessage).slice(0, 200) });
+          return names;
         } catch (error) {
-          console.warn('[变量状态栏] 读取最新楼层失败:', error);
+          debugError('读取最新楼层失败。', error);
           return [];
         }
       }
       function loadStatData() {
         try {
-          return ensureObject(_.get(getVariables({ type: 'chat' }), 'stat_data', {}));
+          const statData = ensureObject(_.get(getVariables({ type: 'chat' }), 'stat_data', {}));
+          debugLog('读取到 chat.stat_data。', { topLevelKeys: Object.keys(statData).slice(0, 20), topLevelKeyCount: Object.keys(statData).length });
+          return statData;
         } catch (error) {
-          console.warn('[变量状态栏] 读取 chat 变量失败:', error);
+          debugError('读取 chat 变量失败。', error);
           return {};
         }
       }
@@ -1502,11 +1539,17 @@
           if (panelData) panelDataList.push(panelData);
           else missingNames.push(name);
         });
+        debugLog('开始刷新面板。', {
+          names,
+          missingNames,
+          panelCount: panelDataList.length,
+        });
         let rootHtml = '';
         if (missingNames.length > 0) rootHtml += renderFeedback(`未找到变量人物：${missingNames.join('、')}`, 'warning');
         if (panelDataList.length === 0) {
           rootHtml += renderFeedback(names.length === 0 ? '未找到当前人物。请在最新楼层加入 <当前人物>人物名</当前人物> 或 <当前角色>人物名</当前角色>。' : '未找到当前人物对应的变量数据。');
           root.innerHTML = rootHtml;
+          debugLog('没有可渲染面板，已输出反馈信息。', { names, missingNames });
           return;
         }
         rootHtml += panelDataList.map((data, index) => `<div class="status-container jm-state-panel" data-panel-key="${index}" data-character-name="${data.Name}"></div>`).join('');
@@ -1518,6 +1561,7 @@
         });
         await Promise.all(panels.map((panel, index) => updatePortrait(panel, panelDataList[index]).catch(error => console.error(`[变量状态栏 ${panelDataList[index].Name}] 头像更新失败:`, error))));
         panels.forEach(panel => linkifyAllText(panel));
+        debugLog('面板刷新完成。', { renderedPanels: panelDataList.map(data => data.Name) });
       }
       function scheduleRefresh() {
         if (refreshTimer) clearTimeout(refreshTimer);
@@ -1534,11 +1578,15 @@
         eventOn('era:writeDone', () => scheduleRefresh());
       }
       async function init() {
+        installDebugHooks();
+        debugLog('开始初始化。');
         root = document.querySelector('.jm-state-panel-list');
         if (!root) throw new Error('未找到变量状态栏根容器。');
+        debugLog('已找到根容器。');
         await fetchData();
         await refreshPanels();
         setupGlobalEventListeners();
+        debugLog('初始化完成。');
       }
       $(() => {
         errorCatched(init)();

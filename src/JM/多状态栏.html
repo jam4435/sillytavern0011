@@ -716,15 +716,43 @@
       document.addEventListener('DOMContentLoaded', () => {
         // 查找所有状态栏面板并为每个初始化
         const panels = document.querySelectorAll('.jm-state-panel');
+        console.log('[状态栏 全局] DOMContentLoaded，检测到状态栏面板数量:', panels.length);
 
         panels.forEach(panel => {
+          const panelId = panel.id || '未知';
+          const debugPrefix = `[状态栏 ${panelId}]`;
+          let debugHooksInstalled = false;
+          function debugLog(message, details) {
+            if (details === undefined) console.log(`${debugPrefix} ${message}`);
+            else console.log(`${debugPrefix} ${message}`, details);
+          }
+          function debugError(message, error, details) {
+            if (details === undefined) console.error(`${debugPrefix} ${message}`, error);
+            else console.error(`${debugPrefix} ${message}`, error, details);
+          }
+          function installDebugHooks() {
+            if (debugHooksInstalled || typeof window?.addEventListener !== 'function') return;
+            window.addEventListener('error', event => {
+              debugError('捕获到全局 error 事件。', event.error || event.message, {
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+              });
+            });
+            window.addEventListener('unhandledrejection', event => {
+              debugError('捕获到未处理的 Promise 拒绝。', event.reason);
+            });
+            debugHooksInstalled = true;
+            debugLog('调试钩子已安装。');
+          }
           function displayError(message, details = '') {
-            const panelId = panel.id || '未知';
-            console.error(`[状态栏 ${panelId}] ` + message, details);
+            console.error(`${debugPrefix} ${message}`, details);
             panel.innerHTML = `<div style="color: var(--red-color); padding: 20px; font-family: monospace; white-space: pre-wrap;"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${details}</p></details></div>`;
           }
 
           try {
+            installDebugHooks();
+            debugLog('开始初始化。');
             const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
             const rawData = `{
   "Name": "爱丽丝",
@@ -762,6 +790,11 @@
   }
 }`;
             const jsonData = JSON.parse(rawData.trim());
+            debugLog('rawData JSON 解析成功。', {
+              rawDataLength: rawData.length,
+              name: jsonData?.Name,
+              identity: jsonData?.Status?.Identity,
+            });
 
             function safeGet(obj, path, defaultValue = undefined) {
               const keys = Array.isArray(path) ? path : path.split('.');
@@ -881,11 +914,14 @@
                 allKeywords = sharedData.allKeywords;
                 keywordRegex = sharedData.keywordRegex;
 
-                console.log(`[状态栏 ${panel.id}] 已从全局管理器获取数据。`);
+                debugLog('已从全局管理器获取数据。', {
+                  imageKeywordCount: Object.keys(imageIndex).length,
+                  synonymCount: Object.keys(synonymMap).length,
+                  fallbackAvatarCount: fallbackAvatars.length,
+                });
                 return true;
               } catch (error) {
-                const panelId = panel.id || '未知';
-                console.error(`[状态栏 ${panelId}] 从全局管理器获取数据失败:`, error);
+                debugError('从全局管理器获取数据失败。', error);
                 displayError('核心数据加载失败', `错误: ${error.message}`);
                 return false;
               }
@@ -1144,6 +1180,7 @@
             }
 
             function updatePanel(data) {
+              debugLog('开始渲染面板。', { name: data?.Name, identity: safeGet(data, 'Status.Identity', '') });
               // 1. 设置只包含静态部分的HTML框架
               panel.innerHTML = `
                         <div class="header">
@@ -1231,6 +1268,10 @@
               const { tabsHtml, contentsHtml } = generateDynamicTabsAndContent(data);
               panel.querySelector('.tabs-container').innerHTML = tabsHtml;
               panel.querySelector('.tab-content-container').innerHTML = contentsHtml;
+              debugLog('面板渲染完成。', {
+                tabCount: panel.querySelectorAll('.tab-button').length,
+                htmlLength: panel.innerHTML.length,
+              });
             }
 
             // --- 修改：主渲染循环 (支持自动格式检测和原始顺序) ---
@@ -1634,6 +1675,7 @@
             }
 
             function setupEventListeners() {
+              debugLog('开始绑定事件。');
               // 折叠/展开功能
               const collapseToggle = panel.querySelector('.collapse-toggle');
               if (collapseToggle) {
@@ -1687,7 +1729,7 @@
               if (editSaveButton) {
                 editSaveButton.addEventListener('click', () => {
                   saveCharacterEdits().catch(error => {
-                    console.error(`[状态栏 ${panel.id}] 保存角色信息失败:`, error);
+                    debugError('保存角色信息失败。', error);
                     setEditError(error?.message || '保存失败，请重试。');
                   });
                 });
@@ -1835,9 +1877,11 @@
                 updateTransform();
               }
               setupPortraitUpload(jsonData);
+              debugLog('事件绑定完成。');
             }
 
             async function main() {
+              debugLog('main() 开始执行。');
               updatePanel(jsonData);
               // 设置默认折叠状态
               panel.classList.add('collapsed');
@@ -1846,10 +1890,12 @@
               if (dataLoaded) {
                 await updatePortrait(jsonData); // 等待头像加载完成
                 linkifyAllText();
+                debugLog('头像和链接处理完成。');
               } else {
-                console.warn(`[状态栏 ${panel.id}] 无法加载图片索引，图片相关功能将不可用。`);
+                console.warn(`${debugPrefix} 无法加载图片索引，图片相关功能将不可用。`);
               }
               setupEventListeners();
+              debugLog('main() 执行完成。');
             }
 
             main().catch(error => {
