@@ -756,41 +756,7 @@
             installDebugHooks();
             debugLog('开始初始化。');
             const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
-            const rawData = `{
-  "Name": "爱丽丝",
-  "Location": "图书馆",
-  "Time": "下午 3:00",
-  "Affection": "60 → 65 (送了她一本书)",
-  "Libido": "20",
-  "Thoughts": "他似乎对我有好感... 这本书正是我需要的。",
-  "RecentSex": "无",
-  "ModificationsAndRestraints": [
-    "银色项圈",
-    "手腕上的细链"
-  ],
-  "Status": {
-    "Identity": "皇家魔法学院学生",
-    "Occupation": "图书管理员助理",
-    "Affiliation": "白魔法协会",
-    "Temperament": "文静、有点害羞",
-    "Posture": "优雅地站着"
-  },
-  "Outfit": {
-    "Top": "白色蕾丝边衬衫",
-    "Bottom": "及膝的蓝色格子裙",
-    "Underwear": "纯棉白色内衣",
-    "Footwear": "黑色玛丽珍鞋"
-  },
-  "BodyDetails": {
-    "Mouth": "自然的粉色，带着一丝微笑",
-    "Breasts": "被衬衫包裹得很好，不大不小",
-    "WombAndVagina": "纯洁而健康",
-    "Anus": "紧致",
-    "Hands": "纤细的手指，指甲修剪得很干净",
-    "Legs": "修长而白皙",
-    "Feet": "小巧玲珑"
-  }
-}`;
+            const rawData = `$2`;
             const jsonData = JSON.parse(rawData.trim());
             debugLog('rawData JSON 解析成功。', {
               rawDataLength: rawData.length,
