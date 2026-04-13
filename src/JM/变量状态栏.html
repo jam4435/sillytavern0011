@@ -713,11 +713,21 @@
       const DISPLAY_TEXT_REPLACEMENTS = [['__DOT__', '.']];
       function normalizeDisplayValue(value) {
         if (typeof value === 'string') {
-          return DISPLAY_TEXT_REPLACEMENTS.reduce((text, [token, replacement]) => text.split(token).join(replacement), value);
+          let normalizedText = value;
+          for (const pair of DISPLAY_TEXT_REPLACEMENTS) {
+            const token = pair[0];
+            const replacement = pair[1];
+            normalizedText = normalizedText.split(token).join(replacement);
+          }
+          return normalizedText;
         }
         if (Array.isArray(value)) return value.map(item => normalizeDisplayValue(item));
         if (_.isPlainObject(value)) {
-          return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, normalizeDisplayValue(nestedValue)]));
+          const normalizedObject = {};
+          for (const key of Object.keys(value)) {
+            normalizedObject[key] = normalizeDisplayValue(value[key]);
+          }
+          return normalizedObject;
         }
         return value;
       }
@@ -756,17 +766,28 @@
       }
       function renameKeyInObject(target, oldKey, newKey, newValue) {
         const entries = Object.entries(ensureObject(target));
-        if (oldKey !== newKey && entries.some(([key]) => key === newKey)) {
-          throw new Error(`变量中已存在人物“${newKey}”。`);
+        if (oldKey !== newKey) {
+          for (const entry of entries) {
+            const key = entry[0];
+            if (key === newKey) {
+              throw new Error(`变量中已存在人物“${newKey}”。`);
+            }
+          }
         }
         let found = false;
-        const nextEntries = entries.map(([key, value]) => {
+        const nextEntries = entries.map(entry => {
+          const key = entry[0];
+          const value = entry[1];
           if (key !== oldKey) return [key, value];
           found = true;
           return [newKey, newValue];
         });
         if (!found) throw new Error(`未找到人物“${oldKey}”对应的变量。`);
-        return Object.fromEntries(nextEntries);
+        const nextObject = {};
+        nextEntries.forEach(entry => {
+          nextObject[entry[0]] = entry[1];
+        });
+        return nextObject;
       }
       function buildUpdatedStatData(statData, oldName, newName, newIdentity) {
         const nextStatData = _.cloneDeep(ensureObject(statData));
