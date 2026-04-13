@@ -472,19 +472,7 @@ function renderCompactDetailEditorV2(tabKey, context, entry) {
             <input class="secondary-keywords-input" type="text" value="${escapeHtml(keysSecondary)}" data-field="strategy.keys_secondary.keys" data-value-type="csv" data-save-mode="debounced" placeholder="逗号分隔列表">
           </div>
         </div>
-      </section>
-      <section class="detail-section">
-        <div class="detail-section-header">
-          <span>正文</span>
-          <div class="detail-inline-actions">
-            <button type="button" class="detail-inline-button" data-detail-action="open-content-editor">全屏编辑</button>
-            <button type="button" class="detail-inline-button" data-detail-action="open-compare-editor">对比编辑</button>
-          </div>
-        </div>
-        ${buildDetailContentFieldMarkup(entry.content)}
-      </section>
-      <section class="detail-section detail-keywords-panel">
-        <div class="detail-row detail-row-flags">
+        <div class="detail-row detail-row-flags detail-row-flags-integrated">
           <label class="detail-check-field">
             <input type="checkbox" ${preventOutgoing ? 'checked' : ''} data-field="recursion.prevent_outgoing" data-save-mode="immediate">
             <span>阻止外向递归</span>
@@ -502,6 +490,17 @@ function renderCompactDetailEditorV2(tabKey, context, entry) {
             <span>置顶</span>
           </label>
         </div>
+      </section>
+      <section class="detail-section detail-content-section">
+        <div class="detail-content-toolbar">
+          <button type="button" class="content-edit-button detail-content-tool" data-detail-action="open-content-editor" title="在新窗口中编辑内容" aria-label="全屏编辑">
+            <i class="fa-solid fa-expand"></i>
+          </button>
+          <button type="button" class="content-edit-button detail-content-tool" data-detail-action="open-compare-editor" title="打开对比编辑" aria-label="对比编辑">
+            <i class="fa-solid fa-not-equal"></i>
+          </button>
+        </div>
+        ${buildDetailContentFieldMarkup(entry.content)}
       </section>
     </div>
   `);
@@ -915,11 +914,20 @@ function ensureDetailStyles() {
         flex-wrap: wrap;
         gap: 10px 18px;
       }
+      #${LOREBOOK_PANEL_ID} .detail-row-flags-integrated {
+        padding-top: 2px;
+        border-top: 1px solid rgba(255,255,255,0.06);
+      }
       #${LOREBOOK_PANEL_ID} .detail-section {
         background: rgba(255,255,255,0.03);
         border: 1px solid rgba(255,255,255,0.06);
         border-radius: 10px;
         padding: 14px;
+      }
+      #${LOREBOOK_PANEL_ID} .detail-content-section {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
       }
       #${LOREBOOK_PANEL_ID} .detail-main-grid,
       #${LOREBOOK_PANEL_ID} .detail-advanced-grid {
@@ -999,6 +1007,15 @@ function ensureDetailStyles() {
         border-radius: 999px;
         padding: 6px 10px;
         cursor: pointer;
+      }
+      #${LOREBOOK_PANEL_ID} .detail-content-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin: -4px 0 0 -8px;
+      }
+      #${LOREBOOK_PANEL_ID} .detail-content-tool {
+        margin-left: 0;
       }
       #${LOREBOOK_PANEL_ID} .detail-content-textarea {
         min-height: 320px;
