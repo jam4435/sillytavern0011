@@ -672,15 +672,17 @@
       const DEBUG_PREFIX = '[变量状态栏]';
       let debugHooksInstalled = false;
 
-      const safeGet = (obj, path, defaultValue = undefined) => {
+      function safeGet(obj, path, defaultValue) {
+        const fallbackValue = arguments.length >= 3 ? defaultValue : undefined;
         const keys = Array.isArray(path) ? path : path.split('.');
         let result = obj;
         for (const key of keys) {
-          result = result?.[key];
-          if (result === undefined) return defaultValue;
+          if (result === undefined || result === null) return fallbackValue;
+          result = result[key];
+          if (result === undefined) return fallbackValue;
         }
         return result;
-      };
+      }
       const uniq = arr => Array.from(new Set(arr));
       const ensureString = value => (value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value));
       const ensureArray = value => (Array.isArray(value) ? value : []);
@@ -732,7 +734,7 @@
         return value;
       }
       function escapeHtml(value) {
-        return String(value ?? '')
+        return String(value === undefined || value === null ? '' : value)
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
@@ -740,10 +742,16 @@
           .replace(/'/g, '&#39;');
       }
       function splitCharacterNames(rawText) {
-        return uniq(String(rawText ?? '').split(/[，,、|/]/).map(name => name.trim()).filter(Boolean));
+        const parts = String(rawText === undefined || rawText === null ? '' : rawText).split(/[，,、|/]/);
+        const names = [];
+        parts.forEach(part => {
+          const name = part.trim();
+          if (name) names.push(name);
+        });
+        return uniq(names);
       }
       function replaceDelimitedCharacterName(content, oldName, newName) {
-        const parts = String(content ?? '').split(/([，,、|/])/);
+        const parts = String(content === undefined || content === null ? '' : content).split(/([，,、|/])/);
         let replaced = false;
         for (let index = 0; index < parts.length; index += 2) {
           const originalPart = parts[index];
@@ -756,11 +764,11 @@
       }
       function replaceCurrentCharacterNameInMessage(message, oldName, newName) {
         let replaced = false;
-        const updatedMessage = String(message ?? '').replace(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/g, (full, tagName, content) => {
+        const updatedMessage = String(message === undefined || message === null ? '' : message).replace(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/g, function (full, tagName, content) {
           const result = replaceDelimitedCharacterName(content, oldName, newName);
           if (!result.replaced) return full;
           replaced = true;
-          return `<当前${tagName}>${result.content}</当前${tagName}>`;
+          return '<当前' + tagName + '>' + result.content + '</当前' + tagName + '>';
         });
         return { message: updatedMessage, replaced };
       }
@@ -835,10 +843,11 @@
         }
         return Math.abs(hash) % max;
       }
-      function displayRootError(message, details = '') {
+      function displayRootError(message, details) {
+        const detailText = details === undefined ? '' : details;
         if (!root) return;
-        console.error('[变量状态栏] ' + message, details);
-        root.innerHTML = `<div class="status-feedback error"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${details}</p></details></div>`;
+        console.error('[变量状态栏] ' + message, detailText);
+        root.innerHTML = `<div class="status-feedback error"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${detailText}</p></details></div>`;
       }
       async function fetchData() {
         try {
@@ -866,7 +875,9 @@
       }
       function loadCurrentCharacterNames() {
         try {
-          const latestMessage = getChatMessages(-1)?.[0]?.message ?? '';
+          const latestMessages = getChatMessages(-1);
+          const latestMessageObject = Array.isArray(latestMessages) && latestMessages.length > 0 ? latestMessages[0] : null;
+          const latestMessage = latestMessageObject && latestMessageObject.message !== undefined && latestMessageObject.message !== null ? latestMessageObject.message : '';
           const match = typeof latestMessage === 'string' ? latestMessage.match(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/) : null;
           if (!match) {
             debugLog('最新楼层未找到 <当前人物>/<当前角色> 标签。', { latestMessagePreview: String(latestMessage).slice(0, 200) });
@@ -954,19 +965,21 @@
           /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
         );
         if (rangeMatch) {
+          const rangeReason = rangeMatch[3] === undefined || rangeMatch[3] === null ? '' : rangeMatch[3].trim();
           return {
             mode: 'range',
             from: rangeMatch[1],
             to: rangeMatch[2],
-            reason: rangeMatch[3]?.trim() ?? '',
+            reason: rangeReason,
           };
         }
         const singleMatch = normalizedValue.match(/^([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/);
         if (singleMatch) {
+          const singleReason = singleMatch[2] === undefined || singleMatch[2] === null ? '' : singleMatch[2].trim();
           return {
             mode: 'single',
             value: singleMatch[1],
-            reason: singleMatch[2]?.trim() ?? '',
+            reason: singleReason,
           };
         }
         return null;
@@ -1219,7 +1232,9 @@
           }
         };
         uploadInput.onchange = event => {
-          const file = event.target.files?.[0];
+          const target = event && event.target ? event.target : null;
+          const fileList = target && target.files ? target.files : null;
+          const file = fileList && fileList.length > 0 ? fileList[0] : null;
           if (!file) {
             uploadInput.value = '';
             return;
@@ -1289,11 +1304,12 @@
         modal.classList.toggle('visible', visible);
         modal.setAttribute('aria-hidden', visible ? 'false' : 'true');
       }
-      function setEditError(panel, message = '') {
+      function setEditError(panel, message) {
+        const nextMessage = message === undefined ? '' : message;
         const errorBox = panel.querySelector('.jm-edit-error');
         if (!errorBox) return;
-        errorBox.textContent = message;
-        errorBox.classList.toggle('visible', Boolean(message));
+        errorBox.textContent = nextMessage;
+        errorBox.classList.toggle('visible', Boolean(nextMessage));
       }
       function openCharacterEditor(panel, data) {
         const nameInput = panel.querySelector('.jm-edit-name-input');
@@ -1373,7 +1389,7 @@
           } catch (rollbackError) {
             console.error('[变量状态栏] 回滚编辑失败:', rollbackError);
           }
-          setEditError(panel, error?.message || '保存失败，请重试。');
+          setEditError(panel, error && error.message ? error.message : '保存失败，请重试。');
         } finally {
           saveButton.disabled = false;
           cancelButton.disabled = false;
@@ -1401,7 +1417,8 @@
             panel.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
             panel.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             button.classList.add('active');
-            panel.querySelector(`#${targetTabId}`)?.classList.add('active');
+            const targetTab = panel.querySelector(`#${targetTabId}`);
+            if (targetTab) targetTab.classList.add('active');
           });
         });
         const gallery = panel.querySelector('.jm-image-gallery');
@@ -1535,7 +1552,7 @@
           editSaveButton.addEventListener('click', () => {
             saveCharacterEdits(panel, data).catch(error => {
               console.error('[变量状态栏] 保存角色信息失败:', error);
-              setEditError(panel, error?.message || '保存失败，请重试。');
+              setEditError(panel, error && error.message ? error.message : '保存失败，请重试。');
             });
           });
         }
@@ -1548,7 +1565,10 @@
           if (name) collapsedStateByName.set(name, panel.classList.contains('collapsed'));
         });
       }
-      const renderFeedback = (message, type = '') => `<div class="status-feedback${type ? ` ${type}` : ''}">${message}</div>`;
+      function renderFeedback(message, type) {
+        const typeClass = type ? ` ${type}` : '';
+        return `<div class="status-feedback${typeClass}">${message}</div>`;
+      }
       async function refreshPanels() {
         if (!root) return;
         persistCollapsedStates();
@@ -1589,7 +1609,10 @@
         if (refreshTimer) clearTimeout(refreshTimer);
         refreshTimer = window.setTimeout(() => {
           refreshTimer = null;
-          refreshPanels().catch(error => displayRootError('刷新状态栏失败。', error?.stack || error?.message || String(error)));
+          refreshPanels().catch(error => {
+            const errorDetails = error && error.stack ? error.stack : error && error.message ? error.message : String(error);
+            displayRootError('刷新状态栏失败。', errorDetails);
+          });
         }, 150);
       }
       function setupGlobalEventListeners() {
