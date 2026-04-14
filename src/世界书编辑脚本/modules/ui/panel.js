@@ -606,6 +606,16 @@ export function initPanel() {
                     overflow: hidden;
                     box-sizing: border-box;
                 }
+                #${LOREBOOK_PANEL_ID} .entry-header,
+                #${LOREBOOK_PANEL_ID} .entry-header button,
+                #${LOREBOOK_PANEL_ID} .entry-header input,
+                #${LOREBOOK_PANEL_ID} .entry-header select,
+                #${LOREBOOK_PANEL_ID} .entry-expand-area button,
+                #${LOREBOOK_PANEL_ID} .entry-expand-area input,
+                #${LOREBOOK_PANEL_ID} .entry-expand-area textarea,
+                #${LOREBOOK_PANEL_ID} .entry-expand-area select {
+                    -webkit-tap-highlight-color: transparent;
+                }
                 #${LOREBOOK_PANEL_ID} .tab-content {
                     display: none;
                     flex-direction: column;
@@ -2352,6 +2362,39 @@ export function initPanel() {
                     }
                     #${LOREBOOK_PANEL_ID} .lorebook-table-header {
                         display: none; /* 恢复在移动端隐藏表头 */
+                    }
+
+                    /* 移动端 WebView 在滚动虚拟列表时容易把合成层刷成黑块，这里关闭条目级 GPU/contain 优化。 */
+                    #${LOREBOOK_PANEL_ID} .clusterize-scroll,
+                    #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS} {
+                        contain: none;
+                        transform: none;
+                    }
+
+                    /* 触摸设备上不保留 hover 高亮，避免滚动途中条目头部或按钮停留在发黑状态。 */
+                    #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}:hover {
+                        border-color: #444;
+                    }
+                    #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}.entry-active:hover {
+                        border-left-color: #4CAF50;
+                        background-color: rgba(76, 175, 80, 0.08);
+                    }
+                    #${LOREBOOK_PANEL_ID} .entry-header:hover {
+                        background-color: var(--panel-entry-bg-color);
+                    }
+                    #${LOREBOOK_PANEL_ID} .entry-item-title:hover {
+                        border-color: transparent;
+                        background-color: transparent;
+                    }
+                    #${LOREBOOK_PANEL_ID} .small-expand-button:hover,
+                    #${LOREBOOK_PANEL_ID} .content-edit-button:hover {
+                        opacity: 0.7;
+                        color: inherit;
+                        background-color: transparent;
+                    }
+                    #${LOREBOOK_PANEL_ID} .move-button:hover {
+                        color: #eee;
+                        background-color: #444;
                     }
 
                     /* 为移动端控件添加标签的样式 */

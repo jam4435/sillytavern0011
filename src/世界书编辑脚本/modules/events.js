@@ -314,8 +314,11 @@ export function bindEventListeners() {
       const title = $target.attr('title');
       if (!title) return;
 
-      lastTouchX = e.originalEvent.touches.clientX;
-      lastTouchY = e.originalEvent.touches.clientY;
+      const touch = e.originalEvent.touches?.[0] || e.originalEvent.changedTouches?.[0];
+      if (!touch) return;
+
+      lastTouchX = touch.clientX;
+      lastTouchY = touch.clientY;
 
       pressTimer = setTimeout(() => {
         const $tooltip = $(`#${MOBILE_TOOLTIP_ID}`, parentDoc);
@@ -354,7 +357,9 @@ export function bindEventListeners() {
     });
 
     $panel.on('touchmove', '[title]', function (e) {
-      const touch = e.originalEvent.touches;
+      const touch = e.originalEvent.touches?.[0] || e.originalEvent.changedTouches?.[0];
+      if (!touch) return;
+
       if (Math.abs(touch.clientX - lastTouchX) > 10 || Math.abs(touch.clientY - lastTouchY) > 10) {
         clearTimeout(pressTimer);
         $(`#${MOBILE_TOOLTIP_ID}`, parentDoc).hide();
