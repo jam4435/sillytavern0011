@@ -2,7 +2,7 @@
 
 ## 1. 简介
 
-本文档说明 `src/世界书编辑脚本/` 当前代码的模块划分、主要数据流，以及现有 `AI 修改` 功能的真实工作流。
+本文档说明 `src/世界书编辑脚本/` 当前代码的模块划分和主要数据流。
 
 说明：
 
@@ -184,149 +184,9 @@ src/世界书编辑脚本/
 
 这套机制适用于 AI 应用，也适用于删除、批量修改等高风险操作。
 
-## 6. 现有 AI 修改功能工作流
+## 6. 开发指南
 
-### 6.1 入口
-
-现有 AI 修改有两类入口：
-
-1. **轻量弹窗入口**
-   - 单条目入口：`entryCommands.js`
-   - 批量选中入口：`titleBarCommands.js`
-   - 打开 `ui/aiActionDialog.js`
-
-2. **完整工作区入口**
-   - `panel.js` 提供 `AI 修改` 标签页
-   - `titleBarCommands.js` 可把当前选中的条目同步到 AI 工作区
-   - 支持 `direct` / `plan` 两种导航模式
-
-### 6.2 工作区加载
-
-完整工作区的初始化流程如下：
-
-```text
-切到 AI 修改页签 / 从标题栏打开工作区
-→ panel.js 调用 refreshAiWorkspace()
-→ aiWorkspace.js 读取 settings.js 中的持久化设置
-→ 加载世界书列表
-→ 读取目标世界书条目
-→ 恢复已保存的 selected / readonly / plan / preview 状态
-→ 渲染条目列表与表单
-```
-
-如果刷新时检测到世界书内容已变化，旧的规划和预览结果会被自动清空，避免把过期结果应用到新数据上。
-
-### 6.3 条目分组
-
-AI 工作区把条目分成三类：
-
-- `不参与`
-- `本批可修改`
-- `只读参考`
-
-来源有两种：
-
-1. 用户手动设置
-   - 逐条切换下拉框
-   - 将当前筛选结果批量设为可修改或只读
-
-2. AI 自动规划
-   - 先不手选条目
-   - 让 AI 根据全部条目输出 `editable_uids` 和 `readonly_uids`
-
-### 6.4 生成改造方案
-
-当用户点击“生成改造方案”时：
-
-```text
-aiWorkspace.js.handlePlan()
-→ aiActionsBatch.js.generateAiPlan()
-→ 收集目标世界书全部普通条目
-→ 组合规划提示词
-→ llmClient.js 请求 LLM
-→ 解析 JSON：readonly_uids / editable_uids / plan
-→ 回填到工作区状态
-```
-
-这一步**不直接修改世界书**，只负责确定：
-
-- 哪些条目作为只读背景
-- 哪些条目属于本批待修改条目
-- 本轮整体改造目标与规则
-
-### 6.5 生成预览
-
-当用户点击“生成预览”时：
-
-```text
-aiWorkspace.js.handlePreview()
-→ aiActionsBatch.js.generateAiPreview()
-→ 按可修改条目收集 targetEntries
-→ 按只读条目收集 readonlyEntries
-→ 根据 token 预算分批
-→ 为每一批拼接提示词与上下文
-→ llmClient.js 发起请求
-→ 解析 / 修复 JSON
-→ 生成 beforeEntry / afterEntry / diffs
-→ 汇总 summary、errors、debug
-→ ui/aiWorkspace.js 渲染预览
-```
-
-当前批量预览实现已经包含这些能力：
-
-- 分批请求，避免单次上下文过大
-- 把只读条目和前面批次的已修改结果作为上下文传入
-- 兼容流式与非流式
-- 自定义 OpenAI 兼容接口
-- JSON 提取、修复、失败诊断
-- 每条 diff 展示，便于人工确认
-
-### 6.6 应用预览
-
-当用户点击“应用预览”时：
-
-```text
-aiWorkspace.js.handleApply()
-→ aiActions.js.applyAiPreview()
-→ 过滤出真正 changed 的条目
-→ api.js.updateWorldbookEntries()
-→ history.js 记录事务快照
-→ 重新加载当前世界书
-→ 清空本轮预览
-```
-
-要点：
-
-- 没有 diff 的条目不会写回
-- AI 预览应用使用事务历史，默认支持后续回滚
-- 轻量弹窗 `aiActionDialog.js` 走的是同一套预览/应用核心能力，只是 UI 更简单
-
-### 6.7 回滚
-
-AI 应用后，如果结果不理想，可走回滚链路：
-
-```text
-titleBarCommands.js 打开回滚预览
-→ history.js.getRollbackPreview()
-→ 对比当前条目与历史快照
-→ 展示恢复 / 删除 / 回退修改列表
-→ history.js.rollbackLastTransaction()
-```
-
-这意味着现有 AI 修改流程不是“直接覆盖即结束”，而是完整的：
-
-```text
-选择入口
-→ 规划条目
-→ 生成预览
-→ 人工确认
-→ 原子写回
-→ 可回滚
-```
-
-## 7. 开发指南
-
-### 7.1 修改现有 AI 修改功能时优先看哪些文件
+### 6.1 修改现有 AI 修改功能时优先看哪些文件
 
 | 目标 | 优先查看 |
 |------|----------|
@@ -339,7 +199,7 @@ titleBarCommands.js 打开回滚预览
 | 改回滚 | `features/history.js` |
 | 改实际 LLM 请求方式 | `features/llmClient.js` |
 
-### 7.2 添加新功能
+### 6.2 添加新功能
 
 1. 先判断它属于命令入口、业务能力、界面渲染还是酒馆 API 封装
 2. 优先把核心逻辑放进 `features/`
@@ -348,7 +208,7 @@ titleBarCommands.js 打开回滚预览
 5. 若属于高风险批量操作，接入 `history.js`
 6. 运行 `pnpm build` 做回归验证
 
-### 7.3 常见排查方向
+### 6.3 常见排查方向
 
 | 问题 | 排查方向 |
 |------|----------|
@@ -358,7 +218,7 @@ titleBarCommands.js 打开回滚预览
 | 回滚按钮不可用 | 检查本次操作是否开启事务记录，以及 `history.js` 中是否成功提交快照 |
 | 主列表按钮无响应 | 检查 `data-action`、`events.js` 和对应 `commands/*.js` 是否已经注册 |
 
-## 8. 技术栈
+## 7. 技术栈
 
 - **核心库**: jQuery
 - **虚拟滚动**: Clusterize.js
