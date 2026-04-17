@@ -8,6 +8,9 @@ const PC_MASTER_DETAIL_SPLIT_KEY = 'lorebook-pc-master-detail-split';
 const FLOATING_BUBBLE_POSITION_DESKTOP_KEY = 'lorebook-floating-bubble-position-desktop';
 const FLOATING_BUBBLE_POSITION_MOBILE_KEY = 'lorebook-floating-bubble-position-mobile';
 const VALID_PC_LAYOUT_MODES = new Set(['drawer', 'master-detail']);
+const DEFAULT_AI_CHAT_CONTEXT = {
+  messageCount: 10,
+};
 const DEFAULT_AI_JAILBREAK_PROMPT_TEMPLATE = `[RESET COMPLET]
 <system>
 [Meta.System]
@@ -53,6 +56,10 @@ const DEFAULT_AI_WORKSPACE_SETTINGS = {
   lorebookName: '',
   apiMode: 'preset',
   stream: false,
+  chatContext: _.cloneDeep(DEFAULT_AI_CHAT_CONTEXT),
+  chatMessages: [],
+  referenceMaterial: '',
+  assistantChatHistory: [],
   promptSettings: {
     jailbreakPromptTemplate: DEFAULT_AI_JAILBREAK_PROMPT_TEMPLATE,
     builtinPromptTemplate: DEFAULT_AI_BUILTIN_PROMPT_TEMPLATE,
@@ -87,6 +94,10 @@ const DEFAULT_AI_WORKSPACE_SETTINGS = {
     },
     selectedEntryUids: [],
     readonlyEntryUids: [],
+    chatContext: _.cloneDeep(DEFAULT_AI_CHAT_CONTEXT),
+    chatMessages: [],
+    referenceMaterial: '',
+    assistantChatHistory: [],
     planningResult: null,
     previewResult: null,
     debugInfo: null,
@@ -109,12 +120,66 @@ const DEFAULT_AI_WORKSPACE_SETTINGS = {
     },
     selectedEntryUids: [],
     readonlyEntryUids: [],
+    chatContext: _.cloneDeep(DEFAULT_AI_CHAT_CONTEXT),
+    chatMessages: [],
+    referenceMaterial: '',
+    assistantChatHistory: [],
     planningResult: null,
     previewResult: null,
     debugInfo: null,
     statusText: '',
   },
 };
+
+function normalizeAiChatContext(chatContext = {}) {
+  const messageCount = Number.parseInt(`${chatContext?.messageCount ?? DEFAULT_AI_CHAT_CONTEXT.messageCount}`, 10);
+  return {
+    messageCount: Number.isFinite(messageCount)
+      ? Math.min(50, Math.max(0, messageCount))
+      : DEFAULT_AI_CHAT_CONTEXT.messageCount,
+  };
+}
+
+function normalizeAiChatMessages(chatMessages = []) {
+  if (!Array.isArray(chatMessages)) {
+    return [];
+  }
+
+  return chatMessages
+    .map(message => {
+      const role = ['system', 'assistant', 'user'].includes(message?.role) ? message.role : 'system';
+      const content = typeof message?.message === 'string' ? message.message : '';
+      if (!content.trim()) {
+        return null;
+      }
+
+      return {
+        message_id: Number.isFinite(Number(message?.message_id)) ? Number(message.message_id) : -1,
+        name: typeof message?.name === 'string' ? message.name : '',
+        role,
+        message: content,
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeAssistantChatHistory(chatHistory = []) {
+  if (!Array.isArray(chatHistory)) {
+    return [];
+  }
+
+  return chatHistory
+    .map(item => {
+      const role = item?.role === 'assistant' ? 'assistant' : 'user';
+      const content = typeof item?.content === 'string' ? item.content : '';
+      if (!content.trim()) {
+        return null;
+      }
+
+      return { role, content };
+    })
+    .filter(Boolean);
+}
 
 function buildAiModeSettings(settings = {}, fallback = {}) {
   return {
@@ -131,6 +196,18 @@ function buildAiModeSettings(settings = {}, fallback = {}) {
       ...(fallback?.promptSettings || {}),
       ...(settings?.promptSettings || {}),
     },
+    chatContext: normalizeAiChatContext(settings?.chatContext || fallback?.chatContext || DEFAULT_AI_CHAT_CONTEXT),
+    chatMessages: normalizeAiChatMessages(
+      Array.isArray(settings?.chatMessages) ? settings.chatMessages : fallback?.chatMessages,
+    ),
+    referenceMaterial: typeof settings?.referenceMaterial === 'string'
+      ? settings.referenceMaterial
+      : typeof fallback?.referenceMaterial === 'string'
+        ? fallback.referenceMaterial
+        : '',
+    assistantChatHistory: normalizeAssistantChatHistory(
+      Array.isArray(settings?.assistantChatHistory) ? settings.assistantChatHistory : fallback?.assistantChatHistory,
+    ),
     selectedEntryUids: Array.isArray(settings?.selectedEntryUids)
       ? [...settings.selectedEntryUids]
       : Array.isArray(fallback?.selectedEntryUids)
@@ -161,6 +238,9 @@ function buildCompactAiWorkspaceSettings(settings = {}) {
     previewResult: null,
     debugInfo: null,
     statusText: typeof settings?.statusText === 'string' ? settings.statusText.slice(0, 500) : '',
+    chatMessages: normalizeAiChatMessages(settings?.chatMessages),
+    assistantChatHistory: normalizeAssistantChatHistory(settings?.assistantChatHistory),
+    referenceMaterial: typeof settings?.referenceMaterial === 'string' ? settings.referenceMaterial : '',
     direct: stripLargeAiModeFields(settings?.direct || {}),
     plan: stripLargeAiModeFields(settings?.plan || {}),
   };
@@ -288,11 +368,19 @@ export function getAiWorkspaceSettings() {
         ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.editableFields),
         ...(parsed?.editableFields || {}),
       },
+      chatContext: normalizeAiChatContext(parsed?.chatContext),
+      chatMessages: normalizeAiChatMessages(parsed?.chatMessages),
+      referenceMaterial: typeof parsed?.referenceMaterial === 'string' ? parsed.referenceMaterial : '',
+      assistantChatHistory: normalizeAssistantChatHistory(parsed?.assistantChatHistory),
     };
     const modeFallback = {
       lorebookName: merged.lorebookName,
       editableFields: merged.editableFields,
       promptSettings: merged.promptSettings,
+      chatContext: merged.chatContext,
+      chatMessages: merged.chatMessages,
+      referenceMaterial: merged.referenceMaterial,
+      assistantChatHistory: merged.assistantChatHistory,
       selectedEntryUids: [],
       readonlyEntryUids: [],
     };
@@ -325,11 +413,19 @@ export function setAiWorkspaceSettings(settings = {}) {
       ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.editableFields),
       ...(settings?.editableFields || {}),
     },
+    chatContext: normalizeAiChatContext(settings?.chatContext),
+    chatMessages: normalizeAiChatMessages(settings?.chatMessages),
+    referenceMaterial: typeof settings?.referenceMaterial === 'string' ? settings.referenceMaterial : '',
+    assistantChatHistory: normalizeAssistantChatHistory(settings?.assistantChatHistory),
   };
   const modeFallback = {
     lorebookName: merged.lorebookName,
     editableFields: merged.editableFields,
     promptSettings: merged.promptSettings,
+    chatContext: merged.chatContext,
+    chatMessages: merged.chatMessages,
+    referenceMaterial: merged.referenceMaterial,
+    assistantChatHistory: merged.assistantChatHistory,
   };
   merged.navMode = ['api', 'direct', 'plan', 'generate'].includes(settings?.navMode) ? settings.navMode : 'direct';
   merged.direct = buildAiModeSettings(settings?.direct, modeFallback);

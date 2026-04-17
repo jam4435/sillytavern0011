@@ -3,7 +3,7 @@ import HtmlInlineScriptWebpackPlugin from 'html-inline-script-webpack-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import _ from 'lodash';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
-import { ChildProcess, exec, spawn } from 'node:child_process';
+import { ChildProcess, execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -127,8 +127,23 @@ function watch_tavern_helper(compiler: webpack.Compiler) {
 }
 
 let watcher: FSWatcher;
+function runBackgroundNodeScript(args: string[], label: string) {
+  try {
+    const child = execFile(process.execPath, args, { cwd: import.meta.dirname });
+    child.on('error', error => {
+      console.warn(`\x1b[33m[${label}]\x1b[0m 子进程启动失败，已跳过: ${error.message}`);
+    });
+  } catch (error: any) {
+    if (error?.code === 'EPERM') {
+      console.warn(`\x1b[33m[${label}]\x1b[0m 当前环境禁止创建子进程，已跳过。`);
+      return;
+    }
+    throw error;
+  }
+}
+
 const dump = () => {
-  exec('pnpm dump', { cwd: import.meta.dirname });
+  runBackgroundNodeScript(['dump_schema.ts'], 'schema_dump');
   console.info('\x1b[36m[schema_dump]\x1b[0m 已将所有 schema.ts 转换为 schema.json');
 };
 const dump_debounced = _.debounce(dump, 500, { leading: true, trailing: false });
@@ -150,7 +165,7 @@ function schema_dump(compiler: webpack.Compiler) {
 
 let child_process: ChildProcess;
 const bundle = () => {
-  exec('pnpm sync bundle all', { cwd: import.meta.dirname });
+  runBackgroundNodeScript(['tavern_sync.mjs', 'bundle', 'all'], 'tavern_sync');
   console.info('\x1b[36m[tavern_sync]\x1b[0m 已打包所有配置了的角色卡/世界书/预设');
 };
 const bundle_debounced = _.debounce(bundle, 500, { leading: true, trailing: false });
@@ -161,8 +176,8 @@ function tavern_sync(compiler: webpack.Compiler) {
   }
   compiler.hooks.watchRun.tap('watch_tavern_sync', () => {
     if (!child_process) {
-      child_process = spawn('pnpm', ['sync', 'watch', 'all', '-f'], {
-        shell: true,
+      child_process = spawn(process.execPath, ['tavern_sync.mjs', 'watch', 'all', '-f'], {
+        shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: import.meta.dirname,
         env: { ...process.env, FORCE_COLOR: '1' },

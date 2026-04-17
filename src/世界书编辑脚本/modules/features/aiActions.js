@@ -106,7 +106,6 @@ function buildEntryPrompt(lorebookName, instruction, entry, fieldOptions) {
     `只允许读取和修改这些字段：${enabledFields || '无'}`,
     '如果某个允许字段不需要修改，请原样返回当前值。',
     '',
-    `世界书：${lorebookName}`,
     `条目 UID：${entry.uid}`,
     `用户要求：${instruction}`,
     '',

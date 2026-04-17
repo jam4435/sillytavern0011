@@ -582,9 +582,9 @@
       };
       const uniq = arr => Array.from(new Set(arr));
       const ensureString = value => (value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value));
-      const ensureArray = value => (Array.isArray(value) ? value : []);
       const ensureObject = value => (_.isPlainObject(value) ? value : {});
-      const EDIT_TRIGGER_HTML = '<button class="edit-trigger jm-edit-character-trigger" type="button" title="编辑名字与身份">&#9998;</button>';
+      const NAME_EDIT_TRIGGER_HTML = '<button class="edit-trigger jm-edit-name-trigger" type="button" title="编辑名字">&#9998;</button>';
+      const OCCUPATION_EDIT_TRIGGER_HTML = '<button class="edit-trigger jm-edit-occupation-trigger" type="button" title="编辑职业">&#9998;</button>';
       const DISPLAY_TEXT_REPLACEMENTS = [['__DOT__', '.']];
       function normalizeDisplayValue(value) {
         if (typeof value === 'string') {
@@ -638,6 +638,15 @@
       function splitCharacterNames(rawText) {
         return uniq(String(rawText ?? '').split(/[，,、|/]/).map(name => name.trim()).filter(Boolean));
       }
+      function normalizeListField(value) {
+        if (Array.isArray(value)) {
+          return uniq(value.flatMap(item => normalizeListField(item)).filter(Boolean));
+        }
+        if (value === undefined || value === null) return [];
+        const text = ensureString(value).trim();
+        if (!text) return [];
+        return uniq(text.split(/[|｜\r\n]+/).map(item => item.trim()).filter(Boolean));
+      }
       function loadCurrentCharacterNames() {
         try {
           const latestMessage = getChatMessages(-1)?.[0]?.message ?? '';
@@ -668,11 +677,12 @@
         if (!source) return null;
         const normalizedSource = normalizeDisplayValue(source);
         const mergedModifications = uniq([
-          ...ensureArray(safeGet(normalizedSource, 'ModificationsAndRestraints', [])).filter(Boolean),
-          ...ensureArray(safeGet(normalizedSource, 'Modifications', [])).filter(Boolean),
+          ...normalizeListField(safeGet(normalizedSource, 'ModificationsAndRestraints', [])),
+          ...normalizeListField(safeGet(normalizedSource, 'Modifications', [])),
         ]);
         return {
           ..._.omit(normalizedSource, ['Modifications', 'ModificationsAndRestraints']),
+          RawName: name,
           Name: normalizeDisplayValue(name),
           Location: ensureString(safeGet(normalizedSource, 'Location', '')),
           Time: ensureString(safeGet(normalizedSource, 'Time', '')),
@@ -796,27 +806,50 @@
         if (!found) throw new Error(`未找到人物“${oldKey}”对应的变量。`);
         return nextObject;
       }
-      function buildUpdatedStatData(statData, oldName, newName, newIdentity) {
+      function isCharacterLikeEntry(value) {
+        if (!_.isPlainObject(value)) return false;
+        return ['Status', 'Outfit', 'BodyDetails', 'Location', 'Time', 'Affection', 'Libido', 'Thoughts', 'RecentSex', 'Modifications', 'ModificationsAndRestraints']
+          .some(key => Object.prototype.hasOwnProperty.call(value, key));
+      }
+      function removeLegacyRootCharacterDuplicates(statData, duplicateCandidates, preservedKeys = []) {
+        const nextStatData = ensureObject(statData);
+        const keepKeys = new Set(['角色数据', ...preservedKeys]);
+        Object.keys(nextStatData).forEach(key => {
+          if (keepKeys.has(key)) return;
+          const value = nextStatData[key];
+          if (!isCharacterLikeEntry(value)) return;
+          if (duplicateCandidates.some(candidate => _.isEqual(value, candidate))) {
+            delete nextStatData[key];
+          }
+        });
+      }
+      function buildUpdatedStatData(statData, oldName, newName, newOccupation) {
         const nextStatData = _.cloneDeep(ensureObject(statData));
         if (_.has(nextStatData, ['角色数据', oldName])) {
           const roleMap = ensureObject(_.get(nextStatData, '角色数据', {}));
-          const updatedCharacter = _.cloneDeep(ensureObject(roleMap[oldName]));
+          const originalCharacter = _.cloneDeep(ensureObject(roleMap[oldName]));
+          const updatedCharacter = _.cloneDeep(originalCharacter);
           updatedCharacter.Status = ensureObject(updatedCharacter.Status);
-          updatedCharacter.Status.Identity = newIdentity;
+          updatedCharacter.Status.Occupation = newOccupation;
           nextStatData.角色数据 = renameKeyInObject(roleMap, oldName, newName, updatedCharacter);
+          removeLegacyRootCharacterDuplicates(nextStatData, [originalCharacter, updatedCharacter], [newName]);
           return nextStatData;
         }
         if (_.has(nextStatData, oldName)) {
           const updatedCharacter = _.cloneDeep(ensureObject(nextStatData[oldName]));
           updatedCharacter.Status = ensureObject(updatedCharacter.Status);
-          updatedCharacter.Status.Identity = newIdentity;
+          updatedCharacter.Status.Occupation = newOccupation;
           return renameKeyInObject(nextStatData, oldName, newName, updatedCharacter);
         }
         throw new Error(`未找到人物“${oldName}”对应的变量。`);
       }
-      function getLatestAssistantMessage() {
-        const messages = getChatMessages('0-{{lastMessageId}}', { role: 'assistant', hide_state: 'all' }) || [];
-        return messages.length > 0 ? messages[messages.length - 1] : null;
+      function getLatestChatMessage() {
+        try {
+          return getChatMessages(-1)?.[0] || null;
+        } catch (error) {
+          console.warn('[变量状态栏] 读取最新楼层失败:', error);
+          return null;
+        }
       }
       async function migratePortraitStorage(oldName, newName) {
         if (!oldName || !newName || oldName === newName) return;
@@ -827,8 +860,115 @@
         await idbHelper.set(newKey, existingPortrait);
         await idbHelper.delete(oldKey);
       }
+      async function refreshEditedPanel(panel, data) {
+        updatePanel(panel, data);
+        setupEventListeners(panel, data);
+        try {
+          await updatePortrait(panel, data);
+        } catch (error) {
+          console.error(`[变量状态栏 ${data.Name}] 头像更新失败:`, error);
+        }
+        linkifyAllText(panel);
+      }
+      async function syncCurrentCharacterNameInLatestMessage(oldName, newName) {
+        const latestMessage = getLatestChatMessage();
+        if (!latestMessage) {
+          return { synced: false, reason: '未找到最新楼层，无法同步 <当前人物>/<当前角色> 标签。' };
+        }
+        const originalText = ensureString(latestMessage.message);
+        const messageReplacement = replaceCurrentCharacterNameInMessage(originalText, oldName, newName);
+        if (!messageReplacement.replaced) {
+          return { synced: false, reason: '未在最新楼层的 <当前人物>/<当前角色> 标签中找到当前名字。' };
+        }
+        if (messageReplacement.message !== originalText) {
+          await setChatMessages([{ message_id: latestMessage.message_id, message: messageReplacement.message }], { refresh: 'affected' });
+        }
+        return { synced: true };
+      }
+      async function updateCharacterInfo(panel, data, { newName, newRawName = newName, newOccupation, syncLatestMessage = false }) {
+        const oldName = ensureString(data.Name).trim();
+        const oldRawName = ensureString(data.RawName || data.Name).trim();
+        const oldOccupation = ensureString(safeGet(data, 'Status.Occupation', '')).trim();
+        const hasDisplayNameChanged = newName !== oldName;
+        const hasRawNameChanged = newRawName !== oldRawName;
+        if (!hasDisplayNameChanged && !hasRawNameChanged && newOccupation === oldOccupation) return;
+        const originalVariables = _.cloneDeep(getVariables({ type: 'chat' }));
+        buildUpdatedStatData(ensureObject(_.get(originalVariables, 'stat_data', {})), oldRawName, newRawName, newOccupation);
+        try {
+          updateVariablesWith(variables => {
+            const nextVariables = _.cloneDeep(ensureObject(variables));
+            nextVariables.stat_data = buildUpdatedStatData(
+              ensureObject(_.get(nextVariables, 'stat_data', {})),
+              oldRawName,
+              newRawName,
+              newOccupation,
+            );
+            return nextVariables;
+          }, { type: 'chat' });
+        } catch (error) {
+          try {
+            replaceVariables(originalVariables, { type: 'chat' });
+          } catch (rollbackError) {
+            console.error('[变量状态栏] 回滚变量失败:', rollbackError);
+          }
+          throw error;
+        }
+        let syncWarning = '';
+        if (syncLatestMessage && hasDisplayNameChanged) {
+          try {
+            const syncResult = await syncCurrentCharacterNameInLatestMessage(oldName, newName);
+            if (!syncResult.synced) syncWarning = syncResult.reason || '同步最新楼层失败。';
+          } catch (error) {
+            syncWarning = error?.message || '同步最新楼层失败。';
+          }
+        }
+        if (hasDisplayNameChanged) {
+          const collapsedState = collapsedStateByName.get(oldName);
+          if (collapsedState !== undefined) {
+            collapsedStateByName.set(newName, collapsedState);
+            collapsedStateByName.delete(oldName);
+          }
+          try {
+            await migratePortraitStorage(oldName, newName);
+          } catch (error) {
+            console.error('[变量状态栏] 迁移头像缓存失败:', error);
+          }
+        }
+        data.RawName = newRawName;
+        data.Name = newName;
+        data.Status = ensureObject(data.Status);
+        data.Status.Occupation = newOccupation;
+        await refreshEditedPanel(panel, data);
+        if (!syncWarning) {
+          scheduleRefresh();
+          return;
+        }
+        console.warn('[变量状态栏] ' + syncWarning);
+        alert(`人物变量已修改，但最新楼层文本未同步：${syncWarning}`);
+      }
+      async function editCharacterName(panel, data) {
+        const oldName = ensureString(data.Name).trim();
+        const oldOccupation = ensureString(safeGet(data, 'Status.Occupation', '')).trim();
+        const promptedName = window.prompt('修改名字', oldName);
+        if (promptedName === null) return;
+        const newName = normalizeDisplayValue(promptedName.trim());
+        if (!newName) {
+          alert('名字不能为空。');
+          return;
+        }
+        await updateCharacterInfo(panel, data, { newName, newRawName: newName, newOccupation: oldOccupation, syncLatestMessage: true });
+      }
+      async function editCharacterOccupation(panel, data) {
+        const oldName = ensureString(data.Name).trim();
+        const oldRawName = ensureString(data.RawName || data.Name).trim();
+        const oldOccupation = ensureString(safeGet(data, 'Status.Occupation', '')).trim();
+        const promptedOccupation = window.prompt('修改职业', oldOccupation);
+        if (promptedOccupation === null) return;
+        const newOccupation = normalizeDisplayValue(promptedOccupation.trim());
+        await updateCharacterInfo(panel, data, { newName: oldName, newRawName: oldRawName, newOccupation });
+      }
       function generateDynamicTabsAndContent(panel, data) {
-        const excludedKeys = new Set(['Name', 'Location', 'Time', 'Affection', 'Libido', 'Thoughts', 'RecentSex', 'ModificationsAndRestraints', 'Modifications']);
+        const excludedKeys = new Set(['RawName', 'Name', 'Location', 'Time', 'Affection', 'Libido', 'Thoughts', 'RecentSex', 'ModificationsAndRestraints', 'Modifications']);
         const panelKey = panel.dataset.panelKey || '0';
         let tabsHtml = '<div class="tabs">';
         let contentsHtml = '';
@@ -842,8 +982,8 @@
             contentsHtml += `<div id="${tabId}" class="tab-content ${isActive}"><ul class="details-list">`;
             for (const subKey in data[key]) {
               const label = tabInfo.labels[subKey] || subKey;
-              const valueHtml = key === 'Status' && subKey === 'Identity'
-                ? `<span class="inline-editable-value"><span class="details-value">${data[key][subKey]}</span>${EDIT_TRIGGER_HTML}</span>`
+              const valueHtml = key === 'Status' && subKey === 'Occupation'
+                ? `<span class="inline-editable-value"><span class="details-value">${data[key][subKey]}</span>${OCCUPATION_EDIT_TRIGGER_HTML}</span>`
                 : `<span class="details-value">${data[key][subKey]}</span>`;
               contentsHtml += `<li class="details-item"><span class="details-label">${label}</span>${valueHtml}</li>`;
             }
@@ -857,7 +997,7 @@
       function renderDynamicContent(panel, data) {
         const container = panel.querySelector('.jm-dynamic-content-area');
         if (!container) return;
-        const headerFields = new Set(['Name', 'Location', 'Time']);
+        const headerFields = new Set(['RawName', 'Name', 'Location', 'Time']);
         const itemsToRender = Object.keys(data)
           .filter(key => (!headerFields.has(key) && typeof data[key] !== 'object') || Array.isArray(data[key]))
           .map(key => ({ key, label: DYNAMIC_CONTENT_CONFIG[key] ? DYNAMIC_CONTENT_CONFIG[key].label : key, value: data[key] }));
@@ -894,12 +1034,12 @@
             </div>
             <div class="header-info">
               <div class="char-name-row">
-                <div class="char-name" data-field="Name"></div>
-                ${EDIT_TRIGGER_HTML}
+                <div class="char-name" data-field="name"></div>
+                ${NAME_EDIT_TRIGGER_HTML}
               </div>
               <div class="meta-info">
-                <span class="location">📍 <span data-field="Location"></span></span>
-                <span class="timestamp">🕰️ <span data-field="Time"></span></span>
+                <span class="location">📍 <span data-field="location"></span></span>
+                <span class="timestamp">🕰️ <span data-field="time"></span></span>
               </div>
             </div>
             <div class="collapse-toggle" title="展开/折叠"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg></div>
@@ -917,9 +1057,12 @@
               <a class="gallery-next">&#10095;</a>
             </div>
           </div>`;
-        ['Name', 'Location', 'Time'].forEach(field => {
-          const el = panel.querySelector(`[data-field="${field}"]`);
-          if (el) el.textContent = data[field] || '';
+        const fieldMap = { name: 'Name', location: 'Location', time: 'Time' };
+        panel.querySelectorAll('[data-field]').forEach(el => {
+          const fieldName = el.getAttribute('data-field') || '';
+          const dataKey = fieldMap[fieldName];
+          if (!dataKey) return;
+          el.textContent = data[dataKey] || '';
         });
         renderDynamicContent(panel, data);
         const { tabsHtml, contentsHtml } = generateDynamicTabsAndContent(panel, data);
@@ -1100,64 +1243,6 @@
           reader.readAsDataURL(file);
         };
       }
-      async function editCharacterInfo(panel, data) {
-        const oldName = ensureString(data.Name).trim();
-        const oldIdentity = ensureString(safeGet(data, 'Status.Identity', '')).trim();
-        const promptedName = window.prompt('修改名字', oldName);
-        if (promptedName === null) return;
-        const newName = normalizeDisplayValue(promptedName.trim());
-        if (!newName) {
-          alert('名字不能为空。');
-          return;
-        }
-        const promptedIdentity = window.prompt('修改身份', oldIdentity);
-        if (promptedIdentity === null) return;
-        const newIdentity = normalizeDisplayValue(promptedIdentity.trim());
-        if (newName === oldName && newIdentity === oldIdentity) return;
-        const originalVariables = _.cloneDeep(getVariables({ type: 'chat' }));
-        const originalStatData = ensureObject(_.get(originalVariables, 'stat_data', {}));
-        const nextStatData = buildUpdatedStatData(originalStatData, oldName, newName, newIdentity);
-        const nextVariables = _.cloneDeep(originalVariables);
-        nextVariables.stat_data = nextStatData;
-        const latestAssistantMessage = newName !== oldName ? getLatestAssistantMessage() : null;
-        let originalAssistantText = '';
-        let updatedAssistantText = '';
-        if (newName !== oldName) {
-          if (!latestAssistantMessage) throw new Error('未找到最新 AI 回复，无法同步当前人物标签。');
-          originalAssistantText = ensureString(latestAssistantMessage.message);
-          const messageReplacement = replaceCurrentCharacterNameInMessage(originalAssistantText, oldName, newName);
-          if (!messageReplacement.replaced) throw new Error('未在最新 AI 回复的 <当前人物>/<当前角色> 标签中找到当前名字。');
-          updatedAssistantText = messageReplacement.message;
-        }
-        try {
-          replaceVariables(nextVariables, { type: 'chat' });
-          if (latestAssistantMessage && updatedAssistantText !== originalAssistantText) {
-            await setChatMessages([{ message_id: latestAssistantMessage.message_id, message: updatedAssistantText }], { refresh: 'affected' });
-          }
-          if (newName !== oldName) {
-            const collapsedState = collapsedStateByName.get(oldName);
-            if (collapsedState !== undefined) {
-              collapsedStateByName.set(newName, collapsedState);
-              collapsedStateByName.delete(oldName);
-            }
-            await migratePortraitStorage(oldName, newName);
-          }
-          data.Name = newName;
-          data.Status = ensureObject(data.Status);
-          data.Status.Identity = newIdentity;
-          scheduleRefresh();
-        } catch (error) {
-          try {
-            replaceVariables(originalVariables, { type: 'chat' });
-            if (latestAssistantMessage && updatedAssistantText !== originalAssistantText) {
-              await setChatMessages([{ message_id: latestAssistantMessage.message_id, message: originalAssistantText }], { refresh: 'affected' });
-            }
-          } catch (rollbackError) {
-            console.error('[变量状态栏] 回滚编辑失败:', rollbackError);
-          }
-          throw error;
-        }
-      }
       function setupEventListeners(panel, data) {
         const collapseToggle = panel.querySelector('.collapse-toggle');
         if (collapseToggle) {
@@ -1182,12 +1267,22 @@
             panel.querySelector(`#${targetTabId}`)?.classList.add('active');
           });
         });
-        panel.querySelectorAll('.jm-edit-character-trigger').forEach(button => {
+        panel.querySelectorAll('.jm-edit-name-trigger').forEach(button => {
           button.addEventListener('click', event => {
             event.preventDefault();
             event.stopPropagation();
-            editCharacterInfo(panel, data).catch(error => {
-              console.error('[变量状态栏] 编辑角色信息失败:', error);
+            editCharacterName(panel, data).catch(error => {
+              console.error('[变量状态栏] 编辑名字失败:', error);
+              alert(error?.message || '保存失败，请重试。');
+            });
+          });
+        });
+        panel.querySelectorAll('.jm-edit-occupation-trigger').forEach(button => {
+          button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            editCharacterOccupation(panel, data).catch(error => {
+              console.error('[变量状态栏] 编辑职业失败:', error);
               alert(error?.message || '保存失败，请重试。');
             });
           });

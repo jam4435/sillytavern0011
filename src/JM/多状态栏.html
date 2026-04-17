@@ -136,6 +136,31 @@
         color: var(--accent-light-color);
         letter-spacing: 1px;
       }
+      .inline-editable-value {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .edit-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-secondary-color);
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+      }
+      .edit-trigger:hover {
+        background: rgba(187, 134, 252, 0.16);
+        border-color: rgba(187, 134, 252, 0.32);
+        color: var(--accent-light-color);
+      }
       .meta-info {
         display: flex;
         justify-content: space-between;
@@ -594,8 +619,8 @@
         const panels = document.querySelectorAll('.jm-state-panel');
         console.log('[状态栏 全局] DOMContentLoaded，检测到状态栏面板数量:', panels.length);
 
-        panels.forEach(panel => {
-          const panelId = panel.id || '未知';
+        panels.forEach((panel, panelIndex) => {
+          const panelId = panel.id || panel.dataset.panelKey || `panel-${panelIndex}`;
           const debugPrefix = `[状态栏 ${panelId}]`;
           let debugHooksInstalled = false;
           function debugLog(message, details) {
@@ -605,6 +630,84 @@
           function debugError(message, error, details) {
             if (details === undefined) console.error(`${debugPrefix} ${message}`, error);
             else console.error(`${debugPrefix} ${message}`, error, details);
+          }
+          function previewValue(value, maxLength) {
+            const limit = typeof maxLength === 'number' ? maxLength : 240;
+            let text = '';
+            if (typeof value === 'string') {
+              text = value;
+            } else {
+              try {
+                text = JSON.stringify(value);
+              } catch (error) {
+                text = String(value);
+              }
+            }
+            if (text.length > limit) {
+              return `${text.slice(0, limit)}...(共 ${text.length} 字符)`;
+            }
+            return text;
+          }
+          function describeValue(value) {
+            if (Array.isArray(value)) return `array(${value.length})`;
+            if (value === null) return 'null';
+            return typeof value;
+          }
+          function requireElement(selector, stageLabel) {
+            const element = panel.querySelector(selector);
+            if (element) return element;
+            const error = new Error(`未找到关键节点: ${selector}`);
+            debugError(`${stageLabel} 缺少关键节点。`, error, {
+              selector,
+              panelHtmlPreview: previewValue(panel.innerHTML, 600),
+            });
+            throw error;
+          }
+          function reportSuspiciousRenderValue(path, value) {
+            if (typeof value === 'string' && /<[^>]+>/.test(value)) {
+              console.error(`${debugPrefix} 检测到可能破坏 innerHTML 渲染的原始文本。`, {
+                path,
+                valuePreview: previewValue(value, 400),
+              });
+              return;
+            }
+            if (Array.isArray(value)) {
+              value.forEach((item, index) => {
+                if (item !== null && typeof item === 'object') {
+                  console.error(`${debugPrefix} 检测到数组项不是纯文本，可能影响渲染。`, {
+                    path: `${path}[${index}]`,
+                    itemType: describeValue(item),
+                    itemPreview: previewValue(item, 400),
+                  });
+                }
+              });
+              return;
+            }
+            if (value !== null && typeof value === 'object') {
+              Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+                reportSuspiciousRenderValue(`${path}.${nestedKey}`, nestedValue);
+              });
+            }
+          }
+          function validateRenderData(data) {
+            if (!data || typeof data !== 'object' || Array.isArray(data)) {
+              console.error(`${debugPrefix} 解析后的状态数据不是可渲染对象。`, {
+                dataType: describeValue(data),
+                dataPreview: previewValue(data, 400),
+              });
+              return;
+            }
+            Object.entries(data).forEach(([key, value]) => {
+              reportSuspiciousRenderValue(key, value);
+            });
+          }
+          function escapeHtml(value) {
+            return String(value === undefined || value === null ? '' : value)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;');
           }
           function installDebugHooks() {
             if (debugHooksInstalled) return;
@@ -623,22 +726,35 @@
             debugLog('调试钩子已安装。');
           }
           function displayError(message, details) {
-            const detailText = details === undefined ? '' : details;
+            const detailText = details === undefined ? '' : String(details);
             console.error(`${debugPrefix} ${message}`, detailText);
-            panel.innerHTML = `<div style="color: var(--red-color); padding: 20px; font-family: monospace; white-space: pre-wrap;"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${detailText}</p></details></div>`;
+            panel.innerHTML = `<div style="color: var(--red-color); padding: 20px; font-family: monospace; white-space: pre-wrap;"><h3>状态栏错误</h3><p>${escapeHtml(message)}</p><details><summary>详细信息</summary><p>${escapeHtml(detailText)}</p></details></div>`;
           }
 
+          let rawData = '';
+          let jsonData = null;
           try {
             installDebugHooks();
             debugLog('开始初始化。');
             const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
-            const rawData = `$2`;
-            const jsonData = JSON.parse(rawData.trim());
+            const STATE_BLOCK_REGEX = /<(state\d+)>([\s\S]+?)<\/\1>/g;
+            rawData = `$2`;
+            const trimmedRawData = rawData.trim();
+            debugLog('收到原始状态数据。', {
+              rawDataLength: rawData.length,
+              rawDataPreview: previewValue(rawData, 500),
+            });
+            if (!trimmedRawData) {
+              throw new Error('rawData 为空，无法渲染状态栏。');
+            }
+            jsonData = JSON.parse(trimmedRawData);
             debugLog('rawData JSON 解析成功。', {
               rawDataLength: rawData.length,
               name: jsonData && jsonData.Name !== undefined ? jsonData.Name : undefined,
               identity: jsonData && jsonData.Status && jsonData.Status.Identity !== undefined ? jsonData.Status.Identity : undefined,
+              jsonType: describeValue(jsonData),
             });
+            validateRenderData(jsonData);
 
             function safeGet(obj, path, defaultValue) {
               const fallbackValue = arguments.length >= 3 ? defaultValue : undefined;
@@ -660,14 +776,14 @@
               return _.isPlainObject(value) ? value : {};
             }
 
-            function escapeHtml(value) {
-              return String(value === undefined || value === null ? '' : value)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+            function ensureString(value) {
+              return value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value);
             }
+
+            const NAME_EDIT_TRIGGER_HTML =
+              '<button class="edit-trigger jm-edit-name-trigger" type="button" title="编辑名字">&#9998;</button>';
+            const OCCUPATION_EDIT_TRIGGER_HTML =
+              '<button class="edit-trigger jm-edit-occupation-trigger" type="button" title="编辑职业">&#9998;</button>';
 
             // --- 数据现在由全局管理器提供 ---
             let imageIndex, synonymMap, allKeywords, keywordRegex, fallbackAvatars;
@@ -745,9 +861,17 @@
             }
 
             function linkifyAllText() {
-              if (!keywordRegex) return;
+              if (!keywordRegex) {
+                debugLog('跳过关键词链接化，keywordRegex 尚未初始化。');
+                return;
+              }
 
-              panel.querySelectorAll('.details-value, .narrative-content').forEach(el => {
+              const textNodes = panel.querySelectorAll('.details-value, .narrative-content');
+              debugLog('开始关键词链接化。', {
+                candidateCount: textNodes.length,
+              });
+
+              textNodes.forEach(el => {
                 // 如果已经有链接，或者没有文本内容，则跳过
                 if (el.querySelector('a.image-link') || !el.textContent) return;
 
@@ -770,6 +894,7 @@
                   el.innerHTML = newHtml;
                 }
               });
+              debugLog('关键词链接化完成。');
             }
 
             function parseStat(statValue) {
@@ -907,6 +1032,85 @@
               },
             };
 
+            function getCurrentStateBlockIndex() {
+              if (typeof getIframeName !== 'function') return 0;
+              const iframeName = ensureString(getIframeName());
+              const match = iframeName.match(/^TH-message--(-?\d+)--(\d+)$/);
+              return match ? Number(match[2]) : 0;
+            }
+
+            function resolveCurrentStateBlock(messageText) {
+              const matches = [...ensureString(messageText).matchAll(STATE_BLOCK_REGEX)];
+              if (matches.length === 0) {
+                throw new Error('当前楼层中未找到 <stateN>...</stateN> 文本块。');
+              }
+              const stateBlockIndex = getCurrentStateBlockIndex();
+              const targetMatch =
+                matches[stateBlockIndex] ||
+                matches.find(match => ensureString(match[2]).trim() === ensureString(rawData).trim()) ||
+                matches[0];
+              return {
+                tagName: targetMatch[1],
+                start: targetMatch.index || 0,
+                end: (targetMatch.index || 0) + targetMatch[0].length,
+              };
+            }
+
+            async function saveEditedStateText(nextData) {
+              const messageId = typeof getCurrentMessageId === 'function' ? getCurrentMessageId() : null;
+              if (typeof messageId !== 'number' || Number.isNaN(messageId)) {
+                throw new Error('无法获取当前楼层号。');
+              }
+              const currentMessage = getChatMessages(messageId)?.[0];
+              if (!currentMessage) {
+                throw new Error(`未找到楼层 ${messageId} 的消息内容。`);
+              }
+              const currentMessageText = ensureString(currentMessage.message);
+              const currentStateBlock = resolveCurrentStateBlock(currentMessageText);
+              const nextRawData = JSON.stringify(nextData, null, 2);
+              const replacement = `<${currentStateBlock.tagName}>${nextRawData}</${currentStateBlock.tagName}>`;
+              const nextMessageText =
+                currentMessageText.slice(0, currentStateBlock.start) + replacement + currentMessageText.slice(currentStateBlock.end);
+              await setChatMessages([{ message_id: messageId, message: nextMessageText }], { refresh: 'affected' });
+              rawData = nextRawData;
+            }
+
+            async function updateStateText({ newName, newOccupation }) {
+              const oldName = ensureString(jsonData.Name).trim();
+              const oldOccupation = ensureString(safeGet(jsonData, 'Status.Occupation', '')).trim();
+              if (newName === oldName && newOccupation === oldOccupation) return;
+              const nextData = _.cloneDeep(ensureObject(jsonData));
+              nextData.Name = newName;
+              nextData.Status = ensureObject(nextData.Status);
+              nextData.Status.Occupation = newOccupation;
+              await saveEditedStateText(nextData);
+              jsonData.Name = newName;
+              jsonData.Status = ensureObject(jsonData.Status);
+              jsonData.Status.Occupation = newOccupation;
+            }
+
+            async function editCharacterName() {
+              const oldName = ensureString(jsonData.Name).trim();
+              const oldOccupation = ensureString(safeGet(jsonData, 'Status.Occupation', '')).trim();
+              const promptedName = window.prompt('修改名字', oldName);
+              if (promptedName === null) return;
+              const newName = ensureString(promptedName).trim();
+              if (!newName) {
+                alert('名字不能为空。');
+                return;
+              }
+              await updateStateText({ newName, newOccupation: oldOccupation });
+            }
+
+            async function editCharacterOccupation() {
+              const oldName = ensureString(jsonData.Name).trim();
+              const oldOccupation = ensureString(safeGet(jsonData, 'Status.Occupation', '')).trim();
+              const promptedOccupation = window.prompt('修改职业', oldOccupation);
+              if (promptedOccupation === null) return;
+              const newOccupation = ensureString(promptedOccupation).trim();
+              await updateStateText({ newName: oldName, newOccupation });
+            }
+
             function generateDynamicTabsAndContent(data) {
               const EXCLUDED_KEYS = new Set([
                 'Name',
@@ -942,7 +1146,10 @@
                   for (const subKey in data[key]) {
                     const label = tabInfo.labels[subKey] || subKey;
                     const value = data[key][subKey];
-                    const valueHtml = `<span class="details-value">${escapeHtml(value)}</span>`;
+                    const valueHtml =
+                      key === 'Status' && subKey === 'Occupation'
+                        ? `<span class="inline-editable-value"><span class="details-value">${escapeHtml(value)}</span>${OCCUPATION_EDIT_TRIGGER_HTML}</span>`
+                        : `<span class="details-value">${escapeHtml(value)}</span>`;
                     contentsHtml += `
                     <li class="details-item">
                       <span class="details-label">${label}</span>
@@ -973,10 +1180,13 @@
                                 <input type="file" class="jm-portrait-upload" style="display:none" accept="image/*" />
                             </div>
                             <div class="header-info">
-                                <div class="char-name" data-field="Name"></div>
+                                <div class="char-name-row">
+                                    <div class="char-name" data-field="name"></div>
+                                    ${NAME_EDIT_TRIGGER_HTML}
+                                </div>
                                 <div class="meta-info">
-                                    <span class="location">📍 <span data-field="Location"></span></span>
-                                    <span class="timestamp">🕰️ <span data-field="Time"></span></span>
+                                    <span class="location">📍 <span data-field="location"></span></span>
+                                    <span class="timestamp">🕰️ <span data-field="time"></span></span>
                                 </div>
                             </div>
                             <div class="collapse-toggle" title="展开/折叠">
@@ -1006,37 +1216,45 @@
                         </div>
                     `;
 
-              // 2. 填充静态头部数据
-              const staticFields = {
-                Name: data.Name,
-                Location: data.Location,
-                Time: data.Time,
-              };
+              requireElement('#jm-dynamic-content-area', 'updatePanel');
+              const tabsContainer = requireElement('.tabs-container', 'updatePanel');
+              const tabContentContainer = requireElement('.tab-content-container', 'updatePanel');
+              requireElement('.jm-image-gallery', 'updatePanel');
+              requireElement('[data-field="portrait"]', 'updatePanel');
 
-              for (const field in staticFields) {
-                const el = panel.querySelector(`[data-field="${field}"]`);
-                if (el && staticFields[field] !== undefined) {
-                  el.textContent = staticFields[field];
-                }
-              }
+              // 2. 填充静态头部数据
+              const fieldMap = { name: 'Name', location: 'Location', time: 'Time' };
+              panel.querySelectorAll('[data-field]').forEach(el => {
+                const fieldName = el.getAttribute('data-field') || '';
+                const dataKey = fieldMap[fieldName];
+                if (!dataKey) return;
+                el.textContent = data[dataKey] || '';
+              });
 
               // 3. 渲染所有动态内容
-              renderDynamicContent(data);
+              try {
+                renderDynamicContent(data);
+              } catch (error) {
+                debugError('动态内容渲染失败。', error, {
+                  dataPreview: previewValue(data, 600),
+                });
+                throw error;
+              }
 
               // 4. 生成并插入动态的Tabs和内容 (这部分逻辑不变)
               const { tabsHtml, contentsHtml } = generateDynamicTabsAndContent(data);
-              panel.querySelector('.tabs-container').innerHTML = tabsHtml;
-              panel.querySelector('.tab-content-container').innerHTML = contentsHtml;
+              tabsContainer.innerHTML = tabsHtml;
+              tabContentContainer.innerHTML = contentsHtml;
               debugLog('面板渲染完成。', {
                 tabCount: panel.querySelectorAll('.tab-button').length,
                 htmlLength: panel.innerHTML.length,
+                dynamicContentLength: requireElement('#jm-dynamic-content-area', 'updatePanel').innerHTML.length,
               });
             }
 
             // --- 修改：主渲染循环 (支持自动格式检测和原始顺序) ---
             function renderDynamicContent(data) {
-              const container = panel.querySelector('#jm-dynamic-content-area');
-              if (!container) return;
+              const container = requireElement('#jm-dynamic-content-area', 'renderDynamicContent');
 
               // 定义哪些字段是头部信息，需要被排除
               const HEADER_FIELDS = new Set(['Name', 'Location', 'Time']);
@@ -1059,38 +1277,56 @@
                   };
                 });
 
+              debugLog('动态内容字段列表。', {
+                itemCount: itemsToRender.length,
+                items: itemsToRender.map(item => ({
+                  key: item.key,
+                  type: describeValue(item.value),
+                  valuePreview: previewValue(item.value, 120),
+                })),
+              });
+
               // 用于收集所有 stat 项，以便统一渲染
               const statItems = [];
               let dynamicHtml = '';
 
               itemsToRender.forEach(item => {
-                let type = 'narrative'; // 默认类型
-                let value = item.value;
+                try {
+                  let type = 'narrative'; // 默认类型
+                  const value = item.value;
 
-                // 自动检测UI类型
-                if (isStatField(item.key)) {
-                  type = 'stat';
-                } else if (Array.isArray(value)) {
-                  type = 'list';
-                }
+                  // 自动检测UI类型
+                  if (isStatField(item.key)) {
+                    type = 'stat';
+                  } else if (Array.isArray(value)) {
+                    type = 'list';
+                  }
 
-                if (type === 'stat') {
-                  statItems.push(item);
-                } else {
-                  // 如果遇到非 stat 项，且之前有 stat 项，则先渲染 stat 容器
-                  if (statItems.length > 0) {
-                    dynamicHtml += `<div class="core-stats">${statItems.map(statItem => renderStat(statItem.label, statItem.value)).join('')}</div>`;
-                    statItems.length = 0; // 清空 stat 项
+                  if (type === 'stat') {
+                    statItems.push(item);
+                  } else {
+                    // 如果遇到非 stat 项，且之前有 stat 项，则先渲染 stat 容器
+                    if (statItems.length > 0) {
+                      dynamicHtml += `<div class="core-stats">${statItems.map(statItem => renderStat(statItem.label, statItem.value)).join('')}</div>`;
+                      statItems.length = 0; // 清空 stat 项
+                    }
+                    // 渲染当前项
+                    switch (type) {
+                      case 'narrative':
+                        dynamicHtml += renderNarrative(item.label, item.value);
+                        break;
+                      case 'list':
+                        dynamicHtml += renderList(item.label, item.value);
+                        break;
+                    }
                   }
-                  // 渲染当前项
-                  switch (type) {
-                    case 'narrative':
-                      dynamicHtml += renderNarrative(item.label, item.value);
-                      break;
-                    case 'list':
-                      dynamicHtml += renderList(item.label, item.value);
-                      break;
-                  }
+                } catch (error) {
+                  debugError(`渲染动态字段 ${item.key} 失败。`, error, {
+                    fieldKey: item.key,
+                    fieldType: describeValue(item.value),
+                    fieldValuePreview: previewValue(item.value, 400),
+                  });
+                  throw error;
                 }
               });
 
@@ -1100,11 +1336,13 @@
               }
 
               container.innerHTML = dynamicHtml;
+              debugLog('动态内容写入完成。', {
+                htmlLength: dynamicHtml.length,
+              });
             }
 
             async function updatePortrait(data) {
-              const portraitImg = panel.querySelector('[data-field="portrait"]');
-              if (!portraitImg) return;
+              const portraitImg = requireElement('[data-field="portrait"]', 'updatePortrait');
 
               // 统一管理事件监听器，先移除旧的
               if (portraitClickListener) {
@@ -1114,6 +1352,10 @@
 
               const charName = safeGet(data, 'Name', '');
               const storageKey = `jm_user_portrait_${charName}`;
+              debugLog('开始更新头像。', {
+                charName,
+                storageKey,
+              });
 
               try {
                 const savedPortraitBlob = await idbHelper.get(storageKey);
@@ -1129,10 +1371,15 @@
                     openGallery([galleryURL], 0, '');
                   };
                   portraitImg.addEventListener('click', portraitClickListener);
+                  debugLog('已应用用户上传头像。', {
+                    blobSize: savedPortraitBlob.size,
+                  });
                   return; // 找到用户头像后，终止函数
                 }
               } catch (error) {
-                console.error('从 IndexedDB 加载头像失败:', error);
+                debugError('从 IndexedDB 加载头像失败。', error, {
+                  storageKey,
+                });
               }
 
               const occupationText = safeGet(data, 'Status.Occupation', '');
@@ -1187,6 +1434,10 @@
                 portraitImg.src = GITHUB_BASE_URL + matchedImages[0];
                 portraitClickListener = () => openGallery(matchedImages, 0, GITHUB_BASE_URL);
                 portraitImg.addEventListener('click', portraitClickListener);
+                debugLog('已应用匹配到的头像资源。', {
+                  matchedImageCount: matchedImages.length,
+                  firstImage: matchedImages[0],
+                });
               } else if (fallbackAvatars.length > 0) {
                 const charName = safeGet(data, 'Name', 'default');
                 const fallbackIndex = getDeterministicRandomIndex(charName, fallbackAvatars.length);
@@ -1195,15 +1446,23 @@
                 portraitImg.src = FACE_BASE_URL + fallbackAvatar;
                 portraitClickListener = () => openGallery([fallbackAvatar], 0, FACE_BASE_URL);
                 portraitImg.addEventListener('click', portraitClickListener);
+                debugLog('已应用备用头像。', {
+                  fallbackIndex,
+                  fallbackAvatar,
+                });
               } else {
                 portraitImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                console.error(`${debugPrefix} 未找到任何可用头像资源。`, {
+                  charName,
+                  textToSearch,
+                });
               }
             }
 
             function openGallery(images, startIndex, baseUrl) {
-              const gallery = panel.querySelector('.jm-image-gallery');
-              const prevArrow = gallery.querySelector('.gallery-prev');
-              const nextArrow = gallery.querySelector('.gallery-next');
+              const gallery = requireElement('.jm-image-gallery', 'openGallery');
+              const prevArrow = requireElement('.gallery-prev', 'openGallery');
+              const nextArrow = requireElement('.gallery-next', 'openGallery');
 
               currentGalleryImages = images;
               currentGalleryIndex = startIndex;
@@ -1223,7 +1482,7 @@
 
             function updateGalleryImage() {
               if (currentGalleryImages.length > 0) {
-                const galleryImage = panel.querySelector('.gallery-image');
+                const galleryImage = requireElement('.gallery-image', 'updateGalleryImage');
                 galleryImage.src = currentGalleryBaseUrl + currentGalleryImages[currentGalleryIndex];
                 // 重置缩放和位置
                 galleryImage.style.transform = 'scale(1) translate(0, 0)';
@@ -1231,12 +1490,10 @@
             }
 
             function setupPortraitUpload(data) {
-              const uploadTrigger = panel.querySelector('.portrait-upload-trigger');
-              const resetTrigger = panel.querySelector('.portrait-reset-trigger');
-              const uploadInput = panel.querySelector('.jm-portrait-upload');
-              const portraitImg = panel.querySelector('[data-field="portrait"]');
-
-              if (!uploadTrigger || !uploadInput || !portraitImg || !resetTrigger) return;
+              const uploadTrigger = requireElement('.portrait-upload-trigger', 'setupPortraitUpload');
+              const resetTrigger = requireElement('.portrait-reset-trigger', 'setupPortraitUpload');
+              const uploadInput = requireElement('.jm-portrait-upload', 'setupPortraitUpload');
+              const portraitImg = requireElement('[data-field="portrait"]', 'setupPortraitUpload');
 
               const charName = safeGet(data, 'Name', '');
               const storageKey = `jm_user_portrait_${charName}`;
@@ -1384,30 +1641,50 @@
                   panel.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
                   panel.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
                   button.classList.add('active');
-                  panel.querySelector(`#${targetTabId}`).classList.add('active');
+                  requireElement(`#${targetTabId}`, 'tab 切换').classList.add('active');
                 });
               });
-              const gallery = panel.querySelector('.jm-image-gallery');
-              gallery.querySelector('.gallery-close').addEventListener('click', () => {
-                const galleryImage = gallery.querySelector('.gallery-image');
+              panel.querySelectorAll('.jm-edit-name-trigger').forEach(button => {
+                button.addEventListener('click', event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  editCharacterName().catch(error => {
+                    debugError('编辑名字失败。', error);
+                    alert(error?.message || '保存失败，请重试。');
+                  });
+                });
+              });
+              panel.querySelectorAll('.jm-edit-occupation-trigger').forEach(button => {
+                button.addEventListener('click', event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  editCharacterOccupation().catch(error => {
+                    debugError('编辑职业失败。', error);
+                    alert(error?.message || '保存失败，请重试。');
+                  });
+                });
+              });
+              const gallery = requireElement('.jm-image-gallery', 'setupEventListeners');
+              requireElement('.gallery-close', 'setupEventListeners').addEventListener('click', () => {
+                const galleryImage = requireElement('.gallery-image', 'setupEventListeners');
                 // 如果是 Object URL, 释放它以防止内存泄漏
                 if (galleryImage.src.startsWith('blob:')) {
                   URL.revokeObjectURL(galleryImage.src);
                 }
                 gallery.style.display = 'none';
               });
-              gallery.querySelector('.gallery-prev').addEventListener('click', () => {
+              requireElement('.gallery-prev', 'setupEventListeners').addEventListener('click', () => {
                 currentGalleryIndex =
                   (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
                 updateGalleryImage();
               });
-              gallery.querySelector('.gallery-next').addEventListener('click', () => {
+              requireElement('.gallery-next', 'setupEventListeners').addEventListener('click', () => {
                 currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
                 updateGalleryImage();
               });
 
               // --- 新增：图片缩放和拖动功能 ---
-              const galleryImage = gallery.querySelector('.gallery-image');
+              const galleryImage = requireElement('.gallery-image', 'setupEventListeners');
               let isDragging = false;
               let startX,
                 startY,
@@ -1533,21 +1810,36 @@
               debugLog('事件绑定完成。');
             }
 
+            async function runStage(stageName, handler) {
+              debugLog(`${stageName} 开始。`);
+              try {
+                const result = await handler();
+                debugLog(`${stageName} 完成。`);
+                return result;
+              } catch (error) {
+                debugError(`${stageName} 失败。`, error, {
+                  rawDataPreview: previewValue(rawData, 500),
+                  panelHtmlPreview: previewValue(panel.innerHTML, 600),
+                });
+                throw error;
+              }
+            }
+
             async function main() {
               debugLog('main() 开始执行。');
-              updatePanel(jsonData);
-              // 设置默认折叠状态
-              panel.classList.add('collapsed');
+              await runStage('首屏渲染', async () => {
+                updatePanel(jsonData);
+                panel.classList.add('collapsed');
+              });
 
-              const dataLoaded = await fetchData();
+              const dataLoaded = await runStage('核心数据加载', async () => fetchData());
               if (dataLoaded) {
-                await updatePortrait(jsonData); // 等待头像加载完成
-                linkifyAllText();
-                debugLog('头像和链接处理完成。');
+                await runStage('头像更新', async () => updatePortrait(jsonData));
+                await runStage('文本链接化', async () => linkifyAllText());
               } else {
                 console.warn(`${debugPrefix} 无法加载图片索引，图片相关功能将不可用。`);
               }
-              setupEventListeners();
+              await runStage('事件绑定', async () => setupEventListeners());
               debugLog('main() 执行完成。');
             }
 
@@ -1558,9 +1850,13 @@
               );
             });
           } catch (error) {
+            debugError('初始化阶段失败。', error, {
+              rawDataLength: rawData.length,
+              rawDataPreview: previewValue(rawData, 600),
+            });
             displayError(
               '脚本执行失败。这通常是由于AI输出的JSON格式不正确导致的。',
-              `错误信息: ${error.message}. 捕获到的原始数据: ${rawData}`,
+              `错误信息: ${error && error.stack ? error.stack : error.message}. 捕获到的原始数据: ${previewValue(rawData, 1200)}`,
             );
           }
         }); // 结束 forEach 循环

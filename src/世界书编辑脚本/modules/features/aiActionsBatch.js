@@ -223,7 +223,6 @@ function buildBatchPromptDuplicate(lorebookName, instruction, entries, fieldOpti
 
   return [
     renderedBuiltinPrompt,
-    `世界书：${lorebookName}`,
     `用户要求：${instruction}`,
     `本次必须返回的 UID：${requestedUids}`,
     '',
@@ -279,6 +278,52 @@ function buildInfoGroupXml(sectionName, entries = [], usedNames = new Set()) {
   return lines.join('\n');
 }
 
+function buildChatContextXml(chatMessages = []) {
+  const normalizedMessages = Array.isArray(chatMessages)
+    ? chatMessages.filter(message => typeof message?.message === 'string' && message.message.trim())
+    : [];
+
+  if (!normalizedMessages.length) {
+    return '';
+  }
+
+  const lines = ['<聊天上下文>'];
+  normalizedMessages.forEach(message => {
+    const role = ['system', 'assistant', 'user'].includes(message?.role) ? message.role : 'system';
+    lines.push(`  <${role}>`);
+    lines.push(escapeXmlText(message?.message || ''));
+    lines.push(`  </${role}>`);
+  });
+  lines.push('</聊天上下文>');
+  return lines.join('\n');
+}
+
+function buildReferenceMaterialXml(referenceMaterial = '') {
+  const content = typeof referenceMaterial === 'string' ? referenceMaterial.trim() : '';
+  if (!content) {
+    return '';
+  }
+
+  return ['<参考资料>', escapeXmlText(content), '</参考资料>'].join('\n');
+}
+
+function buildWorkspaceInfoSectionXml(contextEntries = {}, { includePlan = false } = {}) {
+  const usedNames = new Set();
+  const sections = [
+    includePlan ? buildPlanSectionXml(contextEntries.plan || null) : '',
+    buildChatContextXml(contextEntries.chatMessages || []),
+    buildReferenceMaterialXml(contextEntries.referenceMaterial || ''),
+    buildInfoGroupXml('只读条目', contextEntries.readonlyEntries || [], usedNames),
+    buildInfoGroupXml('已修改批次', contextEntries.modifiedEntries || [], usedNames),
+  ].filter(Boolean);
+
+  if (!sections.length) {
+    return '';
+  }
+
+  return ['<信息>', ...sections, '</信息>'].join('\n');
+}
+
 function buildInfoSectionXmlDuplicate(readonlyEntries = [], modifiedEntries = []) {
   const usedNames = new Set();
   const sections = [
@@ -322,7 +367,6 @@ function buildContextualBatchPromptDuplicate(
     '</条目>',
     '',
     '<用户指令>',
-    `世界书：${lorebookName}`,
     instruction,
     `本次必须返回的 UID：${requestedUids}`,
     '</用户指令>',
@@ -377,7 +421,6 @@ function buildContextualBatchPromptV2Duplicate(
     '</条目>',
     '',
     '<用户指令>',
-    `世界书：${lorebookName}`,
     instruction,
     `本次必须返回的 UID：${requestedUids}`,
     '</用户指令>',
@@ -414,7 +457,6 @@ function buildPlanningPromptDuplicate(lorebookName, instruction, entries, prompt
     '</条目全集>',
     '',
     '<用户指令>',
-    `世界书：${lorebookName}`,
     instruction,
     '</用户指令>',
     '',
@@ -1039,17 +1081,29 @@ function buildAttemptItemsDuplicate({ targetEntries, parsedDrafts, normalizedFie
       return;
     }
 
-    const afterEntry = normalizeAiDraft(draft, entry, normalizedFieldOptions);
-    const diffs = buildPreviewDiffs(entry, afterEntry, normalizedFieldOptions);
+    try {
+      const afterEntry = normalizeAiDraft(draft, entry, normalizedFieldOptions);
+      const diffs = buildPreviewDiffs(entry, afterEntry, normalizedFieldOptions);
 
-    items.push({
-      uid,
-      title: entry.name || `UID ${entry.uid}`,
-      beforeEntry: _.cloneDeep(entry),
-      afterEntry,
-      diffs,
-      changed: diffs.length > 0,
-    });
+      items.push({
+        uid,
+        title: entry.name || `UID ${entry.uid}`,
+        beforeEntry: _.cloneDeep(entry),
+        afterEntry,
+        diffs,
+        changed: diffs.length > 0,
+      });
+    } catch (entryError) {
+      errors.push({
+        uid,
+        title: entry.name || `UID ${entry.uid}`,
+        error: buildDetailedErrorMessage('该条目的 AI 返回数据解析失败', [
+          `UID: ${uid}`,
+          `错误信息: ${entryError?.message || '未知错误'}`,
+          `AI 返回的 draft: ${JSON.stringify(draft, null, 2)}`,
+        ]),
+      });
+    }
   });
 
   return { items, errors };
@@ -1318,6 +1372,8 @@ async function executeSingleBatch(options = {}) {
     readonlyEntries = [],
     modifiedEntries = [],
     planningResult = null,
+    chatMessages = [],
+    referenceMaterial = '',
   } = options;
   const batchLabel = `批次 ${batchPlan.batchNumber}/${options.totalBatches}`;
 
@@ -1329,6 +1385,8 @@ async function executeSingleBatch(options = {}) {
     promptSettings,
     {
       plan: planningResult?.plan || null,
+      chatMessages,
+      referenceMaterial,
       readonlyEntries,
       modifiedEntries,
     },
@@ -1489,7 +1547,6 @@ function buildBatchPrompt(lorebookName, instruction, entries, fieldOptions, prom
 
   return [
     renderedBuiltinPrompt,
-    `世界书：${lorebookName}`,
     `用户要求：${instruction}`,
     `本次必须返回的 UID：${requestedUids}`,
     '',
@@ -1504,17 +1561,7 @@ function buildBatchPrompt(lorebookName, instruction, entries, fieldOptions, prom
 }
 
 function buildInfoSectionXml(readonlyEntries = [], modifiedEntries = []) {
-  const usedNames = new Set();
-  const sections = [
-    buildInfoGroupXml('只读条目', readonlyEntries, usedNames),
-    buildInfoGroupXml('已修改批次', modifiedEntries, usedNames),
-  ].filter(Boolean);
-
-  if (!sections.length) {
-    return '';
-  }
-
-  return ['<信息>', ...sections, '</信息>'].join('\n');
+  return buildWorkspaceInfoSectionXml({ readonlyEntries, modifiedEntries });
 }
 
 function buildContextualBatchPrompt(
@@ -1533,10 +1580,7 @@ function buildContextualBatchPrompt(
     ? promptSettings.builtinPromptTemplate.trim()
     : '';
   const renderedBuiltinPrompt = builtinPromptTemplate.replaceAll('{{editableFields}}', enabledFields || '无');
-  const infoSection = buildInfoSectionXml(
-    contextEntries.readonlyEntries || [],
-    contextEntries.modifiedEntries || [],
-  );
+  const infoSection = buildWorkspaceInfoSectionXml(contextEntries);
 
   return [
     infoSection,
@@ -1546,7 +1590,6 @@ function buildContextualBatchPrompt(
     '</条目>',
     '',
     '<用户指令>',
-    `世界书：${lorebookName}`,
     instruction,
     `本次必须返回的 UID：${requestedUids}`,
     '</用户指令>',
@@ -1584,13 +1627,7 @@ function buildContextualBatchPromptV2(
     : '';
   const renderedJailbreakPrompt = jailbreakPromptTemplate.replaceAll('{{editableFields}}', enabledFields || '无');
   const renderedBuiltinPrompt = builtinPromptTemplate.replaceAll('{{editableFields}}', enabledFields || '无');
-  const usedNames = new Set();
-  const infoSections = [
-    buildPlanSectionXml(contextEntries.plan || null),
-    buildInfoGroupXml('只读条目', contextEntries.readonlyEntries || [], usedNames),
-    buildInfoGroupXml('已修改批次', contextEntries.modifiedEntries || [], usedNames),
-  ].filter(Boolean);
-  const infoSection = infoSections.length ? ['<信息>', ...infoSections, '</信息>'].join('\n') : '';
+  const infoSection = buildWorkspaceInfoSectionXml(contextEntries, { includePlan: true });
 
   return [
     renderedJailbreakPrompt,
@@ -1601,7 +1638,6 @@ function buildContextualBatchPromptV2(
     '</条目>',
     '',
     '<用户指令>',
-    `世界书：${lorebookName}`,
     instruction,
     `本次必须返回的 UID：${requestedUids}`,
     '</用户指令>',
@@ -1619,7 +1655,7 @@ function buildContextualBatchPromptV2(
     .join('\n');
 }
 
-function buildPlanningPrompt(lorebookName, instruction, entries, promptSettings = {}) {
+function buildPlanningPrompt(lorebookName, instruction, entries, promptSettings = {}, contextEntries = {}) {
   const entriesPayload = buildPlanningEntriesPayload(entries);
   const jailbreakPromptTemplate = typeof promptSettings?.jailbreakPromptTemplate === 'string'
     ? promptSettings.jailbreakPromptTemplate.trim()
@@ -1630,15 +1666,16 @@ function buildPlanningPrompt(lorebookName, instruction, entries, promptSettings 
   const planningPromptTemplate = typeof promptSettings?.planningPromptTemplate === 'string'
     ? promptSettings.planningPromptTemplate.trim()
     : '';
+  const infoSection = buildWorkspaceInfoSectionXml(contextEntries);
 
   return [
     jailbreakPromptTemplate,
+    infoSection,
     '<条目全集>',
     entriesPayload,
     '</条目全集>',
     '',
     '<用户指令>',
-    `世界书：${lorebookName}`,
     instruction,
     '</用户指令>',
     '',
@@ -1953,17 +1990,29 @@ function buildAttemptItems({ targetEntries, parsedDrafts, normalizedFieldOptions
       return;
     }
 
-    const afterEntry = normalizeAiDraft(draft, entry, normalizedFieldOptions);
-    const diffs = buildPreviewDiffs(entry, afterEntry, normalizedFieldOptions);
+    try {
+      const afterEntry = normalizeAiDraft(draft, entry, normalizedFieldOptions);
+      const diffs = buildPreviewDiffs(entry, afterEntry, normalizedFieldOptions);
 
-    items.push({
-      uid,
-      title: entry.name || `UID ${entry.uid}`,
-      beforeEntry: _.cloneDeep(entry),
-      afterEntry,
-      diffs,
-      changed: diffs.length > 0,
-    });
+      items.push({
+        uid,
+        title: entry.name || `UID ${entry.uid}`,
+        beforeEntry: _.cloneDeep(entry),
+        afterEntry,
+        diffs,
+        changed: diffs.length > 0,
+      });
+    } catch (entryError) {
+      errors.push({
+        uid,
+        title: entry.name || `UID ${entry.uid}`,
+        error: buildDetailedErrorMessage('该条目的 AI 返回数据解析失败', [
+          `UID: ${uid}`,
+          `错误信息: ${entryError?.message || '未知错误'}`,
+          `AI 返回的 draft: ${JSON.stringify(draft, null, 2)}`,
+        ]),
+      });
+    }
   });
 
   return { items, errors };
@@ -2100,6 +2149,8 @@ export const generateAiPlan = errorCatched(async (options = {}) => {
     customApi = null,
     onGenerationStart,
     shouldStream = false,
+    chatMessages = [],
+    referenceMaterial = '',
   } = options;
   const trimmedInstruction = instruction.trim();
 
@@ -2115,7 +2166,10 @@ export const generateAiPlan = errorCatched(async (options = {}) => {
     throw new Error('没有可供规划的条目');
   }
 
-  const requestPrompt = buildPlanningPrompt(lorebookName, trimmedInstruction, allEntries, promptSettings);
+  const requestPrompt = buildPlanningPrompt(lorebookName, trimmedInstruction, allEntries, promptSettings, {
+    chatMessages,
+    referenceMaterial,
+  });
   const rawResponse = await requestLlmText({
     prompt: requestPrompt,
     promptSettings,
@@ -2151,6 +2205,8 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     onGenerationStart,
     shouldStream = false,
     shouldStop,
+    chatMessages = [],
+    referenceMaterial = '',
   } = options;
   const trimmedInstruction = instruction.trim();
 
@@ -2241,6 +2297,8 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
         readonlyEntries,
         modifiedEntries: modifiedContextEntries,
         planningResult,
+        chatMessages,
+        referenceMaterial,
       });
       batchResults.push(batchResult);
 

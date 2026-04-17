@@ -1,6 +1,6 @@
 import { getWorldbookNamesSafe } from '../api.js';
 import { applyAiPreview, collectAiTargetEntries, generateAiPlan, generateAiPreview } from '../features/aiActionsBatch.js';
-import { cancelLlmGeneration } from '../features/llmClient.js';
+import { cancelLlmGeneration, requestLlmText } from '../features/llmClient.js';
 import { AI_CONTENT_ID } from '../config.js';
 import { getAiWorkspaceSettings, setAiWorkspaceSettings } from '../settings.js';
 import { initDesktopAiWorkspace, isDesktopAiWorkspace, refreshDesktopAiWorkspace, resetDesktopAiWorkspace } from './aiWorkspaceDesktop.js';
@@ -26,11 +26,16 @@ const state = {
   readonlyEntryUids: new Set(),
   planningResult: null,
   previewResult: null,
+  chatContext: { messageCount: 10 },
+  chatMessages: [],
+  referenceMaterial: '',
+  assistantChatHistory: [],
   modelOptions: [],
   statusText: '',
   modelStatusText: '',
   loadedLorebookName: '',
   isGenerating: false,
+  isAssistantGenerating: false,
   activeGenerationId: '',
   stopRequested: false,
   previewRunId: 0,
@@ -47,12 +52,28 @@ const entrySearch = () => ($('#ai-workspace-search', parentDoc()).val() || '').t
 const instructionValue = () => ($('#ai-workspace-instruction', parentDoc()).val() || '').trim();
 const jailbreakPromptTemplateValue = () => ($('#ai-workspace-jailbreak-prompt-template', parentDoc()).val() || '').trim();
 const builtinPromptTemplateValue = () => ($('#ai-workspace-builtin-prompt-template', parentDoc()).val() || '').trim();
+const referenceMaterialValue = () => $('#ai-workspace-reference-material', parentDoc()).val() || '';
+const assistantInputValue = () => ($('#ai-workspace-assistant-input', parentDoc()).val() || '').trim();
 const getApiMode = () => ($('input[name="ai-workspace-api-mode"]:checked', parentDoc()).val() || 'preset').trim();
 const selectedSource = () => ($('#ai-workspace-source-select', parentDoc()).val() || 'openai').trim();
 const isKnownSource = source => SOURCES.some(([value]) => value === source);
 const isCustomSource = source => (source || '').trim() === 'custom';
 const isStreamEnabled = () => $('#ai-workspace-stream', parentDoc()).prop('checked');
 const debouncedRenderLorebookSearchResults = _.debounce(() => renderLorebookSearchResults(), 150);
+
+function normalizeChatContextCount(value) {
+  const parsed = Number.parseInt(`${value ?? 10}`, 10);
+  if (!Number.isFinite(parsed)) {
+    return 10;
+  }
+  return Math.min(50, Math.max(0, parsed));
+}
+
+function currentChatContextSettings() {
+  return {
+    messageCount: normalizeChatContextCount($('#ai-workspace-chat-context-count', parentDoc()).val()),
+  };
+}
 
 function buildEntryPromptSnapshot(entry = {}) {
   return {
@@ -89,6 +110,9 @@ function saveSettings(patch = {}) {
   const current = settings();
   const hasPlanningResultPatch = Object.prototype.hasOwnProperty.call(patch, 'planningResult');
   const hasPreviewResultPatch = Object.prototype.hasOwnProperty.call(patch, 'previewResult');
+  const hasChatMessagesPatch = Object.prototype.hasOwnProperty.call(patch, 'chatMessages');
+  const hasReferenceMaterialPatch = Object.prototype.hasOwnProperty.call(patch, 'referenceMaterial');
+  const hasAssistantChatHistoryPatch = Object.prototype.hasOwnProperty.call(patch, 'assistantChatHistory');
   setAiWorkspaceSettings({
     ...current,
     ...patch,
@@ -101,6 +125,12 @@ function saveSettings(patch = {}) {
     readonlyEntryUids: Array.isArray(patch.readonlyEntryUids)
       ? [...patch.readonlyEntryUids]
       : Array.from(state.readonlyEntryUids),
+    chatContext: { ...current.chatContext, ...(patch.chatContext || currentChatContextSettings()) },
+    chatMessages: hasChatMessagesPatch ? _.cloneDeep(patch.chatMessages) : _.cloneDeep(state.chatMessages),
+    referenceMaterial: hasReferenceMaterialPatch ? patch.referenceMaterial : state.referenceMaterial,
+    assistantChatHistory: hasAssistantChatHistoryPatch
+      ? _.cloneDeep(patch.assistantChatHistory)
+      : _.cloneDeep(state.assistantChatHistory),
     planningResult: hasPlanningResultPatch ? _.cloneDeep(patch.planningResult) : _.cloneDeep(state.planningResult),
     previewResult: hasPreviewResultPatch ? _.cloneDeep(patch.previewResult) : _.cloneDeep(state.previewResult),
     statusText: typeof patch.statusText === 'string' ? patch.statusText : state.statusText,
@@ -122,6 +152,10 @@ function hydrateWorkspaceState(saved = settings(), lorebookName = '') {
 
   state.selectedEntryUids = new Set(canReuseSavedState ? normalizeUidList(saved?.selectedEntryUids) : []);
   state.readonlyEntryUids = new Set(canReuseSavedState ? normalizeUidList(saved?.readonlyEntryUids) : []);
+  state.chatContext = { messageCount: normalizeChatContextCount(saved?.chatContext?.messageCount) };
+  state.chatMessages = canReuseSavedState ? _.cloneDeep(saved?.chatMessages || []) : [];
+  state.referenceMaterial = canReuseSavedState ? (saved?.referenceMaterial || '') : '';
+  state.assistantChatHistory = canReuseSavedState ? _.cloneDeep(saved?.assistantChatHistory || []) : [];
   state.planningResult = canReuseSavedState ? _.cloneDeep(saved?.planningResult || null) : null;
   state.previewResult = canReuseSavedState ? _.cloneDeep(saved?.previewResult || null) : null;
   state.statusText = canReuseSavedState ? (saved?.statusText || '') : '';
@@ -145,6 +179,120 @@ function setGeneratingState(isGenerating) {
   if (!state.isGenerating) {
     state.activeGenerationId = '';
   }
+}
+
+function formatChatContextPreview(chatMessages = []) {
+  if (!Array.isArray(chatMessages) || !chatMessages.length) {
+    return '';
+  }
+
+  return chatMessages
+    .map(message => {
+      const role = message?.role || 'system';
+      const roleLabel = role === 'assistant' ? '助手' : role === 'user' ? '用户' : '系统';
+      const name = message?.name ? ` / ${message.name}` : '';
+      const messageId = Number.isFinite(Number(message?.message_id)) ? ` #${message.message_id}` : '';
+      return `[${roleLabel}${name}${messageId}]\n${message?.message || ''}`;
+    })
+    .join('\n\n');
+}
+
+function renderChatContextPreview() {
+  $('#ai-workspace-chat-context-count', parentDoc()).val(state.chatContext.messageCount);
+  $('#ai-workspace-chat-context-preview', parentDoc()).val(
+    formatChatContextPreview(state.chatMessages) || '尚未获取聊天上下文。',
+  );
+
+  const summary = !state.chatMessages.length
+    ? '尚未获取聊天消息。'
+    : `已载入最近 ${state.chatMessages.length} 条聊天消息，将注入到 <聊天上下文>。`;
+  $('#ai-workspace-chat-context-status', parentDoc()).text(summary);
+}
+
+function renderReferenceMaterial() {
+  $('#ai-workspace-reference-material', parentDoc()).val(state.referenceMaterial || '');
+  syncReferenceMaterialStatus();
+}
+
+function syncReferenceMaterialStatus() {
+  const trimmed = (state.referenceMaterial || '').trim();
+  $('#ai-workspace-reference-material-status', parentDoc()).text(
+    trimmed ? `资料区已填写 ${trimmed.length} 个字符，将注入到 <参考资料>。` : '资料区为空。',
+  );
+}
+
+function renderAssistantHistory() {
+  const $history = $('#ai-workspace-assistant-history', parentDoc());
+  if (!$history.length) {
+    return;
+  }
+
+  $history.empty();
+  if (!Array.isArray(state.assistantChatHistory) || !state.assistantChatHistory.length) {
+    $history.append('<div class="ai-empty">还没有对话内容。</div>');
+    return;
+  }
+
+  state.assistantChatHistory.forEach((item, index) => {
+    const isAssistant = item.role === 'assistant';
+    $history.append(`
+      <div class="ai-assistant-message${isAssistant ? ' is-assistant' : ' is-user'}">
+        <div class="ai-assistant-message-meta">${isAssistant ? 'AI 助手' : '用户'}</div>
+        <div class="ai-assistant-message-body">${_.escape(item.content || '')}</div>
+        ${isAssistant ? `<div class="ai-assistant-actions"><button type="button" class="ai-assistant-pick" data-history-index="${index}">选取到资料区</button></div>` : ''}
+      </div>
+    `);
+  });
+}
+
+function setAssistantStatus(text) {
+  $('#ai-workspace-assistant-status', parentDoc()).text(text || '');
+}
+
+function setAssistantGeneratingState(isGenerating) {
+  state.isAssistantGenerating = Boolean(isGenerating);
+  $('#ai-workspace-assistant-send', parentDoc()).prop('disabled', state.isAssistantGenerating);
+}
+
+function invalidateInfoDrivenOutputs(message = '信息区已变化，请重新生成改造方案或预览。') {
+  const hadPlanning = Boolean(state.planningResult);
+  const hadPreview = Boolean(state.previewResult);
+  if (hadPlanning) {
+    renderPlanningResult(null);
+  }
+  if (hadPreview) {
+    clearPreview(message);
+  } else if (hadPlanning) {
+    setStatus(message);
+  }
+  if (hadPlanning || hadPreview) {
+    saveSettings({ planningResult: null, previewResult: null });
+  }
+}
+
+function buildAssistantPrompt(userInput, saved = settings(), chatHistory = state.assistantChatHistory) {
+  const jailbreakPrompt = saved.promptSettings?.jailbreakPromptTemplate?.trim() || '';
+  const referenceMaterial = (state.referenceMaterial || '').trim();
+  const history = (Array.isArray(chatHistory) ? chatHistory : [])
+    .map(item => `<${item.role}>${item.content || ''}</${item.role}>`)
+    .join('\n');
+
+  return [
+    jailbreakPrompt,
+    '<任务>',
+    '你是世界书 AI 工作区里的资料整理助手。',
+    '你的任务是帮助用户整理设定、提炼要点，并生成适合放入<参考资料>的文本。',
+    '不要改写世界书条目，不要返回 JSON，不要假装看见未提供的世界书内容。',
+    '</任务>',
+    referenceMaterial ? `<当前参考资料>\n${referenceMaterial}\n</当前参考资料>` : '',
+    history ? `<对话历史>\n${history}\n</对话历史>` : '',
+    '<用户问题>',
+    userInput,
+    '</用户问题>',
+    '请用简洁中文回答；如果合适，直接给出可粘贴进资料区的整理内容。',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 function renderDebugInfo(debug = {}) {
@@ -294,6 +442,24 @@ function ensureMarkup() {
         </div>
       </div>
 
+      <div class="ai-drawer" data-expanded="true">
+        <div class="ai-drawer-summary" tabindex="0">上下文区</div>
+        <div class="ai-drawer-body">
+          <div class="ai-row">
+            <div class="ai-field">
+              <label for="ai-workspace-chat-context-count">最近消息条数</label>
+              <input id="ai-workspace-chat-context-count" type="number" min="0" max="50" value="10">
+            </div>
+            <div class="ai-field ai-btn-field">
+              <label>&nbsp;</label>
+              <button type="button" id="ai-workspace-chat-context-refresh">刷新聊天上下文</button>
+            </div>
+          </div>
+          <div id="ai-workspace-chat-context-status" class="ai-text">尚未获取聊天消息。</div>
+          <textarea id="ai-workspace-chat-context-preview" class="ai-readonly-textarea" readonly></textarea>
+        </div>
+      </div>
+
       <div class="ai-drawer ai-selection-drawer" data-expanded="true">
         <div class="ai-drawer-summary" tabindex="0">条目列表</div>
         <div class="ai-drawer-body">
@@ -330,6 +496,30 @@ function ensureMarkup() {
             <span id="ai-workspace-selection-summary" class="ai-text">尚未加载条目</span>
           </div>
           <div id="ai-workspace-entry-list" class="ai-scroll ai-entry-list"></div>
+        </div>
+      </div>
+
+      <div class="ai-drawer" data-expanded="true">
+        <div class="ai-drawer-summary" tabindex="0">资料区</div>
+        <div class="ai-drawer-body">
+          <div class="ai-note">这里的文本会注入到&lt;参考资料&gt;，你也可以先和 AI 助手讨论，再把结果选取进来。</div>
+          <div class="ai-field">
+            <label for="ai-workspace-reference-material">参考资料</label>
+            <textarea id="ai-workspace-reference-material" class="ai-reference-material" placeholder="粘贴设定、百科、剧情摘要、风格约束等补充资料。"></textarea>
+          </div>
+          <div id="ai-workspace-reference-material-status" class="ai-text">资料区为空。</div>
+          <details class="ai-assistant-panel" open>
+            <summary>AI 助手</summary>
+            <div id="ai-workspace-assistant-history" class="ai-scroll ai-assistant-history"></div>
+            <div class="ai-field">
+              <label for="ai-workspace-assistant-input">助手输入</label>
+              <textarea id="ai-workspace-assistant-input" class="ai-assistant-input" placeholder="例如：根据当前资料，整理出一段适合放进资料区的世界观摘要。"></textarea>
+            </div>
+            <div class="ai-toolbar">
+              <button type="button" id="ai-workspace-assistant-send">发送给 AI 助手</button>
+              <span id="ai-workspace-assistant-status" class="ai-text"></span>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -426,6 +616,8 @@ function ensureMarkup() {
             <div id="ai-workspace-preview-modal-content"></div>
           </div>
           <div class="ai-preview-modal-footer">
+            <button type="button" id="ai-workspace-preview-modal-regenerate">重新生成此条</button>
+            <button type="button" id="ai-workspace-preview-modal-save">保存修改</button>
             <button type="button" id="ai-workspace-preview-modal-close-button">关闭</button>
           </div>
         </div>
@@ -460,6 +652,9 @@ function ensureStyles() {
       #${ROOT_ID} label{font-size:13px;color:var(--panel-text-color,#ddd)}
       #${ROOT_ID} input[type='text'],#${ROOT_ID} input[type='password'],#${ROOT_ID} select,#${ROOT_ID} textarea{width:100%;box-sizing:border-box;border:1px solid var(--panel-border-color,#555);border-radius:4px;background:var(--search-input-bg-color,#222);color:var(--panel-text-color,#eee);padding:8px 10px}
       #${ROOT_ID} textarea{min-height:120px;resize:vertical}
+      #${ROOT_ID} .ai-readonly-textarea{min-height:180px;font-family:Consolas,Monaco,monospace}
+      #${ROOT_ID} .ai-reference-material{min-height:220px}
+      #${ROOT_ID} .ai-assistant-input{min-height:120px}
       #${ROOT_ID} .ai-prompt-template{min-height:220px;font-family:Consolas,Monaco,monospace}
       #${ROOT_ID} button{border:1px solid var(--panel-border-color,#666);border-radius:4px;background:var(--panel-accent-color,#4a6a8a);color:var(--panel-text-color,#fff);padding:8px 12px;cursor:pointer}
       #${ROOT_ID} button[disabled]{opacity:.6;cursor:not-allowed}
@@ -479,6 +674,17 @@ function ensureStyles() {
       #${ROOT_ID} .ai-entry-item-snippet{margin-top:4px}
       #${ROOT_ID} .ai-preview-errors{display:none;margin-top:10px;margin-bottom:10px;color:#ffb4b4;white-space:pre-wrap}
       #${ROOT_ID} .ai-preview-errors.has-errors{display:block}
+      #${ROOT_ID} .ai-assistant-panel{margin-top:12px;border:1px solid var(--panel-border-color,#444);border-radius:4px;background:var(--panel-entry-bg-color,#242424);overflow:hidden}
+      #${ROOT_ID} .ai-assistant-panel summary{cursor:pointer;padding:10px 12px;font-size:13px;font-weight:600;color:var(--panel-text-color,#ddd);background:rgba(255,255,255,.03)}
+      #${ROOT_ID} .ai-assistant-panel > *:not(summary){margin:12px}
+      #${ROOT_ID} .ai-assistant-history{min-height:180px;max-height:320px;padding:12px}
+      #${ROOT_ID} .ai-assistant-message{padding:10px 12px;border:1px solid var(--panel-border-color,#3d3d3d);border-radius:6px;background:rgba(255,255,255,.03)}
+      #${ROOT_ID} .ai-assistant-message + .ai-assistant-message{margin-top:10px}
+      #${ROOT_ID} .ai-assistant-message.is-assistant{border-color:rgba(159,200,228,.45);background:rgba(159,200,228,.08)}
+      #${ROOT_ID} .ai-assistant-message-meta{font-size:12px;color:var(--panel-text-color,#bbb);margin-bottom:6px}
+      #${ROOT_ID} .ai-assistant-message-body{white-space:pre-wrap;word-break:break-word;line-height:1.5}
+      #${ROOT_ID} .ai-assistant-actions{margin-top:8px}
+      #${ROOT_ID} .ai-assistant-actions button{padding:6px 10px;font-size:12px}
       #${ROOT_ID} .ai-preview-item{padding:10px 12px;border-bottom:1px solid var(--panel-border-color,#3e3e3e);cursor:pointer}
       #${ROOT_ID} .ai-preview-item:hover{background:rgba(255,255,255,.04)}
       #${ROOT_ID} .ai-preview-diff + .ai-preview-diff{margin-top:8px}
@@ -703,6 +909,8 @@ async function loadModelListViaStatusApiWithFallback(apiConfig) {
 }
 
 function persist() {
+  state.chatContext = currentChatContextSettings();
+  state.referenceMaterial = referenceMaterialValue();
   saveSettings({
     lorebookName: currentLorebook(),
     apiMode: getApiMode(),
@@ -711,6 +919,119 @@ function persist() {
     customApi: customApi(),
     editableFields: selectedFields(),
   });
+}
+
+async function refreshChatContext() {
+  state.chatContext = currentChatContextSettings();
+  const messageCount = state.chatContext.messageCount;
+  const hadOutputs = Boolean(state.planningResult || state.previewResult);
+
+  if (messageCount <= 0) {
+    state.chatMessages = [];
+    renderChatContextPreview();
+    saveSettings({ chatContext: state.chatContext, chatMessages: [] });
+    invalidateInfoDrivenOutputs('聊天上下文已清空，请重新生成改造方案或预览。');
+    if (!hadOutputs) {
+      setStatus('聊天上下文已清空。');
+    }
+    return;
+  }
+
+  if (typeof getChatMessages !== 'function') {
+    throw new Error('当前环境没有可用的 getChatMessages()');
+  }
+
+  const allMessages = getChatMessages('0-{{lastMessageId}}', { hide_state: 'unhidden' }) || [];
+  state.chatMessages = allMessages
+    .slice(-messageCount)
+    .map(message => ({
+      message_id: Number(message?.message_id),
+      name: typeof message?.name === 'string' ? message.name : '',
+      role: ['system', 'assistant', 'user'].includes(message?.role) ? message.role : 'system',
+      message: typeof message?.message === 'string' ? message.message : '',
+    }))
+    .filter(message => message.message.trim());
+
+  renderChatContextPreview();
+  saveSettings({ chatContext: state.chatContext, chatMessages: state.chatMessages });
+  invalidateInfoDrivenOutputs('聊天上下文已更新，请重新生成改造方案或预览。');
+  if (!hadOutputs) {
+    setStatus(`已刷新聊天上下文，共载入 ${state.chatMessages.length} 条消息。`);
+  }
+}
+
+function setReferenceMaterial(nextValue, { invalidateOutputs = false, syncTextarea = true } = {}) {
+  state.referenceMaterial = typeof nextValue === 'string' ? nextValue : '';
+  if (syncTextarea) {
+    renderReferenceMaterial();
+  } else {
+    syncReferenceMaterialStatus();
+  }
+  saveSettings({ referenceMaterial: state.referenceMaterial });
+  if (invalidateOutputs) {
+    invalidateInfoDrivenOutputs('参考资料已更新，请重新生成改造方案或预览。');
+  }
+}
+
+async function handleAssistantSend() {
+  const userInput = assistantInputValue();
+  const saved = settings();
+
+  if (!userInput) {
+    setAssistantStatus('请输入要发送给 AI 助手的内容。');
+    return;
+  }
+  if (saved.apiMode === 'custom') {
+    const validationMessage = validateCustomApiConfig(saved.customApi, { requireModel: true });
+    if (validationMessage) {
+      setAssistantStatus(validationMessage);
+      return;
+    }
+  }
+
+  const previousHistory = state.assistantChatHistory;
+  const assistantPrompt = buildAssistantPrompt(userInput, saved, previousHistory);
+  const nextHistory = previousHistory.concat({ role: 'user', content: userInput });
+  state.assistantChatHistory = nextHistory;
+  renderAssistantHistory();
+  saveSettings({ assistantChatHistory: state.assistantChatHistory });
+  setAssistantGeneratingState(true);
+  setAssistantStatus('AI 助手正在整理资料...');
+
+  try {
+    const response = await requestLlmText({
+      prompt: assistantPrompt,
+      promptSettings: saved.promptSettings,
+      customApi: saved.apiMode === 'custom' ? saved.customApi : null,
+      shouldStream: saved.stream === true,
+    });
+
+    state.assistantChatHistory = nextHistory.concat({ role: 'assistant', content: response });
+    $('#ai-workspace-assistant-input', parentDoc()).val('');
+    renderAssistantHistory();
+    saveSettings({ assistantChatHistory: state.assistantChatHistory });
+    setAssistantStatus('AI 助手回复完成。');
+  } catch (error) {
+    state.assistantChatHistory = nextHistory;
+    renderAssistantHistory();
+    saveSettings({ assistantChatHistory: state.assistantChatHistory });
+    setAssistantStatus(error?.message || 'AI 助手请求失败。');
+  } finally {
+    setAssistantGeneratingState(false);
+  }
+}
+
+function appendAssistantReplyToReferenceMaterial(index) {
+  const historyItem = state.assistantChatHistory[Number(index)];
+  if (!historyItem || historyItem.role !== 'assistant') {
+    return;
+  }
+
+  const nextValue = state.referenceMaterial.trim()
+    ? `${state.referenceMaterial.trim()}\n\n${historyItem.content}`
+    : historyItem.content;
+  setReferenceMaterial(nextValue, { invalidateOutputs: true });
+  window.toastr?.success('已追加到资料区');
 }
 
 function syncSource(source) {
@@ -771,8 +1092,15 @@ function syncForm() {
   $('#ai-workspace-field-prompt', parentDoc()).prop('checked', saved.editableFields?.prompt !== false);
   $('#ai-workspace-jailbreak-prompt-template', parentDoc()).val(saved.promptSettings?.jailbreakPromptTemplate || '');
   $('#ai-workspace-builtin-prompt-template', parentDoc()).val(saved.promptSettings?.builtinPromptTemplate || '');
+  $('#ai-workspace-chat-context-count', parentDoc()).val(normalizeChatContextCount(saved.chatContext?.messageCount));
+  $('#ai-workspace-reference-material', parentDoc()).val(saved.referenceMaterial || '');
   syncSource(saved.customApi?.source || 'openai');
   toggleCustomApi();
+  renderChatContextPreview();
+  renderReferenceMaterial();
+  renderAssistantHistory();
+  setAssistantStatus('');
+  setAssistantGeneratingState(false);
 }
 
 function renderModelOptions() {
@@ -1038,43 +1366,164 @@ function buildPreviewModalSections(item) {
   const beforeKeywords = Array.isArray(beforeEntry?.strategy?.keys) ? beforeEntry.strategy.keys : [];
   const afterKeywords = Array.isArray(afterEntry?.strategy?.keys) ? afterEntry.strategy.keys : [];
 
-  if ((beforeEntry?.name || '') !== (afterEntry?.name || '')) {
-    sections.push({
-      title: '标题',
-      before: beforeEntry?.name || '',
-      after: afterEntry?.name || '',
-    });
-  }
+  sections.push({
+    title: '标题',
+    fieldKey: 'name',
+    before: beforeEntry?.name || '',
+    after: afterEntry?.name || '',
+    changed: (beforeEntry?.name || '') !== (afterEntry?.name || ''),
+  });
 
-  if ((beforeEntry?.content || '') !== (afterEntry?.content || '')) {
-    sections.push({
-      title: '内容',
-      before: beforeEntry?.content || '',
-      after: afterEntry?.content || '',
-    });
-  }
+  sections.push({
+    title: '内容',
+    fieldKey: 'content',
+    before: beforeEntry?.content || '',
+    after: afterEntry?.content || '',
+    changed: (beforeEntry?.content || '') !== (afterEntry?.content || ''),
+  });
 
-  if (!_.isEqual(beforeKeywords, afterKeywords)) {
-    sections.push({
-      title: '关键词',
-      before: beforeKeywords,
-      after: afterKeywords,
-    });
-  }
-
-  if (!sections.length) {
-    sections.push({
-      title: '当前条目',
-      before: beforeEntry?.content || '',
-      after: afterEntry?.content || '',
-    });
-  }
+  sections.push({
+    title: '关键词',
+    fieldKey: 'keywords',
+    before: beforeKeywords,
+    after: afterKeywords,
+    changed: !_.isEqual(beforeKeywords, afterKeywords),
+  });
 
   return sections;
 }
 
 function closePreviewModal() {
   $('#ai-workspace-preview-modal', parentDoc()).hide();
+}
+
+function recalcPreviewItemDiffs(item) {
+  const beforeEntry = item?.beforeEntry || {};
+  const afterEntry = item?.afterEntry || {};
+  const diffs = [];
+
+  if ((beforeEntry?.name || '') !== (afterEntry?.name || '')) {
+    diffs.push({ label: '标题', before: beforeEntry?.name || '', after: afterEntry?.name || '' });
+  }
+
+  const beforeContent = beforeEntry?.content || '';
+  const afterContent = afterEntry?.content || '';
+  if (beforeContent !== afterContent) {
+    diffs.push({
+      label: '内容差异',
+      type: 'content-snippets',
+      snippets: [{ before: beforeContent.slice(0, 200), after: afterContent.slice(0, 200) }],
+      before: beforeContent.slice(0, 120),
+      after: afterContent.slice(0, 120),
+    });
+  }
+
+  const beforeKeywords = Array.isArray(beforeEntry?.strategy?.keys) ? beforeEntry.strategy.keys : [];
+  const afterKeywords = Array.isArray(afterEntry?.strategy?.keys) ? afterEntry.strategy.keys : [];
+  if (!_.isEqual(beforeKeywords, afterKeywords)) {
+    diffs.push({ label: '关键词', before: beforeKeywords, after: afterKeywords });
+  }
+
+  item.diffs = diffs;
+  item.changed = diffs.length > 0;
+}
+
+function handlePreviewModalSave() {
+  const uid = Number($('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid'));
+  const item = state.previewResult?.items?.find(previewItem => Number(previewItem?.uid) === uid);
+  if (!item) {
+    return;
+  }
+
+  const afterEntry = item.afterEntry;
+  $('.ai-preview-modal-editable', parentDoc()).each(function () {
+    const fieldKey = $(this).attr('data-field-key');
+    const value = $(this).val();
+
+    if (fieldKey === 'name') {
+      afterEntry.name = value;
+    } else if (fieldKey === 'content') {
+      afterEntry.content = value;
+    } else if (fieldKey === 'keywords') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          afterEntry.strategy = afterEntry.strategy || {};
+          afterEntry.strategy.keys = parsed.map(k => String(k).trim()).filter(Boolean);
+        }
+      } catch {
+        afterEntry.strategy = afterEntry.strategy || {};
+        afterEntry.strategy.keys = value.split(',').map(k => k.trim()).filter(Boolean);
+      }
+    }
+  });
+
+  recalcPreviewItemDiffs(item);
+  renderPreview(state.previewResult);
+  saveSettings({ previewResult: state.previewResult });
+  closePreviewModal();
+  window.toastr?.success('预览修改已保存');
+}
+
+async function handlePreviewModalRegenerate() {
+  const uid = Number($('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid'));
+  const item = state.previewResult?.items?.find(previewItem => Number(previewItem?.uid) === uid);
+  if (!item) {
+    return;
+  }
+
+  const lorebookName = currentLorebook();
+  const instruction = instructionValue();
+  const saved = settings();
+
+  if (!lorebookName || !instruction) {
+    window.toastr?.warning('请确保已选择世界书并输入 AI 指令');
+    return;
+  }
+
+  $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', true).text('正在重新生成...');
+  $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', true);
+  state.stopRequested = false;
+
+  try {
+    const singleResult = await generateAiPreview({
+      lorebookName,
+      entryUids: [uid],
+      readonlyEntryUids: Array.from(state.readonlyEntryUids),
+      planningResult: state.planningResult,
+      instruction,
+      chatMessages: state.chatMessages,
+      referenceMaterial: state.referenceMaterial,
+      fieldOptions: saved.editableFields,
+      promptSettings: saved.promptSettings,
+      customApi: saved.apiMode === 'custom' ? saved.customApi : null,
+      shouldStream: saved.stream === true,
+      onGenerationStart: generationId => {
+        state.activeGenerationId = generationId;
+      },
+      shouldStop: () => state.stopRequested === true,
+    });
+
+    const newItem = singleResult?.items?.[0];
+    if (newItem) {
+      const index = state.previewResult.items.findIndex(i => Number(i.uid) === uid);
+      if (index >= 0) {
+        state.previewResult.items[index] = newItem;
+      }
+      renderPreview(state.previewResult);
+      saveSettings({ previewResult: state.previewResult });
+      openPreviewModal(uid);
+      window.toastr?.success('已重新生成该条目');
+    } else {
+      const errorMsg = singleResult?.errors?.[0]?.error || '重新生成失败';
+      window.toastr?.error(errorMsg.slice(0, 200));
+    }
+  } catch (error) {
+    window.toastr?.error(error?.message || '重新生成失败');
+  } finally {
+    $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', false).text('重新生成此条');
+    $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', false);
+  }
 }
 
 function openPreviewModal(uid) {
@@ -1084,25 +1533,30 @@ function openPreviewModal(uid) {
   }
 
   const sections = buildPreviewModalSections(item);
+  $('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid', uid);
   $('#ai-workspace-preview-modal-title', parentDoc()).text(`${item.title || '条目'} (UID: ${item.uid})`);
-  $('#ai-workspace-preview-modal-summary', parentDoc()).text(item.changed ? '显示本条目的完整修改内容。' : '本条目当前无实际变更。');
+  $('#ai-workspace-preview-modal-summary', parentDoc()).text(
+    item.changed ? '可直接编辑预览内容，修改后点击「保存修改」。' : '本条目当前无实际变更，可手动编辑后保存。',
+  );
   $('#ai-workspace-preview-modal-content', parentDoc()).html(
     sections.map(section => `
-          <div class="ai-preview-modal-section">
-            <div class="ai-preview-modal-section-title">${_.escape(section.title)}</div>
+          <div class="ai-preview-modal-section" data-field-key="${section.fieldKey}">
+            <div class="ai-preview-modal-section-title">${_.escape(section.title)}${section.changed ? ' <span class="ai-changed-badge">已变更</span>' : ''}</div>
             <div class="ai-preview-modal-panel">
               <div class="ai-preview-modal-field">
                 <label>当前</label>
                 <textarea readonly>${_.escape(formatPreviewModalValue(section.before))}</textarea>
               </div>
               <div class="ai-preview-modal-field">
-                <label>预览</label>
-                <textarea readonly>${_.escape(formatPreviewModalValue(section.after))}</textarea>
+                <label>预览（可编辑）</label>
+                <textarea class="ai-preview-modal-editable" data-field-key="${section.fieldKey}">${_.escape(formatPreviewModalValue(section.after))}</textarea>
               </div>
             </div>
           </div>
         `).join(''),
   );
+  $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', false);
+  $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', state.isGenerating);
   $('#ai-workspace-preview-modal', parentDoc()).css('display', 'block');
 }
 
@@ -1491,6 +1945,12 @@ function legacyBindEvents() {
     .on('click.aiWorkspace', '#ai-workspace-preview-modal-close-button, #ai-workspace-preview-modal .ai-preview-modal-close', () => {
       closePreviewModal();
     })
+    .on('click.aiWorkspace', '#ai-workspace-preview-modal-save', () => {
+      handlePreviewModalSave();
+    })
+    .on('click.aiWorkspace', '#ai-workspace-preview-modal-regenerate', async () => {
+      await handlePreviewModalRegenerate();
+    })
     .on('keydown.aiWorkspace', '#ai-workspace-preview-modal .ai-preview-modal-close', function (event) {
       if (event.key !== 'Enter' && event.key !== ' ') return;
       event.preventDefault();
@@ -1688,6 +2148,8 @@ async function handlePlan() {
     const planningResult = await generateAiPlan({
       lorebookName,
       instruction,
+      chatMessages: state.chatMessages,
+      referenceMaterial: state.referenceMaterial,
       promptSettings: saved.promptSettings,
       customApi: saved.apiMode === 'custom' ? saved.customApi : null,
       shouldStream: saved.stream === true,
@@ -1752,6 +2214,8 @@ async function handlePreview() {
       readonlyEntryUids,
       planningResult: state.planningResult,
       instruction,
+      chatMessages: state.chatMessages,
+      referenceMaterial: state.referenceMaterial,
       fieldOptions: saved.editableFields,
       promptSettings: saved.promptSettings,
       customApi: saved.apiMode === 'custom' ? saved.customApi : null,
@@ -1826,8 +2290,24 @@ function bindEvents() {
       persist();
       await loadEntriesCompat(lorebookName);
     })
+    .on('change.aiWorkspace input.aiWorkspace', '#ai-workspace-chat-context-count', () => {
+      state.chatContext = currentChatContextSettings();
+      renderChatContextPreview();
+      saveSettings({ chatContext: state.chatContext });
+      setStatus('聊天上下文条数已更新，点击“刷新聊天上下文”后生效。');
+    })
+    .on('click.aiWorkspace', '#ai-workspace-chat-context-refresh', async () => {
+      try {
+        await refreshChatContext();
+      } catch (error) {
+        setStatus(error?.message || '刷新聊天上下文失败。');
+      }
+    })
     .on('click.aiWorkspace', '#ai-workspace-refresh-entries', async () => loadEntriesCompat(currentLorebook()))
     .on('input.aiWorkspace', '#ai-workspace-search', renderEntryList)
+    .on('input.aiWorkspace', '#ai-workspace-reference-material', () => {
+      setReferenceMaterial(referenceMaterialValue(), { invalidateOutputs: true, syncTextarea: false });
+    })
     .on('click.aiWorkspace', '#ai-workspace-select-visible', () => markVisibleEntriesCompat('editable'))
     .on('click.aiWorkspace', '#ai-workspace-mark-visible-readonly', () => markVisibleEntriesCompat('readonly'))
     .on('click.aiWorkspace', '#ai-workspace-clear-selection', () => {
@@ -1871,6 +2351,18 @@ function bindEvents() {
     .on('click.aiWorkspace', '#ai-workspace-preview', async () => handlePreview())
     .on('click.aiWorkspace', '#ai-workspace-stop', () => handleStop())
     .on('click.aiWorkspace', '#ai-workspace-apply', async () => handleApply())
+    .on('click.aiWorkspace', '#ai-workspace-assistant-send', async () => {
+      await handleAssistantSend();
+    })
+    .on('keydown.aiWorkspace', '#ai-workspace-assistant-input', async event => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        await handleAssistantSend();
+      }
+    })
+    .on('click.aiWorkspace', '.ai-assistant-pick', function () {
+      appendAssistantReplyToReferenceMaterial($(this).attr('data-history-index'));
+    })
     .on('click.aiWorkspace', event => {
       if (!$(event.target).closest('.ai-worldbook-adder').length) {
         hideLorebookSearchResults();
@@ -1905,11 +2397,16 @@ export function resetAiWorkspace() {
   state.readonlyEntryUids = new Set();
   state.planningResult = null;
   state.previewResult = null;
+  state.chatContext = { messageCount: 10 };
+  state.chatMessages = [];
+  state.referenceMaterial = '';
+  state.assistantChatHistory = [];
   state.modelOptions = [];
   state.statusText = '';
   state.modelStatusText = '';
   state.loadedLorebookName = '';
   state.isGenerating = false;
+  state.isAssistantGenerating = false;
   state.activeGenerationId = '';
   state.stopRequested = false;
   state.previewRunId += 1;
@@ -1922,14 +2419,23 @@ export function resetAiWorkspace() {
   $('#ai-workspace-instruction', parentDoc()).val('');
   $('#ai-workspace-search', parentDoc()).val('');
   $('#ai-workspace-lorebook-search', parentDoc()).val('');
+  $('#ai-workspace-chat-context-count', parentDoc()).val('10');
+  $('#ai-workspace-chat-context-preview', parentDoc()).val('');
+  $('#ai-workspace-reference-material', parentDoc()).val('');
+  $('#ai-workspace-assistant-input', parentDoc()).val('');
   syncCurrentLorebookDisplay('');
   hideLorebookSearchResults();
   clearPreview();
   renderPlanningResult(null);
   renderEntryList();
+  renderChatContextPreview();
+  renderReferenceMaterial();
+  renderAssistantHistory();
   renderDebugInfo();
   setStatus('');
   setModelStatus('');
+  setAssistantStatus('');
+  setAssistantGeneratingState(false);
   setGeneratingState(false);
 }
 
@@ -1948,6 +2454,11 @@ export const refreshAiWorkspace = errorCatched(async () => {
     state.formHydrated = true;
   } else {
     toggleCustomApi();
+    renderChatContextPreview();
+    renderReferenceMaterial();
+    renderAssistantHistory();
+    setAssistantStatus('');
+    setAssistantGeneratingState(false);
   }
 
   const lorebookName = await populateLorebooks();

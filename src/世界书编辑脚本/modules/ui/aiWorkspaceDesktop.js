@@ -1,6 +1,6 @@
 import { getWorldbookNamesSafe } from '../api.js';
 import { applyAiPreview, collectAiTargetEntries, generateAiPlan, generateAiPreview } from '../features/aiActionsBatch.js';
-import { cancelLlmGeneration } from '../features/llmClient.js';
+import { cancelLlmGeneration, requestLlmText } from '../features/llmClient.js';
 import { AI_CONTENT_ID } from '../config.js';
 import { getAiWorkspaceSettings, getPcLayoutModeSetting, setAiWorkspaceSettings } from '../settings.js';
 import { errorCatched, isMobile } from '../utils.js';
@@ -101,11 +101,16 @@ const state = {
   sharedStatusText: '',
   currentNav: 'direct',
   isGenerating: false,
+  isAssistantGenerating: false,
   activeGenerationId: '',
   stopRequested: false,
   previewRunId: 0,
   initialized: false,
   hydrated: false,
+  chatContext: { messageCount: 10 },
+  chatMessages: [],
+  referenceMaterial: '',
+  assistantChatHistory: [],
   modes: {
     direct: createEmptyModeState(),
     plan: createEmptyModeState(),
@@ -118,6 +123,20 @@ const root = () => $(`#${ROOT_ID}`, parentDoc());
 const settings = () => getAiWorkspaceSettings();
 const currentModeKey = () => (state.currentNav === 'plan' ? 'plan' : 'direct');
 const currentModeState = () => state.modes[currentModeKey()];
+
+function normalizeChatContextCount(value) {
+  const parsed = Number.parseInt(`${value ?? 10}`, 10);
+  if (!Number.isFinite(parsed)) {
+    return 10;
+  }
+  return Math.min(50, Math.max(0, parsed));
+}
+
+function currentChatContextSettings() {
+  return {
+    messageCount: normalizeChatContextCount($('#ai-workspace-chat-context-count', parentDoc()).val()),
+  };
+}
 
 export function isDesktopAiWorkspace() {
   return !isMobile() && getPcLayoutModeSetting() === 'master-detail';
@@ -176,6 +195,10 @@ function hydrateStateFromSettings() {
   state.currentNav = normalizeNavMode(saved.navMode || 'direct');
   state.modelStatusText = '';
   state.sharedStatusText = '';
+  state.chatContext = { messageCount: normalizeChatContextCount(saved.chatContext?.messageCount) };
+  state.chatMessages = _.cloneDeep(saved.chatMessages || []);
+  state.referenceMaterial = saved.referenceMaterial || '';
+  state.assistantChatHistory = _.cloneDeep(saved.assistantChatHistory || []);
   state.modes.direct = createModeState(saved.direct, { ...fallback, modeKey: 'direct' });
   state.modes.plan = createModeState(saved.plan, { ...fallback, modeKey: 'plan' });
   state.hydrated = true;
@@ -224,6 +247,12 @@ function isStreamEnabled() {
 function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
   const saved = settings();
   const mirrorMode = state.modes[mirrorModeKey] || state.modes.direct;
+  if ($('#ai-workspace-chat-context-count', parentDoc()).length) {
+    state.chatContext = currentChatContextSettings();
+  }
+  if ($('#ai-workspace-reference-material', parentDoc()).length) {
+    state.referenceMaterial = ($('#ai-workspace-reference-material', parentDoc()).val() || '').toString();
+  }
   setAiWorkspaceSettings({
     ...saved,
     navMode: state.currentNav,
@@ -235,6 +264,10 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
     apiMode: getApiMode(),
     stream: isStreamEnabled(),
     customApi: currentApiSettings(),
+    chatContext: state.chatContext,
+    chatMessages: state.chatMessages,
+    referenceMaterial: state.referenceMaterial,
+    assistantChatHistory: state.assistantChatHistory,
   });
 }
 
@@ -318,6 +351,79 @@ function setGeneratingState(isGenerating) {
   if (!state.isGenerating) {
     state.activeGenerationId = '';
   }
+}
+
+function formatChatContextPreview(chatMessages = []) {
+  if (!Array.isArray(chatMessages) || !chatMessages.length) {
+    return '';
+  }
+
+  return chatMessages
+    .map(message => {
+      const role = message?.role || 'system';
+      const roleLabel = role === 'assistant' ? '助手' : role === 'user' ? '用户' : '系统';
+      const name = message?.name ? ` / ${message.name}` : '';
+      const messageId = Number.isFinite(Number(message?.message_id)) ? ` #${message.message_id}` : '';
+      return `[${roleLabel}${name}${messageId}]\n${message?.message || ''}`;
+    })
+    .join('\n\n');
+}
+
+function renderChatContextPreview() {
+  $('#ai-workspace-chat-context-count', parentDoc()).val(state.chatContext.messageCount);
+  $('#ai-workspace-chat-context-preview', parentDoc()).val(
+    formatChatContextPreview(state.chatMessages) || '尚未获取聊天上下文。',
+  );
+  $('#ai-workspace-chat-context-status', parentDoc()).text(
+    state.chatMessages.length
+      ? `已载入最近 ${state.chatMessages.length} 条聊天消息，将注入到 <聊天上下文>。`
+      : '尚未获取聊天消息。',
+  );
+}
+
+function renderReferenceMaterial() {
+  $('#ai-workspace-reference-material', parentDoc()).val(state.referenceMaterial || '');
+  syncReferenceMaterialStatus();
+}
+
+function syncReferenceMaterialStatus() {
+  const trimmed = (state.referenceMaterial || '').trim();
+  $('#ai-workspace-reference-material-status', parentDoc()).text(
+    trimmed ? `资料区已填写 ${trimmed.length} 个字符，将注入到 <参考资料>。` : '资料区为空。',
+  );
+}
+
+function renderAssistantHistory() {
+  const $history = $('#ai-workspace-assistant-history', parentDoc());
+  if (!$history.length) {
+    return;
+  }
+
+  $history.empty();
+  if (!state.assistantChatHistory.length) {
+    $history.append('<div class="ai-empty">还没有对话内容。</div>');
+    return;
+  }
+
+  state.assistantChatHistory.forEach((item, index) => {
+    const isAssistant = item.role === 'assistant';
+    $history.append(`
+      <div class="ai-assistant-message${isAssistant ? ' is-assistant' : ' is-user'}">
+        <div class="ai-assistant-message-meta">${isAssistant ? 'AI 助手' : '用户'}</div>
+        <div class="ai-assistant-message-body">${_.escape(item.content || '')}</div>
+        ${isAssistant ? `<div class="ai-assistant-actions"><button type="button" class="ai-assistant-pick" data-history-index="${index}">选取到资料区</button></div>` : ''}
+      </div>
+    `);
+  });
+}
+
+function setAssistantStatus(text) {
+  $('#ai-workspace-assistant-status', parentDoc()).text(text || '');
+}
+
+function setAssistantGeneratingState(isGenerating) {
+  state.isAssistantGenerating = Boolean(isGenerating);
+  $('#ai-workspace-assistant-send', parentDoc()).prop('disabled', state.isAssistantGenerating);
 }
 
 function invalidateModeOutputs(modeKey, { clearPlan = modeKey === 'plan' } = {}) {
@@ -668,6 +774,35 @@ function buildPreviewModalSections(item, mode) {
   return sections;
 }
 
+function applyPreviewModalEdits(modeKey) {
+  const mode = state.modes[modeKey];
+  const uid = Number($('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid'));
+  const item = mode.previewResult?.items?.find(previewItem => Number(previewItem?.uid) === uid);
+  if (!item) {
+    return null;
+  }
+
+  item.afterEntry = _.cloneDeep(item.afterEntry || item.beforeEntry || {});
+  item.afterEntry.strategy = item.afterEntry.strategy || {};
+
+  $('#ai-workspace-preview-modal-content textarea[data-preview-field]', parentDoc()).each(function () {
+    const field = ($(this).attr('data-preview-field') || '').trim();
+    const value = $(this).val() || '';
+    if (field === 'title') {
+      item.afterEntry.name = `${value}`.trim();
+    } else if (field === 'content') {
+      item.afterEntry.content = `${value}`;
+    } else if (field === 'keywords') {
+      item.afterEntry.strategy.keys = parseKeywordsEditorValue(value);
+    }
+  });
+
+  rebuildPreviewResult(modeKey);
+  renderPreview(modeKey);
+  persistSettings({ mirrorModeKey: modeKey });
+  return item;
+}
+
 function renderDebugInfo(modeKey, debug = null) {
   const mode = state.modes[modeKey];
   mode.debugInfo = debug || mode.debugInfo || {};
@@ -815,6 +950,237 @@ function closePreviewModal() {
   $('#ai-workspace-preview-modal', parentDoc()).hide();
 }
 
+function invalidateSharedInfoOutputs(message = '信息区已变化，请重新生成改造方案或预览。') {
+  ['direct', 'plan'].forEach(modeKey => {
+    const mode = state.modes[modeKey];
+    const hadPreview = Boolean(mode.previewResult);
+    const hadPlan = Boolean(mode.planningResult);
+    if (!hadPreview && !hadPlan) {
+      return;
+    }
+
+    invalidateModeOutputs(modeKey, { clearPlan: true });
+    if (state.currentNav === modeKey) {
+      if (hadPreview) {
+        clearPreview(modeKey, message);
+      }
+      if (hadPlan) {
+        renderPlanningResult(modeKey, null);
+      }
+      setModeStatus(modeKey, message);
+    }
+  });
+
+  persistSettings({ mirrorModeKey: currentModeKey() });
+}
+
+function setReferenceMaterial(nextValue, { invalidateOutputs = false, syncTextarea = true } = {}) {
+  state.referenceMaterial = typeof nextValue === 'string' ? nextValue : '';
+  if (syncTextarea) {
+    renderReferenceMaterial();
+  } else {
+    syncReferenceMaterialStatus();
+  }
+  persistSettings({ mirrorModeKey: currentModeKey() });
+  if (invalidateOutputs) {
+    invalidateSharedInfoOutputs('参考资料已更新，请重新生成改造方案或预览。');
+  }
+}
+
+async function refreshChatContext() {
+  state.chatContext = currentChatContextSettings();
+  const messageCount = state.chatContext.messageCount;
+  const hadOutputs = ['direct', 'plan'].some(modeKey => state.modes[modeKey].planningResult || state.modes[modeKey].previewResult);
+
+  if (messageCount <= 0) {
+    state.chatMessages = [];
+    renderChatContextPreview();
+    persistSettings({ mirrorModeKey: currentModeKey() });
+    invalidateSharedInfoOutputs('聊天上下文已清空，请重新生成改造方案或预览。');
+    if (!hadOutputs) {
+      setModeStatus(currentModeKey(), '聊天上下文已清空。');
+    }
+    return;
+  }
+
+  if (typeof getChatMessages !== 'function') {
+    throw new Error('当前环境没有可用的 getChatMessages()');
+  }
+
+  const allMessages = getChatMessages('0-{{lastMessageId}}', { hide_state: 'unhidden' }) || [];
+  state.chatMessages = allMessages
+    .slice(-messageCount)
+    .map(message => ({
+      message_id: Number(message?.message_id),
+      name: typeof message?.name === 'string' ? message.name : '',
+      role: ['system', 'assistant', 'user'].includes(message?.role) ? message.role : 'system',
+      message: typeof message?.message === 'string' ? message.message : '',
+    }))
+    .filter(message => message.message.trim());
+
+  renderChatContextPreview();
+  persistSettings({ mirrorModeKey: currentModeKey() });
+  invalidateSharedInfoOutputs('聊天上下文已更新，请重新生成改造方案或预览。');
+  if (!hadOutputs) {
+    setModeStatus(currentModeKey(), `已刷新聊天上下文，共载入 ${state.chatMessages.length} 条消息。`);
+  }
+}
+
+function buildAssistantPrompt(userInput, saved = settings(), chatHistory = state.assistantChatHistory) {
+  const jailbreakPrompt = currentPromptSettings(currentModeKey()).jailbreakPromptTemplate
+    || saved.promptSettings?.jailbreakPromptTemplate
+    || '';
+  const referenceMaterial = (state.referenceMaterial || '').trim();
+  const history = (Array.isArray(chatHistory) ? chatHistory : [])
+    .map(item => `<${item.role}>${item.content || ''}</${item.role}>`)
+    .join('\n');
+
+  return [
+    jailbreakPrompt.trim(),
+    '<任务>',
+    '你是世界书 AI 工作区里的资料整理助手。',
+    '你的任务是帮助用户整理设定、提炼要点，并生成适合放入<参考资料>的文本。',
+    '不要改写世界书条目，不要返回 JSON，不要假装看见未提供的世界书内容。',
+    '</任务>',
+    referenceMaterial ? `<当前参考资料>\n${referenceMaterial}\n</当前参考资料>` : '',
+    history ? `<对话历史>\n${history}\n</对话历史>` : '',
+    '<用户问题>',
+    userInput,
+    '</用户问题>',
+    '请用简洁中文回答；如果合适，直接给出可粘贴进资料区的整理内容。',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+async function handleAssistantSend() {
+  const userInput = ($('#ai-workspace-assistant-input', parentDoc()).val() || '').trim();
+  const saved = settings();
+  const modeKey = currentModeKey();
+
+  if (!userInput) {
+    setAssistantStatus('请输入要发送给 AI 助手的内容。');
+    return;
+  }
+  if (saved.apiMode === 'custom') {
+    const validationMessage = validateCustomApiConfig(saved.customApi, { requireModel: true });
+    if (validationMessage) {
+      setAssistantStatus(validationMessage);
+      return;
+    }
+  }
+
+  const previousHistory = state.assistantChatHistory;
+  const assistantPrompt = buildAssistantPrompt(userInput, saved, previousHistory);
+  state.assistantChatHistory = previousHistory.concat({ role: 'user', content: userInput });
+  renderAssistantHistory();
+  persistSettings({ mirrorModeKey: modeKey });
+  setAssistantGeneratingState(true);
+  setAssistantStatus('AI 助手正在整理资料...');
+
+  try {
+    const response = await requestLlmText({
+      prompt: assistantPrompt,
+      promptSettings: currentPromptSettings(modeKey),
+      customApi: saved.apiMode === 'custom' ? saved.customApi : null,
+      shouldStream: saved.stream === true,
+    });
+
+    state.assistantChatHistory = state.assistantChatHistory.concat({ role: 'assistant', content: response });
+    $('#ai-workspace-assistant-input', parentDoc()).val('');
+    renderAssistantHistory();
+    persistSettings({ mirrorModeKey: modeKey });
+    setAssistantStatus('AI 助手回复完成。');
+  } catch (error) {
+    setAssistantStatus(error?.message || 'AI 助手请求失败。');
+  } finally {
+    setAssistantGeneratingState(false);
+  }
+}
+
+function appendAssistantReplyToReferenceMaterial(index) {
+  const historyItem = state.assistantChatHistory[Number(index)];
+  if (!historyItem || historyItem.role !== 'assistant') {
+    return;
+  }
+
+  const nextValue = state.referenceMaterial.trim()
+    ? `${state.referenceMaterial.trim()}\n\n${historyItem.content}`
+    : historyItem.content;
+  setReferenceMaterial(nextValue, { invalidateOutputs: true });
+  window.toastr?.success('已追加到资料区');
+}
+
+function handlePreviewModalSave() {
+  const modeKey = currentModeKey();
+  const item = applyPreviewModalEdits(modeKey);
+  if (!item) {
+    return;
+  }
+
+  $('#ai-workspace-preview-modal-title', parentDoc()).text(`${item.afterEntry.name || item.beforeEntry?.name || item.title || '条目'} (UID: ${item.uid})`);
+  $('#ai-workspace-preview-modal-summary', parentDoc()).text(item.changed ? '预览修改已保存，可继续编辑或直接应用。' : '当前无实际变更，但修改内容已保存。');
+  setModeStatus(modeKey, '改造结果已更新，可直接应用。');
+  window.toastr?.success('预览修改已保存');
+}
+
+async function handlePreviewModalRegenerate() {
+  const modeKey = currentModeKey();
+  const mode = state.modes[modeKey];
+  const saved = settings();
+  const uid = Number($('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid'));
+  const item = mode.previewResult?.items?.find(previewItem => Number(previewItem?.uid) === uid);
+  if (!item) {
+    return;
+  }
+
+  $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', true).text('正在重新生成...');
+  $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', true);
+  state.stopRequested = false;
+
+  try {
+    const previewResult = await generateAiPreview({
+      lorebookName: mode.lorebookName,
+      entryUids: [uid],
+      readonlyEntryUids: Array.from(mode.readonlyEntryUids),
+      planningResult: mode.planningResult,
+      instruction: mode.instruction,
+      chatMessages: state.chatMessages,
+      referenceMaterial: state.referenceMaterial,
+      fieldOptions: mode.editableFields,
+      promptSettings: mode.promptSettings,
+      customApi: saved.apiMode === 'custom' ? saved.customApi : null,
+      shouldStream: saved.stream === true,
+      onGenerationStart: generationId => {
+        state.activeGenerationId = generationId;
+      },
+      shouldStop: () => state.stopRequested === true,
+    });
+
+    const newItem = previewResult?.items?.[0];
+    if (!newItem) {
+      throw new Error(previewResult?.errors?.[0]?.error || '重新生成失败');
+    }
+
+    const index = mode.previewResult.items.findIndex(previewItem => Number(previewItem.uid) === uid);
+    if (index >= 0) {
+      mode.previewResult.items[index] = newItem;
+    }
+    rebuildPreviewResult(modeKey);
+    renderPreview(modeKey);
+    persistSettings({ mirrorModeKey: modeKey });
+    openPreviewModal(uid);
+    setModeStatus(modeKey, '已重新生成该条目。');
+    window.toastr?.success('已重新生成该条目');
+  } catch (error) {
+    setModeStatus(modeKey, error?.message || '重新生成失败。');
+    window.toastr?.error(error?.message || '重新生成失败');
+  } finally {
+    $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', false).text('重新生成此条');
+    $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', false);
+  }
+}
+
 function openPreviewModal(uid) {
   const mode = currentModeState();
   const item = mode.previewResult?.items?.find(previewItem => Number(previewItem?.uid) === Number(uid));
@@ -823,6 +1189,7 @@ function openPreviewModal(uid) {
   }
 
   const sections = buildPreviewModalSections(item, mode);
+  $('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid', uid);
   $('#ai-workspace-preview-modal-title', parentDoc()).text(`${item.title || '条目'} (UID: ${item.uid})`);
   $('#ai-workspace-preview-modal-summary', parentDoc()).text(item.changed ? '你可以直接编辑右侧预览内容。' : '当前无实际变更，但你仍可直接编辑右侧预览内容。');
   $('#ai-workspace-preview-modal-content', parentDoc()).html(
@@ -842,6 +1209,8 @@ function openPreviewModal(uid) {
       </div>
     `).join(''),
   );
+  $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', false);
+  $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', state.isGenerating);
   $('#ai-workspace-preview-modal', parentDoc()).css('display', 'block');
 }
 
@@ -1013,8 +1382,60 @@ function buildPreviewModalMarkup() {
           <div id="ai-workspace-preview-modal-content"></div>
         </div>
         <div class="ai-preview-modal-footer">
+          <button type="button" id="ai-workspace-preview-modal-regenerate">重新生成此条</button>
+          <button type="button" id="ai-workspace-preview-modal-save">保存修改</button>
           <button type="button" id="ai-workspace-preview-modal-close-button">关闭</button>
         </div>
+      </div>
+    </div>
+  `;
+}
+
+function buildInfoResourcesMarkup() {
+  return `
+    <div class="ai-info-panel">
+      <div class="ai-subpanel">
+        <div class="ai-subpanel-header">
+          <h5>上下文区</h5>
+          <p>拉取最近聊天消息，注入到&lt;聊天上下文&gt;。</p>
+        </div>
+        <div class="ai-row">
+          <div class="ai-field">
+            <label for="ai-workspace-chat-context-count">最近消息条数</label>
+            <input id="ai-workspace-chat-context-count" type="number" min="0" max="50" value="10">
+          </div>
+          <div class="ai-field ai-btn-field">
+            <label>&nbsp;</label>
+            <button type="button" id="ai-workspace-chat-context-refresh">刷新聊天上下文</button>
+          </div>
+        </div>
+        <div id="ai-workspace-chat-context-status" class="ai-text">尚未获取聊天消息。</div>
+        <textarea id="ai-workspace-chat-context-preview" class="ai-readonly-textarea" readonly></textarea>
+      </div>
+      <div class="ai-subpanel">
+        <div class="ai-subpanel-header">
+          <h5>资料区</h5>
+          <p>手动输入或从 AI 助手选取文本，注入到&lt;参考资料&gt;。</p>
+        </div>
+        <div class="ai-field">
+          <label for="ai-workspace-reference-material">参考资料</label>
+          <textarea id="ai-workspace-reference-material" class="ai-reference-material" placeholder="粘贴设定、补充资料、剧情摘要或风格约束。"></textarea>
+        </div>
+        <div id="ai-workspace-reference-material-status" class="ai-text">资料区为空。</div>
+        <details class="ai-prompt-settings ai-assistant-panel" open>
+          <summary>AI 助手</summary>
+          <div class="ai-prompt-settings-body">
+            <div id="ai-workspace-assistant-history" class="ai-scroll ai-assistant-history"></div>
+            <div class="ai-field">
+              <label for="ai-workspace-assistant-input">助手输入</label>
+              <textarea id="ai-workspace-assistant-input" class="ai-assistant-input" placeholder="例如：根据当前资料，整理一段适合放进资料区的摘要。"></textarea>
+            </div>
+            <div class="ai-toolbar">
+              <button type="button" id="ai-workspace-assistant-send">发送给 AI 助手</button>
+              <span id="ai-workspace-assistant-status" class="ai-text"></span>
+            </div>
+          </div>
+        </details>
       </div>
     </div>
   `;
@@ -1171,6 +1592,7 @@ function buildInstructionMarkup(modeKey) {
         <textarea id="ai-workspace-instruction" placeholder="例如：保留原意，但压缩内容，统一语气，并补全更明确的提示词。"></textarea>
       </div>
       <div class="ai-note">这里将 AI 指令、可编辑字段和提示词设置合并到同一步骤，不再散落在多个抽屉中。</div>
+      ${buildInfoResourcesMarkup()}
       <details class="ai-prompt-settings">
         <summary>提示词设置</summary>
         <div class="ai-prompt-settings-body">
@@ -1391,10 +1813,17 @@ function ensureStyles() {
       #${ROOT_ID} label{font-size:13px;color:var(--panel-text-color,#ddd)}
       #${ROOT_ID} input[type='text'],#${ROOT_ID} input[type='password'],#${ROOT_ID} select,#${ROOT_ID} textarea{width:100%;box-sizing:border-box;border:1px solid var(--panel-border-color,#555);border-radius:6px;background:var(--search-input-bg-color,#222);color:var(--panel-text-color,#eee);padding:9px 10px}
       #${ROOT_ID} textarea{min-height:120px;resize:vertical}
+      #${ROOT_ID} .ai-readonly-textarea{min-height:180px;font-family:Consolas,Monaco,monospace}
+      #${ROOT_ID} .ai-reference-material{min-height:220px}
+      #${ROOT_ID} .ai-assistant-input{min-height:120px}
       #${ROOT_ID} .ai-prompt-template{min-height:220px;font-family:Consolas,Monaco,monospace}
       #${ROOT_ID} .ai-prompt-settings{border:1px solid var(--panel-border-color,#444);border-radius:6px;background:var(--panel-entry-bg-color,#242424)}
       #${ROOT_ID} .ai-prompt-settings summary{cursor:pointer;padding:10px 12px;font-size:13px;font-weight:600;color:var(--panel-text-color,#ddd);background:rgba(255,255,255,.03)}
       #${ROOT_ID} .ai-prompt-settings-body{display:flex;flex-direction:column;gap:12px;padding:12px}
+      #${ROOT_ID} .ai-info-panel{display:grid;gap:12px}
+      #${ROOT_ID} .ai-subpanel{border:1px solid var(--panel-border-color,#444);border-radius:6px;background:var(--panel-entry-bg-color,#242424);padding:12px;display:flex;flex-direction:column;gap:12px}
+      #${ROOT_ID} .ai-subpanel-header h5{margin:0 0 4px 0;font-size:14px}
+      #${ROOT_ID} .ai-subpanel-header p{margin:0;color:var(--panel-text-color,#cfd8dc);font-size:12px;line-height:1.5}
       #${ROOT_ID} button{border:1px solid var(--panel-border-color,#666);border-radius:6px;background:var(--panel-accent-color,#4a6a8a);color:var(--panel-text-color,#fff);padding:9px 12px;cursor:pointer}
       #${ROOT_ID} button[disabled]{opacity:.6;cursor:not-allowed}
       #${ROOT_ID} .ai-secondary-button{background:transparent}
@@ -1415,6 +1844,14 @@ function ensureStyles() {
       #${ROOT_ID} .ai-entry-item-snippet{margin-top:4px}
       #${ROOT_ID} .ai-preview-errors{display:none;color:#ffb4b4;white-space:pre-wrap}
       #${ROOT_ID} .ai-preview-errors.has-errors{display:block}
+      #${ROOT_ID} .ai-assistant-history{min-height:180px;max-height:320px;padding:12px}
+      #${ROOT_ID} .ai-assistant-message{padding:10px 12px;border:1px solid var(--panel-border-color,#3d3d3d);border-radius:6px;background:rgba(255,255,255,.03)}
+      #${ROOT_ID} .ai-assistant-message + .ai-assistant-message{margin-top:10px}
+      #${ROOT_ID} .ai-assistant-message.is-assistant{border-color:rgba(159,200,228,.45);background:rgba(159,200,228,.08)}
+      #${ROOT_ID} .ai-assistant-message-meta{font-size:12px;color:var(--panel-text-color,#bbb);margin-bottom:6px}
+      #${ROOT_ID} .ai-assistant-message-body{white-space:pre-wrap;word-break:break-word;line-height:1.5}
+      #${ROOT_ID} .ai-assistant-actions{margin-top:8px}
+      #${ROOT_ID} .ai-assistant-actions button{padding:6px 10px;font-size:12px}
       #${ROOT_ID} .ai-preview-item{padding:12px;border-bottom:1px solid var(--panel-border-color,#3e3e3e);cursor:pointer}
       #${ROOT_ID} .ai-preview-item:hover{background:rgba(255,255,255,.04)}
       #${ROOT_ID} .ai-preview-diff + .ai-preview-diff{margin-top:8px}
@@ -1514,6 +1951,11 @@ function syncModeForm(modeKey) {
   $('#ai-workspace-jailbreak-prompt-template', parentDoc()).val(mode.promptSettings.jailbreakPromptTemplate || '');
   $('#ai-workspace-builtin-prompt-template', parentDoc()).val(mode.promptSettings.builtinPromptTemplate || '');
   $('#ai-workspace-planning-prompt-template', parentDoc()).val(mode.promptSettings.planningPromptTemplate || '');
+  renderChatContextPreview();
+  renderReferenceMaterial();
+  renderAssistantHistory();
+  setAssistantStatus('');
+  setAssistantGeneratingState(false);
 }
 
 function renderCurrentPanel() {
@@ -1722,6 +2164,8 @@ async function handlePlan() {
     const planningResult = await generateAiPlan({
       lorebookName: mode.lorebookName,
       instruction: mode.instruction,
+      chatMessages: state.chatMessages,
+      referenceMaterial: state.referenceMaterial,
       promptSettings: mode.promptSettings,
       customApi: saved.apiMode === 'custom' ? saved.customApi : null,
       shouldStream: saved.stream === true,
@@ -1788,6 +2232,8 @@ async function handlePreview() {
       readonlyEntryUids: Array.from(mode.readonlyEntryUids),
       planningResult: mode.planningResult,
       instruction: mode.instruction,
+      chatMessages: state.chatMessages,
+      referenceMaterial: state.referenceMaterial,
       fieldOptions: mode.editableFields,
       promptSettings: mode.promptSettings,
       customApi: saved.apiMode === 'custom' ? saved.customApi : null,
@@ -1962,6 +2408,19 @@ function bindEvents() {
       await loadEntriesForMode(modeKey, { force: true, resetSelection: true, clearOutputs: false });
       renderCurrentPanel();
     })
+    .on('change.aiWorkspaceDesktop input.aiWorkspaceDesktop', '#ai-workspace-chat-context-count', () => {
+      state.chatContext = currentChatContextSettings();
+      renderChatContextPreview();
+      persistSettings({ mirrorModeKey: currentModeKey() });
+      setModeStatus(currentModeKey(), '聊天上下文条数已更新，点击“刷新聊天上下文”后生效。');
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-chat-context-refresh', async () => {
+      try {
+        await refreshChatContext();
+      } catch (error) {
+        setModeStatus(currentModeKey(), error?.message || '刷新聊天上下文失败。');
+      }
+    })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-refresh-entries', async () => {
       await loadEntriesForMode(currentModeKey(), {
         force: true,
@@ -1975,6 +2434,12 @@ function bindEvents() {
       const modeKey = currentModeKey();
       state.modes[modeKey].searchText = ($(this).val() || '').trim();
       renderEntryList(modeKey);
+    })
+    .on('input.aiWorkspaceDesktop', '#ai-workspace-reference-material', function () {
+      state.referenceMaterial = ($(this).val() || '').toString();
+      syncReferenceMaterialStatus();
+      persistSettings({ mirrorModeKey: currentModeKey() });
+      invalidateSharedInfoOutputs('参考资料已更新，请重新生成改造方案或预览。');
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-select-visible', () => {
       const modeKey = currentModeKey();
@@ -2074,6 +2539,12 @@ function bindEvents() {
     .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-modal-close-button, #ai-workspace-preview-modal .ai-preview-modal-close', () => {
       closePreviewModal();
     })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-modal-save', () => {
+      handlePreviewModalSave();
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-modal-regenerate', async () => {
+      await handlePreviewModalRegenerate();
+    })
     .on('input.aiWorkspaceDesktop', '#ai-workspace-preview-modal-content textarea[data-preview-field]', () => {
       if (state.currentNav !== 'direct' && state.currentNav !== 'plan') {
         return;
@@ -2085,37 +2556,30 @@ function bindEvents() {
         return;
       }
 
-      const modeKey = currentModeKey();
-      const mode = state.modes[modeKey];
-      const uid = Number($(this).attr('data-preview-uid'));
-      const field = ($(this).attr('data-preview-field') || '').trim();
-      const item = mode.previewResult?.items?.find(previewItem => Number(previewItem?.uid) === uid);
-      if (!item) {
-        return;
-      }
-
-      item.afterEntry = _.cloneDeep(item.afterEntry || item.beforeEntry || {});
-      item.afterEntry.strategy = item.afterEntry.strategy || {};
-
       try {
-        const value = $(this).val() || '';
-        if (field === 'title') {
-          item.afterEntry.name = `${value}`.trim();
-        } else if (field === 'content') {
-          item.afterEntry.content = `${value}`;
-        } else if (field === 'keywords') {
-          item.afterEntry.strategy.keys = parseKeywordsEditorValue(value);
+        const modeKey = currentModeKey();
+        const item = applyPreviewModalEdits(modeKey);
+        if (!item) {
+          return;
         }
-
-        rebuildPreviewResult(modeKey);
-        renderPreview(modeKey);
         $('#ai-workspace-preview-modal-title', parentDoc()).text(`${item.afterEntry.name || item.beforeEntry?.name || item.title || '条目'} (UID: ${item.uid})`);
         $('#ai-workspace-preview-modal-summary', parentDoc()).text(item.changed ? '你可以直接编辑右侧预览内容。' : '当前无实际变更，但你仍可直接编辑右侧预览内容。');
-        persistSettings({ mirrorModeKey: modeKey });
         setModeStatus(modeKey, '改造结果已更新，可直接应用。');
       } catch (error) {
         setModeStatus(modeKey, `改造结果无法解析：${error.message}`);
       }
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-assistant-send', async () => {
+      await handleAssistantSend();
+    })
+    .on('keydown.aiWorkspaceDesktop', '#ai-workspace-assistant-input', async event => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        await handleAssistantSend();
+      }
+    })
+    .on('click.aiWorkspaceDesktop', '.ai-assistant-pick', function () {
+      appendAssistantReplyToReferenceMaterial($(this).attr('data-history-index'));
     })
     .on('keydown.aiWorkspaceDesktop', '#ai-workspace-preview-modal .ai-preview-modal-close', function (event) {
       if (event.key === 'Enter' || event.key === ' ') {
@@ -2156,6 +2620,7 @@ export function resetDesktopAiWorkspace() {
   state.modelStatusText = '';
   state.sharedStatusText = '';
   state.isGenerating = false;
+  state.isAssistantGenerating = false;
   state.activeGenerationId = '';
   state.stopRequested = false;
   state.previewRunId += 1;

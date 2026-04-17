@@ -1,5 +1,6 @@
 import { byId } from './dom';
 import { handleNext, handleRandomize } from './flow';
+import { queueSettingsSyncPopup } from './popup';
 import { checkAllFeaturesSelected, navigateTo, syncSettingsControls } from './render';
 import {
   createSelectionState,
@@ -91,10 +92,7 @@ function bindBodyClickEvents(selections: SelectionState) {
   });
 }
 
-function bindInputEvents(
-  selections: SelectionState,
-  syncGenerationSettings: (settings: GenerationSettings) => void,
-) {
+function bindInputEvents(selections: SelectionState, syncGenerationSettings: (settings: GenerationSettings) => void) {
   bindSettingsEvents(selections, syncGenerationSettings);
 
   byId<HTMLInputElement>('custom-profession-input').addEventListener('input', event => {
@@ -179,7 +177,8 @@ function createSettingsSyncer() {
       pendingSettings = null;
 
       try {
-        await applyGenerationSettings(nextSettings);
+        const syncReport = await applyGenerationSettings(nextSettings);
+        queueSettingsSyncPopup(syncReport);
       } catch (error) {
         console.error('同步开局设置失败:', error);
         alert(error instanceof Error ? error.message : '同步开局设置失败');

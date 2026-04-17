@@ -25,6 +25,18 @@ type ScriptPatchResult = {
   changedItems: string[];
 };
 
+export type GenerationSettingsSyncScopeReport = {
+  scope: string;
+  changedItems: string[];
+  missingLabels: string[];
+};
+
+export type GenerationSettingsSyncReport = {
+  scopes: GenerationSettingsSyncScopeReport[];
+  hasChanges: boolean;
+  hasMissing: boolean;
+};
+
 const CHARACTER_REGEX_OPTION = { type: 'character', name: 'current' } as const;
 const CHARACTER_SCRIPT_OPTION = { type: 'character' } as const;
 
@@ -49,29 +61,30 @@ const WORLDBOOK_ENTRY_RULES: NamedRule[] = [
   { key: 'actionSuggestion', label: '行动建议', query: '行动建议', mode: 'includes' },
 ];
 
-export async function applyGenerationSettings(settings: GenerationSettings) {
+export async function applyGenerationSettings(settings: GenerationSettings): Promise<GenerationSettingsSyncReport> {
   const api = getRuntimeApi();
 
-  const changedRegexes = await applyCharacterRegexSettings(api, settings);
-  const changedScripts = await applyCharacterScriptSettings(api, settings);
-  const changedWorldbookEntries = await applyCharacterWorldbookSettings(api, settings);
+  const scopes = [
+    await applyCharacterRegexSettings(api, settings),
+    await applyCharacterScriptSettings(api, settings),
+    await applyCharacterWorldbookSettings(api, settings),
+  ];
 
-  logAppliedChanges('局部正则', changedRegexes);
-  logAppliedChanges('局部脚本', changedScripts);
-  logAppliedChanges('当前角色世界书条目', changedWorldbookEntries);
+  return {
+    scopes,
+    hasChanges: scopes.some(scope => scope.changedItems.length > 0),
+    hasMissing: scopes.some(scope => scope.missingLabels.length > 0),
+  };
 }
 
 function getRuntimeApi(): RuntimeApi {
-  const getCharWorldbookNamesApi =
-    typeof getCharWorldbookNames === 'function' ? getCharWorldbookNames : undefined;
+  const getCharWorldbookNamesApi = typeof getCharWorldbookNames === 'function' ? getCharWorldbookNames : undefined;
   const getScriptTreesApi = typeof getScriptTrees === 'function' ? getScriptTrees : undefined;
   const getWorldbookApi = typeof getWorldbook === 'function' ? getWorldbook : undefined;
-  const updateScriptTreesWithApi =
-    typeof updateScriptTreesWith === 'function' ? updateScriptTreesWith : undefined;
+  const updateScriptTreesWithApi = typeof updateScriptTreesWith === 'function' ? updateScriptTreesWith : undefined;
   const updateTavernRegexesWithApi =
     typeof updateTavernRegexesWith === 'function' ? updateTavernRegexesWith : undefined;
-  const updateWorldbookWithApi =
-    typeof updateWorldbookWith === 'function' ? updateWorldbookWith : undefined;
+  const updateWorldbookWithApi = typeof updateWorldbookWith === 'function' ? updateWorldbookWith : undefined;
 
   if (!getCharWorldbookNamesApi) {
     throw Error('缺少酒馆助手接口: getCharWorldbookNames');
@@ -103,6 +116,7 @@ function getRuntimeApi(): RuntimeApi {
 }
 
 async function applyCharacterRegexSettings(api: RuntimeApi, settings: GenerationSettings) {
+  const scope = '局部正则';
   const desiredState = new Map<string, boolean>([
     ['variableStatusBar', settings.enableVariables],
     ['openingInfoReplace', settings.enableVariables],
@@ -138,24 +152,40 @@ async function applyCharacterRegexSettings(api: RuntimeApi, settings: Generation
     CHARACTER_REGEX_OPTION,
   );
 
-  logMissingRules('局部正则', REGEX_RULES, matchedKeys, getRelevantRegexKeys(settings));
-  return changedItems;
+  return {
+    scope,
+    changedItems,
+    missingLabels: getMissingLabels(REGEX_RULES, matchedKeys, getRelevantRegexKeys(settings)),
+  };
 }
 
 async function applyCharacterScriptSettings(api: RuntimeApi, settings: GenerationSettings) {
+  const scope = '局部脚本';
   const desiredState = new Map<string, boolean>([['eraVariableFramework', settings.enableVariables]]);
   const patchResult = patchScriptTrees(api.getScriptTrees(CHARACTER_SCRIPT_OPTION), desiredState);
 
   await api.updateScriptTreesWith(() => patchResult.trees, CHARACTER_SCRIPT_OPTION);
-  logMissingRules('局部脚本', SCRIPT_RULES, patchResult.matchedKeys, settings.enableVariables ? ['eraVariableFramework'] : []);
-  return patchResult.changedItems;
+  return {
+    scope,
+    changedItems: patchResult.changedItems,
+    missingLabels: getMissingLabels(
+      SCRIPT_RULES,
+      patchResult.matchedKeys,
+      settings.enableVariables ? ['eraVariableFramework'] : [],
+    ),
+  };
 }
 
 async function applyCharacterWorldbookSettings(api: RuntimeApi, settings: GenerationSettings) {
+  const scope = '当前角色世界书条目';
   const charWorldbooks = api.getCharWorldbookNames('current');
   const worldbookNames = uniqueStrings([charWorldbooks.primary || '', ...(charWorldbooks.additional || [])]);
   if (worldbookNames.length === 0) {
-    return [];
+    return {
+      scope,
+      changedItems: [],
+      missingLabels: [],
+    };
   }
 
   const desiredState = new Map<string, boolean>([
@@ -198,8 +228,11 @@ async function applyCharacterWorldbookSettings(api: RuntimeApi, settings: Genera
     await api.updateWorldbookWith(worldbookName, () => nextWorldbook);
   }
 
-  logMissingRules('当前角色世界书条目', WORLDBOOK_ENTRY_RULES, matchedKeys, getRelevantWorldbookKeys(settings));
-  return changedItems;
+  return {
+    scope,
+    changedItems,
+    missingLabels: getMissingLabels(WORLDBOOK_ENTRY_RULES, matchedKeys, getRelevantWorldbookKeys(settings)),
+  };
 }
 
 function patchScriptTrees(scriptTrees: ScriptTree[], desiredState: Map<string, boolean>): ScriptPatchResult {
@@ -288,25 +321,9 @@ function uniqueStrings(values: string[]) {
   return [...new Set(values.map(value => value.trim()).filter(Boolean))];
 }
 
-function logMissingRules(scope: string, rules: NamedRule[], matchedKeys: Set<string>, relevantKeys: string[]) {
+function getMissingLabels(rules: NamedRule[], matchedKeys: Set<string>, relevantKeys: string[]) {
   const relevantKeySet = new Set(relevantKeys);
-  const missingLabels = rules
-    .filter(rule => relevantKeySet.has(rule.key) && !matchedKeys.has(rule.key))
-    .map(rule => rule.label);
-  if (missingLabels.length === 0) {
-    return;
-  }
-
-  console.warn(`[开局前端] ${scope}未找到以下资源: ${missingLabels.join('、')}`);
-}
-
-function logAppliedChanges(scope: string, changedItems: string[]) {
-  if (changedItems.length === 0) {
-    console.info(`[开局前端] ${scope}未发生修改`);
-    return;
-  }
-
-  console.info(`[开局前端] ${scope}已修改:`, changedItems);
+  return rules.filter(rule => relevantKeySet.has(rule.key) && !matchedKeys.has(rule.key)).map(rule => rule.label);
 }
 
 function getRelevantRegexKeys(settings: GenerationSettings) {

@@ -8,12 +8,7 @@ export function navigateTo(screenId: string) {
   byId<HTMLElement>(screenId).classList.add('active');
 }
 
-export function renderCardOptions(
-  containerId: string,
-  options: CardOptions,
-  type: string,
-  selections: SelectionState,
-) {
+export function renderCardOptions(containerId: string, options: CardOptions, type: string, selections: SelectionState) {
   const container = byId<HTMLElement>(containerId);
   container.innerHTML = '';
 

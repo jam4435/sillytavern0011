@@ -1,185 +1,179 @@
 <head></head>
 <body>
-<div class="generator-container">
-      <span class="corner corner-tl"></span>
-      <span class="corner corner-tr"></span>
-      <span class="corner corner-bl"></span>
-      <span class="corner corner-br"></span>
+  <div class="generator-container">
+    <span class="corner corner-tl"></span>
+    <span class="corner corner-tr"></span>
+    <span class="corner corner-bl"></span>
+    <span class="corner corner-br"></span>
 
-      <div id="screen-gender" class="screen active">
-        <div class="screen-header">
-          <div class="randomize-btn" title="随机选择" data-screen-id="screen-gender">
-            <i class="fa-solid fa-dice-six"></i>
-          </div>
-          <h2>第一步：基因序列鉴定</h2>
-          <p>你的染色体，决定了你生而为王，或生而为奴</p>
+    <div id="screen-gender" class="screen active">
+      <div class="screen-header">
+        <div class="randomize-btn" title="随机选择" data-screen-id="screen-gender">
+          <i class="fa-solid fa-dice-six"></i>
         </div>
-        <div class="settings-panel">
-          <div class="settings-panel-header">
-            <span class="settings-panel-eyebrow">开局设置</span>
-            <p>这些设置会在注入世界前同步到酒馆助手的局部正则、局部脚本和当前角色世界书。</p>
-          </div>
-          <label class="setting-item" for="setting-enable-variables">
-            <span class="setting-copy">
-              <span class="setting-title">是否开启变量</span>
-              <span class="setting-hint">控制变量状态栏、开局信息替换、ERA变量框架和变量相关世界书条目。</span>
-            </span>
-            <span class="setting-switch">
-              <input id="setting-enable-variables" type="checkbox" />
-              <span class="setting-slider"></span>
-            </span>
-          </label>
-          <label id="setting-use-text-status-bar-item" class="setting-item" for="setting-use-text-status-bar">
-            <span class="setting-copy">
-              <span class="setting-title">无图片状态栏</span>
-              <span id="setting-use-text-status-bar-hint" class="setting-hint">关闭图片状态栏并启用无图片状态栏。</span>
-            </span>
-            <span class="setting-switch">
-              <input id="setting-use-text-status-bar" type="checkbox" />
-              <span class="setting-slider"></span>
-            </span>
-          </label>
-          <label class="setting-item" for="setting-generate-options">
-            <span class="setting-copy">
-              <span class="setting-title">是否生成选项</span>
-              <span class="setting-hint">开启后启用选项正则，并打开当前角色世界书的行动建议条目。</span>
-            </span>
-            <span class="setting-switch">
-              <input id="setting-generate-options" type="checkbox" />
-              <span class="setting-slider"></span>
-            </span>
-          </label>
+        <h2>第一步：基因序列鉴定</h2>
+        <p>你的染色体，决定了你生而为王，或生而为奴</p>
+      </div>
+      <div class="settings-panel">
+        <div class="settings-panel-header">
+          <span class="settings-panel-eyebrow">开局设置</span>
+          <p>这些设置会在注入世界前同步到酒馆助手的局部正则、局部脚本和当前角色世界书。</p>
         </div>
-        <div class="selection-grid">
-          <div class="card" data-type="gender" data-value="男">
-            <h3>男性</h3>
-            <p>帝国的支配者，或是在边缘挣扎的弃民。</p>
-          </div>
-          <div class="card" data-type="gender" data-value="女">
-            <h3>女性</h3>
-            <p>帝国的财产、商品与基石。</p>
-          </div>
+        <label class="setting-item" for="setting-enable-variables">
+          <span class="setting-copy">
+            <span class="setting-title">是否开启变量</span>
+            <span class="setting-hint">控制变量状态栏、开局信息替换、ERA变量框架和变量相关世界书条目。</span>
+          </span>
+          <span class="setting-switch">
+            <input id="setting-enable-variables" type="checkbox" />
+            <span class="setting-slider"></span>
+          </span>
+        </label>
+        <label id="setting-use-text-status-bar-item" class="setting-item" for="setting-use-text-status-bar">
+          <span class="setting-copy">
+            <span class="setting-title">无图片状态栏</span>
+            <span id="setting-use-text-status-bar-hint" class="setting-hint">关闭图片状态栏并启用无图片状态栏。</span>
+          </span>
+          <span class="setting-switch">
+            <input id="setting-use-text-status-bar" type="checkbox" />
+            <span class="setting-slider"></span>
+          </span>
+        </label>
+        <label class="setting-item" for="setting-generate-options">
+          <span class="setting-copy">
+            <span class="setting-title">是否生成选项</span>
+            <span class="setting-hint">开启后启用选项正则，并打开当前角色世界书的行动建议条目。</span>
+          </span>
+          <span class="setting-switch">
+            <input id="setting-generate-options" type="checkbox" />
+            <span class="setting-slider"></span>
+          </span>
+        </label>
+      </div>
+      <div class="selection-grid">
+        <div class="card" data-type="gender" data-value="男">
+          <h3>男性</h3>
+          <p>帝国的支配者，或是在边缘挣扎的弃民。</p>
         </div>
-        <div class="nav-buttons">
-          <span></span><button id="to-status" class="btn btn-primary" disabled>下一步</button>
+        <div class="card" data-type="gender" data-value="女">
+          <h3>女性</h3>
+          <p>帝国的财产、商品与基石。</p>
         </div>
       </div>
-      <div id="screen-status" class="screen">
-        <div class="screen-header">
-          <div class="randomize-btn" title="随机选择" data-screen-id="screen-status">
-            <i class="fa-solid fa-dice-six"></i>
-          </div>
-          <h2>第二步：社会身份划分</h2>
-          <p>血脉、信仰与法规，将你焊死在金字塔的特定位置</p>
-        </div>
-        <div id="status-options"></div>
-        <div class="nav-buttons">
-          <button class="btn back-btn" data-target="screen-gender">上一步</button
-          ><button id="to-profession-or-category" class="btn btn-primary" disabled>下一步</button>
-        </div>
-      </div>
-      <div id="screen-profession-category" class="screen">
-        <div class="screen-header">
-          <div class="randomize-btn" title="随机选择" data-screen-id="screen-profession-category">
-            <i class="fa-solid fa-dice-six"></i>
-          </div>
-          <h2>第三步：选择职业大类</h2>
-          <p>你的身份决定了你能从事的工种范围</p>
-        </div>
-        <div id="profession-category-options" class="selection-grid"></div>
-        <div class="nav-buttons">
-          <button class="btn back-btn" data-target="screen-status">上一步</button
-          ><button id="to-profession" class="btn btn-primary" disabled>下一步</button>
-        </div>
-      </div>
-      <div id="screen-profession" class="screen">
-        <div class="screen-header">
-          <div class="randomize-btn" title="随机选择" data-screen-id="screen-profession">
-            <i class="fa-solid fa-dice-six"></i>
-          </div>
-          <h2>第四步：确定具体职业</h2>
-          <p>你的工作，是享受特权，或是提供服务，亦或是成为工具本身</p>
-        </div>
-        <div id="profession-options" class="selection-grid"></div>
-        <div class="custom-input-container">
-          <label for="custom-profession-input">或自定义职业:</label>
-          <input
-            type="text"
-            id="custom-profession-input"
-            class="custom-input"
-            placeholder="在此输入自定义职业名称..."
-          />
-        </div>
-        <div class="nav-buttons">
-          <button class="btn back-btn" data-target="screen-profession-category">上一步</button
-          ><button id="to-features" class="btn btn-primary" disabled>下一步</button>
-        </div>
-      </div>
-      <div id="screen-features" class="screen">
-        <div class="screen-header">
-          <div class="randomize-btn" title="随机选择" data-screen-id="screen-features">
-            <i class="fa-solid fa-dice-six"></i>
-          </div>
-          <h2>第五步：生理特征登录</h2>
-          <p>你的肉体，是武器，是工具，也是商品</p>
-        </div>
-        <div id="features-container"></div>
-        <div class="custom-input-container">
-          <label for="custom-features-input">补充生理特征 (可选):</label>
-          <input
-            type="text"
-            id="custom-features-input"
-            class="custom-input"
-            placeholder="例如：猫耳、半机械化、有发光纹路..."
-          />
-        </div>
-        <div class="nav-buttons">
-          <button class="btn back-btn" data-target="screen-profession">上一步</button
-          ><button id="to-modification" class="btn btn-primary" disabled>下一步</button>
-        </div>
-      </div>
-      <div id="screen-modification" class="screen">
-        <div class="screen-header">
-          <div class="randomize-btn" title="随机选择" data-screen-id="screen-modification">
-            <i class="fa-solid fa-dice-six"></i>
-          </div>
-          <h2>第六步：强制性身体改造</h2>
-          <p>帝国的烙印，将铭刻在你的骨肉之上</p>
-        </div>
-        <div id="modification-container"></div>
-        <div class="custom-input-container">
-          <label for="custom-modification-input">补充身体改造 (可选):</label>
-          <input
-            type="text"
-            id="custom-modification-input"
-            class="custom-input"
-            placeholder="例如：植入天使翅膀、身体水晶化..."
-          />
-        </div>
-        <div class="nav-buttons">
-          <button class="btn back-btn" data-target="screen-features">上一步</button
-          ><button id="to-summary" class="btn btn-primary">下一步</button>
-        </div>
-      </div>
-      <div id="screen-summary" class="screen">
-        <div class="screen-header">
-          <h2>最终档案确认</h2>
-          <p>警告：档案生成后，命运将无法更改</p>
-        </div>
-        <div id="summary-content"></div>
-        <div class="custom-input-container summary-custom-scene">
-          <label for="custom-scene-input">开场背景和场景自定义:</label>
-          <textarea
-            id="custom-scene-input"
-            class="custom-textarea"
-            placeholder="在此输入你希望的开场背景，例如：“在一个阴暗的地下实验室醒来...”，留空则由AI完全决定。"
-          ></textarea>
-        </div>
-        <div class="nav-buttons">
-          <button class="btn back-btn" data-target="screen-modification">上一步</button
-          ><button id="confirm-and-start" class="btn btn-primary">注入世界</button>
-        </div>
+      <div class="nav-buttons">
+        <span></span><button id="to-status" class="btn btn-primary" disabled>下一步</button>
       </div>
     </div>
+    <div id="screen-status" class="screen">
+      <div class="screen-header">
+        <div class="randomize-btn" title="随机选择" data-screen-id="screen-status">
+          <i class="fa-solid fa-dice-six"></i>
+        </div>
+        <h2>第二步：社会身份划分</h2>
+        <p>血脉、信仰与法规，将你焊死在金字塔的特定位置</p>
+      </div>
+      <div id="status-options"></div>
+      <div class="nav-buttons">
+        <button class="btn back-btn" data-target="screen-gender">上一步</button
+        ><button id="to-profession-or-category" class="btn btn-primary" disabled>下一步</button>
+      </div>
+    </div>
+    <div id="screen-profession-category" class="screen">
+      <div class="screen-header">
+        <div class="randomize-btn" title="随机选择" data-screen-id="screen-profession-category">
+          <i class="fa-solid fa-dice-six"></i>
+        </div>
+        <h2>第三步：选择职业大类</h2>
+        <p>你的身份决定了你能从事的工种范围</p>
+      </div>
+      <div id="profession-category-options" class="selection-grid"></div>
+      <div class="nav-buttons">
+        <button class="btn back-btn" data-target="screen-status">上一步</button
+        ><button id="to-profession" class="btn btn-primary" disabled>下一步</button>
+      </div>
+    </div>
+    <div id="screen-profession" class="screen">
+      <div class="screen-header">
+        <div class="randomize-btn" title="随机选择" data-screen-id="screen-profession">
+          <i class="fa-solid fa-dice-six"></i>
+        </div>
+        <h2>第四步：确定具体职业</h2>
+        <p>你的工作，是享受特权，或是提供服务，亦或是成为工具本身</p>
+      </div>
+      <div id="profession-options" class="selection-grid"></div>
+      <div class="custom-input-container">
+        <label for="custom-profession-input">或自定义职业:</label>
+        <input type="text" id="custom-profession-input" class="custom-input" placeholder="在此输入自定义职业名称..." />
+      </div>
+      <div class="nav-buttons">
+        <button class="btn back-btn" data-target="screen-profession-category">上一步</button
+        ><button id="to-features" class="btn btn-primary" disabled>下一步</button>
+      </div>
+    </div>
+    <div id="screen-features" class="screen">
+      <div class="screen-header">
+        <div class="randomize-btn" title="随机选择" data-screen-id="screen-features">
+          <i class="fa-solid fa-dice-six"></i>
+        </div>
+        <h2>第五步：生理特征登录</h2>
+        <p>你的肉体，是武器，是工具，也是商品</p>
+      </div>
+      <div id="features-container"></div>
+      <div class="custom-input-container">
+        <label for="custom-features-input">补充生理特征 (可选):</label>
+        <input
+          type="text"
+          id="custom-features-input"
+          class="custom-input"
+          placeholder="例如：猫耳、半机械化、有发光纹路..."
+        />
+      </div>
+      <div class="nav-buttons">
+        <button class="btn back-btn" data-target="screen-profession">上一步</button
+        ><button id="to-modification" class="btn btn-primary" disabled>下一步</button>
+      </div>
+    </div>
+    <div id="screen-modification" class="screen">
+      <div class="screen-header">
+        <div class="randomize-btn" title="随机选择" data-screen-id="screen-modification">
+          <i class="fa-solid fa-dice-six"></i>
+        </div>
+        <h2>第六步：强制性身体改造</h2>
+        <p>帝国的烙印，将铭刻在你的骨肉之上</p>
+      </div>
+      <div id="modification-container"></div>
+      <div class="custom-input-container">
+        <label for="custom-modification-input">补充身体改造 (可选):</label>
+        <input
+          type="text"
+          id="custom-modification-input"
+          class="custom-input"
+          placeholder="例如：植入天使翅膀、身体水晶化..."
+        />
+      </div>
+      <div class="nav-buttons">
+        <button class="btn back-btn" data-target="screen-features">上一步</button
+        ><button id="to-summary" class="btn btn-primary">下一步</button>
+      </div>
+    </div>
+    <div id="screen-summary" class="screen">
+      <div class="screen-header">
+        <h2>最终档案确认</h2>
+        <p>警告：档案生成后，命运将无法更改</p>
+      </div>
+      <div id="summary-content"></div>
+      <div class="custom-input-container summary-custom-scene">
+        <label for="custom-scene-input">开场背景和场景自定义:</label>
+        <textarea
+          id="custom-scene-input"
+          class="custom-textarea"
+          placeholder="在此输入你希望的开场背景，例如：“在一个阴暗的地下实验室醒来...”，留空则由AI完全决定。"
+        ></textarea>
+      </div>
+      <div class="nav-buttons">
+        <button class="btn back-btn" data-target="screen-modification">上一步</button
+        ><button id="confirm-and-start" class="btn btn-primary">注入世界</button>
+      </div>
+    </div>
+  </div>
 </body>
-
