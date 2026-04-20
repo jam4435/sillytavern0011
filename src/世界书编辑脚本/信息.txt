@@ -1,0 +1,31 @@
+## UI模块分析 - `src/世界书编辑脚本/modules/ui/`
+
+### 文件: `aiActionDialog.js`
+**职责**: 管理一个轻量级的AI改写弹窗，用于对单个或选中的条目进行快速内容修改。
+
+**UI模块组成**:
+
+1.  **主模态框 (`#lorebook-ai-action-modal`)**:
+    *   这是一个覆盖整个屏幕的固定定位浮层。
+    *   内部包含一个居中的对话框 `.ai-action-dialog`。
+    *   点击背景或关闭按钮可以关闭此弹窗。
+
+2.  **对话框 (`.ai-action-dialog`)**:
+    *   **头部 (`.ai-action-header`)**:
+        *   标题 (`<h4>AI 条目改写</h4>`)。
+        *   关闭按钮 (`.close-button`)。
+    *   **主体 (`.ai-action-body`)**:
+        *   **目标信息区 (`.ai-action-targets`)**: 显示当前操作的世界书名称和模式（单条/批量）。
+        *   **指令输入区 (`.ai-action-instruction`)**: 一个 `<textarea>`，供用户输入改写要求。
+        *   **状态显示区 (`.ai-action-status`)**: 显示当前操作状态，如“等待输入指令”、“正在生成...”等。
+        *   **错误信息区 (`.ai-action-errors`)**: 默认隐藏，当AI生成或解析出错时显示错误详情。
+        *   **预览区 (`.ai-action-preview`)**:
+            *   **概要 (`.ai-action-preview-summary`)**: 显示预览结果的统计信息（成功、失败、有无变更等）。
+            *   **列表 (`.ai-action-preview-list`)**: 逐条目展示具体的修改对比。
+                *   每个条目 (`.ai-preview-item`) 包含标题和差异对比 (`.ai-preview-diff`)。
+                *   差异对比 (`.ai-preview-diff`) 分为修改前的`.ai-preview-diff-before`和修改后的`.ai-preview-diff-after`。
+    *   **底部 (`.ai-action-footer`)**:
+        *   **取消按钮 (`.ai-action-cancel`)**。
+        *   **主操作按钮 (`.ai-action-primary`)**: 一个多功能按钮，根据上下文在“生成预览”和“应用预览”之间切换。
+
+**总结**: 这是一个独立的、自包含的对话框组件。它通过动态注入HTML和CSS到主文档中来创建UI，并使用jQuery来处理事件和DOM操作。其状态（如上下文、预览结果）也通过jQuery的`.data()`方法直接绑定在模态框的DOM元素上。设计上比较传统，未使用现代前端框架。
