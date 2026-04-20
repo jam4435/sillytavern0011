@@ -6,306 +6,105 @@
 
 ## 2. 优化原则
 
-*   **美观优先**：提升整体视觉体验，包括色彩搭配、间距、排版、交互反馈等。
+*   **美观优先**：提升整体视觉体验，包括色彩搭配、间距、排版、交互反馈等。统一采用现代暗黑风格和毛玻璃质感（Glassmorphism）。
 *   **不涉及功能改动**：绝对不修改任何现有的业务逻辑、API 调用和数据处理。
-*   **影响最小化**：优先通过修改 CSS 样式来实现。
+*   **影响最小化**：优先通过修改 CSS 样式字符串（模板字面量中的`<style>`标签内容）来实现。
 
 ## 3. 具体修改计划
 
-以下是详细的修改计划，精确到文件、行号和具体的 CSS 改动。
+### 3.1 主面板及核心组件样式优化 (`src/世界书编辑脚本/modules/ui/panel.js`)
 
-### 3.1 主面板样式优化 (src/世界书编辑脚本/modules/ui/panel.js)
-
-**文件：** `src/世界书编辑脚本/modules/ui/panel.js`
 **目标：** 优化整体容器的阴影、圆角、背景色，以及 Header 的内边距。
 
-1.  **行 366-372：优化 `#${LOREBOOK_PANEL_ID}` 基础样式**
-    *   **原代码：**
-        \`\`\`css
-        background-color: var(--panel-bg-color);
-        color: var(--panel-text-color);
-        border: 1px solid var(--panel-border-color);
-        border-radius: 8px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-        \`\`\`
-    *   **修改为：**
-        \`\`\`css
-        background-color: var(--panel-bg-color);
-        backdrop-filter: blur(10px);
-        color: var(--panel-text-color);
-        border: 1px solid var(--panel-border-color);
-        border-radius: 12px;
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
-        \`\`\`
+1.  **面板主体 (`#${LOREBOOK_PANEL_ID}`)**
+    *   增加毛玻璃效果，调整圆角和阴影深度。
+    *   `background-color: var(--panel-bg-color);` -> `background-color: var(--panel-bg-color); backdrop-filter: blur(10px);`
+    *   `border-radius: 8px;` -> `border-radius: 12px;`
+    *   `box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);` -> `box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);`
 
-2.  **行 408-412：优化 Header 内边距**
-    *   **原代码：**
-        \`\`\`css
-        padding: 10px 15px;
-        border-bottom: 1px solid #555;
-        \`\`\`
-    *   **修改为：**
-        \`\`\`css
-        padding: 12px 20px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        \`\`\`
+2.  **顶部 Header (`.panel-header`)**
+    *   扩大内边距，柔化边框。
+    *   `padding: 10px 15px;` -> `padding: 12px 20px;`
+    *   `border-bottom: 1px solid #555;` -> `border-bottom: 1px solid rgba(255, 255, 255, 0.1);`
 
-3.  **行 582-598：优化 Tabs (标签页) 样式**
-    *   **原代码：**
-        \`\`\`css
-        #${LOREBOOK_PANEL_ID} .tab-button {
-            /* ... */
-            padding: 10px 15px;
-            transition: color 0.2s, border-color 0.2s;
-        }
-        #${LOREBOOK_PANEL_ID} .tab-button.${ACTIVE_TAB_CLASS} {
-            /* ... */
-            border-bottom-color: var(--panel-accent-color);
-        }
-        \`\`\`
-    *   **修改为：**
-        \`\`\`css
-        #${LOREBOOK_PANEL_ID} .tab-button {
-            /* ... */
-            padding: 12px 20px;
-            transition: all 0.3s ease;
-        }
-        #${LOREBOOK_PANEL_ID} .tab-button.${ACTIVE_TAB_CLASS} {
-            /* ... */
-            border-bottom-color: var(--panel-accent-color);
-            background-color: rgba(255, 255, 255, 0.05);
-            border-radius: 6px 6px 0 0;
-        }
-        \`\`\`
+3.  **Tabs 标签页 (`.tab-button`)**
+    *   增加平滑过渡动画，当前激活标签采用半透明强调色。
+    *   添加 `transition: all 0.3s ease;`
+    *   `padding: 10px 15px;` -> `padding: 12px 20px;`
+    *   在 `.tab-button.${ACTIVE_TAB_CLASS}` 中增加: `background-color: rgba(255, 255, 255, 0.05); border-radius: 6px 6px 0 0;`
 
-4.  **行 755-768：优化 Clusterize 滚动条 (针对 `.clusterize-scroll`)**
-    *   **追加代码：**
-        \`\`\`css
-        .clusterize-scroll::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        .clusterize-scroll::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-        }
-        .clusterize-scroll::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-        }
-        .clusterize-scroll::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        \`\`\`
+4.  **滚动条 (`.clusterize-scroll`)**
+    *   美化默认滚动条。
+    *   新增伪元素样式：`::-webkit-scrollbar` (宽高 8px)，`::-webkit-scrollbar-track` (背景 rgba(0,0,0,0.1), 圆角)，`::-webkit-scrollbar-thumb` (背景 rgba(255,255,255,0.2), hover 变亮)。
 
-5.  **行 927-942：优化条目卡片 (Entry) 样式 (`.${LOREBOOK_ENTRY_CLASS}`)**
-    *   **原代码：**
-        \`\`\`css
-        margin-bottom: 8px;
-        border: 1px solid #444;
-        border-radius: 4px;
-        /* ... */
-        transition: border-color 0.2s ease;
-        \`\`\`
-    *   **修改为：**
-        \`\`\`css
-        margin-bottom: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 6px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-        /* ... */
-        transition: all 0.2s ease;
-        \`\`\`
-    *   **Hover状态（原）：**
-        \`\`\`css
-        #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}:hover {
-            border-color: #666;
-        }
-        \`\`\`
-    *   **Hover状态（修改为）：**
-        \`\`\`css
-        #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}:hover {
-            border-color: var(--panel-accent-color);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            transform: translateY(-1px);
-        }
-        \`\`\`
+5.  **条目卡片 (`.${LOREBOOK_ENTRY_CLASS}`)**
+    *   增加呼吸感间距，悬浮卡片微浮效果。
+    *   `margin-bottom: 8px;` -> `margin-bottom: 10px;`
+    *   `border-radius: 4px;` -> `border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);`
+    *   在 `:hover` 状态：`border-color: var(--panel-accent-color); box-shadow: 0 4px 12px rgba(0,0,0,0.3); transform: translateY(-1px);`
 
-6.  **行 956-966：优化 Entry Header 样式 (`.entry-header`)**
-    *   **原代码：**
-        \`\`\`css
-        padding: 8px 10px; 
-        \`\`\`
-    *   **修改为：**
-        \`\`\`css
-        padding: 10px 14px;
-        border-radius: 6px 6px 0 0;
-        \`\`\`
+6.  **条目头部 (`.entry-header`) & 展开区域 (`.entry-expand-area`)**
+    *   `.entry-header`: `padding: 8px 10px;` -> `padding: 10px 14px; border-radius: 6px 6px 0 0;`
+    *   `.entry-expand-area`: `padding: 12px; border-top: 1px solid rgba(255, 255, 255, 0.05); background-color: rgba(0, 0, 0, 0.15); border-radius: 0 0 6px 6px;`
 
-7.  **行 1162-1166：优化 Entry Expand Area 样式 (`.entry-expand-area`)**
-    *   **原代码：**
-        \`\`\`css
-        padding: 12px;
-        border-top: 1px solid #444;
-        background-color: #2a2a2a;
-        \`\`\`
-    *   **修改为：**
-        \`\`\`css
-        padding: 15px;
-        border-top: 1px solid rgba(255, 255, 255, 0.05);
-        background-color: rgba(0, 0, 0, 0.15);
-        border-radius: 0 0 6px 6px;
-        \`\`\`
+7.  **表单控件与按钮 (Textarea, Input, Action Buttons)**
+    *   为输入框(`.content-textarea`, `.keywords-input`等)统一深色透明底和聚焦光晕：
+        *   `background-color: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; transition: all 0.2s;`
+        *   `:focus` 状态：`box-shadow: 0 0 0 2px rgba(154, 122, 206, 0.2); border-color: var(--panel-accent-color);`
+    *   为悬停按钮添加过渡和亮度提升：`.lorebook-batch-action-button:hover`, `.move-button:hover`, `.copy-button:hover` 等统一增加 `filter: brightness(1.2);` 或高亮色彩。
 
-8.  **行 1273-1284：优化文本框样式 (`.content-textarea`, `.keywords-input`)**
-    *   **原代码（修改 `.content-textarea` 和 `.keywords-input`、`.secondary-keywords-input`、`.secondary-keys-logic-select` 等的共有部分）：**
-        \`\`\`css
-        border: 1px solid #555;
-        \`\`\`
-    *   **修改为：**
-        \`\`\`css
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background-color: rgba(0, 0, 0, 0.2);
-        border-radius: 4px;
-        transition: border-color 0.2s, box-shadow 0.2s;
-        \`\`\`
-    *   **Focus 状态 (`:focus`)：**
-        \`\`\`css
-        #${LOREBOOK_PANEL_ID} .content-textarea:focus,
-        #${LOREBOOK_PANEL_ID} .keywords-input:focus,
-        #${LOREBOOK_PANEL_ID} .secondary-keywords-input:focus,
-        #${LOREBOOK_PANEL_ID} .secondary-keys-logic-select:focus {
-            border-color: var(--panel-accent-color);
-            box-shadow: 0 0 0 2px rgba(154, 122, 206, 0.2);
-            outline: none;
-        }
-        \`\`\`
+### 3.2 弹窗及悬浮组件优化
 
-9.  **行 1346-1390：优化 Toggle Switch (开关) 样式**
-    *   增加 `.toggle-slider` 及其 `:before` 伪元素的过渡圆滑度。
-    *   **修改 `.toggle-slider:before` ：**
-        \`\`\`css
-        top: 3px; /* 增加 top 以垂直居中 */
-        bottom: 3px;
-        \`\`\`
+1.  **悬浮控制球 (`#${LOREBOOK_FLOATING_BUBBLE_ID}`)** (`panel.js`)
+    *   提升立体感和交互动效。
+    *   `box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.2s;`
+    *   `:hover` 状态：`transform: scale(1.05); filter: brightness(1.15);`
 
-### 3.2 浮动元素与模态框优化
+2.  **各类 Modal 模态框通用样式**
+    *   涉及组件：内容编辑器(`#content-editor-modal`)、对比编辑器(`#content-compare-modal`) (`contentEditor.js`)、AI 应用预览框(`#ai-workspace-preview-modal`) (`aiWorkspace.js`, `aiWorkspaceDesktop.js`)、主题设置框(`#theme-settings-modal`) (`panel.js`)、全屏详情弹窗(`detail.js`)。
+    *   **统一遮罩层 (`.lorebook-modal`, `#content-editor-modal` 等)：**
+        *   `background-color: rgba(0,0,0,0.7);` -> `background-color: rgba(0,0,0,0.65); backdrop-filter: blur(5px);` (增加深色毛玻璃背景遮罩)。
+    *   **统一对话框面板 (`.lorebook-modal-content`, `.ai-preview-modal-dialog` 等)：**
+        *   `border-radius: 12px;` (目前有部分是 8px 或 0px，全部统一为 12px)
+        *   `box-shadow: 0 10px 40px rgba(0,0,0,0.6);` (增强悬浮感)
+        *   `border: 1px solid rgba(255, 255, 255, 0.1);` (增加边缘微光)
+    *   **统一 Header 区域 (`.modal-header`, `#content-editor-modal-header` 等)：**
+        *   加高 Header 的 padding (如 `padding: 15px 20px;`)，使顶部操作栏显得更大气。
+        *   调整圆角适应父容器：`border-top-left-radius: 12px; border-top-right-radius: 12px;`
 
-**文件：** `src/世界书编辑脚本/modules/ui/panel.js`
+3.  **AI工作区/桌面端工作区抽屉卡片 (`.ai-drawer`, `.ai-panel`)** (`aiWorkspace.js`, `aiWorkspaceDesktop.js`)
+    *   `.ai-drawer` / `.ai-panel`: `border-radius: 6px;` -> `border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);`
+    *   `.ai-drawer-summary`: `padding: 12px 16px; background: rgba(255,255,255,0.03);`
+    *   统一卡片内的操作按钮 (如 `.ai-step-button`): 增强激活状态的光晕感。
 
-1.  **行 521-542：优化悬浮球 (`#${LOREBOOK_FLOATING_BUBBLE_ID}`)**
-    *   **原代码：**
-        ```css
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-        ```
-    *   **修改为：**
-        ```css
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-        transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.2s;
-        ```
-    *   **Hover状态：**
-        ```css
-        #${LOREBOOK_FLOATING_BUBBLE_ID}:hover {
-            transform: scale(1.05);
-            filter: brightness(1.15);
-        }
-        ```
+4.  **长内容悬浮预览层 (`.large-content-preview-card`)** (`largeContentPreview.js` / `panel.js`)
+    *   `background: rgba(0, 0, 0, 0.18);` -> `background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);`
 
-2.  **行 2007-2043：优化主题设置模态框 (`#theme-settings-modal`)**
-    *   **外层内容区 (`.lorebook-modal-content`)**
-        *   **原代码：**
-            ```css
-            border-radius: 7px;
-            ```
-        *   **修改为：**
-            ```css
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            ```
-    *   **Header (`.modal-header`)**
-        *   **原代码：**
-            ```css
-            padding: 8px 12px;
-            ```
-        *   **修改为：**
-            ```css
-            padding: 15px 20px;
-            ```
-    *   **动画 (进场效果) 追加：**
-        ```css
-        #theme-settings-modal[open] {
-            animation: modalFadeIn 0.3s ease-out;
-        }
-        @keyframes modalFadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        ```
+### 3.3 局部及次级UI细节修正
 
-### 3.3 内联样式替换建议 (Inline Styles)
+1.  **代码块/Diff 展示区 (`.ai-preview-diff-panel`, `#ai-workspace-debug-json`)**
+    *   增加更好的等宽字体可读性和圆角背景：
+    *   `border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); padding: 12px;`
 
-在 JS 文件中存在少量直接使用 `.css()` 或 `style="..."` 的地方。虽然计划主要关注 CSS，但可以留意以下几点：
+2.  **Toggle Switch (开关) 圆滑度** (`panel.js`, `editor.js`)
+    *   在 `.toggle-slider`, `.mini-toggle-slider`, `.constant-toggle-slider` 的 `:before` 伪元素中调整。
+    *   确保内部圆点完全垂直居中且过度平滑。
 
-1.  **文件：** `src/世界书编辑脚本/modules/ui/list.js`
-    *   **行 809, 1962 (近似)：** 虚拟滚动条目占位高
-        *   **原代码：** `$1 style="height: ${styleHeight}px; box-sizing: border-box;"`
-        *   **修改建议：** 这里控制高度不可避免，但可将 `box-sizing: border-box;` 移至 CSS 类中。
-    *   **行 932：** 搜索栏容器 (`.global-lorebook-adder`)
-        *   **原代码：** `style="margin-bottom: 15px; position: relative; display: ${showSearchBar ? 'flex' : 'none'}; align-items: center;"`
-        *   **修改建议：** 将基础样式移入 `.global-lorebook-adder` 的 CSS 规则中，JS 中只使用 `display` 控制显示/隐藏或用 `.toggle()`。
-    *   **行 938, 977, 1075, 1088, 1090 等：** 各种全局/常驻世界书相关的容器
-        *   **修改建议：** 这些通过 HTML 字符串拼接的组件内联了大量的 `style="..."`。将它们提炼到 `panel.js` 的 `panelStyles` 中，例如提取类 `.current-bound-books`, `.global-search-bars-container`, `.preset-dropdown-container`, `.preset-dropdown-button` 等对应的 CSS 规则。
+3.  **下拉菜单选项 (`.preset-item`, `.sort-dropdown li`, `.add-worldbook-result-item`)**
+    *   列表项增加左右 padding 和过渡：`padding: 10px 14px; transition: background-color 0.2s ease;`
+    *   悬停高亮采用柔和的主题色叠加：`:hover { background-color: var(--panel-accent-color); opacity: 0.9; }`
 
-2.  **文件：** `src/世界书编辑脚本/modules/ui/entry.js`
-    *   **行 114, 166, 201：** 置顶图标 (`.master-entry-pin`)
-        *   **原代码：** `style="${isPinned ? '' : 'display:none;'}"`
-        *   **修改建议：** 改用类名控制，例如 `<i class="fa-solid fa-thumbtack master-entry-pin ${isPinned ? '' : 'd-none'}"></i>`（需在 CSS 中定义 `.d-none { display: none !important; }`）。
+### 3.4 颜色主题变量微调 (`src/世界书编辑脚本/modules/ui/theme.js`)
 
-3.  **使用 jQuery `.css()` 的地方 (跨多文件)：**
-    *   **文件：** `src/世界书编辑脚本/modules/ui/list.js`
-        *   大量的 `.css('background-color', '...')` 用于控制按钮颜色。
-        *   **修改建议：** 这些按钮都附加了相关的 class，比如 `.lorebook-batch-action-button` 或具体功能对应的数据属性。最好在 CSS 中使用 `[data-action="..."]` 选择器来统一管理颜色，而不是在 JS 中硬编码。例如：
-            ```css
-            #${LOREBOOK_PANEL_ID} .lorebook-batch-action-button[data-action="bulk-import"] {
-                background-color: #4a7c9a;
-            }
-            #${LOREBOOK_PANEL_ID} .lorebook-batch-action-button[data-action="bulk-import"]:hover {
-                background-color: #5c8cae; /* 顺便添加悬停效果 */
-            }
-            ```
-            然后在 JS 中移除 `.css('background-color', '...')` 的调用。
+调整 `getDefaultTheme()` 返回的默认色彩以适应毛玻璃和暗色系视觉：
+*   `bgColor`: `'rgba(40, 40, 40, 0.95)'` -> `'rgba(30, 30, 35, 0.85)'` (略带冷灰色的通透背景)
+*   `textColor`: `'#eeeeee'` -> `'#e0e0e0'` (降低纯白对比度，保护视力)
+*   `accentColor`: `'#9a7ace'` -> `'#8a6ad6'` (略微提亮一点的柔和紫)
+*   `entryBgColor`: `'#333333'` -> `'rgba(255, 255, 255, 0.04)'` (用半透明色适配背景透明度)
 
-### 3.4 颜色变量的统一 (src/世界书编辑脚本/modules/ui/theme.js)
+## 4. 实施策略
 
-**文件：** `src/世界书编辑脚本/modules/ui/theme.js`
-*   **行 20-30：** 默认主题定义 `getDefaultTheme()`
-    *   **原代码：**
-        ```javascript
-        return {
-            bgColor: 'rgba(40, 40, 40, 0.95)',
-            textColor: '#eeeeee',
-            accentColor: '#9a7ace',
-            entryBgColor: '#333333',
-            // ...
-        };
-        ```
-    *   **修改建议：**
-        ```javascript
-        return {
-            bgColor: 'rgba(30, 30, 35, 0.95)', // 微微偏冷的深色背景，更具现代感
-            textColor: '#e0e0e0', // 稍微柔和的文本色，避免刺眼
-            accentColor: '#8a6ad6', // 稍微调整饱和度
-            entryBgColor: 'rgba(255, 255, 255, 0.03)', // 用半透明白色叠加，适应任何背景
-            // ...
-        };
-        ```
-
-## 4. 实施步骤总结
-
-1.  **备份文件**：修改前确保通过 Git 管理目标文件。
-2.  **定位核心 CSS**：在 `src/世界书编辑脚本/modules/ui/panel.js` 的 `initPanel` 函数内找到模板字符串 `panelStyles`。
-3.  **应用 CSS 修改 (主面板和组件)**：按照计划 3.1 和 3.2，逐一替换对应的 CSS 规则块。
-4.  **清理 JS 内联样式**：按照 3.3 节的建议，查找 `ui` 目录下的其他 JS 文件（主要是 `list.js` 和 `entry.js`），将硬编码的 `style="..."` 和 `.css('background-color', ...)` 转移到 CSS 选择器中。
-5.  **调整默认主题**：修改 `theme.js` 中的默认色值。
-6.  **保存并测试**：刷新酒馆页面，唤出世界书面板，验证面板外观、Hover 效果、各种子组件展示和悬浮球交互是否正常，确保无任何功能受损。
+1.  本计划所有修改全部集中在对应的 `ui/*.js` 文件内部的 CSS 字符串字面量 `<style>...</style>` 中。
+2.  避免触碰 `src/世界书编辑脚本/modules/features` 或 `commands` 里的任何 JavaScript 逻辑代码。
+3.  涉及到 `:hover`, `:focus` 状态时，直接在原有选择器后追加覆盖样式即可。
+4.  为确保影响最小化，不会移除现有的 ID 和 Class 选择器，只对其内部的属性(padding, border-radius, background, box-shadow, transition)进行值替换和叠加。
