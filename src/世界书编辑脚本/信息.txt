@@ -307,3 +307,18 @@
 
 **总结**:
 `floatingBatchDropdown.js` 是一个纯粹的UI实用工具模块，用于实现健壮且用户体验良好的自定义下拉菜单。它通过巧妙地操纵DOM结构（在浮动层和原始位置之间移动元素）和精确的几何计算，解决了Web开发中一个常见的UI挑战。这个模块不处理任何业务逻辑，只专注于下拉菜单的呈现和交互。
+
+### 文件: `largeContentPreview.js`
+**职责**: 一个小而专的实用工具模块，旨在处理超大文本内容的显示问题。直接在 `<textarea>` 中显示数万字符的文本会导致严重的浏览器性能问题，使UI变得卡顿。该模块通过在内容超过特定阈值时，用一个轻量级的“预览卡片”来代替文本框，从而解决了这个问题。
+
+**UI模块组成/核心逻辑**:
+
+*   **阈值常量 (`LARGE_CONTENT_PREVIEW_THRESHOLD`)**: 定义了触发预览模式的字符数阈值（当前为30000）。
+*   **预览判断 (`shouldPreviewLargeContent`)**: 一个简单的函数，用于检查给定的文本内容长度是否超过了阈值。
+*   **预览文本生成 (`buildLargeContentPreviewText`)**: 如果内容超过阈值，此函数会截取内容的开头一小部分（`LARGE_CONTENT_PREVIEW_SNIPPET_LENGTH`，当前为200字符），并在末尾附加一个“内容过长，已折叠预览”的提示。
+*   **预览卡片HTML生成 (`buildLargeContentPreviewCardHtml`)**:
+    *   这是模块的核心UI功能。它生成一个包含预览文本、可选提示信息和可选操作按钮的HTML卡片 (`.large-content-preview-card`)。
+    *   **可定制性**: 调用者可以传入 `hint` (提示文本)和 `actionsHtml` (操作按钮的HTML)来自定义卡片的功能。例如，`editor.js` 和 `entry.js` 都使用它来添加一个“全屏编辑”按钮，引导用户到 `contentEditor.js` 提供的专门编辑器。
+
+**总结**:
+`largeContentPreview.js` 是一个经典的性能优化工具。它通过“延迟加载”或“摘要显示”的策略，避免了因渲染大量DOM内容而导致的性能瓶颈。这是一个非常通用的模块，被项目中的多个其他UI模块（如 `editor.js`, `entry.js`, `contentEditor.js`）所依赖，用于在不同的编辑上下文中统一处理长文本的显示问题。
