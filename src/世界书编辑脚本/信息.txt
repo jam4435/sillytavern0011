@@ -163,3 +163,70 @@
 
 **总结**:
 `contentEditor.js` 提供了两个高度专业化的UI工具。特别是对比编辑器，它的实现相当复杂，包含了自己的状态管理（`compareState`）、差异计算算法（LCS，最长公共子序列）、以及复杂的DOM渲染和事件处理逻辑。它是一个独立的、功能强大的“微应用”，为用户提供了类似代码版本控制工具（如Git diff）的体验来处理世界书条目。这个模块的设计展现了相当高的技术水平。
+
+### 文件: `detail.js`
+**职责**: 实现“主从式布局”（Master-Detail Layout）的核心逻辑。该布局在PC端将屏幕分割为左右两栏：左侧是条目列表（Master），右侧是当前选中条目的详细编辑面板（Detail）。此文件专门负责渲染和管理右侧的详细面板。
+
+**UI模块组成**:
+
+1.  **面板分割与布局**:
+    *   **动态布局**: 通过 `isMasterDetailLayout()` 函数检测当前是否应启用主从式布局（仅在PC端且用户设置为 'master-detail' 模式时）。
+    *   **CSS变量控制**: 布局的分割比例由CSS变量 `--master-pane-width` 控制，用户可以通过拖拽分割条 `.workspace-resizer` 来调整左右栏的宽度。
+    *   **容器**: 整个主从布局存在于 `.tab-workspace` 中，左侧为 `.workspace-master`，右侧为 `.workspace-detail` (其DOM ID为 `#character-detail` 或 `#global-detail`)。
+
+2.  **右侧详情面板 (`.detail-editor`)**:
+    *   **空状态 (`.detail-empty-state`)**: 当没有选中任何条目时，右侧面板会显示一个提示信息，引导用户在左侧选择条目。
+    *   **编辑器渲染**: 当选中一个条目时，`renderDetailPane` 函数会根据条目数据动态生成一个完整的表单作为详情编辑器。这个编辑器有多个版本（`renderDetailEditor`, `renderCompactDetailEditorV2`），但核心都是 `renderCompactDetailEditorV2`。
+    *   **编辑器UI (`renderCompactDetailEditorV2`)**:
+        *   **度量指标区 (`.detail-row-metrics`)**: 一行内联的表单，用于编辑“插入位置”、“深度”、“顺序”等核心参数。
+        *   **关键词编辑区 (`.keywords-edit-area`)**: 一个高度定制的UI，将主、次关键词和逻辑选择器整合在一起，提供比原生更好的编辑体验。
+        *   **标志位区 (`.detail-row-flags`)**: 一组复选框，用于控制“阻止递归”、“置顶”等布尔值选项。
+        *   **正文区 (`.detail-content-section`)**:
+            *   **工具栏 (`.detail-content-toolbar`)**: 在正文上方提供“全屏编辑”和“对比编辑”的图标按钮，用于调用 `contentEditor.js` 提供的功能。
+            *   **正文内容**: 通过 `buildDetailContentFieldMarkup` 函数渲染。如果内容过长，会显示一个预览卡片（来自 `largeContentPreview.js`）；否则，直接显示一个 `<textarea>`。
+    *   **高级设置 (`.detail-advanced`)**: 在旧版 `renderDetailEditor` 中存在，但在新版 `renderCompactDetailEditorV2` 中已被整合到主界面，不再是可折叠的独立部分。
+
+**交互与数据流**:
+
+*   **即时保存**: 这是该模块的核心交互模式。用户在右侧详情面板中对任何字段的修改都会**几乎实时地**保存回世界书。
+    *   对于下拉框、复选框等即时生效的操作，会立即触发保存。
+    *   对于文本输入框，会使用一个防抖（debounce）机制（`queueSave`），在用户停止输入`DETAIL_SAVE_DELAY`（250毫秒）后自动触发保存。
+*   **状态同步**:
+    *   当一个字段保存成功后，会调用 `updateEntryStateValue` 更新内存中的 `allEntriesData` 状态。
+    *   然后调用 `syncMasterRowFromState` 来**精确地更新左侧主列表中对应条目的显示**，如修改条目名、元数据等，而无需重渲染整个列表。
+    *   这套机制使得左右两栏的数据保持了高效的双向同步。
+
+**总结**:
+`detail.js` 是实现高级桌面体验的关键。它通过将条目列表和条目编辑器并置，并结合即时保存与高效的状态同步机制，创造了一个非常流畅、专业的编辑工作流。用户无需在列表和编辑器之间来回跳转，也无需频繁点击“保存”按钮。该模块与 `list.js` (负责左侧列表) 和 `contentEditor.js` (提供高级编辑弹窗) 紧密协作，共同构成了PC端编辑器的核心交互框架。
+
+### 文件: `editor.js`
+**职责**: 管理一个独立的、全屏模态框式的条目编辑器。这似乎是插件早期或用于移动端/非主从布局下的主要编辑方式。
+
+**UI模块组成**:
+
+1.  **编辑器模态框 (`#lorebook-editor-panel`)**:
+    *   一个覆盖全屏的模态框 (`.lorebook-modal`)。
+    *   **头部 (`.modal-header`)**: 包含标题和关闭按钮。
+    *   **主体 (`.modal-body`)**:
+        *   **加载指示器 (`.loading-spinner`)**: 在加载条目数据时显示。
+        *   **编辑表单 (`#entry-edit-form`)**: 包含用于编辑条目所有属性的字段。
+            *   **标题/注释 (`#entry-comment`)**: 条目名称。
+            *   **内容 (`#entry-content`)**: 条目的主要文本。这里有一个重要的逻辑：如果内容过长（由 `shouldPreviewLargeContent` 判断），它会显示一个预览卡片（来自 `largeContentPreview.js`）和一个“全屏编辑”按钮，而不是一个可直接编辑的文本域。这会调用 `contentEditor.js` 的功能。
+            *   **关键词 (`#entry-keys`)**: 逗号分隔的触发词。
+            *   **插入位置 (`#entry-position`)**: 下拉菜单选择插入点。
+            *   **深度 (`#entry-depth`)**: 仅在特定插入位置时显示。
+            *   **概率 (`#entry-probability`)**: 触发概率。
+            *   **激活方式 (`.constant-toggle-container`)**: 一个自定义的滑动开关 (`.constant-toggle-switch`)，用于在“关键词触发”和“常量激活”之间切换。
+    *   **底部 (`.form-actions`)**: 包含“保存”和“取消”按钮。
+
+**交互与数据流**:
+
+*   **加载**: 当 `showEntryEditor` 被调用时，它首先显示加载动画，然后通过API获取完整的条目数据，最后将数据填充到表单的各个字段中。
+*   **保存**:
+    *   用户点击“保存”后，表单数据被收集。
+    *   `saveEditedEntry` 函数被调用。这个函数的核心是使用了 `updateWorldbookEntries` API，它接收一个回调函数。
+    *   在回调函数内部，它会在世界书的完整条目列表中找到要修改的条目，深拷贝它，然后用表单数据更新这个拷贝，最后返回整个更新后的条目数组。这种事务性的更新方式是当前推荐的做法，可以避免竞态条件并简化状态管理。
+*   **关注点分离**: 这个模块很好地将“显示/填充表单”（`showEntryEditor`）和“保存逻辑”（`saveEditedEntry`）分离开。
+
+**总结**:
+`editor.js` 提供了一个传统的、基于表单的模态框编辑体验。与 `detail.js` 的即时保存不同，这里的交互是“打开 -> 修改 -> 点击保存 -> 关闭”的典型流程。它作为一个独立的编辑单元，在不需要主从布局的场景下（如移动端或用户偏好设置）发挥作用。它与 `contentEditor.js` 和 `largeContentPreview.js` 的集成表明它是为了处理各种复杂条目而设计的。
