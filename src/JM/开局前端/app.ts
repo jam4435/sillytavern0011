@@ -1,5 +1,6 @@
 import { byId } from './dom';
 import { handleNext, handleRandomize } from './flow';
+import { refreshQuickOpeningScreen, selectQuickOpening } from './opening-switcher';
 import { queueSettingsSyncPopup } from './popup';
 import { checkAllFeaturesSelected, navigateTo, syncSettingsControls } from './render';
 import {
@@ -28,9 +29,32 @@ function bindBodyClickEvents(selections: SelectionState) {
     const card = event.target.closest('.card') as HTMLElement | null;
     const featureOption = event.target.closest('.feature-option') as HTMLElement | null;
     const modOption = event.target.closest('.mod-option') as HTMLElement | null;
+    const modeCard = event.target.closest('.mode-card') as HTMLButtonElement | null;
     const backButton = event.target.closest('.back-btn') as HTMLButtonElement | null;
     const randomizeButton = event.target.closest('.randomize-btn') as HTMLElement | null;
+    const refreshQuickOpeningsButton = event.target.closest('#refresh-quick-openings') as HTMLButtonElement | null;
+    const quickOpeningSwitchButton = event.target.closest('.quick-opening-switch') as HTMLButtonElement | null;
     const nextButton = event.target.closest('.btn-primary') as HTMLButtonElement | null;
+
+    const modeTarget = modeCard?.dataset.modeTarget;
+    if (modeTarget) {
+      navigateTo(modeTarget);
+      if (modeTarget === 'screen-quick-opening') {
+        void refreshQuickOpeningScreen();
+      }
+      return;
+    }
+
+    if (refreshQuickOpeningsButton && !refreshQuickOpeningsButton.disabled) {
+      void refreshQuickOpeningScreen();
+      return;
+    }
+
+    if (quickOpeningSwitchButton && !quickOpeningSwitchButton.disabled) {
+      const swipeIndex = Number(quickOpeningSwitchButton.dataset.swipeIndex);
+      void selectQuickOpening(swipeIndex, ensureGenerationSettings(selections));
+      return;
+    }
 
     const randomizeScreenId = randomizeButton?.dataset.screenId;
     if (randomizeScreenId) {

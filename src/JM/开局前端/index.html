@@ -6,7 +6,26 @@
     <span class="corner corner-bl"></span>
     <span class="corner corner-br"></span>
 
-    <div id="screen-gender" class="screen active">
+    <div id="screen-mode" class="screen active">
+      <div class="screen-header">
+        <h2>开局控制台</h2>
+        <p>选择生成新的自定义开局，或切换当前聊天里已有的开局分支</p>
+      </div>
+      <div class="mode-selection-grid">
+        <button class="mode-card" type="button" data-mode-target="screen-gender">
+          <span class="mode-card-icon"><i class="fa-solid fa-dna"></i></span>
+          <span class="mode-card-title">自定义开局</span>
+          <span class="mode-card-text">按性别、身份、职业、特征和场景生成新的开局档案。</span>
+        </button>
+        <button class="mode-card" type="button" data-mode-target="screen-quick-opening">
+          <span class="mode-card-icon"><i class="fa-solid fa-shuffle"></i></span>
+          <span class="mode-card-title">快捷开局</span>
+          <span class="mode-card-text">读取当前聊天第 0 楼已有开局分支，并直接切换到指定版本。</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="screen-gender" class="screen">
       <div class="screen-header">
         <div class="randomize-btn" title="随机选择" data-screen-id="screen-gender">
           <i class="fa-solid fa-dice-six"></i>
@@ -22,7 +41,7 @@
         <label class="setting-item" for="setting-enable-variables">
           <span class="setting-copy">
             <span class="setting-title">是否开启变量</span>
-            <span class="setting-hint">控制变量状态栏、开局信息替换、ERA变量框架和变量相关世界书条目。</span>
+            <span class="setting-hint">控制变量状态栏、快捷开局变量注入、ERA变量框架和变量相关世界书条目。</span>
           </span>
           <span class="setting-switch">
             <input id="setting-enable-variables" type="checkbox" />
@@ -61,7 +80,31 @@
         </div>
       </div>
       <div class="nav-buttons">
-        <span></span><button id="to-status" class="btn btn-primary" disabled>下一步</button>
+        <button class="btn back-btn" data-target="screen-mode">返回入口</button
+        ><button id="to-status" class="btn btn-primary" disabled>下一步</button>
+      </div>
+    </div>
+    <div id="screen-quick-opening" class="screen">
+      <div class="screen-header">
+        <h2>快捷开局切换</h2>
+        <p>读取当前聊天第 0 楼已有开局分支，不生成新内容</p>
+      </div>
+      <div class="quick-opening-panel">
+        <div class="quick-opening-toolbar">
+          <div class="quick-opening-toolbar-copy">
+            <span class="quick-opening-eyebrow">当前聊天 · 第 0 楼</span>
+            <p>切换后只更新当前开局分支，保留在本页显示结果。</p>
+          </div>
+          <button id="refresh-quick-openings" class="btn quick-opening-refresh" type="button">
+            <i class="fa-solid fa-rotate-right"></i>
+            <span>刷新</span>
+          </button>
+        </div>
+        <div id="quick-opening-feedback" class="quick-opening-feedback" role="status"></div>
+        <div id="quick-opening-list" class="quick-opening-list"></div>
+      </div>
+      <div class="nav-buttons">
+        <button class="btn back-btn" data-target="screen-mode">返回入口</button><span></span>
       </div>
     </div>
     <div id="screen-status" class="screen">

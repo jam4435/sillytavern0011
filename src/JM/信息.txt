@@ -1,0 +1,146 @@
+开场白有关的函数或者指令
+
+1. @types/function/character.d.ts
+
+- Character.first_messages: string[]
+  角色卡的开场白数组。
+
+- getCharacter(character_name)
+  读取角色卡内容。
+
+- replaceCharacter(character_name, character, options?)
+  完全替换角色卡内容。可用于修改角色卡开场白。
+
+  示例:
+  const character = await getCharacter('角色卡名称');
+  character.first_messages = ['新的开场白1', '新的开场白2'];
+  await replaceCharacter('角色卡名称', character);
+
+- updateCharacterWith(character_name, updater)
+  以回调方式更新角色卡。可用于追加或修改开场白。
+
+  示例:
+  await updateCharacterWith('角色卡名称', character => {
+    character.first_messages.push('新的开场白');
+    return character;
+  });
+
+2. @types/function/chat_message.d.ts
+
+- getChatMessages(range, { include_swipes: true })
+  获取聊天消息，并包含每楼所有回复页/swipe。可查看第 0 楼开局有哪些开场分支。
+
+- setChatMessages(chat_messages, options?)
+  修改聊天消息数据。可用于设置当前聊天第 0 楼开局，或切换第 0 楼开局分支。
+
+  示例:
+  await setChatMessages([{ message_id: 0, swipes: ['开局1', '开局2'] }]);
+  await setChatMessages([{ message_id: 0, swipe_id: 2 }]);
+
+- createChatMessages(chat_messages, options?)
+  创建聊天消息。可用于脚本手动插入首楼/开场消息。
+
+3. @types/iframe/exported.sillytavern.d.ts
+
+- first_mes: string
+  角色第一条消息/开场白。
+
+- alternate_greetings: string[]
+  额外问候/备用开场白。
+
+4. @types/iframe/event.d.ts
+
+- tavern_events.CHARACTER_FIRST_MESSAGE_SELECTED
+  事件值: character_first_message_selected
+  角色开场白被选择时触发。
+
+- 生成类型 first_message
+  生成消息事件里存在 first_message 类型。
+
+5. 酒馆资料/slash_command.txt
+
+没有搜到直接叫 /greeting、/first-message、/开场白 的指令。相关指令如下:
+
+- /newchat [delete=true|false]?=false
+  用当前角色开始新聊天，通常会产生角色开场。
+
+- /random (string)?
+  随机角色开始新聊天。
+
+- /sendas [name=string] ...
+  以指定角色发送消息，可手动构造角色开场。
+
+- /send ...
+  插入用户消息，不触发生成。
+
+- /sys ...
+  插入系统旁白消息。
+
+- /trigger [await=true|false]?=false
+  触发生成，适合在设置开场上下文后让角色回复。
+
+
+跳转该层回复分支的函数或者指令
+
+1. @types/function/chat_message.d.ts
+
+- setChatMessages(chat_messages, options?)
+  可直接切换指定楼层的回复分支/swipe。
+
+  示例:
+  // 切到第 12 楼的第 2 个回复分支
+  // swipe_id 是 0-based，所以第 2 个分支是 1
+  await setChatMessages([{ message_id: 12, swipe_id: 1 }]);
+
+- getChatMessages(range, { include_swipes: true })
+  可先读取该楼所有分支，确认当前 swipe_id 和 swipes 列表。
+
+  示例:
+  const [msg] = getChatMessages(12, { include_swipes: true });
+  console.log(msg.swipe_id, msg.swipes);
+
+- ChatMessageSwiped
+  相关字段:
+  message_id: number
+  swipe_id: number
+  swipes: string[]
+  swipes_data: Record<string, any>[]
+  swipes_info: Record<string, any>[]
+
+2. @types/iframe/event.d.ts
+
+- tavern_events.MESSAGE_SWIPED
+  事件值: message_swiped
+  消息回复页/swipe 被切换时触发。
+
+3. 酒馆资料/slash_command.txt
+
+没有搜到“跳到某一楼某个已有回复分支/swipe”的直接 slash 指令。相关但不等价的指令如下:
+
+- /addswipe [switch=true|false]? (string)
+  给最后一条消息添加 swipe。switch=true 时会直接切到新添加的 swipe。
+
+- /delswipe (number)
+  删除最后一条消息的 swipe。不传参数时删除当前 swipe。
+
+- /chat-jump (number)
+  滚动到指定消息楼层。只跳转页面位置，不切换回复分支。
+
+- /branch-create (number)?
+  从指定消息创建新的聊天分支，并自动打开该分支聊天。这是独立聊天分支，不是同一楼的 swipe。
+
+- /checkpoint-create [mesId=number]? (string)?
+  为指定消息创建 checkpoint。
+
+- /checkpoint-go (number)?
+  打开指定消息关联的 checkpoint 聊天。这是 checkpoint 聊天，不是同一楼的 swipe。
+
+- /go (string)
+  打开指定角色、群组或 checkpoint 名称对应的聊天。
+
+结论:
+
+- 改角色卡自带开场白: 使用 Character.first_messages、getCharacter、replaceCharacter、updateCharacterWith。
+- 改当前聊天第 0 楼开局: 使用 setChatMessages([{ message_id: 0, swipes, swipe_id }])。
+- 跳转指定楼层的回复分支: 使用 setChatMessages([{ message_id: 楼层号, swipe_id: 分支序号 - 1 }])。
+- slash command 里没有找到可直接切换任意楼层已有 swipe 的指令。

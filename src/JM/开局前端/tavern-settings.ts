@@ -42,7 +42,6 @@ const CHARACTER_SCRIPT_OPTION = { type: 'character' } as const;
 
 const REGEX_RULES: NamedRule[] = [
   { key: 'variableStatusBar', label: '变量状态栏', query: '变量状态栏', mode: 'exact' },
-  { key: 'openingInfoReplace', label: '开局信息替换', query: '开局信息替换', mode: 'exact' },
   { key: 'hideOne', label: '隐藏', query: '隐藏', mode: 'exact' },
   { key: 'hideTwo', label: '隐藏2', query: '隐藏2', mode: 'exact' },
   { key: 'imageStatusBar', label: '图片状态栏', query: '图片状态栏', mode: 'exact' },
@@ -119,7 +118,6 @@ async function applyCharacterRegexSettings(api: RuntimeApi, settings: Generation
   const scope = '局部正则';
   const desiredState = new Map<string, boolean>([
     ['variableStatusBar', settings.enableVariables],
-    ['openingInfoReplace', settings.enableVariables],
     ['hideOne', settings.enableVariables],
     ['hideTwo', settings.enableVariables],
     ['imageStatusBar', !settings.enableVariables && !settings.useTextStatusBar],
@@ -328,7 +326,7 @@ function getMissingLabels(rules: NamedRule[], matchedKeys: Set<string>, relevant
 
 function getRelevantRegexKeys(settings: GenerationSettings) {
   const keys = settings.enableVariables
-    ? ['variableStatusBar', 'openingInfoReplace', 'hideOne', 'hideTwo']
+    ? ['variableStatusBar', 'hideOne', 'hideTwo']
     : [settings.useTextStatusBar ? 'textStatusBar' : 'imageStatusBar'];
 
   if (settings.generateOptions) {
