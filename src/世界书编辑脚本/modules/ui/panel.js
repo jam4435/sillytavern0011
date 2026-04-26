@@ -993,6 +993,11 @@ export function initPanel() {
                     transition: border-color 0.2s;
                     min-width: 80px;
                     width: 150px;
+                    overflow: hidden;
+                    text-overflow: var(--lorebook-name-text-overflow);
+                    white-space: var(--lorebook-name-white-space);
+                    overflow-wrap: var(--lorebook-name-overflow-wrap);
+                    word-break: var(--lorebook-name-word-break);
                 }
                 #${LOREBOOK_PANEL_ID} .entry-item-title:hover,
                 #${LOREBOOK_PANEL_ID} .entry-item-title:focus {
@@ -2342,6 +2347,11 @@ export function initPanel() {
                         margin: 0 8px 0 0;
                         min-width: 50px;
                         width: auto;
+                        overflow: hidden;
+                        text-overflow: var(--lorebook-name-text-overflow);
+                        white-space: var(--lorebook-name-white-space);
+                        overflow-wrap: var(--lorebook-name-overflow-wrap);
+                        word-break: var(--lorebook-name-word-break);
                     }
                     #${LOREBOOK_PANEL_ID} .select-checkbox-container {
                         padding-left: 8px;
