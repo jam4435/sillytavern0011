@@ -669,7 +669,7 @@ function ensureStyles() {
       #${ROOT_ID} .ai-entry-item:last-child,#${ROOT_ID} .ai-preview-item:last-child{border-bottom:0}
       #${ROOT_ID} .ai-entry-main{min-width:0;flex:1 1 auto}
       #${ROOT_ID} .ai-entry-mode{width:150px;flex:0 0 150px}
-      #${ROOT_ID} .ai-entry-item-title,#${ROOT_ID} .ai-preview-item-title{font-weight:600;margin-bottom:4px;color:var(--panel-text-color,#eee)}
+      #${ROOT_ID} .ai-entry-item-title,#${ROOT_ID} .ai-preview-item-title{font-weight:600;margin-bottom:4px;color:var(--panel-text-color,#eee);overflow:hidden;text-overflow:var(--lorebook-name-text-overflow);white-space:var(--lorebook-name-white-space);overflow-wrap:var(--lorebook-name-overflow-wrap);word-break:var(--lorebook-name-word-break)}
       #${ROOT_ID} .ai-entry-item-meta,#${ROOT_ID} .ai-entry-item-snippet{color:var(--panel-text-color,#ccc);font-size:13px;line-height:1.5}
       #${ROOT_ID} .ai-entry-item-snippet{margin-top:4px}
       #${ROOT_ID} .ai-preview-errors{display:none;margin-top:10px;margin-bottom:10px;color:#ffb4b4;white-space:pre-wrap}
