@@ -19,6 +19,13 @@ interface QuickOpeningSwitchResult {
   currentNames: string[];
 }
 
+type OpeningMessagePatch = {
+  message_id: number;
+  message?: string;
+  swipes?: string[];
+  swipe_id?: number;
+};
+
 type QuickOpeningLoadResult =
   | {
       ok: true;
@@ -33,9 +40,26 @@ type QuickOpeningLoadResult =
     };
 
 const STATE_BLOCK_REGEX = /<(state\d+)>\s*([\s\S]*?)\s*<\/\1>/g;
-const CURRENT_CHARACTER_TAG_REGEX = /<当前人物>[\s\S]*?<\/当前人物>/;
+const TAG_OPEN = '<';
+const TAG_CLOSE = '>';
+const CURRENT_CHARACTER_TAG_PREFIX = '当前';
+const CURRENT_CHARACTER_TAG_PRIMARY_SUFFIX = '人物';
+const CURRENT_CHARACTER_TAG_COMPAT_SUFFIX = '角色';
+const CURRENT_CHARACTER_TAG_SUFFIX_PATTERN = `(${CURRENT_CHARACTER_TAG_PRIMARY_SUFFIX}|${CURRENT_CHARACTER_TAG_COMPAT_SUFFIX})`;
+const CURRENT_CHARACTER_TAG_PATTERN = `${TAG_OPEN}${CURRENT_CHARACTER_TAG_PREFIX}${CURRENT_CHARACTER_TAG_SUFFIX_PATTERN}${TAG_CLOSE}[\\s\\S]*?${TAG_OPEN}/${CURRENT_CHARACTER_TAG_PREFIX}\\1${TAG_CLOSE}`;
+const CURRENT_CHARACTER_TAG_REGEX = new RegExp(`${CURRENT_CHARACTER_TAG_PATTERN}\\s*`, 'g');
+const CURRENT_CHARACTER_TAG_DETECT_REGEX = new RegExp(CURRENT_CHARACTER_TAG_PATTERN);
+const CURRENT_CHARACTER_TAG_CONTENT_REGEX = new RegExp(
+  `${TAG_OPEN}${CURRENT_CHARACTER_TAG_PREFIX}${CURRENT_CHARACTER_TAG_SUFFIX_PATTERN}${TAG_CLOSE}([\\s\\S]*?)${TAG_OPEN}/${CURRENT_CHARACTER_TAG_PREFIX}\\1${TAG_CLOSE}`,
+  'g',
+);
+const VARIABLE_INSERT_BLOCK_REGEX = /<VariableInsert>\s*([\s\S]*?)\s*<\/VariableInsert>/;
+const VARIABLE_INSERT_BLOCK_GLOBAL_REGEX = /<VariableInsert>\s*[\s\S]*?\s*<\/VariableInsert>/g;
+const VARIABLE_INSERT_DETECT_REGEX = /<VariableInsert>[\s\S]*?<\/VariableInsert>/;
+const STATE_BLOCK_DETECT_REGEX = /<(state\d+)>\s*[\s\S]*?\s*<\/\1>/;
 const QUICK_OPENING_DEBUG_PREFIX = '[开局前端][快捷开局]';
-const DEBUG_PREVIEW_LIMIT = 1400;
+const QUICK_OPENING_DEBUG_STORAGE_KEY = 'jm-opening-quick-debug';
+const DEBUG_PREVIEW_LIMIT = 3000;
 
 let quickOpeningBusy = false;
 
@@ -136,6 +160,11 @@ export async function switchQuickOpening(
   index: number,
   settings: Pick<GenerationSettings, 'enableVariables'>,
 ): Promise<QuickOpeningSwitchResult> {
+  debugQuickOpening('开始切换开局', {
+    targetSwipeIndex: index,
+    enableVariables: settings.enableVariables,
+  });
+
   if (typeof setChatMessages !== 'function') {
     throw new Error('当前环境没有提供 setChatMessages 接口，无法切换开局。');
   }
@@ -145,33 +174,44 @@ export async function switchQuickOpening(
   }
 
   if (!settings.enableVariables) {
+    debugQuickOpening('变量模式未开启，仅切换 swipe_id', { targetSwipeIndex: index });
     await setChatMessages([{ message_id: 0, swipe_id: index }], { refresh: 'affected' });
+    debugOpeningMessageAfterWrite({ message_id: 0, swipe_id: index });
     return { processedStateCount: 0, currentNames: [] };
   }
 
   const swipes = getCurrentOpeningSwipes();
+  debugQuickOpening('已读取第 0 楼 swipes', {
+    swipeCount: swipes.length,
+    targetSwipeIndex: index,
+    targetSwipeBeforeProcess: summarizeOpeningText(swipes[index] ?? ''),
+  });
+
   if (index >= swipes.length) {
     throw new Error(`目标开局不存在：第 ${index + 1} 个开局超出当前分支数量。`);
   }
 
   const processed = processOpeningForVariableMode(swipes[index]);
+  debugQuickOpening('变量模式处理结果', {
+    changed: processed.changed,
+    processedStateCount: processed.stateCount,
+    names: processed.names,
+    processedText: summarizeOpeningText(processed.text),
+  });
+
   if (!processed.changed) {
-    await setChatMessages([{ message_id: 0, swipe_id: index }], { refresh: 'affected' });
+    await switchOpeningSwipe(index);
     return { processedStateCount: 0, currentNames: [] };
   }
 
   const nextSwipes = [...swipes];
   nextSwipes[index] = processed.text;
-  debugQuickOpening('准备写回变量模式开局', {
+  await setOpeningSwipesAndSwitch(nextSwipes, index, processed.text);
+  debugQuickOpening('快捷开局写入第 0 楼分支完成', {
     targetSwipeIndex: index,
     processedStateCount: processed.stateCount,
     names: processed.names,
-    hasCurrentCharacterTagBeforeWrite: CURRENT_CHARACTER_TAG_REGEX.test(processed.text),
-    processedTextPreview: previewDebugText(processed.text),
-    processedText: processed.text,
   });
-  await setChatMessages([{ message_id: 0, swipes: nextSwipes, swipe_id: index }], { refresh: 'affected' });
-  debugWrittenQuickOpening(index, processed.text);
   return {
     processedStateCount: processed.stateCount,
     currentNames: processed.names,
@@ -308,12 +348,7 @@ function getCurrentOpeningSwipes() {
 function processOpeningForVariableMode(text: string) {
   const matches = [...text.matchAll(STATE_BLOCK_REGEX)];
   if (matches.length === 0) {
-    return {
-      changed: false,
-      text,
-      stateCount: 0,
-      names: [],
-    };
+    return ensureCurrentCharacterTagFromVariableInsert(text);
   }
 
   const parsedStates = matches.map((match, index) => {
@@ -322,32 +357,65 @@ function processOpeningForVariableMode(text: string) {
     const stateData = parseStateBlockJson(stateJson, stateName, index);
     const characterName = getStateCharacterName(stateData, stateName, index);
     return {
+      stateName,
       characterName,
       stateData,
+      stateDataWithoutName: omitNameField(stateData),
     };
   });
 
-  const names = parsedStates.map(state => state.characterName);
+  const allNames = parsedStates.map(state => state.characterName);
+  const names = uniqueStrings(allNames);
   const currentCharacterTag = createCurrentCharacterTag(names);
-  const variableData = Object.fromEntries(
-    parsedStates.map(state => [state.characterName, omitNameField(state.stateData)]),
-  );
+  const variableData = Object.fromEntries(parsedStates.map(state => [state.characterName, state.stateDataWithoutName]));
   const variableInsert = createVariableInsertBlock(variableData);
-  const processedText = replaceStateBlocksWithVariableContent(text, matches, currentCharacterTag, variableInsert);
 
-  debugQuickOpening('变量模式开局转换完成', {
+  debugQuickOpening('解析 state 块结果', {
     stateCount: matches.length,
-    names,
-    currentCharacterTag,
-    hasCurrentCharacterTagAfterProcess: CURRENT_CHARACTER_TAG_REGEX.test(processedText),
-    originalTextPreview: previewDebugText(text),
-    processedTextPreview: previewDebugText(processedText),
+    allNames,
+    uniqueNames: names,
+    duplicateNames: getDuplicateStrings(allNames),
+    parsedStates: parsedStates.map((state, index) => ({
+      index,
+      stateName: state.stateName,
+      characterName: state.characterName,
+      originalStateBlock: previewDebugText(matches[index]?.[0] ?? ''),
+      stateData: state.stateData,
+      stateDataWithoutName: state.stateDataWithoutName,
+    })),
+    generatedCurrentCharacterTag: currentCharacterTag,
+    generatedVariableInsert: variableInsert,
   });
+
+  const processedText = ensureCurrentCharacterTag(
+    replaceStateBlocksWithVariableContent(text, matches, variableInsert),
+    currentCharacterTag,
+  );
 
   return {
     changed: processedText !== text,
     text: processedText,
     stateCount: matches.length,
+    names,
+  };
+}
+
+function ensureCurrentCharacterTagFromVariableInsert(text: string) {
+  const names = getVariableInsertCharacterNames(text);
+  if (names.length === 0) {
+    return {
+      changed: false,
+      text,
+      stateCount: 0,
+      names: [],
+    };
+  }
+
+  const processedText = ensureCurrentCharacterTag(text, createCurrentCharacterTag(names));
+  return {
+    changed: processedText !== text,
+    text: processedText,
+    stateCount: 0,
     names,
   };
 }
@@ -387,19 +455,28 @@ function omitNameField(stateData: Record<string, unknown>) {
 }
 
 function createCurrentCharacterTag(names: string[]) {
-  return `<当前人物>${names.join(',')}</当前人物>`;
+  const uniqueNames = uniqueStrings(names);
+  const tagName = `${CURRENT_CHARACTER_TAG_PREFIX}${CURRENT_CHARACTER_TAG_PRIMARY_SUFFIX}`;
+  const content = uniqueNames.join(',');
+  const tag = [TAG_OPEN, tagName, TAG_CLOSE, content, TAG_OPEN, '/', tagName, TAG_CLOSE].join('');
+
+  debugQuickOpening('构造当前人物标签', {
+    inputNames: names,
+    uniqueNames,
+    tagName,
+    content,
+    tag,
+    tagLength: tag.length,
+  });
+
+  return tag;
 }
 
 function createVariableInsertBlock(variableData: Record<string, Record<string, unknown>>) {
   return `<VariableInsert>\n${JSON.stringify(variableData, null, 2)}\n</VariableInsert>`;
 }
 
-function replaceStateBlocksWithVariableContent(
-  text: string,
-  matches: RegExpMatchArray[],
-  currentCharacterTag: string,
-  variableInsert: string,
-) {
+function replaceStateBlocksWithVariableContent(text: string, matches: RegExpMatchArray[], variableInsert: string) {
   let nextText = '';
   let lastIndex = 0;
 
@@ -408,13 +485,161 @@ function replaceStateBlocksWithVariableContent(
     const endIndex = startIndex + match[0].length;
     nextText += text.slice(lastIndex, startIndex);
     if (index === 0) {
-      nextText += `${currentCharacterTag}\n${variableInsert}`;
+      nextText += variableInsert;
     }
     lastIndex = endIndex;
   });
 
   nextText += text.slice(lastIndex);
+
+  debugQuickOpening('替换 state 块为 VariableInsert', {
+    removedStateBlocks: matches.map((match, index) => ({
+      index,
+      stateName: match[1] ?? '',
+      raw: previewDebugText(match[0] ?? ''),
+      jsonText: previewDebugText((match[2] ?? '').trim()),
+    })),
+    insertedVariableInsert: variableInsert,
+    before: summarizeOpeningText(text),
+    after: summarizeOpeningText(nextText),
+  });
+
   return nextText;
+}
+
+function ensureCurrentCharacterTag(text: string, currentCharacterTag: string) {
+  const removal = removeCurrentCharacterTagsOutsideVariableInsert(text);
+  const variableInsertMatch = removal.text.match(VARIABLE_INSERT_BLOCK_REGEX);
+  const insertionTarget = variableInsertMatch ? 'before-variable-insert' : 'document-start';
+  const nextText = variableInsertMatch
+    ? removal.text.replace(VARIABLE_INSERT_BLOCK_REGEX, match => `${currentCharacterTag}\n${match}`)
+    : `${currentCharacterTag}\n${removal.text}`;
+
+  debugQuickOpening('整理当前人物标签', {
+    insertedCurrentCharacterTag: currentCharacterTag,
+    insertedCurrentCharacterTagLength: currentCharacterTag.length,
+    insertionTarget,
+    removedCurrentCharacterTagsOutsideVariableInsert: removal.removedTags,
+    textLengthDelta: nextText.length - text.length,
+    before: summarizeOpeningText(text),
+    after: summarizeOpeningText(nextText),
+  });
+
+  return nextText;
+}
+
+function removeCurrentCharacterTagsOutsideVariableInsert(text: string) {
+  let nextText = '';
+  let lastIndex = 0;
+  const removedTags: string[] = [];
+
+  for (const match of text.matchAll(VARIABLE_INSERT_BLOCK_GLOBAL_REGEX)) {
+    const startIndex = match.index ?? 0;
+    const endIndex = startIndex + match[0].length;
+    const outsideText = text.slice(lastIndex, startIndex);
+    removedTags.push(...getCurrentCharacterTagTexts(outsideText));
+    nextText += outsideText.replace(CURRENT_CHARACTER_TAG_REGEX, '');
+    nextText += match[0];
+    lastIndex = endIndex;
+  }
+
+  const trailingText = text.slice(lastIndex);
+  removedTags.push(...getCurrentCharacterTagTexts(trailingText));
+  nextText += trailingText.replace(CURRENT_CHARACTER_TAG_REGEX, '');
+
+  return {
+    text: nextText,
+    removedTags,
+  };
+}
+
+function getVariableInsertCharacterNames(text: string) {
+  const match = text.match(VARIABLE_INSERT_BLOCK_REGEX);
+  if (!match) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(match[1].trim()) as unknown;
+    if (!isRecord(parsed)) {
+      return [];
+    }
+
+    return uniqueStrings(extractCharacterNamesFromVariableInsert(parsed));
+  } catch (error) {
+    console.warn('[开局前端] 无法从现有 VariableInsert 中同步当前人物标签:', error);
+    return [];
+  }
+}
+
+function extractCharacterNamesFromVariableInsert(variableData: Record<string, unknown>) {
+  const statData = isRecord(variableData.stat_data) ? variableData.stat_data : variableData;
+  const characterData = isRecord(statData.角色数据) ? statData.角色数据 : statData;
+  return Object.entries(characterData)
+    .filter(([key, value]) => !key.startsWith('$') && isRecord(value))
+    .map(([key]) => key);
+}
+
+async function switchOpeningSwipe(index: number) {
+  debugQuickOpening('准备切换第 0 楼 swipe_id', { targetSwipeIndex: index });
+  await setChatMessages([{ message_id: 0, swipe_id: index }], { refresh: 'affected' });
+  debugOpeningMessageAfterWrite({ message_id: 0, swipe_id: index });
+}
+
+async function setOpeningSwipesAndSwitch(swipes: string[], index: number, targetText: string) {
+  debugQuickOpening('准备安全写回第 0 楼 swipes', summarizeOpeningPatch({ message_id: 0, swipes, swipe_id: index }));
+  await setChatMessages([{ message_id: 0, swipe_id: index }], { refresh: 'none' });
+  assertActiveOpeningSwipe(index, '切换目标 swipe 后');
+
+  await setChatMessages([{ message_id: 0, swipes }], { refresh: 'none' });
+  assertActiveOpeningSwipe(index, '更新 swipes 后');
+
+  await ensureActiveOpeningMessage(index, targetText);
+  debugOpeningMessageAfterWrite({ message_id: 0, swipes, swipe_id: index });
+  await refreshOpeningMessageDisplay(index);
+}
+
+async function refreshOpeningMessageDisplay(index: number) {
+  debugQuickOpening('准备刷新第 0 楼显示', {
+    targetSwipeIndex: index,
+    patch: summarizeOpeningPatch({ message_id: 0 }),
+  });
+
+  await setChatMessages([{ message_id: 0 }], { refresh: 'affected' });
+}
+
+function assertActiveOpeningSwipe(index: number, step: string) {
+  const [message] = getChatMessages(0, { include_swipes: true });
+  const actualSwipeIndex = message?.swipe_id;
+  debugQuickOpening(`${step}确认 active swipe`, {
+    expectedSwipeIndex: index,
+    actualSwipeIndex,
+  });
+
+  if (actualSwipeIndex !== index) {
+    throw new Error(
+      `${step}失败：当前 active swipe 是 ${actualSwipeIndex}，不是目标 ${index}。已停止写入 message 以避免覆盖其他开局。`,
+    );
+  }
+}
+
+async function ensureActiveOpeningMessage(index: number, targetText: string) {
+  const [message] = getChatMessages(0);
+  if (message?.message === targetText) {
+    debugQuickOpening('当前第 0 楼正文已等于目标开局，无需补写 message', {
+      targetSwipeIndex: index,
+      message: summarizeOpeningText(message.message),
+    });
+    return;
+  }
+
+  debugQuickOpening('当前第 0 楼正文未跟随目标 swipe，已确认目标 active 后补写 message', {
+    targetSwipeIndex: index,
+    currentMessage: summarizeOpeningText(message?.message ?? ''),
+    targetText: summarizeOpeningText(targetText),
+  });
+
+  await setChatMessages([{ message_id: 0, message: targetText }], { refresh: 'none' });
 }
 
 function getQuickOpeningSwitchSuccessText(index: number, result: QuickOpeningSwitchResult) {
@@ -429,34 +654,89 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function debugWrittenQuickOpening(index: number, expectedText: string) {
+function uniqueStrings(values: string[]) {
+  return [...new Set(values.map(value => value.trim()).filter(Boolean))];
+}
+
+function getDuplicateStrings(values: string[]) {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+
+  values.forEach(value => {
+    const normalized = value.trim();
+    if (!normalized) return;
+
+    if (seen.has(normalized)) {
+      duplicates.add(normalized);
+      return;
+    }
+
+    seen.add(normalized);
+  });
+
+  return [...duplicates];
+}
+
+function debugOpeningMessageAfterWrite(patch: OpeningMessagePatch) {
   try {
-    const swipes = getCurrentOpeningSwipes();
-    const writtenText = swipes[index] ?? '';
-    debugQuickOpening('写回后重新读取目标开局', {
-      targetSwipeIndex: index,
-      hasCurrentCharacterTagAfterRead: CURRENT_CHARACTER_TAG_REGEX.test(writtenText),
-      hasVariableInsertAfterRead: writtenText.includes('<VariableInsert>'),
-      expectedHasCurrentCharacterTag: CURRENT_CHARACTER_TAG_REGEX.test(expectedText),
-      expectedTextLength: expectedText.length,
-      writtenTextLength: writtenText.length,
-      writtenTextPreview: previewDebugText(writtenText),
-      writtenText,
+    const targetSwipeIndex = patch.swipe_id;
+    const [openingMessage] = getChatMessages(0);
+    const [openingMessageWithSwipes] = getChatMessages(0, { include_swipes: true });
+    const swipes = Array.isArray(openingMessageWithSwipes?.swipes) ? openingMessageWithSwipes.swipes : [];
+
+    debugQuickOpening('写回后重新读取第 0 楼', {
+      requestedSwipeIndex: targetSwipeIndex,
+      actualSwipeIndex: openingMessageWithSwipes?.swipe_id,
+      message0: {
+        message_id: openingMessage?.message_id,
+        role: openingMessage?.role,
+        message: summarizeOpeningText(openingMessage?.message ?? ''),
+      },
+      message0TargetSwipe:
+        typeof targetSwipeIndex === 'number' && swipes[targetSwipeIndex] !== undefined
+          ? summarizeOpeningText(swipes[targetSwipeIndex])
+          : null,
     });
   } catch (error) {
-    debugQuickOpening('写回后重新读取失败', {
-      error: getErrorMessage(error),
-    });
+    debugQuickOpening('写回后重新读取失败', { error: getErrorMessage(error) });
   }
 }
 
-function debugQuickOpening(message: string, details?: Record<string, unknown>) {
-  if (details === undefined) {
-    console.log(`${QUICK_OPENING_DEBUG_PREFIX} ${message}`);
-    return;
-  }
+function summarizeOpeningPatch(patch: OpeningMessagePatch) {
+  return {
+    message_id: patch.message_id,
+    swipe_id: patch.swipe_id,
+    hasMessageField: typeof patch.message === 'string',
+    hasSwipesField: Array.isArray(patch.swipes),
+    swipesLength: patch.swipes?.length ?? 0,
+    message: summarizeOpeningText(patch.message ?? ''),
+    targetSwipe:
+      typeof patch.swipe_id === 'number' && patch.swipes?.[patch.swipe_id] !== undefined
+        ? summarizeOpeningText(patch.swipes[patch.swipe_id])
+        : null,
+  };
+}
 
-  console.log(`${QUICK_OPENING_DEBUG_PREFIX} ${message}`, details);
+function summarizeOpeningText(text: string) {
+  return {
+    length: text.length,
+    hasCurrentCharacterTag: CURRENT_CHARACTER_TAG_DETECT_REGEX.test(text),
+    currentCharacterTags: getCurrentCharacterTagContents(text),
+    hasVariableInsert: VARIABLE_INSERT_DETECT_REGEX.test(text),
+    hasStateBlock: STATE_BLOCK_DETECT_REGEX.test(text),
+    preview: previewDebugText(text),
+  };
+}
+
+function getCurrentCharacterTagContents(text: string) {
+  return [...text.matchAll(CURRENT_CHARACTER_TAG_CONTENT_REGEX)].map(match => ({
+    tagName: `当前${match[1]}`,
+    content: match[2].trim(),
+  }));
+}
+
+function getCurrentCharacterTagTexts(text: string) {
+  return [...text.matchAll(CURRENT_CHARACTER_TAG_CONTENT_REGEX)].map(match => match[0]);
 }
 
 function previewDebugText(text: string) {
@@ -465,6 +745,25 @@ function previewDebugText(text: string) {
   }
 
   return `${text.slice(0, DEBUG_PREVIEW_LIMIT)}... [truncated, length=${text.length}]`;
+}
+
+function debugQuickOpening(message: string, details?: Record<string, unknown>) {
+  if (!shouldDebugQuickOpening()) return;
+
+  if (details === undefined) {
+    console.info(`${QUICK_OPENING_DEBUG_PREFIX} ${message}`);
+    return;
+  }
+
+  console.info(`${QUICK_OPENING_DEBUG_PREFIX} ${message}`, details);
+}
+
+function shouldDebugQuickOpening() {
+  try {
+    return localStorage.getItem(QUICK_OPENING_DEBUG_STORAGE_KEY) !== '0';
+  } catch {
+    return true;
+  }
 }
 
 function getErrorMessage(error: unknown) {

@@ -1,6 +1,6 @@
 脚本名称
 变量图片状态栏
 查找正则表达式
-/<(state\d+)>([\s\S]+?)<\/\1>/g
+<StatusPlaceHolderImpl/>
 替换为
 src\JM\变量状态栏.html

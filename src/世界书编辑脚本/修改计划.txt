@@ -1,9 +1,13 @@
-# 世界书编辑脚本 - UI 全面审美升级计划 (代码级详细版)
+# 世界书编辑脚本 - UI 全面审美升级计划 (严格宿主隔离与内联样式消除版)
 
-## 设计目标
-在**不改变现有 HTML 结构逻辑（防破坏事件绑定）**、**不引入外部 CSS 框架**、**不影响后端交互**的前提下，通过修改 JS 文件中硬编码的 `<style>` 字符串和内联 `.css()` 调用，实现 UI 的**现代化暗黑扁平风格** (Modern Dark Flat Design) 升级。
+## 核心准则 (GPT 评估反馈修正)
 
-## 全局设计规范 (参考)
+1.  **严格选择器隔离：** 所有注入到宿主 (`parentDoc`) 的 CSS 规则，**必须**以 `#${LOREBOOK_PANEL_ID}`、`#theme-settings-modal` 或具体的弹窗 ID 作为前缀。**绝对禁止**全局定义 `button`, `input`, `::-webkit-scrollbar` 等通用标签，防止污染酒馆宿主页面或其他插件。
+2.  **消除内联背景色：** 现存的通过 `$.css('background-color', ...)` 动态设置的高饱和度颜色（集中在 `list.js` 和部分批量菜单），尽量移除或统一改用添加 class 配合 CSS 变量的方式处理。
+3.  **精准属性更新：** 主题变量的设置状态不属于单纯的“主题”，应仅修改颜色和圆角等纯视觉变量（如 `bgColor`, `textColor`, `accentColor` 等），不要混入需要 Settings Manager 管理的功能开关（如 `showSearchBar` 等）。
+4.  **安全的主题更新机制：** 直接修改 `getDefaultTheme` 可能无法覆盖用户 localStorage 中的旧配置。因此，新的 CSS 规则应该在设计上兼容或优雅降级，或者直接将默认色板更替为暗黑风格，如果用户已存储则按用户存储的来，确保不破坏用户的自定义。
+
+## 全局设计规范
 *   **背景色 (Background):** 主面板 `#1e1e1e` (深灰)，次级面板 (条目, 弹窗) `#252526`，输入框 `#333333`。
 *   **文字色 (Text):** 主文本 `#e0e0e0`，次要文本/描述 `#a0a0a0`。
 *   **强调色 (Primary/Accent):** 采用更柔和、现代的蓝紫色，例如 `#6c5ce7` 或青色 `#00cec9`。
@@ -14,265 +18,232 @@
 
 ---
 
-## 阶段 1：全局主题与基础组件重塑
+## 阶段 1：全局主题变量与基础组件重塑 (带作用域)
 
 ### 1.1 `src/世界书编辑脚本/modules/ui/theme.js`
-*   **目标:** 修改默认色板，这是所有使用 CSS 变量（如 `var(--panel-bg-color)`）的组件的基础。
-*   **具体代码修改 (`getDefaultTheme` 函数):**
-    ```javascript
-    export function getDefaultTheme() {
-        return {
-            bgColor: '#1e1e1e', // 深邃灰底
-            textColor: '#e0e0e0', // 柔和白字
-            accentColor: '#6c5ce7', // 现代蓝紫
-            entryBgColor: '#252526', // 卡片底色
-            yamlInputBgColor: '#1e1e1e', // YAML输入框与主背景融合
-            searchInputBgColor: '#2d2d30', // 搜索框略亮
-            overrideWiIcon: false,
-            highlightActiveEntry: true,
-            showSearchBar: true,
-            fullscreenMode: false,
-            truncateLongNames: true,
-            pcLayoutMode: 'master-detail'
-        };
-    }
-    ```
+*   **目标:** 修改默认色板，这是所有使用 CSS 变量的基础。**仅修改颜色相关的字段。**
+*   **代码修改:**
+    *   在 `getDefaultTheme()` 中：
+        ```javascript
+        bgColor: '#1e1e1e', // 更深的背景
+        textColor: '#e0e0e0', // 柔和的白色
+        accentColor: '#6c5ce7', // 现代的强调色 (蓝紫)
+        entryBgColor: '#252526', // 条目卡片背景
+        yamlInputBgColor: '#1e1e1e', // YAML框融合
+        searchInputBgColor: '#2d2d30', // 搜索框
+        ```
 
-### 1.2 `src/世界书编辑脚本/modules/ui/panel.js` (核心样式库)
-*   **目标:** 重写 `panelStyles` 字符串中的基础控件样式。
-*   **具体代码修改 (定位到 `<style id="enhanced-lorebook-styles">` 内部):**
-    *   **滚动条 (Scrollbar):**
+### 1.2 `src/世界书编辑脚本/modules/ui/panel.js`
+*   **目标:** 重写 `panelStyles`，为滚动条、按钮、输入框添加带作用域的现代样式。
+*   **代码修改 (定位到 `<style id="enhanced-lorebook-styles">`):**
+    *   **作用域滚动条:**
         ```css
-        ::-webkit-scrollbar { width: 6px; height: 6px; } /* 更细 */
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background-color: #555; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background-color: #888; }
+        #${LOREBOOK_PANEL_ID} ::-webkit-scrollbar,
+        .lorebook-modal ::-webkit-scrollbar { width: 6px; height: 6px; }
+        #${LOREBOOK_PANEL_ID} ::-webkit-scrollbar-track,
+        .lorebook-modal ::-webkit-scrollbar-track { background: transparent; }
+        #${LOREBOOK_PANEL_ID} ::-webkit-scrollbar-thumb,
+        .lorebook-modal ::-webkit-scrollbar-thumb { background-color: #555; border-radius: 3px; }
+        #${LOREBOOK_PANEL_ID} ::-webkit-scrollbar-thumb:hover,
+        .lorebook-modal ::-webkit-scrollbar-thumb:hover { background-color: #888; }
         ```
-    *   **通用面板 (`#${LOREBOOK_PANEL_ID}`):**
+    *   **作用域通用按钮:**
         ```css
-        #${LOREBOOK_PANEL_ID} {
-            border-radius: 8px; /* 增加圆角 */
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); /* 更柔和的阴影 */
-            border: 1px solid #333; /* 弱化边框 */
-            /* 移除可能存在的旧背景渐变或强烈的边框色 */
-        }
-        .panel-header {
-            border-bottom: 1px solid #333;
-            background-color: transparent; /* 依赖面板本身的 bgColor */
-            padding: 12px 16px;
-        }
-        ```
-    *   **标签页 (`.tab-button`):**
-        ```css
-        .tab-button {
+        #${LOREBOOK_PANEL_ID} button,
+        .lorebook-modal button {
+            border-radius: 6px;
             border: none;
-            background: transparent;
-            color: #a0a0a0; /* 默认暗灰 */
-            border-bottom: 2px solid transparent;
-            padding: 10px 16px;
-            transition: all 0.2s ease;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            background-color: #444;
+            color: #eee;
+            padding: 6px 12px;
         }
-        .tab-button:hover {
-            color: #e0e0e0;
-            background-color: rgba(255,255,255,0.05);
+        #${LOREBOOK_PANEL_ID} button:hover:not(:disabled),
+        .lorebook-modal button:hover:not(:disabled) {
+            filter: brightness(1.2);
+            transform: translateY(-1px);
         }
-        .tab-button.${ACTIVE_TAB_CLASS} {
-            color: var(--panel-accent-color);
-            border-bottom: 2px solid var(--panel-accent-color);
-            background-color: transparent; /* 移除旧的白色或高亮背景 */
-            font-weight: 600;
+        #${LOREBOOK_PANEL_ID} button:active:not(:disabled),
+        .lorebook-modal button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        /* 主操作按钮特化 */
+        #${LOREBOOK_PANEL_ID} .lorebook-copy-confirm-btn,
+        #${LOREBOOK_PANEL_ID} .save-button,
+        .lorebook-modal .lorebook-copy-confirm-btn,
+        .lorebook-modal .save-button {
+            background-color: var(--panel-accent-color) !important;
+            color: #fff;
         }
         ```
-    *   **通用输入框/Select (`.form-control`, `input[type="text"]`, `textarea`):**
+    *   **作用域输入框:**
         ```css
-        input[type="text"], input[type="number"], select, textarea, .form-control {
+        #${LOREBOOK_PANEL_ID} input[type="text"],
+        #${LOREBOOK_PANEL_ID} input[type="number"],
+        #${LOREBOOK_PANEL_ID} select,
+        #${LOREBOOK_PANEL_ID} textarea,
+        .lorebook-modal input[type="text"],
+        .lorebook-modal input[type="number"],
+        .lorebook-modal select,
+        .lorebook-modal textarea {
             background-color: #2d2d30;
             border: 1px solid #444;
-            border-radius: 4px;
+            border-radius: 6px;
             color: #eee;
             padding: 8px 12px;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-        input:focus, select:focus, textarea:focus, .form-control:focus {
+        #${LOREBOOK_PANEL_ID} input:focus,
+        #${LOREBOOK_PANEL_ID} select:focus,
+        #${LOREBOOK_PANEL_ID} textarea:focus,
+        .lorebook-modal input:focus,
+        .lorebook-modal select:focus,
+        .lorebook-modal textarea:focus {
             border-color: var(--panel-accent-color);
             outline: none;
-            box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.2); /* 发光效果 */
+            box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.2);
         }
         ```
-    *   **基础按钮 (`button`, `.lorebook-copy-confirm-btn`, 等):**
+    *   **标签页 (.tab-button):**
         ```css
-        button {
-            border-radius: 4px;
+        #${LOREBOOK_PANEL_ID} .tab-button {
             border: none;
-            cursor: pointer;
+            background: transparent;
+            color: #a0a0a0;
+            border-bottom: 2px solid transparent;
+            padding: 10px 16px;
             transition: all 0.2s ease;
-            /* 默认按钮样式 */
-            background-color: #444;
-            color: #eee;
         }
-        button:hover:not(:disabled) {
-            filter: brightness(1.2);
-            transform: translateY(-1px);
+        #${LOREBOOK_PANEL_ID} .tab-button:hover {
+            color: #e0e0e0;
+            background-color: rgba(255,255,255,0.05);
         }
-        button:active:not(:disabled) {
-            transform: translateY(0);
+        #${LOREBOOK_PANEL_ID} .tab-button.${ACTIVE_TAB_CLASS} {
+            color: var(--panel-accent-color);
+            border-bottom: 2px solid var(--panel-accent-color);
+            background-color: transparent;
+            font-weight: 600;
         }
-        .lorebook-copy-confirm-btn, .save-button {
-            background-color: var(--panel-accent-color) !important; /* 强调按钮 */
-            color: #fff;
-        }
-        ```
-    *   **切换开关 (`.switch` / `.mini-toggle-switch`):**
-        ```css
-        .switch, .mini-toggle-switch { width: 36px; height: 20px; }
-        .slider:before, .mini-toggle-slider:before {
-            height: 14px; width: 14px; left: 3px; bottom: 3px;
-        }
-        input:checked + .slider:before, input:checked + .mini-toggle-slider:before {
-            transform: translateX(16px);
-        }
-        /* 调整开/关的背景色，使用更现代的绿/蓝色和深灰色 */
-        .slider, .mini-toggle-slider { background-color: #555; }
-        input:checked + .slider { background-color: var(--panel-accent-color); }
-        input[data-action="toggle-enabled"]:checked + .slider { background-color: #10b981; /* 启用状态用绿色 */ }
         ```
 
 ---
 
-## 阶段 2：列表与主从布局优化
+## 阶段 2：列表与批量按钮内联样式清理
 
 ### 2.1 `src/世界书编辑脚本/modules/ui/list.js`
-*   **目标:** 弱化顶部大面积的色块工具栏，使其融入暗黑背景；统一图标按钮风格。
-*   **具体代码修改:**
-    *   在 `.addClass('lorebook-batch-action-button')` 后面的 `.css('background-color', '...')`。
-    *   将各种五颜六色的高纯度色值（如 `#336699`, `#993333`, `#7a5a9e`）统一改为低饱和度、低明度的深色，或者统一使用主背景色但依赖 icon 本身的颜色或 hover 态。
-    *   **建议修改方式:**
-        将其背景色统一设为 `#333` 或 `#2a2d31`，文字色为浅灰 `#ccc`。
-        ```javascript
-        .css({
-            'background-color': '#333',
-            'color': '#ccc',
-            'border': '1px solid #444',
-            'border-radius': '6px',
-            'padding': '6px 10px'
-        })
+*   **目标:** 移除 `$.css('background-color', ...)` 造成的高饱和度色彩污染，改用 CSS 类统一管理或统一为暗灰色。
+*   **代码修改:**
+    *   找到所有 `.addClass('lorebook-batch-action-button')` 的地方。
+    *   将其后跟随的 `.css('background-color', '#xxxxxx')` **删除**。
+    *   在 `panel.js` 的样式中添加针对 `.lorebook-batch-action-button` 的统一样式：
+        ```css
+        #${LOREBOOK_PANEL_ID} .lorebook-batch-action-button {
+            background-color: #333;
+            color: #ccc;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 6px 10px;
+        }
+        #${LOREBOOK_PANEL_ID} .lorebook-batch-action-button:hover {
+            background-color: #444;
+            color: #fff;
+            border-color: #666;
+        }
         ```
-        （由于这是 jQuery 动态设置的内联样式，如果可能，最好在 `panel.js` 的 CSS 中增加 `.lorebook-batch-action-button { background: #333 !important; ... }` 并在此处移除 `.css()` 调用，以实现彻底的样式分离，但这取决于代码的耦合程度。若只求最少修改，则直接改 `.css()` 参数。）
 
 ### 2.2 `src/世界书编辑脚本/modules/ui/entry.js`
-*   **目标:** 条目卡片化，提升列表浏览体验。
-*   **具体代码修改 (需要同时修改 `panel.js` 中的对应 CSS 和 `entry.js` 的 HTML class，如果必要):**
-    *   修改 `.master-entry-item` (主从布局列表项) 和 `.lorebook-entry-item` (标准列表项) 的 CSS (通常在 `panelStyles` 中):
-        ```css
-        .master-entry-item, .lorebook-entry-item {
-            background-color: var(--panel-entry-bg-color);
-            border: 1px solid #333;
-            border-radius: 6px;
-            margin-bottom: 6px; /* 增加条目间距 */
-            padding: 8px 12px;
-            transition: all 0.2s ease;
-        }
-        .master-entry-item:hover, .lorebook-entry-item:hover {
-            background-color: #2a2d31;
-            border-color: #555;
-        }
-        /* 弱化选中时的突兀感，改用边框或发光指示 */
-        .master-entry-item.is-current-detail {
-            border-left: 4px solid var(--panel-accent-color);
-            background-color: rgba(108, 92, 231, 0.05); /* 极淡的强调色背景 */
-            /* 移除可能存在的旧高亮背景 */
-        }
-        .master-entry-meta {
-            color: #888; /* 次要信息变暗 */
-            font-size: 0.85em;
-        }
-        ```
+*   **目标:** 条目卡片化。
+*   **代码修改 (确保在 `panel.js` 的 style 中定义):**
+    ```css
+    #${LOREBOOK_PANEL_ID} .master-entry-item,
+    #${LOREBOOK_PANEL_ID} .lorebook-entry-item {
+        background-color: var(--panel-entry-bg-color);
+        border: 1px solid #333;
+        border-radius: 6px;
+        margin-bottom: 6px;
+        padding: 8px 12px;
+        transition: all 0.2s ease;
+    }
+    #${LOREBOOK_PANEL_ID} .master-entry-item:hover,
+    #${LOREBOOK_PANEL_ID} .lorebook-entry-item:hover {
+        background-color: #2a2d31;
+        border-color: #555;
+    }
+    #${LOREBOOK_PANEL_ID} .master-entry-item.is-current-detail {
+        border-left: 4px solid var(--panel-accent-color);
+        background-color: rgba(108, 92, 231, 0.05);
+    }
+    #${LOREBOOK_PANEL_ID} .master-entry-meta {
+        color: #888;
+        font-size: 0.85em;
+    }
+    ```
 
 ---
 
 ## 阶段 3：详情编辑与弹出编辑器美化
 
 ### 3.1 `src/世界书编辑脚本/modules/ui/detail.js`
-*   **目标:** 改善右侧编辑面板的排版密度，使其看起来像一个专业的表单。
-*   **具体代码修改 (定位到 `const DETAIL_STYLE_ID` 相关的 `<style>` 块):**
+*   **目标:** 表单排版优化。
+*   **代码修改 (定位到 `const DETAIL_STYLE_ID` 下的 `<style>`):**
     ```css
-    .detail-editor {
-        padding: 20px; /* 增加主容器内边距 */
+    #${CHARACTER_DETAIL_CONTAINER_ID} .detail-editor,
+    #${GLOBAL_DETAIL_CONTAINER_ID} .detail-editor {
+        padding: 20px;
     }
-    .detail-section {
+    #${CHARACTER_DETAIL_CONTAINER_ID} .detail-section,
+    #${GLOBAL_DETAIL_CONTAINER_ID} .detail-section {
         background-color: #252526;
         border: 1px solid #333;
         border-radius: 8px;
         padding: 16px;
-        margin-bottom: 16px; /* 区块间距 */
-    }
-    .detail-section-header {
-        font-size: 1.1em;
-        font-weight: 600;
-        color: #eee;
-        border-bottom: 1px solid #333;
-        padding-bottom: 10px;
         margin-bottom: 16px;
     }
-    .detail-field {
-        display: flex;
-        flex-direction: column;
-        gap: 6px; /* 标签和输入框的间距 */
-    }
-    .detail-field span {
-        color: #aaa;
-        font-size: 0.9em;
-    }
-    /* 优化复选框组的排列 */
-    .detail-row-flags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 16px;
-        margin-top: 10px;
-    }
+    /* 优化间距 */
+    .detail-field { gap: 6px; }
+    .detail-field span { color: #aaa; font-size: 0.9em; }
+    .detail-row-flags { gap: 16px; margin-top: 10px; }
     ```
 
 ### 3.2 `src/世界书编辑脚本/modules/ui/contentEditor.js`
-*   **目标:** 优化弹窗的深度和双栏对比的视觉效果。
-*   **具体代码修改 (定位到 `STYLE_ID` 相关的 `<style>` 块):**
-    *   **模态框层级与视觉:**
-        ```css
-        #${CONTENT_EDITOR_MODAL_ID}, #${COMPARE_EDITOR_MODAL_ID} {
-            backdrop-filter: blur(5px);
-            background-color: rgba(0,0,0,0.6);
-        }
-        #${COMPARE_EDITOR_MODAL_ID}-content {
-            background-color: #1e1e1e;
-            border: 1px solid #444;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-        }
-        ```
-    *   **对比差异高亮:** 避免使用纯红纯绿。
-        ```css
-        .compare-diff-panel:first-child pre {
-            background-color: rgba(220, 53, 69, 0.15); /* 柔和暗红 */
-            border: 1px solid rgba(220, 53, 69, 0.3);
-            color: #ff8a8a;
-        }
-        .compare-diff-panel:last-child pre {
-            background-color: rgba(40, 167, 69, 0.15); /* 柔和暗绿 */
-            border: 1px solid rgba(40, 167, 69, 0.3);
-            color: #8aff8a;
-        }
-        ```
+*   **目标:** 优化弹窗的模糊背景和双栏对比颜色。
+*   **代码修改 (定位到 `<style id="${STYLE_ID}">`):**
+    ```css
+    #${CONTENT_EDITOR_MODAL_ID}, #${COMPARE_EDITOR_MODAL_ID} {
+        backdrop-filter: blur(5px);
+        background-color: rgba(0,0,0,0.6);
+    }
+    #${COMPARE_EDITOR_MODAL_ID}-content {
+        background-color: #1e1e1e;
+        border: 1px solid #444;
+        border-radius: 10px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    }
+    /* 柔和的差异色块 */
+    .compare-diff-panel:first-child pre {
+        background-color: rgba(220, 53, 69, 0.15);
+        border: 1px solid rgba(220, 53, 69, 0.3);
+        color: #ff8a8a;
+    }
+    .compare-diff-panel:last-child pre {
+        background-color: rgba(40, 167, 69, 0.15);
+        border: 1px solid rgba(40, 167, 69, 0.3);
+        color: #8aff8a;
+    }
+    ```
 
 ---
 
 ## 阶段 4：AI 工作区深度美化
 
 ### 4.1 `src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js`
-*   **目标:** 现代化的两栏布局、清晰的步骤条和规整的表单面板。
-*   **具体代码修改 (定位到 `lorebook-ai-workspace-desktop-styles` 块):**
-    *   **左侧导航 (`.ai-desktop-nav`):**
+*   **目标:** 现代化的两栏布局、步骤条和规整的设定区块。
+*   **代码修改 (定位到 `lorebook-ai-workspace-desktop-styles`):**
+    *   **左侧导航:**
         ```css
         .ai-desktop-nav {
-            background-color: #18181b; /* 更深的侧边栏 */
+            background-color: #18181b;
             border-right: 1px solid #333;
             padding: 20px 10px;
         }
@@ -288,10 +259,9 @@
         .ai-mode-nav-button.is-active {
             background-color: rgba(108, 92, 231, 0.1);
             color: var(--panel-accent-color);
-            /* border-left: 3px solid var(--panel-accent-color); 移除默认粗边框 */
         }
         ```
-    *   **步骤条 (`.ai-stepper`):**
+    *   **步骤条:** (注意修正了 `.ai-step-indicator` 为 `.ai-step-index`)
         ```css
         .ai-stepper {
             background-color: #1e1e1e;
@@ -299,28 +269,27 @@
             border-bottom: 1px solid #333;
             gap: 20px;
         }
-        .ai-step-indicator {
+        .ai-step-index {
             background-color: #333;
             color: #888;
-            border-radius: 50%; /* 圆形指示器 */
+            border-radius: 50%;
             width: 24px; height: 24px;
-            display: flex; align-items: center; justify-content: center;
+            display: inline-flex; align-items: center; justify-content: center;
             font-size: 0.85em; font-weight: bold;
+            margin-right: 8px;
         }
-        .ai-step-button.is-active .ai-step-indicator {
+        .ai-step-button.is-active .ai-step-index {
             background-color: var(--panel-accent-color);
             color: #fff;
         }
-        .ai-step-button.is-complete .ai-step-indicator {
-            background-color: #10b981; /* 完成态为绿色 */
+        .ai-step-button.is-complete .ai-step-index {
+            background-color: #10b981;
             color: #fff;
         }
-        .ai-step-button {
-            color: #888;
-        }
+        .ai-step-button { color: #888; }
         .ai-step-button.is-active { color: #eee; font-weight: 600; }
         ```
-    *   **内部面板 (`.ai-panel`, `.ai-subpanel`):**
+    *   **内部面板 (`.ai-panel`):**
         ```css
         .ai-panel {
             background-color: #252526;
@@ -330,60 +299,31 @@
             margin-bottom: 24px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        .ai-subpanel {
-            background-color: #1e1e1e; /* 嵌套面板颜色变深以区分层级 */
-            border: 1px solid #333;
-            border-radius: 6px;
-            padding: 16px;
-        }
-        ```
-    *   **代码折叠区 (`details.ai-debug-block`):**
-        ```css
-        details.ai-debug-block {
-            background-color: #18181b;
-            border: 1px solid #333;
-            border-radius: 6px;
-            overflow: hidden;
-        }
-        details.ai-debug-block summary {
-            background-color: #2d2d30;
-            padding: 10px 16px;
-            color: #eee;
-            font-weight: 600;
-        }
-        details.ai-debug-block pre {
-            padding: 16px;
-            margin: 0;
-            background-color: #18181b;
-            color: #d4d4d4; /* 代码高亮基础色 */
-        }
         ```
 
 ---
 
-## 阶段 5：独立功能弹窗 (Features)
+## 阶段 5：剩余模态框的内联样式覆盖
 
-### 5.1 目标文件: 
+### 5.1 目标文件
 *   `src/世界书编辑脚本/modules/features/optimizer.js`
 *   `src/世界书编辑脚本/modules/features/bulkImport.js`
 *   `src/世界书编辑脚本/modules/features/batchActions.js`
+*   `src/世界书编辑脚本/modules/commands/titleBarCommands.js` (回滚预览)
 
-*   **目标:** 替换掉这些文件中 HTML 字符串内联 `style="..."` 的老旧暗色主题定义。
-*   **具体代码修改:**
-    *   搜索文件内的: `background-color: #2c2c2c` (主背景) -> 替换为 `#1e1e1e` (或依赖 theme 变量如果在 `<style>` 块内)。
-    *   搜索: `background-color: #3a6a8e` (弹窗头部蓝底) -> 替换为 `transparent` 或底色，并通过下边框 `border-bottom: 1px solid #333` 区分。
-    *   搜索: `border-radius: 8px` 保持不变，但为其添加阴影 `box-shadow: 0 10px 30px rgba(0,0,0,0.5)`。
-    *   搜索: 内部表单控件的背景色如 `background-color: #333`, 确保它们有适当的边框 `border: 1px solid #444` 和圆角 `border-radius: 4px`，保持与阶段 1 一致。
-    *   例如，在 `bulkImport.js` 的 `const importStyles = ...` 中：
+*   **目标:** 替换 HTML 字符串内联 `style="..."` 为现代规范。
+*   **代码修改 (使用正则或局部替换):**
+    *   寻找 `background-color: #2c2c2c` (或类似主背景) -> 替换为 `background-color: #1e1e1e`。
+    *   寻找 `background-color: #3a6a8e` (旧蓝底头部) -> 替换为 `background-color: transparent; border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 15px;`。
+    *   寻找 `border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5)` -> 替换为 `border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.4);` 以符合新弹窗规范。
+    *   例如，在 `bulkImport.js` 中：
         ```css
+        /* 确保导入弹窗样式符合规范 */
         #${IMPORT_MODAL_ID}-content {
-            background-color: var(--panel-bg-color, #1e1e1e);
-            border: 1px solid #333;
-            border-radius: 8px;
-            /* ... */
+            background-color: #1e1e1e;
+            border: 1px solid #444;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
         }
         ```
-    *   在 `optimizer.js` 的内联 HTML 中：
-        ```javascript
-        // 原: <div id="..." style="background-color: #2c2c2c; ... border: 1px solid #555; ...">
-        // 改: <div id="..." style="background-color: #1e1e1e; ... border: 1px solid #333; box-shadow: 0 8px 32px rgba(0,0,0,0.5); ...">
+    *   对于 `optimizer.js` 中直接写死在 `div` 上的 `style="..."`，进行相应的字符串替换，去除高亮背景，压暗底色，统一边框 `#444` 和圆角 `6px`。

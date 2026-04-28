@@ -1,3 +1,4 @@
+```
 <!doctype html>
 <html lang="zh">
   <head>
@@ -45,6 +46,14 @@
         border: 1px solid var(--border-color);
         background-color: rgba(0, 0, 0, 0.2);
         color: var(--text-color);
+      }
+      .status-feedback strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--accent-light-color);
+      }
+      .status-feedback div {
+        line-height: 1.5;
       }
       .status-feedback.warning {
         border-color: rgba(207, 102, 121, 0.45);
@@ -102,7 +111,9 @@
         justify-content: center;
         cursor: pointer;
         border: 1px solid var(--border-color);
-        transition: background-color 0.3s, opacity 0.3s ease;
+        transition:
+          background-color 0.3s,
+          opacity 0.3s ease;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
       }
       .portrait-upload-trigger {
@@ -249,7 +260,9 @@
         font-size: 15px;
         font-weight: 500;
         cursor: pointer;
-        transition: color 0.3s, border-bottom 0.3s;
+        transition:
+          color 0.3s,
+          border-bottom 0.3s;
       }
       .tab-button.active {
         color: var(--accent-light-color);
@@ -364,7 +377,9 @@
         overflow: hidden;
         max-height: 2000px;
         opacity: 1;
-        transition: max-height 0.4s ease-in-out, opacity 0.4s ease-in-out;
+        transition:
+          max-height 0.4s ease-in-out,
+          opacity 0.4s ease-in-out;
       }
       .status-container.collapsed .collapsible-section {
         max-height: 0;
@@ -381,7 +396,9 @@
         border-radius: 50%;
         background-color: rgba(255, 255, 255, 0.1);
         cursor: pointer;
-        transition: background-color 0.3s, transform 0.3s;
+        transition:
+          background-color 0.3s,
+          transform 0.3s;
       }
       .collapse-toggle:hover {
         background-color: rgba(255, 255, 255, 0.2);
@@ -390,7 +407,9 @@
         width: 20px;
         height: 20px;
         fill: var(--text-secondary-color);
-        transition: transform 0.3s, fill 0.3s;
+        transition:
+          transform 0.3s,
+          fill 0.3s;
       }
       .status-container.collapsed .collapse-toggle svg {
         transform: rotate(180deg);
@@ -559,7 +578,15 @@
         BodyDetails: {
           title: '身体与性器细节',
           icon: '🩸',
-          labels: { Mouth: '口腔', Breasts: '胸部', WombAndVagina: '子宫与阴道', Anus: '后庭', Hands: '手部', Legs: '腿部', Feet: '足部' },
+          labels: {
+            Mouth: '口腔',
+            Breasts: '胸部',
+            WombAndVagina: '子宫与阴道',
+            Anus: '后庭',
+            Hands: '手部',
+            Legs: '腿部',
+            Feet: '足部',
+          },
         },
       };
 
@@ -570,6 +597,10 @@
       let keywordRegex = null;
       let fallbackAvatars = [];
       let refreshTimer = null;
+      const LOG_PREFIX = '[变量状态栏]';
+      const logInfo = (message, ...details) => console.info(`${LOG_PREFIX} ${message}`, ...details);
+      const logWarn = (message, ...details) => console.warn(`${LOG_PREFIX} ${message}`, ...details);
+      const logError = (message, ...details) => console.error(`${LOG_PREFIX} ${message}`, ...details);
 
       const safeGet = (obj, path, defaultValue = undefined) => {
         const keys = Array.isArray(path) ? path : path.split('.');
@@ -581,24 +612,42 @@
         return result;
       };
       const uniq = arr => Array.from(new Set(arr));
-      const ensureString = value => (value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value));
+      const ensureString = value =>
+        value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value);
       const ensureObject = value => (_.isPlainObject(value) ? value : {});
-      const NAME_EDIT_TRIGGER_HTML = '<button class="edit-trigger jm-edit-name-trigger" type="button" title="编辑名字">&#9998;</button>';
-      const OCCUPATION_EDIT_TRIGGER_HTML = '<button class="edit-trigger jm-edit-occupation-trigger" type="button" title="编辑职业">&#9998;</button>';
+      const escapeHtml = value =>
+        ensureString(value).replace(
+          /[&<>"']/g,
+          char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
+        );
+      const NAME_EDIT_TRIGGER_HTML =
+        '<button class="edit-trigger jm-edit-name-trigger" type="button" title="编辑名字">&#9998;</button>';
+      const OCCUPATION_EDIT_TRIGGER_HTML =
+        '<button class="edit-trigger jm-edit-occupation-trigger" type="button" title="编辑职业">&#9998;</button>';
       const DISPLAY_TEXT_REPLACEMENTS = [['__DOT__', '.']];
       function normalizeDisplayValue(value) {
         if (typeof value === 'string') {
-          return DISPLAY_TEXT_REPLACEMENTS.reduce((text, [token, replacement]) => text.split(token).join(replacement), value);
+          return DISPLAY_TEXT_REPLACEMENTS.reduce(
+            (text, [token, replacement]) => text.split(token).join(replacement),
+            value,
+          );
         }
         if (Array.isArray(value)) return value.map(item => normalizeDisplayValue(item));
         if (_.isPlainObject(value)) {
-          return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, normalizeDisplayValue(nestedValue)]));
+          return Object.fromEntries(
+            Object.entries(value).map(([key, nestedValue]) => [key, normalizeDisplayValue(nestedValue)]),
+          );
         }
         return value;
       }
       function getPanelState(panel) {
         if (!panelStates.has(panel)) {
-          panelStates.set(panel, { currentGalleryImages: [], currentGalleryIndex: 0, currentGalleryBaseUrl: '', portraitClickListener: null });
+          panelStates.set(panel, {
+            currentGalleryImages: [],
+            currentGalleryIndex: 0,
+            currentGalleryBaseUrl: '',
+            portraitClickListener: null,
+          });
         }
         return panelStates.get(panel);
       }
@@ -613,20 +662,22 @@
       }
       function displayRootError(message, details = '') {
         if (!root) return;
-        console.error('[变量状态栏] ' + message, details);
-        root.innerHTML = `<div class="status-feedback error"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${details}</p></details></div>`;
+        logError(message, details);
+        root.innerHTML = `<div class="status-feedback error"><h3>状态栏错误</h3><p>${escapeHtml(message)}</p><details><summary>详细信息</summary><p>${escapeHtml(details)}</p></details></div>`;
       }
       async function fetchData() {
         try {
+          logInfo('开始加载图片索引。');
           const sharedData = await window.JM_StatusDataManager.getData();
           imageIndex = sharedData.imageIndex;
           synonymMap = sharedData.synonymMap;
           fallbackAvatars = sharedData.fallbackAvatars;
           allKeywords = sharedData.allKeywords;
           keywordRegex = sharedData.keywordRegex;
+          logInfo(`图片索引加载完成：关键词 ${allKeywords.length} 个，默认头像 ${fallbackAvatars.length} 个。`);
           return true;
         } catch (error) {
-          console.warn('[变量状态栏] 核心图片数据加载失败，图片相关功能将退化。', error);
+          logWarn('图片索引加载失败，图片相关功能将退化。', error);
           imageIndex = {};
           synonymMap = {};
           fallbackAvatars = [];
@@ -636,7 +687,12 @@
         }
       }
       function splitCharacterNames(rawText) {
-        return uniq(String(rawText ?? '').split(/[，,、|/]/).map(name => name.trim()).filter(Boolean));
+        return uniq(
+          String(rawText ?? '')
+            .split(/[，,、|/]/)
+            .map(name => name.trim())
+            .filter(Boolean),
+        );
       }
       function normalizeListField(value) {
         if (Array.isArray(value)) {
@@ -645,24 +701,63 @@
         if (value === undefined || value === null) return [];
         const text = ensureString(value).trim();
         if (!text) return [];
-        return uniq(text.split(/[|｜\r\n]+/).map(item => item.trim()).filter(Boolean));
+        return uniq(
+          text
+            .split(/[|｜\r\n]+/)
+            .map(item => item.trim())
+            .filter(Boolean),
+        );
       }
       function loadCurrentCharacterNames() {
         try {
-          const latestMessage = getChatMessages(-1)?.[0]?.message ?? '';
-          const match = typeof latestMessage === 'string' ? latestMessage.match(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/) : null;
-          if (!match) return [];
-          return splitCharacterNames(match[2]);
+          const latestMessage = getChatMessages(-1)?.[0]?.message;
+          if (latestMessage === undefined || latestMessage === null) {
+            logWarn('未读取到最新楼层，显示“无当前角色”。');
+            return [];
+          }
+          if (typeof latestMessage !== 'string') {
+            logWarn('最新楼层内容不是字符串，显示“无当前角色”。', latestMessage);
+            return [];
+          }
+          const match = latestMessage.match(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/);
+          if (!match) {
+            logWarn('最新楼层未找到 <当前人物>/<当前角色> 标签，显示“无当前角色”。');
+            return [];
+          }
+          const names = splitCharacterNames(match[2]);
+          if (names.length === 0) {
+            logWarn('当前角色标签为空，显示“无当前角色”。');
+            return [];
+          }
+          logInfo(`读取当前角色：${names.join('、')}。`);
+          return names;
         } catch (error) {
-          console.warn('[变量状态栏] 读取最新楼层失败:', error);
+          logError('读取最新楼层失败，显示“无当前角色”。', error);
           return [];
         }
       }
       function loadStatData() {
         try {
-          return ensureObject(_.get(getVariables({ type: 'chat' }), 'stat_data', {}));
+          const chatVariables = ensureObject(getVariables({ type: 'chat' }));
+          const rawStatData = _.get(chatVariables, 'stat_data', undefined);
+          if (rawStatData === undefined) {
+            logWarn('chat 变量中没有 stat_data，当前角色变量无法读取。');
+            return {};
+          }
+          if (!_.isPlainObject(rawStatData)) {
+            logWarn('chat.stat_data 不是对象，已按空变量处理。', rawStatData);
+            return {};
+          }
+          const statKeys = Object.keys(rawStatData);
+          const characterData = ensureObject(safeGet(rawStatData, '角色数据', {}));
+          if (statKeys.length === 0) {
+            logWarn('chat.stat_data 为空，当前角色变量无法读取。');
+          } else {
+            logInfo(`已读取 chat.stat_data：顶层 ${statKeys.length} 项，角色数据 ${Object.keys(characterData).length} 项。`);
+          }
+          return rawStatData;
         } catch (error) {
-          console.warn('[变量状态栏] 读取 chat 变量失败:', error);
+          logError('读取 chat 变量失败，当前角色变量无法读取。', error);
           return {};
         }
       }
@@ -699,8 +794,15 @@
       function findImagesByKeyword(textToSearch) {
         if (!textToSearch || typeof textToSearch !== 'string') return [];
         const preliminaryMatches = allKeywords.filter(keyword => textToSearch.includes(keyword));
-        const preciseMatches = preliminaryMatches.filter(shortMatch => !preliminaryMatches.some(longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch)));
-        const mainKeywordMatches = preciseMatches.map(match => ({ keyword: synonymMap[match] || match, index: textToSearch.indexOf(match) })).sort((a, b) => a.index - b.index);
+        const preciseMatches = preliminaryMatches.filter(
+          shortMatch =>
+            !preliminaryMatches.some(
+              longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch),
+            ),
+        );
+        const mainKeywordMatches = preciseMatches
+          .map(match => ({ keyword: synonymMap[match] || match, index: textToSearch.indexOf(match) }))
+          .sort((a, b) => a.index - b.index);
         let foundImages = [];
         mainKeywordMatches.forEach(match => {
           const imageList = imageIndex[match.keyword];
@@ -716,7 +818,11 @@
           keywordRegex.lastIndex = 0;
           if (!keywordRegex.test(originalText)) return;
           keywordRegex.lastIndex = 0;
-          el.innerHTML = originalText.replace(keywordRegex, match => (imageIndex[synonymMap[match] || match] ? `<a href="#" class="image-link" data-keyword="${match}">${match}</a>` : match));
+          el.innerHTML = originalText.replace(keywordRegex, match =>
+            imageIndex[synonymMap[match] || match]
+              ? `<a href="#" class="image-link" data-keyword="${match}">${match}</a>`
+              : match,
+          );
         });
       }
       function parseStat(statValue) {
@@ -760,10 +866,16 @@
           : String(value);
         return `<div class="stat-box"><div class="stat-label">${label}</div><div class="stat-value">${valueHtml}</div></div>`;
       };
-      const renderNarrative = (label, value) => `<div class="narrative-block"><span class="narrative-label">${label}</span><p class="narrative-content">${String(value)}</p></div>`;
+      const renderNarrative = (label, value) =>
+        `<div class="narrative-block"><span class="narrative-label">${label}</span><p class="narrative-content">${String(value)}</p></div>`;
       function renderList(label, items) {
         if (!Array.isArray(items) || items.length === 0) return '';
-        const itemsHtml = items.map(item => `<li class="modifications-item"><span class="details-value" data-keyword="${item}">${item}</span></li>`).join('');
+        const itemsHtml = items
+          .map(
+            item =>
+              `<li class="modifications-item"><span class="details-value" data-keyword="${item}">${item}</span></li>`,
+          )
+          .join('');
         return `<div class="details-block"><div class="details-header">${label}</div><ul class="modifications-list">${itemsHtml}</ul></div>`;
       }
       function replaceDelimitedCharacterName(content, oldName, newName) {
@@ -780,12 +892,15 @@
       }
       function replaceCurrentCharacterNameInMessage(message, oldName, newName) {
         let replaced = false;
-        const updatedMessage = String(message ?? '').replace(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/g, (full, tagName, content) => {
-          const result = replaceDelimitedCharacterName(content, oldName, newName);
-          if (!result.replaced) return full;
-          replaced = true;
-          return `<当前${tagName}>${result.content}</当前${tagName}>`;
-        });
+        const updatedMessage = String(message ?? '').replace(
+          /<当前(人物|角色)>([\s\S]*?)<\/当前\1>/g,
+          (full, tagName, content) => {
+            const result = replaceDelimitedCharacterName(content, oldName, newName);
+            if (!result.replaced) return full;
+            replaced = true;
+            return `<当前${tagName}>${result.content}</当前${tagName}>`;
+          },
+        );
         return { message: updatedMessage, replaced };
       }
       function renameKeyInObject(target, oldKey, newKey, newValue) {
@@ -808,8 +923,19 @@
       }
       function isCharacterLikeEntry(value) {
         if (!_.isPlainObject(value)) return false;
-        return ['Status', 'Outfit', 'BodyDetails', 'Location', 'Time', 'Affection', 'Libido', 'Thoughts', 'RecentSex', 'Modifications', 'ModificationsAndRestraints']
-          .some(key => Object.prototype.hasOwnProperty.call(value, key));
+        return [
+          'Status',
+          'Outfit',
+          'BodyDetails',
+          'Location',
+          'Time',
+          'Affection',
+          'Libido',
+          'Thoughts',
+          'RecentSex',
+          'Modifications',
+          'ModificationsAndRestraints',
+        ].some(key => Object.prototype.hasOwnProperty.call(value, key));
       }
       function removeLegacyRootCharacterDuplicates(statData, duplicateCandidates, preservedKeys = []) {
         const nextStatData = ensureObject(statData);
@@ -847,7 +973,7 @@
         try {
           return getChatMessages(-1)?.[0] || null;
         } catch (error) {
-          console.warn('[变量状态栏] 读取最新楼层失败:', error);
+          logWarn('读取最新楼层失败。', error);
           return null;
         }
       }
@@ -866,7 +992,7 @@
         try {
           await updatePortrait(panel, data);
         } catch (error) {
-          console.error(`[变量状态栏 ${data.Name}] 头像更新失败:`, error);
+          logError(`${data.Name} 头像更新失败。`, error);
         }
         linkifyAllText(panel);
       }
@@ -881,11 +1007,17 @@
           return { synced: false, reason: '未在最新楼层的 <当前人物>/<当前角色> 标签中找到当前名字。' };
         }
         if (messageReplacement.message !== originalText) {
-          await setChatMessages([{ message_id: latestMessage.message_id, message: messageReplacement.message }], { refresh: 'affected' });
+          await setChatMessages([{ message_id: latestMessage.message_id, message: messageReplacement.message }], {
+            refresh: 'affected',
+          });
         }
         return { synced: true };
       }
-      async function updateCharacterInfo(panel, data, { newName, newRawName = newName, newOccupation, syncLatestMessage = false }) {
+      async function updateCharacterInfo(
+        panel,
+        data,
+        { newName, newRawName = newName, newOccupation, syncLatestMessage = false },
+      ) {
         const oldName = ensureString(data.Name).trim();
         const oldRawName = ensureString(data.RawName || data.Name).trim();
         const oldOccupation = ensureString(safeGet(data, 'Status.Occupation', '')).trim();
@@ -893,23 +1025,31 @@
         const hasRawNameChanged = newRawName !== oldRawName;
         if (!hasDisplayNameChanged && !hasRawNameChanged && newOccupation === oldOccupation) return;
         const originalVariables = _.cloneDeep(getVariables({ type: 'chat' }));
-        buildUpdatedStatData(ensureObject(_.get(originalVariables, 'stat_data', {})), oldRawName, newRawName, newOccupation);
+        buildUpdatedStatData(
+          ensureObject(_.get(originalVariables, 'stat_data', {})),
+          oldRawName,
+          newRawName,
+          newOccupation,
+        );
         try {
-          updateVariablesWith(variables => {
-            const nextVariables = _.cloneDeep(ensureObject(variables));
-            nextVariables.stat_data = buildUpdatedStatData(
-              ensureObject(_.get(nextVariables, 'stat_data', {})),
-              oldRawName,
-              newRawName,
-              newOccupation,
-            );
-            return nextVariables;
-          }, { type: 'chat' });
+          updateVariablesWith(
+            variables => {
+              const nextVariables = _.cloneDeep(ensureObject(variables));
+              nextVariables.stat_data = buildUpdatedStatData(
+                ensureObject(_.get(nextVariables, 'stat_data', {})),
+                oldRawName,
+                newRawName,
+                newOccupation,
+              );
+              return nextVariables;
+            },
+            { type: 'chat' },
+          );
         } catch (error) {
           try {
             replaceVariables(originalVariables, { type: 'chat' });
           } catch (rollbackError) {
-            console.error('[变量状态栏] 回滚变量失败:', rollbackError);
+            logError('回滚变量失败。', rollbackError);
           }
           throw error;
         }
@@ -931,7 +1071,7 @@
           try {
             await migratePortraitStorage(oldName, newName);
           } catch (error) {
-            console.error('[变量状态栏] 迁移头像缓存失败:', error);
+            logError('迁移头像缓存失败。', error);
           }
         }
         data.RawName = newRawName;
@@ -943,7 +1083,7 @@
           scheduleRefresh();
           return;
         }
-        console.warn('[变量状态栏] ' + syncWarning);
+        logWarn(syncWarning);
         alert(`人物变量已修改，但最新楼层文本未同步：${syncWarning}`);
       }
       async function editCharacterName(panel, data) {
@@ -956,7 +1096,12 @@
           alert('名字不能为空。');
           return;
         }
-        await updateCharacterInfo(panel, data, { newName, newRawName: newName, newOccupation: oldOccupation, syncLatestMessage: true });
+        await updateCharacterInfo(panel, data, {
+          newName,
+          newRawName: newName,
+          newOccupation: oldOccupation,
+          syncLatestMessage: true,
+        });
       }
       async function editCharacterOccupation(panel, data) {
         const oldName = ensureString(data.Name).trim();
@@ -968,7 +1113,18 @@
         await updateCharacterInfo(panel, data, { newName: oldName, newRawName: oldRawName, newOccupation });
       }
       function generateDynamicTabsAndContent(panel, data) {
-        const excludedKeys = new Set(['RawName', 'Name', 'Location', 'Time', 'Affection', 'Libido', 'Thoughts', 'RecentSex', 'ModificationsAndRestraints', 'Modifications']);
+        const excludedKeys = new Set([
+          'RawName',
+          'Name',
+          'Location',
+          'Time',
+          'Affection',
+          'Libido',
+          'Thoughts',
+          'RecentSex',
+          'ModificationsAndRestraints',
+          'Modifications',
+        ]);
         const panelKey = panel.dataset.panelKey || '0';
         let tabsHtml = '<div class="tabs">';
         let contentsHtml = '';
@@ -982,9 +1138,10 @@
             contentsHtml += `<div id="${tabId}" class="tab-content ${isActive}"><ul class="details-list">`;
             for (const subKey in data[key]) {
               const label = tabInfo.labels[subKey] || subKey;
-              const valueHtml = key === 'Status' && subKey === 'Occupation'
-                ? `<span class="inline-editable-value"><span class="details-value">${data[key][subKey]}</span>${OCCUPATION_EDIT_TRIGGER_HTML}</span>`
-                : `<span class="details-value">${data[key][subKey]}</span>`;
+              const valueHtml =
+                key === 'Status' && subKey === 'Occupation'
+                  ? `<span class="inline-editable-value"><span class="details-value">${data[key][subKey]}</span>${OCCUPATION_EDIT_TRIGGER_HTML}</span>`
+                  : `<span class="details-value">${data[key][subKey]}</span>`;
               contentsHtml += `<li class="details-item"><span class="details-label">${label}</span>${valueHtml}</li>`;
             }
             contentsHtml += '</ul></div>';
@@ -1000,7 +1157,11 @@
         const headerFields = new Set(['RawName', 'Name', 'Location', 'Time']);
         const itemsToRender = Object.keys(data)
           .filter(key => (!headerFields.has(key) && typeof data[key] !== 'object') || Array.isArray(data[key]))
-          .map(key => ({ key, label: DYNAMIC_CONTENT_CONFIG[key] ? DYNAMIC_CONTENT_CONFIG[key].label : key, value: data[key] }));
+          .map(key => ({
+            key,
+            label: DYNAMIC_CONTENT_CONFIG[key] ? DYNAMIC_CONTENT_CONFIG[key].label : key,
+            value: data[key],
+          }));
         const statItems = [];
         let dynamicHtml = '';
         itemsToRender.forEach(item => {
@@ -1092,13 +1253,18 @@
             return;
           }
         } catch (error) {
-          console.error('从 IndexedDB 加载头像失败:', error);
+          logError('从 IndexedDB 加载头像失败。', error);
         }
         const textToSearch = `${safeGet(data, 'Status.Occupation', '')} ${safeGet(data, 'Name', '')}`.trim();
         let matchedImages = [];
         if (textToSearch) {
           let potentialKeywords = allKeywords.filter(keyword => textToSearch.includes(keyword));
-          potentialKeywords = potentialKeywords.filter(shortMatch => !potentialKeywords.some(longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch)));
+          potentialKeywords = potentialKeywords.filter(
+            shortMatch =>
+              !potentialKeywords.some(
+                longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch),
+              ),
+          );
           const portraitKeywords = potentialKeywords.filter(keyword => {
             const mainKeyword = synonymMap[keyword] || keyword;
             const imageList = imageIndex[mainKeyword] || [];
@@ -1114,7 +1280,8 @@
           keywordsToUse.forEach(keyword => {
             const mainKeyword = synonymMap[keyword] || keyword;
             const imageList = imageIndex[mainKeyword] || [];
-            if (Array.isArray(imageList)) matchedImages = matchedImages.concat(imageList.filter(img => img !== '非头像.abc'));
+            if (Array.isArray(imageList))
+              matchedImages = matchedImages.concat(imageList.filter(img => img !== '非头像.abc'));
           });
           matchedImages = uniq(matchedImages);
         }
@@ -1126,7 +1293,8 @@
         }
         if (fallbackAvatars.length > 0) {
           const faceBaseUrl = GITHUB_BASE_URL.replace('/jm/', '/face/');
-          const fallbackAvatar = fallbackAvatars[getDeterministicRandomIndex(charName || 'default', fallbackAvatars.length)];
+          const fallbackAvatar =
+            fallbackAvatars[getDeterministicRandomIndex(charName || 'default', fallbackAvatars.length)];
           portraitImg.src = faceBaseUrl + fallbackAvatar;
           state.portraitClickListener = () => openGallery(panel, [fallbackAvatar], 0, faceBaseUrl);
           portraitImg.addEventListener('click', state.portraitClickListener);
@@ -1207,28 +1375,34 @@
               canvas.height = height;
               const ctx = canvas.getContext('2d');
               ctx.drawImage(img, 0, 0, width, height);
-              canvas.toBlob(async blob => {
-                if (!blob) {
-                  alert('图片处理失败，无法创建 Blob 对象。');
-                  uploadInput.value = '';
-                  return;
-                }
-                if (blob.size > 800 * 1024) {
-                  alert('压缩后的图片仍然太大。请选择一张更小的图片。');
-                  uploadInput.value = '';
-                  return;
-                }
-                try {
-                  await idbHelper.set(storageKey, blob);
-                  await updatePortrait(panel, data);
-                  resetTrigger.style.display = 'flex';
-                } catch (error) {
-                  console.error('保存头像到 IndexedDB 失败:', error);
-                  alert(error.name === 'QuotaExceededError' ? '浏览器存储空间不足。' : `头像保存失败: ${error.message}`);
-                } finally {
-                  uploadInput.value = '';
-                }
-              }, 'image/jpeg', 0.7);
+              canvas.toBlob(
+                async blob => {
+                  if (!blob) {
+                    alert('图片处理失败，无法创建 Blob 对象。');
+                    uploadInput.value = '';
+                    return;
+                  }
+                  if (blob.size > 800 * 1024) {
+                    alert('压缩后的图片仍然太大。请选择一张更小的图片。');
+                    uploadInput.value = '';
+                    return;
+                  }
+                  try {
+                    await idbHelper.set(storageKey, blob);
+                    await updatePortrait(panel, data);
+                    resetTrigger.style.display = 'flex';
+                  } catch (error) {
+                    logError('保存头像到 IndexedDB 失败。', error);
+                    alert(
+                      error.name === 'QuotaExceededError' ? '浏览器存储空间不足。' : `头像保存失败: ${error.message}`,
+                    );
+                  } finally {
+                    uploadInput.value = '';
+                  }
+                },
+                'image/jpeg',
+                0.7,
+              );
             };
             img.onerror = () => {
               alert('无法加载所选文件，可能不是有效的图片格式。');
@@ -1272,7 +1446,7 @@
             event.preventDefault();
             event.stopPropagation();
             editCharacterName(panel, data).catch(error => {
-              console.error('[变量状态栏] 编辑名字失败:', error);
+              logError('编辑名字失败。', error);
               alert(error?.message || '保存失败，请重试。');
             });
           });
@@ -1282,7 +1456,7 @@
             event.preventDefault();
             event.stopPropagation();
             editCharacterOccupation(panel, data).catch(error => {
-              console.error('[变量状态栏] 编辑职业失败:', error);
+              logError('编辑职业失败。', error);
               alert(error?.message || '保存失败，请重试。');
             });
           });
@@ -1296,7 +1470,8 @@
           });
           gallery.querySelector('.gallery-prev').addEventListener('click', () => {
             const state = getPanelState(panel);
-            state.currentGalleryIndex = (state.currentGalleryIndex - 1 + state.currentGalleryImages.length) % state.currentGalleryImages.length;
+            state.currentGalleryIndex =
+              (state.currentGalleryIndex - 1 + state.currentGalleryImages.length) % state.currentGalleryImages.length;
             updateGalleryImage(panel);
           });
           gallery.querySelector('.gallery-next').addEventListener('click', () => {
@@ -1346,10 +1521,12 @@
             startX = e.pageX - lastX;
             startY = e.pageY - lastY;
           });
-          ['mouseleave', 'mouseup'].forEach(eventName => galleryImage.addEventListener(eventName, () => {
-            isDragging = false;
-            galleryImage.classList.remove('dragging');
-          }));
+          ['mouseleave', 'mouseup'].forEach(eventName =>
+            galleryImage.addEventListener(eventName, () => {
+              isDragging = false;
+              galleryImage.classList.remove('dragging');
+            }),
+          );
           galleryImage.addEventListener('mousemove', e => {
             if (!isDragging) return;
             e.preventDefault();
@@ -1366,7 +1543,10 @@
               startY = e.touches[0].pageY - lastY;
             } else if (e.touches.length === 2) {
               isDragging = false;
-              lastTouchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+              lastTouchDistance = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY,
+              );
             }
           });
           galleryImage.addEventListener('touchend', () => {
@@ -1405,12 +1585,17 @@
           if (name) collapsedStateByName.set(name, panel.classList.contains('collapsed'));
         });
       }
-      const renderFeedback = (message, type = '') => `<div class="status-feedback${type ? ` ${type}` : ''}">${message}</div>`;
+      function renderFeedback(title, messages = [], type = '') {
+        const messageList = (Array.isArray(messages) ? messages : [messages]).filter(Boolean);
+        const detailsHtml = messageList.map(message => `<div>${escapeHtml(message)}</div>`).join('');
+        return `<div class="status-feedback${type ? ` ${type}` : ''}"><strong>${escapeHtml(title)}</strong>${detailsHtml}</div>`;
+      }
       async function refreshPanels() {
         if (!root) return;
         persistCollapsedStates();
         const names = loadCurrentCharacterNames();
         const statData = loadStatData();
+        const statDataIsEmpty = Object.keys(statData).length === 0;
         const panelDataList = [];
         const missingNames = [];
         names.forEach(name => {
@@ -1419,27 +1604,67 @@
           else missingNames.push(name);
         });
         let rootHtml = '';
-        if (missingNames.length > 0) rootHtml += renderFeedback(`未找到变量人物：${missingNames.join('、')}`, 'warning');
+        if (names.length === 0) {
+          rootHtml += renderFeedback(
+            '无当前角色',
+            [
+              '最新楼层没有可用的 <当前人物>...</当前人物> 或 <当前角色>...</当前角色> 标签。',
+              '如果控制台没有“脚本开始初始化”日志，通常是正则没有加载或占位符没有被替换。',
+            ],
+            'warning',
+          );
+          logWarn('刷新完成：无当前角色，仅显示提示条。');
+        } else if (missingNames.length > 0) {
+          rootHtml += renderFeedback(
+            '当前角色变量缺失',
+            [
+              `当前角色：${names.join('、')}`,
+              statDataIsEmpty ? 'chat.stat_data 为空或读取失败。' : `未找到变量：${missingNames.join('、')}`,
+            ],
+            'warning',
+          );
+          logWarn(
+            `刷新发现当前角色变量缺失：${missingNames.join('、')}。`,
+            statDataIsEmpty ? 'chat.stat_data 为空或读取失败。' : statData,
+          );
+        }
         if (panelDataList.length === 0) {
-          rootHtml += renderFeedback(names.length === 0 ? '未找到当前人物。请在最新楼层加入 <当前人物>人物名</当前人物>。' : '未找到当前人物对应的变量数据。');
+          if (names.length > 0 && missingNames.length === 0) {
+            rootHtml += renderFeedback('当前角色变量缺失', ['当前角色存在，但没有可渲染的变量数据。'], 'warning');
+            logWarn('刷新完成：当前角色存在，但没有可渲染的变量数据。');
+          }
           root.innerHTML = rootHtml;
           return;
         }
-        rootHtml += panelDataList.map((data, index) => `<div class="status-container jm-state-panel" data-panel-key="${index}" data-character-name="${data.Name}"></div>`).join('');
+        rootHtml += panelDataList
+          .map(
+            (data, index) =>
+              `<div class="status-container jm-state-panel" data-panel-key="${index}" data-character-name="${data.Name}"></div>`,
+          )
+          .join('');
         root.innerHTML = rootHtml;
         const panels = Array.from(root.querySelectorAll('.jm-state-panel'));
         panels.forEach((panel, index) => {
           updatePanel(panel, panelDataList[index]);
           setupEventListeners(panel, panelDataList[index]);
         });
-        await Promise.all(panels.map((panel, index) => updatePortrait(panel, panelDataList[index]).catch(error => console.error(`[变量状态栏 ${panelDataList[index].Name}] 头像更新失败:`, error))));
+        await Promise.all(
+          panels.map((panel, index) =>
+            updatePortrait(panel, panelDataList[index]).catch(error =>
+              logError(`${panelDataList[index].Name} 头像更新失败。`, error),
+            ),
+          ),
+        );
         panels.forEach(panel => linkifyAllText(panel));
+        logInfo(`刷新完成：渲染 ${panelDataList.length} 个状态栏。`);
       }
       function scheduleRefresh() {
         if (refreshTimer) clearTimeout(refreshTimer);
         refreshTimer = window.setTimeout(() => {
           refreshTimer = null;
-          refreshPanels().catch(error => displayRootError('刷新状态栏失败。', error?.stack || error?.message || String(error)));
+          refreshPanels().catch(error =>
+            displayRootError('刷新状态栏失败。', error?.stack || error?.message || String(error)),
+          );
         }, 150);
       }
       function setupGlobalEventListeners() {
@@ -1448,13 +1673,16 @@
         eventOn(tavern_events.MESSAGE_SWIPED, () => scheduleRefresh());
         eventOn(tavern_events.CHAT_CHANGED, () => scheduleRefresh());
         eventOn('era:writeDone', () => scheduleRefresh());
+        logInfo('已监听消息接收、更新、切换和 era 写入事件。');
       }
       async function init() {
+        logInfo('脚本开始初始化：已确认正则替换触发；如果完全没有这条日志，请检查正则是否加载。');
         root = document.querySelector('.jm-state-panel-list');
         if (!root) throw new Error('未找到变量状态栏根容器。');
         await fetchData();
         await refreshPanels();
         setupGlobalEventListeners();
+        logInfo('初始化完成。');
       }
       $(() => {
         errorCatched(init)();
@@ -1462,3 +1690,5 @@
     </script>
   </body>
 </html>
+
+```
