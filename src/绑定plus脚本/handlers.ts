@@ -1643,6 +1643,58 @@ export function deleteContextBinding(
   return saveContextBindings(nextBindings);
 }
 
+export function deleteContextBindingById(bindingId: string): boolean {
+  const normalizedId = ensureString(bindingId).trim();
+  if (!normalizedId) {
+    return false;
+  }
+
+  const bindings = loadContextBindings();
+  const nextBindings = bindings.filter(binding => binding.id !== normalizedId);
+  if (nextBindings.length === bindings.length) {
+    return false;
+  }
+  return saveContextBindings(nextBindings);
+}
+
+function isChatContextBindingMatchedByFileName(binding: PersonaContextBinding, chatFileName: string): boolean {
+  const normalizedChatFileName = ensureString(chatFileName).trim();
+  if (binding.scope !== 'chat' || !normalizedChatFileName) {
+    return false;
+  }
+
+  const targetId = ensureString(binding.targetId).trim();
+  const targetName = ensureString(binding.targetName).trim();
+  const stableIdTarget = `chat:id:${normalizedChatFileName}`;
+  const stableNameTarget = `chat:name:${normalizedChatFileName}`;
+  const legacyTarget = `${normalizedChatFileName} ${targetName}`.trim();
+
+  return (
+    targetId === stableIdTarget ||
+    targetId === stableNameTarget ||
+    targetId === normalizedChatFileName ||
+    targetId === legacyTarget ||
+    targetName === normalizedChatFileName ||
+    targetId.startsWith(`${normalizedChatFileName} `)
+  );
+}
+
+export function deleteChatContextBindingsByFileName(chatFileName: string): PersonaContextBinding[] {
+  const normalizedChatFileName = ensureString(chatFileName).trim();
+  if (!normalizedChatFileName) {
+    return [];
+  }
+
+  const bindings = loadContextBindings();
+  const removedBindings = bindings.filter(binding => isChatContextBindingMatchedByFileName(binding, normalizedChatFileName));
+  if (removedBindings.length === 0) {
+    return [];
+  }
+
+  const nextBindings = bindings.filter(binding => !isChatContextBindingMatchedByFileName(binding, normalizedChatFileName));
+  return saveContextBindings(nextBindings) ? removedBindings : [];
+}
+
 export function loadBindingGroups(): BindingGroup[] {
   try {
     const raw = localStorage.getItem(PERSONA_BINDING_GROUPS_STORAGE_KEY);

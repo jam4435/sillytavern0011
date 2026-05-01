@@ -9,7 +9,12 @@
       "mcp__chrome-devtools__navigate_page",
       "mcp__chrome-devtools__list_network_requests",
       "WebSearch",
-      "mcp__chrome-devtools__new_page"
+      "mcp__chrome-devtools__new_page",
+      "Bash(curl -s -o \"f:/Develop/AI/sillytavern/src/无用/aa_models_rsc.txt\" -H \"User-Agent: Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://artificialanalysis.ai/models?_rsc=1ywbr\")",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(python verify_aa_ranking.py)",
+      "Bash(python extract_and_recalc.py)",
+      "Bash(python parse_models.py)"
     ]
   }
 }

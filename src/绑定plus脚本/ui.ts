@@ -10,7 +10,9 @@ import {
   buildContextBindingTarget,
   composePersonaDescription,
   deleteBindingGroup,
+  deleteChatContextBindingsByFileName,
   deleteContextBinding,
+  deleteContextBindingById,
   extractBaseDescriptionFromComposed,
   findContextBinding,
   findPersonaByAvatarId,
@@ -184,6 +186,13 @@ const PLUS_EVENT_DEFINITIONS: Array<Pick<PersonaPlusEventState, 'key' | 'label' 
     available:
       typeof eventOn === 'function' && typeof tavern_events !== 'undefined' && Boolean(tavern_events.CHAT_CHANGED),
     detail: '聊天切换的正式事件。',
+  },
+  {
+    key: 'official_chat_deleted',
+    label: '官方事件 CHAT_DELETED',
+    available:
+      typeof eventOn === 'function' && typeof tavern_events !== 'undefined' && Boolean(tavern_events.CHAT_DELETED),
+    detail: '聊天删除后清理绑定plus里的聊天绑定。',
   },
   {
     key: 'official_character_page_loaded',
@@ -482,6 +491,60 @@ function markPlusEventTriggered(key: string, detail: string): void {
   renderPlusBindingSection();
 }
 
+function getContextBindingDisplayLabel(binding: PersonaContextBinding): string {
+  const scopeLabel = binding.scope === 'chat' ? '聊天' : '角色';
+  return `${scopeLabel}「${binding.targetName || binding.targetId || binding.id}」`;
+}
+
+async function refreshAfterContextBindingDeleted(reason: string): Promise<void> {
+  syncActiveBindingScope();
+  renderToolbarSelectionSummary();
+  renderResourceDetailPages();
+  renderPlusBindingSection();
+
+  const currentContext = getRuntimeContext();
+  const applied = await applyPersonaPlusBindingsWithToast(
+    getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || '',
+    currentContext,
+    true,
+    `${reason}后应用当前绑定失败`,
+  );
+  if (!applied) {
+    return;
+  }
+
+  const currentPersona = getCurrentPersonaFromDOM();
+  if (currentPersona?.avatarId) {
+    await applyComposedDescriptionForAvatar(currentPersona.avatarId, `${reason}后自动同步`, {
+      errorToastTitle: `${reason}后同步 user人设失败`,
+    });
+  }
+}
+
+async function deleteContextBindingFromUi(bindingId: string): Promise<void> {
+  const normalizedId = (bindingId || '').trim();
+  const binding = loadContextBindings().find(item => item.id === normalizedId);
+  if (!binding) {
+    toastr.warning('未找到目标绑定，可能已经被清理');
+    renderPlusBindingSection();
+    renderResourceDetailPages();
+    return;
+  }
+
+  const label = getContextBindingDisplayLabel(binding);
+  if (!confirm(`确定删除${label}的绑定吗？`)) {
+    return;
+  }
+
+  if (!deleteContextBindingById(binding.id)) {
+    toastr.error('删除绑定失败');
+    return;
+  }
+
+  await refreshAfterContextBindingDeleted('删除绑定');
+  toastr.success(`已删除${label}的绑定`);
+}
+
 function scheduleContextRefresh(source: string, delayMs: number = 120): void {
   window.setTimeout(() => {
     void handleContextChanged(source);
@@ -529,6 +592,32 @@ function startPlusEventBridge(): void {
       markPlusEventTriggered('official_chat_changed', `收到 chat_id_changed: ${String(chatFileName || '空')}`);
       scheduleContextRefresh('tavern_events.CHAT_CHANGED');
     });
+
+    if (tavern_events.CHAT_DELETED) {
+      eventOn(tavern_events.CHAT_DELETED, chatFileName => {
+        const deletedChatFileName = String(chatFileName || '').trim();
+        const removedBindings = deleteChatContextBindingsByFileName(deletedChatFileName);
+        const detail = removedBindings.length
+          ? `收到 chat_deleted: ${deletedChatFileName || '空'}，已清理 ${removedBindings.length} 个聊天绑定`
+          : `收到 chat_deleted: ${deletedChatFileName || '空'}，未找到匹配聊天绑定`;
+        markPlusEventTriggered('official_chat_deleted', detail);
+
+        if (removedBindings.length > 0) {
+          console.info(
+            '绑定plus: 聊天删除后已清理聊天绑定',
+            removedBindings.map(binding => ({
+              id: binding.id,
+              targetId: binding.targetId,
+              targetName: binding.targetName,
+            })),
+          );
+          toastr.info(`已清理 ${removedBindings.length} 个已删除聊天的绑定`);
+          void refreshAfterContextBindingDeleted('清理已删除聊天绑定');
+        }
+
+        scheduleContextRefresh('tavern_events.CHAT_DELETED');
+      });
+    }
 
     eventOn(tavern_events.CHARACTER_PAGE_LOADED, () => {
       markPlusEventTriggered('official_character_page_loaded', '收到 character_page_loaded。');
@@ -711,6 +800,11 @@ function createPanelHtml(): string {
                       <div id="persona-plus-api-test-summary" class="text-note">未测试</div>
                       <div id="persona-plus-api-test-details" class="persona-plus-list"></div>
                       <div id="persona-plus-api-test-notes" class="persona-plus-list"></div>
+                    </div>
+                    <div>
+                      <div class="plus-probe-title">绑定存储管理</div>
+                      <div class="text-note">这里列出绑定plus保存的全部聊天/角色绑定。用于删除已经不存在的聊天残留绑定。</div>
+                      <div id="persona-context-binding-storage-list" class="persona-plus-list"></div>
                     </div>
                   </div>
 
@@ -1293,6 +1387,10 @@ function syncActiveDetailPageUi(): void {
 
   if (activeDetailPage === 'api') {
     void refreshApiConnectionCatalog({ quiet: true, rerender: true });
+  }
+
+  if (activeDetailPage === 'events') {
+    renderPlusBindingSection();
   }
 }
 
@@ -3200,6 +3298,23 @@ function createRegexSelectionDetailHtml(selectionId: string): string {
   );
 }
 
+function createContextBindingStorageItemHtml(binding: PersonaContextBinding): string {
+  return `
+    <div class="plus-probe-item persona-context-binding-storage-item" data-binding-id="${escapeHtml(binding.id)}">
+      <div class="persona-context-binding-storage-head">
+        <div>
+          <div class="persona-context-binding-storage-title">${escapeHtml(getContextBindingDisplayLabel(binding))}</div>
+          <div class="plus-probe-meta">${escapeHtml(summarizeContextBindingResources(binding.resources))}</div>
+        </div>
+        <button type="button" class="persona-btn small persona-context-binding-delete-btn" data-binding-id="${escapeHtml(binding.id)}">删除绑定</button>
+      </div>
+      <div class="plus-probe-meta">${escapeHtml(`targetId: ${binding.targetId || '空'}`)}</div>
+      <div class="plus-probe-meta">${escapeHtml(`bindingId: ${binding.id}`)}</div>
+      <div class="plus-probe-meta">${escapeHtml(`更新时间: ${formatTime(binding.updatedAt)}`)}</div>
+    </div>
+  `;
+}
+
 function createBindingItemSectionHtml(
   page: DetailPageKey,
   selectionId: string,
@@ -3222,7 +3337,10 @@ function createBindingItemSectionHtml(
         .map(
           binding => `
           <div class="persona-binding-item ${binding.scope === activeBindingScope && binding.targetId === activeBinding?.targetId ? 'active' : ''}">
-            <div class="persona-binding-item-title">${escapeHtml(binding.scope === 'chat' ? `聊天 · ${binding.targetName}` : `角色 · ${binding.targetName}`)}</div>
+            <div class="persona-binding-item-title-row">
+              <div class="persona-binding-item-title">${escapeHtml(binding.scope === 'chat' ? `聊天 · ${binding.targetName}` : `角色 · ${binding.targetName}`)}</div>
+              <button type="button" class="persona-btn small persona-context-binding-delete-btn" data-binding-id="${escapeHtml(binding.id)}">删除绑定</button>
+            </div>
             <div class="persona-binding-item-meta">${escapeHtml(summarizeContextBindingResources(binding.resources))}</div>
           </div>
         `,
@@ -4278,6 +4396,22 @@ function refreshCompatibilitySection(): void {
   }
 }
 
+function renderContextBindingStorageSection(): void {
+  const parentDoc = window.parent.document;
+  const $storageList = $('#persona-context-binding-storage-list', parentDoc);
+  if (!$storageList.length) {
+    return;
+  }
+
+  const bindings = loadContextBindings();
+  if (!bindings.length) {
+    $storageList.html('<div class="empty-list">当前没有保存任何聊天/角色绑定。</div>');
+    return;
+  }
+
+  $storageList.html(bindings.map(binding => createContextBindingStorageItemHtml(binding)).join(''));
+}
+
 function renderPlusBindingSection(report: PersonaPlusProbeReport | null = lastPlusProbeReport): void {
   const parentDoc = window.parent.document;
   const $contextSummary = $('#persona-plus-context-summary', parentDoc);
@@ -4289,6 +4423,8 @@ function renderPlusBindingSection(report: PersonaPlusProbeReport | null = lastPl
   if (!$contextSummary.length) {
     return;
   }
+
+  renderContextBindingStorageSection();
 
   const debugInfo = getRuntimeContextDebugInfo();
   const currentContext = report?.currentContext || debugInfo.context;
@@ -6302,6 +6438,15 @@ function bindPanelEvents(): void {
     .off(`click${PANEL_EVENT_NAMESPACE}`, '#binding-group-delete-btn')
     .on(`click${PANEL_EVENT_NAMESPACE}`, '#binding-group-delete-btn', () => {
       deleteActiveBindingGroup();
+    });
+
+  $(parentDoc)
+    .off(`click${PANEL_EVENT_NAMESPACE}`, '.persona-context-binding-delete-btn')
+    .on(`click${PANEL_EVENT_NAMESPACE}`, '.persona-context-binding-delete-btn', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const bindingId = (($(event.currentTarget).attr('data-binding-id') as string | undefined) || '').trim();
+      void deleteContextBindingFromUi(bindingId);
     });
 
   $(parentDoc)

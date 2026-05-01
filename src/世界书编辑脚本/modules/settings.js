@@ -1,4 +1,5 @@
 import { HIGHLIGHT_ACTIVE_ENTRIES_KEY, PINNED_ENTRIES_KEY } from './config.js';
+import { getLocalStorageItem, setLocalStorageItem } from './utils.js';
 
 const DEFAULT_COPY_CONFLICT_STRATEGY_KEY = 'lorebook-default-copy-conflict-strategy';
 const VALID_COPY_CONFLICT_STRATEGIES = new Set(['overwrite', 'rename', 'keep-original']);
@@ -248,49 +249,49 @@ function buildCompactAiWorkspaceSettings(settings = {}) {
 
 // 读取高亮激活条目的设置
 export function getHighlightActiveEntriesSetting() {
-  const saved = localStorage.getItem(HIGHLIGHT_ACTIVE_ENTRIES_KEY);
+  const saved = getLocalStorageItem(HIGHLIGHT_ACTIVE_ENTRIES_KEY);
   return saved === 'true';
 }
 
 // 保存高亮激活条目的设置
 export function setHighlightActiveEntriesSetting(enabled) {
-  localStorage.setItem(HIGHLIGHT_ACTIVE_ENTRIES_KEY, enabled ? 'true' : 'false');
+  setLocalStorageItem(HIGHLIGHT_ACTIVE_ENTRIES_KEY, enabled ? 'true' : 'false');
 }
 
 // 读取搜索栏显示设置
 export function getShowSearchBarSetting() {
-  const saved = localStorage.getItem('lorebook-show-search-bar');
+  const saved = getLocalStorageItem('lorebook-show-search-bar');
   return saved === null ? true : saved === 'true'; // 默认显示
 }
 
 // 保存搜索栏显示设置
 export function setShowSearchBarSetting(enabled) {
-  localStorage.setItem('lorebook-show-search-bar', enabled ? 'true' : 'false');
+  setLocalStorageItem('lorebook-show-search-bar', enabled ? 'true' : 'false');
 }
 
 // 读取全屏模式设置
 export function getFullscreenModeSetting() {
-  const saved = localStorage.getItem('lorebook-fullscreen-mode');
+  const saved = getLocalStorageItem('lorebook-fullscreen-mode');
   return saved === 'true';
 }
 
 // 保存全屏模式设置
 export function setFullscreenModeSetting(enabled) {
-  localStorage.setItem('lorebook-fullscreen-mode', enabled ? 'true' : 'false');
+  setLocalStorageItem('lorebook-fullscreen-mode', enabled ? 'true' : 'false');
 }
 
 export function getPcLayoutModeSetting() {
-  const saved = localStorage.getItem(PC_LAYOUT_MODE_KEY);
+  const saved = getLocalStorageItem(PC_LAYOUT_MODE_KEY);
   return VALID_PC_LAYOUT_MODES.has(saved) ? saved : 'master-detail';
 }
 
 export function setPcLayoutModeSetting(mode) {
   const normalized = VALID_PC_LAYOUT_MODES.has(mode) ? mode : 'master-detail';
-  localStorage.setItem(PC_LAYOUT_MODE_KEY, normalized);
+  setLocalStorageItem(PC_LAYOUT_MODE_KEY, normalized);
 }
 
 export function getPcMasterDetailSplitSetting() {
-  const saved = Number.parseFloat(localStorage.getItem(PC_MASTER_DETAIL_SPLIT_KEY) || '');
+  const saved = Number.parseFloat(getLocalStorageItem(PC_MASTER_DETAIL_SPLIT_KEY) || '');
   if (!Number.isFinite(saved)) {
     return 40;
   }
@@ -300,7 +301,7 @@ export function getPcMasterDetailSplitSetting() {
 export function setPcMasterDetailSplitSetting(width) {
   const numericWidth = Number.parseFloat(width);
   const normalized = Number.isFinite(numericWidth) ? Math.min(70, Math.max(25, numericWidth)) : 40;
-  localStorage.setItem(PC_MASTER_DETAIL_SPLIT_KEY, String(normalized));
+  setLocalStorageItem(PC_MASTER_DETAIL_SPLIT_KEY, String(normalized));
 }
 
 function getFloatingBubblePositionStorageKey(isMobileView = false) {
@@ -309,7 +310,7 @@ function getFloatingBubblePositionStorageKey(isMobileView = false) {
 
 export function getFloatingBubblePositionSetting(isMobileView = false) {
   const key = getFloatingBubblePositionStorageKey(isMobileView);
-  const saved = localStorage.getItem(key);
+  const saved = getLocalStorageItem(key);
   if (!saved) {
     return null;
   }
@@ -332,21 +333,21 @@ export function setFloatingBubblePositionSetting(position = {}, isMobileView = f
     return;
   }
 
-  localStorage.setItem(getFloatingBubblePositionStorageKey(isMobileView), JSON.stringify({ x, y }));
+  setLocalStorageItem(getFloatingBubblePositionStorageKey(isMobileView), JSON.stringify({ x, y }));
 }
 
 export function getDefaultCopyConflictStrategy() {
-  const saved = localStorage.getItem(DEFAULT_COPY_CONFLICT_STRATEGY_KEY);
+  const saved = getLocalStorageItem(DEFAULT_COPY_CONFLICT_STRATEGY_KEY);
   return VALID_COPY_CONFLICT_STRATEGIES.has(saved) ? saved : 'rename';
 }
 
 export function setDefaultCopyConflictStrategy(strategy) {
   const normalized = VALID_COPY_CONFLICT_STRATEGIES.has(strategy) ? strategy : 'rename';
-  localStorage.setItem(DEFAULT_COPY_CONFLICT_STRATEGY_KEY, normalized);
+  setLocalStorageItem(DEFAULT_COPY_CONFLICT_STRATEGY_KEY, normalized);
 }
 
 export function getAiWorkspaceSettings() {
-  const saved = localStorage.getItem(AI_WORKSPACE_SETTINGS_KEY);
+  const saved = getLocalStorageItem(AI_WORKSPACE_SETTINGS_KEY);
   if (!saved) {
     return _.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS);
   }
@@ -431,7 +432,7 @@ export function setAiWorkspaceSettings(settings = {}) {
   merged.direct = buildAiModeSettings(settings?.direct, modeFallback);
   merged.plan = buildAiModeSettings(settings?.plan, modeFallback);
   try {
-    localStorage.setItem(AI_WORKSPACE_SETTINGS_KEY, JSON.stringify(merged));
+    setLocalStorageItem(AI_WORKSPACE_SETTINGS_KEY, JSON.stringify(merged), { throwOnError: true });
   } catch (error) {
     const isQuotaExceeded = error?.name === 'QuotaExceededError' || error?.code === 22 || error?.code === 1014;
     if (!isQuotaExceeded) {
@@ -439,7 +440,7 @@ export function setAiWorkspaceSettings(settings = {}) {
     }
 
     const compact = buildCompactAiWorkspaceSettings(merged);
-    localStorage.setItem(AI_WORKSPACE_SETTINGS_KEY, JSON.stringify(compact));
+    setLocalStorageItem(AI_WORKSPACE_SETTINGS_KEY, JSON.stringify(compact), { throwOnError: true });
     console.warn('世界书 AI 工作区设置超出 localStorage 配额，已自动改为轻量保存。');
   }
 }
@@ -448,7 +449,7 @@ export function setAiWorkspaceSettings(settings = {}) {
 
 // 获取所有已置顶条目的数据结构
 function getAllPinnedEntries() {
-  const saved = localStorage.getItem(PINNED_ENTRIES_KEY);
+  const saved = getLocalStorageItem(PINNED_ENTRIES_KEY);
   try {
     // 尝试解析JSON，如果为空或无效则返回一个空对象
     return saved ? JSON.parse(saved) : {};
@@ -460,7 +461,7 @@ function getAllPinnedEntries() {
 
 // 保存整个置顶条目的数据结构
 function saveAllPinnedEntries(data) {
-  localStorage.setItem(PINNED_ENTRIES_KEY, JSON.stringify(data));
+  setLocalStorageItem(PINNED_ENTRIES_KEY, JSON.stringify(data));
 }
 
 /**

@@ -1541,6 +1541,27 @@ export const styles = `
     padding: 10px 12px;
   }
 
+  #${PERSONA_PANEL_ID} .persona-binding-item-title-row,
+  #${PERSONA_PANEL_ID} .persona-context-binding-storage-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  #${PERSONA_PANEL_ID} .persona-context-binding-storage-title {
+    font-size: 13px;
+    line-height: 1.45;
+    font-weight: 700;
+    color: #f8fafc;
+  }
+
+  #${PERSONA_PANEL_ID} .persona-context-binding-delete-btn.persona-btn.small {
+    width: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
   #${PERSONA_PANEL_ID} .persona-prompt-check-card,
   #${PERSONA_PANEL_ID} .persona-worldbook-entry-check-card {
     align-items: flex-start;

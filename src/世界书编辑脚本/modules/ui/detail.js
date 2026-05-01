@@ -585,8 +585,8 @@ function ensureDetailStyles() {
         display: flex;
         align-items: stretch;
         gap: 8px;
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.06);
+        background: var(--panel-md-entry-bg-color, var(--panel-entry-bg-color, rgba(255,255,255,0.03)));
+        border: 1px solid var(--panel-border-color, rgba(255,255,255,0.06));
         border-radius: 8px;
         padding: 6px;
         margin-bottom: 0;
@@ -595,7 +595,7 @@ function ensureDetailStyles() {
       #${LOREBOOK_PANEL_ID} .lorebook-entry-item.master-entry-item.is-current-detail {
         border-color: var(--panel-accent-color);
         box-shadow: 0 0 0 1px color-mix(in srgb, var(--panel-accent-color) 45%, transparent);
-        background: color-mix(in srgb, var(--panel-accent-color) 12%, rgba(255,255,255,0.03));
+        background: var(--panel-md-entry-current-bg-color, color-mix(in srgb, var(--panel-accent-color) 12%, rgba(255,255,255,0.03)));
       }
       #${LOREBOOK_PANEL_ID} .lorebook-entry-item.master-entry-item.entry-active {
         border-left: 4px solid #4CAF50;
@@ -643,8 +643,8 @@ function ensureDetailStyles() {
         padding: 6px 8px;
         margin: 4px 0 2px;
         border-radius: 10px;
-        background: rgba(255,255,255,0.045);
-        border: 1px solid rgba(255,255,255,0.08);
+        background: var(--panel-md-entry-bg-color, rgba(255,255,255,0.045));
+        border: 1px solid var(--panel-border-color, rgba(255,255,255,0.08));
       }
       #${LOREBOOK_PANEL_ID} .master-folder-toggle {
         display: flex;
@@ -704,8 +704,8 @@ function ensureDetailStyles() {
         align-items: center;
         justify-content: center;
         border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(255,255,255,0.06);
+        border: 1px solid var(--panel-border-color, rgba(255,255,255,0.12));
+        background: var(--panel-input-bg-color, rgba(255,255,255,0.06));
         color: inherit;
         cursor: pointer;
         padding: 0;
@@ -716,7 +716,7 @@ function ensureDetailStyles() {
         gap: 6px;
         margin: 0 0 8px 14px;
         padding-left: 14px;
-        border-left: 1px solid rgba(255,255,255,0.08);
+        border-left: 1px solid var(--panel-border-color, rgba(255,255,255,0.08));
       }
       #${LOREBOOK_PANEL_ID} .master-entry-toggle {
         margin: 0;
@@ -764,7 +764,7 @@ function ensureDetailStyles() {
       #${LOREBOOK_PANEL_ID} .master-entry-title-input:focus {
         outline: none;
         border-color: var(--panel-accent-color);
-        background: rgba(255,255,255,0.08);
+        background: var(--panel-input-focus-bg-color, rgba(255,255,255,0.08));
       }
       #${LOREBOOK_PANEL_ID} .master-entry-item.is-editing-title .master-entry-title {
         display: none;
@@ -796,7 +796,7 @@ function ensureDetailStyles() {
       #${LOREBOOK_PANEL_ID} .master-entry-title-edit-button:hover,
       #${LOREBOOK_PANEL_ID} .master-entry-title-edit-button:focus-visible {
         color: rgba(255,255,255,0.92);
-        background: rgba(255,255,255,0.08);
+        background: var(--panel-input-focus-bg-color, rgba(255,255,255,0.08));
       }
       #${LOREBOOK_PANEL_ID} .master-entry-meta {
         display: flex;
@@ -815,8 +815,8 @@ function ensureDetailStyles() {
         padding: 0 6px;
         min-height: 18px;
         border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(255,255,255,0.06);
+        border: 1px solid var(--panel-border-color, rgba(255,255,255,0.12));
+        background: var(--panel-input-bg-color, rgba(255,255,255,0.06));
         color: inherit;
         font-size: 0.92em;
         line-height: 1;
@@ -916,11 +916,11 @@ function ensureDetailStyles() {
       }
       #${LOREBOOK_PANEL_ID} .detail-row-flags-integrated {
         padding-top: 2px;
-        border-top: 1px solid rgba(255,255,255,0.06);
+        border-top: 1px solid var(--panel-border-color, rgba(255,255,255,0.06));
       }
       #${LOREBOOK_PANEL_ID} .detail-section {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.06);
+        background: var(--panel-entry-bg-color, rgba(255,255,255,0.03));
+        border: 1px solid var(--panel-border-color, rgba(255,255,255,0.06));
         border-radius: 10px;
         padding: 14px;
       }
@@ -970,11 +970,18 @@ function ensureDetailStyles() {
       #${LOREBOOK_PANEL_ID} .detail-content-textarea {
         width: 100%;
         border-radius: 8px;
-        border: 1px solid rgba(255,255,255,0.08);
-        background: rgba(0,0,0,0.22);
+        border: 1px solid var(--panel-border-color, rgba(255,255,255,0.08));
+        background: var(--panel-input-bg-color, rgba(0,0,0,0.22));
         color: inherit;
         padding: 10px 12px;
         box-sizing: border-box;
+      }
+      #${LOREBOOK_PANEL_ID} .detail-field input:focus,
+      #${LOREBOOK_PANEL_ID} .detail-field select:focus,
+      #${LOREBOOK_PANEL_ID} .detail-content-textarea:focus {
+        outline: none;
+        border-color: var(--panel-accent-color);
+        background: var(--panel-input-focus-bg-color, rgba(0,0,0,0.3));
       }
       #${LOREBOOK_PANEL_ID} .detail-field-inline input,
       #${LOREBOOK_PANEL_ID} .detail-field-inline select {
@@ -1001,8 +1008,8 @@ function ensureDetailStyles() {
         gap: 8px;
       }
       #${LOREBOOK_PANEL_ID} .detail-inline-button {
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(255,255,255,0.06);
+        border: 1px solid var(--panel-border-color, rgba(255,255,255,0.12));
+        background: var(--panel-input-bg-color, rgba(255,255,255,0.06));
         color: inherit;
         border-radius: 999px;
         padding: 6px 10px;
@@ -1101,10 +1108,10 @@ function ensureDetailStyles() {
         max-width: none;
         padding: 4px 10px 4px 28px;
         margin: 0;
-        border: 1px solid #555;
+        border: 1px solid var(--panel-border-color, #555);
         border-radius: 15px;
-        background-color: var(--search-input-bg-color, #333);
-        color: #eee;
+        background-color: var(--panel-input-bg-color, var(--search-input-bg-color, #333));
+        color: var(--panel-text-color, #eee);
         font-size: 0.85em;
         position: relative;
         z-index: 2;
@@ -1112,8 +1119,8 @@ function ensureDetailStyles() {
       }
       #${LOREBOOK_PANEL_ID} .lorebook-title.is-master-layout .lorebook-search-input:focus {
         outline: none;
-        border-color: #7a4abe;
-        background-color: #3a3a3a;
+        border-color: var(--panel-accent-color, #7a4abe);
+        background-color: var(--panel-input-focus-bg-color, #3a3a3a);
         box-shadow: none;
       }
       #${LOREBOOK_PANEL_ID} .lorebook-title.is-master-layout .lorebook-search-icon {
@@ -1173,8 +1180,8 @@ function ensureDetailStyles() {
         display: contents;
       }
       #${LOREBOOK_PANEL_ID} .lorebook-title-menu-button {
-        border: 1px solid rgba(255,255,255,0.08);
-        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--panel-border-color, rgba(255,255,255,0.08));
+        background: var(--panel-input-bg-color, rgba(255,255,255,0.05));
         color: inherit;
         border-radius: 8px;
         width: 30px;
@@ -1188,8 +1195,8 @@ function ensureDetailStyles() {
         top: calc(100% + 6px);
         min-width: 220px;
         z-index: 6;
-        background: rgba(40,40,40,0.98);
-        border: 1px solid rgba(255,255,255,0.08);
+        background: var(--panel-dropdown-bg-color, rgba(40,40,40,0.98));
+        border: 1px solid var(--panel-border-color, rgba(255,255,255,0.08));
         border-radius: 10px;
         padding: 8px;
         box-shadow: 0 12px 28px rgba(0,0,0,0.35);
