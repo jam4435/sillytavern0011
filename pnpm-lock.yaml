@@ -12,8 +12,13 @@ importers:
         specifier: 8.0.0-beta.25
         version: 8.0.0-beta.25(@types/react@19.2.14)(pixi.js@8.18.1)(react@19.2.5)
       '@vueuse/components':
+<<<<<<< HEAD
         specifier: ^14.2.1
         version: 14.2.1(vue@3.5.33(typescript@6.0.0-dev.20250807))
+=======
+        specifier: ^14.3.0
+        version: 14.3.0(vue@3.5.33(typescript@6.0.0-dev.20250807))
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
       '@vueuse/core':
         specifier: ^13.9.0
         version: 13.9.0(vue@3.5.33(typescript@6.0.0-dev.20250807))
@@ -56,9 +61,12 @@ importers:
       lodash:
         specifier: ^4.18.1
         version: 4.18.1
+<<<<<<< HEAD
       lucide-react:
         specifier: ^1.14.0
         version: 1.14.0(react@19.2.5)
+=======
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
       pinia:
         specifier: ^3.0.4
         version: 3.0.4(typescript@6.0.0-dev.20250807)(vue@3.5.33(typescript@6.0.0-dev.20250807))
@@ -982,8 +990,13 @@ packages:
   '@vue/shared@3.5.33':
     resolution: {integrity: sha512-5vR2QIlmaLG77Ygd4pMP6+SGQ5yox9VhtnbDWTy9DzMzdmeLxZ1QqxrywEZ9sa1AVubfIJyaCG3ytyWU81ufcQ==}
 
+<<<<<<< HEAD
   '@vueuse/components@14.2.1':
     resolution: {integrity: sha512-wB0SvwJ22mNm1hWCMI1wTWz4x55nDTugT5RIg/KCwlWc1vITWL6ry5VTU3SQzsMD2XcazJK8Be1siIsrBb/Vcw==}
+=======
+  '@vueuse/components@14.3.0':
+    resolution: {integrity: sha512-jnrJrecSfa8H+G6wtAwsCnMtKbKZDSpu5JZDuulZikWrHb6uuS5SyXP6M2b79tofxipm78VWDSzW+58pu1yglA==}
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
     peerDependencies:
       vue: ^3.5.0
 
@@ -995,8 +1008,13 @@ packages:
     peerDependencies:
       vue: ^3.5.0
 
+<<<<<<< HEAD
   '@vueuse/core@14.2.1':
     resolution: {integrity: sha512-3vwDzV+GDUNpdegRY6kzpLm4Igptq+GA0QkJ3W61Iv27YWwW/ufSlOfgQIpN6FZRMG0mkaz4gglJRtq5SeJyIQ==}
+=======
+  '@vueuse/core@14.3.0':
+    resolution: {integrity: sha512-aHfz47g0ZhMtTVHmIzMVpJy8ePhhOy68GY5bv110+5DVtZ+W7BsOx+m61UNQqfrWyPztIHIanWa3E2tib3NFIw==}
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
     peerDependencies:
       vue: ^3.5.0
 
@@ -1048,8 +1066,13 @@ packages:
   '@vueuse/metadata@13.9.0':
     resolution: {integrity: sha512-1AFRvuiGphfF7yWixZa0KwjYH8ulyjDCC0aFgrGRz8+P4kvDFSdXLVfTk5xAN9wEuD1J6z4/myMoYbnHoX07zg==}
 
+<<<<<<< HEAD
   '@vueuse/metadata@14.2.1':
     resolution: {integrity: sha512-1ButlVtj5Sb/HDtIy1HFr1VqCP4G6Ypqt5MAo0lCgjokrk2mvQKsK2uuy0vqu/Ks+sHfuHo0B9Y9jn9xKdjZsw==}
+=======
+  '@vueuse/metadata@14.3.0':
+    resolution: {integrity: sha512-BwxmbAzwAVF50+MW57GXOUEV61nFBGnlBvrTqj49PqWJu3uw7hdu72ztXeZ33RdZtDY6kO+bfCAE1PCn88Tktw==}
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
 
   '@vueuse/shared@10.11.1':
     resolution: {integrity: sha512-LHpC8711VFZlDaYUXEBbFBCQ7GS3dVU9mjOhhMhXP6txTV4EhYQg/KGnQuvt/sPAtoUKq7VVUnL6mVtFoL42sA==}
@@ -1059,8 +1082,13 @@ packages:
     peerDependencies:
       vue: ^3.5.0
 
+<<<<<<< HEAD
   '@vueuse/shared@14.2.1':
     resolution: {integrity: sha512-shTJncjV9JTI4oVNyF1FQonetYAiTBd+Qj7cY89SWbXSkx7gyhrgtEdF2ZAVWS1S3SHlaROO6F2IesJxQEkZBw==}
+=======
+  '@vueuse/shared@14.3.0':
+    resolution: {integrity: sha512-bZpge9eSXwa4ToSiqJ7j6KRwhAsneMFoSz3LMWKQDkqimm3D/tbFlrklrs/IOqC8tEcYmXQZJ6N0UrjhBirVCg==}
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
     peerDependencies:
       vue: ^3.5.0
 
@@ -1740,8 +1768,13 @@ packages:
   earcut@3.0.2:
     resolution: {integrity: sha512-X7hshQbLyMJ/3RPhyObLARM2sNxxmRALLKx1+NVFFnQ9gKzmCrxm9+uLIAdBcvc8FNLpctqlQ2V6AE92Ol9UDQ==}
 
+<<<<<<< HEAD
   electron-to-chromium@1.5.346:
     resolution: {integrity: sha512-3PGbvVwt9AppQsta0Kuq5DIcSj7aQfDfCVS7KnV3nhXEDtuJVRS7kK28Q+qy5KRkQ4bICV4xOaXNeUaXe78dDg==}
+=======
+  electron-to-chromium@1.5.347:
+    resolution: {integrity: sha512-BqbKWR67PjxFypgOFcDevD6j8N8GCPkSnQQRuqQIBh3GYCwr0xsLqw2EtSn83oq5iTqJ/wabM/YHV7KgvWGz7Q==}
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -2754,11 +2787,14 @@ packages:
   lower-case@2.0.2:
     resolution: {integrity: sha512-7fm3l3NAF9WfN6W3JOmf5drwpVqX78JtoGJ3A6W0a6ZnldM41w2fV5D490psKFTpMds8TJse/eHLFFsNHHjHgg==}
 
+<<<<<<< HEAD
   lucide-react@1.14.0:
     resolution: {integrity: sha512-+1mdWcfSJVUsaTIjN9zoezmUhfXo5l0vP7ekBMPo3jcS/aIkxHnXqAPsByszMZx/Y8oQBRJxJx5xg+RH3urzxA==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
+=======
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
@@ -4817,10 +4853,17 @@ snapshots:
 
   '@vue/shared@3.5.33': {}
 
+<<<<<<< HEAD
   '@vueuse/components@14.2.1(vue@3.5.33(typescript@6.0.0-dev.20250807))':
     dependencies:
       '@vueuse/core': 14.2.1(vue@3.5.33(typescript@6.0.0-dev.20250807))
       '@vueuse/shared': 14.2.1(vue@3.5.33(typescript@6.0.0-dev.20250807))
+=======
+  '@vueuse/components@14.3.0(vue@3.5.33(typescript@6.0.0-dev.20250807))':
+    dependencies:
+      '@vueuse/core': 14.3.0(vue@3.5.33(typescript@6.0.0-dev.20250807))
+      '@vueuse/shared': 14.3.0(vue@3.5.33(typescript@6.0.0-dev.20250807))
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
       vue: 3.5.33(typescript@6.0.0-dev.20250807)
 
   '@vueuse/core@10.11.1(vue@3.5.33(typescript@6.0.0-dev.20250807))':
@@ -4840,11 +4883,19 @@ snapshots:
       '@vueuse/shared': 13.9.0(vue@3.5.33(typescript@6.0.0-dev.20250807))
       vue: 3.5.33(typescript@6.0.0-dev.20250807)
 
+<<<<<<< HEAD
   '@vueuse/core@14.2.1(vue@3.5.33(typescript@6.0.0-dev.20250807))':
     dependencies:
       '@types/web-bluetooth': 0.0.21
       '@vueuse/metadata': 14.2.1
       '@vueuse/shared': 14.2.1(vue@3.5.33(typescript@6.0.0-dev.20250807))
+=======
+  '@vueuse/core@14.3.0(vue@3.5.33(typescript@6.0.0-dev.20250807))':
+    dependencies:
+      '@types/web-bluetooth': 0.0.21
+      '@vueuse/metadata': 14.3.0
+      '@vueuse/shared': 14.3.0(vue@3.5.33(typescript@6.0.0-dev.20250807))
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
       vue: 3.5.33(typescript@6.0.0-dev.20250807)
 
   '@vueuse/integrations@13.9.0(axios@1.14.0)(focus-trap@7.6.5)(vue@3.5.33(typescript@6.0.0-dev.20250807))':
@@ -4860,7 +4911,11 @@ snapshots:
 
   '@vueuse/metadata@13.9.0': {}
 
+<<<<<<< HEAD
   '@vueuse/metadata@14.2.1': {}
+=======
+  '@vueuse/metadata@14.3.0': {}
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
 
   '@vueuse/shared@10.11.1(vue@3.5.33(typescript@6.0.0-dev.20250807))':
     dependencies:
@@ -4873,7 +4928,11 @@ snapshots:
     dependencies:
       vue: 3.5.33(typescript@6.0.0-dev.20250807)
 
+<<<<<<< HEAD
   '@vueuse/shared@14.2.1(vue@3.5.33(typescript@6.0.0-dev.20250807))':
+=======
+  '@vueuse/shared@14.3.0(vue@3.5.33(typescript@6.0.0-dev.20250807))':
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
     dependencies:
       vue: 3.5.33(typescript@6.0.0-dev.20250807)
 
@@ -5168,7 +5227,11 @@ snapshots:
     dependencies:
       baseline-browser-mapping: 2.10.24
       caniuse-lite: 1.0.30001791
+<<<<<<< HEAD
       electron-to-chromium: 1.5.346
+=======
+      electron-to-chromium: 1.5.347
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
       node-releases: 2.0.38
       update-browserslist-db: 1.2.3(browserslist@4.28.2)
 
@@ -5617,7 +5680,11 @@ snapshots:
 
   earcut@3.0.2: {}
 
+<<<<<<< HEAD
   electron-to-chromium@1.5.346: {}
+=======
+  electron-to-chromium@1.5.347: {}
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
 
   emoji-regex@8.0.0: {}
 
@@ -6716,10 +6783,13 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
+<<<<<<< HEAD
   lucide-react@1.14.0(react@19.2.5):
     dependencies:
       react: 19.2.5
 
+=======
+>>>>>>> 1135d5998344ca329c4a49283460954de5cb18ce
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
