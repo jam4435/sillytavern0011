@@ -102,9 +102,15 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
              data-enabled="${isEnabled}"
              data-order="${order}">
             <div class="master-entry-main">
-                <button class="master-entry-button" type="button">
+                <div class="master-entry-button">
                     <div class="master-entry-text">
-                        <span class="master-entry-title">${entryTitle}</span>
+                        <span class="master-entry-title-row">
+                            <span class="master-entry-title">${entryTitle}</span>
+                            <input class="master-entry-title-input" type="text" value="${entryTitle}" placeholder="条目名" data-action="edit-title">
+                            <button class="master-entry-title-edit-button" type="button" data-action="start-edit-title" title="修改条目名">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                        </span>
                         <span class="master-entry-meta">
                             <span class="master-entry-meta-primary">${_.escape(compactMasterMetaText)}</span>
                             ${buildMasterEntryTokenBadgeHtml(entry, lorebookName, isGlobal)}
@@ -113,11 +119,7 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
                     <div class="master-entry-status">
                         <i class="fa-solid fa-thumbtack master-entry-pin" style="${isPinned ? '' : 'display:none;'}"></i>
                     </div>
-                </button>
-                <input class="master-entry-title-input" type="text" value="${entryTitle}" placeholder="条目名" data-action="edit-title">
-                <button class="master-entry-title-edit-button" type="button" data-action="start-edit-title" title="修改条目名">
-                    <i class="fa-solid fa-pen"></i>
-                </button>
+                </div>
             </div>
             <div class="master-entry-controls">
                 <label class="${LOREBOOK_TOGGLE_SWITCH_CLASS} master-entry-toggle" title="${isEnabled ? '启用' : '禁用'}">

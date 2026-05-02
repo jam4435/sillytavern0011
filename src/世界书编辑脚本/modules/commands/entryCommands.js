@@ -327,11 +327,9 @@ function selectEntry({ $target, lorebookName, numericUid, isGlobal }) {
  */
 function editContent({ event, $target, $item, lorebookName, numericUid }) {
   if (event.type === 'change') {
-    saveEntryField(numericUid, lorebookName, 'content', $target.val());
-  }
-  if (event.type === 'input') {
     const content = $target.val() || '';
     const $counter = $item.find('.token-counter');
+    saveEntryField(numericUid, lorebookName, 'content', content);
 
     // 使用酒馆的真实tokenizer计算token数
     if (window.SillyTavern && window.SillyTavern.getTokenCountAsync) {

@@ -126,7 +126,8 @@ function describeMasterEntryMeta(entry) {
   return parts.filter(Boolean).join(' · ');
 }
 
-export function syncMasterRowFromState(lorebookName, entryUid, isGlobal = false) {
+export function syncMasterRowFromState(lorebookName, entryUid, isGlobal = false, options = {}) {
+  const { refreshTokens = true } = options;
   const entry = getEntryFromState(lorebookName, entryUid);
   if (!entry) {
     return;
@@ -141,6 +142,8 @@ export function syncMasterRowFromState(lorebookName, entryUid, isGlobal = false)
     return;
   }
 
+  $row.attr('data-enabled', entry.enabled !== false);
+  $row.attr('data-order', entry.position?.order ?? 0);
   $row.toggleClass('disabled-entry', entry.enabled === false);
   $row.toggleClass('is-current-detail', isEntryCurrentDetail(lorebookName, ensureNumericUID(entryUid), isGlobal));
   $row.find('.master-entry-title').text(entry.name || '未命名条目');
@@ -163,7 +166,9 @@ export function syncMasterRowFromState(lorebookName, entryUid, isGlobal = false)
   $row.find('.master-entry-enabled').text(entry.enabled === false ? '已禁用' : '已启用');
   $row.find('.master-entry-enabled').toggleClass('is-disabled', entry.enabled === false);
   $row.find('.master-entry-pin').toggle(entry.pinned === true);
-  refreshSingleMasterEntryTokenBadge(lorebookName, entry, isGlobal);
+  if (refreshTokens) {
+    refreshSingleMasterEntryTokenBadge(lorebookName, entry, isGlobal);
+  }
 }
 
 function showSaveError(message) {
@@ -436,7 +441,7 @@ function renderCompactDetailEditorV2(tabKey, context, entry) {
 
   $container.html(`
     <div class="detail-editor" data-tab-key="${tabKey}" data-lorebook-name="${escapeHtml(context.lorebookName)}" data-entry-uid="${ensureNumericUID(context.entryUid)}" data-is-global="${context.isGlobal ? 'true' : 'false'}">
-      <section class="detail-section detail-section-compact">
+      <section class="detail-section detail-section-compact detail-section-integrated">
         <div class="detail-row detail-row-metrics">
           <label class="detail-field detail-field-inline">
             <span>插入位置</span>
@@ -490,17 +495,20 @@ function renderCompactDetailEditorV2(tabKey, context, entry) {
             <span>置顶</span>
           </label>
         </div>
-      </section>
-      <section class="detail-section detail-content-section">
-        <div class="detail-content-toolbar">
-          <button type="button" class="content-edit-button detail-content-tool" data-detail-action="open-content-editor" title="在新窗口中编辑内容" aria-label="全屏编辑">
-            <i class="fa-solid fa-expand"></i>
-          </button>
-          <button type="button" class="content-edit-button detail-content-tool" data-detail-action="open-compare-editor" title="打开对比编辑" aria-label="对比编辑">
-            <i class="fa-solid fa-not-equal"></i>
-          </button>
+        <div class="detail-content-block">
+          <div class="detail-content-block-header">
+            <span>正文</span>
+            <div class="detail-content-toolbar">
+              <button type="button" class="content-edit-button detail-content-tool" data-detail-action="open-content-editor" title="在新窗口中编辑内容" aria-label="全屏编辑">
+                <i class="fa-solid fa-expand"></i>
+              </button>
+              <button type="button" class="content-edit-button detail-content-tool" data-detail-action="open-compare-editor" title="打开对比编辑" aria-label="对比编辑">
+                <i class="fa-solid fa-not-equal"></i>
+              </button>
+            </div>
+          </div>
+          ${buildDetailContentFieldMarkup(entry.content)}
         </div>
-        ${buildDetailContentFieldMarkup(entry.content)}
       </section>
     </div>
   `);
@@ -584,11 +592,11 @@ function ensureDetailStyles() {
       #${LOREBOOK_PANEL_ID} .lorebook-entry-item.master-entry-item {
         display: flex;
         align-items: stretch;
-        gap: 8px;
+        gap: 6px;
         background: var(--panel-md-entry-bg-color, var(--panel-entry-bg-color, rgba(255,255,255,0.03)));
         border: 1px solid var(--panel-border-color, rgba(255,255,255,0.06));
         border-radius: 8px;
-        padding: 6px;
+        padding: 5px 6px;
         margin-bottom: 0;
         height: auto !important;
       }
@@ -729,18 +737,25 @@ function ensureDetailStyles() {
         min-width: 0;
         flex: 1 1 auto;
         display: flex;
-        align-items: center;
-        gap: 6px;
+        flex-direction: column;
+        gap: 4px;
       }
       #${LOREBOOK_PANEL_ID} .master-entry-text {
         min-width: 0;
         flex: 1 1 auto;
         display: flex;
         flex-direction: column;
+        gap: 3px;
+      }
+      #${LOREBOOK_PANEL_ID} .master-entry-title-row {
+        display: flex;
+        align-items: flex-start;
         gap: 4px;
+        min-width: 0;
       }
       #${LOREBOOK_PANEL_ID} .master-entry-title {
         display: block;
+        flex: 1 1 auto;
         min-width: 0;
         font-weight: 600;
         overflow: hidden;
@@ -751,15 +766,19 @@ function ensureDetailStyles() {
       }
       #${LOREBOOK_PANEL_ID} .master-entry-title-input {
         display: none;
-        width: 100%;
+        width: auto;
+        flex: 1 1 auto;
         min-width: 0;
         border: 1px solid transparent;
         background: transparent;
         color: inherit;
         border-radius: 6px;
-        padding: 4px 6px;
+        height: 20px;
+        margin: 0;
+        padding: 1px 5px;
         font-weight: 600;
-        line-height: 1.3;
+        line-height: 1.2;
+        box-sizing: border-box;
       }
       #${LOREBOOK_PANEL_ID} .master-entry-title-input:focus {
         outline: none;
@@ -773,15 +792,16 @@ function ensureDetailStyles() {
         display: block;
         flex: 1 1 auto;
       }
-      #${LOREBOOK_PANEL_ID} .master-entry-item.is-editing-title .master-entry-button,
       #${LOREBOOK_PANEL_ID} .master-entry-item.is-editing-title .master-entry-title-edit-button {
         display: none;
       }
+      #${LOREBOOK_PANEL_ID} .master-entry-item.is-editing-title .master-entry-title-row {
+        align-items: center;
+      }
       #${LOREBOOK_PANEL_ID} .master-entry-title-edit-button {
-        width: 20px;
-        height: 20px;
+        width: 16px;
+        height: 16px;
         flex: 0 0 auto;
-        order: -1;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -793,6 +813,9 @@ function ensureDetailStyles() {
         color: rgba(255,255,255,0.62);
         cursor: pointer;
       }
+      #${LOREBOOK_PANEL_ID} .master-entry-title-edit-button i {
+        font-size: 10px;
+      }
       #${LOREBOOK_PANEL_ID} .master-entry-title-edit-button:hover,
       #${LOREBOOK_PANEL_ID} .master-entry-title-edit-button:focus-visible {
         color: rgba(255,255,255,0.92);
@@ -802,12 +825,14 @@ function ensureDetailStyles() {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 4px 6px;
         font-size: 0.82em;
+        line-height: 1.2;
         color: color-mix(in srgb, var(--panel-text-color,#eee) 72%, transparent);
       }
       #${LOREBOOK_PANEL_ID} .master-entry-meta-primary {
         min-width: 0;
+        flex: 1 1 auto;
       }
       #${LOREBOOK_PANEL_ID} .master-entry-token {
         display: inline-flex;
@@ -833,7 +858,8 @@ function ensureDetailStyles() {
       #${LOREBOOK_PANEL_ID} .master-entry-status {
         display: flex;
         align-items: center;
-        gap: 8px;
+        align-self: flex-start;
+        gap: 6px;
         flex-shrink: 0;
       }
       #${LOREBOOK_PANEL_ID} .master-entry-pin {
@@ -873,6 +899,9 @@ function ensureDetailStyles() {
         flex-direction: column;
         gap: 12px;
       }
+      #${LOREBOOK_PANEL_ID} .detail-section-integrated {
+        gap: 10px;
+      }
       #${LOREBOOK_PANEL_ID} .detail-row {
         display: grid;
         align-items: center;
@@ -890,17 +919,27 @@ function ensureDetailStyles() {
         gap: 12px;
       }
       #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 118px minmax(0, 1fr);
+        align-items: end;
         gap: 10px;
-        align-items: flex-end;
-        flex-wrap: wrap;
+      }
+      #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area .keyword-group {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        gap: 4px;
+      }
+      #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area .keyword-group label {
+        margin: 0;
+        line-height: 1.2;
       }
       #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area.keyword-focused .keyword-group {
         display: none;
       }
       #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area.keyword-focused .keyword-group.focused {
         display: flex;
-        flex: 1 1 100%;
+        grid-column: 1 / -1;
         width: 100%;
       }
       #${LOREBOOK_PANEL_ID} .detail-row-metrics {
@@ -915,7 +954,7 @@ function ensureDetailStyles() {
         gap: 10px 18px;
       }
       #${LOREBOOK_PANEL_ID} .detail-row-flags-integrated {
-        padding-top: 2px;
+        padding-top: 4px;
         border-top: 1px solid var(--panel-border-color, rgba(255,255,255,0.06));
       }
       #${LOREBOOK_PANEL_ID} .detail-section {
@@ -924,10 +963,22 @@ function ensureDetailStyles() {
         border-radius: 10px;
         padding: 14px;
       }
-      #${LOREBOOK_PANEL_ID} .detail-content-section {
+      #${LOREBOOK_PANEL_ID} .detail-content-block {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 8px;
+        padding-top: 10px;
+        border-top: 1px solid var(--panel-border-color, rgba(255,255,255,0.06));
+      }
+      #${LOREBOOK_PANEL_ID} .detail-content-block-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      #${LOREBOOK_PANEL_ID} .detail-content-block-header > span {
+        font-size: 0.86em;
+        opacity: 0.82;
       }
       #${LOREBOOK_PANEL_ID} .detail-main-grid,
       #${LOREBOOK_PANEL_ID} .detail-advanced-grid {
@@ -988,6 +1039,23 @@ function ensureDetailStyles() {
         flex: 1 1 auto;
         min-width: 0;
       }
+      #${LOREBOOK_PANEL_ID} .detail-row-metrics .detail-field-inline input,
+      #${LOREBOOK_PANEL_ID} .detail-row-metrics .detail-field-inline select {
+        height: 28px;
+        padding: 3px 8px;
+      }
+      #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area .keywords-input,
+      #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area .secondary-keywords-input,
+      #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area .secondary-keys-logic-select {
+        display: block;
+        width: 100%;
+        height: 30px;
+        min-height: 30px;
+        margin: 0;
+        padding: 5px 8px;
+        line-height: 18px;
+        box-sizing: border-box;
+      }
       #${LOREBOOK_PANEL_ID} .detail-field-boolean input[type="checkbox"] {
         width: 18px;
         height: 18px;
@@ -1019,7 +1087,7 @@ function ensureDetailStyles() {
         display: flex;
         align-items: center;
         gap: 4px;
-        margin: -4px 0 0 -8px;
+        margin: 0;
       }
       #${LOREBOOK_PANEL_ID} .detail-content-tool {
         margin-left: 0;
@@ -1239,6 +1307,9 @@ function ensureDetailStyles() {
         #${LOREBOOK_PANEL_ID} .detail-advanced-grid {
           grid-template-columns: 1fr;
         }
+        #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area {
+          grid-template-columns: 1fr;
+        }
         #${LOREBOOK_PANEL_ID} .detail-row-primary,
         #${LOREBOOK_PANEL_ID} .detail-row-metrics,
         #${LOREBOOK_PANEL_ID} .detail-row-keywords {
@@ -1249,6 +1320,24 @@ function ensureDetailStyles() {
   `);
 }
 
+function executeQueuedSave($field, callback) {
+  $field.removeData('detail-save-timer');
+  $field.removeData('detail-save-callback');
+  const savePromise = Promise.resolve(callback()).then(result => {
+    $field.data('detail-last-save-result', result);
+    return result;
+  });
+
+  $field.data('detail-save-promise', savePromise);
+  savePromise.finally(() => {
+    if ($field.data('detail-save-promise') === savePromise) {
+      $field.removeData('detail-save-promise');
+    }
+  });
+
+  return savePromise;
+}
+
 function queueSave($field, callback, immediate = false) {
   const existingTimer = $field.data('detail-save-timer');
   if (existingTimer) {
@@ -1257,15 +1346,11 @@ function queueSave($field, callback, immediate = false) {
   $field.data('detail-save-callback', callback);
 
   if (immediate) {
-    $field.removeData('detail-save-callback');
-    callback();
-    return;
+    return executeQueuedSave($field, callback);
   }
 
   const timer = window.setTimeout(() => {
-    $field.removeData('detail-save-timer');
-    $field.removeData('detail-save-callback');
-    callback();
+    void executeQueuedSave($field, callback);
   }, DETAIL_SAVE_DELAY);
 
   $field.data('detail-save-timer', timer);
@@ -1274,18 +1359,34 @@ function queueSave($field, callback, immediate = false) {
 function flushQueuedSave($field) {
   const callback = $field.data('detail-save-callback');
   if (!callback) {
-    return;
+    return $field.data('detail-save-promise') || Promise.resolve(null);
   }
   const timer = $field.data('detail-save-timer');
   if (timer) {
     clearTimeout(timer);
   }
-  $field.removeData('detail-save-timer');
-  $field.removeData('detail-save-callback');
-  callback();
+  return executeQueuedSave($field, callback);
 }
 
-async function persistDetailField($field) {
+function isDetailContentField($field) {
+  return $field.is('.detail-content-textarea') && $field.attr('data-field') === 'content';
+}
+
+function refreshDetailContentTokenBadge($field) {
+  const $editor = $field.closest('.detail-editor');
+  const lorebookName = $editor.attr('data-lorebook-name');
+  const entryUid = ensureNumericUID($editor.attr('data-entry-uid'));
+  const isGlobal = $editor.attr('data-is-global') === 'true';
+  const entry = getEntryFromState(lorebookName, entryUid);
+  if (!entry) {
+    return;
+  }
+
+  refreshSingleMasterEntryTokenBadge(lorebookName, entry, isGlobal);
+}
+
+async function persistDetailField($field, options = {}) {
+  const { refreshTokens = true } = options;
   const $editor = $field.closest('.detail-editor');
   const lorebookName = $editor.attr('data-lorebook-name');
   const entryUid = ensureNumericUID($editor.attr('data-entry-uid'));
@@ -1311,7 +1412,7 @@ async function persistDetailField($field) {
     } else {
       removePinnedEntry(lorebookName, entryUid);
     }
-    syncMasterRowFromState(lorebookName, entryUid, isGlobal);
+    syncMasterRowFromState(lorebookName, entryUid, isGlobal, { refreshTokens });
     showSaveSuccess('置顶状态已更新');
     return true;
   } else if ($field.is(':checkbox')) {
@@ -1348,7 +1449,7 @@ async function persistDetailField($field) {
     $depthField.find('input').prop('disabled', !needsDepth);
   }
 
-  syncMasterRowFromState(lorebookName, entryUid, isGlobal);
+  syncMasterRowFromState(lorebookName, entryUid, isGlobal, { refreshTokens });
   return true;
 }
 
@@ -1516,19 +1617,31 @@ export function initDetailView() {
     .off('input.detail change.detail blur.detail click.detail')
     .on('input.detail', '.detail-editor [data-save-mode="debounced"]', function () {
       const $field = $(this);
+      const shouldDeferTokenRefresh = isDetailContentField($field);
+      if (shouldDeferTokenRefresh) {
+        $field.data('detail-content-token-dirty', true);
+      }
       queueSave($field, () => {
-        persistDetailField($field);
+        return persistDetailField($field, { refreshTokens: !shouldDeferTokenRefresh });
       });
     })
-    .on('blur.detail', '.detail-editor [data-save-mode="debounced"]', function () {
-      flushQueuedSave($(this));
+    .on('blur.detail', '.detail-editor [data-save-mode="debounced"]', async function () {
+      const $field = $(this);
+      const shouldRefreshTokens = isDetailContentField($field) && $field.data('detail-content-token-dirty') === true;
+      await flushQueuedSave($field);
+      if (shouldRefreshTokens && $field.data('detail-last-save-result') !== false) {
+        refreshDetailContentTokenBadge($field);
+      }
+      if (isDetailContentField($field)) {
+        $field.removeData('detail-content-token-dirty');
+      }
     })
     .on('change.detail', '.detail-editor [data-save-mode="immediate"]', function () {
       const $field = $(this);
       queueSave(
         $field,
         () => {
-          persistDetailField($field);
+          return persistDetailField($field);
         },
         true,
       );
