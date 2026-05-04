@@ -257,6 +257,7 @@ function applyTheme(theme) {
 
     if ($panel.length) {
       $panel.attr('data-unified-icon-buttons', sharedTheme.unifiedIconButtons ? 'true' : 'false');
+      $panel.attr('data-mobile-entry-title-mode', truncateLongNames ? 'single-line' : 'two-line');
       $panel.css({
         '--panel-bg-color': panelBgColor,
         '--panel-text-color': layoutTheme.textColor,
@@ -667,6 +668,8 @@ export function initTheme() {
   const handleSettingsChange = () => {
     const layoutMode = getEffectiveThemeLayoutMode();
     try {
+      const previousTheme = loadTheme(layoutMode);
+      const previousTruncateLongNames = previousTheme.truncateLongNames !== false;
       const themeFromModal = readThemeFromModal(layoutMode);
       setRangePercent(
         parentDoc,
@@ -680,6 +683,11 @@ export function initTheme() {
       const newSettings = saveTheme(themeFromModal, layoutMode);
       applyTheme(newSettings);
       updateButtonBehavior(newSettings);
+
+      const nextTruncateLongNames = themeFromModal.truncateLongNames !== false;
+      if (isMobile() && previousTruncateLongNames !== nextTruncateLongNames) {
+        void refreshCurrentTabForLayoutChange();
+      }
     } catch (error) {
       console.error('角色世界书: 保存主题设置失败', error);
       alert('主题设置保存失败。背景图可能过大，请换用更小的图片或图片 URL。');

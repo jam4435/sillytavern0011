@@ -26,11 +26,28 @@
         display: flex;
         flex-direction: column;
         gap: 20px;
+        width: 100%;
+      }
+      .jm-state-panel-list:empty::before {
+        content: '无\003C 当前人物\003E 标签';
+        display: block;
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 16px 20px;
+        box-sizing: border-box;
+        border-radius: 12px;
+        border: 1px solid rgba(207, 102, 121, 0.45);
+        background-color: rgba(0, 0, 0, 0.2);
+        color: #ffd6de;
+        white-space: pre-line;
+        line-height: 1.6;
       }
       .status-container,
       .status-feedback {
+        width: 100%;
         max-width: 600px;
-        margin: auto;
+        margin: 0 auto;
         box-sizing: border-box;
       }
       .status-container {
@@ -39,6 +56,78 @@
         border-radius: 12px;
         border: 1px solid var(--border-color);
         padding: 24px;
+      }
+      .status-diagnostic {
+        padding: 0;
+        overflow: hidden;
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        background-color: rgba(255, 255, 255, 0.02);
+      }
+      .status-diagnostic.warning {
+        border-color: rgba(207, 102, 121, 0.32);
+      }
+      .status-diagnostic.error {
+        border-color: rgba(207, 102, 121, 0.48);
+      }
+      .status-diagnostic > .header {
+        margin-bottom: 0;
+        padding: 12px 16px;
+        border-bottom: none;
+        list-style: none;
+        cursor: pointer;
+      }
+      .status-diagnostic > .header::-webkit-details-marker {
+        display: none;
+      }
+      .status-diagnostic > .header::marker {
+        content: '';
+      }
+      .status-diagnostic[open] > .header {
+        border-bottom: 1px solid var(--border-color);
+      }
+      .status-diagnostic .header-info {
+        min-width: 0;
+      }
+      .status-diagnostic .char-name-row {
+        gap: 0;
+      }
+      .status-diagnostic .char-name {
+        letter-spacing: 0;
+        font-size: 15px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.92);
+      }
+      .status-diagnostic .diagnostic-toggle {
+        pointer-events: none;
+        width: 26px;
+        height: 26px;
+        margin-left: 12px;
+        background-color: rgba(255, 255, 255, 0.08);
+      }
+      .status-diagnostic .diagnostic-toggle svg {
+        width: 16px;
+        height: 16px;
+        fill: var(--text-secondary-color);
+      }
+      .status-diagnostic[open] .diagnostic-toggle svg {
+        transform: rotate(180deg);
+      }
+      .diagnostic-details {
+        padding: 12px 16px 14px;
+      }
+      .diagnostic-message-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .diagnostic-message {
+        font-size: 13px;
+        line-height: 1.55;
+        color: rgba(255, 255, 255, 0.86);
+        white-space: pre-wrap;
+        word-wrap: break-word;
       }
       .status-feedback {
         padding: 16px 20px;
@@ -438,6 +527,9 @@
         .header-info {
           width: 100%;
         }
+        .jm-state-panel .char-name-row {
+          justify-content: center;
+        }
         .meta-info {
           flex-direction: column;
           align-items: center;
@@ -465,7 +557,26 @@
     </style>
   </head>
   <body>
-    <div class="jm-state-panel-list"></div>
+    <div class="jm-state-panel-list">
+      <details class="status-container status-diagnostic warning">
+        <summary class="header">
+          <div class="header-info">
+            <div class="char-name-row">
+              <div class="char-name">无&lt;当前人物&gt; 标签</div>
+            </div>
+          </div>
+          <span class="collapse-toggle diagnostic-toggle" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+          </span>
+        </summary>
+        <div class="diagnostic-details">
+          <div class="diagnostic-message-list">
+            <div class="diagnostic-message">默认需要在最新楼层写入 &lt;当前人物&gt;...&lt;/当前人物&gt; 或 &lt;当前角色&gt;...&lt;/当前角色&gt; 标签。</div>
+            <div class="diagnostic-message">如果你确认标签已存在但这里仍不更新，请检查控制台中的 [变量状态栏] 日志。</div>
+          </div>
+        </div>
+      </details>
+    </div>
     <script>
       window.JM_StatusDataManager =
         window.JM_StatusDataManager ||
@@ -618,12 +729,26 @@
       const escapeHtml = value =>
         ensureString(value).replace(
           /[&<>"']/g,
-          char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
+          char =>
+            ({
+              '&': '&' + 'amp;',
+              '<': '&' + 'lt;',
+              '>': '&' + 'gt;',
+              '"': '&' + 'quot;',
+              "'": '&' + '#39;',
+            })[char],
         );
       const NAME_EDIT_TRIGGER_HTML =
         '<button class="edit-trigger jm-edit-name-trigger" type="button" title="编辑名字">&#9998;</button>';
       const OCCUPATION_EDIT_TRIGGER_HTML =
         '<button class="edit-trigger jm-edit-occupation-trigger" type="button" title="编辑职业">&#9998;</button>';
+      const CURRENT_PERSON_TAG = '<' + '当前人物' + '>';
+      const CURRENT_PERSON_CLOSING_TAG = '</' + '当前人物' + '>';
+      const CURRENT_ROLE_TAG = '<' + '当前角色' + '>';
+      const CURRENT_ROLE_CLOSING_TAG = '</' + '当前角色' + '>';
+      const CURRENT_PERSON_TAG_BLOCK = `${CURRENT_PERSON_TAG}...${CURRENT_PERSON_CLOSING_TAG}`;
+      const CURRENT_ROLE_TAG_BLOCK = `${CURRENT_ROLE_TAG}...${CURRENT_ROLE_CLOSING_TAG}`;
+      const CURRENT_TAGS_SHORT = `${CURRENT_PERSON_TAG}/${CURRENT_ROLE_TAG}`;
       const DISPLAY_TEXT_REPLACEMENTS = [['__DOT__', '.']];
       function normalizeDisplayValue(value) {
         if (typeof value === 'string') {
@@ -708,32 +833,69 @@
             .filter(Boolean),
         );
       }
+      function hasRenderableValue(value) {
+        if (Array.isArray(value)) return normalizeListField(value).length > 0;
+        if (_.isPlainObject(value)) return Object.values(value).some(item => hasRenderableValue(item));
+        if (value === undefined || value === null) return false;
+        return ensureString(value).trim() !== '';
+      }
       function loadCurrentCharacterNames() {
         try {
           const latestMessage = getChatMessages(-1)?.[0]?.message;
           if (latestMessage === undefined || latestMessage === null) {
             logWarn('未读取到最新楼层，显示“无当前角色”。');
-            return [];
+            return {
+              code: 'missing_latest_message',
+              names: [],
+              reason: '未读取到最新楼层。',
+              details: ['请确认聊天记录存在，或检查酒馆助手消息接口是否正常。'],
+            };
           }
           if (typeof latestMessage !== 'string') {
             logWarn('最新楼层内容不是字符串，显示“无当前角色”。', latestMessage);
-            return [];
+            return {
+              code: 'invalid_latest_message',
+              names: [],
+              reason: '最新楼层内容不是字符串。',
+              details: ['请检查当前聊天记录是否异常。'],
+            };
           }
           const match = latestMessage.match(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/);
           if (!match) {
-            logWarn('最新楼层未找到 <当前人物>/<当前角色> 标签，显示“无当前角色”。');
-            return [];
+            logWarn(`最新楼层未找到 ${CURRENT_TAGS_SHORT} 标签，显示“无当前角色”。`);
+            return {
+              code: 'missing_tag',
+              names: [],
+              reason: `最新楼层没有可用的 ${CURRENT_PERSON_TAG_BLOCK} 或 ${CURRENT_ROLE_TAG_BLOCK} 标签。`,
+              details: [
+                '本诊断条能显示，说明状态栏 HTML 已运行；若控制台完全没有初始化日志，请检查变量状态栏正则是否启用、占位符是否存在。',
+              ],
+            };
           }
           const names = splitCharacterNames(match[2]);
           if (names.length === 0) {
             logWarn('当前角色标签为空，显示“无当前角色”。');
-            return [];
+            return {
+              code: 'empty_tag',
+              tagName: match[1],
+              names: [],
+              reason:
+                match[1] === '人物'
+                  ? `存在${CURRENT_PERSON_TAG} 标签，里面为空。`
+                  : `存在${CURRENT_ROLE_TAG} 标签，里面为空。`,
+              details: [],
+            };
           }
           logInfo(`读取当前角色：${names.join('、')}。`);
-          return names;
+          return { code: 'ok', names, reason: '', details: [] };
         } catch (error) {
           logError('读取最新楼层失败，显示“无当前角色”。', error);
-          return [];
+          return {
+            code: 'error',
+            names: [],
+            reason: '读取最新楼层失败。',
+            details: [error?.message || String(error)],
+          };
         }
       }
       function loadStatData() {
@@ -742,23 +904,29 @@
           const rawStatData = _.get(chatVariables, 'stat_data', undefined);
           if (rawStatData === undefined) {
             logWarn('chat 变量中没有 stat_data，当前角色变量无法读取。');
-            return {};
+            return { statData: {}, status: 'missing', message: 'chat 变量中没有 stat_data。' };
           }
           if (!_.isPlainObject(rawStatData)) {
             logWarn('chat.stat_data 不是对象，已按空变量处理。', rawStatData);
-            return {};
+            return { statData: {}, status: 'invalid', message: 'chat.stat_data 不是对象，已按空变量处理。' };
           }
           const statKeys = Object.keys(rawStatData);
           const characterData = ensureObject(safeGet(rawStatData, '角色数据', {}));
           if (statKeys.length === 0) {
             logWarn('chat.stat_data 为空，当前角色变量无法读取。');
-          } else {
-            logInfo(`已读取 chat.stat_data：顶层 ${statKeys.length} 项，角色数据 ${Object.keys(characterData).length} 项。`);
+            return { statData: rawStatData, status: 'empty', message: 'chat.stat_data 为空。' };
           }
-          return rawStatData;
+          logInfo(
+            `已读取 chat.stat_data：顶层 ${statKeys.length} 项，角色数据 ${Object.keys(characterData).length} 项。`,
+          );
+          return { statData: rawStatData, status: 'ok', message: '' };
         } catch (error) {
           logError('读取 chat 变量失败，当前角色变量无法读取。', error);
-          return {};
+          return {
+            statData: {},
+            status: 'error',
+            message: `读取 chat 变量失败：${error?.message || String(error)}`,
+          };
         }
       }
       function resolveCharacterSource(name, statData) {
@@ -771,6 +939,7 @@
         const source = resolveCharacterSource(name, statData);
         if (!source) return null;
         const normalizedSource = normalizeDisplayValue(source);
+        if (!hasRenderableValue(normalizedSource)) return null;
         const mergedModifications = uniq([
           ...normalizeListField(safeGet(normalizedSource, 'ModificationsAndRestraints', [])),
           ...normalizeListField(safeGet(normalizedSource, 'Modifications', [])),
@@ -999,12 +1168,12 @@
       async function syncCurrentCharacterNameInLatestMessage(oldName, newName) {
         const latestMessage = getLatestChatMessage();
         if (!latestMessage) {
-          return { synced: false, reason: '未找到最新楼层，无法同步 <当前人物>/<当前角色> 标签。' };
+          return { synced: false, reason: `未找到最新楼层，无法同步 ${CURRENT_TAGS_SHORT} 标签。` };
         }
         const originalText = ensureString(latestMessage.message);
         const messageReplacement = replaceCurrentCharacterNameInMessage(originalText, oldName, newName);
         if (!messageReplacement.replaced) {
-          return { synced: false, reason: '未在最新楼层的 <当前人物>/<当前角色> 标签中找到当前名字。' };
+          return { synced: false, reason: `未在最新楼层的 ${CURRENT_TAGS_SHORT} 标签中找到当前名字。` };
         }
         if (messageReplacement.message !== originalText) {
           await setChatMessages([{ message_id: latestMessage.message_id, message: messageReplacement.message }], {
@@ -1063,10 +1232,12 @@
           }
         }
         if (hasDisplayNameChanged) {
-          const collapsedState = collapsedStateByName.get(oldName);
+          const oldStateKey = `character:${oldName}`;
+          const newStateKey = `character:${newName}`;
+          const collapsedState = collapsedStateByName.get(oldStateKey);
           if (collapsedState !== undefined) {
-            collapsedStateByName.set(newName, collapsedState);
-            collapsedStateByName.delete(oldName);
+            collapsedStateByName.set(newStateKey, collapsedState);
+            collapsedStateByName.delete(oldStateKey);
           }
           try {
             await migratePortraitStorage(oldName, newName);
@@ -1185,6 +1356,7 @@
       }
       function updatePanel(panel, data) {
         panel.dataset.characterName = data.Name;
+        panel.dataset.panelStateKey = `character:${data.Name}`;
         panel.innerHTML = `
           <div class="header">
             <div class="portrait">
@@ -1229,7 +1401,8 @@
         const { tabsHtml, contentsHtml } = generateDynamicTabsAndContent(panel, data);
         panel.querySelector('.tabs-container').innerHTML = tabsHtml;
         panel.querySelector('.tab-content-container').innerHTML = contentsHtml;
-        const shouldCollapse = collapsedStateByName.has(data.Name) ? collapsedStateByName.get(data.Name) : true;
+        const stateKey = panel.dataset.panelStateKey || `character:${data.Name}`;
+        const shouldCollapse = isPanelCollapsed(stateKey, true);
         panel.classList.toggle('collapsed', shouldCollapse);
       }
       async function updatePortrait(panel, data) {
@@ -1422,7 +1595,8 @@
         if (collapseToggle) {
           collapseToggle.addEventListener('click', () => {
             panel.classList.toggle('collapsed');
-            collapsedStateByName.set(data.Name, panel.classList.contains('collapsed'));
+            const stateKey = panel.dataset.panelStateKey || `character:${data.Name}`;
+            collapsedStateByName.set(stateKey, panel.classList.contains('collapsed'));
           });
         }
         panel.addEventListener('click', e => {
@@ -1580,22 +1754,98 @@
       }
       function persistCollapsedStates() {
         if (!root) return;
-        root.querySelectorAll('.jm-state-panel').forEach(panel => {
-          const name = panel.dataset.characterName;
-          if (name) collapsedStateByName.set(name, panel.classList.contains('collapsed'));
+        root.querySelectorAll('.jm-state-panel, .status-diagnostic').forEach(panel => {
+          const stateKey = panel.dataset.panelStateKey;
+          if (!stateKey) return;
+          const isCollapsed = panel.matches('.status-diagnostic')
+            ? !panel.hasAttribute('open')
+            : panel.classList.contains('collapsed');
+          collapsedStateByName.set(stateKey, isCollapsed);
         });
       }
-      function renderFeedback(title, messages = [], type = '') {
+      function isPanelCollapsed(stateKey, defaultCollapsed = true) {
+        if (!stateKey) return defaultCollapsed;
+        return collapsedStateByName.has(stateKey) ? collapsedStateByName.get(stateKey) : defaultCollapsed;
+      }
+      function renderDiagnosticPanel(title, messages = [], options = {}) {
+        const { type = 'warning', stateKey = '', defaultCollapsed = true } = options;
         const messageList = (Array.isArray(messages) ? messages : [messages]).filter(Boolean);
-        const detailsHtml = messageList.map(message => `<div>${escapeHtml(message)}</div>`).join('');
-        return `<div class="status-feedback${type ? ` ${type}` : ''}"><strong>${escapeHtml(title)}</strong>${detailsHtml}</div>`;
+        const detailsHtml = messageList
+          .map(message => `<div class="diagnostic-message">${escapeHtml(message)}</div>`)
+          .join('');
+        const openAttr = isPanelCollapsed(stateKey, defaultCollapsed) ? '' : ' open';
+        return `
+          <details class="status-container status-diagnostic${type ? ` ${type}` : ''}"${openAttr}>
+            <summary class="header">
+              <div class="header-info">
+                <div class="char-name-row">
+                  <div class="char-name">${escapeHtml(title)}</div>
+                </div>
+              </div>
+              <span class="collapse-toggle diagnostic-toggle" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+              </span>
+            </summary>
+            <div class="diagnostic-details">
+              <div class="diagnostic-message-list">${detailsHtml}</div>
+            </div>
+          </details>`;
+      }
+      function buildNoCharacterFeedback(currentCharacterResult, statDataResult, names, missingNames) {
+        if (names.length === 0) {
+          if (currentCharacterResult.code === 'missing_tag') {
+            return {
+              title: `无${CURRENT_PERSON_TAG} 标签`,
+              details: [currentCharacterResult.reason || `未找到 ${CURRENT_PERSON_TAG} 标签。`, ...(currentCharacterResult.details || [])],
+              stateKey: 'diagnostic:missing-current-tag',
+            };
+          }
+          if (currentCharacterResult.code === 'empty_tag') {
+            return {
+              title: currentCharacterResult.tagName === '人物' ? '当前无在场女性角色' : '当前无当前角色',
+              details: [currentCharacterResult.reason || '存在当前角色标签，但内容为空。'],
+              stateKey: 'diagnostic:empty-current-tag',
+            };
+          }
+          return {
+            title: '无当前角色',
+            details: [currentCharacterResult.reason || '未找到当前角色。', ...(currentCharacterResult.details || [])],
+            stateKey: `diagnostic:${currentCharacterResult.code || 'unknown'}`,
+          };
+        }
+        const details = [`当前角色：${names.join('、')}`];
+        let title = '当前角色无变量数据';
+        if (statDataResult.status !== 'ok') {
+          details.push(statDataResult.message || 'chat.stat_data 无法读取。');
+        } else if (missingNames.length > 0) {
+          details.push(`未找到变量或变量为空：${missingNames.join('、')}`);
+        } else {
+          title = '当前角色无可显示变量';
+          details.push('当前角色存在，但没有可渲染的变量数据。');
+        }
+        details.push(
+          '如果控制台完全没有“脚本开始初始化”日志，请检查变量状态栏正则是否启用、占位符是否存在。',
+        );
+        return {
+          title,
+          details,
+          stateKey: 'diagnostic:no-renderable-panel',
+        };
+      }
+      function buildMissingCharacterFeedback(names, missingNames) {
+        return {
+          title: '部分角色无变量数据',
+          details: [`当前角色：${names.join('、')}`, `未找到变量或变量为空：${missingNames.join('、')}`],
+          stateKey: 'diagnostic:missing-character-data',
+        };
       }
       async function refreshPanels() {
         if (!root) return;
         persistCollapsedStates();
-        const names = loadCurrentCharacterNames();
-        const statData = loadStatData();
-        const statDataIsEmpty = Object.keys(statData).length === 0;
+        const currentCharacterResult = loadCurrentCharacterNames();
+        const names = currentCharacterResult.names;
+        const statDataResult = loadStatData();
+        const statData = statDataResult.statData;
         const panelDataList = [];
         const missingNames = [];
         names.forEach(name => {
@@ -1604,42 +1854,28 @@
           else missingNames.push(name);
         });
         let rootHtml = '';
-        if (names.length === 0) {
-          rootHtml += renderFeedback(
-            '无当前角色',
-            [
-              '最新楼层没有可用的 <当前人物>...</当前人物> 或 <当前角色>...</当前角色> 标签。',
-              '如果控制台没有“脚本开始初始化”日志，通常是正则没有加载或占位符没有被替换。',
-            ],
-            'warning',
-          );
-          logWarn('刷新完成：无当前角色，仅显示提示条。');
-        } else if (missingNames.length > 0) {
-          rootHtml += renderFeedback(
-            '当前角色变量缺失',
-            [
-              `当前角色：${names.join('、')}`,
-              statDataIsEmpty ? 'chat.stat_data 为空或读取失败。' : `未找到变量：${missingNames.join('、')}`,
-            ],
-            'warning',
-          );
-          logWarn(
-            `刷新发现当前角色变量缺失：${missingNames.join('、')}。`,
-            statDataIsEmpty ? 'chat.stat_data 为空或读取失败。' : statData,
-          );
-        }
         if (panelDataList.length === 0) {
-          if (names.length > 0 && missingNames.length === 0) {
-            rootHtml += renderFeedback('当前角色变量缺失', ['当前角色存在，但没有可渲染的变量数据。'], 'warning');
-            logWarn('刷新完成：当前角色存在，但没有可渲染的变量数据。');
-          }
+          const feedback = buildNoCharacterFeedback(currentCharacterResult, statDataResult, names, missingNames);
+          rootHtml += renderDiagnosticPanel(feedback.title, feedback.details, {
+            type: 'warning',
+            stateKey: feedback.stateKey,
+          });
           root.innerHTML = rootHtml;
+          logWarn('刷新完成：无可渲染角色，仅显示诊断条。');
           return;
+        }
+        if (missingNames.length > 0) {
+          const feedback = buildMissingCharacterFeedback(names, missingNames);
+          rootHtml += renderDiagnosticPanel(feedback.title, feedback.details, {
+            type: 'warning',
+            stateKey: feedback.stateKey,
+          });
+          logWarn(`刷新发现当前角色变量缺失：${missingNames.join('、')}。`);
         }
         rootHtml += panelDataList
           .map(
             (data, index) =>
-              `<div class="status-container jm-state-panel" data-panel-key="${index}" data-character-name="${data.Name}"></div>`,
+              `<div class="status-container jm-state-panel" data-panel-key="${index}" data-character-name="${data.Name}" data-panel-state-key="character:${data.Name}"></div>`,
           )
           .join('');
         root.innerHTML = rootHtml;
@@ -1676,7 +1912,9 @@
         logInfo('已监听消息接收、更新、切换和 era 写入事件。');
       }
       async function init() {
-        logInfo('脚本开始初始化：已确认正则替换触发；如果完全没有这条日志，请检查正则是否加载。');
+        logInfo(
+          '脚本开始初始化：状态栏脚本已运行，正则替换已触发；如果完全没有这条日志，请检查变量状态栏正则。',
+        );
         root = document.querySelector('.jm-state-panel-list');
         if (!root) throw new Error('未找到变量状态栏根容器。');
         await fetchData();

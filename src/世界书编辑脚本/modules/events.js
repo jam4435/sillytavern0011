@@ -103,6 +103,7 @@ export function bindEventListeners() {
   const BUBBLE_DRAG_THRESHOLD = 4;
   let bubbleDragState = null;
   let suppressBubbleClickUntil = 0;
+  let suppressLongPressClickUntil = 0;
   let lastViewportIsMobile = isMobile();
   let pendingViewportModeRefresh = false;
 
@@ -308,6 +309,7 @@ export function bindEventListeners() {
     let pressTimer;
     let lastTouchX = 0;
     let lastTouchY = 0;
+    let longPressTriggered = false;
 
     $panel.on('touchstart', '[title]', function (e) {
       const $target = $(this);
@@ -319,8 +321,10 @@ export function bindEventListeners() {
 
       lastTouchX = touch.clientX;
       lastTouchY = touch.clientY;
+      longPressTriggered = false;
 
       pressTimer = setTimeout(() => {
+        longPressTriggered = true;
         const $tooltip = $(`#${MOBILE_TOOLTIP_ID}`, parentDoc);
         $tooltip.text(title).css({ top: '-9999px', left: '-9999px' }).show();
 
@@ -353,6 +357,9 @@ export function bindEventListeners() {
 
     $panel.on('touchend touchcancel', '[title]', function () {
       clearTimeout(pressTimer);
+      if (longPressTriggered) {
+        suppressLongPressClickUntil = Date.now() + 250;
+      }
       $(`#${MOBILE_TOOLTIP_ID}`, parentDoc).hide();
     });
 
@@ -451,6 +458,10 @@ export function bindEventListeners() {
       const $target = $(e.target);
       const $actionTarget = $target.closest('[data-action]');
       if (!$actionTarget.length) return;
+      if (isMobile() && e.type === 'click' && Date.now() < suppressLongPressClickUntil) {
+        e.preventDefault();
+        return;
+      }
 
       const action = $actionTarget.data('action');
 
@@ -846,6 +857,28 @@ export function bindEventListeners() {
     .off('focusout.masterTitleEdit')
     .on('focusout.masterTitleEdit', '.master-entry-title-input', function () {
       $(this).closest('.master-entry-item').removeClass('is-editing-title');
+    });
+
+  $panel
+    .off('keydown.mobileTitleEdit')
+    .on('keydown.mobileTitleEdit', '.mobile-entry-title-input', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.blur();
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        const $input = $(this);
+        const originalTitle = $input.closest(`.${LOREBOOK_ENTRY_CLASS}`).find('.mobile-entry-title-display').text();
+        $input.val(originalTitle);
+        $input.closest(`.${LOREBOOK_ENTRY_CLASS}`).removeClass('is-editing-title-mobile');
+        this.blur();
+      }
+    })
+    .off('focusout.mobileTitleEdit')
+    .on('focusout.mobileTitleEdit', '.mobile-entry-title-input', function () {
+      $(this).closest(`.${LOREBOOK_ENTRY_CLASS}`).removeClass('is-editing-title-mobile');
     });
 
   $panel.off('click.masterEntryDetail').on('click.masterEntryDetail', '.master-entry-item', async function (e) {

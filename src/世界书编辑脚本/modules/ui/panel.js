@@ -2490,10 +2490,11 @@ export function initPanel() {
                         align-items: center;
                         margin-left: auto;
                         flex-shrink: 0;
+                        padding-top: 2px;
                     }
                     #${LOREBOOK_PANEL_ID} .mobile-row-1 {
                         display: flex;
-                        align-items: center;
+                        align-items: flex-start;
                         width: 100%;
                         margin-bottom: 8px;
                     }
@@ -2512,6 +2513,47 @@ export function initPanel() {
                         flex-direction: column;
                         margin: 0 8px 0 0;
                     }
+                    #${LOREBOOK_PANEL_ID} .mobile-title-editor {
+                        flex: 1 1 auto;
+                        min-width: 0;
+                        margin: 0 8px 0 0;
+                    }
+                    #${LOREBOOK_PANEL_ID} .mobile-entry-title-display {
+                        display: block;
+                        box-sizing: border-box;
+                        width: 100%;
+                        min-width: 0;
+                        padding: 4px 6px;
+                        border: 1px solid transparent;
+                        border-radius: 4px;
+                        background: transparent;
+                        appearance: none;
+                        -webkit-appearance: none;
+                        color: var(--panel-text-color);
+                        font-size: 0.95em;
+                        font-weight: bold;
+                        line-height: 1.25;
+                        text-align: left;
+                        cursor: text;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-entry-title-mode="two-line"] .mobile-entry-title-display {
+                        display: -webkit-box;
+                        -webkit-box-orient: vertical;
+                        -webkit-line-clamp: 2;
+                        white-space: normal;
+                        overflow-wrap: anywhere;
+                        word-break: break-word;
+                        min-height: calc(1.25em * 2 + 8px);
+                        max-height: calc(1.25em * 2 + 8px);
+                    }
+                    #${LOREBOOK_PANEL_ID} .mobile-entry-title-display:focus-visible {
+                        outline: none;
+                        border-color: var(--panel-accent-color, #666);
+                        background-color: var(--panel-field-focus-bg-color, #444);
+                    }
                     #${LOREBOOK_PANEL_ID} .entry-item-title {
                         flex-grow: 1;
                         margin: 0 8px 0 0;
@@ -2522,6 +2564,17 @@ export function initPanel() {
                         white-space: var(--lorebook-name-white-space);
                         overflow-wrap: var(--lorebook-name-overflow-wrap);
                         word-break: var(--lorebook-name-word-break);
+                    }
+                    #${LOREBOOK_PANEL_ID} .mobile-entry-title-input {
+                        display: none;
+                        margin: 0;
+                        width: 100%;
+                    }
+                    #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}.is-editing-title-mobile .mobile-entry-title-display {
+                        display: none;
+                    }
+                    #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}.is-editing-title-mobile .mobile-entry-title-input {
+                        display: block;
                     }
                     #${LOREBOOK_PANEL_ID} .select-checkbox-container {
                         padding-left: 8px;
