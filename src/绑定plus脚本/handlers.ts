@@ -5,6 +5,9 @@
 import {
   BINDING_PLUS_THEME_STORAGE_KEY,
   BindingGroup,
+  BindingPlusBackupFile,
+  BindingPlusBackupImportSummary,
+  BindingPlusPersonaBackup,
   BindingPlusThemePreset,
   BindingPlusThemePresetId,
   BindingPlusThemeState,
@@ -47,6 +50,8 @@ const PERSONA_ADVANCED_CONFIG_VERSION = 1;
 const SNAPSHOT_MAX_COUNT = 30;
 const SNAPSHOT_MIN_INTERVAL_MS = 4000;
 const PERSONA_DEFAULT_PRESET_STORAGE_KEY = 'tavern_helper_default_preset_v1';
+const BINDING_PLUS_BACKUP_APP = 'bindingplus';
+const BINDING_PLUS_BACKUP_VERSION = 1;
 const DEFAULT_BINDING_PLUS_THEME_PRESET_ID: BindingPlusThemePresetId = 'midnight_cyan';
 
 const FOLLOW_SMART_THEME_TOKENS: BindingPlusThemeTokens = {
