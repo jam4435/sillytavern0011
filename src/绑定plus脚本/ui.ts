@@ -270,6 +270,76 @@ function formatTime(timestamp: number): string {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
 }
 
+function formatBackupFileTimestamp(date: Date = new Date()): string {
+  const yyyy = date.getFullYear();
+  const mm = `${date.getMonth() + 1}`.padStart(2, '0');
+  const dd = `${date.getDate()}`.padStart(2, '0');
+  const hh = `${date.getHours()}`.padStart(2, '0');
+  const min = `${date.getMinutes()}`.padStart(2, '0');
+  const ss = `${date.getSeconds()}`.padStart(2, '0');
+  return `${yyyy}${mm}${dd}-${hh}${min}${ss}`;
+}
+
+function readTextFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(typeof reader.result === 'string' ? reader.result : '');
+    };
+    reader.onerror = () => {
+      reject(reader.error || new Error('读取文件失败'));
+    };
+    reader.readAsText(file, 'utf-8');
+  });
+}
+
+function exportBindingPlusBackup(): void {
+  try {
+    const parentDoc = window.parent.document;
+    const backup = createBindingPlusBackupFile();
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = parentDoc.createElement('a');
+    link.href = url;
+    link.download = `bindingplus-backup-${formatBackupFileTimestamp(new Date(backup.exportedAt))}.json`;
+    link.style.display = 'none';
+    parentDoc.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    toastr.success('绑定plus备份已导出');
+  } catch (error) {
+    showUiErrorToast('导出绑定plus备份失败', error);
+  }
+}
+
+async function importBindingPlusBackupFromFile(file: File): Promise<void> {
+  try {
+    const text = await readTextFile(file);
+    const parsed = JSON.parse(text) as unknown;
+    const summary = importBindingPlusBackupFile(parsed);
+    const summaryText = summarizeBindingPlusBackupImport(summary);
+
+    renderSidebarSecondaryList();
+    renderToolbarSelectionSummary();
+    renderResourceDetailPages();
+    renderBindingPlusThemeSection();
+    applyBindingPlusThemeToDom(window.parent.document);
+    renderPlusBindingSection();
+
+    await applyPersonaPlusBindingsWithToast(
+      getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || 'bindingplus',
+      getRuntimeContext(),
+      true,
+      '导入备份后应用当前绑定失败',
+    );
+
+    toastr.success(`导入绑定plus备份完成：${summaryText}`);
+  } catch (error) {
+    showUiErrorToast('导入绑定plus备份失败', error);
+  }
+}
+
 function isBindingPlusFollowSmartThemePreset(presetId: BindingPlusThemePresetId): boolean {
   return presetId === 'follow_smart_theme';
 }
@@ -806,7 +876,12 @@ function createPanelHtml(): string {
                     </div>
                     <div>
                       <div class="plus-probe-title">绑定存储管理</div>
-                      <div class="text-note">这里列出绑定plus保存的全部聊天/角色绑定。用于删除已经不存在的聊天残留绑定。</div>
+                      <div class="text-note">这里列出绑定plus保存的全部聊天/角色绑定。用于删除已经不存在的聊天残留绑定，也可以把绑定plus配置导出为 JSON 备份后再导入恢复。</div>
+                      <div class="edit-actions-bar compact-toolbar">
+                        <button class="persona-btn" id="bindingplus-backup-export-btn" type="button">导出备份</button>
+                        <button class="persona-btn" id="bindingplus-backup-import-btn" type="button">导入备份</button>
+                        <input id="bindingplus-backup-import-input" type="file" accept=".json,application/json" style="display:none;">
+                      </div>
                       <div id="persona-context-binding-storage-list" class="persona-plus-list"></div>
                     </div>
                   </div>
@@ -6450,6 +6525,30 @@ function bindPanelEvents(): void {
       event.stopPropagation();
       const bindingId = (($(event.currentTarget).attr('data-binding-id') as string | undefined) || '').trim();
       void deleteContextBindingFromUi(bindingId);
+    });
+
+  $(parentDoc)
+    .off(`click${PANEL_EVENT_NAMESPACE}`, '#bindingplus-backup-export-btn')
+    .on(`click${PANEL_EVENT_NAMESPACE}`, '#bindingplus-backup-export-btn', () => {
+      exportBindingPlusBackup();
+    });
+
+  $(parentDoc)
+    .off(`click${PANEL_EVENT_NAMESPACE}`, '#bindingplus-backup-import-btn')
+    .on(`click${PANEL_EVENT_NAMESPACE}`, '#bindingplus-backup-import-btn', () => {
+      $('#bindingplus-backup-import-input', parentDoc).trigger('click');
+    });
+
+  $(parentDoc)
+    .off(`change${PANEL_EVENT_NAMESPACE}`, '#bindingplus-backup-import-input')
+    .on(`change${PANEL_EVENT_NAMESPACE}`, '#bindingplus-backup-import-input', function () {
+      const input = this as HTMLInputElement;
+      const file = input.files?.[0];
+      input.value = '';
+      if (!file) {
+        return;
+      }
+      void importBindingPlusBackupFromFile(file);
     });
 
   $(parentDoc)
