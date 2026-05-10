@@ -1,4 +1,6 @@
-import { LOREBOOK_PANEL_ID } from '../config.js';
+import { LOREBOOK_PANEL_ID, LOREBOOK_THEME_KEY } from '../config.js';
+import { exportBrowserSettings, importBrowserSettings } from '../features/browserSettingsBackup.js';
+import { loadSortPreference } from '../features/sorting.js';
 import {
   getFullscreenModeSetting,
   getHighlightActiveEntriesSetting,
@@ -9,12 +11,11 @@ import {
   setPcLayoutModeSetting,
   setShowSearchBarSetting,
 } from '../settings.js';
-import { getLocalStorageItem, isMobile, rgbaToHex, setLocalStorageItem } from '../utils.js';
+import { getLocalStorageItem, isMobile, rgbaToHex, setLocalStorageItem, triggerDownload } from '../utils.js';
 import { refreshAiWorkspace } from './aiWorkspace.js';
 import { syncPanelLayoutMode } from './detail.js';
 import { switchTab, toggleLorebookPanel } from './panel.js';
 
-const LOREBOOK_THEME_KEY = 'enhanced-lorebook-theme';
 const THEME_VERSION = 3;
 const DEFAULT_LAYOUT_MODE = 'master-detail';
 const VALID_LAYOUT_MODES = new Set(['drawer', 'master-detail']);
@@ -521,6 +522,31 @@ function ensureThemeModalShape($modal) {
       }
     }
   }
+
+  if ($modal.find('#browser-settings-transfer-group').length === 0) {
+    const browserSettingsHtml = `
+      <div id="browser-settings-transfer-group" class="form-group theme-form-group-stacked">
+        <label>浏览器设置</label>
+        <div class="theme-browser-settings-actions">
+          <button type="button" id="browser-settings-export-button">
+            <i class="fa-solid fa-file-export"></i>
+            <span>导出浏览器设置</span>
+          </button>
+          <button type="button" id="browser-settings-import-button">
+            <i class="fa-solid fa-file-import"></i>
+            <span>导入浏览器设置</span>
+          </button>
+          <input type="file" id="browser-settings-import-file-input" accept=".json,application/json">
+        </div>
+      </div>
+    `;
+    const $actions = $modal.find('.form-actions');
+    if ($actions.length) {
+      $actions.before(browserSettingsHtml);
+    } else {
+      $modal.find('.modal-body').append(browserSettingsHtml);
+    }
+  }
 }
 
 async function refreshCurrentTabForLayoutChange() {
@@ -566,6 +592,59 @@ function updateButtonBehavior(settings) {
 
     toggleButton.addEventListener('click', hijackHandler, true);
   }
+}
+
+function buildBrowserSettingsBackupFilename() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `enhanced-lorebook-browser-settings-${timestamp}.json`;
+}
+
+function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(typeof reader.result === 'string' ? reader.result : '');
+    };
+    reader.onerror = () => reject(new Error('读取浏览器设置备份失败。'));
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+function notifyBrowserSettings(type, message) {
+  const toastr = window.toastr || window.parent?.toastr;
+  if (toastr && typeof toastr[type] === 'function') {
+    toastr[type](message);
+    return;
+  }
+
+  alert(message);
+}
+
+async function applyImportedBrowserSettingsToUi() {
+  loadSortPreference();
+
+  const parentDoc = getParentDoc();
+  const $panel = $(`#${LOREBOOK_PANEL_ID}`, parentDoc);
+  const pcLayoutMode = getPcLayoutModeSetting();
+  const themeLayoutMode = getEffectiveThemeLayoutMode(pcLayoutMode);
+  const theme = loadTheme(themeLayoutMode);
+
+  applyTheme(theme);
+  updateButtonBehavior(theme);
+  fillThemeModal(theme, pcLayoutMode);
+  syncPanelLayoutMode();
+
+  $panel.toggleClass('fullscreen-mode', getFullscreenModeSetting());
+  $panel.find('.global-lorebook-adder').toggle(getShowSearchBarSetting());
+
+  if (window.toggleActivationListeners) {
+    window.toggleActivationListeners();
+  }
+
+  await refreshCurrentTabForLayoutChange();
+  void refreshAiWorkspace();
+
+  return themeLayoutMode;
 }
 
 export function initTheme() {
