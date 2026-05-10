@@ -2209,7 +2209,8 @@ export function initPanel() {
                     align-items: center;
                     gap: 6px;
                 }
-                #theme-settings-modal #panel-background-image-file-input {
+                #theme-settings-modal #panel-background-image-file-input,
+                #theme-settings-modal #browser-settings-import-file-input {
                     display: none;
                 }
                 #theme-settings-modal #panel-background-image-upload-button,
@@ -2225,6 +2226,30 @@ export function initPanel() {
                 #theme-settings-modal #panel-background-image-upload-button:hover,
                 #theme-settings-modal #panel-background-image-clear-button:hover {
                     background-color: var(--panel-input-focus-bg-color, #3a3a3a);
+                }
+                #theme-settings-modal .theme-browser-settings-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                }
+                #theme-settings-modal #browser-settings-export-button,
+                #theme-settings-modal #browser-settings-import-button {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background-color: var(--panel-input-bg-color, #333);
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
+                    border: 1px solid var(--panel-border-color, #555);
+                    border-radius: 6px;
+                    padding: 7px 10px;
+                    cursor: pointer;
+                    transition: background-color 0.2s, filter 0.2s;
+                }
+                #theme-settings-modal #browser-settings-export-button:hover,
+                #theme-settings-modal #browser-settings-import-button:hover {
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
+                    filter: brightness(1.08);
                 }
                 #theme-settings-modal select.form-control {
                     min-width: 120px;

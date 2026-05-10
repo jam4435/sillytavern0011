@@ -46,6 +46,7 @@ src/世界书编辑脚本/
     │   ├── aiActions.js
     │   ├── aiActionsBatch.js
     │   ├── batchActions.js
+    │   ├── browserSettingsBackup.js
     │   ├── bulkImport.js
     │   ├── folderMeta.js
     │   ├── history.js
@@ -103,6 +104,7 @@ src/世界书编辑脚本/
 | `aiActions.js` | AI 改写基础能力：收集条目、解析单条/基础预览、应用预览并写回世界书 |
 | `aiActionsBatch.js` | 当前 AI 工作区主实现：规划、分批预览、提示词组装、JSON 修复解析、批次上下文承接 |
 | `batchActions.js` | 批量删除、复制、全选、位置调整、字段批量切换等 |
+| `browserSettingsBackup.js` | 浏览器设置备份：按白名单导出/导入插件 localStorage 设置，并在导出时脱敏 AI 自定义 API Key |
 | `bulkImport.js` | YAML 批量导入条目 |
 | `folderMeta.js` | 文件夹元数据处理 |
 | `history.js` | 事务快照、回滚预览、执行回滚 |
@@ -127,7 +129,7 @@ src/世界书编辑脚本/
 | `aiWorkspaceDesktop.js` | 桌面布局下的 AI 工作区适配 |
 | `masterEntryTokens.js` | 主从布局下条目 token 辅助展示 |
 | `expandManager.js` | 展开/折叠状态维护 |
-| `theme.js` | 主题和样式覆盖 |
+| `theme.js` | 主题、样式覆盖，以及主题弹窗内的浏览器设置导入导出入口 |
 
 ## 5. 核心架构
 
@@ -168,6 +170,8 @@ src/世界书编辑脚本/
    - 可编辑字段
    - 破限提示词、指导提示词、规划提示词
    - `direct` / `plan` 两套 AI 工作区上下文
+
+浏览器设置导入导出由 `features/browserSettingsBackup.js` 统一维护 localStorage 白名单，`ui/theme.js` 负责主题弹窗入口和导入后的界面刷新。
 
 ### 5.3 原子写回与事务历史
 

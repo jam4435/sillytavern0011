@@ -827,6 +827,56 @@ export function initTheme() {
     reader.readAsDataURL(file);
   });
 
+  $modal.on('click', '#browser-settings-export-button', function () {
+    try {
+      const payload = exportBrowserSettings({ redactSecrets: true });
+      const content = JSON.stringify(payload, null, 2);
+      triggerDownload(buildBrowserSettingsBackupFilename(), content);
+      notifyBrowserSettings('success', `已导出 ${Object.keys(payload.items).length} 个浏览器设置，API Key 已脱敏。`);
+    } catch (error) {
+      console.error('角色世界书: 导出浏览器设置失败', error);
+      notifyBrowserSettings('error', `导出浏览器设置失败：${error.message}`);
+    }
+  });
+
+  $modal.on('click', '#browser-settings-import-button', function () {
+    $('#browser-settings-import-file-input', parentDoc).val('').trigger('click');
+  });
+
+  $modal.on('change', '#browser-settings-import-file-input', async function () {
+    const file = this.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (file.type && file.type !== 'application/json' && !/\.json$/i.test(file.name)) {
+      notifyBrowserSettings('error', '请选择 JSON 格式的浏览器设置备份。');
+      $(this).val('');
+      return;
+    }
+
+    try {
+      const content = await readTextFile(file);
+      const result = importBrowserSettings(content);
+      appliedThemeLayoutMode = await applyImportedBrowserSettingsToUi();
+
+      const skippedParts = [];
+      if (result.skippedUnknownCount > 0) {
+        skippedParts.push(`跳过 ${result.skippedUnknownCount} 个未知项`);
+      }
+      if (result.skippedInvalidCount > 0) {
+        skippedParts.push(`跳过 ${result.skippedInvalidCount} 个无效项`);
+      }
+      const suffix = skippedParts.length ? `，${skippedParts.join('，')}` : '';
+      notifyBrowserSettings('success', `已导入 ${result.importedCount} 个浏览器设置${suffix}。`);
+    } catch (error) {
+      console.error('角色世界书: 导入浏览器设置失败', error);
+      notifyBrowserSettings('error', `导入浏览器设置失败：${error.message}`);
+    } finally {
+      $(this).val('');
+    }
+  });
+
   $modal.on('change', '#highlight-active-toggle', function () {
     const isEnabled = $(this).is(':checked');
     setHighlightActiveEntriesSetting(isEnabled);
