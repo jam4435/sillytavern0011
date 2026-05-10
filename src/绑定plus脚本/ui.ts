@@ -17,6 +17,7 @@ import {
   extractBaseDescriptionFromComposed,
   findContextBinding,
   findPersonaByAvatarId,
+  getBindingPlusStorageReport,
   getBindingPlusThemePresets,
   getApiConnectionDisplayState,
   getCachedCurrentConnectionProfileName,
@@ -42,6 +43,7 @@ import {
   loadPersonaTraits,
   mergeBindingGroupResources,
   probePlusBindingInterfaces,
+  pruneLegacyPersonaSnapshots,
   recordPersonaSnapshot,
   resetBindingPlusTheme,
   refreshConnectionProfileCatalog,
@@ -100,6 +102,7 @@ let baseDescDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastCompatibilityReport: CompatibilityCheckReport | null = null;
 let lastPlusProbeReport: PersonaPlusProbeReport | null = null;
 let lastApiConfigTestReport: PersonaPlusApiConfigTestReport | null = null;
+let lastSnapshotPruneSummary: ReturnType<typeof pruneLegacyPersonaSnapshots> | null = null;
 let plusEventBridgeStarted = false;
 let lastObservedContext: PersonaRuntimeContext | null = null;
 let panelStyleDestroy: (() => void) | null = null;
@@ -280,6 +283,17 @@ function formatBackupFileTimestamp(date: Date = new Date()): string {
   return `${yyyy}${mm}${dd}-${hh}${min}${ss}`;
 }
 
+function formatStorageSize(bytes: number): string {
+  const safeBytes = Math.max(0, bytes);
+  if (safeBytes >= 1024 * 1024) {
+    return `${(safeBytes / 1024 / 1024).toFixed(2)} MiB`;
+  }
+  if (safeBytes >= 1024) {
+    return `${(safeBytes / 1024).toFixed(1)} KiB`;
+  }
+  return `${safeBytes} B`;
+}
+
 function readTextFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -333,6 +347,7 @@ async function importBindingPlusBackupFromFile(file: File): Promise<void> {
       true,
       '导入备份后应用当前绑定失败',
     );
+    renderBindingPlusStorageSection();
 
     toastr.success(`导入绑定plus备份完成：${summaryText}`);
   } catch (error) {
@@ -592,6 +607,7 @@ async function refreshAfterContextBindingDeleted(reason: string): Promise<void> 
       errorToastTitle: `${reason}后同步 user人设失败`,
     });
   }
+  renderBindingPlusStorageSection();
 }
 
 async function deleteContextBindingFromUi(bindingId: string): Promise<void> {
@@ -877,6 +893,7 @@ function createPanelHtml(): string {
                     <div>
                       <div class="plus-probe-title">绑定存储管理</div>
                       <div class="text-note">这里列出绑定plus保存的全部聊天/角色绑定。用于删除已经不存在的聊天残留绑定，也可以把绑定plus配置导出为 JSON 备份后再导入恢复。</div>
+                      <div id="bindingplus-storage-size-summary" class="persona-plus-list"></div>
                       <div class="edit-actions-bar compact-toolbar">
                         <button class="persona-btn" id="bindingplus-backup-export-btn" type="button">导出备份</button>
                         <button class="persona-btn" id="bindingplus-backup-import-btn" type="button">导入备份</button>
@@ -4490,6 +4507,56 @@ function renderContextBindingStorageSection(): void {
   $storageList.html(bindings.map(binding => createContextBindingStorageItemHtml(binding)).join(''));
 }
 
+function renderBindingPlusStorageSection(): void {
+  const parentDoc = window.parent.document;
+  const $summary = $('#bindingplus-storage-size-summary', parentDoc);
+  if (!$summary.length) {
+    return;
+  }
+
+  const report = getBindingPlusStorageReport(6);
+  const categoryText = report.categories
+    .slice(0, 6)
+    .map(category => `${category.category} ${formatStorageSize(category.bytes)} / ${category.keyCount} key`)
+    .join('；');
+  const cleanupHtml =
+    lastSnapshotPruneSummary && lastSnapshotPruneSummary.removedSnapshots > 0
+      ? `<div class="plus-probe-item ok">
+          <div>已自动清理旧快照</div>
+          <div class="plus-probe-meta">${escapeHtml(
+            `删除 ${lastSnapshotPruneSummary.removedSnapshots} 份，释放约 ${formatStorageSize(lastSnapshotPruneSummary.freedBytes)}`,
+          )}</div>
+        </div>`
+      : '';
+  const topItemsHtml = report.topItems
+    .map(
+      item => `
+        <div class="plus-probe-item">
+          <div>${escapeHtml(item.label)}</div>
+          <div class="plus-probe-meta">${escapeHtml(`${formatStorageSize(item.bytes)} · ${item.key}`)}</div>
+        </div>
+      `,
+    )
+    .join('');
+
+  $summary.html(`
+    <div class="plus-probe-item ok">
+      <div>绑定plus存储占用</div>
+      <div class="plus-probe-meta">${escapeHtml(`总计 ${formatStorageSize(report.totalBytes)} · ${report.keyCount} 个 key`)}</div>
+    </div>
+    ${cleanupHtml}
+    ${
+      categoryText
+        ? `<div class="plus-probe-item">
+            <div>模块占用 Top</div>
+            <div class="plus-probe-meta">${escapeHtml(categoryText)}</div>
+          </div>`
+        : '<div class="empty-list">绑定plus当前没有保存本地数据。</div>'
+    }
+    ${topItemsHtml}
+  `);
+}
+
 function renderPlusBindingSection(report: PersonaPlusProbeReport | null = lastPlusProbeReport): void {
   const parentDoc = window.parent.document;
   const $contextSummary = $('#persona-plus-context-summary', parentDoc);
@@ -4503,6 +4570,7 @@ function renderPlusBindingSection(report: PersonaPlusProbeReport | null = lastPl
   }
 
   renderContextBindingStorageSection();
+  renderBindingPlusStorageSection();
 
   const debugInfo = getRuntimeContextDebugInfo();
   const currentContext = report?.currentContext || debugInfo.context;
@@ -6034,6 +6102,7 @@ async function rollbackLastSnapshot(avatarId: string): Promise<void> {
 
   renderPersonaTraits(avatarId);
   renderSnapshotSection(avatarId);
+  renderBindingPlusStorageSection();
   await applyComposedDescriptionForAvatar(avatarId, '回滚快照后自动同步', {
     applyPlusBindings: false,
     errorToastTitle: '回滚快照后同步 user人设失败',
@@ -6855,6 +6924,13 @@ function bindPanelEvents(): void {
 
 export function initPanel(): void {
   const parentDoc = window.parent.document;
+
+  lastSnapshotPruneSummary = pruneLegacyPersonaSnapshots();
+  if (lastSnapshotPruneSummary.removedSnapshots > 0) {
+    console.info(
+      `绑定plus: 已自动清理旧快照 ${lastSnapshotPruneSummary.removedSnapshots} 份，释放约 ${formatStorageSize(lastSnapshotPruneSummary.freedBytes)}`,
+    );
+  }
 
   injectStyles(parentDoc);
   const $existingButton = $(`#${PERSONA_BUTTON_ID}`, parentDoc);

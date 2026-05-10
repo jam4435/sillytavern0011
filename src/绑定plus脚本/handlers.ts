@@ -47,7 +47,7 @@ declare const toastr: any;
 declare function triggerSlash(command: string): Promise<string>;
 
 const PERSONA_ADVANCED_CONFIG_VERSION = 1;
-const SNAPSHOT_MAX_COUNT = 30;
+const SNAPSHOT_MAX_COUNT = 3;
 const SNAPSHOT_MIN_INTERVAL_MS = 4000;
 const PERSONA_DEFAULT_PRESET_STORAGE_KEY = 'tavern_helper_default_preset_v1';
 const BINDING_PLUS_BACKUP_APP = 'bindingplus';
@@ -604,6 +604,200 @@ function cloneNumberArrayRecord(source: Record<string, number[]> | undefined): R
     next[normalizedKey] = uniqueNumbers(values);
   });
   return next;
+}
+
+export type BindingPlusStorageReportItem = {
+  key: string;
+  label: string;
+  category: string;
+  bytes: number;
+};
+
+export type BindingPlusStorageCategoryReport = {
+  category: string;
+  keyCount: number;
+  bytes: number;
+};
+
+export type BindingPlusStorageReport = {
+  totalBytes: number;
+  keyCount: number;
+  topItems: BindingPlusStorageReportItem[];
+  categories: BindingPlusStorageCategoryReport[];
+};
+
+export type PersonaSnapshotPruneSummary = {
+  scannedKeys: number;
+  prunedKeys: number;
+  removedSnapshots: number;
+  freedBytes: number;
+};
+
+function limitPersonaSnapshots<T>(snapshots: T[]): T[] {
+  return snapshots.length > SNAPSHOT_MAX_COUNT ? snapshots.slice(-SNAPSHOT_MAX_COUNT) : snapshots;
+}
+
+function estimateLocalStorageBytes(key: string, value: string): number {
+  return (key.length + value.length) * 2;
+}
+
+function isBindingPlusStorageKey(key: string): boolean {
+  return (
+    key.startsWith('tavern_helper_persona_') ||
+    key === PERSONA_CONTEXT_BINDINGS_STORAGE_KEY ||
+    key === PERSONA_BINDING_GROUPS_STORAGE_KEY ||
+    key === PERSONA_DEFAULT_PRESET_STORAGE_KEY ||
+    key === PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY ||
+    key === PERSONA_DEFAULT_WORLDBOOK_ENTRIES_STORAGE_KEY ||
+    key === BINDING_PLUS_THEME_STORAGE_KEY
+  );
+}
+
+function getBindingPlusStorageKeyInfo(key: string): { label: string; category: string } {
+  if (key.startsWith(PERSONA_SNAPSHOT_STORAGE_PREFIX)) {
+    return {
+      label: `变更保护快照 · ${key.slice(PERSONA_SNAPSHOT_STORAGE_PREFIX.length) || 'unknown'}`,
+      category: '变更保护快照',
+    };
+  }
+  if (key.startsWith(PERSONA_BASE_DESC_STORAGE_PREFIX)) {
+    return {
+      label: `基础描述 · ${key.slice(PERSONA_BASE_DESC_STORAGE_PREFIX.length) || 'unknown'}`,
+      category: '基础描述',
+    };
+  }
+  if (key.startsWith(PERSONA_TRAITS_STORAGE_PREFIX)) {
+    return {
+      label: `条目列表 · ${key.slice(PERSONA_TRAITS_STORAGE_PREFIX.length) || 'unknown'}`,
+      category: '条目列表',
+    };
+  }
+  if (key.startsWith(PERSONA_ADVANCED_STORAGE_PREFIX)) {
+    return {
+      label: `高级配置 · ${key.slice(PERSONA_ADVANCED_STORAGE_PREFIX.length) || 'unknown'}`,
+      category: '高级配置',
+    };
+  }
+  if (key.startsWith(PERSONA_PLUS_APPLIED_STORAGE_PREFIX)) {
+    return {
+      label: `已应用状态 · ${key.slice(PERSONA_PLUS_APPLIED_STORAGE_PREFIX.length) || 'global'}`,
+      category: '已应用状态',
+    };
+  }
+  if (key === PERSONA_CONTEXT_BINDINGS_STORAGE_KEY) {
+    return { label: '聊天/角色绑定', category: '聊天/角色绑定' };
+  }
+  if (key === PERSONA_BINDING_GROUPS_STORAGE_KEY) {
+    return { label: '绑定组', category: '绑定组' };
+  }
+  if (key === PERSONA_DEFAULT_PRESET_STORAGE_KEY) {
+    return { label: '默认预设', category: '默认预设' };
+  }
+  if (key === PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY) {
+    return { label: '默认预设条目', category: '默认预设条目' };
+  }
+  if (key === PERSONA_DEFAULT_WORLDBOOK_ENTRIES_STORAGE_KEY) {
+    return { label: '默认世界书条目', category: '默认世界书条目' };
+  }
+  if (key === BINDING_PLUS_THEME_STORAGE_KEY) {
+    return { label: '主题配置', category: '主题配置' };
+  }
+  return { label: key, category: 'user 人设其他数据' };
+}
+
+export function getBindingPlusStorageReport(topItemCount: number = 8): BindingPlusStorageReport {
+  const items: BindingPlusStorageReportItem[] = [];
+
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key || !isBindingPlusStorageKey(key)) {
+        continue;
+      }
+
+      const value = localStorage.getItem(key);
+      if (value === null) {
+        continue;
+      }
+
+      const info = getBindingPlusStorageKeyInfo(key);
+      items.push({
+        key,
+        ...info,
+        bytes: estimateLocalStorageBytes(key, value),
+      });
+    }
+  } catch (error) {
+    console.warn('绑定plus: 统计本地存储占用失败', error);
+  }
+
+  items.sort((a, b) => b.bytes - a.bytes);
+  const categoryMap = new Map<string, BindingPlusStorageCategoryReport>();
+  items.forEach(item => {
+    const current = categoryMap.get(item.category) || {
+      category: item.category,
+      keyCount: 0,
+      bytes: 0,
+    };
+    current.keyCount += 1;
+    current.bytes += item.bytes;
+    categoryMap.set(item.category, current);
+  });
+
+  return {
+    totalBytes: items.reduce((sum, item) => sum + item.bytes, 0),
+    keyCount: items.length,
+    topItems: items.slice(0, Math.max(0, topItemCount)),
+    categories: Array.from(categoryMap.values()).sort((a, b) => b.bytes - a.bytes),
+  };
+}
+
+export function pruneLegacyPersonaSnapshots(): PersonaSnapshotPruneSummary {
+  const summary: PersonaSnapshotPruneSummary = {
+    scannedKeys: 0,
+    prunedKeys: 0,
+    removedSnapshots: 0,
+    freedBytes: 0,
+  };
+
+  const snapshotKeys: string[] = [];
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(PERSONA_SNAPSHOT_STORAGE_PREFIX)) {
+        snapshotKeys.push(key);
+      }
+    }
+  } catch (error) {
+    console.warn('绑定plus: 扫描旧快照失败', error);
+    return summary;
+  }
+
+  for (const key of snapshotKeys) {
+    summary.scannedKeys += 1;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        continue;
+      }
+
+      const snapshots = safeArray<PersonaSnapshot>(JSON.parse(raw));
+      if (snapshots.length <= SNAPSHOT_MAX_COUNT) {
+        continue;
+      }
+
+      const limited = limitPersonaSnapshots(snapshots);
+      const nextRaw = JSON.stringify(limited);
+      localStorage.setItem(key, nextRaw);
+      summary.prunedKeys += 1;
+      summary.removedSnapshots += snapshots.length - limited.length;
+      summary.freedBytes += Math.max(0, estimateLocalStorageBytes(key, raw) - estimateLocalStorageBytes(key, nextRaw));
+    } catch (error) {
+      console.warn(`绑定plus: 清理旧快照失败 (${key})`, error);
+    }
+  }
+
+  return summary;
 }
 
 function areOptionalStringArraysEqual(left?: string[], right?: string[]): boolean {
@@ -3896,7 +4090,7 @@ export function loadPersonaSnapshots(avatarId: string): PersonaSnapshot[] {
       return [];
     }
     const parsed = JSON.parse(raw);
-    return safeArray<PersonaSnapshot>(parsed);
+    return limitPersonaSnapshots(safeArray<PersonaSnapshot>(parsed));
   } catch (error) {
     console.error('用户设定脚本: 加载快照失败', error);
     return [];
@@ -3906,7 +4100,7 @@ export function loadPersonaSnapshots(avatarId: string): PersonaSnapshot[] {
 function savePersonaSnapshots(avatarId: string, snapshots: PersonaSnapshot[]): boolean {
   try {
     const key = getPersonaSnapshotStorageKey(avatarId);
-    localStorage.setItem(key, JSON.stringify(snapshots));
+    localStorage.setItem(key, JSON.stringify(limitPersonaSnapshots(snapshots)));
     return true;
   } catch (error) {
     console.error('用户设定脚本: 保存快照失败', error);
