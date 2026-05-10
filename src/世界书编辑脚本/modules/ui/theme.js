@@ -829,10 +829,13 @@ export function initTheme() {
 
   $modal.on('click', '#browser-settings-export-button', function () {
     try {
-      const payload = exportBrowserSettings({ redactSecrets: true });
+      const payload = exportBrowserSettings({ redactSecrets: true, redactUploadedImages: true });
       const content = JSON.stringify(payload, null, 2);
       triggerDownload(buildBrowserSettingsBackupFilename(), content);
-      notifyBrowserSettings('success', `已导出 ${Object.keys(payload.items).length} 个浏览器设置，API Key 已脱敏。`);
+      notifyBrowserSettings(
+        'success',
+        `已导出 ${Object.keys(payload.items).length} 个浏览器设置，API Key 和上传背景图已脱敏。`,
+      );
     } catch (error) {
       console.error('角色世界书: 导出浏览器设置失败', error);
       notifyBrowserSettings('error', `导出浏览器设置失败：${error.message}`);

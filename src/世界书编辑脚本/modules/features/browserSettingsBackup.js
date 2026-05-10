@@ -76,6 +76,39 @@ function redactAiWorkspaceSettings(rawValue) {
   }
 }
 
+function isDataUrl(value) {
+  return typeof value === 'string' && value.trim().toLowerCase().startsWith('data:');
+}
+
+function redactUploadedBackgroundImages(value) {
+  if (Array.isArray(value)) {
+    return value.map(redactUploadedBackgroundImages);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => {
+      if (key === 'backgroundImageUrl' && isDataUrl(item)) {
+        return [key, ''];
+      }
+
+      return [key, redactUploadedBackgroundImages(item)];
+    }),
+  );
+}
+
+function redactThemeSettings(rawValue) {
+  try {
+    return JSON.stringify(redactUploadedBackgroundImages(JSON.parse(rawValue)));
+  } catch (error) {
+    console.warn('角色世界书: 主题设置解析失败，导出时已跳过该设置。', error);
+    return null;
+  }
+}
+
 function normalizePayload(payload) {
   if (typeof payload === 'string') {
     try {
@@ -88,7 +121,7 @@ function normalizePayload(payload) {
   return payload;
 }
 
-export function exportBrowserSettings({ redactSecrets = true } = {}) {
+export function exportBrowserSettings({ redactSecrets = true, redactUploadedImages = true } = {}) {
   const items = {};
 
   for (const key of BROWSER_SETTINGS_STORAGE_KEYS) {
@@ -106,6 +139,15 @@ export function exportBrowserSettings({ redactSecrets = true } = {}) {
       continue;
     }
 
+    if (key === LOREBOOK_THEME_KEY && redactUploadedImages) {
+      const redactedValue = redactThemeSettings(value);
+      if (redactedValue === null) {
+        continue;
+      }
+      items[key] = redactedValue;
+      continue;
+    }
+
     items[key] = value;
   }
 
@@ -115,6 +157,7 @@ export function exportBrowserSettings({ redactSecrets = true } = {}) {
     exportedAt: new Date().toISOString(),
     redactions: {
       aiWorkspaceCustomApiKey: redactSecrets,
+      uploadedBackgroundImages: redactUploadedImages,
     },
     items,
   };

@@ -104,7 +104,7 @@ src/世界书编辑脚本/
 | `aiActions.js` | AI 改写基础能力：收集条目、解析单条/基础预览、应用预览并写回世界书 |
 | `aiActionsBatch.js` | 当前 AI 工作区主实现：规划、分批预览、提示词组装、JSON 修复解析、批次上下文承接 |
 | `batchActions.js` | 批量删除、复制、全选、位置调整、字段批量切换等 |
-| `browserSettingsBackup.js` | 浏览器设置备份：按白名单导出/导入插件 localStorage 设置，并在导出时脱敏 AI 自定义 API Key |
+| `browserSettingsBackup.js` | 浏览器设置备份：按白名单导出/导入插件 localStorage 设置，并在导出时脱敏 AI 自定义 API Key 和上传背景图 data URL |
 | `bulkImport.js` | YAML 批量导入条目 |
 | `folderMeta.js` | 文件夹元数据处理 |
 | `history.js` | 事务快照、回滚预览、执行回滚 |
