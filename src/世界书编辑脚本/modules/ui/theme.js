@@ -67,6 +67,7 @@ function getDefaultSharedTheme() {
   return {
     showTopbarButton: false,
     truncateLongNames: true,
+    mobileExpandButtonUnderCheckbox: false,
     invertButtonMode: 'invert',
     unifiedIconButtons: false,
   };
@@ -104,6 +105,10 @@ function normalizeSharedTheme(shared = {}, fallback = getDefaultSharedTheme()) {
   return {
     showTopbarButton: pickBoolean(shared.showTopbarButton, fallback.showTopbarButton),
     truncateLongNames: pickBoolean(shared.truncateLongNames, fallback.truncateLongNames),
+    mobileExpandButtonUnderCheckbox: pickBoolean(
+      shared.mobileExpandButtonUnderCheckbox,
+      fallback.mobileExpandButtonUnderCheckbox,
+    ),
     invertButtonMode: typeof shared.invertButtonMode === 'string' ? shared.invertButtonMode : fallback.invertButtonMode,
     unifiedIconButtons: pickBoolean(shared.unifiedIconButtons, fallback.unifiedIconButtons),
   };
@@ -259,6 +264,10 @@ function applyTheme(theme) {
     if ($panel.length) {
       $panel.attr('data-unified-icon-buttons', sharedTheme.unifiedIconButtons ? 'true' : 'false');
       $panel.attr('data-mobile-entry-title-mode', truncateLongNames ? 'single-line' : 'two-line');
+      $panel.attr(
+        'data-mobile-expand-placement',
+        sharedTheme.mobileExpandButtonUnderCheckbox ? 'under-checkbox' : 'inline',
+      );
       $panel.css({
         '--panel-bg-color': panelBgColor,
         '--panel-text-color': layoutTheme.textColor,
@@ -397,6 +406,9 @@ function readThemeFromModal(layoutMode = getPcLayoutModeSetting()) {
     truncateLongNames: $('#truncate-long-names-toggle', parentDoc).length
       ? $('#truncate-long-names-toggle', parentDoc).is(':checked')
       : currentTheme.truncateLongNames,
+    mobileExpandButtonUnderCheckbox: $('#mobile-expand-under-checkbox-toggle', parentDoc).length
+      ? $('#mobile-expand-under-checkbox-toggle', parentDoc).is(':checked')
+      : currentTheme.mobileExpandButtonUnderCheckbox,
     unifiedIconButtons: $('#unified-icon-toggle', parentDoc).length
       ? $('#unified-icon-toggle', parentDoc).is(':checked')
       : currentTheme.unifiedIconButtons,
@@ -426,6 +438,10 @@ function fillThemeModal(theme, layoutMode = getPcLayoutModeSetting()) {
   $('#show-search-bar-toggle', parentDoc).prop('checked', getShowSearchBarSetting());
   $('#fullscreen-mode-toggle', parentDoc).prop('checked', getFullscreenModeSetting());
   $('#truncate-long-names-toggle', parentDoc).prop('checked', theme.truncateLongNames !== false);
+  $('#mobile-expand-under-checkbox-toggle', parentDoc).prop(
+    'checked',
+    theme.mobileExpandButtonUnderCheckbox === true,
+  );
   $('#unified-icon-toggle', parentDoc).prop('checked', theme.unifiedIconButtons === true);
   $('#pc-layout-mode-select', parentDoc).val(normalizeLayoutMode(layoutMode));
   syncIconColorGroup(parentDoc, theme.unifiedIconButtons === true);
@@ -519,6 +535,35 @@ function ensureThemeModalShape($modal) {
         $pcLayoutGroup.before(iconControlsHtml);
       } else {
         $modal.find('.modal-body').append(iconControlsHtml);
+      }
+    }
+  }
+
+  if (
+    $modal.find('#topbar-button-toggle-group').length &&
+    $modal.find('#mobile-expand-under-checkbox-toggle-group').length === 0
+  ) {
+    const mobileExpandToggleHtml = `
+      <div id="mobile-expand-under-checkbox-toggle-group" class="form-group">
+        <label for="mobile-expand-under-checkbox-toggle">手机端展开箭头下置</label>
+        <label class="switch">
+          <input type="checkbox" id="mobile-expand-under-checkbox-toggle">
+          <span class="slider round"></span>
+        </label>
+      </div>
+    `;
+    const $truncateGroup = $modal.find('#truncate-long-names-toggle-group');
+    if ($truncateGroup.length) {
+      $truncateGroup.after(mobileExpandToggleHtml);
+    } else {
+      const $iconGroup = $modal.find('#unified-icon-toggle-group');
+      const $pcLayoutGroup = $modal.find('#pc-layout-mode-group');
+      if ($iconGroup.length) {
+        $iconGroup.before(mobileExpandToggleHtml);
+      } else if ($pcLayoutGroup.length) {
+        $pcLayoutGroup.before(mobileExpandToggleHtml);
+      } else {
+        $modal.find('.modal-body').append(mobileExpandToggleHtml);
       }
     }
   }
@@ -703,6 +748,13 @@ export function initTheme() {
                    <span class="slider round"></span>
                </label>
            </div>
+           <div id="mobile-expand-under-checkbox-toggle-group" class="form-group">
+               <label for="mobile-expand-under-checkbox-toggle">手机端展开箭头下置</label>
+               <label class="switch">
+                   <input type="checkbox" id="mobile-expand-under-checkbox-toggle">
+                   <span class="slider round"></span>
+               </label>
+           </div>
            <div id="unified-icon-toggle-group" class="form-group">
                <label for="unified-icon-toggle">统一图标样式</label>
                <label class="switch">
@@ -749,6 +801,7 @@ export function initTheme() {
     try {
       const previousTheme = loadTheme(layoutMode);
       const previousTruncateLongNames = previousTheme.truncateLongNames !== false;
+      const previousMobileExpandPlacement = previousTheme.mobileExpandButtonUnderCheckbox === true;
       const themeFromModal = readThemeFromModal(layoutMode);
       setRangePercent(
         parentDoc,
@@ -764,7 +817,12 @@ export function initTheme() {
       updateButtonBehavior(newSettings);
 
       const nextTruncateLongNames = themeFromModal.truncateLongNames !== false;
-      if (isMobile() && previousTruncateLongNames !== nextTruncateLongNames) {
+      const nextMobileExpandPlacement = themeFromModal.mobileExpandButtonUnderCheckbox === true;
+      if (
+        isMobile() &&
+        (previousTruncateLongNames !== nextTruncateLongNames ||
+          previousMobileExpandPlacement !== nextMobileExpandPlacement)
+      ) {
         void refreshCurrentTabForLayoutChange();
       }
     } catch (error) {
@@ -778,6 +836,7 @@ export function initTheme() {
   $modal.on('change', '#panel-background-image-url-input', handleSettingsChange);
   $modal.on('change', '#topbar-button-toggle', handleSettingsChange);
   $modal.on('change', '#truncate-long-names-toggle', handleSettingsChange);
+  $modal.on('change', '#mobile-expand-under-checkbox-toggle', handleSettingsChange);
   $modal.on('change', '#unified-icon-toggle', handleSettingsChange);
 
   $modal.on('click', '#panel-background-image-clear-button', function () {

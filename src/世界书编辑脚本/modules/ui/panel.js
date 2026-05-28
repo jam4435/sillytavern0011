@@ -2604,6 +2604,52 @@ export function initPanel() {
                     #${LOREBOOK_PANEL_ID} .select-checkbox-container {
                         padding-left: 8px;
                     }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .mobile-row-1 {
+                        align-items: stretch;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions {
+                        align-self: stretch;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: flex-start;
+                        width: 30px;
+                        gap: 4px;
+                        margin-left: 0;
+                        padding-top: 0;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions .select-checkbox-container {
+                        order: 1;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 24px;
+                        padding-left: 0;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions .small-expand-button {
+                        order: 2;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 28px;
+                        min-height: 24px;
+                        margin-right: 0;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .mobile-title-editor {
+                        align-self: stretch;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .mobile-entry-title-display,
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .mobile-entry-title-input {
+                        min-height: 52px;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"][data-mobile-entry-title-mode="single-line"] .mobile-entry-title-display {
+                        display: flex;
+                        align-items: center;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"][data-mobile-entry-title-mode="two-line"] .mobile-entry-title-display {
+                        max-height: 52px;
+                    }
                     #${LOREBOOK_PANEL_ID} .mini-position-select {
                         flex-grow: 1;
                         min-width: 120px;
