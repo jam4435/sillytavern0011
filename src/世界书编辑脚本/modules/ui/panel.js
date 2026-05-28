@@ -2609,9 +2609,11 @@ export function initPanel() {
                     }
                     #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions {
                         align-self: stretch;
-                        flex-direction: column;
+                        display: grid;
+                        grid-template-rows: 24px 24px;
+                        justify-items: center;
+                        align-content: start;
                         align-items: center;
-                        justify-content: flex-start;
                         width: 30px;
                         gap: 4px;
                         margin-left: 0;
@@ -2622,17 +2624,32 @@ export function initPanel() {
                         display: flex;
                         align-items: center;
                         justify-content: center;
+                        width: 30px;
+                        height: 24px;
                         min-height: 24px;
+                        margin-left: 0;
                         padding-left: 0;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions .entry-select-checkbox {
+                        margin: 0;
                     }
                     #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions .small-expand-button {
                         order: 2;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        width: 28px;
+                        box-sizing: border-box;
+                        width: 30px;
+                        height: 24px;
                         min-height: 24px;
+                        margin: 0;
                         margin-right: 0;
+                        padding: 0;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions .small-expand-button i {
+                        width: 16px;
+                        text-align: center;
+                        line-height: 1;
                     }
                     #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .mobile-title-editor {
                         align-self: stretch;
