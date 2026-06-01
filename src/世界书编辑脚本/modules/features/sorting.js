@@ -1,6 +1,6 @@
 import { LOREBOOK_ENTRY_CLASS, LOREBOOK_SORT_PREF_KEY, LOREBOOK_UI_SORT_KEY } from '../config.js';
 import { lorebookSorts, setLorebookSorts } from '../state.js';
-import { ensureNumericUID } from '../utils.js';
+import { ensureNumericUID, getLocalStorageItem, setLocalStorageItem } from '../utils.js';
 
 // --- UI Drag-and-Drop Sorting ---
 
@@ -140,9 +140,9 @@ async function syncOrderToNativeWorldbook(lorebookName, sortedEntries) {
 function saveUISort(lorebookName, sortedIds) {
   try {
     // 以世界书名为键保存顺序
-    const allSortData = JSON.parse(localStorage.getItem(LOREBOOK_UI_SORT_KEY) || '{}');
+    const allSortData = JSON.parse(getLocalStorageItem(LOREBOOK_UI_SORT_KEY) || '{}');
     allSortData[lorebookName] = sortedIds;
-    localStorage.setItem(LOREBOOK_UI_SORT_KEY, JSON.stringify(allSortData));
+    setLocalStorageItem(LOREBOOK_UI_SORT_KEY, JSON.stringify(allSortData));
     console.log('[排序] 已保存 UI 排序到 localStorage:', lorebookName, sortedIds.length, '个条目');
   } catch (error) {
     console.error('角色世界书: 保存UI排序到本地存储失败', error);
@@ -152,7 +152,7 @@ function saveUISort(lorebookName, sortedIds) {
 // 从 localStorage 加载保存的排序顺序
 export function loadUISort(lorebookName) {
   try {
-    const storedData = localStorage.getItem(LOREBOOK_UI_SORT_KEY);
+    const storedData = getLocalStorageItem(LOREBOOK_UI_SORT_KEY);
     if (!storedData) return null;
 
     const allSortData = JSON.parse(storedData);
@@ -194,7 +194,7 @@ export function applySavedUISort($container, lorebookName) {
 
 export function saveSortPreference() {
   try {
-    localStorage.setItem(LOREBOOK_SORT_PREF_KEY, JSON.stringify(lorebookSorts));
+    setLocalStorageItem(LOREBOOK_SORT_PREF_KEY, JSON.stringify(lorebookSorts));
   } catch (error) {
     console.error('角色世界书: 保存排序偏好失败', error);
   }
@@ -202,7 +202,7 @@ export function saveSortPreference() {
 
 export function loadSortPreference() {
   try {
-    const savedSorts = localStorage.getItem(LOREBOOK_SORT_PREF_KEY);
+    const savedSorts = getLocalStorageItem(LOREBOOK_SORT_PREF_KEY);
     if (savedSorts) {
       setLorebookSorts(JSON.parse(savedSorts));
     }

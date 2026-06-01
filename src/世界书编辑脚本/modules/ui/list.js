@@ -27,7 +27,7 @@ import {
 } from '../state.js';
 
 import { getPinnedEntries, getShowSearchBarSetting } from '../settings.js';
-import { ensureNumericUID, errorCatched, isMobile } from '../utils.js';
+import { ensureNumericUID, errorCatched, getLocalStorageItem, isMobile, setLocalStorageItem } from '../utils.js';
 import { extractFolderMeta, getRenderableEntriesWithoutFolderMeta } from '../features/folderMeta.js';
 import { createEntryHtml } from './entry.js';
 import {
@@ -94,11 +94,11 @@ function sanitizeGlobalPresetMap(value) {
 // --- 常驻世界书管理 ---
 export const getPinnedBooks = () => {
   try {
-    const pinned = localStorage.getItem(PINNED_GLOBAL_WORLDBOOKS_KEY);
+    const pinned = getLocalStorageItem(PINNED_GLOBAL_WORLDBOOKS_KEY);
     const parsed = pinned ? JSON.parse(pinned) : [];
     const sanitized = sanitizeLorebookNameList(parsed);
     if (JSON.stringify(parsed) !== JSON.stringify(sanitized)) {
-      localStorage.setItem(PINNED_GLOBAL_WORLDBOOKS_KEY, JSON.stringify(sanitized));
+      setLocalStorageItem(PINNED_GLOBAL_WORLDBOOKS_KEY, JSON.stringify(sanitized));
       console.warn('Sanitized invalid pinned lorebook names from localStorage.');
     }
     return sanitized;
@@ -110,7 +110,7 @@ export const getPinnedBooks = () => {
 
 export const savePinnedBooks = books => {
   try {
-    localStorage.setItem(PINNED_GLOBAL_WORLDBOOKS_KEY, JSON.stringify(sanitizeLorebookNameList(books)));
+    setLocalStorageItem(PINNED_GLOBAL_WORLDBOOKS_KEY, JSON.stringify(sanitizeLorebookNameList(books)));
   } catch (e) {
     console.error('Error saving pinned worldbooks to localStorage', e);
   }
@@ -119,11 +119,11 @@ export const savePinnedBooks = books => {
 // --- 预设管理 ---
 export const getGlobalLorebookPresets = () => {
   try {
-    const presets = localStorage.getItem(GLOBAL_WORLDBOOK_PRESETS_KEY);
+    const presets = getLocalStorageItem(GLOBAL_WORLDBOOK_PRESETS_KEY);
     const parsed = presets ? JSON.parse(presets) : {};
     const sanitized = sanitizeGlobalPresetMap(parsed);
     if (JSON.stringify(parsed) !== JSON.stringify(sanitized)) {
-      localStorage.setItem(GLOBAL_WORLDBOOK_PRESETS_KEY, JSON.stringify(sanitized));
+      setLocalStorageItem(GLOBAL_WORLDBOOK_PRESETS_KEY, JSON.stringify(sanitized));
       console.warn('Sanitized invalid global lorebook presets from localStorage.');
     }
     return sanitized;
@@ -135,7 +135,7 @@ export const getGlobalLorebookPresets = () => {
 
 export const saveGlobalLorebookPresets = presets => {
   try {
-    localStorage.setItem(GLOBAL_WORLDBOOK_PRESETS_KEY, JSON.stringify(sanitizeGlobalPresetMap(presets)));
+    setLocalStorageItem(GLOBAL_WORLDBOOK_PRESETS_KEY, JSON.stringify(sanitizeGlobalPresetMap(presets)));
   } catch (e) {
     console.error('Error saving global lorebook presets to localStorage', e);
   }

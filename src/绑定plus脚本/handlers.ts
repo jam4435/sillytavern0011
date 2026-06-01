@@ -5,6 +5,9 @@
 import {
   BINDING_PLUS_THEME_STORAGE_KEY,
   BindingGroup,
+  BindingPlusBackupFile,
+  BindingPlusBackupImportSummary,
+  BindingPlusPersonaBackup,
   BindingPlusThemePreset,
   BindingPlusThemePresetId,
   BindingPlusThemeState,
@@ -44,9 +47,11 @@ declare const toastr: any;
 declare function triggerSlash(command: string): Promise<string>;
 
 const PERSONA_ADVANCED_CONFIG_VERSION = 1;
-const SNAPSHOT_MAX_COUNT = 30;
+const SNAPSHOT_MAX_COUNT = 3;
 const SNAPSHOT_MIN_INTERVAL_MS = 4000;
 const PERSONA_DEFAULT_PRESET_STORAGE_KEY = 'tavern_helper_default_preset_v1';
+const BINDING_PLUS_BACKUP_APP = 'bindingplus';
+const BINDING_PLUS_BACKUP_VERSION = 1;
 const DEFAULT_BINDING_PLUS_THEME_PRESET_ID: BindingPlusThemePresetId = 'midnight_cyan';
 
 const FOLLOW_SMART_THEME_TOKENS: BindingPlusThemeTokens = {
@@ -601,6 +606,200 @@ function cloneNumberArrayRecord(source: Record<string, number[]> | undefined): R
   return next;
 }
 
+export type BindingPlusStorageReportItem = {
+  key: string;
+  label: string;
+  category: string;
+  bytes: number;
+};
+
+export type BindingPlusStorageCategoryReport = {
+  category: string;
+  keyCount: number;
+  bytes: number;
+};
+
+export type BindingPlusStorageReport = {
+  totalBytes: number;
+  keyCount: number;
+  topItems: BindingPlusStorageReportItem[];
+  categories: BindingPlusStorageCategoryReport[];
+};
+
+export type PersonaSnapshotPruneSummary = {
+  scannedKeys: number;
+  prunedKeys: number;
+  removedSnapshots: number;
+  freedBytes: number;
+};
+
+function limitPersonaSnapshots<T>(snapshots: T[]): T[] {
+  return snapshots.length > SNAPSHOT_MAX_COUNT ? snapshots.slice(-SNAPSHOT_MAX_COUNT) : snapshots;
+}
+
+function estimateLocalStorageBytes(key: string, value: string): number {
+  return (key.length + value.length) * 2;
+}
+
+function isBindingPlusStorageKey(key: string): boolean {
+  return (
+    key.startsWith('tavern_helper_persona_') ||
+    key === PERSONA_CONTEXT_BINDINGS_STORAGE_KEY ||
+    key === PERSONA_BINDING_GROUPS_STORAGE_KEY ||
+    key === PERSONA_DEFAULT_PRESET_STORAGE_KEY ||
+    key === PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY ||
+    key === PERSONA_DEFAULT_WORLDBOOK_ENTRIES_STORAGE_KEY ||
+    key === BINDING_PLUS_THEME_STORAGE_KEY
+  );
+}
+
+function getBindingPlusStorageKeyInfo(key: string): { label: string; category: string } {
+  if (key.startsWith(PERSONA_SNAPSHOT_STORAGE_PREFIX)) {
+    return {
+      label: `变更保护快照 · ${key.slice(PERSONA_SNAPSHOT_STORAGE_PREFIX.length) || 'unknown'}`,
+      category: '变更保护快照',
+    };
+  }
+  if (key.startsWith(PERSONA_BASE_DESC_STORAGE_PREFIX)) {
+    return {
+      label: `基础描述 · ${key.slice(PERSONA_BASE_DESC_STORAGE_PREFIX.length) || 'unknown'}`,
+      category: '基础描述',
+    };
+  }
+  if (key.startsWith(PERSONA_TRAITS_STORAGE_PREFIX)) {
+    return {
+      label: `条目列表 · ${key.slice(PERSONA_TRAITS_STORAGE_PREFIX.length) || 'unknown'}`,
+      category: '条目列表',
+    };
+  }
+  if (key.startsWith(PERSONA_ADVANCED_STORAGE_PREFIX)) {
+    return {
+      label: `高级配置 · ${key.slice(PERSONA_ADVANCED_STORAGE_PREFIX.length) || 'unknown'}`,
+      category: '高级配置',
+    };
+  }
+  if (key.startsWith(PERSONA_PLUS_APPLIED_STORAGE_PREFIX)) {
+    return {
+      label: `已应用状态 · ${key.slice(PERSONA_PLUS_APPLIED_STORAGE_PREFIX.length) || 'global'}`,
+      category: '已应用状态',
+    };
+  }
+  if (key === PERSONA_CONTEXT_BINDINGS_STORAGE_KEY) {
+    return { label: '聊天/角色绑定', category: '聊天/角色绑定' };
+  }
+  if (key === PERSONA_BINDING_GROUPS_STORAGE_KEY) {
+    return { label: '绑定组', category: '绑定组' };
+  }
+  if (key === PERSONA_DEFAULT_PRESET_STORAGE_KEY) {
+    return { label: '默认预设', category: '默认预设' };
+  }
+  if (key === PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY) {
+    return { label: '默认预设条目', category: '默认预设条目' };
+  }
+  if (key === PERSONA_DEFAULT_WORLDBOOK_ENTRIES_STORAGE_KEY) {
+    return { label: '默认世界书条目', category: '默认世界书条目' };
+  }
+  if (key === BINDING_PLUS_THEME_STORAGE_KEY) {
+    return { label: '主题配置', category: '主题配置' };
+  }
+  return { label: key, category: 'user 人设其他数据' };
+}
+
+export function getBindingPlusStorageReport(topItemCount: number = 8): BindingPlusStorageReport {
+  const items: BindingPlusStorageReportItem[] = [];
+
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key || !isBindingPlusStorageKey(key)) {
+        continue;
+      }
+
+      const value = localStorage.getItem(key);
+      if (value === null) {
+        continue;
+      }
+
+      const info = getBindingPlusStorageKeyInfo(key);
+      items.push({
+        key,
+        ...info,
+        bytes: estimateLocalStorageBytes(key, value),
+      });
+    }
+  } catch (error) {
+    console.warn('绑定plus: 统计本地存储占用失败', error);
+  }
+
+  items.sort((a, b) => b.bytes - a.bytes);
+  const categoryMap = new Map<string, BindingPlusStorageCategoryReport>();
+  items.forEach(item => {
+    const current = categoryMap.get(item.category) || {
+      category: item.category,
+      keyCount: 0,
+      bytes: 0,
+    };
+    current.keyCount += 1;
+    current.bytes += item.bytes;
+    categoryMap.set(item.category, current);
+  });
+
+  return {
+    totalBytes: items.reduce((sum, item) => sum + item.bytes, 0),
+    keyCount: items.length,
+    topItems: items.slice(0, Math.max(0, topItemCount)),
+    categories: Array.from(categoryMap.values()).sort((a, b) => b.bytes - a.bytes),
+  };
+}
+
+export function pruneLegacyPersonaSnapshots(): PersonaSnapshotPruneSummary {
+  const summary: PersonaSnapshotPruneSummary = {
+    scannedKeys: 0,
+    prunedKeys: 0,
+    removedSnapshots: 0,
+    freedBytes: 0,
+  };
+
+  const snapshotKeys: string[] = [];
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(PERSONA_SNAPSHOT_STORAGE_PREFIX)) {
+        snapshotKeys.push(key);
+      }
+    }
+  } catch (error) {
+    console.warn('绑定plus: 扫描旧快照失败', error);
+    return summary;
+  }
+
+  for (const key of snapshotKeys) {
+    summary.scannedKeys += 1;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        continue;
+      }
+
+      const snapshots = safeArray<PersonaSnapshot>(JSON.parse(raw));
+      if (snapshots.length <= SNAPSHOT_MAX_COUNT) {
+        continue;
+      }
+
+      const limited = limitPersonaSnapshots(snapshots);
+      const nextRaw = JSON.stringify(limited);
+      localStorage.setItem(key, nextRaw);
+      summary.prunedKeys += 1;
+      summary.removedSnapshots += snapshots.length - limited.length;
+      summary.freedBytes += Math.max(0, estimateLocalStorageBytes(key, raw) - estimateLocalStorageBytes(key, nextRaw));
+    } catch (error) {
+      console.warn(`绑定plus: 清理旧快照失败 (${key})`, error);
+    }
+  }
+
+  return summary;
+}
+
 function areOptionalStringArraysEqual(left?: string[], right?: string[]): boolean {
   if (left === undefined || right === undefined) {
     return left === right;
@@ -912,6 +1111,354 @@ export function saveDefaultWorldbookEnabledEntryUids(worldbookName: string, entr
   const map = loadDefaultWorldbookEntrySnapshotMap();
   map[normalizedName] = uniqueNumbers(entryUids);
   return saveNumberArraySnapshotMap(PERSONA_DEFAULT_WORLDBOOK_ENTRIES_STORAGE_KEY, map);
+}
+
+function getLocalStorageKeysByPrefix(prefix: string): string[] {
+  const keys: string[] = [];
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(prefix)) {
+        keys.push(key);
+      }
+    }
+  } catch (error) {
+    console.warn(`绑定plus: 枚举本地存储键 ${prefix} 失败`, error);
+  }
+  return keys;
+}
+
+function hasLocalStorageItem(key: string): boolean {
+  try {
+    return localStorage.getItem(key) !== null;
+  } catch (error) {
+    console.warn(`绑定plus: 检查本地存储键 ${key} 失败`, error);
+    return false;
+  }
+}
+
+function getLocalStorageString(key: string): string | undefined {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? undefined : value;
+  } catch (error) {
+    console.warn(`绑定plus: 读取本地存储键 ${key} 失败`, error);
+    return undefined;
+  }
+}
+
+function getStoredPersonaAvatarIds(): string[] {
+  const avatarIds = new Set<string>();
+  [
+    PERSONA_TRAITS_STORAGE_PREFIX,
+    PERSONA_ADVANCED_STORAGE_PREFIX,
+    PERSONA_BASE_DESC_STORAGE_PREFIX,
+    PERSONA_SNAPSHOT_STORAGE_PREFIX,
+  ].forEach(prefix => {
+    getLocalStorageKeysByPrefix(prefix).forEach(key => {
+      const avatarId = key.slice(prefix.length).trim();
+      if (avatarId) {
+        avatarIds.add(avatarId);
+      }
+    });
+  });
+  return Array.from(avatarIds).sort((left, right) => left.localeCompare(right));
+}
+
+function normalizeSnapshotStringRecord(value: unknown): Record<string, string[]> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return cloneStringArrayRecord(value as Record<string, string[]>);
+}
+
+function normalizeSnapshotNumberRecord(value: unknown): Record<string, number[]> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return cloneNumberArrayRecord(value as Record<string, number[]>);
+}
+
+function normalizePersonaTraitsForBackup(value: unknown): PersonaTrait[] {
+  return safeArray<Partial<PersonaTrait>>(value).map(trait => ({
+    id: ensureString(trait.id) || createId(),
+    name: ensureString(trait.name) || '未命名设定',
+    description: ensureString(trait.description),
+    enabled: Boolean(trait.enabled),
+    createdAt: typeof trait.createdAt === 'number' ? trait.createdAt : Date.now(),
+    updatedAt: typeof trait.updatedAt === 'number' ? trait.updatedAt : Date.now(),
+  }));
+}
+
+function normalizePersonaAdvancedConfigForBackup(value: unknown): PersonaAdvancedConfig {
+  const source =
+    value && typeof value === 'object' && !Array.isArray(value) ? (value as Partial<PersonaAdvancedConfig>) : {};
+  const profiles = normalizeProfiles(safeArray<PersonaProfile>(source.profiles));
+  const rules = normalizeRules(safeArray<PersonaAutoRule>(source.rules));
+  const profileIds = new Set(profiles.map(profile => profile.id));
+  const activeProfileId = ensureString(source.activeProfileId);
+
+  return {
+    version: PERSONA_ADVANCED_CONFIG_VERSION,
+    activeProfileId: activeProfileId && profileIds.has(activeProfileId) ? activeProfileId : '',
+    defaultEnabledTraitIds: normalizeOptionalStringArrayField(source as object, 'defaultEnabledTraitIds'),
+    profiles,
+    rules,
+    updatedAt: typeof source.updatedAt === 'number' ? source.updatedAt : Date.now(),
+  };
+}
+
+function normalizePersonaSnapshotsForBackup(value: unknown): PersonaSnapshot[] {
+  return safeArray<Partial<PersonaSnapshot>>(value).map(snapshot => ({
+    id: ensureString(snapshot.id) || createId(),
+    timestamp: typeof snapshot.timestamp === 'number' ? snapshot.timestamp : Date.now(),
+    reason: ensureString(snapshot.reason) || '导入备份',
+    description: normalizeDescription(ensureString(snapshot.description)),
+    baseDescription: normalizeDescription(ensureString(snapshot.baseDescription)),
+    traits: normalizePersonaTraitsForBackup(snapshot.traits),
+    config: normalizePersonaAdvancedConfigForBackup(snapshot.config),
+  }));
+}
+
+function collectPersonaBackups(): BindingPlusPersonaBackup[] {
+  return getStoredPersonaAvatarIds()
+    .map(avatarId => {
+      const backup: BindingPlusPersonaBackup = { avatarId };
+      if (hasLocalStorageItem(getPersonaTraitStorageKey(avatarId))) {
+        backup.traits = loadPersonaTraits(avatarId);
+      }
+      if (hasLocalStorageItem(getPersonaAdvancedStorageKey(avatarId))) {
+        backup.advancedConfig = loadPersonaAdvancedConfig(avatarId);
+      }
+      const baseDescription = getLocalStorageString(getPersonaBaseDescriptionStorageKey(avatarId));
+      if (baseDescription !== undefined) {
+        backup.baseDescription = baseDescription;
+      }
+      if (hasLocalStorageItem(getPersonaSnapshotStorageKey(avatarId))) {
+        backup.snapshots = loadPersonaSnapshots(avatarId);
+      }
+      return backup;
+    })
+    .filter(
+      backup =>
+        backup.traits !== undefined ||
+        backup.advancedConfig !== undefined ||
+        backup.baseDescription !== undefined ||
+        backup.snapshots !== undefined,
+    );
+}
+
+function normalizeBindingPlusBackupPersonas(value: unknown): BindingPlusPersonaBackup[] {
+  const result: BindingPlusPersonaBackup[] = [];
+  const seenAvatarIds = new Set<string>();
+
+  safeArray<Partial<BindingPlusPersonaBackup>>(value).forEach(source => {
+    const avatarId = ensureString(source.avatarId).trim();
+    if (!avatarId || seenAvatarIds.has(avatarId)) {
+      return;
+    }
+
+    const backup: BindingPlusPersonaBackup = { avatarId };
+    if (hasOwn(source, 'traits')) {
+      backup.traits = normalizePersonaTraitsForBackup(source.traits);
+    }
+    if (hasOwn(source, 'advancedConfig')) {
+      backup.advancedConfig = normalizePersonaAdvancedConfigForBackup(source.advancedConfig);
+    }
+    if (hasOwn(source, 'baseDescription')) {
+      backup.baseDescription = normalizeDescription(ensureString(source.baseDescription));
+    }
+    if (hasOwn(source, 'snapshots')) {
+      backup.snapshots = normalizePersonaSnapshotsForBackup(source.snapshots);
+    }
+
+    seenAvatarIds.add(avatarId);
+    result.push(backup);
+  });
+
+  return result;
+}
+
+function normalizeBindingPlusBackupFile(input: unknown): BindingPlusBackupFile {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('不是有效的绑定plus备份文件');
+  }
+
+  const source = input as Record<string, unknown>;
+  if (source.app !== BINDING_PLUS_BACKUP_APP || source.version !== BINDING_PLUS_BACKUP_VERSION) {
+    throw new Error('不是支持的绑定plus备份文件版本');
+  }
+
+  const rawData = source.data;
+  if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
+    throw new Error('绑定plus备份文件缺少 data 数据');
+  }
+
+  const data = rawData as Record<string, unknown>;
+  const normalizedData: BindingPlusBackupFile['data'] = {
+    contextBindings: normalizeContextBindings(data.contextBindings),
+    bindingGroups: normalizeBindingGroups(data.bindingGroups),
+    defaultPresetPromptIds: normalizeSnapshotStringRecord(data.defaultPresetPromptIds),
+    defaultWorldbookEntryUids: normalizeSnapshotNumberRecord(data.defaultWorldbookEntryUids),
+    personas: normalizeBindingPlusBackupPersonas(data.personas),
+    theme: hasOwn(data, 'theme') ? normalizeBindingPlusThemeState(data.theme) : undefined,
+  };
+
+  if (hasOwn(data, 'defaultPresetName')) {
+    normalizedData.defaultPresetName = ensureString(data.defaultPresetName).trim();
+  }
+
+  return {
+    app: BINDING_PLUS_BACKUP_APP,
+    version: BINDING_PLUS_BACKUP_VERSION,
+    exportedAt: typeof source.exportedAt === 'number' ? source.exportedAt : Date.now(),
+    data: normalizedData,
+  };
+}
+
+function mergeContextBindingsForBackupImport(
+  existingBindings: PersonaContextBinding[],
+  importedBindings: PersonaContextBinding[],
+): PersonaContextBinding[] {
+  let nextBindings = normalizeContextBindings(existingBindings);
+  normalizeContextBindings(importedBindings).forEach(importedBinding => {
+    const importedTargetKey = `${importedBinding.scope}:${importedBinding.targetId}`;
+    nextBindings = nextBindings.filter(binding => {
+      const bindingTargetKey = `${binding.scope}:${binding.targetId}`;
+      return binding.id !== importedBinding.id && bindingTargetKey !== importedTargetKey;
+    });
+    nextBindings.push(importedBinding);
+  });
+  return normalizeContextBindings(nextBindings);
+}
+
+function mergeBindingGroupsForBackupImport(existingGroups: BindingGroup[], importedGroups: BindingGroup[]): BindingGroup[] {
+  let nextGroups = normalizeBindingGroups(existingGroups);
+  normalizeBindingGroups(importedGroups).forEach(importedGroup => {
+    const importedName = importedGroup.name.trim();
+    nextGroups = nextGroups.filter(group => group.id !== importedGroup.id && group.name.trim() !== importedName);
+    nextGroups.push(importedGroup);
+  });
+  return normalizeBindingGroups(nextGroups);
+}
+
+export function createBindingPlusBackupFile(): BindingPlusBackupFile {
+  return {
+    app: BINDING_PLUS_BACKUP_APP,
+    version: BINDING_PLUS_BACKUP_VERSION,
+    exportedAt: Date.now(),
+    data: {
+      contextBindings: loadContextBindings(),
+      bindingGroups: loadBindingGroups(),
+      defaultPresetName: getDefaultPresetName(),
+      defaultPresetPromptIds: loadStringArraySnapshotMap(PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY),
+      defaultWorldbookEntryUids: loadDefaultWorldbookEntrySnapshotMap(),
+      personas: collectPersonaBackups(),
+      theme: loadBindingPlusTheme(),
+    },
+  };
+}
+
+export function importBindingPlusBackupFile(input: unknown): BindingPlusBackupImportSummary {
+  const backup = normalizeBindingPlusBackupFile(input);
+  const summary: BindingPlusBackupImportSummary = {
+    contextBindings: backup.data.contextBindings.length,
+    bindingGroups: backup.data.bindingGroups.length,
+    defaultPresetName: hasOwn(backup.data, 'defaultPresetName'),
+    defaultPresetPromptSnapshots: Object.keys(backup.data.defaultPresetPromptIds).length,
+    defaultWorldbookEntrySnapshots: Object.keys(backup.data.defaultWorldbookEntryUids).length,
+    personas: backup.data.personas.length,
+    personaTraits: backup.data.personas.filter(persona => persona.traits !== undefined).length,
+    personaAdvancedConfigs: backup.data.personas.filter(persona => persona.advancedConfig !== undefined).length,
+    personaBaseDescriptions: backup.data.personas.filter(persona => persona.baseDescription !== undefined).length,
+    personaSnapshots: backup.data.personas.filter(persona => persona.snapshots !== undefined).length,
+    theme: backup.data.theme !== undefined,
+  };
+
+  if (backup.data.contextBindings.length > 0) {
+    const mergedBindings = mergeContextBindingsForBackupImport(loadContextBindings(), backup.data.contextBindings);
+    if (!saveContextBindings(mergedBindings)) {
+      throw new Error('恢复聊天/角色绑定失败');
+    }
+  }
+
+  if (backup.data.bindingGroups.length > 0) {
+    const mergedGroups = mergeBindingGroupsForBackupImport(loadBindingGroups(), backup.data.bindingGroups);
+    if (!saveBindingGroups(mergedGroups)) {
+      throw new Error('恢复绑定组失败');
+    }
+  }
+
+  if (hasOwn(backup.data, 'defaultPresetName') && !setDefaultPresetName(backup.data.defaultPresetName)) {
+    throw new Error('恢复默认预设失败');
+  }
+
+  if (summary.defaultPresetPromptSnapshots > 0) {
+    const nextPromptSnapshots = {
+      ...loadStringArraySnapshotMap(PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY),
+      ...backup.data.defaultPresetPromptIds,
+    };
+    if (!saveStringArraySnapshotMap(PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY, nextPromptSnapshots)) {
+      throw new Error('恢复默认预设条目状态失败');
+    }
+  }
+
+  if (summary.defaultWorldbookEntrySnapshots > 0) {
+    const nextWorldbookSnapshots = {
+      ...loadDefaultWorldbookEntrySnapshotMap(),
+      ...backup.data.defaultWorldbookEntryUids,
+    };
+    if (!saveNumberArraySnapshotMap(PERSONA_DEFAULT_WORLDBOOK_ENTRIES_STORAGE_KEY, nextWorldbookSnapshots)) {
+      throw new Error('恢复默认世界书条目状态失败');
+    }
+  }
+
+  backup.data.personas.forEach(persona => {
+    if (persona.traits !== undefined && !savePersonaTraits(persona.avatarId, persona.traits)) {
+      throw new Error(`恢复 user 人设「${persona.avatarId}」条目失败`);
+    }
+    if (persona.advancedConfig !== undefined && !savePersonaAdvancedConfig(persona.avatarId, persona.advancedConfig)) {
+      throw new Error(`恢复 user 人设「${persona.avatarId}」高级配置失败`);
+    }
+    if (persona.baseDescription !== undefined && !savePersonaBaseDescription(persona.avatarId, persona.baseDescription)) {
+      throw new Error(`恢复 user 人设「${persona.avatarId}」基础描述失败`);
+    }
+    if (persona.snapshots !== undefined && !savePersonaSnapshots(persona.avatarId, persona.snapshots)) {
+      throw new Error(`恢复 user 人设「${persona.avatarId}」快照失败`);
+    }
+  });
+
+  if (backup.data.theme !== undefined && !saveBindingPlusTheme(backup.data.theme)) {
+    throw new Error('恢复绑定plus主题失败');
+  }
+
+  return summary;
+}
+
+export function summarizeBindingPlusBackupImport(summary: BindingPlusBackupImportSummary): string {
+  const parts: string[] = [];
+  if (summary.contextBindings > 0) {
+    parts.push(`聊天/角色绑定 ${summary.contextBindings} 条`);
+  }
+  if (summary.bindingGroups > 0) {
+    parts.push(`绑定组 ${summary.bindingGroups} 个`);
+  }
+  if (summary.defaultPresetName) {
+    parts.push('默认预设');
+  }
+  if (summary.defaultPresetPromptSnapshots > 0) {
+    parts.push(`默认预设条目 ${summary.defaultPresetPromptSnapshots} 组`);
+  }
+  if (summary.defaultWorldbookEntrySnapshots > 0) {
+    parts.push(`默认世界书条目 ${summary.defaultWorldbookEntrySnapshots} 组`);
+  }
+  if (summary.personas > 0) {
+    parts.push(`user 人设配置 ${summary.personas} 个`);
+  }
+  if (summary.theme) {
+    parts.push('主题');
+  }
+  return parts.join('，') || '没有发现可恢复的数据';
 }
 
 export function getInputPersonaName(): string {
@@ -1641,6 +2188,58 @@ export function deleteContextBinding(
     return false;
   }
   return saveContextBindings(nextBindings);
+}
+
+export function deleteContextBindingById(bindingId: string): boolean {
+  const normalizedId = ensureString(bindingId).trim();
+  if (!normalizedId) {
+    return false;
+  }
+
+  const bindings = loadContextBindings();
+  const nextBindings = bindings.filter(binding => binding.id !== normalizedId);
+  if (nextBindings.length === bindings.length) {
+    return false;
+  }
+  return saveContextBindings(nextBindings);
+}
+
+function isChatContextBindingMatchedByFileName(binding: PersonaContextBinding, chatFileName: string): boolean {
+  const normalizedChatFileName = ensureString(chatFileName).trim();
+  if (binding.scope !== 'chat' || !normalizedChatFileName) {
+    return false;
+  }
+
+  const targetId = ensureString(binding.targetId).trim();
+  const targetName = ensureString(binding.targetName).trim();
+  const stableIdTarget = `chat:id:${normalizedChatFileName}`;
+  const stableNameTarget = `chat:name:${normalizedChatFileName}`;
+  const legacyTarget = `${normalizedChatFileName} ${targetName}`.trim();
+
+  return (
+    targetId === stableIdTarget ||
+    targetId === stableNameTarget ||
+    targetId === normalizedChatFileName ||
+    targetId === legacyTarget ||
+    targetName === normalizedChatFileName ||
+    targetId.startsWith(`${normalizedChatFileName} `)
+  );
+}
+
+export function deleteChatContextBindingsByFileName(chatFileName: string): PersonaContextBinding[] {
+  const normalizedChatFileName = ensureString(chatFileName).trim();
+  if (!normalizedChatFileName) {
+    return [];
+  }
+
+  const bindings = loadContextBindings();
+  const removedBindings = bindings.filter(binding => isChatContextBindingMatchedByFileName(binding, normalizedChatFileName));
+  if (removedBindings.length === 0) {
+    return [];
+  }
+
+  const nextBindings = bindings.filter(binding => !isChatContextBindingMatchedByFileName(binding, normalizedChatFileName));
+  return saveContextBindings(nextBindings) ? removedBindings : [];
 }
 
 export function loadBindingGroups(): BindingGroup[] {
@@ -3491,7 +4090,7 @@ export function loadPersonaSnapshots(avatarId: string): PersonaSnapshot[] {
       return [];
     }
     const parsed = JSON.parse(raw);
-    return safeArray<PersonaSnapshot>(parsed);
+    return limitPersonaSnapshots(safeArray<PersonaSnapshot>(parsed));
   } catch (error) {
     console.error('用户设定脚本: 加载快照失败', error);
     return [];
@@ -3501,7 +4100,7 @@ export function loadPersonaSnapshots(avatarId: string): PersonaSnapshot[] {
 function savePersonaSnapshots(avatarId: string, snapshots: PersonaSnapshot[]): boolean {
   try {
     const key = getPersonaSnapshotStorageKey(avatarId);
-    localStorage.setItem(key, JSON.stringify(snapshots));
+    localStorage.setItem(key, JSON.stringify(limitPersonaSnapshots(snapshots)));
     return true;
   } catch (error) {
     console.error('用户设定脚本: 保存快照失败', error);

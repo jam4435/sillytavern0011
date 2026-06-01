@@ -349,6 +349,22 @@ export function initPanel() {
                     --panel-border-color: #555;
                     --panel-accent-color: #9a7ace; /* 新增：强调颜色变量 */
                     --panel-entry-bg-color: #333; /* 新增：条目背景颜色变量 */
+                    --panel-input-bg-color: #333;
+                    --panel-field-bg-color: #333;
+                    --panel-input-focus-bg-color: #3a3a3a;
+                    --panel-field-focus-bg-color: #3a3a3a;
+                    --panel-dropdown-bg-color: #333;
+                    --panel-dropdown-hover-bg-color: #9a7ace;
+                    --panel-dropdown-active-bg-color: #4a4a9a;
+                    --panel-entry-hover-bg-color: #3a3a3a;
+                    --panel-selected-bg-color: rgba(154, 122, 206, 0.1);
+                    --panel-md-entry-bg-color: #333;
+                    --panel-md-entry-current-bg-color: rgba(154, 122, 206, 0.1);
+                    --panel-background-image: none;
+                    --panel-background-image-opacity: 0;
+                    --panel-surface-opacity: 1;
+                    --panel-icon-bg-color: #666;
+                    --panel-icon-hover-bg-color: #777;
                     --lorebook-name-white-space: nowrap;
                     --lorebook-name-text-overflow: ellipsis;
                     --lorebook-name-overflow-wrap: normal;
@@ -363,7 +379,7 @@ export function initPanel() {
                     width: 95%;
                     max-width: 1100px; /* 增加最大宽度 */
                     max-height: 80vh;
-                    background-color: var(--panel-bg-color);
+                    background-color: transparent;
                     color: var(--panel-text-color);
                     border: 1px solid var(--panel-border-color);
                     border-radius: 8px;
@@ -373,6 +389,29 @@ export function initPanel() {
                     box-sizing: border-box;
                     flex-direction: column;
                     margin: 0;
+                    isolation: isolate;
+                }
+
+                #${LOREBOOK_PANEL_ID}::before,
+                #${LOREBOOK_PANEL_ID}::after {
+                    content: "";
+                    position: absolute;
+                    inset: 0;
+                    border-radius: inherit;
+                    pointer-events: none;
+                }
+                #${LOREBOOK_PANEL_ID}::before {
+                    z-index: -2;
+                    background-color: var(--panel-bg-color);
+                    opacity: var(--panel-surface-opacity, 1);
+                }
+                #${LOREBOOK_PANEL_ID}::after {
+                    z-index: -1;
+                    background-image: var(--panel-background-image, none);
+                    background-position: center;
+                    background-size: cover;
+                    background-repeat: no-repeat;
+                    opacity: var(--panel-background-image-opacity, 0);
                 }
 
                 /* --- 全屏模式 --- */
@@ -573,9 +612,9 @@ export function initPanel() {
                 /* --- 标签页 --- */
                 #${LOREBOOK_PANEL_ID} .tab-container {
                     display: flex;
-                    border-bottom: 1px solid #555;
+                    border-bottom: 1px solid var(--panel-border-color, #555);
                     flex-shrink: 0;
-                    background-color: #2a2a2a;
+                    background-color: var(--panel-entry-bg-color, #2a2a2a);
                 }
                 #${LOREBOOK_PANEL_ID} .tab-button {
                     flex: 1;
@@ -615,6 +654,12 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .entry-expand-area textarea,
                 #${LOREBOOK_PANEL_ID} .entry-expand-area select {
                     -webkit-tap-highlight-color: transparent;
+                }
+                #${LOREBOOK_PANEL_ID} select option,
+                #theme-settings-modal select option,
+                #lorebook-copy-modal select option {
+                    background-color: var(--panel-dropdown-bg-color, var(--panel-input-bg-color, #333));
+                    color: var(--panel-text-color, #eee);
                 }
                 #${LOREBOOK_PANEL_ID} .tab-content {
                     display: none;
@@ -656,7 +701,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .drag-handle:hover {
                     color: var(--panel-text-color);
                     opacity: 1;
-                    background-color: #444;
+                    background-color: var(--panel-field-focus-bg-color, #444);
                 }
                 #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}.ui-sortable-helper {
                     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
@@ -664,7 +709,7 @@ export function initPanel() {
                 }
                 #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}.ui-sortable-placeholder {
                     border: 1px dashed #666;
-                    background-color: #2a2a2a;
+                    background-color: var(--panel-entry-bg-color, #2a2a2a);
                     visibility: visible !important;
                     height: 40px;
                 }
@@ -678,7 +723,7 @@ export function initPanel() {
                 }
                 #${LOREBOOK_PANEL_ID} li.drag-placeholder-li {
                     border: 2px dashed #666 !important;
-                    background-color: #2a2a2a !important;
+                    background-color: var(--panel-entry-bg-color, #2a2a2a) !important;
                     opacity: 0.5 !important;
                     list-style: none !important;
                 }
@@ -726,12 +771,12 @@ export function initPanel() {
                 }
                 
                 #${LOREBOOK_PANEL_ID} .lorebook-title-clickable:hover {
-                    background-color: rgba(154, 122, 206, 0.1);
+                    background-color: var(--panel-selected-bg-color, rgba(154, 122, 206, 0.1));
                 }
                 
                 #${LOREBOOK_PANEL_ID} .lorebook-title-clickable[data-expanded="true"] {
                     border-bottom-color: var(--panel-accent-color);
-                    background-color: rgba(154, 122, 206, 0.1);
+                    background-color: var(--panel-selected-bg-color, rgba(154, 122, 206, 0.1));
                 }
                 
                 #${LOREBOOK_PANEL_ID} .lorebook-expand-icon {
@@ -802,10 +847,10 @@ export function initPanel() {
                 }
                 
                 #${LOREBOOK_PANEL_ID} .lorebook-search-input {
-                    background-color: var(--search-input-bg-color, #333);
-                    border: 1px solid #555;
+                    background-color: var(--panel-input-bg-color, var(--search-input-bg-color, #333));
+                    border: 1px solid var(--panel-border-color, #555);
                     border-radius: 15px;
-                    color: #eee;
+                    color: var(--panel-text-color, #eee);
                     padding: 4px 10px 4px 28px;
                     font-size: 0.85em;
                     width: 100%;
@@ -813,8 +858,8 @@ export function initPanel() {
                 
                 #${LOREBOOK_PANEL_ID} .lorebook-search-input:focus {
                     outline: none;
-                    border-color: #7a4abe;
-                    background-color: #3a3a3a;
+                    border-color: var(--panel-accent-color, #7a4abe);
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
                 }
                 
                 #${LOREBOOK_PANEL_ID} .lorebook-search-icon {
@@ -852,8 +897,13 @@ export function initPanel() {
                     text-align: center;
                     font-size: 0.9em;
                     margin: 10px 0;
-                    background-color: rgba(80, 80, 80, 0.2);
+                    background-color: var(--panel-input-bg-color, rgba(80, 80, 80, 0.2));
                     border-radius: 4px;
+                }
+                #${LOREBOOK_PANEL_ID} .current-bound-books {
+                    background-color: var(--panel-entry-bg-color, rgba(42, 42, 42, 0.65)) !important;
+                    border: 1px solid var(--panel-border-color, #555);
+                    color: var(--panel-text-color);
                 }
                 
                 /* --- 排序下拉菜单 --- */
@@ -862,9 +912,9 @@ export function initPanel() {
                     margin-left: 10px;
                 }
                 #${LOREBOOK_PANEL_ID} .sort-display-button {
-                    background-color: #3a3a3a;
-                    border: 1px solid #555;
-                    color: #ccc;
+                    background-color: var(--panel-input-bg-color, #3a3a3a);
+                    border: 1px solid var(--panel-border-color, #555);
+                    color: var(--panel-text-color, #ccc);
                     padding: 4px 10px;
                     border-radius: 15px;
                     cursor: pointer;
@@ -882,8 +932,8 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .sort-dropdown {
                     display: none;
                     position: absolute;
-                    background-color: #282828;
-                    border: 1px solid #555;
+                    background-color: var(--panel-dropdown-bg-color, #282828);
+                    border: 1px solid var(--panel-border-color, #555);
                     border-radius: 4px;
                     list-style: none;
                     padding: 5px 0;
@@ -898,18 +948,18 @@ export function initPanel() {
                     font-size: 0.9em;
                 }
                 #${LOREBOOK_PANEL_ID} .sort-dropdown li:hover {
-                    background-color: var(--panel-accent-color);
+                    background-color: var(--panel-dropdown-hover-bg-color, var(--panel-accent-color));
                     color: #fff;
                 }
                 #${LOREBOOK_PANEL_ID} .sort-dropdown li.active {
-                    background-color: #4a4a9a;
+                    background-color: var(--panel-dropdown-active-bg-color, #4a4a9a);
                     font-weight: bold;
                 }
 
                 /* --- 世界书分隔线 --- */
                 #${LOREBOOK_PANEL_ID} .lorebook-divider {
                     height: 1px;
-                    background-color: #444;
+                    background-color: var(--panel-border-color, #444);
                     margin: 15px 0;
                 }
                 
@@ -938,7 +988,7 @@ export function initPanel() {
                     transform: translateZ(0);
                 }
                 #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}:hover {
-                    border-color: #666;
+                    border-color: var(--panel-accent-color, #666);
                 }
                 
                 /* --- 激活条目高亮样式 --- */
@@ -962,7 +1012,7 @@ export function initPanel() {
                     flex-direction: row; /* 确保PC端默认为水平布局 */
                 }
                 #${LOREBOOK_PANEL_ID} .entry-header:hover {
-                    background-color: #3a3a3a;
+                    background-color: var(--panel-entry-hover-bg-color, #3a3a3a);
                 }
                 
                 /* 拖拽样式 */
@@ -976,7 +1026,7 @@ export function initPanel() {
                 }
                 #${LOREBOOK_PANEL_ID} .drag-handle:hover {
                     color: #fff;
-                    background-color: #444;
+                    background-color: var(--panel-field-focus-bg-color, #444);
                 }
                 
                 
@@ -1001,8 +1051,8 @@ export function initPanel() {
                 }
                 #${LOREBOOK_PANEL_ID} .entry-item-title:hover,
                 #${LOREBOOK_PANEL_ID} .entry-item-title:focus {
-                    border-color: #666;
-                    background-color: #444;
+                    border-color: var(--panel-accent-color, #666);
+                    background-color: var(--panel-field-focus-bg-color, #444);
                     outline: none;
                 }
                 
@@ -1021,7 +1071,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .small-expand-button:hover {
                     color: var(--panel-text-color);
                     opacity: 1;
-                    background-color: #444;
+                    background-color: var(--panel-field-focus-bg-color, #444);
                 }
                 
                 /* --- 迷你常量开关 --- */
@@ -1078,8 +1128,8 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .mini-position-select {
                     margin: 0 8px;
                     padding: 3px 6px;
-                    background-color: #444;
-                    border: 1px solid #555;
+                    background-color: var(--panel-input-bg-color, #444);
+                    border: 1px solid var(--panel-border-color, #555);
                     border-radius: 3px;
                     color: var(--panel-text-color);
                     font-size: 0.85em;
@@ -1087,7 +1137,8 @@ export function initPanel() {
                 }
                 #${LOREBOOK_PANEL_ID} .mini-position-select:focus {
                     outline: none;
-                    border-color: #777;
+                    border-color: var(--panel-accent-color, #777);
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
                 }
                 
                 /* 深度、顺序和概率输入 */
@@ -1102,8 +1153,8 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .mini-number-input {
                     width: 40px;
                     padding: 3px 5px;
-                    background-color: #3a3a3a;
-                    border: 1px solid #555;
+                    background-color: var(--panel-input-bg-color, #3a3a3a);
+                    border: 1px solid var(--panel-border-color, #555);
                     border-radius: 3px;
                     color: var(--panel-text-color);
                     font-size: 0.85em;
@@ -1166,8 +1217,8 @@ export function initPanel() {
                 /* 展开区域 */
                 #${LOREBOOK_PANEL_ID} .entry-expand-area {
                     padding: 12px;
-                    border-top: 1px solid #444;
-                    background-color: #2a2a2a;
+                    border-top: 1px solid var(--panel-border-color, #444);
+                    background-color: var(--panel-entry-bg-color, #2a2a2a);
                 }
                 
                 /* --- UID显示区域 --- */
@@ -1176,7 +1227,7 @@ export function initPanel() {
                     align-items: center;
                     margin-bottom: 10px;
                     padding: 5px;
-                    background-color: #333;
+                    background-color: var(--panel-input-bg-color, #333);
                     border-radius: 4px;
                 }
                 #${LOREBOOK_PANEL_ID} .uid-display-area label {
@@ -1208,7 +1259,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .token-counter {
                     font-size: 0.85em;
                     color: #8a5fbd;
-                    background-color: #333;
+                    background-color: var(--panel-input-bg-color, #333);
                     padding: 2px 8px;
                     border-radius: 10px;
                     font-weight: bold;
@@ -1228,16 +1279,16 @@ export function initPanel() {
                 }
                 #${LOREBOOK_PANEL_ID} .content-edit-button:hover {
                     color: var(--panel-text-color);
-                    background-color: #444;
+                    background-color: var(--panel-field-focus-bg-color, #444);
                 }
                 
                 /* --- 递归选项区域 --- */
                 #${LOREBOOK_PANEL_ID} .recursion-options-area {
                     margin: 10px 0;
                     padding: 10px;
-                    background-color: #333;
+                    background-color: var(--panel-input-bg-color, #333);
                     border-radius: 4px;
-                    border: 1px solid #444;
+                    border: 1px solid var(--panel-border-color, #444);
                 }
                 #${LOREBOOK_PANEL_ID} .recursion-label {
                     display: block;
@@ -1278,8 +1329,8 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .content-textarea {
                     width: 100%;
                     padding: 8px;
-                    background-color: #333;
-                    border: 1px solid #555;
+                    background-color: var(--panel-input-bg-color, #333);
+                    border: 1px solid var(--panel-border-color, #555);
                     border-radius: 4px;
                     color: var(--panel-text-color);
                     font-size: 0.9em;
@@ -1289,13 +1340,14 @@ export function initPanel() {
                 }
                 #${LOREBOOK_PANEL_ID} .content-textarea:focus {
                     outline: none;
-                    border-color: #777;
+                    border-color: var(--panel-accent-color, #777);
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
                 }
                 #${LOREBOOK_PANEL_ID} .keywords-input {
                     width: 100%;
                     padding: 8px;
-                    background-color: #333;
-                    border: 1px solid #555;
+                    background-color: var(--panel-input-bg-color, #333);
+                    border: 1px solid var(--panel-border-color, #555);
                     border-radius: 4px;
                     color: var(--panel-text-color);
                     font-size: 0.9em;
@@ -1305,7 +1357,8 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .secondary-keywords-input:focus,
                 #${LOREBOOK_PANEL_ID} .secondary-keys-logic-select:focus {
                     outline: none;
-                    border-color: #777;
+                    border-color: var(--panel-accent-color, #777);
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
                 }
 
                #${LOREBOOK_PANEL_ID} .keywords-edit-area {
@@ -1335,8 +1388,8 @@ export function initPanel() {
                #${LOREBOOK_PANEL_ID} .secondary-keys-logic-select {
                    width: 100%;
                    padding: 8px;
-                   background-color: #333;
-                   border: 1px solid #555;
+                   background-color: var(--panel-input-bg-color, #333);
+                   border: 1px solid var(--panel-border-color, #555);
                    border-radius: 4px;
                    color: var(--panel-text-color);
                    font-size: 0.9em;
@@ -1390,7 +1443,7 @@ export function initPanel() {
                     transform: translateX(18px);
                 }
                 .${LOREBOOK_TOGGLE_SWITCH_CLASS} input:disabled + .toggle-slider {
-                    background-color: #333;
+                    background-color: var(--panel-input-bg-color, #333);
                     cursor: not-allowed;
                 }
                 
@@ -1410,12 +1463,12 @@ export function initPanel() {
                 .lorebook-table-header {
                     display: flex;
                     padding: 5px 10px;
-                    border-bottom: 1px solid #555;
+                    border-bottom: 1px solid var(--panel-border-color, #555);
                     font-weight: bold;
                     font-size: 0.85em;
                     color: var(--panel-text-color);
                     opacity: 0.7;
-                    background-color: #2a2a2a;
+                    background-color: var(--panel-entry-bg-color, #2a2a2a);
                     margin-bottom: 8px;
                     align-items: center;
                 }
@@ -1467,7 +1520,7 @@ export function initPanel() {
                     opacity: 0.5;
                 }
                 .depth-disabled input {
-                    background-color: #2a2a2a;
+                    background-color: var(--panel-input-bg-color, #2a2a2a);
                     cursor: not-allowed;
                 }
                 
@@ -1577,8 +1630,8 @@ export function initPanel() {
                     position: absolute;
                     top: 100%;
                     left: 0;
-                    background-color: #2a2a2a;
-                    border: 1px solid #555;
+                    background-color: var(--panel-dropdown-bg-color, #2a2a2a);
+                    border: 1px solid var(--panel-border-color, #555);
                     border-radius: 4px;
                     padding: 12px;
                     min-width: 150px;
@@ -1602,7 +1655,7 @@ export function initPanel() {
                 }
                 
                 #${LOREBOOK_PANEL_ID} .batch-toggle-label {
-                    color: #9a7ace;
+                    color: var(--panel-accent-color, #9a7ace);
                     font-size: 13px;
                     font-weight: bold;
                     margin-bottom: 8px;
@@ -1679,6 +1732,49 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .lorebook-rollback-button:hover {
                     background-color: #cc3333;
                 }
+
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .lorebook-batch-action-button,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .lorebook-delete-entries-button,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .lorebook-add-entry-button,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .sort-display-button.master-sort-button,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .character-lorebook-actions .lorebook-batch-action-button {
+                    width: 28px !important;
+                    height: 28px !important;
+                    min-width: 28px !important;
+                    padding: 0 !important;
+                    border-radius: 8px !important;
+                    border: 1px solid color-mix(in srgb, var(--panel-icon-bg-color, #666) 78%, #fff) !important;
+                    background-color: var(--panel-icon-bg-color, #666) !important;
+                    color: #fff !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    text-align: center !important;
+                    line-height: 1 !important;
+                    box-shadow: none !important;
+                    filter: none;
+                }
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .sort-display-button.master-sort-button {
+                    margin-left: 0;
+                }
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .lorebook-batch-action-button i,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .lorebook-delete-entries-button i,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .lorebook-add-entry-button i,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .sort-display-button.master-sort-button i,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .character-lorebook-actions .lorebook-batch-action-button i {
+                    color: #fff !important;
+                    float: none !important;
+                    margin: 0 !important;
+                    font-size: 0.9em;
+                }
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .lorebook-batch-action-button:hover,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .lorebook-delete-entries-button:hover,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .lorebook-add-entry-button:hover,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .lorebook-title .sort-display-button.master-sort-button:hover,
+                #${LOREBOOK_PANEL_ID}[data-unified-icon-buttons="true"] .character-lorebook-actions .lorebook-batch-action-button:hover {
+                    background-color: var(--panel-icon-hover-bg-color, #777) !important;
+                    color: #fff !important;
+                }
                 
                 /* 选择复选框容器样式 */
                 #${LOREBOOK_PANEL_ID} .select-checkbox-container {
@@ -1717,8 +1813,8 @@ export function initPanel() {
                     display: flex;
                     justify-content: flex-end;
                     padding: 5px 10px;
-                    background-color: #2a2a2a;
-                    border-bottom: 1px solid #444;
+                    background-color: var(--panel-entry-bg-color, #2a2a2a);
+                    border-bottom: 1px solid var(--panel-border-color, #444);
                     margin-top: 5px;
                 }
                 
@@ -1778,10 +1874,18 @@ export function initPanel() {
                 #global-lorebook-search, #character-worldbook-search-input, #add-worldbook-search-input, #optimize-compare-search-input {
                     width: 100%;
                     padding: 8px 12px 8px 35px;
-                    background-color: var(--search-input-bg-color, #2a2a2a);
+                    background-color: var(--panel-input-bg-color, var(--search-input-bg-color, #2a2a2a));
                     border: 1px solid var(--panel-border-color);
                     border-radius: 4px;
                     color: var(--panel-text-color);
+                }
+                #global-lorebook-search:focus,
+                #character-worldbook-search-input:focus,
+                #add-worldbook-search-input:focus,
+                #optimize-compare-search-input:focus {
+                    outline: none;
+                    border-color: var(--panel-accent-color);
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
                 }
                 #${LOREBOOK_PANEL_ID} .character-lorebook-actions {
                     gap: 6px !important;
@@ -1806,7 +1910,7 @@ export function initPanel() {
                     overflow-y: auto;
                 }
                 .lorebook-tag {
-                    background-color: #444;
+                    background-color: var(--panel-input-bg-color, #444);
                     color: #ccc;
                     padding: 5px 10px;
                     border-radius: 15px;
@@ -1818,7 +1922,7 @@ export function initPanel() {
                     font-size: 0.9em;
                 }
                 .lorebook-tag:hover {
-                    background-color: #555;
+                    background-color: var(--panel-field-focus-bg-color, #555);
                 }
                 .lorebook-tag.active {
                     background-color: var(--panel-accent-color);
@@ -1852,8 +1956,8 @@ export function initPanel() {
                     position: absolute;
                     top: 100%;
                     right: 0;
-                    background-color: #2a2a2a;
-                    border: 1px solid #555;
+                    background-color: var(--panel-dropdown-bg-color, #2a2a2a);
+                    border: 1px solid var(--panel-border-color, #555);
                     border-radius: 4px;
                     padding: 5px 0;
                     min-width: 180px;
@@ -1890,7 +1994,7 @@ export function initPanel() {
                 }
                 .preset-divider {
                     height: 1px;
-                    background-color: #444;
+                    background-color: var(--panel-border-color, #444);
                     margin: 5px 0;
                 }
 
@@ -1898,7 +2002,7 @@ export function initPanel() {
                     color: var(--panel-accent-color) !important;
                 }
                 .preset-item:hover, .preset-item-row:hover {
-                    background-color: rgba(255, 255, 255, 0.1);
+                    background-color: var(--panel-field-focus-bg-color, rgba(255, 255, 255, 0.1));
                 }
                 .preset-name:hover {
                     color: var(--panel-accent-color);
@@ -1916,8 +2020,8 @@ export function initPanel() {
                    top: 100%;
                    left: 0;
                    right: 0;
-                   background-color: #333;
-                   border: 1px solid #555;
+                   background-color: var(--panel-dropdown-bg-color, #333);
+                   border: 1px solid var(--panel-border-color, #555);
                    border-top: none;
                    border-radius: 0 0 4px 4px;
                    max-height: 400px;
@@ -1930,7 +2034,7 @@ export function initPanel() {
                    font-size: 0.9em;
                 }
                 .add-worldbook-result-item:hover {
-                   background-color: var(--panel-accent-color);
+                   background-color: var(--panel-dropdown-hover-bg-color, var(--panel-accent-color));
                    color: #fff;
                 }
                 .add-worldbook-no-results {
@@ -1954,8 +2058,8 @@ export function initPanel() {
 }
 
 #lorebook-copy-modal-content {
-    background-color: #282828;
-    color: #eee;
+    background-color: var(--panel-bg-color, #282828);
+    color: var(--panel-text-color, #eee);
     padding: 20px;
     border-radius: 8px;
     border: 1px solid #555;
@@ -1975,9 +2079,9 @@ export function initPanel() {
     width: 100%;
     padding: 10px;
     margin-bottom: 20px;
-    background-color: #333;
-    color: #eee;
-    border: 1px solid #555;
+    background-color: var(--panel-input-bg-color, #333);
+    color: var(--panel-text-color, #eee);
+    border: 1px solid var(--panel-border-color, #555);
     border-radius: 4px;
     font-size: 1em;
 }
@@ -2021,6 +2125,9 @@ export function initPanel() {
                     background-color: var(--modal-bg-color, #2c2c2c);
                     border-radius: 7px; /* 略小于父容器以避免边框冲突 */
                     overflow: hidden; /* 确保子元素（如header）不会溢出圆角 */
+                    display: flex;
+                    flex-direction: column;
+                    max-height: calc(100vh - 80px);
                 }
                 #theme-settings-modal::backdrop {
                     background-color: rgba(0,0,0,0.8);
@@ -2045,12 +2152,21 @@ export function initPanel() {
                     gap: 8px;
                     padding: 15px;
                     background-color: var(--modal-bg-color, #2c2c2c);
+                    overflow-y: auto;
                 }
                 #theme-settings-modal .form-group {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                     margin-bottom: 2px;
+                }
+                #theme-settings-modal .theme-hidden {
+                    display: none !important;
+                }
+                #theme-settings-modal .theme-form-group-stacked {
+                    align-items: stretch;
+                    flex-direction: column;
+                    gap: 6px;
                 }
                 #theme-settings-modal label {
                     color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
@@ -2068,6 +2184,85 @@ export function initPanel() {
                     border-radius: 6px !important;
                     cursor: pointer !important;
                     padding: 2px !important;
+                }
+                #theme-settings-modal input[type="text"].form-control {
+                    min-width: 0;
+                    flex: 1 1 auto;
+                    background-color: var(--panel-input-bg-color, #333);
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
+                    border: 1px solid var(--panel-border-color, #555);
+                    border-radius: 6px;
+                    padding: 7px 8px;
+                    box-sizing: border-box;
+                }
+                #theme-settings-modal input[type="text"].form-control:focus {
+                    outline: none;
+                    border-color: var(--modal-accent-color, #9a7ace);
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
+                }
+                #theme-settings-modal input[type="range"] {
+                    width: 100%;
+                    accent-color: var(--modal-accent-color, #9a7ace);
+                }
+                #theme-settings-modal .theme-background-image-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                #theme-settings-modal #panel-background-image-file-input,
+                #theme-settings-modal #browser-settings-import-file-input {
+                    display: none;
+                }
+                #theme-settings-modal #panel-background-image-upload-button,
+                #theme-settings-modal #panel-background-image-clear-button {
+                    flex: 0 0 auto;
+                    background-color: var(--panel-input-bg-color, #333);
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
+                    border: 1px solid var(--panel-border-color, #555);
+                    border-radius: 6px;
+                    padding: 7px 10px;
+                    cursor: pointer;
+                }
+                #theme-settings-modal #panel-background-image-upload-button:hover,
+                #theme-settings-modal #panel-background-image-clear-button:hover {
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
+                }
+                #theme-settings-modal .theme-browser-settings-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                }
+                #theme-settings-modal #browser-settings-export-button,
+                #theme-settings-modal #browser-settings-import-button {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background-color: var(--panel-input-bg-color, #333);
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
+                    border: 1px solid var(--panel-border-color, #555);
+                    border-radius: 6px;
+                    padding: 7px 10px;
+                    cursor: pointer;
+                    transition: background-color 0.2s, filter 0.2s;
+                }
+                #theme-settings-modal #browser-settings-export-button:hover,
+                #theme-settings-modal #browser-settings-import-button:hover {
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
+                    filter: brightness(1.08);
+                }
+                #theme-settings-modal select.form-control {
+                    min-width: 120px;
+                    background-color: var(--panel-input-bg-color, #333);
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
+                    border: 1px solid var(--panel-border-color, #555);
+                    border-radius: 6px;
+                    padding: 6px 8px;
+                }
+                #theme-settings-modal select.form-control:focus {
+                    outline: none;
+                    border-color: var(--modal-accent-color, #9a7ace);
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
                 }
                 #theme-settings-modal input[type="color"]::-webkit-color-swatch-wrapper {
                     padding: 0;
@@ -2189,8 +2384,8 @@ export function initPanel() {
                     overflow-y: auto; /* 超出部分显示滚动条 */
                 }
                 .optimize-section {
-                    background-color: #333;
-                    border: 1px solid #444;
+                    background-color: var(--panel-entry-bg-color, #333);
+                    border: 1px solid var(--panel-border-color, #444);
                     border-radius: 6px;
                     padding: 15px;
                 }
@@ -2320,10 +2515,11 @@ export function initPanel() {
                         align-items: center;
                         margin-left: auto;
                         flex-shrink: 0;
+                        padding-top: 2px;
                     }
                     #${LOREBOOK_PANEL_ID} .mobile-row-1 {
                         display: flex;
-                        align-items: center;
+                        align-items: flex-start;
                         width: 100%;
                         margin-bottom: 8px;
                     }
@@ -2342,6 +2538,47 @@ export function initPanel() {
                         flex-direction: column;
                         margin: 0 8px 0 0;
                     }
+                    #${LOREBOOK_PANEL_ID} .mobile-title-editor {
+                        flex: 1 1 auto;
+                        min-width: 0;
+                        margin: 0 8px 0 0;
+                    }
+                    #${LOREBOOK_PANEL_ID} .mobile-entry-title-display {
+                        display: block;
+                        box-sizing: border-box;
+                        width: 100%;
+                        min-width: 0;
+                        padding: 4px 6px;
+                        border: 1px solid transparent;
+                        border-radius: 4px;
+                        background: transparent;
+                        appearance: none;
+                        -webkit-appearance: none;
+                        color: var(--panel-text-color);
+                        font-size: 0.95em;
+                        font-weight: bold;
+                        line-height: 1.25;
+                        text-align: left;
+                        cursor: text;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-entry-title-mode="two-line"] .mobile-entry-title-display {
+                        display: -webkit-box;
+                        -webkit-box-orient: vertical;
+                        -webkit-line-clamp: 2;
+                        white-space: normal;
+                        overflow-wrap: anywhere;
+                        word-break: break-word;
+                        min-height: calc(1.25em * 2 + 8px);
+                        max-height: calc(1.25em * 2 + 8px);
+                    }
+                    #${LOREBOOK_PANEL_ID} .mobile-entry-title-display:focus-visible {
+                        outline: none;
+                        border-color: var(--panel-accent-color, #666);
+                        background-color: var(--panel-field-focus-bg-color, #444);
+                    }
                     #${LOREBOOK_PANEL_ID} .entry-item-title {
                         flex-grow: 1;
                         margin: 0 8px 0 0;
@@ -2353,8 +2590,82 @@ export function initPanel() {
                         overflow-wrap: var(--lorebook-name-overflow-wrap);
                         word-break: var(--lorebook-name-word-break);
                     }
+                    #${LOREBOOK_PANEL_ID} .mobile-entry-title-input {
+                        display: none;
+                        margin: 0;
+                        width: 100%;
+                    }
+                    #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}.is-editing-title-mobile .mobile-entry-title-display {
+                        display: none;
+                    }
+                    #${LOREBOOK_PANEL_ID} .${LOREBOOK_ENTRY_CLASS}.is-editing-title-mobile .mobile-entry-title-input {
+                        display: block;
+                    }
                     #${LOREBOOK_PANEL_ID} .select-checkbox-container {
                         padding-left: 8px;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .mobile-row-1 {
+                        align-items: stretch;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions {
+                        align-self: stretch;
+                        display: grid;
+                        grid-template-rows: 24px 24px;
+                        justify-items: center;
+                        align-content: start;
+                        align-items: center;
+                        width: 30px;
+                        gap: 4px;
+                        margin-left: 0;
+                        padding-top: 0;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions .select-checkbox-container {
+                        order: 1;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 30px;
+                        height: 24px;
+                        min-height: 24px;
+                        margin-left: 0;
+                        padding-left: 0;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions .entry-select-checkbox {
+                        margin: 0;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions .small-expand-button {
+                        order: 2;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-sizing: border-box;
+                        width: 30px;
+                        height: 24px;
+                        min-height: 24px;
+                        margin: 0;
+                        margin-right: 0;
+                        padding: 0;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .entry-header-right-actions .small-expand-button i {
+                        width: 16px;
+                        text-align: center;
+                        line-height: 1;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .mobile-title-editor {
+                        align-self: stretch;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .mobile-entry-title-display,
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"] .mobile-entry-title-input {
+                        min-height: 52px;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"][data-mobile-entry-title-mode="single-line"] .mobile-entry-title-display {
+                        display: flex;
+                        align-items: center;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"][data-mobile-entry-title-mode="two-line"] .mobile-entry-title-display {
+                        max-height: 52px;
                     }
                     #${LOREBOOK_PANEL_ID} .mini-position-select {
                         flex-grow: 1;
@@ -2568,15 +2879,28 @@ export function initPanel() {
                             <input type="color" id="panel-entry-bg-color-picker" class="form-control">
                         </div>
                         <div class="form-group">
-                            <label for="search-input-bg-color-picker">搜索栏输入背景色</label>
+                            <label for="search-input-bg-color-picker">输入栏背景色</label>
                             <input type="color" id="search-input-bg-color-picker" class="form-control">
                         </div>
-                        <div class="form-group">
-                            <label for="yaml-input-bg-color-picker">YAML导入栏背景色</label>
-                            <input type="color" id="yaml-input-bg-color-picker" class="form-control">
+                        <div id="panel-background-image-url-group" class="form-group theme-form-group-stacked">
+                            <label for="panel-background-image-url-input">背景图</label>
+                            <div class="theme-background-image-row">
+                                <input type="text" id="panel-background-image-url-input" class="form-control" placeholder="粘贴图片 URL 或上传图片">
+                                <button type="button" id="panel-background-image-upload-button">上传</button>
+                                <button type="button" id="panel-background-image-clear-button">清除</button>
+                                <input type="file" id="panel-background-image-file-input" accept="image/*">
+                            </div>
+                        </div>
+                        <div id="panel-background-opacity-group" class="form-group theme-form-group-stacked">
+                            <label for="panel-background-opacity-slider">背景图不透明度 <span id="panel-background-opacity-value">35%</span></label>
+                            <input type="range" id="panel-background-opacity-slider" min="0" max="100" step="1">
+                        </div>
+                        <div id="panel-opacity-group" class="form-group theme-form-group-stacked">
+                            <label for="panel-opacity-slider">插件页面不透明度 <span id="panel-opacity-value">100%</span></label>
+                            <input type="range" id="panel-opacity-slider" min="0" max="100" step="1">
                         </div>
                         <div class="form-actions">
-                            <button type="button" id="reset-theme-button">恢复默认</button>
+                            <button type="button" id="reset-theme-button">恢复当前布局默认颜色</button>
                         </div>
                     </div>
                 </div>

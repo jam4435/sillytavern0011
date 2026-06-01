@@ -170,6 +170,45 @@ export interface BindingPlusThemeState {
   useCustomOverrides: boolean;
 }
 
+export interface BindingPlusPersonaBackup {
+  avatarId: string;
+  traits?: PersonaTrait[];
+  advancedConfig?: PersonaAdvancedConfig;
+  baseDescription?: string;
+  snapshots?: PersonaSnapshot[];
+}
+
+export interface BindingPlusBackupData {
+  contextBindings: PersonaContextBinding[];
+  bindingGroups: BindingGroup[];
+  defaultPresetName?: string;
+  defaultPresetPromptIds: Record<string, string[]>;
+  defaultWorldbookEntryUids: Record<string, number[]>;
+  personas: BindingPlusPersonaBackup[];
+  theme?: BindingPlusThemeState;
+}
+
+export interface BindingPlusBackupFile {
+  app: 'bindingplus';
+  version: 1;
+  exportedAt: number;
+  data: BindingPlusBackupData;
+}
+
+export interface BindingPlusBackupImportSummary {
+  contextBindings: number;
+  bindingGroups: number;
+  defaultPresetName: boolean;
+  defaultPresetPromptSnapshots: number;
+  defaultWorldbookEntrySnapshots: number;
+  personas: number;
+  personaTraits: number;
+  personaAdvancedConfigs: number;
+  personaBaseDescriptions: number;
+  personaSnapshots: number;
+  theme: boolean;
+}
+
 export type PersonaRuleScope = 'chat' | 'character';
 export type PersonaRuleMatchMode = 'includes' | 'equals' | 'regex';
 

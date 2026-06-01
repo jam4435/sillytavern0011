@@ -1,6 +1,80 @@
 // 通用辅助函数
 import { LOREBOOK_ENTRY_CLASS } from './config.js';
 
+const fallbackLocalStorage = new Map();
+let lastStorageAccessError = null;
+let hasWarnedLocalStorageFallback = false;
+
+function getAvailableLocalStorage() {
+  lastStorageAccessError = null;
+  const candidates = [
+    () => (typeof globalThis !== 'undefined' ? globalThis.localStorage : null),
+    () => (typeof window !== 'undefined' ? window.localStorage : null),
+    () => (typeof window !== 'undefined' && window.parent ? window.parent.localStorage : null),
+  ];
+
+  for (const getCandidate of candidates) {
+    try {
+      const storage = getCandidate();
+      if (storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function') {
+        return storage;
+      }
+    } catch (error) {
+      lastStorageAccessError = error;
+    }
+  }
+
+  return null;
+}
+
+function warnLocalStorageFallback(error = lastStorageAccessError) {
+  if (hasWarnedLocalStorageFallback) {
+    return;
+  }
+  hasWarnedLocalStorageFallback = true;
+  console.warn('角色世界书: localStorage 不可用，当前会话将使用内存存储。刷新页面后这些设置可能不会保留。', error);
+}
+
+export function getLocalStorageItem(key) {
+  const normalizedKey = String(key);
+  const storage = getAvailableLocalStorage();
+  if (storage) {
+    try {
+      return storage.getItem(normalizedKey);
+    } catch (error) {
+      warnLocalStorageFallback(error);
+    }
+  } else {
+    warnLocalStorageFallback();
+  }
+
+  return fallbackLocalStorage.has(normalizedKey) ? fallbackLocalStorage.get(normalizedKey) : null;
+}
+
+export function setLocalStorageItem(key, value, options = {}) {
+  const normalizedKey = String(key);
+  const normalizedValue = String(value);
+  const storage = getAvailableLocalStorage();
+  if (storage) {
+    try {
+      storage.setItem(normalizedKey, normalizedValue);
+      fallbackLocalStorage.delete(normalizedKey);
+      return true;
+    } catch (error) {
+      fallbackLocalStorage.set(normalizedKey, normalizedValue);
+      warnLocalStorageFallback(error);
+      if (options.throwOnError) {
+        throw error;
+      }
+      return false;
+    }
+  }
+
+  fallbackLocalStorage.set(normalizedKey, normalizedValue);
+  warnLocalStorageFallback();
+  return false;
+}
+
 export function ensureNumericUID(uid) {
   if (uid === undefined || uid === null) {
     console.warn('角色世界书: 收到undefined或null的UID值');

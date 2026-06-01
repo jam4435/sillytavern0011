@@ -54,6 +54,33 @@ function updateLocalEntryState(lorebookName, numericUid, updater) {
   return entry;
 }
 
+function getDisplayTitleValue(value) {
+  const normalizedValue = value == null ? '' : `${value}`;
+  return normalizedValue || '未命名条目';
+}
+
+function exitTitleEditMode($item) {
+  $item.removeClass('is-editing-title');
+  $item.removeClass('is-editing-title-mobile');
+}
+
+function syncMobileTitleUi($item, value) {
+  const displayTitle = getDisplayTitleValue(value);
+  $item.find('.mobile-entry-title-display').text(displayTitle).attr('title', displayTitle);
+  $item.find('.mobile-entry-title-input').val(displayTitle);
+}
+
+function getCurrentTitleValue($item) {
+  if ($item.hasClass('master-entry-item')) {
+    return $item.find('.master-entry-title').first().text();
+  }
+  const mobileTitle = $item.find('.mobile-entry-title-display').first().text();
+  if (mobileTitle) {
+    return mobileTitle;
+  }
+  return getDisplayTitleValue($item.find('.mobile-entry-title-input').first().val());
+}
+
 /**
  * 展开/折叠条目
  */
@@ -123,16 +150,21 @@ async function toggleEnabled({ $target, $item, lorebookName, numericUid, isGloba
  */
 async function editTitle({ event, $target, lorebookName, numericUid, isGlobal }) {
   if (event.type === 'change') {
+    const $item = $target.closest('.lorebook-entry-item');
     const nextTitle = $target.val();
+    const originalTitle = getCurrentTitleValue($item);
     const success = await saveEntryField(numericUid, lorebookName, 'name', nextTitle);
-    $target.closest('.master-entry-item').removeClass('is-editing-title');
+    exitTitleEditMode($item);
     if (!success) {
+      $target.val(originalTitle);
+      syncMobileTitleUi($item, originalTitle);
       return;
     }
 
     updateLocalEntryState(lorebookName, numericUid, entry => {
       entry.name = nextTitle;
     });
+    syncMobileTitleUi($item, nextTitle);
     syncMasterRowFromState(lorebookName, numericUid, isGlobal);
     if (isMasterDetailLayout()) {
       renderDetailPane(isGlobal);
@@ -144,8 +176,12 @@ function startEditTitle({ $item }) {
   if (!$item?.length) {
     return;
   }
-  $item.addClass('is-editing-title');
-  const input = $item.find('.master-entry-title-input').get(0);
+  if ($item.hasClass('master-entry-item')) {
+    $item.addClass('is-editing-title');
+  } else {
+    $item.addClass('is-editing-title-mobile');
+  }
+  const input = $item.find('.master-entry-title-input, .mobile-entry-title-input').get(0);
   if (input) {
     input.focus();
     input.select();
@@ -327,11 +363,9 @@ function selectEntry({ $target, lorebookName, numericUid, isGlobal }) {
  */
 function editContent({ event, $target, $item, lorebookName, numericUid }) {
   if (event.type === 'change') {
-    saveEntryField(numericUid, lorebookName, 'content', $target.val());
-  }
-  if (event.type === 'input') {
     const content = $target.val() || '';
     const $counter = $item.find('.token-counter');
+    saveEntryField(numericUid, lorebookName, 'content', content);
 
     // 使用酒馆的真实tokenizer计算token数
     if (window.SillyTavern && window.SillyTavern.getTokenCountAsync) {
