@@ -1964,11 +1964,200 @@ export async function autoUpdateMartialArts(
   }
 }
 
+const COMPLETION_DEBOUNCE_MS = 80;
+
+let completionTimer: ReturnType<typeof setTimeout> | null = null;
+let completionPromise: Promise<void> | null = null;
+let completionWaitPromise: Promise<void> | null = null;
+let resolveCompletionWaitPromise: (() => void) | null = null;
+let pendingFullCompletion = false;
+let pendingCompletionScope: GameDataCompletionScope | null = null;
+let initialCompletionFinished = false;
+
+function ensureCompletionWaitPromise(): Promise<void> {
+  if (!completionWaitPromise) {
+    completionWaitPromise = new Promise(resolve => {
+      resolveCompletionWaitPromise = resolve;
+    });
+  }
+  return completionWaitPromise;
+}
+
+function resolveCompletionWaiters(): void {
+  resolveCompletionWaitPromise?.();
+  completionWaitPromise = null;
+  resolveCompletionWaitPromise = null;
+}
+
+function hasPendingCompletionScope(scope: GameDataCompletionScope | null): boolean {
+  return !!(
+    scope?.playerAttributes ||
+    scope?.characterAttributes ||
+    scope?.martialArts?.player ||
+    scope?.martialArts?.characters
+  );
+}
+
+function queueCompletionRequest(options: GameDataCompletionOptions): void {
+  const shouldFullScan = options.fullScan ?? !options.scope;
+  if (shouldFullScan) {
+    pendingFullCompletion = true;
+    return;
+  }
+
+  if (options.scope) {
+    pendingCompletionScope = mergeCompletionScope(pendingCompletionScope || {}, options.scope);
+  }
+}
+
+async function runCompletionOnce(fullScan: boolean, scope: GameDataCompletionScope | null): Promise<void> {
+  if (fullScan) {
+    const variables = getGameVariables();
+    if (Object.keys(variables).length === 0) {
+      return;
+    }
+
+    if (variables.user数据) {
+      await autoUpdatePlayerAttributes(variables.user数据);
+    }
+    if (variables.角色数据) {
+      await autoUpdateCharacterAttributes(variables.角色数据);
+    }
+    await autoUpdateMartialArts(variables.user数据?.功法, variables.角色数据);
+    initialCompletionFinished = true;
+    return;
+  }
+
+  if (!scope) {
+    return;
+  }
+
+  if (scope.playerAttributes) {
+    await autoUpdatePlayerAttributes(scope.playerAttributes);
+  }
+  if (scope.characterAttributes) {
+    await autoUpdateCharacterAttributes(scope.characterAttributes);
+  }
+  if (scope.martialArts) {
+    await autoUpdateMartialArts(scope.martialArts.player, scope.martialArts.characters);
+  }
+}
+
+async function runCompletionLoop(): Promise<void> {
+  if (completionTimer) {
+    clearTimeout(completionTimer);
+    completionTimer = null;
+  }
+
+  if (completionPromise) {
+    return completionPromise;
+  }
+
+  completionPromise = (async () => {
+    try {
+      do {
+        const fullScan = pendingFullCompletion;
+        const scope = pendingCompletionScope;
+        pendingFullCompletion = false;
+        pendingCompletionScope = null;
+        await runCompletionOnce(fullScan, scope);
+      } while (pendingFullCompletion || hasPendingCompletionScope(pendingCompletionScope));
+    } catch (error) {
+      dataLogger.error('[gameDataCompletion] 后台补全失败:', error);
+    } finally {
+      completionPromise = null;
+      resolveCompletionWaiters();
+    }
+  })();
+
+  return completionPromise;
+}
+
+export function scheduleGameDataCompletion(
+  reason: string = 'manual',
+  options: GameDataCompletionOptions = {},
+): Promise<void> {
+  dataLogger.log(`[gameDataCompletion] 已调度: ${reason}`);
+  queueCompletionRequest(options);
+  const waitPromise = ensureCompletionWaitPromise();
+
+  if (!completionTimer && !completionPromise) {
+    completionTimer = setTimeout(() => {
+      void runCompletionLoop();
+    }, options.debounceMs ?? COMPLETION_DEBOUNCE_MS);
+  }
+
+  return waitPromise;
+}
+
+export async function flushPendingGameDataCompletion(reason: string = 'manual-flush'): Promise<void> {
+  dataLogger.log(`[gameDataCompletion] flush: ${reason}`);
+  if (!initialCompletionFinished && !pendingFullCompletion && !hasPendingCompletionScope(pendingCompletionScope)) {
+    pendingFullCompletion = true;
+  }
+
+  if (!completionPromise && (pendingFullCompletion || hasPendingCompletionScope(pendingCompletionScope) || completionTimer)) {
+    await runCompletionLoop();
+    return;
+  }
+
+  if (completionPromise) {
+    await completionPromise;
+  }
+}
+
+export function scheduleGameDataCompletionFromMvuUpdate(nextData: unknown, previousData: unknown): void {
+  const nextVariables = extractGameVariablesFromMvuData(nextData);
+  const previousVariables = extractGameVariablesFromMvuData(previousData);
+
+  const scope: GameDataCompletionScope = {};
+  if (shouldCheckPlayerAttributes(nextVariables.user数据, previousVariables.user数据)) {
+    scope.playerAttributes = nextVariables.user数据;
+  }
+
+  const changedCharacterAttributes = collectChangedCharacterAttributes(nextVariables, previousVariables);
+  if (changedCharacterAttributes) {
+    scope.characterAttributes = changedCharacterAttributes;
+  }
+
+  const changedMartialArts = collectChangedMartialArts(nextVariables, previousVariables);
+  if (changedMartialArts) {
+    scope.martialArts = changedMartialArts;
+  }
+
+  if (hasPendingCompletionScope(scope)) {
+    scheduleGameDataCompletion('mvu-variable-update', { fullScan: false, scope });
+  }
+}
+
+/**
+ * 从酒馆变量表纯读取游戏数据，不触发任何变量写入。
+ */
+export function readGameDataPure(): Partial<GameState> | null {
+  dataLogger.log('[variableReader] ====== 开始纯读取游戏数据 ======');
+  try {
+    const variables = getGameVariables();
+
+    if (Object.keys(variables).length === 0) {
+      dataLogger.log('[variableReader] 变量表为空，返回 null');
+      return null;
+    }
+
+    const result = mapVariablesToGameState(variables);
+    dataLogger.log('[variableReader] ====== 纯读取完成 ======');
+    return result;
+  } catch (error) {
+    dataLogger.error('[variableReader] 读取游戏数据失败:', error);
+    return null;
+  }
+}
+
 /**
  * 从酒馆变量表读取游戏数据
  * 使用 getAllVariables() API 获取合并后的变量
  *
- * 注意：此函数会自动检测并更新角色数据中缺失的战斗属性
+ * 注意：保留兼容旧调用。新 UI 刷新路径应使用 readGameDataPure()，
+ * 自动补全由 scheduleGameDataCompletion()/flushPendingGameDataCompletion() 调度。
  */
 export async function readGameData(): Promise<Partial<GameState> | null> {
   dataLogger.log('[variableReader] ====== 开始读取游戏数据 ======');
@@ -1981,26 +2170,8 @@ export async function readGameData(): Promise<Partial<GameState> | null> {
       return null;
     }
 
-    // 自动更新玩家数据中缺失的战斗属性
-    if (variables.user数据) {
-      await autoUpdatePlayerAttributes(variables.user数据);
-    }
-
-    // 自动更新角色数据中缺失的战斗属性
-    // 这会检测有初始属性但缺少战斗属性的角色，并自动计算写入
-    if (variables.角色数据) {
-      await autoUpdateCharacterAttributes(variables.角色数据);
-    }
-
-    // 自动补全功法信息
-    // 检测只有掌握程度、缺少其他信息的功法，从数据库补全
-    const 玩家功法 = variables.user数据?.功法;
-    if (玩家功法 || variables.角色数据) {
-      await autoUpdateMartialArts(玩家功法, variables.角色数据);
-    }
-
-    const result = mapVariablesToGameState(variables);
-    dataLogger.log('[variableReader] Step 7 - 最终 GameState:', result);
+    await runCompletionOnce(true, null);
+    const result = readGameDataPure();
     dataLogger.log('[variableReader] ====== 读取完成 ======');
     return result;
   } catch (error) {
