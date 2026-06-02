@@ -364,18 +364,25 @@ export function getGameVariables(): GameVariables {
   try {
     // 调用酒馆助手提供的 getAllVariables API
     const rawVariables = getAllVariables() as Record<string, unknown>;
-    dataLogger.log('[variableReader] Step 1a - getAllVariables() 原始数据:', rawVariables);
 
     // 真正的游戏变量在 stat_data 键下
     const statData = rawVariables?.stat_data as GameVariables;
-    dataLogger.log('[variableReader] Step 1b - stat_data 数据:', statData);
-    dataLogger.log('[variableReader] Step 1c - stat_data 所有键:', statData ? Object.keys(statData) : []);
+    dataLogger.log('[variableReader] stat_data 键:', statData ? Object.keys(statData) : []);
 
     return statData || {};
   } catch (error) {
     dataLogger.error('[variableReader] 获取变量表失败:', error);
     return {};
   }
+}
+
+function extractGameVariablesFromMvuData(data: unknown): GameVariables {
+  if (!data || typeof data !== 'object') {
+    return {};
+  }
+
+  const record = data as Record<string, unknown>;
+  return (record.stat_data as GameVariables | undefined) || (record as GameVariables);
 }
 
 /**
@@ -1380,6 +1387,10 @@ function checkMartialArtUpdateType(功法数据: SimpleMartialArt, 功法名: st
   const dbData = getMartialArtData(功法名);
   if (!dbData) return 'none';
 
+  if (!功法数据.特性) {
+    return 'update';
+  }
+
   const 掌握程度 = 功法数据.掌握程度 || '初窥门径';
   const allTraits = dbData.特性 || {};
   const MASTERY_LEVELS = ['初窥门径', '略有小成', '融会贯通', '炉火纯青', '出神入化'];
@@ -1503,6 +1514,248 @@ function shouldUpdateMartialArtByCache(
 function updateMartialArtCache(cacheKey: string, mastery: string, isCompleted: boolean): void {
   martialArtStateCache.set(cacheKey, { mastery, isCompleted });
   dataLogger.log(`[updateMartialArtCache] 已更新缓存: ${cacheKey} -> mastery=${mastery}, isCompleted=${isCompleted}`);
+}
+
+type CharacterRecord = Record<string, CharacterData | unknown>;
+
+export interface MartialArtsCompletionScope {
+  player?: Record<string, SimpleMartialArt>;
+  characters?: CharacterRecord;
+}
+
+interface GameDataCompletionScope {
+  playerAttributes?: UserProfile;
+  characterAttributes?: CharacterRecord;
+  martialArts?: MartialArtsCompletionScope;
+}
+
+export interface GameDataCompletionOptions {
+  fullScan?: boolean;
+  scope?: GameDataCompletionScope;
+  debounceMs?: number;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function toSimpleMartialArts(value: unknown): Record<string, SimpleMartialArt> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const result: Record<string, SimpleMartialArt> = {};
+  for (const [name, art] of Object.entries(value)) {
+    if (name.startsWith('$') || !isRecord(art)) {
+      continue;
+    }
+    result[name] = art as SimpleMartialArt;
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function martialArtSignature(art: SimpleMartialArt | undefined): string {
+  if (!art) {
+    return '';
+  }
+
+  const traits = art.特性
+    ? Object.entries(art.特性).sort(([a], [b]) => a.localeCompare(b))
+    : [];
+
+  return JSON.stringify({
+    mastery: art.掌握程度 || '初窥门径',
+    type: art.类型 || '',
+    rank: art.功法品阶 || '',
+    description: art.功法描述 || '',
+    traits,
+  });
+}
+
+function shouldQueueMartialArtForCompletion(
+  功法名: string,
+  nextArt: SimpleMartialArt,
+  previousArt?: SimpleMartialArt,
+): boolean {
+  if (!nextArt.类型 || !nextArt.功法品阶 || !nextArt.功法描述 || !nextArt.特性) {
+    return true;
+  }
+
+  if (previousArt && martialArtSignature(nextArt) !== martialArtSignature(previousArt)) {
+    return true;
+  }
+
+  const cached = martialArtStateCache.get(getMartialArtCacheKey('diff', 功法名));
+  return !previousArt && !cached;
+}
+
+function collectChangedMartialArts(
+  nextVariables: GameVariables,
+  previousVariables: GameVariables,
+): MartialArtsCompletionScope | null {
+  const scope: MartialArtsCompletionScope = {};
+
+  const nextPlayerArts = toSimpleMartialArts(nextVariables.user数据?.功法);
+  const previousPlayerArts = toSimpleMartialArts(previousVariables.user数据?.功法);
+  if (nextPlayerArts) {
+    const changedPlayerArts: Record<string, SimpleMartialArt> = {};
+    for (const [name, art] of Object.entries(nextPlayerArts)) {
+      if (shouldQueueMartialArtForCompletion(name, art, previousPlayerArts?.[name])) {
+        changedPlayerArts[name] = art;
+      }
+    }
+    if (Object.keys(changedPlayerArts).length > 0) {
+      scope.player = changedPlayerArts;
+    }
+  }
+
+  const nextCharacters = nextVariables.角色数据 || {};
+  const previousCharacters = previousVariables.角色数据 || {};
+  const changedCharacters: CharacterRecord = {};
+
+  for (const [characterName, nextCharacter] of Object.entries(nextCharacters)) {
+    if (characterName.startsWith('$') || !isRecord(nextCharacter)) {
+      continue;
+    }
+
+    const nextArts = toSimpleMartialArts((nextCharacter as CharacterData).功法);
+    if (!nextArts) {
+      continue;
+    }
+
+    const previousCharacter = previousCharacters[characterName];
+    const previousArts = isRecord(previousCharacter)
+      ? toSimpleMartialArts((previousCharacter as CharacterData).功法)
+      : undefined;
+    const changedArts: Record<string, SimpleMartialArt> = {};
+
+    for (const [name, art] of Object.entries(nextArts)) {
+      if (shouldQueueMartialArtForCompletion(name, art, previousArts?.[name])) {
+        changedArts[name] = art;
+      }
+    }
+
+    if (Object.keys(changedArts).length > 0) {
+      changedCharacters[characterName] = { 功法: changedArts };
+    }
+  }
+
+  if (Object.keys(changedCharacters).length > 0) {
+    scope.characters = changedCharacters;
+  }
+
+  return scope.player || scope.characters ? scope : null;
+}
+
+function shouldCheckPlayerAttributes(nextUser?: UserProfile, previousUser?: UserProfile): nextUser is UserProfile {
+  if (!nextUser?.初始属性) {
+    return false;
+  }
+
+  if (!previousUser) {
+    return true;
+  }
+
+  return (
+    !nextUser.属性 ||
+    nextUser.境界 !== previousUser.境界 ||
+    JSON.stringify(nextUser.初始属性) !== JSON.stringify(previousUser.初始属性) ||
+    martialArtSignatureMap(nextUser.功法) !== martialArtSignatureMap(previousUser.功法)
+  );
+}
+
+function martialArtSignatureMap(arts?: Record<string, SimpleMartialArt>): string {
+  if (!arts) {
+    return '';
+  }
+
+  return JSON.stringify(
+    Object.entries(arts)
+      .filter(([name]) => !name.startsWith('$'))
+      .map(([name, art]) => [name, martialArtSignature(art)])
+      .sort(([a], [b]) => String(a).localeCompare(String(b))),
+  );
+}
+
+function collectChangedCharacterAttributes(
+  nextVariables: GameVariables,
+  previousVariables: GameVariables,
+): CharacterRecord | undefined {
+  const nextCharacters = nextVariables.角色数据 || {};
+  const previousCharacters = previousVariables.角色数据 || {};
+  const changedCharacters: CharacterRecord = {};
+
+  for (const [characterName, nextCharacter] of Object.entries(nextCharacters)) {
+    if (characterName.startsWith('$') || !isRecord(nextCharacter)) {
+      continue;
+    }
+
+    const nextData = nextCharacter as CharacterData;
+    if (!nextData.初始属性) {
+      continue;
+    }
+
+    const previousCharacter = previousCharacters[characterName];
+    const previousData = isRecord(previousCharacter) ? (previousCharacter as CharacterData) : undefined;
+    const shouldCheck =
+      !previousData ||
+      !nextData.属性 ||
+      nextData.境界 !== previousData.境界 ||
+      JSON.stringify(nextData.初始属性) !== JSON.stringify(previousData.初始属性) ||
+      martialArtSignatureMap(nextData.功法) !== martialArtSignatureMap(previousData.功法);
+
+    if (shouldCheck) {
+      changedCharacters[characterName] = nextData;
+    }
+  }
+
+  return Object.keys(changedCharacters).length > 0 ? changedCharacters : undefined;
+}
+
+function mergeMartialArtsScope(target: MartialArtsCompletionScope, source: MartialArtsCompletionScope): MartialArtsCompletionScope {
+  if (source.player) {
+    target.player = { ...(target.player || {}), ...source.player };
+  }
+
+  if (source.characters) {
+    target.characters = target.characters || {};
+    for (const [characterName, characterData] of Object.entries(source.characters)) {
+      const existing = isRecord(target.characters[characterName])
+        ? (target.characters[characterName] as CharacterData)
+        : {};
+      const next = isRecord(characterData) ? (characterData as CharacterData) : {};
+      target.characters[characterName] = {
+        ...existing,
+        ...next,
+        功法: {
+          ...(existing.功法 || {}),
+          ...(next.功法 || {}),
+        },
+      };
+    }
+  }
+
+  return target;
+}
+
+function mergeCompletionScope(target: GameDataCompletionScope, source: GameDataCompletionScope): GameDataCompletionScope {
+  if (source.playerAttributes) {
+    target.playerAttributes = source.playerAttributes;
+  }
+
+  if (source.characterAttributes) {
+    target.characterAttributes = {
+      ...(target.characterAttributes || {}),
+      ...source.characterAttributes,
+    };
+  }
+
+  if (source.martialArts) {
+    target.martialArts = mergeMartialArtsScope(target.martialArts || {}, source.martialArts);
+  }
+
+  return target;
 }
 
 /**
