@@ -1482,7 +1482,7 @@ function shouldUpdateMartialArtByCache(
   updateType: MartialArtUpdateType;
 } {
   const currentMastery = 功法数据.掌握程度 || '初窥门径';
-  const isCompleted = !!(功法数据.类型 && 功法数据.功法品阶 && 功法数据.功法描述);
+  const isCompleted = !!(功法数据.类型 && 功法数据.功法品阶 && 功法数据.功法描述 && 功法数据.特性);
   const cached = martialArtStateCache.get(cacheKey);
   
   if (!cached) {
@@ -1490,6 +1490,12 @@ function shouldUpdateMartialArtByCache(
     const updateType = checkMartialArtUpdateType(功法数据, 功法名);
     dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 新功法，更新类型=${updateType}`);
     return { shouldUpdate: updateType !== 'none', isNew: true, masteryChanged: false, updateType };
+  }
+
+  if (!isCompleted) {
+    const updateType = checkMartialArtUpdateType(功法数据, 功法名);
+    dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 当前变量缺字段，更新类型=${updateType}`);
+    return { shouldUpdate: updateType !== 'none', isNew: false, masteryChanged: false, updateType };
   }
   
   if (!cached.isCompleted && !isCompleted) {
@@ -1818,7 +1824,7 @@ export async function autoUpdateMartialArts(
       
       if (!shouldUpdate) {
         // 无需更新，但要确保缓存是最新的
-        const isCompleted = !!(功法数据.类型 && 功法数据.功法品阶 && 功法数据.功法描述);
+        const isCompleted = !!(功法数据.类型 && 功法数据.功法品阶 && 功法数据.功法描述 && 功法数据.特性);
         updateMartialArtCache(cacheKey, 功法数据.掌握程度 || '初窥门径', isCompleted);
         continue;
       }
@@ -1874,7 +1880,7 @@ export async function autoUpdateMartialArts(
         
         if (!shouldUpdate) {
           // 无需更新，但要确保缓存是最新的
-          const isCompleted = !!(功法数据.类型 && 功法数据.功法品阶 && 功法数据.功法描述);
+          const isCompleted = !!(功法数据.类型 && 功法数据.功法品阶 && 功法数据.功法描述 && 功法数据.特性);
           updateMartialArtCache(cacheKey, 功法数据.掌握程度 || '初窥门径', isCompleted);
           continue;
         }
