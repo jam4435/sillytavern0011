@@ -4,6 +4,7 @@
  */
 
 import { MapData } from '../types';
+import { gameLogger } from './logger';
 
 let cachedMapData: MapData | null = null;
 
@@ -24,7 +25,7 @@ export async function loadMapData(): Promise<MapData> {
     cachedMapData = await response.json();
     return cachedMapData;
   } catch (error) {
-    console.error('加载地图数据失败:', error);
+    gameLogger.error('加载地图数据失败:', error);
     // 返回空地图数据以防止应用崩溃
     return {};
   }

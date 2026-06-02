@@ -27,6 +27,7 @@ import {
   type MartialArtData,
   type MartialArtsRank
 } from '../utils/martialArtsDatabase';
+import { gameLogger } from '../utils/logger';
 
 // 武功品阶点数消耗（直接选择）- 统一到总点数池
 const RANK_POINT_COST: Record<MartialArtsRank, number> = {
@@ -166,7 +167,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
           setMartialArtsDatabase(allArts);
         }
       } catch (e) {
-        console.warn('无法加载武功数据库:', e);
+        gameLogger.warn('无法加载武功数据库:', e);
       } finally {
         setMartialArtsLoading(false);
       }
@@ -292,7 +293,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed)) {
-        console.warn('存档数据格式错误，期望数组');
+        gameLogger.warn('存档数据格式错误，期望数组');
         return [];
       }
       
@@ -317,7 +318,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       
       return validBuilds;
     } catch (e) {
-      console.error('加载存档失败:', e);
+      gameLogger.error('加载存档失败:', e);
       showNotification('error', '加载存档失败');
       return [];
     }
@@ -340,7 +341,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         }
       }
     } catch (e) {
-      console.error('加载自定义天赋失败:', e);
+      gameLogger.error('加载自定义天赋失败:', e);
     }
   }, []);
   
@@ -349,7 +350,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     try {
       localStorage.setItem(CUSTOM_TRAITS_KEY, JSON.stringify(traits));
     } catch (e) {
-      console.error('保存自定义天赋失败:', e);
+      gameLogger.error('保存自定义天赋失败:', e);
       showNotification('error', '保存自定义天赋失败');
     }
   }, [showNotification]);
@@ -473,7 +474,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       setSavedBuilds(updatedBuilds);
       showNotification('success', `存档「${newBuild.name}」保存成功！`);
     } catch (e) {
-      console.error('保存存档失败:', e);
+      gameLogger.error('保存存档失败:', e);
       showNotification('error', '保存存档失败，请检查浏览器存储空间');
     }
   }, [
@@ -556,7 +557,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       
       showNotification('success', `存档「${buildToLoad.name}」加载成功！`);
     } catch (e) {
-      console.error('加载存档失败:', e);
+      gameLogger.error('加载存档失败:', e);
       showNotification('error', '加载存档失败');
     }
   }, [martialArtsDatabase, showNotification]);
@@ -576,7 +577,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       setSavedBuilds(updatedBuilds);
       showNotification('success', `存档「${buildName}」已删除`);
     } catch (e) {
-      console.error('删除存档失败:', e);
+      gameLogger.error('删除存档失败:', e);
       showNotification('error', '删除存档失败');
     }
   }, [savedBuilds, showNotification]);
@@ -602,7 +603,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       setSavedBuilds(updatedBuilds);
       showNotification('success', '备注已更新');
     } catch (e) {
-      console.error('更新备注失败:', e);
+      gameLogger.error('更新备注失败:', e);
       showNotification('error', '更新备注失败');
     }
   }, [savedBuilds, showNotification]);

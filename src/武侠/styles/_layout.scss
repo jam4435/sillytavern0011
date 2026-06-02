@@ -46,9 +46,6 @@
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  // 性能优化：使用 GPU 加速
-  will-change: opacity;
-  transform: translateZ(0);
 }
 
 .bg-img {
@@ -56,13 +53,9 @@
   inset: 0;
   background-size: cover;
   background-position: center;
-  transition: opacity 1s ease;
+  transition: opacity 0.3s ease;
   opacity: 0.15;
-  transform: scale(1.02);
   background-image: url('https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?q=80&w=1920&auto=format&fit=crop&blur=10');
-  filter: grayscale(60%) sepia(20%);
-  // 性能优化
-  will-change: transform, opacity;
 }
 
 .bg-gradient-vert {

@@ -6,6 +6,7 @@
 import React, { useEffect, useRef } from 'react';
 import { MapRegion, MapLocation } from '../types';
 import { isLocationUnlocked, buildLocationPath } from '../utils/mapUtils';
+import { gameLogger } from '../utils/logger';
 
 interface LocationPopoverProps {
   areaName: string;
@@ -50,7 +51,7 @@ const LocationPopover: React.FC<LocationPopoverProps> = ({
     const unlocked = isLocationUnlocked(locationPath, location, exploredLocations);
 
     if (!unlocked) {
-      console.warn(`[LocationPopover] 地点未解锁: ${locationPath}`);
+      gameLogger.warn(`[LocationPopover] 地点未解锁: ${locationPath}`);
       return;
     }
 

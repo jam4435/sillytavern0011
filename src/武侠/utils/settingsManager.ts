@@ -281,6 +281,22 @@ function parseRegexString(input: string): { pattern: string; flags: string } {
   };
 }
 
+const regexCache = new Map<string, RegExp>();
+
+function getCachedRegex(pattern: string, flags: string): RegExp {
+  const finalFlags = flags.includes('g') ? flags : 'g' + flags;
+  const cacheKey = `${finalFlags}\n${pattern}`;
+  const cached = regexCache.get(cacheKey);
+  if (cached) {
+    cached.lastIndex = 0;
+    return cached;
+  }
+
+  const regex = new RegExp(pattern, finalFlags);
+  regexCache.set(cacheKey, regex);
+  return regex;
+}
+
 /**
  * 应用正则替换规则到文本
  * 支持用户在 pattern 中使用 /pattern/flags 格式指定标志
@@ -292,9 +308,7 @@ export function applyRegexRules(text: string, rules: RegexRule[]): string {
     if (!rule.enabled || !rule.pattern) continue;
     try {
       const { pattern, flags } = parseRegexString(rule.pattern);
-      // 确保至少有 'g' 标志用于全局替换
-      const finalFlags = flags.includes('g') ? flags : 'g' + flags;
-      const regex = new RegExp(pattern, finalFlags);
+      const regex = getCachedRegex(pattern, flags);
       result = result.replace(regex, rule.replacement);
     } catch (error) {
       dataLogger.warn(`正则规则 "${rule.pattern}" 无效:`, error);

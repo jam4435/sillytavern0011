@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { MapData, MapArea, MapRegion, MapLocation } from '../types';
 import { isLocationUnlocked, buildLocationPath } from '../utils/mapUtils';
+import { gameLogger } from '../utils/logger';
 
 interface MapSidebarProps {
   mapData: MapData;
@@ -70,7 +71,7 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
   const handleLocationClick = (locationPath: string, location: MapLocation) => {
     const unlocked = isLocationUnlocked(locationPath, location, exploredLocations);
     if (!unlocked) {
-      console.warn(`[MapSidebar] 地点未解锁: ${locationPath}`);
+      gameLogger.warn(`[MapSidebar] 地点未解锁: ${locationPath}`);
       return;
     }
     onLocationClick(locationPath);
