@@ -7,6 +7,7 @@ import { MapLocation } from '../types';
 import { gameLogger } from './logger';
 
 declare function getAllVariables(): Record<string, unknown>;
+declare function eventEmit(eventName: string, data: unknown): void;
 
 /**
  * 检查地点是否已解锁
@@ -53,7 +54,8 @@ export function isLocationUnlocked(
  */
 export function getExploredLocations(): string[] {
   const variables = getAllVariables();
-  const user数据 = variables.stat_data?.user数据 as Record<string, unknown> | undefined;
+  const statData = variables.stat_data as { user数据?: Record<string, unknown> } | undefined;
+  const user数据 = statData?.user数据;
 
   if (!user数据) {
     return [];
@@ -79,7 +81,6 @@ export async function addExploredLocation(locationPath: string): Promise<void> {
   const newExploredLocations = [...exploredLocations, locationPath];
 
   // 使用 eventEmit 更新变量
-  declare function eventEmit(eventName: string, data: unknown): void;
   await eventEmit('era:updateByObject', {
     stat_data: {
       user数据: {

@@ -16,7 +16,8 @@ declare function eventEmit(eventName: string, data: unknown): void;
  */
 export async function decreaseItemCount(itemName: string, count: number = 1): Promise<number> {
   const variables = getAllVariables();
-  const user数据 = variables.stat_data?.user数据 as Record<string, unknown> | undefined;
+  const statData = variables.stat_data as { user数据?: Record<string, unknown> } | undefined;
+  const user数据 = statData?.user数据;
 
   if (!user数据) {
     gameLogger.warn('[itemManager] user数据不存在');
@@ -62,7 +63,8 @@ export async function decreaseItemCount(itemName: string, count: number = 1): Pr
  */
 export async function restoreItemCount(itemName: string, originalCount: number): Promise<void> {
   const variables = getAllVariables();
-  const user数据 = variables.stat_data?.user数据 as Record<string, unknown> | undefined;
+  const statData = variables.stat_data as { user数据?: Record<string, unknown> } | undefined;
+  const user数据 = statData?.user数据;
 
   if (!user数据) {
     gameLogger.warn('[itemManager] user数据不存在，无法恢复物品');
@@ -112,7 +114,8 @@ export async function restoreItemCount(itemName: string, originalCount: number):
  */
 export function getItemCount(itemName: string): number {
   const variables = getAllVariables();
-  const user数据 = variables.stat_data?.user数据 as Record<string, unknown> | undefined;
+  const statData = variables.stat_data as { user数据?: Record<string, unknown> } | undefined;
+  const user数据 = statData?.user数据;
 
   if (!user数据) {
     return 0;

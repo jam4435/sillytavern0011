@@ -22,8 +22,9 @@ export async function loadMapData(): Promise<MapData> {
     if (!response.ok) {
       throw new Error(`加载地图数据失败: ${response.statusText}`);
     }
-    cachedMapData = await response.json();
-    return cachedMapData;
+    const data = await response.json() as MapData;
+    cachedMapData = data;
+    return data;
   } catch (error) {
     gameLogger.error('加载地图数据失败:', error);
     // 返回空地图数据以防止应用崩溃
