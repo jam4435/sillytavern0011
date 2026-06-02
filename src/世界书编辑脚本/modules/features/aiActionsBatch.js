@@ -1,6 +1,6 @@
 import {
   collectAiTargetEntries as collectAiTargetEntriesFromSingle,
-  applyAiPreview as applyAiPreviewFromSingle,
+  buildAiEntryHash,
 } from './aiActions.js';
 export {
   collectAiTargetEntries,
@@ -22,6 +22,11 @@ const VALID_SECONDARY_LOGIC = new Set(['and_any', 'and_all', 'not_all', 'not_any
 const AI_BATCH_REQUEST_MAX_RETRIES = 0;
 const AI_BATCH_MAX_ENTRY_TOKENS = 4000;
 const AI_BATCH_TOKEN_FALLBACK_DIVISOR = 4;
+const DEFAULT_CONTEXT_BUDGET = {
+  enabled: true,
+  maxInputTokens: 12000,
+  reserveOutputTokens: 4096,
+};
 const COMPATIBILITY_MODEL_PREFIXES = ['流式抗截断/', '假流式/'];
 const COMPATIBILITY_FAILURE_PATTERNS = [
   /Got response status 503/i,
@@ -135,6 +140,41 @@ function sanitizeStringArray(value, fallback = []) {
     .filter(Boolean);
 }
 
+function normalizeUidList(value = []) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return _.uniq(
+    value
+      .map(uid => ensureNumericUID(uid))
+      .filter(uid => uid >= 0),
+  );
+}
+
+function normalizeContextBudget(contextBudget = {}) {
+  const maxInputTokens = Number.parseInt(`${contextBudget?.maxInputTokens ?? DEFAULT_CONTEXT_BUDGET.maxInputTokens}`, 10);
+  const reserveOutputTokens = Number.parseInt(
+    `${contextBudget?.reserveOutputTokens ?? DEFAULT_CONTEXT_BUDGET.reserveOutputTokens}`,
+    10,
+  );
+
+  return {
+    enabled: contextBudget?.enabled !== false,
+    maxInputTokens: Number.isFinite(maxInputTokens)
+      ? Math.min(200000, Math.max(1000, maxInputTokens))
+      : DEFAULT_CONTEXT_BUDGET.maxInputTokens,
+    reserveOutputTokens: Number.isFinite(reserveOutputTokens)
+      ? Math.min(64000, Math.max(256, reserveOutputTokens))
+      : DEFAULT_CONTEXT_BUDGET.reserveOutputTokens,
+  };
+}
+
+function getMaxInputTokens(contextBudget = {}) {
+  const normalized = normalizeContextBudget(contextBudget);
+  return normalized.enabled ? normalized.maxInputTokens : AI_BATCH_MAX_ENTRY_TOKENS;
+}
+
 function normalizeFieldOptions(fieldOptions = {}) {
   return {
     title: fieldOptions.title !== false,
@@ -145,6 +185,16 @@ function normalizeFieldOptions(fieldOptions = {}) {
 
 function getKeywordSnapshot(entry) {
   return Array.isArray(entry?.strategy?.keys) ? [...entry.strategy.keys] : [];
+}
+
+function getPromptSnapshot(entry) {
+  return {
+    primary: Array.isArray(entry?.strategy?.keys) ? [...entry.strategy.keys] : [],
+    secondary_logic: VALID_SECONDARY_LOGIC.has(entry?.strategy?.keys_secondary?.logic)
+      ? entry.strategy.keys_secondary.logic
+      : 'and_any',
+    secondary: Array.isArray(entry?.strategy?.keys_secondary?.keys) ? [...entry.strategy.keys_secondary.keys] : [],
+  };
 }
 
 function buildEditableSnapshot(entry, fieldOptions) {
@@ -160,7 +210,7 @@ function buildEditableSnapshot(entry, fieldOptions) {
   }
 
   if (normalizedFieldOptions.prompt) {
-    snapshot.keywords = getKeywordSnapshot(entry);
+    snapshot.prompts = getPromptSnapshot(entry);
   }
 
   return snapshot;
@@ -195,6 +245,7 @@ function buildPlanningEntriesPayload(entries = []) {
         uid: ensureNumericUID(entry?.uid),
         title: entry?.name || '',
         content: entry?.content || '',
+        prompts: getPromptSnapshot(entry),
       })),
     },
     null,
@@ -243,6 +294,14 @@ function escapeXmlText(value) {
     .replaceAll('>', '&gt;');
 }
 
+function escapeXmlAttribute(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+}
+
 function normalizeXmlTagNameSafe(title, usedNames = new Set()) {
   const raw = typeof title === 'string' ? title.trim() : '';
   const collapsed = raw.replace(/\s+/g, '_');
@@ -270,12 +329,46 @@ function buildInfoGroupXml(sectionName, entries = [], usedNames = new Set()) {
   const lines = [`<${sectionName}>`];
   entries.forEach(entry => {
     const tagName = normalizeXmlTagNameSafe(entry?.name || '', usedNames);
-    lines.push(`  <${tagName}>`);
+    const prompts = getPromptSnapshot(entry);
+    const role = sectionName === '已修改批次' ? 'modified' : sectionName === '只读条目' ? 'readonly' : 'context';
+    lines.push(
+      `  <条目 uid="${escapeXmlAttribute(ensureNumericUID(entry?.uid))}" title="${escapeXmlAttribute(entry?.name || tagName)}" role="${role}">`,
+    );
+    lines.push('    <标题>');
+    lines.push(`    ${escapeXmlText(entry?.name || '')}`);
+    lines.push('    </标题>');
+    lines.push('    <内容>');
     lines.push(escapeXmlText(entry?.content || ''));
-    lines.push(`  </${tagName}>`);
+    lines.push('    </内容>');
+    lines.push('    <关键词>');
+    lines.push(escapeXmlText(JSON.stringify(prompts.primary || [])));
+    lines.push('    </关键词>');
+    lines.push('    <次级关键词逻辑>');
+    lines.push(escapeXmlText(prompts.secondary_logic || 'and_any'));
+    lines.push('    </次级关键词逻辑>');
+    lines.push('    <次级关键词>');
+    lines.push(escapeXmlText(JSON.stringify(prompts.secondary || [])));
+    lines.push('    </次级关键词>');
+    lines.push('  </条目>');
   });
   lines.push(`</${sectionName}>`);
   return lines.join('\n');
+}
+
+function buildLockedSelectionXml(contextEntries = {}) {
+  const lockedEditableUids = normalizeUidList(contextEntries.lockedEditableUids);
+  const lockedReadonlyUids = normalizeUidList(contextEntries.lockedReadonlyUids)
+    .filter(uid => !lockedEditableUids.includes(uid));
+  if (!lockedEditableUids.length && !lockedReadonlyUids.length) {
+    return '';
+  }
+
+  return [
+    '<锁定选择>',
+    `<可修改>${lockedEditableUids.join(', ')}</可修改>`,
+    `<只读>${lockedReadonlyUids.join(', ')}</只读>`,
+    '</锁定选择>',
+  ].join('\n');
 }
 
 function buildChatContextXml(chatMessages = []) {
@@ -311,6 +404,7 @@ function buildWorkspaceInfoSectionXml(contextEntries = {}, { includePlan = false
   const usedNames = new Set();
   const sections = [
     includePlan ? buildPlanSectionXml(contextEntries.plan || null) : '',
+    buildLockedSelectionXml(contextEntries),
     buildChatContextXml(contextEntries.chatMessages || []),
     buildReferenceMaterialXml(contextEntries.referenceMaterial || ''),
     buildInfoGroupXml('只读条目', contextEntries.readonlyEntries || [], usedNames),
@@ -443,9 +537,6 @@ function buildPlanningPromptDuplicate(lorebookName, instruction, entries, prompt
   const jailbreakPromptTemplate = typeof promptSettings?.jailbreakPromptTemplate === 'string'
     ? promptSettings.jailbreakPromptTemplate.trim()
     : '';
-  const builtinPromptTemplate = typeof promptSettings?.builtinPromptTemplate === 'string'
-    ? promptSettings.builtinPromptTemplate.trim()
-    : '';
   const planningPromptTemplate = typeof promptSettings?.planningPromptTemplate === 'string'
     ? promptSettings.planningPromptTemplate.trim()
     : '';
@@ -511,12 +602,21 @@ async function getTokenCount(text) {
   return details.count;
 }
 
-async function buildBatchPlans({ lorebookName, instruction, targetEntries, fieldOptions, promptSettings }) {
+async function buildBatchPlans({
+  lorebookName,
+  instruction,
+  targetEntries,
+  fieldOptions,
+  promptSettings,
+  contextEntries = {},
+  contextBudget = {},
+}) {
   const plans = [];
   let currentEntries = [];
   let currentPrompt = '';
   let currentEntryTokenCount = 0;
   let currentEntryTokenSource = 'fallback';
+  const maxInputTokens = getMaxInputTokens(contextBudget);
 
   const finalizeCurrent = () => {
     if (!currentEntries.length) {
@@ -528,36 +628,36 @@ async function buildBatchPlans({ lorebookName, instruction, targetEntries, field
       requestPrompt: currentPrompt,
       entryTokenCount: currentEntryTokenCount,
       tokenCountSource: currentEntryTokenSource,
-      isOversized: currentEntryTokenCount > AI_BATCH_MAX_ENTRY_TOKENS,
+      isOversized: currentEntryTokenCount > maxInputTokens,
     });
   };
 
   for (const entry of targetEntries) {
     const candidateEntries = [...currentEntries, entry];
-    const candidateEntriesPayload = buildEntriesPayload(candidateEntries, fieldOptions);
-    const candidatePrompt = buildBatchPrompt(
+    const candidatePrompt = buildContextualBatchPromptV2(
       lorebookName,
       instruction,
       candidateEntries,
       fieldOptions,
       promptSettings,
+      contextEntries,
     );
-    const candidateEntryTokenDetails = await getTokenCountDetails(candidateEntriesPayload);
+    const candidateEntryTokenDetails = await getTokenCountDetails(candidatePrompt);
     const candidateEntryTokenCount = candidateEntryTokenDetails.count;
-    const shouldSplit = candidateEntryTokenCount > AI_BATCH_MAX_ENTRY_TOKENS;
+    const shouldSplit = candidateEntryTokenCount > maxInputTokens;
 
     if (shouldSplit && currentEntries.length > 0) {
       finalizeCurrent();
       currentEntries = [entry];
-      const currentEntriesPayload = buildEntriesPayload(currentEntries, fieldOptions);
-      currentPrompt = buildBatchPrompt(
+      currentPrompt = buildContextualBatchPromptV2(
         lorebookName,
         instruction,
         currentEntries,
         fieldOptions,
         promptSettings,
+        contextEntries,
       );
-      const currentEntryTokenDetails = await getTokenCountDetails(currentEntriesPayload);
+      const currentEntryTokenDetails = await getTokenCountDetails(currentPrompt);
       currentEntryTokenCount = currentEntryTokenDetails.count;
       currentEntryTokenSource = currentEntryTokenDetails.source;
       continue;
@@ -576,6 +676,7 @@ async function buildBatchPlans({ lorebookName, instruction, targetEntries, field
     batchIndex: index,
     batchNumber: index + 1,
     entryCount: plan.entries.length,
+    maxInputTokens,
   }));
 }
 
@@ -586,6 +687,7 @@ async function callDefaultAiClient(prompt, options = {}) {
     customApi: options.customApi,
     onGenerationStart: options.onGenerationStart,
     shouldStream: options.shouldStream,
+    maxOutputTokens: normalizeContextBudget(options.contextBudget).reserveOutputTokens,
   });
 }
 
@@ -900,18 +1002,22 @@ function normalizeAiDraft(rawDraft, entry, fieldOptions) {
   }
 
   if (normalizedFieldOptions.prompt) {
+    const promptSnapshot = getPromptSnapshot(entry);
     const keywordDraft = Array.isArray(draft.keywords)
       ? draft.keywords
       : isPlainObject(draft.prompts)
         ? draft.prompts.primary
         : [];
     nextEntry.strategy = _.cloneDeep(nextEntry.strategy || {});
-    nextEntry.strategy.keys = sanitizeStringArray(keywordDraft, getKeywordSnapshot(entry));
+    nextEntry.strategy.keys = sanitizeStringArray(keywordDraft, promptSnapshot.primary);
     nextEntry.strategy.keys_secondary = _.cloneDeep(nextEntry.strategy.keys_secondary || {});
-    nextEntry.strategy.keys_secondary.logic = entry?.strategy?.keys_secondary?.logic || 'and_any';
-    nextEntry.strategy.keys_secondary.keys = Array.isArray(entry?.strategy?.keys_secondary?.keys)
-      ? [...entry.strategy.keys_secondary.keys]
-      : [];
+    nextEntry.strategy.keys_secondary.logic = VALID_SECONDARY_LOGIC.has(draft?.prompts?.secondary_logic)
+      ? draft.prompts.secondary_logic
+      : promptSnapshot.secondary_logic;
+    nextEntry.strategy.keys_secondary.keys = sanitizeStringArray(
+      draft?.prompts?.secondary,
+      promptSnapshot.secondary,
+    );
   }
 
   return nextEntry;
@@ -920,8 +1026,8 @@ function normalizeAiDraft(rawDraft, entry, fieldOptions) {
 function buildPreviewDiffsDuplicate(beforeEntry, afterEntry, fieldOptions) {
   const normalizedFieldOptions = normalizeFieldOptions(fieldOptions);
   const diffs = [];
-  const beforeKeywords = getKeywordSnapshot(beforeEntry);
-  const afterKeywords = getKeywordSnapshot(afterEntry);
+  const beforePrompts = getPromptSnapshot(beforeEntry);
+  const afterPrompts = getPromptSnapshot(afterEntry);
 
   const pushDiff = (label, beforeValue, afterValue) => {
     if (!_.isEqual(beforeValue, afterValue)) {
@@ -948,7 +1054,9 @@ function buildPreviewDiffsDuplicate(beforeEntry, afterEntry, fieldOptions) {
   }
 
   if (normalizedFieldOptions.prompt) {
-    pushDiff('关键词', beforeKeywords, afterKeywords);
+    pushDiff('关键词', beforePrompts.primary, afterPrompts.primary);
+    pushDiff('次级关键词逻辑', beforePrompts.secondary_logic, afterPrompts.secondary_logic);
+    pushDiff('次级关键词', beforePrompts.secondary, afterPrompts.secondary);
   }
 
   return diffs;
@@ -1256,12 +1364,12 @@ function buildBatchPlanReport(plans = []) {
   }
 
   const lines = [
-    `本次预览按 ${plans.length} 批发送，条目 JSON 达到 ${AI_BATCH_MAX_ENTRY_TOKENS} tokens 即切分。`,
+    `本次预览按 ${plans.length} 批发送，最终请求达到预算即切分。`,
   ];
 
   plans.forEach(plan => {
     lines.push(
-      `批次 ${plan.batchNumber}: ${plan.entryCount} 条，条目约 ${plan.entryTokenCount} tokens${plan.isOversized ? '（单条已超限，按最小批次发送）' : ''}`,
+      `批次 ${plan.batchNumber}: ${plan.entryCount} 条，最终请求约 ${plan.entryTokenCount} tokens${plan.maxInputTokens ? ` / 预算 ${plan.maxInputTokens}` : ''}${plan.isOversized ? '（单批已超预算，按最小批次发送）' : ''}`,
     );
   });
 
@@ -1374,6 +1482,8 @@ async function executeSingleBatch(options = {}) {
     planningResult = null,
     chatMessages = [],
     referenceMaterial = '',
+    contextBudget = {},
+    sourceMode = 'direct',
   } = options;
   const batchLabel = `批次 ${batchPlan.batchNumber}/${options.totalBatches}`;
 
@@ -1406,6 +1516,8 @@ async function executeSingleBatch(options = {}) {
     requestPrompt,
     shouldStop,
     batchLabel,
+    sourceMode,
+    contextBudget,
   });
 
   const attempts = [initialAttempt];
@@ -1439,6 +1551,8 @@ async function executeSingleBatch(options = {}) {
         requestPrompt,
         shouldStop,
         batchLabel,
+        sourceMode,
+        contextBudget,
       });
       attempts.push(attemptResult);
 
@@ -1680,7 +1794,6 @@ function buildPlanningPrompt(lorebookName, instruction, entries, promptSettings 
     '</用户指令>',
     '',
     '<提示词>',
-    builtinPromptTemplate,
     planningPromptTemplate,
     '</提示词>',
     '',
@@ -1750,14 +1863,33 @@ function parseAiBatchResponseWithRepair(rawText) {
 
 function parseAiPlanResponse(rawText, validUids = []) {
   const candidate = extractJsonCandidate(rawText);
-  const parsed = JSON.parse(candidate);
+  let parsed;
+  try {
+    parsed = JSON.parse(candidate);
+  } catch (error) {
+    const repairedCandidate = repairJsonCandidate(candidate);
+    if (repairedCandidate !== candidate) {
+      parsed = JSON.parse(repairedCandidate);
+    } else {
+      throw error;
+    }
+  }
   const validUidSet = new Set((validUids || []).map(uid => ensureNumericUID(uid)).filter(uid => uid >= 0));
-  const readonlyUids = _.uniq((Array.isArray(parsed?.readonly_uids) ? parsed.readonly_uids : [])
-    .map(uid => ensureNumericUID(uid))
-    .filter(uid => validUidSet.has(uid)));
-  const editableUids = _.uniq((Array.isArray(parsed?.editable_uids) ? parsed.editable_uids : [])
-    .map(uid => ensureNumericUID(uid))
-    .filter(uid => validUidSet.has(uid)));
+  const rawReadonlyUids = Array.isArray(parsed?.readonly_uids) ? parsed.readonly_uids.map(uid => ensureNumericUID(uid)) : [];
+  const rawEditableUids = Array.isArray(parsed?.editable_uids) ? parsed.editable_uids.map(uid => ensureNumericUID(uid)) : [];
+  const unknownUids = [...rawReadonlyUids, ...rawEditableUids].filter(uid => !validUidSet.has(uid));
+  if (unknownUids.length) {
+    throw new Error(`规划结果包含不存在的 UID: ${_.uniq(unknownUids).join(', ')}`);
+  }
+  const duplicateReadonlyUids = rawReadonlyUids.filter((uid, index) => rawReadonlyUids.indexOf(uid) !== index);
+  const duplicateEditableUids = rawEditableUids.filter((uid, index) => rawEditableUids.indexOf(uid) !== index);
+  if (duplicateReadonlyUids.length || duplicateEditableUids.length) {
+    throw new Error(
+      `规划结果包含重复 UID: ${_.uniq([...duplicateReadonlyUids, ...duplicateEditableUids]).join(', ')}`,
+    );
+  }
+  const readonlyUids = _.uniq(rawReadonlyUids.filter(uid => validUidSet.has(uid)));
+  const editableUids = _.uniq(rawEditableUids.filter(uid => validUidSet.has(uid)));
   const overlap = readonlyUids.filter(uid => editableUids.includes(uid));
   if (overlap.length) {
     throw new Error(`规划结果中 readonly_uids 与 editable_uids 重叠: ${overlap.join(', ')}`);
@@ -1812,6 +1944,25 @@ function buildPlanSectionXml(plan = null) {
   }
 
   return ['<改造方案>', ...lines, '</改造方案>'].join('\n');
+}
+
+function mergePlanSelectionWithLocks(parsedPlan, lockedEditableUids = [], lockedReadonlyUids = []) {
+  const lockedEditable = normalizeUidList(lockedEditableUids);
+  const lockedReadonly = normalizeUidList(lockedReadonlyUids).filter(uid => !lockedEditable.includes(uid));
+  const plannedReadonly = normalizeUidList(parsedPlan?.readonly_uids)
+    .filter(uid => !lockedEditable.includes(uid) && !lockedReadonly.includes(uid));
+  const plannedEditable = normalizeUidList(parsedPlan?.editable_uids)
+    .filter(uid => !lockedEditable.includes(uid) && !lockedReadonly.includes(uid) && !plannedReadonly.includes(uid));
+
+  return {
+    ...parsedPlan,
+    readonly_uids: _.uniq([...lockedReadonly, ...plannedReadonly]),
+    editable_uids: _.uniq([...lockedEditable, ...plannedEditable]),
+    locked_editable_uids: lockedEditable,
+    locked_readonly_uids: lockedReadonly,
+    planned_editable_uids: plannedEditable,
+    planned_readonly_uids: plannedReadonly,
+  };
 }
 
 function formatErrorDetails(error) {
@@ -1964,7 +2115,7 @@ function buildAttemptErrors({ targetEntries, lastError, requestPrompt, rawText, 
   }));
 }
 
-function buildAttemptItems({ targetEntries, parsedDrafts, normalizedFieldOptions, rawText }) {
+function buildAttemptItems({ targetEntries, parsedDrafts, normalizedFieldOptions, rawText, sourceMode = 'direct' }) {
   const items = [];
   const errors = [];
   const draftsByUid = new Map(
@@ -1998,7 +2149,11 @@ function buildAttemptItems({ targetEntries, parsedDrafts, normalizedFieldOptions
         uid,
         title: entry.name || `UID ${entry.uid}`,
         beforeEntry: _.cloneDeep(entry),
+        beforeEntryHash: buildAiEntryHash(entry),
         afterEntry,
+        editableFields: { ...normalizedFieldOptions },
+        conflictStatus: 'none',
+        sourceMode,
         diffs,
         changed: diffs.length > 0,
       });
@@ -2033,6 +2188,8 @@ async function executePreviewAttempt(options = {}) {
     requestPrompt,
     shouldStop,
     batchLabel = '',
+    sourceMode = 'direct',
+    contextBudget = {},
   } = options;
 
   let parsedDrafts = [];
@@ -2059,6 +2216,7 @@ async function executePreviewAttempt(options = {}) {
         customApi,
         onGenerationStart,
         shouldStream,
+        contextBudget,
       });
       console.info('[世界书 AI] 完整返回内容', { batchLabel, attemptLabel, rawText });
 
@@ -2108,6 +2266,8 @@ async function executePreviewAttempt(options = {}) {
       parsedDrafts,
       normalizedFieldOptions,
       rawText,
+      sourceMode,
+      contextBudget,
     });
 
   const diagnostics = lastError && shouldRunCompatibilityDiagnostics(customApi, {
@@ -2151,6 +2311,8 @@ export const generateAiPlan = errorCatched(async (options = {}) => {
     shouldStream = false,
     chatMessages = [],
     referenceMaterial = '',
+    lockedEditableUids = [],
+    lockedReadonlyUids = [],
   } = options;
   const trimmedInstruction = instruction.trim();
 
@@ -2169,6 +2331,8 @@ export const generateAiPlan = errorCatched(async (options = {}) => {
   const requestPrompt = buildPlanningPrompt(lorebookName, trimmedInstruction, allEntries, promptSettings, {
     chatMessages,
     referenceMaterial,
+    lockedEditableUids,
+    lockedReadonlyUids,
   });
   const rawResponse = await requestLlmText({
     prompt: requestPrompt,
@@ -2177,7 +2341,11 @@ export const generateAiPlan = errorCatched(async (options = {}) => {
     onGenerationStart,
     shouldStream,
   });
-  const parsed = parseAiPlanResponse(rawResponse, allEntries.map(entry => entry.uid));
+  const parsed = mergePlanSelectionWithLocks(
+    parseAiPlanResponse(rawResponse, allEntries.map(entry => entry.uid)),
+    lockedEditableUids,
+    lockedReadonlyUids,
+  );
 
   return {
     ...parsed,
@@ -2207,6 +2375,8 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     shouldStop,
     chatMessages = [],
     referenceMaterial = '',
+    contextBudget = {},
+    sourceMode = 'direct',
   } = options;
   const trimmedInstruction = instruction.trim();
 
@@ -2239,6 +2409,14 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     targetEntries,
     fieldOptions: normalizedFieldOptions,
     promptSettings,
+    contextBudget,
+    contextEntries: {
+      plan: planningResult?.plan || null,
+      chatMessages,
+      referenceMaterial,
+      readonlyEntries,
+      modifiedEntries: [],
+    },
   });
 
   console.groupCollapsed('[世界书 AI] 批量预览请求');
@@ -2271,7 +2449,50 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     let totalFailed = 0;
     let modifiedContextEntries = [];
 
-    for (const batchPlan of batchPlans) {
+    for (let batchCursor = 0; batchCursor < batchPlans.length; batchCursor++) {
+      let batchPlan = batchPlans[batchCursor];
+      const actualPrompt = buildContextualBatchPromptV2(
+        lorebookName,
+        trimmedInstruction,
+        batchPlan.entries,
+        normalizedFieldOptions,
+        promptSettings,
+        {
+          plan: planningResult?.plan || null,
+          chatMessages,
+          referenceMaterial,
+          readonlyEntries,
+          modifiedEntries: modifiedContextEntries,
+        },
+      );
+      const actualPromptTokenDetails = await getTokenCountDetails(actualPrompt);
+      const maxInputTokens = getMaxInputTokens(contextBudget);
+      if (actualPromptTokenDetails.count > maxInputTokens && batchPlan.entries.length > 1) {
+        const splitIndex = Math.max(1, Math.floor(batchPlan.entries.length / 2));
+        const splitPlans = [
+          {
+            ...batchPlan,
+            entries: batchPlan.entries.slice(0, splitIndex),
+            entryCount: splitIndex,
+          },
+          {
+            ...batchPlan,
+            entries: batchPlan.entries.slice(splitIndex),
+            entryCount: batchPlan.entries.length - splitIndex,
+          },
+        ];
+        batchPlans.splice(batchCursor, 1, ...splitPlans);
+        batchPlans.forEach((plan, index) => {
+          plan.batchIndex = index;
+          plan.batchNumber = index + 1;
+        });
+        batchCursor -= 1;
+        continue;
+      }
+      batchPlan.entryTokenCount = actualPromptTokenDetails.count;
+      batchPlan.tokenCountSource = actualPromptTokenDetails.source;
+      batchPlan.isOversized = actualPromptTokenDetails.count > maxInputTokens;
+
       emitPreviewProgress(onProgress, {
         phase: 'running',
         batchTotal: batchPlans.length,
@@ -2299,6 +2520,8 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
         planningResult,
         chatMessages,
         referenceMaterial,
+        contextBudget,
+        sourceMode,
       });
       batchResults.push(batchResult);
 

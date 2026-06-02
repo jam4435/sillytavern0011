@@ -17,7 +17,6 @@ import { getRollbackPreview, rollbackLastTransaction } from '../features/history
 import { prepareOptimizerModal } from '../features/optimizer.js';
 import { getAiWorkspaceSettings, setAiWorkspaceSettings } from '../settings.js';
 import { getActiveFilters, getFilteredEntries, getSelectedEntries, getSelectedEntriesCount, setActiveFilter } from '../state.js';
-import { openAiActionDialog } from '../ui/aiActionDialog.js';
 import { refreshAiWorkspace, resetAiWorkspace } from '../ui/aiWorkspace.js';
 import { selectDetailEntry } from '../ui/detail.js';
 import { closeFloatingBatchToggleDropdowns } from '../ui/floatingBatchDropdown.js';
@@ -97,18 +96,17 @@ async function copyEntries({ lorebookName, isGlobal }) {
   updateRollbackButtonState(lorebookName, isGlobal);
 }
 
-function openAiBatchEdit({ lorebookName, isGlobal }) {
+async function openAiBatchEdit({ lorebookName }) {
   const entryUids = getSelectedEntries(lorebookName);
   if (entryUids.length === 0) {
     window.toastr?.warning('请先选择至少一个条目');
     return;
   }
 
-  openAiActionDialog({
-    lorebookName,
-    isGlobal,
-    entryUids,
-  });
+  const selectedCount = await openAiWorkspaceForSelectedEntries(lorebookName, 'direct');
+  if (selectedCount > 0) {
+    window.toastr?.success(`已打开 AI 直接修改，并载入 ${selectedCount} 个选中条目`);
+  }
 }
 
 function mirrorAiWorkspaceModeToLegacyState(settings, modeKey) {

@@ -4,9 +4,9 @@
  */
 
 import { saveEntryField, toggleEntryEnabled } from '../api.js';
-import { DEBUG_MODE } from '../config.js';
+import { AI_TAB_ID, DEBUG_MODE } from '../config.js';
 import { applyAiPreview, generateAiPreview } from '../features/aiActions.js';
-import { addPinnedEntry, removePinnedEntry } from '../settings.js';
+import { addPinnedEntry, getAiWorkspaceSettings, removePinnedEntry, setAiWorkspaceSettings } from '../settings.js';
 import { allEntriesData, toggleEntrySelection, virtualScrollers } from '../state.js';
 import {
   closeAiActionDialog,
@@ -23,6 +23,8 @@ import { isMasterDetailLayout, renderDetailPane, selectDetailEntry, syncMasterRo
 import { showEntryEditor } from '../ui/editor.js';
 import { toggleExpanded } from '../ui/expandManager.js';
 import { updateHeaderCheckboxState, updateVirtualScroll } from '../ui/list.js';
+import { switchTab } from '../ui/panel.js';
+import { refreshAiWorkspace, resetAiWorkspace } from '../ui/aiWorkspace.js';
 import { ensureNumericUID } from '../utils.js';
 import { registerCommands } from './index.js';
 
@@ -267,12 +269,28 @@ async function openCompareEditor({ lorebookName, numericUid }) {
   await showCompareEditor(lorebookName, numericUid);
 }
 
-function openAiEntryEdit({ lorebookName, numericUid, isGlobal }) {
-  openAiActionDialog({
-    lorebookName,
-    isGlobal,
-    entryUids: [numericUid],
-  });
+async function openAiEntryEdit({ lorebookName, numericUid }) {
+  const settings = getAiWorkspaceSettings();
+  const direct = _.cloneDeep(settings.direct || {});
+  direct.lorebookName = lorebookName;
+  direct.selectedEntryUids = [Number(numericUid)];
+  direct.readonlyEntryUids = [];
+  direct.planningResult = null;
+  direct.previewResult = null;
+  direct.debugInfo = null;
+  direct.statusText = '';
+  direct.currentStep = 'instruction';
+  settings.lorebookName = lorebookName;
+  settings.navMode = 'direct';
+  settings.direct = direct;
+  settings.selectedEntryUids = [Number(numericUid)];
+  settings.readonlyEntryUids = [];
+  setAiWorkspaceSettings(settings);
+
+  await switchTab(AI_TAB_ID);
+  resetAiWorkspace();
+  await refreshAiWorkspace();
+  window.toastr?.success('已打开 AI 直接修改，并载入当前条目');
 }
 
 async function previewOrApplyAiAction({ $actionTarget, refreshList }) {

@@ -94,7 +94,12 @@ function buildGenerateConfig({ prompt, generationId, customApi, shouldStream }) 
   return config;
 }
 
-function buildCustomGenerateBody({ prompt, customApi, shouldStream }) {
+function normalizeMaxOutputTokens(value) {
+  const parsed = Number.parseInt(`${value ?? DEFAULT_CUSTOM_MAX_TOKENS}`, 10);
+  return Number.isFinite(parsed) ? Math.min(64000, Math.max(256, parsed)) : DEFAULT_CUSTOM_MAX_TOKENS;
+}
+
+function buildCustomGenerateBody({ prompt, customApi, shouldStream, maxOutputTokens }) {
   return {
     messages: [
       {
@@ -103,7 +108,7 @@ function buildCustomGenerateBody({ prompt, customApi, shouldStream }) {
       },
     ],
     model: normalizeModelName(customApi?.model),
-    max_tokens: DEFAULT_CUSTOM_MAX_TOKENS,
+    max_tokens: normalizeMaxOutputTokens(maxOutputTokens),
     temperature: 0.7,
     top_p: 0.95,
     stream: Boolean(shouldStream),
@@ -241,7 +246,7 @@ function extractResponseContent(rawText, parsedData) {
   return '';
 }
 
-async function requestCustomChatCompletion({ prompt, customApi, shouldStream, generationId, timeoutMs }) {
+async function requestCustomChatCompletion({ prompt, customApi, shouldStream, generationId, timeoutMs, maxOutputTokens }) {
   const stApi = getSillyTavernApi();
   if (!stApi || typeof stApi.getRequestHeaders !== 'function') {
     throw new Error('当前环境没有可用的 SillyTavern.getRequestHeaders()');
@@ -254,7 +259,7 @@ async function requestCustomChatCompletion({ prompt, customApi, shouldStream, ge
   try {
     timeoutHandle = setTimeout(() => controller.abort('timeout'), timeoutMs);
 
-    const requestBody = buildCustomGenerateBody({ prompt, customApi, shouldStream });
+    const requestBody = buildCustomGenerateBody({ prompt, customApi, shouldStream, maxOutputTokens });
     console.info('[世界书 AI] custom 直调请求体', {
       generationId,
       requestBody: {
@@ -329,6 +334,7 @@ export async function requestLlmText(options = {}) {
     timeoutMs = DEFAULT_TIMEOUT_MS,
     onGenerationStart,
     shouldStream = false,
+    maxOutputTokens = DEFAULT_CUSTOM_MAX_TOKENS,
   } = options;
 
   void promptSettings;
@@ -397,6 +403,7 @@ export async function requestLlmText(options = {}) {
         shouldStream,
         generationId,
         timeoutMs,
+        maxOutputTokens,
       });
     } else {
       response = await Promise.race([

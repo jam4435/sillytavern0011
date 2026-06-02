@@ -1,9 +1,10 @@
 import { getWorldbookNamesSafe } from '../api.js';
 import { applyAiPreview, collectAiTargetEntries, generateAiPlan, generateAiPreview } from '../features/aiActionsBatch.js';
 import { cancelLlmGeneration, requestLlmText } from '../features/llmClient.js';
+import { getRollbackPreview, rollbackLastTransaction } from '../features/history.js';
 import { AI_CONTENT_ID } from '../config.js';
-import { getAiWorkspaceSettings, getPcLayoutModeSetting, setAiWorkspaceSettings } from '../settings.js';
-import { errorCatched, isMobile } from '../utils.js';
+import { getAiWorkspaceSettings, setAiWorkspaceSettings } from '../settings.js';
+import { errorCatched } from '../utils.js';
 
 const ROOT_ID = 'lorebook-ai-workspace';
 const MODEL_LIST_ID = 'lorebook-ai-model-list';
@@ -139,7 +140,7 @@ function currentChatContextSettings() {
 }
 
 export function isDesktopAiWorkspace() {
-  return !isMobile() && getPcLayoutModeSetting() === 'master-detail';
+  return true;
 }
 
 function normalizeNavMode(mode) {
@@ -244,6 +245,27 @@ function isStreamEnabled() {
   return settings().stream === true;
 }
 
+function currentContextBudget() {
+  const saved = settings();
+  const savedBudget = saved.contextBudget || {};
+  const $enabled = $('#ai-workspace-budget-enabled', parentDoc());
+  if (!$enabled.length) {
+    return {
+      enabled: savedBudget.enabled !== false,
+      maxInputTokens: Number(savedBudget.maxInputTokens) || 12000,
+      reserveOutputTokens: Number(savedBudget.reserveOutputTokens) || 4096,
+    };
+  }
+
+  const maxInputTokens = Number.parseInt($('#ai-workspace-budget-max-input', parentDoc()).val(), 10);
+  const reserveOutputTokens = Number.parseInt($('#ai-workspace-budget-reserve-output', parentDoc()).val(), 10);
+  return {
+    enabled: $enabled.prop('checked'),
+    maxInputTokens: Number.isFinite(maxInputTokens) ? maxInputTokens : 12000,
+    reserveOutputTokens: Number.isFinite(reserveOutputTokens) ? reserveOutputTokens : 4096,
+  };
+}
+
 function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
   const saved = settings();
   const mirrorMode = state.modes[mirrorModeKey] || state.modes.direct;
@@ -263,6 +285,7 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
     promptSettings: { ...mirrorMode.promptSettings },
     apiMode: getApiMode(),
     stream: isStreamEnabled(),
+    contextBudget: currentContextBudget(),
     customApi: currentApiSettings(),
     chatContext: state.chatContext,
     chatMessages: state.chatMessages,
@@ -635,6 +658,18 @@ function normalizePlanEditorValue(rawValue) {
   return {
     readonly_uids: readonlyUids,
     editable_uids: editableUids,
+    locked_editable_uids: Array.isArray(parsed?.locked_editable_uids)
+      ? parsed.locked_editable_uids.map(uid => Number(uid)).filter(uid => Number.isFinite(uid))
+      : [],
+    locked_readonly_uids: Array.isArray(parsed?.locked_readonly_uids)
+      ? parsed.locked_readonly_uids.map(uid => Number(uid)).filter(uid => Number.isFinite(uid))
+      : [],
+    planned_editable_uids: Array.isArray(parsed?.planned_editable_uids)
+      ? parsed.planned_editable_uids.map(uid => Number(uid)).filter(uid => Number.isFinite(uid))
+      : [],
+    planned_readonly_uids: Array.isArray(parsed?.planned_readonly_uids)
+      ? parsed.planned_readonly_uids.map(uid => Number(uid)).filter(uid => Number.isFinite(uid))
+      : [],
     plan: {
       goal: typeof parsed?.plan?.goal === 'string' ? parsed.plan.goal.trim() : '',
       must_keep: Array.isArray(parsed?.plan?.must_keep) ? parsed.plan.must_keep.map(item => `${item || ''}`.trim()).filter(Boolean) : [],
@@ -665,6 +700,10 @@ function syncPlanSelectionFromPlanningResult(modeKey) {
   mode.planningResult = {
     readonly_uids: readonlyUids,
     editable_uids: editableUids,
+    locked_editable_uids: mode.planningResult?.locked_editable_uids || [],
+    locked_readonly_uids: mode.planningResult?.locked_readonly_uids || [],
+    planned_editable_uids: mode.planningResult?.planned_editable_uids || [],
+    planned_readonly_uids: mode.planningResult?.planned_readonly_uids || [],
     plan: mode.planningResult?.plan || {},
   };
   mode.selectedEntryUids = new Set(editableUids);
@@ -724,6 +763,16 @@ function buildManualPreviewDiffs(beforeEntry, afterEntry, fieldOptions = {}) {
       Array.isArray(beforeEntry?.strategy?.keys) ? beforeEntry.strategy.keys : [],
       Array.isArray(afterEntry?.strategy?.keys) ? afterEntry.strategy.keys : [],
     );
+    pushDiff(
+      '次级关键词逻辑',
+      beforeEntry?.strategy?.keys_secondary?.logic || 'and_any',
+      afterEntry?.strategy?.keys_secondary?.logic || 'and_any',
+    );
+    pushDiff(
+      '次级关键词',
+      Array.isArray(beforeEntry?.strategy?.keys_secondary?.keys) ? beforeEntry.strategy.keys_secondary.keys : [],
+      Array.isArray(afterEntry?.strategy?.keys_secondary?.keys) ? afterEntry.strategy.keys_secondary.keys : [],
+    );
   }
 
   return diffs;
@@ -757,6 +806,8 @@ function buildPreviewModalSections(item, mode) {
   const afterEntry = item?.afterEntry || {};
   const beforeKeywords = Array.isArray(beforeEntry?.strategy?.keys) ? beforeEntry.strategy.keys : [];
   const afterKeywords = Array.isArray(afterEntry?.strategy?.keys) ? afterEntry.strategy.keys : [];
+  const beforeSecondaryKeywords = Array.isArray(beforeEntry?.strategy?.keys_secondary?.keys) ? beforeEntry.strategy.keys_secondary.keys : [];
+  const afterSecondaryKeywords = Array.isArray(afterEntry?.strategy?.keys_secondary?.keys) ? afterEntry.strategy.keys_secondary.keys : [];
   const sections = [];
 
   if (mode?.editableFields?.title) {
@@ -767,6 +818,13 @@ function buildPreviewModalSections(item, mode) {
   }
   if (mode?.editableFields?.prompt) {
     sections.push({ key: 'keywords', title: '关键词', before: beforeKeywords, after: afterKeywords });
+    sections.push({
+      key: 'secondary_logic',
+      title: '次级关键词逻辑',
+      before: beforeEntry?.strategy?.keys_secondary?.logic || 'and_any',
+      after: afterEntry?.strategy?.keys_secondary?.logic || 'and_any',
+    });
+    sections.push({ key: 'secondary_keywords', title: '次级关键词', before: beforeSecondaryKeywords, after: afterSecondaryKeywords });
   }
   if (!sections.length) {
     sections.push({ key: 'content', title: '当前条目', before: beforeEntry?.content || '', after: afterEntry?.content || '' });
@@ -777,6 +835,16 @@ function buildPreviewModalSections(item, mode) {
 function applyPreviewModalEdits(modeKey) {
   const mode = state.modes[modeKey];
   const uid = Number($('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid'));
+  return applyPreviewEditsFromFields(modeKey, uid, '#ai-workspace-preview-modal-content textarea[data-preview-field]');
+}
+
+function applyPreviewDetailEdits(modeKey) {
+  const uid = Number($('#ai-workspace-preview-detail', parentDoc()).attr('data-preview-uid'));
+  return applyPreviewEditsFromFields(modeKey, uid, '#ai-workspace-preview-detail textarea[data-preview-field]');
+}
+
+function applyPreviewEditsFromFields(modeKey, uid, fieldsSelector) {
+  const mode = state.modes[modeKey];
   const item = mode.previewResult?.items?.find(previewItem => Number(previewItem?.uid) === uid);
   if (!item) {
     return null;
@@ -785,7 +853,7 @@ function applyPreviewModalEdits(modeKey) {
   item.afterEntry = _.cloneDeep(item.afterEntry || item.beforeEntry || {});
   item.afterEntry.strategy = item.afterEntry.strategy || {};
 
-  $('#ai-workspace-preview-modal-content textarea[data-preview-field]', parentDoc()).each(function () {
+  $(fieldsSelector, parentDoc()).each(function () {
     const field = ($(this).attr('data-preview-field') || '').trim();
     const value = $(this).val() || '';
     if (field === 'title') {
@@ -794,6 +862,12 @@ function applyPreviewModalEdits(modeKey) {
       item.afterEntry.content = `${value}`;
     } else if (field === 'keywords') {
       item.afterEntry.strategy.keys = parseKeywordsEditorValue(value);
+    } else if (field === 'secondary_logic') {
+      item.afterEntry.strategy.keys_secondary = item.afterEntry.strategy.keys_secondary || {};
+      item.afterEntry.strategy.keys_secondary.logic = `${value}`.trim() || 'and_any';
+    } else if (field === 'secondary_keywords') {
+      item.afterEntry.strategy.keys_secondary = item.afterEntry.strategy.keys_secondary || {};
+      item.afterEntry.strategy.keys_secondary.keys = parseKeywordsEditorValue(value);
     }
   });
 
@@ -801,6 +875,49 @@ function applyPreviewModalEdits(modeKey) {
   renderPreview(modeKey);
   persistSettings({ mirrorModeKey: modeKey });
   return item;
+}
+
+function renderPreviewDetail(modeKey, uid = null) {
+  const mode = state.modes[modeKey];
+  const $detail = $('#ai-workspace-preview-detail', parentDoc());
+  if (!$detail.length) {
+    return;
+  }
+
+  const items = Array.isArray(mode.previewResult?.items) ? mode.previewResult.items : [];
+  const item = items.find(previewItem => Number(previewItem?.uid) === Number(uid)) || items[0];
+  if (!item) {
+    $detail.removeAttr('data-preview-uid').html('<div class="ai-empty">选择左侧条目后查看完整修改。</div>');
+    return;
+  }
+
+  $detail.attr('data-preview-uid', item.uid);
+  $detail.html(`
+    <div class="ai-preview-detail-header">
+      <div>
+        <div class="ai-preview-item-title">${_.escape(item.afterEntry?.name || item.beforeEntry?.name || item.title || '条目')} (UID: ${item.uid})</div>
+        <div class="ai-text">${item.changed ? '可直接编辑预览内容。' : '当前无实际变更，可手动编辑后应用。'}</div>
+      </div>
+      <button type="button" id="ai-workspace-preview-detail-regenerate">重新生成此条</button>
+    </div>
+    <div class="ai-preview-modal-content-inline">
+      ${buildPreviewModalSections(item, mode).map(section => `
+        <div class="ai-preview-modal-section" data-field-key="${section.key}">
+          <div class="ai-preview-modal-section-title">${_.escape(section.title)}${_.isEqual(section.before, section.after) ? '' : ' <span class="ai-changed-badge">已变更</span>'}</div>
+          <div class="ai-preview-modal-panel">
+            <div class="ai-preview-modal-field">
+              <label>当前</label>
+              <textarea readonly>${_.escape(formatPreviewModalValue(section.before))}</textarea>
+            </div>
+            <div class="ai-preview-modal-field">
+              <label>预览</label>
+              <textarea data-preview-field="${section.key}">${_.escape(formatPreviewModalValue(section.after))}</textarea>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `);
 }
 
 function renderDebugInfo(modeKey, debug = null) {
@@ -859,6 +976,16 @@ function renderPlanningResult(modeKey, planningResult = null) {
   const lines = [
     `只读 ${mode.planningResult.readonly_uids?.length || 0} 条，可修改 ${mode.planningResult.editable_uids?.length || 0} 条`,
   ];
+  if ((mode.planningResult.locked_editable_uids?.length || 0) || (mode.planningResult.locked_readonly_uids?.length || 0)) {
+    lines.push(
+      `手动锁定：可修改 ${mode.planningResult.locked_editable_uids?.length || 0} 条，只读 ${mode.planningResult.locked_readonly_uids?.length || 0} 条`,
+    );
+  }
+  if ((mode.planningResult.planned_editable_uids?.length || 0) || (mode.planningResult.planned_readonly_uids?.length || 0)) {
+    lines.push(
+      `AI规划：可修改 ${mode.planningResult.planned_editable_uids?.length || 0} 条，只读 ${mode.planningResult.planned_readonly_uids?.length || 0} 条`,
+    );
+  }
   if (plan.goal) {
     lines.push(`目标：${plan.goal}`);
   }
@@ -867,6 +994,10 @@ function renderPlanningResult(modeKey, planningResult = null) {
   $json.val(JSON.stringify({
     readonly_uids: mode.planningResult.readonly_uids || [],
     editable_uids: mode.planningResult.editable_uids || [],
+    locked_editable_uids: mode.planningResult.locked_editable_uids || [],
+    locked_readonly_uids: mode.planningResult.locked_readonly_uids || [],
+    planned_editable_uids: mode.planningResult.planned_editable_uids || [],
+    planned_readonly_uids: mode.planningResult.planned_readonly_uids || [],
     plan: mode.planningResult.plan || {},
   }, null, 2));
 }
@@ -885,6 +1016,7 @@ function clearPreview(modeKey, text = EMPTY_PREVIEW_TEXT) {
   $summary.text(text);
   $('#ai-workspace-preview-errors', parentDoc()).removeClass('has-errors').empty();
   $('#ai-workspace-preview-list', parentDoc()).empty();
+  renderPreviewDetail(modeKey, null);
   $('#ai-workspace-apply', parentDoc()).prop('disabled', true);
   renderDebugInfo(modeKey, {});
 }
@@ -925,25 +1057,95 @@ function renderPreview(modeKey, previewResult = null) {
   $list.empty();
   if (!Array.isArray(mode.previewResult?.items) || !mode.previewResult.items.length) {
     $list.append('<div class="ai-empty">没有可展示的预览结果。</div>');
+    renderPreviewDetail(modeKey, null);
     $('#ai-workspace-apply', parentDoc()).prop('disabled', true);
     renderDebugInfo(modeKey, mode.previewResult?.debug || {});
     return;
   }
 
+  const activeUid = Number($('#ai-workspace-preview-detail', parentDoc()).attr('data-preview-uid'))
+    || Number(mode.previewResult.items[0]?.uid);
   mode.previewResult.items.forEach(item => {
     const diffs = item.diffs.length
       ? item.diffs.map(diff => renderPreviewDiff(diff)).join('')
       : '<div class="ai-preview-diff-after">无实际变更。</div>';
     $list.append(`
-      <div class="ai-preview-item" data-preview-uid="${item.uid}" title="点击查看完整修改">
+      <div class="ai-preview-item${Number(item.uid) === activeUid ? ' is-active' : ''}" data-preview-uid="${item.uid}" title="点击查看完整修改">
         <div class="ai-preview-item-title">${_.escape(item.title)} (UID: ${item.uid})</div>
         ${diffs}
       </div>
     `);
   });
 
+  renderPreviewDetail(modeKey, activeUid);
   renderDebugInfo(modeKey, mode.previewResult?.debug || {});
   $('#ai-workspace-apply', parentDoc()).prop('disabled', summary.changed === 0);
+  void refreshRollbackPanel(modeKey);
+}
+
+async function refreshRollbackPanel(modeKey) {
+  const mode = state.modes[modeKey];
+  const $panel = $('#ai-workspace-rollback-panel', parentDoc());
+  if (!$panel.length || !mode?.lorebookName) {
+    return;
+  }
+
+  try {
+    const preview = await getRollbackPreview(mode.lorebookName);
+    const available = Boolean(preview?.available);
+    $('#ai-workspace-rollback-preview', parentDoc()).prop('disabled', !available);
+    $('#ai-workspace-rollback-execute', parentDoc()).prop('disabled', !available);
+    if (!available) {
+      $panel.empty();
+      return;
+    }
+    $panel.html(
+      `可回滚最近一次操作：恢复 ${preview.summary.restoreCount} 条，移除 ${preview.summary.removeCount} 条，修改 ${preview.summary.modifyCount} 条。`,
+    );
+  } catch {
+    $panel.empty();
+    $('#ai-workspace-rollback-preview', parentDoc()).prop('disabled', true);
+    $('#ai-workspace-rollback-execute', parentDoc()).prop('disabled', true);
+  }
+}
+
+async function handleRollbackPreview() {
+  const modeKey = currentModeKey();
+  const mode = state.modes[modeKey];
+  const preview = await getRollbackPreview(mode.lorebookName);
+  if (!preview?.available) {
+    setModeStatus(modeKey, '当前没有可回滚的 AI 应用。');
+    return;
+  }
+  const lines = preview.items.slice(0, 20).map(item => `${item.type} UID ${item.uid}: ${item.title}`);
+  const message = [
+    `回滚预览：恢复 ${preview.summary.restoreCount} 条，移除 ${preview.summary.removeCount} 条，修改 ${preview.summary.modifyCount} 条。`,
+    ...lines,
+    preview.items.length > 20 ? `另有 ${preview.items.length - 20} 条未显示。` : '',
+  ].filter(Boolean).join('\n');
+  window.alert?.(message);
+}
+
+async function handleRollbackExecute() {
+  const modeKey = currentModeKey();
+  const mode = state.modes[modeKey];
+  const preview = await getRollbackPreview(mode.lorebookName);
+  if (!preview?.available) {
+    setModeStatus(modeKey, '当前没有可回滚的 AI 应用。');
+    return;
+  }
+  if (!window.confirm?.('确定要回滚最近一次 AI 应用吗？')) {
+    return;
+  }
+  const result = await rollbackLastTransaction(mode.lorebookName);
+  if (!result.success) {
+    setModeStatus(modeKey, result.error?.message || '回滚失败。');
+    return;
+  }
+  await loadEntriesForMode(modeKey, { force: true, resetSelection: false, clearOutputs: true });
+  clearPreview(modeKey, '最近一次 AI 应用已回滚。');
+  await refreshRollbackPanel(modeKey);
+  setModeStatus(modeKey, '回滚完成。');
 }
 
 function closePreviewModal() {
@@ -1149,6 +1351,8 @@ async function handlePreviewModalRegenerate() {
       referenceMaterial: state.referenceMaterial,
       fieldOptions: mode.editableFields,
       promptSettings: mode.promptSettings,
+      contextBudget: saved.contextBudget,
+      sourceMode: modeKey,
       customApi: saved.apiMode === 'custom' ? saved.customApi : null,
       shouldStream: saved.stream === true,
       onGenerationStart: generationId => {
@@ -1488,6 +1692,19 @@ function buildApiSettingsMarkup() {
             <span id="ai-workspace-models-status" class="ai-text"></span>
           </div>
           <div id="ai-workspace-api-hint" class="ai-note"></div>
+          <div class="ai-budget-panel">
+            <label><input type="checkbox" id="ai-workspace-budget-enabled"> 启用上下文预算</label>
+            <div class="ai-row">
+              <div class="ai-field">
+                <label for="ai-workspace-budget-max-input">最大输入 tokens</label>
+                <input id="ai-workspace-budget-max-input" type="number" min="1000" max="200000" step="500">
+              </div>
+              <div class="ai-field">
+                <label for="ai-workspace-budget-reserve-output">预留输出 tokens</label>
+                <input id="ai-workspace-budget-reserve-output" type="number" min="256" max="64000" step="256">
+              </div>
+            </div>
+          </div>
           <div class="ai-status-line">
             <span id="ai-workspace-status" class="ai-text"></span>
           </div>
@@ -1646,12 +1863,18 @@ function buildResultMarkup(modeKey) {
     <div class="ai-panel">
       <div id="ai-workspace-preview-summary" class="ai-text">${EMPTY_PREVIEW_TEXT}</div>
       <div id="ai-workspace-preview-errors" class="ai-preview-errors"></div>
-      <div id="ai-workspace-preview-list" class="ai-scroll ai-preview-list"></div>
+      <div id="ai-workspace-rollback-panel" class="ai-rollback-panel"></div>
+      <div class="ai-result-grid">
+        <div id="ai-workspace-preview-list" class="ai-scroll ai-preview-list"></div>
+        <div id="ai-workspace-preview-detail" class="ai-preview-detail"></div>
+      </div>
       <div class="ai-step-actions">
         <button type="button" class="ai-secondary-button" data-ai-step-target="${backStep}">返回上一步</button>
         <button type="button" id="ai-workspace-preview">重新生成修改结果</button>
         <button type="button" id="ai-workspace-stop" disabled>停止生成</button>
         <button type="button" id="ai-workspace-apply" disabled>应用预览</button>
+        <button type="button" id="ai-workspace-rollback-preview" disabled>回滚预览</button>
+        <button type="button" id="ai-workspace-rollback-execute" disabled>执行回滚</button>
         <span id="ai-workspace-status" class="ai-text"></span>
       </div>
       <div class="ai-debug-grid">
@@ -1824,6 +2047,7 @@ function ensureStyles() {
       #${ROOT_ID} .ai-subpanel{border:1px solid var(--panel-border-color,#444);border-radius:6px;background:var(--panel-entry-bg-color,#242424);padding:12px;display:flex;flex-direction:column;gap:12px}
       #${ROOT_ID} .ai-subpanel-header h5{margin:0 0 4px 0;font-size:14px}
       #${ROOT_ID} .ai-subpanel-header p{margin:0;color:var(--panel-text-color,#cfd8dc);font-size:12px;line-height:1.5}
+      #${ROOT_ID} .ai-budget-panel{border:1px solid var(--panel-border-color,#444);border-radius:6px;background:var(--panel-entry-bg-color,#242424);padding:12px;display:flex;flex-direction:column;gap:10px}
       #${ROOT_ID} button{border:1px solid var(--panel-border-color,#666);border-radius:6px;background:var(--panel-accent-color,#4a6a8a);color:var(--panel-text-color,#fff);padding:9px 12px;cursor:pointer}
       #${ROOT_ID} button[disabled]{opacity:.6;cursor:not-allowed}
       #${ROOT_ID} .ai-secondary-button{background:transparent}
@@ -1835,6 +2059,12 @@ function ensureStyles() {
       #${ROOT_ID} .ai-scroll{overflow-y:auto;border:1px solid var(--panel-border-color,#444);border-radius:6px;background:var(--panel-entry-bg-color,#242424)}
       #${ROOT_ID} .ai-entry-list{min-height:320px;max-height:460px}
       #${ROOT_ID} .ai-preview-list{min-height:220px;max-height:420px}
+      #${ROOT_ID} .ai-result-grid{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(0,1.2fr);gap:12px;min-height:360px}
+      #${ROOT_ID} .ai-preview-detail{border:1px solid var(--panel-border-color,#444);border-radius:6px;background:var(--panel-entry-bg-color,#242424);padding:12px;overflow:auto;min-height:320px}
+      #${ROOT_ID} .ai-preview-detail-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+      #${ROOT_ID} .ai-preview-modal-content-inline{display:flex;flex-direction:column;gap:12px}
+      #${ROOT_ID} .ai-rollback-panel{display:none;border:1px solid rgba(111,180,140,.55);border-radius:6px;background:rgba(111,180,140,.1);padding:10px 12px;color:var(--panel-text-color,#e8f5ee)}
+      #${ROOT_ID} .ai-rollback-panel:not(:empty){display:block}
       #${ROOT_ID} .ai-entry-item{display:flex;gap:10px;align-items:flex-start;padding:12px;border-bottom:1px solid var(--panel-border-color,#3e3e3e)}
       #${ROOT_ID} .ai-entry-item:last-child,#${ROOT_ID} .ai-preview-item:last-child{border-bottom:0}
       #${ROOT_ID} .ai-entry-main{min-width:0;flex:1 1 auto}
@@ -1854,6 +2084,7 @@ function ensureStyles() {
       #${ROOT_ID} .ai-assistant-actions button{padding:6px 10px;font-size:12px}
       #${ROOT_ID} .ai-preview-item{padding:12px;border-bottom:1px solid var(--panel-border-color,#3e3e3e);cursor:pointer}
       #${ROOT_ID} .ai-preview-item:hover{background:rgba(255,255,255,.04)}
+      #${ROOT_ID} .ai-preview-item.is-active{background:rgba(154,122,206,.18)}
       #${ROOT_ID} .ai-preview-diff + .ai-preview-diff{margin-top:8px}
       #${ROOT_ID} .ai-preview-diff-label{color:var(--panel-accent-color,#9fc8e4);margin-bottom:2px}
       #${ROOT_ID} .ai-preview-diff-before,#${ROOT_ID} .ai-preview-diff-after{font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
@@ -1884,6 +2115,15 @@ function ensureStyles() {
       #${ROOT_ID} .ai-debug-block summary{cursor:pointer;padding:10px 12px;font-size:13px;font-weight:600;color:var(--panel-text-color,#ddd);background:rgba(255,255,255,.03)}
       #${ROOT_ID} .ai-debug-block textarea{border:0;border-top:1px solid var(--panel-border-color,#444);border-radius:0;min-height:180px;background:transparent;font-family:Consolas,Monaco,monospace}
       #${ROOT_ID} .ai-coming-soon{font-size:28px;font-weight:700;letter-spacing:.08em}
+      @media (max-width:900px){
+        #${ROOT_ID}.ai-desktop-root{grid-template-columns:1fr}
+        #${ROOT_ID} .ai-desktop-nav{position:sticky;top:0;z-index:2}
+        #${ROOT_ID} .ai-nav-list{flex-direction:row;overflow-x:auto}
+        #${ROOT_ID} .ai-mode-nav-button{min-width:130px}
+        #${ROOT_ID} .ai-row{flex-direction:column;align-items:stretch}
+        #${ROOT_ID} .ai-field,#${ROOT_ID} .ai-btn-field{min-width:0;width:100%}
+        #${ROOT_ID} .ai-result-grid{grid-template-columns:1fr}
+      }
     </style>
   `);
 }
@@ -1926,6 +2166,9 @@ function syncApiForm() {
   $('#ai-workspace-apikey', parentDoc()).val(saved.customApi?.key || '');
   $('#ai-workspace-model', parentDoc()).val(saved.customApi?.model || '');
   $('#ai-workspace-stream', parentDoc()).prop('checked', saved.stream === true);
+  $('#ai-workspace-budget-enabled', parentDoc()).prop('checked', saved.contextBudget?.enabled !== false);
+  $('#ai-workspace-budget-max-input', parentDoc()).val(saved.contextBudget?.maxInputTokens || 12000);
+  $('#ai-workspace-budget-reserve-output', parentDoc()).val(saved.contextBudget?.reserveOutputTokens || 4096);
   syncSource(saved.customApi?.source || 'openai');
   toggleCustomApi();
   renderModelOptions();
@@ -1994,6 +2237,7 @@ function renderCurrentPanel() {
       renderDebugInfo(modeKey, state.modes[modeKey].debugInfo || {});
     }
     setModeStatus(modeKey, state.modes[modeKey].statusText);
+    void refreshRollbackPanel(modeKey);
   }
 
   setGeneratingState(state.isGenerating);
@@ -2166,6 +2410,8 @@ async function handlePlan() {
       instruction: mode.instruction,
       chatMessages: state.chatMessages,
       referenceMaterial: state.referenceMaterial,
+      lockedEditableUids: Array.from(mode.selectedEntryUids),
+      lockedReadonlyUids: Array.from(mode.readonlyEntryUids),
       promptSettings: mode.promptSettings,
       customApi: saved.apiMode === 'custom' ? saved.customApi : null,
       shouldStream: saved.stream === true,
@@ -2236,6 +2482,8 @@ async function handlePreview() {
       referenceMaterial: state.referenceMaterial,
       fieldOptions: mode.editableFields,
       promptSettings: mode.promptSettings,
+      contextBudget: saved.contextBudget,
+      sourceMode: modeKey,
       customApi: saved.apiMode === 'custom' ? saved.customApi : null,
       shouldStream: saved.stream === true,
       onGenerationStart: generationId => {
@@ -2306,14 +2554,20 @@ async function handleApply() {
   try {
     const result = await applyAiPreview({ lorebookName: mode.lorebookName, previewItems: mode.previewResult.items });
     if (result.changed) {
-      window.toastr?.success(`AI 修改已应用：${result.appliedCount} 条`);
+      window.toastr?.success(`AI 修改已应用：${result.appliedCount} 条${result.skippedCount ? `，跳过冲突 ${result.skippedCount} 条` : ''}`);
     } else {
-      window.toastr?.warning('没有可应用的 AI 变更');
+      window.toastr?.warning(result.skippedCount ? `没有可应用的无冲突变更，跳过 ${result.skippedCount} 条` : '没有可应用的 AI 变更');
     }
 
     await loadEntriesForMode(modeKey, { force: true, resetSelection: false, clearOutputs: false });
     clearPreview(modeKey, '本次预览已应用。');
-    setModeStatus(modeKey, 'AI 修改已应用完成。');
+    await refreshRollbackPanel(modeKey);
+    setModeStatus(
+      modeKey,
+      result.skippedCount
+        ? `AI 修改已应用完成，${result.skippedCount} 条因冲突或缺失被跳过。`
+        : 'AI 修改已应用完成。',
+    );
     persistSettings({ mirrorModeKey: modeKey });
   } catch (error) {
     setModeStatus(modeKey, error?.message || '应用 AI 预览失败。');
@@ -2498,7 +2752,7 @@ function bindEvents() {
         setModeStatus(modeKey, `规划 JSON 无法解析：${error.message}`);
       }
     })
-    .on('change.aiWorkspaceDesktop input.aiWorkspaceDesktop', '#ai-workspace-apiurl, #ai-workspace-apikey, #ai-workspace-model, #ai-workspace-stream', () => {
+    .on('change.aiWorkspaceDesktop input.aiWorkspaceDesktop', '#ai-workspace-apiurl, #ai-workspace-apikey, #ai-workspace-model, #ai-workspace-stream, #ai-workspace-budget-enabled, #ai-workspace-budget-max-input, #ai-workspace-budget-reserve-output', () => {
       persistSettings({ mirrorModeKey: currentModeKey() });
       ['direct', 'plan'].forEach(modeKey => {
         state.modes[modeKey].previewResult = null;
@@ -2533,8 +2787,24 @@ function bindEvents() {
     .on('click.aiWorkspaceDesktop', '#ai-workspace-apply', async () => {
       await handleApply();
     })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-rollback-preview', async () => {
+      await handleRollbackPreview();
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-rollback-execute', async () => {
+      await handleRollbackExecute();
+    })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-list .ai-preview-item', function () {
-      openPreviewModal(Number($(this).attr('data-preview-uid')));
+      renderPreviewDetail(currentModeKey(), Number($(this).attr('data-preview-uid')));
+      $('#ai-workspace-preview-list .ai-preview-item', parentDoc()).removeClass('is-active');
+      $(this).addClass('is-active');
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-detail-regenerate', async () => {
+      const uid = Number($('#ai-workspace-preview-detail', parentDoc()).attr('data-preview-uid'));
+      if (!uid) return;
+      $('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid', uid);
+      await handlePreviewModalRegenerate();
+      closePreviewModal();
+      renderPreviewDetail(currentModeKey(), uid);
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-modal-close-button, #ai-workspace-preview-modal .ai-preview-modal-close', () => {
       closePreviewModal();
@@ -2550,6 +2820,26 @@ function bindEvents() {
         return;
       }
       setModeStatus(currentModeKey(), '改造结果已修改，离开输入框后保存。');
+    })
+    .on('input.aiWorkspaceDesktop', '#ai-workspace-preview-detail textarea[data-preview-field]', () => {
+      if (state.currentNav !== 'direct' && state.currentNav !== 'plan') {
+        return;
+      }
+      setModeStatus(currentModeKey(), '改造结果已修改，离开输入框后保存。');
+    })
+    .on('change.aiWorkspaceDesktop', '#ai-workspace-preview-detail textarea[data-preview-field]', () => {
+      if (state.currentNav !== 'direct' && state.currentNav !== 'plan') {
+        return;
+      }
+      try {
+        const modeKey = currentModeKey();
+        const item = applyPreviewDetailEdits(modeKey);
+        if (!item) return;
+        renderPreviewDetail(modeKey, item.uid);
+        setModeStatus(modeKey, '改造结果已更新，可直接应用。');
+      } catch (error) {
+        setModeStatus(currentModeKey(), `改造结果无法解析：${error.message}`);
+      }
     })
     .on('change.aiWorkspaceDesktop', '#ai-workspace-preview-modal-content textarea[data-preview-field]', function () {
       if (state.currentNav !== 'direct' && state.currentNav !== 'plan') {

@@ -218,6 +218,15 @@ function buildPreviewDiffs(beforeEntry, afterEntry, fieldOptions) {
   return diffs;
 }
 
+export function buildAiEntryHash(entry = {}) {
+  const source = JSON.stringify(entry || {});
+  let hash = 0;
+  for (let index = 0; index < source.length; index++) {
+    hash = ((hash << 5) - hash + source.charCodeAt(index)) | 0;
+  }
+  return `${source.length}:${hash >>> 0}`;
+}
+
 async function buildPreviewItemForEntry({ lorebookName, entry, instruction, fieldOptions, invokeClient, customApi }) {
   let lastError = null;
 
@@ -240,7 +249,11 @@ async function buildPreviewItemForEntry({ lorebookName, entry, instruction, fiel
           uid: ensureNumericUID(entry.uid),
           title: entry.name || `UID ${entry.uid}`,
           beforeEntry: _.cloneDeep(entry),
+          beforeEntryHash: buildAiEntryHash(entry),
           afterEntry,
+          editableFields: normalizeFieldOptions(fieldOptions),
+          conflictStatus: 'none',
+          sourceMode: 'quick',
           diffs,
           changed: diffs.length > 0,
           rawText,
@@ -401,10 +414,43 @@ export const applyAiPreview = errorCatched(async options => {
       success: true,
       changed: false,
       appliedCount: 0,
+      skippedCount: 0,
+      conflicts: [],
     };
   }
 
-  const nextEntriesByUid = new Map(changedItems.map(item => [ensureNumericUID(item.uid), _.cloneDeep(item.afterEntry)]));
+  const previewItemsByUid = new Map(changedItems.map(item => [ensureNumericUID(item.uid), _.cloneDeep(item)]));
+  const conflicts = [];
+  let appliedCount = 0;
+
+  const patchAllowedFields = (currentEntry, afterEntry, fieldOptions = {}) => {
+    const normalizedFieldOptions = normalizeFieldOptions(fieldOptions);
+    const nextEntry = _.cloneDeep(currentEntry);
+
+    if (normalizedFieldOptions.title) {
+      nextEntry.name = typeof afterEntry?.name === 'string' ? afterEntry.name : currentEntry?.name || '';
+    }
+
+    if (normalizedFieldOptions.content) {
+      nextEntry.content = typeof afterEntry?.content === 'string' ? afterEntry.content : currentEntry?.content || '';
+    }
+
+    if (normalizedFieldOptions.prompt) {
+      const afterPrompts = getPromptSnapshot(afterEntry);
+      nextEntry.strategy = _.cloneDeep(nextEntry.strategy || {});
+      nextEntry.strategy.keys = sanitizeStringArray(afterPrompts.primary, getPromptSnapshot(currentEntry).primary);
+      nextEntry.strategy.keys_secondary = _.cloneDeep(nextEntry.strategy.keys_secondary || {});
+      nextEntry.strategy.keys_secondary.logic = VALID_SECONDARY_LOGIC.has(afterPrompts.secondary_logic)
+        ? afterPrompts.secondary_logic
+        : getPromptSnapshot(currentEntry).secondary_logic;
+      nextEntry.strategy.keys_secondary.keys = sanitizeStringArray(
+        afterPrompts.secondary,
+        getPromptSnapshot(currentEntry).secondary,
+      );
+    }
+
+    return nextEntry;
+  };
 
   const result = await updateWorldbookEntries(
     lorebookName,
@@ -412,13 +458,52 @@ export const applyAiPreview = errorCatched(async options => {
       let hasChanges = false;
       const updatedEntries = entries.map(entry => {
         const numericUid = ensureNumericUID(entry.uid);
-        const nextEntry = nextEntriesByUid.get(numericUid);
-        if (!nextEntry) {
+        const previewItem = previewItemsByUid.get(numericUid);
+        if (!previewItem) {
           return entry;
         }
 
+        if (!previewItem.beforeEntry) {
+          conflicts.push({
+            uid: numericUid,
+            title: previewItem.title || entry.name || `UID ${numericUid}`,
+            status: 'conflict',
+            message: '缺少生成预览时的原始条目快照，已跳过。',
+          });
+          return entry;
+        }
+
+        if (!_.isEqual(entry, previewItem.beforeEntry)) {
+          conflicts.push({
+            uid: numericUid,
+            title: previewItem.title || entry.name || `UID ${numericUid}`,
+            status: 'conflict',
+            beforeEntryHash: previewItem.beforeEntryHash || buildAiEntryHash(previewItem.beforeEntry),
+            currentEntryHash: buildAiEntryHash(entry),
+            message: '当前条目已变化，已跳过该项。',
+          });
+          return entry;
+        }
+
+        const nextEntry = patchAllowedFields(entry, previewItem.afterEntry, previewItem.editableFields || previewItem.fieldOptions);
+        if (_.isEqual(entry, nextEntry)) {
+          return entry;
+        }
+
+        appliedCount += 1;
         hasChanges = true;
         return _.cloneDeep(nextEntry);
+      });
+
+      previewItemsByUid.forEach((previewItem, uid) => {
+        if (!entries.some(entry => ensureNumericUID(entry.uid) === uid)) {
+          conflicts.push({
+            uid,
+            title: previewItem.title || `UID ${uid}`,
+            status: 'missing',
+            message: '当前世界书中找不到该条目，已跳过。',
+          });
+        }
       });
 
       return hasChanges ? updatedEntries : entries;
@@ -427,7 +512,7 @@ export const applyAiPreview = errorCatched(async options => {
       trackHistory: true,
       transactionType: changedItems.length > 1 ? 'ai-edit-selected' : 'ai-edit-entry',
       transactionMeta: {
-        appliedCount: changedItems.length,
+        requestedCount: changedItems.length,
       },
     },
   );
@@ -439,6 +524,8 @@ export const applyAiPreview = errorCatched(async options => {
   return {
     success: true,
     changed: result.changed,
-    appliedCount: changedItems.length,
+    appliedCount,
+    skippedCount: conflicts.length,
+    conflicts,
   };
 }, 'applyAiPreview');
