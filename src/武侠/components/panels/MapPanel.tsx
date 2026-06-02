@@ -9,6 +9,7 @@ import MapSidebar from '../MapSidebar';
 import { MapData } from '../../types';
 import { loadMapData } from '../../utils/mapLoader';
 import { getExploredLocations } from '../../utils/mapUtils';
+import { gameLogger } from '../../utils/logger';
 
 interface MapPanelProps {
   currentLocation: string;
@@ -38,7 +39,7 @@ export const MapPanel: React.FC<MapPanelProps> = ({
 
         setIsLoading(false);
       } catch (err) {
-        console.error('[MapPanel] 加载地图数据失败:', err);
+        gameLogger.error('[MapPanel] 加载地图数据失败:', err);
         setError('加载地图数据失败');
         setIsLoading(false);
       }
@@ -49,7 +50,7 @@ export const MapPanel: React.FC<MapPanelProps> = ({
 
   // 处理地点点击
   const handleLocationClick = (locationPath: string) => {
-    console.log('[MapPanel] 点击地点:', locationPath);
+    gameLogger.log('[MapPanel] 点击地点:', locationPath);
     if (onTravelCommand) {
       onTravelCommand(locationPath);
     }

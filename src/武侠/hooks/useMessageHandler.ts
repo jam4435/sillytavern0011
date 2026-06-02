@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { parseOptions } from '../utils/variableReader';
+import { flushPendingGameDataCompletion, parseOptions } from '../utils/variableReader';
 import { messageLogger } from '../utils/logger';
 
 interface UseMessageHandlerOptions {
@@ -69,6 +69,10 @@ export function useMessageHandler({
 
       // ========== 步骤 2: 调用 generate() 触发 AI 生成 ==========
       messageLogger.log('');
+      messageLogger.log('📌 [步骤 2] 同步待补全变量');
+      await flushPendingGameDataCompletion('before-generate');
+      messageLogger.log('✅ [步骤 2] 待补全变量同步完成');
+
       messageLogger.log('📌 [步骤 2] 调用 generate() 触发 AI 生成');
       messageLogger.log('generate 参数:', { should_stream: true });
       messageLogger.log('⏳ 等待 AI 回复中...');

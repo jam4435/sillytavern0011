@@ -29,7 +29,6 @@ import {
 import { ActivePanel } from './types';
 import { createOpeningStoryMessage, type NewGameFormData } from './utils/gameInitializer';
 import { gameLogger, initLogger } from './utils/logger';
-import { loadMartialArtsDatabase } from './utils/martialArtsDatabase';
 import {
   applyRegexRules,
   applySettingsToDOM,
@@ -41,7 +40,8 @@ import {
   getLastMessageContent,
   hasSavedGame,
   parseOptions,
-  readGameData
+  readGameDataPure,
+  scheduleGameDataCompletion,
 } from './utils/variableReader';
 
 const App: React.FC = () => {
@@ -79,9 +79,6 @@ const App: React.FC = () => {
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = React.useState<DisplaySettings>(() => loadSettings());
-
-  // 功法数据库加载状态
-  const [isDatabaseReady, setIsDatabaseReady] = React.useState(false);
 
   // 使用消息处理 hook
   const { handleSendMessage } = useMessageHandler({
@@ -124,14 +121,6 @@ const App: React.FC = () => {
       initLogger.log('');
       initLogger.log('初始化开始...');
 
-      // 1. 首先加载功法数据库（异步）
-      initLogger.log('📚 加载功法数据库...');
-      const dbLoaded = await loadMartialArtsDatabase();
-      initLogger.log('📚 功法数据库加载结果:', dbLoaded ? '成功' : '失败');
-
-      setIsDatabaseReady(dbLoaded);
-
-      // 2. 检查是否存在存档
       initLogger.log('检查是否存在存档');
       const exists = hasSavedGame();
       initLogger.log('hasSavedGame() 返回:', exists);
@@ -141,13 +130,14 @@ const App: React.FC = () => {
       if (exists) {
         initLogger.log('检测到存档，直接进入游戏界面');
 
-        const savedData = await readGameData();
-        initLogger.log('readGameData 返回:', savedData ? '有数据' : 'null');
+        const savedData = readGameDataPure();
+        initLogger.log('readGameDataPure 返回:', savedData ? '有数据' : 'null');
         if (savedData) {
           initLogger.log('功法数据:', savedData.stats?.martialArts);
           initLogger.log('属性数据:', savedData.stats?.attributes);
           setGameState(prev => ({ ...prev, ...savedData }));
         }
+        scheduleGameDataCompletion('startup-existing-save', { fullScan: true });
 
         const lastContent = getLastMessageContent();
         initLogger.log('getLastMessageContent 返回长度:', lastContent.length);
@@ -194,14 +184,12 @@ const App: React.FC = () => {
     gameLogger.log('');
     gameLogger.log('续写江湖 - 加载存档');
 
-    readGameData().then(savedData => {
-      gameLogger.log('readGameData 返回:', savedData ? '有数据' : 'null');
-      if (savedData) {
-        setGameState(prev => ({ ...prev, ...savedData }));
-      }
-    }).catch(err => {
-      gameLogger.error('readGameData 失败:', err);
-    });
+    const savedData = readGameDataPure();
+    gameLogger.log('readGameDataPure 返回:', savedData ? '有数据' : 'null');
+    if (savedData) {
+      setGameState(prev => ({ ...prev, ...savedData }));
+    }
+    scheduleGameDataCompletion('continue-existing-save', { fullScan: true });
 
     const lastContent = getLastMessageContent();
     gameLogger.log('getLastMessageContent 返回长度:', lastContent.length);
@@ -242,8 +230,8 @@ const App: React.FC = () => {
         dismissToast();
 
         gameLogger.log('📖 从变量表重新读取游戏状态...');
-        const savedData = await readGameData();
-        gameLogger.log('readGameData 返回:', savedData ? '有数据' : 'null');
+        const savedData = readGameDataPure();
+        gameLogger.log('readGameDataPure 返回:', savedData ? '有数据' : 'null');
         if (savedData) {
           gameLogger.log('变量表中的 stats:', savedData.stats);
           setGameState(prev => ({ ...prev, ...savedData }));
@@ -282,6 +270,7 @@ const App: React.FC = () => {
             }
           }));
         }
+        scheduleGameDataCompletion('new-game-setup-submit', { fullScan: true });
 
         setCurrentMaintext(result.content);
         setCurrentOptions([]);

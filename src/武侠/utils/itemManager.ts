@@ -3,6 +3,8 @@
  * 负责物品数量的增减和恢复操作
  */
 
+import { gameLogger } from './logger';
+
 declare function getAllVariables(): Record<string, unknown>;
 declare function eventEmit(eventName: string, data: unknown): void;
 
@@ -17,13 +19,13 @@ export async function decreaseItemCount(itemName: string, count: number = 1): Pr
   const user数据 = variables.stat_data?.user数据 as Record<string, unknown> | undefined;
 
   if (!user数据) {
-    console.warn('[itemManager] user数据不存在');
+    gameLogger.warn('[itemManager] user数据不存在');
     return 0;
   }
 
   const 包裹 = user数据.包裹 as Record<string, { 数量?: number }> | undefined;
   if (!包裹 || !包裹[itemName]) {
-    console.warn(`[itemManager] 物品 ${itemName} 不存在`);
+    gameLogger.warn(`[itemManager] 物品 ${itemName} 不存在`);
     return 0;
   }
 
@@ -35,7 +37,7 @@ export async function decreaseItemCount(itemName: string, count: number = 1): Pr
     await eventEmit('era:deleteByPath', {
       path: `stat_data.user数据.包裹.${itemName}`
     });
-    console.log(`[itemManager] 删除物品: ${itemName}`);
+    gameLogger.log(`[itemManager] 删除物品: ${itemName}`);
   } else {
     // 更新数量
     await eventEmit('era:updateByObject', {
@@ -47,7 +49,7 @@ export async function decreaseItemCount(itemName: string, count: number = 1): Pr
         }
       }
     });
-    console.log(`[itemManager] 更新物品数量: ${itemName} ${currentCount} -> ${newCount}`);
+    gameLogger.log(`[itemManager] 更新物品数量: ${itemName} ${currentCount} -> ${newCount}`);
   }
 
   return newCount;
@@ -63,14 +65,14 @@ export async function restoreItemCount(itemName: string, originalCount: number):
   const user数据 = variables.stat_data?.user数据 as Record<string, unknown> | undefined;
 
   if (!user数据) {
-    console.warn('[itemManager] user数据不存在，无法恢复物品');
+    gameLogger.warn('[itemManager] user数据不存在，无法恢复物品');
     return;
   }
 
   const 包裹 = user数据.包裹 as Record<string, unknown> | undefined;
 
   if (!包裹) {
-    console.warn('[itemManager] 包裹不存在，无法恢复物品');
+    gameLogger.warn('[itemManager] 包裹不存在，无法恢复物品');
     return;
   }
 
@@ -87,7 +89,7 @@ export async function restoreItemCount(itemName: string, originalCount: number):
         }
       }
     });
-    console.log(`[itemManager] 恢复物品: ${itemName} 数量: ${originalCount}`);
+    gameLogger.log(`[itemManager] 恢复物品: ${itemName} 数量: ${originalCount}`);
   } else {
     // 物品存在，只更新数量
     await eventEmit('era:updateByObject', {
@@ -99,7 +101,7 @@ export async function restoreItemCount(itemName: string, originalCount: number):
         }
       }
     });
-    console.log(`[itemManager] 恢复物品数量: ${itemName} -> ${originalCount}`);
+    gameLogger.log(`[itemManager] 恢复物品数量: ${itemName} -> ${originalCount}`);
   }
 }
 

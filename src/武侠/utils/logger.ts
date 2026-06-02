@@ -5,15 +5,15 @@
 
 export type LogCategory = 'init' | 'message' | 'event' | 'game' | 'api' | 'ui' | 'data';
 
-// 开发环境下各类别的日志开关
+// 开发环境下各类别的默认日志开关。默认关闭，避免酒馆 iframe 初始化时打印大量变量和长文本。
 const DEBUG_CATEGORIES: Record<LogCategory, boolean> = {
-  init: true,      // 初始化流程
-  message: true,   // 消息处理
-  event: true,     // 事件监听
-  game: true,      // 游戏状态
-  api: true,       // API 调用
-  ui: true,        // UI 组件
-  data: true,      // 数据读取/解析
+  init: false,      // 初始化流程
+  message: false,   // 消息处理
+  event: false,     // 事件监听
+  game: false,      // 游戏状态
+  api: false,       // API 调用
+  ui: false,        // UI 组件
+  data: false,      // 数据读取/解析
 };
 
 // 判断是否为开发环境
@@ -29,6 +29,28 @@ const CATEGORY_STYLES: Record<LogCategory, string> = {
   ui: '🖼️',
   data: '📊',
 };
+
+function getDebugOverride(category: LogCategory): boolean {
+  if (!isDev || typeof localStorage === 'undefined') {
+    return false;
+  }
+
+  try {
+    const enabled = localStorage.getItem('wuxia_debug_categories') || localStorage.getItem('wuxia_debug');
+    if (!enabled) {
+      return DEBUG_CATEGORIES[category];
+    }
+
+    if (enabled === 'true' || enabled === 'all') {
+      return true;
+    }
+
+    const categories = enabled.split(',').map(item => item.trim().toLowerCase());
+    return categories.includes(category);
+  } catch {
+    return DEBUG_CATEGORIES[category];
+  }
+}
 
 export interface Logger {
   log: (...args: unknown[]) => void;
@@ -47,7 +69,7 @@ const noop = () => {};
  * @returns Logger 对象
  */
 export function createLogger(category: LogCategory): Logger {
-  const enabled = isDev && DEBUG_CATEGORIES[category];
+  const enabled = getDebugOverride(category);
   const prefix = `${CATEGORY_STYLES[category]} [${category.toUpperCase()}]`;
 
   if (!enabled) {
@@ -79,10 +101,11 @@ export const uiLogger = createLogger('ui');
 export const dataLogger = createLogger('data');
 
 // 简单的全局日志器（用于不需要分类的场景）
+const globalLoggerEnabled = getDebugOverride('game');
 export const logger: Logger = {
-  log: isDev ? console.log.bind(console) : noop,
-  error: isDev ? console.error.bind(console) : noop,
-  warn: isDev ? console.warn.bind(console) : noop,
-  group: isDev ? console.group.bind(console) : noop,
-  groupEnd: isDev ? console.groupEnd.bind(console) : noop,
+  log: globalLoggerEnabled ? console.log.bind(console) : noop,
+  error: globalLoggerEnabled ? console.error.bind(console) : noop,
+  warn: globalLoggerEnabled ? console.warn.bind(console) : noop,
+  group: globalLoggerEnabled ? console.group.bind(console) : noop,
+  groupEnd: globalLoggerEnabled ? console.groupEnd.bind(console) : noop,
 };

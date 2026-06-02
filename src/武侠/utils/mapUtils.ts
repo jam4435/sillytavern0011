@@ -4,6 +4,7 @@
  */
 
 import { MapLocation } from '../types';
+import { gameLogger } from './logger';
 
 declare function getAllVariables(): Record<string, unknown>;
 
@@ -87,7 +88,7 @@ export async function addExploredLocation(locationPath: string): Promise<void> {
     }
   });
 
-  console.log(`[mapUtils] 添加已探索地点: ${locationPath}`);
+  gameLogger.log(`[mapUtils] 添加已探索地点: ${locationPath}`);
 }
 
 /**
@@ -102,7 +103,7 @@ export function parseLocationPath(locationPath: string): {
 } | null {
   const parts = locationPath.split('/');
   if (parts.length !== 3) {
-    console.warn(`[mapUtils] 无效的地点路径: ${locationPath}`);
+    gameLogger.warn(`[mapUtils] 无效的地点路径: ${locationPath}`);
     return null;
   }
 
