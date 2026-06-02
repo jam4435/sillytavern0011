@@ -1,0 +1,90 @@
+# 墨剑录前端加载排查临时记录
+
+更新时间: 2026-06-03
+
+## Chrome/MCP 运行时记录
+
+- 目标页: `http://127.0.0.1:8000/`
+- 酒馆消息 iframe: `TH-message--18--0`
+- 5500 未开启时，iframe body 只剩 `$('body').load('http://localhost:5500/dist/武侠/index.html')`，没有 `#root`，因此表现为空白/加载失败。
+- 5500 开启并 reload 后，前端已成功渲染: 标题 `墨剑录`，导航 `状态/功法/行囊/事件/地图/侠缘/设置`，主视图为游戏内容。
+- 当前 iframe 文档约 `644,848` 字符；主应用 inline module script 约 `492,335` 字符；主样式 style 约 `132,649` 字符。
+- iframe navigation 计时约: `domInteractive 3692ms`，`DOMContentLoaded 3696ms`，`load 3697ms`。
+- `http://localhost:5500/dist/武侠/index.html` 资源请求约 `324ms`，主要卡顿不只是网络下载，而是下载后解析/执行/初始化。
+- 截图已保存: `tmp/wuxia-tavern-runtime.png`
+- 控制台有大量 ERA/变量写入相关日志和警告，尤其是 `Settings not ready, scheduling another save` 与若干 `角色数据.*` 路径缺失/非法写入警告。它们可能放大启动期日志和写入压力，但需要和 React 前端问题分开看。
+
+## 架构入口
+
+- `src/武侠/index.html` 加载 `src/武侠/index.tsx`。
+- `index.tsx` 使用 `React.StrictMode` 渲染 `App`，开发环境会让 effect 执行两次，容易放大初始化副作用。
+- `App.tsx` 初始化路径: `initializeApp()` -> `loadMartialArtsDatabase()` -> `get变量('当前游戏存在')` -> `readGameData()` -> `getLastMessage()` -> 设置游戏状态。
+- 保存存在时首屏通常是 `StartScreen` 后转入 `GameContent`，但大量非首屏代码已经被静态 import 进首包。
+
+## 构建与首包问题
+
+- `webpack.config.ts` 对 `src/武侠` 输出单个内联 HTML。
+- 当前配置包含 `HtmlInlineScriptWebpackPlugin`、`HTMLInlineCSSWebpackPlugin`、`LimitChunkCountPlugin({ maxChunks: 1 })`。
+- `LimitChunkCountPlugin({ maxChunks: 1 })` 会阻止 `React.lazy/import()` 真正拆出异步 chunk。
+- `dist/武侠/index.html` 约 `793KB`，没有 `.chunk.js`；运行时还会在酒馆 iframe 里叠加若干 SillyTavern/JS-Slash-Runner 依赖。
+- `App.tsx` 静态 import 了 `NewGameSetup`、所有面板聚合、`SettingsPanel`、`createOpeningStoryMessage` 等，导致设置页、新建流程、面板和部分 JSON 数据进入启动包。
+- `gameInitializer.ts` 静态 import 多个 JSON，事件数据约 `49.7KB`，出生地数据约 `9.6KB`。
+- `_合并后功法.json` 约 `304KB`、357 条功法；`martialArtsDatabase.ts` 虽然写了 dynamic import，但 `App.tsx` 启动时立即 `loadMartialArtsDatabase()`，且单 chunk 构建会把它压回首包。
+
+## 数据读取/写入问题
+
+- `src/武侠/utils/variableReader.ts` 的 `readGameData()` 不是纯读取。
+- `readGameData()` 先 `getGameVariables()`，再 await:
+  - `autoUpdatePlayerAttributes`
+  - `autoUpdateCharacterAttributes`
+  - `autoUpdateMartialArts`
+- 这些 autoUpdate 会通过 ERA 写变量，并等待 `era:writeDone` 或 500ms timeout。
+- `readGameData()` 后续仍基于最开始的变量快照映射 UI 数据，所以写入后的 `era:writeDone` 刷新在补偿旧快照问题。
+- `useEventListeners.ts` 监听 `MESSAGE_RECEIVED`、`CHAT_CHANGED`、`era:writeDone`，每个都可能触发一次完整 `readGameData()`。
+- `useSummaryDetection.ts` 也监听 `MESSAGE_RECEIVED`，随后调用 `checkSummaryTrigger()`，会再次扫描变量。
+- 结果: 一条消息可能触发多次全量变量读取、自动补全写入、等待写入完成、再刷新。
+
+## 渲染与样式问题
+
+- `GameContent.tsx` 每次 render 都有较多日志，并对当前消息全文做 split/map。
+- `settingsManager.applyRegexRules` 每次应用都会重新构造正则。
+- `handleSettingsChange` 直接应用 DOM 设置，同时 effect 又会再应用一遍。
+- `main.scss` 全量 import 所有模块样式，包括设置页、新建页和各面板样式。
+- 样式中存在较多 `backdrop-filter`、`filter`、blur、动画、远程背景图。全屏背景加滤镜可能明显增加绘制压力。
+- 用户背景如果是 base64 存在 localStorage，启动读取并应用到全屏背景也会放大首屏成本。
+
+## 优化优先级建议
+
+1. 先把 `readGameData()` 拆成纯读取与后台补全写入。
+   - 新增类似 `readGameDataPure()`，只读取变量并映射 UI。
+   - 新增类似 `completeGameDataInBackground()`，单飞执行自动属性/功法补全。
+   - `MESSAGE_RECEIVED` 先纯读刷新 UI，再后台补全。
+   - `era:writeDone` 只做纯读刷新，避免再次触发写入。
+
+2. 给事件刷新加单飞/防抖。
+   - 合并同一轮 `MESSAGE_RECEIVED`、`CHAT_CHANGED`、`era:writeDone` 的重复刷新。
+   - 对自身后台补全产生的 `era:writeDone` 做标记，避免立刻循环进入重补全。
+
+3. 调整启动加载。
+   - 不要在 `App.initializeApp()` 无条件加载 `_合并后功法.json`。
+   - 只在功法面板、角色功法详情、新建开局真正需要时加载。
+   - `createOpeningStoryMessage` 可改为提交新建角色时 dynamic import。
+
+4. 拆包需要先改构建。
+   - 若仍保留 `LimitChunkCountPlugin({ maxChunks: 1 })`，lazy import 基本不会降低首包。
+   - 若酒馆卡支持多文件加载，可对 `src/武侠` 移除/条件禁用 `maxChunks: 1`，再 lazy `NewGameSetup`、`SettingsPanel`、面板组件和重数据模块。
+   - 如果必须单 HTML，优先做数据读取/事件风暴治理，因为拆包收益有限。
+
+5. 降低渲染和绘制成本。
+   - 缓存 regex 编译结果。
+   - memo 当前消息分段和面板 props。
+   - 开发模式关闭大对象日志或按类别打开。
+   - 降低全屏 blur/backdrop-filter 使用，尤其是 iframe 内全屏背景。
+
+## 第一阶段较低风险改法
+
+- 在 `variableReader.ts` 增加纯读函数，不改变现有数据结构。
+- 在事件 hook 中用纯读替换 `era:writeDone` 和消息刷新路径。
+- 后台补全加 in-flight guard。
+- 保持原有 autoUpdate 行为，但从阻塞首屏改为后台执行。
+- 验证点: 角色状态、功法、地图、事件、侠缘面板数据一致；收到新消息后 UI 能快速刷新；ERA 变量补全仍会落库。
