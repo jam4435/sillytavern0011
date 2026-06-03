@@ -1,0 +1,146 @@
+酒馆脚本与事件系统梳理
+更新时间: 2026-06-03
+
+一、隐藏楼层脚本
+
+文件: 酒馆资料/隐藏楼层脚本.txt
+
+核心逻辑：
+- 加载时删除 #chat 下除 .last_mes 之外的楼层 DOM。
+- CHAT_CHANGED 时 reloadIframe。
+
+作用：
+- 让页面视觉上只剩最新楼层。
+- 不修改聊天记录。
+- 不修改消息 is_hidden。
+- 不减少最新消息正文。
+- 不减少 ERA 变量块。
+
+因此它是“伪同层显示机制”，不是性能优化核心。
+
+二、事件脚本文件职责
+
+1. src/事件脚本/index.ts
+- 入口文件。
+- 加载 era-main.js。
+
+2. src/事件脚本/era-main.js
+- 主控文件。
+- 初始化事件系统。
+- 加载世界书事件定义。
+- 执行 checkEvents。
+- 处理地点触发。
+- 处理后续事件线索计数。
+- 注册 CHAT_CHANGED、MESSAGE_SENT、era:writeDone 监听。
+
+3. src/事件脚本/era-event-loader.js
+- 从角色绑定世界书和附加世界书读取事件定义。
+- 扫描条目名。
+- JSON.parse 事件内容。
+
+4. src/事件脚本/era-event-checker.js
+- 判断事件是否到触发时间。
+- 判断事件是否结束。
+- 支持短期事件提前 10 天开放。
+
+5. src/事件脚本/era-event-operations.js
+- 初始化事件列表。
+- 批量开始事件。
+- 批量完成登场事件。
+- 玩家参与事件。
+- 批量结束事件。
+- 多处通过 eventEmit('era:*') 后等待 era:writeDone。
+
+6. src/事件脚本/era-utils.js
+- 日志开关。
+- 时间计算。
+- 事件名辅助函数。
+
+三、已生效的止血点
+
+1. 空 resync 跳过事件检查
+- era-main.js 有 isResyncOnlyWriteDone。
+- 对 actions.resync=true 且无 apply/rollback/apiWrite 的 writeDone 直接 return。
+- 这修掉了旧的“编辑确认后纯同步也扫 272 未发生事件”的问题。
+
+2. checkEvents 单飞/防抖
+- MESSAGE_SENT 和 era:writeDone 不再直接裸跑 checkEvents。
+- scheduleCheckEvents 以 100ms 合并请求。
+- isCheckingEvents 防止并发。
+
+3. debug/time debug 默认关闭
+- era-utils.js 中 DEBUG_MODE=false。
+- TIME_DEBUG_MODE=false。
+- localStorage.era_event_debug='1' 才开启普通日志。
+- localStorage.era_event_time_debug='1' 才开启逐事件时间日志。
+
+四、仍可能卡顿的脚本路径
+
+1. 世界书全量扫描
+- 初始化和聊天切换会重新扫描角色绑定世界书。
+- 世界书条目多时，这条链仍然是线性成本。
+
+2. 单次 checkEvents 仍是全量
+- 防抖只减少重复触发。
+- 每次真正执行仍扫描全部未发生事件和进行中事件。
+
+3. 串行写回链
+- event-operations 中大量 era 写入后等待 writeDone。
+- 事件开始、结束、参与、后续线索可能拉成长链。
+
+4. MESSAGE_SENT 仍做真工作
+- 发送消息时会处理后续事件线索计数。
+- 然后调度事件检查。
+
+5. 事件 key 可能混用
+- 部分逻辑用完整 eventName。
+- 部分逻辑用 getEventShortName。
+- 如果不一致，可能导致重复判定或参与状态判断不准。
+
+6. 非 debug 日志仍存在
+- logSuccess、logWarning、toastr、console.log 初始化信息仍会输出。
+- 大量事件时仍可能放大主线程压力。
+
+五、与编辑确认卡顿的关系
+
+当前事件脚本已经不是 57 秒级卡顿的第一主因。
+
+原因：
+- 空 resync 全扫已跳过。
+- 重复 checkEvents 已合并。
+- 隐藏楼层脚本只删 DOM，不参与大消息格式化。
+
+但事件脚本仍可能是第二段放大器：
+- 如果编辑确认触发真实 apply/rollback，仍会调度事件检查。
+- 如果事件世界书很大，初始化/切聊天仍会扫描。
+- 如果事件触发链包含多次写回，仍会追加更多变量块。
+
+六、建议
+
+1. 给 checkEvents 增加相关字段变更判定
+- 只在时间、位置、事件系统、参与事件、后续事件线索计数变化时检查。
+- 风险：漏字段会漏触发事件。
+
+2. 缓存事件定义
+- 以聊天/角色/世界书版本为 key。
+- 只在 CHAT_CHANGED、WORLDINFO_UPDATED、角色绑定世界书变化时重扫。
+- 风险：缓存失效漏判会读旧事件。
+
+3. 合并串行 ERA 写回
+- 尽量把同类 insert/update/delete 合并。
+- 风险：ERA insert/update/delete 语义不同，合并要保持顺序。
+
+4. 统一事件 key
+- eventDefinitions、参与事件、附近传闻、后续事件引用使用同一 key 体系。
+- 风险：需要兼容旧档。
+
+5. 隐藏楼层机制改进
+- 不建议只在加载时 remove 一次。
+- 可考虑监听 MESSAGE_RECEIVED/MESSAGE_UPDATED 后再次收缩。
+- 或用 CSS 隐藏旧楼层，减少删 DOM 对宿主的影响。
+
+七、结论
+
+脚本层第一轮止血有效。
+剩余大头仍是最新大消息的上游处理链，而不是隐藏楼层或事件脚本本身。
+

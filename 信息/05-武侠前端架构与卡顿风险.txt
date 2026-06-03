@@ -1,0 +1,160 @@
+墨剑录前端架构与卡顿风险
+更新时间: 2026-06-03
+
+一、单 HTML 加载链路
+
+当前武侠前端通过酒馆消息楼层 iframe 加载：
+1. 酒馆显示正则将楼层显示替换为 loader script。
+2. loader 执行 $('body').load('http://localhost:5500/dist/武侠/index.html')。
+3. dist/武侠/index.html 内联 JS/CSS，启动 React。
+
+构建特点：
+- 单 HTML。
+- HtmlInlineScriptWebpackPlugin 内联脚本。
+- HTMLInlineCSSWebpackPlugin 内联样式。
+- LimitChunkCountPlugin({ maxChunks: 1 }) 限制为单 chunk。
+
+当前产物：
+- dist/武侠/index.html 约 796,474 B。
+- 没有独立 chunk。
+- _合并后功法.json 约 304,207 B，357 条功法。
+
+历史实测：
+- iframe domInteractive 约 3,692ms。
+- DOMContentLoaded 约 3,696ms。
+- load 约 3,697ms。
+
+判断：
+前端自身加载偏重，但不是 57 秒编辑确认卡顿的第一主因。
+
+二、React 初始化链路
+
+入口：
+- src/武侠/index.html 提供 #root。
+- src/武侠/index.tsx 在 $(() => {}) 中 createRoot 并 render App。
+- pagehide 时 unmount。
+
+App 初始化：
+1. loadSettings。
+2. hasSavedGame。
+3. 有存档时 readGameDataPure。
+4. scheduleGameDataCompletion('startup-existing-save', fullScan=true)。
+5. getLastMessageContent。
+6. parseOptions。
+7. 切到 game 页面。
+
+常驻 hook：
+- useDebugLogs
+- useToast
+- usePageFlow
+- useGameState
+- useMessageHandler
+- useEventListeners
+- useSummaryDetection
+
+注意：
+- React.StrictMode 在开发构建下会放大 effect/副作用观察成本。
+- 当前日志默认关闭，降低了启动时 console 压力。
+
+三、变量读取与补全
+
+当前设计已经从阻塞读写改成：
+- readGameDataPure: 纯读变量并映射 GameState。
+- scheduleGameDataCompletion: 后台补全。
+- scheduleGameDataCompletionFromMvuUpdate: 基于 MVU diff 做 scoped completion。
+- flushPendingGameDataCompletion: 发送前等待补全完成。
+
+好处：
+- UI 初始化和消息刷新不再同步等待功法/属性补全。
+- era:writeDone 不再触发写回链式循环。
+
+风险：
+- fullScan 最坏仍会串行处理玩家属性、NPC 属性、功法补全。
+- 每段补全可能 eventEmit('era:*') 并等待 era:writeDone 或 500ms timeout。
+- 发送前 flush 如果兜底 fullScan，会把等待时间加到用户点击发送上。
+
+四、首包与首屏成本
+
+首包包含：
+- App.tsx。
+- NewGameSetup，文件较大。
+- SettingsPanel。
+- 所有 panels。
+- gameInitializer。
+- 多份静态 JSON。
+- 全量 SCSS。
+
+即使当前页面只显示游戏主界面，很多设置页、新建流程、面板代码仍进入首包。
+
+因为单 HTML 构建：
+- dynamic import 对拆包帮助有限。
+- 功法库即使用 dynamic import，在 maxChunks=1 下仍偏向被压回首包。
+
+五、渲染成本点
+
+1. GameContent
+- 对整段 currentMaintext 做 containsHTML 检测。
+- 按空行 split。
+- HTML 路径构造 dangerouslySetInnerHTML。
+- 大文本每次变动都会付费。
+
+2. settingsManager.applyRegexRules
+- 已有 RegExp cache。
+- 但仍会对整段正文逐条 replace。
+- 当前默认 ERA_BASE_REGEX_RULE 用于清理 era_data 和 Variable 块。
+
+3. 样式绘制
+- 背景层、blur、backdrop-filter、动画较多。
+- 会增加 iframe 重绘压力。
+- 这是流畅度问题，不是编辑确认 57 秒主因。
+
+六、编辑确认时 iframe reload 占比
+
+已有实测：
+- 编辑确认到新 iframe 回 DOM 曾约 57,388ms。
+- 正常 iframe 自身 load 约 3,697ms。
+- 粗略占比上限约 6.44%。
+
+更关键的是：
+- 57 秒期间，新 iframe 大部分时间尚未插回 DOM。
+- 因此主耗时发生在外层酒馆格式化/正则/Prompt Template/ERA，而不是 React。
+
+七、前端内可做优化
+
+低风险：
+1. GameContent 分段结果 useMemo。
+2. parseOptions 结果缓存。
+3. applyRegexRules 结果按 text + rules 缓存。
+4. handleSettingsChange 不必同步 applySettingsToDOM，交给 effect。
+5. 降低 blur/backdrop-filter 默认覆盖范围。
+
+中风险：
+1. hasSavedGame/getLastMessageContent 避免全历史 getChatMessages(-1)。
+2. flushPendingGameDataCompletion 只等 dirty scope，避免兜底 full scan。
+3. useSummaryDetection 在 summary disabled 时不注册 MESSAGE_RECEIVED。
+
+高风险：
+1. 拆分单 HTML 多 chunk。
+- 酒馆 .load() 注入环境可能找不到 chunk 路径。
+- 需要稳定部署路径支持。
+
+2. 彻底迁移 UI 入口。
+- 从正则 loader 改为脚本挂载。
+- 会影响伪同层机制。
+
+八、结论
+
+src/武侠 的问题是：
+- 首包偏重。
+- 初始化仍有全量读取成本。
+- 补全写回会继续推高最新消息体积。
+- 大文本显示仍会有前端内 replace/split 成本。
+
+但编辑确认长卡顿的第一主因在外层：
+- 最新 assistant 消息膨胀。
+- 酒馆显示格式化。
+- Prompt Template/dry-run/world-info。
+- ERA 变量块解析。
+
+前端优化能改善加载和交互流畅度，但要解决编辑确认卡顿，必须先处理最新消息体积和外层显示链路。
+

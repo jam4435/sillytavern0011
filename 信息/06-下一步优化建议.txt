@@ -1,0 +1,94 @@
+下一步优化建议
+更新时间: 2026-06-03
+
+一、建议先做的低风险动作
+
+1. 固化运行时配置
+- 确认 EjsTemplate.raw_message_evaluation_enabled=false。
+- 确认 era_event_debug / era_event_time_debug 未开启。
+- 如可接受，测试 Prompt Template cache_enabled 和 render_loader_enabled/generate_loader_enabled 的组合。
+
+2. 正则运行时梳理
+- 保留“游戏页面”加载正则。
+- 逐条关闭/优化重型显示正则。
+- 重点检查 think/thinking、VariableEdit/Insert/Delete、Progress 相关规则。
+
+3. 世界书扫描面缩小
+- 临时只启用当前活跃章节事件世界书。
+- 观察编辑确认后 Prompt Manager dry-run 长任务是否下降。
+
+4. 前端低风险优化
+- GameContent 分段 useMemo。
+- options 解析缓存。
+- summary disabled 时不注册 MESSAGE_RECEIVED。
+- 降低默认 blur/backdrop-filter。
+
+二、中期需要设计的动作
+
+1. 最新消息变量块压缩
+
+目标：
+- 避免 VariableEdit/Insert/Delete 无限堆在最新 assistant 消息。
+
+可能路线：
+- 定期把变量块归档到旧楼层或专用状态楼层。
+- 最新楼层只保留 UI loader 和正文。
+- 保留 ERA/MVU 可见的最终 stat_data。
+
+风险：
+- ERA 当前写入模型就是追加到最后一条 AI 消息。
+- 需要确保下次发给 AI 的变量仍准确。
+- 需要处理旧档兼容。
+
+2. 事件系统按需扫描
+
+目标：
+- checkEvents 只在相关字段变化时执行。
+
+相关字段：
+- 世界信息.时间
+- user数据.所在位置
+- 事件系统
+- 参与事件
+- 后续事件线索计数
+
+风险：
+- 漏字段会漏触发事件。
+
+3. Prompt Manager/Template dry-run 限制
+
+目标：
+- 编辑确认不触发完整 prompt dry-run/world-info 扫描，或只在 Prompt Manager 面板可见时跑。
+
+风险：
+- 需要改第三方扩展源码或运行时 monkey patch。
+- 可能影响提示词预览功能。
+
+三、长期架构方向
+
+1. UI 入口从正则迁移到脚本挂载
+- 不再用 /.+/s 吞整条消息。
+- 用脚本监听最新楼层，挂载武侠 UI。
+- 消息正文、变量块、UI loader 解耦。
+
+2. 变量存储从“最新消息追加补丁”迁移
+- 减少最新 assistant 消息体积。
+- 让编辑确认不再处理几十万字符变量块。
+
+3. 世界书事件按章节/索引加载
+- 当前活跃章节常驻。
+- 历史章节归档。
+- 事件定义缓存并按失效源更新。
+
+四、当前最高价值判断
+
+如果只做一件事：
+优先控制最新 assistant 消息体积。
+
+原因：
+- 它同时影响酒馆格式化、正则、Prompt Template、ERA、前端显示。
+- 它是所有卡顿链路的共同放大器。
+
+如果先做一个稳妥试验：
+先缩小 Prompt Template/dry-run 和世界书扫描面，然后复测编辑确认。
+

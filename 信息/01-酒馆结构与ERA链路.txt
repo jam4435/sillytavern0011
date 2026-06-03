@@ -1,0 +1,107 @@
+酒馆结构、ERA 链路与编辑确认卡顿
+更新时间: 2026-06-03
+
+一、伪同层卡结构
+
+酒馆助手前端界面本质是挂在消息楼层中的无沙盒 iframe。武侠卡当前不是独立 App 页面，而是：
+- 消息楼层提供 iframe 挂载点。
+- 酒馆显示正则把楼层正文替换成 loader script。
+- loader 通过 jQuery .load() 拉取 dist/武侠/index.html。
+- 隐藏楼层脚本删除旧楼层 DOM，只保留 .last_mes，制造类似同层的视觉效果。
+
+这意味着“最新 assistant 消息”同时承担三种职责：
+- UI 挂载楼层。
+- 玩家看到的最新故事正文来源。
+- ERA 变量块承载点。
+
+因此编辑最新消息不是普通编辑文本，而是在编辑 UI 承载楼层、变量补丁历史和 iframe 挂载点共用的同一条消息。
+
+二、编辑确认链路
+
+酒馆原生编辑确认的大致顺序：
+1. 读取编辑框内容，更新消息对象。
+2. emit MESSAGE_EDITED。
+3. 清空当前楼层 .mes_text。
+4. 对消息重新 messageFormatting。
+5. append 新 HTML。
+6. emit MESSAGE_UPDATED。
+7. 保存聊天。
+
+关键点：
+- 旧 iframe 在 .mes_text 清空时立即被销毁。
+- 新 iframe 要等 messageFormatting、正则、Prompt Template、ERA 相关处理完成后才可能重新插入。
+- 所以体感是“点确认后界面消失，然后很久才回来”。
+
+三、Prompt Template 参与
+
+Prompt Template 会监听消息渲染/更新相关事件。
+它会执行：
+- prepareContext
+- getEnabledWorldInfoEntries
+- applyRegex
+- evalTemplateHandler
+- updateMessageBlock
+
+旧实测中 raw_message_evaluation_enabled=true 时，Prompt Template processing #18 用时约 27,650ms。
+第一轮已将 raw_message_evaluation_enabled 关闭，主热点明显下降。
+
+仍需注意：
+- render_loader_enabled、generate_loader_enabled、preload_worldinfo_enabled 仍可能触发 dry-run。
+- dry-run 可能扫描世界书、构造 prompt，剩余秒级长任务仍存在。
+
+四、ERA 写入模型
+
+ERA API 不是直接写一个独立变量文件，而是把补丁块追加到最后一条 AI 消息：
+- era:insertByObject -> 追加 VariableInsert
+- era:updateByObject -> 追加 VariableEdit
+- era:deleteByObject -> 追加 VariableDelete
+
+这会导致：
+- 最新消息越来越长。
+- 编辑确认时酒馆格式化越来越慢。
+- 正则替换越来越慢。
+- ERA 每次解析变量块越来越慢。
+- 前端重新读取/显示最新消息也越来越慢。
+
+当前采样：
+- 最新消息约 163,517 字符。
+- VariableInsert 4 个。
+- VariableEdit 100 个。
+- VariableDelete 3 个。
+
+五、已排除点
+
+1. 5500 未开导致空白，但不是卡顿根因。
+- 5500 关闭时，loader 不能加载 index.html，iframe 内没有 #root。
+- 这解释“不显示”，不解释“为什么确认后几十秒才重建 iframe”。
+
+2. React iframe 自身不是 57s 主因。
+- 正常 iframe 自身加载约数秒。
+- 旧实测中大部分时间发生在新 iframe 尚未回 DOM 之前。
+
+3. 事件脚本空 resync 全扫已经止血。
+- era-main.js 已跳过 actions.resync=true 且无 apply/rollback/apiWrite 的 writeDone。
+- checkEvents 已有防抖和单飞。
+
+六、剩余高风险点
+
+1. 最新消息体积无限增长
+- 这是根因级放大器。
+- 不处理它，后续任何正则/模板/变量解析都会越来越慢。
+
+2. Prompt Template / Prompt Manager dry-run
+- raw 已关，但 dry-run 仍可能在编辑确认后扫描 world-info。
+
+3. 酒馆原生 messageFormatting
+- 它会同步重建楼层 HTML，旧 iframe 必然先销毁。
+
+4. ERA 变量块解析
+- 大量 VariableEdit 长期堆在最新消息中，解析成本会持续上升。
+
+七、判断
+
+当前的卡顿链是：
+编辑确认 -> 旧 iframe 销毁 -> 大消息 messageFormatting -> 酒馆正则 -> Prompt Template/dry-run/world-info -> ERA resync/变量块处理 -> 新 iframe 插回 -> 武侠前端加载。
+
+优化应优先减少前半段同步工作，而不是只优化 React iframe。
+

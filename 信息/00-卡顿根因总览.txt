@@ -1,0 +1,105 @@
+墨剑录伪同层卡卡顿根因总览
+更新时间: 2026-06-03
+
+一、当前结论
+
+当前“编辑最新消息 -> 确认”后的明显卡顿，主因不是 5500、也不是 React iframe 自身加载。
+
+本轮运行时采样显示：
+- 最新 assistant 消息长度约 163,517 字符。
+- 同一条最新消息内已有 VariableInsert 4 个、VariableEdit 100 个、VariableDelete 3 个。
+- 当前 DOM 只保留 1 个可见消息楼层，last_mes 为 mesid=18。
+- 武侠 iframe 存在，id 为 TH-message--18--0，iframe 内有 #root。
+- EjsTemplate.raw_message_evaluation_enabled 仍为 false。
+
+结合之前实测：
+- 编辑确认到新 iframe 回 DOM 曾约 57,388ms。
+- Prompt Template raw 开启时曾出现 processing #18 约 27,650ms。
+- 关闭 raw 并优化两条重型显示正则后，messageFormatting 单独测试从约 33,683ms 降到约 4ms，完整编辑确认降到约 0.5-4.6s 级别。
+- 剩余秒级卡顿主要来自 Prompt Manager/Prompt Template dry-run、world-info 扫描、以及最新消息体积继续膨胀。
+
+一句话概括：
+编辑确认会先销毁旧 iframe，然后酒馆在主线程里对最新大消息同步跑显示格式化、酒馆正则、Prompt Template、ERA resync/变量块解析；新 iframe 只能等这些同步工作结束后再插回 DOM。
+
+二、伪同层卡运行链路
+
+1. 显示层
+- 酒馆消息楼层经显示正则替换成 loader script。
+- loader 执行 $('body').load('http://localhost:5500/dist/武侠/index.html')。
+- 5500 未开启时，iframe 只能看到 loader，不会出现 #root，表现为空白。
+
+2. 隐藏楼层层
+- 酒馆资料/隐藏楼层脚本.txt 只执行 DOM 层收缩：
+  $('#chat > .mes').not('.last_mes').remove()
+- 它不改聊天记录、不改消息 hidden 状态、不减小最新消息原文。
+- 因此它能让视觉上只剩最新楼层，但不能解决编辑确认前的大消息格式化。
+
+3. 状态层
+- ERA API 通过向最后一条 AI 消息末尾追加 VariableInsert/Edit/Delete 指令块来写变量。
+- 这些块长期堆在最新 assistant 消息正文里。
+- MVU/getAllVariables 再把聊天历史折叠成当前 stat_data。
+
+三、主卡顿面排序
+
+1. 最新 assistant 消息正文膨胀
+- 这是共同放大器。
+- 任何格式化、正则、Prompt Template、ERA 扫描都会按这条消息的体积付费。
+- 当前已到 16 万字符、100 个 VariableEdit，后续会继续增长。
+
+2. 酒馆显示正则与其他正则叠加
+- “游戏页面”正则是 UI 加载入口，不能直接关闭。
+- 用户截图中的规则是 /.+/s -> loader script，run_on_edit 开启。
+- 单看 /.+/s 是线性扫描，不是灾难正则；问题是它每次编辑都命中，并和其他显示正则叠加。
+
+3. Prompt Template / Prompt Manager
+- raw_message_evaluation_enabled 已关闭，是第一轮有效止血。
+- 但 render_loader_enabled / generate_loader_enabled / preload_worldinfo_enabled 仍可能在编辑确认后触发 dry-run。
+- dry-run 会构建 prompt、扫描 world-info，剩余长任务大约 2-3s 级别。
+
+4. ERA 变量框架
+- ERA 变量块解析会分别处理 Insert/Edit/Delete。
+- 纯 resync 后触发 272 个事件全扫的问题已经在事件脚本层止血。
+- 但大消息和变量块累积仍会让 ERA 自身解析越来越贵。
+
+5. 武侠 React 前端自身
+- dist/武侠/index.html 约 796KB，单 HTML 内联脚本和样式。
+- 正常 iframe 自身加载约数秒，远小于 57s 卡顿。
+- 它是末端成本，不是编辑确认超长卡顿的第一原因。
+
+四、已经完成的止血点
+
+1. EjsTemplate.raw_message_evaluation_enabled=false。
+2. 事件脚本默认关闭 debug/time debug 日志。
+3. era:writeDone 的纯 resync 分支跳过事件检查。
+4. checkEvents 加入防抖和单飞。
+5. 武侠前端 UI 刷新改用 readGameDataPure。
+6. 功法/属性补全移到后台调度，发送前 flush 兜底。
+7. 新建开局去掉手动内嵌完整 VariableInsert，避免和 era:insertByObject 双写。
+
+五、后续优先级
+
+P0: 控制最新消息正文体积
+- 减少 VariableEdit/Insert/Delete 在最新 assistant 消息末尾无限堆积。
+- 考虑变量块压缩、迁移、归档、或只保留最新有效补丁。
+- 这是最大收益，但会触碰 ERA 写入模型，需要谨慎设计。
+
+P1: 正则层止血
+- 保留“游戏页面”加载正则。
+- 尽量关闭或优化围绕 think、VariableEdit/Insert/Delete 的重型显示正则。
+- “游戏页面”正则可考虑 source 只勾 ai_output，max_depth 收窄到 0，是否可行需以实际 UI 入口为准。
+
+P1: Prompt Template / Prompt Manager
+- raw 已关。
+- 继续确认编辑确认是否仍触发 generate dry-run/world-info 扫描。
+- 如收益不足，需要考虑扩展源码或运行时配置层限制 MESSAGE_EDITED/MESSAGE_UPDATED 后的 dry-run。
+
+P2: 事件系统
+- 事件定义世界书做缓存。
+- checkEvents 增加相关字段变更判定，仅时间/位置/事件系统变化时检查。
+- 合并串行 era 写回。
+
+P2: 前端
+- 保持单 HTML 前提下，减少首包静态 import。
+- 缓存 GameContent 分段、正则结果、options 解析。
+- 减少 backdrop-filter/blur 的常驻绘制成本。
+
