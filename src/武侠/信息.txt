@@ -119,3 +119,51 @@
    - 直接证据: `era:writeDone` 后触发事件检查，扫描 272 个未发生事件并大量输出日志。
 4. 武侠 iframe 自身 reload。
    - 生产 iframe HTML 约 `796KB`，内部导航在正常 5500 可用时约数秒级；但本次 57 秒等待中，新 iframe 尚未加入 DOM，所以不是此次确认卡顿第一原因。
+
+## 2026-06-03 并行子任务补充结论
+
+- `ST-Prompt-Template` 是编辑确认后的第一主因。
+  - 运行时加载路径: `http://127.0.0.1:8000/scripts/extensions/third-party/ST-Prompt-Template/dist/index.js`，版本 `1.15.9.6`。
+  - sourcemap 源: `webpack://extension-prompt-template/./src/modules/handler.ts`。
+  - `handleMessageRender()` 监听 `MESSAGE_UPDATED`、`MESSAGE_SWIPED`、`USER_MESSAGE_RENDERED`，并 `makeFirst(CHARACTER_MESSAGE_RENDERED)`。
+  - 编辑确认后日志 `processing #18 messages in 27650ms` 中的 `#18` 是消息 id，不是 18 条消息。
+  - 当前运行时开关: `render_enabled=true`、`render_loader_enabled=true`、`raw_message_evaluation_enabled=true`、`preload_worldinfo_enabled=true`、`generate_loader_enabled=true`、`cache_enabled=0`、`depth_limit=-1`。
+  - 热点路径: 先处理 `message.mes` 原文，再处理 `.mes_text` HTML；中间会跑 `prepareContext()`、`getEnabledWorldInfoEntries()`、`applyRegex()`、EJS 模板求值、HTML 清理、`container.html(newContent)`。
+  - `applyRegex()` 会对所有启用 message regex 逐个 `content.replace(...)`，因此对 157KB 消息非常敏感。
+  - `raw_message_evaluation_enabled` 路径只判断 `newContent != null` 就 `updateMessageBlock(...)`，没有判断 `newContent !== message.mes`，即使内容不变也可能重渲染大消息。
+
+- ERA 变量框架是消息正文膨胀和后续事件风暴的核心来源。
+  - `酒馆资料/era框架.txt` 是 webpack eval 打包脚本，可从 sourcemap 还原原始 TS。
+  - `api/command.ts::performApiWrite()` 明确把 API 写入块追加到最后一条 AI 消息: `newContent = originalContent + block`，然后 `updateMessageContent()`。
+  - `utils/message.ts::findLastAiMessage()` 会扫全聊天找最后一条 AI 消息；`updateMessageContent()` 用 `setChatMessages(..., { refresh: 'none' })` 回写正文或当前 swipe。
+  - `core/crud/patcher.ts::ApplyVarChangeForMessage()` 对同一消息分别三次扫描 `VariableInsert/Edit/Delete`，再解析和应用全部块。
+  - ERA 只解析变量块，不清理正文里的旧变量块；因此 96 个 `VariableEdit`、4 个 `VariableInsert`、3 个 `VariableDelete` 可以长期堆在同一条最新 AI 消息里。
+  - `resyncStateOnHistoryChange()` 即使判定“所有 MK 均匹配，无需重算”，dispatcher 也会因为 `actions.resync=true` 发 `era:writeDone`。
+  - 可选 `forceRenderRecentMessages()` 如果脚本变量 `强制重载功能=true`，会模拟点击最近消息的“编辑 -> 确认”，风险很高；当前通过 TavernHelper 查询脚本变量为空，暂未看到它开启。
+
+- `src/事件脚本` 是第二段卡顿放大器。
+  - `era-main.js` 的 `eventOn('era:writeDone')` 只排除 `actions.apiWrite === true`，没有排除 `actions.resync === true`。
+  - 因此编辑确认导致的 ERA resync，即使没有业务变量变化，也会触发 `checkEvents(eventDefinitions)`。
+  - `checkEvents()` 每轮读取变量，打印完整 `世界信息` / `事件系统`，遍历全部 `未发生事件`，当前观测为 `272` 个。
+  - `era-utils.js` 中 `CONFIG.DEBUG_MODE=true`，`compareTime()` 每个事件输出多行时间比较日志，造成控制台洪峰。
+  - 事件操作模块有大量 `eventEmit('era:*') -> eventOnce('era:writeDone')` 链式写回，且 `checkEvents()` 无重入/防抖保护，可能造成连续处理次数升高。
+
+- `src/武侠` 自身也有确定的变量块制造点，但不是本次 57 秒第一主因。
+  - `utils/gameInitializer.ts::generateOpeningMessage()` 会把完整初始变量写成 `<VariableInsert>` 放进开场消息。
+  - `createOpeningStoryMessage()` 创建带 `VariableInsert` 的 assistant 楼层后，又调用 `eventEmit('era:insertByObject', variableData)`，存在开局双重写入。
+  - `variableReader.ts` 的后台补全会发多个 `era:updateByObject`，每次都会经 ERA API 追加变量块到最后 AI 消息。虽已从首屏阻塞路径移出，但仍会增加消息原文体积。
+
+### 优先处理建议
+
+1. 先减少 `ST-Prompt-Template` 对编辑确认的成本。
+   - 配置层: 先测试关闭 `raw_message_evaluation_enabled`；其次测试关闭 `render_loader_enabled` 或开启缓存。
+   - 代码层: raw-message 路径增加 `newContent !== message.mes` 判断；若消息不含 `<%`，跳过原文 EJS 处理。
+2. 阻断 ERA 空 resync 引发外层事件扫描。
+   - `src/事件脚本/era-main.js` 的 `era:writeDone` 监听应跳过 `detail.actions.resync === true && !detail.actions.apply && !detail.actions.rollback`。
+   - `checkEvents()` 增加单飞/防抖，业务写回期间暂停重复检查。
+3. 关闭事件脚本默认调试日志。
+   - `era-utils.js` 中 `CONFIG.DEBUG_MODE` 默认改为 `false`，逐事件 `compareTime()` 日志只在手动 debug 时开启。
+4. 降低变量块正文膨胀。
+   - 修复 `gameInitializer.ts` 的开局双重 `VariableInsert`。
+   - 合并 `variableReader.ts` 的补全 patch，尽量一次 `era:updateByObject`。
+   - 长期应改 ERA API 写入策略，不再把脚本写入 patch 无限追加到最新 AI 消息正文。
