@@ -45,11 +45,37 @@ export const logError = (...args) => {
 };
 
 export const logSuccess = (...args) => {
-  console.log('%c[ERA 事件系统 V5.2 ✅]', 'color: #00ff00; font-weight: bold;', ...args);
+  if (isDebugEnabled()) {
+    console.log('%c[ERA 事件系统 V5.2 ✅]', 'color: #00ff00; font-weight: bold;', ...args);
+  }
 };
 
 export const logWarning = (...args) => {
   console.warn('[ERA 事件系统 V5.2 ⚠️]', ...args);
+};
+
+export const debugGroup = (...args) => {
+  if (isDebugEnabled()) {
+    console.group(...args);
+  }
+};
+
+export const debugGroupCollapsed = (...args) => {
+  if (isDebugEnabled()) {
+    console.groupCollapsed(...args);
+  }
+};
+
+export const debugGroupEnd = () => {
+  if (isDebugEnabled()) {
+    console.groupEnd();
+  }
+};
+
+export const debugTable = data => {
+  if (isDebugEnabled()) {
+    console.table(data);
+  }
 };
 
 // ==================== 时间比较函数 ====================

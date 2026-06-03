@@ -15,18 +15,29 @@ import {
   calculateDateOffset,
   compareTime,
   formatDate,
+  debugGroup,
+  debugGroupCollapsed,
+  debugGroupEnd,
+  isDebugEnabled,
 } from './era-utils.js';
 
 import { isTimeForEvent, isTimeAfterEventEnd } from './era-event-checker.js';
+import {
+  writeDirectInsert,
+  writeDirectDelete,
+  writeEraCommand,
+  writeEraInsert,
+  writeEraDelete,
+} from './era-write-helper.js';
 
 // ==================== 批量初始化未发生事件列表（智能优化版）====================
 export async function initializeEventList(eventDefinitions) {
-  console.group('🔧 智能批量初始化事件列表');
+  debugGroup('🔧 智能批量初始化事件列表');
 
   const eventNames = Object.keys(eventDefinitions);
   if (eventNames.length === 0) {
     logWarning('没有可初始化的事件');
-    console.groupEnd();
+    debugGroupEnd();
     return;
   }
 
@@ -37,14 +48,14 @@ export async function initializeEventList(eventDefinitions) {
     if (!variables || !variables.stat_data) {
       logError('无法读取变量或 stat_data 未初始化');
       logError('请确保已执行初始化脚本设置 stat_data');
-      console.groupEnd();
+      debugGroupEnd();
       return;
     }
 
     // ✅ 修复：检查必要的数据结构
     if (!variables.stat_data.世界信息 || !variables.stat_data.世界信息.时间) {
       logError('世界信息或时间数据未初始化');
-      console.groupEnd();
+      debugGroupEnd();
       return;
     }
 
@@ -66,14 +77,14 @@ export async function initializeEventList(eventDefinitions) {
 
     if (newEvents.length === 0) {
       logSuccess('所有事件都已在系统中，无需添加');
-      console.groupEnd();
+      debugGroupEnd();
       return;
     }
 
     logSuccess(`找到 ${newEvents.length} 个新事件需要添加:`, newEvents);
 
     // ==================== 智能分类新事件 ====================
-    console.group('🧠 智能分类事件状态');
+    debugGroup('🧠 智能分类事件状态');
 
     const 未开始事件 = []; // 触发时间未到
     const 应立即触发事件 = []; // 触发时间已到但未超过结束时间（普通事件）
@@ -112,11 +123,11 @@ export async function initializeEventList(eventDefinitions) {
     log(
       `分类结果: 未开始=${未开始事件.length}, 应触发=${应立即触发事件.length}, 登场事件=${应立即完成的登场事件.length}, 已过期=${已过期事件.length}`,
     );
-    console.groupEnd();
+    debugGroupEnd();
 
     // ==================== 1. 添加未开始的事件到"未发生事件" ====================
     if (未开始事件.length > 0) {
-      console.group(`📝 添加 ${未开始事件.length} 个未开始事件`);
+      debugGroup(`📝 添加 ${未开始事件.length} 个未开始事件`);
 
       const 未开始事件对象 = Object.fromEntries(未开始事件.map(name => [name, eventDefinitions[name].触发条件]));
 
@@ -125,16 +136,15 @@ export async function initializeEventList(eventDefinitions) {
       };
 
       log('🚀 发送 era:insertByObject 指令:', payload);
-      eventEmit('era:insertByObject', payload);
-      await new Promise(resolve => eventOnce('era:writeDone', resolve));
+      await writeDirectInsert(payload, 'initialize-unstarted-events');
       logSuccess(`✅ 已添加 ${未开始事件.length} 个未开始事件`);
 
-      console.groupEnd();
+      debugGroupEnd();
     }
 
     // ==================== 2. 批量触发应立即开始的事件 ====================
     if (应立即触发事件.length > 0) {
-      console.group(`▶️ 批量触发 ${应立即触发事件.length} 个事件`);
+      debugGroup(`▶️ 批量触发 ${应立即触发事件.length} 个事件`);
 
       const 进行中事件对象 = Object.fromEntries(
         应立即触发事件.map(name => [name, getEndTime(eventDefinitions[name])]),
@@ -145,11 +155,10 @@ export async function initializeEventList(eventDefinitions) {
       };
 
       log('🚀 发送 era:insertByObject 指令:', payload);
-      eventEmit('era:insertByObject', payload);
-      await new Promise(resolve => eventOnce('era:writeDone', resolve));
+      await writeDirectInsert(payload, 'initialize-in-progress-events');
       logSuccess(`✅ 已触发 ${应立即触发事件.length} 个事件`);
 
-      console.groupEnd();
+      debugGroupEnd();
     }
 
     // ==================== 2.5 批量完成登场事件（直接应用insert并标记完成）====================
@@ -177,19 +186,21 @@ export async function initializeEventList(eventDefinitions) {
 
     // 验证最终结果
     const verifyVars = await getVariables({ type: 'chat' });
-    console.groupCollapsed('🔍 初始化后的事件系统状态');
-    console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data?.事件系统 || {})));
-    console.groupEnd();
+    if (isDebugEnabled()) {
+      debugGroupCollapsed('🔍 初始化后的事件系统状态');
+      console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data?.事件系统 || {})));
+      debugGroupEnd();
+    }
   } catch (error) {
     logError('智能批量初始化事件列表失败:', error);
   }
 
-  console.groupEnd();
+  debugGroupEnd();
 }
 
 // ==================== 处理登场事件完成的辅助函数 ====================
 async function processDebutEventsCompletion(eventNames, eventDefinitions) {
-  console.group(`🎭 批量完成 ${eventNames.length} 个登场事件`);
+  debugGroup(`🎭 批量完成 ${eventNames.length} 个登场事件`);
 
   const 登场事件差分 = {
     insert: {},
@@ -223,8 +234,7 @@ async function processDebutEventsCompletion(eventNames, eventDefinitions) {
     const insertPayload = { 角色数据: 登场事件差分.insert };
 
     log(`🚀 [登场事件 INSERT] 发送 era:insertByObject 指令`);
-    eventEmit('era:insertByObject', insertPayload);
-    await new Promise(resolve => eventOnce('era:writeDone', resolve));
+    await writeEraInsert(insertPayload, 'debut-character-insert');
     log(`✅ [登场事件 INSERT] 完成`);
   }
 
@@ -234,16 +244,15 @@ async function processDebutEventsCompletion(eventNames, eventDefinitions) {
   };
 
   log('🚀 发送 era:insertByObject 指令（登场事件移至已完成）');
-  eventEmit('era:insertByObject', debutCompletedPayload);
-  await new Promise(resolve => eventOnce('era:writeDone', resolve));
+  await writeDirectInsert(debutCompletedPayload, 'debut-events-completed');
   logSuccess(`✅ 已完成 ${eventNames.length} 个登场事件`);
 
-  console.groupEnd();
+  debugGroupEnd();
 }
 
 // ==================== 处理过期事件完成的辅助函数 ====================
 async function processExpiredEventsCompletion(eventNames, eventDefinitions) {
-  console.group(`⚡ 批量完成 ${eventNames.length} 个已过期事件`);
+  debugGroup(`⚡ 批量完成 ${eventNames.length} 个已过期事件`);
 
   const 合并后的差分 = {
     insert: {},
@@ -299,11 +308,10 @@ async function processExpiredEventsCompletion(eventNames, eventDefinitions) {
   };
 
   log('🚀 发送 era:insertByObject 指令（移至已完成）');
-  eventEmit('era:insertByObject', completedPayload);
-  await new Promise(resolve => eventOnce('era:writeDone', resolve));
+  await writeDirectInsert(completedPayload, 'expired-events-completed');
   logSuccess(`✅ 已完成 ${eventNames.length} 个过期事件`);
 
-  console.groupEnd();
+  debugGroupEnd();
 }
 
 // ==================== 应用事件差分的辅助函数 ====================
@@ -323,8 +331,7 @@ async function applyEventDiff(差分对象) {
       const payload = { 角色数据: delta };
 
       log(`🚀 [${logName}] 发送 ${command} 指令`);
-      eventEmit(command, payload);
-      await new Promise(resolve => eventOnce('era:writeDone', resolve));
+      await writeEraCommand(command, payload, `event-diff-${actionKey}`);
       log(`✅ [${logName}] 完成`);
     }
   }
@@ -334,7 +341,7 @@ async function applyEventDiff(差分对象) {
 export async function batchStartEvents(eventNames, eventDefinitions) {
   if (eventNames.length === 0) return;
 
-  console.group(`▶️ 批量开始事件 (${eventNames.length}个)`);
+  debugGroup(`▶️ 批量开始事件 (${eventNames.length}个)`);
 
   try {
     // 1. 批量添加到"进行中"
@@ -347,9 +354,7 @@ export async function batchStartEvents(eventNames, eventDefinitions) {
     };
 
     log('🚀 1. 发送 era:insertByObject 指令 (批量添加到进行中):', insertPayload);
-    eventEmit('era:insertByObject', insertPayload);
-
-    await new Promise(resolve => eventOnce('era:writeDone', resolve));
+    await writeDirectInsert(insertPayload, 'batch-start-in-progress');
     log('✅ 步骤1完成: 批量添加到进行中事件');
 
     // 2. 批量从"未发生"中删除
@@ -362,16 +367,16 @@ export async function batchStartEvents(eventNames, eventDefinitions) {
     };
 
     log('🚀 2. 发送 era:deleteByObject 指令 (批量从未发生中删除):', deletePayload);
-    eventEmit('era:deleteByObject', deletePayload);
-
-    await new Promise(resolve => eventOnce('era:writeDone', resolve));
+    await writeDirectDelete(deletePayload, 'batch-start-delete-unstarted');
     log('✅ 步骤2完成: 批量从未发生事件中删除');
 
     // 验证操作后的状态
     const verifyVars = await getVariables({ type: 'chat' });
-    console.groupCollapsed('🔍 批量开始后的事件系统状态');
-    console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data?.事件系统 || {})));
-    console.groupEnd();
+    if (isDebugEnabled()) {
+      debugGroupCollapsed('🔍 批量开始后的事件系统状态');
+      console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data?.事件系统 || {})));
+      debugGroupEnd();
+    }
 
     logSuccess(`批量开始了 ${eventNames.length} 个事件:`, eventNames);
 
@@ -387,14 +392,14 @@ export async function batchStartEvents(eventNames, eventDefinitions) {
     logError(`批量开始事件失败`, error);
   }
 
-  console.groupEnd();
+  debugGroupEnd();
 }
 
 // ==================== 批量完成登场事件（从未发生直接到已完成）====================
 export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
   if (eventNames.length === 0) return;
 
-  console.group(`🎭 批量完成登场事件 (${eventNames.length}个)`);
+  debugGroup(`🎭 批量完成登场事件 (${eventNames.length}个)`);
 
   try {
     const currentVars = await getVariables({ type: 'chat' });
@@ -432,15 +437,14 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
 
     // 1. 应用 insert 差分（添加人物变量）
     if (Object.keys(登场事件差分.insert).length > 0) {
-      console.group('🔄 应用登场事件人物差分');
+      debugGroup('🔄 应用登场事件人物差分');
       log(`[INSERT] 合并后的差分:`, JSON.parse(JSON.stringify(登场事件差分.insert)));
       const insertPayload = { 角色数据: 登场事件差分.insert };
 
       log(`🚀 [INSERT] 发送 era:insertByObject 指令`);
-      eventEmit('era:insertByObject', insertPayload);
-      await new Promise(resolve => eventOnce('era:writeDone', resolve));
+      await writeEraInsert(insertPayload, 'batch-debut-character-insert');
       log(`✅ [INSERT] 完成`);
-      console.groupEnd();
+      debugGroupEnd();
     }
 
     // 2. 批量将事件移至"已完成"
@@ -450,8 +454,7 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
       },
     };
     log('🚀 发送 era:insertByObject 指令 (登场事件移至已完成):', completedPayload);
-    eventEmit('era:insertByObject', completedPayload);
-    await new Promise(resolve => eventOnce('era:writeDone', resolve));
+    await writeDirectInsert(completedPayload, 'batch-debut-completed');
     log('✅ 登场事件已移至已完成');
 
     // 3. 批量从"未发生"中删除
@@ -461,15 +464,16 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
       },
     };
     log('🚀 发送 era:deleteByObject 指令 (从未发生中删除):', deletePayload);
-    eventEmit('era:deleteByObject', deletePayload);
-    await new Promise(resolve => eventOnce('era:writeDone', resolve));
+    await writeDirectDelete(deletePayload, 'batch-debut-delete-unstarted');
     log('✅ 已从未发生事件中删除');
 
     // 验证操作后的状态
     const verifyVars = await getVariables({ type: 'chat' });
-    console.groupCollapsed('🔍 登场事件完成后的事件系统状态');
-    console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data?.事件系统 || {})));
-    console.groupEnd();
+    if (isDebugEnabled()) {
+      debugGroupCollapsed('🔍 登场事件完成后的事件系统状态');
+      console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data?.事件系统 || {})));
+      debugGroupEnd();
+    }
 
     logSuccess(`批量完成了 ${eventNames.length} 个登场事件:`, eventNames);
 
@@ -485,12 +489,12 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
     logError(`批量完成登场事件失败`, error);
   }
 
-  console.groupEnd();
+  debugGroupEnd();
 }
 
 // ==================== 玩家参与事件 (重构版：时间平移+简化键名) ====================
 export async function playerJoinsEvent(eventName, eventData) {
-  console.group(`👤 玩家参与事件: ${eventName}`);
+  debugGroup(`👤 玩家参与事件: ${eventName}`);
 
   try {
     // 1. 获取简化键名
@@ -499,7 +503,7 @@ export async function playerJoinsEvent(eventName, eventData) {
     // 2. 检查是否已参与 (避免重复添加)
     const currentVars = await getVariables({ type: 'chat' });
     if (currentVars?.stat_data?.参与事件?.[shortName]) {
-      console.groupEnd();
+      debugGroupEnd();
       return;
     }
 
@@ -527,15 +531,14 @@ export async function playerJoinsEvent(eventName, eventData) {
       },
     };
 
-    eventEmit('era:insertByObject', payload);
-    await new Promise(resolve => eventOnce('era:writeDone', resolve));
+    await writeEraInsert(payload, 'player-joins-event');
     logSuccess(`玩家已参与事件: ${shortName}`);
     toastr.warning(`⚠️ 你已到达事件地点: ${eventName}！你的行为可能会改变事件的结局。`);
 
-    console.groupEnd();
+    debugGroupEnd();
   } catch (error) {
     logError(`玩家参与事件失败: ${eventName}`, error);
-    console.groupEnd();
+    debugGroupEnd();
   }
 }
 
@@ -543,7 +546,7 @@ export async function playerJoinsEvent(eventName, eventData) {
 export async function batchEndEvents(eventNames, eventDefinitions) {
   if (eventNames.length === 0) return;
 
-  console.group(`⏹️ 批量结算事件 (${eventNames.length}个)`);
+  debugGroup(`⏹️ 批量结算事件 (${eventNames.length}个)`);
 
   try {
     const currentVars = await getVariables({ type: 'chat' });
@@ -623,9 +626,9 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     }
 
     // 1. 批量应用角色数据差分
-    console.group('🔄 批量应用人物差分');
+    debugGroup('🔄 批量应用人物差分');
     await applyEventDiff(合并后的差分);
-    console.groupEnd();
+    debugGroupEnd();
 
     // 2. 批量将事件移至"已完成"
     const completedPayload = {
@@ -634,8 +637,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       },
     };
     log('🚀 2. 发送 era:insertByObject 指令 (批量移至已完成):', completedPayload);
-    eventEmit('era:insertByObject', completedPayload);
-    await new Promise(resolve => eventOnce('era:writeDone', resolve));
+    await writeDirectInsert(completedPayload, 'batch-end-completed');
     log('✅ 步骤2完成: 批量移至已完成');
 
     // 3. 批量从"进行中"删除
@@ -645,8 +647,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       },
     };
     log('🚀 3. 发送 era:deleteByObject 指令 (批量从进行中删除):', deleteInProgressPayload);
-    eventEmit('era:deleteByObject', deleteInProgressPayload);
-    await new Promise(resolve => eventOnce('era:writeDone', resolve));
+    await writeDirectDelete(deleteInProgressPayload, 'batch-end-delete-in-progress');
     log('✅ 步骤3完成: 批量从进行中删除');
 
     // 4. 如果有玩家参与的事件，批量从"参与事件"中删除
@@ -655,16 +656,17 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
         参与事件: 参与删除对象,
       };
       log('🚀 4. 发送 era:deleteByObject 指令 (批量从参与事件中删除):', deleteParticipationPayload);
-      eventEmit('era:deleteByObject', deleteParticipationPayload);
-      await new Promise(resolve => eventOnce('era:writeDone', resolve));
+      await writeEraDelete(deleteParticipationPayload, 'batch-end-delete-participation');
       log('✅ 步骤4完成: 批量从参与事件中删除');
     }
 
     // 验证操作后的状态
     const verifyVars = await getVariables({ type: 'chat' });
-    console.groupCollapsed('🔍 批量结算后的完整状态');
-    console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data || {})));
-    console.groupEnd();
+    if (isDebugEnabled()) {
+      debugGroupCollapsed('🔍 批量结算后的完整状态');
+      console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data || {})));
+      debugGroupEnd();
+    }
 
     logSuccess(`批量结算完成 ${eventNames.length} 个事件:`, eventNames);
 
@@ -683,12 +685,12 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     logError(`批量结算事件失败`, error);
   }
 
-  console.groupEnd();
+  debugGroupEnd();
 }
 
 // ==================== 生成事件后续 ====================
 async function generateFollowupEvents(eventNames, eventDefinitions) {
-  console.group('🔗 生成事件后续');
+  debugGroup('🔗 生成事件后续');
 
   // 初始化后续事件payload
   const followupPayload = {};
@@ -756,8 +758,7 @@ async function generateFollowupEvents(eventNames, eventDefinitions) {
     };
 
     log('🚀 发送 era:insertByObject 指令 (写入后续事件线索):', followupEventPayload);
-    eventEmit('era:insertByObject', followupEventPayload);
-    await new Promise(resolve => eventOnce('era:writeDone', resolve));
+    await writeDirectInsert(followupEventPayload, 'insert-followup-clues');
     logSuccess(`✅ 已写入 ${Object.keys(followupPayload).length} 个后续事件线索`);
 
     // 写入后续事件线索计数
@@ -766,12 +767,12 @@ async function generateFollowupEvents(eventNames, eventDefinitions) {
     };
 
     log('🚀 发送 era:insertByObject 指令 (写入后续事件线索计数):', followupCountEventPayload);
-    eventEmit('era:insertByObject', followupCountEventPayload);
-    await new Promise(resolve => eventOnce('era:writeDone', resolve));
+    await writeDirectInsert(followupCountEventPayload, 'insert-followup-counters');
     logSuccess(`✅ 已写入 ${Object.keys(followupCountPayload).length} 个后续事件线索计数`);
   } else {
     log('没有需要生成的后续事件');
   }
 
-  console.groupEnd();
+  debugGroupEnd();
 }
+

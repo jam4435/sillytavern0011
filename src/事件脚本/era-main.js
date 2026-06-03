@@ -20,6 +20,7 @@
     playerJoinsEvent,
     batchEndEvents,
   } = await import('./era-event-operations.js');
+  const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
   const debugGroup = (...args) => {
     if (isDebugEnabled()) {
@@ -43,6 +44,8 @@
     const actions = detail?.actions || {};
     return actions.resync === true && !actions.apply && !actions.rollback && !actions.apiWrite;
   };
+
+  const isDirectChatWriteDone = detail => detail?.actions?.directChatWrite === true;
 
   // ==================== 主检查函数（批量优化版）====================
   async function checkEvents(eventDefinitions, reason = 'manual') {
@@ -231,8 +234,7 @@
     if (JSON.stringify(existingRumors) !== JSON.stringify(附近传闻)) {
       logSuccess('附近传闻发生变化，正在更新...');
       const updatePayload = { 附近传闻: 附近传闻 };
-      eventEmit('era:insertByObject', updatePayload);
-      await new Promise(resolve => eventOnce('era:writeDone', resolve));
+      await writeDirectAssign(updatePayload, 'update-nearby-rumors');
       logSuccess(`✅ 已更新附近传闻，现有 ${Object.keys(附近传闻).length} 条`);
     } else {
       log('附近传闻无变化，跳过写入');
@@ -274,8 +276,7 @@
       if (Object.keys(updates).length > 0) {
         const updatePayload = { 后续事件线索计数: updates };
         log('🚀 发送 era:updateByObject 指令 (更新计数器):', updatePayload);
-        eventEmit('era:updateByObject', updatePayload);
-        await new Promise(resolve => eventOnce('era:writeDone', resolve));
+        await writeDirectUpdate(updatePayload, 'update-followup-counters');
         logSuccess(`✅ 已更新 ${Object.keys(updates).length} 个计数器`);
       }
 
@@ -287,8 +288,7 @@
         };
 
         log('🚀 发送 era:deleteByObject 指令 (删除过期的后续事件线索):', deletePayload);
-        eventEmit('era:deleteByObject', deletePayload);
-        await new Promise(resolve => eventOnce('era:writeDone', resolve));
+        await writeDirectDelete(deletePayload, 'delete-expired-followups');
         logSuccess(`✅ 已删除 ${expiredKeys.length} 个过期的后续事件线索`);
       }
     } catch (error) {
@@ -348,7 +348,9 @@
     }
 
     isInitializing = true;
-    console.log('%c===== ERA 事件系统 V5.2 初始化 =====', 'color: #00aaff; font-size: 14px; font-weight: bold;');
+    if (isDebugEnabled()) {
+      console.log('%c===== ERA 事件系统 V5.2 初始化 =====', 'color: #00aaff; font-size: 14px; font-weight: bold;');
+    }
 
     // 预检查：确保 stat_data 已初始化
     try {
@@ -395,7 +397,9 @@
       logError('输出初始状态失败:', error);
     }
 
-    console.log('%c===== 初始化完成 =====', 'color: #00aaff; font-size: 14px; font-weight: bold;');
+    if (isDebugEnabled()) {
+      console.log('%c===== 初始化完成 =====', 'color: #00aaff; font-size: 14px; font-weight: bold;');
+    }
 
     // 初始化后自动执行一次事件检查
     log('🔄 初始化完成，开始自动检查事件...');
@@ -467,12 +471,19 @@
       return;
     }
 
+    if (isDirectChatWriteDone(detail)) {
+      log('📝 检测到事件脚本直接变量写入，跳过事件检查');
+      return;
+    }
+
     if (detail?.actions?.apiWrite !== true) {
       log('📝 检测到ERA变量更新，触发事件检查');
       scheduleCheckEvents('era-write-done');
     }
   });
 
-  console.log('%c[ERA 事件系统 V5.2] 已启动 - 模块化重构版', 'color: #00ff00; font-size: 16px; font-weight: bold;');
-  toastr.success('ERA 事件系统 V5.2 已启动（模块化重构版）');
+  if (isDebugEnabled()) {
+    console.log('%c[ERA 事件系统 V5.2] 已启动 - 模块化重构版', 'color: #00ff00; font-size: 16px; font-weight: bold;');
+    toastr.success('ERA 事件系统 V5.2 已启动（模块化重构版）');
+  }
 })();

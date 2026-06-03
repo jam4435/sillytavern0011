@@ -302,26 +302,41 @@ export function parseMaintext(messageContent: string): string {
   return result;
 }
 
+const ERA_VARIABLE_BLOCK_REGEX = /\s*<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>\s*/gi;
+
+/**
+ * 剥离 ERA 变量块，保留真正需要展示/解析的楼层正文。
+ */
+export function stripEraVariableBlocks(messageContent: string): string {
+  if (!messageContent) return '';
+  return messageContent
+    .replace(ERA_VARIABLE_BLOCK_REGEX, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 /**
  * 解析消息中的 option 内容（兼容旧版）
  * @deprecated 建议使用 parseAIResponse，然后从 otherTags 中获取 option
  */
 export function parseOptions(messageContent: string): string[] {
+  const content = stripEraVariableBlocks(messageContent);
+
   dataLogger.log('');
   dataLogger.log('🔍 [parseOptions] 开始解析 options');
-  dataLogger.log('   输入内容长度:', messageContent.length);
+  dataLogger.log('   输入内容长度:', content.length);
 
   // 检查是否包含 option 标签
-  const hasOption = /<option>/i.test(messageContent);
+  const hasOption = /<option>/i.test(content);
   dataLogger.log('   是否包含 <option> 标签:', hasOption);
 
-  const match = messageContent.match(/<option>([\s\S]*?)<\/option>/i);
+  const match = content.match(/<option>([\s\S]*?)<\/option>/i);
   dataLogger.log('   正则匹配结果:', match ? '匹配成功' : '匹配失败');
 
   if (!match) {
     // 调试：查找可能的标签变体
-    const optionStart = messageContent.indexOf('<option');
-    const optionEnd = messageContent.indexOf('</option>');
+    const optionStart = content.indexOf('<option');
+    const optionEnd = content.indexOf('</option>');
     dataLogger.log('   <option 位置:', optionStart);
     dataLogger.log('   </option> 位置:', optionEnd);
     dataLogger.log('⚠️ [parseOptions] 未找到 option 标签，返回空数组');
@@ -2419,6 +2434,11 @@ export function getLastMessageContent(): string {
     }
 
     const lastMessage = messages[messages.length - 1];
+    const messageWithSwipes = lastMessage as TavernChatMessage & {
+      mes?: string;
+      swipes?: string[];
+      swipe_id?: number;
+    };
     dataLogger.log('   最后一条消息信息:');
     dataLogger.log('     - message_id:', lastMessage.message_id);
     dataLogger.log('     - name:', lastMessage.name);
@@ -2429,7 +2449,13 @@ export function getLastMessageContent(): string {
     dataLogger.log('     - data:', lastMessage.data);
     dataLogger.log('     - extra:', lastMessage.extra);
 
-    const result = lastMessage.message || '';
+    const swipeIndex = Number(messageWithSwipes.swipe_id ?? 0);
+    const rawResult =
+      lastMessage.message ||
+      messageWithSwipes.mes ||
+      messageWithSwipes.swipes?.[Number.isFinite(swipeIndex) ? swipeIndex : 0] ||
+      '';
+    const result = stripEraVariableBlocks(rawResult);
     dataLogger.log('✅ [getLastMessageContent] 返回内容长度:', result.length);
     return result;
   } catch (error) {

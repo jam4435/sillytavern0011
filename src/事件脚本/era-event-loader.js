@@ -3,11 +3,11 @@
 // ================================================================================
 // 包含: 从世界书加载事件定义
 
-import { CONFIG, log, logError, logSuccess, logWarning } from './era-utils.js';
+import { CONFIG, log, logError, logSuccess, logWarning, debugGroup, debugGroupEnd, debugTable } from './era-utils.js';
 
 // ==================== 从世界书加载事件定义 ====================
 export async function loadEventDefinitionsFromWorldbook() {
-  console.group('📚 加载事件定义');
+  debugGroup('📚 加载事件定义');
 
   const eventDefinitions = {};
 
@@ -20,7 +20,7 @@ export async function loadEventDefinitionsFromWorldbook() {
 
     if (worldbookNamesToScan.length === 0) {
       logWarning('未找到关联的角色世界书');
-      console.groupEnd();
+      debugGroupEnd();
       return {};
     }
 
@@ -85,7 +85,7 @@ export async function loadEventDefinitionsFromWorldbook() {
     log(`识别到的事件数: ${Object.keys(eventDefinitions).length}`);
 
     if (Object.keys(eventDefinitions).length > 0) {
-      console.table(
+      debugTable(
         Object.keys(eventDefinitions).map(name => ({
           事件名: name,
           地点: eventDefinitions[name].事件地点,
@@ -102,6 +102,6 @@ export async function loadEventDefinitionsFromWorldbook() {
     toastr.error('加载世界书事件时出错');
   }
 
-  console.groupEnd();
+  debugGroupEnd();
   return eventDefinitions;
 }

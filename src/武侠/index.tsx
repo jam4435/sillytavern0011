@@ -16,11 +16,7 @@ $(() => {
   }
   
   root = ReactDOM.createRoot(rootElement);
-  root.render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
-  );
+  root.render(<App />);
   
   initLogger.log('✅ 墨剑录界面已加载');
 });

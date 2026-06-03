@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { DisplaySettings } from '../utils/settingsManager';
 import { Icons } from './Icons';
 import { uiLogger } from '../utils/logger';
@@ -49,37 +49,29 @@ const GameContent: React.FC<GameContentProps> = ({
   uiLogger.log('   options 数量:', options.length);
   uiLogger.log('   options 内容:', options);
   uiLogger.log('   settings:', settings ? '有设置' : '无设置');
-  
+
   // 计算内联样式（基于设置）
-  const contentStyle: React.CSSProperties = settings ? {
-    fontSize: `${settings.fontSize}px`,
-    color: settings.fontColor,
-    lineHeight: settings.lineHeight,
-  } : {};
-
-  // 如果没有任何内容，显示占位符
-  if (!maintext) {
-    uiLogger.log('⚠️ [GameContent] maintext 为空，显示占位符');
-    return (
-      <div className="game-content-placeholder">
-        <Icons.Scroll className="placeholder-icon" />
-        <p className="placeholder-text">江湖风云，待你书写...</p>
-      </div>
-    );
-  }
-
-  uiLogger.log('✅ [GameContent] 渲染正文内容');
+  const contentStyle = useMemo<React.CSSProperties>(() => settings ? {
+      fontSize: `${settings.fontSize}px`,
+      color: settings.fontColor,
+      lineHeight: settings.lineHeight,
+    } : {},
+    [settings]
+  );
 
   // 检测内容是否包含 HTML 标签
-  const containsHTML = /<[^>]+>/.test(maintext);
+  const normalizedMaintext = maintext || '';
+  const containsHTML = useMemo(() => /<[^>]+>/.test(normalizedMaintext), [normalizedMaintext]);
   uiLogger.log('   内容是否包含 HTML:', containsHTML);
 
   // 处理内容：如果包含 HTML 则保留，否则按行分割
-  const renderContent = () => {
+  const renderedContent = useMemo(() => {
+    if (!normalizedMaintext) return null;
+
     if (containsHTML) {
       // 内容包含 HTML，使用 dangerouslySetInnerHTML 渲染
       // 保留换行结构：将连续的换行转换为段落分隔，单个换行转换为 <br>
-      const htmlContent = maintext
+      const htmlContent = normalizedMaintext
         .split(/\n{2,}/) // 先按连续换行（段落分隔）分割
         .map(paragraph => paragraph.trim())
         .filter(paragraph => paragraph) // 过滤空段落
@@ -98,7 +90,7 @@ const GameContent: React.FC<GameContentProps> = ({
       );
     } else {
       // 纯文本内容，按段落分割渲染（连续换行为段落分隔）
-      const paragraphs = maintext
+      const paragraphs = normalizedMaintext
         .split(/\n{2,}/) // 连续换行分割为段落
         .map(p => p.trim())
         .filter(p => p);
@@ -117,7 +109,28 @@ const GameContent: React.FC<GameContentProps> = ({
         );
       });
     }
-  };
+  }, [containsHTML, contentStyle, normalizedMaintext]);
+
+  const parsedOptions = useMemo(() =>
+    options.map(option => ({
+      option,
+      ...parseOptionText(option),
+    })),
+    [options]
+  );
+
+  // 如果没有任何内容，显示占位符
+  if (!maintext) {
+    uiLogger.log('⚠️ [GameContent] maintext 为空，显示占位符');
+    return (
+      <div className="game-content-placeholder">
+        <Icons.Scroll className="placeholder-icon" />
+        <p className="placeholder-text">江湖风云，待你书写...</p>
+      </div>
+    );
+  }
+
+  uiLogger.log('✅ [GameContent] 渲染正文内容');
 
   return (
     <div className="game-content">
@@ -125,7 +138,7 @@ const GameContent: React.FC<GameContentProps> = ({
       {maintext && (
         <div className="maintext-container">
           <div className="maintext-content">
-            {renderContent()}
+            {renderedContent}
           </div>
         </div>
       )}
@@ -135,8 +148,7 @@ const GameContent: React.FC<GameContentProps> = ({
         <div className="options-container">
           <div className="options-label">抉择时刻</div>
           <div className="options-list">
-            {options.map((option, index) => {
-              const { letter, text } = parseOptionText(option);
+            {parsedOptions.map(({ option, letter, text }, index) => {
               return (
                 <button
                   key={index}
