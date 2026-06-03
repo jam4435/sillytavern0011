@@ -456,10 +456,8 @@ export interface OpeningStoryResult {
 export async function createOpeningStoryMessage(formData: NewGameFormData): Promise<OpeningStoryResult> {
   try {
     const openingLine = getRandomOpeningLine();
-    const variableInsertContent = generateOpeningMessage(formData);
-    const openingFloorMessage = `${openingLine}\n\n${variableInsertContent}`;
 
-    await createChatMessages([{ role: 'assistant', message: openingFloorMessage }], { refresh: 'none' });
+    await createChatMessages([{ role: 'assistant', message: openingLine }], { refresh: 'none' });
 
     const variableData = generateVariableData(formData);
     eventEmit('era:insertByObject', variableData);

@@ -4,8 +4,17 @@
 // 包含: 日志工具、时间计算、辅助函数
 
 // ==================== 配置项 ====================
+function readLocalStorageFlag(key) {
+  try {
+    return globalThis.localStorage?.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export const CONFIG = {
-  DEBUG_MODE: true,
+  DEBUG_MODE: false,
+  TIME_DEBUG_MODE: false,
   EVENT_KEY_PREFIXES: ['事件条目-', '成长条目-'],
   EVENT_KEY_PATTERNS: [/事件条目-/, /登场事件-/, /成长条目-/],
   DEBUT_EVENT_PATTERN: /登场事件-/,
@@ -15,8 +24,18 @@ export const CONFIG = {
 };
 
 // ==================== 日志工具 ====================
+export const isDebugEnabled = () => CONFIG.DEBUG_MODE || readLocalStorageFlag('era_event_debug');
+
+export const isTimeDebugEnabled = () => CONFIG.TIME_DEBUG_MODE || readLocalStorageFlag('era_event_time_debug');
+
 export const log = (...args) => {
-  if (CONFIG.DEBUG_MODE) {
+  if (isDebugEnabled()) {
+    console.log('[ERA 事件系统 V5.2]', ...args);
+  }
+};
+
+export const logTime = (...args) => {
+  if (isTimeDebugEnabled()) {
     console.log('[ERA 事件系统 V5.2]', ...args);
   }
 };
@@ -48,7 +67,31 @@ export function compareTime(currentTime, targetTime, comparisonType) {
 
   // 如果请求的是差值，直接返回天数差值
   if (comparisonType === 'diff') {
-    log(`⏰ 时间差值计算:`);
+    if (isTimeDebugEnabled()) {
+      logTime(`⏰ 时间差值计算:`);
+      let currentTimeStr = `${currentTime.年}年${currentTime.月}月${currentTime.日}日`;
+      let targetTimeStr = `${targetTime.年}年${targetTime.月}月${targetTime.日}日`;
+
+      if (currentTime.时 !== undefined) {
+        currentTimeStr += `${currentTime.时}时`;
+      }
+      if (targetTime.时 !== undefined) {
+        targetTimeStr += `${targetTime.时}时`;
+      }
+
+      logTime(`  当前: ${currentTimeStr} (${currentDays}天, ${currentTotalHours}小时)`);
+      logTime(`  目标: ${targetTimeStr} (${targetDays}天, ${targetTotalHours}小时)`);
+      logTime(`  差值: ${diff}天`);
+    }
+    return diff;
+  }
+
+  // 使用总小时数进行比较，支持小时级精度
+  const result =
+    comparisonType === '>=' ? currentTotalHours >= targetTotalHours : currentTotalHours > targetTotalHours;
+
+  if (isTimeDebugEnabled()) {
+    logTime(`⏰ 时间比较 (${comparisonType}):`);
     let currentTimeStr = `${currentTime.年}年${currentTime.月}月${currentTime.日}日`;
     let targetTimeStr = `${targetTime.年}年${targetTime.月}月${targetTime.日}日`;
 
@@ -59,34 +102,14 @@ export function compareTime(currentTime, targetTime, comparisonType) {
       targetTimeStr += `${targetTime.时}时`;
     }
 
-    log(`  当前: ${currentTimeStr} (${currentDays}天, ${currentTotalHours}小时)`);
-    log(`  目标: ${targetTimeStr} (${targetDays}天, ${targetTotalHours}小时)`);
-    log(`  差值: ${diff}天`);
-    return diff;
+    logTime(`  当前: ${currentTimeStr} (${currentDays}天, ${currentTotalHours}小时)`);
+    logTime(`  目标: ${targetTimeStr} (${targetDays}天, ${targetTotalHours}小时)`);
+    logTime(
+      `  差值: ${diff}天, 小时差: ${currentTotalHours - targetTotalHours}小时 | 结果: ${
+        result ? '✅ 满足' : '❌ 不满足'
+      }`,
+    );
   }
-
-  // 使用总小时数进行比较，支持小时级精度
-  const result =
-    comparisonType === '>=' ? currentTotalHours >= targetTotalHours : currentTotalHours > targetTotalHours;
-
-  log(`⏰ 时间比较 (${comparisonType}):`);
-  let currentTimeStr = `${currentTime.年}年${currentTime.月}月${currentTime.日}日`;
-  let targetTimeStr = `${targetTime.年}年${targetTime.月}月${targetTime.日}日`;
-
-  if (currentTime.时 !== undefined) {
-    currentTimeStr += `${currentTime.时}时`;
-  }
-  if (targetTime.时 !== undefined) {
-    targetTimeStr += `${targetTime.时}时`;
-  }
-
-  log(`  当前: ${currentTimeStr} (${currentDays}天, ${currentTotalHours}小时)`);
-  log(`  目标: ${targetTimeStr} (${targetDays}天, ${targetTotalHours}小时)`);
-  log(
-    `  差值: ${diff}天, 小时差: ${currentTotalHours - targetTotalHours}小时 | 结果: ${
-      result ? '✅ 满足' : '❌ 不满足'
-    }`,
-  );
 
   return result;
 }

@@ -10,7 +10,7 @@
 
 (async function () {
   // ==================== 导入模块 ====================
-  const { log, logError, logSuccess, logWarning, CONFIG } = await import('./era-utils.js');
+  const { log, logError, logSuccess, logWarning, isDebugEnabled } = await import('./era-utils.js');
   const { loadEventDefinitionsFromWorldbook } = await import('./era-event-loader.js');
   const { isTimeForEvent, isTimeAfterEventEnd } = await import('./era-event-checker.js');
   const {
@@ -21,13 +21,36 @@
     batchEndEvents,
   } = await import('./era-event-operations.js');
 
+  const debugGroup = (...args) => {
+    if (isDebugEnabled()) {
+      console.group(...args);
+    }
+  };
+
+  const debugGroupCollapsed = (...args) => {
+    if (isDebugEnabled()) {
+      console.groupCollapsed(...args);
+    }
+  };
+
+  const debugGroupEnd = () => {
+    if (isDebugEnabled()) {
+      console.groupEnd();
+    }
+  };
+
+  const isResyncOnlyWriteDone = detail => {
+    const actions = detail?.actions || {};
+    return actions.resync === true && !actions.apply && !actions.rollback && !actions.apiWrite;
+  };
+
   // ==================== 主检查函数（批量优化版）====================
-  async function checkEvents(eventDefinitions) {
-    console.group('🔄 事件系统检查周期');
+  async function checkEvents(eventDefinitions, reason = 'manual') {
+    debugGroup(`🔄 事件系统检查周期: ${reason}`);
 
     if (Object.keys(eventDefinitions).length === 0) {
       logWarning('没有加载任何事件定义');
-      console.groupEnd();
+      debugGroupEnd();
       return;
     }
 
@@ -35,13 +58,15 @@
       const variables = await getVariables({ type: 'chat' });
 
       // 输出完整的世界信息和事件系统
-      console.groupCollapsed('🌍 当前世界信息（完整）');
-      console.log(JSON.parse(JSON.stringify(variables?.stat_data?.世界信息 || {})));
-      console.groupEnd();
+      if (isDebugEnabled()) {
+        debugGroupCollapsed('🌍 当前世界信息（完整）');
+        console.log(JSON.parse(JSON.stringify(variables?.stat_data?.世界信息 || {})));
+        debugGroupEnd();
 
-      console.groupCollapsed('🎮 当前事件系统（完整）');
-      console.log(JSON.parse(JSON.stringify(variables?.stat_data?.事件系统 || {})));
-      console.groupEnd();
+        debugGroupCollapsed('🎮 当前事件系统（完整）');
+        console.log(JSON.parse(JSON.stringify(variables?.stat_data?.事件系统 || {})));
+        debugGroupEnd();
+      }
 
       const currentTime = variables.stat_data.世界信息.时间;
       const 未发生事件 = variables.stat_data.事件系统.未发生事件 || {};
@@ -53,7 +78,7 @@
       log(`当前时间: ${timeString}`);
 
       // ==================== 批量检查未发生事件 ====================
-      console.group('📋 批量检查未发生事件');
+      debugGroup('📋 批量检查未发生事件');
       const 未发生列表 = Object.keys(未发生事件);
       log(`未发生事件数: ${未发生列表.length}`);
 
@@ -65,7 +90,7 @@
         const triggerCondition = 未发生事件[eventName];
         const eventData = eventDefinitions[eventName];
 
-        console.groupCollapsed(`检查事件: ${eventName}`);
+        debugGroupCollapsed(`检查事件: ${eventName}`);
         if (eventData && isTimeForEvent(currentTime, eventData, eventName)) {
           const { isDebutEvent } = await import('./era-utils.js');
           if (isDebutEvent(eventName)) {
@@ -78,7 +103,7 @@
         } else {
           log(`事件 ${eventName} 触发条件不满足`);
         }
-        console.groupEnd();
+        debugGroupEnd();
       }
 
       // 批量触发普通事件
@@ -94,7 +119,7 @@
         log(`🎭 发现 ${debutEventsToComplete.length} 个登场事件需要直接完成:`, debutEventsToComplete);
         await batchCompleteDebutEvents(debutEventsToComplete, eventDefinitions);
       }
-      console.groupEnd();
+      debugGroupEnd();
 
       // ⚠️ 重新读取变量，因为事件状态可能已改变
       log('🔄 重新读取变量以获取最新的事件状态...');
@@ -103,7 +128,7 @@
       const 最新参与事件 = updatedVariables?.stat_data?.参与事件 || {};
 
       // ==================== 批量检查进行中事件 ====================
-      console.group('⏳ 批量检查进行中事件');
+      debugGroup('⏳ 批量检查进行中事件');
       const 进行中列表 = Object.keys(最新进行中事件);
       log(`进行中事件数: ${进行中列表.length}`);
 
@@ -113,14 +138,14 @@
         const endTime = 最新进行中事件[eventName];
         const eventData = eventDefinitions[eventName];
 
-        console.groupCollapsed(`检查事件: ${eventName}`);
+        debugGroupCollapsed(`检查事件: ${eventName}`);
         if (eventData && isTimeAfterEventEnd(updatedVariables.stat_data.世界信息.时间, endTime)) {
           logSuccess(`事件 ${eventName} 已到结束时间！`);
           eventsToEnd.push(eventName);
         } else {
           log(`事件 ${eventName} 尚未结束`);
         }
-        console.groupEnd();
+        debugGroupEnd();
       }
 
       // 批量结束事件
@@ -130,7 +155,7 @@
       } else {
         log('没有事件需要结束');
       }
-      console.groupEnd();
+      debugGroupEnd();
 
       // ==================== 检查玩家位置触发（弹性时间+层级式地点匹配）====================
       if (进行中列表.length > 0) {
@@ -141,12 +166,12 @@
       console.trace();
     }
 
-    console.groupEnd();
+    debugGroupEnd();
   }
 
   // ==================== 检查玩家位置触发 ====================
   async function checkPlayerLocationTriggers(进行中列表, eventDefinitions, updatedVariables, 最新参与事件) {
-    console.group('📍 检查玩家位置触发');
+    debugGroup('📍 检查玩家位置触发');
     const { getEventShortName } = await import('./era-utils.js');
     const playerLocation = updatedVariables.stat_data.user数据?.所在位置;
     log(`玩家位置: ${playerLocation}`);
@@ -213,19 +238,19 @@
       log('附近传闻无变化，跳过写入');
     }
 
-    console.groupEnd();
+    debugGroupEnd();
   }
 
   // ==================== 处理后续事件线索计数器 ====================
   async function processFollowupCounters() {
-    console.group('🔢 处理后续事件线索计数器');
+    debugGroup('🔢 处理后续事件线索计数器');
 
     try {
       const currentVars = await getVariables({ type: 'chat' });
       const followupCounters = currentVars?.stat_data?.后续事件线索计数 || {};
 
       if (Object.keys(followupCounters).length === 0) {
-        console.groupEnd();
+        debugGroupEnd();
         return;
       }
 
@@ -270,13 +295,51 @@
       logError('处理后续事件线索计数器失败:', error);
     }
 
-    console.groupEnd();
+    debugGroupEnd();
   }
 
   // ==================== 初始化流程 ====================
   let eventDefinitions = {};
   let isInitializing = false;
   let isInitialized = false;
+  let isCheckingEvents = false;
+  let pendingCheckReason = null;
+  let checkEventsTimer = null;
+
+  async function runScheduledCheck(reason) {
+    if (isCheckingEvents) {
+      pendingCheckReason = reason;
+      log(`🔁 事件检查正在进行，合并请求: ${reason}`);
+      return;
+    }
+
+    isCheckingEvents = true;
+    let currentReason = reason;
+    try {
+      do {
+        pendingCheckReason = null;
+        await checkEvents(eventDefinitions, currentReason);
+        currentReason = pendingCheckReason;
+      } while (currentReason);
+    } finally {
+      isCheckingEvents = false;
+    }
+  }
+
+  function scheduleCheckEvents(reason) {
+    pendingCheckReason = reason;
+    if (checkEventsTimer) {
+      log(`🧩 已有待执行事件检查，合并请求: ${reason}`);
+      return;
+    }
+
+    checkEventsTimer = setTimeout(() => {
+      checkEventsTimer = null;
+      const reasonToRun = pendingCheckReason || reason;
+      pendingCheckReason = null;
+      void runScheduledCheck(reasonToRun);
+    }, 100);
+  }
 
   async function initialize() {
     if (isInitializing) {
@@ -317,13 +380,15 @@
     try {
       const vars = await getVariables({ type: 'chat' });
 
-      console.groupCollapsed('🌍 当前世界信息（完整JSON）');
-      console.log(JSON.parse(JSON.stringify(vars?.stat_data?.世界信息 || {})));
-      console.groupEnd();
+      if (isDebugEnabled()) {
+        debugGroupCollapsed('🌍 当前世界信息（完整JSON）');
+        console.log(JSON.parse(JSON.stringify(vars?.stat_data?.世界信息 || {})));
+        debugGroupEnd();
 
-      console.groupCollapsed('🎮 当前事件系统（完整JSON）');
-      console.log(JSON.parse(JSON.stringify(vars?.stat_data?.事件系统 || {})));
-      console.groupEnd();
+        debugGroupCollapsed('🎮 当前事件系统（完整JSON）');
+        console.log(JSON.parse(JSON.stringify(vars?.stat_data?.事件系统 || {})));
+        debugGroupEnd();
+      }
 
       log('✅ 初始化完成，完整数据已输出到控制台（点击展开查看）');
     } catch (error) {
@@ -334,7 +399,7 @@
 
     // 初始化后自动执行一次事件检查
     log('🔄 初始化完成，开始自动检查事件...');
-    await checkEvents(eventDefinitions);
+    await checkEvents(eventDefinitions, 'initialize');
     isInitializing = false;
     isInitialized = true;
     log('🏁 初始化流程结束，事件监听器已激活');
@@ -378,7 +443,7 @@
   eventOn(tavern_events.MESSAGE_SENT, async () => {
     await processFollowupCounters();
     log('📨 检测到消息发送，触发事件检查');
-    checkEvents(eventDefinitions);
+    scheduleCheckEvents('message-sent');
   });
 
   eventOn('era:writeDone', async detail => {
@@ -397,9 +462,14 @@
       return;
     }
 
+    if (isResyncOnlyWriteDone(detail)) {
+      log('📝 检测到 ERA 纯同步 writeDone，跳过事件检查');
+      return;
+    }
+
     if (detail?.actions?.apiWrite !== true) {
       log('📝 检测到ERA变量更新，触发事件检查');
-      checkEvents(eventDefinitions);
+      scheduleCheckEvents('era-write-done');
     }
   });
 
