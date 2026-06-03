@@ -88,3 +88,34 @@
 - 后台补全加 in-flight guard。
 - 保持原有 autoUpdate 行为，但从阻塞首屏改为后台执行。
 - 验证点: 角色状态、功法、地图、事件、侠缘面板数据一致；收到新消息后 UI 能快速刷新；ERA 变量补全仍会落库。
+
+## 2026-06-03 编辑最新信息确认卡顿复现
+
+- 复现场景: 酒馆最新 assistant 楼层点击“编辑”后不修改正文，直接点击“确认”。
+- 页面内计时结果:
+  - 最新楼层: `mesid=18`。
+  - 编辑框原文长度: `157065` 字符。
+  - 编辑框内变量块数量: `<VariableEdit>` 96 个、`<VariableInsert>` 4 个、`<VariableDelete>` 3 个。
+  - 点击确认到重新加入 `TH-message--18--0` iframe: 约 `57388ms`。
+  - 旧 iframe 在进入编辑态后立即断开；新 iframe 约 57 秒后才加入 DOM。
+- 控制台关键日志:
+  - `[Prompt Template] processing #18 messages in 27650ms`，堆栈位置为 `handleMessageRender (handler.ts:464)`。
+  - ERA 同步随后触发: `resyncStateOnHistoryChange`、`emitWriteDoneEvent`，连续处理次数显示到 `12`。
+  - ERA 事件系统在 `era:writeDone` 后扫描 `未发生事件数: 272`，并逐条输出时间比较日志。
+- 当前环境问题:
+  - `http://localhost:5500/dist/武侠/index.html` 访问失败，浏览器报 `ERR_CONNECTION_REFUSED`。
+  - 因此新 iframe 当前只剩 `$('body').load('http://localhost:5500/dist/武侠/index.html')` 脚本，没有加载出墨剑录 UI。
+  - 这个问题会造成空白/加载失败，但不是确认后 57 秒卡顿的主因；主因发生在 iframe 被重新加入 DOM 之前。
+
+### 当前卡顿点排序
+
+1. 酒馆/提示词模板扩展重新处理整段消息。
+   - 直接证据: `Prompt Template` 处理 18 条消息耗时 `27650ms`。
+   - 放大因素: 最新消息原文 `157KB`，变量块超过 100 个。
+2. 最新消息原文膨胀。
+   - 直接证据: 编辑框内重复出现大量属性 `VariableEdit` 块。
+   - 影响: 编辑确认、正则/模板处理、楼层格式化、iframe 重建都会按原文体量付费。
+3. ERA 在确认后的变量写入/同步链路继续占主线程。
+   - 直接证据: `era:writeDone` 后触发事件检查，扫描 272 个未发生事件并大量输出日志。
+4. 武侠 iframe 自身 reload。
+   - 生产 iframe HTML 约 `796KB`，内部导航在正常 5500 可用时约数秒级；但本次 57 秒等待中，新 iframe 尚未加入 DOM，所以不是此次确认卡顿第一原因。
