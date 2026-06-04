@@ -1,0 +1,492 @@
+酒馆脚本与事件系统梳理
+更新时间: 2026-06-04
+
+一、范围与定位
+
+本文面向后续修改角色卡的开发者，聚焦两部分：
+
+1. 酒馆资料/隐藏楼层脚本.txt
+2. src/事件脚本 下的 ERA 事件系统
+
+目标不是解释酒馆通用概念，而是说明这套脚本在当前仓库里的职责、数据流、事件流、写变量边界，以及后续改动最容易踩的坑。
+
+
+二、隐藏楼层脚本：它只是“伪同层显示”
+
+文件: 酒馆资料/隐藏楼层脚本.txt
+
+行为非常简单：
+
+1. 脚本加载时执行：
+   - `$('#chat > .mes').not('.last_mes').remove()`
+   - 直接把当前页面 DOM 中除最新楼层外的所有楼层节点删除。
+2. 监听 `tavern_events.CHAT_CHANGED`：
+   - 聊天切换后调用 `reloadIframe()`，让脚本随聊天重载。
+
+它的作用：
+
+1. 视觉上只保留最新楼层。
+2. 营造“单楼层 / 同层游玩”的感觉。
+3. 配合前端卡或显示正则，让用户以为界面始终只在当前一层活动。
+
+它明确不做的事：
+
+1. 不删除聊天记录本身。
+2. 不修改消息 `is_hidden`。
+3. 不压缩最新消息正文。
+4. 不减少 ERA 变量块。
+5. 不阻止酒馆、Prompt Template、ERA 在后台继续处理完整消息。
+
+因此它是 UI 层伪装，不是性能优化核心。后续如果遇到“编辑确认很慢”“消息越来越大”，不要把主要精力放在这个脚本上。
+
+
+三、src/事件脚本 模块分工
+
+目录：
+
+1. `index.ts`
+   - 入口文件。
+   - 只负责加载 `era-main.js`。
+
+2. `era-main.js`
+   - 主控模块。
+   - 负责初始化、缓存事件定义、注册监听器、调度 `checkEvents()`、处理地点触发、处理后续事件线索计数器。
+   - 它决定“什么时候检查事件”。
+
+3. `era-event-loader.js`
+   - 事件定义加载模块。
+   - 从当前角色关联的世界书读取事件条目。
+   - 负责识别条目名、`JSON.parse(entry.content)`、构建 `eventDefinitions`。
+
+4. `era-event-checker.js`
+   - 纯判断模块。
+   - 负责“现在是否到触发时间”“现在是否超过结束时间”。
+   - 内含短期事件弹性触发逻辑。
+
+5. `era-event-operations.js`
+   - 状态迁移与变量写入模块。
+   - 负责初始化事件列表、批量开始事件、批量完成登场事件、玩家参与事件、批量结束事件、生成后续事件线索。
+   - 它决定“事件状态怎么改、变量怎么写”。
+
+6. `era-write-helper.js`
+   - 写入抽象层。
+   - 把事件脚本的写变量操作分成两种：
+     - `writeDirect*`：直接改 chat 变量表。
+     - `writeEra*`：通过 `era:*` API 走 ERA 标签写入链。
+   - 同时做重复写入签名去重。
+
+7. `era-utils.js`
+   - 通用工具与调试开关。
+   - 包括日志、时间比较、日期偏移、事件名辅助函数。
+
+
+四、事件定义从哪里来
+
+当前实现不是扫描全部世界书，而是扫描“当前角色绑定的世界书”：
+
+1. `getCharWorldbookNames('current')`
+   - 取主世界书和附加世界书。
+2. `getWorldbook(name)`
+   - 逐本读取条目。
+3. 条目名匹配规则：
+   - 精确前缀：`事件条目-`、`成长条目-`
+   - 或匹配正则：`/事件条目-/`、`/登场事件-/`、`/成长条目-/`
+4. 命中后 `JSON.parse(entry.content)`，形成 `eventDefinitions[eventName] = eventData`
+
+这意味着：
+
+1. 事件定义本质上是“世界书条目里的 JSON 配置”。
+2. 当前事件脚本默认只在初始化和 `CHAT_CHANGED` 时重读。
+3. 它没有监听 `WORLDINFO_UPDATED`、`WORLDINFO_ENTRIES_LOADED` 等事件，所以世界书热更新后，内存里的 `eventDefinitions` 可能仍是旧的。
+
+
+五、事件系统维护的数据结构
+
+当前脚本主要读写 `chat` 变量域中的 `stat_data`，关键路径如下：
+
+1. `stat_data.世界信息.时间`
+   - 当前时间，触发/结束判断的基准。
+
+2. `stat_data.事件系统`
+   - `未发生事件`
+   - `进行中事件`
+   - `已完成事件`
+
+3. `stat_data.user数据.所在位置`
+   - 玩家位置，用于地点触发与附近传闻。
+
+4. `stat_data.参与事件`
+   - 玩家已参与的事件。
+
+5. `stat_data.附近传闻`
+   - 按地点层级生成的“附近事件提示”。
+
+6. `stat_data.后续事件线索`
+   - 事件结束后生成的后续线索文本。
+
+7. `stat_data.后续事件线索计数`
+   - 每次 `MESSAGE_SENT` 递减，用于自动过期。
+
+8. `stat_data.角色数据`
+   - 事件结算时对 NPC / 角色数据做 insert/update/delete 差分。
+
+
+六、初始化与加载链路
+
+主入口在 `era-main.js` 的 `initialize()`：
+
+1. 先读 `getVariables({ type: 'chat' })`
+2. 检查 `stat_data` 是否存在
+3. 检查 `stat_data.世界信息.时间` 是否存在
+4. 调用 `loadEventDefinitionsFromWorldbook()`
+5. 调用 `initializeEventList(eventDefinitions)`
+6. 初始化完成后立刻跑一次 `checkEvents(eventDefinitions, 'initialize')`
+
+如果首次初始化失败：
+
+1. 脚本会等待 `waitGlobalInitialized('GameInitialized')`
+2. 当前仓库里这个信号由 `src/武侠/utils/gameInitializer.ts` 在创建开局后 `initializeGlobal('GameInitialized', ...)` 发出
+3. 此外，如果后续收到 `era:writeDone` 且系统尚未初始化，也会再次尝试 `initialize()`
+
+结论：
+
+1. 事件系统依赖 `stat_data` 成型后再启动。
+2. 它和“武侠开局完成”之间有显式耦合。
+3. 如果后续角色卡改了初始化时机，记得保住 `stat_data` 和 `GameInitialized` 这两条唤醒路径。
+
+
+七、事件检查 / 触发 / 结算链路
+
+1. 初始化阶段：`initializeEventList(eventDefinitions)`
+
+它会把世界书中的事件按当前时间分成四类：
+
+1. 未开始事件
+   - 写入 `stat_data.事件系统.未发生事件`
+2. 已到触发时间的普通事件
+   - 直接写入 `进行中事件`
+3. 已到触发时间的登场事件
+   - 直接完成，不进 `进行中`
+4. 已经过期的事件
+   - 直接完成并应用差分
+
+这是“补账”逻辑。作用是聊天切入时快速把事件状态追到当前时间，而不是从头一条条推进。
+
+2. 常规检查阶段：`checkEvents(eventDefinitions, reason)`
+
+执行顺序：
+
+1. 读取 chat 变量。
+2. 扫描 `未发生事件`：
+   - 到触发时间的普通事件 -> `batchStartEvents`
+   - 到触发时间的登场事件 -> `batchCompleteDebutEvents`
+3. 重新读取变量，拿到最新 `进行中事件` 和 `参与事件`
+4. 扫描 `进行中事件`：
+   - 已到结束时间 -> `batchEndEvents`
+5. 调用 `checkPlayerLocationTriggers()`
+   - 生成附近传闻
+   - 玩家到达精确事件地点时触发 `playerJoinsEvent`
+
+3. 后续事件线索计数器：`processFollowupCounters()`
+
+触发时机：`MESSAGE_SENT`
+
+逻辑：
+
+1. 读取 `后续事件线索计数`
+2. 所有计数减 1
+3. 仍大于 0 的用 update 写回
+4. 降到 0 的从 `后续事件线索` 和 `后续事件线索计数` 一起删掉
+
+
+八、当前监听的酒馆 / ERA 事件
+
+事件脚本实际监听的是：
+
+1. `tavern_events.CHAT_CHANGED`
+   - 重新初始化整个事件系统。
+
+2. `tavern_events.MESSAGE_SENT`
+   - 先处理后续事件线索计数器。
+   - 再调度一次 `checkEvents('message-sent')`。
+
+3. `era:writeDone`
+   - 用来感知 ERA 或直接写变量后的状态变化。
+   - 但会跳过若干特殊情况，防止无意义回环：
+     - 初始化期间跳过
+     - `resync` 且无 apply/rollback/apiWrite 时跳过
+     - `directChatWrite` 时跳过
+     - `apiWrite === true` 时跳过
+
+4. `GameInitialized`
+   - 不是 `eventOn` 注册，而是 `waitGlobalInitialized('GameInitialized')`
+   - 用于在前端完成开局后补启动事件系统。
+
+没有监听但后续开发可能会想加的：
+
+1. `WORLDINFO_UPDATED`
+2. `WORLDINFO_ENTRIES_LOADED`
+3. `MESSAGE_RECEIVED`
+4. `MESSAGE_UPDATED`
+
+当前不监听这些事件，意味着系统更保守，但也意味着世界书变化和某些消息态变化不会自动刷新事件定义。
+
+
+九、writeDirect* 与 writeEra* 的边界
+
+这是当前事件系统最重要的边界。
+
+1. `writeDirect*`：直接改 chat 变量表
+
+实现方式：
+
+1. `getVariables({ type: 'chat' })`
+2. `updateVariablesWith(...)`
+3. 直接修改 `variables.stat_data`
+4. 手动 `eventEmit('era:writeDone', { actions: { directChatWrite: true, ... } })`
+
+特点：
+
+1. 不往消息正文追加 `<VariableInsert/Edit/Delete>`。
+2. 不增加最新 AI 消息体积。
+3. 不依赖 ERA 去解析消息中的变量标签。
+4. 适合脚本自维护字段：
+   - `附近传闻`
+   - `后续事件线索`
+   - `后续事件线索计数`
+   - `事件系统` 状态位
+
+代价：
+
+1. 绕过了 ERA“变量块写入消息 -> 解析 -> 回放”的自然链路。
+2. 必须自己保证写入语义和 ERA 一致。
+3. 必须自己补发 `era:writeDone`，否则外层监听不到。
+
+2. `writeEra*`：通过 ERA API 走标签写入链
+
+实现方式：
+
+1. `eventEmit('era:insertByObject' / 'era:updateByObject' / 'era:deleteByObject', payload)`
+2. ERA 框架把 payload 转成 `<VariableInsert>` / `<VariableEdit>` / `<VariableDelete>`
+3. 这些标签被追加到“最后一条 AI 消息”末尾
+4. ERA 再解析标签、回写状态、广播真实 `era:writeDone`
+
+特点：
+
+1. 与 ERA 自身工作流保持一致。
+2. 适合“人物变量差分”这类希望纳入 ERA 历史与回滚语义的写入。
+3. 当前事件系统主要用它处理：
+   - 角色数据差分
+   - 玩家参与事件
+
+代价：
+
+1. 会继续膨胀最后一条 AI 消息正文。
+2. 会增加 `VariableInsert/Edit/Delete` 数量。
+3. 会放大编辑确认、Prompt Template、ERA patcher 的处理成本。
+
+3. 当前脚本的实际分工
+
+倾向如下：
+
+1. 事件系统状态字段、提示字段：
+   - 优先 `writeDirect*`
+2. 角色数据 / 需要沿用 ERA 语义的差分：
+   - 仍走 `writeEra*`
+
+这套分层本身是合理的。后续不要把所有字段一股脑改成 `writeEra*`，否则消息体积会继续恶化。
+
+
+十、为什么主监听会跳过某些 writeDone
+
+`era-main.js` 对 `era:writeDone` 做了三道保护：
+
+1. 纯 `resync` 跳过
+   - 避免 ERA 历史重同步时反复全量扫事件。
+
+2. `directChatWrite` 跳过
+   - 避免事件脚本自己写了 `事件系统/附近传闻/后续事件线索` 后，立刻因为自己这次写回再跑一次 `checkEvents`。
+
+3. `apiWrite === true` 跳过
+   - 避免通过 `writeEra*` 写入的变量标签，又把事件系统自己重新触发一遍。
+
+这说明当前事件系统已经显式处理“自触发回环”问题。后续加新写入链时，也要带上可识别的动作标记。
+
+
+十一、调试开关与日志行为
+
+配置在 `era-utils.js`：
+
+1. `CONFIG.DEBUG_MODE = false`
+2. `CONFIG.TIME_DEBUG_MODE = false`
+
+动态开关：
+
+1. `localStorage.era_event_debug = '1'`
+   - 开启普通 debug 日志
+2. `localStorage.era_event_time_debug = '1'`
+   - 开启时间比较日志
+
+日志分层：
+
+1. `log` / `logSuccess`
+   - 仅 debug 打开时输出
+2. `logTime`
+   - 仅 time debug 打开时输出
+3. `logWarning`
+   - 默认就会输出
+4. `logError`
+   - 默认就会输出
+
+这意味着：
+
+1. 当前默认已经比旧版本安静得多。
+2. 但 warning / error / toastr 仍会在异常或重要状态下出现。
+3. 如果后续要压性能，先检查是不是有人开了 `localStorage.era_event_debug`。
+
+
+十二、性能风险
+
+1. 世界书扫描仍是线性成本
+
+`loadEventDefinitionsFromWorldbook()` 会逐本世界书、逐条 entry 扫描并尝试命名匹配与 JSON 解析。聊天切换频繁、世界书条目多时，这部分仍会吃时间。
+
+2. `checkEvents()` 仍是全量检查
+
+虽然已经有：
+
+1. `scheduleCheckEvents()` 100ms 合并请求
+2. `isCheckingEvents` 单飞
+
+但每次真正执行时，仍会：
+
+1. 扫全部 `未发生事件`
+2. 扫全部 `进行中事件`
+3. 重新读变量
+4. 再跑地点检查
+
+所以事件数一大，成本仍会线性上升。
+
+3. `getVariables({ type: 'chat' })` 调用很多
+
+当前实现里，初始化、检查、结束、参与、生成后续、计数器处理都频繁整表读取 chat 变量。变量表越大，频繁全量读的成本越高。
+
+4. 仍有 ERA 标签写入链
+
+`writeEra*` 最终还是往最后一条 AI 消息塞变量标签。只要角色数据差分大量发生，消息正文还是会继续变大。
+
+5. `CHAT_CHANGED` 总是全量重建状态
+
+当前聊天切换时直接 `initialize()`，没有对事件定义做版本缓存，也没有按世界书版本增量刷新。
+
+
+十三、一致性风险
+
+1. `参与事件` 的 key 体系不一致
+
+这是当前最明显的逻辑风险。
+
+写入时：
+
+1. `playerJoinsEvent()` 使用 `shortName`
+2. 写入到 `stat_data.参与事件[shortName]`
+
+读取时却有两处按 `eventName` 判断：
+
+1. `checkPlayerLocationTriggers()` 中：
+   - `const alreadyJoined = eventName in 最新参与事件`
+2. `batchEndEvents()` 中：
+   - `const playerParticipated = eventName in 参与事件`
+
+如果 `eventName` 是完整条目名、而 `参与事件` 里存的是简化名，那么：
+
+1. “已参与”判断会失真。
+2. 附近传闻可能重复显示。
+3. 结算时可能把玩家参与事件当成“未参与”结算。
+
+这是后续优先要修的一处一致性问题。
+
+2. 事件定义缓存不会随世界书更新自动失效
+
+世界书条目改了，但没切聊天、没手动重载时，`eventDefinitions` 可能还是旧的。
+
+3. `compareTime` 的日期模型是固定 365/30 近似
+
+当前年月日换算是：
+
+1. 年 = 365 天
+2. 月 = 30 天
+
+这足够做游戏内事件顺序判断，但不是自然历法。不要拿它做精确日历推导。
+
+4. `playerJoinsEvent()` 对事件时间做“平移”
+
+玩家提前到达事件地点时，会把开始/结束时间按天数差整体平移。这个语义是业务设定，不是通用规则。以后如果事件有“到场后锁定时长”“只改开始不改结束”等需求，这里要重写。
+
+5. `writeDirect*` 与 ERA 内部状态的兼容性
+
+直接写变量不会在消息正文留下变量块，也不会天然进入 ERA 的历史链。适合轻量状态，但不适合需要依赖 ERA 历史回放/回滚语义的核心剧情数据。
+
+
+十四、后续开发建议
+
+1. 先统一 key 体系
+   - `事件系统`
+   - `参与事件`
+   - `附近传闻`
+   - `后续事件`
+   最好明确“完整事件名”和“短名”分别用在哪些字段上。
+
+2. 给事件定义加缓存失效条件
+   - 至少考虑 `WORLDINFO_UPDATED`
+   - 或在角色/世界书变动时主动刷新
+
+3. 继续减少 `writeEra*` 使用面
+   - 能用 `writeDirect*` 维护的脚本状态，尽量不要回流到最后一条 AI 消息
+
+4. 为 `checkEvents()` 增加更细的触发条件
+   - 例如仅在时间、位置、事件系统相关字段变化时触发
+
+5. 明确哪些字段必须纳入 ERA 语义
+   - 人物变量、需要历史回滚的字段可以保留 `writeEra*`
+   - UI 辅助态、事件提示态尽量 direct write
+
+
+十五、结论
+
+当前仓库里的“酒馆脚本与事件系统”可以分成两层理解：
+
+1. 隐藏楼层脚本
+   - 只是伪同层显示层。
+   - 只管删 DOM，不解决消息膨胀，不解决变量块累积。
+
+2. `src/事件脚本`
+   - 是真正的事件状态机。
+   - 通过世界书定义事件，通过 chat 变量维护状态，通过 direct write 和 ERA write 两条链落库。
+
+目前这套事件脚本已经做过一轮止血：
+
+1. 纯 `resync` 不再触发事件检查
+2. `checkEvents` 有防抖和单飞
+3. debug 默认关闭
+4. 一部分事件状态写回已改为 direct write
+
+但它仍然有两类核心风险：
+
+1. 性能风险：
+   - 世界书全量扫描
+   - 事件全量检查
+   - 角色差分继续走 ERA 标签写入
+
+2. 一致性风险：
+   - `参与事件` key 体系不统一
+   - 事件定义缓存不自动失效
+
+后续改角色卡时，优先关注：
+
+1. `stat_data` 初始化时机
+2. `GameInitialized` 唤醒链
+3. `writeDirect*` / `writeEra*` 的边界
+4. 事件 key 的统一规则
+
+这四点比“再加一条监听器”更影响稳定性。
