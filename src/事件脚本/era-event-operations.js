@@ -60,14 +60,12 @@ export async function initializeEventList(eventDefinitions) {
     }
 
     const currentTime = variables.stat_data.世界信息.时间;
-    const currentChapter = getCurrentEventChapter(variables.stat_data);
     const 未发生事件 = variables?.stat_data?.事件系统?.未发生事件 || {};
     const 进行中事件 = variables?.stat_data?.事件系统?.进行中事件 || {};
     const 已完成事件 = variables?.stat_data?.事件系统?.已完成事件 || {};
 
     let timeString = formatDate(currentTime);
     log('当前时间:', timeString);
-    log('当前回目:', currentChapter || '未设置');
     log('当前未发生事件:', Object.keys(未发生事件));
     log('当前进行中事件:', Object.keys(进行中事件));
     log('当前已完成事件:', Object.keys(已完成事件));
@@ -98,24 +96,6 @@ export async function initializeEventList(eventDefinitions) {
       const triggerTime = eventData.触发条件;
       const endTime = getEndTime(eventData);
       const isDebut = isDebutEvent(eventName);
-      const eventChapter = getEventChapter(eventName, eventData);
-
-      if (currentChapter && eventChapter && eventChapter < currentChapter) {
-        if (isDebut) {
-          应立即完成的登场事件.push(eventName);
-          log(`🎭 ${eventName}: 早于当前回目，作为历史登场事件完成`);
-        } else {
-          已过期事件.push(eventName);
-          log(`📚 ${eventName}: 早于当前回目，作为历史事件完成`);
-        }
-        continue;
-      }
-
-      if (currentChapter && eventChapter && eventChapter > currentChapter) {
-        未开始事件.push(eventName);
-        log(`⏰ ${eventName}: 属于未来回目（第${eventChapter}回），暂不触发`);
-        continue;
-      }
 
       // 检查是否已超过结束时间
       if (endTime && isTimeAfterEventEnd(currentTime, endTime)) {
@@ -228,9 +208,6 @@ async function processDebutEventsCompletion(eventNames, eventDefinitions) {
 
   const 登场事件完成对象 = {};
 
-  const latestVarsForDebut = await getVariables({ type: 'chat' });
-  const statDataForDebut = latestVarsForDebut.stat_data;
-
   for (const eventName of eventNames) {
     const eventData = eventDefinitions[eventName];
 
@@ -265,10 +242,6 @@ async function processDebutEventsCompletion(eventNames, eventDefinitions) {
 
   log('🚀 发送 era:insertByObject 指令（登场事件移至已完成）');
   await writeDirectInsert(debutCompletedPayload, 'debut-events-completed');
-  const chapterProgressPayload = getChapterProgressPatch(eventNames, eventDefinitions, statDataForDebut);
-  if (chapterProgressPayload) {
-    await writeDirectUpdate(chapterProgressPayload, 'debut-events-chapter-progress');
-  }
   logSuccess(`✅ 已完成 ${eventNames.length} 个登场事件`);
 
   debugGroupEnd();
@@ -292,11 +265,20 @@ async function processExpiredEventsCompletion(eventNames, eventDefinitions) {
   for (const eventName of eventNames) {
     const eventData = eventDefinitions[eventName];
 
-    // ✅ 修改：区分 insert 和 update/delete 的处理逻辑
     for (const actionKey of ['insert', 'update', 'delete']) {
       const delta = eventData[actionKey] || {};
       for (const charName in delta) {
-        addCharacterDelta(合并后的差分, actionKey, charName, delta[charName], statData);
+        // update 和 delete 需要角色已存在，insert 无需检查
+        if (actionKey !== 'insert' && (!statData.角色数据 || !statData.角色数据[charName])) {
+          logWarning(`角色 ${charName} 不存在，跳过 ${actionKey}`);
+          continue;
+        }
+
+        if (!合并后的差分[actionKey][charName]) {
+          合并后的差分[actionKey][charName] = {};
+        }
+        Object.assign(合并后的差分[actionKey][charName], delta[charName]);
+        log(`[${actionKey.toUpperCase()}] 准备${actionKey === 'delete' ? '删除' : '修改'}角色: ${charName}`);
       }
     }
 
@@ -314,10 +296,6 @@ async function processExpiredEventsCompletion(eventNames, eventDefinitions) {
 
   log('🚀 发送 era:insertByObject 指令（移至已完成）');
   await writeDirectInsert(completedPayload, 'expired-events-completed');
-  const chapterProgressPayload = getChapterProgressPatch(eventNames, eventDefinitions, statData);
-  if (chapterProgressPayload) {
-    await writeDirectUpdate(chapterProgressPayload, 'expired-events-chapter-progress');
-  }
   logSuccess(`✅ 已完成 ${eventNames.length} 个过期事件`);
 
   debugGroupEnd();
@@ -411,9 +389,6 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
   debugGroup(`🎭 批量完成登场事件 (${eventNames.length}个)`);
 
   try {
-    const currentVars = await getVariables({ type: 'chat' });
-    const statData = currentVars.stat_data;
-
     // 收集所有需要应用的 insert 差分
     const 登场事件差分 = {
       insert: {},
@@ -465,11 +440,6 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
     log('🚀 发送 era:insertByObject 指令 (登场事件移至已完成):', completedPayload);
     await writeDirectInsert(completedPayload, 'batch-debut-completed');
     log('✅ 登场事件已移至已完成');
-
-    const chapterProgressPayload = getChapterProgressPatch(eventNames, eventDefinitions, statData);
-    if (chapterProgressPayload) {
-      await writeDirectUpdate(chapterProgressPayload, 'batch-debut-chapter-progress');
-    }
 
     // 3. 批量从"未发生"中删除
     const deletePayload = {
@@ -607,7 +577,17 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
         }
 
         for (const charName in delta) {
-          addCharacterDelta(合并后的差分, actionKey, charName, delta[charName], statData);
+          // update 和 delete 需要角色已存在，insert 无需检查
+          if (actionKey !== 'insert' && (!statData.角色数据 || !statData.角色数据[charName])) {
+            logWarning(`角色 ${charName} 不存在，跳过 ${actionKey}`);
+            continue;
+          }
+
+          if (!合并后的差分[actionKey][charName]) {
+            合并后的差分[actionKey][charName] = {};
+          }
+          Object.assign(合并后的差分[actionKey][charName], delta[charName]);
+          log(`[${actionKey.toUpperCase()}] 准备${actionKey === 'delete' ? '删除' : '修改'}角色: ${charName}`);
         }
       }
 
@@ -634,11 +614,6 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     log('🚀 2. 发送 era:insertByObject 指令 (批量移至已完成):', completedPayload);
     await writeDirectInsert(completedPayload, 'batch-end-completed');
     log('✅ 步骤2完成: 批量移至已完成');
-
-    const chapterProgressPayload = getChapterProgressPatch(eventNames, eventDefinitions, statData);
-    if (chapterProgressPayload) {
-      await writeDirectUpdate(chapterProgressPayload, 'batch-end-chapter-progress');
-    }
 
     // 3. 批量从"进行中"删除
     const deleteInProgressPayload = {
