@@ -10,6 +10,8 @@ import {
   logSuccess,
   logWarning,
   getEndTime,
+  getEventChapter,
+  getCurrentEventChapter,
   getEventShortName,
   isDebutEvent,
   calculateDateOffset,
@@ -25,10 +27,131 @@ import { isTimeForEvent, isTimeAfterEventEnd } from './era-event-checker.js';
 import {
   writeDirectInsert,
   writeDirectDelete,
+  writeDirectUpdate,
   writeEraCommand,
   writeEraInsert,
   writeEraDelete,
 } from './era-write-helper.js';
+
+function isPlainObject(value) {
+  return Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function cloneJson(value) {
+  if (value === undefined) return undefined;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return value;
+  }
+}
+
+function mergeDeep(target, source) {
+  if (!isPlainObject(source)) {
+    return target;
+  }
+
+  for (const key of Object.keys(source)) {
+    const sourceValue = source[key];
+    if (isPlainObject(target[key]) && isPlainObject(sourceValue)) {
+      mergeDeep(target[key], sourceValue);
+    } else {
+      target[key] = cloneJson(sourceValue);
+    }
+  }
+
+  return target;
+}
+
+function ensureObjectPath(root, key) {
+  if (!isPlainObject(root[key])) {
+    root[key] = {};
+  }
+  return root[key];
+}
+
+function splitPatchByExistingPath(current, patch) {
+  if (!isPlainObject(patch)) {
+    return {
+      insert: current === undefined ? cloneJson(patch) : undefined,
+      update: current === undefined || Object.is(current, patch) ? undefined : cloneJson(patch),
+    };
+  }
+
+  const insert = {};
+  const update = {};
+  const currentObject = isPlainObject(current) ? current : undefined;
+
+  for (const key of Object.keys(patch)) {
+    const childCurrent = currentObject?.[key];
+    const childPatch = patch[key];
+
+    if (childCurrent === undefined) {
+      insert[key] = cloneJson(childPatch);
+      continue;
+    }
+
+    if (isPlainObject(childCurrent) && isPlainObject(childPatch)) {
+      const childSplit = splitPatchByExistingPath(childCurrent, childPatch);
+      if (childSplit.insert !== undefined && isPlainObject(childSplit.insert) && Object.keys(childSplit.insert).length > 0) {
+        insert[key] = childSplit.insert;
+      }
+      if (childSplit.update !== undefined && isPlainObject(childSplit.update) && Object.keys(childSplit.update).length > 0) {
+        update[key] = childSplit.update;
+      }
+      continue;
+    }
+
+    if (JSON.stringify(childCurrent) !== JSON.stringify(childPatch)) {
+      update[key] = cloneJson(childPatch);
+    }
+  }
+
+  return {
+    insert: Object.keys(insert).length > 0 ? insert : undefined,
+    update: Object.keys(update).length > 0 ? update : undefined,
+  };
+}
+
+function addCharacterDelta(mergedDiff, actionKey, charName, charDelta, statData) {
+  if (actionKey === 'insert') {
+    mergeDeep(ensureObjectPath(mergedDiff.insert, charName), charDelta);
+    log(`[INSERT] 准备新增/补充角色字段: ${charName}`);
+    return;
+  }
+
+  if (!statData.角色数据 || !statData.角色数据[charName]) {
+    logWarning(`角色 ${charName} 不存在，跳过 ${actionKey}`);
+    return;
+  }
+
+  if (actionKey === 'update') {
+    const split = splitPatchByExistingPath(statData.角色数据[charName], charDelta);
+    if (split.insert !== undefined) {
+      mergeDeep(ensureObjectPath(mergedDiff.insert, charName), split.insert);
+    }
+    if (split.update !== undefined) {
+      mergeDeep(ensureObjectPath(mergedDiff.update, charName), split.update);
+    }
+    return;
+  }
+
+  mergeDeep(ensureObjectPath(mergedDiff.delete, charName), charDelta);
+}
+
+function getChapterProgressPatch(eventNames, eventDefinitions, statData) {
+  const currentChapter = getCurrentEventChapter(statData) || 0;
+  let nextChapter = currentChapter;
+
+  for (const eventName of eventNames) {
+    const chapter = getEventChapter(eventName, eventDefinitions[eventName]);
+    if (chapter && chapter > nextChapter) {
+      nextChapter = chapter;
+    }
+  }
+
+  return nextChapter > currentChapter ? { 事件系统: { 当前回目: nextChapter } } : null;
+}
 
 // ==================== 批量初始化未发生事件列表（智能优化版）====================
 export async function initializeEventList(eventDefinitions) {
@@ -60,12 +183,14 @@ export async function initializeEventList(eventDefinitions) {
     }
 
     const currentTime = variables.stat_data.世界信息.时间;
+    const currentChapter = getCurrentEventChapter(variables.stat_data);
     const 未发生事件 = variables?.stat_data?.事件系统?.未发生事件 || {};
     const 进行中事件 = variables?.stat_data?.事件系统?.进行中事件 || {};
     const 已完成事件 = variables?.stat_data?.事件系统?.已完成事件 || {};
 
     let timeString = formatDate(currentTime);
     log('当前时间:', timeString);
+    log('当前回目:', currentChapter || '未设置');
     log('当前未发生事件:', Object.keys(未发生事件));
     log('当前进行中事件:', Object.keys(进行中事件));
     log('当前已完成事件:', Object.keys(已完成事件));
@@ -96,6 +221,24 @@ export async function initializeEventList(eventDefinitions) {
       const triggerTime = eventData.触发条件;
       const endTime = getEndTime(eventData);
       const isDebut = isDebutEvent(eventName);
+      const eventChapter = getEventChapter(eventName, eventData);
+
+      if (currentChapter && eventChapter && eventChapter < currentChapter) {
+        if (isDebut) {
+          应立即完成的登场事件.push(eventName);
+          log(`🎭 ${eventName}: 早于当前回目，作为历史登场事件完成`);
+        } else {
+          已过期事件.push(eventName);
+          log(`📚 ${eventName}: 早于当前回目，作为历史事件完成`);
+        }
+        continue;
+      }
+
+      if (currentChapter && eventChapter && eventChapter > currentChapter) {
+        未开始事件.push(eventName);
+        log(`⏰ ${eventName}: 属于未来回目（第${eventChapter}回），暂不触发`);
+        continue;
+      }
 
       // 检查是否已超过结束时间
       if (endTime && isTimeAfterEventEnd(currentTime, endTime)) {
@@ -245,6 +388,10 @@ async function processDebutEventsCompletion(eventNames, eventDefinitions) {
 
   log('🚀 发送 era:insertByObject 指令（登场事件移至已完成）');
   await writeDirectInsert(debutCompletedPayload, 'debut-events-completed');
+  const chapterProgressPayload = getChapterProgressPatch(eventNames, eventDefinitions, statDataForDebut);
+  if (chapterProgressPayload) {
+    await writeDirectUpdate(chapterProgressPayload, 'debut-events-chapter-progress');
+  }
   logSuccess(`✅ 已完成 ${eventNames.length} 个登场事件`);
 
   debugGroupEnd();
@@ -272,26 +419,7 @@ async function processExpiredEventsCompletion(eventNames, eventDefinitions) {
     for (const actionKey of ['insert', 'update', 'delete']) {
       const delta = eventData[actionKey] || {};
       for (const charName in delta) {
-        // ✅ insert 操作：允许新增角色，不检查是否存在
-        if (actionKey === 'insert') {
-          if (!合并后的差分.insert[charName]) {
-            合并后的差分.insert[charName] = {};
-          }
-          Object.assign(合并后的差分.insert[charName], delta[charName]);
-          log(`[INSERT] 准备新增角色: ${charName}`);
-        }
-        // ✅ update/delete 操作：必须角色已存在
-        else {
-          if (!statData.角色数据 || !statData.角色数据[charName]) {
-            logWarning(`角色 ${charName} 不存在，跳过 ${actionKey}`);
-            continue;
-          }
-
-          if (!合并后的差分[actionKey][charName]) {
-            合并后的差分[actionKey][charName] = {};
-          }
-          Object.assign(合并后的差分[actionKey][charName], delta[charName]);
-        }
+        addCharacterDelta(合并后的差分, actionKey, charName, delta[charName], statData);
       }
     }
 
@@ -309,6 +437,10 @@ async function processExpiredEventsCompletion(eventNames, eventDefinitions) {
 
   log('🚀 发送 era:insertByObject 指令（移至已完成）');
   await writeDirectInsert(completedPayload, 'expired-events-completed');
+  const chapterProgressPayload = getChapterProgressPatch(eventNames, eventDefinitions, statData);
+  if (chapterProgressPayload) {
+    await writeDirectUpdate(chapterProgressPayload, 'expired-events-chapter-progress');
+  }
   logSuccess(`✅ 已完成 ${eventNames.length} 个过期事件`);
 
   debugGroupEnd();
@@ -457,6 +589,11 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
     await writeDirectInsert(completedPayload, 'batch-debut-completed');
     log('✅ 登场事件已移至已完成');
 
+    const chapterProgressPayload = getChapterProgressPatch(eventNames, eventDefinitions, statData);
+    if (chapterProgressPayload) {
+      await writeDirectUpdate(chapterProgressPayload, 'batch-debut-chapter-progress');
+    }
+
     // 3. 批量从"未发生"中删除
     const deletePayload = {
       事件系统: {
@@ -593,26 +730,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
         }
 
         for (const charName in delta) {
-          // ✅ insert 操作：允许新增角色，不检查是否存在
-          if (actionKey === 'insert') {
-            if (!合并后的差分.insert[charName]) {
-              合并后的差分.insert[charName] = {};
-            }
-            Object.assign(合并后的差分.insert[charName], delta[charName]);
-            log(`[INSERT] 准备新增角色: ${charName}`);
-          }
-          // ✅ update/delete 操作：必须角色已存在
-          else {
-            if (!statData.角色数据 || !statData.角色数据[charName]) {
-              logWarning(`角色 ${charName} 不存在，跳过 ${actionKey}`);
-              continue;
-            }
-
-            if (!合并后的差分[actionKey][charName]) {
-              合并后的差分[actionKey][charName] = {};
-            }
-            Object.assign(合并后的差分[actionKey][charName], delta[charName]);
-          }
+          addCharacterDelta(合并后的差分, actionKey, charName, delta[charName], statData);
         }
       }
 
@@ -639,6 +757,11 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     log('🚀 2. 发送 era:insertByObject 指令 (批量移至已完成):', completedPayload);
     await writeDirectInsert(completedPayload, 'batch-end-completed');
     log('✅ 步骤2完成: 批量移至已完成');
+
+    const chapterProgressPayload = getChapterProgressPatch(eventNames, eventDefinitions, statData);
+    if (chapterProgressPayload) {
+      await writeDirectUpdate(chapterProgressPayload, 'batch-end-chapter-progress');
+    }
 
     // 3. 批量从"进行中"删除
     const deleteInProgressPayload = {
