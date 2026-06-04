@@ -1,0 +1,274 @@
+武侠前端架构梳理
+更新时间: 2026-06-04
+
+一、构建与加载方式
+
+`src/武侠` 是标准的“前端界面”目录，入口由 `index.html + index.tsx` 组成，不是纯脚本。
+
+实际构建是单 HTML 方案：
+- `webpack.config.ts` 对带 `index.html` 的入口使用 `HtmlWebpackPlugin`
+- 再叠加 `HtmlInlineScriptWebpackPlugin` 和 `HTMLInlineCSSWebpackPlugin`
+- 同时启用 `LimitChunkCountPlugin({ maxChunks: 1 })`
+- 结果是脚本和样式都倾向于内联进 `dist/武侠/index.html`
+
+这意味着：
+- 运行时首包较重，但加载方式简单
+- `React.lazy()` 或动态 `import()` 的拆包收益很有限
+- 修改构建策略时，不能默认把“代码分片”当成有效优化手段
+
+`src/武侠/index.html` 本身只保留一个静态 `#root`，真正的 UI 全靠 TSX 挂载。
+
+二、React 入口与卸载
+
+`src/武侠/index.tsx` 的职责很单纯：
+- 用 `$(...)` 等待酒馆助手环境就绪
+- `ReactDOM.createRoot(document.getElementById('root'))`
+- `root.render(<App />)`
+- 页面离开时通过 `pagehide` 卸载 `root`
+- 挂载后立即执行 `ensureLoaderRegexSafety()`
+
+这里的关键点是：
+- 没有依赖 `DOMContentLoaded`
+- 依赖的是酒馆环境里的 iframe 加载时机
+- 卸载使用 `pagehide`，避免残留 React 树
+
+三、页面与状态流
+
+页面流程由 `usePageFlow` 管：
+- `start` -> `splash` -> `setup` -> `game`
+
+`App.tsx` 负责把流程串起来，主数据流大致是：
+
+`getAllVariables()` -> `variableReader.getGameVariables()` -> `readGameDataPure()` -> `GameState` -> `useGameState` -> `App` 渲染
+
+若已有存档，初始化时会走：
+1. `hasSavedGame()` 判断是否存在有效楼层与 `user数据`
+2. `readGameDataPure()` 纯读一次变量，直接映射进 `GameState`
+3. `scheduleGameDataCompletion('startup-existing-save', { fullScan: true })` 异步补全缺失属性/功法
+4. `getLastMessageContent()` 读取最后一条有效 assistant 正文
+5. `parseOptions()` 提取 `<option>` 选项
+6. 切到游戏页
+
+新开局则走：
+1. `NewGameSetup` 收集表单
+2. `createOpeningStoryMessage(formData)`
+3. `generateVariableData()` 生成整份 `era:insertByObject` 数据
+4. 写入后等待 `era:writeDone`
+5. `initializeGlobal('GameInitialized', ...)`
+
+四、状态读取与补全链路
+
+`src/武侠/utils/variableReader.ts` 是最核心的读写枢纽，职责不是单纯“读变量”，而是“读 + 补全 + 映射 + 过滤”。
+
+读链路分两层：
+- `readGameDataPure()`：只读 `stat_data`，不触发写回
+- `readGameData()`：全量扫描并自动补全，再返回映射后的状态
+
+补全链路主要有三条：
+- `autoUpdatePlayerAttributes()`：补玩家属性
+- `autoUpdateCharacterAttributes()`：补 NPC 属性
+- `autoUpdateMartialArts()`：补功法模板与解锁特性
+
+调度方式也分两类：
+- `scheduleGameDataCompletion(...)`：后台异步补全，带 debounce
+- `scheduleGameDataCompletionFromMvuUpdate(...)`：根据 MVU diff 做 scoped completion，只处理变化区
+
+因此当前数据流不是“每次都全库重算”，而是尽量走：
+
+`MVU 变更 -> scope 判断 -> 局部补全 -> era:writeDone -> 纯读刷新`
+
+`flushPendingGameDataCompletion()` 会在发送前等待未完成补全结束，避免把脏数据直接送进下一轮 `generate()`。
+
+五、事件监听与刷新
+
+`useEventListeners` 同时监听三类事件：
+- `tavern_events.MESSAGE_RECEIVED`
+- `tavern_events.CHAT_CHANGED`
+- `era:writeDone`
+
+此外，如果 `Mvu` 已就绪，还会挂 `VARIABLE_UPDATE_ENDED`，把变量更新 diff 转成局部补全请求。
+
+刷新策略是：
+- 消息更新时先排一个短延迟刷新
+- `era:writeDone` 后再做一次纯读刷新
+- 如果 MVU 监听还没准备好，就退回到“消息到来后触发 full scan 兜底”
+
+这套设计的目标是减少“每次消息都全量补全”的同步阻塞。
+
+六、发送流程
+
+用户发消息时的链路在 `useMessageHandler`：
+
+`ChatInput` -> `handleSendMessage()` -> `createChatMessages(user)` -> `flushPendingGameDataCompletion()` -> `generate({ should_stream: true })` -> `createChatMessages(assistant)` -> `setCurrentMaintext()` / `setCurrentOptions()`
+
+这里有几个细节：
+- 先写用户楼层，再生成
+- 生成前先 flush 补全，避免读到未完成的变量
+- 生成结果直接保留为完整正文，不做截断
+- 选项只从 `parseOptions()` 提取
+
+`GameContent` 负责显示这份结果：
+- 如果正文里有 HTML 标签，就按段落拼成 `dangerouslySetInnerHTML`
+- 没有 HTML 时就按换行拆段
+- `<option>` 会变成可点击按钮，点击后继续走 `handleSendMessage(option)`
+
+`ChatInput` 只是输入层：
+- 输入框自动撑高
+- Enter 发送，Shift+Enter 换行
+- 按发送键后清空输入并重置高度
+
+七、ERA 变量块剥离
+
+这部分对编辑确认和正文解析都很关键。
+
+`src/武侠/utils/variableReader.ts` 里有：
+- `stripEraVariableBlocks()`
+- `stripFrontendLoaderArtifacts()`
+- `normalizeDisplayedMessageContent()`
+- `getLastMessageContent()`
+
+它们的作用是把真正展示层和“写变量指令壳”分开：
+- 剥掉 `<VariableThink>`
+- 剥掉 `<VariableInsert>`
+- 剥掉 `<VariableEdit>`
+- 剥掉 `<VariableDelete>`
+- 也剥掉 loader 脚本和 `body` 标签壳
+
+这意味着：
+- UI 显示的是正文，不是 ERA 指令
+- `parseOptions()` 也是在清洗后的正文上找 `<option>`
+- `getLastMessageContent()` 会从后往前跳过仅含 `$('body').load(...)` 的 assistant 楼层
+
+如果这里改坏了，最直接的后果就是：
+- 选项解析失效
+- loader 壳被当正文
+- 编辑确认/干跑时看起来像“正文变短了”或“正文丢了”
+
+八、loader guard
+
+`src/武侠/utils/loaderRegexGuard.ts` 是一个非常具体的保护层。
+
+它会在这些范围里扫描酒馆正则：
+- 当前角色正则
+- 全局正则
+- 当前预设正则
+
+如果发现：
+- 正则已启用
+- `run_on_edit === true`
+- 替换内容里带有 `localhost:5500/dist/武侠/index.html`
+- 或带有 `$('body').load(...)`
+
+就会自动把 `run_on_edit` 关掉，避免编辑确认链路把“前端加载壳”卷进真实消息更新。
+
+这一步很重要，因为它直接关系到：
+- 编辑确认时楼层污染
+- 最新 assistant 楼层是否还保留可解析正文
+- 后续 `getLastMessageContent()` 能不能从后往前找到真正内容
+
+九、主要组件分层
+
+组件层已经比较清晰，分成四层：
+
+1. 页面壳
+- `StartScreen`
+- `SplashScreen`
+- `NewGameSetup`
+- `StatusToast`
+- `Modal`
+
+2. 主界面
+- `GameContent`
+- `ChatInput`
+- `FullscreenButton`
+- 顶部状态栏和左侧导航由 `App.tsx` 直接拼装
+
+3. 面板层
+- `CharacterPanel`
+- `MartialArtsPanel`
+- `InventoryPanel`
+- `EventsPanel`
+- `SocialPanel`
+- `MapPanel`
+- `EmptyState`
+
+4. 地图辅助层
+- `MapCanvas`
+- `MapSidebar`
+- `LocationPopover`
+
+`components/panels/index.ts` 统一导出面板，`App.tsx` 根据 `activePanel` 选择具体内容。
+
+十、主要工具模块
+
+几个最值得记住的工具模块：
+
+- `variableReader.ts`
+  - 变量读取、消息正文解析、选项解析、ERA 块剥离、补全调度
+
+- `settingsManager.ts`
+  - 显示设置本地存储
+  - `ERA_BASE_REGEX_RULE` 默认剥离 `<era_data>` 和 `Variable*` 块
+  - 正则缓存，减少重复编译
+  - `applySettingsToDOM()` 把字体、背景、模糊度写成 CSS 变量
+
+- `gameInitializer.ts`
+  - 开局变量生成
+  - `generateVariableData()`
+  - `generateOpeningMessage()`
+  - `createOpeningStoryMessage()`
+
+- `summaryManager.ts`
+  - 自动总结人物经历
+  - 根据条目数阈值触发
+  - 用 `generate()` 生成总结，再 `era:updateByObject` 写回
+
+- `loaderRegexGuard.ts`
+  - 保护编辑确认链路
+
+- `logger.ts`
+  - 分类日志，默认关闭，避免酒馆 iframe 启动时刷屏
+
+十一、当前性能优化点
+
+现在已经做过的优化，后续改动时应尽量保留：
+
+- `readGameDataPure()` 只读不写，避免每次渲染都触发补全
+- `scheduleGameDataCompletion()` 有 debounce，不是每次事件都立即补全
+- `scheduleGameDataCompletionFromMvuUpdate()` 支持局部 scope，而不是无条件 full scan
+- `getLastMessageContent()` 会跳过 loader 壳，避免把无效 assistant 楼层当正文
+- `settingsManager` 的正则有缓存，减少重复 `new RegExp()`
+- `GameContent`、`App` 里对正文和选项有 `useMemo`
+- `useSummaryDetection` 只有开启自动总结才真正执行检测逻辑
+- `logger.ts` 默认关闭调试日志，减少 console 压力
+
+十二、修改风险
+
+这里的改动风险比普通 React 页面高，原因是它不仅是 UI，还直接连着酒馆变量、正则、事件和生成链路。
+
+高风险点：
+- 不要轻易改 `LimitChunkCountPlugin({ maxChunks: 1 })` 的前提下再指望 lazy 分包显著减首包
+- 不要破坏 `stripEraVariableBlocks()` 和 `getLastMessageContent()`，否则正文和变量壳会互相污染
+- 不要改坏 loader 正则的识别规则，否则编辑确认链路可能被 `$('body').load(...)` 污染
+- 不要忽略 `era:writeDone`，否则补全和刷新会错序
+- 不要随意改 `user数据/角色数据/$template` 结构，前端读取、开局生成、自动总结都依赖这套字段
+- 不要只改一个面板的 props，不同步核对 `App.tsx` 的调用点
+
+中风险点：
+- `MapPanel` / `MapSidebar` / `MapCanvas` 的接口关系比较紧，改地图相关数据结构时最容易串
+- 自动总结会额外引入 `generate()` 和 `era:updateByObject`，打开后会显著增加写回压力
+- `App.tsx` 同时做页面流程、状态编排、设置应用、正文处理，改动时容易引入重复刷新
+
+十三、结论
+
+`src/武侠` 不是单纯的展示页，而是一条完整的“酒馆变量读写 + 事件监听 + AI 生成 + 正文展示”链路。
+
+它的核心特点是：
+- 单 HTML 内联构建
+- React 作为 UI 外壳
+- `stat_data` 是真实游戏状态入口
+- 补全写回和正文展示是分离的
+- loader guard 和 ERA 剥离是这套前端能否稳定工作的关键
+
+后续做角色卡修改时，最稳妥的顺序通常是：
+先看变量结构，再看 `variableReader`，再看 `App` 和 `useMessageHandler`，最后才动面板和样式。

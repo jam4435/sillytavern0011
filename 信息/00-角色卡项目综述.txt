@@ -1,0 +1,378 @@
+墨剑录角色卡项目综述
+更新时间: 2026-06-04
+
+一、这份综述怎么用
+
+本目录下这组文档是给后续继续修改“墨剑录/武侠”角色卡用的项目地图：
+
+- 01-酒馆结构与伪同层链路.txt
+- 02-酒馆正则与UI加载入口.txt
+- 03-酒馆脚本与事件系统.txt
+- 04-武侠事件世界书抽样.txt
+- 05-武侠前端架构.txt
+
+如果只想快速理解整体，先读本文。需要动某一块时，再读对应专项文档。
+
+二、最小心智模型
+
+这张卡不是一个普通网页，也不是真正脱离聊天楼层的单页游戏。
+
+它的实际结构是：
+
+1. 酒馆真实保存聊天楼层。
+2. “游戏页面”显示正则把最新楼层显示替换成 loader。
+3. loader 用 `$('body').load('http://localhost:5500/dist/武侠/index.html')` 拉起 React 前端。
+4. 隐藏楼层脚本只删旧楼层 DOM，让视觉上只剩最后一楼。
+5. 真正游戏状态在 `stat_data`，由 MVU/ERA 变量框架折叠得到。
+6. ERA 通过给最后一条 AI 消息追加 `<VariableInsert/Edit/Delete>` 块来表达状态变更。
+7. `src/事件脚本` 是独立后台事件状态机，会按时间、地点、世界书事件继续改变量。
+8. `src/武侠` React 前端主要负责读变量、展示 UI、发送消息、做必要的数据补全。
+
+一句话概括：
+
+酒馆消息是存档和承载体；显示正则是 UI 入口；隐藏楼层脚本只是视觉收缩；`stat_data` 是真实游戏状态；ERA 是变量写入通道；事件脚本是后台状态机；React 前端是交互外壳。
+
+三、各子系统职责
+
+1. 酒馆楼层与伪同层链路
+
+详见 `信息/01-酒馆结构与伪同层链路.txt`。
+
+关键点：
+
+- 聊天数据仍然是完整楼层，不会因为 DOM 只剩 `.last_mes` 而消失。
+- 最新 assistant 消息可能同时承担剧情正文、loader 壳、ERA 变量补丁三种职责。
+- `getAllVariables()` 在消息 iframe 和脚本 iframe 中的合并范围不同，移动代码位置时必须重测。
+- `CHAT_CHANGED`、编辑确认、`setChatMessages(..., { refresh: 'all' })` 都可能触发重建链路。
+
+后续改动边界：
+
+- 改 UI 样式，不应动楼层链路。
+- 改正文读取，要看 `variableReader.ts`。
+- 改挂载方式，要同时看酒馆正则、loader guard、隐藏楼层脚本和 `index.tsx`。
+
+2. 酒馆正则与 UI 加载入口
+
+详见 `信息/02-酒馆正则与UI加载入口.txt`。
+
+当前主要入口：
+
+```html
+<script>
+$('body').load('http://localhost:5500/dist/武侠/index.html')
+</script>
+</body>
+```
+
+关键点：
+
+- “游戏页面”正则是前端显示入口，不是普通文本美化规则。
+- `仅格式显示` 不代表编辑确认时不运行；编辑确认本来就会重建显示链。
+- `run_on_edit` 对 loader 型正则很危险，会把 loader 壳卷入编辑确认链路。
+- `src/武侠/utils/loaderRegexGuard.ts` 会自动把匹配到的 loader 正则 `run_on_edit` 关掉。
+- `variableReader.ts` 会跳过只含 loader 的 assistant 楼层，避免正文回退异常。
+
+后续改动边界：
+
+- 改端口、URL、脚本名、路径时，要同步更新 `loaderRegexGuard.ts` 和 `variableReader.ts` 的识别规则。
+- 入口正则应保持 display 目的，不应进入 prompt。
+- 需要代码改正则时，优先局部 `updateTavernRegexesWith`，避免整表替换触发重载。
+
+3. 酒馆脚本与事件系统
+
+详见 `信息/03-酒馆脚本与事件系统.txt`。
+
+脚本分两类：
+
+- `酒馆资料/隐藏楼层脚本.txt`：只负责删旧楼层 DOM，制造伪同层视觉。
+- `src/事件脚本`：真正的事件系统，负责从世界书读取事件、检查时间地点、推进事件状态、写变量。
+
+`src/事件脚本` 模块分工：
+
+- `era-main.js`：初始化、监听、调度、主检查。
+- `era-event-loader.js`：从角色世界书加载事件 JSON。
+- `era-event-checker.js`：时间触发/结束判断。
+- `era-event-operations.js`：事件状态迁移和差分写入。
+- `era-write-helper.js`：直接 chat 写入与 ERA 标签写入的统一助手。
+- `era-utils.js`：日志、时间、事件名工具。
+
+写入边界：
+
+- `writeDirect*`：直接 `updateVariablesWith(..., { type: 'chat' })`，不膨胀最新消息，适合事件 bookkeeping。
+- `writeEra*`：走 `era:insertByObject/updateByObject/deleteByObject`，会追加变量块，适合需要 ERA 语义的角色差分。
+
+当前重要风险：
+
+- `参与事件` 的 key 体系有不一致风险：部分写入用短名，部分判断用完整事件名。
+- 事件定义只在初始化和 `CHAT_CHANGED` 时重读，不会自动响应世界书热更新。
+- `checkEvents()` 真正执行时仍是全量扫描，事件量大时成本线性增加。
+
+4. 武侠事件世界书
+
+详见 `信息/04-武侠事件世界书抽样.txt`。
+
+抽样结论：
+
+- 世界书目录主要由大量 `射雕事件条目-*.json`、`射雕登场事件-*.json` 和少量规则提示文本组成。
+- 普通剧情条目数量多，但后续维护优先级不如规则文件和关键事件节点。
+- `变量指导.txt`、`输出提示词.txt` 会影响 AI 如何输出变量和理解事件上下文。
+- 事件 JSON 大体匹配事件脚本支持的结构：触发条件、结束时间、地点、引子、差分、后续事件。
+
+当前风险：
+
+- 少量条目存在 `前置事件`，而事件脚本当前主路径偏向时间触发。
+- 个别条目有非标准差分结构，例如在 `update` 下嵌入 insert/delete 语义。
+- 如果要批量改世界书，先做格式抽样和校验，不要直接全量替换。
+
+5. 武侠 React 前端
+
+详见 `信息/05-武侠前端架构.txt`。
+
+核心入口：
+
+- `src/武侠/index.html`：只提供 `#root`。
+- `src/武侠/index.tsx`：按酒馆助手规范用 `$(() => ...)` 挂载 React，并执行 `ensureLoaderRegexSafety()`。
+- `src/武侠/App.tsx`：串页面流程、状态读取、设置、正文、输入、面板。
+
+核心数据流：
+
+```text
+getAllVariables()
+  -> variableReader.getGameVariables()
+  -> readGameDataPure()
+  -> GameState
+  -> App/useGameState
+  -> UI panels
+```
+
+发送流：
+
+```text
+ChatInput
+  -> handleSendMessage()
+  -> createChatMessages(user)
+  -> flushPendingGameDataCompletion()
+  -> generate({ should_stream: true })
+  -> createChatMessages(assistant)
+  -> setCurrentMaintext / parseOptions
+```
+
+关键模块：
+
+- `variableReader.ts`：变量读取、正文清洗、选项解析、功法/属性补全调度。
+- `gameInitializer.ts`：开局变量和开场消息创建。
+- `settingsManager.ts`：显示设置、本地正则、DOM 变量。
+- `summaryManager.ts`：人物经历总结，会额外调用 `generate()` 和 ERA 写回。
+- `loaderRegexGuard.ts`：保护 loader 正则不在编辑确认时污染楼层。
+- `logger.ts`：分类日志，默认关闭。
+
+四、关键生命周期
+
+1. 首次加载 / 继续存档
+
+1) loader 正则拉起 `dist/武侠/index.html`。
+2) `index.tsx` 挂载 `App`。
+3) `hasSavedGame()` 判断是否已有有效 `user数据`。
+4) 有存档则 `readGameDataPure()` 纯读状态。
+5) `scheduleGameDataCompletion(..., { fullScan: true })` 后台补全。
+6) `getLastMessageContent()` 找最近有效 assistant 正文。
+7) `parseOptions()` 提取选项。
+
+2. 新开局
+
+1) `NewGameSetup` 收集角色创建表单。
+2) `createOpeningStoryMessage()` 创建开局 assistant 楼层。
+3) 通过 `eventEmit('era:insertByObject', variableData)` 写入初始变量。
+4) 等待 `era:writeDone`。
+5) 发 `initializeGlobal('GameInitialized', ...)` 唤醒事件脚本。
+6) 前端回读变量进入游戏页。
+
+3. 用户发送消息
+
+1) 前端先创建 user 楼层。
+2) 发送前执行 `flushPendingGameDataCompletion()`，确保功法/属性补全落库。
+3) 调 `generate()` 请求 AI。
+4) 写入 assistant 楼层。
+5) 更新正文和选项。
+6) 后续由 MVU/ERA/事件脚本继续推动变量更新。
+
+4. AI 回复后变量更新
+
+1) MVU 解析 AI 文本中的变量命令。
+2) 触发 `Mvu.events.VARIABLE_UPDATE_ENDED`。
+3) 前端根据 diff 调度局部功法/属性补全。
+4) 补全走 ERA 写入，完成后触发 `era:writeDone`。
+5) 前端只做纯读刷新，不再把 UI 刷新和补全强绑在一起。
+6) 事件脚本按需要调度事件检查。
+
+5. 编辑确认
+
+这是最敏感链路：
+
+1) 酒馆更新消息对象。
+2) 旧楼层显示和 iframe 被销毁。
+3) 酒馆重跑消息格式化、显示正则、Prompt Template、ERA resync 等同步工作。
+4) loader 正则重新执行。
+5) 新 iframe 才重新挂回 DOM。
+
+因此，编辑确认卡顿通常发生在前端回来之前，不应只从 React 首屏找原因。
+
+五、后续修改入口速查
+
+1. 改 UI 视觉和面板
+
+优先看：
+
+- `src/武侠/App.tsx`
+- `src/武侠/components/*`
+- `src/武侠/components/panels/*`
+- `src/武侠/styles/*`
+
+注意：
+
+- 不要顺手改 `variableReader.ts` 的正文清洗。
+- 不要动外层酒馆正则。
+
+2. 改正文展示、选项解析、文本过滤
+
+优先看：
+
+- `src/武侠/utils/variableReader.ts`
+- `src/武侠/components/GameContent.tsx`
+- `src/武侠/utils/settingsManager.ts`
+
+注意：
+
+- `parseOptions()` 必须在剥离 ERA 变量块和 loader 壳之后运行。
+- `getLastMessageContent()` 不能退回到只读 `getChatMessages(-1)`，否则 loader-only 楼层会再次污染正文。
+
+3. 改变量结构和状态面板
+
+优先看：
+
+- `src/武侠/types.ts`
+- `src/武侠/utils/variableReader.ts`
+- `src/武侠/utils/gameInitializer.ts`
+- 对应 panel 组件
+
+注意：
+
+- `stat_data.user数据`、`stat_data.角色数据`、`stat_data.事件系统` 是多方共享结构。
+- 改字段前要同时检查前端、事件脚本、世界书变量指导。
+
+4. 改功法、属性、补全逻辑
+
+优先看：
+
+- `src/武侠/utils/variableReader.ts`
+- `src/武侠/utils/martialArtsDatabase.ts`
+- `src/武侠/utils/attributeCalculator.ts`
+- `src/武侠/data/_合并后功法.json`
+
+注意：
+
+- UI 刷新应继续走 `readGameDataPure()`。
+- 写回应继续由 `scheduleGameDataCompletion()` / `flushPendingGameDataCompletion()` 调度。
+- 发送前一致性依赖 `flushPendingGameDataCompletion('before-generate')`。
+
+5. 改事件系统
+
+优先看：
+
+- `src/事件脚本/era-main.js`
+- `src/事件脚本/era-event-loader.js`
+- `src/事件脚本/era-event-operations.js`
+- `src/事件脚本/era-write-helper.js`
+- `F:\Develop\AI\世界书\世界书\武侠事件`
+
+注意：
+
+- 先统一完整事件名和短名的使用规则。
+- 事件系统 bookkeeping 尽量 direct write。
+- 角色差分再考虑走 ERA 写入。
+- 改世界书加载策略时，要考虑缓存失效和世界书热更新。
+
+6. 改加载方式、端口、构建输出
+
+优先看：
+
+- 酒馆正则“游戏页面”
+- `src/武侠/index.html`
+- `src/武侠/index.tsx`
+- `src/武侠/utils/loaderRegexGuard.ts`
+- `src/武侠/utils/variableReader.ts`
+- `webpack.config.ts`
+
+注意：
+
+- 当前构建是单 HTML 内联方案。
+- `LimitChunkCountPlugin({ maxChunks: 1 })` 使动态拆包收益有限。
+- 改 URL 或端口时，仓内 loader 识别规则必须同步。
+
+六、当前最值得后续关注的问题
+
+1. 事件系统 `参与事件` key 不统一
+
+这是逻辑正确性风险，不只是性能问题。建议单独开任务修：
+
+- 明确 `参与事件` 存完整事件名还是短名。
+- `playerJoinsEvent()`、`checkPlayerLocationTriggers()`、`batchEndEvents()` 统一。
+- 附近传闻和后续事件线索也同步明确 key 规范。
+
+2. 事件世界书缓存不会自动失效
+
+如果世界书条目改动频繁，事件脚本需要监听世界书更新或提供手动重载按钮。
+
+3. 最新 assistant 消息仍是多用途承载体
+
+ERA 写入已经做了批处理和压缩，但模型仍是“变量块追加到最后 AI 消息”。长期游玩后，最新消息体积仍可能继续增长。
+
+4. 前端和事件脚本都有变量写回能力
+
+新增写回逻辑前要先判断：
+
+- 是否需要 ERA 历史语义？
+- 是否只是 UI/事件系统 bookkeeping？
+- 是否会触发 `era:writeDone` 后的额外链路？
+
+5. 外层 TavernRegex 和内层前端正则容易混淆
+
+- 外层正则决定酒馆楼层如何显示，影响编辑确认。
+- 内层 `applyRegexRules()` 只处理 React 中的正文显示。
+
+后续排查“显示不对”时，先确认是哪一层正则在生效。
+
+七、改动前检查清单
+
+做任何较大修改前，建议先回答这几个问题：
+
+1. 这次改动发生在酒馆楼层、显示正则、React 前端、ERA 变量、事件脚本，还是世界书？
+2. 是否会改变 `stat_data` 字段结构？
+3. 是否会让 `era:insertByObject/updateByObject/deleteByObject` 写入次数增加？
+4. 是否会影响 `getLastMessageContent()` 对 loader-only 楼层的跳过？
+5. 是否会影响 `run_on_edit` 防护？
+6. 是否会触发 `CHAT_CHANGED` 或整楼重渲染？
+7. 是否需要同步修改世界书里的变量指导或事件 JSON？
+8. 是否需要在发送前保证变量已补全？
+
+八、推荐阅读顺序
+
+1. 先读本文，建立整体模型。
+2. 要理解为什么叫伪同层，读 `01-酒馆结构与伪同层链路.txt`。
+3. 要改加载入口或处理编辑确认问题，读 `02-酒馆正则与UI加载入口.txt`。
+4. 要改事件、传闻、后续线索、登场剧情，读 `03-酒馆脚本与事件系统.txt` 和 `04-武侠事件世界书抽样.txt`。
+5. 要改 UI、发送、状态面板、功法/属性补全，读 `05-武侠前端架构.txt`。
+
+九、结论
+
+这套角色卡的复杂度不在单个文件，而在多条链路交织：
+
+- 酒馆楼层负责持久化和显示触发。
+- 正则负责把楼层变成前端入口。
+- 隐藏楼层脚本负责伪同层视觉。
+- ERA/MVU 负责状态折叠和变量写入。
+- 世界书负责事件定义和 AI 规则上下文。
+- 事件脚本负责后台事件推进。
+- React 前端负责交互、展示、发送和数据补全。
+
+后续修改时，把“显示入口、真实状态、事件后处理、AI 可见变量、React 展示”分开思考，基本就能避免大部分误改。

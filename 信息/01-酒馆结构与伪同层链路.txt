@@ -1,0 +1,501 @@
+酒馆结构与伪同层卡运行链路
+更新时间: 2026-06-04
+
+一、先说结论
+
+当前“武侠卡”不是一个真正意义上的“同层楼层组件”，而是下面几层东西叠出来的伪同层效果：
+
+1. 聊天记录里最后一条 assistant 消息，仍然是酒馆的真实消息楼层。
+2. 酒馆显示正则把这条消息的显示结果替换成一个 loader 脚本，loader 再把 `dist/武侠/index.html` 拉进消息 iframe。
+3. 后台脚本再把旧楼层 DOM 删除，只保留 `.last_mes`，于是视觉上像“整个游戏一直在同一层里更新”。
+4. 游戏状态并不存进 React 自己的 store，而是落在 MVU/ERA 所在的 `stat_data` 中；前端只是读取并映射它。
+5. 事件脚本不属于前端 UI，它是另一套后台 iframe，在 `era:writeDone`、`MESSAGE_SENT`、`CHAT_CHANGED` 等事件上继续改变量。
+
+因此，当前卡是“消息楼层承载 UI、消息正文承载剧情、最后一条 AI 消息末尾承载 ERA 变量补丁、后台脚本负责再加工”的复合体。后续改角色卡时，必须分清你改的是：
+
+- 显示入口
+- 变量状态
+- 事件后处理
+- 还是仅仅是 DOM 视觉收缩
+
+这四者不是同一层。
+
+二、什么叫“伪同层”，和真正同层有什么差别
+
+项目里真正接近“同层组件”的参考是 `util/streaming.ts` 的 `mountStreamingMessages()`：
+
+- 它的做法是保留原消息楼层。
+- 隐藏原 `.mes_text`。
+- 在同一条 `.mes` 下插入新的挂载节点或 iframe。
+- 依赖 `tavern_events.CHARACTER_MESSAGE_RENDERED`、`MESSAGE_EDITED`、`MESSAGE_DELETED`、`STREAM_TOKEN_RECEIVED` 等事件重渲染。
+
+这属于“楼层 DOM 内再挂一个前端”的方案。
+
+当前武侠卡不是这样。当前实现更接近：
+
+- 先让酒馆把消息显示结果替换成 loader。
+- loader 在消息 iframe 里 `$('body').load('http://localhost:5500/dist/武侠/index.html')`。
+- 再由隐藏楼层脚本把别的 `.mes` 删掉。
+
+所以它不是“消息正文下方挂一个界面”，而是“直接把消息显示面替换成界面壳，再把历史楼层在 DOM 上藏掉”。这也是为什么这里叫“伪同层”。
+
+三、参与层级与职责
+
+1. 聊天数据层：酒馆真正保存的仍是消息楼层
+
+核心接口在 `@types/function/chat_message.d.ts`：
+
+- `getChatMessages(range, options)`
+- `setChatMessages(chat_messages, { refresh })`
+- `createChatMessages(...)`
+- `deleteChatMessages(...)`
+- `rotateChatMessages(...)`
+
+要点：
+
+- 真正持久化的是消息对象本身，而不是 DOM。
+- 消息对象有 `message_id`、`role`、`message`、`is_hidden`、`swipes` 等字段。
+- `setChatMessages(..., { refresh: 'affected' })` 会重新渲染受影响楼层，并发 `USER_MESSAGE_RENDERED` / `CHARACTER_MESSAGE_RENDERED`。
+- `setChatMessages(..., { refresh: 'all' })` 会重载整个聊天，触发 `CHAT_CHANGED`。
+
+这层的数据和 `#chat > .mes` 里的 DOM 不是一回事。DOM 被删掉，不代表消息不存在；消息 `is_hidden` 为 false，也不代表它现在一定可见。
+
+2. 显示正则层：当前 UI 的真实入口
+
+当前武侠卡依赖酒馆显示正则中的“游戏页面”规则，把楼层显示替换成 loader。这个 loader 不在仓库源码里，而是在酒馆正则配置里；实测表现见：
+
+- `信息/卡顿追踪/01-酒馆结构与ERA链路.txt`
+- `src/武侠/信息.txt`
+
+仓库里和它直接相关的保护逻辑是 `src/武侠/utils/loaderRegexGuard.ts` 的 `ensureLoaderRegexSafety()`：
+
+- 通过 `getTavernRegexes(scope)` 扫描 `global`、`character(current)`、`preset(in_use)` 三类正则。
+- 识别“游戏页面”或包含 `$('body').load(...)` / `localhost:5500/dist/武侠/index.html` 的替换规则。
+- 若 `enabled && run_on_edit`，则用 `updateTavernRegexesWith(...)` 把 `run_on_edit` 关掉。
+
+这里有两个非常容易混淆的“正则层”：
+
+- 外层酒馆正则：发生在酒馆消息渲染流程里，能决定楼层最终显示成什么，影响编辑确认和整楼重渲染。
+- 内层武侠 UI 正则：`src/武侠/utils/settingsManager.ts` 的 `applyRegexRules()`，只是前端在 React 里对正文再做一次显示替换，不改酒馆消息原文。
+
+后续如果要改“正则替换”，先判断你改的是哪一层。大多数 UI 文本修饰，应改内层；只在需要改变挂载入口时才碰外层。
+
+3. 隐藏楼层层：只是 DOM 收缩，不是状态裁剪
+
+`酒馆资料/隐藏楼层脚本.txt` 只有两件事：
+
+- 初始化时执行 `$('#chat > .mes').not('.last_mes').remove()`
+- 监听 `tavern_events.CHAT_CHANGED`，调用 `reloadIframe()`
+
+它的本质是后台脚本 iframe 对父页面 DOM 的直接操作。按照仓库规则，脚本里的 jQuery 实际作用在宿主酒馆页面，而不是脚本 iframe 自己的 body。
+
+这层只负责“视觉上只剩最后一层”，不会：
+
+- 删除聊天记录
+- 修改 `is_hidden`
+- 减少最后一条消息正文长度
+- 减少 ERA 变量块数量
+
+所以它能制造“同层感”，但对卡顿、变量累积、消息解析成本基本没有帮助。
+
+4. 消息 iframe 层：前端 UI 真正运行的容器
+
+前端界面和脚本都是 iframe，但职责不同：
+
+- 前端界面：消息楼层中的 iframe，名称形如 `TH-message--楼层号--序号`
+- 后台脚本：脚本库中的 iframe，名称形如 `TH-script--脚本名称--脚本id`
+
+可用接口见 `@types/iframe/util.d.ts`：
+
+- `getIframeName()`
+- `getCurrentMessageId()`
+- `reloadIframe()`
+
+辅助创建逻辑见 `util/script.ts`：
+
+- `createScriptIdIframe()`
+- `createScriptIdDiv()`
+- `teleportStyle()`
+- `reloadOnChatChange()`
+
+当前武侠前端的启动入口是 `src/武侠/index.tsx`：
+
+- `$(() => { ... })` 中找 `#root`
+- `ReactDOM.createRoot(rootElement).render(<App />)`
+- 然后执行 `ensureLoaderRegexSafety()`
+- `pagehide` 时 `root.unmount()`
+
+也就是说，消息 iframe 只负责跑打包后的前端；它自己不持有最终真状态，状态还是从变量层读回来。
+
+5. 变量层：MVU 是状态容器，ERA 是消息补丁写入通道
+
+这一层要拆开看。
+
+（1）MVU 侧
+
+`@types/iframe/exported.mvu.d.ts` 给出的 `MvuData` 结构至少包含：
+
+- `initialized_lorebooks`
+- `stat_data`
+
+以及事件：
+
+- `Mvu.events.VARIABLE_INITIALIZED`
+- `Mvu.events.VARIABLE_UPDATE_STARTED`
+- `Mvu.events.COMMAND_PARSED`
+- `Mvu.events.VARIABLE_UPDATE_ENDED`
+- `Mvu.events.BEFORE_MESSAGE_UPDATE`
+
+当前武侠卡没有直接用 `Mvu.getMvuData()` 作为主读取入口，而是主要：
+
+- 用 `getAllVariables()` 取合并后的变量结果
+- 用 `Mvu.events.VARIABLE_UPDATE_ENDED` 作为“变量刚变过”的触发信号
+
+如果后续要做真正的双向 MVU store，同仓库推荐入口是 `util/mvu.ts` 的 `defineMvuDataStore()`。它会把 `stat_data` 和本地响应式数据双向同步。
+
+（2）通用变量接口侧
+
+核心接口在 `@types/function/variables.d.ts`：
+
+- `getVariables(option)`
+- `replaceVariables(variables, option)`
+- `updateVariablesWith(updater, option)`
+
+作用域很关键：
+
+- `type: 'chat'`：整个聊天变量表
+- `type: 'message'`：某个消息楼层变量
+- `type: 'script'`：脚本自己的变量
+- `type: 'character' | 'global' | 'preset' | 'extension'`：其他专用作用域
+
+更关键的是 `@types/iframe/variables.d.ts` 的 `getAllVariables()`：
+
+- 在消息楼层 iframe 内调用时，返回“全局 -> 角色卡 -> 聊天 -> 0 楼 -> 中间消息楼层 -> 当前消息楼层”的合并结果。
+- 在全局变量 iframe / 脚本 iframe 中调用时，返回“全局 -> 角色卡 -> 脚本 -> 聊天 -> 0 楼 -> 中间消息楼层 -> 最新消息楼层”的合并结果。
+
+这意味着同一段读取代码，如果从“消息 iframe”挪到“后台脚本 iframe”，得到的视图可能不一样。当前武侠卡之所以能用 `getAllVariables()` 读到最新游戏状态，是因为它本来就挂在最新消息楼层里。
+
+（3）ERA 侧
+
+根据 `酒馆资料/era框架.txt` 中的打包实现，ERA API 的核心行为不是直接改一个独立 JSON 文件，而是：
+
+- `era:insertByObject` -> 追加 `<VariableInsert>...</VariableInsert>`
+- `era:updateByObject` -> 追加 `<VariableEdit>...</VariableEdit>`
+- `era:deleteByObject` -> 追加 `<VariableDelete>...</VariableDelete>`
+
+这些补丁块会被追加到“最后一条 AI 消息”的末尾。ERA 内部会做相邻同类块压缩，但写入目标仍然是最后一条 AI 消息本身。
+
+所以：
+
+- MVU/`stat_data` 是“当前状态”
+- ERA `era:*` 是“通过消息正文追加补丁，驱动状态更新的写入通道”
+
+两者不是替代关系，而是当前项目里“状态结果”和“状态变更运输层”的关系。
+
+6. 事件脚本层：对 `stat_data` 的二次业务处理
+
+`src/事件脚本/era-main.js` 负责事件系统主循环：
+
+- `loadEventDefinitionsFromWorldbook()` 从世界书加载事件定义
+- `initializeEventList(eventDefinitions)` 初始化事件池
+- `checkEvents(eventDefinitions, reason)` 做批量事件检查
+- 监听 `CHAT_CHANGED`、`MESSAGE_SENT`、`era:writeDone`
+
+当前保护逻辑有两层：
+
+- `isResyncOnlyWriteDone(detail)`：若只是 `actions.resync === true` 且没有 `apply/rollback/apiWrite`，跳过事件检查
+- `isDirectChatWriteDone(detail)`：若是事件脚本自己用直接变量写回构造的 `directChatWrite`，也跳过事件检查
+
+而 `src/事件脚本/era-write-helper.js` 其实提供了两套写法：
+
+- `writeEraInsert / writeEraUpdate / writeEraDelete`
+  - 本质还是 `eventEmit('era:*')`
+  - 会进入 ERA“追加到最后 AI 消息”的路径
+- `writeDirectInsert / writeDirectUpdate / writeDirectDelete / writeDirectAssign`
+  - 直接 `updateVariablesWith(..., { type: 'chat' })` 改 `stat_data`
+  - 再人工发一个带 `actions.directChatWrite = true` 的 `era:writeDone`
+
+这条边界很重要：如果只是事件系统内部维护自己的状态，优先评估能否走 direct write，而不是无脑走 ERA 补丁追加。
+
+四、当前武侠卡的实际运行链路
+
+1. 楼层显示链
+
+大致顺序是：
+
+1) 酒馆里存在一条最新 assistant 消息。
+2) 酒馆渲染这条消息时，命中“游戏页面”显示正则。
+3) 楼层显示结果被替换成 loader。
+4) loader 在消息 iframe 中 `$('body').load('http://localhost:5500/dist/武侠/index.html')`。
+5) `src/武侠/index.tsx` 挂载 React。
+6) `src/武侠/App.tsx` 读取变量和正文，进入游戏 UI。
+7) 隐藏楼层脚本删掉其它 `.mes`，视觉上只剩当前楼层。
+
+这里要注意：
+
+- loader 正则是外部入口。
+- React 只是在 loader 拉进来的页面里运行。
+- 隐藏楼层脚本发生在宿主 DOM 层，不在 React 内。
+
+2. 新开局链
+
+`src/武侠/App.tsx` 的 `handleSetupSubmit()` 会调用 `src/武侠/utils/gameInitializer.ts` 的 `createOpeningStoryMessage()`：
+
+1) `createChatMessages([{ role: 'assistant', message: openingLine }], { refresh: 'none' })`
+2) `eventEmit('era:insertByObject', variableData)`
+3) `await eventOnce('era:writeDone', ...)`
+4) `initializeGlobal('GameInitialized', { timestamp, formData })`
+
+然后：
+
+- ERA 变量框架把开局变量补丁合并进状态。
+- 事件脚本若先前因 `stat_data` 不完整而未初始化，会等 `GameInitialized` 后再次 `initialize()`。
+- 前端随后用 `readGameDataPure()` 从变量层回读，更新本地界面状态。
+
+这说明“新开局”不是“前端先持有一份 authoritative state 再同步回酒馆”，而是“前端发起一次消息 + ERA 写入，然后再从酒馆变量读回”。
+
+3. 前端读链
+
+武侠前端的主读路径在 `src/武侠/utils/variableReader.ts`：
+
+- `getGameVariables()` -> `getAllVariables()` -> 取 `stat_data`
+- `readGameDataPure()` -> 只映射 UI，不写回
+- `readGameData()` -> 先执行后台补全，再回到 `readGameDataPure()`
+
+当前推荐的刷新入口已经偏向纯读：
+
+- `App.tsx` 启动时优先 `readGameDataPure()`
+- `src/武侠/hooks/useEventListeners.ts` 的 `refreshGameState()` 也只走 `readGameDataPure()`
+
+这是为了把“UI 刷新”与“变量补全写回”拆开，避免前端每次刷新都再次触发 ERA 写入。
+
+4. 前端正文读链
+
+当前主文本不是直接取“最后一条 assistant 消息原文”，而是 `variableReader.ts` 的：
+
+- `getLastMessageContent()`
+- `resolveAssistantMessageRawContent()`
+- `normalizeDisplayedMessageContent()`
+- `isFrontendLoaderOnlyMessage()`
+
+逻辑是：
+
+- 倒序扫描所有 assistant 消息
+- 去掉 ERA 变量块
+- 去掉 loader 壳
+- 如果最新那条只剩 loader，就继续往前回退，找最近一条真正有正文的 assistant 消息
+
+这是当前伪同层实现的关键补丁。因为“最新消息”经常承担 UI 挂载或变量补丁承载职能，真正给玩家看的正文可能要从更早一条 assistant 消息中回退出来。
+
+5. 后台补全链
+
+`src/武侠/utils/variableReader.ts` 里还有三类自动补全：
+
+- `autoUpdatePlayerAttributes()`
+- `autoUpdateCharacterAttributes()`
+- `autoUpdateMartialArts()`
+
+它们会在需要时发：
+
+- `era:insertByObject`
+- `era:updateByObject`
+
+并等待一次 `era:writeDone` 再结束。
+
+新的调度方式是：
+
+- 启动时由 `scheduleGameDataCompletion('startup-existing-save' | 'continue-existing-save' | 'new-game-setup-submit', ...)`
+- MVU 更新后由 `scheduleGameDataCompletionFromMvuUpdate(nextData, previousData)`
+- 最终由 `runCompletionOnce()` 或 `runCompletionLoop()` 串行执行
+
+这一层的本质是“后台数据修复/补全器”，不是前端显示逻辑。
+
+6. 前端刷新事件链
+
+`src/武侠/hooks/useEventListeners.ts` 目前监听：
+
+- `tavern_events.MESSAGE_RECEIVED`
+- `tavern_events.CHAT_CHANGED`
+- `era:writeDone`
+- `Mvu.events.VARIABLE_UPDATE_ENDED`
+
+职责分工是：
+
+- `MESSAGE_RECEIVED` / `CHAT_CHANGED`：
+  - 更新正文和选项
+  - 在 MVU 监听未就绪时，用 `scheduleGameDataCompletion(..., { fullScan: true })` 兜底
+- `Mvu.events.VARIABLE_UPDATE_ENDED`：
+  - 只做“根据变量差异调度补全”
+- `era:writeDone`：
+  - 只调度一次延迟纯读刷新，不直接补全
+
+这说明当前前端已经在努力把“写链”和“读链”分开。后续新增逻辑时最好遵守这个方向。
+
+7. 事件脚本业务链
+
+事件系统的主顺序是：
+
+1) `MESSAGE_SENT` 或某些变量写入完成后触发
+2) `era-main.js` 的 `scheduleCheckEvents(reason)`
+3) `checkEvents()` 读 `getVariables({ type: 'chat' })`
+4) 依据世界书事件定义，决定初始化、触发、结束或推进事件
+5) 通过 `era-event-operations.js` 或 `era-write-helper.js` 再次改变量
+
+所以事件脚本不是前端的附属物，而是独立的“状态后处理器”。改事件系统时，要假设它会在 UI 之外自行多次读写 `stat_data`。
+
+五、生命周期与关键时机
+
+1. 聊天载入 / 切换
+
+- 正则重新参与显示
+- 消息 iframe 重新建立
+- 隐藏楼层脚本在 `CHAT_CHANGED` 后 `reloadIframe()`
+- 武侠前端重新挂载
+- 事件脚本 `era-main.js` 也会在 `CHAT_CHANGED` 上重新 `initialize()`
+
+所以 `CHAT_CHANGED` 是整条链最重的全量重建信号。不要轻易引入会导致 `CHAT_CHANGED` 的操作。
+
+2. 编辑确认
+
+这是当前最敏感的生命周期。
+
+从现有追踪资料看，编辑确认的大致顺序是：
+
+1) 酒馆更新消息对象
+2) 发 `MESSAGE_EDITED`
+3) 清空原楼层显示区域，旧 iframe 消失
+4) 重新走消息格式化、显示正则、Prompt Template / world-info 等
+5) ERA resync / 变量块解析 / 外层事件处理完成后
+6) 新 iframe 才重新插回 DOM
+
+因此，“点确认后 UI 先消失，再过一段时间回来”是结构性现象，不是 React 自己慢。
+
+如果外层 loader 正则还开着 `run_on_edit`，编辑确认时会把 loader 规则卷进这条链，风险更高。`ensureLoaderRegexSafety()` 正是为这个问题存在的。
+
+3. 消息到达
+
+- `MESSAGE_RECEIVED` 驱动正文和选项更新
+- MVU 若改了变量，会再触发 `VARIABLE_UPDATE_ENDED`
+- 补全器可能继续发 `era:*`
+- 收到 `era:writeDone` 后前端再次纯读刷新
+
+这是一条天然存在的多阶段异步链，不应在同一事件里同时做“重读 + 补全 + 再写 + 再重读”的叠加。
+
+4. 页面卸载
+
+仓库规则要求使用 `pagehide`，当前武侠前端也这么做。后续新增监听器、定时器、外部 DOM 挂载时，也应在 `pagehide` 清理。
+
+六、当前结构里的高风险点
+
+1. 最新 assistant 消息是多用途承载体
+
+它同时可能承载：
+
+- 玩家看到的最近剧情正文
+- UI loader 壳
+- ERA `VariableInsert/Edit/Delete` 补丁
+
+改这条消息，不是在改单一文本，而是在改挂载入口、剧情来源和状态补丁载体。
+
+2. 隐藏楼层只是“看不见”，不是“不存在”
+
+任何依赖“DOM 里只有一条 `.mes`”的逻辑都只是视觉假设。真实消息仍在聊天记录里，`getChatMessages()` 仍会全部返回。
+
+3. `getAllVariables()` 受 iframe 上下文影响
+
+同样的代码从消息 iframe 挪到脚本 iframe 后，读取范围会从“当前楼层截止”变成“最新楼层截止”。涉及状态判定时必须重测。
+
+4. 外层酒馆正则会影响编辑和整楼重渲染
+
+尤其是：
+
+- `run_on_edit`
+- `replaceTavernRegexes`
+- `setChatMessages(..., { refresh: 'all' })`
+
+这些都会把“只改 UI”的问题升级成“全聊天重建”的问题。
+
+5. ERA 补丁写入会推高最后一条 AI 消息体积
+
+即使 ERA 内部做了相邻块压缩，目标仍然是最后一条 AI 消息。变量补丁长期累积后，会同步放大：
+
+- 编辑确认成本
+- 正则替换成本
+- 正文提取成本
+- ERA 重新解析成本
+
+6. `eventOnce('era:writeDone')` 只是粗粒度同步
+
+当前前端和部分脚本仍有“发一个 `era:*`，然后 `eventOnce('era:writeDone')` 等待”的模式。并发写多时，它可能等到的是“别人的 writeDone”。事件脚本里的 `stableStringify + signature` 去重只能覆盖 helper 自己，不会自动保护所有调用方。
+
+七、后续修改时的边界建议
+
+1. 想改 UI 外观、交互、面板结构
+
+优先改：
+
+- `src/武侠/App.tsx`
+- `src/武侠/components/*`
+- `src/武侠/styles/*`
+
+不要动：
+
+- ERA 写入模型
+- 事件脚本写回链
+- 外层 loader 正则
+
+2. 想改“正文怎么显示”
+
+先看你改的是哪种“正文”：
+
+- 酒馆消息的真实显示入口：外层 TavernRegex
+- 武侠界面里的正文展示：`getLastMessageContent()` + `applyRegexRules()`
+
+多数情况下应该只改：
+
+- `src/武侠/utils/variableReader.ts`
+- `src/武侠/utils/settingsManager.ts`
+
+3. 想改变量结构、角色卡字段、映射结果
+
+优先改：
+
+- `variableReader.ts` 的映射逻辑
+- 若以后正式走 MVU schema，再引入 `util/mvu.ts`
+
+谨慎改：
+
+- 直接消息正文中的 `<VariableInsert>` / `<VariableEdit>` 格式
+- 事件脚本对 `stat_data` 的读路径
+
+因为这会同时影响前端、ERA、事件系统。
+
+4. 想减少卡顿或减少状态回写副作用
+
+优先检查：
+
+- 是否还在走 `run_on_edit` 的 loader 正则
+- 是否能把 UI 刷新留在 `readGameDataPure()`
+- 是否能把事件脚本改成 `writeDirect*`
+- 是否能合并多次 `era:updateByObject`
+
+不要先从“再加一个前端缓存”入手，因为当前瓶颈大多在前端回来之前。
+
+5. 想把它改成更像“真正同层”
+
+可参考 `util/streaming.ts` 的 `mountStreamingMessages()`，但这是架构迁移，不是小修。它会改变：
+
+- UI 挂载方式
+- 编辑/重渲染接入点
+- 流式支持方式
+- 与隐藏楼层脚本的关系
+
+迁移前要先决定是否仍保留“最新 assistant 消息兼作 ERA 补丁载体”的模型。
+
+八、给后续开发者的最小心智模型
+
+可以把当前系统记成下面这句话：
+
+“酒馆真实保存的是消息；显示正则把最后一条 assistant 消息变成前端入口；隐藏楼层脚本只负责把其它楼层从 DOM 上抹掉；真正游戏状态在 `stat_data`；ERA 通过给最后一条 AI 消息追加变量块来改状态；前端与事件脚本都只是围绕这套状态层做读写和后处理。”
+
+只要记住这句，后续改角色卡时就不容易把“显示问题、状态问题、事件问题、DOM 问题”混在一起。
