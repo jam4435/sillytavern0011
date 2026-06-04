@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/main.scss';
+import { ensureLoaderRegexSafety } from './utils/loaderRegexGuard';
 import { initLogger } from './utils/logger';
 
 // 保存 root 实例以便卸载
@@ -17,6 +18,10 @@ $(() => {
   
   root = ReactDOM.createRoot(rootElement);
   root.render(<App />);
+
+  void ensureLoaderRegexSafety().catch(error => {
+    initLogger.error('修正游戏页面加载正则失败:', error);
+  });
   
   initLogger.log('✅ 墨剑录界面已加载');
 });

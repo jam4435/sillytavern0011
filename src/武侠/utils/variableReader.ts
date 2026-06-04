@@ -303,6 +303,9 @@ export function parseMaintext(messageContent: string): string {
 }
 
 const ERA_VARIABLE_BLOCK_REGEX = /\s*<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>\s*/gi;
+const FRONTEND_LOADER_SCRIPT_REGEX = /<script\b[\s\S]*?<\/script>/gi;
+const FRONTEND_LOADER_BODY_TAG_REGEX = /<\/?body\b[^>]*>/gi;
+const FRONTEND_LOADER_HINT_REGEX = /(localhost|127\.0\.0\.1):5500\/dist\/武侠\/index\.html|\$\(['"]body['"]\)\.load\(/i;
 
 /**
  * 剥离 ERA 变量块，保留真正需要展示/解析的楼层正文。
@@ -315,12 +318,58 @@ export function stripEraVariableBlocks(messageContent: string): string {
     .trim();
 }
 
+function stripFrontendLoaderArtifacts(messageContent: string): string {
+  if (!messageContent) return '';
+  return messageContent
+    .replace(FRONTEND_LOADER_SCRIPT_REGEX, '\n')
+    .replace(FRONTEND_LOADER_BODY_TAG_REGEX, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function normalizeDisplayedMessageContent(messageContent: string): string {
+  return stripFrontendLoaderArtifacts(stripEraVariableBlocks(messageContent));
+}
+
+function resolveAssistantMessageRawContent(message: TavernChatMessage): string {
+  const messageWithSwipes = message as TavernChatMessage & {
+    mes?: string;
+    swipes?: string[];
+    swipe_id?: number;
+  };
+  const swipeIndex = Number(messageWithSwipes.swipe_id ?? 0);
+  return (
+    message.message ||
+    messageWithSwipes.mes ||
+    messageWithSwipes.swipes?.[Number.isFinite(swipeIndex) ? swipeIndex : 0] ||
+    ''
+  );
+}
+
+function isFrontendLoaderOnlyMessage(messageContent: string): boolean {
+  if (!messageContent) {
+    return true;
+  }
+
+  const trimmed = messageContent.trim();
+  if (!trimmed) {
+    return true;
+  }
+
+  if (!FRONTEND_LOADER_HINT_REGEX.test(trimmed)) {
+    return false;
+  }
+
+  const cleaned = normalizeDisplayedMessageContent(trimmed);
+  return cleaned.length === 0;
+}
+
 /**
  * 解析消息中的 option 内容（兼容旧版）
  * @deprecated 建议使用 parseAIResponse，然后从 otherTags 中获取 option
  */
 export function parseOptions(messageContent: string): string[] {
-  const content = stripEraVariableBlocks(messageContent);
+  const content = normalizeDisplayedMessageContent(messageContent);
 
   dataLogger.log('');
   dataLogger.log('🔍 [parseOptions] 开始解析 options');
@@ -2423,8 +2472,11 @@ export function getLastMessageContent(): string {
   dataLogger.log('📨 [getLastMessageContent] 获取最后一条消息');
 
   try {
-    dataLogger.log('   调用 getChatMessages(-1, { role: "assistant" })...');
-    const messages = getChatMessages(-1, { role: 'assistant' }) as TavernChatMessage[];
+    dataLogger.log('   调用 getChatMessages("0-{{lastMessageId}}", { role: "assistant", include_swipes: true })...');
+    const messages = getChatMessages('0-{{lastMessageId}}', {
+      role: 'assistant',
+      include_swipes: true,
+    }) as TavernChatMessage[];
 
     dataLogger.log('   获取到消息数量:', messages.length);
 
@@ -2433,31 +2485,42 @@ export function getLastMessageContent(): string {
       return '';
     }
 
-    const lastMessage = messages[messages.length - 1];
-    const messageWithSwipes = lastMessage as TavernChatMessage & {
-      mes?: string;
-      swipes?: string[];
-      swipe_id?: number;
-    };
-    dataLogger.log('   最后一条消息信息:');
-    dataLogger.log('     - message_id:', lastMessage.message_id);
-    dataLogger.log('     - name:', lastMessage.name);
-    dataLogger.log('     - role:', lastMessage.role);
-    dataLogger.log('     - is_hidden:', lastMessage.is_hidden);
-    dataLogger.log('     - message 长度:', lastMessage.message?.length || 0);
-    dataLogger.log('     - message 前 300 字符:', lastMessage.message?.substring(0, 300) || '(无内容)');
-    dataLogger.log('     - data:', lastMessage.data);
-    dataLogger.log('     - extra:', lastMessage.extra);
+    let fallbackContent = '';
 
-    const swipeIndex = Number(messageWithSwipes.swipe_id ?? 0);
-    const rawResult =
-      lastMessage.message ||
-      messageWithSwipes.mes ||
-      messageWithSwipes.swipes?.[Number.isFinite(swipeIndex) ? swipeIndex : 0] ||
-      '';
-    const result = stripEraVariableBlocks(rawResult);
-    dataLogger.log('✅ [getLastMessageContent] 返回内容长度:', result.length);
-    return result;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      const rawContent = resolveAssistantMessageRawContent(message);
+      const normalizedContent = normalizeDisplayedMessageContent(rawContent);
+
+      dataLogger.log(`   检查 assistant 消息 #${message.message_id}:`, {
+        rawLength: rawContent.length,
+        normalizedLength: normalizedContent.length,
+        loaderOnly: isFrontendLoaderOnlyMessage(rawContent),
+      });
+
+      if (!fallbackContent && normalizedContent) {
+        fallbackContent = normalizedContent;
+      }
+
+      if (!rawContent.trim()) {
+        continue;
+      }
+
+      if (isFrontendLoaderOnlyMessage(rawContent)) {
+        continue;
+      }
+
+      if (!normalizedContent) {
+        continue;
+      }
+
+      dataLogger.log('✅ [getLastMessageContent] 命中有效正文，message_id:', message.message_id);
+      dataLogger.log('✅ [getLastMessageContent] 返回内容长度:', normalizedContent.length);
+      return normalizedContent;
+    }
+
+    dataLogger.warn('⚠️ [getLastMessageContent] 未找到有效正文，返回回退内容');
+    return fallbackContent;
   } catch (error) {
     dataLogger.error('❌ [getLastMessageContent] 获取消息失败:', error);
     return '';
