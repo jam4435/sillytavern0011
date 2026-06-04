@@ -202,14 +202,6 @@ export function getRandomOpeningLine(): string {
   return OPENING_LINES[randomIndex];
 }
 
-function extractChapterNumber(text?: string): number | undefined {
-  if (!text) return undefined;
-  const match = text.match(/第(\d+)[回章节]/);
-  if (!match) return undefined;
-  const chapter = Number(match[1]);
-  return Number.isFinite(chapter) ? chapter : undefined;
-}
-
 export interface NewGameFormData {
   name: string;
   gender: '男' | '女';
@@ -340,20 +332,6 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
   };
 
   const { combat, resources } = calculateAllAttributes(chineseInitialAttrs, realm, martialArtsForCalc);
-  const openingChapter = extractChapterNumber(locationInfo.eventName);
-  const openingEventAnchor = locationInfo.eventName
-    ? {
-        事件名: locationInfo.eventName,
-        ...(openingChapter !== undefined ? { 回目: openingChapter } : {}),
-        时间: {
-          年: locationInfo.year,
-          月: locationInfo.month,
-          日: locationInfo.day,
-          时: 11,
-        },
-        地点: locationInfo.location,
-      }
-    : undefined;
 
   const variableData = {
     世界信息: {
@@ -368,8 +346,6 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     },
     附近传闻: {},
     事件系统: {
-      ...(openingEventAnchor ? { 开局事件: openingEventAnchor } : {}),
-      ...(openingChapter !== undefined ? { 当前回目: openingChapter } : {}),
       未发生事件: {},
       进行中事件: {},
       已完成事件: {},

@@ -10,8 +10,6 @@ import {
   logSuccess,
   logWarning,
   getEndTime,
-  getEventChapter,
-  getCurrentEventChapter,
   getEventShortName,
   isDebutEvent,
   calculateDateOffset,
@@ -27,131 +25,10 @@ import { isTimeForEvent, isTimeAfterEventEnd } from './era-event-checker.js';
 import {
   writeDirectInsert,
   writeDirectDelete,
-  writeDirectUpdate,
   writeEraCommand,
   writeEraInsert,
   writeEraDelete,
 } from './era-write-helper.js';
-
-function isPlainObject(value) {
-  return Object.prototype.toString.call(value) === '[object Object]';
-}
-
-function cloneJson(value) {
-  if (value === undefined) return undefined;
-  try {
-    return JSON.parse(JSON.stringify(value));
-  } catch {
-    return value;
-  }
-}
-
-function mergeDeep(target, source) {
-  if (!isPlainObject(source)) {
-    return target;
-  }
-
-  for (const key of Object.keys(source)) {
-    const sourceValue = source[key];
-    if (isPlainObject(target[key]) && isPlainObject(sourceValue)) {
-      mergeDeep(target[key], sourceValue);
-    } else {
-      target[key] = cloneJson(sourceValue);
-    }
-  }
-
-  return target;
-}
-
-function ensureObjectPath(root, key) {
-  if (!isPlainObject(root[key])) {
-    root[key] = {};
-  }
-  return root[key];
-}
-
-function splitPatchByExistingPath(current, patch) {
-  if (!isPlainObject(patch)) {
-    return {
-      insert: current === undefined ? cloneJson(patch) : undefined,
-      update: current === undefined || Object.is(current, patch) ? undefined : cloneJson(patch),
-    };
-  }
-
-  const insert = {};
-  const update = {};
-  const currentObject = isPlainObject(current) ? current : undefined;
-
-  for (const key of Object.keys(patch)) {
-    const childCurrent = currentObject?.[key];
-    const childPatch = patch[key];
-
-    if (childCurrent === undefined) {
-      insert[key] = cloneJson(childPatch);
-      continue;
-    }
-
-    if (isPlainObject(childCurrent) && isPlainObject(childPatch)) {
-      const childSplit = splitPatchByExistingPath(childCurrent, childPatch);
-      if (childSplit.insert !== undefined && isPlainObject(childSplit.insert) && Object.keys(childSplit.insert).length > 0) {
-        insert[key] = childSplit.insert;
-      }
-      if (childSplit.update !== undefined && isPlainObject(childSplit.update) && Object.keys(childSplit.update).length > 0) {
-        update[key] = childSplit.update;
-      }
-      continue;
-    }
-
-    if (JSON.stringify(childCurrent) !== JSON.stringify(childPatch)) {
-      update[key] = cloneJson(childPatch);
-    }
-  }
-
-  return {
-    insert: Object.keys(insert).length > 0 ? insert : undefined,
-    update: Object.keys(update).length > 0 ? update : undefined,
-  };
-}
-
-function addCharacterDelta(mergedDiff, actionKey, charName, charDelta, statData) {
-  if (actionKey === 'insert') {
-    mergeDeep(ensureObjectPath(mergedDiff.insert, charName), charDelta);
-    log(`[INSERT] 准备新增/补充角色字段: ${charName}`);
-    return;
-  }
-
-  if (!statData.角色数据 || !statData.角色数据[charName]) {
-    logWarning(`角色 ${charName} 不存在，跳过 ${actionKey}`);
-    return;
-  }
-
-  if (actionKey === 'update') {
-    const split = splitPatchByExistingPath(statData.角色数据[charName], charDelta);
-    if (split.insert !== undefined) {
-      mergeDeep(ensureObjectPath(mergedDiff.insert, charName), split.insert);
-    }
-    if (split.update !== undefined) {
-      mergeDeep(ensureObjectPath(mergedDiff.update, charName), split.update);
-    }
-    return;
-  }
-
-  mergeDeep(ensureObjectPath(mergedDiff.delete, charName), charDelta);
-}
-
-function getChapterProgressPatch(eventNames, eventDefinitions, statData) {
-  const currentChapter = getCurrentEventChapter(statData) || 0;
-  let nextChapter = currentChapter;
-
-  for (const eventName of eventNames) {
-    const chapter = getEventChapter(eventName, eventDefinitions[eventName]);
-    if (chapter && chapter > nextChapter) {
-      nextChapter = chapter;
-    }
-  }
-
-  return nextChapter > currentChapter ? { 事件系统: { 当前回目: nextChapter } } : null;
-}
 
 // ==================== 批量初始化未发生事件列表（智能优化版）====================
 export async function initializeEventList(eventDefinitions) {

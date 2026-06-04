@@ -147,44 +147,6 @@ export function isDebutEvent(eventName) {
   return CONFIG.DEBUT_EVENT_PATTERN.test(eventName);
 }
 
-// 从事件名或事件数据中提取“第 N 回/章”的数字。
-export function getEventChapter(eventName, eventData = null) {
-  const chapterText =
-    eventData?.所属回目 ||
-    eventData?.回目 ||
-    eventData?.章节 ||
-    eventData?.chapter ||
-    eventName ||
-    '';
-  const match = String(chapterText).match(/第\s*(\d+)\s*[回章节]/);
-  if (!match) {
-    return null;
-  }
-  const chapter = Number(match[1]);
-  return Number.isFinite(chapter) ? chapter : null;
-}
-
-export function getCurrentEventChapter(statData) {
-  const rawChapter = statData?.事件系统?.当前回目 ?? statData?.事件系统?.开局事件?.回目;
-  const numericChapter = Number(rawChapter);
-  if (Number.isFinite(numericChapter) && numericChapter > 0) {
-    return numericChapter;
-  }
-
-  return getEventChapter(statData?.事件系统?.开局事件?.事件名);
-}
-
-export function isEventChapterAllowed(statData, eventName, eventData = null) {
-  const currentChapter = getCurrentEventChapter(statData);
-  const eventChapter = getEventChapter(eventName, eventData);
-  if (!currentChapter || !eventChapter) {
-    return true;
-  }
-
-  // 允许当前回目与下一回目自然推进，避免高回目因年份乱序在开局时被触发。
-  return eventChapter <= currentChapter + 1;
-}
-
 // 从完整事件文件名中提取核心名称
 export function getEventShortName(eventName) {
   const match = eventName.match(/-([^-]+)\.json$/);
