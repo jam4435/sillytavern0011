@@ -1,0 +1,9 @@
+worldinfo/空白测试/874606-输出提示词:46
+    44| <% } %>
+    45| 
+ >> 46| <%
+    47| // --- 数据准备阶段 ---
+    48| const allCharacters = variables.stat_data.角色数据;
+    49| const playerLocation = allCharacters && allCharacters['你'] ? allCharacters['你'].所在位置 : null;
+
+Cannot read properties of undefined (reading '角色数据')
