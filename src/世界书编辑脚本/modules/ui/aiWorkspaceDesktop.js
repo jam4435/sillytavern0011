@@ -34,6 +34,12 @@ const STEP_LABELS = {
   planning: '计划确认',
   result: '修改结果',
 };
+const STEP_DESCRIPTIONS = {
+  selection: '选择本次允许 AI 修改的条目，并标记只读参考条目。',
+  instruction: '填写修改目标、上下文资料、可编辑字段和提示词。',
+  planning: '检查 AI 规划的可修改/只读范围，必要时调整方案 JSON。',
+  result: '查看每条改动，编辑预览内容，然后应用或回滚。',
+};
 const AI_WORKSPACE_SURFACE = 'rgba(0,0,0,.68)';
 const EMPTY_PREVIEW_TEXT = '尚未生成预览。';
 const EMPTY_PLAN_TEXT = '尚未生成改造方案。';
@@ -130,10 +136,8 @@ function getNavItemLabel(navKey = state.currentNav) {
   return NAV_ITEMS.find(item => item.key === navKey)?.label || 'AI 工作台';
 }
 
-function getModeDescription(modeKey) {
-  return modeKey === 'plan'
-    ? '先生成改造方案，再由你确认后进入修改结果。'
-    : '直接选择条目、设定指令并生成修改结果。';
+function getStepDescription(step) {
+  return STEP_DESCRIPTIONS[step] || '';
 }
 
 function normalizeChatContextCount(value) {
@@ -399,7 +403,7 @@ function syncNavigationState({ collapseMobile = false } = {}) {
   $(`.ai-mode-nav-button[data-ai-nav="${state.currentNav}"]`, parentDoc())
     .addClass('is-active')
     .attr('aria-current', 'page');
-  $('.ai-mobile-nav-current', parentDoc()).text(getNavItemLabel());
+  $('.ai-mobile-nav-current', parentDoc()).text(`当前：${getNavItemLabel()}`);
   if (collapseMobile) {
     setMobileNavExpanded(false);
   }
@@ -1762,7 +1766,7 @@ function buildStepIndicator(modeKey) {
         `;
       }).join('')}
       </div>
-      <div class="ai-step-description">${getModeDescription(modeKey)}</div>
+      <div class="ai-step-description">${getStepDescription(mode.currentStep)}</div>
     </div>
   `;
 }
@@ -1987,10 +1991,13 @@ function buildDesktopShellMarkup() {
           >
             <i class="fa-solid fa-bars"></i>
           </button>
-          <span class="ai-mobile-nav-current">${_.escape(getNavItemLabel())}</span>
         </div>
         <div class="ai-nav-title">AI 工作台</div>
         <div id="ai-workspace-mobile-nav-list" class="ai-nav-list">
+          <div class="ai-mobile-nav-menu-header">
+            <span>AI 工作台</span>
+            <strong class="ai-mobile-nav-current">当前：${_.escape(getNavItemLabel())}</strong>
+          </div>
           ${NAV_ITEMS.map(item => `
             <button
               type="button"
@@ -2037,7 +2044,8 @@ function ensureStyles() {
       #${ROOT_ID} .ai-mobile-nav-bar{display:none}
       #${ROOT_ID} .ai-mobile-nav-toggle{width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--panel-text-color,#eee)}
       #${ROOT_ID} .ai-mobile-nav-toggle:hover{background:rgba(255,255,255,.08)}
-      #${ROOT_ID} .ai-mobile-nav-current{min-width:0;font-size:14px;font-weight:700;color:var(--panel-text-color,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      #${ROOT_ID} .ai-mobile-nav-menu-header{display:none}
+      #${ROOT_ID} .ai-mobile-nav-current{min-width:0;font-size:13px;font-weight:600;color:var(--panel-text-color,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       #${ROOT_ID} .ai-nav-title{font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--panel-text-color,#eee)}
       #${ROOT_ID} .ai-nav-list{display:flex;flex-direction:column;gap:8px}
       #${ROOT_ID} .ai-mode-nav-button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;border:1px solid var(--panel-border-color,#555);border-radius:8px;background:rgba(255,255,255,.02);color:var(--panel-text-color,#eee);padding:12px 14px;cursor:pointer;text-align:left}
@@ -2148,14 +2156,17 @@ function ensureStyles() {
       #${ROOT_ID} .ai-debug-block textarea{border:0;border-top:1px solid var(--panel-border-color,#444);border-radius:0;min-height:180px;background:transparent;font-family:Consolas,Monaco,monospace}
       #${ROOT_ID} .ai-coming-soon{font-size:28px;font-weight:700;letter-spacing:.08em}
       @media (max-width:900px){
-        #${ROOT_ID}.ai-desktop-root{grid-template-columns:1fr;grid-template-rows:auto auto;gap:10px;min-width:0;overflow-y:auto}
-        #${ROOT_ID} .ai-desktop-nav{position:relative;z-index:6;border-radius:8px;padding:6px 8px;gap:0;min-height:36px}
-        #${ROOT_ID} .ai-mobile-nav-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
-        #${ROOT_ID} .ai-mobile-nav-toggle{width:28px;height:28px;font-size:14px}
+        #${ROOT_ID}.ai-desktop-root{position:relative;grid-template-columns:1fr;grid-template-rows:minmax(0,1fr);gap:0;min-width:0;overflow-y:auto}
+        #${ROOT_ID} .ai-desktop-nav{position:absolute;top:8px;right:8px;z-index:6;width:0;height:0;min-height:0;border:0;border-radius:0;background:transparent;padding:0;gap:0;overflow:visible}
+        #${ROOT_ID} .ai-mobile-nav-bar{position:absolute;top:0;right:0;display:block;min-width:0}
+        #${ROOT_ID} .ai-mobile-nav-toggle{width:26px;height:26px;border-radius:999px;font-size:14px}
+        #${ROOT_ID} .ai-mobile-nav-toggle:active,#${ROOT_ID} .ai-mobile-nav-toggle:focus-visible{background:rgba(255,255,255,.1);outline:0}
         #${ROOT_ID} .ai-nav-title{display:none}
-        #${ROOT_ID} .ai-mobile-nav-current{font-size:13px;text-align:right}
-        #${ROOT_ID} .ai-nav-list{position:absolute;top:calc(100% + 6px);right:8px;left:auto;width:min(260px,calc(100vw - 32px));display:none;flex-direction:column;gap:6px;overflow:visible;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:${AI_WORKSPACE_SURFACE};padding:8px;box-shadow:0 10px 24px rgba(0,0,0,.42);z-index:8}
+        #${ROOT_ID} .ai-nav-list{position:absolute;top:32px;right:0;left:auto;width:min(260px,calc(100vw - 32px));display:none;flex-direction:column;gap:6px;overflow:visible;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:${AI_WORKSPACE_SURFACE};padding:8px;box-shadow:0 10px 24px rgba(0,0,0,.42);z-index:8}
         #${ROOT_ID} .ai-nav-list.is-open{display:flex}
+        #${ROOT_ID} .ai-mobile-nav-menu-header{display:flex;flex-direction:column;gap:3px;padding:4px 4px 8px 4px;border-bottom:1px solid rgba(255,255,255,.12);color:var(--panel-text-color,#eee)}
+        #${ROOT_ID} .ai-mobile-nav-menu-header span{font-size:12px;opacity:.72}
+        #${ROOT_ID} .ai-mobile-nav-current{font-size:13px;text-align:left}
         #${ROOT_ID} .ai-mode-nav-button{width:100%;min-width:0;padding:10px 12px;border-radius:6px}
         #${ROOT_ID} .ai-desktop-main{min-height:0;padding:8px;overflow:visible}
         #${ROOT_ID} #ai-workspace-desktop-panel{height:auto;overflow:visible;padding-right:0}
