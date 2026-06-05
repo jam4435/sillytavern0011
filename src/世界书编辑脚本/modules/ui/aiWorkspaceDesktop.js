@@ -34,6 +34,7 @@ const STEP_LABELS = {
   planning: '计划确认',
   result: '修改结果',
 };
+const AI_WORKSPACE_SURFACE = 'rgba(0,0,0,.68)';
 const EMPTY_PREVIEW_TEXT = '尚未生成预览。';
 const EMPTY_PLAN_TEXT = '尚未生成改造方案。';
 
@@ -1746,15 +1747,13 @@ function buildStepIndicator(modeKey) {
       ${steps.map((step, index) => {
         const isActive = step === mode.currentStep;
         const isComplete = index < currentIndex;
-        const isUnlocked = isComplete || isActive;
         return `
           <button
             type="button"
-            class="ai-step-button${isActive ? ' is-active' : ''}${isComplete ? ' is-complete' : ''}${isUnlocked ? ' is-unlocked' : ''}"
+            class="ai-step-button${isActive ? ' is-active' : ''}${isComplete ? ' is-complete' : ''}"
             data-ai-step="${step}"
             aria-label="${STEP_LABELS[step]}"
             ${isActive ? 'aria-current="step"' : ''}
-            ${isUnlocked ? '' : 'disabled'}
           >
             <span class="ai-step-index">${index + 1}</span>
             <span class="ai-step-label">${STEP_LABELS[step]}</span>
@@ -2034,9 +2033,10 @@ function ensureStyles() {
       #${AI_CONTENT_ID}{overflow:hidden!important;padding-right:0;box-sizing:border-box}
       #${AI_CONTENT_ID} .ai-workspace-list-container{overflow:hidden;flex-grow:1}
       #${ROOT_ID}.ai-desktop-root{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;height:100%;min-height:0;color:var(--panel-text-color,#eee)}
-      #${ROOT_ID} .ai-desktop-nav{border:1px solid var(--panel-border-color,#555);border-radius:8px;background:var(--panel-entry-bg-color,#2f2f2f);padding:16px;display:flex;flex-direction:column;gap:12px}
+      #${ROOT_ID} .ai-desktop-nav{border:1px solid rgba(255,255,255,.12);border-radius:8px;background:${AI_WORKSPACE_SURFACE};padding:16px;display:flex;flex-direction:column;gap:12px}
       #${ROOT_ID} .ai-mobile-nav-bar{display:none}
-      #${ROOT_ID} .ai-mobile-nav-toggle{width:38px;height:38px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+      #${ROOT_ID} .ai-mobile-nav-toggle{width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--panel-text-color,#eee)}
+      #${ROOT_ID} .ai-mobile-nav-toggle:hover{background:rgba(255,255,255,.08)}
       #${ROOT_ID} .ai-mobile-nav-current{min-width:0;font-size:14px;font-weight:700;color:var(--panel-text-color,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       #${ROOT_ID} .ai-nav-title{font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--panel-text-color,#eee)}
       #${ROOT_ID} .ai-nav-list{display:flex;flex-direction:column;gap:8px}
@@ -2044,16 +2044,14 @@ function ensureStyles() {
       #${ROOT_ID} .ai-mode-nav-button.is-active{border-color:var(--panel-accent-color,#9a7ace);background:rgba(154,122,206,.18);box-shadow:inset 0 0 0 1px rgba(154,122,206,.18)}
       #${ROOT_ID} .ai-mode-nav-button.is-disabled{opacity:.78}
       #${ROOT_ID} .ai-mode-nav-button small{font-size:12px;opacity:.7}
-      #${ROOT_ID} .ai-desktop-main{min-width:0;overflow:hidden}
+      #${ROOT_ID} .ai-desktop-main{min-width:0;overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:${AI_WORKSPACE_SURFACE};padding:12px}
       #${ROOT_ID} #ai-workspace-desktop-panel{height:100%;overflow-y:auto;padding-right:4px}
       #${ROOT_ID} .ai-page{display:flex;flex-direction:column;gap:14px;min-height:100%}
-      #${ROOT_ID} .ai-workflow-progress{border:1px solid var(--panel-border-color,#555);border-radius:8px;background:var(--panel-bg-color,rgba(42,42,42,.95));padding:12px;display:flex;flex-direction:column;gap:8px}
+      #${ROOT_ID} .ai-workflow-progress{position:sticky;top:0;z-index:4;border:1px solid var(--panel-border-color,#555);border-radius:8px;background:var(--panel-bg-color,rgba(42,42,42,.95));padding:12px;display:flex;flex-direction:column;gap:8px}
       #${ROOT_ID} .ai-stepper{display:flex;align-items:center;gap:8px;min-width:0}
       #${ROOT_ID} .ai-step-button{position:relative;display:inline-flex;align-items:center;gap:8px;border:0;border-radius:0;background:transparent;color:var(--panel-text-color,#cfd8dc);padding:0;cursor:pointer;min-width:0}
       #${ROOT_ID} .ai-step-button:hover{background:transparent}
       #${ROOT_ID} .ai-step-button.is-active{color:var(--panel-text-color,#fff)}
-      #${ROOT_ID} .ai-step-button[disabled]{opacity:.5;cursor:not-allowed}
-      #${ROOT_ID} .ai-step-button[disabled]:hover{background:transparent}
       #${ROOT_ID} .ai-step-index{width:28px;height:28px;flex:0 0 28px;border-radius:999px;border:1px solid var(--panel-border-color,#555);background:var(--panel-entry-bg-color,#242424);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
       #${ROOT_ID} .ai-step-button.is-complete .ai-step-index{border-color:#4a9a7c;background:rgba(74,154,124,.2);color:#dff5e8}
       #${ROOT_ID} .ai-step-button.is-active .ai-step-index{border-color:var(--panel-accent-color,#9a7ace);background:rgba(154,122,206,.28);box-shadow:0 0 0 3px rgba(154,122,206,.16)}
@@ -2151,15 +2149,17 @@ function ensureStyles() {
       #${ROOT_ID} .ai-coming-soon{font-size:28px;font-weight:700;letter-spacing:.08em}
       @media (max-width:900px){
         #${ROOT_ID}.ai-desktop-root{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);gap:10px;min-width:0}
-        #${ROOT_ID} .ai-desktop-nav{position:sticky;top:0;z-index:5;border-radius:8px;padding:8px;gap:8px}
-        #${ROOT_ID} .ai-mobile-nav-bar{display:flex;align-items:center;gap:10px;min-width:0}
+        #${ROOT_ID} .ai-desktop-nav{position:relative;z-index:6;border-radius:8px;padding:6px 8px;gap:0;min-height:36px}
+        #${ROOT_ID} .ai-mobile-nav-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
+        #${ROOT_ID} .ai-mobile-nav-toggle{width:28px;height:28px;font-size:14px}
         #${ROOT_ID} .ai-nav-title{display:none}
-        #${ROOT_ID} .ai-nav-list{display:none;flex-direction:column;gap:6px;overflow:visible}
+        #${ROOT_ID} .ai-mobile-nav-current{font-size:13px;text-align:right}
+        #${ROOT_ID} .ai-nav-list{position:absolute;top:calc(100% + 6px);right:8px;left:auto;width:min(260px,calc(100vw - 32px));display:none;flex-direction:column;gap:6px;overflow:visible;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:${AI_WORKSPACE_SURFACE};padding:8px;box-shadow:0 10px 24px rgba(0,0,0,.42);z-index:8}
         #${ROOT_ID} .ai-nav-list.is-open{display:flex}
         #${ROOT_ID} .ai-mode-nav-button{width:100%;min-width:0;padding:10px 12px;border-radius:6px}
-        #${ROOT_ID} .ai-desktop-main{min-height:0}
+        #${ROOT_ID} .ai-desktop-main{min-height:0;padding:8px}
         #${ROOT_ID} #ai-workspace-desktop-panel{padding-right:0}
-        #${ROOT_ID} .ai-workflow-progress{position:sticky;top:0;z-index:4;padding:10px;gap:8px}
+        #${ROOT_ID} .ai-workflow-progress{top:0;z-index:4;padding:10px;gap:8px}
         #${ROOT_ID} .ai-stepper{gap:6px;width:100%;min-width:0}
         #${ROOT_ID} .ai-step-button{flex:0 0 28px;gap:6px}
         #${ROOT_ID} .ai-step-button.is-active{flex:1 1 auto;min-width:0}
@@ -2411,15 +2411,6 @@ async function loadEntriesForMode(
 function goToStep(modeKey, targetStep) {
   const mode = state.modes[modeKey];
   if (!MODE_STEPS[modeKey].includes(targetStep)) {
-    return;
-  }
-  const currentIndex = MODE_STEPS[modeKey].indexOf(mode.currentStep);
-  const targetIndex = MODE_STEPS[modeKey].indexOf(targetStep);
-  const canAdvance = targetIndex <= currentIndex
-    || (targetStep === 'planning' && Boolean(mode.planningResult))
-    || (targetStep === 'result' && Boolean(mode.previewResult))
-    || targetStep === 'instruction';
-  if (!canAdvance) {
     return;
   }
   mode.currentStep = targetStep;
