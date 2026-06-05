@@ -31,7 +31,7 @@ const MODE_STEPS = {
 const STEP_LABELS = {
   selection: '条目选择',
   instruction: '指令设定',
-  planning: '计划页面',
+  planning: '计划确认',
   result: '修改结果',
 };
 const EMPTY_PREVIEW_TEXT = '尚未生成预览。';
@@ -124,6 +124,16 @@ const root = () => $(`#${ROOT_ID}`, parentDoc());
 const settings = () => getAiWorkspaceSettings();
 const currentModeKey = () => (state.currentNav === 'plan' ? 'plan' : 'direct');
 const currentModeState = () => state.modes[currentModeKey()];
+
+function getNavItemLabel(navKey = state.currentNav) {
+  return NAV_ITEMS.find(item => item.key === navKey)?.label || 'AI 工作台';
+}
+
+function getModeDescription(modeKey) {
+  return modeKey === 'plan'
+    ? '先生成改造方案，再由你确认后进入修改结果。'
+    : '直接选择条目、设定指令并生成修改结果。';
+}
 
 function normalizeChatContextCount(value) {
   const parsed = Number.parseInt(`${value ?? 10}`, 10);
@@ -373,6 +383,24 @@ function setGeneratingState(isGenerating) {
   $('.ai-mode-nav-button', parentDoc()).prop('disabled', state.isGenerating);
   if (!state.isGenerating) {
     state.activeGenerationId = '';
+  }
+}
+
+function setMobileNavExpanded(expanded) {
+  const isExpanded = Boolean(expanded);
+  $('#ai-workspace-mobile-nav-list', parentDoc()).toggleClass('is-open', isExpanded);
+  $('.ai-mobile-nav-toggle', parentDoc()).attr('aria-expanded', isExpanded ? 'true' : 'false');
+}
+
+function syncNavigationState({ collapseMobile = false } = {}) {
+  const $buttons = $('.ai-mode-nav-button', parentDoc());
+  $buttons.removeClass('is-active').removeAttr('aria-current');
+  $(`.ai-mode-nav-button[data-ai-nav="${state.currentNav}"]`, parentDoc())
+    .addClass('is-active')
+    .attr('aria-current', 'page');
+  $('.ai-mobile-nav-current', parentDoc()).text(getNavItemLabel());
+  if (collapseMobile) {
+    setMobileNavExpanded(false);
   }
 }
 
@@ -1648,12 +1676,6 @@ function buildInfoResourcesMarkup() {
 function buildApiSettingsMarkup() {
   return `
     <div class="ai-page">
-      <div class="ai-page-header">
-        <div>
-          <h4>API设置</h4>
-          <p>共享给“直接修改”和“计划修改”的模型与调用配置。</p>
-        </div>
-      </div>
       <div class="ai-panel">
         <div class="ai-toolbar">
           <label><input type="radio" name="ai-workspace-api-mode" value="preset"> 使用当前预设</label>
@@ -1719,7 +1741,8 @@ function buildStepIndicator(modeKey) {
   const steps = MODE_STEPS[modeKey];
   const currentIndex = steps.indexOf(mode.currentStep);
   return `
-    <div class="ai-stepper">
+    <div class="ai-workflow-progress">
+      <div class="ai-stepper" aria-label="AI 修改步骤">
       ${steps.map((step, index) => {
         const isActive = step === mode.currentStep;
         const isComplete = index < currentIndex;
@@ -1727,15 +1750,20 @@ function buildStepIndicator(modeKey) {
         return `
           <button
             type="button"
-            class="ai-step-button${isActive ? ' is-active' : ''}${isComplete ? ' is-complete' : ''}"
+            class="ai-step-button${isActive ? ' is-active' : ''}${isComplete ? ' is-complete' : ''}${isUnlocked ? ' is-unlocked' : ''}"
             data-ai-step="${step}"
+            aria-label="${STEP_LABELS[step]}"
+            ${isActive ? 'aria-current="step"' : ''}
             ${isUnlocked ? '' : 'disabled'}
           >
             <span class="ai-step-index">${index + 1}</span>
-            <span>${STEP_LABELS[step]}</span>
+            <span class="ai-step-label">${STEP_LABELS[step]}</span>
           </button>
+          ${index < steps.length - 1 ? `<span class="ai-step-connector${index < currentIndex ? ' is-complete' : ''}"></span>` : ''}
         `;
       }).join('')}
+      </div>
+      <div class="ai-step-description">${getModeDescription(modeKey)}</div>
     </div>
   `;
 }
@@ -1839,7 +1867,7 @@ function buildInstructionMarkup(modeKey) {
 function buildPlanningMarkup() {
   return `
     <div class="ai-panel">
-      <div class="ai-note">计划页面承载当前“生成改造方案”的结果。确认后将基于该方案生成最终修改预览。</div>
+      <div class="ai-note">计划确认承载当前“生成改造方案”的结果。确认后将基于该方案生成最终修改预览。</div>
       <div id="ai-workspace-plan-summary" class="ai-text">${EMPTY_PLAN_TEXT}</div>
       <div class="ai-debug-grid">
         <details class="ai-debug-block" open>
@@ -1904,10 +1932,6 @@ function buildResultMarkup(modeKey) {
 }
 
 function buildModeWorkspace(modeKey) {
-  const title = modeKey === 'plan' ? '计划修改' : '直接修改';
-  const description = modeKey === 'plan'
-    ? '先生成改造方案，再由你确认后进入修改结果。'
-    : '直接选择条目、设定指令并生成修改结果。';
   const mode = state.modes[modeKey];
   let bodyMarkup = '';
   switch (mode.currentStep) {
@@ -1930,12 +1954,6 @@ function buildModeWorkspace(modeKey) {
 
   return `
     <div class="ai-page">
-      <div class="ai-page-header">
-        <div>
-          <h4>${title}</h4>
-          <p>${description}</p>
-        </div>
-      </div>
       ${buildStepIndicator(modeKey)}
       ${bodyMarkup}
     </div>
@@ -1945,12 +1963,6 @@ function buildModeWorkspace(modeKey) {
 function buildGeneratorMarkup() {
   return `
     <div class="ai-page">
-      <div class="ai-page-header">
-        <div>
-          <h4>世界书生成</h4>
-          <p>本轮只提供占位，不接入具体功能。</p>
-        </div>
-      </div>
       <div class="ai-panel ai-placeholder-panel">
         <div class="ai-coming-soon">敬请期待</div>
         <div class="ai-note">该入口将在后续迭代中接入完整生成工作流。</div>
@@ -1966,13 +1978,26 @@ function buildDesktopShellMarkup() {
   return `
     <div id="${ROOT_ID}" data-layout="desktop" class="ai-desktop-root">
       <aside class="ai-desktop-nav">
+        <div class="ai-mobile-nav-bar">
+          <button
+            type="button"
+            class="ai-mobile-nav-toggle"
+            aria-expanded="false"
+            aria-controls="ai-workspace-mobile-nav-list"
+            aria-label="展开 AI 工作台菜单"
+          >
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <span class="ai-mobile-nav-current">${_.escape(getNavItemLabel())}</span>
+        </div>
         <div class="ai-nav-title">AI 工作台</div>
-        <div class="ai-nav-list">
+        <div id="ai-workspace-mobile-nav-list" class="ai-nav-list">
           ${NAV_ITEMS.map(item => `
             <button
               type="button"
               class="ai-mode-nav-button${state.currentNav === item.key ? ' is-active' : ''}${item.key === 'generate' ? ' is-disabled' : ''}"
               data-ai-nav="${item.key}"
+              ${state.currentNav === item.key ? 'aria-current="page"' : ''}
             >
               <span>${item.label}</span>
               ${item.key === 'generate' ? '<small>敬请期待</small>' : ''}
@@ -2010,6 +2035,9 @@ function ensureStyles() {
       #${AI_CONTENT_ID} .ai-workspace-list-container{overflow:hidden;flex-grow:1}
       #${ROOT_ID}.ai-desktop-root{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;height:100%;min-height:0;color:var(--panel-text-color,#eee)}
       #${ROOT_ID} .ai-desktop-nav{border:1px solid var(--panel-border-color,#555);border-radius:8px;background:var(--panel-entry-bg-color,#2f2f2f);padding:16px;display:flex;flex-direction:column;gap:12px}
+      #${ROOT_ID} .ai-mobile-nav-bar{display:none}
+      #${ROOT_ID} .ai-mobile-nav-toggle{width:38px;height:38px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+      #${ROOT_ID} .ai-mobile-nav-current{min-width:0;font-size:14px;font-weight:700;color:var(--panel-text-color,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       #${ROOT_ID} .ai-nav-title{font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--panel-text-color,#eee)}
       #${ROOT_ID} .ai-nav-list{display:flex;flex-direction:column;gap:8px}
       #${ROOT_ID} .ai-mode-nav-button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;border:1px solid var(--panel-border-color,#555);border-radius:8px;background:rgba(255,255,255,.02);color:var(--panel-text-color,#eee);padding:12px 14px;cursor:pointer;text-align:left}
@@ -2019,14 +2047,20 @@ function ensureStyles() {
       #${ROOT_ID} .ai-desktop-main{min-width:0;overflow:hidden}
       #${ROOT_ID} #ai-workspace-desktop-panel{height:100%;overflow-y:auto;padding-right:4px}
       #${ROOT_ID} .ai-page{display:flex;flex-direction:column;gap:14px;min-height:100%}
-      #${ROOT_ID} .ai-page-header h4{margin:0 0 4px 0;font-size:18px}
-      #${ROOT_ID} .ai-page-header p{margin:0;color:var(--panel-text-color,#cfd8dc);font-size:13px;line-height:1.5}
-      #${ROOT_ID} .ai-stepper{display:flex;gap:10px;flex-wrap:wrap}
-      #${ROOT_ID} .ai-step-button{display:flex;align-items:center;gap:10px;border:1px solid var(--panel-border-color,#555);border-radius:999px;background:rgba(255,255,255,.03);color:var(--panel-text-color,#ddd);padding:10px 14px;cursor:pointer}
-      #${ROOT_ID} .ai-step-button.is-active{background:rgba(154,122,206,.22);border-color:var(--panel-accent-color,#9a7ace);color:var(--panel-text-color,#fff)}
-      #${ROOT_ID} .ai-step-button.is-complete{background:rgba(74,122,112,.18);border-color:#4a9a7c}
+      #${ROOT_ID} .ai-workflow-progress{border:1px solid var(--panel-border-color,#555);border-radius:8px;background:var(--panel-bg-color,rgba(42,42,42,.95));padding:12px;display:flex;flex-direction:column;gap:8px}
+      #${ROOT_ID} .ai-stepper{display:flex;align-items:center;gap:8px;min-width:0}
+      #${ROOT_ID} .ai-step-button{position:relative;display:inline-flex;align-items:center;gap:8px;border:0;border-radius:0;background:transparent;color:var(--panel-text-color,#cfd8dc);padding:0;cursor:pointer;min-width:0}
+      #${ROOT_ID} .ai-step-button:hover{background:transparent}
+      #${ROOT_ID} .ai-step-button.is-active{color:var(--panel-text-color,#fff)}
       #${ROOT_ID} .ai-step-button[disabled]{opacity:.5;cursor:not-allowed}
-      #${ROOT_ID} .ai-step-index{width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+      #${ROOT_ID} .ai-step-button[disabled]:hover{background:transparent}
+      #${ROOT_ID} .ai-step-index{width:28px;height:28px;flex:0 0 28px;border-radius:999px;border:1px solid var(--panel-border-color,#555);background:var(--panel-entry-bg-color,#242424);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+      #${ROOT_ID} .ai-step-button.is-complete .ai-step-index{border-color:#4a9a7c;background:rgba(74,154,124,.2);color:#dff5e8}
+      #${ROOT_ID} .ai-step-button.is-active .ai-step-index{border-color:var(--panel-accent-color,#9a7ace);background:rgba(154,122,206,.28);box-shadow:0 0 0 3px rgba(154,122,206,.16)}
+      #${ROOT_ID} .ai-step-label{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #${ROOT_ID} .ai-step-connector{height:2px;min-width:28px;flex:1 1 28px;background:var(--panel-border-color,#555);opacity:.8}
+      #${ROOT_ID} .ai-step-connector.is-complete{background:#4a9a7c}
+      #${ROOT_ID} .ai-step-description{color:var(--panel-text-color,#cfd8dc);font-size:13px;line-height:1.45}
       #${ROOT_ID} .ai-panel{border:1px solid var(--panel-border-color,#555);border-radius:8px;background:var(--panel-bg-color,rgba(42,42,42,.95));padding:16px;display:flex;flex-direction:column;gap:12px}
       #${ROOT_ID} .ai-row{display:flex;gap:12px;align-items:flex-end}
       #${ROOT_ID} .ai-worldbook-row{align-items:flex-start}
@@ -2116,13 +2150,29 @@ function ensureStyles() {
       #${ROOT_ID} .ai-debug-block textarea{border:0;border-top:1px solid var(--panel-border-color,#444);border-radius:0;min-height:180px;background:transparent;font-family:Consolas,Monaco,monospace}
       #${ROOT_ID} .ai-coming-soon{font-size:28px;font-weight:700;letter-spacing:.08em}
       @media (max-width:900px){
-        #${ROOT_ID}.ai-desktop-root{grid-template-columns:1fr}
-        #${ROOT_ID} .ai-desktop-nav{position:sticky;top:0;z-index:2}
-        #${ROOT_ID} .ai-nav-list{flex-direction:row;overflow-x:auto}
-        #${ROOT_ID} .ai-mode-nav-button{min-width:130px}
+        #${ROOT_ID}.ai-desktop-root{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);gap:10px;min-width:0}
+        #${ROOT_ID} .ai-desktop-nav{position:sticky;top:0;z-index:5;border-radius:8px;padding:8px;gap:8px}
+        #${ROOT_ID} .ai-mobile-nav-bar{display:flex;align-items:center;gap:10px;min-width:0}
+        #${ROOT_ID} .ai-nav-title{display:none}
+        #${ROOT_ID} .ai-nav-list{display:none;flex-direction:column;gap:6px;overflow:visible}
+        #${ROOT_ID} .ai-nav-list.is-open{display:flex}
+        #${ROOT_ID} .ai-mode-nav-button{width:100%;min-width:0;padding:10px 12px;border-radius:6px}
+        #${ROOT_ID} .ai-desktop-main{min-height:0}
+        #${ROOT_ID} #ai-workspace-desktop-panel{padding-right:0}
+        #${ROOT_ID} .ai-workflow-progress{position:sticky;top:0;z-index:4;padding:10px;gap:8px}
+        #${ROOT_ID} .ai-stepper{gap:6px;width:100%;min-width:0}
+        #${ROOT_ID} .ai-step-button{flex:0 0 28px;gap:6px}
+        #${ROOT_ID} .ai-step-button.is-active{flex:1 1 auto;min-width:0}
+        #${ROOT_ID} .ai-step-button:not(.is-active) .ai-step-label{display:none}
+        #${ROOT_ID} .ai-step-label{min-width:0;font-size:12px}
+        #${ROOT_ID} .ai-step-connector{min-width:8px;flex:1 1 8px}
+        #${ROOT_ID} .ai-step-description{font-size:12px}
         #${ROOT_ID} .ai-row{flex-direction:column;align-items:stretch}
         #${ROOT_ID} .ai-field,#${ROOT_ID} .ai-btn-field{min-width:0;width:100%}
+        #${ROOT_ID} .ai-entry-item{flex-direction:column}
+        #${ROOT_ID} .ai-entry-mode{width:100%;flex:0 0 auto}
         #${ROOT_ID} .ai-result-grid{grid-template-columns:1fr}
+        #${ROOT_ID} .ai-preview-detail-header{flex-direction:column}
       }
     </style>
   `);
@@ -2217,8 +2267,7 @@ function renderCurrentPanel() {
   }
   $panel.html(markup);
 
-  $('.ai-mode-nav-button', parentDoc()).removeClass('is-active');
-  $(`.ai-mode-nav-button[data-ai-nav="${state.currentNav}"]`, parentDoc()).addClass('is-active');
+  syncNavigationState();
 
   if (state.currentNav === 'api') {
     syncApiForm();
@@ -2592,9 +2641,17 @@ function ensureSelectionReady(modeKey) {
 function bindEvents() {
   $(parentDoc())
     .off('.aiWorkspaceDesktop')
+    .on('click.aiWorkspaceDesktop', '.ai-mobile-nav-toggle', function () {
+      const isExpanded = $(this).attr('aria-expanded') === 'true';
+      setMobileNavExpanded(!isExpanded);
+    })
     .on('click.aiWorkspaceDesktop', '.ai-mode-nav-button', async function () {
       const targetNav = ($(this).attr('data-ai-nav') || '').trim();
-      if (!targetNav || targetNav === state.currentNav || state.isGenerating) {
+      if (!targetNav) {
+        return;
+      }
+      if (targetNav === state.currentNav || state.isGenerating) {
+        setMobileNavExpanded(false);
         return;
       }
       if (state.currentNav === 'direct' || state.currentNav === 'plan') {
@@ -2604,6 +2661,7 @@ function bindEvents() {
       state.currentNav = normalizeNavMode(targetNav);
       persistSettings({ mirrorModeKey: currentModeKey() });
       renderCurrentPanel();
+      setMobileNavExpanded(false);
       if (state.currentNav === 'direct' || state.currentNav === 'plan') {
         ensureModeLorebook(currentModeKey());
         await loadEntriesForMode(currentModeKey(), {
@@ -2613,6 +2671,7 @@ function bindEvents() {
           invalidateOutputsOnChange: true,
         });
         renderCurrentPanel();
+        setMobileNavExpanded(false);
       }
     })
     .on('click.aiWorkspaceDesktop', '[data-ai-step]', function () {
