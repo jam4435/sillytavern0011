@@ -302,7 +302,10 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
         </div>
     `;
 
-  const headerLayout = isMobile() ? mobileLayout : pcLayout;
+  const headerLayout = (isMobile() ? mobileLayout : pcLayout).replace(
+    /\s*<button class="content-edit-button entry-ai-button"[\s\S]*?<\/button>/,
+    '',
+  );
 
   return `
         <div class="${LOREBOOK_ENTRY_CLASS} ${disabledClass} ${activeClass}"

@@ -1438,6 +1438,7 @@ function createLorebookTitleSectionLegacy(lorebookName, isGlobal = false) {
     </div>
   `);
   $batchToggleDropdown.find('.batch-toggle-section:has(input[name="batch-ai-mode"])').slice(1).remove();
+  $batchToggleDropdown.find('.batch-toggle-section:has(input[name="batch-ai-mode"])').remove();
   $batchToggleContainer.append($batchToggleButton).append($batchToggleDropdown);
 
   // Add filter button and dropdown
@@ -1673,6 +1674,7 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
     </div>
   `);
   $batchToggleDropdown.find('.batch-toggle-section:has(input[name="batch-ai-mode"])').slice(1).remove();
+  $batchToggleDropdown.find('.batch-toggle-section:has(input[name="batch-ai-mode"])').remove();
   $batchToggleContainer.append($batchToggleButton).append($batchToggleDropdown);
 
   const $filterContainer = $('<div></div>').addClass('lorebook-batch-toggle-container');
