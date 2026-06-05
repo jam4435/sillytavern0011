@@ -2148,7 +2148,7 @@ function ensureStyles() {
       #${ROOT_ID} .ai-debug-block textarea{border:0;border-top:1px solid var(--panel-border-color,#444);border-radius:0;min-height:180px;background:transparent;font-family:Consolas,Monaco,monospace}
       #${ROOT_ID} .ai-coming-soon{font-size:28px;font-weight:700;letter-spacing:.08em}
       @media (max-width:900px){
-        #${ROOT_ID}.ai-desktop-root{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);gap:10px;min-width:0}
+        #${ROOT_ID}.ai-desktop-root{grid-template-columns:1fr;grid-template-rows:auto auto;gap:10px;min-width:0;overflow-y:auto}
         #${ROOT_ID} .ai-desktop-nav{position:relative;z-index:6;border-radius:8px;padding:6px 8px;gap:0;min-height:36px}
         #${ROOT_ID} .ai-mobile-nav-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
         #${ROOT_ID} .ai-mobile-nav-toggle{width:28px;height:28px;font-size:14px}
@@ -2157,8 +2157,8 @@ function ensureStyles() {
         #${ROOT_ID} .ai-nav-list{position:absolute;top:calc(100% + 6px);right:8px;left:auto;width:min(260px,calc(100vw - 32px));display:none;flex-direction:column;gap:6px;overflow:visible;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:${AI_WORKSPACE_SURFACE};padding:8px;box-shadow:0 10px 24px rgba(0,0,0,.42);z-index:8}
         #${ROOT_ID} .ai-nav-list.is-open{display:flex}
         #${ROOT_ID} .ai-mode-nav-button{width:100%;min-width:0;padding:10px 12px;border-radius:6px}
-        #${ROOT_ID} .ai-desktop-main{min-height:0;padding:8px}
-        #${ROOT_ID} #ai-workspace-desktop-panel{padding-right:0}
+        #${ROOT_ID} .ai-desktop-main{min-height:0;padding:8px;overflow:visible}
+        #${ROOT_ID} #ai-workspace-desktop-panel{height:auto;overflow:visible;padding-right:0}
         #${ROOT_ID} .ai-workflow-progress{top:0;z-index:4;padding:10px;gap:8px}
         #${ROOT_ID} .ai-stepper{gap:6px;width:100%;min-width:0}
         #${ROOT_ID} .ai-step-button{flex:0 0 28px;gap:6px}
