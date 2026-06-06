@@ -26,6 +26,15 @@ const parseOptionText = (option: string): { letter: string; text: string } => {
   return { letter: '', text: option };
 };
 
+const normalizeMaintextForDisplay = (text: string): string =>
+  text
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+const HTML_BLOCK_START_REGEX = /^(?:<style\b[\s\S]*?<\/style>\s*)*<(?:div|details|section|article|ul|ol|li|table|pre|blockquote|h[1-6]|p)\b/i;
+
 /**
  * 游戏内容显示组件
  * 显示从楼层读取的内容：
@@ -60,7 +69,10 @@ const GameContent: React.FC<GameContentProps> = ({
   );
 
   // 检测内容是否包含 HTML 标签
-  const normalizedMaintext = maintext || '';
+  const normalizedMaintext = useMemo(
+    () => normalizeMaintextForDisplay(maintext || ''),
+    [maintext],
+  );
   const containsHTML = useMemo(() => /<[^>]+>/.test(normalizedMaintext), [normalizedMaintext]);
   uiLogger.log('   内容是否包含 HTML:', containsHTML);
 
@@ -78,7 +90,8 @@ const GameContent: React.FC<GameContentProps> = ({
         .map(paragraph => {
           // 段落内的单个换行转换为 <br>
           const lines = paragraph.split('\n').map(line => line.trim()).filter(line => line);
-          return `<p class="maintext-paragraph">${lines.join('<br />')}</p>`;
+          const blockClass = HTML_BLOCK_START_REGEX.test(paragraph) ? ' maintext-paragraph--html-block' : '';
+          return `<div class="maintext-paragraph${blockClass}">${lines.join('<br />')}</div>`;
         })
         .join('');
       return (

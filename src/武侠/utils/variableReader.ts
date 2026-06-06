@@ -307,7 +307,7 @@ export function parseMaintext(messageContent: string): string {
   return result;
 }
 
-const ERA_VARIABLE_BLOCK_REGEX = /\s*<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>\s*/gi;
+const ERA_VARIABLE_BLOCK_REGEX = /\s*<Variable(Think|Insert|Edit|Delete)>\s*[\s\S]*?<\/Variable\1>\s*/gi;
 const FRONTEND_LOADER_SCRIPT_REGEX = /<script\b[\s\S]*?<\/script>/gi;
 const FRONTEND_LOADER_BODY_TAG_REGEX = /<\/?body\b[^>]*>/gi;
 const FRONTEND_LOADER_HINT_REGEX = /(localhost|127\.0\.0\.1):5500\/dist\/武侠\/index\.html|\$\(['"]body['"]\)\.load\(/i;

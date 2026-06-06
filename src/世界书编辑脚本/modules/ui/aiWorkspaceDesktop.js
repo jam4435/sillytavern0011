@@ -2184,6 +2184,7 @@ function ensureStyles() {
       #${ROOT_ID} input[type='text'],#${ROOT_ID} input[type='password'],#${ROOT_ID} select,#${ROOT_ID} textarea{width:100%;box-sizing:border-box;border:1px solid var(--panel-border-color,#555);border-radius:6px;background:var(--search-input-bg-color,#222);color:var(--panel-text-color,#eee);padding:9px 10px}
       #${ROOT_ID} textarea{min-height:120px;resize:vertical}
       #${ROOT_ID} .ai-readonly-textarea{min-height:180px;font-family:Consolas,Monaco,monospace}
+      #${ROOT_ID} .ai-chat-context-textarea{min-height:180px;font-family:Consolas,Monaco,monospace}
       #${ROOT_ID} .ai-reference-material{min-height:220px}
       #${ROOT_ID} .ai-assistant-input{min-height:120px}
       #${ROOT_ID} .ai-prompt-template{min-height:220px;font-family:Consolas,Monaco,monospace}
@@ -2232,6 +2233,11 @@ function ensureStyles() {
       #${ROOT_ID} .ai-preview-item{padding:12px;border-bottom:1px solid var(--panel-border-color,#3e3e3e);cursor:pointer}
       #${ROOT_ID} .ai-preview-item:hover{background:rgba(255,255,255,.04)}
       #${ROOT_ID} .ai-preview-item.is-active{background:rgba(154,122,206,.18)}
+      #${ROOT_ID} .ai-preview-item-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+      #${ROOT_ID} .ai-preview-item-header .ai-preview-item-title{min-width:0;flex:1 1 auto}
+      #${ROOT_ID} .ai-preview-exclude{flex:0 0 auto;padding:4px 8px;font-size:12px;border-color:rgba(220,120,120,.5);color:#f0c6c6;background:rgba(220,120,120,.08)}
+      #${ROOT_ID} .ai-preview-exclude:hover{background:rgba(220,120,120,.16)}
+      #${ROOT_ID} .ai-preview-detail-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
       #${ROOT_ID} .ai-preview-diff + .ai-preview-diff{margin-top:8px}
       #${ROOT_ID} .ai-preview-diff-label{color:var(--panel-accent-color,#9fc8e4);margin-bottom:2px}
       #${ROOT_ID} .ai-preview-diff-before,#${ROOT_ID} .ai-preview-diff-after{font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
@@ -2291,6 +2297,7 @@ function ensureStyles() {
         #${ROOT_ID} .ai-entry-mode{width:100%;flex:0 0 auto}
         #${ROOT_ID} .ai-result-grid{grid-template-columns:1fr}
         #${ROOT_ID} .ai-preview-detail-header{flex-direction:column}
+        #${ROOT_ID} .ai-preview-detail-actions{width:100%;justify-content:flex-start}
       }
     </style>
   `);
@@ -2843,6 +2850,12 @@ function bindEvents() {
         setModeStatus(currentModeKey(), error?.message || '刷新聊天上下文失败。');
       }
     })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-chat-context-clear', () => {
+      handleChatContextClear();
+    })
+    .on('input.aiWorkspaceDesktop', '#ai-workspace-chat-context-preview', () => {
+      handleChatContextEdited();
+    })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-refresh-entries', async () => {
       await loadEntriesForMode(currentModeKey(), {
         force: true,
@@ -2961,6 +2974,11 @@ function bindEvents() {
     .on('click.aiWorkspaceDesktop', '#ai-workspace-rollback-execute', async () => {
       await handleRollbackExecute();
     })
+    .on('click.aiWorkspaceDesktop', '.ai-preview-exclude', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      excludePreviewItem(currentModeKey(), Number($(this).attr('data-preview-uid')));
+    })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-list .ai-preview-item', function () {
       renderPreviewDetail(currentModeKey(), Number($(this).attr('data-preview-uid')));
       $('#ai-workspace-preview-list .ai-preview-item', parentDoc()).removeClass('is-active');
@@ -3030,6 +3048,9 @@ function bindEvents() {
     .on('click.aiWorkspaceDesktop', '#ai-workspace-assistant-send', async () => {
       await handleAssistantSend();
     })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-assistant-clear', () => {
+      clearAssistantHistory();
+    })
     .on('keydown.aiWorkspaceDesktop', '#ai-workspace-assistant-input', async event => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
@@ -3038,6 +3059,9 @@ function bindEvents() {
     })
     .on('click.aiWorkspaceDesktop', '.ai-assistant-pick', function () {
       appendAssistantReplyToReferenceMaterial($(this).attr('data-history-index'));
+    })
+    .on('click.aiWorkspaceDesktop', '.ai-assistant-delete', function () {
+      deleteAssistantHistoryItem($(this).attr('data-history-index'));
     })
     .on('keydown.aiWorkspaceDesktop', '#ai-workspace-preview-modal .ai-preview-modal-close', function (event) {
       if (event.key === 'Enter' || event.key === ' ') {

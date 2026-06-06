@@ -454,6 +454,20 @@
     }
   }
 
+  .maintext-paragraph--html-block {
+    margin: 0.5rem 0 0.75rem;
+    text-indent: 0;
+    line-height: 1.6;
+  }
+
+  :where(.tucao-w, .k-sum-w, .kz-w, details, summary) {
+    text-indent: 0;
+  }
+
+  :where(.tucao-w, .k-sum-w, .kz-w) {
+    line-height: normal;
+  }
+
   // 段落内的换行不需要额外间距
   br {
     line-height: 2.2;
