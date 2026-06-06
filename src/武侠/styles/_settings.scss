@@ -1225,13 +1225,37 @@
   color: $stone-500;
 }
 
-.variable-scope-select {
-  min-width: 140px;
+.variables-scope-display {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 150px;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.18);
+
+  span {
+    font-size: 0.72rem;
+    color: $stone-600;
+  }
+
+  strong {
+    color: $amber-600;
+    font-size: 0.88rem;
+    font-weight: normal;
+    font-family: monospace;
+  }
 }
 
-.variable-message-input {
-  width: 120px;
-  min-width: 120px;
+.variables-search-field {
+  flex: 1;
+  min-width: 180px;
+}
+
+.variables-search-input {
+  width: 100%;
+  min-width: 180px;
 }
 
 .variables-status {
@@ -1254,15 +1278,184 @@
   }
 }
 
-.variables-json-editor {
+.variables-tree {
   min-height: 320px;
-  max-height: 520px;
-  resize: vertical;
+  max-height: 560px;
+  overflow: auto;
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg, rgba($amber-600, 0.04), transparent 36%),
+    rgba(0, 0, 0, 0.22);
+}
 
-  &.invalid {
-    border-color: $red-500;
-    background: rgba($red-500, 0.04);
+.variables-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 260px;
+  color: $stone-600;
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
   }
+}
+
+.variable-node {
+  min-width: 720px;
+
+  &.root > .variable-node-row {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: rgba($stone-900, 0.96);
+    border-bottom-color: rgba($amber-600, 0.35);
+  }
+}
+
+.variable-node-row {
+  display: grid;
+  grid-template-columns: 22px minmax(150px, 0.85fr) 82px auto minmax(120px, 1.4fr);
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 38px;
+  padding: 0.35rem 0.65rem 0.35rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.025);
+  }
+}
+
+.variable-node-toggle,
+.variable-node-toggle-spacer {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.variable-node-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: $stone-500;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    color: $amber-600;
+    background: rgba($amber-600, 0.1);
+  }
+}
+
+.variable-node-key {
+  min-width: 0;
+  color: $stone-300;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-node-type,
+.variable-node-hidden {
+  justify-self: start;
+  padding: 0.18rem 0.4rem;
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  color: $stone-500;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.variable-node-hidden {
+  color: $stone-600;
+}
+
+.variable-node-preview {
+  min-width: 0;
+  color: $stone-600;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-node-empty {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  color: $stone-700;
+  font-size: 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.035);
+}
+
+.variable-leaf-input {
+  width: 100%;
+  min-width: 160px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  background: rgba($stone-900, 0.72);
+  color: $stone-200;
+  font-family: monospace;
+  font-size: 0.78rem;
+
+  &:focus {
+    outline: none;
+    border-color: $amber-600;
+    background: $stone-900;
+  }
+}
+
+.variable-leaf-textarea {
+  min-height: 2.6rem;
+  max-height: 8rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.variable-leaf-number {
+  max-width: 180px;
+}
+
+.variable-boolean-toggle {
+  justify-self: start;
+  padding: 0.32rem 0.7rem;
+  border: 1px solid $stone-700;
+  border-radius: 4px;
+  background: transparent;
+  color: $stone-500;
+  font-family: monospace;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all $transition-normal;
+
+  &.active {
+    border-color: rgba($green-500, 0.6);
+    color: $green-500;
+    background: rgba($green-500, 0.08);
+  }
+
+  &:hover {
+    border-color: $amber-600;
+    color: $amber-600;
+  }
+}
+
+.variable-null-value,
+.variable-unknown-value {
+  color: $stone-600;
+  font-family: monospace;
+  font-size: 0.78rem;
 }
 
 .variables-editor-meta {
