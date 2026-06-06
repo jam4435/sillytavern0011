@@ -1225,29 +1225,6 @@
   color: $stone-500;
 }
 
-.variables-scope-display {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-width: 150px;
-  padding: 0.45rem 0.75rem;
-  border: 1px solid $stone-800;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.18);
-
-  span {
-    font-size: 0.72rem;
-    color: $stone-600;
-  }
-
-  strong {
-    color: $amber-600;
-    font-size: 0.88rem;
-    font-weight: normal;
-    font-family: monospace;
-  }
-}
-
 .variables-search-field {
   flex: 1;
   min-width: 180px;
@@ -1305,20 +1282,12 @@
 }
 
 .variable-node {
-  min-width: 720px;
-
-  &.root > .variable-node-row {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background: rgba($stone-900, 0.96);
-    border-bottom-color: rgba($amber-600, 0.35);
-  }
+  min-width: 640px;
 }
 
 .variable-node-row {
   display: grid;
-  grid-template-columns: 22px minmax(150px, 0.85fr) 82px auto minmax(120px, 1.4fr);
+  grid-template-columns: 22px minmax(150px, 0.95fr) 82px minmax(180px, 1.5fr);
   align-items: center;
   gap: 0.5rem;
   min-height: 38px;
@@ -1364,8 +1333,7 @@
   white-space: nowrap;
 }
 
-.variable-node-type,
-.variable-node-hidden {
+.variable-node-type {
   justify-self: start;
   padding: 0.18rem 0.4rem;
   border: 1px solid $stone-800;
@@ -1374,19 +1342,6 @@
   font-size: 0.72rem;
   white-space: nowrap;
   background: rgba(0, 0, 0, 0.18);
-}
-
-.variable-node-hidden {
-  color: $stone-600;
-}
-
-.variable-node-preview {
-  min-width: 0;
-  color: $stone-600;
-  font-size: 0.78rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .variable-node-empty {
