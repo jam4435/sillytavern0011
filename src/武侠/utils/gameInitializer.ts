@@ -464,7 +464,9 @@ export async function createOpeningStoryMessage(formData: NewGameFormData): Prom
 
     await new Promise<void>(resolve => eventOnce('era:writeDone', resolve));
 
-    initializeGlobal('GameInitialized', { timestamp: Date.now(), formData });
+    const initializationSignal = { timestamp: Date.now(), formData };
+    initializeGlobal('GameInitialized', initializationSignal);
+    eventEmit('GameInitialized', initializationSignal);
 
     return { success: true, content: openingLine };
   } catch (error) {

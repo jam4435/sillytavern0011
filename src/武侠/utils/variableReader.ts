@@ -180,6 +180,11 @@ interface GameVariables {
     已完成事件?: Record<string, unknown>;
   };
 
+  参与事件?: Record<string, unknown>;
+  附近传闻?: Record<string, unknown>;
+  后续事件线索?: Record<string, unknown>;
+  后续事件线索计数?: Record<string, unknown>;
+
   // 社交/NPC
   侠缘?: Array<{
     姓名?: string;
@@ -709,31 +714,83 @@ function mapItemQuality(品质?: string): string {
   return qualityMap[品质 || ''] || 'WHITE';
 }
 
-/**
- * 将变量表中的事件转换为 GameEvent[] 结构
- */
-function parseEvents(事件?: GameVariables['事件']): GameEvent[] {
-  if (!事件 || !Array.isArray(事件)) return [];
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
 
-  return 事件.map((ev, index) => ({
-    id: `event_${index}`,
-    title: ev.标题 || '未知事件',
-    type: mapEventType(ev.类型),
-    description: ev.描述 || '',
-    details: ev.详情,
-  }));
+function getDisplayEventName(eventName: string): string {
+  return eventName
+    .replace(/\.(json|txt)$/i, '')
+    .replace(/^.*?(事件条目-|登场事件-|成长条目-)/, '')
+    .trim();
+}
+
+function formatEventValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return value === 1 ? '玩家参与' : '未参与';
+  if (isRecord(value) && ('年' in value || '月' in value || '日' in value)) {
+    const time = value as { 年?: number; 月?: number; 日?: number; 时?: number };
+    return `${time.年 ?? '?'}年${time.月 ?? '?'}月${time.日 ?? '?'}日${time.时 === undefined ? '' : `${time.时}时`}`;
+  }
+  if (value === null || value === undefined) return '';
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function pushRecordEvents(
+  target: GameEvent[],
+  record: Record<string, unknown> | undefined,
+  type: GameEvent['type'],
+  idPrefix: string,
+  buildDescription: (eventName: string, value: unknown) => string,
+) {
+  if (!record) return;
+
+  for (const [eventName, value] of Object.entries(record)) {
+    target.push({
+      id: `${idPrefix}_${target.length}`,
+      title: getDisplayEventName(eventName),
+      type,
+      description: buildDescription(eventName, value),
+    });
+  }
 }
 
 /**
- * 映射事件类型
+ * 将当前事件系统变量转换为前端事件面板结构。
+ *
+ * 不展示全部未发生事件，避免初始化后把数百条事件渲染进前端。
  */
-function mapEventType(类型?: string): GameEvent['type'] {
-  const typeMap: Record<string, GameEvent['type']> = {
-    传闻: 'RUMOR',
-    进行中: 'ACTIVE',
-    已完成: 'AFTERMATH',
-  };
-  return typeMap[类型 || ''] || 'ACTIVE';
+function parseEvents(variables: GameVariables): GameEvent[] {
+  const events: GameEvent[] = [];
+  const eventSystem = variables.事件系统 || {};
+
+  pushRecordEvents(events, variables.附近传闻, 'RUMOR', 'rumor', (_name, value) => formatEventValue(value));
+
+  pushRecordEvents(events, variables.参与事件, 'ACTIVE', 'participating', (_name, value) => formatEventValue(value));
+
+  pushRecordEvents(events, eventSystem.进行中事件, 'ACTIVE', 'active', (_name, value) => {
+    const endTime = formatEventValue(value);
+    return endTime ? `进行中，预计结束于 ${endTime}` : '进行中';
+  });
+
+  pushRecordEvents(events, variables.后续事件线索, 'AFTERMATH', 'followup', (_name, value) => formatEventValue(value));
+
+  const completedCount = Object.keys(eventSystem.已完成事件 || {}).length;
+  if (completedCount > 0) {
+    events.push({
+      id: 'completed_summary',
+      title: '已归档事件',
+      type: 'AFTERMATH',
+      description: `已完成 ${completedCount} 个事件`,
+    });
+  }
+
+  return events;
 }
 
 /**
@@ -2389,8 +2446,8 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
     state.inventory = [];
   }
 
-  // 事件 - 从事件系统读取（需要转换格式）
-  state.events = [];
+  // 事件 - 从事件系统读取（避免全量渲染未发生事件）
+  state.events = parseEvents(variables);
 
   // 社交
   state.social = parseSocial(variables.侠缘);

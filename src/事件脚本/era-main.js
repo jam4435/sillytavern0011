@@ -47,6 +47,27 @@
 
   const isDirectChatWriteDone = detail => detail?.actions?.directChatWrite === true;
 
+  const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件'];
+
+  const isPlainObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
+
+  const isEmptyObject = value => isPlainObject(value) && Object.keys(value).length === 0;
+
+  const isEmptyOpeningEventSystemWrite = detail => {
+    if (detail?.actions?.apiWrite !== true) {
+      return false;
+    }
+
+    const stat = detail?.statWithoutMeta || detail?.stat || {};
+    const eventSystem = stat?.事件系统;
+    return (
+      !!stat?.世界信息?.时间 &&
+      !!stat?.user数据 &&
+      isPlainObject(eventSystem) &&
+      EVENT_SYSTEM_BUCKETS.every(key => isEmptyObject(eventSystem[key]))
+    );
+  };
+
   // ==================== 主检查函数（批量优化版）====================
   async function checkEvents(eventDefinitions, reason = 'manual') {
     debugGroup(`🔄 事件系统检查周期: ${reason}`);
@@ -410,6 +431,28 @@
     return true;
   }
 
+  let frontendInitializationTimer = null;
+
+  function scheduleFrontendInitialization(reason, signal, delay = 500) {
+    if (frontendInitializationTimer) {
+      clearTimeout(frontendInitializationTimer);
+    }
+
+    frontendInitializationTimer = setTimeout(async () => {
+      frontendInitializationTimer = null;
+      log(`🎮 检测到前端开局初始化信号，重新初始化事件系统: ${reason}`, signal);
+      isInitialized = false;
+
+      const success = await initialize();
+      if (success) {
+        logSuccess('🎉 ERA 事件系统已随前端开局重新初始化！');
+        toastr.success('ERA 事件系统已自动初始化');
+      } else {
+        logError('ERA 事件系统重新初始化失败，请检查变量结构或世界书事件条目');
+      }
+    }, delay);
+  }
+
   // ==================== 启动系统 ====================
   const initialSuccess = await initialize();
 
@@ -418,19 +461,10 @@
     log('⏳ 首次初始化失败，等待前端 GameInitialized 信号...');
 
     waitGlobalInitialized('GameInitialized')
-      .then(async signal => {
+      .then(signal => {
         log('🎮 收到 GameInitialized 信号:', signal);
         logSuccess('🎉 前端已完成角色创建，开始自动初始化 ERA 事件系统...');
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const success = await initialize();
-        if (success) {
-          logSuccess('🎉 ERA 事件系统已随前端初始化自动启动！');
-          toastr.success('ERA 事件系统已自动启动');
-        } else {
-          logError('ERA 事件系统初始化仍然失败，请检查变量结构');
-        }
+        scheduleFrontendInitialization('waitGlobalInitialized', signal, 500);
       })
       .catch(error => {
         logError('等待 GameInitialized 信号失败:', error);
@@ -442,6 +476,10 @@
     log('💬 检测到聊天切换，重新初始化');
     isInitialized = false;
     await initialize();
+  });
+
+  eventOn('GameInitialized', signal => {
+    scheduleFrontendInitialization('GameInitialized-event', signal, 500);
   });
 
   eventOn(tavern_events.MESSAGE_SENT, async () => {
@@ -463,6 +501,12 @@
         logSuccess('🎉 stat_data 已就绪，ERA事件系统自动初始化成功！');
         toastr.success('ERA 事件系统已自动启动');
       }
+      return;
+    }
+
+    if (isEmptyOpeningEventSystemWrite(detail)) {
+      log('📝 检测到新开局空事件系统写入，重新初始化事件列表');
+      scheduleFrontendInitialization('opening-empty-event-system-api-write', detail, 300);
       return;
     }
 
