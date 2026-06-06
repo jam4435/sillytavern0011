@@ -105,6 +105,10 @@ export function useEventListeners({
 
     eventLogger.log('注册 MESSAGE_RECEIVED 监听器...');
     const messageReceivedListener = eventOn(tavern_events.MESSAGE_RECEIVED, handleMessageUpdate);
+    eventLogger.log('注册 MESSAGE_SWIPED 监听器...');
+    const messageSwipedListener = eventOn(tavern_events.MESSAGE_SWIPED, handleMessageUpdate);
+    eventLogger.log('注册 MESSAGE_UPDATED 监听器...');
+    const messageUpdatedListener = eventOn(tavern_events.MESSAGE_UPDATED, handleMessageUpdate);
     eventLogger.log('注册 CHAT_CHANGED 监听器...');
     const chatChangedListener = eventOn(tavern_events.CHAT_CHANGED, handleMessageUpdate);
     eventLogger.log('注册 era:writeDone 监听器...');
@@ -118,6 +122,8 @@ export function useEventListeners({
         clearTimeout(refreshTimer);
       }
       messageReceivedListener.stop();
+      messageSwipedListener.stop();
+      messageUpdatedListener.stop();
       chatChangedListener.stop();
       writeDoneListener.stop();
       mvuVariableListener?.stop();
