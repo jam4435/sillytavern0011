@@ -1525,7 +1525,7 @@ type MartialArtUpdateType = 'insert' | 'update' | 'none';
 
 /**
  * 检查单个功法的更新需求
- * - 'insert': 缺少类型、描述、品阶等基本字段，需要用 insert 补全
+ * - 'insert': 缺少类型、描述、品阶等基本字段，需要补全
  * - 'update': 基本字段已存在，但特性数量可能需要根据掌握程度更新
  * - 'none': 不需要更新
  *
@@ -1929,7 +1929,7 @@ function mergeCompletionScope(target: GameDataCompletionScope, source: GameDataC
  * 2. 掌握程度变动（缓存中的掌握程度与当前不同，需要更新特性）
  *
  * 两种操作：
- * 1. 补全（insert）: 功法只有掌握程度，缺少类型、描述、品阶、特性 -> 用 era:insertByObject
+ * 1. 补全（update）: 功法只有掌握程度，缺少类型、描述、品阶、特性 -> 用 era:updateByObject
  * 2. 更新（update）: 掌握程度上升后，特性需要增加 -> 用 era:updateByObject
  *
  * @param 玩家功法 user数据中的功法对象
@@ -1954,23 +1954,16 @@ export async function autoUpdateMartialArts(
     return;
   }
 
-  // 分别收集需要 insert（补全）和 update（更新特性）的功法
-  const insertData: {
-    user数据?: { 功法: Record<string, MartialArtUpdateData> };
-    角色数据?: Record<string, { 功法: Record<string, MartialArtUpdateData> }>;
-  } = {};
-
+  // 功法路径已经存在时，补全字段也应使用 update，避免 insert 撞上已存在路径。
   const updateData: {
     user数据?: { 功法: Record<string, Partial<MartialArtUpdateData>> };
     角色数据?: Record<string, { 功法: Record<string, Partial<MartialArtUpdateData>> }>;
   } = {};
 
-  let needsInsert = false;
   let needsUpdate = false;
 
   // 1. 检查玩家功法
   if (玩家功法) {
-    const 玩家功法Insert: Record<string, MartialArtUpdateData> = {};
     const 玩家功法Update: Record<string, Partial<MartialArtUpdateData>> = {};
 
     for (const [功法名, 功法数据] of Object.entries(玩家功法)) {
@@ -1991,8 +1984,8 @@ export async function autoUpdateMartialArts(
       if (updateType === 'insert') {
         const completedData = completeMartialArtFromDatabase(功法名, 功法数据);
         if (completedData) {
-          玩家功法Insert[功法名] = completedData;
-          needsInsert = true;
+          玩家功法Update[功法名] = completedData;
+          needsUpdate = true;
           // 更新缓存
           updateMartialArtCache(cacheKey, completedData.掌握程度, true);
         }
@@ -2007,9 +2000,6 @@ export async function autoUpdateMartialArts(
       }
     }
 
-    if (Object.keys(玩家功法Insert).length > 0) {
-      insertData.user数据 = { 功法: 玩家功法Insert };
-    }
     if (Object.keys(玩家功法Update).length > 0) {
       updateData.user数据 = { 功法: 玩家功法Update };
     }
@@ -2017,7 +2007,6 @@ export async function autoUpdateMartialArts(
 
   // 2. 检查角色功法
   if (角色数据) {
-    const 角色功法Insert: Record<string, { 功法: Record<string, MartialArtUpdateData> }> = {};
     const 角色功法Update: Record<string, { 功法: Record<string, Partial<MartialArtUpdateData>> }> = {};
 
     for (const [角色名, 角色] of Object.entries(角色数据)) {
@@ -2026,7 +2015,6 @@ export async function autoUpdateMartialArts(
       const 角色Data = 角色 as CharacterData;
       if (!角色Data.功法) continue;
 
-      const 该角色功法Insert: Record<string, MartialArtUpdateData> = {};
       const 该角色功法Update: Record<string, Partial<MartialArtUpdateData>> = {};
 
       for (const [功法名, 功法数据] of Object.entries(角色Data.功法)) {
@@ -2047,8 +2035,8 @@ export async function autoUpdateMartialArts(
         if (updateType === 'insert') {
           const completedData = completeMartialArtFromDatabase(功法名, 功法数据);
           if (completedData) {
-            该角色功法Insert[功法名] = completedData;
-            needsInsert = true;
+            该角色功法Update[功法名] = completedData;
+            needsUpdate = true;
             updateMartialArtCache(cacheKey, completedData.掌握程度, true);
           }
         } else if (updateType === 'update') {
@@ -2061,44 +2049,27 @@ export async function autoUpdateMartialArts(
         }
       }
 
-      if (Object.keys(该角色功法Insert).length > 0) {
-        角色功法Insert[角色名] = { 功法: 该角色功法Insert };
-      }
       if (Object.keys(该角色功法Update).length > 0) {
         角色功法Update[角色名] = { 功法: 该角色功法Update };
       }
     }
 
-    if (Object.keys(角色功法Insert).length > 0) {
-      insertData.角色数据 = 角色功法Insert;
-    }
     if (Object.keys(角色功法Update).length > 0) {
       updateData.角色数据 = 角色功法Update;
     }
   }
 
   // 如果有需要处理的功法，写入变量表
-  if (needsInsert || needsUpdate) {
+  if (needsUpdate) {
     dataLogger.log('[autoUpdateMartialArts] 需要处理功法数据...');
-    dataLogger.log(`  - 需要 INSERT（补全）: ${needsInsert}`);
-    dataLogger.log(`  - 需要 UPDATE（更新特性）: ${needsUpdate}`);
+    dataLogger.log('  - 需要 UPDATE（补全/更新特性）: true');
 
     isUpdatingMartialArts = true;
 
     try {
-      // 1. 处理需要补全的功法
-      if (needsInsert) {
-        dataLogger.log('[autoUpdateMartialArts] INSERT 数据:', JSON.stringify(insertData, null, 2));
-        eventEmit('era:insertByObject', insertData);
-        dataLogger.log('[autoUpdateMartialArts] 功法补全(insert)请求已发送');
-      }
-
-      // 2. 处理需要更新特性的功法
-      if (needsUpdate) {
-        dataLogger.log('[autoUpdateMartialArts] UPDATE 数据:', JSON.stringify(updateData, null, 2));
-        eventEmit('era:updateByObject', updateData);
-        dataLogger.log('[autoUpdateMartialArts] 功法更新(update)请求已发送');
-      }
+      dataLogger.log('[autoUpdateMartialArts] UPDATE 数据:', JSON.stringify(updateData, null, 2));
+      eventEmit('era:updateByObject', updateData);
+      dataLogger.log('[autoUpdateMartialArts] 功法补全/更新(update)请求已发送');
 
       // 等待写入完成
       await new Promise<void>(resolve => {
