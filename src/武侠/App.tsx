@@ -13,6 +13,7 @@ import {
   MartialArtsPanel,
   SocialPanel
 } from './components/panels';
+import OpeningScreen from './components/OpeningScreen';
 import SettingsPanel from './components/SettingsPanel';
 import SplashScreen from './components/SplashScreen';
 import StartScreen from './components/StartScreen';
@@ -27,7 +28,7 @@ import {
   useToast,
 } from './hooks';
 import { ActivePanel } from './types';
-import { createOpeningStoryMessage, type NewGameFormData } from './utils/gameInitializer';
+import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { gameLogger, initLogger } from './utils/logger';
 import {
   applyRegexRules,
@@ -37,8 +38,8 @@ import {
   saveSettings
 } from './utils/settingsManager';
 import {
+  detectGameSessionState,
   getLastMessageContent,
-  hasSavedGame,
   parseOptions,
   readGameDataPure,
   scheduleGameDataCompletion,
@@ -79,6 +80,7 @@ const App: React.FC = () => {
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = React.useState<DisplaySettings>(() => loadSettings());
+  const [openingWelcomeLine, setOpeningWelcomeLine] = React.useState(() => getRandomOpeningLine());
 
   // 使用消息处理 hook
   const { handleSendMessage } = useMessageHandler({
@@ -121,13 +123,13 @@ const App: React.FC = () => {
       initLogger.log('');
       initLogger.log('初始化开始...');
 
-      initLogger.log('检查是否存在存档');
-      const exists = hasSavedGame();
-      initLogger.log('hasSavedGame() 返回:', exists);
-      setSavedGameExists(exists);
-      initLogger.log('savedGameExists 设置为:', exists);
+      initLogger.log('检查游戏会话状态');
+      const sessionState = detectGameSessionState();
+      initLogger.log('detectGameSessionState() 返回:', sessionState);
+      setSavedGameExists(sessionState !== 'empty');
+      initLogger.log('savedGameExists 设置为:', sessionState !== 'empty');
 
-      if (exists) {
+      if (sessionState === 'active') {
         initLogger.log('检测到存档，直接进入游戏界面');
 
         const savedData = readGameDataPure();
@@ -149,8 +151,23 @@ const App: React.FC = () => {
 
         setCurrentPage('game');
         initLogger.log('✅ 已跳转到游戏界面');
+      } else if (sessionState === 'opening') {
+        initLogger.log('检测到已初始化但尚未开局的存档，进入开局输入界面');
+
+        const savedData = readGameDataPure();
+        initLogger.log('readGameDataPure 返回:', savedData ? '有数据' : 'null');
+        if (savedData) {
+          setGameState(prev => ({ ...prev, ...savedData }));
+        }
+        scheduleGameDataCompletion('startup-opening-save', { fullScan: true });
+        setCurrentMaintext('');
+        setCurrentOptions([]);
+        setOpeningWelcomeLine(getRandomOpeningLine());
+        setCurrentPage('opening');
+        initLogger.log('✅ 已跳转到开局输入界面');
       } else {
-        initLogger.log('未检测到存档，保持在开始界面');
+        initLogger.log('未检测到存档，进入开始界面');
+        setCurrentPage('start');
       }
     };
 
@@ -222,10 +239,11 @@ const App: React.FC = () => {
     addDebugLog('prompt', openingMessageSummary);
 
     try {
-      const result = await createOpeningStoryMessage(formData);
+      const result = await initializeNewGameSession(formData);
 
       if (result.success && result.content) {
-        addDebugLog('assistant', `[预设开场白]\n${result.content}`);
+        addDebugLog('assistant', `[开局欢迎语，仅前端显示]\n${result.content}`);
+        setOpeningWelcomeLine(result.content);
 
         dismissToast();
 
@@ -272,12 +290,13 @@ const App: React.FC = () => {
         }
         scheduleGameDataCompletion('new-game-setup-submit', { fullScan: true });
 
-        setCurrentMaintext(result.content);
+        setSavedGameExists(true);
+        setCurrentMaintext('');
         setCurrentOptions([]);
-        gameLogger.log('✅ 开场白已设置到前端');
-        gameLogger.log('开场白:', result.content);
+        gameLogger.log('✅ 欢迎语已设置到开局输入界面');
+        gameLogger.log('欢迎语:', result.content);
 
-        goToGame();
+        setCurrentPage('opening');
       } else {
         gameLogger.error('创建开局失败:', result.error);
         showError(`初始化失败：${result.error || '创建开局楼层时出错'}，请重试`);
@@ -289,7 +308,18 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [addDebugLog, setIsLoading, showLoading, showError, dismissToast, setGameState, setCurrentMaintext, setCurrentOptions, goToGame]);
+  }, [addDebugLog, setIsLoading, showLoading, showError, dismissToast, setGameState, setCurrentMaintext, setCurrentOptions, setSavedGameExists, setCurrentPage]);
+
+  const handleOpeningSend = useCallback(async (message: string) => {
+    await handleSendMessage(message);
+
+    const lastContent = getLastMessageContent();
+    if (lastContent) {
+      setCurrentMaintext(lastContent);
+      setCurrentOptions(parseOptions(lastContent));
+      setCurrentPage('game');
+    }
+  }, [handleSendMessage, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
 
   const getModalTitle = (panel: ActivePanel) => {
     switch(panel) {
@@ -325,6 +355,10 @@ const App: React.FC = () => {
   };
 
   // 根据页面状态渲染不同内容
+  if (currentPage === 'booting') {
+    return <div className="booting-screen" aria-label="正在载入"></div>;
+  }
+
   if (currentPage === 'start') {
     return <StartScreen onStart={handleStart} />;
   }
@@ -351,6 +385,25 @@ const App: React.FC = () => {
           onSubmit={handleSetupSubmit}
           onBack={handleSetupBack}
           isLoading={isLoading}
+        />
+      </>
+    );
+  }
+
+  if (currentPage === 'opening') {
+    return (
+      <>
+        <StatusToast
+          state={toastState}
+          onDismiss={dismissToast}
+          autoHideDelay={8000}
+        />
+        <OpeningScreen
+          welcomeLine={openingWelcomeLine}
+          playerName={gameState.stats.name}
+          location={gameState.currentLocation}
+          isLoading={isLoading}
+          onSend={handleOpeningSend}
         />
       </>
     );

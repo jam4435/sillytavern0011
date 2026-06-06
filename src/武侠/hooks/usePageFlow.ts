@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { PageState } from '../types';
 
 export function usePageFlow() {
-  const [currentPage, setCurrentPage] = useState<PageState>('start');
+  const [currentPage, setCurrentPage] = useState<PageState>('booting');
   const [savedGameExists, setSavedGameExists] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 

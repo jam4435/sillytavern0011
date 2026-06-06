@@ -156,9 +156,9 @@ export enum ActivePanel {
 
 /**
  * 页面状态枚举
- * StartScreen → SplashScreen → NewGameSetup → Game
+ * Booting → StartScreen → SplashScreen → NewGameSetup → Opening → Game
  */
-export type PageState = 'start' | 'splash' | 'setup' | 'game';
+export type PageState = 'booting' | 'start' | 'splash' | 'setup' | 'opening' | 'game';
 
 /**
  * 页面流程上下文

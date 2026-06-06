@@ -202,6 +202,8 @@ interface GameVariables {
   [key: string]: unknown;
 }
 
+export type GameSessionState = 'empty' | 'opening' | 'active';
+
 /**
  * 解析后的 AI 回复结构
  */
@@ -443,6 +445,19 @@ export function getGameVariables(): GameVariables {
     dataLogger.error('[variableReader] 获取变量表失败:', error);
     return {};
   }
+}
+
+function hasValidUserData(variables: GameVariables): boolean {
+  const user数据 = variables.user数据;
+  if (!user数据) {
+    return false;
+  }
+
+  const hasGender = '性别' in user数据 && Boolean(user数据.性别);
+  const hasRealm = '境界' in user数据 && Boolean(user数据.境界);
+  const hasUserName = '用户名' in user数据 && Boolean(user数据.用户名);
+
+  return hasGender || hasRealm || hasUserName;
 }
 
 function extractGameVariablesFromMvuData(data: unknown): GameVariables {
@@ -2462,70 +2477,59 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
   return state;
 }
 
-/**
- * 检查是否有保存的游戏存档
- *
- * 检测逻辑：
- * 1. 首先检查是否存在 assistant 消息
- * 2. 然后检查变量表中是否存在user数据的特征字段（性别、境界、用户名等）
- *
- * 只有同时满足两个条件才认为是有效存档
- */
-export function hasSavedGame(): boolean {
+export function detectGameSessionState(): GameSessionState {
   dataLogger.log('');
-  dataLogger.log('🔍 [hasSavedGame] 检查是否存在存档');
+  dataLogger.log('🔍 [detectGameSessionState] 检查游戏会话状态');
 
   try {
-    // 第一步：检查是否存在 assistant 消息
-    dataLogger.log('   [Step 1] 检查 assistant 消息...');
-    const messages = getChatMessages(-1, { role: 'assistant' });
-    dataLogger.log('   获取到 assistant 消息数量:', messages.length);
-
-    if (messages.length === 0) {
-      dataLogger.log('⚠️ [hasSavedGame] 没有 assistant 消息，返回 false');
-      return false;
-    }
-
-    // 第二步：检查变量表中是否存在有效的user数据
-    dataLogger.log('   [Step 2] 检查user数据变量...');
+    dataLogger.log('   [Step 1] 检查user数据变量...');
     const variables = getGameVariables();
     dataLogger.log('   变量表键:', Object.keys(variables));
 
-    const user数据 = variables.user数据;
-    if (!user数据) {
-      dataLogger.log('⚠️ [hasSavedGame] 变量表中没有user数据，返回 false');
-      return false;
+    if (!hasValidUserData(variables)) {
+      dataLogger.log('⚠️ [detectGameSessionState] 没有有效user数据，返回 empty');
+      return 'empty';
     }
 
-    dataLogger.log('   user数据键:', Object.keys(user数据));
+    dataLogger.log('   [Step 2] 检查第0楼之后是否已有有效assistant剧情...');
+    const messages = getChatMessages('0-{{lastMessageId}}', {
+      role: 'assistant',
+      hide_state: 'all',
+      include_swipes: true,
+    }) as TavernChatMessage[];
 
-    // 检查user数据中是否存在特征字段
-    // 这些字段是在开局时由 gameInitializer 创建的
-    const hasGender = '性别' in user数据 && user数据.性别;
-    const hasRealm = '境界' in user数据 && user数据.境界;
-    const hasAttributes = '属性' in user数据 || '初始属性' in user数据;
-    const hasUserName = '用户名' in user数据 && user数据.用户名;
+    const hasAssistantStory = messages.some(message => {
+      if (message.message_id <= 0 || message.is_hidden) {
+        return false;
+      }
 
-    dataLogger.log('   特征字段检测:');
-    dataLogger.log('     - 性别:', hasGender ? `"${user数据.性别}"` : '无');
-    dataLogger.log('     - 境界:', hasRealm ? `"${user数据.境界}"` : '无');
-    dataLogger.log('     - 属性:', hasAttributes ? '存在' : '无');
-    dataLogger.log('     - 用户名:', hasUserName ? `"${user数据.用户名}"` : '无');
+      const rawContent = resolveAssistantMessageRawContent(message);
+      if (!rawContent.trim() || isFrontendLoaderOnlyMessage(rawContent)) {
+        return false;
+      }
 
-    // 至少需要存在性别或境界或用户名中的一个特征字段
-    const hasValidPlayerData = hasGender || hasRealm || hasUserName;
+      return normalizeDisplayedMessageContent(rawContent).length > 0;
+    });
 
-    if (hasValidPlayerData) {
-      dataLogger.log('✅ [hasSavedGame] 检测到有效user数据，返回 true');
-      return true;
-    } else {
-      dataLogger.log('⚠️ [hasSavedGame] user数据不完整（缺少特征字段），返回 false');
-      return false;
+    if (hasAssistantStory) {
+      dataLogger.log('✅ [detectGameSessionState] 已有有效剧情，返回 active');
+      return 'active';
     }
+
+    dataLogger.log('✅ [detectGameSessionState] 已有角色数据但没有有效剧情，返回 opening');
+    return 'opening';
   } catch (error) {
-    dataLogger.error('❌ [hasSavedGame] 检查存档失败:', error);
-    return false;
+    dataLogger.error('❌ [detectGameSessionState] 检查会话状态失败:', error);
+    return 'empty';
   }
+}
+
+/**
+ * 检查是否有保存的游戏存档。
+ * @deprecated 新流程请使用 detectGameSessionState() 区分 empty/opening/active。
+ */
+export function hasSavedGame(): boolean {
+  return detectGameSessionState() !== 'empty';
 }
 
 /**

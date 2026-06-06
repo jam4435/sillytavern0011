@@ -453,16 +453,20 @@ export interface OpeningStoryResult {
   error?: string;
 }
 
-export async function createOpeningStoryMessage(formData: NewGameFormData): Promise<OpeningStoryResult> {
+export async function initializeNewGameSession(formData: NewGameFormData): Promise<OpeningStoryResult> {
   try {
     const openingLine = getRandomOpeningLine();
-
-    await createChatMessages([{ role: 'assistant', message: openingLine }], { refresh: 'none' });
-
     const variableData = generateVariableData(formData);
-    eventEmit('era:insertByObject', variableData);
 
-    await new Promise<void>(resolve => eventOnce('era:writeDone', resolve));
+    updateVariablesWith(
+      variables => ({
+        ...variables,
+        stat_data: variableData,
+      }),
+      { type: 'chat' },
+    );
+
+    await setChatMessages([{ message_id: 0, is_hidden: true }], { refresh: 'none' });
 
     const initializationSignal = { timestamp: Date.now(), formData };
     initializeGlobal('GameInitialized', initializationSignal);
@@ -471,9 +475,14 @@ export async function createOpeningStoryMessage(formData: NewGameFormData): Prom
     return { success: true, content: openingLine };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    initLogger.error('❌ 创建开局楼层失败:', error);
+    initLogger.error('❌ 初始化新游戏失败:', error);
     return { success: false, error: errorMessage };
   }
+}
+
+/** @deprecated 新开局不再创建assistant开场楼，请使用 initializeNewGameSession。 */
+export async function createOpeningStoryMessage(formData: NewGameFormData): Promise<OpeningStoryResult> {
+  return initializeNewGameSession(formData);
 }
 
 export function validateAttributes(attributes: InitialAttributes): { valid: boolean; message?: string } {
