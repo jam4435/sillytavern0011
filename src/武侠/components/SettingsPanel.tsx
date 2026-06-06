@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_BACKGROUND_SETTINGS,
   DEFAULT_DISPLAY_SETTINGS,
@@ -57,20 +57,6 @@ const getVisibleEntries = (value: unknown): Array<[string | number, unknown]> =>
 };
 
 const getVisibleChildCount = (value: unknown): number => getVisibleEntries(value).length;
-
-const getHiddenMetadataCount = (value: unknown): number => {
-  if (Array.isArray(value)) {
-    return value.reduce((count, item) => count + getHiddenMetadataCount(item), 0);
-  }
-
-  if (!isRecord(value)) {
-    return 0;
-  }
-
-  return Object.entries(value).reduce((count, [key, item]) => (
-    count + (isHiddenVariableKey(key) ? 1 : getHiddenMetadataCount(item))
-  ), 0);
-};
 
 const getVariableTypeLabel = (value: unknown): string => {
   if (Array.isArray(value)) {
@@ -200,20 +186,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [variableStatusText, setVariableStatusText] = useState('');
   const [isVariablesDirty, setIsVariablesDirty] = useState(false);
   const [expandedVariablePaths, setExpandedVariablePaths] = useState<Set<string>>(
-    () => new Set([ROOT_VARIABLE_PATH_KEY]),
+    () => new Set(),
   );
   const [variableSearch, setVariableSearch] = useState('');
 
   const normalizedVariableSearch = variableSearch.trim().toLowerCase();
-
-  const visibleStatDataTopLevelCount = useMemo(
-    () => statData ? getVisibleChildCount(statData) : 0,
-    [statData],
-  );
-  const hiddenMetadataCount = useMemo(
-    () => statData ? getHiddenMetadataCount(statData) : 0,
-    [statData],
-  );
+  const visibleStatDataEntries = statData
+    ? getVisibleEntries(statData).filter(([key, value]) =>
+      matchesVariableSearch(key, value, normalizedVariableSearch)
+    )
+    : [];
 
   // 更新单个设置项
   const updateSetting = useCallback(<K extends keyof DisplaySettings>(
@@ -228,14 +210,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
       const nextStatData = variables.stat_data;
       if (!isRecord(nextStatData)) {
-        throw new Error('聊天变量中没有 stat_data 对象');
+        throw new Error('没有可读取的变量对象');
       }
 
       setStatData(nextStatData);
-      setVariableStatus('success');
-      setVariableStatusText('stat_data 已读取');
+      setVariableStatus('idle');
+      setVariableStatusText('');
       setIsVariablesDirty(false);
-      setExpandedVariablePaths(new Set([ROOT_VARIABLE_PATH_KEY]));
+      setExpandedVariablePaths(new Set());
     } catch (error) {
       setVariableStatus('error');
       setVariableStatusText(`读取失败：${getErrorMessage(error)}`);
@@ -245,7 +227,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const saveStatData = useCallback(() => {
     try {
       if (!statData) {
-        throw new Error('没有可保存的 stat_data');
+        throw new Error('没有可保存的变量数据');
       }
 
       const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
@@ -256,8 +238,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       if (isRecord(savedStatData)) {
         setStatData(savedStatData);
       }
-      setVariableStatus('success');
-      setVariableStatusText('stat_data 已保存');
+      setVariableStatus('idle');
+      setVariableStatusText('');
       setIsVariablesDirty(false);
     } catch (error) {
       setVariableStatus('error');
@@ -1082,18 +1064,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="settings-section variables-section">
             <h4 className="settings-section-title">
               <span className="diamond-bullet"></span>
-              stat_data
+              变量
             </h4>
-            <p className="settings-description">
-              只读取当前聊天变量下的 stat_data，并以结构树查看和修改；$meta 与 $template 会自动隐藏。
-            </p>
 
             <div className="variables-toolbar">
-              <div className="variables-scope-display">
-                <span>聊天变量</span>
-                <strong>stat_data</strong>
-              </div>
-
               <div className="variables-field variables-search-field">
                 <label className="variables-field-label">搜索</label>
                 <input
@@ -1127,29 +1101,39 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
             <div className="variables-tree">
               {statData ? (
-                <VariableTreeNode
-                  label="stat_data"
-                  value={statData}
-                  path={[]}
-                  depth={0}
-                  expandedPaths={expandedVariablePaths}
-                  normalizedSearch={normalizedVariableSearch}
-                  onToggle={toggleVariablePath}
-                  onValueChange={handleVariableLeafChange}
-                />
+                visibleStatDataEntries.length > 0 ? (
+                  visibleStatDataEntries.map(([key, value]) => (
+                    <VariableTreeNode
+                      key={String(key)}
+                      label={key}
+                      value={value}
+                      path={[key]}
+                      depth={0}
+                      expandedPaths={expandedVariablePaths}
+                      normalizedSearch={normalizedVariableSearch}
+                      onToggle={toggleVariablePath}
+                      onValueChange={handleVariableLeafChange}
+                    />
+                  ))
+                ) : (
+                  <div className="variables-empty">
+                    <Icons.Variables size={32} />
+                    <p>没有可显示的变量</p>
+                  </div>
+                )
               ) : (
                 <div className="variables-empty">
                   <Icons.Variables size={32} />
-                  <p>尚未读取到 stat_data</p>
+                  <p>尚未读取到变量数据</p>
                 </div>
               )}
             </div>
 
-            <div className="variables-editor-meta">
-              <span>{visibleStatDataTopLevelCount} 个可见顶层键</span>
-              <span>已隐藏 {hiddenMetadataCount} 个元数据节点</span>
-              {isVariablesDirty && <span className="dirty">有未保存修改</span>}
-            </div>
+            {isVariablesDirty && (
+              <div className="variables-editor-meta">
+                <span className="dirty">有未保存修改</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -1295,9 +1279,6 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
   const visibleEntries = normalizedSearch
     ? rawEntries.filter(([childKey, childValue]) => matchesVariableSearch(childKey, childValue, normalizedSearch))
     : rawEntries;
-  const hiddenDirectCount = isRecord(value)
-    ? Object.keys(value).filter(key => isHiddenVariableKey(key)).length
-    : 0;
 
   return (
     <div className={`variable-node ${isRoot ? 'root' : ''} ${isContainer ? 'branch' : 'leaf'}`}>
@@ -1319,13 +1300,7 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
 
         <span className="variable-node-key" title={String(label)}>{String(label)}</span>
         <span className="variable-node-type">{getVariableTypeLabel(value)}</span>
-        {hiddenDirectCount > 0 && (
-          <span className="variable-node-hidden">隐藏 {hiddenDirectCount}</span>
-        )}
-
-        {isContainer ? (
-          <span className="variable-node-preview">{formatVariablePreview(value)}</span>
-        ) : (
+        {!isContainer && (
           <VariableLeafEditor
             value={value}
             path={path}
