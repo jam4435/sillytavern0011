@@ -33,6 +33,7 @@ import {
 const EVENT_KIND_PATTERN = /(事件条目-|登场事件-|成长条目-)/;
 const CHAPTER_EVENT_PATTERN = /^第[0-9一二三四五六七八九十百千万]+回-/;
 const CHAPTER_SEQUENCE_PATTERN = /^(第[0-9一二三四五六七八九十百千万]+回-[0-9]+-)/;
+const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件'];
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -41,6 +42,25 @@ function isPlainObject(value) {
 function cloneJson(value) {
   if (value === undefined) return value;
   return JSON.parse(JSON.stringify(value));
+}
+
+function countExpectedEventKeys(eventSystemPatch) {
+  return EVENT_SYSTEM_BUCKETS.reduce((total, bucket) => {
+    const bucketPatch = eventSystemPatch?.[bucket];
+    return total + (isPlainObject(bucketPatch) ? Object.keys(bucketPatch).length : 0);
+  }, 0);
+}
+
+function countPersistedEventKeys(currentEventSystem, eventSystemPatch) {
+  return EVENT_SYSTEM_BUCKETS.reduce((total, bucket) => {
+    const currentBucket = currentEventSystem?.[bucket];
+    const bucketPatch = eventSystemPatch?.[bucket];
+    if (!isPlainObject(currentBucket) || !isPlainObject(bucketPatch)) {
+      return total;
+    }
+
+    return total + Object.keys(bucketPatch).filter(key => key in currentBucket).length;
+  }, 0);
 }
 
 function getEventFamilyParts(eventName) {
@@ -275,11 +295,27 @@ export async function initializeEventList(eventDefinitions) {
     );
     debugGroupEnd();
 
+    const 未开始事件对象 = Object.fromEntries(未开始事件.map(name => [name, eventDefinitions[name].触发条件]));
+    const 进行中事件对象 = Object.fromEntries(
+      应立即触发事件.map(name => [name, getEndTime(eventDefinitions[name])]),
+    );
+    const 初始化完成事件对象 = Object.fromEntries(
+      [...应立即完成的登场事件, ...已过期事件].map(name => [name, 0]),
+    );
+    const expectedEventSystemPatch = {};
+    if (未开始事件.length > 0) {
+      expectedEventSystemPatch.未发生事件 = 未开始事件对象;
+    }
+    if (应立即触发事件.length > 0) {
+      expectedEventSystemPatch.进行中事件 = 进行中事件对象;
+    }
+    if (Object.keys(初始化完成事件对象).length > 0) {
+      expectedEventSystemPatch.已完成事件 = 初始化完成事件对象;
+    }
+
     // ==================== 1. 添加未开始的事件到"未发生事件" ====================
     if (未开始事件.length > 0) {
       debugGroup(`📝 添加 ${未开始事件.length} 个未开始事件`);
-
-      const 未开始事件对象 = Object.fromEntries(未开始事件.map(name => [name, eventDefinitions[name].触发条件]));
 
       const payload = {
         事件系统: { 未发生事件: 未开始事件对象 },
@@ -295,10 +331,6 @@ export async function initializeEventList(eventDefinitions) {
     // ==================== 2. 批量触发应立即开始的事件 ====================
     if (应立即触发事件.length > 0) {
       debugGroup(`▶️ 批量触发 ${应立即触发事件.length} 个事件`);
-
-      const 进行中事件对象 = Object.fromEntries(
-        应立即触发事件.map(name => [name, getEndTime(eventDefinitions[name])]),
-      );
 
       const payload = {
         事件系统: { 进行中事件: 进行中事件对象 },
@@ -335,7 +367,19 @@ export async function initializeEventList(eventDefinitions) {
     }
 
     // 验证最终结果
-    const verifyVars = await getVariables({ type: 'chat' });
+    let verifyVars = await getVariables({ type: 'chat' });
+    const expectedEventCount = countExpectedEventKeys(expectedEventSystemPatch);
+    const persistedEventCount = countPersistedEventKeys(verifyVars?.stat_data?.事件系统, expectedEventSystemPatch);
+
+    if (expectedEventCount > 0 && persistedEventCount < expectedEventCount) {
+      logWarning(
+        `事件初始化 direct write 未完全落库: ${persistedEventCount}/${expectedEventCount}，切换 ERA 持久写入兜底`,
+      );
+      await writeEraInsert({ 事件系统: expectedEventSystemPatch }, 'initialize-event-system-fallback');
+      verifyVars = await getVariables({ type: 'chat' });
+      toastr.warning('事件初始化已切换为 ERA 持久写入兜底');
+    }
+
     if (isDebugEnabled()) {
       debugGroupCollapsed('🔍 初始化后的事件系统状态');
       console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data?.事件系统 || {})));
