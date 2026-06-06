@@ -382,11 +382,12 @@ const App: React.FC = () => {
           style={{
             background: `linear-gradient(
               to bottom,
-              ${displaySettings.backgroundColor} 0%,
-              ${displaySettings.backgroundColor}b3 20%,
-              transparent 50%,
-              ${displaySettings.backgroundColor}b3 80%,
-              ${displaySettings.backgroundColor} 100%
+              ${displaySettings.backgroundColor}cc 0%,
+              ${displaySettings.backgroundColor}55 18%,
+              transparent 38%,
+              transparent 68%,
+              ${displaySettings.backgroundColor}55 86%,
+              ${displaySettings.backgroundColor}cc 100%
             )`,
           }}
         ></div>

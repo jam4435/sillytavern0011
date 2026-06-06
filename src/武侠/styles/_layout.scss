@@ -55,7 +55,7 @@
   background-position: center;
   transition: opacity 0.3s ease;
   opacity: 0.15;
-  background-image: url('https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?q=80&w=1920&auto=format&fit=crop&blur=10');
+  background-image: url('https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?q=80&w=1920&auto=format&fit=crop');
 }
 
 .bg-gradient-vert {
@@ -74,8 +74,8 @@
 .bg-radial {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% 30%, transparent 0%, rgba(12, 10, 9, 0.5) 40%, var(--bg-dark) 100%);
-  opacity: 0.9;
+  background: radial-gradient(ellipse at 50% 30%, transparent 0%, rgba(12, 10, 9, 0.22) 55%, rgba(12, 10, 9, 0.72) 100%);
+  opacity: 0.65;
 }
 
 // 武侠风格装饰性背景元素

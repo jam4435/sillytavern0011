@@ -39,8 +39,6 @@
   align-items: center;
   justify-content: center;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   box-shadow:
     0 2px 12px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(181, 137, 80, 0.1);
@@ -118,8 +116,6 @@
   box-shadow:
     4px 0 20px rgba(0, 0, 0, 0.4),
     inset -1px 0 0 rgba(181, 137, 80, 0.05);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   z-index: 100;
   flex-shrink: 0;
   overflow-y: auto;
