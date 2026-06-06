@@ -43,6 +43,7 @@ const STEP_DESCRIPTIONS = {
 const AI_WORKSPACE_SURFACE = 'rgba(0,0,0,.68)';
 const EMPTY_PREVIEW_TEXT = '尚未生成预览。';
 const EMPTY_PLAN_TEXT = '尚未生成改造方案。';
+const MANUAL_CHAT_CONTEXT_NAME = '__ai_workspace_manual_chat_context__';
 
 function createEmptyModeState() {
   return {
@@ -152,6 +153,37 @@ function currentChatContextSettings() {
   return {
     messageCount: normalizeChatContextCount($('#ai-workspace-chat-context-count', parentDoc()).val()),
   };
+}
+
+function buildManualChatContextMessages(text = '') {
+  const content = `${text || ''}`.trim();
+  if (!content) {
+    return [];
+  }
+  return [{
+    message_id: -1,
+    name: MANUAL_CHAT_CONTEXT_NAME,
+    role: 'system',
+    message: content,
+  }];
+}
+
+function isManualChatContextMessages(chatMessages = []) {
+  return Array.isArray(chatMessages)
+    && chatMessages.length === 1
+    && chatMessages[0]?.name === MANUAL_CHAT_CONTEXT_NAME;
+}
+
+function currentChatContextText() {
+  const $preview = $('#ai-workspace-chat-context-preview', parentDoc());
+  if ($preview.length) {
+    return ($preview.val() || '').toString();
+  }
+  return formatChatContextPreview(state.chatMessages);
+}
+
+function currentChatMessagesForRequest() {
+  return buildManualChatContextMessages(currentChatContextText());
 }
 
 export function isDesktopAiWorkspace() {
@@ -287,6 +319,9 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
   if ($('#ai-workspace-chat-context-count', parentDoc()).length) {
     state.chatContext = currentChatContextSettings();
   }
+  if ($('#ai-workspace-chat-context-preview', parentDoc()).length) {
+    state.chatMessages = currentChatMessagesForRequest();
+  }
   if ($('#ai-workspace-reference-material', parentDoc()).length) {
     state.referenceMaterial = ($('#ai-workspace-reference-material', parentDoc()).val() || '').toString();
   }
@@ -413,6 +448,9 @@ function formatChatContextPreview(chatMessages = []) {
   if (!Array.isArray(chatMessages) || !chatMessages.length) {
     return '';
   }
+  if (isManualChatContextMessages(chatMessages)) {
+    return chatMessages[0]?.message || '';
+  }
 
   return chatMessages
     .map(message => {
@@ -426,13 +464,12 @@ function formatChatContextPreview(chatMessages = []) {
 }
 
 function renderChatContextPreview() {
+  const previewText = formatChatContextPreview(state.chatMessages);
   $('#ai-workspace-chat-context-count', parentDoc()).val(state.chatContext.messageCount);
-  $('#ai-workspace-chat-context-preview', parentDoc()).val(
-    formatChatContextPreview(state.chatMessages) || '尚未获取聊天上下文。',
-  );
+  $('#ai-workspace-chat-context-preview', parentDoc()).val(previewText);
   $('#ai-workspace-chat-context-status', parentDoc()).text(
-    state.chatMessages.length
-      ? `已载入最近 ${state.chatMessages.length} 条聊天消息，将注入到 <聊天上下文>。`
+    previewText.trim()
+      ? `聊天上下文已填写 ${previewText.trim().length} 个字符，将注入到 <聊天上下文>。`
       : '尚未获取聊天消息。',
   );
 }
@@ -467,7 +504,10 @@ function renderAssistantHistory() {
       <div class="ai-assistant-message${isAssistant ? ' is-assistant' : ' is-user'}">
         <div class="ai-assistant-message-meta">${isAssistant ? 'AI 助手' : '用户'}</div>
         <div class="ai-assistant-message-body">${_.escape(item.content || '')}</div>
-        ${isAssistant ? `<div class="ai-assistant-actions"><button type="button" class="ai-assistant-pick" data-history-index="${index}">选取到资料区</button></div>` : ''}
+        <div class="ai-assistant-actions">
+          ${isAssistant ? `<button type="button" class="ai-assistant-pick" data-history-index="${index}">选取到资料区</button>` : ''}
+          <button type="button" class="ai-assistant-delete" data-history-index="${index}">删除</button>
+        </div>
       </div>
     `);
   });
@@ -834,6 +874,25 @@ function rebuildPreviewResult(modeKey) {
   };
 }
 
+function excludePreviewItem(modeKey, uid) {
+  const mode = state.modes[modeKey];
+  if (!mode.previewResult || !Array.isArray(mode.previewResult.items)) {
+    return;
+  }
+
+  const numericUid = Number(uid);
+  const beforeCount = mode.previewResult.items.length;
+  mode.previewResult.items = mode.previewResult.items.filter(item => Number(item?.uid) !== numericUid);
+  if (mode.previewResult.items.length === beforeCount) {
+    return;
+  }
+
+  rebuildPreviewResult(modeKey);
+  renderPreview(modeKey);
+  persistSettings({ mirrorModeKey: modeKey });
+  setModeStatus(modeKey, `已从本次预览中排除 UID ${numericUid}，不会应用该项。`);
+}
+
 function buildPreviewModalSections(item, mode) {
   const beforeEntry = item?.beforeEntry || {};
   const afterEntry = item?.afterEntry || {};
@@ -931,7 +990,10 @@ function renderPreviewDetail(modeKey, uid = null) {
         <div class="ai-preview-item-title">${_.escape(item.afterEntry?.name || item.beforeEntry?.name || item.title || '条目')} (UID: ${item.uid})</div>
         <div class="ai-text">${item.changed ? '可直接编辑预览内容。' : '当前无实际变更，可手动编辑后应用。'}</div>
       </div>
-      <button type="button" id="ai-workspace-preview-detail-regenerate">重新生成此条</button>
+      <div class="ai-preview-detail-actions">
+        <button type="button" id="ai-workspace-preview-detail-regenerate">重新生成此条</button>
+        <button type="button" class="ai-preview-exclude" data-preview-uid="${item.uid}">排除此项</button>
+      </div>
     </div>
     <div class="ai-preview-modal-content-inline">
       ${buildPreviewModalSections(item, mode).map(section => `
@@ -1096,15 +1158,20 @@ function renderPreview(modeKey, previewResult = null) {
     return;
   }
 
-  const activeUid = Number($('#ai-workspace-preview-detail', parentDoc()).attr('data-preview-uid'))
-    || Number(mode.previewResult.items[0]?.uid);
+  const currentUid = Number($('#ai-workspace-preview-detail', parentDoc()).attr('data-preview-uid'));
+  const activeUid = mode.previewResult.items.some(item => Number(item?.uid) === currentUid)
+    ? currentUid
+    : Number(mode.previewResult.items[0]?.uid);
   mode.previewResult.items.forEach(item => {
     const diffs = item.diffs.length
       ? item.diffs.map(diff => renderPreviewDiff(diff)).join('')
       : '<div class="ai-preview-diff-after">无实际变更。</div>';
     $list.append(`
       <div class="ai-preview-item${Number(item.uid) === activeUid ? ' is-active' : ''}" data-preview-uid="${item.uid}" title="点击查看完整修改">
-        <div class="ai-preview-item-title">${_.escape(item.title)} (UID: ${item.uid})</div>
+        <div class="ai-preview-item-header">
+          <div class="ai-preview-item-title">${_.escape(item.title)} (UID: ${item.uid})</div>
+          <button type="button" class="ai-preview-exclude" data-preview-uid="${item.uid}">排除</button>
+        </div>
         ${diffs}
       </div>
     `);
@@ -1225,16 +1292,12 @@ function setReferenceMaterial(nextValue, { invalidateOutputs = false, syncTextar
 async function refreshChatContext() {
   state.chatContext = currentChatContextSettings();
   const messageCount = state.chatContext.messageCount;
-  const hadOutputs = ['direct', 'plan'].some(modeKey => state.modes[modeKey].planningResult || state.modes[modeKey].previewResult);
 
   if (messageCount <= 0) {
     state.chatMessages = [];
     renderChatContextPreview();
     persistSettings({ mirrorModeKey: currentModeKey() });
-    invalidateSharedInfoOutputs('聊天上下文已清空，请重新生成改造方案或预览。');
-    if (!hadOutputs) {
-      setModeStatus(currentModeKey(), '聊天上下文已清空。');
-    }
+    setModeStatus(currentModeKey(), '聊天上下文已清空。若继续使用旧计划/预览，注意其未基于当前上下文重新生成。');
     return;
   }
 
@@ -1255,10 +1318,25 @@ async function refreshChatContext() {
 
   renderChatContextPreview();
   persistSettings({ mirrorModeKey: currentModeKey() });
-  invalidateSharedInfoOutputs('聊天上下文已更新，请重新生成改造方案或预览。');
-  if (!hadOutputs) {
-    setModeStatus(currentModeKey(), `已刷新聊天上下文，共载入 ${state.chatMessages.length} 条消息。`);
-  }
+  setModeStatus(currentModeKey(), `已刷新聊天上下文，共载入 ${state.chatMessages.length} 条消息。建议重新生成计划或预览。`);
+}
+
+function handleChatContextEdited() {
+  state.chatMessages = currentChatMessagesForRequest();
+  $('#ai-workspace-chat-context-status', parentDoc()).text(
+    currentChatContextText().trim()
+      ? `聊天上下文已填写 ${currentChatContextText().trim().length} 个字符，将注入到 <聊天上下文>。`
+      : '尚未获取聊天消息。',
+  );
+  persistSettings({ mirrorModeKey: currentModeKey() });
+  setModeStatus(currentModeKey(), '聊天上下文已修改，建议重新生成计划或预览。');
+}
+
+function handleChatContextClear() {
+  state.chatMessages = [];
+  renderChatContextPreview();
+  persistSettings({ mirrorModeKey: currentModeKey() });
+  setModeStatus(currentModeKey(), '聊天上下文已清空。若继续使用旧计划/预览，注意其未基于当前上下文重新生成。');
 }
 
 function buildAssistantPrompt(userInput, saved = settings(), chatHistory = state.assistantChatHistory) {
@@ -1344,6 +1422,30 @@ function appendAssistantReplyToReferenceMaterial(index) {
     : historyItem.content;
   setReferenceMaterial(nextValue, { invalidateOutputs: true });
   window.toastr?.success('已追加到资料区');
+}
+
+function deleteAssistantHistoryItem(index) {
+  const numericIndex = Number(index);
+  if (!Number.isInteger(numericIndex) || numericIndex < 0 || numericIndex >= state.assistantChatHistory.length) {
+    return;
+  }
+
+  state.assistantChatHistory.splice(numericIndex, 1);
+  renderAssistantHistory();
+  persistSettings({ mirrorModeKey: currentModeKey() });
+  setAssistantStatus('已删除该条助手历史。');
+}
+
+function clearAssistantHistory() {
+  if (!state.assistantChatHistory.length) {
+    setAssistantStatus('助手历史已经为空。');
+    return;
+  }
+
+  state.assistantChatHistory = [];
+  renderAssistantHistory();
+  persistSettings({ mirrorModeKey: currentModeKey() });
+  setAssistantStatus('助手历史已清空。');
 }
 
 function handlePreviewModalSave() {
@@ -1645,9 +1747,13 @@ function buildInfoResourcesMarkup() {
             <label>&nbsp;</label>
             <button type="button" id="ai-workspace-chat-context-refresh">刷新聊天上下文</button>
           </div>
+          <div class="ai-field ai-btn-field">
+            <label>&nbsp;</label>
+            <button type="button" id="ai-workspace-chat-context-clear">清空上下文</button>
+          </div>
         </div>
         <div id="ai-workspace-chat-context-status" class="ai-text">尚未获取聊天消息。</div>
-        <textarea id="ai-workspace-chat-context-preview" class="ai-readonly-textarea" readonly></textarea>
+        <textarea id="ai-workspace-chat-context-preview" class="ai-chat-context-textarea" placeholder="刷新最近消息后，可直接删掉不想作为参考的内容。"></textarea>
       </div>
       <div class="ai-subpanel">
         <div class="ai-subpanel-header">
@@ -1669,6 +1775,7 @@ function buildInfoResourcesMarkup() {
             </div>
             <div class="ai-toolbar">
               <button type="button" id="ai-workspace-assistant-send">发送给 AI 助手</button>
+              <button type="button" id="ai-workspace-assistant-clear">清空历史</button>
               <span id="ai-workspace-assistant-status" class="ai-text"></span>
             </div>
           </div>
