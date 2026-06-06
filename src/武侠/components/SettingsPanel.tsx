@@ -138,18 +138,30 @@ const setValueAtVariablePath = (
     const isLast = index === path.length - 1;
 
     if (isLast) {
-      cursor[segment as keyof typeof cursor] = nextValue as never;
+      if (Array.isArray(cursor) && typeof segment === 'number') {
+        cursor[segment] = nextValue;
+      } else if (!Array.isArray(cursor)) {
+        cursor[String(segment)] = nextValue;
+      }
       return;
     }
 
-    const currentValue = cursor[segment as keyof typeof cursor] as unknown;
+    const currentValue = Array.isArray(cursor) && typeof segment === 'number'
+      ? cursor[segment]
+      : !Array.isArray(cursor)
+        ? cursor[String(segment)]
+        : undefined;
     const nextContainer = Array.isArray(currentValue)
       ? [...currentValue]
       : isRecord(currentValue)
         ? { ...currentValue }
         : {};
 
-    cursor[segment as keyof typeof cursor] = nextContainer as never;
+    if (Array.isArray(cursor) && typeof segment === 'number') {
+      cursor[segment] = nextContainer;
+    } else if (!Array.isArray(cursor)) {
+      cursor[String(segment)] = nextContainer;
+    }
     cursor = nextContainer;
   });
 
