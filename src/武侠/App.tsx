@@ -5,6 +5,7 @@ import GameContent from './components/GameContent';
 import { Icons } from './components/Icons';
 import Modal from './components/Modal';
 import NewGameSetup from './components/NewGameSetup';
+import SaveLoadPanel from './components/SaveLoadPanel';
 import {
   CharacterPanel,
   EventsPanel,
@@ -30,6 +31,7 @@ import {
 import { ActivePanel } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { gameLogger, initLogger } from './utils/logger';
+import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
 import {
   applyRegexRules,
   applySettingsToDOM,
@@ -80,9 +82,10 @@ const App: React.FC = () => {
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
+  const [canRegenerate, setCanRegenerate] = useState(false);
 
   // 使用消息处理 hook
-  const { handleSendMessage } = useMessageHandler({
+  const { handleSendMessage, handleRegenerateLastAssistant } = useMessageHandler({
     setIsLoading,
     showLoading,
     showError,
@@ -115,6 +118,15 @@ const App: React.FC = () => {
       showError(`自动总结失败: ${error.message}`);
     },
   });
+
+  useEffect(() => {
+    if (currentPage !== 'game' || isLoading) {
+      setCanRegenerate(false);
+      return;
+    }
+
+    setCanRegenerate(canRegenerateLastAssistantSwipe());
+  }, [currentPage, currentMaintext, currentOptions, isLoading]);
 
   // 检查是否存在存档，如果存在则直接进入游戏
   useEffect(() => {
@@ -329,6 +341,7 @@ const App: React.FC = () => {
       case ActivePanel.MAP: return "九州舆图";
       case ActivePanel.SOCIAL: return "江湖侠缘";
       case ActivePanel.SETTINGS: return "界面设置";
+      case ActivePanel.SAVE_LOAD: return "存档与分叉";
       default: return "";
     }
   };
@@ -347,6 +360,12 @@ const App: React.FC = () => {
           onSettingsChange={handleSettingsChange}
           debugLogs={debugLogs}
           onClearDebugLogs={clearDebugLogs}
+        />
+      );
+      case ActivePanel.SAVE_LOAD: return (
+        <SaveLoadPanel
+          gameState={gameState}
+          onClose={closeModal}
         />
       );
       default: return null;
@@ -493,6 +512,15 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="header-right">
+                    <button
+                      type="button"
+                      className={`header-action-btn ${activePanel === ActivePanel.SAVE_LOAD ? 'active' : ''}`}
+                      onClick={() => setActivePanel(ActivePanel.SAVE_LOAD)}
+                      title="存档与分叉"
+                      aria-label="存档与分叉"
+                    >
+                      <Icons.Variables size={14} />
+                    </button>
                     <FullscreenButton className="header-fullscreen-btn header-fullscreen-btn-small" />
 
                     <div className="status-bars-container">
@@ -537,6 +565,10 @@ const App: React.FC = () => {
             {/* 底部聊天输入区域 */}
             <ChatInput
               onSend={handleSendMessage}
+              onRegenerate={handleRegenerateLastAssistant}
+              canRegenerate={canRegenerate}
+              isRegenerating={isLoading}
+              disabled={isLoading}
               placeholder="书写你的江湖故事..."
             />
         </main>
