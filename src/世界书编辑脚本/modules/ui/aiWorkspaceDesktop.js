@@ -669,6 +669,17 @@ function buildDiagnosticsErrorSummary(previewResult) {
   return lines.join('\n');
 }
 
+function buildPreviewWarningsSummary(previewResult) {
+  const warnings = Array.isArray(previewResult?.warnings) ? previewResult.warnings : [];
+  if (!warnings.length) {
+    return '';
+  }
+
+  return warnings
+    .map(item => `${item.title || '警告'}: ${summarizePreviewError(item.warning || '')}`)
+    .join('\n');
+}
+
 function getPreviewStatusText(previewResult) {
   const diagnostics = previewResult?.summary?.diagnostics;
   if (diagnostics?.stopped) {
@@ -1129,21 +1140,23 @@ function renderPreview(modeKey, previewResult = null) {
 
   const $errors = $('#ai-workspace-preview-errors', parentDoc());
   const diagnosticsSummary = buildDiagnosticsErrorSummary(mode.previewResult);
+  const warningsSummary = buildPreviewWarningsSummary(mode.previewResult);
   if (diagnosticsSummary) {
-    $errors.addClass('has-errors').text(diagnosticsSummary);
+    $errors.addClass('has-errors').text([diagnosticsSummary, warningsSummary].filter(Boolean).join('\n'));
   } else if (Array.isArray(mode.previewResult?.errors) && mode.previewResult.errors.length) {
+    const errorText = mode.previewResult.errors
+      .map(item => {
+        const summaryText = /Got response status 503|response status 503|\b503\b/i.test(item.error || '')
+          ? 'OpenAI兼容后端返回 503，请优先检查 URL / 模型 / 流式支持 / 上游服务状态。'
+          : summarizePreviewError(item.error);
+        return `${item.title}: ${summaryText}`;
+      })
+      .join('\n');
     $errors
       .addClass('has-errors')
-      .text(
-        mode.previewResult.errors
-          .map(item => {
-            const summaryText = /Got response status 503|response status 503|\b503\b/i.test(item.error || '')
-              ? 'OpenAI兼容后端返回 503，请优先检查 URL / 模型 / 流式支持 / 上游服务状态。'
-              : summarizePreviewError(item.error);
-            return `${item.title}: ${summaryText}`;
-          })
-          .join('\n'),
-      );
+      .text([warningsSummary, errorText].filter(Boolean).join('\n'));
+  } else if (warningsSummary) {
+    $errors.addClass('has-errors').text(warningsSummary);
   } else {
     $errors.removeClass('has-errors').empty();
   }
@@ -1482,7 +1495,7 @@ async function handlePreviewModalRegenerate() {
       readonlyEntryUids: Array.from(mode.readonlyEntryUids),
       planningResult: mode.planningResult,
       instruction: mode.instruction,
-      chatMessages: state.chatMessages,
+      chatMessages: currentChatMessagesForRequest(),
       referenceMaterial: state.referenceMaterial,
       fieldOptions: mode.editableFields,
       promptSettings: mode.promptSettings,
@@ -2573,7 +2586,7 @@ async function handlePlan() {
     const planningResult = await generateAiPlan({
       lorebookName: mode.lorebookName,
       instruction: mode.instruction,
-      chatMessages: state.chatMessages,
+      chatMessages: currentChatMessagesForRequest(),
       referenceMaterial: state.referenceMaterial,
       lockedEditableUids: Array.from(mode.selectedEntryUids),
       lockedReadonlyUids: Array.from(mode.readonlyEntryUids),
@@ -2643,7 +2656,7 @@ async function handlePreview() {
       readonlyEntryUids: Array.from(mode.readonlyEntryUids),
       planningResult: mode.planningResult,
       instruction: mode.instruction,
-      chatMessages: state.chatMessages,
+      chatMessages: currentChatMessagesForRequest(),
       referenceMaterial: state.referenceMaterial,
       fieldOptions: mode.editableFields,
       promptSettings: mode.promptSettings,

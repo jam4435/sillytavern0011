@@ -88,10 +88,14 @@ const GameContent: React.FC<GameContentProps> = ({
         .map(paragraph => paragraph.trim())
         .filter(paragraph => paragraph) // 过滤空段落
         .map(paragraph => {
+          const blockClass = HTML_BLOCK_START_REGEX.test(paragraph) ? ' maintext-paragraph--html-block' : '';
+          if (blockClass) {
+            return `<div class="maintext-paragraph${blockClass}">${paragraph}</div>`;
+          }
+
           // 段落内的单个换行转换为 <br>
           const lines = paragraph.split('\n').map(line => line.trim()).filter(line => line);
-          const blockClass = HTML_BLOCK_START_REGEX.test(paragraph) ? ' maintext-paragraph--html-block' : '';
-          return `<div class="maintext-paragraph${blockClass}">${lines.join('<br />')}</div>`;
+          return `<div class="maintext-paragraph">${lines.join('<br />')}</div>`;
         })
         .join('');
       return (

@@ -1424,6 +1424,7 @@ function buildSingleBatchResult({
     targetCount: targetEntries.length,
     items,
     errors: adoptedAttempt?.success ? [] : (resolvedAttempt?.errors || []),
+    warnings: adoptedAttempt?.warnings || [],
     debug: {
       requestPrompt: resolvedAttempt?.requestPrompt || '',
       rawResponse: resolvedAttempt?.rawResponse || '',
@@ -2118,11 +2119,23 @@ function buildAttemptErrors({ targetEntries, lastError, requestPrompt, rawText, 
 function buildAttemptItems({ targetEntries, parsedDrafts, normalizedFieldOptions, rawText, sourceMode = 'direct' }) {
   const items = [];
   const errors = [];
+  const warnings = [];
   const draftsByUid = new Map(
     parsedDrafts
       .map(draft => [ensureNumericUID(draft?.uid), draft])
       .filter(([uid, draft]) => uid >= 0 && isPlainObject(draft)),
   );
+  const targetUidSet = new Set(targetEntries.map(entry => ensureNumericUID(entry.uid)));
+  const extraUids = Array.from(draftsByUid.keys()).filter(uid => !targetUidSet.has(uid));
+  if (extraUids.length) {
+    warnings.push({
+      title: 'AI 返回额外 UID',
+      warning: buildDetailedErrorMessage('AI 返回了本批目标之外的 UID，已忽略。', [
+        `额外 UID: ${_.uniq(extraUids).join(', ')}`,
+        `本批目标 UID: ${Array.from(targetUidSet).join(', ') || '(无)'}`,
+      ]),
+    });
+  }
 
   targetEntries.forEach(entry => {
     const uid = ensureNumericUID(entry.uid);
@@ -2170,7 +2183,7 @@ function buildAttemptItems({ targetEntries, parsedDrafts, normalizedFieldOptions
     }
   });
 
-  return { items, errors };
+  return { items, errors, warnings };
 }
 
 async function executePreviewAttempt(options = {}) {
@@ -2250,7 +2263,7 @@ async function executePreviewAttempt(options = {}) {
     }
   }
 
-  const { items, errors } = lastError
+  const { items, errors, warnings } = lastError
     ? {
       items: [],
       errors: buildAttemptErrors({
@@ -2260,6 +2273,7 @@ async function executePreviewAttempt(options = {}) {
         rawText,
         parsedJsonCandidate,
       }),
+      warnings: [],
     }
     : buildAttemptItems({
       targetEntries,
@@ -2287,6 +2301,7 @@ async function executePreviewAttempt(options = {}) {
     success: !lastError,
     items,
     errors,
+    warnings,
     rawResponse: rawText,
     parsedJsonCandidate,
     errorDetails,
@@ -2540,6 +2555,7 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
 
     const items = batchResults.flatMap(result => result.items || []);
     const errors = batchResults.flatMap(result => result.errors || []);
+    const warnings = batchResults.flatMap(result => result.warnings || []);
     const changedCount = items.filter(item => item.changed).length;
     const debug = mergeDebugOutput(batchPlans, batchResults);
     const diagnostics = mergeDiagnosticsSummary(batchResults);
@@ -2568,6 +2584,7 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
       targetCount: targetEntries.length,
       items,
       errors,
+      warnings,
       debug,
       summary: {
         total: targetEntries.length,
