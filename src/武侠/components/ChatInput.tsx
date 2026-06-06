@@ -1,8 +1,12 @@
+import { RotateCcw } from 'lucide-react';
 import React, { useCallback, useRef, useState } from 'react';
 import { uiLogger } from '../utils/logger';
 
 interface ChatInputProps {
   onSend: (message: string) => void | Promise<void>;
+  onRegenerate?: () => void | Promise<void>;
+  canRegenerate?: boolean;
+  isRegenerating?: boolean;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -13,6 +17,9 @@ interface ChatInputProps {
  */
 const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
+  onRegenerate,
+  canRegenerate = false,
+  isRegenerating = false,
   placeholder = '书写你的江湖故事...',
   disabled = false
 }) => {
@@ -21,6 +28,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputDisabled = disabled || isSubmitting;
+  const regenerateDisabled = disabled || isSubmitting || isRegenerating || !canRegenerate || !onRegenerate;
 
   // 自动调整文本框高度
   const adjustHeight = useCallback(() => {
@@ -73,6 +81,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  const handleRegenerate = async () => {
+    if (regenerateDisabled || !onRegenerate) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onRegenerate();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className={`chat-input-wrapper ${isFocused ? 'focused' : ''}`}>
       {/* 装饰性顶部边框 */}
@@ -106,6 +127,16 @@ const ChatInput: React.FC<ChatInputProps> = ({
             <span className="chat-input-count">{message.length}</span>
           )}
         </div>
+
+        {/* 重新生成按钮 */}
+        <button
+          className={`chat-regenerate-btn ${isRegenerating ? 'spinning' : ''}`}
+          onClick={handleRegenerate}
+          disabled={regenerateDisabled}
+          title={canRegenerate ? '重新生成上一条回复' : '暂无可重新生成的回复'}
+        >
+          <RotateCcw size={18} />
+        </button>
 
         {/* 发送按钮 */}
         <button

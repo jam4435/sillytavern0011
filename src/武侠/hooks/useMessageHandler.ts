@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { flushPendingGameDataCompletion, parseOptions } from '../utils/variableReader';
 import { messageLogger } from '../utils/logger';
+import { regenerateLastAssistantSwipe } from '../utils/messageActions';
 
 interface UseMessageHandlerOptions {
   setIsLoading: (loading: boolean) => void;
@@ -187,5 +188,40 @@ export function useMessageHandler({
     }
   }, [currentMaintext, currentOptions, addDebugLog, setIsLoading, showLoading, showError, dismissToast, setCurrentMaintext, setCurrentOptions]);
 
-  return { handleSendMessage };
+  const handleRegenerateLastAssistant = useCallback(async (): Promise<void> => {
+    messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    messageLogger.log('🔁 开始重新生成最新回复');
+
+    setIsLoading(true);
+    showLoading('正在重新生成回复...');
+
+    try {
+      const result = await regenerateLastAssistantSwipe();
+      setCurrentMaintext(result.maintext);
+      setCurrentOptions(result.options);
+      if (result.maintext) {
+        addDebugLog('assistant', `[重新生成]\n${result.maintext}`);
+      }
+      dismissToast();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      messageLogger.error('重新生成失败:', error);
+      addDebugLog('assistant', `[重新生成异常]\n${errorMessage}`);
+      showError(`重新生成失败：${errorMessage}`);
+    } finally {
+      setIsLoading(false);
+      messageLogger.log('🏁 重新生成流程结束');
+      messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
+  }, [
+    addDebugLog,
+    dismissToast,
+    setCurrentMaintext,
+    setCurrentOptions,
+    setIsLoading,
+    showError,
+    showLoading,
+  ]);
+
+  return { handleSendMessage, handleRegenerateLastAssistant };
 }
