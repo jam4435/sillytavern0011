@@ -34,6 +34,7 @@ const EVENT_KIND_PATTERN = /(事件条目-|登场事件-|成长条目-)/;
 const CHAPTER_EVENT_PATTERN = /^第[0-9一二三四五六七八九十百千万]+回-/;
 const CHAPTER_SEQUENCE_PATTERN = /^(第[0-9一二三四五六七八九十百千万]+回-[0-9]+-)/;
 const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件'];
+const POST_RESYNC_VERIFY_DELAY_MS = 1200;
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -61,6 +62,32 @@ function countPersistedEventKeys(currentEventSystem, eventSystemPatch) {
 
     return total + Object.keys(bucketPatch).filter(key => key in currentBucket).length;
   }, 0);
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function ensureEventSystemPatchPersisted(eventSystemPatch, reason) {
+  const expectedEventCount = countExpectedEventKeys(eventSystemPatch);
+  if (expectedEventCount <= 0) {
+    return await getVariables({ type: 'chat' });
+  }
+
+  let variables = await getVariables({ type: 'chat' });
+  const persistedEventCount = countPersistedEventKeys(variables?.stat_data?.事件系统, eventSystemPatch);
+
+  if (persistedEventCount >= expectedEventCount) {
+    return variables;
+  }
+
+  logWarning(
+    `事件初始化 ${reason} 后未完全落库: ${persistedEventCount}/${expectedEventCount}，切换 ERA 持久写入兜底`,
+  );
+  await writeEraInsert({ 事件系统: eventSystemPatch }, `initialize-event-system-${reason}-fallback`);
+  variables = await getVariables({ type: 'chat' });
+  toastr.warning('事件初始化已切换为 ERA 持久写入兜底');
+  return variables;
 }
 
 function getEventFamilyParts(eventName) {
@@ -366,18 +393,12 @@ export async function initializeEventList(eventDefinitions) {
       );
     }
 
-    // 验证最终结果
-    let verifyVars = await getVariables({ type: 'chat' });
-    const expectedEventCount = countExpectedEventKeys(expectedEventSystemPatch);
-    const persistedEventCount = countPersistedEventKeys(verifyVars?.stat_data?.事件系统, expectedEventSystemPatch);
-
-    if (expectedEventCount > 0 && persistedEventCount < expectedEventCount) {
-      logWarning(
-        `事件初始化 direct write 未完全落库: ${persistedEventCount}/${expectedEventCount}，切换 ERA 持久写入兜底`,
-      );
-      await writeEraInsert({ 事件系统: expectedEventSystemPatch }, 'initialize-event-system-fallback');
-      verifyVars = await getVariables({ type: 'chat' });
-      toastr.warning('事件初始化已切换为 ERA 持久写入兜底');
+    // 验证最终结果。直接写聊天变量可能先成功，但随后被 ERA/隐藏楼层的楼层重同步恢复成开局空桶；
+    // 因此这里先即时校验，再延迟一轮校验，必要时写入 ERA 变量块兜底持久化。
+    let verifyVars = await ensureEventSystemPatchPersisted(expectedEventSystemPatch, 'direct-write');
+    if (countExpectedEventKeys(expectedEventSystemPatch) > 0) {
+      await wait(POST_RESYNC_VERIFY_DELAY_MS);
+      verifyVars = await ensureEventSystemPatchPersisted(expectedEventSystemPatch, 'post-resync');
     }
 
     if (isDebugEnabled()) {

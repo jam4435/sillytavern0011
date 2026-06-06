@@ -22,7 +22,7 @@
   } = await import('./era-event-operations.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
-  const EVENT_SCRIPT_VERSION = '2026-06-06-event-fallback';
+  const EVENT_SCRIPT_VERSION = '2026-06-06-event-persist-verify';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
