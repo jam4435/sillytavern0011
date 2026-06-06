@@ -30,6 +30,139 @@ import {
   writeEraDelete,
 } from './era-write-helper.js';
 
+const EVENT_KIND_PATTERN = /(事件条目-|登场事件-|成长条目-)/;
+const CHAPTER_EVENT_PATTERN = /^第[0-9一二三四五六七八九十百千万]+回-/;
+
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cloneJson(value) {
+  if (value === undefined) return value;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function getEventFamilyParts(eventName) {
+  const text = String(eventName || '');
+  const match = text.match(EVENT_KIND_PATTERN);
+  if (!match) return null;
+
+  const kindPrefix = match[1];
+  const kindIndex = match.index || 0;
+  const fullPrefix = text.slice(0, kindIndex + kindPrefix.length);
+  const novelPrefix = text.slice(0, kindIndex);
+  const coreName = text.slice(kindIndex + kindPrefix.length);
+
+  return { novelPrefix, kindPrefix, fullPrefix, coreName };
+}
+
+function stripJsonSuffix(value) {
+  const text = String(value || '').trim();
+  return text.endsWith('.json') ? text.slice(0, -5) : text;
+}
+
+function resolveEventReference(sourceEventName, targetEventName, eventDefinitions) {
+  const rawTarget = stripJsonSuffix(targetEventName);
+  if (!rawTarget) return rawTarget;
+  if (eventDefinitions[rawTarget]) return rawTarget;
+
+  const sourceParts = getEventFamilyParts(sourceEventName);
+  const targetParts = getEventFamilyParts(rawTarget);
+  const candidates = [];
+  const addCandidate = candidate => {
+    if (candidate && !candidates.includes(candidate)) {
+      candidates.push(candidate);
+    }
+  };
+
+  addCandidate(rawTarget);
+
+  if (sourceParts) {
+    if (targetParts) {
+      addCandidate(`${sourceParts.novelPrefix}${targetParts.kindPrefix}${targetParts.coreName}`);
+      addCandidate(`${sourceParts.fullPrefix}${targetParts.coreName}`);
+      addCandidate(targetParts.coreName);
+    } else {
+      addCandidate(`${sourceParts.fullPrefix}${rawTarget}`);
+    }
+  }
+
+  if (targetParts) {
+    addCandidate(targetParts.coreName);
+  }
+
+  for (const candidate of candidates) {
+    if (eventDefinitions[candidate]) {
+      return candidate;
+    }
+  }
+
+  if (sourceParts) {
+    const coreTarget = targetParts ? targetParts.coreName : rawTarget;
+    const suffixMatches = Object.keys(eventDefinitions).filter(name => {
+      const parts = getEventFamilyParts(name);
+      return (
+        parts &&
+        parts.novelPrefix === sourceParts.novelPrefix &&
+        parts.kindPrefix === sourceParts.kindPrefix &&
+        parts.coreName === coreTarget
+      );
+    });
+    if (suffixMatches.length === 1) {
+      return suffixMatches[0];
+    }
+  }
+
+  return rawTarget;
+}
+
+function normalizeEventRecordName(sourceEventName, recordName) {
+  const sourceParts = getEventFamilyParts(sourceEventName);
+  const rawRecordName = stripJsonSuffix(recordName);
+  const recordParts = getEventFamilyParts(rawRecordName);
+  const strippedRecordName = recordParts ? `${recordParts.novelPrefix}${recordParts.coreName}` : rawRecordName;
+
+  if (!sourceParts?.novelPrefix) {
+    return strippedRecordName;
+  }
+  if (strippedRecordName.startsWith(sourceParts.novelPrefix)) {
+    return strippedRecordName;
+  }
+  if (CHAPTER_EVENT_PATTERN.test(strippedRecordName)) {
+    return `${sourceParts.novelPrefix}${strippedRecordName}`;
+  }
+  return strippedRecordName;
+}
+
+function normalizeCharacterDeltaForEvent(delta, eventName) {
+  const normalizedDelta = cloneJson(delta || {});
+  if (!isPlainObject(normalizedDelta?.人物经历)) {
+    return normalizedDelta;
+  }
+
+  const normalizedExperiences = {};
+  for (const [recordName, recordValue] of Object.entries(normalizedDelta.人物经历)) {
+    normalizedExperiences[normalizeEventRecordName(eventName, recordName)] = recordValue;
+  }
+  normalizedDelta.人物经历 = normalizedExperiences;
+  return normalizedDelta;
+}
+
+function mergePlainObject(target, source) {
+  for (const [key, value] of Object.entries(source || {})) {
+    if (isPlainObject(target[key]) && isPlainObject(value)) {
+      mergePlainObject(target[key], value);
+    } else {
+      target[key] = cloneJson(value);
+    }
+  }
+  return target;
+}
+
+function mergeCharacterDeltaForEvent(target, source, eventName) {
+  return mergePlainObject(target, normalizeCharacterDeltaForEvent(source, eventName));
+}
+
 // ==================== 批量初始化未发生事件列表（智能优化版）====================
 export async function initializeEventList(eventDefinitions) {
   debugGroup('🔧 智能批量初始化事件列表');
@@ -217,7 +350,7 @@ async function processDebutEventsCompletion(eventNames, eventDefinitions) {
       if (!登场事件差分.insert[charName]) {
         登场事件差分.insert[charName] = {};
       }
-      Object.assign(登场事件差分.insert[charName], delta[charName]);
+      mergeCharacterDeltaForEvent(登场事件差分.insert[charName], delta[charName], eventName);
       log(`[登场事件 INSERT] 准备新增角色: ${charName}`);
     }
 
@@ -277,7 +410,7 @@ async function processExpiredEventsCompletion(eventNames, eventDefinitions) {
         if (!合并后的差分[actionKey][charName]) {
           合并后的差分[actionKey][charName] = {};
         }
-        Object.assign(合并后的差分[actionKey][charName], delta[charName]);
+        mergeCharacterDeltaForEvent(合并后的差分[actionKey][charName], delta[charName], eventName);
         log(`[${actionKey.toUpperCase()}] 准备${actionKey === 'delete' ? '删除' : '修改'}角色: ${charName}`);
       }
     }
@@ -410,7 +543,7 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
         if (!登场事件差分.insert[charName]) {
           登场事件差分.insert[charName] = {};
         }
-        Object.assign(登场事件差分.insert[charName], delta[charName]);
+        mergeCharacterDeltaForEvent(登场事件差分.insert[charName], delta[charName], eventName);
         log(`[登场事件 INSERT] 准备新增角色: ${charName}`);
       }
 
@@ -586,7 +719,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
           if (!合并后的差分[actionKey][charName]) {
             合并后的差分[actionKey][charName] = {};
           }
-          Object.assign(合并后的差分[actionKey][charName], delta[charName]);
+          mergeCharacterDeltaForEvent(合并后的差分[actionKey][charName], delta[charName], eventName);
           log(`[${actionKey.toUpperCase()}] 准备${actionKey === 'delete' ? '删除' : '修改'}角色: ${charName}`);
         }
       }
@@ -682,26 +815,9 @@ async function generateFollowupEvents(eventNames, eventDefinitions) {
       // 从后续事件对象中提取描述和事件名
       const followupInfo = eventDefinitions[eventName].后续事件;
 
-      // 步骤 1: 处理目标事件名
-      let targetEventKey = followupInfo.事件名;
-
-      // 移除可能存在的 .json 后缀
-      if (targetEventKey.endsWith('.json')) {
-        targetEventKey = targetEventKey.slice(0, -5);
-      }
-
-      // 步骤 2: 尝试在事件定义中查找
-      // 优先直接匹配完整名称（支持新格式如 "射雕事件条目-xxx"）
-      // 如果找不到，再尝试移除精确前缀后匹配（向后兼容旧格式）
-      if (!eventDefinitions[targetEventKey]) {
-        const matchedPrefix = CONFIG.EVENT_KEY_PREFIXES.find(prefix => targetEventKey.startsWith(prefix));
-        if (matchedPrefix) {
-          const shortKey = targetEventKey.substring(matchedPrefix.length);
-          if (eventDefinitions[shortKey]) {
-            targetEventKey = shortKey;
-          }
-        }
-      }
+      // 步骤 1: 处理目标事件名。新世界书事件名带小说名前缀，
+      // 旧后续引用常只写 "第N回..."，这里按来源事件补同小说前缀。
+      const targetEventKey = resolveEventReference(eventName, followupInfo.事件名, eventDefinitions);
 
       const description = followupInfo.描述 || '';
 
