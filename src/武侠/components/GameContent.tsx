@@ -33,7 +33,29 @@ const normalizeMaintextForDisplay = (text: string): string =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-const HTML_BLOCK_START_REGEX = /^(?:<style\b[\s\S]*?<\/style>\s*)*<(?:div|details|section|article|ul|ol|li|table|pre|blockquote|h[1-6]|p)\b/i;
+const STYLE_BLOCK_REGEX = /<style\b[\s\S]*?<\/style>/gi;
+const STYLE_ONLY_HTML_REGEX = /^(?:\s*<!--[\s\S]*?-->\s*)*<style\b[\s\S]*?<\/style>\s*$/i;
+const HTML_BLOCK_START_REGEX = /^(?:\s*<!--[\s\S]*?-->\s*)*(?:<style\b[\s\S]*?<\/style>\s*)*<(?:div|details|section|article|ul|ol|li|table|pre|blockquote|h[1-6]|p)\b/i;
+const STYLE_BLOCK_TOKEN_PREFIX = '\uE000STYLE_BLOCK_';
+const STYLE_BLOCK_TOKEN_SUFFIX = '\uE000';
+
+function protectStyleBlocks(html: string): { protectedHtml: string; styleBlocks: string[] } {
+  const styleBlocks: string[] = [];
+  const protectedHtml = html.replace(STYLE_BLOCK_REGEX, match => {
+    const token = `${STYLE_BLOCK_TOKEN_PREFIX}${styleBlocks.length}${STYLE_BLOCK_TOKEN_SUFFIX}`;
+    styleBlocks.push(match);
+    return token;
+  });
+
+  return { protectedHtml, styleBlocks };
+}
+
+function restoreStyleBlocks(html: string, styleBlocks: string[]): string {
+  return html.replace(
+    new RegExp(`${STYLE_BLOCK_TOKEN_PREFIX}(\\d+)${STYLE_BLOCK_TOKEN_SUFFIX}`, 'g'),
+    (_, index: string) => styleBlocks[Number(index)] || '',
+  );
+}
 
 /**
  * 游戏内容显示组件
@@ -83,18 +105,25 @@ const GameContent: React.FC<GameContentProps> = ({
     if (containsHTML) {
       // 内容包含 HTML，使用 dangerouslySetInnerHTML 渲染
       // 保留换行结构：将连续的换行转换为段落分隔，单个换行转换为 <br>
-      const htmlContent = normalizedMaintext
+      const { protectedHtml, styleBlocks } = protectStyleBlocks(normalizedMaintext);
+      const htmlContent = protectedHtml
         .split(/\n{2,}/) // 先按连续换行（段落分隔）分割
         .map(paragraph => paragraph.trim())
         .filter(paragraph => paragraph) // 过滤空段落
         .map(paragraph => {
-          const blockClass = HTML_BLOCK_START_REGEX.test(paragraph) ? ' maintext-paragraph--html-block' : '';
+          const restoredParagraph = restoreStyleBlocks(paragraph, styleBlocks);
+
+          if (STYLE_ONLY_HTML_REGEX.test(restoredParagraph)) {
+            return restoredParagraph;
+          }
+
+          const blockClass = HTML_BLOCK_START_REGEX.test(restoredParagraph) ? ' maintext-paragraph--html-block' : '';
           if (blockClass) {
-            return `<div class="maintext-paragraph${blockClass}">${paragraph}</div>`;
+            return `<div class="maintext-paragraph${blockClass}">${restoredParagraph}</div>`;
           }
 
           // 段落内的单个换行转换为 <br>
-          const lines = paragraph.split('\n').map(line => line.trim()).filter(line => line);
+          const lines = restoredParagraph.split('\n').map(line => line.trim()).filter(line => line);
           return `<div class="maintext-paragraph">${lines.join('<br />')}</div>`;
         })
         .join('');

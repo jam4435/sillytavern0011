@@ -455,16 +455,25 @@
   }
 
   .maintext-paragraph--html-block {
-    margin: 0.5rem 0 0.75rem;
+    margin: 0.35rem 0 0.75rem;
     text-indent: 0;
     line-height: 1.6;
   }
 
-  :where(.tucao-w, .k-sum-w, .kz-w, details, summary) {
+  .maintext-paragraph:has(+ style),
+  .maintext-paragraph:has(+ .maintext-paragraph--html-block) {
+    margin-bottom: 0.75rem;
+  }
+
+  style + .maintext-paragraph--html-block {
+    margin-top: 0;
+  }
+
+  :where(.tucao-w, .tucao-wrapper, .k-sum-w, .kz-w, details, summary) {
     text-indent: 0;
   }
 
-  :where(.tucao-w, .k-sum-w, .kz-w) {
+  :where(.tucao-w, .tucao-wrapper, .k-sum-w, .kz-w) {
     line-height: normal;
   }
 
