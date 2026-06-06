@@ -59,7 +59,6 @@ const App: React.FC = () => {
     handleStart,
     handleNewGame,
     handleSetupBack,
-    goToGame,
   } = usePageFlow();
   const {
     gameState,
