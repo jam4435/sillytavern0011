@@ -19,6 +19,7 @@
 
 .settings-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -1191,5 +1192,88 @@
 
   &.partial {
     border-color: rgba($amber-600, 0.3);
+  }
+}
+
+// =========================================
+// 变量编辑面板
+// =========================================
+
+.variables-section {
+  gap: 1rem;
+}
+
+.variables-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+}
+
+.variables-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.variables-field-label {
+  font-size: 0.75rem;
+  color: $stone-500;
+}
+
+.variable-scope-select {
+  min-width: 140px;
+}
+
+.variable-message-input {
+  width: 120px;
+  min-width: 120px;
+}
+
+.variables-status {
+  padding: 0.65rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid $stone-800;
+  font-size: 0.82rem;
+  line-height: 1.4;
+
+  &.success {
+    color: $green-500;
+    border-color: rgba($green-500, 0.35);
+    background: rgba($green-500, 0.08);
+  }
+
+  &.error {
+    color: $red-500;
+    border-color: rgba($red-500, 0.4);
+    background: rgba($red-500, 0.08);
+  }
+}
+
+.variables-json-editor {
+  min-height: 320px;
+  max-height: 520px;
+  resize: vertical;
+
+  &.invalid {
+    border-color: $red-500;
+    background: rgba($red-500, 0.04);
+  }
+}
+
+.variables-editor-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  color: $stone-600;
+  font-size: 0.78rem;
+
+  .dirty {
+    color: $amber-600;
   }
 }

@@ -6,7 +6,9 @@ import {
   ChevronDown,
   ChevronUp,
   Compass,
+  Database,
   Map as MapIcon,
+  RotateCw,
   Scroll,
   Send,
   Settings,
@@ -57,4 +59,6 @@ export const Icons = {
   ChevronUp: ({ className, size, color }: IconProps) => <IconWrapper className={className}><ChevronUp size={size || 20} color={color} /></IconWrapper>,
   ChevronDown: ({ className, size, color }: IconProps) => <IconWrapper className={className}><ChevronDown size={size || 20} color={color} /></IconWrapper>,
   Debug: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Bug size={size || 20} color={color} /></IconWrapper>,
+  Refresh: ({ className, size, color }: IconProps) => <IconWrapper className={className}><RotateCw size={size || 20} color={color} /></IconWrapper>,
+  Variables: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Database size={size || 20} color={color} /></IconWrapper>,
 };
