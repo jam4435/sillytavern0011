@@ -2567,12 +2567,12 @@ export function initPanel() {
                     #${LOREBOOK_PANEL_ID}[data-mobile-entry-title-mode="two-line"] .mobile-entry-title-display {
                         display: -webkit-box;
                         -webkit-box-orient: vertical;
-                        -webkit-line-clamp: 2;
+                        -webkit-line-clamp: 3;
                         white-space: normal;
                         overflow-wrap: anywhere;
                         word-break: break-word;
-                        min-height: calc(1.25em * 2 + 8px);
-                        max-height: calc(1.25em * 2 + 8px);
+                        min-height: calc(1.25em * 3 + 8px);
+                        max-height: calc(1.25em * 3 + 8px);
                     }
                     #${LOREBOOK_PANEL_ID} .mobile-entry-title-display:focus-visible {
                         outline: none;
@@ -2664,8 +2664,12 @@ export function initPanel() {
                         display: flex;
                         align-items: center;
                     }
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"][data-mobile-entry-title-mode="two-line"] .mobile-entry-title-display,
+                    #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"][data-mobile-entry-title-mode="two-line"] .mobile-entry-title-input {
+                        min-height: calc(1.25em * 3 + 8px);
+                    }
                     #${LOREBOOK_PANEL_ID}[data-mobile-expand-placement="under-checkbox"][data-mobile-entry-title-mode="two-line"] .mobile-entry-title-display {
-                        max-height: 52px;
+                        max-height: calc(1.25em * 3 + 8px);
                     }
                     #${LOREBOOK_PANEL_ID} .mini-position-select {
                         flex-grow: 1;
