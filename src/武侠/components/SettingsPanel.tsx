@@ -1266,6 +1266,174 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   );
 };
 
+interface VariableTreeNodeProps {
+  label: string | number;
+  value: unknown;
+  path: VariablePath;
+  depth: number;
+  expandedPaths: Set<string>;
+  normalizedSearch: string;
+  onToggle: (pathKey: string) => void;
+  onValueChange: (path: VariablePath, nextValue: unknown) => void;
+}
+
+const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
+  label,
+  value,
+  path,
+  depth,
+  expandedPaths,
+  normalizedSearch,
+  onToggle,
+  onValueChange,
+}) => {
+  const pathKey = getVariablePathKey(path);
+  const isRoot = path.length === 0;
+  const isContainer = Array.isArray(value) || isRecord(value);
+  const isExpanded = isRoot || Boolean(normalizedSearch) || expandedPaths.has(pathKey);
+  const rawEntries = isContainer ? getVisibleEntries(value) : [];
+  const visibleEntries = normalizedSearch
+    ? rawEntries.filter(([childKey, childValue]) => matchesVariableSearch(childKey, childValue, normalizedSearch))
+    : rawEntries;
+  const hiddenDirectCount = isRecord(value)
+    ? Object.keys(value).filter(key => isHiddenVariableKey(key)).length
+    : 0;
+
+  return (
+    <div className={`variable-node ${isRoot ? 'root' : ''} ${isContainer ? 'branch' : 'leaf'}`}>
+      <div
+        className="variable-node-row"
+        style={{ paddingLeft: `${Math.min(depth, 8) * 0.85}rem` }}
+      >
+        {isContainer && !isRoot ? (
+          <button
+            className="variable-node-toggle"
+            onClick={() => onToggle(pathKey)}
+            title={isExpanded ? '收起' : '展开'}
+          >
+            {isExpanded ? <Icons.ChevronDown size={16} /> : <Icons.ChevronUp size={16} />}
+          </button>
+        ) : (
+          <span className="variable-node-toggle-spacer" />
+        )}
+
+        <span className="variable-node-key" title={String(label)}>{String(label)}</span>
+        <span className="variable-node-type">{getVariableTypeLabel(value)}</span>
+        {hiddenDirectCount > 0 && (
+          <span className="variable-node-hidden">隐藏 {hiddenDirectCount}</span>
+        )}
+
+        {isContainer ? (
+          <span className="variable-node-preview">{formatVariablePreview(value)}</span>
+        ) : (
+          <VariableLeafEditor
+            value={value}
+            path={path}
+            onValueChange={onValueChange}
+          />
+        )}
+      </div>
+
+      {isContainer && isExpanded && (
+        <div className="variable-node-children">
+          {visibleEntries.length > 0 ? (
+            visibleEntries.map(([childKey, childValue]) => (
+              <VariableTreeNode
+                key={`${pathKey}:${String(childKey)}`}
+                label={childKey}
+                value={childValue}
+                path={[...path, childKey]}
+                depth={depth + 1}
+                expandedPaths={expandedPaths}
+                normalizedSearch={normalizedSearch}
+                onToggle={onToggle}
+                onValueChange={onValueChange}
+              />
+            ))
+          ) : (
+            <div
+              className="variable-node-empty"
+              style={{ paddingLeft: `${Math.min(depth + 1, 8) * 0.85 + 1.5}rem` }}
+            >
+              空
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface VariableLeafEditorProps {
+  value: unknown;
+  path: VariablePath;
+  onValueChange: (path: VariablePath, nextValue: unknown) => void;
+}
+
+const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({
+  value,
+  path,
+  onValueChange,
+}) => {
+  if (typeof value === 'string') {
+    const isLongText = value.length > 80 || value.includes('\n');
+    if (isLongText) {
+      return (
+        <textarea
+          className="variable-leaf-input variable-leaf-textarea"
+          value={value}
+          onChange={(e) => onValueChange(path, e.target.value)}
+          rows={Math.min(5, Math.max(2, value.split('\n').length))}
+          spellCheck={false}
+        />
+      );
+    }
+
+    return (
+      <input
+        className="variable-leaf-input"
+        type="text"
+        value={value}
+        onChange={(e) => onValueChange(path, e.target.value)}
+      />
+    );
+  }
+
+  if (typeof value === 'number') {
+    return (
+      <input
+        className="variable-leaf-input variable-leaf-number"
+        type="number"
+        value={Number.isFinite(value) ? String(value) : ''}
+        onChange={(e) => {
+          const rawValue = e.target.value.trim();
+          const nextValue = rawValue === '' ? 0 : Number(rawValue);
+          if (Number.isFinite(nextValue)) {
+            onValueChange(path, nextValue);
+          }
+        }}
+      />
+    );
+  }
+
+  if (typeof value === 'boolean') {
+    return (
+      <button
+        className={`variable-boolean-toggle ${value ? 'active' : ''}`}
+        onClick={() => onValueChange(path, !value)}
+      >
+        {value ? 'true' : 'false'}
+      </button>
+    );
+  }
+
+  if (value === null) {
+    return <span className="variable-null-value">null</span>;
+  }
+
+  return <span className="variable-unknown-value">{formatVariablePreview(value)}</span>;
+};
+
 /**
  * 正则规则项组件
  */
