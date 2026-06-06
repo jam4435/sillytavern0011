@@ -264,7 +264,7 @@ export async function writeDirectChatVariables(action, payload, reason = 'direct
   markPending(signature);
   try {
     await updateVariablesWith(variables => {
-      const nextVariables = cloneJson(variables || {});
+      const nextVariables = variables || {};
       if (!isPlainObject(nextVariables.stat_data)) {
         nextVariables.stat_data = {};
       }
