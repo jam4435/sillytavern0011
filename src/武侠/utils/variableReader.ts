@@ -2499,7 +2499,7 @@ export function detectGameSessionState(): GameSessionState {
     }) as TavernChatMessage[];
 
     const hasAssistantStory = messages.some(message => {
-      if (message.message_id <= 0 || message.is_hidden) {
+      if (message.message_id <= 0) {
         return false;
       }
 

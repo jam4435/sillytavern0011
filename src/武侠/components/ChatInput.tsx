@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { uiLogger } from '../utils/logger';
 
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string) => void | Promise<void>;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -18,7 +18,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const [message, setMessage] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputDisabled = disabled || isSubmitting;
 
   // 自动调整文本框高度
   const adjustHeight = useCallback(() => {
@@ -35,24 +37,30 @@ const ChatInput: React.FC<ChatInputProps> = ({
     adjustHeight();
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     uiLogger.log('');
     uiLogger.log('📤 [ChatInput.handleSend] 发送按钮被点击');
     uiLogger.log('   message:', message);
     uiLogger.log('   message.trim():', message.trim());
-    uiLogger.log('   disabled:', disabled);
-    uiLogger.log('   条件判断: message.trim() && !disabled =', !!(message.trim() && !disabled));
+    uiLogger.log('   disabled:', inputDisabled);
+    uiLogger.log('   条件判断: message.trim() && !disabled =', !!(message.trim() && !inputDisabled));
     
-    if (message.trim() && !disabled) {
+    if (message.trim() && !inputDisabled) {
       uiLogger.log('✅ [ChatInput.handleSend] 条件满足，调用 onSend()');
-      uiLogger.log('   发送内容:', message.trim());
-      onSend(message.trim());
-      uiLogger.log('   onSend() 调用完成');
+      const trimmedMessage = message.trim();
+      uiLogger.log('   发送内容:', trimmedMessage);
       setMessage('');
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
       uiLogger.log('   输入框已清空');
+      setIsSubmitting(true);
+      try {
+        await onSend(trimmedMessage);
+        uiLogger.log('   onSend() 调用完成');
+      } finally {
+        setIsSubmitting(false);
+      }
     } else {
       uiLogger.log('⚠️ [ChatInput.handleSend] 条件不满足，未发送');
     }
@@ -89,7 +97,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             placeholder={placeholder}
-            disabled={disabled}
+            disabled={inputDisabled}
             rows={1}
           />
           
@@ -103,7 +111,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         <button
           className={`chat-send-btn ${message.trim() ? 'active' : ''}`}
           onClick={handleSend}
-          disabled={disabled || !message.trim()}
+          disabled={inputDisabled || !message.trim()}
           title="发送 (Enter)"
         >
           <div className="send-btn-bg"></div>

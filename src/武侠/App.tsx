@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ChatInput from './components/ChatInput';
 import FullscreenButton from './components/FullscreenButton';
 import GameContent from './components/GameContent';
@@ -78,8 +78,8 @@ const App: React.FC = () => {
   } = useGameState();
 
   // 显示设置状态
-  const [displaySettings, setDisplaySettings] = React.useState<DisplaySettings>(() => loadSettings());
-  const [openingWelcomeLine, setOpeningWelcomeLine] = React.useState(() => getRandomOpeningLine());
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
+  const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
 
   // 使用消息处理 hook
   const { handleSendMessage } = useMessageHandler({

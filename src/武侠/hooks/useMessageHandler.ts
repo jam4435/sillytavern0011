@@ -25,7 +25,7 @@ export function useMessageHandler({
   currentMaintext,
   currentOptions,
 }: UseMessageHandlerOptions) {
-  const handleSendMessage = useCallback(async (message: string) => {
+  const handleSendMessage = useCallback(async (message: string): Promise<void> => {
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     messageLogger.log('🚀 开始发送消息流程');
     messageLogger.log('📝 用户输入:', message);
@@ -81,25 +81,26 @@ export function useMessageHandler({
       const result = await generate({
         should_stream: true,
       });
+      const resultText = typeof result === 'string' ? result : result.content;
       const generateEndTime = Date.now();
 
       messageLogger.log('✅ [步骤 2] generate() 调用完成');
       messageLogger.log('耗时:', generateEndTime - generateStartTime, 'ms');
       messageLogger.log('返回值类型:', typeof result);
-      messageLogger.log('返回值是否为空:', !result);
-      messageLogger.log('返回值长度:', result ? result.length : 0);
-      messageLogger.log('返回值前 500 字符:', result ? result.substring(0, 500) : '(null/undefined)');
-      if (result && result.length > 500) {
-        messageLogger.log('返回值后 200 字符:', result.substring(result.length - 200));
+      messageLogger.log('返回文本是否为空:', !resultText);
+      messageLogger.log('返回文本长度:', resultText ? resultText.length : 0);
+      messageLogger.log('返回文本前 500 字符:', resultText ? resultText.substring(0, 500) : '(null/undefined)');
+      if (resultText && resultText.length > 500) {
+        messageLogger.log('返回文本后 200 字符:', resultText.substring(resultText.length - 200));
       }
 
-      if (result) {
+      if (resultText) {
         // ========== 步骤 3: 解析 AI 回复 ==========
         messageLogger.log('');
         messageLogger.log('📌 [步骤 3] 解析 AI 回复');
 
-        const maintext = result;
-        const options = parseOptions(result);
+        const maintext = resultText;
+        const options = parseOptions(resultText);
 
         messageLogger.log('🔧 调试模式：直接显示 AI 完整回复');
         messageLogger.log('parseMaintext 结果 (完整内容):');
@@ -123,7 +124,7 @@ export function useMessageHandler({
           [
             {
               role: 'assistant',
-              message: result,
+              message: resultText,
             },
           ],
           {
@@ -144,7 +145,7 @@ export function useMessageHandler({
         setCurrentMaintext(maintext);
         setCurrentOptions(options);
 
-        addDebugLog('assistant', result);
+        addDebugLog('assistant', resultText);
 
         messageLogger.log('✅ [步骤 5] 前端状态已更新');
         messageLogger.log('注意: React 状态更新是异步的，新值将在下次渲染时生效');
@@ -158,7 +159,7 @@ export function useMessageHandler({
         messageLogger.log('result 值:', result);
         messageLogger.log('result 类型:', typeof result);
 
-        addDebugLog('assistant', `[AI 回复为空]\n返回值: ${result === null ? 'null' : result === undefined ? 'undefined' : `"${result}"`}\n类型: ${typeof result}`);
+        addDebugLog('assistant', `[AI 回复为空]\n返回值: ${result === null ? 'null' : result === undefined ? 'undefined' : JSON.stringify(result)}\n类型: ${typeof result}`);
 
         showError('生成失败：AI 回复为空，请重试');
         messageLogger.log('已设置错误提示到前端');
