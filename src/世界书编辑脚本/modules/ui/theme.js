@@ -36,7 +36,7 @@ function getDefaultLayoutTheme(mode = DEFAULT_LAYOUT_MODE) {
     textColor: '#eeeeee',
     accentColor: '#9a7ace',
     entryBgColor: '#333333',
-    inputBgColor: '#333333',
+    inputBgColor: '#4F4F4F',
     backgroundImageUrl: '',
     backgroundImageOpacity: 0.35,
     panelOpacity: 1,
@@ -438,10 +438,7 @@ function fillThemeModal(theme, layoutMode = getPcLayoutModeSetting()) {
   $('#show-search-bar-toggle', parentDoc).prop('checked', getShowSearchBarSetting());
   $('#fullscreen-mode-toggle', parentDoc).prop('checked', getFullscreenModeSetting());
   $('#truncate-long-names-toggle', parentDoc).prop('checked', theme.truncateLongNames !== false);
-  $('#mobile-expand-under-checkbox-toggle', parentDoc).prop(
-    'checked',
-    theme.mobileExpandButtonUnderCheckbox === true,
-  );
+  $('#mobile-expand-under-checkbox-toggle', parentDoc).prop('checked', theme.mobileExpandButtonUnderCheckbox === true);
   $('#unified-icon-toggle', parentDoc).prop('checked', theme.unifiedIconButtons === true);
   $('#pc-layout-mode-select', parentDoc).val(normalizeLayoutMode(layoutMode));
   syncIconColorGroup(parentDoc, theme.unifiedIconButtons === true);
