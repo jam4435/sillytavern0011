@@ -114,6 +114,36 @@
   gap: 1rem;
 }
 
+.header-action-btn {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0.35rem;
+  background: rgba(28, 25, 23, 0.6);
+  border: 1px solid rgba(139, 90, 43, 0.3);
+  border-radius: 4px;
+  color: var(--stone-400);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover,
+  &.active {
+    color: rgba(254, 249, 195, 0.95);
+    background: rgba(139, 90, 43, 0.2);
+    border-color: rgba(181, 137, 80, 0.5);
+    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(181, 137, 80, 0.2);
+  }
+}
+
 // =========================================
 // Fullscreen Button - 全屏按钮（缩小版）
 // =========================================
@@ -122,6 +152,7 @@
   position: relative;
   top: auto;
   right: auto;
+  margin-left: 0;
   width: 28px;
   height: 28px;
   padding: 0.35rem;

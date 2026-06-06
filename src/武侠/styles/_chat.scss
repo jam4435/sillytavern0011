@@ -310,6 +310,47 @@
 }
 
 // 发送按钮
+.chat-regenerate-btn {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(28, 25, 23, 0.62), rgba(41, 37, 36, 0.42));
+  border: 1px solid rgba(181, 137, 80, 0.28);
+  border-radius: 9px;
+  color: rgba(168, 162, 158, 0.75);
+  cursor: pointer;
+  transition: all 0.25s ease;
+
+  &:hover:not(:disabled) {
+    color: rgba(254, 249, 195, 0.95);
+    border-color: rgba(212, 175, 55, 0.55);
+    background: linear-gradient(135deg, rgba(69, 26, 3, 0.34), rgba(133, 77, 14, 0.28));
+    box-shadow: 0 0 16px rgba(181, 137, 80, 0.22);
+    transform: translateY(-1px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+  }
+
+  &.spinning svg {
+    animation: spin 1s linear infinite;
+  }
+
+  @media (max-width: 768px) {
+    width: 40px;
+    height: 40px;
+  }
+}
+
 .chat-send-btn {
   position: relative;
   width: 48px;
