@@ -714,10 +714,6 @@ function mapItemQuality(品质?: string): string {
   return qualityMap[品质 || ''] || 'WHITE';
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
 function getDisplayEventName(eventName: string): string {
   return eventName
     .replace(/\.(json|txt)$/i, '')
