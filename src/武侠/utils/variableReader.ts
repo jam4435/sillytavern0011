@@ -994,6 +994,34 @@ function needsAttributeUpdate(角色Data: CharacterData): AttributeUpdateCheck {
   return { needsUpdate: false, attributeExists: true };
 }
 
+type VariableAttributeSet = NonNullable<UserProfile['属性']> | NonNullable<CharacterData['属性']>;
+
+function normalizeAttributeResourceValue(value: string | number | undefined): string {
+  return String(value ?? '').trim();
+}
+
+function normalizeAttributeNumberValue(value: number | undefined): number {
+  return Number(value ?? NaN);
+}
+
+function areCalculatedAttributesEqual(
+  currentAttributes: VariableAttributeSet | undefined,
+  calculatedAttributes: CalculatedCharacterAttributes,
+): boolean {
+  if (!currentAttributes) {
+    return false;
+  }
+
+  return (
+    normalizeAttributeResourceValue(currentAttributes.气血) === calculatedAttributes.气血 &&
+    normalizeAttributeResourceValue(currentAttributes.内力) === calculatedAttributes.内力 &&
+    normalizeAttributeNumberValue(currentAttributes.臂力) === calculatedAttributes.臂力 &&
+    normalizeAttributeNumberValue(currentAttributes.根骨) === calculatedAttributes.根骨 &&
+    normalizeAttributeNumberValue(currentAttributes.机敏) === calculatedAttributes.机敏 &&
+    normalizeAttributeNumberValue(currentAttributes.洞察) === calculatedAttributes.洞察
+  );
+}
+
 // 防止重复调用的标记
 // 由于属性更新会触发 era:writeDone 事件，
 // 而 App.tsx 监听 era:writeDone 后会调用 readGameData()，
@@ -1211,6 +1239,12 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
     洞察: combat.洞察,
   };
 
+  if (areCalculatedAttributesEqual(user数据.属性, calculatedAttrs)) {
+    dataLogger.log('[autoUpdatePlayerAttributes] 玩家属性已与计算结果一致，跳过 ERA 写入');
+    updateCharacterCache(cacheKey, currentRealm);
+    return;
+  }
+
   // 检查属性字段是否存在
   const attributeExists = !!user数据.属性;
 
@@ -1387,6 +1421,12 @@ export async function autoUpdateCharacterAttributes(角色数据?: Record<string
 
     // 检查属性字段是否存在，决定使用 insert 还是 update
     const checkResult = needsAttributeUpdate(角色Data);
+
+    if (checkResult.attributeExists && areCalculatedAttributesEqual(角色Data.属性, calculatedAttrs)) {
+      dataLogger.log(`[autoUpdateCharacterAttributes] 角色 ${角色名}: 属性已与计算结果一致，跳过 ERA 写入`);
+      updateCharacterCache(cacheKey, 角色Data.境界 || '不入流');
+      continue;
+    }
 
     if (checkResult.attributeExists) {
       // 属性已存在，使用 update（境界变更场景）
