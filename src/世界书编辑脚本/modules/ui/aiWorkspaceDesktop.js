@@ -1329,9 +1329,10 @@ async function refreshChatContext() {
     }))
     .filter(message => message.message.trim());
 
+  const loadedCount = state.chatMessages.length;
   renderChatContextPreview();
   persistSettings({ mirrorModeKey: currentModeKey() });
-  setModeStatus(currentModeKey(), `已刷新聊天上下文，共载入 ${state.chatMessages.length} 条消息。建议重新生成计划或预览。`);
+  setModeStatus(currentModeKey(), `已刷新聊天上下文，共载入 ${loadedCount} 条消息。建议重新生成计划或预览。`);
 }
 
 function handleChatContextEdited() {
