@@ -32,6 +32,7 @@ import {
 
 const EVENT_KIND_PATTERN = /(事件条目-|登场事件-|成长条目-)/;
 const CHAPTER_EVENT_PATTERN = /^第[0-9一二三四五六七八九十百千万]+回-/;
+const CHAPTER_SEQUENCE_PATTERN = /^(第[0-9一二三四五六七八九十百千万]+回-[0-9]+-)/;
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -110,6 +111,22 @@ function resolveEventReference(sourceEventName, targetEventName, eventDefinition
     });
     if (suffixMatches.length === 1) {
       return suffixMatches[0];
+    }
+
+    const sequencePrefix = coreTarget.match(CHAPTER_SEQUENCE_PATTERN)?.[1];
+    if (sequencePrefix) {
+      const sequenceMatches = Object.keys(eventDefinitions).filter(name => {
+        const parts = getEventFamilyParts(name);
+        return (
+          parts &&
+          parts.novelPrefix === sourceParts.novelPrefix &&
+          parts.kindPrefix === sourceParts.kindPrefix &&
+          parts.coreName.startsWith(sequencePrefix)
+        );
+      });
+      if (sequenceMatches.length === 1) {
+        return sequenceMatches[0];
+      }
     }
   }
 
