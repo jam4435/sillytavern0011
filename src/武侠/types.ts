@@ -148,6 +148,26 @@ export enum ActivePanel {
   MAP = 'MAP',
   SOCIAL = 'SOCIAL',
   SETTINGS = 'SETTINGS',
+  SAVE_LOAD = 'SAVE_LOAD',
+}
+
+export interface WuxiaSaveNode {
+  id: string;
+  label: string;
+  checkpointName: string;
+  messageId: number;
+  parentId: string | null;
+  createdAt: number;
+  playerName: string;
+  location: string;
+  worldTimeText: string;
+  preview: string;
+}
+
+export interface WuxiaSaveTreeData {
+  version: 1;
+  updatedAt: number;
+  nodes: WuxiaSaveNode[];
 }
 
 // ============================================

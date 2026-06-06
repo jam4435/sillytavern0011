@@ -334,7 +334,7 @@ function stripFrontendLoaderArtifacts(messageContent: string): string {
     .trim();
 }
 
-function normalizeDisplayedMessageContent(messageContent: string): string {
+export function normalizeDisplayedMessageContent(messageContent: string): string {
   return stripFrontendLoaderArtifacts(stripEraVariableBlocks(messageContent));
 }
 
@@ -353,7 +353,7 @@ function resolveAssistantMessageRawContent(message: TavernChatMessage): string {
   );
 }
 
-function isFrontendLoaderOnlyMessage(messageContent: string): boolean {
+export function isFrontendLoaderOnlyMessage(messageContent: string): boolean {
   if (!messageContent) {
     return true;
   }
