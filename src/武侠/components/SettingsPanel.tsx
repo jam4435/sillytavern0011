@@ -27,37 +27,134 @@ import { DebugLogEntry } from '../hooks';
 import { uiLogger } from '../utils/logger';
 
 type SettingsTab = 'display' | 'background' | 'regex' | 'summary' | 'variables' | 'debug';
-type VariableScope = 'chat' | 'message' | 'global' | 'character' | 'preset';
-type EditableVariableOption =
-  | { type: 'chat' | 'global' | 'character' | 'preset' }
-  | { type: 'message'; message_id?: number | 'latest' };
 type VariableStatus = 'idle' | 'success' | 'error';
+type VariablePath = Array<string | number>;
 
-const VARIABLE_SCOPE_OPTIONS: Array<{ value: VariableScope; label: string }> = [
-  { value: 'chat', label: '聊天变量' },
-  { value: 'message', label: '楼层变量' },
-  { value: 'global', label: '全局变量' },
-  { value: 'character', label: '角色卡变量' },
-  { value: 'preset', label: '预设变量' },
-];
-
-const formatVariableTable = (variables: Record<string, unknown>): string => JSON.stringify(variables, null, 2);
-
-const parseMessageId = (value: string): number | 'latest' => {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed === 'latest') {
-    return 'latest';
-  }
-
-  const parsed = Number(trimmed);
-  if (!Number.isInteger(parsed)) {
-    throw new Error('楼层号必须是整数、负数索引，或 latest');
-  }
-
-  return parsed;
-};
+const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
+const ROOT_VARIABLE_PATH_KEY = 'root';
 
 const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const isHiddenVariableKey = (key: string | number): boolean =>
+  typeof key === 'string' && HIDDEN_VARIABLE_KEYS.has(key);
+
+const getVariablePathKey = (path: VariablePath): string =>
+  path.length === 0 ? ROOT_VARIABLE_PATH_KEY : path.map(segment => String(segment)).join('\u001f');
+
+const getVisibleEntries = (value: unknown): Array<[string | number, unknown]> => {
+  if (Array.isArray(value)) {
+    return value.map((item, index) => [index, item]);
+  }
+
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  return Object.entries(value).filter(([key]) => !isHiddenVariableKey(key));
+};
+
+const getVisibleChildCount = (value: unknown): number => getVisibleEntries(value).length;
+
+const getHiddenMetadataCount = (value: unknown): number => {
+  if (Array.isArray(value)) {
+    return value.reduce((count, item) => count + getHiddenMetadataCount(item), 0);
+  }
+
+  if (!isRecord(value)) {
+    return 0;
+  }
+
+  return Object.entries(value).reduce((count, [key, item]) => (
+    count + (isHiddenVariableKey(key) ? 1 : getHiddenMetadataCount(item))
+  ), 0);
+};
+
+const getVariableTypeLabel = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return `数组 ${getVisibleChildCount(value)}`;
+  }
+
+  if (isRecord(value)) {
+    return `对象 ${getVisibleChildCount(value)}`;
+  }
+
+  if (value === null) {
+    return '空值';
+  }
+
+  return typeof value;
+};
+
+const formatVariablePreview = (value: unknown): string => {
+  if (Array.isArray(value) || isRecord(value)) {
+    return getVariableTypeLabel(value);
+  }
+
+  if (value === null) {
+    return 'null';
+  }
+
+  if (typeof value === 'string') {
+    return value.length > 64 ? `${value.slice(0, 64)}...` : value;
+  }
+
+  return String(value);
+};
+
+const matchesVariableSearch = (key: string | number, value: unknown, normalizedQuery: string): boolean => {
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  if (String(key).toLowerCase().includes(normalizedQuery)) {
+    return true;
+  }
+
+  if (Array.isArray(value) || isRecord(value)) {
+    return getVisibleEntries(value).some(([childKey, childValue]) =>
+      matchesVariableSearch(childKey, childValue, normalizedQuery)
+    );
+  }
+
+  return formatVariablePreview(value).toLowerCase().includes(normalizedQuery);
+};
+
+const setValueAtVariablePath = (
+  source: Record<string, unknown>,
+  path: VariablePath,
+  nextValue: unknown,
+): Record<string, unknown> => {
+  if (path.length === 0) {
+    return isRecord(nextValue) ? nextValue : source;
+  }
+
+  const cloneRoot = { ...source };
+  let cursor: Record<string, unknown> | unknown[] = cloneRoot;
+
+  path.forEach((segment, index) => {
+    const isLast = index === path.length - 1;
+
+    if (isLast) {
+      cursor[segment as keyof typeof cursor] = nextValue as never;
+      return;
+    }
+
+    const currentValue = cursor[segment as keyof typeof cursor] as unknown;
+    const nextContainer = Array.isArray(currentValue)
+      ? [...currentValue]
+      : isRecord(currentValue)
+        ? { ...currentValue }
+        : {};
+
+    cursor[segment as keyof typeof cursor] = nextContainer as never;
+    cursor = nextContainer;
+  });
+
+  return cloneRoot;
+};
 
 interface SettingsPanelProps {
   settings: DisplaySettings;
