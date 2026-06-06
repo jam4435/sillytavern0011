@@ -176,7 +176,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [activeTab, setActiveTab] = useState<SettingsTab>('display');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
-  const loadedVariableScopeKeyRef = useRef<string | null>(null);
 
   // 自动总结相关状态
   const [summaryStatus, setSummaryStatus] = useState<SummaryTriggerResult | null>(null);
@@ -184,30 +183,25 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [summaryResult, setSummaryResult] = useState<BatchSummaryResult | null>(null);
 
   // 变量编辑相关状态
-  const [variableScope, setVariableScope] = useState<VariableScope>('chat');
-  const [messageIdInput, setMessageIdInput] = useState('latest');
-  const [variableEditorText, setVariableEditorText] = useState('');
+  const [statData, setStatData] = useState<Record<string, unknown> | null>(null);
   const [variableStatus, setVariableStatus] = useState<VariableStatus>('idle');
   const [variableStatusText, setVariableStatusText] = useState('');
   const [isVariablesDirty, setIsVariablesDirty] = useState(false);
+  const [expandedVariablePaths, setExpandedVariablePaths] = useState<Set<string>>(
+    () => new Set([ROOT_VARIABLE_PATH_KEY]),
+  );
+  const [variableSearch, setVariableSearch] = useState('');
 
-  const variableScopeKey = `${variableScope}:${variableScope === 'message' ? messageIdInput.trim() || 'latest' : ''}`;
+  const normalizedVariableSearch = variableSearch.trim().toLowerCase();
 
-  const topLevelVariableCount = useMemo(() => {
-    if (!variableEditorText.trim()) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(variableEditorText) as unknown;
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        return null;
-      }
-      return Object.keys(parsed).length;
-    } catch {
-      return null;
-    }
-  }, [variableEditorText]);
+  const visibleStatDataTopLevelCount = useMemo(
+    () => statData ? getVisibleChildCount(statData) : 0,
+    [statData],
+  );
+  const hiddenMetadataCount = useMemo(
+    () => statData ? getHiddenMetadataCount(statData) : 0,
+    [statData],
+  );
 
   // 更新单个设置项
   const updateSetting = useCallback(<K extends keyof DisplaySettings>(
@@ -217,64 +211,78 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     onSettingsChange({ ...settings, [key]: value });
   }, [settings, onSettingsChange]);
 
-  const buildVariableOption = useCallback((): EditableVariableOption => {
-    if (variableScope === 'message') {
-      return {
-        type: 'message',
-        message_id: parseMessageId(messageIdInput),
-      };
-    }
-
-    return { type: variableScope };
-  }, [messageIdInput, variableScope]);
-
-  const refreshVariables = useCallback(() => {
+  const refreshStatData = useCallback(() => {
     try {
-      const option = buildVariableOption();
-      const variables = getVariables(option) as Record<string, unknown>;
-      setVariableEditorText(formatVariableTable(variables));
+      const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+      const nextStatData = variables.stat_data;
+      if (!isRecord(nextStatData)) {
+        throw new Error('聊天变量中没有 stat_data 对象');
+      }
+
+      setStatData(nextStatData);
       setVariableStatus('success');
-      setVariableStatusText('变量已读取');
+      setVariableStatusText('stat_data 已读取');
       setIsVariablesDirty(false);
-      loadedVariableScopeKeyRef.current = variableScopeKey;
+      setExpandedVariablePaths(new Set([ROOT_VARIABLE_PATH_KEY]));
     } catch (error) {
       setVariableStatus('error');
       setVariableStatusText(`读取失败：${getErrorMessage(error)}`);
     }
-  }, [buildVariableOption, variableScopeKey]);
+  }, []);
 
-  const saveVariables = useCallback(() => {
+  const saveStatData = useCallback(() => {
     try {
-      const parsed = JSON.parse(variableEditorText) as unknown;
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('变量表必须是 JSON 对象');
+      if (!statData) {
+        throw new Error('没有可保存的 stat_data');
       }
 
-      const option = buildVariableOption();
-      replaceVariables(parsed as Record<string, unknown>, option);
-      const savedVariables = getVariables(option) as Record<string, unknown>;
-      setVariableEditorText(formatVariableTable(savedVariables));
+      const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+      replaceVariables({ ...variables, stat_data: statData }, { type: 'chat' });
+
+      const savedVariables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+      const savedStatData = savedVariables.stat_data;
+      if (isRecord(savedStatData)) {
+        setStatData(savedStatData);
+      }
       setVariableStatus('success');
-      setVariableStatusText('变量已保存');
+      setVariableStatusText('stat_data 已保存');
       setIsVariablesDirty(false);
-      loadedVariableScopeKeyRef.current = variableScopeKey;
     } catch (error) {
       setVariableStatus('error');
       setVariableStatusText(`保存失败：${getErrorMessage(error)}`);
     }
-  }, [buildVariableOption, variableEditorText, variableScopeKey]);
+  }, [statData]);
+
+  const toggleVariablePath = useCallback((pathKey: string) => {
+    setExpandedVariablePaths(prev => {
+      const next = new Set(prev);
+      if (next.has(pathKey)) {
+        next.delete(pathKey);
+      } else {
+        next.add(pathKey);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleVariableLeafChange = useCallback((path: VariablePath, nextValue: unknown) => {
+    setStatData(prev => prev ? setValueAtVariablePath(prev, path, nextValue) : prev);
+    setIsVariablesDirty(true);
+    setVariableStatus('idle');
+    setVariableStatusText('');
+  }, []);
 
   useEffect(() => {
     if (activeTab !== 'variables') {
       return;
     }
 
-    if (loadedVariableScopeKeyRef.current === variableScopeKey && variableEditorText) {
+    if (statData) {
       return;
     }
 
-    refreshVariables();
-  }, [activeTab, refreshVariables, variableEditorText, variableScopeKey]);
+    refreshStatData();
+  }, [activeTab, refreshStatData, statData]);
 
   // 重置当前页面设置
   const resetCurrentTab = useCallback(() => {
@@ -310,14 +318,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         setSummaryResult(null);
         break;
       case 'variables':
-        refreshVariables();
+        refreshStatData();
         break;
       case 'debug':
         // 清空调试日志
         onClearDebugLogs?.();
         break;
     }
-  }, [activeTab, settings, onSettingsChange, refreshVariables, onClearDebugLogs]);
+  }, [activeTab, settings, onSettingsChange, refreshStatData, onClearDebugLogs]);
 
   // 获取当前页面的重置按钮文本
   const getResetButtonText = useCallback(() => {
@@ -1062,57 +1070,37 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="settings-section variables-section">
             <h4 className="settings-section-title">
               <span className="diamond-bullet"></span>
-              变量
+              stat_data
             </h4>
             <p className="settings-description">
-              直接读取和修改酒馆变量表。保存前会校验 JSON；默认编辑当前聊天变量。
+              只读取当前聊天变量下的 stat_data，并以结构树查看和修改；$meta 与 $template 会自动隐藏。
             </p>
 
             <div className="variables-toolbar">
-              <div className="variables-field">
-                <label className="variables-field-label">变量范围</label>
-                <select
-                  value={variableScope}
-                  onChange={(e) => {
-                    setVariableScope(e.target.value as VariableScope);
-                    setVariableStatus('idle');
-                    setVariableStatusText('');
-                  }}
-                  className="settings-select variable-scope-select"
-                >
-                  {VARIABLE_SCOPE_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="variables-scope-display">
+                <span>聊天变量</span>
+                <strong>stat_data</strong>
               </div>
 
-              {variableScope === 'message' && (
-                <div className="variables-field">
-                  <label className="variables-field-label">楼层号</label>
-                  <input
-                    type="text"
-                    value={messageIdInput}
-                    onChange={(e) => {
-                      setMessageIdInput(e.target.value);
-                      setVariableStatus('idle');
-                      setVariableStatusText('');
-                    }}
-                    placeholder="latest"
-                    className="settings-text-input variable-message-input"
-                  />
-                </div>
-              )}
+              <div className="variables-field variables-search-field">
+                <label className="variables-field-label">搜索</label>
+                <input
+                  type="text"
+                  value={variableSearch}
+                  onChange={(e) => setVariableSearch(e.target.value)}
+                  placeholder="字段名或值"
+                  className="settings-text-input variables-search-input"
+                />
+              </div>
 
-              <button className="settings-action-btn" onClick={refreshVariables}>
+              <button className="settings-action-btn" onClick={refreshStatData}>
                 <Icons.Refresh size={16} />
                 <span>刷新</span>
               </button>
               <button
                 className="settings-action-btn primary"
-                onClick={saveVariables}
-                disabled={!isVariablesDirty}
+                onClick={saveStatData}
+                disabled={!isVariablesDirty || !statData}
               >
                 <Icons.Variables size={16} />
                 <span>保存</span>
@@ -1125,22 +1113,29 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             )}
 
-            <textarea
-              value={variableEditorText}
-              onChange={(e) => {
-                setVariableEditorText(e.target.value);
-                setIsVariablesDirty(true);
-                setVariableStatus('idle');
-                setVariableStatusText('');
-              }}
-              spellCheck={false}
-              className={`settings-textarea variables-json-editor ${variableStatus === 'error' ? 'invalid' : ''}`}
-              rows={18}
-            />
+            <div className="variables-tree">
+              {statData ? (
+                <VariableTreeNode
+                  label="stat_data"
+                  value={statData}
+                  path={[]}
+                  depth={0}
+                  expandedPaths={expandedVariablePaths}
+                  normalizedSearch={normalizedVariableSearch}
+                  onToggle={toggleVariablePath}
+                  onValueChange={handleVariableLeafChange}
+                />
+              ) : (
+                <div className="variables-empty">
+                  <Icons.Variables size={32} />
+                  <p>尚未读取到 stat_data</p>
+                </div>
+              )}
+            </div>
 
             <div className="variables-editor-meta">
-              <span>{topLevelVariableCount === null ? 'JSON 未解析' : `${topLevelVariableCount} 个顶层键`}</span>
-              <span>{variableEditorText.length} 字符</span>
+              <span>{visibleStatDataTopLevelCount} 个可见顶层键</span>
+              <span>已隐藏 {hiddenMetadataCount} 个元数据节点</span>
               {isVariablesDirty && <span className="dirty">有未保存修改</span>}
             </div>
           </div>
