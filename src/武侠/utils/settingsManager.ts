@@ -515,6 +515,22 @@ function getRawTavernRegexesFromScope(scope: { type: 'global' } | { type: 'prese
   }
 }
 
+function filterPresetDerivedRegexesFromGlobalApi(regexes: TavernRegex[]): TavernRegex[] {
+  if (regexes.length === 0) {
+    return regexes;
+  }
+
+  const rawPresetIds = new Set(getRawPresetRegexesFromInUsePreset().map(regex => regex.id));
+  return regexes.filter(regex => {
+    if (!regex.id.startsWith('preset_')) {
+      return true;
+    }
+
+    const normalizedId = regex.id.slice('preset_'.length);
+    return rawPresetIds.size > 0 ? !rawPresetIds.has(normalizedId) : false;
+  });
+}
+
 // =========================================
 // 设置管理函数
 // =========================================
@@ -935,7 +951,8 @@ export function applySettingsToDOM(settings: DisplaySettings): void {
  */
 export function importGlobalTavernRegexes(): RegexRule[] {
   try {
-    const globalRules = getImportableTavernRegexesFromScope({ type: 'global' }, 'global');
+    const rawGlobalRegexes = getRawTavernRegexesFromScope({ type: 'global' });
+    const globalRules = getImportableTavernRegexes(filterPresetDerivedRegexesFromGlobalApi(rawGlobalRegexes), 'global');
     const presetRules = getImportablePresetRegexesFromInUsePreset();
     if (presetRules.length === 0) {
       return globalRules;
