@@ -251,7 +251,7 @@ function getRegexRuleSignature(rule: RegexRule): string {
   return [rule.originScope, rule.description || '', rule.pattern, rule.replacement].join('\u001f');
 }
 
-function getRegexRuleContentSignature(rule: Pick<RegexRule, 'description' | 'pattern' | 'replacement'>): string {
+export function getRegexRuleContentSignature(rule: Pick<RegexRule, 'description' | 'pattern' | 'replacement'>): string {
   return [rule.description || '', rule.pattern, rule.replacement].join('\u001f');
 }
 
