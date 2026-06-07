@@ -1,174 +1,79 @@
 酒馆正则与 UI 加载入口梳理
-更新时间：2026-06-04
+更新时间：2026-06-08
 
-一、当前入口配置（按用户提供现状记录）
+一、当前入口配置
 
-当前主要加载正则为“游戏页面”：
-- 脚本名：`游戏页面`
-- 查找正则：`/.+/s`
-- 替换内容：
-  ```html
-  <script>
-  $('body').load('http://localhost:5500/dist/武侠/index.html')
-  </script>
-  </body>
-  ```
-- 作用范围：`user_input`、`ai_output`
-- 编辑时运行：`run_on_edit=true`
-- 目的：`仅格式显示`
-- 深度：最小深度无限、最大深度 `1`
-- 当前用户记录里还有“替换策略不替换”；本梳理不额外解读该 UI 字段，只按当前实际行为说明：这条规则确实在显示链上把楼层替成了 loader。
+当前主入口仍是角色卡里名为“游戏页面”的显示正则：
 
-从 `@types/function/tavern_regex.d.ts:8-28,30-56` 可知，酒馆正则是按“来源 source + 目的 destination + 深度 depth + run_on_edit”一起决定是否生效；`destination.display=true` 代表它属于显示链，不是提示词链。
+- 名称：`游戏页面`
+- 启用：`true`
+- 查找表达式：`/.+/s`
+- 配置来源字段：`用户输入=true`、`AI输出=true`
+- 作用于：`仅格式显示=true`
+- 最大深度：`1`
+- 正则内容：在楼层 iframe 中执行 `$('body').load('http://localhost:5500/dist/武侠/index.html')`
 
-二、这条正则如何把伪同层 UI 挂到楼层
+来源：角色卡/金庸群侠传/index.yaml:9035-9047；角色卡/金庸群侠传/正则/游戏页面.txt:1-7；@types/function/tavern_regex.d.ts:30-56
 
-1. 楼层里的前端界面本来就是消息楼层 iframe
-- `.cursor/rules/前端界面.mdc:7-13`：前端界面以无沙盒 iframe 的形式在酒馆消息楼层中前台显示。
-- `.cursor/rules/项目基本概念.mdc:26-37`：项目允许通过“替换楼层显示”的方式，把原本只支持文本的楼层变成可交互界面。
+二、它如何把伪同层 UI 挂到楼层
 
-2. “游戏页面”正则做的不是改数据，而是改显示结果
-- 楼层原文仍然是聊天正文和 ERA 变量块。
-- 但在显示阶段，这条 `/ .+/s`（实际为 `/.+/s`）会吞掉整条非空楼层文本，并产出一段 loader HTML。
-- loader HTML 里的 `$('body').load('http://localhost:5500/dist/武侠/index.html')` 会把 `dist/武侠/index.html` 载入当前楼层对应的前端界面容器。
+1. 前端界面本来就是消息楼层 iframe 里的前台页面，`src/武侠/index.html` 只提供 `#root`，真正的界面由 `index.tsx` 在 iframe 内挂载。来源：.cursor/rules/前端界面.mdc:7-13；src/武侠/index.tsx:11-35
+2. “游戏页面”正则改写的是显示结果，不是聊天原文；楼层里真实保存的正文和 ERA 变量块仍在，显示时才被 loader 壳覆盖。来源：@types/function/displayed_message.d.ts:28-46；角色卡/金庸群侠传/正则/游戏页面.txt:1-7
+3. loader 拉起 `dist/武侠/index.html` 后，React 入口会立即执行 `ensureLoaderRegexSafety()`，把危险的 `run_on_edit` 配置关掉。来源：src/武侠/index.tsx:19-24；src/武侠/utils/loaderRegexGuard.ts:32-73
 
-3. `dist/武侠/index.html` 和 `src/武侠/index.tsx` 是真正的 UI 入口
-- `src/武侠/index.html` 只有一个 `#root` 容器（见 `src/武侠/index.html:1-10`）。
-- `src/武侠/index.tsx:11-27` 在 `$(() => {})` 中查找 `#root`，然后 `ReactDOM.createRoot(...).render(<App />)`。
-- 同文件 `29-36` 在 `pagehide` 时卸载 React root。
+三、“复制”正则的定位
 
-4. 为什么它叫“伪同层”
-- 从用户视角看，像是在“同一张卡、同一块界面”里继续玩。
-- 实际上 UI 是随着“最新可见楼层”一起换壳的，不是真正脱离楼层历史的单页应用。
-- `酒馆资料/隐藏楼层脚本.txt:1-13` 只是把 `#chat > .mes` 里除 `.last_mes` 之外的楼层 DOM 删除，让前台看起来只剩最后一楼；它不删除聊天记录，也不减少最新楼层原文体积。
-- 所以这个结构本质上是：历史仍在，前台只露出最后一楼，这最后一楼再通过显示正则挂出武侠 UI。
+`复制` 不是当前主入口，而是一个被禁用的 display 正则，内容直接内联了一份前端构建快照。它更像角色卡导出时附带的“打包产物备份位”，不是当前开发期依赖的 loader URL。来源：角色卡/金庸群侠传/index.yaml:9048-9059；角色卡/金庸群侠传/正则/复制.txt:1-2
 
-三、`仅格式显示` 为什么仍会深度影响编辑确认
+这份内联快照为什么会存在：
 
-1. `仅格式显示` 不等于“不会参与编辑确认”
-- 它的意思是：不把替换结果送进 prompt，不代表不参与“楼层重新显示”。
-- 只要酒馆在编辑确认后重新格式化楼层显示，这条正则就会再跑一遍。
+1. `tavern_sync pull` 会把长内容正则拆到 `正则/*.txt`。
+2. `tavern_sync push/bundle` 会把外链正则再回填到角色卡。
+3. 所以角色卡里既能保留开发期的 loader 正则，也能保留一次性内联的构建快照正则。
 
-2. 编辑确认时，酒馆要重建楼层显示
-- 这次任务前的卡顿梳理已经确认：编辑确认会先销毁旧 iframe，再在主线程里同步跑显示格式化、酒馆正则、Prompt Template、ERA 解析，最后新 iframe 才插回去。
-- 因此即使“游戏页面”正则只属于 display，它仍然是编辑确认链上的一环，而不是纯旁路配置。
+来源：tavern_sync.mjs:61903-62028,62120-62145,62542-62580
 
-3. `$('body').load(...)` 把“显示替换”变成了“重新拉起整张前端”
-- 这条正则不是简单把文本包一层 `<div>`，而是直接注入 loader script。
-- loader script 一旦重新执行，就意味着当前楼层 UI 要重新走一遍：
-  - 楼层显示被替换成 loader；
-  - loader 再拉 `dist/武侠/index.html`；
-  - `src/武侠/index.tsx` 再次挂载 React。
-- 所以用户体感上会看到“确认后旧界面先没了，过一阵子新界面才回来”。
+四、`仅格式显示` 为什么仍会影响编辑确认
 
-四、为什么 `run_on_edit` 危险
+`destination.display=true` 只说明这条正则不进入 prompt，不说明它不会参与楼层重建。酒馆在编辑确认后会重新格式化并重新渲染楼层，因此 display 正则仍会在编辑确认链中执行。来源：@types/function/tavern_regex.d.ts:41-56,92-130；@types/function/chat_message.d.ts:106-153
 
-1. 它会把“显示入口正则”卷进编辑确认链
-- `@types/function/tavern_regex.d.ts:48-56` 把 `run_on_edit` 列为正则配置的一部分。
-- 当前武侠前端已经专门为此做保护：`src/武侠/utils/loaderRegexGuard.ts:59-79` 只要发现“游戏页面”这类加载正则开启了 `run_on_edit`，就会自动改成 `false`。
+对当前卡来说，这意味着：
 
-2. 已有仓内实测结论认为它会污染最新楼层判断
-- `src/武侠/信息.txt:125-131` 记录了一个已出现过的问题：
-  - 编辑最新消息确认后，前台会“像回到第一层”。
-  - 高概率根因是：加载 `dist/武侠/index.html` 的显示正则参与了编辑确认链路，`run_on_edit=true` 时会把显示替换规则卷进真实消息更新。
-  - 对伪同层卡来说，最新 assistant 楼层一旦退化成“只剩 loader 脚本壳”，前端从后往前找正文时就会回退到更早的 assistant 楼层。
+1. 旧 iframe 会先被销毁。
+2. 楼层重新命中“游戏页面”正则。
+3. loader 再次执行 `$('body').load(...)`。
+4. 新前端稍后才重新挂回。
 
-3. 它还会放大编辑确认时的重渲染成本
-- 当前“游戏页面”正则使用 `/.+/s`，会稳定命中所有非空目标楼层。
-- `信息/卡顿追踪/02-酒馆正则与UI加载入口.txt` 和 `信息/卡顿追踪/00-卡顿根因总览.txt` 的结论已经说明：
-  - 单看 `/.+/s` 不是灾难回溯正则；
-  - 但它每次编辑都命中最新大消息，并和其他显示正则、Prompt Template、ERA 变量块处理叠加；
-  - 优化其他重型正则后，完整编辑确认已经从 30 秒级降到约 0.5-4.6 秒，说明真正的问题是“它参与了整条重建链”，不是它单独一条就 30 秒。
+来源：角色卡/金庸群侠传/正则/游戏页面.txt:1-7；src/武侠/index.tsx:11-35；src/武侠/utils/loaderRegexGuard.ts:32-73
 
-五、`loaderRegexGuard` 现在具体做了什么
+五、为什么 `run_on_edit` 危险
 
-`src/武侠/utils/loaderRegexGuard.ts` 的作用不是“创建入口”，而是“防止入口正则在编辑确认时误伤”。
+1. `run_on_edit` 是正则配置的一部分，会直接决定编辑确认时是否参与这条链。来源：@types/function/tavern_regex.d.ts:48-56
+2. 当前 loader guard 会扫描角色、全局、当前预设三类正则，只要匹配到“游戏页面”脚本名，或者替换内容中带有 `localhost:5500/dist/武侠/index.html`、`127.0.0.1:5500/dist/武侠/index.html`、`$('body').load(`，就自动把 `run_on_edit` 改成 `false`。来源：src/武侠/utils/loaderRegexGuard.ts:4-18,32-73
+3. 这样做的目的不是优化审美，而是避免最新 assistant 楼层在编辑后退化成“只有 loader 壳”的消息，进而让前端正文回退到更早楼层。来源：src/武侠/utils/loaderRegexGuard.ts:57-73；src/武侠/utils/variableReader.ts:349-365,2470-2523
 
-1. 它会检查三个作用域
-- `character(current)`、`global`、`preset(in_use)`，见 `src/武侠/utils/loaderRegexGuard.ts:3-12`。
+六、`variableReader` 对入口链的兜底
 
-2. 它如何识别“游戏页面”加载正则
-- 先看脚本名是不是 `游戏页面`，见 `28-37`。
-- 如果脚本名改了，再看替换内容里是否命中这些特征：
-  - `localhost:5500/dist/武侠/index.html`
-  - `127.0.0.1:5500/dist/武侠/index.html`
-  - `$('body').load(`
-  见 `14-18`。
+当前前端不把显示结果直接当正文，而是做了三层兜底：
 
-3. 它修什么
-- 只修一件事：把匹配到的 loader 正则的 `run_on_edit` 改成 `false`，见 `57-79`。
-- 日志里已经明确写了目的：`正在关闭以避免编辑确认污染楼层`，见 `65-67`。
+1. `stripEraVariableBlocks()` 去掉 `<VariableInsert>` / `<VariableEdit>` / `<VariableDelete>`。来源：src/武侠/utils/variableReader.ts:230-331
+2. `stripFrontendLoaderArtifacts()` 去掉 `<script>`、`<body>` 等 loader 壳残留。来源：src/武侠/utils/variableReader.ts:305-331
+3. `getLastMessageContent()` 倒序扫描 assistant 楼层，遇到 `isFrontendLoaderOnlyMessage()` 判断为 loader-only 的消息就继续往前找。来源：src/武侠/utils/variableReader.ts:349-365,2470-2523
 
-4. 它什么时候运行
-- `src/武侠/index.tsx:22-24`：UI 挂载完成后立即异步执行 `ensureLoaderRegexSafety()`。
+因此，当前前端的正确性依赖“loader URL / loader 特征识别规则”与外层正则保持同步。来源：src/武侠/utils/variableReader.ts:305-331,349-365；src/武侠/utils/loaderRegexGuard.ts:14-18,32-73
 
-5. 它可以被手动跳过
-- `src/武侠/utils/loaderRegexGuard.ts:20-26`：如果 localStorage 里 `wuxia_skip_loader_regex_guard=1`，就跳过这层保护。
+七、改入口时必须一起改的地方
 
-六、`variableReader` 为这条入口链补了哪些兜底
+1. 改 loader URL、端口、路径或脚本名时，要同步改 `loaderRegexGuard.ts` 的识别条件。来源：src/武侠/utils/loaderRegexGuard.ts:14-18,32-73
+2. 还要同步改 `variableReader.ts` 对 loader-only 楼层的判断，否则它会把新 loader 壳误当正文。来源：src/武侠/utils/variableReader.ts:305-331,349-365
+3. 如果改成新的挂载节点，`src/武侠/index.html` 与 `index.tsx` 的 `#root` 依赖也要同步处理。来源：src/武侠/index.tsx:13-20
+4. 若要通过代码修改酒馆正则，优先 `updateTavernRegexesWith()`，不要轻易 `replaceTavernRegexes()`，因为后者会触发整聊天重载和 `CHAT_CHANGED`。来源：@types/function/tavern_regex.d.ts:92-130
 
-这部分很重要，因为“显示入口是 loader，而正文还在聊天记录里”是当前伪同层卡的核心现实。
+八、构建与同步层面要记住的事
 
-1. 读取变量时，仍以合并变量表为主
-- `src/武侠/utils/variableReader.ts:5-7`：在消息楼层 iframe 中，`getAllVariables()` 读到的是“全局 -> 角色卡 -> 聊天 -> 0 号楼层 -> 中间所有楼层 -> 当前楼层”的合并结果。
-- `421-437`：真正使用的是 `rawVariables.stat_data`。
-- 这说明 UI 状态主要不靠显示后的 loader 文本，而是靠 MVU/ERA 变量表。
+1. 当前开发主入口是 `localhost:5500/dist/武侠/index.html`，不是角色卡内联 HTML。来源：角色卡/金庸群侠传/正则/游戏页面.txt:1-7；src/武侠/index.tsx:11-35
+2. `webpack.config.ts` 会产出前端 bundle，并在 watch 模式下串上 tavern_sync；`npm run sync` 则单独走同步脚本。来源：webpack.config.ts:168-210；package.json:10-10；tavern_sync.mjs:62542-62630
 
-2. 解析正文时，会主动剥掉 ERA 变量块和 loader 残留
-- `305-331`：
-  - `stripEraVariableBlocks()` 去掉 `<VariableInsert|Edit|Delete>...</...>`
-  - `stripFrontendLoaderArtifacts()` 去掉 `<script>...</script>` 和 `<body>` 标签
-  - `normalizeDisplayedMessageContent()` 把两者串起来
+九、结论
 
-3. 它会识别“这条 assistant 只有 loader，没有正文”
-- `349-365`：`isFrontendLoaderOnlyMessage()` 先看消息里有没有 5500 / `$('body').load(` 的提示，再看清洗后是否为空。
-
-4. 它会从后往前跳过“只有 loader 的最新楼层”
-- `2470-2523`：`getLastMessageContent()` 会倒序扫描 assistant 楼层。
-- 遇到 `loaderOnly=true` 的楼层直接跳过，继续往前找真正有正文的 assistant。
-- 这正对应了 `src/武侠/信息.txt:129-131` 里那条止血：不要把仅含 5500 加载脚本的楼层当成正文。
-
-七、后续改正则、加载路径、端口时的注意事项
-
-1. 不能只改酒馆正则，不改仓内识别逻辑
-- 只要你改了 loader URL、端口、域名、脚本名，就要同步检查：
-  - `src/武侠/utils/loaderRegexGuard.ts:14-18,28-37`
-  - `src/武侠/utils/variableReader.ts:306-308,349-365`
-- 否则会出现两类后果：
-  - `loaderRegexGuard` 识别不到新 loader，`run_on_edit` 保护失效；
-  - `variableReader` 识别不到“这条楼层只有 loader”，又把它当正文使用。
-
-2. 如果改了入口页面结构，`index.html` 和 `index.tsx` 要一起看
-- `src/武侠/index.html:7-10` 依赖 `#root`。
-- `src/武侠/index.tsx:13-20` 也硬依赖 `#root`。
-- 如果未来改成别的挂载节点，两个文件要同步改。
-
-3. `run_on_edit` 应保持关闭
-- 对当前伪同层结构，这是高风险项，不是可随便打开的小开关。
-- 除非后续把 UI 入口从“显示正则注入 loader”改成别的结构，否则不建议重新开启。
-
-4. `destination` 应继续限定在 `display`
-- 这条规则的职责是“把楼层显示换成 UI 入口”。
-- 一旦让它进入 `prompt`，就等于把 loader script 送进提示词链，职责完全错位。
-
-5. 作用范围 `source` 和深度 `max_depth` 可以改，但必须配合实际消息流复测
-- 当前配置把 `user_input` 和 `ai_output` 都勾上、`max_depth=1`。
-- 如果 UI 实际只挂在最新 assistant 楼层，那么收窄到只匹配 `ai_output`、或把深度进一步收窄，会减少无谓命中面。
-- 但这不是纸面可直接拍板的项，因为它决定了哪些楼层还会显示 UI。
-
-6. `localhost:5500` 只是开发入口，不是稳定发布地址
-- 端口没开、路径不对、dev server 没起时，前台会只剩 loader 壳或空白。
-- 当前仓内多处识别逻辑都直接写死了 `5500/dist/武侠/index.html`，所以改端口不是只改酒馆正则一处。
-
-7. 如果后续需要通过代码改酒馆正则，优先 `updateTavernRegexesWith`
-- `@types/function/tavern_regex.d.ts:92-102` 明确写了：`replaceTavernRegexes()` 很慢，而且会重新载入整个聊天消息并触发 `CHAT_CHANGED`。
-- 对这种已经把 UI 入口绑在显示正则上的角色卡，整表替换正则会放大重载副作用。
-
-八、当前可直接记住的结论
-
-1. “游戏页面”正则是武侠伪同层卡的显示入口，不是可直接删掉的普通美化规则。
-2. 它的真实职责是：把消息楼层显示替成 loader，再由 loader 拉起 `dist/武侠/index.html`。
-3. `仅格式显示` 不能说明它对编辑确认无影响；编辑确认本来就要重建显示链，所以它一定会参与。
-4. `run_on_edit` 对这种 loader 型正则是危险项，当前前端已经通过 `loaderRegexGuard` 自动关掉它。
-5. `variableReader` 现在依赖“识别并跳过 loader-only 楼层”来避免正文回退；改 URL/端口/脚本名时必须一起改识别规则。
-6. 后续如果要重构这张卡，最需要优先拆耦的是：UI 入口正则、loader URL 识别、最新 assistant 正文读取，这三处现在是绑死的。
+“游戏页面”是当前伪同层卡的真实显示入口，`复制` 只是备用的内联快照位；`run_on_edit` 是高风险项，loader guard 和 variableReader 的 loader-only 识别是这一入口能稳定工作的两道止血层。后续改入口时，至少要同步检查正则矩阵、loader guard、正文读取和构建/同步脚本这四处。来源：角色卡/金庸群侠传/index.yaml:9035-9059；src/武侠/utils/loaderRegexGuard.ts:32-73；src/武侠/utils/variableReader.ts:2470-2523；tavern_sync.mjs:61903-62145
