@@ -251,6 +251,10 @@ function getRegexRuleSignature(rule: RegexRule): string {
   return [rule.originScope, rule.description || '', rule.pattern, rule.replacement].join('\u001f');
 }
 
+function getRegexRuleContentSignature(rule: Pick<RegexRule, 'description' | 'pattern' | 'replacement'>): string {
+  return [rule.description || '', rule.pattern, rule.replacement].join('\u001f');
+}
+
 function mergeExtractedGlobalRules(localRegexRules: RegexRule[], extractedGlobalRules: RegexRule[]): RegexRule[] {
   if (extractedGlobalRules.length === 0) {
     return localRegexRules;
@@ -306,6 +310,24 @@ function normalizePresetRegexRulesByPreset(
     presetRegexRulesByPreset: nextPresetRegexRulesByPreset,
     extractedGlobalRules,
   };
+}
+
+function removePresetRulesDuplicatedWithGlobalRules(
+  presetRegexRulesByPreset: RegexRulesByPreset,
+  globalRules: RegexRule[],
+): RegexRulesByPreset {
+  if (globalRules.length === 0 || Object.keys(presetRegexRulesByPreset).length === 0) {
+    return presetRegexRulesByPreset;
+  }
+
+  const globalSignatures = new Set(globalRules.map(getRegexRuleContentSignature));
+  return Object.entries(presetRegexRulesByPreset).reduce<RegexRulesByPreset>((result, [presetName, rules]) => {
+    const nextRules = rules.filter(rule => !globalSignatures.has(getRegexRuleContentSignature(rule)));
+    if (nextRules.length > 0) {
+      result[presetName] = nextRules;
+    }
+    return result;
+  }, {});
 }
 
 function normalizeSummarySettings(summarySettings: Partial<SummarySettings> | undefined): SummarySettings {
@@ -385,6 +407,7 @@ export function loadSettings(): DisplaySettings {
     const defaultSettings = createDefaultDisplaySettings();
     const legacyRegexRules = Array.isArray(parsed.regexRules) ? parsed.regexRules : undefined;
     const presetRegexRuleState = normalizePresetRegexRulesByPreset(parsed.presetRegexRulesByPreset);
+    const importedGlobalRegexRules = importGlobalTavernRegexes();
     const localRegexRules = mergeExtractedGlobalRules(
       normalizeLocalRegexRules(
       Array.isArray(parsed.localRegexRules) ? parsed.localRegexRules : legacyRegexRules,
@@ -401,7 +424,10 @@ export function loadSettings(): DisplaySettings {
       backgroundImage: getNullableStringSetting(parsed.backgroundImage, defaultSettings.backgroundImage),
       backgroundBlur: getNumberSetting(parsed.backgroundBlur, defaultSettings.backgroundBlur),
       localRegexRules,
-      presetRegexRulesByPreset: presetRegexRuleState.presetRegexRulesByPreset,
+      presetRegexRulesByPreset: removePresetRulesDuplicatedWithGlobalRules(
+        presetRegexRuleState.presetRegexRulesByPreset,
+        importedGlobalRegexRules,
+      ),
       summarySettings: normalizeSummarySettings(parsed.summarySettings),
     };
   } catch (error) {
@@ -688,7 +714,14 @@ export function importGlobalTavernRegexes(): RegexRule[] {
  */
 export function importPresetTavernRegexes(): RegexRule[] {
   try {
-    return getImportableTavernRegexesFromScope({ type: 'preset', name: 'in_use' }, 'preset');
+    const presetRules = getImportableTavernRegexesFromScope({ type: 'preset', name: 'in_use' }, 'preset');
+    const globalRules = importGlobalTavernRegexes();
+    if (globalRules.length === 0) {
+      return presetRules;
+    }
+
+    const globalSignatures = new Set(globalRules.map(getRegexRuleContentSignature));
+    return presetRules.filter(rule => !globalSignatures.has(getRegexRuleContentSignature(rule)));
   } catch (error) {
     dataLogger.error('导入当前预设酒馆正则失败:', error);
     return [];
