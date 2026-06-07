@@ -477,12 +477,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // 导入全局酒馆正则
   const handleImportGlobalTavernRegexes = useCallback(() => {
     const importedRules = importGlobalTavernRegexes();
+    replaceImportedGlobalRegexRules(importedRules);
     if (importedRules.length === 0) {
-      alert('没有找到符合条件的全局酒馆正则\n\n筛选条件：\n• 作用域：全局\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
+      alert('没有找到符合条件的全局酒馆正则，已清理此前导入的全局规则\n\n筛选条件：\n• 作用域：全局\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
       return;
     }
 
-    replaceImportedGlobalRegexRules(importedRules);
     alert(`已覆盖导入 ${importedRules.length} 条全局酒馆正则规则`);
   }, [replaceImportedGlobalRegexRules]);
 
