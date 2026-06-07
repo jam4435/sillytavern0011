@@ -708,7 +708,7 @@ export function importPresetTavernRegexes(): RegexRule[] {
  * - 仅格式显示（destination.display: true）
  * - 名称不为"游戏页面"（排除游戏页面专用正则）
  *
- * 注意：导入后的正则默认关闭，需要用户手动启用
+ * 注意：导入后的正则默认开启，沿用酒馆中已启用的筛选结果
  */
 export function importTavernRegexes(): RegexRule[] {
   try {
