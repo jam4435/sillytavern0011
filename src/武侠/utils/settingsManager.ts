@@ -988,7 +988,7 @@ export function importPresetTavernRegexes(): RegexRule[] {
  * - 已启用（enabled: true）
  * - 无最小深度（min_depth: null）
  * - 有 AI 输出（source.ai_output: true）
- * - 仅格式显示（destination.display: true）
+ * - 有格式显示作用（destination.display: true）
  * - 名称不为"游戏页面"（排除游戏页面专用正则）
  *
  * 注意：导入后的正则默认开启，沿用酒馆中已启用的筛选结果

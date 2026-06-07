@@ -483,7 +483,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     replaceImportedGlobalRegexRules(importedRules);
     scheduleRegexDebugDump('点击覆盖导入全局正则（导入后）');
     if (importedRules.length === 0) {
-      alert('没有找到符合条件的全局酒馆正则，已清理此前导入的全局规则\n\n筛选条件：\n• 作用域：全局\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
+      alert('没有找到符合条件的全局酒馆正则，已清理此前导入的全局规则\n\n筛选条件：\n• 作用域：全局\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 有作用于格式显示');
       return;
     }
 
@@ -500,7 +500,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     logRegexDebugSnapshot(settings, normalizedCurrentPresetName, '点击覆盖导入当前预设规则（导入前）');
     const importedRules = importPresetTavernRegexes();
     if (importedRules.length === 0) {
-      alert('没有找到符合条件的当前预设酒馆正则\n\n筛选条件：\n• 作用域：当前预设\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
+      alert('没有找到符合条件的当前预设酒馆正则\n\n筛选条件：\n• 作用域：当前预设\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 有作用于格式显示');
       return;
     }
 
