@@ -2,17 +2,19 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_BACKGROUND_SETTINGS,
   DEFAULT_DISPLAY_SETTINGS,
-  DEFAULT_REGEX_SETTINGS,
   DEFAULT_SUMMARY_SETTINGS,
   DEFAULT_SUMMARY_TAB_SETTINGS,
   DisplaySettings,
   RegexRule,
+  createDefaultRegexSettings,
   SummarySettings,
   SummaryApiConfig,
   SummaryThresholds,
   createRegexRule,
+  getCurrentPresetRegexRules,
   imageToBase64,
   importTavernRegexes,
+  setPresetRegexRulesForPreset,
   validateRegex
 } from '../utils/settingsManager';
 import {
@@ -155,6 +157,7 @@ const setValueAtVariablePath = (
 };
 
 interface SettingsPanelProps {
+  currentPresetName: string;
   settings: DisplaySettings;
   onSettingsChange: (settings: DisplaySettings) => void;
   debugLogs?: DebugLogEntry[];
@@ -166,6 +169,7 @@ interface SettingsPanelProps {
  * 提供正文显示、背景和正则替换的设置功能
  */
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
+  currentPresetName,
   settings,
   onSettingsChange,
   debugLogs = [],
@@ -191,6 +195,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [variableSearch, setVariableSearch] = useState('');
 
   const normalizedVariableSearch = variableSearch.trim().toLowerCase();
+  const normalizedCurrentPresetName = currentPresetName.trim();
+  const hasCurrentPreset = normalizedCurrentPresetName.length > 0;
+  const currentPresetRegexRules = getCurrentPresetRegexRules(settings, normalizedCurrentPresetName);
   const visibleStatDataEntries = statData
     ? getVisibleEntries(statData).filter(([key, value]) =>
       matchesVariableSearch(key, value, normalizedVariableSearch)
@@ -298,10 +305,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         }
         break;
       case 'regex':
-        onSettingsChange({
-          ...settings,
-          ...DEFAULT_REGEX_SETTINGS,
-        });
+        {
+          const defaultRegexSettings = createDefaultRegexSettings();
+          const regexResetSettings = {
+            ...settings,
+            localRegexRules: defaultRegexSettings.localRegexRules,
+          };
+          onSettingsChange(
+            hasCurrentPreset
+              ? setPresetRegexRulesForPreset(regexResetSettings, normalizedCurrentPresetName, [])
+              : regexResetSettings,
+          );
+        }
         break;
       case 'summary':
         onSettingsChange({
@@ -319,7 +334,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         onClearDebugLogs?.();
         break;
     }
-  }, [activeTab, settings, onSettingsChange, refreshStatData, onClearDebugLogs]);
+  }, [
+    activeTab,
+    hasCurrentPreset,
+    normalizedCurrentPresetName,
+    settings,
+    onSettingsChange,
+    refreshStatData,
+    onClearDebugLogs,
+  ]);
 
   // 获取当前页面的重置按钮文本
   const getResetButtonText = useCallback(() => {
@@ -329,7 +352,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       case 'background':
         return '重置背景设置';
       case 'regex':
-        return '清空所有规则';
+        return '重置全局并清空当前预设';
       case 'summary':
         return '重置总结设置';
       case 'variables':
@@ -373,69 +396,80 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [updateSetting]);
 
-  // 添加正则规则
-  const addRegexRule = useCallback(() => {
-    const newRule = createRegexRule();
-    updateSetting('regexRules', [...settings.regexRules, newRule]);
-  }, [settings.regexRules, updateSetting]);
+  const updateCurrentPresetRules = useCallback((rules: RegexRule[]) => {
+    if (!hasCurrentPreset) {
+      return;
+    }
 
-  // 更新正则规则
-  const updateRegexRule = useCallback((id: string, updates: Partial<RegexRule>) => {
-    const newRules = settings.regexRules.map(rule =>
+    onSettingsChange(setPresetRegexRulesForPreset(settings, normalizedCurrentPresetName, rules));
+  }, [hasCurrentPreset, normalizedCurrentPresetName, onSettingsChange, settings]);
+
+  // 添加全局正则规则
+  const addLocalRegexRule = useCallback(() => {
+    const newRule = createRegexRule();
+    updateSetting('localRegexRules', [...settings.localRegexRules, newRule]);
+  }, [settings.localRegexRules, updateSetting]);
+
+  // 更新全局正则规则
+  const updateLocalRegexRule = useCallback((id: string, updates: Partial<RegexRule>) => {
+    const newRules = settings.localRegexRules.map(rule =>
       rule.id === id ? { ...rule, ...updates } : rule
     );
-    updateSetting('regexRules', newRules);
-  }, [settings.regexRules, updateSetting]);
+    updateSetting('localRegexRules', newRules);
+  }, [settings.localRegexRules, updateSetting]);
 
-  // 删除正则规则
-  const deleteRegexRule = useCallback((id: string) => {
-    const newRules = settings.regexRules.filter(rule => rule.id !== id);
-    updateSetting('regexRules', newRules);
-  }, [settings.regexRules, updateSetting]);
+  // 删除全局正则规则
+  const deleteLocalRegexRule = useCallback((id: string) => {
+    const newRules = settings.localRegexRules.filter(rule => rule.id !== id);
+    updateSetting('localRegexRules', newRules);
+  }, [settings.localRegexRules, updateSetting]);
 
-  // 切换正则规则启用状态
-  const toggleRegexRule = useCallback((id: string) => {
-    const rule = settings.regexRules.find(r => r.id === id);
+  // 切换全局正则规则启用状态
+  const toggleLocalRegexRule = useCallback((id: string) => {
+    const rule = settings.localRegexRules.find(r => r.id === id);
     if (rule) {
-      updateRegexRule(id, { enabled: !rule.enabled });
+      updateLocalRegexRule(id, { enabled: !rule.enabled });
     }
-  }, [settings.regexRules, updateRegexRule]);
+  }, [settings.localRegexRules, updateLocalRegexRule]);
+
+  // 更新当前预设正则规则
+  const updatePresetRegexRule = useCallback((id: string, updates: Partial<RegexRule>) => {
+    const newRules = currentPresetRegexRules.map(rule =>
+      rule.id === id ? { ...rule, ...updates } : rule
+    );
+    updateCurrentPresetRules(newRules);
+  }, [currentPresetRegexRules, updateCurrentPresetRules]);
+
+  // 删除当前预设正则规则
+  const deletePresetRegexRule = useCallback((id: string) => {
+    const newRules = currentPresetRegexRules.filter(rule => rule.id !== id);
+    updateCurrentPresetRules(newRules);
+  }, [currentPresetRegexRules, updateCurrentPresetRules]);
+
+  // 切换当前预设正则规则启用状态
+  const togglePresetRegexRule = useCallback((id: string) => {
+    const rule = currentPresetRegexRules.find(r => r.id === id);
+    if (rule) {
+      updatePresetRegexRule(id, { enabled: !rule.enabled });
+    }
+  }, [currentPresetRegexRules, updatePresetRegexRule]);
 
   // 导入酒馆正则
   const handleImportTavernRegexes = useCallback(() => {
+    if (!hasCurrentPreset) {
+      alert('当前没有加载中的预设，无法导入当前预设规则');
+      return;
+    }
+
     const importedRules = importTavernRegexes();
     if (importedRules.length === 0) {
-      alert('没有找到符合条件的酒馆正则\n\n筛选条件：\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
+      alert('没有找到符合条件的酒馆正则\n\n筛选条件：\n• 作用域：全局 + 当前预设\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
       return;
     }
-    
-    // 获取现有规则的描述列表（用于重名检查）
-    const existingDescriptions = new Set(
-      settings.regexRules
-        .map(rule => rule.description)
-        .filter((desc): desc is string => !!desc)
-    );
-    
-    // 过滤掉重名的规则
-    const newRules = importedRules.filter(
-      rule => !rule.description || !existingDescriptions.has(rule.description)
-    );
-    const skippedCount = importedRules.length - newRules.length;
-    
-    if (newRules.length === 0) {
-      alert(`所有 ${importedRules.length} 条酒馆正则都已存在（重名），未导入任何规则`);
-      return;
-    }
-    
-    // 将导入的规则添加到现有规则列表末尾
-    updateSetting('regexRules', [...settings.regexRules, ...newRules]);
 
-    if (skippedCount > 0) {
-      alert(`成功导入 ${newRules.length} 条酒馆正则规则\n跳过 ${skippedCount} 条重名规则`);
-    } else {
-      alert(`成功导入 ${newRules.length} 条酒馆正则规则`);
-    }
-  }, [settings.regexRules, updateSetting]);
+    updateCurrentPresetRules(importedRules);
+    alert(`已覆盖导入 ${importedRules.length} 条酒馆正则规则到预设「${normalizedCurrentPresetName}」`);
+  }, [hasCurrentPreset, normalizedCurrentPresetName, updateCurrentPresetRules]);
 
   // =========================================
   // 自动总结相关回调
@@ -774,43 +808,90 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               正则替换规则
             </h4>
             <p className="settings-description">
-              使用正则表达式替换正文中的内容。规则按顺序执行。
+              正文显示时按固定顺序执行：ERA 基础规则、当前预设规则、其它全局规则。
             </p>
 
-            {/* 规则列表 */}
-            <div className="regex-rules-list">
-              {settings.regexRules.length === 0 ? (
-                <div className="regex-empty">
-                  <Icons.Scroll size={32} />
-                  <p>暂无替换规则</p>
+            <div className="regex-scope-section">
+              <div className="regex-section-header">
+                <div>
+                  <h5 className="regex-section-title">全局共享规则</h5>
+                  <p className="regex-section-caption">手动添加的规则对所有预设共用。</p>
                 </div>
-              ) : (
-                settings.regexRules.map((rule, index) => (
-                  <RegexRuleItem
-                    key={rule.id}
-                    rule={rule}
-                    index={index}
-                    onUpdate={(updates) => updateRegexRule(rule.id, updates)}
-                    onDelete={() => deleteRegexRule(rule.id)}
-                    onToggle={() => toggleRegexRule(rule.id)}
-                  />
-                ))
-              )}
+              </div>
+
+              <div className="regex-rules-list">
+                {settings.localRegexRules.length === 0 ? (
+                  <div className="regex-empty">
+                    <Icons.Scroll size={32} />
+                    <p>暂无全局共享规则</p>
+                  </div>
+                ) : (
+                  settings.localRegexRules.map((rule, index) => (
+                    <RegexRuleItem
+                      key={rule.id}
+                      rule={rule}
+                      index={index}
+                      onUpdate={(updates) => updateLocalRegexRule(rule.id, updates)}
+                      onDelete={() => deleteLocalRegexRule(rule.id)}
+                      onToggle={() => toggleLocalRegexRule(rule.id)}
+                    />
+                  ))
+                )}
+              </div>
+
+              <div className="regex-buttons-group">
+                <button className="settings-add-btn" onClick={addLocalRegexRule}>
+                  <span className="add-icon">+</span>
+                  <span>添加全局规则</span>
+                </button>
+              </div>
             </div>
 
-            {/* 按钮组 */}
-            <div className="regex-buttons-group">
-              {/* 添加规则按钮 */}
-              <button className="settings-add-btn" onClick={addRegexRule}>
-                <span className="add-icon">+</span>
-                <span>添加规则</span>
-              </button>
+            <div className="regex-scope-section">
+              <div className="regex-section-header">
+                <div>
+                  <h5 className="regex-section-title">当前预设规则</h5>
+                  <p className="regex-section-caption">
+                    {hasCurrentPreset
+                      ? `当前预设：${normalizedCurrentPresetName}。导入时会覆盖这一桶规则。`
+                      : '未检测到当前预设，仅可查看和编辑全局共享规则。'}
+                  </p>
+                </div>
+                {hasCurrentPreset && (
+                  <span className="regex-section-meta">{normalizedCurrentPresetName}</span>
+                )}
+              </div>
 
-              {/* 导入酒馆正则按钮 */}
-              <button className="settings-import-btn" onClick={handleImportTavernRegexes}>
-                <Icons.Scroll size={14} />
-                <span>导入酒馆正则</span>
-              </button>
+              <div className="regex-rules-list">
+                {currentPresetRegexRules.length === 0 ? (
+                  <div className="regex-empty">
+                    <Icons.Scroll size={32} />
+                    <p>{hasCurrentPreset ? '当前预设暂无导入规则' : '暂无可用预设规则'}</p>
+                  </div>
+                ) : (
+                  currentPresetRegexRules.map((rule, index) => (
+                    <RegexRuleItem
+                      key={rule.id}
+                      rule={rule}
+                      index={index}
+                      onUpdate={(updates) => updatePresetRegexRule(rule.id, updates)}
+                      onDelete={() => deletePresetRegexRule(rule.id)}
+                      onToggle={() => togglePresetRegexRule(rule.id)}
+                    />
+                  ))
+                )}
+              </div>
+
+              <div className="regex-buttons-group">
+                <button
+                  className="settings-import-btn"
+                  onClick={handleImportTavernRegexes}
+                  disabled={!hasCurrentPreset}
+                >
+                  <Icons.Scroll size={14} />
+                  <span>覆盖导入当前预设规则</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1429,6 +1510,12 @@ const RegexRuleItem: React.FC<RegexRuleItemProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false); // 默认收起
   const validation = validateRegex(rule.pattern);
+  const originScopeLabel =
+    rule.originScope === 'preset'
+      ? '预设快照'
+      : rule.originScope === 'global'
+        ? '全局快照'
+        : '全局规则';
 
   // 阻止事件冒泡
   const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
@@ -1450,6 +1537,7 @@ const RegexRuleItem: React.FC<RegexRuleItemProps> = ({
             {rule.enabled ? <Icons.ToggleRight size={20} /> : <Icons.ToggleLeft size={20} />}
           </button>
           <span className="regex-rule-index">规则 {index + 1}</span>
+          <span className={`regex-rule-origin regex-rule-origin--${rule.originScope}`}>{originScopeLabel}</span>
           {rule.description && (
             <span className="regex-rule-desc" title={rule.description}>{rule.description}</span>
           )}

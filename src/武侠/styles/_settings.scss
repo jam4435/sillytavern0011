@@ -362,6 +362,50 @@
   margin-bottom: 1rem;
 }
 
+.regex-scope-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.regex-scope-section + .regex-scope-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.regex-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.regex-section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+  color: $stone-200;
+}
+
+.regex-section-caption {
+  margin: 0;
+  font-size: 0.82rem;
+  color: $stone-500;
+  line-height: 1.5;
+}
+
+.regex-section-meta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.6rem;
+  background: rgba($amber-600, 0.08);
+  border: 1px solid rgba($amber-600, 0.35);
+  color: $amber-600;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .regex-empty {
   display: flex;
   flex-direction: column;
@@ -470,6 +514,31 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.regex-rule-origin {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.regex-rule-origin--manual {
+  background: rgba($stone-700, 0.4);
+  color: $stone-300;
+}
+
+.regex-rule-origin--global {
+  background: rgba($green-500, 0.12);
+  color: $green-500;
+}
+
+.regex-rule-origin--preset {
+  background: rgba($amber-600, 0.12);
+  color: $amber-600;
 }
 
 .regex-rule-actions {
@@ -641,6 +710,14 @@
 
   &:active {
     background: rgba($amber-600, 0.2);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    background: rgba($stone-700, 0.12);
+    border-color: rgba($stone-700, 0.35);
+    color: $stone-500;
   }
 }
 
