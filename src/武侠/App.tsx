@@ -37,7 +37,9 @@ import {
   applySettingsToDOM,
   DisplaySettings,
   getLoadedPresetNameSafe,
+  getRegexDebugSnapshot,
   getRegexRulesForDisplay,
+  logRegexDebugSnapshot,
   loadSettings,
   renamePresetRegexBucket,
   saveSettings
@@ -195,6 +197,23 @@ const App: React.FC = () => {
   useEffect(() => {
     applySettingsToDOM(displaySettings);
   }, [displaySettings]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.WuxiaRegexDebug = {
+      dump: (reason?: string) => logRegexDebugSnapshot(displaySettings, currentPresetName, reason ?? '控制台手动调用'),
+      getSnapshot: () => getRegexDebugSnapshot(displaySettings, currentPresetName),
+    };
+
+    return () => {
+      if (window.WuxiaRegexDebug?.getSnapshot) {
+        delete window.WuxiaRegexDebug;
+      }
+    };
+  }, [currentPresetName, displaySettings]);
 
   const persistDisplaySettings = useCallback(
     (updater: DisplaySettings | ((previousSettings: DisplaySettings) => DisplaySettings)) => {

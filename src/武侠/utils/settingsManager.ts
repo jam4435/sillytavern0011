@@ -74,6 +74,70 @@ export interface SummarySettings {
 
 export type RegexRulesByPreset = Record<string, RegexRule[]>;
 
+export interface RegexRuleDebugSummary {
+  id: string;
+  description: string;
+  enabled: boolean;
+  originScope?: RegexRuleOriginScope;
+  pattern: string;
+  replacement: string;
+}
+
+export interface TavernRegexDebugSummary {
+  id: string;
+  script_name: string;
+  enabled: boolean;
+  source_ai_output: boolean;
+  destination_display: boolean;
+  destination_prompt: boolean;
+  min_depth: number | null;
+  max_depth: number | null;
+  find_regex: string;
+  replace_string: string;
+}
+
+export interface RegexDebugSnapshot {
+  currentPresetName: string;
+  counts: {
+    localRegexRules: number;
+    currentPresetRegexRules: number;
+    displayRegexRules: number;
+    presetBuckets: number;
+    tavernGlobalApi: number;
+    tavernPresetApi: number;
+    tavernRawPreset: number;
+    importableGlobal: number;
+    importablePreset: number;
+  };
+  duplicates: {
+    globalApiMatchingRawPreset: string[];
+  };
+  frontend: {
+    localRegexRules: RegexRuleDebugSummary[];
+    currentPresetRegexRules: RegexRuleDebugSummary[];
+    displayRegexRules: RegexRuleDebugSummary[];
+    presetRegexBuckets: Record<string, RegexRuleDebugSummary[]>;
+  };
+  tavern: {
+    globalApi: TavernRegexDebugSummary[];
+    presetApi: TavernRegexDebugSummary[];
+    rawPreset: TavernRegexDebugSummary[];
+    importableGlobal: RegexRuleDebugSummary[];
+    importablePreset: RegexRuleDebugSummary[];
+  };
+}
+
+export interface WuxiaRegexDebugTools {
+  dump: (reason?: string) => void;
+  getSnapshot: () => RegexDebugSnapshot;
+}
+
+declare global {
+  interface Window {
+    WuxiaRegexDebug?: WuxiaRegexDebugTools;
+  }
+}
+
 /** 显示设置 */
 export interface DisplaySettings {
   // 正文字体设置
@@ -255,6 +319,36 @@ export function getRegexRuleContentSignature(rule: Pick<RegexRule, 'description'
   return [rule.description || '', rule.pattern, rule.replacement].join('\u001f');
 }
 
+function truncateDebugText(value: string, maxLength: number = 120): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function summarizeRegexRuleForDebug(rule: RegexRule): RegexRuleDebugSummary {
+  return {
+    id: rule.id,
+    description: rule.description || '',
+    enabled: rule.enabled,
+    originScope: rule.originScope,
+    pattern: truncateDebugText(rule.pattern),
+    replacement: truncateDebugText(rule.replacement),
+  };
+}
+
+function summarizeTavernRegexForDebug(regex: TavernRegex): TavernRegexDebugSummary {
+  return {
+    id: regex.id,
+    script_name: regex.script_name,
+    enabled: regex.enabled,
+    source_ai_output: regex.source.ai_output === true,
+    destination_display: regex.destination.display === true,
+    destination_prompt: regex.destination.prompt === true,
+    min_depth: regex.min_depth,
+    max_depth: regex.max_depth,
+    find_regex: truncateDebugText(regex.find_regex),
+    replace_string: truncateDebugText(regex.replace_string),
+  };
+}
+
 function mergeExtractedGlobalRules(localRegexRules: RegexRule[], extractedGlobalRules: RegexRule[]): RegexRule[] {
   if (extractedGlobalRules.length === 0) {
     return localRegexRules;
@@ -391,17 +485,32 @@ function getImportableTavernRegexesFromScope(
   return getImportableTavernRegexes(getTavernRegexes(scope), originScope);
 }
 
-function getImportablePresetRegexesFromInUsePreset(): RegexRule[] {
+function getRawPresetRegexesFromInUsePreset(): TavernRegex[] {
   try {
     if (typeof getPreset !== 'function') {
       return [];
     }
 
     const preset = getPreset('in_use');
-    const presetRegexes = Array.isArray(preset?.extensions?.regex_scripts) ? preset.extensions.regex_scripts : [];
-    return getImportableTavernRegexes(presetRegexes, 'preset');
+    return Array.isArray(preset?.extensions?.regex_scripts) ? preset.extensions.regex_scripts : [];
   } catch (error) {
     dataLogger.error('从 in_use 预设读取酒馆正则失败:', error);
+    return [];
+  }
+}
+
+function getImportablePresetRegexesFromInUsePreset(): RegexRule[] {
+  return getImportableTavernRegexes(getRawPresetRegexesFromInUsePreset(), 'preset');
+}
+
+function getRawTavernRegexesFromScope(scope: { type: 'global' } | { type: 'preset'; name: 'in_use' }): TavernRegex[] {
+  try {
+    if (typeof getTavernRegexes !== 'function') {
+      return [];
+    }
+    return getTavernRegexes(scope);
+  } catch (error) {
+    dataLogger.error('读取酒馆正则失败:', error);
     return [];
   }
 }
@@ -513,6 +622,113 @@ export function getRegexRulesForDisplay(settings: DisplaySettings, currentPreset
   const otherLocalRules = settings.localRegexRules.filter(rule => rule.id !== ERA_BASE_REGEX_RULE.id);
   const currentPresetRules = getCurrentPresetRegexRules(settings, currentPresetName);
   return [...eraBaseRules, ...currentPresetRules, ...otherLocalRules];
+}
+
+export function getRegexDebugSnapshot(settings: DisplaySettings, currentPresetName: string): RegexDebugSnapshot {
+  const normalizedCurrentPresetName = currentPresetName.trim();
+  const localRegexRules = settings.localRegexRules.map(summarizeRegexRuleForDebug);
+  const currentPresetRegexRules = getCurrentPresetRegexRules(settings, normalizedCurrentPresetName).map(
+    summarizeRegexRuleForDebug,
+  );
+  const displayRegexRules = getRegexRulesForDisplay(settings, normalizedCurrentPresetName).map(summarizeRegexRuleForDebug);
+  const presetRegexBuckets = Object.fromEntries(
+    Object.entries(settings.presetRegexRulesByPreset).map(([presetName, rules]) => [
+      presetName,
+      rules.map(summarizeRegexRuleForDebug),
+    ]),
+  );
+
+  const rawGlobalApi = getRawTavernRegexesFromScope({ type: 'global' });
+  const rawPresetApi = getRawTavernRegexesFromScope({ type: 'preset', name: 'in_use' });
+  const rawPreset = getRawPresetRegexesFromInUsePreset();
+  const importableGlobal = importGlobalTavernRegexes().map(summarizeRegexRuleForDebug);
+  const importablePreset = importPresetTavernRegexes().map(summarizeRegexRuleForDebug);
+
+  const rawPresetSignatures = new Set(
+    rawPreset.map(regex =>
+      getRegexRuleContentSignature({
+        description: regex.script_name,
+        pattern: regex.find_regex,
+        replacement: regex.replace_string,
+      }),
+    ),
+  );
+
+  const globalApiMatchingRawPreset = rawGlobalApi
+    .filter(regex =>
+      rawPresetSignatures.has(
+        getRegexRuleContentSignature({
+          description: regex.script_name,
+          pattern: regex.find_regex,
+          replacement: regex.replace_string,
+        }),
+      ),
+    )
+    .map(regex => regex.script_name);
+
+  return {
+    currentPresetName: normalizedCurrentPresetName,
+    counts: {
+      localRegexRules: localRegexRules.length,
+      currentPresetRegexRules: currentPresetRegexRules.length,
+      displayRegexRules: displayRegexRules.length,
+      presetBuckets: Object.keys(presetRegexBuckets).length,
+      tavernGlobalApi: rawGlobalApi.length,
+      tavernPresetApi: rawPresetApi.length,
+      tavernRawPreset: rawPreset.length,
+      importableGlobal: importableGlobal.length,
+      importablePreset: importablePreset.length,
+    },
+    duplicates: {
+      globalApiMatchingRawPreset,
+    },
+    frontend: {
+      localRegexRules,
+      currentPresetRegexRules,
+      displayRegexRules,
+      presetRegexBuckets,
+    },
+    tavern: {
+      globalApi: rawGlobalApi.map(summarizeTavernRegexForDebug),
+      presetApi: rawPresetApi.map(summarizeTavernRegexForDebug),
+      rawPreset: rawPreset.map(summarizeTavernRegexForDebug),
+      importableGlobal,
+      importablePreset,
+    },
+  };
+}
+
+export function logRegexDebugSnapshot(
+  settings: DisplaySettings,
+  currentPresetName: string,
+  reason: string = '手动调试',
+): void {
+  const snapshot = getRegexDebugSnapshot(settings, currentPresetName);
+  console.groupCollapsed(`[武侠正则调试] ${reason}`);
+  console.log('当前预设:', snapshot.currentPresetName || '(空)');
+  console.log('数量概览:', snapshot.counts);
+  console.log('global API 与 raw preset 的重复项:', snapshot.duplicates.globalApiMatchingRawPreset);
+  console.log('前端预设桶:', Object.keys(snapshot.frontend.presetRegexBuckets));
+  console.table(snapshot.frontend.localRegexRules);
+  console.table(snapshot.frontend.currentPresetRegexRules);
+  console.table(snapshot.frontend.displayRegexRules);
+  console.table(snapshot.tavern.importableGlobal);
+  console.table(snapshot.tavern.importablePreset);
+  console.table(snapshot.tavern.globalApi);
+  console.table(snapshot.tavern.presetApi);
+  console.table(snapshot.tavern.rawPreset);
+  console.log('完整快照对象:', snapshot);
+  console.groupEnd();
+}
+
+export function scheduleRegexDebugDump(reason: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.setTimeout(() => {
+    window.WuxiaRegexDebug?.dump(reason);
+  }, 0);
 }
 
 /**

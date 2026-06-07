@@ -12,10 +12,12 @@ import {
   SummaryThresholds,
   createRegexRule,
   getCurrentPresetRegexRules,
+  logRegexDebugSnapshot,
   getRegexRuleContentSignature,
   imageToBase64,
   importGlobalTavernRegexes,
   importPresetTavernRegexes,
+  scheduleRegexDebugDump,
   setPresetRegexRulesForPreset,
   validateRegex
 } from '../utils/settingsManager';
@@ -476,15 +478,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // 导入全局酒馆正则
   const handleImportGlobalTavernRegexes = useCallback(() => {
+    logRegexDebugSnapshot(settings, normalizedCurrentPresetName, '点击覆盖导入全局正则（导入前）');
     const importedRules = importGlobalTavernRegexes();
     replaceImportedGlobalRegexRules(importedRules);
+    scheduleRegexDebugDump('点击覆盖导入全局正则（导入后）');
     if (importedRules.length === 0) {
       alert('没有找到符合条件的全局酒馆正则，已清理此前导入的全局规则\n\n筛选条件：\n• 作用域：全局\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
       return;
     }
 
     alert(`已覆盖导入 ${importedRules.length} 条全局酒馆正则规则`);
-  }, [replaceImportedGlobalRegexRules]);
+  }, [normalizedCurrentPresetName, replaceImportedGlobalRegexRules, settings]);
 
   // 导入当前预设酒馆正则
   const handleImportPresetTavernRegexes = useCallback(() => {
@@ -493,6 +497,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       return;
     }
 
+    logRegexDebugSnapshot(settings, normalizedCurrentPresetName, '点击覆盖导入当前预设规则（导入前）');
     const importedRules = importPresetTavernRegexes();
     if (importedRules.length === 0) {
       alert('没有找到符合条件的当前预设酒馆正则\n\n筛选条件：\n• 作用域：当前预设\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
@@ -500,8 +505,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
 
     updateCurrentPresetRules(importedRules);
+    scheduleRegexDebugDump('点击覆盖导入当前预设规则（导入后）');
     alert(`已覆盖导入 ${importedRules.length} 条酒馆正则规则到预设「${normalizedCurrentPresetName}」`);
-  }, [hasCurrentPreset, normalizedCurrentPresetName, updateCurrentPresetRules]);
+  }, [hasCurrentPreset, normalizedCurrentPresetName, settings, updateCurrentPresetRules]);
 
   // =========================================
   // 自动总结相关回调
