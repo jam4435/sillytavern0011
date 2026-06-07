@@ -13,7 +13,8 @@ import {
   createRegexRule,
   getCurrentPresetRegexRules,
   imageToBase64,
-  importTavernRegexes,
+  importGlobalTavernRegexes,
+  importPresetTavernRegexes,
   setPresetRegexRulesForPreset,
   validateRegex
 } from '../utils/settingsManager';
@@ -432,6 +433,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [settings.localRegexRules, updateLocalRegexRule]);
 
+  const replaceImportedGlobalRegexRules = useCallback((rules: RegexRule[]) => {
+    const preservedLocalRules = settings.localRegexRules.filter(rule => rule.originScope !== 'global');
+    updateSetting('localRegexRules', [...preservedLocalRules, ...rules]);
+  }, [settings.localRegexRules, updateSetting]);
+
   // 更新当前预设正则规则
   const updatePresetRegexRule = useCallback((id: string, updates: Partial<RegexRule>) => {
     const newRules = currentPresetRegexRules.map(rule =>
@@ -454,16 +460,28 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [currentPresetRegexRules, updatePresetRegexRule]);
 
-  // 导入酒馆正则
-  const handleImportTavernRegexes = useCallback(() => {
+  // 导入全局酒馆正则
+  const handleImportGlobalTavernRegexes = useCallback(() => {
+    const importedRules = importGlobalTavernRegexes();
+    if (importedRules.length === 0) {
+      alert('没有找到符合条件的全局酒馆正则\n\n筛选条件：\n• 作用域：全局\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
+      return;
+    }
+
+    replaceImportedGlobalRegexRules(importedRules);
+    alert(`已覆盖导入 ${importedRules.length} 条全局酒馆正则规则`);
+  }, [replaceImportedGlobalRegexRules]);
+
+  // 导入当前预设酒馆正则
+  const handleImportPresetTavernRegexes = useCallback(() => {
     if (!hasCurrentPreset) {
       alert('当前没有加载中的预设，无法导入当前预设规则');
       return;
     }
 
-    const importedRules = importTavernRegexes();
+    const importedRules = importPresetTavernRegexes();
     if (importedRules.length === 0) {
-      alert('没有找到符合条件的酒馆正则\n\n筛选条件：\n• 作用域：全局 + 当前预设\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
+      alert('没有找到符合条件的当前预设酒馆正则\n\n筛选条件：\n• 作用域：当前预设\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 仅用于格式显示');
       return;
     }
 
@@ -844,6 +862,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <span className="add-icon">+</span>
                   <span>添加全局规则</span>
                 </button>
+                <button className="settings-import-btn" onClick={handleImportGlobalTavernRegexes}>
+                  <Icons.Scroll size={14} />
+                  <span>覆盖导入全局正则</span>
+                </button>
               </div>
             </div>
 
@@ -885,7 +907,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="regex-buttons-group">
                 <button
                   className="settings-import-btn"
-                  onClick={handleImportTavernRegexes}
+                  onClick={handleImportPresetTavernRegexes}
                   disabled={!hasCurrentPreset}
                 >
                   <Icons.Scroll size={14} />
@@ -1512,9 +1534,9 @@ const RegexRuleItem: React.FC<RegexRuleItemProps> = ({
   const validation = validateRegex(rule.pattern);
   const originScopeLabel =
     rule.originScope === 'preset'
-      ? '预设快照'
+      ? '预设导入'
       : rule.originScope === 'global'
-        ? '全局快照'
+        ? '全局导入'
         : '全局规则';
 
   // 阻止事件冒泡

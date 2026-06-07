@@ -247,24 +247,65 @@ function normalizeLocalRegexRules(rules: Partial<RegexRule>[] | undefined): Rege
   return nextRules;
 }
 
-function normalizePresetRegexRulesByPreset(
-  presetRegexRulesByPreset: Record<string, Partial<RegexRule>[]> | undefined,
-): RegexRulesByPreset {
-  if (!presetRegexRulesByPreset || typeof presetRegexRulesByPreset !== 'object') {
-    return {};
+function getRegexRuleSignature(rule: RegexRule): string {
+  return [rule.originScope, rule.description || '', rule.pattern, rule.replacement].join('\u001f');
+}
+
+function mergeExtractedGlobalRules(localRegexRules: RegexRule[], extractedGlobalRules: RegexRule[]): RegexRule[] {
+  if (extractedGlobalRules.length === 0) {
+    return localRegexRules;
   }
 
-  return Object.entries(presetRegexRulesByPreset).reduce<RegexRulesByPreset>((result, [presetName, rules]) => {
+  const knownSignatures = new Set(localRegexRules.map(getRegexRuleSignature));
+  const nextRules = [...localRegexRules];
+  extractedGlobalRules.forEach(rule => {
+    const signature = getRegexRuleSignature(rule);
+    if (knownSignatures.has(signature)) {
+      return;
+    }
+    knownSignatures.add(signature);
+    nextRules.push(rule);
+  });
+  return nextRules;
+}
+
+function normalizePresetRegexRulesByPreset(
+  presetRegexRulesByPreset: Record<string, Partial<RegexRule>[]> | undefined,
+): { presetRegexRulesByPreset: RegexRulesByPreset; extractedGlobalRules: RegexRule[] } {
+  if (!presetRegexRulesByPreset || typeof presetRegexRulesByPreset !== 'object') {
+    return {
+      presetRegexRulesByPreset: {},
+      extractedGlobalRules: [],
+    };
+  }
+
+  const extractedGlobalRules: RegexRule[] = [];
+  const nextPresetRegexRulesByPreset = Object.entries(presetRegexRulesByPreset).reduce<RegexRulesByPreset>((result, [presetName, rules]) => {
     const normalizedPresetName = presetName.trim();
     if (!normalizedPresetName || !Array.isArray(rules)) {
       return result;
     }
 
-    result[normalizedPresetName] = rules.map(rule =>
-      normalizeRegexRule(rule, normalizeOriginScope(rule?.originScope, 'preset')),
-    );
+    const nextRules = rules
+      .map(rule => normalizeRegexRule(rule, normalizeOriginScope(rule?.originScope, 'preset')))
+      .filter(rule => {
+        if (rule.originScope === 'global') {
+          extractedGlobalRules.push(rule);
+          return false;
+        }
+        return true;
+      });
+
+    if (nextRules.length > 0) {
+      result[normalizedPresetName] = nextRules;
+    }
     return result;
   }, {});
+
+  return {
+    presetRegexRulesByPreset: nextPresetRegexRulesByPreset,
+    extractedGlobalRules,
+  };
 }
 
 function normalizeSummarySettings(summarySettings: Partial<SummarySettings> | undefined): SummarySettings {
@@ -320,7 +361,7 @@ function getImportableTavernRegexesFromScope(
       id: generateId(),
       pattern: regex.find_regex,
       replacement: regex.replace_string,
-      enabled: false,
+      enabled: true,
       description: regex.script_name,
       originScope,
     }));
@@ -343,8 +384,12 @@ export function loadSettings(): DisplaySettings {
     const parsed = JSON.parse(stored) as StoredDisplaySettings;
     const defaultSettings = createDefaultDisplaySettings();
     const legacyRegexRules = Array.isArray(parsed.regexRules) ? parsed.regexRules : undefined;
-    const localRegexRules = normalizeLocalRegexRules(
+    const presetRegexRuleState = normalizePresetRegexRulesByPreset(parsed.presetRegexRulesByPreset);
+    const localRegexRules = mergeExtractedGlobalRules(
+      normalizeLocalRegexRules(
       Array.isArray(parsed.localRegexRules) ? parsed.localRegexRules : legacyRegexRules,
+      ),
+      presetRegexRuleState.extractedGlobalRules,
     );
 
     return {
@@ -356,7 +401,7 @@ export function loadSettings(): DisplaySettings {
       backgroundImage: getNullableStringSetting(parsed.backgroundImage, defaultSettings.backgroundImage),
       backgroundBlur: getNumberSetting(parsed.backgroundBlur, defaultSettings.backgroundBlur),
       localRegexRules,
-      presetRegexRulesByPreset: normalizePresetRegexRulesByPreset(parsed.presetRegexRulesByPreset),
+      presetRegexRulesByPreset: presetRegexRuleState.presetRegexRulesByPreset,
       summarySettings: normalizeSummarySettings(parsed.summarySettings),
     };
   } catch (error) {
@@ -627,6 +672,30 @@ export function applySettingsToDOM(settings: DisplaySettings): void {
 // =========================================
 
 /**
+ * 从全局酒馆正则导入符合条件的规则
+ */
+export function importGlobalTavernRegexes(): RegexRule[] {
+  try {
+    return getImportableTavernRegexesFromScope({ type: 'global' }, 'global');
+  } catch (error) {
+    dataLogger.error('导入全局酒馆正则失败:', error);
+    return [];
+  }
+}
+
+/**
+ * 从当前预设酒馆正则导入符合条件的规则
+ */
+export function importPresetTavernRegexes(): RegexRule[] {
+  try {
+    return getImportableTavernRegexesFromScope({ type: 'preset', name: 'in_use' }, 'preset');
+  } catch (error) {
+    dataLogger.error('导入当前预设酒馆正则失败:', error);
+    return [];
+  }
+}
+
+/**
  * 从酒馆正则导入符合条件的正则规则
  * 导入来源：
  * - global
@@ -643,8 +712,8 @@ export function applySettingsToDOM(settings: DisplaySettings): void {
  */
 export function importTavernRegexes(): RegexRule[] {
   try {
-    const globalRegexRules = getImportableTavernRegexesFromScope({ type: 'global' }, 'global');
-    const presetRegexRules = getImportableTavernRegexesFromScope({ type: 'preset', name: 'in_use' }, 'preset');
+    const globalRegexRules = importGlobalTavernRegexes();
+    const presetRegexRules = importPresetTavernRegexes();
     return [...globalRegexRules, ...presetRegexRules];
   } catch (error) {
     dataLogger.error('导入酒馆正则失败:', error);
