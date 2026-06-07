@@ -36,7 +36,10 @@ import {
   applyRegexRules,
   applySettingsToDOM,
   DisplaySettings,
+  getLoadedPresetNameSafe,
+  getRegexRulesForDisplay,
   loadSettings,
+  renamePresetRegexBucket,
   saveSettings
 } from './utils/settingsManager';
 import {
@@ -81,6 +84,7 @@ const App: React.FC = () => {
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
+  const [currentPresetName, setCurrentPresetName] = useState(() => getLoadedPresetNameSafe());
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
 
@@ -192,20 +196,65 @@ const App: React.FC = () => {
     applySettingsToDOM(displaySettings);
   }, [displaySettings]);
 
+  const persistDisplaySettings = useCallback(
+    (updater: DisplaySettings | ((previousSettings: DisplaySettings) => DisplaySettings)) => {
+      setDisplaySettings(previousSettings => {
+        const nextSettings =
+          typeof updater === 'function'
+            ? (updater as (previousSettings: DisplaySettings) => DisplaySettings)(previousSettings)
+            : updater;
+        saveSettings(nextSettings);
+        return nextSettings;
+      });
+    },
+    [],
+  );
+
   // 设置更改处理函数
   const handleSettingsChange = useCallback((newSettings: DisplaySettings) => {
-    setDisplaySettings(newSettings);
-    saveSettings(newSettings);
-    applySettingsToDOM(newSettings);
-  }, []);
+    persistDisplaySettings(newSettings);
+  }, [persistDisplaySettings]);
+
+  useEffect(() => {
+    const syncCurrentPresetName = () => {
+      setCurrentPresetName(getLoadedPresetNameSafe());
+    };
+
+    const presetChangedListener = eventOn(tavern_events.PRESET_CHANGED, data => {
+      const nextPresetName = (data?.name || '').trim();
+      setCurrentPresetName(nextPresetName || getLoadedPresetNameSafe());
+    });
+    const oaiPresetChangedListener = eventOn(tavern_events.OAI_PRESET_CHANGED_AFTER, syncCurrentPresetName);
+    const presetRenamedListener = eventOn(tavern_events.PRESET_RENAMED, data => {
+      const oldName = (data?.oldName || '').trim();
+      const newName = (data?.newName || '').trim();
+      if (!oldName || !newName || oldName === newName) {
+        return;
+      }
+
+      persistDisplaySettings(previousSettings => renamePresetRegexBucket(previousSettings, oldName, newName));
+      setCurrentPresetName(previousPresetName => (previousPresetName === oldName ? newName : previousPresetName));
+    });
+
+    return () => {
+      presetChangedListener.stop();
+      oaiPresetChangedListener.stop();
+      presetRenamedListener.stop();
+    };
+  }, [persistDisplaySettings]);
+
+  const activeRegexRules = useMemo(
+    () => getRegexRulesForDisplay(displaySettings, currentPresetName),
+    [displaySettings, currentPresetName],
+  );
 
   // 应用正则替换到主文本
   const processedMaintext = useMemo(() => {
-    if (!currentMaintext || displaySettings.regexRules.length === 0) {
+    if (!currentMaintext || activeRegexRules.length === 0) {
       return currentMaintext;
     }
-    return applyRegexRules(currentMaintext, displaySettings.regexRules);
-  }, [currentMaintext, displaySettings.regexRules]);
+    return applyRegexRules(currentMaintext, activeRegexRules);
+  }, [activeRegexRules, currentMaintext]);
 
   // 续写江湖处理
   const handleContinue = useCallback(() => {
@@ -356,6 +405,7 @@ const App: React.FC = () => {
       case ActivePanel.SOCIAL: return <SocialPanel npcs={gameState.social} />;
       case ActivePanel.SETTINGS: return (
         <SettingsPanel
+          currentPresetName={currentPresetName}
           settings={displaySettings}
           onSettingsChange={handleSettingsChange}
           debugLogs={debugLogs}
