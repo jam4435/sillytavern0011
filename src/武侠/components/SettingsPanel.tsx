@@ -12,6 +12,7 @@ import {
   SummaryThresholds,
   createRegexRule,
   getCurrentPresetRegexRules,
+  getRegexRuleContentSignature,
   imageToBase64,
   importGlobalTavernRegexes,
   importPresetTavernRegexes,
@@ -434,7 +435,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [settings.localRegexRules, updateLocalRegexRule]);
 
   const replaceImportedGlobalRegexRules = useCallback((rules: RegexRule[]) => {
-    const preservedLocalRules = settings.localRegexRules.filter(rule => rule.originScope !== 'global');
+    const importablePresetRules = importPresetTavernRegexes();
+    const knownImportedSignatures = new Set(
+      [...rules, ...importablePresetRules].map(rule => getRegexRuleContentSignature(rule)),
+    );
+
+    const preservedLocalRules = settings.localRegexRules.filter(rule => {
+      if (rule.id === 'era-base-regex') {
+        return true;
+      }
+      if (rule.originScope === 'global') {
+        return false;
+      }
+      return !knownImportedSignatures.has(getRegexRuleContentSignature(rule));
+    });
     updateSetting('localRegexRules', [...preservedLocalRules, ...rules]);
   }, [settings.localRegexRules, updateSetting]);
 
