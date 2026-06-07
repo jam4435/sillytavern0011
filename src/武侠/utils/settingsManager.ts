@@ -364,12 +364,7 @@ function getNullableStringSetting(value: unknown, fallbackValue: string | null):
   return typeof value === 'string' ? value : fallbackValue;
 }
 
-function getImportableTavernRegexesFromScope(
-  scope: { type: 'global' } | { type: 'preset'; name: 'in_use' },
-  originScope: RegexRuleOriginScope,
-): RegexRule[] {
-  const regexes = getTavernRegexes(scope);
-
+function getImportableTavernRegexes(regexes: TavernRegex[], originScope: RegexRuleOriginScope): RegexRule[] {
   return regexes
     .filter(
       regex =>
@@ -387,6 +382,28 @@ function getImportableTavernRegexesFromScope(
       description: regex.script_name,
       originScope,
     }));
+}
+
+function getImportableTavernRegexesFromScope(
+  scope: { type: 'global' } | { type: 'preset'; name: 'in_use' },
+  originScope: RegexRuleOriginScope,
+): RegexRule[] {
+  return getImportableTavernRegexes(getTavernRegexes(scope), originScope);
+}
+
+function getImportablePresetRegexesFromInUsePreset(): RegexRule[] {
+  try {
+    if (typeof getPreset !== 'function') {
+      return [];
+    }
+
+    const preset = getPreset('in_use');
+    const presetRegexes = Array.isArray(preset?.extensions?.regex_scripts) ? preset.extensions.regex_scripts : [];
+    return getImportableTavernRegexes(presetRegexes, 'preset');
+  } catch (error) {
+    dataLogger.error('从 in_use 预设读取酒馆正则失败:', error);
+    return [];
+  }
 }
 
 // =========================================
@@ -702,7 +719,14 @@ export function applySettingsToDOM(settings: DisplaySettings): void {
  */
 export function importGlobalTavernRegexes(): RegexRule[] {
   try {
-    return getImportableTavernRegexesFromScope({ type: 'global' }, 'global');
+    const globalRules = getImportableTavernRegexesFromScope({ type: 'global' }, 'global');
+    const presetRules = getImportablePresetRegexesFromInUsePreset();
+    if (presetRules.length === 0) {
+      return globalRules;
+    }
+
+    const presetSignatures = new Set(presetRules.map(getRegexRuleContentSignature));
+    return globalRules.filter(rule => !presetSignatures.has(getRegexRuleContentSignature(rule)));
   } catch (error) {
     dataLogger.error('导入全局酒馆正则失败:', error);
     return [];
@@ -714,14 +738,7 @@ export function importGlobalTavernRegexes(): RegexRule[] {
  */
 export function importPresetTavernRegexes(): RegexRule[] {
   try {
-    const presetRules = getImportableTavernRegexesFromScope({ type: 'preset', name: 'in_use' }, 'preset');
-    const globalRules = importGlobalTavernRegexes();
-    if (globalRules.length === 0) {
-      return presetRules;
-    }
-
-    const globalSignatures = new Set(globalRules.map(getRegexRuleContentSignature));
-    return presetRules.filter(rule => !globalSignatures.has(getRegexRuleContentSignature(rule)));
+    return getImportablePresetRegexesFromInUsePreset();
   } catch (error) {
     dataLogger.error('导入当前预设酒馆正则失败:', error);
     return [];
