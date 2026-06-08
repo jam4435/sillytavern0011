@@ -1,5 +1,8 @@
 $(() => {
   let collapseTimer = null;
+  let chatElement = null;
+  let chatObserver = null;
+  let shellObserver = null;
 
   function getLastMessageElement($messages) {
     let $last = $messages.filter('.last_mes').last();
@@ -19,10 +22,14 @@ $(() => {
   }
 
   function collapseToLastMessage() {
+    observeChat();
+
     // 编辑框打开时不要删 DOM，否则会打断酒馆的编辑控件。
     if ($('#curEditTextarea').length > 0) {
       return;
     }
+
+    $('#show_more_messages').remove();
 
     const $messages = $('#chat > .mes');
     if ($messages.length <= 1) {
@@ -48,7 +55,24 @@ $(() => {
     }, delay);
   }
 
+  function observeChat() {
+    const nextChatElement = $('#chat')[0] || null;
+    if (nextChatElement === chatElement) {
+      return;
+    }
+
+    chatObserver?.disconnect();
+    chatElement = nextChatElement;
+    chatObserver = chatElement
+      ? new MutationObserver(() => {
+          scheduleCollapse();
+        })
+      : null;
+    chatObserver?.observe(chatElement, { childList: true });
+  }
+
   // 移除除了最后一楼以外的楼层
+  observeChat();
   scheduleCollapse(0);
 
   [
@@ -65,13 +89,14 @@ $(() => {
     }
   });
 
-  const chatElement = $('#chat')[0];
-  const observer = chatElement
+  const shellElement = $('#sheld')[0] || document.body;
+  shellObserver = shellElement
     ? new MutationObserver(() => {
+        observeChat();
         scheduleCollapse();
       })
     : null;
-  observer?.observe(chatElement, { childList: true });
+  shellObserver?.observe(shellElement, { childList: true });
 
   // 当聊天文件变更时, 重新加载前端界面或脚本
   let current_chat_id = SillyTavern.getCurrentChatId();
@@ -89,6 +114,7 @@ $(() => {
     if (collapseTimer) {
       clearTimeout(collapseTimer);
     }
-    observer?.disconnect();
+    chatObserver?.disconnect();
+    shellObserver?.disconnect();
   })
 })
