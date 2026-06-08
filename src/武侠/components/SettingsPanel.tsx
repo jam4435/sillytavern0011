@@ -1385,10 +1385,9 @@ interface VariableTreeNodeProps {
   path: VariablePath;
   depth: number;
   expandedPaths: Set<string>;
-  selectedPath: VariablePath | null;
   normalizedSearch: string;
   onToggle: (pathKey: string) => void;
-  onSelect: (path: VariablePath) => void;
+  onValueChange: (path: VariablePath, nextValue: unknown) => void;
 }
 
 const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
@@ -1397,46 +1396,30 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
   path,
   depth,
   expandedPaths,
-  selectedPath,
   normalizedSearch,
   onToggle,
-  onSelect,
+  onValueChange,
 }) => {
   const pathKey = getVariablePathKey(path);
   const isRoot = path.length === 0;
   const isContainer = Array.isArray(value) || isRecord(value);
   const isExpanded = isRoot || Boolean(normalizedSearch) || expandedPaths.has(pathKey);
-  const isSelected = areVariablePathsEqual(selectedPath, path);
   const rawEntries = isContainer ? getVisibleEntries(value) : [];
   const visibleEntries = normalizedSearch
     ? rawEntries.filter(([childKey, childValue]) => matchesVariableSearch(childKey, childValue, normalizedSearch))
     : rawEntries;
-  const handleSelect = () => onSelect(path);
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onSelect(path);
-    }
-  };
 
   return (
-    <div className={`variable-node ${isRoot ? 'root' : ''} ${isContainer ? 'branch' : 'leaf'} ${isSelected ? 'selected' : ''}`}>
+    <div className={`variable-node ${isRoot ? 'root' : ''} ${isContainer ? 'branch' : 'leaf'}`}>
       <div
         className="variable-node-row"
         style={{ paddingLeft: `${Math.min(depth, 8) * 0.85}rem` }}
-        role="button"
-        tabIndex={0}
-        onClick={handleSelect}
-        onKeyDown={handleKeyDown}
       >
         {isContainer && !isRoot ? (
           <button
             className="variable-node-toggle"
             type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggle(pathKey);
-            }}
+            onClick={() => onToggle(pathKey)}
             title={isExpanded ? '收起' : '展开'}
           >
             {isExpanded ? <Icons.ChevronDown size={16} /> : <Icons.ChevronUp size={16} />}
@@ -1445,11 +1428,15 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
           <span className="variable-node-toggle-spacer" />
         )}
 
-        <span className="variable-node-key" title={String(label)}>
-          {renderHighlightedText(String(label), normalizedSearch)}
-        </span>
+        <span className="variable-node-key" title={String(label)}>{String(label)}</span>
         <span className="variable-node-type">{getVariableTypeLabel(value)}</span>
-        <VariableValuePreview value={value} normalizedSearch={normalizedSearch} />
+        {!isContainer && (
+          <VariableLeafEditor
+            value={value}
+            path={path}
+            onValueChange={onValueChange}
+          />
+        )}
       </div>
 
       {isContainer && isExpanded && (
@@ -1463,10 +1450,9 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
                 path={[...path, childKey]}
                 depth={depth + 1}
                 expandedPaths={expandedPaths}
-                selectedPath={selectedPath}
                 normalizedSearch={normalizedSearch}
                 onToggle={onToggle}
-                onSelect={onSelect}
+                onValueChange={onValueChange}
               />
             ))
           ) : (
@@ -1480,111 +1466,6 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
         </div>
       )}
     </div>
-  );
-};
-
-interface VariableValuePreviewProps {
-  value: unknown;
-  normalizedSearch: string;
-}
-
-const VariableValuePreview: React.FC<VariableValuePreviewProps> = ({
-  value,
-  normalizedSearch,
-}) => {
-  const preview = Array.isArray(value) || isRecord(value)
-    ? getContainerPreview(value)
-    : formatVariablePreview(value);
-
-  return (
-    <span className="variable-node-preview" title={preview}>
-      {renderHighlightedText(preview, normalizedSearch)}
-    </span>
-  );
-};
-
-interface VariableDetailPanelProps {
-  path: VariablePath | null;
-  value: unknown;
-  normalizedSearch: string;
-  onValueChange: (path: VariablePath, nextValue: unknown) => void;
-  onCopyPath: (path: VariablePath) => void;
-  onCopyValue: (value: unknown) => void;
-}
-
-const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
-  path,
-  value,
-  normalizedSearch,
-  onValueChange,
-  onCopyPath,
-  onCopyValue,
-}) => {
-  if (!path) {
-    return (
-      <aside className="variable-detail-panel empty" aria-label="变量详情">
-        <Icons.Eye size={28} />
-        <p>选择变量查看详情</p>
-      </aside>
-    );
-  }
-
-  const isContainer = Array.isArray(value) || isRecord(value);
-  const displayPath = getVariableDisplayPath(path);
-  const copyPath = getVariableCopyPath(path);
-  const detailValue = formatVariableDetailValue(value);
-
-  return (
-    <aside className="variable-detail-panel" aria-label="变量详情">
-      <div className="variable-detail-header">
-        <div className="variable-detail-title">
-          <Icons.Eye size={16} />
-          <span>变量详情</span>
-        </div>
-        <div className="variable-detail-actions">
-          <button
-            type="button"
-            className="variable-detail-icon-btn"
-            onClick={() => onCopyPath(path)}
-            title="复制路径"
-          >
-            <Icons.Copy size={15} />
-          </button>
-          <button
-            type="button"
-            className="variable-detail-icon-btn"
-            onClick={() => onCopyValue(value)}
-            title="复制值"
-          >
-            <Icons.FileText size={15} />
-          </button>
-        </div>
-      </div>
-
-      <div className="variable-detail-path" title={copyPath}>
-        {renderHighlightedText(displayPath, normalizedSearch)}
-      </div>
-
-      <div className="variable-detail-meta">
-        <span>{getVariableTypeLabel(value)}</span>
-        <span>{path.length} 层</span>
-      </div>
-
-      <div className="variable-detail-body">
-        {isContainer ? (
-          <pre className="variable-detail-code">{detailValue}</pre>
-        ) : (
-          <>
-            <label className="variable-detail-field-label">值</label>
-            <VariableLeafEditor
-              value={value}
-              path={path}
-              onValueChange={onValueChange}
-            />
-          </>
-        )}
-      </div>
-    </aside>
   );
 };
 
