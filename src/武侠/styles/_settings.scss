@@ -1348,7 +1348,6 @@
 
 .variables-section {
   gap: 1rem;
-  min-height: 0;
 }
 
 .variables-toolbar {
@@ -1375,40 +1374,12 @@
 
 .variables-search-field {
   flex: 1;
-  min-width: 0;
-}
-
-.variables-search-box {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  min-width: 0;
-  padding: 0 0.65rem;
-  background: rgba($stone-900, 0.82);
-  border: 1px solid $stone-700;
-  border-radius: 4px;
-  color: $stone-500;
-  transition: border-color $transition-fast, background $transition-fast;
-
-  &:focus-within {
-    border-color: $amber-600;
-    background: $stone-900;
-    color: $amber-600;
-  }
+  min-width: 180px;
 }
 
 .variables-search-input {
   width: 100%;
-  min-width: 0;
-  padding-left: 0;
-  padding-right: 0;
-  border: none;
-  background: transparent;
-
-  &:focus {
-    border-color: transparent;
-  }
+  min-width: 180px;
 }
 
 .variables-status {
@@ -1431,20 +1402,10 @@
   }
 }
 
-.variables-browser {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
-  align-items: start;
-  gap: 1rem;
-  min-height: 0;
-}
-
 .variables-tree {
   min-height: 320px;
   max-height: 560px;
-  min-width: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: auto;
   border: 1px solid $stone-800;
   border-radius: 4px;
   background:
@@ -1468,47 +1429,28 @@
 }
 
 .variable-node {
-  min-width: 0;
+  min-width: 640px;
 }
 
 .variable-node-row {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) max-content;
-  grid-template-areas:
-    "toggle key type"
-    "toggle preview preview";
-  align-items: start;
-  gap: 0.35rem 0.55rem;
-  min-height: 46px;
-  padding: 0.55rem 0.7rem 0.55rem 0;
+  grid-template-columns: 22px minmax(150px, 0.95fr) 82px minmax(180px, 1.5fr);
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 38px;
+  padding: 0.35rem 0.65rem 0.35rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
-  cursor: pointer;
-  transition: background $transition-fast, border-color $transition-fast;
 
   &:hover {
     background: rgba(255, 255, 255, 0.025);
   }
-
-  &:focus-visible {
-    outline: 1px solid rgba($amber-600, 0.65);
-    outline-offset: -1px;
-  }
-}
-
-.variable-node.selected > .variable-node-row {
-  background:
-    linear-gradient(90deg, rgba($amber-600, 0.13), transparent 62%),
-    rgba(255, 255, 255, 0.025);
-  border-bottom-color: rgba($amber-600, 0.24);
 }
 
 .variable-node-toggle,
 .variable-node-toggle-spacer {
-  grid-area: toggle;
   width: 22px;
   height: 22px;
   flex-shrink: 0;
-  margin-top: 0.05rem;
 }
 
 .variable-node-toggle {
@@ -1530,19 +1472,15 @@
 }
 
 .variable-node-key {
-  grid-area: key;
   min-width: 0;
   color: $stone-300;
   font-size: 0.85rem;
   overflow: hidden;
-  text-overflow: clip;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .variable-node-type {
-  grid-area: type;
   justify-self: start;
   padding: 0.18rem 0.4rem;
   border: 1px solid $stone-800;
@@ -1551,30 +1489,6 @@
   font-size: 0.72rem;
   white-space: nowrap;
   background: rgba(0, 0, 0, 0.18);
-}
-
-.variable-node-preview {
-  grid-area: preview;
-  min-width: 0;
-  color: $stone-500;
-  font-size: 0.76rem;
-  line-height: 1.45;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.variable-node.branch > .variable-node-row .variable-node-preview {
-  color: $stone-600;
-}
-
-.variable-search-mark {
-  padding: 0 0.08rem;
-  border-radius: 2px;
-  background: rgba($amber-600, 0.28);
-  color: $yellow-100;
 }
 
 .variable-node-empty {
@@ -1586,148 +1500,16 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.035);
 }
 
-.variable-detail-panel {
-  position: sticky;
-  top: 0;
-  min-width: 0;
-  max-height: 560px;
-  overflow: auto;
-  padding: 0.9rem;
-  border: 1px solid rgba($amber-600, 0.22);
-  border-radius: 4px;
-  background:
-    linear-gradient(180deg, rgba($amber-600, 0.065), transparent 8rem),
-    rgba(0, 0, 0, 0.24);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
-
-  &.empty {
-    position: static;
-    min-height: 220px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    color: $stone-600;
-    text-align: center;
-
-    p {
-      margin: 0;
-      font-size: 0.9rem;
-    }
-  }
-}
-
-.variable-detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.variable-detail-title {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: $stone-300;
-  font-family: $font-serif;
-  font-size: 0.92rem;
-}
-
-.variable-detail-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.variable-detail-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  border: 1px solid $stone-700;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.16);
-  color: $stone-500;
-  cursor: pointer;
-  transition: all $transition-fast;
-
-  &:hover {
-    border-color: $amber-600;
-    color: $amber-600;
-    background: rgba($amber-600, 0.09);
-  }
-}
-
-.variable-detail-path {
-  padding: 0.65rem 0.7rem;
-  border: 1px solid rgba($stone-700, 0.75);
-  border-radius: 4px;
-  background: rgba($stone-900, 0.58);
-  color: $stone-300;
-  font-family: monospace;
-  font-size: 0.78rem;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-
-.variable-detail-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin: 0.75rem 0;
-
-  span {
-    padding: 0.2rem 0.48rem;
-    border: 1px solid $stone-800;
-    border-radius: 4px;
-    background: rgba(0, 0, 0, 0.18);
-    color: $stone-500;
-    font-size: 0.72rem;
-  }
-}
-
-.variable-detail-body {
-  min-width: 0;
-}
-
-.variable-detail-field-label {
-  display: block;
-  margin-bottom: 0.35rem;
-  color: $stone-500;
-  font-size: 0.75rem;
-}
-
-.variable-detail-code {
-  max-height: 360px;
-  margin: 0;
-  padding: 0.8rem;
-  overflow: auto;
-  border: 1px solid $stone-800;
-  border-radius: 4px;
-  background: rgba($stone-900, 0.74);
-  color: $stone-300;
-  font-family: monospace;
-  font-size: 0.76rem;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 .variable-leaf-input {
   width: 100%;
-  min-width: 0;
-  padding: 0.5rem 0.65rem;
+  min-width: 160px;
+  padding: 0.35rem 0.5rem;
   border: 1px solid $stone-800;
   border-radius: 4px;
   background: rgba($stone-900, 0.72);
   color: $stone-200;
   font-family: monospace;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 
   &:focus {
     outline: none;
@@ -1737,14 +1519,14 @@
 }
 
 .variable-leaf-textarea {
-  min-height: 8rem;
-  max-height: 18rem;
-  line-height: 1.65;
+  min-height: 2.6rem;
+  max-height: 8rem;
+  line-height: 1.45;
   resize: vertical;
 }
 
 .variable-leaf-number {
-  max-width: none;
+  max-width: 180px;
 }
 
 .variable-boolean-toggle {
