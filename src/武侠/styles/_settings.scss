@@ -11,8 +11,6 @@
   flex-direction: column;
   height: 100%;
   min-height: 400px;
-  min-width: 0;
-  overflow: hidden;
 }
 
 // =========================================
@@ -26,15 +24,12 @@
   padding-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   margin-bottom: 1.5rem;
-  min-width: 0;
 }
 
 .settings-tab {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.5rem;
-  min-width: 0;
   padding: 0.75rem 1rem;
   background: transparent;
   border: 1px solid $stone-700;
@@ -70,11 +65,6 @@
   svg {
     opacity: 0.7;
   }
-
-  span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
 }
 
 // =========================================
@@ -84,16 +74,13 @@
 .settings-content {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
   padding-right: 0.5rem;
-  min-width: 0;
 }
 
 .settings-section {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  min-width: 0;
 }
 
 .settings-section-title {
@@ -131,7 +118,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  min-width: 0;
   padding: 0.75rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 
@@ -151,7 +137,6 @@
   color: $stone-400;
   min-width: 80px;
   flex-shrink: 0;
-  line-height: 1.4;
 }
 
 .settings-control {
@@ -159,7 +144,6 @@
   align-items: center;
   gap: 0.75rem;
   flex: 1;
-  min-width: 0;
   justify-content: flex-end;
 }
 
@@ -178,9 +162,7 @@
 .settings-slider {
   -webkit-appearance: none;
   appearance: none;
-  flex: 0 1 150px;
   width: 150px;
-  min-width: 0;
   height: 4px;
   background: $stone-800;
   border-radius: 2px;
@@ -256,7 +238,6 @@
 
 .settings-color-input {
   width: 90px;
-  min-width: 0;
   padding: 0.5rem;
   background: $stone-900;
   border: 1px solid $stone-700;
@@ -280,8 +261,6 @@
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  min-width: 0;
-  flex-wrap: wrap;
 }
 
 .settings-file-input {
@@ -291,7 +270,6 @@
 .settings-upload-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   background: transparent;
@@ -311,7 +289,6 @@
 .settings-clear-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.25rem;
   padding: 0.4rem 0.75rem;
   background: transparent;
@@ -328,7 +305,6 @@
 
 .settings-image-preview {
   width: 100%;
-  min-width: 0;
   max-height: 150px;
   overflow: hidden;
   border: 1px solid $stone-700;
@@ -355,7 +331,6 @@
 .settings-preview {
   margin-top: 1rem;
   padding: 1rem;
-  min-width: 0;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid $stone-800;
   border-radius: 4px;
@@ -374,7 +349,6 @@
   padding: 1rem;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
-  overflow-wrap: anywhere;
 }
 
 // =========================================
@@ -386,14 +360,12 @@
   flex-direction: column;
   gap: 0.75rem;
   margin-bottom: 1rem;
-  min-width: 0;
 }
 
 .regex-scope-section {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  min-width: 0;
 }
 
 .regex-scope-section + .regex-scope-section {
@@ -407,7 +379,6 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  min-width: 0;
 }
 
 .regex-section-title {
@@ -421,13 +392,11 @@
   font-size: 0.82rem;
   color: $stone-500;
   line-height: 1.5;
-  overflow-wrap: anywhere;
 }
 
 .regex-section-meta {
   display: inline-flex;
   align-items: center;
-  max-width: 100%;
   padding: 0.25rem 0.6rem;
   background: rgba($amber-600, 0.08);
   border: 1px solid rgba($amber-600, 0.35);
@@ -435,8 +404,6 @@
   font-size: 0.75rem;
   border-radius: 999px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .regex-empty {
@@ -455,7 +422,6 @@
 }
 
 .regex-rule-item {
-  min-width: 0;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid $stone-800;
   padding: 0.75rem;
@@ -479,7 +445,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  min-width: 0;
   padding: 0.5rem;
   margin: -0.5rem -0.5rem 0 -0.5rem; // 扩展点击区域
   cursor: pointer; // 提示可点击
@@ -546,7 +511,6 @@
 .regex-rule-desc {
   font-size: 0.85rem;
   color: $stone-400;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -621,7 +585,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  min-width: 0;
   padding: 1rem 0.5rem 0.5rem; // 调整内边距
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   margin-top: 0.75rem; // 与 header 分隔
@@ -631,7 +594,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  min-width: 0;
 
   label {
     font-size: 0.75rem;
@@ -643,7 +605,6 @@
 
 .regex-input {
   width: 100%;
-  min-width: 0;
   padding: 0.5rem 0.75rem;
   background: $stone-900;
   border: 1px solid $stone-700;
@@ -681,7 +642,6 @@
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
-  min-width: 0;
 }
 
 // =========================================
@@ -777,7 +737,6 @@
 .settings-reset-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   background: transparent;
@@ -805,8 +764,6 @@
   margin-bottom: 1rem;
   max-height: 400px;
   overflow-y: auto;
-  overflow-x: hidden;
-  min-width: 0;
 }
 
 .debug-empty {
@@ -831,7 +788,6 @@
 }
 
 .debug-log-item {
-  min-width: 0;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid $stone-800;
   border-radius: 4px;
@@ -859,7 +815,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  min-width: 0;
   padding: 0.75rem;
   cursor: pointer;
   transition: background-color $transition-fast;
@@ -937,18 +892,13 @@
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: normal;
+  white-space: nowrap;
   font-family: monospace;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
 }
 
 .debug-log-body {
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   padding: 0.75rem;
-  min-width: 0;
 }
 
 .debug-log-content {
@@ -956,8 +906,7 @@
   border-radius: 4px;
   padding: 0.75rem;
   max-height: 300px;
-  overflow: auto;
-  min-width: 0;
+  overflow-y: auto;
 
   pre {
     margin: 0;
@@ -966,8 +915,7 @@
     color: $stone-300;
     line-height: 1.5;
     white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    word-break: normal;
+    word-break: break-all;
   }
 }
 
@@ -1005,7 +953,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.75rem;
   margin-top: 0.5rem;
@@ -1027,7 +974,6 @@
 .summary-toggle-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   background: transparent;
@@ -1057,7 +1003,6 @@
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-  min-width: 0;
 }
 
 .summary-subsection-title {
@@ -1071,8 +1016,7 @@
 // 文本输入框
 .settings-text-input {
   flex: 1;
-  width: 100%;
-  min-width: 0;
+  min-width: 200px;
   padding: 0.5rem 0.75rem;
   background: $stone-900;
   border: 1px solid $stone-700;
@@ -1093,7 +1037,6 @@
 // 数字输入框
 .settings-number-input {
   width: 80px;
-  min-width: 0;
   padding: 0.5rem 0.75rem;
   background: $stone-900;
   border: 1px solid $stone-700;
@@ -1119,8 +1062,7 @@
 
 // 下拉选择框
 .settings-select {
-  width: 100%;
-  min-width: 0;
+  min-width: 120px;
   padding: 0.5rem 0.75rem;
   background: $stone-900;
   border: 1px solid $stone-700;
@@ -1145,14 +1087,11 @@
   font-size: 0.75rem;
   color: $stone-600;
   margin-left: 0.5rem;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
 }
 
 // 文本域
 .settings-textarea {
   width: 100%;
-  min-width: 0;
   min-height: 150px;
   padding: 0.75rem;
   background: $stone-900;
@@ -1195,14 +1134,12 @@
 .summary-actions {
   display: flex;
   gap: 0.75rem;
-  flex-wrap: wrap;
   margin-bottom: 1rem;
 }
 
 .settings-action-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
   background: transparent;
@@ -1239,7 +1176,6 @@
 // 状态显示
 .summary-status,
 .summary-result {
-  min-width: 0;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid $stone-800;
   border-radius: 4px;
@@ -1251,8 +1187,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  min-width: 0;
   padding: 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 0.9rem;
@@ -1291,7 +1225,6 @@
 .summary-result-item {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.25rem 0;
   font-size: 0.85rem;
@@ -1299,7 +1232,6 @@
 
   strong {
     color: $stone-200;
-    overflow-wrap: anywhere;
   }
 
   &.success strong {
@@ -1317,8 +1249,6 @@
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 0.85rem;
   color: $stone-400;
-  min-width: 0;
-  overflow-wrap: anywhere;
 
   ul {
     margin: 0.5rem 0 0 0;
@@ -1348,6 +1278,7 @@
 
 .variables-section {
   gap: 1rem;
+  min-height: 0;
 }
 
 .variables-toolbar {
@@ -1374,12 +1305,40 @@
 
 .variables-search-field {
   flex: 1;
-  min-width: 180px;
+  min-width: 0;
+}
+
+.variables-search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0 0.65rem;
+  background: rgba($stone-900, 0.82);
+  border: 1px solid $stone-700;
+  border-radius: 4px;
+  color: $stone-500;
+  transition: border-color $transition-fast, background $transition-fast;
+
+  &:focus-within {
+    border-color: $amber-600;
+    background: $stone-900;
+    color: $amber-600;
+  }
 }
 
 .variables-search-input {
   width: 100%;
-  min-width: 180px;
+  min-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border: none;
+  background: transparent;
+
+  &:focus {
+    border-color: transparent;
+  }
 }
 
 .variables-status {
@@ -1402,10 +1361,20 @@
   }
 }
 
+.variables-browser {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+  align-items: start;
+  gap: 1rem;
+  min-height: 0;
+}
+
 .variables-tree {
   min-height: 320px;
   max-height: 560px;
-  overflow: auto;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid $stone-800;
   border-radius: 4px;
   background:
@@ -1429,28 +1398,47 @@
 }
 
 .variable-node {
-  min-width: 640px;
+  min-width: 0;
 }
 
 .variable-node-row {
   display: grid;
-  grid-template-columns: 22px minmax(150px, 0.95fr) 82px minmax(180px, 1.5fr);
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 38px;
-  padding: 0.35rem 0.65rem 0.35rem 0;
+  grid-template-columns: 22px minmax(0, 1fr) max-content;
+  grid-template-areas:
+    "toggle key type"
+    "toggle preview preview";
+  align-items: start;
+  gap: 0.35rem 0.55rem;
+  min-height: 46px;
+  padding: 0.55rem 0.7rem 0.55rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  cursor: pointer;
+  transition: background $transition-fast, border-color $transition-fast;
 
   &:hover {
     background: rgba(255, 255, 255, 0.025);
   }
+
+  &:focus-visible {
+    outline: 1px solid rgba($amber-600, 0.65);
+    outline-offset: -1px;
+  }
+}
+
+.variable-node.selected > .variable-node-row {
+  background:
+    linear-gradient(90deg, rgba($amber-600, 0.13), transparent 62%),
+    rgba(255, 255, 255, 0.025);
+  border-bottom-color: rgba($amber-600, 0.24);
 }
 
 .variable-node-toggle,
 .variable-node-toggle-spacer {
+  grid-area: toggle;
   width: 22px;
   height: 22px;
   flex-shrink: 0;
+  margin-top: 0.05rem;
 }
 
 .variable-node-toggle {
@@ -1472,15 +1460,19 @@
 }
 
 .variable-node-key {
+  grid-area: key;
   min-width: 0;
   color: $stone-300;
   font-size: 0.85rem;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
 }
 
 .variable-node-type {
+  grid-area: type;
   justify-self: start;
   padding: 0.18rem 0.4rem;
   border: 1px solid $stone-800;
@@ -1489,6 +1481,30 @@
   font-size: 0.72rem;
   white-space: nowrap;
   background: rgba(0, 0, 0, 0.18);
+}
+
+.variable-node-preview {
+  grid-area: preview;
+  min-width: 0;
+  color: $stone-500;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.variable-node.branch > .variable-node-row .variable-node-preview {
+  color: $stone-600;
+}
+
+.variable-search-mark {
+  padding: 0 0.08rem;
+  border-radius: 2px;
+  background: rgba($amber-600, 0.28);
+  color: $yellow-100;
 }
 
 .variable-node-empty {
@@ -1500,16 +1516,148 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.035);
 }
 
+.variable-detail-panel {
+  position: sticky;
+  top: 0;
+  min-width: 0;
+  max-height: 560px;
+  overflow: auto;
+  padding: 0.9rem;
+  border: 1px solid rgba($amber-600, 0.22);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba($amber-600, 0.065), transparent 8rem),
+    rgba(0, 0, 0, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+
+  &.empty {
+    position: static;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: $stone-600;
+    text-align: center;
+
+    p {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+  }
+}
+
+.variable-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.variable-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: $stone-300;
+  font-family: $font-serif;
+  font-size: 0.92rem;
+}
+
+.variable-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.variable-detail-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid $stone-700;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.16);
+  color: $stone-500;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    border-color: $amber-600;
+    color: $amber-600;
+    background: rgba($amber-600, 0.09);
+  }
+}
+
+.variable-detail-path {
+  padding: 0.65rem 0.7rem;
+  border: 1px solid rgba($stone-700, 0.75);
+  border-radius: 4px;
+  background: rgba($stone-900, 0.58);
+  color: $stone-300;
+  font-family: monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.variable-detail-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.75rem 0;
+
+  span {
+    padding: 0.2rem 0.48rem;
+    border: 1px solid $stone-800;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.18);
+    color: $stone-500;
+    font-size: 0.72rem;
+  }
+}
+
+.variable-detail-body {
+  min-width: 0;
+}
+
+.variable-detail-field-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: $stone-500;
+  font-size: 0.75rem;
+}
+
+.variable-detail-code {
+  max-height: 360px;
+  margin: 0;
+  padding: 0.8rem;
+  overflow: auto;
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  background: rgba($stone-900, 0.74);
+  color: $stone-300;
+  font-family: monospace;
+  font-size: 0.76rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .variable-leaf-input {
   width: 100%;
-  min-width: 160px;
-  padding: 0.35rem 0.5rem;
+  min-width: 0;
+  padding: 0.5rem 0.65rem;
   border: 1px solid $stone-800;
   border-radius: 4px;
   background: rgba($stone-900, 0.72);
   color: $stone-200;
   font-family: monospace;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
 
   &:focus {
     outline: none;
@@ -1519,14 +1667,14 @@
 }
 
 .variable-leaf-textarea {
-  min-height: 2.6rem;
-  max-height: 8rem;
-  line-height: 1.45;
+  min-height: 8rem;
+  max-height: 18rem;
+  line-height: 1.65;
   resize: vertical;
 }
 
 .variable-leaf-number {
-  max-width: 180px;
+  max-width: none;
 }
 
 .variable-boolean-toggle {
@@ -1574,293 +1722,77 @@
 }
 
 @media (max-width: $breakpoint-md) {
-  .settings-panel {
-    min-height: 0;
-  }
-
-  .settings-tabs {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 0.25rem;
-    padding-bottom: 0.55rem;
-    margin-bottom: 0.85rem;
-    overflow: hidden;
-  }
-
-  .settings-tab {
-    flex: 0 0 2.25rem;
-    width: 2.25rem;
-    height: 2.25rem;
-    min-height: 0;
-    padding: 0;
-    gap: 0;
-    font-size: 0.8rem;
-    overflow: hidden;
-
-    svg {
-      flex-shrink: 0;
-    }
-
-    > span:not(.icon-wrap) {
-      display: none;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      overflow-wrap: normal;
-    }
-
-    &.active {
-      flex: 1 1 auto;
-      width: auto;
-      max-width: 8.5rem;
-      padding: 0 0.55rem;
-      gap: 0.35rem;
-
-      > span:not(.icon-wrap) {
-        display: inline;
-      }
-    }
-  }
-
-  .settings-content {
-    padding-right: 0;
-  }
-
-  .settings-section {
-    gap: 1rem;
-  }
-
-  .settings-section-title {
-    margin-bottom: 0.15rem;
-  }
-
-  .settings-description {
-    margin-bottom: 0.35rem;
-  }
-
-  .settings-row {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-    gap: 0.6rem;
-    padding: 0.85rem 0;
-  }
-
-  .settings-label {
-    min-width: 0;
-  }
-
-  .settings-control {
-    width: 100%;
-    justify-content: flex-start;
-    align-items: stretch;
-    flex-wrap: wrap;
-  }
-
-  .settings-slider {
-    flex: 1 1 auto;
-    width: 100%;
-  }
-
-  .settings-value {
-    min-width: 3.25rem;
-    align-self: center;
-  }
-
-  .settings-color-picker {
-    flex-shrink: 0;
-  }
-
-  .settings-color-input {
-    flex: 1 1 7rem;
-    width: auto;
-  }
-
-  .settings-image-upload {
-    align-items: stretch;
-  }
-
-  .settings-upload-btn,
-  .settings-clear-btn,
-  .settings-reset-template-btn,
-  .settings-action-btn,
-  .settings-reset-btn,
-  .summary-toggle-btn,
-  .debug-copy-btn {
-    width: 100%;
-  }
-
-  .settings-preview {
-    margin-top: 0.35rem;
-    padding: 0.75rem;
-  }
-
-  .preview-text {
-    padding: 0.75rem;
-  }
-
-  .regex-section-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.6rem;
-  }
-
-  .regex-section-meta {
-    align-self: flex-start;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-
-  .regex-rule-item {
-    padding: 0.65rem;
-  }
-
-  .regex-rule-header {
-    align-items: flex-start;
-    gap: 0.55rem;
-  }
-
-  .regex-rule-info {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    row-gap: 0.4rem;
-  }
-
-  .regex-rule-desc {
-    flex-basis: 100%;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    overflow-wrap: anywhere;
-    line-height: 1.45;
-  }
-
-  .regex-rule-actions {
-    flex-shrink: 0;
-  }
-
-  .regex-rule-body {
-    padding: 0.85rem 0 0;
-  }
-
-  .regex-buttons-group,
-  .summary-actions {
-    display: grid;
+  .variables-browser {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .settings-add-btn,
-  .settings-import-btn {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .summary-subsection {
-    margin-top: 1rem;
-  }
-
-  .settings-hint-inline {
-    flex-basis: 100%;
-    margin-left: 0;
-  }
-
-  .settings-number-input {
-    width: 100%;
-    text-align: left;
-  }
-
-  .summary-status-header,
-  .summary-result-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .summary-status-badge,
-  .summary-result-badge {
-    align-self: flex-start;
-  }
-
-  .summary-pending-list ul {
-    padding-left: 1rem;
-  }
-
-  .debug-logs-list {
+  .variable-detail-panel {
+    order: -1;
+    position: static;
     max-height: none;
-  }
-
-  .debug-log-header {
-    align-items: flex-start;
-  }
-
-  .debug-log-info {
-    flex-wrap: wrap;
-    gap: 0.45rem 0.65rem;
-  }
-
-  .debug-log-type {
-    width: 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-
-  .debug-log-preview {
-    -webkit-line-clamp: 3;
-  }
-
-  .debug-log-content {
-    max-height: 24rem;
-    padding: 0.65rem;
-  }
-
-  .debug-log-footer {
-    justify-content: stretch;
-  }
-
-  .debug-stats {
-    justify-content: flex-start;
   }
 
   .variables-tree {
     max-height: none;
   }
-
-  .variables-toolbar .settings-action-btn {
-    width: auto;
-    flex: 0 0 auto;
-  }
 }
 
 @media (max-width: 420px) {
-  .settings-control {
-    gap: 0.55rem;
-  }
-
-  .settings-color-input {
-    flex-basis: 100%;
-  }
-
-  .settings-image-upload {
+  .variables-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
   }
 
-  .regex-rule-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+  .variables-toolbar .settings-action-btn,
+  .variables-search-field,
+  .variables-search-input {
+    width: 100%;
+    min-width: 0;
   }
 
-  .regex-rule-actions {
-    align-self: start;
+  .variables-tree {
+    min-height: 260px;
+    border: none;
+    background: transparent;
   }
 
-  .debug-log-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+  .variable-node {
+    margin-bottom: 0.45rem;
   }
 
-  .debug-stats {
-    gap: 0.35rem 0.55rem;
+  .variable-node-row {
+    grid-template-columns: 22px minmax(0, 1fr);
+    grid-template-areas:
+      "toggle key"
+      "type type"
+      "preview preview";
+    padding: 0.7rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .variable-node-type {
+    justify-self: start;
+  }
+
+  .variable-node-children {
+    margin-left: 0.55rem;
+    padding-left: 0.45rem;
+    border-left: 1px solid rgba($amber-600, 0.16);
+  }
+
+  .variable-detail-panel {
+    padding: 0.75rem;
+  }
+
+  .variable-detail-code {
+    max-height: 300px;
+  }
+
+  .variable-leaf-textarea {
+    min-height: 10rem;
+    max-height: 16rem;
   }
 }
