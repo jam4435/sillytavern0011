@@ -1,0 +1,29 @@
+tavern_sync.mjs 是重点。它读取根目录的 tavern_sync.yaml。你当前只配置了一个同步项：
+
+配置:
+  角色卡示例:
+    类型: 角色卡
+    酒馆中的名称: 呕吐内心的少女
+    本地文件路径: 示例/角色卡示例/index
+    导出文件路径: 示例/角色卡示例/角色卡示例
+也就是说，配置名叫 角色卡示例，对应酒馆里的角色卡 呕吐内心的少女，本地文件实际会是 示例/角色卡示例/index.yaml，打包角色卡时会输出成 .png。
+
+常用命令：
+
+node tavern_sync.mjs list
+node tavern_sync.mjs pull 角色卡示例
+node tavern_sync.mjs push 角色卡示例
+node tavern_sync.mjs watch 角色卡示例
+node tavern_sync.mjs bundle 角色卡示例
+node tavern_sync.mjs update
+含义：
+
+pull：从酒馆拉到本地。默认会把较长提示词拆成外链文件；加 -i 则尽量内嵌在 YAML 里；本地和酒馆条目名/数量不一致时会拒绝，确认要覆盖就加 -f。
+
+push：把本地 YAML 和外链文件推回酒馆。若酒馆里不存在目标，或条目差异较大，需要 -f。
+
+watch：先推送一次，然后监听本地文件变化并自动推送。这个命令会常驻运行。
+
+bundle：只根据本地文件打包，不需要连接酒馆。角色卡输出 .png，世界书/预设输出 .json。
+
+pull/push/watch 需要酒馆页面里对应的同步脚本连接本地 6620 端口；如果终端停在“等待脚本连接”，就打开/刷新 SillyTavern，并确认酒馆助手脚本库里的同步脚本已启用。

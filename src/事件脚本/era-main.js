@@ -539,8 +539,9 @@
       return;
     }
 
+    await processFollowupCounters({ decrementCounters: false, reason: 'era-write-done' });
+
     if (detail?.actions?.apiWrite !== true) {
-      await processFollowupCounters({ decrementCounters: false, reason: 'era-write-done' });
       log('📝 检测到ERA变量更新，触发事件检查');
       scheduleCheckEvents('era-write-done');
     }
