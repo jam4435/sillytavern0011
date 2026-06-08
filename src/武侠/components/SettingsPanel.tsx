@@ -50,6 +50,45 @@ const isHiddenVariableKey = (key: string | number): boolean =>
 const getVariablePathKey = (path: VariablePath): string =>
   path.length === 0 ? ROOT_VARIABLE_PATH_KEY : path.map(segment => String(segment)).join('\u001f');
 
+const areVariablePathsEqual = (lhs: VariablePath | null, rhs: VariablePath): boolean =>
+  !!lhs && lhs.length === rhs.length && lhs.every((segment, index) => segment === rhs[index]);
+
+const getValueAtVariablePath = (source: Record<string, unknown>, path: VariablePath): unknown => {
+  let cursor: unknown = source;
+
+  for (const segment of path) {
+    if (Array.isArray(cursor) && typeof segment === 'number') {
+      cursor = cursor[segment];
+      continue;
+    }
+
+    if (isRecord(cursor)) {
+      cursor = cursor[String(segment)];
+      continue;
+    }
+
+    return undefined;
+  }
+
+  return cursor;
+};
+
+const getVariableDisplayPath = (path: VariablePath): string =>
+  ['stat_data', ...path.map(segment => String(segment))].join(' › ');
+
+const formatCopyPathSegment = (segment: string | number): string => {
+  if (typeof segment === 'number') {
+    return `[${segment}]`;
+  }
+
+  return /^[\p{L}_$][\p{L}\p{N}_$]*$/u.test(segment)
+    ? `.${segment}`
+    : `[${JSON.stringify(segment)}]`;
+};
+
+const getVariableCopyPath = (path: VariablePath): string =>
+  path.reduce((copyPath, segment) => `${copyPath}${formatCopyPathSegment(segment)}`, 'stat_data');
+
 const getVisibleEntries = (value: unknown): Array<[string | number, unknown]> => {
   if (Array.isArray(value)) {
     return value.map((item, index) => [index, item]);
@@ -77,6 +116,18 @@ const getVariableTypeLabel = (value: unknown): string => {
     return '空值';
   }
 
+  if (typeof value === 'string') {
+    return `文本 ${value.length}`;
+  }
+
+  if (typeof value === 'number') {
+    return '数字';
+  }
+
+  if (typeof value === 'boolean') {
+    return '布尔';
+  }
+
   return typeof value;
 };
 
@@ -90,10 +141,76 @@ const formatVariablePreview = (value: unknown): string => {
   }
 
   if (typeof value === 'string') {
-    return value.length > 64 ? `${value.slice(0, 64)}...` : value;
+    const compactValue = value.replace(/\s+/g, ' ').trim();
+    if (!compactValue) {
+      return '空文本';
+    }
+    return compactValue.length > 140 ? `${compactValue.slice(0, 140)}...` : compactValue;
   }
 
   return String(value);
+};
+
+const formatVariableDetailValue = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (Array.isArray(value) || isRecord(value)) {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return formatVariablePreview(value);
+    }
+  }
+
+  if (value === null) {
+    return 'null';
+  }
+
+  return String(value);
+};
+
+const getContainerPreview = (value: unknown): string => {
+  const entries = getVisibleEntries(value);
+  if (entries.length === 0) {
+    return '空';
+  }
+
+  const previewKeys = entries.slice(0, 4).map(([key]) => String(key)).join('、');
+  return entries.length > 4 ? `${previewKeys}...` : previewKeys;
+};
+
+const renderHighlightedText = (text: string, normalizedQuery: string): React.ReactNode => {
+  if (!normalizedQuery) {
+    return text;
+  }
+
+  const lowerText = text.toLowerCase();
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  let matchIndex = lowerText.indexOf(normalizedQuery);
+
+  while (matchIndex !== -1) {
+    if (matchIndex > cursor) {
+      parts.push(text.slice(cursor, matchIndex));
+    }
+
+    const matchEnd = matchIndex + normalizedQuery.length;
+    parts.push(
+      <mark className="variable-search-mark" key={`${matchIndex}-${matchEnd}`}>
+        {text.slice(matchIndex, matchEnd)}
+      </mark>,
+    );
+    cursor = matchEnd;
+    matchIndex = lowerText.indexOf(normalizedQuery, cursor);
+  }
+
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor));
+  }
+
+  return parts;
 };
 
 const matchesVariableSearch = (key: string | number, value: unknown, normalizedQuery: string): boolean => {
@@ -160,6 +277,23 @@ const setValueAtVariablePath = (
   return cloneRoot;
 };
 
+const copyTextToClipboard = async (text: string): Promise<void> => {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  textarea.remove();
+};
+
 interface SettingsPanelProps {
   currentPresetName: string;
   settings: DisplaySettings;
@@ -196,6 +330,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [expandedVariablePaths, setExpandedVariablePaths] = useState<Set<string>>(
     () => new Set(),
   );
+  const [selectedVariablePath, setSelectedVariablePath] = useState<VariablePath | null>(null);
   const [variableSearch, setVariableSearch] = useState('');
 
   const normalizedVariableSearch = variableSearch.trim().toLowerCase();
@@ -225,6 +360,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       }
 
       setStatData(nextStatData);
+      const firstVisibleEntry = getVisibleEntries(nextStatData)[0];
+      setSelectedVariablePath(firstVisibleEntry ? [firstVisibleEntry[0]] : null);
       setVariableStatus('idle');
       setVariableStatusText('');
       setIsVariablesDirty(false);
@@ -258,6 +395,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [statData]);
 
+  const selectedVariableValue = statData && selectedVariablePath
+    ? getValueAtVariablePath(statData, selectedVariablePath)
+    : undefined;
+
   const toggleVariablePath = useCallback((pathKey: string) => {
     setExpandedVariablePaths(prev => {
       const next = new Set(prev);
@@ -275,6 +416,28 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setIsVariablesDirty(true);
     setVariableStatus('idle');
     setVariableStatusText('');
+  }, []);
+
+  const handleCopyVariablePath = useCallback(async (path: VariablePath) => {
+    try {
+      await copyTextToClipboard(getVariableCopyPath(path));
+      setVariableStatus('success');
+      setVariableStatusText('已复制变量路径');
+    } catch (error) {
+      setVariableStatus('error');
+      setVariableStatusText(`复制失败：${getErrorMessage(error)}`);
+    }
+  }, []);
+
+  const handleCopyVariableValue = useCallback(async (value: unknown) => {
+    try {
+      await copyTextToClipboard(formatVariableDetailValue(value));
+      setVariableStatus('success');
+      setVariableStatusText('已复制变量值');
+    } catch (error) {
+      setVariableStatus('error');
+      setVariableStatusText(`复制失败：${getErrorMessage(error)}`);
+    }
   }, []);
 
   useEffect(() => {
@@ -1193,21 +1356,25 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="variables-toolbar">
               <div className="variables-field variables-search-field">
                 <label className="variables-field-label">搜索</label>
-                <input
-                  type="text"
-                  value={variableSearch}
-                  onChange={(e) => setVariableSearch(e.target.value)}
-                  placeholder="字段名或值"
-                  className="settings-text-input variables-search-input"
-                />
+                <div className="variables-search-box">
+                  <Icons.Search size={16} />
+                  <input
+                    type="text"
+                    value={variableSearch}
+                    onChange={(e) => setVariableSearch(e.target.value)}
+                    placeholder="字段名或值"
+                    className="settings-text-input variables-search-input"
+                  />
+                </div>
               </div>
 
-              <button className="settings-action-btn" onClick={refreshStatData}>
+              <button className="settings-action-btn" type="button" onClick={refreshStatData}>
                 <Icons.Refresh size={16} />
                 <span>刷新</span>
               </button>
               <button
                 className="settings-action-btn primary"
+                type="button"
                 onClick={saveStatData}
                 disabled={!isVariablesDirty || !statData}
               >
@@ -1222,34 +1389,46 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             )}
 
-            <div className="variables-tree">
-              {statData ? (
-                visibleStatDataEntries.length > 0 ? (
-                  visibleStatDataEntries.map(([key, value]) => (
-                    <VariableTreeNode
-                      key={String(key)}
-                      label={key}
-                      value={value}
-                      path={[key]}
-                      depth={0}
-                      expandedPaths={expandedVariablePaths}
-                      normalizedSearch={normalizedVariableSearch}
-                      onToggle={toggleVariablePath}
-                      onValueChange={handleVariableLeafChange}
-                    />
-                  ))
+            <div className="variables-browser">
+              <div className="variables-tree" aria-label="变量树">
+                {statData ? (
+                  visibleStatDataEntries.length > 0 ? (
+                    visibleStatDataEntries.map(([key, value]) => (
+                      <VariableTreeNode
+                        key={String(key)}
+                        label={key}
+                        value={value}
+                        path={[key]}
+                        depth={0}
+                        expandedPaths={expandedVariablePaths}
+                        selectedPath={selectedVariablePath}
+                        normalizedSearch={normalizedVariableSearch}
+                        onToggle={toggleVariablePath}
+                        onSelect={setSelectedVariablePath}
+                      />
+                    ))
+                  ) : (
+                    <div className="variables-empty">
+                      <Icons.Variables size={32} />
+                      <p>没有可显示的变量</p>
+                    </div>
+                  )
                 ) : (
                   <div className="variables-empty">
                     <Icons.Variables size={32} />
-                    <p>没有可显示的变量</p>
+                    <p>尚未读取到变量数据</p>
                   </div>
-                )
-              ) : (
-                <div className="variables-empty">
-                  <Icons.Variables size={32} />
-                  <p>尚未读取到变量数据</p>
-                </div>
-              )}
+                )}
+              </div>
+
+              <VariableDetailPanel
+                path={statData ? selectedVariablePath : null}
+                value={selectedVariableValue}
+                normalizedSearch={normalizedVariableSearch}
+                onValueChange={handleVariableLeafChange}
+                onCopyPath={handleCopyVariablePath}
+                onCopyValue={handleCopyVariableValue}
+              />
             </div>
 
             {isVariablesDirty && (
@@ -1379,9 +1558,10 @@ interface VariableTreeNodeProps {
   path: VariablePath;
   depth: number;
   expandedPaths: Set<string>;
+  selectedPath: VariablePath | null;
   normalizedSearch: string;
   onToggle: (pathKey: string) => void;
-  onValueChange: (path: VariablePath, nextValue: unknown) => void;
+  onSelect: (path: VariablePath) => void;
 }
 
 const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
@@ -1390,29 +1570,46 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
   path,
   depth,
   expandedPaths,
+  selectedPath,
   normalizedSearch,
   onToggle,
-  onValueChange,
+  onSelect,
 }) => {
   const pathKey = getVariablePathKey(path);
   const isRoot = path.length === 0;
   const isContainer = Array.isArray(value) || isRecord(value);
   const isExpanded = isRoot || Boolean(normalizedSearch) || expandedPaths.has(pathKey);
+  const isSelected = areVariablePathsEqual(selectedPath, path);
   const rawEntries = isContainer ? getVisibleEntries(value) : [];
   const visibleEntries = normalizedSearch
     ? rawEntries.filter(([childKey, childValue]) => matchesVariableSearch(childKey, childValue, normalizedSearch))
     : rawEntries;
+  const handleSelect = () => onSelect(path);
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect(path);
+    }
+  };
 
   return (
-    <div className={`variable-node ${isRoot ? 'root' : ''} ${isContainer ? 'branch' : 'leaf'}`}>
+    <div className={`variable-node ${isRoot ? 'root' : ''} ${isContainer ? 'branch' : 'leaf'} ${isSelected ? 'selected' : ''}`}>
       <div
         className="variable-node-row"
         style={{ paddingLeft: `${Math.min(depth, 8) * 0.85}rem` }}
+        role="button"
+        tabIndex={0}
+        onClick={handleSelect}
+        onKeyDown={handleKeyDown}
       >
         {isContainer && !isRoot ? (
           <button
             className="variable-node-toggle"
-            onClick={() => onToggle(pathKey)}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggle(pathKey);
+            }}
             title={isExpanded ? '收起' : '展开'}
           >
             {isExpanded ? <Icons.ChevronDown size={16} /> : <Icons.ChevronUp size={16} />}
@@ -1421,15 +1618,11 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
           <span className="variable-node-toggle-spacer" />
         )}
 
-        <span className="variable-node-key" title={String(label)}>{String(label)}</span>
+        <span className="variable-node-key" title={String(label)}>
+          {renderHighlightedText(String(label), normalizedSearch)}
+        </span>
         <span className="variable-node-type">{getVariableTypeLabel(value)}</span>
-        {!isContainer && (
-          <VariableLeafEditor
-            value={value}
-            path={path}
-            onValueChange={onValueChange}
-          />
-        )}
+        <VariableValuePreview value={value} normalizedSearch={normalizedSearch} />
       </div>
 
       {isContainer && isExpanded && (
@@ -1443,9 +1636,10 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
                 path={[...path, childKey]}
                 depth={depth + 1}
                 expandedPaths={expandedPaths}
+                selectedPath={selectedPath}
                 normalizedSearch={normalizedSearch}
                 onToggle={onToggle}
-                onValueChange={onValueChange}
+                onSelect={onSelect}
               />
             ))
           ) : (
@@ -1459,6 +1653,111 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
         </div>
       )}
     </div>
+  );
+};
+
+interface VariableValuePreviewProps {
+  value: unknown;
+  normalizedSearch: string;
+}
+
+const VariableValuePreview: React.FC<VariableValuePreviewProps> = ({
+  value,
+  normalizedSearch,
+}) => {
+  const preview = Array.isArray(value) || isRecord(value)
+    ? getContainerPreview(value)
+    : formatVariablePreview(value);
+
+  return (
+    <span className="variable-node-preview" title={preview}>
+      {renderHighlightedText(preview, normalizedSearch)}
+    </span>
+  );
+};
+
+interface VariableDetailPanelProps {
+  path: VariablePath | null;
+  value: unknown;
+  normalizedSearch: string;
+  onValueChange: (path: VariablePath, nextValue: unknown) => void;
+  onCopyPath: (path: VariablePath) => void;
+  onCopyValue: (value: unknown) => void;
+}
+
+const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
+  path,
+  value,
+  normalizedSearch,
+  onValueChange,
+  onCopyPath,
+  onCopyValue,
+}) => {
+  if (!path) {
+    return (
+      <aside className="variable-detail-panel empty" aria-label="变量详情">
+        <Icons.Eye size={28} />
+        <p>选择变量查看详情</p>
+      </aside>
+    );
+  }
+
+  const isContainer = Array.isArray(value) || isRecord(value);
+  const displayPath = getVariableDisplayPath(path);
+  const copyPath = getVariableCopyPath(path);
+  const detailValue = formatVariableDetailValue(value);
+
+  return (
+    <aside className="variable-detail-panel" aria-label="变量详情">
+      <div className="variable-detail-header">
+        <div className="variable-detail-title">
+          <Icons.Eye size={16} />
+          <span>变量详情</span>
+        </div>
+        <div className="variable-detail-actions">
+          <button
+            type="button"
+            className="variable-detail-icon-btn"
+            onClick={() => onCopyPath(path)}
+            title="复制路径"
+          >
+            <Icons.Copy size={15} />
+          </button>
+          <button
+            type="button"
+            className="variable-detail-icon-btn"
+            onClick={() => onCopyValue(value)}
+            title="复制值"
+          >
+            <Icons.FileText size={15} />
+          </button>
+        </div>
+      </div>
+
+      <div className="variable-detail-path" title={copyPath}>
+        {renderHighlightedText(displayPath, normalizedSearch)}
+      </div>
+
+      <div className="variable-detail-meta">
+        <span>{getVariableTypeLabel(value)}</span>
+        <span>{path.length} 层</span>
+      </div>
+
+      <div className="variable-detail-body">
+        {isContainer ? (
+          <pre className="variable-detail-code">{detailValue}</pre>
+        ) : (
+          <>
+            <label className="variable-detail-field-label">值</label>
+            <VariableLeafEditor
+              value={value}
+              path={path}
+              onValueChange={onValueChange}
+            />
+          </>
+        )}
+      </div>
+    </aside>
   );
 };
 

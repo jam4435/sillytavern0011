@@ -114,6 +114,26 @@
   border-top: 0;
 }
 
+@media (max-width: $breakpoint-md) {
+  .modal-box {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+  }
+
+  .modal-header {
+    padding: 0 1rem;
+  }
+
+  .modal-content {
+    padding: 1rem 0.875rem;
+  }
+
+  .corner-dec {
+    display: none;
+  }
+}
+
 // Animations
 @keyframes fadeIn {
   from {
