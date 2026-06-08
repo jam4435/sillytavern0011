@@ -11,6 +11,8 @@
   flex-direction: column;
   height: 100%;
   min-height: 400px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 // =========================================
@@ -24,12 +26,15 @@
   padding-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   margin-bottom: 1.5rem;
+  min-width: 0;
 }
 
 .settings-tab {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
+  min-width: 0;
   padding: 0.75rem 1rem;
   background: transparent;
   border: 1px solid $stone-700;
@@ -65,6 +70,11 @@
   svg {
     opacity: 0.7;
   }
+
+  span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
 }
 
 // =========================================
@@ -74,13 +84,16 @@
 .settings-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 0.5rem;
+  min-width: 0;
 }
 
 .settings-section {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  min-width: 0;
 }
 
 .settings-section-title {
@@ -118,6 +131,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  min-width: 0;
   padding: 0.75rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 
@@ -137,6 +151,7 @@
   color: $stone-400;
   min-width: 80px;
   flex-shrink: 0;
+  line-height: 1.4;
 }
 
 .settings-control {
@@ -144,6 +159,7 @@
   align-items: center;
   gap: 0.75rem;
   flex: 1;
+  min-width: 0;
   justify-content: flex-end;
 }
 
@@ -162,7 +178,9 @@
 .settings-slider {
   -webkit-appearance: none;
   appearance: none;
+  flex: 0 1 150px;
   width: 150px;
+  min-width: 0;
   height: 4px;
   background: $stone-800;
   border-radius: 2px;
@@ -238,6 +256,7 @@
 
 .settings-color-input {
   width: 90px;
+  min-width: 0;
   padding: 0.5rem;
   background: $stone-900;
   border: 1px solid $stone-700;
@@ -261,6 +280,8 @@
   align-items: center;
   gap: 0.75rem;
   width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .settings-file-input {
@@ -270,6 +291,7 @@
 .settings-upload-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   background: transparent;
@@ -289,6 +311,7 @@
 .settings-clear-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.25rem;
   padding: 0.4rem 0.75rem;
   background: transparent;
@@ -305,6 +328,7 @@
 
 .settings-image-preview {
   width: 100%;
+  min-width: 0;
   max-height: 150px;
   overflow: hidden;
   border: 1px solid $stone-700;
@@ -331,6 +355,7 @@
 .settings-preview {
   margin-top: 1rem;
   padding: 1rem;
+  min-width: 0;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid $stone-800;
   border-radius: 4px;
@@ -349,6 +374,7 @@
   padding: 1rem;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
+  overflow-wrap: anywhere;
 }
 
 // =========================================
@@ -360,12 +386,14 @@
   flex-direction: column;
   gap: 0.75rem;
   margin-bottom: 1rem;
+  min-width: 0;
 }
 
 .regex-scope-section {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .regex-scope-section + .regex-scope-section {
@@ -379,6 +407,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  min-width: 0;
 }
 
 .regex-section-title {
@@ -392,11 +421,13 @@
   font-size: 0.82rem;
   color: $stone-500;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .regex-section-meta {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   padding: 0.25rem 0.6rem;
   background: rgba($amber-600, 0.08);
   border: 1px solid rgba($amber-600, 0.35);
@@ -404,6 +435,8 @@
   font-size: 0.75rem;
   border-radius: 999px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .regex-empty {
@@ -422,6 +455,7 @@
 }
 
 .regex-rule-item {
+  min-width: 0;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid $stone-800;
   padding: 0.75rem;
@@ -445,6 +479,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  min-width: 0;
   padding: 0.5rem;
   margin: -0.5rem -0.5rem 0 -0.5rem; // 扩展点击区域
   cursor: pointer; // 提示可点击
@@ -511,6 +546,7 @@
 .regex-rule-desc {
   font-size: 0.85rem;
   color: $stone-400;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -585,6 +621,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
   padding: 1rem 0.5rem 0.5rem; // 调整内边距
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   margin-top: 0.75rem; // 与 header 分隔
@@ -594,6 +631,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-width: 0;
 
   label {
     font-size: 0.75rem;
@@ -605,6 +643,7 @@
 
 .regex-input {
   width: 100%;
+  min-width: 0;
   padding: 0.5rem 0.75rem;
   background: $stone-900;
   border: 1px solid $stone-700;
@@ -642,6 +681,7 @@
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 // =========================================
@@ -737,6 +777,7 @@
 .settings-reset-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   background: transparent;
@@ -764,6 +805,8 @@
   margin-bottom: 1rem;
   max-height: 400px;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 .debug-empty {
@@ -788,6 +831,7 @@
 }
 
 .debug-log-item {
+  min-width: 0;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid $stone-800;
   border-radius: 4px;
@@ -815,6 +859,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  min-width: 0;
   padding: 0.75rem;
   cursor: pointer;
   transition: background-color $transition-fast;
@@ -892,13 +937,18 @@
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
   font-family: monospace;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .debug-log-body {
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   padding: 0.75rem;
+  min-width: 0;
 }
 
 .debug-log-content {
@@ -906,7 +956,8 @@
   border-radius: 4px;
   padding: 0.75rem;
   max-height: 300px;
-  overflow-y: auto;
+  overflow: auto;
+  min-width: 0;
 
   pre {
     margin: 0;
@@ -915,7 +966,8 @@
     color: $stone-300;
     line-height: 1.5;
     white-space: pre-wrap;
-    word-break: break-all;
+    overflow-wrap: anywhere;
+    word-break: normal;
   }
 }
 
@@ -953,6 +1005,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.75rem;
   margin-top: 0.5rem;
@@ -974,6 +1027,7 @@
 .summary-toggle-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   background: transparent;
@@ -1003,6 +1057,7 @@
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
+  min-width: 0;
 }
 
 .summary-subsection-title {
@@ -1016,7 +1071,8 @@
 // 文本输入框
 .settings-text-input {
   flex: 1;
-  min-width: 200px;
+  width: 100%;
+  min-width: 0;
   padding: 0.5rem 0.75rem;
   background: $stone-900;
   border: 1px solid $stone-700;
@@ -1037,6 +1093,7 @@
 // 数字输入框
 .settings-number-input {
   width: 80px;
+  min-width: 0;
   padding: 0.5rem 0.75rem;
   background: $stone-900;
   border: 1px solid $stone-700;
@@ -1062,7 +1119,8 @@
 
 // 下拉选择框
 .settings-select {
-  min-width: 120px;
+  width: 100%;
+  min-width: 0;
   padding: 0.5rem 0.75rem;
   background: $stone-900;
   border: 1px solid $stone-700;
@@ -1087,11 +1145,14 @@
   font-size: 0.75rem;
   color: $stone-600;
   margin-left: 0.5rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 // 文本域
 .settings-textarea {
   width: 100%;
+  min-width: 0;
   min-height: 150px;
   padding: 0.75rem;
   background: $stone-900;
@@ -1134,12 +1195,14 @@
 .summary-actions {
   display: flex;
   gap: 0.75rem;
+  flex-wrap: wrap;
   margin-bottom: 1rem;
 }
 
 .settings-action-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
   background: transparent;
@@ -1176,6 +1239,7 @@
 // 状态显示
 .summary-status,
 .summary-result {
+  min-width: 0;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid $stone-800;
   border-radius: 4px;
@@ -1187,6 +1251,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
   padding: 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 0.9rem;
@@ -1225,6 +1291,7 @@
 .summary-result-item {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.25rem 0;
   font-size: 0.85rem;
@@ -1232,6 +1299,7 @@
 
   strong {
     color: $stone-200;
+    overflow-wrap: anywhere;
   }
 
   &.success strong {
@@ -1249,6 +1317,8 @@
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 0.85rem;
   color: $stone-400;
+  min-width: 0;
+  overflow-wrap: anywhere;
 
   ul {
     margin: 0.5rem 0 0 0;
@@ -1722,6 +1792,227 @@
 }
 
 @media (max-width: $breakpoint-md) {
+  .settings-panel {
+    min-height: 0;
+  }
+
+  .settings-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .settings-tab {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.6rem 0.7rem;
+    font-size: 0.82rem;
+
+    svg {
+      flex-shrink: 0;
+    }
+  }
+
+  .settings-content {
+    padding-right: 0;
+  }
+
+  .settings-section {
+    gap: 1rem;
+  }
+
+  .settings-section-title {
+    margin-bottom: 0.15rem;
+  }
+
+  .settings-description {
+    margin-bottom: 0.35rem;
+  }
+
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.6rem;
+    padding: 0.85rem 0;
+  }
+
+  .settings-label {
+    min-width: 0;
+  }
+
+  .settings-control {
+    width: 100%;
+    justify-content: flex-start;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .settings-slider {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .settings-value {
+    min-width: 3.25rem;
+    align-self: center;
+  }
+
+  .settings-color-picker {
+    flex-shrink: 0;
+  }
+
+  .settings-color-input {
+    flex: 1 1 7rem;
+    width: auto;
+  }
+
+  .settings-image-upload {
+    align-items: stretch;
+  }
+
+  .settings-upload-btn,
+  .settings-clear-btn,
+  .settings-reset-template-btn,
+  .settings-action-btn,
+  .settings-reset-btn,
+  .summary-toggle-btn,
+  .debug-copy-btn {
+    width: 100%;
+  }
+
+  .settings-preview {
+    margin-top: 0.35rem;
+    padding: 0.75rem;
+  }
+
+  .preview-text {
+    padding: 0.75rem;
+  }
+
+  .regex-section-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+
+  .regex-section-meta {
+    align-self: flex-start;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .regex-rule-item {
+    padding: 0.65rem;
+  }
+
+  .regex-rule-header {
+    align-items: flex-start;
+    gap: 0.55rem;
+  }
+
+  .regex-rule-info {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+  }
+
+  .regex-rule-desc {
+    flex-basis: 100%;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+  }
+
+  .regex-rule-actions {
+    flex-shrink: 0;
+  }
+
+  .regex-rule-body {
+    padding: 0.85rem 0 0;
+  }
+
+  .regex-buttons-group,
+  .summary-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-add-btn,
+  .settings-import-btn {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .summary-subsection {
+    margin-top: 1rem;
+  }
+
+  .settings-hint-inline {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .settings-number-input {
+    width: 100%;
+    text-align: left;
+  }
+
+  .summary-status-header,
+  .summary-result-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .summary-status-badge,
+  .summary-result-badge {
+    align-self: flex-start;
+  }
+
+  .summary-pending-list ul {
+    padding-left: 1rem;
+  }
+
+  .debug-logs-list {
+    max-height: none;
+  }
+
+  .debug-log-header {
+    align-items: flex-start;
+  }
+
+  .debug-log-info {
+    flex-wrap: wrap;
+    gap: 0.45rem 0.65rem;
+  }
+
+  .debug-log-type {
+    width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .debug-log-preview {
+    -webkit-line-clamp: 3;
+  }
+
+  .debug-log-content {
+    max-height: 24rem;
+    padding: 0.65rem;
+  }
+
+  .debug-log-footer {
+    justify-content: stretch;
+  }
+
+  .debug-stats {
+    justify-content: flex-start;
+  }
+
   .variables-browser {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1735,9 +2026,57 @@
   .variables-tree {
     max-height: none;
   }
+
+  .variables-toolbar {
+    align-items: stretch;
+  }
+
+  .variables-toolbar .settings-action-btn {
+    width: auto;
+    flex: 1 1 7rem;
+  }
 }
 
 @media (max-width: 420px) {
+  .settings-tabs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-tab {
+    min-height: 2.6rem;
+  }
+
+  .settings-control {
+    gap: 0.55rem;
+  }
+
+  .settings-color-input {
+    flex-basis: 100%;
+  }
+
+  .settings-image-upload {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .regex-rule-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .regex-rule-actions {
+    align-self: start;
+  }
+
+  .debug-log-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .debug-stats {
+    gap: 0.35rem 0.55rem;
+  }
+
   .variables-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
