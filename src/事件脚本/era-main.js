@@ -19,6 +19,8 @@
     batchCompleteDebutEvents,
     playerJoinsEvent,
     batchEndEvents,
+    ensureFollowupCluesForInProgressEvents,
+    cleanupFollowupCluesForActiveParticipation,
   } = await import('./era-event-operations.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
@@ -155,6 +157,12 @@
       const 最新进行中事件 = updatedVariables?.stat_data?.事件系统?.进行中事件 || {};
       const 最新参与事件 = updatedVariables?.stat_data?.参与事件 || {};
 
+      await ensureFollowupCluesForInProgressEvents(
+        Object.keys(最新进行中事件),
+        eventDefinitions,
+        'check-in-progress',
+      );
+
       // ==================== 批量检查进行中事件 ====================
       debugGroup('⏳ 批量检查进行中事件');
       const 进行中列表 = Object.keys(最新进行中事件);
@@ -269,10 +277,17 @@
   }
 
   // ==================== 处理后续事件线索计数器 ====================
-  async function processFollowupCounters() {
+  async function processFollowupCounters({ decrementCounters = true, reason = 'manual' } = {}) {
     debugGroup('🔢 处理后续事件线索计数器');
 
     try {
+      await cleanupFollowupCluesForActiveParticipation(eventDefinitions, reason);
+
+      if (!decrementCounters) {
+        debugGroupEnd();
+        return;
+      }
+
       const currentVars = await getVariables({ type: 'chat' });
       const followupCounters = currentVars?.stat_data?.后续事件线索计数 || {};
 
@@ -487,7 +502,7 @@
   });
 
   eventOn(tavern_events.MESSAGE_SENT, async () => {
-    await processFollowupCounters();
+    await processFollowupCounters({ decrementCounters: true, reason: 'message-sent' });
     log('📨 检测到消息发送，触发事件检查');
     scheduleCheckEvents('message-sent');
   });
@@ -525,6 +540,7 @@
     }
 
     if (detail?.actions?.apiWrite !== true) {
+      await processFollowupCounters({ decrementCounters: false, reason: 'era-write-done' });
       log('📝 检测到ERA变量更新，触发事件检查');
       scheduleCheckEvents('era-write-done');
     }

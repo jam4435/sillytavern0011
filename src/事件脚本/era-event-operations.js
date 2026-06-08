@@ -367,6 +367,8 @@ export async function initializeEventList(eventDefinitions) {
       await writeDirectInsert(payload, 'initialize-in-progress-events');
       logSuccess(`✅ 已触发 ${应立即触发事件.length} 个事件`);
 
+      await ensureFollowupCluesForInProgressEvents(应立即触发事件, eventDefinitions, 'initialize-in-progress');
+
       debugGroupEnd();
     }
 
@@ -571,6 +573,8 @@ export async function batchStartEvents(eventNames, eventDefinitions) {
     log('🚀 2. 发送 era:deleteByObject 指令 (批量从未发生中删除):', deletePayload);
     await writeDirectDelete(deletePayload, 'batch-start-delete-unstarted');
     log('✅ 步骤2完成: 批量从未发生事件中删除');
+
+    await ensureFollowupCluesForInProgressEvents(eventNames, eventDefinitions, 'batch-start');
 
     // 验证操作后的状态
     const verifyVars = await getVariables({ type: 'chat' });
@@ -860,8 +864,11 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
 
     logSuccess(`批量结算完成 ${eventNames.length} 个事件:`, eventNames);
 
-    // ==================== 生成事件后续 ====================
-    await generateFollowupEvents(eventNames, eventDefinitions);
+    // ==================== 生成事件后续清理计数 ====================
+    await writeFollowupEvents(eventNames, eventDefinitions, {
+      includeCounters: true,
+      reason: 'batch-end',
+    });
 
     // 显示通知（限制数量避免刷屏）
     if (eventNames.length <= 5) {
@@ -878,32 +885,18 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
   debugGroupEnd();
 }
 
-// ==================== 生成事件后续 ====================
-async function generateFollowupEvents(eventNames, eventDefinitions) {
-  debugGroup('🔗 生成事件后续');
-
-  // 初始化后续事件payload
+// ==================== 后续事件线索 ====================
+function buildFollowupPayloads(eventNames, eventDefinitions) {
   const followupPayload = {};
   const followupCountPayload = {};
 
-  // 遍历本次完成的eventNames数组
   for (const eventName of eventNames) {
-    // 检查eventDefinitions[eventName].后续事件是否存在
     if (eventDefinitions[eventName] && eventDefinitions[eventName].后续事件) {
-      // 获取来源事件的简化名，构建key (e.g., `${shortName}的后续`)
       const shortName = getEventShortName(eventName);
       const key = `${shortName}的后续`;
-
-      // 从后续事件对象中提取描述和事件名
       const followupInfo = eventDefinitions[eventName].后续事件;
-
-      // 步骤 1: 处理目标事件名。新世界书事件名带小说名前缀，
-      // 旧后续引用常只写 "第N回..."，这里按来源事件补同小说前缀。
       const targetEventKey = resolveEventReference(eventName, followupInfo.事件名, eventDefinitions);
-
       const description = followupInfo.描述 || '';
-
-      // 在所有事件定义中查找目标事件
       const targetEventData = eventDefinitions[targetEventKey];
 
       if (targetEventData) {
@@ -911,41 +904,119 @@ async function generateFollowupEvents(eventNames, eventDefinitions) {
         const location = targetEventData.事件地点;
         const timeString = formatDate(time);
 
-        // 优化后的字符串拼接格式
         const formattedDescription = `(${timeString}，${location}，似乎还会有事情发生)${description}`;
 
-        // 填充两个payload
         followupPayload[key] = formattedDescription;
-        followupCountPayload[key] = CONFIG.DEFAULT_FOLLOWUP_LIFETIME; // 使用全局常量
+        followupCountPayload[key] = CONFIG.DEFAULT_FOLLOWUP_LIFETIME;
       }
 
       log(`为事件 ${eventName} 生成后续: ${key}`);
     }
   }
 
-  // 循环结束后，如果payload不为空，则发送两次era:insertByObject指令
-  if (Object.keys(followupPayload).length > 0) {
-    // 写入后续事件线索
-    const followupEventPayload = {
-      后续事件线索: followupPayload,
-    };
+  return { followupPayload, followupCountPayload };
+}
+
+async function writeFollowupEvents(eventNames, eventDefinitions, { includeCounters, reason }) {
+  debugGroup(`🔗 生成事件后续: ${reason}`);
+
+  const { followupPayload, followupCountPayload } = buildFollowupPayloads(eventNames, eventDefinitions);
+  if (Object.keys(followupPayload).length === 0) {
+    log('没有需要生成的后续事件');
+    debugGroupEnd();
+    return;
+  }
+
+  const currentVars = await getVariables({ type: 'chat' });
+  const existingClues = currentVars?.stat_data?.后续事件线索 || {};
+  const existingCounters = currentVars?.stat_data?.后续事件线索计数 || {};
+
+  const cluePatch = Object.fromEntries(
+    Object.entries(followupPayload).filter(([key, value]) => existingClues[key] !== value),
+  );
+  if (Object.keys(cluePatch).length > 0) {
+    const followupEventPayload = { 后续事件线索: cluePatch };
 
     log('🚀 发送 era:insertByObject 指令 (写入后续事件线索):', followupEventPayload);
-    await writeDirectInsert(followupEventPayload, 'insert-followup-clues');
-    logSuccess(`✅ 已写入 ${Object.keys(followupPayload).length} 个后续事件线索`);
+    await writeDirectInsert(followupEventPayload, `insert-followup-clues-${reason}`);
+    logSuccess(`✅ 已写入 ${Object.keys(cluePatch).length} 个后续事件线索`);
+  } else {
+    log('后续事件线索无变化，跳过写入');
+  }
 
-    // 写入后续事件线索计数
-    const followupCountEventPayload = {
-      后续事件线索计数: followupCountPayload,
-    };
+  if (!includeCounters) {
+    debugGroupEnd();
+    return;
+  }
+
+  const counterPatch = Object.fromEntries(
+    Object.entries(followupCountPayload).filter(([key, value]) => existingCounters[key] !== value),
+  );
+  if (Object.keys(counterPatch).length > 0) {
+    const followupCountEventPayload = { 后续事件线索计数: counterPatch };
 
     log('🚀 发送 era:insertByObject 指令 (写入后续事件线索计数):', followupCountEventPayload);
-    await writeDirectInsert(followupCountEventPayload, 'insert-followup-counters');
-    logSuccess(`✅ 已写入 ${Object.keys(followupCountPayload).length} 个后续事件线索计数`);
+    await writeDirectInsert(followupCountEventPayload, `insert-followup-counters-${reason}`);
+    logSuccess(`✅ 已写入 ${Object.keys(counterPatch).length} 个后续事件线索计数`);
   } else {
-    log('没有需要生成的后续事件');
+    log('后续事件线索计数无变化，跳过写入');
   }
 
   debugGroupEnd();
+}
+
+export async function ensureFollowupCluesForInProgressEvents(eventNames, eventDefinitions, reason = 'in-progress') {
+  await writeFollowupEvents(eventNames, eventDefinitions, {
+    includeCounters: false,
+    reason,
+  });
+}
+
+export async function cleanupFollowupCluesForActiveParticipation(eventDefinitions, reason = 'manual') {
+  debugGroup(`🧹 清理已参与后续事件线索: ${reason}`);
+
+  const currentVars = await getVariables({ type: 'chat' });
+  const participation = currentVars?.stat_data?.参与事件 || {};
+  const followupClues = currentVars?.stat_data?.后续事件线索 || {};
+  const followupCounters = currentVars?.stat_data?.后续事件线索计数 || {};
+  const participationKeys = new Set(Object.keys(participation));
+  const keysToDelete = new Set();
+
+  if (participationKeys.size === 0 || (Object.keys(followupClues).length === 0 && Object.keys(followupCounters).length === 0)) {
+    debugGroupEnd();
+    return 0;
+  }
+
+  for (const [sourceEventName, eventData] of Object.entries(eventDefinitions)) {
+    const followupInfo = eventData?.后续事件;
+    if (!followupInfo) continue;
+
+    const clueKey = `${getEventShortName(sourceEventName)}的后续`;
+    if (!(clueKey in followupClues) && !(clueKey in followupCounters)) continue;
+
+    const targetEventKey = resolveEventReference(sourceEventName, followupInfo.事件名, eventDefinitions);
+    const targetShortName = getEventShortName(targetEventKey);
+
+    if (participationKeys.has(targetEventKey) || participationKeys.has(targetShortName)) {
+      keysToDelete.add(clueKey);
+    }
+  }
+
+  if (keysToDelete.size === 0) {
+    debugGroupEnd();
+    return 0;
+  }
+
+  const deletePayload = {
+    后续事件线索: Object.fromEntries([...keysToDelete].map(key => [key, {}])),
+    后续事件线索计数: Object.fromEntries([...keysToDelete].map(key => [key, {}])),
+  };
+
+  log('🚀 发送 era:deleteByObject 指令 (清理已参与后续事件线索):', deletePayload);
+  await writeDirectDelete(deletePayload, `delete-active-followups-${reason}`);
+  logSuccess(`✅ 已清理 ${keysToDelete.size} 个已参与后续事件线索`);
+
+  debugGroupEnd();
+  return keysToDelete.size;
 }
 
