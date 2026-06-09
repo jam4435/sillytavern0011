@@ -26,7 +26,7 @@ export function useMessageHandler({
   currentMaintext,
   currentOptions,
 }: UseMessageHandlerOptions) {
-  const handleSendMessage = useCallback(async (message: string): Promise<void> => {
+  const handleSendMessage = useCallback(async (message: string): Promise<string> => {
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     messageLogger.log('🚀 开始发送消息流程');
     messageLogger.log('📝 用户输入:', message);
@@ -152,6 +152,7 @@ export function useMessageHandler({
         messageLogger.log('注意: React 状态更新是异步的，新值将在下次渲染时生效');
 
         dismissToast();
+        return resultText;
 
       } else {
         // ========== 错误处理: AI 回复为空 ==========
@@ -164,6 +165,7 @@ export function useMessageHandler({
 
         showError('生成失败：AI 回复为空，请重试');
         messageLogger.log('已设置错误提示到前端');
+        return '';
       }
     } catch (error) {
       // ========== 异常处理 ==========
@@ -179,6 +181,7 @@ export function useMessageHandler({
       addDebugLog('assistant', `[生成异常]\n错误信息: ${errorMessage}\n\n堆栈:\n${errorStack}`);
 
       showError(`生成失败：${errorMessage}`);
+      return '';
     } finally {
       setIsLoading(false);
       messageLogger.log('');

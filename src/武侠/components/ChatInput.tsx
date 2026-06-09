@@ -3,7 +3,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { uiLogger } from '../utils/logger';
 
 interface ChatInputProps {
-  onSend: (message: string) => void | Promise<void>;
+  onSend: (message: string) => void | Promise<unknown>;
   onRegenerate?: () => void | Promise<void>;
   canRegenerate?: boolean;
   isRegenerating?: boolean;

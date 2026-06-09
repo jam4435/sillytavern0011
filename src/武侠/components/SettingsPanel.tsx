@@ -28,13 +28,31 @@ import {
   type SummaryTriggerResult,
   type BatchSummaryResult,
 } from '../utils/summaryManager';
+import { normalizeDisplayedMessageContent } from '../utils/variableReader';
 import { Icons } from './Icons';
 import { DebugLogEntry } from '../hooks';
 import { uiLogger } from '../utils/logger';
 
-type SettingsTab = 'display' | 'background' | 'regex' | 'summary' | 'variables' | 'debug';
+type SettingsTab = 'display' | 'background' | 'regex' | 'summary' | 'variables' | 'test' | 'debug';
 type VariableStatus = 'idle' | 'success' | 'error';
 type VariablePath = Array<string | number>;
+type AutoTestStatus = 'idle' | 'running' | 'stopping' | 'done' | 'error';
+type AutoTestResultStatus = 'running' | 'success' | 'error';
+
+interface AutoTestResult {
+  id: string;
+  index: number;
+  prompt: string;
+  rawResponse: string;
+  plainResponse: string;
+  startedAt: Date;
+  finishedAt?: Date;
+  status: AutoTestResultStatus;
+  error?: string;
+}
+
+const DEFAULT_AUTO_TEST_PROMPT = '合理地继续推进剧情';
+const AUTO_TEST_MAX_COUNT = 50;
 
 const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
 const ROOT_VARIABLE_PATH_KEY = 'root';
@@ -294,12 +312,61 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
   textarea.remove();
 };
 
+const sleep = (milliseconds: number): Promise<void> =>
+  new Promise(resolve => window.setTimeout(resolve, milliseconds));
+
+const clampAutoTestCount = (value: number): number => {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  return Math.min(AUTO_TEST_MAX_COUNT, Math.max(1, Math.floor(value)));
+};
+
+const createAutoTestExportText = (results: AutoTestResult[], mode: 'plain' | 'full'): string => {
+  const title = mode === 'plain' ? '自动推进测试 - 纯文本回复' : '自动推进测试 - 完整回复';
+  const contentKey = mode === 'plain' ? 'plainResponse' : 'rawResponse';
+
+  return [
+    title,
+    `导出时间: ${new Date().toLocaleString('zh-CN')}`,
+    `记录数量: ${results.length}`,
+    '',
+    ...results.flatMap(result => [
+      `## 第 ${result.index} 轮 [${result.status}]`,
+      `开始时间: ${result.startedAt.toLocaleString('zh-CN')}`,
+      result.finishedAt ? `结束时间: ${result.finishedAt.toLocaleString('zh-CN')}` : '',
+      '',
+      '[发送]',
+      result.prompt,
+      '',
+      mode === 'plain' ? '[纯文本回复]' : '[完整回复]',
+      result.error ? `错误: ${result.error}` : result[contentKey] || '(空)',
+      '',
+    ]),
+  ].filter(Boolean).join('\n');
+};
+
+const downloadTextFile = (filename: string, content: string): void => {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+};
+
 interface SettingsPanelProps {
   currentPresetName: string;
   settings: DisplaySettings;
   onSettingsChange: (settings: DisplaySettings) => void;
   debugLogs?: DebugLogEntry[];
   onClearDebugLogs?: () => void;
+  onTestMessageSend?: (message: string) => Promise<string>;
+  isGenerating?: boolean;
 }
 
 /**
@@ -312,10 +379,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onSettingsChange,
   debugLogs = [],
   onClearDebugLogs,
+  onTestMessageSend,
+  isGenerating = false,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('display');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const autoTestStopRequestedRef = useRef(false);
 
   // 自动总结相关状态
   const [summaryStatus, setSummaryStatus] = useState<SummaryTriggerResult | null>(null);
@@ -334,6 +404,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isVariableDetailOpen, setIsVariableDetailOpen] = useState(false);
   const [variableSearch, setVariableSearch] = useState('');
 
+  // 自动推进测试相关状态
+  const [autoTestPrompt, setAutoTestPrompt] = useState(DEFAULT_AUTO_TEST_PROMPT);
+  const [autoTestCount, setAutoTestCount] = useState(5);
+  const [autoTestDelaySeconds, setAutoTestDelaySeconds] = useState(0.8);
+  const [autoTestStatus, setAutoTestStatus] = useState<AutoTestStatus>('idle');
+  const [autoTestStatusText, setAutoTestStatusText] = useState('');
+  const [autoTestResults, setAutoTestResults] = useState<AutoTestResult[]>([]);
+  const [expandedAutoTestResultId, setExpandedAutoTestResultId] = useState<string | null>(null);
+
   const normalizedVariableSearch = variableSearch.trim().toLowerCase();
   const normalizedCurrentPresetName = currentPresetName.trim();
   const hasCurrentPreset = normalizedCurrentPresetName.length > 0;
@@ -343,6 +422,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       matchesVariableSearch(key, value, normalizedVariableSearch)
     )
     : [];
+  const isAutoTestRunning = autoTestStatus === 'running' || autoTestStatus === 'stopping';
+  const autoTestCompletedCount = autoTestResults.filter(result => result.status === 'success').length;
+  const autoTestFailedCount = autoTestResults.filter(result => result.status === 'error').length;
+  const hasAutoTestResults = autoTestResults.length > 0;
 
   // 更新单个设置项
   const updateSetting = useCallback(<K extends keyof DisplaySettings>(
