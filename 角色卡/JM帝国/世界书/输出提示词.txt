@@ -1,0 +1,60 @@
+<%_
+const statData = getvar('stat_data', { defaults: {} }) || {};
+
+function parseCurrentNames(value) {
+  return String(value || '')
+    .split(/[，,、|/]/)
+    .map(name => name.trim())
+    .filter((name, index, arr) => name && arr.indexOf(name) === index);
+}
+
+const names = parseCurrentNames(_.get(statData, '当前人物', ''));
+
+function resolveCharacterData(name) {
+  const fromCharacterMap = _.get(statData, ['角色数据', name]);
+  if (_.isPlainObject(fromCharacterMap)) return fromCharacterMap;
+
+  const fromRoot = _.get(statData, [name]);
+  if (_.isPlainObject(fromRoot)) return fromRoot;
+
+  return null;
+}
+
+const currentCharacters = {};
+
+for (const name of names) {
+  const source = resolveCharacterData(name);
+  if (!source) continue;
+
+  currentCharacters[name] = {
+    Time: _.get(source, 'Time', ''),
+    Location: _.get(source, 'Location', ''),
+    Affection: _.get(source, 'Affection', ''),
+    Libido: _.get(source, 'Libido', ''),
+    Thoughts: _.get(source, 'Thoughts', ''),
+    RecentSex: _.get(source, 'RecentSex', ''),
+    Modifications: _.get(source, 'ModificationsAndRestraints', _.get(source, 'Modifications', [])),
+    Status: _.get(source, 'Status', {}),
+    Outfit: _.get(source, 'Outfit', {}),
+    BodyDetails: _.get(source, 'BodyDetails', {}),
+  };
+}
+
+let displayNames = '无';
+let displayVariables = '无';
+
+if (Object.keys(currentCharacters).length > 0) {
+  displayNames = Object.keys(currentCharacters).join('，');
+  displayVariables = JSON.stringify(currentCharacters, null, 2);
+}
+
+print(`
+<已有变量女角色>
+${displayNames}
+</已有变量女角色>
+
+<上轮在场女角色变量>
+${displayVariables}
+</上轮在场女角色变量>
+`);
+_%>

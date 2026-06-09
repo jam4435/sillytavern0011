@@ -1,0 +1,1932 @@
+```
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <title>角色状态</title>
+    <style>
+      :root {
+        --bg-color: transparent;
+        --container-bg: #1e1e1e;
+        --text-color: #e0e0e0;
+        --text-secondary-color: #b0b0b0;
+        --accent-color: #6200ea;
+        --accent-light-color: #bb86fc;
+        --border-color: #333333;
+        --red-color: #cf6679;
+        --green-color: #03dac6;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Noto Sans SC', sans-serif;
+        background-color: var(--bg-color);
+      }
+      .jm-state-panel-list {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
+      }
+      .jm-state-panel-list:empty::before {
+        content: '无\003C 当前人物\003E 标签';
+        display: block;
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 16px 20px;
+        box-sizing: border-box;
+        border-radius: 12px;
+        border: 1px solid rgba(207, 102, 121, 0.45);
+        background-color: rgba(0, 0, 0, 0.2);
+        color: #ffd6de;
+        white-space: pre-line;
+        line-height: 1.6;
+      }
+      .status-container,
+      .status-feedback {
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        box-sizing: border-box;
+      }
+      .status-container {
+        background-color: var(--container-bg);
+        color: var(--text-color);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        padding: 24px;
+      }
+      .status-diagnostic {
+        padding: 0;
+        overflow: hidden;
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        background-color: rgba(255, 255, 255, 0.02);
+      }
+      .status-diagnostic.warning {
+        border-color: rgba(207, 102, 121, 0.32);
+      }
+      .status-diagnostic.error {
+        border-color: rgba(207, 102, 121, 0.48);
+      }
+      .status-diagnostic > .header {
+        margin-bottom: 0;
+        padding: 12px 16px;
+        border-bottom: none;
+        list-style: none;
+        cursor: pointer;
+      }
+      .status-diagnostic > .header::-webkit-details-marker {
+        display: none;
+      }
+      .status-diagnostic > .header::marker {
+        content: '';
+      }
+      .status-diagnostic[open] > .header {
+        border-bottom: 1px solid var(--border-color);
+      }
+      .status-diagnostic .header-info {
+        min-width: 0;
+      }
+      .status-diagnostic .char-name-row {
+        gap: 0;
+      }
+      .status-diagnostic .char-name {
+        letter-spacing: 0;
+        font-size: 15px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.92);
+      }
+      .status-diagnostic .diagnostic-toggle {
+        pointer-events: none;
+        width: 26px;
+        height: 26px;
+        margin-left: 12px;
+        background-color: rgba(255, 255, 255, 0.08);
+      }
+      .status-diagnostic .diagnostic-toggle svg {
+        width: 16px;
+        height: 16px;
+        fill: var(--text-secondary-color);
+      }
+      .status-diagnostic[open] .diagnostic-toggle svg {
+        transform: rotate(180deg);
+      }
+      .diagnostic-details {
+        padding: 12px 16px 14px;
+      }
+      .diagnostic-message-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .diagnostic-message {
+        font-size: 13px;
+        line-height: 1.55;
+        color: rgba(255, 255, 255, 0.86);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      .status-feedback {
+        padding: 16px 20px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background-color: rgba(0, 0, 0, 0.2);
+        color: var(--text-color);
+      }
+      .status-feedback strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--accent-light-color);
+      }
+      .status-feedback div {
+        line-height: 1.5;
+      }
+      .status-feedback.warning {
+        border-color: rgba(207, 102, 121, 0.45);
+        color: #ffd6de;
+      }
+      .status-feedback.error {
+        border-color: rgba(207, 102, 121, 0.65);
+        color: var(--red-color);
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid var(--border-color);
+      }
+      .portrait {
+        position: relative;
+        flex-shrink: 0;
+        margin-right: 20px;
+      }
+      .portrait img {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--border-color);
+        cursor: pointer;
+        transition: transform 0.3s;
+      }
+      .portrait img:hover {
+        transform: scale(1.1);
+      }
+      .portrait .portrait-upload-trigger,
+      .portrait .portrait-reset-trigger {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .portrait:hover .portrait-upload-trigger,
+      .portrait:hover .portrait-reset-trigger {
+        opacity: 1;
+      }
+      .portrait-upload-trigger,
+      .portrait-reset-trigger {
+        position: absolute;
+        bottom: 2px;
+        z-index: 2;
+        width: 28px;
+        height: 28px;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border: 1px solid var(--border-color);
+        transition:
+          background-color 0.3s,
+          opacity 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      }
+      .portrait-upload-trigger {
+        right: 2px;
+      }
+      .portrait-reset-trigger {
+        right: 32px;
+        display: none;
+      }
+      .portrait-upload-trigger:hover,
+      .portrait-reset-trigger:hover {
+        background-color: rgba(0, 0, 0, 0.9);
+      }
+      .portrait-upload-trigger svg,
+      .portrait-reset-trigger svg {
+        width: 16px;
+        height: 16px;
+      }
+      .header-info {
+        flex-grow: 1;
+      }
+      .char-name-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .char-name {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--accent-light-color);
+        letter-spacing: 1px;
+      }
+      .inline-editable-value {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .edit-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-secondary-color);
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+      }
+      .edit-trigger:hover {
+        background: rgba(187, 134, 252, 0.16);
+        border-color: rgba(187, 134, 252, 0.32);
+        color: var(--accent-light-color);
+      }
+      .meta-info {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 13px;
+        color: var(--text-secondary-color);
+      }
+      .core-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 25px;
+      }
+      .stat-box,
+      .narrative-block,
+      .details-block {
+        background-color: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+      }
+      .stat-box {
+        padding: 15px;
+        text-align: center;
+      }
+      .stat-label {
+        margin-bottom: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-secondary-color);
+      }
+      .stat-value {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-color);
+      }
+      .stat-value .arrow {
+        margin: 0 5px;
+        font-size: 18px;
+      }
+      .stat-change-reason {
+        margin-top: 5px;
+        font-size: 12px;
+        color: var(--text-secondary-color);
+        font-style: italic;
+      }
+      .green {
+        color: var(--green-color);
+      }
+      .red {
+        color: var(--red-color);
+      }
+      .narrative-block,
+      .details-block {
+        margin-bottom: 25px;
+        padding: 15px;
+      }
+      .narrative-label,
+      .details-header {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--accent-light-color);
+      }
+      .narrative-content {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--text-color);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      .tabs {
+        display: flex;
+        justify-content: space-around;
+        margin-bottom: 20px;
+        border-bottom: 2px solid var(--border-color);
+      }
+      .tab-button {
+        flex: 1;
+        margin-bottom: -2px;
+        padding: 10px 20px;
+        border: none;
+        border-bottom: 3px solid transparent;
+        background: none;
+        color: var(--text-secondary-color);
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+        transition:
+          color 0.3s,
+          border-bottom 0.3s;
+      }
+      .tab-button.active {
+        color: var(--accent-light-color);
+        border-bottom-color: var(--accent-light-color);
+      }
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      .details-list,
+      .modifications-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .details-item {
+        display: flex;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .details-item:last-child {
+        border-bottom: none;
+      }
+      .details-label {
+        flex-basis: 120px;
+        flex-shrink: 0;
+        padding-right: 15px;
+        font-weight: 500;
+        color: var(--text-secondary-color);
+      }
+      .details-value {
+        flex-grow: 1;
+        color: var(--text-color);
+      }
+      .modifications-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .modifications-item {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      .image-link {
+        color: var(--accent-light-color);
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .image-link:hover {
+        color: var(--accent-color);
+      }
+      .gallery-modal {
+        position: fixed;
+        z-index: 1000;
+        inset: 0;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        background-color: rgba(0, 0, 0, 0.8);
+      }
+      .gallery-content {
+        position: relative;
+        max-width: 90vw;
+        max-height: 90vh;
+      }
+      .gallery-image {
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+        margin: auto;
+        cursor: grab;
+        transition: transform 0.2s ease-out;
+      }
+      .gallery-image.dragging {
+        cursor: grabbing;
+      }
+      .gallery-close {
+        position: absolute;
+        top: 15px;
+        right: 35px;
+        z-index: 10;
+        color: #f1f1f1;
+        font-size: 40px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      .gallery-prev,
+      .gallery-next {
+        position: absolute;
+        top: 50%;
+        margin-top: -22px;
+        padding: 16px;
+        color: white;
+        font-size: 20px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: 0.6s ease;
+        user-select: none;
+      }
+      .gallery-next {
+        right: 0;
+      }
+      .gallery-prev:hover,
+      .gallery-next:hover {
+        background-color: rgba(0, 0, 0, 0.8);
+      }
+      .collapsible-section {
+        overflow: hidden;
+        max-height: 2000px;
+        opacity: 1;
+        transition:
+          max-height 0.4s ease-in-out,
+          opacity 0.4s ease-in-out;
+      }
+      .status-container.collapsed .collapsible-section {
+        max-height: 0;
+        opacity: 0;
+      }
+      .collapse-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        margin-left: 15px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.1);
+        cursor: pointer;
+        transition:
+          background-color 0.3s,
+          transform 0.3s;
+      }
+      .collapse-toggle:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+      .collapse-toggle svg {
+        width: 20px;
+        height: 20px;
+        fill: var(--text-secondary-color);
+        transition:
+          transform 0.3s,
+          fill 0.3s;
+      }
+      .status-container.collapsed .collapse-toggle svg {
+        transform: rotate(180deg);
+      }
+      .collapse-toggle:hover svg {
+        fill: var(--text-color);
+      }
+      @media screen and (max-width: 480px) {
+        .status-container,
+        .status-feedback {
+          max-width: 100%;
+          margin: 10px;
+        }
+        .status-container {
+          padding: 16px;
+        }
+        .header {
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+        }
+        .portrait {
+          margin-right: 0;
+          margin-bottom: 15px;
+        }
+        .header-info {
+          width: 100%;
+        }
+        .jm-state-panel .char-name-row {
+          justify-content: center;
+        }
+        .meta-info {
+          flex-direction: column;
+          align-items: center;
+          gap: 5px;
+        }
+        .core-stats {
+          grid-template-columns: 1fr;
+          gap: 15px;
+        }
+        .tab-button {
+          padding: 8px 10px;
+          font-size: 14px;
+          line-height: 1.3;
+          white-space: normal;
+        }
+        .details-item {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+        .details-label {
+          flex-basis: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="jm-state-panel-list">
+      <details class="status-container status-diagnostic warning">
+        <summary class="header">
+          <div class="header-info">
+            <div class="char-name-row">
+              <div class="char-name">无&lt;当前人物&gt; 标签</div>
+            </div>
+          </div>
+          <span class="collapse-toggle diagnostic-toggle" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+          </span>
+        </summary>
+        <div class="diagnostic-details">
+          <div class="diagnostic-message-list">
+            <div class="diagnostic-message">默认需要在最新楼层写入 &lt;当前人物&gt;...&lt;/当前人物&gt; 或 &lt;当前角色&gt;...&lt;/当前角色&gt; 标签。</div>
+            <div class="diagnostic-message">如果你确认标签已存在但这里仍不更新，请检查控制台中的 [变量状态栏] 日志。</div>
+          </div>
+        </div>
+      </details>
+    </div>
+    <script>
+      window.JM_StatusDataManager =
+        window.JM_StatusDataManager ||
+        (() => {
+          let dataPromise = null;
+          async function fetchDataInternal() {
+            const baseUrl = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
+            const imageIndexUrl = `${baseUrl}imageIndex.json`;
+            const synonymsUrl = `${baseUrl}synonyms.json`;
+            const faceIndexUrl = `${baseUrl.replace('/jm/', '/face/')}face_index.json`;
+            const [imageResponse, synonymResponse, faceResponse] = await Promise.all([
+              fetch(imageIndexUrl),
+              fetch(synonymsUrl),
+              fetch(faceIndexUrl),
+            ]);
+            const data = { imageIndex: {}, synonymMap: {}, fallbackAvatars: [], allKeywords: [], keywordRegex: null };
+            if (!imageResponse.ok) throw new Error(`图片索引加载失败: ${imageResponse.status}`);
+            data.imageIndex = await imageResponse.json();
+            if (synonymResponse.ok) {
+              const synonymData = await synonymResponse.json();
+              for (const mainKeyword in synonymData) {
+                synonymData[mainKeyword].forEach(alias => {
+                  data.synonymMap[alias] = mainKeyword;
+                });
+              }
+            }
+            if (faceResponse.ok) {
+              data.fallbackAvatars = await faceResponse.json();
+            }
+            data.allKeywords = [...Object.keys(data.imageIndex), ...Object.keys(data.synonymMap)];
+            if (data.allKeywords.length > 0) {
+              const escapeRegExp = str => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              data.allKeywords.sort((a, b) => b.length - a.length);
+              data.keywordRegex = new RegExp(`(${data.allKeywords.map(escapeRegExp).join('|')})`, 'g');
+            }
+            return data;
+          }
+          return {
+            getData() {
+              if (!dataPromise) dataPromise = fetchDataInternal();
+              return dataPromise;
+            },
+          };
+        })();
+
+      const idbHelper = {
+        db: null,
+        openDB() {
+          if (this.db) return Promise.resolve(this.db);
+          return new Promise((resolve, reject) => {
+            const request = indexedDB.open('JM_UserData', 1);
+            request.onupgradeneeded = event => {
+              const db = event.target.result;
+              if (!db.objectStoreNames.contains('portraits')) db.createObjectStore('portraits', { keyPath: 'id' });
+            };
+            request.onsuccess = event => {
+              this.db = event.target.result;
+              resolve(this.db);
+            };
+            request.onerror = event => reject(new Error(`IndexedDB error: ${event.target.errorCode}`));
+          });
+        },
+        async set(id, value) {
+          const db = await this.openDB();
+          return new Promise((resolve, reject) => {
+            const request = db.transaction(['portraits'], 'readwrite').objectStore('portraits').put({ id, value });
+            request.onsuccess = () => resolve();
+            request.onerror = event => reject(event.target.error);
+          });
+        },
+        async get(id) {
+          const db = await this.openDB();
+          return new Promise((resolve, reject) => {
+            const request = db.transaction(['portraits'], 'readonly').objectStore('portraits').get(id);
+            request.onsuccess = () => resolve(request.result ? request.result.value : undefined);
+            request.onerror = event => reject(event.target.error);
+          });
+        },
+        async delete(id) {
+          const db = await this.openDB();
+          return new Promise((resolve, reject) => {
+            const request = db.transaction(['portraits'], 'readwrite').objectStore('portraits').delete(id);
+            request.onsuccess = () => resolve();
+            request.onerror = event => reject(event.target.error);
+          });
+        },
+      };
+
+      const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
+      const panelStates = new WeakMap();
+      const collapsedStateByName = new Map();
+      const DYNAMIC_CONTENT_CONFIG = {
+        Affection: { label: '好感度' },
+        Libido: { label: '性欲值' },
+        Thoughts: { label: '🧠 内心想法' },
+        RecentSex: { label: '📋 最近性行为' },
+        ModificationsAndRestraints: { label: '身体改造与束具' },
+      };
+      const DYNAMIC_CONTENT_MAP = {
+        Status: {
+          title: '身份与当前状态',
+          icon: '🎖️',
+          labels: { Identity: '身份', Occupation: '职业', Affiliation: '从属', Temperament: '气质', Posture: '姿势' },
+        },
+        Outfit: {
+          title: '服装与内衣',
+          icon: '👗',
+          labels: { Top: '上装', Bottom: '下装', Underwear: '内衣', Footwear: '鞋履' },
+        },
+        BodyDetails: {
+          title: '身体与性器细节',
+          icon: '🩸',
+          labels: {
+            Mouth: '口腔',
+            Breasts: '胸部',
+            WombAndVagina: '子宫与阴道',
+            Anus: '后庭',
+            Hands: '手部',
+            Legs: '腿部',
+            Feet: '足部',
+          },
+        },
+      };
+
+      let root;
+      let imageIndex = {};
+      let synonymMap = {};
+      let allKeywords = [];
+      let keywordRegex = null;
+      let fallbackAvatars = [];
+      let refreshTimer = null;
+      const LOG_PREFIX = '[变量状态栏]';
+      const logInfo = (message, ...details) => console.info(`${LOG_PREFIX} ${message}`, ...details);
+      const logWarn = (message, ...details) => console.warn(`${LOG_PREFIX} ${message}`, ...details);
+      const logError = (message, ...details) => console.error(`${LOG_PREFIX} ${message}`, ...details);
+
+      const safeGet = (obj, path, defaultValue = undefined) => {
+        const keys = Array.isArray(path) ? path : path.split('.');
+        let result = obj;
+        for (const key of keys) {
+          result = result?.[key];
+          if (result === undefined) return defaultValue;
+        }
+        return result;
+      };
+      const uniq = arr => Array.from(new Set(arr));
+      const ensureString = value =>
+        value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value);
+      const ensureObject = value => (_.isPlainObject(value) ? value : {});
+      const escapeHtml = value =>
+        ensureString(value).replace(
+          /[&<>"']/g,
+          char =>
+            ({
+              '&': '&' + 'amp;',
+              '<': '&' + 'lt;',
+              '>': '&' + 'gt;',
+              '"': '&' + 'quot;',
+              "'": '&' + '#39;',
+            })[char],
+        );
+      const NAME_EDIT_TRIGGER_HTML =
+        '<button class="edit-trigger jm-edit-name-trigger" type="button" title="编辑名字">&#9998;</button>';
+      const OCCUPATION_EDIT_TRIGGER_HTML =
+        '<button class="edit-trigger jm-edit-occupation-trigger" type="button" title="编辑职业">&#9998;</button>';
+      const CURRENT_PERSON_TAG = '<' + '当前人物' + '>';
+      const CURRENT_PERSON_CLOSING_TAG = '</' + '当前人物' + '>';
+      const CURRENT_ROLE_TAG = '<' + '当前角色' + '>';
+      const CURRENT_ROLE_CLOSING_TAG = '</' + '当前角色' + '>';
+      const CURRENT_PERSON_TAG_BLOCK = `${CURRENT_PERSON_TAG}...${CURRENT_PERSON_CLOSING_TAG}`;
+      const CURRENT_ROLE_TAG_BLOCK = `${CURRENT_ROLE_TAG}...${CURRENT_ROLE_CLOSING_TAG}`;
+      const CURRENT_TAGS_SHORT = `${CURRENT_PERSON_TAG}/${CURRENT_ROLE_TAG}`;
+      const DISPLAY_TEXT_REPLACEMENTS = [['__DOT__', '.']];
+      function normalizeDisplayValue(value) {
+        if (typeof value === 'string') {
+          return DISPLAY_TEXT_REPLACEMENTS.reduce(
+            (text, [token, replacement]) => text.split(token).join(replacement),
+            value,
+          );
+        }
+        if (Array.isArray(value)) return value.map(item => normalizeDisplayValue(item));
+        if (_.isPlainObject(value)) {
+          return Object.fromEntries(
+            Object.entries(value).map(([key, nestedValue]) => [key, normalizeDisplayValue(nestedValue)]),
+          );
+        }
+        return value;
+      }
+      function getPanelState(panel) {
+        if (!panelStates.has(panel)) {
+          panelStates.set(panel, {
+            currentGalleryImages: [],
+            currentGalleryIndex: 0,
+            currentGalleryBaseUrl: '',
+            portraitClickListener: null,
+          });
+        }
+        return panelStates.get(panel);
+      }
+      function getDeterministicRandomIndex(seed, max) {
+        if (!seed || max === 0) return 0;
+        let hash = 0;
+        for (let i = 0; i < seed.length; i++) {
+          hash = (hash << 5) - hash + seed.charCodeAt(i);
+          hash |= 0;
+        }
+        return Math.abs(hash) % max;
+      }
+      function displayRootError(message, details = '') {
+        if (!root) return;
+        logError(message, details);
+        root.innerHTML = `<div class="status-feedback error"><h3>状态栏错误</h3><p>${escapeHtml(message)}</p><details><summary>详细信息</summary><p>${escapeHtml(details)}</p></details></div>`;
+      }
+      async function fetchData() {
+        try {
+          logInfo('开始加载图片索引。');
+          const sharedData = await window.JM_StatusDataManager.getData();
+          imageIndex = sharedData.imageIndex;
+          synonymMap = sharedData.synonymMap;
+          fallbackAvatars = sharedData.fallbackAvatars;
+          allKeywords = sharedData.allKeywords;
+          keywordRegex = sharedData.keywordRegex;
+          logInfo(`图片索引加载完成：关键词 ${allKeywords.length} 个，默认头像 ${fallbackAvatars.length} 个。`);
+          return true;
+        } catch (error) {
+          logWarn('图片索引加载失败，图片相关功能将退化。', error);
+          imageIndex = {};
+          synonymMap = {};
+          fallbackAvatars = [];
+          allKeywords = [];
+          keywordRegex = null;
+          return false;
+        }
+      }
+      function splitCharacterNames(rawText) {
+        return uniq(
+          String(rawText ?? '')
+            .split(/[，,、|/]/)
+            .map(name => name.trim())
+            .filter(Boolean),
+        );
+      }
+      function normalizeListField(value) {
+        if (Array.isArray(value)) {
+          return uniq(value.flatMap(item => normalizeListField(item)).filter(Boolean));
+        }
+        if (value === undefined || value === null) return [];
+        const text = ensureString(value).trim();
+        if (!text) return [];
+        return uniq(
+          text
+            .split(/[|｜\r\n]+/)
+            .map(item => item.trim())
+            .filter(Boolean),
+        );
+      }
+      function hasRenderableValue(value) {
+        if (Array.isArray(value)) return normalizeListField(value).length > 0;
+        if (_.isPlainObject(value)) return Object.values(value).some(item => hasRenderableValue(item));
+        if (value === undefined || value === null) return false;
+        return ensureString(value).trim() !== '';
+      }
+      function loadCurrentCharacterNames() {
+        try {
+          const latestMessage = getChatMessages(-1)?.[0]?.message;
+          if (latestMessage === undefined || latestMessage === null) {
+            logWarn('未读取到最新楼层，显示“无当前角色”。');
+            return {
+              code: 'missing_latest_message',
+              names: [],
+              reason: '未读取到最新楼层。',
+              details: ['请确认聊天记录存在，或检查酒馆助手消息接口是否正常。'],
+            };
+          }
+          if (typeof latestMessage !== 'string') {
+            logWarn('最新楼层内容不是字符串，显示“无当前角色”。', latestMessage);
+            return {
+              code: 'invalid_latest_message',
+              names: [],
+              reason: '最新楼层内容不是字符串。',
+              details: ['请检查当前聊天记录是否异常。'],
+            };
+          }
+          const match = latestMessage.match(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/);
+          if (!match) {
+            logWarn(`最新楼层未找到 ${CURRENT_TAGS_SHORT} 标签，显示“无当前角色”。`);
+            return {
+              code: 'missing_tag',
+              names: [],
+              reason: `最新楼层没有可用的 ${CURRENT_PERSON_TAG_BLOCK} 或 ${CURRENT_ROLE_TAG_BLOCK} 标签。`,
+              details: [
+                '本诊断条能显示，说明状态栏 HTML 已运行；若控制台完全没有初始化日志，请检查变量状态栏正则是否启用、占位符是否存在。',
+              ],
+            };
+          }
+          const names = splitCharacterNames(match[2]);
+          if (names.length === 0) {
+            logWarn('当前角色标签为空，显示“无当前角色”。');
+            return {
+              code: 'empty_tag',
+              tagName: match[1],
+              names: [],
+              reason:
+                match[1] === '人物'
+                  ? `存在${CURRENT_PERSON_TAG} 标签，里面为空。`
+                  : `存在${CURRENT_ROLE_TAG} 标签，里面为空。`,
+              details: [],
+            };
+          }
+          logInfo(`读取当前角色：${names.join('、')}。`);
+          return { code: 'ok', names, reason: '', details: [] };
+        } catch (error) {
+          logError('读取最新楼层失败，显示“无当前角色”。', error);
+          return {
+            code: 'error',
+            names: [],
+            reason: '读取最新楼层失败。',
+            details: [error?.message || String(error)],
+          };
+        }
+      }
+      function loadStatData() {
+        try {
+          const chatVariables = ensureObject(getVariables({ type: 'chat' }));
+          const rawStatData = _.get(chatVariables, 'stat_data', undefined);
+          if (rawStatData === undefined) {
+            logWarn('chat 变量中没有 stat_data，当前角色变量无法读取。');
+            return { statData: {}, status: 'missing', message: 'chat 变量中没有 stat_data。' };
+          }
+          if (!_.isPlainObject(rawStatData)) {
+            logWarn('chat.stat_data 不是对象，已按空变量处理。', rawStatData);
+            return { statData: {}, status: 'invalid', message: 'chat.stat_data 不是对象，已按空变量处理。' };
+          }
+          const statKeys = Object.keys(rawStatData);
+          const characterData = ensureObject(safeGet(rawStatData, '角色数据', {}));
+          if (statKeys.length === 0) {
+            logWarn('chat.stat_data 为空，当前角色变量无法读取。');
+            return { statData: rawStatData, status: 'empty', message: 'chat.stat_data 为空。' };
+          }
+          logInfo(
+            `已读取 chat.stat_data：顶层 ${statKeys.length} 项，角色数据 ${Object.keys(characterData).length} 项。`,
+          );
+          return { statData: rawStatData, status: 'ok', message: '' };
+        } catch (error) {
+          logError('读取 chat 变量失败，当前角色变量无法读取。', error);
+          return {
+            statData: {},
+            status: 'error',
+            message: `读取 chat 变量失败：${error?.message || String(error)}`,
+          };
+        }
+      }
+      function resolveCharacterSource(name, statData) {
+        const fromCharacterMap = safeGet(statData, ['角色数据', name], undefined);
+        if (_.isPlainObject(fromCharacterMap)) return fromCharacterMap;
+        const fromRoot = safeGet(statData, name, undefined);
+        return _.isPlainObject(fromRoot) ? fromRoot : null;
+      }
+      function buildPanelDataFromCharacter(name, statData) {
+        const source = resolveCharacterSource(name, statData);
+        if (!source) return null;
+        const normalizedSource = normalizeDisplayValue(source);
+        if (!hasRenderableValue(normalizedSource)) return null;
+        const mergedModifications = uniq([
+          ...normalizeListField(safeGet(normalizedSource, 'ModificationsAndRestraints', [])),
+          ...normalizeListField(safeGet(normalizedSource, 'Modifications', [])),
+        ]);
+        return {
+          ..._.omit(normalizedSource, ['Modifications', 'ModificationsAndRestraints']),
+          RawName: name,
+          Name: normalizeDisplayValue(name),
+          Location: ensureString(safeGet(normalizedSource, 'Location', '')),
+          Time: ensureString(safeGet(normalizedSource, 'Time', '')),
+          Affection: ensureString(safeGet(normalizedSource, 'Affection', '')),
+          Libido: ensureString(safeGet(normalizedSource, 'Libido', '')),
+          Thoughts: ensureString(safeGet(normalizedSource, 'Thoughts', '')),
+          RecentSex: ensureString(safeGet(normalizedSource, 'RecentSex', '')),
+          ModificationsAndRestraints: mergedModifications,
+          Status: ensureObject(safeGet(normalizedSource, 'Status', {})),
+          Outfit: ensureObject(safeGet(normalizedSource, 'Outfit', {})),
+          BodyDetails: ensureObject(safeGet(normalizedSource, 'BodyDetails', {})),
+        };
+      }
+      function findImagesByKeyword(textToSearch) {
+        if (!textToSearch || typeof textToSearch !== 'string') return [];
+        const preliminaryMatches = allKeywords.filter(keyword => textToSearch.includes(keyword));
+        const preciseMatches = preliminaryMatches.filter(
+          shortMatch =>
+            !preliminaryMatches.some(
+              longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch),
+            ),
+        );
+        const mainKeywordMatches = preciseMatches
+          .map(match => ({ keyword: synonymMap[match] || match, index: textToSearch.indexOf(match) }))
+          .sort((a, b) => a.index - b.index);
+        let foundImages = [];
+        mainKeywordMatches.forEach(match => {
+          const imageList = imageIndex[match.keyword];
+          if (Array.isArray(imageList)) foundImages = foundImages.concat(imageList.filter(img => img !== '非头像.abc'));
+        });
+        return uniq(foundImages);
+      }
+      function linkifyAllText(panel) {
+        if (!keywordRegex) return;
+        panel.querySelectorAll('.details-value, .narrative-content').forEach(el => {
+          if (el.querySelector('a.image-link') || !el.textContent) return;
+          const originalText = el.textContent;
+          keywordRegex.lastIndex = 0;
+          if (!keywordRegex.test(originalText)) return;
+          keywordRegex.lastIndex = 0;
+          el.innerHTML = originalText.replace(keywordRegex, match =>
+            imageIndex[synonymMap[match] || match]
+              ? `<a href="#" class="image-link" data-keyword="${match}">${match}</a>`
+              : match,
+          );
+        });
+      }
+      function parseStat(statValue) {
+        if (statValue === null || statValue === undefined) return null;
+        const normalizedValue = String(statValue)
+          .trim()
+          .replace(/（/g, '(')
+          .replace(/）/g, ')')
+          .replace(/[－−—–]/g, '-');
+        if (!normalizedValue) return null;
+        const rangeMatch = normalizedValue.match(
+          /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
+        );
+        if (rangeMatch) {
+          return {
+            mode: 'range',
+            from: rangeMatch[1],
+            to: rangeMatch[2],
+            reason: rangeMatch[3]?.trim() ?? '',
+          };
+        }
+        const singleMatch = normalizedValue.match(/^([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/);
+        if (singleMatch) {
+          return {
+            mode: 'single',
+            value: singleMatch[1],
+            reason: singleMatch[2]?.trim() ?? '',
+          };
+        }
+        return null;
+      }
+      function isStatField(key) {
+        return key === 'Affection' || key === 'Libido';
+      }
+      const renderStat = (label, value) => {
+        const parsed = parseStat(value);
+        const valueHtml = parsed
+          ? parsed.mode === 'range'
+            ? `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`
+            : `<div><span class="${Number(parsed.value) < 0 ? 'red' : 'green'}">${parsed.value}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`
+          : String(value);
+        return `<div class="stat-box"><div class="stat-label">${label}</div><div class="stat-value">${valueHtml}</div></div>`;
+      };
+      const renderNarrative = (label, value) =>
+        `<div class="narrative-block"><span class="narrative-label">${label}</span><p class="narrative-content">${String(value)}</p></div>`;
+      function renderList(label, items) {
+        if (!Array.isArray(items) || items.length === 0) return '';
+        const itemsHtml = items
+          .map(
+            item =>
+              `<li class="modifications-item"><span class="details-value" data-keyword="${item}">${item}</span></li>`,
+          )
+          .join('');
+        return `<div class="details-block"><div class="details-header">${label}</div><ul class="modifications-list">${itemsHtml}</ul></div>`;
+      }
+      function replaceDelimitedCharacterName(content, oldName, newName) {
+        const parts = String(content ?? '').split(/([，,、|/])/);
+        let replaced = false;
+        for (let index = 0; index < parts.length; index += 2) {
+          const originalPart = parts[index];
+          const trimmedPart = originalPart.trim();
+          if (trimmedPart !== oldName) continue;
+          parts[index] = originalPart.replace(trimmedPart, newName);
+          replaced = true;
+        }
+        return { content: parts.join(''), replaced };
+      }
+      function replaceCurrentCharacterNameInMessage(message, oldName, newName) {
+        let replaced = false;
+        const updatedMessage = String(message ?? '').replace(
+          /<当前(人物|角色)>([\s\S]*?)<\/当前\1>/g,
+          (full, tagName, content) => {
+            const result = replaceDelimitedCharacterName(content, oldName, newName);
+            if (!result.replaced) return full;
+            replaced = true;
+            return `<当前${tagName}>${result.content}</当前${tagName}>`;
+          },
+        );
+        return { message: updatedMessage, replaced };
+      }
+      function renameKeyInObject(target, oldKey, newKey, newValue) {
+        const source = ensureObject(target);
+        const nextObject = {};
+        let found = false;
+        if (oldKey !== newKey && Object.prototype.hasOwnProperty.call(source, newKey)) {
+          throw new Error(`变量中已存在人物“${newKey}”。`);
+        }
+        Object.keys(source).forEach(key => {
+          if (key === oldKey) {
+            nextObject[newKey] = newValue;
+            found = true;
+            return;
+          }
+          nextObject[key] = source[key];
+        });
+        if (!found) throw new Error(`未找到人物“${oldKey}”对应的变量。`);
+        return nextObject;
+      }
+      function isCharacterLikeEntry(value) {
+        if (!_.isPlainObject(value)) return false;
+        return [
+          'Status',
+          'Outfit',
+          'BodyDetails',
+          'Location',
+          'Time',
+          'Affection',
+          'Libido',
+          'Thoughts',
+          'RecentSex',
+          'Modifications',
+          'ModificationsAndRestraints',
+        ].some(key => Object.prototype.hasOwnProperty.call(value, key));
+      }
+      function removeLegacyRootCharacterDuplicates(statData, duplicateCandidates, preservedKeys = []) {
+        const nextStatData = ensureObject(statData);
+        const keepKeys = new Set(['角色数据', ...preservedKeys]);
+        Object.keys(nextStatData).forEach(key => {
+          if (keepKeys.has(key)) return;
+          const value = nextStatData[key];
+          if (!isCharacterLikeEntry(value)) return;
+          if (duplicateCandidates.some(candidate => _.isEqual(value, candidate))) {
+            delete nextStatData[key];
+          }
+        });
+      }
+      function buildUpdatedStatData(statData, oldName, newName, newOccupation) {
+        const nextStatData = _.cloneDeep(ensureObject(statData));
+        if (_.has(nextStatData, ['角色数据', oldName])) {
+          const roleMap = ensureObject(_.get(nextStatData, '角色数据', {}));
+          const originalCharacter = _.cloneDeep(ensureObject(roleMap[oldName]));
+          const updatedCharacter = _.cloneDeep(originalCharacter);
+          updatedCharacter.Status = ensureObject(updatedCharacter.Status);
+          updatedCharacter.Status.Occupation = newOccupation;
+          nextStatData.角色数据 = renameKeyInObject(roleMap, oldName, newName, updatedCharacter);
+          removeLegacyRootCharacterDuplicates(nextStatData, [originalCharacter, updatedCharacter], [newName]);
+          return nextStatData;
+        }
+        if (_.has(nextStatData, oldName)) {
+          const updatedCharacter = _.cloneDeep(ensureObject(nextStatData[oldName]));
+          updatedCharacter.Status = ensureObject(updatedCharacter.Status);
+          updatedCharacter.Status.Occupation = newOccupation;
+          return renameKeyInObject(nextStatData, oldName, newName, updatedCharacter);
+        }
+        throw new Error(`未找到人物“${oldName}”对应的变量。`);
+      }
+      function getLatestChatMessage() {
+        try {
+          return getChatMessages(-1)?.[0] || null;
+        } catch (error) {
+          logWarn('读取最新楼层失败。', error);
+          return null;
+        }
+      }
+      async function migratePortraitStorage(oldName, newName) {
+        if (!oldName || !newName || oldName === newName) return;
+        const oldKey = `jm_user_portrait_${oldName}`;
+        const newKey = `jm_user_portrait_${newName}`;
+        const existingPortrait = await idbHelper.get(oldKey);
+        if (!existingPortrait) return;
+        await idbHelper.set(newKey, existingPortrait);
+        await idbHelper.delete(oldKey);
+      }
+      async function refreshEditedPanel(panel, data) {
+        updatePanel(panel, data);
+        setupEventListeners(panel, data);
+        try {
+          await updatePortrait(panel, data);
+        } catch (error) {
+          logError(`${data.Name} 头像更新失败。`, error);
+        }
+        linkifyAllText(panel);
+      }
+      async function syncCurrentCharacterNameInLatestMessage(oldName, newName) {
+        const latestMessage = getLatestChatMessage();
+        if (!latestMessage) {
+          return { synced: false, reason: `未找到最新楼层，无法同步 ${CURRENT_TAGS_SHORT} 标签。` };
+        }
+        const originalText = ensureString(latestMessage.message);
+        const messageReplacement = replaceCurrentCharacterNameInMessage(originalText, oldName, newName);
+        if (!messageReplacement.replaced) {
+          return { synced: false, reason: `未在最新楼层的 ${CURRENT_TAGS_SHORT} 标签中找到当前名字。` };
+        }
+        if (messageReplacement.message !== originalText) {
+          await setChatMessages([{ message_id: latestMessage.message_id, message: messageReplacement.message }], {
+            refresh: 'affected',
+          });
+        }
+        return { synced: true };
+      }
+      async function updateCharacterInfo(
+        panel,
+        data,
+        { newName, newRawName = newName, newOccupation, syncLatestMessage = false },
+      ) {
+        const oldName = ensureString(data.Name).trim();
+        const oldRawName = ensureString(data.RawName || data.Name).trim();
+        const oldOccupation = ensureString(safeGet(data, 'Status.Occupation', '')).trim();
+        const hasDisplayNameChanged = newName !== oldName;
+        const hasRawNameChanged = newRawName !== oldRawName;
+        if (!hasDisplayNameChanged && !hasRawNameChanged && newOccupation === oldOccupation) return;
+        const originalVariables = _.cloneDeep(getVariables({ type: 'chat' }));
+        buildUpdatedStatData(
+          ensureObject(_.get(originalVariables, 'stat_data', {})),
+          oldRawName,
+          newRawName,
+          newOccupation,
+        );
+        try {
+          updateVariablesWith(
+            variables => {
+              const nextVariables = _.cloneDeep(ensureObject(variables));
+              nextVariables.stat_data = buildUpdatedStatData(
+                ensureObject(_.get(nextVariables, 'stat_data', {})),
+                oldRawName,
+                newRawName,
+                newOccupation,
+              );
+              return nextVariables;
+            },
+            { type: 'chat' },
+          );
+        } catch (error) {
+          try {
+            replaceVariables(originalVariables, { type: 'chat' });
+          } catch (rollbackError) {
+            logError('回滚变量失败。', rollbackError);
+          }
+          throw error;
+        }
+        let syncWarning = '';
+        if (syncLatestMessage && hasDisplayNameChanged) {
+          try {
+            const syncResult = await syncCurrentCharacterNameInLatestMessage(oldName, newName);
+            if (!syncResult.synced) syncWarning = syncResult.reason || '同步最新楼层失败。';
+          } catch (error) {
+            syncWarning = error?.message || '同步最新楼层失败。';
+          }
+        }
+        if (hasDisplayNameChanged) {
+          const oldStateKey = `character:${oldName}`;
+          const newStateKey = `character:${newName}`;
+          const collapsedState = collapsedStateByName.get(oldStateKey);
+          if (collapsedState !== undefined) {
+            collapsedStateByName.set(newStateKey, collapsedState);
+            collapsedStateByName.delete(oldStateKey);
+          }
+          try {
+            await migratePortraitStorage(oldName, newName);
+          } catch (error) {
+            logError('迁移头像缓存失败。', error);
+          }
+        }
+        data.RawName = newRawName;
+        data.Name = newName;
+        data.Status = ensureObject(data.Status);
+        data.Status.Occupation = newOccupation;
+        await refreshEditedPanel(panel, data);
+        if (!syncWarning) {
+          scheduleRefresh();
+          return;
+        }
+        logWarn(syncWarning);
+        alert(`人物变量已修改，但最新楼层文本未同步：${syncWarning}`);
+      }
+      async function editCharacterName(panel, data) {
+        const oldName = ensureString(data.Name).trim();
+        const oldOccupation = ensureString(safeGet(data, 'Status.Occupation', '')).trim();
+        const promptedName = window.prompt('修改名字', oldName);
+        if (promptedName === null) return;
+        const newName = normalizeDisplayValue(promptedName.trim());
+        if (!newName) {
+          alert('名字不能为空。');
+          return;
+        }
+        await updateCharacterInfo(panel, data, {
+          newName,
+          newRawName: newName,
+          newOccupation: oldOccupation,
+          syncLatestMessage: true,
+        });
+      }
+      async function editCharacterOccupation(panel, data) {
+        const oldName = ensureString(data.Name).trim();
+        const oldRawName = ensureString(data.RawName || data.Name).trim();
+        const oldOccupation = ensureString(safeGet(data, 'Status.Occupation', '')).trim();
+        const promptedOccupation = window.prompt('修改职业', oldOccupation);
+        if (promptedOccupation === null) return;
+        const newOccupation = normalizeDisplayValue(promptedOccupation.trim());
+        await updateCharacterInfo(panel, data, { newName: oldName, newRawName: oldRawName, newOccupation });
+      }
+      function generateDynamicTabsAndContent(panel, data) {
+        const excludedKeys = new Set([
+          'RawName',
+          'Name',
+          'Location',
+          'Time',
+          'Affection',
+          'Libido',
+          'Thoughts',
+          'RecentSex',
+          'ModificationsAndRestraints',
+          'Modifications',
+        ]);
+        const panelKey = panel.dataset.panelKey || '0';
+        let tabsHtml = '<div class="tabs">';
+        let contentsHtml = '';
+        let tabIndex = 0;
+        for (const key in data) {
+          if (!excludedKeys.has(key) && _.isPlainObject(data[key])) {
+            const tabId = `dynamic-tab-${panelKey}-${tabIndex}`;
+            const isActive = tabIndex === 0 ? 'active' : '';
+            const tabInfo = DYNAMIC_CONTENT_MAP[key] || { title: key, icon: '📋', labels: {} };
+            tabsHtml += `<button class="tab-button ${isActive}" data-tab="${tabId}">${tabInfo.icon} ${tabInfo.title}</button>`;
+            contentsHtml += `<div id="${tabId}" class="tab-content ${isActive}"><ul class="details-list">`;
+            for (const subKey in data[key]) {
+              const label = tabInfo.labels[subKey] || subKey;
+              const valueHtml =
+                key === 'Status' && subKey === 'Occupation'
+                  ? `<span class="inline-editable-value"><span class="details-value">${data[key][subKey]}</span>${OCCUPATION_EDIT_TRIGGER_HTML}</span>`
+                  : `<span class="details-value">${data[key][subKey]}</span>`;
+              contentsHtml += `<li class="details-item"><span class="details-label">${label}</span>${valueHtml}</li>`;
+            }
+            contentsHtml += '</ul></div>';
+            tabIndex++;
+          }
+        }
+        tabsHtml += '</div>';
+        return tabIndex === 0 ? { tabsHtml: '', contentsHtml: '' } : { tabsHtml, contentsHtml };
+      }
+      function renderDynamicContent(panel, data) {
+        const container = panel.querySelector('.jm-dynamic-content-area');
+        if (!container) return;
+        const headerFields = new Set(['RawName', 'Name', 'Location', 'Time']);
+        const itemsToRender = Object.keys(data)
+          .filter(key => (!headerFields.has(key) && typeof data[key] !== 'object') || Array.isArray(data[key]))
+          .map(key => ({
+            key,
+            label: DYNAMIC_CONTENT_CONFIG[key] ? DYNAMIC_CONTENT_CONFIG[key].label : key,
+            value: data[key],
+          }));
+        const statItems = [];
+        let dynamicHtml = '';
+        itemsToRender.forEach(item => {
+          let type = 'narrative';
+          if (isStatField(item.key)) type = 'stat';
+          else if (Array.isArray(item.value)) type = 'list';
+          if (type === 'stat') {
+            statItems.push(item);
+            return;
+          }
+          if (statItems.length > 0) {
+            dynamicHtml += `<div class="core-stats">${statItems.map(statItem => renderStat(statItem.label, statItem.value)).join('')}</div>`;
+            statItems.length = 0;
+          }
+          dynamicHtml += type === 'list' ? renderList(item.label, item.value) : renderNarrative(item.label, item.value);
+        });
+        if (statItems.length > 0) {
+          dynamicHtml += `<div class="core-stats">${statItems.map(statItem => renderStat(statItem.label, statItem.value)).join('')}</div>`;
+        }
+        container.innerHTML = dynamicHtml;
+      }
+      function updatePanel(panel, data) {
+        panel.dataset.characterName = data.Name;
+        panel.dataset.panelStateKey = `character:${data.Name}`;
+        panel.innerHTML = `
+          <div class="header">
+            <div class="portrait">
+              <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="角色肖像" data-field="portrait" />
+              <div class="portrait-upload-trigger" title="上传新头像"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></div>
+              <div class="portrait-reset-trigger" title="重置为默认头像"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg></div>
+              <input type="file" class="jm-portrait-upload" style="display:none" accept="image/*" />
+            </div>
+            <div class="header-info">
+              <div class="char-name-row">
+                <div class="char-name" data-field="name"></div>
+                ${NAME_EDIT_TRIGGER_HTML}
+              </div>
+              <div class="meta-info">
+                <span class="location">📍 <span data-field="location"></span></span>
+                <span class="timestamp">🕰️ <span data-field="time"></span></span>
+              </div>
+            </div>
+            <div class="collapse-toggle" title="展开/折叠"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg></div>
+          </div>
+          <div class="collapsible-section">
+            <div class="jm-dynamic-content-area"></div>
+            <div class="tabs-container"></div>
+            <div class="tab-content-container"></div>
+          </div>
+          <div class="jm-image-gallery gallery-modal">
+            <div class="gallery-content">
+              <span class="gallery-close">&times;</span>
+              <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="gallery-image" />
+              <a class="gallery-prev">&#10094;</a>
+              <a class="gallery-next">&#10095;</a>
+            </div>
+          </div>`;
+        const fieldMap = { name: 'Name', location: 'Location', time: 'Time' };
+        panel.querySelectorAll('[data-field]').forEach(el => {
+          const fieldName = el.getAttribute('data-field') || '';
+          const dataKey = fieldMap[fieldName];
+          if (!dataKey) return;
+          el.textContent = data[dataKey] || '';
+        });
+        renderDynamicContent(panel, data);
+        const { tabsHtml, contentsHtml } = generateDynamicTabsAndContent(panel, data);
+        panel.querySelector('.tabs-container').innerHTML = tabsHtml;
+        panel.querySelector('.tab-content-container').innerHTML = contentsHtml;
+        const stateKey = panel.dataset.panelStateKey || `character:${data.Name}`;
+        const shouldCollapse = isPanelCollapsed(stateKey, true);
+        panel.classList.toggle('collapsed', shouldCollapse);
+      }
+      async function updatePortrait(panel, data) {
+        const portraitImg = panel.querySelector('[data-field="portrait"]');
+        if (!portraitImg) return;
+        const state = getPanelState(panel);
+        if (state.portraitClickListener) {
+          portraitImg.removeEventListener('click', state.portraitClickListener);
+          state.portraitClickListener = null;
+        }
+        const charName = safeGet(data, 'Name', '');
+        const storageKey = `jm_user_portrait_${charName}`;
+        try {
+          const savedPortraitBlob = await idbHelper.get(storageKey);
+          if (savedPortraitBlob) {
+            const objectURL = URL.createObjectURL(savedPortraitBlob);
+            portraitImg.src = objectURL;
+            portraitImg.onload = () => URL.revokeObjectURL(portraitImg.src);
+            state.portraitClickListener = () => openGallery(panel, [URL.createObjectURL(savedPortraitBlob)], 0, '');
+            portraitImg.addEventListener('click', state.portraitClickListener);
+            return;
+          }
+        } catch (error) {
+          logError('从 IndexedDB 加载头像失败。', error);
+        }
+        const textToSearch = `${safeGet(data, 'Status.Occupation', '')} ${safeGet(data, 'Name', '')}`.trim();
+        let matchedImages = [];
+        if (textToSearch) {
+          let potentialKeywords = allKeywords.filter(keyword => textToSearch.includes(keyword));
+          potentialKeywords = potentialKeywords.filter(
+            shortMatch =>
+              !potentialKeywords.some(
+                longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch),
+              ),
+          );
+          const portraitKeywords = potentialKeywords.filter(keyword => {
+            const mainKeyword = synonymMap[keyword] || keyword;
+            const imageList = imageIndex[mainKeyword] || [];
+            return Array.isArray(imageList) && !imageList.includes('非头像.abc');
+          });
+          const conceptKeywords = potentialKeywords.filter(keyword => {
+            const mainKeyword = synonymMap[keyword] || keyword;
+            const imageList = imageIndex[mainKeyword] || [];
+            return Array.isArray(imageList) && imageList.includes('非头像.abc');
+          });
+          const keywordsToUse = portraitKeywords.length > 0 ? portraitKeywords : conceptKeywords;
+          keywordsToUse.sort((a, b) => textToSearch.indexOf(a) - textToSearch.indexOf(b));
+          keywordsToUse.forEach(keyword => {
+            const mainKeyword = synonymMap[keyword] || keyword;
+            const imageList = imageIndex[mainKeyword] || [];
+            if (Array.isArray(imageList))
+              matchedImages = matchedImages.concat(imageList.filter(img => img !== '非头像.abc'));
+          });
+          matchedImages = uniq(matchedImages);
+        }
+        if (matchedImages.length > 0) {
+          portraitImg.src = GITHUB_BASE_URL + matchedImages[0];
+          state.portraitClickListener = () => openGallery(panel, matchedImages, 0, GITHUB_BASE_URL);
+          portraitImg.addEventListener('click', state.portraitClickListener);
+          return;
+        }
+        if (fallbackAvatars.length > 0) {
+          const faceBaseUrl = GITHUB_BASE_URL.replace('/jm/', '/face/');
+          const fallbackAvatar =
+            fallbackAvatars[getDeterministicRandomIndex(charName || 'default', fallbackAvatars.length)];
+          portraitImg.src = faceBaseUrl + fallbackAvatar;
+          state.portraitClickListener = () => openGallery(panel, [fallbackAvatar], 0, faceBaseUrl);
+          portraitImg.addEventListener('click', state.portraitClickListener);
+          return;
+        }
+        portraitImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      }
+      function openGallery(panel, images, startIndex, baseUrl) {
+        const gallery = panel.querySelector('.jm-image-gallery');
+        if (!gallery) return;
+        const state = getPanelState(panel);
+        state.currentGalleryImages = images;
+        state.currentGalleryIndex = startIndex;
+        state.currentGalleryBaseUrl = baseUrl;
+        updateGalleryImage(panel);
+        gallery.style.display = 'flex';
+        gallery.querySelector('.gallery-prev').style.display = images.length <= 1 ? 'none' : 'block';
+        gallery.querySelector('.gallery-next').style.display = images.length <= 1 ? 'none' : 'block';
+      }
+      function updateGalleryImage(panel) {
+        const state = getPanelState(panel);
+        const galleryImage = panel.querySelector('.gallery-image');
+        if (!galleryImage || state.currentGalleryImages.length === 0) return;
+        galleryImage.src = state.currentGalleryBaseUrl + state.currentGalleryImages[state.currentGalleryIndex];
+        galleryImage.style.transform = 'scale(1) translate(0, 0)';
+      }
+      function setupPortraitUpload(panel, data) {
+        const uploadTrigger = panel.querySelector('.portrait-upload-trigger');
+        const resetTrigger = panel.querySelector('.portrait-reset-trigger');
+        const uploadInput = panel.querySelector('.jm-portrait-upload');
+        const portraitImg = panel.querySelector('[data-field="portrait"]');
+        if (!uploadTrigger || !resetTrigger || !uploadInput || !portraitImg) return;
+        const storageKey = `jm_user_portrait_${safeGet(data, 'Name', '')}`;
+        (async () => {
+          try {
+            resetTrigger.style.display = (await idbHelper.get(storageKey)) ? 'flex' : 'none';
+          } catch {
+            resetTrigger.style.display = 'none';
+          }
+        })();
+        uploadTrigger.onclick = () => uploadInput.click();
+        resetTrigger.onclick = async () => {
+          try {
+            await idbHelper.delete(storageKey);
+            resetTrigger.style.display = 'none';
+            portraitImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+            await updatePortrait(panel, data);
+          } catch (error) {
+            alert(`无法重置头像: ${error.name}: ${error.message}`);
+          }
+        };
+        uploadInput.onchange = event => {
+          const file = event.target.files?.[0];
+          if (!file) {
+            uploadInput.value = '';
+            return;
+          }
+          if (file.size > 1000 * 1024) {
+            alert('图片文件太大 (最大 1000KB)。请选择一张小一点的图片，或使用图片压缩工具。');
+            uploadInput.value = '';
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              let { width, height } = img;
+              const maxSize = 400;
+              if (width > height && width > maxSize) {
+                height = (height * maxSize) / width;
+                width = maxSize;
+              } else if (height > maxSize) {
+                width = (width * maxSize) / height;
+                height = maxSize;
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, width, height);
+              canvas.toBlob(
+                async blob => {
+                  if (!blob) {
+                    alert('图片处理失败，无法创建 Blob 对象。');
+                    uploadInput.value = '';
+                    return;
+                  }
+                  if (blob.size > 800 * 1024) {
+                    alert('压缩后的图片仍然太大。请选择一张更小的图片。');
+                    uploadInput.value = '';
+                    return;
+                  }
+                  try {
+                    await idbHelper.set(storageKey, blob);
+                    await updatePortrait(panel, data);
+                    resetTrigger.style.display = 'flex';
+                  } catch (error) {
+                    logError('保存头像到 IndexedDB 失败。', error);
+                    alert(
+                      error.name === 'QuotaExceededError' ? '浏览器存储空间不足。' : `头像保存失败: ${error.message}`,
+                    );
+                  } finally {
+                    uploadInput.value = '';
+                  }
+                },
+                'image/jpeg',
+                0.7,
+              );
+            };
+            img.onerror = () => {
+              alert('无法加载所选文件，可能不是有效的图片格式。');
+              uploadInput.value = '';
+            };
+            img.src = e.target.result;
+          };
+          reader.onerror = () => {
+            alert('读取文件失败。');
+            uploadInput.value = '';
+          };
+          reader.readAsDataURL(file);
+        };
+      }
+      function setupEventListeners(panel, data) {
+        const collapseToggle = panel.querySelector('.collapse-toggle');
+        if (collapseToggle) {
+          collapseToggle.addEventListener('click', () => {
+            panel.classList.toggle('collapsed');
+            const stateKey = panel.dataset.panelStateKey || `character:${data.Name}`;
+            collapsedStateByName.set(stateKey, panel.classList.contains('collapsed'));
+          });
+        }
+        panel.addEventListener('click', e => {
+          const link = e.target.closest('.image-link');
+          if (!link) return;
+          e.preventDefault();
+          const matchedImages = findImagesByKeyword(link.dataset.keyword || '');
+          if (matchedImages.length > 0) openGallery(panel, matchedImages, 0, GITHUB_BASE_URL);
+        });
+        panel.querySelectorAll('.tab-button').forEach(button => {
+          button.addEventListener('click', () => {
+            const targetTabId = button.dataset.tab;
+            panel.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            panel.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            button.classList.add('active');
+            panel.querySelector(`#${targetTabId}`)?.classList.add('active');
+          });
+        });
+        panel.querySelectorAll('.jm-edit-name-trigger').forEach(button => {
+          button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            editCharacterName(panel, data).catch(error => {
+              logError('编辑名字失败。', error);
+              alert(error?.message || '保存失败，请重试。');
+            });
+          });
+        });
+        panel.querySelectorAll('.jm-edit-occupation-trigger').forEach(button => {
+          button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            editCharacterOccupation(panel, data).catch(error => {
+              logError('编辑职业失败。', error);
+              alert(error?.message || '保存失败，请重试。');
+            });
+          });
+        });
+        const gallery = panel.querySelector('.jm-image-gallery');
+        if (gallery) {
+          gallery.querySelector('.gallery-close').addEventListener('click', () => {
+            const galleryImage = gallery.querySelector('.gallery-image');
+            if (galleryImage.src.startsWith('blob:')) URL.revokeObjectURL(galleryImage.src);
+            gallery.style.display = 'none';
+          });
+          gallery.querySelector('.gallery-prev').addEventListener('click', () => {
+            const state = getPanelState(panel);
+            state.currentGalleryIndex =
+              (state.currentGalleryIndex - 1 + state.currentGalleryImages.length) % state.currentGalleryImages.length;
+            updateGalleryImage(panel);
+          });
+          gallery.querySelector('.gallery-next').addEventListener('click', () => {
+            const state = getPanelState(panel);
+            state.currentGalleryIndex = (state.currentGalleryIndex + 1) % state.currentGalleryImages.length;
+            updateGalleryImage(panel);
+          });
+          const galleryImage = gallery.querySelector('.gallery-image');
+          let isDragging = false;
+          let startX;
+          let startY;
+          let lastX = 0;
+          let lastY = 0;
+          let scale = 1;
+          let lastTouchDistance = null;
+          const updateTransform = () => {
+            const canPan = scale > 1;
+            const translateX = canPan ? lastX : 0;
+            const translateY = canPan ? lastY : 0;
+            if (!canPan) {
+              lastX = 0;
+              lastY = 0;
+            }
+            galleryImage.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+          };
+          const resetTransform = () => {
+            scale = 1;
+            lastX = 0;
+            lastY = 0;
+            updateTransform();
+          };
+          galleryImage.addEventListener('wheel', e => {
+            e.preventDefault();
+            const rect = galleryImage.getBoundingClientRect();
+            const offsetX = e.clientX - rect.left;
+            const offsetY = e.clientY - rect.top;
+            const oldScale = scale;
+            scale = Math.min(Math.max(scale + e.deltaY * -0.001, 0.5), 5);
+            lastX = offsetX - (offsetX - lastX) * (scale / oldScale);
+            lastY = offsetY - (offsetY - lastY) * (scale / oldScale);
+            updateTransform();
+          });
+          galleryImage.addEventListener('mousedown', e => {
+            e.preventDefault();
+            isDragging = true;
+            galleryImage.classList.add('dragging');
+            startX = e.pageX - lastX;
+            startY = e.pageY - lastY;
+          });
+          ['mouseleave', 'mouseup'].forEach(eventName =>
+            galleryImage.addEventListener(eventName, () => {
+              isDragging = false;
+              galleryImage.classList.remove('dragging');
+            }),
+          );
+          galleryImage.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            e.preventDefault();
+            lastX = e.pageX - startX;
+            lastY = e.pageY - startY;
+            updateTransform();
+          });
+          galleryImage.addEventListener('dblclick', () => resetTransform());
+          galleryImage.addEventListener('touchstart', e => {
+            if (e.touches.length === 1) {
+              isDragging = true;
+              galleryImage.classList.add('dragging');
+              startX = e.touches[0].pageX - lastX;
+              startY = e.touches[0].pageY - lastY;
+            } else if (e.touches.length === 2) {
+              isDragging = false;
+              lastTouchDistance = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY,
+              );
+            }
+          });
+          galleryImage.addEventListener('touchend', () => {
+            isDragging = false;
+            galleryImage.classList.remove('dragging');
+            lastTouchDistance = null;
+          });
+          galleryImage.addEventListener('touchmove', e => {
+            e.preventDefault();
+            if (isDragging && e.touches.length === 1) {
+              lastX = e.touches[0].pageX - startX;
+              lastY = e.touches[0].pageY - startY;
+              updateTransform();
+            } else if (e.touches.length === 2 && lastTouchDistance) {
+              const rect = galleryImage.getBoundingClientRect();
+              const touch1 = { x: e.touches[0].pageX, y: e.touches[0].pageY };
+              const touch2 = { x: e.touches[1].pageX, y: e.touches[1].pageY };
+              const centerX = (touch1.x + touch2.x) / 2 - rect.left;
+              const centerY = (touch1.y + touch2.y) / 2 - rect.top;
+              const newTouchDistance = Math.hypot(touch1.x - touch2.x, touch1.y - touch2.y);
+              const oldScale = scale;
+              scale = Math.min(Math.max(scale * (newTouchDistance / lastTouchDistance), 0.5), 5);
+              lastTouchDistance = newTouchDistance;
+              lastX = centerX - (centerX - lastX) * (scale / oldScale);
+              lastY = centerY - (centerY - lastY) * (scale / oldScale);
+              updateTransform();
+            }
+          });
+        }
+        setupPortraitUpload(panel, data);
+      }
+      function persistCollapsedStates() {
+        if (!root) return;
+        root.querySelectorAll('.jm-state-panel, .status-diagnostic').forEach(panel => {
+          const stateKey = panel.dataset.panelStateKey;
+          if (!stateKey) return;
+          const isCollapsed = panel.matches('.status-diagnostic')
+            ? !panel.hasAttribute('open')
+            : panel.classList.contains('collapsed');
+          collapsedStateByName.set(stateKey, isCollapsed);
+        });
+      }
+      function isPanelCollapsed(stateKey, defaultCollapsed = true) {
+        if (!stateKey) return defaultCollapsed;
+        return collapsedStateByName.has(stateKey) ? collapsedStateByName.get(stateKey) : defaultCollapsed;
+      }
+      function renderDiagnosticPanel(title, messages = [], options = {}) {
+        const { type = 'warning', stateKey = '', defaultCollapsed = true } = options;
+        const messageList = (Array.isArray(messages) ? messages : [messages]).filter(Boolean);
+        const detailsHtml = messageList
+          .map(message => `<div class="diagnostic-message">${escapeHtml(message)}</div>`)
+          .join('');
+        const openAttr = isPanelCollapsed(stateKey, defaultCollapsed) ? '' : ' open';
+        return `
+          <details class="status-container status-diagnostic${type ? ` ${type}` : ''}"${openAttr}>
+            <summary class="header">
+              <div class="header-info">
+                <div class="char-name-row">
+                  <div class="char-name">${escapeHtml(title)}</div>
+                </div>
+              </div>
+              <span class="collapse-toggle diagnostic-toggle" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+              </span>
+            </summary>
+            <div class="diagnostic-details">
+              <div class="diagnostic-message-list">${detailsHtml}</div>
+            </div>
+          </details>`;
+      }
+      function buildNoCharacterFeedback(currentCharacterResult, statDataResult, names, missingNames) {
+        if (names.length === 0) {
+          if (currentCharacterResult.code === 'missing_tag') {
+            return {
+              title: `无${CURRENT_PERSON_TAG} 标签`,
+              details: [currentCharacterResult.reason || `未找到 ${CURRENT_PERSON_TAG} 标签。`, ...(currentCharacterResult.details || [])],
+              stateKey: 'diagnostic:missing-current-tag',
+            };
+          }
+          if (currentCharacterResult.code === 'empty_tag') {
+            return {
+              title: currentCharacterResult.tagName === '人物' ? '当前无在场女性角色' : '当前无当前角色',
+              details: [currentCharacterResult.reason || '存在当前角色标签，但内容为空。'],
+              stateKey: 'diagnostic:empty-current-tag',
+            };
+          }
+          return {
+            title: '无当前角色',
+            details: [currentCharacterResult.reason || '未找到当前角色。', ...(currentCharacterResult.details || [])],
+            stateKey: `diagnostic:${currentCharacterResult.code || 'unknown'}`,
+          };
+        }
+        const details = [`当前角色：${names.join('、')}`];
+        let title = '当前角色无变量数据';
+        if (statDataResult.status !== 'ok') {
+          details.push(statDataResult.message || 'chat.stat_data 无法读取。');
+        } else if (missingNames.length > 0) {
+          details.push(`未找到变量或变量为空：${missingNames.join('、')}`);
+        } else {
+          title = '当前角色无可显示变量';
+          details.push('当前角色存在，但没有可渲染的变量数据。');
+        }
+        details.push(
+          '如果控制台完全没有“脚本开始初始化”日志，请检查变量状态栏正则是否启用、占位符是否存在。',
+        );
+        return {
+          title,
+          details,
+          stateKey: 'diagnostic:no-renderable-panel',
+        };
+      }
+      function buildMissingCharacterFeedback(names, missingNames) {
+        return {
+          title: '部分角色无变量数据',
+          details: [`当前角色：${names.join('、')}`, `未找到变量或变量为空：${missingNames.join('、')}`],
+          stateKey: 'diagnostic:missing-character-data',
+        };
+      }
+      async function refreshPanels() {
+        if (!root) return;
+        persistCollapsedStates();
+        const currentCharacterResult = loadCurrentCharacterNames();
+        const names = currentCharacterResult.names;
+        const statDataResult = loadStatData();
+        const statData = statDataResult.statData;
+        const panelDataList = [];
+        const missingNames = [];
+        names.forEach(name => {
+          const panelData = buildPanelDataFromCharacter(name, statData);
+          if (panelData) panelDataList.push(panelData);
+          else missingNames.push(name);
+        });
+        let rootHtml = '';
+        if (panelDataList.length === 0) {
+          const feedback = buildNoCharacterFeedback(currentCharacterResult, statDataResult, names, missingNames);
+          rootHtml += renderDiagnosticPanel(feedback.title, feedback.details, {
+            type: 'warning',
+            stateKey: feedback.stateKey,
+          });
+          root.innerHTML = rootHtml;
+          logWarn('刷新完成：无可渲染角色，仅显示诊断条。');
+          return;
+        }
+        if (missingNames.length > 0) {
+          const feedback = buildMissingCharacterFeedback(names, missingNames);
+          rootHtml += renderDiagnosticPanel(feedback.title, feedback.details, {
+            type: 'warning',
+            stateKey: feedback.stateKey,
+          });
+          logWarn(`刷新发现当前角色变量缺失：${missingNames.join('、')}。`);
+        }
+        rootHtml += panelDataList
+          .map(
+            (data, index) =>
+              `<div class="status-container jm-state-panel" data-panel-key="${index}" data-character-name="${data.Name}" data-panel-state-key="character:${data.Name}"></div>`,
+          )
+          .join('');
+        root.innerHTML = rootHtml;
+        const panels = Array.from(root.querySelectorAll('.jm-state-panel'));
+        panels.forEach((panel, index) => {
+          updatePanel(panel, panelDataList[index]);
+          setupEventListeners(panel, panelDataList[index]);
+        });
+        await Promise.all(
+          panels.map((panel, index) =>
+            updatePortrait(panel, panelDataList[index]).catch(error =>
+              logError(`${panelDataList[index].Name} 头像更新失败。`, error),
+            ),
+          ),
+        );
+        panels.forEach(panel => linkifyAllText(panel));
+        logInfo(`刷新完成：渲染 ${panelDataList.length} 个状态栏。`);
+      }
+      function scheduleRefresh() {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        refreshTimer = window.setTimeout(() => {
+          refreshTimer = null;
+          refreshPanels().catch(error =>
+            displayRootError('刷新状态栏失败。', error?.stack || error?.message || String(error)),
+          );
+        }, 150);
+      }
+      function setupGlobalEventListeners() {
+        eventOn(tavern_events.MESSAGE_RECEIVED, () => scheduleRefresh());
+        eventOn(tavern_events.MESSAGE_UPDATED, () => scheduleRefresh());
+        eventOn(tavern_events.MESSAGE_SWIPED, () => scheduleRefresh());
+        eventOn(tavern_events.CHAT_CHANGED, () => scheduleRefresh());
+        eventOn('era:writeDone', () => scheduleRefresh());
+        logInfo('已监听消息接收、更新、切换和 era 写入事件。');
+      }
+      async function init() {
+        logInfo(
+          '脚本开始初始化：状态栏脚本已运行，正则替换已触发；如果完全没有这条日志，请检查变量状态栏正则。',
+        );
+        root = document.querySelector('.jm-state-panel-list');
+        if (!root) throw new Error('未找到变量状态栏根容器。');
+        await fetchData();
+        await refreshPanels();
+        setupGlobalEventListeners();
+        logInfo('初始化完成。');
+      }
+      $(() => {
+        errorCatched(init)();
+      });
+    </script>
+  </body>
+</html>
+
+```

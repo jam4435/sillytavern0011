@@ -1,0 +1,650 @@
+```
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <title>角色状态</title>
+    <style>
+      :root {
+        --bg-color: transparent;
+        --container-bg: #1e1e1e;
+        --text-color: #e0e0e0;
+        --text-secondary-color: #b0b0b0;
+        --accent-color: #6200ea;
+        --accent-light-color: #bb86fc;
+        --border-color: #333333;
+        --red-color: #cf6679;
+        --green-color: #03dac6;
+      }
+      body {
+        font-family: 'Noto Sans SC', sans-serif;
+        background-color: var(--bg-color);
+      }
+      .status-container {
+        background-color: var(--container-bg);
+        color: var(--text-color);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        box-shadow: none;
+        max-width: 600px;
+        margin: auto;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid var(--border-color);
+        position: relative;
+        padding-right: 40px;
+      }
+      .header-info {
+        text-align: center;
+        width: 100%;
+      }
+      .char-name {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--accent-light-color);
+        letter-spacing: 1px;
+      }
+      .meta-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        color: var(--text-secondary-color);
+        margin-top: 8px;
+      }
+      .core-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 25px;
+      }
+      .stat-box {
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+      }
+      .stat-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-secondary-color);
+        margin-bottom: 8px;
+      }
+      .stat-value {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-color);
+      }
+      .stat-value .arrow {
+        font-size: 18px;
+        margin: 0 5px;
+      }
+      .stat-change-reason {
+        font-size: 12px;
+        color: var(--text-secondary-color);
+        margin-top: 5px;
+        font-style: italic;
+      }
+      .green {
+        color: var(--green-color);
+      }
+      .red {
+        color: var(--red-color);
+      }
+      .narrative-block,
+      .details-block {
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+      }
+      .narrative-label,
+      .details-header {
+        font-weight: 700;
+        color: var(--accent-light-color);
+        margin-bottom: 8px;
+        display: block;
+        font-size: 16px;
+      }
+      .narrative-content {
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--text-color);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      .tabs {
+        display: flex;
+        justify-content: space-around;
+        border-bottom: 2px solid var(--border-color);
+        margin-bottom: 20px;
+      }
+      .tab-button {
+        flex: 1;
+        text-align: center;
+        padding: 10px 20px;
+        cursor: pointer;
+        background: none;
+        border: none;
+        color: var(--text-secondary-color);
+        font-size: 15px;
+        font-weight: 500;
+        transition:
+          color 0.3s,
+          border-bottom 0.3s;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+      }
+      .tab-button.active {
+        color: var(--accent-light-color);
+        border-bottom-color: var(--accent-light-color);
+      }
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      .details-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .details-item {
+        display: flex;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .details-item:last-child {
+        border-bottom: none;
+      }
+      .details-label {
+        flex-basis: 120px;
+        flex-shrink: 0;
+        font-weight: 500;
+        color: var(--text-secondary-color);
+        padding-right: 15px;
+      }
+      .details-value {
+        flex-grow: 1;
+        color: var(--text-color);
+      }
+      .modifications-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+      .modifications-item {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        border: none;
+      }
+
+      /* --- 响应式设计：针对小屏幕设备 --- */
+      @media screen and (max-width: 480px) {
+        .status-container {
+          padding: 16px;
+          margin: 10px;
+          max-width: 100%;
+        }
+
+        .header {
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+        }
+
+        .header-info {
+          width: 100%;
+        }
+
+        .meta-info {
+          flex-direction: column;
+          align-items: center;
+          gap: 5px;
+        }
+
+        .core-stats {
+          grid-template-columns: 1fr;
+          gap: 15px;
+        }
+
+        .tab-button {
+          font-size: 14px;
+          padding: 8px 10px;
+          white-space: normal;
+          line-height: 1.3;
+          flex-basis: 0; /* 让 flex-grow 生效 */
+        }
+
+        .details-item {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+
+        .details-label {
+          flex-basis: auto;
+        }
+      }
+
+      /* --- 折叠功能样式 --- */
+      .collapsible-section {
+        overflow: hidden;
+        transition:
+          max-height 0.4s ease-in-out,
+          opacity 0.4s ease-in-out;
+        max-height: 2000px; /* 设置一个足够大的值以容纳所有内容 */
+        opacity: 1;
+      }
+
+      .status-container.collapsed .collapsible-section {
+        max-height: 0;
+        opacity: 0;
+      }
+
+      .collapse-toggle {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.1);
+        transition:
+          background-color 0.3s,
+          transform 0.3s;
+        flex-shrink: 0;
+        position: absolute;
+        right: 0;
+      }
+
+      .collapse-toggle:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .collapse-toggle svg {
+        width: 20px;
+        height: 20px;
+        fill: var(--text-secondary-color);
+        transition:
+          transform 0.3s,
+          fill 0.3s;
+      }
+
+      .status-container.collapsed .collapse-toggle svg {
+        transform: rotate(180deg);
+      }
+
+      .collapse-toggle:hover svg {
+        fill: var(--text-color);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="status-container jm-state-panel">
+      <!-- Content will be generated by script -->
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        // 查找所有状态栏面板并为每个初始化
+        const panels = document.querySelectorAll('.jm-state-panel');
+
+        panels.forEach(panel => {
+          function displayError(message, details = '') {
+            const panelId = panel.id || '未知';
+            console.error(`[状态栏 ${panelId}] ` + message, details);
+            panel.innerHTML = `<div style="color: var(--red-color); padding: 20px; font-family: monospace; white-space: pre-wrap;"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${details}</p></details></div>`;
+          }
+
+          try {
+            const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
+            const rawData = `$2`;
+            const jsonData = JSON.parse(rawData.trim());
+
+            function safeGet(obj, path, defaultValue = undefined) {
+              const keys = Array.isArray(path) ? path : path.split('.');
+              let result = obj;
+              for (const key of keys) {
+                result = result?.[key];
+                if (result === undefined) return defaultValue;
+              }
+              return result;
+            }
+
+            function parseStat(statString) {
+              if (typeof statString !== 'string') return null;
+              const match = statString.match(/(\d+)\s*→\s*(\d+)\s*\((.*?)\)/);
+              if (match) {
+                return { from: match[1], to: match[2], reason: match[3] };
+              }
+              return null;
+            }
+
+            // --- 新增：动态内容配置 ---
+            const DYNAMIC_CONTENT_CONFIG = {
+              // 格式 a: 数字变化 -> stat-box UI
+              Affection: { label: '好感度' },
+              Libido: { label: '性欲值' },
+              // 格式 b: 字符串 -> narrative-block UI
+              Thoughts: { label: '🧠 内心想法' },
+              RecentSex: { label: '📋 最近性行为' },
+              // 格式 c: 列表 -> modifications-list UI
+              ModificationsAndRestraints: { label: '身体改造与束具' },
+            };
+
+            // --- 新增：UI渲染函数 ---
+
+            // 渲染 "stat-box" (用于好感度等)
+            function renderStat(label, value) {
+              const parsed = parseStat(value); // parseStat 是已有的函数
+              let valueHtml = '';
+              if (parsed) {
+                valueHtml = `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div><div class="stat-change-reason">(${parsed.reason})</div>`;
+              } else {
+                valueHtml = String(value);
+              }
+              return `
+              <div class="stat-box">
+                <div class="stat-label">${label}</div>
+                <div class="stat-value">${valueHtml}</div>
+              </div>
+            `;
+            }
+
+            // 渲染 "narrative-block" (用于内心想法等)
+            function renderNarrative(label, value) {
+              return `
+              <div class="narrative-block">
+                <span class="narrative-label">${label}</span>
+                <p class="narrative-content">${String(value)}</p>
+              </div>
+            `;
+            }
+
+            // 渲染 "list" (用于改造与束具等)
+            function renderList(label, items) {
+              if (!Array.isArray(items) || items.length === 0) return '';
+              const itemsHtml = items
+                .map(
+                  item => `
+              <li class="modifications-item">
+                <span class="details-value" data-keyword="${item}">${item}</span>
+              </li>
+            `,
+                )
+                .join('');
+              return `
+              <div class="details-block">
+                <div class="details-header">${label}</div>
+                <ul class="modifications-list">${itemsHtml}</ul>
+              </div>
+            `;
+            }
+
+            const DYNAMIC_CONTENT_MAP = {
+              Status: {
+                title: '身份与当前状态',
+                icon: '🎖️',
+                labels: {
+                  Identity: '身份',
+                  Occupation: '职业',
+                  Affiliation: '从属',
+                  Temperament: '气质',
+                  Posture: '姿势',
+                },
+              },
+              Outfit: {
+                title: '服装与内衣',
+                icon: '👗',
+                labels: {
+                  Top: '上装',
+                  Bottom: '下装',
+                  Underwear: '内衣',
+                  Footwear: '鞋履',
+                },
+              },
+              BodyDetails: {
+                title: '身体与性器细节',
+                icon: '🩸',
+                labels: {
+                  Mouth: '口腔',
+                  Breasts: '胸部',
+                  WombAndVagina: '子宫与阴道',
+                  Anus: '后庭',
+                  Hands: '手部',
+                  Legs: '腿部',
+                  Feet: '足部',
+                },
+              },
+            };
+
+            function generateDynamicTabsAndContent(data) {
+              const EXCLUDED_KEYS = new Set([
+                'Name',
+                'Location',
+                'Time',
+                'Affection',
+                'Libido',
+                'Thoughts',
+                'RecentSex',
+                'ModificationsAndRestraints',
+                'Modifications',
+              ]);
+
+              let tabsHtml = '<div class="tabs">';
+              let contentsHtml = '';
+              let tabIndex = 0;
+
+              for (const key in data) {
+                if (
+                  !EXCLUDED_KEYS.has(key) &&
+                  typeof data[key] === 'object' &&
+                  data[key] !== null &&
+                  !Array.isArray(data[key])
+                ) {
+                  const tabId = `dynamic-tab-${tabIndex}`;
+                  const isActive = tabIndex === 0 ? 'active' : '';
+                  const tabInfo = DYNAMIC_CONTENT_MAP[key] || { title: key, icon: '📋', labels: {} };
+
+                  tabsHtml += `<button class="tab-button ${isActive}" data-tab="${tabId}">${tabInfo.icon} ${tabInfo.title}</button>`;
+
+                  contentsHtml += `<div id="${tabId}" class="tab-content ${isActive}"><ul class="details-list">`;
+
+                  for (const subKey in data[key]) {
+                    const label = tabInfo.labels[subKey] || subKey;
+                    const value = data[key][subKey];
+                    contentsHtml += `
+                    <li class="details-item">
+                      <span class="details-label">${label}</span>
+                      <span class="details-value">${value}</span>
+                    </li>
+                  `;
+                  }
+
+                  contentsHtml += '</ul></div>';
+                  tabIndex++;
+                }
+              }
+
+              tabsHtml += '</div>';
+
+              return { tabsHtml, contentsHtml };
+            }
+
+            function updatePanel(data) {
+              // 1. 设置只包含静态部分的HTML框架
+              panel.innerHTML = `
+                        <div class="header">
+                            <div class="header-info">
+                                <div class="char-name" data-field="Name"></div>
+                                <div class="meta-info">
+                                    <span class="location">📍 <span data-field="Location"></span></span>
+                                    <span class="timestamp">🕰️ <span data-field="Time"></span></span>
+                                </div>
+                            </div>
+                            <div class="collapse-toggle" title="展开/折叠">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- 可折叠内容区域 -->
+                        <div class="collapsible-section">
+                            <!-- 新的动态内容容器 -->
+                            <div id="jm-dynamic-content-area"></div>
+
+                            <!-- 动态Tab页容器 -->
+                            <div class="tabs-container"></div>
+                            <div class="tab-content-container"></div>
+                        </div>
+
+                    `;
+
+              // 2. 填充静态头部数据
+              const staticFields = {
+                Name: data.Name,
+                Location: data.Location,
+                Time: data.Time,
+              };
+
+              for (const field in staticFields) {
+                const el = panel.querySelector(`[data-field="${field}"]`);
+                if (el && staticFields[field] !== undefined) {
+                  el.textContent = staticFields[field];
+                }
+              }
+
+              // 3. 渲染所有动态内容
+              renderDynamicContent(data);
+
+              // 4. 生成并插入动态的Tabs和内容 (这部分逻辑不变)
+              const { tabsHtml, contentsHtml } = generateDynamicTabsAndContent(data);
+              panel.querySelector('.tabs-container').innerHTML = tabsHtml;
+              panel.querySelector('.tab-content-container').innerHTML = contentsHtml;
+            }
+
+            // --- 修改：主渲染循环 (支持自动格式检测和原始顺序) ---
+            function renderDynamicContent(data) {
+              const container = panel.querySelector('#jm-dynamic-content-area');
+              if (!container) return;
+
+              // 定义哪些字段是头部信息，需要被排除
+              const HEADER_FIELDS = new Set(['Name', 'Location', 'Time']);
+
+              // 收集所有需要渲染的字段，并保持原始顺序
+              const itemsToRender = Object.keys(data)
+                .filter(
+                  key =>
+                    (!HEADER_FIELDS.has(key) && // 排除头部字段
+                      typeof data[key] !== 'object') ||
+                    Array.isArray(data[key]), // 排除对象（留给Tab），但保留数组
+                )
+                .map(key => {
+                  // 从配置中获取标签，如果没有则使用字段名
+                  const config = DYNAMIC_CONTENT_CONFIG[key];
+                  return {
+                    key,
+                    label: config ? config.label : key,
+                    value: data[key],
+                  };
+                });
+
+              // 用于收集所有 stat 项，以便统一渲染
+              const statItems = [];
+              let dynamicHtml = '';
+
+              itemsToRender.forEach(item => {
+                let type = 'narrative'; // 默认类型
+                let value = item.value;
+
+                // 自动检测UI类型
+                if (typeof value === 'string' && parseStat(value)) {
+                  type = 'stat';
+                } else if (Array.isArray(value)) {
+                  type = 'list';
+                }
+
+                if (type === 'stat') {
+                  statItems.push(item);
+                } else {
+                  // 如果遇到非 stat 项，且之前有 stat 项，则先渲染 stat 容器
+                  if (statItems.length > 0) {
+                    dynamicHtml += `<div class="core-stats">${statItems.map(statItem => renderStat(statItem.label, statItem.value)).join('')}</div>`;
+                    statItems.length = 0; // 清空 stat 项
+                  }
+                  // 渲染当前项
+                  switch (type) {
+                    case 'narrative':
+                      dynamicHtml += renderNarrative(item.label, item.value);
+                      break;
+                    case 'list':
+                      dynamicHtml += renderList(item.label, item.value);
+                      break;
+                  }
+                }
+              });
+
+              // 确保最后的 stat 项也被渲染
+              if (statItems.length > 0) {
+                dynamicHtml += `<div class="core-stats">${statItems.map(statItem => renderStat(statItem.label, statItem.value)).join('')}</div>`;
+              }
+
+              container.innerHTML = dynamicHtml;
+            }
+
+            function setupEventListeners() {
+              // 折叠/展开功能
+              const collapseToggle = panel.querySelector('.collapse-toggle');
+              if (collapseToggle) {
+                collapseToggle.addEventListener('click', () => {
+                  panel.classList.toggle('collapsed');
+                });
+              }
+
+              panel.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', () => {
+                  const targetTabId = button.dataset.tab;
+                  panel.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                  panel.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                  button.classList.add('active');
+                  panel.querySelector(`#${targetTabId}`).classList.add('active');
+                });
+              });
+            }
+
+            function main() {
+              updatePanel(jsonData);
+              // 设置默认折叠状态
+              panel.classList.add('collapsed');
+              setupEventListeners();
+            }
+
+            main();
+          } catch (error) {
+            displayError(
+              '脚本执行失败。这通常是由于AI输出的JSON格式不正确导致的。',
+              `错误信息: ${error.message}. 捕获到的原始数据: ${rawData}`,
+            );
+          }
+        }); // 结束 forEach 循环
+      });
+    </script>
+  </body>
+</html>
+
+```

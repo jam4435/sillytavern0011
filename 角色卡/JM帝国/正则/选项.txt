@@ -1,0 +1,170 @@
+```html
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>下一步行动建议</title>
+<style>
+body {
+  background-color: transparent;
+  color: #e0e0e0;
+  font-family: 'Noto Sans SC', sans-serif;
+  margin: 0; padding: 0;
+}
+.container {
+  max-width: 900px;
+  margin: auto;
+  background: #1e1e1e;
+  border-radius: 12px;
+  box-shadow: none;
+  padding: 8px;
+  position: relative;
+}
+.header {
+  text-align: center;
+  color: #bb86fc;
+  font-weight: 500;
+  font-size: 16px;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+.option {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.option:hover {
+  background: rgba(187,134,252,0.1);
+  border-color: rgba(187,134,252,0.4);
+  transform: translateY(-1px);
+}
+.option:active {
+  transform: scale(0.98);
+  background: rgba(187,134,252,0.2);
+}
+.option-label {
+  color: #bb86fc;
+  font-weight: 500;
+}
+.option-desc {
+  color: #ccc;
+}
+@media (max-width: 600px) {
+  .container { padding: 6px; }
+  .header { font-size: 15px; margin-bottom: 4px; }
+  .option { padding: 2px 3px; font-size: 11px; }
+}
+/* 隐藏数据载体容器 */
+#raw-data-container {
+  display: none;
+}
+</style>
+</head>
+<body>
+<div id="raw-data-container">$1</div>
+
+<div class="container">
+  <div class="header">🎯 下一步行动建议</div>
+  <div id="options-container"></div>
+</div>
+
+<script>
+// 1. 安全读取数据
+const rawDataContainer = document.getElementById('raw-data-container');
+const rawData = rawDataContainer ? rawDataContainer.innerText || rawDataContainer.textContent : '';
+
+function parseActionSuggestions(data) {
+  const lines = data.split('\n').map(l => l.trim());
+  const suggestions = [];
+  let parsing = false;
+
+  lines.forEach(line => {
+    // 兼容可能存在的不同前缀或微小偏差
+    if (line.includes('下一步行动建议')) { parsing = true; return; }
+    
+    // 2. 增强正则鲁棒性：兼容 -、*、数字前缀，兼容中英文冒号，兼容中英文引号
+    if (parsing && /^[-\*1-9]/.test(line)) {
+      const match = line.match(/^[-\*1-9\.\]\)]?\s*【(.*?)】\s*[:：]\s*["'“]?(.*?)["'”]?$/);
+      if(match){
+        const label = match[1].trim();
+        const desc = match[2].trim();
+        suggestions.push({ label, desc });
+      }
+    }
+  });
+  return suggestions;
+}
+
+const actions = parseActionSuggestions(rawData);
+const container = document.getElementById('options-container');
+
+actions.forEach(({label, desc}) => {
+  const div = document.createElement('div');
+  div.className = 'option';
+  div.innerHTML = `<span class="option-label">【${label}】</span> <span class="option-desc">${desc}</span>`;
+  
+  div.addEventListener('click', () => {
+    const toSend = desc;
+
+    try {
+      // 尝试多重路径获取输入框，增强酒馆兼容性
+      const $textarea = (window.parent && window.parent.document.querySelector('#send_textarea')) 
+                        || document.querySelector('#send_textarea') 
+                        || document.querySelector('textarea');
+
+      if ($textarea) {
+        const currentContent = $textarea.value || '';
+        const separator = currentContent.trim() ? '\n' : '';
+        
+        // 修改原生 value
+        $textarea.value = currentContent + separator + toSend.trim();
+
+        // 3. 深度触发事件：唤醒酒馆内部的字数统计和高度自动调整
+        $textarea.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+        $textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        // 兼容 React 等框架的受控组件拦截
+        let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+        if (nativeInputValueSetter) {
+            nativeInputValueSetter.call($textarea, $textarea.value);
+            $textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+      } else {
+        console.log('要发送的文本:', toSend);
+        alert('无法找到输入框，已复制文本到剪贴板:\n' + toSend);
+        navigator.clipboard.writeText(toSend).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('追加到输入框失败', e);
+      alert('跨域或沙盒限制，已复制文本到剪贴板:\n' + toSend);
+      navigator.clipboard.writeText(toSend).catch(() => {});
+    }
+
+    // 视觉反馈
+    div.style.background = 'rgba(187,134,252,0.25)';
+    div.style.borderColor = 'rgba(187,134,252,0.5)';
+    setTimeout(() => {
+        div.style.background = '';
+        div.style.borderColor = '';
+    }, 200);
+  });
+
+  container.appendChild(div);
+});
+
+if(actions.length === 0){
+  container.innerHTML='<div style="text-align:center;color:#777;padding:10px;">（无可用行动建议）<br><span style="font-size:10px;opacity:0.5;">请检查模型输出格式是否为" - 【动作】: 描述 "</span></div>';
+}
+</script>
+</body>
+</html>
+```
