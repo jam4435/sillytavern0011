@@ -28,7 +28,7 @@ import {
   type SummaryTriggerResult,
   type BatchSummaryResult,
 } from '../utils/summaryManager';
-import { normalizeDisplayedMessageContent } from '../utils/variableReader';
+import { normalizeDisplayedMessageContent, parseAIResponse } from '../utils/variableReader';
 import { Icons } from './Icons';
 import { DebugLogEntry } from '../hooks';
 import { uiLogger } from '../utils/logger';
@@ -53,6 +53,7 @@ interface AutoTestResult {
 
 const DEFAULT_AUTO_TEST_PROMPT = '合理地继续推进剧情';
 const AUTO_TEST_MAX_COUNT = 50;
+const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
 
 const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
 const ROOT_VARIABLE_PATH_KEY = 'root';
@@ -321,6 +322,16 @@ const clampAutoTestCount = (value: number): number => {
   }
 
   return Math.min(AUTO_TEST_MAX_COUNT, Math.max(1, Math.floor(value)));
+};
+
+const createAutoTestPlainResponse = (rawResponse: string): string => {
+  const normalizedResponse = normalizeDisplayedMessageContent(rawResponse);
+  const parsedResponse = parseAIResponse(normalizedResponse);
+  const content = parsedResponse.content || normalizedResponse;
+  return content
+    .replace(OPTION_BLOCK_REGEX, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 };
 
 const createAutoTestExportText = (results: AutoTestResult[], mode: 'plain' | 'full'): string => {
@@ -598,7 +609,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           throw new Error('本轮没有取得 AI 回复');
         }
 
-        const plainResponse = normalizeDisplayedMessageContent(rawResponse);
+        const plainResponse = createAutoTestPlainResponse(rawResponse);
         completedCount += 1;
         updateAutoTestResult(id, {
           rawResponse,
@@ -1690,6 +1701,213 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <span className="dirty">有未保存修改</span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* 自动推进测试 */}
+        {activeTab === 'test' && (
+          <div className="settings-section auto-test-section">
+            <h4 className="settings-section-title">
+              <span className="diamond-bullet"></span>
+              自动推进测试
+            </h4>
+            <p className="settings-description">
+              按设定轮数连续发送同一句测试指令，用于抽查多轮剧情推进、变量块写入和回复稳定性。
+            </p>
+
+            <div className="auto-test-control-panel">
+              <div className="settings-row settings-row-vertical">
+                <label className="settings-label">测试指令</label>
+                <textarea
+                  className="settings-textarea auto-test-prompt-input"
+                  value={autoTestPrompt}
+                  onChange={(event) => setAutoTestPrompt(event.target.value)}
+                  disabled={isAutoTestRunning}
+                  rows={3}
+                  spellCheck={false}
+                />
+              </div>
+
+              <div className="auto-test-grid">
+                <div className="settings-row settings-row-vertical">
+                  <label className="settings-label">对话轮数</label>
+                  <input
+                    className="settings-number-input auto-test-number-input"
+                    type="number"
+                    min={1}
+                    max={AUTO_TEST_MAX_COUNT}
+                    value={autoTestCount}
+                    onChange={(event) => setAutoTestCount(clampAutoTestCount(Number(event.target.value)))}
+                    disabled={isAutoTestRunning}
+                  />
+                </div>
+                <div className="settings-row settings-row-vertical">
+                  <label className="settings-label">轮间等待秒</label>
+                  <input
+                    className="settings-number-input auto-test-number-input"
+                    type="number"
+                    min={0}
+                    max={30}
+                    step={0.1}
+                    value={autoTestDelaySeconds}
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      setAutoTestDelaySeconds(Number.isFinite(value) ? Math.max(0, value) : 0);
+                    }}
+                    disabled={isAutoTestRunning}
+                  />
+                </div>
+              </div>
+
+              <div className="auto-test-actions">
+                <button
+                  className="settings-action-btn primary"
+                  type="button"
+                  onClick={handleStartAutoTest}
+                  disabled={isAutoTestRunning || isGenerating || !autoTestPrompt.trim()}
+                >
+                  <Icons.Send size={16} />
+                  <span>{isAutoTestRunning ? '测试中' : '开始测试'}</span>
+                </button>
+                <button
+                  className="settings-action-btn"
+                  type="button"
+                  onClick={handleStopAutoTest}
+                  disabled={!isAutoTestRunning}
+                >
+                  <Icons.Close size={16} />
+                  <span>停止</span>
+                </button>
+                <button
+                  className="settings-action-btn"
+                  type="button"
+                  onClick={handleClearAutoTestResults}
+                  disabled={isAutoTestRunning || !hasAutoTestResults}
+                >
+                  <Icons.Refresh size={16} />
+                  <span>清空</span>
+                </button>
+              </div>
+
+              {(autoTestStatusText || hasAutoTestResults) && (
+                <div className={`auto-test-status ${autoTestStatus}`}>
+                  <span>{autoTestStatusText || '等待测试开始'}</span>
+                  {hasAutoTestResults && (
+                    <span className="auto-test-status-meta">
+                      成功 {autoTestCompletedCount} / 失败 {autoTestFailedCount} / 共 {autoTestResults.length}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="auto-test-export-panel">
+              <div className="auto-test-export-header">
+                <div>
+                  <h5>结果导出</h5>
+                  <p>纯文本用于检查剧情质量；完整回复保留变量块，便于复制给其他 AI 检查变量生成。</p>
+                </div>
+              </div>
+              <div className="auto-test-export-actions">
+                <button
+                  className="settings-action-btn"
+                  type="button"
+                  onClick={() => handleCopyAutoTestExport('plain')}
+                  disabled={!hasAutoTestResults}
+                >
+                  <Icons.Copy size={16} />
+                  <span>复制纯文本</span>
+                </button>
+                <button
+                  className="settings-action-btn"
+                  type="button"
+                  onClick={() => handleDownloadAutoTestExport('plain')}
+                  disabled={!hasAutoTestResults}
+                >
+                  <Icons.FileText size={16} />
+                  <span>下载纯文本</span>
+                </button>
+                <button
+                  className="settings-action-btn"
+                  type="button"
+                  onClick={() => handleCopyAutoTestExport('full')}
+                  disabled={!hasAutoTestResults}
+                >
+                  <Icons.Copy size={16} />
+                  <span>复制完整回复</span>
+                </button>
+                <button
+                  className="settings-action-btn"
+                  type="button"
+                  onClick={() => handleDownloadAutoTestExport('full')}
+                  disabled={!hasAutoTestResults}
+                >
+                  <Icons.FileText size={16} />
+                  <span>下载完整回复</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="auto-test-results">
+              {autoTestResults.length === 0 ? (
+                <div className="auto-test-empty">
+                  <Icons.Send size={32} />
+                  <p>暂无测试结果</p>
+                </div>
+              ) : (
+                autoTestResults.map(result => (
+                  <div
+                    key={result.id}
+                    className={`auto-test-result ${result.status} ${expandedAutoTestResultId === result.id ? 'expanded' : ''}`}
+                  >
+                    <button
+                      className="auto-test-result-header"
+                      type="button"
+                      onClick={() => setExpandedAutoTestResultId(
+                        expandedAutoTestResultId === result.id ? null : result.id,
+                      )}
+                    >
+                      <span className="auto-test-result-title">第 {result.index} 轮</span>
+                      <span className={`auto-test-result-badge ${result.status}`}>
+                        {result.status === 'running' ? '生成中' : result.status === 'success' ? '完成' : '失败'}
+                      </span>
+                      <span className="auto-test-result-length">
+                        {result.status === 'success'
+                          ? `${result.plainResponse.length} / ${result.rawResponse.length} 字符`
+                          : result.error || '等待回复'}
+                      </span>
+                      {expandedAutoTestResultId === result.id
+                        ? <Icons.ChevronDown size={18} />
+                        : <Icons.ChevronUp size={18} />}
+                    </button>
+
+                    {expandedAutoTestResultId !== result.id && result.plainResponse && (
+                      <div className="auto-test-result-preview">
+                        {result.plainResponse.slice(0, 180)}
+                        {result.plainResponse.length > 180 && '...'}
+                      </div>
+                    )}
+
+                    {expandedAutoTestResultId === result.id && (
+                      <div className="auto-test-result-body">
+                        <div className="auto-test-result-block">
+                          <div className="auto-test-result-block-title">发送内容</div>
+                          <pre>{result.prompt}</pre>
+                        </div>
+                        <div className="auto-test-result-block">
+                          <div className="auto-test-result-block-title">纯文本回复</div>
+                          <pre>{result.error ? `错误：${result.error}` : result.plainResponse || '(空)'}</pre>
+                        </div>
+                        <div className="auto-test-result-block">
+                          <div className="auto-test-result-block-title">完整回复</div>
+                          <pre>{result.error ? `错误：${result.error}` : result.rawResponse || '(空)'}</pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
 

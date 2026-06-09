@@ -74,7 +74,7 @@
 @media (max-width: $breakpoint-md) {
   .settings-tabs {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(3rem, 1fr));
     gap: 0.35rem;
     padding-bottom: 0.75rem;
     margin-bottom: 1rem;
@@ -1333,6 +1333,320 @@
 
   &.partial {
     border-color: rgba($amber-600, 0.3);
+  }
+}
+
+// =========================================
+// 自动推进测试
+// =========================================
+
+.auto-test-section {
+  gap: 1rem;
+}
+
+.auto-test-control-panel,
+.auto-test-export-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.9rem;
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  background:
+    linear-gradient(135deg, rgba($amber-600, 0.055), transparent 42%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.auto-test-prompt-input {
+  min-height: 5.5rem;
+}
+
+.auto-test-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+
+  .settings-row {
+    padding: 0;
+    border-bottom: none;
+  }
+}
+
+.auto-test-number-input {
+  width: 100%;
+  max-width: 10rem;
+  text-align: left;
+}
+
+.auto-test-actions,
+.auto-test-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.auto-test-actions .settings-action-btn,
+.auto-test-export-actions .settings-action-btn {
+  min-width: 8.5rem;
+  justify-content: center;
+}
+
+.auto-test-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  color: $stone-400;
+  font-size: 0.82rem;
+  line-height: 1.45;
+
+  &.running,
+  &.stopping {
+    border-color: rgba($amber-600, 0.4);
+    color: $amber-600;
+    background: rgba($amber-600, 0.06);
+  }
+
+  &.done {
+    border-color: rgba($green-500, 0.35);
+    color: $green-500;
+    background: rgba($green-500, 0.07);
+  }
+
+  &.error {
+    border-color: rgba($red-500, 0.4);
+    color: $red-500;
+    background: rgba($red-500, 0.08);
+  }
+}
+
+.auto-test-status-meta {
+  color: $stone-500;
+  white-space: nowrap;
+}
+
+.auto-test-export-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+
+  h5 {
+    margin: 0 0 0.35rem;
+    color: $stone-200;
+    font-family: $font-serif;
+    font-size: 0.95rem;
+    font-weight: normal;
+  }
+
+  p {
+    margin: 0;
+    color: $stone-500;
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+}
+
+.auto-test-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auto-test-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 12rem;
+  gap: 0.75rem;
+  border: 1px dashed $stone-800;
+  border-radius: 4px;
+  color: $stone-600;
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+}
+
+.auto-test-result {
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  transition: border-color $transition-normal, background $transition-normal;
+
+  &.success {
+    border-left: 3px solid $green-500;
+  }
+
+  &.running {
+    border-left: 3px solid $amber-600;
+  }
+
+  &.error {
+    border-left: 3px solid $red-500;
+  }
+
+  &.expanded {
+    background: rgba(255, 255, 255, 0.035);
+  }
+}
+
+.auto-test-result-header {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background $transition-fast;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.045);
+  }
+}
+
+.auto-test-result-title {
+  color: $stone-300;
+  font-family: $font-serif;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.auto-test-result-badge {
+  padding: 0.18rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+
+  &.running {
+    color: $amber-600;
+    background: rgba($amber-600, 0.1);
+  }
+
+  &.success {
+    color: $green-500;
+    background: rgba($green-500, 0.1);
+  }
+
+  &.error {
+    color: $red-500;
+    background: rgba($red-500, 0.1);
+  }
+}
+
+.auto-test-result-length {
+  min-width: 0;
+  overflow: hidden;
+  color: $stone-500;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auto-test-result-preview {
+  padding: 0 0.75rem 0.75rem;
+  color: $stone-500;
+  font-family: monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auto-test-result-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.auto-test-result-block {
+  min-width: 0;
+}
+
+.auto-test-result-block-title {
+  margin-bottom: 0.35rem;
+  color: $stone-500;
+  font-size: 0.74rem;
+}
+
+.auto-test-result-block pre {
+  max-height: 18rem;
+  margin: 0;
+  padding: 0.75rem;
+  overflow: auto;
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  background: rgba($stone-900, 0.72);
+  color: $stone-300;
+  font-family: monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: $breakpoint-md) {
+  .auto-test-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .auto-test-status {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .auto-test-status-meta {
+    white-space: normal;
+  }
+
+  .auto-test-actions .settings-action-btn,
+  .auto-test-export-actions .settings-action-btn {
+    flex: 1 1 9rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .auto-test-control-panel,
+  .auto-test-export-panel {
+    padding: 0.75rem;
+  }
+
+  .auto-test-result-header {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    grid-template-areas:
+      "title length icon"
+      "badge badge badge";
+  }
+
+  .auto-test-result-title {
+    grid-area: title;
+  }
+
+  .auto-test-result-badge {
+    grid-area: badge;
+    justify-self: start;
+  }
+
+  .auto-test-result-length {
+    grid-area: length;
+  }
+
+  .auto-test-result-header > .icon-wrap {
+    grid-area: icon;
   }
 }
 

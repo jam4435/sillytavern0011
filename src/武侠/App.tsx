@@ -429,6 +429,8 @@ const App: React.FC = () => {
           onSettingsChange={handleSettingsChange}
           debugLogs={debugLogs}
           onClearDebugLogs={clearDebugLogs}
+          onTestMessageSend={handleSendMessage}
+          isGenerating={isLoading}
         />
       );
       case ActivePanel.SAVE_LOAD: return (
