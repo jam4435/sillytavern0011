@@ -331,6 +331,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     () => new Set(),
   );
   const [selectedVariablePath, setSelectedVariablePath] = useState<VariablePath | null>(null);
+  const [isVariableDetailOpen, setIsVariableDetailOpen] = useState(false);
   const [variableSearch, setVariableSearch] = useState('');
 
   const normalizedVariableSearch = variableSearch.trim().toLowerCase();
@@ -366,6 +367,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setVariableStatusText('');
       setIsVariablesDirty(false);
       setExpandedVariablePaths(new Set());
+      setIsVariableDetailOpen(false);
     } catch (error) {
       setVariableStatus('error');
       setVariableStatusText(`读取失败：${getErrorMessage(error)}`);
@@ -398,6 +400,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const selectedVariableValue = statData && selectedVariablePath
     ? getValueAtVariablePath(statData, selectedVariablePath)
     : undefined;
+
+  const handleVariableSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setVariableSearch(event.target.value);
+    setIsVariableDetailOpen(false);
+  }, []);
+
+  const handleVariableSelect = useCallback((path: VariablePath) => {
+    setSelectedVariablePath(path);
+    setIsVariableDetailOpen(true);
+  }, []);
+
+  const closeVariableDetail = useCallback(() => {
+    setIsVariableDetailOpen(false);
+  }, []);
 
   const toggleVariablePath = useCallback((pathKey: string) => {
     setExpandedVariablePaths(prev => {
@@ -782,42 +798,42 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           onClick={() => setActiveTab('display')}
         >
           <Icons.Character size={16} />
-          <span>正文显示</span>
+          <span className="settings-tab-label" data-short-label="正文">正文显示</span>
         </button>
         <button
           className={`settings-tab ${activeTab === 'background' ? 'active' : ''}`}
           onClick={() => setActiveTab('background')}
         >
           <Icons.Map size={16} />
-          <span>背景设置</span>
+          <span className="settings-tab-label" data-short-label="背景">背景设置</span>
         </button>
         <button
           className={`settings-tab ${activeTab === 'regex' ? 'active' : ''}`}
           onClick={() => setActiveTab('regex')}
         >
           <Icons.Scroll size={16} />
-          <span>正则替换</span>
+          <span className="settings-tab-label" data-short-label="正则">正则替换</span>
         </button>
         <button
           className={`settings-tab ${activeTab === 'summary' ? 'active' : ''}`}
           onClick={() => setActiveTab('summary')}
         >
           <Icons.Scroll size={16} />
-          <span>自动总结</span>
+          <span className="settings-tab-label" data-short-label="总结">自动总结</span>
         </button>
         <button
           className={`settings-tab ${activeTab === 'variables' ? 'active' : ''}`}
           onClick={() => setActiveTab('variables')}
         >
           <Icons.Variables size={16} />
-          <span>变量</span>
+          <span className="settings-tab-label" data-short-label="变量">变量</span>
         </button>
         <button
           className={`settings-tab ${activeTab === 'debug' ? 'active' : ''}`}
           onClick={() => setActiveTab('debug')}
         >
           <Icons.Debug size={16} />
-          <span>调试</span>
+          <span className="settings-tab-label" data-short-label="调试">调试</span>
         </button>
       </div>
 
@@ -1361,7 +1377,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <input
                     type="text"
                     value={variableSearch}
-                    onChange={(e) => setVariableSearch(e.target.value)}
+                    onChange={handleVariableSearchChange}
                     placeholder="字段名或值"
                     className="settings-text-input variables-search-input"
                   />
@@ -1389,7 +1405,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             )}
 
-            <div className="variables-browser">
+            <div className={`variables-browser${isVariableDetailOpen ? ' detail-open' : ''}`}>
               <div className="variables-tree" aria-label="变量树">
                 {statData ? (
                   visibleStatDataEntries.length > 0 ? (
@@ -1404,7 +1420,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         selectedPath={selectedVariablePath}
                         normalizedSearch={normalizedVariableSearch}
                         onToggle={toggleVariablePath}
-                        onSelect={setSelectedVariablePath}
+                        onSelect={handleVariableSelect}
                       />
                     ))
                   ) : (
@@ -1428,6 +1444,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 onValueChange={handleVariableLeafChange}
                 onCopyPath={handleCopyVariablePath}
                 onCopyValue={handleCopyVariableValue}
+                onBack={closeVariableDetail}
               />
             </div>
 
@@ -1683,6 +1700,7 @@ interface VariableDetailPanelProps {
   onValueChange: (path: VariablePath, nextValue: unknown) => void;
   onCopyPath: (path: VariablePath) => void;
   onCopyValue: (value: unknown) => void;
+  onBack: () => void;
 }
 
 const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
@@ -1692,6 +1710,7 @@ const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
   onValueChange,
   onCopyPath,
   onCopyValue,
+  onBack,
 }) => {
   if (!path) {
     return (
@@ -1711,6 +1730,15 @@ const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
     <aside className="variable-detail-panel" aria-label="变量详情">
       <div className="variable-detail-header">
         <div className="variable-detail-title">
+          <button
+            type="button"
+            className="variable-detail-back-btn"
+            onClick={onBack}
+            title="返回变量列表"
+            aria-label="返回变量列表"
+          >
+            <Icons.ArrowLeft size={15} />
+          </button>
           <Icons.Eye size={16} />
           <span>变量详情</span>
         </div>

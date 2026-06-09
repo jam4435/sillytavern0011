@@ -1,5 +1,6 @@
 
 import {
+  ArrowLeft,
   Backpack,
   BookOpen,
   Bug,
@@ -67,6 +68,7 @@ export const Icons = {
   Variables: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Database size={size || 20} color={color} /></IconWrapper>,
   Search: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Search size={size || 18} color={color} /></IconWrapper>,
   Eye: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Eye size={size || 18} color={color} /></IconWrapper>,
+  ArrowLeft: ({ className, size, color }: IconProps) => <IconWrapper className={className}><ArrowLeft size={size || 18} color={color} /></IconWrapper>,
   Copy: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Copy size={size || 18} color={color} /></IconWrapper>,
   FileText: ({ className, size, color }: IconProps) => <IconWrapper className={className}><FileText size={size || 18} color={color} /></IconWrapper>,
 };
