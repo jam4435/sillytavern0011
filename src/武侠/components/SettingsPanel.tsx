@@ -1059,6 +1059,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <span className="settings-tab-label" data-short-label="变量">变量</span>
         </button>
         <button
+          className={`settings-tab ${activeTab === 'test' ? 'active' : ''}`}
+          onClick={() => setActiveTab('test')}
+        >
+          <Icons.Send size={16} />
+          <span className="settings-tab-label" data-short-label="测试">自动测试</span>
+        </button>
+        <button
           className={`settings-tab ${activeTab === 'debug' ? 'active' : ''}`}
           onClick={() => setActiveTab('debug')}
         >
