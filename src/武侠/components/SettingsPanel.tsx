@@ -539,6 +539,147 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, []);
 
+  const updateAutoTestResult = useCallback((id: string, updates: Partial<AutoTestResult>) => {
+    setAutoTestResults(previousResults =>
+      previousResults.map(result => result.id === id ? { ...result, ...updates } : result)
+    );
+  }, []);
+
+  const handleStartAutoTest = useCallback(async () => {
+    if (isAutoTestRunning) {
+      return;
+    }
+
+    if (!onTestMessageSend) {
+      setAutoTestStatus('error');
+      setAutoTestStatusText('当前页面没有可用的发送接口');
+      return;
+    }
+
+    const prompt = autoTestPrompt.trim() || DEFAULT_AUTO_TEST_PROMPT;
+    const totalCount = clampAutoTestCount(autoTestCount);
+    const delaySeconds = Math.max(0, Number.isFinite(autoTestDelaySeconds) ? autoTestDelaySeconds : 0);
+    const delayMs = Math.round(delaySeconds * 1000);
+    let completedCount = 0;
+
+    autoTestStopRequestedRef.current = false;
+    setAutoTestPrompt(prompt);
+    setAutoTestCount(totalCount);
+    setAutoTestDelaySeconds(delaySeconds);
+    setAutoTestResults([]);
+    setExpandedAutoTestResultId(null);
+    setAutoTestStatus('running');
+    setAutoTestStatusText(`准备发送 ${totalCount} 轮自动推进测试`);
+
+    for (let index = 1; index <= totalCount; index += 1) {
+      if (autoTestStopRequestedRef.current) {
+        break;
+      }
+
+      const id = `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
+      const startedAt = new Date();
+      setAutoTestStatusText(`正在发送第 ${index}/${totalCount} 轮`);
+      setAutoTestResults(previousResults => [
+        ...previousResults,
+        {
+          id,
+          index,
+          prompt,
+          rawResponse: '',
+          plainResponse: '',
+          startedAt,
+          status: 'running',
+        },
+      ]);
+
+      try {
+        const rawResponse = await onTestMessageSend(prompt);
+        if (!rawResponse.trim()) {
+          throw new Error('本轮没有取得 AI 回复');
+        }
+
+        const plainResponse = normalizeDisplayedMessageContent(rawResponse);
+        completedCount += 1;
+        updateAutoTestResult(id, {
+          rawResponse,
+          plainResponse,
+          finishedAt: new Date(),
+          status: 'success',
+        });
+      } catch (error) {
+        const errorMessage = getErrorMessage(error);
+        updateAutoTestResult(id, {
+          finishedAt: new Date(),
+          status: 'error',
+          error: errorMessage,
+        });
+        setAutoTestStatus('error');
+        setAutoTestStatusText(`第 ${index} 轮失败：${errorMessage}`);
+        autoTestStopRequestedRef.current = true;
+        return;
+      }
+
+      if (autoTestStopRequestedRef.current) {
+        break;
+      }
+
+      if (index < totalCount && delayMs > 0) {
+        setAutoTestStatusText(`第 ${index} 轮完成，等待 ${(delayMs / 1000).toFixed(1)} 秒后继续`);
+        await sleep(delayMs);
+      }
+    }
+
+    setAutoTestStatus('done');
+    setAutoTestStatusText(
+      autoTestStopRequestedRef.current
+        ? `已停止，完成 ${completedCount}/${totalCount} 轮`
+        : `测试完成，完成 ${completedCount}/${totalCount} 轮`,
+    );
+    autoTestStopRequestedRef.current = false;
+  }, [
+    autoTestCount,
+    autoTestDelaySeconds,
+    autoTestPrompt,
+    isAutoTestRunning,
+    onTestMessageSend,
+    updateAutoTestResult,
+  ]);
+
+  const handleStopAutoTest = useCallback(() => {
+    if (!isAutoTestRunning) {
+      return;
+    }
+
+    autoTestStopRequestedRef.current = true;
+    setAutoTestStatus('stopping');
+    setAutoTestStatusText('正在等待当前这一轮生成结束，结束后停止');
+  }, [isAutoTestRunning]);
+
+  const handleClearAutoTestResults = useCallback(() => {
+    autoTestStopRequestedRef.current = true;
+    setAutoTestStatus('idle');
+    setAutoTestStatusText('');
+    setAutoTestResults([]);
+    setExpandedAutoTestResultId(null);
+  }, []);
+
+  const handleCopyAutoTestExport = useCallback(async (mode: 'plain' | 'full') => {
+    try {
+      await copyTextToClipboard(createAutoTestExportText(autoTestResults, mode));
+      setAutoTestStatusText(mode === 'plain' ? '已复制纯文本测试记录' : '已复制完整回复测试记录');
+    } catch (error) {
+      setAutoTestStatus('error');
+      setAutoTestStatusText(`复制失败：${getErrorMessage(error)}`);
+    }
+  }, [autoTestResults]);
+
+  const handleDownloadAutoTestExport = useCallback((mode: 'plain' | 'full') => {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const suffix = mode === 'plain' ? '纯文本' : '完整回复';
+    downloadTextFile(`武侠自动推进测试-${suffix}-${timestamp}.txt`, createAutoTestExportText(autoTestResults, mode));
+    setAutoTestStatusText(mode === 'plain' ? '已下载纯文本测试记录' : '已下载完整回复测试记录');
+  }, [autoTestResults]);
+
   useEffect(() => {
     if (activeTab !== 'variables') {
       return;
@@ -595,6 +736,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       case 'variables':
         refreshStatData();
         break;
+      case 'test':
+        handleClearAutoTestResults();
+        break;
       case 'debug':
         // 清空调试日志
         onClearDebugLogs?.();
@@ -607,6 +751,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     settings,
     onSettingsChange,
     refreshStatData,
+    handleClearAutoTestResults,
     onClearDebugLogs,
   ]);
 
@@ -623,6 +768,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         return '重置总结设置';
       case 'variables':
         return '重新读取变量';
+      case 'test':
+        return '清空测试结果';
       case 'debug':
         return '清空调试日志';
     }
