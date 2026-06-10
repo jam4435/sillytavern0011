@@ -309,11 +309,12 @@ function createEntryTogglePresetDropdown(lorebookName, isGlobal) {
     .attr('data-lorebook-name', lorebookName)
     .attr('data-is-global', isGlobal ? 'true' : 'false');
   const $button = $('<button></button>')
-    .addClass('preset-dropdown-button lorebook-batch-action-button entry-toggle-preset-button')
+    .addClass('preset-dropdown-button entry-toggle-preset-button')
     .attr('type', 'button')
     .attr('title', '条目组预设')
     .attr('aria-label', '条目组预设')
-    .html('<i class="fa-solid fa-bookmark"></i>');
+    .css({ background: 'none', border: 'none', color: 'var(--panel-text-color)', cursor: 'pointer' })
+    .html('<i class="fa-solid fa-bookmark"></i> 预设 <i class="fa-solid fa-caret-down"></i>');
   const $menu = $('<div></div>').addClass('preset-dropdown-menu entry-toggle-preset-menu');
 
   $menu.append(

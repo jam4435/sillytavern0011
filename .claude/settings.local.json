@@ -14,7 +14,8 @@
       "Bash(echo \"Exit code: $?\")",
       "Bash(python verify_aa_ranking.py)",
       "Bash(python extract_and_recalc.py)",
-      "Bash(python parse_models.py)"
+      "Bash(python parse_models.py)",
+      "PowerShell(pnpm build 2>&1)"
     ]
   }
 }
