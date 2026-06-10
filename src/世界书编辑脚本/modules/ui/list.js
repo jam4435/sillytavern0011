@@ -314,7 +314,7 @@ function createEntryTogglePresetDropdown(lorebookName, isGlobal) {
     .attr('title', '条目组预设')
     .attr('aria-label', '条目组预设')
     .css({ background: 'none', border: 'none', color: 'var(--panel-text-color)', cursor: 'pointer' })
-    .html('<i class="fa-solid fa-bookmark"></i> 预设 <i class="fa-solid fa-caret-down"></i>');
+    .html('<i class="fa-solid fa-bookmark"></i>');
   const $menu = $('<div></div>').addClass('preset-dropdown-menu entry-toggle-preset-menu');
 
   $menu.append(
