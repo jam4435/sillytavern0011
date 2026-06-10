@@ -74,6 +74,7 @@ export function setIsApiReady(value) {
 export const LOREBOOK_THEME_KEY = 'enhanced-lorebook-theme';
 export const PINNED_GLOBAL_WORLDBOOKS_KEY = 'pinned-global-worldbooks';
 export const GLOBAL_WORLDBOOK_PRESETS_KEY = 'global-lorebook-presets';
+export const ENTRY_TOGGLE_PRESETS_KEY = 'enhanced-lorebook-entry-toggle-presets';
 export const HIGHLIGHT_ACTIVE_ENTRIES_KEY = 'enhanced-lorebook-highlight-active';
 export const PINNED_ENTRIES_KEY = 'enhanced-lorebook-pinned-entries';
 

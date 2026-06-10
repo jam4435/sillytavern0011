@@ -763,6 +763,129 @@ export function initPanel() {
                     overflow-wrap: var(--lorebook-name-overflow-wrap);
                     word-break: var(--lorebook-name-word-break);
                 }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-title-meta {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    gap: 6px;
+                    flex: 0 0 auto;
+                    min-width: max-content;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-title-meta .preset-dropdown-container {
+                    margin-left: 0;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-title-meta .entry-toggle-preset-button {
+                    margin-left: 0;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-title-meta .lorebook-entries-count {
+                    display: inline-flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 1px;
+                    line-height: 1.05;
+                    white-space: nowrap;
+                    font-size: 0.72em;
+                    opacity: 0.8;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-title-meta .lorebook-entries-count .count-line {
+                    display: block;
+                }
+
+                #${LOREBOOK_PANEL_ID} .drawer-folder-entry-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-folder-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 8px 10px;
+                    border: 1px solid var(--panel-border-color, #555);
+                    border-radius: 6px;
+                    background-color: color-mix(in srgb, var(--panel-entry-bg-color, #2a2a2a) 86%, var(--panel-accent-color, #9a7ace));
+                    color: var(--panel-text-color);
+                    margin-top: 6px;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-folder-toggle {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    border: none;
+                    background: transparent;
+                    color: inherit;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    cursor: pointer;
+                    padding: 0;
+                    text-align: left;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-folder-label {
+                    min-width: 0;
+                    display: inline-flex;
+                    flex-direction: column;
+                    gap: 1px;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-folder-title {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-folder-meta {
+                    font-size: 0.78em;
+                    opacity: 0.72;
+                    font-weight: normal;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-folder-actions {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    flex: 0 0 auto;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-folder-action-button {
+                    width: 24px;
+                    height: 24px;
+                    border: 1px solid color-mix(in srgb, var(--panel-icon-bg-color, #666) 80%, #fff);
+                    border-radius: 6px;
+                    background-color: var(--panel-icon-bg-color, #666);
+                    color: #fff;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    padding: 0;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-folder-action-button:hover {
+                    background-color: var(--panel-icon-hover-bg-color, #777);
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-folder-checkbox {
+                    flex: 0 0 auto;
+                    width: 16px;
+                    height: 16px;
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-folder-entries {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    margin-left: 18px;
+                    padding-left: 10px;
+                    border-left: 2px solid color-mix(in srgb, var(--panel-accent-color, #9a7ace) 70%, transparent);
+                }
                 
                 /* 世界书标题展开/折叠相关样式 */
                 #${LOREBOOK_PANEL_ID} .lorebook-title-clickable {
@@ -1998,6 +2121,19 @@ export function initPanel() {
                     margin: 5px 0;
                 }
 
+                .entry-toggle-preset-menu .preset-item {
+                    justify-content: flex-start;
+                    gap: 8px;
+                }
+
+                .entry-toggle-preset-menu .preset-empty {
+                    padding: 8px 12px;
+                    color: rgba(255, 255, 255, 0.55);
+                    font-size: 0.86em;
+                    font-style: italic;
+                    white-space: nowrap;
+                }
+
                 .preset-dropdown-button:hover {
                     color: var(--panel-accent-color) !important;
                 }
@@ -2456,10 +2592,23 @@ export function initPanel() {
                     }
                     #${LOREBOOK_PANEL_ID} .lorebook-title-info-wrapper {
                         display: flex;
-                        flex-direction: column;
+                        flex-direction: row;
                         align-items: flex-start;
+                        justify-content: space-between;
+                        gap: 8px;
                         flex-basis: 100%;
+                        min-width: 0;
                         order: 1;
+                    }
+                    #${LOREBOOK_PANEL_ID} .lorebook-title-info-wrapper .lorebook-title-text {
+                        flex: 1 1 auto;
+                        min-width: 0;
+                    }
+                    #${LOREBOOK_PANEL_ID} .lorebook-title-info-wrapper .lorebook-title-meta {
+                        flex: 0 0 auto;
+                    }
+                    #${LOREBOOK_PANEL_ID} .lorebook-title-info-wrapper .lorebook-entries-count {
+                        font-size: 0.72em;
                     }
                     #${LOREBOOK_PANEL_ID} .lorebook-actions-wrapper {
                         display: flex;
@@ -2502,6 +2651,21 @@ export function initPanel() {
                     #${LOREBOOK_PANEL_ID} .lorebook-batch-toggle-container {
                         flex-shrink: 0;
                         margin-left: 0;
+                    }
+
+                    #${LOREBOOK_PANEL_ID} .lorebook-folder-item {
+                        align-items: flex-start;
+                        flex-wrap: wrap;
+                    }
+                    #${LOREBOOK_PANEL_ID} .lorebook-folder-toggle {
+                        min-width: 160px;
+                    }
+                    #${LOREBOOK_PANEL_ID} .lorebook-folder-actions {
+                        margin-left: auto;
+                    }
+                    #${LOREBOOK_PANEL_ID} .lorebook-folder-entries {
+                        margin-left: 8px;
+                        padding-left: 8px;
                     }
 
                     /* 条目头部 */

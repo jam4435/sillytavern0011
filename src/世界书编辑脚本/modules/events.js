@@ -482,7 +482,7 @@ export function bindEventListeners() {
           $title = $floatingOwner.closest('.lorebook-title');
         }
       }
-      const $folder = $target.closest('.master-folder-item');
+      const $folder = $target.closest('.lorebook-folder-item, .master-folder-item');
       const $item = $target.closest(`.${LOREBOOK_ENTRY_CLASS}`);
 
       const isTitleAction = $title.length > 0 && !$item.length;
@@ -615,35 +615,35 @@ export function bindEventListeners() {
     $headerCheckbox.prop('indeterminate', false);
   });
 
-  $panel.off('click.folderToggle').on('click.folderToggle', '.master-folder-toggle', function (e) {
+  $panel.off('click.folderToggle').on('click.folderToggle', '.lorebook-folder-toggle, .master-folder-toggle', function (e) {
     e.preventDefault();
     e.stopPropagation();
 
     const $toggle = $(this);
-    const $folderItem = $toggle.closest('.master-folder-item');
+    const $folderItem = $toggle.closest('.lorebook-folder-item, .master-folder-item');
     const lorebookName = $folderItem.attr('data-lorebook-name');
     const folderId = $folderItem.attr('data-folder-id');
     const nextCollapsed = toggleFolderCollapsedState(lorebookName, folderId);
-    const $folderEntries = $folderItem.next('.master-folder-entries');
+    const $folderEntries = $folderItem.next('.lorebook-folder-entries, .master-folder-entries');
 
     $folderItem.toggleClass('is-collapsed', nextCollapsed);
     $toggle.attr('title', nextCollapsed ? '展开文件夹' : '折叠文件夹');
     $toggle
-      .find('.master-folder-chevron')
+      .find('.lorebook-folder-chevron, .master-folder-chevron')
       .toggleClass('fa-chevron-right', nextCollapsed)
       .toggleClass('fa-chevron-down', !nextCollapsed);
     $toggle
-      .find('.master-folder-icon')
+      .find('.lorebook-folder-icon, .master-folder-icon')
       .toggleClass('fa-folder', nextCollapsed)
       .toggleClass('fa-folder-open', !nextCollapsed);
     $folderEntries.toggle(!nextCollapsed);
   });
 
-  $panel.off('change.folderSelect').on('change.folderSelect', '.master-folder-checkbox', function (e) {
+  $panel.off('change.folderSelect').on('change.folderSelect', '.lorebook-folder-checkbox, .master-folder-checkbox', function (e) {
     e.stopPropagation();
 
     const $checkbox = $(this);
-    const $folderItem = $checkbox.closest('.master-folder-item');
+    const $folderItem = $checkbox.closest('.lorebook-folder-item, .master-folder-item');
     const lorebookName = $folderItem.attr('data-lorebook-name');
     const isGlobal = $folderItem.attr('data-is-global') === 'true';
     const shouldSelect = $checkbox.prop('checked');
@@ -679,7 +679,7 @@ export function bindEventListeners() {
     const $title = $(this);
     if (
       $(e.target).closest(
-        '.lorebook-search-container, .lorebook-search-input, .lorebook-batch-action-button, .lorebook-delete-entries-button, .lorebook-add-entry-button, .sort-display-button, .lorebook-batch-toggle-container, .lorebook-title-menu-button, .lorebook-title-menu, .lorebook-title-select-all, .header-checkbox',
+        '.lorebook-search-container, .lorebook-search-input, .lorebook-batch-action-button, .lorebook-delete-entries-button, .lorebook-add-entry-button, .sort-display-button, .lorebook-batch-toggle-container, .preset-dropdown-container, .preset-dropdown-menu, .lorebook-title-menu-button, .lorebook-title-menu, .lorebook-title-select-all, .header-checkbox',
       ).length > 0
     ) {
       return;
@@ -1295,7 +1295,13 @@ export function bindSearchEvents() {
     }
 
     const clusterize = virtualScrollers[lorebookName];
-    if (!clusterize) return;
+    if (!clusterize) {
+      const $wrapper = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"]`, parentDoc).first();
+      if ($wrapper.length) {
+        loadLorebookEntries(lorebookName, $wrapper, isGlobal);
+      }
+      return;
+    }
 
     const newRows = matchedEntries.map(entry => `<li>${createEntryHtml(entry, lorebookName, isGlobal)}</li>`);
 

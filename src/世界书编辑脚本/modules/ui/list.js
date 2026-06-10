@@ -29,6 +29,7 @@ import {
 import { getPinnedEntries, getShowSearchBarSetting } from '../settings.js';
 import { ensureNumericUID, errorCatched, getLocalStorageItem, isMobile, setLocalStorageItem } from '../utils.js';
 import { extractFolderMeta, getRenderableEntriesWithoutFolderMeta } from '../features/folderMeta.js';
+import { getEntryTogglePresetNames } from '../features/entryTogglePresets.js';
 import { createEntryHtml } from './entry.js';
 import {
   getTabKey,
@@ -301,7 +302,78 @@ function buildAiActionDropdownHtml(lorebookName, isGlobal) {
   `;
 }
 
-function buildMasterDetailSegments(entries, lorebookName) {
+function createEntryTogglePresetDropdown(lorebookName, isGlobal) {
+  const presetNames = getEntryTogglePresetNames(lorebookName);
+  const $container = $('<div></div>')
+    .addClass('preset-dropdown-container entry-toggle-preset-container')
+    .attr('data-lorebook-name', lorebookName)
+    .attr('data-is-global', isGlobal ? 'true' : 'false');
+  const $button = $('<button></button>')
+    .addClass('preset-dropdown-button lorebook-batch-action-button entry-toggle-preset-button')
+    .attr('type', 'button')
+    .attr('title', '条目组预设')
+    .attr('aria-label', '条目组预设')
+    .html('<i class="fa-solid fa-bookmark"></i>');
+  const $menu = $('<div></div>').addClass('preset-dropdown-menu entry-toggle-preset-menu');
+
+  $menu.append(
+    $('<div></div>')
+      .addClass('preset-item')
+      .attr('data-action', 'save-entry-toggle-preset')
+      .append($('<i></i>').addClass('fa-solid fa-plus'))
+      .append($('<span></span>').text('保存当前条目开关')),
+  );
+  $menu.append($('<div></div>').addClass('preset-divider'));
+
+  if (presetNames.length === 0) {
+    $menu.append($('<div></div>').addClass('preset-empty').text('暂无条目组预设'));
+  } else {
+    presetNames.forEach(name => {
+      const $row = $('<div></div>').addClass('preset-item-row');
+      const $name = $('<span></span>')
+        .addClass('preset-name')
+        .attr('data-action', 'apply-entry-toggle-preset')
+        .attr('data-preset-name', name)
+        .text(name);
+      const $delete = $('<i></i>')
+        .addClass('fa-solid fa-trash preset-delete-btn')
+        .attr('data-action', 'delete-entry-toggle-preset')
+        .attr('data-preset-name', name)
+        .attr('title', '删除条目组预设');
+      $row.append($name).append($delete);
+      $menu.append($row);
+    });
+  }
+
+  return $container.append($button).append($menu);
+}
+
+export function refreshEntryTogglePresetMenu(lorebookName, isGlobal = false, parentDoc = window.parent.document) {
+  const $title = $(
+    `.lorebook-title[data-lorebook-name="${lorebookName}"][data-is-global="${isGlobal ? 'true' : 'false'}"]`,
+    parentDoc,
+  ).first();
+  if (!$title.length) {
+    return;
+  }
+
+  const $existing = $title.find('.entry-toggle-preset-container').first();
+  if (!$existing.length) {
+    return;
+  }
+
+  $existing.replaceWith(createEntryTogglePresetDropdown(lorebookName, isGlobal));
+}
+
+function hasFolderSegments(lorebookName) {
+  const folderMeta = getFolderMetaSession(lorebookName);
+  return !!(
+    (Array.isArray(folderMeta?.folders) && folderMeta.folders.length > 0) ||
+    Object.keys(folderMeta?.entryFolderMap || {}).length > 0
+  );
+}
+
+function buildLorebookSegments(entries, lorebookName) {
   const folderMeta = getFolderMetaSession(lorebookName);
   const folderDefinitions = Array.isArray(folderMeta?.folders) ? folderMeta.folders : [];
   const entryFolderMap = folderMeta?.entryFolderMap || {};
@@ -369,12 +441,12 @@ function buildMasterDetailSegments(entries, lorebookName) {
   return [...emptyFolderSegments, ...normalizedSegments];
 }
 
-function renderMasterDetailFolder($content, folderSegment, lorebookName, isGlobal) {
+function renderLorebookFolder($content, folderSegment, lorebookName, isGlobal) {
   const { folderId, folderName, entries } = folderSegment;
   const isCollapsed = getFolderCollapsedState(lorebookName, folderId);
   const folderUids = entries.map(entry => ensureNumericUID(entry.uid)).join(',');
   const $folderItem = $('<div></div>')
-    .addClass(`master-folder-item${isCollapsed ? ' is-collapsed' : ''}`)
+    .addClass(`lorebook-folder-item master-folder-item${isCollapsed ? ' is-collapsed' : ''}`)
     .attr('data-folder-id', folderId)
     .attr('data-folder-name', folderName)
     .attr('data-folder-uids', folderUids)
@@ -382,52 +454,54 @@ function renderMasterDetailFolder($content, folderSegment, lorebookName, isGloba
     .attr('data-is-global', isGlobal ? 'true' : 'false');
 
   const $toggleButton = $('<button></button>')
-    .addClass('master-folder-toggle')
+    .addClass('lorebook-folder-toggle master-folder-toggle')
     .attr('type', 'button')
     .attr('title', isCollapsed ? '展开文件夹' : '折叠文件夹')
     .append(
-      $('<i></i>').addClass(`fa-solid master-folder-chevron ${isCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`),
+      $('<i></i>').addClass(`fa-solid lorebook-folder-chevron master-folder-chevron ${isCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`),
     )
-    .append($('<i></i>').addClass(`fa-solid master-folder-icon ${isCollapsed ? 'fa-folder' : 'fa-folder-open'}`))
+    .append(
+      $('<i></i>').addClass(`fa-solid lorebook-folder-icon master-folder-icon ${isCollapsed ? 'fa-folder' : 'fa-folder-open'}`),
+    )
     .append(
       $('<span></span>')
-        .addClass('master-folder-label')
-        .append($('<span></span>').addClass('master-folder-title').text(folderName))
-        .append($('<span></span>').addClass('master-folder-meta').text(`${entries.length} 个条目`)),
+        .addClass('lorebook-folder-label master-folder-label')
+        .append($('<span></span>').addClass('lorebook-folder-title master-folder-title').text(folderName))
+        .append($('<span></span>').addClass('lorebook-folder-meta master-folder-meta').text(`${entries.length} 个条目`)),
     );
 
   const $checkbox = $('<input>')
     .attr('type', 'checkbox')
-    .addClass('master-folder-checkbox')
+    .addClass('lorebook-folder-checkbox master-folder-checkbox')
     .attr('title', '选择文件夹内全部条目');
-  const $actions = $('<div></div>').addClass('master-folder-actions');
+  const $actions = $('<div></div>').addClass('lorebook-folder-actions master-folder-actions');
   const $importButton = $('<button></button>')
-    .addClass('master-folder-action-button')
+    .addClass('lorebook-folder-action-button master-folder-action-button')
     .attr('type', 'button')
     .attr('title', '将选中条目导入此文件夹')
     .attr('data-action', 'import-folder-entries')
     .html('<i class="fa-solid fa-file-import"></i>');
   const $exportButton = $('<button></button>')
-    .addClass('master-folder-action-button')
+    .addClass('lorebook-folder-action-button master-folder-action-button')
     .attr('type', 'button')
     .attr('title', '将此文件夹中选中条目导出到顶层')
     .attr('data-action', 'export-folder-entries')
     .html('<i class="fa-solid fa-file-export"></i>');
   const $renameButton = $('<button></button>')
-    .addClass('master-folder-action-button')
+    .addClass('lorebook-folder-action-button master-folder-action-button')
     .attr('type', 'button')
     .attr('title', '重命名文件夹')
     .attr('data-action', 'rename-folder')
     .html('<i class="fa-solid fa-pen-to-square"></i>');
   const $deleteButton = $('<button></button>')
-    .addClass('master-folder-action-button')
+    .addClass('lorebook-folder-action-button master-folder-action-button')
     .attr('type', 'button')
     .attr('title', '删除文件夹')
     .attr('data-action', 'delete-folder')
     .html('<i class="fa-solid fa-trash"></i>');
 
   const $folderEntries = $('<div></div>')
-    .addClass('master-folder-entries')
+    .addClass('lorebook-folder-entries master-folder-entries')
     .attr('data-folder-id', folderId)
     .attr('data-lorebook-name', lorebookName)
     .attr('data-is-global', isGlobal ? 'true' : 'false')
@@ -558,10 +632,10 @@ function renderMasterDetailEntries($container, entries, lorebookName, isGlobal) 
   if (entries.length === 0) {
     $container.append('<div class="no-entries-message">没有匹配的条目</div>');
   } else {
-    const segments = buildMasterDetailSegments(entries, lorebookName);
+    const segments = buildLorebookSegments(entries, lorebookName);
     segments.forEach(segment => {
       if (segment.type === 'folder') {
-        renderMasterDetailFolder($content, segment, lorebookName, isGlobal);
+        renderLorebookFolder($content, segment, lorebookName, isGlobal);
         return;
       }
       $content.append(createEntryHtml(segment.entry, lorebookName, isGlobal));
@@ -574,6 +648,32 @@ function renderMasterDetailEntries($container, entries, lorebookName, isGlobal) 
   delete currentVirtualScrollers[lorebookName];
   setVirtualScrollers(currentVirtualScrollers);
   setTimeout(() => syncMasterDetailSelectionInList(isGlobal), 0);
+}
+
+function renderDrawerFolderEntries($container, entries, lorebookName, isGlobal) {
+  const $content = $('<div></div>')
+    .addClass('drawer-folder-entry-list lorebook-entries-container')
+    .attr('data-lorebook-name', lorebookName)
+    .attr('data-is-global', isGlobal ? 'true' : 'false')
+    .attr('data-folder-rendered', 'true');
+  const segments = buildLorebookSegments(entries, lorebookName);
+
+  if (segments.length === 0) {
+    $container.append('<div class="no-entries-message">没有匹配的条目</div>');
+  } else {
+    segments.forEach(segment => {
+      if (segment.type === 'folder') {
+        renderLorebookFolder($content, segment, lorebookName, isGlobal);
+        return;
+      }
+      $content.append(createEntryHtml(segment.entry, lorebookName, isGlobal));
+    });
+    $container.append($content);
+  }
+
+  const currentVirtualScrollers = { ...virtualScrollers };
+  delete currentVirtualScrollers[lorebookName];
+  setVirtualScrollers(currentVirtualScrollers);
 }
 
 export const createPresetFromCurrentState = errorCatched(async name => {
@@ -758,10 +858,12 @@ export const loadLorebookEntries = errorCatched(async (lorebookName, $container,
               (isGlobal ? 'true' : 'false') +
               '" title="全选/取消全选">',
           ),
-      );
+    );
     $container.append($tableHeader);
 
-    if (entries.length === 0) {
+    if (hasFolderSegments(lorebookName)) {
+      renderDrawerFolderEntries($container, entries, lorebookName, isGlobal);
+    } else if (entries.length === 0) {
       $container.append('<div class="no-entries-message">该世界书没有条目</div>');
     } else {
       // 【修复问题1】始终使用虚拟滚动，但在自定义排序时启用兼容的拖拽功能
@@ -1560,6 +1662,10 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
   const $lorebookTitle = $('<div></div>').addClass('lorebook-title');
   const $titleText = $('<span></span>').addClass('lorebook-title-text').text(lorebookName);
   const $countInfo = $('<span></span>').addClass('lorebook-entries-count').html(formatLorebookCountHtml('?', '--token'));
+  const $titleMeta = $('<div></div>')
+    .addClass('lorebook-title-meta')
+    .append(createEntryTogglePresetDropdown(lorebookName, isGlobal))
+    .append($countInfo);
   const isDesktopMaster = isMasterDetailLayout();
 
   const $sortContainer = $('<div></div>').addClass('lorebook-sort-container');
@@ -1718,6 +1824,18 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
     .html('<i class="fa-solid fa-folder-plus"></i>')
     .attr('title', '新建文件夹')
     .attr('data-action', 'create-folder');
+  const $moveToFolderButton = $('<button></button>')
+    .addClass('lorebook-batch-action-button')
+    .css('background-color', '#5f7d6e')
+    .html('<i class="fa-solid fa-folder-open"></i>')
+    .attr('title', '将已选条目移入文件夹')
+    .attr('data-action', 'move-selected-to-folder');
+  const $removeFromFolderButton = $('<button></button>')
+    .addClass('lorebook-batch-action-button')
+    .css('background-color', '#7d6e5f')
+    .html('<i class="fa-solid fa-folder-minus"></i>')
+    .attr('title', '将已选条目移出文件夹')
+    .attr('data-action', 'remove-selected-from-folder');
   const $addButton = $('<button></button>')
     .addClass('lorebook-add-entry-button')
     .html('<i class="fa-solid fa-plus"></i>')
@@ -1736,7 +1854,7 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
     const $titleInfoWrapper = $('<div></div>').addClass('lorebook-title-info-wrapper');
     const $actionsWrapper = $('<div></div>').addClass('lorebook-actions-wrapper');
     const $searchSortWrapper = $('<div></div>').addClass('lorebook-search-sort-wrapper');
-    $titleInfoWrapper.append($titleText).append($countInfo);
+    $titleInfoWrapper.append($titleText).append($titleMeta);
     $searchSortWrapper.append($searchContainer).append($sortContainer);
     $actionsWrapper
       .append($searchSortWrapper)
@@ -1746,6 +1864,8 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
       .append($aiActionContainer)
       .append($rollbackButton)
       .append($createFolderButton)
+      .append($moveToFolderButton)
+      .append($removeFromFolderButton)
       .append($selectAllButton)
       .append($batchToggleContainer)
       .append($filterContainer)
@@ -1763,7 +1883,7 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
       .attr('title', '更多操作')
       .attr('data-is-global', isGlobal ? 'true' : 'false');
     $sortButton.addClass('master-sort-button').attr('title', currentSortText).html('<i class="fa-solid fa-arrow-down-wide-short"></i>');
-    $titleMain.append($titleText).append($countInfo);
+    $titleMain.append($titleText).append($titleMeta);
     $selectAllToggle.append($selectAllCheckbox.attr('data-lorebook-name', lorebookName));
     $compactActions
       .append($sortContainer)
@@ -1775,6 +1895,8 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
       .append($aiActionContainer)
       .append($rollbackButton)
       .append($createFolderButton)
+      .append($moveToFolderButton)
+      .append($removeFromFolderButton)
       .append($batchToggleContainer)
       .append($filterContainer)
       .append($adjustPositionButton)
@@ -1784,7 +1906,7 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
   } else {
     $lorebookTitle
       .append($titleText)
-      .append($countInfo)
+      .append($titleMeta)
       .append($sortContainer)
       .append($searchContainer)
       .append($importButton)
@@ -1793,6 +1915,8 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
       .append($aiActionContainer)
       .append($rollbackButton)
       .append($createFolderButton)
+      .append($moveToFolderButton)
+      .append($removeFromFolderButton)
       .append($batchToggleContainer)
       .append($filterContainer)
       .append($adjustPositionButton)
@@ -1894,11 +2018,19 @@ export const updateVirtualScroll = errorCatched(async lorebookName => {
   if (!lorebookName) return false;
 
   try {
+    const parentDoc = window.parent.document;
+    const $wrapper = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"]`, parentDoc).first();
+    const isGlobal = $wrapper.attr('data-is-global') === 'true';
+
     // 1. 从 state.js 中获取指定 lorebookName 的数据
     if (isMasterDetailLayout()) {
-      const parentDoc = window.parent.document;
-      const $wrapper = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"]`, parentDoc).first();
-      const isGlobal = $wrapper.attr('data-is-global') === 'true';
+      if ($wrapper.length) {
+        return loadLorebookEntries(lorebookName, $wrapper, isGlobal);
+      }
+      return false;
+    }
+
+    if (hasFolderSegments(lorebookName)) {
       if ($wrapper.length) {
         return loadLorebookEntries(lorebookName, $wrapper, isGlobal);
       }

@@ -13,6 +13,12 @@ import {
   toggleAllEntries,
 } from '../features/batchActions.js';
 import { handleBulkImport } from '../features/bulkImport.js';
+import {
+  applyEntryTogglePreset,
+  createEntryTogglePresetFromCurrentState,
+  deleteEntryTogglePreset,
+  getEntryTogglePresetsForLorebook,
+} from '../features/entryTogglePresets.js';
 import { getRollbackPreview, rollbackLastTransaction } from '../features/history.js';
 import { prepareOptimizerModal } from '../features/optimizer.js';
 import { getAiWorkspaceSettings, setAiWorkspaceSettings } from '../settings.js';
@@ -21,7 +27,12 @@ import { refreshAiWorkspace, resetAiWorkspace } from '../ui/aiWorkspace.js';
 import { selectDetailEntry } from '../ui/detail.js';
 import { closeFloatingBatchToggleDropdowns } from '../ui/floatingBatchDropdown.js';
 import { switchTab } from '../ui/panel.js';
-import { updateHeaderCheckboxState, updateRollbackButtonState, updateVirtualScroll } from '../ui/list.js';
+import {
+  refreshEntryTogglePresetMenu,
+  updateHeaderCheckboxState,
+  updateRollbackButtonState,
+  updateVirtualScroll,
+} from '../ui/list.js';
 import { registerCommands } from './index.js';
 
 /**
@@ -434,6 +445,72 @@ async function addEntry({ lorebookName, isGlobal, refreshList }) {
   }
 }
 
+async function saveEntryTogglePreset({ lorebookName, isGlobal, parentDoc }) {
+  const presetName = window.prompt('请输入条目组预设名称：');
+  const normalizedPresetName = `${presetName || ''}`.trim();
+  if (!normalizedPresetName) {
+    return;
+  }
+
+  const existingPresets = getEntryTogglePresetsForLorebook(lorebookName);
+  if (
+    existingPresets[normalizedPresetName] &&
+    !window.confirm(`条目组预设“${normalizedPresetName}”已存在，是否覆盖？`)
+  ) {
+    return;
+  }
+
+  const success = await createEntryTogglePresetFromCurrentState(lorebookName, normalizedPresetName);
+  if (!success) {
+    window.toastr?.error('保存条目组预设失败');
+    return;
+  }
+
+  refreshEntryTogglePresetMenu(lorebookName, isGlobal, parentDoc);
+  window.toastr?.success(`已保存条目组预设：${normalizedPresetName}`);
+}
+
+async function applyEntryTogglePresetCommand({ $actionTarget, lorebookName, isGlobal, refreshList }) {
+  const presetName = `${$actionTarget.data('preset-name') || ''}`.trim();
+  if (!presetName) {
+    return;
+  }
+
+  if (!window.confirm(`确定应用条目组预设“${presetName}”吗？\n这会恢复保存时记录过的条目启用状态。`)) {
+    return;
+  }
+
+  const result = await applyEntryTogglePreset(lorebookName, presetName);
+  if (!result?.success) {
+    window.toastr?.error(result?.error?.message || '应用条目组预设失败');
+    return;
+  }
+
+  await refreshList(lorebookName, isGlobal);
+  updateRollbackButtonState(lorebookName, isGlobal);
+  window.toastr?.success(`已应用条目组预设：${presetName}，修改 ${result.modifiedCount || 0} 个条目`);
+}
+
+async function deleteEntryTogglePresetCommand({ $actionTarget, lorebookName, isGlobal, parentDoc }) {
+  const presetName = `${$actionTarget.data('preset-name') || ''}`.trim();
+  if (!presetName) {
+    return;
+  }
+
+  if (!window.confirm(`确定删除条目组预设“${presetName}”吗？`)) {
+    return;
+  }
+
+  const success = await deleteEntryTogglePreset(lorebookName, presetName);
+  if (!success) {
+    window.toastr?.error('删除条目组预设失败');
+    return;
+  }
+
+  refreshEntryTogglePresetMenu(lorebookName, isGlobal, parentDoc);
+  window.toastr?.success(`已删除条目组预设：${presetName}`);
+}
+
 /**
  * 反转字段值
  */
@@ -672,6 +749,9 @@ registerCommands({
   'adjust-position': adjustPosition,
   'delete-entries': deleteEntries,
   'add-entry': addEntry,
+  'save-entry-toggle-preset': saveEntryTogglePreset,
+  'apply-entry-toggle-preset': applyEntryTogglePresetCommand,
+  'delete-entry-toggle-preset': deleteEntryTogglePresetCommand,
   'invert': invert,
   'execute-batch-toggle': executeBatchTogglePatched,
   'execute-ai-selection': executeAiSelection,
