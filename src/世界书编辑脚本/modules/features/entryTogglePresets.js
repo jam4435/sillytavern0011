@@ -3,6 +3,8 @@ import { ENTRY_TOGGLE_PRESETS_KEY } from '../config.js';
 import { getRenderableEntriesWithoutFolderMeta, isFolderMetaEntry } from './folderMeta.js';
 import { ensureNumericUID, errorCatched, getLocalStorageItem, setLocalStorageItem } from '../utils.js';
 
+const VALID_STRATEGY_TYPES = new Set(['constant', 'selective', 'vectorized']);
+
 function normalizePresetName(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -29,6 +31,33 @@ function sanitizeUidList(value) {
     });
 }
 
+function normalizeStrategyType(value) {
+  return VALID_STRATEGY_TYPES.has(value) ? value : null;
+}
+
+function getEntryStrategyType(entry) {
+  return normalizeStrategyType(entry?.strategy?.type) || 'selective';
+}
+
+function sanitizeStrategyTypes(value, uidSet) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([uidKey, strategyType]) => {
+        const uid = ensureNumericUID(uidKey);
+        const normalizedStrategyType = normalizeStrategyType(strategyType);
+        if (!Number.isFinite(uid) || uid < 0 || !uidSet.has(uid) || !normalizedStrategyType) {
+          return null;
+        }
+        return [String(uid), normalizedStrategyType];
+      })
+      .filter(Boolean),
+  );
+}
+
 function sanitizePresetMap(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
@@ -53,6 +82,8 @@ function sanitizePresetMap(value) {
               const uids = sanitizeUidList(preset.uids);
               const uidSet = new Set(uids);
               const enabled = sanitizeUidList(preset.enabled).filter(uid => uidSet.has(uid));
+              const hasStrategyTypes = Object.prototype.hasOwnProperty.call(preset, 'strategyTypes');
+              const strategyTypes = hasStrategyTypes ? sanitizeStrategyTypes(preset.strategyTypes, uidSet) : undefined;
               const updatedAt = Number.isFinite(Number(preset.updatedAt)) ? Number(preset.updatedAt) : 0;
 
               return [
@@ -61,6 +92,7 @@ function sanitizePresetMap(value) {
                   name: normalizedPresetName,
                   uids,
                   enabled,
+                  ...(hasStrategyTypes ? { strategyTypes } : {}),
                   updatedAt,
                 },
               ];
@@ -129,9 +161,20 @@ export const createEntryTogglePresetFromCurrentState = errorCatched(async (loreb
   const entries = getRenderableEntriesWithoutFolderMeta(result.data || []);
   const uids = entries.map(entry => ensureNumericUID(entry.uid)).filter(uid => Number.isFinite(uid) && uid >= 0);
   const enabled = entries
-    .filter(entry => entry.enabled === true)
+    .filter(entry => entry.enabled !== false)
     .map(entry => ensureNumericUID(entry.uid))
     .filter(uid => Number.isFinite(uid) && uid >= 0);
+  const strategyTypes = Object.fromEntries(
+    entries
+      .map(entry => {
+        const uid = ensureNumericUID(entry.uid);
+        if (!Number.isFinite(uid) || uid < 0) {
+          return null;
+        }
+        return [String(uid), getEntryStrategyType(entry)];
+      })
+      .filter(Boolean),
+  );
 
   const presets = getEntryTogglePresetMap();
   presets[normalizedLorebookName] = {
@@ -140,6 +183,7 @@ export const createEntryTogglePresetFromCurrentState = errorCatched(async (loreb
       name: normalizedPresetName,
       uids: sanitizeUidList(uids),
       enabled: sanitizeUidList(enabled),
+      strategyTypes,
       updatedAt: Date.now(),
     },
   };
@@ -157,6 +201,7 @@ export const applyEntryTogglePreset = errorCatched(async (lorebookName, presetNa
 
   const recordedUidSet = new Set(sanitizeUidList(preset.uids));
   const enabledUidSet = new Set(sanitizeUidList(preset.enabled).filter(uid => recordedUidSet.has(uid)));
+  const strategyTypes = sanitizeStrategyTypes(preset.strategyTypes, recordedUidSet);
   let modifiedCount = 0;
 
   const result = await updateWorldbookEntries(
@@ -174,16 +219,27 @@ export const applyEntryTogglePreset = errorCatched(async (lorebookName, presetNa
         }
 
         const nextEnabled = enabledUidSet.has(uid);
-        if (entry.enabled === nextEnabled) {
+        const nextStrategyType = strategyTypes[String(uid)];
+        const currentStrategyType = getEntryStrategyType(entry);
+        const enabledChanged = entry.enabled !== nextEnabled;
+        const strategyTypeChanged = !!nextStrategyType && currentStrategyType !== nextStrategyType;
+        if (!enabledChanged && !strategyTypeChanged) {
           return entry;
         }
 
         hasChanges = true;
         modifiedCount++;
-        return {
+        const nextEntry = {
           ...entry,
           enabled: nextEnabled,
         };
+        if (strategyTypeChanged) {
+          nextEntry.strategy = {
+            ...(entry.strategy || {}),
+            type: nextStrategyType,
+          };
+        }
+        return nextEntry;
       });
 
       return hasChanges ? nextEntries : entries;
@@ -195,6 +251,7 @@ export const applyEntryTogglePreset = errorCatched(async (lorebookName, presetNa
         presetName: normalizedPresetName,
         recordedCount: recordedUidSet.size,
         enabledCount: enabledUidSet.size,
+        strategyTypeCount: Object.keys(strategyTypes).length,
       },
     },
   );

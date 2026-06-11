@@ -476,7 +476,7 @@ async function applyEntryTogglePresetCommand({ $actionTarget, lorebookName, isGl
     return;
   }
 
-  if (!window.confirm(`确定应用条目组预设“${presetName}”吗？\n这会恢复保存时记录过的条目启用状态。`)) {
+  if (!window.confirm(`确定应用条目组预设“${presetName}”吗？\n这会恢复保存时记录过的条目启用状态与蓝/绿灯模式。`)) {
     return;
   }
 

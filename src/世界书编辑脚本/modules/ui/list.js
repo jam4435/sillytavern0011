@@ -322,7 +322,7 @@ function createEntryTogglePresetDropdown(lorebookName, isGlobal) {
       .addClass('preset-item')
       .attr('data-action', 'save-entry-toggle-preset')
       .append($('<i></i>').addClass('fa-solid fa-plus'))
-      .append($('<span></span>').text('保存当前条目开关')),
+      .append($('<span></span>').text('保存当前条目状态')),
   );
   $menu.append($('<div></div>').addClass('preset-divider'));
 
