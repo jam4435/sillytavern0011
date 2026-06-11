@@ -91,7 +91,13 @@ const App: React.FC = () => {
   const [canRegenerate, setCanRegenerate] = useState(false);
 
   // 使用消息处理 hook
-  const { handleSendMessage, handleAutoAdvanceTurn, handleRegenerateLastAssistant } = useMessageHandler({
+  const {
+    handleSendMessage,
+    handleAutoAdvanceTurn,
+    handleRegenerateLastAssistant,
+    startAutoAdvanceSession,
+    finishAutoAdvanceSession,
+  } = useMessageHandler({
     setIsLoading,
     showLoading,
     showError,
@@ -431,6 +437,8 @@ const App: React.FC = () => {
           debugLogs={debugLogs}
           onClearDebugLogs={clearDebugLogs}
           onAutoAdvanceTurn={handleAutoAdvanceTurn}
+          onAutoAdvanceSessionStart={startAutoAdvanceSession}
+          onAutoAdvanceSessionEnd={finishAutoAdvanceSession}
           isGenerating={isLoading}
         />
       );

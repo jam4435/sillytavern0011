@@ -314,9 +314,6 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
   textarea.remove();
 };
 
-const sleep = (milliseconds: number): Promise<void> =>
-  new Promise(resolve => window.setTimeout(resolve, milliseconds));
-
 const clampAutoAdvanceCount = (value: number): number => {
   if (!Number.isFinite(value)) {
     return 1;
@@ -372,6 +369,8 @@ interface SettingsPanelProps {
   debugLogs?: DebugLogEntry[];
   onClearDebugLogs?: () => void;
   onAutoAdvanceTurn?: (message: string) => Promise<AutoAdvanceTurnResult>;
+  onAutoAdvanceSessionStart?: () => void;
+  onAutoAdvanceSessionEnd?: () => void;
   isGenerating?: boolean;
 }
 
@@ -386,6 +385,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   debugLogs = [],
   onClearDebugLogs,
   onAutoAdvanceTurn,
+  onAutoAdvanceSessionStart,
+  onAutoAdvanceSessionEnd,
   isGenerating = false,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('display');
@@ -413,7 +414,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // 自动推进相关状态
   const [autoAdvancePrompt, setAutoAdvancePrompt] = useState(DEFAULT_AUTO_ADVANCE_PROMPT);
   const [autoAdvanceCount, setAutoAdvanceCount] = useState(5);
-  const [autoAdvanceDelaySeconds, setAutoAdvanceDelaySeconds] = useState(0.8);
   const [autoAdvanceStatus, setAutoAdvanceStatus] = useState<AutoAdvanceStatus>('idle');
   const [autoAdvanceStatusText, setAutoAdvanceStatusText] = useState('');
   const [autoAdvanceResults, setAutoAdvanceResults] = useState<AutoAdvanceResult[]>([]);
@@ -564,78 +564,80 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
     const prompt = autoAdvancePrompt.trim() || DEFAULT_AUTO_ADVANCE_PROMPT;
     const totalCount = clampAutoAdvanceCount(autoAdvanceCount);
-    const delaySeconds = Math.max(0, Number.isFinite(autoAdvanceDelaySeconds) ? autoAdvanceDelaySeconds : 0);
-    const delayMs = Math.round(delaySeconds * 1000);
     let completedCount = 0;
 
     autoAdvanceStopRequestedRef.current = false;
     setAutoAdvancePrompt(prompt);
     setAutoAdvanceCount(totalCount);
-    setAutoAdvanceDelaySeconds(delaySeconds);
     setAutoAdvanceResults([]);
     setExpandedAutoAdvanceResultId(null);
     setAutoAdvanceStatus('running');
     setAutoAdvanceStatusText(`准备推进 ${totalCount} 轮`);
 
-    for (let index = 1; index <= totalCount; index += 1) {
-      if (autoAdvanceStopRequestedRef.current) {
-        break;
-      }
+    onAutoAdvanceSessionStart?.();
 
-      const id = `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
-      const startedAt = new Date();
-      setAutoAdvanceStatusText(`正在发送第 ${index}/${totalCount} 轮`);
-      setAutoAdvanceResults(previousResults => [
-        ...previousResults,
-        {
-          id,
-          index,
-          prompt,
-          plainText: '',
-          rawReply: '',
-          startedAt,
-          status: 'running',
-        },
-      ]);
-
-      try {
-        const turnResult = await onAutoAdvanceTurn(prompt);
-        if (!turnResult.rawReply.trim()) {
-          throw new Error('本轮没有取得 AI 回复');
+    try {
+      for (let index = 1; index <= totalCount; index += 1) {
+        if (autoAdvanceStopRequestedRef.current) {
+          break;
         }
 
-        completedCount += 1;
-        updateAutoAdvanceResult(id, {
-          prompt: turnResult.prompt,
-          plainText: turnResult.plainText,
-          rawReply: turnResult.rawReply,
-          userMessageId: turnResult.userMessageId,
-          assistantMessageId: turnResult.assistantMessageId,
-          variableWriteObserved: turnResult.variableWriteObserved,
-          finishedAt: new Date(),
-          status: 'success',
-        });
-      } catch (error) {
-        const errorMessage = getErrorMessage(error);
-        updateAutoAdvanceResult(id, {
-          finishedAt: new Date(),
-          status: 'error',
-          error: errorMessage,
-        });
-        setAutoAdvanceStatus('error');
-        setAutoAdvanceStatusText(`第 ${index} 轮失败：${errorMessage}`);
-        autoAdvanceStopRequestedRef.current = true;
-        return;
-      }
+        const id = `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
+        const startedAt = new Date();
+        setAutoAdvanceStatusText(`正在推进第 ${index}/${totalCount} 轮`);
+        setAutoAdvanceResults(previousResults => [
+          ...previousResults,
+          {
+            id,
+            index,
+            prompt,
+            plainText: '',
+            rawReply: '',
+            startedAt,
+            status: 'running',
+          },
+        ]);
 
-      if (autoAdvanceStopRequestedRef.current) {
-        break;
-      }
+        try {
+          const turnResult = await onAutoAdvanceTurn(prompt);
+          if (!turnResult.rawReply.trim()) {
+            throw new Error('本轮没有取得 AI 回复');
+          }
 
-      if (index < totalCount && delayMs > 0) {
-        setAutoAdvanceStatusText(`第 ${index} 轮完成，等待 ${(delayMs / 1000).toFixed(1)} 秒后继续`);
-        await sleep(delayMs);
+          completedCount += 1;
+          updateAutoAdvanceResult(id, {
+            prompt: turnResult.prompt,
+            plainText: turnResult.plainText,
+            rawReply: turnResult.rawReply,
+            userMessageId: turnResult.userMessageId,
+            assistantMessageId: turnResult.assistantMessageId,
+            variableWriteObserved: turnResult.variableWriteObserved,
+            finishedAt: new Date(),
+            status: 'success',
+          });
+        } catch (error) {
+          const errorMessage = getErrorMessage(error);
+          updateAutoAdvanceResult(id, {
+            finishedAt: new Date(),
+            status: 'error',
+            error: errorMessage,
+          });
+          setAutoAdvanceStatus('error');
+          setAutoAdvanceStatusText(`第 ${index} 轮失败：${errorMessage}`);
+          autoAdvanceStopRequestedRef.current = true;
+          return;
+        }
+
+        if (autoAdvanceStopRequestedRef.current) {
+          break;
+        }
+
+        if (index < totalCount) {
+          setAutoAdvanceStatusText(`第 ${index} 轮完成，立即进入第 ${index + 1} 轮`);
+        }
       }
+    } finally {
+      onAutoAdvanceSessionEnd?.();
     }
 
     setAutoAdvanceStatus('done');
@@ -647,9 +649,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     autoAdvanceStopRequestedRef.current = false;
   }, [
     autoAdvanceCount,
-    autoAdvanceDelaySeconds,
     autoAdvancePrompt,
     isAutoAdvanceRunning,
+    onAutoAdvanceSessionEnd,
+    onAutoAdvanceSessionStart,
     onAutoAdvanceTurn,
     updateAutoAdvanceResult,
   ]);
@@ -1710,7 +1713,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               自动推进
             </h4>
             <p className="settings-description">
-              按设定轮数连续发送同一句推进指令，并走完整楼层、变量和事件流程。
+              按设定轮数连续发送同一句推进指令。每轮在收到并处理完 AI 回复后，立即进入下一轮。
             </p>
 
             <div className="auto-advance-control-panel">
@@ -1736,22 +1739,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     max={AUTO_ADVANCE_MAX_COUNT}
                     value={autoAdvanceCount}
                     onChange={(event) => setAutoAdvanceCount(clampAutoAdvanceCount(Number(event.target.value)))}
-                    disabled={isAutoAdvanceRunning}
-                  />
-                </div>
-                <div className="settings-row settings-row-vertical">
-                  <label className="settings-label">轮间等待秒</label>
-                  <input
-                    className="settings-number-input auto-advance-number-input"
-                    type="number"
-                    min={0}
-                    max={30}
-                    step={0.1}
-                    value={autoAdvanceDelaySeconds}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      setAutoAdvanceDelaySeconds(Number.isFinite(value) ? Math.max(0, value) : 0);
-                    }}
                     disabled={isAutoAdvanceRunning}
                   />
                 </div>

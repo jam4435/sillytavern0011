@@ -10,6 +10,11 @@ import {
 } from '../utils/variableReader';
 import { messageLogger } from '../utils/logger';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
+import {
+  beginAutoAdvanceSession,
+  endAutoAdvanceSession,
+  isAutoAdvanceSessionActive,
+} from '../utils/autoAdvanceSession';
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -42,6 +47,11 @@ interface UseMessageHandlerOptions {
   addDebugLog: (type: 'prompt' | 'assistant', content: string) => void;
   currentMaintext: string;
   currentOptions: string[];
+}
+
+export interface AutoAdvanceSessionControls {
+  startAutoAdvanceSession: () => void;
+  finishAutoAdvanceSession: () => void;
 }
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
@@ -320,18 +330,36 @@ export function useMessageHandler({
     }
   }, [currentMaintext, currentOptions, addDebugLog, setIsLoading, showLoading, showError, dismissToast, setCurrentMaintext, setCurrentOptions]);
 
+  const startAutoAdvanceSession = useCallback(() => {
+    beginAutoAdvanceSession();
+    setIsLoading(true);
+    showLoading('正在自动推进剧情...');
+  }, [setIsLoading, showLoading]);
+
+  const finishAutoAdvanceSession = useCallback(() => {
+    endAutoAdvanceSession();
+    if (!isAutoAdvanceSessionActive()) {
+      dismissToast();
+      setIsLoading(false);
+    }
+  }, [dismissToast, setIsLoading]);
+
   const handleAutoAdvanceTurn = useCallback(async (message: string): Promise<AutoAdvanceTurnResult> => {
     const prompt = message.trim();
     if (!prompt) {
       throw new Error('自动推进指令不能为空。');
     }
 
+    const sessionActive = isAutoAdvanceSessionActive();
+
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     messageLogger.log('⏩ 开始自动推进完整回合');
     messageLogger.log('📝 推进指令:', prompt);
 
-    setIsLoading(true);
-    showLoading('正在自动推进剧情...');
+    if (!sessionActive) {
+      setIsLoading(true);
+      showLoading('正在自动推进剧情...');
+    }
 
     let variableWriteObserved = false;
     const writeDoneListener = eventOn('era:writeDone', () => {
@@ -391,7 +419,9 @@ export function useMessageHandler({
       setCurrentOptions(options);
       addDebugLog('assistant', `[自动推进 #${latestAssistantMessage.message_id}]\n${rawReply}`);
 
-      dismissToast();
+      if (!sessionActive) {
+        dismissToast();
+      }
       messageLogger.log('✅ 自动推进完整回合完成:', {
         userMessageId: userMessage.message_id,
         assistantMessageId: latestAssistantMessage.message_id,
@@ -414,7 +444,9 @@ export function useMessageHandler({
       throw error;
     } finally {
       writeDoneListener.stop();
-      setIsLoading(false);
+      if (!sessionActive) {
+        setIsLoading(false);
+      }
       messageLogger.log('🏁 自动推进流程结束');
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
@@ -464,5 +496,11 @@ export function useMessageHandler({
     showLoading,
   ]);
 
-  return { handleSendMessage, handleAutoAdvanceTurn, handleRegenerateLastAssistant };
+  return {
+    handleSendMessage,
+    handleAutoAdvanceTurn,
+    handleRegenerateLastAssistant,
+    startAutoAdvanceSession,
+    finishAutoAdvanceSession,
+  };
 }

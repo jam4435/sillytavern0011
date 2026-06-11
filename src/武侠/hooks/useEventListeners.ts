@@ -7,6 +7,7 @@ import {
   scheduleGameDataCompletion,
   scheduleGameDataCompletionFromMvuUpdate,
 } from '../utils/variableReader';
+import { isAutoAdvanceSessionActive } from '../utils/autoAdvanceSession';
 import { eventLogger } from '../utils/logger';
 
 interface UseEventListenersOptions {
@@ -77,6 +78,12 @@ export function useEventListeners({
 
     const handleMessageUpdate = (eventData?: unknown) => {
       eventLogger.log('收到消息更新事件:', eventData);
+
+      if (isAutoAdvanceSessionActive()) {
+        eventLogger.log('自动推进批处理中，跳过中间消息刷新');
+        return;
+      }
+
       scheduleRefresh();
 
       if (!mvuVariableUpdatesReady) {
@@ -99,6 +106,11 @@ export function useEventListeners({
     };
 
     const handleWriteDone = () => {
+      if (isAutoAdvanceSessionActive()) {
+        eventLogger.log('[era:writeDone] 自动推进批处理中，跳过中间变量刷新');
+        return;
+      }
+
       eventLogger.log('[era:writeDone] 检测到变量写入完成，调度纯读刷新');
       scheduleRefresh(50);
     };
