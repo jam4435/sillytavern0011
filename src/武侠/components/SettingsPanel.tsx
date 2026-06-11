@@ -28,32 +28,33 @@ import {
   type SummaryTriggerResult,
   type BatchSummaryResult,
 } from '../utils/summaryManager';
-import { normalizeDisplayedMessageContent, parseAIResponse } from '../utils/variableReader';
 import { Icons } from './Icons';
-import { DebugLogEntry } from '../hooks';
+import type { AutoAdvanceTurnResult, DebugLogEntry } from '../hooks';
 import { uiLogger } from '../utils/logger';
 
-type SettingsTab = 'display' | 'background' | 'regex' | 'summary' | 'variables' | 'test' | 'debug';
+type SettingsTab = 'display' | 'background' | 'regex' | 'summary' | 'variables' | 'advance' | 'debug';
 type VariableStatus = 'idle' | 'success' | 'error';
 type VariablePath = Array<string | number>;
-type AutoTestStatus = 'idle' | 'running' | 'stopping' | 'done' | 'error';
-type AutoTestResultStatus = 'running' | 'success' | 'error';
+type AutoAdvanceStatus = 'idle' | 'running' | 'stopping' | 'done' | 'error';
+type AutoAdvanceResultStatus = 'running' | 'success' | 'error';
 
-interface AutoTestResult {
+interface AutoAdvanceResult {
   id: string;
   index: number;
   prompt: string;
-  rawResponse: string;
-  plainResponse: string;
+  plainText: string;
+  rawReply: string;
+  userMessageId?: number;
+  assistantMessageId?: number;
+  variableWriteObserved?: boolean;
   startedAt: Date;
   finishedAt?: Date;
-  status: AutoTestResultStatus;
+  status: AutoAdvanceResultStatus;
   error?: string;
 }
 
-const DEFAULT_AUTO_TEST_PROMPT = '合理地继续推进剧情';
-const AUTO_TEST_MAX_COUNT = 50;
-const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
+const DEFAULT_AUTO_ADVANCE_PROMPT = '合理地继续推进剧情';
+const AUTO_ADVANCE_MAX_COUNT = 50;
 
 const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
 const ROOT_VARIABLE_PATH_KEY = 'root';
@@ -316,27 +317,16 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
 const sleep = (milliseconds: number): Promise<void> =>
   new Promise(resolve => window.setTimeout(resolve, milliseconds));
 
-const clampAutoTestCount = (value: number): number => {
+const clampAutoAdvanceCount = (value: number): number => {
   if (!Number.isFinite(value)) {
     return 1;
   }
 
-  return Math.min(AUTO_TEST_MAX_COUNT, Math.max(1, Math.floor(value)));
+  return Math.min(AUTO_ADVANCE_MAX_COUNT, Math.max(1, Math.floor(value)));
 };
 
-const createAutoTestPlainResponse = (rawResponse: string): string => {
-  const normalizedResponse = normalizeDisplayedMessageContent(rawResponse);
-  const parsedResponse = parseAIResponse(normalizedResponse);
-  const content = parsedResponse.content || normalizedResponse;
-  return content
-    .replace(OPTION_BLOCK_REGEX, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-};
-
-const createAutoTestExportText = (results: AutoTestResult[], mode: 'plain' | 'full'): string => {
-  const title = mode === 'plain' ? '自动推进测试 - 纯文本回复' : '自动推进测试 - 完整回复';
-  const contentKey = mode === 'plain' ? 'plainResponse' : 'rawResponse';
+const createAutoAdvanceExportText = (results: AutoAdvanceResult[], mode: 'plain' | 'full'): string => {
+  const title = mode === 'plain' ? '自动推进 - 纯文本回复' : '自动推进 - 完整回复';
 
   return [
     title,
@@ -347,12 +337,17 @@ const createAutoTestExportText = (results: AutoTestResult[], mode: 'plain' | 'fu
       `## 第 ${result.index} 轮 [${result.status}]`,
       `开始时间: ${result.startedAt.toLocaleString('zh-CN')}`,
       result.finishedAt ? `结束时间: ${result.finishedAt.toLocaleString('zh-CN')}` : '',
+      result.userMessageId !== undefined ? `用户楼层: #${result.userMessageId}` : '',
+      result.assistantMessageId !== undefined ? `助手楼层: #${result.assistantMessageId}` : '',
+      result.status === 'success'
+        ? `变量写入观察: ${result.variableWriteObserved ? '已观察到 era:writeDone' : '未观察到变量写入'}`
+        : '',
       '',
       '[发送]',
       result.prompt,
       '',
       mode === 'plain' ? '[纯文本回复]' : '[完整回复]',
-      result.error ? `错误: ${result.error}` : result[contentKey] || '(空)',
+      result.error ? `错误: ${result.error}` : mode === 'plain' ? result.plainText || '(空)' : result.rawReply || '(空)',
       '',
     ]),
   ].filter(Boolean).join('\n');
@@ -376,7 +371,7 @@ interface SettingsPanelProps {
   onSettingsChange: (settings: DisplaySettings) => void;
   debugLogs?: DebugLogEntry[];
   onClearDebugLogs?: () => void;
-  onTestMessageSend?: (message: string) => Promise<string>;
+  onAutoAdvanceTurn?: (message: string) => Promise<AutoAdvanceTurnResult>;
   isGenerating?: boolean;
 }
 
@@ -390,13 +385,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onSettingsChange,
   debugLogs = [],
   onClearDebugLogs,
-  onTestMessageSend,
+  onAutoAdvanceTurn,
   isGenerating = false,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('display');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
-  const autoTestStopRequestedRef = useRef(false);
+  const autoAdvanceStopRequestedRef = useRef(false);
 
   // 自动总结相关状态
   const [summaryStatus, setSummaryStatus] = useState<SummaryTriggerResult | null>(null);
@@ -415,14 +410,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isVariableDetailOpen, setIsVariableDetailOpen] = useState(false);
   const [variableSearch, setVariableSearch] = useState('');
 
-  // 自动推进测试相关状态
-  const [autoTestPrompt, setAutoTestPrompt] = useState(DEFAULT_AUTO_TEST_PROMPT);
-  const [autoTestCount, setAutoTestCount] = useState(5);
-  const [autoTestDelaySeconds, setAutoTestDelaySeconds] = useState(0.8);
-  const [autoTestStatus, setAutoTestStatus] = useState<AutoTestStatus>('idle');
-  const [autoTestStatusText, setAutoTestStatusText] = useState('');
-  const [autoTestResults, setAutoTestResults] = useState<AutoTestResult[]>([]);
-  const [expandedAutoTestResultId, setExpandedAutoTestResultId] = useState<string | null>(null);
+  // 自动推进相关状态
+  const [autoAdvancePrompt, setAutoAdvancePrompt] = useState(DEFAULT_AUTO_ADVANCE_PROMPT);
+  const [autoAdvanceCount, setAutoAdvanceCount] = useState(5);
+  const [autoAdvanceDelaySeconds, setAutoAdvanceDelaySeconds] = useState(0.8);
+  const [autoAdvanceStatus, setAutoAdvanceStatus] = useState<AutoAdvanceStatus>('idle');
+  const [autoAdvanceStatusText, setAutoAdvanceStatusText] = useState('');
+  const [autoAdvanceResults, setAutoAdvanceResults] = useState<AutoAdvanceResult[]>([]);
+  const [expandedAutoAdvanceResultId, setExpandedAutoAdvanceResultId] = useState<string | null>(null);
 
   const normalizedVariableSearch = variableSearch.trim().toLowerCase();
   const normalizedCurrentPresetName = currentPresetName.trim();
@@ -433,10 +428,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       matchesVariableSearch(key, value, normalizedVariableSearch)
     )
     : [];
-  const isAutoTestRunning = autoTestStatus === 'running' || autoTestStatus === 'stopping';
-  const autoTestCompletedCount = autoTestResults.filter(result => result.status === 'success').length;
-  const autoTestFailedCount = autoTestResults.filter(result => result.status === 'error').length;
-  const hasAutoTestResults = autoTestResults.length > 0;
+  const isAutoAdvanceRunning = autoAdvanceStatus === 'running' || autoAdvanceStatus === 'stopping';
+  const autoAdvanceCompletedCount = autoAdvanceResults.filter(result => result.status === 'success').length;
+  const autoAdvanceFailedCount = autoAdvanceResults.filter(result => result.status === 'error').length;
+  const hasAutoAdvanceResults = autoAdvanceResults.length > 0;
 
   // 更新单个设置项
   const updateSetting = useCallback(<K extends keyof DisplaySettings>(
@@ -550,146 +545,149 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, []);
 
-  const updateAutoTestResult = useCallback((id: string, updates: Partial<AutoTestResult>) => {
-    setAutoTestResults(previousResults =>
+  const updateAutoAdvanceResult = useCallback((id: string, updates: Partial<AutoAdvanceResult>) => {
+    setAutoAdvanceResults(previousResults =>
       previousResults.map(result => result.id === id ? { ...result, ...updates } : result)
     );
   }, []);
 
-  const handleStartAutoTest = useCallback(async () => {
-    if (isAutoTestRunning) {
+  const handleStartAutoAdvance = useCallback(async () => {
+    if (isAutoAdvanceRunning) {
       return;
     }
 
-    if (!onTestMessageSend) {
-      setAutoTestStatus('error');
-      setAutoTestStatusText('当前页面没有可用的发送接口');
+    if (!onAutoAdvanceTurn) {
+      setAutoAdvanceStatus('error');
+      setAutoAdvanceStatusText('当前页面没有可用的自动推进接口');
       return;
     }
 
-    const prompt = autoTestPrompt.trim() || DEFAULT_AUTO_TEST_PROMPT;
-    const totalCount = clampAutoTestCount(autoTestCount);
-    const delaySeconds = Math.max(0, Number.isFinite(autoTestDelaySeconds) ? autoTestDelaySeconds : 0);
+    const prompt = autoAdvancePrompt.trim() || DEFAULT_AUTO_ADVANCE_PROMPT;
+    const totalCount = clampAutoAdvanceCount(autoAdvanceCount);
+    const delaySeconds = Math.max(0, Number.isFinite(autoAdvanceDelaySeconds) ? autoAdvanceDelaySeconds : 0);
     const delayMs = Math.round(delaySeconds * 1000);
     let completedCount = 0;
 
-    autoTestStopRequestedRef.current = false;
-    setAutoTestPrompt(prompt);
-    setAutoTestCount(totalCount);
-    setAutoTestDelaySeconds(delaySeconds);
-    setAutoTestResults([]);
-    setExpandedAutoTestResultId(null);
-    setAutoTestStatus('running');
-    setAutoTestStatusText(`准备发送 ${totalCount} 轮自动推进测试`);
+    autoAdvanceStopRequestedRef.current = false;
+    setAutoAdvancePrompt(prompt);
+    setAutoAdvanceCount(totalCount);
+    setAutoAdvanceDelaySeconds(delaySeconds);
+    setAutoAdvanceResults([]);
+    setExpandedAutoAdvanceResultId(null);
+    setAutoAdvanceStatus('running');
+    setAutoAdvanceStatusText(`准备推进 ${totalCount} 轮`);
 
     for (let index = 1; index <= totalCount; index += 1) {
-      if (autoTestStopRequestedRef.current) {
+      if (autoAdvanceStopRequestedRef.current) {
         break;
       }
 
       const id = `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
       const startedAt = new Date();
-      setAutoTestStatusText(`正在发送第 ${index}/${totalCount} 轮`);
-      setAutoTestResults(previousResults => [
+      setAutoAdvanceStatusText(`正在发送第 ${index}/${totalCount} 轮`);
+      setAutoAdvanceResults(previousResults => [
         ...previousResults,
         {
           id,
           index,
           prompt,
-          rawResponse: '',
-          plainResponse: '',
+          plainText: '',
+          rawReply: '',
           startedAt,
           status: 'running',
         },
       ]);
 
       try {
-        const rawResponse = await onTestMessageSend(prompt);
-        if (!rawResponse.trim()) {
+        const turnResult = await onAutoAdvanceTurn(prompt);
+        if (!turnResult.rawReply.trim()) {
           throw new Error('本轮没有取得 AI 回复');
         }
 
-        const plainResponse = createAutoTestPlainResponse(rawResponse);
         completedCount += 1;
-        updateAutoTestResult(id, {
-          rawResponse,
-          plainResponse,
+        updateAutoAdvanceResult(id, {
+          prompt: turnResult.prompt,
+          plainText: turnResult.plainText,
+          rawReply: turnResult.rawReply,
+          userMessageId: turnResult.userMessageId,
+          assistantMessageId: turnResult.assistantMessageId,
+          variableWriteObserved: turnResult.variableWriteObserved,
           finishedAt: new Date(),
           status: 'success',
         });
       } catch (error) {
         const errorMessage = getErrorMessage(error);
-        updateAutoTestResult(id, {
+        updateAutoAdvanceResult(id, {
           finishedAt: new Date(),
           status: 'error',
           error: errorMessage,
         });
-        setAutoTestStatus('error');
-        setAutoTestStatusText(`第 ${index} 轮失败：${errorMessage}`);
-        autoTestStopRequestedRef.current = true;
+        setAutoAdvanceStatus('error');
+        setAutoAdvanceStatusText(`第 ${index} 轮失败：${errorMessage}`);
+        autoAdvanceStopRequestedRef.current = true;
         return;
       }
 
-      if (autoTestStopRequestedRef.current) {
+      if (autoAdvanceStopRequestedRef.current) {
         break;
       }
 
       if (index < totalCount && delayMs > 0) {
-        setAutoTestStatusText(`第 ${index} 轮完成，等待 ${(delayMs / 1000).toFixed(1)} 秒后继续`);
+        setAutoAdvanceStatusText(`第 ${index} 轮完成，等待 ${(delayMs / 1000).toFixed(1)} 秒后继续`);
         await sleep(delayMs);
       }
     }
 
-    setAutoTestStatus('done');
-    setAutoTestStatusText(
-      autoTestStopRequestedRef.current
+    setAutoAdvanceStatus('done');
+    setAutoAdvanceStatusText(
+      autoAdvanceStopRequestedRef.current
         ? `已停止，完成 ${completedCount}/${totalCount} 轮`
-        : `测试完成，完成 ${completedCount}/${totalCount} 轮`,
+        : `推进完成，完成 ${completedCount}/${totalCount} 轮`,
     );
-    autoTestStopRequestedRef.current = false;
+    autoAdvanceStopRequestedRef.current = false;
   }, [
-    autoTestCount,
-    autoTestDelaySeconds,
-    autoTestPrompt,
-    isAutoTestRunning,
-    onTestMessageSend,
-    updateAutoTestResult,
+    autoAdvanceCount,
+    autoAdvanceDelaySeconds,
+    autoAdvancePrompt,
+    isAutoAdvanceRunning,
+    onAutoAdvanceTurn,
+    updateAutoAdvanceResult,
   ]);
 
-  const handleStopAutoTest = useCallback(() => {
-    if (!isAutoTestRunning) {
+  const handleStopAutoAdvance = useCallback(() => {
+    if (!isAutoAdvanceRunning) {
       return;
     }
 
-    autoTestStopRequestedRef.current = true;
-    setAutoTestStatus('stopping');
-    setAutoTestStatusText('正在等待当前这一轮生成结束，结束后停止');
-  }, [isAutoTestRunning]);
+    autoAdvanceStopRequestedRef.current = true;
+    setAutoAdvanceStatus('stopping');
+    setAutoAdvanceStatusText('正在等待当前这一轮生成结束，结束后停止');
+  }, [isAutoAdvanceRunning]);
 
-  const handleClearAutoTestResults = useCallback(() => {
-    autoTestStopRequestedRef.current = true;
-    setAutoTestStatus('idle');
-    setAutoTestStatusText('');
-    setAutoTestResults([]);
-    setExpandedAutoTestResultId(null);
+  const handleClearAutoAdvanceResults = useCallback(() => {
+    autoAdvanceStopRequestedRef.current = true;
+    setAutoAdvanceStatus('idle');
+    setAutoAdvanceStatusText('');
+    setAutoAdvanceResults([]);
+    setExpandedAutoAdvanceResultId(null);
   }, []);
 
-  const handleCopyAutoTestExport = useCallback(async (mode: 'plain' | 'full') => {
+  const handleCopyAutoAdvanceExport = useCallback(async (mode: 'plain' | 'full') => {
     try {
-      await copyTextToClipboard(createAutoTestExportText(autoTestResults, mode));
-      setAutoTestStatusText(mode === 'plain' ? '已复制纯文本测试记录' : '已复制完整回复测试记录');
+      await copyTextToClipboard(createAutoAdvanceExportText(autoAdvanceResults, mode));
+      setAutoAdvanceStatusText(mode === 'plain' ? '已复制纯文本推进记录' : '已复制完整回复推进记录');
     } catch (error) {
-      setAutoTestStatus('error');
-      setAutoTestStatusText(`复制失败：${getErrorMessage(error)}`);
+      setAutoAdvanceStatus('error');
+      setAutoAdvanceStatusText(`复制失败：${getErrorMessage(error)}`);
     }
-  }, [autoTestResults]);
+  }, [autoAdvanceResults]);
 
-  const handleDownloadAutoTestExport = useCallback((mode: 'plain' | 'full') => {
+  const handleDownloadAutoAdvanceExport = useCallback((mode: 'plain' | 'full') => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const suffix = mode === 'plain' ? '纯文本' : '完整回复';
-    downloadTextFile(`武侠自动推进测试-${suffix}-${timestamp}.txt`, createAutoTestExportText(autoTestResults, mode));
-    setAutoTestStatusText(mode === 'plain' ? '已下载纯文本测试记录' : '已下载完整回复测试记录');
-  }, [autoTestResults]);
+    downloadTextFile(`武侠自动推进-${suffix}-${timestamp}.txt`, createAutoAdvanceExportText(autoAdvanceResults, mode));
+    setAutoAdvanceStatusText(mode === 'plain' ? '已下载纯文本推进记录' : '已下载完整回复推进记录');
+  }, [autoAdvanceResults]);
 
   useEffect(() => {
     if (activeTab !== 'variables') {
@@ -747,8 +745,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       case 'variables':
         refreshStatData();
         break;
-      case 'test':
-        handleClearAutoTestResults();
+      case 'advance':
+        handleClearAutoAdvanceResults();
         break;
       case 'debug':
         // 清空调试日志
@@ -762,7 +760,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     settings,
     onSettingsChange,
     refreshStatData,
-    handleClearAutoTestResults,
+    handleClearAutoAdvanceResults,
     onClearDebugLogs,
   ]);
 
@@ -779,8 +777,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         return '重置总结设置';
       case 'variables':
         return '重新读取变量';
-      case 'test':
-        return '清空测试结果';
+      case 'advance':
+        return '清空推进记录';
       case 'debug':
         return '清空调试日志';
     }
@@ -1070,11 +1068,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <span className="settings-tab-label" data-short-label="变量">变量</span>
         </button>
         <button
-          className={`settings-tab ${activeTab === 'test' ? 'active' : ''}`}
-          onClick={() => setActiveTab('test')}
+          className={`settings-tab ${activeTab === 'advance' ? 'active' : ''}`}
+          onClick={() => setActiveTab('advance')}
         >
           <Icons.Send size={16} />
-          <span className="settings-tab-label" data-short-label="测试">自动测试</span>
+          <span className="settings-tab-label" data-short-label="推进">自动推进</span>
         </button>
         <button
           className={`settings-tab ${activeTab === 'debug' ? 'active' : ''}`}
@@ -1704,76 +1702,76 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
         )}
 
-        {/* 自动推进测试 */}
-        {activeTab === 'test' && (
-          <div className="settings-section auto-test-section">
+        {/* 自动推进 */}
+        {activeTab === 'advance' && (
+          <div className="settings-section auto-advance-section">
             <h4 className="settings-section-title">
               <span className="diamond-bullet"></span>
-              自动推进测试
+              自动推进
             </h4>
             <p className="settings-description">
-              按设定轮数连续发送同一句测试指令，用于抽查多轮剧情推进、变量块写入和回复稳定性。
+              按设定轮数连续发送同一句推进指令，并走完整楼层、变量和事件流程。
             </p>
 
-            <div className="auto-test-control-panel">
+            <div className="auto-advance-control-panel">
               <div className="settings-row settings-row-vertical">
-                <label className="settings-label">测试指令</label>
+                <label className="settings-label">推进指令</label>
                 <textarea
-                  className="settings-textarea auto-test-prompt-input"
-                  value={autoTestPrompt}
-                  onChange={(event) => setAutoTestPrompt(event.target.value)}
-                  disabled={isAutoTestRunning}
+                  className="settings-textarea auto-advance-prompt-input"
+                  value={autoAdvancePrompt}
+                  onChange={(event) => setAutoAdvancePrompt(event.target.value)}
+                  disabled={isAutoAdvanceRunning}
                   rows={3}
                   spellCheck={false}
                 />
               </div>
 
-              <div className="auto-test-grid">
+              <div className="auto-advance-grid">
                 <div className="settings-row settings-row-vertical">
                   <label className="settings-label">对话轮数</label>
                   <input
-                    className="settings-number-input auto-test-number-input"
+                    className="settings-number-input auto-advance-number-input"
                     type="number"
                     min={1}
-                    max={AUTO_TEST_MAX_COUNT}
-                    value={autoTestCount}
-                    onChange={(event) => setAutoTestCount(clampAutoTestCount(Number(event.target.value)))}
-                    disabled={isAutoTestRunning}
+                    max={AUTO_ADVANCE_MAX_COUNT}
+                    value={autoAdvanceCount}
+                    onChange={(event) => setAutoAdvanceCount(clampAutoAdvanceCount(Number(event.target.value)))}
+                    disabled={isAutoAdvanceRunning}
                   />
                 </div>
                 <div className="settings-row settings-row-vertical">
                   <label className="settings-label">轮间等待秒</label>
                   <input
-                    className="settings-number-input auto-test-number-input"
+                    className="settings-number-input auto-advance-number-input"
                     type="number"
                     min={0}
                     max={30}
                     step={0.1}
-                    value={autoTestDelaySeconds}
+                    value={autoAdvanceDelaySeconds}
                     onChange={(event) => {
                       const value = Number(event.target.value);
-                      setAutoTestDelaySeconds(Number.isFinite(value) ? Math.max(0, value) : 0);
+                      setAutoAdvanceDelaySeconds(Number.isFinite(value) ? Math.max(0, value) : 0);
                     }}
-                    disabled={isAutoTestRunning}
+                    disabled={isAutoAdvanceRunning}
                   />
                 </div>
               </div>
 
-              <div className="auto-test-actions">
+              <div className="auto-advance-actions">
                 <button
                   className="settings-action-btn primary"
                   type="button"
-                  onClick={handleStartAutoTest}
-                  disabled={isAutoTestRunning || isGenerating || !autoTestPrompt.trim()}
+                  onClick={handleStartAutoAdvance}
+                  disabled={isAutoAdvanceRunning || isGenerating || !autoAdvancePrompt.trim()}
                 >
                   <Icons.Send size={16} />
-                  <span>{isAutoTestRunning ? '测试中' : '开始测试'}</span>
+                  <span>{isAutoAdvanceRunning ? '推进中' : '开始推进'}</span>
                 </button>
                 <button
                   className="settings-action-btn"
                   type="button"
-                  onClick={handleStopAutoTest}
-                  disabled={!isAutoTestRunning}
+                  onClick={handleStopAutoAdvance}
+                  disabled={!isAutoAdvanceRunning}
                 >
                   <Icons.Close size={16} />
                   <span>停止</span>
@@ -1781,39 +1779,39 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <button
                   className="settings-action-btn"
                   type="button"
-                  onClick={handleClearAutoTestResults}
-                  disabled={isAutoTestRunning || !hasAutoTestResults}
+                  onClick={handleClearAutoAdvanceResults}
+                  disabled={isAutoAdvanceRunning || !hasAutoAdvanceResults}
                 >
                   <Icons.Refresh size={16} />
                   <span>清空</span>
                 </button>
               </div>
 
-              {(autoTestStatusText || hasAutoTestResults) && (
-                <div className={`auto-test-status ${autoTestStatus}`}>
-                  <span>{autoTestStatusText || '等待测试开始'}</span>
-                  {hasAutoTestResults && (
-                    <span className="auto-test-status-meta">
-                      成功 {autoTestCompletedCount} / 失败 {autoTestFailedCount} / 共 {autoTestResults.length}
+              {(autoAdvanceStatusText || hasAutoAdvanceResults) && (
+                <div className={`auto-advance-status ${autoAdvanceStatus}`}>
+                  <span>{autoAdvanceStatusText || '等待推进开始'}</span>
+                  {hasAutoAdvanceResults && (
+                    <span className="auto-advance-status-meta">
+                      成功 {autoAdvanceCompletedCount} / 失败 {autoAdvanceFailedCount} / 共 {autoAdvanceResults.length}
                     </span>
                   )}
                 </div>
               )}
             </div>
 
-            <div className="auto-test-export-panel">
-              <div className="auto-test-export-header">
+            <div className="auto-advance-export-panel">
+              <div className="auto-advance-export-header">
                 <div>
                   <h5>结果导出</h5>
                   <p>纯文本用于检查剧情质量；完整回复保留变量块，便于复制给其他 AI 检查变量生成。</p>
                 </div>
               </div>
-              <div className="auto-test-export-actions">
+              <div className="auto-advance-export-actions">
                 <button
                   className="settings-action-btn"
                   type="button"
-                  onClick={() => handleCopyAutoTestExport('plain')}
-                  disabled={!hasAutoTestResults}
+                  onClick={() => handleCopyAutoAdvanceExport('plain')}
+                  disabled={!hasAutoAdvanceResults}
                 >
                   <Icons.Copy size={16} />
                   <span>复制纯文本</span>
@@ -1821,8 +1819,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <button
                   className="settings-action-btn"
                   type="button"
-                  onClick={() => handleDownloadAutoTestExport('plain')}
-                  disabled={!hasAutoTestResults}
+                  onClick={() => handleDownloadAutoAdvanceExport('plain')}
+                  disabled={!hasAutoAdvanceResults}
                 >
                   <Icons.FileText size={16} />
                   <span>下载纯文本</span>
@@ -1830,8 +1828,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <button
                   className="settings-action-btn"
                   type="button"
-                  onClick={() => handleCopyAutoTestExport('full')}
-                  disabled={!hasAutoTestResults}
+                  onClick={() => handleCopyAutoAdvanceExport('full')}
+                  disabled={!hasAutoAdvanceResults}
                 >
                   <Icons.Copy size={16} />
                   <span>复制完整回复</span>
@@ -1839,8 +1837,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <button
                   className="settings-action-btn"
                   type="button"
-                  onClick={() => handleDownloadAutoTestExport('full')}
-                  disabled={!hasAutoTestResults}
+                  onClick={() => handleDownloadAutoAdvanceExport('full')}
+                  disabled={!hasAutoAdvanceResults}
                 >
                   <Icons.FileText size={16} />
                   <span>下载完整回复</span>
@@ -1848,59 +1846,66 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </div>
 
-            <div className="auto-test-results">
-              {autoTestResults.length === 0 ? (
-                <div className="auto-test-empty">
+            <div className="auto-advance-results">
+              {autoAdvanceResults.length === 0 ? (
+                <div className="auto-advance-empty">
                   <Icons.Send size={32} />
-                  <p>暂无测试结果</p>
+                  <p>暂无推进记录</p>
                 </div>
               ) : (
-                autoTestResults.map(result => (
+                autoAdvanceResults.map(result => (
                   <div
                     key={result.id}
-                    className={`auto-test-result ${result.status} ${expandedAutoTestResultId === result.id ? 'expanded' : ''}`}
+                    className={`auto-advance-result ${result.status} ${expandedAutoAdvanceResultId === result.id ? 'expanded' : ''}`}
                   >
                     <button
-                      className="auto-test-result-header"
+                      className="auto-advance-result-header"
                       type="button"
-                      onClick={() => setExpandedAutoTestResultId(
-                        expandedAutoTestResultId === result.id ? null : result.id,
+                      onClick={() => setExpandedAutoAdvanceResultId(
+                        expandedAutoAdvanceResultId === result.id ? null : result.id,
                       )}
                     >
-                      <span className="auto-test-result-title">第 {result.index} 轮</span>
-                      <span className={`auto-test-result-badge ${result.status}`}>
+                      <span className="auto-advance-result-title">第 {result.index} 轮</span>
+                      <span className={`auto-advance-result-badge ${result.status}`}>
                         {result.status === 'running' ? '生成中' : result.status === 'success' ? '完成' : '失败'}
                       </span>
-                      <span className="auto-test-result-length">
+                      <span className="auto-advance-result-length">
                         {result.status === 'success'
-                          ? `${result.plainResponse.length} / ${result.rawResponse.length} 字符`
+                          ? `#${result.userMessageId ?? '?'} → #${result.assistantMessageId ?? '?'} · ${result.plainText.length} / ${result.rawReply.length} 字符`
                           : result.error || '等待回复'}
                       </span>
-                      {expandedAutoTestResultId === result.id
+                      {expandedAutoAdvanceResultId === result.id
                         ? <Icons.ChevronDown size={18} />
                         : <Icons.ChevronUp size={18} />}
                     </button>
 
-                    {expandedAutoTestResultId !== result.id && result.plainResponse && (
-                      <div className="auto-test-result-preview">
-                        {result.plainResponse.slice(0, 180)}
-                        {result.plainResponse.length > 180 && '...'}
+                    {expandedAutoAdvanceResultId !== result.id && result.plainText && (
+                      <div className="auto-advance-result-preview">
+                        {result.plainText.slice(0, 180)}
+                        {result.plainText.length > 180 && '...'}
                       </div>
                     )}
 
-                    {expandedAutoTestResultId === result.id && (
-                      <div className="auto-test-result-body">
-                        <div className="auto-test-result-block">
-                          <div className="auto-test-result-block-title">发送内容</div>
+                    {expandedAutoAdvanceResultId === result.id && (
+                      <div className="auto-advance-result-body">
+                        {result.status === 'success' && (
+                          <div className="auto-advance-result-meta">
+                            <span>用户楼层 #{result.userMessageId ?? '?'}</span>
+                            <span>助手楼层 #{result.assistantMessageId ?? '?'}</span>
+                            <span>{result.variableWriteObserved ? '已观察到变量写入' : '未观察到变量写入'}</span>
+                          </div>
+                        )}
+                        <div className="auto-advance-result-block">
+                          <div className="auto-advance-result-block-title">发送内容</div>
                           <pre>{result.prompt}</pre>
                         </div>
-                        <div className="auto-test-result-block">
-                          <div className="auto-test-result-block-title">纯文本回复</div>
-                          <pre>{result.error ? `错误：${result.error}` : result.plainResponse || '(空)'}</pre>
+                        <div className="auto-advance-result-block">
+                          <div className="auto-advance-result-block-title">纯文本回复</div>
+                          <pre>{result.error ? `错误：${result.error}` : result.plainText || '(空)'}</pre>
                         </div>
-                        <div className="auto-test-result-block">
-                          <div className="auto-test-result-block-title">完整回复</div>
-                          <pre>{result.error ? `错误：${result.error}` : result.rawResponse || '(空)'}</pre>
+                        <div className="auto-advance-result-block">
+                          <div className="auto-advance-result-block-title">完整回复</div>
+                          <pre>{result.error ? `错误：${result.error}` : result.rawReply || '(空)'}</pre>
                         </div>
                       </div>
                     )}

@@ -1337,15 +1337,15 @@
 }
 
 // =========================================
-// 自动推进测试
+// 自动推进
 // =========================================
 
-.auto-test-section {
+.auto-advance-section {
   gap: 1rem;
 }
 
-.auto-test-control-panel,
-.auto-test-export-panel {
+.auto-advance-control-panel,
+.auto-advance-export-panel {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
@@ -1357,11 +1357,11 @@
     rgba(255, 255, 255, 0.02);
 }
 
-.auto-test-prompt-input {
+.auto-advance-prompt-input {
   min-height: 5.5rem;
 }
 
-.auto-test-grid {
+.auto-advance-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
@@ -1372,26 +1372,26 @@
   }
 }
 
-.auto-test-number-input {
+.auto-advance-number-input {
   width: 100%;
   max-width: 10rem;
   text-align: left;
 }
 
-.auto-test-actions,
-.auto-test-export-actions {
+.auto-advance-actions,
+.auto-advance-export-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
 }
 
-.auto-test-actions .settings-action-btn,
-.auto-test-export-actions .settings-action-btn {
+.auto-advance-actions .settings-action-btn,
+.auto-advance-export-actions .settings-action-btn {
   min-width: 8.5rem;
   justify-content: center;
 }
 
-.auto-test-status {
+.auto-advance-status {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1423,12 +1423,12 @@
   }
 }
 
-.auto-test-status-meta {
+.auto-advance-status-meta {
   color: $stone-500;
   white-space: nowrap;
 }
 
-.auto-test-export-header {
+.auto-advance-export-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1450,13 +1450,13 @@
   }
 }
 
-.auto-test-results {
+.auto-advance-results {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.auto-test-empty {
+.auto-advance-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1473,7 +1473,7 @@
   }
 }
 
-.auto-test-result {
+.auto-advance-result {
   border: 1px solid $stone-800;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.02);
@@ -1497,7 +1497,7 @@
   }
 }
 
-.auto-test-result-header {
+.auto-advance-result-header {
   display: grid;
   grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
   align-items: center;
@@ -1516,14 +1516,14 @@
   }
 }
 
-.auto-test-result-title {
+.auto-advance-result-title {
   color: $stone-300;
   font-family: $font-serif;
   font-size: 0.9rem;
   white-space: nowrap;
 }
 
-.auto-test-result-badge {
+.auto-advance-result-badge {
   padding: 0.18rem 0.45rem;
   border-radius: 4px;
   font-size: 0.72rem;
@@ -1545,7 +1545,7 @@
   }
 }
 
-.auto-test-result-length {
+.auto-advance-result-length {
   min-width: 0;
   overflow: hidden;
   color: $stone-500;
@@ -1554,7 +1554,7 @@
   white-space: nowrap;
 }
 
-.auto-test-result-preview {
+.auto-advance-result-preview {
   padding: 0 0.75rem 0.75rem;
   color: $stone-500;
   font-family: monospace;
@@ -1565,7 +1565,7 @@
   white-space: nowrap;
 }
 
-.auto-test-result-body {
+.auto-advance-result-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
@@ -1573,17 +1573,32 @@
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.auto-test-result-block {
+.auto-advance-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  color: $stone-500;
+  font-size: 0.76rem;
+
+  span {
+    padding: 0.18rem 0.45rem;
+    border: 1px solid $stone-800;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+}
+
+.auto-advance-result-block {
   min-width: 0;
 }
 
-.auto-test-result-block-title {
+.auto-advance-result-block-title {
   margin-bottom: 0.35rem;
   color: $stone-500;
   font-size: 0.74rem;
 }
 
-.auto-test-result-block pre {
+.auto-advance-result-block pre {
   max-height: 18rem;
   margin: 0;
   padding: 0.75rem;
@@ -1600,52 +1615,52 @@
 }
 
 @media (max-width: $breakpoint-md) {
-  .auto-test-grid {
+  .auto-advance-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .auto-test-status {
+  .auto-advance-status {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .auto-test-status-meta {
+  .auto-advance-status-meta {
     white-space: normal;
   }
 
-  .auto-test-actions .settings-action-btn,
-  .auto-test-export-actions .settings-action-btn {
+  .auto-advance-actions .settings-action-btn,
+  .auto-advance-export-actions .settings-action-btn {
     flex: 1 1 9rem;
   }
 }
 
 @media (max-width: 420px) {
-  .auto-test-control-panel,
-  .auto-test-export-panel {
+  .auto-advance-control-panel,
+  .auto-advance-export-panel {
     padding: 0.75rem;
   }
 
-  .auto-test-result-header {
+  .auto-advance-result-header {
     grid-template-columns: max-content minmax(0, 1fr) max-content;
     grid-template-areas:
       "title length icon"
       "badge badge badge";
   }
 
-  .auto-test-result-title {
+  .auto-advance-result-title {
     grid-area: title;
   }
 
-  .auto-test-result-badge {
+  .auto-advance-result-badge {
     grid-area: badge;
     justify-self: start;
   }
 
-  .auto-test-result-length {
+  .auto-advance-result-length {
     grid-area: length;
   }
 
-  .auto-test-result-header > .icon-wrap {
+  .auto-advance-result-header > .icon-wrap {
     grid-area: icon;
   }
 }

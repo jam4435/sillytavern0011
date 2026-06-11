@@ -91,11 +91,12 @@ const App: React.FC = () => {
   const [canRegenerate, setCanRegenerate] = useState(false);
 
   // 使用消息处理 hook
-  const { handleSendMessage, handleRegenerateLastAssistant } = useMessageHandler({
+  const { handleSendMessage, handleAutoAdvanceTurn, handleRegenerateLastAssistant } = useMessageHandler({
     setIsLoading,
     showLoading,
     showError,
     dismissToast,
+    updateGameState,
     setCurrentMaintext,
     setCurrentOptions,
     addDebugLog,
@@ -429,7 +430,7 @@ const App: React.FC = () => {
           onSettingsChange={handleSettingsChange}
           debugLogs={debugLogs}
           onClearDebugLogs={clearDebugLogs}
-          onTestMessageSend={handleSendMessage}
+          onAutoAdvanceTurn={handleAutoAdvanceTurn}
           isGenerating={isLoading}
         />
       );
