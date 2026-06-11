@@ -6,15 +6,9 @@ import {
   normalizeDisplayedMessageContent,
   parseAIResponse,
   parseOptions,
-  readGameDataPure,
 } from '../utils/variableReader';
 import { messageLogger } from '../utils/logger';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
-import {
-  beginAutoAdvanceSession,
-  endAutoAdvanceSession,
-  isAutoAdvanceSessionActive,
-} from '../utils/autoAdvanceSession';
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -49,29 +43,10 @@ interface UseMessageHandlerOptions {
   currentOptions: string[];
 }
 
-export interface AutoAdvanceSessionControls {
-  startAutoAdvanceSession: () => void;
-  finishAutoAdvanceSession: () => void;
-}
-
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
-const AUTO_ADVANCE_USER_MESSAGE_TIMEOUT_MS = 15000;
-const AUTO_ADVANCE_ASSISTANT_MESSAGE_TIMEOUT_MS = 120000;
-const AUTO_ADVANCE_ERA_WRITE_TIMEOUT_MS = 12000;
-const AUTO_ADVANCE_EVENT_SETTLE_TIMEOUT_MS = 1500;
-const AUTO_ADVANCE_POLL_INTERVAL_MS = 400;
-const AUTO_ADVANCE_SETTLE_MS = 500;
-const AUTO_ADVANCE_VARIABLE_BLOCK_REGEX = /<Variable(?:Think|Insert|Edit|Delete)>/i;
-
-const sleep = (milliseconds: number): Promise<void> =>
-  new Promise(resolve => window.setTimeout(resolve, milliseconds));
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
-
-function quoteSlashCommandArgument(value: string): string {
-  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-}
 
 function getActiveMessageText(message: ChatMessageWithSwipes): string {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
@@ -104,43 +79,6 @@ function getNewestMessageAfter(messageId: number, role: ChatRole): ChatMessageWi
   }
 
   return messages.find(message => getActiveMessageText(message).trim().length > 0) || null;
-}
-
-async function waitForNewMessageAfter(
-  messageId: number,
-  role: ChatRole,
-  timeoutMs: number,
-): Promise<ChatMessageWithSwipes> {
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() <= deadline) {
-    const message = getNewestMessageAfter(messageId, role);
-    if (message) {
-      return message;
-    }
-
-    await sleep(AUTO_ADVANCE_POLL_INTERVAL_MS);
-  }
-
-  throw new Error(role === 'user' ? '发送后没有找到新增用户楼层。' : '触发生成后没有找到新增助手楼层。');
-}
-
-async function waitForCondition(
-  predicate: () => boolean,
-  timeoutMs: number,
-  intervalMs = 100,
-): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() <= deadline) {
-    if (predicate()) {
-      return true;
-    }
-
-    await sleep(intervalMs);
-  }
-
-  return predicate();
 }
 
 function createAutoAdvancePlainText(rawReply: string): string {
@@ -330,36 +268,15 @@ export function useMessageHandler({
     }
   }, [currentMaintext, currentOptions, addDebugLog, setIsLoading, showLoading, showError, dismissToast, setCurrentMaintext, setCurrentOptions]);
 
-  const startAutoAdvanceSession = useCallback(() => {
-    beginAutoAdvanceSession();
-    setIsLoading(true);
-    showLoading('正在自动推进剧情...');
-  }, [setIsLoading, showLoading]);
-
-  const finishAutoAdvanceSession = useCallback(() => {
-    endAutoAdvanceSession();
-    if (!isAutoAdvanceSessionActive()) {
-      dismissToast();
-      setIsLoading(false);
-    }
-  }, [dismissToast, setIsLoading]);
-
   const handleAutoAdvanceTurn = useCallback(async (message: string): Promise<AutoAdvanceTurnResult> => {
     const prompt = message.trim();
     if (!prompt) {
       throw new Error('自动推进指令不能为空。');
     }
 
-    const sessionActive = isAutoAdvanceSessionActive();
-
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    messageLogger.log('⏩ 开始自动推进完整回合');
+    messageLogger.log('⏩ 开始自动推进手动回合');
     messageLogger.log('📝 推进指令:', prompt);
-
-    if (!sessionActive) {
-      setIsLoading(true);
-      showLoading('正在自动推进剧情...');
-    }
 
     let variableWriteObserved = false;
     const writeDoneListener = eventOn('era:writeDone', () => {
@@ -367,73 +284,31 @@ export function useMessageHandler({
     });
 
     try {
-      await flushPendingGameDataCompletion('before-auto-advance');
-
       const beforeLastMessageId = getLatestMessageId();
-      addDebugLog('prompt', `[自动推进]\n${prompt}`);
-
-      await triggerSlash(`/send raw=true ${quoteSlashCommandArgument(prompt)}`);
-      const userMessage = await waitForNewMessageAfter(
-        beforeLastMessageId,
-        'user',
-        AUTO_ADVANCE_USER_MESSAGE_TIMEOUT_MS,
-      );
-
-      await triggerSlash('/trigger await=true');
-      const assistantMessage = await waitForNewMessageAfter(
-        userMessage.message_id,
-        'assistant',
-        AUTO_ADVANCE_ASSISTANT_MESSAGE_TIMEOUT_MS,
-      );
-      let latestAssistantMessage = getNewestMessageAfter(userMessage.message_id, 'assistant') || assistantMessage;
-      let rawReply = getActiveMessageText(latestAssistantMessage);
+      const rawReply = await handleSendMessage(prompt);
       if (!rawReply.trim()) {
-        throw new Error('本轮新增助手楼层没有可读取的回复内容。');
+        throw new Error('本轮没有取得 AI 回复');
       }
 
-      await flushPendingGameDataCompletion('after-auto-advance-message');
-
-      if (!variableWriteObserved) {
-        await waitForCondition(
-          () => variableWriteObserved,
-          AUTO_ADVANCE_VARIABLE_BLOCK_REGEX.test(rawReply)
-            ? AUTO_ADVANCE_ERA_WRITE_TIMEOUT_MS
-            : AUTO_ADVANCE_EVENT_SETTLE_TIMEOUT_MS,
-        );
-      }
-      await sleep(AUTO_ADVANCE_SETTLE_MS);
-
-      latestAssistantMessage = getNewestMessageAfter(userMessage.message_id, 'assistant') || latestAssistantMessage;
-      rawReply = getActiveMessageText(latestAssistantMessage);
-      if (!rawReply.trim()) {
-        throw new Error('本轮新增助手楼层没有可读取的回复内容。');
+      const userMessage = getNewestMessageAfter(beforeLastMessageId, 'user');
+      const assistantMessage = getNewestMessageAfter(beforeLastMessageId, 'assistant');
+      if (!userMessage || !assistantMessage) {
+        throw new Error('手动发送流程完成后，没有找到对应的新楼层记录。');
       }
 
-      const maintext = getLastMessageContent() || normalizeDisplayedMessageContent(rawReply);
-      const options = parseOptions(maintext || rawReply);
-      const gameData = readGameDataPure();
-      if (gameData) {
-        updateGameState(gameData);
-      }
-      setCurrentMaintext(maintext);
-      setCurrentOptions(options);
-      addDebugLog('assistant', `[自动推进 #${latestAssistantMessage.message_id}]\n${rawReply}`);
-
-      if (!sessionActive) {
-        dismissToast();
-      }
+      const recordedRawReply = getActiveMessageText(assistantMessage) || rawReply;
       messageLogger.log('✅ 自动推进完整回合完成:', {
         userMessageId: userMessage.message_id,
-        assistantMessageId: latestAssistantMessage.message_id,
+        assistantMessageId: assistantMessage.message_id,
         variableWriteObserved,
       });
 
       return {
         prompt,
         userMessageId: userMessage.message_id,
-        assistantMessageId: latestAssistantMessage.message_id,
+        assistantMessageId: assistantMessage.message_id,
         plainText: createAutoAdvancePlainText(rawReply),
-        rawReply,
+        rawReply: recordedRawReply,
         variableWriteObserved,
       };
     } catch (error) {
@@ -444,21 +319,13 @@ export function useMessageHandler({
       throw error;
     } finally {
       writeDoneListener.stop();
-      if (!sessionActive) {
-        setIsLoading(false);
-      }
       messageLogger.log('🏁 自动推进流程结束');
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
   }, [
     addDebugLog,
-    dismissToast,
-    setCurrentMaintext,
-    setCurrentOptions,
-    setIsLoading,
+    handleSendMessage,
     showError,
-    showLoading,
-    updateGameState,
   ]);
 
   const handleRegenerateLastAssistant = useCallback(async (): Promise<void> => {
@@ -500,7 +367,5 @@ export function useMessageHandler({
     handleSendMessage,
     handleAutoAdvanceTurn,
     handleRegenerateLastAssistant,
-    startAutoAdvanceSession,
-    finishAutoAdvanceSession,
   };
 }

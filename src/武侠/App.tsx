@@ -95,8 +95,6 @@ const App: React.FC = () => {
     handleSendMessage,
     handleAutoAdvanceTurn,
     handleRegenerateLastAssistant,
-    startAutoAdvanceSession,
-    finishAutoAdvanceSession,
   } = useMessageHandler({
     setIsLoading,
     showLoading,
@@ -437,8 +435,6 @@ const App: React.FC = () => {
           debugLogs={debugLogs}
           onClearDebugLogs={clearDebugLogs}
           onAutoAdvanceTurn={handleAutoAdvanceTurn}
-          onAutoAdvanceSessionStart={startAutoAdvanceSession}
-          onAutoAdvanceSessionEnd={finishAutoAdvanceSession}
           isGenerating={isLoading}
         />
       );
