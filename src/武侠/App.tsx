@@ -27,6 +27,7 @@ import {
   usePageFlow,
   useSummaryDetection,
   useToast,
+  useVariableChangeTracker,
 } from './hooks';
 import { ActivePanel } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
@@ -89,6 +90,14 @@ const App: React.FC = () => {
   const [currentPresetName, setCurrentPresetName] = useState(() => getLoadedPresetNameSafe());
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
+  const {
+    variableChanges,
+    handleVariableTurnStart,
+    handleVariableAssistantReply,
+    handleMvuVariableUpdate,
+    handleEraWriteDone,
+    clearVariableChanges,
+  } = useVariableChangeTracker();
 
   // 使用消息处理 hook
   const {
@@ -106,6 +115,8 @@ const App: React.FC = () => {
     addDebugLog,
     currentMaintext,
     currentOptions,
+    onVariableTurnStart: handleVariableTurnStart,
+    onVariableAssistantReply: handleVariableAssistantReply,
   });
 
   // 使用事件监听 hook
@@ -113,6 +124,8 @@ const App: React.FC = () => {
     updateGameState,
     setCurrentMaintext,
     setCurrentOptions,
+    onMvuVariableUpdate: handleMvuVariableUpdate,
+    onEraWriteDone: handleEraWriteDone,
   });
 
   // 使用自动总结检测 hook
@@ -284,6 +297,7 @@ const App: React.FC = () => {
   const handleContinue = useCallback(() => {
     gameLogger.log('');
     gameLogger.log('续写江湖 - 加载存档');
+    clearVariableChanges();
 
     const savedData = readGameDataPure();
     gameLogger.log('readGameDataPure 返回:', savedData ? '有数据' : 'null');
@@ -302,7 +316,7 @@ const App: React.FC = () => {
 
     setCurrentPage('game');
     gameLogger.log('✅ 加载完成，进入游戏');
-  }, [setGameState, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
+  }, [clearVariableChanges, setGameState, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
 
   // 新游戏设置提交处理
   const handleSetupSubmit = useCallback(async (formData: NewGameFormData) => {
@@ -377,6 +391,7 @@ const App: React.FC = () => {
         setSavedGameExists(true);
         setCurrentMaintext('');
         setCurrentOptions([]);
+        clearVariableChanges();
         gameLogger.log('✅ 欢迎语已设置到开局输入界面');
         gameLogger.log('欢迎语:', result.content);
 
@@ -392,7 +407,19 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [addDebugLog, setIsLoading, showLoading, showError, dismissToast, setGameState, setCurrentMaintext, setCurrentOptions, setSavedGameExists, setCurrentPage]);
+  }, [
+    addDebugLog,
+    clearVariableChanges,
+    setIsLoading,
+    showLoading,
+    showError,
+    dismissToast,
+    setGameState,
+    setCurrentMaintext,
+    setCurrentOptions,
+    setSavedGameExists,
+    setCurrentPage,
+  ]);
 
   const handleOpeningSend = useCallback(async (message: string) => {
     await handleSendMessage(message);
@@ -635,6 +662,7 @@ const App: React.FC = () => {
                   handleSendMessage(option);
                 }}
                 settings={displaySettings}
+                variableChanges={variableChanges}
               />
             </section>
 

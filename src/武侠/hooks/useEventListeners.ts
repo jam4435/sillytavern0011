@@ -13,12 +13,16 @@ interface UseEventListenersOptions {
   updateGameState: (data: Partial<GameState>) => void;
   setCurrentMaintext: (text: string) => void;
   setCurrentOptions: (options: string[]) => void;
+  onMvuVariableUpdate?: (variables: unknown, variablesBeforeUpdate: unknown) => void;
+  onEraWriteDone?: (detail: unknown) => void;
 }
 
 export function useEventListeners({
   updateGameState,
   setCurrentMaintext,
   setCurrentOptions,
+  onMvuVariableUpdate,
+  onEraWriteDone,
 }: UseEventListenersOptions) {
   useEffect(() => {
     eventLogger.log('🎧 注册消息事件监听器');
@@ -55,6 +59,7 @@ export function useEventListeners({
       }
 
       mvuVariableListener = eventOn(mvu.events.VARIABLE_UPDATE_ENDED, (variables: unknown, variablesBeforeUpdate: unknown) => {
+        onMvuVariableUpdate?.(variables, variablesBeforeUpdate);
         scheduleGameDataCompletionFromMvuUpdate(variables, variablesBeforeUpdate);
       });
       mvuVariableUpdatesReady = true;
@@ -98,8 +103,9 @@ export function useEventListeners({
       }
     };
 
-    const handleWriteDone = () => {
+    const handleWriteDone = (detail?: unknown) => {
       eventLogger.log('[era:writeDone] 检测到变量写入完成，调度纯读刷新');
+      onEraWriteDone?.(detail);
       scheduleRefresh(50);
     };
 
@@ -128,5 +134,11 @@ export function useEventListeners({
       writeDoneListener.stop();
       mvuVariableListener?.stop();
     };
-  }, [updateGameState, setCurrentMaintext, setCurrentOptions]);
+  }, [
+    updateGameState,
+    setCurrentMaintext,
+    setCurrentOptions,
+    onMvuVariableUpdate,
+    onEraWriteDone,
+  ]);
 }

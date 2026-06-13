@@ -41,6 +41,8 @@ interface UseMessageHandlerOptions {
   addDebugLog: (type: 'prompt' | 'assistant', content: string) => void;
   currentMaintext: string;
   currentOptions: string[];
+  onVariableTurnStart?: () => void;
+  onVariableAssistantReply?: (rawReply: string, assistantMessageId?: number) => void;
 }
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
@@ -102,6 +104,8 @@ export function useMessageHandler({
   addDebugLog,
   currentMaintext,
   currentOptions,
+  onVariableTurnStart,
+  onVariableAssistantReply,
 }: UseMessageHandlerOptions) {
   const handleSendMessage = useCallback(async (message: string): Promise<string> => {
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -115,6 +119,9 @@ export function useMessageHandler({
     messageLogger.log('🔄 isLoading 设置为 true');
 
     try {
+      const beforeSendLastMessageId = getLatestMessageId();
+      onVariableTurnStart?.();
+
       // ========== 步骤 1: 创建用户消息楼层 ==========
       messageLogger.log('');
       messageLogger.log('📌 [步骤 1] 创建用户消息楼层');
@@ -211,6 +218,8 @@ export function useMessageHandler({
         );
         messageLogger.log('✅ [步骤 4] assistant 消息楼层创建完成');
         messageLogger.log('createChatMessages 返回值:', createAssistantResult);
+        const assistantMessage = getNewestMessageAfter(beforeSendLastMessageId, 'assistant');
+        onVariableAssistantReply?.(resultText, assistantMessage?.message_id);
 
         // ========== 步骤 5: 手动刷新前端显示 ==========
         messageLogger.log('');
@@ -266,7 +275,19 @@ export function useMessageHandler({
       messageLogger.log('🔄 isLoading 设置为 false');
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
-  }, [currentMaintext, currentOptions, addDebugLog, setIsLoading, showLoading, showError, dismissToast, setCurrentMaintext, setCurrentOptions]);
+  }, [
+    currentMaintext,
+    currentOptions,
+    addDebugLog,
+    setIsLoading,
+    showLoading,
+    showError,
+    dismissToast,
+    setCurrentMaintext,
+    setCurrentOptions,
+    onVariableTurnStart,
+    onVariableAssistantReply,
+  ]);
 
   const handleAutoAdvanceTurn = useCallback(async (message: string): Promise<AutoAdvanceTurnResult> => {
     const prompt = message.trim();
