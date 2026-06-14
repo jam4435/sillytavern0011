@@ -47,6 +47,7 @@ import {
 } from './utils/settingsManager';
 import {
   detectGameSessionState,
+  getLastAssistantRawMessage,
   getLastMessageContent,
   parseOptions,
   readGameDataPure,
@@ -177,12 +178,13 @@ const App: React.FC = () => {
         }
         scheduleGameDataCompletion('startup-existing-save', { fullScan: true });
 
-        const lastContent = getLastMessageContent();
+        const lastAssistantRaw = getLastAssistantRawMessage();
+        const lastContent = lastAssistantRaw?.displayedContent || getLastMessageContent();
         initLogger.log('getLastMessageContent 返回长度:', lastContent.length);
         if (lastContent) {
           setCurrentMaintext(lastContent);
           setCurrentOptions(parseOptions(lastContent));
-          hydrateVariableAssistantReply(lastContent);
+          hydrateVariableAssistantReply(lastAssistantRaw?.rawContent || lastContent, lastAssistantRaw?.messageId);
           initLogger.log('已设置 maintext 和 options');
         }
 
@@ -308,12 +310,13 @@ const App: React.FC = () => {
     }
     scheduleGameDataCompletion('continue-existing-save', { fullScan: true });
 
-    const lastContent = getLastMessageContent();
+    const lastAssistantRaw = getLastAssistantRawMessage();
+    const lastContent = lastAssistantRaw?.displayedContent || getLastMessageContent();
     gameLogger.log('getLastMessageContent 返回长度:', lastContent.length);
     if (lastContent) {
       setCurrentMaintext(lastContent);
       setCurrentOptions(parseOptions(lastContent));
-      hydrateVariableAssistantReply(lastContent);
+      hydrateVariableAssistantReply(lastAssistantRaw?.rawContent || lastContent, lastAssistantRaw?.messageId);
       gameLogger.log('🔧 调试模式：直接显示完整消息内容');
     }
 
