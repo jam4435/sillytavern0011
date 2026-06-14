@@ -141,6 +141,17 @@ function ensureStyles(targetDocument: Document = window.parent?.document || docu
   const style = targetDocument.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
+.variable-change-dock {
+  flex-shrink: 0;
+  padding: 0 2rem 0.65rem;
+}
+.variable-change-dock .${BAR_CLASS} {
+  margin: 0;
+}
+.variable-change-dock .${BAR_CLASS}.expanded {
+  max-height: min(360px, 42vh);
+  overflow-y: auto;
+}
 .${BAR_CLASS} {
   margin: 14px 0 4px;
   border: 1px solid rgba(181, 137, 80, 0.32);
@@ -316,6 +327,12 @@ function ensureStyles(targetDocument: Document = window.parent?.document || docu
   overflow-wrap: anywhere;
 }
 @media (max-width: 640px) {
+  .variable-change-dock {
+    padding: 0 1.25rem 0.5rem;
+  }
+  .variable-change-dock .${BAR_CLASS}.expanded {
+    max-height: min(320px, 40vh);
+  }
   .${BAR_CLASS} .wuxia-vcb-summary {
     grid-template-columns: max-content max-content max-content 18px;
     grid-template-areas:
