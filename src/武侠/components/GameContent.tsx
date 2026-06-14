@@ -1,9 +1,7 @@
 import React, { useMemo } from 'react';
 import type { DisplaySettings } from '../utils/settingsManager';
-import type { VariableChangeSummary } from '../utils/variableChanges';
 import { Icons } from './Icons';
 import { uiLogger } from '../utils/logger';
-import VariableChangeBar from './VariableChangeBar';
 
 interface GameContentProps {
   /** 主文本内容（完整的 AI 回复正文） */
@@ -14,8 +12,6 @@ interface GameContentProps {
   onSelectOption?: (option: string) => void;
   /** 显示设置 */
   settings?: DisplaySettings;
-  /** 本轮变量变更摘要 */
-  variableChanges?: VariableChangeSummary | null;
 }
 
 /**
@@ -74,7 +70,6 @@ const GameContent: React.FC<GameContentProps> = ({
   options,
   onSelectOption,
   settings,
-  variableChanges,
 }) => {
   // 调试日志 - 组件渲染
   uiLogger.log('');
@@ -193,8 +188,6 @@ const GameContent: React.FC<GameContentProps> = ({
           </div>
         </div>
       )}
-
-      <VariableChangeBar summary={variableChanges || null} />
 
       {/* 选项区域 */}
       {options.length > 0 && (

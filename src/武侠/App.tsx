@@ -19,6 +19,7 @@ import SettingsPanel from './components/SettingsPanel';
 import SplashScreen from './components/SplashScreen';
 import StartScreen from './components/StartScreen';
 import StatusToast from './components/StatusToast';
+import VariableChangeBar from './components/VariableChangeBar';
 import {
   useDebugLogs,
   useEventListeners,
@@ -662,9 +663,12 @@ const App: React.FC = () => {
                   handleSendMessage(option);
                 }}
                 settings={displaySettings}
-                variableChanges={variableChanges}
               />
             </section>
+
+            <div className="variable-change-dock">
+              <VariableChangeBar summary={variableChanges || null} />
+            </div>
 
             {/* 底部聊天输入区域 */}
             <ChatInput

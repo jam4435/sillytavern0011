@@ -446,6 +446,28 @@
   padding-bottom: 1rem;
 }
 
+.variable-change-dock {
+  flex-shrink: 0;
+  padding: 0 2rem 0.65rem;
+
+  .variable-change-bar {
+    margin: 0;
+
+    &.expanded {
+      max-height: min(360px, 42vh);
+      overflow-y: auto;
+    }
+  }
+
+  @media (max-width: 768px) {
+    padding: 0 1.25rem 0.5rem;
+
+    .variable-change-bar.expanded {
+      max-height: min(320px, 40vh);
+    }
+  }
+}
+
 // =========================================
 // Command Queue - 指令队列
 // =========================================

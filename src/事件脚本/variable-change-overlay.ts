@@ -575,7 +575,9 @@ function mountSummaryInsideMessageIframe(
     return true;
   }
 
-  const target = iframeDocument.querySelector('.game-content .maintext-container');
+  const wrapperTarget = iframeDocument.querySelector('.game-content-wrapper');
+  const inlineTarget = iframeDocument.querySelector('.game-content .maintext-container');
+  const target = wrapperTarget || inlineTarget;
   if (!target) {
     if (retryCount < MAX_RENDER_RETRIES) {
       window.setTimeout(() => mountSummary(summary, retryCount + 1), RENDER_RETRY_DELAY_MS);
@@ -597,7 +599,18 @@ function mountSummaryInsideMessageIframe(
     bar.querySelector('.wuxia-vcb-summary')?.setAttribute('aria-expanded', 'true');
   }
   bindNativeBarEvents(bar);
-  target.insertAdjacentElement('afterend', bar);
+  if (wrapperTarget) {
+    let dock = iframeDocument.querySelector('.variable-change-dock');
+    if (!dock) {
+      dock = iframeDocument.createElement('div');
+      dock.className = 'variable-change-dock';
+      wrapperTarget.insertAdjacentElement('afterend', dock);
+    }
+    dock.querySelectorAll(`.${BAR_CLASS}`).forEach(element => element.remove());
+    dock.appendChild(bar);
+  } else {
+    target.insertAdjacentElement('afterend', bar);
+  }
   $message.find(`.${BAR_CLASS}`).remove();
   return true;
 }
