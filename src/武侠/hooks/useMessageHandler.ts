@@ -186,6 +186,7 @@ export function useMessageHandler({
 
         const maintext = resultText;
         const options = parseOptions(resultText);
+        onVariableAssistantReply?.(resultText);
 
         messageLogger.log('🔧 调试模式：直接显示 AI 完整回复');
         messageLogger.log('parseMaintext 结果 (完整内容):');
