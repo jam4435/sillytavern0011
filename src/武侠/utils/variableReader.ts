@@ -42,12 +42,6 @@ type TavernChatMessage = {
   extra: Record<string, unknown>;
 };
 
-export interface LastAssistantRawMessage {
-  messageId: number;
-  rawContent: string;
-  displayedContent: string;
-}
-
 /**
  * 用户档案结构类型定义
  * 实际变量存储在 user数据.[用户名] 下
@@ -357,35 +351,6 @@ function resolveAssistantMessageRawContent(message: TavernChatMessage): string {
     messageWithSwipes.swipes?.[Number.isFinite(swipeIndex) ? swipeIndex : 0] ||
     ''
   );
-}
-
-export function getLastAssistantRawMessage(): LastAssistantRawMessage | null {
-  try {
-    const messages = getChatMessages('0-{{lastMessageId}}', {
-      role: 'assistant',
-      include_swipes: true,
-    }) as TavernChatMessage[];
-
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index];
-      const rawContent = resolveAssistantMessageRawContent(message);
-      const displayedContent = normalizeDisplayedMessageContent(rawContent);
-
-      if (!rawContent.trim() || isFrontendLoaderOnlyMessage(rawContent) || !displayedContent) {
-        continue;
-      }
-
-      return {
-        messageId: Number(message.message_id),
-        rawContent,
-        displayedContent,
-      };
-    }
-  } catch (error) {
-    dataLogger.error('❌ [getLastAssistantRawMessage] 获取最新 assistant raw 失败:', error);
-  }
-
-  return null;
 }
 
 export function isFrontendLoaderOnlyMessage(messageContent: string): boolean {

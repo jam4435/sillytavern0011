@@ -116,7 +116,6 @@ export function useVariableChangeTracker() {
   const [variableChanges, setVariableChanges] = useState<VariableChangeSummary | null>(
     () => restoredTurn?.summary ?? null,
   );
-  const variableChangesRef = useRef<VariableChangeSummary | null>(restoredTurn?.summary ?? null);
   const activeTurnRef = useRef<ActiveVariableTurn | null>(restoredTurn?.activeTurn ?? null);
   const nextTurnIdRef = useRef(restoredTurn?.summary.turnId ?? 0);
 
@@ -127,7 +126,6 @@ export function useVariableChangeTracker() {
       const next = typeof updater === 'function'
         ? (updater as (previous: VariableChangeSummary | null) => VariableChangeSummary | null)(previous)
         : updater;
-      variableChangesRef.current = next;
       persistVariableTurn(activeTurnRef.current, next);
       return next;
     });
@@ -212,28 +210,6 @@ export function useVariableChangeTracker() {
     refreshActualChanges();
   }, [refreshActualChanges, updateVariableChanges]);
 
-  const hydrateVariableAssistantReply = useCallback((rawReply: string, assistantMessageId?: number) => {
-    if (!rawReply.trim() || variableChangesRef.current) {
-      return;
-    }
-
-    const turnId = nextTurnIdRef.current + 1;
-    nextTurnIdRef.current = turnId;
-    activeTurnRef.current = null;
-
-    const parsedChanges = parseDeclaredVariableChanges(rawReply);
-    updateVariableChanges({
-      ...createEmptyVariableChangeSummary(turnId, 'error'),
-      assistantMessageId,
-      updatedAt: Date.now(),
-      declaredChanges: parsedChanges.declaredChanges,
-      thoughts: parsedChanges.thoughts,
-      parseErrors: parsedChanges.parseErrors,
-      omittedDeclaredCount: parsedChanges.omittedDeclaredCount,
-      topLevelGroups: collectVariableTopLevelGroups(parsedChanges.declaredChanges, []),
-    });
-  }, [updateVariableChanges]);
-
   const handleMvuVariableUpdate = useCallback((variables: unknown) => {
     refreshActualChanges(variables);
   }, [refreshActualChanges]);
@@ -262,7 +238,6 @@ export function useVariableChangeTracker() {
     variableChanges,
     handleVariableTurnStart,
     handleVariableAssistantReply,
-    hydrateVariableAssistantReply,
     handleMvuVariableUpdate,
     handleEraWriteDone,
     clearVariableChanges,

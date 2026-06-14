@@ -508,29 +508,6 @@
 // Variable Change Bar - 变量变更批注条
 // =========================================
 
-.variable-change-inline {
-  position: relative;
-  z-index: 2;
-  margin: -0.65rem 0 1.75rem;
-
-  .variable-change-bar {
-    margin: 0;
-
-    &.expanded {
-      max-height: 380px;
-      overflow-y: auto;
-    }
-  }
-
-  @media (max-width: 768px) {
-    margin: -0.35rem 0 1.25rem;
-
-    .variable-change-bar.expanded {
-      max-height: 320px;
-    }
-  }
-}
-
 .variable-change-bar {
   position: relative;
   z-index: 1;

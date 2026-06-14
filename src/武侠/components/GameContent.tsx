@@ -1,9 +1,7 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import type { VariableChangeSummary } from '../utils/variableChanges';
+import React, { useMemo } from 'react';
 import type { DisplaySettings } from '../utils/settingsManager';
 import { Icons } from './Icons';
 import { uiLogger } from '../utils/logger';
-import VariableChangeBar from './VariableChangeBar';
 
 interface GameContentProps {
   /** 主文本内容（完整的 AI 回复正文） */
@@ -14,8 +12,6 @@ interface GameContentProps {
   onSelectOption?: (option: string) => void;
   /** 显示设置 */
   settings?: DisplaySettings;
-  /** 本轮变量变更摘要 */
-  variableChanges?: VariableChangeSummary | null;
 }
 
 /**
@@ -74,9 +70,7 @@ const GameContent: React.FC<GameContentProps> = ({
   options,
   onSelectOption,
   settings,
-  variableChanges,
 }) => {
-  const variableChangeRef = useRef<HTMLDivElement | null>(null);
   // 调试日志 - 组件渲染
   uiLogger.log('');
   uiLogger.log('🎨 [GameContent] 组件渲染');
@@ -171,21 +165,6 @@ const GameContent: React.FC<GameContentProps> = ({
     [options]
   );
 
-  useEffect(() => {
-    if (!variableChanges?.turnId) {
-      return;
-    }
-
-    const frameId = window.requestAnimationFrame(() => {
-      variableChangeRef.current?.scrollIntoView({
-        block: 'nearest',
-        inline: 'nearest',
-      });
-    });
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, [normalizedMaintext, variableChanges?.assistantMessageId, variableChanges?.turnId]);
-
   // 如果没有任何内容，显示占位符
   if (!maintext) {
     uiLogger.log('⚠️ [GameContent] maintext 为空，显示占位符');
@@ -207,12 +186,6 @@ const GameContent: React.FC<GameContentProps> = ({
           <div className="maintext-content">
             {renderedContent}
           </div>
-        </div>
-      )}
-
-      {variableChanges && (
-        <div className="variable-change-inline" ref={variableChangeRef}>
-          <VariableChangeBar summary={variableChanges} />
         </div>
       )}
 

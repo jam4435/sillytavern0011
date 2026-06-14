@@ -19,6 +19,7 @@ import SettingsPanel from './components/SettingsPanel';
 import SplashScreen from './components/SplashScreen';
 import StartScreen from './components/StartScreen';
 import StatusToast from './components/StatusToast';
+import VariableChangeBar from './components/VariableChangeBar';
 import {
   useDebugLogs,
   useEventListeners,
@@ -47,7 +48,6 @@ import {
 } from './utils/settingsManager';
 import {
   detectGameSessionState,
-  getLastAssistantRawMessage,
   getLastMessageContent,
   parseOptions,
   readGameDataPure,
@@ -95,7 +95,6 @@ const App: React.FC = () => {
     variableChanges,
     handleVariableTurnStart,
     handleVariableAssistantReply,
-    hydrateVariableAssistantReply,
     handleMvuVariableUpdate,
     handleEraWriteDone,
     clearVariableChanges,
@@ -178,13 +177,11 @@ const App: React.FC = () => {
         }
         scheduleGameDataCompletion('startup-existing-save', { fullScan: true });
 
-        const lastAssistantRaw = getLastAssistantRawMessage();
-        const lastContent = lastAssistantRaw?.displayedContent || getLastMessageContent();
+        const lastContent = getLastMessageContent();
         initLogger.log('getLastMessageContent 返回长度:', lastContent.length);
         if (lastContent) {
           setCurrentMaintext(lastContent);
           setCurrentOptions(parseOptions(lastContent));
-          hydrateVariableAssistantReply(lastAssistantRaw?.rawContent || lastContent, lastAssistantRaw?.messageId);
           initLogger.log('已设置 maintext 和 options');
         }
 
@@ -310,19 +307,17 @@ const App: React.FC = () => {
     }
     scheduleGameDataCompletion('continue-existing-save', { fullScan: true });
 
-    const lastAssistantRaw = getLastAssistantRawMessage();
-    const lastContent = lastAssistantRaw?.displayedContent || getLastMessageContent();
+    const lastContent = getLastMessageContent();
     gameLogger.log('getLastMessageContent 返回长度:', lastContent.length);
     if (lastContent) {
       setCurrentMaintext(lastContent);
       setCurrentOptions(parseOptions(lastContent));
-      hydrateVariableAssistantReply(lastAssistantRaw?.rawContent || lastContent, lastAssistantRaw?.messageId);
       gameLogger.log('🔧 调试模式：直接显示完整消息内容');
     }
 
     setCurrentPage('game');
     gameLogger.log('✅ 加载完成，进入游戏');
-  }, [clearVariableChanges, hydrateVariableAssistantReply, setGameState, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
+  }, [clearVariableChanges, setGameState, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
 
   // 新游戏设置提交处理
   const handleSetupSubmit = useCallback(async (formData: NewGameFormData) => {
@@ -668,9 +663,12 @@ const App: React.FC = () => {
                   handleSendMessage(option);
                 }}
                 settings={displaySettings}
-                variableChanges={variableChanges}
               />
             </section>
+
+            <div className="variable-change-dock">
+              <VariableChangeBar summary={variableChanges || null} />
+            </div>
 
             {/* 底部聊天输入区域 */}
             <ChatInput
