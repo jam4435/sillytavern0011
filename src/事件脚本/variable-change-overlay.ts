@@ -36,6 +36,7 @@ type EraWriteDoneDetail = {
 
 const STYLE_ID = 'wuxia-variable-change-overlay-style';
 const BAR_CLASS = 'wuxia-variable-change-overlay';
+const HOST_DOCK_CLASS = 'wuxia-variable-change-host-dock';
 const MAX_RENDER_RETRIES = 30;
 const RENDER_RETRY_DELAY_MS = 250;
 
@@ -150,6 +151,22 @@ function ensureStyles(targetDocument: Document = window.parent?.document || docu
 }
 .variable-change-dock .${BAR_CLASS}.expanded {
   max-height: min(360px, 42vh);
+  overflow-y: auto;
+}
+.${HOST_DOCK_CLASS} {
+  position: sticky;
+  bottom: 6px;
+  z-index: 80;
+  flex: 0 0 auto;
+  margin: 0 10px 6px 70px;
+  pointer-events: none;
+}
+.${HOST_DOCK_CLASS} .${BAR_CLASS} {
+  margin: 0;
+  pointer-events: auto;
+}
+.${HOST_DOCK_CLASS} .${BAR_CLASS}.expanded {
+  max-height: min(360px, calc(100vh - 160px));
   overflow-y: auto;
 }
 .${BAR_CLASS} {
@@ -330,8 +347,14 @@ function ensureStyles(targetDocument: Document = window.parent?.document || docu
   .variable-change-dock {
     padding: 0 1.25rem 0.5rem;
   }
+  .${HOST_DOCK_CLASS} {
+    margin: 0 8px 6px 8px;
+  }
   .variable-change-dock .${BAR_CLASS}.expanded {
     max-height: min(320px, 40vh);
+  }
+  .${HOST_DOCK_CLASS} .${BAR_CLASS}.expanded {
+    max-height: min(320px, calc(100vh - 140px));
   }
   .${BAR_CLASS} .wuxia-vcb-summary {
     grid-template-columns: max-content max-content max-content 18px;
@@ -589,6 +612,7 @@ function mountSummaryInsideMessageIframe(
   const reactBar = iframeDocument.querySelector('.variable-change-bar');
   if (reactBar) {
     iframeDocument.querySelectorAll(`.${BAR_CLASS}`).forEach(element => element.remove());
+    getParentJQuery()?.(`.${HOST_DOCK_CLASS}`).remove();
     return true;
   }
 
@@ -629,6 +653,7 @@ function mountSummaryInsideMessageIframe(
     target.insertAdjacentElement('afterend', bar);
   }
   $message.find(`.${BAR_CLASS}`).remove();
+  getParentJQuery()?.(`.${HOST_DOCK_CLASS}`).remove();
   return true;
 }
 
@@ -653,7 +678,10 @@ function mountSummary(summary: VariableChangeSummary, retryCount = 0): void {
   }
 
   ensureStyles();
-  const wasExpanded = $message.find(`.${BAR_CLASS}`).hasClass('expanded');
+  const $existingHostDock = parentDollar(`.${HOST_DOCK_CLASS}`);
+  const wasExpanded = $existingHostDock.find(`.${BAR_CLASS}`).hasClass('expanded')
+    || $message.find(`.${BAR_CLASS}`).hasClass('expanded');
+  $existingHostDock.remove();
   $message.find(`.${BAR_CLASS}`).remove();
   const $bar = parentDollar(`<div class="${BAR_CLASS}${wasExpanded ? ' expanded' : ''}" data-turn-id="${summary.turnId}"></div>`);
   $bar.html(renderSummary(summary));
@@ -661,6 +689,14 @@ function mountSummary(summary: VariableChangeSummary, retryCount = 0): void {
     $bar.find('.wuxia-vcb-summary').attr('aria-expanded', 'true');
   }
   bindBarEvents($bar);
+  const $chat = parentDollar('#chat');
+  if ($chat.length) {
+    const $dock = parentDollar(`<div class="${HOST_DOCK_CLASS}" data-message-id="${summary.assistantMessageId ?? ''}"></div>`);
+    $dock.append($bar);
+    $chat.append($dock);
+    return;
+  }
+
   $content.after($bar);
 }
 
