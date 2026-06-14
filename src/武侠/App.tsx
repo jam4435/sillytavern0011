@@ -94,6 +94,7 @@ const App: React.FC = () => {
     variableChanges,
     handleVariableTurnStart,
     handleVariableAssistantReply,
+    hydrateVariableAssistantReply,
     handleMvuVariableUpdate,
     handleEraWriteDone,
     clearVariableChanges,
@@ -181,6 +182,7 @@ const App: React.FC = () => {
         if (lastContent) {
           setCurrentMaintext(lastContent);
           setCurrentOptions(parseOptions(lastContent));
+          hydrateVariableAssistantReply(lastContent);
           initLogger.log('已设置 maintext 和 options');
         }
 
@@ -311,12 +313,13 @@ const App: React.FC = () => {
     if (lastContent) {
       setCurrentMaintext(lastContent);
       setCurrentOptions(parseOptions(lastContent));
+      hydrateVariableAssistantReply(lastContent);
       gameLogger.log('🔧 调试模式：直接显示完整消息内容');
     }
 
     setCurrentPage('game');
     gameLogger.log('✅ 加载完成，进入游戏');
-  }, [clearVariableChanges, setGameState, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
+  }, [clearVariableChanges, hydrateVariableAssistantReply, setGameState, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
 
   // 新游戏设置提交处理
   const handleSetupSubmit = useCallback(async (formData: NewGameFormData) => {
