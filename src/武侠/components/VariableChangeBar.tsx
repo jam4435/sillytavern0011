@@ -90,7 +90,7 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
           <Icons.Variables size={15} />
           <span>变量变更</span>
         </span>
-        <span className="variable-change-pill declared">AI {declaredTotal}</span>
+        <span className="variable-change-pill declared">声明 {declaredTotal}</span>
         <span className="variable-change-pill actual">实际 {actualTotal}</span>
         <span className={`variable-change-status ${summary.status}`}>{STATUS_LABELS[summary.status]}</span>
         <span className="variable-change-groups" title={groupText}>{groupText}</span>
@@ -120,8 +120,8 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
           )}
 
           <section className="variable-change-section">
-            <div className="variable-change-section-heading">
-              <span>AI 声明</span>
+              <div className="variable-change-section-heading">
+              <span>声明/API</span>
               <span>{declaredTotal}</span>
             </div>
             {summary.declaredChanges.length > 0 ? (
@@ -134,7 +134,7 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
                 )}
               </div>
             ) : (
-              <div className="variable-change-empty">本轮回复没有声明变量写入。</div>
+              <div className="variable-change-empty">本轮未捕获变量声明或 API 写入。</div>
             )}
           </section>
 

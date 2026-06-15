@@ -15,8 +15,16 @@ type ActiveVariableTurn = {
 };
 
 type EraWriteDoneDetail = {
+  message_id?: number;
   stat?: unknown;
   statWithoutMeta?: unknown;
+};
+
+type ChatMessageWithSwipes = {
+  message?: string;
+  mes?: string;
+  swipes?: string[];
+  swipe_id?: number;
 };
 
 type StoredVariableTurn = {
@@ -106,6 +114,29 @@ const persistVariableTurn = (
   }
 };
 
+function getActiveMessageContent(message: ChatMessageWithSwipes): string {
+  const swipes = Array.isArray(message.swipes) ? message.swipes : [];
+  const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
+  return message.message || message.mes || swipes[swipeIndex] || swipes[0] || '';
+}
+
+function readAssistantMessageContent(messageId: unknown): string {
+  if (!Number.isInteger(messageId)) {
+    return '';
+  }
+
+  try {
+    const messages = getChatMessages(Number(messageId), {
+      role: 'assistant',
+      hide_state: 'all',
+      include_swipes: true,
+    }) as ChatMessageWithSwipes[];
+    return messages[0] ? getActiveMessageContent(messages[0]) : '';
+  } catch {
+    return '';
+  }
+}
+
 export function useVariableChangeTracker() {
   const restoredTurnRef = useRef<StoredVariableTurn | null | undefined>(undefined);
   if (restoredTurnRef.current === undefined) {
@@ -164,6 +195,35 @@ export function useVariableChangeTracker() {
     });
   }, [updateVariableChanges]);
 
+  const refreshDeclaredChanges = useCallback((rawReply: string, assistantMessageId?: number) => {
+    const activeTurn = activeTurnRef.current;
+    if (!activeTurn || !rawReply.trim()) {
+      return;
+    }
+
+    const parsedChanges = parseDeclaredVariableChanges(rawReply);
+    updateVariableChanges(previous => {
+      if (!previous || previous.turnId !== activeTurn.turnId) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        status: activeTurn.baselineStatData ? 'reply-recorded' : 'error',
+        assistantMessageId: assistantMessageId ?? previous.assistantMessageId,
+        updatedAt: Date.now(),
+        declaredChanges: parsedChanges.declaredChanges,
+        thoughts: parsedChanges.thoughts,
+        parseErrors: parsedChanges.parseErrors,
+        omittedDeclaredCount: parsedChanges.omittedDeclaredCount,
+        topLevelGroups: collectVariableTopLevelGroups(
+          parsedChanges.declaredChanges,
+          previous.actualChanges,
+        ),
+      };
+    });
+  }, [updateVariableChanges]);
+
   const handleVariableTurnStart = useCallback(() => {
     const turnId = nextTurnIdRef.current + 1;
     nextTurnIdRef.current = turnId;
@@ -181,34 +241,9 @@ export function useVariableChangeTracker() {
   }, [updateVariableChanges]);
 
   const handleVariableAssistantReply = useCallback((rawReply: string, assistantMessageId?: number) => {
-    const activeTurn = activeTurnRef.current;
-    if (!activeTurn) {
-      return;
-    }
-
-    const parsedChanges = parseDeclaredVariableChanges(rawReply);
-    updateVariableChanges(previous => {
-      if (!previous || previous.turnId !== activeTurn.turnId) {
-        return previous;
-      }
-
-      return {
-        ...previous,
-        status: activeTurn.baselineStatData ? 'reply-recorded' : 'error',
-        assistantMessageId,
-        updatedAt: Date.now(),
-        declaredChanges: parsedChanges.declaredChanges,
-        thoughts: parsedChanges.thoughts,
-        parseErrors: parsedChanges.parseErrors,
-        omittedDeclaredCount: parsedChanges.omittedDeclaredCount,
-        topLevelGroups: collectVariableTopLevelGroups(
-          parsedChanges.declaredChanges,
-          previous.actualChanges,
-        ),
-      };
-    });
+    refreshDeclaredChanges(rawReply, assistantMessageId);
     refreshActualChanges();
-  }, [refreshActualChanges, updateVariableChanges]);
+  }, [refreshActualChanges, refreshDeclaredChanges]);
 
   const handleMvuVariableUpdate = useCallback((variables: unknown) => {
     refreshActualChanges(variables);
@@ -216,7 +251,11 @@ export function useVariableChangeTracker() {
 
   const handleEraWriteDone = useCallback((detail?: EraWriteDoneDetail) => {
     refreshActualChanges(detail?.statWithoutMeta ?? detail?.stat);
-  }, [refreshActualChanges]);
+    const finalMessageContent = readAssistantMessageContent(detail?.message_id);
+    if (finalMessageContent) {
+      refreshDeclaredChanges(finalMessageContent, detail?.message_id);
+    }
+  }, [refreshActualChanges, refreshDeclaredChanges]);
 
   const clearVariableChanges = useCallback(() => {
     activeTurnRef.current = null;
