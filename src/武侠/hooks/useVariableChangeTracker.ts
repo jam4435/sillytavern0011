@@ -21,6 +21,7 @@ type EraWriteDoneDetail = {
 };
 
 type ChatMessageWithSwipes = {
+  message_id?: number;
   message?: string;
   mes?: string;
   swipes?: string[];
@@ -120,21 +121,76 @@ function getActiveMessageContent(message: ChatMessageWithSwipes): string {
   return message.message || message.mes || swipes[swipeIndex] || swipes[0] || '';
 }
 
-function readAssistantMessageContent(messageId: unknown): string {
-  if (!Number.isInteger(messageId)) {
-    return '';
-  }
+type ResolvedAssistantMessageContent = {
+  messageId?: number;
+  content: string;
+};
 
+function readAssistantMessageContentById(messageId: number): ResolvedAssistantMessageContent {
   try {
-    const messages = getChatMessages(Number(messageId), {
+    const messages = getChatMessages(messageId, {
       role: 'assistant',
       hide_state: 'all',
       include_swipes: true,
     }) as ChatMessageWithSwipes[];
-    return messages[0] ? getActiveMessageContent(messages[0]) : '';
+    return {
+      messageId,
+      content: messages[0] ? getActiveMessageContent(messages[0]) : '',
+    };
   } catch {
-    return '';
+    return { messageId, content: '' };
   }
+}
+
+function readLatestAssistantMessageContent(): ResolvedAssistantMessageContent {
+  try {
+    const messages = getChatMessages('0-{{lastMessageId}}', {
+      role: 'assistant',
+      hide_state: 'all',
+      include_swipes: true,
+    }) as ChatMessageWithSwipes[];
+
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      const content = getActiveMessageContent(message);
+      if (content.trim()) {
+        return {
+          messageId: Number.isInteger(message.message_id) ? Number(message.message_id) : undefined,
+          content,
+        };
+      }
+    }
+
+    return { content: '' };
+  } catch {
+    return { content: '' };
+  }
+}
+
+function readAssistantMessageContent(
+  messageId: unknown,
+  fallbackMessageId?: unknown,
+): ResolvedAssistantMessageContent {
+  const candidateIds = [messageId, fallbackMessageId]
+    .filter((id): id is number => Number.isInteger(id))
+    .map(id => Number(id));
+  const uniqueCandidateIds = Array.from(new Set(candidateIds));
+
+  for (const candidateId of uniqueCandidateIds) {
+    const resolved = readAssistantMessageContentById(candidateId);
+    if (resolved.content.trim()) {
+      return resolved;
+    }
+  }
+
+  return readLatestAssistantMessageContent();
+}
+
+function normalizeAssistantMessageId(messageId: unknown): number | undefined {
+  if (!Number.isInteger(messageId)) {
+    return undefined;
+  }
+  return Number(messageId);
 }
 
 export function useVariableChangeTracker() {
@@ -147,6 +203,7 @@ export function useVariableChangeTracker() {
   const [variableChanges, setVariableChanges] = useState<VariableChangeSummary | null>(
     () => restoredTurn?.summary ?? null,
   );
+  const variableChangesRef = useRef<VariableChangeSummary | null>(restoredTurn?.summary ?? null);
   const activeTurnRef = useRef<ActiveVariableTurn | null>(restoredTurn?.activeTurn ?? null);
   const nextTurnIdRef = useRef(restoredTurn?.summary.turnId ?? 0);
 
@@ -157,6 +214,7 @@ export function useVariableChangeTracker() {
       const next = typeof updater === 'function'
         ? (updater as (previous: VariableChangeSummary | null) => VariableChangeSummary | null)(previous)
         : updater;
+      variableChangesRef.current = next;
       persistVariableTurn(activeTurnRef.current, next);
       return next;
     });
@@ -207,9 +265,13 @@ export function useVariableChangeTracker() {
         return previous;
       }
 
+      const nextStatus = activeTurn.baselineStatData
+        ? previous.status === 'settled' ? 'settled' : 'reply-recorded'
+        : 'error';
+
       return {
         ...previous,
-        status: activeTurn.baselineStatData ? 'reply-recorded' : 'error',
+        status: nextStatus,
         assistantMessageId: assistantMessageId ?? previous.assistantMessageId,
         updatedAt: Date.now(),
         declaredChanges: parsedChanges.declaredChanges,
@@ -250,11 +312,17 @@ export function useVariableChangeTracker() {
   }, [refreshActualChanges]);
 
   const handleEraWriteDone = useCallback((detail?: EraWriteDoneDetail) => {
-    refreshActualChanges(detail?.statWithoutMeta ?? detail?.stat);
-    const finalMessageContent = readAssistantMessageContent(detail?.message_id);
-    if (finalMessageContent) {
-      refreshDeclaredChanges(finalMessageContent, detail?.message_id);
+    const finalMessage = readAssistantMessageContent(
+      detail?.message_id,
+      variableChangesRef.current?.assistantMessageId,
+    );
+    if (finalMessage.content) {
+      refreshDeclaredChanges(
+        finalMessage.content,
+        normalizeAssistantMessageId(detail?.message_id) ?? finalMessage.messageId,
+      );
     }
+    refreshActualChanges(detail?.statWithoutMeta ?? detail?.stat);
   }, [refreshActualChanges, refreshDeclaredChanges]);
 
   const clearVariableChanges = useCallback(() => {
