@@ -851,7 +851,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       case 'regex':
         return '重置全局并清空当前预设';
       case 'summary':
-        return '重置总结设置';
+        return '重置额外模型';
       case 'variables':
         return '重新读取变量';
       case 'advance':
@@ -1211,15 +1211,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 外观设置 */}
         {activeTab === 'appearance' && (
           <div className="settings-section appearance-section">
-            <h4 className="settings-section-title">
-              <span className="diamond-bullet"></span>
-              外观
-            </h4>
-
-            <div className="appearance-settings-grid">
-              <div className="appearance-group">
-                <h5 className="appearance-group-title">正文</h5>
-
+            <div className="appearance-stack">
+              <SettingsCollapsibleBlock
+                id="appearanceText"
+                title="正文"
+                isOpen={openSettingBlocks.appearanceText}
+                onToggle={toggleSettingBlock}
+              >
                 <div className="settings-row">
                   <label className="settings-label">字体大小</label>
                   <div className="settings-control">
@@ -1270,11 +1268,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <span className="settings-value">{settings.lineHeight.toFixed(1)}</span>
                   </div>
                 </div>
-              </div>
 
-              <div className="appearance-group">
-                <h5 className="appearance-group-title">背景</h5>
+                <div className="settings-preview appearance-preview">
+                  <div className="preview-label">预览效果</div>
+                  <div
+                    className="preview-text"
+                    style={{
+                      fontSize: `${settings.fontSize}px`,
+                      color: settings.fontColor,
+                      lineHeight: settings.lineHeight,
+                      backgroundColor: `${settings.backgroundColor}${Math.round(settings.backgroundOpacity * 255)
+                        .toString(16)
+                        .padStart(2, '0')}`,
+                    }}
+                  >
+                    江湖路远，刀光剑影，恩怨情仇，尽在一念之间。
+                    少侠且行且珍重，莫让红尘染白衣。
+                  </div>
+                </div>
+              </SettingsCollapsibleBlock>
 
+              <SettingsCollapsibleBlock
+                id="appearanceBackground"
+                title="背景"
+                isOpen={openSettingBlocks.appearanceBackground}
+                onToggle={toggleSettingBlock}
+              >
                 <div className="settings-row">
                   <label className="settings-label">背景颜色</label>
                   <div className="settings-control">
@@ -1358,25 +1377,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   )}
                   <p className="settings-hint">支持 JPG、PNG、GIF 格式，最大 5MB</p>
                 </div>
-              </div>
-            </div>
-
-            <div className="settings-preview appearance-preview">
-              <div className="preview-label">预览效果</div>
-              <div
-                className="preview-text"
-                style={{
-                  fontSize: `${settings.fontSize}px`,
-                  color: settings.fontColor,
-                  lineHeight: settings.lineHeight,
-                  backgroundColor: `${settings.backgroundColor}${Math.round(settings.backgroundOpacity * 255)
-                    .toString(16)
-                    .padStart(2, '0')}`,
-                }}
-              >
-                江湖路远，刀光剑影，恩怨情仇，尽在一念之间。
-                少侠且行且珍重，莫让红尘染白衣。
-              </div>
+              </SettingsCollapsibleBlock>
             </div>
           </div>
         )}
@@ -1384,10 +1385,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 正则替换设置 */}
         {activeTab === 'regex' && (
           <div className="settings-section">
-            <h4 className="settings-section-title">
-              <span className="diamond-bullet"></span>
-              正则替换规则
-            </h4>
             <p className="settings-description">
               正文显示时按固定顺序执行：ERA 基础规则、当前预设规则、其它全局规则。
             </p>
@@ -1481,36 +1478,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
         )}
 
-        {/* 自动总结设置 */}
+        {/* 额外模型设置 */}
         {activeTab === 'summary' && (
           <div className="settings-section summary-section">
-            <h4 className="settings-section-title">
-              <span className="diamond-bullet"></span>
-              自动总结设置
-            </h4>
-            <p className="settings-description">
-              当角色的人物经历条目过多时，自动调用 AI 进行总结精炼。
-            </p>
-
-            {/* 启用开关 */}
-            <div className="settings-row">
-              <label className="settings-label">启用自动总结</label>
-              <div className="settings-control">
-                <button
-                  className={`summary-toggle-btn ${settings.summarySettings.enabled ? 'active' : ''}`}
-                  onClick={() => updateSummarySetting('enabled', !settings.summarySettings.enabled)}
-                >
-                  {settings.summarySettings.enabled ? <Icons.ToggleRight size={24} /> : <Icons.ToggleLeft size={24} />}
-                  <span>{settings.summarySettings.enabled ? '已启用' : '已禁用'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* API 配置 */}
-            <div className="summary-subsection">
-              <h5 className="summary-subsection-title">API 配置</h5>
-
-              <div className="summary-api-mode-group" role="radiogroup" aria-label="自动总结 API 模式">
+            <SettingsCollapsibleBlock
+              id="extraModelApi"
+              title="API"
+              isOpen={openSettingBlocks.extraModelApi}
+              onToggle={toggleSettingBlock}
+            >
+              <div className="summary-api-mode-group" role="radiogroup" aria-label="额外模型 API 模式">
                 <label className={`summary-api-mode ${!isSummaryCustomApiMode ? 'active' : ''}`}>
                   <input
                     type="radio"
@@ -1532,7 +1509,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
 
               <p className="settings-hint">
-                当前预设模式沿用酒馆正在使用的后端；覆盖模式只改变自动总结请求。
+                当前预设模式沿用酒馆正在使用的后端；覆盖模式用于自动总结和额外变量更新请求。
               </p>
 
               {isSummaryCustomApiMode && (
@@ -1607,17 +1584,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       </button>
                     </div>
                   </div>
-
-                  <div className="summary-api-toolbar">
-                    <label className="summary-stream-toggle">
-                      <input
-                        type="checkbox"
-                        checked={settings.summarySettings.stream}
-                        onChange={(e) => updateSummarySetting('stream', e.target.checked)}
-                      />
-                      <span>流式生成</span>
-                    </label>
-                  </div>
                 </div>
               )}
 
@@ -1629,12 +1595,203 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   {summaryModelStatus}
                 </div>
               )}
-            </div>
+            </SettingsCollapsibleBlock>
 
-            {/* 正文变量更新 */}
-            <div className="summary-subsection">
-              <h5 className="summary-subsection-title">正文变量更新</h5>
+            <SettingsCollapsibleBlock
+              id="extraModelSummary"
+              title="自动总结"
+              isOpen={openSettingBlocks.extraModelSummary}
+              onToggle={toggleSettingBlock}
+            >
+              <p className="settings-description compact">
+                当角色的人物经历条目过多时，调用额外模型进行总结精炼。
+              </p>
 
+              <div className="settings-row">
+                <label className="settings-label">启用自动总结</label>
+                <div className="settings-control">
+                  <button
+                    className={`summary-toggle-btn ${settings.summarySettings.enabled ? 'active' : ''}`}
+                    onClick={() => updateSummarySetting('enabled', !settings.summarySettings.enabled)}
+                  >
+                    {settings.summarySettings.enabled ? <Icons.ToggleRight size={24} /> : <Icons.ToggleLeft size={24} />}
+                    <span>{settings.summarySettings.enabled ? '已启用' : '已禁用'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="summary-api-toolbar summary-api-toolbar-inline">
+                <label className="summary-stream-toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.summarySettings.stream}
+                    onChange={(e) => updateSummarySetting('stream', e.target.checked)}
+                  />
+                  <span>流式生成</span>
+                </label>
+              </div>
+
+              <div className="summary-subsection">
+                <h5 className="summary-subsection-title">触发阈值</h5>
+
+                <div className="settings-row">
+                  <label className="settings-label">单角色条目阈值</label>
+                  <div className="settings-control">
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={settings.summarySettings.thresholds.perCharacterEntriesThreshold}
+                      onChange={(e) => updateThreshold('perCharacterEntriesThreshold', parseInt(e.target.value) || 10)}
+                      className="settings-number-input"
+                    />
+                    <span className="settings-hint-inline">超过此条目数的角色加入待处理队列</span>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-label">待处理队列阈值</label>
+                  <div className="settings-control">
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={settings.summarySettings.thresholds.pendingQueueThreshold}
+                      onChange={(e) => updateThreshold('pendingQueueThreshold', parseInt(e.target.value) || 5)}
+                      className="settings-number-input"
+                    />
+                    <span className="settings-hint-inline">队列中角色数达到此值时触发总结</span>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-label">总条目数阈值</label>
+                  <div className="settings-control">
+                    <input
+                      type="number"
+                      min="10"
+                      max="500"
+                      value={settings.summarySettings.thresholds.totalEntriesThreshold}
+                      onChange={(e) => updateThreshold('totalEntriesThreshold', parseInt(e.target.value) || 50)}
+                      className="settings-number-input"
+                    />
+                    <span className="settings-hint-inline">所有角色总条目数达到此值时触发总结</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="summary-subsection">
+                <h5 className="summary-subsection-title">提示词模板</h5>
+                <p className="settings-hint">
+                  可用变量：{'{{characterName}}'} - 角色名称，{'{{biographyEntries}}'} - 经历条目
+                </p>
+                <textarea
+                  value={settings.summarySettings.promptTemplate}
+                  onChange={(e) => updateSummarySetting('promptTemplate', e.target.value)}
+                  placeholder="请输入总结提示词模板..."
+                  className="settings-textarea"
+                  rows={8}
+                />
+                <button
+                  className="settings-reset-template-btn"
+                  onClick={() => updateSummarySetting('promptTemplate', DEFAULT_SUMMARY_SETTINGS.promptTemplate)}
+                >
+                  恢复默认模板
+                </button>
+              </div>
+
+              <div className="summary-subsection">
+                <h5 className="summary-subsection-title">手动操作</h5>
+
+                <div className="summary-actions">
+                  <button
+                    className="settings-action-btn"
+                    onClick={handleCheckSummaryStatus}
+                    disabled={isSummaryRunning}
+                  >
+                    <Icons.Debug size={16} />
+                    <span>检测状态</span>
+                  </button>
+                  <button
+                    className="settings-action-btn primary"
+                    onClick={handleManualSummaryTrigger}
+                    disabled={isSummaryRunning}
+                  >
+                    <Icons.Scroll size={16} />
+                    <span>{isSummaryRunning ? '总结中...' : '手动触发总结'}</span>
+                  </button>
+                </div>
+
+                {/* 状态显示 */}
+                {summaryStatus && (
+                  <div className="summary-status">
+                    <div className="summary-status-header">
+                      <span>检测结果</span>
+                      <span className={`summary-status-badge ${summaryStatus.shouldTrigger ? 'warning' : 'ok'}`}>
+                        {summaryStatus.shouldTrigger ? '需要总结' : '正常'}
+                      </span>
+                    </div>
+                    <div className="summary-status-body">
+                      <div className="summary-status-item">
+                        <span>待处理角色数：</span>
+                        <strong>{summaryStatus.pendingCharacters.length}</strong>
+                      </div>
+                      <div className="summary-status-item">
+                        <span>总经历条目数：</span>
+                        <strong>{summaryStatus.totalEntries}</strong>
+                      </div>
+                      {summaryStatus.pendingCharacters.length > 0 && (
+                        <div className="summary-pending-list">
+                          <span>待处理角色：</span>
+                          <ul>
+                            {summaryStatus.pendingCharacters.map(c => (
+                              <li key={c.characterId}>
+                                {c.displayName} ({c.entriesCount} 条)
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 总结结果 */}
+                {summaryResult && (
+                  <div className={`summary-result ${summaryResult.success ? 'success' : 'partial'}`}>
+                    <div className="summary-result-header">
+                      <span>总结结果</span>
+                      <span className={`summary-result-badge ${summaryResult.success ? 'success' : 'warning'}`}>
+                        {summaryResult.success ? '全部成功' : '部分失败'}
+                      </span>
+                    </div>
+                    <div className="summary-result-body">
+                      <div className="summary-result-item">
+                        <span>处理总数：</span>
+                        <strong>{summaryResult.totalProcessed}</strong>
+                      </div>
+                      <div className="summary-result-item success">
+                        <span>成功：</span>
+                        <strong>{summaryResult.totalSuccess}</strong>
+                      </div>
+                      {summaryResult.totalFailed > 0 && (
+                        <div className="summary-result-item failed">
+                          <span>失败：</span>
+                          <strong>{summaryResult.totalFailed}</strong>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </SettingsCollapsibleBlock>
+
+            <SettingsCollapsibleBlock
+              id="extraModelVariables"
+              title="额外变量"
+              isOpen={openSettingBlocks.extraModelVariables}
+              onToggle={toggleSettingBlock}
+            >
               <div className="summary-api-mode-group" role="radiogroup" aria-label="正文变量更新模式">
                 <label className={`summary-api-mode ${settings.summarySettings.variableUpdateMode !== 'extra' ? 'active' : ''}`}>
                   <input
@@ -1667,175 +1824,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   {summaryVariableModeStatus}
                 </div>
               )}
-            </div>
-
-            {/* 触发阈值 */}
-            <div className="summary-subsection">
-              <h5 className="summary-subsection-title">触发阈值</h5>
-
-              <div className="settings-row">
-                <label className="settings-label">单角色条目阈值</label>
-                <div className="settings-control">
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={settings.summarySettings.thresholds.perCharacterEntriesThreshold}
-                    onChange={(e) => updateThreshold('perCharacterEntriesThreshold', parseInt(e.target.value) || 10)}
-                    className="settings-number-input"
-                  />
-                  <span className="settings-hint-inline">超过此条目数的角色加入待处理队列</span>
-                </div>
-              </div>
-
-              <div className="settings-row">
-                <label className="settings-label">待处理队列阈值</label>
-                <div className="settings-control">
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={settings.summarySettings.thresholds.pendingQueueThreshold}
-                    onChange={(e) => updateThreshold('pendingQueueThreshold', parseInt(e.target.value) || 5)}
-                    className="settings-number-input"
-                  />
-                  <span className="settings-hint-inline">队列中角色数达到此值时触发总结</span>
-                </div>
-              </div>
-
-              <div className="settings-row">
-                <label className="settings-label">总条目数阈值</label>
-                <div className="settings-control">
-                  <input
-                    type="number"
-                    min="10"
-                    max="500"
-                    value={settings.summarySettings.thresholds.totalEntriesThreshold}
-                    onChange={(e) => updateThreshold('totalEntriesThreshold', parseInt(e.target.value) || 50)}
-                    className="settings-number-input"
-                  />
-                  <span className="settings-hint-inline">所有角色总条目数达到此值时触发总结</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 提示词模板 */}
-            <div className="summary-subsection">
-              <h5 className="summary-subsection-title">提示词模板</h5>
-              <p className="settings-hint">
-                可用变量：{'{{characterName}}'} - 角色名称，{'{{biographyEntries}}'} - 经历条目
-              </p>
-              <textarea
-                value={settings.summarySettings.promptTemplate}
-                onChange={(e) => updateSummarySetting('promptTemplate', e.target.value)}
-                placeholder="请输入总结提示词模板..."
-                className="settings-textarea"
-                rows={8}
-              />
-              <button
-                className="settings-reset-template-btn"
-                onClick={() => updateSummarySetting('promptTemplate', DEFAULT_SUMMARY_SETTINGS.promptTemplate)}
-              >
-                恢复默认模板
-              </button>
-            </div>
-
-            {/* 状态检测和手动触发 */}
-            <div className="summary-subsection">
-              <h5 className="summary-subsection-title">手动操作</h5>
-
-              <div className="summary-actions">
-                <button
-                  className="settings-action-btn"
-                  onClick={handleCheckSummaryStatus}
-                  disabled={isSummaryRunning}
-                >
-                  <Icons.Debug size={16} />
-                  <span>检测状态</span>
-                </button>
-                <button
-                  className="settings-action-btn primary"
-                  onClick={handleManualSummaryTrigger}
-                  disabled={isSummaryRunning}
-                >
-                  <Icons.Scroll size={16} />
-                  <span>{isSummaryRunning ? '总结中...' : '手动触发总结'}</span>
-                </button>
-              </div>
-
-              {/* 状态显示 */}
-              {summaryStatus && (
-                <div className="summary-status">
-                  <div className="summary-status-header">
-                    <span>检测结果</span>
-                    <span className={`summary-status-badge ${summaryStatus.shouldTrigger ? 'warning' : 'ok'}`}>
-                      {summaryStatus.shouldTrigger ? '需要总结' : '正常'}
-                    </span>
-                  </div>
-                  <div className="summary-status-body">
-                    <div className="summary-status-item">
-                      <span>待处理角色数：</span>
-                      <strong>{summaryStatus.pendingCharacters.length}</strong>
-                    </div>
-                    <div className="summary-status-item">
-                      <span>总经历条目数：</span>
-                      <strong>{summaryStatus.totalEntries}</strong>
-                    </div>
-                    {summaryStatus.pendingCharacters.length > 0 && (
-                      <div className="summary-pending-list">
-                        <span>待处理角色：</span>
-                        <ul>
-                          {summaryStatus.pendingCharacters.map(c => (
-                            <li key={c.characterId}>
-                              {c.displayName} ({c.entriesCount} 条)
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 总结结果 */}
-              {summaryResult && (
-                <div className={`summary-result ${summaryResult.success ? 'success' : 'partial'}`}>
-                  <div className="summary-result-header">
-                    <span>总结结果</span>
-                    <span className={`summary-result-badge ${summaryResult.success ? 'success' : 'warning'}`}>
-                      {summaryResult.success ? '全部成功' : '部分失败'}
-                    </span>
-                  </div>
-                  <div className="summary-result-body">
-                    <div className="summary-result-item">
-                      <span>处理总数：</span>
-                      <strong>{summaryResult.totalProcessed}</strong>
-                    </div>
-                    <div className="summary-result-item success">
-                      <span>成功：</span>
-                      <strong>{summaryResult.totalSuccess}</strong>
-                    </div>
-                    {summaryResult.totalFailed > 0 && (
-                      <div className="summary-result-item failed">
-                        <span>失败：</span>
-                        <strong>{summaryResult.totalFailed}</strong>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            </SettingsCollapsibleBlock>
           </div>
         )}
 
         {/* 变量查看与编辑 */}
         {activeTab === 'variables' && (
           <div className="settings-section variables-section">
-            <h4 className="settings-section-title">
-              <span className="diamond-bullet"></span>
-              变量
-            </h4>
-
             <div className="variables-toolbar">
               <div className="variables-field variables-search-field">
                 <label className="variables-field-label">搜索</label>
@@ -1926,10 +1921,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 自动推进 */}
         {activeTab === 'advance' && (
           <div className="settings-section auto-advance-section">
-            <h4 className="settings-section-title">
-              <span className="diamond-bullet"></span>
-              自动推进
-            </h4>
             <p className="settings-description">
               按设定轮数连续发送同一句推进指令，复用底部输入框的手动发送流程，并记录每轮回复。
             </p>
@@ -2124,10 +2115,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 调试设置 */}
         {activeTab === 'debug' && (
           <div className="settings-section">
-            <h4 className="settings-section-title">
-              <span className="diamond-bullet"></span>
-              消息调试日志
-            </h4>
             <p className="settings-description">
               查看每次发送给 AI 的消息和 AI 回复的内容，帮助调试提示词和检查输出。
             </p>

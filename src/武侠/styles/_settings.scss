@@ -137,6 +137,7 @@
 
 .settings-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 0.5rem;
 }
@@ -144,7 +145,88 @@
 .settings-section {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
+}
+
+.settings-collapsible-block {
+  overflow: hidden;
+  border: 1px solid $stone-800;
+  border-radius: 4px;
+  background:
+    linear-gradient(135deg, rgba($amber-600, 0.045), transparent 42%),
+    rgba(255, 255, 255, 0.02);
+  transition: border-color $transition-normal, background $transition-normal;
+
+  &.open {
+    border-color: rgba($stone-700, 0.82);
+  }
+
+  &.collapsed {
+    background: rgba(255, 255, 255, 0.014);
+  }
+}
+
+.settings-collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  background: transparent;
+  color: $stone-300;
+  font-family: $font-serif;
+  font-size: 0.94rem;
+  cursor: pointer;
+  transition: background $transition-normal, color $transition-normal;
+  text-align: left;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: $amber-600;
+  }
+
+  .icon-wrap {
+    flex-shrink: 0;
+  }
+}
+
+.settings-collapsible-block.collapsed .settings-collapsible-header {
+  border-bottom-color: transparent;
+}
+
+.settings-collapsible-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+
+  .diamond-bullet {
+    width: 6px;
+    height: 6px;
+    background: $amber-600;
+    transform: rotate(45deg);
+    flex-shrink: 0;
+  }
+}
+
+.settings-collapsible-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+
+  > .settings-row:first-child {
+    padding-top: 0;
+  }
+
+  > .settings-row:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+  }
 }
 
 .settings-section-title {
@@ -171,6 +253,10 @@
   font-size: 0.85rem;
   color: $stone-500;
   line-height: 1.5;
+
+  &.compact {
+    margin-bottom: 0;
+  }
 }
 
 // =========================================
@@ -419,6 +505,12 @@
 // 外观设置
 // =========================================
 
+.appearance-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
 .appearance-settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -462,6 +554,14 @@
 }
 
 @media (max-width: $breakpoint-md) {
+  .settings-collapsible-header {
+    padding: 0.8rem 0.85rem;
+  }
+
+  .settings-collapsible-body {
+    padding: 0.85rem;
+  }
+
   .appearance-settings-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -847,6 +947,7 @@
 
 .settings-footer {
   display: flex;
+  flex-shrink: 0;
   justify-content: flex-end;
   gap: 0.75rem;
   padding-top: 1rem;
@@ -1120,8 +1221,8 @@
 }
 
 .summary-subsection {
-  margin-top: 1.5rem;
-  padding-top: 1rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -1253,6 +1354,7 @@
 // 操作按钮组
 .summary-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
@@ -1314,7 +1416,13 @@
   transition: all $transition-normal;
 
   input {
+    flex-shrink: 0;
     accent-color: $amber-600;
+  }
+
+  span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   &:hover {
@@ -1362,6 +1470,11 @@
   justify-content: flex-end;
   gap: 0.75rem;
   padding-top: 0.65rem;
+}
+
+.summary-api-toolbar-inline {
+  justify-content: flex-start;
+  padding-top: 0;
 }
 
 .summary-stream-toggle {
