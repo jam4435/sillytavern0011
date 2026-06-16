@@ -8,6 +8,7 @@ import {
   RegexRule,
   createDefaultRegexSettings,
   SummarySettings,
+  SummaryApiMode,
   SummaryApiConfig,
   SummaryThresholds,
   createRegexRule,
@@ -22,6 +23,10 @@ import {
   validateRegex
 } from '../utils/settingsManager';
 import {
+  loadSummaryModelList,
+  validateSummaryApiConfig,
+} from '../utils/summaryApiClient';
+import {
   checkSummaryTrigger,
   triggerManualSummary,
   getIsSummarizing,
@@ -32,7 +37,7 @@ import { Icons } from './Icons';
 import type { AutoAdvanceTurnResult, DebugLogEntry } from '../hooks';
 import { uiLogger } from '../utils/logger';
 
-type SettingsTab = 'display' | 'background' | 'regex' | 'summary' | 'variables' | 'advance' | 'debug';
+type SettingsTab = 'appearance' | 'regex' | 'summary' | 'variables' | 'advance' | 'debug';
 type VariableStatus = 'idle' | 'success' | 'error';
 type VariablePath = Array<string | number>;
 type AutoAdvanceStatus = 'idle' | 'running' | 'stopping' | 'done' | 'error';
@@ -55,6 +60,17 @@ interface AutoAdvanceResult {
 
 const DEFAULT_AUTO_ADVANCE_PROMPT = '合理地继续推进剧情';
 const AUTO_ADVANCE_MAX_COUNT = 50;
+const SUMMARY_MODEL_LIST_ID = 'wuxia-summary-model-list';
+const SUMMARY_API_SOURCES = [
+  ['openai', 'OpenAI'],
+  ['openrouter', 'OpenRouter'],
+  ['claude', 'Claude'],
+  ['google', 'Gemini'],
+  ['groq', 'Groq'],
+  ['mistral', 'Mistral'],
+  ['deepseek', 'DeepSeek'],
+  ['custom', '自定义（OpenAI兼容）'],
+] as const;
 
 const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
 const ROOT_VARIABLE_PATH_KEY = 'root';
@@ -385,7 +401,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onAutoAdvanceTurn,
   isGenerating = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('display');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const autoAdvanceStopRequestedRef = useRef(false);
@@ -394,6 +410,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [summaryStatus, setSummaryStatus] = useState<SummaryTriggerResult | null>(null);
   const [isSummaryRunning, setIsSummaryRunning] = useState(false);
   const [summaryResult, setSummaryResult] = useState<BatchSummaryResult | null>(null);
+  const [summaryModelOptions, setSummaryModelOptions] = useState<string[]>([]);
+  const [summaryModelStatus, setSummaryModelStatus] = useState('');
+  const [isSummaryModelLoading, setIsSummaryModelLoading] = useState(false);
 
   // 变量编辑相关状态
   const [statData, setStatData] = useState<Record<string, unknown> | null>(null);
@@ -428,6 +447,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const autoAdvanceCompletedCount = autoAdvanceResults.filter(result => result.status === 'success').length;
   const autoAdvanceFailedCount = autoAdvanceResults.filter(result => result.status === 'error').length;
   const hasAutoAdvanceResults = autoAdvanceResults.length > 0;
+  const isSummaryCustomApiMode = settings.summarySettings.apiMode === 'custom';
+  const isSummaryCustomApiSource = settings.summarySettings.apiConfig.source === 'custom';
+  const summaryApiValidationMessage = isSummaryCustomApiMode
+    ? validateSummaryApiConfig(settings.summarySettings.apiConfig, { requireModel: true })
+    : '';
 
   // 更新单个设置项
   const updateSetting = useCallback(<K extends keyof DisplaySettings>(
@@ -695,15 +719,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // 重置当前页面设置
   const resetCurrentTab = useCallback(() => {
     switch (activeTab) {
-      case 'display':
+      case 'appearance':
         onSettingsChange({
           ...settings,
           ...DEFAULT_DISPLAY_SETTINGS,
-        });
-        break;
-      case 'background':
-        onSettingsChange({
-          ...settings,
           ...DEFAULT_BACKGROUND_SETTINGS,
         });
         // 清除文件输入
@@ -758,10 +777,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // 获取当前页面的重置按钮文本
   const getResetButtonText = useCallback(() => {
     switch (activeTab) {
-      case 'display':
-        return '重置正文显示';
-      case 'background':
-        return '重置背景设置';
+      case 'appearance':
+        return '重置外观';
       case 'regex':
         return '重置全局并清空当前预设';
       case 'summary':
@@ -927,6 +944,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     key: K,
     value: SummarySettings[K]
   ) => {
+    if (key === 'apiMode' || key === 'stream') {
+      setSummaryModelStatus('');
+    }
     onSettingsChange({
       ...settings,
       summarySettings: {
@@ -941,6 +961,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     key: K,
     value: SummaryApiConfig[K]
   ) => {
+    setSummaryModelStatus('');
     onSettingsChange({
       ...settings,
       summarySettings: {
@@ -952,6 +973,31 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       },
     });
   }, [settings, onSettingsChange]);
+
+  const updateSummaryApiMode = useCallback((apiMode: SummaryApiMode) => {
+    updateSummarySetting('apiMode', apiMode);
+  }, [updateSummarySetting]);
+
+  const handleLoadSummaryModels = useCallback(async () => {
+    if (settings.summarySettings.apiMode !== 'custom') {
+      setSummaryModelStatus('使用当前预设时无需读取模型列表。');
+      return;
+    }
+
+    setIsSummaryModelLoading(true);
+    setSummaryModelStatus('正在读取模型列表...');
+
+    try {
+      const models = await loadSummaryModelList(settings.summarySettings.apiConfig);
+      setSummaryModelOptions(models);
+      setSummaryModelStatus(`已读取 ${models.length} 个模型。`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSummaryModelStatus(message || '读取模型列表失败。');
+    } finally {
+      setIsSummaryModelLoading(false);
+    }
+  }, [settings.summarySettings]);
 
   // 更新阈值
   const updateThreshold = useCallback(<K extends keyof SummaryThresholds>(

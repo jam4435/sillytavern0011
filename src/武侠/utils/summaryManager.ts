@@ -9,6 +9,7 @@ import type {
   SummaryThresholds,
   PendingCharacterSummary,
 } from './settingsManager';
+import { requestSummaryText } from './summaryApiClient';
 
 // =========================================
 // 类型定义
@@ -335,34 +336,13 @@ export async function executeSummary(
     const prompt = formatPromptForCharacter(settings.promptTemplate, character);
     dataLogger.log(`[summaryManager] 构建的提示词长度: ${prompt.length}`);
 
-    // 2. 调用 generate API
-    const generateConfig: {
-      user_input: string;
-      should_silence: boolean;
-      custom_api?: {
-        apiurl: string;
-        key: string;
-        model: string;
-        source?: string;
-      };
-    } = {
-      user_input: prompt,
-      should_silence: true, // 静默生成，不干扰主聊天
-    };
-
-    // 如果配置了自定义 API，使用自定义 API
-    if (settings.apiConfig.apiurl && settings.apiConfig.model) {
-      generateConfig.custom_api = {
-        apiurl: settings.apiConfig.apiurl,
-        key: settings.apiConfig.key,
-        model: settings.apiConfig.model,
-        source: settings.apiConfig.source || 'openai',
-      };
-      dataLogger.log(`[summaryManager] 使用自定义 API: ${settings.apiConfig.apiurl}`);
-    }
-
-    dataLogger.log('[summaryManager] 调用 generate API...');
-    const response = await generate(generateConfig);
+    // 2. 调用总结 API
+    dataLogger.log('[summaryManager] 调用总结 API...', {
+      apiMode: settings.apiMode,
+      source: settings.apiConfig.source,
+      stream: settings.stream,
+    });
+    const response = await requestSummaryText({ prompt, settings });
     dataLogger.log(`[summaryManager] 收到响应，长度: ${response.length}`);
 
     // 3. 解析响应
