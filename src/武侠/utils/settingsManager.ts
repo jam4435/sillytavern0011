@@ -35,8 +35,11 @@ export interface SummaryApiConfig {
   /** 模型名称 */
   model: string;
   /** API源，默认为 'openai' */
-  source?: string;
+  source: string;
 }
+
+/** 自动总结 API 使用模式 */
+export type SummaryApiMode = 'preset' | 'custom';
 
 /** 阈值设置 */
 export interface SummaryThresholds {
@@ -64,6 +67,10 @@ export interface PendingCharacterSummary {
 export interface SummarySettings {
   /** 是否启用自动总结 */
   enabled: boolean;
+  /** API 使用模式 */
+  apiMode: SummaryApiMode;
+  /** 是否启用流式生成 */
+  stream: boolean;
   /** API配置 */
   apiConfig: SummaryApiConfig;
   /** 提示词模板 */
@@ -194,6 +201,8 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你是一个专业的文学编�
 /** 默认自动总结设置 */
 export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   enabled: false,
+  apiMode: 'preset',
+  stream: false,
   apiConfig: {
     apiurl: '',
     key: '',
@@ -426,15 +435,30 @@ function removePresetRulesDuplicatedWithGlobalRules(
 
 function normalizeSummarySettings(summarySettings: Partial<SummarySettings> | undefined): SummarySettings {
   if (!summarySettings) {
-    return DEFAULT_SUMMARY_SETTINGS;
+    return { ...DEFAULT_SUMMARY_SETTINGS, apiConfig: { ...DEFAULT_SUMMARY_SETTINGS.apiConfig }, thresholds: { ...DEFAULT_SUMMARY_SETTINGS.thresholds } };
   }
+
+  const apiConfig = {
+    ...DEFAULT_SUMMARY_SETTINGS.apiConfig,
+    ...summarySettings.apiConfig,
+  };
+  const hasLegacyCustomApi = Boolean(apiConfig.apiurl?.trim() || apiConfig.model?.trim());
+  const migratedSource = apiConfig.source === 'openai' && apiConfig.apiurl?.trim() ? 'custom' : apiConfig.source;
 
   return {
     ...DEFAULT_SUMMARY_SETTINGS,
     ...summarySettings,
+    apiMode: summarySettings.apiMode === 'preset' || summarySettings.apiMode === 'custom'
+      ? summarySettings.apiMode
+      : hasLegacyCustomApi
+        ? 'custom'
+        : DEFAULT_SUMMARY_SETTINGS.apiMode,
+    stream: typeof summarySettings.stream === 'boolean'
+      ? summarySettings.stream
+      : DEFAULT_SUMMARY_SETTINGS.stream,
     apiConfig: {
-      ...DEFAULT_SUMMARY_SETTINGS.apiConfig,
-      ...summarySettings.apiConfig,
+      ...apiConfig,
+      source: migratedSource || DEFAULT_SUMMARY_SETTINGS.apiConfig.source,
     },
     thresholds: {
       ...DEFAULT_SUMMARY_SETTINGS.thresholds,
