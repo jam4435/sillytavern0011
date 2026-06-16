@@ -32,6 +32,8 @@ export interface RegenerateResult {
   maintext: string;
   options: string[];
   gameData: Partial<GameState> | null;
+  assistantMessageId: number;
+  rawReply: string;
 }
 
 type RegenerateContext = {
@@ -110,9 +112,10 @@ function buildHistoryPrompts(messages: ChatMessageWithSwipes[], lastMessageId: n
     .filter(prompt => prompt.content.length > 0);
 }
 
-async function emitEraForceSyncAndWait(
+export async function emitEraForceSyncAndWait(
   payload: Record<string, unknown>,
   timeoutMs = 10000,
+  timeoutMessage = 'ERA 变量同步没有响应，已停止重新生成。',
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -135,7 +138,7 @@ async function emitEraForceSyncAndWait(
     };
 
     const timer = window.setTimeout(() => {
-      finish(new Error('ERA 变量同步没有响应，已停止重新生成。'));
+      finish(new Error(timeoutMessage));
     }, timeoutMs);
 
     listener = eventOnce('era:writeDone', () => {
@@ -232,5 +235,7 @@ export async function regenerateLastAssistantSwipe(): Promise<RegenerateResult> 
     maintext,
     options: parseOptions(maintext),
     gameData: readGameDataPure(),
+    assistantMessageId: context.assistantMessage.message_id,
+    rawReply: resultText,
   };
 }

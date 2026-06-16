@@ -1,4 +1,4 @@
-import type { SummaryApiConfig, SummarySettings } from './settingsManager';
+import type { SummaryApiConfig, SummaryApiMode, SummarySettings } from './settingsManager';
 
 const CUSTOM_GENERATE_URL = '/api/backends/chat-completions/generate';
 const STATUS_URL = '/api/backends/chat-completions/status';
@@ -9,6 +9,20 @@ interface SummaryRequestOptions {
   prompt: string;
   settings: SummarySettings;
   timeoutMs?: number;
+}
+
+export interface ConfiguredTextRequestSettings {
+  apiMode: SummaryApiMode;
+  apiConfig: SummaryApiConfig;
+  stream?: boolean;
+}
+
+export interface ConfiguredTextRequestOptions {
+  prompt: string;
+  settings: ConfiguredTextRequestSettings;
+  timeoutMs?: number;
+  shouldStream?: boolean;
+  generationIdPrefix?: string;
 }
 
 interface SummaryCustomApi {
@@ -27,8 +41,8 @@ interface StatusRequestAttempt {
   body: Record<string, string>;
 }
 
-function buildGenerationId(): string {
-  return `wuxia-summary-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+function buildGenerationId(prefix = 'wuxia-summary'): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function normalizeModelName(model: string | undefined): string {
@@ -276,7 +290,7 @@ async function requestCustomChatCompletion({
   }
 }
 
-function resolveSummaryCustomApi(settings: SummarySettings): SummaryCustomApi | null {
+function resolveConfiguredCustomApi(settings: ConfiguredTextRequestSettings): SummaryCustomApi | null {
   if (settings.apiMode !== 'custom') {
     return null;
   }
@@ -305,18 +319,20 @@ function resolveSummaryCustomApi(settings: SummarySettings): SummaryCustomApi | 
   };
 }
 
-export async function requestSummaryText({
+export async function requestConfiguredText({
   prompt,
   settings,
   timeoutMs = DEFAULT_TIMEOUT_MS,
-}: SummaryRequestOptions): Promise<string> {
-  const customApi = resolveSummaryCustomApi(settings);
+  shouldStream = Boolean(settings.stream),
+  generationIdPrefix = 'wuxia-summary',
+}: ConfiguredTextRequestOptions): Promise<string> {
+  const customApi = resolveConfiguredCustomApi(settings);
 
   if (customApi?.source === 'custom') {
     return requestCustomChatCompletion({
       prompt,
       apiConfig: settings.apiConfig,
-      shouldStream: settings.stream,
+      shouldStream,
       timeoutMs,
     });
   }
@@ -326,7 +342,7 @@ export async function requestSummaryText({
     throw new Error('当前环境没有可用的 generateRaw()');
   }
 
-  const generationId = buildGenerationId();
+  const generationId = buildGenerationId(generationIdPrefix);
   const stopGeneration = getStopGenerationByIdFn();
   let timeoutHandle: number | null = null;
 
@@ -336,7 +352,7 @@ export async function requestSummaryText({
         prompt,
         generationId,
         customApi,
-        shouldStream: settings.stream,
+        shouldStream,
       }))),
       new Promise<never>((_, reject) => {
         timeoutHandle = window.setTimeout(() => {
@@ -352,6 +368,20 @@ export async function requestSummaryText({
       window.clearTimeout(timeoutHandle);
     }
   }
+}
+
+export async function requestSummaryText({
+  prompt,
+  settings,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+}: SummaryRequestOptions): Promise<string> {
+  return requestConfiguredText({
+    prompt,
+    settings,
+    timeoutMs,
+    shouldStream: settings.stream,
+    generationIdPrefix: 'wuxia-summary',
+  });
 }
 
 function parseModelListPayload(data: unknown): string[] {

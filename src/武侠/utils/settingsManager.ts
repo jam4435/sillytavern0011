@@ -41,6 +41,9 @@ export interface SummaryApiConfig {
 /** 自动总结 API 使用模式 */
 export type SummaryApiMode = 'preset' | 'custom';
 
+/** 正文变量更新模式 */
+export type SummaryVariableUpdateMode = 'inline' | 'extra';
+
 /** 阈值设置 */
 export interface SummaryThresholds {
   /** 待处理队列角色数阈值 (默认5) */
@@ -69,6 +72,8 @@ export interface SummarySettings {
   enabled: boolean;
   /** API 使用模式 */
   apiMode: SummaryApiMode;
+  /** 正文变量更新模式 */
+  variableUpdateMode: SummaryVariableUpdateMode;
   /** 是否启用流式生成 */
   stream: boolean;
   /** API配置 */
@@ -202,6 +207,7 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你是一个专业的文学编�
 export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   enabled: false,
   apiMode: 'preset',
+  variableUpdateMode: 'inline',
   stream: false,
   apiConfig: {
     apiurl: '',
@@ -453,6 +459,9 @@ function normalizeSummarySettings(summarySettings: Partial<SummarySettings> | un
       : hasLegacyCustomApi
         ? 'custom'
         : DEFAULT_SUMMARY_SETTINGS.apiMode,
+    variableUpdateMode: summarySettings.variableUpdateMode === 'extra' || summarySettings.variableUpdateMode === 'inline'
+      ? summarySettings.variableUpdateMode
+      : DEFAULT_SUMMARY_SETTINGS.variableUpdateMode,
     stream: typeof summarySettings.stream === 'boolean'
       ? summarySettings.stream
       : DEFAULT_SUMMARY_SETTINGS.stream,

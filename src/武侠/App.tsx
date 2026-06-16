@@ -116,6 +116,7 @@ const App: React.FC = () => {
     addDebugLog,
     currentMaintext,
     currentOptions,
+    summarySettings: displaySettings.summarySettings,
     onVariableTurnStart: handleVariableTurnStart,
     onVariableAssistantReply: handleVariableAssistantReply,
   });

@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import type { GameState } from '../types';
+import type { SummarySettings } from '../utils/settingsManager';
 import {
   flushPendingGameDataCompletion,
   getLastMessageContent,
@@ -9,6 +10,11 @@ import {
 } from '../utils/variableReader';
 import { messageLogger } from '../utils/logger';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
+import {
+  executeExtraVariableUpdate,
+  prepareExtraVariableUpdateTurn,
+  type ExtraVariableUpdateReservation,
+} from '../utils/extraVariableUpdateManager';
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -41,6 +47,7 @@ interface UseMessageHandlerOptions {
   addDebugLog: (type: 'prompt' | 'assistant', content: string) => void;
   currentMaintext: string;
   currentOptions: string[];
+  summarySettings: SummarySettings;
   onVariableTurnStart?: () => void;
   onVariableAssistantReply?: (rawReply: string, assistantMessageId?: number) => void;
 }
@@ -104,6 +111,7 @@ export function useMessageHandler({
   addDebugLog,
   currentMaintext,
   currentOptions,
+  summarySettings,
   onVariableTurnStart,
   onVariableAssistantReply,
 }: UseMessageHandlerOptions) {
@@ -118,7 +126,10 @@ export function useMessageHandler({
     showLoading('正在生成回复...');
     messageLogger.log('🔄 isLoading 设置为 true');
 
+    let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
+
     try {
+      extraVariableUpdateReservation = await prepareExtraVariableUpdateTurn(summarySettings);
       const beforeSendLastMessageId = getLatestMessageId();
       onVariableTurnStart?.();
 
@@ -235,6 +246,36 @@ export function useMessageHandler({
 
         addDebugLog('assistant', resultText);
 
+        if (summarySettings.variableUpdateMode === 'extra') {
+          if (!assistantMessage?.message_id) {
+            const errorMessage = '正文已生成，但没有找到可追加变量块的 assistant 楼层。';
+            addDebugLog('assistant', `[额外变量更新失败]\n${errorMessage}`);
+            showError(errorMessage);
+            return resultText;
+          }
+
+          showLoading('正在额外更新变量...');
+          try {
+            const extraUpdateResult = await executeExtraVariableUpdate({
+              settings: summarySettings,
+              assistantMessageId: assistantMessage.message_id,
+              latestRawReply: resultText,
+            });
+            addDebugLog(
+              'assistant',
+              extraUpdateResult.appended
+                ? `[额外变量更新]\n${extraUpdateResult.appendedBlocks || extraUpdateResult.rawResponse}`
+                : '[额外变量更新]\n未发现需要写入的变量变化。',
+            );
+          } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            messageLogger.error('额外变量更新失败:', error);
+            addDebugLog('assistant', `[额外变量更新失败]\n${errorMessage}`);
+            showError(`正文已生成，但额外变量更新失败：${errorMessage}`);
+            return resultText;
+          }
+        }
+
         messageLogger.log('✅ [步骤 5] 前端状态已更新');
         messageLogger.log('注意: React 状态更新是异步的，新值将在下次渲染时生效');
 
@@ -270,6 +311,7 @@ export function useMessageHandler({
       showError(`生成失败：${errorMessage}`);
       return '';
     } finally {
+      extraVariableUpdateReservation?.release();
       setIsLoading(false);
       messageLogger.log('');
       messageLogger.log('🏁 流程结束');
@@ -286,6 +328,7 @@ export function useMessageHandler({
     dismissToast,
     setCurrentMaintext,
     setCurrentOptions,
+    summarySettings,
     onVariableTurnStart,
     onVariableAssistantReply,
   ]);
@@ -357,13 +400,46 @@ export function useMessageHandler({
     setIsLoading(true);
     showLoading('正在重新生成回复...');
 
+    let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
+
     try {
+      extraVariableUpdateReservation = await prepareExtraVariableUpdateTurn(summarySettings);
       const result = await regenerateLastAssistantSwipe();
       setCurrentMaintext(result.maintext);
       setCurrentOptions(result.options);
       if (result.maintext) {
         addDebugLog('assistant', `[重新生成]\n${result.maintext}`);
       }
+
+      if (summarySettings.variableUpdateMode === 'extra') {
+        showLoading('正在额外更新变量...');
+        try {
+          const extraUpdateResult = await executeExtraVariableUpdate({
+            settings: summarySettings,
+            assistantMessageId: result.assistantMessageId,
+            latestRawReply: result.rawReply,
+          });
+          addDebugLog(
+            'assistant',
+            extraUpdateResult.appended
+              ? `[重新生成额外变量更新]\n${extraUpdateResult.appendedBlocks || extraUpdateResult.rawResponse}`
+              : '[重新生成额外变量更新]\n未发现需要写入的变量变化。',
+          );
+
+          const latestContent = getLastMessageContent();
+          if (latestContent) {
+            setCurrentMaintext(latestContent);
+            setCurrentOptions(parseOptions(latestContent));
+          }
+        } catch (error) {
+          const errorMessage = getErrorMessage(error);
+          messageLogger.error('重新生成后的额外变量更新失败:', error);
+          addDebugLog('assistant', `[重新生成额外变量更新失败]\n${errorMessage}`);
+          showError(`重新生成已完成，但额外变量更新失败：${errorMessage}`);
+          return;
+        }
+      }
+
       dismissToast();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -371,6 +447,7 @@ export function useMessageHandler({
       addDebugLog('assistant', `[重新生成异常]\n${errorMessage}`);
       showError(`重新生成失败：${errorMessage}`);
     } finally {
+      extraVariableUpdateReservation?.release();
       setIsLoading(false);
       messageLogger.log('🏁 重新生成流程结束');
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -383,6 +460,7 @@ export function useMessageHandler({
     setIsLoading,
     showError,
     showLoading,
+    summarySettings,
   ]);
 
   return {

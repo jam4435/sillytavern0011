@@ -10,6 +10,7 @@ import {
   SummarySettings,
   SummaryApiMode,
   SummaryApiConfig,
+  SummaryVariableUpdateMode,
   SummaryThresholds,
   createRegexRule,
   getCurrentPresetRegexRules,
@@ -26,6 +27,7 @@ import {
   loadSummaryModelList,
   validateSummaryApiConfig,
 } from '../utils/summaryApiClient';
+import { applyVariableUpdateModeWorldbookState } from '../utils/extraVariableUpdateManager';
 import {
   checkSummaryTrigger,
   triggerManualSummary,
@@ -413,6 +415,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [summaryModelOptions, setSummaryModelOptions] = useState<string[]>([]);
   const [summaryModelStatus, setSummaryModelStatus] = useState('');
   const [isSummaryModelLoading, setIsSummaryModelLoading] = useState(false);
+  const [summaryVariableModeStatus, setSummaryVariableModeStatus] = useState('');
+  const [isSummaryVariableModeUpdating, setIsSummaryVariableModeUpdating] = useState(false);
 
   // 变量编辑相关状态
   const [statData, setStatData] = useState<Record<string, unknown> | null>(null);
@@ -978,6 +982,30 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     updateSummarySetting('apiMode', apiMode);
   }, [updateSummarySetting]);
 
+  const updateVariableUpdateMode = useCallback(async (mode: SummaryVariableUpdateMode) => {
+    if (settings.summarySettings.variableUpdateMode === mode || isSummaryVariableModeUpdating) {
+      return;
+    }
+
+    setIsSummaryVariableModeUpdating(true);
+    setSummaryVariableModeStatus(mode === 'extra' ? '正在禁用变量指导条目...' : '正在恢复变量指导条目...');
+
+    try {
+      const status = await applyVariableUpdateModeWorldbookState(mode);
+      updateSummarySetting('variableUpdateMode', mode);
+      setSummaryVariableModeStatus(status);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSummaryVariableModeStatus(`切换失败：${message}`);
+    } finally {
+      setIsSummaryVariableModeUpdating(false);
+    }
+  }, [
+    isSummaryVariableModeUpdating,
+    settings.summarySettings.variableUpdateMode,
+    updateSummarySetting,
+  ]);
+
   const handleLoadSummaryModels = useCallback(async () => {
     if (settings.summarySettings.apiMode !== 'custom') {
       setSummaryModelStatus('使用当前预设时无需读取模型列表。');
@@ -1534,6 +1562,44 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               {summaryModelStatus && (
                 <div className={`summary-api-status ${summaryModelStatus.startsWith('已读取') ? 'success' : 'info'}`}>
                   {summaryModelStatus}
+                </div>
+              )}
+            </div>
+
+            {/* 正文变量更新 */}
+            <div className="summary-subsection">
+              <h5 className="summary-subsection-title">正文变量更新</h5>
+
+              <div className="summary-api-mode-group" role="radiogroup" aria-label="正文变量更新模式">
+                <label className={`summary-api-mode ${settings.summarySettings.variableUpdateMode !== 'extra' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="summary-variable-update-mode"
+                    checked={settings.summarySettings.variableUpdateMode !== 'extra'}
+                    disabled={isSummaryVariableModeUpdating}
+                    onChange={() => void updateVariableUpdateMode('inline')}
+                  />
+                  <span>随正文更新变量</span>
+                </label>
+                <label className={`summary-api-mode ${settings.summarySettings.variableUpdateMode === 'extra' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="summary-variable-update-mode"
+                    checked={settings.summarySettings.variableUpdateMode === 'extra'}
+                    disabled={isSummaryVariableModeUpdating}
+                    onChange={() => void updateVariableUpdateMode('extra')}
+                  />
+                  <span>额外进行变量更新</span>
+                </label>
+              </div>
+
+              <p className="settings-hint">
+                额外更新会禁用当前角色世界书的「变量指导」条目，正文输出后复用本页 API 配置单独生成变量块。
+              </p>
+
+              {summaryVariableModeStatus && (
+                <div className={`summary-api-status ${summaryVariableModeStatus.startsWith('切换失败') ? 'warning' : 'info'}`}>
+                  {summaryVariableModeStatus}
                 </div>
               )}
             </div>

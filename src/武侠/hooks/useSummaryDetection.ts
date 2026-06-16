@@ -14,6 +14,7 @@ import {
   type BatchSummaryResult,
 } from '../utils/summaryManager';
 import { dataLogger } from '../utils/logger';
+import { getIsExtraVariableUpdating } from '../utils/extraVariableUpdateManager';
 
 export interface UseSummaryDetectionOptions {
   /** 总结设置 */
@@ -69,6 +70,11 @@ export function useSummaryDetection({
     // 如果正在执行总结，跳过
     if (getIsSummarizing()) {
       dataLogger.log('[useSummaryDetection] 已有总结任务在执行中，跳过');
+      return;
+    }
+
+    if (getIsExtraVariableUpdating()) {
+      dataLogger.log('[useSummaryDetection] 额外变量更新正在执行，跳过本次总结检测');
       return;
     }
 
