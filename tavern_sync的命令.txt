@@ -27,3 +27,5 @@ watch：先推送一次，然后监听本地文件变化并自动推送。这个
 bundle：只根据本地文件打包，不需要连接酒馆。角色卡输出 .png，世界书/预设输出 .json。
 
 pull/push/watch 需要酒馆页面里对应的同步脚本连接本地 6620 端口；如果终端停在“等待脚本连接”，就打开/刷新 SillyTavern，并确认酒馆助手脚本库里的同步脚本已启用。
+
+powershell -NoProfile -ExecutionPolicy Bypass -File .\update-worldbookplus.ps1
