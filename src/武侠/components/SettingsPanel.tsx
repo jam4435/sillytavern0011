@@ -1417,60 +1417,125 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="summary-subsection">
               <h5 className="summary-subsection-title">API 配置</h5>
 
-              <div className="settings-row">
-                <label className="settings-label">API 地址</label>
-                <div className="settings-control">
+              <div className="summary-api-mode-group" role="radiogroup" aria-label="自动总结 API 模式">
+                <label className={`summary-api-mode ${!isSummaryCustomApiMode ? 'active' : ''}`}>
                   <input
-                    type="text"
-                    value={settings.summarySettings.apiConfig.apiurl}
-                    onChange={(e) => updateApiConfig('apiurl', e.target.value)}
-                    placeholder="https://api.openai.com/v1"
-                    className="settings-text-input"
+                    type="radio"
+                    name="summary-api-mode"
+                    checked={!isSummaryCustomApiMode}
+                    onChange={() => updateSummaryApiMode('preset')}
                   />
-                </div>
+                  <span>使用当前预设</span>
+                </label>
+                <label className={`summary-api-mode ${isSummaryCustomApiMode ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="summary-api-mode"
+                    checked={isSummaryCustomApiMode}
+                    onChange={() => updateSummaryApiMode('custom')}
+                  />
+                  <span>覆盖 API 配置</span>
+                </label>
               </div>
 
-              <div className="settings-row">
-                <label className="settings-label">API 密钥</label>
-                <div className="settings-control">
-                  <input
-                    type="password"
-                    value={settings.summarySettings.apiConfig.key}
-                    onChange={(e) => updateApiConfig('key', e.target.value)}
-                    placeholder="sk-..."
-                    className="settings-text-input"
-                  />
-                </div>
-              </div>
+              <p className="settings-hint">
+                当前预设模式沿用酒馆正在使用的后端；覆盖模式只改变自动总结请求。
+              </p>
 
-              <div className="settings-row">
-                <label className="settings-label">模型名称</label>
-                <div className="settings-control">
-                  <input
-                    type="text"
-                    value={settings.summarySettings.apiConfig.model}
-                    onChange={(e) => updateApiConfig('model', e.target.value)}
-                    placeholder="gpt-4"
-                    className="settings-text-input"
-                  />
-                </div>
-              </div>
+              {isSummaryCustomApiMode && (
+                <div className="summary-api-fields">
+                  <div className="settings-row">
+                    <label className="settings-label">API 渠道</label>
+                    <div className="settings-control">
+                      <select
+                        value={settings.summarySettings.apiConfig.source}
+                        onChange={(e) => updateApiConfig('source', e.target.value)}
+                        className="settings-select"
+                      >
+                        {SUMMARY_API_SOURCES.map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-              <div className="settings-row">
-                <label className="settings-label">API 源</label>
-                <div className="settings-control">
-                  <select
-                    value={settings.summarySettings.apiConfig.source || 'openai'}
-                    onChange={(e) => updateApiConfig('source', e.target.value)}
-                    className="settings-select"
-                  >
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="google">Google</option>
-                    <option value="custom">自定义</option>
-                  </select>
+                  {isSummaryCustomApiSource && (
+                    <div className="settings-row">
+                      <label className="settings-label">API URL</label>
+                      <div className="settings-control">
+                        <input
+                          type="text"
+                          value={settings.summarySettings.apiConfig.apiurl}
+                          onChange={(e) => updateApiConfig('apiurl', e.target.value)}
+                          placeholder="https://api.example.com/v1"
+                          className="settings-text-input"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="settings-row">
+                    <label className="settings-label">API Key</label>
+                    <div className="settings-control">
+                      <input
+                        type="password"
+                        value={settings.summarySettings.apiConfig.key}
+                        onChange={(e) => updateApiConfig('key', e.target.value)}
+                        placeholder="sk-..."
+                        className="settings-text-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="settings-row">
+                    <label className="settings-label">Model</label>
+                    <div className="settings-control summary-model-control">
+                      <input
+                        type="text"
+                        list={SUMMARY_MODEL_LIST_ID}
+                        value={settings.summarySettings.apiConfig.model}
+                        onChange={(e) => updateApiConfig('model', e.target.value)}
+                        placeholder="模型名称"
+                        className="settings-text-input"
+                      />
+                      <datalist id={SUMMARY_MODEL_LIST_ID}>
+                        {summaryModelOptions.map(model => (
+                          <option key={model} value={model} />
+                        ))}
+                      </datalist>
+                      <button
+                        type="button"
+                        className="settings-action-btn summary-model-load-btn"
+                        onClick={handleLoadSummaryModels}
+                        disabled={isSummaryModelLoading}
+                      >
+                        <Icons.Refresh size={15} />
+                        <span>{isSummaryModelLoading ? '读取中' : '读取模型列表'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="summary-api-toolbar">
+                    <label className="summary-stream-toggle">
+                      <input
+                        type="checkbox"
+                        checked={settings.summarySettings.stream}
+                        onChange={(e) => updateSummarySetting('stream', e.target.checked)}
+                      />
+                      <span>流式生成</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {summaryApiValidationMessage && (
+                <div className="summary-api-status warning">{summaryApiValidationMessage}</div>
+              )}
+              {summaryModelStatus && (
+                <div className={`summary-api-status ${summaryModelStatus.startsWith('已读取') ? 'success' : 'info'}`}>
+                  {summaryModelStatus}
+                </div>
+              )}
             </div>
 
             {/* 触发阈值 */}

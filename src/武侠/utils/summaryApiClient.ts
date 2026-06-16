@@ -355,9 +355,11 @@ export async function requestSummaryText({
 }
 
 function parseModelListPayload(data: unknown): string[] {
-  const payload = data as { models?: unknown[]; data?: unknown[] } | unknown[];
-  const modelsList = Array.isArray(payload)
-    ? payload
+  const payload = data && typeof data === 'object' && !Array.isArray(data)
+    ? data as { models?: unknown[]; data?: unknown[] }
+    : null;
+  const modelsList = Array.isArray(data)
+    ? data
     : Array.isArray(payload?.models)
       ? payload.models
       : Array.isArray(payload?.data)
