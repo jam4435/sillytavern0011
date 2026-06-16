@@ -1070,18 +1070,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       {/* 标签页导航 */}
       <div className="settings-tabs">
         <button
-          className={`settings-tab ${activeTab === 'display' ? 'active' : ''}`}
-          onClick={() => setActiveTab('display')}
+          className={`settings-tab ${activeTab === 'appearance' ? 'active' : ''}`}
+          onClick={() => setActiveTab('appearance')}
         >
           <Icons.Character size={16} />
-          <span className="settings-tab-label" data-short-label="正文">正文显示</span>
-        </button>
-        <button
-          className={`settings-tab ${activeTab === 'background' ? 'active' : ''}`}
-          onClick={() => setActiveTab('background')}
-        >
-          <Icons.Map size={16} />
-          <span className="settings-tab-label" data-short-label="背景">背景设置</span>
+          <span className="settings-tab-label" data-short-label="外观">外观</span>
         </button>
         <button
           className={`settings-tab ${activeTab === 'regex' ? 'active' : ''}`}
