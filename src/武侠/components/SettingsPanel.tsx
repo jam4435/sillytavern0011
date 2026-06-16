@@ -1115,70 +1115,160 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
       {/* 设置内容区域 */}
       <div className="settings-content">
-        {/* 正文显示设置 */}
-        {activeTab === 'display' && (
-          <div className="settings-section">
+        {/* 外观设置 */}
+        {activeTab === 'appearance' && (
+          <div className="settings-section appearance-section">
             <h4 className="settings-section-title">
               <span className="diamond-bullet"></span>
-              字体设置
+              外观
             </h4>
 
-            {/* 字体大小 */}
-            <div className="settings-row">
-              <label className="settings-label">字体大小</label>
-              <div className="settings-control">
-                <input
-                  type="range"
-                  min="12"
-                  max="24"
-                  step="1"
-                  value={settings.fontSize}
-                  onChange={(e) => updateSetting('fontSize', parseInt(e.target.value))}
-                  className="settings-slider"
-                />
-                <span className="settings-value">{settings.fontSize}px</span>
+            <div className="appearance-settings-grid">
+              <div className="appearance-group">
+                <h5 className="appearance-group-title">正文</h5>
+
+                <div className="settings-row">
+                  <label className="settings-label">字体大小</label>
+                  <div className="settings-control">
+                    <input
+                      type="range"
+                      min="12"
+                      max="24"
+                      step="1"
+                      value={settings.fontSize}
+                      onChange={(e) => updateSetting('fontSize', parseInt(e.target.value))}
+                      className="settings-slider"
+                    />
+                    <span className="settings-value">{settings.fontSize}px</span>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-label">字体颜色</label>
+                  <div className="settings-control">
+                    <input
+                      type="color"
+                      value={settings.fontColor}
+                      onChange={(e) => updateSetting('fontColor', e.target.value)}
+                      className="settings-color-picker"
+                    />
+                    <input
+                      type="text"
+                      value={settings.fontColor}
+                      onChange={(e) => updateSetting('fontColor', e.target.value)}
+                      className="settings-color-input"
+                      placeholder="#RRGGBB"
+                    />
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-label">行高</label>
+                  <div className="settings-control">
+                    <input
+                      type="range"
+                      min="1.2"
+                      max="2.5"
+                      step="0.1"
+                      value={settings.lineHeight}
+                      onChange={(e) => updateSetting('lineHeight', parseFloat(e.target.value))}
+                      className="settings-slider"
+                    />
+                    <span className="settings-value">{settings.lineHeight.toFixed(1)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="appearance-group">
+                <h5 className="appearance-group-title">背景</h5>
+
+                <div className="settings-row">
+                  <label className="settings-label">背景颜色</label>
+                  <div className="settings-control">
+                    <input
+                      type="color"
+                      value={settings.backgroundColor}
+                      onChange={(e) => updateSetting('backgroundColor', e.target.value)}
+                      className="settings-color-picker"
+                    />
+                    <input
+                      type="text"
+                      value={settings.backgroundColor}
+                      onChange={(e) => updateSetting('backgroundColor', e.target.value)}
+                      className="settings-color-input"
+                      placeholder="#RRGGBB"
+                    />
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-label">背景透明度</label>
+                  <div className="settings-control">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={settings.backgroundOpacity}
+                      onChange={(e) => updateSetting('backgroundOpacity', parseFloat(e.target.value))}
+                      className="settings-slider"
+                    />
+                    <span className="settings-value">{Math.round(settings.backgroundOpacity * 100)}%</span>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-label">背景模糊</label>
+                  <div className="settings-control">
+                    <input
+                      type="range"
+                      min="0"
+                      max="20"
+                      step="1"
+                      value={settings.backgroundBlur}
+                      onChange={(e) => updateSetting('backgroundBlur', parseInt(e.target.value))}
+                      className="settings-slider"
+                    />
+                    <span className="settings-value">{settings.backgroundBlur}px</span>
+                  </div>
+                </div>
+
+                <div className="settings-row settings-row-vertical">
+                  <label className="settings-label">背景图片</label>
+                  <div className="settings-image-upload">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="settings-file-input"
+                      id="bg-image-input"
+                    />
+                    <label htmlFor="bg-image-input" className="settings-upload-btn">
+                      <Icons.Inventory size={16} />
+                      <span>选择图片</span>
+                    </label>
+                    {settings.backgroundImage && (
+                      <button
+                        className="settings-clear-btn"
+                        onClick={clearBackgroundImage}
+                      >
+                        <Icons.Close size={14} />
+                        <span>清除</span>
+                      </button>
+                    )}
+                  </div>
+                  {settings.backgroundImage && (
+                    <div className="settings-image-preview">
+                      <img src={settings.backgroundImage} alt="背景预览" />
+                    </div>
+                  )}
+                  <p className="settings-hint">支持 JPG、PNG、GIF 格式，最大 5MB</p>
+                </div>
               </div>
             </div>
 
-            {/* 字体颜色 */}
-            <div className="settings-row">
-              <label className="settings-label">字体颜色</label>
-              <div className="settings-control">
-                <input
-                  type="color"
-                  value={settings.fontColor}
-                  onChange={(e) => updateSetting('fontColor', e.target.value)}
-                  className="settings-color-picker"
-                />
-                <input
-                  type="text"
-                  value={settings.fontColor}
-                  onChange={(e) => updateSetting('fontColor', e.target.value)}
-                  className="settings-color-input"
-                  placeholder="#RRGGBB"
-                />
-              </div>
-            </div>
-
-            {/* 行高 */}
-            <div className="settings-row">
-              <label className="settings-label">行高</label>
-              <div className="settings-control">
-                <input
-                  type="range"
-                  min="1.2"
-                  max="2.5"
-                  step="0.1"
-                  value={settings.lineHeight}
-                  onChange={(e) => updateSetting('lineHeight', parseFloat(e.target.value))}
-                  className="settings-slider"
-                />
-                <span className="settings-value">{settings.lineHeight.toFixed(1)}</span>
-              </div>
-            </div>
-
-            {/* 预览区域 */}
-            <div className="settings-preview">
+            <div className="settings-preview appearance-preview">
               <div className="preview-label">预览效果</div>
               <div
                 className="preview-text"
@@ -1186,109 +1276,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   fontSize: `${settings.fontSize}px`,
                   color: settings.fontColor,
                   lineHeight: settings.lineHeight,
+                  backgroundColor: `${settings.backgroundColor}${Math.round(settings.backgroundOpacity * 255)
+                    .toString(16)
+                    .padStart(2, '0')}`,
                 }}
               >
                 江湖路远，刀光剑影，恩怨情仇，尽在一念之间。
                 少侠且行且珍重，莫让红尘染白衣。
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* 背景设置 */}
-        {activeTab === 'background' && (
-          <div className="settings-section">
-            <h4 className="settings-section-title">
-              <span className="diamond-bullet"></span>
-              背景设置
-            </h4>
-
-            {/* 背景颜色 */}
-            <div className="settings-row">
-              <label className="settings-label">背景颜色</label>
-              <div className="settings-control">
-                <input
-                  type="color"
-                  value={settings.backgroundColor}
-                  onChange={(e) => updateSetting('backgroundColor', e.target.value)}
-                  className="settings-color-picker"
-                />
-                <input
-                  type="text"
-                  value={settings.backgroundColor}
-                  onChange={(e) => updateSetting('backgroundColor', e.target.value)}
-                  className="settings-color-input"
-                  placeholder="#RRGGBB"
-                />
-              </div>
-            </div>
-
-            {/* 背景透明度 */}
-            <div className="settings-row">
-              <label className="settings-label">背景透明度</label>
-              <div className="settings-control">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={settings.backgroundOpacity}
-                  onChange={(e) => updateSetting('backgroundOpacity', parseFloat(e.target.value))}
-                  className="settings-slider"
-                />
-                <span className="settings-value">{Math.round(settings.backgroundOpacity * 100)}%</span>
-              </div>
-            </div>
-
-            {/* 背景模糊度 */}
-            <div className="settings-row">
-              <label className="settings-label">背景模糊</label>
-              <div className="settings-control">
-                <input
-                  type="range"
-                  min="0"
-                  max="20"
-                  step="1"
-                  value={settings.backgroundBlur}
-                  onChange={(e) => updateSetting('backgroundBlur', parseInt(e.target.value))}
-                  className="settings-slider"
-                />
-                <span className="settings-value">{settings.backgroundBlur}px</span>
-              </div>
-            </div>
-
-            {/* 背景图片上传 */}
-            <div className="settings-row settings-row-vertical">
-              <label className="settings-label">背景图片</label>
-              <div className="settings-image-upload">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="settings-file-input"
-                  id="bg-image-input"
-                />
-                <label htmlFor="bg-image-input" className="settings-upload-btn">
-                  <Icons.Inventory size={16} />
-                  <span>选择图片</span>
-                </label>
-                {settings.backgroundImage && (
-                  <button
-                    className="settings-clear-btn"
-                    onClick={clearBackgroundImage}
-                  >
-                    <Icons.Close size={14} />
-                    <span>清除</span>
-                  </button>
-                )}
-              </div>
-              {settings.backgroundImage && (
-                <div className="settings-image-preview">
-                  <img src={settings.backgroundImage} alt="背景预览" />
-                </div>
-              )}
-              <p className="settings-hint">支持 JPG、PNG、GIF 格式，最大 5MB</p>
             </div>
           </div>
         )}
