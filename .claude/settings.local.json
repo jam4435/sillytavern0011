@@ -16,7 +16,8 @@
       "Bash(python extract_and_recalc.py)",
       "Bash(python parse_models.py)",
       "PowerShell(pnpm build 2>&1)",
-      "PowerShell(Get-ChildItem \"f:\\\\Develop\\\\AI\\\\sillytavern\\\\tmp\\\\st_release\" -Recurse -File | Select-Object -First 30 | ForEach-Object { $_.FullName })"
+      "PowerShell(Get-ChildItem \"f:\\\\Develop\\\\AI\\\\sillytavern\\\\tmp\\\\st_release\" -Recurse -File | Select-Object -First 30 | ForEach-Object { $_.FullName })",
+      "PowerShell(\\(Get-Content \"f:\\\\Develop\\\\AI\\\\sillytavern\\\\dist\\\\世界书编辑脚本\\\\index.js\" -Raw\\) -split ';' | Where-Object { $_ -match 'getWorldbook' } | ForEach-Object { $_.Substring\\(0, [Math]::Min\\(500, $_.Length\\)\\) })"
     ]
   }
 }
