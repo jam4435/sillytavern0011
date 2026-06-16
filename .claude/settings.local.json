@@ -19,7 +19,8 @@
       "PowerShell(Get-ChildItem \"f:\\\\Develop\\\\AI\\\\sillytavern\\\\tmp\\\\st_release\" -Recurse -File | Select-Object -First 30 | ForEach-Object { $_.FullName })",
       "PowerShell(\\(Get-Content \"f:\\\\Develop\\\\AI\\\\sillytavern\\\\dist\\\\世界书编辑脚本\\\\index.js\" -Raw\\) -split ';' | Where-Object { $_ -match 'getWorldbook' } | ForEach-Object { $_.Substring\\(0, [Math]::Min\\(500, $_.Length\\)\\) })",
       "PowerShell($content = Get-Content \"f:\\\\Develop\\\\AI\\\\sillytavern\\\\dist\\\\世界书编辑脚本\\\\index.js\" -Raw; $idx = $content.IndexOf\\('getWorldbook'\\); if \\($idx -gt 0\\) { $start = [Math]::Max\\(0, $idx - 200\\); $len = [Math]::Min\\(800, $content.Length - $start\\); Write-Output $content.Substring\\($start, $len\\) })",
-      "PowerShell($content = Get-Content \"f:\\\\Develop\\\\AI\\\\sillytavern\\\\dist\\\\世界书编辑脚本\\\\index.js\" -Raw; $pattern = 'getWorldbook'; $matches = [regex]::Matches\\($content, '.{0,50}' + [regex]::Escape\\($pattern\\) + '.{0,50}'\\); $matches | Select-Object -First 10 | ForEach-Object { \"$\\($_.Index\\): $\\($_.Value\\)\" })"
+      "PowerShell($content = Get-Content \"f:\\\\Develop\\\\AI\\\\sillytavern\\\\dist\\\\世界书编辑脚本\\\\index.js\" -Raw; $pattern = 'getWorldbook'; $matches = [regex]::Matches\\($content, '.{0,50}' + [regex]::Escape\\($pattern\\) + '.{0,50}'\\); $matches | Select-Object -First 10 | ForEach-Object { \"$\\($_.Index\\): $\\($_.Value\\)\" })",
+      "PowerShell(git show bf45b68~1:dist/世界书编辑脚本/index.js 2>$null | Select-Object -First 1 | ForEach-Object { $_.Substring\\(0, 100\\) })"
     ]
   }
 }
