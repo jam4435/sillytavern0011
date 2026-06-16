@@ -44,6 +44,12 @@ type VariableStatus = 'idle' | 'success' | 'error';
 type VariablePath = Array<string | number>;
 type AutoAdvanceStatus = 'idle' | 'running' | 'stopping' | 'done' | 'error';
 type AutoAdvanceResultStatus = 'running' | 'success' | 'error';
+type SettingsCollapsibleId =
+  | 'appearanceText'
+  | 'appearanceBackground'
+  | 'extraModelApi'
+  | 'extraModelSummary'
+  | 'extraModelVariables';
 
 interface AutoAdvanceResult {
   id: string;
@@ -63,6 +69,13 @@ interface AutoAdvanceResult {
 const DEFAULT_AUTO_ADVANCE_PROMPT = '合理地继续推进剧情';
 const AUTO_ADVANCE_MAX_COUNT = 50;
 const SUMMARY_MODEL_LIST_ID = 'wuxia-summary-model-list';
+const DEFAULT_OPEN_SETTING_BLOCKS: Record<SettingsCollapsibleId, boolean> = {
+  appearanceText: true,
+  appearanceBackground: true,
+  extraModelApi: true,
+  extraModelSummary: true,
+  extraModelVariables: true,
+};
 const SUMMARY_API_SOURCES = [
   ['openai', 'OpenAI'],
   ['openrouter', 'OpenRouter'],
@@ -390,6 +403,50 @@ interface SettingsPanelProps {
   isGenerating?: boolean;
 }
 
+interface SettingsCollapsibleBlockProps {
+  id: SettingsCollapsibleId;
+  title: string;
+  isOpen: boolean;
+  onToggle: (id: SettingsCollapsibleId) => void;
+  children: React.ReactNode;
+  className?: string;
+}
+
+const SettingsCollapsibleBlock: React.FC<SettingsCollapsibleBlockProps> = ({
+  id,
+  title,
+  isOpen,
+  onToggle,
+  children,
+  className = '',
+}) => {
+  const bodyId = `settings-collapsible-${id}`;
+
+  return (
+    <section className={`settings-collapsible-block ${isOpen ? 'open' : 'collapsed'} ${className}`.trim()}>
+      <button
+        type="button"
+        className="settings-collapsible-header"
+        aria-expanded={isOpen}
+        aria-controls={bodyId}
+        onClick={() => onToggle(id)}
+      >
+        <span className="settings-collapsible-title">
+          <span className="diamond-bullet"></span>
+          <span>{title}</span>
+        </span>
+        {isOpen ? <Icons.ChevronDown size={18} /> : <Icons.ChevronUp size={18} />}
+      </button>
+
+      {isOpen && (
+        <div className="settings-collapsible-body" id={bodyId}>
+          {children}
+        </div>
+      )}
+    </section>
+  );
+};
+
 /**
  * 设置面板组件
  * 提供正文显示、背景和正则替换的设置功能
@@ -406,6 +463,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [openSettingBlocks, setOpenSettingBlocks] = useState(DEFAULT_OPEN_SETTING_BLOCKS);
   const autoAdvanceStopRequestedRef = useRef(false);
 
   // 自动总结相关状态
@@ -456,6 +514,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const summaryApiValidationMessage = isSummaryCustomApiMode
     ? validateSummaryApiConfig(settings.summarySettings.apiConfig, { requireModel: true })
     : '';
+
+  const toggleSettingBlock = useCallback((id: SettingsCollapsibleId) => {
+    setOpenSettingBlocks(previousBlocks => ({
+      ...previousBlocks,
+      [id]: !previousBlocks[id],
+    }));
+  }, []);
 
   // 更新单个设置项
   const updateSetting = useCallback(<K extends keyof DisplaySettings>(
@@ -1095,54 +1160,54 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   return (
     <div className="settings-panel">
-      {/* 标签页导航 */}
-      <div className="settings-tabs">
-        <button
-          className={`settings-tab ${activeTab === 'appearance' ? 'active' : ''}`}
-          onClick={() => setActiveTab('appearance')}
-        >
-          <Icons.Character size={16} />
-          <span className="settings-tab-label" data-short-label="外观">外观</span>
-        </button>
-        <button
-          className={`settings-tab ${activeTab === 'regex' ? 'active' : ''}`}
-          onClick={() => setActiveTab('regex')}
-        >
-          <Icons.Scroll size={16} />
-          <span className="settings-tab-label" data-short-label="正则">正则替换</span>
-        </button>
-        <button
-          className={`settings-tab ${activeTab === 'summary' ? 'active' : ''}`}
-          onClick={() => setActiveTab('summary')}
-        >
-          <Icons.Scroll size={16} />
-          <span className="settings-tab-label" data-short-label="总结">自动总结</span>
-        </button>
-        <button
-          className={`settings-tab ${activeTab === 'variables' ? 'active' : ''}`}
-          onClick={() => setActiveTab('variables')}
-        >
-          <Icons.Variables size={16} />
-          <span className="settings-tab-label" data-short-label="变量">变量</span>
-        </button>
-        <button
-          className={`settings-tab ${activeTab === 'advance' ? 'active' : ''}`}
-          onClick={() => setActiveTab('advance')}
-        >
-          <Icons.Send size={16} />
-          <span className="settings-tab-label" data-short-label="推进">自动推进</span>
-        </button>
-        <button
-          className={`settings-tab ${activeTab === 'debug' ? 'active' : ''}`}
-          onClick={() => setActiveTab('debug')}
-        >
-          <Icons.Debug size={16} />
-          <span className="settings-tab-label" data-short-label="调试">调试</span>
-        </button>
-      </div>
-
       {/* 设置内容区域 */}
       <div className="settings-content">
+        {/* 标签页导航 */}
+        <div className="settings-tabs">
+          <button
+            className={`settings-tab ${activeTab === 'appearance' ? 'active' : ''}`}
+            onClick={() => setActiveTab('appearance')}
+          >
+            <Icons.Character size={16} />
+            <span className="settings-tab-label" data-short-label="外观">外观</span>
+          </button>
+          <button
+            className={`settings-tab ${activeTab === 'regex' ? 'active' : ''}`}
+            onClick={() => setActiveTab('regex')}
+          >
+            <Icons.Scroll size={16} />
+            <span className="settings-tab-label" data-short-label="正则">正则替换</span>
+          </button>
+          <button
+            className={`settings-tab ${activeTab === 'summary' ? 'active' : ''}`}
+            onClick={() => setActiveTab('summary')}
+          >
+            <Icons.Scroll size={16} />
+            <span className="settings-tab-label" data-short-label="模型">额外模型</span>
+          </button>
+          <button
+            className={`settings-tab ${activeTab === 'variables' ? 'active' : ''}`}
+            onClick={() => setActiveTab('variables')}
+          >
+            <Icons.Variables size={16} />
+            <span className="settings-tab-label" data-short-label="变量">变量</span>
+          </button>
+          <button
+            className={`settings-tab ${activeTab === 'advance' ? 'active' : ''}`}
+            onClick={() => setActiveTab('advance')}
+          >
+            <Icons.Send size={16} />
+            <span className="settings-tab-label" data-short-label="推进">自动推进</span>
+          </button>
+          <button
+            className={`settings-tab ${activeTab === 'debug' ? 'active' : ''}`}
+            onClick={() => setActiveTab('debug')}
+          >
+            <Icons.Debug size={16} />
+            <span className="settings-tab-label" data-short-label="调试">调试</span>
+          </button>
+        </div>
+
         {/* 外观设置 */}
         {activeTab === 'appearance' && (
           <div className="settings-section appearance-section">
