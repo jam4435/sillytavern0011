@@ -201,7 +201,7 @@ export function getFolderCollapsedState(lorebookName, folderId) {
   if (!lorebookName || !folderId) {
     return false;
   }
-  return !!folderSessionState[lorebookName]?.collapsedFolders?.[folderId];
+  return folderSessionState[lorebookName]?.collapsedFolders?.[folderId] ?? true;
 }
 
 export function setFolderCollapsedState(lorebookName, folderId, collapsed) {
