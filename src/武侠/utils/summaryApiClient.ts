@@ -23,6 +23,7 @@ export interface ConfiguredTextRequestOptions {
   timeoutMs?: number;
   shouldStream?: boolean;
   generationIdPrefix?: string;
+  skipWorldInfoAndAuthorNote?: boolean;
 }
 
 interface SummaryCustomApi {
@@ -35,6 +36,10 @@ interface SummaryCustomApi {
 interface SillyTavernApiLike {
   getRequestHeaders: () => Record<string, string>;
 }
+
+type GenerateRawConfigWithContextGuards = GenerateRawConfig & {
+  skipWIAN?: boolean;
+};
 
 interface StatusRequestAttempt {
   label: string;
@@ -157,13 +162,15 @@ function buildGenerateRawConfig({
   generationId,
   customApi,
   shouldStream,
+  skipWorldInfoAndAuthorNote,
 }: {
   prompt: string;
   generationId: string;
   customApi: SummaryCustomApi | null;
   shouldStream: boolean;
+  skipWorldInfoAndAuthorNote: boolean;
 }): GenerateRawConfig {
-  const config: GenerateRawConfig = {
+  const config: GenerateRawConfigWithContextGuards = {
     generation_id: generationId,
     should_silence: true,
     should_stream: shouldStream,
@@ -190,11 +197,56 @@ function buildGenerateRawConfig({
     max_chat_history: 0,
   };
 
+  if (skipWorldInfoAndAuthorNote) {
+    config.skipWIAN = true;
+  }
+
   if (customApi) {
     config.custom_api = customApi;
   }
 
   return config;
+}
+
+function installSkipWIANHooks(enabled: boolean): () => void {
+  if (
+    !enabled
+    || typeof eventOn !== 'function'
+    || typeof tavern_events === 'undefined'
+  ) {
+    return () => {};
+  }
+
+  const eventOnAny = eventOn as unknown as (
+    eventType: string,
+    listener: (...args: unknown[]) => void,
+  ) => EventOnReturn;
+  const unsubs: EventOnReturn[] = [];
+  const applySkipWIAN = (_generationType: unknown, option?: unknown) => {
+    if (!option || typeof option !== 'object') {
+      return;
+    }
+    (option as { skipWIAN?: boolean }).skipWIAN = true;
+  };
+
+  for (const eventType of [
+    tavern_events.GENERATION_STARTED,
+    tavern_events.GENERATION_AFTER_COMMANDS,
+  ]) {
+    if (typeof eventType === 'string' && eventType) {
+      unsubs.push(eventOnAny(eventType, applySkipWIAN));
+    }
+  }
+
+  return () => {
+    for (const unsub of unsubs) {
+      try {
+        unsub.stop();
+      } catch {
+        // Ignore cleanup failures from the host event bus.
+      }
+    }
+  };
 }
 
 function buildCustomGenerateBody({
@@ -325,6 +377,7 @@ export async function requestConfiguredText({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   shouldStream = Boolean(settings.stream),
   generationIdPrefix = 'wuxia-summary',
+  skipWorldInfoAndAuthorNote = false,
 }: ConfiguredTextRequestOptions): Promise<string> {
   const customApi = resolveConfiguredCustomApi(settings);
 
@@ -344,6 +397,7 @@ export async function requestConfiguredText({
 
   const generationId = buildGenerationId(generationIdPrefix);
   const stopGeneration = getStopGenerationByIdFn();
+  const removeSkipWIANHooks = installSkipWIANHooks(skipWorldInfoAndAuthorNote);
   let timeoutHandle: number | null = null;
 
   try {
@@ -353,6 +407,7 @@ export async function requestConfiguredText({
         generationId,
         customApi,
         shouldStream,
+        skipWorldInfoAndAuthorNote,
       }))),
       new Promise<never>((_, reject) => {
         timeoutHandle = window.setTimeout(() => {
@@ -364,6 +419,7 @@ export async function requestConfiguredText({
 
     return extractTextResponse(response);
   } finally {
+    removeSkipWIANHooks();
     if (timeoutHandle !== null) {
       window.clearTimeout(timeoutHandle);
     }

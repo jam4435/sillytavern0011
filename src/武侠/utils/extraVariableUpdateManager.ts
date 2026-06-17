@@ -49,14 +49,20 @@ export type ExtraVariableUpdateResult = {
   actionBlockCount: number;
   rawResponse: string;
   appendedBlocks?: string;
+  finalMessageText?: string;
 };
 
 let extraVariableUpdateBusy = false;
 let extraVariableUpdateReserved = false;
 
 const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/gi;
+const ERA_VARIABLE_BLOCK_STRIP_REGEX = /\s*<Variable(Think|Insert|Edit|Delete)>\s*[\s\S]*?<\/Variable\1>\s*/gi;
 const ACTION_BLOCK_TAGS = new Set(['VariableInsert', 'VariableEdit', 'VariableDelete']);
 const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
+const VARIABLE_ROOT_KEY_ALIASES: Record<string, string> = {
+  玩家数据: 'user数据',
+  同场景角色: '角色数据',
+};
 
 export function getIsExtraVariableUpdating(): boolean {
   return extraVariableUpdateBusy || extraVariableUpdateReserved;
@@ -76,6 +82,49 @@ function stripCodeFence(text: string): string {
     .replace(/^\s*(?:```|~~~)[a-zA-Z0-9_-]*\s*\r?\n/, '')
     .replace(/\r?\n(?:```|~~~)\s*$/, '')
     .trim();
+}
+
+function stripEraVariableBlocksForPrompt(text: string): string {
+  if (!text) {
+    return '';
+  }
+  ERA_VARIABLE_BLOCK_STRIP_REGEX.lastIndex = 0;
+  return text
+    .replace(ERA_VARIABLE_BLOCK_STRIP_REGEX, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function normalizeBodyMessageForPrompt(rawText: string): string {
+  return stripEraVariableBlocksForPrompt(normalizeDisplayedMessageContent(stripEraVariableBlocksForPrompt(rawText)))
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function mergePatchValue(previous: unknown, next: unknown): unknown {
+  if (!isRecord(previous) || !isRecord(next)) {
+    return next;
+  }
+
+  return Object.entries(next).reduce<Record<string, unknown>>(
+    (result, [key, value]) => {
+      result[key] = Object.prototype.hasOwnProperty.call(result, key)
+        ? mergePatchValue(result[key], value)
+        : value;
+      return result;
+    },
+    { ...previous },
+  );
+}
+
+function canonicalizeVariablePatchRootKeys(patch: Record<string, unknown>): Record<string, unknown> {
+  return Object.entries(patch).reduce<Record<string, unknown>>((result, [key, value]) => {
+    const canonicalKey = VARIABLE_ROOT_KEY_ALIASES[key] || key;
+    result[canonicalKey] = Object.prototype.hasOwnProperty.call(result, canonicalKey)
+      ? mergePatchValue(result[canonicalKey], value)
+      : value;
+    return result;
+  }, {});
 }
 
 function getCurrentCharacterWorldbookNames(): string[] {
@@ -301,7 +350,12 @@ async function renderOutputPromptContext(assistantMessageId: number): Promise<st
       throw new Error('输出提示词渲染后仍包含未处理的模板标记。');
     }
 
-    return rendered.trim();
+    const sanitizedRendered = stripEraVariableBlocksForPrompt(rendered.trim());
+    if (!sanitizedRendered) {
+      throw new Error('输出提示词渲染内容清洗后为空。');
+    }
+
+    return sanitizedRendered;
   } catch (error) {
     dataLogger.warn('渲染输出提示词失败，改用前端变量快照:', error);
     return buildFallbackVariableSnapshot(assistantMessageId);
@@ -405,15 +459,15 @@ function buildFallbackVariableSnapshot(assistantMessageId: number): string {
 
   const snapshot = {
     世界信息: statData.世界信息 ?? variables.世界信息 ?? null,
-    玩家数据: userData,
+    user数据: userData,
     参与事件: statData.参与事件 ?? null,
     后续事件线索: statData.后续事件线索 ?? null,
     附近传闻: statData.附近传闻 ?? null,
-    同场景角色: collectSameSceneCharacters(statData, playerLocation),
+    角色数据: collectSameSceneCharacters(statData, playerLocation),
   };
 
   return [
-    '以下为前端构造的当前变量快照。原始输出提示词模板未能完整渲染。',
+    '以下为前端构造的当前变量快照。键名为实际 ERA 根路径；角色数据仅包含同场景角色。',
     JSON.stringify(snapshot, null, 2),
   ].join('\n');
 }
@@ -439,9 +493,7 @@ function getRecentBodyMessages(targetMessageId: number, latestRawReply: string):
       if (!rawText.trim() || isFrontendLoaderOnlyMessage(rawText)) {
         return null;
       }
-      const normalized = normalizeDisplayedMessageContent(rawText)
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
+      const normalized = normalizeBodyMessageForPrompt(rawText);
       if (!normalized) {
         return null;
       }
@@ -454,7 +506,7 @@ function getRecentBodyMessages(targetMessageId: number, latestRawReply: string):
     .slice(-MAX_CONTEXT_BODY_MESSAGES);
 
   if (bodies.length === 0 && latestRawReply.trim()) {
-    return `#${targetMessageId}\n${normalizeDisplayedMessageContent(latestRawReply).trim()}`;
+    return `#${targetMessageId}\n${normalizeBodyMessageForPrompt(latestRawReply)}`;
   }
 
   return bodies
@@ -482,9 +534,10 @@ async function buildExtraVariableUpdatePrompt({
     '- 不要续写正文，不要解释，不要输出寒暄。',
     '- 只允许输出 <VariableThink>、<VariableInsert>、<VariableEdit>、<VariableDelete> 块。',
     '- <VariableInsert>、<VariableEdit>、<VariableDelete> 内必须是严格 JSON 对象；不要注释、不要尾随逗号、不要 JSON5。',
+    '- JSON 根路径必须使用实际 ERA 键名：世界信息、user数据、角色数据、参与事件、后续事件线索、附近传闻。不要输出“玩家数据”或“同场景角色”这类说明别名。',
     '- 如果没有需要写入的变量变化，可以不输出 Insert/Edit/Delete 块。',
     '',
-    '【最近 5 层正文，按旧到新排列】',
+    '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】',
     recentBodies || '(无可用正文)',
     '',
     '【当前变量上下文，来自输出提示词渲染结果或等价快照】',
@@ -521,7 +574,7 @@ function extractValidVariableBlocks(rawResponse: string): {
       if (!isRecord(parsed)) {
         throw new Error(`${blockTag} 内容必须是 JSON 对象。`);
       }
-      body = JSON.stringify(parsed, null, 2);
+      body = JSON.stringify(canonicalizeVariablePatchRootKeys(parsed), null, 2);
       actionBlockCount += 1;
     }
 
@@ -534,7 +587,7 @@ function extractValidVariableBlocks(rawResponse: string): {
   };
 }
 
-async function appendVariableBlocksToAssistantMessage(messageId: number, blocksText: string): Promise<void> {
+async function appendVariableBlocksToAssistantMessage(messageId: number, blocksText: string): Promise<string> {
   const [freshMessage] = getChatMessages(messageId, {
     hide_state: 'all',
     include_swipes: true,
@@ -565,7 +618,7 @@ async function appendVariableBlocksToAssistantMessage(messageId: number, blocksT
       ],
       { refresh: 'affected' },
     );
-    return;
+    return nextText;
   }
 
   await setChatMessages(
@@ -577,6 +630,7 @@ async function appendVariableBlocksToAssistantMessage(messageId: number, blocksT
     ],
     { refresh: 'affected' },
   );
+  return nextText;
 }
 
 export async function executeExtraVariableUpdate({
@@ -606,6 +660,7 @@ export async function executeExtraVariableUpdate({
       timeoutMs: EXTRA_VARIABLE_UPDATE_TIMEOUT_MS,
       shouldStream: false,
       generationIdPrefix: 'wuxia-variable-update',
+      skipWorldInfoAndAuthorNote: true,
     });
     const { blocksText, actionBlockCount } = extractValidVariableBlocks(rawResponse);
 
@@ -617,7 +672,7 @@ export async function executeExtraVariableUpdate({
       };
     }
 
-    await appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText);
+    const finalMessageText = await appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText);
     await emitEraForceSyncAndWait(
       { mode: 'latest' },
       ERA_SYNC_TIMEOUT_MS,
@@ -629,6 +684,7 @@ export async function executeExtraVariableUpdate({
       actionBlockCount,
       rawResponse,
       appendedBlocks: blocksText,
+      finalMessageText,
     };
   } finally {
     finishExtraVariableUpdate();

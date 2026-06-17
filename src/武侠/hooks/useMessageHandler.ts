@@ -115,6 +115,17 @@ export function useMessageHandler({
   onVariableTurnStart,
   onVariableAssistantReply,
 }: UseMessageHandlerOptions) {
+  const refreshAssistantStateFromFinalText = useCallback((finalText: string, assistantMessageId: number) => {
+    onVariableAssistantReply?.(finalText, assistantMessageId);
+    const displayText = normalizeDisplayedMessageContent(finalText) || finalText;
+    setCurrentMaintext(displayText);
+    setCurrentOptions(parseOptions(finalText));
+  }, [
+    onVariableAssistantReply,
+    setCurrentMaintext,
+    setCurrentOptions,
+  ]);
+
   const handleSendMessage = useCallback(async (message: string): Promise<string> => {
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     messageLogger.log('🚀 开始发送消息流程');
@@ -267,6 +278,12 @@ export function useMessageHandler({
                 ? `[额外变量更新]\n${extraUpdateResult.appendedBlocks || extraUpdateResult.rawResponse}`
                 : '[额外变量更新]\n未发现需要写入的变量变化。',
             );
+            if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
+              refreshAssistantStateFromFinalText(
+                extraUpdateResult.finalMessageText,
+                assistantMessage.message_id,
+              );
+            }
           } catch (error) {
             const errorMessage = getErrorMessage(error);
             messageLogger.error('额外变量更新失败:', error);
@@ -331,6 +348,7 @@ export function useMessageHandler({
     summarySettings,
     onVariableTurnStart,
     onVariableAssistantReply,
+    refreshAssistantStateFromFinalText,
   ]);
 
   const handleAutoAdvanceTurn = useCallback(async (message: string): Promise<AutoAdvanceTurnResult> => {
@@ -426,10 +444,17 @@ export function useMessageHandler({
               : '[重新生成额外变量更新]\n未发现需要写入的变量变化。',
           );
 
-          const latestContent = getLastMessageContent();
-          if (latestContent) {
-            setCurrentMaintext(latestContent);
-            setCurrentOptions(parseOptions(latestContent));
+          if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
+            refreshAssistantStateFromFinalText(
+              extraUpdateResult.finalMessageText,
+              result.assistantMessageId,
+            );
+          } else {
+            const latestContent = getLastMessageContent();
+            if (latestContent) {
+              setCurrentMaintext(latestContent);
+              setCurrentOptions(parseOptions(latestContent));
+            }
           }
         } catch (error) {
           const errorMessage = getErrorMessage(error);
@@ -461,6 +486,7 @@ export function useMessageHandler({
     showError,
     showLoading,
     summarySettings,
+    refreshAssistantStateFromFinalText,
   ]);
 
   return {
