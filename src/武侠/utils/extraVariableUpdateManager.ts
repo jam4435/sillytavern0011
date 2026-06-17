@@ -55,6 +55,21 @@ export type ExtraVariableUpdateResult = {
   rawResponse: string;
   appendedBlocks?: string;
   finalMessageText?: string;
+  appendReadbackText?: string;
+  appendVerification?: string;
+  syncReadbackText?: string;
+  syncVerification?: string;
+};
+
+export type ExtraVariableUpdateProgress = Partial<ExtraVariableUpdateResult>;
+
+type MessageWriteVerification = {
+  messageId: number;
+  swipeId: number;
+  beforeText: string;
+  attemptedText: string;
+  readbackText: string;
+  verification: string;
 };
 
 let extraVariableUpdateBusy = false;
@@ -480,8 +495,12 @@ function buildFallbackVariableSnapshot(assistantMessageId: number): string {
 
 function getActiveMessageText(message: ChatMessageWithSwipes): string {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
-  const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
-  return message.message || swipes[swipeIndex] || swipes[0] || '';
+  if (swipes.length > 0) {
+    const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
+    const safeSwipeIndex = Math.max(0, Math.min(swipeIndex, swipes.length - 1));
+    return swipes[safeSwipeIndex] || swipes.find(text => text.trim().length > 0) || message.message || '';
+  }
+  return message.message || '';
 }
 
 function getRecentBodyMessages(targetMessageId: number, latestRawReply: string): string {
