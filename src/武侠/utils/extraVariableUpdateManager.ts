@@ -803,7 +803,7 @@ export async function executeExtraVariableUpdate({
       prompt,
       rawResponse,
       appendedBlocks: blocksText,
-      finalMessageText: appendVerification.attemptedText,
+      finalMessageText: appendVerification.readbackText,
       appendReadbackText: appendVerification.readbackText,
       appendVerification: appendVerification.verification,
     });
