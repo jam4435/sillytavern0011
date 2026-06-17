@@ -557,7 +557,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     : null;
   const isEditingExistingApiProfile = Boolean(editingApiProfile);
   const isApiDraftCustomSource = apiProfileDraft.apiConfig.source === 'custom';
-  const summaryApiValidationMessage = validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true });
+  const hasApiDraftContent = Boolean(
+    apiProfileDraft.name.trim()
+    || apiProfileDraft.apiConfig.apiurl.trim()
+    || apiProfileDraft.apiConfig.key.trim()
+    || apiProfileDraft.apiConfig.model.trim(),
+  );
+  const summaryApiValidationMessage = hasApiDraftContent
+    ? validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true })
+    : '';
 
   const toggleSettingBlock = useCallback((id: SettingsCollapsibleId) => {
     setOpenSettingBlocks(previousBlocks => ({
@@ -2455,70 +2463,72 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               查看每次发送给 AI 的消息和 AI 回复的内容，帮助调试提示词和检查输出。
             </p>
 
-            {/* 调试日志列表 */}
+            {/* 最新一轮调试记录 */}
             <div className="debug-logs-list">
-              {debugLogs.length === 0 ? (
+              {!latestDebugRound ? (
                 <div className="debug-empty">
                   <Icons.Debug size={32} />
                   <p>暂无调试日志</p>
-                  <p className="debug-hint">发送消息后，日志将在此显示</p>
+                  <p className="debug-hint">发送消息后，最新一轮输入和输出将在此保存</p>
                 </div>
               ) : (
-                debugLogs.map((log) => (
+                debugSections.map((section) => (
                   <div
-                    key={log.id}
-                    className={`debug-log-item ${log.type === 'prompt' ? 'prompt' : 'assistant'} ${expandedLogId === log.id ? 'expanded' : ''}`}
+                    key={section.id}
+                    className={`debug-log-item ${section.id.includes('input') ? 'prompt' : 'assistant'} ${expandedLogId === section.id ? 'expanded' : ''}`}
                   >
                     <div
                       className="debug-log-header"
-                      onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                      onClick={() => setExpandedLogId(expandedLogId === section.id ? null : section.id)}
                     >
                       <div className="debug-log-info">
-                        <span className={`debug-log-type ${log.type}`}>
-                          {log.type === 'prompt' ? '📤 完整提示词' : '📥 AI 回复'}
+                        <span className={`debug-log-type ${section.id.includes('input') ? 'prompt' : 'assistant'}`}>
+                          {section.title}
                         </span>
                         <span className="debug-log-time">
-                          {log.timestamp.toLocaleTimeString('zh-CN', {
+                          {new Date(latestDebugRound.updatedAt).toLocaleTimeString('zh-CN', {
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit'
                           })}
                         </span>
                         <span className="debug-log-length">
-                          {log.content.length} 字符
+                          {section.content.length} 字符
+                        </span>
+                        <span className={`debug-log-status ${section.status}`}>
+                          {section.status === 'running' ? '进行中' : section.status === 'success' ? '完成' : section.status === 'error' ? '失败' : '未运行'}
                         </span>
                       </div>
                       <div className="debug-log-actions">
                         <button
                           className="debug-expand-btn"
-                          title={expandedLogId === log.id ? '收起' : '展开'}
+                          title={expandedLogId === section.id ? '收起' : '展开'}
                         >
-                          {expandedLogId === log.id ? <Icons.ChevronDown size={18} /> : <Icons.ChevronUp size={18} />}
+                          {expandedLogId === section.id ? <Icons.ChevronDown size={18} /> : <Icons.ChevronUp size={18} />}
                         </button>
                       </div>
                     </div>
                     
                     {/* 预览内容（收起状态） */}
-                    {expandedLogId !== log.id && (
+                    {expandedLogId !== section.id && (
                       <div className="debug-log-preview">
-                        {log.content.substring(0, 150)}
-                        {log.content.length > 150 && '...'}
+                        {section.content.substring(0, 150)}
+                        {section.content.length > 150 && '...'}
                       </div>
                     )}
                     
                     {/* 完整内容（展开状态） */}
-                    {expandedLogId === log.id && (
+                    {expandedLogId === section.id && (
                       <div className="debug-log-body">
                         <div className="debug-log-content">
-                          <pre>{log.content}</pre>
+                          <pre>{section.content}</pre>
                         </div>
                         <div className="debug-log-footer">
                           <button
                             className="debug-copy-btn"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigator.clipboard.writeText(log.content);
-                              // 可以添加复制成功的提示
+                              navigator.clipboard.writeText(section.content);
                             }}
                             title="复制内容"
                           >
@@ -2533,13 +2543,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
 
             {/* 日志统计 */}
-            {debugLogs.length > 0 && (
+            {latestDebugRound && (
               <div className="debug-stats">
-                <span>共 {debugLogs.length} 条记录</span>
+                <span>最新一轮</span>
                 <span>•</span>
-                <span>提示词 {debugLogs.filter(l => l.type === 'prompt').length} 条</span>
+                <span>{new Date(latestDebugRound.startedAt).toLocaleString('zh-CN')}</span>
                 <span>•</span>
-                <span>回复 {debugLogs.filter(l => l.type === 'assistant').length} 条</span>
+                <span>正文 {latestDebugRound.main.status}</span>
+                <span>•</span>
+                <span>变量 {latestDebugRound.variable.status}</span>
               </div>
             )}
           </div>

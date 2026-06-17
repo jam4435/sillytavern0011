@@ -1059,7 +1059,8 @@
   font-weight: 500;
   white-space: nowrap;
 
-  &.user {
+  &.user,
+  &.prompt {
     color: $amber-600;
   }
 
@@ -1079,6 +1080,31 @@
   font-size: 0.75rem;
   color: $stone-600;
   white-space: nowrap;
+}
+
+.debug-log-status {
+  padding: 0.12rem 0.4rem;
+  border: 1px solid $stone-700;
+  border-radius: 999px;
+  color: $stone-500;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  white-space: nowrap;
+
+  &.running {
+    border-color: rgba($amber-600, 0.45);
+    color: $amber-600;
+  }
+
+  &.success {
+    border-color: rgba($green-500, 0.4);
+    color: $green-500;
+  }
+
+  &.error {
+    border-color: rgba($red-500, 0.45);
+    color: $red-500;
+  }
 }
 
 .debug-log-actions {
@@ -1393,6 +1419,17 @@
       color: $yellow-500;
     }
   }
+
+  &.danger {
+    border-color: rgba($red-500, 0.55);
+    color: $red-500;
+
+    &:hover:not(:disabled) {
+      background: rgba($red-500, 0.1);
+      border-color: $red-500;
+      color: $stone-200;
+    }
+  }
 }
 
 .summary-api-mode-group {
@@ -1437,6 +1474,28 @@
   }
 }
 
+.summary-api-profile-toolbar,
+.summary-api-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.summary-api-profile-toolbar {
+  margin-bottom: 0.65rem;
+}
+
+.summary-api-profile-select {
+  flex: 1;
+  min-width: 14rem;
+}
+
+.summary-api-actions {
+  justify-content: flex-start;
+}
+
 .summary-api-fields {
   display: flex;
   flex-direction: column;
@@ -1446,6 +1505,10 @@
   border: 1px solid $stone-800;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.16);
+}
+
+.variable-prompt-template-input {
+  min-height: 260px;
 }
 
 .summary-model-control {
@@ -1528,6 +1591,17 @@
 
   .summary-model-load-btn {
     width: 100%;
+  }
+
+  .summary-api-profile-toolbar,
+  .summary-api-actions {
+    align-items: stretch;
+
+    .settings-action-btn,
+    .summary-api-profile-select {
+      width: 100%;
+      justify-content: center;
+    }
   }
 }
 
