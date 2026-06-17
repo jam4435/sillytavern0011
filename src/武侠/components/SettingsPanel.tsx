@@ -1354,6 +1354,55 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [settings.summarySettings]);
 
+  const debugSections = latestDebugRound
+    ? [
+      {
+        id: 'main-input',
+        title: '正文输入',
+        status: latestDebugRound.main.status,
+        content: [
+          '【用户输入】',
+          latestDebugRound.main.userInput || '(空)',
+          '',
+          '【合并提示词】',
+          latestDebugRound.main.combinedPrompt || latestDebugRound.main.userInput || '(未捕获，显示用户输入)',
+          latestDebugRound.main.error ? `\n【错误】\n${latestDebugRound.main.error}` : '',
+        ].filter(Boolean).join('\n'),
+      },
+      {
+        id: 'main-output',
+        title: '正文输出',
+        status: latestDebugRound.main.status,
+        content: [
+          latestDebugRound.main.output || '(暂无正文输出)',
+          latestDebugRound.main.error ? `\n【错误】\n${latestDebugRound.main.error}` : '',
+        ].filter(Boolean).join('\n'),
+      },
+      {
+        id: 'variable-input',
+        title: '额外变量输入',
+        status: latestDebugRound.variable.status,
+        content: latestDebugRound.variable.input || '(本轮未进行额外变量更新)',
+      },
+      {
+        id: 'variable-output',
+        title: '额外变量输出',
+        status: latestDebugRound.variable.status,
+        content: [
+          '【原始返回】',
+          latestDebugRound.variable.output || '(无)',
+          '',
+          '【合法变量块】',
+          latestDebugRound.variable.appendedBlocks || '(无)',
+          '',
+          '【最终楼层文本】',
+          latestDebugRound.variable.finalMessageText || '(未追加)',
+          latestDebugRound.variable.error ? `\n【错误】\n${latestDebugRound.variable.error}` : '',
+        ].filter(Boolean).join('\n'),
+      },
+    ]
+    : [];
+
   return (
     <div className="settings-panel">
       {/* 设置内容区域 */}
