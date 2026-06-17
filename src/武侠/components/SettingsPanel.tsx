@@ -1362,6 +1362,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [settings.summarySettings]);
 
+  const shouldShowVariableDebug = Boolean(
+    latestDebugRound
+    && (
+      latestDebugRound.variable.status !== 'idle'
+      || latestDebugRound.variable.input
+      || latestDebugRound.variable.output
+      || latestDebugRound.variable.appendedBlocks
+      || latestDebugRound.variable.finalMessageText
+      || latestDebugRound.variable.error
+    ),
+  );
   const debugSections = latestDebugRound
     ? [
       {
@@ -1386,7 +1397,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           latestDebugRound.main.error ? `\n【错误】\n${latestDebugRound.main.error}` : '',
         ].filter(Boolean).join('\n'),
       },
-      {
+      ...(shouldShowVariableDebug ? [{
         id: 'variable-input',
         title: '额外变量输入',
         status: latestDebugRound.variable.status,
@@ -1407,7 +1418,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           latestDebugRound.variable.finalMessageText || '(未追加)',
           latestDebugRound.variable.error ? `\n【错误】\n${latestDebugRound.variable.error}` : '',
         ].filter(Boolean).join('\n'),
-      },
+      }] : []),
     ]
     : [];
 
