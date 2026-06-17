@@ -1370,6 +1370,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       || latestDebugRound.variable.output
       || latestDebugRound.variable.appendedBlocks
       || latestDebugRound.variable.finalMessageText
+      || latestDebugRound.variable.appendReadbackText
+      || latestDebugRound.variable.appendVerification
+      || latestDebugRound.variable.syncReadbackText
+      || latestDebugRound.variable.syncVerification
       || latestDebugRound.variable.error
     ),
   );
@@ -1413,6 +1417,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           '',
           '【合法变量块】',
           latestDebugRound.variable.appendedBlocks || '(无)',
+          '',
+          '【写入后回读验证】',
+          latestDebugRound.variable.appendVerification || '(未验证)',
+          '',
+          '【写入后回读文本】',
+          latestDebugRound.variable.appendReadbackText || '(未回读)',
+          '',
+          '【ERA 同步后回读验证】',
+          latestDebugRound.variable.syncVerification || '(未同步或未回读)',
+          '',
+          '【ERA 同步后回读文本】',
+          latestDebugRound.variable.syncReadbackText || '(未同步或未回读)',
           '',
           '【最终楼层文本】',
           latestDebugRound.variable.finalMessageText || '(未追加)',

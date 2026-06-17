@@ -13,6 +13,7 @@ import { regenerateLastAssistantSwipe } from '../utils/messageActions';
 import {
   executeExtraVariableUpdate,
   prepareExtraVariableUpdateTurn,
+  type ExtraVariableUpdateProgress,
   type ExtraVariableUpdateReservation,
 } from '../utils/extraVariableUpdateManager';
 import type { LatestDebugRoundPatch } from './useDebugLogs';
@@ -59,6 +60,39 @@ const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+function createExtraVariableProgressPatch(
+  progress: ExtraVariableUpdateProgress,
+): NonNullable<LatestDebugRoundPatch['variable']> {
+  const patch: NonNullable<LatestDebugRoundPatch['variable']> = {
+    status: 'running',
+  };
+  if (typeof progress.prompt === 'string') {
+    patch.input = progress.prompt;
+  }
+  if (typeof progress.rawResponse === 'string') {
+    patch.output = progress.rawResponse;
+  }
+  if (typeof progress.appendedBlocks === 'string') {
+    patch.appendedBlocks = progress.appendedBlocks;
+  }
+  if (typeof progress.finalMessageText === 'string') {
+    patch.finalMessageText = progress.finalMessageText;
+  }
+  if (typeof progress.appendReadbackText === 'string') {
+    patch.appendReadbackText = progress.appendReadbackText;
+  }
+  if (typeof progress.appendVerification === 'string') {
+    patch.appendVerification = progress.appendVerification;
+  }
+  if (typeof progress.syncReadbackText === 'string') {
+    patch.syncReadbackText = progress.syncReadbackText;
+  }
+  if (typeof progress.syncVerification === 'string') {
+    patch.syncVerification = progress.syncVerification;
+  }
+  return patch;
+}
+
 function captureNextCombinedPrompt(onPrompt: (prompt: string) => void): { stop: () => void } | null {
   if (
     typeof eventOn !== 'function'
@@ -86,8 +120,12 @@ function captureNextCombinedPrompt(onPrompt: (prompt: string) => void): { stop: 
 
 function getActiveMessageText(message: ChatMessageWithSwipes): string {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
-  const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
-  return message.message || swipes[swipeIndex] || swipes[0] || '';
+  if (swipes.length > 0) {
+    const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
+    const safeSwipeIndex = Math.max(0, Math.min(swipeIndex, swipes.length - 1));
+    return swipes[safeSwipeIndex] || swipes.find(text => text.trim().length > 0) || message.message || '';
+  }
+  return message.message || '';
 }
 
 function getAllChatMessagesWithSwipes(): ChatMessageWithSwipes[] {
@@ -329,6 +367,11 @@ export function useMessageHandler({
                   },
                 });
               },
+              onProgress: progress => {
+                patchLatestDebugRound({
+                  variable: createExtraVariableProgressPatch(progress),
+                });
+              },
             });
             patchLatestDebugRound({
               variable: {
@@ -337,6 +380,10 @@ export function useMessageHandler({
                 output: extraUpdateResult.rawResponse,
                 appendedBlocks: extraUpdateResult.appendedBlocks || '',
                 finalMessageText: extraUpdateResult.finalMessageText || '',
+                appendReadbackText: extraUpdateResult.appendReadbackText || '',
+                appendVerification: extraUpdateResult.appendVerification || '',
+                syncReadbackText: extraUpdateResult.syncReadbackText || '',
+                syncVerification: extraUpdateResult.syncVerification || '',
                 finishedAt: Date.now(),
               },
             });
@@ -549,6 +596,11 @@ export function useMessageHandler({
                 },
               });
             },
+            onProgress: progress => {
+              patchLatestDebugRound({
+                variable: createExtraVariableProgressPatch(progress),
+              });
+            },
           });
           patchLatestDebugRound({
             variable: {
@@ -557,6 +609,10 @@ export function useMessageHandler({
               output: extraUpdateResult.rawResponse,
               appendedBlocks: extraUpdateResult.appendedBlocks || '',
               finalMessageText: extraUpdateResult.finalMessageText || '',
+              appendReadbackText: extraUpdateResult.appendReadbackText || '',
+              appendVerification: extraUpdateResult.appendVerification || '',
+              syncReadbackText: extraUpdateResult.syncReadbackText || '',
+              syncVerification: extraUpdateResult.syncVerification || '',
               finishedAt: Date.now(),
             },
           });

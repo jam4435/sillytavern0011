@@ -69,6 +69,7 @@ type MessageWriteVerification = {
   beforeText: string;
   attemptedText: string;
   readbackText: string;
+  verified: boolean;
   verification: string;
 };
 
@@ -493,14 +494,90 @@ function buildFallbackVariableSnapshot(assistantMessageId: number): string {
   ].join('\n');
 }
 
+function getSafeSwipeIndex(message: ChatMessageWithSwipes, swipes: string[]): number {
+  if (swipes.length === 0) {
+    return 0;
+  }
+  const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
+  return Math.max(0, Math.min(swipeIndex, swipes.length - 1));
+}
+
 function getActiveMessageText(message: ChatMessageWithSwipes): string {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
   if (swipes.length > 0) {
-    const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
-    const safeSwipeIndex = Math.max(0, Math.min(swipeIndex, swipes.length - 1));
+    const safeSwipeIndex = getSafeSwipeIndex(message, swipes);
     return swipes[safeSwipeIndex] || swipes.find(text => text.trim().length > 0) || message.message || '';
   }
   return message.message || '';
+}
+
+function normalizeNewlines(text: string): string {
+  return text.replace(/\r\n/g, '\n');
+}
+
+function containsAppendedBlocks(readbackText: string, blocksText: string): boolean {
+  return normalizeNewlines(readbackText).includes(normalizeNewlines(blocksText));
+}
+
+function normalizeArray<T>(value: T[] | undefined, expectedLength: number, fallback: () => T): T[] {
+  const result = Array.isArray(value) ? [...value] : [];
+  while (result.length < expectedLength) {
+    result.push(fallback());
+  }
+  return result;
+}
+
+function readAssistantMessageActiveText(messageId: number): {
+  message: ChatMessageWithSwipes;
+  activeText: string;
+  swipeId: number;
+} {
+  const [freshMessage] = getChatMessages(messageId, {
+    hide_state: 'all',
+    include_swipes: true,
+  }) as ChatMessageWithSwipes[];
+
+  if (!freshMessage || freshMessage.role !== 'assistant') {
+    throw new Error(`找不到要追加变量块的 assistant 楼层 #${messageId}。`);
+  }
+
+  const swipes = Array.isArray(freshMessage.swipes) ? freshMessage.swipes : [];
+  return {
+    message: freshMessage,
+    activeText: getActiveMessageText(freshMessage),
+    swipeId: getSafeSwipeIndex(freshMessage, swipes),
+  };
+}
+
+function createWriteVerification({
+  messageId,
+  swipeId,
+  beforeText,
+  attemptedText,
+  readbackText,
+  blocksText,
+  stage,
+}: {
+  messageId: number;
+  swipeId: number;
+  beforeText: string;
+  attemptedText: string;
+  readbackText: string;
+  blocksText: string;
+  stage: string;
+}): MessageWriteVerification {
+  const verified = containsAppendedBlocks(readbackText, blocksText);
+  return {
+    messageId,
+    swipeId,
+    beforeText,
+    attemptedText,
+    readbackText,
+    verified,
+    verification: verified
+      ? `${stage}回读通过：assistant #${messageId} / swipe #${swipeId} 中存在刚追加的变量块。`
+      : `${stage}回读失败：assistant #${messageId} / swipe #${swipeId} 中没有刚追加的变量块。`,
+  };
 }
 
 function getRecentBodyMessages(targetMessageId: number, latestRawReply: string): string {
@@ -615,50 +692,59 @@ function extractValidVariableBlocks(rawResponse: string): {
   };
 }
 
-async function appendVariableBlocksToAssistantMessage(messageId: number, blocksText: string): Promise<string> {
-  const [freshMessage] = getChatMessages(messageId, {
-    hide_state: 'all',
-    include_swipes: true,
-  }) as ChatMessageWithSwipes[];
-
-  if (!freshMessage || freshMessage.role !== 'assistant') {
-    throw new Error(`找不到要追加变量块的 assistant 楼层 #${messageId}。`);
-  }
-
-  const activeText = getActiveMessageText(freshMessage);
+async function appendVariableBlocksToAssistantMessage(
+  messageId: number,
+  blocksText: string,
+): Promise<MessageWriteVerification> {
+  const {
+    message: freshMessage,
+    activeText,
+    swipeId,
+  } = readAssistantMessageActiveText(messageId);
   const nextText = `${activeText.trimEnd()}\n\n${blocksText}`.trim();
   const swipes = Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0
     ? [...freshMessage.swipes]
     : null;
 
   if (swipes) {
-    const swipeIndex = Number.isInteger(freshMessage.swipe_id) ? Number(freshMessage.swipe_id) : 0;
-    const safeSwipeIndex = Math.max(0, Math.min(swipeIndex, swipes.length - 1));
-    swipes[safeSwipeIndex] = nextText;
+    swipes[swipeId] = nextText;
+    const swipesData = normalizeArray(freshMessage.swipes_data, swipes.length, () => ({}));
+    const swipesInfo = normalizeArray(freshMessage.swipes_info, swipes.length, () => ({}));
     await setChatMessages(
       [
         {
           message_id: messageId,
           message: nextText,
-          swipe_id: safeSwipeIndex,
+          swipe_id: swipeId,
           swipes,
+          swipes_data: swipesData,
+          swipes_info: swipesInfo,
         },
       ],
       { refresh: 'affected' },
     );
-    return nextText;
+  } else {
+    await setChatMessages(
+      [
+        {
+          message_id: messageId,
+          message: nextText,
+        },
+      ],
+      { refresh: 'affected' },
+    );
   }
 
-  await setChatMessages(
-    [
-      {
-        message_id: messageId,
-        message: nextText,
-      },
-    ],
-    { refresh: 'affected' },
-  );
-  return nextText;
+  const readback = readAssistantMessageActiveText(messageId);
+  return createWriteVerification({
+    messageId,
+    swipeId: readback.swipeId,
+    beforeText: activeText,
+    attemptedText: nextText,
+    readbackText: readback.activeText,
+    blocksText,
+    stage: '写入后',
+  });
 }
 
 export async function executeExtraVariableUpdate({
@@ -666,11 +752,13 @@ export async function executeExtraVariableUpdate({
   assistantMessageId,
   latestRawReply,
   onPromptBuilt,
+  onProgress,
 }: {
   settings: SummarySettings;
   assistantMessageId: number;
   latestRawReply: string;
   onPromptBuilt?: (prompt: string) => void;
+  onProgress?: (progress: ExtraVariableUpdateProgress) => void;
 }): Promise<ExtraVariableUpdateResult> {
   if (settings.variableUpdateMode !== 'extra') {
     return {
@@ -686,6 +774,7 @@ export async function executeExtraVariableUpdate({
     const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
     const prompt = await buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply });
     onPromptBuilt?.(prompt);
+    onProgress?.({ prompt });
     const rawResponse = await requestConfiguredText({
       prompt,
       settings: requestSettings,
@@ -694,7 +783,9 @@ export async function executeExtraVariableUpdate({
       generationIdPrefix: 'wuxia-variable-update',
       skipWorldInfoAndAuthorNote: true,
     });
+    onProgress?.({ prompt, rawResponse });
     const { blocksText, actionBlockCount } = extractValidVariableBlocks(rawResponse);
+    onProgress?.({ prompt, rawResponse, appendedBlocks: blocksText, actionBlockCount });
 
     if (actionBlockCount === 0 || !blocksText) {
       return {
@@ -705,12 +796,73 @@ export async function executeExtraVariableUpdate({
       };
     }
 
-    const finalMessageText = await appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText);
-    await emitEraForceSyncAndWait(
-      { mode: 'latest' },
-      ERA_SYNC_TIMEOUT_MS,
-      'ERA 变量同步没有响应，额外变量更新已停止。',
-    );
+    const appendVerification = await appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText);
+    onProgress?.({
+      appended: true,
+      actionBlockCount,
+      prompt,
+      rawResponse,
+      appendedBlocks: blocksText,
+      finalMessageText: appendVerification.attemptedText,
+      appendReadbackText: appendVerification.readbackText,
+      appendVerification: appendVerification.verification,
+    });
+
+    if (!appendVerification.verified) {
+      throw new Error(`${appendVerification.verification}\n变量块没有成功写入目标楼层，已停止 ERA latest 同步。`);
+    }
+
+    try {
+      await emitEraForceSyncAndWait(
+        { mode: 'latest' },
+        ERA_SYNC_TIMEOUT_MS,
+        'ERA 变量同步没有响应，额外变量更新已停止。',
+      );
+    } catch (error) {
+      try {
+        const syncReadback = readAssistantMessageActiveText(assistantMessageId);
+        const syncVerification = createWriteVerification({
+          messageId: assistantMessageId,
+          swipeId: syncReadback.swipeId,
+          beforeText: appendVerification.beforeText,
+          attemptedText: appendVerification.attemptedText,
+          readbackText: syncReadback.activeText,
+          blocksText,
+          stage: '同步失败后',
+        });
+        onProgress?.({
+          finalMessageText: syncReadback.activeText,
+          syncReadbackText: syncReadback.activeText,
+          syncVerification: syncVerification.verification,
+        });
+        throw new Error(`${getErrorMessage(error)}\n${syncVerification.verification}`);
+      } catch (readbackError) {
+        if (readbackError instanceof Error && readbackError.message.includes('同步失败后回读')) {
+          throw readbackError;
+        }
+        throw new Error(`${getErrorMessage(error)}\n同步失败后回读最新楼层失败：${getErrorMessage(readbackError)}`);
+      }
+    }
+
+    const syncReadback = readAssistantMessageActiveText(assistantMessageId);
+    const syncVerification = createWriteVerification({
+      messageId: assistantMessageId,
+      swipeId: syncReadback.swipeId,
+      beforeText: appendVerification.beforeText,
+      attemptedText: appendVerification.attemptedText,
+      readbackText: syncReadback.activeText,
+      blocksText,
+      stage: 'ERA 同步后',
+    });
+    onProgress?.({
+      finalMessageText: syncReadback.activeText,
+      syncReadbackText: syncReadback.activeText,
+      syncVerification: syncVerification.verification,
+    });
+
+    if (!syncVerification.verified) {
+      throw new Error(`${syncVerification.verification}\n变量块写入后又从最新楼层消失，请检查 ERA latest 同步或楼层刷新是否覆盖了正文。`);
+    }
 
     return {
       appended: true,
@@ -718,7 +870,11 @@ export async function executeExtraVariableUpdate({
       prompt,
       rawResponse,
       appendedBlocks: blocksText,
-      finalMessageText,
+      finalMessageText: syncReadback.activeText,
+      appendReadbackText: appendVerification.readbackText,
+      appendVerification: appendVerification.verification,
+      syncReadbackText: syncReadback.activeText,
+      syncVerification: syncVerification.verification,
     };
   } finally {
     finishExtraVariableUpdate();

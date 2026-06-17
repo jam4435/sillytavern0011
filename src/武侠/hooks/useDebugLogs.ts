@@ -25,6 +25,10 @@ export interface LatestDebugRound {
     output: string;
     appendedBlocks: string;
     finalMessageText: string;
+    appendReadbackText: string;
+    appendVerification: string;
+    syncReadbackText: string;
+    syncVerification: string;
   };
 }
 
@@ -51,6 +55,10 @@ function createEmptyDebugRound(): LatestDebugRound {
       output: '',
       appendedBlocks: '',
       finalMessageText: '',
+      appendReadbackText: '',
+      appendVerification: '',
+      syncReadbackText: '',
+      syncVerification: '',
     },
   };
 }
@@ -105,6 +113,10 @@ function normalizeLoadedDebugRound(value: unknown): LatestDebugRound | null {
       output: normalizeString(variable.output),
       appendedBlocks: normalizeString(variable.appendedBlocks),
       finalMessageText: normalizeString(variable.finalMessageText),
+      appendReadbackText: normalizeString(variable.appendReadbackText),
+      appendVerification: normalizeString(variable.appendVerification),
+      syncReadbackText: normalizeString(variable.syncReadbackText),
+      syncVerification: normalizeString(variable.syncVerification),
     },
   };
 }
