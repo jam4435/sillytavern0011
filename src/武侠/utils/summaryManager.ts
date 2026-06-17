@@ -9,7 +9,7 @@ import type {
   SummaryThresholds,
   PendingCharacterSummary,
 } from './settingsManager';
-import { requestSummaryText } from './summaryApiClient';
+import { requestSummaryText, resolveConfiguredTextSettings } from './summaryApiClient';
 
 // =========================================
 // 类型定义
@@ -337,10 +337,11 @@ export async function executeSummary(
     dataLogger.log(`[summaryManager] 构建的提示词长度: ${prompt.length}`);
 
     // 2. 调用总结 API
+    const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
     dataLogger.log('[summaryManager] 调用总结 API...', {
-      apiMode: settings.apiMode,
-      source: settings.apiConfig.source,
-      stream: settings.stream,
+      apiMode: requestSettings.apiMode,
+      source: requestSettings.apiConfig.source,
+      stream: requestSettings.stream,
     });
     const response = await requestSummaryText({ prompt, settings });
     dataLogger.log(`[summaryManager] 收到响应，长度: ${response.length}`);

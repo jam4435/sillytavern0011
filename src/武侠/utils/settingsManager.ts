@@ -41,6 +41,20 @@ export interface SummaryApiConfig {
 /** 自动总结 API 使用模式 */
 export type SummaryApiMode = 'preset' | 'custom';
 
+/** 额外模型 API 保存项 */
+export interface SummaryApiProfile {
+  id: string;
+  name: string;
+  apiConfig: SummaryApiConfig;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 额外模型 API 选择 */
+export type SummaryApiSelection =
+  | { type: 'preset' }
+  | { type: 'profile'; profileId: string };
+
 /** 正文变量更新模式 */
 export type SummaryVariableUpdateMode = 'inline' | 'extra';
 
@@ -70,16 +84,20 @@ export interface PendingCharacterSummary {
 export interface SummarySettings {
   /** 是否启用自动总结 */
   enabled: boolean;
-  /** API 使用模式 */
-  apiMode: SummaryApiMode;
   /** 正文变量更新模式 */
   variableUpdateMode: SummaryVariableUpdateMode;
   /** 是否启用流式生成 */
   stream: boolean;
-  /** API配置 */
-  apiConfig: SummaryApiConfig;
+  /** 已保存的额外模型 API */
+  apiProfiles: SummaryApiProfile[];
+  /** 自动总结使用的 API */
+  summaryApiSelection: SummaryApiSelection;
+  /** 额外变量更新使用的 API */
+  variableApiSelection: SummaryApiSelection;
   /** 提示词模板 */
   promptTemplate: string;
+  /** 额外变量更新提示词模板 */
+  variablePromptTemplate: string;
   /** 触发阈值 */
   thresholds: SummaryThresholds;
 }
@@ -171,10 +189,16 @@ export interface DisplaySettings {
   summarySettings: SummarySettings;
 }
 
-type StoredDisplaySettings = Partial<Omit<DisplaySettings, 'localRegexRules' | 'presetRegexRulesByPreset'>> & {
+type StoredSummarySettings = Partial<SummarySettings> & {
+  apiMode?: SummaryApiMode;
+  apiConfig?: Partial<SummaryApiConfig>;
+};
+
+type StoredDisplaySettings = Partial<Omit<DisplaySettings, 'localRegexRules' | 'presetRegexRulesByPreset' | 'summarySettings'>> & {
   regexRules?: Partial<RegexRule>[];
   localRegexRules?: Partial<RegexRule>[];
   presetRegexRulesByPreset?: Record<string, Partial<RegexRule>[]>;
+  summarySettings?: StoredSummarySettings;
 };
 
 // =========================================
@@ -203,25 +227,77 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你是一个专业的文学编�
 [总结内容，按时间顺序，每个关键事件一行]
 </summary>`;
 
+/** 默认额外变量更新提示词模板 */
+export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传》ERA 变量更新模型。你的任务是根据最新正文和当前变量上下文，补充正文造成的变量变化。
+
+严格规则：
+- 不要续写正文，不要解释，不要输出寒暄。
+- 只允许输出 <VariableThink>、<VariableInsert>、<VariableEdit>、<VariableDelete> 块。
+- <VariableInsert>、<VariableEdit>、<VariableDelete> 内必须是严格 JSON 对象；不要注释、不要尾随逗号、不要 JSON5。
+- JSON 根路径必须使用实际 ERA 键名：世界信息、user数据、角色数据、参与事件、后续事件线索、附近传闻。不要输出“玩家数据”或“同场景角色”这类说明别名。
+- 如果没有需要写入的变量变化，可以不输出 Insert/Edit/Delete 块。
+
+【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】
+{{recentBodies}}
+
+【当前变量上下文，来自输出提示词渲染结果或等价快照】
+{{variableContext}}
+
+【变量指导】
+{{variableGuidance}}`;
+
+export const DEFAULT_SUMMARY_API_CONFIG: SummaryApiConfig = {
+  apiurl: '',
+  key: '',
+  model: '',
+  source: 'openai',
+};
+
+export const PRESET_SUMMARY_API_SELECTION: SummaryApiSelection = { type: 'preset' };
+
 /** 默认自动总结设置 */
 export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   enabled: false,
-  apiMode: 'preset',
   variableUpdateMode: 'inline',
   stream: false,
-  apiConfig: {
-    apiurl: '',
-    key: '',
-    model: '',
-    source: 'openai',
-  },
+  apiProfiles: [],
+  summaryApiSelection: PRESET_SUMMARY_API_SELECTION,
+  variableApiSelection: PRESET_SUMMARY_API_SELECTION,
   promptTemplate: DEFAULT_SUMMARY_PROMPT_TEMPLATE,
+  variablePromptTemplate: DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
   thresholds: {
     pendingQueueThreshold: 5,
     totalEntriesThreshold: 50,
     perCharacterEntriesThreshold: 10,
   },
 };
+
+function cloneSummaryApiConfig(apiConfig: SummaryApiConfig): SummaryApiConfig {
+  return { ...apiConfig };
+}
+
+function cloneSummaryApiSelection(selection: SummaryApiSelection): SummaryApiSelection {
+  return selection.type === 'profile'
+    ? { type: 'profile', profileId: selection.profileId }
+    : { type: 'preset' };
+}
+
+function cloneSummaryApiProfile(profile: SummaryApiProfile): SummaryApiProfile {
+  return {
+    ...profile,
+    apiConfig: cloneSummaryApiConfig(profile.apiConfig),
+  };
+}
+
+export function createDefaultSummarySettings(): SummarySettings {
+  return {
+    ...DEFAULT_SUMMARY_SETTINGS,
+    apiProfiles: [],
+    summaryApiSelection: { type: 'preset' },
+    variableApiSelection: { type: 'preset' },
+    thresholds: { ...DEFAULT_SUMMARY_SETTINGS.thresholds },
+  };
+}
 
 function cloneRegexRule(rule: RegexRule): RegexRule {
   return { ...rule };
@@ -247,7 +323,7 @@ export function createDefaultDisplaySettings(): DisplaySettings {
 
     ...createDefaultRegexSettings(),
 
-    summarySettings: DEFAULT_SUMMARY_SETTINGS,
+    summarySettings: createDefaultSummarySettings(),
   };
 }
 
@@ -273,7 +349,7 @@ export const DEFAULT_REGEX_SETTINGS = createDefaultRegexSettings();
 
 /** 自动总结设置的默认值 */
 export const DEFAULT_SUMMARY_TAB_SETTINGS = {
-  summarySettings: DEFAULT_SUMMARY_SETTINGS,
+  summarySettings: createDefaultSummarySettings(),
 } as const;
 
 // =========================================
@@ -439,38 +515,155 @@ function removePresetRulesDuplicatedWithGlobalRules(
   }, {});
 }
 
-function normalizeSummarySettings(summarySettings: Partial<SummarySettings> | undefined): SummarySettings {
-  if (!summarySettings) {
-    return { ...DEFAULT_SUMMARY_SETTINGS, apiConfig: { ...DEFAULT_SUMMARY_SETTINGS.apiConfig }, thresholds: { ...DEFAULT_SUMMARY_SETTINGS.thresholds } };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeSummaryApiConfig(apiConfig: Partial<SummaryApiConfig> | undefined): SummaryApiConfig {
+  const normalizedSource = typeof apiConfig?.source === 'string' && apiConfig.source.trim()
+    ? apiConfig.source.trim()
+    : DEFAULT_SUMMARY_API_CONFIG.source;
+  return {
+    apiurl: typeof apiConfig?.apiurl === 'string' ? apiConfig.apiurl : DEFAULT_SUMMARY_API_CONFIG.apiurl,
+    key: typeof apiConfig?.key === 'string' ? apiConfig.key : DEFAULT_SUMMARY_API_CONFIG.key,
+    model: typeof apiConfig?.model === 'string' ? apiConfig.model : DEFAULT_SUMMARY_API_CONFIG.model,
+    source: normalizedSource,
+  };
+}
+
+function hasSummaryApiConfigContent(apiConfig: SummaryApiConfig): boolean {
+  return Boolean(apiConfig.apiurl.trim() || apiConfig.key.trim() || apiConfig.model.trim());
+}
+
+function normalizeSummaryApiProfile(
+  profile: unknown,
+  fallbackIndex: number,
+  seenIds: Set<string>,
+): SummaryApiProfile | null {
+  if (!isRecord(profile)) {
+    return null;
   }
 
-  const apiConfig = {
-    ...DEFAULT_SUMMARY_SETTINGS.apiConfig,
-    ...summarySettings.apiConfig,
-  };
-  const hasLegacyCustomApi = Boolean(apiConfig.apiurl?.trim() || apiConfig.model?.trim());
-  const migratedSource = apiConfig.source === 'openai' && apiConfig.apiurl?.trim() ? 'custom' : apiConfig.source;
+  const normalizedApiConfig = normalizeSummaryApiConfig(
+    isRecord(profile.apiConfig) ? profile.apiConfig : undefined,
+  );
+  const now = Date.now();
+  let id = typeof profile.id === 'string' && profile.id.trim()
+    ? profile.id.trim()
+    : `summary-api-${now}-${fallbackIndex}`;
+  if (seenIds.has(id)) {
+    id = `${id}-${fallbackIndex}`;
+  }
+  seenIds.add(id);
 
   return {
-    ...DEFAULT_SUMMARY_SETTINGS,
-    ...summarySettings,
-    apiMode: summarySettings.apiMode === 'preset' || summarySettings.apiMode === 'custom'
-      ? summarySettings.apiMode
-      : hasLegacyCustomApi
-        ? 'custom'
-        : DEFAULT_SUMMARY_SETTINGS.apiMode,
+    id,
+    name: typeof profile.name === 'string' && profile.name.trim()
+      ? profile.name.trim()
+      : `额外模型 API ${fallbackIndex + 1}`,
+    apiConfig: normalizedApiConfig,
+    createdAt: typeof profile.createdAt === 'number' && Number.isFinite(profile.createdAt)
+      ? profile.createdAt
+      : now,
+    updatedAt: typeof profile.updatedAt === 'number' && Number.isFinite(profile.updatedAt)
+      ? profile.updatedAt
+      : now,
+  };
+}
+
+function normalizeSummaryApiProfiles(apiProfiles: unknown): SummaryApiProfile[] {
+  if (!Array.isArray(apiProfiles)) {
+    return [];
+  }
+
+  const seenIds = new Set<string>();
+  return apiProfiles
+    .map((profile, index) => normalizeSummaryApiProfile(profile, index, seenIds))
+    .filter((profile): profile is SummaryApiProfile => profile !== null);
+}
+
+function normalizeSummaryApiSelection(
+  selection: unknown,
+  profileIds: Set<string>,
+  fallback: SummaryApiSelection = PRESET_SUMMARY_API_SELECTION,
+): SummaryApiSelection {
+  if (isRecord(selection) && selection.type === 'profile') {
+    const profileId = typeof selection.profileId === 'string' ? selection.profileId.trim() : '';
+    if (profileId && profileIds.has(profileId)) {
+      return { type: 'profile', profileId };
+    }
+  }
+  if (isRecord(selection) && selection.type === 'preset') {
+    return { type: 'preset' };
+  }
+  return cloneSummaryApiSelection(fallback);
+}
+
+function normalizeSummarySettings(summarySettings: StoredSummarySettings | undefined): SummarySettings {
+  const defaults = createDefaultSummarySettings();
+  if (!summarySettings) {
+    return defaults;
+  }
+
+  const apiProfiles = normalizeSummaryApiProfiles(summarySettings.apiProfiles);
+  const legacyApiConfig = normalizeSummaryApiConfig(summarySettings.apiConfig);
+  const legacySource = legacyApiConfig.source === 'openai' && legacyApiConfig.apiurl.trim()
+    ? 'custom'
+    : legacyApiConfig.source;
+  const normalizedLegacyApiConfig = {
+    ...legacyApiConfig,
+    source: legacySource || DEFAULT_SUMMARY_API_CONFIG.source,
+  };
+  const shouldMigrateLegacyApi =
+    summarySettings.apiMode === 'custom' || hasSummaryApiConfigContent(normalizedLegacyApiConfig);
+  const hasLegacyProfile = apiProfiles.some(profile => profile.id === 'legacy-custom-api');
+
+  if (shouldMigrateLegacyApi && !hasLegacyProfile) {
+    apiProfiles.unshift({
+      id: 'legacy-custom-api',
+      name: '旧额外模型 API',
+      apiConfig: normalizedLegacyApiConfig,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  }
+
+  const profileIds = new Set(apiProfiles.map(profile => profile.id));
+  const legacySelection: SummaryApiSelection =
+    shouldMigrateLegacyApi && profileIds.has('legacy-custom-api')
+      ? { type: 'profile', profileId: 'legacy-custom-api' }
+      : { type: 'preset' };
+
+  return {
+    ...defaults,
+    enabled: typeof summarySettings.enabled === 'boolean'
+      ? summarySettings.enabled
+      : defaults.enabled,
     variableUpdateMode: summarySettings.variableUpdateMode === 'extra' || summarySettings.variableUpdateMode === 'inline'
       ? summarySettings.variableUpdateMode
-      : DEFAULT_SUMMARY_SETTINGS.variableUpdateMode,
+      : defaults.variableUpdateMode,
     stream: typeof summarySettings.stream === 'boolean'
       ? summarySettings.stream
-      : DEFAULT_SUMMARY_SETTINGS.stream,
-    apiConfig: {
-      ...apiConfig,
-      source: migratedSource || DEFAULT_SUMMARY_SETTINGS.apiConfig.source,
-    },
+      : defaults.stream,
+    apiProfiles: apiProfiles.map(cloneSummaryApiProfile),
+    summaryApiSelection: normalizeSummaryApiSelection(
+      summarySettings.summaryApiSelection,
+      profileIds,
+      legacySelection,
+    ),
+    variableApiSelection: normalizeSummaryApiSelection(
+      summarySettings.variableApiSelection,
+      profileIds,
+      legacySelection,
+    ),
+    promptTemplate: typeof summarySettings.promptTemplate === 'string'
+      ? summarySettings.promptTemplate
+      : defaults.promptTemplate,
+    variablePromptTemplate: typeof summarySettings.variablePromptTemplate === 'string'
+      ? summarySettings.variablePromptTemplate
+      : defaults.variablePromptTemplate,
     thresholds: {
-      ...DEFAULT_SUMMARY_SETTINGS.thresholds,
+      ...defaults.thresholds,
       ...summarySettings.thresholds,
     },
   };

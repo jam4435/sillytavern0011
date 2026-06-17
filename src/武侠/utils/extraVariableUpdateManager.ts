@@ -1,5 +1,9 @@
-import type { SummarySettings, SummaryVariableUpdateMode } from './settingsManager';
-import { requestConfiguredText, validateSummaryApiConfig } from './summaryApiClient';
+import {
+  DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
+  type SummarySettings,
+  type SummaryVariableUpdateMode,
+} from './settingsManager';
+import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryApiConfig } from './summaryApiClient';
 import { dataLogger } from './logger';
 import {
   isFrontendLoaderOnlyMessage,
@@ -47,6 +51,7 @@ export type ExtraVariableUpdateReservation = {
 export type ExtraVariableUpdateResult = {
   appended: boolean;
   actionBlockCount: number;
+  prompt?: string;
   rawResponse: string;
   appendedBlocks?: string;
   finalMessageText?: string;
@@ -286,8 +291,9 @@ export async function prepareExtraVariableUpdateTurn(
 
   const reservation = reserveExtraVariableUpdate();
   try {
-    if (settings.apiMode === 'custom') {
-      const validationMessage = validateSummaryApiConfig(settings.apiConfig, { requireModel: true });
+    const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
+    if (requestSettings.apiMode === 'custom') {
+      const validationMessage = validateSummaryApiConfig(requestSettings.apiConfig, { requireModel: true });
       if (validationMessage) {
         throw new Error(validationMessage);
       }
@@ -514,10 +520,27 @@ function getRecentBodyMessages(targetMessageId: number, latestRawReply: string):
     .join('\n\n---\n\n');
 }
 
+function renderVariablePromptTemplate(
+  template: string,
+  values: {
+    recentBodies: string;
+    variableContext: string;
+    variableGuidance: string;
+  },
+): string {
+  const sourceTemplate = template.trim() ? template : DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE;
+  return sourceTemplate
+    .replace(/\{\{recentBodies\}\}/g, values.recentBodies)
+    .replace(/\{\{variableContext\}\}/g, values.variableContext)
+    .replace(/\{\{variableGuidance\}\}/g, values.variableGuidance);
+}
+
 async function buildExtraVariableUpdatePrompt({
+  settings,
   assistantMessageId,
   latestRawReply,
 }: {
+  settings: SummarySettings;
   assistantMessageId: number;
   latestRawReply: string;
 }): Promise<string> {
@@ -527,25 +550,11 @@ async function buildExtraVariableUpdatePrompt({
   ]);
   const recentBodies = getRecentBodyMessages(assistantMessageId, latestRawReply);
 
-  return [
-    '你是《金庸群侠传》ERA 变量更新模型。你的任务是根据最新正文和当前变量上下文，补充正文造成的变量变化。',
-    '',
-    '严格规则：',
-    '- 不要续写正文，不要解释，不要输出寒暄。',
-    '- 只允许输出 <VariableThink>、<VariableInsert>、<VariableEdit>、<VariableDelete> 块。',
-    '- <VariableInsert>、<VariableEdit>、<VariableDelete> 内必须是严格 JSON 对象；不要注释、不要尾随逗号、不要 JSON5。',
-    '- JSON 根路径必须使用实际 ERA 键名：世界信息、user数据、角色数据、参与事件、后续事件线索、附近传闻。不要输出“玩家数据”或“同场景角色”这类说明别名。',
-    '- 如果没有需要写入的变量变化，可以不输出 Insert/Edit/Delete 块。',
-    '',
-    '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】',
-    recentBodies || '(无可用正文)',
-    '',
-    '【当前变量上下文，来自输出提示词渲染结果或等价快照】',
-    renderedOutputPromptContext,
-    '',
-    '【变量指导】',
+  return renderVariablePromptTemplate(settings.variablePromptTemplate, {
+    recentBodies: recentBodies || '(无可用正文)',
+    variableContext: renderedOutputPromptContext,
     variableGuidance,
-  ].join('\n');
+  });
 }
 
 function extractValidVariableBlocks(rawResponse: string): {
@@ -637,10 +646,12 @@ export async function executeExtraVariableUpdate({
   settings,
   assistantMessageId,
   latestRawReply,
+  onPromptBuilt,
 }: {
   settings: SummarySettings;
   assistantMessageId: number;
   latestRawReply: string;
+  onPromptBuilt?: (prompt: string) => void;
 }): Promise<ExtraVariableUpdateResult> {
   if (settings.variableUpdateMode !== 'extra') {
     return {
@@ -653,10 +664,12 @@ export async function executeExtraVariableUpdate({
   beginExtraVariableUpdate();
   try {
     await ensureVariableGuidanceDisabled();
-    const prompt = await buildExtraVariableUpdatePrompt({ assistantMessageId, latestRawReply });
+    const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
+    const prompt = await buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply });
+    onPromptBuilt?.(prompt);
     const rawResponse = await requestConfiguredText({
       prompt,
-      settings,
+      settings: requestSettings,
       timeoutMs: EXTRA_VARIABLE_UPDATE_TIMEOUT_MS,
       shouldStream: false,
       generationIdPrefix: 'wuxia-variable-update',
@@ -668,6 +681,7 @@ export async function executeExtraVariableUpdate({
       return {
         appended: false,
         actionBlockCount,
+        prompt,
         rawResponse,
       };
     }
@@ -682,6 +696,7 @@ export async function executeExtraVariableUpdate({
     return {
       appended: true,
       actionBlockCount,
+      prompt,
       rawResponse,
       appendedBlocks: blocksText,
       finalMessageText,

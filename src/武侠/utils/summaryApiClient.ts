@@ -1,4 +1,9 @@
-import type { SummaryApiConfig, SummaryApiMode, SummarySettings } from './settingsManager';
+import {
+  DEFAULT_SUMMARY_API_CONFIG,
+  type SummaryApiConfig,
+  type SummaryApiMode,
+  type SummarySettings,
+} from './settingsManager';
 
 const CUSTOM_GENERATE_URL = '/api/backends/chat-completions/generate';
 const STATUS_URL = '/api/backends/chat-completions/status';
@@ -25,6 +30,8 @@ export interface ConfiguredTextRequestOptions {
   generationIdPrefix?: string;
   skipWorldInfoAndAuthorNote?: boolean;
 }
+
+export type ConfiguredTextTarget = 'summary' | 'variable';
 
 interface SummaryCustomApi {
   apiurl?: string;
@@ -155,6 +162,32 @@ export function validateSummaryApiConfig(
     return '自定义 OpenAI 兼容渠道必须填写 API URL。';
   }
   return '';
+}
+
+export function resolveConfiguredTextSettings(
+  settings: SummarySettings,
+  target: ConfiguredTextTarget,
+): ConfiguredTextRequestSettings {
+  const selection = target === 'summary'
+    ? settings.summaryApiSelection
+    : settings.variableApiSelection;
+
+  if (selection.type === 'profile') {
+    const profile = settings.apiProfiles.find(item => item.id === selection.profileId);
+    if (profile) {
+      return {
+        apiMode: 'custom',
+        apiConfig: { ...profile.apiConfig },
+        stream: settings.stream,
+      };
+    }
+  }
+
+  return {
+    apiMode: 'preset',
+    apiConfig: { ...DEFAULT_SUMMARY_API_CONFIG },
+    stream: settings.stream,
+  };
 }
 
 function buildGenerateRawConfig({
@@ -431,11 +464,12 @@ export async function requestSummaryText({
   settings,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: SummaryRequestOptions): Promise<string> {
+  const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
   return requestConfiguredText({
     prompt,
-    settings,
+    settings: requestSettings,
     timeoutMs,
-    shouldStream: settings.stream,
+    shouldStream: requestSettings.stream,
     generationIdPrefix: 'wuxia-summary',
   });
 }

@@ -33,7 +33,13 @@ export interface RegenerateResult {
   options: string[];
   gameData: Partial<GameState> | null;
   assistantMessageId: number;
+  userInput: string;
+  combinedPrompt: string;
   rawReply: string;
+}
+
+export interface RegenerateOptions {
+  onCombinedPrompt?: (prompt: string) => void;
 }
 
 type RegenerateContext = {
@@ -110,6 +116,12 @@ function buildHistoryPrompts(messages: ChatMessageWithSwipes[], lastMessageId: n
       };
     })
     .filter(prompt => prompt.content.length > 0);
+}
+
+function formatHistoryPromptsForDebug(prompts: GenerateHistoryPrompt[]): string {
+  return prompts
+    .map(prompt => `[${prompt.role}]\n${prompt.content}`)
+    .join('\n\n---\n\n');
 }
 
 export async function emitEraForceSyncAndWait(
@@ -196,7 +208,7 @@ async function writeGeneratedSwipe(messageId: number, resultText: string): Promi
   );
 }
 
-export async function regenerateLastAssistantSwipe(): Promise<RegenerateResult> {
+export async function regenerateLastAssistantSwipe(options: RegenerateOptions = {}): Promise<RegenerateResult> {
   const context = getRegenerateContext();
   if (!context) {
     throw new Error('当前没有可重新生成的最新回复。');
@@ -213,14 +225,35 @@ export async function regenerateLastAssistantSwipe(): Promise<RegenerateResult> 
     throw new Error('无法构造重新生成所需的聊天历史。');
   }
 
-  const generated = await generate({
+  let combinedPrompt = formatHistoryPromptsForDebug(prompts);
+  const combinedPromptCapture =
+    typeof eventOn === 'function'
+    && typeof tavern_events !== 'undefined'
+    && tavern_events.GENERATE_AFTER_COMBINE_PROMPTS
+      ? eventOn(
+        tavern_events.GENERATE_AFTER_COMBINE_PROMPTS,
+        (result: { prompt?: string }) => {
+          if (typeof result?.prompt === 'string' && result.prompt.trim()) {
+            combinedPrompt = result.prompt;
+            options.onCombinedPrompt?.(result.prompt);
+          }
+        },
+      )
+      : null;
+
+  let generated: string | GenerateToolCallResult;
+  try {
+    generated = await generate({
     should_stream: true,
     overrides: {
       chat_history: {
         prompts,
       },
     },
-  });
+    });
+  } finally {
+    combinedPromptCapture?.stop();
+  }
 
   const resultText = typeof generated === 'string' ? generated : generated.content;
   if (!resultText?.trim()) {
@@ -236,6 +269,8 @@ export async function regenerateLastAssistantSwipe(): Promise<RegenerateResult> 
     options: parseOptions(maintext),
     gameData: readGameDataPure(),
     assistantMessageId: context.assistantMessage.message_id,
+    userInput: getActiveMessageText(context.userMessage),
+    combinedPrompt,
     rawReply: resultText,
   };
 }

@@ -15,6 +15,7 @@ import {
   prepareExtraVariableUpdateTurn,
   type ExtraVariableUpdateReservation,
 } from '../utils/extraVariableUpdateManager';
+import type { LatestDebugRoundPatch } from './useDebugLogs';
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -44,7 +45,8 @@ interface UseMessageHandlerOptions {
   updateGameState: (data: Partial<GameState>) => void;
   setCurrentMaintext: (text: string) => void;
   setCurrentOptions: (options: string[]) => void;
-  addDebugLog: (type: 'prompt' | 'assistant', content: string) => void;
+  beginDebugRound: (userInput: string) => string;
+  patchLatestDebugRound: (patch: LatestDebugRoundPatch) => void;
   currentMaintext: string;
   currentOptions: string[];
   summarySettings: SummarySettings;
@@ -56,6 +58,31 @@ const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
+
+function captureNextCombinedPrompt(onPrompt: (prompt: string) => void): { stop: () => void } | null {
+  if (
+    typeof eventOn !== 'function'
+    || typeof tavern_events === 'undefined'
+    || !tavern_events.GENERATE_AFTER_COMBINE_PROMPTS
+  ) {
+    return null;
+  }
+
+  const eventOnAny = eventOn as unknown as (
+    eventType: string,
+    listener: (result: { prompt?: string }) => void,
+  ) => EventOnReturn;
+  let captured = false;
+  return eventOnAny(tavern_events.GENERATE_AFTER_COMBINE_PROMPTS, result => {
+    if (captured) {
+      return;
+    }
+    captured = true;
+    if (typeof result?.prompt === 'string' && result.prompt.trim()) {
+      onPrompt(result.prompt);
+    }
+  });
+}
 
 function getActiveMessageText(message: ChatMessageWithSwipes): string {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
@@ -108,7 +135,8 @@ export function useMessageHandler({
   updateGameState,
   setCurrentMaintext,
   setCurrentOptions,
-  addDebugLog,
+  beginDebugRound,
+  patchLatestDebugRound,
   currentMaintext,
   currentOptions,
   summarySettings,
@@ -136,6 +164,7 @@ export function useMessageHandler({
     setIsLoading(true);
     showLoading('正在生成回复...');
     messageLogger.log('🔄 isLoading 设置为 true');
+    beginDebugRound(message);
 
     let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
 
@@ -168,12 +197,6 @@ export function useMessageHandler({
       messageLogger.log('createChatMessages 返回值:', createUserResult);
       messageLogger.log('返回值类型:', typeof createUserResult);
 
-      // ========== 步骤 1.5: 记录用户消息到调试日志 ==========
-      messageLogger.log('');
-      messageLogger.log('📌 [步骤 1.5] 记录用户消息到调试日志');
-      addDebugLog('prompt', `用户发送:\n${message}`);
-      messageLogger.log('已记录用户消息到调试日志');
-
       // ========== 步骤 2: 调用 generate() 触发 AI 生成 ==========
       messageLogger.log('');
       messageLogger.log('📌 [步骤 2] 同步待补全变量');
@@ -185,9 +208,17 @@ export function useMessageHandler({
       messageLogger.log('⏳ 等待 AI 回复中...');
 
       const generateStartTime = Date.now();
-      const result = await generate({
-        should_stream: true,
+      const combinedPromptCapture = captureNextCombinedPrompt(prompt => {
+        patchLatestDebugRound({ main: { combinedPrompt: prompt } });
       });
+      let result: string | GenerateToolCallResult;
+      try {
+        result = await generate({
+          should_stream: true,
+        });
+      } finally {
+        combinedPromptCapture?.stop();
+      }
       const resultText = typeof result === 'string' ? result : result.content;
       const generateEndTime = Date.now();
 
@@ -255,29 +286,60 @@ export function useMessageHandler({
         setCurrentMaintext(maintext);
         setCurrentOptions(options);
 
-        addDebugLog('assistant', resultText);
+        patchLatestDebugRound({
+          main: {
+            status: 'success',
+            output: resultText,
+            finishedAt: Date.now(),
+          },
+        });
 
         if (summarySettings.variableUpdateMode === 'extra') {
           if (!assistantMessage?.message_id) {
             const errorMessage = '正文已生成，但没有找到可追加变量块的 assistant 楼层。';
-            addDebugLog('assistant', `[额外变量更新失败]\n${errorMessage}`);
+            patchLatestDebugRound({
+              variable: {
+                status: 'error',
+                error: errorMessage,
+                finishedAt: Date.now(),
+              },
+            });
             showError(errorMessage);
             return resultText;
           }
 
           showLoading('正在额外更新变量...');
+          patchLatestDebugRound({
+            variable: {
+              status: 'running',
+              startedAt: Date.now(),
+              error: '',
+            },
+          });
           try {
             const extraUpdateResult = await executeExtraVariableUpdate({
               settings: summarySettings,
               assistantMessageId: assistantMessage.message_id,
               latestRawReply: resultText,
+              onPromptBuilt: prompt => {
+                patchLatestDebugRound({
+                  variable: {
+                    input: prompt,
+                    status: 'running',
+                  },
+                });
+              },
             });
-            addDebugLog(
-              'assistant',
-              extraUpdateResult.appended
-                ? `[额外变量更新]\n${extraUpdateResult.appendedBlocks || extraUpdateResult.rawResponse}`
-                : '[额外变量更新]\n未发现需要写入的变量变化。',
-            );
+            patchLatestDebugRound({
+              variable: {
+                status: 'success',
+                input: extraUpdateResult.prompt || '',
+                output: extraUpdateResult.rawResponse,
+                appendedBlocks: extraUpdateResult.appendedBlocks || '',
+                finalMessageText: extraUpdateResult.finalMessageText || '',
+                finishedAt: Date.now(),
+              },
+            });
             if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
               refreshAssistantStateFromFinalText(
                 extraUpdateResult.finalMessageText,
@@ -287,7 +349,13 @@ export function useMessageHandler({
           } catch (error) {
             const errorMessage = getErrorMessage(error);
             messageLogger.error('额外变量更新失败:', error);
-            addDebugLog('assistant', `[额外变量更新失败]\n${errorMessage}`);
+            patchLatestDebugRound({
+              variable: {
+                status: 'error',
+                error: errorMessage,
+                finishedAt: Date.now(),
+              },
+            });
             showError(`正文已生成，但额外变量更新失败：${errorMessage}`);
             return resultText;
           }
@@ -306,7 +374,13 @@ export function useMessageHandler({
         messageLogger.log('result 值:', result);
         messageLogger.log('result 类型:', typeof result);
 
-        addDebugLog('assistant', `[AI 回复为空]\n返回值: ${result === null ? 'null' : result === undefined ? 'undefined' : JSON.stringify(result)}\n类型: ${typeof result}`);
+        patchLatestDebugRound({
+          main: {
+            status: 'error',
+            error: `AI 回复为空。返回值: ${result === null ? 'null' : result === undefined ? 'undefined' : JSON.stringify(result)}；类型: ${typeof result}`,
+            finishedAt: Date.now(),
+          },
+        });
 
         showError('生成失败：AI 回复为空，请重试');
         messageLogger.log('已设置错误提示到前端');
@@ -323,7 +397,13 @@ export function useMessageHandler({
       messageLogger.error('错误信息:', errorMessage);
       messageLogger.log('错误堆栈:', errorStack);
 
-      addDebugLog('assistant', `[生成异常]\n错误信息: ${errorMessage}\n\n堆栈:\n${errorStack}`);
+      patchLatestDebugRound({
+        main: {
+          status: 'error',
+          error: `${errorMessage}\n\n${errorStack}`,
+          finishedAt: Date.now(),
+        },
+      });
 
       showError(`生成失败：${errorMessage}`);
       return '';
@@ -338,7 +418,8 @@ export function useMessageHandler({
   }, [
     currentMaintext,
     currentOptions,
-    addDebugLog,
+    beginDebugRound,
+    patchLatestDebugRound,
     setIsLoading,
     showLoading,
     showError,
@@ -397,7 +478,13 @@ export function useMessageHandler({
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       messageLogger.error('自动推进失败:', error);
-      addDebugLog('assistant', `[自动推进异常]\n${errorMessage}`);
+      patchLatestDebugRound({
+        main: {
+          status: 'error',
+          error: errorMessage,
+          finishedAt: Date.now(),
+        },
+      });
       showError(`自动推进失败：${errorMessage}`);
       throw error;
     } finally {
@@ -406,8 +493,8 @@ export function useMessageHandler({
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
   }, [
-    addDebugLog,
     handleSendMessage,
+    patchLatestDebugRound,
     showError,
   ]);
 
@@ -422,27 +509,57 @@ export function useMessageHandler({
 
     try {
       extraVariableUpdateReservation = await prepareExtraVariableUpdateTurn(summarySettings);
-      const result = await regenerateLastAssistantSwipe();
+      beginDebugRound('重新生成最新回复');
+      const result = await regenerateLastAssistantSwipe({
+        onCombinedPrompt: prompt => {
+          patchLatestDebugRound({ main: { combinedPrompt: prompt } });
+        },
+      });
+      patchLatestDebugRound({
+        main: {
+          userInput: result.userInput || '重新生成最新回复',
+          combinedPrompt: result.combinedPrompt || result.userInput || '重新生成最新回复',
+          output: result.rawReply,
+          status: 'success',
+          finishedAt: Date.now(),
+        },
+      });
       setCurrentMaintext(result.maintext);
       setCurrentOptions(result.options);
-      if (result.maintext) {
-        addDebugLog('assistant', `[重新生成]\n${result.maintext}`);
-      }
 
       if (summarySettings.variableUpdateMode === 'extra') {
         showLoading('正在额外更新变量...');
+        patchLatestDebugRound({
+          variable: {
+            status: 'running',
+            startedAt: Date.now(),
+            error: '',
+          },
+        });
         try {
           const extraUpdateResult = await executeExtraVariableUpdate({
             settings: summarySettings,
             assistantMessageId: result.assistantMessageId,
             latestRawReply: result.rawReply,
+            onPromptBuilt: prompt => {
+              patchLatestDebugRound({
+                variable: {
+                  input: prompt,
+                  status: 'running',
+                },
+              });
+            },
           });
-          addDebugLog(
-            'assistant',
-            extraUpdateResult.appended
-              ? `[重新生成额外变量更新]\n${extraUpdateResult.appendedBlocks || extraUpdateResult.rawResponse}`
-              : '[重新生成额外变量更新]\n未发现需要写入的变量变化。',
-          );
+          patchLatestDebugRound({
+            variable: {
+              status: 'success',
+              input: extraUpdateResult.prompt || '',
+              output: extraUpdateResult.rawResponse,
+              appendedBlocks: extraUpdateResult.appendedBlocks || '',
+              finalMessageText: extraUpdateResult.finalMessageText || '',
+              finishedAt: Date.now(),
+            },
+          });
 
           if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
             refreshAssistantStateFromFinalText(
@@ -459,7 +576,13 @@ export function useMessageHandler({
         } catch (error) {
           const errorMessage = getErrorMessage(error);
           messageLogger.error('重新生成后的额外变量更新失败:', error);
-          addDebugLog('assistant', `[重新生成额外变量更新失败]\n${errorMessage}`);
+          patchLatestDebugRound({
+            variable: {
+              status: 'error',
+              error: errorMessage,
+              finishedAt: Date.now(),
+            },
+          });
           showError(`重新生成已完成，但额外变量更新失败：${errorMessage}`);
           return;
         }
@@ -469,7 +592,13 @@ export function useMessageHandler({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       messageLogger.error('重新生成失败:', error);
-      addDebugLog('assistant', `[重新生成异常]\n${errorMessage}`);
+      patchLatestDebugRound({
+        main: {
+          status: 'error',
+          error: errorMessage,
+          finishedAt: Date.now(),
+        },
+      });
       showError(`重新生成失败：${errorMessage}`);
     } finally {
       extraVariableUpdateReservation?.release();
@@ -478,8 +607,9 @@ export function useMessageHandler({
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
   }, [
-    addDebugLog,
+    beginDebugRound,
     dismissToast,
+    patchLatestDebugRound,
     setCurrentMaintext,
     setCurrentOptions,
     setIsLoading,

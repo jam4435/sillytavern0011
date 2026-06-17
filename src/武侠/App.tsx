@@ -56,7 +56,12 @@ import {
 
 const App: React.FC = () => {
   // 使用自定义 hooks
-  const { debugLogs, addDebugLog, clearDebugLogs } = useDebugLogs();
+  const {
+    latestDebugRound,
+    beginDebugRound,
+    patchLatestDebugRound,
+    clearDebugLogs,
+  } = useDebugLogs();
   const { toastState, showLoading, showError, dismissToast } = useToast();
   const {
     currentPage,
@@ -113,7 +118,8 @@ const App: React.FC = () => {
     updateGameState,
     setCurrentMaintext,
     setCurrentOptions,
-    addDebugLog,
+    beginDebugRound,
+    patchLatestDebugRound,
     currentMaintext,
     currentOptions,
     summarySettings: displaySettings.summarySettings,
