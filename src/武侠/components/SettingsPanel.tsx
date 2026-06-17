@@ -8,10 +8,12 @@ import {
   RegexRule,
   createDefaultRegexSettings,
   SummarySettings,
-  SummaryApiMode,
   SummaryApiConfig,
+  SummaryApiProfile,
+  SummaryApiSelection,
   SummaryVariableUpdateMode,
   SummaryThresholds,
+  DEFAULT_SUMMARY_API_CONFIG,
   createRegexRule,
   getCurrentPresetRegexRules,
   logRegexDebugSnapshot,
@@ -36,7 +38,7 @@ import {
   type BatchSummaryResult,
 } from '../utils/summaryManager';
 import { Icons } from './Icons';
-import type { AutoAdvanceTurnResult, DebugLogEntry } from '../hooks';
+import type { AutoAdvanceTurnResult, LatestDebugRound } from '../hooks';
 import { uiLogger } from '../utils/logger';
 
 type SettingsTab = 'appearance' | 'regex' | 'summary' | 'variables' | 'advance' | 'debug';
@@ -66,9 +68,15 @@ interface AutoAdvanceResult {
   error?: string;
 }
 
+interface SummaryApiProfileDraft {
+  name: string;
+  apiConfig: SummaryApiConfig;
+}
+
 const DEFAULT_AUTO_ADVANCE_PROMPT = '合理地继续推进剧情';
 const AUTO_ADVANCE_MAX_COUNT = 50;
 const SUMMARY_MODEL_LIST_ID = 'wuxia-summary-model-list';
+const API_SELECTION_PRESET_VALUE = 'preset';
 const DEFAULT_OPEN_SETTING_BLOCKS: Record<SettingsCollapsibleId, boolean> = {
   appearanceText: true,
   appearanceBackground: true,
@@ -91,6 +99,34 @@ const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
 const ROOT_VARIABLE_PATH_KEY = 'root';
 
 const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
+
+const createEmptyApiProfileDraft = (): SummaryApiProfileDraft => ({
+  name: '',
+  apiConfig: { ...DEFAULT_SUMMARY_API_CONFIG },
+});
+
+const createApiProfileId = (): string =>
+  `summary-api-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+const cloneApiProfileDraftFromProfile = (profile: SummaryApiProfile): SummaryApiProfileDraft => ({
+  name: profile.name,
+  apiConfig: { ...profile.apiConfig },
+});
+
+const apiSelectionToValue = (selection: SummaryApiSelection): string =>
+  selection.type === 'profile' ? `profile:${selection.profileId}` : API_SELECTION_PRESET_VALUE;
+
+const valueToApiSelection = (value: string): SummaryApiSelection =>
+  value.startsWith('profile:')
+    ? { type: 'profile', profileId: value.slice('profile:'.length) }
+    : { type: 'preset' };
+
+const getApiSelectionLabel = (selection: SummaryApiSelection, profiles: SummaryApiProfile[]): string => {
+  if (selection.type === 'preset') {
+    return '当前预设';
+  }
+  return profiles.find(profile => profile.id === selection.profileId)?.name || '已删除的 API';
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -397,7 +433,7 @@ interface SettingsPanelProps {
   currentPresetName: string;
   settings: DisplaySettings;
   onSettingsChange: (settings: DisplaySettings) => void;
-  debugLogs?: DebugLogEntry[];
+  latestDebugRound?: LatestDebugRound | null;
   onClearDebugLogs?: () => void;
   onAutoAdvanceTurn?: (message: string) => Promise<AutoAdvanceTurnResult>;
   isGenerating?: boolean;
@@ -455,7 +491,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   currentPresetName,
   settings,
   onSettingsChange,
-  debugLogs = [],
+  latestDebugRound = null,
   onClearDebugLogs,
   onAutoAdvanceTurn,
   isGenerating = false,
@@ -475,6 +511,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isSummaryModelLoading, setIsSummaryModelLoading] = useState(false);
   const [summaryVariableModeStatus, setSummaryVariableModeStatus] = useState('');
   const [isSummaryVariableModeUpdating, setIsSummaryVariableModeUpdating] = useState(false);
+  const [editingApiProfileId, setEditingApiProfileId] = useState<string | null>(
+    () => settings.summarySettings.apiProfiles[0]?.id || null,
+  );
+  const [apiProfileDraft, setApiProfileDraft] = useState<SummaryApiProfileDraft>(() => {
+    const firstProfile = settings.summarySettings.apiProfiles[0];
+    return firstProfile ? cloneApiProfileDraftFromProfile(firstProfile) : createEmptyApiProfileDraft();
+  });
 
   // 变量编辑相关状态
   const [statData, setStatData] = useState<Record<string, unknown> | null>(null);
@@ -509,11 +552,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const autoAdvanceCompletedCount = autoAdvanceResults.filter(result => result.status === 'success').length;
   const autoAdvanceFailedCount = autoAdvanceResults.filter(result => result.status === 'error').length;
   const hasAutoAdvanceResults = autoAdvanceResults.length > 0;
-  const isSummaryCustomApiMode = settings.summarySettings.apiMode === 'custom';
-  const isSummaryCustomApiSource = settings.summarySettings.apiConfig.source === 'custom';
-  const summaryApiValidationMessage = isSummaryCustomApiMode
-    ? validateSummaryApiConfig(settings.summarySettings.apiConfig, { requireModel: true })
-    : '';
+  const editingApiProfile = editingApiProfileId
+    ? settings.summarySettings.apiProfiles.find(profile => profile.id === editingApiProfileId) || null
+    : null;
+  const isEditingExistingApiProfile = Boolean(editingApiProfile);
+  const isApiDraftCustomSource = apiProfileDraft.apiConfig.source === 'custom';
+  const summaryApiValidationMessage = validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true });
 
   const toggleSettingBlock = useCallback((id: SettingsCollapsibleId) => {
     setOpenSettingBlocks(previousBlocks => ({
@@ -521,6 +565,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       [id]: !previousBlocks[id],
     }));
   }, []);
+
+  useEffect(() => {
+    if (!editingApiProfileId) {
+      return;
+    }
+    const profile = settings.summarySettings.apiProfiles.find(item => item.id === editingApiProfileId);
+    if (profile) {
+      setApiProfileDraft(cloneApiProfileDraftFromProfile(profile));
+      return;
+    }
+    const fallbackProfile = settings.summarySettings.apiProfiles[0];
+    setEditingApiProfileId(fallbackProfile?.id || null);
+    setApiProfileDraft(fallbackProfile ? cloneApiProfileDraftFromProfile(fallbackProfile) : createEmptyApiProfileDraft());
+  }, [editingApiProfileId, settings.summarySettings.apiProfiles]);
 
   // 更新单个设置项
   const updateSetting = useCallback(<K extends keyof DisplaySettings>(
@@ -1013,7 +1071,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     key: K,
     value: SummarySettings[K]
   ) => {
-    if (key === 'apiMode' || key === 'stream') {
+    if (key === 'stream') {
       setSummaryModelStatus('');
     }
     onSettingsChange({
@@ -1025,27 +1083,170 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
   }, [settings, onSettingsChange]);
 
-  // 更新 API 配置
-  const updateApiConfig = useCallback(<K extends keyof SummaryApiConfig>(
+  const updateApiProfileDraft = useCallback(<K extends keyof SummaryApiProfileDraft>(
+    key: K,
+    value: SummaryApiProfileDraft[K],
+  ) => {
+    setSummaryModelStatus('');
+    setApiProfileDraft(previous => ({
+      ...previous,
+      [key]: value,
+    }));
+  }, []);
+
+  const updateApiProfileDraftConfig = useCallback(<K extends keyof SummaryApiConfig>(
     key: K,
     value: SummaryApiConfig[K]
   ) => {
     setSummaryModelStatus('');
+    setApiProfileDraft(previous => ({
+      ...previous,
+      apiConfig: {
+        ...previous.apiConfig,
+          [key]: value,
+      },
+    }));
+  }, []);
+
+  const handleSelectApiProfile = useCallback((profileId: string) => {
+    const profile = settings.summarySettings.apiProfiles.find(item => item.id === profileId) || null;
+    setEditingApiProfileId(profile?.id || null);
+    setApiProfileDraft(profile ? cloneApiProfileDraftFromProfile(profile) : createEmptyApiProfileDraft());
+    setSummaryModelStatus('');
+  }, [settings.summarySettings.apiProfiles]);
+
+  const handleNewApiProfile = useCallback(() => {
+    setEditingApiProfileId(null);
+    setApiProfileDraft(createEmptyApiProfileDraft());
+    setSummaryModelOptions([]);
+    setSummaryModelStatus('正在创建新的 API 配置草稿。');
+  }, []);
+
+  const buildApiProfileFromDraft = useCallback((profileId?: string): SummaryApiProfile => {
+    const now = Date.now();
+    const existingProfile = profileId
+      ? settings.summarySettings.apiProfiles.find(profile => profile.id === profileId)
+      : null;
+    return {
+      id: profileId || createApiProfileId(),
+      name: apiProfileDraft.name.trim() || '未命名 API',
+      apiConfig: { ...apiProfileDraft.apiConfig },
+      createdAt: existingProfile?.createdAt || now,
+      updatedAt: now,
+    };
+  }, [apiProfileDraft, settings.summarySettings.apiProfiles]);
+
+  const handleSaveApiProfile = useCallback(() => {
+    const validationMessage = validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true });
+    if (validationMessage) {
+      setSummaryModelStatus(validationMessage);
+      return;
+    }
+
+    const savedProfile = buildApiProfileFromDraft(editingApiProfileId || undefined);
+    const nextProfiles = editingApiProfileId
+      ? settings.summarySettings.apiProfiles.map(profile =>
+        profile.id === editingApiProfileId ? savedProfile : profile,
+      )
+      : [...settings.summarySettings.apiProfiles, savedProfile];
+
     onSettingsChange({
       ...settings,
       summarySettings: {
         ...settings.summarySettings,
-        apiConfig: {
-          ...settings.summarySettings.apiConfig,
-          [key]: value,
-        },
+        apiProfiles: nextProfiles,
       },
     });
-  }, [settings, onSettingsChange]);
+    setEditingApiProfileId(savedProfile.id);
+    setApiProfileDraft(cloneApiProfileDraftFromProfile(savedProfile));
+    setSummaryModelStatus('API 配置已保存。');
+  }, [
+    apiProfileDraft,
+    buildApiProfileFromDraft,
+    editingApiProfileId,
+    onSettingsChange,
+    settings,
+  ]);
 
-  const updateSummaryApiMode = useCallback((apiMode: SummaryApiMode) => {
-    updateSummarySetting('apiMode', apiMode);
-  }, [updateSummarySetting]);
+  const handleDuplicateApiProfile = useCallback(() => {
+    const validationMessage = validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true });
+    if (validationMessage) {
+      setSummaryModelStatus(validationMessage);
+      return;
+    }
+
+    const now = Date.now();
+    const savedProfile: SummaryApiProfile = {
+      id: createApiProfileId(),
+      name: `${apiProfileDraft.name.trim() || '未命名 API'} 副本`,
+      apiConfig: { ...apiProfileDraft.apiConfig },
+      createdAt: now,
+      updatedAt: now,
+    };
+    onSettingsChange({
+      ...settings,
+      summarySettings: {
+        ...settings.summarySettings,
+        apiProfiles: [...settings.summarySettings.apiProfiles, savedProfile],
+      },
+    });
+    setEditingApiProfileId(savedProfile.id);
+    setApiProfileDraft(cloneApiProfileDraftFromProfile(savedProfile));
+    setSummaryModelStatus('已另存为新的 API 配置。');
+  }, [apiProfileDraft, onSettingsChange, settings]);
+
+  const handleDeleteApiProfile = useCallback(() => {
+    if (!editingApiProfileId) {
+      return;
+    }
+    const profile = settings.summarySettings.apiProfiles.find(item => item.id === editingApiProfileId);
+    if (!profile) {
+      return;
+    }
+    if (!confirm(`确定删除 API 配置「${profile.name}」吗？`)) {
+      return;
+    }
+
+    const nextProfiles = settings.summarySettings.apiProfiles.filter(item => item.id !== editingApiProfileId);
+    const fallbackSelection: SummaryApiSelection = { type: 'preset' };
+    const nextSummaryApiSelection =
+      settings.summarySettings.summaryApiSelection.type === 'profile'
+      && settings.summarySettings.summaryApiSelection.profileId === editingApiProfileId
+        ? fallbackSelection
+        : settings.summarySettings.summaryApiSelection;
+    const nextVariableApiSelection =
+      settings.summarySettings.variableApiSelection.type === 'profile'
+      && settings.summarySettings.variableApiSelection.profileId === editingApiProfileId
+        ? fallbackSelection
+        : settings.summarySettings.variableApiSelection;
+    onSettingsChange({
+      ...settings,
+      summarySettings: {
+        ...settings.summarySettings,
+        apiProfiles: nextProfiles,
+        summaryApiSelection: nextSummaryApiSelection,
+        variableApiSelection: nextVariableApiSelection,
+      },
+    });
+    const fallbackProfile = nextProfiles[0];
+    setEditingApiProfileId(fallbackProfile?.id || null);
+    setApiProfileDraft(fallbackProfile ? cloneApiProfileDraftFromProfile(fallbackProfile) : createEmptyApiProfileDraft());
+    setSummaryModelOptions([]);
+    setSummaryModelStatus('API 配置已删除。');
+  }, [editingApiProfileId, onSettingsChange, settings]);
+
+  const updateApiSelection = useCallback((
+    target: 'summary' | 'variable',
+    selection: SummaryApiSelection,
+  ) => {
+    onSettingsChange({
+      ...settings,
+      summarySettings: {
+        ...settings.summarySettings,
+        [target === 'summary' ? 'summaryApiSelection' : 'variableApiSelection']: selection,
+      },
+    });
+  }, [onSettingsChange, settings]);
 
   const updateVariableUpdateMode = useCallback(async (mode: SummaryVariableUpdateMode) => {
     if (settings.summarySettings.variableUpdateMode === mode || isSummaryVariableModeUpdating) {
@@ -1072,16 +1273,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   ]);
 
   const handleLoadSummaryModels = useCallback(async () => {
-    if (settings.summarySettings.apiMode !== 'custom') {
-      setSummaryModelStatus('使用当前预设时无需读取模型列表。');
-      return;
-    }
-
     setIsSummaryModelLoading(true);
     setSummaryModelStatus('正在读取模型列表...');
 
     try {
-      const models = await loadSummaryModelList(settings.summarySettings.apiConfig);
+      const models = await loadSummaryModelList(apiProfileDraft.apiConfig);
       setSummaryModelOptions(models);
       setSummaryModelStatus(`已读取 ${models.length} 个模型。`);
     } catch (error) {
@@ -1090,7 +1286,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     } finally {
       setIsSummaryModelLoading(false);
     }
-  }, [settings.summarySettings]);
+  }, [apiProfileDraft.apiConfig]);
 
   // 更新阈值
   const updateThreshold = useCallback(<K extends keyof SummaryThresholds>(
@@ -1487,105 +1683,134 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               isOpen={openSettingBlocks.extraModelApi}
               onToggle={toggleSettingBlock}
             >
-              <div className="summary-api-mode-group" role="radiogroup" aria-label="额外模型 API 模式">
-                <label className={`summary-api-mode ${!isSummaryCustomApiMode ? 'active' : ''}`}>
-                  <input
-                    type="radio"
-                    name="summary-api-mode"
-                    checked={!isSummaryCustomApiMode}
-                    onChange={() => updateSummaryApiMode('preset')}
-                  />
-                  <span>使用当前预设</span>
-                </label>
-                <label className={`summary-api-mode ${isSummaryCustomApiMode ? 'active' : ''}`}>
-                  <input
-                    type="radio"
-                    name="summary-api-mode"
-                    checked={isSummaryCustomApiMode}
-                    onChange={() => updateSummaryApiMode('custom')}
-                  />
-                  <span>覆盖 API 配置</span>
-                </label>
-              </div>
-
               <p className="settings-hint">
-                当前预设模式沿用酒馆正在使用的后端；覆盖模式用于自动总结和额外变量更新请求。
+                在这里保存可复用的额外模型 API；自动总结和额外变量可以在各自分组中分别选择使用哪一个。
               </p>
 
-              {isSummaryCustomApiMode && (
-                <div className="summary-api-fields">
-                  <div className="settings-row">
-                    <label className="settings-label">API 渠道</label>
-                    <div className="settings-control">
-                      <select
-                        value={settings.summarySettings.apiConfig.source}
-                        onChange={(e) => updateApiConfig('source', e.target.value)}
-                        className="settings-select"
-                      >
-                        {SUMMARY_API_SOURCES.map(([value, label]) => (
-                          <option key={value} value={value}>{label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+              <div className="summary-api-profile-toolbar">
+                <select
+                  value={editingApiProfileId || ''}
+                  onChange={(e) => handleSelectApiProfile(e.target.value)}
+                  className="settings-select summary-api-profile-select"
+                >
+                  <option value="">新 API 草稿</option>
+                  {settings.summarySettings.apiProfiles.map(profile => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="settings-action-btn" onClick={handleNewApiProfile}>
+                  <Icons.Plus size={15} />
+                  <span>新建</span>
+                </button>
+              </div>
 
-                  {isSummaryCustomApiSource && (
-                    <div className="settings-row">
-                      <label className="settings-label">API URL</label>
-                      <div className="settings-control">
-                        <input
-                          type="text"
-                          value={settings.summarySettings.apiConfig.apiurl}
-                          onChange={(e) => updateApiConfig('apiurl', e.target.value)}
-                          placeholder="https://api.example.com/v1"
-                          className="settings-text-input"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="settings-row">
-                    <label className="settings-label">API Key</label>
-                    <div className="settings-control">
-                      <input
-                        type="password"
-                        value={settings.summarySettings.apiConfig.key}
-                        onChange={(e) => updateApiConfig('key', e.target.value)}
-                        placeholder="sk-..."
-                        className="settings-text-input"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="settings-row">
-                    <label className="settings-label">Model</label>
-                    <div className="settings-control summary-model-control">
-                      <input
-                        type="text"
-                        list={SUMMARY_MODEL_LIST_ID}
-                        value={settings.summarySettings.apiConfig.model}
-                        onChange={(e) => updateApiConfig('model', e.target.value)}
-                        placeholder="模型名称"
-                        className="settings-text-input"
-                      />
-                      <datalist id={SUMMARY_MODEL_LIST_ID}>
-                        {summaryModelOptions.map(model => (
-                          <option key={model} value={model} />
-                        ))}
-                      </datalist>
-                      <button
-                        type="button"
-                        className="settings-action-btn summary-model-load-btn"
-                        onClick={handleLoadSummaryModels}
-                        disabled={isSummaryModelLoading}
-                      >
-                        <Icons.Refresh size={15} />
-                        <span>{isSummaryModelLoading ? '读取中' : '读取模型列表'}</span>
-                      </button>
-                    </div>
+              <div className="summary-api-fields">
+                <div className="settings-row">
+                  <label className="settings-label">保存名称</label>
+                  <div className="settings-control">
+                    <input
+                      type="text"
+                      value={apiProfileDraft.name}
+                      onChange={(e) => updateApiProfileDraft('name', e.target.value)}
+                      placeholder="例如：总结用 GPT / 变量用 DeepSeek"
+                      className="settings-text-input"
+                    />
                   </div>
                 </div>
-              )}
+
+                <div className="settings-row">
+                  <label className="settings-label">API 渠道</label>
+                  <div className="settings-control">
+                    <select
+                      value={apiProfileDraft.apiConfig.source}
+                      onChange={(e) => updateApiProfileDraftConfig('source', e.target.value)}
+                      className="settings-select"
+                    >
+                      {SUMMARY_API_SOURCES.map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {isApiDraftCustomSource && (
+                  <div className="settings-row">
+                    <label className="settings-label">API URL</label>
+                    <div className="settings-control">
+                      <input
+                        type="text"
+                        value={apiProfileDraft.apiConfig.apiurl}
+                        onChange={(e) => updateApiProfileDraftConfig('apiurl', e.target.value)}
+                        placeholder="https://api.example.com/v1"
+                        className="settings-text-input"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="settings-row">
+                  <label className="settings-label">API Key</label>
+                  <div className="settings-control">
+                    <input
+                      type="password"
+                      value={apiProfileDraft.apiConfig.key}
+                      onChange={(e) => updateApiProfileDraftConfig('key', e.target.value)}
+                      placeholder="sk-..."
+                      className="settings-text-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-label">Model</label>
+                  <div className="settings-control summary-model-control">
+                    <input
+                      type="text"
+                      list={SUMMARY_MODEL_LIST_ID}
+                      value={apiProfileDraft.apiConfig.model}
+                      onChange={(e) => updateApiProfileDraftConfig('model', e.target.value)}
+                      placeholder="模型名称"
+                      className="settings-text-input"
+                    />
+                    <datalist id={SUMMARY_MODEL_LIST_ID}>
+                      {summaryModelOptions.map(model => (
+                        <option key={model} value={model} />
+                      ))}
+                    </datalist>
+                    <button
+                      type="button"
+                      className="settings-action-btn summary-model-load-btn"
+                      onClick={handleLoadSummaryModels}
+                      disabled={isSummaryModelLoading}
+                    >
+                      <Icons.Refresh size={15} />
+                      <span>{isSummaryModelLoading ? '读取中' : '读取模型列表'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="summary-api-actions">
+                <button type="button" className="settings-action-btn primary" onClick={handleSaveApiProfile}>
+                  <Icons.Save size={15} />
+                  <span>{isEditingExistingApiProfile ? '保存修改' : '保存 API'}</span>
+                </button>
+                <button type="button" className="settings-action-btn" onClick={handleDuplicateApiProfile}>
+                  <Icons.Copy size={15} />
+                  <span>另存为新 API</span>
+                </button>
+                <button
+                  type="button"
+                  className="settings-action-btn danger"
+                  onClick={handleDeleteApiProfile}
+                  disabled={!isEditingExistingApiProfile}
+                >
+                  <Icons.Trash size={15} />
+                  <span>删除当前 API</span>
+                </button>
+              </div>
 
               {summaryApiValidationMessage && (
                 <div className="summary-api-status warning">{summaryApiValidationMessage}</div>
@@ -1606,6 +1831,27 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <p className="settings-description compact">
                 当角色的人物经历条目过多时，调用额外模型进行总结精炼。
               </p>
+
+              <div className="settings-row">
+                <label className="settings-label">使用 API</label>
+                <div className="settings-control">
+                  <select
+                    value={apiSelectionToValue(settings.summarySettings.summaryApiSelection)}
+                    onChange={(e) => updateApiSelection('summary', valueToApiSelection(e.target.value))}
+                    className="settings-select"
+                  >
+                    <option value={API_SELECTION_PRESET_VALUE}>当前预设</option>
+                    {settings.summarySettings.apiProfiles.map(profile => (
+                      <option key={profile.id} value={`profile:${profile.id}`}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="settings-hint-inline">
+                    当前：{getApiSelectionLabel(settings.summarySettings.summaryApiSelection, settings.summarySettings.apiProfiles)}
+                  </span>
+                </div>
+              </div>
 
               <div className="settings-row">
                 <label className="settings-label">启用自动总结</label>

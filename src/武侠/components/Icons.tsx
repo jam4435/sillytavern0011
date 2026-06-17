@@ -12,7 +12,9 @@ import {
   Eye,
   FileText,
   Map as MapIcon,
+  Plus,
   RotateCw,
+  Save,
   Scroll,
   Send,
   Settings,
@@ -21,6 +23,7 @@ import {
   Search,
   ToggleLeft,
   ToggleRight,
+  Trash2,
   User,
   Users,
   X
@@ -71,4 +74,7 @@ export const Icons = {
   ArrowLeft: ({ className, size, color }: IconProps) => <IconWrapper className={className}><ArrowLeft size={size || 18} color={color} /></IconWrapper>,
   Copy: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Copy size={size || 18} color={color} /></IconWrapper>,
   FileText: ({ className, size, color }: IconProps) => <IconWrapper className={className}><FileText size={size || 18} color={color} /></IconWrapper>,
+  Plus: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Plus size={size || 18} color={color} /></IconWrapper>,
+  Save: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Save size={size || 18} color={color} /></IconWrapper>,
+  Trash: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Trash2 size={size || 18} color={color} /></IconWrapper>,
 };
