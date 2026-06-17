@@ -331,24 +331,10 @@ const App: React.FC = () => {
     setIsLoading(true);
     showLoading('正在初始化角色...');
 
-    const openingMessageSummary = `[开局设置]
-姓名: ${formData.name}
-性别: ${formData.gender}
-年龄: ${formData.age}
-外貌: ${formData.appearance}
-时间: ${formData.locationInfo.year}年${formData.locationInfo.month}月${formData.locationInfo.day}日
-地点: ${formData.locationInfo.location}
-出身: ${formData.origin}
-武功: ${formData.martialArtId}
-属性: 臂力${formData.initialAttributes.臂力} 根骨${formData.initialAttributes.根骨} 机敏${formData.initialAttributes.机敏} 悟性${formData.initialAttributes.悟性} 洞察${formData.initialAttributes.洞察} 风姿${formData.initialAttributes.风姿} 福缘${formData.initialAttributes.福缘}`;
-
-    addDebugLog('prompt', openingMessageSummary);
-
     try {
       const result = await initializeNewGameSession(formData);
 
       if (result.success && result.content) {
-        addDebugLog('assistant', `[开局欢迎语，仅前端显示]\n${result.content}`);
         setOpeningWelcomeLine(result.content);
 
         dismissToast();
@@ -416,7 +402,6 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   }, [
-    addDebugLog,
     clearVariableChanges,
     setIsLoading,
     showLoading,
@@ -467,7 +452,7 @@ const App: React.FC = () => {
           currentPresetName={currentPresetName}
           settings={displaySettings}
           onSettingsChange={handleSettingsChange}
-          debugLogs={debugLogs}
+          latestDebugRound={latestDebugRound}
           onClearDebugLogs={clearDebugLogs}
           onAutoAdvanceTurn={handleAutoAdvanceTurn}
           isGenerating={isLoading}
