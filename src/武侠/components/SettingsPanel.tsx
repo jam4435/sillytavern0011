@@ -2038,6 +2038,27 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               isOpen={openSettingBlocks.extraModelVariables}
               onToggle={toggleSettingBlock}
             >
+              <div className="settings-row">
+                <label className="settings-label">使用 API</label>
+                <div className="settings-control">
+                  <select
+                    value={apiSelectionToValue(settings.summarySettings.variableApiSelection)}
+                    onChange={(e) => updateApiSelection('variable', valueToApiSelection(e.target.value))}
+                    className="settings-select"
+                  >
+                    <option value={API_SELECTION_PRESET_VALUE}>当前预设</option>
+                    {settings.summarySettings.apiProfiles.map(profile => (
+                      <option key={profile.id} value={`profile:${profile.id}`}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="settings-hint-inline">
+                    当前：{getApiSelectionLabel(settings.summarySettings.variableApiSelection, settings.summarySettings.apiProfiles)}
+                  </span>
+                </div>
+              </div>
+
               <div className="summary-api-mode-group" role="radiogroup" aria-label="正文变量更新模式">
                 <label className={`summary-api-mode ${settings.summarySettings.variableUpdateMode !== 'extra' ? 'active' : ''}`}>
                   <input
@@ -2062,8 +2083,28 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
 
               <p className="settings-hint">
-                额外更新会禁用当前角色世界书的「变量指导」条目，正文输出后复用本页 API 配置单独生成变量块。
+                额外更新会禁用当前角色世界书的「变量指导」条目，正文输出后使用上方选择的 API 单独生成变量块。
               </p>
+
+              <div className="summary-subsection">
+                <h5 className="summary-subsection-title">变量提示词模板</h5>
+                <p className="settings-hint">
+                  可用变量：{'{{recentBodies}}'}、{'{{variableContext}}'}、{'{{variableGuidance}}'}。
+                </p>
+                <textarea
+                  value={settings.summarySettings.variablePromptTemplate}
+                  onChange={(e) => updateSummarySetting('variablePromptTemplate', e.target.value)}
+                  placeholder="请输入额外变量更新提示词模板..."
+                  className="settings-textarea variable-prompt-template-input"
+                  rows={12}
+                />
+                <button
+                  className="settings-reset-template-btn"
+                  onClick={() => updateSummarySetting('variablePromptTemplate', DEFAULT_SUMMARY_SETTINGS.variablePromptTemplate)}
+                >
+                  恢复默认模板
+                </button>
+              </div>
 
               {summaryVariableModeStatus && (
                 <div className={`summary-api-status ${summaryVariableModeStatus.startsWith('切换失败') ? 'warning' : 'info'}`}>
