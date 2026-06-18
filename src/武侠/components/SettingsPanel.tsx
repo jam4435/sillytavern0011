@@ -389,6 +389,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   currentPresetName,
   settings,
   onSettingsChange,
+  variableEditorCapability,
   latestDebugRound = null,
   onClearDebugLogs,
   onAutoAdvanceTurn,
@@ -418,14 +419,21 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   });
 
   // 变量编辑相关状态
+  const [variableBaseStatData, setVariableBaseStatData] = useState<Record<string, unknown> | null>(null);
   const [statData, setStatData] = useState<Record<string, unknown> | null>(null);
   const [variableStatus, setVariableStatus] = useState<VariableStatus>('idle');
   const [variableStatusText, setVariableStatusText] = useState('');
-  const [isVariablesDirty, setIsVariablesDirty] = useState(false);
+  const [variableChanges, setVariableChanges] = useState<Record<string, VariableLeafChange>>({});
+  const [isVariableSaving, setIsVariableSaving] = useState(false);
   const [expandedVariablePaths, setExpandedVariablePaths] = useState<Set<string>>(() => new Set());
   const [selectedVariablePath, setSelectedVariablePath] = useState<VariablePath | null>(null);
   const [isVariableDetailOpen, setIsVariableDetailOpen] = useState(false);
+  const [activeVariableScope, setActiveVariableScope] = useState<string | null>(null);
+  const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
+  const [characterSearch, setCharacterSearch] = useState('');
   const [variableSearch, setVariableSearch] = useState('');
+  const [variableSearchMode, setVariableSearchMode] = useState<VariableSearchMode>('scope');
+  const [variableIncludeValueSearch, setVariableIncludeValueSearch] = useState(false);
 
   // 自动推进相关状态
   const [autoAdvancePrompt, setAutoAdvancePrompt] = useState(DEFAULT_AUTO_ADVANCE_PROMPT);
@@ -436,12 +444,71 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [expandedAutoAdvanceResultId, setExpandedAutoAdvanceResultId] = useState<string | null>(null);
 
   const normalizedVariableSearch = variableSearch.trim().toLowerCase();
+  const normalizedCharacterSearch = characterSearch.trim().toLowerCase();
   const normalizedCurrentPresetName = currentPresetName.trim();
   const hasCurrentPreset = normalizedCurrentPresetName.length > 0;
   const currentPresetRegexRules = getCurrentPresetRegexRules(settings, normalizedCurrentPresetName);
-  const visibleStatDataEntries = statData
-    ? getVisibleEntries(statData).filter(([key, value]) => matchesVariableSearch(key, value, normalizedVariableSearch))
-    : [];
+  const visibleVariableScopeEntries = statData ? getVisibleEntries(statData) : [];
+  const fallbackVariableScope = visibleVariableScopeEntries[0] ? String(visibleVariableScopeEntries[0][0]) : null;
+  const resolvedActiveVariableScope =
+    activeVariableScope && visibleVariableScopeEntries.some(([key]) => String(key) === activeVariableScope)
+      ? activeVariableScope
+      : fallbackVariableScope;
+  const activeVariableScopeEntry =
+    visibleVariableScopeEntries.find(([key]) => String(key) === resolvedActiveVariableScope) ?? null;
+  const activeVariableScopePath = activeVariableScopeEntry ? [activeVariableScopeEntry[0]] : [];
+  const activeVariableScopeValue = activeVariableScopeEntry?.[1];
+  const roleVariableEntries =
+    resolvedActiveVariableScope === '角色数据' && isVariableRecord(activeVariableScopeValue)
+      ? getVisibleEntries(activeVariableScopeValue)
+          .filter(([key]) => typeof key === 'string')
+          .map(([key, value]) => ({
+            name: String(key),
+            value,
+            score: getVariableMatchScore(String(key), normalizedCharacterSearch),
+          }))
+          .filter(entry => !normalizedCharacterSearch || entry.score < 3)
+          .sort((left, right) => left.score - right.score || left.name.localeCompare(right.name, 'zh-CN'))
+      : [];
+  const resolvedSelectedCharacterName =
+    selectedCharacterName && roleVariableEntries.some(entry => entry.name === selectedCharacterName)
+      ? selectedCharacterName
+      : roleVariableEntries[0]?.name ?? null;
+  const selectedCharacterEntry =
+    resolvedSelectedCharacterName
+      ? roleVariableEntries.find(entry => entry.name === resolvedSelectedCharacterName) ?? null
+      : null;
+  const variableBrowserRootPath =
+    resolvedActiveVariableScope === '角色数据' && resolvedSelectedCharacterName
+      ? [resolvedActiveVariableScope, resolvedSelectedCharacterName]
+      : activeVariableScopePath;
+  const variableBrowserRootValue =
+    resolvedActiveVariableScope === '角色数据' && selectedCharacterEntry
+      ? selectedCharacterEntry.value
+      : activeVariableScopeValue;
+  const scopeMatchPathKeys =
+    variableSearchMode === 'scope' &&
+    normalizedVariableSearch &&
+    variableBrowserRootValue !== undefined
+      ? collectVariableMatchPathKeys(
+          variableBrowserRootValue,
+          normalizedVariableSearch,
+          { includeValues: variableIncludeValueSearch },
+          variableBrowserRootPath,
+        )
+      : new Set<string>();
+  const globalVariableResults =
+    statData && variableSearchMode === 'global'
+      ? searchVariablePaths(statData, normalizedVariableSearch, {
+          includeValues: variableIncludeValueSearch,
+          maxResults: 160,
+        })
+      : [];
+  const variableChangeList = Object.values(variableChanges);
+  const hasVariableChanges = variableChangeList.length > 0;
+  const selectedVariableValue =
+    statData && selectedVariablePath ? getValueAtVariablePath(statData, selectedVariablePath) : undefined;
+  const canEditVariables = variableEditorCapability.canEdit;
   const isAutoAdvanceRunning = autoAdvanceStatus === 'running' || autoAdvanceStatus === 'stopping';
   const autoAdvanceCompletedCount = autoAdvanceResults.filter(result => result.status === 'success').length;
   const autoAdvanceFailedCount = autoAdvanceResults.filter(result => result.status === 'error').length;
@@ -492,57 +559,70 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     [settings, onSettingsChange],
   );
 
-  const refreshStatData = useCallback(() => {
+  const resetVariableBrowser = useCallback((nextStatData: Record<string, unknown>) => {
+    const nextScopeEntry = getVisibleEntries(nextStatData)[0];
+    const nextScopeKey = nextScopeEntry ? String(nextScopeEntry[0]) : null;
+    const nextScopeValue = nextScopeEntry?.[1];
+    const nextCharacterEntry =
+      nextScopeKey === '角色数据' && isVariableRecord(nextScopeValue) ? getVisibleEntries(nextScopeValue)[0] : undefined;
+    const nextCharacterName =
+      typeof nextCharacterEntry?.[0] === 'string' ? String(nextCharacterEntry[0]) : null;
+
+    setActiveVariableScope(nextScopeKey);
+    setSelectedCharacterName(nextCharacterName);
+    setSelectedVariablePath(
+      nextCharacterName && nextScopeKey
+        ? [nextScopeKey, nextCharacterName]
+        : nextScopeEntry
+          ? [nextScopeEntry[0]]
+          : null,
+    );
+    setExpandedVariablePaths(new Set());
+    setCharacterSearch('');
+    setIsVariableDetailOpen(false);
+  }, []);
+
+  const refreshStatData = useCallback((force = false) => {
     try {
+      if (!force && hasVariableChanges) {
+        const confirmed = window.confirm('重新读取会丢弃当前未保存的变量修改，是否继续？');
+        if (!confirmed) {
+          return;
+        }
+      }
+
       const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
       const nextStatData = variables.stat_data;
-      if (!isRecord(nextStatData)) {
+      if (!isVariableRecord(nextStatData)) {
         throw new Error('没有可读取的变量对象');
       }
 
+      setVariableBaseStatData(nextStatData);
       setStatData(nextStatData);
-      const firstVisibleEntry = getVisibleEntries(nextStatData)[0];
-      setSelectedVariablePath(firstVisibleEntry ? [firstVisibleEntry[0]] : null);
+      setVariableChanges({});
       setVariableStatus('idle');
       setVariableStatusText('');
-      setIsVariablesDirty(false);
-      setExpandedVariablePaths(new Set());
-      setIsVariableDetailOpen(false);
+      resetVariableBrowser(nextStatData);
     } catch (error) {
       setVariableStatus('error');
       setVariableStatusText(`读取失败：${getErrorMessage(error)}`);
     }
-  }, []);
-
-  const saveStatData = useCallback(() => {
-    try {
-      if (!statData) {
-        throw new Error('没有可保存的变量数据');
-      }
-
-      const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
-      replaceVariables({ ...variables, stat_data: statData }, { type: 'chat' });
-
-      const savedVariables = getVariables({ type: 'chat' }) as Record<string, unknown>;
-      const savedStatData = savedVariables.stat_data;
-      if (isRecord(savedStatData)) {
-        setStatData(savedStatData);
-      }
-      setVariableStatus('idle');
-      setVariableStatusText('');
-      setIsVariablesDirty(false);
-    } catch (error) {
-      setVariableStatus('error');
-      setVariableStatusText(`保存失败：${getErrorMessage(error)}`);
-    }
-  }, [statData]);
-
-  const selectedVariableValue =
-    statData && selectedVariablePath ? getValueAtVariablePath(statData, selectedVariablePath) : undefined;
+  }, [hasVariableChanges, resetVariableBrowser]);
 
   const handleVariableSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setVariableSearch(event.target.value);
-    setIsVariableDetailOpen(false);
+  }, []);
+
+  const handleCharacterSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setCharacterSearch(event.target.value);
+  }, []);
+
+  const handleVariableSearchModeChange = useCallback((mode: VariableSearchMode) => {
+    setVariableSearchMode(mode);
+  }, []);
+
+  const handleToggleVariableValueSearch = useCallback(() => {
+    setVariableIncludeValueSearch(previousValue => !previousValue);
   }, []);
 
   const handleVariableSelect = useCallback((path: VariablePath) => {
@@ -552,6 +632,43 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const closeVariableDetail = useCallback(() => {
     setIsVariableDetailOpen(false);
+  }, []);
+
+  const handleVariableScopeSelect = useCallback((scopeKey: string) => {
+    setActiveVariableScope(scopeKey);
+    setVariableSearchMode('scope');
+    setExpandedVariablePaths(new Set());
+
+    if (!statData) {
+      return;
+    }
+
+    const scopeValue = statData[scopeKey];
+    if (scopeKey === '角色数据' && isVariableRecord(scopeValue)) {
+      const firstCharacterEntry = getVisibleEntries(scopeValue)[0];
+      const firstCharacterName = typeof firstCharacterEntry?.[0] === 'string' ? String(firstCharacterEntry[0]) : null;
+      setSelectedCharacterName(firstCharacterName);
+      setSelectedVariablePath(firstCharacterName ? [scopeKey, firstCharacterName] : [scopeKey]);
+      return;
+    }
+
+    setSelectedCharacterName(null);
+    setSelectedVariablePath([scopeKey]);
+  }, [statData]);
+
+  const handleCharacterSelect = useCallback((characterName: string) => {
+    setSelectedCharacterName(characterName);
+    setSelectedVariablePath(['角色数据', characterName]);
+  }, []);
+
+  const handleGlobalResultSelect = useCallback((result: VariableSearchResult) => {
+    const scopeKey = typeof result.path[0] === 'string' ? result.path[0] : String(result.path[0]);
+    setActiveVariableScope(scopeKey);
+    if (scopeKey === '角色数据' && typeof result.path[1] === 'string') {
+      setSelectedCharacterName(result.path[1]);
+    }
+    setSelectedVariablePath(result.path);
+    setIsVariableDetailOpen(true);
   }, []);
 
   const toggleVariablePath = useCallback((pathKey: string) => {
@@ -567,11 +684,90 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, []);
 
   const handleVariableLeafChange = useCallback((path: VariablePath, nextValue: unknown) => {
+    if (!canEditVariables || !variableBaseStatData) {
+      setVariableStatus('error');
+      setVariableStatusText(variableEditorCapability.reason);
+      return;
+    }
+
     setStatData(prev => (prev ? setValueAtVariablePath(prev, path, nextValue) : prev));
-    setIsVariablesDirty(true);
+    setVariableChanges(previousChanges => {
+      const baseValue = getValueAtVariablePath(variableBaseStatData, path);
+      const pathKey = getVariablePathKey(path);
+      const nextChanges = { ...previousChanges };
+
+      if (areVariableValuesEqual(baseValue, nextValue)) {
+        delete nextChanges[pathKey];
+        return nextChanges;
+      }
+
+      nextChanges[pathKey] = {
+        path,
+        beforeValue: baseValue,
+        nextValue,
+      };
+      return nextChanges;
+    });
     setVariableStatus('idle');
     setVariableStatusText('');
-  }, []);
+  }, [canEditVariables, variableBaseStatData, variableEditorCapability.reason]);
+
+  const handleDiscardVariableChanges = useCallback(() => {
+    if (!variableBaseStatData || !hasVariableChanges) {
+      return;
+    }
+
+    setStatData(variableBaseStatData);
+    setVariableChanges({});
+    setVariableStatus('idle');
+    setVariableStatusText('');
+  }, [hasVariableChanges, variableBaseStatData]);
+
+  const saveStatData = useCallback(async () => {
+    try {
+      if (!canEditVariables) {
+        throw new Error(variableEditorCapability.reason);
+      }
+
+      if (!statData || !variableBaseStatData || variableChangeList.length === 0) {
+        throw new Error('没有可保存的变量数据');
+      }
+
+      setIsVariableSaving(true);
+      const saveResult = await saveChatVariableLeafChanges(variableChangeList);
+      if (saveResult.conflicts.length > 0) {
+        const conflictPaths = saveResult.conflicts
+          .slice(0, 3)
+          .map(conflict => getVariableDisplayPath(conflict.path))
+          .join('；');
+        const suffix = saveResult.conflicts.length > 3 ? '；其余冲突已省略' : '';
+        setVariableStatus('error');
+        setVariableStatusText(`保存已中止：${conflictPaths}${suffix}`);
+        return;
+      }
+
+      if (!saveResult.statData) {
+        throw new Error('保存后未能读取最新变量');
+      }
+
+      setVariableBaseStatData(saveResult.statData);
+      setStatData(saveResult.statData);
+      setVariableChanges({});
+      setVariableStatus('success');
+      setVariableStatusText(`已保存 ${variableChangeList.length} 项变量修改`);
+    } catch (error) {
+      setVariableStatus('error');
+      setVariableStatusText(`保存失败：${getErrorMessage(error)}`);
+    } finally {
+      setIsVariableSaving(false);
+    }
+  }, [
+    canEditVariables,
+    statData,
+    variableBaseStatData,
+    variableChangeList,
+    variableEditorCapability.reason,
+  ]);
 
   const handleCopyVariablePath = useCallback(async (path: VariablePath) => {
     try {
