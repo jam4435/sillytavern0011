@@ -470,3 +470,330 @@ function createConflictErrorMessage(conflicts: VariableEditorConflict[]): string
 
   return `变量保存冲突：以下路径在保存前已发生外部变化：${preview}`;
 }
+
+export type VariablePath = Array<VariableEditorPathSegment>;
+
+export interface VariableLeafChange {
+  path: VariablePath;
+  beforeValue: unknown;
+  nextValue: unknown;
+}
+
+export interface VariableSearchResult {
+  path: VariablePath;
+  pathKey: string;
+  displayPath: string;
+  copyPath: string;
+  typeLabel: string;
+  preview: string;
+  value: unknown;
+  score: number;
+}
+
+export interface SaveVariableDraftResult {
+  conflicts: Array<{
+    path: VariablePath;
+    currentValue: unknown;
+    expectedValue: unknown;
+    nextValue: unknown;
+  }>;
+  statData: Record<string, unknown> | null;
+}
+
+export const ROOT_VARIABLE_PATH_KEY = ROOT_PATH_KEY;
+export const isVariableRecord = isRecord;
+export const getVisibleEntries = getVisibleVariableEntries;
+export const getVariablePathKey = getVariableEditorPathKey;
+export const getVariableDisplayPath = getVariableEditorDisplayPath;
+export const getVariableCopyPath = getVariableEditorCopyPath;
+export const getValueAtVariablePath = readVariableValueAtPath as (
+  source: Record<string, unknown>,
+  path: VariablePath,
+) => unknown;
+export const setValueAtVariablePath = writeVariableValueAtPath as (
+  source: Record<string, unknown>,
+  path: VariablePath,
+  nextValue: unknown,
+) => Record<string, unknown>;
+export const sanitizeVariableValue = sanitizeVariableEditorValue;
+export const areVariableValuesEqual = areEqual;
+
+export const areVariablePathsEqual = (left: VariablePath | null, right: VariablePath): boolean =>
+  left !== null && left.length === right.length && left.every((segment, index) => segment === right[index]);
+
+export const getVisibleChildCount = (value: unknown): number => getVisibleEntries(value).length;
+
+export const getVariableTypeLabel = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return `数组 ${getVisibleChildCount(value)}`;
+  }
+
+  if (isRecord(value)) {
+    return `对象 ${getVisibleChildCount(value)}`;
+  }
+
+  if (value === null) {
+    return '空值';
+  }
+
+  if (typeof value === 'string') {
+    return `文本 ${value.length}`;
+  }
+
+  if (typeof value === 'number') {
+    return '数字';
+  }
+
+  if (typeof value === 'boolean') {
+    return '布尔';
+  }
+
+  return typeof value;
+};
+
+export const formatVariablePreview = (value: unknown, maxLength = 140): string => {
+  if (Array.isArray(value) || isRecord(value)) {
+    return getVariableTypeLabel(value);
+  }
+
+  if (value === null) {
+    return 'null';
+  }
+
+  if (typeof value === 'string') {
+    const compactValue = value.replace(/\s+/g, ' ').trim();
+    if (!compactValue) {
+      return '空文本';
+    }
+
+    return compactValue.length > maxLength ? `${compactValue.slice(0, maxLength)}...` : compactValue;
+  }
+
+  return String(value);
+};
+
+export const formatVariableDetailValue = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (Array.isArray(value) || isRecord(value)) {
+    try {
+      return JSON.stringify(sanitizeVariableValue(value), null, 2);
+    } catch {
+      return formatVariablePreview(value);
+    }
+  }
+
+  if (value === null) {
+    return 'null';
+  }
+
+  return String(value);
+};
+
+export const getContainerPreview = (value: unknown): string => {
+  const entries = getVisibleEntries(value);
+  if (entries.length === 0) {
+    return '空';
+  }
+
+  const previewKeys = entries
+    .slice(0, 4)
+    .map(([key]) => String(key))
+    .join('、');
+  return entries.length > 4 ? `${previewKeys}...` : previewKeys;
+};
+
+const matchesVariableSearch = (
+  label: string | number,
+  value: unknown,
+  path: VariablePath,
+  normalizedQuery: string,
+  includeValues: boolean,
+): boolean => {
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  if (String(label).toLowerCase().includes(normalizedQuery)) {
+    return true;
+  }
+
+  if (getVariableDisplayPath(path).toLowerCase().includes(normalizedQuery)) {
+    return true;
+  }
+
+  if (!includeValues) {
+    return false;
+  }
+
+  if (Array.isArray(value) || isRecord(value)) {
+    return false;
+  }
+
+  return formatVariablePreview(value).toLowerCase().includes(normalizedQuery);
+};
+
+export const collectVariableMatchPathKeys = (
+  value: unknown,
+  normalizedQuery: string,
+  options: { includeValues?: boolean } = {},
+  rootPath: VariablePath = [],
+): Set<string> => {
+  const matchedPaths = new Set<string>();
+  const includeValues = options.includeValues === true;
+
+  const visit = (node: unknown, path: VariablePath, label: string | number): boolean => {
+    let hasMatch = matchesVariableSearch(label, node, path, normalizedQuery, includeValues);
+
+    for (const [childKey, childValue] of getVisibleEntries(node)) {
+      if (visit(childValue, [...path, childKey], childKey)) {
+        hasMatch = true;
+      }
+    }
+
+    if (hasMatch) {
+      matchedPaths.add(getVariablePathKey(path));
+    }
+
+    return hasMatch;
+  };
+
+  visit(value, rootPath, rootPath[rootPath.length - 1] ?? 'stat_data');
+  return matchedPaths;
+};
+
+const getVariableSearchScore = (
+  path: VariablePath,
+  value: unknown,
+  normalizedQuery: string,
+  includeValues: boolean,
+): number | null => {
+  const lastSegment = String(path[path.length - 1] ?? '').toLowerCase();
+  const displayPath = getVariableDisplayPath(path).toLowerCase();
+
+  if (lastSegment === normalizedQuery) {
+    return 0;
+  }
+
+  if (lastSegment.startsWith(normalizedQuery)) {
+    return 1;
+  }
+
+  if (lastSegment.includes(normalizedQuery)) {
+    return 2;
+  }
+
+  if (displayPath.includes(normalizedQuery)) {
+    return 3;
+  }
+
+  if (includeValues && formatVariablePreview(value).toLowerCase().includes(normalizedQuery)) {
+    return 4;
+  }
+
+  return null;
+};
+
+export const searchVariablePaths = (
+  source: Record<string, unknown>,
+  normalizedQuery: string,
+  options: { includeValues?: boolean; maxResults?: number } = {},
+): VariableSearchResult[] => {
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const results: VariableSearchResult[] = [];
+  const includeValues = options.includeValues === true;
+  const maxResults = options.maxResults ?? 200;
+
+  const visit = (node: unknown, path: VariablePath) => {
+    if (path.length > 0) {
+      const score = getVariableSearchScore(path, node, normalizedQuery, includeValues);
+      if (score !== null) {
+        results.push({
+          path: [...path],
+          pathKey: getVariablePathKey(path),
+          displayPath: getVariableDisplayPath(path),
+          copyPath: getVariableCopyPath(path),
+          typeLabel: getVariableTypeLabel(node),
+          preview: Array.isArray(node) || isRecord(node) ? getContainerPreview(node) : formatVariablePreview(node),
+          value: node,
+          score,
+        });
+      }
+    }
+
+    for (const [childKey, childValue] of getVisibleEntries(node)) {
+      visit(childValue, [...path, childKey]);
+    }
+  };
+
+  visit(source, []);
+
+  return results
+    .sort((left, right) => {
+      if (left.score !== right.score) {
+        return left.score - right.score;
+      }
+
+      if (left.path.length !== right.path.length) {
+        return left.path.length - right.path.length;
+      }
+
+      return left.displayPath.localeCompare(right.displayPath, 'zh-CN');
+    })
+    .slice(0, maxResults);
+};
+
+export const saveChatVariableLeafChanges = async (
+  changes: VariableLeafChange[],
+): Promise<SaveVariableDraftResult> => {
+  try {
+    await updateVariablesWith(currentVariables => {
+      const currentStatData = getVariableEditorStatDataFromVariables(currentVariables);
+      const internalChanges = changes.map(change =>
+        createLeafChange(
+          change.beforeValue === undefined ? 'insert' : change.nextValue === undefined ? 'delete' : 'edit',
+          change.path,
+          change.beforeValue,
+          change.nextValue,
+        ),
+      );
+      const conflicts = detectVariableLeafConflicts(currentStatData, internalChanges);
+      if (conflicts.length > 0) {
+        throw new VariableEditorConflictError(conflicts);
+      }
+
+      return {
+        ...currentVariables,
+        stat_data: applyVariableLeafChanges(currentStatData, internalChanges),
+      };
+    }, { type: 'chat' });
+  } catch (error) {
+    if (error instanceof VariableEditorConflictError) {
+      return {
+        conflicts: error.conflicts.map(conflict => ({
+          path: [...conflict.change.path],
+          currentValue: conflict.currentValue,
+          expectedValue: conflict.change.beforeValue,
+          nextValue: conflict.change.afterValue,
+        })),
+        statData: null,
+      };
+    }
+
+    throw error;
+  }
+
+  const savedVariables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+  const savedStatData = getVariableEditorStatDataFromVariables(savedVariables);
+  await eventEmit('era:writeDone', createDirectChatWriteDoneDetail(savedStatData));
+
+  return {
+    conflicts: [],
+    statData: savedStatData,
+  };
+};

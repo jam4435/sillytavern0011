@@ -48,7 +48,6 @@ import {
 } from './utils/settingsManager';
 import {
   resolveVariableEditorCapability,
-  type VariableEditorCapability,
 } from './utils/variableEditorPolicy';
 import {
   detectGameSessionState,
@@ -57,13 +56,6 @@ import {
   readGameDataPure,
   scheduleGameDataCompletion,
 } from './utils/variableReader';
-
-const SettingsPanelWithVariableEditorCapability =
-  SettingsPanel as unknown as React.ComponentType<
-    React.ComponentProps<typeof SettingsPanel> & {
-      variableEditorCapability: VariableEditorCapability;
-    }
-  >;
 
 const App: React.FC = () => {
   // 使用自定义 hooks
@@ -460,15 +452,15 @@ const App: React.FC = () => {
       case ActivePanel.INVENTORY: return <InventoryPanel items={gameState.inventory} />;
       case ActivePanel.SOCIAL: return <SocialPanel npcs={gameState.social} />;
       case ActivePanel.SETTINGS: return (
-        <SettingsPanelWithVariableEditorCapability
+        <SettingsPanel
           currentPresetName={currentPresetName}
           settings={displaySettings}
           onSettingsChange={handleSettingsChange}
+          variableEditorCapability={variableEditorCapability}
           latestDebugRound={latestDebugRound}
           onClearDebugLogs={clearDebugLogs}
           onAutoAdvanceTurn={handleAutoAdvanceTurn}
           isGenerating={isLoading}
-          variableEditorCapability={variableEditorCapability}
         />
       );
       case ActivePanel.SAVE_LOAD: return (

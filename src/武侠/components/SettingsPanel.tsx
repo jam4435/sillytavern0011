@@ -52,7 +52,6 @@ import {
   type VariableLeafChange,
   type VariablePath,
   type VariableSearchResult,
-  ROOT_VARIABLE_PATH_KEY,
   saveChatVariableLeafChanges,
   searchVariablePaths,
   setValueAtVariablePath,
@@ -2324,65 +2323,211 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {activeTab === 'variables' && (
           <div className="settings-section variables-section">
             <div className="variables-toolbar">
-              <div className="variables-field variables-search-field">
-                <label className="variables-field-label">搜索</label>
-                <div className="variables-search-box">
-                  <Icons.Search size={16} />
-                  <input
-                    type="text"
-                    value={variableSearch}
-                    onChange={handleVariableSearchChange}
-                    placeholder="字段名或值"
-                    className="settings-text-input variables-search-input"
-                  />
+              <div className="variables-toolbar-main">
+                <div className="variables-field variables-search-field">
+                  <label className="variables-field-label">
+                    {variableSearchMode === 'global' ? '全局搜索' : resolvedActiveVariableScope === '角色数据' ? '人物内部搜索' : '分区搜索'}
+                  </label>
+                  <div className="variables-search-box">
+                    <Icons.Search size={16} />
+                    <input
+                      type="text"
+                      value={variableSearch}
+                      onChange={handleVariableSearchChange}
+                      placeholder={
+                        variableSearchMode === 'global'
+                          ? '字段名、完整路径，或开启包含值后搜索正文'
+                          : resolvedActiveVariableScope === '角色数据'
+                            ? '当前人物的字段名或路径'
+                            : '当前分区的字段名或路径'
+                      }
+                      className="settings-text-input variables-search-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="variables-toolbar-actions">
+                  <button className="settings-action-btn" type="button" onClick={() => refreshStatData()}>
+                    <Icons.Refresh size={16} />
+                    <span>刷新</span>
+                  </button>
+                  <button
+                    className="settings-action-btn"
+                    type="button"
+                    onClick={handleDiscardVariableChanges}
+                    disabled={!hasVariableChanges || !variableBaseStatData}
+                  >
+                    <Icons.Close size={16} />
+                    <span>撤销</span>
+                  </button>
+                  <button
+                    className="settings-action-btn primary"
+                    type="button"
+                    onClick={() => void saveStatData()}
+                    disabled={!hasVariableChanges || !statData || isVariableSaving || !canEditVariables}
+                  >
+                    <Icons.Variables size={16} />
+                    <span>{isVariableSaving ? '保存中' : '保存'}</span>
+                  </button>
                 </div>
               </div>
 
-              <button className="settings-action-btn" type="button" onClick={refreshStatData}>
-                <Icons.Refresh size={16} />
-                <span>刷新</span>
-              </button>
-              <button
-                className="settings-action-btn primary"
-                type="button"
-                onClick={saveStatData}
-                disabled={!isVariablesDirty || !statData}
-              >
-                <Icons.Variables size={16} />
-                <span>保存</span>
-              </button>
+              <div className="variables-toolbar-meta">
+                <div className="variables-mode-switch" role="tablist" aria-label="变量搜索模式">
+                  <button
+                    type="button"
+                    className={`variables-mode-btn ${variableSearchMode === 'scope' ? 'active' : ''}`}
+                    onClick={() => handleVariableSearchModeChange('scope')}
+                  >
+                    当前分区
+                  </button>
+                  <button
+                    type="button"
+                    className={`variables-mode-btn ${variableSearchMode === 'global' ? 'active' : ''}`}
+                    onClick={() => handleVariableSearchModeChange('global')}
+                  >
+                    全局路径
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  className={`variables-mode-btn ${variableIncludeValueSearch ? 'active' : ''}`}
+                  onClick={handleToggleVariableValueSearch}
+                >
+                  包含值
+                </button>
+
+                <div className={`variables-capability ${canEditVariables ? 'editable' : 'readonly'}`}>
+                  {canEditVariables ? '叶子值可编辑' : '当前仅可查看'}
+                </div>
+              </div>
+
+              {variableSearchMode === 'scope' && visibleVariableScopeEntries.length > 0 && (
+                <div className="variables-scope-strip">
+                  {visibleVariableScopeEntries.map(([key]) => {
+                    const scopeKey = String(key);
+                    return (
+                      <button
+                        key={scopeKey}
+                        type="button"
+                        className={`variables-scope-chip ${resolvedActiveVariableScope === scopeKey ? 'active' : ''}`}
+                        onClick={() => handleVariableScopeSelect(scopeKey)}
+                      >
+                        {scopeKey}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {variableSearchMode === 'scope' && resolvedActiveVariableScope === '角色数据' && (
+                <div className="variables-character-toolbar">
+                  <div className="variables-search-box">
+                    <Icons.Search size={16} />
+                    <input
+                      type="text"
+                      value={characterSearch}
+                      onChange={handleCharacterSearchChange}
+                      placeholder="先按人物名定位"
+                      className="settings-text-input variables-search-input"
+                    />
+                  </div>
+                  <span className="variables-character-count">{roleVariableEntries.length} 人</span>
+                </div>
+              )}
             </div>
 
             {variableStatusText && <div className={`variables-status ${variableStatus}`}>{variableStatusText}</div>}
 
             <div className={`variables-browser${isVariableDetailOpen ? ' detail-open' : ''}`}>
-              <div className="variables-tree" aria-label="变量树">
-                {statData ? (
-                  visibleStatDataEntries.length > 0 ? (
-                    visibleStatDataEntries.map(([key, value]) => (
-                      <VariableTreeNode
-                        key={String(key)}
-                        label={key}
-                        value={value}
-                        path={[key]}
-                        depth={0}
-                        expandedPaths={expandedVariablePaths}
-                        selectedPath={selectedVariablePath}
-                        normalizedSearch={normalizedVariableSearch}
-                        onToggle={toggleVariablePath}
-                        onSelect={handleVariableSelect}
-                      />
-                    ))
-                  ) : (
-                    <div className="variables-empty">
-                      <Icons.Variables size={32} />
-                      <p>没有可显示的变量</p>
-                    </div>
-                  )
-                ) : (
+              <div className="variables-tree" aria-label="变量浏览">
+                {!statData ? (
                   <div className="variables-empty">
                     <Icons.Variables size={32} />
                     <p>尚未读取到变量数据</p>
+                  </div>
+                ) : variableSearchMode === 'global' ? (
+                  normalizedVariableSearch ? (
+                    globalVariableResults.length > 0 ? (
+                      <div className="variables-search-results">
+                        {globalVariableResults.map(result => (
+                          <button
+                            key={result.pathKey}
+                            type="button"
+                            className={`variables-result-item ${areVariablePathsEqual(selectedVariablePath, result.path) ? 'selected' : ''}`}
+                            onClick={() => handleGlobalResultSelect(result)}
+                          >
+                            <span className="variables-result-path">
+                              {renderHighlightedText(result.displayPath, normalizedVariableSearch)}
+                            </span>
+                            <span className="variables-result-meta">
+                              <span>{result.typeLabel}</span>
+                              <span>{renderHighlightedText(result.preview, normalizedVariableSearch)}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="variables-empty">
+                        <Icons.Search size={32} />
+                        <p>没有命中的变量路径</p>
+                      </div>
+                    )
+                  ) : (
+                    <div className="variables-empty">
+                      <Icons.Search size={32} />
+                      <p>输入完整路径或字段名开始全局搜索</p>
+                    </div>
+                  )
+                ) : (
+                  <div className="variables-browser-pane">
+                    {resolvedActiveVariableScope === '角色数据' && (
+                      <div className="variables-character-list" aria-label="人物列表">
+                        {roleVariableEntries.length > 0 ? (
+                          roleVariableEntries.map(entry => (
+                            <button
+                              key={entry.name}
+                              type="button"
+                              className={`variables-character-item ${resolvedSelectedCharacterName === entry.name ? 'active' : ''}`}
+                              onClick={() => handleCharacterSelect(entry.name)}
+                            >
+                              <span>{renderHighlightedText(entry.name, normalizedCharacterSearch)}</span>
+                              <span>{getVariableTypeLabel(entry.value)}</span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="variables-empty variables-empty-inline">
+                            <p>没有匹配的人物</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="variables-scope-tree">
+                      {variableBrowserRootValue === undefined || variableBrowserRootPath.length === 0 ? (
+                        <div className="variables-empty variables-empty-inline">
+                          <p>当前分区没有可显示内容</p>
+                        </div>
+                      ) : normalizedVariableSearch && scopeMatchPathKeys.size === 0 ? (
+                        <div className="variables-empty variables-empty-inline">
+                          <p>当前视图没有命中的字段</p>
+                        </div>
+                      ) : (
+                        <VariableTreeNode
+                          label={variableBrowserRootPath[variableBrowserRootPath.length - 1]}
+                          value={variableBrowserRootValue}
+                          path={variableBrowserRootPath}
+                          depth={0}
+                          expandedPaths={expandedVariablePaths}
+                          matchedPathKeys={scopeMatchPathKeys}
+                          selectedPath={selectedVariablePath}
+                          normalizedSearch={normalizedVariableSearch}
+                          onToggle={toggleVariablePath}
+                          onSelect={handleVariableSelect}
+                        />
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -2391,6 +2536,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 path={statData ? selectedVariablePath : null}
                 value={selectedVariableValue}
                 normalizedSearch={normalizedVariableSearch}
+                canEdit={canEditVariables}
+                capabilityReason={variableEditorCapability.reason}
                 onValueChange={handleVariableLeafChange}
                 onCopyPath={handleCopyVariablePath}
                 onCopyValue={handleCopyVariableValue}
@@ -2398,9 +2545,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               />
             </div>
 
-            {isVariablesDirty && (
+            {(hasVariableChanges || !canEditVariables) && (
               <div className="variables-editor-meta">
-                <span className="dirty">有未保存修改</span>
+                {hasVariableChanges && <span className="dirty">{formatVariableConflictStatus(variableChangeList)}</span>}
+                {!canEditVariables && <span>{variableEditorCapability.reason}</span>}
               </div>
             )}
           </div>
@@ -2724,6 +2872,7 @@ interface VariableTreeNodeProps {
   path: VariablePath;
   depth: number;
   expandedPaths: Set<string>;
+  matchedPathKeys: Set<string>;
   selectedPath: VariablePath | null;
   normalizedSearch: string;
   onToggle: (pathKey: string) => void;
@@ -2736,19 +2885,21 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
   path,
   depth,
   expandedPaths,
+  matchedPathKeys,
   selectedPath,
   normalizedSearch,
   onToggle,
   onSelect,
 }) => {
   const pathKey = getVariablePathKey(path);
-  const isRoot = path.length === 0;
-  const isContainer = Array.isArray(value) || isRecord(value);
-  const isExpanded = isRoot || Boolean(normalizedSearch) || expandedPaths.has(pathKey);
+  const isRoot = depth === 0;
+  const isContainer = Array.isArray(value) || isVariableRecord(value);
+  const isSearchActive = normalizedSearch.length > 0;
+  const isExpanded = isRoot || expandedPaths.has(pathKey) || (isSearchActive && matchedPathKeys.has(pathKey));
   const isSelected = areVariablePathsEqual(selectedPath, path);
   const rawEntries = isContainer ? getVisibleEntries(value) : [];
-  const visibleEntries = normalizedSearch
-    ? rawEntries.filter(([childKey, childValue]) => matchesVariableSearch(childKey, childValue, normalizedSearch))
+  const visibleEntries = isSearchActive
+    ? rawEntries.filter(([childKey]) => matchedPathKeys.has(getVariablePathKey([...path, childKey])))
     : rawEntries;
   const handleSelect = () => onSelect(path);
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -2804,6 +2955,7 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
                 path={[...path, childKey]}
                 depth={depth + 1}
                 expandedPaths={expandedPaths}
+                matchedPathKeys={matchedPathKeys}
                 selectedPath={selectedPath}
                 normalizedSearch={normalizedSearch}
                 onToggle={onToggle}
@@ -2840,6 +2992,8 @@ interface VariableDetailPanelProps {
   path: VariablePath | null;
   value: unknown;
   normalizedSearch: string;
+  canEdit: boolean;
+  capabilityReason: string;
   onValueChange: (path: VariablePath, nextValue: unknown) => void;
   onCopyPath: (path: VariablePath) => void;
   onCopyValue: (value: unknown) => void;
@@ -2850,21 +3004,23 @@ const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
   path,
   value,
   normalizedSearch,
+  canEdit,
+  capabilityReason,
   onValueChange,
   onCopyPath,
   onCopyValue,
   onBack,
 }) => {
-  if (!path) {
+  if (!path || typeof value === 'undefined') {
     return (
       <aside className="variable-detail-panel empty" aria-label="变量详情">
         <Icons.Eye size={28} />
-        <p>选择变量查看详情</p>
+        <p>{path ? '当前选择已不可见' : '选择变量查看详情'}</p>
       </aside>
     );
   }
 
-  const isContainer = Array.isArray(value) || isRecord(value);
+  const isContainer = Array.isArray(value) || isVariableRecord(value);
   const displayPath = getVariableDisplayPath(path);
   const copyPath = getVariableCopyPath(path);
   const detailValue = formatVariableDetailValue(value);
@@ -2902,6 +3058,7 @@ const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
       <div className="variable-detail-meta">
         <span>{getVariableTypeLabel(value)}</span>
         <span>{path.length} 层</span>
+        <span>{canEdit ? '可编辑' : '只读'}</span>
       </div>
 
       <div className="variable-detail-body">
@@ -2910,7 +3067,8 @@ const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
         ) : (
           <>
             <label className="variable-detail-field-label">值</label>
-            <VariableLeafEditor value={value} path={path} onValueChange={onValueChange} />
+            <VariableLeafEditor value={value} path={path} canEdit={canEdit} onValueChange={onValueChange} />
+            {!canEdit && <p className="variable-detail-note">{capabilityReason}</p>}
           </>
         )}
       </div>
@@ -2921,10 +3079,11 @@ const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
 interface VariableLeafEditorProps {
   value: unknown;
   path: VariablePath;
+  canEdit: boolean;
   onValueChange: (path: VariablePath, nextValue: unknown) => void;
 }
 
-const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, onValueChange }) => {
+const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, canEdit, onValueChange }) => {
   if (typeof value === 'string') {
     const isLongText = value.length > 80 || value.includes('\n');
     if (isLongText) {
@@ -2932,6 +3091,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, on
         <textarea
           className="variable-leaf-input variable-leaf-textarea"
           value={value}
+          disabled={!canEdit}
           onChange={e => onValueChange(path, e.target.value)}
           rows={Math.min(5, Math.max(2, value.split('\n').length))}
           spellCheck={false}
@@ -2944,6 +3104,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, on
         className="variable-leaf-input"
         type="text"
         value={value}
+        disabled={!canEdit}
         onChange={e => onValueChange(path, e.target.value)}
       />
     );
@@ -2955,6 +3116,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, on
         className="variable-leaf-input variable-leaf-number"
         type="number"
         value={Number.isFinite(value) ? String(value) : ''}
+        disabled={!canEdit}
         onChange={e => {
           const rawValue = e.target.value.trim();
           const nextValue = rawValue === '' ? 0 : Number(rawValue);
@@ -2970,6 +3132,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, on
     return (
       <button
         className={`variable-boolean-toggle ${value ? 'active' : ''}`}
+        disabled={!canEdit}
         onClick={() => onValueChange(path, !value)}
       >
         {value ? 'true' : 'false'}
@@ -2978,7 +3141,23 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, on
   }
 
   if (value === null) {
-    return <span className="variable-null-value">null</span>;
+    return (
+      <div className="variable-null-actions">
+        <span className="variable-null-value">null</span>
+        <button type="button" className="variable-null-btn" disabled={!canEdit} onClick={() => onValueChange(path, '')}>
+          设为空文本
+        </button>
+        <button type="button" className="variable-null-btn" disabled={!canEdit} onClick={() => onValueChange(path, 0)}>
+          设为 0
+        </button>
+        <button type="button" className="variable-null-btn" disabled={!canEdit} onClick={() => onValueChange(path, true)}>
+          设为 true
+        </button>
+        <button type="button" className="variable-null-btn" disabled={!canEdit} onClick={() => onValueChange(path, false)}>
+          设为 false
+        </button>
+      </div>
+    );
   }
 
   return <span className="variable-unknown-value">{formatVariablePreview(value)}</span>;
