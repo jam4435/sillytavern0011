@@ -11,6 +11,8 @@ import {
   logWarning,
   getEndTime,
   getEventShortName,
+  hasParticipationEntry,
+  buildParticipationDeletePatch,
   isDebutEvent,
   calculateDateOffset,
   compareTime,
@@ -705,7 +707,7 @@ export async function playerJoinsEvent(eventName, eventData) {
 
     // 2. 检查是否已参与 (避免重复添加)
     const currentVars = await getVariables({ type: 'chat' });
-    if (currentVars?.stat_data?.参与事件?.[shortName]) {
+    if (hasParticipationEntry(currentVars?.stat_data?.参与事件, eventName)) {
       debugGroupEnd();
       return;
     }
@@ -776,7 +778,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       }
 
       // 步骤 1: 明确判断玩家是否参与
-      const playerParticipated = eventName in 参与事件;
+      const playerParticipated = hasParticipationEntry(参与事件, eventName);
       log(`事件 ${eventName}: 玩家是否参与? ${playerParticipated}`);
 
       // 步骤 2: 根据玩家参与状态决定数据源
@@ -815,7 +817,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       进行中删除对象[eventName] = {};
 
       if (playerParticipated) {
-        参与删除对象[eventName] = {};
+        Object.assign(参与删除对象, buildParticipationDeletePatch(参与事件, eventName));
       }
     }
 

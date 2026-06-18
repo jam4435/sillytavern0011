@@ -153,6 +153,30 @@ export function getEventShortName(eventName) {
   return match ? match[1] : eventName;
 }
 
+export function getEventParticipationKeys(eventName) {
+  return [...new Set([eventName, getEventShortName(eventName)])];
+}
+
+export function hasParticipationEntry(participation, eventName) {
+  if (!participation || typeof participation !== 'object') {
+    return false;
+  }
+
+  return getEventParticipationKeys(eventName).some(key => Object.prototype.hasOwnProperty.call(participation, key));
+}
+
+export function buildParticipationDeletePatch(participation, eventName) {
+  if (!participation || typeof participation !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    getEventParticipationKeys(eventName)
+      .filter(key => Object.prototype.hasOwnProperty.call(participation, key))
+      .map(key => [key, {}]),
+  );
+}
+
 // 对一个时间对象进行天数加减，并正确处理跨月、跨年
 export function calculateDateOffset(dateObject, days) {
   // 将年月日统一转换为总天数进行计算

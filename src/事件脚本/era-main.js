@@ -10,7 +10,8 @@
 
 (async function () {
   // ==================== 导入模块 ====================
-  const { log, logError, logSuccess, logWarning, isDebugEnabled } = await import('./era-utils.js');
+  const { log, logError, logSuccess, logWarning, isDebugEnabled, getEventShortName, hasParticipationEntry } =
+    await import('./era-utils.js');
   const { loadEventDefinitionsFromWorldbook } = await import('./era-event-loader.js');
   const { isTimeForEvent, isTimeAfterEventEnd } = await import('./era-event-checker.js');
   const {
@@ -72,6 +73,71 @@
       isPlainObject(eventSystem) &&
       EVENT_SYSTEM_BUCKETS.every(key => isEmptyObject(eventSystem[key]))
     );
+  };
+
+  const normalizeEditLogPath = path =>
+    String(path ?? '')
+      .replace(/\[['"]([^'"[\]]+)['"]\]/g, '.$1')
+      .replace(/\[(\d+)\]/g, '.$1');
+
+  const extractEditLogOperations = detail => {
+    const operations = [];
+    const pushOperations = value => {
+      if (Array.isArray(value)) {
+        value.forEach(item => {
+          if (isPlainObject(item)) {
+            operations.push(item);
+          }
+        });
+        return;
+      }
+
+      if (isPlainObject(value) && typeof value.path === 'string') {
+        operations.push(value);
+      }
+    };
+
+    const editLogs = detail?.editLogs;
+    if (Array.isArray(editLogs)) {
+      pushOperations(editLogs);
+      return operations;
+    }
+
+    if (isPlainObject(editLogs)) {
+      Object.values(editLogs).forEach(pushOperations);
+    }
+
+    return operations;
+  };
+
+  const isEventRelevantApiWritePath = path => {
+    const segments = normalizeEditLogPath(path)
+      .split('.')
+      .filter(Boolean);
+
+    if (segments[0] === '世界信息' && segments[1] === '时间') {
+      return true;
+    }
+
+    if (segments[0] === 'user数据' && segments[1] === '所在位置') {
+      return true;
+    }
+
+    if (segments[0] === '角色数据' && segments[2] === '所在位置') {
+      return true;
+    }
+
+    return segments[0] === '参与事件';
+  };
+
+  const getEventRelevantApiWritePaths = detail => {
+    if (detail?.actions?.apiWrite !== true) {
+      return [];
+    }
+
+    return extractEditLogOperations(detail)
+      .map(operation => operation?.path)
+      .filter(path => typeof path === 'string' && isEventRelevantApiWritePath(path));
   };
 
   // ==================== 主检查函数（批量优化版）====================
@@ -208,7 +274,6 @@
   // ==================== 检查玩家位置触发 ====================
   async function checkPlayerLocationTriggers(进行中列表, eventDefinitions, updatedVariables, 最新参与事件) {
     debugGroup('📍 检查玩家位置触发');
-    const { getEventShortName } = await import('./era-utils.js');
     const playerLocation = updatedVariables.stat_data.user数据?.所在位置;
     log(`玩家位置: ${playerLocation}`);
 
@@ -219,7 +284,7 @@
       if (!eventData) continue;
 
       const eventLocation = eventData.事件地点;
-      const alreadyJoined = eventName in 最新参与事件;
+      const alreadyJoined = hasParticipationEntry(最新参与事件, eventName);
 
       log(`事件 ${eventName} 地点: ${eventLocation} | 已参与: ${alreadyJoined}`);
 
@@ -541,10 +606,21 @@
 
     await processFollowupCounters({ decrementCounters: false, reason: 'era-write-done' });
 
+    const eventRelevantApiWritePaths = getEventRelevantApiWritePaths(detail);
+
     if (detail?.actions?.apiWrite !== true) {
       log('📝 检测到ERA变量更新，触发事件检查');
       scheduleCheckEvents('era-write-done');
+      return;
     }
+
+    if (eventRelevantApiWritePaths.length > 0) {
+      log(`📝 检测到事件相关 API 写入，触发事件检查: ${eventRelevantApiWritePaths.join(', ')}`);
+      scheduleCheckEvents(`era-write-done-api:${eventRelevantApiWritePaths.join('|')}`);
+      return;
+    }
+
+    log('📝 检测到非事件相关 API 写入，跳过事件检查');
   });
 
   if (isDebugEnabled()) {

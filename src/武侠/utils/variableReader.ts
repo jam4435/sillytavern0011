@@ -1324,7 +1324,10 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
  *
  * @param 角色数据 变量表中的角色数据对象
  */
-export async function autoUpdateCharacterAttributes(角色数据?: Record<string, CharacterData | unknown>): Promise<void> {
+export async function autoUpdateCharacterAttributes(
+  角色数据?: Record<string, CharacterData | unknown>,
+  user数据?: Pick<UserProfile, '用户名'>,
+): Promise<void> {
   // 防止重复调用
   if (isUpdatingCharacterAttributes) {
     dataLogger.log('[autoUpdateCharacterAttributes] 正在更新中，跳过重复调用');
@@ -1349,6 +1352,9 @@ export async function autoUpdateCharacterAttributes(角色数据?: Record<string
   for (const [角色名, 角色] of Object.entries(角色数据)) {
     // 跳过模板和非对象数据
     if (角色名.startsWith('$')) {
+      continue;
+    }
+    if (isPlayerCharacterEntry(角色名, user数据)) {
       continue;
     }
     if (typeof 角色 !== 'object' || 角色 === null) {
@@ -1396,6 +1402,9 @@ export async function autoUpdateCharacterAttributes(角色数据?: Record<string
   for (const [角色名, 角色] of Object.entries(角色数据)) {
     // 跳过模板和非对象数据
     if (角色名.startsWith('$')) {
+      continue;
+    }
+    if (isPlayerCharacterEntry(角色名, user数据)) {
       continue;
     }
     if (typeof 角色 !== 'object' || 角色 === null) {
@@ -1718,6 +1727,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function getUserName(user数据?: Pick<UserProfile, '用户名'>): string {
+  return typeof user数据?.用户名 === 'string' ? user数据.用户名.trim() : '';
+}
+
+function isPlayerCharacterEntry(characterName: string, userDataOrName?: Pick<UserProfile, '用户名'> | string): boolean {
+  const userName = typeof userDataOrName === 'string' ? userDataOrName.trim() : getUserName(userDataOrName);
+  return !!userName && characterName === userName;
+}
+
 function toSimpleMartialArts(value: unknown): Record<string, SimpleMartialArt> | undefined {
   if (!isRecord(value)) {
     return undefined;
@@ -1774,6 +1792,7 @@ function collectChangedMartialArts(
   previousVariables: GameVariables,
 ): MartialArtsCompletionScope | null {
   const scope: MartialArtsCompletionScope = {};
+  const playerName = getUserName(nextVariables.user数据) || getUserName(previousVariables.user数据);
 
   const nextPlayerArts = toSimpleMartialArts(nextVariables.user数据?.功法);
   const previousPlayerArts = toSimpleMartialArts(previousVariables.user数据?.功法);
@@ -1794,7 +1813,7 @@ function collectChangedMartialArts(
   const changedCharacters: CharacterRecord = {};
 
   for (const [characterName, nextCharacter] of Object.entries(nextCharacters)) {
-    if (characterName.startsWith('$') || !isRecord(nextCharacter)) {
+    if (characterName.startsWith('$') || isPlayerCharacterEntry(characterName, playerName) || !isRecord(nextCharacter)) {
       continue;
     }
 
@@ -1864,9 +1883,10 @@ function collectChangedCharacterAttributes(
   const nextCharacters = nextVariables.角色数据 || {};
   const previousCharacters = previousVariables.角色数据 || {};
   const changedCharacters: CharacterRecord = {};
+  const playerName = getUserName(nextVariables.user数据) || getUserName(previousVariables.user数据);
 
   for (const [characterName, nextCharacter] of Object.entries(nextCharacters)) {
-    if (characterName.startsWith('$') || !isRecord(nextCharacter)) {
+    if (characterName.startsWith('$') || isPlayerCharacterEntry(characterName, playerName) || !isRecord(nextCharacter)) {
       continue;
     }
 
@@ -1954,6 +1974,7 @@ function mergeCompletionScope(target: GameDataCompletionScope, source: GameDataC
 export async function autoUpdateMartialArts(
   玩家功法?: Record<string, SimpleMartialArt>,
   角色数据?: Record<string, CharacterData | unknown>,
+  user数据?: Pick<UserProfile, '用户名'>,
 ): Promise<void> {
   // 防止重复调用
   if (isUpdatingMartialArts) {
@@ -2030,7 +2051,7 @@ export async function autoUpdateMartialArts(
     const 角色功法Update: Record<string, { 功法: Record<string, Partial<MartialArtUpdateData>> }> = {};
 
     for (const [角色名, 角色] of Object.entries(角色数据)) {
-      if (角色名.startsWith('$') || typeof 角色 !== 'object' || 角色 === null) continue;
+      if (角色名.startsWith('$') || isPlayerCharacterEntry(角色名, user数据) || typeof 角色 !== 'object' || 角色 === null) continue;
 
       const 角色Data = 角色 as CharacterData;
       if (!角色Data.功法) continue;
@@ -2191,9 +2212,9 @@ async function runCompletionOnce(fullScan: boolean, scope: GameDataCompletionSco
       await autoUpdatePlayerAttributes(variables.user数据);
     }
     if (variables.角色数据) {
-      await autoUpdateCharacterAttributes(variables.角色数据);
+      await autoUpdateCharacterAttributes(variables.角色数据, variables.user数据);
     }
-    await autoUpdateMartialArts(variables.user数据?.功法, variables.角色数据);
+    await autoUpdateMartialArts(variables.user数据?.功法, variables.角色数据, variables.user数据);
     initialCompletionFinished = true;
     return;
   }
@@ -2205,11 +2226,12 @@ async function runCompletionOnce(fullScan: boolean, scope: GameDataCompletionSco
   if (scope.playerAttributes) {
     await autoUpdatePlayerAttributes(scope.playerAttributes);
   }
+  const currentUserData = getGameVariables().user数据;
   if (scope.characterAttributes) {
-    await autoUpdateCharacterAttributes(scope.characterAttributes);
+    await autoUpdateCharacterAttributes(scope.characterAttributes, currentUserData);
   }
   if (scope.martialArts) {
-    await autoUpdateMartialArts(scope.martialArts.player, scope.martialArts.characters);
+    await autoUpdateMartialArts(scope.martialArts.player, scope.martialArts.characters, currentUserData);
   }
 }
 
