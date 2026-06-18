@@ -5,11 +5,8 @@ import {
 } from './settingsManager';
 import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryApiConfig } from './summaryApiClient';
 import { dataLogger } from './logger';
-import {
-  isFrontendLoaderOnlyMessage,
-  normalizeDisplayedMessageContent,
-} from './variableReader';
-import { emitEraForceSyncAndWait } from './messageActions';
+import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
+import { emitEraEventAndWait } from './messageActions';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
 const OUTPUT_PROMPT_ENTRY_NAME = '输出提示词';
@@ -129,9 +126,7 @@ function mergePatchValue(previous: unknown, next: unknown): unknown {
 
   return Object.entries(next).reduce<Record<string, unknown>>(
     (result, [key, value]) => {
-      result[key] = Object.prototype.hasOwnProperty.call(result, key)
-        ? mergePatchValue(result[key], value)
-        : value;
+      result[key] = Object.prototype.hasOwnProperty.call(result, key) ? mergePatchValue(result[key], value) : value;
       return result;
     },
     { ...previous },
@@ -150,10 +145,13 @@ function canonicalizeVariablePatchRootKeys(patch: Record<string, unknown>): Reco
 
 function getCurrentCharacterWorldbookNames(): string[] {
   const charWorldbooks = getCharWorldbookNames('current');
-  return Array.from(new Set([
-    charWorldbooks.primary,
-    ...(Array.isArray(charWorldbooks.additional) ? charWorldbooks.additional : []),
-  ].filter((name): name is string => typeof name === 'string' && name.trim().length > 0)));
+  return Array.from(
+    new Set(
+      [charWorldbooks.primary, ...(Array.isArray(charWorldbooks.additional) ? charWorldbooks.additional : [])].filter(
+        (name): name is string => typeof name === 'string' && name.trim().length > 0,
+      ),
+    ),
+  );
 }
 
 async function findWorldbookEntryByExactName(entryName: string): Promise<WorldbookEntryLocation | null> {
@@ -180,10 +178,10 @@ function readGuidanceSnapshot(): VariableGuidanceSnapshot | null {
     }
     const parsed = JSON.parse(raw) as Partial<VariableGuidanceSnapshot>;
     if (
-      typeof parsed.worldbookName === 'string'
-      && typeof parsed.uid === 'number'
-      && typeof parsed.name === 'string'
-      && typeof parsed.wasEnabled === 'boolean'
+      typeof parsed.worldbookName === 'string' &&
+      typeof parsed.uid === 'number' &&
+      typeof parsed.name === 'string' &&
+      typeof parsed.wasEnabled === 'boolean'
     ) {
       return {
         worldbookName: parsed.worldbookName,
@@ -207,21 +205,18 @@ function clearGuidanceSnapshot(): void {
   localStorage.removeItem(SNAPSHOT_STORAGE_KEY);
 }
 
-async function setWorldbookEntryEnabled(
-  worldbookName: string,
-  uid: number,
-  enabled: boolean,
-): Promise<boolean> {
+async function setWorldbookEntryEnabled(worldbookName: string, uid: number, enabled: boolean): Promise<boolean> {
   let found = false;
   await updateWorldbookWith(
     worldbookName,
-    worldbook => worldbook.map(entry => {
-      if (entry.uid !== uid) {
-        return entry;
-      }
-      found = true;
-      return { ...entry, enabled };
-    }),
+    worldbook =>
+      worldbook.map(entry => {
+        if (entry.uid !== uid) {
+          return entry;
+        }
+        found = true;
+        return { ...entry, enabled };
+      }),
     { render: 'debounced' },
   );
   return found;
@@ -269,9 +264,7 @@ async function restoreVariableGuidanceFromSnapshot(): Promise<string> {
     : `已恢复「${VARIABLE_GUIDANCE_ENTRY_NAME}」为原本的禁用状态。`;
 }
 
-export async function applyVariableUpdateModeWorldbookState(
-  mode: SummaryVariableUpdateMode,
-): Promise<string> {
+export async function applyVariableUpdateModeWorldbookState(mode: SummaryVariableUpdateMode): Promise<string> {
   if (mode === 'extra') {
     await ensureVariableGuidanceDisabled();
     return `已禁用当前角色世界书中的「${VARIABLE_GUIDANCE_ENTRY_NAME}」，之后将额外调用模型更新变量。`;
@@ -351,9 +344,9 @@ async function renderOutputPromptContext(assistantMessageId: number): Promise<st
   const rawOutputPrompt = await readWorldbookEntryContent(OUTPUT_PROMPT_ENTRY_NAME);
   try {
     if (
-      typeof EjsTemplate === 'undefined'
-      || typeof EjsTemplate.prepareContext !== 'function'
-      || typeof EjsTemplate.evaltemplate !== 'function'
+      typeof EjsTemplate === 'undefined' ||
+      typeof EjsTemplate.prepareContext !== 'function' ||
+      typeof EjsTemplate.evaltemplate !== 'function'
     ) {
       throw new Error('当前环境没有可用的 EjsTemplate。');
     }
@@ -589,9 +582,10 @@ function getRecentBodyMessages(targetMessageId: number, latestRawReply: string):
 
   const bodies = messages
     .map(message => {
-      const rawText = message.message_id === targetMessageId && latestRawReply.trim()
-        ? latestRawReply
-        : getActiveMessageText(message);
+      const rawText =
+        message.message_id === targetMessageId && latestRawReply.trim()
+          ? latestRawReply
+          : getActiveMessageText(message);
       if (!rawText.trim() || isFrontendLoaderOnlyMessage(rawText)) {
         return null;
       }
@@ -611,9 +605,7 @@ function getRecentBodyMessages(targetMessageId: number, latestRawReply: string):
     return `#${targetMessageId}\n${normalizeBodyMessageForPrompt(latestRawReply)}`;
   }
 
-  return bodies
-    .map(item => `#${item.messageId}\n${item.text}`)
-    .join('\n\n---\n\n');
+  return bodies.map(item => `#${item.messageId}\n${item.text}`).join('\n\n---\n\n');
 }
 
 function renderVariablePromptTemplate(
@@ -696,15 +688,9 @@ async function appendVariableBlocksToAssistantMessage(
   messageId: number,
   blocksText: string,
 ): Promise<MessageWriteVerification> {
-  const {
-    message: freshMessage,
-    activeText,
-    swipeId,
-  } = readAssistantMessageActiveText(messageId);
+  const { message: freshMessage, activeText, swipeId } = readAssistantMessageActiveText(messageId);
   const nextText = `${activeText.trimEnd()}\n\n${blocksText}`.trim();
-  const swipes = Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0
-    ? [...freshMessage.swipes]
-    : null;
+  const swipes = Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0 ? [...freshMessage.swipes] : null;
 
   if (swipes) {
     swipes[swipeId] = nextText;
@@ -813,11 +799,12 @@ export async function executeExtraVariableUpdate({
     }
 
     try {
-      await emitEraForceSyncAndWait(
-        { mode: 'latest' },
-        ERA_SYNC_TIMEOUT_MS,
-        'ERA 变量同步没有响应，额外变量更新已停止。',
-      );
+      await emitEraEventAndWait('era:apiWrite', {
+        timeoutMs: ERA_SYNC_TIMEOUT_MS,
+        timeoutMessage: 'ERA 没有响应 era:apiWrite，额外变量更新已停止。',
+        expectedMessageId: assistantMessageId,
+        expectedAction: 'apiWrite',
+      });
     } catch (error) {
       try {
         const syncReadback = readAssistantMessageActiveText(assistantMessageId);
@@ -861,7 +848,9 @@ export async function executeExtraVariableUpdate({
     });
 
     if (!syncVerification.verified) {
-      throw new Error(`${syncVerification.verification}\n变量块写入后又从最新楼层消失，请检查 ERA latest 同步或楼层刷新是否覆盖了正文。`);
+      throw new Error(
+        `${syncVerification.verification}\n变量块写入后又从最新楼层消失，请检查 ERA latest 同步或楼层刷新是否覆盖了正文。`,
+      );
     }
 
     return {

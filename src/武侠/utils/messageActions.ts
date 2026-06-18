@@ -48,6 +48,27 @@ type RegenerateContext = {
   allMessages: ChatMessageWithSwipes[];
 };
 
+type EraWriteDoneDetail = {
+  message_id?: number | null;
+  actions?: Record<string, unknown>;
+};
+
+type EraWaitOptions = {
+  timeoutMs?: number;
+  timeoutMessage: string;
+  expectedMessageId?: number;
+  expectedAction?: string;
+  detail?: unknown;
+};
+
+type RegenerateSwipeTransaction = {
+  messageId: number;
+  previousSwipeId: number;
+  regenerateSwipeId: number;
+};
+
+const ERA_DATA_BLOCK_REGEX = /\s*<era_data>[\s\S]*?<\/era_data>\s*/gi;
+
 function getActiveMessageText(message: ChatMessageWithSwipes): string {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
   if (swipes.length > 0) {
@@ -123,15 +144,27 @@ function buildHistoryPrompts(messages: ChatMessageWithSwipes[], lastMessageId: n
 }
 
 function formatHistoryPromptsForDebug(prompts: GenerateHistoryPrompt[]): string {
-  return prompts
-    .map(prompt => `[${prompt.role}]\n${prompt.content}`)
-    .join('\n\n---\n\n');
+  return prompts.map(prompt => `[${prompt.role}]\n${prompt.content}`).join('\n\n---\n\n');
 }
 
-export async function emitEraForceSyncAndWait(
-  payload: Record<string, unknown>,
-  timeoutMs = 10000,
-  timeoutMessage = 'ERA 变量同步没有响应，已停止重新生成。',
+function matchesEraWriteDone(detail: unknown, expectedMessageId?: number, expectedAction?: string): boolean {
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) {
+    return false;
+  }
+
+  const writeDone = detail as EraWriteDoneDetail;
+  if (expectedMessageId !== undefined && writeDone.message_id !== expectedMessageId) {
+    return false;
+  }
+  if (expectedAction && writeDone.actions?.[expectedAction] !== true) {
+    return false;
+  }
+  return true;
+}
+
+export async function emitEraEventAndWait(
+  eventName: string,
+  { timeoutMs = 10000, timeoutMessage, expectedMessageId, expectedAction, detail }: EraWaitOptions,
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -157,11 +190,15 @@ export async function emitEraForceSyncAndWait(
       finish(new Error(timeoutMessage));
     }, timeoutMs);
 
-    listener = eventOnce('era:writeDone', () => {
+    listener = eventOn('era:writeDone', (writeDoneDetail: unknown) => {
+      if (!matchesEraWriteDone(writeDoneDetail, expectedMessageId, expectedAction)) {
+        return;
+      }
       finish();
     });
 
-    void eventEmit('era:forceSync', payload).catch(error => {
+    const emitPromise = detail === undefined ? eventEmit(eventName) : eventEmit(eventName, detail);
+    void emitPromise.catch(error => {
       finish(error instanceof Error ? error : new Error(String(error)));
     });
   });
@@ -175,34 +212,62 @@ function normalizeArray<T>(value: T[] | undefined, expectedLength: number, fallb
   return result;
 }
 
-async function writeGeneratedSwipe(messageId: number, resultText: string): Promise<void> {
+function getSafeSwipeIndex(message: ChatMessageWithSwipes, swipes: string[]): number {
+  if (swipes.length === 0) {
+    return 0;
+  }
+  const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
+  return Math.max(0, Math.min(swipeIndex, swipes.length - 1));
+}
+
+function stripEraDataBlocks(text: string): string {
+  ERA_DATA_BLOCK_REGEX.lastIndex = 0;
+  return text
+    .replace(ERA_DATA_BLOCK_REGEX, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function getEraDataBlock(text: string): string {
+  ERA_DATA_BLOCK_REGEX.lastIndex = 0;
+  return text.match(ERA_DATA_BLOCK_REGEX)?.[0]?.trim() || '';
+}
+
+function attachEraDataBlock(text: string, eraDataBlock: string): string {
+  const body = stripEraDataBlocks(text);
+  return eraDataBlock ? `${body}\n\n${eraDataBlock}`.trim() : body;
+}
+
+async function beginRegenerateSwipe(messageId: number): Promise<RegenerateSwipeTransaction> {
   const [freshMessage] = getChatMessages(messageId, { include_swipes: true }) as ChatMessageWithSwipes[];
   if (!freshMessage) {
     throw new Error(`找不到要重新生成的楼层 #${messageId}。`);
   }
 
   const activeText = getActiveMessageText(freshMessage);
-  const swipes = Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0
-    ? [...freshMessage.swipes]
-    : [activeText || freshMessage.message || ''];
-
-  const newSwipeId = swipes.length;
-  swipes.push(resultText);
+  const swipes =
+    Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0
+      ? [...freshMessage.swipes]
+      : [activeText || freshMessage.message || ''];
+  const previousSwipeId = getSafeSwipeIndex(freshMessage, swipes);
+  const regenerateSwipeId = swipes.length;
+  const placeholderText = stripEraDataBlocks(normalizeDisplayedMessageContent(activeText)) || '正在重新生成...';
+  swipes.push(placeholderText);
 
   const swipesData = normalizeArray(freshMessage.swipes_data, swipes.length, () => ({}));
   const swipesInfo = normalizeArray(freshMessage.swipes_info, swipes.length, () => ({}));
-  swipesData[newSwipeId] = {};
-  swipesInfo[newSwipeId] = {
+  swipesData[regenerateSwipeId] = {};
+  swipesInfo[regenerateSwipeId] = {
     send_date: Date.now(),
-    type: 'wuxia_regenerate',
+    type: 'wuxia_regenerate_pending',
   };
 
   await setChatMessages(
     [
       {
         message_id: messageId,
-        message: resultText,
-        swipe_id: newSwipeId,
+        message: placeholderText,
+        swipe_id: regenerateSwipeId,
         swipes,
         swipes_data: swipesData,
         swipes_info: swipesInfo,
@@ -210,6 +275,70 @@ async function writeGeneratedSwipe(messageId: number, resultText: string): Promi
     ],
     { refresh: 'affected' },
   );
+
+  return {
+    messageId,
+    previousSwipeId,
+    regenerateSwipeId,
+  };
+}
+
+async function writeGeneratedSwipe(transaction: RegenerateSwipeTransaction, resultText: string): Promise<string> {
+  const [freshMessage] = getChatMessages(transaction.messageId, {
+    hide_state: 'all',
+    include_swipes: true,
+  }) as ChatMessageWithSwipes[];
+  if (!freshMessage) {
+    throw new Error(`找不到要写入重新生成结果的楼层 #${transaction.messageId}。`);
+  }
+
+  const swipes = Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0 ? [...freshMessage.swipes] : [];
+  if (transaction.regenerateSwipeId >= swipes.length) {
+    throw new Error(`重新生成目标 swipe #${transaction.regenerateSwipeId} 已不存在。`);
+  }
+
+  const currentSwipeText = swipes[transaction.regenerateSwipeId] || '';
+  const nextText = attachEraDataBlock(resultText, getEraDataBlock(currentSwipeText));
+  swipes[transaction.regenerateSwipeId] = nextText;
+  const swipesData = normalizeArray(freshMessage.swipes_data, swipes.length, () => ({}));
+  const swipesInfo = normalizeArray(freshMessage.swipes_info, swipes.length, () => ({}));
+  swipesInfo[transaction.regenerateSwipeId] = {
+    ...swipesInfo[transaction.regenerateSwipeId],
+    send_date: Date.now(),
+    type: 'wuxia_regenerate',
+  };
+
+  await setChatMessages(
+    [
+      {
+        message_id: transaction.messageId,
+        message: nextText,
+        swipe_id: transaction.regenerateSwipeId,
+        swipes,
+        swipes_data: swipesData,
+        swipes_info: swipesInfo,
+      },
+    ],
+    { refresh: 'affected' },
+  );
+  return nextText;
+}
+
+async function restorePreviousSwipe(transaction: RegenerateSwipeTransaction): Promise<void> {
+  await setChatMessages(
+    [
+      {
+        message_id: transaction.messageId,
+        swipe_id: transaction.previousSwipeId,
+      },
+    ],
+    { refresh: 'affected' },
+  );
+  await emitEraEventAndWait('manual_sync', {
+    timeoutMessage: '重新生成失败后已切回原 swipe，但 ERA 没有确认变量恢复。',
+    expectedMessageId: transaction.messageId,
+    expectedAction: 'resync',
+  });
 }
 
 export async function regenerateLastAssistantSwipe(options: RegenerateOptions = {}): Promise<RegenerateResult> {
@@ -218,63 +347,80 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
     throw new Error('当前没有可重新生成的最新回复。');
   }
 
-  await flushPendingGameDataCompletion('before-regenerate');
-  await emitEraForceSyncAndWait({
-    mode: 'rollbackTo',
-    message_id: context.userMessage.message_id,
-  });
-
   const prompts = buildHistoryPrompts(context.allMessages, context.userMessage.message_id);
   if (prompts.length === 0 || prompts[prompts.length - 1].role !== 'user') {
     throw new Error('无法构造重新生成所需的聊天历史。');
   }
 
   let combinedPrompt = formatHistoryPromptsForDebug(prompts);
-  const combinedPromptCapture =
-    typeof eventOn === 'function'
-    && typeof tavern_events !== 'undefined'
-    && tavern_events.GENERATE_AFTER_COMBINE_PROMPTS
-      ? eventOn(
-        tavern_events.GENERATE_AFTER_COMBINE_PROMPTS,
-        (result: { prompt?: string }) => {
-          if (typeof result?.prompt === 'string' && result.prompt.trim()) {
-            combinedPrompt = result.prompt;
-            options.onCombinedPrompt?.(result.prompt);
-          }
-        },
-      )
-      : null;
-
-  let generated: string | GenerateToolCallResult;
+  let transaction: RegenerateSwipeTransaction | null = null;
   try {
-    generated = await generate({
-    should_stream: true,
-    overrides: {
-      chat_history: {
-        prompts,
-      },
-    },
+    await flushPendingGameDataCompletion('before-regenerate');
+    transaction = await beginRegenerateSwipe(context.assistantMessage.message_id);
+    await emitEraEventAndWait('manual_sync', {
+      timeoutMessage: 'ERA 没有响应 manual_sync，无法在重新生成前回滚旧 swipe 变量。',
+      expectedMessageId: context.assistantMessage.message_id,
+      expectedAction: 'resync',
     });
-  } finally {
-    combinedPromptCapture?.stop();
+
+    const combinedPromptCapture =
+      typeof eventOn === 'function' &&
+      typeof tavern_events !== 'undefined' &&
+      tavern_events.GENERATE_AFTER_COMBINE_PROMPTS
+        ? eventOn(tavern_events.GENERATE_AFTER_COMBINE_PROMPTS, (result: { prompt?: string }) => {
+            if (typeof result?.prompt === 'string' && result.prompt.trim()) {
+              combinedPrompt = result.prompt;
+              options.onCombinedPrompt?.(result.prompt);
+            }
+          })
+        : null;
+
+    let generated: string | GenerateToolCallResult;
+    try {
+      generated = await generate({
+        should_stream: true,
+        overrides: {
+          chat_history: {
+            prompts,
+          },
+        },
+      });
+    } finally {
+      combinedPromptCapture?.stop();
+    }
+
+    const resultText = typeof generated === 'string' ? generated : generated.content;
+    if (!resultText?.trim()) {
+      throw new Error('重新生成失败：AI 回复为空。');
+    }
+
+    await writeGeneratedSwipe(transaction, resultText);
+    await emitEraEventAndWait('era:apiWrite', {
+      timeoutMessage: '新 swipe 已写入，但 ERA 没有响应 era:apiWrite。',
+      expectedMessageId: context.assistantMessage.message_id,
+      expectedAction: 'apiWrite',
+    });
+
+    const maintext = getLastMessageContent();
+    return {
+      maintext,
+      options: parseOptions(maintext),
+      gameData: readGameDataPure(),
+      assistantMessageId: context.assistantMessage.message_id,
+      userInput: getActiveMessageText(context.userMessage),
+      combinedPrompt,
+      rawReply: resultText,
+    };
+  } catch (error) {
+    if (transaction) {
+      try {
+        await restorePreviousSwipe(transaction);
+      } catch (restoreError) {
+        const originalMessage = error instanceof Error ? error.message : String(error);
+        const restoreMessage = restoreError instanceof Error ? restoreError.message : String(restoreError);
+        throw new Error(`${originalMessage}\n${restoreMessage}`);
+      }
+    }
+    throw error;
   }
-
-  const resultText = typeof generated === 'string' ? generated : generated.content;
-  if (!resultText?.trim()) {
-    throw new Error('重新生成失败：AI 回复为空。');
-  }
-
-  await writeGeneratedSwipe(context.assistantMessage.message_id, resultText);
-  await emitEraForceSyncAndWait({ mode: 'latest' });
-
-  const maintext = getLastMessageContent();
-  return {
-    maintext,
-    options: parseOptions(maintext),
-    gameData: readGameDataPure(),
-    assistantMessageId: context.assistantMessage.message_id,
-    userInput: getActiveMessageText(context.userMessage),
-    combinedPrompt,
-    rawReply: resultText,
-  };
 }
