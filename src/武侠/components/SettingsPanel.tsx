@@ -34,15 +34,38 @@ import {
   type SummaryTriggerResult,
   type BatchSummaryResult,
 } from '../utils/summaryManager';
+import type { VariableEditorCapability } from '../utils/variableEditorPolicy';
+import {
+  areVariablePathsEqual,
+  areVariableValuesEqual,
+  collectVariableMatchPathKeys,
+  formatVariableDetailValue,
+  formatVariablePreview,
+  getContainerPreview,
+  getValueAtVariablePath,
+  getVariableCopyPath,
+  getVariableDisplayPath,
+  getVariablePathKey,
+  getVariableTypeLabel,
+  getVisibleEntries,
+  isVariableRecord,
+  type VariableLeafChange,
+  type VariablePath,
+  type VariableSearchResult,
+  ROOT_VARIABLE_PATH_KEY,
+  saveChatVariableLeafChanges,
+  searchVariablePaths,
+  setValueAtVariablePath,
+} from '../utils/variableEditorState';
 import { Icons } from './Icons';
 import type { AutoAdvanceTurnResult, LatestDebugRound } from '../hooks';
 import { uiLogger } from '../utils/logger';
 
 type SettingsTab = 'appearance' | 'regex' | 'summary' | 'variables' | 'advance' | 'debug';
 type VariableStatus = 'idle' | 'success' | 'error';
-type VariablePath = Array<string | number>;
 type AutoAdvanceStatus = 'idle' | 'running' | 'stopping' | 'done' | 'error';
 type AutoAdvanceResultStatus = 'running' | 'success' | 'error';
+type VariableSearchMode = 'scope' | 'global';
 type SettingsCollapsibleId =
   | 'appearanceText'
   | 'appearanceBackground'
@@ -91,9 +114,6 @@ const SUMMARY_API_SOURCES = [
   ['deepseek', 'DeepSeek'],
   ['custom', '自定义（OpenAI兼容）'],
 ] as const;
-
-const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
-const ROOT_VARIABLE_PATH_KEY = 'root';
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 const normalizeDebugText = (value: string | undefined): string => (value || '').trim();
@@ -177,143 +197,6 @@ const getApiSelectionLabel = (selection: SummaryApiSelection, profiles: SummaryA
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-const isHiddenVariableKey = (key: string | number): boolean => typeof key === 'string' && HIDDEN_VARIABLE_KEYS.has(key);
-
-const getVariablePathKey = (path: VariablePath): string =>
-  path.length === 0 ? ROOT_VARIABLE_PATH_KEY : path.map(segment => String(segment)).join('\u001f');
-
-const areVariablePathsEqual = (lhs: VariablePath | null, rhs: VariablePath): boolean =>
-  !!lhs && lhs.length === rhs.length && lhs.every((segment, index) => segment === rhs[index]);
-
-const getValueAtVariablePath = (source: Record<string, unknown>, path: VariablePath): unknown => {
-  let cursor: unknown = source;
-
-  for (const segment of path) {
-    if (Array.isArray(cursor) && typeof segment === 'number') {
-      cursor = cursor[segment];
-      continue;
-    }
-
-    if (isRecord(cursor)) {
-      cursor = cursor[String(segment)];
-      continue;
-    }
-
-    return undefined;
-  }
-
-  return cursor;
-};
-
-const getVariableDisplayPath = (path: VariablePath): string =>
-  ['stat_data', ...path.map(segment => String(segment))].join(' › ');
-
-const formatCopyPathSegment = (segment: string | number): string => {
-  if (typeof segment === 'number') {
-    return `[${segment}]`;
-  }
-
-  return /^[\p{L}_$][\p{L}\p{N}_$]*$/u.test(segment) ? `.${segment}` : `[${JSON.stringify(segment)}]`;
-};
-
-const getVariableCopyPath = (path: VariablePath): string =>
-  path.reduce((copyPath, segment) => `${copyPath}${formatCopyPathSegment(segment)}`, 'stat_data');
-
-const getVisibleEntries = (value: unknown): Array<[string | number, unknown]> => {
-  if (Array.isArray(value)) {
-    return value.map((item, index) => [index, item]);
-  }
-
-  if (!isRecord(value)) {
-    return [];
-  }
-
-  return Object.entries(value).filter(([key]) => !isHiddenVariableKey(key));
-};
-
-const getVisibleChildCount = (value: unknown): number => getVisibleEntries(value).length;
-
-const getVariableTypeLabel = (value: unknown): string => {
-  if (Array.isArray(value)) {
-    return `数组 ${getVisibleChildCount(value)}`;
-  }
-
-  if (isRecord(value)) {
-    return `对象 ${getVisibleChildCount(value)}`;
-  }
-
-  if (value === null) {
-    return '空值';
-  }
-
-  if (typeof value === 'string') {
-    return `文本 ${value.length}`;
-  }
-
-  if (typeof value === 'number') {
-    return '数字';
-  }
-
-  if (typeof value === 'boolean') {
-    return '布尔';
-  }
-
-  return typeof value;
-};
-
-const formatVariablePreview = (value: unknown): string => {
-  if (Array.isArray(value) || isRecord(value)) {
-    return getVariableTypeLabel(value);
-  }
-
-  if (value === null) {
-    return 'null';
-  }
-
-  if (typeof value === 'string') {
-    const compactValue = value.replace(/\s+/g, ' ').trim();
-    if (!compactValue) {
-      return '空文本';
-    }
-    return compactValue.length > 140 ? `${compactValue.slice(0, 140)}...` : compactValue;
-  }
-
-  return String(value);
-};
-
-const formatVariableDetailValue = (value: unknown): string => {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (Array.isArray(value) || isRecord(value)) {
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch {
-      return formatVariablePreview(value);
-    }
-  }
-
-  if (value === null) {
-    return 'null';
-  }
-
-  return String(value);
-};
-
-const getContainerPreview = (value: unknown): string => {
-  const entries = getVisibleEntries(value);
-  if (entries.length === 0) {
-    return '空';
-  }
-
-  const previewKeys = entries
-    .slice(0, 4)
-    .map(([key]) => String(key))
-    .join('、');
-  return entries.length > 4 ? `${previewKeys}...` : previewKeys;
-};
-
 const renderHighlightedText = (text: string, normalizedQuery: string): React.ReactNode => {
   if (!normalizedQuery) {
     return text;
@@ -346,69 +229,30 @@ const renderHighlightedText = (text: string, normalizedQuery: string): React.Rea
   return parts;
 };
 
-const matchesVariableSearch = (key: string | number, value: unknown, normalizedQuery: string): boolean => {
+const getVariableMatchScore = (label: string, normalizedQuery: string): number => {
   if (!normalizedQuery) {
-    return true;
+    return 0;
   }
 
-  if (String(key).toLowerCase().includes(normalizedQuery)) {
-    return true;
+  const normalizedLabel = label.toLowerCase();
+  if (normalizedLabel === normalizedQuery) {
+    return 0;
   }
-
-  if (Array.isArray(value) || isRecord(value)) {
-    return getVisibleEntries(value).some(([childKey, childValue]) =>
-      matchesVariableSearch(childKey, childValue, normalizedQuery),
-    );
+  if (normalizedLabel.startsWith(normalizedQuery)) {
+    return 1;
   }
-
-  return formatVariablePreview(value).toLowerCase().includes(normalizedQuery);
+  if (normalizedLabel.includes(normalizedQuery)) {
+    return 2;
+  }
+  return 3;
 };
 
-const setValueAtVariablePath = (
-  source: Record<string, unknown>,
-  path: VariablePath,
-  nextValue: unknown,
-): Record<string, unknown> => {
-  if (path.length === 0) {
-    return isRecord(nextValue) ? nextValue : source;
+const formatVariableConflictStatus = (changes: VariableLeafChange[]): string => {
+  if (changes.length === 0) {
+    return '';
   }
 
-  const cloneRoot = { ...source };
-  let cursor: Record<string, unknown> | unknown[] = cloneRoot;
-
-  path.forEach((segment, index) => {
-    const isLast = index === path.length - 1;
-
-    if (isLast) {
-      if (Array.isArray(cursor) && typeof segment === 'number') {
-        cursor[segment] = nextValue;
-      } else if (!Array.isArray(cursor)) {
-        cursor[String(segment)] = nextValue;
-      }
-      return;
-    }
-
-    const currentValue =
-      Array.isArray(cursor) && typeof segment === 'number'
-        ? cursor[segment]
-        : !Array.isArray(cursor)
-          ? cursor[String(segment)]
-          : undefined;
-    const nextContainer = Array.isArray(currentValue)
-      ? [...currentValue]
-      : isRecord(currentValue)
-        ? { ...currentValue }
-        : {};
-
-    if (Array.isArray(cursor) && typeof segment === 'number') {
-      cursor[segment] = nextContainer;
-    } else if (!Array.isArray(cursor)) {
-      cursor[String(segment)] = nextContainer;
-    }
-    cursor = nextContainer;
-  });
-
-  return cloneRoot;
+  return `${changes.length} 项修改待保存`;
 };
 
 const copyTextToClipboard = async (text: string): Promise<void> => {
@@ -486,6 +330,7 @@ interface SettingsPanelProps {
   currentPresetName: string;
   settings: DisplaySettings;
   onSettingsChange: (settings: DisplaySettings) => void;
+  variableEditorCapability: VariableEditorCapability;
   latestDebugRound?: LatestDebugRound | null;
   onClearDebugLogs?: () => void;
   onAutoAdvanceTurn?: (message: string) => Promise<AutoAdvanceTurnResult>;

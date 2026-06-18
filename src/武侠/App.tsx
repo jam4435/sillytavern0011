@@ -47,12 +47,23 @@ import {
   saveSettings
 } from './utils/settingsManager';
 import {
+  resolveVariableEditorCapability,
+  type VariableEditorCapability,
+} from './utils/variableEditorPolicy';
+import {
   detectGameSessionState,
   getLastMessageContent,
   parseOptions,
   readGameDataPure,
   scheduleGameDataCompletion,
 } from './utils/variableReader';
+
+const SettingsPanelWithVariableEditorCapability =
+  SettingsPanel as unknown as React.ComponentType<
+    React.ComponentProps<typeof SettingsPanel> & {
+      variableEditorCapability: VariableEditorCapability;
+    }
+  >;
 
 const App: React.FC = () => {
   // 使用自定义 hooks
@@ -292,6 +303,7 @@ const App: React.FC = () => {
     () => getRegexRulesForDisplay(displaySettings, currentPresetName),
     [displaySettings, currentPresetName],
   );
+  const variableEditorCapability = useMemo(() => resolveVariableEditorCapability(), []);
 
   // 应用正则替换到主文本
   const processedMaintext = useMemo(() => {
@@ -448,7 +460,7 @@ const App: React.FC = () => {
       case ActivePanel.INVENTORY: return <InventoryPanel items={gameState.inventory} />;
       case ActivePanel.SOCIAL: return <SocialPanel npcs={gameState.social} />;
       case ActivePanel.SETTINGS: return (
-        <SettingsPanel
+        <SettingsPanelWithVariableEditorCapability
           currentPresetName={currentPresetName}
           settings={displaySettings}
           onSettingsChange={handleSettingsChange}
@@ -456,6 +468,7 @@ const App: React.FC = () => {
           onClearDebugLogs={clearDebugLogs}
           onAutoAdvanceTurn={handleAutoAdvanceTurn}
           isGenerating={isLoading}
+          variableEditorCapability={variableEditorCapability}
         />
       );
       case ActivePanel.SAVE_LOAD: return (
