@@ -205,21 +205,37 @@ function clearGuidanceSnapshot(): void {
   localStorage.removeItem(SNAPSHOT_STORAGE_KEY);
 }
 
-async function setWorldbookEntryEnabled(worldbookName: string, uid: number, enabled: boolean): Promise<boolean> {
-  let found = false;
+async function setWorldbookEntryEnabled(
+  worldbookName: string,
+  uid: number,
+  entryName: string,
+  enabled: boolean,
+): Promise<'uid' | 'name' | null> {
+  let matchedBy: 'uid' | 'name' | null = null;
   await updateWorldbookWith(
     worldbookName,
-    worldbook =>
-      worldbook.map(entry => {
-        if (entry.uid !== uid) {
+    worldbook => {
+      const uidMatch = worldbook.find(entry => entry.uid === uid && entry.name === entryName);
+      const nameMatches = uidMatch ? [] : worldbook.filter(entry => entry.name === entryName);
+      if (!uidMatch && nameMatches.length > 1) {
+        throw new Error(`世界书「${worldbookName}」中存在多个同名条目「${entryName}」，无法安全修改。`);
+      }
+
+      const target = uidMatch || nameMatches[0];
+      if (!target) {
+        return worldbook;
+      }
+      matchedBy = uidMatch ? 'uid' : 'name';
+      return worldbook.map(entry => {
+        if (entry.uid !== target.uid) {
           return entry;
         }
-        found = true;
         return { ...entry, enabled };
-      }),
+      });
+    },
     { render: 'debounced' },
   );
-  return found;
+  return matchedBy;
 }
 
 async function ensureVariableGuidanceDisabled(): Promise<VariableGuidanceSnapshot> {
@@ -229,19 +245,29 @@ async function ensureVariableGuidanceDisabled(): Promise<VariableGuidanceSnapsho
   }
 
   const existingSnapshot = readGuidanceSnapshot();
-  const snapshot = existingSnapshot || {
-    worldbookName: location.worldbookName,
-    uid: location.entry.uid,
-    name: location.entry.name,
-    wasEnabled: location.entry.enabled,
-    savedAt: Date.now(),
-  };
-  if (!existingSnapshot) {
-    writeGuidanceSnapshot(snapshot);
+  const canReuseSnapshot =
+    existingSnapshot?.worldbookName === location.worldbookName && existingSnapshot.name === location.entry.name;
+  const snapshot = canReuseSnapshot
+    ? { ...existingSnapshot, uid: location.entry.uid }
+    : {
+        worldbookName: location.worldbookName,
+        uid: location.entry.uid,
+        name: location.entry.name,
+        wasEnabled: location.entry.enabled,
+        savedAt: Date.now(),
+      };
+  if (existingSnapshot && !canReuseSnapshot) {
+    dataLogger.warn('检测到不属于当前变量指导条目的旧快照，已用当前条目状态替换。', {
+      oldSnapshot: existingSnapshot,
+      currentWorldbookName: location.worldbookName,
+      currentUid: location.entry.uid,
+      currentName: location.entry.name,
+    });
   }
+  writeGuidanceSnapshot(snapshot);
 
   if (location.entry.enabled) {
-    await setWorldbookEntryEnabled(location.worldbookName, location.entry.uid, false);
+    await setWorldbookEntryEnabled(location.worldbookName, location.entry.uid, location.entry.name, false);
   }
 
   return snapshot;
@@ -253,9 +279,20 @@ async function restoreVariableGuidanceFromSnapshot(): Promise<string> {
     return `未找到已记录的「${VARIABLE_GUIDANCE_ENTRY_NAME}」原始状态，无需恢复。`;
   }
 
-  const restored = await setWorldbookEntryEnabled(snapshot.worldbookName, snapshot.uid, snapshot.wasEnabled);
+  const restored = await setWorldbookEntryEnabled(
+    snapshot.worldbookName,
+    snapshot.uid,
+    snapshot.name,
+    snapshot.wasEnabled,
+  );
   if (!restored) {
     throw new Error(`无法在世界书「${snapshot.worldbookName}」中找到要恢复的「${snapshot.name}」条目。`);
+  }
+  if (restored === 'name') {
+    dataLogger.warn(`变量指导条目 uid 已变化，已按名称在世界书「${snapshot.worldbookName}」中完成恢复。`, {
+      snapshotUid: snapshot.uid,
+      entryName: snapshot.name,
+    });
   }
 
   clearGuidanceSnapshot();
