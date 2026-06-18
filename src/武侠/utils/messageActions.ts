@@ -7,6 +7,7 @@ import {
   parseOptions,
   readGameDataPure,
 } from './variableReader';
+import { captureNextCombinedPromptForDebug } from './promptDebug';
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -363,17 +364,10 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
       expectedAction: 'resync',
     });
 
-    const combinedPromptCapture =
-      typeof eventOn === 'function' &&
-      typeof tavern_events !== 'undefined' &&
-      tavern_events.GENERATE_AFTER_COMBINE_PROMPTS
-        ? eventOn(tavern_events.GENERATE_AFTER_COMBINE_PROMPTS, (result: { prompt?: string }) => {
-            if (typeof result?.prompt === 'string' && result.prompt.trim()) {
-              combinedPrompt = result.prompt;
-              options.onCombinedPrompt?.(result.prompt);
-            }
-          })
-        : null;
+    const combinedPromptCapture = captureNextCombinedPromptForDebug(prompt => {
+      combinedPrompt = prompt;
+      options.onCombinedPrompt?.(prompt);
+    });
 
     let generated: string | GenerateToolCallResult;
     try {

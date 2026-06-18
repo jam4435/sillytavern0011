@@ -64,9 +64,7 @@ function createEmptyDebugRound(): LatestDebugRound {
 }
 
 function normalizeDebugStageStatus(value: unknown): DebugStageStatus {
-  return value === 'running' || value === 'success' || value === 'error' || value === 'idle'
-    ? value
-    : 'idle';
+  return value === 'running' || value === 'success' || value === 'error' || value === 'idle' ? value : 'idle';
 }
 
 function normalizeNumber(value: unknown): number | undefined {
@@ -83,12 +81,14 @@ function normalizeLoadedDebugRound(value: unknown): LatestDebugRound | null {
   }
 
   const source = value as Partial<LatestDebugRound>;
-  const main = source.main && typeof source.main === 'object' && !Array.isArray(source.main)
-    ? source.main as Partial<LatestDebugRound['main']>
-    : {};
-  const variable = source.variable && typeof source.variable === 'object' && !Array.isArray(source.variable)
-    ? source.variable as Partial<LatestDebugRound['variable']>
-    : {};
+  const main =
+    source.main && typeof source.main === 'object' && !Array.isArray(source.main)
+      ? (source.main as Partial<LatestDebugRound['main']>)
+      : {};
+  const variable =
+    source.variable && typeof source.variable === 'object' && !Array.isArray(source.variable)
+      ? (source.variable as Partial<LatestDebugRound['variable']>)
+      : {};
   const now = Date.now();
 
   return {
@@ -158,7 +158,7 @@ export function useDebugLogs() {
         status: 'running',
         startedAt: now,
         userInput,
-        combinedPrompt: userInput,
+        combinedPrompt: '',
         output: '',
       },
     };

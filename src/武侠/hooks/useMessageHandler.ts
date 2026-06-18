@@ -10,6 +10,7 @@ import {
 } from '../utils/variableReader';
 import { messageLogger } from '../utils/logger';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
+import { captureNextCombinedPromptForDebug } from '../utils/promptDebug';
 import {
   executeExtraVariableUpdate,
   prepareExtraVariableUpdateTurn,
@@ -57,8 +58,7 @@ interface UseMessageHandlerOptions {
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
 
-const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
+const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 function createExtraVariableProgressPatch(
   progress: ExtraVariableUpdateProgress,
@@ -91,31 +91,6 @@ function createExtraVariableProgressPatch(
     patch.syncVerification = progress.syncVerification;
   }
   return patch;
-}
-
-function captureNextCombinedPrompt(onPrompt: (prompt: string) => void): { stop: () => void } | null {
-  if (
-    typeof eventOn !== 'function'
-    || typeof tavern_events === 'undefined'
-    || !tavern_events.GENERATE_AFTER_COMBINE_PROMPTS
-  ) {
-    return null;
-  }
-
-  const eventOnAny = eventOn as unknown as (
-    eventType: string,
-    listener: (result: { prompt?: string }) => void,
-  ) => EventOnReturn;
-  let captured = false;
-  return eventOnAny(tavern_events.GENERATE_AFTER_COMBINE_PROMPTS, result => {
-    if (captured) {
-      return;
-    }
-    captured = true;
-    if (typeof result?.prompt === 'string' && result.prompt.trim()) {
-      onPrompt(result.prompt);
-    }
-  });
 }
 
 function getActiveMessageText(message: ChatMessageWithSwipes): string {
@@ -181,369 +156,366 @@ export function useMessageHandler({
   onVariableTurnStart,
   onVariableAssistantReply,
 }: UseMessageHandlerOptions) {
-  const refreshAssistantStateFromFinalText = useCallback((finalText: string, assistantMessageId: number) => {
-    onVariableAssistantReply?.(finalText, assistantMessageId);
-    const displayText = normalizeDisplayedMessageContent(finalText) || finalText;
-    setCurrentMaintext(displayText);
-    setCurrentOptions(parseOptions(finalText));
-  }, [
-    onVariableAssistantReply,
-    setCurrentMaintext,
-    setCurrentOptions,
-  ]);
+  const refreshAssistantStateFromFinalText = useCallback(
+    (finalText: string, assistantMessageId: number) => {
+      onVariableAssistantReply?.(finalText, assistantMessageId);
+      const displayText = normalizeDisplayedMessageContent(finalText) || finalText;
+      setCurrentMaintext(displayText);
+      setCurrentOptions(parseOptions(finalText));
+    },
+    [onVariableAssistantReply, setCurrentMaintext, setCurrentOptions],
+  );
 
-  const handleSendMessage = useCallback(async (message: string): Promise<string> => {
-    messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    messageLogger.log('🚀 开始发送消息流程');
-    messageLogger.log('📝 用户输入:', message);
-    messageLogger.log('⏱️ 时间戳:', new Date().toISOString());
-    messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  const handleSendMessage = useCallback(
+    async (message: string): Promise<string> => {
+      messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      messageLogger.log('🚀 开始发送消息流程');
+      messageLogger.log('📝 用户输入:', message);
+      messageLogger.log('⏱️ 时间戳:', new Date().toISOString());
+      messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    setIsLoading(true);
-    showLoading('正在生成回复...');
-    messageLogger.log('🔄 isLoading 设置为 true');
-    beginDebugRound(message);
+      setIsLoading(true);
+      showLoading('正在生成回复...');
+      messageLogger.log('🔄 isLoading 设置为 true');
+      beginDebugRound(message);
 
-    let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
+      let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
 
-    try {
-      extraVariableUpdateReservation = await prepareExtraVariableUpdateTurn(summarySettings);
-      const beforeSendLastMessageId = getLatestMessageId();
-      onVariableTurnStart?.();
-
-      // ========== 步骤 1: 创建用户消息楼层 ==========
-      messageLogger.log('');
-      messageLogger.log('📌 [步骤 1] 创建用户消息楼层');
-      messageLogger.log('调用 createChatMessages() 参数:', {
-        role: 'user',
-        message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
-        options: { refresh: 'none' }
-      });
-
-      const createUserResult = await createChatMessages(
-        [
-          {
-            role: 'user',
-            message: message,
-          },
-        ],
-        {
-          refresh: 'none',
-        }
-      );
-      messageLogger.log('✅ [步骤 1] 用户消息楼层创建完成');
-      messageLogger.log('createChatMessages 返回值:', createUserResult);
-      messageLogger.log('返回值类型:', typeof createUserResult);
-
-      // ========== 步骤 2: 调用 generate() 触发 AI 生成 ==========
-      messageLogger.log('');
-      messageLogger.log('📌 [步骤 2] 同步待补全变量');
-      await flushPendingGameDataCompletion('before-generate');
-      messageLogger.log('✅ [步骤 2] 待补全变量同步完成');
-
-      messageLogger.log('📌 [步骤 2] 调用 generate() 触发 AI 生成');
-      messageLogger.log('generate 参数:', { should_stream: true });
-      messageLogger.log('⏳ 等待 AI 回复中...');
-
-      const generateStartTime = Date.now();
-      const combinedPromptCapture = captureNextCombinedPrompt(prompt => {
-        patchLatestDebugRound({ main: { combinedPrompt: prompt } });
-      });
-      let result: string | GenerateToolCallResult;
       try {
-        result = await generate({
-          should_stream: true,
-        });
-      } finally {
-        combinedPromptCapture?.stop();
-      }
-      const resultText = typeof result === 'string' ? result : result.content;
-      const generateEndTime = Date.now();
+        extraVariableUpdateReservation = await prepareExtraVariableUpdateTurn(summarySettings);
+        const beforeSendLastMessageId = getLatestMessageId();
+        onVariableTurnStart?.();
 
-      messageLogger.log('✅ [步骤 2] generate() 调用完成');
-      messageLogger.log('耗时:', generateEndTime - generateStartTime, 'ms');
-      messageLogger.log('返回值类型:', typeof result);
-      messageLogger.log('返回文本是否为空:', !resultText);
-      messageLogger.log('返回文本长度:', resultText ? resultText.length : 0);
-      messageLogger.log('返回文本前 500 字符:', resultText ? resultText.substring(0, 500) : '(null/undefined)');
-      if (resultText && resultText.length > 500) {
-        messageLogger.log('返回文本后 200 字符:', resultText.substring(resultText.length - 200));
-      }
-
-      if (resultText) {
-        // ========== 步骤 3: 解析 AI 回复 ==========
+        // ========== 步骤 1: 创建用户消息楼层 ==========
         messageLogger.log('');
-        messageLogger.log('📌 [步骤 3] 解析 AI 回复');
-
-        const maintext = resultText;
-        const options = parseOptions(resultText);
-        onVariableAssistantReply?.(resultText);
-
-        messageLogger.log('🔧 调试模式：直接显示 AI 完整回复');
-        messageLogger.log('parseMaintext 结果 (完整内容):');
-        messageLogger.log('  - 是否有内容:', !!maintext);
-        messageLogger.log('  - 长度:', maintext.length);
-        messageLogger.log('  - 前 300 字符:', maintext.substring(0, 300));
-        messageLogger.log('parseOptions 结果:');
-        messageLogger.log('  - 选项数量:', options.length);
-        messageLogger.log('  - 选项列表:', options);
-
-        // ========== 步骤 4: 创建 assistant 楼层 ==========
-        messageLogger.log('');
-        messageLogger.log('📌 [步骤 4] 创建 assistant 消息楼层');
+        messageLogger.log('📌 [步骤 1] 创建用户消息楼层');
         messageLogger.log('调用 createChatMessages() 参数:', {
-          role: 'assistant',
-          messageLength: result.length,
-          options: { refresh: 'none' }
+          role: 'user',
+          message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
+          options: { refresh: 'none' },
         });
 
-        const createAssistantResult = await createChatMessages(
+        const createUserResult = await createChatMessages(
           [
             {
-              role: 'assistant',
-              message: resultText,
+              role: 'user',
+              message: message,
             },
           ],
           {
             refresh: 'none',
-          }
-        );
-        messageLogger.log('✅ [步骤 4] assistant 消息楼层创建完成');
-        messageLogger.log('createChatMessages 返回值:', createAssistantResult);
-        const assistantMessage = getNewestMessageAfter(beforeSendLastMessageId, 'assistant');
-        onVariableAssistantReply?.(resultText, assistantMessage?.message_id);
-
-        // ========== 步骤 5: 手动刷新前端显示 ==========
-        messageLogger.log('');
-        messageLogger.log('📌 [步骤 5] 手动刷新前端显示');
-        messageLogger.log('当前 currentMaintext 长度:', currentMaintext.length);
-        messageLogger.log('当前 currentOptions:', currentOptions);
-        messageLogger.log('即将设置 maintext 长度:', maintext.length);
-        messageLogger.log('即将设置 options:', options);
-
-        setCurrentMaintext(maintext);
-        setCurrentOptions(options);
-
-        patchLatestDebugRound({
-          main: {
-            status: 'success',
-            output: resultText,
-            finishedAt: Date.now(),
           },
+        );
+        messageLogger.log('✅ [步骤 1] 用户消息楼层创建完成');
+        messageLogger.log('createChatMessages 返回值:', createUserResult);
+        messageLogger.log('返回值类型:', typeof createUserResult);
+
+        // ========== 步骤 2: 调用 generate() 触发 AI 生成 ==========
+        messageLogger.log('');
+        messageLogger.log('📌 [步骤 2] 同步待补全变量');
+        await flushPendingGameDataCompletion('before-generate');
+        messageLogger.log('✅ [步骤 2] 待补全变量同步完成');
+
+        messageLogger.log('📌 [步骤 2] 调用 generate() 触发 AI 生成');
+        messageLogger.log('generate 参数:', { should_stream: true });
+        messageLogger.log('⏳ 等待 AI 回复中...');
+
+        const generateStartTime = Date.now();
+        const combinedPromptCapture = captureNextCombinedPromptForDebug(prompt => {
+          patchLatestDebugRound({ main: { combinedPrompt: prompt } });
         });
-
-        if (summarySettings.variableUpdateMode === 'extra') {
-          if (!assistantMessage?.message_id) {
-            const errorMessage = '正文已生成，但没有找到可追加变量块的 assistant 楼层。';
-            patchLatestDebugRound({
-              variable: {
-                status: 'error',
-                error: errorMessage,
-                finishedAt: Date.now(),
-              },
-            });
-            showError(errorMessage);
-            return resultText;
-          }
-
-          showLoading('正在额外更新变量...');
-          patchLatestDebugRound({
-            variable: {
-              status: 'running',
-              startedAt: Date.now(),
-              error: '',
-            },
+        let result: string | GenerateToolCallResult;
+        try {
+          result = await generate({
+            should_stream: true,
           });
-          try {
-            const extraUpdateResult = await executeExtraVariableUpdate({
-              settings: summarySettings,
-              assistantMessageId: assistantMessage.message_id,
-              latestRawReply: resultText,
-              onPromptBuilt: prompt => {
-                patchLatestDebugRound({
-                  variable: {
-                    input: prompt,
-                    status: 'running',
-                  },
-                });
-              },
-              onProgress: progress => {
-                patchLatestDebugRound({
-                  variable: createExtraVariableProgressPatch(progress),
-                });
-              },
-            });
-            patchLatestDebugRound({
-              variable: {
-                status: 'success',
-                input: extraUpdateResult.prompt || '',
-                output: extraUpdateResult.rawResponse,
-                appendedBlocks: extraUpdateResult.appendedBlocks || '',
-                finalMessageText: extraUpdateResult.finalMessageText || '',
-                appendReadbackText: extraUpdateResult.appendReadbackText || '',
-                appendVerification: extraUpdateResult.appendVerification || '',
-                syncReadbackText: extraUpdateResult.syncReadbackText || '',
-                syncVerification: extraUpdateResult.syncVerification || '',
-                finishedAt: Date.now(),
-              },
-            });
-            if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
-              refreshAssistantStateFromFinalText(
-                extraUpdateResult.finalMessageText,
-                assistantMessage.message_id,
-              );
-            }
-          } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            messageLogger.error('额外变量更新失败:', error);
-            patchLatestDebugRound({
-              variable: {
-                status: 'error',
-                error: errorMessage,
-                finishedAt: Date.now(),
-              },
-            });
-            showError(`正文已生成，但额外变量更新失败：${errorMessage}`);
-            return resultText;
-          }
+        } finally {
+          combinedPromptCapture?.stop();
+        }
+        const resultText = typeof result === 'string' ? result : result.content;
+        const generateEndTime = Date.now();
+
+        messageLogger.log('✅ [步骤 2] generate() 调用完成');
+        messageLogger.log('耗时:', generateEndTime - generateStartTime, 'ms');
+        messageLogger.log('返回值类型:', typeof result);
+        messageLogger.log('返回文本是否为空:', !resultText);
+        messageLogger.log('返回文本长度:', resultText ? resultText.length : 0);
+        messageLogger.log('返回文本前 500 字符:', resultText ? resultText.substring(0, 500) : '(null/undefined)');
+        if (resultText && resultText.length > 500) {
+          messageLogger.log('返回文本后 200 字符:', resultText.substring(resultText.length - 200));
         }
 
-        messageLogger.log('✅ [步骤 5] 前端状态已更新');
-        messageLogger.log('注意: React 状态更新是异步的，新值将在下次渲染时生效');
+        if (resultText) {
+          // ========== 步骤 3: 解析 AI 回复 ==========
+          messageLogger.log('');
+          messageLogger.log('📌 [步骤 3] 解析 AI 回复');
 
-        dismissToast();
-        return resultText;
+          const maintext = resultText;
+          const options = parseOptions(resultText);
+          onVariableAssistantReply?.(resultText);
 
-      } else {
-        // ========== 错误处理: AI 回复为空 ==========
+          messageLogger.log('🔧 调试模式：直接显示 AI 完整回复');
+          messageLogger.log('parseMaintext 结果 (完整内容):');
+          messageLogger.log('  - 是否有内容:', !!maintext);
+          messageLogger.log('  - 长度:', maintext.length);
+          messageLogger.log('  - 前 300 字符:', maintext.substring(0, 300));
+          messageLogger.log('parseOptions 结果:');
+          messageLogger.log('  - 选项数量:', options.length);
+          messageLogger.log('  - 选项列表:', options);
+
+          // ========== 步骤 4: 创建 assistant 楼层 ==========
+          messageLogger.log('');
+          messageLogger.log('📌 [步骤 4] 创建 assistant 消息楼层');
+          messageLogger.log('调用 createChatMessages() 参数:', {
+            role: 'assistant',
+            messageLength: result.length,
+            options: { refresh: 'none' },
+          });
+
+          const createAssistantResult = await createChatMessages(
+            [
+              {
+                role: 'assistant',
+                message: resultText,
+              },
+            ],
+            {
+              refresh: 'none',
+            },
+          );
+          messageLogger.log('✅ [步骤 4] assistant 消息楼层创建完成');
+          messageLogger.log('createChatMessages 返回值:', createAssistantResult);
+          const assistantMessage = getNewestMessageAfter(beforeSendLastMessageId, 'assistant');
+          onVariableAssistantReply?.(resultText, assistantMessage?.message_id);
+
+          // ========== 步骤 5: 手动刷新前端显示 ==========
+          messageLogger.log('');
+          messageLogger.log('📌 [步骤 5] 手动刷新前端显示');
+          messageLogger.log('当前 currentMaintext 长度:', currentMaintext.length);
+          messageLogger.log('当前 currentOptions:', currentOptions);
+          messageLogger.log('即将设置 maintext 长度:', maintext.length);
+          messageLogger.log('即将设置 options:', options);
+
+          setCurrentMaintext(maintext);
+          setCurrentOptions(options);
+
+          patchLatestDebugRound({
+            main: {
+              status: 'success',
+              output: resultText,
+              finishedAt: Date.now(),
+            },
+          });
+
+          if (summarySettings.variableUpdateMode === 'extra') {
+            if (!assistantMessage?.message_id) {
+              const errorMessage = '正文已生成，但没有找到可追加变量块的 assistant 楼层。';
+              patchLatestDebugRound({
+                variable: {
+                  status: 'error',
+                  error: errorMessage,
+                  finishedAt: Date.now(),
+                },
+              });
+              showError(errorMessage);
+              return resultText;
+            }
+
+            showLoading('正在额外更新变量...');
+            patchLatestDebugRound({
+              variable: {
+                status: 'running',
+                startedAt: Date.now(),
+                error: '',
+              },
+            });
+            try {
+              const extraUpdateResult = await executeExtraVariableUpdate({
+                settings: summarySettings,
+                assistantMessageId: assistantMessage.message_id,
+                latestRawReply: resultText,
+                onPromptBuilt: prompt => {
+                  patchLatestDebugRound({
+                    variable: {
+                      input: prompt,
+                      status: 'running',
+                    },
+                  });
+                },
+                onProgress: progress => {
+                  patchLatestDebugRound({
+                    variable: createExtraVariableProgressPatch(progress),
+                  });
+                },
+              });
+              patchLatestDebugRound({
+                variable: {
+                  status: 'success',
+                  input: extraUpdateResult.prompt || '',
+                  output: extraUpdateResult.rawResponse,
+                  appendedBlocks: extraUpdateResult.appendedBlocks || '',
+                  finalMessageText: extraUpdateResult.finalMessageText || '',
+                  appendReadbackText: extraUpdateResult.appendReadbackText || '',
+                  appendVerification: extraUpdateResult.appendVerification || '',
+                  syncReadbackText: extraUpdateResult.syncReadbackText || '',
+                  syncVerification: extraUpdateResult.syncVerification || '',
+                  finishedAt: Date.now(),
+                },
+              });
+              if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
+                refreshAssistantStateFromFinalText(extraUpdateResult.finalMessageText, assistantMessage.message_id);
+              }
+            } catch (error) {
+              const errorMessage = getErrorMessage(error);
+              messageLogger.error('额外变量更新失败:', error);
+              patchLatestDebugRound({
+                variable: {
+                  status: 'error',
+                  error: errorMessage,
+                  finishedAt: Date.now(),
+                },
+              });
+              showError(`正文已生成，但额外变量更新失败：${errorMessage}`);
+              return resultText;
+            }
+          }
+
+          messageLogger.log('✅ [步骤 5] 前端状态已更新');
+          messageLogger.log('注意: React 状态更新是异步的，新值将在下次渲染时生效');
+
+          dismissToast();
+          return resultText;
+        } else {
+          // ========== 错误处理: AI 回复为空 ==========
+          messageLogger.log('');
+          messageLogger.warn('⚠️ [错误处理] AI 回复为空');
+          messageLogger.log('result 值:', result);
+          messageLogger.log('result 类型:', typeof result);
+
+          patchLatestDebugRound({
+            main: {
+              status: 'error',
+              error: `AI 回复为空。返回值: ${result === null ? 'null' : result === undefined ? 'undefined' : JSON.stringify(result)}；类型: ${typeof result}`,
+              finishedAt: Date.now(),
+            },
+          });
+
+          showError('生成失败：AI 回复为空，请重试');
+          messageLogger.log('已设置错误提示到前端');
+          return '';
+        }
+      } catch (error) {
+        // ========== 异常处理 ==========
         messageLogger.log('');
-        messageLogger.warn('⚠️ [错误处理] AI 回复为空');
-        messageLogger.log('result 值:', result);
-        messageLogger.log('result 类型:', typeof result);
+        messageLogger.error('❌ [异常处理] 发送消息过程中出错');
+        messageLogger.error('错误对象:', error);
+        messageLogger.log('错误类型:', typeof error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : '无堆栈信息';
+        messageLogger.error('错误信息:', errorMessage);
+        messageLogger.log('错误堆栈:', errorStack);
 
         patchLatestDebugRound({
           main: {
             status: 'error',
-            error: `AI 回复为空。返回值: ${result === null ? 'null' : result === undefined ? 'undefined' : JSON.stringify(result)}；类型: ${typeof result}`,
+            error: `${errorMessage}\n\n${errorStack}`,
             finishedAt: Date.now(),
           },
         });
 
-        showError('生成失败：AI 回复为空，请重试');
-        messageLogger.log('已设置错误提示到前端');
+        showError(`生成失败：${errorMessage}`);
         return '';
+      } finally {
+        extraVariableUpdateReservation?.release();
+        setIsLoading(false);
+        messageLogger.log('');
+        messageLogger.log('🏁 流程结束');
+        messageLogger.log('🔄 isLoading 设置为 false');
+        messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       }
-    } catch (error) {
-      // ========== 异常处理 ==========
-      messageLogger.log('');
-      messageLogger.error('❌ [异常处理] 发送消息过程中出错');
-      messageLogger.error('错误对象:', error);
-      messageLogger.log('错误类型:', typeof error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : '无堆栈信息';
-      messageLogger.error('错误信息:', errorMessage);
-      messageLogger.log('错误堆栈:', errorStack);
+    },
+    [
+      currentMaintext,
+      currentOptions,
+      beginDebugRound,
+      patchLatestDebugRound,
+      setIsLoading,
+      showLoading,
+      showError,
+      dismissToast,
+      setCurrentMaintext,
+      setCurrentOptions,
+      summarySettings,
+      onVariableTurnStart,
+      onVariableAssistantReply,
+      refreshAssistantStateFromFinalText,
+    ],
+  );
 
-      patchLatestDebugRound({
-        main: {
-          status: 'error',
-          error: `${errorMessage}\n\n${errorStack}`,
-          finishedAt: Date.now(),
-        },
-      });
+  const handleAutoAdvanceTurn = useCallback(
+    async (message: string): Promise<AutoAdvanceTurnResult> => {
+      const prompt = message.trim();
+      if (!prompt) {
+        throw new Error('自动推进指令不能为空。');
+      }
 
-      showError(`生成失败：${errorMessage}`);
-      return '';
-    } finally {
-      extraVariableUpdateReservation?.release();
-      setIsLoading(false);
-      messageLogger.log('');
-      messageLogger.log('🏁 流程结束');
-      messageLogger.log('🔄 isLoading 设置为 false');
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    }
-  }, [
-    currentMaintext,
-    currentOptions,
-    beginDebugRound,
-    patchLatestDebugRound,
-    setIsLoading,
-    showLoading,
-    showError,
-    dismissToast,
-    setCurrentMaintext,
-    setCurrentOptions,
-    summarySettings,
-    onVariableTurnStart,
-    onVariableAssistantReply,
-    refreshAssistantStateFromFinalText,
-  ]);
+      messageLogger.log('⏩ 开始自动推进手动回合');
+      messageLogger.log('📝 推进指令:', prompt);
 
-  const handleAutoAdvanceTurn = useCallback(async (message: string): Promise<AutoAdvanceTurnResult> => {
-    const prompt = message.trim();
-    if (!prompt) {
-      throw new Error('自动推进指令不能为空。');
-    }
-
-    messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    messageLogger.log('⏩ 开始自动推进手动回合');
-    messageLogger.log('📝 推进指令:', prompt);
-
-    let variableWriteObserved = false;
-    const writeDoneListener = eventOn('era:writeDone', () => {
-      variableWriteObserved = true;
-    });
-
-    try {
-      const beforeLastMessageId = getLatestMessageId();
-      const rawReply = await handleSendMessage(prompt);
-      if (!rawReply.trim()) {
-        throw new Error('本轮没有取得 AI 回复');
-      }
-
-      const userMessage = getNewestMessageAfter(beforeLastMessageId, 'user');
-      const assistantMessage = getNewestMessageAfter(beforeLastMessageId, 'assistant');
-      if (!userMessage || !assistantMessage) {
-        throw new Error('手动发送流程完成后，没有找到对应的新楼层记录。');
-      }
-
-      const recordedRawReply = getActiveMessageText(assistantMessage) || rawReply;
-      messageLogger.log('✅ 自动推进完整回合完成:', {
-        userMessageId: userMessage.message_id,
-        assistantMessageId: assistantMessage.message_id,
-        variableWriteObserved,
+      let variableWriteObserved = false;
+      const writeDoneListener = eventOn('era:writeDone', () => {
+        variableWriteObserved = true;
       });
 
-      return {
-        prompt,
-        userMessageId: userMessage.message_id,
-        assistantMessageId: assistantMessage.message_id,
-        plainText: createAutoAdvancePlainText(rawReply),
-        rawReply: recordedRawReply,
-        variableWriteObserved,
-      };
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      messageLogger.error('自动推进失败:', error);
-      patchLatestDebugRound({
-        main: {
-          status: 'error',
-          error: errorMessage,
-          finishedAt: Date.now(),
-        },
-      });
-      showError(`自动推进失败：${errorMessage}`);
-      throw error;
-    } finally {
-      writeDoneListener.stop();
-      messageLogger.log('🏁 自动推进流程结束');
-      messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    }
-  }, [
-    handleSendMessage,
-    patchLatestDebugRound,
-    showError,
-  ]);
+      try {
+        const beforeLastMessageId = getLatestMessageId();
+        const rawReply = await handleSendMessage(prompt);
+        if (!rawReply.trim()) {
+          throw new Error('本轮没有取得 AI 回复');
+        }
+
+        const userMessage = getNewestMessageAfter(beforeLastMessageId, 'user');
+        const assistantMessage = getNewestMessageAfter(beforeLastMessageId, 'assistant');
+        if (!userMessage || !assistantMessage) {
+          throw new Error('手动发送流程完成后，没有找到对应的新楼层记录。');
+        }
+
+        const recordedRawReply = getActiveMessageText(assistantMessage) || rawReply;
+        messageLogger.log('✅ 自动推进完整回合完成:', {
+          userMessageId: userMessage.message_id,
+          assistantMessageId: assistantMessage.message_id,
+          variableWriteObserved,
+        });
+
+        return {
+          prompt,
+          userMessageId: userMessage.message_id,
+          assistantMessageId: assistantMessage.message_id,
+          plainText: createAutoAdvancePlainText(rawReply),
+          rawReply: recordedRawReply,
+          variableWriteObserved,
+        };
+      } catch (error) {
+        const errorMessage = getErrorMessage(error);
+        messageLogger.error('自动推进失败:', error);
+        patchLatestDebugRound({
+          main: {
+            status: 'error',
+            error: errorMessage,
+            finishedAt: Date.now(),
+          },
+        });
+        showError(`自动推进失败：${errorMessage}`);
+        throw error;
+      } finally {
+        writeDoneListener.stop();
+        messageLogger.log('🏁 自动推进流程结束');
+        messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      }
+    },
+    [handleSendMessage, patchLatestDebugRound, showError],
+  );
 
   const handleRegenerateLastAssistant = useCallback(async (): Promise<void> => {
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -618,10 +590,7 @@ export function useMessageHandler({
           });
 
           if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
-            refreshAssistantStateFromFinalText(
-              extraUpdateResult.finalMessageText,
-              result.assistantMessageId,
-            );
+            refreshAssistantStateFromFinalText(extraUpdateResult.finalMessageText, result.assistantMessageId);
           } else {
             const latestContent = getLastMessageContent();
             if (latestContent) {

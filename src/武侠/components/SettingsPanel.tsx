@@ -23,12 +23,9 @@ import {
   importPresetTavernRegexes,
   scheduleRegexDebugDump,
   setPresetRegexRulesForPreset,
-  validateRegex
+  validateRegex,
 } from '../utils/settingsManager';
-import {
-  loadSummaryModelList,
-  validateSummaryApiConfig,
-} from '../utils/summaryApiClient';
+import { loadSummaryModelList, validateSummaryApiConfig } from '../utils/summaryApiClient';
 import { applyVariableUpdateModeWorldbookState } from '../utils/extraVariableUpdateManager';
 import {
   checkSummaryTrigger,
@@ -98,15 +95,66 @@ const SUMMARY_API_SOURCES = [
 const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
 const ROOT_VARIABLE_PATH_KEY = 'root';
 
-const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
+const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+const normalizeDebugText = (value: string | undefined): string => (value || '').trim();
+
+function buildMainInputDebugContent(debugRound: LatestDebugRound): string {
+  const sections = ['【用户输入】', debugRound.main.userInput || '(空)', ''];
+  const combinedPrompt = normalizeDebugText(debugRound.main.combinedPrompt);
+
+  sections.push('【合并提示词】');
+  sections.push(combinedPrompt || '(未捕获到合并提示词)');
+
+  if (debugRound.main.error) {
+    sections.push(`\n【错误】\n${debugRound.main.error}`);
+  }
+
+  return sections.filter(Boolean).join('\n');
+}
+
+function buildVariableOutputDebugContent(debugRound: LatestDebugRound): string {
+  const { variable } = debugRound;
+  const sections: string[] = [];
+  const rawResponse = normalizeDebugText(variable.output);
+  const appendedBlocks = normalizeDebugText(variable.appendedBlocks);
+  const appendReadbackText = normalizeDebugText(variable.appendReadbackText);
+  const syncReadbackText = normalizeDebugText(variable.syncReadbackText);
+  const finalMessageText = normalizeDebugText(variable.finalMessageText);
+  const isError = variable.status === 'error' || Boolean(variable.error);
+
+  if (rawResponse && rawResponse !== appendedBlocks) {
+    sections.push('【原始返回】', variable.output, '');
+  }
+
+  sections.push('【合法变量块】', variable.appendedBlocks || '(无)', '');
+  sections.push('【写入后回读验证】', variable.appendVerification || '(未验证)', '');
+  sections.push('【ERA 同步后回读验证】', variable.syncVerification || '(未同步或未回读)');
+
+  if (isError || (appendReadbackText && appendReadbackText !== syncReadbackText)) {
+    sections.push('', '【写入后回读文本】', variable.appendReadbackText || '(未回读)');
+  }
+
+  if (isError || (syncReadbackText && syncReadbackText !== finalMessageText)) {
+    sections.push('', '【ERA 同步后回读文本】', variable.syncReadbackText || '(未同步或未回读)');
+  }
+
+  if (isError && finalMessageText) {
+    sections.push('', '【最终楼层文本】', variable.finalMessageText);
+  }
+
+  if (variable.error) {
+    sections.push(`\n【错误】\n${variable.error}`);
+  }
+
+  return sections.filter(Boolean).join('\n');
+}
 
 const createEmptyApiProfileDraft = (): SummaryApiProfileDraft => ({
   name: '',
   apiConfig: { ...DEFAULT_SUMMARY_API_CONFIG },
 });
 
-const createApiProfileId = (): string =>
-  `summary-api-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+const createApiProfileId = (): string => `summary-api-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 const cloneApiProfileDraftFromProfile = (profile: SummaryApiProfile): SummaryApiProfileDraft => ({
   name: profile.name,
@@ -117,9 +165,7 @@ const apiSelectionToValue = (selection: SummaryApiSelection): string =>
   selection.type === 'profile' ? `profile:${selection.profileId}` : API_SELECTION_PRESET_VALUE;
 
 const valueToApiSelection = (value: string): SummaryApiSelection =>
-  value.startsWith('profile:')
-    ? { type: 'profile', profileId: value.slice('profile:'.length) }
-    : { type: 'preset' };
+  value.startsWith('profile:') ? { type: 'profile', profileId: value.slice('profile:'.length) } : { type: 'preset' };
 
 const getApiSelectionLabel = (selection: SummaryApiSelection, profiles: SummaryApiProfile[]): string => {
   if (selection.type === 'preset') {
@@ -131,8 +177,7 @@ const getApiSelectionLabel = (selection: SummaryApiSelection, profiles: SummaryA
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-const isHiddenVariableKey = (key: string | number): boolean =>
-  typeof key === 'string' && HIDDEN_VARIABLE_KEYS.has(key);
+const isHiddenVariableKey = (key: string | number): boolean => typeof key === 'string' && HIDDEN_VARIABLE_KEYS.has(key);
 
 const getVariablePathKey = (path: VariablePath): string =>
   path.length === 0 ? ROOT_VARIABLE_PATH_KEY : path.map(segment => String(segment)).join('\u001f');
@@ -168,9 +213,7 @@ const formatCopyPathSegment = (segment: string | number): string => {
     return `[${segment}]`;
   }
 
-  return /^[\p{L}_$][\p{L}\p{N}_$]*$/u.test(segment)
-    ? `.${segment}`
-    : `[${JSON.stringify(segment)}]`;
+  return /^[\p{L}_$][\p{L}\p{N}_$]*$/u.test(segment) ? `.${segment}` : `[${JSON.stringify(segment)}]`;
 };
 
 const getVariableCopyPath = (path: VariablePath): string =>
@@ -264,7 +307,10 @@ const getContainerPreview = (value: unknown): string => {
     return '空';
   }
 
-  const previewKeys = entries.slice(0, 4).map(([key]) => String(key)).join('、');
+  const previewKeys = entries
+    .slice(0, 4)
+    .map(([key]) => String(key))
+    .join('、');
   return entries.length > 4 ? `${previewKeys}...` : previewKeys;
 };
 
@@ -311,7 +357,7 @@ const matchesVariableSearch = (key: string | number, value: unknown, normalizedQ
 
   if (Array.isArray(value) || isRecord(value)) {
     return getVisibleEntries(value).some(([childKey, childValue]) =>
-      matchesVariableSearch(childKey, childValue, normalizedQuery)
+      matchesVariableSearch(childKey, childValue, normalizedQuery),
     );
   }
 
@@ -342,11 +388,12 @@ const setValueAtVariablePath = (
       return;
     }
 
-    const currentValue = Array.isArray(cursor) && typeof segment === 'number'
-      ? cursor[segment]
-      : !Array.isArray(cursor)
-        ? cursor[String(segment)]
-        : undefined;
+    const currentValue =
+      Array.isArray(cursor) && typeof segment === 'number'
+        ? cursor[segment]
+        : !Array.isArray(cursor)
+          ? cursor[String(segment)]
+          : undefined;
     const nextContainer = Array.isArray(currentValue)
       ? [...currentValue]
       : isRecord(currentValue)
@@ -411,10 +458,16 @@ const createAutoAdvanceExportText = (results: AutoAdvanceResult[], mode: 'plain'
       result.prompt,
       '',
       mode === 'plain' ? '[纯文本回复]' : '[完整回复]',
-      result.error ? `错误: ${result.error}` : mode === 'plain' ? result.plainText || '(空)' : result.rawReply || '(空)',
+      result.error
+        ? `错误: ${result.error}`
+        : mode === 'plain'
+          ? result.plainText || '(空)'
+          : result.rawReply || '(空)',
       '',
     ]),
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 };
 
 const downloadTextFile = (filename: string, content: string): void => {
@@ -524,9 +577,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [variableStatus, setVariableStatus] = useState<VariableStatus>('idle');
   const [variableStatusText, setVariableStatusText] = useState('');
   const [isVariablesDirty, setIsVariablesDirty] = useState(false);
-  const [expandedVariablePaths, setExpandedVariablePaths] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [expandedVariablePaths, setExpandedVariablePaths] = useState<Set<string>>(() => new Set());
   const [selectedVariablePath, setSelectedVariablePath] = useState<VariablePath | null>(null);
   const [isVariableDetailOpen, setIsVariableDetailOpen] = useState(false);
   const [variableSearch, setVariableSearch] = useState('');
@@ -544,9 +595,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const hasCurrentPreset = normalizedCurrentPresetName.length > 0;
   const currentPresetRegexRules = getCurrentPresetRegexRules(settings, normalizedCurrentPresetName);
   const visibleStatDataEntries = statData
-    ? getVisibleEntries(statData).filter(([key, value]) =>
-      matchesVariableSearch(key, value, normalizedVariableSearch)
-    )
+    ? getVisibleEntries(statData).filter(([key, value]) => matchesVariableSearch(key, value, normalizedVariableSearch))
     : [];
   const isAutoAdvanceRunning = autoAdvanceStatus === 'running' || autoAdvanceStatus === 'stopping';
   const autoAdvanceCompletedCount = autoAdvanceResults.filter(result => result.status === 'success').length;
@@ -558,10 +607,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const isEditingExistingApiProfile = Boolean(editingApiProfile);
   const isApiDraftCustomSource = apiProfileDraft.apiConfig.source === 'custom';
   const hasApiDraftContent = Boolean(
-    apiProfileDraft.name.trim()
-    || apiProfileDraft.apiConfig.apiurl.trim()
-    || apiProfileDraft.apiConfig.key.trim()
-    || apiProfileDraft.apiConfig.model.trim(),
+    apiProfileDraft.name.trim() ||
+    apiProfileDraft.apiConfig.apiurl.trim() ||
+    apiProfileDraft.apiConfig.key.trim() ||
+    apiProfileDraft.apiConfig.model.trim(),
   );
   const summaryApiValidationMessage = hasApiDraftContent
     ? validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true })
@@ -585,16 +634,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
     const fallbackProfile = settings.summarySettings.apiProfiles[0];
     setEditingApiProfileId(fallbackProfile?.id || null);
-    setApiProfileDraft(fallbackProfile ? cloneApiProfileDraftFromProfile(fallbackProfile) : createEmptyApiProfileDraft());
+    setApiProfileDraft(
+      fallbackProfile ? cloneApiProfileDraftFromProfile(fallbackProfile) : createEmptyApiProfileDraft(),
+    );
   }, [editingApiProfileId, settings.summarySettings.apiProfiles]);
 
   // 更新单个设置项
-  const updateSetting = useCallback(<K extends keyof DisplaySettings>(
-    key: K,
-    value: DisplaySettings[K]
-  ) => {
-    onSettingsChange({ ...settings, [key]: value });
-  }, [settings, onSettingsChange]);
+  const updateSetting = useCallback(
+    <K extends keyof DisplaySettings>(key: K, value: DisplaySettings[K]) => {
+      onSettingsChange({ ...settings, [key]: value });
+    },
+    [settings, onSettingsChange],
+  );
 
   const refreshStatData = useCallback(() => {
     try {
@@ -641,9 +692,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [statData]);
 
-  const selectedVariableValue = statData && selectedVariablePath
-    ? getValueAtVariablePath(statData, selectedVariablePath)
-    : undefined;
+  const selectedVariableValue =
+    statData && selectedVariablePath ? getValueAtVariablePath(statData, selectedVariablePath) : undefined;
 
   const handleVariableSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setVariableSearch(event.target.value);
@@ -672,7 +722,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, []);
 
   const handleVariableLeafChange = useCallback((path: VariablePath, nextValue: unknown) => {
-    setStatData(prev => prev ? setValueAtVariablePath(prev, path, nextValue) : prev);
+    setStatData(prev => (prev ? setValueAtVariablePath(prev, path, nextValue) : prev));
     setIsVariablesDirty(true);
     setVariableStatus('idle');
     setVariableStatusText('');
@@ -702,7 +752,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const updateAutoAdvanceResult = useCallback((id: string, updates: Partial<AutoAdvanceResult>) => {
     setAutoAdvanceResults(previousResults =>
-      previousResults.map(result => result.id === id ? { ...result, ...updates } : result)
+      previousResults.map(result => (result.id === id ? { ...result, ...updates } : result)),
     );
   }, []);
 
@@ -796,13 +846,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         : `推进完成，完成 ${completedCount}/${totalCount} 轮`,
     );
     autoAdvanceStopRequestedRef.current = false;
-  }, [
-    autoAdvanceCount,
-    autoAdvancePrompt,
-    isAutoAdvanceRunning,
-    onAutoAdvanceTurn,
-    updateAutoAdvanceResult,
-  ]);
+  }, [autoAdvanceCount, autoAdvancePrompt, isAutoAdvanceRunning, onAutoAdvanceTurn, updateAutoAdvanceResult]);
 
   const handleStopAutoAdvance = useCallback(() => {
     if (!isAutoAdvanceRunning) {
@@ -822,22 +866,31 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setExpandedAutoAdvanceResultId(null);
   }, []);
 
-  const handleCopyAutoAdvanceExport = useCallback(async (mode: 'plain' | 'full') => {
-    try {
-      await copyTextToClipboard(createAutoAdvanceExportText(autoAdvanceResults, mode));
-      setAutoAdvanceStatusText(mode === 'plain' ? '已复制纯文本推进记录' : '已复制完整回复推进记录');
-    } catch (error) {
-      setAutoAdvanceStatus('error');
-      setAutoAdvanceStatusText(`复制失败：${getErrorMessage(error)}`);
-    }
-  }, [autoAdvanceResults]);
+  const handleCopyAutoAdvanceExport = useCallback(
+    async (mode: 'plain' | 'full') => {
+      try {
+        await copyTextToClipboard(createAutoAdvanceExportText(autoAdvanceResults, mode));
+        setAutoAdvanceStatusText(mode === 'plain' ? '已复制纯文本推进记录' : '已复制完整回复推进记录');
+      } catch (error) {
+        setAutoAdvanceStatus('error');
+        setAutoAdvanceStatusText(`复制失败：${getErrorMessage(error)}`);
+      }
+    },
+    [autoAdvanceResults],
+  );
 
-  const handleDownloadAutoAdvanceExport = useCallback((mode: 'plain' | 'full') => {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const suffix = mode === 'plain' ? '纯文本' : '完整回复';
-    downloadTextFile(`武侠自动推进-${suffix}-${timestamp}.txt`, createAutoAdvanceExportText(autoAdvanceResults, mode));
-    setAutoAdvanceStatusText(mode === 'plain' ? '已下载纯文本推进记录' : '已下载完整回复推进记录');
-  }, [autoAdvanceResults]);
+  const handleDownloadAutoAdvanceExport = useCallback(
+    (mode: 'plain' | 'full') => {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const suffix = mode === 'plain' ? '纯文本' : '完整回复';
+      downloadTextFile(
+        `武侠自动推进-${suffix}-${timestamp}.txt`,
+        createAutoAdvanceExportText(autoAdvanceResults, mode),
+      );
+      setAutoAdvanceStatusText(mode === 'plain' ? '已下载纯文本推进记录' : '已下载完整回复推进记录');
+    },
+    [autoAdvanceResults],
+  );
 
   useEffect(() => {
     if (activeTab !== 'variables') {
@@ -928,30 +981,33 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [activeTab]);
 
   // 处理图片上传
-  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    // 检查文件类型
-    if (!file.type.startsWith('image/')) {
-      alert('请选择图片文件');
-      return;
-    }
+      // 检查文件类型
+      if (!file.type.startsWith('image/')) {
+        alert('请选择图片文件');
+        return;
+      }
 
-    // 检查文件大小 (最大 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('图片大小不能超过 5MB');
-      return;
-    }
+      // 检查文件大小 (最大 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('图片大小不能超过 5MB');
+        return;
+      }
 
-    try {
-      const base64 = await imageToBase64(file);
-      updateSetting('backgroundImage', base64);
-    } catch (error) {
-      uiLogger.error('图片上传失败:', error);
-      alert('图片上传失败');
-    }
-  }, [updateSetting]);
+      try {
+        const base64 = await imageToBase64(file);
+        updateSetting('backgroundImage', base64);
+      } catch (error) {
+        uiLogger.error('图片上传失败:', error);
+        alert('图片上传失败');
+      }
+    },
+    [updateSetting],
+  );
 
   // 清除背景图片
   const clearBackgroundImage = useCallback(() => {
@@ -961,13 +1017,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [updateSetting]);
 
-  const updateCurrentPresetRules = useCallback((rules: RegexRule[]) => {
-    if (!hasCurrentPreset) {
-      return;
-    }
+  const updateCurrentPresetRules = useCallback(
+    (rules: RegexRule[]) => {
+      if (!hasCurrentPreset) {
+        return;
+      }
 
-    onSettingsChange(setPresetRegexRulesForPreset(settings, normalizedCurrentPresetName, rules));
-  }, [hasCurrentPreset, normalizedCurrentPresetName, onSettingsChange, settings]);
+      onSettingsChange(setPresetRegexRulesForPreset(settings, normalizedCurrentPresetName, rules));
+    },
+    [hasCurrentPreset, normalizedCurrentPresetName, onSettingsChange, settings],
+  );
 
   // 添加全局正则规则
   const addLocalRegexRule = useCallback(() => {
@@ -976,66 +1035,83 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [settings.localRegexRules, updateSetting]);
 
   // 更新全局正则规则
-  const updateLocalRegexRule = useCallback((id: string, updates: Partial<RegexRule>) => {
-    const newRules = settings.localRegexRules.map(rule =>
-      rule.id === id ? { ...rule, ...updates } : rule
-    );
-    updateSetting('localRegexRules', newRules);
-  }, [settings.localRegexRules, updateSetting]);
+  const updateLocalRegexRule = useCallback(
+    (id: string, updates: Partial<RegexRule>) => {
+      const newRules = settings.localRegexRules.map(rule => (rule.id === id ? { ...rule, ...updates } : rule));
+      updateSetting('localRegexRules', newRules);
+    },
+    [settings.localRegexRules, updateSetting],
+  );
 
   // 删除全局正则规则
-  const deleteLocalRegexRule = useCallback((id: string) => {
-    const newRules = settings.localRegexRules.filter(rule => rule.id !== id);
-    updateSetting('localRegexRules', newRules);
-  }, [settings.localRegexRules, updateSetting]);
+  const deleteLocalRegexRule = useCallback(
+    (id: string) => {
+      const newRules = settings.localRegexRules.filter(rule => rule.id !== id);
+      updateSetting('localRegexRules', newRules);
+    },
+    [settings.localRegexRules, updateSetting],
+  );
 
   // 切换全局正则规则启用状态
-  const toggleLocalRegexRule = useCallback((id: string) => {
-    const rule = settings.localRegexRules.find(r => r.id === id);
-    if (rule) {
-      updateLocalRegexRule(id, { enabled: !rule.enabled });
-    }
-  }, [settings.localRegexRules, updateLocalRegexRule]);
-
-  const replaceImportedGlobalRegexRules = useCallback((rules: RegexRule[]) => {
-    const importablePresetRules = importPresetTavernRegexes();
-    const knownImportedSignatures = new Set(
-      [...rules, ...importablePresetRules].map(rule => getRegexRuleContentSignature(rule)),
-    );
-
-    const preservedLocalRules = settings.localRegexRules.filter(rule => {
-      if (rule.id === 'era-base-regex') {
-        return true;
+  const toggleLocalRegexRule = useCallback(
+    (id: string) => {
+      const rule = settings.localRegexRules.find(r => r.id === id);
+      if (rule) {
+        updateLocalRegexRule(id, { enabled: !rule.enabled });
       }
-      if (rule.originScope === 'global') {
-        return false;
-      }
-      return !knownImportedSignatures.has(getRegexRuleContentSignature(rule));
-    });
-    updateSetting('localRegexRules', [...preservedLocalRules, ...rules]);
-  }, [settings.localRegexRules, updateSetting]);
+    },
+    [settings.localRegexRules, updateLocalRegexRule],
+  );
+
+  const replaceImportedGlobalRegexRules = useCallback(
+    (rules: RegexRule[]) => {
+      const importablePresetRules = importPresetTavernRegexes();
+      const knownImportedSignatures = new Set(
+        [...rules, ...importablePresetRules].map(rule => getRegexRuleContentSignature(rule)),
+      );
+
+      const preservedLocalRules = settings.localRegexRules.filter(rule => {
+        if (rule.id === 'era-base-regex') {
+          return true;
+        }
+        if (rule.originScope === 'global') {
+          return false;
+        }
+        return !knownImportedSignatures.has(getRegexRuleContentSignature(rule));
+      });
+      updateSetting('localRegexRules', [...preservedLocalRules, ...rules]);
+    },
+    [settings.localRegexRules, updateSetting],
+  );
 
   // 更新当前预设正则规则
-  const updatePresetRegexRule = useCallback((id: string, updates: Partial<RegexRule>) => {
-    const newRules = currentPresetRegexRules.map(rule =>
-      rule.id === id ? { ...rule, ...updates } : rule
-    );
-    updateCurrentPresetRules(newRules);
-  }, [currentPresetRegexRules, updateCurrentPresetRules]);
+  const updatePresetRegexRule = useCallback(
+    (id: string, updates: Partial<RegexRule>) => {
+      const newRules = currentPresetRegexRules.map(rule => (rule.id === id ? { ...rule, ...updates } : rule));
+      updateCurrentPresetRules(newRules);
+    },
+    [currentPresetRegexRules, updateCurrentPresetRules],
+  );
 
   // 删除当前预设正则规则
-  const deletePresetRegexRule = useCallback((id: string) => {
-    const newRules = currentPresetRegexRules.filter(rule => rule.id !== id);
-    updateCurrentPresetRules(newRules);
-  }, [currentPresetRegexRules, updateCurrentPresetRules]);
+  const deletePresetRegexRule = useCallback(
+    (id: string) => {
+      const newRules = currentPresetRegexRules.filter(rule => rule.id !== id);
+      updateCurrentPresetRules(newRules);
+    },
+    [currentPresetRegexRules, updateCurrentPresetRules],
+  );
 
   // 切换当前预设正则规则启用状态
-  const togglePresetRegexRule = useCallback((id: string) => {
-    const rule = currentPresetRegexRules.find(r => r.id === id);
-    if (rule) {
-      updatePresetRegexRule(id, { enabled: !rule.enabled });
-    }
-  }, [currentPresetRegexRules, updatePresetRegexRule]);
+  const togglePresetRegexRule = useCallback(
+    (id: string) => {
+      const rule = currentPresetRegexRules.find(r => r.id === id);
+      if (rule) {
+        updatePresetRegexRule(id, { enabled: !rule.enabled });
+      }
+    },
+    [currentPresetRegexRules, updatePresetRegexRule],
+  );
 
   // 导入全局酒馆正则
   const handleImportGlobalTavernRegexes = useCallback(() => {
@@ -1044,7 +1120,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     replaceImportedGlobalRegexRules(importedRules);
     scheduleRegexDebugDump('点击覆盖导入全局正则（导入后）');
     if (importedRules.length === 0) {
-      alert('没有找到符合条件的全局酒馆正则，已清理此前导入的全局规则\n\n筛选条件：\n• 作用域：全局\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 有作用于格式显示');
+      alert(
+        '没有找到符合条件的全局酒馆正则，已清理此前导入的全局规则\n\n筛选条件：\n• 作用域：全局\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 有作用于格式显示',
+      );
       return;
     }
 
@@ -1061,7 +1139,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     logRegexDebugSnapshot(settings, normalizedCurrentPresetName, '点击覆盖导入当前预设规则（导入前）');
     const importedRules = importPresetTavernRegexes();
     if (importedRules.length === 0) {
-      alert('没有找到符合条件的当前预设酒馆正则\n\n筛选条件：\n• 作用域：当前预设\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 有作用于格式显示');
+      alert(
+        '没有找到符合条件的当前预设酒馆正则\n\n筛选条件：\n• 作用域：当前预设\n• 已启用\n• 无最小深度\n• 作用于 AI 输出\n• 有作用于格式显示',
+      );
       return;
     }
 
@@ -1075,53 +1155,56 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // =========================================
 
   // 更新总结设置
-  const updateSummarySetting = useCallback(<K extends keyof SummarySettings>(
-    key: K,
-    value: SummarySettings[K]
-  ) => {
-    if (key === 'stream') {
-      setSummaryModelStatus('');
-    }
-    onSettingsChange({
-      ...settings,
-      summarySettings: {
-        ...settings.summarySettings,
-        [key]: value,
-      },
-    });
-  }, [settings, onSettingsChange]);
-
-  const updateApiProfileDraft = useCallback(<K extends keyof SummaryApiProfileDraft>(
-    key: K,
-    value: SummaryApiProfileDraft[K],
-  ) => {
-    setSummaryModelStatus('');
-    setApiProfileDraft(previous => ({
-      ...previous,
-      [key]: value,
-    }));
-  }, []);
-
-  const updateApiProfileDraftConfig = useCallback(<K extends keyof SummaryApiConfig>(
-    key: K,
-    value: SummaryApiConfig[K]
-  ) => {
-    setSummaryModelStatus('');
-    setApiProfileDraft(previous => ({
-      ...previous,
-      apiConfig: {
-        ...previous.apiConfig,
+  const updateSummarySetting = useCallback(
+    <K extends keyof SummarySettings>(key: K, value: SummarySettings[K]) => {
+      if (key === 'stream') {
+        setSummaryModelStatus('');
+      }
+      onSettingsChange({
+        ...settings,
+        summarySettings: {
+          ...settings.summarySettings,
           [key]: value,
-      },
-    }));
-  }, []);
+        },
+      });
+    },
+    [settings, onSettingsChange],
+  );
 
-  const handleSelectApiProfile = useCallback((profileId: string) => {
-    const profile = settings.summarySettings.apiProfiles.find(item => item.id === profileId) || null;
-    setEditingApiProfileId(profile?.id || null);
-    setApiProfileDraft(profile ? cloneApiProfileDraftFromProfile(profile) : createEmptyApiProfileDraft());
-    setSummaryModelStatus('');
-  }, [settings.summarySettings.apiProfiles]);
+  const updateApiProfileDraft = useCallback(
+    <K extends keyof SummaryApiProfileDraft>(key: K, value: SummaryApiProfileDraft[K]) => {
+      setSummaryModelStatus('');
+      setApiProfileDraft(previous => ({
+        ...previous,
+        [key]: value,
+      }));
+    },
+    [],
+  );
+
+  const updateApiProfileDraftConfig = useCallback(
+    <K extends keyof SummaryApiConfig>(key: K, value: SummaryApiConfig[K]) => {
+      setSummaryModelStatus('');
+      setApiProfileDraft(previous => ({
+        ...previous,
+        apiConfig: {
+          ...previous.apiConfig,
+          [key]: value,
+        },
+      }));
+    },
+    [],
+  );
+
+  const handleSelectApiProfile = useCallback(
+    (profileId: string) => {
+      const profile = settings.summarySettings.apiProfiles.find(item => item.id === profileId) || null;
+      setEditingApiProfileId(profile?.id || null);
+      setApiProfileDraft(profile ? cloneApiProfileDraftFromProfile(profile) : createEmptyApiProfileDraft());
+      setSummaryModelStatus('');
+    },
+    [settings.summarySettings.apiProfiles],
+  );
 
   const handleNewApiProfile = useCallback(() => {
     setEditingApiProfileId(null);
@@ -1130,19 +1213,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setSummaryModelStatus('正在创建新的 API 配置草稿。');
   }, []);
 
-  const buildApiProfileFromDraft = useCallback((profileId?: string): SummaryApiProfile => {
-    const now = Date.now();
-    const existingProfile = profileId
-      ? settings.summarySettings.apiProfiles.find(profile => profile.id === profileId)
-      : null;
-    return {
-      id: profileId || createApiProfileId(),
-      name: apiProfileDraft.name.trim() || '未命名 API',
-      apiConfig: { ...apiProfileDraft.apiConfig },
-      createdAt: existingProfile?.createdAt || now,
-      updatedAt: now,
-    };
-  }, [apiProfileDraft, settings.summarySettings.apiProfiles]);
+  const buildApiProfileFromDraft = useCallback(
+    (profileId?: string): SummaryApiProfile => {
+      const now = Date.now();
+      const existingProfile = profileId
+        ? settings.summarySettings.apiProfiles.find(profile => profile.id === profileId)
+        : null;
+      return {
+        id: profileId || createApiProfileId(),
+        name: apiProfileDraft.name.trim() || '未命名 API',
+        apiConfig: { ...apiProfileDraft.apiConfig },
+        createdAt: existingProfile?.createdAt || now,
+        updatedAt: now,
+      };
+    },
+    [apiProfileDraft, settings.summarySettings.apiProfiles],
+  );
 
   const handleSaveApiProfile = useCallback(() => {
     const validationMessage = validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true });
@@ -1154,8 +1240,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     const savedProfile = buildApiProfileFromDraft(editingApiProfileId || undefined);
     const nextProfiles = editingApiProfileId
       ? settings.summarySettings.apiProfiles.map(profile =>
-        profile.id === editingApiProfileId ? savedProfile : profile,
-      )
+          profile.id === editingApiProfileId ? savedProfile : profile,
+        )
       : [...settings.summarySettings.apiProfiles, savedProfile];
 
     onSettingsChange({
@@ -1168,13 +1254,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setEditingApiProfileId(savedProfile.id);
     setApiProfileDraft(cloneApiProfileDraftFromProfile(savedProfile));
     setSummaryModelStatus('API 配置已保存。');
-  }, [
-    apiProfileDraft,
-    buildApiProfileFromDraft,
-    editingApiProfileId,
-    onSettingsChange,
-    settings,
-  ]);
+  }, [apiProfileDraft, buildApiProfileFromDraft, editingApiProfileId, onSettingsChange, settings]);
 
   const handleDuplicateApiProfile = useCallback(() => {
     const validationMessage = validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true });
@@ -1218,13 +1298,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     const nextProfiles = settings.summarySettings.apiProfiles.filter(item => item.id !== editingApiProfileId);
     const fallbackSelection: SummaryApiSelection = { type: 'preset' };
     const nextSummaryApiSelection =
-      settings.summarySettings.summaryApiSelection.type === 'profile'
-      && settings.summarySettings.summaryApiSelection.profileId === editingApiProfileId
+      settings.summarySettings.summaryApiSelection.type === 'profile' &&
+      settings.summarySettings.summaryApiSelection.profileId === editingApiProfileId
         ? fallbackSelection
         : settings.summarySettings.summaryApiSelection;
     const nextVariableApiSelection =
-      settings.summarySettings.variableApiSelection.type === 'profile'
-      && settings.summarySettings.variableApiSelection.profileId === editingApiProfileId
+      settings.summarySettings.variableApiSelection.type === 'profile' &&
+      settings.summarySettings.variableApiSelection.profileId === editingApiProfileId
         ? fallbackSelection
         : settings.summarySettings.variableApiSelection;
     onSettingsChange({
@@ -1238,47 +1318,48 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
     const fallbackProfile = nextProfiles[0];
     setEditingApiProfileId(fallbackProfile?.id || null);
-    setApiProfileDraft(fallbackProfile ? cloneApiProfileDraftFromProfile(fallbackProfile) : createEmptyApiProfileDraft());
+    setApiProfileDraft(
+      fallbackProfile ? cloneApiProfileDraftFromProfile(fallbackProfile) : createEmptyApiProfileDraft(),
+    );
     setSummaryModelOptions([]);
     setSummaryModelStatus('API 配置已删除。');
   }, [editingApiProfileId, onSettingsChange, settings]);
 
-  const updateApiSelection = useCallback((
-    target: 'summary' | 'variable',
-    selection: SummaryApiSelection,
-  ) => {
-    onSettingsChange({
-      ...settings,
-      summarySettings: {
-        ...settings.summarySettings,
-        [target === 'summary' ? 'summaryApiSelection' : 'variableApiSelection']: selection,
-      },
-    });
-  }, [onSettingsChange, settings]);
+  const updateApiSelection = useCallback(
+    (target: 'summary' | 'variable', selection: SummaryApiSelection) => {
+      onSettingsChange({
+        ...settings,
+        summarySettings: {
+          ...settings.summarySettings,
+          [target === 'summary' ? 'summaryApiSelection' : 'variableApiSelection']: selection,
+        },
+      });
+    },
+    [onSettingsChange, settings],
+  );
 
-  const updateVariableUpdateMode = useCallback(async (mode: SummaryVariableUpdateMode) => {
-    if (settings.summarySettings.variableUpdateMode === mode || isSummaryVariableModeUpdating) {
-      return;
-    }
+  const updateVariableUpdateMode = useCallback(
+    async (mode: SummaryVariableUpdateMode) => {
+      if (settings.summarySettings.variableUpdateMode === mode || isSummaryVariableModeUpdating) {
+        return;
+      }
 
-    setIsSummaryVariableModeUpdating(true);
-    setSummaryVariableModeStatus(mode === 'extra' ? '正在禁用变量指导条目...' : '正在恢复变量指导条目...');
+      setIsSummaryVariableModeUpdating(true);
+      setSummaryVariableModeStatus(mode === 'extra' ? '正在禁用变量指导条目...' : '正在恢复变量指导条目...');
 
-    try {
-      const status = await applyVariableUpdateModeWorldbookState(mode);
-      updateSummarySetting('variableUpdateMode', mode);
-      setSummaryVariableModeStatus(status);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setSummaryVariableModeStatus(`切换失败：${message}`);
-    } finally {
-      setIsSummaryVariableModeUpdating(false);
-    }
-  }, [
-    isSummaryVariableModeUpdating,
-    settings.summarySettings.variableUpdateMode,
-    updateSummarySetting,
-  ]);
+      try {
+        const status = await applyVariableUpdateModeWorldbookState(mode);
+        updateSummarySetting('variableUpdateMode', mode);
+        setSummaryVariableModeStatus(status);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setSummaryVariableModeStatus(`切换失败：${message}`);
+      } finally {
+        setIsSummaryVariableModeUpdating(false);
+      }
+    },
+    [isSummaryVariableModeUpdating, settings.summarySettings.variableUpdateMode, updateSummarySetting],
+  );
 
   const handleLoadSummaryModels = useCallback(async () => {
     setIsSummaryModelLoading(true);
@@ -1297,21 +1378,21 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [apiProfileDraft.apiConfig]);
 
   // 更新阈值
-  const updateThreshold = useCallback(<K extends keyof SummaryThresholds>(
-    key: K,
-    value: SummaryThresholds[K]
-  ) => {
-    onSettingsChange({
-      ...settings,
-      summarySettings: {
-        ...settings.summarySettings,
-        thresholds: {
-          ...settings.summarySettings.thresholds,
-          [key]: value,
+  const updateThreshold = useCallback(
+    <K extends keyof SummaryThresholds>(key: K, value: SummaryThresholds[K]) => {
+      onSettingsChange({
+        ...settings,
+        summarySettings: {
+          ...settings.summarySettings,
+          thresholds: {
+            ...settings.summarySettings.thresholds,
+            [key]: value,
+          },
         },
-      },
-    });
-  }, [settings, onSettingsChange]);
+      });
+    },
+    [settings, onSettingsChange],
+  );
 
   // 检测总结状态
   const handleCheckSummaryStatus = useCallback(() => {
@@ -1363,79 +1444,54 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [settings.summarySettings]);
 
   const shouldShowVariableDebug = Boolean(
-    latestDebugRound
-    && (
-      latestDebugRound.variable.status !== 'idle'
-      || latestDebugRound.variable.input
-      || latestDebugRound.variable.output
-      || latestDebugRound.variable.appendedBlocks
-      || latestDebugRound.variable.finalMessageText
-      || latestDebugRound.variable.appendReadbackText
-      || latestDebugRound.variable.appendVerification
-      || latestDebugRound.variable.syncReadbackText
-      || latestDebugRound.variable.syncVerification
-      || latestDebugRound.variable.error
-    ),
+    latestDebugRound &&
+    (latestDebugRound.variable.status !== 'idle' ||
+      latestDebugRound.variable.input ||
+      latestDebugRound.variable.output ||
+      latestDebugRound.variable.appendedBlocks ||
+      latestDebugRound.variable.finalMessageText ||
+      latestDebugRound.variable.appendReadbackText ||
+      latestDebugRound.variable.appendVerification ||
+      latestDebugRound.variable.syncReadbackText ||
+      latestDebugRound.variable.syncVerification ||
+      latestDebugRound.variable.error),
   );
   const debugSections = latestDebugRound
     ? [
-      {
-        id: 'main-input',
-        title: '正文输入',
-        status: latestDebugRound.main.status,
-        content: [
-          '【用户输入】',
-          latestDebugRound.main.userInput || '(空)',
-          '',
-          '【合并提示词】',
-          latestDebugRound.main.combinedPrompt || latestDebugRound.main.userInput || '(未捕获，显示用户输入)',
-          latestDebugRound.main.error ? `\n【错误】\n${latestDebugRound.main.error}` : '',
-        ].filter(Boolean).join('\n'),
-      },
-      {
-        id: 'main-output',
-        title: '正文输出',
-        status: latestDebugRound.main.status,
-        content: [
-          latestDebugRound.main.output || '(暂无正文输出)',
-          latestDebugRound.main.error ? `\n【错误】\n${latestDebugRound.main.error}` : '',
-        ].filter(Boolean).join('\n'),
-      },
-      ...(shouldShowVariableDebug ? [{
-        id: 'variable-input',
-        title: '额外变量输入',
-        status: latestDebugRound.variable.status,
-        content: latestDebugRound.variable.input || '(本轮未进行额外变量更新)',
-      },
-      {
-        id: 'variable-output',
-        title: '额外变量输出',
-        status: latestDebugRound.variable.status,
-        content: [
-          '【原始返回】',
-          latestDebugRound.variable.output || '(无)',
-          '',
-          '【合法变量块】',
-          latestDebugRound.variable.appendedBlocks || '(无)',
-          '',
-          '【写入后回读验证】',
-          latestDebugRound.variable.appendVerification || '(未验证)',
-          '',
-          '【写入后回读文本】',
-          latestDebugRound.variable.appendReadbackText || '(未回读)',
-          '',
-          '【ERA 同步后回读验证】',
-          latestDebugRound.variable.syncVerification || '(未同步或未回读)',
-          '',
-          '【ERA 同步后回读文本】',
-          latestDebugRound.variable.syncReadbackText || '(未同步或未回读)',
-          '',
-          '【最终楼层文本】',
-          latestDebugRound.variable.finalMessageText || '(未追加)',
-          latestDebugRound.variable.error ? `\n【错误】\n${latestDebugRound.variable.error}` : '',
-        ].filter(Boolean).join('\n'),
-      }] : []),
-    ]
+        {
+          id: 'main-input',
+          title: '正文输入',
+          status: latestDebugRound.main.status,
+          content: buildMainInputDebugContent(latestDebugRound),
+        },
+        {
+          id: 'main-output',
+          title: '正文输出',
+          status: latestDebugRound.main.status,
+          content: [
+            latestDebugRound.main.output || '(暂无正文输出)',
+            latestDebugRound.main.error ? `\n【错误】\n${latestDebugRound.main.error}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        },
+        ...(shouldShowVariableDebug
+          ? [
+              {
+                id: 'variable-input',
+                title: '额外变量输入',
+                status: latestDebugRound.variable.status,
+                content: latestDebugRound.variable.input || '(本轮未进行额外变量更新)',
+              },
+              {
+                id: 'variable-output',
+                title: '额外变量输出',
+                status: latestDebugRound.variable.status,
+                content: buildVariableOutputDebugContent(latestDebugRound),
+              },
+            ]
+          : []),
+      ]
     : [];
 
   return (
@@ -1449,42 +1505,54 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             onClick={() => setActiveTab('appearance')}
           >
             <Icons.Character size={16} />
-            <span className="settings-tab-label" data-short-label="外观">外观</span>
+            <span className="settings-tab-label" data-short-label="外观">
+              外观
+            </span>
           </button>
           <button
             className={`settings-tab ${activeTab === 'regex' ? 'active' : ''}`}
             onClick={() => setActiveTab('regex')}
           >
             <Icons.Scroll size={16} />
-            <span className="settings-tab-label" data-short-label="正则">正则替换</span>
+            <span className="settings-tab-label" data-short-label="正则">
+              正则替换
+            </span>
           </button>
           <button
             className={`settings-tab ${activeTab === 'summary' ? 'active' : ''}`}
             onClick={() => setActiveTab('summary')}
           >
             <Icons.Scroll size={16} />
-            <span className="settings-tab-label" data-short-label="模型">额外模型</span>
+            <span className="settings-tab-label" data-short-label="模型">
+              额外模型
+            </span>
           </button>
           <button
             className={`settings-tab ${activeTab === 'variables' ? 'active' : ''}`}
             onClick={() => setActiveTab('variables')}
           >
             <Icons.Variables size={16} />
-            <span className="settings-tab-label" data-short-label="变量">变量</span>
+            <span className="settings-tab-label" data-short-label="变量">
+              变量
+            </span>
           </button>
           <button
             className={`settings-tab ${activeTab === 'advance' ? 'active' : ''}`}
             onClick={() => setActiveTab('advance')}
           >
             <Icons.Send size={16} />
-            <span className="settings-tab-label" data-short-label="推进">自动推进</span>
+            <span className="settings-tab-label" data-short-label="推进">
+              自动推进
+            </span>
           </button>
           <button
             className={`settings-tab ${activeTab === 'debug' ? 'active' : ''}`}
             onClick={() => setActiveTab('debug')}
           >
             <Icons.Debug size={16} />
-            <span className="settings-tab-label" data-short-label="调试">调试</span>
+            <span className="settings-tab-label" data-short-label="调试">
+              调试
+            </span>
           </button>
         </div>
 
@@ -1507,7 +1575,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       max="24"
                       step="1"
                       value={settings.fontSize}
-                      onChange={(e) => updateSetting('fontSize', parseInt(e.target.value))}
+                      onChange={e => updateSetting('fontSize', parseInt(e.target.value))}
                       className="settings-slider"
                     />
                     <span className="settings-value">{settings.fontSize}px</span>
@@ -1520,13 +1588,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <input
                       type="color"
                       value={settings.fontColor}
-                      onChange={(e) => updateSetting('fontColor', e.target.value)}
+                      onChange={e => updateSetting('fontColor', e.target.value)}
                       className="settings-color-picker"
                     />
                     <input
                       type="text"
                       value={settings.fontColor}
-                      onChange={(e) => updateSetting('fontColor', e.target.value)}
+                      onChange={e => updateSetting('fontColor', e.target.value)}
                       className="settings-color-input"
                       placeholder="#RRGGBB"
                     />
@@ -1542,7 +1610,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       max="2.5"
                       step="0.1"
                       value={settings.lineHeight}
-                      onChange={(e) => updateSetting('lineHeight', parseFloat(e.target.value))}
+                      onChange={e => updateSetting('lineHeight', parseFloat(e.target.value))}
                       className="settings-slider"
                     />
                     <span className="settings-value">{settings.lineHeight.toFixed(1)}</span>
@@ -1562,8 +1630,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         .padStart(2, '0')}`,
                     }}
                   >
-                    江湖路远，刀光剑影，恩怨情仇，尽在一念之间。
-                    少侠且行且珍重，莫让红尘染白衣。
+                    江湖路远，刀光剑影，恩怨情仇，尽在一念之间。 少侠且行且珍重，莫让红尘染白衣。
                   </div>
                 </div>
               </SettingsCollapsibleBlock>
@@ -1580,13 +1647,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <input
                       type="color"
                       value={settings.backgroundColor}
-                      onChange={(e) => updateSetting('backgroundColor', e.target.value)}
+                      onChange={e => updateSetting('backgroundColor', e.target.value)}
                       className="settings-color-picker"
                     />
                     <input
                       type="text"
                       value={settings.backgroundColor}
-                      onChange={(e) => updateSetting('backgroundColor', e.target.value)}
+                      onChange={e => updateSetting('backgroundColor', e.target.value)}
                       className="settings-color-input"
                       placeholder="#RRGGBB"
                     />
@@ -1602,7 +1669,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       max="1"
                       step="0.05"
                       value={settings.backgroundOpacity}
-                      onChange={(e) => updateSetting('backgroundOpacity', parseFloat(e.target.value))}
+                      onChange={e => updateSetting('backgroundOpacity', parseFloat(e.target.value))}
                       className="settings-slider"
                     />
                     <span className="settings-value">{Math.round(settings.backgroundOpacity * 100)}%</span>
@@ -1618,7 +1685,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       max="20"
                       step="1"
                       value={settings.backgroundBlur}
-                      onChange={(e) => updateSetting('backgroundBlur', parseInt(e.target.value))}
+                      onChange={e => updateSetting('backgroundBlur', parseInt(e.target.value))}
                       className="settings-slider"
                     />
                     <span className="settings-value">{settings.backgroundBlur}px</span>
@@ -1641,10 +1708,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       <span>选择图片</span>
                     </label>
                     {settings.backgroundImage && (
-                      <button
-                        className="settings-clear-btn"
-                        onClick={clearBackgroundImage}
-                      >
+                      <button className="settings-clear-btn" onClick={clearBackgroundImage}>
                         <Icons.Close size={14} />
                         <span>清除</span>
                       </button>
@@ -1665,9 +1729,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 正则替换设置 */}
         {activeTab === 'regex' && (
           <div className="settings-section">
-            <p className="settings-description">
-              正文显示时按固定顺序执行：ERA 基础规则、当前预设规则、其它全局规则。
-            </p>
+            <p className="settings-description">正文显示时按固定顺序执行：ERA 基础规则、当前预设规则、其它全局规则。</p>
 
             <div className="regex-scope-section">
               <div className="regex-section-header">
@@ -1689,7 +1751,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       key={rule.id}
                       rule={rule}
                       index={index}
-                      onUpdate={(updates) => updateLocalRegexRule(rule.id, updates)}
+                      onUpdate={updates => updateLocalRegexRule(rule.id, updates)}
                       onDelete={() => deleteLocalRegexRule(rule.id)}
                       onToggle={() => toggleLocalRegexRule(rule.id)}
                     />
@@ -1719,9 +1781,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       : '未检测到当前预设，仅可查看和编辑全局共享规则。'}
                   </p>
                 </div>
-                {hasCurrentPreset && (
-                  <span className="regex-section-meta">{normalizedCurrentPresetName}</span>
-                )}
+                {hasCurrentPreset && <span className="regex-section-meta">{normalizedCurrentPresetName}</span>}
               </div>
 
               <div className="regex-rules-list">
@@ -1736,7 +1796,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       key={rule.id}
                       rule={rule}
                       index={index}
-                      onUpdate={(updates) => updatePresetRegexRule(rule.id, updates)}
+                      onUpdate={updates => updatePresetRegexRule(rule.id, updates)}
                       onDelete={() => deletePresetRegexRule(rule.id)}
                       onToggle={() => togglePresetRegexRule(rule.id)}
                     />
@@ -1774,7 +1834,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="summary-api-profile-toolbar">
                 <select
                   value={editingApiProfileId || ''}
-                  onChange={(e) => handleSelectApiProfile(e.target.value)}
+                  onChange={e => handleSelectApiProfile(e.target.value)}
                   className="settings-select summary-api-profile-select"
                 >
                   <option value="">新 API 草稿</option>
@@ -1797,7 +1857,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <input
                       type="text"
                       value={apiProfileDraft.name}
-                      onChange={(e) => updateApiProfileDraft('name', e.target.value)}
+                      onChange={e => updateApiProfileDraft('name', e.target.value)}
                       placeholder="例如：总结用 GPT / 变量用 DeepSeek"
                       className="settings-text-input"
                     />
@@ -1809,11 +1869,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <div className="settings-control">
                     <select
                       value={apiProfileDraft.apiConfig.source}
-                      onChange={(e) => updateApiProfileDraftConfig('source', e.target.value)}
+                      onChange={e => updateApiProfileDraftConfig('source', e.target.value)}
                       className="settings-select"
                     >
                       {SUMMARY_API_SOURCES.map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -1826,7 +1888,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       <input
                         type="text"
                         value={apiProfileDraft.apiConfig.apiurl}
-                        onChange={(e) => updateApiProfileDraftConfig('apiurl', e.target.value)}
+                        onChange={e => updateApiProfileDraftConfig('apiurl', e.target.value)}
                         placeholder="https://api.example.com/v1"
                         className="settings-text-input"
                       />
@@ -1840,7 +1902,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <input
                       type="password"
                       value={apiProfileDraft.apiConfig.key}
-                      onChange={(e) => updateApiProfileDraftConfig('key', e.target.value)}
+                      onChange={e => updateApiProfileDraftConfig('key', e.target.value)}
                       placeholder="sk-..."
                       className="settings-text-input"
                     />
@@ -1854,7 +1916,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       type="text"
                       list={SUMMARY_MODEL_LIST_ID}
                       value={apiProfileDraft.apiConfig.model}
-                      onChange={(e) => updateApiProfileDraftConfig('model', e.target.value)}
+                      onChange={e => updateApiProfileDraftConfig('model', e.target.value)}
                       placeholder="模型名称"
                       className="settings-text-input"
                     />
@@ -1912,16 +1974,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               isOpen={openSettingBlocks.extraModelSummary}
               onToggle={toggleSettingBlock}
             >
-              <p className="settings-description compact">
-                当角色的人物经历条目过多时，调用额外模型进行总结精炼。
-              </p>
+              <p className="settings-description compact">当角色的人物经历条目过多时，调用额外模型进行总结精炼。</p>
 
               <div className="settings-row">
                 <label className="settings-label">使用 API</label>
                 <div className="settings-control">
                   <select
                     value={apiSelectionToValue(settings.summarySettings.summaryApiSelection)}
-                    onChange={(e) => updateApiSelection('summary', valueToApiSelection(e.target.value))}
+                    onChange={e => updateApiSelection('summary', valueToApiSelection(e.target.value))}
                     className="settings-select"
                   >
                     <option value={API_SELECTION_PRESET_VALUE}>当前预设</option>
@@ -1932,7 +1992,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     ))}
                   </select>
                   <span className="settings-hint-inline">
-                    当前：{getApiSelectionLabel(settings.summarySettings.summaryApiSelection, settings.summarySettings.apiProfiles)}
+                    当前：
+                    {getApiSelectionLabel(
+                      settings.summarySettings.summaryApiSelection,
+                      settings.summarySettings.apiProfiles,
+                    )}
                   </span>
                 </div>
               </div>
@@ -1944,7 +2008,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     className={`summary-toggle-btn ${settings.summarySettings.enabled ? 'active' : ''}`}
                     onClick={() => updateSummarySetting('enabled', !settings.summarySettings.enabled)}
                   >
-                    {settings.summarySettings.enabled ? <Icons.ToggleRight size={24} /> : <Icons.ToggleLeft size={24} />}
+                    {settings.summarySettings.enabled ? (
+                      <Icons.ToggleRight size={24} />
+                    ) : (
+                      <Icons.ToggleLeft size={24} />
+                    )}
                     <span>{settings.summarySettings.enabled ? '已启用' : '已禁用'}</span>
                   </button>
                 </div>
@@ -1955,7 +2023,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <input
                     type="checkbox"
                     checked={settings.summarySettings.stream}
-                    onChange={(e) => updateSummarySetting('stream', e.target.checked)}
+                    onChange={e => updateSummarySetting('stream', e.target.checked)}
                   />
                   <span>流式生成</span>
                 </label>
@@ -1972,7 +2040,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       min="1"
                       max="100"
                       value={settings.summarySettings.thresholds.perCharacterEntriesThreshold}
-                      onChange={(e) => updateThreshold('perCharacterEntriesThreshold', parseInt(e.target.value) || 10)}
+                      onChange={e => updateThreshold('perCharacterEntriesThreshold', parseInt(e.target.value) || 10)}
                       className="settings-number-input"
                     />
                     <span className="settings-hint-inline">超过此条目数的角色加入待处理队列</span>
@@ -1987,7 +2055,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       min="1"
                       max="50"
                       value={settings.summarySettings.thresholds.pendingQueueThreshold}
-                      onChange={(e) => updateThreshold('pendingQueueThreshold', parseInt(e.target.value) || 5)}
+                      onChange={e => updateThreshold('pendingQueueThreshold', parseInt(e.target.value) || 5)}
                       className="settings-number-input"
                     />
                     <span className="settings-hint-inline">队列中角色数达到此值时触发总结</span>
@@ -2002,7 +2070,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       min="10"
                       max="500"
                       value={settings.summarySettings.thresholds.totalEntriesThreshold}
-                      onChange={(e) => updateThreshold('totalEntriesThreshold', parseInt(e.target.value) || 50)}
+                      onChange={e => updateThreshold('totalEntriesThreshold', parseInt(e.target.value) || 50)}
                       className="settings-number-input"
                     />
                     <span className="settings-hint-inline">所有角色总条目数达到此值时触发总结</span>
@@ -2017,7 +2085,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </p>
                 <textarea
                   value={settings.summarySettings.promptTemplate}
-                  onChange={(e) => updateSummarySetting('promptTemplate', e.target.value)}
+                  onChange={e => updateSummarySetting('promptTemplate', e.target.value)}
                   placeholder="请输入总结提示词模板..."
                   className="settings-textarea"
                   rows={8}
@@ -2127,7 +2195,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <div className="settings-control">
                   <select
                     value={apiSelectionToValue(settings.summarySettings.variableApiSelection)}
-                    onChange={(e) => updateApiSelection('variable', valueToApiSelection(e.target.value))}
+                    onChange={e => updateApiSelection('variable', valueToApiSelection(e.target.value))}
                     className="settings-select"
                   >
                     <option value={API_SELECTION_PRESET_VALUE}>当前预设</option>
@@ -2138,13 +2206,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     ))}
                   </select>
                   <span className="settings-hint-inline">
-                    当前：{getApiSelectionLabel(settings.summarySettings.variableApiSelection, settings.summarySettings.apiProfiles)}
+                    当前：
+                    {getApiSelectionLabel(
+                      settings.summarySettings.variableApiSelection,
+                      settings.summarySettings.apiProfiles,
+                    )}
                   </span>
                 </div>
               </div>
 
               <div className="summary-api-mode-group" role="radiogroup" aria-label="正文变量更新模式">
-                <label className={`summary-api-mode ${settings.summarySettings.variableUpdateMode !== 'extra' ? 'active' : ''}`}>
+                <label
+                  className={`summary-api-mode ${settings.summarySettings.variableUpdateMode !== 'extra' ? 'active' : ''}`}
+                >
                   <input
                     type="radio"
                     name="summary-variable-update-mode"
@@ -2154,7 +2228,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   />
                   <span>随正文更新变量</span>
                 </label>
-                <label className={`summary-api-mode ${settings.summarySettings.variableUpdateMode === 'extra' ? 'active' : ''}`}>
+                <label
+                  className={`summary-api-mode ${settings.summarySettings.variableUpdateMode === 'extra' ? 'active' : ''}`}
+                >
                   <input
                     type="radio"
                     name="summary-variable-update-mode"
@@ -2177,21 +2253,25 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </p>
                 <textarea
                   value={settings.summarySettings.variablePromptTemplate}
-                  onChange={(e) => updateSummarySetting('variablePromptTemplate', e.target.value)}
+                  onChange={e => updateSummarySetting('variablePromptTemplate', e.target.value)}
                   placeholder="请输入额外变量更新提示词模板..."
                   className="settings-textarea variable-prompt-template-input"
                   rows={12}
                 />
                 <button
                   className="settings-reset-template-btn"
-                  onClick={() => updateSummarySetting('variablePromptTemplate', DEFAULT_SUMMARY_SETTINGS.variablePromptTemplate)}
+                  onClick={() =>
+                    updateSummarySetting('variablePromptTemplate', DEFAULT_SUMMARY_SETTINGS.variablePromptTemplate)
+                  }
                 >
                   恢复默认模板
                 </button>
               </div>
 
               {summaryVariableModeStatus && (
-                <div className={`summary-api-status ${summaryVariableModeStatus.startsWith('切换失败') ? 'warning' : 'info'}`}>
+                <div
+                  className={`summary-api-status ${summaryVariableModeStatus.startsWith('切换失败') ? 'warning' : 'info'}`}
+                >
                   {summaryVariableModeStatus}
                 </div>
               )}
@@ -2232,11 +2312,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </button>
             </div>
 
-            {variableStatusText && (
-              <div className={`variables-status ${variableStatus}`}>
-                {variableStatusText}
-              </div>
-            )}
+            {variableStatusText && <div className={`variables-status ${variableStatus}`}>{variableStatusText}</div>}
 
             <div className={`variables-browser${isVariableDetailOpen ? ' detail-open' : ''}`}>
               <div className="variables-tree" aria-label="变量树">
@@ -2302,7 +2378,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <textarea
                   className="settings-textarea auto-advance-prompt-input"
                   value={autoAdvancePrompt}
-                  onChange={(event) => setAutoAdvancePrompt(event.target.value)}
+                  onChange={event => setAutoAdvancePrompt(event.target.value)}
                   disabled={isAutoAdvanceRunning}
                   rows={3}
                   spellCheck={false}
@@ -2318,7 +2394,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     min={1}
                     max={AUTO_ADVANCE_MAX_COUNT}
                     value={autoAdvanceCount}
-                    onChange={(event) => setAutoAdvanceCount(clampAutoAdvanceCount(Number(event.target.value)))}
+                    onChange={event => setAutoAdvanceCount(clampAutoAdvanceCount(Number(event.target.value)))}
                     disabled={isAutoAdvanceRunning}
                   />
                 </div>
@@ -2428,9 +2504,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <button
                       className="auto-advance-result-header"
                       type="button"
-                      onClick={() => setExpandedAutoAdvanceResultId(
-                        expandedAutoAdvanceResultId === result.id ? null : result.id,
-                      )}
+                      onClick={() =>
+                        setExpandedAutoAdvanceResultId(expandedAutoAdvanceResultId === result.id ? null : result.id)
+                      }
                     >
                       <span className="auto-advance-result-title">第 {result.index} 轮</span>
                       <span className={`auto-advance-result-badge ${result.status}`}>
@@ -2441,9 +2517,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                           ? `#${result.userMessageId ?? '?'} → #${result.assistantMessageId ?? '?'} · ${result.plainText.length} / ${result.rawReply.length} 字符`
                           : result.error || '等待回复'}
                       </span>
-                      {expandedAutoAdvanceResultId === result.id
-                        ? <Icons.ChevronDown size={18} />
-                        : <Icons.ChevronUp size={18} />}
+                      {expandedAutoAdvanceResultId === result.id ? (
+                        <Icons.ChevronDown size={18} />
+                      ) : (
+                        <Icons.ChevronUp size={18} />
+                      )}
                     </button>
 
                     {expandedAutoAdvanceResultId !== result.id && result.plainText && (
@@ -2486,9 +2564,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 调试设置 */}
         {activeTab === 'debug' && (
           <div className="settings-section">
-            <p className="settings-description">
-              查看每次发送给 AI 的消息和 AI 回复的内容，帮助调试提示词和检查输出。
-            </p>
+            <p className="settings-description">查看每次发送给 AI 的消息和 AI 回复的内容，帮助调试提示词和检查输出。</p>
 
             {/* 最新一轮调试记录 */}
             <div className="debug-logs-list">
@@ -2499,7 +2575,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <p className="debug-hint">发送消息后，最新一轮输入和输出将在此保存</p>
                 </div>
               ) : (
-                debugSections.map((section) => (
+                debugSections.map(section => (
                   <div
                     key={section.id}
                     className={`debug-log-item ${section.id.includes('input') ? 'prompt' : 'assistant'} ${expandedLogId === section.id ? 'expanded' : ''}`}
@@ -2516,26 +2592,31 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                           {new Date(latestDebugRound.updatedAt).toLocaleTimeString('zh-CN', {
                             hour: '2-digit',
                             minute: '2-digit',
-                            second: '2-digit'
+                            second: '2-digit',
                           })}
                         </span>
-                        <span className="debug-log-length">
-                          {section.content.length} 字符
-                        </span>
+                        <span className="debug-log-length">{section.content.length} 字符</span>
                         <span className={`debug-log-status ${section.status}`}>
-                          {section.status === 'running' ? '进行中' : section.status === 'success' ? '完成' : section.status === 'error' ? '失败' : '未运行'}
+                          {section.status === 'running'
+                            ? '进行中'
+                            : section.status === 'success'
+                              ? '完成'
+                              : section.status === 'error'
+                                ? '失败'
+                                : '未运行'}
                         </span>
                       </div>
                       <div className="debug-log-actions">
-                        <button
-                          className="debug-expand-btn"
-                          title={expandedLogId === section.id ? '收起' : '展开'}
-                        >
-                          {expandedLogId === section.id ? <Icons.ChevronDown size={18} /> : <Icons.ChevronUp size={18} />}
+                        <button className="debug-expand-btn" title={expandedLogId === section.id ? '收起' : '展开'}>
+                          {expandedLogId === section.id ? (
+                            <Icons.ChevronDown size={18} />
+                          ) : (
+                            <Icons.ChevronUp size={18} />
+                          )}
                         </button>
                       </div>
                     </div>
-                    
+
                     {/* 预览内容（收起状态） */}
                     {expandedLogId !== section.id && (
                       <div className="debug-log-preview">
@@ -2543,7 +2624,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         {section.content.length > 150 && '...'}
                       </div>
                     )}
-                    
+
                     {/* 完整内容（展开状态） */}
                     {expandedLogId === section.id && (
                       <div className="debug-log-body">
@@ -2553,7 +2634,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         <div className="debug-log-footer">
                           <button
                             className="debug-copy-btn"
-                            onClick={(e) => {
+                            onClick={e => {
                               e.stopPropagation();
                               navigator.clipboard.writeText(section.content);
                             }}
@@ -2637,7 +2718,9 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
   };
 
   return (
-    <div className={`variable-node ${isRoot ? 'root' : ''} ${isContainer ? 'branch' : 'leaf'} ${isSelected ? 'selected' : ''}`}>
+    <div
+      className={`variable-node ${isRoot ? 'root' : ''} ${isContainer ? 'branch' : 'leaf'} ${isSelected ? 'selected' : ''}`}
+    >
       <div
         className="variable-node-row"
         style={{ paddingLeft: `${Math.min(depth, 8) * 0.85}rem` }}
@@ -2650,7 +2733,7 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
           <button
             className="variable-node-toggle"
             type="button"
-            onClick={(event) => {
+            onClick={event => {
               event.stopPropagation();
               onToggle(pathKey);
             }}
@@ -2687,10 +2770,7 @@ const VariableTreeNode: React.FC<VariableTreeNodeProps> = ({
               />
             ))
           ) : (
-            <div
-              className="variable-node-empty"
-              style={{ paddingLeft: `${Math.min(depth + 1, 8) * 0.85 + 1.5}rem` }}
-            >
+            <div className="variable-node-empty" style={{ paddingLeft: `${Math.min(depth + 1, 8) * 0.85 + 1.5}rem` }}>
               空
             </div>
           )}
@@ -2705,13 +2785,8 @@ interface VariableValuePreviewProps {
   normalizedSearch: string;
 }
 
-const VariableValuePreview: React.FC<VariableValuePreviewProps> = ({
-  value,
-  normalizedSearch,
-}) => {
-  const preview = Array.isArray(value) || isRecord(value)
-    ? getContainerPreview(value)
-    : formatVariablePreview(value);
+const VariableValuePreview: React.FC<VariableValuePreviewProps> = ({ value, normalizedSearch }) => {
+  const preview = Array.isArray(value) || isRecord(value) ? getContainerPreview(value) : formatVariablePreview(value);
 
   return (
     <span className="variable-node-preview" title={preview}>
@@ -2770,20 +2845,10 @@ const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
           <span>变量详情</span>
         </div>
         <div className="variable-detail-actions">
-          <button
-            type="button"
-            className="variable-detail-icon-btn"
-            onClick={() => onCopyPath(path)}
-            title="复制路径"
-          >
+          <button type="button" className="variable-detail-icon-btn" onClick={() => onCopyPath(path)} title="复制路径">
             <Icons.Copy size={15} />
           </button>
-          <button
-            type="button"
-            className="variable-detail-icon-btn"
-            onClick={() => onCopyValue(value)}
-            title="复制值"
-          >
+          <button type="button" className="variable-detail-icon-btn" onClick={() => onCopyValue(value)} title="复制值">
             <Icons.FileText size={15} />
           </button>
         </div>
@@ -2804,11 +2869,7 @@ const VariableDetailPanel: React.FC<VariableDetailPanelProps> = ({
         ) : (
           <>
             <label className="variable-detail-field-label">值</label>
-            <VariableLeafEditor
-              value={value}
-              path={path}
-              onValueChange={onValueChange}
-            />
+            <VariableLeafEditor value={value} path={path} onValueChange={onValueChange} />
           </>
         )}
       </div>
@@ -2822,11 +2883,7 @@ interface VariableLeafEditorProps {
   onValueChange: (path: VariablePath, nextValue: unknown) => void;
 }
 
-const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({
-  value,
-  path,
-  onValueChange,
-}) => {
+const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, onValueChange }) => {
   if (typeof value === 'string') {
     const isLongText = value.length > 80 || value.includes('\n');
     if (isLongText) {
@@ -2834,7 +2891,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({
         <textarea
           className="variable-leaf-input variable-leaf-textarea"
           value={value}
-          onChange={(e) => onValueChange(path, e.target.value)}
+          onChange={e => onValueChange(path, e.target.value)}
           rows={Math.min(5, Math.max(2, value.split('\n').length))}
           spellCheck={false}
         />
@@ -2846,7 +2903,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({
         className="variable-leaf-input"
         type="text"
         value={value}
-        onChange={(e) => onValueChange(path, e.target.value)}
+        onChange={e => onValueChange(path, e.target.value)}
       />
     );
   }
@@ -2857,7 +2914,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({
         className="variable-leaf-input variable-leaf-number"
         type="number"
         value={Number.isFinite(value) ? String(value) : ''}
-        onChange={(e) => {
+        onChange={e => {
           const rawValue = e.target.value.trim();
           const nextValue = rawValue === '' ? 0 : Number(rawValue);
           if (Number.isFinite(nextValue)) {
@@ -2897,21 +2954,11 @@ interface RegexRuleItemProps {
   onToggle: () => void;
 }
 
-const RegexRuleItem: React.FC<RegexRuleItemProps> = ({
-  rule,
-  index,
-  onUpdate,
-  onDelete,
-  onToggle,
-}) => {
+const RegexRuleItem: React.FC<RegexRuleItemProps> = ({ rule, index, onUpdate, onDelete, onToggle }) => {
   const [isExpanded, setIsExpanded] = useState(false); // 默认收起
   const validation = validateRegex(rule.pattern);
   const originScopeLabel =
-    rule.originScope === 'preset'
-      ? '预设导入'
-      : rule.originScope === 'global'
-        ? '全局导入'
-        : '全局规则';
+    rule.originScope === 'preset' ? '预设导入' : rule.originScope === 'global' ? '全局导入' : '全局规则';
 
   // 阻止事件冒泡
   const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
@@ -2935,19 +2982,18 @@ const RegexRuleItem: React.FC<RegexRuleItemProps> = ({
           <span className="regex-rule-index">规则 {index + 1}</span>
           <span className={`regex-rule-origin regex-rule-origin--${rule.originScope}`}>{originScopeLabel}</span>
           {rule.description && (
-            <span className="regex-rule-desc" title={rule.description}>{rule.description}</span>
+            <span className="regex-rule-desc" title={rule.description}>
+              {rule.description}
+            </span>
           )}
         </div>
         <div className="regex-rule-actions">
-          <button
-            className="regex-expand-btn"
-            title={isExpanded ? '收起' : '展开'}
-          >
+          <button className="regex-expand-btn" title={isExpanded ? '收起' : '展开'}>
             {isExpanded ? <Icons.ChevronDown size={18} /> : <Icons.ChevronUp size={18} />}
           </button>
           <button
             className="regex-delete-btn"
-            onClick={(e) => {
+            onClick={e => {
               stopPropagation(e);
               onDelete();
             }}
@@ -2966,7 +3012,7 @@ const RegexRuleItem: React.FC<RegexRuleItemProps> = ({
             <input
               type="text"
               value={rule.description || ''}
-              onChange={(e) => onUpdate({ description: e.target.value })}
+              onChange={e => onUpdate({ description: e.target.value })}
               placeholder="例如：移除思考过程"
               className="regex-input"
             />
@@ -2978,13 +3024,11 @@ const RegexRuleItem: React.FC<RegexRuleItemProps> = ({
             <input
               type="text"
               value={rule.pattern}
-              onChange={(e) => onUpdate({ pattern: e.target.value })}
+              onChange={e => onUpdate({ pattern: e.target.value })}
               placeholder="例如：/<thinks>.*?<\/thinks>/gs"
               className={`regex-input ${!validation.valid ? 'invalid' : ''}`}
             />
-            {!validation.valid && (
-              <span className="regex-error">{validation.error}</span>
-            )}
+            {!validation.valid && <span className="regex-error">{validation.error}</span>}
           </div>
 
           {/* 替换文本 */}
@@ -2993,7 +3037,7 @@ const RegexRuleItem: React.FC<RegexRuleItemProps> = ({
             <input
               type="text"
               value={rule.replacement}
-              onChange={(e) => onUpdate({ replacement: e.target.value })}
+              onChange={e => onUpdate({ replacement: e.target.value })}
               placeholder="留空即为删除"
               className="regex-input"
             />
