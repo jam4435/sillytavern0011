@@ -753,11 +753,13 @@ export function buildAiComparisons({
     } else {
       action = declaredChange?.action ?? observedChange?.action ?? 'edit';
       const baselineMatchesExpected = areValuesEqual(baselineValue, expectedValue);
-      const finalMatchesExpected = areValuesEqual(finalValue, expectedValue);
+      const observedMatchesExpected = observedChange
+        ? areValuesEqual(observedChange.afterValue, expectedValue)
+        : false;
 
-      if (baselineMatchesExpected && finalMatchesExpected) {
+      if (baselineMatchesExpected && !observedChange) {
         status = 'no-op';
-      } else if (finalMatchesExpected) {
+      } else if (observedMatchesExpected) {
         status = 'applied';
       } else if (observedChange) {
         status = 'diverged';

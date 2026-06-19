@@ -44,7 +44,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 2;
+  version: 3;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -57,10 +57,14 @@ type CaptureMetadata = {
   actions?: VariableWriteActions | null;
   assistantMessageId?: number;
   allowDeclaredMatching?: boolean;
+  aiOnlyDeclaredMatches?: boolean;
 };
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v2';
-const LEGACY_STORAGE_KEY = 'wuxia.variableChangeTurn.v1';
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v3';
+const LEGACY_STORAGE_KEYS = [
+  'wuxia.variableChangeTurn.v1',
+  'wuxia.variableChangeTurn.v2',
+];
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -90,7 +94,9 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
   }
 
   try {
-    window.sessionStorage.removeItem(LEGACY_STORAGE_KEY);
+    for (const legacyStorageKey of LEGACY_STORAGE_KEYS) {
+      window.sessionStorage.removeItem(legacyStorageKey);
+    }
     const rawStored = window.sessionStorage.getItem(STORAGE_KEY);
     if (!rawStored) {
       return null;
@@ -104,7 +110,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 2 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== 3 || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -131,7 +137,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 2,
+      version: 3,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -218,6 +224,11 @@ const declaredMatchesObserved = (
   }
   return stableStringify(declared.value) === stableStringify(observed.afterValue);
 };
+
+const matchesAnyDeclaredChange = (
+  declaredChanges: VariableChangeSummary['aiReply']['declaredChanges'],
+  observed: VariableActualChange,
+): boolean => declaredChanges.some(declared => declaredMatchesObserved(declared, observed));
 
 const appendLimited = <T,>(
   existing: T[],
@@ -343,27 +354,85 @@ export function useVariableChangeTracker() {
       return true;
     }
 
-    const patchChange = (change: VariableActualChange): VariableActualChange =>
-      change.batchId === batch.batchId
-        ? {
-          ...change,
-          origin: shouldMoveToAi ? 'ai' : change.origin,
-          actions: metadata.actions ?? change.actions,
-          reason: metadata.reason,
-          assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
-        }
-        : change;
-
     mutateSummary(summary => {
-      const patchedAi = summary.aiReply.observedChanges.map(patchChange);
-      const patchedBackground = summary.background.observedChanges.map(patchChange);
+      const batchBackgroundChanges = summary.background.observedChanges
+        .filter(change => change.batchId === batch.batchId);
       const movedChanges = shouldMoveToAi
-        ? patchedBackground.filter(change => change.batchId === batch.batchId)
+        ? batchBackgroundChanges.filter(change =>
+          !metadata.aiOnlyDeclaredMatches
+          || matchesAnyDeclaredChange(summary.aiReply.declaredChanges, change))
         : [];
+      const movedChangeIds = new Set(movedChanges.map(change => change.id));
+      const aiUpgradeBatchId = `${batch.batchId}:ai`;
+      const upgradedAiChanges = movedChanges.map((change, index) => ({
+        ...change,
+        id: `${change.source}:${change.action}:${getPathKey(change)}:${aiUpgradeBatchId}:${index}`,
+        batchId: aiUpgradeBatchId,
+        origin: 'ai' as const,
+        actions: metadata.actions ?? change.actions,
+        reason: metadata.reason,
+        assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
+      }));
+      const patchedAi = summary.aiReply.observedChanges.map(change =>
+        change.batchId === batch.batchId && shouldImproveMetadata
+          ? {
+            ...change,
+            actions: metadata.actions ?? change.actions,
+            reason: metadata.reason,
+            assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
+          }
+          : change);
+      const patchedBackground = summary.background.observedChanges
+        .filter(change => !movedChangeIds.has(change.id))
+        .map(change =>
+          !shouldMoveToAi && shouldImproveMetadata && change.batchId === batch.batchId
+            ? {
+              ...change,
+              actions: metadata.actions ?? change.actions,
+              reason: metadata.reason,
+              assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
+            }
+            : change);
       const aiAppend = appendLimited(
         patchedAi,
-        movedChanges.map(change => ({ ...change, origin: 'ai' as const })),
+        upgradedAiChanges,
       );
+      const remainingBatchChangeCount = batchBackgroundChanges.length - movedChanges.length;
+      const nextBatches = summary.batches.flatMap(candidate => {
+        if (candidate.batchId !== batch.batchId) {
+          return [candidate];
+        }
+
+        if (!shouldMoveToAi) {
+          return [{
+            ...candidate,
+            actions: metadata.actions ?? candidate.actions,
+            reason: metadata.reason,
+            assistantMessageId: metadata.assistantMessageId ?? candidate.assistantMessageId,
+          }];
+        }
+
+        const upgradedBatch: VariableObservedBatch | null = movedChanges.length > 0
+          ? {
+            ...candidate,
+            batchId: aiUpgradeBatchId,
+            origin: 'ai',
+            actions: metadata.actions ?? candidate.actions,
+            reason: metadata.reason,
+            assistantMessageId: metadata.assistantMessageId ?? candidate.assistantMessageId,
+            changeCount: movedChanges.length,
+          }
+          : null;
+        const remainingBatch: VariableObservedBatch | null = remainingBatchChangeCount > 0
+          ? {
+            ...candidate,
+            changeCount: remainingBatchChangeCount,
+          }
+          : null;
+        return [remainingBatch, upgradedBatch].filter(
+          (nextBatch): nextBatch is VariableObservedBatch => Boolean(nextBatch),
+        );
+      });
       const nextSummary: VariableChangeSummary = {
         ...summary,
         aiReply: {
@@ -373,19 +442,9 @@ export function useVariableChangeTracker() {
         },
         background: {
           ...summary.background,
-          observedChanges: shouldMoveToAi
-            ? patchedBackground.filter(change => change.batchId !== batch.batchId)
-            : patchedBackground,
+          observedChanges: patchedBackground,
         },
-        batches: summary.batches.map(candidate => candidate.batchId === batch.batchId
-          ? {
-            ...candidate,
-            origin: shouldMoveToAi ? 'ai' : candidate.origin,
-            actions: metadata.actions ?? candidate.actions,
-            reason: metadata.reason,
-            assistantMessageId: metadata.assistantMessageId ?? candidate.assistantMessageId,
-          }
-          : candidate),
+        batches: nextBatches,
       };
       return rebuildSummary(nextSummary, activeTurn);
     });
@@ -446,10 +505,14 @@ export function useVariableChangeTracker() {
     const aiChanges: VariableActualChange[] = [];
     const backgroundChanges: VariableActualChange[] = [];
     for (const change of result.observedChanges) {
-      const matchedAsAi = metadata.origin === 'ai'
+      const matchesDeclaration = matchesAnyDeclaredChange(declaredChanges, change);
+      const matchedAsAi = (
+        metadata.origin === 'ai'
+        && (!metadata.aiOnlyDeclaredMatches || matchesDeclaration)
+      )
         || (
           metadata.allowDeclaredMatching === true
-          && declaredChanges.some(declared => declaredMatchesObserved(declared, change))
+          && matchesDeclaration
         );
       (matchedAsAi ? aiChanges : backgroundChanges).push(change);
     }
@@ -677,6 +740,7 @@ export function useVariableChangeTracker() {
       reason,
       actions,
       assistantMessageId,
+      aiOnlyDeclaredMatches: actions?.apply === true,
     });
   }, [captureSnapshot, refreshDeclaredChanges]);
 
