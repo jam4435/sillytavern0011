@@ -102,9 +102,12 @@ const App: React.FC = () => {
   const {
     variableChanges,
     handleVariableTurnStart,
+    handleGlobalMessageSent,
     handleVariableAssistantReply,
+    handleVariableMessageBoundary,
     handleMvuVariableUpdate,
     handleEraWriteDone,
+    markVariableApiWriteAsAi,
     clearVariableChanges,
   } = useVariableChangeTracker();
 
@@ -128,6 +131,7 @@ const App: React.FC = () => {
     summarySettings: displaySettings.summarySettings,
     onVariableTurnStart: handleVariableTurnStart,
     onVariableAssistantReply: handleVariableAssistantReply,
+    onVariableAiWriteTarget: markVariableApiWriteAsAi,
   });
 
   // 使用事件监听 hook
@@ -135,6 +139,9 @@ const App: React.FC = () => {
     updateGameState,
     setCurrentMaintext,
     setCurrentOptions,
+    onMessageSent: handleGlobalMessageSent,
+    onMessageBoundary: handleVariableMessageBoundary,
+    onChatChanged: clearVariableChanges,
     onMvuVariableUpdate: handleMvuVariableUpdate,
     onEraWriteDone: handleEraWriteDone,
   });

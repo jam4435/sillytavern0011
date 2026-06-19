@@ -41,6 +41,7 @@ export interface RegenerateResult {
 
 export interface RegenerateOptions {
   onCombinedPrompt?: (prompt: string) => void;
+  onTargetAssistantResolved?: (assistantMessageId: number) => void;
 }
 
 type RegenerateContext = {
@@ -347,6 +348,7 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
   if (!context) {
     throw new Error('当前没有可重新生成的最新回复。');
   }
+  options.onTargetAssistantResolved?.(context.assistantMessage.message_id);
 
   const prompts = buildHistoryPrompts(context.allMessages, context.userMessage.message_id);
   if (prompts.length === 0 || prompts[prompts.length - 1].role !== 'user') {

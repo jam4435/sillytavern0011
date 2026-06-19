@@ -54,6 +54,7 @@ interface UseMessageHandlerOptions {
   summarySettings: SummarySettings;
   onVariableTurnStart?: () => void;
   onVariableAssistantReply?: (rawReply: string, assistantMessageId?: number) => void;
+  onVariableAiWriteTarget?: (assistantMessageId: number) => void;
 }
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
@@ -155,6 +156,7 @@ export function useMessageHandler({
   summarySettings,
   onVariableTurnStart,
   onVariableAssistantReply,
+  onVariableAiWriteTarget,
 }: UseMessageHandlerOptions) {
   const refreshAssistantStateFromFinalText = useCallback(
     (finalText: string, assistantMessageId: number) => {
@@ -321,6 +323,7 @@ export function useMessageHandler({
               return resultText;
             }
 
+            onVariableAiWriteTarget?.(assistantMessage.message_id);
             showLoading('正在额外更新变量...');
             patchLatestDebugRound({
               variable: {
@@ -448,6 +451,7 @@ export function useMessageHandler({
       summarySettings,
       onVariableTurnStart,
       onVariableAssistantReply,
+      onVariableAiWriteTarget,
       refreshAssistantStateFromFinalText,
     ],
   );
@@ -527,13 +531,18 @@ export function useMessageHandler({
     let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
 
     try {
+      onVariableTurnStart?.();
       extraVariableUpdateReservation = await prepareExtraVariableUpdateTurn(summarySettings);
       beginDebugRound('重新生成最新回复');
       const result = await regenerateLastAssistantSwipe({
         onCombinedPrompt: prompt => {
           patchLatestDebugRound({ main: { combinedPrompt: prompt } });
         },
+        onTargetAssistantResolved: assistantMessageId => {
+          onVariableAiWriteTarget?.(assistantMessageId);
+        },
       });
+      onVariableAssistantReply?.(result.rawReply, result.assistantMessageId);
       patchLatestDebugRound({
         main: {
           userInput: result.userInput || '重新生成最新回复',
@@ -547,6 +556,7 @@ export function useMessageHandler({
       setCurrentOptions(result.options);
 
       if (summarySettings.variableUpdateMode === 'extra') {
+        onVariableAiWriteTarget?.(result.assistantMessageId);
         showLoading('正在额外更新变量...');
         patchLatestDebugRound({
           variable: {
@@ -642,6 +652,9 @@ export function useMessageHandler({
     showLoading,
     summarySettings,
     refreshAssistantStateFromFinalText,
+    onVariableTurnStart,
+    onVariableAssistantReply,
+    onVariableAiWriteTarget,
   ]);
 
   return {

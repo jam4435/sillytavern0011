@@ -13,6 +13,9 @@ interface UseEventListenersOptions {
   updateGameState: (data: Partial<GameState>) => void;
   setCurrentMaintext: (text: string) => void;
   setCurrentOptions: (options: string[]) => void;
+  onMessageSent?: (messageId: number) => void;
+  onMessageBoundary?: (messageId?: number) => void;
+  onChatChanged?: () => void;
   onMvuVariableUpdate?: (variables: unknown, variablesBeforeUpdate: unknown) => void;
   onEraWriteDone?: (detail: unknown) => void;
 }
@@ -21,6 +24,9 @@ export function useEventListeners({
   updateGameState,
   setCurrentMaintext,
   setCurrentOptions,
+  onMessageSent,
+  onMessageBoundary,
+  onChatChanged,
   onMvuVariableUpdate,
   onEraWriteDone,
 }: UseEventListenersOptions) {
@@ -101,6 +107,9 @@ export function useEventListeners({
       } else {
         eventLogger.warn('⚠️ 没有消息内容，跳过更新');
       }
+
+      const messageId = Number.isInteger(eventData) ? Number(eventData) : undefined;
+      onMessageBoundary?.(messageId);
     };
 
     const handleWriteDone = (detail?: unknown) => {
@@ -109,6 +118,10 @@ export function useEventListeners({
       scheduleRefresh(50);
     };
 
+    eventLogger.log('注册 MESSAGE_SENT 监听器...');
+    const messageSentListener = eventOn(tavern_events.MESSAGE_SENT, messageId => {
+      onMessageSent?.(messageId);
+    });
     eventLogger.log('注册 MESSAGE_RECEIVED 监听器...');
     const messageReceivedListener = eventOn(tavern_events.MESSAGE_RECEIVED, handleMessageUpdate);
     eventLogger.log('注册 MESSAGE_SWIPED 监听器...');
@@ -116,7 +129,10 @@ export function useEventListeners({
     eventLogger.log('注册 MESSAGE_UPDATED 监听器...');
     const messageUpdatedListener = eventOn(tavern_events.MESSAGE_UPDATED, handleMessageUpdate);
     eventLogger.log('注册 CHAT_CHANGED 监听器...');
-    const chatChangedListener = eventOn(tavern_events.CHAT_CHANGED, handleMessageUpdate);
+    const chatChangedListener = eventOn(tavern_events.CHAT_CHANGED, eventData => {
+      onChatChanged?.();
+      handleMessageUpdate(eventData);
+    });
     eventLogger.log('注册 era:writeDone 监听器...');
     const writeDoneListener = eventOn('era:writeDone', handleWriteDone);
     eventLogger.log('🎧 监听器注册完成');
@@ -127,6 +143,7 @@ export function useEventListeners({
       if (refreshTimer) {
         clearTimeout(refreshTimer);
       }
+      messageSentListener.stop();
       messageReceivedListener.stop();
       messageSwipedListener.stop();
       messageUpdatedListener.stop();
@@ -138,6 +155,9 @@ export function useEventListeners({
     updateGameState,
     setCurrentMaintext,
     setCurrentOptions,
+    onMessageSent,
+    onMessageBoundary,
+    onChatChanged,
     onMvuVariableUpdate,
     onEraWriteDone,
   ]);
