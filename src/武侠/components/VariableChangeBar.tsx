@@ -266,7 +266,7 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
     setExpandedSegment(null);
     setLastExpandedSegment(preferredSegment);
     setCopiedText('');
-  }, [summary?.turnId, summary]);
+  }, [summary?.turnId]);
 
   const normalizedData = useMemo(() => {
     if (!summary) {

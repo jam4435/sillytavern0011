@@ -1,7 +1,10 @@
 export type VariablePath = Array<string | number>;
 export type VariableChangeAction = 'insert' | 'edit' | 'delete';
-export type VariableChangeSource = 'ai-declared' | 'actual-diff';
+export type VariableChangeOrigin = 'ai' | 'background';
+export type VariableChangeSource = 'ai-declared' | 'observed-diff';
+export type VariableComparisonStatus = 'applied' | 'not-applied' | 'diverged' | 'no-op' | 'api-only';
 export type VariableChangeStatus = 'tracking' | 'reply-recorded' | 'settled' | 'error';
+export type VariableWriteActions = Record<string, boolean>;
 
 export interface VariableThoughtEntry {
   id: string;
@@ -23,7 +26,8 @@ export interface VariableDeclaredChange {
 
 export interface VariableActualChange {
   id: string;
-  source: 'actual-diff';
+  source: 'observed-diff';
+  origin: VariableChangeOrigin;
   action: VariableChangeAction;
   path: VariablePath;
   displayPath: string;
@@ -32,6 +36,40 @@ export interface VariableActualChange {
   afterValue: unknown;
   beforePreview: string;
   afterPreview: string;
+  timestamp: number;
+  batchId: string;
+  actions: VariableWriteActions | null;
+  reason: string | null;
+  assistantMessageId?: number;
+}
+
+export interface VariableObservedBatch {
+  batchId: string;
+  origin: VariableChangeOrigin;
+  timestamp: number;
+  reason: string | null;
+  actions: VariableWriteActions | null;
+  assistantMessageId?: number;
+  previousSnapshotHash: string;
+  nextSnapshotHash: string;
+  changeCount: number;
+}
+
+export interface VariableAiComparison {
+  id: string;
+  status: VariableComparisonStatus;
+  action: VariableChangeAction;
+  path: VariablePath;
+  displayPath: string;
+  copyPath: string;
+  declaredChange?: VariableDeclaredChange;
+  observedChange?: VariableActualChange;
+  baselineValue: unknown;
+  expectedValue: unknown;
+  finalValue: unknown;
+  baselinePreview: string;
+  expectedPreview: string;
+  finalPreview: string;
 }
 
 export interface ParsedDeclaredVariableChanges {
@@ -41,29 +79,56 @@ export interface ParsedDeclaredVariableChanges {
   omittedDeclaredCount: number;
 }
 
-export interface ActualVariableChangesResult {
-  actualChanges: VariableActualChange[];
-  omittedActualCount: number;
+export interface ObservedVariableChangesResult {
+  observedChanges: VariableActualChange[];
+  omittedObservedCount: number;
+  totalObservedCount: number;
+  batch: VariableObservedBatch | null;
+  previousSnapshotHash: string | null;
+  nextSnapshotHash: string | null;
+}
+
+export interface VariableAiComparisonResult {
+  comparisons: VariableAiComparison[];
+  omittedComparisonCount: number;
+}
+
+export interface VariableAiReplySummary {
+  declaredChanges: VariableDeclaredChange[];
+  observedChanges: VariableActualChange[];
+  comparisons: VariableAiComparison[];
+  omittedDeclaredCount: number;
+  omittedObservedCount: number;
+  omittedComparisonCount: number;
+}
+
+export interface VariableBackgroundSummary {
+  observedChanges: VariableActualChange[];
+  omittedObservedCount: number;
 }
 
 export interface VariableChangeSummary {
   turnId: number;
   status: VariableChangeStatus;
+  userMessageId?: number;
   assistantMessageId?: number;
   startedAt: number;
   updatedAt: number;
-  declaredChanges: VariableDeclaredChange[];
-  actualChanges: VariableActualChange[];
   thoughts: VariableThoughtEntry[];
   parseErrors: string[];
   topLevelGroups: string[];
+  aiReply: VariableAiReplySummary;
+  background: VariableBackgroundSummary;
+  batches: VariableObservedBatch[];
+  declaredChanges: VariableDeclaredChange[];
+  actualChanges: VariableActualChange[];
   omittedDeclaredCount: number;
   omittedActualCount: number;
 }
 
 const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
 const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/gi;
-const MAX_STORED_VARIABLE_CHANGES = 100;
+export const MAX_STORED_VARIABLE_CHANGES = 100;
 
 const ACTION_BY_BLOCK_TAG: Record<'VariableInsert' | 'VariableEdit' | 'VariableDelete', VariableChangeAction> = {
   VariableInsert: 'insert',
@@ -98,7 +163,7 @@ const cloneJson = <T,>(value: T): T => {
   }
 };
 
-const stableStringify = (value: unknown): string => {
+export const stableStringify = (value: unknown): string => {
   if (Array.isArray(value)) {
     return `[${value.map(item => stableStringify(item)).join(',')}]`;
   }
@@ -113,8 +178,25 @@ const stableStringify = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
+export const getSnapshotHash = (value: unknown): string => stableStringify(value);
+
 const areValuesEqual = (left: unknown, right: unknown): boolean =>
   stableStringify(left) === stableStringify(right);
+
+const normalizeWriteActions = (actions: VariableWriteActions | null | undefined): VariableWriteActions | null => {
+  if (!actions || !isRecord(actions)) {
+    return null;
+  }
+
+  const normalizedEntries = Object.entries(actions)
+    .filter(([, enabled]) => enabled === true)
+    .sort(([left], [right]) => left.localeCompare(right));
+  if (normalizedEntries.length === 0) {
+    return null;
+  }
+
+  return Object.fromEntries(normalizedEntries);
+};
 
 const getVisibleEntries = (value: unknown): Array<[string | number, unknown]> => {
   if (Array.isArray(value)) {
@@ -210,6 +292,32 @@ const extractStatData = (source: unknown): Record<string, unknown> | null => {
   return source;
 };
 
+const getValueAtPath = (source: unknown, path: VariablePath): unknown => {
+  let current: unknown = source;
+  for (const segment of path) {
+    if (Array.isArray(current) && typeof segment === 'number') {
+      current = current[segment];
+      continue;
+    }
+    if (isRecord(current)) {
+      current = current[String(segment)];
+      continue;
+    }
+    return undefined;
+  }
+  return current;
+};
+
+const normalizeObservedAction = (beforeValue: unknown, afterValue: unknown): VariableChangeAction => {
+  if (beforeValue === undefined) {
+    return 'insert';
+  }
+  if (afterValue === undefined) {
+    return 'delete';
+  }
+  return 'edit';
+};
+
 export const readCurrentStatDataSnapshot = (): Record<string, unknown> | null => {
   try {
     const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
@@ -235,11 +343,24 @@ export const createEmptyVariableChangeSummary = (
     status,
     startedAt: now,
     updatedAt: now,
-    declaredChanges: [],
-    actualChanges: [],
     thoughts: [],
     parseErrors: [],
     topLevelGroups: [],
+    aiReply: {
+      declaredChanges: [],
+      observedChanges: [],
+      comparisons: [],
+      omittedDeclaredCount: 0,
+      omittedObservedCount: 0,
+      omittedComparisonCount: 0,
+    },
+    background: {
+      observedChanges: [],
+      omittedObservedCount: 0,
+    },
+    batches: [],
+    declaredChanges: [],
+    actualChanges: [],
     omittedDeclaredCount: 0,
     omittedActualCount: 0,
   };
@@ -357,15 +478,24 @@ export function parseDeclaredVariableChanges(rawReply: string): ParsedDeclaredVa
   };
 }
 
-const createActualChange = (
+const createObservedChange = (
   action: VariableChangeAction,
   path: VariablePath,
   beforeValue: unknown,
   afterValue: unknown,
   index: number,
+  metadata: {
+    origin: VariableChangeOrigin;
+    timestamp: number;
+    batchId: string;
+    actions: VariableWriteActions | null;
+    reason: string | null;
+    assistantMessageId?: number;
+  },
 ): VariableActualChange => ({
-  id: getVariableBlockId('actual-diff', action, path, index),
-  source: 'actual-diff',
+  id: getVariableBlockId('observed-diff', action, path, index),
+  source: 'observed-diff',
+  origin: metadata.origin,
   action,
   path,
   displayPath: getVariableDisplayPath(path),
@@ -374,28 +504,49 @@ const createActualChange = (
   afterValue,
   beforePreview: formatVariablePreview(beforeValue),
   afterPreview: formatVariablePreview(afterValue),
+  timestamp: metadata.timestamp,
+  batchId: metadata.batchId,
+  actions: normalizeWriteActions(metadata.actions),
+  reason: metadata.reason,
+  assistantMessageId: metadata.assistantMessageId,
 });
 
-function pushActualChange(
+function pushObservedChange(
   result: VariableActualChange[],
   counters: { total: number },
   action: VariableChangeAction,
   path: VariablePath,
   beforeValue: unknown,
   afterValue: unknown,
+  metadata: {
+    origin: VariableChangeOrigin;
+    timestamp: number;
+    batchId: string;
+    actions: VariableWriteActions | null;
+    reason: string | null;
+    assistantMessageId?: number;
+  },
 ): void {
   counters.total += 1;
   if (result.length < MAX_STORED_VARIABLE_CHANGES) {
-    result.push(createActualChange(action, path, beforeValue, afterValue, counters.total));
+    result.push(createObservedChange(action, path, beforeValue, afterValue, counters.total, metadata));
   }
 }
 
-function collectActualDiffs(
+function collectObservedDiffs(
   beforeValue: unknown,
   afterValue: unknown,
   path: VariablePath,
   result: VariableActualChange[],
   counters: { total: number },
+  metadata: {
+    origin: VariableChangeOrigin;
+    timestamp: number;
+    batchId: string;
+    actions: VariableWriteActions | null;
+    reason: string | null;
+    assistantMessageId?: number;
+  },
 ): void {
   if (areValuesEqual(beforeValue, afterValue)) {
     return;
@@ -407,11 +558,11 @@ function collectActualDiffs(
   if (beforeValue === undefined && afterIsContainer) {
     const entries = getVisibleEntries(afterValue);
     if (entries.length === 0) {
-      pushActualChange(result, counters, 'insert', path, beforeValue, afterValue);
+      pushObservedChange(result, counters, 'insert', path, beforeValue, afterValue, metadata);
       return;
     }
     for (const [key, childValue] of entries) {
-      collectActualDiffs(undefined, childValue, [...path, key], result, counters);
+      collectObservedDiffs(undefined, childValue, [...path, key], result, counters, metadata);
     }
     return;
   }
@@ -419,18 +570,25 @@ function collectActualDiffs(
   if (afterValue === undefined && beforeIsContainer) {
     const entries = getVisibleEntries(beforeValue);
     if (entries.length === 0) {
-      pushActualChange(result, counters, 'delete', path, beforeValue, afterValue);
+      pushObservedChange(result, counters, 'delete', path, beforeValue, afterValue, metadata);
       return;
     }
     for (const [key, childValue] of entries) {
-      collectActualDiffs(childValue, undefined, [...path, key], result, counters);
+      collectObservedDiffs(childValue, undefined, [...path, key], result, counters, metadata);
     }
     return;
   }
 
   if (!beforeIsContainer || !afterIsContainer || Array.isArray(beforeValue) !== Array.isArray(afterValue)) {
-    const action = beforeValue === undefined ? 'insert' : afterValue === undefined ? 'delete' : 'edit';
-    pushActualChange(result, counters, action, path, beforeValue, afterValue);
+    pushObservedChange(
+      result,
+      counters,
+      normalizeObservedAction(beforeValue, afterValue),
+      path,
+      beforeValue,
+      afterValue,
+      metadata,
+    );
     return;
   }
 
@@ -456,28 +614,181 @@ function collectActualDiffs(
       ? afterRecord[key]
       : (afterRecord as Record<string, unknown>)[String(key)];
 
-    collectActualDiffs(beforeChild, afterChild, [...path, key], result, counters);
+    collectObservedDiffs(beforeChild, afterChild, [...path, key], result, counters, metadata);
   }
 }
 
-export function createActualVariableChanges(
-  baselineStatData: Record<string, unknown> | null,
+export function createObservedVariableChanges(
+  previousStatData: Record<string, unknown> | null,
   nextStatData: Record<string, unknown> | null,
-): ActualVariableChangesResult {
-  const actualChanges: VariableActualChange[] = [];
-  const counters = { total: 0 };
+  metadata: {
+    origin: VariableChangeOrigin;
+    timestamp: number;
+    batchId: string;
+    actions?: VariableWriteActions | null;
+    reason?: string | null;
+    assistantMessageId?: number;
+  },
+): ObservedVariableChangesResult {
+  const observedChanges: VariableActualChange[] = [];
+  const previousSnapshotHash = previousStatData ? getSnapshotHash(previousStatData) : null;
+  const nextSnapshotHash = nextStatData ? getSnapshotHash(nextStatData) : null;
 
-  if (!baselineStatData || !nextStatData) {
+  if (!previousStatData || !nextStatData) {
     return {
-      actualChanges,
-      omittedActualCount: 0,
+      observedChanges,
+      omittedObservedCount: 0,
+      totalObservedCount: 0,
+      batch: null,
+      previousSnapshotHash,
+      nextSnapshotHash,
     };
   }
 
-  collectActualDiffs(baselineStatData, nextStatData, [], actualChanges, counters);
+  const counters = { total: 0 };
+  const normalizedMetadata = {
+    origin: metadata.origin,
+    timestamp: metadata.timestamp,
+    batchId: metadata.batchId,
+    actions: normalizeWriteActions(metadata.actions),
+    reason: metadata.reason ?? null,
+    assistantMessageId: metadata.assistantMessageId,
+  };
+
+  collectObservedDiffs(previousStatData, nextStatData, [], observedChanges, counters, normalizedMetadata);
   return {
-    actualChanges,
-    omittedActualCount: Math.max(0, counters.total - actualChanges.length),
+    observedChanges,
+    omittedObservedCount: Math.max(0, counters.total - observedChanges.length),
+    totalObservedCount: counters.total,
+    batch: counters.total > 0 && previousSnapshotHash && nextSnapshotHash
+      ? {
+        batchId: metadata.batchId,
+        origin: metadata.origin,
+        timestamp: metadata.timestamp,
+        reason: metadata.reason ?? null,
+        actions: normalizedMetadata.actions,
+        assistantMessageId: metadata.assistantMessageId,
+        previousSnapshotHash,
+        nextSnapshotHash,
+        changeCount: counters.total,
+      }
+      : null,
+    previousSnapshotHash,
+    nextSnapshotHash,
+  };
+}
+
+const aggregateObservedAiChanges = (changes: VariableActualChange[]): Map<string, VariableActualChange> => {
+  const result = new Map<string, VariableActualChange>();
+  const sortedChanges = [...changes].sort((left, right) => {
+    if (left.timestamp !== right.timestamp) {
+      return left.timestamp - right.timestamp;
+    }
+    return left.id.localeCompare(right.id);
+  });
+
+  for (const change of sortedChanges) {
+    const key = getVariablePathId(change.path);
+    const previous = result.get(key);
+    if (!previous) {
+      result.set(key, change);
+      continue;
+    }
+
+    result.set(key, {
+      ...change,
+      beforeValue: previous.beforeValue,
+      beforePreview: previous.beforePreview,
+      action: normalizeObservedAction(previous.beforeValue, change.afterValue),
+    });
+  }
+
+  return result;
+};
+
+export function buildAiComparisons({
+  declaredChanges,
+  observedChanges,
+  baselineStatData,
+  currentStatData,
+}: {
+  declaredChanges: VariableDeclaredChange[];
+  observedChanges: VariableActualChange[];
+  baselineStatData: Record<string, unknown> | null;
+  currentStatData: Record<string, unknown> | null;
+}): VariableAiComparisonResult {
+  const comparisons: VariableAiComparison[] = [];
+  const declaredByPath = new Map<string, VariableDeclaredChange>();
+  const aggregatedObserved = aggregateObservedAiChanges(observedChanges);
+
+  for (const declaredChange of declaredChanges) {
+    declaredByPath.set(getVariablePathId(declaredChange.path), declaredChange);
+  }
+
+  const pathKeys = new Set<string>([
+    ...declaredByPath.keys(),
+    ...aggregatedObserved.keys(),
+  ]);
+
+  for (const pathKey of pathKeys) {
+    const declaredChange = declaredByPath.get(pathKey);
+    const observedChange = aggregatedObserved.get(pathKey);
+    const path = declaredChange?.path ?? observedChange?.path ?? [];
+    const baselineValue = baselineStatData ? getValueAtPath(baselineStatData, path) : undefined;
+    const expectedValue = declaredChange
+      ? declaredChange.action === 'delete'
+        ? undefined
+        : declaredChange.value
+      : observedChange?.afterValue;
+    const finalValue = currentStatData
+      ? getValueAtPath(currentStatData, path)
+      : observedChange?.afterValue;
+
+    let status: VariableComparisonStatus;
+    let action: VariableChangeAction;
+
+    if (!declaredChange && observedChange) {
+      status = 'api-only';
+      action = observedChange.action;
+    } else {
+      action = declaredChange?.action ?? observedChange?.action ?? 'edit';
+      const baselineMatchesExpected = areValuesEqual(baselineValue, expectedValue);
+      const finalMatchesExpected = areValuesEqual(finalValue, expectedValue);
+
+      if (baselineMatchesExpected && finalMatchesExpected) {
+        status = 'no-op';
+      } else if (finalMatchesExpected) {
+        status = 'applied';
+      } else if (observedChange) {
+        status = 'diverged';
+      } else {
+        status = 'not-applied';
+      }
+    }
+
+    if (comparisons.length < MAX_STORED_VARIABLE_CHANGES) {
+      comparisons.push({
+        id: `comparison:${pathKey || 'root'}`,
+        status,
+        action,
+        path,
+        displayPath: getVariableDisplayPath(path),
+        copyPath: getVariableCopyPath(path),
+        declaredChange,
+        observedChange,
+        baselineValue,
+        expectedValue,
+        finalValue,
+        baselinePreview: formatVariablePreview(baselineValue),
+        expectedPreview: formatVariablePreview(expectedValue),
+        finalPreview: formatVariablePreview(finalValue),
+      });
+    }
+  }
+
+  return {
+    comparisons,
+    omittedComparisonCount: Math.max(0, pathKeys.size - comparisons.length),
   };
 }
 
