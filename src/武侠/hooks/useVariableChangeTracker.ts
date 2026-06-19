@@ -534,9 +534,14 @@ export function useVariableChangeTracker() {
     }
     const parsed = parseDeclaredVariableChanges(rawReply);
     mutateSummary(summary => {
+      const hasObservedChanges =
+        summary.aiReply.observedChanges.length > 0
+        || summary.background.observedChanges.length > 0;
       const nextSummary: VariableChangeSummary = {
         ...summary,
-        status: activeTurn.baselineStatData ? 'reply-recorded' : 'error',
+        status: activeTurn.baselineStatData
+          ? hasObservedChanges ? 'settled' : 'reply-recorded'
+          : 'error',
         assistantMessageId: assistantMessageId ?? summary.assistantMessageId,
         thoughts: parsed.thoughts,
         parseErrors: parsed.parseErrors,
