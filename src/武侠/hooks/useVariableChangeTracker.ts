@@ -1,21 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  buildAiComparisons,
   collectVariableTopLevelGroups,
-  createActualVariableChanges,
   createEmptyVariableChangeSummary,
+  createObservedVariableChanges,
+  getSnapshotHash,
+  MAX_STORED_VARIABLE_CHANGES,
   parseDeclaredVariableChanges,
   readCurrentStatDataSnapshot,
   readStatDataSnapshotFromUnknown,
+  stableStringify,
+  type VariableActualChange,
+  type VariableChangeOrigin,
   type VariableChangeSummary,
+  type VariableObservedBatch,
+  type VariableWriteActions,
 } from '../utils/variableChanges';
 
 type ActiveVariableTurn = {
   turnId: number;
   baselineStatData: Record<string, unknown> | null;
+  lastStatData: Record<string, unknown> | null;
+  userMessageId?: number;
+  assistantMessageId?: number;
+  aiWriteTargetIds: number[];
+  batchSequence: number;
 };
 
 type EraWriteDoneDetail = {
-  message_id?: number;
+  message_id?: number | null;
+  actions?: Record<string, unknown>;
+  reason?: unknown;
   stat?: unknown;
   statWithoutMeta?: unknown;
 };
@@ -29,15 +44,27 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 1;
+  version: 2;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
   summary: VariableChangeSummary;
 };
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v1';
+type CaptureMetadata = {
+  origin: VariableChangeOrigin;
+  reason: string;
+  actions?: VariableWriteActions | null;
+  assistantMessageId?: number;
+  allowDeclaredMatching?: boolean;
+};
+
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v2';
+const LEGACY_STORAGE_KEY = 'wuxia.variableChangeTurn.v1';
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const getCurrentChatStorageId = (): string => {
   try {
@@ -63,20 +90,21 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
   }
 
   try {
+    window.sessionStorage.removeItem(LEGACY_STORAGE_KEY);
     const rawStored = window.sessionStorage.getItem(STORAGE_KEY);
     if (!rawStored) {
       return null;
     }
 
     const stored = JSON.parse(rawStored) as StoredVariableTurn;
-    const isExpired = Date.now() - Number(stored.savedAt || 0) > STORED_TURN_TTL_MS;
     const currentChatId = getCurrentChatStorageId();
+    const isExpired = Date.now() - Number(stored.savedAt || 0) > STORED_TURN_TTL_MS;
     const isDifferentKnownChat =
       stored.chatId !== 'unknown'
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 1 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== 2 || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -103,7 +131,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 1,
+      version: 2,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -115,18 +143,13 @@ const persistVariableTurn = (
   }
 };
 
-function getActiveMessageContent(message: ChatMessageWithSwipes): string {
+const getActiveMessageContent = (message: ChatMessageWithSwipes): string => {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
   const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
   return message.message || message.mes || swipes[swipeIndex] || swipes[0] || '';
-}
-
-type ResolvedAssistantMessageContent = {
-  messageId?: number;
-  content: string;
 };
 
-function readAssistantMessageContentById(messageId: number): ResolvedAssistantMessageContent {
+const readAssistantMessageContentById = (messageId: number): { messageId?: number; content: string } => {
   try {
     const messages = getChatMessages(messageId, {
       role: 'assistant',
@@ -140,9 +163,9 @@ function readAssistantMessageContentById(messageId: number): ResolvedAssistantMe
   } catch {
     return { messageId, content: '' };
   }
-}
+};
 
-function readLatestAssistantMessageContent(): ResolvedAssistantMessageContent {
+const readLatestAssistantMessageContent = (): { messageId?: number; content: string } => {
   try {
     const messages = getChatMessages('0-{{lastMessageId}}', {
       role: 'assistant',
@@ -160,38 +183,91 @@ function readLatestAssistantMessageContent(): ResolvedAssistantMessageContent {
         };
       }
     }
-
-    return { content: '' };
   } catch {
-    return { content: '' };
+    // Message-boundary refresh is a best-effort fallback.
   }
-}
+  return { content: '' };
+};
 
-function readAssistantMessageContent(
-  messageId: unknown,
-  fallbackMessageId?: unknown,
-): ResolvedAssistantMessageContent {
-  const candidateIds = [messageId, fallbackMessageId]
-    .filter((id): id is number => Number.isInteger(id))
-    .map(id => Number(id));
-  const uniqueCandidateIds = Array.from(new Set(candidateIds));
+const normalizeMessageId = (messageId: unknown): number | undefined =>
+  Number.isInteger(messageId) ? Number(messageId) : undefined;
 
-  for (const candidateId of uniqueCandidateIds) {
-    const resolved = readAssistantMessageContentById(candidateId);
-    if (resolved.content.trim()) {
-      return resolved;
-    }
+const normalizeWriteActions = (actions: unknown): VariableWriteActions | null => {
+  if (!isRecord(actions)) {
+    return null;
   }
 
-  return readLatestAssistantMessageContent();
-}
+  const enabledActions = Object.entries(actions)
+    .filter(([, enabled]) => enabled === true)
+    .map(([action]) => [action, true] as const);
+  return enabledActions.length > 0 ? Object.fromEntries(enabledActions) : null;
+};
 
-function normalizeAssistantMessageId(messageId: unknown): number | undefined {
-  if (!Number.isInteger(messageId)) {
-    return undefined;
+const getPathKey = (change: Pick<VariableActualChange, 'path'>): string =>
+  JSON.stringify(change.path);
+
+const declaredMatchesObserved = (
+  declared: VariableChangeSummary['aiReply']['declaredChanges'][number],
+  observed: VariableActualChange,
+): boolean => {
+  if (JSON.stringify(declared.path) !== JSON.stringify(observed.path)) {
+    return false;
   }
-  return Number(messageId);
-}
+  if (declared.action === 'delete') {
+    return observed.afterValue === undefined;
+  }
+  return stableStringify(declared.value) === stableStringify(observed.afterValue);
+};
+
+const appendLimited = <T,>(
+  existing: T[],
+  additions: T[],
+): { values: T[]; omitted: number } => {
+  const available = Math.max(0, MAX_STORED_VARIABLE_CHANGES - existing.length);
+  return {
+    values: [...existing, ...additions.slice(0, available)],
+    omitted: Math.max(0, additions.length - available),
+  };
+};
+
+const combineObservedChanges = (summary: VariableChangeSummary): VariableActualChange[] =>
+  [...summary.aiReply.observedChanges, ...summary.background.observedChanges]
+    .sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id));
+
+const rebuildSummary = (
+  summary: VariableChangeSummary,
+  activeTurn: ActiveVariableTurn,
+): VariableChangeSummary => {
+  const comparisonResult = buildAiComparisons({
+    declaredChanges: summary.aiReply.declaredChanges,
+    observedChanges: summary.aiReply.observedChanges,
+    baselineStatData: activeTurn.baselineStatData,
+    currentStatData: activeTurn.lastStatData,
+  });
+  const allObservedChanges = combineObservedChanges(summary);
+
+  return {
+    ...summary,
+    userMessageId: activeTurn.userMessageId,
+    assistantMessageId: activeTurn.assistantMessageId ?? summary.assistantMessageId,
+    updatedAt: Date.now(),
+    topLevelGroups: collectVariableTopLevelGroups(summary.aiReply.declaredChanges, allObservedChanges),
+    aiReply: {
+      ...summary.aiReply,
+      comparisons: comparisonResult.comparisons,
+      omittedComparisonCount: comparisonResult.omittedComparisonCount,
+    },
+    declaredChanges: summary.aiReply.declaredChanges,
+    actualChanges: allObservedChanges,
+    omittedDeclaredCount: summary.aiReply.omittedDeclaredCount,
+    omittedActualCount:
+      summary.aiReply.omittedObservedCount
+      + summary.background.omittedObservedCount,
+  };
+};
+
+const isProvisionalReason = (reason: string | null): boolean =>
+  reason === 'mvu-update' || reason === 'message-boundary';
 
 export function useVariableChangeTracker() {
   const restoredTurnRef = useRef<StoredVariableTurn | null | undefined>(undefined);
@@ -207,146 +283,421 @@ export function useVariableChangeTracker() {
   const activeTurnRef = useRef<ActiveVariableTurn | null>(restoredTurn?.activeTurn ?? null);
   const nextTurnIdRef = useRef(restoredTurn?.summary.turnId ?? 0);
 
-  const updateVariableChanges = useCallback((
-    updater: VariableChangeSummary | null | ((previous: VariableChangeSummary | null) => VariableChangeSummary | null),
-  ) => {
-    setVariableChanges(previous => {
-      const next = typeof updater === 'function'
-        ? (updater as (previous: VariableChangeSummary | null) => VariableChangeSummary | null)(previous)
-        : updater;
-      variableChangesRef.current = next;
-      persistVariableTurn(activeTurnRef.current, next);
-      return next;
-    });
+  const commitSummary = useCallback((summary: VariableChangeSummary | null) => {
+    variableChangesRef.current = summary;
+    setVariableChanges(summary);
+    persistVariableTurn(activeTurnRef.current, summary);
   }, []);
 
-  const refreshActualChanges = useCallback((nextData?: unknown) => {
+  const mutateSummary = useCallback((
+    updater: (current: VariableChangeSummary) => VariableChangeSummary,
+  ) => {
+    const current = variableChangesRef.current;
+    if (!current) {
+      return;
+    }
+    commitSummary(updater(current));
+  }, [commitSummary]);
+
+  const startTurn = useCallback((userMessageId?: number) => {
+    const turnId = nextTurnIdRef.current + 1;
+    nextTurnIdRef.current = turnId;
+    const baselineStatData = readCurrentStatDataSnapshot();
+    const activeTurn: ActiveVariableTurn = {
+      turnId,
+      baselineStatData,
+      lastStatData: baselineStatData,
+      userMessageId,
+      aiWriteTargetIds: [],
+      batchSequence: 0,
+    };
+    activeTurnRef.current = activeTurn;
+    commitSummary(createEmptyVariableChangeSummary(
+      turnId,
+      baselineStatData ? 'tracking' : 'error',
+    ));
+  }, [commitSummary]);
+
+  const upgradeMatchingBatch = useCallback((
+    nextSnapshotHash: string,
+    metadata: CaptureMetadata,
+  ): boolean => {
     const activeTurn = activeTurnRef.current;
-    if (!activeTurn) {
+    const current = variableChangesRef.current;
+    if (!activeTurn || !current) {
+      return false;
+    }
+
+    const batch = [...current.batches]
+      .reverse()
+      .find(candidate => candidate.nextSnapshotHash === nextSnapshotHash);
+    if (!batch) {
+      return false;
+    }
+
+    const shouldMoveToAi = metadata.origin === 'ai' && batch.origin !== 'ai';
+    const shouldImproveMetadata =
+      isProvisionalReason(batch.reason)
+      && !isProvisionalReason(metadata.reason);
+    if (!shouldMoveToAi && !shouldImproveMetadata) {
+      return true;
+    }
+
+    const patchChange = (change: VariableActualChange): VariableActualChange =>
+      change.batchId === batch.batchId
+        ? {
+          ...change,
+          origin: shouldMoveToAi ? 'ai' : change.origin,
+          actions: metadata.actions ?? change.actions,
+          reason: metadata.reason,
+          assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
+        }
+        : change;
+
+    mutateSummary(summary => {
+      const patchedAi = summary.aiReply.observedChanges.map(patchChange);
+      const patchedBackground = summary.background.observedChanges.map(patchChange);
+      const movedChanges = shouldMoveToAi
+        ? patchedBackground.filter(change => change.batchId === batch.batchId)
+        : [];
+      const aiAppend = appendLimited(
+        patchedAi,
+        movedChanges.map(change => ({ ...change, origin: 'ai' as const })),
+      );
+      const nextSummary: VariableChangeSummary = {
+        ...summary,
+        aiReply: {
+          ...summary.aiReply,
+          observedChanges: aiAppend.values,
+          omittedObservedCount: summary.aiReply.omittedObservedCount + aiAppend.omitted,
+        },
+        background: {
+          ...summary.background,
+          observedChanges: shouldMoveToAi
+            ? patchedBackground.filter(change => change.batchId !== batch.batchId)
+            : patchedBackground,
+        },
+        batches: summary.batches.map(candidate => candidate.batchId === batch.batchId
+          ? {
+            ...candidate,
+            origin: shouldMoveToAi ? 'ai' : candidate.origin,
+            actions: metadata.actions ?? candidate.actions,
+            reason: metadata.reason,
+            assistantMessageId: metadata.assistantMessageId ?? candidate.assistantMessageId,
+          }
+          : candidate),
+      };
+      return rebuildSummary(nextSummary, activeTurn);
+    });
+    return true;
+  }, [mutateSummary]);
+
+  const captureSnapshot = useCallback((
+    nextData: unknown,
+    metadata: CaptureMetadata,
+  ) => {
+    const activeTurn = activeTurnRef.current;
+    const current = variableChangesRef.current;
+    if (!activeTurn || !current || current.turnId !== activeTurn.turnId) {
       return;
     }
 
     const nextStatData = nextData === undefined
       ? readCurrentStatDataSnapshot()
-      : readStatDataSnapshotFromUnknown(nextData) || readCurrentStatDataSnapshot();
-    const { actualChanges, omittedActualCount } = createActualVariableChanges(
-      activeTurn.baselineStatData,
+      : readStatDataSnapshotFromUnknown(nextData) ?? readCurrentStatDataSnapshot();
+    if (!nextStatData) {
+      mutateSummary(summary => ({ ...summary, status: 'error', updatedAt: Date.now() }));
+      return;
+    }
+
+    const nextSnapshotHash = getSnapshotHash(nextStatData);
+    const previousSnapshotHash = activeTurn.lastStatData
+      ? getSnapshotHash(activeTurn.lastStatData)
+      : null;
+    if (previousSnapshotHash === nextSnapshotHash) {
+      upgradeMatchingBatch(nextSnapshotHash, metadata);
+      activeTurn.lastStatData = nextStatData;
+      persistVariableTurn(activeTurn, variableChangesRef.current);
+      return;
+    }
+
+    activeTurn.batchSequence += 1;
+    const baseBatchId = `${activeTurn.turnId}:${activeTurn.batchSequence}`;
+    const result = createObservedVariableChanges(
+      activeTurn.lastStatData ?? activeTurn.baselineStatData,
       nextStatData,
+      {
+        origin: metadata.origin,
+        timestamp: Date.now(),
+        batchId: baseBatchId,
+        actions: metadata.actions,
+        reason: metadata.reason,
+        assistantMessageId: metadata.assistantMessageId,
+      },
     );
+    activeTurn.lastStatData = nextStatData;
 
-    updateVariableChanges(previous => {
-      if (!previous || previous.turnId !== activeTurn.turnId) {
-        return previous;
+    if (!result.batch || result.observedChanges.length === 0) {
+      persistVariableTurn(activeTurn, variableChangesRef.current);
+      return;
+    }
+
+    const declaredChanges = current.aiReply.declaredChanges;
+    const aiChanges: VariableActualChange[] = [];
+    const backgroundChanges: VariableActualChange[] = [];
+    for (const change of result.observedChanges) {
+      const matchedAsAi = metadata.origin === 'ai'
+        || (
+          metadata.allowDeclaredMatching === true
+          && declaredChanges.some(declared => declaredMatchesObserved(declared, change))
+        );
+      (matchedAsAi ? aiChanges : backgroundChanges).push(change);
+    }
+
+    const createBatch = (
+      origin: VariableChangeOrigin,
+      changes: VariableActualChange[],
+      suffix: string,
+    ): { batch: VariableObservedBatch; changes: VariableActualChange[] } | null => {
+      if (changes.length === 0 || !result.batch) {
+        return null;
       }
-
-      const hasComparableData = Boolean(activeTurn.baselineStatData && nextStatData);
+      const batchId = `${baseBatchId}:${suffix}`;
       return {
-        ...previous,
-        status: hasComparableData
-          ? previous.status === 'tracking' ? 'tracking' : 'settled'
-          : 'error',
-        updatedAt: Date.now(),
-        actualChanges,
-        omittedActualCount,
-        topLevelGroups: collectVariableTopLevelGroups(previous.declaredChanges, actualChanges),
+        batch: {
+          ...result.batch,
+          batchId,
+          origin,
+          changeCount: changes.length,
+        },
+        changes: changes.map((change, index) => ({
+          ...change,
+          id: `${change.source}:${change.action}:${getPathKey(change)}:${batchId}:${index}`,
+          batchId,
+          origin,
+        })),
       };
-    });
-  }, [updateVariableChanges]);
+    };
 
-  const refreshDeclaredChanges = useCallback((rawReply: string, assistantMessageId?: number) => {
+    const aiBatch = createBatch('ai', aiChanges, 'ai');
+    const backgroundBatch = createBatch('background', backgroundChanges, 'background');
+    mutateSummary(summary => {
+      const aiAppend = appendLimited(
+        summary.aiReply.observedChanges,
+        aiBatch?.changes ?? [],
+      );
+      const backgroundAppend = appendLimited(
+        summary.background.observedChanges,
+        backgroundBatch?.changes ?? [],
+      );
+      const nextSummary: VariableChangeSummary = {
+        ...summary,
+        status: summary.status === 'tracking' ? 'tracking' : 'settled',
+        aiReply: {
+          ...summary.aiReply,
+          observedChanges: aiAppend.values,
+          omittedObservedCount:
+            summary.aiReply.omittedObservedCount
+            + aiAppend.omitted
+            + (metadata.origin === 'ai' ? result.omittedObservedCount : 0),
+        },
+        background: {
+          ...summary.background,
+          observedChanges: backgroundAppend.values,
+          omittedObservedCount:
+            summary.background.omittedObservedCount
+            + backgroundAppend.omitted
+            + (metadata.origin === 'background' ? result.omittedObservedCount : 0),
+        },
+        batches: [
+          ...summary.batches,
+          ...[aiBatch?.batch, backgroundBatch?.batch].filter(
+            (batch): batch is VariableObservedBatch => Boolean(batch),
+          ),
+        ].slice(-MAX_STORED_VARIABLE_CHANGES),
+      };
+      return rebuildSummary(nextSummary, activeTurn);
+    });
+  }, [mutateSummary, upgradeMatchingBatch]);
+
+  const refreshDeclaredChanges = useCallback((
+    rawReply: string,
+    assistantMessageId?: number,
+  ) => {
     const activeTurn = activeTurnRef.current;
     if (!activeTurn || !rawReply.trim()) {
       return;
     }
 
-    const parsedChanges = parseDeclaredVariableChanges(rawReply);
-    updateVariableChanges(previous => {
-      if (!previous || previous.turnId !== activeTurn.turnId) {
-        return previous;
-      }
-
-      const nextStatus = activeTurn.baselineStatData
-        ? previous.status === 'settled' ? 'settled' : 'reply-recorded'
-        : 'error';
-
-      return {
-        ...previous,
-        status: nextStatus,
-        assistantMessageId: assistantMessageId ?? previous.assistantMessageId,
-        updatedAt: Date.now(),
-        declaredChanges: parsedChanges.declaredChanges,
-        thoughts: parsedChanges.thoughts,
-        parseErrors: parsedChanges.parseErrors,
-        omittedDeclaredCount: parsedChanges.omittedDeclaredCount,
-        topLevelGroups: collectVariableTopLevelGroups(
-          parsedChanges.declaredChanges,
-          previous.actualChanges,
-        ),
+    if (assistantMessageId !== undefined) {
+      activeTurn.assistantMessageId = assistantMessageId;
+    }
+    const parsed = parseDeclaredVariableChanges(rawReply);
+    mutateSummary(summary => {
+      const nextSummary: VariableChangeSummary = {
+        ...summary,
+        status: activeTurn.baselineStatData ? 'reply-recorded' : 'error',
+        assistantMessageId: assistantMessageId ?? summary.assistantMessageId,
+        thoughts: parsed.thoughts,
+        parseErrors: parsed.parseErrors,
+        aiReply: {
+          ...summary.aiReply,
+          declaredChanges: parsed.declaredChanges,
+          omittedDeclaredCount: parsed.omittedDeclaredCount,
+        },
       };
+      return rebuildSummary(nextSummary, activeTurn);
     });
-  }, [updateVariableChanges]);
+  }, [mutateSummary]);
 
   const handleVariableTurnStart = useCallback(() => {
-    const turnId = nextTurnIdRef.current + 1;
-    nextTurnIdRef.current = turnId;
+    startTurn();
+  }, [startTurn]);
 
-    const baselineStatData = readCurrentStatDataSnapshot();
-    activeTurnRef.current = {
-      turnId,
-      baselineStatData,
-    };
+  const handleGlobalMessageSent = useCallback((messageId: number) => {
+    const normalizedMessageId = normalizeMessageId(messageId);
+    if (normalizedMessageId === undefined) {
+      return;
+    }
 
-    updateVariableChanges(createEmptyVariableChangeSummary(
-      turnId,
-      baselineStatData ? 'tracking' : 'error',
-    ));
-  }, [updateVariableChanges]);
+    const activeTurn = activeTurnRef.current;
+    if (activeTurn && activeTurn.userMessageId === undefined) {
+      activeTurn.userMessageId = normalizedMessageId;
+      mutateSummary(summary => rebuildSummary(summary, activeTurn));
+      return;
+    }
+    if (activeTurn?.userMessageId === normalizedMessageId) {
+      return;
+    }
+    startTurn(normalizedMessageId);
+  }, [mutateSummary, startTurn]);
 
-  const handleVariableAssistantReply = useCallback((rawReply: string, assistantMessageId?: number) => {
+  const handleVariableAssistantReply = useCallback((
+    rawReply: string,
+    assistantMessageId?: number,
+  ) => {
     refreshDeclaredChanges(rawReply, assistantMessageId);
-    refreshActualChanges();
-  }, [refreshActualChanges, refreshDeclaredChanges]);
+    captureSnapshot(undefined, {
+      origin: 'background',
+      reason: 'message-boundary',
+      allowDeclaredMatching: true,
+      assistantMessageId,
+    });
+  }, [captureSnapshot, refreshDeclaredChanges]);
 
-  const handleMvuVariableUpdate = useCallback((variables: unknown) => {
-    refreshActualChanges(variables);
-  }, [refreshActualChanges]);
+  const handleVariableMessageBoundary = useCallback((messageId?: number) => {
+    if (!activeTurnRef.current) {
+      return;
+    }
+
+    const resolved = messageId !== undefined
+      ? readAssistantMessageContentById(messageId)
+      : readLatestAssistantMessageContent();
+    const finalMessage = resolved.content.trim()
+      ? resolved
+      : readLatestAssistantMessageContent();
+    if (finalMessage.content.trim()) {
+      refreshDeclaredChanges(finalMessage.content, finalMessage.messageId);
+    }
+    captureSnapshot(undefined, {
+      origin: 'background',
+      reason: 'message-boundary',
+      allowDeclaredMatching: true,
+      assistantMessageId: finalMessage.messageId,
+    });
+  }, [captureSnapshot, refreshDeclaredChanges]);
+
+  const handleMvuVariableUpdate = useCallback((
+    variables: unknown,
+    variablesBeforeUpdate?: unknown,
+  ) => {
+    const activeTurn = activeTurnRef.current;
+    if (!activeTurn) {
+      return;
+    }
+    if (!activeTurn.lastStatData && variablesBeforeUpdate !== undefined) {
+      activeTurn.lastStatData = readStatDataSnapshotFromUnknown(variablesBeforeUpdate);
+    }
+    captureSnapshot(variables, {
+      origin: 'background',
+      reason: 'mvu-update',
+    });
+  }, [captureSnapshot]);
+
+  const markVariableApiWriteAsAi = useCallback((assistantMessageId: number) => {
+    const activeTurn = activeTurnRef.current;
+    if (!activeTurn || !Number.isInteger(assistantMessageId)) {
+      return;
+    }
+    activeTurn.assistantMessageId = assistantMessageId;
+    if (!activeTurn.aiWriteTargetIds.includes(assistantMessageId)) {
+      activeTurn.aiWriteTargetIds.push(assistantMessageId);
+    }
+    mutateSummary(summary => rebuildSummary(summary, activeTurn));
+  }, [mutateSummary]);
 
   const handleEraWriteDone = useCallback((detail?: EraWriteDoneDetail) => {
-    const finalMessage = readAssistantMessageContent(
-      detail?.message_id,
-      variableChangesRef.current?.assistantMessageId,
-    );
-    if (finalMessage.content) {
-      refreshDeclaredChanges(
-        finalMessage.content,
-        normalizeAssistantMessageId(detail?.message_id) ?? finalMessage.messageId,
-      );
+    const activeTurn = activeTurnRef.current;
+    if (!activeTurn) {
+      return;
     }
-    refreshActualChanges(detail?.statWithoutMeta ?? detail?.stat);
-  }, [refreshActualChanges, refreshDeclaredChanges]);
+
+    const actions = normalizeWriteActions(detail?.actions);
+    const assistantMessageId = normalizeMessageId(detail?.message_id);
+    const isAiTarget = assistantMessageId !== undefined
+      && activeTurn.aiWriteTargetIds.includes(assistantMessageId);
+    const isDirectChatWrite = actions?.directChatWrite === true;
+    const isAiWrite =
+      !isDirectChatWrite
+      && (
+        actions?.apply === true
+        || (actions?.apiWrite === true && isAiTarget)
+        || ((actions?.rollback === true || actions?.resync === true) && isAiTarget)
+      );
+    const reason = typeof detail?.reason === 'string' && detail.reason.trim()
+      ? detail.reason.trim()
+      : 'era-write-done';
+
+    if (assistantMessageId !== undefined && isAiWrite) {
+      activeTurn.assistantMessageId = assistantMessageId;
+      const finalMessage = readAssistantMessageContentById(assistantMessageId);
+      if (finalMessage.content.trim()) {
+        refreshDeclaredChanges(finalMessage.content, assistantMessageId);
+      }
+    }
+
+    captureSnapshot(detail?.statWithoutMeta ?? detail?.stat, {
+      origin: isAiWrite ? 'ai' : 'background',
+      reason,
+      actions,
+      assistantMessageId,
+    });
+  }, [captureSnapshot, refreshDeclaredChanges]);
 
   const clearVariableChanges = useCallback(() => {
     activeTurnRef.current = null;
-    updateVariableChanges(null);
-  }, [updateVariableChanges]);
+    commitSummary(null);
+  }, [commitSummary]);
 
   useEffect(() => {
     if (!restoredTurn) {
       return;
     }
-
     const refreshTimer = window.setTimeout(() => {
-      refreshActualChanges();
+      handleVariableMessageBoundary(restoredTurn.summary.assistantMessageId);
     }, 100);
     return () => window.clearTimeout(refreshTimer);
-  }, [refreshActualChanges, restoredTurn]);
+  }, [handleVariableMessageBoundary, restoredTurn]);
 
   return {
     variableChanges,
     handleVariableTurnStart,
+    handleGlobalMessageSent,
     handleVariableAssistantReply,
+    handleVariableMessageBoundary,
     handleMvuVariableUpdate,
     handleEraWriteDone,
+    markVariableApiWriteAsAi,
     clearVariableChanges,
   };
 }
