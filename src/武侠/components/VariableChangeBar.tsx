@@ -111,6 +111,9 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
     summary.background.observedChanges.length,
     summary.background.omittedObservedCount,
   );
+  const aiReplyComparisons = summary.aiReply.comparisons.filter(
+    comparison => Boolean(comparison.declaredChange),
+  );
 
   const handleCopy = async (label: string, text: string) => {
     await copyTextToClipboard(text);
@@ -173,18 +176,18 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
                   <span>AI回复变量</span>
                   <span>声{declaredTotal} / 实{aiObservedTotal}</span>
                 </div>
-                {summary.aiReply.comparisons.length > 0 ? (
+                {aiReplyComparisons.length > 0 ? (
                   <div className="variable-change-list">
-                    {summary.aiReply.comparisons.map(comparison => (
+                    {aiReplyComparisons.map(comparison => (
                       <AiComparisonRow
                         key={comparison.id}
                         comparison={comparison}
                         onCopy={handleCopy}
                       />
                     ))}
-                    {summary.aiReply.omittedComparisonCount > 0 && (
+                    {summary.aiReply.omittedDeclaredCount > 0 && (
                       <div className="variable-change-omitted">
-                        另有 {summary.aiReply.omittedComparisonCount} 条 AI 对比未显示
+                        另有 {summary.aiReply.omittedDeclaredCount} 条 AI 声明未显示
                       </div>
                     )}
                   </div>

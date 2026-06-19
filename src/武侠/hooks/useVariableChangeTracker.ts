@@ -44,7 +44,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 3;
+  version: 4;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -60,10 +60,11 @@ type CaptureMetadata = {
   aiOnlyDeclaredMatches?: boolean;
 };
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v3';
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v4';
 const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v1',
   'wuxia.variableChangeTurn.v2',
+  'wuxia.variableChangeTurn.v3',
 ];
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
 
@@ -110,7 +111,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 3 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== 4 || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -137,7 +138,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 3,
+      version: 4,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -740,7 +741,7 @@ export function useVariableChangeTracker() {
       reason,
       actions,
       assistantMessageId,
-      aiOnlyDeclaredMatches: actions?.apply === true,
+      aiOnlyDeclaredMatches: isAiWrite,
     });
   }, [captureSnapshot, refreshDeclaredChanges]);
 
