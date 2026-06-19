@@ -636,7 +636,8 @@ export function useVariableChangeTracker() {
     mutateSummary(summary => rebuildSummary(summary, activeTurn));
   }, [mutateSummary]);
 
-  const handleEraWriteDone = useCallback((detail?: EraWriteDoneDetail) => {
+  const handleEraWriteDone = useCallback((unknownDetail?: unknown) => {
+    const detail = isRecord(unknownDetail) ? unknownDetail as EraWriteDoneDetail : undefined;
     const activeTurn = activeTurnRef.current;
     if (!activeTurn) {
       return;

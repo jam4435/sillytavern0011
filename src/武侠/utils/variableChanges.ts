@@ -234,7 +234,7 @@ const formatCopyPathSegment = (segment: string | number): string => {
 };
 
 export const getVariableCopyPath = (path: VariablePath): string =>
-  path.reduce((copyPath, segment) => `${copyPath}${formatCopyPathSegment(segment)}`, 'stat_data');
+  path.reduce<string>((copyPath, segment) => `${copyPath}${formatCopyPathSegment(segment)}`, 'stat_data');
 
 export const formatVariablePreview = (value: unknown, maxLength = 120): string => {
   if (Array.isArray(value)) {
