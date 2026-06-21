@@ -12,6 +12,7 @@ function parseArgs(argv) {
   const options = {
     dir: DEFAULT_DIR,
     json: false,
+    limit: 50,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -23,6 +24,19 @@ function parseArgs(argv) {
     }
     if (arg === '--json') {
       options.json = true;
+      continue;
+    }
+    if (arg === '--limit' && argv[i + 1]) {
+      const limit = Number(argv[i + 1]);
+      if (!Number.isInteger(limit) || limit < 0) {
+        throw new Error(`Invalid --limit value: ${argv[i + 1]}`);
+      }
+      options.limit = limit;
+      i += 1;
+      continue;
+    }
+    if (arg === '--all') {
+      options.limit = Number.POSITIVE_INFINITY;
       continue;
     }
     throw new Error(`Unknown argument: ${arg}`);
@@ -139,7 +153,35 @@ function summarize(records) {
   };
 }
 
-function printText({ dir, fileCount, totalRecords, definiteViolations, suspiciousRecords, reasonCounts, suspiciousCounts }) {
+function printRecordSection(title, records, reasonKey, limit) {
+  if (records.length === 0) {
+    return;
+  }
+
+  console.log(`\n[${title}]`);
+
+  const shownRecords = records.slice(0, limit);
+  for (const record of shownRecords) {
+    console.log(
+      `${record.file}:${record.line} ${record.key} = ${record.value} [${record[reasonKey].join('，')}]`,
+    );
+  }
+
+  if (shownRecords.length < records.length) {
+    console.log(`... 省略 ${records.length - shownRecords.length} 条；使用 --all 或 --json 查看完整结果`);
+  }
+}
+
+function printText({
+  dir,
+  fileCount,
+  totalRecords,
+  definiteViolations,
+  suspiciousRecords,
+  reasonCounts,
+  suspiciousCounts,
+  limit,
+}) {
   console.log(`扫描目录: ${dir}`);
   console.log(`扫描文件: ${fileCount}`);
   console.log(`地点字段: ${totalRecords}`);
@@ -159,20 +201,8 @@ function printText({ dir, fileCount, totalRecords, definiteViolations, suspiciou
       console.log(`- ${reason}: ${count}`);
     }
   }
-
-  if (definiteViolations.length > 0) {
-    console.log('\n[明确违规条目]');
-    for (const record of definiteViolations) {
-      console.log(`${record.file}:${record.line} ${record.key} = ${record.value} [${record.reasons.join('，')}]`);
-    }
-  }
-
-  if (suspiciousRecords.length > 0) {
-    console.log('\n[结构通过但可疑的条目]');
-    for (const record of suspiciousRecords) {
-      console.log(`${record.file}:${record.line} ${record.key} = ${record.value} [${record.suspiciousReasons.join('，')}]`);
-    }
-  }
+  printRecordSection('明确违规条目', definiteViolations, 'reasons', limit);
+  printRecordSection('结构通过但可疑的条目', suspiciousRecords, 'suspiciousReasons', limit);
 }
 
 function main() {
@@ -199,6 +229,7 @@ function main() {
   printText({
     dir,
     fileCount: files.length,
+    limit: options.limit,
     ...summary,
   });
 }
