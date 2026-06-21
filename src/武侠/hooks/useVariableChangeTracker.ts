@@ -774,9 +774,7 @@ export function useVariableChangeTracker() {
       return;
     }
     activeTurn.assistantMessageId = assistantMessageId;
-    if (!activeTurn.aiWriteTargetIds.includes(assistantMessageId)) {
-      activeTurn.aiWriteTargetIds.push(assistantMessageId);
-    }
+    addAiWriteTarget(activeTurn, assistantMessageId);
     mutateSummary(summary => rebuildSummary(summary, activeTurn));
   }, [mutateSummary]);
 
@@ -790,7 +788,7 @@ export function useVariableChangeTracker() {
     const actions = normalizeWriteActions(detail?.actions);
     const assistantMessageId = normalizeMessageId(detail?.message_id);
     const isAiTarget = assistantMessageId !== undefined
-      && activeTurn.aiWriteTargetIds.includes(assistantMessageId);
+      && getAiWriteTargetCount(activeTurn, assistantMessageId) > 0;
     const isDirectChatWrite = actions?.directChatWrite === true;
     const isAiWrite =
       !isDirectChatWrite
@@ -811,19 +809,28 @@ export function useVariableChangeTracker() {
       }
     }
 
-    captureSnapshot(detail?.statWithoutMeta ?? detail?.stat, {
+    if (assistantMessageId !== undefined && actions?.apiWrite === true && isAiTarget) {
+      consumeAiWriteTarget(activeTurn, assistantMessageId);
+    }
+
+    const captureMetadata: CaptureMetadata = {
       origin: isAiWrite ? 'ai' : 'background',
       reason,
       actions,
       assistantMessageId,
       aiOnlyDeclaredMatches: isAiWrite,
-    });
-  }, [captureSnapshot, refreshDeclaredChanges]);
+    };
+    const snapshotAdvanced = captureSnapshot(detail?.statWithoutMeta ?? detail?.stat, captureMetadata);
+    if (!snapshotAdvanced) {
+      scheduleStaleWriteDoneRecovery(captureMetadata);
+    }
+  }, [captureSnapshot, refreshDeclaredChanges, scheduleStaleWriteDoneRecovery]);
 
   const clearVariableChanges = useCallback(() => {
+    clearWriteDoneRecoveryTimers();
     activeTurnRef.current = null;
     commitSummary(null);
-  }, [commitSummary]);
+  }, [clearWriteDoneRecoveryTimers, commitSummary]);
 
   useEffect(() => {
     if (!restoredTurn) {
@@ -834,6 +841,8 @@ export function useVariableChangeTracker() {
     }, 100);
     return () => window.clearTimeout(refreshTimer);
   }, [handleVariableMessageBoundary, restoredTurn]);
+
+  useEffect(() => clearWriteDoneRecoveryTimers, [clearWriteDoneRecoveryTimers]);
 
   return {
     variableChanges,
