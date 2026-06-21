@@ -23,7 +23,7 @@ type ActiveVariableTurn = {
   lastStatData: Record<string, unknown> | null;
   userMessageId?: number;
   assistantMessageId?: number;
-  aiWriteTargetIds: number[];
+  aiWriteTargets: Record<string, number>;
   batchSequence: number;
 };
 
@@ -44,7 +44,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 4;
+  version: 7;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -60,13 +60,19 @@ type CaptureMetadata = {
   aiOnlyDeclaredMatches?: boolean;
 };
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v4';
+const STORAGE_VERSION = 7;
+const STORAGE_KEY = `wuxia.variableChangeTurn.v${STORAGE_VERSION}`;
 const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v1',
   'wuxia.variableChangeTurn.v2',
   'wuxia.variableChangeTurn.v3',
+  'wuxia.variableChangeTurn.v4',
+  'wuxia.variableChangeTurn.v5',
+  'wuxia.variableChangeTurn.v6',
 ];
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
+const WRITE_DONE_RECOVERY_DELAY_MS = 40;
+const WRITE_DONE_RECOVERY_MAX_RETRIES = 8;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -111,7 +117,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 4 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== STORAGE_VERSION || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -138,7 +144,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 4,
+      version: STORAGE_VERSION,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -213,6 +219,39 @@ const normalizeWriteActions = (actions: unknown): VariableWriteActions | null =>
 const getPathKey = (change: Pick<VariableActualChange, 'path'>): string =>
   JSON.stringify(change.path);
 
+const getAiWriteTargetKey = (assistantMessageId: number): string =>
+  String(assistantMessageId);
+
+const getAiWriteTargetCount = (
+  activeTurn: ActiveVariableTurn,
+  assistantMessageId: number,
+): number => {
+  const targetKey = getAiWriteTargetKey(assistantMessageId);
+  const count = activeTurn.aiWriteTargets[targetKey];
+  return Number.isFinite(count) && count > 0 ? count : 0;
+};
+
+const addAiWriteTarget = (
+  activeTurn: ActiveVariableTurn,
+  assistantMessageId: number,
+): void => {
+  const targetKey = getAiWriteTargetKey(assistantMessageId);
+  activeTurn.aiWriteTargets[targetKey] = getAiWriteTargetCount(activeTurn, assistantMessageId) + 1;
+};
+
+const consumeAiWriteTarget = (
+  activeTurn: ActiveVariableTurn,
+  assistantMessageId: number,
+): void => {
+  const targetKey = getAiWriteTargetKey(assistantMessageId);
+  const nextCount = getAiWriteTargetCount(activeTurn, assistantMessageId) - 1;
+  if (nextCount > 0) {
+    activeTurn.aiWriteTargets[targetKey] = nextCount;
+    return;
+  }
+  delete activeTurn.aiWriteTargets[targetKey];
+};
+
 const declaredMatchesObserved = (
   declared: VariableChangeSummary['aiReply']['declaredChanges'][number],
   observed: VariableActualChange,
@@ -282,6 +321,7 @@ const isProvisionalReason = (reason: string | null): boolean =>
   reason === 'mvu-update' || reason === 'message-boundary';
 
 export function useVariableChangeTracker() {
+  const writeDoneRecoveryTimersRef = useRef<Array<ReturnType<typeof window.setTimeout>>>([]);
   const restoredTurnRef = useRef<StoredVariableTurn | null | undefined>(undefined);
   if (restoredTurnRef.current === undefined) {
     restoredTurnRef.current = readStoredVariableTurn();
@@ -301,6 +341,13 @@ export function useVariableChangeTracker() {
     persistVariableTurn(activeTurnRef.current, summary);
   }, []);
 
+  const clearWriteDoneRecoveryTimers = useCallback(() => {
+    for (const timer of writeDoneRecoveryTimersRef.current) {
+      window.clearTimeout(timer);
+    }
+    writeDoneRecoveryTimersRef.current = [];
+  }, []);
+
   const mutateSummary = useCallback((
     updater: (current: VariableChangeSummary) => VariableChangeSummary,
   ) => {
@@ -312,6 +359,7 @@ export function useVariableChangeTracker() {
   }, [commitSummary]);
 
   const startTurn = useCallback((userMessageId?: number) => {
+    clearWriteDoneRecoveryTimers();
     const turnId = nextTurnIdRef.current + 1;
     nextTurnIdRef.current = turnId;
     const baselineStatData = readCurrentStatDataSnapshot();
@@ -320,7 +368,7 @@ export function useVariableChangeTracker() {
       baselineStatData,
       lastStatData: baselineStatData,
       userMessageId,
-      aiWriteTargetIds: [],
+      aiWriteTargets: {},
       batchSequence: 0,
     };
     activeTurnRef.current = activeTurn;
@@ -328,7 +376,7 @@ export function useVariableChangeTracker() {
       turnId,
       baselineStatData ? 'tracking' : 'error',
     ));
-  }, [commitSummary]);
+  }, [clearWriteDoneRecoveryTimers, commitSummary]);
 
   const upgradeMatchingBatch = useCallback((
     nextSnapshotHash: string,
@@ -455,11 +503,11 @@ export function useVariableChangeTracker() {
   const captureSnapshot = useCallback((
     nextData: unknown,
     metadata: CaptureMetadata,
-  ) => {
+  ): boolean => {
     const activeTurn = activeTurnRef.current;
     const current = variableChangesRef.current;
     if (!activeTurn || !current || current.turnId !== activeTurn.turnId) {
-      return;
+      return false;
     }
 
     const nextStatData = nextData === undefined
@@ -467,7 +515,7 @@ export function useVariableChangeTracker() {
       : readStatDataSnapshotFromUnknown(nextData) ?? readCurrentStatDataSnapshot();
     if (!nextStatData) {
       mutateSummary(summary => ({ ...summary, status: 'error', updatedAt: Date.now() }));
-      return;
+      return false;
     }
 
     const nextSnapshotHash = getSnapshotHash(nextStatData);
@@ -478,7 +526,7 @@ export function useVariableChangeTracker() {
       upgradeMatchingBatch(nextSnapshotHash, metadata);
       activeTurn.lastStatData = nextStatData;
       persistVariableTurn(activeTurn, variableChangesRef.current);
-      return;
+      return false;
     }
 
     activeTurn.batchSequence += 1;
@@ -499,7 +547,7 @@ export function useVariableChangeTracker() {
 
     if (!result.batch || result.observedChanges.length === 0) {
       persistVariableTurn(activeTurn, variableChangesRef.current);
-      return;
+      return true;
     }
 
     const declaredChanges = current.aiReply.declaredChanges;
@@ -582,6 +630,7 @@ export function useVariableChangeTracker() {
       };
       return rebuildSummary(nextSummary, activeTurn);
     });
+    return true;
   }, [mutateSummary, upgradeMatchingBatch]);
 
   const refreshDeclaredChanges = useCallback((
@@ -691,6 +740,32 @@ export function useVariableChangeTracker() {
       origin: 'background',
       reason: 'mvu-update',
     });
+  }, [captureSnapshot]);
+
+  const scheduleStaleWriteDoneRecovery = useCallback((
+    metadata: CaptureMetadata,
+    attempt = 1,
+    turnId = activeTurnRef.current?.turnId,
+  ) => {
+    if (turnId === undefined) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      writeDoneRecoveryTimersRef.current = writeDoneRecoveryTimersRef.current
+        .filter(candidate => candidate !== timer);
+      const activeTurn = activeTurnRef.current;
+      if (!activeTurn || activeTurn.turnId !== turnId) {
+        return;
+      }
+
+      const snapshotAdvanced = captureSnapshot(undefined, metadata);
+      if (!snapshotAdvanced && attempt < WRITE_DONE_RECOVERY_MAX_RETRIES) {
+        scheduleStaleWriteDoneRecovery(metadata, attempt + 1, turnId);
+      }
+    }, WRITE_DONE_RECOVERY_DELAY_MS);
+
+    writeDoneRecoveryTimersRef.current.push(timer);
   }, [captureSnapshot]);
 
   const markVariableApiWriteAsAi = useCallback((assistantMessageId: number) => {
