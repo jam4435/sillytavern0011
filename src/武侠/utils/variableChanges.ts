@@ -328,6 +328,7 @@ export const readCurrentStatDataSnapshot = (): Record<string, unknown> | null =>
   }
 };
 
+// Callers must only use this for sources that already match chat stat_data's encoded representation.
 export const readStatDataSnapshotFromUnknown = (source: unknown): Record<string, unknown> | null => {
   const statData = extractStatData(source);
   return statData ? cloneJson(statData) : null;
