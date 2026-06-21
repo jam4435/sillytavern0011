@@ -107,7 +107,9 @@ if (Object.keys(presentCharacters).length > 0) {
 </status_current_variables>
 </variable>
 
+---
 上面ejs的对应输出：
+---
 
 <variable>
 <status_current_variables>
