@@ -44,7 +44,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 4;
+  version: 8;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -60,13 +60,19 @@ type CaptureMetadata = {
   aiOnlyDeclaredMatches?: boolean;
 };
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v4';
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v8';
 const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v1',
   'wuxia.variableChangeTurn.v2',
   'wuxia.variableChangeTurn.v3',
+  'wuxia.variableChangeTurn.v4',
+  'wuxia.variableChangeTurn.v5',
+  'wuxia.variableChangeTurn.v6',
+  'wuxia.variableChangeTurn.v7',
 ];
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
+const STALE_WRITE_DONE_RETRY_DELAY_MS = 40;
+const STALE_WRITE_DONE_MAX_RETRIES = 8;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -111,7 +117,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 4 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== 8 || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -138,7 +144,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 4,
+      version: 8,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -452,8 +458,8 @@ export function useVariableChangeTracker() {
     return true;
   }, [mutateSummary]);
 
-  const captureSnapshot = useCallback((
-    nextData: unknown,
+  const captureResolvedSnapshot = useCallback((
+    nextStatData: Record<string, unknown> | null,
     metadata: CaptureMetadata,
   ) => {
     const activeTurn = activeTurnRef.current;
@@ -462,9 +468,6 @@ export function useVariableChangeTracker() {
       return;
     }
 
-    const nextStatData = nextData === undefined
-      ? readCurrentStatDataSnapshot()
-      : readStatDataSnapshotFromUnknown(nextData) ?? readCurrentStatDataSnapshot();
     if (!nextStatData) {
       mutateSummary(summary => ({ ...summary, status: 'error', updatedAt: Date.now() }));
       return;
@@ -584,6 +587,21 @@ export function useVariableChangeTracker() {
     });
   }, [mutateSummary, upgradeMatchingBatch]);
 
+  const captureCurrentSnapshot = useCallback((metadata: CaptureMetadata) => {
+    captureResolvedSnapshot(readCurrentStatDataSnapshot(), metadata);
+  }, [captureResolvedSnapshot]);
+
+  const captureCanonicalSnapshot = useCallback((
+    nextData: unknown,
+    metadata: CaptureMetadata,
+  ) => {
+    // This path only accepts snapshots that already match chat stat_data's encoded representation.
+    captureResolvedSnapshot(
+      readStatDataSnapshotFromUnknown(nextData) ?? readCurrentStatDataSnapshot(),
+      metadata,
+    );
+  }, [captureResolvedSnapshot]);
+
   const refreshDeclaredChanges = useCallback((
     rawReply: string,
     assistantMessageId?: number,
@@ -646,13 +664,13 @@ export function useVariableChangeTracker() {
     assistantMessageId?: number,
   ) => {
     refreshDeclaredChanges(rawReply, assistantMessageId);
-    captureSnapshot(undefined, {
+    captureCurrentSnapshot({
       origin: 'background',
       reason: 'message-boundary',
       allowDeclaredMatching: true,
       assistantMessageId,
     });
-  }, [captureSnapshot, refreshDeclaredChanges]);
+  }, [captureCurrentSnapshot, refreshDeclaredChanges]);
 
   const handleVariableMessageBoundary = useCallback((messageId?: number) => {
     if (!activeTurnRef.current) {
@@ -668,13 +686,13 @@ export function useVariableChangeTracker() {
     if (finalMessage.content.trim()) {
       refreshDeclaredChanges(finalMessage.content, finalMessage.messageId);
     }
-    captureSnapshot(undefined, {
+    captureCurrentSnapshot({
       origin: 'background',
       reason: 'message-boundary',
       allowDeclaredMatching: true,
       assistantMessageId: finalMessage.messageId,
     });
-  }, [captureSnapshot, refreshDeclaredChanges]);
+  }, [captureCurrentSnapshot, refreshDeclaredChanges]);
 
   const handleMvuVariableUpdate = useCallback((
     variables: unknown,
@@ -687,11 +705,70 @@ export function useVariableChangeTracker() {
     if (!activeTurn.lastStatData && variablesBeforeUpdate !== undefined) {
       activeTurn.lastStatData = readStatDataSnapshotFromUnknown(variablesBeforeUpdate);
     }
-    captureSnapshot(variables, {
+    captureCanonicalSnapshot(variables, {
       origin: 'background',
       reason: 'mvu-update',
     });
-  }, [captureSnapshot]);
+  }, [captureCanonicalSnapshot]);
+
+  const scheduleStaleWriteDoneRecovery = useCallback(({
+    turnId,
+    expectedSnapshotHash,
+    metadata,
+    refreshDeclaredAssistant,
+  }: {
+    turnId: number;
+    expectedSnapshotHash: string | null;
+    metadata: CaptureMetadata;
+    refreshDeclaredAssistant?: boolean;
+  }) => {
+    if (!expectedSnapshotHash) {
+      return;
+    }
+
+    const retryCapture = (remainingRetries: number) => {
+      const activeTurn = activeTurnRef.current;
+      if (!activeTurn || activeTurn.turnId !== turnId) {
+        return;
+      }
+
+      const currentSnapshotHash = activeTurn.lastStatData
+        ? getSnapshotHash(activeTurn.lastStatData)
+        : null;
+      if (currentSnapshotHash !== expectedSnapshotHash) {
+        return;
+      }
+
+      if (refreshDeclaredAssistant && metadata.assistantMessageId !== undefined) {
+        const finalMessage = readAssistantMessageContentById(metadata.assistantMessageId);
+        if (finalMessage.content.trim()) {
+          refreshDeclaredChanges(finalMessage.content, metadata.assistantMessageId);
+        }
+      }
+
+      captureCurrentSnapshot(metadata);
+
+      const refreshedTurn = activeTurnRef.current;
+      if (!refreshedTurn || refreshedTurn.turnId !== turnId) {
+        return;
+      }
+
+      const refreshedSnapshotHash = refreshedTurn.lastStatData
+        ? getSnapshotHash(refreshedTurn.lastStatData)
+        : null;
+      if (refreshedSnapshotHash !== expectedSnapshotHash || remainingRetries <= 1) {
+        return;
+      }
+
+      window.setTimeout(() => {
+        retryCapture(remainingRetries - 1);
+      }, STALE_WRITE_DONE_RETRY_DELAY_MS);
+    };
+
+    window.setTimeout(() => {
+      retryCapture(STALE_WRITE_DONE_MAX_RETRIES);
+    }, STALE_WRITE_DONE_RETRY_DELAY_MS);
+  }, [captureCurrentSnapshot, refreshDeclaredChanges]);
 
   const markVariableApiWriteAsAi = useCallback((assistantMessageId: number) => {
     const activeTurn = activeTurnRef.current;
@@ -727,6 +804,9 @@ export function useVariableChangeTracker() {
     const reason = typeof detail?.reason === 'string' && detail.reason.trim()
       ? detail.reason.trim()
       : 'era-write-done';
+    const beforeCaptureSnapshotHash = activeTurn.lastStatData
+      ? getSnapshotHash(activeTurn.lastStatData)
+      : null;
 
     if (assistantMessageId !== undefined && isAiWrite) {
       activeTurn.assistantMessageId = assistantMessageId;
@@ -736,14 +816,43 @@ export function useVariableChangeTracker() {
       }
     }
 
-    captureSnapshot(detail?.statWithoutMeta ?? detail?.stat, {
+    // ERA unescapes stat/statWithoutMeta before emitting writeDone.
+    // Feeding that payload into diff/hash would mix representations and create fake changes,
+    // so the tracker always rereads chat stat_data here and uses writeDone only for attribution.
+    captureCurrentSnapshot({
       origin: isAiWrite ? 'ai' : 'background',
       reason,
       actions,
       assistantMessageId,
       aiOnlyDeclaredMatches: isAiWrite,
     });
-  }, [captureSnapshot, refreshDeclaredChanges]);
+
+    const afterCaptureSnapshotHash = activeTurn.lastStatData
+      ? getSnapshotHash(activeTurn.lastStatData)
+      : null;
+
+    if (
+      beforeCaptureSnapshotHash === afterCaptureSnapshotHash
+      && (
+        actions?.apply === true
+        || actions?.apiWrite === true
+        || (isAiWrite && (actions?.rollback === true || actions?.resync === true))
+      )
+    ) {
+      scheduleStaleWriteDoneRecovery({
+        turnId: activeTurn.turnId,
+        expectedSnapshotHash: beforeCaptureSnapshotHash,
+        metadata: {
+          origin: isAiWrite ? 'ai' : 'background',
+          reason,
+          actions,
+          assistantMessageId,
+          aiOnlyDeclaredMatches: isAiWrite,
+        },
+        refreshDeclaredAssistant: isAiWrite && assistantMessageId !== undefined,
+      });
+    }
+  }, [captureCurrentSnapshot, refreshDeclaredChanges, scheduleStaleWriteDoneRecovery]);
 
   const clearVariableChanges = useCallback(() => {
     activeTurnRef.current = null;
