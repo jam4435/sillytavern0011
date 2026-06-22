@@ -105,7 +105,7 @@ interface UserProfile {
   >;
   人物经历?: Record<string, string> | string;
   关系网?: Record<string, string>;
-  $meta?: unknown; // MVU 元数据，忽略
+  $meta?: unknown; // ERA 元数据，忽略
 }
 
 /**
@@ -154,7 +154,7 @@ interface CharacterData {
 
 /**
  * 变量表结构类型定义
- * 根据 MVU 框架定义的变量结构
+ * 根据当前项目使用的聊天级 stat_data 结构定义
  */
 interface GameVariables {
   // 世界信息
@@ -429,7 +429,7 @@ export function parseOptionsFromTag(optionContent: string): string[] {
  * 这是读取游戏状态的首选方法
  *
  * 注意：getAllVariables() 返回的数据结构中，真正的游戏变量在 stat_data 键下
- * stat_data 包含世界信息、用户档案等 MVU 框架定义的变量
+ * stat_data 包含世界信息、用户档案等项目变量
  */
 export function getGameVariables(): GameVariables {
   try {
@@ -458,15 +458,6 @@ function hasValidUserData(variables: GameVariables): boolean {
   const hasUserName = '用户名' in user数据 && Boolean(user数据.用户名);
 
   return hasGender || hasRealm || hasUserName;
-}
-
-function extractGameVariablesFromMvuData(data: unknown): GameVariables {
-  if (!data || typeof data !== 'object') {
-    return {};
-  }
-
-  const record = data as Record<string, unknown>;
-  return (record.stat_data as GameVariables | undefined) || (record as GameVariables);
 }
 
 /**
@@ -2298,30 +2289,6 @@ export async function flushPendingGameDataCompletion(reason: string = 'manual-fl
   }
 }
 
-export function scheduleGameDataCompletionFromMvuUpdate(nextData: unknown, previousData: unknown): void {
-  const nextVariables = extractGameVariablesFromMvuData(nextData);
-  const previousVariables = extractGameVariablesFromMvuData(previousData);
-
-  const scope: GameDataCompletionScope = {};
-  if (shouldCheckPlayerAttributes(nextVariables.user数据, previousVariables.user数据)) {
-    scope.playerAttributes = nextVariables.user数据;
-  }
-
-  const changedCharacterAttributes = collectChangedCharacterAttributes(nextVariables, previousVariables);
-  if (changedCharacterAttributes) {
-    scope.characterAttributes = changedCharacterAttributes;
-  }
-
-  const changedMartialArts = collectChangedMartialArts(nextVariables, previousVariables);
-  if (changedMartialArts) {
-    scope.martialArts = changedMartialArts;
-  }
-
-  if (hasPendingCompletionScope(scope)) {
-    scheduleGameDataCompletion('mvu-variable-update', { fullScan: false, scope });
-  }
-}
-
 /**
  * 从酒馆变量表纯读取游戏数据，不触发任何变量写入。
  */
@@ -2635,30 +2602,5 @@ export function getLastMessageContent(): string {
   } catch (error) {
     dataLogger.error('❌ [getLastMessageContent] 获取消息失败:', error);
     return '';
-  }
-}
-
-/**
- * 解析消息中的变量数据（保留兼容性）
- * 支持 MVU 格式的变量块
- */
-export function parseVariables(messageContent: string): Record<string, unknown> | null {
-  try {
-    // 尝试解析 MVU 格式的变量块
-    const mvuMatch = messageContent.match(/<mvu>([\s\S]*?)<\/mvu>/i);
-    if (mvuMatch) {
-      return YAML.parse(mvuMatch[1]);
-    }
-
-    // 尝试解析 JSON 格式的变量块
-    const jsonMatch = messageContent.match(/<variables>([\s\S]*?)<\/variables>/i);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[1]);
-    }
-
-    return null;
-  } catch (error) {
-    dataLogger.error('解析变量失败:', error);
-    return null;
   }
 }

@@ -40,7 +40,7 @@ interface MartialArtsPanelProps {
     onUpgrade?: (result: { success: boolean; martialArtName: string; newMastery?: string; newCultivation?: number; error?: string }) => void;
 }
 
-export const MartialArtsPanel: React.FC<MartialArtsPanelProps & Record<string, unknown>> = ({
+export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
     martialArts,
     cultivation,
     onUpgrade

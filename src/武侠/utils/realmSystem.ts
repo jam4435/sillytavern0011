@@ -6,7 +6,7 @@
  */
 
 import { gameLogger } from './logger';
-import { emitEraEventAndWait } from './messageActions';
+import { emitEraEventAndWait } from './eraWriteWait';
 
 // 大境界列表（按顺序）
 export const MAJOR_REALMS = ['不入流', '三流', '二流', '一流', '宗师', '绝顶', '陆地神仙'] as const;

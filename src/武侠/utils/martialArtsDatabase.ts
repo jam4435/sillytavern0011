@@ -9,7 +9,7 @@
  */
 
 import { dataLogger } from './logger';
-import { emitEraEventAndWait } from './messageActions';
+import { emitEraEventAndWait } from './eraWriteWait';
 
 // ============================================
 // 类型定义

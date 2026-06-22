@@ -6,7 +6,7 @@ import {
 import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryApiConfig } from './summaryApiClient';
 import { dataLogger } from './logger';
 import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
-import { emitEraEventAndWait } from './messageActions';
+import { emitEraEventAndWait } from './eraWriteWait';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
 const OUTPUT_PROMPT_ENTRY_NAME = '输出提示词';

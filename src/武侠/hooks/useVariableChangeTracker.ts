@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type {
+  DirectVariableWriteDoneDetail,
+  DirectVariableWriteSource,
+} from '../../shared/directVariableWrite';
 import {
   buildAiComparisons,
   collectVariableTopLevelGroups,
@@ -59,6 +63,11 @@ type CaptureMetadata = {
   assistantMessageId?: number;
   aiOnlyDeclaredMatches?: boolean;
 };
+
+type VariableWriteSignal =
+  | { kind: 'era'; producer: 'era'; detail?: WriteDoneLikeDetail }
+  | { kind: 'direct'; producer: DirectVariableWriteSource; detail?: DirectVariableWriteDoneDetail }
+  | { kind: 'boundary'; producer: 'message-boundary'; assistantMessageId?: number };
 
 const STORAGE_KEY = 'wuxia.variableChangeTurn.v9';
 const LEGACY_STORAGE_KEYS = [
@@ -286,13 +295,22 @@ const rebuildSummary = (
 };
 
 const PRODUCER_PRIORITY: Record<VariableChangeProducer, number> = {
-  boundary: 0,
+  'message-boundary': 0,
   era: 1,
-  direct: 2,
+  'event-script': 1,
+  'variable-editor': 1,
+  frontend: 1,
+  restore: 1,
 };
 
-const isBoundaryReason = (reason: string | null): boolean =>
-  reason === 'message-boundary';
+const isBoundaryProducer = (producer: VariableChangeProducer): boolean =>
+  producer === 'message-boundary';
+
+const isDirectVariableWriteSource = (value: unknown): value is DirectVariableWriteSource =>
+  value === 'event-script'
+  || value === 'variable-editor'
+  || value === 'frontend'
+  || value === 'restore';
 
 export function useVariableChangeTracker() {
   const restoredTurnRef = useRef<StoredVariableTurn | null | undefined>(undefined);
@@ -367,8 +385,8 @@ export function useVariableChangeTracker() {
       shouldUpgradeProducer
       || (
         batch.producer === metadata.producer
-        && isBoundaryReason(batch.reason)
-        && !isBoundaryReason(metadata.reason)
+        && isBoundaryProducer(batch.producer)
+        && !isBoundaryProducer(metadata.producer)
       )
       || (batch.actions === null && metadata.actions !== null && metadata.actions !== undefined)
       || (batch.assistantMessageId === undefined && metadata.assistantMessageId !== undefined);
@@ -668,41 +686,6 @@ export function useVariableChangeTracker() {
     startTurn(normalizedMessageId);
   }, [mutateSummary, startTurn]);
 
-  const handleVariableAssistantReply = useCallback((
-    rawReply: string,
-    assistantMessageId?: number,
-  ) => {
-    refreshDeclaredChanges(rawReply, assistantMessageId);
-    captureCurrentSnapshot({
-      origin: 'background',
-      producer: 'boundary',
-      reason: 'message-boundary',
-      assistantMessageId,
-    });
-  }, [captureCurrentSnapshot, refreshDeclaredChanges]);
-
-  const handleVariableMessageBoundary = useCallback((messageId?: number) => {
-    if (!activeTurnRef.current) {
-      return;
-    }
-
-    const resolved = messageId !== undefined
-      ? readAssistantMessageContentById(messageId)
-      : readLatestAssistantMessageContent();
-    const finalMessage = resolved.content.trim()
-      ? resolved
-      : readLatestAssistantMessageContent();
-    if (finalMessage.content.trim()) {
-      refreshDeclaredChanges(finalMessage.content, finalMessage.messageId);
-    }
-    captureCurrentSnapshot({
-      origin: 'background',
-      producer: 'boundary',
-      reason: 'message-boundary',
-      assistantMessageId: finalMessage.messageId,
-    });
-  }, [captureCurrentSnapshot, refreshDeclaredChanges]);
-
   const scheduleStaleWriteDoneRecovery = useCallback(({
     turnId,
     expectedSnapshotHash,
@@ -774,32 +757,49 @@ export function useVariableChangeTracker() {
     mutateSummary(summary => rebuildSummary(summary, activeTurn));
   }, [mutateSummary]);
 
-  const handleWriteDoneSignal = useCallback((
-    unknownDetail: unknown,
-    producer: Extract<VariableChangeProducer, 'era' | 'direct'>,
-  ) => {
-    const detail = isRecord(unknownDetail) ? unknownDetail as WriteDoneLikeDetail : undefined;
+  const captureSignal = useCallback((signal: VariableWriteSignal) => {
     const activeTurn = activeTurnRef.current;
     if (!activeTurn) {
       return;
     }
 
-    const actions = normalizeWriteActions(detail?.actions);
-    const assistantMessageId = normalizeMessageId(detail?.message_id);
+    if (signal.kind === 'boundary') {
+      captureCurrentSnapshot({
+        origin: 'background',
+        producer: signal.producer,
+        reason: 'message-boundary',
+        assistantMessageId: signal.assistantMessageId,
+      });
+      return;
+    }
+
+    const actions =
+      signal.kind === 'era'
+        ? normalizeWriteActions(signal.detail?.actions)
+        : null;
+    const assistantMessageId =
+      signal.kind === 'era'
+        ? normalizeMessageId(signal.detail?.message_id)
+        : undefined;
     const isAiTarget = assistantMessageId !== undefined
       && activeTurn.aiWriteTargetIds.includes(assistantMessageId);
     const isDirectChatWrite = actions?.directChatWrite === true;
     const isAiWrite =
-      producer === 'era'
+      signal.kind === 'era'
       && !isDirectChatWrite
       && (
         actions?.apply === true
         || (actions?.apiWrite === true && isAiTarget)
         || ((actions?.rollback === true || actions?.resync === true) && isAiTarget)
       );
-    const reason = typeof detail?.reason === 'string' && detail.reason.trim()
-      ? detail.reason.trim()
-      : producer === 'direct' ? 'direct-write-done' : 'era-write-done';
+    const reason =
+      signal.kind === 'direct'
+        ? (typeof signal.detail?.reason === 'string' && signal.detail.reason.trim()
+          ? signal.detail.reason.trim()
+          : 'direct-write-done')
+        : (typeof signal.detail?.reason === 'string' && signal.detail.reason.trim()
+          ? signal.detail.reason.trim()
+          : 'era-write-done');
     const beforeCaptureSnapshotHash = activeTurn.lastStatData
       ? getSnapshotHash(activeTurn.lastStatData)
       : null;
@@ -816,7 +816,7 @@ export function useVariableChangeTracker() {
     // writeDone payloads are attribution metadata only and must not enter diff/hash directly.
     captureCurrentSnapshot({
       origin: isAiWrite ? 'ai' : 'background',
-      producer,
+      producer: signal.producer,
       reason,
       actions,
       assistantMessageId,
@@ -830,7 +830,7 @@ export function useVariableChangeTracker() {
     if (
       beforeCaptureSnapshotHash === afterCaptureSnapshotHash
       && (
-        producer === 'era'
+        signal.kind === 'era'
         && (
           actions?.apply === true
           || actions?.apiWrite === true
@@ -843,7 +843,7 @@ export function useVariableChangeTracker() {
         expectedSnapshotHash: beforeCaptureSnapshotHash,
         metadata: {
           origin: isAiWrite ? 'ai' : 'background',
-          producer,
+          producer: signal.producer,
           reason,
           actions,
           assistantMessageId,
@@ -854,13 +854,49 @@ export function useVariableChangeTracker() {
     }
   }, [captureCurrentSnapshot, refreshDeclaredChanges, scheduleStaleWriteDoneRecovery]);
 
+  const handleVariableAssistantReply = useCallback((
+    rawReply: string,
+    assistantMessageId?: number,
+  ) => {
+    refreshDeclaredChanges(rawReply, assistantMessageId);
+    captureSignal({
+      kind: 'boundary',
+      producer: 'message-boundary',
+      assistantMessageId,
+    });
+  }, [captureSignal, refreshDeclaredChanges]);
+
+  const handleVariableMessageBoundary = useCallback((messageId?: number) => {
+    if (!activeTurnRef.current) {
+      return;
+    }
+
+    const resolved = messageId !== undefined
+      ? readAssistantMessageContentById(messageId)
+      : readLatestAssistantMessageContent();
+    const finalMessage = resolved.content.trim()
+      ? resolved
+      : readLatestAssistantMessageContent();
+    if (finalMessage.content.trim()) {
+      refreshDeclaredChanges(finalMessage.content, finalMessage.messageId);
+    }
+    captureSignal({
+      kind: 'boundary',
+      producer: 'message-boundary',
+      assistantMessageId: finalMessage.messageId,
+    });
+  }, [captureSignal, refreshDeclaredChanges]);
+
   const handleEraWriteDone = useCallback((unknownDetail?: unknown) => {
-    handleWriteDoneSignal(unknownDetail, 'era');
-  }, [handleWriteDoneSignal]);
+    const detail = isRecord(unknownDetail) ? unknownDetail as WriteDoneLikeDetail : undefined;
+    captureSignal({ kind: 'era', producer: 'era', detail });
+  }, [captureSignal]);
 
   const handleDirectVariableWriteDone = useCallback((unknownDetail?: unknown) => {
-    handleWriteDoneSignal(unknownDetail, 'direct');
-  }, [handleWriteDoneSignal]);
+    const detail = isRecord(unknownDetail) ? unknownDetail as DirectVariableWriteDoneDetail : undefined;
+    const producer = isDirectVariableWriteSource(detail?.source) ? detail.source : 'frontend';
+    captureSignal({ kind: 'direct', producer, detail });
+  }, [captureSignal]);
 
   const clearVariableChanges = useCallback(() => {
     activeTurnRef.current = null;

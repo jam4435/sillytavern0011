@@ -79,7 +79,7 @@ describe('createObservedVariableChanges', () => {
       { user数据: { 修为: 100 } },
       {
         origin: 'background',
-        producer: 'boundary',
+        producer: 'message-boundary',
         timestamp: 1000,
         batchId: 'batch-1',
       },

@@ -51,9 +51,12 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
 };
 
 const PRODUCER_META: Record<VariableChangeProducer, { label: string; tone: SourceTone }> = {
-  era: { label: 'ERA', tone: 'era' },
-  direct: { label: 'Direct', tone: 'direct' },
-  boundary: { label: '边界补偿', tone: 'boundary' },
+  era: { label: 'ERA/API', tone: 'era' },
+  'event-script': { label: '事件脚本', tone: 'event-script' },
+  'variable-editor': { label: '变量编辑器', tone: 'variable-editor' },
+  frontend: { label: '游戏前端', tone: 'frontend' },
+  restore: { label: '状态恢复', tone: 'restore' },
+  'message-boundary': { label: '消息补偿', tone: 'message-boundary' },
 };
 
 const getProducerMeta = (producer: VariableChangeProducer): { label: string; tone: SourceTone } =>

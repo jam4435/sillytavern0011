@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { DIRECT_VARIABLE_WRITE_DONE_EVENT } from '../../shared/directVariableWrite';
 import { GameState } from '../types';
 import {
   getLastMessageContent,
@@ -81,7 +82,7 @@ export function useEventListeners({
     };
 
     const handleDirectWriteDone = (detail?: unknown) => {
-      eventLogger.log('[wuxia:directVariableWriteDone] 检测到 direct 变量写入完成，调度纯读刷新');
+      eventLogger.log(`[${DIRECT_VARIABLE_WRITE_DONE_EVENT}] 检测到 direct 变量写入完成，调度纯读刷新`);
       onDirectVariableWriteDone?.(detail);
       scheduleGameDataCompletion('direct-write-done', { fullScan: true });
       scheduleRefresh(50);
@@ -104,8 +105,8 @@ export function useEventListeners({
     });
     eventLogger.log('注册 era:writeDone 监听器...');
     const writeDoneListener = eventOn('era:writeDone', handleWriteDone);
-    eventLogger.log('注册 wuxia:directVariableWriteDone 监听器...');
-    const directWriteDoneListener = eventOn('wuxia:directVariableWriteDone', handleDirectWriteDone);
+    eventLogger.log(`注册 ${DIRECT_VARIABLE_WRITE_DONE_EVENT} 监听器...`);
+    const directWriteDoneListener = eventOn(DIRECT_VARIABLE_WRITE_DONE_EVENT, handleDirectWriteDone);
     eventLogger.log('🎧 监听器注册完成');
 
     return () => {

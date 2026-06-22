@@ -930,13 +930,31 @@
     border-color: rgba(245, 158, 11, 0.22);
   }
 
-  &.direct {
+  &.event-script {
     color: rgba(191, 219, 254, 0.94);
     background: rgba(8, 47, 73, 0.4);
     border-color: rgba(14, 165, 233, 0.22);
   }
 
-  &.boundary {
+  &.variable-editor {
+    color: rgba(196, 181, 253, 0.96);
+    background: rgba(67, 56, 202, 0.24);
+    border-color: rgba(129, 140, 248, 0.24);
+  }
+
+  &.frontend {
+    color: rgba(191, 219, 254, 0.94);
+    background: rgba(8, 47, 73, 0.4);
+    border-color: rgba(14, 165, 233, 0.22);
+  }
+
+  &.restore {
+    color: rgba(253, 224, 71, 0.95);
+    background: rgba(113, 63, 18, 0.32);
+    border-color: rgba(234, 179, 8, 0.24);
+  }
+
+  &.message-boundary {
     color: rgba(233, 213, 255, 0.96);
     background: rgba(76, 29, 149, 0.28);
     border-color: rgba(168, 85, 247, 0.22);

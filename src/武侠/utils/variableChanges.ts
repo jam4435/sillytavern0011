@@ -1,7 +1,12 @@
+import type { DirectVariableWriteSource } from '../../shared/directVariableWrite';
+
 export type VariablePath = Array<string | number>;
 export type VariableChangeAction = 'insert' | 'edit' | 'delete';
 export type VariableChangeOrigin = 'ai' | 'background';
-export type VariableChangeProducer = 'era' | 'direct' | 'boundary';
+export type VariableChangeProducer =
+  | DirectVariableWriteSource
+  | 'era'
+  | 'message-boundary';
 export type VariableChangeSource = 'ai-declared' | 'observed-diff';
 export type VariableComparisonStatus = 'applied' | 'not-applied' | 'diverged' | 'no-op' | 'api-only';
 export type VariableChangeStatus = 'tracking' | 'reply-recorded' | 'settled' | 'error';
