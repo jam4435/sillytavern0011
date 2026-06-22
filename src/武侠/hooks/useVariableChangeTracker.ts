@@ -27,7 +27,7 @@ type ActiveVariableTurn = {
   batchSequence: number;
 };
 
-type EraWriteDoneDetail = {
+type WriteDoneLikeDetail = {
   message_id?: number | null;
   actions?: Record<string, unknown>;
   reason?: unknown;
@@ -370,7 +370,7 @@ export function useVariableChangeTracker() {
         && isBoundaryReason(batch.reason)
         && !isBoundaryReason(metadata.reason)
       )
-      || (batch.actions === null && metadata.actions !== undefined)
+      || (batch.actions === null && metadata.actions !== null && metadata.actions !== undefined)
       || (batch.assistantMessageId === undefined && metadata.assistantMessageId !== undefined);
     if (!shouldMoveToAi && !shouldImproveMetadata) {
       return true;
@@ -778,7 +778,7 @@ export function useVariableChangeTracker() {
     unknownDetail: unknown,
     producer: Extract<VariableChangeProducer, 'era' | 'direct'>,
   ) => {
-    const detail = isRecord(unknownDetail) ? unknownDetail as EraWriteDoneDetail : undefined;
+    const detail = isRecord(unknownDetail) ? unknownDetail as WriteDoneLikeDetail : undefined;
     const activeTurn = activeTurnRef.current;
     if (!activeTurn) {
       return;
@@ -812,9 +812,8 @@ export function useVariableChangeTracker() {
       }
     }
 
-    // ERA unescapes stat/statWithoutMeta before emitting writeDone.
-    // Feeding that payload into diff/hash would mix representations and create fake changes,
-    // so the tracker always rereads chat stat_data here and uses writeDone only for attribution.
+    // All signals reread chat stat_data as the canonical snapshot source.
+    // writeDone payloads are attribution metadata only and must not enter diff/hash directly.
     captureCurrentSnapshot({
       origin: isAiWrite ? 'ai' : 'background',
       producer,
