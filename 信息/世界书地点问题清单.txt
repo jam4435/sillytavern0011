@@ -12,9 +12,7 @@
 - 超过三级: 11
 
 [明确违规条目]
-F:\Develop\AI\sillytavern\角色卡\金庸群侠传\世界书\变量指导.txt:190 所在位置 = B城 [不足三级]
-F:\Develop\AI\sillytavern\角色卡\金庸群侠传\世界书\变量指导.txt:191 所在位置 = B城 [不足三级]
-F:\Develop\AI\sillytavern\角色卡\金庸群侠传\世界书\变量指导.txt:192 所在位置 = B城 [不足三级]
+
 F:\Develop\AI\sillytavern\角色卡\金庸群侠传\世界书\射雕事件条目-第13回-04-穆念慈夜闯归云庄.txt:26 所在位置 = 大宋/苏州 [不足三级]
 F:\Develop\AI\sillytavern\角色卡\金庸群侠传\世界书\射雕事件条目-第15回-07-黄蓉智斗欧阳克.txt:40 所在位置 = 不明 [不足三级]
 F:\Develop\AI\sillytavern\角色卡\金庸群侠传\世界书\射雕事件条目-第16回-04-穆杨决裂.txt:26 所在位置 = 在逃 [不足三级]
