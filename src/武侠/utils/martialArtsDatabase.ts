@@ -9,6 +9,7 @@
  */
 
 import { dataLogger } from './logger';
+import { emitEraEventAndWait } from './messageActions';
 
 // ============================================
 // 类型定义
@@ -458,7 +459,6 @@ export function getNextMastery(current: MasteryLevel): MasteryLevel | null {
 
 /**
  * 执行功法掌握程度升级
- * @param userName 用户名（变量表中的键名，此参数已废弃，保留用于兼容）
  * @param martialArtName 功法名称
  * @param currentMastery 当前掌握程度
  * @param currentCultivation 当前修为
@@ -466,7 +466,6 @@ export function getNextMastery(current: MasteryLevel): MasteryLevel | null {
  * @param insight 洞察值
  */
 export async function upgradeMartialArt(
-  userName: string,
   martialArtName: string,
   currentMastery: MasteryLevel,
   currentCultivation: number,
@@ -500,28 +499,25 @@ export async function upgradeMartialArt(
 
   try {
     const newCultivation = currentCultivation - cost;
-
-    // 使用酒馆 API 更新变量
-    // 注意：变量路径是 stat_data.user数据.功法，而不是 stat_data.[用户名].武功
-    updateVariablesWith(
-      (variables: Record<string, unknown>) => {
-        const statData = variables.stat_data as Record<string, unknown> | undefined;
-        if (statData && statData['user数据']) {
-          const user数据 = statData['user数据'] as Record<string, unknown>;
-
-          // 更新修为
-          user数据['修为'] = newCultivation;
-
-          // 更新功法掌握程度
-          const 功法 = user数据['功法'] as Record<string, Record<string, unknown>> | undefined;
-          if (功法 && 功法[martialArtName]) {
-            功法[martialArtName]['掌握程度'] = nextMastery;
-          }
-        }
-        return variables;
+    const updatePayload = {
+      stat_data: {
+        user数据: {
+          修为: newCultivation,
+          功法: {
+            [martialArtName]: {
+              掌握程度: nextMastery,
+            },
+          },
+        },
       },
-      { type: 'message', message_id: -1 },
-    );
+    };
+
+    await emitEraEventAndWait('era:updateByObject', {
+      timeoutMs: 20000,
+      timeoutMessage: `功法「${martialArtName}」精进请求已发出，但 ERA 没有确认 apiWrite 写入完成。`,
+      expectedAction: 'apiWrite',
+      detail: updatePayload,
+    });
 
     dataLogger.log(
       `[martialArtsDatabase] 功法升级成功: ${martialArtName} ${currentMastery} -> ${nextMastery}, 消耗修为: ${cost}`,

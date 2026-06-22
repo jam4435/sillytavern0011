@@ -924,25 +924,19 @@
   background: rgba(41, 37, 36, 0.45);
   border-color: rgba(168, 162, 158, 0.16);
 
-  &.event {
+  &.era {
     color: rgba(253, 230, 138, 0.95);
     background: rgba(120, 53, 15, 0.3);
     border-color: rgba(245, 158, 11, 0.22);
   }
 
-  &.frontend {
+  &.direct {
     color: rgba(191, 219, 254, 0.94);
     background: rgba(8, 47, 73, 0.4);
     border-color: rgba(14, 165, 233, 0.22);
   }
 
-  &.api {
-    color: rgba(187, 247, 208, 0.95);
-    background: rgba(20, 83, 45, 0.36);
-    border-color: rgba(34, 197, 94, 0.22);
-  }
-
-  &.mvu {
+  &.boundary {
     color: rgba(233, 213, 255, 0.96);
     background: rgba(76, 29, 149, 0.28);
     border-color: rgba(168, 85, 247, 0.22);

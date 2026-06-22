@@ -6,6 +6,7 @@
  */
 
 import { gameLogger } from './logger';
+import { emitEraEventAndWait } from './messageActions';
 
 // 大境界列表（按顺序）
 export const MAJOR_REALMS = ['不入流', '三流', '二流', '一流', '宗师', '绝顶', '陆地神仙'] as const;
@@ -293,15 +294,13 @@ export function getMinorRealmProgress(realmStr: string): number {
 
 /**
  * 执行境界突破
- * 使用酒馆的 updateVariablesWith API 更新变量
+ * 使用 ERA 对象 API 更新 user 数据下的境界和修为
  *
- * @param userName 用户名（变量表中的键名）
  * @param currentRealm 当前境界
  * @param currentCultivation 当前修为
  * @returns 突破结果
  */
 export async function performBreakthrough(
-  userName: string,
   currentRealm: string,
   currentCultivation: number,
 ): Promise<{
@@ -324,21 +323,21 @@ export async function performBreakthrough(
     // 计算新的修为值
     const newCultivation = currentCultivation - check.cost;
     const newRealm = check.nextRealm!;
-
-    // 使用酒馆 API 更新变量
-    // 需要更新 stat_data 下的用户档案中的境界和修为字段
-    updateVariablesWith(
-      (variables: Record<string, unknown>) => {
-        const statData = variables.stat_data as Record<string, unknown> | undefined;
-        if (statData && statData[userName]) {
-          const userProfile = statData[userName] as Record<string, unknown>;
-          userProfile['境界'] = newRealm;
-          userProfile['修为'] = newCultivation;
-        }
-        return variables;
+    const updatePayload = {
+      stat_data: {
+        user数据: {
+          境界: newRealm,
+          修为: newCultivation,
+        },
       },
-      { type: 'message', message_id: -1 },
-    );
+    };
+
+    await emitEraEventAndWait('era:updateByObject', {
+      timeoutMs: 20000,
+      timeoutMessage: `境界突破到「${newRealm}」的请求已发出，但 ERA 没有确认 apiWrite 写入完成。`,
+      expectedAction: 'apiWrite',
+      detail: updatePayload,
+    });
 
     gameLogger.log(`[realmSystem] 境界突破成功: ${currentRealm} -> ${newRealm}, 消耗修为: ${check.cost}`);
 

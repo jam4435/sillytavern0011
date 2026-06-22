@@ -4,6 +4,7 @@ import {
   type VariableActualChange,
   type VariableAiComparison,
   type VariableChangeAction,
+  type VariableChangeProducer,
   type VariableChangeSummary,
   type VariableComparisonStatus,
 } from '../utils/variableChanges';
@@ -14,7 +15,7 @@ interface VariableChangeBarProps {
 }
 
 type ExpandedSegment = 'ai' | 'background';
-type SourceTone = 'event' | 'frontend' | 'api' | 'mvu' | 'generic';
+type SourceTone = VariableChangeProducer;
 
 const ACTION_LABELS: Record<VariableChangeAction, string> = {
   insert: '新增',
@@ -49,39 +50,21 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
   document.body.removeChild(textarea);
 };
 
-const getBackgroundSource = (
-  change: VariableActualChange,
-): { label: string; tone: SourceTone } => {
-  const reason = change.reason?.toLowerCase() ?? '';
-  const actions = change.actions ?? {};
+const PRODUCER_META: Record<VariableChangeProducer, { label: string; tone: SourceTone }> = {
+  era: { label: 'ERA', tone: 'era' },
+  direct: { label: 'Direct', tone: 'direct' },
+  boundary: { label: '边界补偿', tone: 'boundary' },
+};
 
-  if (reason === 'mvu-update') {
-    return { label: 'MVU补偿', tone: 'mvu' };
-  }
-  if (reason === 'message-boundary') {
-    return { label: '消息补偿', tone: 'mvu' };
-  }
-  if (
-    actions.directChatWrite
-    && (
-      reason.includes('event')
-      || reason.includes('followup')
-      || reason.includes('debut')
-      || reason.includes('batch')
-    )
-  ) {
-    return { label: '事件脚本', tone: 'event' };
-  }
-  if (actions.directChatWrite) {
-    return { label: '游戏前端', tone: 'frontend' };
-  }
-  if (actions.apiWrite || actions.api) {
-    return { label: '游戏前端/API', tone: 'api' };
-  }
-  if (reason && reason !== 'era-write-done') {
-    return { label: '事件脚本', tone: 'event' };
-  }
-  return { label: '后台写入', tone: 'generic' };
+const getProducerMeta = (producer: VariableChangeProducer): { label: string; tone: SourceTone } =>
+  PRODUCER_META[producer];
+
+const getChangeMetaTitle = (change: VariableActualChange, fallbackLabel: string): string => {
+  const actionKeys = Object.keys(change.actions ?? {}).filter(key => change.actions?.[key]);
+  const details = [change.reason, actionKeys.length > 0 ? actionKeys.join(', ') : null]
+    .filter(Boolean)
+    .join(' · ');
+  return details || fallbackLabel;
 };
 
 const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
@@ -292,7 +275,9 @@ const AiComparisonRow: React.FC<AiComparisonRowProps> = ({ comparison, onCopy })
 
         {observed ? (
           <div className="variable-change-stack">
-            <span className="variable-change-caption">实际写入</span>
+            <span className="variable-change-caption">
+              实际写入 · {getProducerMeta(observed.producer).label}
+            </span>
             <div className="variable-change-row-body diff">
               <span className="variable-change-value old" title={formatVariableDetailValue(observed.beforeValue)}>
                 {observed.beforePreview}
@@ -321,13 +306,16 @@ interface ActualChangeRowProps {
 }
 
 const ActualChangeRow: React.FC<ActualChangeRowProps> = ({ change, onCopy }) => {
-  const source = getBackgroundSource(change);
+  const source = getProducerMeta(change.producer);
   return (
     <div className="variable-change-row actual">
       <div className="variable-change-row-head">
         <span className={`variable-change-action ${change.action}`}>{ACTION_LABELS[change.action]}</span>
         <span className="variable-change-path" title={change.copyPath}>{change.displayPath}</span>
-        <span className={`variable-change-source-badge ${source.tone}`} title={change.reason ?? source.label}>
+        <span
+          className={`variable-change-source-badge ${source.tone}`}
+          title={getChangeMetaTitle(change, source.label)}
+        >
           {source.label}
         </span>
         <CopyButtons

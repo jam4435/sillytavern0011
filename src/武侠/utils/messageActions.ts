@@ -63,6 +63,11 @@ type EraWaitOptions = {
   detail?: unknown;
 };
 
+type EraWriteDoneWaiter = {
+  promise: Promise<void>;
+  finish: (error?: Error) => void;
+};
+
 type RegenerateSwipeTransaction = {
   messageId: number;
   previousSwipeId: number;
@@ -164,15 +169,20 @@ function matchesEraWriteDone(detail: unknown, expectedMessageId?: number, expect
   return true;
 }
 
-export async function emitEraEventAndWait(
-  eventName: string,
-  { timeoutMs = 10000, timeoutMessage, expectedMessageId, expectedAction, detail }: EraWaitOptions,
-): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
+function createEraWriteDoneWaiter({
+  timeoutMs,
+  timeoutMessage,
+  expectedMessageId,
+  expectedAction,
+}: Required<Pick<EraWaitOptions, 'timeoutMs' | 'timeoutMessage'>> &
+  Pick<EraWaitOptions, 'expectedMessageId' | 'expectedAction'>): EraWriteDoneWaiter {
+  let finish = (_error?: Error) => {};
+
+  const promise = new Promise<void>((resolve, reject) => {
     let settled = false;
     let listener: { stop: () => void } | null = null;
 
-    const finish = (error?: Error) => {
+    finish = (error?: Error) => {
       if (settled) {
         return;
       }
@@ -198,12 +208,43 @@ export async function emitEraEventAndWait(
       }
       finish();
     });
-
-    const emitPromise = detail === undefined ? eventEmit(eventName) : eventEmit(eventName, detail);
-    void emitPromise.catch(error => {
-      finish(error instanceof Error ? error : new Error(String(error)));
-    });
   });
+
+  return { promise, finish };
+}
+
+export function waitForEraWriteDone({
+  timeoutMs = 10000,
+  timeoutMessage,
+  expectedMessageId,
+  expectedAction,
+}: Omit<EraWaitOptions, 'detail'>): Promise<void> {
+  return createEraWriteDoneWaiter({
+    timeoutMs,
+    timeoutMessage,
+    expectedMessageId,
+    expectedAction,
+  }).promise;
+}
+
+export async function emitEraEventAndWait(
+  eventName: string,
+  { timeoutMs = 10000, timeoutMessage, expectedMessageId, expectedAction, detail }: EraWaitOptions,
+): Promise<void> {
+  const waiter = createEraWriteDoneWaiter({
+    timeoutMs,
+    timeoutMessage,
+    expectedMessageId,
+    expectedAction,
+  });
+
+  try {
+    await (detail === undefined ? eventEmit(eventName) : eventEmit(eventName, detail));
+  } catch (error) {
+    waiter.finish(error instanceof Error ? error : new Error(String(error)));
+  }
+
+  await waiter.promise;
 }
 
 function normalizeArray<T>(value: T[] | undefined, expectedLength: number, fallback: () => T): T[] {

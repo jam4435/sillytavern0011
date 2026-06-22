@@ -76,7 +76,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
     gameLogger.log(`[CharacterPanel] 尝试突破: ${currentRealm} -> ${nextRealm}, 消耗修为: ${breakthroughCost}`);
 
     // 调用突破函数
-    const result = await performBreakthrough(stats.name, currentRealm, cultivation);
+    const result = await performBreakthrough(currentRealm, cultivation);
 
     // 调用回调通知父组件
     if (onBreakthrough) {
@@ -88,7 +88,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
     } else {
       gameLogger.error(`[CharacterPanel] 突破失败: ${result.error}`);
     }
-  }, [canBreakthrough, currentRealm, nextRealm, breakthroughCost, stats.name, cultivation, onBreakthrough, breakthroughCheck.reason]);
+  }, [canBreakthrough, currentRealm, nextRealm, breakthroughCost, cultivation, onBreakthrough, breakthroughCheck.reason]);
 
   // Suppress unused variable warning
   void realmInfo;

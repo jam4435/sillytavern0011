@@ -37,14 +37,12 @@ const getMasteryColor = (mastery: string): string => {
 interface MartialArtsPanelProps {
     martialArts: Record<string, MartialArt>;
     cultivation: number;
-    userName: string;
     onUpgrade?: (result: { success: boolean; martialArtName: string; newMastery?: string; newCultivation?: number; error?: string }) => void;
 }
 
-export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
+export const MartialArtsPanel: React.FC<MartialArtsPanelProps & Record<string, unknown>> = ({
     martialArts,
     cultivation,
-    userName,
     onUpgrade
 }) => {
     const [upgradingArt, setUpgradingArt] = useState<string | null>(null);
@@ -58,7 +56,6 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
 
         try {
             const result = await upgradeMartialArt(
-                userName,
                 artName,
                 art.mastery as MasteryLevel,
                 cultivation,
@@ -92,7 +89,7 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
         } finally {
             setUpgradingArt(null);
         }
-    }, [userName, cultivation, upgradingArt, onUpgrade]);
+    }, [cultivation, upgradingArt, onUpgrade]);
 
     return (
         <div style={{ height: '100%', overflowY: 'auto', paddingRight: '0.5rem' }}>
