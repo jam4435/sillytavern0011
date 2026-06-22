@@ -672,14 +672,11 @@ export const saveChatVariableLeafChanges = async (
         change.nextValue,
       ),
     );
-    const { statData: savedStatData } = await runDirectChatVariableWrite(
+    const savedVariables = await runDirectChatVariableWrite(
       {
         source: 'variable-editor',
-        operation: 'apply-leaf-changes',
-        detail: {
-          changeCount: internalChanges.length,
-          changedPaths: internalChanges.map(change => [...change.path]),
-        },
+        operation: 'update',
+        reason: 'variable-editor-leaf-save',
       },
       () =>
         updateVariablesWith(currentVariables => {
@@ -695,6 +692,7 @@ export const saveChatVariableLeafChanges = async (
           };
         }, { type: 'chat' }),
     );
+    const savedStatData = getVariableEditorStatDataFromVariables(savedVariables);
 
     return {
       conflicts: [],

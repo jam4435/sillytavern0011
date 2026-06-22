@@ -252,10 +252,7 @@ export async function writeDirectChatVariables(action, payload, reason = 'direct
       {
         source: 'event-script',
         operation: action,
-        detail: {
-          reason,
-          effectivePatch: cloneJson(effectivePatch),
-        },
+        reason,
       },
       () =>
         updateVariablesWith(variables => {

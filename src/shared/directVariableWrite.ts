@@ -1,63 +1,45 @@
 export const DIRECT_VARIABLE_WRITE_DONE_EVENT = 'wuxia:directVariableWriteDone';
 
-export type DirectVariableWriteSource = 'variable-editor' | 'event-script';
-export type DirectVariableWriteOperation = 'insert' | 'update' | 'delete' | 'assign' | 'apply-leaf-changes';
+export type DirectVariableWriteSource = 'event-script' | 'variable-editor' | 'frontend' | 'restore';
+export type DirectVariableWriteOperation = 'insert' | 'update' | 'delete' | 'assign' | 'replace';
 
-export interface DirectVariableWriteMetadata<TDetail = unknown> {
+export interface DirectVariableWriteMetadata {
   source: DirectVariableWriteSource;
   operation: DirectVariableWriteOperation;
-  detail: TDetail;
+  reason: string;
 }
 
-export interface DirectVariableWriteDoneDetail<TDetail = unknown> extends DirectVariableWriteMetadata<TDetail> {
-  variables: Record<string, unknown>;
-  statData: Record<string, unknown>;
+export interface DirectVariableWriteDoneDetail extends DirectVariableWriteMetadata {
+  version: 1;
+  writeId: string;
 }
 
-export interface DirectVariableWriteResult<TDetail = unknown> {
-  variables: Record<string, unknown>;
-  statData: Record<string, unknown>;
-  eventDetail: DirectVariableWriteDoneDetail<TDetail>;
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const cloneJson = <T,>(value: T): T => {
-  if (value === undefined) {
-    return value;
-  }
-
+const createDirectVariableWriteId = (): string => {
   try {
-    return JSON.parse(JSON.stringify(value)) as T;
+    if (typeof crypto?.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
   } catch {
-    return value;
+    // ignore
   }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
-const getDirectChatStatData = (variables: Record<string, unknown>): Record<string, unknown> =>
-  isRecord(variables.stat_data) ? cloneJson(variables.stat_data) : {};
-
-export async function runDirectChatVariableWrite<TDetail>(
-  metadata: DirectVariableWriteMetadata<TDetail>,
-  writer: () => Record<string, unknown> | Promise<Record<string, unknown>>,
-): Promise<DirectVariableWriteResult<TDetail>> {
-  const savedVariables = await writer();
-  const variables = isRecord(savedVariables) ? savedVariables : {};
-  const statData = getDirectChatStatData(variables);
-  const eventDetail: DirectVariableWriteDoneDetail<TDetail> = {
+export async function runDirectChatVariableWrite<TResult>(
+  metadata: DirectVariableWriteMetadata,
+  writer: () => TResult | Promise<TResult>,
+): Promise<TResult> {
+  const result = await writer();
+  const eventDetail: DirectVariableWriteDoneDetail = {
+    version: 1,
+    writeId: createDirectVariableWriteId(),
     source: metadata.source,
     operation: metadata.operation,
-    detail: cloneJson(metadata.detail),
-    variables: cloneJson(variables),
-    statData,
+    reason: metadata.reason,
   };
 
   await eventEmit(DIRECT_VARIABLE_WRITE_DONE_EVENT, eventDetail);
 
-  return {
-    variables,
-    statData,
-    eventDetail,
-  };
+  return result;
 }

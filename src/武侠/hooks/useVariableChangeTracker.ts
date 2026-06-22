@@ -361,9 +361,17 @@ export function useVariableChangeTracker() {
     }
 
     const shouldMoveToAi = metadata.origin === 'ai' && batch.origin !== 'ai';
+    const shouldUpgradeProducer =
+      PRODUCER_PRIORITY[metadata.producer] > PRODUCER_PRIORITY[batch.producer];
     const shouldImproveMetadata =
-      isProvisionalReason(batch.reason)
-      && !isProvisionalReason(metadata.reason);
+      shouldUpgradeProducer
+      || (
+        batch.producer === metadata.producer
+        && isBoundaryReason(batch.reason)
+        && !isBoundaryReason(metadata.reason)
+      )
+      || (batch.actions === null && metadata.actions !== undefined)
+      || (batch.assistantMessageId === undefined && metadata.assistantMessageId !== undefined);
     if (!shouldMoveToAi && !shouldImproveMetadata) {
       return true;
     }
@@ -383,6 +391,7 @@ export function useVariableChangeTracker() {
         id: `${change.source}:${change.action}:${getPathKey(change)}:${aiUpgradeBatchId}:${index}`,
         batchId: aiUpgradeBatchId,
         origin: 'ai' as const,
+        producer: metadata.producer,
         actions: metadata.actions ?? change.actions,
         reason: metadata.reason,
         assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
@@ -391,6 +400,7 @@ export function useVariableChangeTracker() {
         change.batchId === batch.batchId && shouldImproveMetadata
           ? {
             ...change,
+            producer: metadata.producer,
             actions: metadata.actions ?? change.actions,
             reason: metadata.reason,
             assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
@@ -402,6 +412,7 @@ export function useVariableChangeTracker() {
           !shouldMoveToAi && shouldImproveMetadata && change.batchId === batch.batchId
             ? {
               ...change,
+              producer: metadata.producer,
               actions: metadata.actions ?? change.actions,
               reason: metadata.reason,
               assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
@@ -420,6 +431,7 @@ export function useVariableChangeTracker() {
         if (!shouldMoveToAi) {
           return [{
             ...candidate,
+            producer: metadata.producer,
             actions: metadata.actions ?? candidate.actions,
             reason: metadata.reason,
             assistantMessageId: metadata.assistantMessageId ?? candidate.assistantMessageId,
@@ -431,6 +443,7 @@ export function useVariableChangeTracker() {
             ...candidate,
             batchId: aiUpgradeBatchId,
             origin: 'ai',
+            producer: metadata.producer,
             actions: metadata.actions ?? candidate.actions,
             reason: metadata.reason,
             assistantMessageId: metadata.assistantMessageId ?? candidate.assistantMessageId,
@@ -440,6 +453,10 @@ export function useVariableChangeTracker() {
         const remainingBatch: VariableObservedBatch | null = remainingBatchChangeCount > 0
           ? {
             ...candidate,
+            producer: metadata.producer,
+            actions: metadata.actions ?? candidate.actions,
+            reason: metadata.reason,
+            assistantMessageId: metadata.assistantMessageId ?? candidate.assistantMessageId,
             changeCount: remainingBatchChangeCount,
           }
           : null;
@@ -498,6 +515,7 @@ export function useVariableChangeTracker() {
       nextStatData,
       {
         origin: metadata.origin,
+        producer: metadata.producer,
         timestamp: Date.now(),
         batchId: baseBatchId,
         actions: metadata.actions,
@@ -517,14 +535,9 @@ export function useVariableChangeTracker() {
     const backgroundChanges: VariableActualChange[] = [];
     for (const change of result.observedChanges) {
       const matchesDeclaration = matchesAnyDeclaredChange(declaredChanges, change);
-      const matchedAsAi = (
+      const matchedAsAi =
         metadata.origin === 'ai'
-        && (!metadata.aiOnlyDeclaredMatches || matchesDeclaration)
-      )
-        || (
-          metadata.allowDeclaredMatching === true
-          && matchesDeclaration
-        );
+        && (!metadata.aiOnlyDeclaredMatches || matchesDeclaration);
       (matchedAsAi ? aiChanges : backgroundChanges).push(change);
     }
 
@@ -598,17 +611,6 @@ export function useVariableChangeTracker() {
     captureResolvedSnapshot(readCurrentStatDataSnapshot(), metadata);
   }, [captureResolvedSnapshot]);
 
-  const captureCanonicalSnapshot = useCallback((
-    nextData: unknown,
-    metadata: CaptureMetadata,
-  ) => {
-    // This path only accepts snapshots that already match chat stat_data's encoded representation.
-    captureResolvedSnapshot(
-      readStatDataSnapshotFromUnknown(nextData) ?? readCurrentStatDataSnapshot(),
-      metadata,
-    );
-  }, [captureResolvedSnapshot]);
-
   const refreshDeclaredChanges = useCallback((
     rawReply: string,
     assistantMessageId?: number,
@@ -673,8 +675,8 @@ export function useVariableChangeTracker() {
     refreshDeclaredChanges(rawReply, assistantMessageId);
     captureCurrentSnapshot({
       origin: 'background',
+      producer: 'boundary',
       reason: 'message-boundary',
-      allowDeclaredMatching: true,
       assistantMessageId,
     });
   }, [captureCurrentSnapshot, refreshDeclaredChanges]);
@@ -695,28 +697,11 @@ export function useVariableChangeTracker() {
     }
     captureCurrentSnapshot({
       origin: 'background',
+      producer: 'boundary',
       reason: 'message-boundary',
-      allowDeclaredMatching: true,
       assistantMessageId: finalMessage.messageId,
     });
   }, [captureCurrentSnapshot, refreshDeclaredChanges]);
-
-  const handleMvuVariableUpdate = useCallback((
-    variables: unknown,
-    variablesBeforeUpdate?: unknown,
-  ) => {
-    const activeTurn = activeTurnRef.current;
-    if (!activeTurn) {
-      return;
-    }
-    if (!activeTurn.lastStatData && variablesBeforeUpdate !== undefined) {
-      activeTurn.lastStatData = readStatDataSnapshotFromUnknown(variablesBeforeUpdate);
-    }
-    captureCanonicalSnapshot(variables, {
-      origin: 'background',
-      reason: 'mvu-update',
-    });
-  }, [captureCanonicalSnapshot]);
 
   const scheduleStaleWriteDoneRecovery = useCallback(({
     turnId,
@@ -789,7 +774,10 @@ export function useVariableChangeTracker() {
     mutateSummary(summary => rebuildSummary(summary, activeTurn));
   }, [mutateSummary]);
 
-  const handleEraWriteDone = useCallback((unknownDetail?: unknown) => {
+  const handleWriteDoneSignal = useCallback((
+    unknownDetail: unknown,
+    producer: Extract<VariableChangeProducer, 'era' | 'direct'>,
+  ) => {
     const detail = isRecord(unknownDetail) ? unknownDetail as EraWriteDoneDetail : undefined;
     const activeTurn = activeTurnRef.current;
     if (!activeTurn) {
@@ -802,7 +790,8 @@ export function useVariableChangeTracker() {
       && activeTurn.aiWriteTargetIds.includes(assistantMessageId);
     const isDirectChatWrite = actions?.directChatWrite === true;
     const isAiWrite =
-      !isDirectChatWrite
+      producer === 'era'
+      && !isDirectChatWrite
       && (
         actions?.apply === true
         || (actions?.apiWrite === true && isAiTarget)
@@ -810,7 +799,7 @@ export function useVariableChangeTracker() {
       );
     const reason = typeof detail?.reason === 'string' && detail.reason.trim()
       ? detail.reason.trim()
-      : 'era-write-done';
+      : producer === 'direct' ? 'direct-write-done' : 'era-write-done';
     const beforeCaptureSnapshotHash = activeTurn.lastStatData
       ? getSnapshotHash(activeTurn.lastStatData)
       : null;
@@ -828,6 +817,7 @@ export function useVariableChangeTracker() {
     // so the tracker always rereads chat stat_data here and uses writeDone only for attribution.
     captureCurrentSnapshot({
       origin: isAiWrite ? 'ai' : 'background',
+      producer,
       reason,
       actions,
       assistantMessageId,
@@ -841,9 +831,12 @@ export function useVariableChangeTracker() {
     if (
       beforeCaptureSnapshotHash === afterCaptureSnapshotHash
       && (
-        actions?.apply === true
-        || actions?.apiWrite === true
-        || (isAiWrite && (actions?.rollback === true || actions?.resync === true))
+        producer === 'era'
+        && (
+          actions?.apply === true
+          || actions?.apiWrite === true
+          || (isAiWrite && (actions?.rollback === true || actions?.resync === true))
+        )
       )
     ) {
       scheduleStaleWriteDoneRecovery({
@@ -851,6 +844,7 @@ export function useVariableChangeTracker() {
         expectedSnapshotHash: beforeCaptureSnapshotHash,
         metadata: {
           origin: isAiWrite ? 'ai' : 'background',
+          producer,
           reason,
           actions,
           assistantMessageId,
@@ -860,6 +854,14 @@ export function useVariableChangeTracker() {
       });
     }
   }, [captureCurrentSnapshot, refreshDeclaredChanges, scheduleStaleWriteDoneRecovery]);
+
+  const handleEraWriteDone = useCallback((unknownDetail?: unknown) => {
+    handleWriteDoneSignal(unknownDetail, 'era');
+  }, [handleWriteDoneSignal]);
+
+  const handleDirectVariableWriteDone = useCallback((unknownDetail?: unknown) => {
+    handleWriteDoneSignal(unknownDetail, 'direct');
+  }, [handleWriteDoneSignal]);
 
   const clearVariableChanges = useCallback(() => {
     activeTurnRef.current = null;
@@ -882,8 +884,8 @@ export function useVariableChangeTracker() {
     handleGlobalMessageSent,
     handleVariableAssistantReply,
     handleVariableMessageBoundary,
-    handleMvuVariableUpdate,
     handleEraWriteDone,
+    handleDirectVariableWriteDone,
     markVariableApiWriteAsAi,
     clearVariableChanges,
   };
