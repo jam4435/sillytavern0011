@@ -1,6 +1,7 @@
 export type VariablePath = Array<string | number>;
 export type VariableChangeAction = 'insert' | 'edit' | 'delete';
 export type VariableChangeOrigin = 'ai' | 'background';
+export type VariableChangeProducer = 'era' | 'direct' | 'boundary';
 export type VariableChangeSource = 'ai-declared' | 'observed-diff';
 export type VariableComparisonStatus = 'applied' | 'not-applied' | 'diverged' | 'no-op' | 'api-only';
 export type VariableChangeStatus = 'tracking' | 'reply-recorded' | 'settled' | 'error';
@@ -28,6 +29,7 @@ export interface VariableActualChange {
   id: string;
   source: 'observed-diff';
   origin: VariableChangeOrigin;
+  producer: VariableChangeProducer;
   action: VariableChangeAction;
   path: VariablePath;
   displayPath: string;
@@ -46,6 +48,7 @@ export interface VariableActualChange {
 export interface VariableObservedBatch {
   batchId: string;
   origin: VariableChangeOrigin;
+  producer: VariableChangeProducer;
   timestamp: number;
   reason: string | null;
   actions: VariableWriteActions | null;
@@ -487,6 +490,7 @@ const createObservedChange = (
   index: number,
   metadata: {
     origin: VariableChangeOrigin;
+    producer: VariableChangeProducer;
     timestamp: number;
     batchId: string;
     actions: VariableWriteActions | null;
@@ -497,6 +501,7 @@ const createObservedChange = (
   id: getVariableBlockId('observed-diff', action, path, index),
   source: 'observed-diff',
   origin: metadata.origin,
+  producer: metadata.producer,
   action,
   path,
   displayPath: getVariableDisplayPath(path),
@@ -521,6 +526,7 @@ function pushObservedChange(
   afterValue: unknown,
   metadata: {
     origin: VariableChangeOrigin;
+    producer: VariableChangeProducer;
     timestamp: number;
     batchId: string;
     actions: VariableWriteActions | null;
@@ -542,6 +548,7 @@ function collectObservedDiffs(
   counters: { total: number },
   metadata: {
     origin: VariableChangeOrigin;
+    producer: VariableChangeProducer;
     timestamp: number;
     batchId: string;
     actions: VariableWriteActions | null;
@@ -624,6 +631,7 @@ export function createObservedVariableChanges(
   nextStatData: Record<string, unknown> | null,
   metadata: {
     origin: VariableChangeOrigin;
+    producer: VariableChangeProducer;
     timestamp: number;
     batchId: string;
     actions?: VariableWriteActions | null;
@@ -649,6 +657,7 @@ export function createObservedVariableChanges(
   const counters = { total: 0 };
   const normalizedMetadata = {
     origin: metadata.origin,
+    producer: metadata.producer,
     timestamp: metadata.timestamp,
     batchId: metadata.batchId,
     actions: normalizeWriteActions(metadata.actions),
@@ -665,6 +674,7 @@ export function createObservedVariableChanges(
       ? {
         batchId: metadata.batchId,
         origin: metadata.origin,
+        producer: metadata.producer,
         timestamp: metadata.timestamp,
         reason: metadata.reason ?? null,
         actions: normalizedMetadata.actions,

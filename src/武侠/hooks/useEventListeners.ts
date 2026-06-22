@@ -5,7 +5,6 @@ import {
   parseOptions,
   readGameDataPure,
   scheduleGameDataCompletion,
-  scheduleGameDataCompletionFromMvuUpdate,
 } from '../utils/variableReader';
 import { eventLogger } from '../utils/logger';
 
@@ -16,8 +15,8 @@ interface UseEventListenersOptions {
   onMessageSent?: (messageId: number) => void;
   onMessageBoundary?: (messageId?: number) => void;
   onChatChanged?: () => void;
-  onMvuVariableUpdate?: (variables: unknown, variablesBeforeUpdate: unknown) => void;
   onEraWriteDone?: (detail: unknown) => void;
+  onDirectVariableWriteDone?: (detail: unknown) => void;
 }
 
 export function useEventListeners({
@@ -27,15 +26,12 @@ export function useEventListeners({
   onMessageSent,
   onMessageBoundary,
   onChatChanged,
-  onMvuVariableUpdate,
   onEraWriteDone,
+  onDirectVariableWriteDone,
 }: UseEventListenersOptions) {
   useEffect(() => {
     eventLogger.log('🎧 注册消息事件监听器');
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-    let mvuVariableListener: { stop: () => void } | null = null;
-    let mvuVariableUpdatesReady = false;
-    let disposed = false;
 
     const refreshGameState = () => {
       const newData = readGameDataPure();
@@ -54,45 +50,10 @@ export function useEventListeners({
       }, delay);
     };
 
-    const registerMvuVariableListener = (): boolean => {
-      if (mvuVariableListener) {
-        return true;
-      }
-
-      const mvu = (globalThis as { Mvu?: { events?: { VARIABLE_UPDATE_ENDED?: string } } }).Mvu;
-      if (!mvu?.events?.VARIABLE_UPDATE_ENDED) {
-        return false;
-      }
-
-      mvuVariableListener = eventOn(mvu.events.VARIABLE_UPDATE_ENDED, (variables: unknown, variablesBeforeUpdate: unknown) => {
-        onMvuVariableUpdate?.(variables, variablesBeforeUpdate);
-        scheduleGameDataCompletionFromMvuUpdate(variables, variablesBeforeUpdate);
-      });
-      mvuVariableUpdatesReady = true;
-      eventLogger.log('MVU 变量更新监听器已注册');
-      return true;
-    };
-
-    if (!registerMvuVariableListener()) {
-      const waitGlobalInitialized = (globalThis as { waitGlobalInitialized?: (name: string) => Promise<void> }).waitGlobalInitialized;
-      void waitGlobalInitialized?.('Mvu')
-        .then(() => {
-          if (!disposed) {
-            registerMvuVariableListener();
-          }
-        })
-        .catch(error => {
-          eventLogger.warn('等待 MVU 初始化失败，使用全量后台补全兜底:', error);
-        });
-    }
-
     const handleMessageUpdate = (eventData?: unknown) => {
       eventLogger.log('收到消息更新事件:', eventData);
       scheduleRefresh();
-
-      if (!mvuVariableUpdatesReady) {
-        scheduleGameDataCompletion('message-update-fallback', { fullScan: true });
-      }
+      scheduleGameDataCompletion('message-boundary', { fullScan: true });
 
       const lastContent = getLastMessageContent();
       eventLogger.log('getLastMessageContent 返回长度:', lastContent.length);
@@ -115,6 +76,14 @@ export function useEventListeners({
     const handleWriteDone = (detail?: unknown) => {
       eventLogger.log('[era:writeDone] 检测到变量写入完成，调度纯读刷新');
       onEraWriteDone?.(detail);
+      scheduleGameDataCompletion('era-write-done', { fullScan: true });
+      scheduleRefresh(50);
+    };
+
+    const handleDirectWriteDone = (detail?: unknown) => {
+      eventLogger.log('[wuxia:directVariableWriteDone] 检测到 direct 变量写入完成，调度纯读刷新');
+      onDirectVariableWriteDone?.(detail);
+      scheduleGameDataCompletion('direct-write-done', { fullScan: true });
       scheduleRefresh(50);
     };
 
@@ -135,10 +104,11 @@ export function useEventListeners({
     });
     eventLogger.log('注册 era:writeDone 监听器...');
     const writeDoneListener = eventOn('era:writeDone', handleWriteDone);
+    eventLogger.log('注册 wuxia:directVariableWriteDone 监听器...');
+    const directWriteDoneListener = eventOn('wuxia:directVariableWriteDone', handleDirectWriteDone);
     eventLogger.log('🎧 监听器注册完成');
 
     return () => {
-      disposed = true;
       eventLogger.log('🛑 取消事件监听器');
       if (refreshTimer) {
         clearTimeout(refreshTimer);
@@ -149,7 +119,7 @@ export function useEventListeners({
       messageUpdatedListener.stop();
       chatChangedListener.stop();
       writeDoneListener.stop();
-      mvuVariableListener?.stop();
+      directWriteDoneListener.stop();
     };
   }, [
     updateGameState,
@@ -158,7 +128,7 @@ export function useEventListeners({
     onMessageSent,
     onMessageBoundary,
     onChatChanged,
-    onMvuVariableUpdate,
     onEraWriteDone,
+    onDirectVariableWriteDone,
   ]);
 }

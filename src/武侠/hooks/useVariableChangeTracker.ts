@@ -8,10 +8,10 @@ import {
   MAX_STORED_VARIABLE_CHANGES,
   parseDeclaredVariableChanges,
   readCurrentStatDataSnapshot,
-  readStatDataSnapshotFromUnknown,
   stableStringify,
   type VariableActualChange,
   type VariableChangeOrigin,
+  type VariableChangeProducer,
   type VariableChangeSummary,
   type VariableObservedBatch,
   type VariableWriteActions,
@@ -44,7 +44,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 8;
+  version: 9;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -53,14 +53,14 @@ type StoredVariableTurn = {
 
 type CaptureMetadata = {
   origin: VariableChangeOrigin;
+  producer: VariableChangeProducer;
   reason: string;
   actions?: VariableWriteActions | null;
   assistantMessageId?: number;
-  allowDeclaredMatching?: boolean;
   aiOnlyDeclaredMatches?: boolean;
 };
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v8';
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v9';
 const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v1',
   'wuxia.variableChangeTurn.v2',
@@ -69,6 +69,7 @@ const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v5',
   'wuxia.variableChangeTurn.v6',
   'wuxia.variableChangeTurn.v7',
+  'wuxia.variableChangeTurn.v8',
 ];
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
 const STALE_WRITE_DONE_RETRY_DELAY_MS = 40;
@@ -117,7 +118,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 8 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== 9 || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -144,7 +145,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 8,
+      version: 9,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -284,8 +285,14 @@ const rebuildSummary = (
   };
 };
 
-const isProvisionalReason = (reason: string | null): boolean =>
-  reason === 'mvu-update' || reason === 'message-boundary';
+const PRODUCER_PRIORITY: Record<VariableChangeProducer, number> = {
+  boundary: 0,
+  era: 1,
+  direct: 2,
+};
+
+const isBoundaryReason = (reason: string | null): boolean =>
+  reason === 'message-boundary';
 
 export function useVariableChangeTracker() {
   const restoredTurnRef = useRef<StoredVariableTurn | null | undefined>(undefined);

@@ -1,4 +1,5 @@
 import { log, logWarning } from './era-utils.js';
+import { runDirectChatVariableWrite } from '../shared/directVariableWrite';
 
 const RECENT_SIGNATURE_TTL_MS = 3000;
 const pendingSignatures = new Set();
@@ -229,22 +230,6 @@ function applyPatchToStat(statData, action, patch) {
   }
 }
 
-async function emitDirectWriteDone(action, reason) {
-  const variables = await getVariables({ type: 'chat' });
-  const stat = variables?.stat_data || {};
-  eventEmit('era:writeDone', {
-    mk: 'direct-chat-write',
-    message_id: null,
-    actions: { directChatWrite: true, [action]: true },
-    stat,
-    statWithoutMeta: stat,
-    editLogs: {},
-    selectedMks: [],
-    consecutiveProcessingCount: 1,
-    reason,
-  });
-}
-
 export async function writeDirectChatVariables(action, payload, reason = 'direct-chat-write') {
   const currentVariables = await getVariables({ type: 'chat' });
   const currentStat = currentVariables?.stat_data || {};
@@ -263,16 +248,26 @@ export async function writeDirectChatVariables(action, payload, reason = 'direct
 
   markPending(signature);
   try {
-    await updateVariablesWith(variables => {
-      const nextVariables = variables || {};
-      if (!isPlainObject(nextVariables.stat_data)) {
-        nextVariables.stat_data = {};
-      }
-      applyPatchToStat(nextVariables.stat_data, action, effectivePatch);
-      return nextVariables;
-    }, { type: 'chat' });
+    await runDirectChatVariableWrite(
+      {
+        source: 'event-script',
+        operation: action,
+        detail: {
+          reason,
+          effectivePatch: cloneJson(effectivePatch),
+        },
+      },
+      () =>
+        updateVariablesWith(variables => {
+          const nextVariables = variables || {};
+          if (!isPlainObject(nextVariables.stat_data)) {
+            nextVariables.stat_data = {};
+          }
+          applyPatchToStat(nextVariables.stat_data, action, effectivePatch);
+          return nextVariables;
+        }, { type: 'chat' }),
+    );
 
-    await emitDirectWriteDone(action, reason);
     log(`直接写入完成: ${reason}`);
     return true;
   } catch (error) {

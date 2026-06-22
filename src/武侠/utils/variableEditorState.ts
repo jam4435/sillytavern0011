@@ -1,7 +1,8 @@
+import { runDirectChatVariableWrite } from '../../shared/directVariableWrite';
+
 export type VariableEditorPathSegment = string | number;
 export type VariableEditorPath = ReadonlyArray<VariableEditorPathSegment>;
 export type VariableEditorLeafChangeKind = 'insert' | 'edit' | 'delete';
-export type VariableEditorVariableOption = Parameters<typeof getVariables>[0];
 
 export interface VariableEditorLeafChange {
   kind: VariableEditorLeafChangeKind;
@@ -13,25 +14,6 @@ export interface VariableEditorLeafChange {
 export interface VariableEditorConflict {
   change: VariableEditorLeafChange;
   currentValue: unknown;
-}
-
-export interface VariableEditorSaveResult {
-  didSave: boolean;
-  appliedChanges: VariableEditorLeafChange[];
-  conflicts: VariableEditorConflict[];
-  savedVariables: Record<string, any>;
-  savedStatData: Record<string, unknown>;
-  sanitizedStatData: Record<string, unknown>;
-  writeDoneDetail: VariableEditorWriteDoneDetail;
-}
-
-export interface VariableEditorWriteDoneDetail {
-  message_id: null;
-  actions: {
-    directChatWrite: true;
-  };
-  stat: Record<string, unknown>;
-  statWithoutMeta: Record<string, unknown>;
 }
 
 export class VariableEditorConflictError extends Error {
@@ -388,76 +370,6 @@ export const applyVariableLeafChanges = (
   }, cloneVariableValue(statData));
 };
 
-export const createDirectChatWriteDoneDetail = (
-  savedStatData: Record<string, unknown>,
-  sanitizedStatData: Record<string, unknown> = sanitizeVariableEditorStatData(savedStatData),
-): VariableEditorWriteDoneDetail => ({
-  message_id: null,
-  actions: {
-    directChatWrite: true,
-  },
-  stat: cloneVariableValue(savedStatData),
-  statWithoutMeta: cloneVariableValue(sanitizedStatData),
-});
-
-export const saveVariableEditorStatData = async ({
-  baselineStatData,
-  draftStatData,
-  option = { type: 'chat' } as VariableEditorVariableOption,
-}: {
-  baselineStatData: Record<string, unknown>;
-  draftStatData: Record<string, unknown>;
-  option?: VariableEditorVariableOption;
-}): Promise<VariableEditorSaveResult> => {
-  const appliedChanges = collectVariableLeafChanges(baselineStatData, draftStatData);
-
-  if (appliedChanges.length === 0) {
-    const savedVariables = getVariables(option) as Record<string, any>;
-    const savedStatData = getVariableEditorStatDataFromVariables(savedVariables);
-    return {
-      didSave: false,
-      appliedChanges,
-      conflicts: [],
-      savedVariables,
-      savedStatData,
-      sanitizedStatData: sanitizeVariableEditorStatData(savedStatData),
-      writeDoneDetail: createDirectChatWriteDoneDetail(savedStatData),
-    };
-  }
-
-  let detectedConflicts: VariableEditorConflict[] = [];
-  const savedVariables = await Promise.resolve(
-    updateVariablesWith(currentVariables => {
-      const currentStatData = getVariableEditorStatDataFromVariables(currentVariables);
-      detectedConflicts = detectVariableLeafConflicts(currentStatData, appliedChanges);
-      if (detectedConflicts.length > 0) {
-        throw new VariableEditorConflictError(detectedConflicts);
-      }
-
-      return {
-        ...currentVariables,
-        stat_data: applyVariableLeafChanges(currentStatData, appliedChanges),
-      };
-    }, option),
-  );
-
-  const savedStatData = getVariableEditorStatDataFromVariables(savedVariables);
-  const sanitizedStatData = sanitizeVariableEditorStatData(savedStatData);
-  const writeDoneDetail = createDirectChatWriteDoneDetail(savedStatData, sanitizedStatData);
-
-  await eventEmit('era:writeDone', writeDoneDetail);
-
-  return {
-    didSave: true,
-    appliedChanges,
-    conflicts: detectedConflicts,
-    savedVariables,
-    savedStatData,
-    sanitizedStatData,
-    writeDoneDetail,
-  };
-};
-
 function createConflictErrorMessage(conflicts: VariableEditorConflict[]): string {
   if (conflicts.length === 0) {
     return '变量保存冲突：目标变量已被其他写入更新。';
@@ -752,26 +664,42 @@ export const saveChatVariableLeafChanges = async (
   changes: VariableLeafChange[],
 ): Promise<SaveVariableDraftResult> => {
   try {
-    await updateVariablesWith(currentVariables => {
-      const currentStatData = getVariableEditorStatDataFromVariables(currentVariables);
-      const internalChanges = changes.map(change =>
-        createLeafChange(
-          change.beforeValue === undefined ? 'insert' : change.nextValue === undefined ? 'delete' : 'edit',
-          change.path,
-          change.beforeValue,
-          change.nextValue,
-        ),
-      );
-      const conflicts = detectVariableLeafConflicts(currentStatData, internalChanges);
-      if (conflicts.length > 0) {
-        throw new VariableEditorConflictError(conflicts);
-      }
+    const internalChanges = changes.map(change =>
+      createLeafChange(
+        change.beforeValue === undefined ? 'insert' : change.nextValue === undefined ? 'delete' : 'edit',
+        change.path,
+        change.beforeValue,
+        change.nextValue,
+      ),
+    );
+    const { statData: savedStatData } = await runDirectChatVariableWrite(
+      {
+        source: 'variable-editor',
+        operation: 'apply-leaf-changes',
+        detail: {
+          changeCount: internalChanges.length,
+          changedPaths: internalChanges.map(change => [...change.path]),
+        },
+      },
+      () =>
+        updateVariablesWith(currentVariables => {
+          const currentStatData = getVariableEditorStatDataFromVariables(currentVariables);
+          const conflicts = detectVariableLeafConflicts(currentStatData, internalChanges);
+          if (conflicts.length > 0) {
+            throw new VariableEditorConflictError(conflicts);
+          }
 
-      return {
-        ...currentVariables,
-        stat_data: applyVariableLeafChanges(currentStatData, internalChanges),
-      };
-    }, { type: 'chat' });
+          return {
+            ...currentVariables,
+            stat_data: applyVariableLeafChanges(currentStatData, internalChanges),
+          };
+        }, { type: 'chat' }),
+    );
+
+    return {
+      conflicts: [],
+      statData: savedStatData,
+    };
   } catch (error) {
     if (error instanceof VariableEditorConflictError) {
       return {
@@ -787,13 +715,4 @@ export const saveChatVariableLeafChanges = async (
 
     throw error;
   }
-
-  const savedVariables = getVariables({ type: 'chat' }) as Record<string, unknown>;
-  const savedStatData = getVariableEditorStatDataFromVariables(savedVariables);
-  await eventEmit('era:writeDone', createDirectChatWriteDoneDetail(savedStatData));
-
-  return {
-    conflicts: [],
-    statData: savedStatData,
-  };
 };
