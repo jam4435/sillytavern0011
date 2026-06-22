@@ -21,14 +21,49 @@ function toCompact(obj) {
   return '{' + entries.join(',') + '}';
 }
 
+function getAptitudeLevel(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '未知';
+  if (num <= 4) return '低劣';
+  if (num <= 8) return '普通';
+  if (num <= 12) return '上佳';
+  if (num <= 16) return '出众';
+  return '绝顶';
+}
+
+function describeInitialAttributes(attrs) {
+  if (!attrs || typeof attrs !== 'object') return '';
+  const entries = Object.entries(attrs)
+    .filter(([k]) => k !== '$meta' && k !== '$template')
+    .map(([k, v]) => `${k}${v}（${getAptitudeLevel(v)}）`);
+  if (entries.length === 0) return '';
+  return '初始属性：' + entries.join('|');
+}
+
+function trimTrailingPunctuation(text) {
+  return String(text).trim().replace(/[。！？；;，,、]+$/, '');
+}
+
+function describeTalents(talents) {
+  if (!talents || typeof talents !== 'object') return '';
+  const entries = Object.entries(talents)
+    .filter(([k]) => k !== '$meta' && k !== '$template')
+    .map(([k, v], index) => `${index + 1}.${k}：${trimTrailingPunctuation(v)}`);
+  if (entries.length === 0) return '';
+  return '天赋：\n' + entries.join('\n');
+}
+
 const p = variables.stat_data.user数据;
 const worldTime = variables.stat_data.世界信息?.时间;
 
 if (p && worldTime) {
   // 创建新对象，用年龄替换出生年份
   const userData = {};
+  const initialAttributesText = describeInitialAttributes(p.初始属性);
+  const talentsText = describeTalents(p.天赋);
   for (const key in p) {
     if (key === '$meta' || key === '$template') continue;
+    if (key === '初始属性' || key === '天赋') continue;
     if (key === '出生年份') {
       userData['年龄'] = (worldTime.年 || 0) - (p.出生年份 || 0);
     } else {
@@ -36,13 +71,20 @@ if (p && worldTime) {
     }
   }
 -%>
-user数据:<%- toCompact(userData) -%>
+user数据:<%- toCompact(userData) %>
+<% if (initialAttributesText) { -%>
+<%- initialAttributesText %>
+<% } -%>
+<% if (talentsText) { -%>
+<%- talentsText %>
+<% } -%>
+
 <%
 } else {
 -%>
 [玩家数据加载失败]
 <% } -%>
-user初始属性代表的资质分级：1-4 愚钝|5-8 普通|9-12 人才|12-16 天才|17-20 妖孽|
+user初始属性代表的资质分级：0-4 低劣|5-8 普通|9-12 上佳|13-16 出众|17-20 绝顶
 天赋和初始属性不要在文中直白写出，而是通过人物表现自然地表露
 
 <%
