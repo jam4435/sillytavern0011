@@ -1,0 +1,150 @@
+<variable>
+<status_current_variables>
+# 当前世界信息：
+世界信息:{{ERA:世界信息}}
+
+# {{user}}数据
+<%
+// 去引号的紧凑JSON格式，节省token
+function toCompact(obj) {
+  if (obj === null || obj === undefined) return 'null';
+  if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
+  if (typeof obj === 'string') return obj.includes(',') || obj.includes(':') || obj.includes('\n') ? `"${obj}"` : obj;
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return '[]';
+    return '[' + obj.map(v => toCompact(v)).join(',') + ']';
+  }
+  const entries = Object.entries(obj)
+    .filter(([k]) => k !== '$meta' && k !== '$template')
+    .map(([k, v]) => k + ':' + toCompact(v));
+  if (entries.length === 0) return '{}';
+  return '{' + entries.join(',') + '}';
+}
+
+function getAptitudeLevel(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '未知';
+  if (num <= 4) return '低劣';
+  if (num <= 8) return '普通';
+  if (num <= 12) return '上佳';
+  if (num <= 16) return '出众';
+  return '绝顶';
+}
+
+function describeInitialAttributes(attrs) {
+  if (!attrs || typeof attrs !== 'object') return '';
+  const entries = Object.entries(attrs)
+    .filter(([k]) => k !== '$meta' && k !== '$template')
+    .map(([k, v]) => `${k}${v}（${getAptitudeLevel(v)}）`);
+  if (entries.length === 0) return '';
+  return '初始属性：' + entries.join('|');
+}
+
+function trimTrailingPunctuation(text) {
+  return String(text).trim().replace(/[。！？；;，,、]+$/, '');
+}
+
+function describeTalents(talents) {
+  if (!talents || typeof talents !== 'object') return '';
+  const entries = Object.entries(talents)
+    .filter(([k]) => k !== '$meta' && k !== '$template')
+    .map(([k, v], index) => `${index + 1}.${k}：${trimTrailingPunctuation(v)}`);
+  if (entries.length === 0) return '';
+  return '天赋：\n' + entries.join('\n');
+}
+
+const p = variables.stat_data.user数据;
+const worldTime = variables.stat_data.世界信息?.时间;
+
+if (p && worldTime) {
+  // 创建新对象，用年龄替换出生年份
+  const userData = {};
+  const initialAttributesText = describeInitialAttributes(p.初始属性);
+  const talentsText = describeTalents(p.天赋);
+  for (const key in p) {
+    if (key === '$meta' || key === '$template') continue;
+    if (key === '初始属性' || key === '天赋') continue;
+    if (key === '出生年份') {
+      userData['年龄'] = (worldTime.年 || 0) - (p.出生年份 || 0);
+    } else {
+      userData[key] = p[key];
+    }
+  }
+-%>
+user数据:<%- toCompact(userData) %>
+<% if (initialAttributesText) { -%>
+<%- initialAttributesText %>
+<% } -%>
+<% if (talentsText) { -%>
+<%- talentsText %>
+<% } -%>
+
+<%
+} else {
+-%>
+[玩家数据加载失败]
+<% } -%>
+user初始属性代表的资质分级：0-4 低劣|5-8 普通|9-12 上佳|13-16 出众|17-20 绝顶
+天赋和初始属性不要在文中直白写出，而是通过人物表现自然地表露
+
+<%
+const 参与事件 = getvar('stat_data.参与事件', { scope: 'local' });
+if (参与事件 && Object.keys(参与事件).length > 0) {
+-%>
+
+# 所在地正在或将要发生的事件
+{{ERA:参与事件}}
+
+<% } -%>
+
+<%
+const 后续事件线索 = getvar('stat_data.后续事件线索', { scope: 'local' });
+if (后续事件线索 && Object.keys(后续事件线索).length > 0) {
+-%>
+# 后续事件线索
+{{ERA:后续事件线索}}
+<% } -%>
+
+<%
+const 附近传闻 = getvar('stat_data.附近传闻', { scope: 'local' });
+if (附近传闻 && Object.keys(附近传闻).length > 0) {
+-%>
+# 附近传闻
+{{ERA:附近传闻}}
+<% } -%>
+
+<%
+const allCharacters = variables.stat_data.角色数据;
+const playerLocation = variables.stat_data.user数据?.所在位置;
+const presentCharacters = {};
+
+if (playerLocation && allCharacters) {
+  for (const charName in allCharacters) {
+    if (allCharacters.hasOwnProperty(charName) && charName !== '$template') {
+      const character = allCharacters[charName];
+      if (character.所在位置 === playerLocation) {
+        // 复制角色数据，排除姓名和初始属性
+        const filtered = {};
+        for (const key in character) {
+          if (key !== '姓名' && key !== '初始属性' && key !== '$meta' && key !== '$template') {
+            filtered[key] = character[key];
+          }
+        }
+        presentCharacters[charName] = filtered;
+      }
+    }
+  }
+}
+
+if (Object.keys(presentCharacters).length > 0) {
+-%>
+# 同场景角色
+角色数据:<%- toCompact(presentCharacters) -%>
+<%
+} else {
+-%>
+[此地无甚知名人物]
+<% } -%>
+
+</status_current_variables>
+</variable>

@@ -56,6 +56,7 @@ const CURRENT_CHARACTER_TAG_CONTENT_REGEX = new RegExp(
 const VARIABLE_INSERT_BLOCK_REGEX = /<VariableInsert>\s*([\s\S]*?)\s*<\/VariableInsert>/;
 const VARIABLE_INSERT_BLOCK_GLOBAL_REGEX = /<VariableInsert>\s*[\s\S]*?\s*<\/VariableInsert>/g;
 const VARIABLE_INSERT_DETECT_REGEX = /<VariableInsert>[\s\S]*?<\/VariableInsert>/;
+const VARIABLE_EDIT_BLOCK_GLOBAL_REGEX = /<VariableEdit>\s*([\s\S]*?)\s*<\/VariableEdit>/g;
 const STATE_BLOCK_DETECT_REGEX = /<(state\d+)>\s*[\s\S]*?\s*<\/\1>/;
 const QUICK_OPENING_DEBUG_PREFIX = '[开局前端][快捷开局]';
 const QUICK_OPENING_DEBUG_STORAGE_KEY = 'jm-opening-quick-debug';
@@ -173,17 +174,11 @@ export async function switchQuickOpening(
     throw new Error('目标开局序号无效。');
   }
 
-  if (!settings.enableVariables) {
-    debugQuickOpening('变量模式未开启，仅切换 swipe_id', { targetSwipeIndex: index });
-    await setChatMessages([{ message_id: 0, swipe_id: index }], { refresh: 'affected' });
-    debugOpeningMessageAfterWrite({ message_id: 0, swipe_id: index });
-    return { processedStateCount: 0, currentNames: [] };
-  }
-
   const swipes = getCurrentOpeningSwipes();
   debugQuickOpening('已读取第 0 楼 swipes', {
     swipeCount: swipes.length,
     targetSwipeIndex: index,
+    enableVariables: settings.enableVariables,
     targetSwipeBeforeProcess: summarizeOpeningText(swipes[index] ?? ''),
   });
 
@@ -196,6 +191,7 @@ export async function switchQuickOpening(
     changed: processed.changed,
     processedStateCount: processed.stateCount,
     names: processed.names,
+    enableVariables: settings.enableVariables,
     processedText: summarizeOpeningText(processed.text),
   });
 
@@ -387,10 +383,9 @@ function processOpeningForVariableMode(text: string) {
     generatedVariableInsert: variableInsert,
   });
 
-  const processedText = ensureCurrentCharacterTag(
-    replaceStateBlocksWithVariableContent(text, matches, variableInsert),
-    currentCharacterTag,
-  );
+  const textWithVariableInsert = replaceStateBlocksWithVariableContent(text, matches, variableInsert);
+  const textWithCurrentCharacterTag = ensureCurrentCharacterTag(textWithVariableInsert, currentCharacterTag);
+  const processedText = ensureCurrentCharacterVariableEdit(textWithCurrentCharacterTag);
 
   return {
     changed: processedText !== text,
@@ -401,17 +396,22 @@ function processOpeningForVariableMode(text: string) {
 }
 
 function ensureCurrentCharacterTagFromVariableInsert(text: string) {
-  const names = getVariableInsertCharacterNames(text);
+  const textWithCurrentCharacterField = ensureCurrentCharacterFieldInVariableInsert(text);
+  const names = getVariableInsertCharacterNames(textWithCurrentCharacterField);
   if (names.length === 0) {
     return {
-      changed: false,
-      text,
+      changed: textWithCurrentCharacterField !== text,
+      text: textWithCurrentCharacterField,
       stateCount: 0,
       names: [],
     };
   }
 
-  const processedText = ensureCurrentCharacterTag(text, createCurrentCharacterTag(names));
+  const textWithCurrentCharacterTag = ensureCurrentCharacterTag(
+    textWithCurrentCharacterField,
+    createCurrentCharacterTag(names),
+  );
+  const processedText = ensureCurrentCharacterVariableEdit(textWithCurrentCharacterTag);
   return {
     changed: processedText !== text,
     text: processedText,
@@ -473,7 +473,7 @@ function createCurrentCharacterTag(names: string[]) {
 }
 
 function createVariableInsertBlock(variableData: Record<string, Record<string, unknown>>) {
-  return `<VariableInsert>\n${JSON.stringify(variableData, null, 2)}\n</VariableInsert>`;
+  return `<VariableInsert>\n${JSON.stringify({ 当前人物: '', 角色数据: variableData }, null, 2)}\n</VariableInsert>`;
 }
 
 function replaceStateBlocksWithVariableContent(text: string, matches: RegExpMatchArray[], variableInsert: string) {
@@ -573,11 +573,87 @@ function getVariableInsertCharacterNames(text: string) {
 }
 
 function extractCharacterNamesFromVariableInsert(variableData: Record<string, unknown>) {
-  const statData = isRecord(variableData.stat_data) ? variableData.stat_data : variableData;
-  const characterData = isRecord(statData.角色数据) ? statData.角色数据 : statData;
+  const statData = isRecord(variableData.stat_data) ? variableData.stat_data : undefined;
+  const characterData = isRecord(variableData.角色数据)
+    ? variableData.角色数据
+    : isRecord(statData?.角色数据)
+      ? statData.角色数据
+      : isRecord(statData)
+        ? statData
+        : variableData;
   return Object.entries(characterData)
     .filter(([key, value]) => !key.startsWith('$') && isRecord(value))
     .map(([key]) => key);
+}
+
+function ensureCurrentCharacterFieldInVariableInsert(text: string) {
+  const match = text.match(VARIABLE_INSERT_BLOCK_REGEX);
+  if (!match) {
+    return text;
+  }
+
+  try {
+    const parsed = JSON.parse(match[1].trim()) as unknown;
+    if (!isRecord(parsed) || typeof parsed.当前人物 === 'string') {
+      return text;
+    }
+
+    const nextVariableInsert = `<VariableInsert>\n${JSON.stringify({ 当前人物: '', ...parsed }, null, 2)}\n</VariableInsert>`;
+    return text.replace(VARIABLE_INSERT_BLOCK_REGEX, nextVariableInsert);
+  } catch (error) {
+    console.warn('[开局前端] 无法补齐 VariableInsert 的当前人物空字段:', error);
+    return text;
+  }
+}
+
+function ensureCurrentCharacterVariableEdit(text: string) {
+  const names = getCurrentCharacterNamesFromText(text);
+  const cleanedText = removeCurrentCharacterVariableEditBlocks(text);
+  if (names.length === 0) {
+    return cleanedText;
+  }
+
+  return `${cleanedText.trimEnd()}\n<VariableEdit>\n${JSON.stringify({ 当前人物: names.join(',') }, null, 2)}\n</VariableEdit>`;
+}
+
+function getCurrentCharacterNamesFromText(text: string) {
+  return uniqueStrings(
+    getCurrentCharacterTagContents(text).flatMap(tag =>
+      tag.content
+        .split(/[,\n\r|｜，]+/)
+        .map(name => name.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function removeCurrentCharacterVariableEditBlocks(text: string) {
+  let nextText = '';
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(VARIABLE_EDIT_BLOCK_GLOBAL_REGEX)) {
+    const startIndex = match.index ?? 0;
+    const endIndex = startIndex + match[0].length;
+    nextText += text.slice(lastIndex, startIndex);
+
+    if (!shouldRemoveCurrentCharacterVariableEdit(match[1] ?? '')) {
+      nextText += match[0];
+    }
+
+    lastIndex = endIndex;
+  }
+
+  nextText += text.slice(lastIndex);
+  return nextText;
+}
+
+function shouldRemoveCurrentCharacterVariableEdit(jsonText: string) {
+  try {
+    const parsed = JSON.parse(jsonText.trim()) as unknown;
+    return isRecord(parsed) && Object.prototype.hasOwnProperty.call(parsed, '当前人物');
+  } catch {
+    return false;
+  }
 }
 
 async function switchOpeningSwipe(index: number) {

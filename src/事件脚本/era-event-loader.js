@@ -3,7 +3,62 @@
 // ================================================================================
 // 包含: 从世界书加载事件定义
 
-import { CONFIG, log, logError, logSuccess, logWarning, debugGroup, debugGroupEnd, debugTable } from './era-utils.js';
+import {
+  CONFIG,
+  log,
+  logError,
+  logSuccess,
+  logWarning,
+  debugGroup,
+  debugGroupEnd,
+  debugTable,
+  isDebutEvent,
+} from './era-utils.js';
+import { normalizeParticipantEventDefinition } from './era-participant-entry.js';
+
+const parsedEventEntryCache = new Map();
+let cachedEventDefinitionsSignature = '';
+let cachedEventDefinitions = null;
+
+function hashString(value) {
+  const text = String(value || '');
+  let hash = 2166136261;
+
+  for (let index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
+function resolveEventName(entryName) {
+  const matchedPrefix = CONFIG.EVENT_KEY_PREFIXES.find(prefix => entryName && entryName.startsWith(prefix));
+  if (matchedPrefix) {
+    return {
+      eventName: entryName.substring(matchedPrefix.length),
+      matchedBy: matchedPrefix,
+      matchType: 'prefix',
+    };
+  }
+
+  for (const pattern of CONFIG.EVENT_KEY_PATTERNS) {
+    const match = entryName && entryName.match(pattern);
+    if (match) {
+      return {
+        eventName: entryName,
+        matchedBy: pattern,
+        matchType: 'pattern',
+      };
+    }
+  }
+
+  return null;
+}
+
+function buildEventEntryFingerprint(entry) {
+  return [entry?.uid ?? '', entry?.name ?? '', hashString(entry?.content ?? '')].join('|');
+}
 
 // ==================== 从世界书加载事件定义 ====================
 export async function loadEventDefinitionsFromWorldbook() {
@@ -36,6 +91,9 @@ export async function loadEventDefinitionsFromWorldbook() {
     );
 
     let totalEntries = 0;
+    const matchedEventEntries = [];
+    const signatureParts = [...worldbookNamesToScan];
+
     for (const entries of worldbooksContents) {
       if (!entries) continue;
 
@@ -44,42 +102,66 @@ export async function loadEventDefinitionsFromWorldbook() {
       for (const entry of entries) {
         log(`[DEBUG] 正在检查条目名称: "${entry.name}"`);
 
-        // 方式1：检查精确前缀匹配（向后兼容）
-        const matchedPrefix = CONFIG.EVENT_KEY_PREFIXES.find(prefix => entry.name && entry.name.startsWith(prefix));
-        let eventName = null;
-
-        if (matchedPrefix) {
-          // 精确前缀匹配：移除前缀作为事件名
-          eventName = entry.name.substring(matchedPrefix.length);
-          log(`[DEBUG] 精确前缀匹配: ${matchedPrefix}`);
-        } else {
-          // 方式2：检查正则模式匹配（支持 xxx事件条目-xxx、xxx登场事件-xxx 等格式）
-          for (const pattern of CONFIG.EVENT_KEY_PATTERNS) {
-            const match = entry.name && entry.name.match(pattern);
-            if (match) {
-              // 使用完整条目名作为事件名（保留前缀部分以区分不同小说）
-              eventName = entry.name;
-              log(`[DEBUG] 正则模式匹配: ${pattern}`);
-              break;
-            }
-          }
-        }
+        const resolvedEvent = resolveEventName(entry.name);
+        const eventName = resolvedEvent?.eventName || null;
 
         log(`[DEBUG] 是否为事件条目? ${!!eventName}`);
+        if (resolvedEvent) {
+          log(
+            `[DEBUG] ${resolvedEvent.matchType === 'prefix' ? '精确前缀匹配' : '正则模式匹配'}: ${resolvedEvent.matchedBy}`,
+          );
+        }
 
         // 检查条目名称 (name 字段)
         if (eventName && entry.content) {
-          try {
-            const eventData = JSON.parse(entry.content);
-            eventDefinitions[eventName] = eventData;
-            logSuccess(`加载事件: ${eventName}`);
-          } catch (e) {
-            logError(`解析事件条目JSON失败 (条目: ${entry.name}):`, e);
-            toastr.error(`解析事件JSON失败: ${entry.name}`);
-          }
+          const entryFingerprint = buildEventEntryFingerprint(entry);
+          signatureParts.push(entryFingerprint);
+          matchedEventEntries.push({
+            entry,
+            eventName,
+            entryFingerprint,
+          });
         }
       }
     }
+
+    const currentSignature = signatureParts.join('||');
+    if (cachedEventDefinitionsSignature === currentSignature && cachedEventDefinitions) {
+      logSuccess(`复用事件定义缓存: ${Object.keys(cachedEventDefinitions).length} 个事件`);
+      debugGroupEnd();
+      return cachedEventDefinitions;
+    }
+
+    for (const { entry, eventName, entryFingerprint } of matchedEventEntries) {
+      const cachedEntryDefinition = parsedEventEntryCache.get(entryFingerprint);
+      if (cachedEntryDefinition) {
+        eventDefinitions[eventName] = cachedEntryDefinition;
+        logSuccess(`复用缓存事件: ${eventName}`);
+        continue;
+      }
+
+      try {
+        const eventData = JSON.parse(entry.content);
+        const normalized = normalizeParticipantEventDefinition(eventName, eventData, {
+          isDebut: isDebutEvent(eventName),
+        });
+        if (!normalized.valid) {
+          normalized.errors.forEach(error => logError(error));
+          toastr.error(`事件定义无效，已跳过: ${entry.name}`);
+          continue;
+        }
+
+        parsedEventEntryCache.set(entryFingerprint, normalized.data);
+        eventDefinitions[eventName] = normalized.data;
+        logSuccess(`加载事件: ${eventName}`);
+      } catch (e) {
+        logError(`解析事件条目JSON失败 (条目: ${entry.name}):`, e);
+        toastr.error(`解析事件JSON失败: ${entry.name}`);
+      }
+    }
+
+    cachedEventDefinitionsSignature = currentSignature;
+    cachedEventDefinitions = eventDefinitions;
 
     log(`世界书总条目数: ${totalEntries}`);
     log(`识别到的事件数: ${Object.keys(eventDefinitions).length}`);

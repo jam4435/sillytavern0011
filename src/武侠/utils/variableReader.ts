@@ -178,6 +178,15 @@ interface GameVariables {
     未发生事件?: Record<string, unknown>;
     进行中事件?: Record<string, unknown>;
     已完成事件?: Record<string, unknown>;
+    人物事件占用?: Record<
+      string,
+      {
+        事件名?: string;
+        地点?: string;
+        来源?: '时间触发' | '玩家参与' | string;
+        入场时间?: { 年?: number; 月?: number; 日?: number; 时?: number };
+      }
+    >;
   };
 
   参与事件?: Record<string, unknown>;

@@ -10,22 +10,32 @@
 
 (async function () {
   // ==================== 导入模块 ====================
-  const { log, logError, logSuccess, logWarning, isDebugEnabled, getEventShortName, hasParticipationEntry } =
-    await import('./era-utils.js');
+  const {
+    log,
+    logError,
+    logSuccess,
+    logWarning,
+    isDebugEnabled,
+    getEventShortName,
+    hasParticipationEntry,
+    isDebutEvent,
+    formatDate,
+  } = await import('./era-utils.js');
   const { loadEventDefinitionsFromWorldbook } = await import('./era-event-loader.js');
   const { isTimeForEvent, isTimeAfterEventEnd } = await import('./era-event-checker.js');
   const {
     initializeEventList,
     batchStartEvents,
     batchCompleteDebutEvents,
-    playerJoinsEvent,
+    playerJoinsEvents,
     batchEndEvents,
+    applyTimedParticipantEntries,
     ensureFollowupCluesForInProgressEvents,
     cleanupFollowupCluesForActiveParticipation,
   } = await import('./era-event-operations.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
-  const EVENT_SCRIPT_VERSION = '2026-06-06-event-persist-verify';
+  const EVENT_SCRIPT_VERSION = '2026-06-24-event-cache-index';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
@@ -60,12 +70,7 @@
 
   const isEmptyObject = value => isPlainObject(value) && Object.keys(value).length === 0;
 
-  const isEmptyOpeningEventSystemWrite = detail => {
-    if (detail?.actions?.apiWrite !== true) {
-      return false;
-    }
-
-    const stat = detail?.statWithoutMeta || detail?.stat || {};
+  const shouldPostResyncVerifyForStat = stat => {
     const eventSystem = stat?.事件系统;
     return (
       !!stat?.世界信息?.时间 &&
@@ -73,6 +78,15 @@
       isPlainObject(eventSystem) &&
       EVENT_SYSTEM_BUCKETS.every(key => isEmptyObject(eventSystem[key]))
     );
+  };
+
+  const isEmptyOpeningEventSystemWrite = detail => {
+    if (detail?.actions?.apiWrite !== true) {
+      return false;
+    }
+
+    const stat = detail?.statWithoutMeta || detail?.stat || {};
+    return shouldPostResyncVerifyForStat(stat);
   };
 
   const normalizeEditLogPath = path =>
@@ -111,9 +125,7 @@
   };
 
   const isEventRelevantApiWritePath = path => {
-    const segments = normalizeEditLogPath(path)
-      .split('.')
-      .filter(Boolean);
+    const segments = normalizeEditLogPath(path).split('.').filter(Boolean);
 
     if (segments[0] === '世界信息' && segments[1] === '时间') {
       return true;
@@ -188,7 +200,6 @@
 
         debugGroupCollapsed(`检查事件: ${eventName}`);
         if (eventData && isTimeForEvent(currentTime, eventData, eventName)) {
-          const { isDebutEvent } = await import('./era-utils.js');
           if (isDebutEvent(eventName)) {
             logSuccess(`登场事件 ${eventName} 触发条件满足，将直接完成！`);
             debutEventsToComplete.push(eventName);
@@ -223,16 +234,19 @@
       const 最新进行中事件 = updatedVariables?.stat_data?.事件系统?.进行中事件 || {};
       const 最新参与事件 = updatedVariables?.stat_data?.参与事件 || {};
 
-      await ensureFollowupCluesForInProgressEvents(
-        Object.keys(最新进行中事件),
-        eventDefinitions,
-        'check-in-progress',
-      );
+      await ensureFollowupCluesForInProgressEvents(Object.keys(最新进行中事件), eventDefinitions, 'check-in-progress');
 
       // ==================== 批量检查进行中事件 ====================
       debugGroup('⏳ 批量检查进行中事件');
       const 进行中列表 = Object.keys(最新进行中事件);
       log(`进行中事件数: ${进行中列表.length}`);
+
+      await applyTimedParticipantEntries(
+        进行中列表,
+        eventDefinitions,
+        updatedVariables.stat_data.世界信息.时间,
+        updatedVariables,
+      );
 
       // 收集所有需要结束的事件
       const eventsToEnd = [];
@@ -260,8 +274,9 @@
       debugGroupEnd();
 
       // ==================== 检查玩家位置触发（弹性时间+层级式地点匹配）====================
-      if (进行中列表.length > 0) {
-        await checkPlayerLocationTriggers(进行中列表, eventDefinitions, updatedVariables, 最新参与事件);
+      const 仍在进行事件 = 进行中列表.filter(eventName => !eventsToEnd.includes(eventName));
+      if (仍在进行事件.length > 0) {
+        await checkPlayerLocationTriggers(仍在进行事件, eventDefinitions, updatedVariables, 最新参与事件);
       }
     } catch (error) {
       logError('主检查函数出错:', error);
@@ -278,6 +293,15 @@
     log(`玩家位置: ${playerLocation}`);
 
     const 附近传闻 = {};
+    const eventsToJoin = [];
+    const hierarchicalPaths = [];
+
+    if (playerLocation) {
+      const locationParts = playerLocation.split('/');
+      for (let i = 1; i <= locationParts.length; i++) {
+        hierarchicalPaths.push(locationParts.slice(0, i).join('/'));
+      }
+    }
 
     for (const eventName of 进行中列表) {
       const eventData = eventDefinitions[eventName];
@@ -290,14 +314,6 @@
 
       // 层级式地点匹配
       if (playerLocation && eventLocation) {
-        // 获取playerLocation并逐级拆分 (e.g., a/b/c -> ['a', 'a/b', 'a/b/c'])
-        const locationParts = playerLocation.split('/');
-        const hierarchicalPaths = [];
-
-        for (let i = 1; i <= locationParts.length; i++) {
-          hierarchicalPaths.push(locationParts.slice(0, i).join('/'));
-        }
-
         // 调整后的引子触发逻辑
         let bestMatchPath = '';
         for (const path of hierarchicalPaths) {
@@ -312,7 +328,6 @@
           const shortName = getEventShortName(eventName);
           const time = eventData.触发条件;
           const location = eventData.事件地点;
-          const { formatDate } = await import('./era-utils.js');
           const timeString = formatDate(time);
 
           附近传闻[shortName] = `${hookText} [${timeString}/${location}]`;
@@ -322,9 +337,13 @@
         // 只有当playerLocation与eventData.事件地点完全相同时，才调用playerJoinsEvent
         if (eventLocation === playerLocation && !alreadyJoined) {
           logSuccess(`玩家到达事件地点: ${eventName}`);
-          await playerJoinsEvent(eventName, eventData);
+          eventsToJoin.push(eventName);
         }
       }
+    }
+
+    if (eventsToJoin.length > 0) {
+      await playerJoinsEvents(eventsToJoin, eventDefinitions);
     }
 
     // 循环结束后，检查传闻是否有变化，仅在有变化时写入
@@ -410,6 +429,7 @@
   let isCheckingEvents = false;
   let pendingCheckReason = null;
   let checkEventsTimer = null;
+  let lastSuccessfulInitializationAt = 0;
 
   async function runScheduledCheck(reason) {
     if (isCheckingEvents) {
@@ -446,7 +466,7 @@
     }, 100);
   }
 
-  async function initialize() {
+  async function initialize(options = {}) {
     if (isInitializing) {
       log('⏳ 初始化正在进行中，跳过重复调用');
       return false;
@@ -458,8 +478,9 @@
     }
 
     // 预检查：确保 stat_data 已初始化
+    let preCheckVars;
     try {
-      const preCheckVars = await getVariables({ type: 'chat' });
+      preCheckVars = await getVariables({ type: 'chat' });
       if (!preCheckVars || !preCheckVars.stat_data) {
         logWarning('⏳ stat_data 尚未初始化，等待前端创建角色后自动重试...');
         isInitializing = false;
@@ -480,8 +501,11 @@
       return false;
     }
 
+    const shouldPostResyncVerify =
+      options.forcePostResyncVerify === true || shouldPostResyncVerifyForStat(preCheckVars.stat_data);
+
     eventDefinitions = await loadEventDefinitionsFromWorldbook();
-    await initializeEventList(eventDefinitions);
+    await initializeEventList(eventDefinitions, { shouldPostResyncVerify });
 
     // 初始化完成后输出当前状态
     try {
@@ -511,23 +535,37 @@
     await checkEvents(eventDefinitions, 'initialize');
     isInitializing = false;
     isInitialized = true;
+    lastSuccessfulInitializationAt = Date.now();
     log('🏁 初始化流程结束，事件监听器已激活');
     return true;
   }
 
   let frontendInitializationTimer = null;
 
-  function scheduleFrontendInitialization(reason, signal, delay = 500) {
+  function scheduleFrontendInitialization(reason, signal, delay = 500, options = {}) {
     if (frontendInitializationTimer) {
       clearTimeout(frontendInitializationTimer);
     }
 
     frontendInitializationTimer = setTimeout(async () => {
       frontendInitializationTimer = null;
+      const signalTimestamp = typeof signal?.timestamp === 'number' ? signal.timestamp : 0;
+
+      if (isInitializing) {
+        log(`🎮 初始化仍在进行，延后处理前端开局初始化信号: ${reason}`, signal);
+        scheduleFrontendInitialization(reason, signal, 300, options);
+        return;
+      }
+
+      if (signalTimestamp > 0 && isInitialized && lastSuccessfulInitializationAt >= signalTimestamp) {
+        log(`🎮 前端开局初始化信号已被最近一次初始化覆盖，跳过重复初始化: ${reason}`, signal);
+        return;
+      }
+
       log(`🎮 检测到前端开局初始化信号，重新初始化事件系统: ${reason}`, signal);
       isInitialized = false;
 
-      const success = await initialize();
+      const success = await initialize(options);
       if (success) {
         logSuccess('🎉 ERA 事件系统已随前端开局重新初始化！');
         toastr.success('ERA 事件系统已自动初始化');
@@ -548,7 +586,7 @@
       .then(signal => {
         log('🎮 收到 GameInitialized 信号:', signal);
         logSuccess('🎉 前端已完成角色创建，开始自动初始化 ERA 事件系统...');
-        scheduleFrontendInitialization('waitGlobalInitialized', signal, 500);
+        scheduleFrontendInitialization('waitGlobalInitialized', signal, 500, { forcePostResyncVerify: true });
       })
       .catch(error => {
         logError('等待 GameInitialized 信号失败:', error);
@@ -563,7 +601,7 @@
   });
 
   eventOn('GameInitialized', signal => {
-    scheduleFrontendInitialization('GameInitialized-event', signal, 500);
+    scheduleFrontendInitialization('GameInitialized-event', signal, 500, { forcePostResyncVerify: true });
   });
 
   eventOn(tavern_events.MESSAGE_SENT, async () => {
@@ -590,7 +628,9 @@
 
     if (isEmptyOpeningEventSystemWrite(detail)) {
       log('📝 检测到新开局空事件系统写入，重新初始化事件列表');
-      scheduleFrontendInitialization('opening-empty-event-system-api-write', detail, 300);
+      scheduleFrontendInitialization('opening-empty-event-system-api-write', detail, 300, {
+        forcePostResyncVerify: true,
+      });
       return;
     }
 

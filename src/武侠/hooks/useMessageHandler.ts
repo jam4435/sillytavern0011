@@ -58,6 +58,7 @@ interface UseMessageHandlerOptions {
 }
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
+const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -182,6 +183,7 @@ export function useMessageHandler({
       beginDebugRound(message);
 
       let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
+      let createdLatestMessageId: number | null = null;
 
       try {
         extraVariableUpdateReservation = await prepareExtraVariableUpdateTurn(summarySettings);
@@ -211,6 +213,8 @@ export function useMessageHandler({
         messageLogger.log('✅ [步骤 1] 用户消息楼层创建完成');
         messageLogger.log('createChatMessages 返回值:', createUserResult);
         messageLogger.log('返回值类型:', typeof createUserResult);
+        const userMessage = getNewestMessageAfter(beforeSendLastMessageId, 'user');
+        createdLatestMessageId = userMessage?.message_id ?? null;
 
         // ========== 步骤 2: 调用 generate() 触发 AI 生成 ==========
         messageLogger.log('');
@@ -288,6 +292,7 @@ export function useMessageHandler({
           messageLogger.log('✅ [步骤 4] assistant 消息楼层创建完成');
           messageLogger.log('createChatMessages 返回值:', createAssistantResult);
           const assistantMessage = getNewestMessageAfter(beforeSendLastMessageId, 'assistant');
+          createdLatestMessageId = assistantMessage?.message_id ?? createdLatestMessageId;
           onVariableAssistantReply?.(resultText, assistantMessage?.message_id);
 
           // ========== 步骤 5: 手动刷新前端显示 ==========
@@ -431,6 +436,10 @@ export function useMessageHandler({
       } finally {
         extraVariableUpdateReservation?.release();
         setIsLoading(false);
+        if (createdLatestMessageId !== null) {
+          // 由后台楼层脚本延迟切换宿主消息节点；此处不等待，避免刷新节点时打断当前调用栈。
+          void eventEmit(SYNC_LATEST_MESSAGE_SHELL_EVENT, createdLatestMessageId);
+        }
         messageLogger.log('');
         messageLogger.log('🏁 流程结束');
         messageLogger.log('🔄 isLoading 设置为 false');

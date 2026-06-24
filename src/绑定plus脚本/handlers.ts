@@ -1212,7 +1212,7 @@ function normalizePersonaSnapshotsForBackup(value: unknown): PersonaSnapshot[] {
   return safeArray<Partial<PersonaSnapshot>>(value).map(snapshot => ({
     id: ensureString(snapshot.id) || createId(),
     timestamp: typeof snapshot.timestamp === 'number' ? snapshot.timestamp : Date.now(),
-    reason: ensureString(snapshot.reason) || '导入备份',
+    reason: ensureString(snapshot.reason) || '导入配置',
     description: normalizeDescription(ensureString(snapshot.description)),
     baseDescription: normalizeDescription(ensureString(snapshot.baseDescription)),
     traits: normalizePersonaTraitsForBackup(snapshot.traits),
@@ -1281,17 +1281,17 @@ function normalizeBindingPlusBackupPersonas(value: unknown): BindingPlusPersonaB
 
 function normalizeBindingPlusBackupFile(input: unknown): BindingPlusBackupFile {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    throw new Error('不是有效的绑定plus备份文件');
+    throw new Error('不是有效的绑定plus配置文件');
   }
 
   const source = input as Record<string, unknown>;
   if (source.app !== BINDING_PLUS_BACKUP_APP || source.version !== BINDING_PLUS_BACKUP_VERSION) {
-    throw new Error('不是支持的绑定plus备份文件版本');
+    throw new Error('不是支持的绑定plus配置文件版本');
   }
 
   const rawData = source.data;
   if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
-    throw new Error('绑定plus备份文件缺少 data 数据');
+    throw new Error('绑定plus配置文件缺少 data 数据');
   }
 
   const data = rawData as Record<string, unknown>;

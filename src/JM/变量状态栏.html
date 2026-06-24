@@ -29,7 +29,7 @@
         width: 100%;
       }
       .jm-state-panel-list:empty::before {
-        content: '无\003C 当前人物\003E 标签';
+        content: '无当前人物变量';
         display: block;
         width: 100%;
         max-width: 600px;
@@ -562,7 +562,7 @@
         <summary class="header">
           <div class="header-info">
             <div class="char-name-row">
-              <div class="char-name">无&lt;当前人物&gt; 标签</div>
+              <div class="char-name">无当前人物变量</div>
             </div>
           </div>
           <span class="collapse-toggle diagnostic-toggle" aria-hidden="true">
@@ -571,8 +571,8 @@
         </summary>
         <div class="diagnostic-details">
           <div class="diagnostic-message-list">
-            <div class="diagnostic-message">默认需要在最新楼层写入 &lt;当前人物&gt;...&lt;/当前人物&gt; 或 &lt;当前角色&gt;...&lt;/当前角色&gt; 标签。</div>
-            <div class="diagnostic-message">如果你确认标签已存在但这里仍不更新，请检查控制台中的 [变量状态栏] 日志。</div>
+            <div class="diagnostic-message">默认需要在 chat.stat_data.当前人物 中提供当前人物名。</div>
+            <div class="diagnostic-message">如果你确认当前人物变量已存在但这里仍不更新，请检查控制台中的 [变量状态栏] 日志。</div>
           </div>
         </div>
       </details>
@@ -742,13 +742,6 @@
         '<button class="edit-trigger jm-edit-name-trigger" type="button" title="编辑名字">&#9998;</button>';
       const OCCUPATION_EDIT_TRIGGER_HTML =
         '<button class="edit-trigger jm-edit-occupation-trigger" type="button" title="编辑职业">&#9998;</button>';
-      const CURRENT_PERSON_TAG = '<' + '当前人物' + '>';
-      const CURRENT_PERSON_CLOSING_TAG = '</' + '当前人物' + '>';
-      const CURRENT_ROLE_TAG = '<' + '当前角色' + '>';
-      const CURRENT_ROLE_CLOSING_TAG = '</' + '当前角色' + '>';
-      const CURRENT_PERSON_TAG_BLOCK = `${CURRENT_PERSON_TAG}...${CURRENT_PERSON_CLOSING_TAG}`;
-      const CURRENT_ROLE_TAG_BLOCK = `${CURRENT_ROLE_TAG}...${CURRENT_ROLE_CLOSING_TAG}`;
-      const CURRENT_TAGS_SHORT = `${CURRENT_PERSON_TAG}/${CURRENT_ROLE_TAG}`;
       const DISPLAY_TEXT_REPLACEMENTS = [['__DOT__', '.']];
       function normalizeDisplayValue(value) {
         if (typeof value === 'string') {
@@ -819,6 +812,26 @@
             .filter(Boolean),
         );
       }
+      function parseCurrentCharacterVariable(value) {
+        if (typeof value === 'string') {
+          return { status: 'ok', names: splitCharacterNames(value), format: 'string' };
+        }
+        if (Array.isArray(value)) {
+          const names = uniq(
+            value
+              .flatMap(item => {
+                if (typeof item === 'string') return splitCharacterNames(item);
+                if (Array.isArray(item)) return parseCurrentCharacterVariable(item).names;
+                return [];
+              })
+              .filter(Boolean),
+          );
+          return { status: 'ok', names, format: 'array' };
+        }
+        if (value === undefined) return { status: 'missing', names: [], format: 'missing' };
+        if (value === null) return { status: 'empty', names: [], format: 'null' };
+        return { status: 'invalid', names: [], format: typeof value };
+      }
       function normalizeListField(value) {
         if (Array.isArray(value)) {
           return uniq(value.flatMap(item => normalizeListField(item)).filter(Boolean));
@@ -841,59 +854,60 @@
       }
       function loadCurrentCharacterNames() {
         try {
-          const latestMessage = getChatMessages(-1)?.[0]?.message;
-          if (latestMessage === undefined || latestMessage === null) {
-            logWarn('未读取到最新楼层，显示“无当前角色”。');
+          const chatVariables = ensureObject(getVariables({ type: 'chat' }));
+          const rawStatData = _.get(chatVariables, 'stat_data', undefined);
+          if (!_.isPlainObject(rawStatData)) {
+            logWarn('chat.stat_data 不可读取，显示“无当前角色”。', rawStatData);
             return {
-              code: 'missing_latest_message',
+              code: rawStatData === undefined ? 'missing_stat_data' : 'invalid_stat_data',
               names: [],
-              reason: '未读取到最新楼层。',
-              details: ['请确认聊天记录存在，或检查酒馆助手消息接口是否正常。'],
+              reason: rawStatData === undefined ? 'chat 变量中没有 stat_data。' : 'chat.stat_data 不是对象。',
+              details: ['状态栏当前只从 chat.stat_data.当前人物 读取当前角色。'],
             };
           }
-          if (typeof latestMessage !== 'string') {
-            logWarn('最新楼层内容不是字符串，显示“无当前角色”。', latestMessage);
+          const parsedCurrentCharacter = parseCurrentCharacterVariable(rawStatData.当前人物);
+          if (parsedCurrentCharacter.status === 'ok' && parsedCurrentCharacter.names.length > 0) {
+            logInfo(
+              `当前角色来自 stat_data.当前人物（${parsedCurrentCharacter.format}）：${parsedCurrentCharacter.names.join('、')}。`,
+            );
             return {
-              code: 'invalid_latest_message',
-              names: [],
-              reason: '最新楼层内容不是字符串。',
-              details: ['请检查当前聊天记录是否异常。'],
-            };
-          }
-          const match = latestMessage.match(/<当前(人物|角色)>([\s\S]*?)<\/当前\1>/);
-          if (!match) {
-            logWarn(`最新楼层未找到 ${CURRENT_TAGS_SHORT} 标签，显示“无当前角色”。`);
-            return {
-              code: 'missing_tag',
-              names: [],
-              reason: `最新楼层没有可用的 ${CURRENT_PERSON_TAG_BLOCK} 或 ${CURRENT_ROLE_TAG_BLOCK} 标签。`,
-              details: [
-                '本诊断条能显示，说明状态栏 HTML 已运行；若控制台完全没有初始化日志，请检查变量状态栏正则是否启用、占位符是否存在。',
-              ],
-            };
-          }
-          const names = splitCharacterNames(match[2]);
-          if (names.length === 0) {
-            logWarn('当前角色标签为空，显示“无当前角色”。');
-            return {
-              code: 'empty_tag',
-              tagName: match[1],
-              names: [],
-              reason:
-                match[1] === '人物'
-                  ? `存在${CURRENT_PERSON_TAG} 标签，里面为空。`
-                  : `存在${CURRENT_ROLE_TAG} 标签，里面为空。`,
+              code: 'ok_from_stat_data_current_person',
+              names: parsedCurrentCharacter.names,
+              reason: '',
               details: [],
             };
           }
-          logInfo(`读取当前角色：${names.join('、')}。`);
-          return { code: 'ok', names, reason: '', details: [] };
+          if (parsedCurrentCharacter.status === 'ok') {
+            logWarn('stat_data.当前人物 为空，显示“无当前角色”。');
+            return {
+              code: 'empty_current_person',
+              names: [],
+              reason: 'stat_data.当前人物 为空。',
+              details: ['请在 chat.stat_data.当前人物 中提供至少一个角色名。'],
+            };
+          }
+          if (parsedCurrentCharacter.status === 'missing') {
+            logWarn('stat_data.当前人物 缺失，显示“无当前角色”。');
+            return {
+              code: 'missing_current_person',
+              names: [],
+              reason: 'stat_data.当前人物 不存在。',
+              details: ['请在 chat.stat_data.当前人物 中提供当前角色名。'],
+            };
+          }
+          logWarn(`stat_data.当前人物 格式无效（${parsedCurrentCharacter.format}），显示“无当前角色”。`, rawStatData.当前人物);
+          return {
+            code: 'invalid_current_person',
+            names: [],
+            reason: `stat_data.当前人物 格式无效（${parsedCurrentCharacter.format}）。`,
+            details: ['支持字符串或字符串数组。'],
+          };
         } catch (error) {
-          logError('读取最新楼层失败，显示“无当前角色”。', error);
+          logError('读取当前人物变量失败，显示“无当前角色”。', error);
           return {
             code: 'error',
             names: [],
-            reason: '读取最新楼层失败。',
+            reason: '读取当前人物变量失败。',
             details: [error?.message || String(error)],
           };
         }
@@ -1059,18 +1073,29 @@
         }
         return { content: parts.join(''), replaced };
       }
-      function replaceCurrentCharacterNameInMessage(message, oldName, newName) {
-        let replaced = false;
-        const updatedMessage = String(message ?? '').replace(
-          /<当前(人物|角色)>([\s\S]*?)<\/当前\1>/g,
-          (full, tagName, content) => {
-            const result = replaceDelimitedCharacterName(content, oldName, newName);
-            if (!result.replaced) return full;
-            replaced = true;
-            return `<当前${tagName}>${result.content}</当前${tagName}>`;
-          },
-        );
-        return { message: updatedMessage, replaced };
+      function replaceCurrentCharacterNameInVariable(value, oldName, newName) {
+        if (typeof value === 'string') {
+          const result = replaceDelimitedCharacterName(value, oldName, newName);
+          return { value: result.content, replaced: result.replaced };
+        }
+        if (Array.isArray(value)) {
+          let replaced = false;
+          const nextValue = value.map(item => {
+            if (typeof item === 'string') {
+              const result = replaceDelimitedCharacterName(item, oldName, newName);
+              replaced = replaced || result.replaced;
+              return result.content;
+            }
+            if (Array.isArray(item)) {
+              const result = replaceCurrentCharacterNameInVariable(item, oldName, newName);
+              replaced = replaced || result.replaced;
+              return result.value;
+            }
+            return item;
+          });
+          return { value: nextValue, replaced };
+        }
+        return { value, replaced: false };
       }
       function renameKeyInObject(target, oldKey, newKey, newValue) {
         const source = ensureObject(target);
@@ -1120,6 +1145,10 @@
       }
       function buildUpdatedStatData(statData, oldName, newName, newOccupation) {
         const nextStatData = _.cloneDeep(ensureObject(statData));
+        if (Object.prototype.hasOwnProperty.call(nextStatData, '当前人物')) {
+          const currentCharacterResult = replaceCurrentCharacterNameInVariable(nextStatData.当前人物, oldName, newName);
+          nextStatData.当前人物 = currentCharacterResult.value;
+        }
         if (_.has(nextStatData, ['角色数据', oldName])) {
           const roleMap = ensureObject(_.get(nextStatData, '角色数据', {}));
           const originalCharacter = _.cloneDeep(ensureObject(roleMap[oldName]));
@@ -1137,14 +1166,6 @@
           return renameKeyInObject(nextStatData, oldName, newName, updatedCharacter);
         }
         throw new Error(`未找到人物“${oldName}”对应的变量。`);
-      }
-      function getLatestChatMessage() {
-        try {
-          return getChatMessages(-1)?.[0] || null;
-        } catch (error) {
-          logWarn('读取最新楼层失败。', error);
-          return null;
-        }
       }
       async function migratePortraitStorage(oldName, newName) {
         if (!oldName || !newName || oldName === newName) return;
@@ -1165,27 +1186,10 @@
         }
         linkifyAllText(panel);
       }
-      async function syncCurrentCharacterNameInLatestMessage(oldName, newName) {
-        const latestMessage = getLatestChatMessage();
-        if (!latestMessage) {
-          return { synced: false, reason: `未找到最新楼层，无法同步 ${CURRENT_TAGS_SHORT} 标签。` };
-        }
-        const originalText = ensureString(latestMessage.message);
-        const messageReplacement = replaceCurrentCharacterNameInMessage(originalText, oldName, newName);
-        if (!messageReplacement.replaced) {
-          return { synced: false, reason: `未在最新楼层的 ${CURRENT_TAGS_SHORT} 标签中找到当前名字。` };
-        }
-        if (messageReplacement.message !== originalText) {
-          await setChatMessages([{ message_id: latestMessage.message_id, message: messageReplacement.message }], {
-            refresh: 'affected',
-          });
-        }
-        return { synced: true };
-      }
       async function updateCharacterInfo(
         panel,
         data,
-        { newName, newRawName = newName, newOccupation, syncLatestMessage = false },
+        { newName, newRawName = newName, newOccupation },
       ) {
         const oldName = ensureString(data.Name).trim();
         const oldRawName = ensureString(data.RawName || data.Name).trim();
@@ -1222,15 +1226,6 @@
           }
           throw error;
         }
-        let syncWarning = '';
-        if (syncLatestMessage && hasDisplayNameChanged) {
-          try {
-            const syncResult = await syncCurrentCharacterNameInLatestMessage(oldName, newName);
-            if (!syncResult.synced) syncWarning = syncResult.reason || '同步最新楼层失败。';
-          } catch (error) {
-            syncWarning = error?.message || '同步最新楼层失败。';
-          }
-        }
         if (hasDisplayNameChanged) {
           const oldStateKey = `character:${oldName}`;
           const newStateKey = `character:${newName}`;
@@ -1250,12 +1245,7 @@
         data.Status = ensureObject(data.Status);
         data.Status.Occupation = newOccupation;
         await refreshEditedPanel(panel, data);
-        if (!syncWarning) {
-          scheduleRefresh();
-          return;
-        }
-        logWarn(syncWarning);
-        alert(`人物变量已修改，但最新楼层文本未同步：${syncWarning}`);
+        scheduleRefresh();
       }
       async function editCharacterName(panel, data) {
         const oldName = ensureString(data.Name).trim();
@@ -1271,7 +1261,6 @@
           newName,
           newRawName: newName,
           newOccupation: oldOccupation,
-          syncLatestMessage: true,
         });
       }
       async function editCharacterOccupation(panel, data) {
@@ -1793,22 +1782,22 @@
       }
       function buildNoCharacterFeedback(currentCharacterResult, statDataResult, names, missingNames) {
         if (names.length === 0) {
-          if (currentCharacterResult.code === 'missing_tag') {
+          if (currentCharacterResult.code === 'missing_stat_data' || currentCharacterResult.code === 'invalid_stat_data') {
             return {
-              title: `无${CURRENT_PERSON_TAG} 标签`,
-              details: [currentCharacterResult.reason || `未找到 ${CURRENT_PERSON_TAG} 标签。`, ...(currentCharacterResult.details || [])],
-              stateKey: 'diagnostic:missing-current-tag',
+              title: '当前角色变量不可读取',
+              details: [currentCharacterResult.reason || 'chat.stat_data 无法读取。', ...(currentCharacterResult.details || [])],
+              stateKey: 'diagnostic:unreadable-stat-data',
             };
           }
-          if (currentCharacterResult.code === 'empty_tag') {
+          if (currentCharacterResult.code === 'invalid_current_person') {
             return {
-              title: currentCharacterResult.tagName === '人物' ? '当前无在场女性角色' : '当前无当前角色',
-              details: [currentCharacterResult.reason || '存在当前角色标签，但内容为空。'],
-              stateKey: 'diagnostic:empty-current-tag',
+              title: '当前人物变量无效',
+              details: [currentCharacterResult.reason || 'stat_data.当前人物 格式无效。', ...(currentCharacterResult.details || [])],
+              stateKey: 'diagnostic:invalid-current-person',
             };
           }
           return {
-            title: '无当前角色',
+            title: '无当前人物变量',
             details: [currentCharacterResult.reason || '未找到当前角色。', ...(currentCharacterResult.details || [])],
             stateKey: `diagnostic:${currentCharacterResult.code || 'unknown'}`,
           };

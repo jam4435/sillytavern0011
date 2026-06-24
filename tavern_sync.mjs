@@ -56662,7 +56662,7 @@ const _default_implicit_keys = {
 };
 function to_original_worldbook_entry(entry, index) {
     let result = lodash_default()({})
-        .set('uid', index)
+        .set('uid', entry.uid ?? index)
         .set('displayIndex', index)
         .set('comment', entry.name)
         .set('disable', !entry.enabled)
@@ -59744,7 +59744,6 @@ const Worldbook_entry = object({
     content: schemas_string(),
 })
     .transform(data => {
-    _.unset(data, 'uid');
     if (data.strategy.keys.length === 0) {
         _.unset(data, 'strategy.keys');
     }
@@ -62772,4 +62771,3 @@ program
     .showHelpAfterError(true)
     .showSuggestionAfterError(true)
     .parse();
-

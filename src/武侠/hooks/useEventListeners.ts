@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { DIRECT_VARIABLE_WRITE_DONE_EVENT } from '../../shared/directVariableWrite';
 import { GameState } from '../types';
 import {
@@ -20,6 +20,40 @@ interface UseEventListenersOptions {
   onDirectVariableWriteDone?: (detail: unknown) => void;
 }
 
+const UNKNOWN_CHAT_ID = 'unknown';
+
+const normalizeChatId = (value: unknown): string => {
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    return normalized || UNKNOWN_CHAT_ID;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return UNKNOWN_CHAT_ID;
+};
+
+const readCurrentChatId = (): string => {
+  try {
+    const currentWindow = globalThis as typeof globalThis & {
+      SillyTavern?: { getCurrentChatId?: () => string | number | null | undefined };
+    };
+    const parentWindow = typeof window !== 'undefined'
+      ? window.parent as Window & typeof globalThis & {
+        SillyTavern?: { getCurrentChatId?: () => string | number | null | undefined };
+      }
+      : undefined;
+    return normalizeChatId(
+      currentWindow.SillyTavern?.getCurrentChatId?.()
+      ?? parentWindow?.SillyTavern?.getCurrentChatId?.(),
+    );
+  } catch {
+    return UNKNOWN_CHAT_ID;
+  }
+};
+
 export function useEventListeners({
   updateGameState,
   setCurrentMaintext,
@@ -30,6 +64,8 @@ export function useEventListeners({
   onEraWriteDone,
   onDirectVariableWriteDone,
 }: UseEventListenersOptions) {
+  const lastKnownChatIdRef = useRef(readCurrentChatId());
+
   useEffect(() => {
     eventLogger.log('🎧 注册消息事件监听器');
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -100,7 +136,26 @@ export function useEventListeners({
     const messageUpdatedListener = eventOn(tavern_events.MESSAGE_UPDATED, handleMessageUpdate);
     eventLogger.log('注册 CHAT_CHANGED 监听器...');
     const chatChangedListener = eventOn(tavern_events.CHAT_CHANGED, eventData => {
-      onChatChanged?.();
+      const previousChatId = lastKnownChatIdRef.current;
+      const nextChatId = normalizeChatId(eventData) !== UNKNOWN_CHAT_ID
+        ? normalizeChatId(eventData)
+        : readCurrentChatId();
+      const didKnownChatChange =
+        previousChatId !== UNKNOWN_CHAT_ID
+        && nextChatId !== UNKNOWN_CHAT_ID
+        && previousChatId !== nextChatId;
+
+      if (nextChatId !== UNKNOWN_CHAT_ID) {
+        lastKnownChatIdRef.current = nextChatId;
+      }
+
+      if (didKnownChatChange) {
+        eventLogger.log(`[CHAT_CHANGED] 聊天已切换: ${previousChatId} -> ${nextChatId}`);
+        onChatChanged?.();
+      } else {
+        eventLogger.log(`[CHAT_CHANGED] 聊天未切换，保留当前回合追踪: ${previousChatId}`);
+      }
+
       handleMessageUpdate(eventData);
     });
     eventLogger.log('注册 era:writeDone 监听器...');

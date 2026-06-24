@@ -6,13 +6,14 @@ import type { FinalMessageOptions, SelectionState } from './types';
 export async function submitSelections(selections: SelectionState) {
   const genderValue = selections.gender === '男' ? 'man' : 'female';
   const description = buildDescription(selections);
+  const finalMessage = appendDefaultCurrentCharacterVariableInsert(description);
   const settings = ensureGenerationSettings(selections);
 
   if (typeof insertOrAssignVariables === 'function' && typeof triggerSlash === 'function') {
     try {
       await applyGenerationSettings(settings);
       await insertOrAssignVariables({ gender: genderValue }, { type: 'chat' });
-      triggerSlash([`/send ${description}`, '/trigger'].join('|'));
+      triggerSlash([`/send ${finalMessage}`, '/trigger'].join('|'));
       renderFinalMessage({
         title: '档案已发送',
         text: '[档案已生成并注入聊天栏...]',
@@ -25,7 +26,7 @@ export async function submitSelections(selections: SelectionState) {
   }
 
   console.log('--- 角色卡生成数据 ---');
-  console.log(description);
+  console.log(finalMessage);
   console.log('--------------------------');
   console.log(
     '错误：外部接口(insertOrAssignVariables 或 triggerSlash)未找到。如果这不是在SillyTavern等应用中加载的，请在浏览器开发者工具的控制台中查看生成的数据。',
@@ -71,6 +72,10 @@ export function buildDescription(selections: SelectionState) {
 
   description += ' 请根据世界观，生成符合人物的身份和设定的开局。';
   return description;
+}
+
+function appendDefaultCurrentCharacterVariableInsert(text: string) {
+  return `${text}\n\n<VariableInsert>\n${JSON.stringify({ 当前人物: '' }, null, 2)}\n</VariableInsert>`;
 }
 
 function renderFinalMessage(options: FinalMessageOptions) {

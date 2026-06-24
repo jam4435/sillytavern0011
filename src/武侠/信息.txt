@@ -1,185 +1,87 @@
-<variable>
-<status_current_variables>
-# 当前世界信息：
-世界信息:{{ERA:世界信息}}
+变量变更
 
-# {{user}}数据
-<%
-// 去引号的紧凑JSON格式，节省token
-function toCompact(obj) {
-  if (obj === null || obj === undefined) return 'null';
-  if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
-  if (typeof obj === 'string') return obj.includes(',') || obj.includes(':') || obj.includes('\n') ? `"${obj}"` : obj;
-  if (Array.isArray(obj)) {
-    if (obj.length === 0) return '[]';
-    return '[' + obj.map(v => toCompact(v)).join(',') + ']';
-  }
-  const entries = Object.entries(obj)
-    .filter(([k]) => k !== '$meta' && k !== '$template')
-    .map(([k, v]) => k + ':' + toCompact(v));
-  if (entries.length === 0) return '{}';
-  return '{' + entries.join(',') + '}';
-}
+AI回复
+声6/实6
 
-function getAptitudeLevel(value) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return '未知';
-  if (num <= 4) return '低劣';
-  if (num <= 8) return '普通';
-  if (num <= 12) return '上佳';
-  if (num <= 16) return '出众';
-  return '绝顶';
-}
+后台变更
+1
 
-function describeInitialAttributes(attrs) {
-  if (!attrs || typeof attrs !== 'object') return '';
-  const entries = Object.entries(attrs)
-    .filter(([k]) => k !== '$meta' && k !== '$template')
-    .map(([k, v]) => `${k}${v}（${getAptitudeLevel(v)}）`);
-  if (entries.length === 0) return '';
-  return '初始属性：' + entries.join('|');
-}
-
-function trimTrailingPunctuation(text) {
-  return String(text).trim().replace(/[。！？；;，,、]+$/, '');
-}
-
-function describeTalents(talents) {
-  if (!talents || typeof talents !== 'object') return '';
-  const entries = Object.entries(talents)
-    .filter(([k]) => k !== '$meta' && k !== '$template')
-    .map(([k, v], index) => `${index + 1}.${k}：${trimTrailingPunctuation(v)}`);
-  if (entries.length === 0) return '';
-  return '天赋：\n' + entries.join('\n');
-}
-
-const p = variables.stat_data.user数据;
-const worldTime = variables.stat_data.世界信息?.时间;
-
-if (p && worldTime) {
-  // 创建新对象，用年龄替换出生年份
-  const userData = {};
-  const initialAttributesText = describeInitialAttributes(p.初始属性);
-  const talentsText = describeTalents(p.天赋);
-  for (const key in p) {
-    if (key === '$meta' || key === '$template') continue;
-    if (key === '初始属性' || key === '天赋') continue;
-    if (key === '出生年份') {
-      userData['年龄'] = (worldTime.年 || 0) - (p.出生年份 || 0);
-    } else {
-      userData[key] = p[key];
-    }
-  }
--%>
-user数据:<%- toCompact(userData) %>
-<% if (initialAttributesText) { -%>
-<%- initialAttributesText %>
-<% } -%>
-<% if (talentsText) { -%>
-<%- talentsText %>
-<% } -%>
-
-<%
-} else {
--%>
-[玩家数据加载失败]
-<% } -%>
-user初始属性代表的资质分级：0-4 低劣|5-8 普通|9-12 上佳|13-16 出众|17-20 绝顶
-天赋和初始属性不要在文中直白写出，而是通过人物表现自然地表露
-
-<%
-const 参与事件 = getvar('stat_data.参与事件', { scope: 'local' });
-if (参与事件 && Object.keys(参与事件).length > 0) {
--%>
-
-# 所在地正在或将要发生的事件
-{{ERA:参与事件}}
-
-<% } -%>
-
-<%
-const 后续事件线索 = getvar('stat_data.后续事件线索', { scope: 'local' });
-if (后续事件线索 && Object.keys(后续事件线索).length > 0) {
--%>
-# 后续事件线索
-{{ERA:后续事件线索}}
-<% } -%>
-
-<%
-const 附近传闻 = getvar('stat_data.附近传闻', { scope: 'local' });
-if (附近传闻 && Object.keys(附近传闻).length > 0) {
--%>
-# 附近传闻
-{{ERA:附近传闻}}
-<% } -%>
-
-<%
-const allCharacters = variables.stat_data.角色数据;
-const playerLocation = variables.stat_data.user数据?.所在位置;
-const presentCharacters = {};
-
-if (playerLocation && allCharacters) {
-  for (const charName in allCharacters) {
-    if (allCharacters.hasOwnProperty(charName) && charName !== '$template') {
-      const character = allCharacters[charName];
-      if (character.所在位置 === playerLocation) {
-        // 复制角色数据，排除姓名和初始属性
-        const filtered = {};
-        for (const key in character) {
-          if (key !== '姓名' && key !== '初始属性' && key !== '$meta' && key !== '$template') {
-            filtered[key] = character[key];
-          }
-        }
-        presentCharacters[charName] = filtered;
-      }
-    }
-  }
-}
-
-if (Object.keys(presentCharacters).length > 0) {
--%>
-# 同场景角色
-角色数据:<%- toCompact(presentCharacters) -%>
-<%
-} else {
--%>
-[此地无甚知名人物]
-<% } -%>
-
-</status_current_variables>
-</variable>
-
----
-上面ejs的对应输出：
----
-
-<variable>
-<status_current_variables>
-# 当前世界信息：
-世界信息:{"时间":{"年":1219,"月":10,"日":20,"时":13}}
-
-# 墨逸数据
-user数据:{用户名:墨逸,性别:男,外貌:剑眉星目，器宇不凡，身形修长，稳健如松,年龄:15,状态:健康,境界:三流-初入,修为:50,所在位置:金国/张家口/大酒店,身份:{豪门公子/小姐:初入江湖的新人},功法:{九阴真经:{掌握程度:初窥门径,类型:内功,功法描述:武学最高秘籍之一，由黄裳所创。王重阳在华山论剑胜出后获得，并将其破解《玉女心经》的部分刻于活死人墓的密室之中。真经包含解穴秘诀、闭气秘诀、易筋锻骨之术、移魂大法等上乘武学，以及诸多高深招式，是武林中人梦寐以求的至宝。,功法品阶:绝世,特性:{初窥门径:}}},属性:{气血:96/96,内力:600/600,臂力:60,根骨:60,机敏:60,洞察:60},包裹:{},人物经历:{},关系网:{}}
-初始属性：臂力6（普通）|根骨6（普通）|机敏6（普通）|悟性6（普通）|洞察6（普通）|风姿20（绝顶）|福缘0（低劣）
-天赋：
-1.魏武遗风（曹贼）：你对已有家室或身负婚约的异性拥有难以言喻的吸引力。在与此类对象相处时，你的言辞更容易打动对方心扉，且不仅不会引起对方伴侣的警觉，反而常被其视为“通家之好”或“可信赖的义兄/弟”
-2.绝代风华：风采才貌冠绝当世，无人能及
-
-user初始属性代表的资质分级：0-4 低劣|5-8 普通|9-12 上佳|13-16 出众|17-20 绝顶
-天赋和初始属性不要在文中直白写出，而是通过人物表现自然地表露
+AI回复变量
+声6 / 实6
+修改
+stat_data › 世界信息 › 时间 › 时
+已落地
 
 
-# 所在地正在或将要发生的事件
-{"射雕事件条目-第7回-02-初遇黄蓉":"1219年10月20日13时 到 1219年10月20日15时，郭靖抵达张家口，在一家大酒店吃饭时遇到了扮成小乞丐模样的黄蓉。见她被店伙计欺负，郭靖心生怜悯，不仅为她解围，还慷慨地邀请她同桌吃饭。黄蓉故意点了满桌昂贵的酒菜，郭靖毫不吝啬，倾囊结账。两人相谈甚欢，郭靖的淳朴和真诚让黄蓉大为感动。饭后，郭靖见黄蓉衣衫单薄，便将自己珍贵的黑貂裘赠予她，并附上两锭黄金。黄蓉被他的善良彻底打动，两人结为朋友，黄蓉更是开玩笑地向郭靖讨要了汗血宝马，郭靖也毫不犹豫地答应了。此番相遇，让两人都给对方留下了极为深刻的印象。"}
+AI 声明
+12
+实际写入 · ERA/API
+11
+→
+12
+新增
+stat_data › user数据 › 人物经历 › 张家口酒店结缘
+已落地
 
 
-# 后续事件线索
-{"射雕事件条目-第7回-02-初遇黄蓉的后续":"(1219年10月20日16时，金国/张家口/黑松林，似乎还会有事情发生)郭靖与黄蓉分别后，被黄河四鬼及其师叔侯通海寻仇，陷入困境。","射雕事件条目-第7回-03-黑松林解围的后续":"(1220年1月25日10时，金国/中都/街头，似乎还会有事情发生)郭靖继续南下，在中都北京遇到了一场比武招亲，并卷入其中。"}
+AI 声明
+1219年10月20日，在张家口大酒店偶遇慷慨请客的憨厚青年郭靖与扮作乞丐的黄蓉，因好奇而主动上前结交，参与了这场特殊的宴席。
+实际写入 · ERA/API
+未定义
+→
+1219年10月20日，在张家口大酒店偶遇慷慨请客的憨厚青年郭靖与扮作乞丐的黄蓉，因好奇而主动上前结交，参与了这场特殊的宴席。
+新增
+stat_data › user数据 › 关系网 › 郭靖
+已落地
 
-# 附近传闻
-{"射雕事件条目-第7回-01-宝马风波":"你听说有人在黑水河畔因一匹汗血宝马起了争执。 [1219年10月20日10时/金国/张家口/张家口镇]","射雕事件条目-第7回-03-黑松林解围":"听说黄河四鬼在城西黑松林吃了大亏，被人吊在了树上。 [1219年10月20日16时/金国/张家口/黑松林]","射雕事件条目-第7回-02-拼桌结交":"你听说有位公子在张家口大酒店与一名黑衣少年和一名小乞丐拼桌共饮，相谈甚欢。[1219年10月20日12时/金国/张家口/大酒店]"}
 
-[此地无甚知名人物]
+AI 声明
+初次见面/10
+实际写入 · ERA/API
+未定义
+→
+初次见面/10
+新增
+stat_data › user数据 › 关系网 › 黄蓉
+已落地
 
-</status_current_variables>
-</variable> 
+
+AI 声明
+初次见面/5
+实际写入 · ERA/API
+未定义
+→
+初次见面/5
+新增
+stat_data › 角色数据 › 郭靖 › 关系网 › 墨逸
+已落地
+
+
+AI 声明
+一见如故/15
+实际写入 · ERA/API
+未定义
+→
+一见如故/15
+新增
+stat_data › 角色数据 › 黄蓉 › 关系网 › 墨逸
+已落地
+
+
+AI 声明
+萍水相逢/5
+实际写入 · ERA/API
+未定义
+→
+萍水相逢/5
+
+后台变更变量
+1
+删除
+stat_data › 后续事件线索 › 射雕事件条目-第7回-01-宝马风波的后续
+事件脚本
+
+
+(1219年10月20日13时，金国/张家口/大酒店，似乎还会有事情发生)郭靖抵达张家口，将在此地遇到一位重要的人物。
+→
+未定义

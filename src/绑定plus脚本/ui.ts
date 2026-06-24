@@ -321,9 +321,9 @@ function exportBindingPlusBackup(): void {
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    toastr.success('绑定plus备份已导出');
+    toastr.success('绑定plus配置已导出');
   } catch (error) {
-    showUiErrorToast('导出绑定plus备份失败', error);
+    showUiErrorToast('导出绑定plus配置失败', error);
   }
 }
 
@@ -345,13 +345,13 @@ async function importBindingPlusBackupFromFile(file: File): Promise<void> {
       getCurrentPersonaFromDOM()?.avatarId || getEditingAvatarId() || 'bindingplus',
       getRuntimeContext(),
       true,
-      '导入备份后应用当前绑定失败',
+      '导入配置后应用当前绑定失败',
     );
     renderBindingPlusStorageSection();
 
-    toastr.success(`导入绑定plus备份完成：${summaryText}`);
+    toastr.success(`导入绑定plus配置完成：${summaryText}`);
   } catch (error) {
-    showUiErrorToast('导入绑定plus备份失败', error);
+    showUiErrorToast('导入绑定plus配置失败', error);
   }
 }
 
@@ -892,11 +892,11 @@ function createPanelHtml(): string {
                     </div>
                     <div>
                       <div class="plus-probe-title">绑定存储管理</div>
-                      <div class="text-note">这里列出绑定plus保存的全部聊天/角色绑定。用于删除已经不存在的聊天残留绑定，也可以把绑定plus配置导出为 JSON 备份后再导入恢复。</div>
+                      <div class="text-note">这里列出绑定plus保存的全部聊天/角色绑定。用于删除已经不存在的聊天残留绑定，也可以把绑定plus配置导出为 JSON 配置文件后再导入恢复。</div>
                       <div id="bindingplus-storage-size-summary" class="persona-plus-list"></div>
                       <div class="edit-actions-bar compact-toolbar">
-                        <button class="persona-btn" id="bindingplus-backup-export-btn" type="button">导出备份</button>
-                        <button class="persona-btn" id="bindingplus-backup-import-btn" type="button">导入备份</button>
+                        <button class="persona-btn" id="bindingplus-backup-export-btn" type="button">导出配置</button>
+                        <button class="persona-btn" id="bindingplus-backup-import-btn" type="button">导入配置</button>
                         <input id="bindingplus-backup-import-input" type="file" accept=".json,application/json" style="display:none;">
                       </div>
                       <div id="persona-context-binding-storage-list" class="persona-plus-list"></div>

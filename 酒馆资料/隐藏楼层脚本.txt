@@ -1,57 +1,92 @@
 $(() => {
+  const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
   let collapseTimer = null;
   let chatElement = null;
   let chatObserver = null;
   let shellObserver = null;
+  let syncInProgress = false;
 
-  function getLastMessageElement($messages) {
-    let $last = $messages.filter('.last_mes').last();
-    if ($last.length > 0) {
-      return $last;
-    }
-
-    let maxMessageId = -1;
-    $messages.each((_index, element) => {
-      const messageId = Number($(element).attr('mesid'));
-      if (Number.isFinite(messageId) && messageId > maxMessageId) {
-        maxMessageId = messageId;
-      }
-    });
-
-    return maxMessageId >= 0 ? $messages.filter(`[mesid="${maxMessageId}"]`).last() : $();
+  function getMessageElement($messages, messageId) {
+    return $messages.filter(`[mesid="${messageId}"]`).last();
   }
 
-  function collapseToLastMessage() {
+  async function syncAndCollapseToLastMessage(expectedMessageId) {
     observeChat();
 
     // 编辑框打开时不要删 DOM，否则会打断酒馆的编辑控件。
     if ($('#curEditTextarea').length > 0) {
+      scheduleCollapse(250, expectedMessageId);
       return;
     }
 
+    const latestMessageId = getLastMessageId();
+    if (Number.isFinite(expectedMessageId) && expectedMessageId !== latestMessageId) {
+      return;
+    }
+
+    let $messages = $('#chat > .mes');
+    if ($messages.length === 0) {
+      return;
+    }
+
+    let $latest = getMessageElement($messages, latestMessageId);
+    if ($latest.length === 0) {
+      if (syncInProgress) {
+        return;
+      }
+
+      // refresh:none 创建的新消息不会生成宿主 DOM。复用当前伪同层外壳时，必须同步
+      // mesid 和楼层标题，酒馆的编辑按钮才会定位到真实最新消息。
+      const $shell = $messages.filter('.last_mes').last().length > 0
+        ? $messages.filter('.last_mes').last()
+        : $messages.last();
+      if ($shell.length === 0) {
+        return;
+      }
+
+      const previousMessageId = $shell.attr('mesid');
+      const previousMessageIdLabel = $shell.find('.mesIDDisplay').text();
+      syncInProgress = true;
+      try {
+        $shell.attr('mesid', String(latestMessageId));
+        $shell.data('mesid', latestMessageId);
+        $shell.find('.mesIDDisplay').text(String(latestMessageId));
+        await refreshOneMessage(latestMessageId, $shell);
+      } catch (error) {
+        if (previousMessageId === undefined) {
+          $shell.removeAttr('mesid');
+          $shell.removeData('mesid');
+        } else {
+          $shell.attr('mesid', previousMessageId);
+          $shell.data('mesid', Number(previousMessageId));
+        }
+        $shell.find('.mesIDDisplay').text(previousMessageIdLabel);
+        console.error('[隐藏楼层] 同步最新楼层显示失败:', error);
+        return;
+      } finally {
+        syncInProgress = false;
+      }
+
+      $messages = $('#chat > .mes');
+      $latest = getMessageElement($messages, latestMessageId);
+      if ($latest.length === 0) {
+        return;
+      }
+    }
+
+    $latest.addClass('last_mes');
+    $messages.not($latest).remove();
     $('#show_more_messages').remove();
-
-    const $messages = $('#chat > .mes');
-    if ($messages.length <= 1) {
-      return;
-    }
-
-    const $last = getLastMessageElement($messages);
-    if ($last.length === 0) {
-      return;
-    }
-
-    $messages.not($last).remove();
   }
 
-  function scheduleCollapse(delay = 120) {
+  function scheduleCollapse(delay = 120, expectedMessageId) {
     if (collapseTimer) {
       clearTimeout(collapseTimer);
     }
 
     collapseTimer = setTimeout(() => {
       collapseTimer = null;
-      collapseToLastMessage();
+      void syncAndCollapseToLastMessage(expectedMessageId);
     }, delay);
   }
 
@@ -87,6 +122,10 @@ $(() => {
     if (eventType) {
       eventOn(eventType, () => scheduleCollapse());
     }
+  });
+
+  eventOn(SYNC_LATEST_MESSAGE_SHELL_EVENT, messageId => {
+    scheduleCollapse(50, Number(messageId));
   });
 
   const shellElement = $('#sheld')[0] || document.body;

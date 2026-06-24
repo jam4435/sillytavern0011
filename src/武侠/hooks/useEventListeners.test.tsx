@@ -32,6 +32,7 @@ describe('useEventListeners', () => {
     scheduleGameDataCompletionMock.mockClear();
     getLastMessageContentMock.mockClear();
     parseOptionsMock.mockClear();
+    (globalThis.SillyTavern.getCurrentChatId as ReturnType<typeof vi.fn>).mockReturnValue('test-chat');
   });
 
   it('注册并注销全部全局监听器', () => {
@@ -110,5 +111,53 @@ describe('useEventListeners', () => {
     expect(updateGameState).toHaveBeenCalledWith({ stats: { cultivation: 100 } });
     expect(setCurrentMaintext).toHaveBeenCalledWith('正文\n[A]选项');
     expect(setCurrentOptions).toHaveBeenCalledWith(['选项']);
+  });
+
+  it('同聊天的 CHAT_CHANGED 只刷新，不清空当前回合追踪', async () => {
+    const updateGameState = vi.fn();
+    const setCurrentMaintext = vi.fn();
+    const setCurrentOptions = vi.fn();
+    const onChatChanged = vi.fn();
+
+    renderHook(() =>
+      useEventListeners({
+        updateGameState,
+        setCurrentMaintext,
+        setCurrentOptions,
+        onChatChanged,
+      }),
+    );
+
+    await act(async () => {
+      await eventEmit(tavern_events.CHAT_CHANGED, 'test-chat');
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(onChatChanged).not.toHaveBeenCalled();
+    expect(updateGameState).toHaveBeenCalledWith({ stats: { cultivation: 100 } });
+    expect(setCurrentMaintext).toHaveBeenCalledWith('正文\n[A]选项');
+    expect(setCurrentOptions).toHaveBeenCalledWith(['选项']);
+  });
+
+  it('聊天 ID 真的变化时才清空当前回合追踪', async () => {
+    const onChatChanged = vi.fn();
+
+    renderHook(() =>
+      useEventListeners({
+        updateGameState: vi.fn(),
+        setCurrentMaintext: vi.fn(),
+        setCurrentOptions: vi.fn(),
+        onChatChanged,
+      }),
+    );
+
+    (globalThis.SillyTavern.getCurrentChatId as ReturnType<typeof vi.fn>).mockReturnValue('next-chat');
+
+    await act(async () => {
+      await eventEmit(tavern_events.CHAT_CHANGED, 'next-chat');
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(onChatChanged).toHaveBeenCalledTimes(1);
   });
 });
