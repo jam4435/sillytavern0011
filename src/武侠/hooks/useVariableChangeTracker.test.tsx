@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useVariableChangeTracker } from './useVariableChangeTracker';
 
 const declaredReply = '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>';
+const backendOnlyReply = '<VariableEdit>{"user数据":{"属性":{"臂力":80}}}</VariableEdit>';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
@@ -199,5 +200,122 @@ describe('useVariableChangeTracker', () => {
         afterValue: 120,
       }),
     ]);
+  });
+
+  it('显式后台 ERA 来源可以把已归入 AI 的批次纠正回后台', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'era-api-write',
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toHaveLength(1);
+
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'era-source-1',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        message_id: 2,
+        actions: { apiWrite: true },
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'frontend',
+        origin: 'background',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+  });
+
+  it('显式后台 ERA 来源会覆盖普通 era 的笼统 producer', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'extra-variable-api-write',
+      });
+    });
+
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'era',
+      }),
+    ]);
+
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'era-source-2',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        message_id: 2,
+        actions: { apiWrite: true },
+      });
+    });
+
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'frontend',
+      }),
+    ]);
+  });
+
+  it('主回复声明已记录后，消息边界不会再用最终 assistant 原文覆盖它', () => {
+    getChatMessagesMock.mockImplementation((messageId?: unknown) => {
+      if (messageId === 2 || messageId === '0-{{lastMessageId}}') {
+        return [{
+          message_id: 2,
+          message: `${declaredReply}\n${backendOnlyReply}`,
+          swipes: [],
+          swipe_id: 0,
+        }];
+      }
+      return [];
+    });
+
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+      result.current.handleVariableMessageBoundary(2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.declaredChanges).toHaveLength(1);
+    expect(result.current.variableChanges?.aiReply.declaredChanges[0]).toEqual(
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+      }),
+    );
   });
 });

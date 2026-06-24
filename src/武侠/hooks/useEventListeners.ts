@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { DIRECT_VARIABLE_WRITE_DONE_EVENT } from '../../shared/directVariableWrite';
+import {
+  DIRECT_VARIABLE_WRITE_DONE_EVENT,
+  ERA_VARIABLE_WRITE_DONE_EVENT,
+} from '../../shared/directVariableWrite';
 import { GameState } from '../types';
 import {
   getLastMessageContent,
@@ -18,6 +21,7 @@ interface UseEventListenersOptions {
   onChatChanged?: () => void;
   onEraWriteDone?: (detail: unknown) => void;
   onDirectVariableWriteDone?: (detail: unknown) => void;
+  onEraVariableWriteDone?: (detail: unknown) => void;
 }
 
 const UNKNOWN_CHAT_ID = 'unknown';
@@ -63,6 +67,7 @@ export function useEventListeners({
   onChatChanged,
   onEraWriteDone,
   onDirectVariableWriteDone,
+  onEraVariableWriteDone,
 }: UseEventListenersOptions) {
   const lastKnownChatIdRef = useRef(readCurrentChatId());
 
@@ -124,6 +129,13 @@ export function useEventListeners({
       scheduleRefresh(50);
     };
 
+    const handleEraVariableWriteDone = (detail?: unknown) => {
+      eventLogger.log(`[${ERA_VARIABLE_WRITE_DONE_EVENT}] 检测到带来源的 ERA 变量写入完成，调度纯读刷新`);
+      onEraVariableWriteDone?.(detail);
+      scheduleGameDataCompletion('era-variable-write-done', { fullScan: true });
+      scheduleRefresh(50);
+    };
+
     eventLogger.log('注册 MESSAGE_SENT 监听器...');
     const messageSentListener = eventOn(tavern_events.MESSAGE_SENT, messageId => {
       onMessageSent?.(messageId);
@@ -162,6 +174,8 @@ export function useEventListeners({
     const writeDoneListener = eventOn('era:writeDone', handleWriteDone);
     eventLogger.log(`注册 ${DIRECT_VARIABLE_WRITE_DONE_EVENT} 监听器...`);
     const directWriteDoneListener = eventOn(DIRECT_VARIABLE_WRITE_DONE_EVENT, handleDirectWriteDone);
+    eventLogger.log(`注册 ${ERA_VARIABLE_WRITE_DONE_EVENT} 监听器...`);
+    const eraVariableWriteDoneListener = eventOn(ERA_VARIABLE_WRITE_DONE_EVENT, handleEraVariableWriteDone);
     eventLogger.log('🎧 监听器注册完成');
 
     return () => {
@@ -176,6 +190,7 @@ export function useEventListeners({
       chatChangedListener.stop();
       writeDoneListener.stop();
       directWriteDoneListener.stop();
+      eraVariableWriteDoneListener.stop();
     };
   }, [
     updateGameState,
@@ -186,5 +201,6 @@ export function useEventListeners({
     onChatChanged,
     onEraWriteDone,
     onDirectVariableWriteDone,
+    onEraVariableWriteDone,
   ]);
 }

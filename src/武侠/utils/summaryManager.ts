@@ -3,6 +3,7 @@
  * 用于检测和执行角色人物经历的自动总结
  */
 
+import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { dataLogger } from './logger';
 import type {
   SummarySettings,
@@ -367,18 +368,15 @@ export async function executeSummary(
     dataLogger.log('[summaryManager] 写入更新数据:', JSON.stringify(updateData, null, 2));
 
     // 使用 updateByObject 替换人物经历
-    eventEmit('era:updateByObject', updateData);
-
-    // 等待写入完成
-    await new Promise<void>(resolve => {
-      const timeout = setTimeout(() => {
-        dataLogger.log('[summaryManager] 等待写入超时 (500ms)');
-        resolve();
-      }, 500);
-      eventOnce('era:writeDone', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
+    await emitSourcedEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'summary-write',
+      eventName: 'era:updateByObject',
+      detail: updateData,
+      expectedAction: 'apiWrite',
+      timeoutMs: 3000,
+      timeoutMessage: '人物经历总结写回请求已发出，但 ERA 没有确认写入完成。',
     });
 
     result.success = true;

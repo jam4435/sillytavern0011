@@ -6,7 +6,7 @@
  */
 
 import { gameLogger } from './logger';
-import { emitEraEventAndWait } from './eraWriteWait';
+import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 
 // 大境界列表（按顺序）
 export const MAJOR_REALMS = ['不入流', '三流', '二流', '一流', '宗师', '绝顶', '陆地神仙'] as const;
@@ -332,11 +332,15 @@ export async function performBreakthrough(
       },
     };
 
-    await emitEraEventAndWait('era:updateByObject', {
+    await emitSourcedEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'realm-breakthrough',
+      eventName: 'era:updateByObject',
+      detail: updatePayload,
       timeoutMs: 20000,
       timeoutMessage: `境界突破到「${newRealm}」的请求已发出，但 ERA 没有确认 apiWrite 写入完成。`,
       expectedAction: 'apiWrite',
-      detail: updatePayload,
     });
 
     gameLogger.log(`[realmSystem] 境界突破成功: ${currentRealm} -> ${newRealm}, 消耗修为: ${check.cost}`);

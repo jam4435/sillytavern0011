@@ -107,6 +107,7 @@ const App: React.FC = () => {
     handleVariableMessageBoundary,
     handleEraWriteDone,
     handleDirectVariableWriteDone,
+    handleEraVariableWriteDone,
     markVariableApiWriteAsAi,
     clearVariableChanges,
   } = useVariableChangeTracker();
@@ -144,6 +145,7 @@ const App: React.FC = () => {
     onChatChanged: clearVariableChanges,
     onEraWriteDone: handleEraWriteDone,
     onDirectVariableWriteDone: handleDirectVariableWriteDone,
+    onEraVariableWriteDone: handleEraVariableWriteDone,
   });
 
   // 使用自动总结检测 hook

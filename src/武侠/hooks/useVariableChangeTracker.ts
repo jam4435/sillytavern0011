@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   DirectVariableWriteDoneDetail,
+  EraVariableWriteDoneDetail,
   DirectVariableWriteSource,
 } from '../../shared/directVariableWrite';
 import {
@@ -27,6 +28,7 @@ type ActiveVariableTurn = {
   lastStatData: Record<string, unknown> | null;
   userMessageId?: number;
   assistantMessageId?: number;
+  assistantReplyLocked: boolean;
   aiWriteTargetIds: number[];
   batchSequence: number;
 };
@@ -48,7 +50,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 9;
+  version: 10;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -66,10 +68,11 @@ type CaptureMetadata = {
 
 type VariableWriteSignal =
   | { kind: 'era'; producer: 'era'; detail?: WriteDoneLikeDetail }
+  | { kind: 'sourced-era'; producer: DirectVariableWriteSource; detail?: EraVariableWriteDoneDetail }
   | { kind: 'direct'; producer: DirectVariableWriteSource; detail?: DirectVariableWriteDoneDetail }
   | { kind: 'boundary'; producer: 'message-boundary'; assistantMessageId?: number };
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v9';
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v10';
 const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v1',
   'wuxia.variableChangeTurn.v2',
@@ -79,6 +82,7 @@ const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v6',
   'wuxia.variableChangeTurn.v7',
   'wuxia.variableChangeTurn.v8',
+  'wuxia.variableChangeTurn.v9',
 ];
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
 const STALE_WRITE_DONE_RETRY_DELAY_MS = 40;
@@ -127,7 +131,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 9 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== 10 || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -154,7 +158,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 9,
+      version: 10,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -297,14 +301,29 @@ const rebuildSummary = (
 const PRODUCER_PRIORITY: Record<VariableChangeProducer, number> = {
   'message-boundary': 0,
   era: 1,
-  'event-script': 1,
-  'variable-editor': 1,
-  frontend: 1,
-  restore: 1,
+  'event-script': 2,
+  'variable-editor': 2,
+  frontend: 2,
+  restore: 2,
 };
 
 const isBoundaryProducer = (producer: VariableChangeProducer): boolean =>
   producer === 'message-boundary';
+
+const canPromoteBatchToAi = (
+  batch: Pick<VariableObservedBatch, 'origin' | 'producer'>,
+  metadata: CaptureMetadata,
+): boolean =>
+  metadata.origin === 'ai'
+  && batch.origin !== 'ai'
+  && isBoundaryProducer(batch.producer);
+
+const canDemoteBatchToBackground = (
+  batch: Pick<VariableObservedBatch, 'origin'>,
+  metadata: CaptureMetadata,
+): boolean =>
+  metadata.origin === 'background'
+  && batch.origin === 'ai';
 
 const isDirectVariableWriteSource = (value: unknown): value is DirectVariableWriteSource =>
   value === 'event-script'
@@ -351,6 +370,7 @@ export function useVariableChangeTracker() {
       baselineStatData,
       lastStatData: baselineStatData,
       userMessageId,
+      assistantReplyLocked: false,
       aiWriteTargetIds: [],
       batchSequence: 0,
     };
@@ -371,14 +391,19 @@ export function useVariableChangeTracker() {
       return false;
     }
 
-    const batch = [...current.batches]
+    const matchingBatches = [...current.batches]
       .reverse()
-      .find(candidate => candidate.nextSnapshotHash === nextSnapshotHash);
+      .filter(candidate => candidate.nextSnapshotHash === nextSnapshotHash);
+    const batch = matchingBatches.find(candidate =>
+      canPromoteBatchToAi(candidate, metadata)
+      || canDemoteBatchToBackground(candidate, metadata))
+      ?? matchingBatches[0];
     if (!batch) {
       return false;
     }
 
-    const shouldMoveToAi = metadata.origin === 'ai' && batch.origin !== 'ai';
+    const shouldMoveToAi = canPromoteBatchToAi(batch, metadata);
+    const shouldMoveToBackground = canDemoteBatchToBackground(batch, metadata);
     const shouldUpgradeProducer =
       PRODUCER_PRIORITY[metadata.producer] > PRODUCER_PRIORITY[batch.producer];
     const shouldImproveMetadata =
@@ -390,20 +415,25 @@ export function useVariableChangeTracker() {
       )
       || (batch.actions === null && metadata.actions !== null && metadata.actions !== undefined)
       || (batch.assistantMessageId === undefined && metadata.assistantMessageId !== undefined);
-    if (!shouldMoveToAi && !shouldImproveMetadata) {
+    if (!shouldMoveToAi && !shouldMoveToBackground && !shouldImproveMetadata) {
       return true;
     }
 
     mutateSummary(summary => {
+      const batchAiChanges = summary.aiReply.observedChanges
+        .filter(change => change.batchId === batch.batchId);
       const batchBackgroundChanges = summary.background.observedChanges
         .filter(change => change.batchId === batch.batchId);
       const movedChanges = shouldMoveToAi
         ? batchBackgroundChanges.filter(change =>
           !metadata.aiOnlyDeclaredMatches
           || matchesAnyDeclaredChange(summary.aiReply.declaredChanges, change))
+        : shouldMoveToBackground
+          ? batchAiChanges
         : [];
       const movedChangeIds = new Set(movedChanges.map(change => change.id));
       const aiUpgradeBatchId = `${batch.batchId}:ai`;
+      const backgroundDowngradeBatchId = `${batch.batchId}:background`;
       const upgradedAiChanges = movedChanges.map((change, index) => ({
         ...change,
         id: `${change.source}:${change.action}:${getPathKey(change)}:${aiUpgradeBatchId}:${index}`,
@@ -414,8 +444,20 @@ export function useVariableChangeTracker() {
         reason: metadata.reason,
         assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
       }));
-      const patchedAi = summary.aiReply.observedChanges.map(change =>
-        change.batchId === batch.batchId && shouldImproveMetadata
+      const downgradedBackgroundChanges = movedChanges.map((change, index) => ({
+        ...change,
+        id: `${change.source}:${change.action}:${getPathKey(change)}:${backgroundDowngradeBatchId}:${index}`,
+        batchId: backgroundDowngradeBatchId,
+        origin: 'background' as const,
+        producer: metadata.producer,
+        actions: metadata.actions ?? change.actions,
+        reason: metadata.reason,
+        assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
+      }));
+      const patchedAi = summary.aiReply.observedChanges
+        .filter(change => !shouldMoveToBackground || !movedChangeIds.has(change.id))
+        .map(change =>
+          change.batchId === batch.batchId && shouldImproveMetadata && !shouldMoveToBackground
           ? {
             ...change,
             producer: metadata.producer,
@@ -440,10 +482,30 @@ export function useVariableChangeTracker() {
         patchedAi,
         upgradedAiChanges,
       );
+      const backgroundAppend = appendLimited(
+        patchedBackground,
+        downgradedBackgroundChanges,
+      );
       const remainingBatchChangeCount = batchBackgroundChanges.length - movedChanges.length;
       const nextBatches = summary.batches.flatMap(candidate => {
         if (candidate.batchId !== batch.batchId) {
           return [candidate];
+        }
+
+        if (shouldMoveToBackground) {
+          const downgradedBatch: VariableObservedBatch | null = movedChanges.length > 0
+            ? {
+              ...candidate,
+              batchId: backgroundDowngradeBatchId,
+              origin: 'background',
+              producer: metadata.producer,
+              actions: metadata.actions ?? candidate.actions,
+              reason: metadata.reason,
+              assistantMessageId: metadata.assistantMessageId ?? candidate.assistantMessageId,
+              changeCount: movedChanges.length,
+            }
+            : null;
+          return downgradedBatch ? [downgradedBatch] : [];
         }
 
         if (!shouldMoveToAi) {
@@ -491,7 +553,8 @@ export function useVariableChangeTracker() {
         },
         background: {
           ...summary.background,
-          observedChanges: patchedBackground,
+          observedChanges: backgroundAppend.values,
+          omittedObservedCount: summary.background.omittedObservedCount + backgroundAppend.omitted,
         },
         batches: nextBatches,
       };
@@ -774,11 +837,11 @@ export function useVariableChangeTracker() {
     }
 
     const actions =
-      signal.kind === 'era'
+      signal.kind === 'era' || signal.kind === 'sourced-era'
         ? normalizeWriteActions(signal.detail?.actions)
         : null;
     const assistantMessageId =
-      signal.kind === 'era'
+      signal.kind === 'era' || signal.kind === 'sourced-era'
         ? normalizeMessageId(signal.detail?.message_id)
         : undefined;
     const isAiTarget = assistantMessageId !== undefined
@@ -793,7 +856,7 @@ export function useVariableChangeTracker() {
         || ((actions?.rollback === true || actions?.resync === true) && isAiTarget)
       );
     const reason =
-      signal.kind === 'direct'
+      signal.kind === 'direct' || signal.kind === 'sourced-era'
         ? (typeof signal.detail?.reason === 'string' && signal.detail.reason.trim()
           ? signal.detail.reason.trim()
           : 'direct-write-done')
@@ -858,6 +921,13 @@ export function useVariableChangeTracker() {
     rawReply: string,
     assistantMessageId?: number,
   ) => {
+    const activeTurn = activeTurnRef.current;
+    if (activeTurn) {
+      activeTurn.assistantReplyLocked = true;
+      if (assistantMessageId !== undefined) {
+        activeTurn.assistantMessageId = assistantMessageId;
+      }
+    }
     refreshDeclaredChanges(rawReply, assistantMessageId);
     captureSignal({
       kind: 'boundary',
@@ -867,7 +937,8 @@ export function useVariableChangeTracker() {
   }, [captureSignal, refreshDeclaredChanges]);
 
   const handleVariableMessageBoundary = useCallback((messageId?: number) => {
-    if (!activeTurnRef.current) {
+    const activeTurn = activeTurnRef.current;
+    if (!activeTurn) {
       return;
     }
 
@@ -877,7 +948,10 @@ export function useVariableChangeTracker() {
     const finalMessage = resolved.content.trim()
       ? resolved
       : readLatestAssistantMessageContent();
-    if (finalMessage.content.trim()) {
+    if (finalMessage.messageId !== undefined) {
+      activeTurn.assistantMessageId = finalMessage.messageId;
+    }
+    if (!activeTurn.assistantReplyLocked && finalMessage.content.trim()) {
       refreshDeclaredChanges(finalMessage.content, finalMessage.messageId);
     }
     captureSignal({
@@ -893,9 +967,19 @@ export function useVariableChangeTracker() {
   }, [captureSignal]);
 
   const handleDirectVariableWriteDone = useCallback((unknownDetail?: unknown) => {
-    const detail = isRecord(unknownDetail) ? unknownDetail as DirectVariableWriteDoneDetail : undefined;
+    const detail = isRecord(unknownDetail)
+      ? unknownDetail as unknown as DirectVariableWriteDoneDetail
+      : undefined;
     const producer = isDirectVariableWriteSource(detail?.source) ? detail.source : 'frontend';
     captureSignal({ kind: 'direct', producer, detail });
+  }, [captureSignal]);
+
+  const handleEraVariableWriteDone = useCallback((unknownDetail?: unknown) => {
+    const detail = isRecord(unknownDetail)
+      ? unknownDetail as unknown as EraVariableWriteDoneDetail
+      : undefined;
+    const producer = isDirectVariableWriteSource(detail?.source) ? detail.source : 'frontend';
+    captureSignal({ kind: 'sourced-era', producer, detail });
   }, [captureSignal]);
 
   const clearVariableChanges = useCallback(() => {
@@ -921,6 +1005,7 @@ export function useVariableChangeTracker() {
     handleVariableMessageBoundary,
     handleEraWriteDone,
     handleDirectVariableWriteDone,
+    handleEraVariableWriteDone,
     markVariableApiWriteAsAi,
     clearVariableChanges,
   };

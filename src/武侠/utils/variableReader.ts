@@ -29,6 +29,7 @@ import {
     type CompleteMartialArt,
     type SimpleMartialArt,
 } from './martialArtsDatabase';
+import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { dataLogger } from './logger';
 
 // 使用酒馆的 ChatMessage 类型（与本地 types.ts 中的 ChatMessage 区分）
@@ -1273,27 +1274,32 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
     if (attributeExists) {
       // 属性已存在，使用 update
       dataLogger.log('[autoUpdatePlayerAttributes] UPDATE 数据:', JSON.stringify(updateData, null, 2));
-      eventEmit('era:updateByObject', updateData);
+      await emitSourcedEraVariableWriteAndWait({
+        source: 'frontend',
+        operation: 'update',
+        reason: 'player-attribute-completion',
+        eventName: 'era:updateByObject',
+        detail: updateData,
+        expectedAction: 'apiWrite',
+        timeoutMs: 3000,
+        timeoutMessage: '玩家属性更新请求已发出，但 ERA 没有确认写入完成。',
+      });
       dataLogger.log('[autoUpdatePlayerAttributes] UPDATE 请求已发送');
     } else {
       // 属性不存在，使用 insert
       dataLogger.log('[autoUpdatePlayerAttributes] INSERT 数据:', JSON.stringify(updateData, null, 2));
-      eventEmit('era:insertByObject', updateData);
+      await emitSourcedEraVariableWriteAndWait({
+        source: 'frontend',
+        operation: 'insert',
+        reason: 'player-attribute-completion',
+        eventName: 'era:insertByObject',
+        detail: updateData,
+        expectedAction: 'apiWrite',
+        timeoutMs: 3000,
+        timeoutMessage: '玩家属性补全请求已发出，但 ERA 没有确认写入完成。',
+      });
       dataLogger.log('[autoUpdatePlayerAttributes] INSERT 请求已发送');
     }
-
-    // 等待写入完成
-    await new Promise<void>(resolve => {
-      const timeout = setTimeout(() => {
-        dataLogger.log('[autoUpdatePlayerAttributes] 等待超时 (500ms)，继续执行');
-        resolve();
-      }, 500);
-      eventOnce('era:writeDone', () => {
-        dataLogger.log('[autoUpdatePlayerAttributes] 收到 era:writeDone 事件');
-        clearTimeout(timeout);
-        resolve();
-      });
-    });
 
     // 更新缓存
     updateCharacterCache(cacheKey, currentRealm);
@@ -1485,7 +1491,16 @@ export async function autoUpdateCharacterAttributes(
           (insertData.角色数据 as Record<string, unknown>)[角色名] = { 属性 };
         }
         dataLogger.log('[autoUpdateCharacterAttributes] INSERT 数据:', JSON.stringify(insertData, null, 2));
-        eventEmit('era:insertByObject', insertData);
+        await emitSourcedEraVariableWriteAndWait({
+          source: 'frontend',
+          operation: 'insert',
+          reason: 'character-attribute-completion',
+          eventName: 'era:insertByObject',
+          detail: insertData,
+          expectedAction: 'apiWrite',
+          timeoutMs: 3000,
+          timeoutMessage: '角色属性补全请求已发出，但 ERA 没有确认写入完成。',
+        });
         dataLogger.log('[autoUpdateCharacterAttributes] INSERT 请求已发送');
       }
 
@@ -1496,22 +1511,18 @@ export async function autoUpdateCharacterAttributes(
           (updateData.角色数据 as Record<string, unknown>)[角色名] = { 属性 };
         }
         dataLogger.log('[autoUpdateCharacterAttributes] UPDATE 数据:', JSON.stringify(updateData, null, 2));
-        eventEmit('era:updateByObject', updateData);
+        await emitSourcedEraVariableWriteAndWait({
+          source: 'frontend',
+          operation: 'update',
+          reason: 'character-attribute-completion',
+          eventName: 'era:updateByObject',
+          detail: updateData,
+          expectedAction: 'apiWrite',
+          timeoutMs: 3000,
+          timeoutMessage: '角色属性刷新请求已发出，但 ERA 没有确认写入完成。',
+        });
         dataLogger.log('[autoUpdateCharacterAttributes] UPDATE 请求已发送');
       }
-
-      // 等待写入完成
-      await new Promise<void>(resolve => {
-        const timeout = setTimeout(() => {
-          dataLogger.log('[autoUpdateCharacterAttributes] 等待超时 (500ms)，继续执行');
-          resolve();
-        }, 500);
-        eventOnce('era:writeDone', () => {
-          dataLogger.log('[autoUpdateCharacterAttributes] 收到 era:writeDone 事件');
-          clearTimeout(timeout);
-          resolve();
-        });
-      });
 
       dataLogger.log('[autoUpdateCharacterAttributes] 角色属性更新完成');
     } catch (error) {
@@ -2118,28 +2129,33 @@ export async function autoUpdateMartialArts(
     try {
       if (needsInsert) {
         dataLogger.log('[autoUpdateMartialArts] INSERT 数据:', JSON.stringify(insertData, null, 2));
-        eventEmit('era:insertByObject', insertData);
+        await emitSourcedEraVariableWriteAndWait({
+          source: 'frontend',
+          operation: 'insert',
+          reason: 'martial-arts-completion',
+          eventName: 'era:insertByObject',
+          detail: insertData,
+          expectedAction: 'apiWrite',
+          timeoutMs: 3000,
+          timeoutMessage: '功法补全请求已发出，但 ERA 没有确认写入完成。',
+        });
         dataLogger.log('[autoUpdateMartialArts] 功法补全(insert)请求已发送');
       }
 
       if (needsUpdate) {
         dataLogger.log('[autoUpdateMartialArts] UPDATE 数据:', JSON.stringify(updateData, null, 2));
-        eventEmit('era:updateByObject', updateData);
+        await emitSourcedEraVariableWriteAndWait({
+          source: 'frontend',
+          operation: 'update',
+          reason: 'martial-arts-completion',
+          eventName: 'era:updateByObject',
+          detail: updateData,
+          expectedAction: 'apiWrite',
+          timeoutMs: 3000,
+          timeoutMessage: '功法特性刷新请求已发出，但 ERA 没有确认写入完成。',
+        });
         dataLogger.log('[autoUpdateMartialArts] 功法特性刷新(update)请求已发送');
       }
-
-      // 等待写入完成
-      await new Promise<void>(resolve => {
-        const timeout = setTimeout(() => {
-          dataLogger.log('[autoUpdateMartialArts] 等待超时 (500ms)，继续执行');
-          resolve();
-        }, 500);
-        eventOnce('era:writeDone', () => {
-          dataLogger.log('[autoUpdateMartialArts] 收到 era:writeDone 事件');
-          clearTimeout(timeout);
-          resolve();
-        });
-      });
 
       dataLogger.log('[autoUpdateMartialArts] 功法处理完成');
     } catch (error) {

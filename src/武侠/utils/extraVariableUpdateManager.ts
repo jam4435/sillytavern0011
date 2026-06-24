@@ -3,10 +3,10 @@ import {
   type SummarySettings,
   type SummaryVariableUpdateMode,
 } from './settingsManager';
+import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryApiConfig } from './summaryApiClient';
 import { dataLogger } from './logger';
 import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
-import { emitEraEventAndWait } from './eraWriteWait';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
 const OUTPUT_PROMPT_ENTRY_NAME = '输出提示词';
@@ -836,7 +836,11 @@ export async function executeExtraVariableUpdate({
     }
 
     try {
-      await emitEraEventAndWait('era:apiWrite', {
+      await emitSourcedEraVariableWriteAndWait({
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
         timeoutMs: ERA_SYNC_TIMEOUT_MS,
         timeoutMessage: 'ERA 没有响应 era:apiWrite，额外变量更新已停止。',
         expectedMessageId: assistantMessageId,

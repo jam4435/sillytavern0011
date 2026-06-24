@@ -3,11 +3,11 @@
  * 提供地图相关的工具函数，如地点解锁检查等
  */
 
+import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { MapLocation } from '../types';
 import { gameLogger } from './logger';
 
 declare function getAllVariables(): Record<string, unknown>;
-declare function eventEmit(eventName: string, data: unknown): void;
 
 /**
  * 检查地点是否已解锁
@@ -81,12 +81,21 @@ export async function addExploredLocation(locationPath: string): Promise<void> {
   const newExploredLocations = [...exploredLocations, locationPath];
 
   // 使用 eventEmit 更新变量
-  await eventEmit('era:updateByObject', {
-    stat_data: {
-      user数据: {
-        已探索地点: newExploredLocations
+  await emitSourcedEraVariableWriteAndWait({
+    source: 'frontend',
+    operation: 'update',
+    reason: 'map-explored-location',
+    eventName: 'era:updateByObject',
+    detail: {
+      stat_data: {
+        user数据: {
+          已探索地点: newExploredLocations
+        }
       }
-    }
+    },
+    expectedAction: 'apiWrite',
+    timeoutMs: 3000,
+    timeoutMessage: `地点 ${locationPath} 解锁请求已发出，但 ERA 没有确认写入完成。`,
   });
 
   gameLogger.log(`[mapUtils] 添加已探索地点: ${locationPath}`);

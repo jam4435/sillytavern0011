@@ -160,13 +160,12 @@ export function useMessageHandler({
   onVariableAiWriteTarget,
 }: UseMessageHandlerOptions) {
   const refreshAssistantStateFromFinalText = useCallback(
-    (finalText: string, assistantMessageId: number) => {
-      onVariableAssistantReply?.(finalText, assistantMessageId);
+    (finalText: string) => {
       const displayText = normalizeDisplayedMessageContent(finalText) || finalText;
       setCurrentMaintext(displayText);
       setCurrentOptions(parseOptions(finalText));
     },
-    [onVariableAssistantReply, setCurrentMaintext, setCurrentOptions],
+    [setCurrentMaintext, setCurrentOptions],
   );
 
   const handleSendMessage = useCallback(
@@ -327,8 +326,6 @@ export function useMessageHandler({
               showError(errorMessage);
               return resultText;
             }
-
-            onVariableAiWriteTarget?.(assistantMessage.message_id);
             showLoading('正在额外更新变量...');
             patchLatestDebugRound({
               variable: {
@@ -371,7 +368,7 @@ export function useMessageHandler({
                 },
               });
               if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
-                refreshAssistantStateFromFinalText(extraUpdateResult.finalMessageText, assistantMessage.message_id);
+                refreshAssistantStateFromFinalText(extraUpdateResult.finalMessageText);
               }
             } catch (error) {
               const errorMessage = getErrorMessage(error);
@@ -565,7 +562,6 @@ export function useMessageHandler({
       setCurrentOptions(result.options);
 
       if (summarySettings.variableUpdateMode === 'extra') {
-        onVariableAiWriteTarget?.(result.assistantMessageId);
         showLoading('正在额外更新变量...');
         patchLatestDebugRound({
           variable: {
@@ -609,7 +605,7 @@ export function useMessageHandler({
           });
 
           if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
-            refreshAssistantStateFromFinalText(extraUpdateResult.finalMessageText, result.assistantMessageId);
+            refreshAssistantStateFromFinalText(extraUpdateResult.finalMessageText);
           } else {
             const latestContent = getLastMessageContent();
             if (latestContent) {

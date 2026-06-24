@@ -3,10 +3,10 @@
  * 负责物品数量的增减和恢复操作
  */
 
+import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { gameLogger } from './logger';
 
 declare function getAllVariables(): Record<string, unknown>;
-declare function eventEmit(eventName: string, data: unknown): void;
 
 /**
  * 扣减物品数量
@@ -35,20 +35,38 @@ export async function decreaseItemCount(itemName: string, count: number = 1): Pr
 
   if (newCount === 0) {
     // 数量为0时删除物品
-    await eventEmit('era:deleteByPath', {
-      path: `stat_data.user数据.包裹.${itemName}`
+    await emitSourcedEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'delete',
+      reason: 'item-write-decrease',
+      eventName: 'era:deleteByPath',
+      detail: {
+        path: `stat_data.user数据.包裹.${itemName}`,
+      },
+      expectedAction: 'apiWrite',
+      timeoutMs: 3000,
+      timeoutMessage: `物品 ${itemName} 删除请求已发出，但 ERA 没有确认写入完成。`,
     });
     gameLogger.log(`[itemManager] 删除物品: ${itemName}`);
   } else {
     // 更新数量
-    await eventEmit('era:updateByObject', {
-      stat_data: {
-        user数据: {
-          包裹: {
-            [itemName]: { 数量: newCount }
+    await emitSourcedEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'item-write-decrease',
+      eventName: 'era:updateByObject',
+      detail: {
+        stat_data: {
+          user数据: {
+            包裹: {
+              [itemName]: { 数量: newCount }
+            }
           }
         }
-      }
+      },
+      expectedAction: 'apiWrite',
+      timeoutMs: 3000,
+      timeoutMessage: `物品 ${itemName} 数量更新请求已发出，但 ERA 没有确认写入完成。`,
     });
     gameLogger.log(`[itemManager] 更新物品数量: ${itemName} ${currentCount} -> ${newCount}`);
   }
@@ -82,26 +100,44 @@ export async function restoreItemCount(itemName: string, originalCount: number):
   if (!包裹[itemName]) {
     // 这里需要完整的物品信息，但我们只有数量
     // 简化处理：只恢复数量字段
-    await eventEmit('era:updateByObject', {
-      stat_data: {
-        user数据: {
-          包裹: {
-            [itemName]: { 数量: originalCount }
+    await emitSourcedEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'item-write-restore',
+      eventName: 'era:updateByObject',
+      detail: {
+        stat_data: {
+          user数据: {
+            包裹: {
+              [itemName]: { 数量: originalCount }
+            }
           }
         }
-      }
+      },
+      expectedAction: 'apiWrite',
+      timeoutMs: 3000,
+      timeoutMessage: `物品 ${itemName} 恢复请求已发出，但 ERA 没有确认写入完成。`,
     });
     gameLogger.log(`[itemManager] 恢复物品: ${itemName} 数量: ${originalCount}`);
   } else {
     // 物品存在，只更新数量
-    await eventEmit('era:updateByObject', {
-      stat_data: {
-        user数据: {
-          包裹: {
-            [itemName]: { 数量: originalCount }
+    await emitSourcedEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'item-write-restore',
+      eventName: 'era:updateByObject',
+      detail: {
+        stat_data: {
+          user数据: {
+            包裹: {
+              [itemName]: { 数量: originalCount }
+            }
           }
         }
-      }
+      },
+      expectedAction: 'apiWrite',
+      timeoutMs: 3000,
+      timeoutMessage: `物品 ${itemName} 数量恢复请求已发出，但 ERA 没有确认写入完成。`,
     });
     gameLogger.log(`[itemManager] 恢复物品数量: ${itemName} -> ${originalCount}`);
   }

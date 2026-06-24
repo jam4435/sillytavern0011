@@ -9,7 +9,7 @@
  */
 
 import { dataLogger } from './logger';
-import { emitEraEventAndWait } from './eraWriteWait';
+import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 
 // ============================================
 // 类型定义
@@ -512,11 +512,15 @@ export async function upgradeMartialArt(
       },
     };
 
-    await emitEraEventAndWait('era:updateByObject', {
+    await emitSourcedEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'martial-art-level-up',
+      eventName: 'era:updateByObject',
+      detail: updatePayload,
       timeoutMs: 20000,
       timeoutMessage: `功法「${martialArtName}」精进请求已发出，但 ERA 没有确认 apiWrite 写入完成。`,
       expectedAction: 'apiWrite',
-      detail: updatePayload,
     });
 
     dataLogger.log(

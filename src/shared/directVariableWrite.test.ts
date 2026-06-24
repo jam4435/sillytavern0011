@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DIRECT_VARIABLE_WRITE_DONE_EVENT,
+  ERA_VARIABLE_WRITE_DONE_EVENT,
+  emitSourcedEraVariableWriteAndWait,
   runDirectChatVariableWrite,
 } from './directVariableWrite';
-import { eventEmitMock } from '../武侠/test/setup';
+import { eventEmitMock, listeners } from '../武侠/test/setup';
 
 describe('runDirectChatVariableWrite', () => {
   beforeEach(() => {
@@ -60,5 +62,55 @@ describe('runDirectChatVariableWrite', () => {
     )).rejects.toThrow(error);
 
     expect(eventEmitMock).not.toHaveBeenCalled();
+  });
+
+  it('ERA 写入确认后发送带来源的完成事件', async () => {
+    const executionOrder: string[] = [];
+
+    eventOn('era:updateByObject', async () => {
+      executionOrder.push('era:updateByObject');
+      const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
+      await Promise.all(writeDoneListeners.map(listener => listener({
+        message_id: 42,
+        actions: { apiWrite: true, ignored: false },
+      })));
+    });
+    eventOn(ERA_VARIABLE_WRITE_DONE_EVENT, () => {
+      executionOrder.push(ERA_VARIABLE_WRITE_DONE_EVENT);
+    });
+
+    const result = await emitSourcedEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'summary-write',
+      eventName: 'era:updateByObject',
+      detail: { stat_data: { user数据: { 修为: 120 } } },
+      expectedAction: 'apiWrite',
+      timeoutMessage: 'timeout',
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      version: 1,
+      source: 'frontend',
+      operation: 'update',
+      reason: 'summary-write',
+      eventName: 'era:updateByObject',
+      message_id: 42,
+      actions: { apiWrite: true },
+    }));
+    expect(eventEmitMock).toHaveBeenCalledWith(
+      ERA_VARIABLE_WRITE_DONE_EVENT,
+      expect.objectContaining({
+        source: 'frontend',
+        operation: 'update',
+        reason: 'summary-write',
+        message_id: 42,
+        actions: { apiWrite: true },
+      }),
+    );
+    expect(executionOrder).toEqual([
+      'era:updateByObject',
+      ERA_VARIABLE_WRITE_DONE_EVENT,
+    ]);
   });
 });
