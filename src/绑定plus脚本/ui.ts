@@ -23,6 +23,7 @@ import {
   getCachedCurrentConnectionProfileName,
   getCurrentPersonaFromDOM,
   getDefaultPresetName,
+  getEnabledPresetPromptIds,
   getPersonaActivationState,
   getPersonaDefaultEnabledTraitIds,
   getPersonaListFromDOM,
@@ -52,7 +53,8 @@ import {
   restoreLastPersonaSnapshot,
   runCompatibilitySelfCheck,
   saveBindingPlusTheme,
-  saveDefaultPresetPromptIds,
+  saveCurrentLoadedPresetPromptsAsDefaultSnapshot,
+  savePresetPromptIdsAsDefaultSnapshot,
   saveDefaultWorldbookEnabledEntryUids,
   savePersonaAdvancedConfig,
   savePersonaBaseDescription,
@@ -62,9 +64,16 @@ import {
   setDefaultPresetName,
   summarizeBindingPlusBackupImport,
   summarizeContextBindingResources,
+  renameDefaultPresetPromptSnapshot,
+  deletePresetDefaultSnapshotState,
   upsertBindingGroup,
   upsertContextBinding,
 } from './handlers';
+import {
+  createLoadedPresetPromptMonitorState,
+  LoadedPresetPromptMonitorState,
+  shouldSyncLoadedPresetPromptDefaultSnapshot,
+} from './presetPromptSync';
 import { injectStyles, styles } from './styles';
 import {
   BindingGroup,
@@ -105,6 +114,7 @@ let lastApiConfigTestReport: PersonaPlusApiConfigTestReport | null = null;
 let lastSnapshotPruneSummary: ReturnType<typeof pruneLegacyPersonaSnapshots> | null = null;
 let plusEventBridgeStarted = false;
 let lastObservedContext: PersonaRuntimeContext | null = null;
+let loadedPresetPromptMonitorState: LoadedPresetPromptMonitorState | null = null;
 let panelStyleDestroy: (() => void) | null = null;
 let $panelContainer: JQuery<HTMLDivElement> | null = null;
 let activeDetailPage: DetailPageKey = 'persona';
@@ -640,6 +650,75 @@ function scheduleContextRefresh(source: string, delayMs: number = 120): void {
   }, delayMs);
 }
 
+function schedulePresetPromptMonitorRefresh(source: string, delayMs: number = 60): void {
+  window.setTimeout(() => {
+    syncLoadedPresetPromptDefaultSnapshot(source);
+  }, delayMs);
+}
+
+function readLoadedPresetPromptMonitorState(): LoadedPresetPromptMonitorState | null {
+  const loadedPresetName = ((getLoadedPresetName() as string | undefined) || '').trim();
+  if (!loadedPresetName) {
+    return null;
+  }
+
+  try {
+    return createLoadedPresetPromptMonitorState({
+      loadedPresetName,
+      livePromptIds: getEnabledPresetPromptIds('in_use'),
+      savedPromptIds: getEnabledPresetPromptIds(loadedPresetName),
+    });
+  } catch (error) {
+    console.warn('绑定plus: 读取当前预设保存监视器状态失败', error);
+    return null;
+  }
+}
+
+function refreshPresetUiAfterStorageMutation(): void {
+  if (!$panelContainer) {
+    return;
+  }
+
+  invalidatePlusBindingCatalogCache();
+  renderSidebarSecondaryList();
+  renderResourceDetailPages();
+}
+
+function syncLoadedPresetPromptDefaultSnapshot(source: string): void {
+  const currentState = readLoadedPresetPromptMonitorState();
+  const shouldSync = shouldSyncLoadedPresetPromptDefaultSnapshot(loadedPresetPromptMonitorState, currentState);
+  loadedPresetPromptMonitorState = currentState;
+  if (!shouldSync) {
+    return;
+  }
+
+  const syncResult = saveCurrentLoadedPresetPromptsAsDefaultSnapshot();
+  if (!syncResult.ok || !syncResult.presetName) {
+    console.warn('绑定plus: 同步酒馆已保存预设的默认条目快照失败', {
+      source,
+      presetName: syncResult.presetName,
+      count: syncResult.count,
+    });
+    return;
+  }
+
+  console.info('绑定plus: 已同步酒馆保存后的默认预设条目快照', {
+    source,
+    presetName: syncResult.presetName,
+    changed: syncResult.changed,
+    count: syncResult.count,
+  });
+
+  if (
+    $panelContainer &&
+    activeDetailPage === 'preset' &&
+    (activeResourceSelection.preset || '').trim() === syncResult.presetName
+  ) {
+    renderPresetPromptDefaultSnapshotState();
+    syncPresetPromptControlsFromLoadedPreset();
+  }
+}
+
 async function emitPlusContextEvents(
   previous: PersonaRuntimeContext,
   current: PersonaRuntimeContext,
@@ -675,6 +754,7 @@ function startPlusEventBridge(): void {
   plusEventBridgeStarted = true;
   lastObservedContext = getRuntimeContext();
   lastContextSignature = buildContextSignature(lastObservedContext);
+  loadedPresetPromptMonitorState = readLoadedPresetPromptMonitorState();
 
   if (typeof tavern_events !== 'undefined') {
     eventOn(tavern_events.CHAT_CHANGED, chatFileName => {
@@ -718,6 +798,67 @@ function startPlusEventBridge(): void {
       markPlusEventTriggered('official_character_edited', `收到 character_edited: ${String(characterName)}`);
       scheduleContextRefresh('tavern_events.CHARACTER_EDITED', 200);
     });
+
+    if (tavern_events.SETTINGS_UPDATED) {
+      eventOn(tavern_events.SETTINGS_UPDATED, () => {
+        schedulePresetPromptMonitorRefresh('tavern_events.SETTINGS_UPDATED', 100);
+      });
+    }
+
+    if (tavern_events.PRESET_CHANGED) {
+      eventOn(tavern_events.PRESET_CHANGED, () => {
+        schedulePresetPromptMonitorRefresh('tavern_events.PRESET_CHANGED', 60);
+      });
+    }
+
+    if (tavern_events.OAI_PRESET_CHANGED_AFTER) {
+      eventOn(tavern_events.OAI_PRESET_CHANGED_AFTER, () => {
+        schedulePresetPromptMonitorRefresh('tavern_events.OAI_PRESET_CHANGED_AFTER', 60);
+      });
+    }
+
+    if (tavern_events.PRESET_RENAMED) {
+      eventOn(tavern_events.PRESET_RENAMED, data => {
+        const previousName = String(data?.oldName || '').trim();
+        const nextName = String(data?.newName || '').trim();
+        if (!previousName || !nextName || previousName === nextName) {
+          return;
+        }
+
+        const renameResult = renameDefaultPresetPromptSnapshot(previousName, nextName);
+        if (!renameResult.ok) {
+          console.warn('绑定plus: 预设重命名后同步默认快照失败', { previousName, nextName });
+        }
+
+        if ((activeResourceSelection.preset || '').trim() === previousName) {
+          activeResourceSelection.preset = nextName;
+        }
+
+        loadedPresetPromptMonitorState = readLoadedPresetPromptMonitorState();
+        refreshPresetUiAfterStorageMutation();
+      });
+    }
+
+    if (tavern_events.PRESET_DELETED) {
+      eventOn(tavern_events.PRESET_DELETED, data => {
+        const presetName = String(data?.name || '').trim();
+        if (!presetName) {
+          return;
+        }
+
+        const deleteResult = deletePresetDefaultSnapshotState(presetName);
+        if (!deleteResult.ok) {
+          console.warn('绑定plus: 预设删除后清理默认快照失败', { presetName });
+        }
+
+        if ((activeResourceSelection.preset || '').trim() === presetName) {
+          activeResourceSelection.preset = '';
+        }
+
+        loadedPresetPromptMonitorState = readLoadedPresetPromptMonitorState();
+        refreshPresetUiAfterStorageMutation();
+      });
+    }
   }
 
   eventOn(PERSONA_PLUS_CONTEXT_CHANGED_EVENT, (payload: PersonaPlusContextChangePayload) => {
@@ -1645,26 +1786,27 @@ function saveCurrentPresetPromptsAsDefaultSnapshot(
     announceUnchanged?: boolean;
   } = {},
 ): { ok: boolean; changed: boolean; count: number } {
-  const currentPromptIds = getCurrentPresetPromptSelectionIds(presetName) || [];
-  const savedPromptIds = loadDefaultPresetPromptIds(presetName);
-  const changed = !areOptionalStringArraysEqual(savedPromptIds, currentPromptIds);
-  if (!changed) {
+  const snapshotResult = savePresetPromptIdsAsDefaultSnapshot(
+    presetName,
+    getCurrentPresetPromptSelectionIds(presetName) || [],
+  );
+  if (!snapshotResult.changed) {
     renderPresetPromptDefaultSnapshotState();
     if (options.announceUnchanged) {
       toastr.info('当前勾选已是默认预设条目状态');
     }
-    return { ok: true, changed: false, count: currentPromptIds.length };
+    return { ok: snapshotResult.ok, changed: false, count: snapshotResult.count };
   }
 
-  if (!saveDefaultPresetPromptIds(presetName, currentPromptIds)) {
-    return { ok: false, changed: true, count: currentPromptIds.length };
+  if (!snapshotResult.ok) {
+    return { ok: false, changed: true, count: snapshotResult.count };
   }
 
   renderPresetPromptDefaultSnapshotState();
   if (options.announceSuccess) {
-    toastr.success(`已保存预设「${presetName}」的默认条目状态（${currentPromptIds.length} 条）`);
+    toastr.success(`已保存预设「${presetName}」的默认条目状态（${snapshotResult.count} 条）`);
   }
-  return { ok: true, changed: true, count: currentPromptIds.length };
+  return { ok: true, changed: true, count: snapshotResult.count };
 }
 
 function applyPresetPromptFilter(): void {
@@ -6327,6 +6469,7 @@ function bindPanelEvents(): void {
       } catch (error) {
         console.error('绑定plus: 同步当前加载预设条目状态失败', error);
       }
+      syncLoadedPresetPromptDefaultSnapshot('preset_prompt_checkbox_changed');
       syncPresetPromptControlsFromLoadedPreset();
     });
 
@@ -7016,6 +7159,7 @@ function startContextWatcher(): void {
   lastContextSignature = buildContextSignature(currentContext);
   contextWatcherTimer = setInterval(() => {
     void handleContextChanged('context_watcher');
+    syncLoadedPresetPromptDefaultSnapshot('context_watcher');
     syncPresetPromptControlsFromLoadedPreset();
   }, 1800);
 }

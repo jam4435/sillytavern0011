@@ -836,6 +836,15 @@ function getEnabledPresetPromptIdsFromPreset(preset: Preset): string[] {
     .map(prompt => getPresetPromptStableId(prompt));
 }
 
+export function getEnabledPresetPromptIds(presetName: string): string[] {
+  const normalizedName = ensureString(presetName).trim();
+  if (!normalizedName) {
+    return [];
+  }
+
+  return getEnabledPresetPromptIdsFromPreset(getPreset(normalizedName));
+}
+
 function getWorldbookEnabledEntryUids(entries: Array<{ uid: number; enabled: boolean }>): number[] {
   return uniqueNumbers(entries.filter(entry => entry.enabled).map(entry => entry.uid));
 }
@@ -1088,6 +1097,116 @@ export function saveDefaultPresetPromptIds(presetName: string, promptIds: string
   const map = loadStringArraySnapshotMap(PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY);
   map[normalizedName] = uniqueStrings(promptIds);
   return saveStringArraySnapshotMap(PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY, map);
+}
+
+export function savePresetPromptIdsAsDefaultSnapshot(
+  presetName: string,
+  promptIds: string[],
+): { ok: boolean; changed: boolean; count: number; presetName: string } {
+  const normalizedName = ensureString(presetName).trim();
+  const normalizedPromptIds = uniqueStrings(promptIds);
+  if (!normalizedName) {
+    return { ok: false, changed: false, count: normalizedPromptIds.length, presetName: '' };
+  }
+
+  const savedPromptIds = loadDefaultPresetPromptIds(normalizedName);
+  const changed = !areOptionalStringArraysEqual(savedPromptIds, normalizedPromptIds);
+  if (!changed) {
+    return { ok: true, changed: false, count: normalizedPromptIds.length, presetName: normalizedName };
+  }
+
+  if (!saveDefaultPresetPromptIds(normalizedName, normalizedPromptIds)) {
+    return { ok: false, changed: true, count: normalizedPromptIds.length, presetName: normalizedName };
+  }
+
+  return { ok: true, changed: true, count: normalizedPromptIds.length, presetName: normalizedName };
+}
+
+export function saveCurrentLoadedPresetPromptsAsDefaultSnapshot(): {
+  ok: boolean;
+  changed: boolean;
+  count: number;
+  presetName: string;
+} {
+  const presetName = ensureString(getLoadedPresetName()).trim();
+  if (!presetName) {
+    return { ok: false, changed: false, count: 0, presetName: '' };
+  }
+
+  return savePresetPromptIdsAsDefaultSnapshot(presetName, getEnabledPresetPromptIds('in_use'));
+}
+
+export function renameDefaultPresetPromptSnapshot(
+  previousPresetName: string,
+  nextPresetName: string,
+): { ok: boolean; changed: boolean; snapshotChanged: boolean; defaultPresetChanged: boolean } {
+  const previousName = ensureString(previousPresetName).trim();
+  const nextName = ensureString(nextPresetName).trim();
+  if (!previousName || !nextName || previousName === nextName) {
+    return { ok: true, changed: false, snapshotChanged: false, defaultPresetChanged: false };
+  }
+
+  let snapshotChanged = false;
+  const snapshotMap = loadStringArraySnapshotMap(PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY);
+  if (hasOwn(snapshotMap, previousName)) {
+    const nextSnapshotMap = cloneStringArrayRecord(snapshotMap);
+    nextSnapshotMap[nextName] = uniqueStrings(nextSnapshotMap[previousName]);
+    delete nextSnapshotMap[previousName];
+    if (!saveStringArraySnapshotMap(PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY, nextSnapshotMap)) {
+      return { ok: false, changed: false, snapshotChanged: false, defaultPresetChanged: false };
+    }
+    snapshotChanged = true;
+  }
+
+  let defaultPresetChanged = false;
+  if (getDefaultPresetName() === previousName) {
+    if (!setDefaultPresetName(nextName)) {
+      return { ok: false, changed: snapshotChanged, snapshotChanged, defaultPresetChanged: false };
+    }
+    defaultPresetChanged = true;
+  }
+
+  return {
+    ok: true,
+    changed: snapshotChanged || defaultPresetChanged,
+    snapshotChanged,
+    defaultPresetChanged,
+  };
+}
+
+export function deletePresetDefaultSnapshotState(
+  presetName: string,
+): { ok: boolean; changed: boolean; snapshotChanged: boolean; defaultPresetChanged: boolean } {
+  const normalizedName = ensureString(presetName).trim();
+  if (!normalizedName) {
+    return { ok: true, changed: false, snapshotChanged: false, defaultPresetChanged: false };
+  }
+
+  let snapshotChanged = false;
+  const snapshotMap = loadStringArraySnapshotMap(PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY);
+  if (hasOwn(snapshotMap, normalizedName)) {
+    const nextSnapshotMap = cloneStringArrayRecord(snapshotMap);
+    delete nextSnapshotMap[normalizedName];
+    if (!saveStringArraySnapshotMap(PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY, nextSnapshotMap)) {
+      return { ok: false, changed: false, snapshotChanged: false, defaultPresetChanged: false };
+    }
+    snapshotChanged = true;
+  }
+
+  let defaultPresetChanged = false;
+  if (getDefaultPresetName() === normalizedName) {
+    if (!setDefaultPresetName('')) {
+      return { ok: false, changed: snapshotChanged, snapshotChanged, defaultPresetChanged: false };
+    }
+    defaultPresetChanged = true;
+  }
+
+  return {
+    ok: true,
+    changed: snapshotChanged || defaultPresetChanged,
+    snapshotChanged,
+    defaultPresetChanged,
+  };
 }
 
 function loadDefaultWorldbookEntrySnapshotMap(): Record<string, number[]> {
