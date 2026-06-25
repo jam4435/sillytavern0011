@@ -817,8 +817,15 @@ export function useVariableChangeTracker() {
     if (!activeTurn.aiWriteTargetIds.includes(assistantMessageId)) {
       activeTurn.aiWriteTargetIds.push(assistantMessageId);
     }
+    captureCurrentSnapshot({
+      origin: 'ai',
+      producer: 'message-boundary',
+      reason: 'message-boundary',
+      assistantMessageId,
+      aiOnlyDeclaredMatches: true,
+    });
     mutateSummary(summary => rebuildSummary(summary, activeTurn));
-  }, [mutateSummary]);
+  }, [captureCurrentSnapshot, mutateSummary]);
 
   const captureSignal = useCallback((signal: VariableWriteSignal) => {
     const activeTurn = activeTurnRef.current;

@@ -292,6 +292,9 @@ export function useMessageHandler({
           messageLogger.log('createChatMessages 返回值:', createAssistantResult);
           const assistantMessage = getNewestMessageAfter(beforeSendLastMessageId, 'assistant');
           createdLatestMessageId = assistantMessage?.message_id ?? createdLatestMessageId;
+          if (assistantMessage?.message_id !== undefined) {
+            onVariableAiWriteTarget?.(assistantMessage.message_id);
+          }
           onVariableAssistantReply?.(resultText, assistantMessage?.message_id);
 
           // ========== 步骤 5: 手动刷新前端显示 ==========

@@ -99,6 +99,44 @@ describe('useVariableChangeTracker', () => {
     expect(result.current.variableChanges?.actualChanges).toHaveLength(1);
   });
 
+  it('assistant 目标在写入后才解析到时，会把消息补偿批次回提为 AI', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+
+    act(() => {
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+    });
+
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'message-boundary',
+        origin: 'background',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+
+    act(() => {
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'message-boundary',
+        origin: 'ai',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
+  });
+
   it('重复通知和相同快照不会重复计数', () => {
     const { result } = renderHook(() => useVariableChangeTracker());
 
