@@ -9,6 +9,7 @@ import {
   type VariableComparisonStatus,
 } from '../utils/variableChanges';
 import { Icons } from './Icons';
+import { variableBarLogger } from '../utils/logger';
 
 interface VariableChangeBarProps {
   summary: VariableChangeSummary | null;
@@ -70,6 +71,47 @@ const getChangeMetaTitle = (change: VariableActualChange, fallbackLabel: string)
   return details || fallbackLabel;
 };
 
+const summarizeActions = (actions: VariableActualChange['actions']): string[] =>
+  Object.keys(actions ?? {}).filter(action => actions?.[action] === true);
+
+const summarizeAiComparison = (comparison: VariableAiComparison) => ({
+  action: comparison.action,
+  path: comparison.displayPath,
+  status: comparison.status,
+  declared: comparison.declaredChange
+    ? {
+      blockTag: comparison.declaredChange.blockTag,
+      value: comparison.declaredChange.valuePreview,
+    }
+    : null,
+  observed: comparison.observedChange
+    ? {
+      producer: comparison.observedChange.producer,
+      before: comparison.observedChange.beforePreview,
+      after: comparison.observedChange.afterPreview,
+      reason: comparison.observedChange.reason,
+      actions: summarizeActions(comparison.observedChange.actions),
+      batchId: comparison.observedChange.batchId,
+    }
+    : null,
+  baseline: comparison.baselinePreview,
+  expected: comparison.expectedPreview,
+  final: comparison.finalPreview,
+});
+
+const summarizeActualChange = (change: VariableActualChange) => ({
+  action: change.action,
+  path: change.displayPath,
+  producer: change.producer,
+  origin: change.origin,
+  before: change.beforePreview,
+  after: change.afterPreview,
+  reason: change.reason,
+  actions: summarizeActions(change.actions),
+  batchId: change.batchId,
+  assistantMessageId: change.assistantMessageId ?? null,
+});
+
 const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
   const [expandedSegment, setExpandedSegment] = useState<ExpandedSegment | null>(null);
   const [lastExpandedSegment, setLastExpandedSegment] = useState<ExpandedSegment>('ai');
@@ -80,6 +122,42 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
     setLastExpandedSegment('ai');
     setCopiedText('');
   }, [summary?.turnId]);
+
+  useEffect(() => {
+    if (!summary) {
+      variableBarLogger.log('[VariableChangeBar] 当前没有变量变更摘要');
+      return;
+    }
+
+    variableBarLogger.group('[VariableChangeBar] 渲染变量变更条');
+    variableBarLogger.log('summary', {
+      turnId: summary.turnId,
+      status: summary.status,
+      userMessageId: summary.userMessageId ?? null,
+      assistantMessageId: summary.assistantMessageId ?? null,
+      thoughts: summary.thoughts.map(thought => thought.preview),
+      parseErrors: summary.parseErrors,
+      topLevelGroups: summary.topLevelGroups,
+      declaredCount: summary.aiReply.declaredChanges.length,
+      aiObservedCount: summary.aiReply.observedChanges.length,
+      backgroundObservedCount: summary.background.observedChanges.length,
+      omittedDeclaredCount: summary.aiReply.omittedDeclaredCount,
+      omittedAiObservedCount: summary.aiReply.omittedObservedCount,
+      omittedBackgroundObservedCount: summary.background.omittedObservedCount,
+    });
+    variableBarLogger.log('aiComparisons', summary.aiReply.comparisons.map(summarizeAiComparison));
+    variableBarLogger.log('backgroundChanges', summary.background.observedChanges.map(summarizeActualChange));
+    variableBarLogger.log('batches', summary.batches.map(batch => ({
+      batchId: batch.batchId,
+      origin: batch.origin,
+      producer: batch.producer,
+      reason: batch.reason,
+      actions: Object.keys(batch.actions ?? {}).filter(action => batch.actions?.[action] === true),
+      assistantMessageId: batch.assistantMessageId ?? null,
+      changeCount: batch.changeCount,
+    })));
+    variableBarLogger.groupEnd();
+  }, [summary]);
 
   if (!summary) {
     return null;

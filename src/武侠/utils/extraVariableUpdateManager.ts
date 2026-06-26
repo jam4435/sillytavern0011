@@ -5,7 +5,7 @@ import {
 } from './settingsManager';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryApiConfig } from './summaryApiClient';
-import { dataLogger } from './logger';
+import { dataLogger, variableTraceLogger } from './logger';
 import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
@@ -793,7 +793,7 @@ export async function executeExtraVariableUpdate({
 
   beginExtraVariableUpdate();
   try {
-    dataLogger.log('[extraVariableUpdate] 开始执行额外变量更新', {
+    variableTraceLogger.log('[extraVariableUpdate] 开始执行额外变量更新', {
       assistantMessageId,
       variableUpdateMode: settings.variableUpdateMode,
       latestRawReplyLength: latestRawReply.length,
@@ -803,6 +803,11 @@ export async function executeExtraVariableUpdate({
     const prompt = await buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply });
     onPromptBuilt?.(prompt);
     onProgress?.({ prompt });
+    variableTraceLogger.log('[extraVariableUpdate] 额外变量提示词已构建', {
+      assistantMessageId,
+      promptLength: prompt.length,
+      prompt,
+    });
     const rawResponse = await requestConfiguredText({
       prompt,
       settings: requestSettings,
@@ -811,21 +816,23 @@ export async function executeExtraVariableUpdate({
       generationIdPrefix: 'wuxia-variable-update',
       skipWorldInfoAndAuthorNote: true,
     });
-    dataLogger.log('[extraVariableUpdate] 额外模型已返回', {
+    variableTraceLogger.log('[extraVariableUpdate] 额外模型已返回', {
       assistantMessageId,
       rawResponseLength: rawResponse.length,
+      rawResponse,
     });
     onProgress?.({ prompt, rawResponse });
     const { blocksText, actionBlockCount } = extractValidVariableBlocks(rawResponse);
-    dataLogger.log('[extraVariableUpdate] 变量块提取完成', {
+    variableTraceLogger.log('[extraVariableUpdate] 变量块提取完成', {
       assistantMessageId,
       actionBlockCount,
       blocksTextLength: blocksText.length,
+      blocksText,
     });
     onProgress?.({ prompt, rawResponse, appendedBlocks: blocksText, actionBlockCount });
 
     if (actionBlockCount === 0 || !blocksText) {
-      dataLogger.log('[extraVariableUpdate] 没有可写入的合法动作块，跳过 ERA 同步', {
+      variableTraceLogger.log('[extraVariableUpdate] 没有可写入的合法动作块，跳过 ERA 同步', {
         assistantMessageId,
         actionBlockCount,
       });
@@ -838,11 +845,12 @@ export async function executeExtraVariableUpdate({
     }
 
     const appendVerification = await appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText);
-    dataLogger.log('[extraVariableUpdate] 变量块已追加到目标楼层', {
+    variableTraceLogger.log('[extraVariableUpdate] 变量块已追加到目标楼层', {
       assistantMessageId,
       actionBlockCount,
       appendVerified: appendVerification.verified,
       appendVerification: appendVerification.verification,
+      appendReadbackText: appendVerification.readbackText,
     });
     onProgress?.({
       appended: true,
@@ -860,7 +868,7 @@ export async function executeExtraVariableUpdate({
     }
 
     try {
-      dataLogger.log('[extraVariableUpdate] 开始等待 ERA 同步', {
+      variableTraceLogger.log('[extraVariableUpdate] 开始等待 ERA 同步', {
         assistantMessageId,
         actionBlockCount,
         expectedAction: 'apiWrite',
@@ -876,14 +884,14 @@ export async function executeExtraVariableUpdate({
         expectedMessageId: assistantMessageId,
         expectedAction: 'apiWrite',
       });
-      dataLogger.log('[extraVariableUpdate] 收到匹配的 ERA 同步完成信号', {
+      variableTraceLogger.log('[extraVariableUpdate] 收到匹配的 ERA 同步完成信号', {
         assistantMessageId,
         actionBlockCount,
         matchedMessageId: eraWriteResult.message_id ?? null,
         matchedActions: eraWriteResult.actions,
       });
     } catch (error) {
-      dataLogger.error('[extraVariableUpdate] 等待 ERA 同步失败', {
+      variableTraceLogger.error('[extraVariableUpdate] 等待 ERA 同步失败', {
         assistantMessageId,
         actionBlockCount,
         error,
@@ -928,10 +936,11 @@ export async function executeExtraVariableUpdate({
       syncReadbackText: syncReadback.activeText,
       syncVerification: syncVerification.verification,
     });
-    dataLogger.log('[extraVariableUpdate] ERA 同步后回读完成', {
+    variableTraceLogger.log('[extraVariableUpdate] ERA 同步后回读完成', {
       assistantMessageId,
       syncVerified: syncVerification.verified,
       syncVerification: syncVerification.verification,
+      syncReadbackText: syncReadback.activeText,
     });
 
     if (!syncVerification.verified) {
@@ -953,7 +962,7 @@ export async function executeExtraVariableUpdate({
       syncVerification: syncVerification.verification,
     };
   } finally {
-    dataLogger.log('[extraVariableUpdate] 本轮额外变量更新结束', { assistantMessageId });
+    variableTraceLogger.log('[extraVariableUpdate] 本轮额外变量更新结束', { assistantMessageId });
     finishExtraVariableUpdate();
   }
 }

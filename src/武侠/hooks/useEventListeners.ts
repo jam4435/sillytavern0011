@@ -10,7 +10,7 @@ import {
   readGameDataPure,
   scheduleGameDataCompletion,
 } from '../utils/variableReader';
-import { eventLogger } from '../utils/logger';
+import { eventLogger, variableTraceLogger } from '../utils/logger';
 
 interface UseEventListenersOptions {
   updateGameState: (data: Partial<GameState>) => void;
@@ -94,6 +94,10 @@ export function useEventListeners({
 
     const handleMessageUpdate = (eventData?: unknown) => {
       eventLogger.log('收到消息更新事件:', eventData);
+      variableTraceLogger.log('[useEventListeners] 收到消息边界事件', {
+        eventData,
+        normalizedMessageId: Number.isInteger(eventData) ? Number(eventData) : null,
+      });
       scheduleRefresh();
       scheduleGameDataCompletion('message-boundary', { fullScan: true });
 
@@ -117,6 +121,7 @@ export function useEventListeners({
 
     const handleWriteDone = (detail?: unknown) => {
       eventLogger.log('[era:writeDone] 检测到变量写入完成，调度纯读刷新');
+      variableTraceLogger.log('[useEventListeners] 收到 era:writeDone', detail ?? null);
       onEraWriteDone?.(detail);
       scheduleGameDataCompletion('era-write-done', { fullScan: true });
       scheduleRefresh(50);
@@ -124,6 +129,7 @@ export function useEventListeners({
 
     const handleDirectWriteDone = (detail?: unknown) => {
       eventLogger.log(`[${DIRECT_VARIABLE_WRITE_DONE_EVENT}] 检测到 direct 变量写入完成，调度纯读刷新`);
+      variableTraceLogger.log(`[useEventListeners] 收到 ${DIRECT_VARIABLE_WRITE_DONE_EVENT}`, detail ?? null);
       onDirectVariableWriteDone?.(detail);
       scheduleGameDataCompletion('direct-write-done', { fullScan: true });
       scheduleRefresh(50);
@@ -131,6 +137,7 @@ export function useEventListeners({
 
     const handleEraVariableWriteDone = (detail?: unknown) => {
       eventLogger.log(`[${ERA_VARIABLE_WRITE_DONE_EVENT}] 检测到带来源的 ERA 变量写入完成，调度纯读刷新`);
+      variableTraceLogger.log(`[useEventListeners] 收到 ${ERA_VARIABLE_WRITE_DONE_EVENT}`, detail ?? null);
       onEraVariableWriteDone?.(detail);
       scheduleGameDataCompletion('era-variable-write-done', { fullScan: true });
       scheduleRefresh(50);

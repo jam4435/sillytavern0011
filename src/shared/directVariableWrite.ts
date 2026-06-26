@@ -1,4 +1,4 @@
-import { eventLogger } from '../武侠/utils/logger';
+import { variableTraceLogger } from '../武侠/utils/logger';
 
 export const DIRECT_VARIABLE_WRITE_DONE_EVENT = 'wuxia:directVariableWriteDone';
 export const ERA_VARIABLE_WRITE_DONE_EVENT = 'wuxia:eraVariableWriteDone';
@@ -144,6 +144,7 @@ export async function runDirectChatVariableWrite<TResult>(
     reason: metadata.reason,
   };
 
+  variableTraceLogger.log('[runDirectChatVariableWrite] 直接变量写入已完成，准备发送来源事件', eventDetail);
   await eventEmit(DIRECT_VARIABLE_WRITE_DONE_EVENT, eventDetail);
 
   return result;
@@ -186,7 +187,7 @@ export async function emitSourcedEraVariableWriteAndWait({
   const waitForWriteDone = new Promise<void>((resolve, reject) => {
     timer = window.setTimeout(() => {
       stopListener();
-      eventLogger.error('[emitSourcedEraVariableWriteAndWait] 等待 era:writeDone 超时', {
+      variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 等待 era:writeDone 超时', {
         ...waitContext,
         observedWriteDoneCount,
         lastObservedWriteDone,
@@ -200,7 +201,7 @@ export async function emitSourcedEraVariableWriteAndWait({
       lastObservedWriteDone = summarizeEraWriteDone(writeDoneDetail);
       lastIgnoredReason = getWriteDoneMismatchReason(writeDoneDetail, expectedMessageId, expectedAction);
       if (!matchesEraWriteDone(writeDoneDetail, expectedMessageId, expectedAction)) {
-        eventLogger.log('[emitSourcedEraVariableWriteAndWait] 忽略不匹配的 era:writeDone', {
+        variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 忽略不匹配的 era:writeDone', {
           ...waitContext,
           observedWriteDoneCount,
           lastIgnoredReason,
@@ -210,7 +211,7 @@ export async function emitSourcedEraVariableWriteAndWait({
       }
 
       matchedDetail = writeDoneDetail;
-      eventLogger.log('[emitSourcedEraVariableWriteAndWait] 匹配到目标 era:writeDone', {
+      variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 匹配到目标 era:writeDone', {
         ...waitContext,
         observedWriteDoneCount,
         matched: lastObservedWriteDone,
@@ -224,15 +225,15 @@ export async function emitSourcedEraVariableWriteAndWait({
   });
 
   try {
-    eventLogger.log('[emitSourcedEraVariableWriteAndWait] 开始发送事件并等待 era:writeDone', waitContext);
+    variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 开始发送事件并等待 era:writeDone', waitContext);
     await (detail === undefined ? eventEmit(eventName) : eventEmit(eventName, detail));
-    eventLogger.log('[emitSourcedEraVariableWriteAndWait] 事件已发出，开始等待匹配的 era:writeDone', waitContext);
+    variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 事件已发出，开始等待匹配的 era:writeDone', waitContext);
   } catch (error) {
     stopListener();
     if (timer) {
       window.clearTimeout(timer);
     }
-    eventLogger.error('[emitSourcedEraVariableWriteAndWait] 发送事件失败', {
+    variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 发送事件失败', {
       ...waitContext,
       error,
     });
@@ -253,7 +254,7 @@ export async function emitSourcedEraVariableWriteAndWait({
   };
 
   await eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
-  eventLogger.log('[emitSourcedEraVariableWriteAndWait] 已发送带来源的 ERA 完成事件', eventDetail);
+  variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 已发送带来源的 ERA 完成事件', eventDetail);
 
   return eventDetail;
 }

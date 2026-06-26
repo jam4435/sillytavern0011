@@ -8,7 +8,7 @@ import {
   parseAIResponse,
   parseOptions,
 } from '../utils/variableReader';
-import { messageLogger } from '../utils/logger';
+import { messageLogger, variableTraceLogger } from '../utils/logger';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
 import { captureNextCombinedPromptForDebug } from '../utils/promptDebug';
 import {
@@ -93,6 +93,23 @@ function createExtraVariableProgressPatch(
     patch.syncVerification = progress.syncVerification;
   }
   return patch;
+}
+
+function summarizeExtraVariableProgress(progress: ExtraVariableUpdateProgress) {
+  return {
+    hasPrompt: typeof progress.prompt === 'string',
+    promptLength: typeof progress.prompt === 'string' ? progress.prompt.length : 0,
+    hasRawResponse: typeof progress.rawResponse === 'string',
+    rawResponseLength: typeof progress.rawResponse === 'string' ? progress.rawResponse.length : 0,
+    hasAppendedBlocks: typeof progress.appendedBlocks === 'string',
+    appendedBlocksLength: typeof progress.appendedBlocks === 'string' ? progress.appendedBlocks.length : 0,
+    actionBlockCount: progress.actionBlockCount ?? 0,
+    appended: progress.appended === true,
+    hasFinalMessageText: typeof progress.finalMessageText === 'string',
+    finalMessageTextLength: typeof progress.finalMessageText === 'string' ? progress.finalMessageText.length : 0,
+    appendVerification: progress.appendVerification ?? '',
+    syncVerification: progress.syncVerification ?? '',
+  };
 }
 
 function getActiveMessageText(message: ChatMessageWithSwipes): string {
@@ -343,6 +360,10 @@ export function useMessageHandler({
                 assistantMessageId: assistantMessage.message_id,
                 latestRawReply: resultText,
                 onPromptBuilt: prompt => {
+                  variableTraceLogger.log('[useMessageHandler] 额外变量提示词已写入调试状态', {
+                    assistantMessageId: assistantMessage.message_id,
+                    promptLength: prompt.length,
+                  });
                   patchLatestDebugRound({
                     variable: {
                       input: prompt,
@@ -351,10 +372,19 @@ export function useMessageHandler({
                   });
                 },
                 onProgress: progress => {
+                  variableTraceLogger.log('[useMessageHandler] 额外变量进度更新', {
+                    assistantMessageId: assistantMessage.message_id,
+                    ...summarizeExtraVariableProgress(progress),
+                  });
                   patchLatestDebugRound({
                     variable: createExtraVariableProgressPatch(progress),
                   });
                 },
+              });
+              variableTraceLogger.log('[useMessageHandler] 额外变量更新成功，调试状态切换为 success', {
+                assistantMessageId: assistantMessage.message_id,
+                actionBlockCount: extraUpdateResult.actionBlockCount,
+                appended: extraUpdateResult.appended,
               });
               patchLatestDebugRound({
                 variable: {
@@ -376,6 +406,10 @@ export function useMessageHandler({
             } catch (error) {
               const errorMessage = getErrorMessage(error);
               messageLogger.error('额外变量更新失败:', error);
+              variableTraceLogger.error('[useMessageHandler] 额外变量更新失败，调试状态切换为 error', {
+                assistantMessageId: assistantMessage.message_id,
+                error: errorMessage,
+              });
               patchLatestDebugRound({
                 variable: {
                   status: 'error',
@@ -579,6 +613,10 @@ export function useMessageHandler({
             assistantMessageId: result.assistantMessageId,
             latestRawReply: result.rawReply,
             onPromptBuilt: prompt => {
+              variableTraceLogger.log('[useMessageHandler] 重新生成后的额外变量提示词已写入调试状态', {
+                assistantMessageId: result.assistantMessageId,
+                promptLength: prompt.length,
+              });
               patchLatestDebugRound({
                 variable: {
                   input: prompt,
@@ -587,10 +625,19 @@ export function useMessageHandler({
               });
             },
             onProgress: progress => {
+              variableTraceLogger.log('[useMessageHandler] 重新生成后的额外变量进度更新', {
+                assistantMessageId: result.assistantMessageId,
+                ...summarizeExtraVariableProgress(progress),
+              });
               patchLatestDebugRound({
                 variable: createExtraVariableProgressPatch(progress),
               });
             },
+          });
+          variableTraceLogger.log('[useMessageHandler] 重新生成后的额外变量更新成功，调试状态切换为 success', {
+            assistantMessageId: result.assistantMessageId,
+            actionBlockCount: extraUpdateResult.actionBlockCount,
+            appended: extraUpdateResult.appended,
           });
           patchLatestDebugRound({
             variable: {
@@ -619,6 +666,10 @@ export function useMessageHandler({
         } catch (error) {
           const errorMessage = getErrorMessage(error);
           messageLogger.error('重新生成后的额外变量更新失败:', error);
+          variableTraceLogger.error('[useMessageHandler] 重新生成后的额外变量更新失败，调试状态切换为 error', {
+            assistantMessageId: result.assistantMessageId,
+            error: errorMessage,
+          });
           patchLatestDebugRound({
             variable: {
               status: 'error',

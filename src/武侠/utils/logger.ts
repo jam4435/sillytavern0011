@@ -91,6 +91,16 @@ export function createLogger(category: LogCategory): Logger {
   };
 }
 
+export function createForcedLogger(prefix: string): Logger {
+  return {
+    log: (...args: unknown[]) => console.log(prefix, ...args),
+    error: (...args: unknown[]) => console.error(prefix, ...args),
+    warn: (...args: unknown[]) => console.warn(prefix, ...args),
+    group: (label: string) => console.group(`${prefix} ${label}`),
+    groupEnd: () => console.groupEnd(),
+  };
+}
+
 // 预创建的常用日志器
 export const initLogger = createLogger('init');
 export const messageLogger = createLogger('message');
@@ -99,6 +109,8 @@ export const gameLogger = createLogger('game');
 export const apiLogger = createLogger('api');
 export const uiLogger = createLogger('ui');
 export const dataLogger = createLogger('data');
+export const variableTraceLogger = createForcedLogger('[wuxia-variable-trace]');
+export const variableBarLogger = createForcedLogger('[wuxia-variable-bar]');
 
 // 简单的全局日志器（用于不需要分类的场景）
 const globalLoggerEnabled = getDebugOverride('game');

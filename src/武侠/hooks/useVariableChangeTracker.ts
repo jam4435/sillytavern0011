@@ -21,6 +21,7 @@ import {
   type VariableObservedBatch,
   type VariableWriteActions,
 } from '../utils/variableChanges';
+import { variableTraceLogger } from '../utils/logger';
 
 type ActiveVariableTurn = {
   turnId: number;
@@ -90,6 +91,61 @@ const STALE_WRITE_DONE_MAX_RETRIES = 8;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
+
+const summarizeActions = (actions?: VariableWriteActions | null): string[] =>
+  Object.keys(actions ?? {}).filter(action => actions?.[action] === true);
+
+const summarizeMetadata = (metadata: CaptureMetadata) => ({
+  origin: metadata.origin,
+  producer: metadata.producer,
+  reason: metadata.reason,
+  actions: summarizeActions(metadata.actions),
+  assistantMessageId: metadata.assistantMessageId ?? null,
+  aiOnlyDeclaredMatches: metadata.aiOnlyDeclaredMatches === true,
+});
+
+const summarizeObservedChange = (change: VariableActualChange) => ({
+  action: change.action,
+  path: change.displayPath,
+  producer: change.producer,
+  origin: change.origin,
+  before: change.beforePreview,
+  after: change.afterPreview,
+  reason: change.reason,
+  actions: summarizeActions(change.actions),
+  batchId: change.batchId,
+});
+
+const summarizeBatch = (batch: VariableObservedBatch) => ({
+  batchId: batch.batchId,
+  origin: batch.origin,
+  producer: batch.producer,
+  reason: batch.reason,
+  actions: summarizeActions(batch.actions),
+  assistantMessageId: batch.assistantMessageId ?? null,
+  changeCount: batch.changeCount,
+});
+
+const summarizeDeclaredChange = (
+  change: VariableChangeSummary['aiReply']['declaredChanges'][number],
+) => ({
+  action: change.action,
+  path: change.displayPath,
+  value: change.valuePreview,
+  blockTag: change.blockTag,
+});
+
+const summarizeSignal = (signal: VariableWriteSignal) => ({
+  kind: signal.kind,
+  producer: signal.producer,
+  assistantMessageId:
+    signal.kind === 'boundary'
+      ? signal.assistantMessageId ?? null
+      : signal.kind === 'direct'
+        ? null
+        : signal.detail?.message_id ?? null,
+  detail: signal.kind === 'boundary' ? null : signal.detail ?? null,
+});
 
 const getCurrentChatStorageId = (): string => {
   try {
@@ -375,6 +431,12 @@ export function useVariableChangeTracker() {
       batchSequence: 0,
     };
     activeTurnRef.current = activeTurn;
+    variableTraceLogger.log('[useVariableChangeTracker] 开始新回合', {
+      turnId,
+      userMessageId: userMessageId ?? null,
+      baselineSnapshotHash: baselineStatData ? getSnapshotHash(baselineStatData) : null,
+      baselineTopLevelKeys: baselineStatData ? Object.keys(baselineStatData) : [],
+    });
     commitSummary(createEmptyVariableChangeSummary(
       turnId,
       baselineStatData ? 'tracking' : 'error',
@@ -399,6 +461,11 @@ export function useVariableChangeTracker() {
       || canDemoteBatchToBackground(candidate, metadata))
       ?? matchingBatches[0];
     if (!batch) {
+      variableTraceLogger.warn('[useVariableChangeTracker] 快照未变化，但没有找到可升级的批次', {
+        turnId: activeTurn.turnId,
+        nextSnapshotHash,
+        metadata: summarizeMetadata(metadata),
+      });
       return false;
     }
 
@@ -416,8 +483,24 @@ export function useVariableChangeTracker() {
       || (batch.actions === null && metadata.actions !== null && metadata.actions !== undefined)
       || (batch.assistantMessageId === undefined && metadata.assistantMessageId !== undefined);
     if (!shouldMoveToAi && !shouldMoveToBackground && !shouldImproveMetadata) {
+      variableTraceLogger.log('[useVariableChangeTracker] 命中已有批次，但无需调整归因', {
+        turnId: activeTurn.turnId,
+        batch: summarizeBatch(batch),
+        metadata: summarizeMetadata(metadata),
+      });
       return true;
     }
+
+    variableTraceLogger.log('[useVariableChangeTracker] 复用已有批次并调整归因', {
+      turnId: activeTurn.turnId,
+      nextSnapshotHash,
+      batch: summarizeBatch(batch),
+      metadata: summarizeMetadata(metadata),
+      shouldMoveToAi,
+      shouldMoveToBackground,
+      shouldUpgradeProducer,
+      shouldImproveMetadata,
+    });
 
     mutateSummary(summary => {
       const batchAiChanges = summary.aiReply.observedChanges
@@ -434,26 +517,30 @@ export function useVariableChangeTracker() {
       const movedChangeIds = new Set(movedChanges.map(change => change.id));
       const aiUpgradeBatchId = `${batch.batchId}:ai`;
       const backgroundDowngradeBatchId = `${batch.batchId}:background`;
-      const upgradedAiChanges = movedChanges.map((change, index) => ({
-        ...change,
-        id: `${change.source}:${change.action}:${getPathKey(change)}:${aiUpgradeBatchId}:${index}`,
-        batchId: aiUpgradeBatchId,
-        origin: 'ai' as const,
-        producer: metadata.producer,
-        actions: metadata.actions ?? change.actions,
-        reason: metadata.reason,
-        assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
-      }));
-      const downgradedBackgroundChanges = movedChanges.map((change, index) => ({
-        ...change,
-        id: `${change.source}:${change.action}:${getPathKey(change)}:${backgroundDowngradeBatchId}:${index}`,
-        batchId: backgroundDowngradeBatchId,
-        origin: 'background' as const,
-        producer: metadata.producer,
-        actions: metadata.actions ?? change.actions,
-        reason: metadata.reason,
-        assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
-      }));
+      const upgradedAiChanges = shouldMoveToAi
+        ? movedChanges.map((change, index) => ({
+          ...change,
+          id: `${change.source}:${change.action}:${getPathKey(change)}:${aiUpgradeBatchId}:${index}`,
+          batchId: aiUpgradeBatchId,
+          origin: 'ai' as const,
+          producer: metadata.producer,
+          actions: metadata.actions ?? change.actions,
+          reason: metadata.reason,
+          assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
+        }))
+        : [];
+      const downgradedBackgroundChanges = shouldMoveToBackground
+        ? movedChanges.map((change, index) => ({
+          ...change,
+          id: `${change.source}:${change.action}:${getPathKey(change)}:${backgroundDowngradeBatchId}:${index}`,
+          batchId: backgroundDowngradeBatchId,
+          origin: 'background' as const,
+          producer: metadata.producer,
+          actions: metadata.actions ?? change.actions,
+          reason: metadata.reason,
+          assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
+        }))
+        : [];
       const patchedAi = summary.aiReply.observedChanges
         .filter(change => !shouldMoveToBackground || !movedChangeIds.has(change.id))
         .map(change =>
@@ -558,6 +645,14 @@ export function useVariableChangeTracker() {
         },
         batches: nextBatches,
       };
+      variableTraceLogger.log('[useVariableChangeTracker] 批次归因调整结果', {
+        turnId: activeTurn.turnId,
+        aiObservedCount: nextSummary.aiReply.observedChanges.length,
+        backgroundObservedCount: nextSummary.background.observedChanges.length,
+        aiObserved: nextSummary.aiReply.observedChanges.map(summarizeObservedChange),
+        backgroundObserved: nextSummary.background.observedChanges.map(summarizeObservedChange),
+        batches: nextSummary.batches.map(summarizeBatch),
+      });
       return rebuildSummary(nextSummary, activeTurn);
     });
     return true;
@@ -574,6 +669,10 @@ export function useVariableChangeTracker() {
     }
 
     if (!nextStatData) {
+      variableTraceLogger.error('[useVariableChangeTracker] 读取 stat_data 快照失败，无法继续归因', {
+        turnId: activeTurn.turnId,
+        metadata: summarizeMetadata(metadata),
+      });
       mutateSummary(summary => ({ ...summary, status: 'error', updatedAt: Date.now() }));
       return;
     }
@@ -583,6 +682,11 @@ export function useVariableChangeTracker() {
       ? getSnapshotHash(activeTurn.lastStatData)
       : null;
     if (previousSnapshotHash === nextSnapshotHash) {
+      variableTraceLogger.log('[useVariableChangeTracker] 快照未变化，尝试复用已有批次', {
+        turnId: activeTurn.turnId,
+        metadata: summarizeMetadata(metadata),
+        snapshotHash: nextSnapshotHash,
+      });
       upgradeMatchingBatch(nextSnapshotHash, metadata);
       activeTurn.lastStatData = nextStatData;
       persistVariableTurn(activeTurn, variableChangesRef.current);
@@ -607,6 +711,12 @@ export function useVariableChangeTracker() {
     activeTurn.lastStatData = nextStatData;
 
     if (!result.batch || result.observedChanges.length === 0) {
+      variableTraceLogger.log('[useVariableChangeTracker] 当前信号未产生新的变量差分', {
+        turnId: activeTurn.turnId,
+        metadata: summarizeMetadata(metadata),
+        previousSnapshotHash,
+        nextSnapshotHash,
+      });
       persistVariableTurn(activeTurn, variableChangesRef.current);
       return;
     }
@@ -621,6 +731,16 @@ export function useVariableChangeTracker() {
         && (!metadata.aiOnlyDeclaredMatches || matchesDeclaration);
       (matchedAsAi ? aiChanges : backgroundChanges).push(change);
     }
+
+    variableTraceLogger.log('[useVariableChangeTracker] 捕获到新的变量差分', {
+      turnId: activeTurn.turnId,
+      metadata: summarizeMetadata(metadata),
+      previousSnapshotHash,
+      nextSnapshotHash,
+      totalObservedCount: result.totalObservedCount,
+      aiChanges: aiChanges.map(summarizeObservedChange),
+      backgroundChanges: backgroundChanges.map(summarizeObservedChange),
+    });
 
     const createBatch = (
       origin: VariableChangeOrigin,
@@ -705,6 +825,15 @@ export function useVariableChangeTracker() {
       activeTurn.assistantMessageId = assistantMessageId;
     }
     const parsed = parseDeclaredVariableChanges(rawReply);
+    variableTraceLogger.log('[useVariableChangeTracker] 刷新 AI 声明变量', {
+      turnId: activeTurn.turnId,
+      assistantMessageId: assistantMessageId ?? null,
+      rawReplyLength: rawReply.length,
+      declaredChanges: parsed.declaredChanges.map(summarizeDeclaredChange),
+      omittedDeclaredCount: parsed.omittedDeclaredCount,
+      thoughts: parsed.thoughts.map(thought => thought.preview),
+      parseErrors: parsed.parseErrors,
+    });
     mutateSummary(summary => {
       const hasObservedChanges =
         summary.aiReply.observedChanges.length > 0
@@ -764,6 +893,13 @@ export function useVariableChangeTracker() {
       return;
     }
 
+    variableTraceLogger.warn('[useVariableChangeTracker] 写入事件先到、变量快照未刷新，安排延迟补读', {
+      turnId,
+      expectedSnapshotHash,
+      metadata: summarizeMetadata(metadata),
+      refreshDeclaredAssistant: refreshDeclaredAssistant === true,
+    });
+
     const retryCapture = (remainingRetries: number) => {
       const activeTurn = activeTurnRef.current;
       if (!activeTurn || activeTurn.turnId !== turnId) {
@@ -776,6 +912,13 @@ export function useVariableChangeTracker() {
       if (currentSnapshotHash !== expectedSnapshotHash) {
         return;
       }
+
+      variableTraceLogger.log('[useVariableChangeTracker] 执行延迟补读', {
+        turnId,
+        remainingRetries,
+        expectedSnapshotHash,
+        metadata: summarizeMetadata(metadata),
+      });
 
       if (refreshDeclaredAssistant && metadata.assistantMessageId !== undefined) {
         const finalMessage = readAssistantMessageContentById(metadata.assistantMessageId);
@@ -817,6 +960,11 @@ export function useVariableChangeTracker() {
     if (!activeTurn.aiWriteTargetIds.includes(assistantMessageId)) {
       activeTurn.aiWriteTargetIds.push(assistantMessageId);
     }
+    variableTraceLogger.log('[useVariableChangeTracker] 标记 assistant 楼层为 AI 写入目标', {
+      turnId: activeTurn.turnId,
+      assistantMessageId,
+      aiWriteTargetIds: [...activeTurn.aiWriteTargetIds],
+    });
     captureCurrentSnapshot({
       origin: 'ai',
       producer: 'message-boundary',
@@ -834,6 +982,10 @@ export function useVariableChangeTracker() {
     }
 
     if (signal.kind === 'boundary') {
+      variableTraceLogger.log('[useVariableChangeTracker] 处理消息边界信号', {
+        turnId: activeTurn.turnId,
+        signal: summarizeSignal(signal),
+      });
       captureCurrentSnapshot({
         origin: 'background',
         producer: signal.producer,
@@ -874,6 +1026,21 @@ export function useVariableChangeTracker() {
       ? getSnapshotHash(activeTurn.lastStatData)
       : null;
 
+    variableTraceLogger.log('[useVariableChangeTracker] 收到变量写入信号', {
+      turnId: activeTurn.turnId,
+      signal: summarizeSignal(signal),
+      normalized: {
+        assistantMessageId: assistantMessageId ?? null,
+        actions: summarizeActions(actions),
+        isAiTarget,
+        isDirectChatWrite,
+        isAiWrite,
+        reason,
+        aiWriteTargetIds: [...activeTurn.aiWriteTargetIds],
+      },
+      beforeCaptureSnapshotHash,
+    });
+
     if (assistantMessageId !== undefined && isAiWrite) {
       activeTurn.assistantMessageId = assistantMessageId;
       const finalMessage = readAssistantMessageContentById(assistantMessageId);
@@ -896,6 +1063,16 @@ export function useVariableChangeTracker() {
     const afterCaptureSnapshotHash = activeTurn.lastStatData
       ? getSnapshotHash(activeTurn.lastStatData)
       : null;
+
+    variableTraceLogger.log('[useVariableChangeTracker] 写入信号归因完成', {
+      turnId: activeTurn.turnId,
+      signalKind: signal.kind,
+      resolvedOrigin: isAiWrite ? 'ai' : 'background',
+      producer: signal.producer,
+      assistantMessageId: assistantMessageId ?? null,
+      beforeCaptureSnapshotHash,
+      afterCaptureSnapshotHash,
+    });
 
     if (
       beforeCaptureSnapshotHash === afterCaptureSnapshotHash
@@ -935,6 +1112,11 @@ export function useVariableChangeTracker() {
         activeTurn.assistantMessageId = assistantMessageId;
       }
     }
+    variableTraceLogger.log('[useVariableChangeTracker] 记录主回复中的变量声明', {
+      turnId: activeTurn?.turnId ?? null,
+      assistantMessageId: assistantMessageId ?? null,
+      rawReplyLength: rawReply.length,
+    });
     refreshDeclaredChanges(rawReply, assistantMessageId);
     captureSignal({
       kind: 'boundary',
@@ -955,6 +1137,14 @@ export function useVariableChangeTracker() {
     const finalMessage = resolved.content.trim()
       ? resolved
       : readLatestAssistantMessageContent();
+    variableTraceLogger.log('[useVariableChangeTracker] 处理消息边界回读', {
+      turnId: activeTurn.turnId,
+      requestedMessageId: messageId ?? null,
+      resolvedMessageId: resolved.messageId ?? null,
+      finalMessageId: finalMessage.messageId ?? null,
+      assistantReplyLocked: activeTurn.assistantReplyLocked,
+      finalMessageLength: finalMessage.content.length,
+    });
     if (finalMessage.messageId !== undefined) {
       activeTurn.assistantMessageId = finalMessage.messageId;
     }
@@ -990,6 +1180,7 @@ export function useVariableChangeTracker() {
   }, [captureSignal]);
 
   const clearVariableChanges = useCallback(() => {
+    variableTraceLogger.log('[useVariableChangeTracker] 清空当前变量追踪回合');
     activeTurnRef.current = null;
     commitSummary(null);
   }, [commitSummary]);
