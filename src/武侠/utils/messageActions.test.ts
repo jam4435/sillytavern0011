@@ -119,7 +119,10 @@ describe('regenerateLastAssistantSwipe', () => {
       [
         expect.objectContaining({
           message_id: 2,
-          swipe_id: 1,
+          swipes: expect.arrayContaining([
+            '旧正文\n\n<era_data>{"mk":"old"}</era_data>',
+            '旧正文',
+          ]),
         }),
       ],
       { refresh: 'none' },
@@ -130,6 +133,38 @@ describe('regenerateLastAssistantSwipe', () => {
         expect.objectContaining({
           message_id: 2,
           swipe_id: 1,
+        }),
+      ],
+      { refresh: 'none' },
+    );
+    expect(globals.setChatMessages).toHaveBeenNthCalledWith(
+      3,
+      [
+        expect.objectContaining({
+          message_id: 2,
+          message: '旧正文',
+        }),
+      ],
+      { refresh: 'none' },
+    );
+    expect(globals.setChatMessages).toHaveBeenNthCalledWith(
+      4,
+      [
+        expect.objectContaining({
+          message_id: 2,
+          swipes: expect.arrayContaining([
+            '旧正文\n\n<era_data>{"mk":"old"}</era_data>',
+            expect.stringContaining('新正文'),
+          ]),
+        }),
+      ],
+      { refresh: 'none' },
+    );
+    expect(globals.setChatMessages).toHaveBeenNthCalledWith(
+      5,
+      [
+        expect.objectContaining({
+          message_id: 2,
           message: expect.stringContaining('新正文'),
         }),
       ],

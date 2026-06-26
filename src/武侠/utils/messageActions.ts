@@ -171,12 +171,62 @@ function attachEraDataBlock(text: string, eraDataBlock: string): string {
   return eraDataBlock ? `${body}\n\n${eraDataBlock}`.trim() : body;
 }
 
-async function beginRegenerateSwipe(messageId: number): Promise<RegenerateSwipeTransaction> {
-  const [freshMessage] = getChatMessages(messageId, { include_swipes: true }) as ChatMessageWithSwipes[];
+function readMessageWithSwipes(messageId: number): ChatMessageWithSwipes {
+  const [freshMessage] = getChatMessages(messageId, {
+    hide_state: 'all',
+    include_swipes: true,
+  }) as ChatMessageWithSwipes[];
+
   if (!freshMessage) {
-    throw new Error(`找不到要重新生成的楼层 #${messageId}。`);
+    throw new Error(`找不到要操作的楼层 #${messageId}。`);
   }
 
+  return freshMessage;
+}
+
+function assertSwipeExists(messageId: number, expectedSwipeId: number, step: string): ChatMessageWithSwipes {
+  const freshMessage = readMessageWithSwipes(messageId);
+  const swipes = Array.isArray(freshMessage.swipes) ? freshMessage.swipes : [];
+
+  if (expectedSwipeId >= swipes.length) {
+    throw new Error(
+      `${step}失败：重新生成目标 swipe #${expectedSwipeId} 未成功写入当前楼层，当前仅有 ${swipes.length} 个 swipe。`,
+    );
+  }
+
+  return freshMessage;
+}
+
+function assertActiveSwipe(messageId: number, expectedSwipeId: number, step: string): ChatMessageWithSwipes {
+  const freshMessage = assertSwipeExists(messageId, expectedSwipeId, step);
+  const actualSwipeId = Number.isInteger(freshMessage.swipe_id) ? Number(freshMessage.swipe_id) : 0;
+
+  if (actualSwipeId !== expectedSwipeId) {
+    throw new Error(`${step}失败：当前 active swipe 是 #${actualSwipeId}，不是目标 #${expectedSwipeId}。`);
+  }
+
+  return freshMessage;
+}
+
+async function ensureMessageFieldMatches(messageId: number, expectedText: string): Promise<void> {
+  const [message] = getChatMessages(messageId);
+  if (message?.message === expectedText) {
+    return;
+  }
+
+  await setChatMessages(
+    [
+      {
+        message_id: messageId,
+        message: expectedText,
+      },
+    ],
+    { refresh: 'none' },
+  );
+}
+
+async function beginRegenerateSwipe(messageId: number): Promise<RegenerateSwipeTransaction> {
+  const freshMessage = readMessageWithSwipes(messageId);
   const activeText = getActiveMessageText(freshMessage);
   const swipes =
     Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0
@@ -199,8 +249,6 @@ async function beginRegenerateSwipe(messageId: number): Promise<RegenerateSwipeT
     [
       {
         message_id: messageId,
-        message: placeholderText,
-        swipe_id: regenerateSwipeId,
         swipes,
         swipes_data: swipesData,
         swipes_info: swipesInfo,
@@ -208,6 +256,19 @@ async function beginRegenerateSwipe(messageId: number): Promise<RegenerateSwipeT
     ],
     { refresh: 'none' },
   );
+  assertSwipeExists(messageId, regenerateSwipeId, '写入占位 swipe 后');
+
+  await setChatMessages(
+    [
+      {
+        message_id: messageId,
+        swipe_id: regenerateSwipeId,
+      },
+    ],
+    { refresh: 'none' },
+  );
+  assertActiveSwipe(messageId, regenerateSwipeId, '切换到占位 swipe 后');
+  await ensureMessageFieldMatches(messageId, placeholderText);
 
   return {
     messageId,
@@ -217,14 +278,11 @@ async function beginRegenerateSwipe(messageId: number): Promise<RegenerateSwipeT
 }
 
 async function writeGeneratedSwipe(transaction: RegenerateSwipeTransaction, resultText: string): Promise<string> {
-  const [freshMessage] = getChatMessages(transaction.messageId, {
-    hide_state: 'all',
-    include_swipes: true,
-  }) as ChatMessageWithSwipes[];
-  if (!freshMessage) {
-    throw new Error(`找不到要写入重新生成结果的楼层 #${transaction.messageId}。`);
-  }
-
+  const freshMessage = assertActiveSwipe(
+    transaction.messageId,
+    transaction.regenerateSwipeId,
+    '写回重新生成正文前',
+  );
   const swipes = Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0 ? [...freshMessage.swipes] : [];
   if (transaction.regenerateSwipeId >= swipes.length) {
     throw new Error(`重新生成目标 swipe #${transaction.regenerateSwipeId} 已不存在。`);
@@ -245,8 +303,6 @@ async function writeGeneratedSwipe(transaction: RegenerateSwipeTransaction, resu
     [
       {
         message_id: transaction.messageId,
-        message: nextText,
-        swipe_id: transaction.regenerateSwipeId,
         swipes,
         swipes_data: swipesData,
         swipes_info: swipesInfo,
@@ -254,6 +310,15 @@ async function writeGeneratedSwipe(transaction: RegenerateSwipeTransaction, resu
     ],
     { refresh: 'none' },
   );
+  const writtenMessage = assertActiveSwipe(
+    transaction.messageId,
+    transaction.regenerateSwipeId,
+    '写回重新生成正文后',
+  );
+  if (getActiveMessageText(writtenMessage) !== nextText) {
+    throw new Error(`写回重新生成正文后回读失败：目标 swipe #${transaction.regenerateSwipeId} 未保持新正文。`);
+  }
+  await ensureMessageFieldMatches(transaction.messageId, nextText);
   return nextText;
 }
 
@@ -267,6 +332,12 @@ async function restorePreviousSwipe(transaction: RegenerateSwipeTransaction): Pr
     ],
     { refresh: 'none' },
   );
+  const restoredMessage = assertActiveSwipe(
+    transaction.messageId,
+    transaction.previousSwipeId,
+    '恢复旧 swipe 后',
+  );
+  await ensureMessageFieldMatches(transaction.messageId, getActiveMessageText(restoredMessage));
   await emitEraEventAndWait('manual_sync', {
     timeoutMessage: '重新生成失败后已切回原 swipe，但 ERA 没有确认变量恢复。',
     expectedMessageId: transaction.messageId,
