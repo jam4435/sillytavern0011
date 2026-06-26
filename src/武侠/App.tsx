@@ -32,7 +32,7 @@ import {
 } from './hooks';
 import { ActivePanel } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
-import { gameLogger, initLogger } from './utils/logger';
+import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
 import {
   applyRegexRules,
@@ -134,6 +134,13 @@ const App: React.FC = () => {
     onVariableAssistantReply: handleVariableAssistantReply,
     onVariableAiWriteTarget: markVariableApiWriteAsAi,
   });
+
+  useEffect(() => {
+    variableTraceLogger.log('[App] 组件已挂载', getRuntimeDebugInfo());
+    return () => {
+      variableTraceLogger.warn('[App] 组件即将卸载', getRuntimeDebugInfo());
+    };
+  }, []);
 
   // 使用事件监听 hook
   useEventListeners({

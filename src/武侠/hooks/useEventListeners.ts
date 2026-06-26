@@ -10,7 +10,7 @@ import {
   readGameDataPure,
   scheduleGameDataCompletion,
 } from '../utils/variableReader';
-import { eventLogger, variableTraceLogger } from '../utils/logger';
+import { eventLogger, getRuntimeDebugInfo, variableTraceLogger } from '../utils/logger';
 
 interface UseEventListenersOptions {
   updateGameState: (data: Partial<GameState>) => void;
@@ -73,6 +73,10 @@ export function useEventListeners({
 
   useEffect(() => {
     eventLogger.log('🎧 注册消息事件监听器');
+    variableTraceLogger.log('[useEventListeners] 开始注册变量相关监听器', {
+      ...getRuntimeDebugInfo(),
+      currentChatId: lastKnownChatIdRef.current,
+    });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const refreshGameState = () => {
@@ -184,9 +188,17 @@ export function useEventListeners({
     eventLogger.log(`注册 ${ERA_VARIABLE_WRITE_DONE_EVENT} 监听器...`);
     const eraVariableWriteDoneListener = eventOn(ERA_VARIABLE_WRITE_DONE_EVENT, handleEraVariableWriteDone);
     eventLogger.log('🎧 监听器注册完成');
+    variableTraceLogger.log('[useEventListeners] 变量相关监听器注册完成', {
+      ...getRuntimeDebugInfo(),
+      currentChatId: lastKnownChatIdRef.current,
+    });
 
     return () => {
       eventLogger.log('🛑 取消事件监听器');
+      variableTraceLogger.warn('[useEventListeners] 变量相关监听器即将清理', {
+        ...getRuntimeDebugInfo(),
+        currentChatId: lastKnownChatIdRef.current,
+      });
       if (refreshTimer) {
         clearTimeout(refreshTimer);
       }
@@ -198,6 +210,10 @@ export function useEventListeners({
       writeDoneListener.stop();
       directWriteDoneListener.stop();
       eraVariableWriteDoneListener.stop();
+      variableTraceLogger.warn('[useEventListeners] 变量相关监听器已清理完成', {
+        ...getRuntimeDebugInfo(),
+        currentChatId: lastKnownChatIdRef.current,
+      });
     };
   }, [
     updateGameState,

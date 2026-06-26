@@ -60,8 +60,55 @@ export interface Logger {
   groupEnd: () => void;
 }
 
+export interface RuntimeDebugInfo {
+  runtimeId: string;
+  iframeName: string;
+  href: string;
+  createdAt: number;
+  readyState: string;
+  visibilityState: string;
+}
+
 // 空操作函数
 const noop = () => {};
+
+const safeGetIframeName = (): string => {
+  try {
+    if (typeof getIframeName === 'function') {
+      const iframeName = getIframeName();
+      if (typeof iframeName === 'string' && iframeName.trim()) {
+        return iframeName.trim();
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const frameId = window.frameElement?.id;
+    if (typeof frameId === 'string' && frameId.trim()) {
+      return frameId.trim();
+    }
+  } catch {
+    // ignore
+  }
+
+  return 'unknown';
+};
+
+const RUNTIME_CREATED_AT = Date.now();
+const RUNTIME_ID = `${RUNTIME_CREATED_AT.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+export function getRuntimeDebugInfo(): RuntimeDebugInfo {
+  return {
+    runtimeId: RUNTIME_ID,
+    iframeName: safeGetIframeName(),
+    href: typeof window !== 'undefined' ? window.location.href : '',
+    createdAt: RUNTIME_CREATED_AT,
+    readyState: typeof document !== 'undefined' ? document.readyState : 'unknown',
+    visibilityState: typeof document !== 'undefined' ? document.visibilityState : 'unknown',
+  };
+}
 
 /**
  * 创建分类日志器
@@ -92,11 +139,12 @@ export function createLogger(category: LogCategory): Logger {
 }
 
 export function createForcedLogger(prefix: string): Logger {
+  const runtimePrefix = `${prefix}#${RUNTIME_ID}`;
   return {
-    log: (...args: unknown[]) => console.log(prefix, ...args),
-    error: (...args: unknown[]) => console.error(prefix, ...args),
-    warn: (...args: unknown[]) => console.warn(prefix, ...args),
-    group: (label: string) => console.group(`${prefix} ${label}`),
+    log: (...args: unknown[]) => console.log(runtimePrefix, ...args),
+    error: (...args: unknown[]) => console.error(runtimePrefix, ...args),
+    warn: (...args: unknown[]) => console.warn(runtimePrefix, ...args),
+    group: (label: string) => console.group(`${runtimePrefix} ${label}`),
     groupEnd: () => console.groupEnd(),
   };
 }
