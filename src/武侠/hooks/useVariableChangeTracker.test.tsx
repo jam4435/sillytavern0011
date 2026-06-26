@@ -240,6 +240,59 @@ describe('useVariableChangeTracker', () => {
     ]);
   });
 
+  it('显式 AI ERA 来源会保留 AI 归因并升级为真实 producer', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'era-api-write',
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'era',
+        origin: 'ai',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'era-source-ai-1',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        message_id: 2,
+        actions: { apiWrite: true },
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'frontend',
+        origin: 'ai',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
+  });
+
   it('显式后台 ERA 来源可以把已归入 AI 的批次纠正回后台', () => {
     const { result } = renderHook(() => useVariableChangeTracker());
 
@@ -267,8 +320,9 @@ describe('useVariableChangeTracker', () => {
         writeId: 'era-source-1',
         source: 'frontend',
         operation: 'update',
-        reason: 'extra-variable-api-write',
+        reason: 'summary-write',
         eventName: 'era:apiWrite',
+        attribution: 'background',
         message_id: 2,
         actions: { apiWrite: true },
       });
@@ -285,7 +339,7 @@ describe('useVariableChangeTracker', () => {
     ]);
   });
 
-  it('显式后台 ERA 来源会覆盖普通 era 的笼统 producer', () => {
+  it('缺失 attribution 的 legacy sourced ERA 仍按后台处理并覆盖普通 era 的笼统 producer', () => {
     const { result } = renderHook(() => useVariableChangeTracker());
 
     act(() => {
@@ -314,7 +368,7 @@ describe('useVariableChangeTracker', () => {
         writeId: 'era-source-2',
         source: 'frontend',
         operation: 'update',
-        reason: 'extra-variable-api-write',
+        reason: 'summary-write',
         eventName: 'era:apiWrite',
         message_id: 2,
         actions: { apiWrite: true },

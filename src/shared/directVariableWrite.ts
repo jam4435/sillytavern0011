@@ -26,7 +26,7 @@ export interface DirectVariableWriteDoneDetail extends DirectVariableWriteMetada
 
 export interface EraVariableWriteMetadata extends DirectVariableWriteMetadata {
   eventName: EraVariableWriteEventName;
-  attribution: EraVariableWriteAttribution;
+  attribution?: EraVariableWriteAttribution;
 }
 
 export interface EraVariableWriteDoneDetail extends EraVariableWriteMetadata {
