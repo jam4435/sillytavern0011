@@ -37,12 +37,14 @@ const getMasteryColor = (mastery: string): string => {
 interface MartialArtsPanelProps {
     martialArts: Record<string, MartialArt>;
     cultivation: number;
+    comprehension: number;
     onUpgrade?: (result: { success: boolean; martialArtName: string; newMastery?: string; newCultivation?: number; error?: string }) => void;
 }
 
 export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
     martialArts,
     cultivation,
+    comprehension,
     onUpgrade
 }) => {
     const [upgradingArt, setUpgradingArt] = useState<string | null>(null);
@@ -59,7 +61,8 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
                 artName,
                 art.mastery as MasteryLevel,
                 cultivation,
-                art.rank as MartialArtsRank
+                art.rank as MartialArtsRank,
+                comprehension
             );
 
             if (onUpgrade) {
@@ -89,7 +92,7 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
         } finally {
             setUpgradingArt(null);
         }
-    }, [cultivation, upgradingArt, onUpgrade]);
+    }, [cultivation, comprehension, upgradingArt, onUpgrade]);
 
     return (
         <div style={{ height: '100%', overflowY: 'auto', paddingRight: '0.5rem' }}>

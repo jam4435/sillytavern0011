@@ -59,8 +59,38 @@ interface UseMessageHandlerOptions {
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
 const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
+const WUXIA_TURN_COMPLETED_EVENT = 'wuxia:turn-completed';
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+/**
+ * 读取当前聊天 ID（用于回合成功完成事件的去重与归档）。
+ * 与 useEventListeners.ts 中的 readCurrentChatId 同源，读取 SillyTavern 全局 API。
+ */
+const readCurrentChatIdForTurn = (): string => {
+  try {
+    const currentWindow = globalThis as typeof globalThis & {
+      SillyTavern?: { getCurrentChatId?: () => string | number | null | undefined };
+    };
+    const parentWindow = typeof window !== 'undefined'
+      ? window.parent as Window & typeof globalThis & {
+        SillyTavern?: { getCurrentChatId?: () => string | number | null | undefined };
+      }
+      : undefined;
+    const chatId = currentWindow.SillyTavern?.getCurrentChatId?.()
+      ?? parentWindow?.SillyTavern?.getCurrentChatId?.();
+    if (typeof chatId === 'string') {
+      const normalized = chatId.trim();
+      return normalized || 'unknown';
+    }
+    if (typeof chatId === 'number' && Number.isFinite(chatId)) {
+      return String(chatId);
+    }
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+};
 
 type ExtraVariableDecisionTrigger = 'send' | 'regenerate';
 
@@ -548,6 +578,16 @@ export function useMessageHandler({
           messageLogger.log('✅ [步骤 5] 前端状态已更新');
           messageLogger.log('注意: React 状态更新是异步的，新值将在下次渲染时生效');
 
+          // 回合成功完成（文本已生成、助手楼层已写入、extra 模式下 ERA 写入已确认）
+          // → 通知事件脚本扣减线索倒计时（替代 MESSAGE_SENT 的发送即扣）。
+          const completedMessageId = assistantMessage?.message_id ?? createdLatestMessageId ?? null;
+          if (completedMessageId !== null && Number.isInteger(completedMessageId)) {
+            void eventEmit(WUXIA_TURN_COMPLETED_EVENT, {
+              messageId: completedMessageId,
+              chatId: readCurrentChatIdForTurn(),
+            });
+          }
+
           dismissToast();
           return resultText;
         } else {
@@ -764,6 +804,16 @@ export function useMessageHandler({
           showError(`重新生成已完成，但额外变量更新失败：${errorMessage}`);
           return;
         }
+      }
+
+      // 回合成功完成（重新生成成功，助手楼层新 swipe 已写入、ERA 已确认）
+      // → 通知事件脚本扣减线索倒计时。regenerate 的 messageId 不变，事件脚本按 messageId 去重，
+      // 因此同一楼层多次 regenerate 只扣一次。
+      if (targetAssistantMessageId !== null && Number.isInteger(targetAssistantMessageId)) {
+        void eventEmit(WUXIA_TURN_COMPLETED_EVENT, {
+          messageId: targetAssistantMessageId,
+          chatId: readCurrentChatIdForTurn(),
+        });
       }
 
       dismissToast();

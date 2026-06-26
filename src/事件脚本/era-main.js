@@ -430,6 +430,9 @@
   let pendingCheckReason = null;
   let checkEventsTimer = null;
   let lastSuccessfulInitializationAt = 0;
+  // 线索倒计时按 messageId 去重：同一助手楼层（含 regenerate 产生的同 messageId 新 swipe）
+  // 只扣一次，避免重复扣减。切换聊天时重置。
+  let lastCountedMessageId = null;
 
   async function runScheduledCheck(reason) {
     if (isCheckingEvents) {
@@ -597,6 +600,7 @@
   eventOn(tavern_events.CHAT_CHANGED, async () => {
     log('💬 检测到聊天切换，重新初始化');
     isInitialized = false;
+    lastCountedMessageId = null;
     await initialize();
   });
 
@@ -604,10 +608,29 @@
     scheduleFrontendInitialization('GameInitialized-event', signal, 500, { forcePostResyncVerify: true });
   });
 
+  // MESSAGE_SENT 只做事件检查，不再扣减线索倒计时。
+  // 扣减改由 wuxia:turn-completed 在回合真正成功完成后触发（见下方监听器），
+  // 避免发送后生成失败/取消/报错/未形成助手回合时仍被扣一次。
   eventOn(tavern_events.MESSAGE_SENT, async () => {
-    await processFollowupCounters({ decrementCounters: true, reason: 'message-sent' });
     log('📨 检测到消息发送，触发事件检查');
     scheduleCheckEvents('message-sent');
+  });
+
+  // 武侠前端在回合成功完成（助手消息已生成 + 必要 ERA 写入已确认 + 未取消/报错）后发出此事件。
+  // 仅在此处扣减线索倒计时，确保只在真实完成一个 AI 回合时计数。
+  eventOn('wuxia:turn-completed', async ({ messageId, chatId } = {}) => {
+    if (!Number.isInteger(messageId)) {
+      log('⚠️ wuxia:turn-completed 缺少有效 messageId，跳过扣减');
+      return;
+    }
+    if (messageId === lastCountedMessageId) {
+      log(`🔁 回合已完成过 (messageId=${messageId})，跳过重复扣减`);
+      return;
+    }
+    lastCountedMessageId = messageId;
+    log(`✅ 检测到武侠回合成功完成 (messageId=${messageId}, chatId=${chatId})，扣减线索倒计时`);
+    await processFollowupCounters({ decrementCounters: true, reason: 'wuxia-turn-completed' });
+    scheduleCheckEvents('wuxia-turn-completed');
   });
 
   eventOn('era:writeDone', async detail => {

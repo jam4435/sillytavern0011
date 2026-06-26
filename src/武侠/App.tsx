@@ -462,7 +462,7 @@ const App: React.FC = () => {
   const renderModalContent = () => {
     switch(activePanel) {
       case ActivePanel.CHARACTER: return <CharacterPanel stats={gameState.stats} worldTime={gameState.worldTime} />;
-      case ActivePanel.MARTIAL_ARTS: return <MartialArtsPanel martialArts={gameState.stats.martialArts} cultivation={gameState.stats.cultivation} />;
+      case ActivePanel.MARTIAL_ARTS: return <MartialArtsPanel martialArts={gameState.stats.martialArts} cultivation={gameState.stats.cultivation} comprehension={gameState.stats.initialAttributes?.悟性 ?? 10} />;
       case ActivePanel.EVENTS: return <EventsPanel events={gameState.events} />;
       case ActivePanel.MAP: return <MapPanel />;
       case ActivePanel.INVENTORY: return <InventoryPanel items={gameState.inventory} />;

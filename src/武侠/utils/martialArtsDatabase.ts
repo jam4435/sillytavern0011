@@ -126,8 +126,8 @@ export const UPGRADE_MULTIPLIER: Record<MasteryLevel, number> = {
   出神入化: 0, // 已满级，无法升级
 };
 
-/** 品阶对应的洞察基准点（用于洞察折扣计算） */
-export const RANK_INSIGHT_BASELINE: Record<MartialArtsRank, number> = {
+/** 品阶对应的悟性基准点（用于悟性折扣计算） */
+export const RANK_COMPREHENSION_BASELINE: Record<MartialArtsRank, number> = {
   粗浅: 0,
   传家: 4,
   上乘: 8,
@@ -295,14 +295,14 @@ export function getAllMartialArtNames(): string[] {
  * @param name 功法名称
  * @param simpleArt 变量中的简化功法结构
  * @param currentCultivation 当前修为（用于计算是否可升级）
- * @param insight 洞察值（用于计算升级折扣）
+ * @param comprehension 悟性值（用于计算升级折扣，对应 user数据.初始属性.悟性）
  * @returns 补完后的完整功法信息
  */
 export function completeMartialArt(
   name: string,
   simpleArt: SimpleMartialArt,
   currentCultivation: number = 0,
-  insight: number = 10,
+  comprehension: number = 10,
 ): CompleteMartialArt {
   // 从数据库获取功法数据
   const dbData = getMartialArtData(name);
@@ -315,7 +315,7 @@ export function completeMartialArt(
     const rank = dbData.功法品阶;
     const traits = dbData.特性 || {};
     const unlockedTraits = getUnlockedTraits(traits, mastery);
-    const { canUpgrade, cost, nextMastery } = calculateUpgradeInfo(rank, mastery, currentCultivation, insight);
+    const { canUpgrade, cost, nextMastery } = calculateUpgradeInfo(rank, mastery, currentCultivation, comprehension);
 
     return {
       name,
@@ -337,7 +337,7 @@ export function completeMartialArt(
   const rank = parseRank(simpleArt.功法品阶 || '粗浅');
   const traits = simpleArt.特性 || {};
   const unlockedTraits = getUnlockedTraits(traits, mastery);
-  const { canUpgrade, cost, nextMastery } = calculateUpgradeInfo(rank, mastery, currentCultivation, insight);
+  const { canUpgrade, cost, nextMastery } = calculateUpgradeInfo(rank, mastery, currentCultivation, comprehension);
 
   return {
     name,
@@ -357,12 +357,12 @@ export function completeMartialArt(
  * 批量补完功法
  * @param martialArts 变量中的功法对象
  * @param currentCultivation 当前修为
- * @param insight 洞察值
+ * @param comprehension 悟性值
  */
 export function completeMartialArts(
   martialArts: Record<string, SimpleMartialArt>,
   currentCultivation: number = 0,
-  insight: number = 10,
+  comprehension: number = 10,
 ): Record<string, CompleteMartialArt> {
   const result: Record<string, CompleteMartialArt> = {};
 
@@ -370,7 +370,7 @@ export function completeMartialArts(
     // 跳过模板字段
     if (name.startsWith('$')) continue;
 
-    result[name] = completeMartialArt(name, art, currentCultivation, insight);
+    result[name] = completeMartialArt(name, art, currentCultivation, comprehension);
   }
 
   return result;
@@ -381,14 +381,14 @@ export function completeMartialArts(
 // ============================================
 
 /**
- * 计算洞察折扣
+ * 计算悟性折扣
  * @param rank 功法品阶
- * @param insight 洞察值
+ * @param comprehension 悟性值（对应 user数据.初始属性.悟性）
  * @returns 折扣率（0.4 ~ 1.6，低于1表示消耗减少）
  */
-export function calculateInsightDiscount(rank: MartialArtsRank, insight: number): number {
-  const baseline = RANK_INSIGHT_BASELINE[rank];
-  const deviation = insight - baseline;
+export function calculateComprehensionDiscount(rank: MartialArtsRank, comprehension: number): number {
+  const baseline = RANK_COMPREHENSION_BASELINE[rank];
+  const deviation = comprehension - baseline;
   // 偏离值 × 5%，限制在 ±60%
   const discountRate = Math.max(-0.6, Math.min(0.6, deviation * 0.05));
   // 返回实际消耗比例（1 - 折扣率）
@@ -399,13 +399,13 @@ export function calculateInsightDiscount(rank: MartialArtsRank, insight: number)
  * 计算升级到下一掌握程度的修为消耗
  * @param rank 功法品阶
  * @param currentMastery 当前掌握程度
- * @param insight 洞察值
+ * @param comprehension 悟性值（对应 user数据.初始属性.悟性）
  * @returns 升级消耗，如果已满级返回 -1
  */
 export function calculateUpgradeCost(
   rank: MartialArtsRank,
   currentMastery: MasteryLevel,
-  insight: number = 10,
+  comprehension: number = 10,
 ): number {
   // 已满级
   if (currentMastery === '出神入化') {
@@ -414,9 +414,9 @@ export function calculateUpgradeCost(
 
   const baseCost = RANK_BASE_COST[rank];
   const multiplier = UPGRADE_MULTIPLIER[currentMastery];
-  const insightDiscount = calculateInsightDiscount(rank, insight);
+  const comprehensionFactor = calculateComprehensionDiscount(rank, comprehension);
 
-  return Math.floor(baseCost * multiplier * insightDiscount);
+  return Math.floor(baseCost * multiplier * comprehensionFactor);
 }
 
 /**
@@ -426,7 +426,7 @@ function calculateUpgradeInfo(
   rank: MartialArtsRank,
   mastery: MasteryLevel,
   cultivation: number,
-  insight: number,
+  comprehension: number,
 ): { canUpgrade: boolean; cost: number; nextMastery: MasteryLevel | null } {
   const masteryIndex = MASTERY_LEVELS.indexOf(mastery);
 
@@ -436,7 +436,7 @@ function calculateUpgradeInfo(
   }
 
   const nextMastery = MASTERY_LEVELS[masteryIndex + 1];
-  const cost = calculateUpgradeCost(rank, mastery, insight);
+  const cost = calculateUpgradeCost(rank, mastery, comprehension);
   const canUpgrade = cost > 0 && cultivation >= cost;
 
   return { canUpgrade, cost, nextMastery };
@@ -463,17 +463,17 @@ export function getNextMastery(current: MasteryLevel): MasteryLevel | null {
  * @param currentMastery 当前掌握程度
  * @param currentCultivation 当前修为
  * @param rank 功法品阶
- * @param insight 洞察值
+ * @param comprehension 悟性值（对应 user数据.初始属性.悟性）
  */
 export async function upgradeMartialArt(
   martialArtName: string,
   currentMastery: MasteryLevel,
   currentCultivation: number,
   rank: MartialArtsRank,
-  insight: number = 10,
+  comprehension: number = 10,
 ): Promise<UpgradeResult> {
   // 计算升级消耗
-  const cost = calculateUpgradeCost(rank, currentMastery, insight);
+  const cost = calculateUpgradeCost(rank, currentMastery, comprehension);
 
   if (cost < 0) {
     return {

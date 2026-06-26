@@ -626,7 +626,7 @@ function parseCurrentAttributes(
 function parseMartialArts(
   用户档案?: UserProfile,
   currentCultivation: number = 0,
-  insight: number = 10,
+  comprehension: number = 10,
 ): Record<string, MartialArt> {
   const 功法 = 用户档案?.功法;
   if (!功法) return {};
@@ -651,7 +651,7 @@ function parseMartialArts(
   const completedArts: Record<string, CompleteMartialArt> = completeMartialArts(
     simpleMartialArtsData,
     currentCultivation,
-    insight,
+    comprehension,
   );
 
   // 转换为 MartialArt 结构
@@ -2456,8 +2456,8 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
     // 解析初始属性
     const initialAttrs = parseInitialAttributes(用户档案);
 
-    // 解析功法（用于属性计算）
-    const martialArts = parseMartialArts(用户档案, 用户档案.修为 ?? 0, 用户档案.初始属性?.洞察 ?? 10);
+    // 解析功法（用于属性计算）— 悟性驱动升级折扣，对应 user数据.初始属性.悟性
+    const martialArts = parseMartialArts(用户档案, 用户档案.修为 ?? 0, 用户档案.初始属性?.悟性 ?? 10);
 
     // 准备功法计算数据
     const martialArtsForCalc: Record<string, MartialArtForCalculation> = {};

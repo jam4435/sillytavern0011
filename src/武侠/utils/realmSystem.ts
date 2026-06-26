@@ -30,8 +30,14 @@ export interface RealmInfo {
  * 各大境界下，每个小境界突破所需的修为
  * 例如：三流初期 → 三流中期 需要消耗 REALM_CULTIVATION_COST['三流']['中期'] 点修为
  *
+ * 数值以《修为境界功法属性战斗的体系架构》§1.3「境界升级消耗表」为唯一权威：
+ * 消耗值为进入该目标境界/阶段所需的修为。
+ *
+ * 特例：不入流无小境界划分，500 修为直接突破到三流初期（见 getNextRealm 的不入流特例）。
+ * 因此不入流行的中期/后期/圆满不会被读到，保留 0 仅为满足 Record 类型完整。
+ *
  * 设计理念：
- * - 不入流: 入门阶段，消耗较少
+ * - 不入流: 入门阶段，无小境界，500 突破到三流初期
  * - 三流: 初入江湖，逐渐增加
  * - 二流: 小有所成
  * - 一流: 高手境界
@@ -41,46 +47,47 @@ export interface RealmInfo {
  */
 export const REALM_CULTIVATION_COST: Record<MajorRealm, Record<MinorRealm, number>> = {
   不入流: {
-    初期: 0, // 起始境界，无需消耗
-    中期: 10,
-    后期: 20,
-    圆满: 30,
+    // 不入流无小境界：getNextRealm 对不入流特例直接返回三流初期，不会读到这三项。
+    初期: 0,
+    中期: 0,
+    后期: 0,
+    圆满: 0,
   },
   三流: {
-    初期: 50, // 从不入流圆满突破到三流初期
-    中期: 80,
-    后期: 120,
-    圆满: 160,
+    初期: 500, // 从不入流突破到三流初期
+    中期: 700,
+    后期: 900,
+    圆满: 1200,
   },
   二流: {
-    初期: 250,
-    中期: 350,
-    后期: 500,
-    圆满: 700,
+    初期: 1500,
+    中期: 2000,
+    后期: 2800,
+    圆满: 4000,
   },
   一流: {
-    初期: 1000,
-    中期: 1500,
-    后期: 2200,
-    圆满: 3000,
+    初期: 6000,
+    中期: 10000,
+    后期: 15000,
+    圆满: 25000,
   },
   宗师: {
-    初期: 5000,
-    中期: 8000,
-    后期: 12000,
-    圆满: 18000,
+    初期: 40000,
+    中期: 60000,
+    后期: 90000,
+    圆满: 140000,
   },
   绝顶: {
-    初期: 30000,
-    中期: 50000,
-    后期: 80000,
-    圆满: 120000,
+    初期: 200000,
+    中期: 300000,
+    后期: 450000,
+    圆满: 650000,
   },
   陆地神仙: {
-    初期: 200000,
-    中期: 350000,
-    后期: 550000,
-    圆满: 999999, // 最高境界，无法再突破
+    初期: 800000,
+    中期: 900000,
+    后期: 950000,
+    圆满: 1000000, // 最高境界，无法再突破
   },
 };
 
@@ -144,6 +151,17 @@ export function parseRealm(realmStr: string): RealmInfo | null {
  * @returns 下一个境界信息，如果已是最高境界则返回 null
  */
 export function getNextRealm(current: RealmInfo): RealmInfo | null {
+  // 不入流无小境界划分：直接突破到三流初期（规则文档 §1.3）
+  if (current.major === '不入流') {
+    return {
+      major: '三流',
+      minor: '初期',
+      majorIndex: 1,
+      minorIndex: 0,
+      displayName: '三流初期',
+    };
+  }
+
   // 检查是否已是最高境界
   if (current.majorIndex === MAJOR_REALMS.length - 1 && current.minorIndex === MINOR_REALMS.length - 1) {
     return null;
@@ -268,9 +286,9 @@ export function getRealmColor(realmStr: string): string {
 
 /**
  * 获取境界等级（用于比较和进度条）
- * 总共 7 个大境界 × 4 个小境界 = 28 级
+ * 共 25 级：不入流为单阶段（1 级），其余 6 个大境界 × 4 个小境界（24 级）。
  * @param realmStr 境界字符串
- * @returns 0-27 的等级数
+ * @returns 0-24 的等级数
  */
 export function getRealmLevel(realmStr: string): number {
   const realm = parseRealm(realmStr);
