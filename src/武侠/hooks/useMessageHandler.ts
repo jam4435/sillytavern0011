@@ -62,6 +62,70 @@ const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
+type ExtraVariableDecisionTrigger = 'send' | 'regenerate';
+
+type ExtraVariableRunDecision = {
+  trigger: ExtraVariableDecisionTrigger;
+  modeSnapshot: SummarySettings['variableUpdateMode'];
+  shouldRunExtra: boolean;
+  skipReason: string;
+};
+
+function createExtraVariableRunDecision(
+  trigger: ExtraVariableDecisionTrigger,
+  settings: SummarySettings,
+): ExtraVariableRunDecision {
+  const modeSnapshot = settings.variableUpdateMode;
+  if (modeSnapshot === 'extra') {
+    return {
+      trigger,
+      modeSnapshot,
+      shouldRunExtra: true,
+      skipReason: '',
+    };
+  }
+
+  return {
+    trigger,
+    modeSnapshot,
+    shouldRunExtra: false,
+    skipReason: `本轮模式快照为 ${modeSnapshot}，跳过额外变量更新。`,
+  };
+}
+
+function createExtraVariableDecisionPatch(
+  decision: ExtraVariableRunDecision,
+  patch: Partial<NonNullable<LatestDebugRoundPatch['variable']>> = {},
+): NonNullable<LatestDebugRoundPatch['variable']> {
+  return {
+    trigger: decision.trigger,
+    modeSnapshot: decision.modeSnapshot,
+    skipReason: decision.skipReason,
+    ...patch,
+  };
+}
+
+function createInitialExtraVariableDecisionPatch(
+  decision: ExtraVariableRunDecision,
+): NonNullable<LatestDebugRoundPatch['variable']> {
+  const now = Date.now();
+  return createExtraVariableDecisionPatch(
+    decision,
+    decision.shouldRunExtra
+      ? {
+        status: 'idle',
+        startedAt: now,
+        error: '',
+      }
+      : {
+        status: 'skipped',
+        startedAt: now,
+        finishedAt: now,
+        error: '',
+      },
+  );
+}
+
 function createExtraVariableProgressPatch(
   progress: ExtraVariableUpdateProgress,
 ): NonNullable<LatestDebugRoundPatch['variable']> {
@@ -185,6 +249,108 @@ export function useMessageHandler({
     [setCurrentMaintext, setCurrentOptions],
   );
 
+  const prepareExtraVariableUpdateForDecision = useCallback(
+    async (
+      decision: ExtraVariableRunDecision,
+    ): Promise<ExtraVariableUpdateReservation | null> => {
+      if (!decision.shouldRunExtra) {
+        return null;
+      }
+
+      try {
+        return await prepareExtraVariableUpdateTurn(summarySettings);
+      } catch (error) {
+        patchLatestDebugRound({
+          variable: createExtraVariableDecisionPatch(decision, {
+            status: 'error',
+            error: getErrorMessage(error),
+            finishedAt: Date.now(),
+          }),
+        });
+        throw error;
+      }
+    },
+    [patchLatestDebugRound, summarySettings],
+  );
+
+  const runExtraVariableUpdate = useCallback(
+    async ({
+      decision,
+      assistantMessageId,
+      latestRawReply,
+      logLabel,
+    }: {
+      decision: ExtraVariableRunDecision;
+      assistantMessageId: number;
+      latestRawReply: string;
+      logLabel: string;
+    }) => {
+      if (!decision.shouldRunExtra) {
+        return null;
+      }
+
+      showLoading('正在额外更新变量...');
+      patchLatestDebugRound({
+        variable: createExtraVariableDecisionPatch(decision, {
+          status: 'running',
+          startedAt: Date.now(),
+          finishedAt: undefined,
+          error: '',
+        }),
+      });
+
+      const extraUpdateResult = await executeExtraVariableUpdate({
+        settings: summarySettings,
+        assistantMessageId,
+        latestRawReply,
+        onPromptBuilt: prompt => {
+          variableTraceLogger.log(`[useMessageHandler] ${logLabel}提示词已写入调试状态`, {
+            assistantMessageId,
+            promptLength: prompt.length,
+          });
+          patchLatestDebugRound({
+            variable: createExtraVariableDecisionPatch(decision, {
+              input: prompt,
+              status: 'running',
+            }),
+          });
+        },
+        onProgress: progress => {
+          variableTraceLogger.log(`[useMessageHandler] ${logLabel}进度更新`, {
+            assistantMessageId,
+            ...summarizeExtraVariableProgress(progress),
+          });
+          patchLatestDebugRound({
+            variable: createExtraVariableDecisionPatch(decision, createExtraVariableProgressPatch(progress)),
+          });
+        },
+      });
+
+      variableTraceLogger.log(`[useMessageHandler] ${logLabel}成功，调试状态切换为 success`, {
+        assistantMessageId,
+        actionBlockCount: extraUpdateResult.actionBlockCount,
+        appended: extraUpdateResult.appended,
+      });
+      patchLatestDebugRound({
+        variable: createExtraVariableDecisionPatch(decision, {
+          status: 'success',
+          input: extraUpdateResult.prompt || '',
+          output: extraUpdateResult.rawResponse,
+          appendedBlocks: extraUpdateResult.appendedBlocks || '',
+          finalMessageText: extraUpdateResult.finalMessageText || '',
+          appendReadbackText: extraUpdateResult.appendReadbackText || '',
+          appendVerification: extraUpdateResult.appendVerification || '',
+          syncReadbackText: extraUpdateResult.syncReadbackText || '',
+          syncVerification: extraUpdateResult.syncVerification || '',
+          finishedAt: Date.now(),
+        }),
+      });
+
+      return extraUpdateResult;
+    },
+    [patchLatestDebugRound, showLoading, summarySettings],
+  );
+
   const handleSendMessage = useCallback(
     async (message: string): Promise<string> => {
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -197,12 +363,16 @@ export function useMessageHandler({
       showLoading('正在生成回复...');
       messageLogger.log('🔄 isLoading 设置为 true');
       beginDebugRound(message);
+      const extraVariableDecision = createExtraVariableRunDecision('send', summarySettings);
+      patchLatestDebugRound({
+        variable: createInitialExtraVariableDecisionPatch(extraVariableDecision),
+      });
 
       let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
       let createdLatestMessageId: number | null = null;
 
       try {
-        extraVariableUpdateReservation = await prepareExtraVariableUpdateTurn(summarySettings);
+        extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
         const beforeSendLastMessageId = getLatestMessageId();
         onVariableTurnStart?.();
 
@@ -333,74 +503,27 @@ export function useMessageHandler({
             },
           });
 
-          if (summarySettings.variableUpdateMode === 'extra') {
+          if (extraVariableDecision.shouldRunExtra) {
             if (!assistantMessage?.message_id) {
               const errorMessage = '正文已生成，但没有找到可追加变量块的 assistant 楼层。';
               patchLatestDebugRound({
-                variable: {
+                variable: createExtraVariableDecisionPatch(extraVariableDecision, {
                   status: 'error',
                   error: errorMessage,
                   finishedAt: Date.now(),
-                },
+                }),
               });
               showError(errorMessage);
               return resultText;
             }
-            showLoading('正在额外更新变量...');
-            patchLatestDebugRound({
-              variable: {
-                status: 'running',
-                startedAt: Date.now(),
-                error: '',
-              },
-            });
             try {
-              const extraUpdateResult = await executeExtraVariableUpdate({
-                settings: summarySettings,
+              const extraUpdateResult = await runExtraVariableUpdate({
+                decision: extraVariableDecision,
                 assistantMessageId: assistantMessage.message_id,
                 latestRawReply: resultText,
-                onPromptBuilt: prompt => {
-                  variableTraceLogger.log('[useMessageHandler] 额外变量提示词已写入调试状态', {
-                    assistantMessageId: assistantMessage.message_id,
-                    promptLength: prompt.length,
-                  });
-                  patchLatestDebugRound({
-                    variable: {
-                      input: prompt,
-                      status: 'running',
-                    },
-                  });
-                },
-                onProgress: progress => {
-                  variableTraceLogger.log('[useMessageHandler] 额外变量进度更新', {
-                    assistantMessageId: assistantMessage.message_id,
-                    ...summarizeExtraVariableProgress(progress),
-                  });
-                  patchLatestDebugRound({
-                    variable: createExtraVariableProgressPatch(progress),
-                  });
-                },
+                logLabel: '额外变量更新',
               });
-              variableTraceLogger.log('[useMessageHandler] 额外变量更新成功，调试状态切换为 success', {
-                assistantMessageId: assistantMessage.message_id,
-                actionBlockCount: extraUpdateResult.actionBlockCount,
-                appended: extraUpdateResult.appended,
-              });
-              patchLatestDebugRound({
-                variable: {
-                  status: 'success',
-                  input: extraUpdateResult.prompt || '',
-                  output: extraUpdateResult.rawResponse,
-                  appendedBlocks: extraUpdateResult.appendedBlocks || '',
-                  finalMessageText: extraUpdateResult.finalMessageText || '',
-                  appendReadbackText: extraUpdateResult.appendReadbackText || '',
-                  appendVerification: extraUpdateResult.appendVerification || '',
-                  syncReadbackText: extraUpdateResult.syncReadbackText || '',
-                  syncVerification: extraUpdateResult.syncVerification || '',
-                  finishedAt: Date.now(),
-                },
-              });
-              if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
+              if (extraUpdateResult?.appended && extraUpdateResult.finalMessageText) {
                 refreshAssistantStateFromFinalText(extraUpdateResult.finalMessageText);
               }
             } catch (error) {
@@ -411,11 +534,11 @@ export function useMessageHandler({
                 error: errorMessage,
               });
               patchLatestDebugRound({
-                variable: {
+                variable: createExtraVariableDecisionPatch(extraVariableDecision, {
                   status: 'error',
                   error: errorMessage,
                   finishedAt: Date.now(),
-                },
+                }),
               });
               showError(`正文已生成，但额外变量更新失败：${errorMessage}`);
               return resultText;
@@ -485,6 +608,8 @@ export function useMessageHandler({
       currentOptions,
       beginDebugRound,
       patchLatestDebugRound,
+      prepareExtraVariableUpdateForDecision,
+      runExtraVariableUpdate,
       setIsLoading,
       showLoading,
       showError,
@@ -570,13 +695,17 @@ export function useMessageHandler({
 
     setIsLoading(true);
     showLoading('正在重新生成回复...');
+    beginDebugRound('重新生成最新回复');
+    const extraVariableDecision = createExtraVariableRunDecision('regenerate', summarySettings);
+    patchLatestDebugRound({
+      variable: createInitialExtraVariableDecisionPatch(extraVariableDecision),
+    });
 
     let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
 
     try {
       onVariableTurnStart?.();
-      extraVariableUpdateReservation = await prepareExtraVariableUpdateTurn(summarySettings);
-      beginDebugRound('重新生成最新回复');
+      extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
       const result = await regenerateLastAssistantSwipe({
         onCombinedPrompt: prompt => {
           patchLatestDebugRound({ main: { combinedPrompt: prompt } });
@@ -598,63 +727,15 @@ export function useMessageHandler({
       setCurrentMaintext(result.maintext);
       setCurrentOptions(result.options);
 
-      if (summarySettings.variableUpdateMode === 'extra') {
-        showLoading('正在额外更新变量...');
-        patchLatestDebugRound({
-          variable: {
-            status: 'running',
-            startedAt: Date.now(),
-            error: '',
-          },
-        });
+      if (extraVariableDecision.shouldRunExtra) {
         try {
-          const extraUpdateResult = await executeExtraVariableUpdate({
-            settings: summarySettings,
+          const extraUpdateResult = await runExtraVariableUpdate({
+            decision: extraVariableDecision,
             assistantMessageId: result.assistantMessageId,
             latestRawReply: result.rawReply,
-            onPromptBuilt: prompt => {
-              variableTraceLogger.log('[useMessageHandler] 重新生成后的额外变量提示词已写入调试状态', {
-                assistantMessageId: result.assistantMessageId,
-                promptLength: prompt.length,
-              });
-              patchLatestDebugRound({
-                variable: {
-                  input: prompt,
-                  status: 'running',
-                },
-              });
-            },
-            onProgress: progress => {
-              variableTraceLogger.log('[useMessageHandler] 重新生成后的额外变量进度更新', {
-                assistantMessageId: result.assistantMessageId,
-                ...summarizeExtraVariableProgress(progress),
-              });
-              patchLatestDebugRound({
-                variable: createExtraVariableProgressPatch(progress),
-              });
-            },
+            logLabel: '重新生成后的额外变量更新',
           });
-          variableTraceLogger.log('[useMessageHandler] 重新生成后的额外变量更新成功，调试状态切换为 success', {
-            assistantMessageId: result.assistantMessageId,
-            actionBlockCount: extraUpdateResult.actionBlockCount,
-            appended: extraUpdateResult.appended,
-          });
-          patchLatestDebugRound({
-            variable: {
-              status: 'success',
-              input: extraUpdateResult.prompt || '',
-              output: extraUpdateResult.rawResponse,
-              appendedBlocks: extraUpdateResult.appendedBlocks || '',
-              finalMessageText: extraUpdateResult.finalMessageText || '',
-              appendReadbackText: extraUpdateResult.appendReadbackText || '',
-              appendVerification: extraUpdateResult.appendVerification || '',
-              syncReadbackText: extraUpdateResult.syncReadbackText || '',
-              syncVerification: extraUpdateResult.syncVerification || '',
-              finishedAt: Date.now(),
-            },
-          });
-
-          if (extraUpdateResult.appended && extraUpdateResult.finalMessageText) {
+          if (extraUpdateResult?.appended && extraUpdateResult.finalMessageText) {
             refreshAssistantStateFromFinalText(extraUpdateResult.finalMessageText);
           } else {
             const latestContent = getLastMessageContent();
@@ -671,11 +752,11 @@ export function useMessageHandler({
             error: errorMessage,
           });
           patchLatestDebugRound({
-            variable: {
+            variable: createExtraVariableDecisionPatch(extraVariableDecision, {
               status: 'error',
               error: errorMessage,
               finishedAt: Date.now(),
-            },
+            }),
           });
           showError(`重新生成已完成，但额外变量更新失败：${errorMessage}`);
           return;
@@ -704,6 +785,8 @@ export function useMessageHandler({
     beginDebugRound,
     dismissToast,
     patchLatestDebugRound,
+    prepareExtraVariableUpdateForDecision,
+    runExtraVariableUpdate,
     setCurrentMaintext,
     setCurrentOptions,
     setIsLoading,

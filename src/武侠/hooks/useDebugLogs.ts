@@ -3,9 +3,12 @@ import { useCallback, useState } from 'react';
 const DEBUG_ROUND_STORAGE_KEY = 'wuxia_latest_debug_round';
 
 export type DebugStageStatus = 'idle' | 'running' | 'success' | 'error';
+export type ExtendedDebugStageStatus = DebugStageStatus | 'skipped';
+export type DebugTrigger = '' | 'send' | 'regenerate';
+export type DebugVariableModeSnapshot = '' | 'inline' | 'extra';
 
 export interface DebugStage {
-  status: DebugStageStatus;
+  status: ExtendedDebugStageStatus;
   startedAt?: number;
   finishedAt?: number;
   error?: string;
@@ -21,6 +24,9 @@ export interface LatestDebugRound {
     output: string;
   };
   variable: DebugStage & {
+    trigger: DebugTrigger;
+    modeSnapshot: DebugVariableModeSnapshot;
+    skipReason: string;
     input: string;
     output: string;
     appendedBlocks: string;
@@ -51,6 +57,9 @@ function createEmptyDebugRound(): LatestDebugRound {
     },
     variable: {
       status: 'idle',
+      trigger: '',
+      modeSnapshot: '',
+      skipReason: '',
       input: '',
       output: '',
       appendedBlocks: '',
@@ -63,8 +72,14 @@ function createEmptyDebugRound(): LatestDebugRound {
   };
 }
 
-function normalizeDebugStageStatus(value: unknown): DebugStageStatus {
-  return value === 'running' || value === 'success' || value === 'error' || value === 'idle' ? value : 'idle';
+function normalizeDebugStageStatus(value: unknown): ExtendedDebugStageStatus {
+  return value === 'running'
+    || value === 'success'
+    || value === 'error'
+    || value === 'idle'
+    || value === 'skipped'
+    ? value
+    : 'idle';
 }
 
 function normalizeNumber(value: unknown): number | undefined {
@@ -73,6 +88,14 @@ function normalizeNumber(value: unknown): number | undefined {
 
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function normalizeDebugTrigger(value: unknown): DebugTrigger {
+  return value === 'send' || value === 'regenerate' ? value : '';
+}
+
+function normalizeDebugVariableModeSnapshot(value: unknown): DebugVariableModeSnapshot {
+  return value === 'inline' || value === 'extra' ? value : '';
 }
 
 function normalizeLoadedDebugRound(value: unknown): LatestDebugRound | null {
@@ -109,6 +132,9 @@ function normalizeLoadedDebugRound(value: unknown): LatestDebugRound | null {
       startedAt: normalizeNumber(variable.startedAt),
       finishedAt: normalizeNumber(variable.finishedAt),
       error: normalizeString(variable.error),
+      trigger: normalizeDebugTrigger(variable.trigger),
+      modeSnapshot: normalizeDebugVariableModeSnapshot(variable.modeSnapshot),
+      skipReason: normalizeString(variable.skipReason),
       input: normalizeString(variable.input),
       output: normalizeString(variable.output),
       appendedBlocks: normalizeString(variable.appendedBlocks),

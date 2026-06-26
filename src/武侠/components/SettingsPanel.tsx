@@ -25,6 +25,13 @@ import {
   setPresetRegexRulesForPreset,
   validateRegex,
 } from '../utils/settingsManager';
+import {
+  buildMainInputDebugContent,
+  buildVariableInputDebugContent,
+  buildVariableOutputDebugContent,
+  getDebugStageStatusLabel,
+  shouldShowVariableDebug,
+} from '../utils/debugRoundView';
 import { loadSummaryModelList, validateSummaryApiConfig } from '../utils/summaryApiClient';
 import { applyVariableUpdateModeWorldbookState } from '../utils/extraVariableUpdateManager';
 import {
@@ -115,58 +122,6 @@ const SUMMARY_API_SOURCES = [
 ] as const;
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-const normalizeDebugText = (value: string | undefined): string => (value || '').trim();
-
-function buildMainInputDebugContent(debugRound: LatestDebugRound): string {
-  const sections = ['【用户输入】', debugRound.main.userInput || '(空)', ''];
-  const combinedPrompt = normalizeDebugText(debugRound.main.combinedPrompt);
-
-  sections.push('【合并提示词】');
-  sections.push(combinedPrompt || '(未捕获到合并提示词)');
-
-  if (debugRound.main.error) {
-    sections.push(`\n【错误】\n${debugRound.main.error}`);
-  }
-
-  return sections.filter(Boolean).join('\n');
-}
-
-function buildVariableOutputDebugContent(debugRound: LatestDebugRound): string {
-  const { variable } = debugRound;
-  const sections: string[] = [];
-  const rawResponse = normalizeDebugText(variable.output);
-  const appendedBlocks = normalizeDebugText(variable.appendedBlocks);
-  const appendReadbackText = normalizeDebugText(variable.appendReadbackText);
-  const syncReadbackText = normalizeDebugText(variable.syncReadbackText);
-  const finalMessageText = normalizeDebugText(variable.finalMessageText);
-  const isError = variable.status === 'error' || Boolean(variable.error);
-
-  if (rawResponse && rawResponse !== appendedBlocks) {
-    sections.push('【原始返回】', variable.output, '');
-  }
-
-  sections.push('【合法变量块】', variable.appendedBlocks || '(无)', '');
-  sections.push('【写入后回读验证】', variable.appendVerification || '(未验证)', '');
-  sections.push('【ERA 同步后回读验证】', variable.syncVerification || '(未同步或未回读)');
-
-  if (isError || (appendReadbackText && appendReadbackText !== syncReadbackText)) {
-    sections.push('', '【写入后回读文本】', variable.appendReadbackText || '(未回读)');
-  }
-
-  if (isError || (syncReadbackText && syncReadbackText !== finalMessageText)) {
-    sections.push('', '【ERA 同步后回读文本】', variable.syncReadbackText || '(未同步或未回读)');
-  }
-
-  if (isError && finalMessageText) {
-    sections.push('', '【最终楼层文本】', variable.finalMessageText);
-  }
-
-  if (variable.error) {
-    sections.push(`\n【错误】\n${variable.error}`);
-  }
-
-  return sections.filter(Boolean).join('\n');
-}
 
 const createEmptyApiProfileDraft = (): SummaryApiProfileDraft => ({
   name: '',
@@ -1483,19 +1438,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [settings.summarySettings]);
 
-  const shouldShowVariableDebug = Boolean(
-    latestDebugRound &&
-    (latestDebugRound.variable.status !== 'idle' ||
-      latestDebugRound.variable.input ||
-      latestDebugRound.variable.output ||
-      latestDebugRound.variable.appendedBlocks ||
-      latestDebugRound.variable.finalMessageText ||
-      latestDebugRound.variable.appendReadbackText ||
-      latestDebugRound.variable.appendVerification ||
-      latestDebugRound.variable.syncReadbackText ||
-      latestDebugRound.variable.syncVerification ||
-      latestDebugRound.variable.error),
-  );
+  const shouldShowVariableDebugSection = shouldShowVariableDebug(latestDebugRound);
   const debugSections = latestDebugRound
     ? [
         {
@@ -1515,13 +1458,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             .filter(Boolean)
             .join('\n'),
         },
-        ...(shouldShowVariableDebug
+        ...(shouldShowVariableDebugSection
           ? [
               {
                 id: 'variable-input',
                 title: '额外变量输入',
                 status: latestDebugRound.variable.status,
-                content: latestDebugRound.variable.input || '(本轮未进行额外变量更新)',
+                content: buildVariableInputDebugContent(latestDebugRound),
               },
               {
                 id: 'variable-output',
@@ -2786,13 +2729,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         </span>
                         <span className="debug-log-length">{section.content.length} 字符</span>
                         <span className={`debug-log-status ${section.status}`}>
-                          {section.status === 'running'
-                            ? '进行中'
-                            : section.status === 'success'
-                              ? '完成'
-                              : section.status === 'error'
-                                ? '失败'
-                                : '未运行'}
+                          {getDebugStageStatusLabel(section.status)}
                         </span>
                       </div>
                       <div className="debug-log-actions">
@@ -2846,9 +2783,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <span>•</span>
                 <span>{new Date(latestDebugRound.startedAt).toLocaleString('zh-CN')}</span>
                 <span>•</span>
-                <span>正文 {latestDebugRound.main.status}</span>
+                <span>正文 {getDebugStageStatusLabel(latestDebugRound.main.status)}</span>
                 <span>•</span>
-                <span>变量 {latestDebugRound.variable.status}</span>
+                <span>变量 {getDebugStageStatusLabel(latestDebugRound.variable.status)}</span>
               </div>
             )}
           </div>
