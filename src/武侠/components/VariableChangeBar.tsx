@@ -86,6 +86,7 @@ const summarizeAiComparison = (comparison: VariableAiComparison) => ({
     : null,
   observed: comparison.observedChange
     ? {
+      attribution: comparison.observedChange.origin,
       producer: comparison.observedChange.producer,
       before: comparison.observedChange.beforePreview,
       after: comparison.observedChange.afterPreview,
@@ -102,6 +103,7 @@ const summarizeAiComparison = (comparison: VariableAiComparison) => ({
 const summarizeActualChange = (change: VariableActualChange) => ({
   action: change.action,
   path: change.displayPath,
+  attribution: change.origin,
   producer: change.producer,
   origin: change.origin,
   before: change.beforePreview,
@@ -149,6 +151,7 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
     variableBarLogger.log('backgroundChanges', summary.background.observedChanges.map(summarizeActualChange));
     variableBarLogger.log('batches', summary.batches.map(batch => ({
       batchId: batch.batchId,
+      attribution: batch.origin,
       origin: batch.origin,
       producer: batch.producer,
       reason: batch.reason,

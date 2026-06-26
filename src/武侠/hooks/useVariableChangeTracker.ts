@@ -96,6 +96,7 @@ const summarizeActions = (actions?: VariableWriteActions | null): string[] =>
   Object.keys(actions ?? {}).filter(action => actions?.[action] === true);
 
 const summarizeMetadata = (metadata: CaptureMetadata) => ({
+  attribution: metadata.origin,
   origin: metadata.origin,
   producer: metadata.producer,
   reason: metadata.reason,
@@ -107,6 +108,7 @@ const summarizeMetadata = (metadata: CaptureMetadata) => ({
 const summarizeObservedChange = (change: VariableActualChange) => ({
   action: change.action,
   path: change.displayPath,
+  attribution: change.origin,
   producer: change.producer,
   origin: change.origin,
   before: change.beforePreview,
@@ -118,6 +120,7 @@ const summarizeObservedChange = (change: VariableActualChange) => ({
 
 const summarizeBatch = (batch: VariableObservedBatch) => ({
   batchId: batch.batchId,
+  attribution: batch.origin,
   origin: batch.origin,
   producer: batch.producer,
   reason: batch.reason,
@@ -135,9 +138,16 @@ const summarizeDeclaredChange = (
   blockTag: change.blockTag,
 });
 
+const normalizeSourcedEraAttribution = (value: unknown): 'ai' | 'background' | undefined =>
+  value === 'ai' || value === 'background' ? value : undefined;
+
 const summarizeSignal = (signal: VariableWriteSignal) => ({
   kind: signal.kind,
   producer: signal.producer,
+  attribution:
+    signal.kind === 'sourced-era'
+      ? normalizeSourcedEraAttribution(signal.detail?.attribution) ?? null
+      : null,
   assistantMessageId:
     signal.kind === 'boundary'
       ? signal.assistantMessageId ?? null
@@ -1003,16 +1013,25 @@ export function useVariableChangeTracker() {
       signal.kind === 'era' || signal.kind === 'sourced-era'
         ? normalizeMessageId(signal.detail?.message_id)
         : undefined;
+    const sourcedAttribution =
+      signal.kind === 'sourced-era'
+        ? normalizeSourcedEraAttribution(signal.detail?.attribution)
+        : undefined;
     const isAiTarget = assistantMessageId !== undefined
       && activeTurn.aiWriteTargetIds.includes(assistantMessageId);
     const isDirectChatWrite = actions?.directChatWrite === true;
     const isAiWrite =
-      signal.kind === 'era'
-      && !isDirectChatWrite
+      !isDirectChatWrite
       && (
-        actions?.apply === true
-        || (actions?.apiWrite === true && isAiTarget)
-        || ((actions?.rollback === true || actions?.resync === true) && isAiTarget)
+        (signal.kind === 'sourced-era' && sourcedAttribution === 'ai')
+        || (
+          signal.kind === 'era'
+          && (
+            actions?.apply === true
+            || (actions?.apiWrite === true && isAiTarget)
+            || ((actions?.rollback === true || actions?.resync === true) && isAiTarget)
+          )
+        )
       );
     const reason =
       signal.kind === 'direct' || signal.kind === 'sourced-era'
@@ -1034,6 +1053,7 @@ export function useVariableChangeTracker() {
         actions: summarizeActions(actions),
         isAiTarget,
         isDirectChatWrite,
+        sourcedAttribution: sourcedAttribution ?? null,
         isAiWrite,
         reason,
         aiWriteTargetIds: [...activeTurn.aiWriteTargetIds],

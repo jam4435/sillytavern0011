@@ -84,6 +84,7 @@ describe('runDirectChatVariableWrite', () => {
       operation: 'update',
       reason: 'summary-write',
       eventName: 'era:updateByObject',
+      attribution: 'background',
       detail: { stat_data: { user数据: { 修为: 120 } } },
       expectedAction: 'apiWrite',
       timeoutMessage: 'timeout',
@@ -95,6 +96,7 @@ describe('runDirectChatVariableWrite', () => {
       operation: 'update',
       reason: 'summary-write',
       eventName: 'era:updateByObject',
+      attribution: 'background',
       message_id: 42,
       actions: { apiWrite: true },
     }));
@@ -104,6 +106,7 @@ describe('runDirectChatVariableWrite', () => {
         source: 'frontend',
         operation: 'update',
         reason: 'summary-write',
+        attribution: 'background',
         message_id: 42,
         actions: { apiWrite: true },
       }),
@@ -112,5 +115,36 @@ describe('runDirectChatVariableWrite', () => {
       'era:updateByObject',
       ERA_VARIABLE_WRITE_DONE_EVENT,
     ]);
+  });
+
+  it('未显式指定 attribution 时默认标记为 background', async () => {
+    eventOn('era:updateByObject', async () => {
+      const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
+      await Promise.all(writeDoneListeners.map(listener => listener({
+        message_id: 7,
+        actions: { apiWrite: true },
+      })));
+    });
+
+    const result = await emitSourcedEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'default-background-write',
+      eventName: 'era:updateByObject',
+      expectedAction: 'apiWrite',
+      timeoutMessage: 'timeout',
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      attribution: 'background',
+      message_id: 7,
+      actions: { apiWrite: true },
+    }));
+    expect(eventEmitMock).toHaveBeenCalledWith(
+      ERA_VARIABLE_WRITE_DONE_EVENT,
+      expect.objectContaining({
+        attribution: 'background',
+      }),
+    );
   });
 });
