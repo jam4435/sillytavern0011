@@ -1,3 +1,5 @@
+import { eventLogger } from '../武侠/utils/logger';
+
 export const DIRECT_VARIABLE_WRITE_DONE_EVENT = 'wuxia:directVariableWriteDone';
 export const ERA_VARIABLE_WRITE_DONE_EVENT = 'wuxia:eraVariableWriteDone';
 
@@ -45,6 +47,14 @@ type EraWriteDoneLikeDetail = {
   actions?: Record<string, unknown>;
 };
 
+type EraWriteDoneSummary = {
+  rawMessageId: unknown;
+  normalizedMessageId?: number;
+  actions: Record<string, boolean> | null;
+  mk?: string;
+  consecutiveProcessingCount?: number;
+};
+
 const createVariableWriteId = (): string => {
   try {
     if (typeof crypto?.randomUUID === 'function') {
@@ -71,23 +81,54 @@ const normalizeActions = (actions: unknown): Record<string, boolean> | null => {
   return enabledActions.length > 0 ? Object.fromEntries(enabledActions) : null;
 };
 
+const summarizeEraWriteDone = (detail: unknown): EraWriteDoneSummary | { invalidDetail: true; detailType: string } => {
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) {
+    return {
+      invalidDetail: true,
+      detailType: Array.isArray(detail) ? 'array' : typeof detail,
+    };
+  }
+
+  const writeDone = detail as EraWriteDoneLikeDetail & {
+    mk?: unknown;
+    consecutiveProcessingCount?: unknown;
+  };
+  return {
+    rawMessageId: writeDone.message_id,
+    normalizedMessageId: normalizeMessageId(writeDone.message_id),
+    actions: normalizeActions(writeDone.actions),
+    mk: typeof writeDone.mk === 'string' ? writeDone.mk : undefined,
+    consecutiveProcessingCount: Number.isInteger(writeDone.consecutiveProcessingCount)
+      ? Number(writeDone.consecutiveProcessingCount)
+      : undefined,
+  };
+};
+
+const getWriteDoneMismatchReason = (
+  detail: unknown,
+  expectedMessageId?: number,
+  expectedAction?: string,
+): string | null => {
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) {
+    return `payload 不是对象: ${Array.isArray(detail) ? 'array' : typeof detail}`;
+  }
+
+  const writeDone = detail as EraWriteDoneLikeDetail;
+  if (expectedMessageId !== undefined && writeDone.message_id !== expectedMessageId) {
+    return `message_id 不匹配: expected=${expectedMessageId}, actual=${String(writeDone.message_id)}`;
+  }
+  if (expectedAction && writeDone.actions?.[expectedAction] !== true) {
+    return `actions.${expectedAction} !== true: actual=${JSON.stringify(normalizeActions(writeDone.actions))}`;
+  }
+  return null;
+};
+
 const matchesEraWriteDone = (
   detail: unknown,
   expectedMessageId?: number,
   expectedAction?: string,
 ): detail is EraWriteDoneLikeDetail => {
-  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) {
-    return false;
-  }
-
-  const writeDone = detail as EraWriteDoneLikeDetail;
-  if (expectedMessageId !== undefined && writeDone.message_id !== expectedMessageId) {
-    return false;
-  }
-  if (expectedAction && writeDone.actions?.[expectedAction] !== true) {
-    return false;
-  }
-  return true;
+  return getWriteDoneMismatchReason(detail, expectedMessageId, expectedAction) === null;
 };
 
 export async function runDirectChatVariableWrite<TResult>(
@@ -122,6 +163,18 @@ export async function emitSourcedEraVariableWriteAndWait({
   let matchedDetail: EraWriteDoneLikeDetail | undefined;
   let timer: ReturnType<typeof window.setTimeout> | null = null;
   let listener: { stop: () => void } | null = null;
+  let observedWriteDoneCount = 0;
+  let lastObservedWriteDone: EraWriteDoneSummary | { invalidDetail: true; detailType: string } | null = null;
+  let lastIgnoredReason: string | null = null;
+  const waitContext = {
+    source,
+    operation,
+    reason,
+    eventName,
+    expectedMessageId: expectedMessageId ?? null,
+    expectedAction: expectedAction ?? null,
+    timeoutMs,
+  };
   const stopListener = () => {
     if (!listener) {
       return;
@@ -133,15 +186,35 @@ export async function emitSourcedEraVariableWriteAndWait({
   const waitForWriteDone = new Promise<void>((resolve, reject) => {
     timer = window.setTimeout(() => {
       stopListener();
+      eventLogger.error('[emitSourcedEraVariableWriteAndWait] 等待 era:writeDone 超时', {
+        ...waitContext,
+        observedWriteDoneCount,
+        lastObservedWriteDone,
+        lastIgnoredReason,
+      });
       reject(new Error(timeoutMessage));
     }, timeoutMs);
 
     listener = eventOn('era:writeDone', (writeDoneDetail: unknown) => {
+      observedWriteDoneCount += 1;
+      lastObservedWriteDone = summarizeEraWriteDone(writeDoneDetail);
+      lastIgnoredReason = getWriteDoneMismatchReason(writeDoneDetail, expectedMessageId, expectedAction);
       if (!matchesEraWriteDone(writeDoneDetail, expectedMessageId, expectedAction)) {
+        eventLogger.log('[emitSourcedEraVariableWriteAndWait] 忽略不匹配的 era:writeDone', {
+          ...waitContext,
+          observedWriteDoneCount,
+          lastIgnoredReason,
+          observed: lastObservedWriteDone,
+        });
         return;
       }
 
       matchedDetail = writeDoneDetail;
+      eventLogger.log('[emitSourcedEraVariableWriteAndWait] 匹配到目标 era:writeDone', {
+        ...waitContext,
+        observedWriteDoneCount,
+        matched: lastObservedWriteDone,
+      });
       stopListener();
       if (timer) {
         window.clearTimeout(timer);
@@ -151,12 +224,18 @@ export async function emitSourcedEraVariableWriteAndWait({
   });
 
   try {
+    eventLogger.log('[emitSourcedEraVariableWriteAndWait] 开始发送事件并等待 era:writeDone', waitContext);
     await (detail === undefined ? eventEmit(eventName) : eventEmit(eventName, detail));
+    eventLogger.log('[emitSourcedEraVariableWriteAndWait] 事件已发出，开始等待匹配的 era:writeDone', waitContext);
   } catch (error) {
     stopListener();
     if (timer) {
       window.clearTimeout(timer);
     }
+    eventLogger.error('[emitSourcedEraVariableWriteAndWait] 发送事件失败', {
+      ...waitContext,
+      error,
+    });
     throw error instanceof Error ? error : new Error(String(error));
   }
 
@@ -174,6 +253,7 @@ export async function emitSourcedEraVariableWriteAndWait({
   };
 
   await eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
+  eventLogger.log('[emitSourcedEraVariableWriteAndWait] 已发送带来源的 ERA 完成事件', eventDetail);
 
   return eventDetail;
 }

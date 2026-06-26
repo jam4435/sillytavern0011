@@ -793,6 +793,11 @@ export async function executeExtraVariableUpdate({
 
   beginExtraVariableUpdate();
   try {
+    dataLogger.log('[extraVariableUpdate] 开始执行额外变量更新', {
+      assistantMessageId,
+      variableUpdateMode: settings.variableUpdateMode,
+      latestRawReplyLength: latestRawReply.length,
+    });
     await ensureVariableGuidanceDisabled();
     const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
     const prompt = await buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply });
@@ -806,11 +811,24 @@ export async function executeExtraVariableUpdate({
       generationIdPrefix: 'wuxia-variable-update',
       skipWorldInfoAndAuthorNote: true,
     });
+    dataLogger.log('[extraVariableUpdate] 额外模型已返回', {
+      assistantMessageId,
+      rawResponseLength: rawResponse.length,
+    });
     onProgress?.({ prompt, rawResponse });
     const { blocksText, actionBlockCount } = extractValidVariableBlocks(rawResponse);
+    dataLogger.log('[extraVariableUpdate] 变量块提取完成', {
+      assistantMessageId,
+      actionBlockCount,
+      blocksTextLength: blocksText.length,
+    });
     onProgress?.({ prompt, rawResponse, appendedBlocks: blocksText, actionBlockCount });
 
     if (actionBlockCount === 0 || !blocksText) {
+      dataLogger.log('[extraVariableUpdate] 没有可写入的合法动作块，跳过 ERA 同步', {
+        assistantMessageId,
+        actionBlockCount,
+      });
       return {
         appended: false,
         actionBlockCount,
@@ -820,6 +838,12 @@ export async function executeExtraVariableUpdate({
     }
 
     const appendVerification = await appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText);
+    dataLogger.log('[extraVariableUpdate] 变量块已追加到目标楼层', {
+      assistantMessageId,
+      actionBlockCount,
+      appendVerified: appendVerification.verified,
+      appendVerification: appendVerification.verification,
+    });
     onProgress?.({
       appended: true,
       actionBlockCount,
@@ -836,7 +860,13 @@ export async function executeExtraVariableUpdate({
     }
 
     try {
-      await emitSourcedEraVariableWriteAndWait({
+      dataLogger.log('[extraVariableUpdate] 开始等待 ERA 同步', {
+        assistantMessageId,
+        actionBlockCount,
+        expectedAction: 'apiWrite',
+        timeoutMs: ERA_SYNC_TIMEOUT_MS,
+      });
+      const eraWriteResult = await emitSourcedEraVariableWriteAndWait({
         source: 'frontend',
         operation: 'update',
         reason: 'extra-variable-api-write',
@@ -846,7 +876,18 @@ export async function executeExtraVariableUpdate({
         expectedMessageId: assistantMessageId,
         expectedAction: 'apiWrite',
       });
+      dataLogger.log('[extraVariableUpdate] 收到匹配的 ERA 同步完成信号', {
+        assistantMessageId,
+        actionBlockCount,
+        matchedMessageId: eraWriteResult.message_id ?? null,
+        matchedActions: eraWriteResult.actions,
+      });
     } catch (error) {
+      dataLogger.error('[extraVariableUpdate] 等待 ERA 同步失败', {
+        assistantMessageId,
+        actionBlockCount,
+        error,
+      });
       try {
         const syncReadback = readAssistantMessageActiveText(assistantMessageId);
         const syncVerification = createWriteVerification({
@@ -887,6 +928,11 @@ export async function executeExtraVariableUpdate({
       syncReadbackText: syncReadback.activeText,
       syncVerification: syncVerification.verification,
     });
+    dataLogger.log('[extraVariableUpdate] ERA 同步后回读完成', {
+      assistantMessageId,
+      syncVerified: syncVerification.verified,
+      syncVerification: syncVerification.verification,
+    });
 
     if (!syncVerification.verified) {
       throw new Error(
@@ -907,6 +953,7 @@ export async function executeExtraVariableUpdate({
       syncVerification: syncVerification.verification,
     };
   } finally {
+    dataLogger.log('[extraVariableUpdate] 本轮额外变量更新结束', { assistantMessageId });
     finishExtraVariableUpdate();
   }
 }
