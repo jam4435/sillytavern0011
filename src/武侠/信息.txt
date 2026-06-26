@@ -1,122 +1,196 @@
-【合法变量块】
-<VariableThink>
-- 剧情摘要: 墨逸、郭靖与黄蓉在张家口大酒店的饭局接近尾声。墨逸以豁达气度化解黄蓉对粗糙菜品的刁难，赢得郭靖敬佩。结账时伙计索要十九两天价，黄蓉趁机挤兑郭靖并试探墨逸。
-- 时间: 剧情推进45分钟，当前时间为1219年10月20日12时45分。
-- 事件: 主线任务 [MQ.Ⅰ_初遇郭黄] 进度推进至结账环节，即将进入赠送貂裘与黄金的关键转折点。
-- 角色: 
-    1. 墨逸：增加“结账风波”的人物经历；因展现的气度，与郭靖、黄蓉的关系进一步提升。
-    2. 郭靖：对墨逸的好感度提升。
-    3. 黄蓉：对墨逸的好奇度与好感度提升。
-- 结论: 更新世界时间，插入人物经历，修改角色关系网。
-</VariableThink>
+[wuxia-variable-trace] [useVariableChangeTracker] 处理消息边界回读 {turnId: 6, requestedMessageId: 20, resolvedMessageId: 20, finalMessageId: 20, assistantReplyLocked: true, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 处理消息边界信号 {turnId: 6, signal: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 6, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 6, batch: {…}, metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useEventListeners] 收到 era:writeDone {mk: 'era_mk_1782442656368_vyu7tm', message_id: 20, actions: {…}, selectedMks: Array(21), editLogs: {…}, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 收到变量写入信号 {turnId: 6, signal: {…}, normalized: {…}, beforeCaptureSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 6, assistantMessageId: 20, rawReplyLength: 7986, declaredChanges: Array(5), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 6, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 复用已有批次并调整归因 {turnId: 6, nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', batch: {…}, metadata: {…}, shouldMoveToAi: true, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 批次归因调整结果 {turnId: 6, aiObservedCount: 5, backgroundObservedCount: 0, aiObserved: Array(5), backgroundObserved: Array(0), …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 写入信号归因完成 {turnId: 6, signalKind: 'era', resolvedOrigin: 'ai', producer: 'era', assistantMessageId: 20, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 写入事件先到、变量快照未刷新，安排延迟补读 {turnId: 6, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}, refreshDeclaredAssistant: true}
+console.<computed> @ VM72936 log.js:10
+warn @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ event.ts:55
+EventEmitter.emit @ eventemitter.js:146
+await in EventEmitter.emit
+_eventEmit @ event.ts:119
+emitWriteDoneEvent @ command.ts:260
+dispatchAndExecuteTask @ dispatcher.ts:200
+await in dispatchAndExecuteTask
+processQueue @ queue.ts:113
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 执行延迟补读 {turnId: 6, remainingRetries: 8, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 6, assistantMessageId: 20, rawReplyLength: 7986, declaredChanges: Array(5), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 6, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 6, batch: {…}, metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 执行延迟补读 {turnId: 6, remainingRetries: 7, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 6, assistantMessageId: 20, rawReplyLength: 7986, declaredChanges: Array(5), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 6, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 6, batch: {…}, metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 执行延迟补读 {turnId: 6, remainingRetries: 6, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 6, assistantMessageId: 20, rawReplyLength: 7986, declaredChanges: Array(5), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 6, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 6, batch: {…}, metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 执行延迟补读 {turnId: 6, remainingRetries: 5, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 6, assistantMessageId: 20, rawReplyLength: 7986, declaredChanges: Array(5), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 6, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 6, batch: {…}, metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 执行延迟补读 {turnId: 6, remainingRetries: 4, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 6, assistantMessageId: 20, rawReplyLength: 7986, declaredChanges: Array(5), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 6, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 6, batch: {…}, metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 执行延迟补读 {turnId: 6, remainingRetries: 3, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 6, assistantMessageId: 20, rawReplyLength: 7986, declaredChanges: Array(5), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 6, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 6, batch: {…}, metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 执行延迟补读 {turnId: 6, remainingRetries: 2, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 6, assistantMessageId: 20, rawReplyLength: 7986, declaredChanges: Array(5), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 6, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 6, batch: {…}, metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 执行延迟补读 {turnId: 6, remainingRetries: 1, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 6, assistantMessageId: 20, rawReplyLength: 7986, declaredChanges: Array(5), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 6, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 6, batch: {…}, metadata: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 开始新回合 {turnId: 7, userMessageId: null, baselineSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', baselineTopLevelKeys: Array(8)}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 记录主回复中的变量声明 {turnId: 7, assistantMessageId: null, rawReplyLength: 6093}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 7, assistantMessageId: null, rawReplyLength: 6093, declaredChanges: Array(0), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 处理消息边界信号 {turnId: 7, signal: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 7, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，但没有找到可升级的批次 {turnId: 7, nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+console.<computed> @ VM72936 log.js:10
+warn @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 标记 assistant 楼层为 AI 写入目标 {turnId: 7, assistantMessageId: 22, aiWriteTargetIds: Array(1)}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 7, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，但没有找到可升级的批次 {turnId: 7, nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+console.<computed> @ VM72936 log.js:10
+warn @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 记录主回复中的变量声明 {turnId: 7, assistantMessageId: 22, rawReplyLength: 6093}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 7, assistantMessageId: 22, rawReplyLength: 6093, declaredChanges: Array(0), omittedDeclaredCount: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 处理消息边界信号 {turnId: 7, signal: {…}}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 7, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72936 log.js:10 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，但没有找到可升级的批次 {turnId: 7, nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
+console.<computed> @ VM72936 log.js:10
+warn @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+（匿名） @ VM72938:2
+VM72936 log.js:10 [wuxia-variable-trace] [extraVariableUpdate] 开始执行额外变量更新 {assistantMessageId: 22, variableUpdateMode: 'extra', latestRawReplyLength: 6093}
+VM72936 log.js:10 [wuxia-variable-trace] [useMessageHandler] 额外变量提示词已写入调试状态 {assistantMessageId: 22, promptLength: 44050}
+VM72936 log.js:10 [wuxia-variable-trace] [useMessageHandler] 额外变量进度更新 {assistantMessageId: 22, hasPrompt: true, promptLength: 44050, hasRawResponse: false, rawResponseLength: 0, …}
+VM72936 log.js:10 [wuxia-variable-trace] [extraVariableUpdate] 额外变量提示词已构建 {assistantMessageId: 22, promptLength: 44050, prompt: '你是《金庸群侠传》ERA 变量更新模型。你的任务是根据最新正文和当前变量上下文，补充正文造成的变量变…侠义之心颇为赞赏。"\n      }\n    }\n  }\n}\n</VariableInsert>\n'}
+VM72936 log.js:10 [wuxia-variable-trace] [extraVariableUpdate] 额外模型已返回 {assistantMessageId: 22, rawResponseLength: 1443, rawResponse: '<VariableThink>\n- 剧情摘要: 侯通海因肉瘤被泥丸击中而狂怒，大肆破坏。金国赵王府援…国官兵面前丢尽颜面。"\n      }\n    }\n  }\n}\n</VariableInsert>'}
+VM72936 log.js:10 [wuxia-variable-trace] [useMessageHandler] 额外变量进度更新 {assistantMessageId: 22, hasPrompt: true, promptLength: 44050, hasRawResponse: true, rawResponseLength: 1443, …}
+VM72936 log.js:10 [wuxia-variable-trace] [extraVariableUpdate] 变量块提取完成 {assistantMessageId: 22, actionBlockCount: 2, blocksTextLength: 1443, blocksText: '<VariableThink>\n- 剧情摘要: 侯通海因肉瘤被泥丸击中而狂怒，大肆破坏。金国赵王府援…国官兵面前丢尽颜面。"\n      }\n    }\n  }\n}\n</VariableInsert>'}
+VM72936 log.js:10 [wuxia-variable-trace] [useMessageHandler] 额外变量进度更新 {assistantMessageId: 22, hasPrompt: true, promptLength: 44050, hasRawResponse: true, rawResponseLength: 1443, …}
+VM72936 log.js:10 [wuxia-variable-trace] [extraVariableUpdate] 变量块已追加到目标楼层 {assistantMessageId: 22, actionBlockCount: 2, appendVerified: true, appendVerification: '写入后回读通过：assistant #22 / swipe #0 中存在刚追加的变量块。', appendReadbackText: '- ¿Situación actual? \n  * Tiempo: 1219, 20 de octu…国官兵面前丢尽颜面。"\n      }\n    }\n  }\n}\n</VariableInsert>'}
+VM72936 log.js:10 [wuxia-variable-trace] [useMessageHandler] 额外变量进度更新 {assistantMessageId: 22, hasPrompt: true, promptLength: 44050, hasRawResponse: true, rawResponseLength: 1443, …}
+VM72936 log.js:10 [wuxia-variable-trace] [extraVariableUpdate] 开始等待 ERA 同步 {assistantMessageId: 22, actionBlockCount: 2, expectedAction: 'apiWrite', timeoutMs: 20000}
+VM72936 log.js:10 [wuxia-variable-trace] [emitSourcedEraVariableWriteAndWait] 开始发送事件并等待 era:writeDone {source: 'frontend', operation: 'update', reason: 'extra-variable-api-write', eventName: 'era:apiWrite', expectedMessageId: 22, …}
+VM72936 log.js:10 [wuxia-variable-trace] [emitSourcedEraVariableWriteAndWait] 事件已发出，开始等待匹配的 era:writeDone {source: 'frontend', operation: 'update', reason: 'extra-variable-api-write', eventName: 'era:apiWrite', expectedMessageId: 22, …}
+VM72979:2 [wuxia-variable-trace] [useEventListeners] 收到 era:writeDone {mk: 'era_mk_1782444355919_bsb5qn', message_id: 22, actions: {…}, selectedMks: Array(23), editLogs: {…}, …}
+VM72979:2 [wuxia-variable-trace] [useVariableChangeTracker] 收到变量写入信号 {turnId: 7, signal: {…}, normalized: {…}, beforeCaptureSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72979:2 [wuxia-variable-trace] [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 7, assistantMessageId: 22, rawReplyLength: 7638, declaredChanges: Array(13), omittedDeclaredCount: 0, …}
+VM72979:2 [wuxia-variable-trace] [useVariableChangeTracker] 捕获到新的变量差分 {turnId: 7, metadata: {…}, previousSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', totalObservedCount: 13, …}
+VM72979:2 [wuxia-variable-trace] [useVariableChangeTracker] 写入信号归因完成 {turnId: 7, signalKind: 'era', resolvedOrigin: 'ai', producer: 'era', assistantMessageId: 22, …}
+VM72979:2 [wuxia-variable-trace] [useVariableChangeTracker] 处理消息边界回读 {turnId: 7, requestedMessageId: 22, resolvedMessageId: 22, finalMessageId: 22, assistantReplyLocked: true, …}
+VM72979:2 [wuxia-variable-trace] [useVariableChangeTracker] 处理消息边界信号 {turnId: 7, signal: {…}}
+VM72979:2 [wuxia-variable-trace] [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 7, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
+VM72979:2 [wuxia-variable-trace] [useVariableChangeTracker] 复用已有批次并调整归因 {turnId: 7, nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', batch: {…}, metadata: {…}, shouldMoveToAi: false, …}
+VM72979:2 [wuxia-variable-trace] [useVariableChangeTracker] 批次归因调整结果 {turnId: 7, aiObservedCount: 0, backgroundObservedCount: 13, aiObserved: Array(0), backgroundObserved: Array(13), …}
 
-<VariableEdit>
-{
-  "世界信息": {
-    "时间": {
-      "分": 45
-    }
-  },
-  "user数据": {
-    "关系网": {
-      "郭靖": "觉得其憨直质朴且赤子之心难得，对其在结账时的窘迫心生怜悯/75",
-      "黄蓉": "看出其女扮男装且古灵精怪，对其层出不穷的试探感到有趣，期待其后续表现/65"
-    }
-  },
-  "角色数据": {
-    "郭靖": {
-      "关系网": {
-        "墨逸": "觉得这位大哥不仅生得俊、懂得多，且性格随和豁达，即便面对粗茶淡饭也能从容自若，真是了不起的好汉/80"
-      }
-    },
-    "黄蓉": {
-      "关系网": {
-        "墨逸": "此人风华绝代，面对本姑娘的百般刁难竟能滴水不漏地化解，那份从容气度绝非寻常草包，倒要看看他舍不舍得这十九两银子/68"
-      }
-    }
-  }
-}
-</VariableEdit>
-
-<VariableInsert>
-{
-  "user数据": {
-    "人物经历": {
-      "结账风波": "在张家口大酒店饭后，伙计开出十九两的天价账单。面对黄蓉的言语挤兑与试探，正冷眼旁观这场有趣的结账风波。"
-    }
-  }
-}
-</VariableInsert>
-
-<变量变更条>
-变量变更
-
-AI回复
-声0/实0
-
-后台变更
-7
-
-AI回复变量
-声0 / 实0
-本轮未捕获 AI 变量声明或写入。
-
-后台变更变量
-7
-修改
-stat_data › 世界信息 › 时间 › 分
-消息补偿
 
 
-0
-→
-45
-新增
-stat_data › user数据 › 人物经历 › 结账风波
-消息补偿
-
-
-未定义
-→
-在张家口大酒店饭后，伙计开出十九两的天价账单。面对黄蓉的言语挤兑与试探，正冷眼旁观这场有趣的结账风波。
-修改
-stat_data › user数据 › 关系网 › 郭靖
-消息补偿
-
-
-觉得其憨直质朴，虽不通文雅但赤子之心难得/65
-→
-觉得其憨直质朴且赤子之心难得，对其在结账时的窘迫心生怜悯/75
-修改
-stat_data › user数据 › 关系网 › 黄蓉
-消息补偿
-
-
-看出其女扮男装且古灵精怪，正借故百般刁难，实则聪慧过人/55
-→
-看出其女扮男装且古灵精怪，对其层出不穷的试探感到有趣，期待其后续表现/65
-修改
-stat_data › 角色数据 › 郭靖 › 关系网 › 墨逸
-消息补偿
-
-
-觉得这位大哥不仅生得俊、懂得多，连志向都与自己相合，是个值得结交的好汉/75
-→
-觉得这位大哥不仅生得俊、懂得多，且性格随和豁达，即便面对粗茶淡饭也能从容自若，真是了不起的好汉/80
-修改
-stat_data › 角色数据 › 黄蓉 › 关系网 › 墨逸
-消息补偿
-
-
-此人风华绝代，面对刁难不仅不恼反而从容调侃，那份气度远胜江南草包，让人忍不住想多试探几番/62
-→
-此人风华绝代，面对本姑娘的百般刁难竟能滴水不漏地化解，那份从容气度绝非寻常草包，倒要看看他舍不舍得这十九两银子/68
-删除
-stat_data › 后续事件线索 › 射雕事件条目-第7回-01-宝马风波的后续
-消息补偿
-
-
-(1219年10月20日13时，金国/张家口/大酒店，似乎还会有事情发生)郭靖抵达张家口，将在此地遇到一位重要的人物。
-→
-未定义
-</变量变更条>
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 6, status: 'settled', userMessageId: null, assistantMessageId: 20, thoughts: Array(0), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons []
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges (5) [{…}, {…}, {…}, {…}, {…}]
+VM72936 log.js:10 [wuxia-variable-bar] batches [{…}]
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 6, status: 'settled', userMessageId: null, assistantMessageId: 20, thoughts: Array(1), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons (5) [{…}, {…}, {…}, {…}, {…}]
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches [{…}]
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 6, status: 'settled', userMessageId: null, assistantMessageId: 20, thoughts: Array(1), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons (5) [{…}, {…}, {…}, {…}, {…}]
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches [{…}]
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 6, status: 'settled', userMessageId: null, assistantMessageId: 20, thoughts: Array(1), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons (5) [{…}, {…}, {…}, {…}, {…}]
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches [{…}]
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 6, status: 'settled', userMessageId: null, assistantMessageId: 20, thoughts: Array(1), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons (5) [{…}, {…}, {…}, {…}, {…}]
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches [{…}]
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 6, status: 'settled', userMessageId: null, assistantMessageId: 20, thoughts: Array(1), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons (5) [{…}, {…}, {…}, {…}, {…}]
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches [{…}]
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 6, status: 'settled', userMessageId: null, assistantMessageId: 20, thoughts: Array(1), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons (5) [{…}, {…}, {…}, {…}, {…}]
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches [{…}]
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 6, status: 'settled', userMessageId: null, assistantMessageId: 20, thoughts: Array(1), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons (5) [{…}, {…}, {…}, {…}, {…}]
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches [{…}]
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 6, status: 'settled', userMessageId: null, assistantMessageId: 20, thoughts: Array(1), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons (5) [{…}, {…}, {…}, {…}, {…}]
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches [{…}]
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 6, status: 'settled', userMessageId: null, assistantMessageId: 20, thoughts: Array(1), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons (5) [{…}, {…}, {…}, {…}, {…}]
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches [{…}]
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 7, status: 'tracking', userMessageId: null, assistantMessageId: null, thoughts: Array(0), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons []
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches []
+VM72938:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72936 log.js:10 [wuxia-variable-bar] summary {turnId: 7, status: 'reply-recorded', userMessageId: null, assistantMessageId: 22, thoughts: Array(0), …}
+VM72936 log.js:10 [wuxia-variable-bar] aiComparisons []
+VM72936 log.js:10 [wuxia-variable-bar] backgroundChanges []
+VM72936 log.js:10 [wuxia-variable-bar] batches []
+VM72979:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72979:2 [wuxia-variable-bar] summary {turnId: 7, status: 'reply-recorded', userMessageId: null, assistantMessageId: 22, thoughts: Array(0), …}
+VM72979:2 [wuxia-variable-bar] aiComparisons []
+VM72979:2 [wuxia-variable-bar] backgroundChanges []
+VM72979:2 [wuxia-variable-bar] batches []
+VM72979:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72979:2 [wuxia-variable-bar] summary {turnId: 7, status: 'settled', userMessageId: null, assistantMessageId: 22, thoughts: Array(1), …}
+VM72979:2 [wuxia-variable-bar] aiComparisons (13) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
+VM72979:2 [wuxia-variable-bar] backgroundChanges []
+VM72979:2 [wuxia-variable-bar] batches [{…}]
+VM72979:2 [wuxia-variable-bar] [VariableChangeBar] 渲染变量变更条
+VM72979:2 [wuxia-variable-bar] summary {turnId: 7, status: 'settled', userMessageId: null, assistantMessageId: 22, thoughts: Array(1), …}
+VM72979:2 [wuxia-variable-bar] aiComparisons (13) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
+VM72979:2 [wuxia-variable-bar] backgroundChanges (13) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
+VM72979:2 [wuxia-variable-bar] batches [{…}]
