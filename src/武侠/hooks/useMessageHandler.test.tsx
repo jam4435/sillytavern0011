@@ -59,6 +59,7 @@ const getChatMessagesMock = globalThis.getChatMessages as ReturnType<typeof vi.f
 const globals = globalThis as typeof globalThis & {
   createChatMessages: ReturnType<typeof vi.fn>;
   generate: ReturnType<typeof vi.fn>;
+  eventEmit: ReturnType<typeof vi.fn>;
 };
 
 const prepareExtraVariableUpdateTurnMock = vi.mocked(prepareExtraVariableUpdateTurn);
@@ -126,6 +127,7 @@ describe('useMessageHandler extra-variable decision', () => {
     prepareExtraVariableUpdateTurnMock.mockReset();
     executeExtraVariableUpdateMock.mockReset();
     regenerateLastAssistantSwipeMock.mockReset();
+    globals.eventEmit.mockClear();
   });
 
   it('send + inline 会显式标记 skipped，且不会触发额外变量链路', async () => {
@@ -229,6 +231,7 @@ describe('useMessageHandler extra-variable decision', () => {
         skipReason: expect.stringContaining('inline'),
       }),
     });
+    expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:sync-latest-message-shell', 9);
   });
 
   it('regenerate + extra 会先记录决策，再执行 prepare 和额外变量更新', async () => {
@@ -283,6 +286,7 @@ describe('useMessageHandler extra-variable decision', () => {
         output: '<VariableEdit>{"user数据":{"修为":130}}</VariableEdit>',
       }),
     });
+    expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:sync-latest-message-shell', 12);
   });
 
   it('regenerate + extra + prepare 失败时，设置页调试仍保留 variable 决策与错误', async () => {

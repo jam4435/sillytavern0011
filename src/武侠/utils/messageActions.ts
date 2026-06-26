@@ -206,7 +206,7 @@ async function beginRegenerateSwipe(messageId: number): Promise<RegenerateSwipeT
         swipes_info: swipesInfo,
       },
     ],
-    { refresh: 'affected' },
+    { refresh: 'none' },
   );
 
   return {
@@ -252,7 +252,7 @@ async function writeGeneratedSwipe(transaction: RegenerateSwipeTransaction, resu
         swipes_info: swipesInfo,
       },
     ],
-    { refresh: 'affected' },
+    { refresh: 'none' },
   );
   return nextText;
 }
@@ -265,7 +265,7 @@ async function restorePreviousSwipe(transaction: RegenerateSwipeTransaction): Pr
         swipe_id: transaction.previousSwipeId,
       },
     ],
-    { refresh: 'affected' },
+    { refresh: 'none' },
   );
   await emitEraEventAndWait('manual_sync', {
     timeoutMessage: '重新生成失败后已切回原 swipe，但 ERA 没有确认变量恢复。',

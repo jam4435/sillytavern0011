@@ -702,6 +702,7 @@ export function useMessageHandler({
     });
 
     let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
+    let targetAssistantMessageId: number | null = null;
 
     try {
       onVariableTurnStart?.();
@@ -711,9 +712,11 @@ export function useMessageHandler({
           patchLatestDebugRound({ main: { combinedPrompt: prompt } });
         },
         onTargetAssistantResolved: assistantMessageId => {
+          targetAssistantMessageId = assistantMessageId;
           onVariableAiWriteTarget?.(assistantMessageId);
         },
       });
+      targetAssistantMessageId = result.assistantMessageId;
       onVariableAssistantReply?.(result.rawReply, result.assistantMessageId);
       patchLatestDebugRound({
         main: {
@@ -778,6 +781,10 @@ export function useMessageHandler({
     } finally {
       extraVariableUpdateReservation?.release();
       setIsLoading(false);
+      if (targetAssistantMessageId !== null) {
+        // 与发送链路一致：等待当前回合结束后再同步宿主楼层，避免中途重绑打断前端状态。
+        void eventEmit(SYNC_LATEST_MESSAGE_SHELL_EVENT, targetAssistantMessageId);
+      }
       messageLogger.log('🏁 重新生成流程结束');
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
