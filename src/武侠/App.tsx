@@ -385,7 +385,7 @@ const App: React.FC = () => {
               location: formData.locationInfo.location,
               identities: { [formData.origin]: '初入江湖的新人' },
               initialAttributes: formData.initialAttributes,
-              realm: '三流-圆满',
+              realm: '三流圆满',
               cultivation: 200,
               attributes: {
                 hp: 1000,

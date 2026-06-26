@@ -46,7 +46,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
   const age = worldTime && stats.birthYear ? worldTime.year - stats.birthYear : null;
 
   // 解析当前境界
-  const currentRealm = stats.realm || '不入流初期';
+  const currentRealm = stats.realm || '不入流';
   const realmInfo = parseRealm(currentRealm);
   const realmColor = getRealmColor(currentRealm);
 

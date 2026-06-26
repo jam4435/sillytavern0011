@@ -13,6 +13,7 @@ import {
   MIN_ATTRIBUTE_VALUE,
   MIN_LUCK_VALUE,
   ORIGIN_OPTIONS,
+  REALM_CULTIVATION_MAP,
   REALM_LEVELS,
   STORY_EVENTS,
   TALENT_TIERS,
@@ -28,6 +29,13 @@ import {
   type MartialArtsRank
 } from '../utils/martialArtsDatabase';
 import { gameLogger } from '../utils/logger';
+
+/**
+ * 从境界字符串中提取大境界名，用于派生 CSS 类名 realm-<大境界>。
+ * 兼容 OLD 格式（"三流初期" → "三流"）与裸 "不入流"（无小境界后缀，原样返回）。
+ */
+const realmMajor = (realm: string): string =>
+  realm.replace(/(初期|中期|后期|圆满)$/, '');
 
 // 武功品阶点数消耗（直接选择）- 统一到总点数池
 const RANK_POINT_COST: Record<MartialArtsRank, number> = {
@@ -131,7 +139,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   // 步骤5: 出身选择状态
   const [selectedOrigin, setSelectedOrigin] = useState<string>(ORIGIN_OPTIONS[0]?.id || '');
   const [customOrigin, setCustomOrigin] = useState('');
-  const [customRealm, setCustomRealm] = useState<RealmLevel>('三流-圆满'); // 自定义出身的境界选择
+  const [customRealm, setCustomRealm] = useState<RealmLevel>('三流圆满'); // 自定义出身的境界选择
   const [originCategoryFilter, setOriginCategoryFilter] = useState<OriginCategory | 'all'>('all'); // 出身类别筛选
   
   // 错误状态
@@ -1957,7 +1965,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   <span className="section-icon">🏠</span>
                   选择出身
                   {selectedOriginDetails && (
-                    <span className={`realm-badge realm-${selectedOriginDetails.realm.split('-')[0]}`}>
+                    <span className={`realm-badge realm-${realmMajor(selectedOriginDetails.realm)}`}>
                       {selectedOriginDetails.realm}
                     </span>
                   )}
@@ -2003,7 +2011,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                             <span className="origin-icon">{origin.icon}</span>
                             <span className="origin-name">{origin.name}</span>
                           </div>
-                          <span className={`origin-realm realm-${origin.realm.split('-')[0]}`}>
+                          <span className={`origin-realm realm-${realmMajor(origin.realm)}`}>
                             {origin.realm}
                           </span>
                           <p className="origin-desc">{origin.description}</p>
@@ -2060,7 +2068,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           <button
                             key={realm}
                             type="button"
-                            className={`realm-option ${customRealm === realm ? 'selected' : ''} realm-${realm.split('-')[0]}`}
+                            className={`realm-option ${customRealm === realm ? 'selected' : ''} realm-${realmMajor(realm)}`}
                             onClick={() => setCustomRealm(realm)}
                           >
                             {realm}
@@ -2462,7 +2470,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       </div>
                       <div className="preview-item">
                         <span className="preview-label">起始境界</span>
-                        <span className={`preview-value realm-badge realm-${(selectedOrigin === 'custom' ? customRealm : selectedOriginDetails?.realm || '不入流').split('-')[0]}`}>
+                        <span className={`preview-value realm-badge realm-${realmMajor(selectedOrigin === 'custom' ? customRealm : selectedOriginDetails?.realm || '不入流')}`}>
                           {selectedOrigin === 'custom' ? customRealm : selectedOriginDetails?.realm}
                         </span>
                       </div>
@@ -2473,24 +2481,8 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                             const { cultivation } = getOriginRealmAndCultivation(selectedOrigin);
                             // 如果是自定义出身，使用自定义境界对应的修为
                             if (selectedOrigin === 'custom' && customRealm) {
-                              const realmInfo = getOriginRealmAndCultivation('custom');
-                              // 需要重新计算自定义境界的修为
-                              const REALM_CULTIVATION_MAP: Record<RealmLevel, number> = {
-                                '不入流': 0,
-                                '三流-初入': 50,
-                                '三流-小成': 100,
-                                '三流-圆满': 200,
-                                '二流-初入': 400,
-                                '二流-小成': 600,
-                                '二流-圆满': 900,
-                                '一流-初入': 1200,
-                                '一流-小成': 1600,
-                                '一流-圆满': 2100,
-                                '绝顶-初入': 2700,
-                                '绝顶-小成': 3400,
-                                '绝顶-圆满': 4200,
-                              };
-                              return REALM_CULTIVATION_MAP[customRealm];
+                              // 自定义出身：用境界系统.json 的 realmCultivationMap 查起始修为（与 gameInitializer 同源）
+                              return REALM_CULTIVATION_MAP[customRealm] ?? 0;
                             }
                             return cultivation;
                           })()}

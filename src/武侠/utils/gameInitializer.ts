@@ -188,7 +188,7 @@ export function getOriginById(originId: string): OriginOption | undefined {
 export function getOriginRealmAndCultivation(originId: string): { realm: RealmLevel; cultivation: number } {
   const origin = getOriginById(originId);
   if (!origin) {
-    return { realm: '三流-圆满', cultivation: 200 };
+    return { realm: '三流圆满', cultivation: 200 };
   }
   const realm = origin.realm;
   const cultivation = origin.cultivation ?? REALM_CULTIVATION_MAP[realm];
