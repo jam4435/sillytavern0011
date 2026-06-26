@@ -373,6 +373,7 @@ export async function executeSummary(
       operation: 'update',
       reason: 'summary-write',
       eventName: 'era:updateByObject',
+      attribution: 'background',
       detail: updateData,
       expectedAction: 'apiWrite',
       timeoutMs: 3000,

@@ -5,6 +5,7 @@ export const ERA_VARIABLE_WRITE_DONE_EVENT = 'wuxia:eraVariableWriteDone';
 
 export type DirectVariableWriteSource = 'event-script' | 'variable-editor' | 'frontend' | 'restore';
 export type DirectVariableWriteOperation = 'insert' | 'update' | 'delete' | 'assign' | 'replace';
+export type EraVariableWriteAttribution = 'ai' | 'background';
 export type EraVariableWriteEventName =
   | 'era:apiWrite'
   | 'era:updateByObject'
@@ -25,6 +26,7 @@ export interface DirectVariableWriteDoneDetail extends DirectVariableWriteMetada
 
 export interface EraVariableWriteMetadata extends DirectVariableWriteMetadata {
   eventName: EraVariableWriteEventName;
+  attribution: EraVariableWriteAttribution;
 }
 
 export interface EraVariableWriteDoneDetail extends EraVariableWriteMetadata {
@@ -155,6 +157,7 @@ export async function emitSourcedEraVariableWriteAndWait({
   operation,
   reason,
   eventName,
+  attribution = 'background',
   detail,
   timeoutMs = 10000,
   timeoutMessage,
@@ -174,6 +177,7 @@ export async function emitSourcedEraVariableWriteAndWait({
     operation,
     reason,
     eventName,
+    attribution,
     expectedMessageId: expectedMessageId ?? null,
     expectedAction: expectedAction ?? null,
     timeoutMs,
@@ -257,6 +261,7 @@ export async function emitSourcedEraVariableWriteAndWait({
     operation,
     reason,
     eventName,
+    attribution,
     message_id: normalizeMessageId(matchedDetail?.message_id),
     actions: normalizeActions(matchedDetail?.actions),
   };

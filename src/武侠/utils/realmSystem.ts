@@ -337,6 +337,7 @@ export async function performBreakthrough(
       operation: 'update',
       reason: 'realm-breakthrough',
       eventName: 'era:updateByObject',
+      attribution: 'background',
       detail: updatePayload,
       timeoutMs: 20000,
       timeoutMessage: `境界突破到「${newRealm}」的请求已发出，但 ERA 没有确认 apiWrite 写入完成。`,

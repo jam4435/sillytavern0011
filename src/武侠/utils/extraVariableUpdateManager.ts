@@ -744,7 +744,7 @@ async function appendVariableBlocksToAssistantMessage(
           swipes_info: swipesInfo,
         },
       ],
-      { refresh: 'affected' },
+      { refresh: 'none' },
     );
   } else {
     await setChatMessages(
@@ -754,7 +754,7 @@ async function appendVariableBlocksToAssistantMessage(
           message: nextText,
         },
       ],
-      { refresh: 'affected' },
+      { refresh: 'none' },
     );
   }
 
@@ -879,6 +879,7 @@ export async function executeExtraVariableUpdate({
         operation: 'update',
         reason: 'extra-variable-api-write',
         eventName: 'era:apiWrite',
+        attribution: 'ai',
         timeoutMs: ERA_SYNC_TIMEOUT_MS,
         timeoutMessage: 'ERA 没有响应 era:apiWrite，额外变量更新已停止。',
         expectedMessageId: assistantMessageId,

@@ -86,6 +86,7 @@ export async function addExploredLocation(locationPath: string): Promise<void> {
     operation: 'update',
     reason: 'map-explored-location',
     eventName: 'era:updateByObject',
+    attribution: 'background',
     detail: {
       stat_data: {
         user数据: {

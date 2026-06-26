@@ -517,6 +517,7 @@ export async function upgradeMartialArt(
       operation: 'update',
       reason: 'martial-art-level-up',
       eventName: 'era:updateByObject',
+      attribution: 'background',
       detail: updatePayload,
       timeoutMs: 20000,
       timeoutMessage: `功法「${martialArtName}」精进请求已发出，但 ERA 没有确认 apiWrite 写入完成。`,

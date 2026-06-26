@@ -40,6 +40,7 @@ export async function decreaseItemCount(itemName: string, count: number = 1): Pr
       operation: 'delete',
       reason: 'item-write-decrease',
       eventName: 'era:deleteByPath',
+      attribution: 'background',
       detail: {
         path: `stat_data.user数据.包裹.${itemName}`,
       },
@@ -55,6 +56,7 @@ export async function decreaseItemCount(itemName: string, count: number = 1): Pr
       operation: 'update',
       reason: 'item-write-decrease',
       eventName: 'era:updateByObject',
+      attribution: 'background',
       detail: {
         stat_data: {
           user数据: {
@@ -105,6 +107,7 @@ export async function restoreItemCount(itemName: string, originalCount: number):
       operation: 'update',
       reason: 'item-write-restore',
       eventName: 'era:updateByObject',
+      attribution: 'background',
       detail: {
         stat_data: {
           user数据: {
@@ -126,6 +129,7 @@ export async function restoreItemCount(itemName: string, originalCount: number):
       operation: 'update',
       reason: 'item-write-restore',
       eventName: 'era:updateByObject',
+      attribution: 'background',
       detail: {
         stat_data: {
           user数据: {
