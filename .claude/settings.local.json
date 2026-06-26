@@ -23,7 +23,10 @@
       "PowerShell(git show bf45b68~1:dist/世界书编辑脚本/index.js 2>$null | Select-Object -First 1 | ForEach-Object { $_.Substring\\(0, 100\\) })",
       "PowerShell($content = Get-Content \"f:\\\\Develop\\\\AI\\\\sillytavern\\\\dist\\\\世界书编辑脚本\\\\index.js\" -Raw; $pattern = 'window\\\\.parent\\\\.'; $matches = [regex]::Matches\\($content, '.{0,30}' + [regex]::Escape\\($pattern\\) + '.{0,60}'\\); $matches | Select-Object -First 15 | ForEach-Object { \"$\\($_.Index\\): $\\($_.Value\\)\" })",
       "PowerShell($content = Get-Content \"f:\\\\Develop\\\\AI\\\\sillytavern\\\\dist\\\\世界书编辑脚本\\\\index.js\" -Raw; $pattern = '.{0,80}window\\\\.parent\\\\.\\\\w+.{0,80}'; $matches = [regex]::Matches\\($content, $pattern\\); $matches | Select-Object -First 20 | ForEach-Object { $_.Value })",
-      "Bash(awk 'NR==72 {print length\\($0\\)}' \"f:/Develop/AI/sillytavern/酒馆资料/era框架.txt\")"
+      "Bash(awk 'NR==72 {print length\\($0\\)}' \"f:/Develop/AI/sillytavern/酒馆资料/era框架.txt\")",
+      "Bash(awk 'NR==72' \"f:/Develop/AI/sillytavern/酒馆资料/era框架.txt\")",
+      "Bash(awk 'NR==96' \"f:/Develop/AI/sillytavern/酒馆资料/era框架.txt\")",
+      "Bash(awk 'NR==6' \"f:/Develop/AI/sillytavern/酒馆资料/era框架.txt\")"
     ]
   }
 }
