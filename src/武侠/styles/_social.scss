@@ -1,0 +1,810 @@
+// =========================================
+// 侠缘页 - 水墨册页风 (Ink-wash Album-leaf Roster)
+// =========================================
+//
+// 设计语言：明色宣纸底 + 墨 + 朱砂印，刻意反转全站默认的暗金色调，
+// 与状态页（CharacterPanel，暗底金芯片 + 下划线分隔）一眼可辨。
+// 概念：一卷展开的「江湖名册册页」—— 概览态是册页叶阵列，详情态是选中叶的展开册页。
+//
+// 仅作用于 .social-panel，不影响其它面板。组件为纯展示，只接收 npcs: NPC[]。
+
+// ---- 水墨册页色板（局部，不进 :root，避免污染全局暗色主题）----
+$social-paper: #e8dfc8; // 宣纸暖黄
+$social-paper-deep: #d9cdb0; // 宣纸深沿
+$social-paper-shadow: #c7b994; // 纸边阴影
+$social-ink: #1c1917; // 墨黑（主文字）
+$social-ink-soft: #4a4339; // 淡墨（次文字）
+$social-ink-faint: #7a6f5d; // 远墨（弱文字）
+$social-cinnabar: #9c2b22; // 朱砂（印章）
+$social-cinnabar-deep: #7a201a; // 朱砂深
+$social-cinnabar-ink: #5a1612; // 印泥暗红
+$social-gold: #8a6a2a; // 暗金描边（极少量，仅轴头）
+
+// =========================================
+// 容器：宣纸册页底
+// =========================================
+
+.social-panel {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  // 宣纸渐变底：中心偏亮，边缘渐深，模拟纸的受光与泛黄
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255, 250, 235, 0.55), transparent 70%),
+    linear-gradient(160deg, $social-paper 0%, $social-paper-deep 100%);
+  color: $social-ink;
+  font-family: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  border: 1px solid rgba(120, 100, 60, 0.28);
+  // 极淡纸纹：细噪点叠加，避免纯色塑料感
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image: url('https://www.transparenttextures.com/patterns/cream-paper.png');
+    mix-blend-mode: multiply;
+  }
+  // 角落墨晕：四角各一抹淡墨，营造水墨晕染
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 6% 8%, rgba(28, 25, 23, 0.1) 0%, transparent 14%),
+      radial-gradient(circle at 96% 92%, rgba(28, 25, 23, 0.08) 0%, transparent 16%);
+  }
+  overflow: hidden;
+}
+
+// 卷轴轴头横饰 —— 名册顶端的木质轴端，标识「这是一卷展开的册页」
+.social-scroll-frame {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1.25rem 0.75rem;
+  border-bottom: 1px solid rgba(74, 67, 57, 0.25);
+  background: linear-gradient(180deg, rgba(255, 250, 235, 0.4), transparent);
+  z-index: 2;
+}
+
+// 轴头圆柱端饰（左右各一）
+.social-scroll-cap {
+  flex-shrink: 0;
+  width: 14px;
+  height: 26px;
+  border-radius: 7px / 13px;
+  background: linear-gradient(90deg, #5a4626 0%, #8a6a2a 45%, #5a4626 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 235, 180, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.social-scroll-title {
+  margin: 0;
+  font-family: 'Ma Shan Zheng', 'LXGW WenKai', 'Songti SC', serif;
+  font-size: 1.5rem;
+  letter-spacing: 0.2em;
+  color: $social-ink;
+  text-shadow: 0 1px 0 rgba(255, 250, 235, 0.6);
+}
+
+.social-scroll-count {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.4rem;
+  font-size: 0.8rem;
+  font-family: 'Noto Serif SC', serif;
+  color: #fff5f1;
+  background: $social-cinnabar;
+  border: 1.5px solid $social-cinnabar-deep;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  // 朱砂印的轻微不规则边：用内阴影模拟印泥压痕
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+// =========================================
+// 主体布局：名册 + 展开册页
+// =========================================
+
+.social-body {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 0;
+  min-height: 0; // 允许子区滚动
+  z-index: 2;
+  overflow: hidden;
+}
+
+// =========================================
+// 左：江湖名册（册页叶阵列）
+// =========================================
+
+.social-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 1.1rem 1rem 1.25rem;
+  overflow-y: auto;
+  border-right: 1px solid rgba(74, 67, 57, 0.22);
+  // 名册侧更浓的纸色，与详情册页区分
+  background: linear-gradient(180deg, rgba(255, 250, 235, 0.18), transparent 60%);
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(74, 67, 57, 0.3);
+    border-radius: 3px;
+  }
+}
+
+// 分组标题：墨色竖排感小标题 + 朱砂方印计数
+.social-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.social-group-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0 0.15rem;
+}
+
+// 墨色短竖线（代替状态页的金菱形子弹点）
+.social-group-rule {
+  flex-shrink: 0;
+  width: 3px;
+  height: 1.1rem;
+  background: $social-ink;
+  border-radius: 1px;
+}
+
+.social-group-title {
+  margin: 0;
+  font-family: 'Ma Shan Zheng', 'LXGW WenKai', 'Songti SC', serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.14em;
+  color: $social-ink;
+}
+
+.social-group-count {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  font-size: 0.72rem;
+  font-family: 'Noto Serif SC', serif;
+  color: #fff5f1;
+  background: $social-cinnabar;
+  border: 1.5px solid $social-cinnabar-deep;
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.social-group-leaves {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+// 册页叶卡片
+.social-leaf {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0.6rem;
+  min-height: 56px; // 触控达标
+  padding: 0.65rem 0.7rem 0.6rem;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  background: rgba(255, 252, 240, 0.45);
+  border: 1px solid rgba(74, 67, 57, 0.22);
+  border-radius: 2px;
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+
+  // 叶片左缘的墨色装订线（册页装订感）
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 14%;
+    bottom: 14%;
+    width: 2px;
+    background: rgba(28, 25, 23, 0.35);
+  }
+
+  &:hover {
+    background: rgba(255, 252, 240, 0.7);
+    border-color: rgba(74, 67, 57, 0.4);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+
+  &.is-selected {
+    background: rgba(255, 252, 240, 0.85);
+    border-color: $social-ink;
+    box-shadow:
+      0 3px 10px rgba(60, 50, 30, 0.18),
+      inset 0 0 0 1px rgba(255, 250, 235, 0.5);
+    transform: translateY(-1px);
+
+    &::before {
+      background: $social-ink;
+      top: 0;
+      bottom: 0;
+    }
+  }
+}
+
+.social-leaf-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-left: 0.35rem;
+}
+
+.social-leaf-name {
+  font-family: 'Ma Shan Zheng', 'LXGW WenKai', 'Songti SC', serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.06em;
+  color: $social-ink;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.social-leaf-sub {
+  font-size: 0.78rem;
+  color: $social-ink-soft;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// 朱砂关系印（叶右侧，一眼可识等级）
+.social-leaf-seal {
+  flex-shrink: 0;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  font-family: 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: 1.15rem;
+  color: #fff5f1;
+  background: $social-cinnabar;
+  border: 2px solid $social-cinnabar-deep;
+  border-radius: 3px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    inset 0 0 0 1px rgba(255, 245, 240, 0.18);
+  // 印章轻微倾斜，模拟手盖印的随性
+  transform: rotate(-4deg);
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.25);
+
+  // 印面等级变体（由组件加修饰类）
+  &.seal-local {
+    background: #3f6e5a;
+    border-color: #2c5240;
+  }
+  &.seal-faint {
+    background: rgba(120, 111, 93, 0.55);
+    border-color: rgba(74, 67, 57, 0.5);
+    color: rgba(255, 250, 235, 0.9);
+  }
+  &.seal-first {
+    background: rgba(120, 111, 93, 0.7);
+    border-color: rgba(74, 67, 57, 0.55);
+  }
+}
+
+// 墨痕进度条（编码 relationship 0-100，朱砂渐隐）
+.social-ink-track {
+  position: absolute;
+  left: 0.7rem;
+  right: 0.7rem;
+  bottom: 0.4rem;
+  height: 2px;
+  background: rgba(74, 67, 57, 0.18);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.social-ink-fill {
+  height: 100%;
+  background: linear-gradient(90deg, $social-cinnabar-ink, $social-cinnabar 70%, transparent 100%);
+  border-radius: 1px;
+  transition: width 0.3s ease;
+}
+
+// 空分组占位：飞白虚线 + 淡墨
+.social-group-empty {
+  padding: 0.7rem 0.6rem;
+  font-size: 0.82rem;
+  color: $social-ink-faint;
+  border: 1px dashed rgba(74, 67, 57, 0.3);
+  border-radius: 2px;
+  background: rgba(255, 252, 240, 0.25);
+}
+
+// =========================================
+// 右：展开册页（详情）
+// =========================================
+
+.social-detail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.4rem 1.6rem 1.6rem;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(74, 67, 57, 0.3);
+    border-radius: 3px;
+  }
+}
+
+// 移动端返回条（仅 <768px 显示）
+.social-detail-back {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  margin: 0 0 0.9rem;
+  padding: 0.35rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: $social-ink;
+  background: transparent;
+  border: 1px solid rgba(74, 67, 57, 0.3);
+  border-radius: 2px;
+  cursor: pointer;
+
+  &:active {
+    background: rgba(28, 25, 23, 0.08);
+  }
+}
+
+.social-detail-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  animation: socialLeafOpen 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes socialLeafOpen {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// 页首：水墨剪影头像 + 大名 + 身份 + 朱砂印
+.social-hero {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid rgba(74, 67, 57, 0.25);
+}
+
+// 水墨剪影头像（CSS 渐变 + 名字首字阴文，非灰底方块）
+.social-portrait-ink {
+  position: relative;
+  flex-shrink: 0;
+  width: 5rem;
+  height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(28, 25, 23, 0.88) 0%, rgba(28, 25, 23, 0.78) 55%, transparent 78%),
+    radial-gradient(circle at 50% 120%, rgba(28, 25, 23, 0.5) 0%, transparent 60%),
+    rgba(255, 252, 240, 0.4);
+  border: 1px solid rgba(74, 67, 57, 0.35);
+  border-radius: 2px;
+  overflow: hidden;
+
+  // 飞白毛边：用内阴影模拟墨边不规则
+  box-shadow: inset 0 0 6px rgba(28, 25, 23, 0.3);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 70%, transparent 60%, rgba(255, 250, 235, 0.25) 80%);
+    pointer-events: none;
+  }
+}
+
+.social-portrait-glyph {
+  position: relative;
+  z-index: 1;
+  font-family: 'Ma Shan Zheng', 'Songti SC', serif;
+  font-size: 2.6rem;
+  color: rgba(255, 250, 235, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.social-hero-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.social-hero-name {
+  margin: 0;
+  font-family: 'Ma Shan Zheng', 'LXGW WenKai', 'Songti SC', serif;
+  font-size: 2rem;
+  letter-spacing: 0.08em;
+  color: $social-ink;
+  line-height: 1.1;
+}
+
+.social-hero-role {
+  font-size: 0.9rem;
+  color: $social-cinnabar-deep;
+  letter-spacing: 0.08em;
+}
+
+.social-hero-loc {
+  font-size: 0.8rem;
+  color: $social-ink-faint;
+}
+
+.social-hero-seal {
+  align-self: flex-start;
+  width: 2.6rem;
+  height: 2.6rem;
+  font-size: 1.45rem;
+}
+
+// 墨匾区块标题（功法根基等）
+.social-plaque {
+  position: relative;
+  padding: 0.9rem 1rem 1rem;
+  background: rgba(255, 252, 240, 0.4);
+  border: 1px solid rgba(74, 67, 57, 0.25);
+  border-radius: 2px;
+}
+
+.social-plaque-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.8rem;
+  font-family: 'Ma Shan Zheng', 'LXGW WenKai', serif;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  color: $social-ink;
+
+  svg,
+  .icon-wrap {
+    color: $social-cinnabar-deep;
+  }
+}
+
+.social-plaque-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+// 朱砂边小印（品阶 / 掌握）
+.social-tag-seal {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.82rem;
+  font-family: 'Noto Serif SC', serif;
+  color: $social-cinnabar-deep;
+  background: rgba(156, 43, 34, 0.08);
+  border: 1px solid rgba(156, 43, 34, 0.45);
+  border-radius: 2px;
+
+  &.tag-muted {
+    color: $social-ink-soft;
+    background: rgba(74, 67, 57, 0.06);
+    border-color: rgba(74, 67, 57, 0.3);
+  }
+}
+
+.social-plaque-desc {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: $social-ink;
+  text-indent: 2em;
+}
+
+// 特性：朱砂阴文标签组
+.social-traits {
+  padding-top: 0.8rem;
+  border-top: 1px dashed rgba(74, 67, 57, 0.28);
+}
+
+.social-traits-label {
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  color: $social-ink-faint;
+  letter-spacing: 0.1em;
+}
+
+.social-trait {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.15rem 0.55rem;
+  margin: 0.2rem 0.35rem 0.2rem 0;
+  font-size: 0.85rem;
+  background: rgba(255, 252, 240, 0.6);
+  border: 1px solid rgba(156, 43, 34, 0.35);
+  border-radius: 2px;
+
+  .social-trait-name {
+    color: $social-cinnabar-deep;
+    font-weight: 600;
+  }
+  .social-trait-desc {
+    color: $social-ink-soft;
+  }
+}
+
+// 双栏：重要物品 / 人情世故
+.social-twin {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.4rem;
+}
+
+.social-twin-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+// 墨色小标题 + 飞白分隔（非状态页的金色下划线）
+.social-col-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'Ma Shan Zheng', 'LXGW WenKai', serif;
+  font-size: 0.98rem;
+  letter-spacing: 0.1em;
+  color: $social-ink;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px dashed rgba(74, 67, 57, 0.3);
+}
+
+.social-col-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: $social-ink-soft;
+
+  li {
+    list-style: '· ';
+    padding-left: 0.15rem;
+  }
+}
+
+// 空态：淡墨「无」字
+.social-col-empty {
+  font-family: 'Ma Shan Zheng', 'Songti SC', serif;
+  font-size: 1.3rem;
+  color: rgba(122, 111, 93, 0.55);
+  letter-spacing: 0.1em;
+}
+
+// 生平往事：宣纸长卷
+.social-bio-title {
+  margin: 0 0 0.6rem;
+  font-family: 'Ma Shan Zheng', 'LXGW WenKai', serif;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  color: $social-ink;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px dashed rgba(74, 67, 57, 0.3);
+}
+
+.social-bio-text {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.85;
+  color: $social-ink;
+  text-indent: 2em;
+  white-space: pre-wrap;
+}
+
+// 行动按钮：墨描边 + 朱砂悬停
+.social-actions {
+  display: flex;
+  gap: 0.9rem;
+  padding-top: 1.1rem;
+  margin-top: auto;
+  border-top: 1px solid rgba(74, 67, 57, 0.25);
+}
+
+.social-action-btn {
+  flex: 1;
+  padding: 0.65rem 0.8rem;
+  font-family: 'Ma Shan Zheng', 'LXGW WenKai', serif;
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  color: $social-ink;
+  background: transparent;
+  border: 1px solid $social-ink;
+  border-radius: 2px;
+  cursor: pointer;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease;
+
+  &:hover {
+    color: #fff5f1;
+    background: $social-cinnabar;
+    border-color: $social-cinnabar-deep;
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+// =========================================
+// 空态（无 NPC）—— 水墨皮肤
+// =========================================
+
+.social-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  padding: 2rem;
+}
+
+.social-empty-ink {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(28, 25, 23, 0.32) 0%, rgba(28, 25, 23, 0.18) 50%, transparent 75%);
+  filter: blur(0.5px);
+}
+
+.social-empty-text {
+  margin: 0;
+  font-family: 'Ma Shan Zheng', 'LXGW WenKai', 'Songti SC', serif;
+  font-size: 1.2rem;
+  letter-spacing: 0.2em;
+  color: $social-ink-soft;
+}
+
+// =========================================
+// 响应式：手机端 <768px —— 整页切换（名册 ↔ 详情）
+// =========================================
+
+@media (max-width: 768px) {
+  .social-body {
+    grid-template-columns: 1fr;
+  }
+
+  .social-roster {
+    border-right: none;
+    border-bottom: 1px solid rgba(74, 67, 57, 0.22);
+  }
+
+  // 默认显示名册，详情滑出屏幕右侧；翻开时名册隐藏、详情滑入
+  .social-detail {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    padding: 1rem 0.9rem calc(1.1rem + env(safe-area-inset-bottom, 0px));
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255, 250, 235, 0.55), transparent 70%),
+      linear-gradient(160deg, $social-paper 0%, $social-paper-deep 100%);
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .social-body.detail-open .social-detail {
+    transform: translateX(0);
+  }
+
+  .social-body.detail-open .social-roster {
+    // 名册留在原地但被详情遮住；此处保留可见性以便返回时无重排
+    visibility: visible;
+  }
+
+  .social-detail-back {
+    display: inline-flex;
+  }
+
+  .social-leaf-name {
+    font-size: 1.2rem;
+  }
+}
+
+// 超窄屏 <640px —— 详情内双栏堆叠
+@media (max-width: 640px) {
+  .social-twin {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
+
+  .social-hero {
+    gap: 0.85rem;
+  }
+
+  .social-portrait-ink {
+    width: 4.2rem;
+    height: 4.2rem;
+  }
+
+  .social-portrait-glyph {
+    font-size: 2.1rem;
+  }
+
+  .social-hero-name {
+    font-size: 1.7rem;
+  }
+
+  .social-scroll-title {
+    font-size: 1.3rem;
+  }
+}
+
+// 尊重「减少动效」偏好
+@media (prefers-reduced-motion: reduce) {
+  .social-leaf,
+  .social-detail,
+  .social-detail-inner,
+  .social-action-btn,
+  .social-ink-fill {
+    transition: none !important;
+    animation: none !important;
+  }
+}

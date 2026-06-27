@@ -20,6 +20,9 @@
 // 变量定义（必须最先导入）
 @import 'variables';
 
+// 字体加载（@import url 必须紧随变量之后、先于其它规则，以符合 CSS @import 顺序规范）
+@import 'fonts';
+
 // 基础样式
 @import 'reset';
 
@@ -32,6 +35,7 @@
 @import 'chat';
 @import 'modal';
 @import 'panels';
+@import 'social';
 @import 'events';
 @import 'save-load';
 

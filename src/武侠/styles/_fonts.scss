@@ -1,0 +1,18 @@
+// =========================================
+// 墨剑录 - 字体加载
+// =========================================
+//
+// 这些字体原本只在 variables.scss 里声明 font-family，从未真正 @import，
+// 运行时全部回落到系统宋体，水墨/书法观感不成立。这里通过 CDN 真正加载：
+//   - Ma Shan Zheng：毛笔楷，用于显示/NPC 名字（var(--font-display)）
+//   - LXGW WenKai：霞鹜文楷，正文楷体（_chat.scss 已引用，此处补齐）
+//   - Noto Serif SC：衬线兜底（var(--font-serif)）
+//
+// 该前端运行在酒馆助手无沙盒 iframe 内，可访问公网 CDN
+// （_layout.scss 已引用 Unsplash、Modal.tsx 已引用 transparenttextures.com）。
+// 若 CDN 不可达，variables.scss 的 fallback 链会优雅降级到 Songti SC / SimSun / serif。
+//
+// @import 必须出现在 SCSS 文件最顶部（CSS 规范要求 @import 先于其它规则）。
+
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+@import url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css');
