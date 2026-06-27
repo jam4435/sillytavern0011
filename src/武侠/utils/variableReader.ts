@@ -48,6 +48,7 @@ type TavernChatMessage = {
  * 实际变量存储在 user数据.[用户名] 下
  */
 interface UserProfile {
+  用户名?: string;
   性别?: string;
   外貌?: string;
   出生年份?: number;
@@ -211,6 +212,8 @@ interface GameVariables {
   // 允许其他未知字段
   [key: string]: unknown;
 }
+
+type LegacySocialNpc = NonNullable<NonNullable<GameVariables['侠缘']>[number]>;
 
 export type GameSessionState = 'empty' | 'opening' | 'active';
 
@@ -806,26 +809,217 @@ function parseEvents(variables: GameVariables): GameEvent[] {
 }
 
 /**
- * 将变量表中的侠缘转换为 NPC[] 结构
+ * 将人物经历统一格式化为前端可读文本
  */
-function parseSocial(侠缘?: GameVariables['侠缘']): NPC[] {
-  if (!侠缘 || !Array.isArray(侠缘)) return [];
+function formatBiographySummary(biography?: Record<string, string> | string): string {
+  if (!biography) return '';
+  if (typeof biography === 'string') return biography;
 
-  return 侠缘.map((npc, index) => ({
-    id: `npc_${index}`,
-    name: npc.姓名 || '未知人物',
-    relationship: npc.关系值 ?? 0,
+  return Object.entries(biography)
+    .filter(([key, value]) => !key.startsWith('$') && Boolean(value))
+    .map(([key, value]) => (key ? `【${key}】${value}` : value))
+    .join('\n');
+}
+
+function formatNetworkSummary(network?: Record<string, string> | string[]): string[] {
+  if (!network) return [];
+  if (Array.isArray(network)) {
+    return network.filter(Boolean);
+  }
+
+  return Object.entries(network)
+    .filter(([name]) => Boolean(name) && !name.startsWith('$'))
+    .map(([name, relation]) => (relation ? `${name}（${relation}）` : name));
+}
+
+function getPrimaryIdentityTitle(
+  identities?: Record<string, string>,
+  fallbackType?: string,
+): string {
+  const identityTitle = identities
+    ? Object.keys(identities).find(name => Boolean(name) && !name.startsWith('$'))
+    : undefined;
+
+  return identityTitle || fallbackType || '江湖人士';
+}
+
+function getPrimaryMartialArtTemplate(
+  characterData?: CharacterData,
+  legacyNpc?: LegacySocialNpc,
+): NPC['template'] {
+  const primaryMartialArt = characterData?.功法
+    ? Object.entries(characterData.功法).find(([name]) => !name.startsWith('$'))?.[1]
+    : undefined;
+
+  return {
+    type: getPrimaryIdentityTitle(characterData?.身份, primaryMartialArt?.类型),
+    martialArtsDescription: primaryMartialArt?.功法描述 || legacyNpc?.武功描述 || '',
+    martialArtsRank: primaryMartialArt?.功法品阶 || legacyNpc?.武功品阶 || '普通',
+    mastery: primaryMartialArt?.掌握程度 || legacyNpc?.掌握程度 || '入门',
+    traits: primaryMartialArt?.特性 || legacyNpc?.特性 || {},
+  };
+}
+
+function getCharacterKeyItems(characterData?: CharacterData, legacyNpc?: LegacySocialNpc): string[] {
+  const characterItems = characterData?.重要物品
+    ? Object.keys(characterData.重要物品).filter(name => Boolean(name) && !name.startsWith('$'))
+    : [];
+
+  if (characterItems.length > 0) {
+    return characterItems;
+  }
+
+  return legacyNpc?.重要物品 || [];
+}
+
+function createCharacterNpc(
+  name: string,
+  characterData: CharacterData,
+  category: NPC['category'],
+  relationshipLabel?: string,
+  legacyNpc?: LegacySocialNpc,
+): NPC {
+  return {
+    id: `npc:${category}:${name}`,
+    name,
+    relationship: legacyNpc?.关系值 ?? 0,
+    relationshipLabel: relationshipLabel?.trim() || undefined,
+    category,
+    location: characterData.所在位置 || undefined,
+    template: getPrimaryMartialArtTemplate(characterData, legacyNpc),
+    keyItems: getCharacterKeyItems(characterData, legacyNpc),
+    biography: formatBiographySummary(characterData.人物经历) || legacyNpc?.人物经历 || '',
+    network: formatNetworkSummary(characterData.关系网).length > 0
+      ? formatNetworkSummary(characterData.关系网)
+      : formatNetworkSummary(legacyNpc?.关系网),
+  };
+}
+
+function createLegacySocialNpc(
+  legacyNpc: LegacySocialNpc,
+  category: NPC['category'],
+  relationshipLabel?: string,
+): NPC {
+  const name = legacyNpc.姓名?.trim() || '未知人物';
+
+  return {
+    id: `npc:${category}:${name}`,
+    name,
+    relationship: legacyNpc.关系值 ?? 0,
+    relationshipLabel: relationshipLabel?.trim() || undefined,
+    category,
     template: {
       type: '江湖人士',
-      martialArtsDescription: npc.武功描述 || '',
-      martialArtsRank: npc.武功品阶 || '普通',
-      mastery: npc.掌握程度 || '入门',
-      traits: npc.特性 || {},
+      martialArtsDescription: legacyNpc.武功描述 || '',
+      martialArtsRank: legacyNpc.武功品阶 || '普通',
+      mastery: legacyNpc.掌握程度 || '入门',
+      traits: legacyNpc.特性 || {},
     },
-    keyItems: npc.重要物品 || [],
-    biography: npc.人物经历 || '',
-    network: npc.关系网 || [],
-  }));
+    keyItems: legacyNpc.重要物品 || [],
+    biography: legacyNpc.人物经历 || '',
+    network: formatNetworkSummary(legacyNpc.关系网),
+  };
+}
+
+function createPlaceholderNpc(
+  name: string,
+  category: NPC['category'],
+  relationshipLabel?: string,
+): NPC {
+  return {
+    id: `npc:${category}:${name}`,
+    name,
+    relationship: 0,
+    relationshipLabel: relationshipLabel?.trim() || undefined,
+    category,
+    template: {
+      type: '江湖人士',
+      martialArtsDescription: '',
+      martialArtsRank: '未知',
+      mastery: '未知',
+      traits: {},
+    },
+    keyItems: [],
+    biography: '',
+    network: [],
+  };
+}
+
+function isCharacterDataRecord(value: unknown): value is CharacterData {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * 按现有变量结构组装侠缘页人物列表：
+ * 1. 相识人物来源于 user数据.关系网
+ * 2. 所在地区人物来源于与 user数据.所在位置 相同的角色数据
+ * 3. 所在地区人物不得与相识人物重复显示
+ */
+function parseSocial(variables: GameVariables, 用户档案?: UserProfile): NPC[] {
+  const legacySocialList = Array.isArray(variables.侠缘) ? variables.侠缘 : [];
+  const legacyByName = new Map<string, LegacySocialNpc>();
+  for (const npc of legacySocialList) {
+    const name = npc.姓名?.trim();
+    if (name) {
+      legacyByName.set(name, npc);
+    }
+  }
+
+  const relationshipNetwork = 用户档案?.关系网 || {};
+  const acquaintanceNames = Object.keys(relationshipNetwork).filter(name => Boolean(name) && !name.startsWith('$'));
+  const currentLocation = 用户档案?.所在位置?.trim();
+  const characterRecords = variables.角色数据 || {};
+  const userName = 用户档案?.用户名?.trim();
+  const seenNames = new Set<string>();
+  const result: NPC[] = [];
+
+  for (const rawName of acquaintanceNames) {
+    const name = rawName.trim();
+    if (!name || name === userName || seenNames.has(name)) {
+      continue;
+    }
+
+    const relationshipLabel = relationshipNetwork[rawName];
+    const characterRecord = characterRecords[name];
+    const legacyNpc = legacyByName.get(name);
+
+    if (isCharacterDataRecord(characterRecord)) {
+      result.push(createCharacterNpc(name, characterRecord, 'acquaintance', relationshipLabel, legacyNpc));
+    } else if (legacyNpc) {
+      result.push(createLegacySocialNpc(legacyNpc, 'acquaintance', relationshipLabel));
+    } else {
+      result.push(createPlaceholderNpc(name, 'acquaintance', relationshipLabel));
+    }
+
+    seenNames.add(name);
+  }
+
+  if (!currentLocation) {
+    return result;
+  }
+
+  for (const [rawName, characterRecord] of Object.entries(characterRecords)) {
+    const name = rawName.trim();
+
+    if (
+      !name ||
+      name.startsWith('$') ||
+      name === userName ||
+      seenNames.has(name) ||
+      !isCharacterDataRecord(characterRecord)
+    ) {
+      continue;
+    }
+
+    if (characterRecord.所在位置?.trim() !== currentLocation) {
+      continue;
+    }
+
+    result.push(createCharacterNpc(name, characterRecord, 'local', undefined, legacyByName.get(name)));
+    seenNames.add(name);
+  }
+
+  return result;
 }
 
 /**
@@ -2513,7 +2707,7 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
   state.events = parseEvents(variables);
 
   // 社交
-  state.social = parseSocial(variables.侠缘);
+  state.social = parseSocial(variables, 用户档案);
 
   return state;
 }

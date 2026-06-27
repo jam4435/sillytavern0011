@@ -108,6 +108,9 @@ export interface NPC {
   id: string;
   name: string;
   relationship: number;
+  relationshipLabel?: string;
+  category: 'acquaintance' | 'local';
+  location?: string;
   template: {
     type: string;
     martialArtsDescription: string;
