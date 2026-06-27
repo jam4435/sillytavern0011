@@ -1,7 +1,7 @@
 import { LocateFixed, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mapImageUrl from '../地图.jpg?url';
-import { MAP_HEIGHT, MAP_WIDTH } from '../data/mapCoordinates';
+import { DISPLAY_AREA_MARKERS, MAP_HEIGHT, MAP_WIDTH } from '../data/mapCoordinates';
 import { MapArea, MapCoordinate, MapData, MapRegion } from '../types';
 import LocationPopover from './LocationPopover';
 
@@ -522,15 +522,19 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
           </g>
         )}
 
-        {Object.entries(mapData).map(([areaName, area]: [string, MapArea]) => (
-          <g key={areaName} className="area-marker" aria-hidden="true">
-            <path
-              className="area-seal"
-              d={`M ${area.坐标.x} ${area.坐标.y - 14} L ${area.坐标.x + 14} ${area.坐标.y} L ${area.坐标.x} ${area.坐标.y + 14} L ${area.坐标.x - 14} ${area.坐标.y} Z`}
-            />
-            <text x={area.坐标.x} y={area.坐标.y - 25} textAnchor="middle">
-              {areaName}
-            </text>
+        {DISPLAY_AREA_MARKERS.map(marker => (
+          <g
+            key={marker.label}
+            className="area-marker"
+            transform={`translate(${marker.coordinate.x} ${marker.coordinate.y})`}
+            aria-hidden="true"
+          >
+            <g transform={`scale(${1 / camera.zoom})`}>
+              <path className="area-seal" d="M 0 -14 L 14 0 L 0 14 L -14 0 Z" />
+              <text x="0" y="-25" textAnchor="middle">
+                {marker.label}
+              </text>
+            </g>
           </g>
         ))}
 

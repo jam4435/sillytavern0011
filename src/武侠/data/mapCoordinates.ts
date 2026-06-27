@@ -7,10 +7,21 @@ export const AREA_COORDINATES: Record<string, MapCoordinate> = {
   海外: { x: 1245, y: 690 },
   大宋: { x: 970, y: 730 },
   大理: { x: 700, y: 760 },
-  西域: { x: 365, y: 520 },
+  西域: { x: 520, y: 395 },
   蒙古: { x: 760, y: 225 },
-  金国: { x: 1190, y: 300 },
+  金国: { x: 1008, y: 430 },
 };
+
+export const DISPLAY_AREA_MARKERS: Array<{ label: string; coordinate: MapCoordinate }> = [
+  { label: '海外', coordinate: AREA_COORDINATES.海外 },
+  { label: '大宋', coordinate: AREA_COORDINATES.大宋 },
+  { label: '大理', coordinate: AREA_COORDINATES.大理 },
+  { label: '吐蕃', coordinate: { x: 365, y: 520 } },
+  { label: '西域', coordinate: AREA_COORDINATES.西域 },
+  { label: '蒙古', coordinate: AREA_COORDINATES.蒙古 },
+  { label: '金国', coordinate: AREA_COORDINATES.金国 },
+  { label: '大清', coordinate: { x: 1190, y: 300 } },
+];
 
 export const AREA_DESCRIPTIONS: Record<string, string> = {
   海外: '烟波浩渺，孤岛藏奇',

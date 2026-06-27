@@ -15,10 +15,10 @@ import { gameLogger } from '../../utils/logger';
 interface MapPanelProps {
   currentLocation: string;
   plannedLocations?: string[];
-  onTravelCommand?: (locationPath: string) => void;
+  onDestinationSelect?: (locationPath: string) => void;
 }
 
-export const MapPanel: React.FC<MapPanelProps> = ({ currentLocation, plannedLocations = [], onTravelCommand }) => {
+export const MapPanel: React.FC<MapPanelProps> = ({ currentLocation, plannedLocations = [], onDestinationSelect }) => {
   const [mapData, setMapData] = useState<MapData>({});
   const [exploredLocations, setExploredLocations] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,8 +52,8 @@ export const MapPanel: React.FC<MapPanelProps> = ({ currentLocation, plannedLoca
   const handleLocationClick = (locationPath: string) => {
     gameLogger.log('[MapPanel] 点击地点:', locationPath);
     setIsIndexOpen(false);
-    if (onTravelCommand) {
-      onTravelCommand(locationPath);
+    if (onDestinationSelect) {
+      onDestinationSelect(locationPath);
     }
   };
 

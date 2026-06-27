@@ -36,6 +36,7 @@ import {
 import { ActivePanel } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
+import { getUserCurrentLocation } from './utils/mapUtils';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
 import {
   applyRegexRules,
@@ -89,7 +90,7 @@ const App: React.FC = () => {
     currentOptions,
     setCurrentOptions,
   } = useGameState();
-  const { commands, addTravelCommand, cancelCommand, sendAllCommands } = useCommandQueue();
+  const { commands, setTravelCommand, cancelCommand, sendAllCommands } = useCommandQueue();
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
@@ -97,6 +98,7 @@ const App: React.FC = () => {
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
   const [isCommandQueueOpen, setIsCommandQueueOpen] = useState(false);
+  const [mapDraftDestination, setMapDraftDestination] = useState<string | null>(null);
   const {
     variableChanges,
     handleVariableTurnStart,
@@ -309,16 +311,35 @@ const App: React.FC = () => {
     [displaySettings, currentPresetName],
   );
   const variableEditorCapability = useMemo(() => resolveVariableEditorCapability(), []);
-  const plannedLocations = useMemo(
+  const queuedTravelLocations = useMemo(
     () =>
       commands.flatMap(command => (command.type === 'TRAVEL' && command.data.location ? [command.data.location] : [])),
     [commands],
+  );
+  const mapPreviewLocations = useMemo(
+    () => (mapDraftDestination ? [mapDraftDestination] : queuedTravelLocations),
+    [mapDraftDestination, queuedTravelLocations],
   );
 
   const handleSendQueuedCommands = useCallback(async () => {
     await sendAllCommands(handleSendMessage);
     setIsCommandQueueOpen(false);
   }, [handleSendMessage, sendAllCommands]);
+
+  const handleMapNavClick = useCallback(() => {
+    setMapDraftDestination(null);
+    handleNavClick(ActivePanel.MAP);
+  }, [handleNavClick]);
+
+  const handleModalClose = useCallback(() => {
+    if (activePanel === ActivePanel.MAP && mapDraftDestination) {
+      const origin = getUserCurrentLocation() || gameState.currentLocation || '未知位置';
+      setTravelCommand(mapDraftDestination, origin);
+    }
+
+    setMapDraftDestination(null);
+    closeModal();
+  }, [activePanel, closeModal, gameState.currentLocation, mapDraftDestination, setTravelCommand]);
 
   // 应用正则替换到主文本
   const processedMaintext = useMemo(() => {
@@ -499,8 +520,8 @@ const App: React.FC = () => {
         return (
           <MapPanel
             currentLocation={gameState.currentLocation}
-            plannedLocations={plannedLocations}
-            onTravelCommand={addTravelCommand}
+            plannedLocations={mapPreviewLocations}
+            onDestinationSelect={setMapDraftDestination}
           />
         );
       case ActivePanel.INVENTORY:
@@ -653,7 +674,7 @@ const App: React.FC = () => {
             icon={<Icons.Map />}
             label="地图"
             isActive={activePanel === ActivePanel.MAP}
-            onClick={() => handleNavClick(ActivePanel.MAP)}
+            onClick={handleMapNavClick}
           />
           <NavButton
             icon={<Icons.Social />}
@@ -769,7 +790,7 @@ const App: React.FC = () => {
       {/* Modals */}
       <Modal
         isOpen={activePanel !== ActivePanel.NONE}
-        onClose={closeModal}
+        onClose={handleModalClose}
         title={getModalTitle(activePanel)}
         type={activePanel}
       >

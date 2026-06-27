@@ -510,6 +510,7 @@ export interface PendingCommand {
   text: string;
   data: {
     location?: string;
+    origin?: string;
     itemName?: string;
     originalCount?: number; // 用于撤销物品使用
   };

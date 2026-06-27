@@ -16,11 +16,7 @@ declare function getAllVariables(): Record<string, unknown>;
  * @param exploredLocations 已探索地点列表
  * @returns 是否已解锁
  */
-export function isLocationUnlocked(
-  locationPath: string,
-  location: MapLocation,
-  exploredLocations: string[]
-): boolean {
+export function isLocationUnlocked(locationPath: string, location: MapLocation, exploredLocations: string[]): boolean {
   // 1. 已探索的地点
   if (exploredLocations.includes(locationPath)) {
     return true;
@@ -65,6 +61,14 @@ export function getExploredLocations(): string[] {
   return exploredLocations || [];
 }
 
+/** 从变量表读取玩家当前所在位置，用于生成地图指令。 */
+export function getUserCurrentLocation(): string | null {
+  const variables = getAllVariables();
+  const statData = variables.stat_data as { user数据?: Record<string, unknown> } | undefined;
+  const location = statData?.user数据?.所在位置;
+  return typeof location === 'string' && location.trim() ? location.trim() : null;
+}
+
 /**
  * 添加已探索地点
  * @param locationPath 地点路径
@@ -90,9 +94,9 @@ export async function addExploredLocation(locationPath: string): Promise<void> {
     detail: {
       stat_data: {
         user数据: {
-          已探索地点: newExploredLocations
-        }
-      }
+          已探索地点: newExploredLocations,
+        },
+      },
     },
     expectedAction: 'apiWrite',
     timeoutMs: 3000,
@@ -121,7 +125,7 @@ export function parseLocationPath(locationPath: string): {
   return {
     area: parts[0],
     region: parts[1],
-    location: parts[2]
+    location: parts[2],
   };
 }
 

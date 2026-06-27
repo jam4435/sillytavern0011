@@ -11,26 +11,22 @@ import { uiLogger } from '../utils/logger';
 export function useCommandQueue() {
   const [commands, setCommands] = useState<PendingCommand[]>([]);
 
-  /**
-   * 添加前往地点指令
-   * @param location 地点路径
-   */
-  const addTravelCommand = useCallback((location: string) => {
+  /** 设置唯一的地图移动指令；新目标会替换旧目标。 */
+  const setTravelCommand = useCallback((location: string, origin: string) => {
+    const target = location.split('/').filter(Boolean).pop() || location;
     const command: PendingCommand = {
       id: `travel_${Date.now()}_${Math.random()}`,
       type: 'TRAVEL' as CommandType,
-      text: `前往 ${location.replaceAll('/', ' · ')}`,
+      text: `[地图指令]从${origin}移动到${target}`,
       data: {
         location,
+        origin,
       },
       timestamp: Date.now(),
     };
 
-    setCommands(prev => {
-      const alreadyQueued = prev.some(item => item.type === 'TRAVEL' && item.data.location === location);
-      return alreadyQueued ? prev : [...prev, command];
-    });
-    uiLogger.log('[useCommandQueue] 添加前往指令:', command);
+    setCommands(previous => [...previous.filter(item => item.type !== 'TRAVEL'), command]);
+    uiLogger.log('[useCommandQueue] 设置地图指令:', command);
   }, []);
 
   /**
@@ -114,7 +110,7 @@ export function useCommandQueue() {
 
   return {
     commands,
-    addTravelCommand,
+    setTravelCommand,
     addUseItemCommand,
     cancelCommand,
     sendAllCommands,
