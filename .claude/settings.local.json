@@ -28,7 +28,8 @@
       "Bash(awk 'NR==96' \"f:/Develop/AI/sillytavern/酒馆资料/era框架.txt\")",
       "Bash(awk 'NR==6' \"f:/Develop/AI/sillytavern/酒馆资料/era框架.txt\")",
       "Bash(npx tsc *)",
-      "PowerShell(npx tsc --noEmit -p tsconfig.json 2>&1)"
+      "PowerShell(npx tsc --noEmit -p tsconfig.json 2>&1)",
+      "PowerShell(npx vitest run 2>&1)"
     ]
   }
 }
