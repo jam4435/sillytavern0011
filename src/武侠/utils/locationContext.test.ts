@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { MapData, MapRegion } from '../types';
+
+vi.mock('./mapLoader', () => ({
+  loadMapData: vi.fn(),
+}));
+
 import { buildDynamicLocationContext, formatDynamicLocationConstraint } from './locationContext';
 
 function createRegion(x: number, y: number, locationNames: string[]): MapRegion {
