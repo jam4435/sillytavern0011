@@ -12,6 +12,10 @@ import { messageLogger, variableTraceLogger } from '../utils/logger';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
 import { captureNextCombinedPromptForDebug } from '../utils/promptDebug';
 import {
+  buildDynamicLocationConstraintPrompt,
+  createDynamicLocationInjection,
+} from '../utils/locationContext';
+import {
   executeExtraVariableUpdate,
   prepareExtraVariableUpdateTurn,
   type ExtraVariableUpdateProgress,
@@ -438,8 +442,14 @@ export function useMessageHandler({
         await flushPendingGameDataCompletion('before-generate');
         messageLogger.log('✅ [步骤 2] 待补全变量同步完成');
 
+        const locationConstraintPrompt = await buildDynamicLocationConstraintPrompt();
+        const locationConstraintInjects = createDynamicLocationInjection(locationConstraintPrompt);
+
         messageLogger.log('📌 [步骤 2] 调用 generate() 触发 AI 生成');
-        messageLogger.log('generate 参数:', { should_stream: true });
+        messageLogger.log('generate 参数:', {
+          should_stream: true,
+          hasLocationConstraint: Boolean(locationConstraintInjects),
+        });
         messageLogger.log('⏳ 等待 AI 回复中...');
 
         const generateStartTime = Date.now();
@@ -450,6 +460,7 @@ export function useMessageHandler({
         try {
           result = await generate({
             should_stream: true,
+            injects: locationConstraintInjects,
           });
         } finally {
           combinedPromptCapture?.stop();

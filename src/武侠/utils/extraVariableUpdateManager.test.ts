@@ -20,6 +20,10 @@ vi.mock('./variableReader', () => ({
   normalizeDisplayedMessageContent: vi.fn((text: string) => text),
 }));
 
+vi.mock('./locationContext', () => ({
+  buildDynamicLocationConstraintPrompt: vi.fn(async () => '动态地点约束'),
+}));
+
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { executeExtraVariableUpdate } from './extraVariableUpdateManager';
 import { requestConfiguredText } from './summaryApiClient';
@@ -166,6 +170,9 @@ describe('executeExtraVariableUpdate', () => {
     expect(result.appended).toBe(true);
     expect(result.actionBlockCount).toBe(1);
     expect(result.finalMessageText).toContain('<VariableEdit>');
+    expect(requestConfiguredTextMock).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: expect.stringContaining('动态地点约束'),
+    }));
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(expect.objectContaining({
       source: 'frontend',
       operation: 'update',

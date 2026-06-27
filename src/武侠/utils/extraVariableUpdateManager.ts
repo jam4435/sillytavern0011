@@ -7,6 +7,7 @@ import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableW
 import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryApiConfig } from './summaryApiClient';
 import { dataLogger, variableTraceLogger } from './logger';
 import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
+import { buildDynamicLocationConstraintPrompt } from './locationContext';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
 const OUTPUT_PROMPT_ENTRY_NAME = '输出提示词';
@@ -669,17 +670,19 @@ async function buildExtraVariableUpdatePrompt({
   assistantMessageId: number;
   latestRawReply: string;
 }): Promise<string> {
-  const [variableGuidance, renderedOutputPromptContext] = await Promise.all([
+  const [variableGuidance, renderedOutputPromptContext, locationConstraintPrompt] = await Promise.all([
     readWorldbookEntryContent(VARIABLE_GUIDANCE_ENTRY_NAME),
     renderOutputPromptContext(assistantMessageId),
+    buildDynamicLocationConstraintPrompt(),
   ]);
   const recentBodies = getRecentBodyMessages(assistantMessageId, latestRawReply);
 
-  return renderVariablePromptTemplate(settings.variablePromptTemplate, {
+  const variablePrompt = renderVariablePromptTemplate(settings.variablePromptTemplate, {
     recentBodies: recentBodies || '(无可用正文)',
     variableContext: renderedOutputPromptContext,
     variableGuidance,
   });
+  return locationConstraintPrompt ? `${variablePrompt}\n\n${locationConstraintPrompt}` : variablePrompt;
 }
 
 function extractValidVariableBlocks(rawResponse: string): {

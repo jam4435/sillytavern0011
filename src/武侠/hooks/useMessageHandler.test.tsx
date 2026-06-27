@@ -17,6 +17,13 @@ vi.mock('../utils/promptDebug', () => ({
   captureNextCombinedPromptForDebug: vi.fn(() => ({ stop: vi.fn() })),
 }));
 
+vi.mock('../utils/locationContext', () => ({
+  buildDynamicLocationConstraintPrompt: vi.fn(async () => '动态地点约束'),
+  createDynamicLocationInjection: vi.fn((prompt: string) => [
+    { position: 'in_chat', depth: 0, role: 'system', content: prompt, should_scan: false },
+  ]),
+}));
+
 vi.mock('../utils/extraVariableUpdateManager', () => ({
   executeExtraVariableUpdate: vi.fn(),
   prepareExtraVariableUpdateTurn: vi.fn(),
@@ -140,6 +147,9 @@ describe('useMessageHandler extra-variable decision', () => {
 
     expect(prepareExtraVariableUpdateTurnMock).not.toHaveBeenCalled();
     expect(executeExtraVariableUpdateMock).not.toHaveBeenCalled();
+    expect(globals.generate).toHaveBeenCalledWith(expect.objectContaining({
+      injects: [expect.objectContaining({ content: '动态地点约束' })],
+    }));
     expect(options.patchLatestDebugRound).toHaveBeenCalledWith({
       variable: expect.objectContaining({
         trigger: 'send',
