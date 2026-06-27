@@ -11,10 +11,7 @@ import {
 import { messageLogger, variableTraceLogger } from '../utils/logger';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
 import { captureNextCombinedPromptForDebug } from '../utils/promptDebug';
-import {
-  buildDynamicLocationConstraintPrompt,
-  createDynamicLocationInjection,
-} from '../utils/locationContext';
+import { syncDynamicLocationContextVariable } from '../utils/locationContext';
 import {
   executeExtraVariableUpdate,
   prepareExtraVariableUpdateTurn,
@@ -442,14 +439,11 @@ export function useMessageHandler({
         await flushPendingGameDataCompletion('before-generate');
         messageLogger.log('✅ [步骤 2] 待补全变量同步完成');
 
-        const locationConstraintPrompt = await buildDynamicLocationConstraintPrompt();
-        const locationConstraintInjects = createDynamicLocationInjection(locationConstraintPrompt);
+        const locationContext = await syncDynamicLocationContextVariable();
+        messageLogger.log('🗺️ 地图上下文聊天变量刷新:', locationContext ? '完成' : '失败');
 
         messageLogger.log('📌 [步骤 2] 调用 generate() 触发 AI 生成');
-        messageLogger.log('generate 参数:', {
-          should_stream: true,
-          hasLocationConstraint: Boolean(locationConstraintInjects),
-        });
+        messageLogger.log('generate 参数:', { should_stream: true });
         messageLogger.log('⏳ 等待 AI 回复中...');
 
         const generateStartTime = Date.now();
@@ -460,7 +454,6 @@ export function useMessageHandler({
         try {
           result = await generate({
             should_stream: true,
-            injects: locationConstraintInjects,
           });
         } finally {
           combinedPromptCapture?.stop();

@@ -244,7 +244,9 @@ export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传
 {{variableContext}}
 
 【变量指导】
-{{variableGuidance}}`;
+{{variableGuidance}}
+
+{{locationContext}}`;
 
 export const DEFAULT_SUMMARY_API_CONFIG: SummaryApiConfig = {
   apiurl: '',

@@ -18,10 +18,7 @@ vi.mock('./promptDebug', () => ({
 }));
 
 vi.mock('./locationContext', () => ({
-  buildDynamicLocationConstraintPrompt: vi.fn(async () => '动态地点约束'),
-  createDynamicLocationInjection: vi.fn((prompt: string) => [
-    { position: 'in_chat', depth: 0, role: 'system', content: prompt, should_scan: false },
-  ]),
+  syncDynamicLocationContextVariable: vi.fn(async () => ({ 已解析: true })),
 }));
 
 import { emitEraEventAndWait } from './eraWriteWait';
@@ -185,9 +182,7 @@ describe('regenerateLastAssistantSwipe', () => {
       expectedMessageId: 2,
       expectedAction: 'apiWrite',
     }));
-    expect(globals.generate).toHaveBeenCalledWith(expect.objectContaining({
-      injects: [expect.objectContaining({ content: '动态地点约束' })],
-    }));
+    expect(globals.generate).toHaveBeenCalledWith(expect.not.objectContaining({ injects: expect.anything() }));
     expect(result.assistantMessageId).toBe(2);
     expect(result.rawReply).toBe('新正文');
   });

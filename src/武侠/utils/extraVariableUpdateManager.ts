@@ -652,13 +652,15 @@ function renderVariablePromptTemplate(
     recentBodies: string;
     variableContext: string;
     variableGuidance: string;
+    locationContext: string;
   },
 ): string {
   const sourceTemplate = template.trim() ? template : DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE;
   return sourceTemplate
     .replace(/\{\{recentBodies\}\}/g, values.recentBodies)
     .replace(/\{\{variableContext\}\}/g, values.variableContext)
-    .replace(/\{\{variableGuidance\}\}/g, values.variableGuidance);
+    .replace(/\{\{variableGuidance\}\}/g, values.variableGuidance)
+    .replace(/\{\{locationContext\}\}/g, values.locationContext);
 }
 
 async function buildExtraVariableUpdatePrompt({
@@ -677,12 +679,12 @@ async function buildExtraVariableUpdatePrompt({
   ]);
   const recentBodies = getRecentBodyMessages(assistantMessageId, latestRawReply);
 
-  const variablePrompt = renderVariablePromptTemplate(settings.variablePromptTemplate, {
+  return renderVariablePromptTemplate(settings.variablePromptTemplate, {
     recentBodies: recentBodies || '(无可用正文)',
     variableContext: renderedOutputPromptContext,
     variableGuidance,
+    locationContext: locationConstraintPrompt,
   });
-  return locationConstraintPrompt ? `${variablePrompt}\n\n${locationConstraintPrompt}` : variablePrompt;
 }
 
 function extractValidVariableBlocks(rawResponse: string): {

@@ -2,6 +2,7 @@ import type { MapData, MapRegion } from '../types';
 import { loadMapData } from './mapLoader';
 
 const DEFAULT_ADJACENT_REGION_LIMIT = 4;
+export const LOCATION_CONTEXT_VARIABLE_KEY = '地图上下文';
 
 interface MapRegionReference {
   areaName: string;
@@ -22,6 +23,17 @@ export interface DynamicLocationContext {
   allowedLocationPaths: string[];
   resolved: boolean;
   ambiguous: boolean;
+}
+
+export interface DynamicLocationContextVariable {
+  当前所在位置: string;
+  当前二级地点: string[];
+  当前二级地点内三级地点: string[];
+  相邻二级地点: string[];
+  允许写入地点: string[];
+  已解析: boolean;
+  存在同名候选: boolean;
+  地点限制提示词: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -206,31 +218,53 @@ export function getCurrentPlayerLocation(): string {
   return typeof location === 'string' ? location.trim() : '';
 }
 
+async function buildCurrentDynamicLocationContext(): Promise<DynamicLocationContext> {
+  const mapData = await loadMapData();
+  return buildDynamicLocationContext(mapData, getCurrentPlayerLocation());
+}
+
 export async function buildDynamicLocationConstraintPrompt(): Promise<string> {
   try {
-    const [mapData, currentLocation] = await Promise.all([
-      loadMapData(),
-      Promise.resolve(getCurrentPlayerLocation()),
-    ]);
-    return formatDynamicLocationConstraint(buildDynamicLocationContext(mapData, currentLocation));
+    return formatDynamicLocationConstraint(await buildCurrentDynamicLocationContext());
   } catch (error) {
-    console.warn('[locationContext] 构建动态地点约束失败，本轮不注入地点约束。', error);
+    console.warn('[locationContext] 构建动态地点约束失败。', error);
     return '';
   }
 }
 
-export function createDynamicLocationInjection(prompt: string): Omit<InjectionPrompt, 'id'>[] | undefined {
-  if (!prompt.trim()) {
-    return undefined;
-  }
+export function createDynamicLocationContextVariable(
+  context: DynamicLocationContext,
+): DynamicLocationContextVariable {
+  return {
+    当前所在位置: context.currentLocation,
+    当前二级地点: context.currentRegions.map(region => region.path),
+    当前二级地点内三级地点: context.currentRegions.flatMap(region => region.locations),
+    相邻二级地点: context.adjacentRegions.map(region => region.path),
+    允许写入地点: context.allowedLocationPaths,
+    已解析: context.resolved,
+    存在同名候选: context.ambiguous,
+    地点限制提示词: formatDynamicLocationConstraint(context),
+  };
+}
 
-  return [
-    {
-      position: 'in_chat',
-      depth: 0,
-      role: 'system',
-      content: prompt,
-      should_scan: false,
-    },
-  ];
+export async function syncDynamicLocationContextVariable(): Promise<DynamicLocationContextVariable | null> {
+  try {
+    const value = createDynamicLocationContextVariable(await buildCurrentDynamicLocationContext());
+    const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+    if (JSON.stringify(variables[LOCATION_CONTEXT_VARIABLE_KEY]) === JSON.stringify(value)) {
+      return value;
+    }
+
+    updateVariablesWith(
+      currentVariables => ({
+        ...currentVariables,
+        [LOCATION_CONTEXT_VARIABLE_KEY]: value,
+      }),
+      { type: 'chat' },
+    );
+    return value;
+  } catch (error) {
+    console.warn('[locationContext] 刷新聊天变量「地图上下文」失败。', error);
+    return null;
+  }
 }

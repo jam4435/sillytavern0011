@@ -9,7 +9,7 @@ import {
   readGameDataPure,
 } from './variableReader';
 import { captureNextCombinedPromptForDebug } from './promptDebug';
-import { buildDynamicLocationConstraintPrompt, createDynamicLocationInjection } from './locationContext';
+import { syncDynamicLocationContextVariable } from './locationContext';
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -368,7 +368,7 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
       expectedMessageId: context.assistantMessage.message_id,
       expectedAction: 'resync',
     });
-    const locationConstraintPrompt = await buildDynamicLocationConstraintPrompt();
+    await syncDynamicLocationContextVariable();
 
     const combinedPromptCapture = captureNextCombinedPromptForDebug(prompt => {
       combinedPrompt = prompt;
@@ -379,7 +379,6 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
     try {
       generated = await generate({
         should_stream: true,
-        injects: createDynamicLocationInjection(locationConstraintPrompt),
         overrides: {
           chat_history: {
             prompts,

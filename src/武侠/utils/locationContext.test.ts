@@ -5,7 +5,17 @@ vi.mock('./mapLoader', () => ({
   loadMapData: vi.fn(),
 }));
 
-import { buildDynamicLocationContext, formatDynamicLocationConstraint } from './locationContext';
+import { loadMapData } from './mapLoader';
+import {
+  buildDynamicLocationContext,
+  createDynamicLocationContextVariable,
+  formatDynamicLocationConstraint,
+  syncDynamicLocationContextVariable,
+} from './locationContext';
+
+const loadMapDataMock = vi.mocked(loadMapData);
+const getVariablesMock = globalThis.getVariables as ReturnType<typeof vi.fn>;
+const updateVariablesWithMock = globalThis.updateVariablesWith as ReturnType<typeof vi.fn>;
 
 function createRegion(x: number, y: number, locationNames: string[]): MapRegion {
   return {
@@ -72,5 +82,37 @@ describe('locationContext', () => {
 
     expect(prompt).toContain('当前值无法在地点表中定位');
     expect(prompt).toContain('本轮不得修改 user数据.所在位置');
+  });
+
+  it('生成可供世界书读取的结构化聊天变量', () => {
+    const value = createDynamicLocationContextVariable(
+      buildDynamicLocationContext(mapData, '大宋/临安府/牛家村', 1),
+    );
+
+    expect(value.当前二级地点).toEqual(['大宋/临安府']);
+    expect(value.当前二级地点内三级地点).toContain('大宋/临安府/西湖');
+    expect(value.相邻二级地点).toEqual(['大宋/嘉兴府']);
+    expect(value.地点限制提示词).toContain('唯一写入白名单');
+  });
+
+  it('把最新地图上下文写入聊天变量顶层', async () => {
+    loadMapDataMock.mockResolvedValue(mapData);
+    getVariablesMock.mockReturnValue({
+      stat_data: { user数据: { 所在位置: '临安府/牛家村' } },
+    });
+
+    const value = await syncDynamicLocationContextVariable();
+
+    expect(value?.当前二级地点).toEqual(['大宋/临安府']);
+    expect(updateVariablesWithMock).toHaveBeenCalledWith(expect.any(Function), { type: 'chat' });
+    const updater = updateVariablesWithMock.mock.calls[0][0] as (
+      variables: Record<string, unknown>,
+    ) => Record<string, unknown>;
+    expect(updater({ stat_data: {} })).toEqual(expect.objectContaining({
+      地图上下文: expect.objectContaining({
+        当前二级地点: ['大宋/临安府'],
+        相邻二级地点: expect.arrayContaining(['大宋/嘉兴府']),
+      }),
+    }));
   });
 });

@@ -183,4 +183,20 @@ describe('executeExtraVariableUpdate', () => {
       expectedAction: 'apiWrite',
     }));
   });
+
+  it('自定义模板未放置 locationContext 时不会强行追加地点约束', async () => {
+    await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+        variablePromptTemplate: '正文：{{recentBodies}}\n变量：{{variableContext}}',
+      },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    });
+
+    expect(requestConfiguredTextMock).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: expect.not.stringContaining('动态地点约束'),
+    }));
+  });
 });
