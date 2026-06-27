@@ -3,7 +3,8 @@
  * 集成地图画布、侧边栏和地点选择功能
  */
 
-import React, { useState, useEffect } from 'react';
+import { ListTree, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import MapCanvas from '../MapCanvas';
 import MapSidebar from '../MapSidebar';
 import { MapData } from '../../types';
@@ -22,6 +23,7 @@ export const MapPanel: React.FC<MapPanelProps> = ({ currentLocation, plannedLoca
   const [exploredLocations, setExploredLocations] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isIndexOpen, setIsIndexOpen] = useState(false);
 
   // 加载地图数据
   useEffect(() => {
@@ -49,6 +51,7 @@ export const MapPanel: React.FC<MapPanelProps> = ({ currentLocation, plannedLoca
   // 处理地点点击
   const handleLocationClick = (locationPath: string) => {
     gameLogger.log('[MapPanel] 点击地点:', locationPath);
+    setIsIndexOpen(false);
     if (onTravelCommand) {
       onTravelCommand(locationPath);
     }
@@ -78,17 +81,38 @@ export const MapPanel: React.FC<MapPanelProps> = ({ currentLocation, plannedLoca
     );
   }
 
+  const regionCount = Object.values(mapData).reduce((count, area) => count + Object.keys(area.子区域).length, 0);
+
   return (
-    <div className="map-container">
-      {/* 侧边栏 */}
-      <MapSidebar
-        mapData={mapData}
-        exploredLocations={exploredLocations}
-        currentLocation={currentLocation}
-        onLocationClick={handleLocationClick}
+    <div className={`map-container ${isIndexOpen ? 'index-open' : ''}`}>
+      <button
+        type="button"
+        className="map-sidebar-scrim"
+        onClick={() => setIsIndexOpen(false)}
+        aria-label="关闭地点索引"
       />
 
-      {/* 地图画布 */}
+      <aside id="map-location-index" className="map-sidebar-shell" aria-label="地点索引">
+        <div className="map-mobile-index-header">
+          <div>
+            <strong>地点索引</strong>
+            <span>
+              {Object.keys(mapData).length} 大区 · {regionCount} 地域
+            </span>
+          </div>
+          <button type="button" onClick={() => setIsIndexOpen(false)} aria-label="关闭地点索引" title="关闭">
+            <X size={18} />
+          </button>
+        </div>
+
+        <MapSidebar
+          mapData={mapData}
+          exploredLocations={exploredLocations}
+          currentLocation={currentLocation}
+          onLocationClick={handleLocationClick}
+        />
+      </aside>
+
       <MapCanvas
         mapData={mapData}
         exploredLocations={exploredLocations}
@@ -96,6 +120,17 @@ export const MapPanel: React.FC<MapPanelProps> = ({ currentLocation, plannedLoca
         plannedLocations={plannedLocations}
         onLocationClick={handleLocationClick}
       />
+
+      <button
+        type="button"
+        className="map-index-toggle"
+        onClick={() => setIsIndexOpen(open => !open)}
+        aria-expanded={isIndexOpen}
+        aria-controls="map-location-index"
+      >
+        <ListTree size={17} />
+        <span>地点</span>
+      </button>
     </div>
   );
 };

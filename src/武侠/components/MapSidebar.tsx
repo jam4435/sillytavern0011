@@ -3,6 +3,7 @@
  * 显示三级折叠列表，用于文字导航
  */
 
+import { ChevronRight, MapPin } from 'lucide-react';
 import React, { useState } from 'react';
 import { MapData, MapArea, MapRegion, MapLocation } from '../types';
 import { isLocationUnlocked, buildLocationPath } from '../utils/mapUtils';
@@ -15,12 +16,7 @@ interface MapSidebarProps {
   onLocationClick: (locationPath: string) => void;
 }
 
-const MapSidebar: React.FC<MapSidebarProps> = ({
-  mapData,
-  exploredLocations,
-  currentLocation,
-  onLocationClick
-}) => {
+const MapSidebar: React.FC<MapSidebarProps> = ({ mapData, exploredLocations, currentLocation, onLocationClick }) => {
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
 
@@ -84,7 +80,7 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
         {Object.entries(mapData).map(([areaName, area]: [string, MapArea]) => {
           // 检查大区域是否有已探索的中区域
           const hasExploredRegion = Object.entries(area.子区域).some(([regionName, region]) =>
-            isRegionExplored(areaName, regionName, region)
+            isRegionExplored(areaName, regionName, region),
           );
 
           if (!hasExploredRegion) {
@@ -95,11 +91,11 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
 
           return (
             <div key={areaName} className="area-section">
-              <div className="area-header" onClick={() => toggleArea(areaName)}>
-                <span className="expand-icon">{isExpanded ? '▼' : '▶'}</span>
+              <button type="button" className="area-header" onClick={() => toggleArea(areaName)}>
+                <ChevronRight className={`expand-icon ${isExpanded ? 'expanded' : ''}`} aria-hidden="true" />
                 <span className="area-name">{areaName}</span>
                 <span className="area-desc">{area.描述}</span>
-              </div>
+              </button>
 
               {isExpanded && (
                 <div className="region-list">
@@ -114,11 +110,14 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
 
                     return (
                       <div key={regionKey} className="region-section">
-                        <div className="region-header" onClick={() => toggleRegion(regionKey)}>
-                          <span className="expand-icon">{isRegionExpanded ? '▼' : '▶'}</span>
+                        <button type="button" className="region-header" onClick={() => toggleRegion(regionKey)}>
+                          <ChevronRight
+                            className={`expand-icon ${isRegionExpanded ? 'expanded' : ''}`}
+                            aria-hidden="true"
+                          />
                           <span className="region-name">{regionName}</span>
                           <span className="region-desc">{region.描述}</span>
-                        </div>
+                        </button>
 
                         {isRegionExpanded && (
                           <div className="location-list">
@@ -133,17 +132,18 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
                               }
 
                               return (
-                                <div
+                                <button
+                                  type="button"
                                   key={locationName}
                                   className={`location-item ${isCurrent ? 'current' : ''}`}
                                   onClick={() => handleLocationClick(locationPath, location)}
                                 >
                                   <span className="location-name">
-                                    {isCurrent && '📍 '}
+                                    {isCurrent && <MapPin size={12} aria-hidden="true" />}
                                     {locationName}
                                   </span>
                                   <span className="location-desc">{location.描述}</span>
-                                </div>
+                                </button>
                               );
                             })}
                           </div>
