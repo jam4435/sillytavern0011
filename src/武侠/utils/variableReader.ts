@@ -832,10 +832,7 @@ function formatNetworkSummary(network?: Record<string, string> | string[]): stri
     .map(([name, relation]) => (relation ? `${name}（${relation}）` : name));
 }
 
-function getPrimaryIdentityTitle(
-  identities?: Record<string, string>,
-  fallbackType?: string,
-): string {
+function getPrimaryIdentityTitle(identities?: Record<string, string>, fallbackType?: string): string {
   const identityTitle = identities
     ? Object.keys(identities).find(name => Boolean(name) && !name.startsWith('$'))
     : undefined;
@@ -843,10 +840,7 @@ function getPrimaryIdentityTitle(
   return identityTitle || fallbackType || '江湖人士';
 }
 
-function getPrimaryMartialArtTemplate(
-  characterData?: CharacterData,
-  legacyNpc?: LegacySocialNpc,
-): NPC['template'] {
+function getPrimaryMartialArtTemplate(characterData?: CharacterData, legacyNpc?: LegacySocialNpc): NPC['template'] {
   const primaryMartialArt = characterData?.功法
     ? Object.entries(characterData.功法).find(([name]) => !name.startsWith('$'))?.[1]
     : undefined;
@@ -879,6 +873,8 @@ function createCharacterNpc(
   relationshipLabel?: string,
   legacyNpc?: LegacySocialNpc,
 ): NPC {
+  const network = formatNetworkSummary(characterData.关系网);
+
   return {
     id: `npc:${category}:${name}`,
     name,
@@ -889,17 +885,11 @@ function createCharacterNpc(
     template: getPrimaryMartialArtTemplate(characterData, legacyNpc),
     keyItems: getCharacterKeyItems(characterData, legacyNpc),
     biography: formatBiographySummary(characterData.人物经历) || legacyNpc?.人物经历 || '',
-    network: formatNetworkSummary(characterData.关系网).length > 0
-      ? formatNetworkSummary(characterData.关系网)
-      : formatNetworkSummary(legacyNpc?.关系网),
+    network: network.length > 0 ? network : formatNetworkSummary(legacyNpc?.关系网),
   };
 }
 
-function createLegacySocialNpc(
-  legacyNpc: LegacySocialNpc,
-  category: NPC['category'],
-  relationshipLabel?: string,
-): NPC {
+function createLegacySocialNpc(legacyNpc: LegacySocialNpc, category: NPC['category'], relationshipLabel?: string): NPC {
   const name = legacyNpc.姓名?.trim() || '未知人物';
 
   return {
@@ -921,11 +911,7 @@ function createLegacySocialNpc(
   };
 }
 
-function createPlaceholderNpc(
-  name: string,
-  category: NPC['category'],
-  relationshipLabel?: string,
-): NPC {
+function createPlaceholderNpc(name: string, category: NPC['category'], relationshipLabel?: string): NPC {
   return {
     id: `npc:${category}:${name}`,
     name,
@@ -1870,7 +1856,7 @@ function shouldUpdateMartialArtByCache(
   const currentMastery = 功法数据.掌握程度 || '初窥门径';
   const isCompleted = !!(功法数据.类型 && 功法数据.功法品阶 && 功法数据.功法描述 && 功法数据.特性);
   const cached = martialArtStateCache.get(cacheKey);
-  
+
   if (!cached) {
     // 新功法
     const updateType = checkMartialArtUpdateType(功法数据, 功法名);
@@ -1883,19 +1869,19 @@ function shouldUpdateMartialArtByCache(
     dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 当前变量缺字段，更新类型=${updateType}`);
     return { shouldUpdate: updateType !== 'none', isNew: false, masteryChanged: false, updateType };
   }
-  
+
   if (!cached.isCompleted && !isCompleted) {
     // 之前未补全，现在仍需补全
     dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 仍需补全`);
     return { shouldUpdate: true, isNew: false, masteryChanged: false, updateType: 'insert' };
   }
-  
+
   if (cached.mastery !== currentMastery) {
     // 掌握程度变动
     dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 掌握程度变动 ${cached.mastery} -> ${currentMastery}`);
     return { shouldUpdate: true, isNew: false, masteryChanged: true, updateType: 'update' };
   }
-  
+
   dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 无变化，跳过`);
   return { shouldUpdate: false, isNew: false, masteryChanged: false, updateType: 'none' };
 }
