@@ -548,6 +548,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
               <g
                 key={`${areaName}-${regionName}`}
                 className={`region-marker ${explored ? 'explored' : 'unexplored'} ${current ? 'current' : ''} ${selected ? 'selected' : ''}`}
+                onPointerDown={event => event.stopPropagation()}
                 onClick={event => explored && handleRegionClick(areaName, regionName, region, event)}
                 onKeyDown={event => {
                   if (explored && (event.key === 'Enter' || event.key === ' ')) {

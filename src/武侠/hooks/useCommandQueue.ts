@@ -75,27 +75,22 @@ export function useCommandQueue() {
     [commands],
   );
 
-  /**
-   * 发送所有指令
-   * @param handleSendMessage 发送消息的函数
-   */
-  const sendAllCommands = useCallback(
-    async (handleSendMessage: (message: string) => void | Promise<unknown>) => {
-      if (commands.length === 0) {
-        uiLogger.warn('[useCommandQueue] 没有待发送的指令');
-        return;
+  /** 将当前队列附加到玩家消息；发送成功后只移除本次附加的指令。 */
+  const sendMessageWithCommands = useCallback(
+    async (message: string, handleSendMessage: (content: string) => void | Promise<unknown>) => {
+      const queuedCommands = commands;
+      const combinedMessage = [message.trim(), ...queuedCommands.map(command => command.text)]
+        .filter(Boolean)
+        .join('\n');
+
+      uiLogger.log('[useCommandQueue] 发送玩家消息并附加指令:', combinedMessage);
+      await handleSendMessage(combinedMessage);
+
+      if (queuedCommands.length > 0) {
+        const sentCommandIds = new Set(queuedCommands.map(command => command.id));
+        setCommands(previous => previous.filter(command => !sentCommandIds.has(command.id)));
+        uiLogger.log('[useCommandQueue] 已移除本次发送的指令');
       }
-
-      // 合并所有指令文本
-      const combinedText = commands.map(cmd => cmd.text).join('\n');
-      uiLogger.log('[useCommandQueue] 发送所有指令:', combinedText);
-
-      // 调用发送消息函数
-      await handleSendMessage(combinedText);
-
-      // 清空队列
-      setCommands([]);
-      uiLogger.log('[useCommandQueue] 队列已清空');
     },
     [commands],
   );
@@ -113,7 +108,7 @@ export function useCommandQueue() {
     setTravelCommand,
     addUseItemCommand,
     cancelCommand,
-    sendAllCommands,
+    sendMessageWithCommands,
     clearQueue,
   };
 }

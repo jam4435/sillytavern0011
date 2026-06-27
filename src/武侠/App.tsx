@@ -90,7 +90,7 @@ const App: React.FC = () => {
     currentOptions,
     setCurrentOptions,
   } = useGameState();
-  const { commands, setTravelCommand, cancelCommand, sendAllCommands } = useCommandQueue();
+  const { commands, setTravelCommand, cancelCommand, sendMessageWithCommands } = useCommandQueue();
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
@@ -321,10 +321,13 @@ const App: React.FC = () => {
     [mapDraftDestination, queuedTravelLocations],
   );
 
-  const handleSendQueuedCommands = useCallback(async () => {
-    await sendAllCommands(handleSendMessage);
-    setIsCommandQueueOpen(false);
-  }, [handleSendMessage, sendAllCommands]);
+  const handlePlayerSend = useCallback(
+    async (message: string) => {
+      await sendMessageWithCommands(message, handleSendMessage);
+      setIsCommandQueueOpen(false);
+    },
+    [handleSendMessage, sendMessageWithCommands],
+  );
 
   const handleMapNavClick = useCallback(() => {
     setMapDraftDestination(null);
@@ -751,9 +754,7 @@ const App: React.FC = () => {
             <GameContent
               maintext={processedMaintext}
               options={currentOptions}
-              onSelectOption={option => {
-                handleSendMessage(option);
-              }}
+              onSelectOption={handlePlayerSend}
               settings={displaySettings}
             />
           </section>
@@ -764,7 +765,7 @@ const App: React.FC = () => {
 
           {/* 底部聊天输入区域 */}
           <ChatInput
-            onSend={handleSendMessage}
+            onSend={handlePlayerSend}
             extraActions={
               <div className="command-queue-anchor">
                 <CommandQueueButton commands={commands} onClick={() => setIsCommandQueueOpen(open => !open)} />
@@ -772,7 +773,6 @@ const App: React.FC = () => {
                   <CommandQueuePopover
                     commands={commands}
                     onCancel={cancelCommand}
-                    onSendAll={handleSendQueuedCommands}
                     onClose={() => setIsCommandQueueOpen(false)}
                   />
                 )}

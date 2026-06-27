@@ -658,45 +658,6 @@
     }
   }
 
-  .popover-footer {
-    display: flex;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-top: 1px solid rgba(181, 137, 80, 0.2);
-
-    button {
-      flex: 1;
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: 1px solid transparent;
-    }
-
-    .clear-all-btn {
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--stone-400);
-      border-color: rgba(255, 255, 255, 0.1);
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.08);
-        color: var(--stone-200);
-      }
-    }
-
-    .send-all-btn {
-      background: linear-gradient(135deg, #d97706, #b45309);
-      color: white;
-      font-weight: 500;
-
-      &:hover {
-        background: linear-gradient(135deg, #ea580c, #c2410c);
-        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
-      }
-    }
-  }
-
   @media (max-width: 420px) {
     position: fixed;
     right: 12px;

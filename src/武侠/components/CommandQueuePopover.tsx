@@ -1,6 +1,6 @@
 /**
  * 指令队列浮窗组件
- * 显示所有待发送的指令，支持取消和发送
+ * 显示所有待发送的指令，支持逐条取消
  */
 
 import { FlaskConical, MapPinned, X } from 'lucide-react';
@@ -10,11 +10,10 @@ import { PendingCommand } from '../types';
 interface CommandQueuePopoverProps {
   commands: PendingCommand[];
   onCancel: (commandId: string) => void | Promise<void>;
-  onSendAll: () => void | Promise<void>;
   onClose: () => void;
 }
 
-const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({ commands, onCancel, onSendAll, onClose }) => {
+const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({ commands, onCancel, onClose }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭浮窗
@@ -68,17 +67,6 @@ const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({ commands, onC
           ))
         )}
       </div>
-
-      {commands.length > 0 && (
-        <div className="popover-footer">
-          <button className="clear-all-btn" onClick={onClose}>
-            关闭
-          </button>
-          <button className="send-all-btn" onClick={onSendAll}>
-            发送全部 ({commands.length})
-          </button>
-        </div>
-      )}
     </div>
   );
 };
