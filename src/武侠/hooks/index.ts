@@ -10,3 +10,4 @@ export { useEventListeners } from './useEventListeners';
 export { useMessageHandler, type AutoAdvanceTurnResult } from './useMessageHandler';
 export { useSummaryDetection, type UseSummaryDetectionOptions } from './useSummaryDetection';
 export { useVariableChangeTracker, type VariableChangeSummary } from './useVariableChangeTracker';
+export { useCommandQueue } from './useCommandQueue';

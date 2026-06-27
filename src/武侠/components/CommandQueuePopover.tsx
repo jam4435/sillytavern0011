@@ -3,13 +3,14 @@
  * 显示所有待发送的指令，支持取消和发送
  */
 
-import React, { useRef, useEffect } from 'react';
+import { FlaskConical, MapPinned, X } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
 import { PendingCommand } from '../types';
 
 interface CommandQueuePopoverProps {
   commands: PendingCommand[];
-  onCancel: (commandId: string) => void;
-  onSendAll: () => void;
+  onCancel: (commandId: string) => void | Promise<void>;
+  onSendAll: () => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -24,7 +25,8 @@ const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({
   // 点击外部关闭浮窗
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+      const target = event.target as Element;
+      if (popoverRef.current && !popoverRef.current.contains(target) && !target.closest('.command-queue-anchor')) {
         onClose();
       }
     };
@@ -38,8 +40,13 @@ const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({
   return (
     <div ref={popoverRef} className="command-queue-popover">
       <div className="popover-header">
-        <span className="popover-title">待发送指令</span>
-        <span className="command-count-badge">{commands.length}</span>
+        <div className="popover-heading">
+          <span className="popover-title">待发送指令</span>
+          <span className="command-count-badge">{commands.length}</span>
+        </div>
+        <button type="button" className="popover-close-btn" onClick={onClose} title="关闭" aria-label="关闭指令队列">
+          <X size={16} />
+        </button>
       </div>
 
       <div className="command-list">
@@ -50,7 +57,7 @@ const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({
             <div key={command.id} className="command-card">
               <div className="command-content">
                 <div className="command-type-icon">
-                  {command.type === 'TRAVEL' ? '🗺️' : '🧪'}
+                  {command.type === 'TRAVEL' ? <MapPinned size={17} /> : <FlaskConical size={17} />}
                 </div>
                 <div className="command-text">{command.text}</div>
               </div>
@@ -60,7 +67,7 @@ const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({
                 aria-label="取消指令"
                 title="取消指令"
               >
-                ✕
+                <X size={15} />
               </button>
             </div>
           ))

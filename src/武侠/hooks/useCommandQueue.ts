@@ -19,14 +19,17 @@ export function useCommandQueue() {
     const command: PendingCommand = {
       id: `travel_${Date.now()}_${Math.random()}`,
       type: 'TRAVEL' as CommandType,
-      text: `前往${location}`,
+      text: `前往 ${location.replaceAll('/', ' · ')}`,
       data: {
         location
       },
       timestamp: Date.now()
     };
 
-    setCommands(prev => [...prev, command]);
+    setCommands(prev => {
+      const alreadyQueued = prev.some(item => item.type === 'TRAVEL' && item.data.location === location);
+      return alreadyQueued ? prev : [...prev, command];
+    });
     uiLogger.log('[useCommandQueue] 添加前往指令:', command);
   }, []);
 
@@ -77,7 +80,7 @@ export function useCommandQueue() {
    * 发送所有指令
    * @param handleSendMessage 发送消息的函数
    */
-  const sendAllCommands = useCallback(async (handleSendMessage: (message: string) => void) => {
+  const sendAllCommands = useCallback(async (handleSendMessage: (message: string) => void | Promise<unknown>) => {
     if (commands.length === 0) {
       uiLogger.warn('[useCommandQueue] 没有待发送的指令');
       return;
@@ -88,7 +91,7 @@ export function useCommandQueue() {
     uiLogger.log('[useCommandQueue] 发送所有指令:', combinedText);
 
     // 调用发送消息函数
-    handleSendMessage(combinedText);
+    await handleSendMessage(combinedText);
 
     // 清空队列
     setCommands([]);

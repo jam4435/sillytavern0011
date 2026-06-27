@@ -77,6 +77,17 @@
   position: relative;
 }
 
+.modal-box.modal-map {
+  width: min(96%, 80rem);
+  max-width: 80rem;
+  height: 90vh;
+
+  .modal-content {
+    overflow: hidden;
+    padding: 0;
+  }
+}
+
 // Modal Corners
 .corner-dec {
   position: absolute;
@@ -127,6 +138,14 @@
 
   .modal-content {
     padding: 1rem 0.875rem;
+  }
+
+  .modal-box.modal-map {
+    height: 100%;
+
+    .modal-content {
+      padding: 0;
+    }
   }
 
   .corner-dec {

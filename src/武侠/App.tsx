@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ChatInput from './components/ChatInput';
+import CommandQueueButton from './components/CommandQueueButton';
+import CommandQueuePopover from './components/CommandQueuePopover';
 import FullscreenButton from './components/FullscreenButton';
 import GameContent from './components/GameContent';
 import { Icons } from './components/Icons';
@@ -22,6 +24,7 @@ import StatusToast from './components/StatusToast';
 import VariableChangeBar from './components/VariableChangeBar';
 import {
   useDebugLogs,
+  useCommandQueue,
   useEventListeners,
   useGameState,
   useMessageHandler,
@@ -93,12 +96,19 @@ const App: React.FC = () => {
     currentOptions,
     setCurrentOptions,
   } = useGameState();
+  const {
+    commands,
+    addTravelCommand,
+    cancelCommand,
+    sendAllCommands,
+  } = useCommandQueue();
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
   const [currentPresetName, setCurrentPresetName] = useState(() => getLoadedPresetNameSafe());
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
+  const [isCommandQueueOpen, setIsCommandQueueOpen] = useState(false);
   const {
     variableChanges,
     handleVariableTurnStart,
@@ -312,6 +322,15 @@ const App: React.FC = () => {
     [displaySettings, currentPresetName],
   );
   const variableEditorCapability = useMemo(() => resolveVariableEditorCapability(), []);
+  const plannedLocations = useMemo(
+    () => commands.flatMap(command => command.type === 'TRAVEL' && command.data.location ? [command.data.location] : []),
+    [commands],
+  );
+
+  const handleSendQueuedCommands = useCallback(async () => {
+    await sendAllCommands(handleSendMessage);
+    setIsCommandQueueOpen(false);
+  }, [handleSendMessage, sendAllCommands]);
 
   // 应用正则替换到主文本
   const processedMaintext = useMemo(() => {
@@ -464,7 +483,13 @@ const App: React.FC = () => {
       case ActivePanel.CHARACTER: return <CharacterPanel stats={gameState.stats} worldTime={gameState.worldTime} />;
       case ActivePanel.MARTIAL_ARTS: return <MartialArtsPanel martialArts={gameState.stats.martialArts} cultivation={gameState.stats.cultivation} comprehension={gameState.stats.initialAttributes?.悟性 ?? 10} />;
       case ActivePanel.EVENTS: return <EventsPanel events={gameState.events} />;
-      case ActivePanel.MAP: return <MapPanel />;
+      case ActivePanel.MAP: return (
+        <MapPanel
+          currentLocation={gameState.currentLocation}
+          plannedLocations={plannedLocations}
+          onTravelCommand={addTravelCommand}
+        />
+      );
       case ActivePanel.INVENTORY: return <InventoryPanel items={gameState.inventory} />;
       case ActivePanel.SOCIAL: return <SocialPanel npcs={gameState.social} />;
       case ActivePanel.SETTINGS: return (
@@ -686,6 +711,22 @@ const App: React.FC = () => {
             {/* 底部聊天输入区域 */}
             <ChatInput
               onSend={handleSendMessage}
+              extraActions={(
+                <div className="command-queue-anchor">
+                  <CommandQueueButton
+                    commands={commands}
+                    onClick={() => setIsCommandQueueOpen(open => !open)}
+                  />
+                  {isCommandQueueOpen && (
+                    <CommandQueuePopover
+                      commands={commands}
+                      onCancel={cancelCommand}
+                      onSendAll={handleSendQueuedCommands}
+                      onClose={() => setIsCommandQueueOpen(false)}
+                    />
+                  )}
+                </div>
+              )}
               onRegenerate={handleRegenerateLastAssistant}
               canRegenerate={canRegenerate}
               isRegenerating={isLoading}

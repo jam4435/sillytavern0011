@@ -4,6 +4,7 @@ import { uiLogger } from '../utils/logger';
 
 interface ChatInputProps {
   onSend: (message: string) => void | Promise<unknown>;
+  extraActions?: React.ReactNode;
   onRegenerate?: () => void | Promise<void>;
   canRegenerate?: boolean;
   isRegenerating?: boolean;
@@ -17,6 +18,7 @@ interface ChatInputProps {
  */
 const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
+  extraActions,
   onRegenerate,
   canRegenerate = false,
   isRegenerating = false,
@@ -127,6 +129,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
             <span className="chat-input-count">{message.length}</span>
           )}
         </div>
+
+        {extraActions}
 
         {/* 重新生成按钮 */}
         <button

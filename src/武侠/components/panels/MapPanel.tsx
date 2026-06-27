@@ -13,11 +13,13 @@ import { gameLogger } from '../../utils/logger';
 
 interface MapPanelProps {
   currentLocation: string;
+  plannedLocations?: string[];
   onTravelCommand?: (locationPath: string) => void;
 }
 
 export const MapPanel: React.FC<MapPanelProps> = ({
   currentLocation,
+  plannedLocations = [],
   onTravelCommand
 }) => {
   const [mapData, setMapData] = useState<MapData>({});
@@ -95,6 +97,7 @@ export const MapPanel: React.FC<MapPanelProps> = ({
         mapData={mapData}
         exploredLocations={exploredLocations}
         currentLocation={currentLocation}
+        plannedLocations={plannedLocations}
         onLocationClick={handleLocationClick}
       />
     </div>

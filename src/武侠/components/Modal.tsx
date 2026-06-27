@@ -15,7 +15,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, type, children })
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()}>
+      <div className={`modal-box modal-${type.toLowerCase()}`} onClick={e => e.stopPropagation()}>
         
         {/* Header */}
         <div className="modal-header">
