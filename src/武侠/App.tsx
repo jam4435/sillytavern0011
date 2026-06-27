@@ -14,7 +14,7 @@ import {
   InventoryPanel,
   MapPanel,
   MartialArtsPanel,
-  SocialPanel
+  SocialPanel,
 } from './components/panels';
 import OpeningScreen from './components/OpeningScreen';
 import SettingsPanel from './components/SettingsPanel';
@@ -47,11 +47,9 @@ import {
   logRegexDebugSnapshot,
   loadSettings,
   renamePresetRegexBucket,
-  saveSettings
+  saveSettings,
 } from './utils/settingsManager';
-import {
-  resolveVariableEditorCapability,
-} from './utils/variableEditorPolicy';
+import { resolveVariableEditorCapability } from './utils/variableEditorPolicy';
 import {
   detectGameSessionState,
   getLastMessageContent,
@@ -62,12 +60,7 @@ import {
 
 const App: React.FC = () => {
   // 使用自定义 hooks
-  const {
-    latestDebugRound,
-    beginDebugRound,
-    patchLatestDebugRound,
-    clearDebugLogs,
-  } = useDebugLogs();
+  const { latestDebugRound, beginDebugRound, patchLatestDebugRound, clearDebugLogs } = useDebugLogs();
   const { toastState, showLoading, showError, dismissToast } = useToast();
   const {
     currentPage,
@@ -96,12 +89,7 @@ const App: React.FC = () => {
     currentOptions,
     setCurrentOptions,
   } = useGameState();
-  const {
-    commands,
-    addTravelCommand,
-    cancelCommand,
-    sendAllCommands,
-  } = useCommandQueue();
+  const { commands, addTravelCommand, cancelCommand, sendAllCommands } = useCommandQueue();
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
@@ -123,11 +111,7 @@ const App: React.FC = () => {
   } = useVariableChangeTracker();
 
   // 使用消息处理 hook
-  const {
-    handleSendMessage,
-    handleAutoAdvanceTurn,
-    handleRegenerateLastAssistant,
-  } = useMessageHandler({
+  const { handleSendMessage, handleAutoAdvanceTurn, handleRegenerateLastAssistant } = useMessageHandler({
     setIsLoading,
     showLoading,
     showError,
@@ -168,13 +152,13 @@ const App: React.FC = () => {
   // 使用自动总结检测 hook
   useSummaryDetection({
     summarySettings: displaySettings.summarySettings,
-    onSummaryComplete: (results) => {
+    onSummaryComplete: results => {
       gameLogger.log('[App] 自动总结完成:', results);
       if (results.totalFailed > 0) {
         showError(`总结完成，但有 ${results.totalFailed} 个角色处理失败`);
       }
     },
-    onSummaryError: (error) => {
+    onSummaryError: error => {
       gameLogger.error('[App] 自动总结失败:', error);
       showError(`自动总结失败: ${error.message}`);
     },
@@ -285,9 +269,12 @@ const App: React.FC = () => {
   );
 
   // 设置更改处理函数
-  const handleSettingsChange = useCallback((newSettings: DisplaySettings) => {
-    persistDisplaySettings(newSettings);
-  }, [persistDisplaySettings]);
+  const handleSettingsChange = useCallback(
+    (newSettings: DisplaySettings) => {
+      persistDisplaySettings(newSettings);
+    },
+    [persistDisplaySettings],
+  );
 
   useEffect(() => {
     const syncCurrentPresetName = () => {
@@ -323,7 +310,8 @@ const App: React.FC = () => {
   );
   const variableEditorCapability = useMemo(() => resolveVariableEditorCapability(), []);
   const plannedLocations = useMemo(
-    () => commands.flatMap(command => command.type === 'TRAVEL' && command.data.location ? [command.data.location] : []),
+    () =>
+      commands.flatMap(command => (command.type === 'TRAVEL' && command.data.location ? [command.data.location] : [])),
     [commands],
   );
 
@@ -366,151 +354,176 @@ const App: React.FC = () => {
   }, [clearVariableChanges, setGameState, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
 
   // 新游戏设置提交处理
-  const handleSetupSubmit = useCallback(async (formData: NewGameFormData) => {
-    setIsLoading(true);
-    showLoading('正在初始化角色...');
+  const handleSetupSubmit = useCallback(
+    async (formData: NewGameFormData) => {
+      setIsLoading(true);
+      showLoading('正在初始化角色...');
 
-    try {
-      const result = await initializeNewGameSession(formData);
+      try {
+        const result = await initializeNewGameSession(formData);
 
-      if (result.success && result.content) {
-        setOpeningWelcomeLine(result.content);
+        if (result.success && result.content) {
+          setOpeningWelcomeLine(result.content);
 
-        dismissToast();
+          dismissToast();
 
-        gameLogger.log('📖 从变量表重新读取游戏状态...');
-        const savedData = readGameDataPure();
-        gameLogger.log('readGameDataPure 返回:', savedData ? '有数据' : 'null');
-        if (savedData) {
-          gameLogger.log('变量表中的 stats:', savedData.stats);
-          setGameState(prev => ({ ...prev, ...savedData }));
-        } else {
-          gameLogger.warn('⚠️ 变量表读取失败，使用表单数据');
-          setGameState(prev => ({
-            ...prev,
-            currentLocation: formData.locationInfo.location,
-            worldTime: {
-              year: formData.locationInfo.year,
-              month: formData.locationInfo.month,
-              day: formData.locationInfo.day,
-              hour: 11
-            },
-            stats: {
-              ...prev.stats,
-              name: formData.name,
-              gender: formData.gender,
-              appearance: formData.appearance,
-              birthYear: formData.locationInfo.year - formData.age,
-              location: formData.locationInfo.location,
-              identities: { [formData.origin]: '初入江湖的新人' },
-              initialAttributes: formData.initialAttributes,
-              realm: '三流圆满',
-              cultivation: 200,
-              attributes: {
-                hp: 1000,
-                mp: 800,
-                臂力: formData.initialAttributes.臂力 * 10,
-                根骨: formData.initialAttributes.根骨 * 10,
-                机敏: formData.initialAttributes.机敏 * 10,
-                悟性: formData.initialAttributes.悟性 * 10,
-                洞察: formData.initialAttributes.洞察 * 10
+          gameLogger.log('📖 从变量表重新读取游戏状态...');
+          const savedData = readGameDataPure();
+          gameLogger.log('readGameDataPure 返回:', savedData ? '有数据' : 'null');
+          if (savedData) {
+            gameLogger.log('变量表中的 stats:', savedData.stats);
+            setGameState(prev => ({ ...prev, ...savedData }));
+          } else {
+            gameLogger.warn('⚠️ 变量表读取失败，使用表单数据');
+            setGameState(prev => ({
+              ...prev,
+              currentLocation: formData.locationInfo.location,
+              worldTime: {
+                year: formData.locationInfo.year,
+                month: formData.locationInfo.month,
+                day: formData.locationInfo.day,
+                hour: 11,
               },
-              biography: formData.origin
-            }
-          }));
+              stats: {
+                ...prev.stats,
+                name: formData.name,
+                gender: formData.gender,
+                appearance: formData.appearance,
+                birthYear: formData.locationInfo.year - formData.age,
+                location: formData.locationInfo.location,
+                identities: { [formData.origin]: '初入江湖的新人' },
+                initialAttributes: formData.initialAttributes,
+                realm: '三流圆满',
+                cultivation: 200,
+                attributes: {
+                  hp: 1000,
+                  mp: 800,
+                  臂力: formData.initialAttributes.臂力 * 10,
+                  根骨: formData.initialAttributes.根骨 * 10,
+                  机敏: formData.initialAttributes.机敏 * 10,
+                  悟性: formData.initialAttributes.悟性 * 10,
+                  洞察: formData.initialAttributes.洞察 * 10,
+                },
+                biography: formData.origin,
+              },
+            }));
+          }
+          scheduleGameDataCompletion('new-game-setup-submit', { fullScan: true });
+
+          setSavedGameExists(true);
+          setCurrentMaintext('');
+          setCurrentOptions([]);
+          clearVariableChanges();
+          gameLogger.log('✅ 欢迎语已设置到开局输入界面');
+          gameLogger.log('欢迎语:', result.content);
+
+          setCurrentPage('opening');
+        } else {
+          gameLogger.error('创建开局失败:', result.error);
+          showError(`初始化失败：${result.error || '创建开局楼层时出错'}，请重试`);
         }
-        scheduleGameDataCompletion('new-game-setup-submit', { fullScan: true });
-
-        setSavedGameExists(true);
-        setCurrentMaintext('');
-        setCurrentOptions([]);
-        clearVariableChanges();
-        gameLogger.log('✅ 欢迎语已设置到开局输入界面');
-        gameLogger.log('欢迎语:', result.content);
-
-        setCurrentPage('opening');
-      } else {
-        gameLogger.error('创建开局失败:', result.error);
-        showError(`初始化失败：${result.error || '创建开局楼层时出错'}，请重试`);
+      } catch (error) {
+        gameLogger.error('创建开局出错:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        showError(`生成失败：${errorMessage}`);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      gameLogger.error('创建开局出错:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      showError(`生成失败：${errorMessage}`);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    clearVariableChanges,
-    setIsLoading,
-    showLoading,
-    showError,
-    dismissToast,
-    setGameState,
-    setCurrentMaintext,
-    setCurrentOptions,
-    setSavedGameExists,
-    setCurrentPage,
-  ]);
+    },
+    [
+      clearVariableChanges,
+      setIsLoading,
+      showLoading,
+      showError,
+      dismissToast,
+      setGameState,
+      setCurrentMaintext,
+      setCurrentOptions,
+      setSavedGameExists,
+      setCurrentPage,
+    ],
+  );
 
-  const handleOpeningSend = useCallback(async (message: string) => {
-    await handleSendMessage(message);
+  const handleOpeningSend = useCallback(
+    async (message: string) => {
+      await handleSendMessage(message);
 
-    const lastContent = getLastMessageContent();
-    if (lastContent) {
-      setCurrentMaintext(lastContent);
-      setCurrentOptions(parseOptions(lastContent));
-      setCurrentPage('game');
-    }
-  }, [handleSendMessage, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
+      const lastContent = getLastMessageContent();
+      if (lastContent) {
+        setCurrentMaintext(lastContent);
+        setCurrentOptions(parseOptions(lastContent));
+        setCurrentPage('game');
+      }
+    },
+    [handleSendMessage, setCurrentMaintext, setCurrentOptions, setCurrentPage],
+  );
 
   const getModalTitle = (panel: ActivePanel) => {
-    switch(panel) {
-      case ActivePanel.CHARACTER: return "侠客状态";
-      case ActivePanel.MARTIAL_ARTS: return "武学秘籍";
-      case ActivePanel.EVENTS: return "江湖轶事";
-      case ActivePanel.INVENTORY: return "行囊包裹";
-      case ActivePanel.MAP: return "九州舆图";
-      case ActivePanel.SOCIAL: return "江湖侠缘";
-      case ActivePanel.SETTINGS: return "界面设置";
-      case ActivePanel.SAVE_LOAD: return "存档与分叉";
-      default: return "";
+    switch (panel) {
+      case ActivePanel.CHARACTER:
+        return '侠客状态';
+      case ActivePanel.MARTIAL_ARTS:
+        return '武学秘籍';
+      case ActivePanel.EVENTS:
+        return '江湖轶事';
+      case ActivePanel.INVENTORY:
+        return '行囊包裹';
+      case ActivePanel.MAP:
+        return '九州舆图';
+      case ActivePanel.SOCIAL:
+        return '江湖侠缘';
+      case ActivePanel.SETTINGS:
+        return '界面设置';
+      case ActivePanel.SAVE_LOAD:
+        return '存档与分叉';
+      default:
+        return '';
     }
   };
 
   const renderModalContent = () => {
-    switch(activePanel) {
-      case ActivePanel.CHARACTER: return <CharacterPanel stats={gameState.stats} worldTime={gameState.worldTime} />;
-      case ActivePanel.MARTIAL_ARTS: return <MartialArtsPanel martialArts={gameState.stats.martialArts} cultivation={gameState.stats.cultivation} comprehension={gameState.stats.initialAttributes?.悟性 ?? 10} />;
-      case ActivePanel.EVENTS: return <EventsPanel events={gameState.events} />;
-      case ActivePanel.MAP: return (
-        <MapPanel
-          currentLocation={gameState.currentLocation}
-          plannedLocations={plannedLocations}
-          onTravelCommand={addTravelCommand}
-        />
-      );
-      case ActivePanel.INVENTORY: return <InventoryPanel items={gameState.inventory} />;
-      case ActivePanel.SOCIAL: return <SocialPanel npcs={gameState.social} />;
-      case ActivePanel.SETTINGS: return (
-        <SettingsPanel
-          currentPresetName={currentPresetName}
-          settings={displaySettings}
-          onSettingsChange={handleSettingsChange}
-          variableEditorCapability={variableEditorCapability}
-          latestDebugRound={latestDebugRound}
-          onClearDebugLogs={clearDebugLogs}
-          onAutoAdvanceTurn={handleAutoAdvanceTurn}
-          isGenerating={isLoading}
-        />
-      );
-      case ActivePanel.SAVE_LOAD: return (
-        <SaveLoadPanel
-          gameState={gameState}
-          onClose={closeModal}
-        />
-      );
-      default: return null;
+    switch (activePanel) {
+      case ActivePanel.CHARACTER:
+        return <CharacterPanel stats={gameState.stats} worldTime={gameState.worldTime} />;
+      case ActivePanel.MARTIAL_ARTS:
+        return (
+          <MartialArtsPanel
+            martialArts={gameState.stats.martialArts}
+            cultivation={gameState.stats.cultivation}
+            comprehension={gameState.stats.initialAttributes?.悟性 ?? 10}
+          />
+        );
+      case ActivePanel.EVENTS:
+        return <EventsPanel events={gameState.events} />;
+      case ActivePanel.MAP:
+        return (
+          <MapPanel
+            currentLocation={gameState.currentLocation}
+            plannedLocations={plannedLocations}
+            onTravelCommand={addTravelCommand}
+          />
+        );
+      case ActivePanel.INVENTORY:
+        return <InventoryPanel items={gameState.inventory} />;
+      case ActivePanel.SOCIAL:
+        return <SocialPanel npcs={gameState.social} />;
+      case ActivePanel.SETTINGS:
+        return (
+          <SettingsPanel
+            currentPresetName={currentPresetName}
+            settings={displaySettings}
+            onSettingsChange={handleSettingsChange}
+            variableEditorCapability={variableEditorCapability}
+            latestDebugRound={latestDebugRound}
+            onClearDebugLogs={clearDebugLogs}
+            onAutoAdvanceTurn={handleAutoAdvanceTurn}
+            isGenerating={isLoading}
+          />
+        );
+      case ActivePanel.SAVE_LOAD:
+        return <SaveLoadPanel gameState={gameState} onClose={closeModal} />;
+      default:
+        return null;
     }
   };
 
@@ -524,28 +537,14 @@ const App: React.FC = () => {
   }
 
   if (currentPage === 'splash') {
-    return (
-      <SplashScreen
-        hasSavedGame={savedGameExists}
-        onNewGame={handleNewGame}
-        onContinue={handleContinue}
-      />
-    );
+    return <SplashScreen hasSavedGame={savedGameExists} onNewGame={handleNewGame} onContinue={handleContinue} />;
   }
 
   if (currentPage === 'setup') {
     return (
       <>
-        <StatusToast
-          state={toastState}
-          onDismiss={dismissToast}
-          autoHideDelay={8000}
-        />
-        <NewGameSetup
-          onSubmit={handleSetupSubmit}
-          onBack={handleSetupBack}
-          isLoading={isLoading}
-        />
+        <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
+        <NewGameSetup onSubmit={handleSetupSubmit} onBack={handleSetupBack} isLoading={isLoading} />
       </>
     );
   }
@@ -553,11 +552,7 @@ const App: React.FC = () => {
   if (currentPage === 'opening') {
     return (
       <>
-        <StatusToast
-          state={toastState}
-          onDismiss={dismissToast}
-          autoHideDelay={8000}
-        />
+        <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
         <OpeningScreen
           welcomeLine={openingWelcomeLine}
           playerName={gameState.stats.name}
@@ -572,23 +567,23 @@ const App: React.FC = () => {
   // 主游戏界面
   return (
     <div className="app-container">
-      <StatusToast
-        state={toastState}
-        onDismiss={dismissToast}
-        autoHideDelay={8000}
-      />
+      <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
 
       {/* Background Ambience Layer */}
       <div className="bg-layer">
         <div
           className="bg-img"
-          style={displaySettings.backgroundImage ? {
-            backgroundImage: `url(${displaySettings.backgroundImage})`,
-            opacity: displaySettings.backgroundOpacity,
-            ...(displaySettings.backgroundBlur > 0
-              ? { filter: `blur(${displaySettings.backgroundBlur}px)` }
-              : {}),
-          } : undefined}
+          style={
+            displaySettings.backgroundImage
+              ? {
+                  backgroundImage: `url(${displaySettings.backgroundImage})`,
+                  opacity: displaySettings.backgroundOpacity,
+                  ...(displaySettings.backgroundBlur > 0
+                    ? { filter: `blur(${displaySettings.backgroundBlur}px)` }
+                    : {}),
+                }
+              : undefined
+          }
         ></div>
         <div
           className="bg-gradient-vert"
@@ -622,139 +617,184 @@ const App: React.FC = () => {
         </button>
 
         {/* 移动端侧边栏遮罩层 */}
-        <div
-          className={`nav-sidebar-overlay ${isSidebarOpen ? 'active' : ''}`}
-          onClick={closeSidebar}
-        />
+        <div className={`nav-sidebar-overlay ${isSidebarOpen ? 'active' : ''}`} onClick={closeSidebar} />
 
         {/* Navigation Sidebar */}
         <nav className={`nav-sidebar ${isSidebarOpen ? 'open' : ''}`}>
-            <div className="logo-box">
-                <span className="logo-char">墨</span>
-            </div>
+          <div className="logo-box">
+            <span className="logo-char">墨</span>
+          </div>
 
-            <NavButton icon={<Icons.Character />} label="状态" isActive={activePanel === ActivePanel.CHARACTER} onClick={() => handleNavClick(ActivePanel.CHARACTER)} />
-            <NavButton icon={<Icons.Manual />} label="功法" isActive={activePanel === ActivePanel.MARTIAL_ARTS} onClick={() => handleNavClick(ActivePanel.MARTIAL_ARTS)} />
-            <NavButton icon={<Icons.Inventory />} label="行囊" isActive={activePanel === ActivePanel.INVENTORY} onClick={() => handleNavClick(ActivePanel.INVENTORY)} />
-            <NavButton icon={<Icons.Quest />} label="事件" isActive={activePanel === ActivePanel.EVENTS} onClick={() => handleNavClick(ActivePanel.EVENTS)} />
-            <NavButton icon={<Icons.Map />} label="地图" isActive={activePanel === ActivePanel.MAP} onClick={() => handleNavClick(ActivePanel.MAP)} />
-            <NavButton icon={<Icons.Social />} label="侠缘" isActive={activePanel === ActivePanel.SOCIAL} onClick={() => handleNavClick(ActivePanel.SOCIAL)} />
-            <NavButton icon={<Icons.Settings />} label="设置" isActive={activePanel === ActivePanel.SETTINGS} onClick={() => handleNavClick(ActivePanel.SETTINGS)} />
+          <NavButton
+            icon={<Icons.Character />}
+            label="状态"
+            isActive={activePanel === ActivePanel.CHARACTER}
+            onClick={() => handleNavClick(ActivePanel.CHARACTER)}
+          />
+          <NavButton
+            icon={<Icons.Manual />}
+            label="功法"
+            isActive={activePanel === ActivePanel.MARTIAL_ARTS}
+            onClick={() => handleNavClick(ActivePanel.MARTIAL_ARTS)}
+          />
+          <NavButton
+            icon={<Icons.Inventory />}
+            label="行囊"
+            isActive={activePanel === ActivePanel.INVENTORY}
+            onClick={() => handleNavClick(ActivePanel.INVENTORY)}
+          />
+          <NavButton
+            icon={<Icons.Quest />}
+            label="事件"
+            isActive={activePanel === ActivePanel.EVENTS}
+            onClick={() => handleNavClick(ActivePanel.EVENTS)}
+          />
+          <NavButton
+            icon={<Icons.Map />}
+            label="地图"
+            isActive={activePanel === ActivePanel.MAP}
+            onClick={() => handleNavClick(ActivePanel.MAP)}
+          />
+          <NavButton
+            icon={<Icons.Social />}
+            label="侠缘"
+            isActive={activePanel === ActivePanel.SOCIAL}
+            onClick={() => handleNavClick(ActivePanel.SOCIAL)}
+          />
+          <NavButton
+            icon={<Icons.Settings />}
+            label="设置"
+            isActive={activePanel === ActivePanel.SETTINGS}
+            onClick={() => handleNavClick(ActivePanel.SETTINGS)}
+          />
         </nav>
 
         {/* Main Content */}
         <main className="main-column">
-            <header className="game-header">
-                <div className="location-group">
-                    <div className="loc-value">
-                        <Icons.Compass className="loc-icon" />
-                        <span className="loc-name">{gameState.currentLocation}</span>
-                    </div>
-                    <div className="time-value">{gameState.gameTime}</div>
-                </div>
-
-                <div className="header-right">
-                    <button
-                      type="button"
-                      className={`header-action-btn ${activePanel === ActivePanel.SAVE_LOAD ? 'active' : ''}`}
-                      onClick={() => setActivePanel(ActivePanel.SAVE_LOAD)}
-                      title="存档与分叉"
-                      aria-label="存档与分叉"
-                    >
-                      <Icons.Variables size={14} />
-                    </button>
-                    <FullscreenButton className="header-fullscreen-btn header-fullscreen-btn-small" />
-
-                    <div className="status-bars-container">
-                        <div className="bar-group">
-                            <span className="bar-label">血</span>
-                            <div className="bar-bg">
-                                <div className="bar-fill-hp" style={{ width: `${Math.min(100, gameState.stats.attributes.hp)}%` }}></div>
-                            </div>
-                        </div>
-                        <div className="bar-group">
-                            <span className="bar-label">气</span>
-                            <div className="bar-bg">
-                                <div className="bar-fill-mp" style={{ width: `${Math.min(100, gameState.stats.attributes.mp)}%` }}></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="player-info">
-                        <div className="player-name">{gameState.stats.name}</div>
-                        <div className="player-realm">{gameState.stats.realm}</div>
-                    </div>
-
-                    <div className="avatar-small">
-                        <div className="avatar-glow"></div>
-                        <img src="https://picsum.photos/100/100?grayscale" alt="Avatar" />
-                    </div>
-                </div>
-            </header>
-
-            {/* 游戏主体内容区域 */}
-            <section className="game-content-wrapper">
-              <GameContent
-                maintext={processedMaintext}
-                options={currentOptions}
-                onSelectOption={(option) => {
-                  handleSendMessage(option);
-                }}
-                settings={displaySettings}
-              />
-            </section>
-
-            <div className="variable-change-dock">
-              <VariableChangeBar summary={variableChanges || null} />
+          <header className="game-header">
+            <div className="location-group">
+              <div className="loc-value">
+                <Icons.Compass className="loc-icon" />
+                <span className="loc-name">{gameState.currentLocation}</span>
+              </div>
+              <div className="time-value">{gameState.gameTime}</div>
             </div>
 
-            {/* 底部聊天输入区域 */}
-            <ChatInput
-              onSend={handleSendMessage}
-              extraActions={(
-                <div className="command-queue-anchor">
-                  <CommandQueueButton
-                    commands={commands}
-                    onClick={() => setIsCommandQueueOpen(open => !open)}
-                  />
-                  {isCommandQueueOpen && (
-                    <CommandQueuePopover
-                      commands={commands}
-                      onCancel={cancelCommand}
-                      onSendAll={handleSendQueuedCommands}
-                      onClose={() => setIsCommandQueueOpen(false)}
-                    />
-                  )}
+            <div className="header-right">
+              <button
+                type="button"
+                className={`header-action-btn ${activePanel === ActivePanel.SAVE_LOAD ? 'active' : ''}`}
+                onClick={() => setActivePanel(ActivePanel.SAVE_LOAD)}
+                title="存档与分叉"
+                aria-label="存档与分叉"
+              >
+                <Icons.Variables size={14} />
+              </button>
+              <FullscreenButton className="header-fullscreen-btn header-fullscreen-btn-small" />
+
+              <div className="status-bars-container">
+                <div className="bar-group">
+                  <span className="bar-label">血</span>
+                  <div className="bar-bg">
+                    <div
+                      className="bar-fill-hp"
+                      style={{ width: `${Math.min(100, gameState.stats.attributes.hp)}%` }}
+                    ></div>
+                  </div>
                 </div>
-              )}
-              onRegenerate={handleRegenerateLastAssistant}
-              canRegenerate={canRegenerate}
-              isRegenerating={isLoading}
-              disabled={isLoading}
-              placeholder="书写你的江湖故事..."
+                <div className="bar-group">
+                  <span className="bar-label">气</span>
+                  <div className="bar-bg">
+                    <div
+                      className="bar-fill-mp"
+                      style={{ width: `${Math.min(100, gameState.stats.attributes.mp)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="player-info">
+                <div className="player-name">{gameState.stats.name}</div>
+                <div className="player-realm">{gameState.stats.realm}</div>
+              </div>
+
+              <div className="avatar-small">
+                <div className="avatar-glow"></div>
+                <img src="https://picsum.photos/100/100?grayscale" alt="Avatar" />
+              </div>
+            </div>
+          </header>
+
+          {/* 游戏主体内容区域 */}
+          <section className="game-content-wrapper">
+            <GameContent
+              maintext={processedMaintext}
+              options={currentOptions}
+              onSelectOption={option => {
+                handleSendMessage(option);
+              }}
+              settings={displaySettings}
             />
+          </section>
+
+          <div className="variable-change-dock">
+            <VariableChangeBar summary={variableChanges || null} />
+          </div>
+
+          {/* 底部聊天输入区域 */}
+          <ChatInput
+            onSend={handleSendMessage}
+            extraActions={
+              <div className="command-queue-anchor">
+                <CommandQueueButton commands={commands} onClick={() => setIsCommandQueueOpen(open => !open)} />
+                {isCommandQueueOpen && (
+                  <CommandQueuePopover
+                    commands={commands}
+                    onCancel={cancelCommand}
+                    onSendAll={handleSendQueuedCommands}
+                    onClose={() => setIsCommandQueueOpen(false)}
+                  />
+                )}
+              </div>
+            }
+            onRegenerate={handleRegenerateLastAssistant}
+            canRegenerate={canRegenerate}
+            isRegenerating={isLoading}
+            disabled={isLoading}
+            placeholder="书写你的江湖故事..."
+          />
         </main>
       </div>
 
       {/* Modals */}
-      <Modal isOpen={activePanel !== ActivePanel.NONE} onClose={closeModal} title={getModalTitle(activePanel)} type={activePanel}>
+      <Modal
+        isOpen={activePanel !== ActivePanel.NONE}
+        onClose={closeModal}
+        title={getModalTitle(activePanel)}
+        type={activePanel}
+      >
         {renderModalContent()}
       </Modal>
     </div>
   );
 };
 
-const NavButton = ({ icon, label, isActive, onClick }: { icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) => (
-    <button
-        onClick={onClick}
-        className={`nav-btn ${isActive ? 'active' : ''}`}
-    >
-        {isActive && <div className="nav-btn-indicator"></div>}
-        <div className="nav-icon-wrapper">
-            {icon}
-        </div>
-        <span className="nav-label">{label}</span>
-    </button>
+const NavButton = ({
+  icon,
+  label,
+  isActive,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}) => (
+  <button onClick={onClick} className={`nav-btn ${isActive ? 'active' : ''}`}>
+    {isActive && <div className="nav-btn-indicator"></div>}
+    <div className="nav-icon-wrapper">{icon}</div>
+    <span className="nav-label">{label}</span>
+  </button>
 );
 
 export default App;

@@ -14,12 +14,7 @@ interface CommandQueuePopoverProps {
   onClose: () => void;
 }
 
-const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({
-  commands,
-  onCancel,
-  onSendAll,
-  onClose
-}) => {
+const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({ commands, onCancel, onSendAll, onClose }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭浮窗
@@ -53,7 +48,7 @@ const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({
         {commands.length === 0 ? (
           <div className="empty-message">暂无待发送指令</div>
         ) : (
-          commands.map((command) => (
+          commands.map(command => (
             <div key={command.id} className="command-card">
               <div className="command-content">
                 <div className="command-type-icon">

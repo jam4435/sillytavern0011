@@ -472,13 +472,20 @@
 // Command Queue - 指令队列
 // =========================================
 
+.command-queue-anchor {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
 .command-queue-btn {
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   flex-shrink: 0;
   background: linear-gradient(135deg, rgba(28, 25, 23, 0.6), rgba(41, 37, 36, 0.4));
   border: 1px solid rgba(181, 137, 80, 0.3);
-  border-radius: 6px;
+  border-radius: 9px;
   cursor: pointer;
   position: relative;
   transition: all 0.3s ease;
@@ -491,6 +498,11 @@
     border-color: rgba(212, 175, 55, 0.6);
     box-shadow: 0 0 12px rgba(181, 137, 80, 0.3);
     color: var(--stone-200);
+  }
+
+  @media (max-width: 768px) {
+    width: 40px;
+    height: 40px;
   }
 
   // 指令数量徽章
@@ -533,6 +545,12 @@
     padding: 0.75rem 1rem;
     border-bottom: 1px solid rgba(181, 137, 80, 0.2);
 
+    .popover-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .popover-title {
       font-size: 0.9rem;
       color: #d4af37;
@@ -545,6 +563,24 @@
       border-radius: 12px;
       font-size: 0.75rem;
       font-weight: bold;
+    }
+
+    .popover-close-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--stone-500);
+      cursor: pointer;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--stone-200);
+      }
     }
   }
 
@@ -585,8 +621,13 @@
       gap: 0.5rem;
 
       .command-type-icon {
-        font-size: 1.2rem;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         flex-shrink: 0;
+        color: #c79752;
       }
 
       .command-text {
@@ -654,5 +695,14 @@
         box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
       }
     }
+  }
+
+  @media (max-width: 420px) {
+    position: fixed;
+    right: 12px;
+    bottom: 90px;
+    left: 12px;
+    width: auto;
+    max-height: min(400px, calc(100vh - 120px));
   }
 }

@@ -16,16 +16,15 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, type, children })
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className={`modal-box modal-${type.toLowerCase()}`} onClick={e => e.stopPropagation()}>
-        
         {/* Header */}
         <div className="modal-header">
-            <div className="modal-title-group">
-                <div className="title-bar"></div>
-                <h2 className="modal-title">{title}</h2>
-            </div>
-            <button onClick={onClose} className="modal-close-btn">
-                <Icons.Close />
-            </button>
+          <div className="modal-title-group">
+            <div className="title-bar"></div>
+            <h2 className="modal-title">{title}</h2>
+          </div>
+          <button onClick={onClose} className="modal-close-btn">
+            <Icons.Close />
+          </button>
         </div>
 
         {/* Decorative Corners */}
@@ -36,8 +35,16 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, type, children })
 
         {/* Body */}
         <div className="modal-content">
-            <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url(https://www.transparenttextures.com/patterns/chinese-style.png)', opacity: 0.05, pointerEvents: 'none' }}></div>
-            {children}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(https://www.transparenttextures.com/patterns/chinese-style.png)',
+              opacity: 0.05,
+              pointerEvents: 'none',
+            }}
+          ></div>
+          {children}
         </div>
       </div>
     </div>

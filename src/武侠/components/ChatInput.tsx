@@ -23,7 +23,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   canRegenerate = false,
   isRegenerating = false,
   placeholder = '书写你的江湖故事...',
-  disabled = false
+  disabled = false,
 }) => {
   const [message, setMessage] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -54,7 +54,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     uiLogger.log('   message.trim():', message.trim());
     uiLogger.log('   disabled:', inputDisabled);
     uiLogger.log('   条件判断: message.trim() && !disabled =', !!(message.trim() && !inputDisabled));
-    
+
     if (message.trim() && !inputDisabled) {
       uiLogger.log('✅ [ChatInput.handleSend] 条件满足，调用 onSend()');
       const trimmedMessage = message.trim();
@@ -100,7 +100,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     <div className={`chat-input-wrapper ${isFocused ? 'focused' : ''}`}>
       {/* 装饰性顶部边框 */}
       <div className="chat-input-top-border"></div>
-      
+
       <div className="chat-input-container">
         {/* 左侧装饰 */}
         <div className="chat-input-decor left">
@@ -123,11 +123,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
             disabled={inputDisabled}
             rows={1}
           />
-          
+
           {/* 字数提示 */}
-          {message.length > 0 && (
-            <span className="chat-input-count">{message.length}</span>
-          )}
+          {message.length > 0 && <span className="chat-input-count">{message.length}</span>}
         </div>
 
         {extraActions}
@@ -150,13 +148,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
           title="发送 (Enter)"
         >
           <div className="send-btn-bg"></div>
-          <svg 
-            className="send-btn-icon" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
+          <svg
+            className="send-btn-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
             strokeWidth="2"
-            strokeLinecap="round" 
+            strokeLinecap="round"
             strokeLinejoin="round"
           >
             <path d="M5 12h14M12 5l7 7-7 7" />

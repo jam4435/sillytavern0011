@@ -17,11 +17,7 @@ interface MapPanelProps {
   onTravelCommand?: (locationPath: string) => void;
 }
 
-export const MapPanel: React.FC<MapPanelProps> = ({
-  currentLocation,
-  plannedLocations = [],
-  onTravelCommand
-}) => {
+export const MapPanel: React.FC<MapPanelProps> = ({ currentLocation, plannedLocations = [], onTravelCommand }) => {
   const [mapData, setMapData] = useState<MapData>({});
   const [exploredLocations, setExploredLocations] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);

@@ -12,10 +12,7 @@ interface CommandQueueButtonProps {
   onClick: () => void;
 }
 
-const CommandQueueButton: React.FC<CommandQueueButtonProps> = ({
-  commands,
-  onClick
-}) => {
+const CommandQueueButton: React.FC<CommandQueueButtonProps> = ({ commands, onClick }) => {
   const commandCount = commands.length;
 
   return (
@@ -28,9 +25,7 @@ const CommandQueueButton: React.FC<CommandQueueButtonProps> = ({
       <ListTodo size={20} />
 
       {/* 数量徽章 */}
-      {commandCount > 0 && (
-        <span className="command-count">{commandCount}</span>
-      )}
+      {commandCount > 0 && <span className="command-count">{commandCount}</span>}
     </button>
   );
 };

@@ -1,8 +1,4 @@
-export {
-  useDebugLogs,
-  type LatestDebugRound,
-  type LatestDebugRoundPatch,
-} from './useDebugLogs';
+export { useDebugLogs, type LatestDebugRound, type LatestDebugRoundPatch } from './useDebugLogs';
 export { useToast } from './useToast';
 export { usePageFlow } from './usePageFlow';
 export { useGameState, DEFAULT_GAME_STATE } from './useGameState';

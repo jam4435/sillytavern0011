@@ -1,11 +1,6 @@
 import locationTable from '../射雕神雕地点表.yaml';
 import { MapData } from '../types';
-import {
-  AREA_COORDINATES,
-  AREA_DESCRIPTIONS,
-  clampMapCoordinate,
-  REGION_COORDINATES,
-} from '../data/mapCoordinates';
+import { AREA_COORDINATES, AREA_DESCRIPTIONS, clampMapCoordinate, REGION_COORDINATES } from '../data/mapCoordinates';
 
 let cachedMapData: MapData | null = null;
 

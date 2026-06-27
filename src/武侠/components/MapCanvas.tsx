@@ -75,7 +75,9 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     const destinations = plannedLocations
       .map(path => ({ path, coordinate: resolveLocationCoordinate(mapData, path) }))
       .filter((item): item is { path: string; coordinate: MapCoordinate } => item.coordinate !== null);
-    const points = current ? [current, ...destinations.map(item => item.coordinate)] : destinations.map(item => item.coordinate);
+    const points = current
+      ? [current, ...destinations.map(item => item.coordinate)]
+      : destinations.map(item => item.coordinate);
 
     return {
       current,
@@ -109,16 +111,26 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const isCurrentRegion = (areaName: string, regionName: string, region: MapRegion): boolean =>
     currentLocation === `${areaName}/${regionName}` ||
     currentLocation.endsWith(regionName) ||
-    Object.keys(region.地点).some(locationName =>
-      currentLocation === `${areaName}/${regionName}/${locationName}` || currentLocation.endsWith(locationName),
+    Object.keys(region.地点).some(
+      locationName =>
+        currentLocation === `${areaName}/${regionName}/${locationName}` || currentLocation.endsWith(locationName),
     );
 
   return (
     <div className="map-canvas">
       <div className="map-legend" aria-hidden="true">
-        <span><i className="legend-current" />所在</span>
-        <span><i className="legend-region" />地点</span>
-        <span><i className="legend-route" />行程</span>
+        <span>
+          <i className="legend-current" />
+          所在
+        </span>
+        <span>
+          <i className="legend-region" />
+          地点
+        </span>
+        <span>
+          <i className="legend-route" />
+          行程
+        </span>
       </div>
 
       {plannedLocations.length > 0 && (
@@ -141,7 +153,15 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
           <filter id="map-route-glow" x="-50%" y="-50%" width="200%" height="200%">
             <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#fff1b8" floodOpacity="0.75" />
           </filter>
-          <marker id="route-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <marker
+            id="route-arrow"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="8"
+            markerHeight="8"
+            orient="auto-start-reverse"
+          >
             <path d="M 0 0 L 10 5 L 0 10 z" fill="#7f1d1d" />
           </marker>
         </defs>
@@ -201,7 +221,11 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         )}
 
         {route.current && (
-          <g className="current-location-marker" transform={`translate(${route.current.x} ${route.current.y})`} aria-hidden="true">
+          <g
+            className="current-location-marker"
+            transform={`translate(${route.current.x} ${route.current.y})`}
+            aria-hidden="true"
+          >
             <circle className="current-pulse" r="18" />
             <circle className="current-dot" r="7" />
           </g>
@@ -215,7 +239,9 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
             aria-hidden="true"
           >
             <circle r="11" />
-            <text x="0" y="4" textAnchor="middle">{index + 1}</text>
+            <text x="0" y="4" textAnchor="middle">
+              {index + 1}
+            </text>
           </g>
         ))}
       </svg>
