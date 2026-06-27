@@ -558,9 +558,14 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                 <circle className="marker-hit-area" cx={region.坐标.x} cy={region.坐标.y} r="18" />
                 <circle className="marker-ring" cx={region.坐标.x} cy={region.坐标.y} r={current ? 9 : 7} />
                 <circle className="marker-core" cx={region.坐标.x} cy={region.坐标.y} r={current ? 3.5 : 2.5} />
-                <text className="region-label" x={region.坐标.x} y={region.坐标.y - 17} textAnchor="middle">
-                  {regionName}
-                </text>
+                <g
+                  className="region-label-anchor"
+                  transform={`translate(${region.坐标.x} ${region.坐标.y}) scale(${1 / camera.zoom})`}
+                >
+                  <text className="region-label" x="0" y="-17" textAnchor="middle">
+                    {regionName}
+                  </text>
+                </g>
               </g>
             );
           }),

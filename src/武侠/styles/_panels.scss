@@ -1850,7 +1850,6 @@
   .region-label {
     transition:
       opacity 0.18s ease,
-      transform 0.18s ease,
       fill 0.18s ease,
       stroke 0.18s ease;
   }
@@ -1878,7 +1877,10 @@
     letter-spacing: 0;
     opacity: 0;
     pointer-events: none;
-    transform: translateY(4px);
+  }
+
+  .region-label-anchor {
+    pointer-events: none;
   }
 
   &:hover,
@@ -1887,7 +1889,6 @@
   &.current {
     .region-label {
       opacity: 1;
-      transform: translateY(0);
     }
 
     .marker-ring {
@@ -2164,6 +2165,74 @@
     letter-spacing: 0;
   }
 
+  .map-search-field {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    min-height: 40px;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) 28px;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 10px;
+    padding: 0 5px 0 10px;
+    border: 1px solid rgba(198, 156, 90, 0.24);
+    border-radius: 5px;
+    background: rgba(24, 22, 19, 0.96);
+    color: #8e8372;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18);
+
+    &:focus-within {
+      border-color: rgba(222, 181, 112, 0.46);
+      color: #d0ae75;
+    }
+
+    input {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: #e1d7c6;
+      font-family: var(--font-serif);
+      font-size: 12px;
+      letter-spacing: 0;
+
+      &::placeholder {
+        color: #6f675c;
+      }
+
+      &::-webkit-search-cancel-button {
+        display: none;
+      }
+    }
+
+    button {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
+      color: #887f72;
+      cursor: pointer;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: #e5d5b8;
+      }
+    }
+  }
+
+  .map-search-empty {
+    padding: 28px 12px;
+    color: #81786b;
+    font-size: 12px;
+    text-align: center;
+  }
+
   .sidebar-content {
     display: flex;
     flex-direction: column;
@@ -2298,6 +2367,15 @@
 
     .sidebar-title {
       display: none;
+    }
+
+    .map-search-field {
+      min-height: 42px;
+      margin-bottom: 7px;
+
+      input {
+        font-size: 14px;
+      }
     }
 
     .area-header,
