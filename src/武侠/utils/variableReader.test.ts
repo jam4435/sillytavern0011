@@ -252,6 +252,7 @@ describe('autoUpdateMartialArts', () => {
   });
 
   it('回读验证失败时不会更新缓存，同一功法下次仍会继续尝试', async () => {
+    vi.useFakeTimers();
     currentChatStatData = {
       user数据: {
         功法: {
@@ -283,6 +284,7 @@ describe('autoUpdateMartialArts', () => {
     const 玩家功法 = clone((currentChatStatData.user数据 as JsonRecord).功法) as Record<string, JsonRecord>;
 
     await autoUpdateMartialArts(玩家功法 as never, undefined, { 用户名: '郭靖' });
+    await vi.advanceTimersByTimeAsync(120);
     await autoUpdateMartialArts(玩家功法 as never, undefined, { 用户名: '郭靖' });
 
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(4);

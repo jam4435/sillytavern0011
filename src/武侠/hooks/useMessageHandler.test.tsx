@@ -226,7 +226,7 @@ describe('useMessageHandler extra-variable decision', () => {
     });
 
     expect(options.onVariableExtraDeclaredBlocks).not.toHaveBeenCalled();
-    expect(options.showError).toHaveBeenCalledWith('AI 回复已生成，但额外变量更新失败：extra failed');
+    expect(options.showError).toHaveBeenCalledWith('正文已生成，但额外变量更新失败：extra failed');
   });
 
   it('regenerate + inline 会显式标记 skipped，且不会触发额外变量链路', async () => {
