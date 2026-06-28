@@ -104,6 +104,7 @@ const App: React.FC = () => {
     handleVariableTurnStart,
     handleGlobalMessageSent,
     handleVariableAssistantReply,
+    handleVariableExtraDeclaredBlocks,
     handleVariableMessageBoundary,
     handleEraWriteDone,
     handleDirectVariableWriteDone,
@@ -128,6 +129,7 @@ const App: React.FC = () => {
     summarySettings: displaySettings.summarySettings,
     onVariableTurnStart: handleVariableTurnStart,
     onVariableAssistantReply: handleVariableAssistantReply,
+    onVariableExtraDeclaredBlocks: handleVariableExtraDeclaredBlocks,
     onVariableAiWriteTarget: markVariableApiWriteAsAi,
   });
 

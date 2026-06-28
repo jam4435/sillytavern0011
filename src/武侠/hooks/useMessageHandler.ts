@@ -55,6 +55,7 @@ interface UseMessageHandlerOptions {
   summarySettings: SummarySettings;
   onVariableTurnStart?: () => void;
   onVariableAssistantReply?: (rawReply: string, assistantMessageId?: number) => void;
+  onVariableExtraDeclaredBlocks?: (blocksText: string, assistantMessageId?: number) => void;
   onVariableAiWriteTarget?: (assistantMessageId: number) => void;
 }
 
@@ -269,6 +270,7 @@ export function useMessageHandler({
   summarySettings,
   onVariableTurnStart,
   onVariableAssistantReply,
+  onVariableExtraDeclaredBlocks,
   onVariableAiWriteTarget,
 }: UseMessageHandlerOptions) {
   const refreshAssistantStateFromFinalText = useCallback(
@@ -362,6 +364,9 @@ export function useMessageHandler({
         actionBlockCount: extraUpdateResult.actionBlockCount,
         appended: extraUpdateResult.appended,
       });
+      if (typeof extraUpdateResult.appendedBlocks === 'string' && extraUpdateResult.appendedBlocks.trim()) {
+        onVariableExtraDeclaredBlocks?.(extraUpdateResult.appendedBlocks, assistantMessageId);
+      }
       patchLatestDebugRound({
         variable: createExtraVariableDecisionPatch(decision, {
           status: 'success',
@@ -379,7 +384,7 @@ export function useMessageHandler({
 
       return extraUpdateResult;
     },
-    [patchLatestDebugRound, showLoading, summarySettings],
+    [onVariableExtraDeclaredBlocks, patchLatestDebugRound, showLoading, summarySettings],
   );
 
   const handleSendMessage = useCallback(

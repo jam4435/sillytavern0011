@@ -15,10 +15,12 @@ import {
   readCurrentStatDataSnapshot,
   stableStringify,
   type VariableActualChange,
+  type VariableDeclaredChange,
   type VariableChangeOrigin,
   type VariableChangeProducer,
   type VariableChangeSummary,
   type VariableObservedBatch,
+  type VariableThoughtEntry,
   type VariableWriteActions,
 } from '../utils/variableChanges';
 import { variableTraceLogger } from '../utils/logger';
@@ -30,6 +32,8 @@ type ActiveVariableTurn = {
   userMessageId?: number;
   assistantMessageId?: number;
   assistantReplyLocked: boolean;
+  assistantDeclaredReply: string;
+  extraDeclaredBlocks: string;
   aiWriteTargetIds: number[];
   batchSequence: number;
 };
@@ -51,7 +55,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 10;
+  version: 11;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -73,7 +77,10 @@ type VariableWriteSignal =
   | { kind: 'direct'; producer: DirectVariableWriteSource; detail?: DirectVariableWriteDoneDetail }
   | { kind: 'boundary'; producer: 'message-boundary'; assistantMessageId?: number };
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v10';
+type DeclaredSourceKind = 'assistant-reply' | 'extra-blocks';
+type ParsedDeclaredState = ReturnType<typeof parseDeclaredVariableChanges>;
+
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v11';
 const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v1',
   'wuxia.variableChangeTurn.v2',
@@ -84,6 +91,7 @@ const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v7',
   'wuxia.variableChangeTurn.v8',
   'wuxia.variableChangeTurn.v9',
+  'wuxia.variableChangeTurn.v10',
 ];
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
 const STALE_WRITE_DONE_RETRY_DELAY_MS = 40;
@@ -197,7 +205,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 10 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== 11 || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -224,7 +232,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 10,
+      version: 11,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -397,13 +405,87 @@ const isDirectVariableWriteSource = (value: unknown): value is DirectVariableWri
   || value === 'frontend'
   || value === 'restore';
 
+const createEmptyParsedDeclaredState = (): ParsedDeclaredState => ({
+  declaredChanges: [],
+  thoughts: [],
+  parseErrors: [],
+  omittedDeclaredCount: 0,
+});
+
+const getDeclaredChangeDedupKey = (change: VariableDeclaredChange): string =>
+  [
+    change.action,
+    change.copyPath,
+    change.blockTag,
+    stableStringify(change.value),
+  ].join('|');
+
+const mergeParsedDeclaredStates = (...parsedList: ParsedDeclaredState[]): ParsedDeclaredState => {
+  const declaredChanges: VariableDeclaredChange[] = [];
+  const thoughts: VariableThoughtEntry[] = [];
+  const parseErrors: string[] = [];
+  const seenDeclaredKeys = new Set<string>();
+  let omittedDeclaredCount = 0;
+
+  for (const parsed of parsedList) {
+    thoughts.push(...parsed.thoughts);
+    parseErrors.push(...parsed.parseErrors);
+    omittedDeclaredCount += parsed.omittedDeclaredCount;
+
+    for (const change of parsed.declaredChanges) {
+      const dedupKey = getDeclaredChangeDedupKey(change);
+      if (seenDeclaredKeys.has(dedupKey)) {
+        continue;
+      }
+
+      seenDeclaredKeys.add(dedupKey);
+      if (declaredChanges.length < MAX_STORED_VARIABLE_CHANGES) {
+        declaredChanges.push(change);
+      } else {
+        omittedDeclaredCount += 1;
+      }
+    }
+  }
+
+  return {
+    declaredChanges,
+    thoughts,
+    parseErrors,
+    omittedDeclaredCount,
+  };
+};
+
+const hasFrozenDeclaredSources = (
+  activeTurn: Pick<ActiveVariableTurn, 'assistantDeclaredReply' | 'extraDeclaredBlocks'>,
+): boolean =>
+  activeTurn.assistantDeclaredReply.trim().length > 0
+  || activeTurn.extraDeclaredBlocks.trim().length > 0;
+
+const normalizeActiveTurn = (activeTurn: ActiveVariableTurn): ActiveVariableTurn => ({
+  ...activeTurn,
+  assistantReplyLocked: activeTurn.assistantReplyLocked === true,
+  assistantDeclaredReply:
+    typeof activeTurn.assistantDeclaredReply === 'string' ? activeTurn.assistantDeclaredReply : '',
+  extraDeclaredBlocks:
+    typeof activeTurn.extraDeclaredBlocks === 'string' ? activeTurn.extraDeclaredBlocks : '',
+  aiWriteTargetIds: Array.isArray(activeTurn.aiWriteTargetIds)
+    ? activeTurn.aiWriteTargetIds.filter(id => Number.isInteger(id))
+    : [],
+  batchSequence: Number.isInteger(activeTurn.batchSequence) ? activeTurn.batchSequence : 0,
+});
+
 export function useVariableChangeTracker() {
   const restoredTurnRef = useRef<StoredVariableTurn | null | undefined>(undefined);
   if (restoredTurnRef.current === undefined) {
     restoredTurnRef.current = readStoredVariableTurn();
   }
 
-  const restoredTurn = restoredTurnRef.current;
+  const restoredTurn = restoredTurnRef.current
+    ? {
+      ...restoredTurnRef.current,
+      activeTurn: normalizeActiveTurn(restoredTurnRef.current.activeTurn),
+    }
+    : null;
   const [variableChanges, setVariableChanges] = useState<VariableChangeSummary | null>(
     () => restoredTurn?.summary ?? null,
   );
@@ -437,6 +519,8 @@ export function useVariableChangeTracker() {
       lastStatData: baselineStatData,
       userMessageId,
       assistantReplyLocked: false,
+      assistantDeclaredReply: '',
+      extraDeclaredBlocks: '',
       aiWriteTargetIds: [],
       batchSequence: 0,
     };
@@ -823,6 +907,7 @@ export function useVariableChangeTracker() {
   }, [captureResolvedSnapshot]);
 
   const refreshDeclaredChanges = useCallback((
+    source: DeclaredSourceKind,
     rawReply: string,
     assistantMessageId?: number,
   ) => {
@@ -834,15 +919,32 @@ export function useVariableChangeTracker() {
     if (assistantMessageId !== undefined) {
       activeTurn.assistantMessageId = assistantMessageId;
     }
-    const parsed = parseDeclaredVariableChanges(rawReply);
+    if (source === 'assistant-reply') {
+      activeTurn.assistantDeclaredReply = rawReply;
+    } else {
+      activeTurn.extraDeclaredBlocks = rawReply;
+    }
+
+    const merged = mergeParsedDeclaredStates(
+      activeTurn.assistantDeclaredReply.trim()
+        ? parseDeclaredVariableChanges(activeTurn.assistantDeclaredReply)
+        : createEmptyParsedDeclaredState(),
+      activeTurn.extraDeclaredBlocks.trim()
+        ? parseDeclaredVariableChanges(activeTurn.extraDeclaredBlocks)
+        : createEmptyParsedDeclaredState(),
+    );
+
     variableTraceLogger.log('[useVariableChangeTracker] 刷新 AI 声明变量', {
       turnId: activeTurn.turnId,
+      source,
       assistantMessageId: assistantMessageId ?? null,
       rawReplyLength: rawReply.length,
-      declaredChanges: parsed.declaredChanges.map(summarizeDeclaredChange),
-      omittedDeclaredCount: parsed.omittedDeclaredCount,
-      thoughts: parsed.thoughts.map(thought => thought.preview),
-      parseErrors: parsed.parseErrors,
+      declaredChanges: merged.declaredChanges.map(summarizeDeclaredChange),
+      omittedDeclaredCount: merged.omittedDeclaredCount,
+      thoughts: merged.thoughts.map(thought => thought.preview),
+      parseErrors: merged.parseErrors,
+      hasAssistantDeclaredReply: activeTurn.assistantDeclaredReply.trim().length > 0,
+      hasExtraDeclaredBlocks: activeTurn.extraDeclaredBlocks.trim().length > 0,
     });
     mutateSummary(summary => {
       const hasObservedChanges =
@@ -854,12 +956,12 @@ export function useVariableChangeTracker() {
           ? hasObservedChanges ? 'settled' : 'reply-recorded'
           : 'error',
         assistantMessageId: assistantMessageId ?? summary.assistantMessageId,
-        thoughts: parsed.thoughts,
-        parseErrors: parsed.parseErrors,
+        thoughts: merged.thoughts,
+        parseErrors: merged.parseErrors,
         aiReply: {
           ...summary.aiReply,
-          declaredChanges: parsed.declaredChanges,
-          omittedDeclaredCount: parsed.omittedDeclaredCount,
+          declaredChanges: merged.declaredChanges,
+          omittedDeclaredCount: merged.omittedDeclaredCount,
         },
       };
       return rebuildSummary(nextSummary, activeTurn);
@@ -892,12 +994,10 @@ export function useVariableChangeTracker() {
     turnId,
     expectedSnapshotHash,
     metadata,
-    refreshDeclaredAssistant,
   }: {
     turnId: number;
     expectedSnapshotHash: string | null;
     metadata: CaptureMetadata;
-    refreshDeclaredAssistant?: boolean;
   }) => {
     if (!expectedSnapshotHash) {
       return;
@@ -907,7 +1007,6 @@ export function useVariableChangeTracker() {
       turnId,
       expectedSnapshotHash,
       metadata: summarizeMetadata(metadata),
-      refreshDeclaredAssistant: refreshDeclaredAssistant === true,
     });
 
     const retryCapture = (remainingRetries: number) => {
@@ -929,13 +1028,6 @@ export function useVariableChangeTracker() {
         expectedSnapshotHash,
         metadata: summarizeMetadata(metadata),
       });
-
-      if (refreshDeclaredAssistant && metadata.assistantMessageId !== undefined) {
-        const finalMessage = readAssistantMessageContentById(metadata.assistantMessageId);
-        if (finalMessage.content.trim()) {
-          refreshDeclaredChanges(finalMessage.content, metadata.assistantMessageId);
-        }
-      }
 
       captureCurrentSnapshot(metadata);
 
@@ -959,7 +1051,7 @@ export function useVariableChangeTracker() {
     window.setTimeout(() => {
       retryCapture(STALE_WRITE_DONE_MAX_RETRIES);
     }, STALE_WRITE_DONE_RETRY_DELAY_MS);
-  }, [captureCurrentSnapshot, refreshDeclaredChanges]);
+  }, [captureCurrentSnapshot]);
 
   const markVariableApiWriteAsAi = useCallback((assistantMessageId: number) => {
     const activeTurn = activeTurnRef.current;
@@ -1063,10 +1155,6 @@ export function useVariableChangeTracker() {
 
     if (assistantMessageId !== undefined && isAiWrite) {
       activeTurn.assistantMessageId = assistantMessageId;
-      const finalMessage = readAssistantMessageContentById(assistantMessageId);
-      if (finalMessage.content.trim()) {
-        refreshDeclaredChanges(finalMessage.content, assistantMessageId);
-      }
     }
 
     // All signals reread chat stat_data as the canonical snapshot source.
@@ -1116,7 +1204,6 @@ export function useVariableChangeTracker() {
           assistantMessageId,
           aiOnlyDeclaredMatches: isAiWrite,
         },
-        refreshDeclaredAssistant: isAiWrite && assistantMessageId !== undefined,
       });
     }
   }, [captureCurrentSnapshot, refreshDeclaredChanges, scheduleStaleWriteDoneRecovery]);
@@ -1137,13 +1224,29 @@ export function useVariableChangeTracker() {
       assistantMessageId: assistantMessageId ?? null,
       rawReplyLength: rawReply.length,
     });
-    refreshDeclaredChanges(rawReply, assistantMessageId);
+    refreshDeclaredChanges('assistant-reply', rawReply, assistantMessageId);
     captureSignal({
       kind: 'boundary',
       producer: 'message-boundary',
       assistantMessageId,
     });
   }, [captureSignal, refreshDeclaredChanges]);
+
+  const handleVariableExtraDeclaredBlocks = useCallback((
+    blocksText: string,
+    assistantMessageId?: number,
+  ) => {
+    const activeTurn = activeTurnRef.current;
+    if (assistantMessageId !== undefined && activeTurn) {
+      activeTurn.assistantMessageId = assistantMessageId;
+    }
+    variableTraceLogger.log('[useVariableChangeTracker] 记录额外变量中的 AI 声明', {
+      turnId: activeTurn?.turnId ?? null,
+      assistantMessageId: assistantMessageId ?? null,
+      blocksLength: blocksText.length,
+    });
+    refreshDeclaredChanges('extra-blocks', blocksText, assistantMessageId);
+  }, [refreshDeclaredChanges]);
 
   const handleVariableMessageBoundary = useCallback((messageId?: number) => {
     const activeTurn = activeTurnRef.current;
@@ -1168,8 +1271,8 @@ export function useVariableChangeTracker() {
     if (finalMessage.messageId !== undefined) {
       activeTurn.assistantMessageId = finalMessage.messageId;
     }
-    if (!activeTurn.assistantReplyLocked && finalMessage.content.trim()) {
-      refreshDeclaredChanges(finalMessage.content, finalMessage.messageId);
+    if (!hasFrozenDeclaredSources(activeTurn) && finalMessage.content.trim()) {
+      refreshDeclaredChanges('assistant-reply', finalMessage.content, finalMessage.messageId);
     }
     captureSignal({
       kind: 'boundary',
@@ -1220,6 +1323,7 @@ export function useVariableChangeTracker() {
     handleVariableTurnStart,
     handleGlobalMessageSent,
     handleVariableAssistantReply,
+    handleVariableExtraDeclaredBlocks,
     handleVariableMessageBoundary,
     handleEraWriteDone,
     handleDirectVariableWriteDone,

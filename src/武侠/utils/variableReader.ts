@@ -1740,52 +1740,222 @@ interface MartialArtUpdateData {
 /**
  * 功法更新类型
  */
-type MartialArtUpdateType = 'insert' | 'update' | 'none';
+type MartialArtUpdateType = 'insert' | 'update' | 'mixed' | 'none';
 
-/**
- * 检查单个功法的更新需求
- * - 'insert': 缺少类型、描述、品阶等基本字段，需要补全
- * - 'update': 基本字段已存在，但特性数量可能需要根据掌握程度更新
- * - 'none': 不需要更新
- *
- * @param 功法数据 变量中的功法数据
- * @param 功法名 功法名称（用于从数据库查询）
- * @returns 更新类型
- */
-function checkMartialArtUpdateType(功法数据: SimpleMartialArt, 功法名: string): MartialArtUpdateType {
-  // 如果缺少基础字段或特性，说明需要补全不存在的字段（用 insert）
-  if (!功法数据.类型 || !功法数据.功法品阶 || !功法数据.功法描述 || !功法数据.特性) {
-    return 'insert';
+interface MartialArtVerificationLeaf {
+  path: string[];
+  expectedValue: unknown;
+  displayPath: string;
+}
+
+interface MartialArtWritePlan {
+  updateType: MartialArtUpdateType;
+  hasChanges: boolean;
+  insertPatch: Partial<MartialArtUpdateData>;
+  updatePatch: Partial<MartialArtUpdateData>;
+  verificationLeaves: MartialArtVerificationLeaf[];
+}
+
+interface PendingMartialArtVerification {
+  cacheKey: string;
+  displayName: string;
+  mastery: string;
+  verificationLeaves: MartialArtVerificationLeaf[];
+}
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const cloneJsonValue = <T,>(value: T): T => {
+  if (value === undefined) {
+    return value;
   }
 
-  // 检查特性是否需要更新
-  // 当掌握程度上升后，需要解锁新的特性
-  const dbData = getMartialArtData(功法名);
-  if (!dbData) return 'none';
+  try {
+    return JSON.parse(JSON.stringify(value)) as T;
+  } catch {
+    return value;
+  }
+};
 
-  const 掌握程度 = 功法数据.掌握程度 || '初窥门径';
-  const allTraits = dbData.特性 || {};
-  const MASTERY_LEVELS = ['初窥门径', '略有小成', '融会贯通', '炉火纯青', '出神入化'];
-  const masteryIndex = MASTERY_LEVELS.indexOf(掌握程度);
+function setNestedValue(target: Record<string, unknown>, path: string[], value: unknown): void {
+  if (path.length === 0) {
+    return;
+  }
 
-  // 计算应该解锁的特性数量
-  let expectedTraitCount = 0;
-  for (const traitMastery of Object.keys(allTraits)) {
-    const traitMasteryIndex = MASTERY_LEVELS.indexOf(traitMastery);
-    if (traitMasteryIndex >= 0 && traitMasteryIndex <= masteryIndex) {
-      expectedTraitCount++;
+  let cursor = target;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const segment = path[index];
+    const nextValue = cursor[segment];
+    if (!isPlainObject(nextValue)) {
+      cursor[segment] = {};
+    }
+    cursor = cursor[segment] as Record<string, unknown>;
+  }
+
+  cursor[path[path.length - 1]] = cloneJsonValue(value);
+}
+
+function getNestedValue(value: unknown, path: string[]): unknown {
+  let cursor = value;
+  for (const segment of path) {
+    if (!isPlainObject(cursor)) {
+      return undefined;
+    }
+    cursor = cursor[segment];
+  }
+  return cursor;
+}
+
+function hasNestedEntries(value: unknown): boolean {
+  if (!isPlainObject(value)) {
+    return value !== undefined;
+  }
+
+  return Object.values(value).some(child => hasNestedEntries(child));
+}
+
+function collectMartialArtLeafWritePlan(
+  currentValue: unknown,
+  targetValue: unknown,
+  path: string[],
+  insertPatch: Record<string, unknown>,
+  updatePatch: Record<string, unknown>,
+  verificationLeaves: MartialArtVerificationLeaf[],
+): void {
+  if (isPlainObject(targetValue)) {
+    for (const [key, childTargetValue] of Object.entries(targetValue)) {
+      const childCurrentValue = isPlainObject(currentValue) ? currentValue[key] : undefined;
+      collectMartialArtLeafWritePlan(
+        childCurrentValue,
+        childTargetValue,
+        [...path, key],
+        insertPatch,
+        updatePatch,
+        verificationLeaves,
+      );
+    }
+    return;
+  }
+
+  if (currentValue === undefined) {
+    setNestedValue(insertPatch, path, targetValue);
+  } else if (currentValue !== targetValue) {
+    setNestedValue(updatePatch, path, targetValue);
+  } else {
+    return;
+  }
+
+  verificationLeaves.push({
+    path,
+    expectedValue: cloneJsonValue(targetValue),
+    displayPath: path.join('.'),
+  });
+}
+
+function buildMartialArtWritePlan(
+  功法数据: SimpleMartialArt,
+  completedData: MartialArtUpdateData,
+): MartialArtWritePlan {
+  const insertPatch: Record<string, unknown> = {};
+  const updatePatch: Record<string, unknown> = {};
+  const verificationLeaves: MartialArtVerificationLeaf[] = [];
+
+  collectMartialArtLeafWritePlan(
+    功法数据 as unknown,
+    completedData as unknown,
+    [],
+    insertPatch,
+    updatePatch,
+    verificationLeaves,
+  );
+
+  const hasInsert = hasNestedEntries(insertPatch);
+  const hasUpdate = hasNestedEntries(updatePatch);
+  const updateType: MartialArtUpdateType =
+    hasInsert && hasUpdate ? 'mixed' : hasInsert ? 'insert' : hasUpdate ? 'update' : 'none';
+
+  return {
+    updateType,
+    hasChanges: verificationLeaves.length > 0,
+    insertPatch: insertPatch as Partial<MartialArtUpdateData>,
+    updatePatch: updatePatch as Partial<MartialArtUpdateData>,
+    verificationLeaves,
+  };
+}
+
+function prefixVerificationLeaves(
+  basePath: string[],
+  leaves: MartialArtVerificationLeaf[],
+): MartialArtVerificationLeaf[] {
+  return leaves.map(leaf => {
+    const fullPath = [...basePath, ...leaf.path];
+    return {
+      path: fullPath,
+      expectedValue: cloneJsonValue(leaf.expectedValue),
+      displayPath: fullPath.join('.'),
+    };
+  });
+}
+
+function readChatStatDataSnapshot(): GameVariables {
+  try {
+    const chatVariables = getVariables({ type: 'chat' }) as { stat_data?: GameVariables } | null | undefined;
+    return isRecord(chatVariables?.stat_data) ? chatVariables.stat_data as GameVariables : {};
+  } catch (error) {
+    dataLogger.error('[variableReader] 读取 chat.stat_data 失败:', error);
+    return {};
+  }
+}
+
+function verifyMartialArtWrites(
+  pendingVerifications: PendingMartialArtVerification[],
+): {
+  succeeded: PendingMartialArtVerification[];
+  failed: Array<PendingMartialArtVerification & {
+    mismatches: Array<{ path: string; expected: unknown; actual: unknown }>;
+  }>;
+} {
+  const chatStatData = readChatStatDataSnapshot();
+  const succeeded: PendingMartialArtVerification[] = [];
+  const failed: Array<PendingMartialArtVerification & {
+    mismatches: Array<{ path: string; expected: unknown; actual: unknown }>;
+  }> = [];
+
+  for (const pending of pendingVerifications) {
+    const mismatches = pending.verificationLeaves
+      .map(leaf => {
+        const actualValue = getNestedValue(chatStatData, leaf.path);
+        if (actualValue === leaf.expectedValue) {
+          return null;
+        }
+        return {
+          path: leaf.displayPath,
+          expected: leaf.expectedValue,
+          actual: actualValue,
+        };
+      })
+      .filter((entry): entry is { path: string; expected: unknown; actual: unknown } => entry !== null);
+
+    if (mismatches.length === 0) {
+      succeeded.push(pending);
+    } else {
+      failed.push({
+        ...pending,
+        mismatches,
+      });
     }
   }
 
-  // 当前特性数量
-  const currentTraitCount = 功法数据.特性 ? Object.keys(功法数据.特性).length : 0;
+  return { succeeded, failed };
+}
 
-  // 如果当前特性数量少于应解锁的特性数量，需要更新
-  if (currentTraitCount < expectedTraitCount) {
-    return 'update';
-  }
-
-  return 'none';
+/**
+ * 根据逐叶写入计划归纳本次补全的写入类型。
+ * @returns 更新类型
+ */
+function checkMartialArtUpdateType(writePlan: MartialArtWritePlan): MartialArtUpdateType {
+  return writePlan.updateType;
 }
 
 /**
@@ -1832,6 +2002,12 @@ function completeMartialArtFromDatabase(功法名: string, 功法数据: SimpleM
 // 防止 autoUpdateMartialArts 重复调用的标记
 let isUpdatingMartialArts = false;
 
+export function __resetVariableReaderTestState(): void {
+  characterStateCache.clear();
+  martialArtStateCache.clear();
+  isUpdatingMartialArts = false;
+}
+
 /**
  * 检查功法是否需要更新（基于缓存对比）
  * 触发条件：
@@ -1846,7 +2022,7 @@ let isUpdatingMartialArts = false;
 function shouldUpdateMartialArtByCache(
   cacheKey: string,
   功法数据: SimpleMartialArt,
-  功法名: string,
+  writePlan: MartialArtWritePlan,
 ): {
   shouldUpdate: boolean;
   isNew: boolean;
@@ -1854,32 +2030,23 @@ function shouldUpdateMartialArtByCache(
   updateType: MartialArtUpdateType;
 } {
   const currentMastery = 功法数据.掌握程度 || '初窥门径';
-  const isCompleted = !!(功法数据.类型 && 功法数据.功法品阶 && 功法数据.功法描述 && 功法数据.特性);
+  const updateType = checkMartialArtUpdateType(writePlan);
   const cached = martialArtStateCache.get(cacheKey);
 
   if (!cached) {
-    // 新功法
-    const updateType = checkMartialArtUpdateType(功法数据, 功法名);
     dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 新功法，更新类型=${updateType}`);
     return { shouldUpdate: updateType !== 'none', isNew: true, masteryChanged: false, updateType };
   }
 
-  if (!isCompleted) {
-    const updateType = checkMartialArtUpdateType(功法数据, 功法名);
-    dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 当前变量缺字段，更新类型=${updateType}`);
-    return { shouldUpdate: updateType !== 'none', isNew: false, masteryChanged: false, updateType };
-  }
-
-  if (!cached.isCompleted && !isCompleted) {
-    // 之前未补全，现在仍需补全
-    dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 仍需补全`);
-    return { shouldUpdate: true, isNew: false, masteryChanged: false, updateType: 'insert' };
+  if (updateType !== 'none') {
+    const masteryChanged = cached.mastery !== currentMastery;
+    dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 目标叶子与当前变量不一致，更新类型=${updateType}`);
+    return { shouldUpdate: true, isNew: false, masteryChanged, updateType };
   }
 
   if (cached.mastery !== currentMastery) {
-    // 掌握程度变动
-    dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 掌握程度变动 ${cached.mastery} -> ${currentMastery}`);
-    return { shouldUpdate: true, isNew: false, masteryChanged: true, updateType: 'update' };
+    dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 掌握程度变动 ${cached.mastery} -> ${currentMastery}，但目标叶子已同步`);
+    return { shouldUpdate: false, isNew: false, masteryChanged: true, updateType };
   }
 
   dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 无变化，跳过`);
