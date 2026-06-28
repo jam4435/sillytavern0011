@@ -56706,8 +56706,12 @@ function to_original_worldbook_entry(entry, index) {
     return result.value();
 }
 function bundle_worldbook(worldbook) {
+    const entries = Object.fromEntries(worldbook.entries.map((entry, index) => {
+        const uid = entry.uid ?? index;
+        return [uid, to_original_worldbook_entry(entry, index)];
+    }));
     return {
-        entries: Object.fromEntries(worldbook.entries.map((entry, index) => [index, to_original_worldbook_entry(entry, index)])),
+        entries,
     };
 }
 
