@@ -26,14 +26,8 @@ export interface DynamicLocationContext {
 }
 
 export interface DynamicLocationContextVariable {
-  当前所在位置: string;
-  当前二级地点: string[];
-  当前二级地点内三级地点: string[];
+  相邻三级地点: string[];
   相邻二级地点: string[];
-  允许写入地点: string[];
-  已解析: boolean;
-  存在同名候选: boolean;
-  地点限制提示词: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -236,14 +230,8 @@ export function createDynamicLocationContextVariable(
   context: DynamicLocationContext,
 ): DynamicLocationContextVariable {
   return {
-    当前所在位置: context.currentLocation,
-    当前二级地点: context.currentRegions.map(region => region.path),
-    当前二级地点内三级地点: context.currentRegions.flatMap(region => region.locations),
+    相邻三级地点: context.currentRegions.flatMap(region => region.locations),
     相邻二级地点: context.adjacentRegions.map(region => region.path),
-    允许写入地点: context.allowedLocationPaths,
-    已解析: context.resolved,
-    存在同名候选: context.ambiguous,
-    地点限制提示词: formatDynamicLocationConstraint(context),
   };
 }
 

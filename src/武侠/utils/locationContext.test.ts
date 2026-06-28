@@ -89,10 +89,9 @@ describe('locationContext', () => {
       buildDynamicLocationContext(mapData, '大宋/临安府/牛家村', 1),
     );
 
-    expect(value.当前二级地点).toEqual(['大宋/临安府']);
-    expect(value.当前二级地点内三级地点).toContain('大宋/临安府/西湖');
+    expect(Object.keys(value)).toEqual(['相邻三级地点', '相邻二级地点']);
+    expect(value.相邻三级地点).toContain('大宋/临安府/西湖');
     expect(value.相邻二级地点).toEqual(['大宋/嘉兴府']);
-    expect(value.地点限制提示词).toContain('唯一写入白名单');
   });
 
   it('把最新地图上下文写入聊天变量顶层', async () => {
@@ -103,14 +102,14 @@ describe('locationContext', () => {
 
     const value = await syncDynamicLocationContextVariable();
 
-    expect(value?.当前二级地点).toEqual(['大宋/临安府']);
+    expect(value?.相邻三级地点).toContain('大宋/临安府/牛家村');
     expect(updateVariablesWithMock).toHaveBeenCalledWith(expect.any(Function), { type: 'chat' });
     const updater = updateVariablesWithMock.mock.calls[0][0] as (
       variables: Record<string, unknown>,
     ) => Record<string, unknown>;
     expect(updater({ stat_data: {} })).toEqual(expect.objectContaining({
       地图上下文: expect.objectContaining({
-        当前二级地点: ['大宋/临安府'],
+        相邻三级地点: expect.arrayContaining(['大宋/临安府/牛家村']),
         相邻二级地点: expect.arrayContaining(['大宋/嘉兴府']),
       }),
     }));
