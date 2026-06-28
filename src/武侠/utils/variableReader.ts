@@ -2326,9 +2326,10 @@ function mergeCompletionScope(target: GameDataCompletionScope, source: GameDataC
  * 1. 新增功法（缓存中不存在该功法）
  * 2. 掌握程度变动（缓存中的掌握程度与当前不同，需要更新特性）
  *
- * 两种操作：
- * 1. 补全（insert）: 功法只有掌握程度，缺少类型、描述、品阶、特性 -> 用 era:insertByObject
- * 2. 更新（update）: 掌握程度上升后，特性需要增加 -> 用 era:updateByObject
+ * 写入策略：
+ * 1. 目标叶子路径为 undefined -> insert
+ * 2. 目标叶子已存在，但为空、占位或值错误 -> update
+ * 3. 写完后回读 chat.stat_data，逐叶验证；失败不记成功，不更新缓存
  *
  * @param 玩家功法 user数据中的功法对象
  * @param 角色数据 角色数据对象（包含所有NPC）
@@ -2356,6 +2357,7 @@ export async function autoUpdateMartialArts(
   // ERA updateByObject 不会创建不存在的字段；功法补全和特性刷新必须分流写入。
   const insertData: MartialArtWriteData = {};
   const updateData: MartialArtWriteData = {};
+  const pendingVerifications: PendingMartialArtVerification[] = [];
 
   let needsInsert = false;
   let needsUpdate = false;
@@ -2369,34 +2371,39 @@ export async function autoUpdateMartialArts(
       if (功法名.startsWith('$')) continue; // 跳过模板
 
       const cacheKey = getMartialArtCacheKey('玩家', 功法名);
-      const { shouldUpdate, isNew, masteryChanged, updateType } = shouldUpdateMartialArtByCache(cacheKey, 功法数据, 功法名);
+      const completedData = completeMartialArtFromDatabase(功法名, 功法数据);
+      if (!completedData) {
+        continue;
+      }
+      const writePlan = buildMartialArtWritePlan(功法数据, completedData);
+      const { shouldUpdate, isNew, masteryChanged, updateType } = shouldUpdateMartialArtByCache(
+        cacheKey,
+        功法数据,
+        writePlan,
+      );
       
       if (!shouldUpdate) {
-        // 无需更新，但要确保缓存是最新的
-        const isCompleted = !!(功法数据.类型 && 功法数据.功法品阶 && 功法数据.功法描述 && 功法数据.特性);
-        updateMartialArtCache(cacheKey, 功法数据.掌握程度 || '初窥门径', isCompleted);
+        updateMartialArtCache(cacheKey, completedData.掌握程度, !writePlan.hasChanges);
         continue;
       }
 
       dataLogger.log(`[autoUpdateMartialArts] 玩家功法 ${功法名}: 需要处理 (新增=${isNew}, 掌握程度变动=${masteryChanged}, 操作=${updateType})`);
 
-      if (updateType === 'insert') {
-        const completedData = completeMartialArtFromDatabase(功法名, 功法数据);
-        if (completedData) {
-          玩家功法Insert[功法名] = completedData;
-          needsInsert = true;
-          // 更新缓存
-          updateMartialArtCache(cacheKey, completedData.掌握程度, true);
-        }
-      } else if (updateType === 'update') {
-        const completedData = completeMartialArtFromDatabase(功法名, 功法数据);
-        if (completedData) {
-          玩家功法Update[功法名] = { 特性: completedData.特性 };
-          needsUpdate = true;
-          // 更新缓存
-          updateMartialArtCache(cacheKey, completedData.掌握程度, true);
-        }
+      if (hasNestedEntries(writePlan.insertPatch)) {
+        玩家功法Insert[功法名] = writePlan.insertPatch;
+        needsInsert = true;
       }
+      if (hasNestedEntries(writePlan.updatePatch)) {
+        玩家功法Update[功法名] = writePlan.updatePatch;
+        needsUpdate = true;
+      }
+
+      pendingVerifications.push({
+        cacheKey,
+        displayName: `玩家功法 ${功法名}`,
+        mastery: completedData.掌握程度,
+        verificationLeaves: prefixVerificationLeaves(['user数据', '功法', 功法名], writePlan.verificationLeaves),
+      });
     }
 
     if (Object.keys(玩家功法Insert).length > 0) {
@@ -2425,32 +2432,39 @@ export async function autoUpdateMartialArts(
         if (功法名.startsWith('$')) continue;
 
         const cacheKey = getMartialArtCacheKey(`角色:${角色名}`, 功法名);
-        const { shouldUpdate, isNew, masteryChanged, updateType } = shouldUpdateMartialArtByCache(cacheKey, 功法数据, 功法名);
+        const completedData = completeMartialArtFromDatabase(功法名, 功法数据);
+        if (!completedData) {
+          continue;
+        }
+        const writePlan = buildMartialArtWritePlan(功法数据, completedData);
+        const { shouldUpdate, isNew, masteryChanged, updateType } = shouldUpdateMartialArtByCache(
+          cacheKey,
+          功法数据,
+          writePlan,
+        );
         
         if (!shouldUpdate) {
-          // 无需更新，但要确保缓存是最新的
-          const isCompleted = !!(功法数据.类型 && 功法数据.功法品阶 && 功法数据.功法描述 && 功法数据.特性);
-          updateMartialArtCache(cacheKey, 功法数据.掌握程度 || '初窥门径', isCompleted);
+          updateMartialArtCache(cacheKey, completedData.掌握程度, !writePlan.hasChanges);
           continue;
         }
 
         dataLogger.log(`[autoUpdateMartialArts] 角色 ${角色名} 功法 ${功法名}: 需要处理 (新增=${isNew}, 掌握程度变动=${masteryChanged}, 操作=${updateType})`);
 
-        if (updateType === 'insert') {
-          const completedData = completeMartialArtFromDatabase(功法名, 功法数据);
-          if (completedData) {
-            该角色功法Insert[功法名] = completedData;
-            needsInsert = true;
-            updateMartialArtCache(cacheKey, completedData.掌握程度, true);
-          }
-        } else if (updateType === 'update') {
-          const completedData = completeMartialArtFromDatabase(功法名, 功法数据);
-          if (completedData) {
-            该角色功法Update[功法名] = { 特性: completedData.特性 };
-            needsUpdate = true;
-            updateMartialArtCache(cacheKey, completedData.掌握程度, true);
-          }
+        if (hasNestedEntries(writePlan.insertPatch)) {
+          该角色功法Insert[功法名] = writePlan.insertPatch;
+          needsInsert = true;
         }
+        if (hasNestedEntries(writePlan.updatePatch)) {
+          该角色功法Update[功法名] = writePlan.updatePatch;
+          needsUpdate = true;
+        }
+
+        pendingVerifications.push({
+          cacheKey,
+          displayName: `角色 ${角色名} 功法 ${功法名}`,
+          mastery: completedData.掌握程度,
+          verificationLeaves: prefixVerificationLeaves(['角色数据', 角色名, '功法', 功法名], writePlan.verificationLeaves),
+        });
       }
 
       if (Object.keys(该角色功法Insert).length > 0) {
@@ -2510,7 +2524,23 @@ export async function autoUpdateMartialArts(
         dataLogger.log('[autoUpdateMartialArts] 功法特性刷新(update)请求已发送');
       }
 
-      dataLogger.log('[autoUpdateMartialArts] 功法处理完成');
+      const verificationResult = verifyMartialArtWrites(pendingVerifications);
+      for (const succeeded of verificationResult.succeeded) {
+        updateMartialArtCache(succeeded.cacheKey, succeeded.mastery, true);
+      }
+
+      if (verificationResult.failed.length > 0) {
+        dataLogger.error('[autoUpdateMartialArts] 功法写入回读验证失败，本次不记成功:', verificationResult.failed.map(failed => ({
+          cacheKey: failed.cacheKey,
+          displayName: failed.displayName,
+          mismatches: failed.mismatches,
+        })));
+      }
+
+      dataLogger.log('[autoUpdateMartialArts] 功法处理结束:', {
+        verifiedSuccessCount: verificationResult.succeeded.length,
+        verifiedFailureCount: verificationResult.failed.length,
+      });
     } catch (error) {
       dataLogger.error('[autoUpdateMartialArts] 功法处理失败:', error);
     } finally {
