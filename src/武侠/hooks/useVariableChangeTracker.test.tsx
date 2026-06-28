@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useVariableChangeTracker } from './useVariableChangeTracker';
 
 const declaredReply = '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>';
+const extraDeclaredReply = '<VariableEdit>{"user数据":{"属性":{"根骨":70}}}</VariableEdit>';
 const backendOnlyReply = '<VariableEdit>{"user数据":{"属性":{"臂力":80}}}</VariableEdit>';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -409,5 +410,93 @@ describe('useVariableChangeTracker', () => {
         path: ['user数据', '修为'],
       }),
     );
+  });
+
+  it('主回复声明冻结后，普通 era:writeDone 不会把后台追加块吸进 AI 声明', () => {
+    getChatMessagesMock.mockImplementation((messageId?: unknown) => {
+      if (messageId === 2 || messageId === '0-{{lastMessageId}}') {
+        return [{
+          message_id: 2,
+          message: `${declaredReply}\n${backendOnlyReply}`,
+          swipes: [],
+          swipe_id: 0,
+        }];
+      }
+      return [];
+    });
+
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+      result.current.markVariableApiWriteAsAi(2);
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'martial-arts-completion',
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.declaredChanges).toHaveLength(1);
+    expect(result.current.variableChanges?.aiReply.declaredChanges[0]).toEqual(
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+      }),
+    );
+  });
+
+  it('额外变量 blocksText 会与主回复声明合并，且最终楼层后台块不会污染 AI 声明', () => {
+    getChatMessagesMock.mockImplementation((messageId?: unknown) => {
+      if (messageId === 2 || messageId === '0-{{lastMessageId}}') {
+        return [{
+          message_id: 2,
+          message: `${declaredReply}\n${extraDeclaredReply}\n${backendOnlyReply}`,
+          swipes: [],
+          swipe_id: 0,
+        }];
+      }
+      return [];
+    });
+
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+      result.current.handleVariableExtraDeclaredBlocks(extraDeclaredReply, 2);
+      result.current.handleVariableMessageBoundary(2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.declaredChanges).toEqual([
+      expect.objectContaining({ path: ['user数据', '修为'] }),
+      expect.objectContaining({ path: ['user数据', '属性', '根骨'] }),
+    ]);
+  });
+
+  it('没有显式声明源时，消息边界仍允许用最终 assistant 原文做 legacy fallback', () => {
+    getChatMessagesMock.mockImplementation((messageId?: unknown) => {
+      if (messageId === 2 || messageId === '0-{{lastMessageId}}') {
+        return [{
+          message_id: 2,
+          message: `${declaredReply}\n${backendOnlyReply}`,
+          swipes: [],
+          swipe_id: 0,
+        }];
+      }
+      return [];
+    });
+
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableMessageBoundary(2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.declaredChanges).toEqual([
+      expect.objectContaining({ path: ['user数据', '修为'] }),
+      expect.objectContaining({ path: ['user数据', '属性', '臂力'] }),
+    ]);
   });
 });

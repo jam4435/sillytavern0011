@@ -92,6 +92,7 @@ const createHookOptions = (summarySettings: ReturnType<typeof createSummarySetti
   summarySettings,
   onVariableTurnStart: vi.fn(),
   onVariableAssistantReply: vi.fn(),
+  onVariableExtraDeclaredBlocks: vi.fn(),
   onVariableAiWriteTarget: vi.fn(),
 });
 
@@ -145,6 +146,7 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(prepareExtraVariableUpdateTurnMock).not.toHaveBeenCalled();
     expect(executeExtraVariableUpdateMock).not.toHaveBeenCalled();
     expect(globals.generate).toHaveBeenCalledWith({ should_stream: true });
+    expect(options.onVariableExtraDeclaredBlocks).not.toHaveBeenCalled();
     expect(options.patchLatestDebugRound).toHaveBeenCalledWith({
       variable: expect.objectContaining({
         trigger: 'send',
@@ -206,6 +208,25 @@ describe('useMessageHandler extra-variable decision', () => {
         output: '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>',
       }),
     });
+    expect(options.onVariableExtraDeclaredBlocks).toHaveBeenCalledWith(
+      '<VariableEdit>\n{\n  "user数据": {\n    "修为": 120\n  }\n}\n</VariableEdit>',
+      2,
+    );
+  });
+
+  it('send + extra 失败时不会上报额外变量声明块', async () => {
+    const options = createHookOptions(createSummarySettings('extra'));
+    prepareExtraVariableUpdateTurnMock.mockResolvedValue({ release: vi.fn() });
+    executeExtraVariableUpdateMock.mockRejectedValue(new Error('extra failed'));
+
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('测试发送');
+    });
+
+    expect(options.onVariableExtraDeclaredBlocks).not.toHaveBeenCalled();
+    expect(options.showError).toHaveBeenCalledWith('AI 回复已生成，但额外变量更新失败：extra failed');
   });
 
   it('regenerate + inline 会显式标记 skipped，且不会触发额外变量链路', async () => {
@@ -228,6 +249,7 @@ describe('useMessageHandler extra-variable decision', () => {
 
     expect(prepareExtraVariableUpdateTurnMock).not.toHaveBeenCalled();
     expect(executeExtraVariableUpdateMock).not.toHaveBeenCalled();
+    expect(options.onVariableExtraDeclaredBlocks).not.toHaveBeenCalled();
     expect(options.patchLatestDebugRound).toHaveBeenCalledWith({
       variable: expect.objectContaining({
         trigger: 'regenerate',
@@ -291,6 +313,10 @@ describe('useMessageHandler extra-variable decision', () => {
         output: '<VariableEdit>{"user数据":{"修为":130}}</VariableEdit>',
       }),
     });
+    expect(options.onVariableExtraDeclaredBlocks).toHaveBeenCalledWith(
+      '<VariableEdit>{"user数据":{"修为":130}}</VariableEdit>',
+      12,
+    );
     expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:sync-latest-message-shell', 12);
   });
 
