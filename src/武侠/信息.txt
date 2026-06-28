@@ -1,350 +1,564 @@
-[wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 记录主回复中的变量声明 {turnId: 3, assistantMessageId: null, rawReplyLength: 7303}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: null, rawReplyLength: 7303, declaredChanges: Array(0), omittedDeclaredCount: 0, …}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 处理消息边界信号 {turnId: 3, signal: {…}}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 快照未变化，但没有找到可升级的批次 {turnId: 3, nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-console.<computed> @ VM76176 log.js:10
-warn @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 标记 assistant 楼层为 AI 写入目标 {turnId: 3, assistantMessageId: 28, aiWriteTargetIds: Array(1)}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 快照未变化，但没有找到可升级的批次 {turnId: 3, nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-console.<computed> @ VM76176 log.js:10
-warn @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 记录主回复中的变量声明 {turnId: 3, assistantMessageId: 28, rawReplyLength: 7303}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: 28, rawReplyLength: 7303, declaredChanges: Array(0), omittedDeclaredCount: 0, …}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 处理消息边界信号 {turnId: 3, signal: {…}}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useVariableChangeTracker] 快照未变化，但没有找到可升级的批次 {turnId: 3, nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-console.<computed> @ VM76176 log.js:10
-warn @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-（匿名） @ VM76180:2
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [extraVariableUpdate] 开始执行额外变量更新 {assistantMessageId: 28, variableUpdateMode: 'extra', latestRawReplyLength: 7303}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useMessageHandler] 额外变量提示词已写入调试状态 {assistantMessageId: 28, promptLength: 46777}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useMessageHandler] 额外变量进度更新 {assistantMessageId: 28, hasPrompt: true, promptLength: 46777, hasRawResponse: false, rawResponseLength: 0, …}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [extraVariableUpdate] 额外变量提示词已构建 {assistantMessageId: 28, promptLength: 46777, prompt: '你是《金庸群侠传》ERA 变量更新模型。你的任务是根据最新正文和当前变量上下文，补充正文造成的变量变…侠义之心颇为赞赏。"\n      }\n    }\n  }\n}\n</VariableInsert>\n'}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [extraVariableUpdate] 额外模型已返回 {assistantMessageId: 28, rawResponseLength: 1798, rawResponse: '<VariableThink>\n- 剧情摘要: 郭靖与完颜康在比武招亲擂台激战，完颜康凭借全真派精妙…王妃车驾抵达而意外脱险。"\n      }\n    }\n  }\n}\n</VariableEdit>'}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useMessageHandler] 额外变量进度更新 {assistantMessageId: 28, hasPrompt: true, promptLength: 46777, hasRawResponse: true, rawResponseLength: 1798, …}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [extraVariableUpdate] 变量块提取完成 {assistantMessageId: 28, actionBlockCount: 3, blocksTextLength: 1798, blocksText: '<VariableThink>\n- 剧情摘要: 郭靖与完颜康在比武招亲擂台激战，完颜康凭借全真派精妙…王妃车驾抵达而意外脱险。"\n      }\n    }\n  }\n}\n</VariableEdit>'}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useMessageHandler] 额外变量进度更新 {assistantMessageId: 28, hasPrompt: true, promptLength: 46777, hasRawResponse: true, rawResponseLength: 1798, …}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [extraVariableUpdate] 变量块已追加到目标楼层 {assistantMessageId: 28, actionBlockCount: 3, appendVerified: true, appendVerification: '写入后回读通过：assistant #28 / swipe #0 中存在刚追加的变量块。', appendReadbackText: '- ¿Cuál es la situación actual?\n * Tiempo: 25 de e…王妃车驾抵达而意外脱险。"\n      }\n    }\n  }\n}\n</VariableEdit>'}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useMessageHandler] 额外变量进度更新 {assistantMessageId: 28, hasPrompt: true, promptLength: 46777, hasRawResponse: true, rawResponseLength: 1798, …}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [extraVariableUpdate] 开始等待 ERA 同步 {assistantMessageId: 28, actionBlockCount: 3, expectedAction: 'apiWrite', timeoutMs: 20000}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [emitSourcedEraVariableWriteAndWait] 已注册 era:writeDone 等待监听器 {waitId: '7c4e6de4-73ef-402c-8c60-732b4b054ead', source: 'frontend', operation: 'update', reason: 'extra-variable-api-write', eventName: 'era:apiWrite', …}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [emitSourcedEraVariableWriteAndWait] 开始发送事件并等待 era:writeDone {waitId: '7c4e6de4-73ef-402c-8c60-732b4b054ead', source: 'frontend', operation: 'update', reason: 'extra-variable-api-write', eventName: 'era:apiWrite', …}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [emitSourcedEraVariableWriteAndWait] 事件已发出，开始等待匹配的 era:writeDone {waitId: '7c4e6de4-73ef-402c-8c60-732b4b054ead', source: 'frontend', operation: 'update', reason: 'extra-variable-api-write', eventName: 'era:apiWrite', …}
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [index] 收到 pagehide，准备卸载 React root {runtimeId: 'mquh41o8-41we6s', iframeName: 'TH-message--26--0', href: 'blob:http://127.0.0.1:8000/3a78c046-bc81-4431-9472-172f8298007b', createdAt: 1782450678392, readyState: 'complete', …}
-console.<computed> @ VM76176 log.js:10
-warn @ VM76180:2
-（匿名） @ VM76180:2
-dispatch @ VM76170 jquery.min.js:2
-v.handle @ VM76170 jquery.min.js:2
-empty @ jquery-3.5.1.min.js:2
-（匿名） @ displayed_message.ts:141
-syncAndCollapseToLastMessage @ 77100e3f-7835-4d3b-94e1-99432ff501e0:67
-（匿名） @ 77100e3f-7835-4d3b-94e1-99432ff501e0:102
-setTimeout
-scheduleCollapse @ 77100e3f-7835-4d3b-94e1-99432ff501e0:100
-（匿名） @ 77100e3f-7835-4d3b-94e1-99432ff501e0:136
-（匿名） @ event.ts:55
-EventEmitter.emit @ eventemitter.js:146
-await in EventEmitter.emit
-（匿名） @ displayed_message.ts:152
-（匿名） @ chat_message.ts:295
-（匿名） @ chat_message.ts:295
-refreshMessages @ chat_message.ts:178
-setChatMessages @ chat_message.ts:294
-await in setChatMessages
-（匿名） @ VM76180:2
-ti @ VM76180:2
-await in ti
-（匿名） @ VM76180:2
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [App] 组件即将卸载 {runtimeId: 'mquh41o8-41we6s', iframeName: 'TH-message--26--0', href: 'blob:http://127.0.0.1:8000/3a78c046-bc81-4431-9472-172f8298007b', createdAt: 1782450678392, readyState: 'complete', …}
-console.<computed> @ VM76176 log.js:10
-warn @ VM76180:2
-（匿名） @ VM76180:2
-xo @ VM76180:2
-mc @ VM76180:2
-uc @ VM76180:2
-dc @ VM76180:2
-ku @ VM76180:2
-wu @ VM76180:2
-ju @ VM76180:2
-yu @ VM76180:2
-Zc @ VM76180:2
-Xc @ VM76180:2
-Wu @ VM76180:2
-Lu @ VM76180:2
-nu @ VM76180:2
-Yp.unmount.Jp.unmount @ VM76180:2
-（匿名） @ VM76180:2
-dispatch @ VM76170 jquery.min.js:2
-v.handle @ VM76170 jquery.min.js:2
-empty @ jquery-3.5.1.min.js:2
-（匿名） @ displayed_message.ts:141
-syncAndCollapseToLastMessage @ 77100e3f-7835-4d3b-94e1-99432ff501e0:67
-（匿名） @ 77100e3f-7835-4d3b-94e1-99432ff501e0:102
-setTimeout
-scheduleCollapse @ 77100e3f-7835-4d3b-94e1-99432ff501e0:100
-（匿名） @ 77100e3f-7835-4d3b-94e1-99432ff501e0:136
-（匿名） @ event.ts:55
-EventEmitter.emit @ eventemitter.js:146
-await in EventEmitter.emit
-（匿名） @ displayed_message.ts:152
-（匿名） @ chat_message.ts:295
-（匿名） @ chat_message.ts:295
-refreshMessages @ chat_message.ts:178
-setChatMessages @ chat_message.ts:294
-await in setChatMessages
-（匿名） @ VM76180:2
-ti @ VM76180:2
-await in ti
-（匿名） @ VM76180:2
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useEventListeners] 变量相关监听器即将清理 {runtimeId: 'mquh41o8-41we6s', iframeName: 'TH-message--26--0', href: 'blob:http://127.0.0.1:8000/3a78c046-bc81-4431-9472-172f8298007b', createdAt: 1782450678392, readyState: 'complete', …}
-console.<computed> @ VM76176 log.js:10
-warn @ VM76180:2
-（匿名） @ VM76180:2
-xo @ VM76180:2
-mc @ VM76180:2
-uc @ VM76180:2
-dc @ VM76180:2
-ku @ VM76180:2
-wu @ VM76180:2
-ju @ VM76180:2
-yu @ VM76180:2
-Zc @ VM76180:2
-Xc @ VM76180:2
-Wu @ VM76180:2
-Lu @ VM76180:2
-nu @ VM76180:2
-Yp.unmount.Jp.unmount @ VM76180:2
-（匿名） @ VM76180:2
-dispatch @ VM76170 jquery.min.js:2
-v.handle @ VM76170 jquery.min.js:2
-empty @ jquery-3.5.1.min.js:2
-（匿名） @ displayed_message.ts:141
-syncAndCollapseToLastMessage @ 77100e3f-7835-4d3b-94e1-99432ff501e0:67
-（匿名） @ 77100e3f-7835-4d3b-94e1-99432ff501e0:102
-setTimeout
-scheduleCollapse @ 77100e3f-7835-4d3b-94e1-99432ff501e0:100
-（匿名） @ 77100e3f-7835-4d3b-94e1-99432ff501e0:136
-（匿名） @ event.ts:55
-EventEmitter.emit @ eventemitter.js:146
-await in EventEmitter.emit
-（匿名） @ displayed_message.ts:152
-（匿名） @ chat_message.ts:295
-（匿名） @ chat_message.ts:295
-refreshMessages @ chat_message.ts:178
-setChatMessages @ chat_message.ts:294
-await in setChatMessages
-（匿名） @ VM76180:2
-ti @ VM76180:2
-await in ti
-（匿名） @ VM76180:2
-VM76176 log.js:10 [wuxia-variable-trace]#mquh41o8-41we6s [useEventListeners] 变量相关监听器已清理完成 {runtimeId: 'mquh41o8-41we6s', iframeName: 'TH-message--26--0', href: 'blob:http://127.0.0.1:8000/3a78c046-bc81-4431-9472-172f8298007b', createdAt: 1782450678392, readyState: 'complete', …}
-console.<computed> @ VM76176 log.js:10
-warn @ VM76180:2
-（匿名） @ VM76180:2
-xo @ VM76180:2
-mc @ VM76180:2
-uc @ VM76180:2
-dc @ VM76180:2
-ku @ VM76180:2
-wu @ VM76180:2
-ju @ VM76180:2
-yu @ VM76180:2
-Zc @ VM76180:2
-Xc @ VM76180:2
-Wu @ VM76180:2
-Lu @ VM76180:2
-nu @ VM76180:2
-Yp.unmount.Jp.unmount @ VM76180:2
-（匿名） @ VM76180:2
-dispatch @ VM76170 jquery.min.js:2
-v.handle @ VM76170 jquery.min.js:2
-empty @ jquery-3.5.1.min.js:2
-（匿名） @ displayed_message.ts:141
-syncAndCollapseToLastMessage @ 77100e3f-7835-4d3b-94e1-99432ff501e0:67
-（匿名） @ 77100e3f-7835-4d3b-94e1-99432ff501e0:102
-setTimeout
-scheduleCollapse @ 77100e3f-7835-4d3b-94e1-99432ff501e0:100
-（匿名） @ 77100e3f-7835-4d3b-94e1-99432ff501e0:136
-（匿名） @ event.ts:55
-EventEmitter.emit @ eventemitter.js:146
-await in EventEmitter.emit
-（匿名） @ displayed_message.ts:152
-（匿名） @ chat_message.ts:295
-（匿名） @ chat_message.ts:295
-refreshMessages @ chat_message.ts:178
-setChatMessages @ chat_message.ts:294
-await in setChatMessages
-（匿名） @ VM76180:2
-ti @ VM76180:2
-await in ti
-（匿名） @ VM76180:2
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [index] React root 即将挂载 {runtimeId: 'mqujhk50-xfugdj', iframeName: 'TH-message--28--0', href: 'blob:http://127.0.0.1:8000/255b2fa8-5702-49a0-a970-62651abff659', createdAt: 1782454668084, readyState: 'complete', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [App] 组件已挂载 {runtimeId: 'mqujhk50-xfugdj', iframeName: 'TH-message--28--0', href: 'blob:http://127.0.0.1:8000/255b2fa8-5702-49a0-a970-62651abff659', createdAt: 1782454668084, readyState: 'complete', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useEventListeners] 开始注册变量相关监听器 {runtimeId: 'mqujhk50-xfugdj', iframeName: 'TH-message--28--0', href: 'blob:http://127.0.0.1:8000/255b2fa8-5702-49a0-a970-62651abff659', createdAt: 1782454668084, readyState: 'complete', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useEventListeners] 变量相关监听器注册完成 {runtimeId: 'mqujhk50-xfugdj', iframeName: 'TH-message--28--0', href: 'blob:http://127.0.0.1:8000/255b2fa8-5702-49a0-a970-62651abff659', createdAt: 1782454668084, readyState: 'complete', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [emitSourcedEraVariableWriteAndWait] 已注册 era:writeDone 等待监听器 {waitId: 'cd9e792f-94ad-4ff7-8a05-231f03feb39e', source: 'frontend', operation: 'insert', reason: 'martial-arts-completion', eventName: 'era:insertByObject', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [emitSourcedEraVariableWriteAndWait] 开始发送事件并等待 era:writeDone {waitId: 'cd9e792f-94ad-4ff7-8a05-231f03feb39e', source: 'frontend', operation: 'insert', reason: 'martial-arts-completion', eventName: 'era:insertByObject', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [emitSourcedEraVariableWriteAndWait] 事件已发出，开始等待匹配的 era:writeDone {waitId: 'cd9e792f-94ad-4ff7-8a05-231f03feb39e', source: 'frontend', operation: 'insert', reason: 'martial-arts-completion', eventName: 'era:insertByObject', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 处理消息边界回读 {turnId: 3, requestedMessageId: 28, resolvedMessageId: 28, finalMessageId: 28, assistantReplyLocked: true, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 处理消息边界信号 {turnId: 3, signal: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 捕获到新的变量差分 {turnId: 3, metadata: {…}, previousSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', totalObservedCount: 8, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useEventListeners] 收到 era:writeDone {mk: 'era_mk_1782454667088_sf7308', message_id: 28, actions: {…}, selectedMks: Array(29), editLogs: {…}, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 收到变量写入信号 {turnId: 3, signal: {…}, normalized: {…}, beforeCaptureSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: 28, rawReplyLength: 8935, declaredChanges: Array(31), omittedDeclaredCount: 0, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 复用已有批次并调整归因 {turnId: 3, nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', batch: {…}, metadata: {…}, shouldMoveToAi: true, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 批次归因调整结果 {turnId: 3, aiObservedCount: 8, backgroundObservedCount: 0, aiObserved: Array(8), backgroundObserved: Array(0), …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 写入信号归因完成 {turnId: 3, signalKind: 'era', resolvedOrigin: 'ai', producer: 'era', assistantMessageId: 28, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 写入事件先到、变量快照未刷新，安排延迟补读 {turnId: 3, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}, refreshDeclaredAssistant: true}
-console.<computed> @ log.js:10
-warn @ VM100423:2
-（匿名） @ VM100423:2
-（匿名） @ VM100423:2
-（匿名） @ VM100423:2
-（匿名） @ VM100423:2
-（匿名） @ event.ts:55
-EventEmitter.emit @ eventemitter.js:146
-await in EventEmitter.emit
-_eventEmit @ event.ts:119
-emitWriteDoneEvent @ command.ts:260
-dispatchAndExecuteTask @ dispatcher.ts:200
-await in dispatchAndExecuteTask
-processQueue @ queue.ts:113
-await in processQueue
-pushToQueue @ queue.ts:47
-（匿名） @ index.ts:45
-（匿名） @ event.ts:55
-EventEmitter.emit @ eventemitter.js:146
-_eventEmit @ event.ts:119
-（匿名） @ command.ts:242
-await in （匿名）
-flushApiWriteQueue @ command.ts:243
-（匿名） @ command.ts:260
-setTimeout
-scheduleApiWriteFlush @ command.ts:260
-performApiWrite @ command.ts:260
-insertByObject @ command.ts:260
-dispatchAndExecuteTask @ dispatcher.ts:157
-await in dispatchAndExecuteTask
-processQueue @ queue.ts:113
-pushToQueue @ queue.ts:47
-（匿名） @ index.ts:45
-（匿名） @ event.ts:55
-EventEmitter.emit @ eventemitter.js:146
-_eventEmit @ event.ts:119
-Bt @ VM100423:2
-ra @ VM100423:2
-await in ra
-ma @ VM100423:2
-await in ma
-（匿名） @ VM100423:2
-fa @ VM100423:2
-（匿名） @ VM100423:2
-setTimeout
-ha @ VM100423:2
-（匿名） @ VM100423:2
-（匿名） @ VM100423:2
-vo @ VM100423:2
-ac @ VM100423:2
-nc @ VM100423:2
-ac @ VM100423:2
-ku @ VM100423:2
-（匿名） @ VM100423:2
-L @ scheduler.production.js:151
-postMessage
-（匿名） @ scheduler.production.js:202
-L @ scheduler.production.js:187
-postMessage
-（匿名） @ scheduler.production.js:202
-（匿名） @ scheduler.production.js:325
-Bu @ VM100423:2
-Uu @ VM100423:2
-（匿名） @ VM100423:2
-setTimeout
-（匿名） @ jquery.min.js:2
-c @ jquery.min.js:2
-add @ jquery.min.js:2
-（匿名） @ jquery.min.js:2
-Deferred @ jquery.min.js:2
-then @ jquery.min.js:2
-T.fn.ready @ jquery.min.js:2
-T.fn.init @ jquery.min.js:2
-T @ jquery.min.js:2
-（匿名） @ VM100423:2
-PendingScript
-x @ jquery.min.js:2
-tm @ jquery.min.js:2
-append @ jquery.min.js:2
-（匿名） @ jquery.min.js:2
-V @ jquery.min.js:2
-html @ jquery.min.js:2
-（匿名） @ jquery.min.js:2
-c @ jquery.min.js:2
-fireWith @ jquery.min.js:2
-E @ jquery.min.js:2
-（匿名） @ jquery.min.js:2
-XMLHttpRequest.send
-send @ jquery.min.js:2
-ajax @ jquery.min.js:2
-T.fn.load @ jquery.min.js:2
-（匿名） @ 255b2fa8-5702-49a0-a970-62651abff659:30
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [emitSourcedEraVariableWriteAndWait] 匹配到目标 era:writeDone {waitId: 'cd9e792f-94ad-4ff7-8a05-231f03feb39e', source: 'frontend', operation: 'insert', reason: 'martial-arts-completion', eventName: 'era:insertByObject', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [emitSourcedEraVariableWriteAndWait] 停止等待监听器 {waitId: 'cd9e792f-94ad-4ff7-8a05-231f03feb39e', source: 'frontend', operation: 'insert', reason: 'matched', eventName: 'era:insertByObject', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useEventListeners] 收到 wuxia:eraVariableWriteDone {version: 1, writeId: 'a9b812b6-7442-4220-bb00-66ef44927c36', source: 'frontend', operation: 'insert', reason: 'martial-arts-completion', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 收到变量写入信号 {turnId: 3, signal: {…}, normalized: {…}, beforeCaptureSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 复用已有批次并调整归因 {turnId: 3, nextSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', batch: {…}, metadata: {…}, shouldMoveToAi: false, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 批次归因调整结果 {turnId: 3, aiObservedCount: 0, backgroundObservedCount: 8, aiObserved: Array(0), backgroundObserved: Array(8), …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 写入信号归因完成 {turnId: 3, signalKind: 'sourced-era', resolvedOrigin: 'background', producer: 'frontend', assistantMessageId: 28, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [emitSourcedEraVariableWriteAndWait] 已发送带来源的 ERA 完成事件 {version: 1, writeId: 'a9b812b6-7442-4220-bb00-66ef44927c36', source: 'frontend', operation: 'insert', reason: 'martial-arts-completion', …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 执行延迟补读 {turnId: 3, remainingRetries: 8, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: 28, rawReplyLength: 8935, declaredChanges: Array(31), omittedDeclaredCount: 0, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 3, batch: {…}, metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 执行延迟补读 {turnId: 3, remainingRetries: 7, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: 28, rawReplyLength: 8935, declaredChanges: Array(31), omittedDeclaredCount: 0, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 3, batch: {…}, metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 执行延迟补读 {turnId: 3, remainingRetries: 6, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: 28, rawReplyLength: 8935, declaredChanges: Array(31), omittedDeclaredCount: 0, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 3, batch: {…}, metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 执行延迟补读 {turnId: 3, remainingRetries: 5, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: 28, rawReplyLength: 8935, declaredChanges: Array(31), omittedDeclaredCount: 0, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 3, batch: {…}, metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 执行延迟补读 {turnId: 3, remainingRetries: 4, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: 28, rawReplyLength: 8935, declaredChanges: Array(31), omittedDeclaredCount: 0, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 3, batch: {…}, metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 执行延迟补读 {turnId: 3, remainingRetries: 3, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: 28, rawReplyLength: 8935, declaredChanges: Array(31), omittedDeclaredCount: 0, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 3, batch: {…}, metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 执行延迟补读 {turnId: 3, remainingRetries: 2, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: 28, rawReplyLength: 8935, declaredChanges: Array(31), omittedDeclaredCount: 0, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 3, batch: {…}, metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 执行延迟补读 {turnId: 3, remainingRetries: 1, expectedSnapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}', metadata: {…}}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 刷新 AI 声明变量 {turnId: 3, assistantMessageId: 28, rawReplyLength: 8935, declaredChanges: Array(31), omittedDeclaredCount: 0, …}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 快照未变化，尝试复用已有批次 {turnId: 3, metadata: {…}, snapshotHash: '{"user数据":{"$meta":{"necessary":"all","updatable":…":{"江东蛇王":"丐帮八袋弟子，两浙群丐首领"},"重要物品":{}}},"附近传闻":{}}'}
-VM100423:2 [wuxia-variable-trace]#mqujhk50-xfugdj [useVariableChangeTracker] 命中已有批次，但无需调整归因 {turnId: 3, batch: {…}, metadata: {…}}
+变量变更
+
+AI回复
+声97/实6
+
+后台变更
+5
+
+AI回复变量
+声97 / 实6
+修改
+stat_data › 世界信息 › 时间 › 时
+无净变化
+
+
+AI 声明
+13
+发送前已经是目标值：13
+修改
+stat_data › 世界信息 › 时间 › 分
+已落地
+
+
+AI 声明
+45
+实际写入 · ERA/API
+5
+→
+45
+修改
+stat_data › user数据 › 关系网 › 郭靖
+已落地
+
+
+AI 声明
+志趣相投/40
+实际写入 · ERA/API
+志趣相投/30
+→
+志趣相投/40
+修改
+stat_data › user数据 › 关系网 › 黄蓉
+已落地
+
+
+AI 声明
+莫测高深/45
+实际写入 · ERA/API
+心生好奇/30
+→
+莫测高深/45
+修改
+stat_data › 角色数据 › 郭靖 › 关系网 › 墨逸
+已落地
+
+
+AI 声明
+志趣相投/40
+实际写入 · ERA/API
+好人/30
+→
+志趣相投/40
+修改
+stat_data › 角色数据 › 黄蓉 › 关系网 › 墨逸
+已落地
+
+
+AI 声明
+莫测高深/45
+实际写入 · ERA/API
+气质不凡/35
+→
+莫测高深/45
+新增
+stat_data › user数据 › 人物经历 › 酒楼试菜
+已落地
+
+
+AI 声明
+1219年10月20日，与郭靖、黄蓉在张家口大酒店共餐。面对黄蓉故意点出的名菜刁难，以从容不迫的气度化解，引起了黄蓉的强烈好奇。
+实际写入 · ERA/API
+未定义
+→
+1219年10月20日，与郭靖、黄蓉在张家口大酒店共餐。面对黄蓉故意点出的名菜刁难，以从容不迫的气度化解，引起了黄蓉的强烈好奇。
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 金雁功 › 类型
+未落地
+
+
+AI 声明
+轻功
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 金雁功 › 功法描述
+未落地
+
+
+AI 声明
+全真派上乘内功与轻功法门，能使人身轻足健。此功法不仅是轻功，同时也能修炼内力，是全真派弟子的核心身法。
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 金雁功 › 功法品阶
+未落地
+
+
+AI 声明
+上乘
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 金雁功 › 掌握程度
+无净变化
+
+
+AI 声明
+略有小成
+发送前已经是目标值：略有小成
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 金雁功 › 特性
+未落地
+
+
+AI 声明
+对象 0
+最终值：对象 1
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 分筋错骨手 › 类型
+未落地
+
+
+AI 声明
+拳掌
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 分筋错骨手 › 功法描述
+未落地
+
+
+AI 声明
+朱聪擅长的擒拿手法，专攻敌人关节，招式有【壮士断腕】等。此擒拿手法优秀，属于江湖好手必备的技能。
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 分筋错骨手 › 功法品阶
+未落地
+
+
+AI 声明
+传家
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 分筋错骨手 › 掌握程度
+无净变化
+
+
+AI 声明
+融会贯通
+发送前已经是目标值：融会贯通
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 分筋错骨手 › 特性
+未落地
+
+
+AI 声明
+对象 0
+最终值：对象 1
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 越女剑法 › 类型
+未落地
+
+
+AI 声明
+剑法
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 越女剑法 › 功法描述
+未落地
+
+
+AI 声明
+韩小莹绝技，源自古越国，招式轻灵，有【十万横磨】、【起凤腾蛟】、【翻身探果】等招式。此剑法招式精妙轻灵，是韩小莹的看家本领。
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 越女剑法 › 功法品阶
+未落地
+
+
+AI 声明
+传家
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 越女剑法 › 掌握程度
+无净变化
+
+
+AI 声明
+融会贯通
+发送前已经是目标值：融会贯通
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 越女剑法 › 特性
+未落地
+
+
+AI 声明
+对象 0
+最终值：对象 1
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 南山刀法 › 类型
+未落地
+
+
+AI 声明
+刀法
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 南山刀法 › 功法描述
+未落地
+
+
+AI 声明
+南希仁的刀法，招式有【燕子入巢】等。此刀法刚猛有力，配合扎实的拳脚功夫，威力更甚。
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 南山刀法 › 功法品阶
+未落地
+
+
+AI 声明
+传家
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 南山刀法 › 掌握程度
+无净变化
+
+
+AI 声明
+融会贯通
+发送前已经是目标值：融会贯通
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 南山刀法 › 特性
+未落地
+
+
+AI 声明
+对象 0
+最终值：对象 1
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 呼延枪法 › 类型
+未落地
+
+
+AI 声明
+枪戟
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 呼延枪法 › 功法描述
+未落地
+
+
+AI 声明
+全金发以铁秤施展的枪法，有家学渊源。虽有呼延家族的传承，但全金发练得一般，属于二流武学。
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 呼延枪法 › 功法品阶
+未落地
+
+
+AI 声明
+传家
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 呼延枪法 › 掌握程度
+无净变化
+
+
+AI 声明
+融会贯通
+发送前已经是目标值：融会贯通
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 呼延枪法 › 特性
+未落地
+
+
+AI 声明
+对象 0
+最终值：对象 1
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 金龙鞭法 › 类型
+未落地
+
+
+AI 声明
+棍锤
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 金龙鞭法 › 功法描述
+未落地
+
+
+AI 声明
+韩宝驹绝技，招式有【风卷云残】等。此鞭法灵活多变，是典型的家传武学，配合马战更显威力。
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 金龙鞭法 › 功法品阶
+未落地
+
+
+AI 声明
+传家
+最终值：空文本
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 金龙鞭法 › 掌握程度
+无净变化
+
+
+AI 声明
+融会贯通
+发送前已经是目标值：融会贯通
+新增
+stat_data › 角色数据 › 郭靖 › 功法 › 金龙鞭法 › 特性
+未落地
+
+
+AI 声明
+对象 0
+最终值：对象 1
+修改
+stat_data › user数据 › 属性 › 气血
+无净变化
+
+
+AI 声明
+96/96
+发送前已经是目标值：96/96
+修改
+stat_data › user数据 › 属性 › 内力
+未落地
+
+
+AI 声明
+600/600
+最终值：600/600
+修改
+stat_data › user数据 › 属性 › 臂力
+无净变化
+
+
+AI 声明
+60
+发送前已经是目标值：60
+修改
+stat_data › user数据 › 属性 › 根骨
+无净变化
+
+
+AI 声明
+60
+发送前已经是目标值：60
+修改
+stat_data › user数据 › 属性 › 机敏
+无净变化
+
+
+AI 声明
+60
+发送前已经是目标值：60
+修改
+stat_data › user数据 › 属性 › 洞察
+无净变化
+
+
+AI 声明
+60
+发送前已经是目标值：60
+修改
+stat_data › 角色数据 › 黄裳 › 属性 › 气血
+无净变化
+
+
+AI 声明
+13440000/13440000
+发送前已经是目标值：13440000/13440000
+修改
+stat_data › 角色数据 › 黄裳 › 属性 › 内力
+未落地
+
+
+AI 声明
+19740000/19740000
+最终值：19740000/19740000
+修改
+stat_data › 角色数据 › 黄裳 › 属性 › 臂力
+无净变化
+
+
+AI 声明
+300000
+发送前已经是目标值：300000
+修改
+stat_data › 角色数据 › 黄裳 › 属性 › 根骨
+无净变化
+
+
+AI 声明
+840000
+发送前已经是目标值：840000
+修改
+stat_data › 角色数据 › 黄裳 › 属性 › 机敏
+无净变化
+
+
+AI 声明
+900000
+发送前已经是目标值：900000
+修改
+stat_data › 角色数据 › 黄裳 › 属性 › 洞察
+无净变化
+
+
+AI 声明
+1080000
+发送前已经是目标值：1080000
+修改
+stat_data › 角色数据 › 欧阳锋 › 属性 › 气血
+无净变化
+
+
+AI 声明
+28/28
+发送前已经是目标值：28/28
+修改
+stat_data › 角色数据 › 欧阳锋 › 属性 › 内力
+未落地
+
+
+AI 声明
+658/658
+最终值：658/658
+修改
+stat_data › 角色数据 › 欧阳锋 › 属性 › 臂力
+无净变化
+
+
+AI 声明
+27
+发送前已经是目标值：27
+修改
+stat_data › 角色数据 › 欧阳锋 › 属性 › 根骨
+无净变化
+
+
+AI 声明
+28
+发送前已经是目标值：28
+修改
+stat_data › 角色数据 › 欧阳锋 › 属性 › 机敏
+无净变化
+
+
+AI 声明
+19
+发送前已经是目标值：19
+修改
+stat_data › 角色数据 › 欧阳锋 › 属性 › 洞察
+无净变化
+
+
+AI 声明
+25
+发送前已经是目标值：25
+修改
+stat_data › 角色数据 › 鲁有脚 › 属性 › 气血
+无净变化
+
+
+AI 声明
+5880/5880
+发送前已经是目标值：5880/5880
+修改
+stat_data › 角色数据 › 鲁有脚 › 属性 › 内力
+未落地
+
+
+AI 声明
+17640/17640
+最终值：17640/17640
+修改
+stat_data › 角色数据 › 鲁有脚 › 属性 › 臂力
+无净变化
+
+
+AI 声明
+2240
+发送前已经是目标值：2240
+修改
+stat_data › 角色数据 › 鲁有脚 › 属性 › 根骨
+无净变化
+
+
+AI 声明
+1960
+发送前已经是目标值：1960
+修改
+stat_data › 角色数据 › 鲁有脚 › 属性 › 机敏
+无净变化
+
+
+AI 声明
+980
+发送前已经是目标值：980
+修改
+stat_data › 角色数据 › 鲁有脚 › 属性 › 洞察
+无净变化
+
+
+AI 声明
+1400
+发送前已经是目标值：1400
+修改
+stat_data › 角色数据 › 一灯大师 › 属性 › 气血
+无净变化
+
+
+AI 声明
+17280000/17280000
+发送前已经是目标值：17280000/17280000
+修改
+stat_data › 角色数据 › 一灯大师 › 属性 › 内力
+未落地
+
+
+AI 声明
+20520000/20520000
+最终值：20520000/20520000
+修改
+stat_data › 角色数据 › 一灯大师 › 属性 › 臂力
+无净变化
+
+
+AI 声明
+720000
+发送前已经是目标值：720000
+修改
+stat_data › 角色数据 › 一灯大师 › 属性 › 根骨
+无净变化
+
+
+AI 声明
+1080000
+发送前已经是目标值：1080000
+修改
+stat_data › 角色数据 › 一灯大师 › 属性 › 机敏
+无净变化
+
+
+AI 声明
+840000
+发送前已经是目标值：840000
+修改
+stat_data › 角色数据 › 一灯大师 › 属性 › 洞察
+无净变化
+
+
+AI 声明
+1020000
+发送前已经是目标值：1020000
