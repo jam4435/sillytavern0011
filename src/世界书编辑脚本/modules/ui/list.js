@@ -13,10 +13,9 @@ import {
   getActiveLorebookGroup,
   getFolderCollapsedState,
   getFolderMetaSession,
-  getFilteredEntries,
   getSelectedEntries,
-  getSearchFilteredEntries,
-  getSelectedEntriesCount,
+  getSelectableEntries,
+  getSelectAllControlState,
   isReplacingCharacterLorebook,
   lorebookSorts,
   setAllEntriesData,
@@ -147,11 +146,7 @@ function hasRollbackTransaction(lorebookName) {
 }
 
 function getRenderableEntries(lorebookName) {
-  const searchInput = $(`.lorebook-search-input[data-lorebook-name="${lorebookName}"]`, window.parent.document).val();
-  if ((searchInput || '').trim()) {
-    return getSearchFilteredEntries(lorebookName);
-  }
-  return getFilteredEntries(lorebookName);
+  return getSelectableEntries(lorebookName);
 }
 
 function getLorebookCharCount(entries) {
@@ -1965,24 +1960,23 @@ export const updateHeaderCheckboxState = errorCatched((lorebookName, isGlobal) =
 
   const allCheckboxes = $headerCheckboxPC.add($headerCheckboxMobile);
 
-  // Get counts from state
-  const selectedCount = getSelectedEntriesCount(lorebookName);
-  const totalEntries = getFilteredEntries(lorebookName).length;
+  const controlState = getSelectAllControlState(lorebookName);
+  allCheckboxes
+    .prop('checked', controlState.checked)
+    .prop('indeterminate', controlState.indeterminate)
+    .prop('disabled', controlState.disabled);
+  $selectAllButtonMobile
+    .toggleClass('active', controlState.checked || controlState.indeterminate)
+    .toggleClass('partial', controlState.indeterminate)
+    .prop('disabled', controlState.disabled);
 
-  if (totalEntries === 0) {
-    allCheckboxes.prop('checked', false).prop('indeterminate', false).prop('disabled', true);
-    $selectAllButtonMobile.removeClass('active partial');
-  } else if (selectedCount === 0) {
-    allCheckboxes.prop('checked', false).prop('indeterminate', false).prop('disabled', false);
-    $selectAllButtonMobile.removeClass('active partial');
-  } else if (selectedCount === totalEntries) {
-    allCheckboxes.prop('checked', true).prop('indeterminate', false).prop('disabled', false);
-    $selectAllButtonMobile.removeClass('partial').addClass('active');
-  } else {
-    // Some are selected
-    allCheckboxes.prop('checked', false).prop('indeterminate', true).prop('disabled', false);
-    $selectAllButtonMobile.removeClass('active').addClass('active partial');
-  }
+  const controlTitle = controlState.checked
+    ? `已选 ${controlState.selectedCount} 条，点击取消全部选择`
+    : controlState.indeterminate
+      ? '部分条目已选，点击处理当前范围'
+      : '全选当前显示条目';
+  allCheckboxes.attr('title', controlTitle);
+  $selectAllButtonMobile.attr('title', controlTitle);
 
   syncFolderCheckboxStates(lorebookName, isGlobal);
 }, 'updateHeaderCheckboxState');
@@ -2082,7 +2076,7 @@ export const updateVirtualScroll = errorCatched(async lorebookName => {
     setAllEntriesData(currentAllEntries);
 
     // 3. 获取筛选后的条目 (现在会从已排序的最新状态中获取)
-    const filteredEntries = getFilteredEntries(lorebookName);
+    const filteredEntries = getSelectableEntries(lorebookName);
 
     // 4. 生成新的HTML内容
     const rows = filteredEntries.map(entry => {
@@ -2104,6 +2098,7 @@ export const updateVirtualScroll = errorCatched(async lorebookName => {
 
     // 6. 更新条目计数
     updateLorebookCountInfo(lorebookName, isGlobal, filteredEntries.length, allEntriesData[lorebookName]);
+    updateHeaderCheckboxState(lorebookName, isGlobal);
 
     if (DEBUG_MODE) {
       console.log(`[无感刷新] 成功更新世界书 "${lorebookName}"，共 ${filteredEntries.length} 个条目`);

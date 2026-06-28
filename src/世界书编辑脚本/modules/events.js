@@ -40,14 +40,13 @@ import {
 import { saveSortPreference } from './features/sorting.js';
 import {
   allEntriesData,
-  clearFilteredEntries,
-  getFilteredEntries,
+  getSelectableEntries,
   setSelectedEntries,
   setActiveLorebookGroup,
   getSelectedEntries,
   lorebookSorts,
   toggleFolderCollapsedState,
-  setFilteredEntries,
+  setEntrySearchQuery,
   virtualScrollers,
 } from './state.js';
 import { toggleAllEntries } from './features/batchActions.js';
@@ -86,6 +85,7 @@ async function refreshList(lorebookName, isGlobal) {
     setSelectedEntries(
       lorebookName,
       selectedUids.filter(uid => existingUidSet.has(ensureNumericUID(uid))),
+      { preserveSelectAllMemory: true },
     );
     updateHeaderCheckboxState(lorebookName, isGlobal);
   }
@@ -610,9 +610,7 @@ export function bindEventListeners() {
     // 【修复】确保 isGlobal 是布尔值，处理字符串 "true"/"false" 的情况
     const isGlobalAttr = $headerCheckbox.data('is-global');
     const isGlobal = isGlobalAttr === true || isGlobalAttr === 'true';
-    const isChecked = $headerCheckbox.prop('checked');
-    toggleAllEntries(lorebookName, isGlobal, isChecked);
-    $headerCheckbox.prop('indeterminate', false);
+    toggleAllEntries(lorebookName, isGlobal);
   });
 
   $panel.off('click.folderToggle').on('click.folderToggle', '.lorebook-folder-toggle, .master-folder-toggle', function (e) {
@@ -1265,25 +1263,8 @@ export function bindSearchEvents() {
     $input.css('width', `${nextWidth}ch`);
   };
 
-  const debouncedFilter = _.debounce((lorebookName, searchText, isGlobal) => {
-    const lowerSearchText = searchText.toLowerCase().trim();
-    const baseEntries = getFilteredEntries(lorebookName);
-    const matchedEntries = !lowerSearchText
-      ? baseEntries
-      : baseEntries.filter(
-          entry =>
-            (entry.name || '').toLowerCase().includes(lowerSearchText) ||
-            (entry.content || '').toLowerCase().includes(lowerSearchText) ||
-            (Array.isArray(entry.strategy?.keys) &&
-              entry.strategy.keys.join(',').toLowerCase().includes(lowerSearchText)),
-        );
-
-    if (!lowerSearchText) {
-      clearFilteredEntries(lorebookName);
-    } else {
-      setFilteredEntries(lorebookName, matchedEntries);
-    }
-
+  const debouncedFilter = _.debounce((lorebookName, isGlobal) => {
+    const matchedEntries = getSelectableEntries(lorebookName);
     if (isMasterDetailLayout()) {
       const $wrapper = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"]`, parentDoc).first();
       if ($wrapper.length) {
@@ -1318,7 +1299,9 @@ export function bindSearchEvents() {
       syncLorebookSearchWidth($input);
       const lorebookName = $input.attr('data-lorebook-name');
       const isGlobal = $input.data('is-global');
-      debouncedFilter(lorebookName, searchText, isGlobal);
+      setEntrySearchQuery(lorebookName, searchText);
+      updateHeaderCheckboxState(lorebookName, isGlobal);
+      debouncedFilter(lorebookName, isGlobal);
     })
     .on('focus.search blur.search', '.lorebook-search-input', function () {
       syncLorebookSearchWidth($(this));

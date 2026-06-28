@@ -11,9 +11,11 @@ import { beginMutationTransaction, commitMutationTransaction } from './history.j
 import { getDefaultCopyConflictStrategy, setDefaultCopyConflictStrategy } from '../settings.js';
 import {
   clearSelectedEntries,
-  getFilteredEntries,
-  getSearchFilteredEntries,
+  getSelectableEntries,
+  getSelectAllControlState,
   getSelectedEntries,
+  isEntrySelected,
+  setSelectAllMemory,
   setSelectedEntries,
 } from '../state.js';
 import { updateHeaderCheckboxState } from '../ui/list.js';
@@ -629,7 +631,7 @@ export const adjustSelectedEntriesPosition = errorCatched(async (lorebookName, i
 }, 'adjustSelectedEntriesPosition');
 
 // 【修复】将函数移至全局作用域以解决 ReferenceError
-export const toggleAllEntries = errorCatched((lorebookName, isGlobal, selectAll) => {
+export const toggleAllEntries = errorCatched((lorebookName, isGlobal) => {
   const parentDoc = window.parent.document;
   // 【修复】确保 isGlobal 是布尔值
   const isGlobalBool = isGlobal === true || isGlobal === 'true';
@@ -644,31 +646,29 @@ export const toggleAllEntries = errorCatched((lorebookName, isGlobal, selectAll)
     return false;
   }
 
-  // 首先检查是否有搜索结果
-  const searchFilteredEntries = getSearchFilteredEntries(lorebookName);
-
-  let entriesToSelect;
-  if (searchFilteredEntries.length > 0) {
-    // 如果有搜索结果，使用搜索结果
-    entriesToSelect = searchFilteredEntries;
-    console.log(`[全选操作] 使用搜索结果，共 ${entriesToSelect.length} 个条目`);
-  } else {
-    // 如果没有搜索结果，使用筛选后的条目（包括过滤器筛选的结果）
-    entriesToSelect = getFilteredEntries(lorebookName);
-    console.log(`[全选操作] 使用筛选结果，共 ${entriesToSelect.length} 个条目`);
+  const controlState = getSelectAllControlState(lorebookName);
+  if (controlState.nextAction === 'none') {
+    updateHeaderCheckboxState(lorebookName, isGlobalBool);
+    return false;
   }
 
-  if (selectAll) {
-    // Select all: add filtered UIDs to selection state
-    const filteredUids = entriesToSelect.map(entry => ensureNumericUID(entry.uid));
-    setSelectedEntries(lorebookName, filteredUids);
-  } else {
-    // Deselect all: clear selection state
+  if (controlState.nextAction === 'clear') {
     clearSelectedEntries(lorebookName);
+    console.log(`[全选操作] 已清空 ${controlState.selectedCount} 个选中条目`);
+  } else {
+    const entriesToSelect = getSelectableEntries(lorebookName);
+    const selectableUids = entriesToSelect.map(entry => ensureNumericUID(entry.uid));
+    setSelectedEntries(lorebookName, selectableUids);
+    setSelectAllMemory(lorebookName, selectableUids.length > 0);
+    console.log(`[全选操作] 已选择当前范围，共 ${selectableUids.length} 个条目`);
   }
 
   // Update visible DOM checkboxes after state change
-  $container.find(`.${LOREBOOK_ENTRY_CHECKBOX_CLASS}`).prop('checked', selectAll);
+  $container.find(`.${LOREBOOK_ENTRY_CHECKBOX_CLASS}`).each(function () {
+    const $checkbox = $(this);
+    const uid = ensureNumericUID($checkbox.attr('data-entry-uid'));
+    $checkbox.prop('checked', isEntrySelected(lorebookName, uid));
+  });
 
   // Call updateHeaderCheckboxState to sync header checkbox
   updateHeaderCheckboxState(lorebookName, isGlobalBool);

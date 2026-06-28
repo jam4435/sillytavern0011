@@ -22,7 +22,7 @@ import {
 import { getRollbackPreview, rollbackLastTransaction } from '../features/history.js';
 import { prepareOptimizerModal } from '../features/optimizer.js';
 import { getAiWorkspaceSettings, setAiWorkspaceSettings } from '../settings.js';
-import { getActiveFilters, getFilteredEntries, getSelectedEntries, getSelectedEntriesCount, setActiveFilter } from '../state.js';
+import { getActiveFilters, getSelectedEntries, setActiveFilter } from '../state.js';
 import { refreshAiWorkspace, resetAiWorkspace } from '../ui/aiWorkspace.js';
 import { selectDetailEntry } from '../ui/detail.js';
 import { closeFloatingBatchToggleDropdowns } from '../ui/floatingBatchDropdown.js';
@@ -727,15 +727,7 @@ function selectAll({ $actionTarget, lorebookName, isGlobal, parentDoc }) {
   const buttonIsGlobalAttr = $actionTarget.attr('data-is-global');
   const buttonIsGlobal = buttonIsGlobalAttr !== undefined ? buttonIsGlobalAttr === 'true' : isGlobal;
 
-  const totalEntries = getFilteredEntries(buttonLorebookName).length;
-  if (totalEntries === 0) {
-    return;
-  }
-
-  const selectedCount = getSelectedEntriesCount(buttonLorebookName);
-  const shouldSelectAll = selectedCount < totalEntries;
-
-  toggleAllEntries(buttonLorebookName, buttonIsGlobal, shouldSelectAll);
+  toggleAllEntries(buttonLorebookName, buttonIsGlobal);
 }
 
 // 注册所有标题栏操作命令

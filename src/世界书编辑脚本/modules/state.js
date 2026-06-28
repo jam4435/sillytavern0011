@@ -52,7 +52,6 @@ export function setIsReplacingCharacterLorebook(value) {
 // e.g., { 'lorebookName': { by: 'uid', dir: 'desc' } }
 export let lorebookSorts = {};
 export let allEntriesData = {};
-export let filteredEntriesData = {};
 export let virtualScrollers = {};
 
 const TAB_KEYS = ['character', 'global'];
@@ -95,6 +94,14 @@ import { isEntryActive } from './features/activationTracker.js';
 
 // Selection state management: { lorebookName: Set<uid> }
 export const selectedEntries = {};
+
+// Remembers that the current selection was created by the top-level select-all control.
+// This is deliberately separate from selectedEntries so batch consumers can keep using Set<uid>.
+export const selectAllMemory = {};
+
+// Search query state: { lorebookName: normalizedQuery }
+// Results are derived from the latest entries and filters to avoid stale debounced snapshots.
+export const entrySearchQueries = {};
 
 // Expanded state management: { lorebookName: Set<uid> }
 export let expandedEntries = {};
@@ -254,8 +261,23 @@ export function clearLastMutationTransaction(lorebookName) {
  * @param {string} lorebookName - The name of the lorebook
  * @param {number[]} uids - Array of numeric UIDs to select
  */
-export function setSelectedEntries(lorebookName, uids) {
+export function setSelectedEntries(lorebookName, uids, { preserveSelectAllMemory = false } = {}) {
   selectedEntries[lorebookName] = new Set(uids);
+  if (selectedEntries[lorebookName].size === 0 || !preserveSelectAllMemory) {
+    delete selectAllMemory[lorebookName];
+  }
+}
+
+export function setSelectAllMemory(lorebookName, remembered) {
+  if (remembered && getSelectedEntriesCount(lorebookName) > 0) {
+    selectAllMemory[lorebookName] = true;
+  } else {
+    delete selectAllMemory[lorebookName];
+  }
+}
+
+export function isSelectAllRemembered(lorebookName) {
+  return selectAllMemory[lorebookName] === true && getSelectedEntriesCount(lorebookName) > 0;
 }
 
 /**
@@ -273,6 +295,7 @@ export function toggleEntrySelection(lorebookName, uid, selected) {
   } else {
     selectedEntries[lorebookName].delete(uid);
   }
+  delete selectAllMemory[lorebookName];
 }
 
 /**
@@ -311,6 +334,7 @@ export function clearSelectedEntries(lorebookName) {
   if (selectedEntries[lorebookName]) {
     selectedEntries[lorebookName].clear();
   }
+  delete selectAllMemory[lorebookName];
 }
 
 /**
@@ -459,21 +483,102 @@ export function getFilteredEntries(lorebookName) {
 }
 
 /**
- * Get filtered entries for a lorebook based on search results
+ * Store the active search query synchronously. Rendering may remain debounced,
+ * but selection always reads this latest value.
  * @param {string} lorebookName - The name of the lorebook
- * @returns {Array} Filtered entries array from search results
+ * @param {string} query - The current search query
  */
-export function getSearchFilteredEntries(lorebookName) {
-  return filteredEntriesData[lorebookName] || [];
+export function setEntrySearchQuery(lorebookName, query) {
+  const normalizedQuery = `${query || ''}`.trim().toLowerCase();
+  if (normalizedQuery) {
+    entrySearchQueries[lorebookName] = normalizedQuery;
+  } else {
+    delete entrySearchQueries[lorebookName];
+  }
+}
+
+export function getEntrySearchQuery(lorebookName) {
+  return entrySearchQueries[lorebookName] || '';
+}
+
+export function hasActiveEntrySearch(lorebookName) {
+  return !!getEntrySearchQuery(lorebookName);
 }
 
 /**
- * Set filtered entries for a lorebook based on search results
- * @param {string} lorebookName - The name of the lorebook
- * @param {Array} entries - Filtered entries array
+ * Get the entries targeted by the top-level select-all control.
+ * Active filters are applied first, followed by the current search query.
  */
-export function setFilteredEntries(lorebookName, entries) {
-  filteredEntriesData[lorebookName] = entries;
+export function getSelectableEntries(lorebookName) {
+  const filteredEntries = getFilteredEntries(lorebookName);
+  const searchQuery = getEntrySearchQuery(lorebookName);
+  if (!searchQuery) {
+    return filteredEntries;
+  }
+
+  return filteredEntries.filter(
+    entry =>
+      (entry.name || '').toLowerCase().includes(searchQuery) ||
+      (entry.content || '').toLowerCase().includes(searchQuery) ||
+      (Array.isArray(entry.strategy?.keys) && entry.strategy.keys.join(',').toLowerCase().includes(searchQuery)),
+  );
+}
+
+/**
+ * Calculate the shared state and next action for every top-level select-all control.
+ */
+export function getSelectAllControlState(lorebookName) {
+  const selectableEntries = getSelectableEntries(lorebookName);
+  const selectedUids = new Set(getSelectedEntries(lorebookName));
+  const selectedInScope = selectableEntries.filter(entry => selectedUids.has(Number(entry.uid))).length;
+  const selectedCount = selectedUids.size;
+  const remembered = isSelectAllRemembered(lorebookName);
+
+  if (remembered) {
+    return {
+      checked: true,
+      indeterminate: false,
+      disabled: false,
+      nextAction: 'clear',
+      selectedCount,
+      selectedInScope,
+      selectableCount: selectableEntries.length,
+    };
+  }
+
+  if (selectableEntries.length === 0) {
+    return {
+      checked: false,
+      indeterminate: selectedCount > 0,
+      disabled: selectedCount === 0,
+      nextAction: selectedCount > 0 ? 'clear' : 'none',
+      selectedCount,
+      selectedInScope,
+      selectableCount: 0,
+    };
+  }
+
+  if (selectedInScope === selectableEntries.length) {
+    return {
+      checked: true,
+      indeterminate: false,
+      disabled: false,
+      nextAction: 'clear',
+      selectedCount,
+      selectedInScope,
+      selectableCount: selectableEntries.length,
+    };
+  }
+
+  return {
+    checked: false,
+    indeterminate: selectedCount > 0,
+    disabled: false,
+    nextAction: 'select',
+    selectedCount,
+    selectedInScope,
+    selectableCount: selectableEntries.length,
+  };
 }
 
 /**
@@ -481,14 +586,14 @@ export function setFilteredEntries(lorebookName, entries) {
  * @param {string} lorebookName - The name of the lorebook
  */
 export function clearFilteredEntries(lorebookName) {
-  filteredEntriesData[lorebookName] = [];
+  delete entrySearchQueries[lorebookName];
 }
 
 /**
  * Clear all filtered entries for all lorebooks
  */
 export function clearAllFilteredEntries() {
-  filteredEntriesData = {};
+  Object.keys(entrySearchQueries).forEach(key => delete entrySearchQueries[key]);
 }
 
 /**
