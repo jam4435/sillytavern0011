@@ -693,13 +693,24 @@ function parseInventory(用户档案?: UserProfile): InventoryItem[] {
     // 过滤掉 $template 模板字段
     if (name.startsWith('$')) continue;
 
+    const martialArtData = item.类型 === '秘籍' ? getMartialArtData(name) : null;
+    const description = martialArtData?.功法描述 || item.物品描述 || '';
+    const rankSource = martialArtData?.功法品阶 || item.品阶 || item.品质;
+
     result.push({
       id: `item_${index++}`,
       name: name,
       type: mapItemType(item.类型),
-      rank: mapItemRank(item.品阶 ?? item.品质),
+      rank: mapItemRank(rankSource),
       count: item.数量 ?? 1,
-      description: item.物品描述 || '',
+      description,
+      martialArtInfo: martialArtData
+        ? {
+            description: martialArtData.功法描述,
+            rank: martialArtData.功法品阶,
+            requirements: martialArtData.修炼限制,
+          }
+        : undefined,
     });
   }
 

@@ -248,6 +248,36 @@
   text-align: justify;
 }
 
+.inv-win-requirements {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.inv-win-requirements-title {
+  margin-bottom: 0.65rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  color: var(--stone-400);
+}
+
+.inv-win-requirements-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.inv-win-requirement-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--stone-300);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
 .inv-win-footer {
   padding: 1rem 1.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.05);

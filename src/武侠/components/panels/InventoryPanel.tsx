@@ -47,6 +47,27 @@ const getItemRankInfo = (item: InventoryItem) => {
     return { ...config, label };
 };
 
+const getItemDisplayDescription = (item: InventoryItem) => {
+    if (item.type === 'SECRET' && item.martialArtInfo?.description) {
+        return item.martialArtInfo.description;
+    }
+    return item.description;
+};
+
+const getItemDisplayRankLabel = (item: InventoryItem) => {
+    if (item.type === 'SECRET' && item.martialArtInfo?.rank) {
+        return item.martialArtInfo.rank;
+    }
+    return getItemRankInfo(item).label;
+};
+
+const getMartialArtRequirementEntries = (item: InventoryItem) => {
+    if (item.type !== 'SECRET' || !item.martialArtInfo?.requirements) {
+        return [];
+    }
+    return Object.entries(item.martialArtInfo.requirements).filter(([, value]) => typeof value === 'number');
+};
+
 // Suppress unused type warning
 void (undefined as unknown as RankKey);
 
@@ -57,6 +78,7 @@ interface InventoryPanelProps {
 
 export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items }) => {
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+    const selectedItemRequirementEntries = selectedItem ? getMartialArtRequirementEntries(selectedItem) : [];
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
@@ -104,7 +126,7 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items }) => {
                                     {getItemTypeLabel(selectedItem.type)}
                                 </span>
                                 <span className="inv-win-badge" style={{ color: getItemRankInfo(selectedItem).color, borderColor: `${getItemRankInfo(selectedItem).color}40` }}>
-                                    {getItemRankInfo(selectedItem).label}
+                                    {getItemDisplayRankLabel(selectedItem)}
                                 </span>
                             </div>
                          </div>
@@ -112,8 +134,20 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items }) => {
                          {/* Window Content */}
                          <div className="inv-win-content">
                             <div className="inv-win-desc">
-                                {selectedItem.description}
+                                {getItemDisplayDescription(selectedItem)}
                             </div>
+                            {selectedItemRequirementEntries.length > 0 && (
+                                <div className="inv-win-requirements">
+                                    <div className="inv-win-requirements-title">参悟条件</div>
+                                    <div className="inv-win-requirements-list">
+                                        {selectedItemRequirementEntries.map(([attribute, value]) => (
+                                            <span key={attribute} className="inv-win-requirement-chip">
+                                                {attribute}{'>='}{value}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                          </div>
 
                          {/* Window Footer (Buttons) */}

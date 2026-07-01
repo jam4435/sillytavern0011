@@ -50,6 +50,7 @@ import {
   renamePresetRegexBucket,
   saveSettings,
 } from './utils/settingsManager';
+import { loadMartialArtsDatabase } from './utils/martialArtsDatabase';
 import { resolveVariableEditorCapability } from './utils/variableEditorPolicy';
 import {
   detectGameSessionState,
@@ -188,6 +189,8 @@ const App: React.FC = () => {
       initLogger.log('detectGameSessionState() 返回:', sessionState);
       setSavedGameExists(sessionState !== 'empty');
       initLogger.log('savedGameExists 设置为:', sessionState !== 'empty');
+
+      await loadMartialArtsDatabase();
 
       if (sessionState === 'active') {
         initLogger.log('检测到存档，直接进入游戏界面');
@@ -355,7 +358,8 @@ const App: React.FC = () => {
   }, [activeRegexRules, currentMaintext]);
 
   // 续写江湖处理
-  const handleContinue = useCallback(() => {
+  const handleContinue = useCallback(async () => {
+    await loadMartialArtsDatabase();
     gameLogger.log('');
     gameLogger.log('续写江湖 - 加载存档');
     clearVariableChanges();
@@ -387,6 +391,7 @@ const App: React.FC = () => {
 
       try {
         const result = await initializeNewGameSession(formData);
+        await loadMartialArtsDatabase();
 
         if (result.success && result.content) {
           setOpeningWelcomeLine(result.content);

@@ -330,9 +330,20 @@ describe('autoUpdateMartialArts', () => {
 describe('readGameDataSync inventory rank field', () => {
   beforeEach(() => {
     getAllVariablesMock.mockReturnValue({ stat_data: {} });
+    getMartialArtDataMock.mockReturnValue(null);
   });
 
-  it('优先读取包裹中的新品阶字段，并支持秘籍品阶文案', () => {
+  it('秘籍优先读取功法数据库中的描述、品阶与参悟条件', () => {
+    getMartialArtDataMock.mockReturnValue({
+      功法名称: '九阴残篇',
+      类型: '内功',
+      功法品阶: '上乘',
+      功法描述: '源自九阴真经的残篇，字句残缺却仍藏精义。',
+      修炼限制: {
+        悟性: 12,
+        根骨: 10,
+      },
+    });
     getAllVariablesMock.mockReturnValue({
       stat_data: {
         user数据: {
@@ -344,8 +355,8 @@ describe('readGameDataSync inventory rank field', () => {
           包裹: {
             九阴残篇: {
               类型: '秘籍',
-              品阶: '上乘',
-              物品描述: '残缺秘籍，仍有精妙之处。',
+              品阶: '凡品',
+              物品描述: '变量里的旧描述，不应优先显示。',
               数量: 1,
             },
           },
@@ -361,7 +372,15 @@ describe('readGameDataSync inventory rank field', () => {
         type: 'SECRET',
         rank: 'BLUE',
         count: 1,
-        description: '残缺秘籍，仍有精妙之处。',
+        description: '源自九阴真经的残篇，字句残缺却仍藏精义。',
+        martialArtInfo: {
+          description: '源自九阴真经的残篇，字句残缺却仍藏精义。',
+          rank: '上乘',
+          requirements: {
+            悟性: 12,
+            根骨: 10,
+          },
+        },
       }),
     ]);
   });
