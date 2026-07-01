@@ -101,7 +101,7 @@ interface UserProfile {
     {
       类型?: string;
       品阶?: string;
-      品质?: string;
+      品质?: string; // legacy field for old saves
       物品描述?: string;
       数量?: number;
     }
@@ -680,6 +680,7 @@ function parseMartialArts(
 /**
  * 将用户档案中的包裹转换为 InventoryItem[] 结构
  * 注意：实际变量名是"包裹"而非"背包"，且是对象格式而非数组
+ * 新存档字段使用"品阶"，同时兼容旧存档中的"品质"
  */
 function parseInventory(用户档案?: UserProfile): InventoryItem[] {
   const 包裹 = 用户档案?.包裹;
@@ -721,6 +722,7 @@ function mapItemType(类型?: string): InventoryItem['type'] {
 
 /**
  * 映射物品品阶
+ * 同时兼容普通物品品阶文案与秘籍品阶文案
  */
 function mapItemRank(品阶?: string): string {
   const rankMap: Record<string, string> = {

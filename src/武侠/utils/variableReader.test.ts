@@ -332,7 +332,7 @@ describe('readGameDataSync inventory rank field', () => {
     getAllVariablesMock.mockReturnValue({ stat_data: {} });
   });
 
-  it('优先读取包裹中的新品阶字段', () => {
+  it('优先读取包裹中的新品阶字段，并支持秘籍品阶文案', () => {
     getAllVariablesMock.mockReturnValue({
       stat_data: {
         user数据: {
@@ -342,11 +342,11 @@ describe('readGameDataSync inventory rank field', () => {
           修为: 0,
           所在位置: '牛家村',
           包裹: {
-            金疮药: {
-              类型: '丹药',
-              品阶: '凡品',
-              物品描述: '普通的伤药。',
-              数量: 3,
+            九阴残篇: {
+              类型: '秘籍',
+              品阶: '上乘',
+              物品描述: '残缺秘籍，仍有精妙之处。',
+              数量: 1,
             },
           },
         },
@@ -357,11 +357,11 @@ describe('readGameDataSync inventory rank field', () => {
 
     expect(result?.inventory).toEqual([
       expect.objectContaining({
-        name: '金疮药',
-        type: 'ELIXIR',
-        rank: 'WHITE',
-        count: 3,
-        description: '普通的伤药。',
+        name: '九阴残篇',
+        type: 'SECRET',
+        rank: 'BLUE',
+        count: 1,
+        description: '残缺秘籍，仍有精妙之处。',
       }),
     ]);
   });
