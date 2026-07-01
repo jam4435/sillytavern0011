@@ -384,38 +384,4 @@ describe('readGameDataSync inventory rank field', () => {
       }),
     ]);
   });
-
-  it('兼容读取老存档中的品质字段', () => {
-    getAllVariablesMock.mockReturnValue({
-      stat_data: {
-        user数据: {
-          用户名: '郭靖',
-          性别: '男',
-          境界: '不入流',
-          修为: 0,
-          所在位置: '牛家村',
-          包裹: {
-            九阴残篇: {
-              类型: '秘籍',
-              品质: '极品',
-              物品描述: '残缺秘籍，仍有精妙之处。',
-              数量: 1,
-            },
-          },
-        },
-      },
-    });
-
-    const result = readGameDataSync();
-
-    expect(result?.inventory).toEqual([
-      expect.objectContaining({
-        name: '九阴残篇',
-        type: 'SECRET',
-        rank: 'PURPLE',
-        count: 1,
-        description: '残缺秘籍，仍有精妙之处。',
-      }),
-    ]);
-  });
 });

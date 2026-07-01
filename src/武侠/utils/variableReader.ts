@@ -101,7 +101,6 @@ interface UserProfile {
     {
       类型?: string;
       品阶?: string;
-      品质?: string; // legacy field for old saves
       物品描述?: string;
       数量?: number;
     }
@@ -680,7 +679,7 @@ function parseMartialArts(
 /**
  * 将用户档案中的包裹转换为 InventoryItem[] 结构
  * 注意：实际变量名是"包裹"而非"背包"，且是对象格式而非数组
- * 新存档字段使用"品阶"，同时兼容旧存档中的"品质"
+ * 包裹物品字段统一使用"品阶"
  */
 function parseInventory(用户档案?: UserProfile): InventoryItem[] {
   const 包裹 = 用户档案?.包裹;
@@ -695,7 +694,7 @@ function parseInventory(用户档案?: UserProfile): InventoryItem[] {
 
     const martialArtData = item.类型 === '秘籍' ? getMartialArtData(name) : null;
     const description = martialArtData?.功法描述 || item.物品描述 || '';
-    const rankSource = martialArtData?.功法品阶 || item.品阶 || item.品质;
+    const rankSource = martialArtData?.功法品阶 || item.品阶;
 
     result.push({
       id: `item_${index++}`,
