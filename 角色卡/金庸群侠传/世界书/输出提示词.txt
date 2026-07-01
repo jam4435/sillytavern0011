@@ -146,5 +146,23 @@ if (Object.keys(presentCharacters).length > 0) {
 [此地无甚知名人物]
 <% } -%>
 
+<%
+const 战力区 = getvar('stat_data.前端变量.战力区', { scope: 'local' });
+if (typeof 战力区 === 'string' && 战力区.trim()) {
+-%>
+<战力区>
+{{ERA:前端变量.战力区}}
+</战力区>
+<% } -%>
+
+<%
+const 随机数 = getvar('stat_data.前端变量.随机数', { scope: 'local' });
+if (typeof 随机数 === 'string' && 随机数.trim()) {
+-%>
+<随机数>
+{{ERA:前端变量.随机数}}
+</随机数>
+<% } -%>
+
 </status_current_variables>
 </variable>

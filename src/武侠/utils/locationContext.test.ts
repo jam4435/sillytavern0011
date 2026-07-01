@@ -94,10 +94,11 @@ describe('locationContext', () => {
     expect(value.相邻二级地点).toEqual(['大宋/嘉兴府']);
   });
 
-  it('把最新地图上下文写入聊天变量顶层', async () => {
+  it('把最新周围地点写入 stat_data.前端变量，并清理旧顶层与旧世界信息变量', async () => {
     loadMapDataMock.mockResolvedValue(mapData);
     getVariablesMock.mockReturnValue({
       stat_data: { user数据: { 所在位置: '临安府/牛家村' } },
+      地图上下文: { 相邻三级地点: ['旧值'], 相邻二级地点: [] },
     });
 
     const value = await syncDynamicLocationContextVariable();
@@ -107,11 +108,21 @@ describe('locationContext', () => {
     const updater = updateVariablesWithMock.mock.calls[0][0] as (
       variables: Record<string, unknown>,
     ) => Record<string, unknown>;
-    expect(updater({ stat_data: {} })).toEqual(expect.objectContaining({
-      地图上下文: expect.objectContaining({
-        相邻三级地点: expect.arrayContaining(['大宋/临安府/牛家村']),
-        相邻二级地点: expect.arrayContaining(['大宋/嘉兴府']),
-      }),
-    }));
+    expect(updater({
+      stat_data: { 世界信息: { 时间: { 年: 1 }, 周围地点: { 相邻三级地点: ['旧值'] } } },
+      地图上下文: { 相邻三级地点: ['旧值'] },
+    })).toEqual({
+      stat_data: {
+        前端变量: {
+          周围地点: {
+            相邻三级地点: expect.arrayContaining(['大宋/临安府/牛家村']),
+            相邻二级地点: expect.arrayContaining(['大宋/嘉兴府']),
+          },
+        },
+        世界信息: {
+          时间: { 年: 1 },
+        },
+      },
+    });
   });
 });

@@ -9,7 +9,7 @@ import {
   readGameDataPure,
 } from './variableReader';
 import { captureNextCombinedPromptForDebug } from './promptDebug';
-import { syncDynamicLocationContextVariable } from './locationContext';
+import { syncFrontendDerivedVariables } from './frontendDerivedVariables';
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -368,7 +368,7 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
       expectedMessageId: context.assistantMessage.message_id,
       expectedAction: 'resync',
     });
-    await syncDynamicLocationContextVariable();
+    await syncFrontendDerivedVariables();
 
     const combinedPromptCapture = captureNextCombinedPromptForDebug(prompt => {
       combinedPrompt = prompt;

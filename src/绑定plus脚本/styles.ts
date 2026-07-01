@@ -2129,6 +2129,12 @@ export const styles = `
   #${PERSONA_PANEL_ID} .persona-index-item,
   #${PERSONA_PANEL_ID} .persona-list-item,
   #${PERSONA_PANEL_ID} .persona-trait-item,
+  #${PERSONA_PANEL_ID} .persona-folder-nav-row,
+  #${PERSONA_PANEL_ID} .persona-embedded-detail,
+  #${PERSONA_PANEL_ID} .persona-detail-list-item,
+  #${PERSONA_PANEL_ID} .persona-binding-inline-status,
+  #${PERSONA_PANEL_ID} .persona-binding-item,
+  #${PERSONA_PANEL_ID} .persona-page-tab,
   .bindingplus-theme-scope .persona-modal-tip-card,
   .bindingplus-theme-scope .persona-modal-check-card,
   .bindingplus-theme-scope .persona-import-status,
@@ -2138,31 +2144,76 @@ export const styles = `
     color: var(--bp-text-primary);
   }
 
+  #${PERSONA_PANEL_ID} .persona-folder-detail-header {
+    background: var(--bp-card-bg-strong);
+    border-color: var(--bp-border);
+  }
+
   #${PERSONA_PANEL_ID} .persona-sidebar-title,
   #${PERSONA_PANEL_ID} .standoutHeader,
   #${PERSONA_PANEL_ID} .panel-title,
   #${PERSONA_PANEL_ID} .persona-folder-detail-title,
+  #${PERSONA_PANEL_ID} .persona-folder-nav-name,
+  #${PERSONA_PANEL_ID} .persona-resource-name,
   #${PERSONA_PANEL_ID} .persona-index-item-title,
   #${PERSONA_PANEL_ID} .persona-toolbar-binding-value,
+  #${PERSONA_PANEL_ID} .persona-detail-list-title,
+  #${PERSONA_PANEL_ID} .persona-binding-inline-value,
+  #${PERSONA_PANEL_ID} .persona-context-binding-storage-title,
+  #${PERSONA_PANEL_ID} .persona-binding-item-title,
+  #${PERSONA_PANEL_ID} .item-name,
+  #${PERSONA_PANEL_ID} .trait-item-name,
   .bindingplus-theme-scope h3,
   .bindingplus-theme-scope label,
-  .bindingplus-theme-scope strong {
+  .bindingplus-theme-scope strong,
+  .bindingplus-theme-scope .persona-modal-section-title,
+  .bindingplus-theme-scope .persona-modal-check-title {
     color: var(--bp-text-primary);
   }
 
   #${PERSONA_PANEL_ID} .persona-sidebar-subtitle,
+  #${PERSONA_PANEL_ID} .persona-workspace-note,
+  #${PERSONA_PANEL_ID} .persona-detail-meta,
   #${PERSONA_PANEL_ID} .persona-sidebar-section-note,
+  #${PERSONA_PANEL_ID} .binding-group-header-meta,
   #${PERSONA_PANEL_ID} .persona-toolbar-binding-key,
   #${PERSONA_PANEL_ID} .persona-folder-detail-eyebrow,
   #${PERSONA_PANEL_ID} .persona-folder-detail-meta,
+  #${PERSONA_PANEL_ID} .persona-folder-nav-meta,
   #${PERSONA_PANEL_ID} .persona-index-item-meta,
+  #${PERSONA_PANEL_ID} .persona-resource-meta-line,
+  #${PERSONA_PANEL_ID} .persona-detail-section-title,
+  #${PERSONA_PANEL_ID} .persona-detail-list-meta,
+  #${PERSONA_PANEL_ID} .persona-detail-list-preview,
+  #${PERSONA_PANEL_ID} .persona-binding-inline-label,
+  #${PERSONA_PANEL_ID} .persona-binding-inline-meta,
+  #${PERSONA_PANEL_ID} .persona-binding-item-meta,
+  #${PERSONA_PANEL_ID} .empty-list,
+  #${PERSONA_PANEL_ID} .item-desc,
+  #${PERSONA_PANEL_ID} .trait-item-desc,
+  #${PERSONA_PANEL_ID} .persona-page-tab,
   #${PERSONA_PANEL_ID} .persona-hint-row,
   #${PERSONA_PANEL_ID} .text-note,
+  .bindingplus-theme-scope .empty-list,
   .bindingplus-theme-scope .persona-modal-subtitle,
   .bindingplus-theme-scope .persona-modal-tip-copy,
+  .bindingplus-theme-scope .persona-modal-section-note,
   .bindingplus-theme-scope .persona-modal-check-desc,
   .bindingplus-theme-scope .persona-modal-stat span {
     color: var(--bp-text-secondary);
+  }
+
+  #${PERSONA_PANEL_ID} .item-desc,
+  #${PERSONA_PANEL_ID} .trait-item-desc,
+  #${PERSONA_PANEL_ID} .persona-trait-item.disabled,
+  #${PERSONA_PANEL_ID} .empty-list,
+  .bindingplus-theme-scope .empty-list {
+    opacity: 1;
+  }
+
+  #${PERSONA_PANEL_ID} .persona-folder-detail-eyebrow,
+  .bindingplus-theme-scope .persona-modal-eyebrow {
+    color: var(--bp-accent);
   }
 
   #${PERSONA_PANEL_ID} .persona-input,
@@ -2226,8 +2277,11 @@ export const styles = `
 
   #${PERSONA_PANEL_ID} .persona-resource-nav-item:hover,
   #${PERSONA_PANEL_ID} .persona-folder-nav-item:hover,
+  #${PERSONA_PANEL_ID} .persona-folder-nav-row:hover,
   #${PERSONA_PANEL_ID} .persona-index-item.interactive:hover,
   #${PERSONA_PANEL_ID} .persona-list-item:hover,
+  #${PERSONA_PANEL_ID} .persona-binding-item:hover,
+  #${PERSONA_PANEL_ID} .persona-page-tab:hover,
   #${PERSONA_PANEL_ID} .persona-trait-item:hover,
   .bindingplus-theme-scope .persona-modal-check-card:hover {
     background: var(--bp-hover-bg);
@@ -2235,15 +2289,20 @@ export const styles = `
   }
 
   #${PERSONA_PANEL_ID} .persona-resource-nav-item:hover,
-  #${PERSONA_PANEL_ID} .persona-resource-nav-item.active {
+  #${PERSONA_PANEL_ID} .persona-resource-nav-item.active,
+  #${PERSONA_PANEL_ID} .persona-page-tab:hover,
+  #${PERSONA_PANEL_ID} .persona-page-tab.active {
     color: var(--bp-text-primary);
   }
 
   #${PERSONA_PANEL_ID} .persona-resource-nav-item.active,
   #${PERSONA_PANEL_ID} .persona-folder-nav-item.active,
+  #${PERSONA_PANEL_ID} .persona-folder-nav-row.selected,
   #${PERSONA_PANEL_ID} .persona-index-item.selected,
   #${PERSONA_PANEL_ID} .persona-toolbar-binding-line.selected,
   #${PERSONA_PANEL_ID} .persona-list-item.active,
+  #${PERSONA_PANEL_ID} .persona-binding-item.active,
+  #${PERSONA_PANEL_ID} .persona-page-tab.active,
   #${PERSONA_PANEL_ID} .persona-trait-item.enabled {
     background: var(--bp-selected-bg);
     border-color: var(--bp-selected-border);
@@ -2253,8 +2312,22 @@ export const styles = `
   #${PERSONA_PANEL_ID} .persona-folder-nav-action,
   #${PERSONA_PANEL_ID} .trait-btn,
   .bindingplus-theme-scope .trait-btn {
+    background: var(--bp-button-bg);
     border-color: var(--bp-button-border);
     color: var(--bp-text-secondary);
+  }
+
+  #${PERSONA_PANEL_ID} .trait-btn:hover,
+  .bindingplus-theme-scope .trait-btn:hover {
+    background: var(--bp-button-hover-bg);
+    border-color: var(--bp-button-hover-border);
+    color: var(--bp-button-text);
+  }
+
+  #${PERSONA_PANEL_ID} .state-tag.off {
+    color: var(--bp-text-secondary);
+    border-color: var(--bp-border);
+    background: transparent;
   }
 
   #${PERSONA_PANEL_ID} .compat-item.ok {
@@ -2588,9 +2661,8 @@ export const styles = `
     z-index: 5;
     max-height: min(56vh, 420px);
     padding: 14px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-    background:
-      linear-gradient(180deg, rgba(11, 16, 26, 0.98), rgba(17, 24, 39, 0.98));
+    border-bottom: 1px solid var(--bp-border);
+    background: var(--bp-panel-bg-secondary);
     transform: translateY(-104%);
     transition: transform 0.22s ease;
   }
@@ -2617,7 +2689,7 @@ export const styles = `
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: rgba(226, 232, 240, 0.74);
+    color: var(--bp-text-secondary);
   }
 
   #${PERSONA_PANEL_ID}[data-device-mode='mobile'] .persona-folder-mobile-drawer-list {
@@ -2671,7 +2743,7 @@ export const styles = `
 
   .pool-edit-modal.bindingplus-mobile-modal .persona-modal-sidebar {
     border-right: none;
-    border-top: 1px solid rgba(148, 163, 184, 0.12);
+    border-top: 1px solid var(--bp-border);
     order: 2;
   }
 

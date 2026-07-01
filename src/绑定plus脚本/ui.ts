@@ -115,6 +115,26 @@ let lastSnapshotPruneSummary: ReturnType<typeof pruneLegacyPersonaSnapshots> | n
 let plusEventBridgeStarted = false;
 let lastObservedContext: PersonaRuntimeContext | null = null;
 let loadedPresetPromptMonitorState: LoadedPresetPromptMonitorState | null = null;
+let pendingOfficialPresetSave:
+  | {
+      presetName: string;
+      startedAt: number;
+      timeoutId: ReturnType<typeof setTimeout>;
+    }
+  | null = null;
+let officialPresetSaveStatus: {
+  kind: 'idle' | 'pending' | 'synced' | 'unchanged' | 'timeout' | 'failed';
+  presetName: string;
+  detail: string;
+  source: string;
+  updatedAt: number;
+} = {
+  kind: 'idle',
+  presetName: '',
+  detail: '等待酒馆“更新当前预设”按钮触发。',
+  source: '',
+  updatedAt: 0,
+};
 let panelStyleDestroy: (() => void) | null = null;
 let $panelContainer: JQuery<HTMLDivElement> | null = null;
 let activeDetailPage: DetailPageKey = 'persona';
@@ -127,6 +147,7 @@ const activeResourceSelection: Partial<Record<DetailPageKey, string>> = {};
 const activePersonaFolderIdByAvatar = new Map<string, string>();
 const PERSONA_UNGROUPED_FOLDER_ID = '__ungrouped__';
 const BINDINGPLUS_THEME_SCOPE_CLASS = 'bindingplus-theme-scope';
+const OFFICIAL_PRESET_SAVE_WAIT_MS = 12000;
 
 const BINDINGPLUS_THEME_VAR_MAP: Record<keyof BindingPlusThemeTokens, string> = {
   panelBg: '--bp-panel-bg',
@@ -302,6 +323,96 @@ function formatStorageSize(bytes: number): string {
     return `${(safeBytes / 1024).toFixed(1)} KiB`;
   }
   return `${safeBytes} B`;
+}
+
+function getOfficialPresetSaveStatusLabel(
+  kind: 'idle' | 'pending' | 'synced' | 'unchanged' | 'timeout' | 'failed',
+): string {
+  switch (kind) {
+    case 'pending':
+      return '等待宿主保存完成';
+    case 'synced':
+      return '已同步到默认快照';
+    case 'unchanged':
+      return '已确认与默认快照一致';
+    case 'timeout':
+      return '等待宿主保存超时';
+    case 'failed':
+      return '同步默认快照失败';
+    case 'idle':
+    default:
+      return '待触发';
+  }
+}
+
+function getOfficialPresetSaveStatusLevel(
+  kind: 'idle' | 'pending' | 'synced' | 'unchanged' | 'timeout' | 'failed',
+): 'ok' | 'warn' | 'danger' {
+  switch (kind) {
+    case 'synced':
+    case 'unchanged':
+      return 'ok';
+    case 'pending':
+    case 'idle':
+    case 'timeout':
+      return 'warn';
+    case 'failed':
+    default:
+      return 'danger';
+  }
+}
+
+function setOfficialPresetSaveStatus(
+  kind: 'idle' | 'pending' | 'synced' | 'unchanged' | 'timeout' | 'failed',
+  options: {
+    presetName?: string;
+    detail: string;
+    source?: string;
+  },
+): void {
+  officialPresetSaveStatus = {
+    kind,
+    presetName: (options.presetName || '').trim(),
+    detail: options.detail,
+    source: (options.source || '').trim(),
+    updatedAt: Date.now(),
+  };
+  renderOfficialPresetSaveStatus();
+  if ($panelContainer && activeDetailPage === 'events') {
+    renderSidebarSecondaryList();
+  }
+}
+
+function renderOfficialPresetSaveStatus(): void {
+  const parentDoc = window.parent.document;
+  const $summary = $('#persona-plus-preset-save-summary', parentDoc);
+  const $details = $('#persona-plus-preset-save-details', parentDoc);
+  if (!$summary.length || !$details.length) {
+    return;
+  }
+
+  const label = getOfficialPresetSaveStatusLabel(officialPresetSaveStatus.kind);
+  const level = getOfficialPresetSaveStatusLevel(officialPresetSaveStatus.kind);
+  const icon = level === 'ok' ? '✅' : level === 'danger' ? '❌' : '⚠️';
+  const metaParts = [label];
+  if (officialPresetSaveStatus.presetName) {
+    metaParts.push(`预设: ${officialPresetSaveStatus.presetName}`);
+  }
+  if (officialPresetSaveStatus.updatedAt > 0) {
+    metaParts.push(`最近: ${formatTime(officialPresetSaveStatus.updatedAt)}`);
+  }
+  $summary.text(`官方保存同步: ${metaParts.join(' | ')}`);
+
+  const sourceHtml = officialPresetSaveStatus.source
+    ? `<div class="plus-probe-meta">${escapeHtml(`来源: ${officialPresetSaveStatus.source}`)}</div>`
+    : '';
+  $details.html(`
+    <div class="plus-probe-item ${level}">
+      <div>${icon} ${escapeHtml(label)}</div>
+      <div class="plus-probe-meta">${escapeHtml(officialPresetSaveStatus.detail)}</div>
+      ${sourceHtml}
+    </div>
+  `);
 }
 
 function readTextFile(file: File): Promise<string> {
@@ -684,6 +795,99 @@ function refreshPresetUiAfterStorageMutation(): void {
   renderResourceDetailPages();
 }
 
+function clearPendingOfficialPresetSave(): void {
+  if (pendingOfficialPresetSave?.timeoutId) {
+    window.clearTimeout(pendingOfficialPresetSave.timeoutId);
+  }
+  pendingOfficialPresetSave = null;
+}
+
+function markPendingOfficialPresetSave(source: string): void {
+  const presetName = ((getLoadedPresetName() as string | undefined) || '').trim();
+  if (!presetName) {
+    return;
+  }
+
+  clearPendingOfficialPresetSave();
+  setOfficialPresetSaveStatus('pending', {
+    presetName,
+    detail: '已点击酒馆“更新当前预设”，正在等待宿主保存完成并回到前端事件链。',
+    source,
+  });
+  pendingOfficialPresetSave = {
+    presetName,
+    startedAt: Date.now(),
+    timeoutId: window.setTimeout(() => {
+      if (!pendingOfficialPresetSave || pendingOfficialPresetSave.presetName !== presetName) {
+        return;
+      }
+
+      console.info('绑定plus: 等待宿主更新当前预设完成超时，放弃本次默认条目快照同步', {
+        source,
+        presetName,
+      });
+      setOfficialPresetSaveStatus('timeout', {
+        presetName,
+        detail: `已点击酒馆“更新当前预设”，但 ${OFFICIAL_PRESET_SAVE_WAIT_MS / 1000} 秒内未等到宿主 PRESET_CHANGED(openai) 完成信号。`,
+        source,
+      });
+      pendingOfficialPresetSave = null;
+    }, OFFICIAL_PRESET_SAVE_WAIT_MS),
+  };
+}
+
+function finalizePendingOfficialPresetSave(source: string, presetNameFromEvent?: string): void {
+  const pendingSave = pendingOfficialPresetSave;
+  if (!pendingSave) {
+    return;
+  }
+
+  const eventPresetName = (presetNameFromEvent || '').trim();
+  if (eventPresetName && eventPresetName !== pendingSave.presetName) {
+    return;
+  }
+
+  clearPendingOfficialPresetSave();
+
+  const syncResult = savePresetPromptIdsAsDefaultSnapshot(pendingSave.presetName, getEnabledPresetPromptIds('in_use'));
+  loadedPresetPromptMonitorState = readLoadedPresetPromptMonitorState();
+  if (!syncResult.ok || !syncResult.presetName) {
+    console.warn('绑定plus: 宿主更新当前预设后同步默认条目快照失败', {
+      source,
+      presetName: pendingSave.presetName,
+    });
+    setOfficialPresetSaveStatus('failed', {
+      presetName: pendingSave.presetName,
+      detail: '已收到宿主保存完成信号，但绑定plus 写入默认预设条目快照失败。',
+      source,
+    });
+    return;
+  }
+
+  console.info('绑定plus: 已根据宿主更新当前预设操作同步默认条目快照', {
+    source,
+    presetName: syncResult.presetName,
+    changed: syncResult.changed,
+    count: syncResult.count,
+  });
+  setOfficialPresetSaveStatus(syncResult.changed ? 'synced' : 'unchanged', {
+    presetName: syncResult.presetName,
+    detail: syncResult.changed
+      ? `已把当前 in_use 的 ${syncResult.count} 条启用 prompt 同步到绑定plus 默认预设条目快照。`
+      : `宿主保存完成，当前预设的 ${syncResult.count} 条启用 prompt 与绑定plus 默认快照本来就一致。`,
+    source,
+  });
+
+  if (
+    $panelContainer &&
+    activeDetailPage === 'preset' &&
+    (activeResourceSelection.preset || '').trim() === syncResult.presetName
+  ) {
+    renderPresetPromptDefaultSnapshotState();
+    syncPresetPromptControlsFromLoadedPreset();
+  }
+}
+
 function syncLoadedPresetPromptDefaultSnapshot(source: string): void {
   const currentState = readLoadedPresetPromptMonitorState();
   const shouldSync = shouldSyncLoadedPresetPromptDefaultSnapshot(loadedPresetPromptMonitorState, currentState);
@@ -806,7 +1010,10 @@ function startPlusEventBridge(): void {
     }
 
     if (tavern_events.PRESET_CHANGED) {
-      eventOn(tavern_events.PRESET_CHANGED, () => {
+      eventOn(tavern_events.PRESET_CHANGED, data => {
+        if (String(data?.apiId || '').trim() === 'openai') {
+          finalizePendingOfficialPresetSave('tavern_events.PRESET_CHANGED', String(data?.name || ''));
+        }
         schedulePresetPromptMonitorRefresh('tavern_events.PRESET_CHANGED', 60);
       });
     }
@@ -1000,6 +1207,11 @@ function createPanelHtml(): string {
                 </section>
 
                 <section id="persona-page-events" class="persona-page-panel ${activeDetailPage === 'events' ? 'active' : ''}">
+                  <div class="persona-page-card bindingplus-theme-card">
+                    <div class="panel-title compact">主题</div>
+                    <div id="bindingplus-theme-card-body"></div>
+                  </div>
+
                   <div class="persona-page-card">
                     <div class="panel-title">
                       <span>测试与诊断</span>
@@ -1010,7 +1222,12 @@ function createPanelHtml(): string {
                       </div>
                     </div>
                     <div id="persona-plus-context-summary" class="text-note">当前聊天 / 当前角色: 未检测</div>
+                    <div id="persona-plus-preset-save-summary" class="text-note">官方保存同步: 待触发</div>
                     <div id="persona-plus-probe-summary" class="text-note">接口: 未检测</div>
+                    <div>
+                      <div class="plus-probe-title">官方保存同步</div>
+                      <div id="persona-plus-preset-save-details" class="persona-plus-list"></div>
+                    </div>
                     <div class="persona-plus-grid">
                       <div>
                         <div class="plus-probe-title">切换事件</div>
@@ -1062,11 +1279,6 @@ function createPanelHtml(): string {
                       <div id="persona-compat-summary" class="text-note">未检测</div>
                       <div id="persona-compat-details" class="persona-compat-details"></div>
                     </div>
-                  </div>
-
-                  <div class="persona-page-card bindingplus-theme-card">
-                    <div class="panel-title compact">主题</div>
-                    <div id="bindingplus-theme-card-body"></div>
                   </div>
                 </section>
             </div>
@@ -1309,7 +1521,7 @@ function getSidebarSectionMeta(): { title: string; note: string; placeholder: st
     case 'events':
       return {
         title: '测试页',
-        note: '这里集中放切换检测、接口探测、兼容性自检、变更保护。',
+        note: '这里集中放主题、保存同步显示、切换检测、接口探测、兼容性自检、变更保护。',
         placeholder: '搜索测试项...',
       };
     default:
@@ -1553,6 +1765,11 @@ function renderSidebarSecondaryList(): void {
     const avatarId = getEditingAvatarId();
     const snapshots = avatarId ? loadPersonaSnapshots(avatarId) : [];
     items = [
+      {
+        id: 'preset_save_sync',
+        label: '预设保存同步',
+        meta: getOfficialPresetSaveStatusLabel(officialPresetSaveStatus.kind),
+      },
       {
         id: 'context_events',
         label: '切换事件',
@@ -4713,6 +4930,7 @@ function renderPlusBindingSection(report: PersonaPlusProbeReport | null = lastPl
 
   renderContextBindingStorageSection();
   renderBindingPlusStorageSection();
+  renderOfficialPresetSaveStatus();
 
   const debugInfo = getRuntimeContextDebugInfo();
   const currentContext = report?.currentContext || debugInfo.context;
@@ -7172,6 +7390,12 @@ export function bindEventListeners(): void {
     .on(`click.${PERSONA_BUTTON_ID}`, `#${PERSONA_BUTTON_ID}`, event => {
       event.preventDefault();
       togglePanel();
+    });
+
+  $(parentDoc)
+    .off('click.bindingplus-official-preset-save', '#update_oai_preset')
+    .on('click.bindingplus-official-preset-save', '#update_oai_preset', () => {
+      markPendingOfficialPresetSave('host_button_click');
     });
 
   startPlusEventBridge();

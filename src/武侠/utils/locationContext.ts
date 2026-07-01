@@ -1,8 +1,12 @@
 import type { MapData, MapRegion } from '../types';
 import { loadMapData } from './mapLoader';
+import { FRONTEND_VARIABLES_KEY } from './frontendVariableKeys';
 
 const DEFAULT_ADJACENT_REGION_LIMIT = 4;
-export const LOCATION_CONTEXT_VARIABLE_KEY = '地图上下文';
+export const LOCATION_CONTEXT_VARIABLE_KEY = '周围地点';
+const LEGACY_LOCATION_CONTEXT_VARIABLE_KEY = '地图上下文';
+const STAT_DATA_KEY = 'stat_data';
+const WORLD_INFO_KEY = '世界信息';
 
 interface MapRegionReference {
   areaName: string;
@@ -32,6 +36,10 @@ export interface DynamicLocationContextVariable {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function omitKeys(record: Record<string, unknown>, keys: string[]): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(record).filter(([key]) => !keys.includes(key)));
 }
 
 function normalizeLocationPath(value: string): string {
@@ -212,7 +220,7 @@ export function getCurrentPlayerLocation(): string {
   return typeof location === 'string' ? location.trim() : '';
 }
 
-async function buildCurrentDynamicLocationContext(): Promise<DynamicLocationContext> {
+export async function buildCurrentDynamicLocationContext(): Promise<DynamicLocationContext> {
   const mapData = await loadMapData();
   return buildDynamicLocationContext(mapData, getCurrentPlayerLocation());
 }
@@ -235,24 +243,79 @@ export function createDynamicLocationContextVariable(
   };
 }
 
+function getWorldInfoRecord(variables: Record<string, unknown>): Record<string, unknown> {
+  const statData = isRecord(variables[STAT_DATA_KEY]) ? variables[STAT_DATA_KEY] : variables;
+  return isRecord(statData[WORLD_INFO_KEY]) ? statData[WORLD_INFO_KEY] : {};
+}
+
+function getFrontendVariablesRecord(variables: Record<string, unknown>): Record<string, unknown> {
+  const statData = isRecord(variables[STAT_DATA_KEY]) ? variables[STAT_DATA_KEY] : variables;
+  return isRecord(statData[FRONTEND_VARIABLES_KEY]) ? statData[FRONTEND_VARIABLES_KEY] : {};
+}
+
+function hasLegacyLocationContext(variables: Record<string, unknown>): boolean {
+  return (
+    Object.hasOwn(variables, LEGACY_LOCATION_CONTEXT_VARIABLE_KEY) ||
+    Object.hasOwn(variables, LOCATION_CONTEXT_VARIABLE_KEY) ||
+    Object.hasOwn(getWorldInfoRecord(variables), LEGACY_LOCATION_CONTEXT_VARIABLE_KEY) ||
+    Object.hasOwn(getWorldInfoRecord(variables), LOCATION_CONTEXT_VARIABLE_KEY)
+  );
+}
+
+export function updateLocationContextInVariables(
+  variables: Record<string, unknown>,
+  value: DynamicLocationContextVariable,
+): Record<string, unknown> {
+  const rootVariables = omitKeys(variables, [LEGACY_LOCATION_CONTEXT_VARIABLE_KEY, LOCATION_CONTEXT_VARIABLE_KEY]);
+  const hasStatDataWrapper = isRecord(variables[STAT_DATA_KEY]);
+  const statData = hasStatDataWrapper ? variables[STAT_DATA_KEY] as Record<string, unknown> : rootVariables;
+  const worldInfo = omitKeys(
+    isRecord(statData[WORLD_INFO_KEY]) ? statData[WORLD_INFO_KEY] : {},
+    [LEGACY_LOCATION_CONTEXT_VARIABLE_KEY, LOCATION_CONTEXT_VARIABLE_KEY],
+  );
+  const frontendVariables = isRecord(statData[FRONTEND_VARIABLES_KEY]) ? statData[FRONTEND_VARIABLES_KEY] : {};
+  const nextStatData = {
+    ...statData,
+    [FRONTEND_VARIABLES_KEY]: {
+      ...frontendVariables,
+      [LOCATION_CONTEXT_VARIABLE_KEY]: value,
+    },
+  };
+  if (Object.keys(worldInfo).length > 0) {
+    nextStatData[WORLD_INFO_KEY] = worldInfo;
+  } else {
+    delete nextStatData[WORLD_INFO_KEY];
+  }
+
+  if (hasStatDataWrapper) {
+    return {
+      ...rootVariables,
+      [STAT_DATA_KEY]: nextStatData,
+    };
+  }
+
+  return nextStatData;
+}
+
 export async function syncDynamicLocationContextVariable(): Promise<DynamicLocationContextVariable | null> {
   try {
     const value = createDynamicLocationContextVariable(await buildCurrentDynamicLocationContext());
     const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
-    if (JSON.stringify(variables[LOCATION_CONTEXT_VARIABLE_KEY]) === JSON.stringify(value)) {
+    const frontendVariables = getFrontendVariablesRecord(variables);
+    if (
+      JSON.stringify(frontendVariables[LOCATION_CONTEXT_VARIABLE_KEY]) === JSON.stringify(value) &&
+      !hasLegacyLocationContext(variables)
+    ) {
       return value;
     }
 
     updateVariablesWith(
-      currentVariables => ({
-        ...currentVariables,
-        [LOCATION_CONTEXT_VARIABLE_KEY]: value,
-      }),
+      currentVariables => updateLocationContextInVariables(currentVariables as Record<string, unknown>, value),
       { type: 'chat' },
     );
     return value;
   } catch (error) {
-    console.warn('[locationContext] 刷新聊天变量「地图上下文」失败。', error);
+    console.warn('[locationContext] 刷新聊天变量「前端变量.周围地点」失败。', error);
     return null;
   }
 }
