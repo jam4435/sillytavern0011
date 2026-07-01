@@ -4,6 +4,7 @@
     "build": "webpack --mode production",
     "watch": "webpack --mode development --watch --progress",
     "test": "vitest run",
+    "test:safe": "vitest run --configLoader native --pool threads --reporter minimal",
     "test:watch": "vitest",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,html,vue}\" --no-error-on-unmatched-pattern",
     "lint": "eslint",
