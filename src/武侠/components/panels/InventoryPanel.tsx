@@ -4,7 +4,7 @@ import { Icons } from '../Icons';
 import { EmptyState } from './EmptyState';
 
 /* --- Private Helper Types and Functions --- */
-type QualityKey = 'WHITE' | 'GREEN' | 'BLUE' | 'PURPLE' | 'GOLD' | 'RED';
+type RankKey = 'WHITE' | 'GREEN' | 'BLUE' | 'PURPLE' | 'GOLD' | 'RED';
 
 interface RankInfo {
     color: string;
@@ -42,14 +42,13 @@ const getItemTypeLabel = (type: InventoryItem['type']) => {
 };
 
 const getItemRankInfo = (item: InventoryItem) => {
-    // Underlying variable still stores "品质"; inventory UI presents it as "品阶".
-    const config = RANK_CONFIG[item.quality] || RANK_CONFIG['WHITE'];
+    const config = RANK_CONFIG[item.rank] || RANK_CONFIG['WHITE'];
     const label = item.type === 'SECRET' ? config.labelSecret : config.labelGeneric;
     return { ...config, label };
 };
 
 // Suppress unused type warning
-void (undefined as unknown as QualityKey);
+void (undefined as unknown as RankKey);
 
 /* --- Inventory Panel --- */
 interface InventoryPanelProps {

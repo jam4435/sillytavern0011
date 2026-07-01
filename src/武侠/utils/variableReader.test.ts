@@ -20,7 +20,7 @@ vi.mock('./logger', () => ({
 
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { getMartialArtData, loadMartialArtsDatabase } from './martialArtsDatabase';
-import { __resetVariableReaderTestState, autoUpdateMartialArts } from './variableReader';
+import { __resetVariableReaderTestState, autoUpdateMartialArts, readGameDataSync } from './variableReader';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -30,6 +30,7 @@ const emitSourcedEraVariableWriteAndWaitMock = vi.mocked(emitSourcedEraVariableW
 const getMartialArtDataMock = vi.mocked(getMartialArtData);
 const loadMartialArtsDatabaseMock = vi.mocked(loadMartialArtsDatabase);
 const getVariablesMock = globalThis.getVariables as ReturnType<typeof vi.fn>;
+const getAllVariablesMock = globalThis.getAllVariables as ReturnType<typeof vi.fn>;
 
 const 金雁功数据库 = {
   类型: '轻功',
@@ -323,5 +324,79 @@ describe('autoUpdateMartialArts', () => {
         },
       },
     }));
+  });
+});
+
+describe('readGameDataSync inventory rank field', () => {
+  beforeEach(() => {
+    getAllVariablesMock.mockReturnValue({ stat_data: {} });
+  });
+
+  it('优先读取包裹中的新品阶字段', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '郭靖',
+          性别: '男',
+          境界: '不入流',
+          修为: 0,
+          所在位置: '牛家村',
+          包裹: {
+            金疮药: {
+              类型: '丹药',
+              品阶: '凡品',
+              物品描述: '普通的伤药。',
+              数量: 3,
+            },
+          },
+        },
+      },
+    });
+
+    const result = readGameDataSync();
+
+    expect(result?.inventory).toEqual([
+      expect.objectContaining({
+        name: '金疮药',
+        type: 'ELIXIR',
+        rank: 'WHITE',
+        count: 3,
+        description: '普通的伤药。',
+      }),
+    ]);
+  });
+
+  it('兼容读取老存档中的品质字段', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '郭靖',
+          性别: '男',
+          境界: '不入流',
+          修为: 0,
+          所在位置: '牛家村',
+          包裹: {
+            九阴残篇: {
+              类型: '秘籍',
+              品质: '极品',
+              物品描述: '残缺秘籍，仍有精妙之处。',
+              数量: 1,
+            },
+          },
+        },
+      },
+    });
+
+    const result = readGameDataSync();
+
+    expect(result?.inventory).toEqual([
+      expect.objectContaining({
+        name: '九阴残篇',
+        type: 'SECRET',
+        rank: 'PURPLE',
+        count: 1,
+        description: '残缺秘籍，仍有精妙之处。',
+      }),
+    ]);
   });
 });

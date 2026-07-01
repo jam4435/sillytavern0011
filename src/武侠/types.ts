@@ -85,7 +85,7 @@ export interface InventoryItem {
   id: string;
   name: string;
   type: 'SECRET' | 'EQUIP' | 'ELIXIR' | 'MISC';
-  quality: string;
+  rank: string;
   count: number;
   description: string;
   // For SECRET type items, this holds martial art details
@@ -333,7 +333,7 @@ export type OriginCategory = '江湖门派' | '世家豪门' | '平民百姓' | 
  */
 export interface OriginItemInfo {
   类型: string;
-  品质: string;
+  品阶: string;
   物品描述: string;
   数量: number;
 }

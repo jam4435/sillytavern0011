@@ -100,6 +100,7 @@ interface UserProfile {
     string,
     {
       类型?: string;
+      品阶?: string;
       品质?: string;
       物品描述?: string;
       数量?: number;
@@ -695,7 +696,7 @@ function parseInventory(用户档案?: UserProfile): InventoryItem[] {
       id: `item_${index++}`,
       name: name,
       type: mapItemType(item.类型),
-      quality: mapItemQuality(item.品质),
+      rank: mapItemRank(item.品阶 ?? item.品质),
       count: item.数量 ?? 1,
       description: item.物品描述 || '',
     });
@@ -719,18 +720,24 @@ function mapItemType(类型?: string): InventoryItem['type'] {
 }
 
 /**
- * 映射物品品质
+ * 映射物品品阶
  */
-function mapItemQuality(品质?: string): string {
-  const qualityMap: Record<string, string> = {
+function mapItemRank(品阶?: string): string {
+  const rankMap: Record<string, string> = {
     凡品: 'WHITE',
+    粗浅: 'WHITE',
     精品: 'GREEN',
+    传家: 'GREEN',
     珍品: 'BLUE',
+    上乘: 'BLUE',
     极品: 'PURPLE',
+    镇派: 'PURPLE',
     绝品: 'GOLD',
+    绝世: 'GOLD',
     神品: 'RED',
+    传说: 'RED',
   };
-  return qualityMap[品质 || ''] || 'WHITE';
+  return rankMap[品阶 || ''] || 'WHITE';
 }
 
 function getDisplayEventName(eventName: string): string {

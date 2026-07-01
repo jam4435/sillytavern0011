@@ -394,7 +394,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
       包裹: {
         $template: {
           类型: '',
-          品质: '',
+          品阶: '',
           物品描述: '',
           数量: 0,
         },
