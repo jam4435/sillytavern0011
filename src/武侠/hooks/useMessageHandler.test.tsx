@@ -17,6 +17,10 @@ vi.mock('../utils/promptDebug', () => ({
   captureNextCombinedPromptForDebug: vi.fn(() => ({ stop: vi.fn() })),
 }));
 
+vi.mock('../utils/frontendDerivedVariables', () => ({
+  syncFrontendDerivedVariables: vi.fn(async () => null),
+}));
+
 vi.mock('../utils/locationContext', () => ({
   syncDynamicLocationContextVariable: vi.fn(async () => ({ 已解析: true })),
 }));
@@ -27,6 +31,11 @@ vi.mock('../utils/extraVariableUpdateManager', () => ({
 }));
 
 vi.mock('../utils/logger', () => ({
+  dataLogger: {
+    log: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
   messageLogger: {
     log: vi.fn(),
     warn: vi.fn(),
