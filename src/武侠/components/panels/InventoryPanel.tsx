@@ -6,13 +6,13 @@ import { EmptyState } from './EmptyState';
 /* --- Private Helper Types and Functions --- */
 type QualityKey = 'WHITE' | 'GREEN' | 'BLUE' | 'PURPLE' | 'GOLD' | 'RED';
 
-interface QualityInfo {
+interface RankInfo {
     color: string;
     labelGeneric: string;
     labelSecret: string;
 }
 
-const QUALITY_CONFIG: Record<string, QualityInfo> = {
+const RANK_CONFIG: Record<string, RankInfo> = {
   WHITE: { color: '#a8a29e', labelGeneric: '凡品', labelSecret: '粗浅' },
   GREEN: { color: '#4ade80', labelGeneric: '精品', labelSecret: '传家' },
   BLUE:  { color: '#60a5fa', labelGeneric: '珍品', labelSecret: '上乘' },
@@ -41,8 +41,9 @@ const getItemTypeLabel = (type: InventoryItem['type']) => {
     }
 };
 
-const getItemQualityInfo = (item: InventoryItem) => {
-    const config = QUALITY_CONFIG[item.quality] || QUALITY_CONFIG['WHITE'];
+const getItemRankInfo = (item: InventoryItem) => {
+    // Underlying variable still stores "品质"; inventory UI presents it as "品阶".
+    const config = RANK_CONFIG[item.quality] || RANK_CONFIG['WHITE'];
     const label = item.type === 'SECRET' ? config.labelSecret : config.labelGeneric;
     return { ...config, label };
 };
@@ -63,21 +64,21 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items }) => {
             {items.length > 0 ? (
                 <div className="inv-grid-container">
                     {items.map((item) => {
-                         const qInfo = getItemQualityInfo(item);
+                         const rankInfo = getItemRankInfo(item);
                          return (
                             <div
                                 key={item.id}
                                 className="inv-square-box"
                                 style={{
-                                    '--item-color': qInfo.color
+                                    '--item-color': rankInfo.color
                                 } as React.CSSProperties}
                                 onClick={() => setSelectedItem(item)}
                             >
                                 <div className="inv-square-inner">
-                                    {item.type === 'SECRET' && <Icons.Quest size={42} color={qInfo.color} />}
-                                    {item.type === 'EQUIP' && <Icons.Combat size={42} color={qInfo.color} />}
-                                    {item.type === 'ELIXIR' && <Icons.Magic size={42} color={qInfo.color} />}
-                                    {item.type === 'MISC' && <Icons.Inventory size={42} color={qInfo.color} />}
+                                    {item.type === 'SECRET' && <Icons.Quest size={42} color={rankInfo.color} />}
+                                    {item.type === 'EQUIP' && <Icons.Combat size={42} color={rankInfo.color} />}
+                                    {item.type === 'ELIXIR' && <Icons.Magic size={42} color={rankInfo.color} />}
+                                    {item.type === 'MISC' && <Icons.Inventory size={42} color={rankInfo.color} />}
                                 </div>
                                 <div className="inv-square-count">{item.count}</div>
                                 <div className="inv-square-name">{item.name}</div>
@@ -92,19 +93,19 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items }) => {
             {/* Item Detail Window */}
             {selectedItem && (
                 <div className="inv-window-overlay" onClick={() => setSelectedItem(null)}>
-                    <div className="inv-window-frame" onClick={e => e.stopPropagation()} style={{ borderColor: `${getItemQualityInfo(selectedItem).color}80` }}>
+                    <div className="inv-window-frame" onClick={e => e.stopPropagation()} style={{ borderColor: `${getItemRankInfo(selectedItem).color}80` }}>
 
                          {/* Window Header */}
                          <div className="inv-win-header">
-                            <h3 className="inv-win-title" style={{ color: getItemQualityInfo(selectedItem).color }}>
+                            <h3 className="inv-win-title" style={{ color: getItemRankInfo(selectedItem).color }}>
                                 {selectedItem.name}
                             </h3>
                             <div className="inv-win-badges">
                                 <span className="inv-win-badge">
                                     {getItemTypeLabel(selectedItem.type)}
                                 </span>
-                                <span className="inv-win-badge" style={{ color: getItemQualityInfo(selectedItem).color, borderColor: `${getItemQualityInfo(selectedItem).color}40` }}>
-                                    {getItemQualityInfo(selectedItem).label}
+                                <span className="inv-win-badge" style={{ color: getItemRankInfo(selectedItem).color, borderColor: `${getItemRankInfo(selectedItem).color}40` }}>
+                                    {getItemRankInfo(selectedItem).label}
                                 </span>
                             </div>
                          </div>
@@ -118,7 +119,7 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items }) => {
 
                          {/* Window Footer (Buttons) */}
                          <div className="inv-win-footer">
-                            <button className="wuxia-btn primary" style={{ color: getItemQualityInfo(selectedItem).color, borderColor: `${getItemQualityInfo(selectedItem).color}60` }}>
+                            <button className="wuxia-btn primary" style={{ color: getItemRankInfo(selectedItem).color, borderColor: `${getItemRankInfo(selectedItem).color}60` }}>
                                 {getActionLabel(selectedItem.type)}
                             </button>
                             <button className="wuxia-btn secondary">
