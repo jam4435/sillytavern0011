@@ -34,9 +34,9 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
   {
     key: 'imperial_male_elite',
     label: '路线一：王座裂缝',
-    difficulty: '极难',
+    difficulty: '炼狱',
     gender: 'male',
-    description: '帝国男性高层，在改革、镇压与权力内斗中求生。',
+    description: '帝国男性高层，在觉醒等级互害、教廷架空、军队养寇与女性反抗中保命。',
   },
   {
     key: 'imperial_male_lowborn',
