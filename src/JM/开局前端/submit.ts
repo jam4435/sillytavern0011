@@ -1,41 +1,47 @@
-import { ensureGenerationSettings } from './state';
+import { ensureGenerationSettings, ensureHardIdentityRoute } from './state';
 import { applyGenerationSettings } from './tavern-settings';
 import { queryRequired } from './dom';
+import {
+  getHardIdentityRouteGenderLabel,
+  getHardIdentityRouteOption,
+  isHardIdentityRouteCompatibleWithGender,
+} from './hard-routes';
 import type { FinalMessageOptions, SelectionState } from './types';
 
 export async function submitSelections(selections: SelectionState) {
-  const genderValue = selections.gender === '男' ? 'man' : 'female';
-  const description = buildDescription(selections);
-  const settings = ensureGenerationSettings(selections);
+  try {
+    const genderValue = selections.gender === '男' ? 'man' : 'female';
+    const hardIdentityRoute = getValidatedHardIdentityRoute(selections);
+    const description = buildDescription(selections);
+    const settings = ensureGenerationSettings(selections);
 
-  if (typeof insertOrAssignVariables === 'function' && typeof triggerSlash === 'function') {
-    try {
+    if (typeof insertOrAssignVariables === 'function' && typeof triggerSlash === 'function') {
       await applyGenerationSettings(settings);
       await initializeCurrentCharacterVariable();
-      await insertOrAssignVariables({ gender: genderValue }, { type: 'chat' });
+      await insertOrAssignVariables({ gender: genderValue, hardIdentityRoute }, { type: 'chat' });
       triggerSlash([`/send ${description}`, '/trigger'].join('|'));
       renderFinalMessage({
         title: '档案已发送',
         text: '[档案已生成并注入聊天栏...]',
       });
-    } catch (error) {
-      console.error('执行指令时出错:', error);
-      alert(error instanceof Error ? error.message : '发送指令失败！');
+      return;
     }
-    return;
+
+    console.log('--- 角色卡生成数据 ---');
+    console.log(description);
+    console.log('--------------------------');
+    console.log(
+      '错误：外部接口(insertOrAssignVariables 或 triggerSlash)未找到。如果这不是在SillyTavern等应用中加载的，请在浏览器开发者工具的控制台中查看生成的数据。',
+    );
+
+    renderFinalMessage({
+      title: '档案已生成',
+      text: '[请在浏览器控制台(F12)查看数据]',
+    });
+  } catch (error) {
+    console.error('执行指令时出错:', error);
+    alert(error instanceof Error ? error.message : '发送指令失败！');
   }
-
-  console.log('--- 角色卡生成数据 ---');
-  console.log(description);
-  console.log('--------------------------');
-  console.log(
-    '错误：外部接口(insertOrAssignVariables 或 triggerSlash)未找到。如果这不是在SillyTavern等应用中加载的，请在浏览器开发者工具的控制台中查看生成的数据。',
-  );
-
-  renderFinalMessage({
-    title: '档案已生成',
-    text: '[请在浏览器控制台(F12)查看数据]',
-  });
 }
 
 export function buildDescription(selections: SelectionState) {
@@ -100,6 +106,17 @@ async function initializeCurrentCharacterVariable() {
   }
 
   throw new Error('外部接口(updateVariablesWith 或 getVariables/replaceVariables)未找到，无法初始化 chat.stat_data.当前人物。');
+}
+
+function getValidatedHardIdentityRoute(selections: SelectionState) {
+  const hardIdentityRoute = ensureHardIdentityRoute(selections);
+  if (isHardIdentityRouteCompatibleWithGender(hardIdentityRoute, selections.gender)) {
+    return hardIdentityRoute;
+  }
+
+  const route = getHardIdentityRouteOption(hardIdentityRoute);
+  const genderLabel = getHardIdentityRouteGenderLabel(route.gender);
+  throw new Error(`${route.label} 只适用于${genderLabel}开局，请调整高难身份路线或性别。`);
 }
 
 function renderFinalMessage(options: FinalMessageOptions) {
