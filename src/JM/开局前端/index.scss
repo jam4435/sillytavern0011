@@ -256,6 +256,116 @@ body {
 .setting-switch input:disabled + .setting-slider::after {
   background: rgba(241, 245, 249, 0.65);
 }
+.hard-route-settings {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.hard-route-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+.hard-route-summary::-webkit-details-marker {
+  display: none;
+}
+.hard-route-summary:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.hard-route-summary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  color: var(--accent-color);
+  transition: transform 0.2s ease;
+}
+.hard-route-settings[open] .hard-route-summary-icon {
+  transform: rotate(180deg);
+}
+.hard-route-options {
+  display: grid;
+  gap: 0.7rem;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 0 0.85rem 0.95rem;
+}
+.hard-route-options::-webkit-scrollbar {
+  width: 8px;
+}
+.hard-route-options::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+.hard-route-options::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+}
+.hard-route-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.hard-route-option:hover {
+  border-color: rgba(196, 58, 58, 0.42);
+  background: rgba(255, 255, 255, 0.04);
+}
+.hard-route-option.selected {
+  border-color: rgba(196, 58, 58, 0.72);
+  background: rgba(196, 58, 58, 0.12);
+  box-shadow: inset 3px 0 0 var(--accent-color);
+}
+.hard-route-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  overflow: hidden;
+}
+.hard-route-option-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+.hard-route-option-title {
+  color: var(--text-color);
+  font-weight: 700;
+  line-height: 1.35;
+}
+.hard-route-option-meta {
+  flex-shrink: 0;
+  color: var(--accent-hover);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+.hard-route-option-description {
+  color: var(--text-secondary-color);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
 .mode-selection-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -814,6 +924,19 @@ body {
   }
   .setting-hint {
     font-size: 0.84rem;
+  }
+  .hard-route-summary {
+    align-items: flex-start;
+    padding: 0.85rem 0.9rem;
+  }
+  .hard-route-options {
+    max-height: 420px;
+    padding: 0 0.7rem 0.85rem;
+  }
+  .hard-route-option-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.3rem;
   }
   .card {
     padding: 1rem;

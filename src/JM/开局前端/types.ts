@@ -1,3 +1,5 @@
+import type { HardIdentityRouteKey } from './hard-routes';
+
 export interface ProfessionCategoryInfo {
   professions?: string[];
   description?: string;
@@ -42,6 +44,7 @@ export interface SelectionState {
   customFeature?: string;
   customModification?: string;
   customScene?: string;
+  hardIdentityRoute?: HardIdentityRouteKey;
   settings?: GenerationSettings;
   [key: string]: unknown;
 }

@@ -1,6 +1,16 @@
 import { getFeatureSet, getModificationOptions } from './data-access';
 import { byId } from './dom';
-import { ensureFeatureSelections, ensureGenerationSettings, ensureModificationSelections } from './state';
+import {
+  ensureFeatureSelections,
+  ensureGenerationSettings,
+  ensureHardIdentityRoute,
+  ensureModificationSelections,
+} from './state';
+import {
+  getHardIdentityRouteGenderLabel,
+  getHardIdentityRouteOption,
+  hardIdentityRouteOptions,
+} from './hard-routes';
 import type { CardOptions, GenerationSettings, ModificationOption, SelectionState } from './types';
 
 export function navigateTo(screenId: string) {
@@ -173,6 +183,9 @@ export function renderSummary(selections: SelectionState) {
   summaryContainer.appendChild(createSummaryItem('变量系统', settings.enableVariables ? '开启' : '关闭'));
   summaryContainer.appendChild(createSummaryItem('状态栏模式', getStatusBarModeLabel(settings)));
   summaryContainer.appendChild(createSummaryItem('生成选项', settings.generateOptions ? '开启' : '关闭'));
+  summaryContainer.appendChild(
+    createSummaryItem('高难身份路线', getHardIdentityRouteOption(ensureHardIdentityRoute(selections)).label),
+  );
 }
 
 export function syncSettingsControls(selections: SelectionState) {
@@ -192,6 +205,45 @@ export function syncSettingsControls(selections: SelectionState) {
   textStatusHint.textContent = settings.enableVariables
     ? '关闭变量后才能切换到无图片状态栏。'
     : '关闭图片状态栏并启用无图片状态栏。';
+}
+
+export function renderHardIdentityRouteControls(selections: SelectionState) {
+  const container = byId<HTMLDivElement>('hard-identity-route-options');
+  const selectedRoute = ensureHardIdentityRoute(selections);
+  container.innerHTML = '';
+
+  hardIdentityRouteOptions.forEach(route => {
+    const option = document.createElement('label');
+    option.className = 'hard-route-option';
+    option.classList.toggle('selected', route.key === selectedRoute);
+    option.htmlFor = `setting-hard-identity-route-${route.key}`;
+
+    const input = document.createElement('input');
+    input.id = `setting-hard-identity-route-${route.key}`;
+    input.type = 'radio';
+    input.name = 'setting-hard-identity-route';
+    input.value = route.key;
+    input.checked = route.key === selectedRoute;
+
+    const heading = document.createElement('span');
+    heading.className = 'hard-route-option-heading';
+
+    const title = document.createElement('span');
+    title.className = 'hard-route-option-title';
+    title.textContent = route.label;
+
+    const meta = document.createElement('span');
+    meta.className = 'hard-route-option-meta';
+    meta.textContent = `${route.difficulty} · ${getHardIdentityRouteGenderLabel(route.gender)}`;
+
+    const description = document.createElement('span');
+    description.className = 'hard-route-option-description';
+    description.textContent = route.description;
+
+    heading.append(title, meta);
+    option.append(input, heading, description);
+    container.appendChild(option);
+  });
 }
 
 function getStatusBarModeLabel(settings: GenerationSettings) {

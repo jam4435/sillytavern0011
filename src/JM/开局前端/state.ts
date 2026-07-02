@@ -1,4 +1,5 @@
 import { maybeById } from './dom';
+import { normalizeHardIdentityRoute, type HardIdentityRouteKey } from './hard-routes';
 import {
   selectionOrder,
   type FeatureSelections,
@@ -8,6 +9,7 @@ import {
 } from './types';
 
 const GENERATION_SETTINGS_STORAGE_KEY = 'jm-opening-frontend-generation-settings-v1';
+const HARD_IDENTITY_ROUTE_STORAGE_KEY = 'jm-opening-frontend-hard-identity-route-v1';
 
 const defaultGenerationSettings: GenerationSettings = {
   enableVariables: true,
@@ -18,6 +20,7 @@ const defaultGenerationSettings: GenerationSettings = {
 export function createSelectionState(): SelectionState {
   return {
     settings: loadGenerationSettings(),
+    hardIdentityRoute: loadHardIdentityRoute(),
   };
 }
 
@@ -75,6 +78,12 @@ export function ensureGenerationSettings(selections: SelectionState): Generation
   return selections.settings;
 }
 
+export function ensureHardIdentityRoute(selections: SelectionState): HardIdentityRouteKey {
+  const route = normalizeHardIdentityRoute(selections.hardIdentityRoute);
+  selections.hardIdentityRoute = route;
+  return route;
+}
+
 function createDefaultGenerationSettings(): GenerationSettings {
   return {
     ...defaultGenerationSettings,
@@ -104,6 +113,14 @@ export function persistGenerationSettings(settings: GenerationSettings) {
   }
 }
 
+export function persistHardIdentityRoute(route: HardIdentityRouteKey) {
+  try {
+    localStorage.setItem(HARD_IDENTITY_ROUTE_STORAGE_KEY, normalizeHardIdentityRoute(route));
+  } catch (error) {
+    console.warn('[开局前端] 保存高难身份路线缓存失败', error);
+  }
+}
+
 function normalizeGenerationSettings(settings?: Partial<GenerationSettings>): GenerationSettings {
   const normalized: GenerationSettings = {
     enableVariables:
@@ -125,4 +142,13 @@ function normalizeGenerationSettings(settings?: Partial<GenerationSettings>): Ge
   }
 
   return normalized;
+}
+
+function loadHardIdentityRoute(): HardIdentityRouteKey {
+  try {
+    return normalizeHardIdentityRoute(localStorage.getItem(HARD_IDENTITY_ROUTE_STORAGE_KEY));
+  } catch (error) {
+    console.warn('[开局前端] 读取高难身份路线缓存失败，已回退到默认设置', error);
+    return normalizeHardIdentityRoute(undefined);
+  }
 }

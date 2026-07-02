@@ -1,14 +1,17 @@
 import { byId } from './dom';
 import { handleNext, handleRandomize } from './flow';
+import { normalizeHardIdentityRoute } from './hard-routes';
 import { refreshQuickOpeningScreen, selectQuickOpening } from './opening-switcher';
 import { queueSettingsSyncPopup } from './popup';
-import { checkAllFeaturesSelected, navigateTo, syncSettingsControls } from './render';
+import { checkAllFeaturesSelected, navigateTo, renderHardIdentityRouteControls, syncSettingsControls } from './render';
 import {
   createSelectionState,
   ensureFeatureSelections,
   ensureGenerationSettings,
+  ensureHardIdentityRoute,
   ensureModificationSelections,
   persistGenerationSettings,
+  persistHardIdentityRoute,
   updateSelection,
 } from './state';
 import { applyGenerationSettings } from './tavern-settings';
@@ -17,6 +20,7 @@ import type { GenerationSettings, SelectionState, StringSelectionKey } from './t
 export function init() {
   const selections = createSelectionState();
   const syncGenerationSettings = createSettingsSyncer();
+  renderHardIdentityRouteControls(selections);
   syncSettingsControls(selections);
   bindBodyClickEvents(selections);
   bindInputEvents(selections, syncGenerationSettings);
@@ -178,6 +182,17 @@ function bindSettingsEvents(
     syncSettingsControls(selections);
     persistGenerationSettings(settings);
     syncGenerationSettings({ ...settings });
+  });
+
+  byId<HTMLDivElement>('hard-identity-route-options').addEventListener('change', event => {
+    if (!(event.target instanceof HTMLInputElement) || event.target.name !== 'setting-hard-identity-route') {
+      return;
+    }
+
+    selections.hardIdentityRoute = normalizeHardIdentityRoute(event.target.value);
+    const route = ensureHardIdentityRoute(selections);
+    persistHardIdentityRoute(route);
+    renderHardIdentityRouteControls(selections);
   });
 }
 
