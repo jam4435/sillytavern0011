@@ -6,14 +6,14 @@ import type { FinalMessageOptions, SelectionState } from './types';
 export async function submitSelections(selections: SelectionState) {
   const genderValue = selections.gender === '男' ? 'man' : 'female';
   const description = buildDescription(selections);
-  const finalMessage = appendDefaultCurrentCharacterVariableInsert(description);
   const settings = ensureGenerationSettings(selections);
 
   if (typeof insertOrAssignVariables === 'function' && typeof triggerSlash === 'function') {
     try {
       await applyGenerationSettings(settings);
+      await initializeCurrentCharacterVariable();
       await insertOrAssignVariables({ gender: genderValue }, { type: 'chat' });
-      triggerSlash([`/send ${finalMessage}`, '/trigger'].join('|'));
+      triggerSlash([`/send ${description}`, '/trigger'].join('|'));
       renderFinalMessage({
         title: '档案已发送',
         text: '[档案已生成并注入聊天栏...]',
@@ -26,7 +26,7 @@ export async function submitSelections(selections: SelectionState) {
   }
 
   console.log('--- 角色卡生成数据 ---');
-  console.log(finalMessage);
+  console.log(description);
   console.log('--------------------------');
   console.log(
     '错误：外部接口(insertOrAssignVariables 或 triggerSlash)未找到。如果这不是在SillyTavern等应用中加载的，请在浏览器开发者工具的控制台中查看生成的数据。',
@@ -74,8 +74,32 @@ export function buildDescription(selections: SelectionState) {
   return description;
 }
 
-function appendDefaultCurrentCharacterVariableInsert(text: string) {
-  return `${text}\n\n<VariableInsert>\n${JSON.stringify({ 当前人物: '' }, null, 2)}\n</VariableInsert>`;
+async function initializeCurrentCharacterVariable() {
+  if (typeof updateVariablesWith === 'function') {
+    await updateVariablesWith(variables => {
+      const nextVariables = _.cloneDeep(variables ?? {});
+      const currentStatData = _.isPlainObject(nextVariables.stat_data) ? nextVariables.stat_data : {};
+      nextVariables.stat_data = {
+        ...currentStatData,
+        当前人物: '',
+      };
+      return nextVariables;
+    }, { type: 'chat' });
+    return;
+  }
+
+  if (typeof getVariables === 'function' && typeof replaceVariables === 'function') {
+    const nextVariables = _.cloneDeep(getVariables({ type: 'chat' }) ?? {});
+    const currentStatData = _.isPlainObject(nextVariables.stat_data) ? nextVariables.stat_data : {};
+    nextVariables.stat_data = {
+      ...currentStatData,
+      当前人物: '',
+    };
+    replaceVariables(nextVariables, { type: 'chat' });
+    return;
+  }
+
+  throw new Error('外部接口(updateVariablesWith 或 getVariables/replaceVariables)未找到，无法初始化 chat.stat_data.当前人物。');
 }
 
 function renderFinalMessage(options: FinalMessageOptions) {
