@@ -19,6 +19,7 @@ vi.mock('./popup', () => ({
 
 const appDocumentHtml = readFileSync(resolve(process.cwd(), 'src/JM/开局前端/index.html'), 'utf8');
 const generationSettingsStorageKey = 'jm-opening-frontend-generation-settings-v1';
+const hardIdentityRouteStorageKey = 'jm-opening-frontend-hard-identity-route-v1';
 
 function resetDocumentWithAppHtml() {
   const parsed = new DOMParser().parseFromString(appDocumentHtml, 'text/html');
@@ -34,6 +35,17 @@ function dispatchCheckboxChange(id: string, checked: boolean) {
   }
 
   input.checked = checked;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  return input;
+}
+
+function dispatchRadioChange(id: string) {
+  const input = document.getElementById(id) as HTMLInputElement | null;
+  if (!input) {
+    throw new Error(`未找到测试所需控件: #${id}`);
+  }
+
+  input.checked = true;
   input.dispatchEvent(new Event('change', { bubbles: true }));
   return input;
 }
@@ -54,7 +66,32 @@ describe('开局前端入口设置', () => {
     const genderScreen = document.getElementById('screen-gender');
 
     expect(modeScreen?.querySelector('.settings-panel')).not.toBeNull();
+    expect(modeScreen?.querySelector('.hard-route-settings')).not.toBeNull();
     expect(genderScreen?.querySelector('.settings-panel')).toBeNull();
+  });
+
+  it('高难身份路线默认不启用', () => {
+    init();
+
+    const routeInput = document.getElementById('setting-hard-identity-route-none') as HTMLInputElement | null;
+
+    expect(routeInput).not.toBeNull();
+    expect(routeInput?.checked).toBe(true);
+    expect(localStorage.getItem(hardIdentityRouteStorageKey)).toBeNull();
+  });
+
+  it('选择高难身份路线只缓存，不触发现有设置同步', async () => {
+    init();
+    vi.clearAllMocks();
+
+    const routeInput = dispatchRadioChange('setting-hard-identity-route-imperial_male_elite');
+
+    await flushEffects();
+
+    expect(routeInput.checked).toBe(true);
+    expect(localStorage.getItem(hardIdentityRouteStorageKey)).toBe('imperial_male_elite');
+    expect(applyGenerationSettings).not.toHaveBeenCalled();
+    expect(queueSettingsSyncPopup).not.toHaveBeenCalled();
   });
 
   it('在入口页切换设置时仍会缓存并立即同步', async () => {
