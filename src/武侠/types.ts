@@ -81,6 +81,21 @@ export interface CharacterProfile {
   已探索地点?: string[]; // 已探索的地点列表（用于地图系统）
 }
 
+export interface InventoryAttributeModifierMap {
+  [attribute: string]: number;
+}
+
+export interface InventoryItemVariableData {
+  类型?: string;
+  品阶?: string;
+  物品描述?: string;
+  数量?: number;
+  部位?: string;
+  属性修正?: InventoryAttributeModifierMap;
+  使用状态?: string;
+  持续时间?: string | number;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -88,6 +103,15 @@ export interface InventoryItem {
   rank: string;
   count: number;
   description: string;
+  equipInfo?: {
+    slot?: string;
+    modifiers?: InventoryAttributeModifierMap;
+    status?: string;
+  };
+  elixirInfo?: {
+    modifiers?: InventoryAttributeModifierMap;
+    duration?: string;
+  };
   // For SECRET type items, this holds martial art details
   martialArtInfo?: {
     description: string;
@@ -336,6 +360,10 @@ export interface OriginItemInfo {
   品阶: string;
   物品描述: string;
   数量: number;
+  部位?: string;
+  属性修正?: InventoryAttributeModifierMap;
+  使用状态?: string;
+  持续时间?: string | number;
 }
 
 /**

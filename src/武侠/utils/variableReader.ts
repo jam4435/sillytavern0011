@@ -12,7 +12,9 @@ import type {
     GameEvent,
     GameState,
     InitialAttributes,
+    InventoryAttributeModifierMap,
     InventoryItem,
+    InventoryItemVariableData,
     MartialArt,
     NPC,
     WorldTime,
@@ -96,15 +98,7 @@ interface UserProfile {
     洞察?: number;
   };
   // 包裹（注意：实际变量名是"包裹"而非"背包"）
-  包裹?: Record<
-    string,
-    {
-      类型?: string;
-      品阶?: string;
-      物品描述?: string;
-      数量?: number;
-    }
-  >;
+  包裹?: Record<string, InventoryItemVariableData>;
   人物经历?: Record<string, string> | string;
   关系网?: Record<string, string>;
   $meta?: unknown; // ERA 元数据，忽略
@@ -679,8 +673,65 @@ function parseMartialArts(
 /**
  * 将用户档案中的包裹转换为 InventoryItem[] 结构
  * 注意：实际变量名是"包裹"而非"背包"，且是对象格式而非数组
- * 包裹物品字段统一使用"品阶"
+ * 包裹物品字段统一使用"品阶"，装备/丹药可携带额外元信息
  */
+function normalizeAttributeModifiers(
+  属性修正?: InventoryAttributeModifierMap,
+): InventoryAttributeModifierMap | undefined {
+  if (!属性修正 || typeof 属性修正 !== 'object') {
+    return undefined;
+  }
+
+  const normalizedEntries = Object.entries(属性修正).filter(
+    ([attribute, value]) => Boolean(attribute) && typeof value === 'number' && Number.isFinite(value),
+  );
+  if (normalizedEntries.length === 0) {
+    return undefined;
+  }
+
+  return Object.fromEntries(normalizedEntries);
+}
+
+function normalizeDurationValue(持续时间?: string | number): string | undefined {
+  if (typeof 持续时间 === 'number' && Number.isFinite(持续时间)) {
+    return String(持续时间);
+  }
+  if (typeof 持续时间 === 'string' && 持续时间.trim()) {
+    return 持续时间.trim();
+  }
+  return undefined;
+}
+
+function parseEquipInfo(item: InventoryItemVariableData): InventoryItem['equipInfo'] | undefined {
+  const slot = typeof item.部位 === 'string' ? item.部位.trim() : '';
+  const status = typeof item.使用状态 === 'string' ? item.使用状态.trim() : '';
+  const modifiers = normalizeAttributeModifiers(item.属性修正);
+
+  if (!slot && !status && !modifiers) {
+    return undefined;
+  }
+
+  return {
+    slot: slot || undefined,
+    modifiers,
+    status: status || undefined,
+  };
+}
+
+function parseElixirInfo(item: InventoryItemVariableData): InventoryItem['elixirInfo'] | undefined {
+  const modifiers = normalizeAttributeModifiers(item.属性修正);
+  const duration = normalizeDurationValue(item.持续时间);
+
+  if (!modifiers && !duration) {
+    return undefined;
+  }
+
+  return {
+    modifiers,
+    duration,
+  };
+}
+
 function parseInventory(用户档案?: UserProfile): InventoryItem[] {
   const 包裹 = 用户档案?.包裹;
   if (!包裹 || typeof 包裹 !== 'object') return [];
@@ -692,6 +743,7 @@ function parseInventory(用户档案?: UserProfile): InventoryItem[] {
     // 过滤掉 $template 模板字段
     if (name.startsWith('$')) continue;
 
+    const type = mapItemType(item.类型);
     const martialArtData = item.类型 === '秘籍' ? getMartialArtData(name) : null;
     const description = martialArtData?.功法描述 || item.物品描述 || '';
     const rankSource = martialArtData?.功法品阶 || item.品阶;
@@ -699,10 +751,12 @@ function parseInventory(用户档案?: UserProfile): InventoryItem[] {
     result.push({
       id: `item_${index++}`,
       name: name,
-      type: mapItemType(item.类型),
+      type,
       rank: mapItemRank(rankSource),
       count: item.数量 ?? 1,
       description,
+      equipInfo: type === 'EQUIP' ? parseEquipInfo(item) : undefined,
+      elixirInfo: type === 'ELIXIR' ? parseElixirInfo(item) : undefined,
       martialArtInfo: martialArtData
         ? {
             description: martialArtData.功法描述,

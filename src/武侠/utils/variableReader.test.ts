@@ -384,4 +384,75 @@ describe('readGameDataSync inventory rank field', () => {
       }),
     ]);
   });
+
+  it('装备和丹药会读取类型专属元信息', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '黄蓉',
+          性别: '女',
+          境界: '不入流',
+          修为: 0,
+          所在位置: '桃花岛',
+          包裹: {
+            软猬甲: {
+              类型: '装备',
+              品阶: '绝品',
+              物品描述: '刀枪难入，贴身护体。',
+              数量: 1,
+              部位: '护甲',
+              属性修正: {
+                根骨: 15,
+                洞察: 5,
+              },
+              使用状态: '装备中',
+            },
+            九花玉露丸: {
+              类型: '丹药',
+              品阶: '珍品',
+              物品描述: '清香沁脾，可调息养气。',
+              数量: 2,
+              属性修正: {
+                气血: 300,
+                内力: 120,
+              },
+              持续时间: 3,
+            },
+          },
+        },
+      },
+    });
+
+    const result = readGameDataSync();
+
+    expect(result?.inventory).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: '软猬甲',
+          type: 'EQUIP',
+          rank: 'GOLD',
+          equipInfo: {
+            slot: '护甲',
+            modifiers: {
+              根骨: 15,
+              洞察: 5,
+            },
+            status: '装备中',
+          },
+        }),
+        expect.objectContaining({
+          name: '九花玉露丸',
+          type: 'ELIXIR',
+          rank: 'BLUE',
+          elixirInfo: {
+            modifiers: {
+              气血: 300,
+              内力: 120,
+            },
+            duration: '3',
+          },
+        }),
+      ]),
+    );
+  });
 });

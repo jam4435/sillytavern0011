@@ -68,6 +68,28 @@ const getMartialArtRequirementEntries = (item: InventoryItem) => {
     return Object.entries(item.martialArtInfo.requirements).filter(([, value]) => typeof value === 'number');
 };
 
+const getAttributeModifierEntries = (modifiers?: Record<string, number>) => {
+    if (!modifiers) {
+        return [];
+    }
+    return Object.entries(modifiers).filter(([, value]) => typeof value === 'number');
+};
+
+const getItemModifierEntries = (item: InventoryItem) => {
+    if (item.type === 'EQUIP') {
+        return getAttributeModifierEntries(item.equipInfo?.modifiers);
+    }
+    if (item.type === 'ELIXIR') {
+        return getAttributeModifierEntries(item.elixirInfo?.modifiers);
+    }
+    return [];
+};
+
+const formatModifierLabel = (attribute: string, value: number) => {
+    const sign = value >= 0 ? '+' : '';
+    return `${attribute}${sign}${value}`;
+};
+
 // Suppress unused type warning
 void (undefined as unknown as RankKey);
 
@@ -79,6 +101,10 @@ interface InventoryPanelProps {
 export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items }) => {
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
     const selectedItemRequirementEntries = selectedItem ? getMartialArtRequirementEntries(selectedItem) : [];
+    const selectedItemModifierEntries = selectedItem ? getItemModifierEntries(selectedItem) : [];
+    const selectedEquipSlot = selectedItem?.type === 'EQUIP' ? selectedItem.equipInfo?.slot : undefined;
+    const selectedEquipStatus = selectedItem?.type === 'EQUIP' ? selectedItem.equipInfo?.status : undefined;
+    const selectedElixirDuration = selectedItem?.type === 'ELIXIR' ? selectedItem.elixirInfo?.duration : undefined;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
@@ -143,6 +169,45 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items }) => {
                                         {selectedItemRequirementEntries.map(([attribute, value]) => (
                                             <span key={attribute} className="inv-win-requirement-chip">
                                                 {attribute}{'>='}{value}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {selectedItem.type === 'EQUIP' && (selectedEquipSlot || selectedEquipStatus || selectedItemModifierEntries.length > 0) && (
+                                <div className="inv-win-requirements">
+                                    <div className="inv-win-requirements-title">装备信息</div>
+                                    <div className="inv-win-requirements-list">
+                                        {selectedEquipSlot && (
+                                            <span className="inv-win-requirement-chip">
+                                                部位：{selectedEquipSlot}
+                                            </span>
+                                        )}
+                                        {selectedEquipStatus && (
+                                            <span className="inv-win-requirement-chip">
+                                                状态：{selectedEquipStatus}
+                                            </span>
+                                        )}
+                                        {selectedItemModifierEntries.map(([attribute, value]) => (
+                                            <span key={attribute} className="inv-win-requirement-chip">
+                                                {formatModifierLabel(attribute, value)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {selectedItem.type === 'ELIXIR' && (selectedElixirDuration || selectedItemModifierEntries.length > 0) && (
+                                <div className="inv-win-requirements">
+                                    <div className="inv-win-requirements-title">药效信息</div>
+                                    <div className="inv-win-requirements-list">
+                                        {selectedElixirDuration && (
+                                            <span className="inv-win-requirement-chip">
+                                                持续时间：{selectedElixirDuration}
+                                            </span>
+                                        )}
+                                        {selectedItemModifierEntries.map(([attribute, value]) => (
+                                            <span key={attribute} className="inv-win-requirement-chip">
+                                                {formatModifierLabel(attribute, value)}
                                             </span>
                                         ))}
                                     </div>
