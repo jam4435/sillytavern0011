@@ -1560,35 +1560,6 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
   const cacheKey = getCharacterCacheKey(true); // 玩家的缓存键
   const currentRealm = user数据.境界 || '不入流';
 
-  // 使用缓存检测是否需要更新
-  const cached = characterStateCache.get(cacheKey);
-
-  // 检查是否需要更新
-  let shouldUpdate = false;
-  let isNew = false;
-  let realmChanged = false;
-
-  if (!cached) {
-    // 新玩家数据
-    shouldUpdate = true;
-    isNew = true;
-    dataLogger.log('[autoUpdatePlayerAttributes] 新玩家数据，需要更新');
-  } else if (cached.realm !== currentRealm) {
-    // 境界变更
-    shouldUpdate = true;
-    realmChanged = true;
-    dataLogger.log(`[autoUpdatePlayerAttributes] 境界变更 ${cached.realm} -> ${currentRealm}，需要更新`);
-  } else {
-    dataLogger.log('[autoUpdatePlayerAttributes] 玩家境界无变化，跳过');
-    return;
-  }
-
-  if (!shouldUpdate) {
-    return;
-  }
-
-  dataLogger.log(`[autoUpdatePlayerAttributes] 需要更新玩家属性 (新玩家=${isNew}, 境界变更=${realmChanged})`);
-
   // 构建初始属性对象（5维：臂力、根骨、机敏、悟性、洞察）
   const initialAttrs: InitialAttributes = {
     臂力: user数据.初始属性.臂力 ?? 10,
@@ -1613,12 +1584,51 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
     }
   }
 
+  const equipmentSlots = parseEquipmentSlots(user数据.装备栏);
+  const statusEffects = parseStatusEffects(user数据.状态效果);
+  const activeModifiers = collectActiveAttributeModifiers(user数据, equipmentSlots, statusEffects);
+  const attributeSignature = createPlayerAttributeSignature(initialAttrs, currentRealm, martialArtsForCalc, activeModifiers);
+
+  // 使用缓存检测是否需要更新
+  const cached = characterStateCache.get(cacheKey);
+
+  // 检查是否需要更新
+  let shouldUpdate = false;
+  let isNew = false;
+  let realmChanged = false;
+
+  if (!cached) {
+    // 新玩家数据
+    shouldUpdate = true;
+    isNew = true;
+    dataLogger.log('[autoUpdatePlayerAttributes] 新玩家数据，需要更新');
+  } else if (cached.realm !== currentRealm) {
+    // 境界变更
+    shouldUpdate = true;
+    realmChanged = true;
+    dataLogger.log(`[autoUpdatePlayerAttributes] 境界变更 ${cached.realm} -> ${currentRealm}，需要更新`);
+  } else if (cached.attributeSignature !== attributeSignature) {
+    shouldUpdate = true;
+    dataLogger.log('[autoUpdatePlayerAttributes] 属性计算输入变更，需要更新');
+  } else {
+    dataLogger.log('[autoUpdatePlayerAttributes] 玩家属性计算输入无变化，跳过');
+    return;
+  }
+
+  if (!shouldUpdate) {
+    return;
+  }
+
+  dataLogger.log(`[autoUpdatePlayerAttributes] 需要更新玩家属性 (新玩家=${isNew}, 境界变更=${realmChanged})`);
   dataLogger.log('[autoUpdatePlayerAttributes] 玩家初始属性:', initialAttrs);
   dataLogger.log('[autoUpdatePlayerAttributes] 玩家境界:', currentRealm);
   dataLogger.log('[autoUpdatePlayerAttributes] 玩家功法:', martialArtsForCalc);
+  dataLogger.log('[autoUpdatePlayerAttributes] 装备栏:', equipmentSlots);
+  dataLogger.log('[autoUpdatePlayerAttributes] 状态效果:', statusEffects);
+  dataLogger.log('[autoUpdatePlayerAttributes] 属性修正:', activeModifiers);
 
   // 使用 attributeCalculator 计算战斗属性和资源属性
-  const { combat, resources } = calculateAllAttributes(initialAttrs, currentRealm, martialArtsForCalc);
+  const { combat, resources } = calculateAllAttributes(initialAttrs, currentRealm, martialArtsForCalc, activeModifiers);
 
   dataLogger.log('[autoUpdatePlayerAttributes] 计算后战斗属性:', combat);
   dataLogger.log('[autoUpdatePlayerAttributes] 计算后资源属性:', resources);
@@ -1635,7 +1645,7 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
 
   if (areCalculatedAttributesEqual(user数据.属性, calculatedAttrs)) {
     dataLogger.log('[autoUpdatePlayerAttributes] 玩家属性已与计算结果一致，跳过 ERA 写入');
-    updateCharacterCache(cacheKey, currentRealm);
+    updateCharacterCache(cacheKey, currentRealm, attributeSignature);
     return;
   }
 
@@ -1682,7 +1692,7 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
     }
 
     // 更新缓存
-    updateCharacterCache(cacheKey, currentRealm);
+    updateCharacterCache(cacheKey, currentRealm, attributeSignature);
 
     dataLogger.log('[autoUpdatePlayerAttributes] 玩家属性更新完成');
   } catch (error) {
@@ -3053,7 +3063,15 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
     dataLogger.log('[variableReader] Step 4c - 境界:', realm);
     dataLogger.log('[variableReader] Step 4d - 功法计算数据:', martialArtsForCalc);
 
-    const { combat, resources } = calculateAllAttributes(initialAttrs, realm, martialArtsForCalc);
+    const equipmentSlots = parseEquipmentSlots(用户档案.装备栏);
+    const statusEffects = parseStatusEffects(用户档案.状态效果);
+    const activeModifiers = collectActiveAttributeModifiers(用户档案, equipmentSlots, statusEffects);
+
+    dataLogger.log('[variableReader] Step 4d1 - 装备栏:', equipmentSlots);
+    dataLogger.log('[variableReader] Step 4d2 - 状态效果:', statusEffects);
+    dataLogger.log('[variableReader] Step 4d3 - 属性修正:', activeModifiers);
+
+    const { combat, resources } = calculateAllAttributes(initialAttrs, realm, martialArtsForCalc, activeModifiers);
 
     dataLogger.log('[variableReader] Step 4e - 计算后的战斗属性:', combat);
     dataLogger.log('[variableReader] Step 4f - 计算后的资源属性:', resources);
@@ -3079,9 +3097,13 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
 
     // 背包（从用户档案中的包裹字段读取）
     state.inventory = parseInventory(用户档案);
+    state.equipment = equipmentSlots;
+    state.statusEffects = statusEffects;
   } else {
     dataLogger.log('[variableReader] 用户档案不存在，使用空背包');
     state.inventory = [];
+    state.equipment = {};
+    state.statusEffects = [];
   }
 
   // 事件 - 从事件系统读取（避免全量渲染未发生事件）
