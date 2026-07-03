@@ -1223,12 +1223,14 @@ export function calculateCharacterAttributes(角色名: string, 角色数据: Ch
   }
 
   // 构建初始属性对象（5维：臂力、根骨、机敏、悟性、洞察）
-  const chineseInitialAttrs: ChineseInitialAttributes = {
+  const chineseInitialAttrs: InitialAttributes = {
     臂力: 初始属性.臂力 ?? 10,
     根骨: 初始属性.根骨 ?? 10,
     机敏: 初始属性.机敏 ?? 10,
     悟性: 初始属性.悟性 ?? 10,
     洞察: 初始属性.洞察 ?? 10,
+    风姿: 10,
+    福缘: 0,
   };
 
   // 准备功法计算数据

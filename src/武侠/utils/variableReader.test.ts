@@ -431,14 +431,14 @@ describe('readGameDataSync inventory rank field', () => {
           name: '软猬甲',
           type: 'EQUIP',
           rank: 'GOLD',
-          equipInfo: {
+          equipInfo: expect.objectContaining({
             slot: '护甲',
             modifiers: {
               根骨: 15,
               洞察: 5,
             },
             status: '装备中',
-          },
+          }),
         }),
         expect.objectContaining({
           name: '九花玉露丸',
@@ -451,6 +451,109 @@ describe('readGameDataSync inventory rank field', () => {
             },
             duration: '3',
           },
+        }),
+      ]),
+    );
+  });
+
+  it('装备栏和状态效果会作为生效真值参与玩家属性计算', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '黄蓉',
+          性别: '女',
+          境界: '不入流',
+          修为: 0,
+          所在位置: '桃花岛',
+          初始属性: {
+            臂力: 10,
+            根骨: 10,
+            机敏: 10,
+            悟性: 10,
+            洞察: 10,
+            风姿: 10,
+            福缘: 0,
+          },
+          功法: {},
+          包裹: {
+            软猬甲: {
+              类型: '装备',
+              品阶: '绝品',
+              物品描述: '刀枪难入，贴身护体。',
+              数量: 1,
+              部位: '护甲',
+              属性修正: {
+                根骨: 15,
+                洞察: 5,
+              },
+              使用状态: '',
+            },
+            九花玉露丸: {
+              类型: '丹药',
+              品阶: '珍品',
+              物品描述: '清香沁脾，可调息养气。',
+              数量: 2,
+              属性修正: {
+                气血: 300,
+                内力: 120,
+                臂力: -2,
+              },
+              持续时间: 3,
+            },
+          },
+          装备栏: {
+            护甲: '软猬甲',
+          },
+          状态效果: {
+            药效一: {
+              类型: '丹药',
+              来源: '九花玉露丸',
+              属性修正: {
+                气血: 300,
+                内力: 120,
+                臂力: -2,
+              },
+              持续时间: 3,
+              剩余时间: 2,
+            },
+          },
+        },
+      },
+    });
+
+    const result = readGameDataSync();
+
+    expect(result?.equipment).toEqual({ 护甲: '软猬甲' });
+    expect(result?.statusEffects).toEqual([
+      {
+        id: '药效一',
+        type: '丹药',
+        source: '九花玉露丸',
+        modifiers: {
+          气血: 300,
+          内力: 120,
+          臂力: -2,
+        },
+        duration: 3,
+        remaining: 2,
+      },
+    ]);
+    expect(result?.stats?.attributes).toEqual({
+      hp: 310,
+      mp: 130,
+      臂力: 8,
+      根骨: 25,
+      机敏: 10,
+      洞察: 15,
+    });
+    expect(result?.inventory).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: '软猬甲',
+          equipInfo: expect.objectContaining({
+            status: '装备中',
+            isEquipped: true,
+          }),
         }),
       ]),
     );
