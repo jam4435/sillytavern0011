@@ -8,7 +8,10 @@
  */
 
 import type {
+    ActiveStatusEffect,
+    ActiveStatusEffectVariableData,
     CurrentAttributes,
+    EquipmentSlots,
     GameEvent,
     GameState,
     InitialAttributes,
@@ -99,6 +102,8 @@ interface UserProfile {
   };
   // 包裹（注意：实际变量名是"包裹"而非"背包"）
   包裹?: Record<string, InventoryItemVariableData>;
+  装备栏?: EquipmentSlots;
+  状态效果?: Record<string, ActiveStatusEffectVariableData>;
   人物经历?: Record<string, string> | string;
   关系网?: Record<string, string>;
   $meta?: unknown; // ERA 元数据，忽略
@@ -702,12 +707,106 @@ function normalizeDurationValue(持续时间?: string | number): string | undefi
   return undefined;
 }
 
-function parseEquipInfo(item: InventoryItemVariableData): InventoryItem['equipInfo'] | undefined {
+function normalizeDurationNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.floor(value));
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : undefined;
+  }
+  return undefined;
+}
+
+function parseEquipmentSlots(装备栏?: EquipmentSlots): EquipmentSlots {
+  if (!装备栏 || typeof 装备栏 !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(装备栏)
+      .filter(([slot, itemName]) => !slot.startsWith('$') && typeof itemName === 'string' && itemName.trim())
+      .map(([slot, itemName]) => [slot, itemName.trim()]),
+  );
+}
+
+function parseStatusEffects(状态效果?: Record<string, ActiveStatusEffectVariableData>): ActiveStatusEffect[] {
+  if (!状态效果 || typeof 状态效果 !== 'object') {
+    return [];
+  }
+
+  return Object.entries(状态效果)
+    .filter(([id]) => !id.startsWith('$'))
+    .map(([id, effect]) => {
+      const duration = normalizeDurationNumber(effect?.持续时间) ?? 0;
+      const remaining = normalizeDurationNumber(effect?.剩余时间) ?? duration;
+      return {
+        id,
+        type: typeof effect?.类型 === 'string' && effect.类型.trim() ? effect.类型.trim() : '丹药',
+        source: typeof effect?.来源 === 'string' ? effect.来源.trim() : '',
+        modifiers: normalizeAttributeModifiers(effect?.属性修正),
+        duration,
+        remaining,
+      };
+    })
+    .filter(effect => effect.remaining > 0);
+}
+
+function addAttributeModifiers(
+  target: InventoryAttributeModifierMap,
+  modifiers?: InventoryAttributeModifierMap,
+): void {
+  if (!modifiers) {
+    return;
+  }
+
+  for (const [attribute, value] of Object.entries(modifiers)) {
+    target[attribute] = (target[attribute] ?? 0) + value;
+  }
+}
+
+function collectActiveAttributeModifiers(
+  用户档案?: UserProfile,
+  equipmentSlots: EquipmentSlots = parseEquipmentSlots(用户档案?.装备栏),
+  statusEffects: ActiveStatusEffect[] = parseStatusEffects(用户档案?.状态效果),
+): InventoryAttributeModifierMap | undefined {
+  const modifiers: InventoryAttributeModifierMap = {};
+  const 包裹 = 用户档案?.包裹;
+
+  if (包裹 && typeof 包裹 === 'object') {
+    for (const [slot, itemName] of Object.entries(equipmentSlots)) {
+      if (!slot || !itemName) {
+        continue;
+      }
+
+      const item = 包裹[itemName];
+      if (!item || mapItemType(item.类型) !== 'EQUIP') {
+        continue;
+      }
+
+      addAttributeModifiers(modifiers, normalizeAttributeModifiers(item.属性修正));
+    }
+  }
+
+  for (const effect of statusEffects) {
+    addAttributeModifiers(modifiers, effect.modifiers);
+  }
+
+  return Object.keys(modifiers).length > 0 ? modifiers : undefined;
+}
+
+function parseEquipInfo(
+  itemName: string,
+  item: InventoryItemVariableData,
+  equipmentSlots: EquipmentSlots,
+): InventoryItem['equipInfo'] | undefined {
   const slot = typeof item.部位 === 'string' ? item.部位.trim() : '';
-  const status = typeof item.使用状态 === 'string' ? item.使用状态.trim() : '';
+  const isEquipped = Boolean(slot && equipmentSlots[slot] === itemName);
+  const itemStatus = typeof item.使用状态 === 'string' ? item.使用状态.trim() : '';
+  const status = isEquipped ? '装备中' : itemStatus;
   const modifiers = normalizeAttributeModifiers(item.属性修正);
 
-  if (!slot && !status && !modifiers) {
+  if (!slot && !status && !modifiers && !isEquipped) {
     return undefined;
   }
 
@@ -715,6 +814,7 @@ function parseEquipInfo(item: InventoryItemVariableData): InventoryItem['equipIn
     slot: slot || undefined,
     modifiers,
     status: status || undefined,
+    isEquipped,
   };
 }
 
@@ -736,6 +836,7 @@ function parseInventory(用户档案?: UserProfile): InventoryItem[] {
   const 包裹 = 用户档案?.包裹;
   if (!包裹 || typeof 包裹 !== 'object') return [];
 
+  const equipmentSlots = parseEquipmentSlots(用户档案?.装备栏);
   const result: InventoryItem[] = [];
   let index = 0;
 
@@ -755,7 +856,7 @@ function parseInventory(用户档案?: UserProfile): InventoryItem[] {
       rank: mapItemRank(rankSource),
       count: item.数量 ?? 1,
       description,
-      equipInfo: type === 'EQUIP' ? parseEquipInfo(item) : undefined,
+      equipInfo: type === 'EQUIP' ? parseEquipInfo(name, item, equipmentSlots) : undefined,
       elixirInfo: type === 'ELIXIR' ? parseElixirInfo(item) : undefined,
       martialArtInfo: martialArtData
         ? {

@@ -85,6 +85,27 @@ export interface InventoryAttributeModifierMap {
   [attribute: string]: number;
 }
 
+export interface EquipmentSlots {
+  [slot: string]: string;
+}
+
+export interface ActiveStatusEffectVariableData {
+  类型?: string;
+  来源?: string;
+  属性修正?: InventoryAttributeModifierMap;
+  持续时间?: number;
+  剩余时间?: number;
+}
+
+export interface ActiveStatusEffect {
+  id: string;
+  type: string;
+  source: string;
+  modifiers?: InventoryAttributeModifierMap;
+  duration: number;
+  remaining: number;
+}
+
 export interface InventoryItemVariableData {
   类型?: string;
   品阶?: string;
@@ -107,6 +128,7 @@ export interface InventoryItem {
     slot?: string;
     modifiers?: InventoryAttributeModifierMap;
     status?: string;
+    isEquipped?: boolean;
   };
   elixirInfo?: {
     modifiers?: InventoryAttributeModifierMap;
@@ -162,6 +184,8 @@ export interface GameState {
   mode: GameMode;
   stats: CharacterProfile; // Updated to new profile structure
   inventory: InventoryItem[];
+  equipment: EquipmentSlots;
+  statusEffects: ActiveStatusEffect[];
   events: GameEvent[];
   social: NPC[];
 }
@@ -544,6 +568,8 @@ export interface PendingCommand {
     origin?: string;
     itemName?: string;
     originalCount?: number; // 用于撤销物品使用
+    originalItem?: InventoryItemVariableData;
+    statusEffectId?: string;
   };
   timestamp: number;
 }

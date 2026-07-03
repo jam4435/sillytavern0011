@@ -80,6 +80,10 @@ export interface MartialArtForCalculation {
   mastery: string;
 }
 
+export interface AttributeModifierMap {
+  [attribute: string]: number;
+}
+
 // ============ 核心函数 ============
 
 /**
@@ -174,6 +178,56 @@ export function calculateResources(
   };
 }
 
+function addModifier(value: number, modifier: number): number {
+  return Math.max(0, Math.floor(value + modifier));
+}
+
+/**
+ * 属性修正是最终值上的平铺加减，不再参与境界倍率放大。
+ */
+export function applyAttributeModifiers(
+  combat: CombatAttributes,
+  resources: ResourceAttributes,
+  modifiers?: AttributeModifierMap,
+): {
+  combat: CombatAttributes;
+  resources: ResourceAttributes;
+} {
+  if (!modifiers) {
+    return { combat, resources };
+  }
+
+  const nextCombat: CombatAttributes = { ...combat };
+  const nextResources: ResourceAttributes = { ...resources };
+
+  for (const [attribute, modifier] of Object.entries(modifiers)) {
+    if (!Number.isFinite(modifier)) {
+      continue;
+    }
+
+    switch (attribute) {
+      case '臂力':
+      case '根骨':
+      case '机敏':
+      case '洞察':
+        nextCombat[attribute] = addModifier(nextCombat[attribute], modifier);
+        break;
+      case '气血':
+      case '气血上限':
+        nextResources.气血上限 = addModifier(nextResources.气血上限, modifier);
+        break;
+      case '内力':
+      case '内力上限':
+        nextResources.内力上限 = addModifier(nextResources.内力上限, modifier);
+        break;
+      default:
+        break;
+    }
+  }
+
+  return { combat: nextCombat, resources: nextResources };
+}
+
 /**
  * 完整的属性计算入口
  */
@@ -181,6 +235,7 @@ export function calculateAllAttributes(
   initial: InitialAttributes,
   realm: string,
   martialArts: Record<string, MartialArtForCalculation>,
+  modifiers?: AttributeModifierMap,
 ): {
   combat: CombatAttributes;
   resources: ResourceAttributes;
@@ -189,5 +244,5 @@ export function calculateAllAttributes(
   const combat = calculateCombatAttributes(initial, realm);
   const resources = calculateResources(combat.根骨, martialArts, major);
 
-  return { combat, resources };
+  return applyAttributeModifiers(combat, resources, modifiers);
 }
