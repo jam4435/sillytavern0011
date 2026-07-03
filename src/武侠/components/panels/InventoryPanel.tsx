@@ -96,15 +96,36 @@ void (undefined as unknown as RankKey);
 /* --- Inventory Panel --- */
 interface InventoryPanelProps {
     items: InventoryItem[];
+    onItemAction?: (item: InventoryItem) => void | Promise<void>;
 }
 
-export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items }) => {
+export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items, onItemAction }) => {
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+    const [isActing, setIsActing] = useState(false);
     const selectedItemRequirementEntries = selectedItem ? getMartialArtRequirementEntries(selectedItem) : [];
     const selectedItemModifierEntries = selectedItem ? getItemModifierEntries(selectedItem) : [];
     const selectedEquipSlot = selectedItem?.type === 'EQUIP' ? selectedItem.equipInfo?.slot : undefined;
     const selectedEquipStatus = selectedItem?.type === 'EQUIP' ? selectedItem.equipInfo?.status : undefined;
     const selectedElixirDuration = selectedItem?.type === 'ELIXIR' ? selectedItem.elixirInfo?.duration : undefined;
+    const selectedActionDisabled =
+        isActing ||
+        !onItemAction ||
+        !selectedItem ||
+        (selectedItem.type !== 'EQUIP' && selectedItem.type !== 'ELIXIR');
+
+    const handleSelectedItemAction = async () => {
+        if (!selectedItem || selectedActionDisabled) {
+            return;
+        }
+
+        setIsActing(true);
+        try {
+            await onItemAction?.(selectedItem);
+            setSelectedItem(null);
+        } finally {
+            setIsActing(false);
+        }
+    };
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
@@ -217,8 +238,13 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items }) => {
 
                          {/* Window Footer (Buttons) */}
                          <div className="inv-win-footer">
-                            <button className="wuxia-btn primary" style={{ color: getItemRankInfo(selectedItem).color, borderColor: `${getItemRankInfo(selectedItem).color}60` }}>
-                                {getActionLabel(selectedItem.type)}
+                            <button
+                                className="wuxia-btn primary"
+                                disabled={selectedActionDisabled}
+                                onClick={handleSelectedItemAction}
+                                style={{ color: getItemRankInfo(selectedItem).color, borderColor: `${getItemRankInfo(selectedItem).color}60` }}
+                            >
+                                {isActing ? '处理中' : getActionLabel(selectedItem.type)}
                             </button>
                             <button className="wuxia-btn secondary">
                                 丢弃

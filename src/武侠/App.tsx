@@ -33,8 +33,9 @@ import {
   useToast,
   useVariableChangeTracker,
 } from './hooks';
-import { ActivePanel } from './types';
+import { ActivePanel, InventoryItem } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
+import { equipInventoryItem, useElixirItem } from './utils/itemManager';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
 import { getUserCurrentLocation } from './utils/mapUtils';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
@@ -91,7 +92,7 @@ const App: React.FC = () => {
     currentOptions,
     setCurrentOptions,
   } = useGameState();
-  const { commands, setTravelCommand, cancelCommand, sendMessageWithCommands } = useCommandQueue();
+  const { commands, setTravelCommand, addUseItemCommand, cancelCommand, sendMessageWithCommands } = useCommandQueue();
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
@@ -326,12 +327,41 @@ const App: React.FC = () => {
     [mapDraftDestination, queuedTravelLocations],
   );
 
+  const refreshGameStateFromVariables = useCallback(() => {
+    const savedData = readGameDataPure();
+    if (savedData) {
+      setGameState(prev => ({ ...prev, ...savedData }));
+    }
+  }, [setGameState]);
+
+  const handleInventoryItemAction = useCallback(
+    async (item: InventoryItem) => {
+      if (item.type === 'EQUIP') {
+        const equipped = await equipInventoryItem(item.name);
+        if (equipped) {
+          refreshGameStateFromVariables();
+        }
+        return;
+      }
+
+      if (item.type === 'ELIXIR') {
+        const result = await useElixirItem(item.name);
+        if (result) {
+          addUseItemCommand(result.itemName, result.originalItem, result.statusEffectId);
+          refreshGameStateFromVariables();
+        }
+      }
+    },
+    [addUseItemCommand, refreshGameStateFromVariables],
+  );
+
   const handlePlayerSend = useCallback(
     async (message: string) => {
       await sendMessageWithCommands(message, handleSendMessage);
       setIsCommandQueueOpen(false);
+      refreshGameStateFromVariables();
     },
-    [handleSendMessage, sendMessageWithCommands],
+    [handleSendMessage, refreshGameStateFromVariables, sendMessageWithCommands],
   );
 
   const handleMapNavClick = useCallback(() => {
@@ -535,7 +565,7 @@ const App: React.FC = () => {
           />
         );
       case ActivePanel.INVENTORY:
-        return <InventoryPanel items={gameState.inventory} />;
+        return <InventoryPanel items={gameState.inventory} onItemAction={handleInventoryItemAction} />;
       case ActivePanel.SOCIAL:
         return <SocialPanel npcs={gameState.social} />;
       case ActivePanel.SETTINGS:
