@@ -1,7 +1,9 @@
 import type { InitialAttributes } from '../types';
 import {
+  applyAttributeModifiers,
   calculateCombatAttributes,
   getRealmCoefficient,
+  type AttributeModifierMap,
 } from './attributeCalculator';
 import {
   completeMartialArts,
@@ -57,6 +59,9 @@ type PlayerProfile = {
   修为?: number;
   初始属性?: Partial<InitialAttributes>;
   功法?: CharacterMartialArtRecord;
+  包裹?: Record<string, unknown>;
+  装备栏?: Record<string, unknown>;
+  状态效果?: Record<string, unknown>;
 };
 
 type NpcProfile = {
@@ -75,6 +80,7 @@ type CombatCharacter = {
   cultivation: number;
   initialAttributes: InitialAttributes;
   martialArts: Record<string, SimpleMartialArt>;
+  attributeModifiers?: AttributeModifierMap;
 };
 
 type StatDataRecord = Record<string, unknown>;
@@ -137,6 +143,62 @@ function toSimpleMartialArts(martialArts: CharacterMartialArtRecord | undefined)
   }, {});
 }
 
+function normalizeModifierMap(value: unknown): AttributeModifierMap | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const entries = Object.entries(value).filter(
+    ([attribute, modifier]) => Boolean(attribute) && typeof modifier === 'number' && Number.isFinite(modifier),
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function addModifiers(target: AttributeModifierMap, modifiers?: AttributeModifierMap): void {
+  if (!modifiers) {
+    return;
+  }
+
+  for (const [attribute, modifier] of Object.entries(modifiers)) {
+    target[attribute] = (target[attribute] ?? 0) + modifier;
+  }
+}
+
+function collectPlayerAttributeModifiers(userData: PlayerProfile): AttributeModifierMap | undefined {
+  const modifiers: AttributeModifierMap = {};
+  const packageItems = isRecord(userData.包裹) ? userData.包裹 : {};
+  const equipmentSlots = isRecord(userData.装备栏) ? userData.装备栏 : {};
+  const statusEffects = isRecord(userData.状态效果) ? userData.状态效果 : {};
+
+  for (const [slot, itemName] of Object.entries(equipmentSlots)) {
+    if (slot.startsWith('$') || typeof itemName !== 'string') {
+      continue;
+    }
+
+    const item = packageItems[itemName];
+    if (!isRecord(item)) {
+      continue;
+    }
+
+    addModifiers(modifiers, normalizeModifierMap(item.属性修正));
+  }
+
+  for (const [effectId, effect] of Object.entries(statusEffects)) {
+    if (effectId.startsWith('$') || !isRecord(effect)) {
+      continue;
+    }
+
+    const remaining = typeof effect.剩余时间 === 'number' ? effect.剩余时间 : Number(effect.剩余时间);
+    if (!Number.isFinite(remaining) || remaining <= 0) {
+      continue;
+    }
+
+    addModifiers(modifiers, normalizeModifierMap(effect.属性修正));
+  }
+
+  return Object.keys(modifiers).length > 0 ? modifiers : undefined;
+}
+
 function buildPlayerCharacter(statData: StatDataRecord): CombatCharacter | null {
   const userData = isRecord(statData.user数据) ? statData.user数据 as PlayerProfile : null;
   if (!userData) {
@@ -150,6 +212,7 @@ function buildPlayerCharacter(statData: StatDataRecord): CombatCharacter | null 
     cultivation: Number.isFinite(userData.修为) ? Number(userData.修为) : 0,
     initialAttributes: sanitizeInitialAttributes(userData.初始属性),
     martialArts: toSimpleMartialArts(userData.功法),
+    attributeModifiers: collectPlayerAttributeModifiers(userData),
   };
 }
 
@@ -244,7 +307,12 @@ function buildCharacterPowerRow(character: CombatCharacter): string {
     character.initialAttributes.悟性,
   );
   const realmCoefficient = getRealmCoefficient(character.realm);
-  const combatAttributes = calculateCombatAttributes(character.initialAttributes, character.realm);
+  const baseCombatAttributes = calculateCombatAttributes(character.initialAttributes, character.realm);
+  const { combat: combatAttributes } = applyAttributeModifiers(
+    baseCombatAttributes,
+    { 气血上限: 0, 内力上限: 0 },
+    character.attributeModifiers,
+  );
   const entriesByType = POWER_ZONE_TYPES.reduce<Record<MartialArtsType, MartialArtPowerEntry[]>>((result, type) => {
     result[type] = [];
     return result;
