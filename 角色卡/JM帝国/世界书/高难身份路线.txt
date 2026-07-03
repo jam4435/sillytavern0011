@@ -1,3 +1,4 @@
+<% { %>
 <% const hardIdentityRoute = variables.hardIdentityRoute; %>
 <% const hasHardIdentityRoute = [
   'imperial_male_elite',
@@ -199,4 +200,5 @@
 - 不替{{user}}决定立场、投降、背叛、性行为或不可逆选择。
 - 不因世界观黑暗而宣告一切努力无效；局部胜利必须真实改变后续资源、关系或制度成本，但不会自动解决全部矛盾。
 </高难身份设定>
+<% } %>
 <% } %>
