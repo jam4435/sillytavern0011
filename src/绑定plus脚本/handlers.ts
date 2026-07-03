@@ -842,7 +842,84 @@ export function getEnabledPresetPromptIds(presetName: string): string[] {
     return [];
   }
 
-  return getEnabledPresetPromptIdsFromPreset(getPreset(normalizedName));
+  const readablePresetName = getReadablePresetName(normalizedName);
+  if (!readablePresetName) {
+    return [];
+  }
+
+  try {
+    return getEnabledPresetPromptIdsFromPreset(getPreset(readablePresetName));
+  } catch (error) {
+    console.warn('绑定plus: 读取预设启用 prompt 失败', { presetName: normalizedName, error });
+    return [];
+  }
+}
+
+export function isPresetNameAvailable(presetName: string): boolean {
+  const normalizedName = ensureString(presetName).trim();
+  if (!normalizedName) {
+    return false;
+  }
+  if (normalizedName === 'in_use') {
+    return true;
+  }
+
+  try {
+    return getPresetNames().includes(normalizedName);
+  } catch (error) {
+    console.warn('绑定plus: 读取预设列表失败', error);
+    return false;
+  }
+}
+
+function getReadablePresetName(presetName: string): string | undefined {
+  const normalizedName = ensureString(presetName).trim();
+  if (!normalizedName) {
+    return undefined;
+  }
+  if (isPresetNameAvailable(normalizedName)) {
+    return normalizedName;
+  }
+
+  const loadedPresetName = ensureString(getLoadedPresetName()).trim();
+  return loadedPresetName && loadedPresetName === normalizedName ? 'in_use' : undefined;
+}
+
+export async function ensurePresetExistsForBinding(
+  presetName: string,
+): Promise<{ ok: boolean; created: boolean; presetName: string; reason?: string }> {
+  const normalizedName = ensureString(presetName).trim();
+  if (!normalizedName) {
+    return { ok: false, created: false, presetName: '', reason: '请先选择一个预设' };
+  }
+  if (normalizedName === 'in_use') {
+    return { ok: false, created: false, presetName: normalizedName, reason: 'in_use 不能直接作为绑定预设名' };
+  }
+  if (isPresetNameAvailable(normalizedName)) {
+    return { ok: true, created: false, presetName: normalizedName };
+  }
+
+  const loadedPresetName = ensureString(getLoadedPresetName()).trim();
+  if (loadedPresetName !== normalizedName) {
+    return {
+      ok: false,
+      created: false,
+      presetName: normalizedName,
+      reason: `预设「${normalizedName}」不存在，请先在酒馆中保存该预设或重新选择已有预设`,
+    };
+  }
+
+  try {
+    await createOrReplacePreset(normalizedName, getPreset('in_use'), { render: 'immediate' });
+    return { ok: true, created: true, presetName: normalizedName };
+  } catch (error) {
+    return {
+      ok: false,
+      created: false,
+      presetName: normalizedName,
+      reason: `保存当前 in_use 为预设「${normalizedName}」失败: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 function getWorldbookEnabledEntryUids(entries: Array<{ uid: number; enabled: boolean }>): number[] {
@@ -901,10 +978,7 @@ function normalizeDescription(description: string): string {
 
 // ==================== Persona 数据获取函数 ====================
 
-/**
- * 从前端 DOM 获取所有已存在的 Persona 列表
- */
-export function getPersonaListFromDOM(): PersonaInfo[] {
+function getPersonaListFromVisibleDOM(): PersonaInfo[] {
   const parentDoc = getParentDoc();
   const personas: PersonaInfo[] = [];
   const $avatarBlock = $('#user_avatar_block', parentDoc);
@@ -942,6 +1016,84 @@ export function getPersonaListFromDOM(): PersonaInfo[] {
   });
 
   return personas;
+}
+
+function getCurrentPersonaAvatarIdSafe(): string {
+  try {
+    return typeof getCurrentPersonaId === 'function' ? ensureString(getCurrentPersonaId()).trim() : '';
+  } catch (error) {
+    console.warn('用户设定脚本: 读取当前 Persona avatarId 失败', error);
+    return '';
+  }
+}
+
+function getPersonaListFromHelperApi(): PersonaInfo[] {
+  if (typeof getPersonaIds !== 'function' || typeof getPersona !== 'function') {
+    return [];
+  }
+
+  const currentAvatarId = getCurrentPersonaAvatarIdSafe();
+  return safeArray<string>(getPersonaIds())
+    .map(avatarId => ensureString(avatarId).trim())
+    .filter(Boolean)
+    .map(avatarId => {
+      try {
+        const persona = getPersona(avatarId);
+        const resolvedAvatarId = ensureString(persona.avatar_id).trim() || avatarId;
+        return {
+          name: ensureString(persona.name || persona.title).trim() || resolvedAvatarId,
+          description: normalizeDescription(ensureString(persona.description)),
+          avatarId: resolvedAvatarId,
+          isDefault: Boolean(persona.is_default),
+          isSelected: currentAvatarId === resolvedAvatarId,
+        };
+      } catch (error) {
+        console.warn('用户设定脚本: 读取 Persona 数据失败', { avatarId, error });
+        return {
+          name: avatarId,
+          avatarId,
+          isSelected: currentAvatarId === avatarId,
+        };
+      }
+    });
+}
+
+/**
+ * 获取所有已存在的 Persona 列表.
+ *
+ * 优先使用酒馆助手 Persona API 读取全量列表; 当前页 DOM 只作为锁定/选中状态的补充。
+ * 这样分页外的人设也能被绑定plus看见和切换。
+ */
+export function getPersonaListFromDOM(): PersonaInfo[] {
+  const domPersonas = getPersonaListFromVisibleDOM();
+  const apiPersonas = getPersonaListFromHelperApi();
+  if (apiPersonas.length === 0) {
+    return domPersonas;
+  }
+
+  const domByAvatarId = new Map(
+    domPersonas.filter(persona => Boolean(persona.avatarId)).map(persona => [persona.avatarId as string, persona]),
+  );
+  const merged = apiPersonas.map(persona => {
+    const domPersona = persona.avatarId ? domByAvatarId.get(persona.avatarId) : undefined;
+    return {
+      ...persona,
+      description: persona.description || domPersona?.description,
+      isDefault: Boolean(persona.isDefault || domPersona?.isDefault),
+      isSelected: Boolean(persona.isSelected || domPersona?.isSelected),
+      isLockedToChat: Boolean(domPersona?.isLockedToChat),
+      isLockedToCharacter: Boolean(domPersona?.isLockedToCharacter),
+    };
+  });
+
+  const apiAvatarIds = new Set(merged.map(persona => persona.avatarId).filter(Boolean));
+  domPersonas.forEach(persona => {
+    if (persona.avatarId && !apiAvatarIds.has(persona.avatarId)) {
+      merged.push(persona);
+    }
+  });
+
+  return merged;
 }
 
 /**
@@ -1206,6 +1358,144 @@ export function deletePresetDefaultSnapshotState(
     changed: snapshotChanged || defaultPresetChanged,
     snapshotChanged,
     defaultPresetChanged,
+  };
+}
+
+function hasContextBindingResourceValue(resources: PersonaContextBindingResources | undefined): boolean {
+  const normalized = normalizeContextBindingResources(resources);
+  return Boolean(
+    normalized.userPersonaAvatarId ||
+      normalized.userPersonaEnabledTraitIds?.length ||
+      normalized.connectionProfileName ||
+      normalized.presetName ||
+      normalized.presetEnabledPromptIds?.length ||
+      normalized.scripts?.global?.length ||
+      normalized.scripts?.preset?.length ||
+      normalized.scripts?.character?.length ||
+      normalized.regexes?.global?.length ||
+      normalized.regexes?.preset?.length ||
+      normalized.regexes?.character?.length ||
+      normalized.worldbooks?.global?.length ||
+      normalized.worldbooks?.characterPrimary ||
+      normalized.worldbooks?.characterAdditional?.length ||
+      normalized.worldbooks?.chat ||
+      normalized.worldbookEntries?.length ||
+      normalized.extensions?.length,
+  );
+}
+
+export function renamePresetBindingReferences(
+  previousPresetName: string,
+  nextPresetName: string,
+): { ok: boolean; changed: boolean; contextBindings: number; bindingGroups: number } {
+  const previousName = ensureString(previousPresetName).trim();
+  const nextName = ensureString(nextPresetName).trim();
+  if (!previousName || !nextName || previousName === nextName) {
+    return { ok: true, changed: false, contextBindings: 0, bindingGroups: 0 };
+  }
+
+  const now = Date.now();
+  let contextBindings = 0;
+  const nextBindings = loadContextBindings().map(binding => {
+    if (binding.resources.presetName !== previousName) {
+      return binding;
+    }
+    contextBindings += 1;
+    return {
+      ...binding,
+      resources: {
+        ...binding.resources,
+        presetName: nextName,
+      },
+      updatedAt: now,
+    };
+  });
+
+  let bindingGroups = 0;
+  const nextGroups = loadBindingGroups().map(group => {
+    if (group.resources.presetName !== previousName) {
+      return group;
+    }
+    bindingGroups += 1;
+    return {
+      ...group,
+      resources: {
+        ...group.resources,
+        presetName: nextName,
+      },
+      updatedAt: now,
+    };
+  });
+
+  const bindingsOk = contextBindings === 0 || saveContextBindings(nextBindings);
+  const groupsOk = bindingGroups === 0 || saveBindingGroups(nextGroups);
+  return {
+    ok: bindingsOk && groupsOk,
+    changed: contextBindings > 0 || bindingGroups > 0,
+    contextBindings,
+    bindingGroups,
+  };
+}
+
+export function deletePresetBindingReferences(
+  presetName: string,
+): { ok: boolean; changed: boolean; contextBindings: number; bindingGroups: number; removedEmptyBindings: number } {
+  const normalizedName = ensureString(presetName).trim();
+  if (!normalizedName) {
+    return { ok: true, changed: false, contextBindings: 0, bindingGroups: 0, removedEmptyBindings: 0 };
+  }
+
+  const now = Date.now();
+  let contextBindings = 0;
+  let removedEmptyBindings = 0;
+  const nextBindings = loadContextBindings().flatMap(binding => {
+    if (binding.resources.presetName !== normalizedName) {
+      return [binding];
+    }
+    contextBindings += 1;
+    const resources = normalizeContextBindingResources({
+      ...binding.resources,
+      presetName: undefined,
+      presetEnabledPromptIds: undefined,
+    });
+    if (!hasContextBindingResourceValue(resources)) {
+      removedEmptyBindings += 1;
+      return [];
+    }
+    return [
+      {
+        ...binding,
+        resources,
+        updatedAt: now,
+      },
+    ];
+  });
+
+  let bindingGroups = 0;
+  const nextGroups = loadBindingGroups().map(group => {
+    if (group.resources.presetName !== normalizedName) {
+      return group;
+    }
+    bindingGroups += 1;
+    return {
+      ...group,
+      resources: normalizeContextBindingResources({
+        ...group.resources,
+        presetName: undefined,
+        presetEnabledPromptIds: undefined,
+      }),
+      updatedAt: now,
+    };
+  });
+
+  const bindingsOk = contextBindings === 0 || saveContextBindings(nextBindings);
+  const groupsOk = bindingGroups === 0 || saveBindingGroups(nextGroups);
+  return {
+    ok: bindingsOk && groupsOk,
+    changed: contextBindings > 0 || bindingGroups > 0,
+    contextBindings,
+    bindingGroups,
+    removedEmptyBindings,
   };
 }
 
@@ -1700,13 +1990,44 @@ export async function handleSyncMessages(): Promise<void> {
  * 在父 UI 中通过点击事件选中指定的 Persona
  */
 export async function selectPersonaInParentUI(avatarId: string): Promise<boolean> {
-  console.log(`用户设定脚本: 尝试在主界面中选中 Persona (avatarId: ${avatarId})`);
+  const normalizedAvatarId = ensureString(avatarId).trim();
+  if (!normalizedAvatarId) {
+    return false;
+  }
+
+  console.log(`用户设定脚本: 尝试选中 Persona (avatarId: ${normalizedAvatarId})`);
   const parentDoc = getParentDoc();
-  const $personaCard = $(`#user_avatar_block .avatar-container[data-avatar-id="${avatarId}"]`, parentDoc);
+  const $personaCard = $(`#user_avatar_block .avatar-container[data-avatar-id="${normalizedAvatarId}"]`, parentDoc);
+
+  const isSelected = () =>
+    getCurrentPersonaAvatarIdSafe() === normalizedAvatarId ||
+    $(`#user_avatar_block .avatar-container[data-avatar-id="${normalizedAvatarId}"]`, parentDoc).hasClass('selected');
+
+  if (isSelected()) {
+    return true;
+  }
+
+  const persona = findPersonaByAvatarId(normalizedAvatarId);
+  const slashCandidates = uniqueStrings([normalizedAvatarId, persona?.name]);
+  for (const candidate of slashCandidates) {
+    try {
+      await triggerSlash(`/persona-set mode=lookup ${quoteSlashCommandArgument(candidate)}`);
+      await new Promise(resolve => setTimeout(resolve, 180));
+      if (isSelected()) {
+        return true;
+      }
+    } catch (error) {
+      console.warn('用户设定脚本: 通过 persona-set 切换 Persona 失败，准备尝试其他候选或 DOM 兜底', {
+        avatarId: normalizedAvatarId,
+        candidate,
+        error,
+      });
+    }
+  }
 
   if ($personaCard.length === 0) {
-    console.error(`用户设定脚本: 在主界面中找不到 avatarId 为 ${avatarId} 的 Persona 卡片`);
-    toastr.error('在主界面找不到对应的 Persona 卡片');
+    console.error(`用户设定脚本: 找不到 avatarId 为 ${normalizedAvatarId} 的 Persona 卡片，persona-set 也未能切换`);
+    toastr.error('切换 Persona 失败：未能通过酒馆接口选中对应 user 人设');
     return false;
   }
 
@@ -1714,8 +2035,8 @@ export async function selectPersonaInParentUI(avatarId: string): Promise<boolean
     $personaCard.trigger('click');
     await new Promise(resolve => setTimeout(resolve, 120));
 
-    if (!$personaCard.hasClass('selected')) {
-      console.error(`用户设定脚本: 点击后，Persona (avatarId: ${avatarId}) 仍未选中`);
+    if (!isSelected()) {
+      console.error(`用户设定脚本: 点击后，Persona (avatarId: ${normalizedAvatarId}) 仍未选中`);
       toastr.error('切换 Persona 失败，无法继续保存');
       return false;
     }
@@ -3439,13 +3760,35 @@ export function getPlusBindingCatalog(): {
     (SillyTavern?.extensionSettings as Record<string, unknown> | undefined) ||
     {};
   const boundConnectionProfiles = uniqueStrings(loadContextBindings().map(binding => binding.resources.connectionProfileName));
+  let savedPresetNames: string[] = [];
+  try {
+    savedPresetNames = uniqueStrings(getPresetNames());
+  } catch (error) {
+    console.warn('绑定plus: 读取预设目录失败', error);
+  }
+  const savedPresetNameSet = new Set(savedPresetNames);
+  let loadedPresetName = '';
+  try {
+    loadedPresetName = ensureString(getLoadedPresetName()).trim();
+  } catch (error) {
+    console.warn('绑定plus: 读取当前加载预设名失败', error);
+  }
+  const referencedPresetNames = uniqueStrings([
+    getDefaultPresetName(),
+    ...loadContextBindings().map(binding => binding.resources.presetName),
+    ...loadBindingGroups().map(group => group.resources.presetName),
+  ]);
+  const presetNames = uniqueStrings([loadedPresetName, ...savedPresetNames, ...referencedPresetNames]);
 
   return {
     connectionProfiles: updateConnectionProfileCatalogCache([
       ...connectionProfileCatalogCache.map(item => item.id),
       ...boundConnectionProfiles,
     ]),
-    presets: getPresetNames().map(name => ({ id: name, label: name })),
+    presets: presetNames.map(name => ({
+      id: name,
+      label: savedPresetNameSet.has(name) ? name : loadedPresetName === name ? `${name}（当前未保存）` : `${name}（缺失）`,
+    })),
     scripts: {
       global: flattenScriptTreeOptions(getScriptTrees({ type: 'global' })),
       preset: flattenScriptTreeOptions(getScriptTrees({ type: 'preset' })),
@@ -4048,7 +4391,14 @@ export async function applyPersonaPlusBindings(
 
   let presetLoadFailed = false;
   if (desired.presetName && desired.presetName !== getLoadedPresetName()) {
-    if (loadPreset(desired.presetName)) {
+    let presetLoaded = false;
+    try {
+      presetLoaded = loadPreset(desired.presetName);
+    } catch (error) {
+      console.warn('绑定plus: 加载绑定预设失败', { presetName: desired.presetName, error });
+    }
+
+    if (presetLoaded) {
       changed = true;
       summary.push(`预设 -> ${desired.presetName}`);
     } else {

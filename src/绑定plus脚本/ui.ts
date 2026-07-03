@@ -14,7 +14,9 @@ import {
   deleteChatContextBindingsByFileName,
   deleteContextBinding,
   deleteContextBindingById,
+  deletePresetBindingReferences,
   extractBaseDescriptionFromComposed,
+  ensurePresetExistsForBinding,
   findContextBinding,
   findPersonaByAvatarId,
   getBindingPlusStorageReport,
@@ -33,6 +35,7 @@ import {
   getRuntimeContextDebugInfo,
   getWorldbookEntryCatalog,
   importBindingPlusBackupFile,
+  isPresetNameAvailable,
   loadBindingGroups,
   loadBindingPlusTheme,
   loadContextBindings,
@@ -65,6 +68,7 @@ import {
   summarizeBindingPlusBackupImport,
   summarizeContextBindingResources,
   renameDefaultPresetPromptSnapshot,
+  renamePresetBindingReferences,
   deletePresetDefaultSnapshotState,
   upsertBindingGroup,
   upsertContextBinding,
@@ -768,7 +772,7 @@ function schedulePresetPromptMonitorRefresh(source: string, delayMs: number = 60
 }
 
 function readLoadedPresetPromptMonitorState(): LoadedPresetPromptMonitorState | null {
-  const loadedPresetName = ((getLoadedPresetName() as string | undefined) || '').trim();
+  const loadedPresetName = getLoadedPresetNameSafe();
   if (!loadedPresetName) {
     return null;
   }
@@ -803,7 +807,7 @@ function clearPendingOfficialPresetSave(): void {
 }
 
 function markPendingOfficialPresetSave(source: string): void {
-  const presetName = ((getLoadedPresetName() as string | undefined) || '').trim();
+  const presetName = getLoadedPresetNameSafe();
   if (!presetName) {
     return;
   }
@@ -1036,6 +1040,10 @@ function startPlusEventBridge(): void {
         if (!renameResult.ok) {
           console.warn('绑定plus: 预设重命名后同步默认快照失败', { previousName, nextName });
         }
+        const referenceRenameResult = renamePresetBindingReferences(previousName, nextName);
+        if (!referenceRenameResult.ok) {
+          console.warn('绑定plus: 预设重命名后同步绑定引用失败', { previousName, nextName });
+        }
 
         if ((activeResourceSelection.preset || '').trim() === previousName) {
           activeResourceSelection.preset = nextName;
@@ -1056,6 +1064,10 @@ function startPlusEventBridge(): void {
         const deleteResult = deletePresetDefaultSnapshotState(presetName);
         if (!deleteResult.ok) {
           console.warn('绑定plus: 预设删除后清理默认快照失败', { presetName });
+        }
+        const referenceDeleteResult = deletePresetBindingReferences(presetName);
+        if (!referenceDeleteResult.ok) {
+          console.warn('绑定plus: 预设删除后清理绑定引用失败', { presetName });
         }
 
         if ((activeResourceSelection.preset || '').trim() === presetName) {
@@ -3261,12 +3273,48 @@ function areOptionalNumberArraysEqual(left?: number[], right?: number[]): boolea
   return left.every(value => rightSet.has(value));
 }
 
+function getLoadedPresetNameSafe(): string {
+  try {
+    return ((getLoadedPresetName() as string | undefined) || '').trim();
+  } catch (error) {
+    console.warn('绑定plus: 读取当前加载预设名失败', error);
+    return '';
+  }
+}
+
+function getPresetForUiSelection(presetName: string): {
+  preset: Preset | null;
+  source: 'saved' | 'loaded_in_use' | 'missing';
+} {
+  const normalizedName = (presetName || '').trim();
+  if (!normalizedName) {
+    return { preset: null, source: 'missing' };
+  }
+
+  try {
+    if (isPresetNameAvailable(normalizedName)) {
+      return { preset: getPreset(normalizedName), source: 'saved' };
+    }
+    if (getLoadedPresetNameSafe() === normalizedName) {
+      return { preset: getPreset('in_use'), source: 'loaded_in_use' };
+    }
+  } catch (error) {
+    console.warn('绑定plus: 读取预设详情失败', { presetName: normalizedName, error });
+  }
+
+  return { preset: null, source: 'missing' };
+}
+
 function getPresetPromptRows(presetName: string): Array<{
   key: string;
   prompt: PresetPrompt;
   source: 'prompts' | 'prompts_unused';
 }> {
-  const preset = getPreset(presetName);
+  const { preset } = getPresetForUiSelection(presetName);
+  if (!preset) {
+    return [];
+  }
+
   return [
     ...preset.prompts.map(prompt => ({
       key: getPresetPromptStableId(prompt),
@@ -3362,8 +3410,13 @@ function getCurrentPresetPromptSelectionIds(
     return [...binding.presetEnabledPromptIds];
   }
 
-  return getPreset(normalizedName)
-    .prompts.filter(prompt => prompt.enabled)
+  const { preset } = getPresetForUiSelection(normalizedName);
+  if (!preset) {
+    return [];
+  }
+
+  return preset.prompts
+    .filter(prompt => prompt.enabled)
     .map(prompt => getPresetPromptStableId(prompt));
 }
 
@@ -3383,7 +3436,7 @@ function syncPresetPromptControlsFromLoadedPreset(): void {
     return;
   }
 
-  const loadedPresetName = ((getLoadedPresetName() as string | undefined) || '').trim();
+  const loadedPresetName = getLoadedPresetNameSafe();
   if (!loadedPresetName || loadedPresetName !== presetName) {
     return;
   }
@@ -3395,8 +3448,13 @@ function syncPresetPromptControlsFromLoadedPreset(): void {
     return;
   }
 
-  const livePromptIds = getPreset(presetName)
-    .prompts.filter((prompt: PresetPrompt) => prompt.enabled)
+  const { preset } = getPresetForUiSelection(presetName);
+  if (!preset) {
+    return;
+  }
+
+  const livePromptIds = preset.prompts
+    .filter((prompt: PresetPrompt) => prompt.enabled)
     .map((prompt: PresetPrompt) => getPresetPromptStableId(prompt));
   const checkedPromptIds = $checkboxes
     .filter(':checked')
@@ -3534,20 +3592,25 @@ function createPresetSelectionDetailHtml(selectionId: string): string {
     return createEmbeddedResourceDetailHtml('未选中预设', ['请从左侧选择一个预设']);
   }
 
-  try {
-    const preset = getPreset(selectionId);
-
+  const { preset, source } = getPresetForUiSelection(selectionId);
+  if (!preset) {
     return createEmbeddedResourceDetailHtml(selectionId, [
+      '当前酒馆中不存在这个预设',
+      '如果这是旧绑定，请重新选择一个已有预设或删除该绑定里的预设项',
+    ]);
+  }
+
+  const sourceLine = source === 'loaded_in_use' ? '当前加载的 in_use 尚未保存为真实预设，绑定时会先保存同名预设' : '';
+  return createEmbeddedResourceDetailHtml(
+    selectionId,
+    [
       `被 ${getReferencedBindings('preset', selectionId).length} 个绑定使用`,
+      sourceLine,
       `prompts ${preset.prompts.length} 条 · 未使用 ${preset.prompts_unused.length} 条`,
       `max_context ${preset.settings.max_context} · max_completion ${preset.settings.max_completion_tokens}`,
       `temperature ${preset.settings.temperature} · top_p ${preset.settings.top_p} · stream ${preset.settings.should_stream ? '开' : '关'}`,
-    ]);
-  } catch (error) {
-    return createEmbeddedResourceDetailHtml(selectionId, [
-      `读取预设失败: ${error instanceof Error ? error.message : String(error)}`,
-    ]);
-  }
+    ].filter(Boolean),
+  );
 }
 
 function showPresetPromptPreviewModal(presetName: string, promptKey: string): void {
@@ -3857,17 +3920,27 @@ function renderPresetBindingPage(
 ): void {
   const selectionId = activeResourceSelection.preset || '';
   const defaultPresetName = getDefaultPresetName();
-  const promptRows = selectionId
-    ? getPreset(selectionId).prompts.map((prompt: PresetPrompt) => ({
-        key: getPresetPromptStableId(prompt),
-        prompt,
-        source: 'prompts' as const,
-      }))
-    : [];
+  const { preset, source } = getPresetForUiSelection(selectionId);
+  const promptRows =
+    selectionId && preset
+      ? preset.prompts.map((prompt: PresetPrompt) => ({
+          key: getPresetPromptStableId(prompt),
+          prompt,
+          source: 'prompts' as const,
+        }))
+      : [];
   const selectedPromptIds = new Set(
     getCurrentPresetPromptSelectionIds(selectionId, binding) ||
       promptRows.filter(item => item.prompt.enabled).map(item => item.key),
   );
+  const missingPresetNote =
+    selectionId && !preset
+      ? '<div class="persona-hint-row">当前绑定指向的预设不存在。请在左侧选择已有预设，或删除这个旧绑定中的预设项。</div>'
+      : '';
+  const unsavedLoadedPresetNote =
+    selectionId && source === 'loaded_in_use'
+      ? '<div class="persona-hint-row">当前加载预设尚未保存为真实预设；点击绑定时会先保存当前 in_use。</div>'
+      : '';
   const promptListHtml = promptRows.length
     ? promptRows
         .map(item => {
@@ -3905,6 +3978,8 @@ function renderPresetBindingPage(
       contentHtml: `
       <div class="persona-hint-row">${defaultPresetName ? `当前默认预设: ${escapeHtml(defaultPresetName)}` : '当前还没有默认预设。可在顶栏设置。'}</div>
       <div class="text-note">顶部“绑定到当前聊天 / 绑定到当前角色”会把当前预设和下面这组 prompt 开关快照一起写入绑定。</div>
+      ${missingPresetNote}
+      ${unsavedLoadedPresetNote}
       <div class="edit-actions-bar">
         <input type="text" class="persona-input persona-inline-search" id="persona-preset-prompt-search" placeholder="搜索预设条目名称、角色或内容">
         <button class="persona-btn" id="persona-save-default-preset-prompts-btn" type="button" ${selectionId ? '' : 'disabled'}>保存为默认预设条目状态</button>
@@ -5852,6 +5927,27 @@ function getCurrentSelectionDisplayLabel(): string {
   return '当前资源';
 }
 
+async function ensureCurrentPresetSelectionBindable(): Promise<boolean> {
+  if (activeDetailPage !== 'preset') {
+    return true;
+  }
+
+  const presetName = (activeResourceSelection.preset || '').trim();
+  const result = await ensurePresetExistsForBinding(presetName);
+  if (!result.ok) {
+    toastr.error(result.reason || '当前预设不可绑定');
+    return false;
+  }
+
+  if (result.created) {
+    invalidatePlusBindingCatalogCache();
+    renderSidebarSecondaryList();
+    renderResourceDetailPages();
+    toastr.info(`已先把当前 in_use 保存为预设「${result.presetName}」`);
+  }
+  return true;
+}
+
 function toggleBindingResourceFromCurrentSelection(resources: PersonaContextBindingResources): {
   resources: PersonaContextBindingResources;
   changed: boolean;
@@ -6604,6 +6700,9 @@ function bindPanelEvents(): void {
           toastr.warning('请先在左侧选择一个预设');
           return;
         }
+        if (!(await ensureCurrentPresetSelectionBindable())) {
+          return;
+        }
 
         const currentDefaultPreset = getDefaultPresetName();
         const nextDefaultPreset = currentDefaultPreset === presetName ? '' : presetName;
@@ -6644,10 +6743,13 @@ function bindPanelEvents(): void {
 
   $(parentDoc)
     .off(`click${PANEL_EVENT_NAMESPACE}`, '#persona-save-default-preset-prompts-btn')
-    .on(`click${PANEL_EVENT_NAMESPACE}`, '#persona-save-default-preset-prompts-btn', () => {
+    .on(`click${PANEL_EVENT_NAMESPACE}`, '#persona-save-default-preset-prompts-btn', async () => {
       const presetName = (activeResourceSelection.preset || '').trim();
       if (!presetName) {
         toastr.warning('请先在左侧选择一个预设');
+        return;
+      }
+      if (!(await ensureCurrentPresetSelectionBindable())) {
         return;
       }
 
@@ -6669,7 +6771,7 @@ function bindPanelEvents(): void {
         return;
       }
 
-      const loadedPresetName = ((getLoadedPresetName() as string | undefined) || '').trim();
+      const loadedPresetName = getLoadedPresetNameSafe();
       if (!loadedPresetName || loadedPresetName !== presetName) {
         return;
       }
@@ -6762,6 +6864,10 @@ function bindPanelEvents(): void {
         return;
       }
 
+      if (!(await ensureCurrentPresetSelectionBindable())) {
+        return;
+      }
+
       const binding = ensureCurrentContextBinding('chat');
       if (!binding) {
         toastr.warning('无法创建当前聊天绑定');
@@ -6821,6 +6927,10 @@ function bindPanelEvents(): void {
     try {
       if (activeDetailPage === 'groups') {
         await applyBindingGroupToCurrentScope('character');
+        return;
+      }
+
+      if (!(await ensureCurrentPresetSelectionBindable())) {
         return;
       }
 
