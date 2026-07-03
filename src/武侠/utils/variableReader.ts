@@ -1411,6 +1411,8 @@ interface CharacterStateCache {
   realm: string;
   /** 是否已存在（用于检测新人物） */
   exists: boolean;
+  /** 玩家属性计算输入签名；NPC 仍只用境界缓存 */
+  attributeSignature?: string;
 }
 
 /**
@@ -1493,8 +1495,30 @@ function shouldUpdateCharacterByCache(
 /**
  * 更新角色状态缓存
  */
-function updateCharacterCache(cacheKey: string, realm: string): void {
-  characterStateCache.set(cacheKey, { realm, exists: true });
+function stringifySortedRecord(record: Record<string, unknown> | undefined): string {
+  if (!record) {
+    return '{}';
+  }
+
+  return JSON.stringify(Object.fromEntries(Object.entries(record).sort(([left], [right]) => left.localeCompare(right))));
+}
+
+function createPlayerAttributeSignature(
+  initialAttrs: InitialAttributes,
+  realm: string,
+  martialArts: Record<string, MartialArtForCalculation>,
+  modifiers?: InventoryAttributeModifierMap,
+): string {
+  return JSON.stringify({
+    initialAttrs,
+    realm,
+    martialArts: stringifySortedRecord(martialArts as Record<string, unknown>),
+    modifiers: stringifySortedRecord(modifiers as Record<string, unknown> | undefined),
+  });
+}
+
+function updateCharacterCache(cacheKey: string, realm: string, attributeSignature?: string): void {
+  characterStateCache.set(cacheKey, { realm, exists: true, attributeSignature });
   dataLogger.log(`[updateCharacterCache] 已更新缓存: ${cacheKey} -> realm=${realm}`);
 }
 
