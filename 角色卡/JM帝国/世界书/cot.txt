@@ -70,7 +70,7 @@
 <% } else if (hardIdentityRoute === 'imperial_male_lowborn') { %>
 
 <% } else if (hardIdentityRoute === 'imperial_female_survival') { %>
-然后以<高难身份设定>的设定为基，进行下面的路线三专属剧情推演
+然后以<高难身份设定>的设定为基，进行下面的剧情推演
 
 1. 先判断当前场景的主轴：
    - 求生日常: 上班、通勤、排队、居住、领薪、体检、补妆、服从检查、同伴闲谈、应付临时侍奉。
