@@ -404,6 +404,18 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
         },
         ...originItems,
       },
+      装备栏: {
+        $template: '',
+      },
+      状态效果: {
+        $template: {
+          类型: '',
+          来源: '',
+          属性修正: {},
+          持续时间: 0,
+          剩余时间: 0,
+        },
+      },
       人物经历: {},
       关系网: {},
       $meta: { necessary: 'all', updatable: true },
