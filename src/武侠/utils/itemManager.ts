@@ -234,6 +234,10 @@ export async function useElixirItem(itemName: string): Promise<UseElixirResult |
     gameLogger.warn(`[itemManager] 物品 ${itemName} 不是可吞服丹药`);
     return null;
   }
+  if ((originalItem.数量 || 0) <= 0) {
+    gameLogger.warn(`[itemManager] 丹药 ${itemName} 数量不足`);
+    return null;
+  }
 
   const duration = normalizeDuration(originalItem.持续时间);
   const statusEffectId = createStatusEffectId(itemName);
@@ -245,20 +249,22 @@ export async function useElixirItem(itemName: string): Promise<UseElixirResult |
     剩余时间: duration,
   };
 
-  const newCount = await decreaseItemCount(itemName, 1);
-  if ((originalItem.数量 || 0) <= 0 && newCount === 0) {
-    return null;
-  }
-
-  await writeUserDataPatch(
-    {
-      状态效果: {
-        [statusEffectId]: statusEffect,
+  let newCount = 0;
+  try {
+    newCount = await decreaseItemCount(itemName, 1);
+    await writeUserDataPatch(
+      {
+        状态效果: {
+          [statusEffectId]: statusEffect,
+        },
       },
-    },
-    'item-write-elixir-effect',
-    'insert',
-  );
+      'item-write-elixir-effect',
+      'insert',
+    );
+  } catch (error) {
+    await restoreItemCount(itemName, originalItem);
+    throw error;
+  }
 
   gameLogger.log(`[itemManager] 吞服丹药: ${itemName}, 效果=${statusEffectId}`);
   return {

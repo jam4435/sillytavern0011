@@ -48,6 +48,8 @@ export const DEFAULT_GAME_STATE: GameState = {
     network: {}
   },
   inventory: [],
+  equipment: {},
+  statusEffects: [],
   events: [],
   social: []
 };

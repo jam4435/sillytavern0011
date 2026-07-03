@@ -336,23 +336,28 @@ const App: React.FC = () => {
 
   const handleInventoryItemAction = useCallback(
     async (item: InventoryItem) => {
-      if (item.type === 'EQUIP') {
-        const equipped = await equipInventoryItem(item.name);
-        if (equipped) {
-          refreshGameStateFromVariables();
+      try {
+        if (item.type === 'EQUIP') {
+          const equipped = await equipInventoryItem(item.name);
+          if (equipped) {
+            refreshGameStateFromVariables();
+          }
+          return;
         }
-        return;
-      }
 
-      if (item.type === 'ELIXIR') {
-        const result = await useElixirItem(item.name);
-        if (result) {
-          addUseItemCommand(result.itemName, result.originalItem, result.statusEffectId);
-          refreshGameStateFromVariables();
+        if (item.type === 'ELIXIR') {
+          const result = await useElixirItem(item.name);
+          if (result) {
+            addUseItemCommand(result.itemName, result.originalItem, result.statusEffectId);
+            refreshGameStateFromVariables();
+          }
         }
+      } catch (error) {
+        gameLogger.error('[App] 行囊物品操作失败:', error);
+        showError(`物品操作失败：${error instanceof Error ? error.message : String(error)}`);
       }
     },
-    [addUseItemCommand, refreshGameStateFromVariables],
+    [addUseItemCommand, refreshGameStateFromVariables, showError],
   );
 
   const handlePlayerSend = useCallback(
