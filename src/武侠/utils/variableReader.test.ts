@@ -474,7 +474,6 @@ describe('readGameDataSync inventory rank field', () => {
             风姿: 10,
             福缘: 0,
           },
-          功法: {},
           包裹: {
             软猬甲: {
               类型: '装备',

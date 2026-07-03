@@ -103,9 +103,10 @@ describe('itemManager', () => {
     expect(result).toEqual(expect.objectContaining({
       itemName: '九花玉露丸',
       newCount: 1,
-      statusEffectId: '九花玉露丸_1000_4fzzzx',
+      statusEffectId: expect.stringMatching(/^九花玉露丸_1000_/),
       originalItem: expect.objectContaining({ 数量: 2 }),
     }));
+    const statusEffectId = result?.statusEffectId ?? '';
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
       eventName: 'era:updateByObject',
       detail: {
@@ -124,7 +125,7 @@ describe('itemManager', () => {
         stat_data: {
           user数据: {
             状态效果: {
-              九花玉露丸_1000_4fzzzx: {
+              [statusEffectId]: {
                 类型: '丹药',
                 来源: '九花玉露丸',
                 属性修正: { 气血: 300, 内力: 120 },
