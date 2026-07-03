@@ -921,6 +921,17 @@ function formatEventValue(value: unknown): string {
     const time = value as { 年?: number; 月?: number; 日?: number; 时?: number };
     return `${time.年 ?? '?'}年${time.月 ?? '?'}月${time.日 ?? '?'}日${time.时 === undefined ? '' : `${time.时}时`}`;
   }
+  if (isRecord(value) && typeof value.描述 === 'string') {
+    const changedActions = ['insert', 'update', 'delete'].filter(action => {
+      const actionValue = value[action];
+      return isRecord(actionValue) && Object.keys(actionValue).some(key => !key.startsWith('$'));
+    });
+    const endingNote = typeof value.结局说明 === 'string' && value.结局说明.trim()
+      ? `\n结局说明：${value.结局说明.trim()}`
+      : '';
+    const diffNote = changedActions.length > 0 ? `\n结局差分：${changedActions.join(', ')}` : '';
+    return `${value.描述}${endingNote}${diffNote}`;
+  }
   if (value === null || value === undefined) return '';
 
   try {

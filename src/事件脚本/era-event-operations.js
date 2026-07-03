@@ -12,6 +12,7 @@ import {
   getEndTime,
   getEventShortName,
   hasParticipationEntry,
+  getParticipationEntry,
   buildParticipationDeletePatch,
   isDebutEvent,
   calculateDateOffset,
@@ -42,6 +43,7 @@ const EVENT_KIND_PATTERN = /(事件条目-|登场事件-|成长条目-)/;
 const CHAPTER_EVENT_PATTERN = /^第[0-9一二三四五六七八九十百千万]+回-/;
 const CHAPTER_SEQUENCE_PATTERN = /^(第[0-9一二三四五六七八九十百千万]+回-[0-9]+-)/;
 const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件'];
+const EVENT_DIFF_ACTIONS = ['insert', 'update', 'delete'];
 const POST_RESYNC_VERIFY_DELAY_MS = 1200;
 const followupReferenceIndexCache = new WeakMap();
 
@@ -290,6 +292,36 @@ function mergePlainObject(target, source) {
 
 function mergeCharacterDeltaForEvent(target, source, eventName) {
   return mergePlainObject(target, normalizeCharacterDeltaForEvent(source, eventName));
+}
+
+function getParticipationActionDiff(participationEntry, actionKey) {
+  if (!isPlainObject(participationEntry)) {
+    return {};
+  }
+
+  const diff = participationEntry[actionKey];
+  return isPlainObject(diff) ? diff : {};
+}
+
+function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, statData, sourceLabel) {
+  if (!isPlainObject(delta) || Object.keys(delta).length === 0) {
+    return;
+  }
+
+  for (const charName in delta) {
+    const characterExists = !!statData.角色数据?.[charName];
+    const willExistAfterInsert = actionKey !== 'insert' && !!mergedDiff.insert?.[charName];
+    if (actionKey !== 'insert' && !characterExists && !willExistAfterInsert) {
+      logWarning(`角色 ${charName} 不存在，跳过 ${sourceLabel} ${actionKey}`);
+      continue;
+    }
+
+    if (!mergedDiff[actionKey][charName]) {
+      mergedDiff[actionKey][charName] = {};
+    }
+    mergeCharacterDeltaForEvent(mergedDiff[actionKey][charName], delta[charName], eventName);
+    log(`[${actionKey.toUpperCase()}] 准备${actionKey === 'delete' ? '删除' : '修改'}角色: ${charName} (${sourceLabel})`);
+  }
 }
 
 // ==================== 批量初始化未发生事件列表（智能优化版）====================
@@ -942,6 +974,16 @@ function buildPlayerParticipationDescription(eventName, eventData, currentTime) 
   return `${formatDate(startTime)} 到 ${formatDate(endTime)}，${eventData.事件详情}`;
 }
 
+function buildPlayerParticipationEntry(eventName, eventData, currentTime) {
+  return {
+    描述: buildPlayerParticipationDescription(eventName, eventData, currentTime),
+    结局说明: '',
+    insert: {},
+    update: {},
+    delete: {},
+  };
+}
+
 export async function playerJoinsEvents(eventNames, eventDefinitions) {
   const uniqueEventNames = [...new Set(eventNames)].filter(eventName => eventDefinitions[eventName]);
   if (uniqueEventNames.length === 0) {
@@ -975,7 +1017,7 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
     const participationPatch = Object.fromEntries(
       eventsToJoin.map(eventName => {
         const eventData = eventDefinitions[eventName];
-        return [getEventShortName(eventName), buildPlayerParticipationDescription(eventName, eventData, currentTime)];
+        return [getEventShortName(eventName), buildPlayerParticipationEntry(eventName, eventData, currentTime)];
       }),
     );
 
@@ -1031,34 +1073,27 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       const playerParticipated = hasParticipationEntry(参与事件, eventName);
       log(`事件 ${eventName}: 玩家是否参与? ${playerParticipated}`);
 
-      // 步骤 2: 根据玩家参与状态决定数据源
-      const eventDataSource = eventData; // 数据源始终是完整的事件定义
+      const participationEntry = playerParticipated ? getParticipationEntry(参与事件, eventName) : null;
 
-      // 步骤 3: 循环应用差分
-      for (const actionKey of ['insert', 'update', 'delete']) {
-        // 根据是否参与，决定使用哪个差分键 (e.g., 'P-insert' or 'insert')
+      // 步骤 2: 循环应用基础差分、玩家参与版差分和参与事件动态结局差分
+      for (const actionKey of EVENT_DIFF_ACTIONS) {
         const playerActionKey = `P-${actionKey}`;
-        let delta = {};
+        let baseDelta = {};
+        let baseSourceLabel = actionKey;
 
-        if (playerParticipated && eventDataSource[playerActionKey]) {
-          delta = eventDataSource[playerActionKey];
+        if (playerParticipated && eventData[playerActionKey]) {
+          baseDelta = eventData[playerActionKey];
+          baseSourceLabel = playerActionKey;
           log(`  └─ 使用玩家参与版差分 [${playerActionKey}]`);
         } else {
-          delta = eventDataSource[actionKey] || {};
+          baseDelta = eventData[actionKey] || {};
         }
 
-        for (const charName in delta) {
-          // update 和 delete 需要角色已存在，insert 无需检查
-          if (actionKey !== 'insert' && (!statData.角色数据 || !statData.角色数据[charName])) {
-            logWarning(`角色 ${charName} 不存在，跳过 ${actionKey}`);
-            continue;
-          }
+        mergeEventActionDelta(合并后的差分, actionKey, baseDelta, eventName, statData, baseSourceLabel);
 
-          if (!合并后的差分[actionKey][charName]) {
-            合并后的差分[actionKey][charName] = {};
-          }
-          mergeCharacterDeltaForEvent(合并后的差分[actionKey][charName], delta[charName], eventName);
-          log(`[${actionKey.toUpperCase()}] 准备${actionKey === 'delete' ? '删除' : '修改'}角色: ${charName}`);
+        const dynamicDelta = getParticipationActionDiff(participationEntry, actionKey);
+        if (Object.keys(dynamicDelta).length > 0) {
+          mergeEventActionDelta(合并后的差分, actionKey, dynamicDelta, eventName, statData, `参与事件.${actionKey}`);
         }
       }
 

@@ -3,9 +3,12 @@ import {
   applyAttributeModifiers,
   calculateCombatAttributes,
   getRealmCoefficient,
+  parseRealm,
+  REALM_IMPLIED_BONUS,
   type AttributeModifierMap,
 } from './attributeCalculator';
 import {
+  calculateMartialArtBonus,
   completeMartialArts,
   loadMartialArtsDatabase,
   type CompleteMartialArt,
@@ -20,6 +23,7 @@ import {
 } from './locationContext';
 import {
   FRONTEND_BATTLE_ZONE_KEY,
+  FRONTEND_CULTIVATION_REFERENCE_KEY,
   FRONTEND_RANDOM_NUMBERS_KEY,
   FRONTEND_VARIABLES_KEY,
 } from './frontendVariableKeys';
@@ -89,6 +93,7 @@ type FrontendDerivedVariables = {
   周围地点: DynamicLocationContextVariable;
   战力区: string;
   随机数: string;
+  修为变化参考: number;
 };
 
 type MartialArtPowerEntry = {
@@ -348,6 +353,40 @@ function buildCharacterPowerRow(character: CombatCharacter): string {
   return [character.displayName, ...cells].join('|');
 }
 
+function calculateEffectiveCultivationBonus(character: CombatCharacter): number {
+  const completedMartialArts = completeMartialArts(
+    character.martialArts,
+    character.cultivation,
+    character.initialAttributes.悟性,
+  );
+  let bestExplicitInner = 0;
+
+  for (const martialArt of Object.values(completedMartialArts)) {
+    if (martialArt.type !== '内功') {
+      continue;
+    }
+    bestExplicitInner = Math.max(bestExplicitInner, calculateMartialArtBonus(martialArt.rank, martialArt.mastery));
+  }
+
+  const { major } = parseRealm(character.realm);
+  const impliedInner = REALM_IMPLIED_BONUS[major] || 0;
+  return Math.max(bestExplicitInner, impliedInner);
+}
+
+export function buildCultivationChangeReferenceFromStatData(statData: StatDataRecord): number {
+  const player = buildPlayerCharacter(statData);
+  if (!player) {
+    return 0;
+  }
+
+  const effectiveCultivationBonus = calculateEffectiveCultivationBonus(player);
+  if (effectiveCultivationBonus <= 0) {
+    return 0;
+  }
+
+  return Math.round(Math.log2(getRealmCoefficient(player.realm) + 1) * effectiveCultivationBonus);
+}
+
 export function buildCombatPowerZoneFromStatData(statData: StatDataRecord): string {
   const player = buildPlayerCharacter(statData);
   const playerLocation = player?.normalizedLocation || '';
@@ -444,6 +483,7 @@ export async function syncFrontendDerivedVariables(): Promise<FrontendDerivedVar
     const currentVariables = getVariables({ type: 'chat' }) as Record<string, unknown>;
     const statData = getStatDataRecord(currentVariables);
     const battleZone = buildCombatPowerZoneFromStatData(statData);
+    const cultivationReference = buildCultivationChangeReferenceFromStatData(statData);
     const randomNumbers = buildFrontendRandomNumbers();
 
     updateVariablesWith(current => {
@@ -458,6 +498,9 @@ export async function syncFrontendDerivedVariables(): Promise<FrontendDerivedVar
       if (frontendVariables[FRONTEND_BATTLE_ZONE_KEY] !== battleZone) {
         updates[FRONTEND_BATTLE_ZONE_KEY] = battleZone;
       }
+      if (frontendVariables[FRONTEND_CULTIVATION_REFERENCE_KEY] !== cultivationReference) {
+        updates[FRONTEND_CULTIVATION_REFERENCE_KEY] = cultivationReference;
+      }
 
       return upsertFrontendVariables(nextWithLocation, updates);
     }, { type: 'chat' });
@@ -466,6 +509,7 @@ export async function syncFrontendDerivedVariables(): Promise<FrontendDerivedVar
       周围地点: locationContext,
       战力区: battleZone,
       随机数: randomNumbers,
+      修为变化参考: cultivationReference,
     };
   } catch (error) {
     dataLogger.warn('[frontendDerivedVariables] 刷新前端变量失败:', error);

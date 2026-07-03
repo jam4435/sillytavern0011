@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { setMartialArtsDatabase } from './martialArtsDatabase';
 import {
   buildCombatPowerZoneFromStatData,
+  buildCultivationChangeReferenceFromStatData,
   buildFrontendRandomNumbers,
 } from './frontendDerivedVariables';
 
@@ -129,6 +130,53 @@ describe('frontendDerivedVariables', () => {
     lines.forEach((line, index) => {
       expect(line).toMatch(new RegExp(`^随机数${index + 1}: (10|[0-9])$`));
     });
+  });
+
+  it('按最高有效内功生成修为变化参考，不叠加多门内功', () => {
+    setMartialArtsDatabase([
+      {
+        功法名称: '九阳神功',
+        类型: '内功',
+        功法品阶: '上乘',
+        功法描述: '测试内功',
+      },
+      {
+        功法名称: '抱元劲',
+        类型: '内功',
+        功法品阶: '粗浅',
+        功法描述: '测试内功',
+      },
+      {
+        功法名称: '凌波微步',
+        类型: '轻功',
+        功法品阶: '传说',
+        功法描述: '测试轻功',
+      },
+    ]);
+
+    expect(buildCultivationChangeReferenceFromStatData({
+      user数据: {
+        境界: '三流初期',
+        初始属性: { 悟性: 10 },
+        功法: {
+          九阳神功: { 掌握程度: '融会贯通' },
+          抱元劲: { 掌握程度: '出神入化' },
+          凌波微步: { 掌握程度: '出神入化' },
+        },
+      },
+    })).toBe(14);
+  });
+
+  it('没有显性内功时使用境界隐含保底生成修为变化参考', () => {
+    setMartialArtsDatabase([]);
+
+    expect(buildCultivationChangeReferenceFromStatData({
+      user数据: {
+        境界: '一流初期',
+        初始属性: { 悟性: 10 },
+        功法: {},
+      },
+    })).toBe(40);
   });
 
   it('玩家战力区会读取装备栏和状态效果的属性修正', () => {

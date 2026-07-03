@@ -149,7 +149,7 @@ export function isDebutEvent(eventName) {
 
 // 从完整事件文件名中提取核心名称
 export function getEventShortName(eventName) {
-  const match = eventName.match(/-([^-]+)\.json$/);
+  const match = eventName.match(/-([^-]+)\.(json|ya?ml)$/i);
   return match ? match[1] : eventName;
 }
 
@@ -158,11 +158,21 @@ export function getEventParticipationKeys(eventName) {
 }
 
 export function hasParticipationEntry(participation, eventName) {
+  return getParticipationEntry(participation, eventName) !== null;
+}
+
+export function getParticipationEntry(participation, eventName) {
   if (!participation || typeof participation !== 'object') {
-    return false;
+    return null;
   }
 
-  return getEventParticipationKeys(eventName).some(key => Object.prototype.hasOwnProperty.call(participation, key));
+  for (const key of getEventParticipationKeys(eventName)) {
+    if (Object.prototype.hasOwnProperty.call(participation, key)) {
+      return participation[key];
+    }
+  }
+
+  return null;
 }
 
 export function buildParticipationDeletePatch(participation, eventName) {
