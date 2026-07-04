@@ -92,15 +92,18 @@ function formatModificationDetails(selections: SelectionState) {
 
 async function initializeCurrentCharacterVariable() {
   if (typeof updateVariablesWith === 'function') {
-    await updateVariablesWith(variables => {
-      const nextVariables = _.cloneDeep(variables ?? {});
-      const currentStatData = _.isPlainObject(nextVariables.stat_data) ? nextVariables.stat_data : {};
-      nextVariables.stat_data = {
-        ...currentStatData,
-        当前人物: '',
-      };
-      return nextVariables;
-    }, { type: 'chat' });
+    await updateVariablesWith(
+      variables => {
+        const nextVariables = _.cloneDeep(variables ?? {});
+        const currentStatData = _.isPlainObject(nextVariables.stat_data) ? nextVariables.stat_data : {};
+        nextVariables.stat_data = {
+          ...currentStatData,
+          当前人物: '',
+        };
+        return nextVariables;
+      },
+      { type: 'chat' },
+    );
     return;
   }
 
@@ -115,7 +118,9 @@ async function initializeCurrentCharacterVariable() {
     return;
   }
 
-  throw new Error('外部接口(updateVariablesWith 或 getVariables/replaceVariables)未找到，无法初始化 chat.stat_data.当前人物。');
+  throw new Error(
+    '外部接口(updateVariablesWith 或 getVariables/replaceVariables)未找到，无法初始化 chat.stat_data.当前人物。',
+  );
 }
 
 function getValidatedHardIdentityRoute(selections: SelectionState) {

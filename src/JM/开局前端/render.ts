@@ -6,11 +6,7 @@ import {
   ensureHardIdentityRoute,
   ensureModificationSelections,
 } from './state';
-import {
-  getHardIdentityRouteGenderLabel,
-  getHardIdentityRouteOption,
-  hardIdentityRouteOptions,
-} from './hard-routes';
+import { getHardIdentityRouteGenderLabel, getHardIdentityRouteOption, hardIdentityRouteOptions } from './hard-routes';
 import type { CardOptions, GenerationSettings, ModificationOption, SelectionState } from './types';
 
 export function navigateTo(screenId: string) {
@@ -218,7 +214,7 @@ export function renderHardIdentityRouteControls(selections: SelectionState) {
     option.className = 'hard-route-option';
     option.classList.toggle('selected', route.key === selectedRoute);
     option.classList.toggle('disabled', !isEnabled);
-    option.toggleAttribute('aria-disabled', !isEnabled);
+    option.setAttribute('aria-disabled', String(!isEnabled));
     if (isEnabled) {
       option.htmlFor = `setting-hard-identity-route-${route.key}`;
     } else {
