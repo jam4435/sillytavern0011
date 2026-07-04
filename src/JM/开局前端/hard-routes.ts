@@ -51,10 +51,10 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
   },
   {
     key: 'imperial_female_survival',
-    label: '路线三：三十五岁以前',
+    label: '路线三：女性“公民”',
     difficulty: '噩梦',
     gender: 'female',
-    description: '帝国女性底层求生线，在身份、年龄与所有权压力下寻找出口。',
+    description: '帝国女性公民的求生线，在身份、年龄与所有权压力下寻找出口。',
     enabled: true,
   },
   {
