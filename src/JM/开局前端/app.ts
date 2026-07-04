@@ -1,6 +1,6 @@
 import { byId } from './dom';
 import { handleNext, handleRandomize } from './flow';
-import { normalizeHardIdentityRoute } from './hard-routes';
+import { normalizeHardIdentityRoute, type HardIdentityRouteKey } from './hard-routes';
 import { refreshQuickOpeningScreen, selectQuickOpening } from './opening-switcher';
 import { queueSettingsSyncPopup } from './popup';
 import { checkAllFeaturesSelected, navigateTo, renderHardIdentityRouteControls, syncSettingsControls } from './render';
@@ -14,16 +14,17 @@ import {
   persistHardIdentityRoute,
   updateSelection,
 } from './state';
-import { applyGenerationSettings } from './tavern-settings';
+import { applyGenerationSettings, applyHardIdentityRouteSettings } from './tavern-settings';
 import type { GenerationSettings, SelectionState, StringSelectionKey } from './types';
 
 export function init() {
   const selections = createSelectionState();
   const syncGenerationSettings = createSettingsSyncer();
+  const syncHardIdentityRoute = createHardIdentityRouteSyncer();
   renderHardIdentityRouteControls(selections);
   syncSettingsControls(selections);
   bindBodyClickEvents(selections);
-  bindInputEvents(selections, syncGenerationSettings);
+  bindInputEvents(selections, syncGenerationSettings, syncHardIdentityRoute);
 }
 
 function bindBodyClickEvents(selections: SelectionState) {
@@ -120,8 +121,12 @@ function bindBodyClickEvents(selections: SelectionState) {
   });
 }
 
-function bindInputEvents(selections: SelectionState, syncGenerationSettings: (settings: GenerationSettings) => void) {
-  bindSettingsEvents(selections, syncGenerationSettings);
+function bindInputEvents(
+  selections: SelectionState,
+  syncGenerationSettings: (settings: GenerationSettings) => void,
+  syncHardIdentityRoute: (route: HardIdentityRouteKey) => void,
+) {
+  bindSettingsEvents(selections, syncGenerationSettings, syncHardIdentityRoute);
 
   byId<HTMLInputElement>('custom-profession-input').addEventListener('input', event => {
     const value = (event.currentTarget as HTMLInputElement).value.trim();
@@ -152,6 +157,7 @@ function bindInputEvents(selections: SelectionState, syncGenerationSettings: (se
 function bindSettingsEvents(
   selections: SelectionState,
   syncGenerationSettings: (settings: GenerationSettings) => void,
+  syncHardIdentityRoute: (route: HardIdentityRouteKey) => void,
 ) {
   byId<HTMLInputElement>('setting-enable-variables').addEventListener('change', event => {
     const settings = ensureGenerationSettings(selections);
@@ -198,6 +204,7 @@ function bindSettingsEvents(
     const route = ensureHardIdentityRoute(selections);
     persistHardIdentityRoute(route);
     renderHardIdentityRouteControls(selections);
+    syncHardIdentityRoute(route);
   });
 }
 
@@ -226,6 +233,37 @@ function createSettingsSyncer() {
       } catch (error) {
         console.error('同步开局设置失败:', error);
         alert(error instanceof Error ? error.message : '同步开局设置失败');
+      }
+    }
+
+    syncing = false;
+  }
+}
+
+function createHardIdentityRouteSyncer() {
+  let pendingRoute: HardIdentityRouteKey | null = null;
+  let syncing = false;
+
+  return function syncHardIdentityRoute(route: HardIdentityRouteKey) {
+    pendingRoute = route;
+    if (syncing) {
+      return;
+    }
+
+    syncing = true;
+    void flushPendingHardIdentityRoute();
+  };
+
+  async function flushPendingHardIdentityRoute() {
+    while (pendingRoute) {
+      const nextRoute = pendingRoute;
+      pendingRoute = null;
+
+      try {
+        await applyHardIdentityRouteSettings(nextRoute);
+      } catch (error) {
+        console.error('同步高难身份路线失败:', error);
+        alert(error instanceof Error ? error.message : '同步高难身份路线失败');
       }
     }
 

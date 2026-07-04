@@ -2,11 +2,16 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { init } from './app';
-import { applyGenerationSettings } from './tavern-settings';
+import { applyGenerationSettings, applyHardIdentityRouteSettings } from './tavern-settings';
 import { queueSettingsSyncPopup } from './popup';
 
 vi.mock('./tavern-settings', () => ({
   applyGenerationSettings: vi.fn(async () => ({
+    scopes: [],
+    hasChanges: true,
+    hasMissing: false,
+  })),
+  applyHardIdentityRouteSettings: vi.fn(async () => ({
     scopes: [],
     hasChanges: true,
     hasMissing: false,
@@ -124,7 +129,7 @@ describe('开局前端入口设置', () => {
     expect(disabledRouteInput?.disabled).toBe(true);
   });
 
-  it('选择高难身份路线只缓存，不触发现有设置同步', async () => {
+  it('选择高难身份路线会缓存并同步路线状态，但不触发现有设置同步', async () => {
     init();
     vi.clearAllMocks();
 
@@ -134,8 +139,26 @@ describe('开局前端入口设置', () => {
 
     expect(routeInput.checked).toBe(true);
     expect(localStorage.getItem(hardIdentityRouteStorageKey)).toBe('imperial_male_elite');
+    expect(applyHardIdentityRouteSettings).toHaveBeenCalledWith('imperial_male_elite');
     expect(applyGenerationSettings).not.toHaveBeenCalled();
     expect(queueSettingsSyncPopup).not.toHaveBeenCalled();
+  });
+
+  it('从路线一切回不启用时会把路线变量同步为 none', async () => {
+    init();
+
+    dispatchRadioChange('setting-hard-identity-route-imperial_male_elite');
+    await flushEffects();
+    vi.clearAllMocks();
+
+    const noneRouteInput = dispatchRadioChange('setting-hard-identity-route-none');
+
+    await flushEffects();
+
+    expect(noneRouteInput.checked).toBe(true);
+    expect(localStorage.getItem(hardIdentityRouteStorageKey)).toBe('none');
+    expect(applyHardIdentityRouteSettings).toHaveBeenCalledWith('none');
+    expect(applyGenerationSettings).not.toHaveBeenCalled();
   });
 
   it('在入口页切换设置时仍会缓存并立即同步', async () => {

@@ -1,5 +1,5 @@
 import { ensureGenerationSettings, ensureHardIdentityRoute } from './state';
-import { applyGenerationSettings } from './tavern-settings';
+import { applyGenerationSettings, applyHardIdentityRouteSettings } from './tavern-settings';
 import { getModificationOptions } from './data-access';
 import { queryRequired } from './dom';
 import {
@@ -18,6 +18,7 @@ export async function submitSelections(selections: SelectionState) {
 
     if (typeof insertOrAssignVariables === 'function' && typeof triggerSlash === 'function') {
       await applyGenerationSettings(settings);
+      await applyHardIdentityRouteSettings(hardIdentityRoute);
       await initializeCurrentCharacterVariable();
       await insertOrAssignVariables({ gender: genderValue, hardIdentityRoute }, { type: 'chat' });
       triggerSlash([`/send ${description}`, '/trigger'].join('|'));

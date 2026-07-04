@@ -1,11 +1,16 @@
 import _ from 'lodash';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { submitSelections } from './submit';
-import { applyGenerationSettings } from './tavern-settings';
+import { applyGenerationSettings, applyHardIdentityRouteSettings } from './tavern-settings';
 import type { SelectionState } from './types';
 
 vi.mock('./tavern-settings', () => ({
   applyGenerationSettings: vi.fn(async () => ({
+    scopes: [],
+    hasChanges: false,
+    hasMissing: false,
+  })),
+  applyHardIdentityRouteSettings: vi.fn(async () => ({
     scopes: [],
     hasChanges: false,
     hasMissing: false,
@@ -52,6 +57,7 @@ describe('开局前端提交', () => {
     await submitSelections(createSelections());
 
     expect(applyGenerationSettings).toHaveBeenCalledWith(baseSettings);
+    expect(applyHardIdentityRouteSettings).toHaveBeenCalledWith('none');
     expect(insertOrAssignVariablesMock).toHaveBeenCalledWith(
       { gender: 'man', hardIdentityRoute: 'none' },
       { type: 'chat' },
@@ -62,6 +68,7 @@ describe('开局前端提交', () => {
   it('会写入选择的高难身份路线变量', async () => {
     await submitSelections(createSelections({ hardIdentityRoute: 'imperial_male_elite' }));
 
+    expect(applyHardIdentityRouteSettings).toHaveBeenCalledWith('imperial_male_elite');
     expect(insertOrAssignVariablesMock).toHaveBeenCalledWith(
       { gender: 'man', hardIdentityRoute: 'imperial_male_elite' },
       { type: 'chat' },
@@ -81,6 +88,7 @@ describe('开局前端提交', () => {
 
     expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('只适用于男性开局'));
     expect(applyGenerationSettings).not.toHaveBeenCalled();
+    expect(applyHardIdentityRouteSettings).not.toHaveBeenCalled();
     expect(insertOrAssignVariablesMock).not.toHaveBeenCalled();
     expect(triggerSlashMock).not.toHaveBeenCalled();
   });

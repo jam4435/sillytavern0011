@@ -1,3 +1,4 @@
+import { HARD_IDENTITY_ROUTE_DEFAULT, normalizeHardIdentityRoute, type HardIdentityRouteKey } from './hard-routes';
 import type { GenerationSettings } from './types';
 
 type MatchMode = 'exact' | 'includes';
@@ -17,6 +18,8 @@ type RuntimeApi = {
   updateTavernRegexesWith: typeof updateTavernRegexesWith;
   updateWorldbookWith: typeof updateWorldbookWith;
 };
+
+type WorldbookRuntimeApi = Pick<RuntimeApi, 'getCharWorldbookNames' | 'getWorldbook' | 'updateWorldbookWith'>;
 
 type ScriptPatchResult = {
   trees: ScriptTree[];
@@ -60,6 +63,11 @@ const WORLDBOOK_ENTRY_RULES: NamedRule[] = [
   { key: 'actionSuggestion', label: '行动建议', query: '行动建议', mode: 'includes' },
 ];
 
+const HARD_IDENTITY_ROUTE_WORLDBOOK_ENTRY_RULES: NamedRule[] = [
+  { key: 'cot', label: 'cot', query: 'cot', mode: 'exact' },
+  { key: 'hardIdentityRoute', label: '高难身份路线', query: '高难身份路线', mode: 'exact' },
+];
+
 export async function applyGenerationSettings(settings: GenerationSettings): Promise<GenerationSettingsSyncReport> {
   const api = getRuntimeApi();
 
@@ -74,6 +82,18 @@ export async function applyGenerationSettings(settings: GenerationSettings): Pro
     hasChanges: scopes.some(scope => scope.changedItems.length > 0),
     hasMissing: scopes.some(scope => scope.missingLabels.length > 0),
   };
+}
+
+export async function applyHardIdentityRouteSettings(
+  route: HardIdentityRouteKey,
+): Promise<GenerationSettingsSyncReport> {
+  const hardIdentityRoute = normalizeHardIdentityRoute(route);
+  const scopes = [
+    await applyHardIdentityRouteVariable(hardIdentityRoute),
+    await applyCharacterHardIdentityRouteWorldbookSettings(getWorldbookRuntimeApi(), hardIdentityRoute),
+  ];
+
+  return createSyncReport(scopes);
 }
 
 function getRuntimeApi(): RuntimeApi {
@@ -111,6 +131,51 @@ function getRuntimeApi(): RuntimeApi {
     updateScriptTreesWith: updateScriptTreesWithApi,
     updateTavernRegexesWith: updateTavernRegexesWithApi,
     updateWorldbookWith: updateWorldbookWithApi,
+  };
+}
+
+function getWorldbookRuntimeApi(): WorldbookRuntimeApi {
+  const getCharWorldbookNamesApi = typeof getCharWorldbookNames === 'function' ? getCharWorldbookNames : undefined;
+  const getWorldbookApi = typeof getWorldbook === 'function' ? getWorldbook : undefined;
+  const updateWorldbookWithApi = typeof updateWorldbookWith === 'function' ? updateWorldbookWith : undefined;
+
+  if (!getCharWorldbookNamesApi) {
+    throw Error('缺少酒馆助手接口: getCharWorldbookNames');
+  }
+  if (!getWorldbookApi) {
+    throw Error('缺少酒馆助手接口: getWorldbook');
+  }
+  if (!updateWorldbookWithApi) {
+    throw Error('缺少酒馆助手接口: updateWorldbookWith');
+  }
+
+  return {
+    getCharWorldbookNames: getCharWorldbookNamesApi,
+    getWorldbook: getWorldbookApi,
+    updateWorldbookWith: updateWorldbookWithApi,
+  };
+}
+
+function createSyncReport(scopes: GenerationSettingsSyncScopeReport[]): GenerationSettingsSyncReport {
+  return {
+    scopes,
+    hasChanges: scopes.some(scope => scope.changedItems.length > 0),
+    hasMissing: scopes.some(scope => scope.missingLabels.length > 0),
+  };
+}
+
+async function applyHardIdentityRouteVariable(
+  hardIdentityRoute: HardIdentityRouteKey,
+): Promise<GenerationSettingsSyncScopeReport> {
+  if (typeof insertOrAssignVariables !== 'function') {
+    throw Error('缺少酒馆助手接口: insertOrAssignVariables');
+  }
+
+  await insertOrAssignVariables({ hardIdentityRoute }, { type: 'chat' });
+  return {
+    scope: 'chat变量',
+    changedItems: [`hardIdentityRoute -> ${hardIdentityRoute}`],
+    missingLabels: [],
   };
 }
 
@@ -175,7 +240,48 @@ async function applyCharacterScriptSettings(api: RuntimeApi, settings: Generatio
 }
 
 async function applyCharacterWorldbookSettings(api: RuntimeApi, settings: GenerationSettings) {
-  const scope = '当前角色世界书条目';
+  const desiredState = new Map<string, boolean>([
+    ['variableGuide', settings.enableVariables],
+    ['outputPrompt', settings.enableVariables],
+    ['multiStatusBar', !settings.enableVariables],
+    ['actionSuggestion', settings.generateOptions],
+  ]);
+
+  return applyCharacterWorldbookEntrySettings(
+    api,
+    '当前角色世界书条目',
+    WORLDBOOK_ENTRY_RULES,
+    desiredState,
+    getRelevantWorldbookKeys(settings),
+  );
+}
+
+async function applyCharacterHardIdentityRouteWorldbookSettings(
+  api: WorldbookRuntimeApi,
+  hardIdentityRoute: HardIdentityRouteKey,
+) {
+  const enabled = hardIdentityRoute !== HARD_IDENTITY_ROUTE_DEFAULT;
+  const desiredState = new Map<string, boolean>([
+    ['cot', enabled],
+    ['hardIdentityRoute', enabled],
+  ]);
+
+  return applyCharacterWorldbookEntrySettings(
+    api,
+    '高难路线世界书条目',
+    HARD_IDENTITY_ROUTE_WORLDBOOK_ENTRY_RULES,
+    desiredState,
+    ['cot', 'hardIdentityRoute'],
+  );
+}
+
+async function applyCharacterWorldbookEntrySettings(
+  api: WorldbookRuntimeApi,
+  scope: string,
+  rules: NamedRule[],
+  desiredState: Map<string, boolean>,
+  relevantKeys: string[],
+) {
   const charWorldbooks = api.getCharWorldbookNames('current');
   const worldbookNames = uniqueStrings([charWorldbooks.primary || '', ...(charWorldbooks.additional || [])]);
   if (worldbookNames.length === 0) {
@@ -186,51 +292,62 @@ async function applyCharacterWorldbookSettings(api: RuntimeApi, settings: Genera
     };
   }
 
-  const desiredState = new Map<string, boolean>([
-    ['variableGuide', settings.enableVariables],
-    ['outputPrompt', settings.enableVariables],
-    ['multiStatusBar', !settings.enableVariables],
-    ['actionSuggestion', settings.generateOptions],
-  ]);
   const matchedKeys = new Set<string>();
   const changedItems: string[] = [];
 
   for (const worldbookName of worldbookNames) {
     const worldbook = await api.getWorldbook(worldbookName);
-    let changed = false;
-
-    const nextWorldbook = worldbook.map(entry => {
-      const matchedRule = findMatchedRule(entry.name, WORLDBOOK_ENTRY_RULES);
-      if (!matchedRule) {
-        return entry;
-      }
-
-      matchedKeys.add(matchedRule.key);
-      const nextEnabled = desiredState.get(matchedRule.key);
-      if (typeof nextEnabled !== 'boolean' || entry.enabled === nextEnabled) {
-        return entry;
-      }
-
-      changed = true;
-      changedItems.push(`${worldbookName} / ${entry.name} -> ${nextEnabled ? '开启' : '关闭'}`);
-      return {
-        ...entry,
-        enabled: nextEnabled,
-      };
-    });
-
-    if (!changed) {
-      continue;
+    const nextWorldbook = patchWorldbookEntries(
+      worldbook,
+      worldbookName,
+      rules,
+      desiredState,
+      matchedKeys,
+      changedItems,
+    );
+    if (nextWorldbook !== worldbook) {
+      await api.updateWorldbookWith(worldbookName, () => nextWorldbook);
     }
-
-    await api.updateWorldbookWith(worldbookName, () => nextWorldbook);
   }
 
   return {
     scope,
     changedItems,
-    missingLabels: getMissingLabels(WORLDBOOK_ENTRY_RULES, matchedKeys, getRelevantWorldbookKeys(settings)),
+    missingLabels: getMissingLabels(rules, matchedKeys, relevantKeys),
   };
+}
+
+function patchWorldbookEntries(
+  worldbook: WorldbookEntry[],
+  worldbookName: string,
+  rules: NamedRule[],
+  desiredState: Map<string, boolean>,
+  matchedKeys: Set<string>,
+  changedItems: string[],
+) {
+  let changed = false;
+
+  const nextWorldbook = worldbook.map(entry => {
+    const matchedRule = findMatchedRule(entry.name, rules);
+    if (!matchedRule) {
+      return entry;
+    }
+
+    matchedKeys.add(matchedRule.key);
+    const nextEnabled = desiredState.get(matchedRule.key);
+    if (typeof nextEnabled !== 'boolean' || entry.enabled === nextEnabled) {
+      return entry;
+    }
+
+    changed = true;
+    changedItems.push(`${worldbookName} / ${entry.name} -> ${nextEnabled ? '开启' : '关闭'}`);
+    return {
+      ...entry,
+      enabled: nextEnabled,
+    };
+  });
+
+  return changed ? nextWorldbook : worldbook;
 }
 
 function patchScriptTrees(scriptTrees: ScriptTree[], desiredState: Map<string, boolean>): ScriptPatchResult {
