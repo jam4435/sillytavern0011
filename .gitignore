@@ -1,7 +1,10 @@
 node_modules
+<<<<<<< HEAD
 .pnpm-store/
 tmp/
 dist/
+=======
+>>>>>>> 24c09dd0d2e3a345ced6bd6449ff0c89cd686543
 
 .DS_Store
 Thumbs.db
@@ -14,5 +17,8 @@ pnpm-debug.log*
 
 auto-imports.d.ts
 components.d.ts
+<<<<<<< HEAD
 
 src/无用/
+=======
+>>>>>>> 24c09dd0d2e3a345ced6bd6449ff0c89cd686543
