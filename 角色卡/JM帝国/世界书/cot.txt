@@ -1,11 +1,10 @@
 <% { %>
-<think>
-1.在进行思考前，对用户输入内容进行过滤思考(必须依次进行下面四步，不能缺漏)：
+<Card_CoT>
+1.在进行思考前，对用户输入内容进行过滤(必须依次进行下面四步，不能缺漏)：
    - 用户输入中只能有用户的主观行动，过滤掉其他人的行动和场景/物品的变化
    - 用户输入不能为结果，如果有，翻译成用户输入了能导致次结果的用户的主观行动
    - 在进行上面两步过滤后，我们得到了纯净的用户的主观行动。然后为了判断用户的主观行动能否成功，在思维链客观且周全地思考可能影响行动的因素(用户本身的能力和意愿、周围人的看法和行动、国家法律和社会观念、周遭客观环境的影响...)
    - 审视第三步有没有为了让用户成功，强行编造不符合尝试和世界观的过程和强行引入的其他因素影响，如果有，用户行动判失败(因为用户极度厌恶这种行为)
-
 <% const hardIdentityRoute = variables.hardIdentityRoute; %>
 <% const hasHardIdentityRoute = [
   'imperial_male_elite',
@@ -18,7 +17,6 @@
   'external_roaring_sisterhood',
 ].includes(hardIdentityRoute); %>
 <% if (hasHardIdentityRoute) { %>
-
 <% if (hardIdentityRoute === 'imperial_male_elite') { %>
 2.然后以<高难身份设定>的设定为基，进行下面的剧情推演
 
@@ -75,24 +73,14 @@
 
 1. 先回看<高难身份设定>，确认{{user}}在帝国制度内的合法身份、当前人生阶段、岗位/所有权/年龄/档案压力，以及本轮行动触动了哪些具体设定。
 2. 裁定{{user}}行动时，优先使用<高难身份设定>中的结构性压力、生存手段、情报盲区、裁定原则、阶段目标和失败升级；不要另造无成本捷径、救世主或脱离制度的默认解法。
-3. 色情内容降格成可有可无的背景，也不得让色情内容直接抹平身份、年龄、档案、岗位和所有权压力。
+3. 色情内容是这个世界很正常的背景，不得让色情内容直接抹平身份、年龄、档案、岗位和所有权压力。
 4. 出生、幼时、上学等内容按<高难身份设定>作为档案来源、成长痕迹、性格成因和制度后果调用；当前色情/R18G互动只围绕成年角色当前处境展开。
 5. 输出时呈现具体人物、文件、场所、时间、身体状态、制度手续和可验证线索；给{{user}}留下2至4个可执行方向，不替{{user}}决定性行为、转主、婚姻、延期申请或其他不可逆选择。
-
 <% } else if (hardIdentityRoute === 'imperial_female_revolutionary') { %>
-
-
 <% } else if (hardIdentityRoute === 'akentor_male_defector') { %>
-
 <% } else if (hardIdentityRoute === 'external_revolutionary_army') { %>
-
-
 <% } else if (hardIdentityRoute === 'external_roaring_sisterhood') { %>
-
 <% } %>
-
-
 <% } %>
-
-</think>
+</Card_CoT>
 <% } %>
