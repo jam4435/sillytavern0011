@@ -3,7 +3,13 @@ import { isEntryActive } from '../features/activationTracker.js';
 import { getHighlightActiveEntriesSetting } from '../settings.js';
 import { isEntryCurrentDetail, isEntryExpanded, isEntrySelected } from '../state.js';
 import { ensureNumericUID, isMobile } from '../utils.js';
-import { getMasterDetailPositionLabel, isMasterDetailLayout } from './detail.js';
+import {
+  getPositionLabel,
+  getPositionSelectionValue,
+  isDepthPositionValue,
+  POSITION_OPTIONS,
+} from '../position.js';
+import { isMasterDetailLayout } from './detail.js';
 import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
 import { buildMasterEntryTokenBadgeHtml } from './masterEntryTokens.js';
 
@@ -26,7 +32,8 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
   const isPinned = entry.pinned === true;
 
   const isConstant = strategy.type === 'constant';
-  const positionType = position.type || 'after_character_definition';
+  const positionValue = getPositionSelectionValue(position);
+  const positionLabel = getPositionLabel(position);
   const depth = position.depth !== undefined ? position.depth : 4;
   const order = position.order || 0;
   const probability = entry.probability || 100;
@@ -47,7 +54,7 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
   const checkedAttr = isEnabled ? 'checked' : '';
   const constantCheckedAttr = isConstant ? 'checked' : '';
   const constantSliderClass = isConstant ? 'constant' : 'keyword';
-  const needsDepth = positionType === 'at_depth';
+  const needsDepth = isDepthPositionValue(position);
   const depthDisabledClass = needsDepth ? '' : 'depth-disabled';
   const depthDisabledAttr = needsDepth ? '' : 'disabled';
 
@@ -55,27 +62,13 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
   const isHighlightEnabled = getHighlightActiveEntriesSetting();
   const activeClass = isHighlightEnabled && isEntryActive(entry.uid, lorebookName) ? 'entry-active' : '';
 
-  const positionOptions = [
-    { value: 'before_character_definition', text: '角色定义前' },
-    { value: 'after_character_definition', text: '角色定义后' },
-    { value: 'before_example_messages', text: '示例消息前' },
-    { value: 'after_example_messages', text: '示例消息后' },
-    { value: 'before_author_note', text: '作者注释前' },
-    { value: 'after_author_note', text: '作者注释后' },
-    { value: 'at_depth', text: '@深度' },
-  ]
-    .map(pos => `<option value="${pos.value}" ${pos.value === positionType ? 'selected' : ''}>${pos.text}</option>`)
+  const positionOptions = POSITION_OPTIONS
+    .map(
+      pos =>
+        `<option value="${pos.value}" ${pos.value === positionValue ? 'selected' : ''}>${_.escape(pos.label)}</option>`,
+    )
     .join('');
-  const positionLabelMap = {
-    before_character_definition: '角色定义前',
-    after_character_definition: '角色定义后',
-    before_example_messages: '示例消息前',
-    after_example_messages: '示例消息后',
-    before_author_note: '作者注释前',
-    after_author_note: '作者注释后',
-    at_depth: '@深度',
-  };
-  const masterMetaParts = [positionLabelMap[positionType] || positionType];
+  const masterMetaParts = [positionLabel];
   if (needsDepth) {
     masterMetaParts.push(`深度 ${depth}`);
   }
@@ -88,7 +81,7 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
   const selectedCheckboxAttr = isSelected ? 'checked' : '';
   const isCurrentDetail = isEntryCurrentDetail(lorebookName, numericUid, isGlobal);
   const selectedDetailClass = isCurrentDetail ? 'is-current-detail' : '';
-  const compactMasterMetaParts = [getMasterDetailPositionLabel(positionType) || positionType];
+  const compactMasterMetaParts = [positionLabel];
   if (needsDepth) {
     compactMasterMetaParts.push(`D${depth}`);
   }
@@ -198,7 +191,7 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
             <button class="master-entry-button" type="button">
                 <div class="master-entry-main">
                     <span class="master-entry-title">${entryTitle}</span>
-                    <span class="master-entry-meta">${_.escape(`${isConstant ? '常驻' : '触发'} · ${positionType} · 顺序 ${order}`)}</span>
+                    <span class="master-entry-meta">${_.escape(`${isConstant ? '常驻' : '触发'} · ${positionLabel} · 顺序 ${order}`)}</span>
                 </div>
                 <div class="master-entry-status">
                     <i class="fa-solid fa-thumbtack master-entry-pin" style="${isPinned ? '' : 'display:none;'}"></i>

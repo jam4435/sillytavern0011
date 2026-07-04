@@ -23,22 +23,27 @@ import {
   setDetailEntry,
 } from '../state.js';
 import { ensureNumericUID, isMobile } from '../utils.js';
+import {
+  applyPositionSelectionToEntry,
+  getPositionLabel,
+  getPositionSelectionValue,
+  isDepthPositionValue,
+  POSITION_OPTIONS,
+} from '../position.js';
 import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
 import { refreshSingleMasterEntryTokenBadge } from './masterEntryTokens.js';
 
 const DETAIL_STYLE_ID = 'enhanced-lorebook-detail-styles';
 const DETAIL_SAVE_DELAY = 250;
-const AUTO_UNPIN_POSITION_FIELDS = new Set(['position.type', 'position.depth', 'position.order', 'position', 'depth', 'order']);
-
-const POSITION_OPTIONS = [
-  { value: 'before_character_definition', label: '角色定义前' },
-  { value: 'after_character_definition', label: '角色定义后' },
-  { value: 'before_example_messages', label: '示例消息前' },
-  { value: 'after_example_messages', label: '示例消息后' },
-  { value: 'before_author_note', label: '作者注释前' },
-  { value: 'after_author_note', label: '作者注释后' },
-  { value: 'at_depth', label: '@深度' },
-];
+const AUTO_UNPIN_POSITION_FIELDS = new Set([
+  'position.type',
+  'position.role',
+  'position.depth',
+  'position.order',
+  'position',
+  'depth',
+  'order',
+]);
 
 function escapeHtml(value) {
   return _.escape(value ?? '');
@@ -90,36 +95,32 @@ function updateEntryStateValue(lorebookName, entryUid, updater) {
   return entry;
 }
 
-function getPositionLabel(value) {
-  return POSITION_OPTIONS.find(option => option.value === value)?.label || '未知位置';
-}
-
 export const getMasterDetailPositionLabel = value => getPositionLabel(value);
 
 function describeEntryMetaCompact(entry) {
-  const positionType = getPositionLabel(entry.position?.type || 'after_character_definition');
+  const positionType = getPositionLabel(entry.position || 'after_character_definition');
   const depthValue = entry.position?.depth ?? 4;
   const orderValue = entry.position?.order ?? 0;
   const probabilityValue = entry.probability ?? 100;
   const parts = [positionType];
-  if ((entry.position?.type || 'after_character_definition') === 'at_depth') {
-    parts.push(`娣卞害 ${depthValue}`);
+  if (isDepthPositionValue(entry.position)) {
+    parts.push(`深度 ${depthValue}`);
   }
-  parts.push(`椤哄簭 ${orderValue}`);
-  parts.push(`姒傜巼 ${probabilityValue}`);
-  return parts.join(' 路 ');
+  parts.push(`顺序 ${orderValue}`);
+  parts.push(`概率 ${probabilityValue}`);
+  return parts.join(' · ');
 }
 
 function describeEntryMeta(entry) {
   const strategyType = entry.strategy?.type === 'constant' ? '常驻' : '触发';
-  const positionType = getPositionLabel(entry.position?.type || 'after_character_definition');
+  const positionType = getPositionLabel(entry.position || 'after_character_definition');
   const orderValue = entry.position?.order ?? 0;
   return `${strategyType} · ${positionType} · 顺序 ${orderValue}`;
 }
 
 function describeMasterEntryMeta(entry) {
-  const parts = [getPositionLabel(entry.position?.type || 'after_character_definition')];
-  if ((entry.position?.type || 'after_character_definition') === 'at_depth') {
+  const parts = [getPositionLabel(entry.position || 'after_character_definition')];
+  if (isDepthPositionValue(entry.position)) {
     parts.push(`D${entry.position?.depth ?? 4}`);
   }
   parts.push(`#${entry.position?.order ?? 0}`);
@@ -230,6 +231,7 @@ function renderDetailEditor(tabKey, context, entry) {
   const $container = getTabDetailContainer(tabKey);
   const strategyType = entry.strategy?.type === 'constant' ? 'constant' : 'selective';
   const positionType = entry.position?.type || 'after_character_definition';
+  const positionValue = getPositionSelectionValue(entry.position || positionType);
   const positionDepth = entry.position?.depth ?? 4;
   const positionOrder = entry.position?.order ?? 0;
   const probability = entry.probability ?? 100;
@@ -241,7 +243,7 @@ function renderDetailEditor(tabKey, context, entry) {
   const preventOutgoing = entry.recursion?.prevent_outgoing === true;
   const preventIncoming = entry.recursion?.prevent_incoming === true;
   const delayRecursion = entry.recursion?.delay_until != null && entry.recursion?.delay_until !== false;
-  const needsDepth = positionType === 'at_depth';
+  const needsDepth = isDepthPositionValue(entry.position || positionType);
 
   $container.html(`
     <div class="detail-editor" data-tab-key="${tabKey}" data-lorebook-name="${escapeHtml(context.lorebookName)}" data-entry-uid="${ensureNumericUID(context.entryUid)}" data-is-global="${context.isGlobal ? 'true' : 'false'}">
@@ -264,7 +266,7 @@ function renderDetailEditor(tabKey, context, entry) {
         <label class="detail-field">
           <span>插入位置</span>
           <select data-field="position.type" data-save-mode="immediate">
-            ${buildSelectOptions(POSITION_OPTIONS, positionType)}
+            ${buildSelectOptions(POSITION_OPTIONS, positionValue)}
           </select>
         </label>
         <label class="detail-field ${needsDepth ? '' : 'is-disabled'}" data-depth-field>
@@ -336,6 +338,7 @@ function renderCompactDetailEditor(tabKey, context, entry) {
   const $container = getTabDetailContainer(tabKey);
   const strategyType = entry.strategy?.type === 'constant' ? 'constant' : 'selective';
   const positionType = entry.position?.type || 'after_character_definition';
+  const positionValue = getPositionSelectionValue(entry.position || positionType);
   const positionDepth = entry.position?.depth ?? 4;
   const positionOrder = entry.position?.order ?? 0;
   const probability = entry.probability ?? 100;
@@ -347,7 +350,7 @@ function renderCompactDetailEditor(tabKey, context, entry) {
   const preventOutgoing = entry.recursion?.prevent_outgoing === true;
   const preventIncoming = entry.recursion?.prevent_incoming === true;
   const delayRecursion = entry.recursion?.delay_until != null && entry.recursion?.delay_until !== false;
-  const needsDepth = positionType === 'at_depth';
+  const needsDepth = isDepthPositionValue(entry.position || positionType);
 
   $container.html(`
     <div class="detail-editor" data-tab-key="${tabKey}" data-lorebook-name="${escapeHtml(context.lorebookName)}" data-entry-uid="${ensureNumericUID(context.entryUid)}" data-is-global="${context.isGlobal ? 'true' : 'false'}">
@@ -356,7 +359,7 @@ function renderCompactDetailEditor(tabKey, context, entry) {
           <label class="detail-field detail-field-inline">
             <span>插入位置</span>
             <select data-field="position.type" data-save-mode="immediate">
-              ${buildSelectOptions(POSITION_OPTIONS, positionType)}
+              ${buildSelectOptions(POSITION_OPTIONS, positionValue)}
             </select>
           </label>
           <label class="detail-field detail-field-inline ${needsDepth ? '' : 'is-disabled'}" data-depth-field>
@@ -427,6 +430,7 @@ function renderCompactDetailEditor(tabKey, context, entry) {
 function renderCompactDetailEditorV2(tabKey, context, entry) {
   const $container = getTabDetailContainer(tabKey);
   const positionType = entry.position?.type || 'after_character_definition';
+  const positionValue = getPositionSelectionValue(entry.position || positionType);
   const positionDepth = entry.position?.depth ?? 4;
   const positionOrder = entry.position?.order ?? 0;
   const keys = Array.isArray(entry.strategy?.keys) ? entry.strategy.keys.join(', ') : '';
@@ -437,7 +441,7 @@ function renderCompactDetailEditorV2(tabKey, context, entry) {
   const preventOutgoing = entry.recursion?.prevent_outgoing === true;
   const preventIncoming = entry.recursion?.prevent_incoming === true;
   const delayRecursion = entry.recursion?.delay_until != null && entry.recursion?.delay_until !== false;
-  const needsDepth = positionType === 'at_depth';
+  const needsDepth = isDepthPositionValue(entry.position || positionType);
 
   $container.html(`
     <div class="detail-editor" data-tab-key="${tabKey}" data-lorebook-name="${escapeHtml(context.lorebookName)}" data-entry-uid="${ensureNumericUID(context.entryUid)}" data-is-global="${context.isGlobal ? 'true' : 'false'}">
@@ -446,7 +450,7 @@ function renderCompactDetailEditorV2(tabKey, context, entry) {
           <label class="detail-field detail-field-inline">
             <span>插入位置</span>
             <select data-field="position.type" data-save-mode="immediate">
-              ${buildSelectOptions(POSITION_OPTIONS, positionType)}
+              ${buildSelectOptions(POSITION_OPTIONS, positionValue)}
             </select>
           </label>
           <label class="detail-field detail-field-inline ${needsDepth ? '' : 'is-disabled'}" data-depth-field>
@@ -1433,7 +1437,11 @@ async function persistDetailField($field, options = {}) {
   }
 
   updateEntryStateValue(lorebookName, entryUid, entry => {
-    _.set(entry, fieldName, value);
+    if (fieldName === 'position.type') {
+      applyPositionSelectionToEntry(entry, value);
+    } else {
+      _.set(entry, fieldName, value);
+    }
     if (AUTO_UNPIN_POSITION_FIELDS.has(fieldName)) {
       entry.pinned = false;
     }
@@ -1443,7 +1451,7 @@ async function persistDetailField($field, options = {}) {
   }
 
   if (fieldName === 'position.type') {
-    const needsDepth = value === 'at_depth';
+    const needsDepth = isDepthPositionValue(value);
     const $depthField = $editor.find('[data-depth-field]');
     $depthField.toggleClass('is-disabled', !needsDepth);
     $depthField.find('input').prop('disabled', !needsDepth);

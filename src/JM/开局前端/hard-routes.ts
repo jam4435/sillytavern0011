@@ -36,7 +36,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
   {
     key: 'imperial_male_elite',
     label: '路线一：血冕将倾',
-    difficulty: '炼狱',
+    difficulty: '困难',
     gender: 'male',
     description: '帝国男性高层线。血统本该是秩序的基石，如今却是彼此轻蔑的锁链——四级鄙夷五级的迟钝，五级憎恨四级的礼遇。教廷架空君权，军队豢养边患，而被侍奉、被工具化的女性正在阴影里悄悄结网。这顶王冠越戴越重，也越戴越薄。',
     enabled: true,

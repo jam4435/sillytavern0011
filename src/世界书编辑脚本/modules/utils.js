@@ -1,5 +1,6 @@
 // 通用辅助函数
 import { LOREBOOK_ENTRY_CLASS } from './config.js';
+import { getNativePositionRole, getNativePositionType } from './position.js';
 
 const fallbackLocalStorage = new Map();
 let lastStorageAccessError = null;
@@ -318,8 +319,8 @@ export const convertPluginToNativeFormat = pluginEntries => {
       keysecondary: entry.strategy?.keys_secondary?.keys || [],
       scanDepth: entry.strategy?.scan_depth === 'same_as_global' ? null : entry.strategy?.scan_depth,
       vectorized: false, // 插件格式中没有对应字段
-      position: entry.position?.type === 'after_character_definition' ? 1 : 0, // 简化映射
-      role: entry.position?.role || null,
+      position: getNativePositionType(entry.position),
+      role: getNativePositionRole(entry.position),
       depth: entry.position?.depth || 4,
       order: entry.position?.order || 100,
       content: entry.content || '',

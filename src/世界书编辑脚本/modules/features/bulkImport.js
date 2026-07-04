@@ -1,4 +1,5 @@
 import { createLorebookEntries, getWorldbookSafe } from '../api.js';
+import { normalizePositionSelection } from '../position.js';
 import { errorCatched } from '../utils.js';
 
 const IMPORT_MODAL_ID = 'lorebook-import-modal';
@@ -71,9 +72,9 @@ export const handleBulkImport = errorCatched(async (lorebookName, isGlobal) => {
       'After Example Messages': 'after_example_messages',
       'Before Author Note': 'before_author_note',
       'After Author Note': 'after_author_note',
-      'At Depth as System': 'at_depth',
-      'At Depth as Assistant': 'at_depth',
-      'At Depth as User': 'at_depth',
+      'At Depth as System': 'at_depth_as_system',
+      'At Depth as Assistant': 'at_depth_as_assistant',
+      'At Depth as User': 'at_depth_as_user',
     };
 
     // Use js-yaml's `loadAll` to safely handle multiple documents,
@@ -99,6 +100,16 @@ export const handleBulkImport = errorCatched(async (lorebookName, isGlobal) => {
         throw new Error(`条目 "${entryIdentifier}" 缺少 "trigger.Title" 或 "content" 字段。`);
       }
 
+      const positionSelection = normalizePositionSelection(yamlPositionToApiPosition[doc.trigger.position]);
+      const position = {
+        type: positionSelection.type,
+        depth: doc.trigger.depth !== undefined ? doc.trigger.depth : 0,
+        order: doc.trigger.order !== undefined ? doc.trigger.order : 100,
+      };
+      if (positionSelection.type === 'at_depth') {
+        position.role = positionSelection.role;
+      }
+
       entriesToCreate.push({
         uid: maxUid + 1 + entriesToCreate.length,
         name: doc.trigger.Title,
@@ -113,11 +124,7 @@ export const handleBulkImport = errorCatched(async (lorebookName, isGlobal) => {
                 .filter(Boolean)
             : [],
         },
-        position: {
-          type: yamlPositionToApiPosition[doc.trigger.position] || 'after_character_definition',
-          depth: doc.trigger.depth !== undefined ? doc.trigger.depth : 0,
-          order: doc.trigger.order !== undefined ? doc.trigger.order : 100,
-        },
+        position,
       });
     }
 

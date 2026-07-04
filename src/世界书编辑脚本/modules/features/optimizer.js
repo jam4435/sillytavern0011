@@ -1,5 +1,6 @@
 import { getWorldbookNamesSafe, getWorldbookSafe, updateWorldbookEntries } from '../api.js';
 import { DEBUG_MODE } from '../config.js';
+import { getPositionLabel as getPositionDisplayLabel } from '../position.js';
 import { allEntriesData, getSelectedEntries } from '../state.js';
 import { ensureNumericUID, errorCatched } from '../utils.js';
 import { batchUpdateEntries } from './batchActions.js';
@@ -351,16 +352,7 @@ function buildContentDiffSnippets(beforeText, afterText, options = {}) {
 }
 
 function getPositionLabel(positionType) {
-  const positionLabelMap = {
-    before_character_definition: '角色定义前',
-    after_character_definition: '角色定义后',
-    before_example_messages: '示例消息前',
-    after_example_messages: '示例消息后',
-    before_author_note: '作者注释前',
-    after_author_note: '作者注释后',
-    at_depth: '@深度',
-  };
-  return positionLabelMap[positionType] || normalizeSortableText(positionType) || '未知位置';
+  return getPositionDisplayLabel(positionType) || normalizeSortableText(positionType) || '未知位置';
 }
 
 function getModeLabel(entry) {
@@ -389,7 +381,7 @@ function getCompareEntrySnapshot(entry = {}) {
     content: typeof entry.content === 'string' ? entry.content : '',
     enabled: entry.enabled !== false,
     mode: getModeLabel(entry),
-    positionType: getPositionLabel(entry?.position?.type || 'after_character_definition'),
+    positionType: getPositionLabel(entry?.position || 'after_character_definition'),
     depth: entry?.position?.depth ?? 4,
     order: entry?.position?.order ?? 0,
     probability: entry?.probability ?? 100,

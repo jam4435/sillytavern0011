@@ -3,6 +3,7 @@ import {
   getLastMutationTransaction,
   setLastMutationTransaction,
 } from '../state.js';
+import { getPositionLabel } from '../position.js';
 import { errorCatched } from '../utils.js';
 
 const rawGetWorldbook = window.parent.getWorldbook || window.getWorldbook;
@@ -127,7 +128,11 @@ function buildFieldDiffs(beforeEntry, afterEntry) {
   pushDiff('内容摘要', summarizeContent(beforeEntry.content), summarizeContent(afterEntry.content));
   pushDiff('激活方式', beforeEntry.strategy?.type || 'selective', afterEntry.strategy?.type || 'selective');
   pushDiff('主要关键字', beforeEntry.strategy?.keys || [], afterEntry.strategy?.keys || []);
-  pushDiff('位置', beforeEntry.position?.type || 'after_character_definition', afterEntry.position?.type || 'after_character_definition');
+  pushDiff(
+    '位置',
+    getPositionLabel(beforeEntry.position || 'after_character_definition'),
+    getPositionLabel(afterEntry.position || 'after_character_definition'),
+  );
   pushDiff('深度', beforeEntry.position?.depth ?? 4, afterEntry.position?.depth ?? 4);
   pushDiff('顺序', beforeEntry.position?.order ?? 0, afterEntry.position?.order ?? 0);
   pushDiff('概率', beforeEntry.probability ?? 100, afterEntry.probability ?? 100);

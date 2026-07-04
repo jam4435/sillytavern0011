@@ -68,6 +68,7 @@ import {
   toggleLorebookPanel,
 } from './ui/panel.js';
 import { ensureNumericUID, isMobile } from './utils.js';
+import { isDepthPositionValue } from './position.js';
 
 /**
  * 刷新条目列表
@@ -1348,7 +1349,7 @@ export function bindSearchEvents() {
 function toggleDepthFieldVisibility(position) {
   const parentDoc = window.parent.document;
   const $depthGroup = $('#entry-depth', parentDoc).closest('.form-group');
-  if (position === 'at_depth') {
+  if (isDepthPositionValue(position)) {
     $depthGroup.show();
   } else {
     $depthGroup.hide();

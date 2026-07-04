@@ -21,6 +21,7 @@ import {
 import { updateHeaderCheckboxState } from '../ui/list.js';
 import { loadTheme } from '../ui/theme.js';
 import { ensureNumericUID, errorCatched } from '../utils.js';
+import { applyPositionSelectionToEntry, isDepthPositionValue, POSITION_OPTIONS } from '../position.js';
 
 const RESERVED_META_ENTRY_PREFIX = '__WI_META_';
 
@@ -111,14 +112,21 @@ export const batchUpdateEntries = errorCatched(async (lorebookName, isGlobal, up
             for (const key in updateData) {
               if (key.startsWith('recursion.') && !updatedEntry.recursion) updatedEntry.recursion = {};
               if (key.startsWith('strategy.') && !updatedEntry.strategy) updatedEntry.strategy = {};
+              if (key.startsWith('position.') && !updatedEntry.position) updatedEntry.position = {};
 
               const updater = updateData[key];
+              let nextValue;
               if (typeof updater === 'function') {
                 const oldValue = _.get(updatedEntry, key);
-                const newValue = updater(oldValue);
-                _.set(updatedEntry, key, newValue);
+                nextValue = updater(oldValue);
               } else {
-                _.set(updatedEntry, key, updateData[key]);
+                nextValue = updateData[key];
+              }
+
+              if (key === 'position.type') {
+                applyPositionSelectionToEntry(updatedEntry, nextValue);
+              } else {
+                _.set(updatedEntry, key, nextValue);
               }
             }
           }
@@ -554,13 +562,7 @@ export const adjustSelectedEntriesPosition = errorCatched(async (lorebookName, i
             <div style="margin: 15px 0;">
               <label style="display: block; margin-bottom: 8px;">插入位置类型:</label>
               <select id="lorebook-position-type-select" style="width: 100%; padding: 8px; background-color: #333; color: #eee; border: 1px solid #555; border-radius: 4px;">
-                <option value="before_character_definition">角色定义前</option>
-                <option value="after_character_definition" selected>角色定义后</option>
-                <option value="before_example_messages">示例消息前</option>
-                <option value="after_example_messages">示例消息后</option>
-                <option value="before_author_note">作者注释前</option>
-                <option value="after_author_note">作者注释后</option>
-                <option value="at_depth">@深度</option>
+                ${POSITION_OPTIONS.map(option => `<option value="${option.value}" ${option.value === 'after_character_definition' ? 'selected' : ''}>${option.label}</option>`).join('')}
               </select>
             </div>
             <div id="lorebook-depth-input-wrapper" style="margin: 15px 0; display: none;">
@@ -583,7 +585,7 @@ export const adjustSelectedEntriesPosition = errorCatched(async (lorebookName, i
 
       // 根据选择的类型显示/隐藏深度输入框
       $typeSelect.on('change', function () {
-        if ($(this).val() === 'at_depth') {
+        if (isDepthPositionValue($(this).val())) {
           $depthWrapper.show();
         } else {
           $depthWrapper.hide();
@@ -614,8 +616,8 @@ export const adjustSelectedEntriesPosition = errorCatched(async (lorebookName, i
     'position.type': positionSettings.type,
   };
 
-  // 只有在选择@深度时才更新深度值
-  if (positionSettings.type === 'at_depth') {
+  // 只有在选择深度位置时才更新深度值
+  if (isDepthPositionValue(positionSettings.type)) {
     updateData['position.depth'] = positionSettings.depth;
   }
 

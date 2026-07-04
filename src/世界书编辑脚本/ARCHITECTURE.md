@@ -174,7 +174,25 @@ index.js
 `state.js` 保存当前条目缓存、筛选/搜索、选择、展开、详情选中项和文件夹折叠状态，便于刷新后恢复局部 UI。
 条目文件夹没有会话记录时默认折叠，用户本次会话中的展开/折叠操作会覆盖这个默认值。
 
-### 5.4 AI 工作区链路
+### 5.4 插入位置模型
+
+世界书条目插入位置统一通过 `modules/position.js` 映射。普通位置直接写入 `position.type`；三种深度位置都写入 `position.type: 'at_depth'`，并用 `position.role` 区分消息身份。
+
+| 界面选项 | 存档字段 |
+|----------|----------|
+| 角色定义前 | `position.type = 'before_character_definition'` |
+| 角色定义后 | `position.type = 'after_character_definition'` |
+| 示例消息前（↑EM） | `position.type = 'before_example_messages'` |
+| 示例消息后（↓EM） | `position.type = 'after_example_messages'` |
+| 作者注释前 | `position.type = 'before_author_note'` |
+| 作者注释后 | `position.type = 'after_author_note'` |
+| @D [系统]在深度 | `position.type = 'at_depth'`, `position.role = 'system'` |
+| @D [用户]在深度 | `position.type = 'at_depth'`, `position.role = 'user'` |
+| @D [AI]在深度 | `position.type = 'at_depth'`, `position.role = 'assistant'` |
+
+`at_depth_as_system`、`at_depth_as_user`、`at_depth_as_assistant` 只作为 UI 下拉框和旧格式导入的内部兼容值，不能原样写入 `position.type`。
+
+### 5.5 AI 工作区链路
 
 ```text
 AI 页签
@@ -188,7 +206,7 @@ AI 页签
 
 `direct` 模式直接从选中条目生成预览；`plan` 模式先产出 `readonly_uids`、`editable_uids` 和整体方案，再用计划驱动预览。
 
-### 5.5 状态分层
+### 5.6 状态分层
 
 当前代码有四类状态边界：
 
@@ -204,7 +222,7 @@ AI 页签
 4. 世界书隐藏元条目
    `folderMeta.js` 用 `__WI_META_FOLDERS__` 条目保存文件夹结构；渲染和 AI 收集时会过滤这些元条目。
 
-### 5.6 写回与回滚
+### 5.7 写回与回滚
 
 世界书变更统一通过 `api.js` 的封装提交：
 

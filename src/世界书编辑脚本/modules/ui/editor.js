@@ -1,5 +1,11 @@
 import { getLorebookEntry, getWorldbookSafe, updateWorldbookEntries } from '../api.js';
 import { LOREBOOK_EDITOR_PANEL_ID } from '../config.js';
+import {
+  applyPositionSelectionToEntry,
+  getPositionSelectionValue,
+  isDepthPositionValue,
+  POSITION_OPTIONS,
+} from '../position.js';
 import { ensureNumericUID } from '../utils.js';
 import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
 
@@ -56,6 +62,7 @@ export const showEntryEditor = async (lorebookName, entryUid, isGlobal = false) 
   // 适配新数据结构
   const isConstant = _.get(entry, 'strategy.type') === 'constant';
   const positionType = _.get(entry, 'position.type', 'after_character_definition');
+  const positionValue = getPositionSelectionValue(entry.position || positionType);
   const depth = _.get(entry, 'position.depth', 4);
   const keys = _.get(entry, 'strategy.keys', []);
 
@@ -66,7 +73,7 @@ export const showEntryEditor = async (lorebookName, entryUid, isGlobal = false) 
   $form.find('#entry-comment').val(entry.name || ''); // comment -> name
   renderEditorContentField($form, entry.content || '');
   $form.find('#entry-keys').val(Array.isArray(keys) ? keys.join(', ') : '');
-  $form.find('#entry-position').val(positionType);
+  $form.find('#entry-position').val(positionValue);
   $form.find('#entry-depth').val(depth);
   $form.find('#entry-probability').val(entry.probability || 100);
   $form.find('#entry-constant').prop('checked', isConstant);
@@ -83,7 +90,7 @@ export const showEntryEditor = async (lorebookName, entryUid, isGlobal = false) 
   }
 
   // 检查是否需要显示深度输入框
-  toggleDepthFieldVisibility(positionType);
+  toggleDepthFieldVisibility(positionValue);
 
   $editorPanel.find('.loading-spinner').hide();
   $form.show();
@@ -93,7 +100,7 @@ export function toggleDepthFieldVisibility(positionValue) {
   const parentDoc = window.parent.document;
   const $depthRow = $(`#${LOREBOOK_EDITOR_PANEL_ID} .depth-row`, parentDoc);
 
-  const needsDepth = positionValue === 'at_depth';
+  const needsDepth = isDepthPositionValue(positionValue);
 
   $depthRow.find('input').prop('disabled', !needsDepth);
   if (needsDepth) {
@@ -136,7 +143,7 @@ export const saveEditedEntry = async formData => {
         .map(k => k.trim())
         .filter(k => k);
 
-      entryToUpdate.position.type = formData.position;
+      applyPositionSelectionToEntry(entryToUpdate, formData.position);
       entryToUpdate.position.depth = parseInt(formData.depth);
 
       return updatedEntries;
@@ -219,15 +226,7 @@ export function createEditorPanel() {
                             <div class="form-group half">
                                 <label for="entry-position">插入位置</label>
                                 <select id="entry-position" name="position" class="form-control">
-                                    <option value="before_character_definition">角色定义前</option>
-                                    <option value="after_character_definition">角色定义后</option>
-                                    <option value="before_example_messages">示例消息前</option>
-                                    <option value="after_example_messages">示例消息后</option>
-                                    <option value="before_author_note">作者注释前</option>
-                                    <option value="after_author_note">作者注释后</option>
-                                    <option value="at_depth_as_system">@系统深度</option>
-                                    <option value="at_depth_as_assistant">@助手深度</option>
-                                    <option value="at_depth_as_user">@用户深度</option>
+                                    ${POSITION_OPTIONS.map(option => `<option value="${option.value}">${option.label}</option>`).join('')}
                                 </select>
                             </div>
                         </div>

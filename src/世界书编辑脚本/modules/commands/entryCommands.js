@@ -6,6 +6,7 @@
 import { saveEntryField, toggleEntryEnabled } from '../api.js';
 import { AI_TAB_ID, DEBUG_MODE } from '../config.js';
 import { applyAiPreview, generateAiPreview } from '../features/aiActions.js';
+import { isDepthPositionValue } from '../position.js';
 import { addPinnedEntry, getAiWorkspaceSettings, removePinnedEntry, setAiWorkspaceSettings } from '../settings.js';
 import { allEntriesData, toggleEntrySelection, virtualScrollers } from '../state.js';
 import {
@@ -225,7 +226,7 @@ async function toggleConstant({ $target, lorebookName, numericUid, isGlobal }) {
 function editPosition({ $target, $item, lorebookName, numericUid }) {
   const newPosition = $target.val();
   const $depthInput = $item.find('[data-action="edit-depth"]');
-  const needsDepth = newPosition === 'at_depth';
+  const needsDepth = isDepthPositionValue(newPosition);
   $depthInput.prop('disabled', !needsDepth);
   $depthInput.closest('.depth-input-container').toggleClass('depth-disabled', !needsDepth);
   saveEntryField(numericUid, lorebookName, 'position.type', newPosition);

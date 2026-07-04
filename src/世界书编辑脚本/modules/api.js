@@ -1,5 +1,6 @@
 import { ensureNumericUID, errorCatched } from './utils.js';
 import { beginMutationTransaction, commitMutationTransaction } from './features/history.js';
+import { applyPositionSelectionToEntry, normalizePositionRole } from './position.js';
 import { addPinnedEntry, removePinnedEntry } from './settings.js';
 
 /**
@@ -17,7 +18,15 @@ export const rawUpdateWorldbookWith = window.parent.updateWorldbookWith || windo
 export const rawCreateWorldbookEntries = window.parent.createWorldbookEntries || window.createWorldbookEntries;
 export const rawDeleteWorldbookEntries = window.parent.deleteWorldbookEntries || window.deleteWorldbookEntries;
 
-const AUTO_UNPIN_POSITION_FIELDS = new Set(['position.type', 'position.depth', 'position.order', 'position', 'depth', 'order']);
+const AUTO_UNPIN_POSITION_FIELDS = new Set([
+  'position.type',
+  'position.role',
+  'position.depth',
+  'position.order',
+  'position',
+  'depth',
+  'order',
+]);
 
 function buildMutationResult(success, changed, error = null, meta = {}, data = null) {
   return { success, changed, error, meta, data };
@@ -355,6 +364,16 @@ export const replaceWorldbookEntries = errorCatched(async (lorebookName, nextEnt
 
 // 【核心更新】使用新API `updateWorldbookWith` 来自动保存单个字段
 function applyEntryFieldUpdate(entryToUpdate, fieldName, value) {
+  if (fieldName === 'position' || fieldName === 'position.type') {
+    applyPositionSelectionToEntry(entryToUpdate, value);
+    return;
+  }
+  if (fieldName === 'position.role') {
+    if (!entryToUpdate.position) entryToUpdate.position = {};
+    entryToUpdate.position.role = normalizePositionRole(value);
+    return;
+  }
+
   _.set(entryToUpdate, fieldName, value);
 
   if (fieldName === 'comment') {
@@ -365,9 +384,6 @@ function applyEntryFieldUpdate(entryToUpdate, fieldName, value) {
   }
   if (fieldName === 'keys') {
     _.set(entryToUpdate, 'strategy.keys', value);
-  }
-  if (fieldName === 'position') {
-    _.set(entryToUpdate, 'position.type', value);
   }
   if (fieldName === 'depth') {
     _.set(entryToUpdate, 'position.depth', value);
@@ -417,44 +433,6 @@ export const saveEntryField = errorCatched(async (entryUid, lorebookName, fieldN
       applyEntryFieldUpdate(entryToUpdate, fieldName, value);
       if (AUTO_UNPIN_POSITION_FIELDS.has(fieldName)) {
         entryToUpdate.pinned = false;
-      }
-
-      // 处理新旧数据结构的映射和联动更新
-      // comment -> name
-      if (fieldName === 'comment') {
-        _.set(entryToUpdate, 'name', value);
-      }
-      // constant (boolean) -> strategy.type
-      if (fieldName === 'type' && (value === 'constant' || value === 'selective')) {
-        _.set(entryToUpdate, 'strategy.type', value);
-      }
-      // keys -> strategy.keys
-      if (fieldName === 'keys') {
-        _.set(entryToUpdate, 'strategy.keys', value);
-      }
-      // position -> position.type
-      if (fieldName === 'position') {
-        _.set(entryToUpdate, 'position.type', value);
-      }
-      // depth -> position.depth
-      if (fieldName === 'depth') {
-        _.set(entryToUpdate, 'position.depth', value);
-      }
-      // order -> position.order
-      if (fieldName === 'order') {
-        _.set(entryToUpdate, 'position.order', value);
-      }
-      // prevent_recursion -> recursion.prevent_outgoing
-      if (fieldName === 'prevent_recursion') {
-        _.set(entryToUpdate, 'recursion.prevent_outgoing', value);
-      }
-      // exclude_recursion -> recursion.prevent_incoming
-      if (fieldName === 'exclude_recursion') {
-        _.set(entryToUpdate, 'recursion.prevent_incoming', value);
-      }
-      // delay_until_recursion -> recursion.delay_until
-      if (fieldName === 'delay_until_recursion') {
-        _.set(entryToUpdate, 'recursion.delay_until', value ? 1 : null);
       }
 
       return updatedEntries;
