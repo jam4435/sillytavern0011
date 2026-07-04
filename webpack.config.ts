@@ -229,11 +229,14 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
     .includes('@obfuscate');
   const script_filepath = path.parse(entry.script);
 
-  return (env, argv) => ({
+  return (env, argv) => {
+    const is_fast_build = env_flag_enabled(env, 'fast');
+
+    return ({
     experiments: {
       outputModule: true,
     },
-    devtool: argv.mode === 'production' ? 'source-map' : 'eval-source-map',
+    devtool: is_fast_build ? false : argv.mode === 'production' ? 'source-map' : 'eval-source-map',
     watchOptions: {
       ignored: ['**/dist', '**/node_modules'],
     },
@@ -524,21 +527,26 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
           : [],
       ),
     optimization: {
-      minimize: true,
-      minimizer: [
-        argv.mode === 'production'
-          ? new TerserPlugin({
-              terserOptions: { format: { quote_style: 1 }, mangle: { reserved: ['_', 'toastr', 'YAML', '$', 'z'] } },
-            })
-          : new TerserPlugin({
-              extractComments: false,
-              terserOptions: {
-                format: { beautify: true, indent_level: 2 },
-                compress: false,
-                mangle: false,
-              },
-            }),
-      ],
+      minimize: !is_fast_build,
+      minimizer: is_fast_build
+        ? []
+        : [
+            argv.mode === 'production'
+              ? new TerserPlugin({
+                  terserOptions: {
+                    format: { quote_style: 1 },
+                    mangle: { reserved: ['_', 'toastr', 'YAML', '$', 'z'] },
+                  },
+                })
+              : new TerserPlugin({
+                  extractComments: false,
+                  terserOptions: {
+                    format: { beautify: true, indent_level: 2 },
+                    compress: false,
+                    mangle: false,
+                  },
+                }),
+          ],
       splitChunks: {
         chunks: 'async',
         minSize: 20000,
@@ -608,6 +616,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
       );
     },
   });
+  };
 }
 
 export default config.entries.map(parse_configuration);
