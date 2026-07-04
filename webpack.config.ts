@@ -28,6 +28,7 @@ interface Entry {
   script: string;
   html?: string;
 }
+type WebpackEnv = Record<string, string | boolean | undefined>;
 
 // 酒馆插件目录不走酒馆助手构建流程。
 const IGNORED_ENTRY_DIRECTORIES = new Set([path.normalize('src/顶部工具栏插件')]);
@@ -217,13 +218,18 @@ function tavern_sync(compiler: webpack.Compiler) {
   });
 }
 
-function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Configuration {
+function env_flag_enabled(env: WebpackEnv | undefined, key: string) {
+  const value = env?.[key];
+  return value === true || value === 'true' || value === '1';
+}
+
+function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: any) => webpack.Configuration {
   const should_obfuscate = fs
     .readFileSync(path.join(import.meta.dirname, entry.script), 'utf-8')
     .includes('@obfuscate');
   const script_filepath = path.parse(entry.script);
 
-  return (_env, argv) => ({
+  return (env, argv) => ({
     experiments: {
       outputModule: true,
     },
@@ -475,7 +481,7 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
       .concat(
         { apply: watch_tavern_helper },
         { apply: schema_dump },
-        { apply: tavern_sync },
+        ...(env_flag_enabled(env, 'srcOnly') ? [] : [{ apply: tavern_sync }]),
         new VueLoaderPlugin(),
         unpluginAutoImport({
           dts: true,
