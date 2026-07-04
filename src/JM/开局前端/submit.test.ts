@@ -68,6 +68,14 @@ describe('开局前端提交', () => {
     );
   });
 
+  it('发送身体改造时包含数据里的改造详情', async () => {
+    await submitSelections(createSelections({ modification: ['神经强化改造'] }));
+
+    expect(triggerSlashMock).toHaveBeenCalledWith(
+      expect.stringContaining('神经强化改造：改造神经系统，加快反应速度。'),
+    );
+  });
+
   it('高难身份路线和性别明显冲突时不产生提交副作用', async () => {
     await submitSelections(createSelections({ gender: '女', hardIdentityRoute: 'imperial_male_elite' }));
 

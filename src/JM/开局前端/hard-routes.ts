@@ -21,6 +21,7 @@ export interface HardIdentityRouteOption {
   difficulty: string;
   gender: HardIdentityRouteGender;
   description: string;
+  enabled: boolean;
 }
 
 export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
@@ -30,6 +31,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '默认',
     gender: 'any',
     description: '不向提示词注入高难身份路线，清空旧聊天残留路线变量。',
+    enabled: true,
   },
   {
     key: 'imperial_male_elite',
@@ -37,6 +39,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '炼狱',
     gender: 'male',
     description: '帝国男性高层，在觉醒等级互害、教廷架空、军队养寇与女性反抗中保命。',
+    enabled: true,
   },
   {
     key: 'imperial_male_lowborn',
@@ -44,6 +47,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '困难',
     gender: 'male',
     description: '帝国男性底层上升线，在晋升诱惑与压迫共谋间选择。',
+    enabled: false,
   },
   {
     key: 'imperial_female_survival',
@@ -51,6 +55,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '噩梦',
     gender: 'female',
     description: '帝国女性底层求生线，在身份、年龄与所有权压力下寻找出口。',
+    enabled: true,
   },
   {
     key: 'imperial_female_revolutionary',
@@ -58,6 +63,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '噩梦+',
     gender: 'female',
     description: '帝国女性武装革命线，建立细胞、保护网络并承受镇压。',
+    enabled: false,
   },
   {
     key: 'imperial_female_reformist',
@@ -65,6 +71,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '噩梦++',
     gender: 'female',
     description: '帝国女性内部改良线，在公开组织与隐蔽保护间维持群众压力。',
+    enabled: false,
   },
   {
     key: 'akentor_male_defector',
@@ -72,6 +79,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '较难',
     gender: 'male',
     description: '阿肯托尔男性叛变线，利用帝国内合法外观推动财富与权利冲突。',
+    enabled: false,
   },
   {
     key: 'external_revolutionary_army',
@@ -79,6 +87,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '极难',
     gender: 'any',
     description: '境外革命军路线，在军事劣势和派系压力中维持旧时代平权理念。',
+    enabled: false,
   },
   {
     key: 'external_roaring_sisterhood',
@@ -86,13 +95,17 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '极难',
     gender: 'female',
     description: '境外怒吼姐妹会路线，在自治边界、复仇冲动与生存合作间取舍。',
+    enabled: false,
   },
 ];
 
 const hardIdentityRouteKeySet = new Set<string>(HARD_IDENTITY_ROUTE_KEYS);
+const enabledHardIdentityRouteKeySet = new Set<string>(
+  hardIdentityRouteOptions.filter(option => option.enabled).map(option => option.key),
+);
 
 export function normalizeHardIdentityRoute(value: unknown): HardIdentityRouteKey {
-  if (typeof value === 'string' && hardIdentityRouteKeySet.has(value)) {
+  if (typeof value === 'string' && hardIdentityRouteKeySet.has(value) && enabledHardIdentityRouteKeySet.has(value)) {
     return value as HardIdentityRouteKey;
   }
 
@@ -101,6 +114,10 @@ export function normalizeHardIdentityRoute(value: unknown): HardIdentityRouteKey
 
 export function getHardIdentityRouteOption(key: HardIdentityRouteKey): HardIdentityRouteOption {
   return hardIdentityRouteOptions.find(option => option.key === key) ?? hardIdentityRouteOptions[0];
+}
+
+export function isHardIdentityRouteEnabled(key: HardIdentityRouteKey) {
+  return getHardIdentityRouteOption(key).enabled;
 }
 
 export function isHardIdentityRouteCompatibleWithGender(routeKey: HardIdentityRouteKey, gender: string | undefined) {

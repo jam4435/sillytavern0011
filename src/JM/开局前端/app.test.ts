@@ -80,6 +80,50 @@ describe('开局前端入口设置', () => {
     expect(localStorage.getItem(hardIdentityRouteStorageKey)).toBeNull();
   });
 
+  it('只开放默认、路线一和路线三，其余高难身份路线暗色禁用', () => {
+    init();
+
+    const enabledRoutes = ['none', 'imperial_male_elite', 'imperial_female_survival'];
+    const disabledRoutes = [
+      'imperial_male_lowborn',
+      'imperial_female_revolutionary',
+      'imperial_female_reformist',
+      'akentor_male_defector',
+      'external_revolutionary_army',
+      'external_roaring_sisterhood',
+    ];
+
+    enabledRoutes.forEach(route => {
+      const input = document.getElementById(`setting-hard-identity-route-${route}`) as HTMLInputElement | null;
+      expect(input?.disabled).toBe(false);
+      expect(input?.closest('.hard-route-option')).not.toHaveClass('disabled');
+    });
+
+    disabledRoutes.forEach(route => {
+      const input = document.getElementById(`setting-hard-identity-route-${route}`) as HTMLInputElement | null;
+      const option = input?.closest('.hard-route-option');
+
+      expect(input?.disabled).toBe(true);
+      expect(option).toHaveClass('disabled');
+      expect(option?.textContent).toContain('未开放');
+    });
+  });
+
+  it('旧缓存中的未开放高难身份路线会回退到不启用', () => {
+    localStorage.setItem(hardIdentityRouteStorageKey, 'imperial_male_lowborn');
+
+    init();
+
+    const noneRouteInput = document.getElementById('setting-hard-identity-route-none') as HTMLInputElement | null;
+    const disabledRouteInput = document.getElementById(
+      'setting-hard-identity-route-imperial_male_lowborn',
+    ) as HTMLInputElement | null;
+
+    expect(noneRouteInput?.checked).toBe(true);
+    expect(disabledRouteInput?.checked).toBe(false);
+    expect(disabledRouteInput?.disabled).toBe(true);
+  });
+
   it('选择高难身份路线只缓存，不触发现有设置同步', async () => {
     init();
     vi.clearAllMocks();

@@ -189,6 +189,11 @@ function bindSettingsEvents(
       return;
     }
 
+    if (event.target.disabled) {
+      renderHardIdentityRouteControls(selections);
+      return;
+    }
+
     selections.hardIdentityRoute = normalizeHardIdentityRoute(event.target.value);
     const route = ensureHardIdentityRoute(selections);
     persistHardIdentityRoute(route);

@@ -1,5 +1,6 @@
 import { ensureGenerationSettings, ensureHardIdentityRoute } from './state';
 import { applyGenerationSettings } from './tavern-settings';
+import { getModificationOptions } from './data-access';
 import { queryRequired } from './dom';
 import {
   getHardIdentityRouteGenderLabel,
@@ -65,7 +66,7 @@ export function buildDescription(selections: SelectionState) {
   }
 
   if (Array.isArray(selections.modification) && selections.modification.length > 0) {
-    description += ` 并接受了以下改造：${selections.modification.join('、')}。`;
+    description += ` 并接受了以下改造：${formatModificationDetails(selections).join('；')}。`;
   }
 
   if (selections.customModification) {
@@ -78,6 +79,15 @@ export function buildDescription(selections: SelectionState) {
 
   description += ' 请根据世界观，生成符合人物的身份和设定的开局。';
   return description;
+}
+
+function formatModificationDetails(selections: SelectionState) {
+  const modificationOptionsByName = new Map(getModificationOptions(selections).map(mod => [mod.name, mod]));
+
+  return (selections.modification ?? []).map(modificationName => {
+    const description = modificationOptionsByName.get(modificationName)?.description?.trim();
+    return description ? `${modificationName}：${description}` : modificationName;
+  });
 }
 
 async function initializeCurrentCharacterVariable() {

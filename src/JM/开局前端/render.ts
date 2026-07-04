@@ -214,9 +214,16 @@ export function renderHardIdentityRouteControls(selections: SelectionState) {
 
   hardIdentityRouteOptions.forEach(route => {
     const option = document.createElement('label');
+    const isEnabled = route.enabled;
     option.className = 'hard-route-option';
     option.classList.toggle('selected', route.key === selectedRoute);
-    option.htmlFor = `setting-hard-identity-route-${route.key}`;
+    option.classList.toggle('disabled', !isEnabled);
+    option.toggleAttribute('aria-disabled', !isEnabled);
+    if (isEnabled) {
+      option.htmlFor = `setting-hard-identity-route-${route.key}`;
+    } else {
+      option.title = '该路线内容还未完善，暂不可选。';
+    }
 
     const input = document.createElement('input');
     input.id = `setting-hard-identity-route-${route.key}`;
@@ -224,6 +231,7 @@ export function renderHardIdentityRouteControls(selections: SelectionState) {
     input.name = 'setting-hard-identity-route';
     input.value = route.key;
     input.checked = route.key === selectedRoute;
+    input.disabled = !isEnabled;
 
     const heading = document.createElement('span');
     heading.className = 'hard-route-option-heading';
@@ -234,7 +242,7 @@ export function renderHardIdentityRouteControls(selections: SelectionState) {
 
     const meta = document.createElement('span');
     meta.className = 'hard-route-option-meta';
-    meta.textContent = `${route.difficulty} · ${getHardIdentityRouteGenderLabel(route.gender)}`;
+    meta.textContent = `${route.difficulty} · ${getHardIdentityRouteGenderLabel(route.gender)}${isEnabled ? '' : ' · 未开放'}`;
 
     const description = document.createElement('span');
     description.className = 'hard-route-option-description';

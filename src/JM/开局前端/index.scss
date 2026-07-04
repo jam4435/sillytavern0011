@@ -334,6 +334,21 @@ body {
   background: rgba(196, 58, 58, 0.12);
   box-shadow: inset 3px 0 0 var(--accent-color);
 }
+.hard-route-option.disabled,
+.hard-route-option.disabled:hover {
+  border-color: rgba(255, 255, 255, 0.04);
+  background: rgba(0, 0, 0, 0.36);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.hard-route-option.disabled .hard-route-option-title,
+.hard-route-option.disabled .hard-route-option-description {
+  color: rgba(226, 232, 240, 0.48);
+}
+.hard-route-option.disabled .hard-route-option-meta {
+  color: rgba(226, 232, 240, 0.38);
+}
 .hard-route-option input {
   position: absolute;
   width: 1px;
