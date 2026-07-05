@@ -3828,7 +3828,10 @@ export async function getWorldbookEntryCatalog(worldbookName: string): Promise<
     return [];
   }
   const worldbook = await getWorldbook(name);
-  return worldbook.map(entry => ({
+  // 防止因返回 HTML 等非数组类型而导致崩溃：getWorldbook 在世界书不存在或接口异常时
+  // 可能返回 undefined / 非数组值，统一退化为空数组，让上层 UI 显示“该世界书没有条目”。
+  const entries = Array.isArray(worldbook) ? worldbook : [];
+  return entries.map(entry => ({
     uid: entry.uid,
     label: entry.name || `uid:${entry.uid}`,
     enabled: entry.enabled,
@@ -4274,7 +4277,10 @@ async function applyManagedWorldbookEntries(
 
     if (!hasOwn(nextBaselines, worldbookName)) {
       try {
-        nextBaselines[worldbookName] = getWorldbookEnabledEntryUids(await getWorldbook(worldbookName));
+        const baselineEntries = await getWorldbook(worldbookName);
+        nextBaselines[worldbookName] = getWorldbookEnabledEntryUids(
+          Array.isArray(baselineEntries) ? baselineEntries : [],
+        );
       } catch (error) {
         console.warn(`绑定plus: 读取世界书「${worldbookName}」条目基线失败`, error);
         nextBaselines[worldbookName] = [];
@@ -4987,7 +4993,8 @@ export async function probePlusBindingInterfaces(): Promise<PersonaPlusProbeRepo
     try {
       const sampleWorldbookName = pickPreferredWorldbookName(chatWorldbookName, charWorldbooks, worldbookNames);
       if (sampleWorldbookName) {
-        const entries = await getWorldbook(sampleWorldbookName);
+        const rawEntries = await getWorldbook(sampleWorldbookName);
+        const entries = Array.isArray(rawEntries) ? rawEntries : [];
         const firstEntry = entries[0];
         pushPlusProbeItem(
           items,
