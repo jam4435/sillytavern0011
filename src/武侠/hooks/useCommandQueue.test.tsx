@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { decrementStatusEffectTurns, removeStatusEffect, restoreItemCount } from '../utils/itemManager';
+import { syncPlayerAttributesFromVariables } from '../utils/variableReader';
 import { useCommandQueue } from './useCommandQueue';
 
 vi.mock('../utils/itemManager', () => ({
@@ -17,15 +18,21 @@ vi.mock('../utils/logger', () => ({
   },
 }));
 
+vi.mock('../utils/variableReader', () => ({
+  syncPlayerAttributesFromVariables: vi.fn(),
+}));
+
 const decrementStatusEffectTurnsMock = vi.mocked(decrementStatusEffectTurns);
 const removeStatusEffectMock = vi.mocked(removeStatusEffect);
 const restoreItemCountMock = vi.mocked(restoreItemCount);
+const syncPlayerAttributesMock = vi.mocked(syncPlayerAttributesFromVariables);
 
 describe('useCommandQueue', () => {
   beforeEach(() => {
     decrementStatusEffectTurnsMock.mockReset();
     removeStatusEffectMock.mockReset();
     restoreItemCountMock.mockReset();
+    syncPlayerAttributesMock.mockReset();
   });
 
   it('玩家消息发送成功后会递减状态效果', async () => {
@@ -38,6 +45,7 @@ describe('useCommandQueue', () => {
 
     expect(send).toHaveBeenCalledWith('行走江湖');
     expect(decrementStatusEffectTurnsMock).toHaveBeenCalledTimes(1);
+    expect(syncPlayerAttributesMock).toHaveBeenCalledTimes(1);
   });
 
   it('玩家消息发送失败时不会递减状态效果', async () => {
@@ -60,7 +68,7 @@ describe('useCommandQueue', () => {
       品阶: '珍品',
       物品描述: '清香沁脾。',
       数量: 2,
-      属性修正: { 气血: 300 },
+      属性修正: { 气血上限: 25 },
       持续时间: 3,
     };
 
@@ -75,6 +83,7 @@ describe('useCommandQueue', () => {
 
     expect(restoreItemCountMock).toHaveBeenCalledWith('九花玉露丸', originalItem);
     expect(removeStatusEffectMock).toHaveBeenCalledWith('effect-1');
+    expect(syncPlayerAttributesMock).toHaveBeenCalledTimes(1);
     expect(result.current.commands).toEqual([]);
   });
 });
