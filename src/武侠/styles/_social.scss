@@ -1090,6 +1090,22 @@
     transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
+  // 水墨主题：手机详情滑入页也铺水墨山水背景
+  [data-theme='ink'] .social-detail {
+    background:
+      radial-gradient(
+        ellipse at center,
+        rgba(232, 226, 214, 0.3) 0%,
+        rgba(200, 192, 176, 0.6) 100%
+      ),
+      var(--sprite-bg, none);
+    background-size:
+      100% 100%,
+      cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
   .social-body.detail-open .social-detail {
     transform: translateX(0);
   }

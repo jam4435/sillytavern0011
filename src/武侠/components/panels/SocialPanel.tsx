@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { NPC } from '../../types';
+import { NPC, UiTheme, UI_THEMES } from '../../types';
 import { Icons } from '../Icons';
+import { buildInkSpriteStyle } from './socialSprites';
 
 interface SocialPanelProps {
   npcs: NPC[];
+  theme: UiTheme;
+  onThemeChange: (theme: UiTheme) => void;
 }
 
 type SocialSectionKey = 'acquaintance' | 'local';
