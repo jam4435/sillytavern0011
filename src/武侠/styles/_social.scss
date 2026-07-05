@@ -8,17 +8,13 @@
 //
 // 仅作用于 .social-panel，不影响其它面板。组件为纯展示，只接收 npcs: NPC[]。
 
-// ---- 水墨册页色板（局部，不进 :root，避免污染全局暗色主题）----
-$social-paper: #e8dfc8; // 宣纸暖黄
-$social-paper-deep: #d9cdb0; // 宣纸深沿
-$social-paper-shadow: #c7b994; // 纸边阴影
-$social-ink: #1c1917; // 墨黑（主文字）
-$social-ink-soft: #4a4339; // 淡墨（次文字）
-$social-ink-faint: #7a6f5d; // 远墨（弱文字）
-$social-cinnabar: #9c2b22; // 朱砂（印章）
-$social-cinnabar-deep: #7a201a; // 朱砂深
-$social-cinnabar-ink: #5a1612; // 印泥暗红
-$social-gold: #8a6a2a; // 暗金描边（极少量，仅轴头）
+// ---- 水墨册页色板 ----
+// 色板以 CSS 自定义属性形式声明在 .social-panel 上（见下），默认值 = 宣纸明底。
+// [data-theme="ink"] .social-panel override block 重写这些变量为黑白水墨色值
+// （见文件末尾），并叠加 --sprite-* 素材做材质覆盖。色板不进 :root，避免污染全局暗色主题。
+// 社会面板色板变量清单（均为 .social-panel 上的 CSS 自定义属性）：
+//   --social-paper / --social-paper-deep / --social-ink / --social-ink-soft /
+//   --social-ink-faint / --social-cinnabar / --social-cinnabar-deep / --social-cinnabar-ink
 
 // =========================================
 // 容器：宣纸册页底
@@ -29,11 +25,20 @@ $social-gold: #8a6a2a; // 暗金描边（极少量，仅轴头）
   height: 100%;
   display: flex;
   flex-direction: column;
+  // 色板默认值 = 宣纸明底；[data-theme="ink"] override 重写为黑白水墨
+  --social-paper: #e8dfc8;
+  --social-paper-deep: #d9cdb0;
+  --social-ink: #1c1917;
+  --social-ink-soft: #4a4339;
+  --social-ink-faint: #7a6f5d;
+  --social-cinnabar: #9c2b22;
+  --social-cinnabar-deep: #7a201a;
+  --social-cinnabar-ink: #5a1612;
   // 宣纸渐变底：中心偏亮，边缘渐深，模拟纸的受光与泛黄
   background:
     radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255, 250, 235, 0.55), transparent 70%),
-    linear-gradient(160deg, $social-paper 0%, $social-paper-deep 100%);
-  color: $social-ink;
+    linear-gradient(160deg, var(--social-paper) 0%, var(--social-paper-deep) 100%);
+  color: var(--social-ink);
   font-family: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
   border: 1px solid rgba(120, 100, 60, 0.28);
   // 极淡纸纹：细噪点叠加，避免纯色塑料感
