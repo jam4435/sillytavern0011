@@ -390,7 +390,7 @@ function buildSideMarkup(sideKey, paneClass = '') {
             : ''
         }
       </div>
-      <textarea class="compare-editor-textarea" data-side-textarea="${sideKey}" placeholder="${side.sourceType === 'paste' ? '在此粘贴内容...' : '正文内容'}">${escapeHtml(side.content)}</textarea>
+      <textarea class="compare-editor-textarea" rows="3" data-side-textarea="${sideKey}" placeholder="${side.sourceType === 'paste' ? '在此粘贴内容...' : '正文内容'}">${escapeHtml(side.content)}</textarea>
       <div class="compare-pane-status">
         <span class="compare-pane-source">${escapeHtml(getSideSourceSummary(side))}</span>
         <span class="compare-pane-dirty">${side.dirty ? '已修改' : '未修改'}</span>
@@ -761,16 +761,19 @@ function ensureStyles() {
     <style id="${STYLE_ID}">
       #${CONTENT_EDITOR_MODAL_ID},#${COMPARE_EDITOR_MODAL_ID}{display:none;position:fixed;z-index:10001;left:0;top:0;width:100vw;height:100vh;overflow-y:auto;background-color:rgba(0,0,0,.75);backdrop-filter:blur(4px);box-sizing:border-box}
       #${CONTENT_EDITOR_MODAL_ID}-content,#${COMPARE_EDITOR_MODAL_ID}-content{background:var(--panel-bg-color,#2a2a2a);color:var(--panel-text-color,#eee);border:1px solid rgba(255,255,255,.15);width:95%;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);display:flex;flex-direction:column;margin:40px auto;box-sizing:border-box}
-      #${CONTENT_EDITOR_MODAL_ID}-content{max-width:800px;max-height:calc(100vh - 100px)}
+      #${CONTENT_EDITOR_MODAL_ID}{overflow:hidden}
+      #${CONTENT_EDITOR_MODAL_ID}-content{width:100%;height:100%;max-width:none;max-height:none;margin:0;border:none;border-radius:0}
       #${COMPARE_EDITOR_MODAL_ID}-content{max-width:1360px;min-height:calc(100vh - 110px)}
       #${CONTENT_EDITOR_MODAL_ID}-header,#${COMPARE_EDITOR_MODAL_ID}-header{padding:15px 20px;background:var(--panel-accent-color,#5a3a8e);color:#fff;border-top-left-radius:12px;border-top-right-radius:12px;display:flex;justify-content:space-between;align-items:center}
+      #${CONTENT_EDITOR_MODAL_ID}-header{flex:0 0 auto;border-radius:0}
       #${CONTENT_EDITOR_MODAL_ID}-header h4,#${COMPARE_EDITOR_MODAL_ID}-header h4{margin:0;font-size:1.05em;font-weight:600}
       #${CONTENT_EDITOR_MODAL_ID} .close-button,#${COMPARE_EDITOR_MODAL_ID} .close-button{font-size:24px;font-weight:700;cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.1)}
-      #${CONTENT_EDITOR_MODAL_ID}-body{padding:20px;display:flex;flex-direction:column;gap:12px;flex:1 1 auto}
+      #${CONTENT_EDITOR_MODAL_ID}-body{padding:20px;display:flex;flex-direction:column;gap:12px;flex:1 1 auto;min-height:0;overflow:hidden}
       #${CONTENT_EDITOR_MODAL_ID}-textarea,#${COMPARE_EDITOR_MODAL_ID} .compare-editor-textarea,#${COMPARE_EDITOR_MODAL_ID} select{width:100%;box-sizing:border-box;background:var(--yaml-input-bg-color,#2d2d2d);color:var(--panel-text-color,#f0f0f0);border:1px solid rgba(255,255,255,.12);border-radius:8px}
-      #${CONTENT_EDITOR_MODAL_ID}-textarea{min-height:400px;padding:12px;line-height:1.6;font-family:Consolas,Monaco,'Courier New',monospace}
+      #${CONTENT_EDITOR_MODAL_ID}-textarea{flex:1 1 0;min-height:0;padding:12px;line-height:1.6;font-family:Consolas,Monaco,'Courier New',monospace;resize:none}
       #${CONTENT_EDITOR_MODAL_ID}-error{display:none;color:#ff6b6b;font-size:.9em;padding:10px 12px;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.3);border-radius:6px}
       #${CONTENT_EDITOR_MODAL_ID}-footer,#${COMPARE_EDITOR_MODAL_ID}-footer{padding:15px 20px;border-top:1px solid rgba(255,255,255,.1);background:var(--panel-entry-bg-color,rgba(0,0,0,.2));border-bottom-left-radius:12px;border-bottom-right-radius:12px;display:flex;justify-content:flex-end;align-items:center;gap:10px}
+      #${CONTENT_EDITOR_MODAL_ID}-footer{flex:0 0 auto;border-radius:0}
       #${CONTENT_EDITOR_MODAL_ID}-footer button,#${COMPARE_EDITOR_MODAL_ID}-footer button,#${COMPARE_EDITOR_MODAL_ID} .compare-side-save,#${COMPARE_EDITOR_MODAL_ID} .compare-toolbar button,#${COMPARE_EDITOR_MODAL_ID} .compare-diff-actions button{padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-size:.9em}
       #${CONTENT_EDITOR_MODAL_ID}-save,#${COMPARE_EDITOR_MODAL_ID} .compare-toolbar button{background:var(--panel-accent-color,#5a3a8e);color:#fff}
       #${CONTENT_EDITOR_MODAL_ID}-cancel,#${COMPARE_EDITOR_MODAL_ID}-close,#${COMPARE_EDITOR_MODAL_ID} .compare-toolbar .secondary{background:var(--panel-entry-bg-color,#555);color:#fff}
@@ -779,14 +782,14 @@ function ensureStyles() {
       #${COMPARE_EDITOR_MODAL_ID} .compare-toolbar-actions{display:flex;gap:8px}
       #${COMPARE_EDITOR_MODAL_ID}-status[data-tone="error"]{color:#ff9b9b}
       #${COMPARE_EDITOR_MODAL_ID}-status[data-tone="success"]{color:#b5e6a7}
-      #${COMPARE_EDITOR_MODAL_ID} .compare-panes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;min-height:420px}
+      #${COMPARE_EDITOR_MODAL_ID} .compare-panes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;min-height:0}
       #${COMPARE_EDITOR_MODAL_ID} .compare-pane{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
       #${COMPARE_EDITOR_MODAL_ID} .compare-pane-header,#${COMPARE_EDITOR_MODAL_ID} .compare-pane-status{display:flex;justify-content:space-between;gap:10px}
       #${COMPARE_EDITOR_MODAL_ID} .compare-pane-caption,#${COMPARE_EDITOR_MODAL_ID} .compare-pane-status{font-size:12px;opacity:.8}
       #${COMPARE_EDITOR_MODAL_ID} .compare-pane-title{font-size:14px;font-weight:600;line-height:1.4;word-break:break-word}
       #${COMPARE_EDITOR_MODAL_ID} .compare-source-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
       #${COMPARE_EDITOR_MODAL_ID} .compare-source-controls label{display:flex;flex-direction:column;gap:4px;font-size:12px}
-      #${COMPARE_EDITOR_MODAL_ID} .compare-editor-textarea{min-height:280px;padding:12px;line-height:1.6;font-family:Consolas,Monaco,'Courier New',monospace;resize:vertical}
+      #${COMPARE_EDITOR_MODAL_ID} .compare-editor-textarea{flex:0 0 auto;min-height:0;max-height:none;padding:12px;line-height:1.6;font-family:Consolas,Monaco,'Courier New',monospace;overflow:auto;resize:vertical !important}
       #${COMPARE_EDITOR_MODAL_ID} .compare-diff-list{border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.02);padding:12px;min-height:140px;max-height:320px;overflow-y:auto}
       #${COMPARE_EDITOR_MODAL_ID} .compare-empty{text-align:center;color:rgba(255,255,255,.75);padding:18px}
       #${COMPARE_EDITOR_MODAL_ID} .compare-diff-item + .compare-diff-item{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
@@ -811,7 +814,6 @@ function ensureStyles() {
       #${COMPARE_EDITOR_MODAL_ID} .compare-pane.compare-pane-mobile{min-height:0}
       #${COMPARE_EDITOR_MODAL_ID} .compare-pane.compare-pane-mobile .compare-source-controls{grid-template-columns:minmax(0,1fr)}
       #${COMPARE_EDITOR_MODAL_ID} .compare-pane.compare-pane-mobile .compare-pane-header,#${COMPARE_EDITOR_MODAL_ID} .compare-pane.compare-pane-mobile .compare-pane-status{flex-direction:column;align-items:flex-start}
-      #${COMPARE_EDITOR_MODAL_ID} .compare-pane.compare-pane-mobile .compare-editor-textarea{min-height:240px}
       #${COMPARE_EDITOR_MODAL_ID} .compare-mobile-diff-list{display:flex;flex-direction:column;gap:12px}
       #${COMPARE_EDITOR_MODAL_ID} .compare-mobile-diff-item{margin:0;padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.03)}
       #${COMPARE_EDITOR_MODAL_ID} .compare-mobile-diff-item + .compare-mobile-diff-item{margin-top:0;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}

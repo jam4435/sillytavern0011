@@ -13,7 +13,7 @@
 ## 2. 核心设计理念
 
 - **分层模块化**：`commands/` 负责操作编排，`features/` 负责业务能力，`ui/` 负责界面，`api.js` 负责酒馆接口封装
-- **双布局并存**：移动端和抽屉布局走列表/展开式界面；PC 默认走主从布局，由 `detail.js`、`list.js`、`aiWorkspaceDesktop.js` 做专门适配
+- **双布局并存**：移动端的有效布局固定为抽屉式，PC 使用独立保存的抽屉式或主从布局偏好；跨设备模式时同步面板属性并重渲染当前页
 - **状态分层**：主列表共享状态集中在 `state.js`；AI 工作区有模块内状态；跨会话偏好写入 `settings.js` 或主题存储
 - **命令驱动 + 局部直绑并存**：主面板遵循 `events.js -> commands/*.js` 的命令分发；AI 工作区、编辑器、优化器、悬浮球等复杂交互在对应 UI 模块或 `events.js` 内部直绑
 - **事务化写回**：世界书更新通过 `api.js` 统一提交，高风险操作用 `history.js` 记录提交前快照
@@ -48,6 +48,7 @@ src/世界书编辑脚本/
     │   ├── batchActions.js
     │   ├── browserSettingsBackup.js
     │   ├── bulkImport.js
+    │   ├── entryTogglePresets.js
     │   ├── folderMeta.js
     │   ├── history.js
     │   ├── llmClient.js
@@ -106,6 +107,7 @@ src/世界书编辑脚本/
 | `batchActions.js` | 批量字段更新、复制到其他世界书、删除、调序、全选；复制支持覆盖、重命名、保留原名策略 |
 | `browserSettingsBackup.js` | 浏览器设置备份：按白名单导出/导入 localStorage，并在导出时脱敏自定义 API Key 和上传背景图 data URL |
 | `bulkImport.js` | YAML 批量导入条目及导入弹窗 |
+| `entryTogglePresets.js` | 按世界书名称保存条目组预设，记录条目 UID、启用状态和策略类型；受控改名时迁移预设命名空间 |
 | `folderMeta.js` | 用隐藏元条目保存文件夹元数据，提供文件夹 CRUD、条目归属修改和渲染过滤 |
 | `history.js` | 最近一次高风险操作的事务快照、回滚预览、执行回滚 |
 | `llmClient.js` | LLM 请求封装，兼容酒馆当前预设与自定义 OpenAI 兼容接口，支持流式、超时和停止生成 |
@@ -174,6 +176,8 @@ index.js
 `state.js` 保存当前条目缓存、筛选/搜索、选择、展开、详情选中项和文件夹折叠状态，便于刷新后恢复局部 UI。
 条目文件夹没有会话记录时默认折叠，用户本次会话中的展开/折叠操作会覆盖这个默认值。
 
+移动端不会改写 `lorebook-pc-layout-mode`：其有效布局始终为抽屉式；返回 PC 后恢复此前保存的抽屉式或主从布局。视口跨设备模式时会先同步 `data-device-mode` / `data-pc-layout-mode`，再重渲染当前标签和对应 AI 工作区。
+
 ### 5.4 插入位置模型
 
 世界书条目插入位置统一通过 `modules/position.js` 映射。普通位置直接写入 `position.type`；三种深度位置都写入 `position.type: 'at_depth'`，并用 `position.role` 区分消息身份。
@@ -238,6 +242,8 @@ UI 命令或 AI 应用
 
 接入事务的操作包括 AI 应用、批量更新、复制覆盖、批量删除、批量导入和文件夹元数据修改等。
 
+世界书改名通过携带完整条目创建新名称后删除旧名称，以保留 UID。改名成功后，`entryTogglePresets.js` 将旧世界书名称下的预设整体迁移到新名称；若新名称存在残留预设，以被改名世界书的预设为准。
+
 ## 6. 开发指南
 
 ### 6.1 修改功能时优先看哪些文件
@@ -251,7 +257,7 @@ UI 命令或 AI 应用
 | 改 AI 规划 / 批量预览 / JSON 解析 | `features/aiActionsBatch.js` |
 | 改轻量 AI 弹窗 | `ui/aiActionDialog.js`、`features/aiActions.js`、`commands/entryCommands.js` |
 | 改实际 LLM 请求方式 | `features/llmClient.js` |
-| 改世界书导入、导出、创建、重命名、重绑 | `commands/worldbookCommands.js`、`api.js`、`ui/list.js` |
+| 改世界书导入、导出、创建、重命名、重绑 | `commands/worldbookCommands.js`、`api.js`、`features/entryTogglePresets.js`、`ui/list.js` |
 | 改批量复制、删除、调序、字段修改 | `features/batchActions.js`、`commands/titleBarCommands.js`、`api.js` |
 | 改文件夹功能 | `commands/folderCommands.js`、`features/folderMeta.js`、`ui/list.js`、`state.js` |
 | 改回滚 | `features/history.js`、`commands/titleBarCommands.js`、`ui/list.js`、`api.js` |

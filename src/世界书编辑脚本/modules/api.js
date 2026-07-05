@@ -540,13 +540,13 @@ export const importWorldbookSafe = errorCatched(async (filename, content) => {
 }, 'importWorldbookSafe');
 
 // 创建新的世界书
-export const createWorldbookSafe = errorCatched(async worldbookName => {
+export const createWorldbookSafe = errorCatched(async (worldbookName, worldbook) => {
   if (typeof createWorldbook !== 'function') {
     const msg = '角色世界书: 核心函数 createWorldbook 不可用。';
     console.error(msg);
     throw new Error(msg);
   }
-  return await createWorldbook(worldbookName);
+  return await createWorldbook(worldbookName, worldbook);
 }, 'createWorldbookSafe');
 
 // 删除世界书
@@ -566,15 +566,8 @@ export const renameWorldbookSafe = errorCatched(async (oldName, newName) => {
     throw result.error || new Error(`获取世界书 "${oldName}" 失败`);
   }
   const entries = result.data;
-  await createWorldbookSafe(newName);
-  if (entries.length > 0) {
-    // createWorldbookEntries API 需要的是不带 uid 的条目数组
-    const entriesForCreation = entries.map(({ uid, ...entryData }) => entryData);
-    const creationResult = await createLorebookEntries(newName, entriesForCreation);
-    if (!creationResult.success) {
-      throw creationResult.error || new Error(`复制世界书 "${oldName}" 的条目到 "${newName}" 失败`);
-    }
-  }
+  // 直接携带完整世界书创建副本，保留条目 UID 以及所有基于 UID 的关联数据。
+  await createWorldbookSafe(newName, entries);
   await deleteWorldbookSafe(oldName);
   return true;
 }, 'renameWorldbookSafe');

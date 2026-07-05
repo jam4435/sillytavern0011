@@ -16,6 +16,7 @@ import {
   GLOBAL_LOREBOOK_LIST_CONTAINER_ID,
   LOREBOOK_LIST_CONTAINER_ID,
 } from '../config.js';
+import { renameEntryTogglePresetLorebook } from '../features/entryTogglePresets.js';
 import { setIsReplacingCharacterLorebook } from '../state.js';
 import {
   createLorebookTitleSection,
@@ -247,6 +248,17 @@ async function renameWorldbook({ $panel }) {
   if (newName && newName !== oldName) {
     try {
       await renameWorldbookSafe(oldName, newName);
+      let presetsMigrated = false;
+      try {
+        presetsMigrated = renameEntryTogglePresetLorebook(oldName, newName);
+      } catch (error) {
+        console.warn('角色世界书: 世界书已重命名，但条目组预设迁移失败。', error);
+      }
+      if (!presetsMigrated) {
+        const warning = '世界书已重命名，但条目组预设迁移失败。';
+        console.warn(`角色世界书: ${warning}`);
+        (window.toastr || window.parent?.toastr)?.warning?.(warning);
+      }
       alert(`世界书 "${oldName}" 已成功重命名为 "${newName}"！`);
       // 局部更新UI，避免刷新
       const $wrapper = $listContainer.find(`.lorebook-entries-wrapper[data-lorebook-name="${oldName}"]`);

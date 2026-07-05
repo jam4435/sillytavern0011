@@ -51,7 +51,13 @@ import {
 } from './state.js';
 import { toggleAllEntries } from './features/batchActions.js';
 import { createEntryHtml } from './ui/entry.js';
-import { getTabKey, isMasterDetailLayout, renderDetailPane, selectDetailEntry } from './ui/detail.js';
+import {
+  getTabKey,
+  isMasterDetailLayout,
+  renderDetailPane,
+  selectDetailEntry,
+  syncPanelLayoutMode,
+} from './ui/detail.js';
 import {
   closeFloatingBatchToggleDropdowns,
   repositionFloatingBatchToggleDropdowns,
@@ -124,6 +130,7 @@ export function bindEventListeners() {
 
     lastViewportIsMobile = currentIsMobile;
     pendingViewportModeRefresh = false;
+    syncPanelLayoutMode();
     const activeTabId = $panel.find('.tab-button.active-tab').attr('id');
     if (activeTabId) {
       await switchTab(activeTabId);

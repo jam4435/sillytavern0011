@@ -146,6 +146,27 @@ export function getEntryTogglePresetNames(lorebookName) {
   );
 }
 
+export function renameEntryTogglePresetLorebook(oldLorebookName, newLorebookName) {
+  const normalizedOldName = normalizeLorebookName(oldLorebookName);
+  const normalizedNewName = normalizeLorebookName(newLorebookName);
+  if (!normalizedOldName || !normalizedNewName) {
+    return false;
+  }
+  if (normalizedOldName === normalizedNewName) {
+    return true;
+  }
+
+  const presets = getEntryTogglePresetMap();
+  if (!Object.prototype.hasOwnProperty.call(presets, normalizedOldName)) {
+    return true;
+  }
+
+  // 新世界书完全来源于旧世界书；旧名称下的预设因此是新名称下的权威数据。
+  presets[normalizedNewName] = presets[normalizedOldName];
+  delete presets[normalizedOldName];
+  return saveEntryTogglePresetMap(presets);
+}
+
 export const createEntryTogglePresetFromCurrentState = errorCatched(async (lorebookName, presetName) => {
   const normalizedLorebookName = normalizeLorebookName(lorebookName);
   const normalizedPresetName = normalizePresetName(presetName);
