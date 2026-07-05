@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActiveStatusEffect, CurrentAttributes, InventoryItem } from '../../types';
+import type { ActiveStatusEffect, CurrentAttributes, InventoryItem } from '../../types';
 import { buildItemAttributePreview } from '../../utils/inventoryAttributePreview';
 import { Icons } from '../Icons';
 import { EmptyState } from './EmptyState';
