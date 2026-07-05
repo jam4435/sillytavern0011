@@ -56,10 +56,17 @@ function getInkWidth(npc: NPC): string {
   return `${Math.max(4, clamped)}%`;
 }
 
-export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
+export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs, theme, onThemeChange }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // 移动端详情开合：桌面忽略（CSS 并排），手机点叶后翻开详情册页。
   const [detailOpen, setDetailOpen] = useState(false);
+
+  // 水墨主题：注入 --sprite-* base64 data URI 给 SCSS override block 用。
+  // 宣纸主题不注入，走纯 CSS 默认值；保持纯展示契约，不读写 localStorage。
+  const spriteStyle = useMemo<React.CSSProperties>(
+    () => (theme === 'ink' ? (buildInkSpriteStyle() as React.CSSProperties) : {}),
+    [theme],
+  );
 
   const groupedNpcs = useMemo(
     () => ({
@@ -90,6 +97,24 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
   };
 
   const handleBack = () => setDetailOpen(false);
+
+  // 主题切换快捷条：仅侠缘页内，UI_THEMES 驱动；随 data-theme 自动换肤。
+  const renderThemeBar = () => (
+    <div className="social-theme-bar" role="group" aria-label="侠缘页主题切换">
+      <span className="social-theme-bar-label">册页</span>
+      {UI_THEMES.map(t => (
+        <button
+          type="button"
+          key={t.id}
+          className={`social-theme-btn${theme === t.id ? ' is-active' : ''}`}
+          aria-pressed={theme === t.id}
+          onClick={() => onThemeChange(t.id)}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
 
   const renderNpcSection = (section: SocialSectionKey) => {
     const meta = SECTION_META[section];
@@ -138,13 +163,14 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
   // 空态：关系网中一人皆无
   if (orderedNpcs.length === 0) {
     return (
-      <div className="social-panel">
+      <div className="social-panel" style={spriteStyle}>
         <div className="social-scroll-frame">
           <span className="social-scroll-cap" />
           <h2 className="social-scroll-title">江湖名册</h2>
           <span className="social-scroll-count">0</span>
           <span className="social-scroll-cap" />
         </div>
+        {renderThemeBar()}
         <div className="social-empty">
           <div className="social-empty-ink" />
           <p className="social-empty-text">江湖未识一人</p>
@@ -154,13 +180,14 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
   }
 
   return (
-    <div className="social-panel">
+    <div className="social-panel" style={spriteStyle}>
       <div className="social-scroll-frame">
         <span className="social-scroll-cap" />
         <h2 className="social-scroll-title">江湖名册</h2>
         <span className="social-scroll-count">{orderedNpcs.length}</span>
         <span className="social-scroll-cap" />
       </div>
+      {renderThemeBar()}
 
       <div className={`social-body${detailOpen ? ' detail-open' : ''}`}>
         {/* 左：江湖名册（概览） */}
