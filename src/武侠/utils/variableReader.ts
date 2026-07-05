@@ -1718,6 +1718,11 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
   }
 }
 
+/** 在物品状态变化后立即重算并写回玩家最终属性。 */
+export async function syncPlayerAttributesFromVariables(): Promise<void> {
+  await autoUpdatePlayerAttributes(getGameVariables().user数据);
+}
+
 /**
  * 自动更新角色数据的战斗属性并写回变量表
  *
@@ -3084,6 +3089,7 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
     dataLogger.log('[variableReader] Step 4d2 - 状态效果:', statusEffects);
     dataLogger.log('[variableReader] Step 4d3 - 属性修正:', activeModifiers);
 
+    const baseAttributes = calculateAllAttributes(initialAttrs, realm, martialArtsForCalc);
     const { combat, resources } = calculateAllAttributes(initialAttrs, realm, martialArtsForCalc, activeModifiers);
 
     dataLogger.log('[variableReader] Step 4e - 计算后的战斗属性:', combat);
@@ -3101,6 +3107,7 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
       identities: 用户档案.身份 || {},
       martialArts: martialArts,
       initialAttributes: initialAttrs,
+      baseAttributes: parseCurrentAttributes(用户档案, baseAttributes.combat, baseAttributes.resources),
       attributes: parseCurrentAttributes(用户档案, combat, resources),
       biography: 用户档案.人物经历 || '',
       network: 用户档案.关系网 || {},

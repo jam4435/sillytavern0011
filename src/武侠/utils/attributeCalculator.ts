@@ -178,12 +178,19 @@ export function calculateResources(
   };
 }
 
-function addModifier(value: number, modifier: number): number {
-  return Math.max(0, Math.floor(value + modifier));
+function applyPercentageModifier(value: number, modifierPercentage: number): number {
+  return Math.max(0, Math.floor((value * (100 + modifierPercentage)) / 100));
+}
+
+function sumModifierPercentages(modifiers: AttributeModifierMap, attributes: string[]): number {
+  return attributes.reduce((total, attribute) => {
+    const modifier = modifiers[attribute];
+    return Number.isFinite(modifier) ? total + modifier : total;
+  }, 0);
 }
 
 /**
- * 属性修正是最终值上的平铺加减，不再参与境界倍率放大。
+ * 属性修正中的数字表示百分比点。所有来源先求和，再对无物品效果的基础值乘算一次。
  */
 export function applyAttributeModifiers(
   combat: CombatAttributes,
@@ -197,33 +204,16 @@ export function applyAttributeModifiers(
     return { combat, resources };
   }
 
-  const nextCombat: CombatAttributes = { ...combat };
-  const nextResources: ResourceAttributes = { ...resources };
-
-  for (const [attribute, modifier] of Object.entries(modifiers)) {
-    if (!Number.isFinite(modifier)) {
-      continue;
-    }
-
-    switch (attribute) {
-      case '臂力':
-      case '根骨':
-      case '机敏':
-      case '洞察':
-        nextCombat[attribute] = addModifier(nextCombat[attribute], modifier);
-        break;
-      case '气血':
-      case '气血上限':
-        nextResources.气血上限 = addModifier(nextResources.气血上限, modifier);
-        break;
-      case '内力':
-      case '内力上限':
-        nextResources.内力上限 = addModifier(nextResources.内力上限, modifier);
-        break;
-      default:
-        break;
-    }
-  }
+  const nextCombat: CombatAttributes = {
+    臂力: applyPercentageModifier(combat.臂力, sumModifierPercentages(modifiers, ['臂力'])),
+    根骨: applyPercentageModifier(combat.根骨, sumModifierPercentages(modifiers, ['根骨'])),
+    机敏: applyPercentageModifier(combat.机敏, sumModifierPercentages(modifiers, ['机敏'])),
+    洞察: applyPercentageModifier(combat.洞察, sumModifierPercentages(modifiers, ['洞察'])),
+  };
+  const nextResources: ResourceAttributes = {
+    气血上限: applyPercentageModifier(resources.气血上限, sumModifierPercentages(modifiers, ['气血', '气血上限'])),
+    内力上限: applyPercentageModifier(resources.内力上限, sumModifierPercentages(modifiers, ['内力', '内力上限'])),
+  };
 
   return { combat: nextCombat, resources: nextResources };
 }

@@ -402,8 +402,8 @@ describe('readGameDataSync inventory rank field', () => {
               数量: 1,
               部位: '护甲',
               属性修正: {
-                根骨: 15,
-                洞察: 5,
+                根骨: 50,
+                洞察: 20,
               },
               使用状态: '装备中',
             },
@@ -413,8 +413,8 @@ describe('readGameDataSync inventory rank field', () => {
               物品描述: '清香沁脾，可调息养气。',
               数量: 2,
               属性修正: {
-                气血: 300,
-                内力: 120,
+                气血: 30,
+                内力: 20,
               },
               持续时间: 3,
             },
@@ -434,8 +434,8 @@ describe('readGameDataSync inventory rank field', () => {
           equipInfo: expect.objectContaining({
             slot: '护甲',
             modifiers: {
-              根骨: 15,
-              洞察: 5,
+              根骨: 50,
+              洞察: 20,
             },
             status: '装备中',
           }),
@@ -446,8 +446,8 @@ describe('readGameDataSync inventory rank field', () => {
           rank: 'BLUE',
           elixirInfo: {
             modifiers: {
-              气血: 300,
-              内力: 120,
+              气血: 30,
+              内力: 20,
             },
             duration: '3',
           },
@@ -482,8 +482,8 @@ describe('readGameDataSync inventory rank field', () => {
               数量: 1,
               部位: '护甲',
               属性修正: {
-                根骨: 15,
-                洞察: 5,
+                根骨: 50,
+                洞察: 20,
               },
               使用状态: '',
             },
@@ -493,9 +493,9 @@ describe('readGameDataSync inventory rank field', () => {
               物品描述: '清香沁脾，可调息养气。',
               数量: 2,
               属性修正: {
-                气血: 300,
-                内力: 120,
-                臂力: -2,
+                气血: 30,
+                内力: 20,
+                臂力: -20,
               },
               持续时间: 3,
             },
@@ -508,9 +508,9 @@ describe('readGameDataSync inventory rank field', () => {
               类型: '丹药',
               来源: '九花玉露丸',
               属性修正: {
-                气血: 300,
-                内力: 120,
-                臂力: -2,
+                气血: 30,
+                内力: 20,
+                臂力: -20,
               },
               持续时间: 3,
               剩余时间: 2,
@@ -529,21 +529,29 @@ describe('readGameDataSync inventory rank field', () => {
         type: '丹药',
         source: '九花玉露丸',
         modifiers: {
-          气血: 300,
-          内力: 120,
-          臂力: -2,
+          气血: 30,
+          内力: 20,
+          臂力: -20,
         },
         duration: 3,
         remaining: 2,
       },
     ]);
     expect(result?.stats?.attributes).toEqual({
-      hp: 310,
-      mp: 130,
+      hp: 13,
+      mp: 12,
       臂力: 8,
-      根骨: 25,
+      根骨: 15,
       机敏: 10,
-      洞察: 15,
+      洞察: 12,
+    });
+    expect(result?.stats?.baseAttributes).toEqual({
+      hp: 10,
+      mp: 10,
+      臂力: 10,
+      根骨: 10,
+      机敏: 10,
+      洞察: 10,
     });
     expect(result?.inventory).toEqual(
       expect.arrayContaining([

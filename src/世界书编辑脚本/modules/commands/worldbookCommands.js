@@ -12,10 +12,7 @@ import {
   rebindChatWorldbookSafe,
   renameWorldbookSafe,
 } from '../api.js';
-import {
-  GLOBAL_LOREBOOK_LIST_CONTAINER_ID,
-  LOREBOOK_LIST_CONTAINER_ID,
-} from '../config.js';
+import { GLOBAL_LOREBOOK_LIST_CONTAINER_ID, LOREBOOK_LIST_CONTAINER_ID } from '../config.js';
 import { renameEntryTogglePresetLorebook } from '../features/entryTogglePresets.js';
 import { setIsReplacingCharacterLorebook } from '../state.js';
 import {
@@ -25,11 +22,7 @@ import {
   updateGlobalLorebooksList,
   updateHeaderCheckboxState,
 } from '../ui/list.js';
-import {
-  convertPluginToNativeFormat,
-  openFilePickerAndRead,
-  triggerDownload,
-} from '../utils.js';
+import { convertPluginToNativeFormat, openFilePickerAndRead, triggerDownload } from '../utils.js';
 import { registerCommands } from './index.js';
 
 async function showCharacterWorldbookWithoutCard($panel, worldbookName) {
@@ -42,7 +35,10 @@ async function showCharacterWorldbookWithoutCard($panel, worldbookName) {
   if (!$wrapper.length) {
     const $title = createLorebookTitleSection(worldbookName, false);
     $title.attr('data-lorebook-name', worldbookName);
-    $wrapper = $('<div></div>').addClass('lorebook-entries-wrapper').attr('data-lorebook-name', worldbookName).attr('data-is-global', 'false');
+    $wrapper = $('<div></div>')
+      .addClass('lorebook-entries-wrapper')
+      .attr('data-lorebook-name', worldbookName)
+      .attr('data-is-global', 'false');
     $listContainer.append($title).append($wrapper);
   }
 
@@ -322,9 +318,7 @@ function selectOptimizerCompareLorebook({ $actionTarget, parentDoc }) {
   }
 
   const $modal = $('#lorebook-optimize-modal', parentDoc);
-  $('#optimize-compare-search-input', $modal)
-    .val(lorebookName)
-    .attr('data-selected-lorebook-name', lorebookName);
+  $('#optimize-compare-search-input', $modal).val(lorebookName).attr('data-selected-lorebook-name', lorebookName);
   $('#optimize-compare-search-results', $modal).empty().hide();
   $('#preview-lorebook-compare-button', $modal).prop('disabled', false);
   $modal.data('compare-target-lorebook', lorebookName);

@@ -70,6 +70,7 @@ export interface CharacterProfile {
   martialArts: Record<string, MartialArt>; // 武功: { Name: Template }
 
   initialAttributes: InitialAttributes; // 初始属性
+  baseAttributes?: CurrentAttributes; // 不含装备/药效的前端计算基准，只用于界面预览
   attributes: CurrentAttributes; // 属性
 
   // Note: Inventory is handled via the specific InventoryItem[] in GameState for the UI grid,
@@ -82,6 +83,7 @@ export interface CharacterProfile {
 }
 
 export interface InventoryAttributeModifierMap {
+  // 数字表示百分比点，例如 10 表示 +10%，-15 表示 -15%。
   [attribute: string]: number;
 }
 

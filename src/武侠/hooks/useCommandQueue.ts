@@ -7,6 +7,7 @@ import { useState, useCallback } from 'react';
 import { InventoryItemVariableData, PendingCommand, CommandType } from '../types';
 import { decrementStatusEffectTurns, removeStatusEffect, restoreItemCount } from '../utils/itemManager';
 import { uiLogger } from '../utils/logger';
+import { syncPlayerAttributesFromVariables } from '../utils/variableReader';
 
 export function useCommandQueue() {
   const [commands, setCommands] = useState<PendingCommand[]>([]);
@@ -78,6 +79,7 @@ export function useCommandQueue() {
         if (command.data.statusEffectId) {
           await removeStatusEffect(command.data.statusEffectId);
         }
+        await syncPlayerAttributesFromVariables();
         uiLogger.log('[useCommandQueue] 恢复物品使用:', command.data.itemName);
       }
 
@@ -100,6 +102,7 @@ export function useCommandQueue() {
       await handleSendMessage(combinedMessage);
       try {
         await decrementStatusEffectTurns();
+        await syncPlayerAttributesFromVariables();
       } catch (error) {
         uiLogger.error('[useCommandQueue] 状态效果回合递减失败:', error);
       }

@@ -318,7 +318,10 @@ function updateVisibleEntryContent(lorebookName, entryUid, content) {
     });
   });
 
-  $(`.lorebook-entry[data-entry-lorebook="${lorebookName}"][data-entry-uid="${uid}"] .content-edit-area`, parentDoc).each(function () {
+  $(
+    `.lorebook-entry[data-entry-lorebook="${lorebookName}"][data-entry-uid="${uid}"] .content-edit-area`,
+    parentDoc,
+  ).each(function () {
     const $contentArea = $(this);
     $contentArea.find('.content-textarea, .large-content-preview-card').remove();
     $contentArea.append(buildInlineEntryContentMarkup(normalized));
@@ -1017,6 +1020,9 @@ export const showCompareEditor = errorCatched(async (lorebookName, entryUid) => 
   await openCompareEditor(lorebookName, entryUid);
 }, 'showCompareEditor');
 
-export const showCompareEditorPair = errorCatched(async (leftSource, rightSource, statusText = '', returnContext = null) => {
-  await openCompareEditorWithSources(leftSource, rightSource, statusText, returnContext);
-}, 'showCompareEditorPair');
+export const showCompareEditorPair = errorCatched(
+  async (leftSource, rightSource, statusText = '', returnContext = null) => {
+    await openCompareEditorWithSources(leftSource, rightSource, statusText, returnContext);
+  },
+  'showCompareEditorPair',
+);

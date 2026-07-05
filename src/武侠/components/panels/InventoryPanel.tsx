@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { InventoryItem } from '../../types';
+import { ActiveStatusEffect, CurrentAttributes, InventoryItem } from '../../types';
+import { buildItemAttributePreview } from '../../utils/inventoryAttributePreview';
 import { Icons } from '../Icons';
 import { EmptyState } from './EmptyState';
 
@@ -87,7 +88,12 @@ const getItemModifierEntries = (item: InventoryItem) => {
 
 const formatModifierLabel = (attribute: string, value: number) => {
     const sign = value >= 0 ? '+' : '';
-    return `${attribute}${sign}${value}`;
+    return `${attribute}${sign}${value}%`;
+};
+
+const formatPreviewLabel = (attribute: string, currentValue: number, nextValue: number, delta: number) => {
+    const sign = delta >= 0 ? '+' : '';
+    return `${attribute} ${currentValue} → ${nextValue}（${sign}${delta}）`;
 };
 
 // Suppress unused type warning
@@ -96,10 +102,19 @@ void (undefined as unknown as RankKey);
 /* --- Inventory Panel --- */
 interface InventoryPanelProps {
     items: InventoryItem[];
+    baseAttributes?: CurrentAttributes;
+    attributes?: CurrentAttributes;
+    statusEffects?: ActiveStatusEffect[];
     onItemAction?: (item: InventoryItem) => void | Promise<void>;
 }
 
-export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items, onItemAction }) => {
+export const InventoryPanel: React.FC<InventoryPanelProps> = ({
+    items,
+    baseAttributes,
+    attributes,
+    statusEffects = [],
+    onItemAction,
+}) => {
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
     const [isActing, setIsActing] = useState(false);
     const selectedItemRequirementEntries = selectedItem ? getMartialArtRequirementEntries(selectedItem) : [];
@@ -107,6 +122,10 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items, onItemAct
     const selectedEquipSlot = selectedItem?.type === 'EQUIP' ? selectedItem.equipInfo?.slot : undefined;
     const selectedEquipStatus = selectedItem?.type === 'EQUIP' ? selectedItem.equipInfo?.status : undefined;
     const selectedElixirDuration = selectedItem?.type === 'ELIXIR' ? selectedItem.elixirInfo?.duration : undefined;
+    const selectedItemPreview =
+        selectedItem && baseAttributes && attributes
+            ? buildItemAttributePreview(selectedItem, items, statusEffects, baseAttributes, attributes)
+            : [];
     const selectedActionDisabled =
         isActing ||
         !onItemAction ||
@@ -229,6 +248,20 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({ items, onItemAct
                                         {selectedItemModifierEntries.map(([attribute, value]) => (
                                             <span key={attribute} className="inv-win-requirement-chip">
                                                 {formatModifierLabel(attribute, value)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {selectedItemPreview.length > 0 && (
+                                <div className="inv-win-requirements">
+                                    <div className="inv-win-requirements-title">
+                                        {selectedItem.type === 'EQUIP' ? '装备后属性' : '服用后属性'}
+                                    </div>
+                                    <div className="inv-win-requirements-list">
+                                        {selectedItemPreview.map(({ attribute, currentValue, nextValue, delta }) => (
+                                            <span key={attribute} className="inv-win-requirement-chip">
+                                                {formatPreviewLabel(attribute, currentValue, nextValue, delta)}
                                             </span>
                                         ))}
                                     </div>

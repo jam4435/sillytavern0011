@@ -1,6 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ENTRY_TOGGLE_PRESETS_KEY } from '../config.js';
 import { getEntryTogglePresetMap, renameEntryTogglePresetLorebook } from './entryTogglePresets.js';
+
+vi.mock('../api.js', () => ({
+  getWorldbookSafe: vi.fn(),
+  updateWorldbookEntries: vi.fn(),
+}));
 
 type Preset = {
   name: string;

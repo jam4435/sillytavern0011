@@ -59,6 +59,7 @@ import {
   parseOptions,
   readGameDataPure,
   scheduleGameDataCompletion,
+  syncPlayerAttributesFromVariables,
 } from './utils/variableReader';
 
 const App: React.FC = () => {
@@ -340,6 +341,7 @@ const App: React.FC = () => {
         if (item.type === 'EQUIP') {
           const equipped = await equipInventoryItem(item.name);
           if (equipped) {
+            await syncPlayerAttributesFromVariables();
             refreshGameStateFromVariables();
           }
           return;
@@ -349,6 +351,7 @@ const App: React.FC = () => {
           const result = await useElixirItem(item.name);
           if (result) {
             addUseItemCommand(result.itemName, result.originalItem, result.statusEffectId);
+            await syncPlayerAttributesFromVariables();
             refreshGameStateFromVariables();
           }
         }
@@ -570,7 +573,15 @@ const App: React.FC = () => {
           />
         );
       case ActivePanel.INVENTORY:
-        return <InventoryPanel items={gameState.inventory} onItemAction={handleInventoryItemAction} />;
+        return (
+          <InventoryPanel
+            items={gameState.inventory}
+            baseAttributes={gameState.stats.baseAttributes}
+            attributes={gameState.stats.attributes}
+            statusEffects={gameState.statusEffects}
+            onItemAction={handleInventoryItemAction}
+          />
+        );
       case ActivePanel.SOCIAL:
         return <SocialPanel npcs={gameState.social} />;
       case ActivePanel.SETTINGS:

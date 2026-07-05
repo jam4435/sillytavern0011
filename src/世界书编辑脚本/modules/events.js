@@ -87,7 +87,9 @@ async function refreshList(lorebookName, isGlobal) {
   if ($entriesWrapper.is(':visible')) {
     await loadLorebookEntries(lorebookName, $entriesWrapper, isGlobal);
     const existingUidSet = new Set(
-      (Array.isArray(allEntriesData[lorebookName]) ? allEntriesData[lorebookName] : []).map(entry => ensureNumericUID(entry.uid)),
+      (Array.isArray(allEntriesData[lorebookName]) ? allEntriesData[lorebookName] : []).map(entry =>
+        ensureNumericUID(entry.uid),
+      ),
     );
     setSelectedEntries(
       lorebookName,
@@ -399,12 +401,10 @@ export function bindEventListeners() {
       await toggleLorebookPanel();
       await refreshCurrentTabForViewportMode(false);
     });
-  $panel
-    .off('click.lorebookClose')
-    .on('click.lorebookClose', '.close-button', async event => {
-      event.preventDefault();
-      await closeLorebookPanel();
-    });
+  $panel.off('click.lorebookClose').on('click.lorebookClose', '.close-button', async event => {
+    event.preventDefault();
+    await closeLorebookPanel();
+  });
   $panel
     .off('click.lorebookMinimize')
     .on('click.lorebookMinimize', `.${LOREBOOK_MINIMIZE_BUTTON_CLASS}`, async event => {
@@ -441,11 +441,10 @@ export function bindEventListeners() {
       .on('mouseup.lorebookBubbleDrag touchend.lorebookBubbleDrag touchcancel.lorebookBubbleDrag', stopBubbleDrag);
   }
 
-  $(parentWin)
-    .on('resize.lorebookBubbleViewport orientationchange.lorebookBubbleViewport', async () => {
-      ensureFloatingBubbleInViewport({ persist: true });
-      await refreshCurrentTabForViewportMode(false);
-    });
+  $(parentWin).on('resize.lorebookBubbleViewport orientationchange.lorebookBubbleViewport', async () => {
+    ensureFloatingBubbleInViewport({ persist: true });
+    await refreshCurrentTabForViewportMode(false);
+  });
 
   // Tab switching
   $panel.off('click.lorebookTabs').on('click.lorebookTabs', '.tab-button', function () {
@@ -621,63 +620,69 @@ export function bindEventListeners() {
     toggleAllEntries(lorebookName, isGlobal);
   });
 
-  $panel.off('click.folderToggle').on('click.folderToggle', '.lorebook-folder-toggle, .master-folder-toggle', function (e) {
-    e.preventDefault();
-    e.stopPropagation();
+  $panel
+    .off('click.folderToggle')
+    .on('click.folderToggle', '.lorebook-folder-toggle, .master-folder-toggle', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
 
-    const $toggle = $(this);
-    const $folderItem = $toggle.closest('.lorebook-folder-item, .master-folder-item');
-    const lorebookName = $folderItem.attr('data-lorebook-name');
-    const folderId = $folderItem.attr('data-folder-id');
-    const nextCollapsed = toggleFolderCollapsedState(lorebookName, folderId);
-    const $folderEntries = $folderItem.next('.lorebook-folder-entries, .master-folder-entries');
+      const $toggle = $(this);
+      const $folderItem = $toggle.closest('.lorebook-folder-item, .master-folder-item');
+      const lorebookName = $folderItem.attr('data-lorebook-name');
+      const folderId = $folderItem.attr('data-folder-id');
+      const nextCollapsed = toggleFolderCollapsedState(lorebookName, folderId);
+      const $folderEntries = $folderItem.next('.lorebook-folder-entries, .master-folder-entries');
 
-    $folderItem.toggleClass('is-collapsed', nextCollapsed);
-    $toggle.attr('title', nextCollapsed ? '展开文件夹' : '折叠文件夹');
-    $toggle
-      .find('.lorebook-folder-chevron, .master-folder-chevron')
-      .toggleClass('fa-chevron-right', nextCollapsed)
-      .toggleClass('fa-chevron-down', !nextCollapsed);
-    $toggle
-      .find('.lorebook-folder-icon, .master-folder-icon')
-      .toggleClass('fa-folder', nextCollapsed)
-      .toggleClass('fa-folder-open', !nextCollapsed);
-    $folderEntries.toggle(!nextCollapsed);
-  });
-
-  $panel.off('change.folderSelect').on('change.folderSelect', '.lorebook-folder-checkbox, .master-folder-checkbox', function (e) {
-    e.stopPropagation();
-
-    const $checkbox = $(this);
-    const $folderItem = $checkbox.closest('.lorebook-folder-item, .master-folder-item');
-    const lorebookName = $folderItem.attr('data-lorebook-name');
-    const isGlobal = $folderItem.attr('data-is-global') === 'true';
-    const shouldSelect = $checkbox.prop('checked');
-    const folderUids = ($folderItem.attr('data-folder-uids') || '')
-      .split(',')
-      .map(uid => Number(uid))
-      .filter(uid => Number.isFinite(uid));
-
-    const nextSelected = new Set(getSelectedEntries(lorebookName));
-    folderUids.forEach(uid => {
-      if (shouldSelect) {
-        nextSelected.add(uid);
-      } else {
-        nextSelected.delete(uid);
-      }
-    });
-    setSelectedEntries(lorebookName, [...nextSelected]);
-
-    const $entriesWrapper = $(
-      `.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"][data-is-global="${isGlobal ? 'true' : 'false'}"]`,
-      parentDoc,
-    );
-    folderUids.forEach(uid => {
-      $entriesWrapper.find(`.${LOREBOOK_ENTRY_CHECKBOX_CLASS}[data-entry-uid="${uid}"]`).prop('checked', shouldSelect);
+      $folderItem.toggleClass('is-collapsed', nextCollapsed);
+      $toggle.attr('title', nextCollapsed ? '展开文件夹' : '折叠文件夹');
+      $toggle
+        .find('.lorebook-folder-chevron, .master-folder-chevron')
+        .toggleClass('fa-chevron-right', nextCollapsed)
+        .toggleClass('fa-chevron-down', !nextCollapsed);
+      $toggle
+        .find('.lorebook-folder-icon, .master-folder-icon')
+        .toggleClass('fa-folder', nextCollapsed)
+        .toggleClass('fa-folder-open', !nextCollapsed);
+      $folderEntries.toggle(!nextCollapsed);
     });
 
-    updateHeaderCheckboxState(lorebookName, isGlobal);
-  });
+  $panel
+    .off('change.folderSelect')
+    .on('change.folderSelect', '.lorebook-folder-checkbox, .master-folder-checkbox', function (e) {
+      e.stopPropagation();
+
+      const $checkbox = $(this);
+      const $folderItem = $checkbox.closest('.lorebook-folder-item, .master-folder-item');
+      const lorebookName = $folderItem.attr('data-lorebook-name');
+      const isGlobal = $folderItem.attr('data-is-global') === 'true';
+      const shouldSelect = $checkbox.prop('checked');
+      const folderUids = ($folderItem.attr('data-folder-uids') || '')
+        .split(',')
+        .map(uid => Number(uid))
+        .filter(uid => Number.isFinite(uid));
+
+      const nextSelected = new Set(getSelectedEntries(lorebookName));
+      folderUids.forEach(uid => {
+        if (shouldSelect) {
+          nextSelected.add(uid);
+        } else {
+          nextSelected.delete(uid);
+        }
+      });
+      setSelectedEntries(lorebookName, [...nextSelected]);
+
+      const $entriesWrapper = $(
+        `.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"][data-is-global="${isGlobal ? 'true' : 'false'}"]`,
+        parentDoc,
+      );
+      folderUids.forEach(uid => {
+        $entriesWrapper
+          .find(`.${LOREBOOK_ENTRY_CHECKBOX_CLASS}[data-entry-uid="${uid}"]`)
+          .prop('checked', shouldSelect);
+      });
+
+      updateHeaderCheckboxState(lorebookName, isGlobal);
+    });
 
   // Lorebook title click to expand/collapse
   $panel.off('click.lorebookTitleClick').on('click.lorebookTitleClick', '.lorebook-title-clickable', function (e) {
@@ -934,20 +939,22 @@ export function bindEventListeners() {
     $editorPanel.find('.debug-info').hide();
     $editorPanel.hide();
   });
-  $editorPanel.off('click.lorebookEditorOpenContent').on('click', '[data-editor-action="open-content-editor"]', async function (e) {
-    e.preventDefault();
-    e.stopPropagation();
+  $editorPanel
+    .off('click.lorebookEditorOpenContent')
+    .on('click', '[data-editor-action="open-content-editor"]', async function (e) {
+      e.preventDefault();
+      e.stopPropagation();
 
-    const $form = $(this).closest('#entry-edit-form');
-    const lorebookName = `${$form.find('#entry-lorebook').val() || ''}`;
-    const entryUid = ensureNumericUID($form.find('#entry-uid').val());
-    if (!lorebookName || !Number.isFinite(entryUid)) {
-      return;
-    }
+      const $form = $(this).closest('#entry-edit-form');
+      const lorebookName = `${$form.find('#entry-lorebook').val() || ''}`;
+      const entryUid = ensureNumericUID($form.find('#entry-uid').val());
+      if (!lorebookName || !Number.isFinite(entryUid)) {
+        return;
+      }
 
-    const { showContentEditor } = await import('./ui/contentEditor.js');
-    await showContentEditor(lorebookName, entryUid);
-  });
+      const { showContentEditor } = await import('./ui/contentEditor.js');
+      await showContentEditor(lorebookName, entryUid);
+    });
   $editorPanel.off('submit.lorebookEditorForm').on('submit', '#entry-edit-form', async function (e) {
     e.preventDefault();
     const formData = Object.fromEntries(new FormData(this));
@@ -1202,30 +1209,42 @@ export function bindSearchEvents() {
     $resultsContainer.html(resultsHtml).show();
   }, 300);
 
-  $panel.on('focus', '#add-worldbook-search-input, #character-worldbook-search-input, #optimize-compare-search-input', function () {
-    const $input = $(this);
-    const searchTerm = $input.val().toLowerCase();
-    debounceSearch(searchTerm, $input);
-  });
+  $panel.on(
+    'focus',
+    '#add-worldbook-search-input, #character-worldbook-search-input, #optimize-compare-search-input',
+    function () {
+      const $input = $(this);
+      const searchTerm = $input.val().toLowerCase();
+      debounceSearch(searchTerm, $input);
+    },
+  );
 
-  $panel.on('input', '#add-worldbook-search-input, #character-worldbook-search-input, #optimize-compare-search-input', function () {
-    const $input = $(this);
-    if ($input.attr('id') === 'optimize-compare-search-input') {
-      const $optimizeModal = $('#lorebook-optimize-modal', parentDoc);
-      $optimizeModal.data('compare-target-lorebook', '');
-      $input.removeAttr('data-selected-lorebook-name');
-      $('#preview-lorebook-compare-button', $optimizeModal).prop('disabled', true);
-    }
-    const searchTerm = $input.val().toLowerCase();
-    debounceSearch(searchTerm, $input);
-  });
+  $panel.on(
+    'input',
+    '#add-worldbook-search-input, #character-worldbook-search-input, #optimize-compare-search-input',
+    function () {
+      const $input = $(this);
+      if ($input.attr('id') === 'optimize-compare-search-input') {
+        const $optimizeModal = $('#lorebook-optimize-modal', parentDoc);
+        $optimizeModal.data('compare-target-lorebook', '');
+        $input.removeAttr('data-selected-lorebook-name');
+        $('#preview-lorebook-compare-button', $optimizeModal).prop('disabled', true);
+      }
+      const searchTerm = $input.val().toLowerCase();
+      debounceSearch(searchTerm, $input);
+    },
+  );
 
-  $panel.on('blur', '#add-worldbook-search-input, #character-worldbook-search-input, #optimize-compare-search-input', function () {
-    const $input = $(this);
-    setTimeout(() => {
-      debounceSearch(null, $input);
-    }, 200);
-  });
+  $panel.on(
+    'blur',
+    '#add-worldbook-search-input, #character-worldbook-search-input, #optimize-compare-search-input',
+    function () {
+      const $input = $(this);
+      setTimeout(() => {
+        debounceSearch(null, $input);
+      }, 200);
+    },
+  );
 
   $(parentDoc)
     .off('focus.optimizeCompareSearch input.optimizeCompareSearch blur.optimizeCompareSearch')
