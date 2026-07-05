@@ -3828,10 +3828,13 @@ export async function getWorldbookEntryCatalog(worldbookName: string): Promise<
     return [];
   }
   const worldbook = await getWorldbook(name);
-  // 防止因返回 HTML 等非数组类型而导致崩溃：getWorldbook 在世界书不存在或接口异常时
-  // 可能返回 undefined / 非数组值，统一退化为空数组，让上层 UI 显示“该世界书没有条目”。
-  const entries = Array.isArray(worldbook) ? worldbook : [];
-  return entries.map(entry => ({
+  // getWorldbook 在世界书不存在或接口异常时可能返回 undefined / 非数组值，
+  // 不静默退化成空数组（那样 UI 会显示“该世界书没有条目”，掩盖世界书已丢失的真实情况），
+  // 而是抛出明确错误，由上层 UI 的 catch 显示“加载失败 / 无法绑定”。
+  if (!Array.isArray(worldbook)) {
+    throw new Error(`世界书「${name}」无法读取（可能已被删除或重命名，请重新选择世界书）`);
+  }
+  return worldbook.map(entry => ({
     uid: entry.uid,
     label: entry.name || `uid:${entry.uid}`,
     enabled: entry.enabled,
