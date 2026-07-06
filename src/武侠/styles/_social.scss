@@ -790,37 +790,41 @@
 
 [data-theme='ink'] {
   .social-panel {
-    --social-paper: #f4f0e6;
-    --social-paper-deep: #d8d3c5;
-    --social-ink: #1a1410;
-    --social-ink-soft: #3d3028;
-    --social-ink-faint: #7a6e62;
-    --social-cinnabar: #8b1a1a; 
-    --social-cinnabar-deep: #6a1212;
-    --social-cinnabar-ink: #4a0e0e;
+    // 纯正黑白水墨色板
+    --social-paper: #f0f0f0;
+    --social-paper-deep: #e4e4e4;
+    --social-ink: #111111;
+    --social-ink-soft: #333333;
+    --social-ink-faint: #666666;
+    --social-cinnabar: #a62019; 
+    --social-cinnabar-deep: #80140f;
+    --social-cinnabar-ink: #5c0d0a;
 
-    background:
-      var(--sprite-bg, none) center / cover no-repeat;
-    border-color: rgba(90, 70, 50, 0.6);
+    background: #f4f4f4; // 纯白底色
+    border-color: rgba(0, 0, 0, 0.4);
     
+    // 底层：水墨山水画背景（大幅度去色，增强黑白感）
     &::before {
       content: '';
       position: absolute;
       inset: 0;
-      background: radial-gradient(ellipse at center, rgba(244, 240, 230, 0.4) 0%, rgba(200, 192, 176, 0.7) 100%);
+      background: var(--sprite-bg, none) center / cover no-repeat;
+      filter: grayscale(100%) contrast(1.1) brightness(1.2) opacity(0.3); // 转黑白并提亮变淡
       pointer-events: none;
       z-index: 0;
     }
 
+    // 表层墨晕
     &::after {
       content: '';
       position: absolute;
       inset: 0;
       background:
-        radial-gradient(circle at 6% 8%, rgba(26, 20, 16, 0.3) 0%, transparent 20%),
-        radial-gradient(circle at 96% 92%, rgba(26, 20, 16, 0.25) 0%, transparent 25%);
+        radial-gradient(circle at 10% 10%, rgba(0, 0, 0, 0.15) 0%, transparent 25%),
+        radial-gradient(circle at 90% 90%, rgba(0, 0, 0, 0.1) 0%, transparent 30%);
       pointer-events: none;
       z-index: 0;
+      mix-blend-mode: multiply;
     }
   }
 
@@ -837,16 +841,17 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: #E8E2D6;
+      color: #ffffff;
       letter-spacing: 6px;
       font-size: 22px;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
       font-family: 'Ma Shan Zheng', 'LXGW WenKai', serif;
       background-size: 100% 100%;
       background-repeat: no-repeat;
       min-width: 360px;
       height: 72px;
       padding: 0 60px;
+      filter: grayscale(100%) brightness(0.8) contrast(1.5); // 让笔刷变黑
     }
   }
 
@@ -855,12 +860,12 @@
     display: none;
   }
 
-  // 名册侧：半透背景，突出列表感
+  // 名册侧：黑白灰过渡区
   .social-roster {
-    background: rgba(244, 240, 230, 0.35);
-    border-right: 2px solid rgba(90, 70, 50, 0.4);
+    background: rgba(240, 240, 240, 0.6);
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
     z-index: 2;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(4px);
   }
 
   // 分组小标题
@@ -880,41 +885,49 @@
     min-height: 50px;
     padding: 0 2rem;
     background: var(--sprite-brush-md, none) center / 100% 100% no-repeat;
-    color: #f4f0e6;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    color: #ffffff;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 1);
     letter-spacing: 0.25em;
     font-size: 1.15rem;
+    filter: grayscale(100%) brightness(0.8) contrast(1.5); // 黑笔刷
   }
 
-  // 册页叶：使用 sprite-panel-rect-md 做出水墨边框
+  // 册页叶
   .social-leaf {
     padding: 0.8rem 1rem 0.8rem 1.1rem;
-    background: rgba(244, 240, 230, 0.7);
-    border: 14px solid transparent;
-    border-image: var(--sprite-panel-rect-md, none);
-    border-image-slice: 28 28 28 28 fill;
-    border-image-repeat: stretch;
-    border-radius: 0;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 2px;
     transition: all 0.2s ease;
     
+    // 纯水墨边线
     &::before {
-      display: none;
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 10%;
+      bottom: 10%;
+      width: 3px;
+      background: #111;
+      border-radius: 1px;
     }
 
     &:hover {
-      background: rgba(244, 240, 230, 0.95);
+      background: #ffffff;
       transform: translateY(-2px);
-      filter: brightness(1.05);
-      box-shadow: 0 4px 12px rgba(26, 20, 16, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
 
     &.is-selected {
-      background: rgba(244, 240, 230, 1);
-      filter: brightness(1.1);
-      box-shadow: 0 4px 15px rgba(26, 20, 16, 0.4);
+      background: #ffffff;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
       transform: scale(1.02);
-      border-image: var(--sprite-panel-rect-lg, none);
-      border-image-slice: 28 28 28 28 fill;
+      border: 1px solid #111;
+      &::before {
+        top: 0;
+        bottom: 0;
+        width: 4px;
+      }
     }
   }
 
@@ -924,31 +937,32 @@
     color: var(--social-ink);
   }
 
-  // 朱砂关系印
+  // 朱砂关系印 (极红，对比黑白)
   .social-leaf-seal {
     background: var(--social-cinnabar);
     border: 2px solid var(--social-cinnabar-deep);
+    color: #fff;
     transform: rotate(-6deg);
-    opacity: 0.9;
-    text-shadow: 0 0 2px rgba(255, 245, 240, 0.5);
+    opacity: 0.95;
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
     font-size: 1.25rem;
-    box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
 
     &.seal-local {
-      background: #4a4339;
-      border-color: #2b2721;
+      background: #333;
+      border-color: #111;
     }
     &.seal-faint {
-      background: rgba(122, 110, 98, 0.7);
-      border-color: rgba(90, 80, 70, 0.8);
-      color: rgba(232, 226, 214, 0.95);
+      background: #888;
+      border-color: #555;
+      color: #fff;
     }
   }
 
   .social-ink-fill {
     background: linear-gradient(
       90deg,
-      var(--social-cinnabar-ink),
+      #111,
       var(--social-cinnabar) 80%,
       transparent 100%
     );
@@ -957,58 +971,69 @@
 
   // 详情册页
   .social-detail {
-    background: rgba(244, 240, 230, 0.45);
+    background: rgba(250, 250, 250, 0.5);
     z-index: 2;
-    backdrop-filter: blur(3px);
+    backdrop-filter: blur(4px);
   }
 
-  // 头像圆框
+  // 头像圆框：纯黑白水墨
   .social-portrait-ink {
-    background: var(--sprite-circle-ink, none) center / cover no-repeat;
-    border: none;
+    background: #fff;
+    border: 2px solid #111;
     border-radius: 50%;
     width: 6rem;
     height: 6rem;
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.5), 0 4px 10px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
     
+    // 黑墨晕底
     &::after {
       content: '';
       position: absolute;
-      inset: 10%;
+      inset: 8%;
       border-radius: 50%;
-      background: rgba(26, 20, 16, 0.85);
+      background: #111;
       z-index: 0;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
     }
     .social-portrait-glyph {
       z-index: 1;
       font-size: 2.8rem;
+      color: #fff;
     }
   }
 
   .social-hero-name {
     font-size: 2.2rem;
     color: var(--social-ink);
-    text-shadow: 1px 1px 2px rgba(255,255,255,0.5);
+    text-shadow: none;
   }
 
-  // 功法墨匾
+  // 功法墨匾：去掉九宫格边框，改用纯简的黑灰线框
   .social-plaque {
     padding: 1.5rem;
-    background: transparent;
-    border: 20px solid transparent;
-    border-image: var(--sprite-panel-rect-lg, none);
-    border-image-slice: 28 28 28 28 fill;
-    border-image-repeat: stretch;
-    border-radius: 0;
+    background: #ffffff;
+    border: 1px solid #111;
+    border-radius: 2px;
     margin-bottom: 1rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.08);
+    // 角落细墨线
+    position: relative;
+    &::before, &::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border: 2px solid #111;
+    }
+    &::before { top: 3px; left: 3px; border-right: none; border-bottom: none; }
+    &::after { bottom: 3px; right: 3px; border-left: none; border-top: none; }
   }
 
   .social-plaque-head {
     font-size: 1.2rem;
     font-weight: bold;
     color: var(--social-ink);
-    border-bottom: 2px dashed rgba(26, 20, 16, 0.3);
+    border-bottom: 2px solid #111;
     padding-bottom: 0.5rem;
     margin-bottom: 1rem;
   }
@@ -1021,7 +1046,8 @@
   .social-col-title, .social-bio-title {
     font-size: 1.1rem;
     font-weight: bold;
-    border-bottom: 2px dashed rgba(26, 20, 16, 0.3);
+    color: #111;
+    border-bottom: 2px solid #111;
     padding-bottom: 0.4rem;
   }
 
@@ -1035,36 +1061,35 @@
     font-size: 1.1rem;
     font-weight: bold;
     letter-spacing: 0.25em;
-    color: #1a1410;
-    background: var(--sprite-btn-outline-md) center / 100% 100% no-repeat;
-    background-color: transparent;
-    border: none;
+    color: #111;
+    background: #fff;
+    border: 1px solid #111;
     border-radius: 0;
-    transition: filter 0.15s ease, transform 0.1s ease;
+    transition: all 0.15s ease;
 
     &:hover {
-      color: #e8e2d6;
-      background: var(--sprite-btn-dark-md) center / 100% 100% no-repeat;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+      color: #fff;
+      background: #111;
       transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
     &:active {
-      transform: translateY(1px) scale(0.98);
+      transform: translateY(1px);
     }
   }
 
   .social-theme-bar {
-    background: rgba(26, 20, 16, 0.85);
-    border-bottom: 2px solid #5a4f44;
+    background: #111;
+    border-bottom: none;
     .social-theme-bar-label {
-      color: #c8c0b0;
+      color: #aaa;
     }
     .social-theme-btn {
-      color: #d8d3c5;
-      border-color: #5a4f44;
-      background: rgba(255,255,255,0.05);
+      color: #ccc;
+      border-color: #444;
+      background: #222;
       &:hover {
-        background: rgba(255,255,255,0.15);
+        background: #333;
         color: #fff;
       }
       &.is-active {
