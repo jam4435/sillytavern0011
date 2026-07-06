@@ -786,283 +786,256 @@
 // =========================================
 // 黑白水墨主题（[data-theme="ink"]）
 // 设计依据：《武侠水墨风前端设计规范 v2.0》—— 素材驱动的水墨册页
-// 色板与宣纸版同属明色系，差异在材质：水墨山水背景 + border-image 九宫格面板
-// + 墨刷标题 + 圆框头像 + 素材按钮。--sprite-* 由 SocialPanel 在 ink 主题下注入
-// （base64 data URI，见 socialSprites.ts）；缺省 fallback 走 CSS 描边。
 // =========================================
 
 [data-theme='ink'] {
   .social-panel {
-    // 规范 §3 / §20 色板：宣纸米白 + 浓焦枯墨 + 朱砂（小面积）
-    --social-paper: #e8e2d6;
-    --social-paper-deep: #c8c0b0;
+    --social-paper: #f4f0e6;
+    --social-paper-deep: #d8d3c5;
     --social-ink: #1a1410;
     --social-ink-soft: #3d3028;
     --social-ink-faint: #7a6e62;
-    --social-cinnabar: #8b1a1a; // 规范 §18 印泥红，强调面积要小
+    --social-cinnabar: #8b1a1a; 
     --social-cinnabar-deep: #6a1212;
     --social-cinnabar-ink: #4a0e0e;
 
-    // 规范 §4 三层背景：水墨山水图打底（cover 全屏）+ 宣纸径向半透遮罩 + 角落墨晕
-    // 山水图在前（主），遮罩在后（辅），与规范层序一致
     background:
-      var(--sprite-bg, none) center / cover no-repeat,
-      radial-gradient(
-        ellipse at center,
-        rgba(232, 226, 214, 0.35) 0%,
-        rgba(200, 192, 176, 0.65) 100%
-      );
-    border-color: rgba(90, 70, 50, 0.4);
-    // 水墨山水图自带质感，去掉原纸纹叠加（::before 内容到遮罩里，不单独噪点）
+      var(--sprite-bg, none) center / cover no-repeat;
+    border-color: rgba(90, 70, 50, 0.6);
+    
     &::before {
-      opacity: 0;
-      visibility: hidden;
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, rgba(244, 240, 230, 0.4) 0%, rgba(200, 192, 176, 0.7) 100%);
+      pointer-events: none;
+      z-index: 0;
     }
-    // 角落墨晕保留（::after），加深墨气
+
     &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
       background:
-        radial-gradient(circle at 6% 8%, rgba(26, 20, 16, 0.18) 0%, transparent 16%),
-        radial-gradient(circle at 96% 92%, rgba(26, 20, 16, 0.14) 0%, transparent 18%);
+        radial-gradient(circle at 6% 8%, rgba(26, 20, 16, 0.3) 0%, transparent 20%),
+        radial-gradient(circle at 96% 92%, rgba(26, 20, 16, 0.25) 0%, transparent 25%);
+      pointer-events: none;
+      z-index: 0;
     }
   }
 
-  // 卷轴轴头框：改用墨刷晕染横条（brush-bar-lg）作标题底纹
-  .social-scroll-frame {
-    background: var(--sprite-brush-lg, none) center / 100% 100% no-repeat;
-    background-color: transparent;
+  .social-scroll-frame.wuxia-brush-title {
+    background: transparent;
     border-bottom: none;
-    min-height: 72px; // 规范 brush-bar-lg 高
-    padding-top: 1.1rem;
-    padding-bottom: 1.1rem;
+    padding-top: 1rem;
+    padding-bottom: 0.5rem;
+    display: flex;
+    justify-content: center;
+    z-index: 2;
+
+    .brush-bar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #E8E2D6;
+      letter-spacing: 6px;
+      font-size: 22px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+      font-family: 'Ma Shan Zheng', 'LXGW WenKai', serif;
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      min-width: 360px;
+      height: 72px;
+      padding: 0 60px;
+    }
   }
 
-  // 轴头圆柱端饰：墨刷版不需要，隐藏（标题由墨刷条承担）
-  .social-scroll-cap {
+  // 顶端标题隐藏，因为用 brush-bar 替代了
+  .social-scroll-title, .social-scroll-count, .social-scroll-cap {
     display: none;
   }
 
-  // 顶端标题：浅色文字叠深色墨刷 + 描阴文
-  .social-scroll-title {
-    color: #e8e2d6;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-    letter-spacing: 0.3em;
-  }
-
-  .social-scroll-count {
-    background: var(--social-cinnabar);
-    border-color: var(--social-cinnabar-deep);
-  }
-
-  // 名册侧：淡墨雾气，不抢山水背景
+  // 名册侧：半透背景，突出列表感
   .social-roster {
-    background: linear-gradient(180deg, rgba(232, 226, 214, 0.42), transparent 70%);
-    border-right: 1px solid rgba(90, 70, 50, 0.22);
+    background: rgba(244, 240, 230, 0.35);
+    border-right: 2px solid rgba(90, 70, 50, 0.4);
+    z-index: 2;
+    backdrop-filter: blur(2px);
   }
 
-  // 分组小标题：叠墨刷中条（brush-md），浅色文字
+  // 分组小标题
   .social-group-head {
     align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 0.5rem 0;
   }
   .social-group-rule {
-    display: none; // 墨刷条自带装饰，去原墨竖线
+    display: none;
   }
   .social-group-title {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 44px;
-    padding: 0 1.6rem;
+    min-height: 50px;
+    padding: 0 2rem;
     background: var(--sprite-brush-md, none) center / 100% 100% no-repeat;
-    color: #e8e2d6;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-    letter-spacing: 0.2em;
-    align-self: flex-start;
-  }
-  .social-group-count {
-    background: var(--social-cinnabar);
-    border-color: var(--social-cinnabar-deep);
+    color: #f4f0e6;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    letter-spacing: 0.25em;
+    font-size: 1.15rem;
   }
 
-  // 册页叶：border-image 九宫格（规范 §6），去掉原 CSS 描边与装订线
+  // 册页叶：使用 sprite-panel-rect-md 做出水墨边框
   .social-leaf {
-    padding: 0.7rem 1rem 0.7rem 1.1rem;
-    background: rgba(232, 226, 214, 0.62);
+    padding: 0.8rem 1rem 0.8rem 1.1rem;
+    background: rgba(244, 240, 230, 0.7);
     border: 14px solid transparent;
     border-image: var(--sprite-panel-rect-md, none);
-    border-image-slice: 20 20 20 20 fill;
+    border-image-slice: 28 28 28 28 fill;
     border-image-repeat: stretch;
     border-radius: 0;
-    // 装订线在九宫格下不再需要
+    transition: all 0.2s ease;
+    
     &::before {
       display: none;
     }
 
     &:hover {
-      background: rgba(232, 226, 214, 0.82);
-      transform: translateY(-1px);
-      box-shadow: 0 2px 8px rgba(40, 32, 24, 0.18);
+      background: rgba(244, 240, 230, 0.95);
+      transform: translateY(-2px);
+      filter: brightness(1.05);
+      box-shadow: 0 4px 12px rgba(26, 20, 16, 0.3);
     }
 
     &.is-selected {
-      background: rgba(26, 20, 16, 0.06);
-      box-shadow:
-        0 4px 12px rgba(40, 32, 24, 0.24),
-        inset 0 0 0 1px rgba(26, 20, 16, 0.18);
+      background: rgba(244, 240, 230, 1);
+      filter: brightness(1.1);
+      box-shadow: 0 4px 15px rgba(26, 20, 16, 0.4);
+      transform: scale(1.02);
+      border-image: var(--sprite-panel-rect-lg, none);
+      border-image-slice: 28 28 28 28 fill;
     }
   }
 
-  // 朱砂关系印：规范 §18 — 印泥红 #8B1A1A、rotate(-6deg)、阴文、小面积
+  .social-leaf-name {
+    font-size: 1.35rem;
+    font-weight: bold;
+    color: var(--social-ink);
+  }
+
+  // 朱砂关系印
   .social-leaf-seal {
     background: var(--social-cinnabar);
     border: 2px solid var(--social-cinnabar-deep);
     transform: rotate(-6deg);
-    opacity: 0.88;
-    text-shadow: 0 0 1px rgba(255, 245, 240, 0.4);
+    opacity: 0.9;
+    text-shadow: 0 0 2px rgba(255, 245, 240, 0.5);
+    font-size: 1.25rem;
+    box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 
     &.seal-local {
-      // 同处一地：规范禁绿，改枯墨灰印
-      background: #7a6e62;
-      border-color: #5a4f44;
+      background: #4a4339;
+      border-color: #2b2721;
     }
     &.seal-faint {
-      background: rgba(122, 110, 98, 0.5);
-      border-color: rgba(90, 80, 70, 0.5);
-      color: rgba(232, 226, 214, 0.9);
-    }
-    &.seal-first {
-      background: rgba(122, 110, 98, 0.68);
-      border-color: rgba(90, 80, 70, 0.55);
+      background: rgba(122, 110, 98, 0.7);
+      border-color: rgba(90, 80, 70, 0.8);
+      color: rgba(232, 226, 214, 0.95);
     }
   }
 
-  // 墨痕进度条：印泥红渐隐
   .social-ink-fill {
     background: linear-gradient(
       90deg,
       var(--social-cinnabar-ink),
-      var(--social-cinnabar) 70%,
+      var(--social-cinnabar) 80%,
       transparent 100%
     );
+    height: 3px;
   }
 
-  .social-group-empty {
-    color: var(--social-ink-faint);
-    border-color: rgba(90, 70, 50, 0.3);
-    background: rgba(232, 226, 214, 0.35);
-  }
-
-  // 详情册页：透叠背景上的内容区，不加色块
+  // 详情册页
   .social-detail {
-    background: linear-gradient(180deg, rgba(232, 226, 214, 0.28), transparent 30%);
+    background: rgba(244, 240, 230, 0.45);
+    z-index: 2;
+    backdrop-filter: blur(3px);
   }
 
-  // 页首：水墨笔触圆框头像（规范 §8 circle-frame-ink），叠原剪影阴文
+  // 头像圆框
   .social-portrait-ink {
-    background:
-      var(--sprite-circle-ink, none) center / cover no-repeat;
+    background: var(--sprite-circle-ink, none) center / cover no-repeat;
     border: none;
     border-radius: 50%;
-    // 圆框中央叠墨色剪影 + 阴文名字首字，规范 §8 圆框内含头像
-    // 用 ::after 模拟圆框内墨底，::before 模拟阴文：
+    width: 6rem;
+    height: 6rem;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5), 0 4px 10px rgba(0,0,0,0.3);
+    
     &::after {
       content: '';
       position: absolute;
-      inset: 12%;
+      inset: 10%;
       border-radius: 50%;
-      background: radial-gradient(
-        circle at 50% 42%,
-        rgba(26, 20, 16, 0.92) 0%,
-        rgba(26, 20, 16, 0.8) 60%,
-        transparent 82%
-      );
+      background: rgba(26, 20, 16, 0.85);
       z-index: 0;
     }
     .social-portrait-glyph {
       z-index: 1;
+      font-size: 2.8rem;
     }
   }
 
   .social-hero-name {
+    font-size: 2.2rem;
     color: var(--social-ink);
-  }
-  .social-hero-role {
-    color: var(--social-cinnabar-deep);
+    text-shadow: 1px 1px 2px rgba(255,255,255,0.5);
   }
 
-  // 功法墨匾：border-image 九宫格大矩形（规范 §6 panel-rect-lg，slice 28 fill）
+  // 功法墨匾
   .social-plaque {
-    padding: 1.1rem 1.2rem 1.2rem;
-    background: rgba(232, 226, 214, 0.5);
-    border: 18px solid transparent;
+    padding: 1.5rem;
+    background: transparent;
+    border: 20px solid transparent;
     border-image: var(--sprite-panel-rect-lg, none);
     border-image-slice: 28 28 28 28 fill;
     border-image-repeat: stretch;
     border-radius: 0;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
   }
 
   .social-plaque-head {
+    font-size: 1.2rem;
+    font-weight: bold;
     color: var(--social-ink);
-    svg,
-    .icon-wrap {
-      color: var(--social-cinnabar-deep);
-    }
+    border-bottom: 2px dashed rgba(26, 20, 16, 0.3);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
   }
 
-  // 品阶/掌握小印
-  .social-tag-seal {
-    color: var(--social-cinnabar-deep);
-    background: rgba(139, 26, 26, 0.08);
-    border-color: rgba(139, 26, 26, 0.42);
-
-    &.tag-muted {
-      color: var(--social-ink-soft);
-      background: rgba(90, 70, 50, 0.06);
-      border-color: rgba(90, 70, 50, 0.3);
-    }
+  .social-plaque-desc {
+    font-size: 1.05rem;
+    line-height: 1.8;
   }
 
-  // 特性标签
-  .social-trait {
-    background: rgba(232, 226, 214, 0.65);
-    border-color: rgba(139, 26, 26, 0.3);
-    .social-trait-name {
-      color: var(--social-cinnabar-deep);
-    }
-    .social-trait-desc {
-      color: var(--social-ink-soft);
-    }
+  .social-col-title, .social-bio-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-bottom: 2px dashed rgba(26, 20, 16, 0.3);
+    padding-bottom: 0.4rem;
   }
 
-  .social-col-title {
-    color: var(--social-ink);
-    border-bottom-color: rgba(90, 70, 50, 0.3);
-  }
-  .social-col-list {
-    color: var(--social-ink-soft);
-  }
-  .social-col-empty {
-    color: rgba(122, 110, 98, 0.6);
-  }
-  .social-bio-title {
-    color: var(--social-ink);
-    border-bottom-color: rgba(90, 70, 50, 0.3);
-  }
-  .social-bio-text {
-    color: var(--social-ink);
-  }
-
-  // 行动按钮：素材胶囊按钮（规范 §7）—— 正常态 outline 深色文字，hover dark 浅色文字
+  // 行动按钮
   .social-action-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 auto;
-    height: 48px;
-    min-width: 128px;
-    padding: 0 1.4rem;
-    font-size: 0.98rem;
-    letter-spacing: 0.18em;
-    color: var(--social-ink);
+    flex: 1;
+    height: 52px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    letter-spacing: 0.25em;
+    color: #1a1410;
     background: var(--sprite-btn-outline-md) center / 100% 100% no-repeat;
     background-color: transparent;
     border: none;
@@ -1072,61 +1045,34 @@
     &:hover {
       color: #e8e2d6;
       background: var(--sprite-btn-dark-md) center / 100% 100% no-repeat;
-      background-color: transparent;
-      filter: brightness(1.06);
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+      transform: translateY(-2px);
     }
     &:active {
-      transform: scale(0.97);
-      filter: brightness(0.94);
+      transform: translateY(1px) scale(0.98);
     }
   }
 
-  // 返回条：标签形素材按钮
-  .social-detail-back {
-    height: 44px;
-    min-width: 120px;
-    padding: 0 1rem;
-    color: var(--social-ink);
-    background: var(--sprite-btn-tag-outline) center / 100% 100% no-repeat;
-    background-color: transparent;
-    border: none;
-    border-radius: 0;
-
-    &:active {
-      transform: scale(0.97);
-      filter: brightness(0.94);
-    }
-  }
-
-  // 快捷条整体：淡墨雾气底
   .social-theme-bar {
-    background: linear-gradient(180deg, rgba(232, 226, 214, 0.4), transparent);
-    border-bottom-color: rgba(90, 70, 50, 0.22);
-  }
-  .social-theme-btn {
-    border-color: rgba(90, 70, 50, 0.34);
-    &:hover {
-      background: rgba(232, 226, 214, 0.6);
-      border-color: var(--social-ink);
+    background: rgba(26, 20, 16, 0.85);
+    border-bottom: 2px solid #5a4f44;
+    .social-theme-bar-label {
+      color: #c8c0b0;
     }
-    &.is-active {
-      // 激活态用印泥红，与朱砂印同源（规范强调色）
-      background: var(--social-cinnabar);
-      border-color: var(--social-cinnabar-deep);
+    .social-theme-btn {
+      color: #d8d3c5;
+      border-color: #5a4f44;
+      background: rgba(255,255,255,0.05);
+      &:hover {
+        background: rgba(255,255,255,0.15);
+        color: #fff;
+      }
+      &.is-active {
+        background: var(--social-cinnabar);
+        border-color: var(--social-cinnabar-deep);
+        color: #fff;
+      }
     }
-  }
-
-  // 空态
-  .social-empty-ink {
-    background: radial-gradient(
-      circle at 50% 45%,
-      rgba(26, 20, 16, 0.34) 0%,
-      rgba(26, 20, 16, 0.18) 50%,
-      transparent 75%
-    );
-  }
-  .social-empty-text {
-    color: var(--social-ink-soft);
   }
 }
 

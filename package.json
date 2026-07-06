@@ -20,13 +20,9 @@
   ],
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-<<<<<<< HEAD
     "@tailwindcss/postcss": "^4.3.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-=======
-    "@tailwindcss/postcss": "^4.3.2",
->>>>>>> origin/main
     "@types/jquery": "^3.5.34",
     "@types/jqueryui": "^1.12.24",
     "@types/lodash": "^4.17.24",
@@ -133,3 +129,4 @@
     ]
   }
 }
+

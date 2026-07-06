@@ -163,13 +163,21 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs, theme, onThemeCh
   // 空态：关系网中一人皆无
   if (orderedNpcs.length === 0) {
     return (
-      <div className="social-panel" style={spriteStyle}>
-        <div className="social-scroll-frame">
-          <span className="social-scroll-cap" />
-          <h2 className="social-scroll-title">江湖名册</h2>
-          <span className="social-scroll-count">0</span>
-          <span className="social-scroll-cap" />
-        </div>
+      <div className={`social-panel theme-${theme}`} style={spriteStyle}>
+        {theme === 'ink' ? (
+          <div className="social-scroll-frame wuxia-brush-title">
+            <div className="brush-bar brush-bar-lg" style={{ backgroundImage: `url(var(--sprite-brush-lg))` }}>
+              江湖名册
+            </div>
+          </div>
+        ) : (
+          <div className="social-scroll-frame">
+            <span className="social-scroll-cap" />
+            <h2 className="social-scroll-title">江湖名册</h2>
+            <span className="social-scroll-count">0</span>
+            <span className="social-scroll-cap" />
+          </div>
+        )}
         {renderThemeBar()}
         <div className="social-empty">
           <div className="social-empty-ink" />
@@ -180,13 +188,21 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs, theme, onThemeCh
   }
 
   return (
-    <div className="social-panel" style={spriteStyle}>
-      <div className="social-scroll-frame">
-        <span className="social-scroll-cap" />
-        <h2 className="social-scroll-title">江湖名册</h2>
-        <span className="social-scroll-count">{orderedNpcs.length}</span>
-        <span className="social-scroll-cap" />
-      </div>
+    <div className={`social-panel theme-${theme}`} style={spriteStyle}>
+      {theme === 'ink' ? (
+        <div className="social-scroll-frame wuxia-brush-title">
+          <div className="brush-bar brush-bar-lg" style={{ backgroundImage: `url(var(--sprite-brush-lg))` }}>
+            江湖名册
+          </div>
+        </div>
+      ) : (
+        <div className="social-scroll-frame">
+          <span className="social-scroll-cap" />
+          <h2 className="social-scroll-title">江湖名册</h2>
+          <span className="social-scroll-count">{orderedNpcs.length}</span>
+          <span className="social-scroll-cap" />
+        </div>
+      )}
       {renderThemeBar()}
 
       <div className={`social-body${detailOpen ? ' detail-open' : ''}`}>
