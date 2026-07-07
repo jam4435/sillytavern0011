@@ -52661,7 +52661,7 @@ const _default_implicit_keys = {
 };
 function to_original_worldbook_entry(entry, index) {
     let result = lodash_default()({})
-        .set('uid', entry.uid ?? index)
+        .set('uid', index)
         .set('displayIndex', index)
         .set('comment', entry.name)
         .set('disable', !entry.enabled)
@@ -52705,12 +52705,8 @@ function to_original_worldbook_entry(entry, index) {
     return result.value();
 }
 function bundle_worldbook(worldbook) {
-    const entries = Object.fromEntries(worldbook.entries.map((entry, index) => {
-        const uid = entry.uid ?? index;
-        return [uid, to_original_worldbook_entry(entry, index)];
-    }));
     return {
-        entries,
+        entries: Object.fromEntries(worldbook.entries.map((entry, index) => [index, to_original_worldbook_entry(entry, index)])),
     };
 }
 
@@ -55798,6 +55794,7 @@ const Worldbook_entry = object({
     content: schemas_string(),
 })
     .transform(data => {
+    _.unset(data, 'uid');
     if (data.strategy.keys.length === 0) {
         _.unset(data, 'strategy.keys');
     }
@@ -63026,3 +63023,4 @@ program
     .showHelpAfterError(true)
     .showSuggestionAfterError(true)
     .parse();
+
