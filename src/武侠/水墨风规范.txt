@@ -1,0 +1,629 @@
+# 武侠水墨风前端设计规范 v2.0
+> 面向纯文本 LLM（如 GLM）的完整风格描述文档  
+> v2.0 新增真实水墨素材库支持（wuxia-sprites），原纯 CSS 模拟方案降级为备用
+
+---
+
+## 〇、v2.0 变更说明
+
+v1.0 的面板边框、按钮、圆形框架全部用 CSS 渐变 + 伪元素「模拟」水墨效果。
+v2.0 引入了真实 AI 生成的水墨素材库，核心变化如下：
+
+| 组件 | v1.0 做法 | v2.0 做法 |
+|------|-----------|-----------|
+| 面板边框 | CSS 伪元素模拟四角线框 | `border-image` 九宫格加载真实水墨纹理图 |
+| 按钮 | CSS `border-radius` + 渐变背景 | 直接使用切好的三态水墨按钮图（outline/dark/light）|
+| 圆形框架 | CSS `border-radius` + `box-shadow` | 使用水墨笔触圆框图（ink/line 两种风格）|
+| 图标底座 | 纯 CSS 圆形/方形 | 使用七档深浅的水墨底座图（circle/square 各7个）|
+| 标题条 | CSS 渐变横条 | 使用真实墨刷晕染图 |
+| 对话气泡 | 不支持 | 新增气泡框（bubble-l / bubble-r）|
+
+**原则：有真实素材的组件，优先用素材；素材库未覆盖的部分（文字、颜色、间距、动画）继续用 CSS。**
+
+---
+
+## 一、整体视觉基调
+
+这是一种「中国古典水墨画」与「武侠游戏 UI」融合的风格。  
+核心感受：苍茫、古朴、飘逸、肃穆，有一种「大漠孤烟直」的孤独美感。
+
+整个界面看起来像是**一幅铺开的宣纸**，背景是水墨晕染的山水画，
+UI 组件漂浮在画面之上——面板是毛笔勾勒的卷轴框，按钮是墨色晕染的胶囊，圆框是笔触苍劲的圆圈。
+
+---
+
+## 二、资源文件结构
+
+```
+项目根目录/
+├── wuxia-sprites/
+│   ├── wuxia-ui.css       ← 素材库配套 CSS，直接引入
+│   ├── panel/             ← 12 个面板（横条/矩形/竖卡/方块/气泡）
+│   ├── button/            ← 22 个按钮（胶囊3色×4尺寸 + 宽条 + 标签形）
+│   ├── brush/             ← 2 个墨刷标题条（lg/md）
+│   ├── circle/            ← 2 个圆形框架（ink笔触/line细线）
+│   └── icon/              ← 14 个图标底座（圆形/方形各7档深浅）
+└── your-page.html
+```
+
+**HTML 引入方式：**
+```html
+<link rel="stylesheet" href="./wuxia-sprites/wuxia-ui.css">
+```
+
+---
+
+## 三、颜色系统（不变）
+
+### 背景色
+```
+主背景色:      #E8E2D6   （米白/宣纸色，带轻微暖黄）
+背景暗部:      #C8C0B0   （远山处的墨色雾气感）
+背景透叠:      rgba(232, 226, 214, 0.85)
+```
+
+### 墨色层次
+```
+主墨色（标题、主要文字）: #1A1410   （浓墨）
+次墨色（说明文字）:       #3D3028   （焦墨）
+淡墨色（辅助文字/禁用）:  #7A6E62   （枯墨）
+```
+
+### 强调色
+```
+朱砂红（激活/标记/徽章）: #C0392B
+印章红（点缀，面积要小）: #8B1A1A
+金色（等级数字/稀有信息）: #B8860B
+暗金色文字（深色按钮上）: #D4C090
+```
+
+**颜色原则：** 画面 90% 灰白色调，颜色只出现在 1-2 个关键点，禁用蓝/绿/紫。
+
+---
+
+## 四、背景处理（不变）
+
+三层叠加：
+
+**第一层：** 水墨山水全屏背景图
+```css
+.page-bg {
+  background-image: url('ink-landscape.jpg');
+  background-size: cover;
+  background-position: center;
+  filter: contrast(0.9) brightness(1.05);
+}
+```
+
+**第二层：** 半透明宣纸遮罩
+```css
+.page-overlay {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(232, 226, 214, 0.3) 0%,
+    rgba(200, 192, 176, 0.6) 100%
+  );
+}
+```
+
+**第三层：** 所有 UI 组件（使用素材库）
+
+---
+
+## 五、字体（不变）
+
+```css
+/* 标题 / 功能文字 */
+font-family: "Ma Shan Zheng", "STKaiti", "KaiTi", "楷体", serif;
+
+/* 正文 / 说明 */
+font-family: "Noto Serif SC", "SimSun", "宋体", serif;
+```
+
+字号比例：
+```
+大标题:          48-64px，letter-spacing: 6-12px
+页面标题:        28-36px
+功能区标题:      18-22px
+列表内容:        14-16px
+辅助信息:        12px
+```
+
+文字规则：颜色用 `#1A1410`，重要词用朱砂红标注，不用加粗，标题拉宽 `letter-spacing`。
+
+---
+
+## 六、面板和容器【v2.0 重写】
+
+### ✅ 主推：border-image 九宫格（使用真实素材）
+
+四角水墨纹理不变形，中间随内容自由拉伸，是水墨边框的正确用法。
+
+```html
+<!-- 矩形内容面板 -->
+<div class="wuxia panel-rect panel-rect-lg" style="padding: 24px; min-height: 120px;">
+  面板内容
+</div>
+
+<!-- 导航/标题横条 -->
+<div class="wuxia panel-rect panel-bar-lg" style="padding: 10px 24px;">
+  标题文字
+</div>
+
+<!-- 对话气泡 -->
+<div class="wuxia panel-bubble-r" style="width: 200px;">
+  NPC 说话内容
+</div>
+```
+
+可用的面板类：
+```
+panel-bar-lg / panel-bar-md / panel-bar-sm   → 宽横条（适合标题栏、导航）
+panel-rect-md / panel-rect-lg / panel-rect-xl → 矩形面板（适合对话框、任务列表）
+panel-card-l / panel-card-r                   → 竖向卡片（适合角色卡、物品卡）
+panel-square-sm / panel-square-md             → 小方块（适合技能格、道具格）
+panel-bubble-r / panel-bubble-l               → 对话气泡（右/左气泡尾）
+```
+
+**border-image slice 参考值（调整四角切割精度用）：**
+```css
+/* 横条面板：角纹理约占边高的 1/4 */
+border-image-slice: 20 20 20 20 fill;
+/* 矩形面板：角纹理略大 */
+border-image-slice: 28 28 28 28 fill;
+/* 小方块面板：角纹理占比更大 */
+border-image-slice: 35 35 35 35 fill;
+```
+
+### ⚠️ 备用：纯 CSS 模拟（素材无法加载时降级）
+
+```css
+.panel-css-fallback {
+  background: rgba(232, 226, 214, 0.88);
+  border: 1px solid rgba(90, 70, 50, 0.4);
+  border-radius: 2px;
+  box-shadow: inset 0 0 20px rgba(150, 120, 90, 0.1), 0 2px 8px rgba(0,0,0,0.15);
+  position: relative;
+}
+.panel-css-fallback::before {
+  content: ''; position: absolute;
+  top: 5px; left: 5px;
+  width: 10px; height: 10px;
+  border-top: 1.5px solid #8B6040;
+  border-left: 1.5px solid #8B6040;
+}
+.panel-css-fallback::after {
+  content: ''; position: absolute;
+  bottom: 5px; right: 5px;
+  width: 10px; height: 10px;
+  border-bottom: 1.5px solid #8B6040;
+  border-right: 1.5px solid #8B6040;
+}
+```
+
+### 面板标题栏（两种方案均适用）
+
+```html
+<div class="panel-header">
+  <span class="title-marker">◆</span>
+  <span class="title-text">任务</span>
+</div>
+```
+
+```css
+.panel-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(90, 70, 50, 0.22);
+  letter-spacing: 4px;
+}
+.title-marker { color: #C0392B; margin-right: 6px; font-size: 9px; }
+.title-text   { font-size: 16px; color: #1A1410; }
+```
+
+---
+
+## 七、按钮【v2.0 重写】
+
+### ✅ 主推：使用素材库按钮
+
+素材库提供三种色态 × 四种尺寸的胶囊按钮，以及宽条按钮和标签形按钮：
+
+```html
+<!-- 胶囊按钮：outline（空心）/ dark（墨色）/ light（浅色） -->
+<button class="wuxia btn-wuxia btn-dark btn-md">确认</button>
+<button class="wuxia btn-wuxia btn-outline btn-md">取消</button>
+<button class="wuxia btn-wuxia btn-light btn-md" disabled>禁用</button>
+
+<!-- 四种尺寸 -->
+<button class="wuxia btn-wuxia btn-dark btn-lg">大号</button>  <!-- 148×54 -->
+<button class="wuxia btn-wuxia btn-dark btn-md">中号</button>  <!-- 128×48 -->
+<button class="wuxia btn-wuxia btn-dark btn-sm">小号</button>  <!-- 110×44 -->
+<button class="wuxia btn-wuxia btn-dark btn-xs">迷你</button>  <!-- 96×40  -->
+
+<!-- 宽条按钮（确认/取消类大按钮）-->
+<button class="wuxia btn-wide btn-wide-dark">开始游戏</button>
+<button class="wuxia btn-wide btn-wide-outline">返回主界面</button>
+
+<!-- 标签形按钮（带切角装饰）-->
+<button class="wuxia btn-tag btn-tag-dark">出战</button>
+<button class="wuxia btn-tag btn-tag-outline">查看</button>
+```
+
+**三态对应语义：**
+```
+btn-outline → 次要操作（取消、返回、查看）  深色文字 #1A1410
+btn-dark    → 主要操作（确认、出战、前往）  浅色文字 #E8E2D6
+btn-light   → 禁用/弱化状态               灰色文字 #7A6E62
+```
+
+**hover/active 交互（wuxia-ui.css 已内置）：**
+```css
+.btn-wuxia:hover  { filter: brightness(1.06); }
+.btn-wuxia:active { transform: scale(0.97); filter: brightness(0.94); }
+```
+
+### ⚠️ 备用：纯 CSS 小按钮（列表内「前往」类行内按钮）
+
+素材库按钮尺寸最小到 96px，比这还小的行内按钮用 CSS：
+
+```css
+.btn-inline {
+  background: transparent;
+  border: 1px solid rgba(90, 70, 50, 0.5);
+  color: #3D3028;
+  padding: 3px 10px;
+  font-size: 13px;
+  letter-spacing: 2px;
+  border-radius: 1px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s;
+}
+.btn-inline:hover { background: rgba(139, 96, 64, 0.1); }
+```
+
+---
+
+## 八、圆形框架【v2.0 新增】
+
+v1.0 用纯 CSS `border-radius` 模拟，v2.0 改用真实水墨笔触圆框图。
+
+```html
+<!-- 水墨笔触圆框（粗犷感，适合头像/地图）-->
+<div class="wuxia circle-frame circle-frame-ink">
+  <img src="avatar.jpg" alt="头像">
+</div>
+
+<!-- 细线圆框（带四角装饰，适合图鉴/技能图标）-->
+<div class="wuxia circle-frame circle-frame-line">
+  <img src="skill-icon.png" alt="">
+</div>
+```
+
+调整圆框大小：
+```css
+/* 默认 120×120，按比例缩放即可 */
+.circle-frame-ink  { width: 80px;  height: 80px; }   /* 小头像 */
+.circle-frame-ink  { width: 120px; height: 120px; }  /* 标准 */
+.circle-frame-ink  { width: 160px; height: 160px; }  /* 大头像/地图窗 */
+```
+
+---
+
+## 九、图标底座【v2.0 新增】
+
+素材库提供圆形和方形两种形状，各有 7 档墨色深浅（从最深的 ink 到最浅的 white）。  
+深浅档用于表示**激活/普通/禁用**三种状态，或用于**功能重要性**的视觉区分。
+
+```html
+<!-- 圆形底座 + 叠加图标 -->
+<div class="wuxia icon-base icon-circle-dark">
+  <img src="sword.svg" width="24" height="24" alt="武器">
+</div>
+
+<!-- 方形底座 + 叠加图标 -->
+<div class="wuxia icon-base icon-square-mid">
+  <img src="potion.svg" width="22" height="22" alt="药水">
+</div>
+```
+
+七档深浅对应语义建议：
+```
+ink      → 当前激活 / 最高优先级
+dark     → 主要功能
+mid      → 普通功能
+light    → 次要功能
+lighter  → 低优先级
+outline  → 空态 / 未解锁
+white    → 禁用 / 空格占位
+```
+
+---
+
+## 十、墨刷标题条【v2.0 新增】
+
+```html
+<!-- 大墨刷条（主标题）-->
+<div class="wuxia brush-bar brush-bar-lg">江湖秘闻</div>
+
+<!-- 中墨刷条（区域标题）-->
+<div class="wuxia brush-bar brush-bar-md">近期事件</div>
+```
+
+注意：墨刷两端会自然晕散渐淡，`padding: 0 40-60px` 是为了让文字避开两端虚化区，保持居中。
+
+---
+
+## 十一、状态标签（不变）
+
+```css
+/* 「进行中」/ 激活状态标签 */
+.tag-active {
+  display: inline-block;
+  border: 1px solid #C0392B;
+  color: #C0392B;
+  background: rgba(192, 57, 43, 0.08);
+  padding: 1px 6px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  border-radius: 1px;
+}
+```
+
+---
+
+## 十二、列表项（不变）
+
+```css
+.quest-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(90, 70, 50, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.quest-type  { font-size: 11px; color: #7A6E62; }
+.quest-type::before { content: '['; }
+.quest-type::after  { content: ']'; }
+.quest-title { font-size: 15px; color: #1A1410; letter-spacing: 1px; }
+.quest-desc  { font-size: 13px; color: #7A6E62; }
+```
+
+---
+
+## 十三、顶部 HUD（不变）
+
+```css
+.hud-item {
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(30, 22, 14, 0.6);
+  border: 1px solid rgba(139, 117, 80, 0.5);
+  border-radius: 12px;
+  padding: 3px 10px 3px 6px;
+  color: #D4C090;
+  font-size: 14px;
+}
+.hud-add { color: #C0392B; font-size: 16px; font-weight: bold; cursor: pointer; }
+```
+
+---
+
+## 十四、圆形功能图标栏（v2.0 调整）
+
+v1.0 用纯 CSS 模拟，v2.0 改用素材库图标底座：
+
+```html
+<!-- 右侧功能按钮栏 -->
+<div class="sidebar-icon-group">
+  <div class="wuxia icon-base icon-circle-dark sidebar-item">
+    <img src="shop.svg" width="22" alt="">
+    <span class="sidebar-label">商城</span>
+  </div>
+  <!-- 有通知时用较深底座 -->
+  <div class="wuxia icon-base icon-circle-ink sidebar-item has-badge">
+    <img src="mail.svg" width="22" alt="">
+    <span class="sidebar-label">邮件</span>
+  </div>
+</div>
+```
+
+```css
+.sidebar-item {
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.sidebar-label {
+  font-size: 11px; color: #7A6E62;
+  text-align: center; letter-spacing: 1px;
+}
+/* 红点徽章 */
+.has-badge { position: relative; }
+.has-badge::after {
+  content: '';
+  position: absolute; top: -2px; right: -2px;
+  width: 8px; height: 8px;
+  background: #C0392B; border-radius: 50%;
+  border: 1px solid #E8E2D6;
+}
+```
+
+---
+
+## 十五、底部功能主按钮（v2.0 调整）
+
+v1.0 纯 CSS 圆形按钮，v2.0 改用图标底座组合：
+
+```html
+<!-- 底部四个主功能按钮 -->
+<div class="wuxia icon-base icon-circle-mid main-nav-btn">
+  <img src="character.svg" width="28" alt="">
+  <span class="nav-label">角色</span>
+</div>
+<!-- 当前选中项用更深的底座 -->
+<div class="wuxia icon-base icon-circle-ink main-nav-btn">
+  <img src="map.svg" width="28" alt="">
+  <span class="nav-label">江湖</span>
+</div>
+```
+
+```css
+.main-nav-btn {
+  width: 64px; height: 64px;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+.nav-label {
+  font-size: 13px;
+  color: #D4C090;
+  letter-spacing: 2px;
+}
+```
+
+---
+
+## 十六、地图小窗（v2.0 调整）
+
+```html
+<!-- 用水墨圆框做地图窗 -->
+<div class="wuxia circle-frame circle-frame-ink" style="width:120px;height:120px;">
+  <!-- 内部放缩略地图图片 -->
+  <img src="minimap.png" alt="地图">
+</div>
+<div class="minimap-title">江湖</div>
+```
+
+```css
+.minimap-title {
+  font-size: 14px; letter-spacing: 4px; color: #3D3028;
+  text-align: center; margin-bottom: 4px;
+}
+```
+
+---
+
+## 十七、系统消息栏（不变）
+
+```css
+.system-msg-bar {
+  background: rgba(10, 8, 5, 0.55);
+  border-top: 1px solid rgba(139, 117, 80, 0.3);
+  padding: 4px 12px;
+  font-size: 13px;
+}
+.system-msg    { color: rgba(212, 192, 144, 0.9); }
+.system-prefix { color: #C0392B; margin-right: 4px; }
+```
+
+---
+
+## 十八、印章元素（不变）
+
+```css
+.seal {
+  display: inline-block;
+  border: 2px solid #8B1A1A; color: #8B1A1A;
+  padding: 3px 5px; font-size: 11px; letter-spacing: 2px;
+  transform: rotate(-6deg); opacity: 0.85;
+  text-shadow: 0 0 1px rgba(139, 26, 26, 0.5);
+  font-family: "STKaiti", serif;
+}
+```
+
+---
+
+## 十九、动画（不变）
+
+原则：慢（0.4-0.8s）、飘逸（ease-in-out）、优先 opacity + transform。
+
+```css
+/* 面板展开 */
+@keyframes unfold {
+  from { opacity: 0; transform: scaleY(0.85) translateY(-8px); }
+  to   { opacity: 1; transform: scaleY(1) translateY(0); }
+}
+.panel-rect { animation: unfold 0.4s ease-out; }
+
+/* 按钮反馈（素材库已内置，此处备注） */
+.btn-wuxia:hover  { filter: brightness(1.06); }
+.btn-wuxia:active { transform: scale(0.97); }
+```
+
+---
+
+## 二十、CSS 变量汇总（v2.0 新增 sprite-path）
+
+```css
+:root {
+  /* 素材路径 */
+  --sprite-path: './wuxia-sprites';
+
+  /* 颜色 */
+  --color-paper:       #E8E2D6;
+  --color-paper-dark:  #C8C0B0;
+  --color-ink:         #1A1410;
+  --color-ink-mid:     #3D3028;
+  --color-ink-light:   #7A6E62;
+  --color-vermilion:   #C0392B;
+  --color-seal:        #8B1A1A;
+  --color-gold:        #B8860B;
+  --color-gold-light:  #D4C090;
+  --color-wood:        #8B6040;
+
+  /* 背景层 */
+  --panel-bg:  rgba(232, 226, 214, 0.88);
+  --panel-border: rgba(90, 70, 50, 0.4);
+  --hud-bg:    rgba(30, 22, 14, 0.65);
+
+  /* 字体 */
+  --font-wuxia: "Ma Shan Zheng", "STKaiti", "KaiTi", "楷体", serif;
+  --font-body:  "Noto Serif SC", "SimSun", "宋体", serif;
+
+  /* 尺寸 */
+  --radius-sharp: 2px;
+  --radius-pill:  20px;
+
+  /* 动画 */
+  --transition-wuxia: all 0.4s ease-in-out;
+}
+```
+
+---
+
+## 二十一、给 LLM 的快捷描述模板（v2.0 更新）
+
+```
+使用中国武侠水墨风格，配合 wuxia-sprites 素材库。
+
+【面板】用 border-image 九宫格加载 panel/ 目录下的水墨边框图，
+        slice 值约 20-30，fill 保留中间内容区。
+        可选类型：panel-bar（横条）、panel-rect（矩形）、
+        panel-card（竖卡）、panel-square（方块）、panel-bubble（气泡）。
+
+【按钮】使用 .btn-wuxia 配合 btn-dark/btn-outline/btn-light 和 btn-lg/md/sm/xs。
+        主操作用 dark（浅色文字 #E8E2D6），
+        次操作用 outline（深色文字 #1A1410），
+        禁用用 light（灰色文字 #7A6E62）。
+        极小行内按钮用纯 CSS：border 1px solid rgba(90,70,50,0.5)，border-radius: 1px。
+
+【圆框】circle-frame-ink（笔触感）或 circle-frame-line（细线+角装饰），
+        内嵌 <img> 自动居中显示。
+
+【图标底座】icon-circle-* 或 icon-square-*，七档深浅（ink/dark/mid/light/lighter/outline/white），
+           深色表激活，浅色表普通/禁用。
+
+【标题条】brush-bar-lg/md，文字叠加在上方，颜色 #E8E2D6，letter-spacing 4-6px。
+
+【颜色】背景宣纸 #E8E2D6，文字墨色 #1A1410，辅助 #7A6E62，强调朱砂红 #C0392B。
+        禁止使用蓝色、绿色、紫色。
+
+【字体】标题用楷体（Ma Shan Zheng / STKaiti），正文用宋体（Noto Serif SC）。
+【动画】慢而飘逸，0.4-0.8s ease-in-out，优先 opacity + transform。
+```
+
+---
+
+*文档版本：2.0 | v1.0 参考：武侠水墨游戏 UI 截图 | v2.0 新增：wuxia-sprites 水墨素材库*
