@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './wuxia-sprites/wuxia-ui.css';
 import './styles/main.scss';
 import { ensureLoaderRegexSafety } from './utils/loaderRegexGuard';
 import { getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
