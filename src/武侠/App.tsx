@@ -33,7 +33,7 @@ import {
   useToast,
   useVariableChangeTracker,
 } from './hooks';
-import { ActivePanel, InventoryItem, UiTheme } from './types';
+import { ActivePanel, InventoryItem } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { equipInventoryItem, useElixirItem } from './utils/itemManager';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
@@ -281,15 +281,6 @@ const App: React.FC = () => {
   const handleSettingsChange = useCallback(
     (newSettings: DisplaySettings) => {
       persistDisplaySettings(newSettings);
-    },
-    [persistDisplaySettings],
-  );
-
-  // 侠缘页主题切换：写入 displaySettings.theme，由同一个 persistDisplaySettings
-  // 管线落 localStorage + 触发 applySettingsToDOM（把 data-theme 写到 <html>）。
-  const handleSocialThemeChange = useCallback(
-    (nextTheme: UiTheme) => {
-      persistDisplaySettings(prev => ({ ...prev, theme: nextTheme }));
     },
     [persistDisplaySettings],
   );
@@ -592,13 +583,7 @@ const App: React.FC = () => {
           />
         );
       case ActivePanel.SOCIAL:
-        return (
-          <SocialPanel
-            npcs={gameState.social}
-            theme={displaySettings.theme}
-            onThemeChange={handleSocialThemeChange}
-          />
-        );
+        return <SocialPanel npcs={gameState.social} />;
       case ActivePanel.SETTINGS:
         return (
           <SettingsPanel

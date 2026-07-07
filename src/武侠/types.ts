@@ -204,27 +204,6 @@ export enum ActivePanel {
   SAVE_LOAD = 'SAVE_LOAD',
 }
 
-// ============================================
-// UI 主题（侠缘页试验，为后续全站主题切换留口）
-// ============================================
-
-/**
- * UI 主题 ID。
- * - parchment: 宣纸明底（纯 CSS 水墨册页，默认）
- * - ink: 黑白水墨（素材驱动册页：水墨山水背景 + border-image 九宫格面板 + 墨刷标题 + 圆框头像 + 素材按钮）
- *
- * 新增主题：在此联合类型加一项 + UI_THEMES 加一条 + SCSS [data-theme="x"] override block。
- */
-export type UiTheme = 'parchment' | 'ink';
-
-/**
- * 主题可选清单，驱动侠缘页快捷条渲染。
- */
-export const UI_THEMES: { id: UiTheme; label: string }[] = [
-  { id: 'parchment', label: '宣纸明底' },
-  { id: 'ink', label: '黑白水墨' },
-];
-
 export interface WuxiaSaveNode {
   id: string;
   label: string;

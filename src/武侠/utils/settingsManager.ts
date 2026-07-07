@@ -4,7 +4,6 @@
  */
 
 import { dataLogger } from './logger';
-import { UiTheme } from '../types';
 
 // =========================================
 // 类型定义
@@ -189,8 +188,6 @@ export interface DisplaySettings {
   // 自动总结设置
   summarySettings: SummarySettings;
 
-  // UI 主题（侠缘页试验，默认宣纸明底；旧存档缺字段回退 'parchment'）
-  theme: UiTheme;
 }
 
 type StoredSummarySettings = Partial<SummarySettings> & {
@@ -330,8 +327,6 @@ export function createDefaultDisplaySettings(): DisplaySettings {
     ...createDefaultRegexSettings(),
 
     summarySettings: createDefaultSummarySettings(),
-
-    theme: 'parchment',
   };
 }
 
@@ -681,13 +676,6 @@ function getStringSetting(value: unknown, fallbackValue: string): string {
   return typeof value === 'string' ? value : fallbackValue;
 }
 
-/**
- * 归一化 UI 主题字段：旧存档缺字段或值非法时回退默认主题。
- */
-function normalizeUiTheme(value: unknown, fallbackValue: UiTheme): UiTheme {
-  return value === 'parchment' || value === 'ink' ? value : fallbackValue;
-}
-
 function getNumberSetting(value: unknown, fallbackValue: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallbackValue;
 }
@@ -812,7 +800,6 @@ export function loadSettings(): DisplaySettings {
         importedGlobalRegexRules,
       ),
       summarySettings: normalizeSummarySettings(parsed.summarySettings),
-      theme: normalizeUiTheme(parsed.theme, defaultSettings.theme),
     };
   } catch (error) {
     dataLogger.warn('加载设置失败，使用默认设置:', error);
@@ -1182,10 +1169,6 @@ export function applySettingsToDOM(settings: DisplaySettings): void {
   Object.entries(cssVars).forEach(([key, value]) => {
     root.style.setProperty(key, value);
   });
-
-  // UI 主题：写到 <html data-theme="...">，供 [data-theme="x"] .social-panel 等
-  // 选择器覆盖。后续推广全站主题时同一属性即可覆盖任意面板。
-  root.setAttribute('data-theme', settings.theme);
 }
 
 // =========================================
