@@ -453,6 +453,24 @@
     }
   }
 
+  .command-queue-btn {
+    background: rgba(255, 250, 244, 0.74);
+    border-color: rgba(61, 48, 40, 0.18);
+    color: #5b5048;
+
+    &:hover {
+      color: #8b1a1a;
+      border-color: rgba(139, 26, 26, 0.32);
+      box-shadow: 0 8px 16px rgba(61, 48, 40, 0.08);
+    }
+  }
+
+  .command-queue-popover {
+    background: rgba(241, 235, 223, 0.94);
+    border-color: rgba(61, 48, 40, 0.18);
+    box-shadow: 0 16px 36px rgba(61, 48, 40, 0.16);
+  }
+
   .chat-send-btn .send-btn-bg {
     background: rgba(26, 20, 16, 0.84);
     border-color: rgba(26, 20, 16, 0.5);
