@@ -35,15 +35,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, type, children })
 
         {/* Body */}
         <div className="modal-content">
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: 'url(https://www.transparenttextures.com/patterns/chinese-style.png)',
-              opacity: 0.05,
-              pointerEvents: 'none',
-            }}
-          ></div>
+          <div className="modal-paper-texture" aria-hidden="true"></div>
           {children}
         </div>
       </div>

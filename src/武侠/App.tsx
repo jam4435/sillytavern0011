@@ -394,6 +394,7 @@ const App: React.FC = () => {
     }
     return applyRegexRules(currentMaintext, activeRegexRules);
   }, [activeRegexRules, currentMaintext]);
+  const shouldUseCustomBackground = displaySettings.uiTheme !== 'ink-wash' && Boolean(displaySettings.backgroundImage);
 
   // 续写江湖处理
   const handleContinue = useCallback(async () => {
@@ -651,7 +652,7 @@ const App: React.FC = () => {
         <div
           className="bg-img"
           style={
-            displaySettings.backgroundImage
+            shouldUseCustomBackground && displaySettings.backgroundImage
               ? {
                   backgroundImage: `url(${displaySettings.backgroundImage})`,
                   opacity: displaySettings.backgroundOpacity,

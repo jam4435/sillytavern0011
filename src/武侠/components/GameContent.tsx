@@ -83,9 +83,9 @@ const GameContent: React.FC<GameContentProps> = ({
 
   // 计算内联样式（基于设置）
   const contentStyle = useMemo<React.CSSProperties>(() => settings ? {
-      fontSize: `${settings.fontSize}px`,
-      color: settings.fontColor,
-      lineHeight: settings.lineHeight,
+      fontSize: 'var(--content-font-size)',
+      color: 'var(--content-font-color)',
+      lineHeight: 'var(--content-line-height)',
     } : {},
     [settings]
   );

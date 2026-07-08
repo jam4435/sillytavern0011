@@ -4,12 +4,21 @@
  */
 
 import { dataLogger } from './logger';
+import inkWashBackgroundUrl from '../wuxia-sprites/水墨背景.jpg?url';
+import inkWashBrushBarMdUrl from '../wuxia-sprites/brush/brush-bar-md.png?url';
+import inkWashCircleFrameInkUrl from '../wuxia-sprites/circle/circle-frame-ink.png?url';
+import inkWashIconCircleInkUrl from '../wuxia-sprites/icon/icon-circle-ink.png?url';
+import inkWashIconSquareDarkUrl from '../wuxia-sprites/icon/icon-square-dark.png?url';
+import inkWashPanelBarMdUrl from '../wuxia-sprites/panel/panel-bar-md.png?url';
+import inkWashPanelRectLgUrl from '../wuxia-sprites/panel/panel-rect-lg.png?url';
+import inkWashPanelRectXlUrl from '../wuxia-sprites/panel/panel-rect-xl.png?url';
 
 // =========================================
 // 类型定义
 // =========================================
 
 export type RegexRuleOriginScope = 'manual' | 'global' | 'preset';
+export type WuxiaUiTheme = 'dark-gold' | 'ink-wash';
 
 /** 正则替换规则 */
 export interface RegexRule {
@@ -170,6 +179,9 @@ declare global {
 
 /** 显示设置 */
 export interface DisplaySettings {
+  // UI整体主题
+  uiTheme: WuxiaUiTheme;
+
   // 正文字体设置
   fontSize: number; // 字体大小 (px)
   fontColor: string; // 字体颜色 (hex)
@@ -188,6 +200,13 @@ export interface DisplaySettings {
   // 自动总结设置
   summarySettings: SummarySettings;
 
+}
+
+export interface ThemeAppearanceDefaults {
+  fontColor: string;
+  backgroundColor: string;
+  backgroundOpacity: number;
+  backgroundBlur: number;
 }
 
 type StoredSummarySettings = Partial<SummarySettings> & {
@@ -257,6 +276,40 @@ export const DEFAULT_SUMMARY_API_CONFIG: SummaryApiConfig = {
 };
 
 export const PRESET_SUMMARY_API_SELECTION: SummaryApiSelection = { type: 'preset' };
+export const DEFAULT_UI_THEME: WuxiaUiTheme = 'dark-gold';
+
+export const UI_THEME_LABELS: Record<WuxiaUiTheme, string> = {
+  'dark-gold': '黑金',
+  'ink-wash': '水墨',
+};
+
+export const THEME_APPEARANCE_DEFAULTS: Record<WuxiaUiTheme, ThemeAppearanceDefaults> = {
+  'dark-gold': {
+    fontColor: '#e7e5e4',
+    backgroundColor: '#0c0a09',
+    backgroundOpacity: 0.85,
+    backgroundBlur: 0,
+  },
+  'ink-wash': {
+    fontColor: '#1a1410',
+    backgroundColor: '#e8e2d6',
+    backgroundOpacity: 0.72,
+    backgroundBlur: 0,
+  },
+};
+
+export const WUXIA_UI_THEMES: { value: WuxiaUiTheme; label: string; description: string }[] = [
+  {
+    value: 'dark-gold',
+    label: UI_THEME_LABELS['dark-gold'],
+    description: '现有黑色金边界面',
+  },
+  {
+    value: 'ink-wash',
+    label: UI_THEME_LABELS['ink-wash'],
+    description: '宣纸水墨界面',
+  },
+];
 
 /** 默认自动总结设置 */
 export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
@@ -314,15 +367,18 @@ export function createDefaultRegexSettings(): Pick<DisplaySettings, 'localRegexR
 }
 
 export function createDefaultDisplaySettings(): DisplaySettings {
+  const defaultAppearance = THEME_APPEARANCE_DEFAULTS[DEFAULT_UI_THEME];
   return {
+    uiTheme: DEFAULT_UI_THEME,
+
     fontSize: 16,
-    fontColor: '#e7e5e4', // stone-200
+    fontColor: defaultAppearance.fontColor,
     lineHeight: 1.8,
 
-    backgroundColor: '#0c0a09', // stone-950
-    backgroundOpacity: 0.85,
+    backgroundColor: defaultAppearance.backgroundColor,
+    backgroundOpacity: defaultAppearance.backgroundOpacity,
     backgroundImage: null,
-    backgroundBlur: 0,
+    backgroundBlur: defaultAppearance.backgroundBlur,
 
     ...createDefaultRegexSettings(),
 
@@ -334,6 +390,7 @@ export const DEFAULT_SETTINGS: DisplaySettings = createDefaultDisplaySettings();
 
 /** 正文显示设置的默认值 */
 export const DEFAULT_DISPLAY_SETTINGS = {
+  uiTheme: DEFAULT_SETTINGS.uiTheme,
   fontSize: DEFAULT_SETTINGS.fontSize,
   fontColor: DEFAULT_SETTINGS.fontColor,
   lineHeight: DEFAULT_SETTINGS.lineHeight,
@@ -687,6 +744,14 @@ function getNullableStringSetting(value: unknown, fallbackValue: string | null):
   return typeof value === 'string' ? value : fallbackValue;
 }
 
+function normalizeUiTheme(value: unknown): WuxiaUiTheme {
+  return value === 'ink-wash' || value === 'dark-gold' ? value : DEFAULT_UI_THEME;
+}
+
+export function getThemeAppearanceDefaults(theme: WuxiaUiTheme): ThemeAppearanceDefaults {
+  return THEME_APPEARANCE_DEFAULTS[theme];
+}
+
 function getImportableTavernRegexes(regexes: TavernRegex[], originScope: RegexRuleOriginScope): RegexRule[] {
   return regexes
     .filter(
@@ -779,6 +844,7 @@ export function loadSettings(): DisplaySettings {
     const legacyRegexRules = Array.isArray(parsed.regexRules) ? parsed.regexRules : undefined;
     const presetRegexRuleState = normalizePresetRegexRulesByPreset(parsed.presetRegexRulesByPreset);
     const importedGlobalRegexRules = importGlobalTavernRegexes();
+    const uiTheme = normalizeUiTheme(parsed.uiTheme);
     const localRegexRules = mergeExtractedGlobalRules(
       normalizeLocalRegexRules(
       Array.isArray(parsed.localRegexRules) ? parsed.localRegexRules : legacyRegexRules,
@@ -787,6 +853,7 @@ export function loadSettings(): DisplaySettings {
     );
 
     return {
+      uiTheme,
       fontSize: getNumberSetting(parsed.fontSize, defaultSettings.fontSize),
       fontColor: getStringSetting(parsed.fontColor, defaultSettings.fontColor),
       lineHeight: getNumberSetting(parsed.lineHeight, defaultSettings.lineHeight),
@@ -1149,13 +1216,29 @@ export function imageToBase64(file: File): Promise<string> {
  * 生成 CSS 变量对象，用于应用设置到样式
  */
 export function generateCSSVariables(settings: DisplaySettings): Record<string, string> {
+  const darkGoldDefaults = THEME_APPEARANCE_DEFAULTS['dark-gold'];
+  const inkWashDefaults = THEME_APPEARANCE_DEFAULTS['ink-wash'];
+  const themeAwareFontColor =
+    settings.uiTheme === 'ink-wash' && settings.fontColor === darkGoldDefaults.fontColor
+      ? inkWashDefaults.fontColor
+      : settings.fontColor;
+  const cssUrl = (url: string) => `url("${url}")`;
+
   return {
     '--content-font-size': `${settings.fontSize}px`,
-    '--content-font-color': settings.fontColor,
+    '--content-font-color': themeAwareFontColor,
     '--content-line-height': `${settings.lineHeight}`,
     '--content-bg-color': settings.backgroundColor,
     '--content-bg-opacity': `${settings.backgroundOpacity}`,
     '--content-bg-blur': `${settings.backgroundBlur}px`,
+    '--wuxia-ink-bg-image': cssUrl(inkWashBackgroundUrl),
+    '--wuxia-ink-panel-rect-lg': cssUrl(inkWashPanelRectLgUrl),
+    '--wuxia-ink-panel-rect-xl': cssUrl(inkWashPanelRectXlUrl),
+    '--wuxia-ink-panel-bar-md': cssUrl(inkWashPanelBarMdUrl),
+    '--wuxia-ink-brush-bar-md': cssUrl(inkWashBrushBarMdUrl),
+    '--wuxia-ink-circle-frame': cssUrl(inkWashCircleFrameInkUrl),
+    '--wuxia-ink-icon-circle': cssUrl(inkWashIconCircleInkUrl),
+    '--wuxia-ink-icon-square-dark': cssUrl(inkWashIconSquareDarkUrl),
   };
 }
 
@@ -1165,6 +1248,9 @@ export function generateCSSVariables(settings: DisplaySettings): Record<string, 
 export function applySettingsToDOM(settings: DisplaySettings): void {
   const root = document.documentElement;
   const cssVars = generateCSSVariables(settings);
+
+  root.dataset.uiTheme = settings.uiTheme;
+  root.style.colorScheme = settings.uiTheme === 'ink-wash' ? 'light' : 'dark';
 
   Object.entries(cssVars).forEach(([key, value]) => {
     root.style.setProperty(key, value);

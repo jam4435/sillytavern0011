@@ -77,6 +77,14 @@
   position: relative;
 }
 
+.modal-paper-texture {
+  position: absolute;
+  inset: 0;
+  background-image: url('https://www.transparenttextures.com/patterns/chinese-style.png');
+  opacity: 0.05;
+  pointer-events: none;
+}
+
 .modal-box.modal-map {
   width: min(96%, 80rem);
   max-width: 80rem;

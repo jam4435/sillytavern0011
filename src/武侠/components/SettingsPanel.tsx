@@ -14,7 +14,9 @@ import {
   SummaryVariableUpdateMode,
   SummaryThresholds,
   DEFAULT_SUMMARY_API_CONFIG,
+  WUXIA_UI_THEMES,
   createRegexRule,
+  getThemeAppearanceDefaults,
   getCurrentPresetRegexRules,
   logRegexDebugSnapshot,
   getRegexRuleContentSignature,
@@ -24,6 +26,7 @@ import {
   scheduleRegexDebugDump,
   setPresetRegexRulesForPreset,
   validateRegex,
+  type WuxiaUiTheme,
 } from '../utils/settingsManager';
 import {
   buildMainInputDebugContent,
@@ -73,6 +76,7 @@ type AutoAdvanceStatus = 'idle' | 'running' | 'stopping' | 'done' | 'error';
 type AutoAdvanceResultStatus = 'running' | 'success' | 'error';
 type VariableSearchMode = 'scope' | 'global';
 type SettingsCollapsibleId =
+  | 'appearanceTheme'
   | 'appearanceText'
   | 'appearanceBackground'
   | 'extraModelApi'
@@ -104,6 +108,7 @@ const AUTO_ADVANCE_MAX_COUNT = 50;
 const SUMMARY_MODEL_LIST_ID = 'wuxia-summary-model-list';
 const API_SELECTION_PRESET_VALUE = 'preset';
 const DEFAULT_OPEN_SETTING_BLOCKS: Record<SettingsCollapsibleId, boolean> = {
+  appearanceTheme: true,
   appearanceText: true,
   appearanceBackground: true,
   extraModelApi: true,
@@ -509,6 +514,37 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const updateSetting = useCallback(
     <K extends keyof DisplaySettings>(key: K, value: DisplaySettings[K]) => {
       onSettingsChange({ ...settings, [key]: value });
+    },
+    [settings, onSettingsChange],
+  );
+
+  const handleThemeChange = useCallback(
+    (nextTheme: WuxiaUiTheme) => {
+      if (nextTheme === settings.uiTheme) {
+        return;
+      }
+
+      const currentThemeDefaults = getThemeAppearanceDefaults(settings.uiTheme);
+      const nextThemeDefaults = getThemeAppearanceDefaults(nextTheme);
+      const nextSettings: DisplaySettings = {
+        ...settings,
+        uiTheme: nextTheme,
+      };
+
+      if (settings.fontColor === currentThemeDefaults.fontColor) {
+        nextSettings.fontColor = nextThemeDefaults.fontColor;
+      }
+      if (settings.backgroundColor === currentThemeDefaults.backgroundColor) {
+        nextSettings.backgroundColor = nextThemeDefaults.backgroundColor;
+      }
+      if (settings.backgroundOpacity === currentThemeDefaults.backgroundOpacity) {
+        nextSettings.backgroundOpacity = nextThemeDefaults.backgroundOpacity;
+      }
+      if (settings.backgroundBlur === currentThemeDefaults.backgroundBlur) {
+        nextSettings.backgroundBlur = nextThemeDefaults.backgroundBlur;
+      }
+
+      onSettingsChange(nextSettings);
     },
     [settings, onSettingsChange],
   );
@@ -1543,6 +1579,38 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {activeTab === 'appearance' && (
           <div className="settings-section appearance-section">
             <div className="appearance-stack">
+              <SettingsCollapsibleBlock
+                id="appearanceTheme"
+                title="界面主题"
+                isOpen={openSettingBlocks.appearanceTheme}
+                onToggle={toggleSettingBlock}
+              >
+                <div className="theme-choice-grid" role="radiogroup" aria-label="界面主题">
+                  {WUXIA_UI_THEMES.map(theme => {
+                    const isActiveTheme = settings.uiTheme === theme.value;
+                    return (
+                      <button
+                        key={theme.value}
+                        type="button"
+                        className={`theme-choice-card ${isActiveTheme ? 'active' : ''}`}
+                        onClick={() => handleThemeChange(theme.value)}
+                        role="radio"
+                        aria-checked={isActiveTheme}
+                      >
+                        <span className={`theme-choice-preview ${theme.value}`}></span>
+                        <span className="theme-choice-text">
+                          <span className="theme-choice-title">{theme.label}</span>
+                          <span className="theme-choice-desc">{theme.description}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {settings.uiTheme === 'ink-wash' && (
+                  <p className="settings-hint">水墨主题会优先使用内置山水背景；自定义背景仍会保留在设置中。</p>
+                )}
+              </SettingsCollapsibleBlock>
+
               <SettingsCollapsibleBlock
                 id="appearanceText"
                 title="正文"
