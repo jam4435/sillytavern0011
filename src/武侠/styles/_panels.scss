@@ -105,6 +105,315 @@
   align-items: center;
 }
 
+.character-side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.character-identity-list,
+.character-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.character-identity-card {
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(120, 53, 15, 0.9);
+  padding: 0.6rem 0.7rem;
+  border-radius: 4px;
+}
+
+.character-identity-title {
+  color: #d97706;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.character-identity-desc {
+  color: #a8a29e;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.character-info-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.28rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.character-info-label {
+  color: #a8a29e;
+}
+
+.character-info-value {
+  color: #e7e5e4;
+
+  &.is-injured {
+    color: #ef4444;
+  }
+}
+
+.character-appearance-note {
+  margin-top: 0.15rem;
+  color: #78716c;
+  font-size: 0.82rem;
+  font-style: italic;
+  line-height: 1.55;
+}
+
+.character-panel-stat-block {
+  margin-bottom: 1.5rem;
+}
+
+.character-stat-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.character-stat-bar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: #a8a29e;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.character-stat-bar-value {
+  color: #e7e5e4;
+}
+
+.character-stat-bar-track {
+  height: 6px;
+  background: #292524;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.character-stat-bar-fill {
+  height: 100%;
+  background: var(--stat-bar-color);
+  box-shadow: 0 0 10px var(--stat-bar-color);
+  transition: width 0.8s ease;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 55%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent);
+  }
+}
+
+.character-attribute-card {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.character-attribute-head {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.character-attribute-label {
+  font-size: 0.8rem;
+  color: #a8a29e;
+}
+
+.character-attribute-value {
+  font-size: 1.2rem;
+  color: #e7e5e4;
+  font-weight: 700;
+}
+
+.character-attribute-initial {
+  font-size: 0.7rem;
+  color: #57534e;
+}
+
+.diamond-bullet {
+  width: 6px;
+  height: 6px;
+  background: #d97706;
+  transform: rotate(45deg);
+  flex: 0 0 auto;
+}
+
+.character-realm-container {
+  position: relative;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  background:
+    radial-gradient(circle at top right, var(--realm-color-muted) 0%, transparent 42%),
+    linear-gradient(135deg, rgba(28, 25, 23, 0.92) 0%, rgba(41, 37, 36, 0.82) 100%);
+  border: 1px solid var(--realm-color-soft);
+  box-shadow:
+    inset 0 0 20px rgba(0, 0, 0, 0.3),
+    0 0 15px var(--realm-color-glow);
+}
+
+.realm-corner {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+
+  &.top-left {
+    top: -1px;
+    left: -1px;
+    border-top: 2px solid var(--realm-color);
+    border-left: 2px solid var(--realm-color);
+  }
+
+  &.top-right {
+    top: -1px;
+    right: -1px;
+    border-top: 2px solid var(--realm-color);
+    border-right: 2px solid var(--realm-color);
+  }
+
+  &.bottom-left {
+    bottom: -1px;
+    left: -1px;
+    border-bottom: 2px solid var(--realm-color);
+    border-left: 2px solid var(--realm-color);
+  }
+
+  &.bottom-right {
+    right: -1px;
+    bottom: -1px;
+    border-right: 2px solid var(--realm-color);
+    border-bottom: 2px solid var(--realm-color);
+  }
+}
+
+.character-realm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.character-realm-copy {
+  min-width: 0;
+}
+
+.character-realm-eyebrow {
+  font-size: 0.72rem;
+  color: #78716c;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.character-realm-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.character-realm-name {
+  font-size: 1.5rem;
+  color: var(--realm-color);
+  font-weight: 700;
+  font-family: 'LXGW WenKai', 'KaiTi', 'STKaiti', 'Kaiti SC', 'Noto Serif SC', serif;
+  text-shadow: 0 0 10px var(--realm-color-soft);
+}
+
+.character-realm-cultivation {
+  font-size: 0.85rem;
+  color: #a8a29e;
+}
+
+.character-realm-cultivation .current {
+  color: var(--realm-color);
+}
+
+.character-realm-cultivation .total {
+  color: #57534e;
+}
+
+.character-realm-next {
+  font-size: 0.76rem;
+  color: #57534e;
+  margin-top: 0.5rem;
+}
+
+.character-realm-next-name {
+  color: var(--next-realm-color);
+}
+
+.character-realm-ready {
+  color: #22c55e;
+  margin-left: 0.55rem;
+}
+
+.character-network-section {
+  margin-top: 1.5rem;
+}
+
+.character-network-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.character-network-chip {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.character-network-name {
+  color: #e7e5e4;
+}
+
+.character-network-relation {
+  color: #78716c;
+  margin-left: 0.5rem;
+}
+
+.character-biography-section {
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+.character-biography {
+  color: #a8a29e;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.character-biography-entry + .character-biography-entry {
+  margin-top: 0.5rem;
+}
+
+.character-biography-label {
+  color: #d97706;
+  margin-right: 0.3rem;
+}
+
 // =========================================
 // Inventory: Square Grid ("Medicine Cabinet" style)
 // =========================================
@@ -1271,6 +1580,35 @@
 
 .breakthrough-btn {
   position: relative;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: 2px solid #44403c;
+  color: #57534e;
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  transform: rotate(45deg);
+  opacity: 0.58;
+  transition: all 0.3s ease;
+
+  &.can-break {
+    background: var(--realm-color-muted);
+    border-color: var(--realm-color);
+    color: var(--realm-color);
+    cursor: pointer;
+    opacity: 1;
+    box-shadow: 0 0 10px var(--realm-color-glow);
+  }
+
+  &.can-break:hover {
+    background: var(--realm-color-soft);
+    box-shadow: 0 0 20px var(--realm-color-soft);
+    transform: rotate(45deg) scale(1.1);
+  }
 
   // 可突破时的脉冲动画
   &.can-break {
@@ -1295,6 +1633,10 @@
       display: none;
     }
   }
+}
+
+.breakthrough-btn-glyph {
+  transform: rotate(-45deg);
 }
 
 @keyframes breakthroughPulse {
@@ -1391,6 +1733,7 @@
 
 // 修为进度条增强样式
 .cultivation-progress-bar {
+  margin-top: 1rem;
   height: 4px;
   background: #292524;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1399,6 +1742,8 @@
 
   .progress-fill {
     height: 100%;
+    background: linear-gradient(90deg, var(--realm-color-soft), var(--realm-color));
+    box-shadow: 0 0 5px var(--realm-color);
     transition: width 0.5s ease;
     position: relative;
 
