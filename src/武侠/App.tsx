@@ -671,9 +671,10 @@ const App: React.FC = () => {
             style={{
               backgroundImage: `url(${displaySettings.backgroundImage})`,
               opacity: Math.min(1, Math.max(0.08, displaySettings.backgroundOpacity * 0.92)),
-              ...(displaySettings.backgroundBlur > 0
-                ? { filter: `blur(${displaySettings.backgroundBlur}px)` }
-                : {}),
+              filter:
+                displaySettings.backgroundBlur > 0
+                  ? `blur(${displaySettings.backgroundBlur}px) contrast(0.9) saturate(0.74)`
+                  : 'contrast(0.9) saturate(0.74)',
             }}
           ></div>
         )}

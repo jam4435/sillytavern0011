@@ -48,7 +48,6 @@
   }
 
   .bg-custom-img.is-stacked {
-    opacity: 0.34;
     mix-blend-mode: multiply;
     filter: contrast(0.9) saturate(0.74);
   }
@@ -331,6 +330,20 @@
   .options-label::before,
   .options-label::after {
     background: rgba(61, 48, 40, 0.28);
+  }
+
+  .save-label-field input,
+  .save-work-state,
+  .save-tree-count,
+  .save-empty-state {
+    background: rgba(255, 250, 244, 0.52);
+    border-color: rgba(61, 48, 40, 0.18);
+    color: #1a1410;
+  }
+
+  .save-label-field span,
+  .save-empty-state p {
+    color: #7a6e62;
   }
 
   .option-btn,
@@ -674,9 +687,9 @@
   .map-mobile-index-header,
   .map-index-toggle {
     border-color: rgba(61, 48, 40, 0.2);
-    background: rgba(250, 246, 238, 0.92);
+    background: rgba(250, 246, 238, 0.76);
     color: #3d3028;
-    box-shadow: 0 10px 22px rgba(61, 48, 40, 0.14);
+    box-shadow: 0 10px 22px rgba(61, 48, 40, 0.08);
   }
 
   .map-legend {
