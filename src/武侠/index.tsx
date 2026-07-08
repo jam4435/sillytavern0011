@@ -1,4 +1,3 @@
-import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/main.scss';
@@ -27,8 +26,8 @@ $(() => {
   void ensureLoaderRegexSafety().catch(error => {
     initLogger.error('修正游戏页面加载正则失败:', error);
   });
-  
-  initLogger.log('✅ 金庸群侠传界面已加载');
+
+  initLogger.log('✅ 金庸群侠传侠传界面已加载');
 });
 
 // 卸载处理
@@ -41,5 +40,5 @@ $(window).on('pagehide', () => {
     root.unmount();
     root = null;
   }
-  initLogger.log('🔄 金庸群侠传界面已卸载');
+  initLogger.log('🔄 金庸群侠传侠传界面已卸载');
 });

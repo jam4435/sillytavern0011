@@ -11,11 +11,7 @@ interface SplashScreenProps {
  * 标题页面组件
  * 显示新游戏/继续游戏选项
  */
-const SplashScreen: React.FC<SplashScreenProps> = ({
-  hasSavedGame,
-  onNewGame,
-  onContinue
-}) => {
+const SplashScreen: React.FC<SplashScreenProps> = ({ hasSavedGame, onNewGame, onContinue }) => {
   return (
     <div className="splash-screen">
       {/* 背景装饰 */}
@@ -40,19 +36,13 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
 
         {/* 菜单按钮 */}
         <div className="splash-menu">
-          <button 
-            className="menu-btn primary"
-            onClick={onNewGame}
-          >
+          <button className="menu-btn primary" onClick={onNewGame}>
             <span className="btn-icon">⚔</span>
             <span className="btn-text">新的故事</span>
           </button>
 
           {hasSavedGame && (
-            <button 
-              className="menu-btn secondary"
-              onClick={onContinue}
-            >
+            <button className="menu-btn secondary" onClick={onContinue}>
               <span className="btn-icon">📜</span>
               <span className="btn-text">续写江湖</span>
             </button>
@@ -69,7 +59,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
 
       {/* 底部信息 */}
       <div className="splash-footer">
-        <p className="version-text">金庸群侠传 v1.0</p>
+        <p className="version-text">金庸群侠传侠传 v1.0</p>
         <p className="credit-text">基于酒馆助手构建</p>
       </div>
     </div>

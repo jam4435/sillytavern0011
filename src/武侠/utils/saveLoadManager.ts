@@ -70,9 +70,7 @@ function readStoredTree(): WuxiaSaveTreeData {
     }
 
     const rawNodes = Array.isArray(rawTree.nodes) ? rawTree.nodes : [];
-    const nodes = rawNodes
-      .map(normalizeNode)
-      .filter((node): node is WuxiaSaveNode => Boolean(node));
+    const nodes = rawNodes.map(normalizeNode).filter((node): node is WuxiaSaveNode => Boolean(node));
 
     return {
       version: 1,
@@ -80,7 +78,7 @@ function readStoredTree(): WuxiaSaveTreeData {
       nodes,
     };
   } catch (error) {
-    console.warn('[金庸群侠传] 读取存档树失败:', error);
+    console.warn('[金庸群侠传侠传] 读取存档树失败:', error);
     return createEmptyTree();
   }
 }
@@ -206,8 +204,7 @@ function parseCheckpointList(rawResult: string): Array<{ checkpointName: string;
       }
 
       if (isRecord(item)) {
-        const checkpointName =
-          String(item.checkpointName ?? item.checkpoint ?? item.name ?? item.link ?? '').trim();
+        const checkpointName = String(item.checkpointName ?? item.checkpoint ?? item.name ?? item.link ?? '').trim();
         const rawMessageId = item.messageId ?? item.message_id ?? item.mesId ?? item.mes_id;
         const messageId = typeof rawMessageId === 'number' ? rawMessageId : Number(rawMessageId);
         if (!checkpointName) {
@@ -241,7 +238,7 @@ function mergeUntrackedCheckpoints(
       playerName: '',
       location: '',
       worldTimeText: '',
-      preview: '此 checkpoint 由酒馆记录发现，尚未写入金庸群侠传存档树。',
+      preview: '此 checkpoint 由酒馆记录发现，尚未写入金庸群侠传侠传存档树。',
     }));
 
   if (additions.length === 0) {
