@@ -1617,6 +1617,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     水墨主题会保留内置山水底图；自定义背景会作为上层叠加，并继续受透明度与模糊设置控制。透明度调到 100% 时会基本盖住底图。
                   </p>
                 )}
+                {settings.uiTheme === 'jinyong' && (
+                  <p className="settings-hint">
+                    金庸群侠传主题会使用内置标题、龙纹条与武功图标；自定义背景仍会替换底图，并继续受透明度与模糊设置控制。
+                  </p>
+                )}
               </SettingsCollapsibleBlock>
 
               <SettingsCollapsibleBlock

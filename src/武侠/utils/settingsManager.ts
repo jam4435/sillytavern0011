@@ -12,13 +12,17 @@ import inkWashIconSquareDarkUrl from '../wuxia-sprites/icon/icon-square-dark.png
 import inkWashPanelBarMdUrl from '../wuxia-sprites/panel/panel-bar-md.png?url';
 import inkWashPanelRectLgUrl from '../wuxia-sprites/panel/panel-rect-lg.png?url';
 import inkWashPanelRectXlUrl from '../wuxia-sprites/panel/panel-rect-xl.png?url';
+import jinyongBeimingIconUrl from '../jinyong-assets/beiming-icon.png?url';
+import jinyongDragonBarUrl from '../jinyong-assets/dragon-bar.png?url';
+import jinyongSaveFrameUrl from '../jinyong-assets/save-frame.png?url';
+import jinyongTitleLogoUrl from '../jinyong-assets/title-logo.png?url';
 
 // =========================================
 // 类型定义
 // =========================================
 
 export type RegexRuleOriginScope = 'manual' | 'global' | 'preset';
-export type WuxiaUiTheme = 'dark-gold' | 'ink-wash';
+export type WuxiaUiTheme = 'dark-gold' | 'ink-wash' | 'jinyong';
 
 /** 正则替换规则 */
 export interface RegexRule {
@@ -285,6 +289,7 @@ export const DEFAULT_UI_THEME: WuxiaUiTheme = 'dark-gold';
 export const UI_THEME_LABELS: Record<WuxiaUiTheme, string> = {
   'dark-gold': '黑金',
   'ink-wash': '水墨',
+  jinyong: '金庸群侠传',
 };
 
 export const THEME_APPEARANCE_DEFAULTS: Record<WuxiaUiTheme, ThemeAppearanceDefaults> = {
@@ -304,6 +309,14 @@ export const THEME_APPEARANCE_DEFAULTS: Record<WuxiaUiTheme, ThemeAppearanceDefa
     chromeOpacity: 0.42,
     modalOpacity: 0.58,
   },
+  jinyong: {
+    fontColor: '#f7e3a0',
+    backgroundColor: '#120907',
+    backgroundOpacity: 0.88,
+    backgroundBlur: 0,
+    chromeOpacity: 0.74,
+    modalOpacity: 0.8,
+  },
 };
 
 export const WUXIA_UI_THEMES: { value: WuxiaUiTheme; label: string; description: string }[] = [
@@ -316,6 +329,11 @@ export const WUXIA_UI_THEMES: { value: WuxiaUiTheme; label: string; description:
     value: 'ink-wash',
     label: UI_THEME_LABELS['ink-wash'],
     description: '宣纸水墨界面',
+  },
+  {
+    value: 'jinyong',
+    label: UI_THEME_LABELS.jinyong,
+    description: '复古 RPG 漆黑铜纹界面',
   },
 ];
 
@@ -757,7 +775,7 @@ function getNullableStringSetting(value: unknown, fallbackValue: string | null):
 }
 
 function normalizeUiTheme(value: unknown): WuxiaUiTheme {
-  return value === 'ink-wash' || value === 'dark-gold' ? value : DEFAULT_UI_THEME;
+  return value === 'ink-wash' || value === 'dark-gold' || value === 'jinyong' ? value : DEFAULT_UI_THEME;
 }
 
 export function getThemeAppearanceDefaults(theme: WuxiaUiTheme): ThemeAppearanceDefaults {
@@ -1231,11 +1249,10 @@ export function imageToBase64(file: File): Promise<string> {
  */
 export function generateCSSVariables(settings: DisplaySettings): Record<string, string> {
   const darkGoldDefaults = THEME_APPEARANCE_DEFAULTS['dark-gold'];
-  const inkWashDefaults = THEME_APPEARANCE_DEFAULTS['ink-wash'];
   const themeDefaults = THEME_APPEARANCE_DEFAULTS[settings.uiTheme];
   const themeAwareFontColor =
-    settings.uiTheme === 'ink-wash' && settings.fontColor === darkGoldDefaults.fontColor
-      ? inkWashDefaults.fontColor
+    settings.uiTheme !== 'dark-gold' && settings.fontColor === darkGoldDefaults.fontColor
+      ? themeDefaults.fontColor
       : settings.fontColor;
   const cssUrl = (url: string) => `url("${url}")`;
   const clampUnit = (value: number) => Math.min(1, Math.max(0, value));
@@ -1277,6 +1294,10 @@ export function generateCSSVariables(settings: DisplaySettings): Record<string, 
     '--wuxia-ink-circle-frame': cssUrl(inkWashCircleFrameInkUrl),
     '--wuxia-ink-icon-circle': cssUrl(inkWashIconCircleInkUrl),
     '--wuxia-ink-icon-square-dark': cssUrl(inkWashIconSquareDarkUrl),
+    '--wuxia-jinyong-title-logo': cssUrl(jinyongTitleLogoUrl),
+    '--wuxia-jinyong-dragon-bar': cssUrl(jinyongDragonBarUrl),
+    '--wuxia-jinyong-save-frame': cssUrl(jinyongSaveFrameUrl),
+    '--wuxia-jinyong-beiming-icon': cssUrl(jinyongBeimingIconUrl),
   };
 }
 
