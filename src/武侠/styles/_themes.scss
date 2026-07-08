@@ -825,7 +825,10 @@
   }
 
   .variables-search-input {
+    border: 0;
+    background: transparent;
     color: #1a1410;
+    box-shadow: none;
 
     &::placeholder {
       color: #7a6e62;
