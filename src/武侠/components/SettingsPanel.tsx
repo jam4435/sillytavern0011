@@ -1607,7 +1607,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   })}
                 </div>
                 {settings.uiTheme === 'ink-wash' && (
-                  <p className="settings-hint">水墨主题会优先使用内置山水背景；自定义背景仍会保留在设置中。</p>
+                  <p className="settings-hint">水墨主题会保留内置山水底图；自定义背景会作为上层叠加，并继续受透明度与模糊设置控制。</p>
                 )}
               </SettingsCollapsibleBlock>
 

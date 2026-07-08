@@ -53,9 +53,26 @@
   inset: 0;
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   transition: opacity 0.3s ease;
   opacity: 0.15;
   background-image: url('https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?q=80&w=1920&auto=format&fit=crop');
+}
+
+.bg-custom-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  transition:
+    opacity 0.3s ease,
+    filter 0.3s ease;
+
+  &.is-stacked {
+    mix-blend-mode: multiply;
+  }
 }
 
 .bg-gradient-vert {

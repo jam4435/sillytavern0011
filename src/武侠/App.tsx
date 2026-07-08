@@ -394,7 +394,9 @@ const App: React.FC = () => {
     }
     return applyRegexRules(currentMaintext, activeRegexRules);
   }, [activeRegexRules, currentMaintext]);
-  const shouldUseCustomBackground = displaySettings.uiTheme !== 'ink-wash' && Boolean(displaySettings.backgroundImage);
+  const hasCustomBackground = Boolean(displaySettings.backgroundImage);
+  const shouldReplaceBaseBackground = displaySettings.uiTheme !== 'ink-wash' && hasCustomBackground;
+  const shouldStackCustomBackground = displaySettings.uiTheme === 'ink-wash' && hasCustomBackground;
 
   // 续写江湖处理
   const handleContinue = useCallback(async () => {
@@ -652,7 +654,7 @@ const App: React.FC = () => {
         <div
           className="bg-img"
           style={
-            shouldUseCustomBackground && displaySettings.backgroundImage
+            shouldReplaceBaseBackground && displaySettings.backgroundImage
               ? {
                   backgroundImage: `url(${displaySettings.backgroundImage})`,
                   opacity: displaySettings.backgroundOpacity,
@@ -663,6 +665,18 @@ const App: React.FC = () => {
               : undefined
           }
         ></div>
+        {shouldStackCustomBackground && displaySettings.backgroundImage && (
+          <div
+            className="bg-custom-img is-stacked"
+            style={{
+              backgroundImage: `url(${displaySettings.backgroundImage})`,
+              opacity: Math.min(1, Math.max(0.08, displaySettings.backgroundOpacity * 0.92)),
+              ...(displaySettings.backgroundBlur > 0
+                ? { filter: `blur(${displaySettings.backgroundBlur}px)` }
+                : {}),
+            }}
+          ></div>
+        )}
         <div
           className="bg-gradient-vert"
           style={{
@@ -704,49 +718,42 @@ const App: React.FC = () => {
           </div>
 
           <NavButton
-            variant="seal"
             icon={<Icons.Character />}
             label="状态"
             isActive={activePanel === ActivePanel.CHARACTER}
             onClick={() => handleNavClick(ActivePanel.CHARACTER)}
           />
           <NavButton
-            variant="panel"
             icon={<Icons.Manual />}
             label="功法"
             isActive={activePanel === ActivePanel.MARTIAL_ARTS}
             onClick={() => handleNavClick(ActivePanel.MARTIAL_ARTS)}
           />
           <NavButton
-            variant="coin"
             icon={<Icons.Inventory />}
             label="行囊"
             isActive={activePanel === ActivePanel.INVENTORY}
             onClick={() => handleNavClick(ActivePanel.INVENTORY)}
           />
           <NavButton
-            variant="seal"
             icon={<Icons.Quest />}
             label="事件"
             isActive={activePanel === ActivePanel.EVENTS}
             onClick={() => handleNavClick(ActivePanel.EVENTS)}
           />
           <NavButton
-            variant="panel"
             icon={<Icons.Map />}
             label="地图"
             isActive={activePanel === ActivePanel.MAP}
             onClick={handleMapNavClick}
           />
           <NavButton
-            variant="coin"
             icon={<Icons.Social />}
             label="侠缘"
             isActive={activePanel === ActivePanel.SOCIAL}
             onClick={() => handleNavClick(ActivePanel.SOCIAL)}
           />
           <NavButton
-            variant="panel"
             icon={<Icons.Settings />}
             label="设置"
             isActive={activePanel === ActivePanel.SETTINGS}
@@ -864,17 +871,15 @@ const App: React.FC = () => {
 const NavButton = ({
   icon,
   label,
-  variant = 'seal',
   isActive,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
-  variant?: 'seal' | 'panel' | 'coin';
   isActive: boolean;
   onClick: () => void;
 }) => (
-  <button onClick={onClick} className={`nav-btn variant-${variant} ${isActive ? 'active' : ''}`}>
+  <button onClick={onClick} className={`nav-btn ${isActive ? 'active' : ''}`}>
     {isActive && <div className="nav-btn-indicator"></div>}
     <div className="nav-icon-wrapper">{icon}</div>
     <span className="nav-label">{label}</span>
