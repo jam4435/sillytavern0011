@@ -18,7 +18,7 @@ export const EventsPanel: React.FC<EventsPanelProps> = ({ events }) => {
             {rumorEvents.length > 0 && (
                 <div className="event-section">
                     <h4 className="event-section-header">
-                        <Icons.Social size={16} className="text-stone-500" />
+                        <Icons.Social size={16} color="currentColor" className="event-section-icon" />
                         <span>江湖传闻</span>
                     </h4>
                     <div className="event-list-compact">
@@ -26,7 +26,7 @@ export const EventsPanel: React.FC<EventsPanelProps> = ({ events }) => {
                             <div key={ev.id} className="event-compact-row">
                                 <span className="event-dot"></span>
                                 <span className="event-compact-text">
-                                    <span style={{color: '#d6d3d1'}}>{ev.title}：</span>
+                                    <span className="event-compact-title">{ev.title}：</span>
                                     {ev.description}
                                 </span>
                             </div>
@@ -37,8 +37,8 @@ export const EventsPanel: React.FC<EventsPanelProps> = ({ events }) => {
 
             {/* 2. Active Events (Middle, Detailed) */}
             <div className="event-section">
-                <h4 className="event-section-header" style={{ color: '#d97706', borderColor: '#d97706' }}>
-                    <Icons.Quest size={16} color="#d97706" />
+                <h4 className="event-section-header event-section-header-accent">
+                    <Icons.Quest size={16} color="currentColor" className="event-section-icon" />
                     <span>当前历练</span>
                 </h4>
 
@@ -68,7 +68,7 @@ export const EventsPanel: React.FC<EventsPanelProps> = ({ events }) => {
             {aftermathEvents.length > 0 && (
                 <div className="event-section" style={{ marginTop: 'auto', paddingTop: '1rem', opacity: 0.7 }}>
                     <h4 className="event-section-header">
-                        <Icons.Compass size={16} className="text-stone-500" />
+                        <Icons.Compass size={16} color="currentColor" className="event-section-icon" />
                         <span>往事后续</span>
                     </h4>
                     <div className="event-list-compact">

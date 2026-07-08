@@ -1429,8 +1429,26 @@
 // Martial Arts Card - 功法卡片
 // =========================================
 
+.martial-art-panel {
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.martial-art-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
 .martial-art-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: all 0.3s ease;
 
   // 悬停效果
@@ -1475,6 +1493,169 @@
   }
 }
 
+.martial-art-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.martial-art-title-group {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.martial-art-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.martial-art-name {
+  min-width: 0;
+  color: #e7e5e4;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.martial-art-rank-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.65rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.martial-art-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: -0.2rem;
+  color: #a8a29e;
+  font-size: 0.85rem;
+}
+
+.martial-art-type {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.martial-art-meta-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #57534e;
+}
+
+.martial-art-mastery {
+  font-weight: 700;
+}
+
+.martial-art-description {
+  flex: 1;
+  margin: 0;
+  color: #d6d3d1;
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.martial-art-traits {
+  padding-top: 1rem;
+  margin-bottom: 0.25rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.martial-art-traits-locked {
+  border-top-style: solid;
+  border-top-color: rgba(255, 255, 255, 0.05);
+}
+
+.martial-art-traits-title {
+  margin-bottom: 0.5rem;
+  color: #78716c;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+}
+
+.martial-art-traits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &.compact {
+    gap: 0.25rem;
+  }
+}
+
+.trait-unlocked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  color: #a8a29e;
+  font-size: 0.85rem;
+}
+
+.trait-unlocked-name {
+  font-weight: 600;
+}
+
+.trait-locked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  color: #44403c;
+  font-size: 0.8rem;
+}
+
+.trait-locked-mask {
+  color: #57534e;
+}
+
+.martial-art-upgrade {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.martial-art-upgrade-meta {
+  color: #78716c;
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
+.martial-art-upgrade-cost.is-affordable {
+  color: #22c55e;
+}
+
+.martial-art-upgrade-cost.is-blocked {
+  color: #ef4444;
+}
+
+.martial-art-complete {
+  width: 100%;
+  color: #fbbf24;
+  font-family: var(--font-serif);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 // =========================================
 // Martial Arts Upgrade Button - 功法精进按钮
 // =========================================
@@ -1482,6 +1663,15 @@
 .martial-upgrade-btn {
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--upgrade-color, #57534e);
+  border-radius: 4px;
+  background: var(--upgrade-bg, transparent);
+  color: var(--upgrade-color, #57534e);
+  font-family: var(--font-serif);
+  font-size: 0.85rem;
+  cursor: pointer;
 
   // 背景光效
   &::before {
@@ -1518,6 +1708,28 @@
     &::before {
       display: none;
     }
+  }
+}
+
+@media (max-width: 640px) {
+  .martial-art-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .martial-art-card {
+    padding: 1.1rem;
+  }
+
+  .martial-art-header,
+  .martial-art-upgrade {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .martial-upgrade-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 

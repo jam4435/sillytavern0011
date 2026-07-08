@@ -27,6 +27,15 @@
   margin: 0;
 }
 
+.event-section-icon {
+  color: currentColor;
+}
+
+.event-section-header-accent {
+  color: #d97706;
+  border-bottom-color: rgba(217, 119, 6, 0.35);
+}
+
 .event-list-compact {
   display: flex;
   flex-direction: column;
@@ -58,6 +67,10 @@
 
 .event-compact-text {
   flex: 1;
+}
+
+.event-compact-title {
+  color: #d6d3d1;
 }
 
 // Active Event Card
