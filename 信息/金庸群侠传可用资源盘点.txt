@@ -1,0 +1,306 @@
+金庸群侠传可用资源盘点
+
+用途
+- 这份文档用于给酒馆武侠 RPG 角色卡选材，基于对 `E:\jinyong` 的只读盘点整理。
+- 本次盘点没有避开 R18/擦边资源，后续由使用者自行筛选。
+
+整体结论
+- `E:\jinyong` 不是单纯的游戏成品目录，而是接近完整的 RPG Maker XP 游戏资源包。
+- 其中最有价值的资源集中在 `Graphics`、`Audio`、`Data`、`Fonts` 四块。
+- 如果只是做一张或一批酒馆角色卡，优先看 `Graphics\Pictures`、`Graphics\Characters`、`Graphics\Icons`、`Graphics\Panoramas`。
+- 如果后续还要做世界观、门派、地点、武功词库，可继续深挖 `Data\*.rxdata`。
+
+资源规模概览
+- 图片资源约 `12208` 个：`.png 9808`、`.jpg 2400`
+- 游戏数据文件约 `1124` 个：`.rxdata 1124`
+- 音频资源约 `1165` 个：`.ogg 525`、`.mp3 291`、`.mid 174`、`.wav 152`、`.wma 3`、歌词 `.lrc 15`
+- PSD 源文件 `13` 个
+- 字体文件 `7` 个
+
+一、最适合直接做角色卡的图像资源
+
+1. 人物立绘 / CG
+- 目录：`E:\jinyong\Graphics\Pictures`
+- 文件数：`4011`
+- 可直接作为头像或卡面插图的命名人物图很多，至少能看到大量 `*_fc2`、`*_fc3`、单人名、双人名资源。
+- 已确认样例：
+  - `阿碧_fc2.png`
+  - `阿九_fc2.png`
+  - `阿青_fc2.png`
+  - `阿朱_fc2.png`
+  - `阿紫_fc2.png`
+  - `東方白_fc2.png`
+  - `東方不敗_fc2.png`
+  - `程靈素_fc2.png`
+  - `程瑤迦_fc2.png`
+  - `狄雲_fc2.png`
+  - `段譽_fc2.png`
+  - `風宿玲.png`
+  - `方怡.png`
+  - `方怡2.png`
+  - `冯蘅.png`
+- 统计补充：
+  - `*_fc数字` 这类命名图约 `245` 张
+  - 文件名带“头像/頭像”的现成头像约 `5` 张
+- 适合用途：
+  - 角色主头像
+  - 卡面半身图 / 全身图
+  - 关系角色附图
+  - 特定剧情分支立绘
+
+2. 行走图 / 战斗姿态 / 小人图
+- 目录：`E:\jinyong\Graphics\Characters`
+- 文件数：`2108`
+- 去重后能识别出大约 `363` 个中文命名角色底稿。
+- 这类资源通常包含站立、移动、战斗、受伤或不同朝向版本，适合做小尺寸 UI 图、状态栏角色、地图式展示。
+- 已确认样例：
+  - `小龍女.png`
+  - `李莫愁.png`
+  - `袁紫衣.png`
+  - `霍青桐2.png`
+  - `段思平.png`
+  - `段思平新郎.png`
+  - `楊過.png`
+  - `風清揚.png`
+  - `童姥.png`
+  - `阿青.png`
+  - `韓小莹.png`
+  - `逍遙掌門.png`
+  - `男宗師.png`
+  - `女掌門.png`
+- 常见变体后缀：
+  - `-D1`
+  - `-D2`
+  - `-die`
+  - `(站立)`
+  - `(行走)`
+  - `(戰鬥)`
+  - `(跑)`
+- 适合用途：
+  - Q 版小头像
+  - 状态栏立绘
+  - 角色切换按钮图
+  - “当前所在场景角色”小地图式展示
+
+3. 武功 / 物品 / 状态图标
+- 目录：`E:\jinyong\Graphics\Icons`
+- 文件数：`2843`
+- 中文命名图标约 `993`
+- 明显属于武功、心法、招式、状态类命名的图标至少 `212`
+- 已确认样例：
+  - `黯然銷魂掌.png`
+  - `北冥真氣.png`
+  - `碧海潮生.png`
+  - `白鶴舒翅.png`
+  - `冰心訣.jpg`
+  - `不死印法.png`
+  - `參合劍氣.png`
+  - `大还丹.png`
+  - `刀氣縱橫.jpg`
+  - `劈空掌.png`
+  - `靈鱉步.png`
+  - `華嚴妙音.png`
+- 适合用途：
+  - 角色卡技能栏
+  - 武学流派标签
+  - Buff / Debuff 图标
+  - 装备、宝物、丹药图标
+
+4. 场景背景 / 氛围图
+- 目录：`E:\jinyong\Graphics\Panoramas`
+- 文件数：`596`
+- 中文命名约 `209`
+- 已确认样例：
+  - `边境村落远景.png`
+  - `储秀宫林苑东侧.png`
+  - `皇宫大殿.png`
+  - `皇宫军机处.png`
+  - `镜湖小筑.png`
+  - `镜湖小筑内.png`
+  - `灵鹫宫童姥大厅.png`
+  - `牛家村室内.png`
+  - `牛家村室外.png`
+  - `少室山道.png`
+  - `神龙岛.jpg`
+  - `天山灵鹫宫.png`
+  - `太和.png`
+  - `嵩山.png`
+  - `洛阳.jpg`
+- 适合用途：
+  - 卡面背景
+  - 开场场景图
+  - 地点卡 / 门派卡背景
+  - 剧情阶段切图
+
+5. 门派 / 地图 / UI 辅助图
+- 主要目录：`E:\jinyong\Graphics\Pictures`
+- 已确认样例：
+  - `001門派.png` 到 `010門派.png`
+  - `白蛇头像.png`
+  - `丹青女子头像.png`
+  - `冷婷头像.png`
+  - `冷轩头像.png`
+  - `宁中则头像.png`
+  - `转盘标题.png`
+  - `zb-d-大地图.png`
+- 适合用途：
+  - 门派选择界面
+  - 阵营标签
+  - 标题装饰图
+  - 大地图概念图
+
+二、可用于排版和风格复刻的资源
+
+1. PSD 源文件
+- 已确认路径：
+  - `E:\jinyong\Graphics\Windowskins\save_90.psd`
+  - `E:\jinyong\Graphics\Windowskins\save2.psd`
+  - `E:\jinyong\Graphics\Titles\title.psd`
+  - `E:\jinyong\Graphics\Titles\continue-2.psd`
+  - `E:\jinyong\Graphics\Pictures\UI5.psd`
+  - `E:\jinyong\Graphics\Pictures\help.psd`
+  - `E:\jinyong\Graphics\Pictures\getquest.psd`
+  - `E:\jinyong\Graphics\Pictures\friend_ui.psd`
+  - `E:\jinyong\Graphics\Pictures\esc.psd`
+  - `E:\jinyong\Graphics\Pictures\choose_boy_1.psd`
+  - `E:\jinyong\Graphics\Pictures\bar.psd`
+  - `E:\jinyong\Graphics\Panoramas\sexmode.psd`
+  - `E:\jinyong\Graphics\Icons\000_statue_number.psd`
+- 用处：
+  - 直接拆 UI 结构
+  - 提取边框、面板、按钮、标题层
+  - 参考原版排版方式
+
+2. 标题图 / 界面图
+- 目录：`E:\jinyong\Graphics\Titles`
+- 已确认样例：
+  - `jytitlelogo.png`
+  - `title01.png`
+  - `title02.png`
+  - `title03.png`
+  - `title04.png`
+  - `title05.png`
+  - `start-1.png`
+  - `start-2.png`
+  - `continue-1.png`
+  - `continue-2.png`
+- 用处：
+  - 做角色卡标题条
+  - 提取 logo 风格
+  - 参考古风 RPG 开始界面的装饰元素
+
+3. 字体
+- 目录：
+  - `E:\jinyong\Fonts`
+  - `E:\jinyong\請點我安裝字型`
+- 已确认字体：
+  - `王漢宗中隸書繁.ttf`
+  - `HanWangShinSuMedium.ttf`
+  - `SimHei.ttf`
+  - `MingLiu.ttc`
+  - `VL-Gothic-Regular.ttf`
+  - `VL-PGothic-Regular.ttf`
+- 用处：
+  - 武侠题字
+  - 标题复刻
+  - 说明文字排版
+
+三、音频资源
+
+1. BGM
+- 目录：`E:\jinyong\Audio\BGM`
+- 文件数：`691`
+- 已确认样例：
+  - `逍遙派.mp3`
+  - `铜雀台.mp3`
+  - `西湖.mp3`
+  - `擂鼓山下.mp3`
+  - `白河寒秋.mp3`
+  - `天策府.mp3`
+  - `天仙子.mp3`
+  - `仙劍奇緣.ogg`
+  - `城鎮音樂.ogg`
+  - `超經典戰鬥音樂.ogg`
+- 用处：
+  - 给 Tavern 角色卡或脚本挑氛围音乐
+  - 参考门派 / 地图 / 战斗音色
+
+2. 音效和歌词
+- `Audio\SE` 文件数：`569`
+- `Audio\ME` 文件数：`27`
+- `Audio\BGS` 文件数：`25`
+- `Audio\Lyric` 文件数：`15`
+- 歌词样例：
+  - `jianghuxiao.lrc`
+  - `jianghuzaijian.lrc`
+  - `qingjitianshu.lrc`
+  - `yujianjianghu.lrc`
+- 用处：
+  - 场景切换音效
+  - 技能释放音
+  - 角色主题曲参考
+
+四、可继续深挖的数据资源
+
+1. 游戏数据库
+- 目录：`E:\jinyong\Data`
+- 关键文件：
+  - `Actors.rxdata`
+  - `Skills.rxdata`
+  - `Items.rxdata`
+  - `Weapons.rxdata`
+  - `Armors.rxdata`
+  - `States.rxdata`
+  - `Classes.rxdata`
+  - `Enemies.rxdata`
+  - `CommonEvents.rxdata`
+  - `MapInfos.rxdata`
+  - `Scripts.rxdata`
+- 用处：
+  - 提取角色名、门派、武功、物品、状态名
+  - 整理地点、事件、系统文本
+  - 研究设定词汇和玩法结构
+
+2. 地图数据
+- `E:\jinyong\Data` 下共有 `1000` 个 `Map*.rxdata`
+- 前 10 个文件：
+  - `Map001.rxdata`
+  - `Map002.rxdata`
+  - `Map003.rxdata`
+  - `Map004.rxdata`
+  - `Map005.rxdata`
+  - `Map006.rxdata`
+  - `Map007.rxdata`
+  - `Map008.rxdata`
+  - `Map009.rxdata`
+  - `Map010.rxdata`
+- 用处：
+  - 抽地点名和场景关系
+  - 研究门派、城镇、地图结构
+  - 给角色卡构建可游玩地理框架
+
+五、建议的实际取材顺序
+- 如果先做“角色头像 + 卡面”：
+  - 先看 `Graphics\Pictures`
+  - 再补 `Graphics\Panoramas`
+  - 最后从 `Graphics\Icons` 选武功图标
+- 如果先做“可游玩武侠设定”：
+  - 先看 `Graphics\Pictures`、`Graphics\Characters` 建人物印象
+  - 再读 `Data\Skills.rxdata`、`Data\Actors.rxdata`、`Data\MapInfos.rxdata`
+- 如果想复刻原游戏 UI 风格：
+  - 先看 `Graphics\Titles`
+  - 再拆 `Graphics\Pictures\*.psd`
+  - 最后配合 `Fonts` 里的字体做排版
+
+六、对当前任务最有价值的结论
+- 这包里确实有大量能直接用于酒馆武侠角色卡的素材，不需要从零开始找图。
+- 最值得优先翻的目录是：
+  - `E:\jinyong\Graphics\Pictures`
+  - `E:\jinyong\Graphics\Characters`
+  - `E:\jinyong\Graphics\Icons`
+  - `E:\jinyong\Graphics\Panoramas`
+  - `E:\jinyong\Graphics\Titles`
+  - `E:\jinyong\Fonts`
+- 如果后续需要，我可以继续做两类更细的整理：
+  - 按“适合做角色卡”的人物图，生成一个精选清单
+  - 尝试从 `Data\*.rxdata` 提取角色名、门派、武功、地点词库
