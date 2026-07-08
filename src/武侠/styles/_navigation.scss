@@ -7,7 +7,7 @@
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.42);
+  background: rgba(0, 0, 0, calc(0.42 * var(--wuxia-chrome-opacity, 1)));
   z-index: 99;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -31,7 +31,11 @@
   left: 0.75rem;
   width: 2.75rem;
   height: 2.75rem;
-  background: linear-gradient(135deg, rgba(12, 10, 9, 0.66) 0%, rgba(20, 16, 14, 0.52) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(12, 10, 9, calc(0.66 * var(--wuxia-chrome-opacity, 1))) 0%,
+    rgba(20, 16, 14, calc(0.52 * var(--wuxia-chrome-opacity, 1))) 100%
+  );
   border: 1px solid rgba(139, 90, 43, 0.4);
   border-radius: 8px;
   cursor: pointer;
@@ -105,7 +109,11 @@
   left: 0;
   width: 4.5rem;
   height: 100%;
-  background: linear-gradient(180deg, rgba(12, 10, 9, 0.72) 0%, rgba(20, 16, 14, 0.56) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(12, 10, 9, calc(0.72 * var(--wuxia-chrome-opacity, 1))) 0%,
+    rgba(20, 16, 14, calc(0.56 * var(--wuxia-chrome-opacity, 1))) 100%
+  );
   border-right: 1px solid rgba(139, 90, 43, 0.2);
   display: flex;
   flex-direction: column;
@@ -291,10 +299,10 @@
   }
 
   @media (min-width: 768px) {
-    flex-direction: row;
-    padding: 0.875rem 0;
+    flex-direction: column;
+    padding: 0.75rem 0.2rem;
     justify-content: center;
-    gap: 0.6rem;
+    gap: 0.32rem;
     width: calc(100% - 1rem);
     margin: 0 0.5rem;
 
@@ -374,8 +382,10 @@
   font-size: 9px;
   font-family: var(--font-serif);
   letter-spacing: 0.08em;
-  margin-top: 0.2rem;
+  margin-top: 0.28rem;
   transition: all 0.3s ease;
+  line-height: 1.1;
+  text-align: center;
 
   .nav-btn:hover & {
     letter-spacing: 0.12em;
@@ -386,16 +396,16 @@
   }
 
   @media (min-width: 768px) {
-    font-size: 0.8rem;
-    letter-spacing: 0.15em;
-    margin-top: 0;
-    writing-mode: vertical-rl;
-    text-orientation: upright;
-    white-space: normal;
-    margin-left: 0.2rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    margin-top: 0.18rem;
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    white-space: nowrap;
+    margin-left: 0;
 
     .nav-btn:hover & {
-      letter-spacing: 0.2em;
+      letter-spacing: 0.16em;
     }
   }
 }

@@ -174,7 +174,7 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                     })}
                 </div>
             ) : (
-                 <EmptyState message="包袱空空如也。" />
+                 <EmptyState message="包袱空空如也。" variant="inventory" />
             )}
 
             {/* Item Detail Window */}

@@ -10,7 +10,11 @@
   justify-content: space-between;
   padding: 0 1.5rem;
   border-bottom: 1px solid rgba(139, 90, 43, 0.15);
-  background: linear-gradient(180deg, rgba(12, 10, 9, 0.58) 0%, rgba(20, 16, 14, 0.38) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(12, 10, 9, calc(0.58 * var(--wuxia-chrome-opacity, 1))) 0%,
+    rgba(20, 16, 14, calc(0.38 * var(--wuxia-chrome-opacity, 1))) 100%
+  );
   position: relative;
   z-index: 20;
   backdrop-filter: blur(14px);

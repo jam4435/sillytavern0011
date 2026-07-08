@@ -543,6 +543,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       if (settings.backgroundBlur === currentThemeDefaults.backgroundBlur) {
         nextSettings.backgroundBlur = nextThemeDefaults.backgroundBlur;
       }
+      if (settings.chromeOpacity === currentThemeDefaults.chromeOpacity) {
+        nextSettings.chromeOpacity = nextThemeDefaults.chromeOpacity;
+      }
+      if (settings.modalOpacity === currentThemeDefaults.modalOpacity) {
+        nextSettings.modalOpacity = nextThemeDefaults.modalOpacity;
+      }
 
       onSettingsChange(nextSettings);
     },
@@ -1742,6 +1748,38 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       className="settings-slider"
                     />
                     <span className="settings-value">{settings.backgroundBlur}px</span>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-label">周边栏目不透明度</label>
+                  <div className="settings-control">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={settings.chromeOpacity}
+                      onChange={e => updateSetting('chromeOpacity', parseFloat(e.target.value))}
+                      className="settings-slider"
+                    />
+                    <span className="settings-value">{Math.round(settings.chromeOpacity * 100)}%</span>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-label">弹窗不透明度</label>
+                  <div className="settings-control">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={settings.modalOpacity}
+                      onChange={e => updateSetting('modalOpacity', parseFloat(e.target.value))}
+                      className="settings-slider"
+                    />
+                    <span className="settings-value">{Math.round(settings.modalOpacity * 100)}%</span>
                   </div>
                 </div>
 

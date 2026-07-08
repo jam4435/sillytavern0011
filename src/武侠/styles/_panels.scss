@@ -647,11 +647,11 @@
   display: flex;
   flex-direction: column;
   overflow-y: visible; // 让父容器处理滚动
-  padding: 1.5rem 2rem 2.5rem;
+  padding: 1rem 1.2rem 1.5rem;
   position: relative;
 
   @media (min-width: 768px) {
-    padding: 2rem 3rem 3rem;
+    padding: 1.2rem 1.6rem 1.8rem;
   }
 }
 
@@ -710,8 +710,8 @@
 .maintext-container {
   position: relative;
   z-index: 1;
-  padding: 2rem 2.5rem;
-  margin-bottom: 2rem;
+  padding: 1.35rem 1.6rem;
+  margin-bottom: 1rem;
   background: linear-gradient(
     135deg,
     rgba(28, 25, 23, 0.28) 0%,
@@ -760,9 +760,81 @@
   }
 
   @media (max-width: 768px) {
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
   }
+}
+
+.empty-state {
+  min-height: 220px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: rgba(168, 162, 158, 0.72);
+}
+
+.empty-state-emblem {
+  position: relative;
+  width: 82px;
+  height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    transform: rotate(45deg);
+    border: 1px solid rgba(139, 90, 43, 0.26);
+    background:
+      linear-gradient(135deg, rgba(181, 137, 80, 0.08), transparent 62%),
+      rgba(28, 25, 23, 0.16);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 9px;
+    border-radius: 999px;
+    border: 1px solid rgba(181, 137, 80, 0.18);
+    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.06), transparent 70%);
+  }
+}
+
+.empty-state-icon-shell {
+  position: relative;
+  z-index: 1;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(41, 37, 36, 0.58), rgba(28, 25, 23, 0.82));
+  border: 1px solid rgba(181, 137, 80, 0.24);
+  color: rgba(231, 229, 228, 0.88);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 18px rgba(0, 0, 0, 0.14);
+}
+
+.empty-state--inventory .empty-state-icon-shell {
+  color: rgba(212, 175, 55, 0.92);
+}
+
+.empty-state-text {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  color: inherit;
 }
 
 .maintext-content {

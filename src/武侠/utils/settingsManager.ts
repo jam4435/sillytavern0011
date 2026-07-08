@@ -192,6 +192,8 @@ export interface DisplaySettings {
   backgroundOpacity: number; // 背景透明度 (0-1)
   backgroundImage: string | null; // 背景图片 (base64 或 URL)
   backgroundBlur: number; // 背景模糊度 (px)
+  chromeOpacity: number; // 周边栏目不透明度 (0-1)
+  modalOpacity: number; // 弹窗不透明度 (0-1)
 
   // 正则替换规则
   localRegexRules: RegexRule[];
@@ -207,6 +209,8 @@ export interface ThemeAppearanceDefaults {
   backgroundColor: string;
   backgroundOpacity: number;
   backgroundBlur: number;
+  chromeOpacity: number;
+  modalOpacity: number;
 }
 
 type StoredSummarySettings = Partial<SummarySettings> & {
@@ -289,12 +293,16 @@ export const THEME_APPEARANCE_DEFAULTS: Record<WuxiaUiTheme, ThemeAppearanceDefa
     backgroundColor: '#0c0a09',
     backgroundOpacity: 0.85,
     backgroundBlur: 0,
+    chromeOpacity: 1,
+    modalOpacity: 1,
   },
   'ink-wash': {
     fontColor: '#1a1410',
     backgroundColor: '#e8e2d6',
     backgroundOpacity: 0.72,
     backgroundBlur: 0,
+    chromeOpacity: 1,
+    modalOpacity: 1,
   },
 };
 
@@ -379,6 +387,8 @@ export function createDefaultDisplaySettings(): DisplaySettings {
     backgroundOpacity: defaultAppearance.backgroundOpacity,
     backgroundImage: null,
     backgroundBlur: defaultAppearance.backgroundBlur,
+    chromeOpacity: defaultAppearance.chromeOpacity,
+    modalOpacity: defaultAppearance.modalOpacity,
 
     ...createDefaultRegexSettings(),
 
@@ -402,6 +412,8 @@ export const DEFAULT_BACKGROUND_SETTINGS = {
   backgroundOpacity: DEFAULT_SETTINGS.backgroundOpacity,
   backgroundImage: DEFAULT_SETTINGS.backgroundImage,
   backgroundBlur: DEFAULT_SETTINGS.backgroundBlur,
+  chromeOpacity: DEFAULT_SETTINGS.chromeOpacity,
+  modalOpacity: DEFAULT_SETTINGS.modalOpacity,
 } as const;
 
 /** 正则替换设置的默认值 */
@@ -861,6 +873,8 @@ export function loadSettings(): DisplaySettings {
       backgroundOpacity: getNumberSetting(parsed.backgroundOpacity, defaultSettings.backgroundOpacity),
       backgroundImage: getNullableStringSetting(parsed.backgroundImage, defaultSettings.backgroundImage),
       backgroundBlur: getNumberSetting(parsed.backgroundBlur, defaultSettings.backgroundBlur),
+      chromeOpacity: getNumberSetting(parsed.chromeOpacity, defaultSettings.chromeOpacity),
+      modalOpacity: getNumberSetting(parsed.modalOpacity, defaultSettings.modalOpacity),
       localRegexRules,
       presetRegexRulesByPreset: removePresetRulesDuplicatedWithGlobalRules(
         presetRegexRuleState.presetRegexRulesByPreset,
@@ -1231,6 +1245,8 @@ export function generateCSSVariables(settings: DisplaySettings): Record<string, 
     '--content-bg-color': settings.backgroundColor,
     '--content-bg-opacity': `${settings.backgroundOpacity}`,
     '--content-bg-blur': `${settings.backgroundBlur}px`,
+    '--wuxia-chrome-opacity': `${settings.chromeOpacity}`,
+    '--wuxia-modal-opacity': `${settings.modalOpacity}`,
     '--wuxia-ink-bg-image': cssUrl(inkWashBackgroundUrl),
     '--wuxia-ink-panel-rect-lg': cssUrl(inkWashPanelRectLgUrl),
     '--wuxia-ink-panel-rect-xl': cssUrl(inkWashPanelRectXlUrl),

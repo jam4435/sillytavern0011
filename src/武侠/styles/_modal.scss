@@ -6,7 +6,7 @@
   position: absolute;
   inset: 0;
   z-index: 50;
-  background-color: rgba(0, 0, 0, 0.52);
+  background-color: rgba(0, 0, 0, calc(0.52 * var(--wuxia-modal-opacity, 1)));
   backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
@@ -18,7 +18,7 @@
   width: 95%;
   max-width: 64rem;
   height: 85vh;
-  background-color: rgba(28, 25, 23, 0.72);
+  background-color: rgba(28, 25, 23, calc(0.72 * var(--wuxia-modal-opacity, 1)));
   border: 1px solid rgba(133, 77, 14, 0.3);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.32);
   display: flex;

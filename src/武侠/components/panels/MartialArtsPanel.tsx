@@ -222,7 +222,7 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
                     })}
                  </div>
              ) : (
-                 <EmptyState message="尚未修习任何武学功法。" />
+                 <EmptyState message="尚未修习任何武学功法。" variant="manual" />
              )}
         </div>
     );

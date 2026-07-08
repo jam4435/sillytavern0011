@@ -46,6 +46,8 @@ describe('SettingsPanel theme controls', () => {
       backgroundColor: '#654321',
       backgroundOpacity: 0.4,
       backgroundBlur: 3,
+      chromeOpacity: 0.55,
+      modalOpacity: 0.65,
     };
     const onSettingsChange = renderSettingsPanel(settings);
 
@@ -58,6 +60,8 @@ describe('SettingsPanel theme controls', () => {
         backgroundColor: '#654321',
         backgroundOpacity: 0.4,
         backgroundBlur: 3,
+        chromeOpacity: 0.55,
+        modalOpacity: 0.65,
       }),
     );
   });

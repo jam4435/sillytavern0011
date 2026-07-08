@@ -1,14 +1,27 @@
 import React from 'react';
+import { Icons } from '../Icons';
 
 interface EmptyStateProps {
   message: string;
+  variant?: 'default' | 'inventory' | 'manual';
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ message }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#78716c', gap: '1rem' }}>
-    <div style={{ width: '50px', height: '50px', border: '1px solid #44403c', transform: 'rotate(45deg)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <div style={{ width: '30px', height: '30px', border: '1px solid #1c1917', transform: 'rotate(-45deg)', background: 'rgba(28,25,23,0.5)' }}></div>
+function buildEmptyStateIcon(variant: NonNullable<EmptyStateProps['variant']>) {
+  switch (variant) {
+    case 'inventory':
+      return <Icons.Inventory size={28} />;
+    case 'manual':
+      return <Icons.Manual size={28} />;
+    default:
+      return <Icons.Scroll size={28} />;
+  }
+}
+
+export const EmptyState: React.FC<EmptyStateProps> = ({ message, variant = 'default' }) => (
+  <div className={`empty-state empty-state--${variant}`}>
+    <div className="empty-state-emblem" aria-hidden="true">
+      <div className="empty-state-icon-shell">{buildEmptyStateIcon(variant)}</div>
     </div>
-    <p style={{ fontFamily: 'serif', fontSize: '1rem' }}>{message}</p>
+    <p className="empty-state-text">{message}</p>
   </div>
 );

@@ -59,6 +59,8 @@ describe('settingsManager ui theme', () => {
     const settings = {
       ...createDefaultDisplaySettings(),
       uiTheme: 'ink-wash' as const,
+      chromeOpacity: 0.45,
+      modalOpacity: 0.7,
     };
 
     applySettingsToDOM(settings);
@@ -68,6 +70,8 @@ describe('settingsManager ui theme', () => {
       getThemeAppearanceDefaults('ink-wash').fontColor,
     );
     expect(document.documentElement.style.getPropertyValue('--wuxia-ink-bg-image')).toContain('url(');
+    expect(document.documentElement.style.getPropertyValue('--wuxia-chrome-opacity')).toBe('0.45');
+    expect(document.documentElement.style.getPropertyValue('--wuxia-modal-opacity')).toBe('0.7');
     expect(document.documentElement.style.colorScheme).toBe('light');
   });
 });

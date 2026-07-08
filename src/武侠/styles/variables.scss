@@ -164,4 +164,8 @@ $z-fullscreen: 100;
   --header-height: #{$header-height};
   --sidebar-w-md: #{$sidebar-w-md};
   --sidebar-w-lg: #{$sidebar-w-lg};
+
+  // 动态外观控制
+  --wuxia-chrome-opacity: 1;
+  --wuxia-modal-opacity: 1;
 }
