@@ -293,16 +293,16 @@ export const THEME_APPEARANCE_DEFAULTS: Record<WuxiaUiTheme, ThemeAppearanceDefa
     backgroundColor: '#0c0a09',
     backgroundOpacity: 0.85,
     backgroundBlur: 0,
-    chromeOpacity: 1,
-    modalOpacity: 1,
+    chromeOpacity: 0.58,
+    modalOpacity: 0.72,
   },
   'ink-wash': {
     fontColor: '#1a1410',
     backgroundColor: '#e8e2d6',
     backgroundOpacity: 0.72,
     backgroundBlur: 0,
-    chromeOpacity: 1,
-    modalOpacity: 1,
+    chromeOpacity: 0.42,
+    modalOpacity: 0.58,
   },
 };
 
@@ -1232,11 +1232,27 @@ export function imageToBase64(file: File): Promise<string> {
 export function generateCSSVariables(settings: DisplaySettings): Record<string, string> {
   const darkGoldDefaults = THEME_APPEARANCE_DEFAULTS['dark-gold'];
   const inkWashDefaults = THEME_APPEARANCE_DEFAULTS['ink-wash'];
+  const themeDefaults = THEME_APPEARANCE_DEFAULTS[settings.uiTheme];
   const themeAwareFontColor =
     settings.uiTheme === 'ink-wash' && settings.fontColor === darkGoldDefaults.fontColor
       ? inkWashDefaults.fontColor
       : settings.fontColor;
   const cssUrl = (url: string) => `url("${url}")`;
+  const clampUnit = (value: number) => Math.min(1, Math.max(0, value));
+  const buildOpacitySegments = (value: number, defaultValue: number) => {
+    const safeDefault = Math.min(0.95, Math.max(0.05, defaultValue));
+    const clampedValue = clampUnit(value);
+    const low = clampedValue <= safeDefault ? clampedValue / safeDefault : 1;
+    const high = clampedValue > safeDefault ? (clampedValue - safeDefault) / (1 - safeDefault) : 0;
+    return {
+      value: clampedValue,
+      defaultValue: safeDefault,
+      low,
+      high,
+    };
+  };
+  const chromeOpacity = buildOpacitySegments(settings.chromeOpacity, themeDefaults.chromeOpacity);
+  const modalOpacity = buildOpacitySegments(settings.modalOpacity, themeDefaults.modalOpacity);
 
   return {
     '--content-font-size': `${settings.fontSize}px`,
@@ -1245,8 +1261,14 @@ export function generateCSSVariables(settings: DisplaySettings): Record<string, 
     '--content-bg-color': settings.backgroundColor,
     '--content-bg-opacity': `${settings.backgroundOpacity}`,
     '--content-bg-blur': `${settings.backgroundBlur}px`,
-    '--wuxia-chrome-opacity': `${settings.chromeOpacity}`,
-    '--wuxia-modal-opacity': `${settings.modalOpacity}`,
+    '--wuxia-chrome-opacity': `${chromeOpacity.value}`,
+    '--wuxia-chrome-opacity-default': `${chromeOpacity.defaultValue}`,
+    '--wuxia-chrome-opacity-low': `${chromeOpacity.low}`,
+    '--wuxia-chrome-opacity-high': `${chromeOpacity.high}`,
+    '--wuxia-modal-opacity': `${modalOpacity.value}`,
+    '--wuxia-modal-opacity-default': `${modalOpacity.defaultValue}`,
+    '--wuxia-modal-opacity-low': `${modalOpacity.low}`,
+    '--wuxia-modal-opacity-high': `${modalOpacity.high}`,
     '--wuxia-ink-bg-image': cssUrl(inkWashBackgroundUrl),
     '--wuxia-ink-panel-rect-lg': cssUrl(inkWashPanelRectLgUrl),
     '--wuxia-ink-panel-rect-xl': cssUrl(inkWashPanelRectXlUrl),

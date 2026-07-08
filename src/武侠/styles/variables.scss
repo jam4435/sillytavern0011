@@ -167,5 +167,11 @@ $z-fullscreen: 100;
 
   // 动态外观控制
   --wuxia-chrome-opacity: 1;
+  --wuxia-chrome-opacity-default: 1;
+  --wuxia-chrome-opacity-low: 1;
+  --wuxia-chrome-opacity-high: 0;
   --wuxia-modal-opacity: 1;
+  --wuxia-modal-opacity-default: 1;
+  --wuxia-modal-opacity-low: 1;
+  --wuxia-modal-opacity-high: 0;
 }

@@ -153,8 +153,8 @@
   .nav-sidebar {
     background: linear-gradient(
       180deg,
-      rgba(241, 235, 223, calc(0.42 * var(--wuxia-chrome-opacity, 1))) 0%,
-      rgba(218, 207, 188, calc(0.24 * var(--wuxia-chrome-opacity, 1))) 100%
+      rgba(241, 235, 223, calc(0.42 * var(--wuxia-chrome-opacity-low, 1) + 0.58 * var(--wuxia-chrome-opacity-high, 0))) 0%,
+      rgba(218, 207, 188, calc(0.24 * var(--wuxia-chrome-opacity-low, 1) + 0.76 * var(--wuxia-chrome-opacity-high, 0))) 100%
     );
     border-right-color: rgba(61, 48, 40, 0.2);
     box-shadow:
@@ -168,14 +168,14 @@
   }
 
   .nav-sidebar-overlay {
-    background: rgba(26, 20, 16, calc(0.08 * var(--wuxia-chrome-opacity, 1)));
+    background: rgba(26, 20, 16, calc(0.08 * var(--wuxia-chrome-opacity-low, 1) + 0.92 * var(--wuxia-chrome-opacity-high, 0)));
   }
 
   .nav-menu-toggle,
   .header-action-btn,
   .header-fullscreen-btn-small,
   .fullscreen-btn {
-    background: rgba(241, 235, 223, calc(0.3 * var(--wuxia-chrome-opacity, 1)));
+    background: rgba(241, 235, 223, calc(0.3 * var(--wuxia-chrome-opacity-low, 1) + 0.7 * var(--wuxia-chrome-opacity-high, 0)));
     border-color: rgba(61, 48, 40, 0.28);
     color: #3d3028;
     backdrop-filter: none;
@@ -250,8 +250,8 @@
   .game-header {
     background: linear-gradient(
       180deg,
-      rgba(241, 235, 223, calc(0.32 * var(--wuxia-chrome-opacity, 1))) 0%,
-      rgba(218, 207, 188, calc(0.16 * var(--wuxia-chrome-opacity, 1))) 100%
+      rgba(241, 235, 223, calc(0.32 * var(--wuxia-chrome-opacity-low, 1) + 0.68 * var(--wuxia-chrome-opacity-high, 0))) 0%,
+      rgba(218, 207, 188, calc(0.16 * var(--wuxia-chrome-opacity-low, 1) + 0.84 * var(--wuxia-chrome-opacity-high, 0))) 100%
     );
     border-bottom-color: rgba(61, 48, 40, 0.18);
     backdrop-filter: none;
@@ -403,13 +403,13 @@
     background: linear-gradient(
       to bottom,
       rgba(232, 226, 214, 0) 0%,
-      rgba(232, 226, 214, calc(0.12 * var(--wuxia-chrome-opacity, 1))) 36%,
-      rgba(218, 207, 188, calc(0.18 * var(--wuxia-chrome-opacity, 1))) 100%
+      rgba(232, 226, 214, calc(0.12 * var(--wuxia-chrome-opacity-low, 1) + 0.88 * var(--wuxia-chrome-opacity-high, 0))) 36%,
+      rgba(218, 207, 188, calc(0.18 * var(--wuxia-chrome-opacity-low, 1) + 0.82 * var(--wuxia-chrome-opacity-high, 0))) 100%
     );
   }
 
   .chat-input-container {
-    background: rgba(241, 235, 223, calc(0.18 * var(--wuxia-chrome-opacity, 1)));
+    background: rgba(241, 235, 223, calc(0.18 * var(--wuxia-chrome-opacity-low, 1) + 0.82 * var(--wuxia-chrome-opacity-high, 0)));
     border: 12px solid transparent;
     border-image-source: var(--wuxia-ink-panel-bar-md);
     border-image-slice: 22 fill;
@@ -495,12 +495,12 @@
   }
 
   .modal-overlay {
-    background: rgba(26, 20, 16, calc(0.16 * var(--wuxia-modal-opacity, 1)));
+    background: rgba(26, 20, 16, calc(0.16 * var(--wuxia-modal-opacity-low, 1) + 0.84 * var(--wuxia-modal-opacity-high, 0)));
     backdrop-filter: none;
   }
 
   .modal-box {
-    background: rgba(241, 235, 223, calc(0.58 * var(--wuxia-modal-opacity, 1)));
+    background: rgba(241, 235, 223, calc(0.58 * var(--wuxia-modal-opacity-low, 1) + 0.42 * var(--wuxia-modal-opacity-high, 0)));
     border: 24px solid transparent;
     border-image-source: var(--wuxia-ink-panel-rect-xl);
     border-image-slice: 44 fill;
@@ -510,7 +510,7 @@
   }
 
   .modal-header {
-    background: rgba(241, 235, 223, calc(0.34 * var(--wuxia-modal-opacity, 1)));
+    background: rgba(241, 235, 223, calc(0.34 * var(--wuxia-modal-opacity-low, 1) + 0.66 * var(--wuxia-modal-opacity-high, 0)));
     border-bottom-color: rgba(61, 48, 40, 0.16);
   }
 

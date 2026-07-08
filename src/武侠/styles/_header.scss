@@ -12,8 +12,8 @@
   border-bottom: 1px solid rgba(139, 90, 43, 0.15);
   background: linear-gradient(
     180deg,
-    rgba(12, 10, 9, calc(0.58 * var(--wuxia-chrome-opacity, 1))) 0%,
-    rgba(20, 16, 14, calc(0.38 * var(--wuxia-chrome-opacity, 1))) 100%
+    rgba(12, 10, 9, calc(0.58 * var(--wuxia-chrome-opacity-low, 1) + 0.42 * var(--wuxia-chrome-opacity-high, 0))) 0%,
+    rgba(20, 16, 14, calc(0.38 * var(--wuxia-chrome-opacity-low, 1) + 0.62 * var(--wuxia-chrome-opacity-high, 0))) 100%
   );
   position: relative;
   z-index: 20;
