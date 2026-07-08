@@ -397,6 +397,50 @@ const App: React.FC = () => {
   const hasCustomBackground = Boolean(displaySettings.backgroundImage);
   const shouldReplaceBaseBackground = displaySettings.uiTheme !== 'ink-wash' && hasCustomBackground;
   const shouldStackCustomBackground = displaySettings.uiTheme === 'ink-wash' && hasCustomBackground;
+  const stackedBackgroundStyle =
+    shouldStackCustomBackground && displaySettings.backgroundImage
+      ? {
+          backgroundImage: `url(${displaySettings.backgroundImage})`,
+          opacity: displaySettings.backgroundOpacity,
+          ...(displaySettings.backgroundBlur > 0 ? { filter: `blur(${displaySettings.backgroundBlur}px)` } : {}),
+        }
+      : undefined;
+  const backgroundOverlayStyle =
+    displaySettings.uiTheme === 'ink-wash'
+      ? shouldStackCustomBackground
+        ? {
+            background: `linear-gradient(
+              to bottom,
+              ${displaySettings.backgroundColor}3d 0%,
+              ${displaySettings.backgroundColor}12 22%,
+              transparent 46%,
+              transparent 78%,
+              ${displaySettings.backgroundColor}14 92%,
+              ${displaySettings.backgroundColor}33 100%
+            )`,
+          }
+        : {
+            background: `linear-gradient(
+              to bottom,
+              ${displaySettings.backgroundColor}80 0%,
+              ${displaySettings.backgroundColor}2b 28%,
+              transparent 52%,
+              transparent 72%,
+              ${displaySettings.backgroundColor}2e 90%,
+              ${displaySettings.backgroundColor}73 100%
+            )`,
+          }
+      : {
+          background: `linear-gradient(
+            to bottom,
+            ${displaySettings.backgroundColor}99 0%,
+            ${displaySettings.backgroundColor}33 28%,
+            transparent 52%,
+            transparent 72%,
+            ${displaySettings.backgroundColor}33 90%,
+            ${displaySettings.backgroundColor}99 100%
+          )`,
+        };
 
   // 续写江湖处理
   const handleContinue = useCallback(async () => {
@@ -646,7 +690,7 @@ const App: React.FC = () => {
 
   // 主游戏界面
   return (
-    <div className="app-container">
+    <div className={`app-container ${shouldStackCustomBackground ? 'has-custom-bg' : ''}`}>
       <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
 
       {/* Background Ambience Layer */}
@@ -666,32 +710,9 @@ const App: React.FC = () => {
           }
         ></div>
         {shouldStackCustomBackground && displaySettings.backgroundImage && (
-          <div
-            className="bg-custom-img is-stacked"
-            style={{
-              backgroundImage: `url(${displaySettings.backgroundImage})`,
-              opacity: Math.min(1, Math.max(0.08, displaySettings.backgroundOpacity * 0.92)),
-              filter:
-                displaySettings.backgroundBlur > 0
-                  ? `blur(${displaySettings.backgroundBlur}px) contrast(0.9) saturate(0.74)`
-                  : 'contrast(0.9) saturate(0.74)',
-            }}
-          ></div>
+          <div className="bg-custom-img is-stacked" style={stackedBackgroundStyle}></div>
         )}
-        <div
-          className="bg-gradient-vert"
-          style={{
-            background: `linear-gradient(
-              to bottom,
-              ${displaySettings.backgroundColor}99 0%,
-              ${displaySettings.backgroundColor}33 28%,
-              transparent 52%,
-              transparent 72%,
-              ${displaySettings.backgroundColor}33 90%,
-              ${displaySettings.backgroundColor}99 100%
-            )`,
-          }}
-        ></div>
+        <div className="bg-gradient-vert" style={backgroundOverlayStyle}></div>
         <div className="bg-radial"></div>
       </div>
 
