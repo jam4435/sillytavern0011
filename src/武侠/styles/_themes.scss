@@ -1266,6 +1266,467 @@
   }
 }
 
+:root[data-ui-theme='jinyong'] {
+  --bg-dark: #100604;
+  --stone-900: #190b07;
+  --stone-800: #2a120b;
+  --stone-700: #512512;
+  --stone-600: #8a5630;
+  --stone-500: #b78143;
+  --stone-400: #d5ad6a;
+  --stone-300: #f0d28a;
+  --stone-200: #f7e3a0;
+  --yellow-900: #8c2f0f;
+  --yellow-800: #b34316;
+  --yellow-700: #d87c1d;
+  --yellow-600: #f0b24b;
+  --yellow-100: #fff1b8;
+  --yellow-50: #fff8d6;
+  --font-serif: 'HanWangShinSuMedium', '王漢宗中隸書繁', 'FZShuTi', 'KaiTi', 'SimSun', serif;
+  --font-display: 'FZShuTi', 'STKaiti', 'KaiTi', 'Ma Shan Zheng', cursive;
+}
+
+[data-ui-theme='jinyong'] {
+  body {
+    background: #100604;
+    color: #f7e3a0;
+  }
+
+  .app-container,
+  .start-screen,
+  .splash-screen,
+  .opening-screen,
+  .setup-screen {
+    background:
+      radial-gradient(circle at 18% 14%, rgba(185, 43, 11, 0.34), transparent 24%),
+      radial-gradient(circle at 82% 18%, rgba(16, 160, 190, 0.18), transparent 18%),
+      linear-gradient(180deg, #170705 0%, #090302 72%, #1f0d06 100%);
+    color: #f7e3a0;
+  }
+
+  .bg-img,
+  .splash-bg-img,
+  .opening-bg-img {
+    background-image:
+      var(--wuxia-jinyong-title-logo),
+      radial-gradient(circle at 50% 30%, rgba(102, 39, 16, 0.62), transparent 33%),
+      linear-gradient(135deg, #190806 0%, #050201 54%, #391707 100%) !important;
+    background-position:
+      center 10%,
+      center,
+      center;
+    background-repeat: no-repeat;
+    background-size:
+      min(76vw, 34rem) auto,
+      cover,
+      cover;
+    opacity: 0.72;
+    filter: saturate(1.14) contrast(1.1) brightness(0.78);
+  }
+
+  .bg-gradient-vert,
+  .splash-bg-overlay,
+  .opening-bg-vignette {
+    background:
+      linear-gradient(180deg, rgba(5, 2, 1, 0.38) 0%, rgba(5, 2, 1, 0.06) 33%, rgba(5, 2, 1, 0.82) 100%),
+      radial-gradient(ellipse at 50% 40%, transparent 0%, rgba(8, 3, 2, 0.74) 76%);
+  }
+
+  .bg-radial,
+  .start-bg-ink,
+  .setup-bg-particles {
+    opacity: 0.22;
+    background:
+      radial-gradient(circle at 16% 78%, rgba(216, 124, 29, 0.22), transparent 24%),
+      radial-gradient(circle at 84% 18%, rgba(43, 184, 217, 0.12), transparent 20%);
+  }
+
+  .bg-texture,
+  .setup-bg-ink {
+    opacity: 0.1;
+    mix-blend-mode: overlay;
+  }
+
+  .start-bg-gradient,
+  .setup-bg-gradient {
+    background:
+      var(--wuxia-jinyong-title-logo) center 9% / min(72vw, 32rem) auto no-repeat,
+      radial-gradient(circle at center, rgba(95, 32, 10, 0.42) 0%, rgba(8, 3, 2, 0.94) 72%),
+      linear-gradient(180deg, #210b05 0%, #070201 100%);
+  }
+
+  .start-content,
+  .splash-content,
+  .setup-content {
+    background:
+      linear-gradient(180deg, rgba(30, 12, 6, 0.9), rgba(5, 2, 1, 0.84)),
+      rgba(8, 3, 2, 0.86);
+    border: 18px solid transparent;
+    border-image-source: var(--wuxia-jinyong-save-frame);
+    border-image-slice: 30 fill;
+    border-image-repeat: stretch;
+    border-radius: 0;
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.48),
+      0 0 42px rgba(216, 124, 29, 0.1);
+  }
+
+  .splash-title,
+  .setup-title .title-text,
+  .section-title,
+  .modal-title,
+  .settings-panel-title,
+  .sidebar-title,
+  .theme-choice-title {
+    color: #fff1b8;
+    font-family: var(--font-display);
+    letter-spacing: 0;
+    text-shadow:
+      0 2px 0 #4a1205,
+      0 0 12px rgba(216, 124, 29, 0.38);
+  }
+
+  .splash-tagline,
+  .setup-subtitle,
+  .settings-hint,
+  .theme-choice-desc {
+    color: rgba(245, 211, 137, 0.74);
+  }
+
+  .menu-btn,
+  .setup-back-btn,
+  .settings-reset-btn,
+  .settings-action-btn,
+  .settings-import-btn,
+  .settings-add-btn,
+  .settings-upload-btn,
+  .settings-clear-btn,
+  .save-primary-btn,
+  .save-secondary-btn,
+  .save-action-btn,
+  .option-btn,
+  .chat-regenerate-btn,
+  .command-queue-btn,
+  .breakthrough-btn,
+  .variables-mode-btn,
+  .variables-null-btn,
+  .variable-detail-back-btn,
+  .variable-detail-icon-btn {
+    background:
+      linear-gradient(180deg, rgba(112, 47, 18, 0.88), rgba(31, 10, 5, 0.92)),
+      #1b0805;
+    border: 1px solid rgba(213, 173, 106, 0.6);
+    border-radius: 3px;
+    color: #fff1b8;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 235, 177, 0.14),
+      0 4px 12px rgba(0, 0, 0, 0.26);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+  }
+
+  .menu-btn:hover,
+  .setup-back-btn:hover,
+  .settings-action-btn:hover,
+  .settings-import-btn:hover,
+  .settings-add-btn:hover,
+  .settings-upload-btn:hover,
+  .settings-clear-btn:hover,
+  .save-secondary-btn:hover,
+  .save-action-btn:hover,
+  .option-btn:hover,
+  .chat-regenerate-btn:hover,
+  .command-queue-btn:hover,
+  .variables-mode-btn:hover,
+  .variables-null-btn:hover {
+    border-color: rgba(240, 178, 75, 0.9);
+    background:
+      linear-gradient(180deg, rgba(150, 54, 14, 0.94), rgba(45, 13, 5, 0.94)),
+      #260b04;
+    transform: translateY(-1px);
+  }
+
+  .menu-btn.primary,
+  .settings-action-btn.primary,
+  .save-primary-btn,
+  .send-button,
+  .chat-input-send-btn,
+  .breakthrough-btn.can-break {
+    background:
+      linear-gradient(180deg, #d87c1d 0%, #8c2f0f 48%, #2a0904 100%),
+      #8c2f0f;
+    border-color: rgba(255, 241, 184, 0.76);
+    color: #fff8d6;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 248, 214, 0.24),
+      0 0 18px rgba(216, 124, 29, 0.34);
+  }
+
+  .nav-sidebar {
+    background:
+      linear-gradient(180deg, rgba(22, 8, 4, 0.92), rgba(6, 2, 1, 0.9)),
+      rgba(8, 3, 2, calc(0.76 * var(--wuxia-chrome-opacity-low, 1) + 0.96 * var(--wuxia-chrome-opacity-high, 0)));
+    border-right: 1px solid rgba(213, 173, 106, 0.34);
+    box-shadow: 12px 0 28px rgba(0, 0, 0, 0.34);
+  }
+
+  .nav-sidebar-overlay {
+    background: rgba(5, 2, 1, 0.7);
+  }
+
+  .nav-menu-toggle,
+  .header-action-btn,
+  .header-fullscreen-btn-small,
+  .fullscreen-btn {
+    background: rgba(24, 9, 4, 0.78);
+    border: 1px solid rgba(213, 173, 106, 0.42);
+    color: #f7e3a0;
+  }
+
+  .nav-menu-toggle .menu-icon span {
+    background: #f0d28a;
+  }
+
+  .logo-box,
+  .avatar-small {
+    background:
+      var(--wuxia-jinyong-beiming-icon) center / 52% no-repeat,
+      radial-gradient(circle, rgba(43, 184, 217, 0.28) 0%, rgba(9, 4, 3, 0.94) 62%);
+    border: 1px solid rgba(213, 173, 106, 0.76);
+    box-shadow:
+      inset 0 0 14px rgba(43, 184, 217, 0.24),
+      0 0 16px rgba(216, 124, 29, 0.2);
+    animation: none;
+  }
+
+  .logo-box::before,
+  .logo-box::after {
+    display: none;
+  }
+
+  .nav-btn {
+    border: 1px solid transparent;
+    color: rgba(247, 227, 160, 0.72);
+  }
+
+  .nav-btn.active,
+  .nav-btn:hover {
+    background:
+      linear-gradient(90deg, rgba(140, 47, 15, 0.62), rgba(32, 12, 6, 0.72)),
+      rgba(31, 10, 5, 0.72);
+    border-color: rgba(213, 173, 106, 0.46);
+    color: #fff1b8;
+  }
+
+  .nav-icon-wrapper {
+    background: rgba(14, 6, 4, 0.7);
+    border: 1px solid rgba(213, 173, 106, 0.32);
+  }
+
+  .nav-btn-indicator {
+    background: linear-gradient(180deg, #f0b24b, #b34316);
+    box-shadow: 0 0 12px rgba(216, 124, 29, 0.48);
+  }
+
+  .maintext-container,
+  .glass-panel,
+  .glass-card,
+  .settings-panel,
+  .save-tree-panel,
+  .auto-advance-control-panel,
+  .auto-advance-export-panel,
+  .variable-detail-panel,
+  .character-identity-card,
+  .character-attribute-card,
+  .martial-art-card,
+  .event-card-active,
+  .location-popover,
+  .map-sidebar,
+  .map-sidebar-shell,
+  .variables-status,
+  .summary-subsection,
+  .appearance-group {
+    background:
+      linear-gradient(180deg, rgba(31, 12, 6, 0.88), rgba(5, 2, 1, 0.82)),
+      rgba(8, 3, 2, calc(0.58 * var(--wuxia-chrome-opacity-low, 1) + 0.88 * var(--wuxia-chrome-opacity-high, 0)));
+    border-color: rgba(213, 173, 106, 0.38);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 241, 184, 0.05),
+      0 12px 30px rgba(0, 0, 0, 0.28);
+    color: #f7e3a0;
+    backdrop-filter: blur(6px);
+  }
+
+  .maintext-container {
+    border: 20px solid transparent;
+    border-image-source: var(--wuxia-jinyong-save-frame);
+    border-image-slice: 30 fill;
+    border-image-repeat: stretch;
+    border-radius: 0;
+    padding: 1.15rem 1.35rem;
+  }
+
+  .maintext-container::before,
+  .maintext-container::after {
+    display: none;
+  }
+
+  .modal-box {
+    background:
+      linear-gradient(180deg, rgba(26, 10, 5, calc(0.76 * var(--wuxia-modal-opacity-low, 1) + 0.94 * var(--wuxia-modal-opacity-high, 0))), rgba(6, 2, 1, calc(0.74 * var(--wuxia-modal-opacity-low, 1) + 0.92 * var(--wuxia-modal-opacity-high, 0)))),
+      #090302;
+    border: 24px solid transparent;
+    border-image-source: var(--wuxia-jinyong-save-frame);
+    border-image-slice: 30 fill;
+    border-image-repeat: stretch;
+    border-radius: 0;
+    box-shadow:
+      0 28px 80px rgba(0, 0, 0, 0.52),
+      0 0 36px rgba(216, 124, 29, 0.12);
+  }
+
+  .modal-close-btn {
+    background: rgba(20, 8, 4, 0.84);
+    border: 1px solid rgba(213, 173, 106, 0.54);
+    color: #f7e3a0;
+  }
+
+  .chat-input-container {
+    position: relative;
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(34, 13, 6, 0.9), rgba(8, 3, 2, 0.86)),
+      rgba(8, 3, 2, calc(0.68 * var(--wuxia-chrome-opacity-low, 1) + 0.9 * var(--wuxia-chrome-opacity-high, 0)));
+    border: 1px solid rgba(213, 173, 106, 0.5);
+    border-radius: 3px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 241, 184, 0.08),
+      0 -12px 28px rgba(0, 0, 0, 0.26);
+  }
+
+  .chat-input-container::after {
+    content: '';
+    position: absolute;
+    left: 0.2rem;
+    right: 0.2rem;
+    bottom: -0.28rem;
+    height: 3rem;
+    background: var(--wuxia-jinyong-dragon-bar) center bottom / 100% auto no-repeat;
+    opacity: 0.46;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .chat-input-container > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .chat-textarea,
+  .settings-textarea,
+  .settings-input,
+  .settings-select,
+  .settings-number-input,
+  .settings-url-input,
+  .regex-input,
+  .regex-textarea,
+  .variables-search-input {
+    background: rgba(5, 2, 1, 0.74);
+    border: 1px solid rgba(213, 173, 106, 0.38);
+    color: #f7e3a0;
+    border-radius: 3px;
+  }
+
+  .chat-textarea::placeholder,
+  .settings-input::placeholder,
+  .settings-url-input::placeholder,
+  .regex-input::placeholder,
+  .regex-textarea::placeholder {
+    color: rgba(247, 227, 160, 0.42);
+  }
+
+  .settings-tabs {
+    background: rgba(8, 3, 2, 0.72);
+    border: 1px solid rgba(213, 173, 106, 0.28);
+  }
+
+  .settings-tab {
+    color: rgba(247, 227, 160, 0.68);
+  }
+
+  .settings-tab.active {
+    background: linear-gradient(180deg, rgba(140, 47, 15, 0.72), rgba(37, 11, 5, 0.72));
+    color: #fff1b8;
+  }
+
+  .theme-choice-card {
+    background: rgba(9, 4, 3, 0.68);
+    border-color: rgba(213, 173, 106, 0.34);
+  }
+
+  .theme-choice-card:hover,
+  .theme-choice-card.active {
+    border-color: rgba(240, 178, 75, 0.82);
+    background:
+      linear-gradient(135deg, rgba(140, 47, 15, 0.28), transparent 60%),
+      rgba(9, 4, 3, 0.82);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 241, 184, 0.08),
+      0 0 18px rgba(216, 124, 29, 0.16);
+  }
+
+  .empty-state--inventory .empty-state-icon-shell {
+    background:
+      var(--wuxia-jinyong-beiming-icon) center / 48% no-repeat,
+      radial-gradient(circle, rgba(43, 184, 217, 0.2), rgba(8, 3, 2, 0.8));
+    border-color: rgba(213, 173, 106, 0.48);
+  }
+
+  .map-zoom-controls button,
+  .variables-toolbar {
+    background: rgba(9, 4, 3, 0.76);
+    border-color: rgba(213, 173, 106, 0.36);
+  }
+
+  .map-panel-loading,
+  .map-panel-empty,
+  .map-panel-error {
+    color: rgba(247, 227, 160, 0.76);
+  }
+
+  .character-attribute-label,
+  .character-attribute-initial,
+  .location-desc,
+  .theme-choice-desc {
+    color: rgba(213, 173, 106, 0.72);
+  }
+
+  .character-attribute-value,
+  .location-name,
+  .theme-choice-title {
+    color: #fff1b8;
+  }
+
+  .location-item {
+    background: rgba(12, 5, 3, 0.62);
+    border-color: rgba(213, 173, 106, 0.26);
+  }
+
+  .location-item.current,
+  .location-item:hover {
+    background: rgba(86, 31, 11, 0.58);
+    border-color: rgba(240, 178, 75, 0.62);
+  }
+
+  ::selection {
+    background: rgba(216, 124, 29, 0.45);
+    color: #fff8d6;
+  }
+
+  * {
+    scrollbar-color: rgba(213, 173, 106, 0.48) rgba(18, 7, 4, 0.8);
+  }
+}
+
 @media (max-width: $breakpoint-md) {
   [data-ui-theme='ink-wash'] {
     .maintext-container {
@@ -1280,6 +1741,39 @@
 
     .chat-input-container {
       border-width: 10px;
+    }
+  }
+
+  [data-ui-theme='jinyong'] {
+    .bg-img,
+    .splash-bg-img,
+    .opening-bg-img,
+    .start-bg-gradient,
+    .setup-bg-gradient {
+      background-size:
+        min(86vw, 26rem) auto,
+        cover,
+        cover;
+    }
+
+    .maintext-container {
+      border-width: 14px;
+      padding: 0.9rem 1rem;
+    }
+
+    .modal-box {
+      border-width: 16px;
+    }
+
+    .start-content,
+    .splash-content,
+    .setup-content {
+      border-width: 14px;
+    }
+
+    .chat-input-container::after {
+      height: 2.3rem;
+      opacity: 0.34;
     }
   }
 }
