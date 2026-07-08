@@ -700,46 +700,53 @@ const App: React.FC = () => {
         {/* Navigation Sidebar */}
         <nav className={`nav-sidebar ${isSidebarOpen ? 'open' : ''}`}>
           <div className="logo-box">
-            <span className="logo-char">墨</span>
+            <span className="logo-char">侠</span>
           </div>
 
           <NavButton
+            variant="seal"
             icon={<Icons.Character />}
             label="状态"
             isActive={activePanel === ActivePanel.CHARACTER}
             onClick={() => handleNavClick(ActivePanel.CHARACTER)}
           />
           <NavButton
+            variant="panel"
             icon={<Icons.Manual />}
             label="功法"
             isActive={activePanel === ActivePanel.MARTIAL_ARTS}
             onClick={() => handleNavClick(ActivePanel.MARTIAL_ARTS)}
           />
           <NavButton
+            variant="coin"
             icon={<Icons.Inventory />}
             label="行囊"
             isActive={activePanel === ActivePanel.INVENTORY}
             onClick={() => handleNavClick(ActivePanel.INVENTORY)}
           />
           <NavButton
+            variant="seal"
             icon={<Icons.Quest />}
             label="事件"
             isActive={activePanel === ActivePanel.EVENTS}
             onClick={() => handleNavClick(ActivePanel.EVENTS)}
           />
           <NavButton
+            variant="panel"
             icon={<Icons.Map />}
             label="地图"
             isActive={activePanel === ActivePanel.MAP}
             onClick={handleMapNavClick}
           />
           <NavButton
+            variant="coin"
             icon={<Icons.Social />}
             label="侠缘"
             isActive={activePanel === ActivePanel.SOCIAL}
             onClick={() => handleNavClick(ActivePanel.SOCIAL)}
           />
           <NavButton
+            variant="panel"
             icon={<Icons.Settings />}
             label="设置"
             isActive={activePanel === ActivePanel.SETTINGS}
@@ -857,15 +864,17 @@ const App: React.FC = () => {
 const NavButton = ({
   icon,
   label,
+  variant = 'seal',
   isActive,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
+  variant?: 'seal' | 'panel' | 'coin';
   isActive: boolean;
   onClick: () => void;
 }) => (
-  <button onClick={onClick} className={`nav-btn ${isActive ? 'active' : ''}`}>
+  <button onClick={onClick} className={`nav-btn variant-${variant} ${isActive ? 'active' : ''}`}>
     {isActive && <div className="nav-btn-indicator"></div>}
     <div className="nav-icon-wrapper">{icon}</div>
     <span className="nav-label">{label}</span>

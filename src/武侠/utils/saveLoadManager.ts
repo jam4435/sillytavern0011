@@ -80,7 +80,7 @@ function readStoredTree(): WuxiaSaveTreeData {
       nodes,
     };
   } catch (error) {
-    console.warn('[墨剑录] 读取存档树失败:', error);
+    console.warn('[金庸群侠传] 读取存档树失败:', error);
     return createEmptyTree();
   }
 }
@@ -241,7 +241,7 @@ function mergeUntrackedCheckpoints(
       playerName: '',
       location: '',
       worldTimeText: '',
-      preview: '此 checkpoint 由酒馆记录发现，尚未写入墨剑录存档树。',
+      preview: '此 checkpoint 由酒馆记录发现，尚未写入金庸群侠传存档树。',
     }));
 
   if (additions.length === 0) {

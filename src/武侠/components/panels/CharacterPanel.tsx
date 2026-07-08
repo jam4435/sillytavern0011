@@ -1,38 +1,64 @@
-import React, { useCallback } from 'react';
+import React, { CSSProperties, useCallback } from 'react';
 import { CharacterProfile, WorldTime } from '../../types';
 import { gameLogger } from '../../utils/logger';
 import {
   checkBreakthrough,
   getBreakthroughTooltip,
   getRealmColor,
-  parseRealm,
   performBreakthrough
 } from '../../utils/realmSystem';
 
 /* --- Helper Components (Internal to CharacterPanel) --- */
-const StatBar = ({ label, current, max, color }: { label: string, current: number, max: number, color: string }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#a8a29e', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            <span>{label}</span>
-            <span>{current}</span>
-        </div>
-        <div style={{ height: '6px', background: '#292524', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ height: '100%', width: `${max > 0 ? (current / max) * 100 : 100}%`, background: color, transition: 'width 1s ease' }}></div>
-        </div>
+const StatBar = ({ label, current, max, color }: { label: string, current: number, max: number, color: string }) => {
+  const percent = max > 0 ? Math.min((current / max) * 100, 100) : 100;
+  const style = { '--stat-bar-color': color } as CSSProperties;
+
+  return (
+    <div className="character-stat-bar" style={style}>
+      <div className="character-stat-bar-head">
+        <span className="character-stat-bar-label">{label}</span>
+        <span className="character-stat-bar-value">{current}</span>
+      </div>
+      <div className="character-stat-bar-track">
+        <div className="character-stat-bar-fill" style={{ width: `${percent}%` }}></div>
+      </div>
     </div>
-);
+  );
+};
 
 const Attribute = ({ label, value, initial }: { label: string, value: number, initial?: number }) => (
-    <div className="attr-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
-        <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8rem', color: '#a8a29e' }}>{label}</span>
-            <span style={{ fontSize: '1.2rem', color: '#e7e5e4', fontWeight: 'bold' }}>{value}</span>
-        </div>
-        {initial !== undefined && initial !== value && (
-            <div style={{ fontSize: '0.7rem', color: '#57534e' }}>初始: {initial}</div>
-        )}
+  <div className="attr-item character-attribute-card">
+    <div className="character-attribute-head">
+      <span className="character-attribute-label">{label}</span>
+      <span className="character-attribute-value">{value}</span>
     </div>
+    {initial !== undefined && initial !== value && <div className="character-attribute-initial">初始: {initial}</div>}
+  </div>
 );
+
+const RealmCorner = ({ position }: { position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' }) => (
+  <div className={`realm-corner ${position}`}></div>
+);
+
+const DiamondBullet = () => <span className="diamond-bullet"></span>;
+
+const renderBiography = (biography: CharacterProfile['biography']) => {
+  if (typeof biography === 'string') {
+    return biography || '尚无记载';
+  }
+
+  const entries = Object.entries(biography);
+  if (entries.length === 0) {
+    return '尚无记载';
+  }
+
+  return entries.map(([key, val]) => (
+    <div key={key} className="character-biography-entry">
+      <span className="character-biography-label">【{key}】</span>
+      <span>{String(val)}</span>
+    </div>
+  ));
+};
 
 /* --- Character Panel --- */
 interface CharacterPanelProps {
@@ -47,7 +73,6 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
 
   // 解析当前境界
   const currentRealm = stats.realm || '不入流';
-  const realmInfo = parseRealm(currentRealm);
   const realmColor = getRealmColor(currentRealm);
 
   // 检查突破条件
@@ -65,6 +90,16 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
 
   // 生成提示信息
   const tooltipText = getBreakthroughTooltip(currentRealm, cultivation);
+  const nextRealmColor = nextRealm ? getRealmColor(nextRealm) : realmColor;
+  const identityEntries = Object.entries(stats.identities);
+  const networkEntries = stats.network ? Object.entries(stats.network) : [];
+  const realmStyles = {
+    '--realm-color': realmColor,
+    '--realm-color-soft': `${realmColor}66`,
+    '--realm-color-muted': `${realmColor}16`,
+    '--realm-color-glow': `${realmColor}33`,
+    '--next-realm-color': nextRealmColor,
+  } as CSSProperties;
 
   // 突破按钮点击处理
   const handleBreakthrough = useCallback(async () => {
@@ -90,9 +125,6 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
     }
   }, [canBreakthrough, currentRealm, nextRealm, breakthroughCost, cultivation, onBreakthrough, breakthroughCheck.reason]);
 
-  // Suppress unused variable warning
-  void realmInfo;
-
   return (
     <div className="char-layout">
       {/* Left Column: Core Identity & Basic Stats */}
@@ -105,37 +137,47 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
             />
             <div className="portrait-text-overlay">
                 <h3 className="char-name-display">{stats.name}</h3>
-                {Object.keys(stats.identities).map(id => (
+                {identityEntries.map(([id]) => (
                     <span key={id} className="char-title-display">{id}</span>
                 ))}
             </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div className="character-side-stack">
             {/* Identities Detailed View */}
-            {Object.entries(stats.identities).map(([name, desc]) => (
-                <div key={name} style={{ background: 'rgba(217, 119, 6, 0.1)', border: '1px solid #78350f', padding: '0.5rem', borderRadius: '4px' }}>
-                    <div style={{ color: '#d97706', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>{name}</div>
-                    <div style={{ color: '#a8a29e', fontSize: '0.75rem', lineHeight: '1.4' }}>{desc}</div>
+            <div className="character-identity-list">
+              {identityEntries.map(([name, desc]) => (
+                <div key={name} className="character-identity-card">
+                  <div className="character-identity-title">{name}</div>
+                  <div className="character-identity-desc">{desc}</div>
                 </div>
-            ))}
+              ))}
+            </div>
 
             {/* 基本信息 */}
-            <div className="info-row" style={{ marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px', display: 'flex', justifyContent: 'space-between', color: '#a8a29e', fontSize: '0.875rem' }}>
-                <span>性别</span><span style={{ color: '#e7e5e4' }}>{stats.gender}</span>
+            <div className="character-info-list">
+              <div className="info-row character-info-row">
+                <span className="character-info-label">性别</span>
+                <span className="character-info-value">{stats.gender}</span>
+              </div>
+              {age !== null && (
+                <div className="info-row character-info-row">
+                  <span className="character-info-label">年龄</span>
+                  <span className="character-info-value">{age} 岁</span>
+                </div>
+              )}
+              {stats.status && (
+                <div className="info-row character-info-row">
+                  <span className="character-info-label">状态</span>
+                  <span className={`character-info-value ${stats.status.includes('受伤') ? 'is-injured' : ''}`}>
+                    {stats.status}
+                  </span>
+                </div>
+              )}
             </div>
-            {age !== null && (
-                <div className="info-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px', display: 'flex', justifyContent: 'space-between', color: '#a8a29e', fontSize: '0.875rem' }}>
-                    <span>年龄</span><span style={{ color: '#e7e5e4' }}>{age} 岁</span>
-                </div>
-            )}
-            {stats.status && (
-                <div className="info-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px', display: 'flex', justifyContent: 'space-between', color: '#a8a29e', fontSize: '0.875rem' }}>
-                    <span>状态</span><span style={{ color: stats.status.includes('受伤') ? '#ef4444' : '#e7e5e4' }}>{stats.status}</span>
-                </div>
-            )}
-            <div style={{ marginTop: '0.5rem', color: '#78716c', fontSize: '0.8rem', fontStyle: 'italic', lineHeight: '1.5' }}>
-                "{stats.appearance || '待定'}"
+
+            <div className="character-appearance-note">
+              "{stats.appearance || '待定'}"
             </div>
         </div>
       </div>
@@ -144,7 +186,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
       <div className="char-right">
 
         {/* 气血/内力/修为条 - 置顶 */}
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div className="character-panel-stat-block">
             <div className="stats-bars-grid">
                 <StatBar label="气血" current={stats.attributes.hp} max={stats.attributes.hp} color="#7f1d1d" />
                 <StatBar label="内力" current={stats.attributes.mp} max={stats.attributes.mp} color="#0e7490" />
@@ -153,108 +195,43 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
         </div>
 
         {/* 境界 - 武侠风格框 */}
-        <div className="realm-container" style={{
-            position: 'relative',
-            marginBottom: '1.5rem',
-            padding: '1.25rem',
-            background: 'linear-gradient(135deg, rgba(28,25,23,0.9) 0%, rgba(41,37,36,0.8) 100%)',
-            border: `1px solid ${realmColor}40`,
-            boxShadow: `inset 0 0 20px rgba(0,0,0,0.3), 0 0 15px ${realmColor}20`
-        }}>
-            {/* 四角装饰 - 使用境界颜色 */}
-            <div style={{ position: 'absolute', top: '-1px', left: '-1px', width: '12px', height: '12px', borderTop: `2px solid ${realmColor}`, borderLeft: `2px solid ${realmColor}` }}></div>
-            <div style={{ position: 'absolute', top: '-1px', right: '-1px', width: '12px', height: '12px', borderTop: `2px solid ${realmColor}`, borderRight: `2px solid ${realmColor}` }}></div>
-            <div style={{ position: 'absolute', bottom: '-1px', left: '-1px', width: '12px', height: '12px', borderBottom: `2px solid ${realmColor}`, borderLeft: `2px solid ${realmColor}` }}></div>
-            <div style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '12px', height: '12px', borderBottom: `2px solid ${realmColor}`, borderRight: `2px solid ${realmColor}` }}></div>
+        <div className="realm-container character-realm-container" style={realmStyles}>
+            <RealmCorner position="top-left" />
+            <RealmCorner position="top-right" />
+            <RealmCorner position="bottom-left" />
+            <RealmCorner position="bottom-right" />
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                    <div style={{ fontSize: '0.7rem', color: '#78716c', letterSpacing: '0.15em', marginBottom: '0.5rem', textTransform: 'uppercase' }}>当前境界</div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <span style={{
-                            fontSize: '1.5rem',
-                            color: realmColor,
-                            fontWeight: 'bold',
-                            fontFamily: 'serif',
-                            textShadow: `0 0 10px ${realmColor}50`
-                        }}>{currentRealm}</span>
-                        <span style={{ fontSize: '0.85rem', color: '#a8a29e' }}>
-                            修为 <span style={{ color: realmColor }}>{cultivation}</span>
-                            {nextRealm && (
-                                <span style={{ color: '#57534e' }}> / {breakthroughCost}</span>
-                            )}
+            <div className="character-realm-header">
+                <div className="character-realm-copy">
+                    <div className="character-realm-eyebrow">当前境界</div>
+                    <div className="character-realm-line">
+                        <span className="character-realm-name">{currentRealm}</span>
+                        <span className="character-realm-cultivation">
+                            修为 <span className="current">{cultivation}</span>
+                            {nextRealm && <span className="total"> / {breakthroughCost}</span>}
                         </span>
                     </div>
-                    {/* 下一境界提示 */}
                     {nextRealm && (
-                        <div style={{ fontSize: '0.75rem', color: '#57534e', marginTop: '0.5rem' }}>
-                            下一境界: <span style={{ color: getRealmColor(nextRealm) }}>{nextRealm}</span>
-                            {canBreakthrough && (
-                                <span style={{ color: '#22c55e', marginLeft: '0.5rem' }}>✓ 可突破</span>
-                            )}
+                        <div className="character-realm-next">
+                            下一境界: <span className="character-realm-next-name">{nextRealm}</span>
+                            {canBreakthrough && <span className="character-realm-ready">可突破</span>}
                         </div>
                     )}
                 </div>
-                {/* 加号按钮 - 突破按钮 */}
                 <button
                     onClick={handleBreakthrough}
                     disabled={!canBreakthrough}
                     className={`breakthrough-btn ${canBreakthrough ? 'can-break' : ''}`}
-                    style={{
-                        width: '40px',
-                        height: '40px',
-                        background: canBreakthrough ? `${realmColor}20` : 'transparent',
-                        border: `2px solid ${canBreakthrough ? realmColor : '#44403c'}`,
-                        color: canBreakthrough ? realmColor : '#57534e',
-                        cursor: canBreakthrough ? 'pointer' : 'not-allowed',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1.5rem',
-                        fontWeight: 'bold',
-                        transition: 'all 0.3s ease',
-                        transform: 'rotate(45deg)',
-                        opacity: canBreakthrough ? 1 : 0.5,
-                        boxShadow: canBreakthrough ? `0 0 10px ${realmColor}40` : 'none'
-                    }}
                     title={tooltipText}
-                    onMouseEnter={(e) => {
-                        if (canBreakthrough) {
-                            e.currentTarget.style.background = `${realmColor}40`;
-                            e.currentTarget.style.boxShadow = `0 0 20px ${realmColor}60`;
-                            e.currentTarget.style.transform = 'rotate(45deg) scale(1.1)';
-                        }
-                    }}
-                    onMouseLeave={(e) => {
-                        if (canBreakthrough) {
-                            e.currentTarget.style.background = `${realmColor}20`;
-                            e.currentTarget.style.boxShadow = `0 0 10px ${realmColor}40`;
-                            e.currentTarget.style.transform = 'rotate(45deg) scale(1)';
-                        }
-                    }}
                 >
-                    <span style={{ transform: 'rotate(-45deg)' }}>+</span>
+                    <span className="breakthrough-btn-glyph">+</span>
                 </button>
             </div>
 
             {/* 修为进度条 */}
             {nextRealm && (
-                <div style={{ marginTop: '1rem' }}>
-                    <div style={{
-                        height: '4px',
-                        background: '#292524',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '2px',
-                        overflow: 'hidden'
-                    }}>
-                        <div style={{
-                            height: '100%',
-                            width: `${cultivationProgress}%`,
-                            background: `linear-gradient(90deg, ${realmColor}80, ${realmColor})`,
-                            transition: 'width 0.5s ease',
-                            boxShadow: `0 0 5px ${realmColor}`
-                        }}></div>
-                    </div>
+                <div className="cultivation-progress-bar">
+                    <div className="progress-fill" style={{ width: `${cultivationProgress}%` }}></div>
                 </div>
             )}
         </div>
@@ -262,7 +239,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
         {/* Attributes Grid (Split Initial / Current) */}
         <div>
             <h4 className="section-header">
-                <span className="diamond-bullet" style={{ width: '6px', height: '6px', background: '#d97706', transform: 'rotate(45deg)' }}></span> 根骨天资
+                <DiamondBullet /> 根骨天资
             </h4>
             <div className="attr-grid">
                 {/* 战斗属性（随境界变化） */}
@@ -278,21 +255,16 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
         </div>
 
         {/* 关系网 */}
-        {stats.network && Object.keys(stats.network).length > 0 && (
-            <div style={{ marginTop: '1.5rem' }}>
+        {networkEntries.length > 0 && (
+            <div className="character-network-section">
                 <h4 className="section-header">
-                    <span className="diamond-bullet" style={{ width: '6px', height: '6px', background: '#d97706', transform: 'rotate(45deg)' }}></span> 人情往来
+                    <DiamondBullet /> 人情往来
                 </h4>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    {Object.entries(stats.network).map(([person, relation]) => (
-                        <div key={person} style={{
-                            background: 'rgba(255,255,255,0.03)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            padding: '0.5rem 0.75rem',
-                            fontSize: '0.85rem'
-                        }}>
-                            <span style={{ color: '#e7e5e4' }}>{person}</span>
-                            <span style={{ color: '#78716c', marginLeft: '0.5rem' }}>({relation})</span>
+                <div className="character-network-list">
+                    {networkEntries.map(([person, relation]) => (
+                        <div key={person} className="character-network-chip">
+                            <span className="character-network-name">{person}</span>
+                            <span className="character-network-relation">({relation})</span>
                         </div>
                     ))}
                 </div>
@@ -300,21 +272,12 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
         )}
 
         {/* Biography (Text) */}
-        <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
+        <div className="character-biography-section">
             <h4 className="section-header">
-                <span className="diamond-bullet" style={{ width: '6px', height: '6px', background: '#d97706', transform: 'rotate(45deg)' }}></span> 往事如烟
+                <DiamondBullet /> 往事如烟
             </h4>
-            <div style={{ color: '#a8a29e', fontSize: '0.9rem', lineHeight: '1.6', background: 'rgba(0,0,0,0.2)', padding: '1rem', maxHeight: '150px', overflowY: 'auto' }}>
-                {typeof stats.biography === 'string'
-                    ? (stats.biography || '尚无记载')
-                    : Object.keys(stats.biography).length > 0
-                        ? Object.entries(stats.biography).map(([key, val]) => (
-                            <div key={key} style={{ marginBottom: '0.5rem' }}>
-                                <span style={{ color: '#d97706' }}>【{key}】</span> {val}
-                            </div>
-                          ))
-                        : '尚无记载'
-                }
+            <div className="character-biography">
+                {renderBiography(stats.biography)}
             </div>
         </div>
 

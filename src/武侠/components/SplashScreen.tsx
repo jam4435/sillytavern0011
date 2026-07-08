@@ -32,10 +32,10 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
         {/* 标题区域 */}
         <div className="splash-header">
           <div className="splash-logo">
-            <span className="logo-main">墨</span>
-            <span className="logo-sub">剑录</span>
+            <span className="logo-main">金庸</span>
+            <span className="logo-sub">群侠传</span>
           </div>
-          <p className="splash-tagline">侠骨柔情，笔墨江湖</p>
+          <p className="splash-tagline">群侠并起，共写江湖</p>
         </div>
 
         {/* 菜单按钮 */}
@@ -69,7 +69,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
 
       {/* 底部信息 */}
       <div className="splash-footer">
-        <p className="version-text">墨剑录 v1.0</p>
+        <p className="version-text">金庸群侠传 v1.0</p>
         <p className="credit-text">基于酒馆助手构建</p>
       </div>
     </div>

@@ -39,8 +39,8 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
       <div className="start-content">
         {/* 书法标题 */}
         <div className="start-title-group">
-          <h1 className="start-title">墨剑录</h1>
-          <p className="start-subtitle">Ink & Blade</p>
+          <h1 className="start-title">金庸群侠传</h1>
+          <p className="start-subtitle">群侠并起，江湖同游</p>
         </div>
 
         {/* 装饰线 */}
