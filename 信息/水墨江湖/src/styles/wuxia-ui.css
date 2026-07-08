@@ -1,0 +1,288 @@
+/* =============================================
+   武侠水墨风 UI 组件样式
+   使用方法: 在 HTML 中引入此 CSS 文件
+   图片资源放在 /wuxia-sprites/ 目录下
+   ============================================= */
+
+/* ── 通用基础 ── */
+.wuxia {
+  --sprite-path: './wuxia-sprites';
+  font-family: "Ma Shan Zheng", "STKaiti", "KaiTi", "楷体", serif;
+  color: #1A1410;
+}
+
+/* =============================================
+   PANEL 面板
+   用法: border-image 九宫格拉伸，内容任意大小
+   ============================================= */
+
+/* 宽横条面板（导航栏、标题栏） */
+.panel-bar {
+  border: 16px solid transparent;
+  border-image-slice: 20 20 20 20 fill;
+  border-image-repeat: stretch;
+  background-clip: padding-box;
+}
+.panel-bar-lg { border-image-source: url('/wuxia-sprites/panel/panel-bar-lg.png'); }
+.panel-bar-md { border-image-source: url('/wuxia-sprites/panel/panel-bar-md.png'); }
+.panel-bar-sm { border-image-source: url('/wuxia-sprites/panel/panel-bar-sm.png'); }
+
+/* 矩形内容面板 */
+.panel-rect {
+  border: 48px solid transparent;
+  border-image-slice: 48 48 48 48 fill;
+  border-image-repeat: stretch;
+}
+.panel-rect-md  { border-image-source: url('/wuxia-sprites/panel/panel-rect-md.png'); }
+.panel-rect-lg  { border-image-source: url('/wuxia-sprites/panel/panel-rect-lg.png'); }
+.panel-rect-xl  { border-image-source: url('/wuxia-sprites/panel/panel-rect-xl.png'); }
+
+/* 竖向卡片面板 */
+.panel-card-l { background: url('/wuxia-sprites/panel/panel-card-l.png') center/100% 100% no-repeat; }
+.panel-card-r { background: url('/wuxia-sprites/panel/panel-card-r.png') center/100% 100% no-repeat; }
+
+/* 小方形面板 */
+.panel-square-sm { background: url('/wuxia-sprites/panel/panel-square-sm.png') center/100% 100% no-repeat; }
+.panel-square-md { background: url('/wuxia-sprites/panel/panel-square-md.png') center/100% 100% no-repeat; }
+
+/* 对话气泡 */
+.panel-bubble-r {
+  background: url('/wuxia-sprites/panel/panel-bubble-r.png') center/100% 100% no-repeat;
+  padding: 12px 16px 20px;  /* 底部多留气泡尾巴空间 */
+}
+.panel-bubble-l {
+  background: url('/wuxia-sprites/panel/panel-bubble-l.png') center/100% 100% no-repeat;
+  padding: 12px 16px 20px;
+}
+
+/* =============================================
+   BRUSH 墨刷标题条
+   直接作为标题背景，文字叠加在上面
+   ============================================= */
+.brush-bar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #E8E2D6;  /* 浅色文字，叠在深色墨刷上 */
+  letter-spacing: 6px;
+  font-size: 20px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+.brush-bar-lg {
+  background: url('/wuxia-sprites/brush/brush-bar-lg.png') center/100% 100% no-repeat;
+  min-width: 360px;
+  height: 72px;
+  padding: 0 60px;  /* 两端墨色渐淡区留空 */
+}
+.brush-bar-md {
+  background: url('/wuxia-sprites/brush/brush-bar-md.png') center/100% 100% no-repeat;
+  min-width: 260px;
+  height: 58px;
+  padding: 0 40px;
+}
+
+/* =============================================
+   CIRCLE 圆形框架（头像框、地图小窗）
+   ============================================= */
+.circle-frame {
+  position: relative;
+  display: inline-block;
+  border-radius: 50%;
+  overflow: hidden;
+}
+/* 水墨笔触圆形（粗糙感） */
+.circle-frame-ink {
+  width: 120px; height: 120px;
+  background: url('/wuxia-sprites/circle/circle-frame-ink.png') center/cover no-repeat;
+}
+/* 细线圆形（带角装饰） */
+.circle-frame-line {
+  width: 120px; height: 120px;
+  background: url('/wuxia-sprites/circle/circle-frame-line.png') center/cover no-repeat;
+}
+/* 圆形内部放头像或地图 */
+.circle-frame-ink  > img,
+.circle-frame-line > img {
+  width: 80%; height: 80%;
+  object-fit: cover;
+  border-radius: 50%;
+  position: absolute;
+  top: 10%; left: 10%;
+}
+
+/* =============================================
+   BUTTON 按钮
+   ============================================= */
+
+/* 胶囊形按钮基础 */
+.btn-wuxia {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 3px;
+  font-size: 14px;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  padding: 0 20px;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+.btn-wuxia:hover  { filter: brightness(1.06); }
+.btn-wuxia:active { transform: scale(0.97); filter: brightness(0.94); }
+
+/* 轮廓款（空心）→ 深色文字 */
+.btn-outline { color: #1A1410; }
+.btn-outline.btn-lg  {
+  background-image: url('/wuxia-sprites/button/btn-capsule-outline-lg.png');
+  width: 148px; height: 54px;
+}
+.btn-outline.btn-md  {
+  background-image: url('/wuxia-sprites/button/btn-capsule-outline-md.png');
+  width: 128px; height: 48px;
+}
+.btn-outline.btn-sm  {
+  background-image: url('/wuxia-sprites/button/btn-capsule-outline-sm.png');
+  width: 110px; height: 44px;
+}
+.btn-outline.btn-xs  {
+  background-image: url('/wuxia-sprites/button/btn-capsule-outline-xs.png');
+  width: 96px;  height: 40px;
+}
+
+/* 深色款（墨色填充）→ 浅色文字 */
+.btn-dark { color: #E8E2D6; }
+.btn-dark.btn-lg {
+  background-image: url('/wuxia-sprites/button/btn-capsule-dark-lg.png');
+  width: 148px; height: 54px;
+}
+.btn-dark.btn-md {
+  background-image: url('/wuxia-sprites/button/btn-capsule-dark-md.png');
+  width: 128px; height: 48px;
+}
+.btn-dark.btn-sm {
+  background-image: url('/wuxia-sprites/button/btn-capsule-dark-sm.png');
+  width: 110px; height: 44px;
+}
+.btn-dark.btn-xs {
+  background-image: url('/wuxia-sprites/button/btn-capsule-dark-xs.png');
+  width: 96px;  height: 40px;
+}
+
+/* 浅色款（灰白填充）→ 暗色文字、禁用感 */
+.btn-light { color: #7A6E62; }
+.btn-light.btn-lg {
+  background-image: url('/wuxia-sprites/button/btn-capsule-light-lg.png');
+  width: 148px; height: 54px;
+}
+.btn-light.btn-md {
+  background-image: url('/wuxia-sprites/button/btn-capsule-light-md.png');
+  width: 128px; height: 48px;
+}
+.btn-light.btn-sm {
+  background-image: url('/wuxia-sprites/button/btn-capsule-light-sm.png');
+  width: 110px; height: 44px;
+}
+.btn-light.btn-xs {
+  background-image: url('/wuxia-sprites/button/btn-capsule-light-xs.png');
+  width: 96px;  height: 40px;
+}
+
+/* 宽条按钮（确认/取消类） */
+.btn-wide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 220px; height: 46px;
+  border: none; cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 5px;
+  font-size: 15px;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  transition: filter 0.15s;
+}
+.btn-wide:hover  { filter: brightness(1.06); }
+.btn-wide:active { filter: brightness(0.92); }
+.btn-wide-outline { background-image: url('/wuxia-sprites/button/btn-wide-outline.png');  color: #1A1410; }
+.btn-wide-dark    { background-image: url('/wuxia-sprites/button/btn-wide-dark.png');    color: #E8E2D6; }
+
+/* 标签形按钮（异形，右侧有切角装饰） */
+.btn-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px; height: 52px;
+  border: none; cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 3px;
+  font-size: 14px;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  transition: filter 0.15s;
+}
+.btn-tag-outline { background-image: url('/wuxia-sprites/button/btn-tag-outline.png'); color: #1A1410; }
+.btn-tag-dark    { background-image: url('/wuxia-sprites/button/btn-tag-dark.png');    color: #E8E2D6; }
+.btn-tag-light   { background-image: url('/wuxia-sprites/button/btn-tag-light.png');   color: #7A6E62; }
+
+/* =============================================
+   ICON 小图标底座
+   用作功能按钮的底图，叠加图标/文字
+   ============================================= */
+.icon-base {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+/* 圆形底座（7个墨色深浅档） */
+.icon-circle-ink     { background-image: url('/wuxia-sprites/icon/icon-circle-ink.png');     width:48px; height:48px; }
+.icon-circle-dark    { background-image: url('/wuxia-sprites/icon/icon-circle-dark.png');    width:48px; height:48px; }
+.icon-circle-mid     { background-image: url('/wuxia-sprites/icon/icon-circle-mid.png');     width:48px; height:48px; }
+.icon-circle-light   { background-image: url('/wuxia-sprites/icon/icon-circle-light.png');   width:48px; height:48px; }
+.icon-circle-lighter { background-image: url('/wuxia-sprites/icon/icon-circle-lighter.png'); width:48px; height:48px; }
+.icon-circle-outline { background-image: url('/wuxia-sprites/icon/icon-circle-outline.png'); width:48px; height:48px; }
+.icon-circle-white   { background-image: url('/wuxia-sprites/icon/icon-circle-white.png');   width:48px; height:48px; }
+
+/* 方形底座（7个墨色深浅档） */
+.icon-square-ink     { background-image: url('/wuxia-sprites/icon/icon-square-ink.png');     width:44px; height:44px; }
+.icon-square-dark    { background-image: url('/wuxia-sprites/icon/icon-square-dark.png');    width:44px; height:44px; }
+.icon-square-mid     { background-image: url('/wuxia-sprites/icon/icon-square-mid.png');     width:44px; height:44px; }
+.icon-square-light   { background-image: url('/wuxia-sprites/icon/icon-square-light.png');   width:44px; height:44px; }
+.icon-square-lighter { background-image: url('/wuxia-sprites/icon/icon-square-lighter.png'); width:44px; height:44px; }
+.icon-square-outline { background-image: url('/wuxia-sprites/icon/icon-square-outline.png'); width:44px; height:44px; }
+.icon-square-white   { background-image: url('/wuxia-sprites/icon/icon-square-white.png');   width:44px; height:44px; }
+
+/* =============================================
+   使用示例备注：
+
+   面板：
+     <div class="wuxia panel-rect panel-rect-lg" style="padding:24px; min-height:120px;">
+       内容
+     </div>
+
+   标题墨刷条：
+     <div class="wuxia brush-bar brush-bar-lg">江湖秘闻</div>
+
+   按钮：
+     <button class="wuxia btn-wuxia btn-dark btn-md">确认</button>
+     <button class="wuxia btn-wuxia btn-outline btn-sm">取消</button>
+
+   圆形头像框：
+     <div class="wuxia circle-frame circle-frame-ink">
+       <img src="avatar.jpg" alt="头像">
+     </div>
+
+   图标底座：
+     <div class="wuxia icon-base icon-circle-dark">
+       <img src="sword-icon.svg" width="24" height="24" alt="">
+     </div>
+   ============================================= */
