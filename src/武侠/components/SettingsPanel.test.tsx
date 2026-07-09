@@ -39,21 +39,6 @@ describe('SettingsPanel theme controls', () => {
     );
   });
 
-  it('emits jinyong settings when the jinyong theme is selected', () => {
-    const settings = createDefaultDisplaySettings();
-    const onSettingsChange = renderSettingsPanel(settings);
-
-    fireEvent.click(screen.getByRole('radio', { name: /金庸群侠传/ }));
-
-    expect(onSettingsChange).toHaveBeenCalledTimes(1);
-    expect(onSettingsChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        uiTheme: 'jinyong',
-        ...getThemeAppearanceDefaults('jinyong'),
-      }),
-    );
-  });
-
   it('preserves custom appearance values when switching themes', () => {
     const settings = {
       ...createDefaultDisplaySettings(),

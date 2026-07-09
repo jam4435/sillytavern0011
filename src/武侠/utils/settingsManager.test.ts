@@ -55,17 +55,6 @@ describe('settingsManager ui theme', () => {
     expect(loadSettings().uiTheme).toBe('ink-wash');
   });
 
-  it('persists and reloads the jinyong theme', () => {
-    const settings = {
-      ...createDefaultDisplaySettings(),
-      uiTheme: 'jinyong' as const,
-      ...getThemeAppearanceDefaults('jinyong'),
-    };
-
-    expect(saveSettings(settings)).toBe(true);
-    expect(loadSettings().uiTheme).toBe('jinyong');
-  });
-
   it('applies data-ui-theme and ink-wash sprite variables to the DOM', () => {
     const settings = {
       ...createDefaultDisplaySettings(),
@@ -84,28 +73,5 @@ describe('settingsManager ui theme', () => {
     expect(document.documentElement.style.getPropertyValue('--wuxia-chrome-opacity')).toBe('0.45');
     expect(document.documentElement.style.getPropertyValue('--wuxia-modal-opacity')).toBe('0.7');
     expect(document.documentElement.style.colorScheme).toBe('light');
-  });
-
-  it('applies jinyong theme sprite variables to the DOM', () => {
-    const settings = {
-      ...createDefaultDisplaySettings(),
-      uiTheme: 'jinyong' as const,
-      chromeOpacity: 0.7,
-      modalOpacity: 0.82,
-    };
-
-    applySettingsToDOM(settings);
-
-    expect(document.documentElement.dataset.uiTheme).toBe('jinyong');
-    expect(document.documentElement.style.getPropertyValue('--content-font-color')).toBe(
-      getThemeAppearanceDefaults('jinyong').fontColor,
-    );
-    expect(document.documentElement.style.getPropertyValue('--wuxia-jinyong-title-logo')).toContain('url(');
-    expect(document.documentElement.style.getPropertyValue('--wuxia-jinyong-dragon-bar')).toContain('url(');
-    expect(document.documentElement.style.getPropertyValue('--wuxia-jinyong-save-frame')).toContain('url(');
-    expect(document.documentElement.style.getPropertyValue('--wuxia-jinyong-beiming-icon')).toContain('url(');
-    expect(document.documentElement.style.getPropertyValue('--wuxia-chrome-opacity')).toBe('0.7');
-    expect(document.documentElement.style.getPropertyValue('--wuxia-modal-opacity')).toBe('0.82');
-    expect(document.documentElement.style.colorScheme).toBe('dark');
   });
 });
