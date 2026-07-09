@@ -513,7 +513,7 @@
 
 .theme-choice-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
 }
 
@@ -577,33 +577,6 @@
       box-shadow:
         0 0.55rem 0 rgba(26, 20, 16, 0.28),
         0 1.1rem 0 rgba(26, 20, 16, 0.18);
-    }
-  }
-
-  &.jinyong {
-    background:
-      radial-gradient(circle at 82% 18%, rgba(20, 190, 210, 0.42), transparent 17%),
-      radial-gradient(circle at 20% 82%, rgba(196, 41, 12, 0.48), transparent 20%),
-      linear-gradient(135deg, #090403 0%, #220d05 58%, #5a2f12 100%);
-    border-color: rgba(214, 157, 72, 0.84);
-
-    &::before {
-      content: '';
-      position: absolute;
-      inset: 0.42rem 0.38rem 1.35rem;
-      background: var(--wuxia-jinyong-title-logo) center / contain no-repeat;
-      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.75));
-    }
-
-    &::after {
-      content: '';
-      position: absolute;
-      right: 0.42rem;
-      bottom: 0.38rem;
-      width: 1.12rem;
-      height: 1.12rem;
-      background: var(--wuxia-jinyong-beiming-icon) center / contain no-repeat;
-      box-shadow: 0 0 10px rgba(43, 184, 217, 0.65);
     }
   }
 }
