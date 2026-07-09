@@ -929,8 +929,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       case 'appearance':
         {
           const defaultDisplaySettings = createDefaultDisplaySettings();
-        onSettingsChange({
-          ...settings,
+          onSettingsChange({
+            ...settings,
             uiTheme: defaultDisplaySettings.uiTheme,
             fontSize: defaultDisplaySettings.fontSize,
             fontColor: defaultDisplaySettings.fontColor,
@@ -942,7 +942,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             chromeOpacity: defaultDisplaySettings.chromeOpacity,
             modalOpacity: defaultDisplaySettings.modalOpacity,
             themeAppearanceByTheme: defaultDisplaySettings.themeAppearanceByTheme,
-        });
+          });
         }
         // 清除文件输入
         if (fileInputRef.current) {
