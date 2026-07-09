@@ -1,0 +1,81 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { NPC } from '../../types';
+import { toCustomAvatarRef } from '../../utils/avatarCatalog';
+import {
+  createAvatarEntityKey,
+  getAvatarSelectionStorageKey,
+  getAvatarStorageKey,
+  saveAvatarSelection,
+  saveCustomAvatar,
+} from '../../utils/avatarStorage';
+import { SocialPanel } from './SocialPanel';
+
+function createNpc(name = '黄蓉'): NPC {
+  return {
+    id: `npc:acquaintance:${name}`,
+    name,
+    relationship: 30,
+    relationshipLabel: '旧识',
+    category: 'acquaintance',
+    location: '桃花岛',
+    template: {
+      type: '江湖人士',
+      martialArtsDescription: '',
+      martialArtsRank: '上乘',
+      mastery: '略有小成',
+      traits: {},
+    },
+    keyItems: [],
+    biography: '',
+    network: [],
+  };
+}
+
+describe('SocialPanel avatar picker', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('姓名匹配时显示头像，并可在多个候选间选择', () => {
+    render(<SocialPanel npcs={[createNpc()]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '设置黄蓉头像' }));
+    expect(screen.getByAltText('黄蓉头像')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /黄蓉二/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /黄蓉二/ }));
+
+    expect(localStorage.getItem(getAvatarSelectionStorageKey(createAvatarEntityKey('npc', '黄蓉')))).toContain(
+      'preset:huang_rong_fc3',
+    );
+  });
+
+  it('上传自定义头像后本地覆盖优先', async () => {
+    render(<SocialPanel npcs={[createNpc()]} />);
+    fireEvent.click(screen.getByRole('button', { name: '设置黄蓉头像' }));
+
+    const input = document.querySelector<HTMLInputElement>('.social-avatar-option.upload input[type="file"]');
+    expect(input).toBeTruthy();
+
+    const file = new File(['avatar'], 'huangrong.png', { type: 'image/png' });
+    fireEvent.change(input as HTMLInputElement, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(localStorage.getItem(getAvatarStorageKey(createAvatarEntityKey('npc', '黄蓉')))).toContain('huangrong.png');
+    });
+    expect(localStorage.getItem(getAvatarSelectionStorageKey(createAvatarEntityKey('npc', '黄蓉')))).toContain(
+      'custom:npc:黄蓉',
+    );
+  });
+
+  it('已有本地自定义覆盖时优先显示自定义图', () => {
+    const entityKey = createAvatarEntityKey('npc', '黄蓉');
+    saveCustomAvatar(entityKey, 'data:image/png;base64,custom', 'custom.png');
+    saveAvatarSelection(entityKey, toCustomAvatarRef(entityKey));
+
+    render(<SocialPanel npcs={[createNpc()]} />);
+
+    expect(screen.getByAltText('黄蓉头像')).toHaveAttribute('src', 'data:image/png;base64,custom');
+  });
+});
