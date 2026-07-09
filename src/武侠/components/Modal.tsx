@@ -8,14 +8,28 @@ interface ModalProps {
   title: string;
   type: ActivePanel;
   children: React.ReactNode;
+  overlayClassName?: string;
+  boxClassName?: string;
+  contentClassName?: string;
+  showPaperTexture?: boolean;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, type, children }) => {
+const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  type,
+  children,
+  overlayClassName = '',
+  boxClassName = '',
+  contentClassName = '',
+  showPaperTexture = true,
+}) => {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className={`modal-box modal-${type.toLowerCase()}`} onClick={e => e.stopPropagation()}>
+    <div className={`modal-overlay ${overlayClassName}`.trim()} onClick={onClose}>
+      <div className={`modal-box modal-${type.toLowerCase()} ${boxClassName}`.trim()} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="modal-header">
           <div className="modal-title-group">
@@ -34,8 +48,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, type, children })
         <div className="corner-dec corner-br"></div>
 
         {/* Body */}
-        <div className="modal-content">
-          <div className="modal-paper-texture" aria-hidden="true"></div>
+        <div className={`modal-content ${contentClassName}`.trim()}>
+          {showPaperTexture && <div className="modal-paper-texture" aria-hidden="true"></div>}
           {children}
         </div>
       </div>

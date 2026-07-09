@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import AvatarPreviewModal from './components/AvatarPreviewModal';
 import ChatInput from './components/ChatInput';
 import CommandQueueButton from './components/CommandQueueButton';
 import CommandQueuePopover from './components/CommandQueuePopover';
@@ -115,6 +116,7 @@ const App: React.FC = () => {
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
   const [isCommandQueueOpen, setIsCommandQueueOpen] = useState(false);
+  const [isPlayerAvatarPreviewOpen, setIsPlayerAvatarPreviewOpen] = useState(false);
   const [mapDraftDestination, setMapDraftDestination] = useState<string | null>(null);
   const {
     variableChanges,
@@ -847,18 +849,26 @@ const App: React.FC = () => {
                 <div className="player-realm">{gameState.stats.realm}</div>
               </div>
 
-              <div className="avatar-small">
-                <div className="avatar-glow"></div>
-                {playerAvatarSource.src ? (
+              {playerAvatarSource.src ? (
+                <button
+                  type="button"
+                  className="avatar-small avatar-small--button"
+                  onClick={() => setIsPlayerAvatarPreviewOpen(true)}
+                  aria-label={`查看${gameState.stats.name}头像`}
+                >
+                  <div className="avatar-glow"></div>
                   <img
                     src={playerAvatarSource.src}
                     alt={`${gameState.stats.name}头像`}
                     style={playerAvatarSource.objectPosition ? { objectPosition: playerAvatarSource.objectPosition } : undefined}
                   />
-                ) : (
+                </button>
+              ) : (
+                <div className="avatar-small">
+                  <div className="avatar-glow"></div>
                   <span>{playerAvatarSource.fallbackInitial}</span>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </header>
 
@@ -909,6 +919,15 @@ const App: React.FC = () => {
       >
         {renderModalContent()}
       </Modal>
+      <AvatarPreviewModal
+        isOpen={isPlayerAvatarPreviewOpen}
+        onClose={() => setIsPlayerAvatarPreviewOpen(false)}
+        title={`${gameState.stats.name}头像`}
+        subtitle={playerAvatarSource.label}
+        src={playerAvatarSource.src}
+        type={ActivePanel.CHARACTER}
+        objectPosition={playerAvatarSource.objectPosition}
+      />
     </div>
   );
 };
