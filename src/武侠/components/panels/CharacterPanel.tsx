@@ -1,5 +1,6 @@
-import React, { CSSProperties, useCallback } from 'react';
+import React, { CSSProperties, useCallback, useMemo } from 'react';
 import { CharacterProfile, WorldTime } from '../../types';
+import { createAvatarEntityKey, resolveAvatarSource } from '../../utils/avatarStorage';
 import { gameLogger } from '../../utils/logger';
 import {
   checkBreakthrough,
@@ -7,6 +8,8 @@ import {
   getRealmColor,
   performBreakthrough
 } from '../../utils/realmSystem';
+
+const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
 
 /* --- Helper Components (Internal to CharacterPanel) --- */
 const StatBar = ({ label, current, max, color }: { label: string, current: number, max: number, color: string }) => {
@@ -100,6 +103,16 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
     '--realm-color-glow': `${realmColor}33`,
     '--next-realm-color': nextRealmColor,
   } as CSSProperties;
+  const avatarSource = useMemo(
+    () =>
+      resolveAvatarSource({
+        entityKey: PLAYER_AVATAR_ENTITY_KEY,
+        avatarRef: stats.avatarRef,
+        name: stats.name,
+        gender: stats.gender === '女' ? '女' : '男',
+      }),
+    [stats.avatarRef, stats.gender, stats.name],
+  );
 
   // 突破按钮点击处理
   const handleBreakthrough = useCallback(async () => {
@@ -130,11 +143,15 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
       {/* Left Column: Core Identity & Basic Stats */}
       <div className="char-left">
         <div className="portrait-container">
-            <img
-                src="https://picsum.photos/400/600?grayscale"
-                alt="Character"
-                className="portrait-img"
-            />
+            {avatarSource.src ? (
+              <img
+                  src={avatarSource.src}
+                  alt={`${stats.name}头像`}
+                  className="portrait-img"
+              />
+            ) : (
+              <div className="portrait-fallback">{avatarSource.fallbackInitial}</div>
+            )}
             <div className="portrait-text-overlay">
                 <h3 className="char-name-display">{stats.name}</h3>
                 {identityEntries.map(([id]) => (

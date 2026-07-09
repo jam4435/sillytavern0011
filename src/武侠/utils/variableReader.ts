@@ -55,6 +55,7 @@ type TavernChatMessage = {
 interface UserProfile {
   用户名?: string;
   性别?: string;
+  头像?: string;
   外貌?: string;
   出生年份?: number;
   状态?: string;
@@ -114,6 +115,7 @@ interface UserProfile {
  */
 interface CharacterData {
   性别?: string;
+  头像?: string;
   外貌?: string;
   性格?: string;
   境界?: string;
@@ -1063,6 +1065,7 @@ function createCharacterNpc(
   return {
     id: `npc:${category}:${name}`,
     name,
+    avatarRef: characterData.头像 || undefined,
     relationship: legacyNpc?.关系值 ?? 0,
     relationshipLabel: relationshipLabel?.trim() || undefined,
     category,
@@ -1080,6 +1083,7 @@ function createLegacySocialNpc(legacyNpc: LegacySocialNpc, category: NPC['catego
   return {
     id: `npc:${category}:${name}`,
     name,
+    avatarRef: undefined,
     relationship: legacyNpc.关系值 ?? 0,
     relationshipLabel: relationshipLabel?.trim() || undefined,
     category,
@@ -1100,6 +1104,7 @@ function createPlaceholderNpc(name: string, category: NPC['category'], relations
   return {
     id: `npc:${category}:${name}`,
     name,
+    avatarRef: undefined,
     relationship: 0,
     relationshipLabel: relationshipLabel?.trim() || undefined,
     category,
@@ -3098,6 +3103,7 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
     state.stats = {
       name: userName,
       gender: 用户档案.性别 || '未知',
+      avatarRef: 用户档案.头像 || undefined,
       appearance: 用户档案.外貌 || '',
       birthYear: 用户档案.出生年份 || (worldTime ? worldTime.year - 20 : 1179),
       status: 用户档案.状态 || '健康',

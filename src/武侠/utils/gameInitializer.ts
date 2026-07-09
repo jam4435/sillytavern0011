@@ -205,6 +205,7 @@ export function getRandomOpeningLine(): string {
 export interface NewGameFormData {
   name: string;
   gender: '男' | '女';
+  avatarRef?: string;
   appearance: string;
   age: number;
   locationInfo: EventLocation;
@@ -239,6 +240,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
   const {
     name,
     gender,
+    avatarRef,
     appearance,
     age,
     locationInfo,
@@ -356,6 +358,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     user数据: {
       用户名: name,
       性别: gender,
+      头像: avatarRef || '',
       外貌: appearance,
       出生年份: birthYear,
       状态: '健康',
@@ -423,6 +426,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     角色数据: {
       $template: {
         性别: '',
+        头像: '',
         外貌: '',
         性格: '',
         境界: '',

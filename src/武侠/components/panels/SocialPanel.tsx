@@ -1,5 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { NPC } from '../../types';
+import { toCustomAvatarRef, toPresetAvatarRef } from '../../utils/avatarCatalog';
+import {
+  clearAvatarSelection,
+  clearCustomAvatar,
+  createAvatarEntityKey,
+  getAvatarCandidates,
+  imageFileToDataUrl,
+  resolveAvatarSource,
+  saveAvatarSelection,
+  saveCustomAvatar,
+} from '../../utils/avatarStorage';
 import { Icons } from '../Icons';
 import { EmptyState } from './EmptyState';
 
@@ -100,6 +111,9 @@ function renderFallbackList(items: string[], emptyText: string) {
 export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [avatarPickerId, setAvatarPickerId] = useState<string | null>(null);
+  const [avatarVersion, setAvatarVersion] = useState(0);
+  const avatarUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [openSections, setOpenSections] = useState<Record<SocialSectionKey, boolean>>({
     acquaintance: true,
     local: true,
@@ -130,14 +144,74 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
   const selectedNpc = orderedNpcs.find(npc => npc.id === selectedId) || orderedNpcs[0] || null;
   const selectedRelation = selectedNpc ? getRelationshipMeta(selectedNpc) : null;
   const traitEntries = selectedNpc ? Object.entries(selectedNpc.template.traits) : [];
+  const selectedAvatarSource = useMemo(
+    () =>
+      selectedNpc
+        ? resolveAvatarSource({
+          entityKey: createAvatarEntityKey('npc', selectedNpc.name),
+          avatarRef: selectedNpc.avatarRef,
+          name: selectedNpc.name,
+        })
+        : null,
+    [avatarVersion, selectedNpc],
+  );
+  const selectedAvatarCandidates = useMemo(
+    () =>
+      selectedNpc
+        ? getAvatarCandidates({
+          entityKey: createAvatarEntityKey('npc', selectedNpc.name),
+          avatarRef: selectedNpc.avatarRef,
+          name: selectedNpc.name,
+        })
+        : [],
+    [avatarVersion, selectedNpc],
+  );
 
   const handleSelectNpc = (npc: NPC) => {
     setSelectedId(npc.id);
     setDetailOpen(true);
+    setAvatarPickerId(null);
   };
 
   const toggleSection = (section: SocialSectionKey) => {
     setOpenSections(current => ({ ...current, [section]: !current[section] }));
+  };
+
+  const refreshAvatars = () => {
+    setAvatarVersion(version => version + 1);
+  };
+
+  const handleSelectPresetAvatar = (npc: NPC, avatarId: string) => {
+    saveAvatarSelection(createAvatarEntityKey('npc', npc.name), toPresetAvatarRef(avatarId));
+    refreshAvatars();
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>, npc: NPC) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const entityKey = createAvatarEntityKey('npc', npc.name);
+    try {
+      const imageData = await imageFileToDataUrl(file);
+      saveCustomAvatar(entityKey, imageData, file.name);
+      saveAvatarSelection(entityKey, toCustomAvatarRef(entityKey));
+      refreshAvatars();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : '头像上传失败');
+    } finally {
+      if (avatarUploadInputRef.current) {
+        avatarUploadInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleClearAvatarOverride = (npc: NPC) => {
+    const entityKey = createAvatarEntityKey('npc', npc.name);
+    clearAvatarSelection(entityKey);
+    clearCustomAvatar(entityKey);
+    refreshAvatars();
   };
 
   const renderSection = (section: SocialSectionKey) => {
@@ -256,9 +330,19 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
               </button>
 
               <header className="social-detail-hero">
-                <div className="social-portrait" aria-hidden="true">
-                  <span>{selectedNpc.name.charAt(0) || '侠'}</span>
-                </div>
+                <button
+                  type="button"
+                  className="social-portrait"
+                  onClick={() => setAvatarPickerId(current => (current === selectedNpc.id ? null : selectedNpc.id))}
+                  aria-label={`设置${selectedNpc.name || '人物'}头像`}
+                  aria-expanded={avatarPickerId === selectedNpc.id}
+                >
+                  {selectedAvatarSource?.src ? (
+                    <img src={selectedAvatarSource.src} alt={`${selectedNpc.name}头像`} />
+                  ) : (
+                    <span>{selectedAvatarSource?.fallbackInitial || selectedNpc.name.charAt(0) || '侠'}</span>
+                  )}
+                </button>
                 <div className="social-hero-copy">
                   <div className="social-hero-label">{selectedRelation.label}</div>
                   <h3 className="social-hero-name">{selectedNpc.name || '未知人物'}</h3>
@@ -274,6 +358,46 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                   {selectedRelation.seal}
                 </span>
               </header>
+
+              {avatarPickerId === selectedNpc.id && (
+                <section className="social-avatar-picker" aria-label={`${selectedNpc.name}头像选择`}>
+                  <div className="social-avatar-picker-head">
+                    <span>头像</span>
+                    <small>{selectedAvatarSource?.label || selectedNpc.name}</small>
+                  </div>
+                  <div className="social-avatar-options">
+                    {selectedAvatarCandidates.map(avatar => {
+                      const isSelected = selectedAvatarSource?.src === avatar.src;
+
+                      return (
+                        <button
+                          key={avatar.id}
+                          type="button"
+                          className={`social-avatar-option ${isSelected ? 'is-selected' : ''}`}
+                          onClick={() => handleSelectPresetAvatar(selectedNpc, avatar.id)}
+                          aria-pressed={isSelected}
+                        >
+                          <img src={avatar.src} alt={avatar.label} />
+                          <span>{avatar.label}</span>
+                        </button>
+                      );
+                    })}
+                    <label className={`social-avatar-option upload ${selectedAvatarSource?.source === 'custom' ? 'is-selected' : ''}`}>
+                      <input
+                        ref={avatarUploadInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={event => handleAvatarUpload(event, selectedNpc)}
+                      />
+                      <span className="social-avatar-upload-mark">+</span>
+                      <span>上传</span>
+                    </label>
+                    <button type="button" className="social-avatar-clear" onClick={() => handleClearAvatarOverride(selectedNpc)}>
+                      清除本地覆盖
+                    </button>
+                  </div>
+                </section>
+              )}
 
               <section className="social-detail-card">
                 <div className="social-detail-card-head">

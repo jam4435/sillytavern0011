@@ -78,6 +78,161 @@
   }
 }
 
+.avatar-form-group {
+  gap: 0.7rem;
+}
+
+.setup-avatar-panel {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 9rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.setup-avatar-preview {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(200, 160, 80, 0.2);
+  border-radius: 6px;
+  background: rgba(12, 10, 9, 0.32);
+
+  img,
+  > span {
+    width: 5.5rem;
+    aspect-ratio: 1;
+    border: 1px solid rgba(200, 160, 80, 0.34);
+    border-radius: 50%;
+    background: rgba(28, 25, 23, 0.72);
+  }
+
+  img {
+    object-fit: cover;
+  }
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffd780;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    line-height: 1;
+  }
+}
+
+.setup-avatar-preview-copy {
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.18rem;
+  text-align: center;
+
+  strong {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--stone-200);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    color: var(--stone-500);
+    font-size: 0.72rem;
+  }
+}
+
+.setup-avatar-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr));
+  gap: 0.6rem;
+}
+
+.setup-avatar-choice {
+  min-width: 0;
+  min-height: 7rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--stone-300);
+  font-family: var(--font-serif);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: rgba(200, 160, 80, 0.32);
+    background: rgba(200, 160, 80, 0.08);
+  }
+
+  &.is-selected {
+    border-color: rgba(250, 204, 21, 0.62);
+    background: rgba(200, 160, 80, 0.16);
+    color: #ffd780;
+  }
+
+  img,
+  .setup-avatar-upload-mark {
+    width: 3.65rem;
+    aspect-ratio: 1;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(200, 160, 80, 0.26);
+    background: rgba(28, 25, 23, 0.72);
+  }
+
+  img {
+    object-fit: cover;
+  }
+
+  > span:not(.setup-avatar-upload-mark) {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &.upload {
+    justify-content: center;
+  }
+
+  input {
+    display: none;
+  }
+}
+
+.setup-avatar-upload-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffd780;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
 // 带随机按钮的输入
 .input-with-btn {
   display: flex;

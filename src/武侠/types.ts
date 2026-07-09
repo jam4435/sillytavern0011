@@ -58,6 +58,7 @@ export interface MartialArt {
 export interface CharacterProfile {
   name: string; // Internal use, though not strictly in JSON, needed for UI
   gender: string; // 性别
+  avatarRef?: string; // 头像引用：preset:<id> 或 custom:<entityKey>
   appearance: string; // 外貌（包含身材特征）
   birthYear: number; // 出生年份
   status: string; // 状态
@@ -155,6 +156,7 @@ export interface GameEvent {
 export interface NPC {
   id: string;
   name: string;
+  avatarRef?: string; // 头像引用：preset:<id> 或 custom:<entityKey>
   relationship: number;
   relationshipLabel?: string;
   category: 'acquaintance' | 'local';
@@ -430,6 +432,7 @@ export interface CharacterBuild {
   characterInfo: {
     name: string;
     gender: '男' | '女';
+    avatarRef?: string;
     appearance: string; // 外貌（包含身材特征）
     age: number;
   };
@@ -481,6 +484,7 @@ export interface NewGameFormDataV2 {
   // 步骤6: 个人身份
   characterName: string;
   gender: '男' | '女';
+  avatarRef?: string;
   appearance: string; // 外貌（包含身材特征）
   age: number;
 }

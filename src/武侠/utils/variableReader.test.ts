@@ -566,3 +566,71 @@ describe('readGameDataSync inventory rank field', () => {
     );
   });
 });
+
+describe('readGameDataSync avatar projection', () => {
+  beforeEach(() => {
+    getMartialArtDataMock.mockReturnValue(null);
+  });
+
+  it('投影 user数据.头像 与 角色数据.<名>.头像', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '乔峰',
+          性别: '男',
+          头像: 'preset:male_palace_1',
+          境界: '不入流',
+          修为: 0,
+          所在位置: '牛家村',
+          关系网: {
+            黄蓉: '旧识',
+          },
+        },
+        角色数据: {
+          黄蓉: {
+            性别: '女',
+            头像: 'preset:huang_rong_fc3',
+            所在位置: '桃花岛',
+            功法: {},
+            关系网: {},
+          },
+        },
+      },
+    });
+
+    const result = readGameDataSync();
+
+    expect(result?.stats.avatarRef).toBe('preset:male_palace_1');
+    expect(result?.social.find(npc => npc.name === '黄蓉')?.avatarRef).toBe('preset:huang_rong_fc3');
+  });
+
+  it('旧存档缺少头像字段时保持兼容', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '乔峰',
+          性别: '男',
+          境界: '不入流',
+          修为: 0,
+          所在位置: '牛家村',
+          关系网: {
+            黄蓉: '旧识',
+          },
+        },
+        角色数据: {
+          黄蓉: {
+            性别: '女',
+            所在位置: '桃花岛',
+            功法: {},
+            关系网: {},
+          },
+        },
+      },
+    });
+
+    const result = readGameDataSync();
+
+    expect(result?.stats.avatarRef).toBeUndefined();
+    expect(result?.social.find(npc => npc.name === '黄蓉')?.avatarRef).toBeUndefined();
+  });
+});

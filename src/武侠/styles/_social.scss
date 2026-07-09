@@ -424,15 +424,37 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  padding: 0;
   border: 1px solid rgba(181, 137, 80, 0.32);
   border-radius: 999px;
   background:
     radial-gradient(circle at 38% 28%, rgba(250, 204, 21, 0.18), transparent 36%),
     linear-gradient(145deg, rgba(127, 29, 29, 0.28), rgba(12, 10, 9, 0.74));
   color: rgba(254, 243, 199, 0.96);
+  font-family: var(--font-serif);
+  cursor: pointer;
+  overflow: hidden;
   box-shadow:
     inset 0 0 0 1px rgba(250, 204, 21, 0.08),
     0 14px 26px rgba(0, 0, 0, 0.28);
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: rgba(250, 204, 21, 0.54);
+    box-shadow:
+      inset 0 0 0 1px rgba(250, 204, 21, 0.12),
+      0 16px 28px rgba(0, 0, 0, 0.32);
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 
   span {
     font-family: var(--font-display);
@@ -494,6 +516,131 @@
   width: 3rem;
   height: 3rem;
   font-size: 1.35rem;
+}
+
+.social-avatar-picker {
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid rgba(181, 137, 80, 0.18);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 58%), rgba(12, 10, 9, 0.34);
+}
+
+.social-avatar-picker-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.7rem;
+  margin-bottom: 0.7rem;
+
+  span {
+    color: rgba(250, 204, 21, 0.9);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+
+  small {
+    min-width: 0;
+    overflow: hidden;
+    color: rgba(168, 162, 158, 0.76);
+    font-size: 0.72rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.social-avatar-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.8rem, 1fr));
+  gap: 0.55rem;
+}
+
+.social-avatar-option {
+  min-width: 0;
+  min-height: 6.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border: 1px solid rgba(120, 113, 108, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(214, 211, 209, 0.82);
+  font-family: var(--font-serif);
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+
+  &:hover {
+    border-color: rgba(181, 137, 80, 0.36);
+    background: rgba(181, 137, 80, 0.08);
+  }
+
+  &.is-selected {
+    border-color: rgba(250, 204, 21, 0.62);
+    background: rgba(113, 63, 18, 0.26);
+    color: rgba(254, 243, 199, 0.95);
+  }
+
+  img,
+  .social-avatar-upload-mark {
+    width: 3.35rem;
+    aspect-ratio: 1;
+    flex-shrink: 0;
+    border: 1px solid rgba(181, 137, 80, 0.26);
+    border-radius: 50%;
+    background: rgba(28, 25, 23, 0.68);
+  }
+
+  img {
+    object-fit: cover;
+  }
+
+  > span:not(.social-avatar-upload-mark) {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &.upload {
+    justify-content: center;
+  }
+
+  input {
+    display: none;
+  }
+}
+
+.social-avatar-upload-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(250, 204, 21, 0.94);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.social-avatar-clear {
+  min-height: 6.2rem;
+  padding: 0.45rem;
+  border: 1px dashed rgba(120, 113, 108, 0.28);
+  border-radius: 6px;
+  background: rgba(12, 10, 9, 0.22);
+  color: rgba(214, 211, 209, 0.72);
+  font-family: var(--font-serif);
+  font-size: 0.7rem;
+  line-height: 1.35;
+  cursor: pointer;
+
+  &:hover {
+    border-color: rgba(185, 28, 28, 0.38);
+    color: rgba(254, 226, 226, 0.92);
+  }
 }
 
 .social-detail-card {

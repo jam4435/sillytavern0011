@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CharacterBuild, CharacterTrait, InitialAttributes, OriginCategory, RealmLevel, SetupStep } from '../types';
 import { ATTRIBUTE_DESCRIPTIONS, ATTRIBUTE_NAMES, getTraitType } from '../types';
 import {
@@ -20,6 +20,22 @@ import {
   type EventLocation,
   type NewGameFormData,
 } from '../utils/gameInitializer';
+import {
+  getAvatarFromRef,
+  getAvatarsByGender,
+  getDefaultAvatarRefForGender,
+  toCustomAvatarRef,
+  toPresetAvatarRef,
+  type AvatarGender,
+} from '../utils/avatarCatalog';
+import {
+  createAvatarEntityKey,
+  imageFileToDataUrl,
+  readAvatarSelection,
+  resolveAvatarSource,
+  saveAvatarSelection,
+  saveCustomAvatar,
+} from '../utils/avatarStorage';
 import {
   getAllMartialArtNames,
   getMartialArtData,
@@ -68,6 +84,7 @@ const SAVED_BUILDS_KEY = 'wuxia_character_builds';
 
 // 自定义天赋 localStorage key
 const CUSTOM_TRAITS_KEY = 'wuxia_custom_traits';
+const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
 
 // 自定义天赋接口
 interface CustomTrait {
@@ -114,8 +131,12 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   // 基础信息状态 (后续步骤使用)
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'男' | '女'>('男');
+  const [selectedAvatarRef, setSelectedAvatarRef] = useState<string>(
+    () => readAvatarSelection(PLAYER_AVATAR_ENTITY_KEY)?.avatarRef || getDefaultAvatarRefForGender('男'),
+  );
   const [appearance, setAppearance] = useState('');
   const [age, setAge] = useState(18);
+  const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
   
   // 时间地点状态
   const [useEventLocation, setUseEventLocation] = useState(true);
@@ -153,6 +174,65 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     setNotification({ type, message });
     // 3秒后自动清除
     setTimeout(() => setNotification(null), 3000);
+  }, []);
+
+  const genderAvatarOptions = useMemo(() => getAvatarsByGender(gender as AvatarGender), [gender]);
+  const selectedAvatar = useMemo(() => getAvatarFromRef(selectedAvatarRef), [selectedAvatarRef]);
+  const selectedAvatarSource = useMemo(
+    () =>
+      resolveAvatarSource({
+        entityKey: PLAYER_AVATAR_ENTITY_KEY,
+        avatarRef: selectedAvatarRef,
+        name: name || '少侠',
+        gender,
+      }),
+    [gender, name, selectedAvatarRef],
+  );
+
+  useEffect(() => {
+    if (!selectedAvatarRef) {
+      const nextAvatarRef = getDefaultAvatarRefForGender(gender);
+      saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, nextAvatarRef);
+      setSelectedAvatarRef(nextAvatarRef);
+      return;
+    }
+
+    if (selectedAvatar && selectedAvatar.gender !== gender) {
+      const nextAvatarRef = getDefaultAvatarRefForGender(gender);
+      saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, nextAvatarRef);
+      setSelectedAvatarRef(nextAvatarRef);
+    }
+  }, [gender, selectedAvatar, selectedAvatarRef]);
+
+  const handleAvatarUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        return;
+      }
+
+      try {
+        const imageData = await imageFileToDataUrl(file);
+        saveCustomAvatar(PLAYER_AVATAR_ENTITY_KEY, imageData, file.name);
+        const avatarRef = toCustomAvatarRef(PLAYER_AVATAR_ENTITY_KEY);
+        saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, avatarRef);
+        setSelectedAvatarRef(avatarRef);
+        showNotification('success', '自定义头像已保存');
+      } catch (error) {
+        showNotification('error', error instanceof Error ? error.message : '头像上传失败');
+      } finally {
+        if (avatarFileInputRef.current) {
+          avatarFileInputRef.current.value = '';
+        }
+      }
+    },
+    [showNotification],
+  );
+
+  const handlePresetAvatarSelect = useCallback((avatarId: string) => {
+    const avatarRef = toPresetAvatarRef(avatarId);
+    saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, avatarRef);
+    setSelectedAvatarRef(avatarRef);
   }, []);
   
   // ============================================
@@ -472,6 +552,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         characterInfo: {
           name: name.trim(),
           gender,
+          avatarRef: selectedAvatarRef,
           appearance,
           age,
         },
@@ -489,7 +570,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     name, selectedTalentId, attributes, selectedTraits, selectedMartialArts,
     selectedOrigin, customOrigin, useEventLocation, selectedEventId,
     customYear, customMonth, customDay, customLocation,
-    gender, appearance, age, savedBuilds, showNotification
+    gender, selectedAvatarRef, appearance, age, savedBuilds, showNotification
   ]);
   
   /**
@@ -556,6 +637,9 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         const info = buildToLoad.characterInfo;
         setName(info.name || '');
         setGender(info.gender || '男');
+        const nextAvatarRef = info.avatarRef || getDefaultAvatarRefForGender(info.gender || '男');
+        saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, nextAvatarRef);
+        setSelectedAvatarRef(nextAvatarRef);
         setAppearance(info.appearance || '');
         setAge(info.age || 18);
       }
@@ -840,6 +924,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     onSubmit({
       name: name.trim(),
       gender,
+      avatarRef: selectedAvatarRef,
       appearance: appearance.trim(),
       age,
       locationInfo,
@@ -853,7 +938,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       originItems, // 传递出身自带的物品
       originMartialArts, // 传递出身自带的功法
     });
-  }, [name, gender, appearance, age, useEventLocation, selectedEvent,
+  }, [name, gender, selectedAvatarRef, appearance, age, useEventLocation, selectedEvent,
       customYear, customMonth, customDay, customLocation, attributes,
       selectedMartialArts, selectedTraits, selectedOrigin, customOrigin, customRealm, onSubmit, validateIdentityInfo]);
 
@@ -2321,6 +2406,54 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     </div>
                   </div>
 
+                  <div className="form-group avatar-form-group">
+                    <label className="form-label">头像</label>
+                    <div className="setup-avatar-panel">
+                      <div className="setup-avatar-preview">
+                        {selectedAvatarSource.src ? (
+                          <img src={selectedAvatarSource.src} alt="当前头像" />
+                        ) : (
+                          <span>{selectedAvatarSource.fallbackInitial}</span>
+                        )}
+                        <div className="setup-avatar-preview-copy">
+                          <strong>{selectedAvatarSource.label}</strong>
+                          <small>{selectedAvatarSource.source === 'custom' ? '自定义头像' : '当前选择'}</small>
+                        </div>
+                      </div>
+
+                      <div className="setup-avatar-grid" aria-label="选择头像">
+                        {genderAvatarOptions.map(avatar => {
+                          const avatarRef = toPresetAvatarRef(avatar.id);
+                          const isSelected = selectedAvatarRef === avatarRef;
+
+                          return (
+                            <button
+                              key={avatar.id}
+                              type="button"
+                              className={`setup-avatar-choice ${isSelected ? 'is-selected' : ''}`}
+                              onClick={() => handlePresetAvatarSelect(avatar.id)}
+                              aria-pressed={isSelected}
+                            >
+                              <img src={avatar.src} alt={avatar.label} />
+                              <span>{avatar.label}</span>
+                            </button>
+                          );
+                        })}
+
+                        <label className={`setup-avatar-choice upload ${selectedAvatarSource.source === 'custom' ? 'is-selected' : ''}`}>
+                          <input
+                            ref={avatarFileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarUpload}
+                          />
+                          <span className="setup-avatar-upload-mark">+</span>
+                          <span>上传头像</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="form-group">
                     <label className="form-label">
                       外貌描述
@@ -2394,6 +2527,19 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   {/* 基础信息 */}
                   <div className="preview-section">
                     <h4 className="preview-title">基础信息</h4>
+                    <div className="preview-avatar-row">
+                      <div className="preview-avatar">
+                        {selectedAvatarSource.src ? (
+                          <img src={selectedAvatarSource.src} alt="头像预览" />
+                        ) : (
+                          <span>{selectedAvatarSource.fallbackInitial}</span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="preview-label">头像</span>
+                        <span className="preview-value">{selectedAvatarSource.label}</span>
+                      </div>
+                    </div>
                     <div className="preview-grid">
                       <div className="preview-item">
                         <span className="preview-label">名号</span>

@@ -35,6 +35,7 @@ import {
 } from './hooks';
 import { ActivePanel, InventoryItem } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
+import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
 import { equipInventoryItem, useElixirItem } from './utils/itemManager';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
 import { getUserCurrentLocation } from './utils/mapUtils';
@@ -61,6 +62,8 @@ import {
   scheduleGameDataCompletion,
   syncPlayerAttributesFromVariables,
 } from './utils/variableReader';
+
+const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
 
 const App: React.FC = () => {
   // 使用自定义 hooks
@@ -94,6 +97,17 @@ const App: React.FC = () => {
     setCurrentOptions,
   } = useGameState();
   const { commands, setTravelCommand, addUseItemCommand, cancelCommand, sendMessageWithCommands } = useCommandQueue();
+
+  const playerAvatarSource = useMemo(
+    () =>
+      resolveAvatarSource({
+        entityKey: PLAYER_AVATAR_ENTITY_KEY,
+        avatarRef: gameState.stats.avatarRef,
+        name: gameState.stats.name,
+        gender: gameState.stats.gender === '女' ? '女' : '男',
+      }),
+    [gameState.stats.avatarRef, gameState.stats.gender, gameState.stats.name],
+  );
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
@@ -504,6 +518,7 @@ const App: React.FC = () => {
                 ...prev.stats,
                 name: formData.name,
                 gender: formData.gender,
+                avatarRef: formData.avatarRef,
                 appearance: formData.appearance,
                 birthYear: formData.locationInfo.year - formData.age,
                 location: formData.locationInfo.location,
@@ -834,7 +849,11 @@ const App: React.FC = () => {
 
               <div className="avatar-small">
                 <div className="avatar-glow"></div>
-                <img src="https://picsum.photos/100/100?grayscale" alt="Avatar" />
+                {playerAvatarSource.src ? (
+                  <img src={playerAvatarSource.src} alt={`${gameState.stats.name}头像`} />
+                ) : (
+                  <span>{playerAvatarSource.fallbackInitial}</span>
+                )}
               </div>
             </div>
           </header>
