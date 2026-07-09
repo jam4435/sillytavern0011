@@ -29,14 +29,14 @@ describe('NewGameSetup avatar selection', () => {
     renderSetup();
     goToIdentityStep();
 
-    expect(screen.getAllByText('男主皇宫正装').length).toBeGreaterThan(0);
-    expect(screen.getByAltText('郭靖')).toBeInTheDocument();
+    expect(screen.getAllByText('少侠一').length).toBeGreaterThan(0);
+    expect(screen.getByAltText('少侠十')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '女' }));
 
-    expect(screen.getAllByText('女主皇宫正装').length).toBeGreaterThan(0);
-    expect(screen.getByAltText('小龙女')).toBeInTheDocument();
-    expect(screen.queryByAltText('郭靖')).not.toBeInTheDocument();
+    expect(screen.getAllByText('女侠一').length).toBeGreaterThan(0);
+    expect(screen.getByAltText('女侠十一')).toBeInTheDocument();
+    expect(screen.queryByAltText('少侠十')).not.toBeInTheDocument();
   });
 
   it('上传图片后显示自定义预览并写入本地头像缓存', async () => {

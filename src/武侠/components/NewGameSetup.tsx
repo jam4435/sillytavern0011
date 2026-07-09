@@ -190,6 +190,8 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   );
 
   useEffect(() => {
+    const isCustomAvatarRef = selectedAvatarRef?.startsWith('custom:');
+
     if (!selectedAvatarRef) {
       const nextAvatarRef = getDefaultAvatarRefForGender(gender);
       saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, nextAvatarRef);
@@ -197,7 +199,14 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       return;
     }
 
-    if (selectedAvatar && selectedAvatar.gender !== gender) {
+    if (!isCustomAvatarRef && !selectedAvatar) {
+      const nextAvatarRef = getDefaultAvatarRefForGender(gender);
+      saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, nextAvatarRef);
+      setSelectedAvatarRef(nextAvatarRef);
+      return;
+    }
+
+    if (selectedAvatar && (selectedAvatar.gender !== gender || selectedAvatar.usage !== 'player')) {
       const nextAvatarRef = getDefaultAvatarRefForGender(gender);
       saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, nextAvatarRef);
       setSelectedAvatarRef(nextAvatarRef);

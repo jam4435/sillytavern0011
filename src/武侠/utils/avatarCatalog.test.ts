@@ -12,14 +12,14 @@ describe('avatarCatalog', () => {
     const femaleAvatars = getAvatarsByGender('女');
 
     expect(maleAvatars).toHaveLength(10);
-    expect(femaleAvatars).toHaveLength(15);
+    expect(femaleAvatars).toHaveLength(11);
     expect(maleAvatars.every(avatar => avatar.gender === '男')).toBe(true);
     expect(femaleAvatars.every(avatar => avatar.gender === '女')).toBe(true);
   });
 
   it('按姓名和别名精确匹配头像', () => {
-    expect(findAvatarsByName('令狐沖').map(avatar => avatar.id)).toEqual(['linghu_chong_fc2']);
-    expect(findAvatarsByName('小龙女').map(avatar => avatar.id)).toEqual(['xiao_longnv_fc2']);
+    expect(findAvatarsByName('令狐沖').map(avatar => avatar.id)).toEqual(['linghu_chong_fc2', 'linghu_chong_alt']);
+    expect(findAvatarsByName('小龙女').map(avatar => avatar.id)).toEqual(['xiao_longnv_fc2', 'xiao_longnv_alt']);
   });
 
   it('同一人物可返回多个头像候选', () => {
