@@ -114,8 +114,13 @@ describe('SettingsPanel theme controls', () => {
       },
     };
     const onSettingsChange = renderSettingsPanel(settings);
+    const fontColorInput = screen
+      .getAllByDisplayValue('#2a2118')
+      .find(element => (element as HTMLInputElement).type === 'text');
 
-    fireEvent.change(screen.getByDisplayValue('#2a2118'), { target: { value: '#112233' } });
+    expect(fontColorInput).toBeTruthy();
+
+    fireEvent.change(fontColorInput as HTMLInputElement, { target: { value: '#112233' } });
 
     expect(onSettingsChange).toHaveBeenCalledWith(
       expect.objectContaining({
