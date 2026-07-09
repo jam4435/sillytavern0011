@@ -1028,6 +1028,8 @@ export function loadSettings(): DisplaySettings {
     const presetRegexRuleState = normalizePresetRegexRulesByPreset(parsed.presetRegexRulesByPreset);
     const importedGlobalRegexRules = importGlobalTavernRegexes();
     const uiTheme = normalizeUiTheme(parsed.uiTheme);
+    const themeAppearanceByTheme = normalizeThemeAppearanceByTheme(parsed.themeAppearanceByTheme, parsed, uiTheme);
+    const activeThemeAppearance = themeAppearanceByTheme[uiTheme];
     const localRegexRules = mergeExtractedGlobalRules(
       normalizeLocalRegexRules(
       Array.isArray(parsed.localRegexRules) ? parsed.localRegexRules : legacyRegexRules,
@@ -1038,14 +1040,15 @@ export function loadSettings(): DisplaySettings {
     return {
       uiTheme,
       fontSize: getNumberSetting(parsed.fontSize, defaultSettings.fontSize),
-      fontColor: getStringSetting(parsed.fontColor, defaultSettings.fontColor),
+      fontColor: activeThemeAppearance.fontColor,
       lineHeight: getNumberSetting(parsed.lineHeight, defaultSettings.lineHeight),
-      backgroundColor: getStringSetting(parsed.backgroundColor, defaultSettings.backgroundColor),
-      backgroundOpacity: getNumberSetting(parsed.backgroundOpacity, defaultSettings.backgroundOpacity),
-      backgroundImage: getNullableStringSetting(parsed.backgroundImage, defaultSettings.backgroundImage),
-      backgroundBlur: getNumberSetting(parsed.backgroundBlur, defaultSettings.backgroundBlur),
-      chromeOpacity: getNumberSetting(parsed.chromeOpacity, defaultSettings.chromeOpacity),
-      modalOpacity: getNumberSetting(parsed.modalOpacity, defaultSettings.modalOpacity),
+      backgroundColor: activeThemeAppearance.backgroundColor,
+      backgroundOpacity: activeThemeAppearance.backgroundOpacity,
+      backgroundImage: activeThemeAppearance.backgroundImage,
+      backgroundBlur: activeThemeAppearance.backgroundBlur,
+      chromeOpacity: activeThemeAppearance.chromeOpacity,
+      modalOpacity: activeThemeAppearance.modalOpacity,
+      themeAppearanceByTheme,
       localRegexRules,
       presetRegexRulesByPreset: removePresetRulesDuplicatedWithGlobalRules(
         presetRegexRuleState.presetRegexRulesByPreset,
@@ -1064,7 +1067,7 @@ export function loadSettings(): DisplaySettings {
  */
 export function saveSettings(settings: DisplaySettings): boolean {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(syncThemeAppearanceSettings(settings)));
     return true;
   } catch (error) {
     dataLogger.error('保存设置失败:', error);
@@ -1401,13 +1404,7 @@ export function imageToBase64(file: File): Promise<string> {
  * 生成 CSS 变量对象，用于应用设置到样式
  */
 export function generateCSSVariables(settings: DisplaySettings): Record<string, string> {
-  const darkGoldDefaults = THEME_APPEARANCE_DEFAULTS['dark-gold'];
-  const inkWashDefaults = THEME_APPEARANCE_DEFAULTS['ink-wash'];
   const themeDefaults = THEME_APPEARANCE_DEFAULTS[settings.uiTheme];
-  const themeAwareFontColor =
-    settings.uiTheme === 'ink-wash' && settings.fontColor === darkGoldDefaults.fontColor
-      ? inkWashDefaults.fontColor
-      : settings.fontColor;
   const cssUrl = (url: string) => `url("${url}")`;
   const clampUnit = (value: number) => Math.min(1, Math.max(0, value));
   const buildOpacitySegments = (value: number, defaultValue: number) => {
@@ -1427,7 +1424,7 @@ export function generateCSSVariables(settings: DisplaySettings): Record<string, 
 
   return {
     '--content-font-size': `${settings.fontSize}px`,
-    '--content-font-color': themeAwareFontColor,
+    '--content-font-color': settings.fontColor,
     '--content-line-height': `${settings.lineHeight}`,
     '--content-bg-color': settings.backgroundColor,
     '--content-bg-opacity': `${settings.backgroundOpacity}`,

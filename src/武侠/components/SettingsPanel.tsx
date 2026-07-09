@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  DEFAULT_BACKGROUND_SETTINGS,
-  DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_SUMMARY_SETTINGS,
   DEFAULT_SUMMARY_TAB_SETTINGS,
   DisplaySettings,
   RegexRule,
+  createDefaultDisplaySettings,
   createDefaultRegexSettings,
   SummarySettings,
   SummaryApiConfig,
@@ -16,7 +15,6 @@ import {
   DEFAULT_SUMMARY_API_CONFIG,
   WUXIA_UI_THEMES,
   createRegexRule,
-  getThemeAppearanceDefaults,
   getCurrentPresetRegexRules,
   logRegexDebugSnapshot,
   getRegexRuleContentSignature,
@@ -25,7 +23,10 @@ import {
   importPresetTavernRegexes,
   scheduleRegexDebugDump,
   setPresetRegexRulesForPreset,
+  switchDisplayTheme,
+  updateThemeAppearanceSetting,
   validateRegex,
+  type ThemeAppearanceSettingKey,
   type WuxiaUiTheme,
 } from '../utils/settingsManager';
 import {
@@ -511,6 +512,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [editingApiProfileId, settings.summarySettings.apiProfiles]);
 
   // 更新单个设置项
+  const updateAppearanceSetting = useCallback(
+    <K extends ThemeAppearanceSettingKey>(key: K, value: DisplaySettings[K]) => {
+      onSettingsChange(updateThemeAppearanceSetting(settings, key, value));
+    },
+    [settings, onSettingsChange],
+  );
+
   const updateSetting = useCallback(
     <K extends keyof DisplaySettings>(key: K, value: DisplaySettings[K]) => {
       onSettingsChange({ ...settings, [key]: value });
@@ -524,33 +532,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         return;
       }
 
-      const currentThemeDefaults = getThemeAppearanceDefaults(settings.uiTheme);
-      const nextThemeDefaults = getThemeAppearanceDefaults(nextTheme);
-      const nextSettings: DisplaySettings = {
-        ...settings,
-        uiTheme: nextTheme,
-      };
-
-      if (settings.fontColor === currentThemeDefaults.fontColor) {
-        nextSettings.fontColor = nextThemeDefaults.fontColor;
-      }
-      if (settings.backgroundColor === currentThemeDefaults.backgroundColor) {
-        nextSettings.backgroundColor = nextThemeDefaults.backgroundColor;
-      }
-      if (settings.backgroundOpacity === currentThemeDefaults.backgroundOpacity) {
-        nextSettings.backgroundOpacity = nextThemeDefaults.backgroundOpacity;
-      }
-      if (settings.backgroundBlur === currentThemeDefaults.backgroundBlur) {
-        nextSettings.backgroundBlur = nextThemeDefaults.backgroundBlur;
-      }
-      if (settings.chromeOpacity === currentThemeDefaults.chromeOpacity) {
-        nextSettings.chromeOpacity = nextThemeDefaults.chromeOpacity;
-      }
-      if (settings.modalOpacity === currentThemeDefaults.modalOpacity) {
-        nextSettings.modalOpacity = nextThemeDefaults.modalOpacity;
-      }
-
-      onSettingsChange(nextSettings);
+      onSettingsChange(switchDisplayTheme(settings, nextTheme));
     },
     [settings, onSettingsChange],
   );
@@ -945,11 +927,23 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const resetCurrentTab = useCallback(() => {
     switch (activeTab) {
       case 'appearance':
+        {
+          const defaultDisplaySettings = createDefaultDisplaySettings();
         onSettingsChange({
           ...settings,
-          ...DEFAULT_DISPLAY_SETTINGS,
-          ...DEFAULT_BACKGROUND_SETTINGS,
+            uiTheme: defaultDisplaySettings.uiTheme,
+            fontSize: defaultDisplaySettings.fontSize,
+            fontColor: defaultDisplaySettings.fontColor,
+            lineHeight: defaultDisplaySettings.lineHeight,
+            backgroundColor: defaultDisplaySettings.backgroundColor,
+            backgroundOpacity: defaultDisplaySettings.backgroundOpacity,
+            backgroundImage: defaultDisplaySettings.backgroundImage,
+            backgroundBlur: defaultDisplaySettings.backgroundBlur,
+            chromeOpacity: defaultDisplaySettings.chromeOpacity,
+            modalOpacity: defaultDisplaySettings.modalOpacity,
+            themeAppearanceByTheme: defaultDisplaySettings.themeAppearanceByTheme,
         });
+        }
         // 清除文件输入
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -1037,22 +1031,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
       try {
         const base64 = await imageToBase64(file);
-        updateSetting('backgroundImage', base64);
+        updateAppearanceSetting('backgroundImage', base64);
       } catch (error) {
         uiLogger.error('图片上传失败:', error);
         alert('图片上传失败');
       }
     },
-    [updateSetting],
+    [updateAppearanceSetting],
   );
 
   // 清除背景图片
   const clearBackgroundImage = useCallback(() => {
-    updateSetting('backgroundImage', null);
+    updateAppearanceSetting('backgroundImage', null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [updateSetting]);
+  }, [updateAppearanceSetting]);
 
   const updateCurrentPresetRules = useCallback(
     (rules: RegexRule[]) => {
