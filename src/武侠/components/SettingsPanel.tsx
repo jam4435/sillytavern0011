@@ -1641,13 +1641,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <input
                       type="color"
                       value={settings.fontColor}
-                      onChange={e => updateSetting('fontColor', e.target.value)}
+                      onChange={e => updateAppearanceSetting('fontColor', e.target.value)}
                       className="settings-color-picker"
                     />
                     <input
                       type="text"
                       value={settings.fontColor}
-                      onChange={e => updateSetting('fontColor', e.target.value)}
+                      onChange={e => updateAppearanceSetting('fontColor', e.target.value)}
                       className="settings-color-input"
                       placeholder="#RRGGBB"
                     />
@@ -1700,13 +1700,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <input
                       type="color"
                       value={settings.backgroundColor}
-                      onChange={e => updateSetting('backgroundColor', e.target.value)}
+                      onChange={e => updateAppearanceSetting('backgroundColor', e.target.value)}
                       className="settings-color-picker"
                     />
                     <input
                       type="text"
                       value={settings.backgroundColor}
-                      onChange={e => updateSetting('backgroundColor', e.target.value)}
+                      onChange={e => updateAppearanceSetting('backgroundColor', e.target.value)}
                       className="settings-color-input"
                       placeholder="#RRGGBB"
                     />
@@ -1722,7 +1722,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       max="1"
                       step="0.05"
                       value={settings.backgroundOpacity}
-                      onChange={e => updateSetting('backgroundOpacity', parseFloat(e.target.value))}
+                      onChange={e => updateAppearanceSetting('backgroundOpacity', parseFloat(e.target.value))}
                       className="settings-slider"
                     />
                     <span className="settings-value">{Math.round(settings.backgroundOpacity * 100)}%</span>
@@ -1738,7 +1738,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       max="20"
                       step="1"
                       value={settings.backgroundBlur}
-                      onChange={e => updateSetting('backgroundBlur', parseInt(e.target.value))}
+                      onChange={e => updateAppearanceSetting('backgroundBlur', parseInt(e.target.value))}
                       className="settings-slider"
                     />
                     <span className="settings-value">{settings.backgroundBlur}px</span>
@@ -1754,7 +1754,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       max="1"
                       step="0.05"
                       value={settings.chromeOpacity}
-                      onChange={e => updateSetting('chromeOpacity', parseFloat(e.target.value))}
+                      onChange={e => updateAppearanceSetting('chromeOpacity', parseFloat(e.target.value))}
                       className="settings-slider"
                     />
                     <span className="settings-value">{Math.round(settings.chromeOpacity * 100)}%</span>
@@ -1770,7 +1770,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       max="1"
                       step="0.05"
                       value={settings.modalOpacity}
-                      onChange={e => updateSetting('modalOpacity', parseFloat(e.target.value))}
+                      onChange={e => updateAppearanceSetting('modalOpacity', parseFloat(e.target.value))}
                       className="settings-slider"
                     />
                     <span className="settings-value">{Math.round(settings.modalOpacity * 100)}%</span>

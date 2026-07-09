@@ -74,6 +74,15 @@ function getNpcSubtitle(npc: NPC): string {
   return npc.location ? `${role} / ${npc.location}` : role;
 }
 
+function getRosterRelationText(npc: NPC, relation: ReturnType<typeof getRelationshipMeta>): string {
+  const relationValue = clampRelationship(npc.relationship);
+  if (npc.category === 'local' && relationValue <= 0) {
+    return relation.label;
+  }
+
+  return `${relation.label}/${relationValue}`;
+}
+
 function renderFallbackList(items: string[], emptyText: string) {
   if (items.length === 0) {
     return <div className="social-detail-empty">{emptyText}</div>;
@@ -170,17 +179,18 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                     style={style}
                     onClick={() => handleSelectNpc(npc)}
                   >
-                    <span className={`social-relation-seal ${relation.modifier}`} title={relation.label}>
-                      {relation.seal}
-                    </span>
                     <span className="social-member-copy">
-                      <span className="social-member-name">{npc.name || '未知人物'}</span>
+                      <span className="social-member-head">
+                        <span className="social-member-name">{npc.name || '未知人物'}</span>
+                        <span className={`social-member-relation ${relation.modifier}`}>
+                          {getRosterRelationText(npc, relation)}
+                        </span>
+                      </span>
                       <span className="social-member-subtitle">{getNpcSubtitle(npc)}</span>
                       <span className="social-relation-track" aria-hidden="true">
                         <span className="social-relation-fill"></span>
                       </span>
                     </span>
-                    <span className="social-member-relation">{relation.label}</span>
                   </button>
                 );
               })
