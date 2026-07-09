@@ -31,9 +31,7 @@
   .splash-screen,
   .opening-screen,
   .setup-screen {
-    background:
-      linear-gradient(180deg, rgba(232, 226, 214, 0.86), rgba(210, 199, 181, 0.7)),
-      #e8e2d6;
+    background: linear-gradient(180deg, rgba(232, 226, 214, 0.86), rgba(210, 199, 181, 0.7)), #e8e2d6;
     color: #1a1410;
   }
 
@@ -56,8 +54,18 @@
   .splash-bg-overlay,
   .opening-bg-vignette {
     background:
-      radial-gradient(ellipse at 50% 36%, rgba(247, 241, 229, 0.2) 0%, rgba(232, 226, 214, 0.74) 58%, rgba(192, 181, 162, 0.84) 100%),
-      linear-gradient(180deg, rgba(246, 239, 226, 0.9) 0%, rgba(232, 226, 214, 0.24) 42%, rgba(222, 211, 194, 0.82) 100%);
+      radial-gradient(
+        ellipse at 50% 36%,
+        rgba(247, 241, 229, 0.2) 0%,
+        rgba(232, 226, 214, 0.74) 58%,
+        rgba(192, 181, 162, 0.84) 100%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(246, 239, 226, 0.9) 0%,
+        rgba(232, 226, 214, 0.24) 42%,
+        rgba(222, 211, 194, 0.82) 100%
+      );
   }
 
   .bg-radial,
@@ -153,8 +161,10 @@
   .nav-sidebar {
     background: linear-gradient(
       180deg,
-      rgba(241, 235, 223, calc(0.42 * var(--wuxia-chrome-opacity-low, 1) + 0.58 * var(--wuxia-chrome-opacity-high, 0))) 0%,
-      rgba(218, 207, 188, calc(0.24 * var(--wuxia-chrome-opacity-low, 1) + 0.76 * var(--wuxia-chrome-opacity-high, 0))) 100%
+      rgba(241, 235, 223, calc(0.42 * var(--wuxia-chrome-opacity-low, 1) + 0.58 * var(--wuxia-chrome-opacity-high, 0)))
+        0%,
+      rgba(218, 207, 188, calc(0.24 * var(--wuxia-chrome-opacity-low, 1) + 0.76 * var(--wuxia-chrome-opacity-high, 0)))
+        100%
     );
     border-right-color: rgba(61, 48, 40, 0.2);
     box-shadow:
@@ -168,14 +178,24 @@
   }
 
   .nav-sidebar-overlay {
-    background: rgba(26, 20, 16, calc(0.08 * var(--wuxia-chrome-opacity-low, 1) + 0.92 * var(--wuxia-chrome-opacity-high, 0)));
+    background: rgba(
+      26,
+      20,
+      16,
+      calc(0.08 * var(--wuxia-chrome-opacity-low, 1) + 0.92 * var(--wuxia-chrome-opacity-high, 0))
+    );
   }
 
   .nav-menu-toggle,
   .header-action-btn,
   .header-fullscreen-btn-small,
   .fullscreen-btn {
-    background: rgba(241, 235, 223, calc(0.3 * var(--wuxia-chrome-opacity-low, 1) + 0.7 * var(--wuxia-chrome-opacity-high, 0)));
+    background: rgba(
+      241,
+      235,
+      223,
+      calc(0.3 * var(--wuxia-chrome-opacity-low, 1) + 0.7 * var(--wuxia-chrome-opacity-high, 0))
+    );
     border-color: rgba(61, 48, 40, 0.28);
     color: #3d3028;
     backdrop-filter: none;
@@ -250,8 +270,10 @@
   .game-header {
     background: linear-gradient(
       180deg,
-      rgba(241, 235, 223, calc(0.32 * var(--wuxia-chrome-opacity-low, 1) + 0.68 * var(--wuxia-chrome-opacity-high, 0))) 0%,
-      rgba(218, 207, 188, calc(0.16 * var(--wuxia-chrome-opacity-low, 1) + 0.84 * var(--wuxia-chrome-opacity-high, 0))) 100%
+      rgba(241, 235, 223, calc(0.32 * var(--wuxia-chrome-opacity-low, 1) + 0.68 * var(--wuxia-chrome-opacity-high, 0)))
+        0%,
+      rgba(218, 207, 188, calc(0.16 * var(--wuxia-chrome-opacity-low, 1) + 0.84 * var(--wuxia-chrome-opacity-high, 0)))
+        100%
     );
     border-bottom-color: rgba(61, 48, 40, 0.18);
     backdrop-filter: none;
@@ -286,9 +308,7 @@
   .auto-advance-control-panel,
   .auto-advance-export-panel,
   .variable-detail-panel {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 52%),
-      rgba(241, 235, 223, 0.44);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 52%), rgba(241, 235, 223, 0.44);
     border-color: rgba(61, 48, 40, 0.24);
     box-shadow:
       0 8px 22px rgba(61, 48, 40, 0.04),
@@ -403,13 +423,20 @@
     background: linear-gradient(
       to bottom,
       rgba(232, 226, 214, 0) 0%,
-      rgba(232, 226, 214, calc(0.12 * var(--wuxia-chrome-opacity-low, 1) + 0.88 * var(--wuxia-chrome-opacity-high, 0))) 36%,
-      rgba(218, 207, 188, calc(0.18 * var(--wuxia-chrome-opacity-low, 1) + 0.82 * var(--wuxia-chrome-opacity-high, 0))) 100%
+      rgba(232, 226, 214, calc(0.12 * var(--wuxia-chrome-opacity-low, 1) + 0.88 * var(--wuxia-chrome-opacity-high, 0)))
+        36%,
+      rgba(218, 207, 188, calc(0.18 * var(--wuxia-chrome-opacity-low, 1) + 0.82 * var(--wuxia-chrome-opacity-high, 0)))
+        100%
     );
   }
 
   .chat-input-container {
-    background: rgba(241, 235, 223, calc(0.18 * var(--wuxia-chrome-opacity-low, 1) + 0.82 * var(--wuxia-chrome-opacity-high, 0)));
+    background: rgba(
+      241,
+      235,
+      223,
+      calc(0.18 * var(--wuxia-chrome-opacity-low, 1) + 0.82 * var(--wuxia-chrome-opacity-high, 0))
+    );
     border: 12px solid transparent;
     border-image-source: var(--wuxia-ink-panel-bar-md);
     border-image-slice: 22 fill;
@@ -495,12 +522,22 @@
   }
 
   .modal-overlay {
-    background: rgba(26, 20, 16, calc(0.16 * var(--wuxia-modal-opacity-low, 1) + 0.84 * var(--wuxia-modal-opacity-high, 0)));
+    background: rgba(
+      26,
+      20,
+      16,
+      calc(0.16 * var(--wuxia-modal-opacity-low, 1) + 0.84 * var(--wuxia-modal-opacity-high, 0))
+    );
     backdrop-filter: none;
   }
 
   .modal-box {
-    background: rgba(241, 235, 223, calc(0.58 * var(--wuxia-modal-opacity-low, 1) + 0.42 * var(--wuxia-modal-opacity-high, 0)));
+    background: rgba(
+      241,
+      235,
+      223,
+      calc(0.58 * var(--wuxia-modal-opacity-low, 1) + 0.42 * var(--wuxia-modal-opacity-high, 0))
+    );
     border: 24px solid transparent;
     border-image-source: var(--wuxia-ink-panel-rect-xl);
     border-image-slice: 44 fill;
@@ -510,7 +547,12 @@
   }
 
   .modal-header {
-    background: rgba(241, 235, 223, calc(0.34 * var(--wuxia-modal-opacity-low, 1) + 0.66 * var(--wuxia-modal-opacity-high, 0)));
+    background: rgba(
+      241,
+      235,
+      223,
+      calc(0.34 * var(--wuxia-modal-opacity-low, 1) + 0.66 * var(--wuxia-modal-opacity-high, 0))
+    );
     border-bottom-color: rgba(61, 48, 40, 0.16);
   }
 
@@ -524,9 +566,7 @@
 
   .empty-state-emblem::before {
     border-color: rgba(61, 48, 40, 0.2);
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent 64%),
-      rgba(241, 235, 223, 0.26);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent 64%), rgba(241, 235, 223, 0.26);
   }
 
   .empty-state-emblem::after {
@@ -613,9 +653,7 @@
   }
 
   .martial-art-card {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.3), transparent 52%),
-      rgba(241, 235, 223, 0.62);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), transparent 52%), rgba(241, 235, 223, 0.62);
     box-shadow:
       0 10px 24px rgba(61, 48, 40, 0.08),
       inset 0 0 0 1px rgba(255, 255, 255, 0.18);
@@ -701,9 +739,7 @@
   }
 
   .event-card-active {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent 50%),
-      rgba(250, 246, 238, 0.58);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent 50%), rgba(250, 246, 238, 0.58);
     border-color: rgba(181, 90, 30, 0.24);
     box-shadow: 0 10px 24px rgba(61, 48, 40, 0.07);
 
@@ -807,8 +843,7 @@
 
   .map-sidebar {
     background:
-      linear-gradient(180deg, rgba(139, 26, 26, 0.08), rgba(255, 255, 255, 0) 160px),
-      rgba(241, 235, 223, 0.68);
+      linear-gradient(180deg, rgba(139, 26, 26, 0.08), rgba(255, 255, 255, 0) 160px), rgba(241, 235, 223, 0.68);
     border-right-color: rgba(61, 48, 40, 0.16);
     box-shadow: 12px 0 24px rgba(61, 48, 40, 0.06);
 
@@ -918,9 +953,7 @@
   .character-network-chip,
   .character-biography,
   .character-realm-container {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 64%),
-      rgba(241, 235, 223, 0.76);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 64%), rgba(241, 235, 223, 0.76);
     border-color: rgba(61, 48, 40, 0.2);
     box-shadow:
       0 8px 22px rgba(61, 48, 40, 0.08),
@@ -962,8 +995,7 @@
   .character-realm-container {
     background:
       radial-gradient(circle at top right, var(--realm-color-muted) 0%, transparent 42%),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.3), transparent 52%),
-      rgba(241, 235, 223, 0.78);
+      linear-gradient(135deg, rgba(255, 255, 255, 0.3), transparent 52%), rgba(241, 235, 223, 0.78);
     border-color: var(--realm-color-soft);
     box-shadow:
       0 10px 26px rgba(61, 48, 40, 0.1),
@@ -1025,16 +1057,12 @@
   }
 
   .variables-toolbar {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 64%),
-      rgba(241, 235, 223, 0.8);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 64%), rgba(241, 235, 223, 0.8);
     border-color: rgba(61, 48, 40, 0.2);
   }
 
   .variables-tree {
-    background:
-      linear-gradient(90deg, rgba(139, 26, 26, 0.04), transparent 36%),
-      rgba(250, 246, 238, 0.62);
+    background: linear-gradient(90deg, rgba(139, 26, 26, 0.04), transparent 36%), rgba(250, 246, 238, 0.62);
     border-color: rgba(61, 48, 40, 0.18);
   }
 
@@ -1163,9 +1191,7 @@
 
   .variables-result-item.selected,
   .variables-character-item.active {
-    background:
-      linear-gradient(90deg, rgba(139, 26, 26, 0.08), transparent 62%),
-      rgba(255, 255, 255, 0.62);
+    background: linear-gradient(90deg, rgba(139, 26, 26, 0.08), transparent 62%), rgba(255, 255, 255, 0.62);
     border-color: rgba(139, 26, 26, 0.26);
   }
 
@@ -1178,9 +1204,7 @@
   }
 
   .variable-node.selected > .variable-node-row {
-    background:
-      linear-gradient(90deg, rgba(139, 26, 26, 0.08), transparent 62%),
-      rgba(255, 255, 255, 0.58);
+    background: linear-gradient(90deg, rgba(139, 26, 26, 0.08), transparent 62%), rgba(255, 255, 255, 0.58);
   }
 
   .variable-search-mark {
@@ -1236,6 +1260,173 @@
     border-top-color: rgba(61, 48, 40, 0.14);
   }
 
+  .social-panel {
+    color: #1a1410;
+  }
+
+  .social-panel-head,
+  .social-section,
+  .social-detail-hero,
+  .social-detail-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 56%), rgba(241, 235, 223, 0.68);
+    border-color: rgba(61, 48, 40, 0.2);
+    box-shadow:
+      0 10px 24px rgba(61, 48, 40, 0.08),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  }
+
+  .social-panel-head {
+    border: 14px solid transparent;
+    border-image-source: var(--wuxia-ink-panel-bar-md);
+    border-image-slice: 22 fill;
+    border-image-repeat: stretch;
+    padding: 0.35rem 0.55rem;
+
+    &::before {
+      border-left-color: rgba(139, 26, 26, 0.64);
+    }
+  }
+
+  .social-panel-kicker,
+  .social-section-desc,
+  .social-member-subtitle,
+  .social-member-relation,
+  .social-hero-meta span,
+  .social-tag.muted,
+  .social-detail-empty,
+  .social-section-empty,
+  .social-trait-chip small {
+    color: #7a6e62;
+  }
+
+  .social-panel-title,
+  .social-section-title,
+  .social-member-name,
+  .social-hero-name,
+  .social-detail-text,
+  .social-detail-list li {
+    color: #1a1410;
+    text-shadow: none;
+  }
+
+  .social-summary-strip span,
+  .social-member-card,
+  .social-tag.muted,
+  .social-detail-empty,
+  .social-section-empty,
+  .social-trait-chip,
+  .social-hero-meta span,
+  .social-member-relation {
+    background: rgba(250, 246, 238, 0.56);
+    border-color: rgba(61, 48, 40, 0.18);
+  }
+
+  .social-summary-strip b,
+  .social-detail-card-head,
+  .social-tag,
+  .social-trait-chip span {
+    color: #8b1a1a;
+  }
+
+  .social-section-count,
+  .social-total-seal,
+  .social-relation-seal {
+    background: rgba(139, 26, 26, 0.78);
+    border-color: rgba(92, 26, 20, 0.7);
+    color: #fff7ed;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+      0 6px 14px rgba(61, 48, 40, 0.14);
+  }
+
+  .social-relation-seal.known,
+  .social-relation-seal.strong {
+    background: rgba(139, 26, 26, 0.78);
+    border-color: rgba(92, 26, 20, 0.7);
+  }
+
+  .social-relation-seal.faint,
+  .social-relation-seal.local {
+    background: rgba(90, 80, 70, 0.66);
+    border-color: rgba(61, 48, 40, 0.28);
+  }
+
+  .social-section-header {
+    background: rgba(255, 255, 255, 0.2);
+    border-bottom-color: rgba(61, 48, 40, 0.12);
+
+    &:hover {
+      background: rgba(139, 26, 26, 0.08);
+    }
+  }
+
+  .social-section {
+    border: 10px solid transparent;
+    border-image-source: var(--wuxia-ink-panel-rect-lg);
+    border-image-slice: 36 fill;
+    border-image-repeat: stretch;
+  }
+
+  .social-member-card {
+    color: #1a1410;
+
+    &:hover,
+    &.is-selected {
+      border-color: rgba(139, 26, 26, 0.34);
+      background: linear-gradient(135deg, rgba(139, 26, 26, 0.1), transparent 58%), rgba(250, 246, 238, 0.72);
+      box-shadow: 0 8px 18px rgba(61, 48, 40, 0.1);
+    }
+  }
+
+  .social-relation-track,
+  .social-relation-fill {
+    box-shadow: none;
+  }
+
+  .social-relation-track {
+    background: rgba(61, 48, 40, 0.14);
+  }
+
+  .social-relation-fill {
+    background: linear-gradient(90deg, rgba(139, 26, 26, 0.8), rgba(184, 134, 11, 0.78));
+  }
+
+  .social-detail-hero,
+  .social-detail-card {
+    border: 16px solid transparent;
+    border-image-source: var(--wuxia-ink-panel-rect-lg);
+    border-image-slice: 36 fill;
+    border-image-repeat: stretch;
+  }
+
+  .social-detail-hero {
+    background: radial-gradient(circle at 12% 20%, rgba(139, 26, 26, 0.12), transparent 30%), rgba(241, 235, 223, 0.72);
+  }
+
+  .social-portrait {
+    border: 0;
+    background: var(--wuxia-ink-circle-frame) center / 100% 100% no-repeat;
+    color: #8b1a1a;
+    box-shadow: none;
+  }
+
+  .social-hero-label,
+  .social-tag {
+    background: rgba(139, 26, 26, 0.08);
+    border-color: rgba(139, 26, 26, 0.24);
+    color: #8b1a1a;
+  }
+
+  .social-detail-list li::before {
+    background: #8b1a1a;
+  }
+
+  .social-detail-back {
+    background: rgba(250, 246, 238, 0.78);
+    border-color: rgba(61, 48, 40, 0.2);
+    color: #3d3028;
+  }
+
   .variable-change-bar {
     background: rgba(241, 235, 223, 0.66);
     border-color: rgba(61, 48, 40, 0.2);
@@ -1280,6 +1471,22 @@
 
     .chat-input-container {
       border-width: 10px;
+    }
+
+    .social-panel-head,
+    .social-section,
+    .social-detail-hero,
+    .social-detail-card {
+      border-width: 8px;
+    }
+
+    .social-panel-head {
+      padding: 0.5rem;
+    }
+
+    .social-detail-hero,
+    .social-detail-card {
+      padding: 0.75rem;
     }
   }
 }
