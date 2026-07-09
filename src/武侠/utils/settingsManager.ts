@@ -194,6 +194,7 @@ export interface DisplaySettings {
   backgroundBlur: number; // 背景模糊度 (px)
   chromeOpacity: number; // 周边栏目不透明度 (0-1)
   modalOpacity: number; // 弹窗不透明度 (0-1)
+  themeAppearanceByTheme: ThemeAppearanceByTheme; // 按主题分别保存的外观配置
 
   // 正则替换规则
   localRegexRules: RegexRule[];
@@ -213,16 +214,27 @@ export interface ThemeAppearanceDefaults {
   modalOpacity: number;
 }
 
+export interface ThemeAppearanceSettings extends ThemeAppearanceDefaults {
+  backgroundImage: string | null;
+}
+
+export type ThemeAppearanceByTheme = Record<WuxiaUiTheme, ThemeAppearanceSettings>;
+
+type StoredThemeAppearanceByTheme = Partial<Record<WuxiaUiTheme, Partial<ThemeAppearanceSettings>>>;
+
 type StoredSummarySettings = Partial<SummarySettings> & {
   apiMode?: SummaryApiMode;
   apiConfig?: Partial<SummaryApiConfig>;
 };
 
-type StoredDisplaySettings = Partial<Omit<DisplaySettings, 'localRegexRules' | 'presetRegexRulesByPreset' | 'summarySettings'>> & {
+type StoredDisplaySettings = Partial<
+  Omit<DisplaySettings, 'localRegexRules' | 'presetRegexRulesByPreset' | 'summarySettings' | 'themeAppearanceByTheme'>
+> & {
   regexRules?: Partial<RegexRule>[];
   localRegexRules?: Partial<RegexRule>[];
   presetRegexRulesByPreset?: Record<string, Partial<RegexRule>[]>;
   summarySettings?: StoredSummarySettings;
+  themeAppearanceByTheme?: StoredThemeAppearanceByTheme;
 };
 
 // =========================================
@@ -287,6 +299,18 @@ export const UI_THEME_LABELS: Record<WuxiaUiTheme, string> = {
   'ink-wash': '水墨',
 };
 
+export const THEME_APPEARANCE_SETTING_KEYS = [
+  'fontColor',
+  'backgroundColor',
+  'backgroundOpacity',
+  'backgroundImage',
+  'backgroundBlur',
+  'chromeOpacity',
+  'modalOpacity',
+] as const;
+
+export type ThemeAppearanceSettingKey = (typeof THEME_APPEARANCE_SETTING_KEYS)[number];
+
 export const THEME_APPEARANCE_DEFAULTS: Record<WuxiaUiTheme, ThemeAppearanceDefaults> = {
   'dark-gold': {
     fontColor: '#e7e5e4',
@@ -305,6 +329,28 @@ export const THEME_APPEARANCE_DEFAULTS: Record<WuxiaUiTheme, ThemeAppearanceDefa
     modalOpacity: 0.58,
   },
 };
+
+function createThemeAppearanceSettings(
+  theme: WuxiaUiTheme,
+  overrides: Partial<ThemeAppearanceSettings> = {},
+): ThemeAppearanceSettings {
+  return {
+    ...THEME_APPEARANCE_DEFAULTS[theme],
+    backgroundImage: null,
+    ...overrides,
+  };
+}
+
+function cloneThemeAppearanceSettings(appearance: ThemeAppearanceSettings): ThemeAppearanceSettings {
+  return { ...appearance };
+}
+
+export function createDefaultThemeAppearanceByTheme(): ThemeAppearanceByTheme {
+  return {
+    'dark-gold': createThemeAppearanceSettings('dark-gold'),
+    'ink-wash': createThemeAppearanceSettings('ink-wash'),
+  };
+}
 
 export const WUXIA_UI_THEMES: { value: WuxiaUiTheme; label: string; description: string }[] = [
   {
@@ -375,7 +421,8 @@ export function createDefaultRegexSettings(): Pick<DisplaySettings, 'localRegexR
 }
 
 export function createDefaultDisplaySettings(): DisplaySettings {
-  const defaultAppearance = THEME_APPEARANCE_DEFAULTS[DEFAULT_UI_THEME];
+  const themeAppearanceByTheme = createDefaultThemeAppearanceByTheme();
+  const defaultAppearance = themeAppearanceByTheme[DEFAULT_UI_THEME];
   return {
     uiTheme: DEFAULT_UI_THEME,
 
@@ -389,6 +436,7 @@ export function createDefaultDisplaySettings(): DisplaySettings {
     backgroundBlur: defaultAppearance.backgroundBlur,
     chromeOpacity: defaultAppearance.chromeOpacity,
     modalOpacity: defaultAppearance.modalOpacity,
+    themeAppearanceByTheme,
 
     ...createDefaultRegexSettings(),
 
@@ -762,6 +810,129 @@ function normalizeUiTheme(value: unknown): WuxiaUiTheme {
 
 export function getThemeAppearanceDefaults(theme: WuxiaUiTheme): ThemeAppearanceDefaults {
   return THEME_APPEARANCE_DEFAULTS[theme];
+}
+
+function normalizeThemeAppearanceSettings(
+  theme: WuxiaUiTheme,
+  appearance: Partial<ThemeAppearanceSettings> | undefined,
+  fallback: ThemeAppearanceSettings,
+): ThemeAppearanceSettings {
+  return createThemeAppearanceSettings(theme, {
+    fontColor: getStringSetting(appearance?.fontColor, fallback.fontColor),
+    backgroundColor: getStringSetting(appearance?.backgroundColor, fallback.backgroundColor),
+    backgroundOpacity: getNumberSetting(appearance?.backgroundOpacity, fallback.backgroundOpacity),
+    backgroundImage: getNullableStringSetting(appearance?.backgroundImage, fallback.backgroundImage),
+    backgroundBlur: getNumberSetting(appearance?.backgroundBlur, fallback.backgroundBlur),
+    chromeOpacity: getNumberSetting(appearance?.chromeOpacity, fallback.chromeOpacity),
+    modalOpacity: getNumberSetting(appearance?.modalOpacity, fallback.modalOpacity),
+  });
+}
+
+function cloneThemeAppearanceByTheme(themeAppearanceByTheme: ThemeAppearanceByTheme): ThemeAppearanceByTheme {
+  return {
+    'dark-gold': cloneThemeAppearanceSettings(themeAppearanceByTheme['dark-gold']),
+    'ink-wash': cloneThemeAppearanceSettings(themeAppearanceByTheme['ink-wash']),
+  };
+}
+
+function buildLegacyThemeAppearance(
+  parsed: StoredDisplaySettings,
+  theme: WuxiaUiTheme,
+  defaults: ThemeAppearanceByTheme,
+): ThemeAppearanceSettings {
+  const fallback = defaults[theme];
+  return createThemeAppearanceSettings(theme, {
+    fontColor: getStringSetting(parsed.fontColor, fallback.fontColor),
+    backgroundColor: getStringSetting(parsed.backgroundColor, fallback.backgroundColor),
+    backgroundOpacity: getNumberSetting(parsed.backgroundOpacity, fallback.backgroundOpacity),
+    backgroundImage: getNullableStringSetting(parsed.backgroundImage, fallback.backgroundImage),
+    backgroundBlur: getNumberSetting(parsed.backgroundBlur, fallback.backgroundBlur),
+    chromeOpacity: getNumberSetting(parsed.chromeOpacity, fallback.chromeOpacity),
+    modalOpacity: getNumberSetting(parsed.modalOpacity, fallback.modalOpacity),
+  });
+}
+
+function normalizeThemeAppearanceByTheme(
+  storedThemeAppearanceByTheme: StoredThemeAppearanceByTheme | undefined,
+  parsed: StoredDisplaySettings,
+  activeTheme: WuxiaUiTheme,
+): ThemeAppearanceByTheme {
+  const defaultThemeAppearanceByTheme = createDefaultThemeAppearanceByTheme();
+  const legacyActiveAppearance = buildLegacyThemeAppearance(parsed, activeTheme, defaultThemeAppearanceByTheme);
+
+  return {
+    'dark-gold': normalizeThemeAppearanceSettings(
+      'dark-gold',
+      storedThemeAppearanceByTheme?.['dark-gold'],
+      activeTheme === 'dark-gold' ? legacyActiveAppearance : defaultThemeAppearanceByTheme['dark-gold'],
+    ),
+    'ink-wash': normalizeThemeAppearanceSettings(
+      'ink-wash',
+      storedThemeAppearanceByTheme?.['ink-wash'],
+      activeTheme === 'ink-wash' ? legacyActiveAppearance : defaultThemeAppearanceByTheme['ink-wash'],
+    ),
+  };
+}
+
+function getActiveThemeAppearance(settings: DisplaySettings): ThemeAppearanceSettings {
+  return {
+    fontColor: settings.fontColor,
+    backgroundColor: settings.backgroundColor,
+    backgroundOpacity: settings.backgroundOpacity,
+    backgroundImage: settings.backgroundImage,
+    backgroundBlur: settings.backgroundBlur,
+    chromeOpacity: settings.chromeOpacity,
+    modalOpacity: settings.modalOpacity,
+  };
+}
+
+export function syncThemeAppearanceSettings(settings: DisplaySettings): DisplaySettings {
+  const nextThemeAppearanceByTheme = cloneThemeAppearanceByTheme(settings.themeAppearanceByTheme);
+  nextThemeAppearanceByTheme[settings.uiTheme] = getActiveThemeAppearance(settings);
+
+  return {
+    ...settings,
+    themeAppearanceByTheme: nextThemeAppearanceByTheme,
+  };
+}
+
+export function updateThemeAppearanceSetting<K extends ThemeAppearanceSettingKey>(
+  settings: DisplaySettings,
+  key: K,
+  value: ThemeAppearanceSettings[K],
+): DisplaySettings {
+  const nextThemeAppearanceByTheme = cloneThemeAppearanceByTheme(settings.themeAppearanceByTheme);
+  nextThemeAppearanceByTheme[settings.uiTheme] = {
+    ...nextThemeAppearanceByTheme[settings.uiTheme],
+    [key]: value,
+  };
+
+  return {
+    ...settings,
+    [key]: value,
+    themeAppearanceByTheme: nextThemeAppearanceByTheme,
+  };
+}
+
+export function switchDisplayTheme(settings: DisplaySettings, nextTheme: WuxiaUiTheme): DisplaySettings {
+  if (nextTheme === settings.uiTheme) {
+    return settings;
+  }
+
+  const syncedSettings = syncThemeAppearanceSettings(settings);
+  const nextAppearance = syncedSettings.themeAppearanceByTheme[nextTheme];
+
+  return {
+    ...syncedSettings,
+    uiTheme: nextTheme,
+    fontColor: nextAppearance.fontColor,
+    backgroundColor: nextAppearance.backgroundColor,
+    backgroundOpacity: nextAppearance.backgroundOpacity,
+    backgroundImage: nextAppearance.backgroundImage,
+    backgroundBlur: nextAppearance.backgroundBlur,
+    chromeOpacity: nextAppearance.chromeOpacity,
+    modalOpacity: nextAppearance.modalOpacity,
+  };
 }
 
 function getImportableTavernRegexes(regexes: TavernRegex[], originScope: RegexRuleOriginScope): RegexRule[] {
