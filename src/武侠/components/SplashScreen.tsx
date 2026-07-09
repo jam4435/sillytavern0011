@@ -59,7 +59,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ hasSavedGame, onNewGame, on
 
       {/* 底部信息 */}
       <div className="splash-footer">
-        <p className="version-text">金庸群侠传侠传 v1.0</p>
+        <p className="version-text">金庸群侠传 v1.0</p>
         <p className="credit-text">基于酒馆助手构建</p>
       </div>
     </div>
