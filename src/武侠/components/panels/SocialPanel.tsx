@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { NPC } from '../../types';
+import AvatarPreviewModal from '../AvatarPreviewModal';
+import { ActivePanel, type NPC } from '../../types';
 import { toCustomAvatarRef, toPresetAvatarRef } from '../../utils/avatarCatalog';
 import {
   clearAvatarSelection,
@@ -113,6 +114,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [avatarPickerId, setAvatarPickerId] = useState<string | null>(null);
   const [avatarVersion, setAvatarVersion] = useState(0);
+  const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState(false);
   const avatarUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [openSections, setOpenSections] = useState<Record<SocialSectionKey, boolean>>({
     acquaintance: true,
@@ -171,7 +173,13 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
     setSelectedId(npc.id);
     setDetailOpen(true);
     setAvatarPickerId(null);
+    setIsAvatarPreviewOpen(false);
   };
+
+  useEffect(() => {
+    setAvatarPickerId(null);
+    setIsAvatarPreviewOpen(false);
+  }, [selectedNpc?.id]);
 
   const toggleSection = (section: SocialSectionKey) => {
     setOpenSections(current => ({ ...current, [section]: !current[section] }));
@@ -333,9 +341,8 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                 <button
                   type="button"
                   className="social-portrait"
-                  onClick={() => setAvatarPickerId(current => (current === selectedNpc.id ? null : selectedNpc.id))}
-                  aria-label={`设置${selectedNpc.name || '人物'}头像`}
-                  aria-expanded={avatarPickerId === selectedNpc.id}
+                  onClick={() => selectedAvatarSource?.src && setIsAvatarPreviewOpen(true)}
+                  aria-label={`查看${selectedNpc.name || '人物'}头像`}
                 >
                   {selectedAvatarSource?.src ? (
                     <img
@@ -356,6 +363,18 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                     {selectedNpc.category === 'acquaintance' && (
                       <span>关系值 {clampRelationship(selectedNpc.relationship)}</span>
                     )}
+                  </div>
+                  <div className="social-hero-actions">
+                    <button
+                      type="button"
+                      className={`social-hero-action ${avatarPickerId === selectedNpc.id ? 'is-active' : ''}`}
+                      onClick={() => setAvatarPickerId(current => (current === selectedNpc.id ? null : selectedNpc.id))}
+                      aria-label={`设置${selectedNpc.name || '人物'}头像`}
+                      aria-expanded={avatarPickerId === selectedNpc.id}
+                    >
+                      <Icons.Plus size={14} />
+                      <span>{avatarPickerId === selectedNpc.id ? '收起头像' : '换头像'}</span>
+                    </button>
                   </div>
                 </div>
                 <span className={`social-relation-seal social-hero-seal ${selectedRelation.modifier}`}>
@@ -462,6 +481,15 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
           )}
         </div>
       </div>
+      <AvatarPreviewModal
+        isOpen={isAvatarPreviewOpen}
+        onClose={() => setIsAvatarPreviewOpen(false)}
+        title={`${selectedNpc?.name || '人物'}头像`}
+        subtitle={selectedAvatarSource?.label || selectedNpc?.name}
+        src={selectedAvatarSource?.src || null}
+        type={ActivePanel.SOCIAL}
+        objectPosition={selectedAvatarSource?.objectPosition}
+      />
     </div>
   );
 };

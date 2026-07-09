@@ -560,6 +560,17 @@
     background: transparent;
   }
 
+  .avatar-preview-stage {
+    border-color: rgba(61, 48, 40, 0.12);
+    background:
+      radial-gradient(circle at 50% 50%, rgba(139, 26, 26, 0.06), transparent 62%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(222, 211, 194, 0.32));
+  }
+
+  .avatar-preview-caption {
+    color: rgba(61, 48, 40, 0.72);
+  }
+
   .empty-state {
     color: rgba(90, 80, 70, 0.88);
   }
@@ -1411,7 +1422,8 @@
   }
 
   .social-hero-label,
-  .social-tag {
+  .social-tag,
+  .social-hero-action {
     background: rgba(139, 26, 26, 0.08);
     border-color: rgba(139, 26, 26, 0.24);
     color: #8b1a1a;

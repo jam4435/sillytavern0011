@@ -1,5 +1,6 @@
-import React, { CSSProperties, useCallback, useMemo } from 'react';
-import { CharacterProfile, WorldTime } from '../../types';
+import React, { CSSProperties, useCallback, useMemo, useState } from 'react';
+import AvatarPreviewModal from '../AvatarPreviewModal';
+import { ActivePanel, CharacterProfile, WorldTime } from '../../types';
 import { createAvatarEntityKey, resolveAvatarSource } from '../../utils/avatarStorage';
 import { gameLogger } from '../../utils/logger';
 import {
@@ -71,6 +72,7 @@ interface CharacterPanelProps {
 }
 
 export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime, onBreakthrough }) => {
+  const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState(false);
   // 计算年龄（如果有世界时间和出生年份）
   const age = worldTime && stats.birthYear ? worldTime.year - stats.birthYear : null;
 
@@ -139,27 +141,41 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
   }, [canBreakthrough, currentRealm, nextRealm, breakthroughCost, cultivation, onBreakthrough, breakthroughCheck.reason]);
 
   return (
+    <>
     <div className="char-layout">
       {/* Left Column: Core Identity & Basic Stats */}
       <div className="char-left">
-        <div className="portrait-container">
-            {avatarSource.src ? (
+        {avatarSource.src ? (
+          <button
+            type="button"
+            className="portrait-container portrait-container--button"
+            onClick={() => setIsAvatarPreviewOpen(true)}
+            aria-label={`查看${stats.name}头像`}
+          >
               <img
                   src={avatarSource.src}
                   alt={`${stats.name}头像`}
                   className="portrait-img"
                   style={avatarSource.objectPosition ? { objectPosition: avatarSource.objectPosition } : undefined}
               />
-            ) : (
-              <div className="portrait-fallback">{avatarSource.fallbackInitial}</div>
-            )}
+              <div className="portrait-text-overlay">
+                <h3 className="char-name-display">{stats.name}</h3>
+                {identityEntries.map(([id]) => (
+                    <span key={id} className="char-title-display">{id}</span>
+                ))}
+              </div>
+          </button>
+        ) : (
+          <div className="portrait-container">
+            <div className="portrait-fallback">{avatarSource.fallbackInitial}</div>
             <div className="portrait-text-overlay">
                 <h3 className="char-name-display">{stats.name}</h3>
                 {identityEntries.map(([id]) => (
                     <span key={id} className="char-title-display">{id}</span>
                 ))}
             </div>
-        </div>
+          </div>
+        )}
 
         <div className="character-side-stack">
             {/* Identities Detailed View */}
@@ -301,5 +317,15 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
 
       </div>
     </div>
+    <AvatarPreviewModal
+      isOpen={isAvatarPreviewOpen}
+      onClose={() => setIsAvatarPreviewOpen(false)}
+      title={`${stats.name}头像`}
+      subtitle={avatarSource.label}
+      src={avatarSource.src}
+      type={ActivePanel.CHARACTER}
+      objectPosition={avatarSource.objectPosition}
+    />
+    </>
   );
 };

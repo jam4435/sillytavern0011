@@ -51,6 +51,14 @@ describe('SocialPanel avatar picker', () => {
     );
   });
 
+  it('点击头像可打开大图预览', () => {
+    render(<SocialPanel npcs={[createNpc()]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '查看黄蓉头像' }));
+
+    expect(screen.getByRole('heading', { name: '黄蓉头像' })).toBeInTheDocument();
+  });
+
   it('上传自定义头像后本地覆盖优先', async () => {
     render(<SocialPanel npcs={[createNpc()]} />);
     fireEvent.click(screen.getByRole('button', { name: '设置黄蓉头像' }));
