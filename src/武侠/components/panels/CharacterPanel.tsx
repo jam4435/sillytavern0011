@@ -148,6 +148,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ stats, worldTime
                   src={avatarSource.src}
                   alt={`${stats.name}头像`}
                   className="portrait-img"
+                  style={avatarSource.objectPosition ? { objectPosition: avatarSource.objectPosition } : undefined}
               />
             ) : (
               <div className="portrait-fallback">{avatarSource.fallbackInitial}</div>

@@ -38,6 +38,7 @@ export interface ResolvedAvatarSource {
   label: string;
   source: 'custom' | 'preset' | 'matched' | 'gender-default' | 'initial';
   fallbackInitial: string;
+  objectPosition?: string;
 }
 
 function getCurrentChatId(): string {
@@ -216,6 +217,7 @@ export function resolveAvatarSource(input: AvatarResolveInput): ResolvedAvatarSo
         label: presetAvatar.label,
         source,
         fallbackInitial,
+        objectPosition: presetAvatar.objectPosition,
       };
     }
 
@@ -250,6 +252,7 @@ export function resolveAvatarSource(input: AvatarResolveInput): ResolvedAvatarSo
       label: matchedAvatar.label,
       source: 'matched',
       fallbackInitial,
+      objectPosition: matchedAvatar.objectPosition,
     };
   }
 
@@ -260,6 +263,7 @@ export function resolveAvatarSource(input: AvatarResolveInput): ResolvedAvatarSo
       label: genderDefault.label,
       source: 'gender-default',
       fallbackInitial,
+      objectPosition: genderDefault.objectPosition,
     };
   }
 

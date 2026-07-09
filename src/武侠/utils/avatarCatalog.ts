@@ -68,7 +68,50 @@ export interface AvatarCatalogEntry {
   aliases: string[];
   src: string;
   usage: AvatarUsage;
+  objectPosition?: string;
 }
+
+// Original portrait PNGs often carry large transparent margins.
+// These focal points keep the visible figure centered inside circular crops.
+const AVATAR_OBJECT_POSITION_BY_ID: Partial<Record<string, string>> = {
+  a_qing_fc2: '66.8% 52.2%',
+  a_zhu_alt: '61.7% 50.6%',
+  a_zhu_fc2: '57.5% 50.0%',
+  a_zi_alt: '31.3% 50.0%',
+  a_zi_fc2: '40.5% 51.8%',
+  danqing_woman: '53.3% 52.4%',
+  duan_yu_alt: '55.1% 56.1%',
+  duan_yu_fc2: '69.3% 52.0%',
+  female_palace_1: '17.8% 50.0%',
+  female_palace_2: '60.0% 50.6%',
+  foreign_girl: '70.8% 50.8%',
+  gongzi_yu_old: '43.4% 55.7%',
+  gongzi_yu: '23.6% 53.0%',
+  guo_jing_fc2: '72.8% 58.7%',
+  guo_xiang_alt: '51.9% 54.3%',
+  guo_xiang_fc2: '30.2% 51.0%',
+  hu_fei_fc2: '47.7% 57.5%',
+  huang_rong_fc2: '70.2% 59.6%',
+  huang_rong_fc3: '48.7% 54.9%',
+  leng_ting_portrait: '49.0% 50.0%',
+  leng_xuan_portrait: '49.2% 50.0%',
+  li_mochou_alt: '57.5% 50.4%',
+  li_mochou_fc2: '71.0% 56.5%',
+  lin_pingzhi_fc2: '41.5% 50.0%',
+  linghu_chong_alt: '46.3% 52.0%',
+  linghu_chong_fc2: '36.6% 55.7%',
+  male_kui: '69.7% 50.0%',
+  male_palace_1: '65.2% 50.0%',
+  male_palace_2: '34.5% 50.2%',
+  mu_wanqing_fc2: '61.3% 58.9%',
+  pink_girl: '37.4% 55.3%',
+  purple_girl: '72.4% 53.9%',
+  white_snake_portrait: '35.8% 50.0%',
+  xiao_longnv_alt: '51.4% 51.4%',
+  xiao_longnv_fc2: '34.4% 57.3%',
+  young_yingzheng_alt: '69.5% 50.8%',
+  young_yingzheng: '67.9% 50.4%',
+};
 
 function createPlayerAvatar(
   id: string,
@@ -83,6 +126,7 @@ function createPlayerAvatar(
     aliases: [],
     src,
     usage: 'player',
+    objectPosition: AVATAR_OBJECT_POSITION_BY_ID[id],
   };
 }
 
@@ -100,6 +144,7 @@ function createNpcAvatar(
     aliases,
     src,
     usage: 'npc',
+    objectPosition: AVATAR_OBJECT_POSITION_BY_ID[id],
   };
 }
 

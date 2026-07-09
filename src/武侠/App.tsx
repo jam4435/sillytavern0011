@@ -850,7 +850,11 @@ const App: React.FC = () => {
               <div className="avatar-small">
                 <div className="avatar-glow"></div>
                 {playerAvatarSource.src ? (
-                  <img src={playerAvatarSource.src} alt={`${gameState.stats.name}头像`} />
+                  <img
+                    src={playerAvatarSource.src}
+                    alt={`${gameState.stats.name}头像`}
+                    style={playerAvatarSource.objectPosition ? { objectPosition: playerAvatarSource.objectPosition } : undefined}
+                  />
                 ) : (
                   <span>{playerAvatarSource.fallbackInitial}</span>
                 )}

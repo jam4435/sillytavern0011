@@ -64,6 +64,7 @@ describe('avatarStorage', () => {
 
     expect(source.label).toBe('黄蓉二');
     expect(source.source).toBe('preset');
+    expect(source.objectPosition).toBe('48.7% 54.9%');
   });
 
   it('本地自定义头像优先，并可清除 selection', () => {

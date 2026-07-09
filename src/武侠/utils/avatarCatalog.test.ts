@@ -27,6 +27,11 @@ describe('avatarCatalog', () => {
   });
 
   it('可从 preset ref 解析头像', () => {
-    expect(getAvatarFromRef(toPresetAvatarRef('guo_jing_fc2'))?.label).toBe('郭靖');
+    expect(getAvatarFromRef(toPresetAvatarRef('guo_jing_fc2'))).toEqual(
+      expect.objectContaining({
+        label: '郭靖',
+        objectPosition: '72.8% 58.7%',
+      }),
+    );
   });
 });

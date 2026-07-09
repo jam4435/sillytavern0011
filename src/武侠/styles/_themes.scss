@@ -332,12 +332,12 @@
   .maintext-html,
   .maintext-line {
     color: var(--content-font-color);
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+    text-shadow: none;
   }
 
   .maintext-line:hover {
-    color: #8b1a1a;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+    color: var(--content-font-color);
+    text-shadow: none;
   }
 
   .game-content-placeholder::before {

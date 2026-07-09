@@ -2420,7 +2420,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     <div className="setup-avatar-panel">
                       <div className="setup-avatar-preview">
                         {selectedAvatarSource.src ? (
-                          <img src={selectedAvatarSource.src} alt="当前头像" />
+                          <img
+                            src={selectedAvatarSource.src}
+                            alt="当前头像"
+                            style={selectedAvatarSource.objectPosition ? { objectPosition: selectedAvatarSource.objectPosition } : undefined}
+                          />
                         ) : (
                           <span>{selectedAvatarSource.fallbackInitial}</span>
                         )}
@@ -2443,7 +2447,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                               onClick={() => handlePresetAvatarSelect(avatar.id)}
                               aria-pressed={isSelected}
                             >
-                              <img src={avatar.src} alt={avatar.label} />
+                              <img
+                                src={avatar.src}
+                                alt={avatar.label}
+                                style={avatar.objectPosition ? { objectPosition: avatar.objectPosition } : undefined}
+                              />
                               <span>{avatar.label}</span>
                             </button>
                           );
@@ -2539,7 +2547,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     <div className="preview-avatar-row">
                       <div className="preview-avatar">
                         {selectedAvatarSource.src ? (
-                          <img src={selectedAvatarSource.src} alt="头像预览" />
+                          <img
+                            src={selectedAvatarSource.src}
+                            alt="头像预览"
+                            style={selectedAvatarSource.objectPosition ? { objectPosition: selectedAvatarSource.objectPosition } : undefined}
+                          />
                         ) : (
                           <span>{selectedAvatarSource.fallbackInitial}</span>
                         )}

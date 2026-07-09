@@ -338,7 +338,11 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                   aria-expanded={avatarPickerId === selectedNpc.id}
                 >
                   {selectedAvatarSource?.src ? (
-                    <img src={selectedAvatarSource.src} alt={`${selectedNpc.name}头像`} />
+                    <img
+                      src={selectedAvatarSource.src}
+                      alt={`${selectedNpc.name}头像`}
+                      style={selectedAvatarSource.objectPosition ? { objectPosition: selectedAvatarSource.objectPosition } : undefined}
+                    />
                   ) : (
                     <span>{selectedAvatarSource?.fallbackInitial || selectedNpc.name.charAt(0) || '侠'}</span>
                   )}
@@ -377,7 +381,11 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                           onClick={() => handleSelectPresetAvatar(selectedNpc, avatar.id)}
                           aria-pressed={isSelected}
                         >
-                          <img src={avatar.src} alt={avatar.label} />
+                          <img
+                            src={avatar.src}
+                            alt={avatar.label}
+                            style={avatar.objectPosition ? { objectPosition: avatar.objectPosition } : undefined}
+                          />
                           <span>{avatar.label}</span>
                         </button>
                       );
