@@ -433,11 +433,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const resolvedSelectedCharacterName =
     selectedCharacterName && roleVariableEntries.some(entry => entry.name === selectedCharacterName)
       ? selectedCharacterName
-      : roleVariableEntries[0]?.name ?? null;
-  const selectedCharacterEntry =
-    resolvedSelectedCharacterName
-      ? roleVariableEntries.find(entry => entry.name === resolvedSelectedCharacterName) ?? null
-      : null;
+      : (roleVariableEntries[0]?.name ?? null);
+  const selectedCharacterEntry = resolvedSelectedCharacterName
+    ? (roleVariableEntries.find(entry => entry.name === resolvedSelectedCharacterName) ?? null)
+    : null;
   const variableBrowserRootPath =
     resolvedActiveVariableScope === '角色数据' && resolvedSelectedCharacterName
       ? [resolvedActiveVariableScope, resolvedSelectedCharacterName]
@@ -447,9 +446,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       ? selectedCharacterEntry.value
       : activeVariableScopeValue;
   const scopeMatchPathKeys =
-    variableSearchMode === 'scope' &&
-    normalizedVariableSearch &&
-    variableBrowserRootValue !== undefined
+    variableSearchMode === 'scope' && normalizedVariableSearch && variableBrowserRootValue !== undefined
       ? collectVariableMatchPathKeys(
           variableBrowserRootValue,
           normalizedVariableSearch,
@@ -542,9 +539,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     const nextScopeKey = nextScopeEntry ? String(nextScopeEntry[0]) : null;
     const nextScopeValue = nextScopeEntry?.[1];
     const nextCharacterEntry =
-      nextScopeKey === '角色数据' && isVariableRecord(nextScopeValue) ? getVisibleEntries(nextScopeValue)[0] : undefined;
-    const nextCharacterName =
-      typeof nextCharacterEntry?.[0] === 'string' ? String(nextCharacterEntry[0]) : null;
+      nextScopeKey === '角色数据' && isVariableRecord(nextScopeValue)
+        ? getVisibleEntries(nextScopeValue)[0]
+        : undefined;
+    const nextCharacterName = typeof nextCharacterEntry?.[0] === 'string' ? String(nextCharacterEntry[0]) : null;
 
     setActiveVariableScope(nextScopeKey);
     setSelectedCharacterName(nextCharacterName);
@@ -560,32 +558,35 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setIsVariableDetailOpen(false);
   }, []);
 
-  const refreshStatData = useCallback((force = false) => {
-    try {
-      if (!force && hasVariableChanges) {
-        const confirmed = window.confirm('重新读取会丢弃当前未保存的变量修改，是否继续？');
-        if (!confirmed) {
-          return;
+  const refreshStatData = useCallback(
+    (force = false) => {
+      try {
+        if (!force && hasVariableChanges) {
+          const confirmed = window.confirm('重新读取会丢弃当前未保存的变量修改，是否继续？');
+          if (!confirmed) {
+            return;
+          }
         }
-      }
 
-      const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
-      const nextStatData = variables.stat_data;
-      if (!isVariableRecord(nextStatData)) {
-        throw new Error('没有可读取的变量对象');
-      }
+        const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+        const nextStatData = variables.stat_data;
+        if (!isVariableRecord(nextStatData)) {
+          throw new Error('没有可读取的变量对象');
+        }
 
-      setVariableBaseStatData(nextStatData);
-      setStatData(nextStatData);
-      setVariableChanges({});
-      setVariableStatus('idle');
-      setVariableStatusText('');
-      resetVariableBrowser(nextStatData);
-    } catch (error) {
-      setVariableStatus('error');
-      setVariableStatusText(`读取失败：${getErrorMessage(error)}`);
-    }
-  }, [hasVariableChanges, resetVariableBrowser]);
+        setVariableBaseStatData(nextStatData);
+        setStatData(nextStatData);
+        setVariableChanges({});
+        setVariableStatus('idle');
+        setVariableStatusText('');
+        resetVariableBrowser(nextStatData);
+      } catch (error) {
+        setVariableStatus('error');
+        setVariableStatusText(`读取失败：${getErrorMessage(error)}`);
+      }
+    },
+    [hasVariableChanges, resetVariableBrowser],
+  );
 
   const handleVariableSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setVariableSearch(event.target.value);
@@ -612,27 +613,30 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setIsVariableDetailOpen(false);
   }, []);
 
-  const handleVariableScopeSelect = useCallback((scopeKey: string) => {
-    setActiveVariableScope(scopeKey);
-    setVariableSearchMode('scope');
-    setExpandedVariablePaths(new Set());
+  const handleVariableScopeSelect = useCallback(
+    (scopeKey: string) => {
+      setActiveVariableScope(scopeKey);
+      setVariableSearchMode('scope');
+      setExpandedVariablePaths(new Set());
 
-    if (!statData) {
-      return;
-    }
+      if (!statData) {
+        return;
+      }
 
-    const scopeValue = statData[scopeKey];
-    if (scopeKey === '角色数据' && isVariableRecord(scopeValue)) {
-      const firstCharacterEntry = getVisibleEntries(scopeValue)[0];
-      const firstCharacterName = typeof firstCharacterEntry?.[0] === 'string' ? String(firstCharacterEntry[0]) : null;
-      setSelectedCharacterName(firstCharacterName);
-      setSelectedVariablePath(firstCharacterName ? [scopeKey, firstCharacterName] : [scopeKey]);
-      return;
-    }
+      const scopeValue = statData[scopeKey];
+      if (scopeKey === '角色数据' && isVariableRecord(scopeValue)) {
+        const firstCharacterEntry = getVisibleEntries(scopeValue)[0];
+        const firstCharacterName = typeof firstCharacterEntry?.[0] === 'string' ? String(firstCharacterEntry[0]) : null;
+        setSelectedCharacterName(firstCharacterName);
+        setSelectedVariablePath(firstCharacterName ? [scopeKey, firstCharacterName] : [scopeKey]);
+        return;
+      }
 
-    setSelectedCharacterName(null);
-    setSelectedVariablePath([scopeKey]);
-  }, [statData]);
+      setSelectedCharacterName(null);
+      setSelectedVariablePath([scopeKey]);
+    },
+    [statData],
+  );
 
   const handleCharacterSelect = useCallback((characterName: string) => {
     setSelectedCharacterName(characterName);
@@ -661,34 +665,37 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
   }, []);
 
-  const handleVariableLeafChange = useCallback((path: VariablePath, nextValue: unknown) => {
-    if (!canEditVariables || !variableBaseStatData) {
-      setVariableStatus('error');
-      setVariableStatusText(variableEditorCapability.reason);
-      return;
-    }
-
-    setStatData(prev => (prev ? setValueAtVariablePath(prev, path, nextValue) : prev));
-    setVariableChanges(previousChanges => {
-      const baseValue = getValueAtVariablePath(variableBaseStatData, path);
-      const pathKey = getVariablePathKey(path);
-      const nextChanges = { ...previousChanges };
-
-      if (areVariableValuesEqual(baseValue, nextValue)) {
-        delete nextChanges[pathKey];
-        return nextChanges;
+  const handleVariableLeafChange = useCallback(
+    (path: VariablePath, nextValue: unknown) => {
+      if (!canEditVariables || !variableBaseStatData) {
+        setVariableStatus('error');
+        setVariableStatusText(variableEditorCapability.reason);
+        return;
       }
 
-      nextChanges[pathKey] = {
-        path,
-        beforeValue: baseValue,
-        nextValue,
-      };
-      return nextChanges;
-    });
-    setVariableStatus('idle');
-    setVariableStatusText('');
-  }, [canEditVariables, variableBaseStatData, variableEditorCapability.reason]);
+      setStatData(prev => (prev ? setValueAtVariablePath(prev, path, nextValue) : prev));
+      setVariableChanges(previousChanges => {
+        const baseValue = getValueAtVariablePath(variableBaseStatData, path);
+        const pathKey = getVariablePathKey(path);
+        const nextChanges = { ...previousChanges };
+
+        if (areVariableValuesEqual(baseValue, nextValue)) {
+          delete nextChanges[pathKey];
+          return nextChanges;
+        }
+
+        nextChanges[pathKey] = {
+          path,
+          beforeValue: baseValue,
+          nextValue,
+        };
+        return nextChanges;
+      });
+      setVariableStatus('idle');
+      setVariableStatusText('');
+    },
+    [canEditVariables, variableBaseStatData, variableEditorCapability.reason],
+  );
 
   const handleDiscardVariableChanges = useCallback(() => {
     if (!variableBaseStatData || !hasVariableChanges) {
@@ -739,13 +746,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     } finally {
       setIsVariableSaving(false);
     }
-  }, [
-    canEditVariables,
-    statData,
-    variableBaseStatData,
-    variableChangeList,
-    variableEditorCapability.reason,
-  ]);
+  }, [canEditVariables, statData, variableBaseStatData, variableChangeList, variableEditorCapability.reason]);
 
   const handleCopyVariablePath = useCallback(async (path: VariablePath) => {
     try {
@@ -1608,7 +1609,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </div>
                 {settings.uiTheme === 'ink-wash' && (
                   <p className="settings-hint">
-                    水墨主题会保留内置山水底图；自定义背景会作为上层叠加，并继续受透明度与模糊设置控制。透明度调到 100% 时会基本盖住底图。
+                    水墨主题会保留内置山水底图；自定义背景会作为上层叠加，并继续受透明度与模糊设置控制。透明度调到 100%
+                    时会基本盖住底图。
                   </p>
                 )}
               </SettingsCollapsibleBlock>
@@ -2372,7 +2374,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="variables-toolbar-main">
                 <div className="variables-field variables-search-field">
                   <label className="variables-field-label">
-                    {variableSearchMode === 'global' ? '全局搜索' : resolvedActiveVariableScope === '角色数据' ? '人物内部搜索' : '分区搜索'}
+                    {variableSearchMode === 'global'
+                      ? '全局搜索'
+                      : resolvedActiveVariableScope === '角色数据'
+                        ? '人物内部搜索'
+                        : '分区搜索'}
                   </label>
                   <div className="variables-search-box">
                     <Icons.Search size={16} />
@@ -2593,7 +2599,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
             {(hasVariableChanges || !canEditVariables) && (
               <div className="variables-editor-meta">
-                {hasVariableChanges && <span className="dirty">{formatVariableConflictStatus(variableChangeList)}</span>}
+                {hasVariableChanges && (
+                  <span className="dirty">{formatVariableConflictStatus(variableChangeList)}</span>
+                )}
                 {!canEditVariables && <span>{variableEditorCapability.reason}</span>}
               </div>
             )}
@@ -3190,10 +3198,20 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, ca
         <button type="button" className="variable-null-btn" disabled={!canEdit} onClick={() => onValueChange(path, 0)}>
           设为 0
         </button>
-        <button type="button" className="variable-null-btn" disabled={!canEdit} onClick={() => onValueChange(path, true)}>
+        <button
+          type="button"
+          className="variable-null-btn"
+          disabled={!canEdit}
+          onClick={() => onValueChange(path, true)}
+        >
           设为 true
         </button>
-        <button type="button" className="variable-null-btn" disabled={!canEdit} onClick={() => onValueChange(path, false)}>
+        <button
+          type="button"
+          className="variable-null-btn"
+          disabled={!canEdit}
+          onClick={() => onValueChange(path, false)}
+        >
           设为 false
         </button>
       </div>

@@ -60,9 +60,7 @@ export interface SummaryApiProfile {
 }
 
 /** 额外模型 API 选择 */
-export type SummaryApiSelection =
-  | { type: 'preset' }
-  | { type: 'profile'; profileId: string };
+export type SummaryApiSelection = { type: 'preset' } | { type: 'profile'; profileId: string };
 
 /** 正文变量更新模式 */
 export type SummaryVariableUpdateMode = 'inline' | 'extra';
@@ -202,7 +200,6 @@ export interface DisplaySettings {
 
   // 自动总结设置
   summarySettings: SummarySettings;
-
 }
 
 export interface ThemeAppearanceDefaults {
@@ -387,9 +384,7 @@ function cloneSummaryApiConfig(apiConfig: SummaryApiConfig): SummaryApiConfig {
 }
 
 function cloneSummaryApiSelection(selection: SummaryApiSelection): SummaryApiSelection {
-  return selection.type === 'profile'
-    ? { type: 'profile', profileId: selection.profileId }
-    : { type: 'preset' };
+  return selection.type === 'profile' ? { type: 'profile', profileId: selection.profileId } : { type: 'preset' };
 }
 
 function cloneSummaryApiProfile(profile: SummaryApiProfile): SummaryApiProfile {
@@ -589,27 +584,30 @@ function normalizePresetRegexRulesByPreset(
   }
 
   const extractedGlobalRules: RegexRule[] = [];
-  const nextPresetRegexRulesByPreset = Object.entries(presetRegexRulesByPreset).reduce<RegexRulesByPreset>((result, [presetName, rules]) => {
-    const normalizedPresetName = presetName.trim();
-    if (!normalizedPresetName || !Array.isArray(rules)) {
+  const nextPresetRegexRulesByPreset = Object.entries(presetRegexRulesByPreset).reduce<RegexRulesByPreset>(
+    (result, [presetName, rules]) => {
+      const normalizedPresetName = presetName.trim();
+      if (!normalizedPresetName || !Array.isArray(rules)) {
+        return result;
+      }
+
+      const nextRules = rules
+        .map(rule => normalizeRegexRule(rule, normalizeOriginScope(rule?.originScope, 'preset')))
+        .filter(rule => {
+          if (rule.originScope === 'global') {
+            extractedGlobalRules.push(rule);
+            return false;
+          }
+          return true;
+        });
+
+      if (nextRules.length > 0) {
+        result[normalizedPresetName] = nextRules;
+      }
       return result;
-    }
-
-    const nextRules = rules
-      .map(rule => normalizeRegexRule(rule, normalizeOriginScope(rule?.originScope, 'preset')))
-      .filter(rule => {
-        if (rule.originScope === 'global') {
-          extractedGlobalRules.push(rule);
-          return false;
-        }
-        return true;
-      });
-
-    if (nextRules.length > 0) {
-      result[normalizedPresetName] = nextRules;
-    }
-    return result;
-  }, {});
+    },
+    {},
+  );
 
   return {
     presetRegexRulesByPreset: nextPresetRegexRulesByPreset,
@@ -640,9 +638,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeSummaryApiConfig(apiConfig: Partial<SummaryApiConfig> | undefined): SummaryApiConfig {
-  const normalizedSource = typeof apiConfig?.source === 'string' && apiConfig.source.trim()
-    ? apiConfig.source.trim()
-    : DEFAULT_SUMMARY_API_CONFIG.source;
+  const normalizedSource =
+    typeof apiConfig?.source === 'string' && apiConfig.source.trim()
+      ? apiConfig.source.trim()
+      : DEFAULT_SUMMARY_API_CONFIG.source;
   return {
     apiurl: typeof apiConfig?.apiurl === 'string' ? apiConfig.apiurl : DEFAULT_SUMMARY_API_CONFIG.apiurl,
     key: typeof apiConfig?.key === 'string' ? apiConfig.key : DEFAULT_SUMMARY_API_CONFIG.key,
@@ -664,13 +663,10 @@ function normalizeSummaryApiProfile(
     return null;
   }
 
-  const normalizedApiConfig = normalizeSummaryApiConfig(
-    isRecord(profile.apiConfig) ? profile.apiConfig : undefined,
-  );
+  const normalizedApiConfig = normalizeSummaryApiConfig(isRecord(profile.apiConfig) ? profile.apiConfig : undefined);
   const now = Date.now();
-  let id = typeof profile.id === 'string' && profile.id.trim()
-    ? profile.id.trim()
-    : `summary-api-${now}-${fallbackIndex}`;
+  let id =
+    typeof profile.id === 'string' && profile.id.trim() ? profile.id.trim() : `summary-api-${now}-${fallbackIndex}`;
   if (seenIds.has(id)) {
     id = `${id}-${fallbackIndex}`;
   }
@@ -678,16 +674,13 @@ function normalizeSummaryApiProfile(
 
   return {
     id,
-    name: typeof profile.name === 'string' && profile.name.trim()
-      ? profile.name.trim()
-      : `额外模型 API ${fallbackIndex + 1}`,
+    name:
+      typeof profile.name === 'string' && profile.name.trim()
+        ? profile.name.trim()
+        : `额外模型 API ${fallbackIndex + 1}`,
     apiConfig: normalizedApiConfig,
-    createdAt: typeof profile.createdAt === 'number' && Number.isFinite(profile.createdAt)
-      ? profile.createdAt
-      : now,
-    updatedAt: typeof profile.updatedAt === 'number' && Number.isFinite(profile.updatedAt)
-      ? profile.updatedAt
-      : now,
+    createdAt: typeof profile.createdAt === 'number' && Number.isFinite(profile.createdAt) ? profile.createdAt : now,
+    updatedAt: typeof profile.updatedAt === 'number' && Number.isFinite(profile.updatedAt) ? profile.updatedAt : now,
   };
 }
 
@@ -727,9 +720,8 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
 
   const apiProfiles = normalizeSummaryApiProfiles(summarySettings.apiProfiles);
   const legacyApiConfig = normalizeSummaryApiConfig(summarySettings.apiConfig);
-  const legacySource = legacyApiConfig.source === 'openai' && legacyApiConfig.apiurl.trim()
-    ? 'custom'
-    : legacyApiConfig.source;
+  const legacySource =
+    legacyApiConfig.source === 'openai' && legacyApiConfig.apiurl.trim() ? 'custom' : legacyApiConfig.source;
   const normalizedLegacyApiConfig = {
     ...legacyApiConfig,
     source: legacySource || DEFAULT_SUMMARY_API_CONFIG.source,
@@ -756,32 +748,25 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
 
   return {
     ...defaults,
-    enabled: typeof summarySettings.enabled === 'boolean'
-      ? summarySettings.enabled
-      : defaults.enabled,
-    variableUpdateMode: summarySettings.variableUpdateMode === 'extra' || summarySettings.variableUpdateMode === 'inline'
-      ? summarySettings.variableUpdateMode
-      : defaults.variableUpdateMode,
-    stream: typeof summarySettings.stream === 'boolean'
-      ? summarySettings.stream
-      : defaults.stream,
+    enabled: typeof summarySettings.enabled === 'boolean' ? summarySettings.enabled : defaults.enabled,
+    variableUpdateMode:
+      summarySettings.variableUpdateMode === 'extra' || summarySettings.variableUpdateMode === 'inline'
+        ? summarySettings.variableUpdateMode
+        : defaults.variableUpdateMode,
+    stream: typeof summarySettings.stream === 'boolean' ? summarySettings.stream : defaults.stream,
     apiProfiles: apiProfiles.map(cloneSummaryApiProfile),
-    summaryApiSelection: normalizeSummaryApiSelection(
-      summarySettings.summaryApiSelection,
-      profileIds,
-      legacySelection,
-    ),
+    summaryApiSelection: normalizeSummaryApiSelection(summarySettings.summaryApiSelection, profileIds, legacySelection),
     variableApiSelection: normalizeSummaryApiSelection(
       summarySettings.variableApiSelection,
       profileIds,
       legacySelection,
     ),
-    promptTemplate: typeof summarySettings.promptTemplate === 'string'
-      ? summarySettings.promptTemplate
-      : defaults.promptTemplate,
-    variablePromptTemplate: typeof summarySettings.variablePromptTemplate === 'string'
-      ? summarySettings.variablePromptTemplate
-      : defaults.variablePromptTemplate,
+    promptTemplate:
+      typeof summarySettings.promptTemplate === 'string' ? summarySettings.promptTemplate : defaults.promptTemplate,
+    variablePromptTemplate:
+      typeof summarySettings.variablePromptTemplate === 'string'
+        ? summarySettings.variablePromptTemplate
+        : defaults.variablePromptTemplate,
     thresholds: {
       ...defaults.thresholds,
       ...summarySettings.thresholds,
@@ -1031,9 +1016,7 @@ export function loadSettings(): DisplaySettings {
     const themeAppearanceByTheme = normalizeThemeAppearanceByTheme(parsed.themeAppearanceByTheme, parsed, uiTheme);
     const activeThemeAppearance = themeAppearanceByTheme[uiTheme];
     const localRegexRules = mergeExtractedGlobalRules(
-      normalizeLocalRegexRules(
-      Array.isArray(parsed.localRegexRules) ? parsed.localRegexRules : legacyRegexRules,
-      ),
+      normalizeLocalRegexRules(Array.isArray(parsed.localRegexRules) ? parsed.localRegexRules : legacyRegexRules),
       presetRegexRuleState.extractedGlobalRules,
     );
 
@@ -1130,7 +1113,9 @@ export function getRegexDebugSnapshot(settings: DisplaySettings, currentPresetNa
   const currentPresetRegexRules = getCurrentPresetRegexRules(settings, normalizedCurrentPresetName).map(
     summarizeRegexRuleForDebug,
   );
-  const displayRegexRules = getRegexRulesForDisplay(settings, normalizedCurrentPresetName).map(summarizeRegexRuleForDebug);
+  const displayRegexRules = getRegexRulesForDisplay(settings, normalizedCurrentPresetName).map(
+    summarizeRegexRuleForDebug,
+  );
   const presetRegexBuckets = Object.fromEntries(
     Object.entries(settings.presetRegexRulesByPreset).map(([presetName, rules]) => [
       presetName,

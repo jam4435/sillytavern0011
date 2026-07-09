@@ -1,7 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsPanel from './SettingsPanel';
-import { createDefaultDisplaySettings, getThemeAppearanceDefaults, type DisplaySettings } from '../utils/settingsManager';
+import {
+  createDefaultDisplaySettings,
+  getThemeAppearanceDefaults,
+  type DisplaySettings,
+} from '../utils/settingsManager';
 import type { VariableEditorCapability } from '../utils/variableEditorPolicy';
 
 const variableEditorCapability: VariableEditorCapability = {
@@ -39,29 +43,87 @@ describe('SettingsPanel theme controls', () => {
     );
   });
 
-  it('preserves custom appearance values when switching themes', () => {
+  it('restores the saved appearance of the selected theme', () => {
+    const defaults = createDefaultDisplaySettings();
     const settings = {
-      ...createDefaultDisplaySettings(),
-      fontColor: '#123456',
-      backgroundColor: '#654321',
-      backgroundOpacity: 0.4,
-      backgroundBlur: 3,
-      chromeOpacity: 0.55,
-      modalOpacity: 0.65,
+      ...defaults,
+      uiTheme: 'ink-wash' as const,
+      fontColor: '#2a2118',
+      backgroundColor: '#efe5d6',
+      backgroundOpacity: 0.46,
+      backgroundImage: 'data:image/png;base64,ink',
+      backgroundBlur: 2,
+      chromeOpacity: 0.44,
+      modalOpacity: 0.54,
+      themeAppearanceByTheme: {
+        'dark-gold': {
+          ...defaults.themeAppearanceByTheme['dark-gold'],
+          fontColor: '#123456',
+          backgroundColor: '#654321',
+          backgroundOpacity: 0.4,
+          backgroundImage: 'data:image/png;base64,dark',
+          backgroundBlur: 3,
+          chromeOpacity: 0.55,
+          modalOpacity: 0.65,
+        },
+        'ink-wash': {
+          ...defaults.themeAppearanceByTheme['ink-wash'],
+          fontColor: '#2a2118',
+          backgroundColor: '#efe5d6',
+          backgroundOpacity: 0.46,
+          backgroundImage: 'data:image/png;base64,ink',
+          backgroundBlur: 2,
+          chromeOpacity: 0.44,
+          modalOpacity: 0.54,
+        },
+      },
     };
     const onSettingsChange = renderSettingsPanel(settings);
 
-    fireEvent.click(screen.getByRole('radio', { name: /水墨/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /黑金/ }));
 
     expect(onSettingsChange).toHaveBeenCalledWith(
       expect.objectContaining({
-        uiTheme: 'ink-wash',
+        uiTheme: 'dark-gold',
         fontColor: '#123456',
         backgroundColor: '#654321',
         backgroundOpacity: 0.4,
+        backgroundImage: 'data:image/png;base64,dark',
         backgroundBlur: 3,
         chromeOpacity: 0.55,
         modalOpacity: 0.65,
+      }),
+    );
+  });
+
+  it('updates only the current theme slot when editing appearance fields', () => {
+    const defaults = createDefaultDisplaySettings();
+    const settings = {
+      ...defaults,
+      uiTheme: 'ink-wash' as const,
+      fontColor: '#2a2118',
+      themeAppearanceByTheme: {
+        'dark-gold': {
+          ...defaults.themeAppearanceByTheme['dark-gold'],
+          fontColor: '#abcdef',
+        },
+        'ink-wash': {
+          ...defaults.themeAppearanceByTheme['ink-wash'],
+          fontColor: '#2a2118',
+        },
+      },
+    };
+    const onSettingsChange = renderSettingsPanel(settings);
+
+    fireEvent.change(screen.getByDisplayValue('#2a2118'), { target: { value: '#112233' } });
+
+    expect(onSettingsChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fontColor: '#112233',
+        themeAppearanceByTheme: expect.objectContaining({
+          'dark-gold': expect.objectContaining({ fontColor: '#abcdef' }),
+          'ink-wash': expect.objectContaining({ fontColor: '#112233' }),
+        }),
       }),
     );
   });

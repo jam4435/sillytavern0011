@@ -19,6 +19,9 @@ describe('settingsManager ui theme', () => {
 
     expect(settings.uiTheme).toBe('dark-gold');
     expect(settings.fontColor).toBe(getThemeAppearanceDefaults('dark-gold').fontColor);
+    expect(settings.themeAppearanceByTheme['ink-wash'].fontColor).toBe(
+      getThemeAppearanceDefaults('ink-wash').fontColor,
+    );
   });
 
   it('migrates old stored settings without a theme field', () => {
@@ -36,6 +39,7 @@ describe('settingsManager ui theme', () => {
     expect(settings.uiTheme).toBe('dark-gold');
     expect(settings.fontSize).toBe(18);
     expect(settings.fontColor).toBe('#ffffff');
+    expect(settings.themeAppearanceByTheme['dark-gold'].fontColor).toBe('#ffffff');
   });
 
   it('normalizes invalid stored themes to dark-gold', () => {
@@ -44,23 +48,90 @@ describe('settingsManager ui theme', () => {
     expect(loadSettings().uiTheme).toBe('dark-gold');
   });
 
+  it('migrates legacy active-theme appearance into the matching theme slot', () => {
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({
+        uiTheme: 'ink-wash',
+        fontColor: '#2a2118',
+        backgroundColor: '#efe5d6',
+        backgroundOpacity: 0.46,
+        backgroundImage: 'data:image/png;base64,ink',
+        backgroundBlur: 2,
+        chromeOpacity: 0.44,
+        modalOpacity: 0.54,
+      }),
+    );
+
+    const settings = loadSettings();
+
+    expect(settings.uiTheme).toBe('ink-wash');
+    expect(settings.fontColor).toBe('#2a2118');
+    expect(settings.backgroundImage).toBe('data:image/png;base64,ink');
+    expect(settings.themeAppearanceByTheme['ink-wash']).toEqual(
+      expect.objectContaining({
+        fontColor: '#2a2118',
+        backgroundColor: '#efe5d6',
+        backgroundOpacity: 0.46,
+        backgroundImage: 'data:image/png;base64,ink',
+        backgroundBlur: 2,
+        chromeOpacity: 0.44,
+        modalOpacity: 0.54,
+      }),
+    );
+    expect(settings.themeAppearanceByTheme['dark-gold'].fontColor).toBe(
+      getThemeAppearanceDefaults('dark-gold').fontColor,
+    );
+  });
+
   it('persists and reloads the selected theme', () => {
+    const defaults = createDefaultDisplaySettings();
     const settings = {
-      ...createDefaultDisplaySettings(),
+      ...defaults,
       uiTheme: 'ink-wash' as const,
       ...getThemeAppearanceDefaults('ink-wash'),
+      backgroundImage: 'data:image/png;base64,ink',
+      themeAppearanceByTheme: {
+        ...defaults.themeAppearanceByTheme,
+        'ink-wash': {
+          ...defaults.themeAppearanceByTheme['ink-wash'],
+          ...getThemeAppearanceDefaults('ink-wash'),
+          backgroundImage: 'data:image/png;base64,ink',
+        },
+      },
     };
 
     expect(saveSettings(settings)).toBe(true);
-    expect(loadSettings().uiTheme).toBe('ink-wash');
+    expect(loadSettings()).toEqual(
+      expect.objectContaining({
+        uiTheme: 'ink-wash',
+        backgroundImage: 'data:image/png;base64,ink',
+        themeAppearanceByTheme: expect.objectContaining({
+          'ink-wash': expect.objectContaining({
+            backgroundImage: 'data:image/png;base64,ink',
+          }),
+        }),
+      }),
+    );
   });
 
   it('applies data-ui-theme and ink-wash sprite variables to the DOM', () => {
+    const defaults = createDefaultDisplaySettings();
     const settings = {
-      ...createDefaultDisplaySettings(),
+      ...defaults,
       uiTheme: 'ink-wash' as const,
+      ...getThemeAppearanceDefaults('ink-wash'),
       chromeOpacity: 0.45,
       modalOpacity: 0.7,
+      themeAppearanceByTheme: {
+        ...defaults.themeAppearanceByTheme,
+        'ink-wash': {
+          ...defaults.themeAppearanceByTheme['ink-wash'],
+          ...getThemeAppearanceDefaults('ink-wash'),
+          chromeOpacity: 0.45,
+          modalOpacity: 0.7,
+        },
+      },
     };
 
     applySettingsToDOM(settings);
