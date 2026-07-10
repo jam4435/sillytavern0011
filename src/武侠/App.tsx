@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
 import ChatInput from './components/ChatInput';
 import CommandQueueButton from './components/CommandQueueButton';
@@ -98,6 +99,7 @@ const App: React.FC = () => {
     setCurrentOptions,
   } = useGameState();
   const { commands, setTravelCommand, addUseItemCommand, cancelCommand, sendMessageWithCommands } = useCommandQueue();
+  const [playerAvatarVersion, setPlayerAvatarVersion] = useState(0);
 
   const playerAvatarSource = useMemo(
     () =>
@@ -107,7 +109,7 @@ const App: React.FC = () => {
         name: gameState.stats.name,
         gender: gameState.stats.gender === '女' ? '女' : '男',
       }),
-    [gameState.stats.avatarRef, gameState.stats.gender, gameState.stats.name],
+    [gameState.stats.avatarRef, gameState.stats.gender, gameState.stats.name, playerAvatarVersion],
   );
 
   // 显示设置状态
@@ -617,7 +619,13 @@ const App: React.FC = () => {
   const renderModalContent = () => {
     switch (activePanel) {
       case ActivePanel.CHARACTER:
-        return <CharacterPanel stats={gameState.stats} worldTime={gameState.worldTime} />;
+        return (
+          <CharacterPanel
+            stats={gameState.stats}
+            worldTime={gameState.worldTime}
+            onAvatarUpdated={() => setPlayerAvatarVersion(version => version + 1)}
+          />
+        );
       case ActivePanel.MARTIAL_ARTS:
         return (
           <MartialArtsPanel
@@ -857,10 +865,11 @@ const App: React.FC = () => {
                   aria-label={`查看${gameState.stats.name}头像`}
                 >
                   <div className="avatar-glow"></div>
-                  <img
+                  <AvatarImage
                     src={playerAvatarSource.src}
                     alt={`${gameState.stats.name}头像`}
-                    style={playerAvatarSource.objectPosition ? { objectPosition: playerAvatarSource.objectPosition } : undefined}
+                    objectPosition={playerAvatarSource.objectPosition}
+                    rasterMode="square"
                   />
                 </button>
               ) : (

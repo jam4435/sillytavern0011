@@ -996,6 +996,47 @@
     color: #1a1410;
   }
 
+  .character-avatar-picker {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 56%), rgba(241, 235, 223, 0.68);
+    border-color: rgba(61, 48, 40, 0.2);
+    box-shadow:
+      0 10px 24px rgba(61, 48, 40, 0.08),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  }
+
+  .character-avatar-picker-head small,
+  .character-avatar-clear {
+    color: #7a6e62;
+  }
+
+  .character-avatar-picker-head span,
+  .character-avatar-action,
+  .character-avatar-option.is-selected {
+    color: #8b1a1a;
+  }
+
+  .character-avatar-action,
+  .character-avatar-option,
+  .character-avatar-clear {
+    background: rgba(250, 246, 238, 0.56);
+    border-color: rgba(61, 48, 40, 0.18);
+  }
+
+  .character-avatar-action:hover,
+  .character-avatar-action.is-active,
+  .character-avatar-option:hover,
+  .character-avatar-option.is-selected {
+    background: linear-gradient(135deg, rgba(139, 26, 26, 0.1), transparent 58%), rgba(250, 246, 238, 0.72);
+    border-color: rgba(139, 26, 26, 0.34);
+    box-shadow: 0 8px 18px rgba(61, 48, 40, 0.1);
+  }
+
+  .character-avatar-clear:hover {
+    color: #8b1a1a;
+    border-color: rgba(139, 26, 26, 0.34);
+    background: rgba(139, 26, 26, 0.06);
+  }
+
   .character-stat-bar-track,
   .cultivation-progress-bar {
     background: rgba(61, 48, 40, 0.12);

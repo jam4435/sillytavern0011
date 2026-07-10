@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import AvatarImage from '../AvatarImage';
 import AvatarPreviewModal from '../AvatarPreviewModal';
 import { ActivePanel, type NPC } from '../../types';
 import { toCustomAvatarRef, toPresetAvatarRef } from '../../utils/avatarCatalog';
@@ -345,10 +346,11 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                   aria-label={`查看${selectedNpc.name || '人物'}头像`}
                 >
                   {selectedAvatarSource?.src ? (
-                    <img
+                    <AvatarImage
                       src={selectedAvatarSource.src}
                       alt={`${selectedNpc.name}头像`}
-                      style={selectedAvatarSource.objectPosition ? { objectPosition: selectedAvatarSource.objectPosition } : undefined}
+                      objectPosition={selectedAvatarSource.objectPosition}
+                      rasterMode="square"
                     />
                   ) : (
                     <span>{selectedAvatarSource?.fallbackInitial || selectedNpc.name.charAt(0) || '侠'}</span>
@@ -400,10 +402,11 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                           onClick={() => handleSelectPresetAvatar(selectedNpc, avatar.id)}
                           aria-pressed={isSelected}
                         >
-                          <img
+                          <AvatarImage
                             src={avatar.src}
                             alt={avatar.label}
-                            style={avatar.objectPosition ? { objectPosition: avatar.objectPosition } : undefined}
+                            objectPosition={avatar.objectPosition}
+                            rasterMode="square"
                           />
                           <span>{avatar.label}</span>
                         </button>

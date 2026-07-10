@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AvatarImage from './AvatarImage';
 import type { CharacterBuild, CharacterTrait, InitialAttributes, OriginCategory, RealmLevel, SetupStep } from '../types';
 import { ATTRIBUTE_DESCRIPTIONS, ATTRIBUTE_NAMES, getTraitType } from '../types';
 import {
@@ -2420,10 +2421,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     <div className="setup-avatar-panel">
                       <div className="setup-avatar-preview">
                         {selectedAvatarSource.src ? (
-                          <img
+                          <AvatarImage
                             src={selectedAvatarSource.src}
                             alt="当前头像"
-                            style={selectedAvatarSource.objectPosition ? { objectPosition: selectedAvatarSource.objectPosition } : undefined}
+                            objectPosition={selectedAvatarSource.objectPosition}
+                            rasterMode="square"
                           />
                         ) : (
                           <span>{selectedAvatarSource.fallbackInitial}</span>
@@ -2447,10 +2449,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                               onClick={() => handlePresetAvatarSelect(avatar.id)}
                               aria-pressed={isSelected}
                             >
-                              <img
+                              <AvatarImage
                                 src={avatar.src}
                                 alt={avatar.label}
-                                style={avatar.objectPosition ? { objectPosition: avatar.objectPosition } : undefined}
+                                objectPosition={avatar.objectPosition}
+                                rasterMode="square"
                               />
                               <span>{avatar.label}</span>
                             </button>
@@ -2547,10 +2550,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     <div className="preview-avatar-row">
                       <div className="preview-avatar">
                         {selectedAvatarSource.src ? (
-                          <img
+                          <AvatarImage
                             src={selectedAvatarSource.src}
                             alt="头像预览"
-                            style={selectedAvatarSource.objectPosition ? { objectPosition: selectedAvatarSource.objectPosition } : undefined}
+                            objectPosition={selectedAvatarSource.objectPosition}
+                            rasterMode="square"
                           />
                         ) : (
                           <span>{selectedAvatarSource.fallbackInitial}</span>
