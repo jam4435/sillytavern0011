@@ -602,9 +602,10 @@ function enhanceMessage(messageId: number) {
 
   const $display = getDisplayedMessageElement(messageId);
   $display.each((_index, element) => {
-    if (!(element instanceof HTMLElement) || element.getAttribute(ENHANCED_ATTR) === '1') {
+    if (!(element instanceof HTMLElement)) {
       return;
     }
+    resetEnhancedElement(element);
     element.setAttribute(ENHANCED_ATTR, '1');
     enhanceRootElement(element);
   });
@@ -634,7 +635,7 @@ function enhanceRootElement(root: HTMLElement) {
         return NodeFilter.FILTER_REJECT;
       }
       const text = node.nodeValue ?? '';
-      if (!text.trim()) {
+      if (!text.trim() || containsHiddenSyntax(text)) {
         return NodeFilter.FILTER_REJECT;
       }
       return NodeFilter.FILTER_ACCEPT;
@@ -658,6 +659,12 @@ function enhanceRootElement(root: HTMLElement) {
     const added = linkifyTextNode(node, usedEntryIds, MAX_LINKS_PER_MESSAGE - linkCount);
     linkCount += added;
   });
+}
+
+function containsHiddenSyntax(text: string) {
+  return /<\/?state\d+>|<Variable(?:Think|Insert|Edit|Delete)>|<\/Variable(?:Think|Insert|Edit|Delete)>|<\/?era_data>/iu.test(
+    text,
+  );
 }
 
 function buildSkipRanges(text: string) {
@@ -741,6 +748,13 @@ function createLoreLink(text: string, entry: LoreEntry) {
   return link;
 }
 
+function resetEnhancedElement(root: HTMLElement) {
+  root.querySelectorAll('a.jm-lore-link').forEach(link => {
+    link.replaceWith(document.createTextNode(link.textContent ?? ''));
+  });
+  root.removeAttribute(ENHANCED_ATTR);
+}
+
 function installEventListeners() {
   stops.push(
     eventOn(tavern_events.CHARACTER_MESSAGE_RENDERED, messageId => {
@@ -784,6 +798,7 @@ function cleanup() {
   stops.splice(0).forEach(stop => stop());
   $(document).off(`.${SCRIPT_KEY}`);
   $(window).off(`.${SCRIPT_KEY}`);
+  document.querySelectorAll<HTMLElement>(`[${ENHANCED_ATTR}="1"]`).forEach(resetEnhancedElement);
   $(`[script_id='${getSafeScriptId()}']`).remove();
 }
 

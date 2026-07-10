@@ -50,6 +50,19 @@ const EXCLUDE_TOKENS = [
   '行动建议',
   '状态栏',
   '高难身份路线',
+  '文风',
+  'LLM抗',
+  '亲密度',
+  '男user规则',
+];
+
+const EXCLUDE_CONTENT_PATTERNS = [
+  /<%/,
+  /<Variable_Format>/i,
+  /<writing_style>/i,
+  /<Card_CoT>/i,
+  /<options>/i,
+  /#user经历和遭遇的指导/,
 ];
 
 const SUMMARY_KEYS = [
@@ -93,6 +106,37 @@ const GENERIC_NO_AUTOLINK = new Set([
   '帝国',
   '女性',
   '男性',
+  '女体',
+  '组织',
+  '机构',
+  '社会',
+  '产品',
+  '职业',
+  '设施',
+  '场所',
+  '地点',
+  '道具',
+  '物品',
+  '装备',
+  '设备',
+  '技术',
+  '规则',
+  '法则',
+  '制度',
+  '流程',
+  '文化',
+  '历史',
+  '概念',
+  '现象',
+  '详情',
+  '总览',
+  '概览',
+  '档案',
+  '体系',
+  '提示词',
+  '文风',
+  '指导',
+  '模型',
   '世界观',
   '世界书',
   '元数据',
@@ -346,8 +390,9 @@ function shortenSummary(text) {
 function inferCategoryFromText(entryName, sourceStem, sourceText, title) {
   const label = `${entryName} ${sourceStem} ${title} ${sourceText.slice(0, 200)}`;
   if (/^世界观元数据/.test(sourceStem) || /^世界观元数据/.test(entryName)) {
-    return null;
+    return '世界观';
   }
+  if (/^核心规则/.test(sourceStem) || /^核心规则/.test(entryName)) return '核心规则';
   if (/^人物/.test(sourceStem) || /^人物/.test(entryName)) return '人物';
   if (/^组织/.test(sourceStem) || /^组织/.test(entryName)) return '组织';
   if (/^职业/.test(sourceStem) || /^职业/.test(entryName)) return '职业';
@@ -426,10 +471,7 @@ function buildImageKeywords(title, aliases, category, indexLabel) {
 
 function shouldAutoLink(title, aliases) {
   const probe = [title, ...aliases];
-  if (probe.some(item => GENERIC_NO_AUTOLINK.has(item))) {
-    return false;
-  }
-  return true;
+  return probe.some(item => item.length >= 2 && !GENERIC_NO_AUTOLINK.has(item));
 }
 
 function resolveWorldbookFile(relativeReference) {
@@ -466,6 +508,9 @@ async function main() {
       continue;
     }
     const sourceText = await fs.readFile(sourcePath, 'utf8');
+    if (EXCLUDE_CONTENT_PATTERNS.some(pattern => pattern.test(sourceText))) {
+      continue;
+    }
     const sourceStem = path.basename(sourcePath, path.extname(sourcePath));
     const parsed = extractTitleAndAliases(sourceText);
     const headerTitle = extractHeaderTitle(sourceText);
@@ -477,8 +522,12 @@ async function main() {
     if (shouldExclude(entryName, sourceStem, title)) {
       continue;
     }
+    const indexKeywords = Array.isArray(entry?.激活策略?.关键字)
+      ? entry.激活策略.关键字.flatMap(item => splitKeywords(item))
+      : [];
     const rawAliases = uniq([
       ...parsed.aliases,
+      ...indexKeywords,
       cleanLabel(entryName),
       cleanLabel(sourceStem),
     ]);
