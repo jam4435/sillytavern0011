@@ -90,6 +90,7 @@ function destroy() {
   $(`#${STYLE_ID}`).remove();
   $('.mes_text').each((_, element) => clearHighlights(element as HTMLElement));
   $(window).off('pagehide', destroy);
+  $(document).off(`keydown.${SCRIPT_ID}`);
 
   console.info('[JM设定百科脚本] destroyed');
 }
@@ -104,6 +105,7 @@ function mountUi() {
       class: 'jm-lore-fab',
       title: '设定百科',
       'aria-label': '打开设定百科搜索面板',
+      'aria-expanded': 'false',
     })
     .text('设')
     .on('click', () => {
@@ -113,7 +115,7 @@ function mountUi() {
       $button.attr('aria-expanded', String(nextOpen));
 
       if (nextOpen) {
-        const input = $root.find<HTMLInputElement>('.jm-lore-search-input').get(0);
+        const input = $root.find('.jm-lore-search-input').get(0) as HTMLInputElement | undefined;
         input?.focus();
         input?.select();
       }
@@ -164,6 +166,7 @@ function mountUi() {
     if (event.key === 'Escape') {
       $panel.removeClass('is-open');
       $button.attr('aria-expanded', 'false');
+      document.getElementById(FALLBACK_MODAL_ID)?.classList.remove('is-open');
     }
   });
 }
@@ -514,11 +517,18 @@ function buildPopupContent(entry: LoreEntry) {
 
   const header = document.createElement('div');
   header.className = 'jm-lore-popup-header';
+  header.style.display = 'flex';
+  header.style.alignItems = 'flex-start';
+  header.style.justifyContent = 'space-between';
+  header.style.gap = '12px';
 
   const titleBlock = document.createElement('div');
   const title = document.createElement('div');
   title.className = 'jm-lore-popup-title';
   title.textContent = entry.title;
+  title.style.fontSize = '1.15rem';
+  title.style.fontWeight = '800';
+  title.style.lineHeight = '1.35';
   titleBlock.appendChild(title);
 
   if (entry.category) {
@@ -530,17 +540,41 @@ function buildPopupContent(entry: LoreEntry) {
   }
 
   header.appendChild(titleBlock);
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'jm-lore-icon-button';
+  closeButton.textContent = '×';
+  closeButton.style.width = '30px';
+  closeButton.style.height = '30px';
+  closeButton.style.border = '1px solid rgba(255, 255, 255, 0.12)';
+  closeButton.style.borderRadius = '8px';
+  closeButton.style.background = 'rgba(255, 255, 255, 0.05)';
+  closeButton.style.color = 'inherit';
+  closeButton.style.cursor = 'pointer';
+  closeButton.addEventListener('click', () => {
+    document.getElementById(FALLBACK_MODAL_ID)?.classList.remove('is-open');
+  });
+  header.appendChild(closeButton);
   wrapper.appendChild(header);
 
   const image = document.createElement('img');
   image.className = 'jm-lore-popup-image';
   image.alt = entry.title;
   image.hidden = true;
+  image.style.width = '100%';
+  image.style.maxHeight = '340px';
+  image.style.objectFit = 'contain';
+  image.style.borderRadius = '10px';
+  image.style.background = 'rgba(255, 255, 255, 0.04)';
   wrapper.appendChild(image);
   void fillPopupImage(image, entry);
 
   const grid = document.createElement('div');
   grid.className = 'jm-lore-popup-grid';
+  grid.style.display = 'grid';
+  grid.style.gridTemplateColumns = '84px 1fr';
+  grid.style.gap = '8px 12px';
+  grid.style.fontSize = '0.95rem';
   appendPopupField(grid, '摘要', entry.summary || '无');
   appendPopupField(grid, '分类', entry.category || '无');
   appendPopupField(grid, '别名', entry.aliases.length > 0 ? entry.aliases.join(' / ') : '无');
@@ -552,6 +586,8 @@ function buildPopupContent(entry: LoreEntry) {
     const contentBlock = document.createElement('div');
     contentBlock.className = 'jm-lore-popup-content';
     contentBlock.textContent = content;
+    contentBlock.style.whiteSpace = 'pre-wrap';
+    contentBlock.style.wordBreak = 'break-word';
     wrapper.appendChild(contentBlock);
   }
 
@@ -562,8 +598,12 @@ function appendPopupField(grid: HTMLElement, key: string, value: string) {
   const keyNode = document.createElement('div');
   keyNode.className = 'jm-lore-popup-key';
   keyNode.textContent = key;
+  keyNode.style.opacity = '0.72';
+  keyNode.style.fontWeight = '700';
   const valueNode = document.createElement('div');
   valueNode.textContent = value;
+  valueNode.style.whiteSpace = 'pre-wrap';
+  valueNode.style.wordBreak = 'break-word';
   grid.append(keyNode, valueNode);
 }
 
@@ -960,8 +1000,12 @@ async function resolveImageUrl(entry: LoreEntry) {
   }
 
   const imageIndex = await loadImageIndex();
+  const indexKeys = Object.keys(imageIndex);
   for (const keyword of entry.imageKeywords) {
-    const matchedKey = Object.keys(imageIndex).find(key => key.trim().toLocaleLowerCase() === keyword.toLocaleLowerCase());
+    const normalizedKeyword = keyword.trim().toLocaleLowerCase();
+    const matchedKey =
+      indexKeys.find(key => key.trim().toLocaleLowerCase() === normalizedKeyword) ??
+      indexKeys.find(key => key.trim().toLocaleLowerCase().includes(normalizedKeyword));
     const fileName = matchedKey ? imageIndex[matchedKey]?.[0] : undefined;
     if (fileName) {
       return fileName;
