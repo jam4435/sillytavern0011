@@ -1,1114 +1,790 @@
-import localImageIndex from '../imageIndex.json';
-import rawLoreEntries from './lore-entries.json';
-
-type PopupApi = Pick<typeof SillyTavern, 'callGenericPopup' | 'POPUP_TYPE'>;
-type ImageIndex = Record<string, string[]>;
-type LoreEntryRecord = Record<string, unknown>;
+import loreEntriesRaw from './lore-entries.json?raw';
 
 type LoreEntry = {
   id: string;
   title: string;
-  aliases: string[];
   category: string;
+  aliases: string[];
   summary: string;
-  source: string;
-  content: string;
+  sourceFile: string;
   imageKeywords: string[];
-  searchText: string;
-  highlightTerms: string[];
+  autoLink: boolean;
 };
 
-type MessageProcessState = {
-  usedTerms: Set<string>;
-  appliedCount: number;
-};
+type PopupApi = Pick<typeof SillyTavern, 'callGenericPopup' | 'POPUP_TYPE'>;
 
-const SCRIPT_ID = typeof getScriptId === 'function' ? getScriptId() : 'jm-lore-browser';
-const UI_ROOT_ID = `jm-lore-browser-root-${SCRIPT_ID}`;
-const STYLE_ID = `jm-lore-browser-style-${SCRIPT_ID}`;
-const FALLBACK_MODAL_ID = `jm-lore-browser-modal-${SCRIPT_ID}`;
-const HIGHLIGHT_CLASS = 'jm-lore-highlight';
-const MAX_HIGHLIGHTS_PER_MESSAGE = 12;
-const MAX_SEARCH_RESULTS = 80;
-const REMOTE_IMAGE_INDEX_URLS = [
-  'https://raw.githubusercontent.com/jam4435/sillytavern0011/main/src/JM/imageIndex.json',
-  'https://cdn.jsdelivr.net/gh/jam4435/sillytavern0011@main/src/JM/imageIndex.json',
-];
-const IMAGE_BASE_URLS = [
-  'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/JM/',
-  'https://cdn.jsdelivr.net/gh/jam4435/my-image-hosting@main/JM/',
-  'https://raw.githubusercontent.com/jam4435/sillytavern0011/main/src/JM/',
-];
+type ImageIndex = Record<string, string[]>;
 
-let loreEntries: LoreEntry[] = [];
-let termToEntry = new Map<string, LoreEntry>();
-let sortedHighlightTerms: string[] = [];
-let activeImageIndexPromise: Promise<ImageIndex> | null = null;
-let highlightTimer: number | null = null;
-let destroyed = false;
+const SCRIPT_KEY = 'jm-lore-encyclopedia';
+const ENHANCED_ATTR = 'data-jm-lore-enhanced';
+const MAX_LINKS_PER_MESSAGE = 12;
+const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
+const IMAGE_INDEX_URL = `${IMAGE_BASE_URL}imageIndex.json`;
 
-function init() {
-  loreEntries = normalizeLoreEntries(rawLoreEntries);
-  buildHighlightIndex(loreEntries);
-  mountUi();
-  scheduleRefreshVisibleMessages();
+const blockedAutoLinkAliases = new Set([
+  '帝国',
+  '女性',
+  '男性',
+  '女体',
+  '组织',
+  '机构',
+  '社会',
+  '产品',
+  '职业',
+  '设施',
+  '场所',
+  '地点',
+  '道具',
+  '物品',
+  '装备',
+  '设备',
+  '技术',
+  '规则',
+  '法则',
+  '制度',
+  '流程',
+  '文化',
+  '历史',
+  '概念',
+  '现象',
+  '详情',
+  '总览',
+  '概览',
+  '档案',
+  '体系',
+  '元数据',
+  '提示词',
+  '文风',
+  '指导',
+  '模型',
+]);
 
-  eventOn(tavern_events.CHARACTER_MESSAGE_RENDERED, onSingleMessageEvent);
-  eventOn(tavern_events.MESSAGE_UPDATED, onSingleMessageEvent);
-  eventOn(tavern_events.MESSAGE_SWIPED, onSingleMessageEvent);
-  eventOn(tavern_events.MORE_MESSAGES_LOADED, () => scheduleRefreshVisibleMessages());
-  $(window).on('pagehide', destroy);
+const ignoredAncestorSelector = [
+  'a',
+  'button',
+  'input',
+  'textarea',
+  'select',
+  'option',
+  'script',
+  'style',
+  'code',
+  'pre',
+  '.jm-lore-link',
+  '.jm-lore-root',
+  '.jm-state-panel',
+  '.status-container',
+  '.TH-streaming',
+  '.mes_streaming',
+].join(',');
 
-  console.info('[JM设定百科脚本] initialized', {
-    entryCount: loreEntries.length,
-    termCount: sortedHighlightTerms.length,
-  });
+const loreEntries = parseLoreEntries();
+const entryById = new Map(loreEntries.map(entry => [entry.id, entry]));
+const linkCandidates = buildLinkCandidates(loreEntries);
+const linkRegex = buildLinkRegex(linkCandidates.map(candidate => candidate.alias));
+const stops: Array<() => void> = [];
+let imageIndexPromise: Promise<ImageIndex> | null = null;
+let searchInput: HTMLInputElement | null = null;
+let panelElement: HTMLElement | null = null;
+let resultElement: HTMLElement | null = null;
+
+function parseLoreEntries(): LoreEntry[] {
+  try {
+    const data = JSON.parse(loreEntriesRaw) as LoreEntry[];
+    return data.filter(entry => entry.id && entry.title && entry.summary);
+  } catch (error) {
+    console.error('[JM设定百科] 词条数据解析失败。', error);
+    return [];
+  }
 }
 
-function onSingleMessageEvent(messageId?: unknown) {
-  if (typeof messageId === 'number' && Number.isFinite(messageId)) {
-    scheduleRefreshMessage(messageId);
-    return;
-  }
+function buildLinkCandidates(entries: LoreEntry[]) {
+  const seen = new Set<string>();
+  const candidates: Array<{ alias: string; entry: LoreEntry }> = [];
 
-  scheduleRefreshVisibleMessages();
+  entries
+    .filter(entry => entry.autoLink)
+    .forEach(entry => {
+      [entry.title, ...entry.aliases]
+        .map(alias => alias.trim())
+        .filter(alias => alias.length >= 2)
+        .filter(alias => !blockedAutoLinkAliases.has(alias))
+        .forEach(alias => {
+          if (seen.has(alias)) {
+            return;
+          }
+          seen.add(alias);
+          candidates.push({ alias, entry });
+        });
+    });
+
+  return candidates.sort((a, b) => b.alias.length - a.alias.length || a.alias.localeCompare(b.alias, 'zh-Hans-CN'));
 }
 
-function destroy() {
-  if (destroyed) {
-    return;
+function buildLinkRegex(aliases: string[]) {
+  if (aliases.length === 0) {
+    return null;
   }
+  return new RegExp(aliases.map(escapeRegExp).join('|'), 'gu');
+}
 
-  destroyed = true;
-  if (highlightTimer !== null) {
-    window.clearTimeout(highlightTimer);
-    highlightTimer = null;
-  }
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-  $(`#${UI_ROOT_ID}`).remove();
-  $(`#${FALLBACK_MODAL_ID}`).remove();
-  $(`#${STYLE_ID}`).remove();
-  $('.mes_text').each((_, element) => clearHighlights(element as HTMLElement));
-  $(window).off('pagehide', destroy);
-  $(document).off(`keydown.${SCRIPT_ID}`);
-
-  console.info('[JM设定百科脚本] destroyed');
+function installStyle() {
+  const styleId = `${SCRIPT_KEY}-style`;
+  $(`#${styleId}`).remove();
+  $('<style>')
+    .attr('id', styleId)
+    .attr('script_id', getSafeScriptId())
+    .text(
+      `
+      .jm-lore-root {
+        position: fixed;
+        right: 22px;
+        bottom: 22px;
+        z-index: 10050;
+        font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+        color: #f4f0e8;
+      }
+      .jm-lore-fab {
+        width: 42px;
+        height: 42px;
+        border: 1px solid rgba(218, 185, 111, 0.62);
+        border-radius: 8px;
+        background:
+          linear-gradient(145deg, rgba(82, 17, 26, 0.96), rgba(21, 24, 23, 0.98));
+        color: #f7df9b;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+        cursor: pointer;
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 1;
+      }
+      .jm-lore-fab:hover,
+      .jm-lore-fab:focus-visible {
+        border-color: #e6c97a;
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.54);
+        outline: none;
+      }
+      .jm-lore-panel {
+        position: absolute;
+        right: 0;
+        bottom: 52px;
+        width: min(430px, calc(100vw - 28px));
+        max-height: min(620px, calc(100vh - 96px));
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid rgba(218, 185, 111, 0.36);
+        border-radius: 8px;
+        background:
+          linear-gradient(160deg, rgba(18, 20, 19, 0.98), rgba(64, 15, 24, 0.97));
+        box-shadow: 0 18px 46px rgba(0, 0, 0, 0.58);
+      }
+      .jm-lore-panel.open {
+        display: flex;
+      }
+      .jm-lore-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px 10px;
+        border-bottom: 1px solid rgba(218, 185, 111, 0.22);
+      }
+      .jm-lore-title {
+        flex: 1;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+      .jm-lore-count {
+        color: #b8d6c2;
+        font-size: 12px;
+      }
+      .jm-lore-icon-btn {
+        width: 30px;
+        height: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #f4f0e8;
+        cursor: pointer;
+      }
+      .jm-lore-icon-btn:hover,
+      .jm-lore-icon-btn:focus-visible {
+        background: rgba(218, 185, 111, 0.16);
+        outline: none;
+      }
+      .jm-lore-search {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(218, 185, 111, 0.16);
+      }
+      .jm-lore-search input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid rgba(218, 185, 111, 0.28);
+        border-radius: 7px;
+        background: rgba(0, 0, 0, 0.22);
+        color: #f4f0e8;
+        padding: 10px 11px;
+        font: inherit;
+        outline: none;
+      }
+      .jm-lore-search input:focus {
+        border-color: rgba(139, 214, 163, 0.78);
+      }
+      .jm-lore-results {
+        overflow: auto;
+        padding: 8px;
+      }
+      .jm-lore-result {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 6px 10px;
+        align-items: start;
+        text-align: left;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.045);
+        color: inherit;
+        padding: 10px;
+        margin: 0 0 7px;
+        cursor: pointer;
+      }
+      .jm-lore-result:hover,
+      .jm-lore-result:focus-visible {
+        border-color: rgba(139, 214, 163, 0.48);
+        background: rgba(139, 214, 163, 0.08);
+        outline: none;
+      }
+      .jm-lore-result-title {
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .jm-lore-result-category {
+        color: #f0cf7c;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .jm-lore-result-summary {
+        grid-column: 1 / -1;
+        color: rgba(244, 240, 232, 0.78);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      .jm-lore-empty {
+        padding: 20px 12px;
+        color: rgba(244, 240, 232, 0.68);
+        text-align: center;
+      }
+      .jm-lore-link {
+        color: #91d7aa;
+        border-bottom: 1px dotted rgba(145, 215, 170, 0.72);
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .jm-lore-link:hover {
+        color: #f0cf7c;
+        border-bottom-color: rgba(240, 207, 124, 0.78);
+      }
+      .jm-lore-popup {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        line-height: 1.65;
+      }
+      .jm-lore-popup-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-weight: 700;
+        font-size: 1.08rem;
+      }
+      .jm-lore-popup-category {
+        color: #b68a37;
+        font-size: 0.84rem;
+        white-space: nowrap;
+      }
+      .jm-lore-popup-summary {
+        font-size: 0.98rem;
+      }
+      .jm-lore-popup-meta {
+        color: rgba(255, 255, 255, 0.68);
+        font-size: 0.86rem;
+      }
+      .jm-lore-tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .jm-lore-tag {
+        border: 1px solid rgba(182, 138, 55, 0.28);
+        border-radius: 6px;
+        padding: 2px 7px;
+        color: #f0cf7c;
+        font-size: 0.78rem;
+      }
+      .jm-lore-images {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+        gap: 8px;
+      }
+      .jm-lore-images img {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      @media (max-width: 520px) {
+        .jm-lore-root {
+          right: 14px;
+          bottom: 14px;
+        }
+        .jm-lore-panel {
+          width: calc(100vw - 28px);
+          max-height: calc(100vh - 78px);
+        }
+      }
+    `,
+    )
+    .appendTo('head');
 }
 
 function mountUi() {
-  ensureStyleMounted();
+  const rootId = `${SCRIPT_KEY}-root`;
+  $(`#${rootId}`).remove();
 
-  const $root = $('<div>').attr('id', UI_ROOT_ID);
-  const $button = $('<button>')
-    .attr({
-      type: 'button',
-      class: 'jm-lore-fab',
-      title: '设定百科',
-      'aria-label': '打开设定百科搜索面板',
-      'aria-expanded': 'false',
-    })
-    .text('设')
-    .on('click', () => {
-      const $panel = $root.find('.jm-lore-panel');
-      const nextOpen = !$panel.hasClass('is-open');
-      $panel.toggleClass('is-open', nextOpen);
-      $button.attr('aria-expanded', String(nextOpen));
+  const $root = $('<div>')
+    .attr('id', rootId)
+    .attr('script_id', getSafeScriptId())
+    .addClass('jm-lore-root')
+    .appendTo('body');
 
-      if (nextOpen) {
-        const input = $root.find('.jm-lore-search-input').get(0) as HTMLInputElement | undefined;
-        input?.focus();
-        input?.select();
-      }
-    });
+  const $panel = $('<section>')
+    .addClass('jm-lore-panel')
+    .attr({ role: 'dialog', 'aria-label': 'JM设定索引' })
+    .appendTo($root);
+  panelElement = $panel[0];
 
-  const $panel = $('<section>').addClass('jm-lore-panel').attr({
-    role: 'dialog',
-    'aria-label': '设定百科搜索面板',
-  });
-
-  const $header = $('<div>').addClass('jm-lore-panel-header');
-  const $title = $('<div>').addClass('jm-lore-panel-title').text('设定百科');
-  const $close = $('<button>')
-    .attr({ type: 'button', class: 'jm-lore-icon-button', title: '关闭' })
+  const $header = $('<div>').addClass('jm-lore-header').appendTo($panel);
+  $('<div>').addClass('jm-lore-title').text('JM 设定索引').appendTo($header);
+  $('<div>').addClass('jm-lore-count').text(`${loreEntries.length} 条`).appendTo($header);
+  $('<button>')
+    .addClass('jm-lore-icon-btn')
+    .attr({ type: 'button', title: '关闭', 'aria-label': '关闭' })
     .text('×')
-    .on('click', () => {
-      $panel.removeClass('is-open');
-      $button.attr('aria-expanded', 'false');
-    });
-  $header.append($title, $close);
+    .on('click', closePanel)
+    .appendTo($header);
 
-  const $input = $('<input>')
-    .attr({
-      type: 'search',
-      class: 'jm-lore-search-input',
-      placeholder: '搜索标题 / 别名 / 分类',
-      autocomplete: 'off',
-      spellcheck: 'false',
+  const $search = $('<div>').addClass('jm-lore-search').appendTo($panel);
+  searchInput = $('<input>')
+    .attr({ type: 'search', placeholder: '搜索设定、别名、分类', autocomplete: 'off' })
+    .on('input', renderSearchResults)
+    .appendTo($search)[0] as HTMLInputElement;
+
+  resultElement = $('<div>').addClass('jm-lore-results').appendTo($panel)[0];
+
+  $('<button>')
+    .addClass('jm-lore-fab')
+    .attr({ type: 'button', title: 'JM设定索引', 'aria-label': 'JM设定索引' })
+    .text('典')
+    .on('click', togglePanel)
+    .appendTo($root);
+
+  renderSearchResults();
+}
+
+function togglePanel() {
+  if (!panelElement) {
+    return;
+  }
+  panelElement.classList.toggle('open');
+  if (panelElement.classList.contains('open')) {
+    searchInput?.focus();
+  }
+}
+
+function closePanel() {
+  panelElement?.classList.remove('open');
+}
+
+function renderSearchResults() {
+  if (!resultElement) {
+    return;
+  }
+
+  const query = normalizeForSearch(searchInput?.value ?? '');
+  const matches = loreEntries
+    .filter(entry => {
+      if (!query) {
+        return true;
+      }
+      return buildSearchHaystack(entry).includes(query);
     })
-    .on('input', event => {
-      const value = String((event.currentTarget as HTMLInputElement).value ?? '');
-      renderSearchResults($results, value);
+    .slice(0, 80);
+
+  resultElement.replaceChildren();
+  if (matches.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'jm-lore-empty';
+    empty.textContent = '未找到匹配词条';
+    resultElement.appendChild(empty);
+    return;
+  }
+
+  matches.forEach(entry => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'jm-lore-result';
+    button.addEventListener('click', () => {
+      void showEntryPopup(entry);
     });
 
-  const $meta = $('<div>')
-    .addClass('jm-lore-panel-meta')
-    .text(`已加载 ${loreEntries.length} 个词条`);
+    const title = document.createElement('div');
+    title.className = 'jm-lore-result-title';
+    title.textContent = entry.title;
+    button.appendChild(title);
 
-  const $results = $('<div>').addClass('jm-lore-results');
+    const category = document.createElement('div');
+    category.className = 'jm-lore-result-category';
+    category.textContent = entry.category;
+    button.appendChild(category);
 
-  $panel.append($header, $input, $meta, $results);
-  $root.append($button, $panel);
-  $('body').append($root);
+    const summary = document.createElement('div');
+    summary.className = 'jm-lore-result-summary';
+    summary.textContent = entry.summary;
+    button.appendChild(summary);
 
-  renderSearchResults($results, '');
-
-  $(document).on(`keydown.${SCRIPT_ID}`, event => {
-    if (event.key === 'Escape') {
-      $panel.removeClass('is-open');
-      $button.attr('aria-expanded', 'false');
-      document.getElementById(FALLBACK_MODAL_ID)?.classList.remove('is-open');
-    }
+    resultElement?.appendChild(button);
   });
 }
 
-function ensureStyleMounted() {
-  if (document.getElementById(STYLE_ID)) {
-    return;
-  }
-
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
-    #${UI_ROOT_ID} {
-      position: fixed;
-      right: 20px;
-      bottom: 96px;
-      z-index: 2147483000;
-      font-family: var(--mainFontFamily, inherit);
-    }
-
-    #${UI_ROOT_ID} .jm-lore-fab {
-      width: 44px;
-      height: 44px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 999px;
-      background: rgba(28, 31, 38, 0.92);
-      color: #f5f7fb;
-      cursor: pointer;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-      font-size: 16px;
-      font-weight: 700;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-panel {
-      position: absolute;
-      right: 0;
-      bottom: 56px;
-      width: min(360px, calc(100vw - 24px));
-      max-height: min(70vh, 720px);
-      display: none;
-      flex-direction: column;
-      gap: 10px;
-      padding: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 10px;
-      background: rgba(18, 20, 25, 0.96);
-      color: #edf2ff;
-      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.36);
-      backdrop-filter: blur(12px);
-    }
-
-    #${UI_ROOT_ID} .jm-lore-panel.is-open {
-      display: flex;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-panel-title {
-      font-size: 14px;
-      font-weight: 800;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-icon-button,
-    #${UI_ROOT_ID} .jm-lore-entry-button {
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.06);
-      color: inherit;
-      cursor: pointer;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-icon-button {
-      width: 30px;
-      height: 30px;
-      font-size: 18px;
-      line-height: 1;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-search-input {
-      width: 100%;
-      padding: 9px 10px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.05);
-      color: inherit;
-      outline: none;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-panel-meta {
-      font-size: 12px;
-      opacity: 0.72;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-results {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      overflow-y: auto;
-      min-height: 0;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-empty {
-      padding: 14px 10px;
-      border: 1px dashed rgba(255, 255, 255, 0.14);
-      border-radius: 8px;
-      font-size: 12px;
-      opacity: 0.76;
-      text-align: center;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-entry-button {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 6px;
-      padding: 10px;
-      text-align: left;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-entry-title {
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-entry-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      font-size: 11px;
-      opacity: 0.78;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-chip {
-      padding: 2px 7px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
-      white-space: nowrap;
-    }
-
-    #${UI_ROOT_ID} .jm-lore-entry-summary {
-      font-size: 12px;
-      line-height: 1.55;
-      opacity: 0.92;
-    }
-
-    .${HIGHLIGHT_CLASS} {
-      display: inline;
-      margin: 0;
-      padding: 0 0.1em;
-      border: 0;
-      border-radius: 4px;
-      background: rgba(126, 177, 255, 0.2);
-      color: inherit;
-      cursor: pointer;
-      text-decoration: none;
-      box-shadow: inset 0 -1px 0 rgba(126, 177, 255, 0.38);
-    }
-
-    .${HIGHLIGHT_CLASS}:hover {
-      background: rgba(126, 177, 255, 0.32);
-    }
-
-    #${FALLBACK_MODAL_ID} {
-      position: fixed;
-      inset: 0;
-      z-index: 2147483646;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      background: rgba(0, 0, 0, 0.56);
-    }
-
-    #${FALLBACK_MODAL_ID}.is-open {
-      display: flex;
-    }
-
-    #${FALLBACK_MODAL_ID} .jm-lore-modal-card {
-      width: min(760px, calc(100vw - 24px));
-      max-height: min(82vh, 860px);
-      overflow-y: auto;
-      padding: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 12px;
-      background: rgba(20, 22, 28, 0.98);
-      color: #edf2ff;
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
-    }
-
-    #${FALLBACK_MODAL_ID} .jm-lore-popup-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-
-    #${FALLBACK_MODAL_ID} .jm-lore-popup-title {
-      font-size: 18px;
-      font-weight: 800;
-      line-height: 1.35;
-    }
-
-    #${FALLBACK_MODAL_ID} .jm-lore-popup-summary,
-    #${FALLBACK_MODAL_ID} .jm-lore-popup-content {
-      line-height: 1.7;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    #${FALLBACK_MODAL_ID} .jm-lore-popup-image {
-      width: 100%;
-      max-height: 340px;
-      object-fit: contain;
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.04);
-      margin-bottom: 14px;
-    }
-
-    #${FALLBACK_MODAL_ID} .jm-lore-popup-grid {
-      display: grid;
-      grid-template-columns: 84px 1fr;
-      gap: 8px 12px;
-      margin-bottom: 14px;
-      font-size: 13px;
-      line-height: 1.55;
-    }
-
-    #${FALLBACK_MODAL_ID} .jm-lore-popup-key {
-      opacity: 0.72;
-      font-weight: 700;
-    }
-  `;
-  document.head.appendChild(style);
+function normalizeForSearch(value: string) {
+  return value.toLowerCase().replace(/[·・\s_\-:：]/gu, '').trim();
 }
 
-function renderSearchResults($container: JQuery, query: string) {
-  const trimmedQuery = query.trim();
-  const entries = searchLoreEntries(trimmedQuery);
-  $container.empty();
-
-  if (entries.length === 0) {
-    $container.append($('<div>').addClass('jm-lore-empty').text(trimmedQuery ? '未找到匹配词条' : '暂无可显示词条'));
-    return;
-  }
-
-  entries.slice(0, MAX_SEARCH_RESULTS).forEach(entry => {
-    const $button = $('<button>')
-      .attr({ type: 'button', class: 'jm-lore-entry-button' })
-      .on('click', () => {
-        void openLoreEntryPopup(entry);
-      });
-
-    const $title = $('<div>').addClass('jm-lore-entry-title').text(entry.title);
-    const $meta = $('<div>').addClass('jm-lore-entry-meta');
-    if (entry.category) {
-      $meta.append($('<span>').addClass('jm-lore-chip').text(entry.category));
-    }
-    if (entry.aliases.length > 0) {
-      $meta.append($('<span>').addClass('jm-lore-chip').text(`别名 ${entry.aliases.slice(0, 3).join(' / ')}`));
-    }
-    if (entry.source) {
-      $meta.append($('<span>').addClass('jm-lore-chip').text(`来源 ${entry.source}`));
-    }
-    const $summary = $('<div>')
-      .addClass('jm-lore-entry-summary')
-      .text(truncateText(entry.summary || entry.content || '无摘要', 120));
-
-    $button.append($title, $meta, $summary);
-    $container.append($button);
-  });
+function buildSearchHaystack(entry: LoreEntry) {
+  return normalizeForSearch([entry.title, entry.category, entry.summary, entry.sourceFile, ...entry.aliases].join(' '));
 }
 
-function searchLoreEntries(query: string) {
-  if (!query) {
-    return loreEntries.slice().sort((left, right) => left.title.localeCompare(right.title, 'zh-Hans-CN'));
+async function showEntryPopup(entry: LoreEntry) {
+  const content = document.createElement('div');
+  content.className = 'jm-lore-popup';
+
+  const titleRow = document.createElement('div');
+  titleRow.className = 'jm-lore-popup-title';
+  const title = document.createElement('span');
+  title.textContent = entry.title;
+  titleRow.appendChild(title);
+  const category = document.createElement('span');
+  category.className = 'jm-lore-popup-category';
+  category.textContent = entry.category;
+  titleRow.appendChild(category);
+  content.appendChild(titleRow);
+
+  const summary = document.createElement('div');
+  summary.className = 'jm-lore-popup-summary';
+  summary.textContent = entry.summary;
+  content.appendChild(summary);
+
+  const aliases = entry.aliases.filter(alias => alias !== entry.title).slice(0, 12);
+  if (aliases.length > 0) {
+    const aliasRow = document.createElement('div');
+    aliasRow.className = 'jm-lore-tag-row';
+    aliases.forEach(alias => {
+      const tag = document.createElement('span');
+      tag.className = 'jm-lore-tag';
+      tag.textContent = alias;
+      aliasRow.appendChild(tag);
+    });
+    content.appendChild(aliasRow);
   }
 
-  const loweredQuery = query.toLocaleLowerCase();
-  return loreEntries
-    .map(entry => ({ entry, score: scoreEntry(entry, loweredQuery) }))
-    .filter(item => item.score > 0)
-    .sort((left, right) => right.score - left.score || right.entry.title.length - left.entry.title.length)
-    .map(item => item.entry);
-}
-
-function scoreEntry(entry: LoreEntry, loweredQuery: string) {
-  let score = 0;
-  const loweredTitle = entry.title.toLocaleLowerCase();
-  const loweredCategory = entry.category.toLocaleLowerCase();
-  const loweredAliases = entry.aliases.map(alias => alias.toLocaleLowerCase());
-
-  if (loweredTitle === loweredQuery) {
-    score += 120;
-  } else if (loweredTitle.includes(loweredQuery)) {
-    score += 80;
+  const images = await findImagesForEntry(entry);
+  if (images.length > 0) {
+    const imageGrid = document.createElement('div');
+    imageGrid.className = 'jm-lore-images';
+    images.slice(0, 6).forEach(fileName => {
+      const image = document.createElement('img');
+      image.loading = 'lazy';
+      image.alt = entry.title;
+      image.src = `${IMAGE_BASE_URL}${fileName}`;
+      imageGrid.appendChild(image);
+    });
+    content.appendChild(imageGrid);
   }
 
-  if (loweredAliases.some(alias => alias === loweredQuery)) {
-    score += 90;
-  } else if (loweredAliases.some(alias => alias.includes(loweredQuery))) {
-    score += 54;
-  }
+  const source = document.createElement('div');
+  source.className = 'jm-lore-popup-meta';
+  source.textContent = `来源：${entry.sourceFile}`;
+  content.appendChild(source);
 
-  if (loweredCategory === loweredQuery) {
-    score += 44;
-  } else if (loweredCategory.includes(loweredQuery)) {
-    score += 24;
-  }
-
-  if (entry.searchText.includes(loweredQuery)) {
-    score += 10;
-  }
-
-  return score;
-}
-
-async function openLoreEntryPopup(entry: LoreEntry) {
-  const popupContent = buildPopupContent(entry);
   const popupApi = getPopupApi();
-
-  if (popupApi?.callGenericPopup && popupApi.POPUP_TYPE) {
-    await popupApi.callGenericPopup(popupContent, popupApi.POPUP_TYPE.TEXT, '', {
+  if (popupApi?.callGenericPopup) {
+    await popupApi.callGenericPopup(content, popupApi.POPUP_TYPE.TEXT, '', {
       okButton: '关闭',
       cancelButton: false,
       wider: true,
-      large: true,
+      large: images.length > 2,
       leftAlign: true,
       allowVerticalScrolling: true,
     });
     return;
   }
 
-  openFallbackModal(popupContent);
+  alert(`${entry.title}\n\n${entry.summary}\n\n${entry.sourceFile}`);
 }
 
-function buildPopupContent(entry: LoreEntry) {
-  const wrapper = document.createElement('div');
-  wrapper.style.display = 'flex';
-  wrapper.style.flexDirection = 'column';
-  wrapper.style.gap = '14px';
-  wrapper.style.lineHeight = '1.65';
-
-  const header = document.createElement('div');
-  header.className = 'jm-lore-popup-header';
-  header.style.display = 'flex';
-  header.style.alignItems = 'flex-start';
-  header.style.justifyContent = 'space-between';
-  header.style.gap = '12px';
-
-  const titleBlock = document.createElement('div');
-  const title = document.createElement('div');
-  title.className = 'jm-lore-popup-title';
-  title.textContent = entry.title;
-  title.style.fontSize = '1.15rem';
-  title.style.fontWeight = '800';
-  title.style.lineHeight = '1.35';
-  titleBlock.appendChild(title);
-
-  if (entry.category) {
-    const category = document.createElement('div');
-    category.style.marginTop = '6px';
-    category.style.opacity = '0.78';
-    category.textContent = entry.category;
-    titleBlock.appendChild(category);
+async function findImagesForEntry(entry: LoreEntry) {
+  if (!entry.imageKeywords || entry.imageKeywords.length === 0) {
+    return [];
   }
 
-  header.appendChild(titleBlock);
-  const closeButton = document.createElement('button');
-  closeButton.type = 'button';
-  closeButton.className = 'jm-lore-icon-button';
-  closeButton.textContent = '×';
-  closeButton.style.width = '30px';
-  closeButton.style.height = '30px';
-  closeButton.style.border = '1px solid rgba(255, 255, 255, 0.12)';
-  closeButton.style.borderRadius = '8px';
-  closeButton.style.background = 'rgba(255, 255, 255, 0.05)';
-  closeButton.style.color = 'inherit';
-  closeButton.style.cursor = 'pointer';
-  closeButton.addEventListener('click', () => {
-    document.getElementById(FALLBACK_MODAL_ID)?.classList.remove('is-open');
-  });
-  header.appendChild(closeButton);
-  wrapper.appendChild(header);
+  try {
+    const imageIndex = await loadImageIndex();
+    const imageNames: string[] = [];
+    entry.imageKeywords.forEach(keyword => {
+      const exactImages = imageIndex[keyword] ?? [];
+      imageNames.push(...exactImages);
 
-  const image = document.createElement('img');
-  image.className = 'jm-lore-popup-image';
-  image.alt = entry.title;
-  image.hidden = true;
-  image.style.width = '100%';
-  image.style.maxHeight = '340px';
-  image.style.objectFit = 'contain';
-  image.style.borderRadius = '10px';
-  image.style.background = 'rgba(255, 255, 255, 0.04)';
-  wrapper.appendChild(image);
-  void fillPopupImage(image, entry);
-
-  const grid = document.createElement('div');
-  grid.className = 'jm-lore-popup-grid';
-  grid.style.display = 'grid';
-  grid.style.gridTemplateColumns = '84px 1fr';
-  grid.style.gap = '8px 12px';
-  grid.style.fontSize = '0.95rem';
-  appendPopupField(grid, '摘要', entry.summary || '无');
-  appendPopupField(grid, '分类', entry.category || '无');
-  appendPopupField(grid, '别名', entry.aliases.length > 0 ? entry.aliases.join(' / ') : '无');
-  appendPopupField(grid, '来源', entry.source || '无');
-  wrapper.appendChild(grid);
-
-  const content = entry.content && entry.content !== entry.summary ? entry.content : '';
-  if (content) {
-    const contentBlock = document.createElement('div');
-    contentBlock.className = 'jm-lore-popup-content';
-    contentBlock.textContent = content;
-    contentBlock.style.whiteSpace = 'pre-wrap';
-    contentBlock.style.wordBreak = 'break-word';
-    wrapper.appendChild(contentBlock);
-  }
-
-  return wrapper;
-}
-
-function appendPopupField(grid: HTMLElement, key: string, value: string) {
-  const keyNode = document.createElement('div');
-  keyNode.className = 'jm-lore-popup-key';
-  keyNode.textContent = key;
-  keyNode.style.opacity = '0.72';
-  keyNode.style.fontWeight = '700';
-  const valueNode = document.createElement('div');
-  valueNode.textContent = value;
-  valueNode.style.whiteSpace = 'pre-wrap';
-  valueNode.style.wordBreak = 'break-word';
-  grid.append(keyNode, valueNode);
-}
-
-async function fillPopupImage(image: HTMLImageElement, entry: LoreEntry) {
-  const imageUrl = await resolveImageUrl(entry);
-  if (!imageUrl) {
-    return;
-  }
-
-  const candidates = buildImageUrlCandidates(imageUrl);
-  if (candidates.length === 0) {
-    return;
-  }
-
-  let index = 0;
-  image.onerror = () => {
-    index += 1;
-    if (index < candidates.length) {
-      image.src = candidates[index];
-      return;
-    }
-
-    image.hidden = true;
-  };
-  image.onload = () => {
-    image.hidden = false;
-  };
-  image.src = candidates[index];
-}
-
-function openFallbackModal(content: HTMLElement) {
-  let modal = document.getElementById(FALLBACK_MODAL_ID);
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = FALLBACK_MODAL_ID;
-    modal.innerHTML = `<div class="jm-lore-modal-card"></div>`;
-    modal.addEventListener('click', event => {
-      if (event.target === modal) {
-        modal?.classList.remove('is-open');
+      if (exactImages.length === 0 && keyword.length >= 3) {
+        Object.entries(imageIndex).forEach(([indexKey, images]) => {
+          if (indexKey.includes(keyword) || keyword.includes(indexKey)) {
+            imageNames.push(...images);
+          }
+        });
       }
     });
-    document.body.appendChild(modal);
+    return uniqueStrings(imageNames).filter(image => image && image !== '非头像.abc');
+  } catch (error) {
+    console.warn('[JM设定百科] 图片索引加载失败。', error);
+    return [];
   }
+}
 
-  const card = modal.querySelector('.jm-lore-modal-card');
-  if (!card) {
+async function loadImageIndex() {
+  if (!imageIndexPromise) {
+    imageIndexPromise = fetch(IMAGE_INDEX_URL).then(async response => {
+      if (!response.ok) {
+        throw new Error(`图片索引加载失败: ${response.status}`);
+      }
+      return (await response.json()) as ImageIndex;
+    });
+  }
+  return imageIndexPromise;
+}
+
+function enhanceVisibleMessages() {
+  $('#chat')
+    .children(".mes[is_user='false'][is_system='false']")
+    .each((_index, node) => {
+      const messageId = Number($(node).attr('mesid'));
+      if (Number.isInteger(messageId)) {
+        enhanceMessage(messageId);
+      }
+    });
+}
+
+function enhanceMessage(messageId: number) {
+  if (!linkRegex || linkCandidates.length === 0) {
     return;
   }
 
-  card.replaceChildren(content);
-  modal.classList.add('is-open');
-}
-
-function scheduleRefreshMessage(messageId: number) {
-  if (destroyed) {
+  const $message = $(`#chat > .mes[mesid='${messageId}']`);
+  if ($message.attr('is_user') === 'true' || $message.attr('is_system') === 'true') {
     return;
   }
 
-  if (highlightTimer !== null) {
-    window.clearTimeout(highlightTimer);
-  }
-
-  highlightTimer = window.setTimeout(() => {
-    highlightTimer = null;
-    enhanceDisplayedMessage(messageId);
-  }, 30);
-}
-
-function scheduleRefreshVisibleMessages() {
-  if (destroyed) {
-    return;
-  }
-
-  if (highlightTimer !== null) {
-    window.clearTimeout(highlightTimer);
-  }
-
-  highlightTimer = window.setTimeout(() => {
-    highlightTimer = null;
-    getVisibleMessageIds().forEach(messageId => enhanceDisplayedMessage(messageId));
-  }, 40);
-}
-
-function getVisibleMessageIds() {
-  return $('#chat .mes[mesid]')
-    .toArray()
-    .map(element => Number((element as HTMLElement).getAttribute('mesid')))
-    .filter(messageId => Number.isFinite(messageId));
-}
-
-function enhanceDisplayedMessage(messageId: number) {
-  const root = resolveMessageTextRoot(messageId);
-  if (!root) {
-    return;
-  }
-
-  clearHighlights(root);
-
-  const state: MessageProcessState = {
-    usedTerms: new Set<string>(),
-    appliedCount: 0,
-  };
-
-  const textNodes = collectEligibleTextNodes(root);
-  for (const textNode of textNodes) {
-    if (state.appliedCount >= MAX_HIGHLIGHTS_PER_MESSAGE) {
-      break;
-    }
-
-    highlightTextNode(textNode, state);
-  }
-}
-
-function resolveMessageTextRoot(messageId: number) {
-  const $displayed = retrieveDisplayedMessage(messageId);
-  if ($displayed.length === 0) {
-    return null;
-  }
-
-  const root = $displayed.hasClass('mes_text')
-    ? ($displayed.get(0) as HTMLElement | undefined)
-    : ($displayed.find('.mes_text').get(0) as HTMLElement | undefined);
-
-  return root ?? null;
-}
-
-function clearHighlights(root: HTMLElement) {
-  root.querySelectorAll(`.${HIGHLIGHT_CLASS}`).forEach(node => {
-    const element = node as HTMLElement;
-    const parent = element.parentNode;
-    if (!parent) {
+  const $display = getDisplayedMessageElement(messageId);
+  $display.each((_index, element) => {
+    if (!(element instanceof HTMLElement) || element.getAttribute(ENHANCED_ATTR) === '1') {
       return;
     }
-
-    parent.replaceChild(document.createTextNode(element.textContent ?? ''), element);
-    parent.normalize();
+    element.setAttribute(ENHANCED_ATTR, '1');
+    enhanceRootElement(element);
   });
 }
 
-function collectEligibleTextNodes(root: HTMLElement) {
+function getDisplayedMessageElement(messageId: number) {
+  if (typeof retrieveDisplayedMessage === 'function') {
+    const displayed = retrieveDisplayedMessage(messageId);
+    if (displayed.length > 0) {
+      return displayed;
+    }
+  }
+  return $(`#chat > .mes[mesid='${messageId}'] .mes_text`);
+}
+
+function enhanceRootElement(root: HTMLElement) {
+  const fullText = root.textContent ?? '';
+  const skipRanges = buildSkipRanges(fullText);
+  const usedEntryIds = new Set<string>();
+  let linkCount = 0;
+  let offset = 0;
+
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
-      if (!(node instanceof Text)) {
-        return NodeFilter.FILTER_REJECT;
-      }
-
-      if (!node.nodeValue || !node.nodeValue.trim()) {
-        return NodeFilter.FILTER_REJECT;
-      }
-
       const parent = node.parentElement;
-      if (!parent || shouldSkipNode(parent)) {
+      if (!parent || parent.closest(ignoredAncestorSelector)) {
         return NodeFilter.FILTER_REJECT;
       }
-
+      const text = node.nodeValue ?? '';
+      if (!text.trim()) {
+        return NodeFilter.FILTER_REJECT;
+      }
       return NodeFilter.FILTER_ACCEPT;
     },
   });
 
-  const nodes: Text[] = [];
-  let current = walker.nextNode();
-  while (current) {
-    nodes.push(current as Text);
-    current = walker.nextNode();
-  }
-  return nodes;
-}
-
-function shouldSkipNode(element: Element) {
-  if (element.closest(`.${HIGHLIGHT_CLASS}`)) {
-    return true;
+  const nodes: Array<{ node: Text; start: number; end: number }> = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    const textLength = node.nodeValue?.length ?? 0;
+    const start = offset;
+    const end = start + textLength;
+    nodes.push({ node, start, end });
+    offset = end;
   }
 
-  const skipSelector = [
-    'a',
-    'pre',
-    'code',
-    'textarea',
-    'input',
-    'select',
-    'button',
-    'script',
-    'style',
-    '[hidden]',
-    '[contenteditable="true"]',
-    '.mes_buttons',
-    '.mes_reasoning',
-    '.mes_reasoning_details',
-    '.mes_prompt',
-    '.displayNone',
-    '.hidden',
-  ].join(',');
-
-  if (element.closest(skipSelector)) {
-    return true;
-  }
-
-  for (let current: Element | null = element; current; current = current.parentElement) {
-    const tagName = current.tagName.toLowerCase();
-    if (/^state\d+$/.test(tagName)) {
-      return true;
-    }
-
-    if (['variableedit', 'datahidden', 'chatdata', 'mesinput'].includes(tagName)) {
-      return true;
-    }
-
-    const style = window.getComputedStyle(current);
-    if (style.display === 'none' || style.visibility === 'hidden') {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function highlightTextNode(textNode: Text, state: MessageProcessState) {
-  const text = textNode.nodeValue ?? '';
-  const loweredText = text.toLocaleLowerCase();
-  const candidates: Array<{ start: number; length: number; term: string; entry: LoreEntry }> = [];
-
-  for (const term of sortedHighlightTerms) {
-    if (state.appliedCount >= MAX_HIGHLIGHTS_PER_MESSAGE) {
-      break;
-    }
-
-    if (state.usedTerms.has(term)) {
-      continue;
-    }
-
-    const index = loweredText.indexOf(term);
-    if (index < 0) {
-      continue;
-    }
-
-    const entry = termToEntry.get(term);
-    if (!entry) {
-      continue;
-    }
-
-    candidates.push({ start: index, length: term.length, term, entry });
-  }
-
-  if (candidates.length === 0) {
-    return;
-  }
-
-  candidates.sort((left, right) => left.start - right.start || right.length - left.length);
-
-  const picks: typeof candidates = [];
-  for (const candidate of candidates) {
-    if (state.usedTerms.has(candidate.term)) {
-      continue;
-    }
-
-    const overlaps = picks.some(
-      pick =>
-        candidate.start < pick.start + pick.length &&
-        pick.start < candidate.start + candidate.length,
-    );
-    if (overlaps) {
-      continue;
-    }
-
-    picks.push(candidate);
-    state.usedTerms.add(candidate.term);
-    state.appliedCount += 1;
-
-    if (state.appliedCount >= MAX_HIGHLIGHTS_PER_MESSAGE) {
-      break;
-    }
-  }
-
-  if (picks.length === 0 || !textNode.parentNode) {
-    return;
-  }
-
-  picks.sort((left, right) => right.start - left.start);
-  for (const pick of picks) {
-    wrapTextRange(textNode, pick.start, pick.start + pick.length, pick.entry);
-  }
-}
-
-function wrapTextRange(textNode: Text, start: number, end: number, entry: LoreEntry) {
-  if (!textNode.parentNode) {
-    return;
-  }
-
-  const range = document.createRange();
-  range.setStart(textNode, start);
-  range.setEnd(textNode, end);
-
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = HIGHLIGHT_CLASS;
-  button.dataset.entryId = entry.id;
-  button.title = `查看设定：${entry.title}`;
-  button.addEventListener('click', event => {
-    event.preventDefault();
-    event.stopPropagation();
-    void openLoreEntryPopup(entry);
-  });
-
-  try {
-    range.surroundContents(button);
-  } catch (error) {
-    console.warn('[JM设定百科脚本] surroundContents failed', { entry: entry.title, error });
-  }
-}
-
-function normalizeLoreEntries(input: unknown) {
-  const records = Array.isArray(input)
-    ? input
-    : typeof input === 'object' && input
-      ? Object.values(input as Record<string, unknown>)
-      : [];
-
-  return records
-    .map((record, index) => normalizeLoreEntry(record, index))
-    .filter((entry): entry is LoreEntry => entry !== null);
-}
-
-function normalizeLoreEntry(record: unknown, index: number): LoreEntry | null {
-  if (!record || typeof record !== 'object') {
-    return null;
-  }
-
-  const source = record as LoreEntryRecord;
-  const title = readString(source, ['title', 'name', '标题', '词条名']) || `未命名词条-${index + 1}`;
-  const aliases = normalizeStringArray([
-    source.aliases,
-    source.alias,
-    source.tags,
-    source.keywords,
-    source['别名'],
-    source['同义词'],
-  ]);
-  const category = readString(source, ['category', 'type', '分类', '类别']);
-  const summary =
-    readString(source, ['summary', 'abstract', '简介', '摘要']) ||
-    readString(source, ['description', 'desc', '说明']);
-  const content =
-    readString(source, ['content', 'text', '正文', '详细内容']) ||
-    summary ||
-    readString(source, ['description', 'desc', '说明']);
-  const sourceText = readString(source, ['source', 'origin', '出处', '来源']);
-  const imageKeywords = normalizeStringArray([
-    source.imageKeywords,
-    source.images,
-    source.imageKeyword,
-    source['图片关键词'],
-  ]);
-
-  const dedupedAliases = aliases.filter(alias => alias && alias !== title);
-  const highlightTerms = uniqueStrings([title, ...dedupedAliases])
-    .filter(term => term.length >= 2)
-    .sort((left, right) => right.length - left.length || left.localeCompare(right, 'zh-Hans-CN'));
-
-  return {
-    id: readString(source, ['id', 'uid']) || `${index}-${title}`,
-    title,
-    aliases: dedupedAliases,
-    category,
-    summary,
-    source: sourceText,
-    content,
-    imageKeywords,
-    searchText: uniqueStrings([title, category, summary, sourceText, ...dedupedAliases]).join(' ').toLocaleLowerCase(),
-    highlightTerms,
-  };
-}
-
-function buildHighlightIndex(entries: LoreEntry[]) {
-  termToEntry = new Map<string, LoreEntry>();
-
-  for (const entry of entries) {
-    for (const rawTerm of entry.highlightTerms) {
-      const term = rawTerm.toLocaleLowerCase();
-      const existing = termToEntry.get(term);
-      if (!existing || entry.title.length > existing.title.length) {
-        termToEntry.set(term, entry);
-      }
-    }
-  }
-
-  sortedHighlightTerms = Array.from(termToEntry.keys()).sort(
-    (left, right) => right.length - left.length || left.localeCompare(right, 'zh-Hans-CN'),
-  );
-}
-
-async function resolveImageUrl(entry: LoreEntry) {
-  if (entry.imageKeywords.length === 0) {
-    return null;
-  }
-
-  const imageIndex = await loadImageIndex();
-  const indexKeys = Object.keys(imageIndex);
-  for (const keyword of entry.imageKeywords) {
-    const normalizedKeyword = keyword.trim().toLocaleLowerCase();
-    const matchedKey =
-      indexKeys.find(key => key.trim().toLocaleLowerCase() === normalizedKeyword) ??
-      indexKeys.find(key => key.trim().toLocaleLowerCase().includes(normalizedKeyword));
-    const fileName = matchedKey ? imageIndex[matchedKey]?.[0] : undefined;
-    if (fileName) {
-      return fileName;
-    }
-  }
-
-  return null;
-}
-
-function loadImageIndex() {
-  if (!activeImageIndexPromise) {
-    activeImageIndexPromise = fetchRemoteImageIndex().catch(error => {
-      console.warn('[JM设定百科脚本] failed to load remote image index, fallback to local', error);
-      return normalizeImageIndex(localImageIndex);
-    });
-  }
-
-  return activeImageIndexPromise;
-}
-
-async function fetchRemoteImageIndex() {
-  for (const url of REMOTE_IMAGE_INDEX_URLS) {
-    try {
-      const response = await fetch(url, { cache: 'force-cache' });
-      if (!response.ok) {
-        continue;
-      }
-
-      const data = (await response.json()) as unknown;
-      const normalized = normalizeImageIndex(data);
-      if (Object.keys(normalized).length > 0) {
-        return normalized;
-      }
-    } catch (error) {
-      console.warn('[JM设定百科脚本] image index fetch failed', { url, error });
-    }
-  }
-
-  return normalizeImageIndex(localImageIndex);
-}
-
-function normalizeImageIndex(input: unknown): ImageIndex {
-  if (!input || typeof input !== 'object') {
-    return {};
-  }
-
-  const result: ImageIndex = {};
-  Object.entries(input as Record<string, unknown>).forEach(([key, value]) => {
-    if (!Array.isArray(value)) {
+  nodes.forEach(({ node, start, end }) => {
+    if (linkCount >= MAX_LINKS_PER_MESSAGE || overlapsSkipRange(start, end, skipRanges)) {
       return;
     }
+    const added = linkifyTextNode(node, usedEntryIds, MAX_LINKS_PER_MESSAGE - linkCount);
+    linkCount += added;
+  });
+}
 
-    const fileNames = value.filter((item): item is string => typeof item === 'string' && item.length > 0);
-    if (fileNames.length > 0) {
-      result[key] = fileNames;
+function buildSkipRanges(text: string) {
+  const ranges: Array<{ start: number; end: number }> = [];
+  const patterns = [
+    /<state\d+>[\s\S]*?<\/state\d+>/giu,
+    /<Variable(?:Think|Insert|Edit|Delete)>[\s\S]*?<\/Variable(?:Think|Insert|Edit|Delete)>/giu,
+    /<era_data>[\s\S]*?<\/era_data>/giu,
+  ];
+
+  patterns.forEach(pattern => {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      ranges.push({ start: match.index, end: match.index + match[0].length });
     }
   });
-  return result;
+
+  return ranges;
 }
 
-function buildImageUrlCandidates(fileName: string) {
-  if (/^https?:\/\//i.test(fileName)) {
-    return [fileName];
+function overlapsSkipRange(start: number, end: number, ranges: Array<{ start: number; end: number }>) {
+  return ranges.some(range => start < range.end && end > range.start);
+}
+
+function linkifyTextNode(node: Text, usedEntryIds: Set<string>, remainingLinks: number) {
+  if (!linkRegex || remainingLinks <= 0) {
+    return 0;
   }
 
-  return IMAGE_BASE_URLS.map(baseUrl => `${baseUrl}${encodeURIComponent(fileName)}`);
-}
+  const text = node.nodeValue ?? '';
+  linkRegex.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let cursor = 0;
+  let added = 0;
+  const fragment = document.createDocumentFragment();
 
-function readString(source: LoreEntryRecord, keys: string[]) {
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
+  while ((match = linkRegex.exec(text)) !== null) {
+    const alias = match[0];
+    const candidate = linkCandidates.find(item => item.alias === alias);
+    if (!candidate) {
+      continue;
+    }
+
+    if (match.index > cursor) {
+      fragment.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+    }
+
+    if (added < remainingLinks && !usedEntryIds.has(candidate.entry.id)) {
+      fragment.appendChild(createLoreLink(alias, candidate.entry));
+      usedEntryIds.add(candidate.entry.id);
+      added += 1;
+    } else {
+      fragment.appendChild(document.createTextNode(alias));
+    }
+
+    cursor = match.index + alias.length;
+    if (added >= remainingLinks) {
+      break;
     }
   }
-  return '';
+
+  if (added === 0) {
+    return 0;
+  }
+
+  if (cursor < text.length) {
+    fragment.appendChild(document.createTextNode(text.slice(cursor)));
+  }
+
+  node.parentNode?.replaceChild(fragment, node);
+  return added;
 }
 
-function normalizeStringArray(values: unknown[]) {
-  const flattened = values.flatMap(value => {
-    if (Array.isArray(value)) {
-      return value;
-    }
-    return typeof value === 'string' ? value.split(/[、,，/|]/g) : [];
-  });
+function createLoreLink(text: string, entry: LoreEntry) {
+  const link = document.createElement('a');
+  link.href = '#';
+  link.className = 'jm-lore-link';
+  link.dataset.entryId = entry.id;
+  link.textContent = text;
+  link.title = entry.title;
+  return link;
+}
 
-  return uniqueStrings(
-    flattened
-      .map(item => (typeof item === 'string' ? item.trim() : ''))
-      .filter(Boolean),
+function installEventListeners() {
+  stops.push(
+    eventOn(tavern_events.CHARACTER_MESSAGE_RENDERED, messageId => {
+      enhanceMessage(Number(messageId));
+    }).stop,
   );
+  stops.push(
+    eventOn(tavern_events.MESSAGE_UPDATED, messageId => {
+      setTimeout(() => enhanceMessage(Number(messageId)), 120);
+    }).stop,
+  );
+  stops.push(
+    eventOn(tavern_events.MESSAGE_SWIPED, messageId => {
+      setTimeout(() => enhanceMessage(Number(messageId)), 120);
+    }).stop,
+  );
+  stops.push(
+    eventOn(tavern_events.MORE_MESSAGES_LOADED, () => {
+      setTimeout(enhanceVisibleMessages, 240);
+    }).stop,
+  );
+  stops.push(
+    eventOn(tavern_events.CHAT_CHANGED, () => {
+      setTimeout(enhanceVisibleMessages, 400);
+    }).stop,
+  );
+
+  $(document).on(`click.${SCRIPT_KEY}`, '.jm-lore-link', event => {
+    event.preventDefault();
+    const entryId = (event.currentTarget as HTMLElement).dataset.entryId;
+    const entry = entryId ? entryById.get(entryId) : null;
+    if (entry) {
+      void showEntryPopup(entry);
+    }
+  });
+
+  $(window).on(`pagehide.${SCRIPT_KEY}`, cleanup);
 }
 
-function uniqueStrings(values: string[]) {
-  return Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
-}
-
-function truncateText(text: string, maxLength: number) {
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  return `${text.slice(0, Math.max(0, maxLength - 1))}…`;
+function cleanup() {
+  stops.splice(0).forEach(stop => stop());
+  $(document).off(`.${SCRIPT_KEY}`);
+  $(window).off(`.${SCRIPT_KEY}`);
+  $(`[script_id='${getSafeScriptId()}']`).remove();
 }
 
 function getPopupApi(): PopupApi | undefined {
@@ -1117,11 +793,25 @@ function getPopupApi(): PopupApi | undefined {
   return parentWindow.SillyTavern || currentWindow.SillyTavern;
 }
 
+function getSafeScriptId() {
+  return typeof getScriptId === 'function' ? getScriptId() : SCRIPT_KEY;
+}
+
+function uniqueStrings(values: string[]) {
+  return [...new Set(values)];
+}
+
+function init() {
+  installStyle();
+  mountUi();
+  installEventListeners();
+  setTimeout(enhanceVisibleMessages, 200);
+  console.info('[JM设定百科] 已加载。', {
+    entries: loreEntries.length,
+    linkCandidates: linkCandidates.length,
+  });
+}
+
 $(() => {
-  try {
-    init();
-  } catch (error) {
-    console.error('[JM设定百科脚本] init failed', error);
-    throw error;
-  }
+  errorCatched(init)();
 });

@@ -1,170 +1,106 @@
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, '../../..');
-const characterRoot = path.join(repoRoot, '角色卡/JM帝国');
-const indexPath = path.join(characterRoot, 'index.yaml');
-const outputPath = path.join(__dirname, 'lore-entries.json');
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(scriptDir, '../../..');
+const indexPath = path.join(repoRoot, '角色卡', 'JM帝国', 'index.yaml');
+const outputPath = path.join(scriptDir, 'lore-entries.json');
 
-const allowedCategoryHints = [
-  '世界观元数据',
-  '核心规则',
-  '规则详情',
-  '法律详情',
-  '比赛规则详情',
-  '势力详情',
-  '势力总览',
-  '组织详情',
-  '机构详情',
-  '机构总览',
-  '人物详情',
-  '人物档案',
-  '职业详情',
-  '帝国职业体系',
-  '产品详情',
-  '产品档案',
-  '产品系列详情',
-  '技术详情',
-  '事件详情',
-  '赛事详情',
-  '场所详情',
-  '设施详情',
-  '地点详情',
-  '道具详情',
-  '装备详情',
-  '设备详情',
-  '制度详情',
-  '历史详情',
-  '历史背景',
-  '文化详情',
-  '流程详情',
-  '概念详情',
-  '现象详情',
-  '生物详情',
-  '产业详情',
-  '教学详情',
-  '训练详情',
-  '娱乐详情',
-  '物品详情',
-  '社会详情',
-  '单位详情',
-  '女畜详情',
-  '改造单位',
-  '改造单位详情',
-  '达维娜系统',
-  '人体改造技术',
-  '女体家具',
-  '女体化公共设施',
-  '女性生命周期',
-  '帝国仪式',
-  '帝国娱乐',
-];
-
-const excludedPatterns = [
-  /cot/i,
-  /输出提示词/,
-  /变量指导/,
-  /user指导/i,
-  /行动建议/,
-  /状态栏/,
-  /高难身份路线/,
-  /文风/,
-  /LLM抗/,
-  /亲密度/,
-  /男user规则/i,
-];
-
-const excludedContentPatterns = [
-  /<%/,
-  /<Variable_Format>/i,
-  /<writing_style>/i,
-  /<Card_CoT>/i,
-  /<options>/i,
-  /#user经历和遭遇的指导/,
-];
-
-const stopAutoLinkTerms = new Set([
-  '帝国',
-  '女性',
-  '男性',
-  '世界',
+const CATEGORY_PREFIXES = [
+  '人物',
   '组织',
-  '势力',
-  '规则',
-  '法律',
   '职业',
   '产品',
   '设施',
-  '技术',
-  '事件',
-  '人物',
-  '地点',
-  '女体',
-  '组织',
-  '机构',
-  '社会',
-  '场所',
-  '地点',
   '道具',
   '物品',
-  '装备',
-  '设备',
-  '法则',
-  '制度',
-  '流程',
+  '地点',
+  '事件',
+  '技术',
+  '规则',
+  '法律',
+  '概念',
+  '生物',
+  '机构',
+  '势力',
+  '改造单位',
+  '女畜',
+  '单位',
   '文化',
   '历史',
-  '概念',
-  '现象',
-  '详情',
-  '总览',
-  '概览',
-  '档案',
-  '体系',
-  '元数据',
-  '提示词',
-  '文风',
-  '指导',
-  '模型',
-  '性奴',
-  '奴隶',
-  '世界信息',
-  '核心设定',
-  '核心规则',
-]);
-
-const yamlSummaryKeys = [
-  'summary',
-  '简介',
-  '概述',
-  'description',
-  '描述',
-  'core_concept',
-  'core_principle',
-  'core_rule',
-  'core_business',
-  'primary_function',
-  'overview',
-  'background',
-  'reputation',
-  'target_group',
-  '核心概念',
-  '核心原则',
-  'type',
-  '类型',
-  '设计理念',
-  '背景故事',
-  '功能',
-  'purpose',
-  '用途',
-  '定义',
+  '流程',
+  '训练',
+  '教学',
+  '社会',
+  '娱乐',
+  '赛事',
+  '制度',
+  '设备',
+  '系统',
 ];
 
-const normalizeSlash = value => String(value ?? '').replace(/\\/g, '/');
+const EXCLUDE_TOKENS = [
+  'cot',
+  '输出提示词',
+  '变量指导',
+  'user指导',
+  '行动建议',
+  '状态栏',
+  '高难身份路线',
+];
+
+const SUMMARY_KEYS = [
+  'description',
+  '概述',
+  'summary',
+  '介绍',
+  '说明',
+  '背景',
+  'background',
+  '定位',
+  '用途',
+  'location',
+  'primary_function',
+  'purpose',
+  'type',
+  'product_type',
+  'Product_positioning',
+  'core_rule',
+  'target_group',
+];
+
+const TITLE_KEYS = [
+  'name',
+  '名称',
+  'title',
+  '产品名称',
+  '产品名',
+  '产品型号',
+  '产品系列',
+  '设备名称',
+];
+
+const ALIAS_KEYS = [
+  'aliases',
+  '别称',
+  '别名',
+];
+
+const GENERIC_NO_AUTOLINK = new Set([
+  '帝国',
+  '女性',
+  '男性',
+  '世界观',
+  '世界书',
+  '元数据',
+]);
+
+function toPosix(relPath) {
+  return relPath.replace(/\\/g, '/');
+}
 
 function normalizeText(value) {
   return String(value ?? '')
@@ -173,255 +109,396 @@ function normalizeText(value) {
     .trim();
 }
 
-function clipSummary(value, maxLength = 150) {
-  const text = normalizeText(value)
-    .replace(/^[-*]\s*/, '')
-    .replace(/^["'“”]+|["'“”]+$/g, '');
-  if (text.length <= maxLength) {
-    return text;
-  }
-  return `${text.slice(0, maxLength).replace(/[，。；、,.:\s]+$/u, '')}...`;
-}
-
-function uniqueStrings(values) {
-  const seen = new Set();
+function uniq(values) {
   const result = [];
-  values
-    .map(value => normalizeText(value))
-    .filter(Boolean)
-    .forEach(value => {
-      if (!seen.has(value)) {
-        seen.add(value);
-        result.push(value);
-      }
-    });
+  const seen = new Set();
+  for (const value of values) {
+    const text = normalizeText(value);
+    if (!text || seen.has(text)) {
+      continue;
+    }
+    seen.add(text);
+    result.push(text);
+  }
   return result;
 }
 
-function stripKnownSuffix(value) {
-  return value
-    .replace(/\.(ya?ml|txt)$/i, '')
-    .replace(/_省token版$/u, '')
-    .replace(/_详细版$/u, '')
-    .replace(/_详细$/u, '')
-    .replace(/_总览$/u, '总览')
-    .replace(/_$/u, '')
-    .trim();
+function splitKeywords(text) {
+  return String(text ?? '')
+    .split(/[、，,;；/|·•\s]+/)
+    .map(item => item.trim())
+    .filter(Boolean);
 }
 
-function splitCategoryAndTitle(entryName, fileName) {
-  const candidates = [entryName, stripKnownSuffix(fileName)];
-  for (const candidate of candidates) {
-    const cleaned = stripKnownSuffix(candidate).replace(/_/g, ' ').trim();
-    const separatorMatch = cleaned.match(/^(.+?)\s*[-:：]\s*(.+)$/u);
-    if (separatorMatch) {
-      return {
-        category: normalizeText(separatorMatch[1]),
-        title: normalizeText(separatorMatch[2]),
-      };
-    }
+function cleanLabel(label) {
+  const raw = normalizeText(label);
+  if (!raw) {
+    return '';
+  }
+  const withoutWrapper = raw.replace(/^<\s*/, '').replace(/\s*>$/, '').replace(/^#\s*/, '');
+  const categoryMatch = withoutWrapper.match(
+    new RegExp(
+      `^((?:${CATEGORY_PREFIXES.map(escapeRegExp).join('|')})(?:档案|详情|总览|概览|体系|背景)?)\\s*(?:[-－_：:]+\\s*)?(.*)$`,
+    ),
+  );
+  if (categoryMatch && normalizeText(categoryMatch[2])) {
+    return normalizeText(categoryMatch[2]);
+  }
+  const slashSplit = withoutWrapper.split(/\s*[-－]\s*|_{1,3}/).map(item => item.trim()).filter(Boolean);
+  if (slashSplit.length > 1) {
+    return slashSplit[slashSplit.length - 1];
+  }
+  return withoutWrapper.trim();
+}
 
-    const doubleUnderscoreMatch = stripKnownSuffix(candidate).match(/^(.+?)__([^_]+)(?:_.+)?$/u);
-    if (doubleUnderscoreMatch) {
-      return {
-        category: normalizeText(doubleUnderscoreMatch[1].replace(/_/g, ' ')),
-        title: normalizeText(doubleUnderscoreMatch[2]),
-      };
-    }
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-    const detailMatch = stripKnownSuffix(candidate).match(/^(.+?)_-_(.+)$/u);
-    if (detailMatch) {
-      return {
-        category: normalizeText(detailMatch[1]),
-        title: normalizeText(detailMatch[2]),
-      };
+function readScalarFromObject(source, keys) {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) {
+    return undefined;
+  }
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
     }
   }
+  return undefined;
+}
 
+function readAliasesFromObject(source) {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) {
+    return [];
+  }
+  for (const key of ALIAS_KEYS) {
+    const value = source[key];
+    if (Array.isArray(value)) {
+      return value.flatMap(item => splitKeywords(item));
+    }
+    if (typeof value === 'string' && value.trim()) {
+      return splitKeywords(value);
+    }
+  }
+  return [];
+}
+
+function tryParseYaml(text) {
+  try {
+    const parsed = YAML.parse(text);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch {
+    // Fall back to line scanning for the mixed txt formats in this worldbook.
+  }
+  return null;
+}
+
+function extractBlockValue(lines, startIndex) {
+  const startLine = lines[startIndex] ?? '';
+  const baseIndent = (startLine.match(/^\s*/)?.[0].length ?? 0);
+  const collected = [];
+  let sawContent = false;
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!line.trim()) {
+      if (sawContent) {
+        collected.push('');
+      }
+      continue;
+    }
+    const indent = line.match(/^\s*/)?.[0].length ?? 0;
+    if (indent <= baseIndent) {
+      break;
+    }
+    sawContent = true;
+    collected.push(line.slice(Math.min(line.length, baseIndent + 2)).trimEnd());
+  }
+  return normalizeText(collected.join('\n'));
+}
+
+function extractScalarFromLines(text, keys) {
+  const lines = text.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    for (const key of keys) {
+      const match = line.match(new RegExp(`^\\s*${escapeRegExp(key)}\\s*[:：]\\s*(.*)$`));
+      if (!match) {
+        continue;
+      }
+      const rest = match[1].trim();
+      if (rest === '|' || rest === '>-'
+        || rest === '|-'
+        || rest === '>') {
+        const block = extractBlockValue(lines, index);
+        if (block) {
+          return block;
+        }
+      }
+      if (rest) {
+        return normalizeText(rest.replace(/^['"]|['"]$/g, ''));
+      }
+    }
+  }
+  return undefined;
+}
+
+function extractTitleAndAliases(text) {
+  const parsed = tryParseYaml(text);
+  const title = normalizeText(readScalarFromObject(parsed, TITLE_KEYS));
+  const aliases = readAliasesFromObject(parsed);
   return {
-    category: normalizeText(entryName.split(/\s+/u)[0] || '设定'),
-    title: normalizeText(stripKnownSuffix(entryName || fileName)),
+    title: title || undefined,
+    aliases,
   };
 }
 
-function isAllowedEntry(entryName, sourceFile) {
-  const target = `${entryName} ${sourceFile}`;
-  if (excludedPatterns.some(pattern => pattern.test(target))) {
-    return false;
+function extractHeaderTitle(text) {
+  const firstRelevant = text.split(/\r?\n/).find(line => normalizeText(line));
+  if (!firstRelevant) {
+    return undefined;
   }
-  return allowedCategoryHints.some(hint => target.includes(hint));
+  const tagMatch = firstRelevant.match(/^<\s*([^>]+?)\s*>$/);
+  if (tagMatch) {
+    return normalizeText(tagMatch[1]);
+  }
+  const headerMatch = firstRelevant.match(/^#\s*([^:：]+?)\s*[:：]\s*(.+)$/);
+  if (headerMatch) {
+    return normalizeText(headerMatch[2]);
+  }
+  return undefined;
 }
 
-async function resolveSourceFile(sourceFile) {
-  const normalized = normalizeSlash(sourceFile);
-  const basePath = path.join(characterRoot, normalized);
-  const candidates = [basePath, `${basePath}.yaml`, `${basePath}.yml`, `${basePath}.txt`];
-  for (const candidate of candidates) {
-    try {
-      const stat = await fs.stat(candidate);
-      if (stat.isFile()) {
-        return candidate;
+function extractSummary(text) {
+  const parsed = tryParseYaml(text);
+  const parsedSummary = normalizeText(readScalarFromObject(parsed, SUMMARY_KEYS));
+  if (parsedSummary) {
+    return shortenSummary(parsedSummary);
+  }
+
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    for (const [key, value] of Object.entries(parsed)) {
+      if (['name', '名称', 'title', ...ALIAS_KEYS].includes(key)) {
+        continue;
       }
-    } catch {
-      // Try the next extension.
+      if (typeof value === 'string' && value.trim()) {
+        return shortenSummary(value);
+      }
+    }
+  }
+
+  const scalarSummary = extractScalarFromLines(text, SUMMARY_KEYS);
+  if (scalarSummary) {
+    return shortenSummary(scalarSummary);
+  }
+
+  const lines = text.split(/\r?\n/);
+  const paragraph = [];
+  let seenBody = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (paragraph.length > 0) {
+        break;
+      }
+      continue;
+    }
+    if (
+      trimmed.startsWith('<') ||
+      trimmed.startsWith('#') ||
+      /^(name|名称|title|aliases|别称|别名|type|类别|产品名称|产品名|定位|目标|制造商|price|primary_function|background|description|概述|summary|介绍|说明|用途|core_rule|target_group|requirements|modifications|special_services|components|working_principle|usage_protocol)\s*[:：]/i.test(trimmed)
+    ) {
+      if (!seenBody) {
+        continue;
+      }
+      if (paragraph.length > 0) {
+        break;
+      }
+      continue;
+    }
+    seenBody = true;
+    paragraph.push(trimmed);
+  }
+  return shortenSummary(normalizeText(paragraph.join(' ')));
+}
+
+function shortenSummary(text) {
+  const normalized = normalizeText(text);
+  if (!normalized) {
+    return '';
+  }
+  const maxLength = 100;
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  const punctuation = ['。', '！', '？', '.', '!', '?', '；', ';'];
+  for (const mark of punctuation) {
+    const cut = normalized.slice(0, maxLength).lastIndexOf(mark);
+    if (cut > 30) {
+      return normalized.slice(0, cut + 1);
+    }
+  }
+  return `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+function inferCategoryFromText(entryName, sourceStem, sourceText, title) {
+  const label = `${entryName} ${sourceStem} ${title} ${sourceText.slice(0, 200)}`;
+  if (/^世界观元数据/.test(sourceStem) || /^世界观元数据/.test(entryName)) {
+    return null;
+  }
+  if (/^人物/.test(sourceStem) || /^人物/.test(entryName)) return '人物';
+  if (/^组织/.test(sourceStem) || /^组织/.test(entryName)) return '组织';
+  if (/^职业/.test(sourceStem) || /^职业/.test(entryName)) return '职业';
+  if (/^产品/.test(sourceStem) || /^产品/.test(entryName)) return '产品';
+  if (/^设施/.test(sourceStem) || /^设施/.test(entryName)) return '设施';
+  if (/^道具/.test(sourceStem) || /^道具/.test(entryName)) return '道具';
+  if (/^物品/.test(sourceStem) || /^物品/.test(entryName)) return '物品';
+  if (/^地点/.test(sourceStem) || /^场所/.test(entryName) || /^地点/.test(entryName)) return '地点';
+  if (/^事件/.test(sourceStem) || /^事件/.test(entryName)) return '事件';
+  if (/^技术/.test(sourceStem) || /^技术/.test(entryName)) return '技术';
+  if (/^规则/.test(sourceStem) || /^规则/.test(entryName)) return '规则';
+  if (/^法律/.test(sourceStem) || /^法律/.test(entryName)) return '法律';
+  if (/^概念/.test(sourceStem) || /^概念/.test(entryName)) return '概念';
+  if (/^生物/.test(sourceStem) || /^生物/.test(entryName)) return '生物';
+  if (/^机构/.test(sourceStem) || /^机构/.test(entryName)) return '机构';
+  if (/^势力/.test(sourceStem) || /^势力/.test(entryName)) return '势力';
+  if (/^改造单位/.test(sourceStem) || /^改造单位/.test(entryName)) return '改造单位';
+  if (/^女畜/.test(sourceStem) || /^女畜/.test(entryName)) return '女畜';
+  if (/^单位/.test(sourceStem) || /^单位/.test(entryName)) return '单位';
+  if (/^文化/.test(sourceStem) || /^文化/.test(entryName)) return '文化';
+  if (/^历史/.test(sourceStem) || /^历史/.test(entryName)) return '历史';
+  if (/^流程/.test(sourceStem) || /^流程/.test(entryName)) return '流程';
+  if (/^训练/.test(sourceStem) || /^训练/.test(entryName)) return '训练';
+  if (/^教学/.test(sourceStem) || /^教学/.test(entryName)) return '教学';
+  if (/^社会/.test(sourceStem) || /^社会/.test(entryName)) return '社会';
+  if (/^娱乐/.test(sourceStem) || /^娱乐/.test(entryName)) return '娱乐';
+  if (/^赛事/.test(sourceStem) || /^赛事/.test(entryName)) return '赛事';
+  if (/^制度/.test(sourceStem) || /^制度/.test(entryName)) return '制度';
+  if (/^设备/.test(sourceStem) || /^设备/.test(entryName)) return '设备';
+  if (/^系统/.test(sourceStem) || /^系统/.test(entryName)) return '系统';
+
+  if (/革命军/.test(label)) return '势力';
+  if (/军事组织|姐妹会|朝圣者|狂欢者/.test(label)) return '组织';
+  if (/阿肯托尔/.test(label)) return '组织';
+  if (/箱娘|军用慰安妇/.test(label)) return '单位';
+  if (/帝国代表性职业体系/.test(label)) return '职业';
+  if (/女性生命周期|社会法则|职业体系|生育体系|风俗总览|社会核心机构/.test(label)) {
+    return '社会';
+  }
+  if (/^\s*<.+>\s*$/.test(sourceText.split(/\r?\n/).find(line => normalizeText(line)) ?? '')) {
+    return null;
+  }
+  return null;
+}
+
+function shouldExclude(entryName, sourceStem, title) {
+  const probe = [entryName, sourceStem, title].filter(Boolean).join(' ');
+  return EXCLUDE_TOKENS.some(token => probe.includes(token));
+}
+
+function buildId(sourceRelativePath, title) {
+  const stem = sourceRelativePath.replace(/\.[^.]+$/, '');
+  return stem
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^\w\u4e00-\u9fff/.-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '') || normalizeText(title);
+}
+
+function buildImageKeywords(title, aliases, category, indexLabel) {
+  const keywords = [
+    title,
+    ...aliases,
+    indexLabel && indexLabel !== title ? indexLabel : '',
+    category,
+  ];
+  for (const item of [...aliases, title, indexLabel]) {
+    for (const token of splitKeywords(item)) {
+      keywords.push(token);
+    }
+  }
+  return uniq(keywords.filter(Boolean));
+}
+
+function shouldAutoLink(title, aliases) {
+  const probe = [title, ...aliases];
+  if (probe.some(item => GENERIC_NO_AUTOLINK.has(item))) {
+    return false;
+  }
+  return true;
+}
+
+function resolveWorldbookFile(relativeReference) {
+  const normalized = relativeReference.replace(/\\/g, path.sep).replace(/^\/+/, '');
+  const directPath = path.join(repoRoot, '角色卡', 'JM帝国', normalized);
+  const candidates = path.extname(directPath)
+    ? [directPath]
+    : [ `${directPath}.yaml`, `${directPath}.yml`, `${directPath}.txt` ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
     }
   }
   return null;
 }
 
-function valueToSummary(value) {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return clipSummary(value);
-  }
-  if (Array.isArray(value)) {
-    return clipSummary(value.map(item => valueToSummary(item)).filter(Boolean).join('；'));
-  }
-  if (typeof value === 'object') {
-    return clipSummary(
-      Object.entries(value)
-        .slice(0, 4)
-        .map(([key, item]) => `${key}: ${valueToSummary(item)}`)
-        .filter(Boolean)
-        .join('；'),
-    );
-  }
-  return '';
-}
-
-function extractYamlSummary(text) {
-  let data;
-  try {
-    data = YAML.parse(text);
-  } catch {
-    return '';
-  }
-  if (!data || typeof data !== 'object') {
-    return '';
-  }
-
-  for (const key of yamlSummaryKeys) {
-    if (Object.prototype.hasOwnProperty.call(data, key)) {
-      const summary = valueToSummary(data[key]);
-      if (summary) {
-        return summary;
-      }
-    }
-  }
-
-  const firstUsefulEntry = Object.entries(data).find(([key, value]) => {
-    if (/^(name|名称|id|manufacturer|制造商)$/iu.test(key)) {
-      return false;
-    }
-    return valueToSummary(value).length >= 12;
-  });
-  return firstUsefulEntry ? valueToSummary(firstUsefulEntry[1]) : '';
-}
-
-function extractTextSummary(text) {
-  const lines = text
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
-    .filter(line => !line.startsWith('#'))
-    .filter(line => !/^<\/?[^>]+>$/.test(line))
-    .filter(line => !/^(<%|%>)/.test(line));
-
-  for (const line of lines) {
-    const bracketMatch = line.match(/^\[([^:：\]]+)[:：]\s*([^\]]+)\]$/u);
-    if (bracketMatch) {
-      return clipSummary(`${bracketMatch[1]}：${bracketMatch[2]}`);
-    }
-    if (line.length >= 12 && !line.includes('{{') && !line.includes('<state')) {
-      return clipSummary(line.replace(/^[\s\-*]+/u, ''));
-    }
-  }
-  return '';
-}
-
-function buildAliases({ title, entryName, keywords, fileName }) {
-  const fileTitle = splitCategoryAndTitle(entryName, fileName).title;
-  const baseAliases = uniqueStrings([
-    title,
-    fileTitle,
-    entryName,
-    stripKnownSuffix(fileName),
-    ...keywords,
-  ]);
-  const normalizedAliases = baseAliases.flatMap(alias => {
-    const noMiddleDot = alias.replace(/[·・\s]/gu, '');
-    const noDecorators = alias.replace(/[《》“”"']/gu, '');
-    const modelMatch = alias.match(/\b[A-Z]+[- ][A-Z0-9]+|\b[A-Z]-[A-Z0-9]+\b/iu);
-    return [alias, noMiddleDot, noDecorators, modelMatch?.[0] ?? ''];
-  });
-  return uniqueStrings(normalizedAliases).filter(alias => alias.length >= 2);
-}
-
-function shouldAutoLink(entry) {
-  const candidates = [entry.title, ...entry.aliases].filter(alias => alias.length >= 3);
-  return candidates.some(alias => !stopAutoLinkTerms.has(alias));
-}
-
 async function main() {
   const indexText = await fs.readFile(indexPath, 'utf8');
   const indexData = YAML.parse(indexText);
-  const entries = Array.isArray(indexData?.['条目']) ? indexData['条目'] : [];
-
-  const loreEntries = [];
-  const usedIds = new Set();
+  const entries = Array.isArray(indexData?.条目) ? indexData.条目 : [];
+  const results = [];
 
   for (const entry of entries) {
-    const entryName = normalizeText(entry?.['名称']);
-    const sourceFile = normalizeSlash(entry?.['文件']);
-    if (!entryName || !sourceFile || !isAllowedEntry(entryName, sourceFile)) {
+    if (!entry || typeof entry !== 'object') {
       continue;
     }
-
-    const sourcePath = await resolveSourceFile(sourceFile);
+    const entryName = normalizeText(entry.名称 ?? entry.name ?? '');
+    const sourceReference = normalizeText(entry.文件 ?? entry.file ?? '');
+    if (!entryName || !sourceReference) {
+      continue;
+    }
+    const sourcePath = resolveWorldbookFile(sourceReference);
     if (!sourcePath) {
       continue;
     }
-
-    const fileText = await fs.readFile(sourcePath, 'utf8');
-    if (excludedContentPatterns.some(pattern => pattern.test(fileText))) {
+    const sourceText = await fs.readFile(sourcePath, 'utf8');
+    const sourceStem = path.basename(sourcePath, path.extname(sourcePath));
+    const parsed = extractTitleAndAliases(sourceText);
+    const headerTitle = extractHeaderTitle(sourceText);
+    const title = normalizeText(parsed.title || headerTitle || cleanLabel(entryName) || cleanLabel(sourceStem));
+    const category = inferCategoryFromText(entryName, sourceStem, sourceText, title);
+    if (!category) {
       continue;
     }
-    const fileName = path.basename(sourcePath);
-    const { category, title } = splitCategoryAndTitle(entryName, fileName);
-    const keywords = Array.isArray(entry?.['激活策略']?.['关键字']) ? entry['激活策略']['关键字'] : [];
-    const aliases = buildAliases({ title, entryName, keywords, fileName });
-    const relativeSource = normalizeSlash(path.relative(repoRoot, sourcePath));
-    const idBase = stripKnownSuffix(normalizeSlash(sourceFile).replace(/^世界书\//u, '')).replace(/[^\p{Letter}\p{Number}]+/gu, '_');
-    let id = idBase;
-    let suffix = 2;
-    while (usedIds.has(id)) {
-      id = `${idBase}_${suffix}`;
-      suffix += 1;
+    if (shouldExclude(entryName, sourceStem, title)) {
+      continue;
     }
-    usedIds.add(id);
-
-    const isYaml = /\.ya?ml$/i.test(sourcePath);
-    const summary = isYaml ? extractYamlSummary(fileText) : extractTextSummary(fileText);
-    const loreEntry = {
-      id,
+    const rawAliases = uniq([
+      ...parsed.aliases,
+      cleanLabel(entryName),
+      cleanLabel(sourceStem),
+    ]);
+    const aliases = rawAliases.filter(alias => alias && alias !== title);
+    const summary = extractSummary(sourceText);
+    results.push({
+      id: buildId(toPosix(path.relative(repoRoot, sourcePath)), title),
       title,
       category,
       aliases,
-      summary: summary || `${title}：来自 JM 帝国世界书的设定词条，建议后续人工补充精简摘要。`,
-      sourceFile: relativeSource,
-      imageKeywords: uniqueStrings([title, ...aliases]).filter(alias => alias.length >= 3 && !stopAutoLinkTerms.has(alias)).slice(0, 4),
-      autoLink: true,
-    };
-    loreEntry.autoLink = shouldAutoLink(loreEntry);
-    loreEntries.push(loreEntry);
+      summary,
+      sourceFile: toPosix(path.relative(repoRoot, sourcePath)),
+      imageKeywords: buildImageKeywords(title, aliases, category, cleanLabel(entryName)),
+      autoLink: shouldAutoLink(title, aliases),
+    });
   }
 
-  loreEntries.sort((a, b) => a.category.localeCompare(b.category, 'zh-Hans-CN') || a.title.localeCompare(b.title, 'zh-Hans-CN'));
-  await fs.writeFile(outputPath, `${JSON.stringify(loreEntries, null, 2)}\n`, 'utf8');
-  console.info(`Generated ${loreEntries.length} lore entries -> ${path.relative(repoRoot, outputPath)}`);
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+  await fs.writeFile(outputPath, `${JSON.stringify(results, null, 2)}\n`, 'utf8');
+  console.log(`Generated ${results.length} lore entries -> ${toPosix(path.relative(repoRoot, outputPath))}`);
 }
 
 main().catch(error => {
