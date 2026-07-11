@@ -5,9 +5,18 @@ import { allEntriesData, getSelectedEntries } from '../state.js';
 import { ensureNumericUID, errorCatched } from '../utils.js';
 import { batchUpdateEntries } from './batchActions.js';
 import { getRenderableEntriesWithoutFolderMeta } from './folderMeta.js';
+import {
+  applyCompareContentOverwritePlan,
+  buildCompareAddedEntryPlan,
+  buildCompareContentOverwritePlan,
+  buildLorebookCompareResult as buildLorebookCompareResultFromEntries,
+  getCompareItemsForFilter,
+} from './optimizerCompare.js';
 
 const LOREBOOK_COMPARE_MODAL_ID = 'lorebook-compare-preview-modal';
 const LOREBOOK_COMPARE_STYLE_ID = 'lorebook-compare-preview-styles';
+const LOREBOOK_COMPARE_ADD_BUTTON_ID = 'lorebook-compare-add-missing-button';
+const LOREBOOK_COMPARE_OVERWRITE_BUTTON_ID = 'lorebook-compare-overwrite-content-button';
 
 function ensureLorebookCompareStyles() {
   const parentDoc = window.parent.document;
@@ -23,7 +32,10 @@ function ensureLorebookCompareStyles() {
       #${LOREBOOK_COMPARE_MODAL_ID}-body{padding:16px 18px;display:flex;flex-direction:column;gap:14px;flex:1 1 auto}
       #${LOREBOOK_COMPARE_MODAL_ID}-footer{padding:15px 20px;border-top:1px solid rgba(255,255,255,.1);background:var(--panel-entry-bg-color,rgba(0,0,0,.2));border-bottom-left-radius:12px;border-bottom-right-radius:12px;display:flex;justify-content:flex-end;align-items:center;gap:10px}
       #${LOREBOOK_COMPARE_MODAL_ID}-footer button,#${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar button,#${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-actions button{padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-size:.9em}
+      #${LOREBOOK_COMPARE_MODAL_ID}-footer button:disabled,#${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar button:disabled,#${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-actions button:disabled{opacity:.45;cursor:not-allowed}
       #${LOREBOOK_COMPARE_MODAL_ID}-close,#${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar .secondary{background:var(--panel-entry-bg-color,#555);color:#fff}
+      #${LOREBOOK_COMPARE_MODAL_ID}-footer .compare-footer-primary{background:#3f7d5e;color:#fff}
+      #${LOREBOOK_COMPARE_MODAL_ID}-footer .compare-footer-danger{background:#8a4f4f;color:#fff}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar-actions button{background:rgba(255,255,255,.08);color:#f0f0f0}
@@ -490,8 +502,9 @@ function buildEntryDiffsV2(baseEntry, targetEntry) {
   return diffs;
 }
 
-async function getComparableLorebookEntries(lorebookName) {
-  const cachedEntries = Array.isArray(allEntriesData[lorebookName]) ? allEntriesData[lorebookName] : null;
+async function getComparableLorebookEntries(lorebookName, options = {}) {
+  const cachedEntries =
+    !options.forceFresh && Array.isArray(allEntriesData[lorebookName]) ? allEntriesData[lorebookName] : null;
   let rawEntries = cachedEntries;
   if (!rawEntries) {
     const result = await getWorldbookSafe(lorebookName);
@@ -847,6 +860,34 @@ function renderCompareEntryCardV3(item, result, index) {
   `;
 }
 
+function getCompareBatchCounts(result) {
+  const items = Array.isArray(result?.items) ? result.items : [];
+  return {
+    added: items.filter(item => item?.type === 'added').length,
+    contentOverwrite: items.filter(item => item?.type === 'modified' && item.hasContentDiff).length,
+  };
+}
+
+function updateCompareBatchActionState($modal, result) {
+  const { added, contentOverwrite } = getCompareBatchCounts(result);
+  const $addButton = $(`#${LOREBOOK_COMPARE_ADD_BUTTON_ID}`, $modal);
+  const $overwriteButton = $(`#${LOREBOOK_COMPARE_OVERWRITE_BUTTON_ID}`, $modal);
+
+  $addButton
+    .text(added > 0 ? `批量添加差异条目 (${added})` : '批量添加差异条目')
+    .prop('disabled', added === 0)
+    .attr('title', added > 0 ? `向当前世界书添加 ${added} 个仅在对比世界书中存在的条目` : '没有可添加的差异条目');
+  $overwriteButton
+    .text(contentOverwrite > 0 ? `批量覆盖内容 (${contentOverwrite})` : '批量覆盖内容')
+    .prop('disabled', contentOverwrite === 0)
+    .attr(
+      'title',
+      contentOverwrite > 0
+        ? `用对比世界书正文覆盖 ${contentOverwrite} 个当前世界书条目`
+        : '没有可覆盖正文的修改条目',
+    );
+}
+
 function renderLorebookCompareResult() {
   const parentDoc = window.parent.document;
   const $modal = $(`#${LOREBOOK_COMPARE_MODAL_ID}`, parentDoc);
@@ -858,13 +899,15 @@ function renderLorebookCompareResult() {
   if (!result) {
     $summary.text('暂无比对结果。');
     $list.empty();
+    updateCompareBatchActionState($modal, null);
     return;
   }
 
   $('.compare-filter-button', $modal).removeClass('active');
   $(`.compare-filter-button[data-compare-filter="${filter}"]`, $modal).addClass('active');
 
-  const filteredItems = filter === 'all' ? result.items : result.items.filter(item => item.type === filter);
+  const filteredItems = getCompareItemsForFilter(result, filter);
+  updateCompareBatchActionState($modal, result);
 
   $summary.html(
     `当前世界书 <strong>${_.escape(result.baseName)}</strong> 对比 <strong>${_.escape(result.targetName)}</strong>。
@@ -876,7 +919,9 @@ function renderLorebookCompareResult() {
     return;
   }
 
-  $list.html(filteredItems.map((item, index) => renderCompareEntryCardV3(item, result, index)).join(''));
+  $list.html(
+    filteredItems.map(({ item, originalIndex }) => renderCompareEntryCardV3(item, result, originalIndex)).join(''),
+  );
 }
 
 export function initOptimizer() {
