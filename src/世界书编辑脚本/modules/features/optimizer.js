@@ -1340,6 +1340,68 @@ const applyLorebookCompareSettingsOverwrite = errorCatched(async $button => {
   }
 }, 'applyLorebookCompareSettingsOverwrite');
 
+const applyLorebookCompareEntryOverwrite = errorCatched(async $button => {
+  const parentDoc = window.parent.document;
+  const $modal = $(`#${LOREBOOK_COMPARE_MODAL_ID}`, parentDoc);
+  const baseResult = $modal.data('compare-result');
+  const { result, isSingle, item } = getScopedCompareActionResult(baseResult, $button);
+  const plannedCount = getCompareBatchCounts(result).entryOverwrite;
+
+  if (!result?.baseName || plannedCount === 0) {
+    window.toastr?.info('没有可覆盖整条的修改条目。');
+    return;
+  }
+
+  const confirmMessage = isSingle
+    ? `确定用“${result.targetName}”的完整条目覆盖“${result.baseName}”中的条目“${item?.title || '未命名条目'}”吗？当前 UID 和文件夹归属会保留。`
+    : `确定用“${result.targetName}”的完整条目覆盖“${result.baseName}”中 ${plannedCount} 个同名条目吗？当前 UID 和文件夹归属会保留。`;
+  if (!window.confirm(confirmMessage)) {
+    return;
+  }
+
+  const originalText = $button.text();
+  let overwrittenCount = 0;
+  await setCompareBatchButtonsBusy($modal, true);
+  $button.text('覆盖中...');
+
+  try {
+    const mutationResult = await updateWorldbookEntries(
+      result.baseName,
+      entries => {
+        const plan = buildCompareEntryOverwritePlan(result, entries);
+        const applied = applyCompareEntryOverwritePlan(entries, plan);
+        overwrittenCount = applied.changedCount;
+        return applied.entries;
+      },
+      {
+        trackHistory: true,
+        transactionType: 'compare-overwrite-entry',
+        transactionMeta: {
+          targetLorebookName: result.targetName,
+          plannedOverwriteCount: plannedCount,
+        },
+      },
+    );
+
+    if (!mutationResult.success) {
+      throw mutationResult.error || new Error('批量覆盖整条失败');
+    }
+
+    if (overwrittenCount > 0) {
+      window.toastr?.success(`已覆盖 ${overwrittenCount} 个完整条目。`);
+    } else {
+      window.toastr?.info('没有需要覆盖的完整条目，可能已经覆盖过。');
+    }
+
+    await refreshVisibleLorebookList(result.baseName);
+    await refreshLorebookComparePreview(baseResult || result);
+  } finally {
+    $button.text(originalText);
+    await setCompareBatchButtonsBusy($modal, false);
+    renderLorebookCompareResult();
+  }
+}, 'applyLorebookCompareEntryOverwrite');
+
 const applyLorebookCompareRemovedDelete = errorCatched(async $button => {
   const parentDoc = window.parent.document;
   const $modal = $(`#${LOREBOOK_COMPARE_MODAL_ID}`, parentDoc);
@@ -1606,6 +1668,7 @@ export function initOptimizer() {
                        <button id="${LOREBOOK_COMPARE_OVERWRITE_BUTTON_ID}" class="compare-footer-secondary" data-action="apply-lorebook-compare-content-overwrite" disabled>批量覆盖正文</button>
                        <button id="${LOREBOOK_COMPARE_KEYWORD_BUTTON_ID}" class="compare-footer-secondary" data-action="apply-lorebook-compare-keyword-overwrite" disabled>批量覆盖关键词</button>
                        <button id="${LOREBOOK_COMPARE_SETTINGS_BUTTON_ID}" class="compare-footer-secondary" data-action="apply-lorebook-compare-settings-overwrite" disabled>批量覆盖设置</button>
+                       <button id="${LOREBOOK_COMPARE_ENTRY_BUTTON_ID}" class="compare-footer-secondary" data-action="apply-lorebook-compare-entry-overwrite" disabled>批量覆盖整条</button>
                        <button id="${LOREBOOK_COMPARE_MODAL_ID}-close">关闭</button>
                    </div>
                </div>
@@ -1706,6 +1769,14 @@ export function initOptimizer() {
     `#${LOREBOOK_COMPARE_MODAL_ID} [data-action="apply-lorebook-compare-settings-overwrite"]`,
     async function () {
       await applyLorebookCompareSettingsOverwrite($(this));
+    },
+  );
+
+  $(parentDoc).on(
+    'click',
+    `#${LOREBOOK_COMPARE_MODAL_ID} [data-action="apply-lorebook-compare-entry-overwrite"]`,
+    async function () {
+      await applyLorebookCompareEntryOverwrite($(this));
     },
   );
 
