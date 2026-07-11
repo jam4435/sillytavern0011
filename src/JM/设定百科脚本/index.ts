@@ -701,42 +701,207 @@ async function renderEntryImages(entry: LoreEntry, content: HTMLElement) {
 }
 
 async function findImagesForEntry(entry: LoreEntry) {
-  if (!entry.imageKeywords || entry.imageKeywords.length === 0) {
-    return [];
-  }
-
   try {
-    const imageIndex = await loadImageIndex();
+    const imageLookup = await loadImageLookupData();
     const imageNames: string[] = [];
-    entry.imageKeywords.forEach(keyword => {
-      const exactImages = imageIndex[keyword] ?? [];
-      imageNames.push(...exactImages);
 
-      if (exactImages.length === 0 && keyword.length >= 3) {
-        Object.entries(imageIndex).forEach(([indexKey, images]) => {
-          if (indexKey.includes(keyword) || keyword.includes(indexKey)) {
-            imageNames.push(...images);
-          }
-        });
+    buildDirectImageKeywords(entry).forEach(keyword => {
+      const hasExactMatch = pushImagesForKeyword(keyword, imageLookup, imageNames);
+      if (!hasExactMatch) {
+        pushLooseImagesForKeyword(keyword, imageLookup.imageIndex, imageNames);
       }
     });
-    return uniqueStrings(imageNames).filter(image => image && image !== '非头像.abc');
+
+    const searchText = buildEntryImageSearchText(entry);
+    const matchedKeywords = imageLookup.allKeywords
+      .filter(keyword => searchText.includes(keyword))
+      .filter(keyword => !isKeywordCoveredByLongerMatch(keyword, imageLookup.allKeywords, searchText))
+      .sort((a, b) => searchText.indexOf(a) - searchText.indexOf(b) || b.length - a.length);
+
+    matchedKeywords.forEach(keyword => {
+      pushImagesForKeyword(keyword, imageLookup, imageNames);
+    });
+
+    return uniqueStrings(imageNames).filter(isUsableImageFile);
   } catch (error) {
     console.warn('[JM设定百科] 图片索引加载失败。', error);
     return [];
   }
 }
 
-async function loadImageIndex() {
-  if (!imageIndexPromise) {
-    imageIndexPromise = fetch(IMAGE_INDEX_URL).then(async response => {
-      if (!response.ok) {
-        throw new Error(`图片索引加载失败: ${response.status}`);
-      }
-      return (await response.json()) as ImageIndex;
-    });
+function buildDirectImageKeywords(entry: LoreEntry) {
+  return uniqueStrings([
+    entry.title,
+    ...(entry.triggers ?? []),
+    ...(entry.aliases ?? []),
+    ...(entry.imageKeywords ?? []),
+  ])
+    .map(keyword => keyword.trim())
+    .filter(isUsefulImageKeyword)
+    .sort((a, b) => b.length - a.length);
+}
+
+function buildEntryImageSearchText(entry: LoreEntry) {
+  return [
+    entry.title,
+    ...(entry.triggers ?? []),
+    ...(entry.aliases ?? []),
+    entry.summary,
+    ...(entry.details ?? []),
+    ...(entry.imageKeywords ?? []),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function pushImagesForKeyword(keyword: string, imageLookup: ImageLookupData, imageNames: string[]) {
+  const cleanKeyword = keyword.trim();
+  const mainKeyword = imageLookup.synonymMap[cleanKeyword] ?? cleanKeyword;
+  const images = imageLookup.imageIndex[mainKeyword] ?? imageLookup.imageIndex[cleanKeyword];
+  if (!Array.isArray(images) || images.length === 0) {
+    return false;
   }
-  return imageIndexPromise;
+  imageNames.push(...images);
+  return true;
+}
+
+function pushLooseImagesForKeyword(keyword: string, imageIndex: ImageIndex, imageNames: string[]) {
+  if (keyword.length < 3) {
+    return;
+  }
+  Object.entries(imageIndex).forEach(([indexKey, images]) => {
+    if (!isUsefulImageKeyword(indexKey)) {
+      return;
+    }
+    if (indexKey.includes(keyword) || keyword.includes(indexKey)) {
+      imageNames.push(...images);
+    }
+  });
+}
+
+function isKeywordCoveredByLongerMatch(keyword: string, allKeywords: string[], searchText: string) {
+  return allKeywords.some(
+    otherKeyword => otherKeyword.length > keyword.length && otherKeyword.includes(keyword) && searchText.includes(otherKeyword),
+  );
+}
+
+function isUsefulImageKeyword(keyword: string) {
+  const cleanKeyword = keyword.trim();
+  if (cleanKeyword.length < 2 || blockedImageKeywords.has(cleanKeyword)) {
+    return false;
+  }
+  return !/\.(?:json|abc)$/iu.test(cleanKeyword);
+}
+
+function isUsableImageFile(image: string) {
+  return Boolean(image && image !== '非头像.abc' && !/\.(?:json|abc)$/iu.test(image));
+}
+
+function buildImageUrl(fileName: string) {
+  return `${IMAGE_BASE_URL}${fileName.split('/').map(encodeURIComponent).join('/')}`;
+}
+
+async function loadImageLookupData() {
+  if (!imageLookupPromise) {
+    imageLookupPromise = (async () => {
+      const [remoteImageIndexResult, synonymResult] = await Promise.allSettled([
+        fetchJson(IMAGE_INDEX_URL),
+        fetchJson(SYNONYMS_URL),
+      ]);
+
+      const localImageIndex = loadLocalImageIndex();
+      const remoteImageIndex =
+        remoteImageIndexResult.status === 'fulfilled' ? normalizeImageIndex(remoteImageIndexResult.value) : {};
+      const synonymMap = synonymResult.status === 'fulfilled' ? buildSynonymMap(synonymResult.value) : {};
+
+      if (remoteImageIndexResult.status === 'rejected') {
+        console.warn('[JM设定百科] 远程图片索引加载失败，已使用本地索引兜底。', remoteImageIndexResult.reason);
+      }
+      if (synonymResult.status === 'rejected') {
+        console.warn('[JM设定百科] 图片别名索引加载失败，将只使用图片主关键词。', synonymResult.reason);
+      }
+
+      const imageIndex = mergeImageIndexes(remoteImageIndex, localImageIndex);
+      const allKeywords = uniqueStrings([...Object.keys(imageIndex), ...Object.keys(synonymMap)])
+        .filter(isUsefulImageKeyword)
+        .sort((a, b) => b.length - a.length || a.localeCompare(b, 'zh-Hans-CN'));
+
+      return { imageIndex, synonymMap, allKeywords };
+    })();
+  }
+  return imageLookupPromise;
+}
+
+async function fetchJson(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`${url} 加载失败: ${response.status}`);
+  }
+  return response.json() as Promise<unknown>;
+}
+
+function loadLocalImageIndex() {
+  try {
+    return normalizeImageIndex(JSON.parse(localImageIndexRaw));
+  } catch (error) {
+    console.warn('[JM设定百科] 本地图片索引解析失败。', error);
+    return {};
+  }
+}
+
+function normalizeImageIndex(raw: unknown) {
+  const normalized: ImageIndex = {};
+  if (!raw || typeof raw !== 'object') {
+    return normalized;
+  }
+
+  Object.entries(raw as Record<string, unknown>).forEach(([key, value]) => {
+    if (!Array.isArray(value)) {
+      return;
+    }
+    const cleanKey = key.trim();
+    const images = value.filter((image): image is string => typeof image === 'string').map(image => image.trim());
+    if (!cleanKey || images.length === 0) {
+      return;
+    }
+    normalized[cleanKey] = uniqueStrings([...(normalized[cleanKey] ?? []), ...images]);
+  });
+  return normalized;
+}
+
+function buildSynonymMap(raw: unknown) {
+  const synonymMap: Record<string, string> = {};
+  if (!raw || typeof raw !== 'object') {
+    return synonymMap;
+  }
+
+  Object.entries(raw as SynonymIndex).forEach(([mainKeyword, aliases]) => {
+    const cleanMainKeyword = mainKeyword.trim();
+    if (!cleanMainKeyword || !Array.isArray(aliases)) {
+      return;
+    }
+    synonymMap[cleanMainKeyword] = cleanMainKeyword;
+    aliases.forEach(alias => {
+      if (typeof alias !== 'string') {
+        return;
+      }
+      const cleanAlias = alias.trim();
+      if (cleanAlias) {
+        synonymMap[cleanAlias] = cleanMainKeyword;
+      }
+    });
+  });
+  return synonymMap;
+}
+
+function mergeImageIndexes(...indexes: ImageIndex[]) {
+  const merged: ImageIndex = {};
+  indexes.forEach(index => {
+    Object.entries(index).forEach(([keyword, images]) => {
+      merged[keyword] = uniqueStrings([...(merged[keyword] ?? []), ...images]);
+    });
+  });
+  return merged;
 }
 
 function enhanceVisibleMessages() {
