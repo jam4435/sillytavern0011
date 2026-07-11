@@ -6,6 +6,8 @@ import {
   buildParticipantEntryPlan,
   normalizeParticipantEventDefinition,
 } from './era-participant-entry.js';
+import { buildPlayerParticipationEntry } from './era-event-operations.js';
+import { buildInvalidParticipationDeletePatch, isParticipationEntry } from './era-utils.js';
 
 const currentTime = { 年: 1210, 月: 8, 日: 8, 时: 7 };
 const eventData = {
@@ -157,6 +159,70 @@ describe('buildOccupancyCleanupPatch', () => {
     ).toEqual({
       郭靖: {},
       柯镇恶: {},
+    });
+  });
+});
+
+describe('player participation ending snapshot', () => {
+  it('loads player-specific ending diffs into the editable participation entry', () => {
+    const sourceEvent = {
+      触发条件: { 年: 1219, 月: 10, 日: 20, 时: 13 },
+      事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
+      事件详情: '郭靖在张家口初遇黄蓉。',
+      insert: {
+        郭靖: { 人物经历: { 原结局: '请黄蓉吃饭。' } },
+      },
+      update: {
+        黄蓉: { 所在位置: '大宋/张家口' },
+      },
+      'P-insert': {
+        郭靖: { 人物经历: { 玩家参与结局: '与你同席见到黄蓉。' } },
+      },
+    };
+
+    const entry = buildPlayerParticipationEntry('射雕事件条目-第7回-02-初遇黄蓉', sourceEvent, {
+      年: 1219,
+      月: 10,
+      日: 20,
+      时: 13,
+    });
+
+    expect(entry).toEqual({
+      描述: '1219年10月20日13时 到 1219年10月20日15时，郭靖在张家口初遇黄蓉。',
+      结局: '',
+      insert: {
+        郭靖: { 人物经历: { 玩家参与结局: '与你同席见到黄蓉。' } },
+      },
+      update: {
+        黄蓉: { 所在位置: '大宋/张家口' },
+      },
+      delete: {},
+    });
+
+    entry.insert.郭靖.人物经历.玩家参与结局 = '已修改';
+    expect(sourceEvent['P-insert'].郭靖.人物经历.玩家参与结局).toBe('与你同席见到黄蓉。');
+  });
+
+  it('rejects task-progress shaped participation entries for cleanup', () => {
+    const participation = {
+      '射雕事件条目-第7回-02-初遇黄蓉': {
+        描述: '事件描述',
+        结局: '',
+        insert: {},
+        update: {},
+        delete: {},
+      },
+      MQ__DOT__Ⅰ_金国初遇: {
+        事件名称: '金国初遇',
+        当前进度: '郭靖请客点菜',
+        描述: '旧任务进度对象',
+      },
+    };
+
+    expect(isParticipationEntry(participation['射雕事件条目-第7回-02-初遇黄蓉'])).toBe(true);
+    expect(isParticipationEntry(participation.MQ__DOT__Ⅰ_金国初遇)).toBe(false);
+    expect(buildInvalidParticipationDeletePatch(participation)).toEqual({
+      MQ__DOT__Ⅰ_金国初遇: {},
     });
   });
 });
