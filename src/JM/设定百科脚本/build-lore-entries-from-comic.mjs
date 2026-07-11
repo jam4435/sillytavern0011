@@ -27,7 +27,9 @@ const fieldLabels = new Set([
   '电话',
   '传真',
   '生产日期',
+  '生产地址',
   '产品标准号',
+  '食签认字',
   '类型',
   '型号',
   '学名',
@@ -38,6 +40,7 @@ const fieldLabels = new Set([
   '床技',
   '近期月经',
   '怀孕几率',
+  '受孕几率',
   '经期',
   '三围',
   '肉改',
@@ -56,8 +59,26 @@ const fieldLabels = new Set([
   '产品规格',
   '品名',
   '食用方法',
+  '女性职员着装要求',
+  '处女年龄',
+  '堕胎次数',
+  '深喉极限',
+  '阴道深度',
+  '阴道弹性',
+  '阴道类型',
+  '菊花深度',
+  '菊花弹性',
+  '手机号',
+  '微信',
+  '出生地',
+  '工作单位',
+  '工作地点',
+  '家庭住址',
+  '思想',
+  '工作特性',
   '注意事项',
   '职位应聘标准',
+  '职位标准',
   '身体改造与工作形态',
   '收纳方式',
   '必备证件',
@@ -83,6 +104,8 @@ const metaTitles = new Set([
   '收纳方式',
   '本作全部内容纯属虚构',
   '一部分读者或因本作中的某些场面而感到不适',
+  '如下图',
+  '以下都是弃稿',
 ]);
 
 const blockedTriggerTerms = new Set([
@@ -208,6 +231,7 @@ function unique(values) {
 function stripWrapper(value) {
   return normalizeText(value)
     .replace(/^[-—\s]+|[-—\s]+$/g, '')
+    .replace(/[:：]\s*$/u, '')
     .replace(/^《(.+)》$/u, '$1')
     .replace(/^["'“”‘’](.+)["'“”‘’]$/u, '$1')
     .replace(/^#\s*/, '')
@@ -232,8 +256,18 @@ function cleanTitle(rawTitle, sectionTitle = '') {
     .replace(/\s*Imperial\s+Society.*$/iu, '')
     .replace(/^The Uniform Fan\s*/iu, '')
     .replace(/^Career Girl\s*[一\-—]?\s*/iu, '')
+    .replace(/^CareerGirl\s*/iu, '')
+    .replace(/^Female\s+Cleaner\s*/iu, '')
+    .replace(/^FemaleCleaner\s*/iu, '')
+    .replace(/^FemaleMilk\s*/iu, '')
     .replace(/\s*J\.M\.?$/iu, '')
+    .replace(/(?:职位应聘标准|职位标准|设定)$/u, '')
     .trim();
+
+  const lawSentence = title.match(/^(.+?(?:法案|条例|宪法|制度|计划|规则|证明|许可))是/u);
+  if (lawSentence) {
+    title = lawSentence[1];
+  }
 
   const field = splitFieldLine(title);
   if (field && !fieldLabels.has(field.label) && field.value.length <= 24) {
@@ -251,7 +285,11 @@ function cleanTitle(rawTitle, sectionTitle = '') {
   if (separatorParts.length > 1) {
     const last = separatorParts.at(-1) ?? title;
     const first = separatorParts[0];
-    if (sectionPrefixTerms.includes(first) || sectionPrefixTerms.some(term => title.startsWith(`${term}`))) {
+    if (
+      sectionPrefixTerms.includes(first) ||
+      sectionPrefixTerms.some(term => title.startsWith(`${term}`)) ||
+      /^[A-Za-z ]+$/.test(first)
+    ) {
       title = last;
     }
   }
@@ -289,6 +327,27 @@ function isBadTitle(title) {
     return true;
   }
   if (metaTitles.has(cleaned) || blockedTriggerTerms.has(cleaned)) {
+    return true;
+  }
+  if (/结束|职位应聘标准|职位标准|着装要求|颁发条件|服务协议|注意事项|收纳方式/u.test(cleaned)) {
+    return true;
+  }
+  if (/^(NO\.\d+|Career ?Girl)$/iu.test(cleaned)) {
+    return true;
+  }
+  if (/^(老主教|闲聊|如下图|以下|以上|左边|最后|谢谢)/u.test(cleaned)) {
+    return true;
+  }
+  if (/^\d+.*(?:元|小时|岁|cm|CM|%)/u.test(cleaned)) {
+    return true;
+  }
+  if (/\d{4,}号$/u.test(cleaned) || /市.+区.+\d+号/u.test(cleaned)) {
+    return true;
+  }
+  if (/配重板|跪垫|真皮坐垫/u.test(cleaned)) {
+    return true;
+  }
+  if (cleaned.length > 12 && /(是|为|需要|要求|可以|必须|不会|不是|应该|因此|因为|如果)/u.test(cleaned)) {
     return true;
   }
   if (/^[\d\s:：.\-—]+$/u.test(cleaned)) {
@@ -357,6 +416,12 @@ function isHeadingLine(line) {
   if (/[。！？；，]/u.test(text)) {
     return false;
   }
+  if (/职位应聘标准|职位标准|着装要求|颁发条件|服务协议|注意事项|收纳方式/u.test(text)) {
+    return false;
+  }
+  if (/^Career ?Girl$/iu.test(text)) {
+    return false;
+  }
 
   const field = splitFieldLine(text);
   if (field) {
@@ -372,6 +437,9 @@ function isHeadingLine(line) {
 function isInlineDefinition(line) {
   const field = splitFieldLine(line);
   if (!field || field.value.length < 24 || field.value.length > 520) {
+    return false;
+  }
+  if (/^NO\.\d+$/iu.test(field.label) || /[说问想]$/u.test(field.label)) {
     return false;
   }
   if (fieldLabels.has(field.label) || isBadTitle(field.label)) {
@@ -406,6 +474,13 @@ function readPreferredTitleFromBody(bodyLines, fallbackTitle) {
     }
     if (blockedTriggerTerms.has(fallbackTitle) || metaTitles.has(fallbackTitle) || fallbackTitle.length <= 5) {
       return field.value;
+    }
+  }
+  if (/许可|许可证|编号|标准号|\d{4,}号$/u.test(fallbackTitle)) {
+    const prose = normalizeText(bodyLines.join(' '));
+    const entitySentence = prose.match(/([A-Za-z0-9\u4e00-\u9fff·\-（）()]{2,24})是/u);
+    if (entitySentence && !isBadTitle(entitySentence[1])) {
+      return entitySentence[1];
     }
   }
   return fallbackTitle;
@@ -520,6 +595,15 @@ function inferCategory(title, sourceText, sectionTitle) {
   if (/南宫|阮|文素妍|安娜|莫妮卡|琳$|伊洛|夏娃|达维娜|瓦丽安娜|瑟琳西卡|达琳|帕米拉|尤里卡/u.test(title)) {
     return '人物';
   }
+  if (/女子敬国军|革命军|姐妹会|阿肯托尔|圣女教|教廷|黑新娘/u.test(title)) {
+    return '组织';
+  }
+  if (/女警|检察官|护士|医生|空中小姐|公务员|教师|女仆|神父|修女|妓|清洁工|教官|守墓人|安魂女|接引者|托圣者|芭比|母马/u.test(probe)) {
+    return '职业';
+  }
+  if (/犬|马|女畜|雌豚|驼鹿|恶媚|箱娘|活体自慰杯|警戒犬|母体/u.test(probe)) {
+    return '生物';
+  }
   if (/法案|条例|宪法|许可|证明|安全条例|生育限制|超龄废除/u.test(probe)) {
     return '法律';
   }
@@ -528,12 +612,6 @@ function inferCategory(title, sourceText, sectionTitle) {
       return '机构';
     }
     return '组织';
-  }
-  if (/女警|检察官|护士|医生|空中小姐|公务员|教师|女仆|神父|修女|妓|清洁工|教官|守墓人|安魂女|接引者|托圣者|芭比|母马/u.test(probe)) {
-    return '职业';
-  }
-  if (/犬|马|女畜|雌豚|驼鹿|恶媚|箱娘|活体自慰杯|警戒犬|母体/u.test(probe)) {
-    return '生物';
   }
   if (/垃圾箱|闸机|红绿灯|陵园|集中营|法庭|厕所|市场|接待室|实验室|办公室/u.test(probe)) {
     return '设施';
