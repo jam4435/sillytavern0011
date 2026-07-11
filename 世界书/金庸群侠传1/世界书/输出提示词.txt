@@ -88,12 +88,28 @@ user初始属性代表的资质分级：0-4 低劣|5-8 普通|9-12 上佳|13-16 
 天赋和初始属性不要在文中直白写出，而是通过人物表现自然地表露
 
 <%
-const 参与事件 = getvar('stat_data.参与事件', { scope: 'local' });
+const 原始参与事件 = getvar('stat_data.参与事件', { scope: 'local' });
+const 参与事件 = {};
+function isParticipationEntry(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) &&
+    typeof value.描述 === 'string' &&
+    typeof value.结局 === 'string' &&
+    value.insert && typeof value.insert === 'object' && !Array.isArray(value.insert) &&
+    value.update && typeof value.update === 'object' && !Array.isArray(value.update) &&
+    value.delete && typeof value.delete === 'object' && !Array.isArray(value.delete);
+}
+if (原始参与事件 && typeof 原始参与事件 === 'object') {
+  for (const [key, value] of Object.entries(原始参与事件)) {
+    if (isParticipationEntry(value)) {
+      参与事件[key] = value;
+    }
+  }
+}
 if (参与事件 && Object.keys(参与事件).length > 0) {
 -%>
 
 # 所在地正在或将要发生的事件
-{{ERA:参与事件}}
+参与事件:<%- toCompact(参与事件) %>
 
 <% } -%>
 
