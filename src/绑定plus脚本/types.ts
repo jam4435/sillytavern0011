@@ -38,6 +38,43 @@ export interface PersonaTrait {
   updatedAt: number;
 }
 
+export interface PersonaSharedTrait {
+  /** 唯一 ID */
+  id: string;
+  /** 名称 */
+  name: string;
+  /** 描述/设定内容 */
+  description: string;
+  /** 创建时间 */
+  createdAt: number;
+  /** 更新时间 */
+  updatedAt: number;
+}
+
+export interface PersonaSharedFolder {
+  /** 唯一 ID */
+  id: string;
+  /** 文件夹名称 */
+  name: string;
+  /** 包含的通用 trait ID 列表 */
+  traitIds: string[];
+  /** 创建时间 */
+  createdAt: number;
+  /** 更新时间 */
+  updatedAt: number;
+}
+
+export interface PersonaSharedTraitsConfig {
+  /** 配置版本 */
+  version: number;
+  /** 通用条目列表 */
+  traits: PersonaSharedTrait[];
+  /** 通用文件夹列表 */
+  folders: PersonaSharedFolder[];
+  /** 更新时间 */
+  updatedAt: number;
+}
+
 /**
  * 设定预设（Profile）
  * 预设本质是多个 trait 的集合，可一键启用
@@ -96,6 +133,7 @@ export interface PersonaContextBindingResources extends PersonaPlusBindingConfig
   userPersonaAvatarId?: string;
   userPersonaProfileId?: string;
   userPersonaEnabledTraitIds?: string[];
+  userPersonaEnabledSharedTraitIds?: string[];
   presetEnabledPromptIds?: string[];
 }
 
@@ -185,6 +223,7 @@ export interface BindingPlusBackupData {
   defaultPresetPromptIds: Record<string, string[]>;
   defaultWorldbookEntryUids: Record<string, number[]>;
   personas: BindingPlusPersonaBackup[];
+  sharedPersonaTraits?: PersonaSharedTraitsConfig;
   theme?: BindingPlusThemeState;
 }
 
@@ -206,6 +245,7 @@ export interface BindingPlusBackupImportSummary {
   personaAdvancedConfigs: number;
   personaBaseDescriptions: number;
   personaSnapshots: number;
+  sharedPersonaTraits: boolean;
   theme: boolean;
 }
 
@@ -252,6 +292,10 @@ export interface PersonaAdvancedConfig {
   activeProfileId?: string;
   /** 默认启用条目快照 */
   defaultEnabledTraitIds?: string[];
+  /** 当前 user 人设启用的通用条目快照 */
+  enabledSharedTraitIds?: string[];
+  /** 未绑定时默认启用的通用条目快照 */
+  defaultEnabledSharedTraitIds?: string[];
   /** 预设列表 */
   profiles: PersonaProfile[];
   /** 自动规则列表 */
@@ -403,6 +447,8 @@ export const PERSONA_BUTTON_TEXT_IN_MENU = '绑定plus';
 
 /** 角色设定存储键前缀 */
 export const PERSONA_TRAITS_STORAGE_PREFIX = 'tavern_helper_persona_traits_';
+
+export const PERSONA_SHARED_TRAITS_STORAGE_KEY = 'tavern_helper_persona_shared_traits_v1';
 
 /** Persona 高级配置存储键前缀 */
 export const PERSONA_ADVANCED_STORAGE_PREFIX = 'tavern_helper_persona_advanced_';

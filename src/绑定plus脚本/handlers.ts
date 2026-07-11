@@ -22,6 +22,7 @@ import {
   PERSONA_DEFAULT_WORLDBOOK_ENTRIES_STORAGE_KEY,
   PERSONA_PLUS_APPLIED_STORAGE_PREFIX,
   PERSONA_SNAPSHOT_STORAGE_PREFIX,
+  PERSONA_SHARED_TRAITS_STORAGE_KEY,
   PERSONA_TRAITS_STORAGE_PREFIX,
   PERSONA_TRAIT_SEPARATOR,
   PersonaActivationState,
@@ -39,6 +40,9 @@ import {
   PersonaPlusProbeReport,
   PersonaProfile,
   PersonaRuntimeContext,
+  PersonaSharedFolder,
+  PersonaSharedTrait,
+  PersonaSharedTraitsConfig,
   PersonaSnapshot,
   PersonaTrait,
 } from './types';
@@ -47,6 +51,7 @@ declare const toastr: any;
 declare function triggerSlash(command: string): Promise<string>;
 
 const PERSONA_ADVANCED_CONFIG_VERSION = 1;
+const PERSONA_SHARED_TRAITS_CONFIG_VERSION = 1;
 const SNAPSHOT_MAX_COUNT = 3;
 const SNAPSHOT_MIN_INTERVAL_MS = 4000;
 const PERSONA_DEFAULT_PRESET_STORAGE_KEY = 'tavern_helper_default_preset_v1';
@@ -360,6 +365,7 @@ type PersonaPlusAppliedState = {
   userPersonaAvatarId?: string;
   userPersonaProfileId?: string;
   userPersonaEnabledTraitIds?: string[];
+  userPersonaEnabledSharedTraitIds?: string[];
   connectionProfileName?: string;
   connectionProfileBaseline?: string | null;
   presetName?: string;
@@ -383,6 +389,7 @@ type PersonaPlusAppliedState = {
   worldbookEntries: PersonaPlusBindingWorldbookEntry[];
   extensions: PersonaPlusExtensionSettingBinding[];
   personaTraitBaselines: Record<string, string[]>;
+  sharedTraitBaselines: Record<string, string[]>;
   presetPromptBaselines: Record<string, string[]>;
   worldbookEntryBaselines: Record<string, number[]>;
 };
@@ -654,6 +661,9 @@ function isBindingPlusStorageKey(key: string): boolean {
 }
 
 function getBindingPlusStorageKeyInfo(key: string): { label: string; category: string } {
+  if (key === PERSONA_SHARED_TRAITS_STORAGE_KEY) {
+    return { label: '通用 user 人设条目', category: '通用条目' };
+  }
   if (key.startsWith(PERSONA_SNAPSHOT_STORAGE_PREFIX)) {
     return {
       label: `变更保护快照 · ${key.slice(PERSONA_SNAPSHOT_STORAGE_PREFIX.length) || 'unknown'}`,
@@ -2148,6 +2158,80 @@ export function savePersonaTraits(avatarId: string, traits: PersonaTrait[]): boo
   }
 }
 
+// ==================== 通用条目存储管理 ====================
+
+function getDefaultSharedTraitsConfig(): PersonaSharedTraitsConfig {
+  return {
+    version: PERSONA_SHARED_TRAITS_CONFIG_VERSION,
+    traits: [],
+    folders: [],
+    updatedAt: Date.now(),
+  };
+}
+
+function normalizeSharedTrait(value: Partial<PersonaSharedTrait>): PersonaSharedTrait {
+  return {
+    id: ensureString(value.id) || createId(),
+    name: ensureString(value.name) || '未命名通用设定',
+    description: ensureString(value.description),
+    createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
+    updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now(),
+  };
+}
+
+function normalizeSharedFolder(value: Partial<PersonaSharedFolder>, validTraitIds: Set<string>): PersonaSharedFolder {
+  return {
+    id: ensureString(value.id) || createId(),
+    name: ensureString(value.name) || '未命名通用文件夹',
+    traitIds: uniqueStrings(value.traitIds).filter(traitId => validTraitIds.has(traitId)),
+    createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
+    updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now(),
+  };
+}
+
+function normalizeSharedTraitsConfig(value: unknown): PersonaSharedTraitsConfig {
+  const source =
+    value && typeof value === 'object' && !Array.isArray(value) ? (value as Partial<PersonaSharedTraitsConfig>) : {};
+  const traits = safeArray<Partial<PersonaSharedTrait>>(source.traits).map(normalizeSharedTrait);
+  const validTraitIds = new Set(traits.map(trait => trait.id));
+  return {
+    version: PERSONA_SHARED_TRAITS_CONFIG_VERSION,
+    traits,
+    folders: safeArray<Partial<PersonaSharedFolder>>(source.folders)
+      .map(folder => normalizeSharedFolder(folder, validTraitIds))
+      .filter(folder => folder.traitIds.length > 0),
+    updatedAt: typeof source.updatedAt === 'number' ? source.updatedAt : Date.now(),
+  };
+}
+
+export function loadSharedPersonaTraitsConfig(): PersonaSharedTraitsConfig {
+  try {
+    const raw = localStorage.getItem(PERSONA_SHARED_TRAITS_STORAGE_KEY);
+    if (!raw) {
+      return getDefaultSharedTraitsConfig();
+    }
+    return normalizeSharedTraitsConfig(JSON.parse(raw));
+  } catch (error) {
+    console.error('用户设定脚本: 加载通用条目失败', error);
+    return getDefaultSharedTraitsConfig();
+  }
+}
+
+export function saveSharedPersonaTraitsConfig(config: PersonaSharedTraitsConfig): boolean {
+  try {
+    const safeConfig = normalizeSharedTraitsConfig({
+      ...config,
+      updatedAt: Date.now(),
+    });
+    localStorage.setItem(PERSONA_SHARED_TRAITS_STORAGE_KEY, JSON.stringify(safeConfig));
+    return true;
+  } catch (error) {
+    console.error('用户设定脚本: 保存通用条目失败', error);
+    toastr.error('保存通用条目失败');
+    return false;
+  }
+}
+
 // ==================== 基础描述存储 ====================
 
 function getPersonaBaseDescriptionStorageKey(avatarId: string): string {
@@ -2203,6 +2287,8 @@ function getDefaultAdvancedConfig(): PersonaAdvancedConfig {
     version: PERSONA_ADVANCED_CONFIG_VERSION,
     activeProfileId: '',
     defaultEnabledTraitIds: undefined,
+    enabledSharedTraitIds: [],
+    defaultEnabledSharedTraitIds: undefined,
     profiles: [],
     rules: [],
     updatedAt: Date.now(),
@@ -2299,6 +2385,9 @@ function normalizeContextBindingResources(
     userPersonaEnabledTraitIds: userPersonaAvatarId
       ? normalizeOptionalStringArrayField(source, 'userPersonaEnabledTraitIds')
       : undefined,
+    userPersonaEnabledSharedTraitIds: userPersonaAvatarId
+      ? normalizeOptionalStringArrayField(source, 'userPersonaEnabledSharedTraitIds')
+      : undefined,
     presetEnabledPromptIds: presetName ? normalizeOptionalStringArrayField(source, 'presetEnabledPromptIds') : undefined,
     ...plusBinding,
   };
@@ -2335,6 +2424,7 @@ function getDefaultPlusAppliedState(): PersonaPlusAppliedState {
     userPersonaAvatarId: undefined,
     userPersonaProfileId: undefined,
     userPersonaEnabledTraitIds: undefined,
+    userPersonaEnabledSharedTraitIds: undefined,
     connectionProfileName: undefined,
     connectionProfileBaseline: undefined,
     presetName: undefined,
@@ -2356,6 +2446,7 @@ function getDefaultPlusAppliedState(): PersonaPlusAppliedState {
     worldbookEntries: [],
     extensions: [],
     personaTraitBaselines: {},
+    sharedTraitBaselines: {},
     presetPromptBaselines: {},
     worldbookEntryBaselines: {},
   };
@@ -2411,6 +2502,11 @@ export function loadPersonaAdvancedConfig(avatarId: string): PersonaAdvancedConf
       version: PERSONA_ADVANCED_CONFIG_VERSION,
       activeProfileId: activeProfileId && profileIds.has(activeProfileId) ? activeProfileId : '',
       defaultEnabledTraitIds: normalizeOptionalStringArrayField(parsed as object, 'defaultEnabledTraitIds'),
+      enabledSharedTraitIds: uniqueStrings(parsed.enabledSharedTraitIds),
+      defaultEnabledSharedTraitIds: normalizeOptionalStringArrayField(
+        parsed as object,
+        'defaultEnabledSharedTraitIds',
+      ),
       profiles,
       rules,
       updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now(),
@@ -2431,6 +2527,11 @@ export function savePersonaAdvancedConfig(avatarId: string, config: PersonaAdvan
       activeProfileId: ensureString(config.activeProfileId),
       defaultEnabledTraitIds:
         config.defaultEnabledTraitIds === undefined ? undefined : uniqueStrings(config.defaultEnabledTraitIds),
+      enabledSharedTraitIds: uniqueStrings(config.enabledSharedTraitIds),
+      defaultEnabledSharedTraitIds:
+        config.defaultEnabledSharedTraitIds === undefined
+          ? undefined
+          : uniqueStrings(config.defaultEnabledSharedTraitIds),
       profiles: normalizeProfiles(config.profiles),
       rules: normalizeRules(config.rules),
       updatedAt: Date.now(),
@@ -2456,6 +2557,45 @@ export function savePersonaDefaultEnabledTraitIds(avatarId: string, traitIds: st
   }
   const config = loadPersonaAdvancedConfig(avatarId);
   config.defaultEnabledTraitIds = uniqueStrings(traitIds);
+  return savePersonaAdvancedConfig(avatarId, config);
+}
+
+export function loadEnabledSharedTraitIds(avatarId: string): string[] {
+  if (!avatarId) {
+    return [];
+  }
+  const sharedTraitIdSet = new Set(loadSharedPersonaTraitsConfig().traits.map(trait => trait.id));
+  return uniqueStrings(loadPersonaAdvancedConfig(avatarId).enabledSharedTraitIds).filter(traitId =>
+    sharedTraitIdSet.has(traitId),
+  );
+}
+
+export function saveEnabledSharedTraitIds(avatarId: string, traitIds: string[]): boolean {
+  if (!avatarId) {
+    return false;
+  }
+  const sharedTraitIdSet = new Set(loadSharedPersonaTraitsConfig().traits.map(trait => trait.id));
+  const config = loadPersonaAdvancedConfig(avatarId);
+  config.enabledSharedTraitIds = uniqueStrings(traitIds).filter(traitId => sharedTraitIdSet.has(traitId));
+  return savePersonaAdvancedConfig(avatarId, config);
+}
+
+export function getPersonaDefaultEnabledSharedTraitIds(avatarId: string): string[] | undefined {
+  const config = loadPersonaAdvancedConfig(avatarId);
+  if (config.defaultEnabledSharedTraitIds === undefined) {
+    return undefined;
+  }
+  const sharedTraitIdSet = new Set(loadSharedPersonaTraitsConfig().traits.map(trait => trait.id));
+  return uniqueStrings(config.defaultEnabledSharedTraitIds).filter(traitId => sharedTraitIdSet.has(traitId));
+}
+
+export function savePersonaDefaultEnabledSharedTraitIds(avatarId: string, traitIds: string[]): boolean {
+  if (!avatarId) {
+    return false;
+  }
+  const sharedTraitIdSet = new Set(loadSharedPersonaTraitsConfig().traits.map(trait => trait.id));
+  const config = loadPersonaAdvancedConfig(avatarId);
+  config.defaultEnabledSharedTraitIds = uniqueStrings(traitIds).filter(traitId => sharedTraitIdSet.has(traitId));
   return savePersonaAdvancedConfig(avatarId, config);
 }
 
@@ -3087,6 +3227,10 @@ function loadPersonaPlusAppliedState(avatarId: string): PersonaPlusAppliedState 
       userPersonaAvatarId: ensureString(parsed.userPersonaAvatarId).trim() || undefined,
       userPersonaProfileId: ensureString(parsed.userPersonaProfileId).trim() || undefined,
       userPersonaEnabledTraitIds: normalizeOptionalStringArrayField(parsed as object, 'userPersonaEnabledTraitIds'),
+      userPersonaEnabledSharedTraitIds: normalizeOptionalStringArrayField(
+        parsed as object,
+        'userPersonaEnabledSharedTraitIds',
+      ),
       connectionProfileName: ensureString(parsed.connectionProfileName).trim() || undefined,
       connectionProfileBaseline:
         parsed.connectionProfileBaseline === null
@@ -3114,6 +3258,9 @@ function loadPersonaPlusAppliedState(avatarId: string): PersonaPlusAppliedState 
       extensions: normalizePlusExtensionBindings(parsed.extensions),
       personaTraitBaselines: clonePersonaTraitBaselines(
         parsed.personaTraitBaselines as Record<string, string[]> | undefined,
+      ),
+      sharedTraitBaselines: clonePersonaTraitBaselines(
+        parsed.sharedTraitBaselines as Record<string, string[]> | undefined,
       ),
       presetPromptBaselines: cloneStringArrayRecord(
         parsed.presetPromptBaselines as Record<string, string[]> | undefined,
@@ -3147,6 +3294,7 @@ function isSamePlusAppliedTarget(left: PersonaPlusAppliedState, right: PersonaPl
     left.userPersonaAvatarId === right.userPersonaAvatarId &&
     left.userPersonaProfileId === right.userPersonaProfileId &&
     areOptionalStringArraysEqual(left.userPersonaEnabledTraitIds, right.userPersonaEnabledTraitIds) &&
+    areOptionalStringArraysEqual(left.userPersonaEnabledSharedTraitIds, right.userPersonaEnabledSharedTraitIds) &&
     left.connectionProfileName === right.connectionProfileName &&
     left.presetName === right.presetName &&
     areOptionalStringArraysEqual(left.presetEnabledPromptIds, right.presetEnabledPromptIds) &&
@@ -3197,6 +3345,29 @@ function getPersonaRestoreTraitIds(avatarId: string, baselines: Record<string, s
   return hasOwn(baselines, avatarId) ? uniqueStrings(baselines[avatarId]) : undefined;
 }
 
+function applySharedPersonaTraitEnabledSnapshot(avatarId: string, enabledTraitIds: string[]): boolean {
+  if (!avatarId) {
+    return false;
+  }
+
+  const currentTraitIds = loadEnabledSharedTraitIds(avatarId);
+  const nextTraitIds = uniqueStrings(enabledTraitIds).filter(traitId =>
+    loadSharedPersonaTraitsConfig().traits.some(trait => trait.id === traitId),
+  );
+  if (areOptionalStringArraysEqual(currentTraitIds, nextTraitIds)) {
+    return false;
+  }
+  return saveEnabledSharedTraitIds(avatarId, nextTraitIds);
+}
+
+function getPersonaRestoreSharedTraitIds(avatarId: string, baselines: Record<string, string[]>): string[] | undefined {
+  const savedDefaultTraitIds = getPersonaDefaultEnabledSharedTraitIds(avatarId);
+  if (savedDefaultTraitIds !== undefined) {
+    return savedDefaultTraitIds;
+  }
+  return hasOwn(baselines, avatarId) ? uniqueStrings(baselines[avatarId]) : undefined;
+}
+
 function mergeContextWorldbookEntries(
   currentEntries: PersonaPlusBindingWorldbookEntry[],
   nextEntries: PersonaPlusBindingWorldbookEntry[],
@@ -3237,6 +3408,9 @@ function mergeContextBindingResources(
     userPersonaEnabledTraitIds: next.userPersonaAvatarId
       ? next.userPersonaEnabledTraitIds
       : base.userPersonaEnabledTraitIds,
+    userPersonaEnabledSharedTraitIds: next.userPersonaAvatarId
+      ? next.userPersonaEnabledSharedTraitIds
+      : base.userPersonaEnabledSharedTraitIds,
     connectionProfileName: next.connectionProfileName || base.connectionProfileName,
     presetEnabledPromptIds: next.presetName ? next.presetEnabledPromptIds : base.presetEnabledPromptIds,
     presetName: next.presetName || base.presetName,
@@ -3289,6 +3463,9 @@ function buildDesiredPlusAppliedState(
   desired.userPersonaAvatarId = merged.userPersonaAvatarId;
   desired.userPersonaProfileId = undefined;
   desired.userPersonaEnabledTraitIds = merged.userPersonaAvatarId ? merged.userPersonaEnabledTraitIds : undefined;
+  desired.userPersonaEnabledSharedTraitIds = merged.userPersonaAvatarId
+    ? merged.userPersonaEnabledSharedTraitIds
+    : undefined;
   desired.connectionProfileName = ensureString(merged.connectionProfileName).trim() || undefined;
   desired.presetName = merged.presetName || getDefaultPresetName() || getLoadedPresetName() || undefined;
   desired.presetEnabledPromptIds = merged.presetName ? merged.presetEnabledPromptIds : undefined;
@@ -3369,6 +3546,9 @@ export function summarizeContextBindingResources(resources?: PersonaContextBindi
     summaryParts.push(`user人设:${personaName}`);
     if (normalized.userPersonaEnabledTraitIds !== undefined) {
       summaryParts.push(`条目:${normalized.userPersonaEnabledTraitIds.length}条`);
+    }
+    if (normalized.userPersonaEnabledSharedTraitIds !== undefined) {
+      summaryParts.push(`通用条目:${normalized.userPersonaEnabledSharedTraitIds.length}条`);
     }
   }
 
