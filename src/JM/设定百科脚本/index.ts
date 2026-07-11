@@ -677,12 +677,20 @@ async function showEntryPopup(entry: LoreEntry) {
     content.appendChild(aliasRow);
   }
 
+  openModal(content);
+  void renderEntryImages(entry, content);
+}
+
+async function renderEntryImages(entry: LoreEntry, content: HTMLElement) {
   const images = await findImagesForEntry(entry);
+  if (!content.isConnected || !modalCardElement?.contains(content)) {
+    return;
+  }
   if (images.length > 0) {
-    const imageGrid = ownerDocument.createElement('div');
+    const imageGrid = content.ownerDocument.createElement('div');
     imageGrid.className = 'jm-lore-images';
     images.slice(0, MAX_IMAGES_PER_ENTRY).forEach(fileName => {
-      const image = ownerDocument.createElement('img');
+      const image = content.ownerDocument.createElement('img');
       image.loading = 'lazy';
       image.alt = entry.title;
       image.src = buildImageUrl(fileName);
@@ -690,8 +698,6 @@ async function showEntryPopup(entry: LoreEntry) {
     });
     content.appendChild(imageGrid);
   }
-
-  openModal(content);
 }
 
 async function findImagesForEntry(entry: LoreEntry) {
