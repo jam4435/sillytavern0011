@@ -1578,6 +1578,512 @@
     color: #1a1410;
   }
 
+  // 角色创建页：水墨主题下优先保证宣纸面板和正文可读性。
+  .setup-screen {
+    --wuxia-setup-paper: rgba(245, 239, 226, 0.9);
+    --wuxia-setup-paper-strong: rgba(250, 246, 238, 0.94);
+    --wuxia-setup-paper-soft: rgba(241, 235, 223, 0.78);
+    --wuxia-setup-ink: #1a1410;
+    --wuxia-setup-ink-soft: #3d3028;
+    --wuxia-setup-muted: #5b5048;
+    --wuxia-setup-faint: #7a6e62;
+    --wuxia-setup-cinnabar: #8b1a1a;
+    --wuxia-setup-gold-deep: #8b5a0a;
+    --wuxia-setup-border: rgba(61, 48, 40, 0.28);
+    --wuxia-setup-border-strong: rgba(61, 48, 40, 0.42);
+    --wuxia-setup-shadow: 0 12px 28px rgba(61, 48, 40, 0.12);
+    background: #e8e2d6;
+    color: var(--wuxia-setup-ink);
+  }
+
+  .setup-screen .setup-bg-gradient {
+    background:
+      radial-gradient(ellipse at 50% 32%, rgba(252, 248, 239, 0.9) 0%, rgba(241, 235, 223, 0.72) 52%, rgba(214, 203, 187, 0.9) 100%),
+      linear-gradient(180deg, rgba(247, 241, 229, 0.84), rgba(222, 211, 194, 0.88)),
+      var(--wuxia-ink-bg-image) center / cover no-repeat;
+    filter: contrast(0.78) brightness(1.08) saturate(0.68);
+  }
+
+  .setup-screen .setup-bg-particles {
+    opacity: 0.1;
+    background: radial-gradient(ellipse at 48% 28%, rgba(26, 20, 16, 0.08), transparent 70%);
+  }
+
+  .setup-screen .setup-bg-ink {
+    opacity: 0.035;
+  }
+
+  .setup-screen .setup-content {
+    color: var(--wuxia-setup-ink);
+    text-shadow: none;
+
+    &::-webkit-scrollbar-track {
+      background: rgba(222, 212, 196, 0.64);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, rgba(90, 80, 70, 0.58), rgba(139, 26, 26, 0.46));
+    }
+  }
+
+  .setup-screen .setup-title .title-decoration {
+    color: rgba(139, 26, 26, 0.48);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .setup-screen .setup-title .title-text {
+    color: var(--wuxia-setup-ink);
+    text-shadow:
+      0 2px 0 rgba(255, 255, 255, 0.72),
+      0 10px 24px rgba(61, 48, 40, 0.16);
+  }
+
+  .setup-screen .glass-card {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(232, 226, 214, 0.16) 54%),
+      var(--wuxia-setup-paper);
+    border-color: var(--wuxia-setup-border);
+    box-shadow:
+      var(--wuxia-setup-shadow),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+    backdrop-filter: none;
+
+    &::before {
+      background: linear-gradient(90deg, transparent, rgba(61, 48, 40, 0.22), transparent);
+    }
+
+    &::after {
+      background: radial-gradient(ellipse at center, rgba(139, 26, 26, 0.035), transparent 56%);
+    }
+
+    &:hover {
+      border-color: var(--wuxia-setup-border-strong);
+      box-shadow:
+        0 14px 30px rgba(61, 48, 40, 0.15),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.38);
+    }
+  }
+
+  .setup-screen .section-title,
+  .setup-screen .pool-rank,
+  .setup-screen .preview-title,
+  .setup-screen .form-label,
+  .setup-screen .field-label .label-text,
+  .setup-screen .attr-name,
+  .setup-screen .talent-name,
+  .setup-screen .trait-name,
+  .setup-screen .ma-name,
+  .setup-screen .martial-name,
+  .setup-screen .origin-name,
+  .setup-screen .event-name,
+  .setup-screen .preview-value,
+  .setup-screen .setup-avatar-preview-copy strong {
+    color: var(--wuxia-setup-ink);
+    text-shadow: none;
+  }
+
+  .setup-screen .section-desc,
+  .setup-screen .talent-desc,
+  .setup-screen .attr-desc,
+  .setup-screen .trait-desc,
+  .setup-screen .ma-desc,
+  .setup-screen .martial-desc,
+  .setup-screen .origin-desc,
+  .setup-screen .event-time,
+  .setup-screen .event-location,
+  .setup-screen .preview-label,
+  .setup-screen .pool-cost,
+  .setup-screen .pool-count,
+  .setup-screen .empty-hint,
+  .setup-screen .label-hint,
+  .setup-screen .setup-avatar-preview-copy small {
+    color: var(--wuxia-setup-muted);
+  }
+
+  .setup-screen .section-title {
+    border-bottom-color: rgba(61, 48, 40, 0.2);
+  }
+
+  .setup-screen .section-icon {
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.72));
+  }
+
+  .setup-screen .points-badge,
+  .setup-screen .trait-count,
+  .setup-screen .talent-points,
+  .setup-screen .build-talent,
+  .setup-screen .effect-tag,
+  .setup-screen .ma-trait .trait-name,
+  .setup-screen .pool-cost .cost-value {
+    background: rgba(139, 26, 26, 0.08);
+    border: 1px solid rgba(139, 26, 26, 0.24);
+    color: var(--wuxia-setup-cinnabar);
+  }
+
+  .setup-screen .points-badge.complete,
+  .setup-screen .trait-cost.gain,
+  .setup-screen .trait-tag.positive,
+  .setup-screen .trait-badge.positive,
+  .setup-screen .pool-cost .free-tag {
+    background: rgba(47, 107, 56, 0.09);
+    border-color: rgba(47, 107, 56, 0.28);
+    color: #2f6b38;
+  }
+
+  .setup-screen .points-badge.error,
+  .setup-screen .trait-cost.cost,
+  .setup-screen .trait-tag.negative,
+  .setup-screen .trait-badge.negative {
+    background: rgba(139, 26, 26, 0.09);
+    border-color: rgba(139, 26, 26, 0.3);
+    color: var(--wuxia-setup-cinnabar);
+  }
+
+  .setup-screen .setup-steps .step-item {
+    opacity: 0.72;
+  }
+
+  .setup-screen .setup-steps .step-item.active,
+  .setup-screen .setup-steps .step-item.completed {
+    opacity: 1;
+  }
+
+  .setup-screen .step-number {
+    background: rgba(250, 246, 238, 0.78);
+    border-color: rgba(61, 48, 40, 0.34);
+    color: var(--wuxia-setup-ink-soft);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+  }
+
+  .setup-screen .step-label {
+    color: var(--wuxia-setup-muted);
+  }
+
+  .setup-screen .step-line {
+    background: rgba(61, 48, 40, 0.24);
+
+    &::after {
+      background: linear-gradient(90deg, rgba(139, 26, 26, 0.72), rgba(184, 134, 11, 0.62));
+    }
+  }
+
+  .setup-screen .step-item.active {
+    .step-number {
+      background: rgba(139, 26, 26, 0.86);
+      border-color: rgba(92, 26, 20, 0.72);
+      color: #fff7ed;
+      box-shadow:
+        0 6px 14px rgba(61, 48, 40, 0.16),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    }
+
+    .step-label {
+      color: var(--wuxia-setup-cinnabar);
+    }
+  }
+
+  .setup-screen .step-item.completed {
+    .step-number {
+      background: rgba(47, 107, 56, 0.14);
+      border-color: rgba(47, 107, 56, 0.42);
+      color: #2f6b38;
+    }
+
+    .step-label {
+      color: var(--wuxia-setup-ink-soft);
+    }
+  }
+
+  .setup-screen .talent-card,
+  .setup-screen .attribute-card,
+  .setup-screen .attribute-card.enhanced,
+  .setup-screen .saved-build-item,
+  .setup-screen .trait-card,
+  .setup-screen .trait-preview-card,
+  .setup-screen .gacha-pool,
+  .setup-screen .martial-art-card,
+  .setup-screen .martial-card,
+  .setup-screen .origin-card,
+  .setup-screen .event-card,
+  .setup-screen .preview-section,
+  .setup-screen .setup-avatar-preview,
+  .setup-screen .setup-avatar-choice {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 58%),
+      var(--wuxia-setup-paper-soft);
+    border-color: rgba(61, 48, 40, 0.24);
+    color: var(--wuxia-setup-ink);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  }
+
+  .setup-screen .talent-card:hover,
+  .setup-screen .attribute-card:hover,
+  .setup-screen .attribute-card.enhanced:hover,
+  .setup-screen .saved-build-item:hover,
+  .setup-screen .trait-card:hover:not(.locked):not(.disabled),
+  .setup-screen .gacha-pool:hover:not(.disabled),
+  .setup-screen .martial-art-card:hover,
+  .setup-screen .martial-card:hover:not(.disabled),
+  .setup-screen .origin-card:hover,
+  .setup-screen .event-card:hover,
+  .setup-screen .setup-avatar-choice:hover {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.36), transparent 58%),
+      var(--wuxia-setup-paper-strong);
+    border-color: rgba(139, 26, 26, 0.36);
+    box-shadow: 0 8px 18px rgba(61, 48, 40, 0.11);
+  }
+
+  .setup-screen .talent-card.selected,
+  .setup-screen .trait-card.selected,
+  .setup-screen .martial-art-card.selected,
+  .setup-screen .martial-card.selected,
+  .setup-screen .origin-card.selected,
+  .setup-screen .event-card.selected,
+  .setup-screen .setup-avatar-choice.is-selected {
+    background:
+      linear-gradient(135deg, rgba(139, 26, 26, 0.12), transparent 58%),
+      rgba(250, 246, 238, 0.92);
+    border-color: rgba(139, 26, 26, 0.52);
+    box-shadow:
+      0 8px 20px rgba(61, 48, 40, 0.13),
+      inset 0 0 0 1px rgba(139, 26, 26, 0.08);
+
+    .talent-name,
+    .trait-name,
+    .ma-name,
+    .martial-name,
+    .origin-name,
+    .event-name {
+      color: var(--wuxia-setup-cinnabar);
+    }
+  }
+
+  .setup-screen .selected-indicator {
+    background: rgba(139, 26, 26, 0.82);
+    color: #fff7ed;
+    box-shadow:
+      0 4px 10px rgba(61, 48, 40, 0.16),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  }
+
+  .setup-screen .saved-build-item .build-name {
+    color: var(--wuxia-setup-ink);
+  }
+
+  .setup-screen .saved-build-item .build-date {
+    color: var(--wuxia-setup-faint);
+  }
+
+  .setup-screen .saved-build-item .build-note {
+    background: rgba(61, 48, 40, 0.08);
+    color: var(--wuxia-setup-ink-soft);
+  }
+
+  .setup-screen .form-input,
+  .setup-screen .form-textarea,
+  .setup-screen .trait-search,
+  .setup-screen .martial-search,
+  .setup-screen .event-search,
+  .setup-screen .event-dropdown,
+  .setup-screen .date-field input,
+  .setup-screen .gender-toggle {
+    background: rgba(255, 250, 244, 0.9);
+    border-color: rgba(61, 48, 40, 0.28);
+    color: var(--wuxia-setup-ink);
+    box-shadow: inset 0 1px 3px rgba(61, 48, 40, 0.08);
+
+    &::placeholder {
+      color: rgba(91, 80, 72, 0.76);
+    }
+
+    &:focus {
+      background: rgba(255, 250, 244, 0.98);
+      border-color: rgba(139, 26, 26, 0.5);
+      box-shadow:
+        0 0 0 3px rgba(139, 26, 26, 0.08),
+        inset 0 1px 3px rgba(61, 48, 40, 0.08);
+    }
+  }
+
+  .setup-screen .event-dropdown option {
+    background: #f1ebdf;
+    color: var(--wuxia-setup-ink);
+  }
+
+  .setup-screen .gender-option,
+  .setup-screen .gender-btn,
+  .setup-screen .toggle-option,
+  .setup-screen .filter-tab {
+    background: rgba(250, 246, 238, 0.76);
+    border-color: rgba(61, 48, 40, 0.24);
+    color: var(--wuxia-setup-muted);
+
+    &:hover:not(:disabled):not(.active) {
+      background: rgba(255, 250, 244, 0.92);
+      border-color: rgba(139, 26, 26, 0.34);
+      color: var(--wuxia-setup-cinnabar);
+    }
+
+    &.active {
+      background: rgba(139, 26, 26, 0.1);
+      border-color: rgba(139, 26, 26, 0.46);
+      color: var(--wuxia-setup-cinnabar);
+    }
+  }
+
+  .setup-screen .gender-slider {
+    background: rgba(139, 26, 26, 0.12);
+    border-color: rgba(139, 26, 26, 0.34);
+  }
+
+  .setup-screen .character-preview {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 58%),
+      rgba(241, 235, 223, 0.9);
+    border-color: rgba(61, 48, 40, 0.24);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  }
+
+  .setup-screen .preview-header,
+  .setup-screen .character-preview .preview-section .preview-title {
+    border-bottom-color: rgba(61, 48, 40, 0.18);
+  }
+
+  .setup-screen .preview-name,
+  .setup-screen .attr-value,
+  .setup-screen .field-label .label-value {
+    color: var(--wuxia-setup-cinnabar);
+  }
+
+  .setup-screen .preview-attributes span,
+  .setup-screen .martial-badge,
+  .setup-screen .bonus-item {
+    background: rgba(61, 48, 40, 0.08);
+    border-color: rgba(61, 48, 40, 0.2);
+    color: var(--wuxia-setup-ink-soft);
+  }
+
+  .setup-screen .origin-bonuses,
+  .setup-screen .event-details,
+  .setup-screen .triggered-traits-preview {
+    background: rgba(255, 250, 244, 0.54);
+    border-color: rgba(61, 48, 40, 0.18);
+  }
+
+  .setup-screen .setup-avatar-preview img,
+  .setup-screen .setup-avatar-preview > span,
+  .setup-screen .setup-avatar-choice img,
+  .setup-screen .setup-avatar-choice .setup-avatar-upload-mark,
+  .setup-screen .preview-avatar {
+    background: rgba(232, 226, 214, 0.88);
+    border-color: rgba(61, 48, 40, 0.3);
+    color: var(--wuxia-setup-cinnabar);
+  }
+
+  .setup-screen .attr-controls .attr-btn,
+  .setup-screen .action-btn,
+  .setup-screen .load-build-btn,
+  .setup-screen .edit-note-btn,
+  .setup-screen .delete-build-btn,
+  .setup-screen .back-step-btn,
+  .setup-screen .save-btn {
+    background: rgba(250, 246, 238, 0.84);
+    border-color: rgba(61, 48, 40, 0.28);
+    color: var(--wuxia-setup-ink-soft);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+
+    &:hover:not(:disabled) {
+      background: rgba(255, 250, 244, 0.98);
+      border-color: rgba(139, 26, 26, 0.44);
+      color: var(--wuxia-setup-cinnabar);
+      box-shadow: 0 6px 14px rgba(61, 48, 40, 0.12);
+    }
+  }
+
+  .setup-screen .next-btn,
+  .setup-screen .submit-btn,
+  .setup-screen .gacha-btn {
+    background: rgba(139, 26, 26, 0.84);
+    border-color: rgba(92, 26, 20, 0.7);
+    color: #fff7ed;
+    box-shadow:
+      0 8px 18px rgba(61, 48, 40, 0.14),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+
+    &:hover:not(:disabled) {
+      background: rgba(127, 33, 25, 0.92);
+      border-color: rgba(92, 26, 20, 0.82);
+      color: #fff7ed;
+      box-shadow:
+        0 10px 22px rgba(61, 48, 40, 0.18),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    }
+
+    &:disabled {
+      background: rgba(90, 80, 70, 0.34);
+      border-color: rgba(61, 48, 40, 0.2);
+      color: rgba(61, 48, 40, 0.62);
+    }
+  }
+
+  .setup-screen .gacha-btn.positive-btn {
+    background: rgba(47, 107, 56, 0.82);
+    border-color: rgba(47, 107, 56, 0.58);
+
+    &:hover:not(:disabled) {
+      background: rgba(47, 107, 56, 0.92);
+    }
+  }
+
+  .setup-screen .gacha-btn.negative-btn {
+    background: rgba(139, 26, 26, 0.82);
+    border-color: rgba(92, 26, 20, 0.62);
+  }
+
+  .setup-screen .gacha-btn.mixed-btn {
+    background: rgba(90, 80, 70, 0.82);
+    border-color: rgba(61, 48, 40, 0.46);
+  }
+
+  .setup-screen .attr-cost.positive {
+    background: rgba(139, 26, 26, 0.08);
+    color: var(--wuxia-setup-cinnabar);
+  }
+
+  .setup-screen .attr-cost.negative {
+    background: rgba(47, 107, 56, 0.08);
+    color: #2f6b38;
+  }
+
+  .setup-screen .attr-controls .attr-slider,
+  .setup-screen .age-slider {
+    background: rgba(61, 48, 40, 0.2);
+
+    &::-webkit-slider-thumb {
+      background: linear-gradient(135deg, #d8a732, #8b5a0a);
+      border-color: rgba(61, 48, 40, 0.44);
+      box-shadow:
+        0 2px 6px rgba(61, 48, 40, 0.22),
+        0 0 0 3px rgba(255, 250, 244, 0.7);
+    }
+
+    &::-moz-range-thumb {
+      background: linear-gradient(135deg, #d8a732, #8b5a0a);
+      border-color: rgba(61, 48, 40, 0.44);
+    }
+  }
+
+  .setup-screen .attr-track,
+  .setup-screen .age-track {
+    background: rgba(61, 48, 40, 0.2);
+  }
+
+  .setup-screen .attr-fill,
+  .setup-screen .age-fill {
+    background: linear-gradient(90deg, rgba(139, 26, 26, 0.68), rgba(184, 134, 11, 0.72));
+  }
+
   *::-webkit-scrollbar-track {
     background: rgba(222, 212, 196, 0.56);
   }

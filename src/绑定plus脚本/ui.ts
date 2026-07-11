@@ -26,6 +26,7 @@ import {
   getCurrentPersonaFromDOM,
   getDefaultPresetName,
   getEnabledPresetPromptIds,
+  getPersonaDefaultEnabledSharedTraitIds,
   getPersonaActivationState,
   getPersonaDefaultEnabledTraitIds,
   getPersonaListFromDOM,
@@ -43,8 +44,10 @@ import {
   loadDefaultWorldbookEnabledEntryUids,
   loadPersonaAdvancedConfig,
   loadPersonaBaseDescription,
+  loadEnabledSharedTraitIds,
   loadPersonaSnapshots,
   loadPersonaTraits,
+  loadSharedPersonaTraitsConfig,
   mergeBindingGroupResources,
   probePlusBindingInterfaces,
   pruneLegacyPersonaSnapshots,
@@ -61,8 +64,11 @@ import {
   saveDefaultWorldbookEnabledEntryUids,
   savePersonaAdvancedConfig,
   savePersonaBaseDescription,
+  saveEnabledSharedTraitIds,
+  savePersonaDefaultEnabledSharedTraitIds,
   savePersonaDefaultEnabledTraitIds,
   savePersonaTraits,
+  saveSharedPersonaTraitsConfig,
   selectPersonaInParentUI,
   setDefaultPresetName,
   summarizeBindingPlusBackupImport,
@@ -105,6 +111,8 @@ import {
   PersonaPlusProbeReport,
   PersonaProfile,
   PersonaRuntimeContext,
+  PersonaSharedFolder,
+  PersonaSharedTrait,
   PersonaTrait,
 } from './types';
 
@@ -147,6 +155,7 @@ let activeBindingScope: 'chat' | 'character' = 'character';
 let bindingPlusDeviceMode: BindingPlusDeviceMode = 'desktop';
 let bindingPlusDrawerOpen = false;
 let personaFolderDrawerOpen = false;
+let activePersonaTraitScope: PersonaTraitScope = 'local';
 const activeResourceSelection: Partial<Record<DetailPageKey, string>> = {};
 const activePersonaFolderIdByAvatar = new Map<string, string>();
 const PERSONA_UNGROUPED_FOLDER_ID = '__ungrouped__';
@@ -208,6 +217,7 @@ type DetailPageKey =
   | 'events';
 type ScopedSelectionScope = 'global' | 'preset' | 'character';
 type BindingPlusDeviceMode = 'desktop' | 'mobile';
+type PersonaTraitScope = 'local' | 'shared';
 
 const DETAIL_PAGE_DEFINITIONS: Array<{ key: DetailPageKey; label: string }> = [
   { key: 'persona', label: '用户人设' },
@@ -1401,12 +1411,19 @@ type PersonaFolderView = {
   name: string;
   traitIds: string[];
   isUngrouped: boolean;
-  profile?: PersonaProfile;
+  source?: PersonaProfile | PersonaSharedFolder;
 };
 
-function buildPersonaFolderViews(traits: PersonaTrait[], profiles: PersonaProfile[]): PersonaFolderView[] {
+function getPersonaFolderStateKey(avatarId: string, scope: PersonaTraitScope = activePersonaTraitScope): string {
+  return scope === 'shared' ? '__shared_persona_traits__' : avatarId;
+}
+
+function buildPersonaFolderViews(
+  traits: Array<Pick<PersonaTrait | PersonaSharedTrait, 'id'>>,
+  folders: Array<Pick<PersonaProfile | PersonaSharedFolder, 'id' | 'name' | 'traitIds'>>,
+): PersonaFolderView[] {
   const validTraitIdSet = new Set(traits.map(trait => trait.id));
-  const groupedTraitIds = new Set(profiles.flatMap(profile => profile.traitIds));
+  const groupedTraitIds = new Set(folders.flatMap(folder => folder.traitIds));
   const ungroupedTraitIds = traits.filter(trait => !groupedTraitIds.has(trait.id)).map(trait => trait.id);
   return [
     {
@@ -1415,18 +1432,23 @@ function buildPersonaFolderViews(traits: PersonaTrait[], profiles: PersonaProfil
       traitIds: ungroupedTraitIds,
       isUngrouped: true,
     },
-    ...profiles.map(profile => ({
-      id: profile.id,
-      name: normalizeProfileDisplayName(profile.name),
-      traitIds: profile.traitIds.filter(traitId => validTraitIdSet.has(traitId)),
+    ...folders.map(folder => ({
+      id: folder.id,
+      name: normalizeProfileDisplayName(folder.name),
+      traitIds: folder.traitIds.filter(traitId => validTraitIdSet.has(traitId)),
       isUngrouped: false,
-      profile,
+      source: folder,
     })),
   ];
 }
 
-function ensureActivePersonaFolderId(avatarId: string, folders: PersonaFolderView[]): string {
-  const currentFolderId = (activePersonaFolderIdByAvatar.get(avatarId) || '').trim();
+function ensureActivePersonaFolderId(
+  avatarId: string,
+  folders: PersonaFolderView[],
+  scope: PersonaTraitScope = activePersonaTraitScope,
+): string {
+  const stateKey = getPersonaFolderStateKey(avatarId, scope);
+  const currentFolderId = (activePersonaFolderIdByAvatar.get(stateKey) || '').trim();
   if (folders.some(folder => folder.id === currentFolderId)) {
     return currentFolderId;
   }
@@ -1436,21 +1458,25 @@ function ensureActivePersonaFolderId(avatarId: string, folders: PersonaFolderVie
     folders.find(folder => folder.traitIds.length > 0) ||
     folders[0];
   const nextFolderId = preferredFolder?.id || PERSONA_UNGROUPED_FOLDER_ID;
-  activePersonaFolderIdByAvatar.set(avatarId, nextFolderId);
+  activePersonaFolderIdByAvatar.set(stateKey, nextFolderId);
   return nextFolderId;
 }
 
-function setActivePersonaFolderId(avatarId: string, folderId: string): void {
+function setActivePersonaFolderId(
+  avatarId: string,
+  folderId: string,
+  scope: PersonaTraitScope = activePersonaTraitScope,
+): void {
   if (!avatarId) {
     return;
   }
-  activePersonaFolderIdByAvatar.set(avatarId, folderId || PERSONA_UNGROUPED_FOLDER_ID);
+  activePersonaFolderIdByAvatar.set(getPersonaFolderStateKey(avatarId, scope), folderId || PERSONA_UNGROUPED_FOLDER_ID);
 }
 
-function createPersonaFolderNavItemHtml(folder: PersonaFolderView, selected: boolean): string {
+function createPersonaFolderNavItemHtml(folder: PersonaFolderView, selected: boolean, scope: PersonaTraitScope): string {
   return `
-    <div class="persona-folder-nav-row ${selected ? 'selected' : ''}" data-folder-id="${escapeHtml(folder.id)}">
-      <button type="button" class="persona-folder-nav-item" data-folder-id="${escapeHtml(folder.id)}">
+    <div class="persona-folder-nav-row ${selected ? 'selected' : ''}" data-folder-id="${escapeHtml(folder.id)}" data-trait-scope="${scope}">
+      <button type="button" class="persona-folder-nav-item" data-folder-id="${escapeHtml(folder.id)}" data-trait-scope="${scope}">
         <span class="persona-folder-nav-name">${escapeHtml(folder.name)}</span>
         <span class="persona-folder-nav-meta">${folder.traitIds.length} 条</span>
       </button>
@@ -1459,8 +1485,8 @@ function createPersonaFolderNavItemHtml(folder: PersonaFolderView, selected: boo
           ? ''
           : `
             <div class="persona-folder-nav-actions">
-              <button type="button" class="trait-btn persona-folder-nav-action" data-action="edit" data-profile-id="${escapeHtml(folder.id)}" title="编辑文件夹">✏️</button>
-              <button type="button" class="trait-btn persona-folder-nav-action" data-action="delete" data-profile-id="${escapeHtml(folder.id)}" title="删除文件夹">🗑️</button>
+              <button type="button" class="trait-btn persona-folder-nav-action" data-action="edit" data-profile-id="${escapeHtml(folder.id)}" data-trait-scope="${scope}" title="编辑文件夹">✏️</button>
+              <button type="button" class="trait-btn persona-folder-nav-action" data-action="delete" data-profile-id="${escapeHtml(folder.id)}" data-trait-scope="${scope}" title="删除文件夹">🗑️</button>
             </div>
           `
       }

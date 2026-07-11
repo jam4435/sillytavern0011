@@ -1622,6 +1622,8 @@ function normalizePersonaAdvancedConfigForBackup(value: unknown): PersonaAdvance
     version: PERSONA_ADVANCED_CONFIG_VERSION,
     activeProfileId: activeProfileId && profileIds.has(activeProfileId) ? activeProfileId : '',
     defaultEnabledTraitIds: normalizeOptionalStringArrayField(source as object, 'defaultEnabledTraitIds'),
+    enabledSharedTraitIds: uniqueStrings(source.enabledSharedTraitIds),
+    defaultEnabledSharedTraitIds: normalizeOptionalStringArrayField(source as object, 'defaultEnabledSharedTraitIds'),
     profiles,
     rules,
     updatedAt: typeof source.updatedAt === 'number' ? source.updatedAt : Date.now(),
@@ -1721,6 +1723,9 @@ function normalizeBindingPlusBackupFile(input: unknown): BindingPlusBackupFile {
     defaultPresetPromptIds: normalizeSnapshotStringRecord(data.defaultPresetPromptIds),
     defaultWorldbookEntryUids: normalizeSnapshotNumberRecord(data.defaultWorldbookEntryUids),
     personas: normalizeBindingPlusBackupPersonas(data.personas),
+    sharedPersonaTraits: hasOwn(data, 'sharedPersonaTraits')
+      ? normalizeSharedTraitsConfig(data.sharedPersonaTraits)
+      : undefined,
     theme: hasOwn(data, 'theme') ? normalizeBindingPlusThemeState(data.theme) : undefined,
   };
 
@@ -1774,6 +1779,7 @@ export function createBindingPlusBackupFile(): BindingPlusBackupFile {
       defaultPresetPromptIds: loadStringArraySnapshotMap(PERSONA_DEFAULT_PRESET_PROMPTS_STORAGE_KEY),
       defaultWorldbookEntryUids: loadDefaultWorldbookEntrySnapshotMap(),
       personas: collectPersonaBackups(),
+      sharedPersonaTraits: loadSharedPersonaTraitsConfig(),
       theme: loadBindingPlusTheme(),
     },
   };
@@ -1792,6 +1798,7 @@ export function importBindingPlusBackupFile(input: unknown): BindingPlusBackupIm
     personaAdvancedConfigs: backup.data.personas.filter(persona => persona.advancedConfig !== undefined).length,
     personaBaseDescriptions: backup.data.personas.filter(persona => persona.baseDescription !== undefined).length,
     personaSnapshots: backup.data.personas.filter(persona => persona.snapshots !== undefined).length,
+    sharedPersonaTraits: backup.data.sharedPersonaTraits !== undefined,
     theme: backup.data.theme !== undefined,
   };
 
@@ -1848,6 +1855,10 @@ export function importBindingPlusBackupFile(input: unknown): BindingPlusBackupIm
     }
   });
 
+  if (backup.data.sharedPersonaTraits !== undefined && !saveSharedPersonaTraitsConfig(backup.data.sharedPersonaTraits)) {
+    throw new Error('恢复通用 user 人设条目失败');
+  }
+
   if (backup.data.theme !== undefined && !saveBindingPlusTheme(backup.data.theme)) {
     throw new Error('恢复绑定plus主题失败');
   }
@@ -1874,6 +1885,9 @@ export function summarizeBindingPlusBackupImport(summary: BindingPlusBackupImpor
   }
   if (summary.personas > 0) {
     parts.push(`user 人设配置 ${summary.personas} 个`);
+  }
+  if (summary.sharedPersonaTraits) {
+    parts.push('通用条目');
   }
   if (summary.theme) {
     parts.push('主题');
@@ -4741,12 +4755,20 @@ function buildComposedDescription(baseDescription: string, lines: string[]): str
  */
 export async function composePersonaDescription(avatarId: string, baseDescription: string): Promise<string> {
   const traits = loadPersonaTraits(avatarId);
-  if (traits.length === 0) {
+  const sharedConfig = loadSharedPersonaTraitsConfig();
+  const enabledSharedTraitIdSet = new Set(loadEnabledSharedTraitIds(avatarId));
+  if (traits.length === 0 && sharedConfig.traits.length === 0) {
     return normalizeDescription(baseDescription);
   }
 
   const activation = getPersonaActivationState(avatarId);
   const enabledTraitIdSet = new Set(activation.effectiveTraitIds);
+
+  const sharedTraitLines = sharedConfig.traits
+    .filter(trait => enabledSharedTraitIdSet.has(trait.id))
+    .map(trait => trait.description.trim())
+    .filter(Boolean)
+    .map(desc => `- ${desc}`);
 
   const traitLines = traits
     .filter(trait => enabledTraitIdSet.has(trait.id))
@@ -4754,7 +4776,7 @@ export async function composePersonaDescription(avatarId: string, baseDescriptio
     .filter(Boolean)
     .map(desc => `- ${desc}`);
 
-  return buildComposedDescription(baseDescription, traitLines);
+  return buildComposedDescription(baseDescription, [...sharedTraitLines, ...traitLines]);
 }
 
 /**
