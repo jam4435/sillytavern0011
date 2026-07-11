@@ -29,6 +29,7 @@ const fieldLabels = new Set([
   '生产日期',
   '生产地址',
   '产品标准号',
+  '符合产品标准',
   '食签认字',
   '类型',
   '型号',
@@ -513,6 +514,9 @@ function cleanBodyLines(lines) {
     .map(line => compactText(line))
     .filter(line => line && !isMetaLine(line))
     .filter(line => !/《制服诱惑·白领篇》结束/u.test(line))
+    .filter(line => !/^Career ?Girl$/iu.test(line))
+    .filter(line => !/配重板|跪垫|真皮坐垫/u.test(line))
+    .filter(line => !/职位应聘标准|职位标准|着装要求/u.test(line))
     .filter(line => !/Slave\s|letusin|ampulationchar|pey\s+nn/iu.test(line));
 }
 
@@ -598,20 +602,14 @@ function inferCategory(title, sourceText, sectionTitle) {
   if (/女子敬国军|革命军|姐妹会|阿肯托尔|圣女教|教廷|黑新娘/u.test(title)) {
     return '组织';
   }
-  if (/女警|检察官|护士|医生|空中小姐|公务员|教师|女仆|神父|修女|妓|清洁工|教官|守墓人|安魂女|接引者|托圣者|芭比|母马/u.test(probe)) {
-    return '职业';
-  }
-  if (/犬|马|女畜|雌豚|驼鹿|恶媚|箱娘|活体自慰杯|警戒犬|母体/u.test(probe)) {
-    return '生物';
-  }
-  if (/法案|条例|宪法|许可|证明|安全条例|生育限制|超龄废除/u.test(probe)) {
+  if (/法案|条例|宪法|许可|证明|安全条例|生育限制|超龄废除/u.test(title)) {
     return '法律';
   }
-  if (/姐妹会|革命军|圣女教|教廷|阿肯托尔|公司|医院|学院|警局|航空|足协|政府|军队|女子敬国军|黑新娘/u.test(probe)) {
-    if (/公司|医院|学院|警局|航空|足协/u.test(probe)) {
-      return '机构';
-    }
-    return '组织';
+  if (/蛇腰犬|犬|母马|马奴|女畜|雌豚|驼鹿|恶媚|箱娘|活体自慰杯|警戒犬|母体|畜牧业/u.test(probe)) {
+    return '生物';
+  }
+  if (/女警|检察官|护士|医生|空中小姐|公务员|教师|女仆|神父|修女|妓|清洁工|教官|守墓人|安魂女|接引者|托圣者|芭比|职场白领|职员|白领/u.test(probe)) {
+    return '职业';
   }
   if (/垃圾箱|闸机|红绿灯|陵园|集中营|法庭|厕所|市场|接待室|实验室|办公室/u.test(probe)) {
     return '设施';
@@ -621,6 +619,12 @@ function inferCategory(title, sourceText, sectionTitle) {
   }
   if (/器|椅|床|球|杯|鞋|勋章|束腰|阻胎器|药|手环|肛塞|鞭|烙铁|娃娃|痰盂|沙发|尿壶|商品|产品/u.test(probe)) {
     return '产品';
+  }
+  if (/姐妹会|革命军|圣女教|教廷|阿肯托尔|公司|医院|学院|警局|航空|足协|政府|军队|女子敬国军|黑新娘/u.test(probe)) {
+    if (/公司|医院|学院|警局|航空|足协/u.test(probe)) {
+      return '机构';
+    }
+    return '组织';
   }
   if (/婚礼|葬礼|游行|赛事|美足杯|征服日|炒奴/u.test(probe)) {
     return '事件';
@@ -783,7 +787,7 @@ function titleVariants(title) {
     variants.push(noWrapper.split('·').at(-1));
   }
   if (/^帝国/.test(noWrapper) && noWrapper.length > 4) {
-    variants.push(noWrapper.slice(2));
+    variants.push(noWrapper.slice(2).replace(/^[·•\s_\-－—:：]+/u, ''));
   }
   return unique(variants);
 }
