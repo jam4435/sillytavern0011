@@ -258,6 +258,7 @@ function cleanTitle(rawTitle, sectionTitle = '') {
     .replace(/^The Uniform Fan\s*/iu, '')
     .replace(/^Career Girl\s*[一\-—]?\s*/iu, '')
     .replace(/^CareerGirl\s*/iu, '')
+    .replace(/^sexy\s+nurse\s*/iu, '')
     .replace(/^Female\s+Cleaner\s*/iu, '')
     .replace(/^FemaleCleaner\s*/iu, '')
     .replace(/^FemaleMilk\s*/iu, '')
@@ -286,6 +287,9 @@ function cleanTitle(rawTitle, sectionTitle = '') {
   if (separatorParts.length > 1) {
     const last = separatorParts.at(-1) ?? title;
     const first = separatorParts[0];
+    if (blockedTriggerTerms.has(last) && /皇家医院|帝国南方航空|口袋公司/u.test(title)) {
+      title = title.replace(/[·•\s_\-－—:：]+/gu, '');
+    } else
     if (
       sectionPrefixTerms.includes(first) ||
       sectionPrefixTerms.some(term => title.startsWith(`${term}`)) ||
@@ -304,7 +308,7 @@ function cleanTitle(rawTitle, sectionTitle = '') {
     title = title.slice(sourcePrefix.length).replace(/^[:：·•\-－—\s]+/u, '');
   }
 
-  return stripWrapper(title);
+  return stripWrapper(title).replace(/^[·•\s_\-－—:：]+/u, '');
 }
 
 function normalizeKey(value) {
@@ -517,6 +521,7 @@ function cleanBodyLines(lines) {
     .filter(line => !/^Career ?Girl$/iu.test(line))
     .filter(line => !/配重板|跪垫|真皮坐垫/u.test(line))
     .filter(line => !/职位应聘标准|职位标准|着装要求/u.test(line))
+    .filter(line => !/生产许可\d+号/u.test(line))
     .filter(line => !/Slave\s|letusin|ampulationchar|pey\s+nn/iu.test(line));
 }
 
@@ -538,6 +543,9 @@ function sentenceLooksUseful(sentence) {
     return false;
   }
   if (/^(年龄|身高|体重|胸围|腰围|臀围|处女|电话|传真|售价|编号|姓名)[:：]/u.test(sentence)) {
+    return false;
+  }
+  if (/任你|随你|爽上天|小穴屁眼/u.test(sentence)) {
     return false;
   }
   return true;
@@ -604,6 +612,9 @@ function inferCategory(title, sourceText, sectionTitle) {
   }
   if (/法案|条例|宪法|许可|证明|安全条例|生育限制|超龄废除/u.test(title)) {
     return '法律';
+  }
+  if (/器|椅|床|球|杯|鞋|勋章|束腰|阻胎器|药|手环|肛塞|鞭|烙铁|娃娃|痰盂|沙发|尿壶|商品|产品/u.test(title)) {
+    return '产品';
   }
   if (/蛇腰犬|犬|母马|马奴|女畜|雌豚|驼鹿|恶媚|箱娘|活体自慰杯|警戒犬|母体|畜牧业/u.test(probe)) {
     return '生物';
