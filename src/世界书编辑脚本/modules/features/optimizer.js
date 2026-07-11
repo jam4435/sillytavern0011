@@ -924,6 +924,164 @@ function renderLorebookCompareResult() {
   );
 }
 
+async function refreshVisibleLorebookList(lorebookName, isGlobalHint = false) {
+  const parentDoc = window.parent.document;
+  const $wrappers = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"]`, parentDoc);
+  if (!$wrappers.length) {
+    return;
+  }
+
+  const { loadLorebookEntries } = await import('../ui/list.js');
+  for (const element of $wrappers.toArray()) {
+    const $wrapper = $(element);
+    if (!$wrapper.is(':visible')) {
+      continue;
+    }
+    const isGlobal = $wrapper.attr('data-is-global') === 'true' || isGlobalHint;
+    await loadLorebookEntries(lorebookName, $wrapper, isGlobal);
+  }
+}
+
+async function refreshLorebookComparePreview(result) {
+  if (!result?.baseName || !result?.targetName) {
+    renderLorebookCompareResult();
+    return;
+  }
+
+  const parentDoc = window.parent.document;
+  const $modal = $(`#${LOREBOOK_COMPARE_MODAL_ID}`, parentDoc);
+  const [baseEntries, targetEntries] = await Promise.all([
+    getComparableLorebookEntries(result.baseName, { forceFresh: true }),
+    getComparableLorebookEntries(result.targetName, { forceFresh: true }),
+  ]);
+  const nextResult = buildLorebookCompareResultFromEntries(result.baseName, result.targetName, baseEntries, targetEntries);
+  $modal.data('compare-result', nextResult);
+  renderLorebookCompareResult();
+}
+
+async function setCompareBatchButtonsBusy($modal, busy) {
+  $modal
+    .find(
+      `[data-action="apply-lorebook-compare-added"], [data-action="apply-lorebook-compare-content-overwrite"]`,
+    )
+    .prop('disabled', busy);
+}
+
+const applyLorebookCompareAdded = errorCatched(async $button => {
+  const parentDoc = window.parent.document;
+  const $modal = $(`#${LOREBOOK_COMPARE_MODAL_ID}`, parentDoc);
+  const result = $modal.data('compare-result');
+  const plannedCount = getCompareBatchCounts(result).added;
+
+  if (!result?.baseName || plannedCount === 0) {
+    window.toastr?.info('没有可添加的差异条目。');
+    return;
+  }
+
+  if (!window.confirm(`确定要向“${result.baseName}”添加 ${plannedCount} 个仅在“${result.targetName}”中存在的条目吗？`)) {
+    return;
+  }
+
+  const originalText = $button.text();
+  let createdCount = 0;
+  await setCompareBatchButtonsBusy($modal, true);
+  $button.text('添加中...');
+
+  try {
+    const mutationResult = await updateWorldbookEntries(
+      result.baseName,
+      entries => {
+        const plan = buildCompareAddedEntryPlan(result, entries);
+        createdCount = plan.createdCount;
+        return createdCount > 0 ? [...entries, ...plan.entriesToCreate] : entries;
+      },
+      {
+        trackHistory: true,
+        transactionType: 'compare-add',
+        transactionMeta: {
+          targetLorebookName: result.targetName,
+          plannedAddedCount: plannedCount,
+        },
+      },
+    );
+
+    if (!mutationResult.success) {
+      throw mutationResult.error || new Error('批量添加差异条目失败');
+    }
+
+    if (createdCount > 0) {
+      window.toastr?.success(`已添加 ${createdCount} 个差异条目。`);
+    } else {
+      window.toastr?.info('没有需要添加的差异条目，可能已经添加过。');
+    }
+
+    await refreshVisibleLorebookList(result.baseName);
+    await refreshLorebookComparePreview(result);
+  } finally {
+    $button.text(originalText);
+    await setCompareBatchButtonsBusy($modal, false);
+    renderLorebookCompareResult();
+  }
+}, 'applyLorebookCompareAdded');
+
+const applyLorebookCompareContentOverwrite = errorCatched(async $button => {
+  const parentDoc = window.parent.document;
+  const $modal = $(`#${LOREBOOK_COMPARE_MODAL_ID}`, parentDoc);
+  const result = $modal.data('compare-result');
+  const plannedCount = getCompareBatchCounts(result).contentOverwrite;
+
+  if (!result?.baseName || plannedCount === 0) {
+    window.toastr?.info('没有可覆盖正文的修改条目。');
+    return;
+  }
+
+  if (!window.confirm(`确定用“${result.targetName}”的正文覆盖“${result.baseName}”中 ${plannedCount} 个同名条目的正文吗？`)) {
+    return;
+  }
+
+  const originalText = $button.text();
+  let overwrittenCount = 0;
+  await setCompareBatchButtonsBusy($modal, true);
+  $button.text('覆盖中...');
+
+  try {
+    const mutationResult = await updateWorldbookEntries(
+      result.baseName,
+      entries => {
+        const plan = buildCompareContentOverwritePlan(result, entries);
+        const applied = applyCompareContentOverwritePlan(entries, plan);
+        overwrittenCount = applied.changedCount;
+        return applied.entries;
+      },
+      {
+        trackHistory: true,
+        transactionType: 'compare-overwrite-content',
+        transactionMeta: {
+          targetLorebookName: result.targetName,
+          plannedOverwriteCount: plannedCount,
+        },
+      },
+    );
+
+    if (!mutationResult.success) {
+      throw mutationResult.error || new Error('批量覆盖内容失败');
+    }
+
+    if (overwrittenCount > 0) {
+      window.toastr?.success(`已覆盖 ${overwrittenCount} 个条目的正文。`);
+    } else {
+      window.toastr?.info('没有需要覆盖的正文，可能已经覆盖过。');
+    }
+
+    await refreshVisibleLorebookList(result.baseName);
+    await refreshLorebookComparePreview(result);
+  } finally {
+    $button.text(originalText);
+    await setCompareBatchButtonsBusy($modal, false);
+    renderLorebookCompareResult();
+  }
+}, 'applyLorebookCompareContentOverwrite');
+
 export function initOptimizer() {
   const parentDoc = window.parent.document;
   if ($('#lorebook-optimize-modal', parentDoc).length > 0) return;
@@ -1089,6 +1247,8 @@ export function initOptimizer() {
                        <div id="lorebook-compare-preview-list" class="compare-diff-list"></div>
                    </div>
                    <div id="${LOREBOOK_COMPARE_MODAL_ID}-footer">
+                       <button id="${LOREBOOK_COMPARE_ADD_BUTTON_ID}" class="compare-footer-primary" data-action="apply-lorebook-compare-added" disabled>批量添加差异条目</button>
+                       <button id="${LOREBOOK_COMPARE_OVERWRITE_BUTTON_ID}" class="compare-footer-danger" data-action="apply-lorebook-compare-content-overwrite" disabled>批量覆盖内容</button>
                        <button id="${LOREBOOK_COMPARE_MODAL_ID}-close">关闭</button>
                    </div>
                </div>
@@ -1151,6 +1311,22 @@ export function initOptimizer() {
     $modal.data('compare-filter', ($(this).attr('data-compare-filter') || 'all').trim());
     renderLorebookCompareResult();
   });
+
+  $(parentDoc).on(
+    'click',
+    `#${LOREBOOK_COMPARE_MODAL_ID} [data-action="apply-lorebook-compare-added"]`,
+    async function () {
+      await applyLorebookCompareAdded($(this));
+    },
+  );
+
+  $(parentDoc).on(
+    'click',
+    `#${LOREBOOK_COMPARE_MODAL_ID} [data-action="apply-lorebook-compare-content-overwrite"]`,
+    async function () {
+      await applyLorebookCompareContentOverwrite($(this));
+    },
+  );
 
   $(parentDoc).on(
     'click',
@@ -1312,7 +1488,7 @@ export const previewLorebookCompare = errorCatched(async lorebookName => {
     getComparableLorebookEntries(targetLorebookName),
   ]);
 
-  const result = buildLorebookCompareResult(lorebookName, targetLorebookName, baseEntries, targetEntries);
+  const result = buildLorebookCompareResultFromEntries(lorebookName, targetLorebookName, baseEntries, targetEntries);
   const $modal = $(`#${LOREBOOK_COMPARE_MODAL_ID}`, parentDoc);
   $modal.data('compare-result', result);
   $modal.data('compare-filter', 'all');
