@@ -142,6 +142,10 @@ export function compareTime(currentTime, targetTime, comparisonType) {
 
 // ==================== 辅助函数 ====================
 
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 // 判断事件是否为登场事件
 export function isDebutEvent(eventName) {
   return CONFIG.DEBUT_EVENT_PATTERN.test(eventName);
@@ -157,6 +161,17 @@ export function getEventParticipationKeys(eventName) {
   return [...new Set([eventName, getEventShortName(eventName)])];
 }
 
+export function isParticipationEntry(value) {
+  return (
+    isPlainObject(value) &&
+    typeof value.描述 === 'string' &&
+    typeof value.结局 === 'string' &&
+    isPlainObject(value.insert) &&
+    isPlainObject(value.update) &&
+    isPlainObject(value.delete)
+  );
+}
+
 export function hasParticipationEntry(participation, eventName) {
   return getParticipationEntry(participation, eventName) !== null;
 }
@@ -167,7 +182,7 @@ export function getParticipationEntry(participation, eventName) {
   }
 
   for (const key of getEventParticipationKeys(eventName)) {
-    if (Object.prototype.hasOwnProperty.call(participation, key)) {
+    if (Object.prototype.hasOwnProperty.call(participation, key) && isParticipationEntry(participation[key])) {
       return participation[key];
     }
   }
@@ -184,6 +199,18 @@ export function buildParticipationDeletePatch(participation, eventName) {
     getEventParticipationKeys(eventName)
       .filter(key => Object.prototype.hasOwnProperty.call(participation, key))
       .map(key => [key, {}]),
+  );
+}
+
+export function buildInvalidParticipationDeletePatch(participation) {
+  if (!isPlainObject(participation)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(participation)
+      .filter(([, value]) => !isParticipationEntry(value))
+      .map(([key]) => [key, {}]),
   );
 }
 

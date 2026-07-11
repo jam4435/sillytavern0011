@@ -13,6 +13,7 @@ import {
   getEventShortName,
   hasParticipationEntry,
   getParticipationEntry,
+  buildInvalidParticipationDeletePatch,
   buildParticipationDeletePatch,
   isDebutEvent,
   calculateDateOffset,
@@ -301,6 +302,12 @@ function getParticipationActionDiff(participationEntry, actionKey) {
 
   const diff = participationEntry[actionKey];
   return isPlainObject(diff) ? diff : {};
+}
+
+function getInitialParticipationActionDiff(eventData, actionKey) {
+  const playerActionKey = `P-${actionKey}`;
+  const delta = isPlainObject(eventData?.[playerActionKey]) ? eventData[playerActionKey] : eventData?.[actionKey];
+  return isPlainObject(delta) ? cloneJson(delta) : {};
 }
 
 function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, statData, sourceLabel) {
@@ -974,14 +981,26 @@ function buildPlayerParticipationDescription(eventName, eventData, currentTime) 
   return `${formatDate(startTime)} 到 ${formatDate(endTime)}，${eventData.事件详情}`;
 }
 
-function buildPlayerParticipationEntry(eventName, eventData, currentTime) {
+export function buildPlayerParticipationEntry(eventName, eventData, currentTime) {
   return {
     描述: buildPlayerParticipationDescription(eventName, eventData, currentTime),
-    结局说明: '',
-    insert: {},
-    update: {},
-    delete: {},
+    结局: '',
+    insert: getInitialParticipationActionDiff(eventData, 'insert'),
+    update: getInitialParticipationActionDiff(eventData, 'update'),
+    delete: getInitialParticipationActionDiff(eventData, 'delete'),
   };
+}
+
+export async function cleanupInvalidParticipationEntries(reason = 'manual') {
+  const currentVars = await getVariables({ type: 'chat' });
+  const deletePatch = buildInvalidParticipationDeletePatch(currentVars?.stat_data?.参与事件);
+  if (Object.keys(deletePatch).length === 0) {
+    return 0;
+  }
+
+  await writeDirectDelete({ 参与事件: deletePatch }, `delete-invalid-participation-${reason}`);
+  logWarning(`已清理 ${Object.keys(deletePatch).length} 个非法参与事件条目:`, Object.keys(deletePatch));
+  return Object.keys(deletePatch).length;
 }
 
 export async function playerJoinsEvents(eventNames, eventDefinitions) {
@@ -1075,25 +1094,15 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
 
       const participationEntry = playerParticipated ? getParticipationEntry(参与事件, eventName) : null;
 
-      // 步骤 2: 循环应用基础差分、玩家参与版差分和参与事件动态结局差分
+      // 步骤 2: 未参与事件使用事件定义差分；玩家参与事件使用参与事件内的结局快照。
       for (const actionKey of EVENT_DIFF_ACTIONS) {
-        const playerActionKey = `P-${actionKey}`;
-        let baseDelta = {};
-        let baseSourceLabel = actionKey;
-
-        if (playerParticipated && eventData[playerActionKey]) {
-          baseDelta = eventData[playerActionKey];
-          baseSourceLabel = playerActionKey;
-          log(`  └─ 使用玩家参与版差分 [${playerActionKey}]`);
+        if (playerParticipated) {
+          const participationDelta = getParticipationActionDiff(participationEntry, actionKey);
+          if (Object.keys(participationDelta).length > 0) {
+            mergeEventActionDelta(合并后的差分, actionKey, participationDelta, eventName, statData, `参与事件.${actionKey}`);
+          }
         } else {
-          baseDelta = eventData[actionKey] || {};
-        }
-
-        mergeEventActionDelta(合并后的差分, actionKey, baseDelta, eventName, statData, baseSourceLabel);
-
-        const dynamicDelta = getParticipationActionDiff(participationEntry, actionKey);
-        if (Object.keys(dynamicDelta).length > 0) {
-          mergeEventActionDelta(合并后的差分, actionKey, dynamicDelta, eventName, statData, `参与事件.${actionKey}`);
+          mergeEventActionDelta(合并后的差分, actionKey, eventData[actionKey] || {}, eventName, statData, actionKey);
         }
       }
 

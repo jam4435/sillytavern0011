@@ -1000,9 +1000,28 @@ function mapItemRank(品阶?: string): string {
 
 function getDisplayEventName(eventName: string): string {
   return eventName
+    .replace(/__DOT__/g, '.')
     .replace(/\.(json|txt)$/i, '')
     .replace(/^.*?(事件条目-|登场事件-|成长条目-)/, '')
     .trim();
+}
+
+function isParticipationEventValue(value: unknown): value is Record<string, unknown> {
+  return (
+    isRecord(value) &&
+    typeof value.描述 === 'string' &&
+    typeof value.结局 === 'string' &&
+    isRecord(value.insert) &&
+    isRecord(value.update) &&
+    isRecord(value.delete)
+  );
+}
+
+function filterParticipationEvents(record: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!record) return undefined;
+
+  const entries = Object.entries(record).filter(([, value]) => isParticipationEventValue(value));
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 function formatEventValue(value: unknown): string {
@@ -1017,8 +1036,8 @@ function formatEventValue(value: unknown): string {
       const actionValue = value[action];
       return isRecord(actionValue) && Object.keys(actionValue).some(key => !key.startsWith('$'));
     });
-    const endingNote = typeof value.结局说明 === 'string' && value.结局说明.trim()
-      ? `\n结局说明：${value.结局说明.trim()}`
+    const endingNote = typeof value.结局 === 'string' && value.结局.trim()
+      ? `\n结局：${value.结局.trim()}`
       : '';
     const diffNote = changedActions.length > 0 ? `\n结局差分：${changedActions.join(', ')}` : '';
     return `${value.描述}${endingNote}${diffNote}`;
@@ -1062,7 +1081,13 @@ function parseEvents(variables: GameVariables): GameEvent[] {
 
   pushRecordEvents(events, variables.附近传闻, 'RUMOR', 'rumor', (_name, value) => formatEventValue(value));
 
-  pushRecordEvents(events, variables.参与事件, 'ACTIVE', 'participating', (_name, value) => formatEventValue(value));
+  pushRecordEvents(
+    events,
+    filterParticipationEvents(variables.参与事件),
+    'ACTIVE',
+    'participating',
+    (_name, value) => formatEventValue(value),
+  );
 
   pushRecordEvents(events, eventSystem.进行中事件, 'ACTIVE', 'active', (_name, value) => {
     const endTime = formatEventValue(value);

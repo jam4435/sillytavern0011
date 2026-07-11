@@ -32,6 +32,7 @@
     applyTimedParticipantEntries,
     ensureFollowupCluesForInProgressEvents,
     cleanupFollowupCluesForActiveParticipation,
+    cleanupInvalidParticipationEntries,
   } = await import('./era-event-operations.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
@@ -233,6 +234,8 @@
       const updatedVariables = await getVariables({ type: 'chat' });
       const 最新进行中事件 = updatedVariables?.stat_data?.事件系统?.进行中事件 || {};
       const 最新参与事件 = updatedVariables?.stat_data?.参与事件 || {};
+
+      await cleanupInvalidParticipationEntries(reason);
 
       await ensureFollowupCluesForInProgressEvents(Object.keys(最新进行中事件), eventDefinitions, 'check-in-progress');
 
