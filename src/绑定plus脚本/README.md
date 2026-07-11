@@ -17,6 +17,7 @@
 
 - `user 人设`
 - `user 人设条目快照`
+- `user 人设通用条目`
 - `API 连接 profile`
 - `预设`
 - `预设 prompt 开关快照`
@@ -67,7 +68,10 @@
 这里要注意：
 
 - 输入框里编辑的是 `基础设定`
-- 最终写回给 Persona 的描述，是“基础设定 + 当前生效条目”的自动拼装结果
+- 最终写回给 Persona 的描述，是“基础设定 + 当前生效通用条目 + 当前生效本地条目”的自动拼装结果
+- `当前人设条目` 只属于当前 user 人设
+- `通用条目` 的条目内容和文件夹结构对所有 user 人设共享
+- `通用条目` 的勾选状态仍按每个 user 人设独立保存
 - 文件夹只负责整理和折叠条目
 - 文件夹不直接参与聊天/角色绑定
 
@@ -79,12 +83,14 @@
 写入的是：
 
 - 当前 `user 人设`
-- 当前手动启用中的条目 ID 快照
+- 当前手动启用中的本地条目 ID 快照
+- 当前 user 人设手动启用中的通用条目 ID 快照
 
 也就是：
 
 - `userPersonaAvatarId`
 - `userPersonaEnabledTraitIds`
+- `userPersonaEnabledSharedTraitIds`
 
 不是绑定文件夹，也不是绑定旧的 profile 容器。
 
@@ -94,6 +100,11 @@
 - `批量导入`
 - `添加文件夹`
 - `添加条目`
+
+其中 `批量导入`、`添加文件夹`、`添加条目` 会跟随当前范围：
+
+- 在 `当前人设条目` 下操作当前 user 人设自己的条目
+- 在 `通用条目` 下操作所有 user 人设共享的通用条目池
 
 ### 预设页
 
@@ -274,6 +285,7 @@
 主要使用这些本地存储键：
 
 - `tavern_helper_persona_traits_{avatarId}`：条目列表
+- `tavern_helper_persona_shared_traits_v1`：通用条目列表与通用文件夹
 - `tavern_helper_persona_advanced_{avatarId}`：文件夹、规则、默认条目状态等高级配置
 - `tavern_helper_persona_base_desc_{avatarId}`：基础描述
 - `tavern_helper_persona_snapshot_{avatarId}`：变更保护快照
@@ -300,7 +312,7 @@
 - 聊天 / 角色绑定
 - 绑定组
 - 默认预设、默认预设条目状态、默认世界书条目状态
-- `user 人设` 条目、文件夹/高级配置、基础描述、变更保护快照
+- `user 人设` 条目、通用条目、文件夹/高级配置、基础描述、变更保护快照
 - `绑定plus` 主题配置
 
 导入采用合并覆盖：同一聊天/角色绑定、同一绑定组、同名默认快照、同一 `avatarId` 的 user 人设配置会以备份为准，其他本地数据会保留。

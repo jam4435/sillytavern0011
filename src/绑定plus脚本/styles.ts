@@ -460,6 +460,34 @@ export const styles = `
     min-height: 0;
   }
 
+  #${PERSONA_PANEL_ID} .persona-trait-scope-tabs {
+    display: inline-flex;
+    gap: 6px;
+    padding: 4px;
+    margin: 0 0 10px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.18);
+  }
+
+  #${PERSONA_PANEL_ID} .persona-trait-scope-tab {
+    min-width: 96px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(226, 232, 240, 0.72);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  #${PERSONA_PANEL_ID} .persona-trait-scope-tab.active {
+    border-color: rgba(125, 211, 252, 0.42);
+    background: rgba(125, 211, 252, 0.12);
+    color: #f8fafc;
+  }
+
   #${PERSONA_PANEL_ID} .persona-traits-md {
     display: grid;
     grid-template-columns: 240px minmax(0, 1fr);
@@ -645,6 +673,10 @@ export const styles = `
     border-color: rgba(160, 200, 120, 0.5);
   }
 
+  #${PERSONA_PANEL_ID} .persona-trait-item.shared-trait.enabled {
+    border-color: rgba(125, 211, 252, 0.48);
+  }
+
   #${PERSONA_PANEL_ID} .persona-folder-item {
     display: flex;
     justify-content: space-between;
@@ -781,6 +813,12 @@ export const styles = `
     color: #9ef0af;
     border-color: rgba(120, 210, 130, 0.45);
     background: rgba(120, 210, 130, 0.14);
+  }
+
+  #${PERSONA_PANEL_ID} .state-tag.shared {
+    color: #b7e6ff;
+    border-color: rgba(125, 211, 252, 0.42);
+    background: rgba(125, 211, 252, 0.12);
   }
 
   #${PERSONA_PANEL_ID} .state-tag.off {

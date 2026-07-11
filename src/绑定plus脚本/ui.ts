@@ -1199,6 +1199,10 @@ function createPanelHtml(): string {
                         <button class="persona-btn" id="persona-trait-add-btn" title="添加新设定">添加条目</button>
                       </div>
                     </div>
+                    <div class="persona-trait-scope-tabs" role="tablist" aria-label="条目范围">
+                      <button type="button" class="persona-trait-scope-tab ${activePersonaTraitScope === 'local' ? 'active' : ''}" data-trait-scope="local">当前人设条目</button>
+                      <button type="button" class="persona-trait-scope-tab ${activePersonaTraitScope === 'shared' ? 'active' : ''}" data-trait-scope="shared">通用条目</button>
+                    </div>
                     <div class="persona-hint-row" id="persona-default-traits-status">默认条目状态：-</div>
                     <div id="persona-traits-container" class="persona-traits-container"></div>
                   </div>
@@ -1338,32 +1342,37 @@ function createPersonaTraitHtml(
   trait: PersonaTrait,
   effectiveTraitIds: Set<string>,
   options?: {
+    scope?: PersonaTraitScope;
     extraClass?: string;
     isRuleMatched?: boolean;
     isBoundToCurrentChat?: boolean;
     isBoundToCurrentCharacter?: boolean;
   },
 ): string {
+  const scope = options?.scope || 'local';
   const isManualEnabled = trait.enabled;
   const isEffectiveEnabled = effectiveTraitIds.has(trait.id);
   const isAutoEnabled = isEffectiveEnabled && !isManualEnabled;
   const enabledClass = isEffectiveEnabled ? 'enabled' : 'disabled';
   const autoBoundClass = options?.isRuleMatched ? ' auto-bound' : '';
+  const sharedClass = scope === 'shared' ? ' shared-trait' : '';
   const extraClass = options?.extraClass ? ` ${options.extraClass}` : '';
   const stateTag = isAutoEnabled
     ? '<span class="state-tag auto">自动</span>'
     : isManualEnabled
       ? '<span class="state-tag manual">手动</span>'
       : '<span class="state-tag off">关闭</span>';
+  const scopeTag = scope === 'shared' ? '<span class="state-tag shared">通用</span>' : '';
   const safeName = escapeHtml(trait.name);
   const safeDesc = escapeHtml(truncatePreviewText(trait.description || '', 180)) || '无描述';
 
   return `
-    <div class="persona-trait-item ${enabledClass}${autoBoundClass}${extraClass}" data-id="${escapeHtml(trait.id)}">
+    <div class="persona-trait-item ${enabledClass}${autoBoundClass}${sharedClass}${extraClass}" data-id="${escapeHtml(trait.id)}" data-trait-scope="${scope}">
       <div class="trait-item-main">
         <div class="trait-item-header">
           <div class="trait-item-name">${safeName}</div>
           <div class="trait-item-state">
+            ${scopeTag}
             ${stateTag}
             <input type="checkbox" class="trait-toggle-checkbox" ${isManualEnabled ? 'checked' : ''} title="手动启用/禁用">
           </div>
@@ -1371,8 +1380,8 @@ function createPersonaTraitHtml(
         <div class="trait-item-desc">${safeDesc}</div>
       </div>
       <div class="trait-item-actions">
-        <button class="trait-btn edit" data-id="${escapeHtml(trait.id)}" title="编辑">✏️</button>
-        <button class="trait-btn delete" data-id="${escapeHtml(trait.id)}" title="删除">🗑️</button>
+        <button class="trait-btn edit" data-id="${escapeHtml(trait.id)}" data-trait-scope="${scope}" title="编辑">✏️</button>
+        <button class="trait-btn delete" data-id="${escapeHtml(trait.id)}" data-trait-scope="${scope}" title="删除">🗑️</button>
       </div>
     </div>
   `;
@@ -1498,6 +1507,10 @@ function getPersonaManualEnabledTraitIds(avatarId: string): string[] {
   return loadPersonaTraits(avatarId)
     .filter(trait => trait.enabled)
     .map(trait => trait.id);
+}
+
+function getPersonaEnabledSharedTraitIds(avatarId: string): string[] {
+  return loadEnabledSharedTraitIds(avatarId);
 }
 
 function isTraitRuleBoundToCurrentContext(
@@ -1924,25 +1937,30 @@ function renderPersonaDefaultTraitSnapshotState(avatarId: string): void {
   }
 
   const currentTraitIds = getPersonaManualEnabledTraitIds(avatarId);
+  const currentSharedTraitIds = loadEnabledSharedTraitIds(avatarId);
   const savedDefaultTraitIds = getPersonaDefaultEnabledTraitIds(avatarId);
+  const savedDefaultSharedTraitIds = getPersonaDefaultEnabledSharedTraitIds(avatarId);
+  const hasSavedSnapshot = savedDefaultTraitIds !== undefined || savedDefaultSharedTraitIds !== undefined;
   const hasUnsavedChanges =
-    savedDefaultTraitIds !== undefined && !areOptionalStringArraysEqual(savedDefaultTraitIds, currentTraitIds);
+    hasSavedSnapshot &&
+    (!areOptionalStringArraysEqual(savedDefaultTraitIds ?? [], currentTraitIds) ||
+      !areOptionalStringArraysEqual(savedDefaultSharedTraitIds ?? [], currentSharedTraitIds));
   const nextTitle =
-    savedDefaultTraitIds !== undefined && !hasUnsavedChanges
+    hasSavedSnapshot && !hasUnsavedChanges
       ? '当前勾选已是未绑定时的默认条目状态'
-      : `将当前勾选的 ${currentTraitIds.length} 条保存为未绑定时的默认状态`;
+      : `将当前勾选的本地 ${currentTraitIds.length} 条、通用 ${currentSharedTraitIds.length} 条保存为未绑定时的默认状态`;
 
   $button.prop('disabled', false).text('保存为默认条目状态').attr('title', nextTitle);
 
-  if (savedDefaultTraitIds === undefined) {
+  if (!hasSavedSnapshot) {
     $status.text('默认条目状态：未保存，当前沿用手动勾选');
     return;
   }
 
   $status.text(
     hasUnsavedChanges
-      ? `默认条目状态：${savedDefaultTraitIds.length} 条已保存，当前有未保存改动`
-      : `默认条目状态：${savedDefaultTraitIds.length} 条已保存`,
+      ? `默认条目状态：本地 ${savedDefaultTraitIds?.length || 0} 条、通用 ${savedDefaultSharedTraitIds?.length || 0} 条已保存，当前有未保存改动`
+      : `默认条目状态：本地 ${savedDefaultTraitIds?.length || 0} 条、通用 ${savedDefaultSharedTraitIds?.length || 0} 条已保存`,
   );
 }
 
@@ -1954,25 +1972,34 @@ function saveCurrentPersonaTraitsAsDefaultSnapshot(
   } = {},
 ): { ok: boolean; changed: boolean; count: number } {
   const currentTraitIds = getPersonaManualEnabledTraitIds(avatarId);
+  const currentSharedTraitIds = loadEnabledSharedTraitIds(avatarId);
   const savedDefaultTraitIds = getPersonaDefaultEnabledTraitIds(avatarId);
-  const changed = !areOptionalStringArraysEqual(savedDefaultTraitIds, currentTraitIds);
+  const savedDefaultSharedTraitIds = getPersonaDefaultEnabledSharedTraitIds(avatarId);
+  const localChanged = !areOptionalStringArraysEqual(savedDefaultTraitIds, currentTraitIds);
+  const sharedChanged = !areOptionalStringArraysEqual(savedDefaultSharedTraitIds, currentSharedTraitIds);
+  const changed = localChanged || sharedChanged;
   if (!changed) {
     renderPersonaDefaultTraitSnapshotState(avatarId);
     if (options.announceUnchanged) {
       toastr.info('当前勾选已是默认条目状态');
     }
-    return { ok: true, changed: false, count: currentTraitIds.length };
+    return { ok: true, changed: false, count: currentTraitIds.length + currentSharedTraitIds.length };
   }
 
-  if (!savePersonaDefaultEnabledTraitIds(avatarId, currentTraitIds)) {
-    return { ok: false, changed: true, count: currentTraitIds.length };
+  if (
+    !savePersonaDefaultEnabledTraitIds(avatarId, currentTraitIds) ||
+    !savePersonaDefaultEnabledSharedTraitIds(avatarId, currentSharedTraitIds)
+  ) {
+    return { ok: false, changed: true, count: currentTraitIds.length + currentSharedTraitIds.length };
   }
 
   renderPersonaDefaultTraitSnapshotState(avatarId);
   if (options.announceSuccess) {
-    toastr.success(`已保存「${findPersonaByAvatarId(avatarId)?.name || avatarId}」的默认条目状态（${currentTraitIds.length} 条）`);
+    toastr.success(
+      `已保存「${findPersonaByAvatarId(avatarId)?.name || avatarId}」的默认条目状态（本地 ${currentTraitIds.length} 条，通用 ${currentSharedTraitIds.length} 条）`,
+    );
   }
-  return { ok: true, changed: true, count: currentTraitIds.length };
+  return { ok: true, changed: true, count: currentTraitIds.length + currentSharedTraitIds.length };
 }
 
 function renderPresetDefaultButtonState(): void {
@@ -2939,6 +2966,11 @@ function createPersonaYamlPreviewHtml(payload: ImportedPersonaYamlPayload): stri
 }
 
 async function importPersonaYamlPayload(avatarId: string, payload: ImportedPersonaYamlPayload): Promise<void> {
+  if (activePersonaTraitScope === 'shared') {
+    await importSharedPersonaYamlPayload(avatarId, payload);
+    return;
+  }
+
   const traits = loadPersonaTraits(avatarId);
   const config = loadPersonaAdvancedConfig(avatarId);
   const stats = {
@@ -3072,9 +3104,145 @@ async function importPersonaYamlPayload(avatarId: string, payload: ImportedPerso
   );
 }
 
+async function importSharedPersonaYamlPayload(avatarId: string, payload: ImportedPersonaYamlPayload): Promise<void> {
+  const sharedConfig = loadSharedPersonaTraitsConfig();
+  const enabledSharedTraitIds = new Set(loadEnabledSharedTraitIds(avatarId));
+  const stats = {
+    createdTraits: 0,
+    updatedTraits: 0,
+    createdFolders: 0,
+    updatedFolders: 0,
+  };
+  let changed = false;
+  let enabledChanged = false;
+
+  const upsertTrait = (draft: ImportedPersonaTraitDraft): string => {
+    const name = draft.name.trim();
+    if (!name) {
+      return '';
+    }
+
+    const index = sharedConfig.traits.findIndex(
+      trait => normalizeImportNameKey(trait.name) === normalizeImportNameKey(name),
+    );
+    const nextDescription = draft.description.trim();
+    const now = Date.now();
+
+    if (index !== -1) {
+      const current = sharedConfig.traits[index];
+      const mergedDescription = nextDescription || current.description;
+      const nextTrait: PersonaSharedTrait = {
+        ...current,
+        name,
+        description: mergedDescription,
+        updatedAt: now,
+      };
+      if (nextTrait.name !== current.name || nextTrait.description !== current.description) {
+        sharedConfig.traits[index] = nextTrait;
+        stats.updatedTraits += 1;
+        changed = true;
+      }
+      if (draft.enabled === true && !enabledSharedTraitIds.has(current.id)) {
+        enabledSharedTraitIds.add(current.id);
+        enabledChanged = true;
+      }
+      return current.id;
+    }
+
+    sharedConfig.traits.push({
+      id: createPersonaLocalId(),
+      name,
+      description: nextDescription,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const createdId = sharedConfig.traits[sharedConfig.traits.length - 1].id;
+    if (draft.enabled === true) {
+      enabledSharedTraitIds.add(createdId);
+      enabledChanged = true;
+    }
+    stats.createdTraits += 1;
+    changed = true;
+    return createdId;
+  };
+
+  payload.traits.forEach(draft => {
+    upsertTrait(draft);
+  });
+
+  payload.folders.forEach(folder => {
+    const folderName = folder.name.trim();
+    const importedTraitIds = folder.traits.map(upsertTrait).filter(Boolean);
+    if (!folderName || importedTraitIds.length === 0) {
+      return;
+    }
+
+    const index = sharedConfig.folders.findIndex(
+      item => normalizeImportNameKey(item.name) === normalizeImportNameKey(folderName),
+    );
+    const now = Date.now();
+
+    if (index !== -1) {
+      const current = sharedConfig.folders[index];
+      const mergedTraitIds = Array.from(new Set([...(current.traitIds || []), ...importedTraitIds]));
+      const isChanged =
+        current.name !== folderName ||
+        mergedTraitIds.length !== current.traitIds.length ||
+        mergedTraitIds.some((traitId, order) => current.traitIds[order] !== traitId);
+
+      if (isChanged) {
+        sharedConfig.folders[index] = {
+          ...current,
+          name: folderName,
+          traitIds: mergedTraitIds,
+          updatedAt: now,
+        };
+        stats.updatedFolders += 1;
+        changed = true;
+      }
+      return;
+    }
+
+    sharedConfig.folders.push({
+      id: createPersonaLocalId(),
+      name: folderName,
+      traitIds: Array.from(new Set(importedTraitIds)),
+      createdAt: now,
+      updatedAt: now,
+    });
+    stats.createdFolders += 1;
+    changed = true;
+  });
+
+  if (!changed && !enabledChanged) {
+    toastr.info('导入内容与当前通用文件夹/条目一致，没有需要导入的改动');
+    return;
+  }
+
+  recordPersonaSnapshot(avatarId, '批量导入通用文件夹与条目');
+  const sharedSaved = changed ? saveSharedPersonaTraitsConfig(sharedConfig) : true;
+  const enabledSaved = enabledChanged ? saveEnabledSharedTraitIds(avatarId, Array.from(enabledSharedTraitIds)) : true;
+  if (!sharedSaved || !enabledSaved) {
+    toastr.error('批量导入通用条目保存失败');
+    return;
+  }
+
+  renderPersonaTraits(avatarId);
+  renderSnapshotSection(avatarId);
+  renderResourceDetailPages();
+  await applyComposedDescriptionForAvatar(avatarId, '批量导入通用条目后自动同步', {
+    applyPlusBindings: false,
+    errorToastTitle: '批量导入通用条目后同步 user人设失败',
+  });
+  toastr.success(
+    `批量导入通用条目完成：新增条目 ${stats.createdTraits} 条，更新条目 ${stats.updatedTraits} 条，新增文件夹 ${stats.createdFolders} 个，更新文件夹 ${stats.updatedFolders} 个`,
+  );
+}
+
 function showPersonaYamlImportModal(avatarId: string): void {
   const parentDoc = window.parent.document;
   const persona = findPersonaByAvatarId(avatarId);
+  const importingShared = activePersonaTraitScope === 'shared';
   const exampleYaml = `性格:
   - 傲娇: 嘴上不承认在意，但会用行动偷偷照顾对方。
   - 慢热:
@@ -3114,11 +3282,11 @@ function showPersonaYamlImportModal(avatarId: string): void {
           <div>
             <div class="persona-modal-eyebrow">批量导入</div>
             <h3>导入文件夹和条目</h3>
-            <div class="persona-modal-subtitle">把 AI 生成的中文 YAML 或 JSON 粘贴进来，批量导入到当前 user 人设。相同名称会优先更新，不会盲目重复新增。</div>
+            <div class="persona-modal-subtitle">${importingShared ? '把 AI 生成的中文 YAML 或 JSON 粘贴进来，批量导入到全局通用条目池。各 user 人设的勾选状态仍然独立。' : '把 AI 生成的中文 YAML 或 JSON 粘贴进来，批量导入到当前 user 人设。相同名称会优先更新，不会盲目重复新增。'}</div>
           </div>
           <div class="persona-modal-stat">
-            <span>当前人设</span>
-            <strong>${escapeHtml(persona?.name || avatarId)}</strong>
+            <span>${importingShared ? '导入范围' : '当前人设'}</span>
+            <strong>${escapeHtml(importingShared ? '通用条目' : persona?.name || avatarId)}</strong>
           </div>
         </div>
         <div class="persona-modal-grid persona-import-grid">
@@ -3136,7 +3304,7 @@ function showPersonaYamlImportModal(avatarId: string): void {
           <aside class="persona-modal-sidebar">
             <div class="persona-modal-tip-card">
               <div class="persona-modal-tip-title">导入规则</div>
-              <div class="persona-modal-tip-copy">同名条目会优先更新；同名文件夹会把新条目并入原文件夹。文件夹只负责折叠整理，不承担聊天/角色绑定。</div>
+              <div class="persona-modal-tip-copy">同名条目会优先更新；同名文件夹会把新条目并入原文件夹。${importingShared ? '导入到通用池后，所有 user 人设都能看到这些内容。' : '文件夹只负责折叠整理，不承担聊天/角色绑定。'}</div>
             </div>
             <div class="persona-modal-tip-card">
               <div class="persona-modal-tip-title">示例 YAML</div>
@@ -4174,104 +4342,15 @@ async function hydrateSelectedWorldbookDetail(
   }
 }
 
-function formatBindingGroupOptionList(
-  options: Array<{ id: string; label: string }>,
-  values: string[] | undefined,
-  emptyText: string = '未绑定',
-): string {
-  const selected = values || [];
-  if (!selected.length) {
-    return emptyText;
-  }
-
-  const optionMap = new Map(options.map(option => [option.id, option.label]));
-  return selected.map(value => optionMap.get(value) || value).join('、');
-}
-
-function createBindingGroupReadonlyBlock(title: string, lines: string[]): string {
-  return `
-    <div class="form-group">
-      <div class="persona-detail-section-title">${escapeHtml(title)}</div>
-      <div class="persona-detail-list-preview">${escapeHtml(lines.filter(Boolean).join('\n') || '未绑定')}</div>
-    </div>
-  `;
-}
-
-function createBindingGroupReadonlySectionsHtml(
-  catalog: PlusBindingCatalog,
-  resources: PersonaContextBindingResources,
-): string {
-  const personas = getPersonaListFromDOM().map(persona => ({
-    id: persona.avatarId || '',
-    label: persona.name || persona.avatarId || '未命名 user 人设',
-  }));
-  const personaMap = new Map(personas.map(item => [item.id, item.label]));
-  const personaLabel = resources.userPersonaAvatarId
-    ? personaMap.get(resources.userPersonaAvatarId) || resources.userPersonaAvatarId
-    : '未绑定';
-  const traitNames = resources.userPersonaAvatarId
-    ? loadPersonaTraits(resources.userPersonaAvatarId)
-        .filter(trait => (resources.userPersonaEnabledTraitIds || []).includes(trait.id))
-        .map(trait => trait.name)
-    : [];
-
-  const worldbookEntrySummary = resources.worldbookEntries?.length
-    ? Array.from(
-        resources.worldbookEntries.reduce((acc, entry) => {
-          const current = acc.get(entry.worldbookName) || { enabled: 0, total: 0 };
-          acc.set(entry.worldbookName, {
-            enabled: current.enabled + (entry.enabled !== false ? entry.entryUids.length : 0),
-            total: current.total + entry.entryUids.length,
-          });
-          return acc;
-        }, new Map<string, { enabled: number; total: number }>()),
-      )
-        .map(([worldbookName, counts]) => `${worldbookName} · 启用 ${counts.enabled} 条 / 共 ${counts.total} 条`)
-        .join('\n')
-    : '未绑定';
-
-  return `
-    <div class="binding-group-sections">
-      ${createBindingGroupReadonlyBlock('user 人设', [
-        `当前人设：${personaLabel}`,
-        `条目快照：${traitNames.length ? `${traitNames.length} 条` : '未记录'}`,
-        traitNames.length ? `条目：${traitNames.join('、')}` : '',
-      ])}
-      ${createBindingGroupReadonlyBlock('API连接', [
-        resources.connectionProfileName ? `connection profile：${resources.connectionProfileName}` : '未绑定',
-        resources.connectionProfileName ? '绑定时通过 /profile 切换。' : '',
-      ])}
-      ${createBindingGroupReadonlyBlock('预设', [
-        resources.presetName ? `当前预设：${resources.presetName}` : '未绑定',
-        resources.presetName && resources.presetEnabledPromptIds !== undefined
-          ? `预设条目：${resources.presetEnabledPromptIds.length} 条`
-          : '预设条目：未记录',
-      ])}
-      ${createBindingGroupReadonlyBlock('酒馆助手脚本', [
-        `global：${formatBindingGroupOptionList(catalog.scripts.global, resources.scripts?.global)}`,
-        `preset：${formatBindingGroupOptionList(catalog.scripts.preset, resources.scripts?.preset)}`,
-        `character：${formatBindingGroupOptionList(catalog.scripts.character, resources.scripts?.character)}`,
-      ])}
-      ${createBindingGroupReadonlyBlock('酒馆正则', [
-        `global：${formatBindingGroupOptionList(catalog.regexes.global, resources.regexes?.global)}`,
-        `preset：${formatBindingGroupOptionList(catalog.regexes.preset, resources.regexes?.preset)}`,
-        `character：${formatBindingGroupOptionList(catalog.regexes.character, resources.regexes?.character)}`,
-      ])}
-      ${createBindingGroupReadonlyBlock('世界书', [
-        `全局：${formatBindingGroupOptionList(catalog.worldbooks, resources.worldbooks?.global)}`,
-        `角色主世界书：${resources.worldbooks?.characterPrimary || '未绑定'}`,
-        `角色附加世界书：${formatBindingGroupOptionList(catalog.worldbooks, resources.worldbooks?.characterAdditional)}`,
-        `聊天世界书：${resources.worldbooks?.chat || '未绑定'}`,
-      ])}
-      ${createBindingGroupReadonlyBlock('世界书条目', [worldbookEntrySummary])}
-    </div>
-  `;
-}
-
 function renderBindingGroupEmptyStateHtml(): string {
   return `
     <div class="persona-page-card">
-      <div class="panel-title">绑定组</div>
+      <div class="panel-title">
+        <span>绑定组</span>
+        <div class="inline-actions binding-group-top-actions">
+          <button class="persona-btn" id="binding-group-new-btn" type="button">新建绑定组</button>
+        </div>
+      </div>
       <div class="binding-group-empty-state">
         <div class="empty-list">还没有绑定组。可使用右上角把当前聊天/角色绑定内容导出为绑定组。</div>
       </div>
@@ -4289,16 +4368,133 @@ function renderBindingGroupPage($container: JQuery<HTMLElement>): void {
 
   const catalog = getCachedPlusBindingCatalog();
   const resources = cloneBindingResources(selectedGroup.resources);
+  const personas = getPersonaListFromDOM().map(persona => ({
+    id: persona.avatarId || '',
+    label: persona.name || persona.avatarId || '未命名 user 人设',
+  }));
+  const selectedPersonaAvatarId = resources.userPersonaAvatarId || '';
 
   $container.html(`
     <div class="persona-page-card">
-      <div class="panel-title">绑定组</div>
+      <div class="panel-title">
+        <span>绑定组</span>
+        <div class="inline-actions binding-group-top-actions">
+          <button class="persona-btn" id="binding-group-new-btn" type="button">新建</button>
+          <button class="persona-btn" id="binding-group-save-btn" type="button">保存</button>
+          <button class="persona-btn" id="binding-group-delete-btn" type="button">删除</button>
+        </div>
+      </div>
       <div class="binding-group-header-meta">${escapeHtml(`当前组：${selectedGroup.name}`)}</div>
       <div class="binding-group-header-meta">${escapeHtml(summarizeContextBindingResources(resources))}</div>
-      <div class="text-note">这里只显示当前绑定组里记录了什么。应用和导出请使用右上角按钮。</div>
-      ${createBindingGroupReadonlySectionsHtml(catalog, resources)}
+      <div class="text-note">应用和导出请使用右上角按钮；这里编辑的是绑定组自己的资源快照。</div>
+      <div class="binding-group-sections">
+        <div class="form-group">
+          <label for="binding-group-name-input">绑定组名称</label>
+          <input type="text" class="persona-input" id="binding-group-name-input" value="${escapeHtml(selectedGroup.name)}">
+        </div>
+
+        <div class="form-group">
+          <div class="persona-detail-section-title">user 人设</div>
+          <select class="persona-input" id="binding-group-persona-select">
+            ${renderSelectOptions(personas, selectedPersonaAvatarId, '不绑定 user 人设')}
+          </select>
+        </div>
+        <div class="two-col-grid">
+          <div class="form-group">
+            <div class="persona-detail-section-title">当前人设条目快照</div>
+            <div class="checkbox-list" id="binding-group-persona-traits">
+              ${buildBindingGroupPersonaTraitListHtml(selectedPersonaAvatarId, resources.userPersonaEnabledTraitIds || [])}
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="persona-detail-section-title">通用条目快照</div>
+            <div class="checkbox-list" id="binding-group-persona-shared-traits">
+              ${buildBindingGroupSharedTraitListHtml(resources.userPersonaEnabledSharedTraitIds || [])}
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col-grid">
+          <div class="form-group">
+            <label for="binding-group-connection-profile-select">API 连接</label>
+            <select class="persona-input" id="binding-group-connection-profile-select">
+              ${renderSelectOptions(catalog.connectionProfiles, resources.connectionProfileName, '不绑定 connection profile')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="binding-group-preset-select">预设</label>
+            <select class="persona-input" id="binding-group-preset-select">
+              ${renderSelectOptions(catalog.presets, resources.presetName, '不绑定预设')}
+            </select>
+            <div class="text-note">${escapeHtml(resources.presetEnabledPromptIds !== undefined ? `已记录预设条目快照 ${resources.presetEnabledPromptIds.length} 条` : '未记录预设条目快照')}</div>
+          </div>
+        </div>
+
+        <div class="two-col-grid">
+          <div class="form-group">
+            <div class="persona-detail-section-title">酒馆助手脚本</div>
+            <div class="persona-detail-list-meta">global</div>
+            ${createBindingGroupCheckboxRowsHtml(catalog.scripts.global, resources.scripts?.global, 'plus-script-global-checkbox', '没有 global 脚本')}
+            <div class="persona-detail-list-meta">preset</div>
+            ${createBindingGroupCheckboxRowsHtml(catalog.scripts.preset, resources.scripts?.preset, 'plus-script-preset-checkbox', '没有 preset 脚本')}
+            <div class="persona-detail-list-meta">character</div>
+            ${createBindingGroupCheckboxRowsHtml(catalog.scripts.character, resources.scripts?.character, 'plus-script-character-checkbox', '没有 character 脚本')}
+          </div>
+          <div class="form-group">
+            <div class="persona-detail-section-title">酒馆正则</div>
+            <div class="persona-detail-list-meta">global</div>
+            ${createBindingGroupCheckboxRowsHtml(catalog.regexes.global, resources.regexes?.global, 'plus-regex-global-checkbox', '没有 global 正则')}
+            <div class="persona-detail-list-meta">preset</div>
+            ${createBindingGroupCheckboxRowsHtml(catalog.regexes.preset, resources.regexes?.preset, 'plus-regex-preset-checkbox', '没有 preset 正则')}
+            <div class="persona-detail-list-meta">character</div>
+            ${createBindingGroupCheckboxRowsHtml(catalog.regexes.character, resources.regexes?.character, 'plus-regex-character-checkbox', '没有 character 正则')}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="persona-detail-section-title">世界书</div>
+          <div class="two-col-grid">
+            <div>
+              <div class="persona-detail-list-meta">全局世界书</div>
+              ${createBindingGroupCheckboxRowsHtml(catalog.worldbooks, resources.worldbooks?.global, 'plus-worldbook-global-checkbox', '没有可选世界书')}
+            </div>
+            <div>
+              <label for="binding-group-worldbook-character-primary-select">角色主世界书</label>
+              <select class="persona-input" id="binding-group-worldbook-character-primary-select">
+                ${renderSelectOptions(catalog.worldbooks, resources.worldbooks?.characterPrimary, '不绑定角色主世界书')}
+              </select>
+              <label for="binding-group-worldbook-chat-select">聊天世界书</label>
+              <select class="persona-input" id="binding-group-worldbook-chat-select">
+                ${renderSelectOptions(catalog.worldbooks, resources.worldbooks?.chat, '不绑定聊天世界书')}
+              </select>
+              <div class="persona-detail-list-meta">角色附加世界书</div>
+              ${createBindingGroupCheckboxRowsHtml(catalog.worldbooks, resources.worldbooks?.characterAdditional, 'plus-worldbook-character-additional-checkbox', '没有可选世界书')}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="panel-title compact">
+            <span>世界书条目</span>
+            <div class="inline-actions">
+              <button class="persona-btn" id="persona-worldbook-entry-add-btn" type="button">添加条目组</button>
+            </div>
+          </div>
+          <div class="plus-entry-bindings-container" id="persona-worldbook-entry-groups">
+            <div class="text-note">未记录世界书条目快照。</div>
+          </div>
+        </div>
+      </div>
     </div>
   `);
+
+  const $entryContainer = $('#persona-worldbook-entry-groups', window.parent.document);
+  if (resources.worldbookEntries?.length) {
+    $entryContainer.empty();
+    resources.worldbookEntries.forEach(entry => {
+      appendWorldbookEntryBindingRow($entryContainer, catalog, entry);
+    });
+  }
 }
 
 function getBindingGroupEditorRoot(): JQuery<HTMLElement> {
@@ -4694,24 +4890,41 @@ function renderPersonaTraits(avatarId: string): void {
     return;
   }
 
-  const traits = loadPersonaTraits(avatarId);
+  const scope = activePersonaTraitScope;
+  const localTraits = loadPersonaTraits(avatarId);
   const config = loadPersonaAdvancedConfig(avatarId);
+  const sharedConfig = loadSharedPersonaTraitsConfig();
+  const enabledSharedTraitIds = new Set(loadEnabledSharedTraitIds(avatarId));
+  const traits: PersonaTrait[] =
+    scope === 'shared'
+      ? sharedConfig.traits.map(trait => ({
+          ...trait,
+          enabled: enabledSharedTraitIds.has(trait.id),
+        }))
+      : localTraits;
+  const folders = scope === 'shared' ? sharedConfig.folders : config.profiles;
   const activation = getPersonaActivationState(avatarId);
   const context = getRuntimeContext();
-  const effectiveTraitIds = new Set(activation.effectiveTraitIds);
+  const effectiveTraitIds =
+    scope === 'shared' ? new Set(loadEnabledSharedTraitIds(avatarId)) : new Set(activation.effectiveTraitIds);
   const matchedRuleIds = new Set(activation.matchedRuleIds);
-  const folderViews = buildPersonaFolderViews(traits, config.profiles);
+  const folderViews = buildPersonaFolderViews(traits, folders);
+
+  $('.persona-trait-scope-tab', parentDoc).removeClass('active');
+  $(`.persona-trait-scope-tab[data-trait-scope="${scope}"]`, parentDoc).addClass('active');
 
   container.empty();
-  if (traits.length === 0 && config.profiles.length === 0) {
-    container.html('<div class="empty-list">暂无条目或文件夹</div>');
+  if (traits.length === 0 && folders.length === 0) {
+    container.html(
+      `<div class="empty-list">${scope === 'shared' ? '暂无通用条目或通用文件夹' : '暂无条目或文件夹'}</div>`,
+    );
     updateAutoStatusText(avatarId);
     renderPersonaDefaultTraitSnapshotState(avatarId);
     renderProfileWorkspace(avatarId);
     return;
   }
 
-  const activeFolderId = ensureActivePersonaFolderId(avatarId, folderViews);
+  const activeFolderId = ensureActivePersonaFolderId(avatarId, folderViews, scope);
   const activeFolder = folderViews.find(folder => folder.id === activeFolderId) ||
     folderViews[0] || {
       id: PERSONA_UNGROUPED_FOLDER_ID,
@@ -4724,7 +4937,7 @@ function renderPersonaTraits(avatarId: string): void {
     .map(traitId => traitById.get(traitId))
     .filter((trait): trait is PersonaTrait => Boolean(trait));
   const navHtml = folderViews
-    .map(folder => createPersonaFolderNavItemHtml(folder, folder.id === activeFolder.id))
+    .map(folder => createPersonaFolderNavItemHtml(folder, folder.id === activeFolder.id, scope))
     .join('');
   const mobileFolderDrawerHtml = `
     <div class="persona-folder-mobile-drawer-backdrop"></div>
@@ -4740,11 +4953,13 @@ function renderPersonaTraits(avatarId: string): void {
     ? visibleTraits
         .map(trait => {
           const traitRule = findTraitRule(config, trait.id);
-          const isTraitRuleMatched = Boolean(traitRule?.id && matchedRuleIds.has(traitRule.id));
+          const isTraitRuleMatched = scope === 'local' && Boolean(traitRule?.id && matchedRuleIds.has(traitRule.id));
           return createPersonaTraitHtml(trait, effectiveTraitIds, {
+            scope,
             isRuleMatched: isTraitRuleMatched,
-            isBoundToCurrentChat: isTraitRuleBoundToCurrentContext(traitRule, 'chat', context),
-            isBoundToCurrentCharacter: isTraitRuleBoundToCurrentContext(traitRule, 'character', context),
+            isBoundToCurrentChat: scope === 'local' && isTraitRuleBoundToCurrentContext(traitRule, 'chat', context),
+            isBoundToCurrentCharacter:
+              scope === 'local' && isTraitRuleBoundToCurrentContext(traitRule, 'character', context),
           });
         })
         .join('')
@@ -4760,7 +4975,7 @@ function renderPersonaTraits(avatarId: string): void {
         ${mobileFolderDrawerHtml}
         <div class="persona-folder-detail-header">
           <div>
-            <div class="persona-folder-detail-eyebrow">${activeFolder.isUngrouped ? '未分组条目' : '当前文件夹'}</div>
+            <div class="persona-folder-detail-eyebrow">${scope === 'shared' ? '通用条目' : activeFolder.isUngrouped ? '未分组条目' : '当前文件夹'}</div>
             <div class="persona-folder-detail-title">${escapeHtml(activeFolder.name)}</div>
           </div>
           <div class="persona-folder-detail-tools">
@@ -5254,8 +5469,10 @@ function updateAutoStatusText(avatarId: string): void {
   }
   const activation = getPersonaActivationState(avatarId);
   const totalTraits = loadPersonaTraits(avatarId).length;
+  const sharedConfig = loadSharedPersonaTraitsConfig();
+  const enabledSharedTraitCount = loadEnabledSharedTraitIds(avatarId).length;
   $status.text(
-    `自动拼装状态: 生效条目 ${activation.effectiveTraitIds.length}/${totalTraits}，触发规则 ${activation.matchedRuleIds.length}`,
+    `自动拼装状态: 生效条目 ${activation.effectiveTraitIds.length}/${totalTraits}，通用条目 ${enabledSharedTraitCount}/${sharedConfig.traits.length}，触发规则 ${activation.matchedRuleIds.length}`,
   );
 }
 
@@ -5281,10 +5498,15 @@ async function syncDescriptionToTavern(avatarId: string, description: string, re
 // ==================== 角色设定管理 ====================
 
 async function addPersonaTrait(avatarId: string): Promise<void> {
+  if (activePersonaTraitScope === 'shared') {
+    await addSharedPersonaTrait(avatarId);
+    return;
+  }
+
   const traits = loadPersonaTraits(avatarId);
   const config = loadPersonaAdvancedConfig(avatarId);
   const folders = buildPersonaFolderViews(traits, config.profiles);
-  const activeFolderId = ensureActivePersonaFolderId(avatarId, folders);
+  const activeFolderId = ensureActivePersonaFolderId(avatarId, folders, 'local');
   const now = Date.now();
 
   const newTrait: PersonaTrait = {
@@ -5321,7 +5543,71 @@ async function addPersonaTrait(avatarId: string): Promise<void> {
   }
 }
 
-async function togglePersonaTrait(avatarId: string, traitId: string, enabled: boolean): Promise<void> {
+async function addSharedPersonaTrait(avatarId: string): Promise<void> {
+  const sharedConfig = loadSharedPersonaTraitsConfig();
+  const folders = buildPersonaFolderViews(sharedConfig.traits, sharedConfig.folders);
+  const activeFolderId = ensureActivePersonaFolderId(avatarId, folders, 'shared');
+  const now = Date.now();
+
+  const newTrait: PersonaSharedTrait = {
+    id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`,
+    name: '新通用设定',
+    description: '',
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  recordPersonaSnapshot(avatarId, '新增通用 trait');
+  sharedConfig.traits.push(newTrait);
+  if (activeFolderId && activeFolderId !== PERSONA_UNGROUPED_FOLDER_ID) {
+    const folderIndex = sharedConfig.folders.findIndex(folder => folder.id === activeFolderId);
+    if (folderIndex !== -1 && !sharedConfig.folders[folderIndex].traitIds.includes(newTrait.id)) {
+      sharedConfig.folders[folderIndex] = {
+        ...sharedConfig.folders[folderIndex],
+        traitIds: [...sharedConfig.folders[folderIndex].traitIds, newTrait.id],
+        updatedAt: Date.now(),
+      };
+    }
+  }
+
+  if (!saveSharedPersonaTraitsConfig(sharedConfig)) {
+    return;
+  }
+  const enabledSharedTraitIds = [...loadEnabledSharedTraitIds(avatarId), newTrait.id];
+  saveEnabledSharedTraitIds(avatarId, enabledSharedTraitIds);
+  renderPersonaTraits(avatarId);
+  await editPersonaTrait(avatarId, newTrait.id, 'shared');
+  await applyComposedDescriptionForAvatar(avatarId, '新增通用 trait 后自动同步', {
+    applyPlusBindings: false,
+    errorToastTitle: '新增通用条目后同步 user人设失败',
+  });
+  renderSnapshotSection(avatarId);
+  toastr.success('通用设定已添加');
+}
+
+async function togglePersonaTrait(
+  avatarId: string,
+  traitId: string,
+  enabled: boolean,
+  scope: PersonaTraitScope = 'local',
+): Promise<void> {
+  if (scope === 'shared') {
+    const currentTraitIds = loadEnabledSharedTraitIds(avatarId);
+    const nextTraitIds = enabled
+      ? Array.from(new Set([...currentTraitIds, traitId]))
+      : currentTraitIds.filter(id => id !== traitId);
+    recordPersonaSnapshot(avatarId, `切换通用 trait: ${traitId}`);
+    if (saveEnabledSharedTraitIds(avatarId, nextTraitIds)) {
+      renderPersonaTraits(avatarId);
+      await applyComposedDescriptionForAvatar(avatarId, '切换通用 trait 后自动同步', {
+        applyPlusBindings: false,
+        errorToastTitle: '切换通用条目后同步 user人设失败',
+      });
+      renderSnapshotSection(avatarId);
+    }
+    return;
+  }
+
   const traits = loadPersonaTraits(avatarId);
   const index = traits.findIndex(t => t.id === traitId);
   if (index === -1) {
@@ -5342,8 +5628,19 @@ async function togglePersonaTrait(avatarId: string, traitId: string, enabled: bo
   }
 }
 
-async function editPersonaTrait(avatarId: string, traitId: string): Promise<void> {
-  const traits = loadPersonaTraits(avatarId);
+async function editPersonaTrait(
+  avatarId: string,
+  traitId: string,
+  scope: PersonaTraitScope = 'local',
+): Promise<void> {
+  const sharedConfig = loadSharedPersonaTraitsConfig();
+  const traits =
+    scope === 'shared'
+      ? sharedConfig.traits.map(trait => ({
+          ...trait,
+          enabled: loadEnabledSharedTraitIds(avatarId).includes(trait.id),
+        }))
+      : loadPersonaTraits(avatarId);
   const trait = traits.find(t => t.id === traitId);
   if (!trait) {
     toastr.error('找不到指定的设定');
@@ -5391,23 +5688,72 @@ async function editPersonaTrait(avatarId: string, traitId: string): Promise<void
       return;
     }
 
-    recordPersonaSnapshot(avatarId, `编辑 trait: ${traits[index].name}`);
-    traits[index].name = newName;
-    traits[index].description = newDesc;
-    traits[index].updatedAt = Date.now();
-    savePersonaTraits(avatarId, traits);
+    recordPersonaSnapshot(avatarId, `${scope === 'shared' ? '编辑通用 trait' : '编辑 trait'}: ${traits[index].name}`);
+    if (scope === 'shared') {
+      const sharedIndex = sharedConfig.traits.findIndex(item => item.id === traitId);
+      if (sharedIndex !== -1) {
+        sharedConfig.traits[sharedIndex] = {
+          ...sharedConfig.traits[sharedIndex],
+          name: newName,
+          description: newDesc,
+          updatedAt: Date.now(),
+        };
+        saveSharedPersonaTraitsConfig(sharedConfig);
+      }
+    } else {
+      traits[index].name = newName;
+      traits[index].description = newDesc;
+      traits[index].updatedAt = Date.now();
+      savePersonaTraits(avatarId, traits);
+    }
     renderPersonaTraits(avatarId);
-    await applyComposedDescriptionForAvatar(avatarId, '编辑 trait 后自动同步', {
+    await applyComposedDescriptionForAvatar(avatarId, `${scope === 'shared' ? '编辑通用 trait' : '编辑 trait'} 后自动同步`, {
       applyPlusBindings: false,
-      errorToastTitle: '编辑条目后同步 user人设失败',
+      errorToastTitle: scope === 'shared' ? '编辑通用条目后同步 user人设失败' : '编辑条目后同步 user人设失败',
     });
     renderSnapshotSection(avatarId);
-    toastr.success('设定已保存');
+    toastr.success(scope === 'shared' ? '通用设定已保存' : '设定已保存');
     closeModal();
   });
 }
 
-async function deletePersonaTrait(avatarId: string, traitId: string): Promise<void> {
+async function deletePersonaTrait(
+  avatarId: string,
+  traitId: string,
+  scope: PersonaTraitScope = 'local',
+): Promise<void> {
+  if (scope === 'shared') {
+    const sharedConfig = loadSharedPersonaTraitsConfig();
+    const target = sharedConfig.traits.find(t => t.id === traitId);
+    if (!target) {
+      return;
+    }
+
+    recordPersonaSnapshot(avatarId, `删除通用 trait: ${target.name}`);
+    sharedConfig.traits = sharedConfig.traits.filter(t => t.id !== traitId);
+    sharedConfig.folders = sharedConfig.folders
+      .map(folder => ({
+        ...folder,
+        traitIds: folder.traitIds.filter(id => id !== traitId),
+        updatedAt: Date.now(),
+      }))
+      .filter(folder => folder.traitIds.length > 0);
+    if (saveSharedPersonaTraitsConfig(sharedConfig)) {
+      saveEnabledSharedTraitIds(
+        avatarId,
+        loadEnabledSharedTraitIds(avatarId).filter(id => id !== traitId),
+      );
+      renderPersonaTraits(avatarId);
+      await applyComposedDescriptionForAvatar(avatarId, '删除通用 trait 后自动同步', {
+        applyPlusBindings: false,
+        errorToastTitle: '删除通用条目后同步 user人设失败',
+      });
+      renderSnapshotSection(avatarId);
+      toastr.success('通用设定已删除');
+    }
+    return;
+  }
+
   const traits = loadPersonaTraits(avatarId);
   const target = traits.find(t => t.id === traitId);
   if (!target) {
@@ -5495,11 +5841,35 @@ function renderSelectOptions(
   return rows.join('');
 }
 
+function createBindingGroupCheckboxRowsHtml(
+  options: Array<{ id: string; label: string }>,
+  selectedIds: string[] | undefined,
+  checkboxClass: string,
+  emptyText: string,
+): string {
+  if (options.length === 0) {
+    return `<div class="text-note">${escapeHtml(emptyText)}</div>`;
+  }
+
+  const selectedSet = new Set(selectedIds || []);
+  return options
+    .map(
+      option => `
+        <label class="inline-check-row">
+          <input type="checkbox" class="${checkboxClass}" value="${escapeHtml(option.id)}" ${selectedSet.has(option.id) ? 'checked' : ''}>
+          <span>${escapeHtml(option.label)}</span>
+        </label>
+      `,
+    )
+    .join('');
+}
+
 function createEmptyBindingResources(): PersonaContextBindingResources {
   return {
     userPersonaAvatarId: undefined,
     userPersonaProfileId: undefined,
     userPersonaEnabledTraitIds: undefined,
+    userPersonaEnabledSharedTraitIds: undefined,
     connectionProfileName: undefined,
     presetName: undefined,
     presetEnabledPromptIds: undefined,
@@ -5566,8 +5936,11 @@ function buildBindingGroupPersonaTraitListHtml(
   }
 
   const traits = loadPersonaTraits(avatarId);
+  const sharedTraits = loadSharedPersonaTraitsConfig().traits;
   if (!traits.length) {
-    return '<div class="text-note">该 user 人设还没有条目。</div>';
+    return sharedTraits.length
+      ? '<div class="text-note">该 user 人设还没有本地条目。下方仍可编辑通用条目快照。</div>'
+      : '<div class="text-note">该 user 人设还没有条目。</div>';
   }
 
   const selectedSet = new Set(selectedTraitIds);
@@ -5576,6 +5949,25 @@ function buildBindingGroupPersonaTraitListHtml(
       trait => `
         <label class="inline-check-row">
           <input type="checkbox" class="binding-group-persona-trait-checkbox" value="${escapeHtml(trait.id)}" ${selectedSet.has(trait.id) ? 'checked' : ''}>
+          <span>${escapeHtml(trait.name)}</span>
+        </label>
+      `,
+    )
+    .join('');
+}
+
+function buildBindingGroupSharedTraitListHtml(selectedTraitIds: string[]): string {
+  const traits = loadSharedPersonaTraitsConfig().traits;
+  if (!traits.length) {
+    return '<div class="text-note">当前还没有通用条目。</div>';
+  }
+
+  const selectedSet = new Set(selectedTraitIds);
+  return traits
+    .map(
+      trait => `
+        <label class="inline-check-row">
+          <input type="checkbox" class="binding-group-persona-shared-trait-checkbox" value="${escapeHtml(trait.id)}" ${selectedSet.has(trait.id) ? 'checked' : ''}>
           <span>${escapeHtml(trait.name)}</span>
         </label>
       `,
@@ -5698,30 +6090,65 @@ function collectBindingGroupResourcesFromRoot(
   const nextResources = cloneBindingResources(currentResources);
   const personaAvatarId = (($root.find('#binding-group-persona-select').val() as string | undefined) || '').trim();
   const personaTraitIds = getCheckedValues($root, '.binding-group-persona-trait-checkbox:checked');
+  const sharedTraitIds = getCheckedValues($root, '.binding-group-persona-shared-trait-checkbox:checked');
+  const hasPersonaControl = $root.find('#binding-group-persona-select').length > 0;
+  const hasConnectionProfileControl = $root.find('#binding-group-connection-profile-select').length > 0;
+  const hasPresetControl = $root.find('#binding-group-preset-select').length > 0;
+  const hasScriptControls =
+    $root.find('.plus-script-global-checkbox, .plus-script-preset-checkbox, .plus-script-character-checkbox').length > 0;
+  const hasRegexControls =
+    $root.find('.plus-regex-global-checkbox, .plus-regex-preset-checkbox, .plus-regex-character-checkbox').length > 0;
+  const hasWorldbookControls =
+    $root.find(
+      '.plus-worldbook-global-checkbox, .plus-worldbook-character-additional-checkbox, #binding-group-worldbook-character-primary-select, #binding-group-worldbook-chat-select',
+    ).length > 0;
+  const hasWorldbookEntryControls = $root.find('#persona-worldbook-entry-groups, .plus-entry-bindings-container').length > 0;
 
-  nextResources.userPersonaAvatarId = personaAvatarId || undefined;
-  nextResources.userPersonaProfileId = undefined;
-  nextResources.userPersonaEnabledTraitIds = personaAvatarId ? personaTraitIds : undefined;
-  nextResources.presetName =
-    (($root.find('#binding-group-preset-select').val() as string | undefined) || '').trim() || undefined;
-  nextResources.scripts = {
-    global: getCheckedValues($root, '.plus-script-global-checkbox:checked'),
-    preset: getCheckedValues($root, '.plus-script-preset-checkbox:checked'),
-    character: getCheckedValues($root, '.plus-script-character-checkbox:checked'),
-  };
-  nextResources.regexes = {
-    global: getCheckedValues($root, '.plus-regex-global-checkbox:checked'),
-    preset: getCheckedValues($root, '.plus-regex-preset-checkbox:checked'),
-    character: getCheckedValues($root, '.plus-regex-character-checkbox:checked'),
-  };
-  nextResources.worldbooks = {
-    global: getCheckedValues($root, '.plus-worldbook-global-checkbox:checked'),
-    characterPrimary:
-      (($root.find('#plus-worldbook-character-primary-select').val() as string | undefined) || '').trim() || undefined,
-    characterAdditional: getCheckedValues($root, '.plus-worldbook-character-additional-checkbox:checked'),
-    chat: (($root.find('#plus-worldbook-chat-select').val() as string | undefined) || '').trim() || undefined,
-  };
-  nextResources.worldbookEntries = collectWorldbookEntryBindingsFromRoot($root);
+  if (hasPersonaControl) {
+    nextResources.userPersonaAvatarId = personaAvatarId || undefined;
+    nextResources.userPersonaProfileId = undefined;
+    nextResources.userPersonaEnabledTraitIds = personaAvatarId ? personaTraitIds : undefined;
+    nextResources.userPersonaEnabledSharedTraitIds = personaAvatarId ? sharedTraitIds : undefined;
+  }
+  if (hasConnectionProfileControl) {
+    nextResources.connectionProfileName =
+      (($root.find('#binding-group-connection-profile-select').val() as string | undefined) || '').trim() || undefined;
+  }
+  if (hasPresetControl) {
+    const nextPresetName =
+      (($root.find('#binding-group-preset-select').val() as string | undefined) || '').trim() || undefined;
+    nextResources.presetName = nextPresetName;
+    if (!nextPresetName || nextPresetName !== currentResources?.presetName) {
+      nextResources.presetEnabledPromptIds = undefined;
+    }
+  }
+  if (hasScriptControls) {
+    nextResources.scripts = {
+      global: getCheckedValues($root, '.plus-script-global-checkbox:checked'),
+      preset: getCheckedValues($root, '.plus-script-preset-checkbox:checked'),
+      character: getCheckedValues($root, '.plus-script-character-checkbox:checked'),
+    };
+  }
+  if (hasRegexControls) {
+    nextResources.regexes = {
+      global: getCheckedValues($root, '.plus-regex-global-checkbox:checked'),
+      preset: getCheckedValues($root, '.plus-regex-preset-checkbox:checked'),
+      character: getCheckedValues($root, '.plus-regex-character-checkbox:checked'),
+    };
+  }
+  if (hasWorldbookControls) {
+    nextResources.worldbooks = {
+      global: getCheckedValues($root, '.plus-worldbook-global-checkbox:checked'),
+      characterPrimary:
+        (($root.find('#binding-group-worldbook-character-primary-select').val() as string | undefined) || '').trim() ||
+        undefined,
+      characterAdditional: getCheckedValues($root, '.plus-worldbook-character-additional-checkbox:checked'),
+      chat: (($root.find('#binding-group-worldbook-chat-select').val() as string | undefined) || '').trim() || undefined,
+    };
+  }
+  if (hasWorldbookEntryControls) {
+    nextResources.worldbookEntries = collectWorldbookEntryBindingsFromRoot($root);
+  }
   nextResources.extensions = [...(currentResources?.extensions || [])];
   return nextResources;
 }
@@ -5734,6 +6161,10 @@ function seedBindingResourcesFromCurrentSelection(
     userPersonaProfileId: resources.userPersonaProfileId,
     userPersonaEnabledTraitIds:
       resources.userPersonaEnabledTraitIds === undefined ? undefined : [...resources.userPersonaEnabledTraitIds],
+    userPersonaEnabledSharedTraitIds:
+      resources.userPersonaEnabledSharedTraitIds === undefined
+        ? undefined
+        : [...resources.userPersonaEnabledSharedTraitIds],
     connectionProfileName: resources.connectionProfileName,
     presetEnabledPromptIds:
       resources.presetEnabledPromptIds === undefined ? undefined : [...resources.presetEnabledPromptIds],
@@ -5764,6 +6195,7 @@ function seedBindingResourcesFromCurrentSelection(
       nextResources.userPersonaAvatarId = avatarId;
       nextResources.userPersonaProfileId = undefined;
       nextResources.userPersonaEnabledTraitIds = getPersonaManualEnabledTraitIds(avatarId);
+      nextResources.userPersonaEnabledSharedTraitIds = getPersonaEnabledSharedTraitIds(avatarId);
     }
     return nextResources;
   }
@@ -5834,6 +6266,7 @@ function hasBindingResources(resources: PersonaContextBindingResources | undefin
   }
   return Boolean(
     resources.userPersonaAvatarId ||
+    resources.userPersonaEnabledSharedTraitIds?.length ||
     resources.connectionProfileName ||
     resources.presetName ||
     resources.presetEnabledPromptIds?.length ||
@@ -5877,7 +6310,8 @@ function getCurrentSelectionDisplayLabel(): string {
     const persona = avatarId ? findPersonaByAvatarId(avatarId) : null;
     const personaLabel = persona?.name || avatarId || '当前 user 人设';
     const enabledTraitCount = avatarId ? getPersonaManualEnabledTraitIds(avatarId).length : 0;
-    return `user人设 ${personaLabel}${avatarId ? ` + 条目 ${enabledTraitCount} 条` : ''}`;
+    const enabledSharedTraitCount = avatarId ? getPersonaEnabledSharedTraitIds(avatarId).length : 0;
+    return `user人设 ${personaLabel}${avatarId ? ` + 条目 ${enabledTraitCount} 条 + 通用 ${enabledSharedTraitCount} 条` : ''}`;
   }
 
   const catalog = getCachedPlusBindingCatalog();
@@ -5984,16 +6418,20 @@ function toggleBindingResourceFromCurrentSelection(resources: PersonaContextBind
   if (activeDetailPage === 'persona') {
     const avatarId = getEditingAvatarId();
     const currentTraitIds = avatarId ? getPersonaManualEnabledTraitIds(avatarId) : undefined;
+    const currentSharedTraitIds = avatarId ? getPersonaEnabledSharedTraitIds(avatarId) : undefined;
     const isSamePersona = avatarId && resources.userPersonaAvatarId === avatarId;
     const isSameTraitSnapshot =
       avatarId && areOptionalStringArraysEqual(resources.userPersonaEnabledTraitIds, currentTraitIds);
-    if (isSamePersona && isSameTraitSnapshot) {
+    const isSameSharedTraitSnapshot =
+      avatarId && areOptionalStringArraysEqual(resources.userPersonaEnabledSharedTraitIds, currentSharedTraitIds);
+    if (isSamePersona && isSameTraitSnapshot && isSameSharedTraitSnapshot) {
       return {
         resources: {
           ...resources,
           userPersonaAvatarId: undefined,
           userPersonaProfileId: undefined,
           userPersonaEnabledTraitIds: undefined,
+          userPersonaEnabledSharedTraitIds: undefined,
         },
         changed: true,
         removed: true,
@@ -6218,6 +6656,10 @@ async function saveSelectedProfileBinding(_avatarId: string): Promise<void> {
         currentBinding.resources.userPersonaEnabledTraitIds === undefined
           ? undefined
           : [...currentBinding.resources.userPersonaEnabledTraitIds],
+      userPersonaEnabledSharedTraitIds:
+        currentBinding.resources.userPersonaEnabledSharedTraitIds === undefined
+          ? undefined
+          : [...currentBinding.resources.userPersonaEnabledSharedTraitIds],
       connectionProfileName:
         activeDetailPage === 'api'
           ? (activeResourceSelection.api || '').trim() || undefined
@@ -6326,6 +6768,11 @@ async function saveSelectedProfileBinding(_avatarId: string): Promise<void> {
 }
 
 async function upsertProfile(avatarId: string, existingProfile?: PersonaProfile): Promise<void> {
+  if (activePersonaTraitScope === 'shared') {
+    await upsertSharedFolder(avatarId);
+    return;
+  }
+
   const parentDoc = window.parent.document;
   const traits = loadPersonaTraits(avatarId);
 
@@ -6501,7 +6948,183 @@ async function upsertProfile(avatarId: string, existingProfile?: PersonaProfile)
   });
 }
 
+async function upsertSharedFolder(avatarId: string, existingFolder?: PersonaSharedFolder): Promise<void> {
+  const parentDoc = window.parent.document;
+  const sharedConfig = loadSharedPersonaTraitsConfig();
+  const traits = sharedConfig.traits;
+
+  if (traits.length === 0) {
+    toastr.warning('请先创建至少一个通用条目，再新建通用文件夹');
+    return;
+  }
+
+  const title = existingFolder ? '编辑通用文件夹' : '新建通用文件夹';
+  const selectedIds = new Set(existingFolder?.traitIds || []);
+  const traitCards = traits
+    .map(trait => {
+      const preview = truncatePreviewText(trait.description || '', 120) || '暂无描述';
+      return `
+        <label class="persona-modal-check-card" data-filter-text="${escapeHtml(
+          `${trait.name} ${trait.description}`.toLowerCase(),
+        )}">
+          <input type="checkbox" class="profile-trait-checkbox" value="${escapeHtml(trait.id)}" ${selectedIds.has(trait.id) ? 'checked' : ''}>
+          <div class="persona-modal-check-copy">
+            <div class="persona-modal-check-title">${escapeHtml(trait.name)}</div>
+            <div class="persona-modal-check-desc">${escapeHtml(preview)}</div>
+          </div>
+        </label>
+      `;
+    })
+    .join('');
+
+  const modalHtml = `
+    <div class="pool-edit-modal ${BINDINGPLUS_THEME_SCOPE_CLASS}">
+      <div class="pool-edit-content persona-modal-content persona-folder-edit-content">
+        <div class="persona-modal-header">
+          <div>
+            <div class="persona-modal-eyebrow">通用文件夹</div>
+            <h3>${title}</h3>
+            <div class="persona-modal-subtitle">通用文件夹在所有 user 人设里共享；每个 user 人设仍然独立保存勾选状态。</div>
+          </div>
+          <div class="persona-modal-stat">
+            <span>已选条目</span>
+            <strong id="profile-selected-trait-count">${selectedIds.size} / ${traits.length}</strong>
+          </div>
+        </div>
+        <div class="persona-modal-grid">
+          <aside class="persona-modal-sidebar">
+            <div class="form-group">
+              <label>文件夹名称</label>
+              <input type="text" class="persona-input" id="profile-edit-name" value="${escapeHtml(existingFolder?.name || '')}" placeholder="例如：性格 / 爱好 / 长期习惯">
+            </div>
+            <div class="persona-modal-tip-card">
+              <div class="persona-modal-tip-title">当前范围</div>
+              <div class="persona-modal-tip-copy">共 ${traits.length} 条通用条目。这里编辑的是全局共享文件夹，不会改变各 user 人设的勾选。</div>
+            </div>
+          </aside>
+          <section class="persona-modal-main">
+            <div class="persona-modal-toolbar">
+              <div class="persona-modal-toolbar-copy">
+                <div class="persona-modal-section-title">包含通用条目</div>
+                <div class="persona-modal-section-note">按名称或描述搜索，然后勾选要收进文件夹的通用条目。</div>
+              </div>
+              <div class="persona-modal-toolbar-actions">
+                <button type="button" class="persona-btn" id="profile-select-visible-btn">全选可见</button>
+                <button type="button" class="persona-btn" id="profile-clear-visible-btn">清空可见</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <input type="text" class="persona-input persona-modal-search" id="profile-trait-search" placeholder="搜索条目名称或描述">
+            </div>
+            <div class="persona-modal-checkbox-list" id="profile-trait-list">${traitCards}</div>
+            <div class="empty-list persona-modal-empty" id="profile-trait-empty" style="display:none;">没有匹配的条目</div>
+          </section>
+        </div>
+        <div class="edit-actions-bar">
+          <button class="persona-btn" id="profile-save-btn">💾 保存</button>
+          <button class="persona-btn" id="profile-close-btn">✖ 关闭</button>
+        </div>
+      </div>
+      <div class="pool-edit-overlay"></div>
+    </div>
+  `;
+
+  const $modal = $(modalHtml).appendTo($('body', parentDoc));
+  applyBindingPlusModalPresentation($modal);
+  const closeModal = () => $modal.remove();
+  const updateSelectedCount = () => {
+    const checkedCount = $('.profile-trait-checkbox:checked', $modal).length;
+    $('#profile-selected-trait-count', $modal).text(`${checkedCount} / ${traits.length}`);
+  };
+  const applyTraitFilter = () => {
+    const keyword = (($('#profile-trait-search', $modal).val() as string | undefined) || '').trim().toLowerCase();
+    let visibleCount = 0;
+    $('.persona-modal-check-card', $modal).each(function () {
+      const haystack = (($(this).attr('data-filter-text') as string | undefined) || '').toLowerCase();
+      const matched = !keyword || haystack.includes(keyword);
+      $(this).toggle(matched);
+      if (matched) {
+        visibleCount += 1;
+      }
+    });
+    $('#profile-trait-empty', $modal).toggle(visibleCount === 0);
+  };
+
+  $('#profile-close-btn', $modal).on('click', closeModal);
+  $('.pool-edit-overlay', $modal).on('click', closeModal);
+  $('#profile-trait-search', $modal).on('input', applyTraitFilter);
+  $('.profile-trait-checkbox', $modal).on('change', updateSelectedCount);
+  $('#profile-select-visible-btn', $modal).on('click', () => {
+    $('.persona-modal-check-card:visible .profile-trait-checkbox', $modal).prop('checked', true);
+    updateSelectedCount();
+  });
+  $('#profile-clear-visible-btn', $modal).on('click', () => {
+    $('.persona-modal-check-card:visible .profile-trait-checkbox', $modal).prop('checked', false);
+    updateSelectedCount();
+  });
+  applyTraitFilter();
+  updateSelectedCount();
+  $('#profile-edit-name', $modal).trigger('focus');
+
+  $('#profile-save-btn', $modal).on('click', async () => {
+    const latestSharedConfig = loadSharedPersonaTraitsConfig();
+    const name = ($('#profile-edit-name', $modal).val() as string | undefined)?.trim();
+    if (!name) {
+      toastr.warning('请输入文件夹名称');
+      return;
+    }
+
+    const traitIds = $('.profile-trait-checkbox:checked', $modal)
+      .map((_, el) => ($(el).val() as string | undefined) || '')
+      .get()
+      .filter(Boolean);
+
+    if (traitIds.length === 0) {
+      toastr.warning('文件夹里至少选择一个通用条目');
+      return;
+    }
+
+    let folderId = existingFolder?.id || '';
+    if (existingFolder) {
+      recordPersonaSnapshot(avatarId, `编辑通用文件夹: ${normalizeProfileDisplayName(existingFolder.name)}`);
+      const index = latestSharedConfig.folders.findIndex(folder => folder.id === existingFolder.id);
+      if (index !== -1) {
+        latestSharedConfig.folders[index] = {
+          ...latestSharedConfig.folders[index],
+          name,
+          traitIds,
+          updatedAt: Date.now(),
+        };
+        folderId = latestSharedConfig.folders[index].id;
+      }
+    } else {
+      recordPersonaSnapshot(avatarId, '新增通用文件夹');
+      folderId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+      latestSharedConfig.folders.push({
+        id: folderId,
+        name,
+        traitIds: Array.from(new Set(traitIds)),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    }
+
+    saveSharedPersonaTraitsConfig(latestSharedConfig);
+    setActivePersonaFolderId(avatarId, folderId, 'shared');
+    renderPersonaTraits(avatarId);
+    renderSnapshotSection(avatarId);
+    await applyComposedDescriptionForAvatar(avatarId, '更新通用文件夹后自动同步');
+    toastr.success('通用文件夹已保存');
+    closeModal();
+  });
+}
+
 async function deleteActiveProfile(avatarId: string, profileIdInput?: string): Promise<void> {
+  if (activePersonaTraitScope === 'shared') {
+    await deleteSharedFolder(avatarId, profileIdInput);
+    return;
+  }
+
   const profileId = (profileIdInput || '').trim();
   if (!profileId) {
     toastr.warning('未指定要删除的文件夹');
@@ -6537,6 +7160,36 @@ async function deleteActiveProfile(avatarId: string, profileIdInput?: string): P
   renderSnapshotSection(avatarId);
   await applyComposedDescriptionForAvatar(avatarId, '删除文件夹后自动同步');
   toastr.success('文件夹已删除');
+}
+
+async function deleteSharedFolder(avatarId: string, folderIdInput?: string): Promise<void> {
+  const folderId = (folderIdInput || '').trim();
+  if (!folderId) {
+    toastr.warning('未指定要删除的通用文件夹');
+    return;
+  }
+
+  const sharedConfig = loadSharedPersonaTraitsConfig();
+  const target = sharedConfig.folders.find(folder => folder.id === folderId);
+  if (!target) {
+    toastr.warning('未找到目标通用文件夹');
+    return;
+  }
+
+  if (!confirm(`确定删除通用文件夹「${normalizeProfileDisplayName(target.name)}」吗？`)) {
+    return;
+  }
+
+  recordPersonaSnapshot(avatarId, `删除通用文件夹: ${normalizeProfileDisplayName(target.name)}`);
+  sharedConfig.folders = sharedConfig.folders.filter(folder => folder.id !== folderId);
+  if (activePersonaFolderIdByAvatar.get(getPersonaFolderStateKey(avatarId, 'shared')) === folderId) {
+    setActivePersonaFolderId(avatarId, PERSONA_UNGROUPED_FOLDER_ID, 'shared');
+  }
+  saveSharedPersonaTraitsConfig(sharedConfig);
+  renderPersonaTraits(avatarId);
+  renderSnapshotSection(avatarId);
+  await applyComposedDescriptionForAvatar(avatarId, '删除通用文件夹后自动同步');
+  toastr.success('通用文件夹已删除');
 }
 
 // ==================== 快照回滚 ====================
@@ -7228,8 +7881,15 @@ function bindPanelEvents(): void {
         selectedGroup?.resources.userPersonaAvatarId === avatarId
           ? selectedGroup.resources.userPersonaEnabledTraitIds || []
           : [];
+      const selectedSharedTraitIds =
+        selectedGroup?.resources.userPersonaAvatarId === avatarId
+          ? selectedGroup.resources.userPersonaEnabledSharedTraitIds || []
+          : [];
       $('#binding-group-persona-traits', parentDoc).html(
         buildBindingGroupPersonaTraitListHtml(avatarId, selectedTraitIds),
+      );
+      $('#binding-group-persona-shared-traits', parentDoc).html(
+        buildBindingGroupSharedTraitListHtml(selectedSharedTraitIds),
       );
     });
 
@@ -7268,15 +7928,29 @@ function bindPanelEvents(): void {
   });
 
   $(parentDoc)
+    .off(`click${PANEL_EVENT_NAMESPACE}`, '.persona-trait-scope-tab')
+    .on(`click${PANEL_EVENT_NAMESPACE}`, '.persona-trait-scope-tab', function () {
+      const scope = (($(this).attr('data-trait-scope') as string | undefined) || 'local') as PersonaTraitScope;
+      activePersonaTraitScope = scope === 'shared' ? 'shared' : 'local';
+      const avatarId = getEditingAvatarId();
+      if (avatarId) {
+        renderPersonaTraits(avatarId);
+        renderPersonaDefaultTraitSnapshotState(avatarId);
+      }
+    });
+
+  $(parentDoc)
     .off(`change${PANEL_EVENT_NAMESPACE}`, '.trait-toggle-checkbox')
     .on(`change${PANEL_EVENT_NAMESPACE}`, '.trait-toggle-checkbox', async function () {
       const avatarId = getEditingAvatarId();
-      const traitId = ($(this).closest('.persona-trait-item').attr('data-id') || '').trim();
+      const $item = $(this).closest('.persona-trait-item');
+      const traitId = ($item.attr('data-id') || '').trim();
+      const scope = (($item.attr('data-trait-scope') as string | undefined) || 'local') as PersonaTraitScope;
       const enabled = Boolean($(this).prop('checked'));
       if (!avatarId || !traitId) {
         return;
       }
-      await togglePersonaTrait(avatarId, traitId, enabled);
+      await togglePersonaTrait(avatarId, traitId, enabled, scope === 'shared' ? 'shared' : 'local');
     });
 
   $(parentDoc)
@@ -7284,10 +7958,11 @@ function bindPanelEvents(): void {
     .on(`click${PANEL_EVENT_NAMESPACE}`, '.trait-btn.edit', async function () {
       const avatarId = getEditingAvatarId();
       const traitId = (($(this).attr('data-id') as string | undefined) || '').trim();
+      const scope = (($(this).attr('data-trait-scope') as string | undefined) || 'local') as PersonaTraitScope;
       if (!avatarId || !traitId) {
         return;
       }
-      await editPersonaTrait(avatarId, traitId);
+      await editPersonaTrait(avatarId, traitId, scope === 'shared' ? 'shared' : 'local');
     });
 
   $(parentDoc)
@@ -7295,11 +7970,12 @@ function bindPanelEvents(): void {
     .on(`click${PANEL_EVENT_NAMESPACE}`, '.trait-btn.delete', async function () {
       const avatarId = getEditingAvatarId();
       const traitId = (($(this).attr('data-id') as string | undefined) || '').trim();
+      const scope = (($(this).attr('data-trait-scope') as string | undefined) || 'local') as PersonaTraitScope;
       if (!avatarId || !traitId) {
         return;
       }
       if (confirm('确定要删除此设定吗？')) {
-        await deletePersonaTrait(avatarId, traitId);
+        await deletePersonaTrait(avatarId, traitId, scope === 'shared' ? 'shared' : 'local');
       }
     });
 
@@ -7308,10 +7984,11 @@ function bindPanelEvents(): void {
     .on(`click${PANEL_EVENT_NAMESPACE}`, '.persona-folder-nav-item', function () {
       const avatarId = getEditingAvatarId();
       const folderId = (($(this).attr('data-folder-id') as string | undefined) || '').trim();
+      const scope = (($(this).attr('data-trait-scope') as string | undefined) || 'local') as PersonaTraitScope;
       if (!avatarId || !folderId) {
         return;
       }
-      setActivePersonaFolderId(avatarId, folderId);
+      setActivePersonaFolderId(avatarId, folderId, scope === 'shared' ? 'shared' : 'local');
       renderPersonaTraits(avatarId);
       togglePersonaFolderDrawer(false);
     });
@@ -7324,17 +8001,29 @@ function bindPanelEvents(): void {
       const avatarId = getEditingAvatarId();
       const profileId = (($(this).attr('data-profile-id') as string | undefined) || '').trim();
       const action = ($(this).attr('data-action') || '').trim();
+      const scope = (($(this).attr('data-trait-scope') as string | undefined) || 'local') as PersonaTraitScope;
       if (!avatarId || !profileId) {
         return;
       }
 
       if (action === 'edit') {
-        const profile = loadPersonaAdvancedConfig(avatarId).profiles.find(item => item.id === profileId);
-        if (profile) {
-          await upsertProfile(avatarId, profile);
+        if (scope === 'shared') {
+          const folder = loadSharedPersonaTraitsConfig().folders.find(item => item.id === profileId);
+          if (folder) {
+            await upsertSharedFolder(avatarId, folder);
+          }
+        } else {
+          const profile = loadPersonaAdvancedConfig(avatarId).profiles.find(item => item.id === profileId);
+          if (profile) {
+            await upsertProfile(avatarId, profile);
+          }
         }
       } else if (action === 'delete') {
-        await deleteActiveProfile(avatarId, profileId);
+        if (scope === 'shared') {
+          await deleteSharedFolder(avatarId, profileId);
+        } else {
+          await deleteActiveProfile(avatarId, profileId);
+        }
       }
     });
 
