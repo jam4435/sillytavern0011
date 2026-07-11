@@ -1,4 +1,5 @@
 import loreEntriesRaw from './lore-entries.json?raw';
+import localImageIndexRaw from '../imageIndex.json?raw';
 
 type LoreEntry = {
   id: string;
@@ -16,12 +17,20 @@ type LoreEntry = {
 };
 
 type ImageIndex = Record<string, string[]>;
+type SynonymIndex = Record<string, string[]>;
+type ImageLookupData = {
+  imageIndex: ImageIndex;
+  synonymMap: Record<string, string>;
+  allKeywords: string[];
+};
 
 const SCRIPT_KEY = 'jm-lore-encyclopedia';
 const ENHANCED_ATTR = 'data-jm-lore-enhanced';
 const MAX_LINKS_PER_MESSAGE = 12;
+const MAX_IMAGES_PER_ENTRY = 8;
 const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
 const IMAGE_INDEX_URL = `${IMAGE_BASE_URL}imageIndex.json`;
+const SYNONYMS_URL = `${IMAGE_BASE_URL}synonyms.json`;
 const SCRIPT_BUTTONS: ScriptButton[] = [
   { name: '打开百科', visible: true },
   { name: '重扫正文', visible: true },
@@ -65,6 +74,20 @@ const blockedAutoLinkAliases = new Set([
   '模型',
 ]);
 
+const blockedImageKeywords = new Set([
+  ...blockedAutoLinkAliases,
+  '小说',
+  '漫画',
+  '介绍',
+  '说明',
+  '女人',
+  '女孩',
+  '身体',
+  '工作',
+  '公司',
+  '帝国军',
+]);
+
 const ignoredAncestorSelector = [
   'a',
   'button',
@@ -101,7 +124,7 @@ const entryById = new Map(loreEntries.map(entry => [entry.id, entry]));
 const linkCandidates = buildLinkCandidates(loreEntries);
 const linkRegex = buildLinkRegex(linkCandidates.map(candidate => candidate.alias));
 const stops: Array<() => void> = [];
-let imageIndexPromise: Promise<ImageIndex> | null = null;
+let imageLookupPromise: Promise<ImageLookupData> | null = null;
 let searchInput: HTMLInputElement | null = null;
 let panelElement: HTMLElement | null = null;
 let resultElement: HTMLElement | null = null;
@@ -353,6 +376,7 @@ function installStyle() {
         display: flex;
         flex-direction: column;
         gap: 12px;
+        padding: 14px 18px 20px;
         line-height: 1.65;
       }
       .jm-lore-popup-title {
@@ -405,15 +429,16 @@ function installStyle() {
       }
       .jm-lore-images {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-        gap: 8px;
+        grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+        gap: 10px;
       }
       .jm-lore-images img {
         width: 100%;
-        aspect-ratio: 1 / 1;
+        aspect-ratio: 4 / 3;
         object-fit: cover;
         border-radius: 6px;
         border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(0, 0, 0, 0.24);
       }
       @media (max-width: 520px) {
         .jm-lore-root {
@@ -656,29 +681,14 @@ async function showEntryPopup(entry: LoreEntry) {
   if (images.length > 0) {
     const imageGrid = ownerDocument.createElement('div');
     imageGrid.className = 'jm-lore-images';
-    images.slice(0, 6).forEach(fileName => {
+    images.slice(0, MAX_IMAGES_PER_ENTRY).forEach(fileName => {
       const image = ownerDocument.createElement('img');
       image.loading = 'lazy';
       image.alt = entry.title;
-      image.src = `${IMAGE_BASE_URL}${fileName}`;
+      image.src = buildImageUrl(fileName);
       imageGrid.appendChild(image);
     });
     content.appendChild(imageGrid);
-  }
-
-  const source = ownerDocument.createElement('div');
-  source.className = 'jm-lore-popup-meta';
-  source.textContent =
-    typeof entry.sourceSegmentIndex === 'number'
-      ? `来源：${entry.sourceFile} · 第 ${entry.sourceSegmentIndex + 1} 段`
-      : `来源：${entry.sourceFile}`;
-  content.appendChild(source);
-
-  if (entry.sourceExcerpt) {
-    const excerpt = ownerDocument.createElement('div');
-    excerpt.className = 'jm-lore-popup-excerpt';
-    excerpt.textContent = entry.sourceExcerpt;
-    content.appendChild(excerpt);
   }
 
   openModal(content);
