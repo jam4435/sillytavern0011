@@ -292,12 +292,37 @@ function getEntrySettingsSnapshot(entry = {}) {
   };
 }
 
+function getComparableEntryData(entry = {}) {
+  const cloned = _.cloneDeep(entry || {});
+  delete cloned.uid;
+  return cloned;
+}
+
+function getRenderedEntryCompareSurface(entry = {}) {
+  return {
+    content: typeof entry.content === 'string' ? entry.content : '',
+    keywords: getKeywordFields(entry),
+    settings: getEntrySettingsSnapshot(entry),
+  };
+}
+
 function hasKeywordFieldDiff(baseEntry, targetEntry) {
   return !_.isEqual(getKeywordFields(baseEntry), getKeywordFields(targetEntry));
 }
 
 function hasEntrySettingsFieldDiff(baseEntry, targetEntry) {
   return !_.isEqual(getEntrySettingsSnapshot(baseEntry), getEntrySettingsSnapshot(targetEntry));
+}
+
+function hasEntryDataDiff(baseEntry, targetEntry) {
+  return !_.isEqual(getComparableEntryData(baseEntry), getComparableEntryData(targetEntry));
+}
+
+function hasUnrenderedEntryDataDiff(baseEntry, targetEntry) {
+  return (
+    hasEntryDataDiff(baseEntry, targetEntry) &&
+    _.isEqual(getRenderedEntryCompareSurface(baseEntry), getRenderedEntryCompareSurface(targetEntry))
+  );
 }
 
 function applyTargetKeywordFields(currentEntry, targetEntry) {
@@ -317,6 +342,13 @@ function applyTargetEntrySettingsFields(currentEntry, targetEntry) {
     }
   });
   return nextEntry;
+}
+
+function applyTargetFullEntry(currentEntry, targetEntry) {
+  return {
+    ..._.cloneDeep(targetEntry || {}),
+    uid: ensureNumericUID(currentEntry?.uid),
+  };
 }
 
 export function getCompareEntrySnapshot(entry = {}) {
@@ -397,6 +429,14 @@ export function buildEntryDiffs(baseEntry, targetEntry) {
     });
   }
 
+  if (hasUnrenderedEntryDataDiff(baseEntry, targetEntry)) {
+    diffs.push({
+      label: '其他条目字段',
+      before: '当前条目存在未展开字段差异',
+      after: '可用“覆盖整条”同步完整条目数据',
+    });
+  }
+
   return diffs;
 }
 
@@ -453,6 +493,7 @@ export function buildLorebookCompareResult(baseName, targetName, baseEntries, ta
           hasContentDiff: baseContent !== targetContent,
           hasKeywordDiff: hasKeywordFieldDiff(baseEntry, targetEntry),
           hasEntrySettingsDiff: hasEntrySettingsFieldDiff(baseEntry, targetEntry),
+          hasEntryDataDiff: hasEntryDataDiff(baseEntry, targetEntry),
           diffs,
         });
       }
@@ -719,6 +760,64 @@ export function buildCompareEntrySettingsOverwritePlan(result, currentEntries) {
 }
 
 export function applyCompareEntrySettingsOverwritePlan(entries, plan) {
+  const updateByUid = new Map((plan?.updates || []).map(update => [ensureNumericUID(update.uid), update.nextEntry]));
+  let changedCount = 0;
+  const nextEntries = (entries || []).map(entry => {
+    const nextEntry = updateByUid.get(ensureNumericUID(entry?.uid));
+    if (!nextEntry || _.isEqual(entry, nextEntry)) {
+      return entry;
+    }
+
+    changedCount += 1;
+    return _.cloneDeep(nextEntry);
+  });
+
+  return {
+    entries: changedCount > 0 ? nextEntries : entries,
+    changedCount,
+  };
+}
+
+export function buildCompareEntryOverwritePlan(result, currentEntries) {
+  const currentByUid = new Map(
+    (currentEntries || [])
+      .filter(entry => !isCompareFolderMetaEntry(entry))
+      .map(entry => [ensureNumericUID(entry.uid), entry]),
+  );
+  const updates = [];
+  let skippedCount = 0;
+
+  (Array.isArray(result?.items) ? result.items : [])
+    .filter(item => item?.type === 'modified' && item.hasEntryDataDiff && item.targetEntry)
+    .forEach(item => {
+      const uid = ensureNumericUID(item.baseUid);
+      const currentEntry = currentByUid.get(uid);
+      if (!currentEntry) {
+        skippedCount += 1;
+        return;
+      }
+
+      const nextEntry = applyTargetFullEntry(currentEntry, item.targetEntry);
+      if (_.isEqual(currentEntry, nextEntry)) {
+        skippedCount += 1;
+        return;
+      }
+
+      updates.push({
+        uid,
+        title: item.title,
+        nextEntry,
+      });
+    });
+
+  return {
+    updates,
+    updateCount: updates.length,
+    skippedCount,
+  };
+}
+
+export function applyCompareEntryOverwritePlan(entries, plan) {
   const updateByUid = new Map((plan?.updates || []).map(update => [ensureNumericUID(update.uid), update.nextEntry]));
   let changedCount = 0;
   const nextEntries = (entries || []).map(entry => {

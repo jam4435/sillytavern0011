@@ -7,10 +7,12 @@ import { batchUpdateEntries } from './batchActions.js';
 import { getRenderableEntriesWithoutFolderMeta } from './folderMeta.js';
 import {
   applyCompareContentOverwritePlan,
+  applyCompareEntryOverwritePlan,
   applyCompareEntrySettingsOverwritePlan,
   applyCompareKeywordOverwritePlan,
   buildCompareAddedEntryPlan,
   buildCompareContentOverwritePlan,
+  buildCompareEntryOverwritePlan,
   buildCompareEntrySettingsOverwritePlan,
   buildCompareKeywordOverwritePlan,
   buildLorebookCompareResult as buildLorebookCompareResultFromEntries,
@@ -24,6 +26,7 @@ const LOREBOOK_COMPARE_ADD_BUTTON_ID = 'lorebook-compare-add-missing-button';
 const LOREBOOK_COMPARE_OVERWRITE_BUTTON_ID = 'lorebook-compare-overwrite-content-button';
 const LOREBOOK_COMPARE_KEYWORD_BUTTON_ID = 'lorebook-compare-overwrite-keywords-button';
 const LOREBOOK_COMPARE_SETTINGS_BUTTON_ID = 'lorebook-compare-overwrite-settings-button';
+const LOREBOOK_COMPARE_ENTRY_BUTTON_ID = 'lorebook-compare-overwrite-entry-button';
 const LOREBOOK_COMPARE_DELETE_BUTTON_ID = 'lorebook-compare-delete-removed-button';
 
 function ensureLorebookCompareStyles() {
@@ -860,6 +863,11 @@ function renderCompareItemActionButtons(item, index) {
         renderCompareActionButton('apply-lorebook-compare-settings-overwrite', '覆盖设置', index, '覆盖标题、启用状态、模式、插入位置和概率'),
       );
     }
+    if (item.hasEntryDataDiff) {
+      buttons.push(
+        renderCompareActionButton('apply-lorebook-compare-entry-overwrite', '覆盖整条', index, '用对比世界书完整条目覆盖当前条目，但保留当前 UID'),
+      );
+    }
   }
 
   return buttons.join('');
@@ -915,15 +923,18 @@ function getCompareBatchCounts(result) {
     contentOverwrite: items.filter(item => item?.type === 'modified' && item.hasContentDiff).length,
     keywordOverwrite: items.filter(item => item?.type === 'modified' && item.hasKeywordDiff).length,
     settingsOverwrite: items.filter(item => item?.type === 'modified' && item.hasEntrySettingsDiff).length,
+    entryOverwrite: items.filter(item => item?.type === 'modified' && item.hasEntryDataDiff).length,
   };
 }
 
 function updateCompareBatchActionState($modal, result) {
-  const { added, removed, contentOverwrite, keywordOverwrite, settingsOverwrite } = getCompareBatchCounts(result);
+  const { added, removed, contentOverwrite, keywordOverwrite, settingsOverwrite, entryOverwrite } =
+    getCompareBatchCounts(result);
   const $addButton = $(`#${LOREBOOK_COMPARE_ADD_BUTTON_ID}`, $modal);
   const $overwriteButton = $(`#${LOREBOOK_COMPARE_OVERWRITE_BUTTON_ID}`, $modal);
   const $keywordButton = $(`#${LOREBOOK_COMPARE_KEYWORD_BUTTON_ID}`, $modal);
   const $settingsButton = $(`#${LOREBOOK_COMPARE_SETTINGS_BUTTON_ID}`, $modal);
+  const $entryButton = $(`#${LOREBOOK_COMPARE_ENTRY_BUTTON_ID}`, $modal);
   const $deleteButton = $(`#${LOREBOOK_COMPARE_DELETE_BUTTON_ID}`, $modal);
 
   $addButton
@@ -956,6 +967,15 @@ function updateCompareBatchActionState($modal, result) {
       settingsOverwrite > 0
         ? `覆盖 ${settingsOverwrite} 个当前世界书条目的标题、启用状态、模式、插入位置和概率`
         : '没有可覆盖设置的修改条目',
+    );
+  $entryButton
+    .text(entryOverwrite > 0 ? `批量覆盖整条 (${entryOverwrite})` : '批量覆盖整条')
+    .prop('disabled', entryOverwrite === 0)
+    .attr(
+      'title',
+      entryOverwrite > 0
+        ? `用对比世界书完整条目覆盖 ${entryOverwrite} 个当前世界书条目，并保留当前 UID`
+        : '没有可覆盖整条的修改条目',
     );
   $deleteButton
     .text(removed > 0 ? `批量删除多余条目 (${removed})` : '批量删除多余条目')
@@ -1066,6 +1086,7 @@ async function setCompareBatchButtonsBusy($modal, busy) {
         '[data-action="apply-lorebook-compare-content-overwrite"]',
         '[data-action="apply-lorebook-compare-keyword-overwrite"]',
         '[data-action="apply-lorebook-compare-settings-overwrite"]',
+        '[data-action="apply-lorebook-compare-entry-overwrite"]',
         '[data-action="swap-lorebook-compare-direction"]',
       ].join(', '),
     )

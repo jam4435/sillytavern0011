@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyCompareEntryOverwritePlan,
   applyCompareEntrySettingsOverwritePlan,
   applyCompareKeywordOverwritePlan,
   buildCompareAddedEntryPlan,
   buildCompareContentOverwritePlan,
+  buildCompareEntryOverwritePlan,
   buildCompareEntrySettingsOverwritePlan,
   buildCompareKeywordOverwritePlan,
   buildLorebookCompareResult,
@@ -163,6 +165,57 @@ describe('世界书全本比对 helper', () => {
       keys: ['旧主'],
       keys_secondary: { logic: 'and_any', keys: ['旧次'] },
     });
+  });
+
+  it('整条覆盖保留当前 UID，并同步正文、关键词和未展开字段', () => {
+    const baseEntry = entry(1, '整条变化', '旧正文', {
+      strategy: { type: 'selective', keys: ['旧主'], keys_secondary: { logic: 'and_any', keys: ['旧次'] } },
+      effect: { sticky: null, cooldown: null, delay: null },
+    });
+    const targetEntry = entry(10, '整条变化', '新正文', {
+      strategy: { type: 'constant', keys: ['新主'], keys_secondary: { logic: 'not_any', keys: ['新次'] } },
+      effect: { sticky: 3, cooldown: 2, delay: 1 },
+      extra: { source: 'target' },
+    });
+    const result = buildLorebookCompareResult('当前', '对比', [baseEntry], [targetEntry]);
+
+    const plan = buildCompareEntryOverwritePlan(result, [baseEntry]);
+    const applied = applyCompareEntryOverwritePlan([baseEntry], plan);
+
+    expect(plan.updateCount).toBe(1);
+    expect(applied.changedCount).toBe(1);
+    expect(applied.entries[0]).toMatchObject({
+      uid: 1,
+      name: '整条变化',
+      content: '新正文',
+      strategy: {
+        type: 'constant',
+        keys: ['新主'],
+        keys_secondary: { logic: 'not_any', keys: ['新次'] },
+      },
+      effect: { sticky: 3, cooldown: 2, delay: 1 },
+      extra: { source: 'target' },
+    });
+  });
+
+  it('只有未展开字段差异时也会生成修改结果以支持覆盖整条', () => {
+    const baseEntry = entry(1, '隐藏字段变化', '正文', {
+      effect: { sticky: null, cooldown: null, delay: null },
+    });
+    const targetEntry = entry(10, '隐藏字段变化', '正文', {
+      effect: { sticky: 2, cooldown: null, delay: null },
+    });
+    const result = buildLorebookCompareResult('当前', '对比', [baseEntry], [targetEntry]);
+
+    expect(result.summary.modified).toBe(1);
+    expect(result.items[0]).toMatchObject({
+      type: 'modified',
+      hasEntryDataDiff: true,
+      hasContentDiff: false,
+      hasKeywordDiff: false,
+      hasEntrySettingsDiff: false,
+    });
+    expect(result.items[0].diffs.map(diff => diff.label)).toContain('其他条目字段');
   });
 
   it('删除计划只包含当前世界书独有条目，交换方向后新增和删除语义反转', () => {
