@@ -4,6 +4,8 @@ import { getPositionLabel as getPositionDisplayLabel } from '../position.js';
 import { ensureNumericUID } from '../utils.js';
 
 const FOLDER_META_ENTRY_PREFIX = '__WI_META_FOLDERS__';
+const DEFAULT_SECONDARY_KEYWORDS = { logic: 'and_any', keys: [] };
+const ENTRY_SETTING_FIELD_PATHS = ['name', 'enabled', 'strategy.type', 'position', 'probability'];
 
 export function isCompareFolderMetaEntry(entry) {
   const entryName = `${entry?.name || ''}`.trim();
@@ -273,6 +275,50 @@ function getSecondaryKeywordSnapshot(entry) {
   };
 }
 
+function getKeywordFields(entry) {
+  return {
+    primary: Array.isArray(entry?.strategy?.keys) ? _.cloneDeep(entry.strategy.keys) : [],
+    secondary: _.cloneDeep(entry?.strategy?.keys_secondary || DEFAULT_SECONDARY_KEYWORDS),
+  };
+}
+
+function getEntrySettingsSnapshot(entry = {}) {
+  return {
+    name: normalizeSortableText(entry.name) || '未命名条目',
+    enabled: entry.enabled !== false,
+    strategyType: normalizeSortableText(entry?.strategy?.type) || 'selective',
+    position: _.cloneDeep(entry.position || { type: 'after_character_definition', depth: 4, order: 0 }),
+    probability: entry.probability ?? 100,
+  };
+}
+
+function hasKeywordFieldDiff(baseEntry, targetEntry) {
+  return !_.isEqual(getKeywordFields(baseEntry), getKeywordFields(targetEntry));
+}
+
+function hasEntrySettingsFieldDiff(baseEntry, targetEntry) {
+  return !_.isEqual(getEntrySettingsSnapshot(baseEntry), getEntrySettingsSnapshot(targetEntry));
+}
+
+function applyTargetKeywordFields(currentEntry, targetEntry) {
+  const nextEntry = _.cloneDeep(currentEntry);
+  const keywordFields = getKeywordFields(targetEntry);
+  nextEntry.strategy = _.cloneDeep(nextEntry.strategy || {});
+  nextEntry.strategy.keys = keywordFields.primary;
+  nextEntry.strategy.keys_secondary = keywordFields.secondary;
+  return nextEntry;
+}
+
+function applyTargetEntrySettingsFields(currentEntry, targetEntry) {
+  const nextEntry = _.cloneDeep(currentEntry);
+  ENTRY_SETTING_FIELD_PATHS.forEach(path => {
+    if (_.has(targetEntry, path)) {
+      _.set(nextEntry, path, _.cloneDeep(_.get(targetEntry, path)));
+    }
+  });
+  return nextEntry;
+}
+
 export function getCompareEntrySnapshot(entry = {}) {
   return {
     uid: ensureNumericUID(entry.uid),
@@ -400,33 +446,39 @@ export function buildLorebookCompareResult(baseName, targetName, baseEntries, ta
           title,
           baseUid: ensureNumericUID(baseEntry.uid),
           targetUid: ensureNumericUID(targetEntry.uid),
+          baseEntry: _.cloneDeep(baseEntry),
+          targetEntry: _.cloneDeep(targetEntry),
           baseContent,
           targetContent,
           hasContentDiff: baseContent !== targetContent,
+          hasKeywordDiff: hasKeywordFieldDiff(baseEntry, targetEntry),
+          hasEntrySettingsDiff: hasEntrySettingsFieldDiff(baseEntry, targetEntry),
           diffs,
         });
       }
     }
 
     if (targetBucket.length > sharedCount) {
-      targetBucket.slice(sharedCount).forEach(entry => {
+      targetBucket.slice(sharedCount).forEach((entry, offset) => {
         summary.added += 1;
         items.push({
           type: 'added',
           title,
           uid: ensureNumericUID(entry.uid),
+          targetTitleIndex: sharedCount + offset,
           entry: _.cloneDeep(entry),
         });
       });
     }
 
     if (baseBucket.length > sharedCount) {
-      baseBucket.slice(sharedCount).forEach(entry => {
+      baseBucket.slice(sharedCount).forEach((entry, offset) => {
         summary.removed += 1;
         items.push({
           type: 'removed',
           title,
           uid: ensureNumericUID(entry.uid),
+          baseTitleIndex: sharedCount + offset,
           entry: _.cloneDeep(entry),
         });
       });
@@ -479,8 +531,9 @@ export function buildCompareAddedEntryPlan(result, currentEntries) {
       const title = normalizeSortableText(item.title || item.entry?.name) || '未命名条目';
       const currentCount = currentTitleCounts.get(title) || 0;
       const targetCount = result?.titleStats?.[title]?.targetCount ?? currentCount + 1;
+      const targetTitleIndex = Number.isFinite(item.targetTitleIndex) ? item.targetTitleIndex : targetCount - 1;
 
-      if (currentCount >= targetCount) {
+      if (currentCount >= targetCount || currentCount > targetTitleIndex) {
         skippedCount += 1;
         return;
       }
@@ -555,5 +608,158 @@ export function applyCompareContentOverwritePlan(entries, plan) {
   return {
     entries: changedCount > 0 ? nextEntries : entries,
     changedCount,
+  };
+}
+
+export function buildCompareKeywordOverwritePlan(result, currentEntries) {
+  const currentByUid = new Map(
+    (currentEntries || [])
+      .filter(entry => !isCompareFolderMetaEntry(entry))
+      .map(entry => [ensureNumericUID(entry.uid), entry]),
+  );
+  const updates = [];
+  let skippedCount = 0;
+
+  (Array.isArray(result?.items) ? result.items : [])
+    .filter(item => item?.type === 'modified' && item.hasKeywordDiff && item.targetEntry)
+    .forEach(item => {
+      const uid = ensureNumericUID(item.baseUid);
+      const currentEntry = currentByUid.get(uid);
+      if (!currentEntry) {
+        skippedCount += 1;
+        return;
+      }
+
+      const nextEntry = applyTargetKeywordFields(currentEntry, item.targetEntry);
+      if (_.isEqual(currentEntry, nextEntry)) {
+        skippedCount += 1;
+        return;
+      }
+
+      updates.push({
+        uid,
+        title: item.title,
+        nextPrimaryKeywords: _.cloneDeep(nextEntry.strategy?.keys || []),
+        nextSecondaryKeywords: _.cloneDeep(nextEntry.strategy?.keys_secondary || DEFAULT_SECONDARY_KEYWORDS),
+      });
+    });
+
+  return {
+    updates,
+    updateCount: updates.length,
+    skippedCount,
+  };
+}
+
+export function applyCompareKeywordOverwritePlan(entries, plan) {
+  const updateByUid = new Map((plan?.updates || []).map(update => [ensureNumericUID(update.uid), update]));
+  let changedCount = 0;
+  const nextEntries = (entries || []).map(entry => {
+    const update = updateByUid.get(ensureNumericUID(entry?.uid));
+    if (!update) {
+      return entry;
+    }
+
+    const nextEntry = _.cloneDeep(entry);
+    nextEntry.strategy = _.cloneDeep(nextEntry.strategy || {});
+    nextEntry.strategy.keys = _.cloneDeep(update.nextPrimaryKeywords || []);
+    nextEntry.strategy.keys_secondary = _.cloneDeep(update.nextSecondaryKeywords || DEFAULT_SECONDARY_KEYWORDS);
+
+    if (_.isEqual(entry, nextEntry)) {
+      return entry;
+    }
+
+    changedCount += 1;
+    return nextEntry;
+  });
+
+  return {
+    entries: changedCount > 0 ? nextEntries : entries,
+    changedCount,
+  };
+}
+
+export function buildCompareEntrySettingsOverwritePlan(result, currentEntries) {
+  const currentByUid = new Map(
+    (currentEntries || [])
+      .filter(entry => !isCompareFolderMetaEntry(entry))
+      .map(entry => [ensureNumericUID(entry.uid), entry]),
+  );
+  const updates = [];
+  let skippedCount = 0;
+
+  (Array.isArray(result?.items) ? result.items : [])
+    .filter(item => item?.type === 'modified' && item.hasEntrySettingsDiff && item.targetEntry)
+    .forEach(item => {
+      const uid = ensureNumericUID(item.baseUid);
+      const currentEntry = currentByUid.get(uid);
+      if (!currentEntry) {
+        skippedCount += 1;
+        return;
+      }
+
+      const nextEntry = applyTargetEntrySettingsFields(currentEntry, item.targetEntry);
+      if (_.isEqual(currentEntry, nextEntry)) {
+        skippedCount += 1;
+        return;
+      }
+
+      updates.push({
+        uid,
+        title: item.title,
+        nextEntry,
+      });
+    });
+
+  return {
+    updates,
+    updateCount: updates.length,
+    skippedCount,
+  };
+}
+
+export function applyCompareEntrySettingsOverwritePlan(entries, plan) {
+  const updateByUid = new Map((plan?.updates || []).map(update => [ensureNumericUID(update.uid), update.nextEntry]));
+  let changedCount = 0;
+  const nextEntries = (entries || []).map(entry => {
+    const nextEntry = updateByUid.get(ensureNumericUID(entry?.uid));
+    if (!nextEntry || _.isEqual(entry, nextEntry)) {
+      return entry;
+    }
+
+    changedCount += 1;
+    return _.cloneDeep(nextEntry);
+  });
+
+  return {
+    entries: changedCount > 0 ? nextEntries : entries,
+    changedCount,
+  };
+}
+
+export function buildCompareRemovedEntryDeletePlan(result, currentEntries) {
+  const currentUidSet = new Set(
+    (currentEntries || [])
+      .filter(entry => !isCompareFolderMetaEntry(entry))
+      .map(entry => ensureNumericUID(entry.uid)),
+  );
+  const uidsToDelete = [];
+  let skippedCount = 0;
+
+  (Array.isArray(result?.items) ? result.items : [])
+    .filter(item => item?.type === 'removed')
+    .forEach(item => {
+      const uid = ensureNumericUID(item.uid);
+      if (!currentUidSet.has(uid)) {
+        skippedCount += 1;
+        return;
+      }
+      uidsToDelete.push(uid);
+    });
+
+  return {
+    uidsToDelete,
+    deleteCount: uidsToDelete.length,
+    skippedCount,
   };
 }

@@ -54,6 +54,7 @@ src/世界书编辑脚本/
     │   ├── history.js
     │   ├── llmClient.js
     │   ├── optimizer.js
+    │   ├── optimizerCompare.js
     │   └── sorting.js
     │
     └── ui/
@@ -113,6 +114,7 @@ src/世界书编辑脚本/
 | `history.js`               | 最近一次高风险操作的事务快照、回滚预览、执行回滚                                                                                    |
 | `llmClient.js`             | LLM 请求封装，兼容酒馆当前预设与自定义 OpenAI 兼容接口，支持流式、超时和停止生成                                                    |
 | `optimizer.js`             | 格式清理、关键词修复、深度整理、八股词清理、全局搜索替换、世界书对比预览与差异写回                                                  |
+| `optimizerCompare.js`      | 世界书全本比对纯 helper：构建差异结果、保留筛选原始索引、生成新增/删除/正文/关键词/条目设置写回计划                                  |
 | `sorting.js`               | 排序偏好、拖拽排序、UI 排序持久化、同步顺序到世界书                                                                                 |
 
 ### 4.4 UI 模块
@@ -124,7 +126,7 @@ src/世界书编辑脚本/
 | `detail.js`                | PC 主从布局右侧详情区、分栏宽度、详情选择恢复、字段延迟保存、布局模式同步                             |
 | `entry.js`                 | 条目 HTML 生成，覆盖抽屉、移动端、主从列表行的展示                                                    |
 | `editor.js`                | 传统条目编辑弹窗                                                                                      |
-| `contentEditor.js`         | 大文本内容编辑器、条目对比编辑器、对比结果跳转编辑                                                    |
+| `contentEditor.js`         | 大文本内容编辑器、正文对比编辑器、对比结果跳转编辑                                                    |
 | `largeContentPreview.js`   | 长内容折叠预览卡片                                                                                    |
 | `floatingBatchDropdown.js` | 标题栏批量菜单的浮动定位                                                                              |
 | `aiActionDialog.js`        | 轻量 AI 改写弹窗，适合单条或已选条目的快速预览/应用                                                   |
@@ -246,7 +248,9 @@ UI 命令或 AI 应用
 → titleBarCommands.js + list.js 提供回滚预览和回滚入口
 ```
 
-接入事务的操作包括 AI 应用、批量更新、复制覆盖、批量删除、批量导入、文件夹元数据修改，以及世界书全本比对的批量添加差异条目/批量覆盖正文等。
+接入事务的操作包括 AI 应用、批量更新、复制覆盖、批量删除、批量导入、文件夹元数据修改，以及世界书全本比对的批量新增/删除差异条目、覆盖正文、覆盖关键词、覆盖条目设置等。
+
+全本比对弹窗的写回方向以结果摘要中的 `当前世界书 ← 对比世界书` 为准；“交换方向”会强制重新读取两本世界书并反转 base/target，使新增、删除、覆盖的作用对象一起反转。
 
 世界书改名通过携带完整条目创建新名称后删除旧名称，以保留 UID。改名成功后，`entryTogglePresets.js`
 将旧世界书名称下的预设整体迁移到新名称；若新名称存在残留预设，以被改名世界书的预设为准。
@@ -269,7 +273,7 @@ UI 命令或 AI 应用
 | 改文件夹功能                           | `commands/folderCommands.js`、`features/folderMeta.js`、`ui/list.js`、`state.js`          |
 | 改回滚                                 | `features/history.js`、`commands/titleBarCommands.js`、`ui/list.js`、`api.js`             |
 | 改主题或浏览器设置备份                 | `ui/theme.js`、`features/browserSettingsBackup.js`、`settings.js`、`config.js`            |
-| 改优化器或世界书对比                   | `features/optimizer.js`、`events.js`、`ui/contentEditor.js`                               |
+| 改优化器或世界书对比                   | `features/optimizer.js`、`features/optimizerCompare.js`、`events.js`、`ui/contentEditor.js` |
 
 ### 6.2 添加新功能
 

@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyCompareEntrySettingsOverwritePlan,
+  applyCompareKeywordOverwritePlan,
   buildCompareAddedEntryPlan,
   buildCompareContentOverwritePlan,
+  buildCompareEntrySettingsOverwritePlan,
+  buildCompareKeywordOverwritePlan,
   buildLorebookCompareResult,
+  buildCompareRemovedEntryDeletePlan,
   getCompareItemsForFilter,
 } from './optimizerCompare.js';
 
@@ -99,5 +104,79 @@ describe('世界书全本比对 helper', () => {
     expect(firstPlan.entriesToCreate).toMatchObject([{ uid: 51, name: '新增条目', content: '目标正文' }]);
     expect(firstPlan.entriesToCreate.some(item => item.name === '__WI_META_FOLDERS__')).toBe(false);
     expect(secondPlan.createdCount).toBe(0);
+  });
+
+  it('关键词覆盖计划只覆盖主关键词和次关键词', () => {
+    const baseEntry = entry(1, '关键词变化', '正文', {
+      strategy: { type: 'selective', keys: ['旧主'], keys_secondary: { logic: 'and_any', keys: ['旧次'] } },
+      probability: 20,
+    });
+    const targetEntry = entry(10, '关键词变化', '正文', {
+      strategy: { type: 'constant', keys: ['新主'], keys_secondary: { logic: 'not_any', keys: ['新次'] } },
+      probability: 90,
+    });
+    const result = buildLorebookCompareResult('当前', '对比', [baseEntry], [targetEntry]);
+
+    const plan = buildCompareKeywordOverwritePlan(result, [baseEntry]);
+    const applied = applyCompareKeywordOverwritePlan([baseEntry], plan);
+
+    expect(plan.updateCount).toBe(1);
+    expect(applied.changedCount).toBe(1);
+    expect(applied.entries[0].content).toBe('正文');
+    expect(applied.entries[0].probability).toBe(20);
+    expect(applied.entries[0].strategy).toMatchObject({
+      type: 'selective',
+      keys: ['新主'],
+      keys_secondary: { logic: 'not_any', keys: ['新次'] },
+    });
+  });
+
+  it('条目设置覆盖保留 UID、正文和关键词', () => {
+    const baseEntry = entry(1, '设置变化', '旧正文', {
+      enabled: true,
+      probability: 20,
+      strategy: { type: 'selective', keys: ['旧主'], keys_secondary: { logic: 'and_any', keys: ['旧次'] } },
+      position: { type: 'after_character_definition', depth: 4, order: 1 },
+    });
+    const targetEntry = entry(10, '设置变化', '新正文', {
+      enabled: false,
+      probability: 80,
+      strategy: { type: 'constant', keys: ['新主'], keys_secondary: { logic: 'not_any', keys: ['新次'] } },
+      position: { type: 'at_depth', role: 'assistant', depth: 2, order: 9 },
+    });
+    const result = buildLorebookCompareResult('当前', '对比', [baseEntry], [targetEntry]);
+
+    const plan = buildCompareEntrySettingsOverwritePlan(result, [baseEntry]);
+    const applied = applyCompareEntrySettingsOverwritePlan([baseEntry], plan);
+
+    expect(plan.updateCount).toBe(1);
+    expect(applied.entries[0]).toMatchObject({
+      uid: 1,
+      name: '设置变化',
+      content: '旧正文',
+      enabled: false,
+      probability: 80,
+      position: { type: 'at_depth', role: 'assistant', depth: 2, order: 9 },
+    });
+    expect(applied.entries[0].strategy).toMatchObject({
+      type: 'constant',
+      keys: ['旧主'],
+      keys_secondary: { logic: 'and_any', keys: ['旧次'] },
+    });
+  });
+
+  it('删除计划只包含当前世界书独有条目，交换方向后新增和删除语义反转', () => {
+    const baseOnly = entry(1, '当前独有', '仅当前有');
+    const targetOnly = entry(10, '对比独有', '仅对比有');
+    const result = buildLorebookCompareResult('当前', '对比', [baseOnly], [targetOnly]);
+    const reversed = buildLorebookCompareResult('对比', '当前', [targetOnly], [baseOnly]);
+
+    const deletePlan = buildCompareRemovedEntryDeletePlan(result, [baseOnly]);
+
+    expect(deletePlan).toMatchObject({ uidsToDelete: [1], deleteCount: 1 });
+    expect(result.items.find(item => item.type === 'added')?.title).toBe('对比独有');
+    expect(result.items.find(item => item.type === 'removed')?.title).toBe('当前独有');
+    expect(reversed.items.find(item => item.type === 'added')?.title).toBe('当前独有');
+    expect(reversed.items.find(item => item.type === 'removed')?.title).toBe('对比独有');
   });
 });
