@@ -1376,6 +1376,7 @@ function hasContextBindingResourceValue(resources: PersonaContextBindingResource
   return Boolean(
     normalized.userPersonaAvatarId ||
       normalized.userPersonaEnabledTraitIds?.length ||
+      normalized.userPersonaEnabledSharedTraitIds?.length ||
       normalized.connectionProfileName ||
       normalized.presetName ||
       normalized.presetEnabledPromptIds?.length ||
@@ -4482,18 +4483,33 @@ async function applyManagedWorldbookEntries(
 async function applyManagedUserPersonaSelection(
   desiredAvatarId: string | undefined,
   desiredTraitIds: string[] | undefined,
+  desiredSharedTraitIds: string[] | undefined,
   previous: PersonaPlusAppliedState,
-): Promise<{ changed: boolean; personaTraitBaselines: Record<string, string[]> }> {
+): Promise<{
+  changed: boolean;
+  personaTraitBaselines: Record<string, string[]>;
+  sharedTraitBaselines: Record<string, string[]>;
+}> {
   let changed = false;
   const baselines = clonePersonaTraitBaselines(previous.personaTraitBaselines);
+  const sharedBaselines = clonePersonaTraitBaselines(previous.sharedTraitBaselines);
   const desiredHasTraitSnapshot = desiredAvatarId !== undefined && desiredTraitIds !== undefined;
+  const desiredHasSharedTraitSnapshot = desiredAvatarId !== undefined && desiredSharedTraitIds !== undefined;
 
   if (desiredAvatarId && desiredHasTraitSnapshot && !hasOwn(baselines, desiredAvatarId)) {
     baselines[desiredAvatarId] = getEnabledTraitIdsFromTraits(loadPersonaTraits(desiredAvatarId));
   }
+  if (desiredAvatarId && desiredHasSharedTraitSnapshot && !hasOwn(sharedBaselines, desiredAvatarId)) {
+    sharedBaselines[desiredAvatarId] = loadEnabledSharedTraitIds(desiredAvatarId);
+  }
 
   if (desiredAvatarId && desiredTraitIds !== undefined) {
     if (applyPersonaTraitEnabledSnapshot(desiredAvatarId, desiredTraitIds)) {
+      changed = true;
+    }
+  }
+  if (desiredAvatarId && desiredSharedTraitIds !== undefined) {
+    if (applySharedPersonaTraitEnabledSnapshot(desiredAvatarId, desiredSharedTraitIds)) {
       changed = true;
     }
   }
@@ -4508,6 +4524,18 @@ async function applyManagedUserPersonaSelection(
       changed = true;
     }
     delete baselines[avatarId];
+  });
+
+  const keptSharedAvatarId = desiredHasSharedTraitSnapshot ? desiredAvatarId : '';
+  Object.keys(sharedBaselines).forEach(avatarId => {
+    if (avatarId === keptSharedAvatarId) {
+      return;
+    }
+    const restoreTraitIds = getPersonaRestoreSharedTraitIds(avatarId, sharedBaselines);
+    if (restoreTraitIds !== undefined && applySharedPersonaTraitEnabledSnapshot(avatarId, restoreTraitIds)) {
+      changed = true;
+    }
+    delete sharedBaselines[avatarId];
   });
 
   if (desiredAvatarId) {
@@ -4532,7 +4560,19 @@ async function applyManagedUserPersonaSelection(
     }
   }
 
-  return { changed, personaTraitBaselines: baselines };
+  if (!desiredHasSharedTraitSnapshot) {
+    const currentPersonaAvatarId = desiredAvatarId || getCurrentPersonaFromDOM()?.avatarId || '';
+    const defaultTraitIds = currentPersonaAvatarId
+      ? getPersonaDefaultEnabledSharedTraitIds(currentPersonaAvatarId)
+      : undefined;
+    if (currentPersonaAvatarId && defaultTraitIds !== undefined) {
+      if (applySharedPersonaTraitEnabledSnapshot(currentPersonaAvatarId, defaultTraitIds)) {
+        changed = true;
+      }
+    }
+  }
+
+  return { changed, personaTraitBaselines: baselines, sharedTraitBaselines: sharedBaselines };
 }
 
 export async function applyPersonaPlusBindings(
@@ -4550,6 +4590,7 @@ export async function applyPersonaPlusBindings(
   const personaResult = await applyManagedUserPersonaSelection(
     desired.userPersonaAvatarId,
     desired.userPersonaEnabledTraitIds,
+    desired.userPersonaEnabledSharedTraitIds,
     previous,
   );
 
@@ -4557,7 +4598,7 @@ export async function applyPersonaPlusBindings(
     changed = true;
     summary.push(
       desired.userPersonaAvatarId
-        ? `user人设 -> ${findPersonaByAvatarId(desired.userPersonaAvatarId)?.name || desired.userPersonaAvatarId}${desired.userPersonaEnabledTraitIds !== undefined ? ` (${desired.userPersonaEnabledTraitIds.length} 条)` : ''}`
+        ? `user人设 -> ${findPersonaByAvatarId(desired.userPersonaAvatarId)?.name || desired.userPersonaAvatarId}${desired.userPersonaEnabledTraitIds !== undefined ? ` (${desired.userPersonaEnabledTraitIds.length} 条)` : ''}${desired.userPersonaEnabledSharedTraitIds !== undefined ? ` + 通用${desired.userPersonaEnabledSharedTraitIds.length} 条` : ''}`
         : 'user人设保持当前',
     );
   }
@@ -4673,6 +4714,7 @@ export async function applyPersonaPlusBindings(
     presetName: presetPromptResult.presetName,
     presetEnabledPromptIds: presetPromptResult.presetEnabledPromptIds,
     personaTraitBaselines: personaResult.personaTraitBaselines,
+    sharedTraitBaselines: personaResult.sharedTraitBaselines,
     presetPromptBaselines: presetPromptResult.presetPromptBaselines,
     worldbookEntryBaselines: worldbookEntryResult.worldbookEntryBaselines,
   };
