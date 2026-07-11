@@ -164,7 +164,7 @@ describe('buildOccupancyCleanupPatch', () => {
 });
 
 describe('player participation ending snapshot', () => {
-  it('loads player-specific ending diffs into the editable participation entry', () => {
+  it('loads default ending diffs into the editable participation entry', () => {
     const sourceEvent = {
       触发条件: { 年: 1219, 月: 10, 日: 20, 时: 13 },
       事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
@@ -174,9 +174,6 @@ describe('player participation ending snapshot', () => {
       },
       update: {
         黄蓉: { 所在位置: '大宋/张家口' },
-      },
-      'P-insert': {
-        郭靖: { 人物经历: { 玩家参与结局: '与你同席见到黄蓉。' } },
       },
     };
 
@@ -191,7 +188,7 @@ describe('player participation ending snapshot', () => {
       描述: '1219年10月20日13时 到 1219年10月20日15时，郭靖在张家口初遇黄蓉。',
       结局: '',
       insert: {
-        郭靖: { 人物经历: { 玩家参与结局: '与你同席见到黄蓉。' } },
+        郭靖: { 人物经历: { 原结局: '请黄蓉吃饭。' } },
       },
       update: {
         黄蓉: { 所在位置: '大宋/张家口' },
@@ -199,8 +196,8 @@ describe('player participation ending snapshot', () => {
       delete: {},
     });
 
-    entry.insert.郭靖.人物经历.玩家参与结局 = '已修改';
-    expect(sourceEvent['P-insert'].郭靖.人物经历.玩家参与结局).toBe('与你同席见到黄蓉。');
+    entry.insert.郭靖.人物经历.原结局 = '已修改';
+    expect(sourceEvent.insert.郭靖.人物经历.原结局).toBe('请黄蓉吃饭。');
   });
 
   it('rejects task-progress shaped participation entries for cleanup', () => {

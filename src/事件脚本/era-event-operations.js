@@ -305,8 +305,7 @@ function getParticipationActionDiff(participationEntry, actionKey) {
 }
 
 function getInitialParticipationActionDiff(eventData, actionKey) {
-  const playerActionKey = `P-${actionKey}`;
-  const delta = isPlainObject(eventData?.[playerActionKey]) ? eventData[playerActionKey] : eventData?.[actionKey];
+  const delta = eventData?.[actionKey];
   return isPlainObject(delta) ? cloneJson(delta) : {};
 }
 

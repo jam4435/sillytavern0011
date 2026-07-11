@@ -5,8 +5,12 @@ type LoreEntry = {
   title: string;
   category: string;
   aliases: string[];
+  triggers?: string[];
   summary: string;
+  details?: string[];
   sourceFile: string;
+  sourceExcerpt?: string;
+  sourceSegmentIndex?: number;
   imageKeywords: string[];
   autoLink: boolean;
 };
@@ -121,7 +125,8 @@ function buildLinkCandidates(entries: LoreEntry[]) {
   entries
     .filter(entry => entry.autoLink)
     .forEach(entry => {
-      [entry.title, ...entry.aliases]
+      const triggers = entry.triggers && entry.triggers.length > 0 ? entry.triggers : [entry.title, ...entry.aliases];
+      triggers
         .map(alias => alias.trim())
         .filter(alias => alias.length >= 2)
         .filter(alias => !blockedAutoLinkAliases.has(alias))
@@ -366,9 +371,25 @@ function installStyle() {
       .jm-lore-popup-summary {
         font-size: 0.98rem;
       }
+      .jm-lore-popup-details {
+        margin: 0;
+        padding-left: 1.2em;
+        color: rgba(255, 255, 255, 0.86);
+        font-size: 0.9rem;
+      }
+      .jm-lore-popup-details li {
+        margin: 0 0 4px;
+      }
       .jm-lore-popup-meta {
         color: rgba(255, 255, 255, 0.68);
         font-size: 0.86rem;
+      }
+      .jm-lore-popup-excerpt {
+        border-left: 2px solid rgba(182, 138, 55, 0.46);
+        padding-left: 10px;
+        color: rgba(255, 255, 255, 0.68);
+        font-size: 0.84rem;
+        line-height: 1.55;
       }
       .jm-lore-tag-row {
         display: flex;
@@ -573,7 +594,17 @@ function normalizeForSearch(value: string) {
 }
 
 function buildSearchHaystack(entry: LoreEntry) {
-  return normalizeForSearch([entry.title, entry.category, entry.summary, entry.sourceFile, ...entry.aliases].join(' '));
+  return normalizeForSearch(
+    [
+      entry.title,
+      entry.category,
+      entry.summary,
+      entry.sourceFile,
+      ...(entry.aliases ?? []),
+      ...(entry.triggers ?? []),
+      ...(entry.details ?? []),
+    ].join(' '),
+  );
 }
 
 async function showEntryPopup(entry: LoreEntry) {
@@ -596,6 +627,17 @@ async function showEntryPopup(entry: LoreEntry) {
   summary.className = 'jm-lore-popup-summary';
   summary.textContent = entry.summary;
   content.appendChild(summary);
+
+  if (entry.details && entry.details.length > 0) {
+    const detailList = ownerDocument.createElement('ul');
+    detailList.className = 'jm-lore-popup-details';
+    entry.details.slice(0, 5).forEach(detail => {
+      const item = ownerDocument.createElement('li');
+      item.textContent = detail;
+      detailList.appendChild(item);
+    });
+    content.appendChild(detailList);
+  }
 
   const aliases = entry.aliases.filter(alias => alias !== entry.title).slice(0, 12);
   if (aliases.length > 0) {
@@ -626,8 +668,18 @@ async function showEntryPopup(entry: LoreEntry) {
 
   const source = ownerDocument.createElement('div');
   source.className = 'jm-lore-popup-meta';
-  source.textContent = `来源：${entry.sourceFile}`;
+  source.textContent =
+    typeof entry.sourceSegmentIndex === 'number'
+      ? `来源：${entry.sourceFile} · 第 ${entry.sourceSegmentIndex + 1} 段`
+      : `来源：${entry.sourceFile}`;
   content.appendChild(source);
+
+  if (entry.sourceExcerpt) {
+    const excerpt = ownerDocument.createElement('div');
+    excerpt.className = 'jm-lore-popup-excerpt';
+    excerpt.textContent = entry.sourceExcerpt;
+    content.appendChild(excerpt);
+  }
 
   openModal(content);
 }
