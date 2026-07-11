@@ -4,8 +4,15 @@
  */
 
 import { useState, useCallback } from 'react';
-import { InventoryItemVariableData, PendingCommand, CommandType } from '../types';
-import { decrementStatusEffectTurns, removeStatusEffect, restoreItemCount } from '../utils/itemManager';
+import { PendingCommand, CommandType } from '../types';
+import {
+  decrementStatusEffectTurns,
+  removePermanentAttributeModifier,
+  removeStatusEffect,
+  restoreEquipmentState,
+  restoreItemCount,
+  undoResourceDeltas,
+} from '../utils/itemManager';
 import { uiLogger } from '../utils/logger';
 import { syncPlayerAttributesFromVariables } from '../utils/variableReader';
 
@@ -30,24 +37,14 @@ export function useCommandQueue() {
     uiLogger.log('[useCommandQueue] 设置地图指令:', command);
   }, []);
 
-  /**
-   * 添加使用物品指令
-   * @param itemName 物品名称
-   * @param originalItem 原始物品快照（用于撤销）
-   * @param statusEffectId 本次吞服创建的状态效果 ID
-  */
+  /** 添加物品/装备指令，并保存撤销所需数据。 */
   const addUseItemCommand = useCallback(
-    (itemName: string, originalItem: InventoryItemVariableData, statusEffectId?: string) => {
+    (commandText: string, data: PendingCommand['data']) => {
       const command: PendingCommand = {
         id: `use_item_${Date.now()}_${Math.random()}`,
         type: 'USE_ITEM' as CommandType,
-        text: `使用${itemName}`,
-        data: {
-          itemName,
-          originalCount: originalItem.数量,
-          originalItem,
-          statusEffectId,
-        },
+        text: commandText,
+        data,
         timestamp: Date.now(),
       };
 
@@ -69,15 +66,22 @@ export function useCommandQueue() {
         return;
       }
 
-      // 如果是物品使用指令，需要恢复物品数量
       if (command.type === 'USE_ITEM' && command.data.itemName) {
-        if (command.data.originalItem) {
+        if (command.data.equipmentRollback) {
+          await restoreEquipmentState(command.data.equipmentRollback);
+        } else if (command.data.originalItem) {
           await restoreItemCount(command.data.itemName, command.data.originalItem);
         } else if (command.data.originalCount !== undefined) {
           await restoreItemCount(command.data.itemName, command.data.originalCount);
         }
         if (command.data.statusEffectId) {
           await removeStatusEffect(command.data.statusEffectId);
+        }
+        if (command.data.permanentModifierId) {
+          await removePermanentAttributeModifier(command.data.permanentModifierId);
+        }
+        if (command.data.resourceDeltas) {
+          await undoResourceDeltas(command.data.resourceDeltas);
         }
         await syncPlayerAttributesFromVariables();
         uiLogger.log('[useCommandQueue] 恢复物品使用:', command.data.itemName);

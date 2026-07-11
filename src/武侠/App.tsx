@@ -38,7 +38,8 @@ import {
 import { ActivePanel, InventoryItem } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
-import { equipInventoryItem, useElixirItem } from './utils/itemManager';
+import { equipInventoryItem, useMedicineItem } from './utils/itemManager';
+import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inventoryAttributePreview';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
 import { getUserCurrentLocation } from './utils/mapUtils';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
@@ -66,6 +67,12 @@ import {
 } from './utils/variableReader';
 
 const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
+
+function formatAttributePreviewSummary(rows: AttributePreviewRow[]): string {
+  return rows
+    .map(({ attribute, delta }) => `${attribute}${delta >= 0 ? '+' : ''}${delta}`)
+    .join('，');
+}
 
 const App: React.FC = () => {
   // 使用自定义 hooks
@@ -356,9 +363,30 @@ const App: React.FC = () => {
   const handleInventoryItemAction = useCallback(
     async (item: InventoryItem) => {
       try {
+        const previewRows =
+          gameState.stats.baseAttributes
+            ? buildItemAttributePreview(
+                item,
+                gameState.inventory,
+                gameState.statusEffects,
+                gameState.stats.baseAttributes,
+                gameState.stats.attributes,
+              )
+            : [];
+        const previewSummary = formatAttributePreviewSummary(previewRows);
+
         if (item.type === 'EQUIP') {
-          const equipped = await equipInventoryItem(item.name);
-          if (equipped) {
+          const result = await equipInventoryItem(item.name);
+          if (result) {
+            addUseItemCommand(
+              previewSummary
+                ? `装备${item.name}，（属性已变化：${previewSummary}）`
+                : result.commandText,
+              {
+                itemName: result.itemName,
+                equipmentRollback: result.rollback,
+              },
+            );
             await syncPlayerAttributesFromVariables();
             refreshGameStateFromVariables();
           }
@@ -366,9 +394,21 @@ const App: React.FC = () => {
         }
 
         if (item.type === 'ELIXIR') {
-          const result = await useElixirItem(item.name);
+          const result = await useMedicineItem(item.name);
           if (result) {
-            addUseItemCommand(result.itemName, result.originalItem, result.statusEffectId);
+            const effectType = item.elixirInfo?.effectType;
+            const commandText =
+              previewSummary && (effectType === '临时增幅' || effectType === '永久增幅')
+                ? `使用${item.name}，（属性已变化：${previewSummary}${effectType === '临时增幅' && item.elixirInfo?.duration ? `，持续${item.elixirInfo.duration}时` : '，永久生效'}）`
+                : result.commandText;
+            addUseItemCommand(commandText, {
+              itemName: result.itemName,
+              originalCount: result.originalItem.数量,
+              originalItem: result.originalItem,
+              statusEffectId: result.statusEffectId,
+              permanentModifierId: result.permanentModifierId,
+              resourceDeltas: result.resourceDeltas,
+            });
             await syncPlayerAttributesFromVariables();
             refreshGameStateFromVariables();
           }
@@ -378,7 +418,7 @@ const App: React.FC = () => {
         showError(`物品操作失败：${error instanceof Error ? error.message : String(error)}`);
       }
     },
-    [addUseItemCommand, refreshGameStateFromVariables, showError],
+    [addUseItemCommand, gameState.inventory, gameState.stats.attributes, gameState.stats.baseAttributes, gameState.statusEffects, refreshGameStateFromVariables, showError],
   );
 
   const handlePlayerSend = useCallback(
@@ -837,7 +877,9 @@ const App: React.FC = () => {
                   <div className="bar-bg">
                     <div
                       className="bar-fill-hp"
-                      style={{ width: `${Math.min(100, gameState.stats.attributes.hp)}%` }}
+                      style={{
+                        width: `${Math.min(100, ((gameState.stats.attributes.hpCurrent ?? gameState.stats.attributes.hp) / Math.max(1, gameState.stats.attributes.hp)) * 100)}%`,
+                      }}
                     ></div>
                   </div>
                 </div>
@@ -846,7 +888,9 @@ const App: React.FC = () => {
                   <div className="bar-bg">
                     <div
                       className="bar-fill-mp"
-                      style={{ width: `${Math.min(100, gameState.stats.attributes.mp)}%` }}
+                      style={{
+                        width: `${Math.min(100, ((gameState.stats.attributes.mpCurrent ?? gameState.stats.attributes.mp) / Math.max(1, gameState.stats.attributes.mp)) * 100)}%`,
+                      }}
                     ></div>
                   </div>
                 </div>

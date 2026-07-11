@@ -385,7 +385,7 @@ describe('readGameDataSync inventory rank field', () => {
     ]);
   });
 
-  it('装备和丹药会读取类型专属元信息', () => {
+  it('装备和药品会读取类型专属元信息', () => {
     getAllVariablesMock.mockReturnValue({
       stat_data: {
         user数据: {
@@ -408,8 +408,9 @@ describe('readGameDataSync inventory rank field', () => {
               使用状态: '装备中',
             },
             九花玉露丸: {
-              类型: '丹药',
+              类型: '药品',
               品阶: '珍品',
+              功效类型: '临时增幅',
               物品描述: '清香沁脾，可调息养气。',
               数量: 2,
               属性修正: {
@@ -445,6 +446,8 @@ describe('readGameDataSync inventory rank field', () => {
           type: 'ELIXIR',
           rank: 'BLUE',
           elixirInfo: {
+            effectType: '临时增幅',
+            rank: '珍品',
             modifiers: {
               气血: 30,
               内力: 20,
@@ -488,8 +491,9 @@ describe('readGameDataSync inventory rank field', () => {
               使用状态: '',
             },
             九花玉露丸: {
-              类型: '丹药',
+              类型: '药品',
               品阶: '珍品',
+              功效类型: '临时增幅',
               物品描述: '清香沁脾，可调息养气。',
               数量: 2,
               属性修正: {
@@ -505,8 +509,10 @@ describe('readGameDataSync inventory rank field', () => {
           },
           状态效果: {
             药效一: {
-              类型: '丹药',
+              类型: '药品',
+              功效类型: '临时增幅',
               来源: '九花玉露丸',
+              品阶: '珍品',
               属性修正: {
                 气血: 30,
                 内力: 20,
@@ -526,8 +532,10 @@ describe('readGameDataSync inventory rank field', () => {
     expect(result?.statusEffects).toEqual([
       {
         id: '药效一',
-        type: '丹药',
+        type: '药品',
+        effectType: '临时增幅',
         source: '九花玉露丸',
+        rank: '珍品',
         modifiers: {
           气血: 30,
           内力: 20,
@@ -540,6 +548,8 @@ describe('readGameDataSync inventory rank field', () => {
     expect(result?.stats?.attributes).toEqual({
       hp: 13,
       mp: 12,
+      hpCurrent: 13,
+      mpCurrent: 12,
       臂力: 8,
       根骨: 15,
       机敏: 10,
@@ -548,6 +558,8 @@ describe('readGameDataSync inventory rank field', () => {
     expect(result?.stats?.baseAttributes).toEqual({
       hp: 10,
       mp: 10,
+      hpCurrent: 10,
+      mpCurrent: 10,
       臂力: 10,
       根骨: 10,
       机敏: 10,

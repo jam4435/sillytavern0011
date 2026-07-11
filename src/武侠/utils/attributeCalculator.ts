@@ -84,6 +84,92 @@ export interface AttributeModifierMap {
   [attribute: string]: number;
 }
 
+export type AttributeModifierKind = '装备' | '回复' | '临时增幅' | '永久增幅' | '未封顶';
+
+export interface AttributeModifierSource {
+  id?: string;
+  kind?: AttributeModifierKind;
+  rank?: string;
+  modifiers?: AttributeModifierMap;
+}
+
+export type AttributeModifierInput = AttributeModifierMap | AttributeModifierSource[];
+
+const REFERENCE_INITIAL_ATTRIBUTES: InitialAttributes = {
+  臂力: 10,
+  根骨: 10,
+  机敏: 10,
+  悟性: 10,
+  洞察: 10,
+  风姿: 10,
+  福缘: 0,
+};
+
+const ORDINARY_RANK_BY_INPUT: Record<string, string> = {
+  WHITE: '凡品',
+  GREEN: '精品',
+  BLUE: '珍品',
+  PURPLE: '极品',
+  GOLD: '绝品',
+  RED: '神品',
+  凡品: '凡品',
+  精品: '精品',
+  珍品: '珍品',
+  极品: '极品',
+  绝品: '绝品',
+  神品: '神品',
+  粗浅: '凡品',
+  传家: '精品',
+  上乘: '珍品',
+  镇派: '极品',
+  绝世: '绝品',
+  传说: '神品',
+};
+
+const RANK_REFERENCE_REALM: Record<string, string> = {
+  凡品: '不入流圆满',
+  精品: '三流圆满',
+  珍品: '二流圆满',
+  极品: '一流圆满',
+  绝品: '宗师圆满',
+  神品: '绝顶圆满',
+};
+
+const MODIFIER_CAP_PERCENT: Record<Exclude<AttributeModifierKind, '未封顶'>, Record<string, number>> = {
+  装备: {
+    凡品: 5,
+    精品: 10,
+    珍品: 18,
+    极品: 30,
+    绝品: 45,
+    神品: 70,
+  },
+  回复: {
+    凡品: 20,
+    精品: 40,
+    珍品: 70,
+    极品: 100,
+    绝品: 150,
+    神品: 200,
+  },
+  临时增幅: {
+    凡品: 10,
+    精品: 18,
+    珍品: 30,
+    极品: 50,
+    绝品: 75,
+    神品: 110,
+  },
+  永久增幅: {
+    凡品: 0,
+    精品: 0,
+    珍品: 18,
+    极品: 35,
+    绝品: 65,
+    神品: 120,
+  },
+};
+
 // ============ 核心函数 ============
 
 /**
@@ -178,44 +264,151 @@ export function calculateResources(
   };
 }
 
-function applyPercentageModifier(value: number, modifierPercentage: number): number {
-  return Math.max(0, Math.floor((value * (100 + modifierPercentage)) / 100));
+export function canonicalModifierAttribute(attribute: string): string {
+  if (attribute === '气血') return '气血上限';
+  if (attribute === '内力') return '内力上限';
+  return attribute;
 }
 
-function sumModifierPercentages(modifiers: AttributeModifierMap, attributes: string[]): number {
-  return attributes.reduce((total, attribute) => {
-    const modifier = modifiers[attribute];
-    return Number.isFinite(modifier) ? total + modifier : total;
-  }, 0);
+function normalizeOrdinaryRank(rank?: string): string | undefined {
+  if (!rank) {
+    return undefined;
+  }
+  return ORDINARY_RANK_BY_INPUT[rank];
+}
+
+function getModifierCapPercent(kind: AttributeModifierKind | undefined, rank?: string): number | undefined {
+  if (!kind || kind === '未封顶') {
+    return undefined;
+  }
+  const normalizedRank = normalizeOrdinaryRank(rank);
+  return normalizedRank ? MODIFIER_CAP_PERCENT[kind]?.[normalizedRank] : undefined;
+}
+
+export function calculateReferenceAttributeBase(attribute: string, rank?: string): number {
+  const normalizedRank = normalizeOrdinaryRank(rank) || '凡品';
+  const referenceRealm = RANK_REFERENCE_REALM[normalizedRank] || RANK_REFERENCE_REALM.凡品;
+  const { major } = parseRealm(referenceRealm);
+  const referenceCombat = calculateCombatAttributes(REFERENCE_INITIAL_ATTRIBUTES, referenceRealm);
+  const referenceResources = calculateResources(referenceCombat.根骨, {}, major);
+  const canonical = canonicalModifierAttribute(attribute);
+
+  if (canonical === '气血上限') {
+    return referenceResources.气血上限;
+  }
+  if (canonical === '内力上限') {
+    return referenceResources.内力上限;
+  }
+  return referenceCombat[canonical as keyof CombatAttributes] ?? 0;
+}
+
+export function calculateCappedModifierDelta(
+  baseValue: number,
+  modifierPercentage: number,
+  rank?: string,
+  kind: AttributeModifierKind = '未封顶',
+  attribute: string = '',
+): number {
+  if (!Number.isFinite(baseValue) || !Number.isFinite(modifierPercentage)) {
+    return 0;
+  }
+
+  const theoreticalDelta = Math.floor((baseValue * modifierPercentage) / 100);
+  if (modifierPercentage <= 0) {
+    return theoreticalDelta;
+  }
+
+  const capPercent = getModifierCapPercent(kind, rank);
+  if (!Number.isFinite(capPercent)) {
+    return theoreticalDelta;
+  }
+
+  const referenceBase = calculateReferenceAttributeBase(attribute, rank);
+  const cappedDelta = Math.floor((referenceBase * Number(capPercent)) / 100);
+  return Math.min(theoreticalDelta, cappedDelta);
+}
+
+function normalizeModifierMap(modifiers?: AttributeModifierMap): AttributeModifierMap | undefined {
+  if (!modifiers) {
+    return undefined;
+  }
+
+  const normalized: AttributeModifierMap = {};
+  for (const [attribute, value] of Object.entries(modifiers)) {
+    if (!attribute || !Number.isFinite(value)) {
+      continue;
+    }
+    const canonical = canonicalModifierAttribute(attribute);
+    normalized[canonical] = (normalized[canonical] ?? 0) + value;
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+function toModifierSources(input?: AttributeModifierInput): AttributeModifierSource[] {
+  if (!input) {
+    return [];
+  }
+  if (Array.isArray(input)) {
+    return input.flatMap(source => {
+      const modifiers = normalizeModifierMap(source.modifiers);
+      return modifiers ? [{ ...source, modifiers }] : [];
+    });
+  }
+  const modifiers = normalizeModifierMap(input);
+  return modifiers ? [{ kind: '未封顶', modifiers }] : [];
+}
+
+function applySourceModifiers<T extends object>(
+  baseValues: T,
+  sources: AttributeModifierSource[],
+): T {
+  const baseRecord = baseValues as Record<string, number>;
+  const deltas: Record<string, number> = Object.fromEntries(Object.keys(baseRecord).map(attribute => [attribute, 0]));
+
+  for (const source of sources) {
+    const modifiers = source.modifiers;
+    if (!modifiers) {
+      continue;
+    }
+
+    for (const [attribute, percentage] of Object.entries(modifiers)) {
+      if (!Object.hasOwn(baseRecord, attribute)) {
+        continue;
+      }
+      const baseValue = baseRecord[attribute];
+      const delta = calculateCappedModifierDelta(baseValue, percentage, source.rank, source.kind, attribute);
+      deltas[attribute] = (deltas[attribute] ?? 0) + delta;
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(baseRecord).map(([attribute, value]) => [
+      attribute,
+      Math.max(0, Math.floor(Number(value) + Number(deltas[attribute] ?? 0))),
+    ]),
+  ) as T;
 }
 
 /**
- * 属性修正中的数字表示百分比点。所有来源先求和，再对无物品效果的基础值乘算一次。
+ * 属性修正中的数字表示百分比点。数组输入会按来源独立封顶后相加；单个 map 输入保持未封顶兼容。
  */
 export function applyAttributeModifiers(
   combat: CombatAttributes,
   resources: ResourceAttributes,
-  modifiers?: AttributeModifierMap,
+  modifiers?: AttributeModifierInput,
 ): {
   combat: CombatAttributes;
   resources: ResourceAttributes;
 } {
-  if (!modifiers) {
+  const sources = toModifierSources(modifiers);
+  if (sources.length === 0) {
     return { combat, resources };
   }
 
-  const nextCombat: CombatAttributes = {
-    臂力: applyPercentageModifier(combat.臂力, sumModifierPercentages(modifiers, ['臂力'])),
-    根骨: applyPercentageModifier(combat.根骨, sumModifierPercentages(modifiers, ['根骨'])),
-    机敏: applyPercentageModifier(combat.机敏, sumModifierPercentages(modifiers, ['机敏'])),
-    洞察: applyPercentageModifier(combat.洞察, sumModifierPercentages(modifiers, ['洞察'])),
+  return {
+    combat: applySourceModifiers(combat, sources),
+    resources: applySourceModifiers(resources, sources),
   };
-  const nextResources: ResourceAttributes = {
-    气血上限: applyPercentageModifier(resources.气血上限, sumModifierPercentages(modifiers, ['气血', '气血上限'])),
-    内力上限: applyPercentageModifier(resources.内力上限, sumModifierPercentages(modifiers, ['内力', '内力上限'])),
-  };
-
-  return { combat: nextCombat, resources: nextResources };
 }
 
 /**
@@ -225,7 +418,7 @@ export function calculateAllAttributes(
   initial: InitialAttributes,
   realm: string,
   martialArts: Record<string, MartialArtForCalculation>,
-  modifiers?: AttributeModifierMap,
+  modifiers?: AttributeModifierInput,
 ): {
   combat: CombatAttributes;
   resources: ResourceAttributes;

@@ -32,8 +32,10 @@ export interface InitialAttributes {
 // "属性" (Current stats)
 // 注意：悟性不随境界变化，只存在于初始属性中
 export interface CurrentAttributes {
-  hp: number; // 气血
-  mp: number; // 内力
+  hp: number; // 气血上限
+  mp: number; // 内力上限
+  hpCurrent?: number; // 当前气血
+  mpCurrent?: number; // 当前内力
   臂力: number;
   根骨: number;
   机敏: number;
@@ -92,9 +94,13 @@ export interface EquipmentSlots {
   [slot: string]: string;
 }
 
+export type ItemEffectType = '回复' | '临时增幅' | '永久增幅' | '特殊';
+
 export interface ActiveStatusEffectVariableData {
   类型?: string;
+  功效类型?: string;
   来源?: string;
+  品阶?: string;
   属性修正?: InventoryAttributeModifierMap;
   持续时间?: number;
   剩余时间?: number;
@@ -103,10 +109,25 @@ export interface ActiveStatusEffectVariableData {
 export interface ActiveStatusEffect {
   id: string;
   type: string;
+  effectType?: string;
   source: string;
+  rank?: string;
   modifiers?: InventoryAttributeModifierMap;
   duration: number;
   remaining: number;
+}
+
+export interface PermanentAttributeModifierVariableData {
+  类型?: string;
+  功效类型?: string;
+  来源?: string;
+  品阶?: string;
+  属性修正?: InventoryAttributeModifierMap;
+}
+
+export interface FrontendVariableData {
+  永久属性修正?: Record<string, PermanentAttributeModifierVariableData>;
+  [key: string]: unknown;
 }
 
 export interface InventoryItemVariableData {
@@ -114,6 +135,7 @@ export interface InventoryItemVariableData {
   品阶?: string;
   物品描述?: string;
   数量?: number;
+  功效类型?: string;
   部位?: string;
   属性修正?: InventoryAttributeModifierMap;
   使用状态?: string;
@@ -134,6 +156,8 @@ export interface InventoryItem {
     isEquipped?: boolean;
   };
   elixirInfo?: {
+    effectType?: string;
+    rank?: string;
     modifiers?: InventoryAttributeModifierMap;
     duration?: string;
   };
@@ -388,6 +412,7 @@ export interface OriginItemInfo {
   品阶: string;
   物品描述: string;
   数量: number;
+  功效类型?: string;
   部位?: string;
   属性修正?: InventoryAttributeModifierMap;
   使用状态?: string;
@@ -562,6 +587,20 @@ export interface MapData {
  */
 export type CommandType = 'TRAVEL' | 'USE_ITEM';
 
+export interface ResourceDeltaMap {
+  气血?: number;
+  内力?: number;
+}
+
+export interface EquipmentRollbackData {
+  slot: string;
+  previousItemName?: string;
+  previousItem?: InventoryItemVariableData;
+  newItemName: string;
+  newItem: InventoryItemVariableData;
+  equipmentSlotExisted: boolean;
+}
+
 /**
  * 待发送指令
  */
@@ -576,6 +615,9 @@ export interface PendingCommand {
     originalCount?: number; // 用于撤销物品使用
     originalItem?: InventoryItemVariableData;
     statusEffectId?: string;
+    permanentModifierId?: string;
+    resourceDeltas?: ResourceDeltaMap;
+    equipmentRollback?: EquipmentRollbackData;
   };
   timestamp: number;
 }

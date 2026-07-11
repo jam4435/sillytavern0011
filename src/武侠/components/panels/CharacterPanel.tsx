@@ -337,8 +337,18 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
         <div className="char-right">
           <div className="character-panel-stat-block">
             <div className="stats-bars-grid">
-              <StatBar label="气血" current={stats.attributes.hp} max={stats.attributes.hp} color="#7f1d1d" />
-              <StatBar label="内力" current={stats.attributes.mp} max={stats.attributes.mp} color="#0e7490" />
+              <StatBar
+                label="气血"
+                current={stats.attributes.hpCurrent ?? stats.attributes.hp}
+                max={stats.attributes.hp}
+                color="#7f1d1d"
+              />
+              <StatBar
+                label="内力"
+                current={stats.attributes.mpCurrent ?? stats.attributes.mp}
+                max={stats.attributes.mp}
+                color="#0e7490"
+              />
               <StatBar label="修为" current={stats.cultivation || 0} max={maxCultivation} color="#78350f" />
             </div>
           </div>

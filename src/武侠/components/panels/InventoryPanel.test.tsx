@@ -33,8 +33,9 @@ const items: InventoryItem[] = [
     count: 2,
     description: '少林疗伤圣药。',
     elixirInfo: {
+      effectType: '回复',
+      rank: '绝品',
       modifiers: { 气血: 20 },
-      duration: '三日',
     },
   },
   {
@@ -56,7 +57,7 @@ describe('InventoryPanel', () => {
   it('可按类别和品阶筛选物品', () => {
     render(<InventoryPanel items={items} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '丹药' }));
+    fireEvent.click(screen.getByRole('button', { name: '药品' }));
     expect(screen.getByRole('button', { name: '查看大还丹' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '查看玄铁剑' })).not.toBeInTheDocument();
 
@@ -76,7 +77,7 @@ describe('InventoryPanel', () => {
     expect(screen.getByText('悟性 >= 12')).toBeInTheDocument();
   });
 
-  it('装备和丹药动作仍调用 onItemAction', async () => {
+  it('装备和药品动作仍调用 onItemAction', async () => {
     const onItemAction = vi.fn();
     render(
       <InventoryPanel

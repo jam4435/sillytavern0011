@@ -6,6 +6,7 @@ import {
   parseRealm,
   REALM_IMPLIED_BONUS,
   type AttributeModifierMap,
+  type AttributeModifierSource,
 } from './attributeCalculator';
 import {
   calculateMartialArtBonus,
@@ -84,7 +85,7 @@ type CombatCharacter = {
   cultivation: number;
   initialAttributes: InitialAttributes;
   martialArts: Record<string, SimpleMartialArt>;
-  attributeModifiers?: AttributeModifierMap;
+  attributeModifiers?: AttributeModifierSource[];
 };
 
 type StatDataRecord = Record<string, unknown>;
@@ -159,21 +160,26 @@ function normalizeModifierMap(value: unknown): AttributeModifierMap | undefined 
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-function addModifiers(target: AttributeModifierMap, modifiers?: AttributeModifierMap): void {
-  if (!modifiers) {
-    return;
-  }
-
-  for (const [attribute, modifier] of Object.entries(modifiers)) {
-    target[attribute] = (target[attribute] ?? 0) + modifier;
-  }
+function createModifierSource(
+  id: string,
+  kind: AttributeModifierSource['kind'],
+  rank: unknown,
+  modifiers?: AttributeModifierMap,
+): AttributeModifierSource | null {
+  return modifiers
+    ? { id, kind, rank: typeof rank === 'string' ? rank : undefined, modifiers }
+    : null;
 }
 
-function collectPlayerAttributeModifiers(userData: PlayerProfile): AttributeModifierMap | undefined {
-  const modifiers: AttributeModifierMap = {};
+function collectPlayerAttributeModifiers(
+  userData: PlayerProfile,
+  frontendVariables?: Record<string, unknown>,
+): AttributeModifierSource[] | undefined {
+  const sources: AttributeModifierSource[] = [];
   const packageItems = isRecord(userData.包裹) ? userData.包裹 : {};
   const equipmentSlots = isRecord(userData.装备栏) ? userData.装备栏 : {};
   const statusEffects = isRecord(userData.状态效果) ? userData.状态效果 : {};
+  const permanentModifiers = isRecord(frontendVariables?.永久属性修正) ? frontendVariables.永久属性修正 : {};
 
   for (const [slot, itemName] of Object.entries(equipmentSlots)) {
     if (slot.startsWith('$') || typeof itemName !== 'string') {
@@ -185,7 +191,10 @@ function collectPlayerAttributeModifiers(userData: PlayerProfile): AttributeModi
       continue;
     }
 
-    addModifiers(modifiers, normalizeModifierMap(item.属性修正));
+    const source = createModifierSource(`装备:${itemName}`, '装备', item.品阶, normalizeModifierMap(item.属性修正));
+    if (source) {
+      sources.push(source);
+    }
   }
 
   for (const [effectId, effect] of Object.entries(statusEffects)) {
@@ -198,14 +207,39 @@ function collectPlayerAttributeModifiers(userData: PlayerProfile): AttributeModi
       continue;
     }
 
-    addModifiers(modifiers, normalizeModifierMap(effect.属性修正));
+    const source = createModifierSource(
+      `状态:${effectId}`,
+      effect.功效类型 === '永久增幅' ? '永久增幅' : '临时增幅',
+      effect.品阶,
+      normalizeModifierMap(effect.属性修正),
+    );
+    if (source) {
+      sources.push(source);
+    }
   }
 
-  return Object.keys(modifiers).length > 0 ? modifiers : undefined;
+  for (const [modifierId, modifier] of Object.entries(permanentModifiers)) {
+    if (modifierId.startsWith('$') || !isRecord(modifier)) {
+      continue;
+    }
+
+    const source = createModifierSource(
+      `永久:${modifierId}`,
+      '永久增幅',
+      modifier.品阶,
+      normalizeModifierMap(modifier.属性修正),
+    );
+    if (source) {
+      sources.push(source);
+    }
+  }
+
+  return sources.length > 0 ? sources : undefined;
 }
 
 function buildPlayerCharacter(statData: StatDataRecord): CombatCharacter | null {
   const userData = isRecord(statData.user数据) ? statData.user数据 as PlayerProfile : null;
+  const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : undefined;
   if (!userData) {
     return null;
   }
@@ -217,7 +251,7 @@ function buildPlayerCharacter(statData: StatDataRecord): CombatCharacter | null 
     cultivation: Number.isFinite(userData.修为) ? Number(userData.修为) : 0,
     initialAttributes: sanitizeInitialAttributes(userData.初始属性),
     martialArts: toSimpleMartialArts(userData.功法),
-    attributeModifiers: collectPlayerAttributeModifiers(userData),
+    attributeModifiers: collectPlayerAttributeModifiers(userData, frontendVariables),
   };
 }
 

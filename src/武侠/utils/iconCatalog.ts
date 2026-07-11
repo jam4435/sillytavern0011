@@ -346,7 +346,7 @@ export const iconCatalog: CatalogIcon[] = [
     names: ['大还丹', '大還丹'],
     aliases: ['还丹', '還丹'],
     kind: 'inventory',
-    categories: ['ELIXIR', '丹药'],
+    categories: ['ELIXIR', '药品', '丹药'],
   }),
   createIcon({
     id: 'jiuhua_yulu_wan',
@@ -355,7 +355,7 @@ export const iconCatalog: CatalogIcon[] = [
     names: ['九花玉露丸'],
     aliases: [],
     kind: 'inventory',
-    categories: ['ELIXIR', '丹药'],
+    categories: ['ELIXIR', '药品', '丹药'],
   }),
   createIcon({
     id: 'jinchuang_yao',
@@ -364,7 +364,7 @@ export const iconCatalog: CatalogIcon[] = [
     names: ['金創藥', '金创药'],
     aliases: [],
     kind: 'inventory',
-    categories: ['ELIXIR', '丹药'],
+    categories: ['ELIXIR', '药品', '丹药'],
   }),
   createIcon({
     id: 'jifeng_dan',
@@ -373,7 +373,7 @@ export const iconCatalog: CatalogIcon[] = [
     names: ['疾風丹', '疾风丹'],
     aliases: [],
     kind: 'inventory',
-    categories: ['ELIXIR', '丹药'],
+    categories: ['ELIXIR', '药品', '丹药'],
   }),
   createIcon({
     id: 'longjiao_jian',
@@ -561,4 +561,3 @@ export function getRankVisual(rank?: string, variant: 'item' | 'secret' | 'marti
 
   return base;
 }
-

@@ -12,7 +12,7 @@ const TYPE_FILTERS: Array<{ key: InventoryTypeFilter; label: string }> = [
   { key: 'ALL', label: '全部' },
   { key: 'EQUIP', label: '兵甲' },
   { key: 'SECRET', label: '秘籍' },
-  { key: 'ELIXIR', label: '丹药' },
+  { key: 'ELIXIR', label: '药品' },
   { key: 'MISC', label: '杂物' },
 ];
 
@@ -33,7 +33,7 @@ const getActionLabel = (type: InventoryItem['type']) => {
     case 'SECRET':
       return '参悟';
     case 'ELIXIR':
-      return '吞服';
+      return '服用';
     case 'MISC':
       return '使用';
     default:
@@ -48,7 +48,7 @@ const getItemTypeLabel = (type: InventoryItem['type']) => {
     case 'SECRET':
       return '秘籍';
     case 'ELIXIR':
-      return '丹药';
+      return '药品';
     case 'MISC':
       return '杂物';
     default:
@@ -144,6 +144,7 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
   const selectedItemModifierEntries = selectedItem ? getItemModifierEntries(selectedItem) : [];
   const selectedEquipSlot = selectedItem?.type === 'EQUIP' ? selectedItem.equipInfo?.slot : undefined;
   const selectedEquipStatus = selectedItem?.type === 'EQUIP' ? selectedItem.equipInfo?.status : undefined;
+  const selectedElixirEffectType = selectedItem?.type === 'ELIXIR' ? selectedItem.elixirInfo?.effectType : undefined;
   const selectedElixirDuration = selectedItem?.type === 'ELIXIR' ? selectedItem.elixirInfo?.duration : undefined;
   const selectedItemPreview =
     selectedItem && baseAttributes && attributes
@@ -309,9 +310,10 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                 </DetailSection>
               )}
 
-              {selectedItem.type === 'ELIXIR' && (selectedElixirDuration || selectedItemModifierEntries.length > 0) && (
-                <DetailSection title="药效信息">
-                  {selectedElixirDuration && <span className="workbench-chip">持续时间：{selectedElixirDuration}</span>}
+              {selectedItem.type === 'ELIXIR' && (selectedElixirEffectType || selectedElixirDuration || selectedItemModifierEntries.length > 0) && (
+                <DetailSection title="药品信息">
+                  {selectedElixirEffectType && <span className="workbench-chip">功效：{selectedElixirEffectType}</span>}
+                  {selectedElixirDuration && <span className="workbench-chip">持续时间：{selectedElixirDuration}时</span>}
                   {selectedItemModifierEntries.map(([attribute, value]) => (
                     <span key={attribute} className="workbench-chip">
                       {formatModifierLabel(attribute, value)}

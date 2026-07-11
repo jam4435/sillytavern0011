@@ -1,13 +1,23 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { decrementStatusEffectTurns, removeStatusEffect, restoreItemCount } from '../utils/itemManager';
+import {
+  decrementStatusEffectTurns,
+  removePermanentAttributeModifier,
+  removeStatusEffect,
+  restoreEquipmentState,
+  restoreItemCount,
+  undoResourceDeltas,
+} from '../utils/itemManager';
 import { syncPlayerAttributesFromVariables } from '../utils/variableReader';
 import { useCommandQueue } from './useCommandQueue';
 
 vi.mock('../utils/itemManager', () => ({
   decrementStatusEffectTurns: vi.fn(),
+  removePermanentAttributeModifier: vi.fn(),
   removeStatusEffect: vi.fn(),
+  restoreEquipmentState: vi.fn(),
   restoreItemCount: vi.fn(),
+  undoResourceDeltas: vi.fn(),
 }));
 
 vi.mock('../utils/logger', () => ({
@@ -23,15 +33,21 @@ vi.mock('../utils/variableReader', () => ({
 }));
 
 const decrementStatusEffectTurnsMock = vi.mocked(decrementStatusEffectTurns);
+const removePermanentAttributeModifierMock = vi.mocked(removePermanentAttributeModifier);
 const removeStatusEffectMock = vi.mocked(removeStatusEffect);
+const restoreEquipmentStateMock = vi.mocked(restoreEquipmentState);
 const restoreItemCountMock = vi.mocked(restoreItemCount);
+const undoResourceDeltasMock = vi.mocked(undoResourceDeltas);
 const syncPlayerAttributesMock = vi.mocked(syncPlayerAttributesFromVariables);
 
 describe('useCommandQueue', () => {
   beforeEach(() => {
     decrementStatusEffectTurnsMock.mockReset();
+    removePermanentAttributeModifierMock.mockReset();
     removeStatusEffectMock.mockReset();
+    restoreEquipmentStateMock.mockReset();
     restoreItemCountMock.mockReset();
+    undoResourceDeltasMock.mockReset();
     syncPlayerAttributesMock.mockReset();
   });
 
@@ -61,19 +77,26 @@ describe('useCommandQueue', () => {
     expect(decrementStatusEffectTurnsMock).not.toHaveBeenCalled();
   });
 
-  it('取消吞服指令会恢复完整物品快照并删除对应状态效果', async () => {
+  it('取消药品指令会恢复完整物品快照并删除对应副作用', async () => {
     const { result } = renderHook(() => useCommandQueue());
     const originalItem = {
-      类型: '丹药',
+      类型: '药品',
       品阶: '珍品',
+      功效类型: '临时增幅',
       物品描述: '清香沁脾。',
       数量: 2,
-      属性修正: { 气血上限: 25 },
+      属性修正: { 气血: 25 },
       持续时间: 3,
     };
 
     act(() => {
-      result.current.addUseItemCommand('九花玉露丸', originalItem, 'effect-1');
+      result.current.addUseItemCommand('使用九花玉露丸，（属性已变化）', {
+        itemName: '九花玉露丸',
+        originalItem,
+        statusEffectId: 'effect-1',
+        permanentModifierId: 'perm-1',
+        resourceDeltas: { 气血: 3 },
+      });
     });
 
     const commandId = result.current.commands[0].id;
@@ -83,7 +106,36 @@ describe('useCommandQueue', () => {
 
     expect(restoreItemCountMock).toHaveBeenCalledWith('九花玉露丸', originalItem);
     expect(removeStatusEffectMock).toHaveBeenCalledWith('effect-1');
+    expect(removePermanentAttributeModifierMock).toHaveBeenCalledWith('perm-1');
+    expect(undoResourceDeltasMock).toHaveBeenCalledWith({ 气血: 3 });
     expect(syncPlayerAttributesMock).toHaveBeenCalledTimes(1);
     expect(result.current.commands).toEqual([]);
+  });
+
+  it('取消装备指令会恢复装备栏和使用状态', async () => {
+    const { result } = renderHook(() => useCommandQueue());
+    const rollback = {
+      slot: '兵器',
+      previousItemName: '旧剑',
+      previousItem: { 类型: '装备', 品阶: '精品', 物品描述: '', 数量: 1, 部位: '兵器', 使用状态: '装备中' },
+      newItemName: '新剑',
+      newItem: { 类型: '装备', 品阶: '珍品', 物品描述: '', 数量: 1, 部位: '兵器', 使用状态: '' },
+      equipmentSlotExisted: true,
+    };
+
+    act(() => {
+      result.current.addUseItemCommand('装备新剑，（属性已变化）', {
+        itemName: '新剑',
+        equipmentRollback: rollback,
+      });
+    });
+
+    const commandId = result.current.commands[0].id;
+    await act(async () => {
+      await result.current.cancelCommand(commandId);
+    });
+
+    expect(restoreEquipmentStateMock).toHaveBeenCalledWith(rollback);
+    expect(syncPlayerAttributesMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -34,17 +34,17 @@ describe('inventoryAttributePreview', () => {
       },
     ];
     const effects: ActiveStatusEffect[] = [
-      { id: '药效', type: '丹药', source: '轻身丸', modifiers: { 机敏: 10 }, duration: 2, remaining: 1 },
+      { id: '药效', type: '药品', effectType: '临时增幅', source: '轻身丸', rank: '精品', modifiers: { 机敏: 10 }, duration: 2, remaining: 1 },
     ];
     const current = { ...baseAttributes, 根骨: 110, 机敏: 110 };
 
     expect(buildItemAttributePreview(items[1], items, effects, baseAttributes, current)).toEqual([
-      { attribute: '臂力', currentValue: 100, nextValue: 120, delta: 20 },
+      { attribute: '臂力', currentValue: 100, nextValue: 116, delta: 16 },
       { attribute: '根骨', currentValue: 110, nextValue: 100, delta: -10 },
     ]);
   });
 
-  it('丹药预览会在现有效果上增加本次百分比', () => {
+  it('临时增幅药品预览会按品阶封顶', () => {
     const elixir: InventoryItem = {
       id: 'elixir',
       name: '护心丹',
@@ -52,11 +52,28 @@ describe('inventoryAttributePreview', () => {
       rank: 'GREEN',
       count: 1,
       description: '',
-      elixirInfo: { modifiers: { 气血上限: 25 }, duration: '2' },
+      elixirInfo: { effectType: '临时增幅', rank: '精品', modifiers: { 气血: 25 }, duration: '2' },
     };
 
     expect(buildItemAttributePreview(elixir, [elixir], [], baseAttributes, baseAttributes)).toEqual([
-      { attribute: '气血上限', currentValue: 200, nextValue: 250, delta: 50 },
+      { attribute: '气血上限', currentValue: 200, nextValue: 246, delta: 46 },
+    ]);
+  });
+
+  it('回复药品预览只改变当前气血', () => {
+    const medicine: InventoryItem = {
+      id: 'medicine',
+      name: '金疮药',
+      type: 'ELIXIR',
+      rank: 'WHITE',
+      count: 1,
+      description: '',
+      elixirInfo: { effectType: '回复', rank: '凡品', modifiers: { 气血: 20 } },
+    };
+    const current = { ...baseAttributes, hpCurrent: 120 };
+
+    expect(buildItemAttributePreview(medicine, [medicine], [], baseAttributes, current)).toEqual([
+      { attribute: '气血', currentValue: 120, nextValue: 123, delta: 3 },
     ]);
   });
 });

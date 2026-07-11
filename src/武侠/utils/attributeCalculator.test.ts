@@ -59,4 +59,29 @@ describe('attributeCalculator', () => {
     expect(result.combat.臂力).toBe(130);
     expect(result.resources.气血上限).toBe(250);
   });
+
+  it('来源数组会按来源品阶独立封顶后叠加', () => {
+    const result = applyAttributeModifiers(
+      { 臂力: 100, 根骨: 100, 机敏: 100, 洞察: 100 },
+      { 气血上限: 200, 内力上限: 200 },
+      [
+        { id: '精品剑', kind: '装备', rank: '精品', modifiers: { 臂力: 50 } },
+        { id: '精品药', kind: '临时增幅', rank: '精品', modifiers: { 臂力: 50, 气血: 25 } },
+      ],
+    );
+
+    expect(result.combat.臂力).toBe(144);
+    expect(result.resources.气血上限).toBe(246);
+  });
+
+  it('负数来源不吃正向封顶但最终不低于 0', () => {
+    const result = applyAttributeModifiers(
+      { 臂力: 20, 根骨: 20, 机敏: 20, 洞察: 20 },
+      { 气血上限: 20, 内力上限: 20 },
+      [{ id: '毒', kind: '装备', rank: '凡品', modifiers: { 臂力: -200, 气血: -50 } }],
+    );
+
+    expect(result.combat.臂力).toBe(0);
+    expect(result.resources.气血上限).toBe(10);
+  });
 });

@@ -11,8 +11,6 @@ type LoreEntry = {
   autoLink: boolean;
 };
 
-type PopupApi = Pick<typeof SillyTavern, 'callGenericPopup' | 'POPUP_TYPE'>;
-
 type ImageIndex = Record<string, string[]>;
 
 const SCRIPT_KEY = 'jm-lore-encyclopedia';
@@ -20,6 +18,10 @@ const ENHANCED_ATTR = 'data-jm-lore-enhanced';
 const MAX_LINKS_PER_MESSAGE = 12;
 const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
 const IMAGE_INDEX_URL = `${IMAGE_BASE_URL}imageIndex.json`;
+const SCRIPT_BUTTONS: ScriptButton[] = [
+  { name: '打开百科', visible: true },
+  { name: '重扫正文', visible: true },
+];
 
 const blockedAutoLinkAliases = new Set([
   '帝国',
@@ -78,6 +80,18 @@ const ignoredAncestorSelector = [
   '.mes_streaming',
 ].join(',');
 
+const hiddenLoreAncestorSelector = [
+  'summary',
+  '.custom-konata-thinking-wrapper',
+  '.custom-tucao-w',
+  '.custom-tucao-c',
+  '.custom-kz-w',
+  '.custom-kz-c',
+  '.TH-render',
+  '.mes_reasoning',
+  '.mes_reasoning_details',
+].join(',');
+
 const loreEntries = parseLoreEntries();
 const entryById = new Map(loreEntries.map(entry => [entry.id, entry]));
 const linkCandidates = buildLinkCandidates(loreEntries);
@@ -87,6 +101,8 @@ let imageIndexPromise: Promise<ImageIndex> | null = null;
 let searchInput: HTMLInputElement | null = null;
 let panelElement: HTMLElement | null = null;
 let resultElement: HTMLElement | null = null;
+let modalElement: HTMLElement | null = null;
+let modalCardElement: HTMLElement | null = null;
 
 function parseLoreEntries(): LoreEntry[] {
   try {
@@ -186,6 +202,39 @@ function installStyle() {
       .jm-lore-panel.open {
         display: flex;
       }
+      .jm-lore-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 10060;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(7, 8, 8, 0.72);
+      }
+      .jm-lore-modal.open {
+        display: flex;
+      }
+      .jm-lore-modal-card {
+        width: min(760px, calc(100vw - 32px));
+        max-height: min(82vh, calc(100vh - 40px));
+        overflow: auto;
+        border: 1px solid rgba(218, 185, 111, 0.32);
+        border-radius: 8px;
+        background:
+          linear-gradient(160deg, rgba(18, 20, 19, 0.99), rgba(64, 15, 24, 0.98));
+        box-shadow: 0 24px 54px rgba(0, 0, 0, 0.58);
+      }
+      .jm-lore-modal-head {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding: 10px 12px 0;
+        background: linear-gradient(180deg, rgba(18, 20, 19, 0.98), rgba(18, 20, 19, 0.78), transparent);
+      }
       .jm-lore-header {
         display: flex;
         align-items: center;
@@ -281,12 +330,17 @@ function installStyle() {
         text-align: center;
       }
       .jm-lore-link {
+        display: inline;
+        padding: 0 2px;
+        border-radius: 4px;
+        background: rgba(145, 215, 170, 0.12);
         color: #91d7aa;
         border-bottom: 1px dotted rgba(145, 215, 170, 0.72);
         cursor: pointer;
         text-decoration: none;
       }
       .jm-lore-link:hover {
+        background: rgba(240, 207, 124, 0.18);
         color: #f0cf7c;
         border-bottom-color: rgba(240, 207, 124, 0.78);
       }
@@ -371,6 +425,31 @@ function mountUi() {
     .appendTo($root);
   panelElement = $panel[0];
 
+  const $modal = $('<div>')
+    .addClass('jm-lore-modal')
+    .attr({ 'aria-hidden': 'true' })
+    .on('click', event => {
+      if (event.target === event.currentTarget) {
+        closeModal();
+      }
+    })
+    .appendTo($root);
+  modalElement = $modal[0];
+
+  const $modalCard = $('<section>')
+    .addClass('jm-lore-modal-card')
+    .attr({ role: 'dialog', 'aria-label': 'JM设定百科详情' })
+    .appendTo($modal);
+  modalCardElement = $modalCard[0];
+
+  const $modalHead = $('<div>').addClass('jm-lore-modal-head').appendTo($modalCard);
+  $('<button>')
+    .addClass('jm-lore-icon-btn')
+    .attr({ type: 'button', title: '关闭', 'aria-label': '关闭' })
+    .text('×')
+    .on('click', closeModal)
+    .appendTo($modalHead);
+
   const $header = $('<div>').addClass('jm-lore-header').appendTo($panel);
   $('<div>').addClass('jm-lore-title').text('JM 设定索引').appendTo($header);
   $('<div>').addClass('jm-lore-count').text(`${loreEntries.length} 条`).appendTo($header);
@@ -409,14 +488,39 @@ function togglePanel() {
   }
 }
 
+function openPanel() {
+  if (!panelElement) {
+    return;
+  }
+  panelElement.classList.add('open');
+  searchInput?.focus();
+}
+
 function closePanel() {
   panelElement?.classList.remove('open');
+}
+
+function openModal(content: HTMLElement) {
+  if (!modalElement || !modalCardElement) {
+    return;
+  }
+  modalCardElement.querySelectorAll('.jm-lore-popup').forEach(node => node.remove());
+  modalCardElement.appendChild(content);
+  modalElement.classList.add('open');
+  modalElement.setAttribute('aria-hidden', 'false');
+}
+
+function closeModal() {
+  modalElement?.classList.remove('open');
+  modalElement?.setAttribute('aria-hidden', 'true');
+  modalCardElement?.querySelectorAll('.jm-lore-popup').forEach(node => node.remove());
 }
 
 function renderSearchResults() {
   if (!resultElement) {
     return;
   }
+  const ownerDocument = resultElement.ownerDocument;
 
   const query = normalizeForSearch(searchInput?.value ?? '');
   const matches = loreEntries
@@ -430,7 +534,7 @@ function renderSearchResults() {
 
   resultElement.replaceChildren();
   if (matches.length === 0) {
-    const empty = document.createElement('div');
+    const empty = ownerDocument.createElement('div');
     empty.className = 'jm-lore-empty';
     empty.textContent = '未找到匹配词条';
     resultElement.appendChild(empty);
@@ -438,24 +542,24 @@ function renderSearchResults() {
   }
 
   matches.forEach(entry => {
-    const button = document.createElement('button');
+    const button = ownerDocument.createElement('button');
     button.type = 'button';
     button.className = 'jm-lore-result';
     button.addEventListener('click', () => {
       void showEntryPopup(entry);
     });
 
-    const title = document.createElement('div');
+    const title = ownerDocument.createElement('div');
     title.className = 'jm-lore-result-title';
     title.textContent = entry.title;
     button.appendChild(title);
 
-    const category = document.createElement('div');
+    const category = ownerDocument.createElement('div');
     category.className = 'jm-lore-result-category';
     category.textContent = entry.category;
     button.appendChild(category);
 
-    const summary = document.createElement('div');
+    const summary = ownerDocument.createElement('div');
     summary.className = 'jm-lore-result-summary';
     summary.textContent = entry.summary;
     button.appendChild(summary);
@@ -473,31 +577,32 @@ function buildSearchHaystack(entry: LoreEntry) {
 }
 
 async function showEntryPopup(entry: LoreEntry) {
-  const content = document.createElement('div');
+  const ownerDocument = getHostDocument();
+  const content = ownerDocument.createElement('div');
   content.className = 'jm-lore-popup';
 
-  const titleRow = document.createElement('div');
+  const titleRow = ownerDocument.createElement('div');
   titleRow.className = 'jm-lore-popup-title';
-  const title = document.createElement('span');
+  const title = ownerDocument.createElement('span');
   title.textContent = entry.title;
   titleRow.appendChild(title);
-  const category = document.createElement('span');
+  const category = ownerDocument.createElement('span');
   category.className = 'jm-lore-popup-category';
   category.textContent = entry.category;
   titleRow.appendChild(category);
   content.appendChild(titleRow);
 
-  const summary = document.createElement('div');
+  const summary = ownerDocument.createElement('div');
   summary.className = 'jm-lore-popup-summary';
   summary.textContent = entry.summary;
   content.appendChild(summary);
 
   const aliases = entry.aliases.filter(alias => alias !== entry.title).slice(0, 12);
   if (aliases.length > 0) {
-    const aliasRow = document.createElement('div');
+    const aliasRow = ownerDocument.createElement('div');
     aliasRow.className = 'jm-lore-tag-row';
     aliases.forEach(alias => {
-      const tag = document.createElement('span');
+      const tag = ownerDocument.createElement('span');
       tag.className = 'jm-lore-tag';
       tag.textContent = alias;
       aliasRow.appendChild(tag);
@@ -507,10 +612,10 @@ async function showEntryPopup(entry: LoreEntry) {
 
   const images = await findImagesForEntry(entry);
   if (images.length > 0) {
-    const imageGrid = document.createElement('div');
+    const imageGrid = ownerDocument.createElement('div');
     imageGrid.className = 'jm-lore-images';
     images.slice(0, 6).forEach(fileName => {
-      const image = document.createElement('img');
+      const image = ownerDocument.createElement('img');
       image.loading = 'lazy';
       image.alt = entry.title;
       image.src = `${IMAGE_BASE_URL}${fileName}`;
@@ -519,25 +624,12 @@ async function showEntryPopup(entry: LoreEntry) {
     content.appendChild(imageGrid);
   }
 
-  const source = document.createElement('div');
+  const source = ownerDocument.createElement('div');
   source.className = 'jm-lore-popup-meta';
   source.textContent = `来源：${entry.sourceFile}`;
   content.appendChild(source);
 
-  const popupApi = getPopupApi();
-  if (popupApi?.callGenericPopup) {
-    await popupApi.callGenericPopup(content, popupApi.POPUP_TYPE.TEXT, '', {
-      okButton: '关闭',
-      cancelButton: false,
-      wider: true,
-      large: images.length > 2,
-      leftAlign: true,
-      allowVerticalScrolling: true,
-    });
-    return;
-  }
-
-  alert(`${entry.title}\n\n${entry.summary}\n\n${entry.sourceFile}`);
+  openModal(content);
 }
 
 async function findImagesForEntry(entry: LoreEntry) {
@@ -602,7 +694,7 @@ function enhanceMessage(messageId: number) {
 
   const $display = getDisplayedMessageElement(messageId);
   $display.each((_index, element) => {
-    if (!(element instanceof HTMLElement)) {
+    if (!isHTMLElement(element)) {
       return;
     }
     resetEnhancedElement(element);
@@ -627,18 +719,25 @@ function enhanceRootElement(root: HTMLElement) {
   const usedEntryIds = new Set<string>();
   let linkCount = 0;
   let offset = 0;
+  const ownerDocument = root.ownerDocument;
+  const nodeFilter = ownerDocument.defaultView?.NodeFilter ?? NodeFilter;
 
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+  const walker = ownerDocument.createTreeWalker(root, nodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
-      if (!parent || parent.closest(ignoredAncestorSelector)) {
-        return NodeFilter.FILTER_REJECT;
+      if (
+        !parent ||
+        parent.closest(ignoredAncestorSelector) ||
+        parent.closest(hiddenLoreAncestorSelector) ||
+        isInsideClosedDetails(node)
+      ) {
+        return nodeFilter.FILTER_REJECT;
       }
       const text = node.nodeValue ?? '';
       if (!text.trim() || containsHiddenSyntax(text)) {
-        return NodeFilter.FILTER_REJECT;
+        return nodeFilter.FILTER_REJECT;
       }
-      return NodeFilter.FILTER_ACCEPT;
+      return nodeFilter.FILTER_ACCEPT;
     },
   });
 
@@ -689,6 +788,23 @@ function overlapsSkipRange(start: number, end: number, ranges: Array<{ start: nu
   return ranges.some(range => start < range.end && end > range.start);
 }
 
+function isInsideClosedDetails(node: Node) {
+  let current = node.parentElement;
+  while (current) {
+    if (current.tagName === 'DETAILS') {
+      const details = current as HTMLDetailsElement;
+      if (!details.open) {
+        const summary = details.querySelector('summary');
+        if (!summary?.contains(node)) {
+          return true;
+        }
+      }
+    }
+    current = current.parentElement;
+  }
+  return false;
+}
+
 function linkifyTextNode(node: Text, usedEntryIds: Set<string>, remainingLinks: number) {
   if (!linkRegex || remainingLinks <= 0) {
     return 0;
@@ -699,7 +815,8 @@ function linkifyTextNode(node: Text, usedEntryIds: Set<string>, remainingLinks: 
   let match: RegExpExecArray | null;
   let cursor = 0;
   let added = 0;
-  const fragment = document.createDocumentFragment();
+  const ownerDocument = node.ownerDocument;
+  const fragment = ownerDocument.createDocumentFragment();
 
   while ((match = linkRegex.exec(text)) !== null) {
     const alias = match[0];
@@ -709,15 +826,15 @@ function linkifyTextNode(node: Text, usedEntryIds: Set<string>, remainingLinks: 
     }
 
     if (match.index > cursor) {
-      fragment.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+      fragment.appendChild(ownerDocument.createTextNode(text.slice(cursor, match.index)));
     }
 
     if (added < remainingLinks && !usedEntryIds.has(candidate.entry.id)) {
-      fragment.appendChild(createLoreLink(alias, candidate.entry));
+      fragment.appendChild(createLoreLink(ownerDocument, alias, candidate.entry));
       usedEntryIds.add(candidate.entry.id);
       added += 1;
     } else {
-      fragment.appendChild(document.createTextNode(alias));
+      fragment.appendChild(ownerDocument.createTextNode(alias));
     }
 
     cursor = match.index + alias.length;
@@ -731,31 +848,48 @@ function linkifyTextNode(node: Text, usedEntryIds: Set<string>, remainingLinks: 
   }
 
   if (cursor < text.length) {
-    fragment.appendChild(document.createTextNode(text.slice(cursor)));
+    fragment.appendChild(ownerDocument.createTextNode(text.slice(cursor)));
   }
 
   node.parentNode?.replaceChild(fragment, node);
   return added;
 }
 
-function createLoreLink(text: string, entry: LoreEntry) {
-  const link = document.createElement('a');
+function createLoreLink(ownerDocument: Document, text: string, entry: LoreEntry) {
+  const link = ownerDocument.createElement('a');
   link.href = '#';
   link.className = 'jm-lore-link';
   link.dataset.entryId = entry.id;
   link.textContent = text;
   link.title = entry.title;
+  link.addEventListener('click', event => {
+    event.preventDefault();
+    void showEntryPopup(entry);
+  });
   return link;
 }
 
 function resetEnhancedElement(root: HTMLElement) {
   root.querySelectorAll('a.jm-lore-link').forEach(link => {
-    link.replaceWith(document.createTextNode(link.textContent ?? ''));
+    link.replaceWith(link.ownerDocument.createTextNode(link.textContent ?? ''));
   });
   root.removeAttribute(ENHANCED_ATTR);
 }
 
 function installEventListeners() {
+  appendInexistentScriptButtons(SCRIPT_BUTTONS);
+  stops.push(
+    eventOn(getButtonEvent('打开百科'), () => {
+      openPanel();
+    }).stop,
+  );
+  stops.push(
+    eventOn(getButtonEvent('重扫正文'), () => {
+      enhanceVisibleMessages();
+      toastr.info('已重新扫描当前可见楼层。', 'JM设定百科');
+    }).stop,
+  );
+
   stops.push(
     eventOn(tavern_events.CHARACTER_MESSAGE_RENDERED, messageId => {
       enhanceMessage(Number(messageId));
@@ -782,34 +916,34 @@ function installEventListeners() {
     }).stop,
   );
 
-  $(document).on(`click.${SCRIPT_KEY}`, '.jm-lore-link', event => {
-    event.preventDefault();
-    const entryId = (event.currentTarget as HTMLElement).dataset.entryId;
-    const entry = entryId ? entryById.get(entryId) : null;
-    if (entry) {
-      void showEntryPopup(entry);
+  $(window).on(`pagehide.${SCRIPT_KEY}`, cleanup);
+  $(document).on(`keydown.${SCRIPT_KEY}`, event => {
+    if (event.key === 'Escape') {
+      closeModal();
+      closePanel();
     }
   });
-
-  $(window).on(`pagehide.${SCRIPT_KEY}`, cleanup);
 }
 
 function cleanup() {
   stops.splice(0).forEach(stop => stop());
   $(document).off(`.${SCRIPT_KEY}`);
   $(window).off(`.${SCRIPT_KEY}`);
-  document.querySelectorAll<HTMLElement>(`[${ENHANCED_ATTR}="1"]`).forEach(resetEnhancedElement);
+  getHostDocument().querySelectorAll<HTMLElement>(`[${ENHANCED_ATTR}="1"]`).forEach(resetEnhancedElement);
   $(`[script_id='${getSafeScriptId()}']`).remove();
-}
-
-function getPopupApi(): PopupApi | undefined {
-  const parentWindow = window.parent as Window & typeof globalThis & { SillyTavern?: typeof SillyTavern };
-  const currentWindow = window as Window & typeof globalThis & { SillyTavern?: typeof SillyTavern };
-  return parentWindow.SillyTavern || currentWindow.SillyTavern;
 }
 
 function getSafeScriptId() {
   return typeof getScriptId === 'function' ? getScriptId() : SCRIPT_KEY;
+}
+
+function getHostDocument() {
+  return window.parent?.document ?? document;
+}
+
+function isHTMLElement(element: Element): element is HTMLElement {
+  const htmlElement = element.ownerDocument.defaultView?.HTMLElement ?? HTMLElement;
+  return element instanceof htmlElement;
 }
 
 function uniqueStrings(values: string[]) {

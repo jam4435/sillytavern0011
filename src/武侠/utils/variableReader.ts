@@ -12,6 +12,7 @@ import type {
     ActiveStatusEffectVariableData,
     CurrentAttributes,
     EquipmentSlots,
+    FrontendVariableData,
     GameEvent,
     GameState,
     InitialAttributes,
@@ -25,6 +26,7 @@ import type {
 
 import {
     calculateAllAttributes,
+    type AttributeModifierSource,
     type MartialArtForCalculation,
 } from './attributeCalculator';
 import {
@@ -172,6 +174,8 @@ interface GameVariables {
 
   // user数据（扁平结构，用户名和其他属性同级）
   user数据?: UserProfile & { 用户名?: string };
+
+  前端变量?: FrontendVariableData;
 
   // 角色数据（NPC 信息存储在这里）
   角色数据?: Record<string, CharacterData | unknown>;
@@ -562,25 +566,67 @@ function parseInitialAttributes(用户档案?: UserProfile): InitialAttributes {
   return result;
 }
 
-/**
- * 解析气血/内力字符串格式，提取最大值
- * 支持格式: "当前值/最大值" (如 "800/1000") 或纯数字
- * @returns 最大值（如果是字符串格式返回最大值，否则返回原数字）
- */
-function parseResourceValue(value: string | number | undefined, defaultValue: number): number {
-  if (value === undefined) return defaultValue;
-  if (typeof value === 'number') return value;
+interface ResourcePair {
+  current: number;
+  max: number;
+  exists: boolean;
+}
 
-  // 尝试解析 "当前值/最大值" 格式
-  const parts = value.split('/');
-  if (parts.length === 2) {
-    const maxValue = parseInt(parts[1], 10);
-    if (!isNaN(maxValue)) return maxValue;
+function clampResourceCurrent(current: number, max: number): number {
+  return Math.max(0, Math.min(Math.floor(current), Math.max(0, Math.floor(max))));
+}
+
+function parseResourcePair(value: string | number | undefined, defaultMax: number): ResourcePair {
+  const fallbackMax = Math.max(0, Math.floor(defaultMax));
+  if (value === undefined) {
+    return { current: fallbackMax, max: fallbackMax, exists: false };
   }
 
-  // 尝试直接解析为数字
-  const numValue = parseInt(value, 10);
-  return isNaN(numValue) ? defaultValue : numValue;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const max = Math.max(0, Math.floor(value));
+    return { current: max, max, exists: true };
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const parts = trimmed.split('/');
+    if (parts.length === 2) {
+      const current = Number(parts[0]);
+      const max = Number(parts[1]);
+      if (Number.isFinite(current) && Number.isFinite(max)) {
+        const normalizedMax = Math.max(0, Math.floor(max));
+        return {
+          current: clampResourceCurrent(current, normalizedMax),
+          max: normalizedMax,
+          exists: true,
+        };
+      }
+    }
+
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed)) {
+      const max = Math.max(0, Math.floor(parsed));
+      return { current: max, max, exists: true };
+    }
+  }
+
+  return { current: fallbackMax, max: fallbackMax, exists: false };
+}
+
+function adjustResourcePairByMaxDelta(pair: ResourcePair, nextMax: number): ResourcePair {
+  const max = Math.max(0, Math.floor(nextMax));
+  if (!pair.exists) {
+    return { current: max, max, exists: true };
+  }
+  return {
+    current: clampResourceCurrent(pair.current + (max - pair.max), max),
+    max,
+    exists: true,
+  };
+}
+
+function formatResourcePair(pair: ResourcePair): string {
+  return `${pair.current}/${pair.max}`;
 }
 
 /**
@@ -604,15 +650,22 @@ function parseCurrentAttributes(
   dataLogger.log('[variableReader] Step 5b - 计算后的战斗属性:', calculatedCombat);
   dataLogger.log('[variableReader] Step 5c - 计算后的资源属性:', calculatedResources);
 
-  // 解析气血/内力（支持 "当前值/最大值" 格式）
-  const hpFromAttrs = parseResourceValue(attrs?.气血, 100);
-  const mpFromAttrs = parseResourceValue(attrs?.内力, 50);
+  const hpPairFromAttrs = parseResourcePair(attrs?.气血, calculatedResources?.气血上限 ?? 100);
+  const mpPairFromAttrs = parseResourcePair(attrs?.内力, calculatedResources?.内力上限 ?? 50);
+  const hpPair = calculatedResources
+    ? adjustResourcePairByMaxDelta(hpPairFromAttrs, calculatedResources.气血上限)
+    : hpPairFromAttrs;
+  const mpPair = calculatedResources
+    ? adjustResourcePairByMaxDelta(mpPairFromAttrs, calculatedResources.内力上限)
+    : mpPairFromAttrs;
 
   // 优先使用计算结果，如果没有则使用变量中的值或默认值
   // 注意：悟性不随境界变化，只存在于初始属性中
   const result: CurrentAttributes = {
-    hp: calculatedResources?.气血上限 ?? hpFromAttrs,
-    mp: calculatedResources?.内力上限 ?? mpFromAttrs,
+    hp: hpPair.max,
+    mp: mpPair.max,
+    hpCurrent: hpPair.current,
+    mpCurrent: mpPair.current,
     臂力: calculatedCombat?.臂力 ?? attrs?.臂力 ?? 10,
     根骨: calculatedCombat?.根骨 ?? attrs?.根骨 ?? 10,
     机敏: calculatedCombat?.机敏 ?? attrs?.机敏 ?? 10,
@@ -680,7 +733,7 @@ function parseMartialArts(
 /**
  * 将用户档案中的包裹转换为 InventoryItem[] 结构
  * 注意：实际变量名是"包裹"而非"背包"，且是对象格式而非数组
- * 包裹物品字段统一使用"品阶"，装备/丹药可携带额外元信息
+ * 包裹物品字段统一使用"品阶"，装备/药品可携带额外元信息
  */
 function normalizeAttributeModifiers(
   属性修正?: InventoryAttributeModifierMap,
@@ -744,8 +797,10 @@ function parseStatusEffects(状态效果?: Record<string, ActiveStatusEffectVari
       const remaining = normalizeDurationNumber(effect?.剩余时间) ?? duration;
       return {
         id,
-        type: typeof effect?.类型 === 'string' && effect.类型.trim() ? effect.类型.trim() : '丹药',
+        type: typeof effect?.类型 === 'string' && effect.类型.trim() ? effect.类型.trim() : '药品',
+        effectType: typeof effect?.功效类型 === 'string' && effect.功效类型.trim() ? effect.功效类型.trim() : undefined,
         source: typeof effect?.来源 === 'string' ? effect.来源.trim() : '',
+        rank: typeof effect?.品阶 === 'string' && effect.品阶.trim() ? effect.品阶.trim() : undefined,
         modifiers: normalizeAttributeModifiers(effect?.属性修正),
         duration,
         remaining,
@@ -754,25 +809,43 @@ function parseStatusEffects(状态效果?: Record<string, ActiveStatusEffectVari
     .filter(effect => effect.remaining > 0);
 }
 
-function addAttributeModifiers(
-  target: InventoryAttributeModifierMap,
+function createModifierSource(
+  id: string,
+  kind: AttributeModifierSource['kind'],
+  rank: string | undefined,
   modifiers?: InventoryAttributeModifierMap,
-): void {
-  if (!modifiers) {
-    return;
+): AttributeModifierSource | undefined {
+  const normalizedModifiers = normalizeAttributeModifiers(modifiers);
+  return normalizedModifiers ? { id, kind, rank, modifiers: normalizedModifiers } : undefined;
+}
+
+function collectPermanentAttributeModifierSources(前端变量?: FrontendVariableData): AttributeModifierSource[] {
+  const 永久属性修正 = 前端变量?.永久属性修正;
+  if (!永久属性修正 || typeof 永久属性修正 !== 'object') {
+    return [];
   }
 
-  for (const [attribute, value] of Object.entries(modifiers)) {
-    target[attribute] = (target[attribute] ?? 0) + value;
-  }
+  return Object.entries(永久属性修正).flatMap(([id, modifier]) => {
+    if (id.startsWith('$')) {
+      return [];
+    }
+    const source = createModifierSource(
+      `永久:${id}`,
+      '永久增幅',
+      typeof modifier?.品阶 === 'string' ? modifier.品阶 : undefined,
+      modifier?.属性修正,
+    );
+    return source ? [source] : [];
+  });
 }
 
 function collectActiveAttributeModifiers(
   用户档案?: UserProfile,
   equipmentSlots: EquipmentSlots = parseEquipmentSlots(用户档案?.装备栏),
   statusEffects: ActiveStatusEffect[] = parseStatusEffects(用户档案?.状态效果),
-): InventoryAttributeModifierMap | undefined {
-  const modifiers: InventoryAttributeModifierMap = {};
+  前端变量?: FrontendVariableData,
+): AttributeModifierSource[] | undefined {
+  const sources: AttributeModifierSource[] = [];
   const 包裹 = 用户档案?.包裹;
 
   if (包裹 && typeof 包裹 === 'object') {
@@ -786,15 +859,28 @@ function collectActiveAttributeModifiers(
         continue;
       }
 
-      addAttributeModifiers(modifiers, normalizeAttributeModifiers(item.属性修正));
+      const source = createModifierSource(`装备:${itemName}`, '装备', item.品阶, item.属性修正);
+      if (source) {
+        sources.push(source);
+      }
     }
   }
 
   for (const effect of statusEffects) {
-    addAttributeModifiers(modifiers, effect.modifiers);
+    const source = createModifierSource(
+      `状态:${effect.id}`,
+      effect.effectType === '永久增幅' ? '永久增幅' : '临时增幅',
+      effect.rank,
+      effect.modifiers,
+    );
+    if (source) {
+      sources.push(source);
+    }
   }
 
-  return Object.keys(modifiers).length > 0 ? modifiers : undefined;
+  sources.push(...collectPermanentAttributeModifierSources(前端变量));
+
+  return sources.length > 0 ? sources : undefined;
 }
 
 function parseEquipInfo(
@@ -823,12 +909,15 @@ function parseEquipInfo(
 function parseElixirInfo(item: InventoryItemVariableData): InventoryItem['elixirInfo'] | undefined {
   const modifiers = normalizeAttributeModifiers(item.属性修正);
   const duration = normalizeDurationValue(item.持续时间);
+  const effectType = typeof item.功效类型 === 'string' && item.功效类型.trim() ? item.功效类型.trim() : undefined;
 
-  if (!modifiers && !duration) {
+  if (!modifiers && !duration && !effectType) {
     return undefined;
   }
 
   return {
+    effectType,
+    rank: item.品阶,
     modifiers,
     duration,
   };
@@ -881,7 +970,7 @@ function mapItemType(类型?: string): InventoryItem['type'] {
     秘籍: 'SECRET',
     装备: 'EQUIP',
     兵器: 'EQUIP',
-    丹药: 'ELIXIR',
+    药品: 'ELIXIR',
     杂物: 'MISC',
   };
   return typeMap[类型 || ''] || 'MISC';
@@ -1525,13 +1614,13 @@ function createPlayerAttributeSignature(
   initialAttrs: InitialAttributes,
   realm: string,
   martialArts: Record<string, MartialArtForCalculation>,
-  modifiers?: InventoryAttributeModifierMap,
+  modifiers?: AttributeModifierSource[],
 ): string {
   return JSON.stringify({
     initialAttrs,
     realm,
     martialArts: stringifySortedRecord(martialArts as Record<string, unknown>),
-    modifiers: stringifySortedRecord(modifiers as Record<string, unknown> | undefined),
+    modifiers: modifiers ?? [],
   });
 }
 
@@ -1555,7 +1644,7 @@ function updateCharacterCache(cacheKey: string, realm: string, attributeSignatur
  *
  * @param user数据 变量表中的玩家数据对象
  */
-export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Promise<void> {
+export async function autoUpdatePlayerAttributes(user数据?: UserProfile, 前端变量?: FrontendVariableData): Promise<void> {
   // 防止重复调用
   if (isUpdatingPlayerAttributes) {
     dataLogger.log('[autoUpdatePlayerAttributes] 正在更新中，跳过重复调用');
@@ -1604,7 +1693,7 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
 
   const equipmentSlots = parseEquipmentSlots(user数据.装备栏);
   const statusEffects = parseStatusEffects(user数据.状态效果);
-  const activeModifiers = collectActiveAttributeModifiers(user数据, equipmentSlots, statusEffects);
+  const activeModifiers = collectActiveAttributeModifiers(user数据, equipmentSlots, statusEffects, 前端变量);
   const attributeSignature = createPlayerAttributeSignature(initialAttrs, currentRealm, martialArtsForCalc, activeModifiers);
 
   // 使用缓存检测是否需要更新
@@ -1647,14 +1736,16 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
 
   // 使用 attributeCalculator 计算战斗属性和资源属性
   const { combat, resources } = calculateAllAttributes(initialAttrs, currentRealm, martialArtsForCalc, activeModifiers);
+  const hpPair = adjustResourcePairByMaxDelta(parseResourcePair(user数据.属性?.气血, resources.气血上限), resources.气血上限);
+  const mpPair = adjustResourcePairByMaxDelta(parseResourcePair(user数据.属性?.内力, resources.内力上限), resources.内力上限);
 
   dataLogger.log('[autoUpdatePlayerAttributes] 计算后战斗属性:', combat);
   dataLogger.log('[autoUpdatePlayerAttributes] 计算后资源属性:', resources);
 
   // 构建属性数据（使用 "当前值/最大值" 格式）
   const calculatedAttrs: CalculatedCharacterAttributes = {
-    气血: `${resources.气血上限}/${resources.气血上限}`,
-    内力: `${resources.内力上限}/${resources.内力上限}`,
+    气血: formatResourcePair(hpPair),
+    内力: formatResourcePair(mpPair),
     臂力: combat.臂力,
     根骨: combat.根骨,
     机敏: combat.机敏,
@@ -1725,7 +1816,8 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile): Prom
 
 /** 在物品状态变化后立即重算并写回玩家最终属性。 */
 export async function syncPlayerAttributesFromVariables(): Promise<void> {
-  await autoUpdatePlayerAttributes(getGameVariables().user数据);
+  const variables = getGameVariables();
+  await autoUpdatePlayerAttributes(variables.user数据, variables.前端变量);
 }
 
 /**
@@ -2839,7 +2931,7 @@ async function runCompletionOnce(fullScan: boolean, scope: GameDataCompletionSco
     }
 
     if (variables.user数据) {
-      await autoUpdatePlayerAttributes(variables.user数据);
+      await autoUpdatePlayerAttributes(variables.user数据, variables.前端变量);
     }
     if (variables.角色数据) {
       await autoUpdateCharacterAttributes(variables.角色数据, variables.user数据);
@@ -2854,7 +2946,7 @@ async function runCompletionOnce(fullScan: boolean, scope: GameDataCompletionSco
   }
 
   if (scope.playerAttributes) {
-    await autoUpdatePlayerAttributes(scope.playerAttributes);
+    await autoUpdatePlayerAttributes(scope.playerAttributes, getGameVariables().前端变量);
   }
   const currentUserData = getGameVariables().user数据;
   if (scope.characterAttributes) {
@@ -3088,7 +3180,7 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
 
     const equipmentSlots = parseEquipmentSlots(用户档案.装备栏);
     const statusEffects = parseStatusEffects(用户档案.状态效果);
-    const activeModifiers = collectActiveAttributeModifiers(用户档案, equipmentSlots, statusEffects);
+    const activeModifiers = collectActiveAttributeModifiers(用户档案, equipmentSlots, statusEffects, variables.前端变量);
 
     dataLogger.log('[variableReader] Step 4d1 - 装备栏:', equipmentSlots);
     dataLogger.log('[variableReader] Step 4d2 - 状态效果:', statusEffects);
