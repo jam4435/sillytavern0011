@@ -1,4 +1,5 @@
 import type { InventoryItem, MartialArt } from '../types';
+import { resolveInventoryVisual } from './inventoryIconCatalog';
 
 import anranXiaohunZhangUrl from '../assets/icons/jinyong/anran_xiaohun_zhang.png?url';
 import bafangCangdaoUrl from '../assets/icons/jinyong/bafang_cangdao.png?url';
@@ -59,6 +60,7 @@ export interface ResolvedIcon {
   src: string;
   label: string;
   matchedBy: IconMatchReason;
+  category?: string;
 }
 
 export interface RankVisual {
@@ -500,13 +502,6 @@ function findIconByCategory(category: string): CatalogIcon | undefined {
 
 const fallbackIcon = iconCatalog.find(icon => icon.id === 'chuanguo_yuxi')!;
 
-const inventoryTypeFallback: Record<InventoryItem['type'], string> = {
-  EQUIP: 'EQUIP',
-  SECRET: 'SECRET',
-  ELIXIR: 'ELIXIR',
-  MISC: 'MISC',
-};
-
 const martialTypeFallback: Record<string, string> = {
   内功: '内功',
   外功: '外功',
@@ -521,18 +516,7 @@ const martialTypeFallback: Record<string, string> = {
 };
 
 export function resolveInventoryIcon(item: InventoryItem): ResolvedIcon {
-  const byName = findIconByName(item.name);
-  if (byName) {
-    return byName;
-  }
-
-  const fallbackCategory = inventoryTypeFallback[item.type];
-  const typeIcon = findIconByCategory(fallbackCategory);
-  if (typeIcon) {
-    return { src: typeIcon.src, label: typeIcon.label, matchedBy: 'type' };
-  }
-
-  return { src: fallbackIcon.src, label: fallbackIcon.label, matchedBy: 'fallback' };
+  return resolveInventoryVisual(item);
 }
 
 export function resolveMartialArtIcon(name: string, art?: Pick<MartialArt, 'type'>): ResolvedIcon {

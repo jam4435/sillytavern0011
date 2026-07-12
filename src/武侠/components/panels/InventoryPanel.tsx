@@ -238,7 +238,8 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                   <span className="workbench-item-copy">
                     <span className="workbench-item-name">{item.name}</span>
                     <span className="workbench-item-meta">
-                      {getItemTypeLabel(item.type)} · {item.type === 'SECRET' && item.martialArtInfo?.rank ? item.martialArtInfo.rank : rank.label}
+                      {icon.category || getItemTypeLabel(item.type)} ·{' '}
+                      {item.type === 'SECRET' && item.martialArtInfo?.rank ? item.martialArtInfo.rank : rank.label}
                     </span>
                   </span>
                   <span className="workbench-item-side">
@@ -275,9 +276,12 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                 <img src={selectedItemIcon.src} alt={`${selectedItem.name}图标`} />
               </div>
               <div className="workbench-detail-title-group">
-                <div className="workbench-detail-kicker">{getItemTypeLabel(selectedItem.type)}</div>
+                <div className="workbench-detail-kicker">
+                  {getItemTypeLabel(selectedItem.type)} · {selectedItemIcon.category || '物品'}
+                </div>
                 <h3 className="workbench-detail-title">{selectedItem.name}</h3>
                 <div className="workbench-detail-badges">
+                  {selectedItemIcon.category && <span>{selectedItemIcon.category}</span>}
                   <span>{getItemDisplayRankLabel(selectedItem)}</span>
                   <span>数量 {selectedItem.count}</span>
                   {selectedEquipStatus && <span>{selectedEquipStatus}</span>}
