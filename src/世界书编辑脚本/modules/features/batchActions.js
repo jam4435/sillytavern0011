@@ -595,7 +595,9 @@ export const adjustSelectedEntriesPosition = errorCatched(async (lorebookName, i
       $('#lorebook-position-confirm-btn', parentDoc).on('click', () => {
         const positionType = $typeSelect.val();
         const depth = $depthInput.val();
-        resolve({ type: positionType, depth: parseInt(depth) || 4 });
+        // 用 ?? 而非 ||：深度 0 是合法值，|| 会让 0 被回退成 4。仅在解析失败时回退到 4。
+        const parsedDepth = parseInt(depth, 10);
+        resolve({ type: positionType, depth: Number.isNaN(parsedDepth) ? 4 : parsedDepth });
       });
 
       $('#lorebook-position-cancel-btn', parentDoc).on('click', () => {

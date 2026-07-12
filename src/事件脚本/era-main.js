@@ -34,9 +34,14 @@
     cleanupFollowupCluesForActiveParticipation,
     cleanupInvalidParticipationEntries,
   } = await import('./era-event-operations.js');
+  const {
+    getRumorScopeFromEventLocation,
+    isLocationWithinRumorScope,
+    normalizeLocationPath,
+  } = await import('./era-participant-entry.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
-  const EVENT_SCRIPT_VERSION = '2026-06-24-event-cache-index';
+  const EVENT_SCRIPT_VERSION = '2026-07-12-string-event-hooks';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
@@ -292,42 +297,27 @@
   // ==================== 检查玩家位置触发 ====================
   async function checkPlayerLocationTriggers(进行中列表, eventDefinitions, updatedVariables, 最新参与事件) {
     debugGroup('📍 检查玩家位置触发');
-    const playerLocation = updatedVariables.stat_data.user数据?.所在位置;
+    const playerLocation = normalizeLocationPath(updatedVariables.stat_data.user数据?.所在位置);
     log(`玩家位置: ${playerLocation}`);
 
     const 附近传闻 = {};
     const eventsToJoin = [];
-    const hierarchicalPaths = [];
-
-    if (playerLocation) {
-      const locationParts = playerLocation.split('/');
-      for (let i = 1; i <= locationParts.length; i++) {
-        hierarchicalPaths.push(locationParts.slice(0, i).join('/'));
-      }
-    }
 
     for (const eventName of 进行中列表) {
       const eventData = eventDefinitions[eventName];
       if (!eventData) continue;
 
-      const eventLocation = eventData.事件地点;
+      const eventLocation = normalizeLocationPath(eventData.事件地点);
+      const hookText = typeof eventData.事件引子 === 'string' ? eventData.事件引子.trim() : '';
+      const rumorScope = getRumorScopeFromEventLocation(eventLocation);
       const alreadyJoined = hasParticipationEntry(最新参与事件, eventName);
 
       log(`事件 ${eventName} 地点: ${eventLocation} | 已参与: ${alreadyJoined}`);
 
       // 层级式地点匹配
       if (playerLocation && eventLocation) {
-        // 调整后的引子触发逻辑
-        let bestMatchPath = '';
-        for (const path of hierarchicalPaths) {
-          if (eventData.事件引子 && eventData.事件引子[path]) {
-            bestMatchPath = path; // 持续寻找更精确的匹配
-          }
-        }
-
-        // 附近传闻只显示"附近"的事件，不显示玩家当前所在位置的事件
-        if (bestMatchPath && !alreadyJoined && eventLocation !== playerLocation) {
-          const hookText = eventData.事件引子[bestMatchPath];
+        // 附近传闻范围固定由事件地点前两级派生；到达完整事件地点后只加入事件，不再显示传闻。
+        if (hookText && isLocationWithinRumorScope(playerLocation, rumorScope) && !alreadyJoined && eventLocation !== playerLocation) {
           const shortName = getEventShortName(eventName);
           const time = eventData.触发条件;
           const location = eventData.事件地点;

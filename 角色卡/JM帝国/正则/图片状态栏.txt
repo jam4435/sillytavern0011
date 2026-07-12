@@ -447,23 +447,39 @@
 
     <script>
       // --- 全局数据管理器，确保数据只加载一次 ---
-      window.JM_StatusDataManager =
-        window.JM_StatusDataManager ||
-        (function () {
+      if (!window.JM_StatusDataManager || window.JM_StatusDataManager.version !== '2026-07-image-index-fallback') {
+        window.JM_StatusDataManager = (function () {
           let dataPromise = null;
+          const MANAGER_VERSION = '2026-07-image-index-fallback';
 
           async function fetchDataInternal() {
             const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
-            const IMAGE_INDEX_URL =
-              'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/imageIndex.json';
+            const IMAGE_INDEX_URLS = [
+              'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/imageIndex.json',
+              'https://raw.githubusercontent.com/jam4435/my-image-hosting/ff27fd0f4b449daf0cc2fbc88e14003f6faa9778/jm/imageIndex.json',
+            ];
             const SYNONYMS_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/synonyms.json';
             const FACE_INDEX_URL = GITHUB_BASE_URL.replace('/jm/', '/face/') + 'face_index.json';
+            const fetchJsonWithFallback = async (urls, label) => {
+              let lastError = null;
+              for (const url of urls) {
+                try {
+                  const response = await fetch(url);
+                  if (!response.ok) throw new Error(`${label}加载失败: ${response.status}`);
+                  return await response.json();
+                } catch (error) {
+                  lastError = error;
+                  console.warn(`[状态栏 全局] ${label}加载失败，尝试备用源。`, error);
+                }
+              }
+              throw lastError || new Error(`${label}加载失败`);
+            };
 
             console.log('[状态栏 全局] 开始加载核心数据...');
 
             try {
-              const [imageResponse, synonymResponse, faceResponse] = await Promise.all([
-                fetch(IMAGE_INDEX_URL),
+              const [imageIndexData, synonymResponse, faceResponse] = await Promise.all([
+                fetchJsonWithFallback(IMAGE_INDEX_URLS, '图片索引'),
                 fetch(SYNONYMS_URL),
                 fetch(FACE_INDEX_URL),
               ]);
@@ -476,8 +492,7 @@
                 keywordRegex: null,
               };
 
-              if (!imageResponse.ok) throw new Error(`图片索引加载失败: ${imageResponse.status}`);
-              data.imageIndex = await imageResponse.json();
+              data.imageIndex = imageIndexData;
 
               if (synonymResponse.ok) {
                 const synonymData = await synonymResponse.json();
@@ -514,14 +529,19 @@
           }
 
           return {
+            version: MANAGER_VERSION,
             getData: function () {
               if (!dataPromise) {
-                dataPromise = fetchDataInternal();
+                dataPromise = fetchDataInternal().catch(error => {
+                  dataPromise = null;
+                  throw error;
+                });
               }
               return dataPromise;
             },
           };
         })();
+      }
 
       // --- IndexedDB 助手，用于存储用户上传的头像 ---
       const idbHelper = {

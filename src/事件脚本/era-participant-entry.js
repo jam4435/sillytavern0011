@@ -7,6 +7,39 @@ function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+export function getLocationPathSegments(location) {
+  if (typeof location !== 'string') {
+    return [];
+  }
+
+  return location
+    .split('/')
+    .map(segment => segment.trim())
+    .filter(Boolean);
+}
+
+export function normalizeLocationPath(location) {
+  return getLocationPathSegments(location).join('/');
+}
+
+export function getHierarchicalLocationPaths(location) {
+  const segments = getLocationPathSegments(location);
+  return segments.map((_segment, index) => segments.slice(0, index + 1).join('/'));
+}
+
+export function getRumorScopeFromEventLocation(eventLocation) {
+  const segments = getLocationPathSegments(eventLocation);
+  return segments.slice(0, 2).join('/');
+}
+
+export function isLocationWithinRumorScope(playerLocation, rumorScope) {
+  if (!rumorScope) {
+    return false;
+  }
+
+  return getHierarchicalLocationPaths(playerLocation).includes(rumorScope);
+}
+
 export function normalizeParticipantEventDefinition(eventName, eventData, { isDebut = false } = {}) {
   if (!isPlainObject(eventData)) {
     return {
@@ -21,11 +54,19 @@ export function normalizeParticipantEventDefinition(eventName, eventData, { isDe
   }
 
   const errors = [];
-  const eventLocation = typeof eventData.事件地点 === 'string' ? eventData.事件地点.trim() : '';
+  const eventLocation = normalizeLocationPath(eventData.事件地点);
+  const eventLocationSegments = getLocationPathSegments(eventLocation);
+  const eventHook = typeof eventData.事件引子 === 'string' ? eventData.事件引子.trim() : '';
   const rawParticipants = eventData.参与人物;
 
   if (!eventLocation) {
     errors.push(`事件 ${eventName} 缺少非空的事件地点`);
+  } else if (eventLocationSegments.length < 2) {
+    errors.push(`事件 ${eventName} 的事件地点至少需要两级路径`);
+  }
+
+  if (!eventHook) {
+    errors.push(`事件 ${eventName} 缺少非空的事件引子`);
   }
 
   if (!Array.isArray(rawParticipants)) {
@@ -51,6 +92,7 @@ export function normalizeParticipantEventDefinition(eventName, eventData, { isDe
     data: {
       ...eventData,
       事件地点: eventLocation,
+      事件引子: eventHook,
       参与人物: participants,
     },
     errors: [],

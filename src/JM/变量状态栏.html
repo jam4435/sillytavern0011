@@ -578,23 +578,39 @@
       </details>
     </div>
     <script>
-      window.JM_StatusDataManager =
-        window.JM_StatusDataManager ||
-        (() => {
+      if (!window.JM_StatusDataManager || window.JM_StatusDataManager.version !== '2026-07-image-index-fallback') {
+        window.JM_StatusDataManager = (() => {
           let dataPromise = null;
+          const MANAGER_VERSION = '2026-07-image-index-fallback';
           async function fetchDataInternal() {
             const baseUrl = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
-            const imageIndexUrl = `${baseUrl}imageIndex.json`;
+            const imageIndexUrls = [
+              `${baseUrl}imageIndex.json`,
+              'https://raw.githubusercontent.com/jam4435/my-image-hosting/ff27fd0f4b449daf0cc2fbc88e14003f6faa9778/jm/imageIndex.json',
+            ];
             const synonymsUrl = `${baseUrl}synonyms.json`;
             const faceIndexUrl = `${baseUrl.replace('/jm/', '/face/')}face_index.json`;
-            const [imageResponse, synonymResponse, faceResponse] = await Promise.all([
-              fetch(imageIndexUrl),
+            const fetchJsonWithFallback = async (urls, label) => {
+              let lastError = null;
+              for (const url of urls) {
+                try {
+                  const response = await fetch(url);
+                  if (!response.ok) throw new Error(`${label}加载失败: ${response.status}`);
+                  return await response.json();
+                } catch (error) {
+                  lastError = error;
+                  console.warn(`[变量状态栏] ${label}加载失败，尝试备用源。`, error);
+                }
+              }
+              throw lastError || new Error(`${label}加载失败`);
+            };
+            const [imageIndexData, synonymResponse, faceResponse] = await Promise.all([
+              fetchJsonWithFallback(imageIndexUrls, '图片索引'),
               fetch(synonymsUrl),
               fetch(faceIndexUrl),
             ]);
             const data = { imageIndex: {}, synonymMap: {}, fallbackAvatars: [], allKeywords: [], keywordRegex: null };
-            if (!imageResponse.ok) throw new Error(`图片索引加载失败: ${imageResponse.status}`);
-            data.imageIndex = await imageResponse.json();
+            data.imageIndex = imageIndexData;
             if (synonymResponse.ok) {
               const synonymData = await synonymResponse.json();
               for (const mainKeyword in synonymData) {
@@ -615,12 +631,19 @@
             return data;
           }
           return {
+            version: MANAGER_VERSION,
             getData() {
-              if (!dataPromise) dataPromise = fetchDataInternal();
+              if (!dataPromise) {
+                dataPromise = fetchDataInternal().catch(error => {
+                  dataPromise = null;
+                  throw error;
+                });
+              }
               return dataPromise;
             },
           };
         })();
+      }
 
       const idbHelper = {
         db: null,

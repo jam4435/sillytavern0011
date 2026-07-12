@@ -4,6 +4,9 @@ import {
   PARTICIPANT_ENTRY_SOURCE,
   buildOccupancyCleanupPatch,
   buildParticipantEntryPlan,
+  getRumorScopeFromEventLocation,
+  isLocationWithinRumorScope,
+  normalizeLocationPath,
   normalizeParticipantEventDefinition,
 } from './era-participant-entry.js';
 import { buildPlayerParticipationEntry } from './era-event-operations.js';
@@ -12,6 +15,7 @@ import { buildInvalidParticipationDeletePatch, isParticipationEntry } from './er
 const currentTime = { 年: 1210, 月: 8, 日: 8, 时: 7 };
 const eventData = {
   事件地点: '蒙古/大漠/荒山',
+  事件引子: '听说大漠荒山近日有人交手。',
   参与人物: ['郭靖', '梅超风'],
 };
 
@@ -21,6 +25,7 @@ describe('normalizeParticipantEventDefinition', () => {
       '射雕事件条目-第4回-05-荒山恶战',
       {
         事件地点: ' 蒙古/大漠/荒山 ',
+        事件引子: ' 听说大漠荒山近日有人交手。 ',
         参与人物: ['郭靖', ' 郭靖 ', '梅超风'],
       },
       { isDebut: false },
@@ -28,6 +33,7 @@ describe('normalizeParticipantEventDefinition', () => {
 
     expect(result.valid).toBe(true);
     expect(result.data.事件地点).toBe('蒙古/大漠/荒山');
+    expect(result.data.事件引子).toBe('听说大漠荒山近日有人交手。');
     expect(result.data.参与人物).toEqual(['郭靖', '梅超风']);
   });
 
@@ -35,18 +41,48 @@ describe('normalizeParticipantEventDefinition', () => {
     const result = normalizeParticipantEventDefinition('无效事件', {}, { isDebut: false });
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(2);
+    expect(result.errors).toHaveLength(3);
   });
 
   it('rejects non-string participant values', () => {
     const result = normalizeParticipantEventDefinition(
       '无效参与人物事件',
-      { 事件地点: '蒙古/大漠', 参与人物: ['郭靖', 123] },
+      { 事件地点: '蒙古/大漠', 事件引子: '听说大漠有异动。', 参与人物: ['郭靖', 123] },
       { isDebut: false },
     );
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('事件 无效参与人物事件 的参与人物只能包含字符串');
+  });
+
+  it('rejects object-shaped event hooks for ordinary events', () => {
+    const result = normalizeParticipantEventDefinition(
+      '旧格式事件',
+      {
+        事件地点: '大宋/临安府/牛家村',
+        事件引子: { '大宋/临安府': '你听说牛家村近日有异动。' },
+        参与人物: ['郭啸天'],
+      },
+      { isDebut: false },
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('事件 旧格式事件 缺少非空的事件引子');
+  });
+
+  it('rejects single-level ordinary event locations', () => {
+    const result = normalizeParticipantEventDefinition(
+      '单级地点事件',
+      {
+        事件地点: '大宋',
+        事件引子: '你听说大宋近日有异动。',
+        参与人物: ['郭啸天'],
+      },
+      { isDebut: false },
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('事件 单级地点事件 的事件地点至少需要两级路径');
   });
 
   it('does not require participant fields for debut events', () => {
@@ -56,6 +92,48 @@ describe('normalizeParticipantEventDefinition', () => {
     });
 
     expect(result).toEqual({ valid: true, data: event, errors: [] });
+  });
+});
+
+describe('derived rumor scope', () => {
+  it('normalizes slash-separated location paths', () => {
+    expect(normalizeLocationPath(' 大宋 / 临安府 / 牛家村 ')).toBe('大宋/临安府/牛家村');
+  });
+
+  it('derives the rumor scope from the first two event-location levels', () => {
+    expect(getRumorScopeFromEventLocation('大宋/临安府/牛家村')).toBe('大宋/临安府');
+    expect(getRumorScopeFromEventLocation(' 大宋 / 临安府 / 牛家村 ')).toBe('大宋/临安府');
+  });
+
+  it('shows rumors only inside the derived scope and below it', () => {
+    const rumorScope = getRumorScopeFromEventLocation('大宋/临安府/牛家村');
+
+    expect(isLocationWithinRumorScope('大宋/临安府', rumorScope)).toBe(true);
+    expect(isLocationWithinRumorScope('大宋/临安府/客栈', rumorScope)).toBe(true);
+    expect(isLocationWithinRumorScope('大宋', rumorScope)).toBe(false);
+    expect(isLocationWithinRumorScope('金国/中都', rumorScope)).toBe(false);
+  });
+
+  it('lets the caller suppress rumor output at the exact event location', () => {
+    const eventLocation = '大宋/临安府/牛家村';
+    const playerLocation = eventLocation;
+    const rumorScope = getRumorScopeFromEventLocation(eventLocation);
+    const alreadyJoined = false;
+    const canShowRumor =
+      isLocationWithinRumorScope(playerLocation, rumorScope) && !alreadyJoined && eventLocation !== playerLocation;
+
+    expect(canShowRumor).toBe(false);
+  });
+
+  it('lets the caller suppress rumor output after participation', () => {
+    const eventLocation = '大宋/临安府/牛家村';
+    const playerLocation = '大宋/临安府/客栈';
+    const rumorScope = getRumorScopeFromEventLocation(eventLocation);
+    const alreadyJoined = true;
+    const canShowRumor =
+      isLocationWithinRumorScope(playerLocation, rumorScope) && !alreadyJoined && eventLocation !== playerLocation;
+
+    expect(canShowRumor).toBe(false);
   });
 });
 

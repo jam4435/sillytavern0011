@@ -9,6 +9,7 @@ const sourceRelativePath = '信息/jm帝国漫画的完整提取文字.txt';
 const sourcePath = path.join(repoRoot, ...sourceRelativePath.split('/'));
 const generatedPath = path.join(scriptDir, 'lore-entries.comic.generated.json');
 const finalPath = path.join(scriptDir, 'lore-entries.json');
+const curationPath = path.join(scriptDir, 'lore-entries.curation.json');
 const applyToFinal = process.argv.includes('--apply');
 
 const fieldLabels = new Set([
@@ -315,15 +316,6 @@ function normalizeKey(value) {
   return normalizeText(value)
     .toLowerCase()
     .replace(/[《》“”"'\s·•_\-－—:：。,.，、（）()]/gu, '');
-}
-
-function buildId(title) {
-  const slug = normalizeText(title)
-    .replace(/\s+/g, '_')
-    .replace(/[^\w\u4e00-\u9fff.-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  return `comic/${slug}`;
 }
 
 function isBadTitle(title) {
@@ -878,8 +870,49 @@ function triggerScore(entry, trigger) {
   return score;
 }
 
-function buildImageKeywords(entry) {
-  return unique([entry.title, ...entry.triggers, ...entry.aliases, entry.category]).slice(0, 14);
+function buildOutputAliases(entry) {
+  return unique([...(entry.triggers ?? []), ...(entry.aliases ?? [])])
+    .filter(alias => alias !== entry.title && isValidTrigger(alias))
+    .slice(0, 16);
+}
+
+async function readCuration() {
+  try {
+    const content = await fs.readFile(curationPath, 'utf8');
+    const items = JSON.parse(content);
+    if (!Array.isArray(items)) {
+      return new Map();
+    }
+    return new Map(items.filter(item => item && item.id).map(item => [item.id, item]));
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      return new Map();
+    }
+    throw error;
+  }
+}
+
+function applyCuration(entries, curation) {
+  if (curation.size === 0) {
+    return entries;
+  }
+  return entries.map(entry => {
+    const curated = curation.get(entry.id);
+    if (!curated) {
+      return entry;
+    }
+    return {
+      ...entry,
+      title: normalizeText(curated.title) || entry.title,
+      category: normalizeText(curated.category) || entry.category,
+      aliases: Array.isArray(curated.aliases)
+        ? unique(curated.aliases).filter(alias => alias !== curated.title)
+        : entry.aliases,
+      images: Array.isArray(curated.images)
+        ? unique(curated.images.filter(image => typeof image === 'string').map(image => image.trim()).filter(Boolean))
+        : entry.images,
+    };
+  });
 }
 
 function finalize(entries) {
@@ -887,21 +920,20 @@ function finalize(entries) {
   return entries
     .filter(entry => entry.title && entry.summary)
     .sort((a, b) => a.sourceSegmentIndex - b.sourceSegmentIndex || a.sourceLineStart - b.sourceLineStart)
-    .map(entry => ({
-      id: buildId(entry.title),
-      title: entry.title,
-      category: entry.category,
-      aliases: entry.aliases.filter(alias => alias !== entry.title).slice(0, 12),
-      triggers: entry.triggers,
-      summary: entry.summary,
-      details: entry.details,
-      sourceFile: entry.sourceFile,
-      sourceExcerpt: entry.sourceExcerpt,
-      sourceSegmentIndex: entry.sourceSegmentIndex,
-      sourceLineStart: entry.sourceLineStart,
-      imageKeywords: buildImageKeywords(entry),
-      autoLink: entry.autoLink,
-    }));
+    .map((entry, index) => {
+      const output = {
+        id: String(index).padStart(3, '0'),
+        title: entry.title,
+        category: entry.category,
+        aliases: buildOutputAliases(entry),
+        summary: entry.summary,
+        details: entry.details,
+      };
+      if (Array.isArray(entry.images) && entry.images.length > 0) {
+        output.images = entry.images;
+      }
+      return output;
+    });
 }
 
 async function main() {
@@ -918,7 +950,7 @@ async function main() {
   });
 
   const merged = mergeCandidates(candidates);
-  const entries = finalize(merged);
+  const entries = applyCuration(finalize(merged), await readCuration());
   stats.effectiveCandidates = entries.length;
   stats.shortSummaryCount = entries.filter(entry => entry.summary.length < 50).length;
 

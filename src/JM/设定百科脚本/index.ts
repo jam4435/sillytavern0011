@@ -1,36 +1,28 @@
 import loreEntriesRaw from './lore-entries.json?raw';
-import localImageIndexRaw from '../imageIndex.json?raw';
 
 type LoreEntry = {
   id: string;
   title: string;
   category: string;
-  aliases: string[];
+  aliases?: string[];
   triggers?: string[];
   summary: string;
   details?: string[];
-  sourceFile: string;
-  sourceExcerpt?: string;
-  sourceSegmentIndex?: number;
-  imageKeywords: string[];
-  autoLink: boolean;
+  images?: string[];
+  /** @deprecated 旧的 imageIndex 关键词兜底方案已停用，图片只从 images 读取。 */
+  imageKeywords?: string[];
+  autoLink?: boolean;
 };
 
-type ImageIndex = Record<string, string[]>;
-type SynonymIndex = Record<string, string[]>;
-type ImageLookupData = {
-  imageIndex: ImageIndex;
-  synonymMap: Record<string, string>;
-  allKeywords: string[];
-};
+type DragLikeEvent = MouseEvent | TouchEvent;
 
 const SCRIPT_KEY = 'jm-lore-encyclopedia';
 const ENHANCED_ATTR = 'data-jm-lore-enhanced';
 const MAX_LINKS_PER_MESSAGE = 12;
 const MAX_IMAGES_PER_ENTRY = 8;
 const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
-const IMAGE_INDEX_URL = `${IMAGE_BASE_URL}imageIndex.json`;
-const SYNONYMS_URL = `${IMAGE_BASE_URL}synonyms.json`;
+const FAB_ICON_FILE = '女仆.webp';
+const FAB_POSITION_STORAGE_KEY = `${SCRIPT_KEY}:fab-position`;
 const SCRIPT_BUTTONS: ScriptButton[] = [
   { name: '打开百科', visible: true },
   { name: '重扫正文', visible: true },
@@ -74,20 +66,6 @@ const blockedAutoLinkAliases = new Set([
   '模型',
 ]);
 
-const blockedImageKeywords = new Set([
-  ...blockedAutoLinkAliases,
-  '小说',
-  '漫画',
-  '介绍',
-  '说明',
-  '女人',
-  '女孩',
-  '身体',
-  '工作',
-  '公司',
-  '帝国军',
-]);
-
 const ignoredAncestorSelector = [
   'a',
   'button',
@@ -124,12 +102,18 @@ const entryById = new Map(loreEntries.map(entry => [entry.id, entry]));
 const linkCandidates = buildLinkCandidates(loreEntries);
 const linkRegex = buildLinkRegex(linkCandidates.map(candidate => candidate.alias));
 const stops: Array<() => void> = [];
-let imageLookupPromise: Promise<ImageLookupData> | null = null;
 let searchInput: HTMLInputElement | null = null;
+let rootElement: HTMLElement | null = null;
+let fabElement: HTMLButtonElement | null = null;
 let panelElement: HTMLElement | null = null;
 let resultElement: HTMLElement | null = null;
 let modalElement: HTMLElement | null = null;
 let modalCardElement: HTMLElement | null = null;
+let imageViewerElement: HTMLElement | null = null;
+let suppressNextFabClick = false;
+let suppressNextFabClickTimer: number | null = null;
+let panelWasManuallyPositioned = false;
+let modalCardWasManuallyPositioned = false;
 
 function parseLoreEntries(): LoreEntry[] {
   try {
@@ -146,9 +130,10 @@ function buildLinkCandidates(entries: LoreEntry[]) {
   const candidates: Array<{ alias: string; entry: LoreEntry }> = [];
 
   entries
-    .filter(entry => entry.autoLink)
+    .filter(entry => entry.autoLink !== false)
     .forEach(entry => {
-      const triggers = entry.triggers && entry.triggers.length > 0 ? entry.triggers : [entry.title, ...entry.aliases];
+      const aliases = entry.aliases ?? [];
+      const triggers = entry.triggers && entry.triggers.length > 0 ? entry.triggers : [entry.title, ...aliases];
       triggers
         .map(alias => alias.trim())
         .filter(alias => alias.length >= 2)
@@ -188,23 +173,57 @@ function installStyle() {
         position: fixed;
         right: 22px;
         bottom: 22px;
+        width: 48px;
+        height: 48px;
         z-index: 10050;
+        box-sizing: border-box;
         font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
         color: #f4f0e8;
       }
       .jm-lore-fab {
-        width: 42px;
-        height: 42px;
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 48px;
+        height: 48px;
         border: 1px solid rgba(218, 185, 111, 0.62);
         border-radius: 8px;
-        background:
-          linear-gradient(145deg, rgba(82, 17, 26, 0.96), rgba(21, 24, 23, 0.98));
+        overflow: hidden;
+        padding: 0;
+        background: rgba(21, 24, 23, 0.98);
         color: #f7df9b;
         box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
-        cursor: pointer;
+        cursor: grab;
         font-size: 20px;
         font-weight: 700;
         line-height: 1;
+        touch-action: none;
+        user-select: none;
+      }
+      .jm-lore-fab.dragging {
+        cursor: grabbing;
+      }
+      .jm-lore-fab::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.14), transparent 34%),
+          linear-gradient(0deg, rgba(0, 0, 0, 0.22), transparent 58%);
+        pointer-events: none;
+      }
+      .jm-lore-fab img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        pointer-events: none;
+      }
+      .jm-lore-fab-label {
+        display: none;
+      }
+      .jm-lore-fab-fallback .jm-lore-fab-label {
+        display: block;
       }
       .jm-lore-fab:hover,
       .jm-lore-fab:focus-visible {
@@ -213,19 +232,24 @@ function installStyle() {
         outline: none;
       }
       .jm-lore-panel {
-        position: absolute;
-        right: 0;
-        bottom: 52px;
+        position: fixed;
+        z-index: 10051;
+        right: 22px;
+        bottom: 82px;
         width: min(430px, calc(100vw - 28px));
-        max-height: min(620px, calc(100vh - 96px));
+        max-height: min(620px, calc(100dvh - 28px));
         display: none;
         flex-direction: column;
         overflow: hidden;
+        box-sizing: border-box;
         border: 1px solid rgba(218, 185, 111, 0.36);
         border-radius: 8px;
         background:
           linear-gradient(160deg, rgba(18, 20, 19, 0.98), rgba(64, 15, 24, 0.97));
         box-shadow: 0 18px 46px rgba(0, 0, 0, 0.58);
+      }
+      .jm-lore-panel.dragging {
+        user-select: none;
       }
       .jm-lore-panel.open {
         display: flex;
@@ -233,11 +257,16 @@ function installStyle() {
       .jm-lore-modal {
         position: fixed;
         inset: 0;
+        width: 100vw;
+        height: 100vh;
+        width: 100dvw;
+        height: 100dvh;
         z-index: 10060;
         display: none;
         align-items: center;
         justify-content: center;
         padding: 24px;
+        box-sizing: border-box;
         background: rgba(7, 8, 8, 0.72);
       }
       .jm-lore-modal.open {
@@ -245,8 +274,9 @@ function installStyle() {
       }
       .jm-lore-modal-card {
         width: min(760px, calc(100vw - 32px));
-        max-height: min(82vh, calc(100vh - 40px));
+        max-height: min(82dvh, calc(100dvh - 40px));
         overflow: auto;
+        box-sizing: border-box;
         border: 1px solid rgba(218, 185, 111, 0.32);
         border-radius: 8px;
         background:
@@ -260,6 +290,9 @@ function installStyle() {
         display: flex;
         align-items: center;
         justify-content: flex-end;
+        cursor: move;
+        touch-action: none;
+        user-select: none;
         padding: 10px 12px 0;
         background: linear-gradient(180deg, rgba(18, 20, 19, 0.98), rgba(18, 20, 19, 0.78), transparent);
       }
@@ -267,6 +300,9 @@ function installStyle() {
         display: flex;
         align-items: center;
         gap: 10px;
+        cursor: move;
+        touch-action: none;
+        user-select: none;
         padding: 12px 14px 10px;
         border-bottom: 1px solid rgba(218, 185, 111, 0.22);
       }
@@ -439,6 +475,60 @@ function installStyle() {
         border-radius: 6px;
         border: 1px solid rgba(255, 255, 255, 0.14);
         background: rgba(0, 0, 0, 0.24);
+        cursor: zoom-in;
+      }
+      .jm-lore-image-viewer {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        width: 100dvw;
+        height: 100dvh;
+        z-index: 10070;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        box-sizing: border-box;
+        background: rgba(4, 5, 5, 0.86);
+      }
+      .jm-lore-image-viewer.open {
+        display: flex;
+      }
+      .jm-lore-image-frame {
+        position: relative;
+        display: grid;
+        gap: 10px;
+        max-width: min(94vw, 1120px);
+        max-height: min(92dvh, 860px);
+      }
+      .jm-lore-image-frame img {
+        max-width: 100%;
+        max-height: calc(92dvh - 52px);
+        object-fit: contain;
+        border-radius: 8px;
+        border: 1px solid rgba(218, 185, 111, 0.32);
+        background: rgba(0, 0, 0, 0.28);
+        box-shadow: 0 24px 58px rgba(0, 0, 0, 0.62);
+      }
+      .jm-lore-image-caption {
+        color: rgba(244, 240, 232, 0.78);
+        font-size: 12px;
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+      .jm-lore-image-close {
+        position: absolute;
+        top: -14px;
+        right: -14px;
+        width: 34px;
+        height: 34px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 7px;
+        background: rgba(20, 20, 20, 0.88);
+        color: #f4f0e8;
+        cursor: pointer;
+        font-size: 18px;
       }
       @media (max-width: 520px) {
         .jm-lore-root {
@@ -447,39 +537,69 @@ function installStyle() {
         }
         .jm-lore-panel {
           width: calc(100vw - 28px);
-          max-height: calc(100vh - 78px);
+          max-height: calc(100dvh - 28px);
+        }
+        .jm-lore-modal,
+        .jm-lore-image-viewer {
+          padding: 10px;
+          align-items: center;
+          justify-content: center;
+        }
+        .jm-lore-modal-card {
+          width: calc(100vw - 20px);
+          max-height: calc(100dvh - 20px);
+        }
+        .jm-lore-popup {
+          padding: 12px 14px 18px;
+        }
+        .jm-lore-image-frame {
+          max-width: calc(100vw - 20px);
+          max-height: calc(100dvh - 20px);
+        }
+        .jm-lore-image-frame img {
+          max-height: calc(100dvh - 62px);
+        }
+        .jm-lore-image-close {
+          top: 6px;
+          right: 6px;
+          background: rgba(20, 20, 20, 0.94);
         }
       }
     `,
     )
-    .appendTo('head');
+    .appendTo(getHostDocument().head);
 }
 
 function mountUi() {
   const rootId = `${SCRIPT_KEY}-root`;
-  $(`#${rootId}`).remove();
+  const hostDocument = getHostDocument();
+  hostDocument.querySelectorAll(`[script_id='${getSafeScriptId()}']:not(style)`).forEach(node => node.remove());
 
   const $root = $('<div>')
     .attr('id', rootId)
     .attr('script_id', getSafeScriptId())
     .addClass('jm-lore-root')
-    .appendTo('body');
+    .appendTo(hostDocument.body);
+  rootElement = $root[0];
+  restoreFabPosition(rootElement);
 
   const $panel = $('<section>')
     .addClass('jm-lore-panel')
+    .attr('script_id', getSafeScriptId())
     .attr({ role: 'dialog', 'aria-label': 'JM设定索引' })
-    .appendTo($root);
+    .appendTo(hostDocument.body);
   panelElement = $panel[0];
 
   const $modal = $('<div>')
     .addClass('jm-lore-modal')
+    .attr('script_id', getSafeScriptId())
     .attr({ 'aria-hidden': 'true' })
     .on('click', event => {
       if (event.target === event.currentTarget) {
         closeModal();
       }
     })
-    .appendTo($root);
+    .appendTo(hostDocument.body);
   modalElement = $modal[0];
 
   const $modalCard = $('<section>')
@@ -489,6 +609,14 @@ function mountUi() {
   modalCardElement = $modalCard[0];
 
   const $modalHead = $('<div>').addClass('jm-lore-modal-head').appendTo($modalCard);
+  installFloatingDrag($modalCard[0], $modalHead[0], {
+    draggableClassTarget: $modalCard[0],
+    onStop: dragged => {
+      if (dragged) {
+        modalCardWasManuallyPositioned = true;
+      }
+    },
+  });
   $('<button>')
     .addClass('jm-lore-icon-btn')
     .attr({ type: 'button', title: '关闭', 'aria-label': '关闭' })
@@ -497,6 +625,18 @@ function mountUi() {
     .appendTo($modalHead);
 
   const $header = $('<div>').addClass('jm-lore-header').appendTo($panel);
+  installFloatingDrag(panelElement, $header[0], {
+    draggableClassTarget: panelElement,
+    onMove: () => {
+      panelElement.style.right = 'auto';
+      panelElement.style.bottom = 'auto';
+    },
+    onStop: dragged => {
+      if (dragged) {
+        panelWasManuallyPositioned = true;
+      }
+    },
+  });
   $('<div>').addClass('jm-lore-title').text('JM 设定索引').appendTo($header);
   $('<div>').addClass('jm-lore-count').text(`${loreEntries.length} 条`).appendTo($header);
   $('<button>')
@@ -514,12 +654,38 @@ function mountUi() {
 
   resultElement = $('<div>').addClass('jm-lore-results').appendTo($panel)[0];
 
-  $('<button>')
+  imageViewerElement = $('<div>')
+    .addClass('jm-lore-image-viewer')
+    .attr('script_id', getSafeScriptId())
+    .attr({ 'aria-hidden': 'true' })
+    .on('click', event => {
+      if (event.target === event.currentTarget) {
+        closeImageViewer();
+      }
+    })
+    .appendTo(hostDocument.body)[0];
+
+  const $fab = $('<button>')
     .addClass('jm-lore-fab')
     .attr({ type: 'button', title: 'JM设定索引', 'aria-label': 'JM设定索引' })
-    .text('典')
-    .on('click', togglePanel)
     .appendTo($root);
+  fabElement = $fab[0] as HTMLButtonElement;
+  $('<img>')
+    .attr({ src: buildImageUrl(FAB_ICON_FILE), alt: '' })
+    .on('error', () => {
+      $fab.addClass('jm-lore-fab-fallback');
+    })
+    .appendTo($fab);
+  $('<span>').addClass('jm-lore-fab-label').text('典').appendTo($fab);
+  $fab.on('click', event => {
+    if (suppressNextFabClick) {
+      clearSuppressedFabClick();
+      event.preventDefault();
+      return;
+    }
+    togglePanel();
+  });
+  installFabDrag(fabElement, rootElement);
 
   renderSearchResults();
 }
@@ -530,7 +696,8 @@ function togglePanel() {
   }
   panelElement.classList.toggle('open');
   if (panelElement.classList.contains('open')) {
-    searchInput?.focus();
+    positionPanelForOpen();
+    focusSearchInputIfComfortable();
   }
 }
 
@@ -539,11 +706,359 @@ function openPanel() {
     return;
   }
   panelElement.classList.add('open');
-  searchInput?.focus();
+  positionPanelForOpen();
+  focusSearchInputIfComfortable();
 }
 
 function closePanel() {
   panelElement?.classList.remove('open');
+}
+
+function focusSearchInputIfComfortable() {
+  if (!searchInput || shouldAvoidMobileAutofocus()) {
+    return;
+  }
+  searchInput.focus();
+}
+
+function shouldAvoidMobileAutofocus() {
+  const hostWindow = getHostWindow();
+  return getViewportWidth() <= 520 || Boolean(hostWindow.matchMedia?.('(pointer: coarse)').matches);
+}
+
+function restoreFabPosition(root: HTMLElement) {
+  const savedPosition = readStoredFabPosition();
+  if (!savedPosition) {
+    return;
+  }
+  setFabPosition(root, savedPosition.x, savedPosition.y, false);
+}
+
+function readStoredFabPosition() {
+  try {
+    const raw = getHostWindow().localStorage.getItem(FAB_POSITION_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown };
+    if (typeof parsed.x !== 'number' || typeof parsed.y !== 'number') {
+      return null;
+    }
+    return { x: parsed.x, y: parsed.y };
+  } catch {
+    return null;
+  }
+}
+
+function installFabDrag(button: HTMLButtonElement, root: HTMLElement) {
+  installFloatingDrag(root, button, {
+    draggableClassTarget: button,
+    onMove: positionPanelNearFab,
+    onStop: dragged => {
+      if (!dragged) {
+        return;
+      }
+      suppressUpcomingFabClick();
+      persistFabPosition(root);
+      positionPanelNearFab();
+    },
+    onTap: () => {
+      suppressUpcomingFabClick();
+      togglePanel();
+    },
+  });
+}
+
+function suppressUpcomingFabClick() {
+  suppressNextFabClick = true;
+  if (suppressNextFabClickTimer !== null) {
+    getHostWindow().clearTimeout(suppressNextFabClickTimer);
+  }
+  suppressNextFabClickTimer = getHostWindow().setTimeout(clearSuppressedFabClick, 450);
+}
+
+function clearSuppressedFabClick() {
+  suppressNextFabClick = false;
+  if (suppressNextFabClickTimer !== null) {
+    getHostWindow().clearTimeout(suppressNextFabClickTimer);
+    suppressNextFabClickTimer = null;
+  }
+}
+
+function installFloatingDrag(
+  target: HTMLElement,
+  handle: HTMLElement,
+  options: {
+    draggableClassTarget?: HTMLElement;
+    onMove?: () => void;
+    onStop?: (dragged: boolean) => void;
+    onTap?: (event: Event) => void;
+  } = {},
+) {
+  const hostDocument = getHostDocument();
+  let startPointerX = 0;
+  let startPointerY = 0;
+  let startTargetX = 0;
+  let startTargetY = 0;
+  let active = false;
+  let dragged = false;
+
+  const classTarget = options.draggableClassTarget ?? target;
+
+  const start = (event: Event) => {
+    const dragEvent = event as DragLikeEvent;
+    if (active || !isPrimaryDragStart(dragEvent) || isInteractiveDragTarget(dragEvent.target, handle)) {
+      return;
+    }
+    const point = getDragPoint(dragEvent);
+    if (!point) {
+      return;
+    }
+    const rect = target.getBoundingClientRect();
+    active = true;
+    dragged = false;
+    startPointerX = point.x;
+    startPointerY = point.y;
+    startTargetX = rect.left;
+    startTargetY = rect.top;
+    target.style.left = `${rect.left}px`;
+    target.style.top = `${rect.top}px`;
+    target.style.right = 'auto';
+    target.style.bottom = 'auto';
+    if (target === modalCardElement) {
+      target.style.position = 'fixed';
+    }
+  };
+
+  const move = (event: Event) => {
+    if (!active) {
+      return;
+    }
+    const point = getDragPoint(event as DragLikeEvent);
+    if (!point) {
+      return;
+    }
+    const deltaX = point.x - startPointerX;
+    const deltaY = point.y - startPointerY;
+    if (!dragged && Math.hypot(deltaX, deltaY) < 4) {
+      return;
+    }
+    dragged = true;
+    classTarget.classList.add('dragging');
+    setFloatingElementPosition(target, startTargetX + deltaX, startTargetY + deltaY);
+    options.onMove?.();
+    event.preventDefault();
+  };
+
+  const stop = (event: Event) => {
+    if (!active) {
+      return;
+    }
+    classTarget.classList.remove('dragging');
+    const wasDragged = dragged;
+    active = false;
+    options.onStop?.(wasDragged);
+    if (!wasDragged && event.type === 'touchend' && options.onTap) {
+      event.preventDefault();
+      options.onTap(event);
+    }
+    dragged = false;
+  };
+
+  handle.addEventListener('mousedown', start);
+  handle.addEventListener('touchstart', start, { passive: false });
+  hostDocument.addEventListener('mousemove', move, { passive: false });
+  hostDocument.addEventListener('touchmove', move, { passive: false });
+  hostDocument.addEventListener('mouseup', stop);
+  hostDocument.addEventListener('touchend', stop, { passive: false });
+  hostDocument.addEventListener('touchcancel', stop);
+
+  stops.push(() => {
+    handle.removeEventListener('mousedown', start);
+    handle.removeEventListener('touchstart', start);
+    hostDocument.removeEventListener('mousemove', move);
+    hostDocument.removeEventListener('touchmove', move);
+    hostDocument.removeEventListener('mouseup', stop);
+    hostDocument.removeEventListener('touchend', stop);
+    hostDocument.removeEventListener('touchcancel', stop);
+  });
+}
+
+function setFloatingElementPosition(element: HTMLElement, x: number, y: number) {
+  const rect = element.getBoundingClientRect();
+  const bounds = getViewportBounds();
+  const width = rect.width || element.offsetWidth || 48;
+  const height = rect.height || element.offsetHeight || 48;
+  const nextX = clamp(x, bounds.left + 8, bounds.right - width - 8);
+  const nextY = clamp(y, bounds.top + 8, bounds.bottom - height - 8);
+
+  element.style.left = `${nextX}px`;
+  element.style.top = `${nextY}px`;
+  element.style.right = 'auto';
+  element.style.bottom = 'auto';
+}
+
+function getDragPoint(event: DragLikeEvent) {
+  if ('touches' in event && event.touches.length > 0) {
+    return { x: event.touches[0].clientX, y: event.touches[0].clientY };
+  }
+  if ('changedTouches' in event && event.changedTouches.length > 0) {
+    return { x: event.changedTouches[0].clientX, y: event.changedTouches[0].clientY };
+  }
+  if ('clientX' in event) {
+    return { x: event.clientX, y: event.clientY };
+  }
+  return null;
+}
+
+function isPrimaryDragStart(event: DragLikeEvent) {
+  return event.type !== 'mousedown' || !('button' in event) || event.button === 0;
+}
+
+function isInteractiveDragTarget(target: EventTarget | null, handle: HTMLElement) {
+  if (!target || !isHTMLElementLike(target)) {
+    return false;
+  }
+  const interactive = target.closest('button, input, textarea, select, option, a, [data-no-drag]');
+  return Boolean(interactive && interactive !== handle);
+}
+
+function setFabPosition(root: HTMLElement, x: number, y: number, persist: boolean) {
+  const bounds = getViewportBounds();
+  const rect = root.getBoundingClientRect();
+  const width = rect.width || 48;
+  const height = rect.height || 48;
+  const nextX = clamp(x, bounds.left + 8, bounds.right - width - 8);
+  const nextY = clamp(y, bounds.top + 8, bounds.bottom - height - 8);
+
+  root.style.left = `${nextX}px`;
+  root.style.top = `${nextY}px`;
+  root.style.right = 'auto';
+  root.style.bottom = 'auto';
+  if (persist) {
+    persistFabPosition(root);
+  }
+}
+
+function persistFabPosition(root: HTMLElement) {
+  const rect = root.getBoundingClientRect();
+  try {
+    getHostWindow().localStorage.setItem(
+      FAB_POSITION_STORAGE_KEY,
+      JSON.stringify({ x: Math.round(rect.left), y: Math.round(rect.top) }),
+    );
+  } catch (error) {
+    console.warn('[JM设定百科] 按钮位置保存失败。', error);
+  }
+}
+
+function clampFabToViewport() {
+  if (!rootElement) {
+    return;
+  }
+  const rect = rootElement.getBoundingClientRect();
+  setFabPosition(rootElement, rect.left, rect.top, true);
+}
+
+function positionPanelForOpen() {
+  if (!panelElement) {
+    return;
+  }
+  if (panelWasManuallyPositioned) {
+    clampFloatingElementToViewport(panelElement);
+    return;
+  }
+  positionPanelNearFab({ force: true });
+}
+
+function positionPanelNearFab(options: { force?: boolean } = {}) {
+  if (!rootElement || !panelElement || !panelElement.classList.contains('open')) {
+    return;
+  }
+  if (panelWasManuallyPositioned && !options.force) {
+    return;
+  }
+
+  const bounds = getViewportBounds();
+  const margin = 14;
+  const gap = 10;
+  const fabRect = rootElement.getBoundingClientRect();
+  const panelRect = panelElement.getBoundingClientRect();
+  const width = panelRect.width || Math.min(430, bounds.width - margin * 2);
+  const height = panelRect.height || Math.min(620, bounds.height - 96);
+  const maxLeft = bounds.right - width - margin;
+  const maxTop = bounds.bottom - height - margin;
+
+  const preferredLeft = fabRect.right - width;
+  let nextLeft = clamp(preferredLeft, bounds.left + margin, maxLeft);
+  let nextTop = fabRect.top - height - gap;
+  if (nextTop < bounds.top + margin) {
+    nextTop = fabRect.bottom + gap;
+  }
+  nextTop = clamp(nextTop, bounds.top + margin, maxTop);
+
+  if (Number.isNaN(nextLeft)) {
+    nextLeft = bounds.left + margin;
+  }
+  if (Number.isNaN(nextTop)) {
+    nextTop = bounds.top + margin;
+  }
+
+  panelElement.style.left = `${nextLeft}px`;
+  panelElement.style.top = `${nextTop}px`;
+  panelElement.style.right = 'auto';
+  panelElement.style.bottom = 'auto';
+}
+
+function clampOpenFloatingWindows() {
+  if (panelElement?.classList.contains('open')) {
+    if (panelWasManuallyPositioned) {
+      clampFloatingElementToViewport(panelElement);
+    } else {
+      positionPanelNearFab({ force: true });
+    }
+  }
+  if (modalElement?.classList.contains('open') && modalCardElement && modalCardWasManuallyPositioned) {
+    clampFloatingElementToViewport(modalCardElement);
+  }
+}
+
+function clampFloatingElementToViewport(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  setFloatingElementPosition(element, rect.left, rect.top);
+}
+
+function clamp(value: number, min: number, max: number) {
+  if (max < min) {
+    return min;
+  }
+  return Math.min(Math.max(value, min), max);
+}
+
+function getViewportBounds() {
+  const hostWindow = getHostWindow();
+  const hostDocument = getHostDocument();
+  const visualViewport = hostWindow.visualViewport;
+  const width = Math.floor(visualViewport?.width ?? hostWindow.innerWidth ?? hostDocument.documentElement.clientWidth ?? 0);
+  const height = Math.floor(visualViewport?.height ?? hostWindow.innerHeight ?? hostDocument.documentElement.clientHeight ?? 0);
+  const left = Math.floor(visualViewport?.offsetLeft ?? 0);
+  const top = Math.floor(visualViewport?.offsetTop ?? 0);
+  return {
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+  };
+}
+
+function getViewportWidth() {
+  return getViewportBounds().width;
+}
+
+function getViewportHeight() {
+  return getViewportBounds().height;
 }
 
 function openModal(content: HTMLElement) {
@@ -554,12 +1069,59 @@ function openModal(content: HTMLElement) {
   modalCardElement.appendChild(content);
   modalElement.classList.add('open');
   modalElement.setAttribute('aria-hidden', 'false');
+  if (modalCardWasManuallyPositioned) {
+    clampFloatingElementToViewport(modalCardElement);
+  } else {
+    modalCardElement.style.position = '';
+    modalCardElement.style.left = '';
+    modalCardElement.style.top = '';
+    modalCardElement.style.right = '';
+    modalCardElement.style.bottom = '';
+  }
 }
 
 function closeModal() {
   modalElement?.classList.remove('open');
   modalElement?.setAttribute('aria-hidden', 'true');
   modalCardElement?.querySelectorAll('.jm-lore-popup').forEach(node => node.remove());
+}
+
+function openImageViewer(src: string, alt: string, caption: string) {
+  if (!imageViewerElement) {
+    return;
+  }
+  const ownerDocument = imageViewerElement.ownerDocument;
+  const frame = ownerDocument.createElement('div');
+  frame.className = 'jm-lore-image-frame';
+
+  const closeButton = ownerDocument.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'jm-lore-image-close';
+  closeButton.setAttribute('aria-label', '关闭图片');
+  closeButton.textContent = '×';
+  closeButton.addEventListener('click', closeImageViewer);
+  frame.appendChild(closeButton);
+
+  const image = ownerDocument.createElement('img');
+  image.src = src;
+  image.alt = alt;
+  frame.appendChild(image);
+
+  const label = ownerDocument.createElement('div');
+  label.className = 'jm-lore-image-caption';
+  label.textContent = caption;
+  frame.appendChild(label);
+
+  imageViewerElement.replaceChildren(frame);
+  imageViewerElement.classList.add('open');
+  imageViewerElement.setAttribute('aria-hidden', 'false');
+  closeButton.focus();
+}
+
+function closeImageViewer() {
+  imageViewerElement?.classList.remove('open');
+  imageViewerElement?.setAttribute('aria-hidden', 'true');
+  imageViewerElement?.replaceChildren();
 }
 
 function renderSearchResults() {
@@ -624,7 +1186,6 @@ function buildSearchHaystack(entry: LoreEntry) {
       entry.title,
       entry.category,
       entry.summary,
-      entry.sourceFile,
       ...(entry.aliases ?? []),
       ...(entry.triggers ?? []),
       ...(entry.details ?? []),
@@ -664,7 +1225,7 @@ async function showEntryPopup(entry: LoreEntry) {
     content.appendChild(detailList);
   }
 
-  const aliases = entry.aliases.filter(alias => alias !== entry.title).slice(0, 12);
+  const aliases = (entry.aliases ?? []).filter(alias => alias !== entry.title).slice(0, 12);
   if (aliases.length > 0) {
     const aliasRow = ownerDocument.createElement('div');
     aliasRow.className = 'jm-lore-tag-row';
@@ -690,10 +1251,32 @@ async function renderEntryImages(entry: LoreEntry, content: HTMLElement) {
     const imageGrid = content.ownerDocument.createElement('div');
     imageGrid.className = 'jm-lore-images';
     images.slice(0, MAX_IMAGES_PER_ENTRY).forEach(fileName => {
+      const imageUrl = buildImageUrl(fileName);
       const image = content.ownerDocument.createElement('img');
       image.loading = 'lazy';
       image.alt = entry.title;
-      image.src = buildImageUrl(fileName);
+      image.tabIndex = 0;
+      image.title = entry.title;
+      image.src = imageUrl;
+      image.addEventListener('click', () => {
+        openImageViewer(imageUrl, entry.title, entry.title);
+      });
+      image.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openImageViewer(imageUrl, entry.title, entry.title);
+        }
+      });
+      image.addEventListener(
+        'error',
+        () => {
+          image.remove();
+          if (!imageGrid.querySelector('img')) {
+            imageGrid.remove();
+          }
+        },
+        { once: true },
+      );
       imageGrid.appendChild(image);
     });
     content.appendChild(imageGrid);
@@ -701,96 +1284,9 @@ async function renderEntryImages(entry: LoreEntry, content: HTMLElement) {
 }
 
 async function findImagesForEntry(entry: LoreEntry) {
-  try {
-    const imageLookup = await loadImageLookupData();
-    const imageNames: string[] = [];
-
-    buildDirectImageKeywords(entry).forEach(keyword => {
-      const hasExactMatch = pushImagesForKeyword(keyword, imageLookup, imageNames);
-      if (!hasExactMatch) {
-        pushLooseImagesForKeyword(keyword, imageLookup.imageIndex, imageNames);
-      }
-    });
-
-    const searchText = buildEntryImageSearchText(entry);
-    const matchedKeywords = imageLookup.allKeywords
-      .filter(keyword => searchText.includes(keyword))
-      .filter(keyword => !isKeywordCoveredByLongerMatch(keyword, imageLookup.allKeywords, searchText))
-      .sort((a, b) => searchText.indexOf(a) - searchText.indexOf(b) || b.length - a.length);
-
-    matchedKeywords.forEach(keyword => {
-      pushImagesForKeyword(keyword, imageLookup, imageNames);
-    });
-
-    return uniqueStrings(imageNames).filter(isUsableImageFile);
-  } catch (error) {
-    console.warn('[JM设定百科] 图片索引加载失败。', error);
-    return [];
-  }
-}
-
-function buildDirectImageKeywords(entry: LoreEntry) {
-  return uniqueStrings([
-    entry.title,
-    ...(entry.triggers ?? []),
-    ...(entry.aliases ?? []),
-    ...(entry.imageKeywords ?? []),
-  ])
-    .map(keyword => keyword.trim())
-    .filter(isUsefulImageKeyword)
-    .sort((a, b) => b.length - a.length);
-}
-
-function buildEntryImageSearchText(entry: LoreEntry) {
-  return [
-    entry.title,
-    ...(entry.triggers ?? []),
-    ...(entry.aliases ?? []),
-    entry.summary,
-    ...(entry.details ?? []),
-    ...(entry.imageKeywords ?? []),
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
-function pushImagesForKeyword(keyword: string, imageLookup: ImageLookupData, imageNames: string[]) {
-  const cleanKeyword = keyword.trim();
-  const mainKeyword = imageLookup.synonymMap[cleanKeyword] ?? cleanKeyword;
-  const images = imageLookup.imageIndex[mainKeyword] ?? imageLookup.imageIndex[cleanKeyword];
-  if (!Array.isArray(images) || images.length === 0) {
-    return false;
-  }
-  imageNames.push(...images);
-  return true;
-}
-
-function pushLooseImagesForKeyword(keyword: string, imageIndex: ImageIndex, imageNames: string[]) {
-  if (keyword.length < 3) {
-    return;
-  }
-  Object.entries(imageIndex).forEach(([indexKey, images]) => {
-    if (!isUsefulImageKeyword(indexKey)) {
-      return;
-    }
-    if (indexKey.includes(keyword) || keyword.includes(indexKey)) {
-      imageNames.push(...images);
-    }
-  });
-}
-
-function isKeywordCoveredByLongerMatch(keyword: string, allKeywords: string[], searchText: string) {
-  return allKeywords.some(
-    otherKeyword => otherKeyword.length > keyword.length && otherKeyword.includes(keyword) && searchText.includes(otherKeyword),
-  );
-}
-
-function isUsefulImageKeyword(keyword: string) {
-  const cleanKeyword = keyword.trim();
-  if (cleanKeyword.length < 2 || blockedImageKeywords.has(cleanKeyword)) {
-    return false;
-  }
-  return !/\.(?:json|abc)$/iu.test(cleanKeyword);
+  // 旧方案已停用：不再根据 title/aliases/summary/details 去匹配 imageIndex.json 或 synonyms.json。
+  // 现在只展示词条 JSON 中人工/半人工确认过的 images，避免泛词导致图片误命中。
+  return uniqueStrings((entry.images ?? []).map(image => image.trim())).filter(isUsableImageFile);
 }
 
 function isUsableImageFile(image: string) {
@@ -799,109 +1295,6 @@ function isUsableImageFile(image: string) {
 
 function buildImageUrl(fileName: string) {
   return `${IMAGE_BASE_URL}${fileName.split('/').map(encodeURIComponent).join('/')}`;
-}
-
-async function loadImageLookupData() {
-  if (!imageLookupPromise) {
-    imageLookupPromise = (async () => {
-      const [remoteImageIndexResult, synonymResult] = await Promise.allSettled([
-        fetchJson(IMAGE_INDEX_URL),
-        fetchJson(SYNONYMS_URL),
-      ]);
-
-      const localImageIndex = loadLocalImageIndex();
-      const remoteImageIndex =
-        remoteImageIndexResult.status === 'fulfilled' ? normalizeImageIndex(remoteImageIndexResult.value) : {};
-      const synonymMap = synonymResult.status === 'fulfilled' ? buildSynonymMap(synonymResult.value) : {};
-
-      if (remoteImageIndexResult.status === 'rejected') {
-        console.warn('[JM设定百科] 远程图片索引加载失败，已使用本地索引兜底。', remoteImageIndexResult.reason);
-      }
-      if (synonymResult.status === 'rejected') {
-        console.warn('[JM设定百科] 图片别名索引加载失败，将只使用图片主关键词。', synonymResult.reason);
-      }
-
-      const imageIndex = mergeImageIndexes(remoteImageIndex, localImageIndex);
-      const allKeywords = uniqueStrings([...Object.keys(imageIndex), ...Object.keys(synonymMap)])
-        .filter(isUsefulImageKeyword)
-        .sort((a, b) => b.length - a.length || a.localeCompare(b, 'zh-Hans-CN'));
-
-      return { imageIndex, synonymMap, allKeywords };
-    })();
-  }
-  return imageLookupPromise;
-}
-
-async function fetchJson(url: string) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`${url} 加载失败: ${response.status}`);
-  }
-  return response.json() as Promise<unknown>;
-}
-
-function loadLocalImageIndex() {
-  try {
-    return normalizeImageIndex(JSON.parse(localImageIndexRaw));
-  } catch (error) {
-    console.warn('[JM设定百科] 本地图片索引解析失败。', error);
-    return {};
-  }
-}
-
-function normalizeImageIndex(raw: unknown) {
-  const normalized: ImageIndex = {};
-  if (!raw || typeof raw !== 'object') {
-    return normalized;
-  }
-
-  Object.entries(raw as Record<string, unknown>).forEach(([key, value]) => {
-    if (!Array.isArray(value)) {
-      return;
-    }
-    const cleanKey = key.trim();
-    const images = value.filter((image): image is string => typeof image === 'string').map(image => image.trim());
-    if (!cleanKey || images.length === 0) {
-      return;
-    }
-    normalized[cleanKey] = uniqueStrings([...(normalized[cleanKey] ?? []), ...images]);
-  });
-  return normalized;
-}
-
-function buildSynonymMap(raw: unknown) {
-  const synonymMap: Record<string, string> = {};
-  if (!raw || typeof raw !== 'object') {
-    return synonymMap;
-  }
-
-  Object.entries(raw as SynonymIndex).forEach(([mainKeyword, aliases]) => {
-    const cleanMainKeyword = mainKeyword.trim();
-    if (!cleanMainKeyword || !Array.isArray(aliases)) {
-      return;
-    }
-    synonymMap[cleanMainKeyword] = cleanMainKeyword;
-    aliases.forEach(alias => {
-      if (typeof alias !== 'string') {
-        return;
-      }
-      const cleanAlias = alias.trim();
-      if (cleanAlias) {
-        synonymMap[cleanAlias] = cleanMainKeyword;
-      }
-    });
-  });
-  return synonymMap;
-}
-
-function mergeImageIndexes(...indexes: ImageIndex[]) {
-  const merged: ImageIndex = {};
-  indexes.forEach(index => {
-    Object.entries(index).forEach(([keyword, images]) => {
-      merged[keyword] = uniqueStrings([...(merged[keyword] ?? []), ...images]);
-    });
-  });
-  return merged;
 }
 
 function enhanceVisibleMessages() {
@@ -1110,6 +1503,9 @@ function resetEnhancedElement(root: HTMLElement) {
 }
 
 function installEventListeners() {
+  const hostWindow = getHostWindow();
+  const hostDocument = getHostDocument();
+
   appendInexistentScriptButtons(SCRIPT_BUTTONS);
   stops.push(
     eventOn(getButtonEvent('打开百科'), () => {
@@ -1149,9 +1545,25 @@ function installEventListeners() {
     }).stop,
   );
 
+  const handleViewportChange = () => {
+    clampFabToViewport();
+    positionPanelNearFab();
+    clampOpenFloatingWindows();
+  };
+  $(hostWindow).on(`resize.${SCRIPT_KEY} orientationchange.${SCRIPT_KEY}`, handleViewportChange);
+  hostWindow.visualViewport?.addEventListener('resize', handleViewportChange);
+  hostWindow.visualViewport?.addEventListener('scroll', handleViewportChange);
+  stops.push(() => {
+    hostWindow.visualViewport?.removeEventListener('resize', handleViewportChange);
+    hostWindow.visualViewport?.removeEventListener('scroll', handleViewportChange);
+  });
   $(window).on(`pagehide.${SCRIPT_KEY}`, cleanup);
-  $(document).on(`keydown.${SCRIPT_KEY}`, event => {
+  $(hostDocument).on(`keydown.${SCRIPT_KEY}`, event => {
     if (event.key === 'Escape') {
+      if (imageViewerElement?.classList.contains('open')) {
+        closeImageViewer();
+        return;
+      }
       closeModal();
       closePanel();
     }
@@ -1159,24 +1571,43 @@ function installEventListeners() {
 }
 
 function cleanup() {
+  clearSuppressedFabClick();
   stops.splice(0).forEach(stop => stop());
   $(document).off(`.${SCRIPT_KEY}`);
   $(window).off(`.${SCRIPT_KEY}`);
+  $(getHostDocument()).off(`.${SCRIPT_KEY}`);
+  $(getHostWindow()).off(`.${SCRIPT_KEY}`);
   getHostDocument().querySelectorAll<HTMLElement>(`[${ENHANCED_ATTR}="1"]`).forEach(resetEnhancedElement);
-  $(`[script_id='${getSafeScriptId()}']`).remove();
+  getHostDocument().querySelectorAll(`[script_id='${getSafeScriptId()}']`).forEach(node => node.remove());
 }
 
 function getSafeScriptId() {
   return typeof getScriptId === 'function' ? getScriptId() : SCRIPT_KEY;
 }
 
+function getHostWindow() {
+  try {
+    if (window.top?.document) {
+      return window.top;
+    }
+  } catch {
+    // Cross-origin frames are not expected here, but parent is still the safest fallback.
+  }
+  return window.parent ?? window;
+}
+
 function getHostDocument() {
-  return window.parent?.document ?? document;
+  return getHostWindow().document ?? document;
 }
 
 function isHTMLElement(element: Element): element is HTMLElement {
   const htmlElement = element.ownerDocument.defaultView?.HTMLElement ?? HTMLElement;
   return element instanceof htmlElement;
+}
+
+function isHTMLElementLike(target: EventTarget): target is HTMLElement {
+  const hostHTMLElement = getHostDocument().defaultView?.HTMLElement ?? HTMLElement;
+  return target instanceof hostHTMLElement;
 }
 
 function uniqueStrings(values: string[]) {
