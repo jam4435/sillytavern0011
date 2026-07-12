@@ -171,7 +171,8 @@ export type InventoryVisualCategory =
   | '医毒典籍'
   | '阵法杂典'
   | '令牌印玺'
-  | '地图书信'
+  | '地图'
+  | '书信文书'
   | '矿石金属'
   | '兽材'
   | '珠玉'
@@ -236,7 +237,8 @@ const assets: Record<InventoryVisualCategory, RankAssets> = {
   医毒典籍: [secretMedicine1, secretMedicine2, secretMedicine3, secretMedicine4],
   阵法杂典: [secretOther1, secretOther2, secretOther3, secretOther4],
   令牌印玺: [miscToken1, miscToken2, miscToken3, miscToken4],
-  地图书信: [miscDocument1, miscDocument2, miscDocument3, miscDocument4],
+  地图: [miscDocument2, miscDocument2, miscDocument4, miscDocument4],
+  书信文书: [miscDocument1, secretQinggong2, miscDocument3, secretOther4],
   矿石金属: [miscOre1, miscOre2, miscOre3, miscOre4],
   兽材: [miscBeast1, miscBeast2, miscBeast3, miscBeast4],
   珠玉: [miscGem1, miscGem2, miscGem3, miscGem4],
@@ -314,12 +316,10 @@ function inferMiscCategory(item: InventoryItem): { category: InventoryVisualCate
   const detail = normalize(`${item.name}${item.description}`);
   if (/(令牌|腰牌|竹牌|木牌|印玺|印璽|玉玺|玉璽|符牌|借阅牌|借閱牌|度牒)/.test(name))
     return { category: '令牌印玺', matchedBy: 'name' };
-  if (
-    /(地图|地圖|舆图|輿圖|残图|殘圖|信|书信|書信|手稿|手札|卷宗|案卷|抄本|残页|殘頁|庚帖|图纸|圖紙|经文|經文)/.test(
-      name,
-    )
-  )
-    return { category: '地图书信', matchedBy: 'name' };
+  if (/(地图|地圖|舆图|輿圖|残图|殘圖|藏宝图|藏寶圖)/.test(name))
+    return { category: '地图', matchedBy: 'name' };
+  if (/(信|书信|書信|手稿|手札|卷宗|案卷|抄本|残页|殘頁|庚帖|图纸|圖紙|经文|經文|度牒)/.test(name))
+    return { category: '书信文书', matchedBy: 'name' };
   if (/(哨|钥匙|鑰匙|机关|機關|锁|鎖|镜|鏡|轮|輪|罗盘|羅盤|火折|火摺)/.test(name))
     return { category: '机关奇物', matchedBy: 'name' };
   if (/(矿|礦|石|铁|鐵|铜|銅|银|銀|金条|金條|陨铁|隕鐵)/.test(name)) return { category: '矿石金属', matchedBy: 'name' };
