@@ -499,6 +499,14 @@
     border-color: rgba(61, 48, 40, 0.18);
     color: #5b5048;
 
+    .command-count {
+      background: #8b1a1a;
+      color: #fff7ed;
+      box-shadow:
+        0 2px 6px rgba(61, 48, 40, 0.18),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+    }
+
     &:hover {
       color: #8b1a1a;
       border-color: rgba(139, 26, 26, 0.32);
@@ -507,9 +515,114 @@
   }
 
   .command-queue-popover {
-    background: rgba(241, 235, 223, 0.94);
-    border-color: rgba(61, 48, 40, 0.18);
-    box-shadow: 0 16px 36px rgba(61, 48, 40, 0.16);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.24), transparent 58%), rgba(241, 235, 223, 0.96);
+    border-color: rgba(61, 48, 40, 0.26);
+    box-shadow:
+      0 16px 36px rgba(61, 48, 40, 0.16),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+
+    .popover-header {
+      border-bottom-color: rgba(61, 48, 40, 0.18);
+    }
+
+    .popover-title {
+      color: #1a1410;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
+    }
+
+    .command-count-badge {
+      background: rgba(139, 26, 26, 0.1);
+      border: 1px solid rgba(139, 26, 26, 0.24);
+      color: #8b1a1a;
+    }
+
+    .popover-close-btn {
+      color: #5b5048;
+
+      &:hover {
+        background: rgba(139, 26, 26, 0.08);
+        color: #8b1a1a;
+      }
+    }
+
+    .empty-message {
+      color: #5b5048;
+    }
+
+    .command-card {
+      background: rgba(255, 250, 244, 0.62);
+      border-color: rgba(61, 48, 40, 0.18);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+
+      &:hover {
+        background: rgba(255, 250, 244, 0.88);
+        border-color: rgba(139, 26, 26, 0.3);
+      }
+
+      .command-type-icon {
+        color: #8b1a1a;
+      }
+
+      .command-text {
+        color: #1a1410;
+      }
+
+      .cancel-btn {
+        color: #7a6e62;
+
+        &:hover {
+          background: rgba(139, 26, 26, 0.1);
+          color: #8b1a1a;
+        }
+      }
+    }
+  }
+
+  .status-toast {
+    box-shadow:
+      0 10px 26px rgba(61, 48, 40, 0.16),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+    backdrop-filter: none;
+
+    &.loading {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 56%), rgba(241, 235, 223, 0.96);
+      border-color: rgba(61, 48, 40, 0.28);
+      border-top: none;
+
+      .status-toast-icon {
+        color: #8b1a1a;
+      }
+
+      .status-toast-message {
+        color: #1a1410;
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
+      }
+
+      &::after {
+        background: linear-gradient(90deg, transparent 0%, rgba(139, 26, 26, 0.56) 50%, transparent 100%);
+      }
+    }
+
+    &.error {
+      background: linear-gradient(135deg, rgba(139, 26, 26, 0.1), transparent 58%), rgba(241, 235, 223, 0.96);
+      border-color: rgba(139, 26, 26, 0.4);
+      border-top: none;
+
+      .status-toast-icon,
+      .status-toast-message,
+      .status-toast-close {
+        color: #8b1a1a;
+      }
+
+      .status-toast-close:hover {
+        background: rgba(139, 26, 26, 0.1);
+        color: #5c1a14;
+      }
+
+      &::after {
+        background: linear-gradient(90deg, transparent 0%, rgba(139, 26, 26, 0.62) 50%, transparent 100%);
+      }
+    }
   }
 
   .chat-send-btn .send-btn-bg {
@@ -1833,7 +1946,12 @@
 
   .setup-screen .setup-bg-gradient {
     background:
-      radial-gradient(ellipse at 50% 32%, rgba(252, 248, 239, 0.9) 0%, rgba(241, 235, 223, 0.72) 52%, rgba(214, 203, 187, 0.9) 100%),
+      radial-gradient(
+        ellipse at 50% 32%,
+        rgba(252, 248, 239, 0.9) 0%,
+        rgba(241, 235, 223, 0.72) 52%,
+        rgba(214, 203, 187, 0.9) 100%
+      ),
       linear-gradient(180deg, rgba(247, 241, 229, 0.84), rgba(222, 211, 194, 0.88)),
       var(--wuxia-ink-bg-image) center / cover no-repeat;
     filter: contrast(0.78) brightness(1.08) saturate(0.68);
@@ -1875,8 +1993,7 @@
 
   .setup-screen .glass-card {
     background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(232, 226, 214, 0.16) 54%),
-      var(--wuxia-setup-paper);
+      linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(232, 226, 214, 0.16) 54%), var(--wuxia-setup-paper);
     border-color: var(--wuxia-setup-border);
     box-shadow:
       var(--wuxia-setup-shadow),
@@ -2043,9 +2160,7 @@
   .setup-screen .preview-section,
   .setup-screen .setup-avatar-preview,
   .setup-screen .setup-avatar-choice {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 58%),
-      var(--wuxia-setup-paper-soft);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 58%), var(--wuxia-setup-paper-soft);
     border-color: rgba(61, 48, 40, 0.24);
     color: var(--wuxia-setup-ink);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
@@ -2062,9 +2177,7 @@
   .setup-screen .origin-card:hover,
   .setup-screen .event-card:hover,
   .setup-screen .setup-avatar-choice:hover {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.36), transparent 58%),
-      var(--wuxia-setup-paper-strong);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.36), transparent 58%), var(--wuxia-setup-paper-strong);
     border-color: rgba(139, 26, 26, 0.36);
     box-shadow: 0 8px 18px rgba(61, 48, 40, 0.11);
   }
@@ -2076,9 +2189,7 @@
   .setup-screen .origin-card.selected,
   .setup-screen .event-card.selected,
   .setup-screen .setup-avatar-choice.is-selected {
-    background:
-      linear-gradient(135deg, rgba(139, 26, 26, 0.12), transparent 58%),
-      rgba(250, 246, 238, 0.92);
+    background: linear-gradient(135deg, rgba(139, 26, 26, 0.12), transparent 58%), rgba(250, 246, 238, 0.92);
     border-color: rgba(139, 26, 26, 0.52);
     box-shadow:
       0 8px 20px rgba(61, 48, 40, 0.13),
@@ -2173,9 +2284,7 @@
   }
 
   .setup-screen .character-preview {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 58%),
-      rgba(241, 235, 223, 0.9);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 58%), rgba(241, 235, 223, 0.9);
     border-color: rgba(61, 48, 40, 0.24);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
   }

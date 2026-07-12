@@ -7,13 +7,14 @@ import type {
 import {
   buildAiComparisons,
   collectVariableTopLevelGroups,
+  createBucketedObservedVariableChanges,
   createEmptyVariableChangeSummary,
-  createObservedVariableChanges,
   getSnapshotHash,
   MAX_STORED_VARIABLE_CHANGES,
   parseDeclaredVariableChanges,
   readCurrentStatDataSnapshot,
   stableStringify,
+  type ObservedVariableChangeBucket,
   type VariableActualChange,
   type VariableDeclaredChange,
   type VariableChangeOrigin,
@@ -55,7 +56,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 11;
+  version: 12;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -80,7 +81,7 @@ type VariableWriteSignal =
 type DeclaredSourceKind = 'assistant-reply' | 'extra-blocks';
 type ParsedDeclaredState = ReturnType<typeof parseDeclaredVariableChanges>;
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v11';
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v12';
 const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v1',
   'wuxia.variableChangeTurn.v2',
@@ -92,6 +93,7 @@ const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v8',
   'wuxia.variableChangeTurn.v9',
   'wuxia.variableChangeTurn.v10',
+  'wuxia.variableChangeTurn.v11',
 ];
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
 const STALE_WRITE_DONE_RETRY_DELAY_MS = 40;
@@ -205,7 +207,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 11 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== 12 || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -232,7 +234,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 11,
+      version: 12,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -309,7 +311,7 @@ const getPathKey = (change: Pick<VariableActualChange, 'path'>): string =>
 
 const declaredMatchesObserved = (
   declared: VariableChangeSummary['aiReply']['declaredChanges'][number],
-  observed: VariableActualChange,
+  observed: Pick<VariableActualChange, 'path' | 'afterValue'>,
 ): boolean => {
   if (JSON.stringify(declared.path) !== JSON.stringify(observed.path)) {
     return false;
@@ -322,7 +324,7 @@ const declaredMatchesObserved = (
 
 const matchesAnyDeclaredChange = (
   declaredChanges: VariableChangeSummary['aiReply']['declaredChanges'],
-  observed: VariableActualChange,
+  observed: Pick<VariableActualChange, 'path' | 'afterValue'>,
 ): boolean => declaredChanges.some(declared => declaredMatchesObserved(declared, observed));
 
 const appendLimited = <T,>(
@@ -789,7 +791,8 @@ export function useVariableChangeTracker() {
 
     activeTurn.batchSequence += 1;
     const baseBatchId = `${activeTurn.turnId}:${activeTurn.batchSequence}`;
-    const result = createObservedVariableChanges(
+    const declaredChanges = current.aiReply.declaredChanges;
+    const result = createBucketedObservedVariableChanges(
       activeTurn.lastStatData ?? activeTurn.baselineStatData,
       nextStatData,
       {
@@ -801,10 +804,17 @@ export function useVariableChangeTracker() {
         reason: metadata.reason,
         assistantMessageId: metadata.assistantMessageId,
       },
+      candidate => {
+        const matchesDeclaration = matchesAnyDeclaredChange(declaredChanges, candidate);
+        const matchedAsAi =
+          metadata.origin === 'ai'
+          && (!metadata.aiOnlyDeclaredMatches || matchesDeclaration);
+        return matchedAsAi ? 'ai' : 'background';
+      },
     );
     activeTurn.lastStatData = nextStatData;
 
-    if (!result.batch || result.observedChanges.length === 0) {
+    if (!result.batch || result.totalObservedCount === 0) {
       variableTraceLogger.log('[useVariableChangeTracker] 当前信号未产生新的变量差分', {
         turnId: activeTurn.turnId,
         metadata: summarizeMetadata(metadata),
@@ -815,16 +825,8 @@ export function useVariableChangeTracker() {
       return;
     }
 
-    const declaredChanges = current.aiReply.declaredChanges;
-    const aiChanges: VariableActualChange[] = [];
-    const backgroundChanges: VariableActualChange[] = [];
-    for (const change of result.observedChanges) {
-      const matchesDeclaration = matchesAnyDeclaredChange(declaredChanges, change);
-      const matchedAsAi =
-        metadata.origin === 'ai'
-        && (!metadata.aiOnlyDeclaredMatches || matchesDeclaration);
-      (matchedAsAi ? aiChanges : backgroundChanges).push(change);
-    }
+    const aiChanges = result.ai.observedChanges;
+    const backgroundChanges = result.background.observedChanges;
 
     variableTraceLogger.log('[useVariableChangeTracker] 捕获到新的变量差分', {
       turnId: activeTurn.turnId,
@@ -832,16 +834,18 @@ export function useVariableChangeTracker() {
       previousSnapshotHash,
       nextSnapshotHash,
       totalObservedCount: result.totalObservedCount,
+      aiObservedTotal: result.ai.totalObservedCount,
+      backgroundObservedTotal: result.background.totalObservedCount,
       aiChanges: aiChanges.map(summarizeObservedChange),
       backgroundChanges: backgroundChanges.map(summarizeObservedChange),
     });
 
     const createBatch = (
       origin: VariableChangeOrigin,
-      changes: VariableActualChange[],
+      bucket: ObservedVariableChangeBucket,
       suffix: string,
     ): { batch: VariableObservedBatch; changes: VariableActualChange[] } | null => {
-      if (changes.length === 0 || !result.batch) {
+      if (bucket.totalObservedCount === 0 || !result.batch) {
         return null;
       }
       const batchId = `${baseBatchId}:${suffix}`;
@@ -850,9 +854,9 @@ export function useVariableChangeTracker() {
           ...result.batch,
           batchId,
           origin,
-          changeCount: changes.length,
+          changeCount: bucket.totalObservedCount,
         },
-        changes: changes.map((change, index) => ({
+        changes: bucket.observedChanges.map((change, index) => ({
           ...change,
           id: `${change.source}:${change.action}:${getPathKey(change)}:${batchId}:${index}`,
           batchId,
@@ -861,8 +865,8 @@ export function useVariableChangeTracker() {
       };
     };
 
-    const aiBatch = createBatch('ai', aiChanges, 'ai');
-    const backgroundBatch = createBatch('background', backgroundChanges, 'background');
+    const aiBatch = createBatch('ai', result.ai, 'ai');
+    const backgroundBatch = createBatch('background', result.background, 'background');
     mutateSummary(summary => {
       const aiAppend = appendLimited(
         summary.aiReply.observedChanges,
@@ -881,7 +885,7 @@ export function useVariableChangeTracker() {
           omittedObservedCount:
             summary.aiReply.omittedObservedCount
             + aiAppend.omitted
-            + (metadata.origin === 'ai' ? result.omittedObservedCount : 0),
+            + result.ai.omittedObservedCount,
         },
         background: {
           ...summary.background,
@@ -889,7 +893,7 @@ export function useVariableChangeTracker() {
           omittedObservedCount:
             summary.background.omittedObservedCount
             + backgroundAppend.omitted
-            + (metadata.origin === 'background' ? result.omittedObservedCount : 0),
+            + result.background.omittedObservedCount,
         },
         batches: [
           ...summary.batches,

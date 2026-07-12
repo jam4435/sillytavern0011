@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAiComparisons,
+  createBucketedObservedVariableChanges,
   createObservedVariableChanges,
   parseDeclaredVariableChanges,
 } from './variableChanges';
@@ -87,6 +88,39 @@ describe('createObservedVariableChanges', () => {
 
     expect(result.observedChanges).toEqual([]);
     expect(result.batch).toBeNull();
+  });
+
+  it('按分类桶分别计算保留和省略条数', () => {
+    const beforeAttrs = Object.fromEntries(
+      Array.from({ length: 150 }, (_, index) => [`attr${index}`, 0]),
+    );
+    const afterAttrs = Object.fromEntries(
+      Array.from({ length: 150 }, (_, index) => [`attr${index}`, 1]),
+    );
+    const result = createBucketedObservedVariableChanges(
+      { user数据: { 属性: beforeAttrs, 修为: 100 } },
+      { user数据: { 属性: afterAttrs, 修为: 120 } },
+      {
+        origin: 'ai',
+        producer: 'era',
+        timestamp: 1000,
+        batchId: 'bucketed-1',
+      },
+      candidate => candidate.path.join('.') === 'user数据.修为' ? 'ai' : 'background',
+    );
+
+    expect(result.ai.totalObservedCount).toBe(1);
+    expect(result.ai.omittedObservedCount).toBe(0);
+    expect(result.ai.observedChanges).toEqual([
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(result.background.totalObservedCount).toBe(150);
+    expect(result.background.observedChanges).toHaveLength(100);
+    expect(result.background.omittedObservedCount).toBe(50);
   });
 });
 

@@ -10,6 +10,7 @@ const FLOATING_BUBBLE_POSITION_DESKTOP_KEY = 'lorebook-floating-bubble-position-
 const FLOATING_BUBBLE_POSITION_MOBILE_KEY = 'lorebook-floating-bubble-position-mobile';
 const VALID_PC_LAYOUT_MODES = new Set(['drawer', 'master-detail']);
 const DEFAULT_AI_CHAT_CONTEXT = {
+  enabled: false,
   messageCount: 10,
 };
 const DEFAULT_AI_CONTEXT_BUDGET = {
@@ -144,6 +145,7 @@ const DEFAULT_AI_WORKSPACE_SETTINGS = {
 function normalizeAiChatContext(chatContext = {}) {
   const messageCount = Number.parseInt(`${chatContext?.messageCount ?? DEFAULT_AI_CHAT_CONTEXT.messageCount}`, 10);
   return {
+    enabled: chatContext?.enabled === true,
     messageCount: Number.isFinite(messageCount)
       ? Math.min(50, Math.max(0, messageCount))
       : DEFAULT_AI_CHAT_CONTEXT.messageCount,

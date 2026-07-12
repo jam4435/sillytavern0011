@@ -116,10 +116,12 @@ const state = {
   previewRunId: 0,
   initialized: false,
   hydrated: false,
-  chatContext: { messageCount: 10 },
+  chatContext: { enabled: false, messageCount: 10 },
   chatMessages: [],
   referenceMaterial: '',
   assistantChatHistory: [],
+  assistantModalTab: 'chat',
+  assistantSelectedText: '',
   modes: {
     direct: createEmptyModeState(),
     plan: createEmptyModeState(),
@@ -150,7 +152,9 @@ function normalizeChatContextCount(value) {
 }
 
 function currentChatContextSettings() {
+  const $enabled = $('#ai-workspace-chat-context-enabled', parentDoc());
   return {
+    enabled: $enabled.length ? $enabled.prop('checked') === true : state.chatContext.enabled === true,
     messageCount: normalizeChatContextCount($('#ai-workspace-chat-context-count', parentDoc()).val()),
   };
 }
@@ -183,6 +187,9 @@ function currentChatContextText() {
 }
 
 function currentChatMessagesForRequest() {
+  if (state.chatContext.enabled !== true) {
+    return [];
+  }
   return buildManualChatContextMessages(currentChatContextText());
 }
 
@@ -243,7 +250,10 @@ function hydrateStateFromSettings() {
   state.currentNav = normalizeNavMode(saved.navMode || 'direct');
   state.modelStatusText = '';
   state.sharedStatusText = '';
-  state.chatContext = { messageCount: normalizeChatContextCount(saved.chatContext?.messageCount) };
+  state.chatContext = {
+    enabled: saved.chatContext?.enabled === true,
+    messageCount: normalizeChatContextCount(saved.chatContext?.messageCount),
+  };
   state.chatMessages = _.cloneDeep(saved.chatMessages || []);
   state.referenceMaterial = saved.referenceMaterial || '';
   state.assistantChatHistory = _.cloneDeep(saved.assistantChatHistory || []);
@@ -321,9 +331,6 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
   }
   if ($('#ai-workspace-chat-context-preview', parentDoc()).length) {
     state.chatMessages = currentChatMessagesForRequest();
-  }
-  if ($('#ai-workspace-reference-material', parentDoc()).length) {
-    state.referenceMaterial = ($('#ai-workspace-reference-material', parentDoc()).val() || '').toString();
   }
   setAiWorkspaceSettings({
     ...saved,
@@ -466,12 +473,15 @@ function formatChatContextPreview(chatMessages = []) {
 function renderChatContextPreview() {
   const previewText = formatChatContextPreview(state.chatMessages);
   $('#ai-workspace-chat-context-count', parentDoc()).val(state.chatContext.messageCount);
+  $('#ai-workspace-chat-context-enabled', parentDoc()).prop('checked', state.chatContext.enabled === true);
   $('#ai-workspace-chat-context-preview', parentDoc()).val(previewText);
-  $('#ai-workspace-chat-context-status', parentDoc()).text(
-    previewText.trim()
+  $('#ai-workspace-chat-context-preview', parentDoc()).prop('disabled', state.chatContext.enabled !== true);
+  const summary = state.chatContext.enabled !== true
+    ? '未开启：生成计划或预览时不会注入聊天上下文。'
+    : previewText.trim()
       ? `聊天上下文已填写 ${previewText.trim().length} 个字符，将注入到 <聊天上下文>。`
-      : '尚未获取聊天消息。',
-  );
+      : '已开启，但尚未获取聊天消息。';
+  $('#ai-workspace-chat-context-status', parentDoc()).text(summary);
 }
 
 function renderReferenceMaterial() {
@@ -481,9 +491,10 @@ function renderReferenceMaterial() {
 
 function syncReferenceMaterialStatus() {
   const trimmed = (state.referenceMaterial || '').trim();
-  $('#ai-workspace-reference-material-status', parentDoc()).text(
-    trimmed ? `资料区已填写 ${trimmed.length} 个字符，将注入到 <参考资料>。` : '资料区为空。',
-  );
+  const statusText = trimmed ? `资料区已填写 ${trimmed.length} 个字符，将注入到 <参考资料>。` : '资料区为空。';
+  const assistantStatusText = trimmed ? `${trimmed.length} 字资料` : '资料为空';
+  $('#ai-workspace-reference-material-status', parentDoc()).text(statusText).attr('data-empty', trimmed ? 'false' : 'true');
+  $('#ai-workspace-assistant-reference-status', parentDoc()).text(assistantStatusText);
 }
 
 function renderAssistantHistory() {
@@ -505,8 +516,8 @@ function renderAssistantHistory() {
         <div class="ai-assistant-message-meta">${isAssistant ? 'AI 助手' : '用户'}</div>
         <div class="ai-assistant-message-body">${_.escape(item.content || '')}</div>
         <div class="ai-assistant-actions">
-          ${isAssistant ? `<button type="button" class="ai-assistant-pick" data-history-index="${index}">选取到资料区</button>` : ''}
-          <button type="button" class="ai-assistant-delete" data-history-index="${index}">删除</button>
+          ${isAssistant ? `<button type="button" class="ai-assistant-pick ai-button-secondary" data-history-index="${index}">选取到资料区</button>` : ''}
+          <button type="button" class="ai-assistant-delete ai-button-danger" data-history-index="${index}">删除</button>
         </div>
       </div>
     `);
@@ -520,6 +531,90 @@ function setAssistantStatus(text) {
 function setAssistantGeneratingState(isGenerating) {
   state.isAssistantGenerating = Boolean(isGenerating);
   $('#ai-workspace-assistant-send', parentDoc()).prop('disabled', state.isAssistantGenerating);
+}
+
+function switchAssistantTab(tab = 'chat') {
+  const nextTab = tab === 'reference' ? 'reference' : 'chat';
+  state.assistantModalTab = nextTab;
+  $('.ai-assistant-tab', parentDoc()).each(function () {
+    const isActive = ($(this).attr('data-assistant-tab') || 'chat') === nextTab;
+    $(this).toggleClass('is-active', isActive).attr('aria-selected', isActive ? 'true' : 'false');
+  });
+  $('.ai-assistant-tab-panel', parentDoc()).each(function () {
+    const isActive = ($(this).attr('data-assistant-panel') || 'chat') === nextTab;
+    $(this).css('display', isActive ? 'flex' : 'none');
+  });
+  hideAssistantSelectionToolbar();
+}
+
+function openAssistantModal(tab = state.assistantModalTab || 'chat') {
+  renderReferenceMaterial();
+  renderAssistantHistory();
+  switchAssistantTab(tab);
+  $('#ai-workspace-assistant-modal', parentDoc()).css('display', 'flex').attr('aria-hidden', 'false');
+}
+
+function closeAssistantModal() {
+  $('#ai-workspace-assistant-modal', parentDoc()).hide().attr('aria-hidden', 'true');
+  hideAssistantSelectionToolbar();
+}
+
+function hideAssistantSelectionToolbar() {
+  state.assistantSelectedText = '';
+  $('#ai-workspace-assistant-selection-toolbar', parentDoc()).hide();
+}
+
+function appendTextToReferenceMaterial(text, toastText = '已追加到资料区') {
+  const content = `${text || ''}`.trim();
+  if (!content) {
+    return;
+  }
+
+  const nextValue = state.referenceMaterial.trim()
+    ? `${state.referenceMaterial.trim()}\n\n${content}`
+    : content;
+  setReferenceMaterial(nextValue, { invalidateOutputs: true });
+  window.toastr?.success(toastText);
+}
+
+function updateAssistantSelectionToolbar() {
+  const selection = parentDoc().getSelection?.();
+  const $history = $('#ai-workspace-assistant-history', parentDoc());
+  const historyElement = $history.get(0);
+
+  if (!selection || !historyElement || !selection.rangeCount || selection.isCollapsed) {
+    hideAssistantSelectionToolbar();
+    return;
+  }
+
+  const selectedText = selection.toString().trim();
+  const range = selection.getRangeAt(0);
+  const startNode = range.startContainer;
+  const endNode = range.endContainer;
+  if (!selectedText || !historyElement.contains(startNode) || !historyElement.contains(endNode)) {
+    hideAssistantSelectionToolbar();
+    return;
+  }
+
+  const phoneElement = $('.ai-assistant-phone', parentDoc()).get(0);
+  const toolbar = $('#ai-workspace-assistant-selection-toolbar', parentDoc());
+  if (!phoneElement || !toolbar.length) {
+    return;
+  }
+
+  const rangeRect = range.getBoundingClientRect();
+  const phoneRect = phoneElement.getBoundingClientRect();
+  const left = Math.max(74, Math.min(phoneRect.width - 74, rangeRect.left - phoneRect.left + rangeRect.width / 2));
+  const top = Math.max(52, rangeRect.top - phoneRect.top - 8);
+  state.assistantSelectedText = selectedText;
+  toolbar.css({ display: 'flex', left: `${left}px`, top: `${top}px` });
+}
+
+function appendSelectedAssistantTextToReferenceMaterial() {
+  const text = state.assistantSelectedText || parentDoc().getSelection?.()?.toString()?.trim() || '';
+  appendTextToReferenceMaterial(text, '已将选中内容追加到资料区');
+  parentDoc().getSelection?.()?.removeAllRanges?.();
+  hideAssistantSelectionToolbar();
 }
 
 function invalidateModeOutputs(modeKey, { clearPlan = modeKey === 'plan' } = {}) {
@@ -1002,7 +1097,7 @@ function renderPreviewDetail(modeKey, uid = null) {
         <div class="ai-text">${item.changed ? '可直接编辑预览内容。' : '当前无实际变更，可手动编辑后应用。'}</div>
       </div>
       <div class="ai-preview-detail-actions">
-        <button type="button" id="ai-workspace-preview-detail-regenerate">重新生成此条</button>
+        <button type="button" id="ai-workspace-preview-detail-regenerate" class="ai-button-primary">重新生成此条</button>
         <button type="button" class="ai-preview-exclude" data-preview-uid="${item.uid}">排除此项</button>
       </div>
     </div>
@@ -1303,14 +1398,16 @@ function setReferenceMaterial(nextValue, { invalidateOutputs = false, syncTextar
 }
 
 async function refreshChatContext() {
-  state.chatContext = currentChatContextSettings();
+  state.chatContext = { ...currentChatContextSettings(), enabled: true };
   const messageCount = state.chatContext.messageCount;
 
   if (messageCount <= 0) {
+    state.chatContext.enabled = false;
     state.chatMessages = [];
     renderChatContextPreview();
     persistSettings({ mirrorModeKey: currentModeKey() });
-    setModeStatus(currentModeKey(), '聊天上下文已清空。若继续使用旧计划/预览，注意其未基于当前上下文重新生成。');
+    invalidateSharedInfoOutputs('聊天上下文已清空，请重新生成计划或预览。');
+    setModeStatus(currentModeKey(), '聊天上下文已清空。');
     return;
   }
 
@@ -1332,25 +1429,27 @@ async function refreshChatContext() {
   const loadedCount = state.chatMessages.length;
   renderChatContextPreview();
   persistSettings({ mirrorModeKey: currentModeKey() });
-  setModeStatus(currentModeKey(), `已刷新聊天上下文，共载入 ${loadedCount} 条消息。建议重新生成计划或预览。`);
+  invalidateSharedInfoOutputs('聊天上下文已更新，请重新生成计划或预览。');
+  setModeStatus(currentModeKey(), `已刷新聊天上下文，共载入 ${loadedCount} 条消息。`);
 }
 
 function handleChatContextEdited() {
+  const text = currentChatContextText().trim();
+  state.chatContext = { ...currentChatContextSettings(), enabled: Boolean(text) };
   state.chatMessages = currentChatMessagesForRequest();
-  $('#ai-workspace-chat-context-status', parentDoc()).text(
-    currentChatContextText().trim()
-      ? `聊天上下文已填写 ${currentChatContextText().trim().length} 个字符，将注入到 <聊天上下文>。`
-      : '尚未获取聊天消息。',
-  );
+  renderChatContextPreview();
   persistSettings({ mirrorModeKey: currentModeKey() });
-  setModeStatus(currentModeKey(), '聊天上下文已修改，建议重新生成计划或预览。');
+  invalidateSharedInfoOutputs('聊天上下文已修改，请重新生成计划或预览。');
+  setModeStatus(currentModeKey(), text ? '聊天上下文已修改并开启。' : '聊天上下文已清空并关闭。');
 }
 
 function handleChatContextClear() {
+  state.chatContext = { ...state.chatContext, enabled: false };
   state.chatMessages = [];
   renderChatContextPreview();
   persistSettings({ mirrorModeKey: currentModeKey() });
-  setModeStatus(currentModeKey(), '聊天上下文已清空。若继续使用旧计划/预览，注意其未基于当前上下文重新生成。');
+  invalidateSharedInfoOutputs('聊天上下文已清空，请重新生成计划或预览。');
+  setModeStatus(currentModeKey(), '聊天上下文已清空。');
 }
 
 function buildAssistantPrompt(userInput, saved = settings(), chatHistory = state.assistantChatHistory) {
@@ -1431,11 +1530,7 @@ function appendAssistantReplyToReferenceMaterial(index) {
     return;
   }
 
-  const nextValue = state.referenceMaterial.trim()
-    ? `${state.referenceMaterial.trim()}\n\n${historyItem.content}`
-    : historyItem.content;
-  setReferenceMaterial(nextValue, { invalidateOutputs: true });
-  window.toastr?.success('已追加到资料区');
+  appendTextToReferenceMaterial(historyItem.content, '已追加到资料区');
 }
 
 function deleteAssistantHistoryItem(index) {
@@ -1735,9 +1830,60 @@ function buildPreviewModalMarkup() {
           <div id="ai-workspace-preview-modal-content"></div>
         </div>
         <div class="ai-preview-modal-footer">
-          <button type="button" id="ai-workspace-preview-modal-regenerate">重新生成此条</button>
-          <button type="button" id="ai-workspace-preview-modal-save">保存修改</button>
-          <button type="button" id="ai-workspace-preview-modal-close-button">关闭</button>
+          <button type="button" id="ai-workspace-preview-modal-regenerate" class="ai-button-primary">重新生成此条</button>
+          <button type="button" id="ai-workspace-preview-modal-save" class="ai-button-primary">保存修改</button>
+          <button type="button" id="ai-workspace-preview-modal-close-button" class="ai-button-secondary">关闭</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function buildAssistantModalMarkup() {
+  return `
+    <div id="ai-workspace-assistant-modal" class="ai-assistant-modal" style="display:none;" aria-hidden="true">
+      <div class="ai-assistant-phone" role="dialog" aria-modal="true" aria-labelledby="ai-workspace-assistant-title">
+        <div class="ai-assistant-phone-header">
+          <div>
+            <div id="ai-workspace-assistant-title" class="ai-assistant-phone-title">AI 助手</div>
+            <div id="ai-workspace-assistant-reference-status" class="ai-assistant-phone-subtitle">资料为空</div>
+          </div>
+          <button type="button" id="ai-workspace-assistant-close" class="ai-icon-button" aria-label="关闭 AI 助手">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="ai-assistant-tabs" role="tablist" aria-label="AI 助手视图">
+          <button type="button" class="ai-assistant-tab is-active" data-assistant-tab="chat" role="tab" aria-selected="true">聊天</button>
+          <button type="button" class="ai-assistant-tab" data-assistant-tab="reference" role="tab" aria-selected="false">资料</button>
+        </div>
+        <div class="ai-assistant-phone-body">
+          <section class="ai-assistant-tab-panel" data-assistant-panel="chat">
+            <div class="ai-assistant-chat-area">
+              <div id="ai-workspace-assistant-history" class="ai-scroll ai-assistant-history"></div>
+              <div id="ai-workspace-assistant-selection-toolbar" class="ai-assistant-selection-toolbar" style="display:none;">
+                <button type="button" id="ai-workspace-assistant-selection-add">加入资料区</button>
+              </div>
+            </div>
+            <div class="ai-assistant-footer">
+              <div class="ai-assistant-actions-row">
+                <button type="button" id="ai-workspace-assistant-clear" class="ai-button-secondary">清空历史</button>
+                <span id="ai-workspace-assistant-status" class="ai-text"></span>
+              </div>
+              <div class="ai-assistant-composer">
+                <textarea id="ai-workspace-assistant-input" class="ai-assistant-input" placeholder="让助手整理设定、提炼要点或生成可放入资料区的文本。"></textarea>
+                <button type="button" id="ai-workspace-assistant-send" class="ai-send-button" aria-label="发送给 AI 助手">
+                  <i class="fa-solid fa-paper-plane"></i>
+                </button>
+              </div>
+            </div>
+          </section>
+          <section class="ai-assistant-tab-panel" data-assistant-panel="reference" style="display:none;">
+            <div class="ai-field ai-reference-editor-field">
+              <label for="ai-workspace-reference-material">参考资料</label>
+              <textarea id="ai-workspace-reference-material" class="ai-reference-material" placeholder="粘贴设定、百科、剧情摘要、风格约束等补充资料。"></textarea>
+            </div>
+            <div class="ai-note">这里的内容会注入到 &lt;参考资料&gt;。聊天中选中的文本会追加到这里。</div>
+          </section>
         </div>
       </div>
     </div>
@@ -1747,53 +1893,40 @@ function buildPreviewModalMarkup() {
 function buildInfoResourcesMarkup() {
   return `
     <div class="ai-info-panel">
-      <div class="ai-subpanel">
-        <div class="ai-subpanel-header">
-          <h5>上下文区</h5>
-          <p>拉取最近聊天消息，注入到&lt;聊天上下文&gt;。</p>
-        </div>
-        <div class="ai-row">
-          <div class="ai-field">
-            <label for="ai-workspace-chat-context-count">最近消息条数</label>
-            <input id="ai-workspace-chat-context-count" type="number" min="0" max="50" value="10">
-          </div>
-          <div class="ai-field ai-btn-field">
-            <label>&nbsp;</label>
-            <button type="button" id="ai-workspace-chat-context-refresh">刷新聊天上下文</button>
-          </div>
-          <div class="ai-field ai-btn-field">
-            <label>&nbsp;</label>
-            <button type="button" id="ai-workspace-chat-context-clear">清空上下文</button>
-          </div>
-        </div>
-        <div id="ai-workspace-chat-context-status" class="ai-text">尚未获取聊天消息。</div>
-        <textarea id="ai-workspace-chat-context-preview" class="ai-chat-context-textarea" placeholder="刷新最近消息后，可直接删掉不想作为参考的内容。"></textarea>
-      </div>
-      <div class="ai-subpanel">
-        <div class="ai-subpanel-header">
-          <h5>资料区</h5>
-          <p>手动输入或从 AI 助手选取文本，注入到&lt;参考资料&gt;。</p>
-        </div>
-        <div class="ai-field">
-          <label for="ai-workspace-reference-material">参考资料</label>
-          <textarea id="ai-workspace-reference-material" class="ai-reference-material" placeholder="粘贴设定、补充资料、剧情摘要或风格约束。"></textarea>
-        </div>
-        <div id="ai-workspace-reference-material-status" class="ai-text">资料区为空。</div>
-        <details class="ai-prompt-settings ai-assistant-panel" open>
-          <summary>AI 助手</summary>
-          <div class="ai-prompt-settings-body">
-            <div id="ai-workspace-assistant-history" class="ai-scroll ai-assistant-history"></div>
+      <details class="ai-prompt-settings ai-context-panel">
+        <summary>当前聊天中有需要提供给ai的信息时开启</summary>
+        <div class="ai-prompt-settings-body">
+          <label class="ai-toggle-line">
+            <input type="checkbox" id="ai-workspace-chat-context-enabled">
+            开启聊天上下文
+          </label>
+          <div class="ai-row">
             <div class="ai-field">
-              <label for="ai-workspace-assistant-input">助手输入</label>
-              <textarea id="ai-workspace-assistant-input" class="ai-assistant-input" placeholder="例如：根据当前资料，整理一段适合放进资料区的摘要。"></textarea>
+              <label for="ai-workspace-chat-context-count">最近消息条数</label>
+              <input id="ai-workspace-chat-context-count" type="number" min="0" max="50" value="10">
             </div>
-            <div class="ai-toolbar">
-              <button type="button" id="ai-workspace-assistant-send">发送给 AI 助手</button>
-              <button type="button" id="ai-workspace-assistant-clear">清空历史</button>
-              <span id="ai-workspace-assistant-status" class="ai-text"></span>
+            <div class="ai-field ai-btn-field">
+              <label>&nbsp;</label>
+              <button type="button" id="ai-workspace-chat-context-refresh" class="ai-button-secondary">刷新聊天上下文</button>
+            </div>
+            <div class="ai-field ai-btn-field">
+              <label>&nbsp;</label>
+              <button type="button" id="ai-workspace-chat-context-clear" class="ai-button-secondary">清空上下文</button>
             </div>
           </div>
-        </details>
+          <div id="ai-workspace-chat-context-status" class="ai-text">未开启：生成计划或预览时不会注入聊天上下文。</div>
+          <textarea id="ai-workspace-chat-context-preview" class="ai-chat-context-textarea" placeholder="刷新最近消息后，可直接删掉不想作为参考的内容。"></textarea>
+        </div>
+      </details>
+      <div class="ai-reference-compact">
+        <div>
+          <div class="ai-reference-title">资料区</div>
+          <div id="ai-workspace-reference-material-status" class="ai-text">资料区为空。</div>
+        </div>
+        <button type="button" class="ai-phone-inline-button" data-ai-open-assistant-tab="reference">
+          <i class="fa-solid fa-mobile-screen-button"></i>
+          打开 AI 助手
+        </button>
       </div>
     </div>
   `;
@@ -1831,7 +1964,7 @@ function buildApiSettingsMarkup() {
               </div>
               <div class="ai-field ai-btn-field">
                 <label>&nbsp;</label>
-                <button type="button" id="ai-workspace-load-models">读取模型列表</button>
+                <button type="button" id="ai-workspace-load-models" class="ai-button-secondary">读取模型列表</button>
               </div>
             </div>
           </div>
@@ -1916,7 +2049,7 @@ function buildSelectionMarkup(modeKey) {
         </div>
         <div class="ai-field ai-btn-field">
           <label>&nbsp;</label>
-          <button type="button" id="ai-workspace-refresh-entries">刷新条目</button>
+          <button type="button" id="ai-workspace-refresh-entries" class="ai-button-secondary">刷新条目</button>
         </div>
       </div>
       <div class="ai-row">
@@ -1926,14 +2059,14 @@ function buildSelectionMarkup(modeKey) {
         </div>
       </div>
       <div class="ai-toolbar">
-        <button type="button" id="ai-workspace-select-visible">当前筛选设为可修改</button>
-        <button type="button" id="ai-workspace-mark-visible-readonly">当前筛选设为只读</button>
-        <button type="button" id="ai-workspace-clear-selection">清空选择</button>
+        <button type="button" id="ai-workspace-select-visible" class="ai-button-secondary">当前筛选设为可修改</button>
+        <button type="button" id="ai-workspace-mark-visible-readonly" class="ai-button-secondary">当前筛选设为只读</button>
+        <button type="button" id="ai-workspace-clear-selection" class="ai-button-secondary">清空选择</button>
         <span id="ai-workspace-selection-summary" class="ai-text">尚未加载条目</span>
       </div>
       <div id="ai-workspace-entry-list" class="ai-scroll ai-entry-list"></div>
       <div class="ai-step-actions">
-        <button type="button" class="ai-secondary-button" data-ai-step-target="instruction">下一步：指令设定</button>
+        <button type="button" class="ai-secondary-button ai-button-secondary" data-ai-step-target="instruction">下一步：指令设定</button>
         <span id="ai-workspace-status" class="ai-text"></span>
       </div>
     </div>
@@ -1977,11 +2110,11 @@ function buildInstructionMarkup(modeKey) {
         </div>
       </details>
       <div class="ai-step-actions">
-        <button type="button" class="ai-secondary-button" data-ai-step-target="selection">返回条目选择</button>
+        <button type="button" class="ai-secondary-button ai-button-secondary" data-ai-step-target="selection">返回条目选择</button>
         ${modeKey === 'plan'
-          ? '<button type="button" id="ai-workspace-plan">生成改造方案</button>'
-          : '<button type="button" id="ai-workspace-preview">生成修改结果</button>'}
-        <button type="button" id="ai-workspace-stop" disabled>停止生成</button>
+          ? '<button type="button" id="ai-workspace-plan" class="ai-button-primary">生成改造方案</button>'
+          : '<button type="button" id="ai-workspace-preview" class="ai-button-primary">生成修改结果</button>'}
+        <button type="button" id="ai-workspace-stop" class="ai-button-danger" disabled>停止生成</button>
         <span id="ai-workspace-status" class="ai-text"></span>
       </div>
     </div>
@@ -2000,9 +2133,9 @@ function buildPlanningMarkup() {
         </details>
       </div>
       <div class="ai-step-actions">
-        <button type="button" class="ai-secondary-button" data-ai-step-target="instruction">返回指令设定</button>
-        <button type="button" id="ai-workspace-preview">确认方案并生成修改结果</button>
-        <button type="button" id="ai-workspace-stop" disabled>停止生成</button>
+        <button type="button" class="ai-secondary-button ai-button-secondary" data-ai-step-target="instruction">返回指令设定</button>
+        <button type="button" id="ai-workspace-preview" class="ai-button-primary">确认方案并生成修改结果</button>
+        <button type="button" id="ai-workspace-stop" class="ai-button-danger" disabled>停止生成</button>
         <span id="ai-workspace-status" class="ai-text"></span>
       </div>
     </div>
@@ -2021,12 +2154,12 @@ function buildResultMarkup(modeKey) {
         <div id="ai-workspace-preview-detail" class="ai-preview-detail"></div>
       </div>
       <div class="ai-step-actions">
-        <button type="button" class="ai-secondary-button" data-ai-step-target="${backStep}">返回上一步</button>
-        <button type="button" id="ai-workspace-preview">重新生成修改结果</button>
-        <button type="button" id="ai-workspace-stop" disabled>停止生成</button>
-        <button type="button" id="ai-workspace-apply" disabled>应用预览</button>
-        <button type="button" id="ai-workspace-rollback-preview" disabled>回滚预览</button>
-        <button type="button" id="ai-workspace-rollback-execute" disabled>执行回滚</button>
+        <button type="button" class="ai-secondary-button ai-button-secondary" data-ai-step-target="${backStep}">返回上一步</button>
+        <button type="button" id="ai-workspace-preview" class="ai-button-primary">重新生成修改结果</button>
+        <button type="button" id="ai-workspace-stop" class="ai-button-danger" disabled>停止生成</button>
+        <button type="button" id="ai-workspace-apply" class="ai-button-primary" disabled>应用预览</button>
+        <button type="button" id="ai-workspace-rollback-preview" class="ai-button-secondary" disabled>回滚预览</button>
+        <button type="button" id="ai-workspace-rollback-execute" class="ai-button-danger" disabled>执行回滚</button>
         <span id="ai-workspace-status" class="ai-text"></span>
       </div>
       <div class="ai-debug-grid">
@@ -2113,10 +2246,20 @@ function buildDesktopShellMarkup() {
             <i class="fa-solid fa-bars"></i>
           </button>
         </div>
-        <div class="ai-nav-title">AI 工作台</div>
+        <div class="ai-nav-title">
+          <span>AI 工作台</span>
+          <button type="button" id="ai-workspace-open-assistant" class="ai-phone-title-button" aria-label="打开 AI 助手">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+          </button>
+        </div>
         <div id="ai-workspace-mobile-nav-list" class="ai-nav-list">
           <div class="ai-mobile-nav-menu-header">
-            <span>AI 工作台</span>
+            <div class="ai-mobile-menu-title">
+              <span>AI 工作台</span>
+              <button type="button" class="ai-phone-title-button" data-ai-open-assistant-tab="chat" aria-label="打开 AI 助手">
+                <i class="fa-solid fa-mobile-screen-button"></i>
+              </button>
+            </div>
             <strong class="ai-mobile-nav-current">当前：${_.escape(getNavItemLabel())}</strong>
           </div>
           ${NAV_ITEMS.map(item => `
@@ -2136,6 +2279,7 @@ function buildDesktopShellMarkup() {
         <div id="ai-workspace-desktop-panel"></div>
       </section>
       ${buildPreviewModalMarkup()}
+      ${buildAssistantModalMarkup()}
     </div>
   `;
 }
@@ -2167,7 +2311,10 @@ function ensureStyles() {
       #${ROOT_ID} .ai-mobile-nav-toggle:hover{background:rgba(255,255,255,.08)}
       #${ROOT_ID} .ai-mobile-nav-menu-header{display:none}
       #${ROOT_ID} .ai-mobile-nav-current{min-width:0;font-size:13px;font-weight:600;color:var(--panel-text-color,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      #${ROOT_ID} .ai-nav-title{font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--panel-text-color,#eee)}
+      #${ROOT_ID} .ai-nav-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px;font-weight:700;letter-spacing:0;color:var(--panel-text-color,#eee)}
+      #${ROOT_ID} .ai-phone-title-button{width:32px;height:32px;min-width:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:var(--panel-text-color,#eee)}
+      #${ROOT_ID} .ai-phone-title-button:hover{background:rgba(255,255,255,.12)}
+      #${ROOT_ID} .ai-mobile-menu-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
       #${ROOT_ID} .ai-nav-list{display:flex;flex-direction:column;gap:8px}
       #${ROOT_ID} .ai-mode-nav-button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;border:1px solid var(--panel-border-color,#555);border-radius:8px;background:rgba(255,255,255,.02);color:var(--panel-text-color,#eee);padding:12px 14px;cursor:pointer;text-align:left}
       #${ROOT_ID} .ai-mode-nav-button.is-active{border-color:var(--panel-accent-color,#9a7ace);background:rgba(154,122,206,.18);box-shadow:inset 0 0 0 1px rgba(154,122,206,.18)}
@@ -2209,10 +2356,19 @@ function ensureStyles() {
       #${ROOT_ID} .ai-subpanel{border:1px solid var(--panel-border-color,#444);border-radius:6px;background:var(--panel-entry-bg-color,#242424);padding:12px;display:flex;flex-direction:column;gap:12px}
       #${ROOT_ID} .ai-subpanel-header h5{margin:0 0 4px 0;font-size:14px}
       #${ROOT_ID} .ai-subpanel-header p{margin:0;color:var(--panel-text-color,#cfd8dc);font-size:12px;line-height:1.5}
+      #${ROOT_ID} .ai-toggle-line{display:inline-flex;align-items:center;gap:8px}
+      #${ROOT_ID} .ai-context-panel:not([open]){background:var(--panel-entry-bg-color,#242424)}
+      #${ROOT_ID} .ai-reference-compact{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--panel-border-color,#444);border-radius:8px;background:var(--panel-entry-bg-color,#242424);padding:12px}
+      #${ROOT_ID} .ai-reference-title{font-size:13px;font-weight:700;margin-bottom:4px}
+      #${ROOT_ID} #ai-workspace-reference-material-status[data-empty='true']{opacity:.74}
+      #${ROOT_ID} .ai-phone-inline-button{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;background:transparent;border-color:rgba(255,255,255,.18)}
       #${ROOT_ID} .ai-budget-panel{border:1px solid var(--panel-border-color,#444);border-radius:6px;background:var(--panel-entry-bg-color,#242424);padding:12px;display:flex;flex-direction:column;gap:10px}
       #${ROOT_ID} button{border:1px solid var(--panel-border-color,#666);border-radius:6px;background:var(--panel-accent-color,#4a6a8a);color:var(--panel-text-color,#fff);padding:9px 12px;cursor:pointer}
       #${ROOT_ID} button[disabled]{opacity:.6;cursor:not-allowed}
       #${ROOT_ID} .ai-secondary-button{background:transparent}
+      #${ROOT_ID} .ai-button-primary{background:var(--panel-accent-color,#4a6a8a);border-color:rgba(159,200,228,.45);font-weight:600}
+      #${ROOT_ID} .ai-button-secondary{background:transparent;border-color:rgba(255,255,255,.18)}
+      #${ROOT_ID} .ai-button-danger{background:rgba(164,68,68,.22);border-color:rgba(230,120,120,.45);color:#ffd7d7}
       #${ROOT_ID} .ai-toolbar,#${ROOT_ID} .ai-step-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
       #${ROOT_ID} .ai-api-toolbar{justify-content:space-between}
       #${ROOT_ID} .ai-status-line{display:flex;align-items:center;gap:10px}
@@ -2244,6 +2400,35 @@ function ensureStyles() {
       #${ROOT_ID} .ai-assistant-message-body{white-space:pre-wrap;word-break:break-word;line-height:1.5}
       #${ROOT_ID} .ai-assistant-actions{margin-top:8px}
       #${ROOT_ID} .ai-assistant-actions button{padding:6px 10px;font-size:12px}
+      #${ROOT_ID} .ai-assistant-modal{position:fixed;inset:0;z-index:10007;background:rgba(0,0,0,.58);display:none;align-items:center;justify-content:flex-end;padding:24px max(24px,5vw);box-sizing:border-box}
+      #${ROOT_ID} .ai-assistant-phone{width:min(420px,calc(100vw - 48px));height:min(720px,calc(100vh - 48px));min-height:520px;border:1px solid rgba(255,255,255,.18);border-radius:8px;background:var(--panel-bg-color,#252525);box-shadow:0 20px 60px rgba(0,0,0,.55);display:flex;flex-direction:column;overflow:hidden;position:relative}
+      #${ROOT_ID} .ai-assistant-phone-header{padding:12px 14px;background:var(--panel-entry-bg-color,#2f2f2f);border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;gap:12px}
+      #${ROOT_ID} .ai-assistant-phone-title{font-size:15px;font-weight:700}
+      #${ROOT_ID} .ai-assistant-phone-subtitle{font-size:12px;color:var(--panel-text-color,#cfd8dc);margin-top:2px}
+      #${ROOT_ID} .ai-icon-button{width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:transparent;border-color:rgba(255,255,255,.16)}
+      #${ROOT_ID} .ai-assistant-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;background:var(--panel-entry-bg-color,#2a2a2a);border-bottom:1px solid rgba(255,255,255,.08)}
+      #${ROOT_ID} .ai-assistant-tab{padding:7px 8px;border-radius:8px;background:transparent;border-color:transparent;color:var(--panel-text-color,#d9d9d9)}
+      #${ROOT_ID} .ai-assistant-tab.is-active{background:rgba(159,200,228,.18);border-color:rgba(159,200,228,.35);color:var(--panel-text-color,#fff)}
+      #${ROOT_ID} .ai-assistant-phone-body{min-height:0;flex:1 1 auto;display:flex;flex-direction:column;background:rgba(255,255,255,.02)}
+      #${ROOT_ID} .ai-assistant-tab-panel{min-height:0;flex:1 1 auto;display:flex;flex-direction:column;gap:0}
+      #${ROOT_ID} .ai-assistant-chat-area{position:relative;min-height:0;flex:1 1 auto;display:flex;flex-direction:column}
+      #${ROOT_ID} .ai-assistant-history{min-height:0;max-height:none;flex:1 1 auto;padding:12px;display:flex;flex-direction:column;gap:10px;border:0;border-radius:0;background:transparent;user-select:text;-webkit-user-select:text}
+      #${ROOT_ID} .ai-assistant-message{max-width:86%;padding:9px 11px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(255,255,255,.07);box-shadow:none}
+      #${ROOT_ID} .ai-assistant-message + .ai-assistant-message{margin-top:0}
+      #${ROOT_ID} .ai-assistant-message.is-assistant{align-self:flex-start;border-color:rgba(159,200,228,.25);background:rgba(159,200,228,.12)}
+      #${ROOT_ID} .ai-assistant-message.is-user{align-self:flex-end;background:rgba(111,180,140,.18);border-color:rgba(111,180,140,.28)}
+      #${ROOT_ID} .ai-assistant-message-meta{font-size:11px;opacity:.72;margin-bottom:4px}
+      #${ROOT_ID} .ai-assistant-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+      #${ROOT_ID} .ai-assistant-actions button{border-radius:6px;padding:5px 8px;font-size:12px}
+      #${ROOT_ID} .ai-assistant-footer{border-top:1px solid rgba(255,255,255,.08);background:var(--panel-entry-bg-color,#292929);padding:8px;display:flex;flex-direction:column;gap:8px}
+      #${ROOT_ID} .ai-assistant-actions-row{display:flex;align-items:center;gap:8px;min-height:30px}
+      #${ROOT_ID} .ai-assistant-composer{display:grid;grid-template-columns:minmax(0,1fr) 38px;gap:8px;align-items:end}
+      #${ROOT_ID} .ai-assistant-input{min-height:44px;max-height:120px;resize:vertical;border-radius:8px}
+      #${ROOT_ID} .ai-send-button{width:38px;height:38px;padding:0;border-radius:8px;display:inline-flex;align-items:center;justify-content:center}
+      #${ROOT_ID} .ai-reference-editor-field{min-height:0;flex:1 1 auto;padding:12px}
+      #${ROOT_ID} .ai-reference-editor-field .ai-reference-material{min-height:360px;flex:1 1 auto;border-radius:8px;background:#151f1c;border-color:rgba(255,255,255,.12)}
+      #${ROOT_ID} .ai-assistant-selection-toolbar{position:absolute;z-index:3;transform:translate(-50%,-100%);background:var(--panel-bg-color,#242424);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:5px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+      #${ROOT_ID} .ai-assistant-selection-toolbar button{padding:6px 10px;border-radius:6px;background:rgba(159,200,228,.18);border-color:rgba(159,200,228,.35);white-space:nowrap}
       #${ROOT_ID} .ai-preview-item{padding:12px;border-bottom:1px solid var(--panel-border-color,#3e3e3e);cursor:pointer}
       #${ROOT_ID} .ai-preview-item:hover{background:rgba(255,255,255,.04)}
       #${ROOT_ID} .ai-preview-item.is-active{background:rgba(154,122,206,.18)}
@@ -2312,6 +2497,14 @@ function ensureStyles() {
         #${ROOT_ID} .ai-result-grid{grid-template-columns:1fr}
         #${ROOT_ID} .ai-preview-detail-header{flex-direction:column}
         #${ROOT_ID} .ai-preview-detail-actions{width:100%;justify-content:flex-start}
+        #${ROOT_ID} .ai-reference-compact{align-items:stretch;flex-direction:column}
+        #${ROOT_ID} .ai-phone-inline-button{justify-content:center;width:100%}
+        #${ROOT_ID} .ai-assistant-modal{padding:0;align-items:stretch;justify-content:stretch}
+        #${ROOT_ID} .ai-assistant-phone{width:100vw;height:100dvh;max-width:none;min-height:0;border-radius:0;border:0}
+        #${ROOT_ID} .ai-assistant-phone-header{padding-top:max(12px,env(safe-area-inset-top))}
+        #${ROOT_ID} .ai-assistant-footer{padding-bottom:max(8px,env(safe-area-inset-bottom))}
+        #${ROOT_ID} .ai-assistant-message{max-width:90%}
+        #${ROOT_ID} .ai-reference-editor-field .ai-reference-material{min-height:260px}
       }
     </style>
   `);
@@ -2857,6 +3050,23 @@ function bindEvents() {
       persistSettings({ mirrorModeKey: currentModeKey() });
       setModeStatus(currentModeKey(), '聊天上下文条数已更新，点击“刷新聊天上下文”后生效。');
     })
+    .on('change.aiWorkspaceDesktop', '#ai-workspace-chat-context-enabled', () => {
+      state.chatContext = currentChatContextSettings();
+      if (!state.chatContext.enabled) {
+        state.chatMessages = [];
+      }
+      renderChatContextPreview();
+      persistSettings({ mirrorModeKey: currentModeKey() });
+      invalidateSharedInfoOutputs(
+        state.chatContext.enabled
+          ? '聊天上下文已开启，请刷新后重新生成计划或预览。'
+          : '聊天上下文已关闭并清空，请重新生成计划或预览。',
+      );
+      setModeStatus(
+        currentModeKey(),
+        state.chatContext.enabled ? '聊天上下文已开启，请刷新后使用。' : '聊天上下文已关闭并清空。',
+      );
+    })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-chat-context-refresh', async () => {
       try {
         await refreshChatContext();
@@ -3015,6 +3225,25 @@ function bindEvents() {
     .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-modal-regenerate', async () => {
       await handlePreviewModalRegenerate();
     })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-open-assistant, [data-ai-open-assistant-tab]', function () {
+      openAssistantModal($(this).attr('data-ai-open-assistant-tab') || 'chat');
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-assistant-close', () => {
+      closeAssistantModal();
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-assistant-modal', function (event) {
+      if (event.target === this) {
+        closeAssistantModal();
+      }
+    })
+    .on('keydown.aiWorkspaceDesktop', event => {
+      if (event.key === 'Escape' && $('#ai-workspace-assistant-modal', parentDoc()).is(':visible')) {
+        closeAssistantModal();
+      }
+    })
+    .on('click.aiWorkspaceDesktop', '.ai-assistant-tab', function () {
+      switchAssistantTab($(this).attr('data-assistant-tab') || 'chat');
+    })
     .on('input.aiWorkspaceDesktop', '#ai-workspace-preview-modal-content textarea[data-preview-field]', () => {
       if (state.currentNav !== 'direct' && state.currentNav !== 'plan') {
         return;
@@ -3076,6 +3305,17 @@ function bindEvents() {
     })
     .on('click.aiWorkspaceDesktop', '.ai-assistant-delete', function () {
       deleteAssistantHistoryItem($(this).attr('data-history-index'));
+    })
+    .on('mouseup.aiWorkspaceDesktop touchend.aiWorkspaceDesktop keyup.aiWorkspaceDesktop', '#ai-workspace-assistant-history', () => {
+      setTimeout(updateAssistantSelectionToolbar, 0);
+    })
+    .on('selectionchange.aiWorkspaceDesktop', () => {
+      if ($('#ai-workspace-assistant-modal', parentDoc()).is(':visible')) {
+        setTimeout(updateAssistantSelectionToolbar, 0);
+      }
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-assistant-selection-add', () => {
+      appendSelectedAssistantTextToReferenceMaterial();
     })
     .on('keydown.aiWorkspaceDesktop', '#ai-workspace-preview-modal .ai-preview-modal-close', function (event) {
       if (event.key === 'Enter' || event.key === ' ') {

@@ -96,6 +96,28 @@ export interface ObservedVariableChangesResult {
   nextSnapshotHash: string | null;
 }
 
+export interface VariableObservedDiffCandidate {
+  action: VariableChangeAction;
+  path: VariablePath;
+  beforeValue: unknown;
+  afterValue: unknown;
+}
+
+export interface ObservedVariableChangeBucket {
+  observedChanges: VariableActualChange[];
+  omittedObservedCount: number;
+  totalObservedCount: number;
+}
+
+export interface BucketedObservedVariableChangesResult {
+  ai: ObservedVariableChangeBucket;
+  background: ObservedVariableChangeBucket;
+  totalObservedCount: number;
+  batch: VariableObservedBatch | null;
+  previousSnapshotHash: string | null;
+  nextSnapshotHash: string | null;
+}
+
 export interface VariableAiComparisonResult {
   comparisons: VariableAiComparison[];
   omittedComparisonCount: number;
@@ -545,21 +567,11 @@ function pushObservedChange(
   }
 }
 
-function collectObservedDiffs(
+function visitObservedDiffs(
   beforeValue: unknown,
   afterValue: unknown,
   path: VariablePath,
-  result: VariableActualChange[],
-  counters: { total: number },
-  metadata: {
-    origin: VariableChangeOrigin;
-    producer: VariableChangeProducer;
-    timestamp: number;
-    batchId: string;
-    actions: VariableWriteActions | null;
-    reason: string | null;
-    assistantMessageId?: number;
-  },
+  visit: (candidate: VariableObservedDiffCandidate) => void,
 ): void {
   if (areValuesEqual(beforeValue, afterValue)) {
     return;
@@ -571,11 +583,11 @@ function collectObservedDiffs(
   if (beforeValue === undefined && afterIsContainer) {
     const entries = getVisibleEntries(afterValue);
     if (entries.length === 0) {
-      pushObservedChange(result, counters, 'insert', path, beforeValue, afterValue, metadata);
+      visit({ action: 'insert', path, beforeValue, afterValue });
       return;
     }
     for (const [key, childValue] of entries) {
-      collectObservedDiffs(undefined, childValue, [...path, key], result, counters, metadata);
+      visitObservedDiffs(undefined, childValue, [...path, key], visit);
     }
     return;
   }
@@ -583,25 +595,22 @@ function collectObservedDiffs(
   if (afterValue === undefined && beforeIsContainer) {
     const entries = getVisibleEntries(beforeValue);
     if (entries.length === 0) {
-      pushObservedChange(result, counters, 'delete', path, beforeValue, afterValue, metadata);
+      visit({ action: 'delete', path, beforeValue, afterValue });
       return;
     }
     for (const [key, childValue] of entries) {
-      collectObservedDiffs(childValue, undefined, [...path, key], result, counters, metadata);
+      visitObservedDiffs(childValue, undefined, [...path, key], visit);
     }
     return;
   }
 
   if (!beforeIsContainer || !afterIsContainer || Array.isArray(beforeValue) !== Array.isArray(afterValue)) {
-    pushObservedChange(
-      result,
-      counters,
-      normalizeObservedAction(beforeValue, afterValue),
+    visit({
+      action: normalizeObservedAction(beforeValue, afterValue),
       path,
       beforeValue,
       afterValue,
-      metadata,
-    );
+    });
     return;
   }
 
@@ -627,8 +636,37 @@ function collectObservedDiffs(
       ? afterRecord[key]
       : (afterRecord as Record<string, unknown>)[String(key)];
 
-    collectObservedDiffs(beforeChild, afterChild, [...path, key], result, counters, metadata);
+    visitObservedDiffs(beforeChild, afterChild, [...path, key], visit);
   }
+}
+
+function collectObservedDiffs(
+  beforeValue: unknown,
+  afterValue: unknown,
+  path: VariablePath,
+  result: VariableActualChange[],
+  counters: { total: number },
+  metadata: {
+    origin: VariableChangeOrigin;
+    producer: VariableChangeProducer;
+    timestamp: number;
+    batchId: string;
+    actions: VariableWriteActions | null;
+    reason: string | null;
+    assistantMessageId?: number;
+  },
+): void {
+  visitObservedDiffs(beforeValue, afterValue, path, candidate => {
+    pushObservedChange(
+      result,
+      counters,
+      candidate.action,
+      candidate.path,
+      candidate.beforeValue,
+      candidate.afterValue,
+      metadata,
+    );
+  });
 }
 
 export function createObservedVariableChanges(
@@ -687,6 +725,102 @@ export function createObservedVariableChanges(
         previousSnapshotHash,
         nextSnapshotHash,
         changeCount: counters.total,
+      }
+      : null,
+    previousSnapshotHash,
+    nextSnapshotHash,
+  };
+}
+
+export function createBucketedObservedVariableChanges(
+  previousStatData: Record<string, unknown> | null,
+  nextStatData: Record<string, unknown> | null,
+  metadata: {
+    origin: VariableChangeOrigin;
+    producer: VariableChangeProducer;
+    timestamp: number;
+    batchId: string;
+    actions?: VariableWriteActions | null;
+    reason?: string | null;
+    assistantMessageId?: number;
+  },
+  classify: (candidate: VariableObservedDiffCandidate) => VariableChangeOrigin,
+): BucketedObservedVariableChangesResult {
+  const previousSnapshotHash = previousStatData ? getSnapshotHash(previousStatData) : null;
+  const nextSnapshotHash = nextStatData ? getSnapshotHash(nextStatData) : null;
+  const emptyBucket = (): ObservedVariableChangeBucket => ({
+    observedChanges: [],
+    omittedObservedCount: 0,
+    totalObservedCount: 0,
+  });
+  const buckets: Record<VariableChangeOrigin, ObservedVariableChangeBucket> = {
+    ai: emptyBucket(),
+    background: emptyBucket(),
+  };
+
+  if (!previousStatData || !nextStatData) {
+    return {
+      ai: buckets.ai,
+      background: buckets.background,
+      totalObservedCount: 0,
+      batch: null,
+      previousSnapshotHash,
+      nextSnapshotHash,
+    };
+  }
+
+  const normalizedMetadata = {
+    origin: metadata.origin,
+    producer: metadata.producer,
+    timestamp: metadata.timestamp,
+    batchId: metadata.batchId,
+    actions: normalizeWriteActions(metadata.actions),
+    reason: metadata.reason ?? null,
+    assistantMessageId: metadata.assistantMessageId,
+  };
+  let totalObservedCount = 0;
+
+  visitObservedDiffs(previousStatData, nextStatData, [], candidate => {
+    totalObservedCount += 1;
+    const origin = classify(candidate);
+    const bucket = buckets[origin];
+    bucket.totalObservedCount += 1;
+
+    if (bucket.observedChanges.length < MAX_STORED_VARIABLE_CHANGES) {
+      bucket.observedChanges.push(createObservedChange(
+        candidate.action,
+        candidate.path,
+        candidate.beforeValue,
+        candidate.afterValue,
+        bucket.totalObservedCount,
+        {
+          ...normalizedMetadata,
+          origin,
+        },
+      ));
+    }
+  });
+
+  for (const bucket of Object.values(buckets)) {
+    bucket.omittedObservedCount = Math.max(0, bucket.totalObservedCount - bucket.observedChanges.length);
+  }
+
+  return {
+    ai: buckets.ai,
+    background: buckets.background,
+    totalObservedCount,
+    batch: totalObservedCount > 0 && previousSnapshotHash && nextSnapshotHash
+      ? {
+        batchId: metadata.batchId,
+        origin: metadata.origin,
+        producer: metadata.producer,
+        timestamp: metadata.timestamp,
+        reason: metadata.reason ?? null,
+        actions: normalizedMetadata.actions,
+        assistantMessageId: metadata.assistantMessageId,
+        previousSnapshotHash,
+        nextSnapshotHash,
+        changeCount: totalObservedCount,
       }
       : null,
     previousSnapshotHash,

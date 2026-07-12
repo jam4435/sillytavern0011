@@ -7,6 +7,8 @@ const extraDeclaredReply = '<VariableEdit>{"user数据":{"属性":{"根骨":70}}
 const backendOnlyReply = '<VariableEdit>{"user数据":{"属性":{"臂力":80}}}</VariableEdit>';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const createNumberMap = (count: number, value: number): Record<string, number> =>
+  Object.fromEntries(Array.from({ length: count }, (_, index) => [`attr${index}`, value]));
 
 const getVariablesMock = globalThis.getVariables as ReturnType<typeof vi.fn>;
 const getChatMessagesMock = globalThis.getChatMessages as ReturnType<typeof vi.fn>;
@@ -205,6 +207,60 @@ describe('useVariableChangeTracker', () => {
         producer: 'event-script',
         beforeValue: 120,
         afterValue: 80,
+      }),
+    ]);
+  });
+
+  it('AI 实际计数只包含匹配声明的叶子，不吞掉大量后台溢出 diff', () => {
+    currentStatData = {
+      user数据: {
+        属性: createNumberMap(150, 0),
+        修为: 100,
+      },
+    };
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    currentStatData = {
+      user数据: {
+        属性: createNumberMap(150, 1),
+        修为: 120,
+      },
+    };
+
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'era-api-write',
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        origin: 'ai',
+        producer: 'era',
+        path: ['user数据', '修为'],
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.aiReply.omittedObservedCount).toBe(0);
+    expect(result.current.variableChanges?.background.observedChanges).toHaveLength(100);
+    expect(result.current.variableChanges?.background.omittedObservedCount).toBe(50);
+    expect(result.current.variableChanges?.batches).toEqual([
+      expect.objectContaining({
+        origin: 'ai',
+        changeCount: 1,
+      }),
+      expect.objectContaining({
+        origin: 'background',
+        changeCount: 150,
       }),
     ]);
   });
