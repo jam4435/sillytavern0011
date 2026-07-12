@@ -62,7 +62,7 @@ describe('iconCatalog', () => {
     );
 
     expect(resolveInventoryIcon({ ...baseItem, name: '达摩心经残页', type: 'MISC', rank: 'BLUE' })).toEqual(
-      expect.objectContaining({ category: '地图书信', matchedBy: 'name' }),
+      expect.objectContaining({ category: '书信文书', matchedBy: 'name' }),
     );
   });
 
