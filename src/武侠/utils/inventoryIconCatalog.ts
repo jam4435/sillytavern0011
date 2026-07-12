@@ -250,6 +250,27 @@ const assets: Record<InventoryVisualCategory, RankAssets> = {
 const normalize = (value: string | undefined): string =>
   (value || '').toLowerCase().replace(/[\s_·・《》<>（）()[\]【】$-]/g, '');
 
+const exactCategoryByType: Partial<Record<InventoryItem['type'], Record<string, InventoryVisualCategory>>> = {
+  EQUIP: {
+    铁沙掌套: '护手',
+    银针药囊: '饰品',
+    惊堂木: '锤',
+    螺钿团扇: '扇',
+  },
+  ELIXIR: {
+    少林金疮药: '药散',
+    华山跌打药: '药散',
+    山寨旧藏金创药: '药散',
+    三步倒: '毒物',
+    定神香: '香囊',
+    安神香囊: '香囊',
+  },
+  MISC: {
+    达摩心经残页: '书信文书',
+    贴身羊皮残图: '地图',
+  },
+};
+
 function inferElixirCategory(item: InventoryItem): { category: InventoryVisualCategory; matchedBy: 'name' | 'type' } {
   const name = normalize(item.name);
   const detail = normalize(`${item.name}${item.description}`);
@@ -333,8 +354,10 @@ function inferMiscCategory(item: InventoryItem): { category: InventoryVisualCate
 }
 
 export function resolveInventoryVisual(item: InventoryItem): InventoryVisualResult {
-  const inferred =
-    item.type === 'ELIXIR'
+  const exactCategory = exactCategoryByType[item.type]?.[normalize(item.name)];
+  const inferred = exactCategory
+    ? { category: exactCategory, matchedBy: 'name' as const }
+    : item.type === 'ELIXIR'
       ? inferElixirCategory(item)
       : item.type === 'EQUIP'
         ? inferEquipCategory(item)
