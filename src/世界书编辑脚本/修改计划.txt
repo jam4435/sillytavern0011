@@ -1,0 +1,441 @@
+# AI 工作区 UI 美化方案
+
+## 1. 总体设计理念
+
+本方案旨在将“世界书编辑脚本”的AI工作区从现有功能性的抽屉式/主从布局，重塑为一个专业、现代、具有科技感的SaaS工具界面。设计灵感来源于Vercel Dashboard、Linear及Claude 2等现代AI与开发工具，强调清晰的信息层级、流畅的操作流程和精致的视觉细节。
+
+**核心设计原则：**
+
+1.  **沉浸式主从布局 (PC端):** 借鉴现代Web App，采用左侧固定导航栏+右侧内容区的经典布局，取代目前分散的抽屉式结构，为核心操作提供更集中的舞台。
+2.  **卡片化与分组:** 将功能区域（如API设置、条目选择、指令等）整合进视觉清晰的卡片（Panel）中，使用圆角、描边和阴影定义边界，增强模块感。
+3.  **视觉层级优化:** 通过字体大小、字重、颜色和间距的微妙变化，引导用户视线。重要操作按钮（如“生成预览”）将使用更醒目的强调色，次要操作则弱化处理。
+4.  **精致的交互反馈:** 为按钮、输入框、下拉菜单等交互元素添加平滑的过渡动画和状态变化（Hover, Focus, Active），提升操作的响应感和愉悦感。
+5.  **统一的视觉语言:** 严格遵循 `theme.js` 中的CSS变量，确保新设计能与现有主题系统无缝对接，同时引入新的CSS变量以支持更丰富的视觉效果（如渐变、阴影）。
+6.  **响应式设计:** 移动端将保留并优化现有的“手机弹窗式AI助手”和抽屉式布局，但会采用与PC端一致的视觉风格和组件样式，确保跨设备体验的一致性。
+
+---
+
+## 2. PC端UI美化方案 (`aiWorkspaceDesktop.js`)
+
+PC端将从根本上重构HTML结构，实现“左侧导航 + 右侧内容区”的主从布局。
+
+### 2.1 整体HTML结构变更
+
+将原有分散的 `ai-page` 和 `ai-panel` 替换为以下结构：
+
+```html
+<!-- In aiWorkspaceDesktop.js, inside ensureMarkup() -->
+<div id="lorebook-ai-workspace" class="desktop-layout" data-layout="desktop">
+    <!-- 1. 左侧固定导航栏 -->
+    <nav class="ai-sidebar">
+        <div class="ai-sidebar-header">
+            <i class="fa-solid fa-brain"></i>
+            <span>AI 工作区</span>
+        </div>
+        <ul class="ai-sidebar-nav-list">
+            <li class="ai-sidebar-nav-item is-active" data-ai-nav="direct">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>直接修改</span>
+            </li>
+            <li class="ai-sidebar-nav-item" data-ai-nav="plan">
+                <i class="fa-solid fa-clipboard-list"></i>
+                <span>计划修改</span>
+            </li>
+            <li class="ai-sidebar-nav-item" data-ai-nav="api">
+                <i class="fa-solid fa-sliders"></i>
+                <span>API 设置</span>
+            </li>
+            <li class="ai-sidebar-nav-item" data-ai-nav="generate">
+                <i class="fa-solid fa-microchip"></i>
+                <span>世界书生成</span>
+            </li>
+        </ul>
+        <div class="ai-sidebar-footer">
+            <button type="button" id="ai-workspace-open-assistant" class="ai-sidebar-assistant-btn">
+                <i class="fa-solid fa-mobile-screen-button"></i>
+                <span>AI 助手</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 2. 右侧主内容区 -->
+    <main class="ai-main-content">
+        <!-- 页面头部 -->
+        <header class="ai-main-header">
+            <h1 id="ai-workspace-main-title">直接修改</h1>
+            <p id="ai-workspace-main-description">选择条目，给出指令，再预览写回。</p>
+        </header>
+
+        <!-- 内容区域，根据导航切换 -->
+        <div id="ai-workspace-page-container">
+            <!-- 具体页面的内容将动态插入这里 -->
+        </div>
+    </main>
+
+    <!-- 3. 手机助手和预览弹窗 (保持不变，仅调整样式) -->
+    ${buildAssistantModalMarkup()}
+    ${buildPreviewModalMarkup()}
+</div>
+```
+
+### 2.2 各功能区域详细设计
+
+#### 2.2.1 API设置页 (`api`)
+
+将原抽屉内的API设置项，重新组织到内容区的卡片中。
+
+**HTML结构 (`buildApiSettingsMarkup`):**
+
+```html
+<div class="ai-page-content" data-page="api">
+    <div class="ai-card">
+        <div class="ai-card-header">
+            <h3>API 模式</h3>
+            <p>选择调用语言模型的方式。</p>
+        </div>
+        <div class="ai-card-body">
+            <div class="ai-radio-group-tabs">
+                <label>
+                    <input type="radio" name="ai-workspace-api-mode" value="preset" checked>
+                    <span><i class="fa-solid fa-book-bookmark"></i> 使用酒馆预设</span>
+                </label>
+                <label>
+                    <input type="radio" name="ai-workspace-api-mode" value="custom">
+                    <span><i class="fa-solid fa-key"></i> 自定义 API</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-card" id="ai-workspace-custom-api">
+        <div class="ai-card-header">
+            <h3>自定义 API 配置</h3>
+            <p>覆盖酒馆预设，使用指定的API接口和模型。</p>
+        </div>
+        <div class="ai-card-body">
+            <!-- API URL, Key, Model 等输入框 -->
+            <!-- ... 原有字段重新布局 ... -->
+        </div>
+        <div class="ai-card-footer">
+            <label class="ai-checkbox-label">
+                <input type="checkbox" id="ai-workspace-stream">
+                流式生成
+            </label>
+            <span id="ai-workspace-models-status" class="ai-status-text"></span>
+            <button type="button" id="ai-workspace-load-models" class="ai-button-primary">
+                <i class="fa-solid fa-sync"></i> 读取模型
+            </button>
+        </div>
+    </div>
+    <!-- ... 其他设置卡片 ... -->
+</div>
+```
+
+**CSS样式:**
+```css
+/* 卡片基础样式 */
+.ai-card {
+    background-color: var(--ai-surface-color);
+    border: 1px solid var(--ai-border-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    margin-bottom: 24px;
+    transition: all 0.3s ease;
+}
+.ai-card:hover {
+    border-color: var(--ai-border-color-hover);
+}
+.ai-card-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--ai-border-color);
+}
+.ai-card-header h3 {
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--panel-text-color);
+}
+.ai-card-header p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ai-text-color-secondary);
+}
+.ai-card-body {
+    padding: 24px;
+}
+.ai-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    background-color: var(--ai-surface-color-subtle);
+    border-top: 1px solid var(--ai-border-color);
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+/* 分段式单选按钮 */
+.ai-radio-group-tabs {
+    display: inline-flex;
+    background-color: var(--ai-surface-color-subtle);
+    border: 1px solid var(--ai-border-color);
+    border-radius: 9px;
+    padding: 4px;
+}
+.ai-radio-group-tabs label {
+    position: relative;
+}
+.ai-radio-group-tabs input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.ai-radio-group-tabs span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 7px;
+    color: var(--ai-text-color-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.ai-radio-group-tabs input:checked + span {
+    background-color: var(--ai-surface-color);
+    color: var(--panel-text-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+```
+
+#### 2.2.2 直接修改 / 计划修改页 (`direct` / `plan`)
+
+采用多列布局，左侧为条目选择区，右侧为指令和预览区。
+
+**HTML结构 (以 `direct` 模式 `selection` 步骤为例):**
+
+```html
+<div class="ai-page-content ai-grid-layout" data-page="direct">
+    <!-- 左侧条目选择区 -->
+    <div class="ai-grid-column">
+        <div class="ai-card">
+            <div class="ai-card-header">
+                <h3>目标世界书</h3>
+            </div>
+            <div class="ai-card-body">
+                <!-- 世界书搜索框 -->
+            </div>
+        </div>
+        <div class="ai-card">
+            <div class="ai-card-header">
+                <h3>条目筛选与选择</h3>
+            </div>
+            <div class="ai-card-body">
+                <!-- 条目搜索、批量操作按钮 -->
+            </div>
+            <div id="ai-workspace-entry-list" class="ai-entry-list-new">
+                <!-- 条目列表 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧上下文/资料区 -->
+    <div class="ai-grid-column">
+        <!-- 聊天上下文卡片 -->
+        <!-- 参考资料卡片 -->
+    </div>
+</div>
+```
+
+**CSS样式:**
+
+```css
+.ai-grid-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 24px;
+    align-items: start;
+}
+.ai-grid-column {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+.ai-entry-list-new {
+    height: 400px; /* 或根据需要调整 */
+    overflow-y: auto;
+    border-top: 1px solid var(--ai-border-color);
+}
+.ai-entry-item { /* 重写条目样式 */
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--ai-border-color);
+    transition: background-color 0.2s ease;
+}
+.ai-entry-item:hover {
+    background-color: var(--ai-surface-color-hover);
+}
+.ai-entry-item .ai-entry-mode { /* 下拉选择框 */
+    flex-shrink: 0;
+    background-color: var(--ai-surface-color-subtle);
+    border: 1px solid var(--ai-border-color);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: var(--panel-text-color);
+}
+```
+
+#### 2.2.3 预览区 (`result` 步骤)
+
+将采用主从视图，左侧为变更条目列表，右侧为详细差异对比。
+
+**HTML结构:**
+
+```html
+<div class="ai-page-content ai-preview-layout" data-page="result">
+    <!-- 左侧变更列表 -->
+    <div class="ai-preview-list-panel">
+        <div id="ai-workspace-preview-list">
+            <!-- 变更的条目，点击切换右侧详情 -->
+        </div>
+    </div>
+    <!-- 右侧差异详情 -->
+    <div id="ai-workspace-preview-detail" class="ai-preview-detail-panel">
+        <!-- 详细的 before/after 对比 -->
+    </div>
+</div>
+```
+
+**CSS样式:**
+
+```css
+.ai-preview-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 1px;
+    height: calc(100vh - 200px); /* 示例高度 */
+    background-color: var(--ai-border-color);
+    border: 1px solid var(--ai-border-color);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.ai-preview-list-panel, .ai-preview-detail-panel {
+    background-color: var(--ai-surface-color);
+    overflow-y: auto;
+}
+.ai-preview-item.is-active {
+    background-color: var(--panel-accent-color-translucent); /* 新增CSS变量 */
+}
+.ai-preview-detail-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--ai-border-color);
+}
+```
+
+### 2.3 新增CSS变量
+
+为了实现更丰富的设计，将在 `theme.js` 中引入以下新的CSS变量（在`applyTheme`函数中计算并应用）：
+
+```javascript
+// 在 theme.js 的 applyTheme 中
+$panel.css({
+    '--ai-surface-color': colorMix(layoutTheme.bgColor, 80, '#000000'),
+    '--ai-surface-color-hover': colorMix(layoutTheme.bgColor, 70, '#ffffff'),
+    '--ai-surface-color-subtle': colorMix(layoutTheme.bgColor, 90, '#000000'),
+    '--ai-border-color': colorMix(layoutTheme.bgColor, 50, '#ffffff'),
+    '--ai-border-color-hover': colorMix(layoutTheme.accentColor, 70, layoutTheme.bgColor),
+    '--ai-text-color-secondary': colorMix(layoutTheme.textColor, 70, 'transparent'),
+    '--panel-accent-color-translucent': colorWithOpacity(layoutTheme.accentColor, 0.15),
+});
+```
+这些变量将统一应用到上述所有新组件中。
+
+---
+
+## 3. 移动端UI美化方案 (`aiWorkspace.js`)
+
+移动端将保持现有的抽屉式布局和手机AI助手弹窗，但会对其内部组件应用与PC端一致的卡片化、控件样式和视觉语言。
+
+### 3.1 抽屉(`ai-drawer`)美化
+
+将`ai-drawer`改造为更具现代感的折叠面板。
+
+**HTML结构 (不变):**
+保持 `ai-drawer` > `ai-drawer-summary` + `ai-drawer-body` 的结构。
+
+**CSS样式 (修改 `ensureStyles`):**
+
+```css
+#${ROOT_ID} .ai-drawer {
+    border: 1px solid var(--ai-border-color); /* 使用新变量 */
+    border-radius: 12px; /* 增大圆角 */
+    background: transparent; /* 父级已有背景 */
+    overflow: hidden;
+    margin-bottom: 16px;
+    transition: box-shadow 0.3s ease;
+}
+#${ROOT_ID} .ai-drawer-summary {
+    padding: 16px 20px;
+    font-weight: 500; /* 减轻字重 */
+    background-color: var(--ai-surface-color);
+    transition: background-color 0.2s ease;
+}
+#${ROOT_ID} .ai-drawer-summary:hover {
+    background-color: var(--ai-surface-color-hover);
+}
+#${ROOT_ID} .ai-drawer-body {
+    padding: 20px;
+    background-color: var(--ai-surface-color-subtle);
+}
+```
+
+### 3.2 手机AI助手弹窗 (`ai-assistant-modal`)
+
+保持其“手机”形态，但内部UI元素（如聊天气泡、输入框、按钮）将进行精致化处理。
+
+**CSS样式 (修改 `ensureStyles`):**
+
+```css
+/* 聊天气泡 */
+#${ROOT_ID} .ai-assistant-message {
+    padding: 10px 14px;
+    border-radius: 12px; /* 更圆润的气泡 */
+    line-height: 1.6;
+}
+#${ROOT_ID} .ai-assistant-message.is-user {
+    background-color: var(--panel-accent-color);
+    color: #fff;
+    border-bottom-right-radius: 4px; /* 经典的聊天气泡尾巴效果 */
+}
+#${ROOT_ID} .ai-assistant-message.is-assistant {
+    background-color: var(--ai-surface-color-subtle);
+    border: 1px solid var(--ai-border-color);
+    border-bottom-left-radius: 4px;
+}
+
+/* 发送按钮 */
+#${ROOT_ID} .ai-send-button {
+    background-color: var(--panel-accent-color);
+    border-radius: 50%; /* 圆形按钮 */
+    width: 40px;
+    height: 40px;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#${ROOT_ID} .ai-send-button:hover {
+    transform: scale(1.1);
+}
+#${ROOT_ID} .ai-send-button:active {
+    transform: scale(0.95);
+}
+```
+
+## 4. 响应式适配
+
+- **PC端:** 新的主从布局天然适合宽屏。当屏幕宽度减小到一定阈值（如 `1024px`）时，左侧导航栏可以设计为可折叠状态，只显示图标，鼠标悬浮时再展开。
+- **移动端:** 当 `isMobile()` 为 `true` 时，`aiWorkspaceDesktop.js` 的 `ensureMarkup` 将不执行任何操作，回退到 `aiWorkspace.js` 的抽屉式布局，并应用上述移动端美化样式。确保两种布局的CSS变量和基础组件样式（按钮、输入框等）保持一致，实现视觉统一。
+
+---
+
+此计划文件已详尽说明了UI美化的方向、HTML结构变更和具体的CSS代码，可作为下一步实施的蓝图。
