@@ -43,9 +43,7 @@ describe('iconCatalog', () => {
     expect(resolveInventoryIcon({ ...baseItem, type: 'ELIXIR' })).toEqual(
       expect.objectContaining({ matchedBy: 'type' }),
     );
-    expect(resolveInventoryIcon({ ...baseItem, type: 'MISC' })).toEqual(
-      expect.objectContaining({ matchedBy: 'type' }),
-    );
+    expect(resolveInventoryIcon({ ...baseItem, type: 'MISC' })).toEqual(expect.objectContaining({ matchedBy: 'type' }));
   });
 
   it('按名称细分装备、药品和杂物外观', () => {
@@ -59,13 +57,13 @@ describe('iconCatalog', () => {
       }),
     ).toEqual(expect.objectContaining({ category: '护手', matchedBy: 'name' }));
 
-    expect(
-      resolveInventoryIcon({ ...baseItem, name: '少林金疮药', type: 'ELIXIR', rank: 'GREEN' }),
-    ).toEqual(expect.objectContaining({ category: '药散', matchedBy: 'name' }));
+    expect(resolveInventoryIcon({ ...baseItem, name: '少林金疮药', type: 'ELIXIR', rank: 'GREEN' })).toEqual(
+      expect.objectContaining({ category: '药散', matchedBy: 'name' }),
+    );
 
-    expect(
-      resolveInventoryIcon({ ...baseItem, name: '达摩心经残页', type: 'MISC', rank: 'BLUE' }),
-    ).toEqual(expect.objectContaining({ category: '地图书信', matchedBy: 'name' }));
+    expect(resolveInventoryIcon({ ...baseItem, name: '达摩心经残页', type: 'MISC', rank: 'BLUE' })).toEqual(
+      expect.objectContaining({ category: '地图书信', matchedBy: 'name' }),
+    );
   });
 
   it('同一细分类会按品阶选择不同资源', () => {

@@ -268,20 +268,27 @@ function inferElixirCategory(item: InventoryItem): { category: InventoryVisualCa
 function inferEquipCategory(item: InventoryItem): { category: InventoryVisualCategory; matchedBy: 'name' | 'type' } {
   const name = normalize(item.name);
   const slot = normalize(item.equipInfo?.slot);
-  if (/(袖箭|袖刃|飞刀|飛刀|飞镖|飛鏢|银针|銀針|毒针|毒針|暗器|弩)/.test(name)) return { category: '暗器', matchedBy: 'name' };
+  if (/(药囊|藥囊|香囊|针囊|針囊)/.test(name) && /饰品|飾品/.test(slot)) return { category: '饰品', matchedBy: 'name' };
+  if (/(袖箭|袖刃|飞刀|飛刀|飞镖|飛鏢|银针|銀針|毒针|毒針|暗器|弩)/.test(name))
+    return { category: '暗器', matchedBy: 'name' };
   if (/(掌套|拳套|手套|护手|護手|护腕|護腕|臂铠|臂鎧|爪套)/.test(name)) return { category: '护手', matchedBy: 'name' };
-  if (/(长剑|長劍|铁剑|鐵劍|短剑|短劍|断剑|斷劍|重剑|重劍|剑|劍)/.test(name)) return { category: '剑', matchedBy: 'name' };
-  if (/(朴刀|苗刀|腰刀|弯刀|彎刀|戒刀|陌刀|短刀|长刀|長刀|刃|刀)/.test(name)) return { category: '刀', matchedBy: 'name' };
+  if (/(长剑|長劍|铁剑|鐵劍|短剑|短劍|断剑|斷劍|重剑|重劍|剑|劍)/.test(name))
+    return { category: '剑', matchedBy: 'name' };
+  if (/(朴刀|苗刀|腰刀|弯刀|彎刀|戒刀|陌刀|短刀|长刀|長刀|刃|刀)/.test(name))
+    return { category: '刀', matchedBy: 'name' };
   if (/(枪|槍|戟|矛|叉|槊)/.test(name)) return { category: '枪戟', matchedBy: 'name' };
   if (/(棍|棒|杖|锏|鐧)/.test(name)) return { category: '棍棒', matchedBy: 'name' };
   if (/(弓|弩)/.test(name)) return { category: '弓', matchedBy: 'name' };
   if (/(斧|钺|鉞)/.test(name)) return { category: '斧', matchedBy: 'name' };
-  if (/(锤|錘|槌)/.test(name)) return { category: '锤', matchedBy: 'name' };
+  if (/(锤|錘|槌|惊堂木|驚堂木)/.test(name)) return { category: '锤', matchedBy: 'name' };
   if (/(扇)/.test(name)) return { category: '扇', matchedBy: 'name' };
   if (/(鞭|索)/.test(name)) return { category: '鞭', matchedBy: 'name' };
-  if (/(鞋|靴|履)/.test(name) || /(鞋履|鞋靴)/.test(slot)) return { category: '鞋履', matchedBy: name ? 'name' : 'type' };
-  if (/(佩|坠|墜|珠|囊|簪|钗|釵|环|環|饰|飾|戒|镯|鐲)/.test(name) || /饰品|飾品/.test(slot)) return { category: '饰品', matchedBy: name ? 'name' : 'type' };
-  if (/(甲|衣|袍|衫|褂|铠|鎧|护心|護心)/.test(name) || /护甲|護甲/.test(slot)) return { category: '衣甲', matchedBy: name ? 'name' : 'type' };
+  if (/(鞋|靴|履)/.test(name)) return { category: '鞋履', matchedBy: 'name' };
+  if (/(鞋履|鞋靴)/.test(slot)) return { category: '鞋履', matchedBy: 'type' };
+  if (/(佩|坠|墜|珠|囊|簪|钗|釵|环|環|饰|飾|戒|镯|鐲)/.test(name)) return { category: '饰品', matchedBy: 'name' };
+  if (/饰品|飾品/.test(slot)) return { category: '饰品', matchedBy: 'type' };
+  if (/(甲|衣|袍|衫|褂|铠|鎧|护心|護心)/.test(name)) return { category: '衣甲', matchedBy: 'name' };
+  if (/护甲|護甲/.test(slot)) return { category: '衣甲', matchedBy: 'type' };
   return { category: '剑', matchedBy: 'type' };
 }
 
@@ -293,7 +300,8 @@ function inferSecretCategory(item: InventoryItem): { category: InventoryVisualCa
   if (/(刀)/.test(name)) return { category: '刀谱', matchedBy: 'name' };
   if (/(拳|掌|指|爪|腿|擒拿)/.test(name)) return { category: '拳掌谱', matchedBy: 'name' };
   if (/(轻功|輕功|步|身法|遁|游墙|遊牆)/.test(name)) return { category: '轻功身法', matchedBy: 'name' };
-  if (/(内功|內功|心法|神功|真经|真經|气功|氣功|心经|心經|诀|訣)/.test(name)) return { category: '内功经诀', matchedBy: 'name' };
+  if (/(内功|內功|心法|神功|真经|真經|气功|氣功|心经|心經|诀|訣)/.test(name))
+    return { category: '内功经诀', matchedBy: 'name' };
   if (/(剑法|劍法|剑诀|劍訣)/.test(detail)) return { category: '剑谱', matchedBy: 'type' };
   if (/(刀法|刀诀|刀訣)/.test(detail)) return { category: '刀谱', matchedBy: 'type' };
   if (/(轻功|輕功|身法|步法)/.test(detail)) return { category: '轻功身法', matchedBy: 'type' };
@@ -304,15 +312,24 @@ function inferSecretCategory(item: InventoryItem): { category: InventoryVisualCa
 function inferMiscCategory(item: InventoryItem): { category: InventoryVisualCategory; matchedBy: 'name' | 'type' } {
   const name = normalize(item.name);
   const detail = normalize(`${item.name}${item.description}`);
-  if (/(令牌|腰牌|竹牌|木牌|印玺|印璽|玉玺|玉璽|符牌|借阅牌|借閱牌|度牒)/.test(name)) return { category: '令牌印玺', matchedBy: 'name' };
-  if (/(地图|地圖|舆图|輿圖|残图|殘圖|信|书信|書信|手稿|手札|卷宗|案卷|抄本|残页|殘頁|庚帖|图纸|圖紙|经文|經文)/.test(name)) return { category: '地图书信', matchedBy: 'name' };
+  if (/(令牌|腰牌|竹牌|木牌|印玺|印璽|玉玺|玉璽|符牌|借阅牌|借閱牌|度牒)/.test(name))
+    return { category: '令牌印玺', matchedBy: 'name' };
+  if (
+    /(地图|地圖|舆图|輿圖|残图|殘圖|信|书信|書信|手稿|手札|卷宗|案卷|抄本|残页|殘頁|庚帖|图纸|圖紙|经文|經文)/.test(
+      name,
+    )
+  )
+    return { category: '地图书信', matchedBy: 'name' };
+  if (/(哨|钥匙|鑰匙|机关|機關|锁|鎖|镜|鏡|轮|輪|罗盘|羅盤|火折|火摺)/.test(name))
+    return { category: '机关奇物', matchedBy: 'name' };
   if (/(矿|礦|石|铁|鐵|铜|銅|银|銀|金条|金條|陨铁|隕鐵)/.test(name)) return { category: '矿石金属', matchedBy: 'name' };
   if (/(骨|角|爪|皮|鳞|鱗|羽|筋|胆|膽|兽|獸)/.test(name)) return { category: '兽材', matchedBy: 'name' };
   if (/(玉|珠|宝石|寶石|水晶|翡翠|玛瑙|瑪瑙|灵石|靈石)/.test(name)) return { category: '珠玉', matchedBy: 'name' };
-  if (/(箱|匣|盒|瓶|罐|壶|壺|碗|篓|簍|篮|籃|囊|袋|坛|罈)/.test(name)) return { category: '容器杂具', matchedBy: 'name' };
-  if (/(钥匙|鑰匙|机关|機關|锁|鎖|镜|鏡|轮|輪|罗盘|羅盤|火折|火摺)/.test(name)) return { category: '机关奇物', matchedBy: 'name' };
+  if (/(箱|匣|盒|瓶|罐|壶|壺|碗|篓|簍|篮|籃|囊|袋|坛|罈)/.test(name))
+    return { category: '容器杂具', matchedBy: 'name' };
   if (/(草|药材|藥材|芝|花|木|竹|藤)/.test(name)) return { category: '药材', matchedBy: 'name' };
-  if (/(凭证|憑證|暗记|暗記|身份|信物|旗|誓|遗物|遺物|残片|殘片|哨|木|碗)/.test(detail)) return { category: '任务信物', matchedBy: 'type' };
+  if (/(凭证|憑證|暗记|暗記|身份|信物|旗|誓|遗物|遺物|残片|殘片|哨|木|碗)/.test(detail))
+    return { category: '任务信物', matchedBy: 'type' };
   return { category: '任务信物', matchedBy: 'type' };
 }
 

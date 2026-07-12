@@ -151,10 +151,7 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
       ? buildItemAttributePreview(selectedItem, items, statusEffects, baseAttributes, attributes)
       : [];
   const selectedActionDisabled =
-    isActing ||
-    !onItemAction ||
-    !selectedItem ||
-    (selectedItem.type !== 'EQUIP' && selectedItem.type !== 'ELIXIR');
+    isActing || !onItemAction || !selectedItem || (selectedItem.type !== 'EQUIP' && selectedItem.type !== 'ELIXIR');
 
   const handleSelectItem = (item: InventoryItem) => {
     setSelectedItemId(item.id);
@@ -276,9 +273,7 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                 <img src={selectedItemIcon.src} alt={`${selectedItem.name}图标`} />
               </div>
               <div className="workbench-detail-title-group">
-                <div className="workbench-detail-kicker">
-                  {getItemTypeLabel(selectedItem.type)} · {selectedItemIcon.category || '物品'}
-                </div>
+                <div className="workbench-detail-kicker">{getItemTypeLabel(selectedItem.type)}</div>
                 <h3 className="workbench-detail-title">{selectedItem.name}</h3>
                 <div className="workbench-detail-badges">
                   {selectedItemIcon.category && <span>{selectedItemIcon.category}</span>}
@@ -302,29 +297,35 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                 </DetailSection>
               )}
 
-              {selectedItem.type === 'EQUIP' && (selectedEquipSlot || selectedEquipStatus || selectedItemModifierEntries.length > 0) && (
-                <DetailSection title="装备信息">
-                  {selectedEquipSlot && <span className="workbench-chip">部位：{selectedEquipSlot}</span>}
-                  {selectedEquipStatus && <span className="workbench-chip">状态：{selectedEquipStatus}</span>}
-                  {selectedItemModifierEntries.map(([attribute, value]) => (
-                    <span key={attribute} className="workbench-chip">
-                      {formatModifierLabel(attribute, value)}
-                    </span>
-                  ))}
-                </DetailSection>
-              )}
+              {selectedItem.type === 'EQUIP' &&
+                (selectedEquipSlot || selectedEquipStatus || selectedItemModifierEntries.length > 0) && (
+                  <DetailSection title="装备信息">
+                    {selectedEquipSlot && <span className="workbench-chip">部位：{selectedEquipSlot}</span>}
+                    {selectedEquipStatus && <span className="workbench-chip">状态：{selectedEquipStatus}</span>}
+                    {selectedItemModifierEntries.map(([attribute, value]) => (
+                      <span key={attribute} className="workbench-chip">
+                        {formatModifierLabel(attribute, value)}
+                      </span>
+                    ))}
+                  </DetailSection>
+                )}
 
-              {selectedItem.type === 'ELIXIR' && (selectedElixirEffectType || selectedElixirDuration || selectedItemModifierEntries.length > 0) && (
-                <DetailSection title="药品信息">
-                  {selectedElixirEffectType && <span className="workbench-chip">功效：{selectedElixirEffectType}</span>}
-                  {selectedElixirDuration && <span className="workbench-chip">持续时间：{selectedElixirDuration}时</span>}
-                  {selectedItemModifierEntries.map(([attribute, value]) => (
-                    <span key={attribute} className="workbench-chip">
-                      {formatModifierLabel(attribute, value)}
-                    </span>
-                  ))}
-                </DetailSection>
-              )}
+              {selectedItem.type === 'ELIXIR' &&
+                (selectedElixirEffectType || selectedElixirDuration || selectedItemModifierEntries.length > 0) && (
+                  <DetailSection title="药品信息">
+                    {selectedElixirEffectType && (
+                      <span className="workbench-chip">功效：{selectedElixirEffectType}</span>
+                    )}
+                    {selectedElixirDuration && (
+                      <span className="workbench-chip">持续时间：{selectedElixirDuration}时</span>
+                    )}
+                    {selectedItemModifierEntries.map(([attribute, value]) => (
+                      <span key={attribute} className="workbench-chip">
+                        {formatModifierLabel(attribute, value)}
+                      </span>
+                    ))}
+                  </DetailSection>
+                )}
 
               {selectedItemPreview.length > 0 && (
                 <DetailSection title={selectedItem.type === 'EQUIP' ? '装备后属性' : '服用后属性'}>

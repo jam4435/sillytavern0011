@@ -81,8 +81,8 @@ describe('InventoryPanel', () => {
     render(<InventoryPanel items={items} />);
 
     expect(screen.getByText('剑 · 珍品')).toBeInTheDocument();
+    expect(screen.getByText('丹药 · 绝品')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '查看大还丹' }));
-    expect(screen.getByText('药品 · 丹药')).toBeInTheDocument();
     expect(screen.getAllByText('丹药').length).toBeGreaterThan(0);
   });
 
