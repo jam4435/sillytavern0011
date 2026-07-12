@@ -209,6 +209,25 @@ function colorMix(baseColor, basePercent, mixedColor) {
   return `color-mix(in srgb, ${baseColor} ${basePercent}%, ${mixedColor})`;
 }
 
+function isColorDark(color) {
+  if (typeof color !== 'string' || !color) {
+    return true;
+  }
+  const hex = rgbaToHex(color);
+  if (!hex || hex.length < 7) {
+    return true;
+  }
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) {
+    return true;
+  }
+  // 相对亮度公式 (W3C)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.5;
+}
+
 function colorWithOpacity(color, opacity) {
   const percent = Math.round(pickOpacity(opacity, 1) * 100);
   return percent >= 100 ? color : `color-mix(in srgb, ${color} ${percent}%, transparent)`;
@@ -260,6 +279,11 @@ function applyTheme(theme) {
       interiorSurfaceOpacity,
     );
     const iconHoverBgColor = colorMix(layoutTheme.iconBgColor, 82, '#ffffff');
+    const isDark = isColorDark(layoutTheme.bgColor);
+    const aiSurfaceColor = colorMix(layoutTheme.bgColor, 88, '#ffffff');
+    const aiTextColorSecondary = colorMix(layoutTheme.textColor, 70, layoutTheme.bgColor);
+    const aiShadowColor = isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)';
+    const panelAccentTextColor = isColorDark(layoutTheme.accentColor) ? '#ffffff' : '#1a1a1a';
 
     if ($panel.length) {
       $panel.attr('data-unified-icon-buttons', sharedTheme.unifiedIconButtons ? 'true' : 'false');
@@ -299,6 +323,10 @@ function applyTheme(theme) {
         '--lorebook-name-overflow-wrap': truncateLongNames ? 'normal' : 'anywhere',
         '--lorebook-name-word-break': truncateLongNames ? 'normal' : 'break-word',
         '--lorebook-title-align-items': truncateLongNames ? 'center' : 'flex-start',
+        '--ai-surface-color': aiSurfaceColor,
+        '--ai-text-color-secondary': aiTextColorSecondary,
+        '--ai-shadow-color': aiShadowColor,
+        '--panel-accent-text-color': panelAccentTextColor,
       });
     }
 

@@ -1,10 +1,20 @@
 import { getWorldbookNamesSafe } from '../api.js';
-import { applyAiPreview, collectAiTargetEntries, generateAiPlan, generateAiPreview } from '../features/aiActionsBatch.js';
-import { cancelLlmGeneration, requestLlmText } from '../features/llmClient.js';
 import { AI_CONTENT_ID } from '../config.js';
+import {
+  applyAiPreview,
+  collectAiTargetEntries,
+  generateAiPlan,
+  generateAiPreview,
+} from '../features/aiActionsBatch.js';
+import { cancelLlmGeneration, requestLlmText } from '../features/llmClient.js';
 import { getAiWorkspaceSettings, setAiWorkspaceSettings } from '../settings.js';
-import { initDesktopAiWorkspace, isDesktopAiWorkspace, refreshDesktopAiWorkspace, resetDesktopAiWorkspace } from './aiWorkspaceDesktop.js';
 import { errorCatched } from '../utils.js';
+import {
+  initDesktopAiWorkspace,
+  isDesktopAiWorkspace,
+  refreshDesktopAiWorkspace,
+  resetDesktopAiWorkspace,
+} from './aiWorkspaceDesktop.js';
 
 const ROOT_ID = 'lorebook-ai-workspace';
 const MODEL_LIST_ID = 'lorebook-ai-model-list';
@@ -52,11 +62,12 @@ const currentLorebook = () => ($('#ai-workspace-lorebook', parentDoc()).val() ||
 const lorebookSearch = () => ($('#ai-workspace-lorebook-search', parentDoc()).val() || '').trim().toLowerCase();
 const entrySearch = () => ($('#ai-workspace-search', parentDoc()).val() || '').trim().toLowerCase();
 const instructionValue = () => ($('#ai-workspace-instruction', parentDoc()).val() || '').trim();
-const jailbreakPromptTemplateValue = () => ($('#ai-workspace-jailbreak-prompt-template', parentDoc()).val() || '').trim();
+const jailbreakPromptTemplateValue = () =>
+  ($('#ai-workspace-jailbreak-prompt-template', parentDoc()).val() || '').trim();
 const builtinPromptTemplateValue = () => ($('#ai-workspace-builtin-prompt-template', parentDoc()).val() || '').trim();
 const referenceMaterialValue = () => {
   const $field = $('#ai-workspace-reference-material', parentDoc());
-  return $field.length ? ($field.val() || '') : state.referenceMaterial || '';
+  return $field.length ? $field.val() || '' : state.referenceMaterial || '';
 };
 const assistantInputValue = () => ($('#ai-workspace-assistant-input', parentDoc()).val() || '').trim();
 const getApiMode = () => ($('input[name="ai-workspace-api-mode"]:checked', parentDoc()).val() || 'preset').trim();
@@ -110,10 +121,12 @@ function areWorkspaceEntriesEqual(previousEntries = [], nextEntries = []) {
 
   return previousEntries.every((entry, index) => {
     const nextEntry = nextEntries[index];
-    return Number(entry?.uid) === Number(nextEntry?.uid)
-      && (entry?.name || '') === (nextEntry?.name || '')
-      && (entry?.content || '') === (nextEntry?.content || '')
-      && _.isEqual(entry?.promptSnapshot || {}, nextEntry?.promptSnapshot || {});
+    return (
+      Number(entry?.uid) === Number(nextEntry?.uid) &&
+      (entry?.name || '') === (nextEntry?.name || '') &&
+      (entry?.content || '') === (nextEntry?.content || '') &&
+      _.isEqual(entry?.promptSnapshot || {}, nextEntry?.promptSnapshot || {})
+    );
   });
 }
 
@@ -127,9 +140,8 @@ function saveSettings(patch = {}) {
   setAiWorkspaceSettings({
     ...current,
     ...patch,
-    lorebookName: typeof patch.lorebookName === 'string'
-      ? patch.lorebookName
-      : currentLorebook() || current.lorebookName || '',
+    lorebookName:
+      typeof patch.lorebookName === 'string' ? patch.lorebookName : currentLorebook() || current.lorebookName || '',
     selectedEntryUids: Array.isArray(patch.selectedEntryUids)
       ? [...patch.selectedEntryUids]
       : Array.from(state.selectedEntryUids),
@@ -152,9 +164,7 @@ function saveSettings(patch = {}) {
 }
 
 function normalizeUidList(value) {
-  return _.uniq((Array.isArray(value) ? value : [])
-    .map(uid => Number(uid))
-    .filter(uid => Number.isFinite(uid)));
+  return _.uniq((Array.isArray(value) ? value : []).map(uid => Number(uid)).filter(uid => Number.isFinite(uid)));
 }
 
 function hydrateWorkspaceState(saved = settings(), lorebookName = '') {
@@ -168,11 +178,11 @@ function hydrateWorkspaceState(saved = settings(), lorebookName = '') {
     messageCount: normalizeChatContextCount(saved?.chatContext?.messageCount),
   };
   state.chatMessages = canReuseSavedState ? _.cloneDeep(saved?.chatMessages || []) : [];
-  state.referenceMaterial = canReuseSavedState ? (saved?.referenceMaterial || '') : '';
+  state.referenceMaterial = canReuseSavedState ? saved?.referenceMaterial || '' : '';
   state.assistantChatHistory = canReuseSavedState ? _.cloneDeep(saved?.assistantChatHistory || []) : [];
   state.planningResult = canReuseSavedState ? _.cloneDeep(saved?.planningResult || null) : null;
   state.previewResult = canReuseSavedState ? _.cloneDeep(saved?.previewResult || null) : null;
-  state.statusText = canReuseSavedState ? (saved?.statusText || '') : '';
+  state.statusText = canReuseSavedState ? saved?.statusText || '' : '';
 }
 
 function setStatus(text) {
@@ -214,15 +224,16 @@ function formatChatContextPreview(chatMessages = []) {
 function renderChatContextPreview() {
   $('#ai-workspace-chat-context-count', parentDoc()).val(state.chatContext.messageCount);
   $('#ai-workspace-chat-context-enabled', parentDoc()).prop('checked', state.chatContext.enabled === true);
-  $('#ai-workspace-chat-context-preview', parentDoc()).val(
-    formatChatContextPreview(state.chatMessages) || '尚未获取聊天上下文。',
-  ).prop('disabled', state.chatContext.enabled !== true);
+  $('#ai-workspace-chat-context-preview', parentDoc())
+    .val(formatChatContextPreview(state.chatMessages) || '尚未获取聊天上下文。')
+    .prop('disabled', state.chatContext.enabled !== true);
 
-  const summary = state.chatContext.enabled !== true
-    ? '未开启：生成计划或预览时不会注入聊天上下文。'
-    : !state.chatMessages.length
-      ? '已开启，但尚未获取聊天消息。'
-      : `已载入最近 ${state.chatMessages.length} 条聊天消息，将注入到 <聊天上下文>。`;
+  const summary =
+    state.chatContext.enabled !== true
+      ? '未开启：生成计划或预览时不会注入聊天上下文。'
+      : !state.chatMessages.length
+        ? '已开启，但尚未获取聊天消息。'
+        : `已载入最近 ${state.chatMessages.length} 条聊天消息，将注入到 <聊天上下文>。`;
   $('#ai-workspace-chat-context-status', parentDoc()).text(summary);
 }
 
@@ -235,8 +246,12 @@ function syncReferenceMaterialStatus() {
   const trimmed = (state.referenceMaterial || '').trim();
   const statusText = trimmed ? `资料区已填写 ${trimmed.length} 个字符，将注入到 <参考资料>。` : '资料区为空。';
   const compactText = trimmed ? `资料 ${trimmed.length} 字` : '资料为空';
-  $('#ai-workspace-reference-material-status', parentDoc()).text(statusText).attr('data-empty', trimmed ? 'false' : 'true');
-  $('#ai-workspace-assistant-reference-status', parentDoc()).text(compactText).attr('data-empty', trimmed ? 'false' : 'true');
+  $('#ai-workspace-reference-material-status', parentDoc())
+    .text(statusText)
+    .attr('data-empty', trimmed ? 'false' : 'true');
+  $('#ai-workspace-assistant-reference-status', parentDoc())
+    .text(compactText)
+    .attr('data-empty', trimmed ? 'false' : 'true');
 }
 
 function renderAssistantHistory() {
@@ -280,7 +295,9 @@ function switchAssistantTab(tab = 'chat') {
   state.assistantModalTab = nextTab;
   $('.ai-assistant-tab', parentDoc()).each(function () {
     const isActive = ($(this).attr('data-assistant-tab') || 'chat') === nextTab;
-    $(this).toggleClass('is-active', isActive).attr('aria-selected', isActive ? 'true' : 'false');
+    $(this)
+      .toggleClass('is-active', isActive)
+      .attr('aria-selected', isActive ? 'true' : 'false');
   });
   $('.ai-assistant-tab-panel', parentDoc()).each(function () {
     const isActive = ($(this).attr('data-assistant-panel') || 'chat') === nextTab;
@@ -312,9 +329,7 @@ function appendTextToReferenceMaterial(text, toastText = '已追加到资料区'
     return;
   }
 
-  const nextValue = state.referenceMaterial.trim()
-    ? `${state.referenceMaterial.trim()}\n\n${content}`
-    : content;
+  const nextValue = state.referenceMaterial.trim() ? `${state.referenceMaterial.trim()}\n\n${content}` : content;
   setReferenceMaterial(nextValue, { invalidateOutputs: true });
   window.toastr?.success(toastText);
 }
@@ -418,19 +433,19 @@ function renderDebugInfo(debug = {}) {
   const hasAnySuccessDebug = Boolean(debug.requestPrompt || debug.rawResponse || debug.parsedJsonCandidate);
   const visibility = hasFailure
     ? {
-      request: false,
-      response: false,
-      json: false,
-      error: Boolean(debug.errorDetails),
-      diagnostics: Boolean(debug.diagnosticsReport),
-    }
+        request: false,
+        response: false,
+        json: false,
+        error: Boolean(debug.errorDetails),
+        diagnostics: Boolean(debug.diagnosticsReport),
+      }
     : {
-      request: hasAnySuccessDebug,
-      response: hasAnySuccessDebug,
-      json: hasAnySuccessDebug,
-      error: false,
-      diagnostics: false,
-    };
+        request: hasAnySuccessDebug,
+        response: hasAnySuccessDebug,
+        json: hasAnySuccessDebug,
+        error: false,
+        diagnostics: false,
+      };
 
   Object.entries(fields).forEach(([key, $field]) => {
     const $block = $field.closest('.ai-debug-block');
@@ -504,9 +519,9 @@ function ensureMarkup() {
   const sourceOptions = SOURCES.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
   $content.html(`
     <div id="${ROOT_ID}">
-      <div class="ai-workspace-header">
+      <div class="ai-workspace-header modern-mobile-header">
         <div class="ai-workspace-heading">
-          <div class="ai-workspace-title">AI 工作台</div>
+          <div class="ai-workspace-title"><i class="fa-solid fa-brain"></i> AI 工作台</div>
           <div class="ai-workspace-subtitle">选择条目，给出指令，再预览写回。</div>
         </div>
         <button type="button" id="ai-workspace-open-assistant" class="ai-phone-button" aria-label="打开 AI 助手">
@@ -514,7 +529,7 @@ function ensureMarkup() {
         </button>
       </div>
 
-      <div class="ai-drawer" data-expanded="false">
+      <div class="ai-drawer modern-drawer" data-expanded="false">
         <div class="ai-drawer-summary" tabindex="0">API 设置</div>
         <div class="ai-drawer-body">
           <div class="ai-toolbar">
@@ -558,7 +573,7 @@ function ensureMarkup() {
         </div>
       </div>
 
-      <div class="ai-drawer" data-expanded="false">
+      <div class="ai-drawer modern-drawer" data-expanded="false">
         <div class="ai-drawer-summary" tabindex="0">当前聊天中有需要提供给ai的信息时开启</div>
         <div class="ai-drawer-body">
           <div class="ai-toolbar">
@@ -583,7 +598,7 @@ function ensureMarkup() {
         </div>
       </div>
 
-      <div class="ai-drawer ai-selection-drawer" data-expanded="true">
+      <div class="ai-drawer ai-selection-drawer modern-drawer" data-expanded="true">
         <div class="ai-drawer-summary" tabindex="0">条目列表</div>
         <div class="ai-drawer-body">
           <div class="ai-row ai-worldbook-row">
@@ -633,7 +648,7 @@ function ensureMarkup() {
         </button>
       </div>
 
-      <div class="ai-drawer" data-expanded="true">
+      <div class="ai-drawer modern-drawer" data-expanded="true">
         <div class="ai-drawer-summary" tabindex="0">AI 指令</div>
         <div class="ai-drawer-body">
           <div class="ai-toolbar">
@@ -655,7 +670,7 @@ function ensureMarkup() {
         </div>
       </div>
 
-      <div class="ai-drawer" data-expanded="false">
+      <div class="ai-drawer modern-drawer" data-expanded="false">
         <div class="ai-drawer-summary" tabindex="0">改造方案</div>
         <div class="ai-drawer-body">
           <div id="ai-workspace-plan-summary" class="ai-text">尚未生成改造方案。</div>
@@ -668,7 +683,7 @@ function ensureMarkup() {
         </div>
       </div>
 
-      <div class="ai-drawer" data-expanded="false">
+      <div class="ai-drawer modern-drawer" data-expanded="false">
         <div class="ai-drawer-summary" tabindex="0">提示词设置</div>
         <div class="ai-drawer-body">
           <div class="ai-note">破限提示词默认放在最前面，不使用 XML 包裹。指导提示词放在后面的&lt;提示词&gt;段内。</div>
@@ -684,7 +699,7 @@ function ensureMarkup() {
         </div>
       </div>
 
-      <div class="ai-drawer" data-expanded="false">
+      <div class="ai-drawer modern-drawer" data-expanded="false">
         <div class="ai-drawer-summary" tabindex="0">预览结果</div>
         <div class="ai-drawer-body">
           <div id="ai-workspace-preview-summary" class="ai-text">尚未生成预览。</div>
@@ -897,7 +912,7 @@ function ensureStyles() {
       #${ROOT_ID} .ai-preview-modal-header{padding:10px 15px;background:var(--panel-accent-color,#3a6a8e);color:#fff;border-top-left-radius:8px;border-top-right-radius:8px;display:flex;justify-content:space-between;align-items:center}
       #${ROOT_ID} .ai-preview-modal-header h4{margin:0;font-size:16px}
       #${ROOT_ID} .ai-preview-modal-close{font-size:28px;font-weight:700;cursor:pointer;line-height:1}
-      #${ROOT_ID} .ai-preview-modal-body{padding:15px;max-height:70vh;overflow-y:auto}
+      #${ROOT_ID} .ai-preview-modal-body{padding:15px;max-height:600px;overflow-y:auto}
       #${ROOT_ID} .ai-preview-modal-section + .ai-preview-modal-section{margin-top:14px}
       #${ROOT_ID} .ai-preview-modal-section-title{font-weight:600;margin-bottom:6px;color:var(--panel-accent-color,#9fc8e4)}
       #${ROOT_ID} .ai-preview-modal-panel{display:grid;gap:10px}
@@ -932,6 +947,23 @@ function ensureStyles() {
         #${ROOT_ID} .ai-preview-list{min-height:220px}
         #${ROOT_ID} .ai-assistant-modal{padding:0;align-items:stretch;justify-content:stretch}
         #${ROOT_ID} .ai-assistant-phone{width:100vw;height:100vh;max-height:none;border-radius:0;border:0}
+      }
+
+      /* ===== 移动端现代化样式（modern-* 前缀） ===== */
+      #${ROOT_ID} .modern-mobile-header{
+        background:linear-gradient(135deg,var(--ai-surface-color,rgba(42,42,42,.96)),var(--ai-surface-color,rgba(23,35,36,.92)));
+        box-shadow:0 2px 8px var(--ai-shadow-color,rgba(0,0,0,.08));
+      }
+      #${ROOT_ID} .modern-mobile-header .ai-workspace-title i{
+        margin-right:6px;color:var(--panel-accent-color,#9a7ace);
+      }
+      #${ROOT_ID} .modern-drawer{
+        border-radius:8px;
+        box-shadow:0 1px 4px var(--ai-shadow-color,rgba(0,0,0,.08));
+        overflow:hidden;
+      }
+      #${ROOT_ID} .modern-drawer .ai-drawer-summary{
+        border-radius:0;
       }
     </style>
   `);
@@ -1039,21 +1071,20 @@ async function loadModelListViaStatusApi(apiConfig) {
     });
 
     const response = await fetch('/api/backends/chat-completions/status', {
-    method: 'POST',
-    headers: { ...stApi.getRequestHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(attempt.body),
-  });
+      method: 'POST',
+      headers: { ...stApi.getRequestHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(attempt.body),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(('状态接口请求失败: ' + response.status + ' ' + response.statusText + ' ' + errorText).trim());
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(('状态接口请求失败: ' + response.status + ' ' + response.statusText + ' ' + errorText).trim());
+    }
+
+    const data = await response.json();
+    console.info('[Lorebook AI] status endpoint raw result', data);
+    return parseModelListPayload(data);
   }
-
-  const data = await response.json();
-  console.info('[Lorebook AI] status endpoint raw result', data);
-  return parseModelListPayload(data);
-}
-
 }
 
 async function loadModelListViaStatusApiWithFallback(apiConfig) {
@@ -1393,17 +1424,19 @@ function renderLorebookSearchResults(searchText = lorebookSearch()) {
     return;
   }
 
-  $results.html(
-    names
-      .map(
-        name => `
+  $results
+    .html(
+      names
+        .map(
+          name => `
           <div class="add-worldbook-result-item${name === activeLorebook ? ' is-active' : ''}" data-lorebook-name="${_.escape(name)}">
             ${_.escape(name)}
           </div>
         `,
-      )
-      .join(''),
-  ).show();
+        )
+        .join(''),
+    )
+    .show();
 }
 
 function syncSelectedLorebook(preferred = '') {
@@ -1518,7 +1551,9 @@ function buildPreviewSummaryText(previewResult) {
   }
 
   if (diagnostics?.triggered) {
-    lines.push(`兼容诊断 ${diagnostics.totalAttempts} 组，成功 ${diagnostics.succeededAttempts} 组，失败 ${diagnostics.failedAttempts} 组。`);
+    lines.push(
+      `兼容诊断 ${diagnostics.totalAttempts} 组，成功 ${diagnostics.succeededAttempts} 组，失败 ${diagnostics.failedAttempts} 组。`,
+    );
     if (diagnostics.foundWorkingConfig) {
       lines.push(`当前预览采用：${describeResolvedConfig(previewResult)}。`);
     } else {
@@ -1542,11 +1577,11 @@ function buildDiagnosticsErrorSummary(previewResult) {
   if (diagnostics.initialErrorSummary) {
     lines.push(`初始失败：${diagnostics.initialErrorSummary}`);
   }
-  lines.push(`诊断统计：共 ${diagnostics.totalAttempts} 组，成功 ${diagnostics.succeededAttempts} 组，失败 ${diagnostics.failedAttempts} 组。`);
   lines.push(
-    diagnostics.foundWorkingConfig
-      ? `已采用可用组合：${describeResolvedConfig(previewResult)}`
-      : '未找到可用组合。',
+    `诊断统计：共 ${diagnostics.totalAttempts} 组，成功 ${diagnostics.succeededAttempts} 组，失败 ${diagnostics.failedAttempts} 组。`,
+  );
+  lines.push(
+    diagnostics.foundWorkingConfig ? `已采用可用组合：${describeResolvedConfig(previewResult)}` : '未找到可用组合。',
   );
   if (diagnostics.stopped) {
     lines.push('诊断过程已手动停止。');
@@ -1572,13 +1607,17 @@ function getPreviewStatusText(previewResult) {
 
 function renderPreviewDiff(diff) {
   if (diff?.type === 'content-snippets' && Array.isArray(diff.snippets) && diff.snippets.length) {
-    return diff.snippets.map((snippet, index) => `
+    return diff.snippets
+      .map(
+        (snippet, index) => `
           <div class="ai-preview-diff">
             <div class="ai-preview-diff-label">${_.escape(diff.label)}${diff.snippets.length > 1 ? ` #${index + 1}` : ''}</div>
             <div class="ai-preview-diff-before">当前: ${_.escape(snippet.before || '')}</div>
             <div class="ai-preview-diff-after">预览: ${_.escape(snippet.after || '')}</div>
           </div>
-        `).join('');
+        `,
+      )
+      .join('');
   }
 
   return `
@@ -1694,7 +1733,10 @@ function handlePreviewModalSave() {
         }
       } catch {
         afterEntry.strategy = afterEntry.strategy || {};
-        afterEntry.strategy.keys = value.split(',').map(k => k.trim()).filter(Boolean);
+        afterEntry.strategy.keys = value
+          .split(',')
+          .map(k => k.trim())
+          .filter(Boolean);
       }
     }
   });
@@ -1780,7 +1822,9 @@ function openPreviewModal(uid) {
     item.changed ? '可直接编辑预览内容，修改后点击「保存修改」。' : '本条目当前无实际变更，可手动编辑后保存。',
   );
   $('#ai-workspace-preview-modal-content', parentDoc()).html(
-    sections.map(section => `
+    sections
+      .map(
+        section => `
           <div class="ai-preview-modal-section" data-field-key="${section.fieldKey}">
             <div class="ai-preview-modal-section-title">${_.escape(section.title)}${section.changed ? ' <span class="ai-changed-badge">已变更</span>' : ''}</div>
             <div class="ai-preview-modal-panel">
@@ -1794,7 +1838,9 @@ function openPreviewModal(uid) {
               </div>
             </div>
           </div>
-        `).join(''),
+        `,
+      )
+      .join(''),
   );
   $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', false);
   $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', state.isGenerating);
@@ -1811,18 +1857,16 @@ function renderPreview(previewResult) {
   if (diagnosticsSummary) {
     $errors.addClass('has-errors').text(diagnosticsSummary);
   } else if (Array.isArray(previewResult?.errors) && previewResult.errors.length) {
-    $errors
-      .addClass('has-errors')
-      .text(
-        previewResult.errors
-          .map(item => {
-            const summary = /Got response status 503|response status 503|\b503\b/i.test(item.error || '')
-              ? 'OpenAI兼容后端返回 503，优先检查 URL / 模型 / 流式支持 / 上游服务状态'
-              : summarizePreviewError(item.error);
-            return `${item.title}: ${summary}`;
-          })
-          .join('\n'),
-      );
+    $errors.addClass('has-errors').text(
+      previewResult.errors
+        .map(item => {
+          const summary = /Got response status 503|response status 503|\b503\b/i.test(item.error || '')
+            ? 'OpenAI兼容后端返回 503，优先检查 URL / 模型 / 流式支持 / 上游服务状态'
+            : summarizePreviewError(item.error);
+          return `${item.title}: ${summary}`;
+        })
+        .join('\n'),
+    );
   } else {
     $errors.removeClass('has-errors').empty();
   }
@@ -1862,15 +1906,19 @@ async function legacyLoadEntries(lorebookName) {
   clearPreview();
 
   if (!lorebookName) {
-       renderEntryList();
-      persist();
+    renderEntryList();
+    persist();
     setStatus('请先选择目标世界书。');
     return;
   }
 
   setStatus(`正在加载世界书“${lorebookName}”的条目...`);
   const entries = await collectAiTargetEntries(lorebookName, []);
-  state.entries = entries.map(entry => ({ uid: Number(entry.uid), name: entry.name || '', content: entry.content || '' }));
+  state.entries = entries.map(entry => ({
+    uid: Number(entry.uid),
+    name: entry.name || '',
+    content: entry.content || '',
+  }));
   renderEntryList();
   setStatus(`已加载 ${state.entries.length} 条可处理条目。`);
 }
@@ -2184,9 +2232,13 @@ function legacyBindEvents() {
       const uid = Number($(this).attr('data-preview-uid'));
       openPreviewModal(uid);
     })
-    .on('click.aiWorkspace', '#ai-workspace-preview-modal-close-button, #ai-workspace-preview-modal .ai-preview-modal-close', () => {
-      closePreviewModal();
-    })
+    .on(
+      'click.aiWorkspace',
+      '#ai-workspace-preview-modal-close-button, #ai-workspace-preview-modal .ai-preview-modal-close',
+      () => {
+        closePreviewModal();
+      },
+    )
     .on('click.aiWorkspace', '#ai-workspace-preview-modal-save', () => {
       handlePreviewModalSave();
     })
@@ -2289,7 +2341,11 @@ async function loadEntries(lorebookName) {
 
   setStatus(`正在加载世界书“${lorebookName}”的条目...`);
   const entries = await collectAiTargetEntries(lorebookName, []);
-  state.entries = entries.map(entry => ({ uid: Number(entry.uid), name: entry.name || '', content: entry.content || '' }));
+  state.entries = entries.map(entry => ({
+    uid: Number(entry.uid),
+    name: entry.name || '',
+    content: entry.content || '',
+  }));
   renderEntryList();
   setStatus(`已加载 ${state.entries.length} 条可处理条目。`);
 }

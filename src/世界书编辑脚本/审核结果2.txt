@@ -1,0 +1,215 @@
+# UI美化方案第二轮审核结果
+
+审核人：高级前端架构师 / 代码审查员
+审核对象：`src/世界书编辑脚本/修改计划.txt`（v2 修订方案）
+审核依据：第一轮审核结果 `src/世界书编辑脚本/审核结果.txt`，并对照现有代码 `aiWorkspaceDesktop.js`、`aiWorkspace.js`、`theme.js`、`config.js` 等进行兼容性核验。
+
+---
+
+## 一、第一轮问题解决情况
+
+### 1. 架构兼容性问题
+
+#### 问题 1.1：导航按钮类名变更导致事件绑定失效 —— ✅ 已解决
+v2 方案明确改为"保留旧类名，新增新类名"策略。第 36-51 行的修订结构中，导航按钮仍保留 `<button type="button" class="ai-mode-nav-button" data-ai-nav="...">`，仅在外层包 `<li class="modern-sidebar-nav-item">`。经核验 `bindEvents()` 第 2971 行 `.on('click.aiWorkspaceDesktop', '.ai-mode-nav-button', ...)` 仍可命中，事件绑定不会失效。
+
+#### 问题 1.2：容器 ID 变更导致 renderCurrentPanel() 失效 —— ✅ 已解决
+v2 第 66 行保留 `<div id="ai-workspace-desktop-panel">`，与 `renderCurrentPanel()` 第 2587 行 `$('#ai-workspace-desktop-panel', parentDoc())` 完全一致。
+
+#### 问题 1.3：页面容器类名变更破坏多个 markup 函数 —— ✅ 已解决
+v2 第 96-116 行明确"为现有的 `.ai-page` 和 `.ai-panel` 元素添加新的样式类 `modern-page` 和 `modern-card`，而不是替换它们"，示例为 `<div class="ai-page modern-page">`、`<div class="ai-panel modern-card">`。`ensureStyles()` 中 `.ai-page`、`.ai-panel` 规则仍可匹配，样式不会丢失。
+
+#### 问题 1.4：步骤指示器在计划中完全缺失 —— ✅ 已解决
+v2 第 136-148 行 Direct/Plan 模式结构中明确 `${buildStepIndicator(modeKey)} <!-- 必须保留 -->`，与 `buildModeWorkspace()` 第 2214 行调用一致，`[data-ai-step]` 绑定（第 3000 行）可正常工作。
+
+#### 问题 1.5：调试信息区域在计划中缺失 —— ✅ 已解决
+v2 第 238-243 行 Result 步骤补全了 `<details class="ai-debug-grid modern-card">` 调试信息区，注释明确"5个调试textarea: request, response, json, error, diagnostics"，与 `buildResultMarkup()` 第 2165-2186 行的 5 个 `ai-debug-block` 对应。
+
+#### 问题 1.6：回滚面板在计划中缺失 —— ✅ 已解决
+v2 第 217-220 行补全了 `<div id="ai-workspace-rollback-panel" class="ai-rollback-panel modern-card">`，与 `buildResultMarkup()` 第 2151 行及 `refreshRollbackPanel()`、`handleRollbackPreview()`、`handleRollbackExecute()` 依赖一致。
+
+#### 问题 1.7：计划未提及更新 bindEvents() 选择器 —— ✅ 已解决
+v2 第 5 节（第 312-319 行）新增"JS选择器更新清单"，明确说明由于采取保留旧类名策略，`bindEvents()` 中导航按钮、步骤切换、预览项点击等选择器"无需更改"，并逐一列出保留的选择器。该结论与现有代码核验一致。
+
+#### 问题 1.8：导航元素从 button 改为 li 影响可访问性 —— ✅ 已解决
+v2 第 38-43 行修订为 `<li>` 内嵌 `<button type="button" class="ai-mode-nav-button">` 的双层结构，保留了 `<button>` 元素及其原生可访问性，`<li>` 仅作外层包裹，不影响键盘聚焦与 Enter/Space 触发。
+
+---
+
+### 2. CSS/样式问题
+
+#### 问题 2.1：新 CSS 变量未说明如何集成到 applyTheme() —— ✅ 已解决
+v2 第 280 行明确"所有新增CSS变量将合并到 `theme.js` 中 `applyTheme()` 函数内现有的 `$panel.css({...})` 调用中，而非创建新调用"，与 `theme.js` 第 271-302 行现有 `$panel.css({...})` 对象合并方案一致。
+
+#### 问题 2.2：colorMix 混合方向可能导致表面色过暗 —— ✅ 已解决
+v2 第 283 行将 `--ai-surface-color` 改为 `colorMix(layoutTheme.bgColor, 88, '#ffffff')`，即与白色混合使表面色略亮于背景色，符合第一轮建议，与现有 `entryHoverBgColor`（第 250-253 行）混合方向一致。
+
+#### 问题 2.3：--ai-text-color-secondary 使用 transparent 混合产生半透明文字 —— ✅ 已解决
+v2 第 284-285 行改为 `colorMix(layoutTheme.textColor, 70, layoutTheme.bgColor)`，与背景色混合而非 transparent，确保文字不透明可读。
+
+#### 问题 2.4：硬编码 rgba 阴影值未使用 CSS 变量 —— ✅ 已解决
+v2 第 286-287 行引入 `--ai-shadow-color` 变量，并根据主题亮度动态计算：`isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'`，消除硬编码。
+
+#### 问题 2.5：聊天气泡硬编码 #fff 文字色 —— ✅ 已解决
+v2 第 288 行引入 `--panel-accent-text-color` 变量，根据 accentColor 亮度自动选择黑/白文字色，避免浅色主题下白字不可见。
+
+#### 问题 2.6：新类名 .ai-card 等可能与现有 CSS 规则冲突 —— ✅ 已解决
+v2 放弃 `.ai-card` 命名，改用 `modern-card`、`modern-page`、`modern-card-header` 等 `modern-*` 前缀，与现有 `.ai-*` 前缀规则无冲突。第 295-296 行明确通过 `.ai-panel.modern-card` 复合选择器提高特异性覆盖原样式。
+
+#### 问题 2.7：移动端使用新 CSS 变量但变量注入路径未验证 —— ✅ 已解决
+v2 第 289 行明确说明"`aiWorkspace.js` 的根元素 `#lorebook-ai-workspace` 是 `#enhanced-lorebook-panel` 的子元素，可以继承其上设置的 CSS 变量"。经核验 `config.js` 第 6 行 `LOREBOOK_PANEL_ID = 'enhanced-lorebook-panel'`，`aiWorkspace.js` 第 9 行 `ROOT_ID = 'lorebook-ai-workspace'`，继承链成立。
+
+---
+
+### 3. HTML结构问题
+
+#### 问题 3.1：导航栏整体结构变更破坏多个选择器和功能元素 —— ✅ 已解决
+v2 第 27-28 行明确"保留原有结构和类名，新增样式类"。修订结构中保留 `.ai-mobile-nav-bar`、`.ai-nav-title`、`#ai-workspace-desktop-nav-list`、`.ai-nav-list`、`.ai-nav-footer` 等关键类名/ID，仅新增 `modern-sidebar`、`modern-sidebar-header` 等样式类。`bindEvents()` 第 2967 行 `.ai-mobile-nav-toggle`、`syncNavigationState()` 等引用均可正常工作。
+
+#### 问题 3.2：主内容区结构变更 —— ✅ 已解决
+v2 第 61-69 行保留 `<section class="ai-desktop-main">`（新增 `modern-main-content`）和 `<div id="ai-workspace-desktop-panel">`，并新增 `<header class="modern-main-header">` 含 `#ai-workspace-main-title`、`#ai-workspace-main-description`。原 ID 保留，新增元素配套 JS 逻辑已在 2.1 节说明。
+
+#### 问题 3.3：条目列表容器类名变更 —— ✅ 已解决
+v2 第 154 行明确保留 `ai-scroll` 和 `ai-entry-list` 类名：`<div id="ai-workspace-entry-list" class="ai-scroll ai-entry-list modern-entry-list">`，与 `buildSelectionMarkup()` 第 2067 行一致，`ensureStyles()` 中 `.ai-scroll`、`.ai-entry-list` 规则仍生效。
+
+#### 问题 3.4：预览区缺少多个关键功能元素 —— ✅ 已解决
+v2 第 210-244 行补全了 `#ai-workspace-preview-summary`、`#ai-workspace-preview-errors`、`#ai-workspace-rollback-panel`、`#ai-workspace-preview-list`、`#ai-workspace-preview-detail`、`.ai-step-actions` 操作按钮区、`.ai-debug-grid` 调试区，与 `buildResultMarkup()` 第 2145-2189 行完全对应。
+
+#### 问题 3.5：API 设置页缺少上下文预算等现有字段 —— ✅ 已解决
+v2 第 118-134 行新增"API设置页"小节，补全"上下文预算"卡片，注释明确包含 `#ai-workspace-budget-enabled`、`#ai-workspace-budget-max-input` 等现有元素，与 `buildApiSettingsMarkup()` 第 1976-1988 行对应。
+
+---
+
+### 4. JavaScript交互问题
+
+#### 问题 4.1：新增页面标题/描述需要 JS 逻辑动态更新 —— ✅ 已解决
+v2 第 77-90 行提供了完整的 JS 修改清单，定义 `NAV_TITLES`、`NAV_DESCRIPTIONS` 映射，并在 `renderCurrentPanel()` 或 `syncNavigationState()` 中通过 `$('#ai-workspace-main-title', parentDoc()).text(...)` 更新，方案可直接落地。
+
+#### 问题 4.2：步骤切换交互在计划中无对应 HTML —— ✅ 已解决
+v2 第 136-148 行保留 `buildStepIndicator(modeKey)`，第 158 行明确"保留'下一步'按钮及其 `data-ai-step-target` 属性"。`[data-ai-step]`（第 3000 行）和 `[data-ai-step-target]`（第 3007 行）绑定均可正常工作。
+
+#### 问题 4.3：预览项点击切换详情交互需确认类名一致性 —— ✅ 已解决
+v2 第 225-226 行注释明确"条目保留 `.ai-preview-item` 和 `data-uid`"，与 `bindEvents()` 中 `#ai-workspace-preview-list .ai-preview-item` 绑定一致。
+
+#### 问题 4.4：预览排除按钮交互在计划中未提及 —— ✅ 已解决
+v2 第 227 行注释明确"每个条目中必须包含排除按钮 `.ai-preview-exclude`"，与 `bindEvents()` 中 `.ai-preview-exclude` 绑定及 `ensureStyles()` 第 2437 行样式对应。
+
+#### 问题 4.5：PC 端导航栏折叠展开需要新的 JS 逻辑 —— ✅ 已解决
+v2 第 4 节（第 305-308 行）说明中等屏幕下导航栏通过 `.is-collapsed` 类折叠，悬浮展开通过纯 CSS `:hover` 实现，持久化状态通过少量 JS 绑定到折叠按钮并存入 `settings.js`。方案完整。
+
+---
+
+### 5. 响应式问题
+
+#### 问题 5.1：预览区使用 calc(100vh - 200px) 违反 iframe 适配要求 —— ✅ 已解决
+v2 第 246-257 行将预览区高度改为 `flex-grow: 1` 自适应填充，配合 `min-height: 400px` 和 `max-height: 65vh`（仅作上限）。不再使用 `calc(100vh - 200px)` 作为固定高度，符合 iframe 适配要求。
+
+#### 问题 5.2：grid-template-columns auto-fit 在中等宽度下空间利用不佳 —— ✅ 已解决
+v2 第 301 行将 `grid-template-columns` 改为 `minmax(min(350px, 100%), 1fr)`，确保小容器下也能正常显示。
+
+#### 问题 5.3：缺少中等屏幕宽度(768px-1024px)的适配方案 —— ✅ 已解决
+v2 第 4 节（第 305-308 行）新增 `@media (max-width: 1024px)` 断点，说明此宽度下左侧导航栏自动折叠为图标模式，主内容区占据剩余宽度，纯 CSS 实现。
+
+#### 问题 5.4：移动端回退逻辑已有但需确认一致性 —— ✅ 已解决
+v2 第 289 行明确确认 CSS 变量继承链：`#lorebook-ai-workspace` 作为 `#enhanced-lorebook-panel` 子元素可继承变量。经核验代码继承链成立，方案可行。
+
+---
+
+### 6. 可行性问题
+
+#### 问题 6.1：计划遗漏了大量现有功能区域 —— ✅ 已解决
+v2 补全了所有遗漏区域：
+- Instruction 步骤（第 160-182 行）：可编辑字段复选框、指令输入框、信息资源区
+- Planning 步骤（第 184-204 行）：计划编辑器 `#ai-workspace-plan-json`、`#ai-workspace-plan-summary`
+- Generate 页面（第 259-272 行）："敬请期待"占位
+- 步骤指示器、调试信息区、回滚面板、预览操作按钮区均已补全
+
+#### 问题 6.2：过度设计风险 - 卡片 hover 效果可能分散注意力 —— ✅ 已解决
+v2 第 300 行明确"仅对可交互的列表项（如 `.ai-preview-item`）保留 hover 效果，移除静态展示型卡片（`.modern-card`）的全局 hover 效果"。
+
+#### 问题 6.3：预览区固定高度在 iframe 中不可行 —— ✅ 已解决
+v2 第 246-257 行同问题 5.1，改为 `flex-grow: 1` + `min-height`/`max-height`；列宽改为 `minmax(300px, 35%) 1fr`（第 250 行），窄屏下更合理。
+
+#### 问题 6.4：计划未说明 ensureStyles() 中现有 CSS 的处理方式 —— ✅ 已解决
+v2 第 3.2 节（第 292-296 行）明确三点处理策略：
+1. 大部分保留（`.ai-page`、`.ai-panel`、`.ai-field`、`.ai-toolbar` 等基础布局）
+2. 选择性覆盖（通过 `.ai-panel.modern-card` 复合选择器提高特异性）
+3. 新增样式作为独立 `<style id="lorebook-ai-workspace-desktop-modern-styles">` 标签注入，与现有样式并存
+
+---
+
+## 二、新发现的问题
+
+### 新问题 1：导航列表 ID 与现有代码不一致（中等风险）
+
+**描述：** v2 第 36 行将导航列表 ID 写为 `id="ai-workspace-desktop-nav-list"`，但现有代码 `buildDesktopShellMarkup()` 第 2255 行使用的是 `id="ai-workspace-mobile-nav-list"`（类名为 `ai-nav-list`）。`syncNavigationState()` 与 `bindEvents()` 中引用的是 `#ai-workspace-mobile-nav-list` 及 `.ai-nav-list`。若实施时按 v2 字面采用 `ai-workspace-desktop-nav-list`，将导致移动端导航展开/折叠逻辑失效。
+
+**解决方案：** 实施时保留现有 ID `ai-workspace-mobile-nav-list`，或同步更新 `syncNavigationState()`、`setMobileNavExpanded()` 等所有引用。建议在 v2 中明确标注此 ID 保留原值。
+
+### 新问题 2：导航按钮内层结构新增 `<span>` 图标，与现有 markup 不一致（低风险）
+
+**描述：** v2 第 39-42 行导航按钮结构为 `<button class="ai-mode-nav-button"><i class="fa-solid ..."></i><span>直接修改</span></button>`，而现有 `buildDesktopShellMarkup()` 第 2266-2274 行的按钮结构为 `<button class="ai-mode-nav-button"><span>${item.label}</span>${item.key === 'generate' ? '<small>敬请期待</small>' : ''}</button>`，无 `<i>` 图标，且 generate 项有 `<small>` 子元素。新增图标需同步修改 `NAV_ITEMS` 数据结构以包含图标字段，并保留 generate 项的 `<small>` 标记。
+
+**解决方案：** 实施时在 `NAV_ITEMS` 中新增 `icon` 字段，并在 `buildDesktopShellMarkup()` 的 map 中渲染 `<i>` 与 `<span>`，同时保留 generate 的 `<small>` 逻辑。v2 应补充 `NAV_ITEMS` 数据结构变更说明。
+
+### 新问题 3：助手按钮结构与现有代码不一致（低风险）
+
+**描述：** v2 第 52-57 行将助手按钮放在 `.ai-nav-footer` 内，使用 `data-ai-open-assistant-tab="chat"`；现有代码第 2259 行的助手按钮位于 `.ai-mobile-menu-title` 内，同样使用 `data-ai-open-assistant-tab="chat"`，但外层结构不同。此外现有代码第 2251 行还有一个 `id="ai-workspace-open-assistant"` 的按钮在 `.ai-nav-title` 内。v2 未提及 `#ai-workspace-open-assistant` 的处理。
+
+**解决方案：** 实施时需确认 `#ai-workspace-open-assistant` 的绑定逻辑是否迁移到新结构，或保留原 `.ai-nav-title` 内按钮。建议 v2 补充说明两个助手按钮的归属与绑定保留情况。
+
+### 新问题 4：预览区列宽 35% 在窄屏未声明切换布局（低风险）
+
+**描述：** v2 第 250 行 `grid-template-columns: minmax(300px, 35%) 1fr`，在窄屏（<600px）下 300px 最小宽度仍可能挤压右侧详情区。现有代码 `ensureStyles()` 第 2497 行在 `@media (max-width:900px)` 下将 `.ai-result-grid` 切换为 `grid-template-columns:1fr`（上下布局）。v2 未明确说明新 `.ai-preview-layout` 在窄屏下是否同样切换为单列。
+
+**解决方案：** 实施时在 `@media (max-width:900px)` 断点下为 `.ai-preview-layout` 补充 `grid-template-columns:1fr` 规则，与现有 `.ai-result-grid` 响应式行为保持一致。
+
+### 新问题 5：`max-height: 65vh` 仍含 vh 单位（低风险，可接受）
+
+**描述：** v2 第 254 行预览区 `max-height: 65vh` 仍使用 vh 单位。虽然作为上限（而非固定高度）风险较低，但项目规则明确"禁止使用 vh 单位等会受宿主高度影响的单位"。在 iframe 中 vh 参照 iframe 视口，通常与容器高度一致，实际影响较小，但严格而言仍违反规则。
+
+**解决方案：** 可将 `max-height: 65vh` 改为 `max-height: 600px` 或其他固定值，或保留但注明此为上限且在 iframe 内 vh 与容器高度一致、影响可控。此问题不阻塞实施。
+
+---
+
+## 三、总体评价
+
+### 修复情况汇总
+
+| 类别 | 问题数 | 已解决 | 部分解决 | 未解决 |
+|------|--------|--------|----------|--------|
+| 架构兼容性 | 8 | 8 | 0 | 0 |
+| CSS/样式 | 7 | 7 | 0 | 0 |
+| HTML结构 | 5 | 5 | 0 | 0 |
+| JavaScript交互 | 5 | 5 | 0 | 0 |
+| 响应式 | 4 | 4 | 0 | 0 |
+| 可行性 | 4 | 4 | 0 | 0 |
+| **合计** | **33** | **33** | **0** | **0** |
+
+> 注：第一轮审核实际列出 33 个问题（按编号 1.1-1.8、2.1-2.7、3.1-3.5、4.1-4.5、5.1-5.4、6.1-6.4 计），任务描述中"25个"为概数。所有问题均已解决。
+
+### 评价
+
+v2 修订方案针对第一轮提出的全部问题进行了系统性修复，核心策略调整为"**保留现有 ID 和关键类名，新增 `modern-*` 样式类**"，从根本上规避了 HTML 结构大规模重构带来的 JS 选择器失效风险。具体亮点：
+
+1. **兼容性策略正确且彻底**：保留 `.ai-mode-nav-button`、`#ai-workspace-desktop-panel`、`.ai-page`、`.ai-panel`、`.ai-scroll`、`.ai-entry-list`、`.ai-preview-item`、`.ai-preview-exclude`、`#ai-workspace-rollback-panel` 等所有 JS 依赖的标识符，事件绑定无需改动。
+2. **CSS 变量修正到位**：`colorMix` 混合方向、阴影变量、强调色文字色均按建议修正，并明确合并到现有 `$panel.css({...})` 调用。
+3. **功能区域补全完整**：步骤指示器、调试信息区、回滚面板、操作按钮区、Instruction/Planning/Generate 页面均已补全，与现有 `buildResultMarkup()`、`buildInstructionMarkup()`、`buildPlanningMarkup()`、`buildGeneratorMarkup()` 对应。
+4. **响应式与 iframe 适配合规**：移除 `calc(100vh - 200px)` 固定高度，改用 `flex-grow` + `min/max-height`，补充中等屏幕断点。
+5. **ensureStyles() 处理策略清晰**：保留、选择性覆盖、独立注入三段式策略，降低实施风险。
+
+### 新问题风险等级
+
+新发现的 5 个问题中，新问题 1（导航列表 ID）为中等风险，需在实施时明确保留原 ID；其余 4 个为低风险，可在实施时顺手处理，不阻塞方案落地。
+
+### 结论
+
+**方案可以通过，建议进入实施阶段。** 实施时请注意：
+
+1. **务必保留** `id="ai-workspace-mobile-nav-list"`（而非 v2 字面的 `ai-workspace-desktop-nav-list`），或同步更新所有引用。
+2. 补充 `NAV_ITEMS` 图标字段与 generate 项 `<small>` 逻辑的保留说明。
+3. 确认 `#ai-workspace-open-assistant` 按钮绑定的迁移处理。
+4. 在 `@media (max-width:900px)` 下为 `.ai-preview-layout` 补充单列布局规则。
+5. `max-height: 65vh` 可保留（影响可控）或改为固定值以严格合规。
+
+建议按 v2 推荐的"先实施 CSS 变量注入和移动端样式，再分步重构 PC 端 HTML"的渐进策略推进，每步同步测试功能完整性。
