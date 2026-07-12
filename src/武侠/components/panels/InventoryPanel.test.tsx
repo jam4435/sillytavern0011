@@ -77,6 +77,15 @@ describe('InventoryPanel', () => {
     expect(screen.getByText('悟性 >= 12')).toBeInTheDocument();
   });
 
+  it('列表和详情显示按外观推断的细分类', () => {
+    render(<InventoryPanel items={items} />);
+
+    expect(screen.getByText('剑 · 珍品')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看大还丹' }));
+    expect(screen.getByText('药品 · 丹药')).toBeInTheDocument();
+    expect(screen.getAllByText('丹药').length).toBeGreaterThan(0);
+  });
+
   it('装备和药品动作仍调用 onItemAction', async () => {
     const onItemAction = vi.fn();
     render(
