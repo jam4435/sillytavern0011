@@ -351,7 +351,7 @@ const normalizeObservedAction = (beforeValue: unknown, afterValue: unknown): Var
 export const readCurrentStatDataSnapshot = (): Record<string, unknown> | null => {
   try {
     const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
-    const statData = extractStatData(variables?.stat_data ?? null);
+    const statData = extractStatData(variables);
     return statData ? cloneJson(statData) : null;
   } catch {
     return null;
@@ -868,6 +868,8 @@ export function buildAiComparisons({
   currentStatData: Record<string, unknown> | null;
 }): VariableAiComparisonResult {
   const comparisons: VariableAiComparison[] = [];
+  const normalizedBaselineStatData = baselineStatData ? extractStatData(baselineStatData) : null;
+  const normalizedCurrentStatData = currentStatData ? extractStatData(currentStatData) : null;
   const declaredByPath = new Map<string, VariableDeclaredChange>();
   const aggregatedObserved = aggregateObservedAiChanges(observedChanges);
 
@@ -884,14 +886,14 @@ export function buildAiComparisons({
     const declaredChange = declaredByPath.get(pathKey);
     const observedChange = aggregatedObserved.get(pathKey);
     const path = declaredChange?.path ?? observedChange?.path ?? [];
-    const baselineValue = baselineStatData ? getValueAtPath(baselineStatData, path) : undefined;
+    const baselineValue = normalizedBaselineStatData ? getValueAtPath(normalizedBaselineStatData, path) : undefined;
     const expectedValue = declaredChange
       ? declaredChange.action === 'delete'
         ? undefined
         : declaredChange.value
       : observedChange?.afterValue;
-    const finalValue = currentStatData
-      ? getValueAtPath(currentStatData, path)
+    const finalValue = normalizedCurrentStatData
+      ? getValueAtPath(normalizedCurrentStatData, path)
       : observedChange?.afterValue;
 
     let status: VariableComparisonStatus;
@@ -906,10 +908,11 @@ export function buildAiComparisons({
       const observedMatchesExpected = observedChange
         ? areValuesEqual(observedChange.afterValue, expectedValue)
         : false;
+      const finalMatchesExpected = areValuesEqual(finalValue, expectedValue);
 
       if (baselineMatchesExpected && !observedChange) {
         status = 'no-op';
-      } else if (observedMatchesExpected) {
+      } else if (observedMatchesExpected || finalMatchesExpected) {
         status = 'applied';
       } else if (observedChange) {
         status = 'diverged';

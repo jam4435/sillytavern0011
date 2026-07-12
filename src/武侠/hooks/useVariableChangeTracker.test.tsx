@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useVariableChangeTracker } from './useVariableChangeTracker';
 
 const declaredReply = '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>';
+const timeDeclaredReply = '<VariableEdit>{"世界信息":{"时间":{"时":14}}}</VariableEdit>';
 const extraDeclaredReply = '<VariableEdit>{"user数据":{"属性":{"根骨":70}}}</VariableEdit>';
 const backendOnlyReply = '<VariableEdit>{"user数据":{"属性":{"臂力":80}}}</VariableEdit>';
 
@@ -57,6 +58,45 @@ describe('useVariableChangeTracker', () => {
         origin: 'background',
         beforeValue: 100,
         afterValue: 120,
+      }),
+    ]);
+  });
+
+  it('世界时间声明能从最终快照识别为已落地', () => {
+    currentStatData = { 世界信息: { 时间: { 时: 13 } } };
+    getVariablesMock.mockImplementation(() => clone(currentStatData));
+
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(timeDeclaredReply, 2);
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    currentStatData = { 世界信息: { 时间: { 时: 14 } } };
+
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'era-api-write',
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        path: ['世界信息', '时间', '时'],
+        beforeValue: 13,
+        afterValue: 14,
+      }),
+    ]);
+    expect(result.current.variableChanges?.aiReply.comparisons).toEqual([
+      expect.objectContaining({
+        status: 'applied',
+        path: ['世界信息', '时间', '时'],
+        expectedValue: 14,
+        finalValue: 14,
       }),
     ]);
   });

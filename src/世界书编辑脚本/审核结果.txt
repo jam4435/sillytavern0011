@@ -1,0 +1,486 @@
+# AI 工作区 UI 美化方案审核结果
+
+审核人：高级前端架构师 / 代码审查员
+审核对象：`src/世界书编辑脚本/修改计划.txt`
+审核依据：`ARCHITECTURE.md`、`aiWorkspaceDesktop.js`、`aiWorkspace.js`、`theme.js`、`panel.js`、`events.js`、`state.js`、`settings.js`、`config.js`
+
+---
+
+## 一、架构兼容性
+
+### 问题 1.1：导航按钮类名变更导致事件绑定失效
+
+**描述：** 计划将导航按钮从 `<button class="ai-mode-nav-button">` 改为 `<li class="ai-sidebar-nav-item">`，但 `bindEvents()` 中绑定了 `.ai-mode-nav-button` 的 click 事件用于导航切换。类名变更后，现有事件绑定将完全失效，用户点击导航项无任何响应。
+
+**计划位置：** 2.1 节，第 36-51 行，新 HTML 结构中的 `<li class="ai-sidebar-nav-item" data-ai-nav="...">`
+
+**现有代码：** [`bindEvents()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2971) 第 2971 行：`.on('click.aiWorkspaceDesktop', '.ai-mode-nav-button', async function () { ... })`
+
+**解决方案：** 两个选择：
+- (推荐) 保留 `.ai-mode-nav-button` 类名，仅在外层结构上做调整，给 `<li>` 额外添加 `.ai-mode-nav-button` 类；
+- 或同步更新 `bindEvents()` 第 2971 行的选择器为 `.ai-sidebar-nav-item`，并确保 `data-ai-nav` 属性保留。
+
+---
+
+### 问题 1.2：容器 ID 变更导致 renderCurrentPanel() 失效
+
+**描述：** 计划将内容容器 ID 从 `#ai-workspace-desktop-panel` 改为 `#ai-workspace-page-container`，但 `renderCurrentPanel()` 通过 `$('#ai-workspace-desktop-panel')` 获取容器并注入面板内容。ID 变更后，`renderCurrentPanel()` 将找不到目标容器，所有面板内容无法渲染。
+
+**计划位置：** 2.1 节，第 70 行，`<div id="ai-workspace-page-container">`
+
+**现有代码：** [`renderCurrentPanel()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2587) 第 2587 行：`const $panel = $('#ai-workspace-desktop-panel', parentDoc());`
+
+**解决方案：** 保留原 ID `ai-workspace-desktop-panel`，或同步更新 `renderCurrentPanel()` 及所有引用此 ID 的代码。
+
+---
+
+### 问题 1.3：页面容器类名变更破坏多个 markup 函数
+
+**描述：** 计划将 `ai-page` 改为 `ai-page-content`，`ai-panel` 改为 `ai-card`。但 `buildModeWorkspace()`、`buildApiSettingsMarkup()`、`buildGeneratorMarkup()` 等多个函数都使用 `ai-page` 和 `ai-panel` 类名。类名变更后，现有 CSS 规则（`ensureStyles()` 中大量 `.ai-page`、`.ai-panel` 选择器）将不再匹配，导致样式全部丢失。
+
+**计划位置：** 2.2.1 节，第 90 行，`<div class="ai-page-content" data-page="api">` 和 `<div class="ai-card">`
+
+**现有代码：**
+- [`buildModeWorkspace()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2213) 第 2213 行：`<div class="ai-page">`
+- [`buildApiSettingsMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:1937) 第 1937 行：`<div class="ai-page">` 和第 1938 行 `<div class="ai-panel">`
+- [`buildGeneratorMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2222) 第 2222 行：`<div class="ai-page">`
+- `ensureStyles()` 中有大量 `.ai-page`、`.ai-panel` 的 CSS 规则
+
+**解决方案：** 如果要使用新类名，必须同步更新所有 markup 函数（`buildModeWorkspace`、`buildApiSettingsMarkup`、`buildGeneratorMarkup`、`buildSelectionMarkup`、`buildInstructionMarkup`、`buildPlanningMarkup`、`buildResultMarkup`）和 `ensureStyles()` 中的全部 CSS 选择器。建议在计划中提供完整的类名映射表。
+
+---
+
+### 问题 1.4：步骤指示器(Step Indicator)在计划中完全缺失
+
+**描述：** 计划的 direct/plan 页面 HTML 结构中没有步骤指示器。但现有代码中，`buildStepIndicator()` 生成步骤导航条（选择 → 指令 → 预览），`bindEvents()` 绑定了 `[data-ai-step]` 和 `[data-ai-step-target]` 的点击事件用于步骤切换。如果步骤指示器被移除，用户将无法在步骤间导航。
+
+**计划位置：** 2.2.2 节，第 218-248 行，direct 模式 selection 步骤的 HTML 中无步骤指示器
+
+**现有代码：**
+- [`buildStepIndicator()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:1998) 第 1998-2026 行，生成 `ai-workflow-progress`、`ai-stepper`、`ai-step-button`
+- [`buildModeWorkspace()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2214) 第 2214 行调用 `buildStepIndicator(modeKey)`
+- [`bindEvents()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:3000) 第 3000 行绑定 `[data-ai-step]`，第 3007 行绑定 `[data-ai-step-target]`
+
+**解决方案：** 必须在 direct/plan 页面的 HTML 结构中保留步骤指示器。建议在 `ai-page-content` 内部、具体步骤内容之前插入 `buildStepIndicator()` 的输出。
+
+---
+
+### 问题 1.5：调试信息区域在计划中缺失
+
+**描述：** 计划的预览区 HTML 中没有调试信息区域。但现有代码中，`buildResultMarkup()` 生成 `ai-debug-grid` 包含 5 个调试 textarea（请求内容、响应内容、解析 JSON、错误信息、诊断报告），`renderDebugInfo()` 依赖这些元素。移除后，调试功能完全丧失。
+
+**计划位置：** 2.2.3 节，第 296-308 行，预览区 HTML 中无调试信息
+
+**现有代码：** [`buildResultMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2165) 第 2165-2186 行，`ai-debug-grid`、`ai-debug-block` 及 5 个调试 textarea
+
+**解决方案：** 必须在预览区 HTML 中保留调试信息区域。可将其放在预览操作按钮之后，使用 `<details>` 折叠以保持界面整洁。
+
+---
+
+### 问题 1.6：回滚面板在计划中缺失
+
+**描述：** 计划的预览区没有回滚面板。但现有代码中，`buildResultMarkup()` 生成 `#ai-workspace-rollback-panel`，`refreshRollbackPanel()`、`handleRollbackPreview()`、`handleRollbackExecute()` 都依赖此元素及其内部按钮。移除后，用户无法回滚已应用的修改。
+
+**计划位置：** 2.2.3 节，第 296-308 行，预览区 HTML 中无回滚面板
+
+**现有代码：**
+- [`buildResultMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2151) 第 2151 行：`<div id="ai-workspace-rollback-panel" class="ai-rollback-panel"></div>`
+- [`refreshRollbackPanel()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:1294) 第 1294 行依赖此元素
+- [`bindEvents()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js) 中绑定 `#ai-workspace-rollback-preview` 和 `#ai-workspace-rollback-execute`
+
+**解决方案：** 必须在预览区 HTML 中保留 `#ai-workspace-rollback-panel` 及回滚操作按钮（`#ai-workspace-rollback-preview`、`#ai-workspace-rollback-execute`）。
+
+---
+
+### 问题 1.7：计划未提及更新 bindEvents() 选择器
+
+**描述：** 计划对 HTML 结构做了大量变更（类名、ID、元素层级），但全文未提及需要同步更新 `bindEvents()` 中的事件绑定选择器。`bindEvents()` 包含约 370 行事件绑定代码，涉及数十个选择器，任何遗漏都会导致功能失效。
+
+**计划位置：** 全文，无任何关于 `bindEvents()` 更新的说明
+
+**现有代码：** [`bindEvents()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2964) 第 2964-3336 行
+
+**解决方案：** 计划必须包含一份 `bindEvents()` 选择器更新清单，逐一列出每个需要修改的选择器及其对应的新选择器。
+
+---
+
+### 问题 1.8：导航元素从 button 改为 li 影响可访问性和默认行为
+
+**描述：** 计划将导航项从 `<button>` 改为 `<li>`。`<button>` 元素默认支持键盘聚焦、Enter/Space 触发点击等可访问性特性，改为 `<li>` 后这些特性丧失，需要额外添加 `tabindex` 和键盘事件处理。
+
+**计划位置：** 2.1 节，第 36 行，`<li class="ai-sidebar-nav-item" data-ai-nav="direct">`
+
+**现有代码：** [`buildDesktopShellMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2266) 第 2266 行：`<button type="button" class="ai-mode-nav-button" data-ai-nav="...">`
+
+**解决方案：** 建议保留 `<button>` 元素以确保可访问性；若必须使用 `<li>`，需添加 `tabindex="0"`、`role="button"` 并处理 keydown 事件。
+
+---
+
+## 二、CSS/样式
+
+### 问题 2.1：新 CSS 变量未说明如何集成到 applyTheme() 的现有代码中
+
+**描述：** 计划提出在 `applyTheme` 中添加新 CSS 变量，但给出的代码片段是独立的 `$panel.css({...})` 调用，没有说明如何与现有的 `$panel.css({...})` 调用（第 271-302 行）合并。直接复制粘贴会导致两个独立的 `$panel.css()` 调用，虽然功能上可行，但不符合代码规范。
+
+**计划位置：** 2.3 节，第 341-351 行
+
+**现有代码：** [`applyTheme()`](src/世界书编辑脚本/modules/ui/theme.js:271) 第 271-302 行，已有的 `$panel.css({...})` 对象
+
+**解决方案：** 将新变量直接添加到第 271-302 行的 `$panel.css({...})` 对象中，与现有变量合并在同一个调用里。
+
+---
+
+### 问题 2.2：colorMix 混合方向可能导致表面色过暗
+
+**描述：** 计划中 `--ai-surface-color` 使用 `colorMix(layoutTheme.bgColor, 80, '#000000')`，即 bgColor 80% + 黑色 20%。在深色主题下，这会使表面色比背景色更暗，但通常卡片表面色应该比背景色略亮（或一致），以产生层次感。
+
+**计划位置：** 2.3 节，第 344 行
+
+**现有代码：** [`colorMix()`](src/世界书编辑脚本/modules/ui/theme.js:217) 定义为 `color-mix(in srgb, ${baseColor} ${basePercent}%, ${mixedColor})`
+
+**解决方案：** 建议将 `--ai-surface-color` 改为 `colorMix(layoutTheme.bgColor, 88, '#ffffff')` 或 `colorMix(layoutTheme.bgColor, 92, layoutTheme.accentColor)`，使表面色略亮于背景色。参考现有代码中 `entryHoverBgColor`（第 250-253 行）使用 `colorMix(layoutTheme.entryBgColor, 88, layoutTheme.accentColor)` 的做法。
+
+---
+
+### 问题 2.3：--ai-text-color-secondary 使用 transparent 混合产生半透明文字
+
+**描述：** 计划中 `--ai-text-color-secondary` 使用 `colorMix(layoutTheme.textColor, 70, 'transparent')`，即 textColor 70% + transparent 30%。`color-mix(in srgb, #fff 70%, transparent)` 会产生半透明白色，在复杂背景（如背景图片）上可能导致文字不可读。
+
+**计划位置：** 2.3 节，第 349 行
+
+**解决方案：** 应使用 `colorMix(layoutTheme.textColor, 70, layoutTheme.bgColor)` 与背景色混合而非 transparent，确保文字始终不透明且可读。或使用 `colorWithOpacity(layoutTheme.textColor, 0.7)` 但需注意此函数也是与 transparent 混合。
+
+---
+
+### 问题 2.4：硬编码 rgba 阴影值未使用 CSS 变量
+
+**描述：** 计划中多处使用硬编码的 `rgba(0,0,0,0.1)` 和 `rgba(0,0,0,0.05)` 作为阴影色。在浅色主题下阴影可能过重，在深色主题下阴影可能完全不可见，无法产生层次感。
+
+**计划位置：**
+- 2.2.1 节 CSS，第 141 行：`box-shadow: 0 4px 12px rgba(0,0,0,0.1);`
+- 2.2.1 节 CSS，第 208 行：`box-shadow: 0 2px 4px rgba(0,0,0,0.05);`
+
+**解决方案：** 引入 `--ai-shadow-color` CSS 变量，在 `applyTheme()` 中根据主题亮度计算：深色主题使用 `rgba(0,0,0,0.3)`，浅色主题使用 `rgba(0,0,0,0.08)`。
+
+---
+
+### 问题 2.5：聊天气泡硬编码 #fff 文字色在浅色主题下可能不可见
+
+**描述：** 计划中用户消息气泡使用 `color: #fff` 作为文字色。如果浅色主题的 `accentColor` 是浅色（如淡蓝），白色文字将不可见。
+
+**计划位置：** 3.2 节 CSS，第 409 行：`color: #fff;`
+
+**解决方案：** 不应硬编码白色。应确保 accentColor 与文字色有足够对比度，或引入 `--panel-accent-text-color` 变量在 `applyTheme()` 中根据 accentColor 亮度自动选择黑/白文字色。
+
+---
+
+### 问题 2.6：新类名 .ai-card 等可能与现有 CSS 规则冲突
+
+**描述：** 计划引入 `.ai-card`、`.ai-card-header`、`.ai-card-body`、`.ai-card-footer` 等新类名。现有 `ensureStyles()` 中已有大量 `.ai-*` 前缀的 CSS 规则，新类名可能与现有规则产生选择器特异性冲突。
+
+**计划位置：** 2.2.1 节 CSS，第 137-175 行
+
+**现有代码：** [`ensureStyles()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2298) 第 2298-2511 行，包含大量 `.ai-page`、`.ai-panel`、`.ai-toolbar`、`.ai-field` 等规则
+
+**解决方案：** 在添加新 CSS 规则前，搜索 `ensureStyles()` 中是否已有同名类名。建议在计划中提供新旧类名的映射表，并明确说明是替换还是新增。
+
+---
+
+### 问题 2.7：移动端使用新 CSS 变量但变量注入路径未验证
+
+**描述：** 计划在移动端抽屉样式中使用 `var(--ai-border-color)` 等新变量。这些变量在 `applyTheme()` 中设置到 `$panel`（即 `#enhanced-lorebook-panel`）上，但移动端 AI 工作区在 `aiWorkspace.js` 的 `ensureStyles()` 中注入 CSS 到 `#${ROOT_ID}`（即 `#lorebook-ai-workspace`）。需确认 `#lorebook-ai-workspace` 是否能继承 `$panel` 上设置的 CSS 变量。
+
+**计划位置：** 3.1 节，第 372 行：`border: 1px solid var(--ai-border-color);`
+
+**现有代码：**
+- [`applyTheme()`](src/世界书编辑脚本/modules/ui/theme.js:240) 第 240 行：`const $panel = $(\`#${LOREBOOK_PANEL_ID}\`, parentDoc())`，变量设置在此元素上
+- `aiWorkspace.js` 中 `ROOT_ID = 'lorebook-ai-workspace'`，是 `$panel` 的子元素
+
+**解决方案：** 由于 CSS 变量会通过 DOM 层级继承，`#lorebook-ai-workspace` 作为 `#enhanced-lorebook-panel` 的后代元素，可以继承父元素上设置的 CSS 变量。此方案可行，但需在计划中明确说明这一继承关系。
+
+---
+
+## 三、HTML 结构
+
+### 问题 3.1：导航栏整体结构变更破坏多个选择器和功能元素
+
+**描述：** 计划将导航栏从 `aside.ai-desktop-nav` 改为 `nav.ai-sidebar`，内部结构也大幅调整。现有代码中 `buildDesktopShellMarkup()` 创建的多个元素和类名在计划中没有对应：`.ai-mobile-nav-bar`、`.ai-mobile-nav-toggle`、`.ai-nav-title`、`#ai-workspace-mobile-nav-list`、`.ai-nav-list`、`.ai-mobile-nav-menu-header`、`.ai-mobile-menu-title`、`.ai-mobile-nav-current` 等。这些元素被 `bindEvents()` 和 `syncNavigationState()` 引用。
+
+**计划位置：** 2.1 节，第 30-58 行
+
+**现有代码：** [`buildDesktopShellMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2234) 第 2234-2285 行
+
+**受影响的功能：**
+- `.ai-mobile-nav-toggle`：`bindEvents()` 第 2967 行绑定点击事件控制移动端导航展开/折叠
+- `#ai-workspace-mobile-nav-list`：`syncNavigationState()` 控制其显示/隐藏
+- `.ai-mobile-nav-current`：显示当前导航项名称
+- `data-ai-open-assistant-tab`：第 2259 行的助手按钮
+
+**解决方案：** 保留现有导航栏的 DOM 结构和类名，仅通过 CSS 调整视觉样式。如果必须重构 HTML，需在计划中逐一列出所有受影响的 JS 选择器并提供更新方案。
+
+---
+
+### 问题 3.2：主内容区结构变更
+
+**描述：** 计划将主内容区从 `<section class="ai-desktop-main">` 改为 `<main class="ai-main-content">`，并新增了 `<header class="ai-main-header">` 包含标题和描述。现有代码中 `renderCurrentPanel()` 通过 `#ai-workspace-desktop-panel` 定位渲染目标。
+
+**计划位置：** 2.1 节，第 62-73 行
+
+**现有代码：** [`buildDesktopShellMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2278) 第 2278-2280 行：`<section class="ai-desktop-main"><div id="ai-workspace-desktop-panel"></div></section>`
+
+**解决方案：** 保留 `#ai-workspace-desktop-panel` ID。新增的 `#ai-workspace-main-title` 和 `#ai-workspace-main-description` 需要额外的 JS 逻辑来动态更新（见问题 4.1）。
+
+---
+
+### 问题 3.3：条目列表容器类名变更
+
+**描述：** 计划将条目列表容器从 `class="ai-scroll ai-entry-list"` 改为 `class="ai-entry-list-new"`。现有 CSS 中 `.ai-scroll` 和 `.ai-entry-list` 有重要的样式规则（滚动、高度等），`renderEntryList()` 也可能依赖这些类名。
+
+**计划位置：** 2.2.2 节，第 237 行：`<div id="ai-workspace-entry-list" class="ai-entry-list-new">`
+
+**现有代码：** [`buildSelectionMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2067) 第 2067 行：`<div id="ai-workspace-entry-list" class="ai-scroll ai-entry-list"></div>`
+
+**解决方案：** 保留 `ai-scroll` 和 `ai-entry-list` 类名，或同步更新 `ensureStyles()` 中的 CSS 选择器和 `renderEntryList()` 中的任何类名引用。
+
+---
+
+### 问题 3.4：预览区缺少多个关键功能元素
+
+**描述：** 计划的预览区 HTML 只保留了 `#ai-workspace-preview-list` 和 `#ai-workspace-preview-detail`，但缺少以下现有元素：
+- `#ai-workspace-preview-summary`：预览摘要文本
+- `#ai-workspace-preview-errors`：预览错误提示
+- `#ai-workspace-rollback-panel`：回滚面板
+- 操作按钮区：返回上一步、重新生成、停止生成、应用预览、回滚预览、执行回滚
+- `#ai-workspace-status`：状态文本
+- 调试信息区：5 个调试 textarea
+
+**计划位置：** 2.2.3 节，第 296-308 行
+
+**现有代码：** [`buildResultMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2145) 第 2145-2189 行
+
+**解决方案：** 必须在预览区 HTML 中保留所有现有功能元素。建议的完整结构：
+```
+ai-page-content > preview-summary + preview-errors + rollback-panel + preview-layout(list + detail) + step-actions(按钮组) + debug-grid
+```
+
+---
+
+### 问题 3.5：API 设置页缺少上下文预算等现有字段
+
+**描述：** 计划的 API 设置页 HTML 只展示了 API 模式选择和自定义 API 配置卡片，但现有 `buildApiSettingsMarkup()` 还包含上下文预算设置（`#ai-workspace-budget-enabled`、`#ai-workspace-budget-max-input` 等）和 API 提示（`#ai-workspace-api-hint`）。
+
+**计划位置：** 2.2.1 节，第 89-131 行，注释 `<!-- ... 其他设置卡片 ... -->` 省略了内容
+
+**现有代码：** [`buildApiSettingsMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:1976) 第 1976-1996 行，包含预算面板和提示
+
+**解决方案：** 计划必须完整列出 API 设置页的所有字段，包括上下文预算设置区域。
+
+---
+
+## 四、JavaScript 交互
+
+### 问题 4.1：新增页面标题/描述需要 JS 逻辑动态更新
+
+**描述：** 计划新增了 `#ai-workspace-main-title` 和 `#ai-workspace-main-description` 元素，用于显示当前页面的标题和描述。但现有代码中没有这两个元素，也没有更新它们的 JS 逻辑。需要在导航切换时根据 `state.currentNav` 动态更新标题和描述文本。
+
+**计划位置：** 2.1 节，第 64-67 行
+
+**解决方案：** 在 `renderCurrentPanel()` 或 `syncNavigationState()` 中添加逻辑：
+```javascript
+const NAV_TITLES = { direct: '直接修改', plan: '计划修改', api: 'API 设置', generate: '世界书生成' };
+const NAV_DESCRIPTIONS = { direct: '选择条目，给出指令，再预览写回。', ... };
+$('#ai-workspace-main-title', parentDoc()).text(NAV_TITLES[state.currentNav] || '');
+$('#ai-workspace-main-description', parentDoc()).text(NAV_DESCRIPTIONS[state.currentNav] || '');
+```
+
+---
+
+### 问题 4.2：步骤切换交互在计划中无对应 HTML
+
+**描述：** 现有代码中步骤切换通过 `[data-ai-step]`（点击步骤按钮跳转）和 `[data-ai-step-target]`（点击"下一步"按钮跳转）两个属性实现。计划的 HTML 中没有包含这些属性的元素，步骤切换交互将完全失效。
+
+**计划位置：** 2.2.2 节，第 218-248 行，无步骤指示器和步骤操作按钮
+
+**现有代码：**
+- [`bindEvents()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:3000) 第 3000 行：`.on('click.aiWorkspaceDesktop', '[data-ai-step]', ...)`
+- [`bindEvents()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:3007) 第 3007 行：`.on('click.aiWorkspaceDesktop', '[data-ai-step-target]', ...)`
+- [`buildSelectionMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2069) 第 2069 行：`<button data-ai-step-target="instruction">下一步：指令设定</button>`
+
+**解决方案：** 必须在每个步骤的 HTML 中保留步骤指示器和步骤操作按钮（含 `data-ai-step-target` 属性）。
+
+---
+
+### 问题 4.3：预览项点击切换详情交互需确认类名一致性
+
+**描述：** 计划注释提到"点击切换右侧详情"，现有代码中 `bindEvents()` 绑定 `#ai-workspace-preview-list .ai-preview-item` 的点击事件来切换详情。计划保留了 `#ai-workspace-preview-list` ID，但需确认预览项是否仍使用 `.ai-preview-item` 类名。
+
+**计划位置：** 2.2.3 节，第 301 行注释
+
+**现有代码：** `bindEvents()` 中绑定 `#ai-workspace-preview-list .ai-preview-item` 的 click 事件调用 `renderPreviewDetail()`
+
+**解决方案：** 确保预览项渲染函数 `renderPreview()` 生成的元素仍使用 `.ai-preview-item` 类名，且 `data-uid` 属性保留。
+
+---
+
+### 问题 4.4：预览排除按钮交互在计划中未提及
+
+**描述：** 现有代码中预览项有排除按钮（`.ai-preview-exclude`），用户可以排除不想应用的条目。`bindEvents()` 绑定了此按钮的点击事件调用 `excludePreviewItem()`。计划中未提及此功能。
+
+**现有代码：** `bindEvents()` 中绑定 `.ai-preview-exclude` 的 click 事件
+
+**解决方案：** 必须在预览项的 HTML 中保留排除按钮，并在计划中说明其样式设计。
+
+---
+
+### 问题 4.5：PC 端导航栏折叠展开需要新的 JS 逻辑
+
+**描述：** 计划提到"左侧导航栏可以设计为可折叠状态，只显示图标，鼠标悬浮时再展开"。现有代码的 `setMobileNavExpanded()` 和 `.ai-mobile-nav-toggle` 是为移动端设计的折叠逻辑，PC 端的悬浮展开需要新的 JS 交互代码。
+
+**计划位置：** 4 节，第 436 行
+
+**解决方案：** 需要新增 PC 端导航折叠的 JS 逻辑，包括：
+- 检测屏幕宽度阈值（如 1024px）切换折叠状态
+- 悬浮展开可通过纯 CSS `:hover` 实现，无需 JS
+- 折叠状态需持久化到 `settings.js`
+
+---
+
+## 五、响应式
+
+### 问题 5.1：预览区使用 calc(100vh - 200px) 违反 iframe 适配要求
+
+**描述：** 计划中预览区使用 `height: calc(100vh - 200px)`。但项目规则明确要求"禁止使用 vh 单位等会受宿主高度影响的单位"，因为前端界面在 iframe 中运行，`vh` 参照的是 iframe 的视口高度而非酒馆页面高度，可能导致高度计算异常。
+
+**计划位置：** 2.2.3 节 CSS，第 318 行：`height: calc(100vh - 200px); /* 示例高度 */`
+
+**解决方案：** 使用替代方案：
+- 使用 `aspect-ratio` 让高度根据宽度动态调整
+- 或使用 `max-height` 配合 `flex` 布局让内容自适应
+- 或使用固定高度如 `height: 500px` 配合 `overflow-y: auto`
+
+---
+
+### 问题 5.2：grid-template-columns auto-fit 在中等宽度下空间利用不佳
+
+**描述：** 计划使用 `grid-template-columns: repeat(auto-fit, minmax(350px, 1fr))`。当容器宽度略大于 350px（如 500px）时，会强制单列且右侧留大量空白；当容器宽度为 700px 时，两列各 350px 刚好填满，但条目内容可能被挤压。
+
+**计划位置：** 2.2.2 节 CSS，第 256 行
+
+**解决方案：** 使用 `minmax(min(350px, 100%), 1fr)` 确保在小容器下也能正常显示，或添加媒体查询在中等宽度下调整列数。
+
+---
+
+### 问题 5.3：缺少中等屏幕宽度(768px-1024px)的适配方案
+
+**描述：** 计划只提到 PC 端（宽屏）和移动端（`isMobile()` 为 true）两种情况，但现有代码在 `ensureStyles()` 中有 `@media (max-width:900px)` 的断点处理中等屏幕。计划没有说明在中等屏幕下新布局如何表现。
+
+**计划位置：** 4 节，第 436-437 行
+
+**现有代码：** [`ensureStyles()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2298) 中有 `@media (max-width:900px)` 的响应式规则
+
+**解决方案：** 补充中等屏幕的适配方案，说明在 768px-1024px 范围内布局如何调整（如导航栏折叠为图标模式、网格列数减少等）。
+
+---
+
+### 问题 5.4：移动端回退逻辑已有但需确认一致性
+
+**描述：** 计划提到"当 `isMobile()` 为 true 时，`aiWorkspaceDesktop.js` 的 `ensureMarkup` 将不执行任何操作，回退到 `aiWorkspace.js`"。现有代码通过 `isDesktopAiWorkspace()` 判断，逻辑已支持此回退。但需确认移动端使用的新 CSS 变量（`--ai-border-color` 等）在移动端 iframe 中可访问。
+
+**计划位置：** 4 节，第 437 行
+
+**现有代码：** [`initAiWorkspace()`](src/世界书编辑脚本/modules/ui/aiWorkspace.js:2667) 第 2667-2680 行，通过 `isDesktopAiWorkspace()` 判断
+
+**解决方案：** 确认 CSS 变量继承链：`applyTheme()` 将变量设置到 `#enhanced-lorebook-panel` 上，移动端 `#lorebook-ai-workspace` 是其子元素，可继承变量。此方案可行。
+
+---
+
+## 六、可行性
+
+### 问题 6.1：计划遗漏了大量现有功能区域
+
+**描述：** 计划只提供了 API 设置页、direct/plan 的 selection 步骤、result 步骤的部分 HTML，但遗漏了：
+- instruction 步骤的 HTML 结构（可编辑字段复选框、指令输入框、信息资源区）
+- planning 步骤的 HTML 结构（计划编辑器）
+- generate 页面的 HTML 结构（"敬请期待"占位）
+- 信息资源区的完整 HTML（聊天上下文 + 参考资料）
+- 步骤指示器的 HTML
+- 调试信息区的 HTML
+- 回滚面板的 HTML
+- 预览操作按钮区的 HTML
+
+**计划位置：** 2.2 节各小节
+
+**现有代码：**
+- [`buildInstructionMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2076) 第 2076-2122 行
+- [`buildPlanningMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2124) 第 2124-2143 行
+- [`buildGeneratorMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2220) 第 2220-2232 行
+- [`buildInfoResourcesMarkup()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:1893) 第 1893-1933 行
+
+**解决方案：** 计划必须为每个功能区域提供完整的 HTML 结构设计，不能省略。建议参考 `buildModeWorkspace()` 中的步骤切换逻辑，确保每个步骤都有对应的设计。
+
+---
+
+### 问题 6.2：过度设计风险 - 卡片 hover 效果可能分散注意力
+
+**描述：** 计划为所有 `.ai-card` 添加了 `:hover` 边框色变化效果。在世界书编辑这种功能密集型工具中，大量卡片同时存在，每个卡片都有 hover 效果会在鼠标移动时产生频繁的视觉闪烁，分散用户注意力。
+
+**计划位置：** 2.2.1 节 CSS，第 145-147 行：`.ai-card:hover { border-color: var(--ai-border-color-hover); }`
+
+**解决方案：** 仅对可交互的卡片（如可点击、可展开的卡片）添加 hover 效果，纯展示型卡片不添加。或使用更微妙的 hover 效果（如仅改变阴影而非边框色）。
+
+---
+
+### 问题 6.3：预览区固定高度在 iframe 中不可行
+
+**描述：** 已在问题 5.1 中指出，预览区使用 `calc(100vh - 200px)` 在 iframe 环境中不可行。此外，预览区的 `grid-template-columns: 320px 1fr` 在窄屏下 320px 固定宽度可能占据过多空间。
+
+**计划位置：** 2.2.3 节 CSS，第 316-323 行
+
+**解决方案：** 高度使用 `aspect-ratio` 或固定值；列宽使用 `minmax(200px, 320px) 1fr` 或在窄屏下切换为上下布局。
+
+---
+
+### 问题 6.4：计划未说明 ensureStyles() 中现有 CSS 的处理方式
+
+**描述：** 计划提供了新的 CSS 规则，但未说明 `ensureStyles()` 中现有的约 200 行 CSS 规则如何处理——是全部替换、保留并存还是逐条合并。这直接影响实施的工作量和风险。
+
+**计划位置：** 全文未提及
+
+**现有代码：** [`ensureStyles()`](src/世界书编辑脚本/modules/ui/aiWorkspaceDesktop.js:2298) 第 2298-2511 行，约 200 行 CSS
+
+**解决方案：** 计划应明确说明：
+- 哪些现有 CSS 规则保留不变
+- 哪些需要替换为新规则
+- 哪些需要删除
+- 新增的 CSS 规则应添加在 `ensureStyles()` 的哪个位置
+
+---
+
+## 七、总体评价
+
+### 优点
+
+1. **设计理念清晰：** 计划借鉴现代 SaaS 工具(Vercel/Linear/Claude)的设计语言，方向正确，卡片化、分层级、统一视觉语言的理念值得肯定。
+2. **CSS 变量使用意识正确：** 计划明确提出通过 `theme.js` 的 `applyTheme()` 注入新 CSS 变量，与现有主题系统对接的思路正确。
+3. **移动端策略合理：** 移动端保持现有结构仅调整样式，风险较低，是正确的渐进式改进策略。
+4. **响应式回退逻辑已有基础：** 现有 `isDesktopAiWorkspace()` 机制已支持移动端回退，计划的描述与现有架构一致。
+
+### 主要风险
+
+1. **HTML 结构变更范围过大且未提供完整更新清单：** 计划重构了 PC 端的 HTML 结构，但只提供了部分页面的示例 HTML，且未说明需要同步更新的 JS 选择器清单。这是最大的风险——实施时极易遗漏选择器更新，导致功能失效。
+2. **遗漏多个关键功能区域：** 步骤指示器、调试信息、回滚面板、操作按钮等核心功能在计划中缺失，说明计划作者对现有功能的全貌了解不足。
+3. **CSS 变量混合方向有误：** `--ai-surface-color` 和 `--ai-text-color-secondary` 的 colorMix 参数可能导致深色主题下表面色过暗、文字不可读。
+4. **违反 iframe 适配要求：** 预览区使用 `vh` 单位违反项目规则。
+
+### 实施建议
+
+1. **要求计划作者补充完整的 HTML 结构设计：** 覆盖所有步骤（selection、instruction、planning、result）和所有页面（api、direct、plan、generate），不得省略。
+2. **要求提供新旧选择器映射表：** 逐一列出所有变更的类名、ID 及其对应的 JS 选择器更新。
+3. **先实施 CSS 变量注入和移动端样式：** 这两部分风险最低，可先行实施验证。
+4. **PC 端 HTML 重构应分步进行：** 先保留现有 DOM 结构仅调整 CSS，验证功能正常后再逐步重构 HTML 结构，每步都同步更新 JS 选择器并测试。
+5. **修正 CSS 变量的 colorMix 参数：** 参考现有 `applyTheme()` 中 `entryHoverBgColor` 等变量的混合方式。
+6. **将 `vh` 单位替换为 `aspect-ratio` 或固定高度。**
+
+### 结论
+
+计划的设计方向和视觉理念值得肯定，但在实施细节上存在重大缺陷：HTML 结构变更不完整、遗漏核心功能区域、未提供 JS 选择器更新清单、CSS 变量混合参数有误。**不建议直接按当前计划实施**，需要求计划作者补充完善后再进行审核。

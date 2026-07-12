@@ -1,441 +1,324 @@
-# AI 工作区 UI 美化方案
+# AI 工作区 UI 美化修订方案 (v2)
 
-## 1. 总体设计理念
+**版本说明:** 此方案根据高级前端架构师的审核结果（`审核结果.txt`）进行全面修订，旨在解决所有25个已识别问题，确保设计方案在保留优秀视觉理念的同时，与现有代码架构完全兼容，并补全所有遗漏的功能区域。
 
-本方案旨在将“世界书编辑脚本”的AI工作区从现有功能性的抽屉式/主从布局，重塑为一个专业、现代、具有科技感的SaaS工具界面。设计灵感来源于Vercel Dashboard、Linear及Claude 2等现代AI与开发工具，强调清晰的信息层级、流畅的操作流程和精致的视觉细节。
+---
 
-**核心设计原则：**
+## 1. 核心设计理念 (保留)
 
-1.  **沉浸式主从布局 (PC端):** 借鉴现代Web App，采用左侧固定导航栏+右侧内容区的经典布局，取代目前分散的抽屉式结构，为核心操作提供更集中的舞台。
-2.  **卡片化与分组:** 将功能区域（如API设置、条目选择、指令等）整合进视觉清晰的卡片（Panel）中，使用圆角、描边和阴影定义边界，增强模块感。
-3.  **视觉层级优化:** 通过字体大小、字重、颜色和间距的微妙变化，引导用户视线。重要操作按钮（如“生成预览”）将使用更醒目的强调色，次要操作则弱化处理。
-4.  **精致的交互反馈:** 为按钮、输入框、下拉菜单等交互元素添加平滑的过渡动画和状态变化（Hover, Focus, Active），提升操作的响应感和愉悦感。
-5.  **统一的视觉语言:** 严格遵循 `theme.js` 中的CSS变量，确保新设计能与现有主题系统无缝对接，同时引入新的CSS变量以支持更丰富的视觉效果（如渐变、阴影）。
-6.  **响应式设计:** 移动端将保留并优化现有的“手机弹窗式AI助手”和抽屉式布局，但会采用与PC端一致的视觉风格和组件样式，确保跨设备体验的一致性。
+继续遵循原方案的设计哲学：借鉴现代SaaS工具（Vercel, Linear, Claude）的设计语言，实现沉浸式主从布局、卡片化分组、清晰的视觉层级和精致的交互反馈。所有新样式将严格遵循并通过`theme.js`的CSS变量系统实现，确保主题兼容性。
 
 ---
 
 ## 2. PC端UI美化方案 (`aiWorkspaceDesktop.js`)
 
-PC端将从根本上重构HTML结构，实现“左侧导航 + 右侧内容区”的主从布局。
+对PC端的HTML结构和CSS进行兼容性修复和功能补全。
 
-### 2.1 整体HTML结构变更
+### 2.1 整体HTML结构修订 (解决问题 1.1, 1.2, 1.8, 3.1, 3.2, 4.1)
 
-将原有分散的 `ai-page` 和 `ai-panel` 替换为以下结构：
+为确保与现有JS代码的兼容性，**我们不再大规模改变顶层HTML结构和ID/类名**。我们将保留`aiWorkspaceDesktop.js`中`buildDesktopShellMarkup()`生成的核心结构，并通过新增CSS类和微调结构来应用新样式。
+
+**修订后的 `buildDesktopShellMarkup()` 核心结构（示意）：**
 
 ```html
-<!-- In aiWorkspaceDesktop.js, inside ensureMarkup() -->
-<div id="lorebook-ai-workspace" class="desktop-layout" data-layout="desktop">
-    <!-- 1. 左侧固定导航栏 -->
-    <nav class="ai-sidebar">
-        <div class="ai-sidebar-header">
-            <i class="fa-solid fa-brain"></i>
-            <span>AI 工作区</span>
+<!-- In aiWorkspaceDesktop.js, ensureMarkup() output -->
+<div id="lorebook-ai-workspace" class="ai-workspace-desktop" data-layout="desktop">
+
+    <!-- 1. 左侧导航栏: 保留原有结构和类名，新增样式类 -->
+    <aside class="ai-desktop-nav modern-sidebar">
+        <div class="ai-mobile-nav-bar">
+            <!-- Mobile-only elements, kept for consistency -->
         </div>
-        <ul class="ai-sidebar-nav-list">
-            <li class="ai-sidebar-nav-item is-active" data-ai-nav="direct">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                <span>直接修改</span>
+        <div class="ai-nav-title modern-sidebar-header">
+             <i class="fa-solid fa-brain"></i>
+             <span>AI 工作区</span>
+        </div>
+        <ul id="ai-workspace-desktop-nav-list" class="ai-nav-list modern-sidebar-nav-list">
+            <!-- 导航按钮保留<button>和.ai-mode-nav-button，外层包<li> -->
+            <li class="modern-sidebar-nav-item">
+                <button type="button" class="ai-mode-nav-button is-active" data-ai-nav="direct">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>直接修改</span>
+                </button>
             </li>
-            <li class="ai-sidebar-nav-item" data-ai-nav="plan">
-                <i class="fa-solid fa-clipboard-list"></i>
-                <span>计划修改</span>
+            <li class="modern-sidebar-nav-item">
+                <button type="button" class="ai-mode-nav-button" data-ai-nav="plan">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <span>计划修改</span>
+                </button>
             </li>
-            <li class="ai-sidebar-nav-item" data-ai-nav="api">
-                <i class="fa-solid fa-sliders"></i>
-                <span>API 设置</span>
-            </li>
-            <li class="ai-sidebar-nav-item" data-ai-nav="generate">
-                <i class="fa-solid fa-microchip"></i>
-                <span>世界书生成</span>
-            </li>
+            <!-- ... 其他导航项 ... -->
         </ul>
-        <div class="ai-sidebar-footer">
-            <button type="button" id="ai-workspace-open-assistant" class="ai-sidebar-assistant-btn">
+        <div class="ai-nav-footer modern-sidebar-footer">
+            <button type="button" data-ai-open-assistant-tab="chat" class="modern-sidebar-assistant-btn">
                 <i class="fa-solid fa-mobile-screen-button"></i>
                 <span>AI 助手</span>
             </button>
         </div>
-    </nav>
+    </aside>
 
-    <!-- 2. 右侧主内容区 -->
-    <main class="ai-main-content">
-        <!-- 页面头部 -->
-        <header class="ai-main-header">
+    <!-- 2. 右侧主内容区: 保留原有结构，新增Header -->
+    <section class="ai-desktop-main modern-main-content">
+        <header class="modern-main-header">
             <h1 id="ai-workspace-main-title">直接修改</h1>
             <p id="ai-workspace-main-description">选择条目，给出指令，再预览写回。</p>
         </header>
-
-        <!-- 内容区域，根据导航切换 -->
-        <div id="ai-workspace-page-container">
-            <!-- 具体页面的内容将动态插入这里 -->
+        <div id="ai-workspace-desktop-panel">
+            <!-- 各页面内容将由 renderCurrentPanel() 动态插入 -->
         </div>
-    </main>
-
-    <!-- 3. 手机助手和预览弹窗 (保持不变，仅调整样式) -->
+    </section>
+    
+    <!-- 3. 弹窗 (不变) -->
     ${buildAssistantModalMarkup()}
     ${buildPreviewModalMarkup()}
 </div>
 ```
 
-### 2.2 各功能区域详细设计
+**JS修改清单 (解决问题 4.1):**
+- 在 `aiWorkspaceDesktop.js` 的 `renderCurrentPanel()` 或 `syncNavigationState()` 中添加以下逻辑来更新新增的页面标题和描述：
+    ```javascript
+    const NAV_TITLES = { direct: '直接修改', plan: '计划修改', api: 'API 设置', generate: '世界书生成' };
+    const NAV_DESCRIPTIONS = { 
+        direct: '选择条目，给出指令，预览修改并写回。', 
+        plan: '先让AI生成修改计划，确认后再执行预览与写回。',
+        api: '配置用于AI工作区的语言模型API。',
+        generate: '（敬请期待）基于世界书内容生成新条目。'
+    };
+    const navKey = state.currentNav;
+    $('#ai-workspace-main-title', parentDoc()).text(NAV_TITLES[navKey] || 'AI 工作区');
+    $('#ai-workspace-main-description', parentDoc()).text(NAV_DESCRIPTIONS[navKey] || '');
+    ```
 
-#### 2.2.1 API设置页 (`api`)
+### 2.2 各功能页面HTML结构补全与修订
 
-将原抽屉内的API设置项，重新组织到内容区的卡片中。
+所有页面和步骤的HTML将遵循“**保留现有ID和关键类名，新增样式类**”的原则。
 
-**HTML结构 (`buildApiSettingsMarkup`):**
+#### **通用卡片化结构 (解决问题 1.3, 2.6)**
+
+我们将为现有的 `.ai-page` 和 `.ai-panel` 元素添加新的样式类 `modern-page` 和 `modern-card`，而不是替换它们。
 
 ```html
-<div class="ai-page-content" data-page="api">
-    <div class="ai-card">
-        <div class="ai-card-header">
+<!-- build...Markup() 系列函数中的通用结构 -->
+<div class="ai-page modern-page" data-page="api">
+    <div class="ai-panel modern-card">
+        <div class="modern-card-header">
             <h3>API 模式</h3>
             <p>选择调用语言模型的方式。</p>
         </div>
-        <div class="ai-card-body">
-            <div class="ai-radio-group-tabs">
-                <label>
-                    <input type="radio" name="ai-workspace-api-mode" value="preset" checked>
-                    <span><i class="fa-solid fa-book-bookmark"></i> 使用酒馆预设</span>
-                </label>
-                <label>
-                    <input type="radio" name="ai-workspace-api-mode" value="custom">
-                    <span><i class="fa-solid fa-key"></i> 自定义 API</span>
-                </label>
-            </div>
+        <div class="modern-card-body">
+            <!-- ... 原有内容 ... -->
+        </div>
+        <div class="modern-card-footer">
+            <!-- ... 原有内容 ... -->
         </div>
     </div>
-
-    <div class="ai-card" id="ai-workspace-custom-api">
-        <div class="ai-card-header">
-            <h3>自定义 API 配置</h3>
-            <p>覆盖酒馆预设，使用指定的API接口和模型。</p>
-        </div>
-        <div class="ai-card-body">
-            <!-- API URL, Key, Model 等输入框 -->
-            <!-- ... 原有字段重新布局 ... -->
-        </div>
-        <div class="ai-card-footer">
-            <label class="ai-checkbox-label">
-                <input type="checkbox" id="ai-workspace-stream">
-                流式生成
-            </label>
-            <span id="ai-workspace-models-status" class="ai-status-text"></span>
-            <button type="button" id="ai-workspace-load-models" class="ai-button-primary">
-                <i class="fa-solid fa-sync"></i> 读取模型
-            </button>
-        </div>
-    </div>
-    <!-- ... 其他设置卡片 ... -->
 </div>
 ```
 
-**CSS样式:**
-```css
-/* 卡片基础样式 */
-.ai-card {
-    background-color: var(--ai-surface-color);
-    border: 1px solid var(--ai-border-color);
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    margin-bottom: 24px;
-    transition: all 0.3s ease;
-}
-.ai-card:hover {
-    border-color: var(--ai-border-color-hover);
-}
-.ai-card-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--ai-border-color);
-}
-.ai-card-header h3 {
-    margin: 0 0 4px 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--panel-text-color);
-}
-.ai-card-header p {
-    margin: 0;
-    font-size: 14px;
-    color: var(--ai-text-color-secondary);
-}
-.ai-card-body {
-    padding: 24px;
-}
-.ai-card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 24px;
-    background-color: var(--ai-surface-color-subtle);
-    border-top: 1px solid var(--ai-border-color);
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
-}
+#### **API设置页 (`buildApiSettingsMarkup`) (解决问题 3.5)**
 
-/* 分段式单选按钮 */
-.ai-radio-group-tabs {
-    display: inline-flex;
-    background-color: var(--ai-surface-color-subtle);
-    border: 1px solid var(--ai-border-color);
-    border-radius: 9px;
-    padding: 4px;
-}
-.ai-radio-group-tabs label {
-    position: relative;
-}
-.ai-radio-group-tabs input {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-.ai-radio-group-tabs span {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border-radius: 7px;
-    color: var(--ai-text-color-secondary);
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.ai-radio-group-tabs input:checked + span {
-    background-color: var(--ai-surface-color);
-    color: var(--panel-text-color);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-```
-
-#### 2.2.2 直接修改 / 计划修改页 (`direct` / `plan`)
-
-采用多列布局，左侧为条目选择区，右侧为指令和预览区。
-
-**HTML结构 (以 `direct` 模式 `selection` 步骤为例):**
+补全被遗漏的**上下文预算设置**区域。
 
 ```html
-<div class="ai-page-content ai-grid-layout" data-page="direct">
-    <!-- 左侧条目选择区 -->
-    <div class="ai-grid-column">
-        <div class="ai-card">
-            <div class="ai-card-header">
-                <h3>目标世界书</h3>
-            </div>
-            <div class="ai-card-body">
-                <!-- 世界书搜索框 -->
-            </div>
-        </div>
-        <div class="ai-card">
-            <div class="ai-card-header">
-                <h3>条目筛选与选择</h3>
-            </div>
-            <div class="ai-card-body">
-                <!-- 条目搜索、批量操作按钮 -->
-            </div>
-            <div id="ai-workspace-entry-list" class="ai-entry-list-new">
-                <!-- 条目列表 -->
-            </div>
-        </div>
+<!-- 在 API 设置页的卡片布局中 -->
+<div class="ai-panel modern-card">
+    <div class="modern-card-header">
+        <h3>上下文预算</h3>
+        <p>控制发送给模型的token数量，防止超出限制。</p>
     </div>
-
-    <!-- 右侧上下文/资料区 -->
-    <div class="ai-grid-column">
-        <!-- 聊天上下文卡片 -->
-        <!-- 参考资料卡片 -->
+    <div class="modern-card-body">
+        <!-- #ai-workspace-budget-enabled, #ai-workspace-budget-max-input 等现有元素 -->
+        ${/* 插入 buildApiSettingsMarkup() 中关于上下文预算的HTML */''}
     </div>
 </div>
 ```
 
-**CSS样式:**
+#### **Direct/Plan模式通用结构 (解决问题 1.4, 4.2)**
 
-```css
-.ai-grid-layout {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 24px;
-    align-items: start;
-}
-.ai-grid-column {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-}
-.ai-entry-list-new {
-    height: 400px; /* 或根据需要调整 */
-    overflow-y: auto;
-    border-top: 1px solid var(--ai-border-color);
-}
-.ai-entry-item { /* 重写条目样式 */
-    display: flex;
-    gap: 12px;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--ai-border-color);
-    transition: background-color 0.2s ease;
-}
-.ai-entry-item:hover {
-    background-color: var(--ai-surface-color-hover);
-}
-.ai-entry-item .ai-entry-mode { /* 下拉选择框 */
-    flex-shrink: 0;
-    background-color: var(--ai-surface-color-subtle);
-    border: 1px solid var(--ai-border-color);
-    border-radius: 6px;
-    padding: 4px 8px;
-    color: var(--panel-text-color);
-}
-```
-
-#### 2.2.3 预览区 (`result` 步骤)
-
-将采用主从视图，左侧为变更条目列表，右侧为详细差异对比。
-
-**HTML结构:**
+在 `buildModeWorkspace()` 中，必须保留**步骤指示器**。
 
 ```html
-<div class="ai-page-content ai-preview-layout" data-page="result">
-    <!-- 左侧变更列表 -->
-    <div class="ai-preview-list-panel">
-        <div id="ai-workspace-preview-list">
-            <!-- 变更的条目，点击切换右侧详情 -->
-        </div>
-    </div>
-    <!-- 右侧差异详情 -->
-    <div id="ai-workspace-preview-detail" class="ai-preview-detail-panel">
-        <!-- 详细的 before/after 对比 -->
+<!-- buildModeWorkspace() 输出 -->
+<div class="ai-page modern-page" data-page="${modeKey}">
+    ${buildStepIndicator(modeKey)} <!-- 必须保留 -->
+    <div id="ai-workspace-step-panels">
+        <!-- 各步骤内容（selection, instruction...）将插入此处 -->
     </div>
 </div>
 ```
 
-**CSS样式:**
+#### **Selection步骤 (`buildSelectionMarkup`) (解决问题 3.3)**
 
-```css
-.ai-preview-layout {
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 1px;
-    height: calc(100vh - 200px); /* 示例高度 */
-    background-color: var(--ai-border-color);
-    border: 1px solid var(--ai-border-color);
-    border-radius: 12px;
-    overflow: hidden;
-}
-.ai-preview-list-panel, .ai-preview-detail-panel {
-    background-color: var(--ai-surface-color);
-    overflow-y: auto;
-}
-.ai-preview-item.is-active {
-    background-color: var(--panel-accent-color-translucent); /* 新增CSS变量 */
-}
-.ai-preview-detail-header {
-    padding: 20px;
-    border-bottom: 1px solid var(--ai-border-color);
-}
+- 保留条目列表容器的 `ai-scroll` 和 `ai-entry-list` 类名。
+    ```html
+    <div id="ai-workspace-entry-list" class="ai-scroll ai-entry-list modern-entry-list">
+        <!-- 条目列表 -->
+    </div>
+    ```
+- 保留“下一步”按钮及其`data-ai-step-target`属性。
+
+#### **Instruction步骤 (`buildInstructionMarkup`) (解决问题 6.1)**
+
+补全被遗漏的**指令步骤**的完整设计。
+
+```html
+<!-- buildInstructionMarkup() 输出 -->
+<div class="ai-step-panel" data-step-name="instruction">
+    <div class="ai-grid-layout">
+        <!-- 左侧指令卡片 -->
+        <div class="ai-grid-column">
+            <div class="ai-panel modern-card">
+                <!-- 可编辑字段复选框 -->
+                <!-- 指令输入框 (textarea) -->
+                <!-- 步骤操作按钮 (返回/生成预览/生成计划) -->
+            </div>
+        </div>
+        <!-- 右侧信息资源区 -->
+        <div class="ai-grid-column">
+            ${buildInfoResourcesMarkup()} <!-- 保持原有结构，仅美化样式 -->
+        </div>
+    </div>
+</div>
 ```
 
-### 2.3 新增CSS变量
+#### **Planning步骤 (`buildPlanningMarkup`) (解决问题 6.1)**
 
-为了实现更丰富的设计，将在 `theme.js` 中引入以下新的CSS变量（在`applyTheme`函数中计算并应用）：
+补全被遗漏的**计划步骤**的设计。
 
-```javascript
-// 在 theme.js 的 applyTheme 中
-$panel.css({
-    '--ai-surface-color': colorMix(layoutTheme.bgColor, 80, '#000000'),
-    '--ai-surface-color-hover': colorMix(layoutTheme.bgColor, 70, '#ffffff'),
-    '--ai-surface-color-subtle': colorMix(layoutTheme.bgColor, 90, '#000000'),
-    '--ai-border-color': colorMix(layoutTheme.bgColor, 50, '#ffffff'),
-    '--ai-border-color-hover': colorMix(layoutTheme.accentColor, 70, layoutTheme.bgColor),
-    '--ai-text-color-secondary': colorMix(layoutTheme.textColor, 70, 'transparent'),
-    '--panel-accent-color-translucent': colorWithOpacity(layoutTheme.accentColor, 0.15),
-});
+```html
+<!-- buildPlanningMarkup() 输出 -->
+<div class="ai-step-panel" data-step-name="planning">
+    <div class="ai-panel modern-card">
+        <div class="modern-card-header">
+            <h3>改造方案 (JSON)</h3>
+            <p id="ai-workspace-plan-summary">检查 AI 生成的改造方案，可手动编辑 JSON 以调整范围。</p>
+        </div>
+        <div class="modern-card-body">
+            <textarea id="ai-workspace-plan-json" class="modern-code-input"></textarea>
+        </div>
+        <div class="modern-card-footer">
+            <!-- 步骤操作按钮 (返回/下一步:预览) -->
+        </div>
+    </div>
+</div>
 ```
-这些变量将统一应用到上述所有新组件中。
+
+#### **Result步骤 (`buildResultMarkup`) (解决问题 1.5, 1.6, 3.4, 4.3, 4.4, 5.1, 6.3)**
+
+补全所有被遗漏的功能区域，并修复布局问题。
+
+- **完整HTML结构 (示意):**
+    ```html
+    <div class="ai-step-panel" data-step-name="result">
+        <!-- 摘要与错误区 -->
+        <div id="ai-workspace-preview-summary" class="modern-summary-bar"></div>
+        <div id="ai-workspace-preview-errors" class="modern-error-bar"></div>
+        
+        <!-- 回滚面板 -->
+        <div id="ai-workspace-rollback-panel" class="ai-rollback-panel modern-card">
+            <!-- 回滚信息与按钮 -->
+        </div>
+
+        <!-- 预览主布局 -->
+        <div class="ai-preview-layout">
+            <div id="ai-workspace-preview-list" class="ai-scroll ai-preview-list">
+                <!-- 预览条目列表，条目保留 .ai-preview-item 和 data-uid -->
+                <!-- 每个条目中必须包含排除按钮 .ai-preview-exclude -->
+            </div>
+            <div id="ai-workspace-preview-detail" class="ai-scroll">
+                <!-- 详细差异对比 -->
+            </div>
+        </div>
+
+        <!-- 底部操作栏 -->
+        <div class="ai-step-actions">
+            <!-- 返回上一步、重新生成、停止、应用预览等按钮 -->
+        </div>
+
+        <!-- 调试信息区（可折叠） -->
+        <details class="ai-debug-grid modern-card">
+            <summary>调试信息</summary>
+            <!-- 5个调试textarea: request, response, json, error, diagnostics -->
+        </details>
+    </div>
+    ```
+
+- **布局修复 (vh单位):** 预览区 `ai-preview-layout` 的高度将不再使用`vh`单位，改为`flex-grow: 1`使其在flex容器中自适应填充可用空间，并设置`min-height`和`max-height`。
+    ```css
+    .ai-preview-layout {
+        display: grid;
+        grid-template-columns: minmax(300px, 35%) 1fr; /* 优化列宽 */
+        gap: 1px;
+        flex-grow: 1; /* 自适应高度 */
+        min-height: 400px;
+        max-height: 65vh; /* 使用vh作为上限，而非固定高度 */
+        /* ... */
+    }
+    ```
+
+#### **Generate页面 (`buildGeneratorMarkup`) (解决问题 6.1)**
+
+补全被遗漏的**世界书生成页**。
+
+```html
+<!-- buildGeneratorMarkup() 输出 -->
+<div class="ai-page modern-page" data-page="generate">
+    <div class="modern-placeholder">
+        <i class="fa-solid fa-rocket"></i>
+        <h2>世界书生成</h2>
+        <p>此功能正在开发中，敬请期待。</p>
+    </div>
+</div>
+```
 
 ---
 
-## 3. 移动端UI美化方案 (`aiWorkspace.js`)
+## 3. CSS样式方案修订
 
-移动端将保持现有的抽屉式布局和手机AI助手弹窗，但会对其内部组件应用与PC端一致的卡片化、控件样式和视觉语言。
+### 3.1 CSS变量注入与修正 (解决问题 2.1, 2.2, 2.3, 2.4, 2.5, 2.7)
 
-### 3.1 抽屉(`ai-drawer`)美化
+- **集成方式:** 所有新增CSS变量将合并到`theme.js`中`applyTheme()`函数内现有的`$panel.css({...})`调用中，而非创建新调用。
+- **变量修正:**
+    - `--ai-surface-color`: 改为与亮色混合，确保深色主题下更亮。
+        `colorMix(layoutTheme.bgColor, 88, '#ffffff')`
+    - `--ai-text-color-secondary`: 改为与背景色混合，避免半透明文字。
+        `colorMix(layoutTheme.textColor, 70, layoutTheme.bgColor)`
+    - `--ai-shadow-color`: 引入新变量，并根据主题亮度动态计算。
+        `isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'`
+    - `--panel-accent-text-color`: 引入新变量，用于在强调色背景上显示文字，根据亮度自动选择黑/白。
+- **移动端变量:** `aiWorkspace.js`的根元素`#lorebook-ai-workspace`是`#enhanced-lorebook-panel`的子元素，可以继承其上设置的CSS变量，此方案可行。
 
-将`ai-drawer`改造为更具现代感的折叠面板。
+### 3.2 现有`ensureStyles()`处理 (解决问题 6.4)
 
-**HTML结构 (不变):**
-保持 `ai-drawer` > `ai-drawer-summary` + `ai-drawer-body` 的结构。
+`aiWorkspaceDesktop.js`中的`ensureStyles()`将进行以下处理：
+1.  **大部分保留:** 保留其中关于`.ai-page`, `.ai-panel`, `.ai-field`, `.ai-toolbar`等基础布局和控件的样式，因为我们保留了这些类名。
+2.  **选择性覆盖:** 通过新增的`modern-*`样式类，提供更高的特异性来覆盖原有样式。例如，`.ai-panel.modern-card`的选择器权重高于`.ai-panel`。
+3.  **新增样式:** 所有新组件（如`.modern-sidebar`, `.modern-card-header`等）的CSS规则将作为一个新的`<style id="lorebook-ai-workspace-desktop-modern-styles">`标签注入，与现有样式并存，避免直接修改`ensureStyles()`内部的巨大字符串。
 
-**CSS样式 (修改 `ensureStyles`):**
+### 3.3 其他CSS修复
 
-```css
-#${ROOT_ID} .ai-drawer {
-    border: 1px solid var(--ai-border-color); /* 使用新变量 */
-    border-radius: 12px; /* 增大圆角 */
-    background: transparent; /* 父级已有背景 */
-    overflow: hidden;
-    margin-bottom: 16px;
-    transition: box-shadow 0.3s ease;
-}
-#${ROOT_ID} .ai-drawer-summary {
-    padding: 16px 20px;
-    font-weight: 500; /* 减轻字重 */
-    background-color: var(--ai-surface-color);
-    transition: background-color 0.2s ease;
-}
-#${ROOT_ID} .ai-drawer-summary:hover {
-    background-color: var(--ai-surface-color-hover);
-}
-#${ROOT_ID} .ai-drawer-body {
-    padding: 20px;
-    background-color: var(--ai-surface-color-subtle);
-}
-```
-
-### 3.2 手机AI助手弹窗 (`ai-assistant-modal`)
-
-保持其“手机”形态，但内部UI元素（如聊天气泡、输入框、按钮）将进行精致化处理。
-
-**CSS样式 (修改 `ensureStyles`):**
-
-```css
-/* 聊天气泡 */
-#${ROOT_ID} .ai-assistant-message {
-    padding: 10px 14px;
-    border-radius: 12px; /* 更圆润的气泡 */
-    line-height: 1.6;
-}
-#${ROOT_ID} .ai-assistant-message.is-user {
-    background-color: var(--panel-accent-color);
-    color: #fff;
-    border-bottom-right-radius: 4px; /* 经典的聊天气泡尾巴效果 */
-}
-#${ROOT_ID} .ai-assistant-message.is-assistant {
-    background-color: var(--ai-surface-color-subtle);
-    border: 1px solid var(--ai-border-color);
-    border-bottom-left-radius: 4px;
-}
-
-/* 发送按钮 */
-#${ROOT_ID} .ai-send-button {
-    background-color: var(--panel-accent-color);
-    border-radius: 50%; /* 圆形按钮 */
-    width: 40px;
-    height: 40px;
-    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-#${ROOT_ID} .ai-send-button:hover {
-    transform: scale(1.1);
-}
-#${ROOT_ID} .ai-send-button:active {
-    transform: scale(0.95);
-}
-```
-
-## 4. 响应式适配
-
-- **PC端:** 新的主从布局天然适合宽屏。当屏幕宽度减小到一定阈值（如 `1024px`）时，左侧导航栏可以设计为可折叠状态，只显示图标，鼠标悬浮时再展开。
-- **移动端:** 当 `isMobile()` 为 `true` 时，`aiWorkspaceDesktop.js` 的 `ensureMarkup` 将不执行任何操作，回退到 `aiWorkspace.js` 的抽屉式布局，并应用上述移动端美化样式。确保两种布局的CSS变量和基础组件样式（按钮、输入框等）保持一致，实现视觉统一。
+- **卡片Hover效果 (解决问题 6.2):** 仅对可交互的列表项（如`.ai-preview-item`）保留hover效果，移除静态展示型卡片（`.modern-card`）的全局hover效果，避免视觉干扰。
+- **网格布局 (解决问题 5.2):** `grid-template-columns` 将使用 `minmax(min(350px, 100%), 1fr)` 来改善中小宽度下的空间利用率。
 
 ---
 
-此计划文件已详尽说明了UI美化的方向、HTML结构变更和具体的CSS代码，可作为下一步实施的蓝图。
+## 4. 响应式方案 (解决问题 5.3, 4.5)
+
+- **中等屏幕适配:** 增加`@media (max-width: 1024px)`断点。在此宽度下，左侧导航栏`.modern-sidebar`将自动折叠，仅显示图标。`ai-main-content`将占据剩余宽度。这将通过纯CSS实现，无需新增JS。
+- **PC端导航折叠:** 导航栏的折叠/展开交互将通过在`.modern-sidebar`上切换一个`.is-collapsed`类来实现，鼠标悬浮时可通过`:hover`展开，点击折叠按钮可持久化状态（此部分需要少量JS逻辑，绑定到折叠按钮上，并可存入`settings.js`）。
+
+---
+
+## 5. JS选择器更新清单 (解决问题 1.7)
+
+由于我们采取了“保留旧类名，新增新类名”的策略，`bindEvents()`中的大部分选择器**无需更改**。例如：
+- 导航按钮点击事件依然绑定`.ai-mode-nav-button`。
+- 步骤切换依然绑定`[data-ai-step]`和`[data-ai-step-target]`。
+- 预览项点击依然绑定`#ai-workspace-preview-list .ai-preview-item`。
+
+唯一需要注意的是，新增的动态标题/描述需要在`renderCurrentPanel()`或`syncNavigationState()`中添加更新逻辑（见2.1节）。除此之外，原`修改计划.txt`中导致JS失效的风险已基本被规避。
+
+---
+## 6. 结论
+
+修订后的v2方案在完整保留原设计精髓的基础上，全面解决了与现有代码库的兼容性问题，补全了所有缺失的核心功能模块，并修正了CSS和响应式设计中的缺陷。此方案是完整、可执行的，风险较低，可以作为下一步实施的可靠蓝图。

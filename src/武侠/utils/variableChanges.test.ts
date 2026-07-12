@@ -128,6 +128,9 @@ describe('buildAiComparisons', () => {
   const declared = parseDeclaredVariableChanges(`
     <VariableEdit>{"user数据":{"修为":120}}</VariableEdit>
   `).declaredChanges;
+  const timeDeclared = parseDeclaredVariableChanges(`
+    <VariableEdit>{"世界信息":{"时间":{"时":14}}}</VariableEdit>
+  `).declaredChanges;
 
   it('识别 applied、not-applied、diverged 和 no-op', () => {
     const appliedChanges = createObservedVariableChanges(
@@ -179,5 +182,22 @@ describe('buildAiComparisons', () => {
       baselineStatData: { user数据: { 修为: 120 } },
       currentStatData: { user数据: { 修为: 120 } },
     }).comparisons[0].status).toBe('no-op');
+  });
+
+  it('用最终快照兜底识别已落地的世界时间声明', () => {
+    const comparison = buildAiComparisons({
+      declaredChanges: timeDeclared,
+      observedChanges: [],
+      baselineStatData: { stat_data: { 世界信息: { 时间: { 时: 13 } } } },
+      currentStatData: { stat_data: { 世界信息: { 时间: { 时: 14 } } } },
+    }).comparisons[0];
+
+    expect(comparison).toEqual(expect.objectContaining({
+      status: 'applied',
+      path: ['世界信息', '时间', '时'],
+      expectedValue: 14,
+      finalValue: 14,
+      finalPreview: '14',
+    }));
   });
 });
