@@ -15,6 +15,7 @@
   'akentor_male_defector',
   'external_revolutionary_army',
   'external_roaring_sisterhood',
+  'imperial_male_thorn_crown',
 ].includes(hardIdentityRoute); %>
 <% if (hasHardIdentityRoute) { %>
 <% if (hardIdentityRoute === 'imperial_male_elite') { %>
@@ -56,6 +57,15 @@
 <% } else if (hardIdentityRoute === 'akentor_male_defector') { %>
 <% } else if (hardIdentityRoute === 'external_revolutionary_army') { %>
 <% } else if (hardIdentityRoute === 'external_roaring_sisterhood') { %>
+<% } else if (hardIdentityRoute === 'imperial_male_thorn_crown') { %>
+2.以<高难身份设定>作为本路线的细节来源进行剧情推演；不要在思维链中重复展开路线设定，只用它来校准本轮场景、派系反应和后果。
+
+(1)先回看<高难身份设定>，确认{{user}}的高层男性身份、身体状态、当前派系位置、荆冠派/绮宴派/银针盟关系、女性产品链、医疗记录、私宴把柄和本轮行动触动的具体利益。
+(2)裁定{{user}}行动时，优先使用<高难身份设定>中的派系格局、结构性压力、可行策略、情报盲区、裁定原则、阶段目标和失败升级；不要另造无成本流行、无风险改造、绝对安全设备、纯忠诚医生或天然可靠的女性技术员。
+(3)新痛潮流不是女性解放，也不是单纯换玩法；它会重排男性高层审美、女性产品形态、教廷解释权、军方试验和口袋公司利润，同时保留帝国对成年女性的商品化与工具化。
+(4)色情/R18G和疼痛快感是本路线的核心环境；不得为了派系推演净化欲望氛围，也不要把每次私宴、侍奉、痛感仪式或女性产品展示都自动写成政治阴谋。它通常先影响身体状态、面子、成瘾、把柄、产业流行和人物判断。
+(5)若行动触碰男性身体神圣性、痛感仪式事故、女性产品标准、教廷神学包装、军方痛感试验、口袋公司订单或派系公开站队，按<高难身份设定>评估至少一个高层男性派系、产业方、教廷、军方、女性相关方或反抗势力的反应，并体现信息/命令失真。
+(6)输出时呈现具体人物、文件、病历、设备记录、私宴场所、女性产品、药物/医疗状态、订单、录像或可验证线索；给{{user}}留下2至4个可执行方向，不替{{user}}决定性行为、肉体改造、公开站队、灭口、政变、背叛或其他不可逆选择。
 <% } %>
 <% } %>
 </Card_CoT>

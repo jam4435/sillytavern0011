@@ -1563,19 +1563,254 @@
   }
 
   .variable-change-bar {
-    background: rgba(241, 235, 223, 0.66);
-    border-color: rgba(61, 48, 40, 0.2);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.34), transparent 56%), rgba(241, 235, 223, 0.84);
+    border-color: rgba(61, 48, 40, 0.26);
     color: #1a1410;
-    box-shadow: 0 10px 24px rgba(61, 48, 40, 0.08);
+    box-shadow:
+      0 10px 24px rgba(61, 48, 40, 0.1),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+
+    &::before {
+      background: linear-gradient(180deg, rgba(61, 48, 40, 0.1), rgba(139, 26, 26, 0.78), rgba(61, 48, 40, 0.1));
+      opacity: 0.9;
+    }
+
+    &.expanded {
+      border-color: rgba(139, 26, 26, 0.34);
+      box-shadow:
+        0 14px 30px rgba(61, 48, 40, 0.14),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+    }
+  }
+
+  .variable-change-summary {
+    color: #1a1410;
+  }
+
+  .variable-change-title {
+    color: #1a1410;
+
+    svg {
+      color: #8b1a1a;
+    }
   }
 
   .variable-change-segment,
-  .variable-change-chevron,
+  .variable-change-chevron {
+    background: rgba(255, 250, 244, 0.72);
+    border-color: rgba(61, 48, 40, 0.24);
+    color: #1a1410;
+
+    &:hover {
+      border-color: rgba(139, 26, 26, 0.42);
+      background: rgba(139, 26, 26, 0.08);
+      color: #8b1a1a;
+    }
+  }
+
+  .variable-change-chevron {
+    color: #5b5048;
+  }
+
+  .variable-change-segment {
+    &.ai {
+      color: #1f4f73;
+    }
+
+    &.background {
+      color: #5f3a78;
+    }
+
+    &.active {
+      &.ai {
+        border-color: rgba(31, 79, 115, 0.46);
+        background: rgba(31, 79, 115, 0.1);
+        color: #143b56;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      }
+
+      &.background {
+        border-color: rgba(95, 58, 120, 0.42);
+        background: rgba(95, 58, 120, 0.09);
+        color: #4a2f60;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      }
+    }
+  }
+
+  .variable-change-segment-label,
+  .variable-change-path,
+  .variable-change-row-body,
+  .variable-change-value.new {
+    color: #1a1410;
+  }
+
+  .variable-change-segment-count,
+  .variable-change-section-heading span:last-child,
+  .variable-change-arrow {
+    color: #8b1a1a;
+  }
+
+  .variable-change-detail {
+    border-top-color: rgba(61, 48, 40, 0.18);
+  }
+
+  .variable-change-section,
   .variable-change-row,
   .variable-change-value {
-    background: rgba(250, 246, 238, 0.56);
-    border-color: rgba(61, 48, 40, 0.18);
+    background: rgba(255, 250, 244, 0.58);
+    border-color: rgba(61, 48, 40, 0.16);
+  }
+
+  .variable-change-section.errors {
+    background: rgba(139, 26, 26, 0.08);
+    border-color: rgba(139, 26, 26, 0.22);
+  }
+
+  .variable-change-section-heading {
     color: #1a1410;
+  }
+
+  .variable-thought-item,
+  .variable-change-empty,
+  .variable-change-omitted,
+  .variable-change-note {
+    color: #5b5048;
+    background: rgba(255, 255, 255, 0.38);
+    border-color: rgba(61, 48, 40, 0.18);
+  }
+
+  .variable-thought-item {
+    border-left-color: rgba(139, 26, 26, 0.46);
+  }
+
+  .variable-change-error {
+    color: #7f2119;
+    background: rgba(139, 26, 26, 0.1);
+  }
+
+  .variable-change-row {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 58%), rgba(250, 246, 238, 0.62);
+
+    &.declared {
+      border-left-color: rgba(31, 79, 115, 0.56);
+    }
+
+    &.actual {
+      border-left-color: rgba(47, 107, 56, 0.56);
+    }
+  }
+
+  .variable-change-caption,
+  .variable-change-value.old {
+    color: #7a6e62;
+  }
+
+  .variable-change-copy-actions button {
+    background: rgba(255, 250, 244, 0.72);
+    border-color: rgba(61, 48, 40, 0.18);
+    color: #5b5048;
+
+    &:hover {
+      border-color: rgba(139, 26, 26, 0.36);
+      background: rgba(139, 26, 26, 0.08);
+      color: #8b1a1a;
+    }
+  }
+
+  .variable-change-action {
+    color: #f8f1e6;
+
+    &.insert {
+      background: rgba(47, 107, 56, 0.88);
+      color: #f3fff0;
+    }
+
+    &.edit {
+      background: rgba(139, 90, 10, 0.88);
+      color: #fff8dc;
+    }
+
+    &.delete {
+      background: rgba(139, 26, 26, 0.88);
+      color: #fff1ed;
+    }
+  }
+
+  .variable-change-compare-status {
+    &.applied {
+      color: #23512b;
+      background: rgba(47, 107, 56, 0.12);
+      border-color: rgba(47, 107, 56, 0.36);
+    }
+
+    &.not-applied {
+      color: #7a4a08;
+      background: rgba(184, 134, 11, 0.13);
+      border-color: rgba(139, 90, 10, 0.32);
+    }
+
+    &.diverged {
+      color: #8b3e12;
+      background: rgba(181, 90, 30, 0.12);
+      border-color: rgba(181, 90, 30, 0.34);
+    }
+
+    &.no-op {
+      color: #5b5048;
+      background: rgba(61, 48, 40, 0.08);
+      border-color: rgba(61, 48, 40, 0.2);
+    }
+
+    &.api-only {
+      color: #1f4f73;
+      background: rgba(31, 79, 115, 0.1);
+      border-color: rgba(31, 79, 115, 0.32);
+    }
+  }
+
+  .variable-change-source-badge {
+    color: #3d3028;
+    background: rgba(61, 48, 40, 0.08);
+    border-color: rgba(61, 48, 40, 0.18);
+
+    &.era {
+      color: #7a4a08;
+      background: rgba(184, 134, 11, 0.12);
+      border-color: rgba(139, 90, 10, 0.3);
+    }
+
+    &.event-script,
+    &.frontend {
+      color: #1f4f73;
+      background: rgba(31, 79, 115, 0.1);
+      border-color: rgba(31, 79, 115, 0.3);
+    }
+
+    &.variable-editor {
+      color: #5f3a78;
+      background: rgba(95, 58, 120, 0.1);
+      border-color: rgba(95, 58, 120, 0.28);
+    }
+
+    &.restore {
+      color: #7a4a08;
+      background: rgba(184, 134, 11, 0.12);
+      border-color: rgba(139, 90, 10, 0.3);
+    }
+
+    &.message-boundary {
+      color: #8b1a1a;
+      background: rgba(139, 26, 26, 0.08);
+      border-color: rgba(139, 26, 26, 0.26);
+    }
+  }
+
+  .variable-change-copy-toast {
+    background: rgba(47, 107, 56, 0.92);
+    border-color: rgba(47, 107, 56, 0.42);
+    color: #f3fff0;
+    box-shadow: 0 8px 18px rgba(61, 48, 40, 0.16);
   }
 
   // 角色创建页：水墨主题下优先保证宣纸面板和正文可读性。
