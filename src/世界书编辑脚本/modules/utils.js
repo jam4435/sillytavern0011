@@ -321,7 +321,7 @@ export const convertPluginToNativeFormat = pluginEntries => {
       vectorized: false, // 插件格式中没有对应字段
       position: getNativePositionType(entry.position),
       role: getNativePositionRole(entry.position),
-      depth: entry.position?.depth || 4,
+      depth: entry.position?.depth ?? 4,
       order: entry.position?.order || 100,
       content: entry.content || '',
       useProbability: true, // 假设总是使用概率

@@ -17,6 +17,7 @@ import {
   getPinnedBooks,
   renderGlobalLorebookSelector,
   savePinnedBooks,
+  updateGlobalLorebooksList,
 } from '../ui/list.js';
 import { registerCommands } from './index.js';
 
@@ -99,8 +100,9 @@ async function unpinGlobalLorebook({ $actionTarget, $panel, parentDoc }) {
   $tag.remove();
   const $header = $panel.find('.global-lorebook-selector-header');
   if ($header.length) {
-    const currentCount = parseInt($header.text().match(/\d+/), 10);
-    $header.text(`常驻世界书 (${currentCount - 1})`);
+    const $headerLabel = $header.find('span').first();
+    const currentCount = Number.parseInt(($headerLabel.text().match(/\d+/) || ['0'])[0], 10);
+    $headerLabel.text(`常驻世界书 (${Math.max(currentCount - 1, 0)})`);
   }
 
   // Remove from the list below
@@ -111,11 +113,19 @@ async function unpinGlobalLorebook({ $actionTarget, $panel, parentDoc }) {
   $wrapper.remove();
   $divider.remove();
 
-  // API call and localStorage update in background
-  disableGlobalLorebook(lorebookName);
-  let pinnedBooks = getPinnedBooks();
-  pinnedBooks = pinnedBooks.filter(b => b !== lorebookName);
-  savePinnedBooks(pinnedBooks);
+  try {
+    await disableGlobalLorebook(lorebookName);
+    let pinnedBooks = getPinnedBooks();
+    pinnedBooks = pinnedBooks.filter(b => b !== lorebookName);
+    savePinnedBooks(pinnedBooks);
+  } catch (error) {
+    console.error('角色世界书: 取消常驻全局世界书失败:', error);
+    if ($listContainer.length) {
+      await updateGlobalLorebooksList($listContainer, true);
+    } else {
+      await renderGlobalLorebookSelector();
+    }
+  }
 }
 
 /**

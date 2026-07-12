@@ -46,3 +46,5 @@
   `GenerationSettings`，切换路线不应触发 `applyGenerationSettings`。
 - 切换高难身份路线和点击“注入世界”都会写入 chat 变量 `hardIdentityRoute`；默认值为 `none`，用于清空旧聊天残留路线。
 - `hardIdentityRoute` 为任一路线时会打开当前角色世界书条目 `cot` 和 `高难身份路线`；切回 `none` 时会关闭这两个条目。
+- 当前开放的高难身份路线为路线一、路线二、路线三、路线四和路线九；路线五到路线八仍保持未开放禁用态。
+- 变量脚本同步只管理 `ERA变量框架-1.0.5`。不要再匹配、开启或关闭 `ERA变量框架1.4.11`。

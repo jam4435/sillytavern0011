@@ -10,6 +10,7 @@ export const HARD_IDENTITY_ROUTE_KEYS = [
   'akentor_male_defector',
   'external_revolutionary_army',
   'external_roaring_sisterhood',
+  'imperial_male_thorn_crown',
 ] as const;
 
 export type HardIdentityRouteKey = (typeof HARD_IDENTITY_ROUTE_KEYS)[number];
@@ -47,7 +48,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '困难',
     gender: 'male',
     description: '帝国底层男性攀爬线。身为男性的特权只够让人站在阶梯最底层张望，真正的上升需要一份投名状——通常是踩碎一个比自己更弱的人。',
-    enabled: false,
+    enabled: true,
   },
   {
     key: 'imperial_female_survival',
@@ -63,7 +64,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '噩梦+',
     gender: 'female',
     description: '帝国女性武装革命线。在档案镇压、审讯连坐、外部盟友分歧和组织保密之间建立可存活的反抗网络。',
-    enabled: false,
+    enabled: true,
   },
   {
     key: 'imperial_female_reformist',
@@ -96,6 +97,14 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     gender: 'female',
     description: '怒吼姐妹会路线。拒绝男性是她们用伤痕换来的安全边界,可完全的拒绝可能活不下去,任何一次援助又可能是重演旧日枷锁的开始。',
     enabled: false,
+  },
+  {
+    key: 'imperial_male_thorn_crown',
+    label: '路线九：荆冠欢宴',
+    difficulty: '炼狱',
+    gender: 'male',
+    description: '帝国男性痛欲革新线。高层男性把疼痛快感包装成血统审美、意志证明和贵族社交门槛，新痛派、旧欢派与医疗产业链围绕私宴、改造、教廷解释权和女性技术劳工展开重排。',
+    enabled: true,
   },
 ];
 

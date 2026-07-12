@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyHardIdentityRouteSettings } from './tavern-settings';
+import { applyGenerationSettings, applyHardIdentityRouteSettings } from './tavern-settings';
 
 type TestWorldbookEntry = Pick<WorldbookEntry, 'name' | 'enabled'>;
 
 let worldbook: TestWorldbookEntry[] = [];
+let scriptTrees: ScriptTree[] = [];
+let regexes: Pick<TavernRegex, 'script_name' | 'enabled'>[] = [];
 
 const insertOrAssignVariablesMock = vi.fn((_variables: Record<string, unknown>, _option: VariableOption) => ({}));
 const getCharWorldbookNamesMock = vi.fn(() => ({ primary: 'JM帝国', additional: [] }));
@@ -12,9 +14,54 @@ const updateWorldbookWithMock = vi.fn(async (_worldbookName: string, updater: Wo
   worldbook = (await updater(worldbook as WorldbookEntry[])) as TestWorldbookEntry[];
   return worldbook as WorldbookEntry[];
 });
+const getScriptTreesMock = vi.fn((_option: ScriptTreesOptions) => scriptTrees);
+const updateScriptTreesWithMock = vi.fn(async (updater: (trees: ScriptTree[]) => ScriptTree[]) => {
+  scriptTrees = await updater(scriptTrees);
+  return scriptTrees;
+});
+const updateTavernRegexesWithMock = vi.fn(async (updater: TavernRegexUpdater) => {
+  regexes = (await updater(regexes as TavernRegex[])) as Pick<TavernRegex, 'script_name' | 'enabled'>[];
+  return regexes as TavernRegex[];
+});
 
 function getEntry(name: string) {
   return worldbook.find(entry => entry.name === name);
+}
+
+function createScript(name: string, enabled: boolean): Script {
+  return {
+    type: 'script',
+    enabled,
+    name,
+    id: name,
+    content: '',
+    info: '',
+    button: {
+      enabled: false,
+      buttons: [],
+    },
+    data: {},
+    export_with: {
+      data: true,
+      button: true,
+    },
+  };
+}
+
+function findScript(name: string) {
+  const result: Script[] = [];
+  const walk = (nodes: ScriptTree[]) => {
+    nodes.forEach(node => {
+      if (node.type === 'folder') {
+        walk(node.scripts);
+        return;
+      }
+
+      result.push(node);
+    });
+  };
+  walk(scriptTrees);
+  return result.find(script => script.name === name);
 }
 
 describe('高难身份路线同步', () => {
@@ -69,6 +116,49 @@ describe('高难身份路线同步', () => {
     expect(report.scopes[1]).toMatchObject({
       scope: '高难路线世界书条目',
       changedItems: ['JM帝国 / cot -> 关闭', 'JM帝国 / 高难身份路线 -> 关闭'],
+      missingLabels: [],
+    });
+  });
+});
+
+describe('开局设置同步', () => {
+  beforeEach(() => {
+    worldbook = [];
+    regexes = [];
+    scriptTrees = [
+      {
+        type: 'folder',
+        enabled: false,
+        name: '变量脚本',
+        id: 'variables',
+        icon: '',
+        color: '',
+        scripts: [createScript('ERA变量框架-1.0.5', false), createScript('ERA变量框架1.4.11', false)],
+      },
+    ];
+    vi.clearAllMocks();
+    Object.assign(globalThis, {
+      getCharWorldbookNames: vi.fn(() => ({ primary: null, additional: [] })),
+      getScriptTrees: getScriptTreesMock,
+      getWorldbook: getWorldbookMock,
+      updateScriptTreesWith: updateScriptTreesWithMock,
+      updateTavernRegexesWith: updateTavernRegexesWithMock,
+      updateWorldbookWith: updateWorldbookWithMock,
+    });
+  });
+
+  it('变量设置只开关 ERA变量框架-1.0.5，不再影响 1.4.11', async () => {
+    const report = await applyGenerationSettings({
+      enableVariables: true,
+      useTextStatusBar: false,
+      generateOptions: true,
+    });
+
+    expect(findScript('ERA变量框架-1.0.5')?.enabled).toBe(true);
+    expect(findScript('ERA变量框架1.4.11')?.enabled).toBe(false);
+    expect(report.scopes[1]).toMatchObject({
+      scope: '局部脚本',
+      changedItems: ['ERA变量框架-1.0.5 -> 开启'],
       missingLabels: [],
     });
   });

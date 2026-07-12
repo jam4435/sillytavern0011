@@ -61,6 +61,13 @@ function sanitizeLorebookNameList(value) {
     });
 }
 
+export function mergePinnedGlobalLorebooks(pinnedBooks, enabledBookNames) {
+  return sanitizeLorebookNameList([
+    ...sanitizeLorebookNameList(pinnedBooks),
+    ...sanitizeLorebookNameList(enabledBookNames),
+  ]);
+}
+
 function sanitizeGlobalPresetMap(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
@@ -115,6 +122,17 @@ export const savePinnedBooks = books => {
     console.error('Error saving pinned worldbooks to localStorage', e);
   }
 };
+
+export function syncPinnedBooksWithEnabledGlobalLorebooks(enabledBookNames) {
+  const pinnedBooks = getPinnedBooks();
+  const nextPinnedBooks = mergePinnedGlobalLorebooks(pinnedBooks, enabledBookNames);
+
+  if (JSON.stringify(pinnedBooks) !== JSON.stringify(nextPinnedBooks)) {
+    savePinnedBooks(nextPinnedBooks);
+  }
+
+  return nextPinnedBooks;
+}
 
 // --- 预设管理 ---
 export const getGlobalLorebookPresets = () => {
@@ -1150,18 +1168,14 @@ export const updateBoundLorebooksList = errorCatched(async ($listContainer, forc
 }, 'updateBoundLorebooksList');
 
 // 渲染全局世界书选择器
-export const renderGlobalLorebookSelector = errorCatched(async () => {
+export const renderGlobalLorebookSelector = errorCatched(async (options = {}) => {
   const parentDoc = window.parent.document;
   const $selectorContainer = $(`#${GLOBAL_WORLDBOOK_SELECTOR_ID}`, parentDoc);
   if (!$selectorContainer.length) return;
 
-  const pinnedBooks = (Array.isArray(getPinnedBooks()) ? getPinnedBooks() : [])
-    .map(normalizeSortableName)
-    .filter(Boolean);
-  const globalLorebooksRaw = await getGlobalLorebooks();
-  const enabledBookNames = (Array.isArray(globalLorebooksRaw) ? globalLorebooksRaw : [])
-    .map(normalizeSortableName)
-    .filter(Boolean);
+  const globalLorebooksRaw = options.enabledBookNames ?? (await getGlobalLorebooks());
+  const enabledBookNames = sanitizeLorebookNameList(globalLorebooksRaw);
+  const pinnedBooks = syncPinnedBooksWithEnabledGlobalLorebooks(enabledBookNames);
   if (DEBUG_MODE) {
     console.log('[renderGlobalLorebookSelector] pinnedBooks:', pinnedBooks, 'enabledBookNames:', enabledBookNames);
   }
@@ -1249,20 +1263,9 @@ export const updateGlobalLorebooksList = errorCatched(async ($listContainer, for
   }
 
   try {
-    // 新增：如果是第一次加载，将当前启用的全局世界书设为默认常驻
-    const pinnedBooks = getPinnedBooks();
-    if (pinnedBooks.length === 0) {
-      const currentGlobalBooks = await getGlobalLorebooks();
-      if (currentGlobalBooks.length > 0) {
-        savePinnedBooks(currentGlobalBooks);
-      }
-    }
-
-    await renderGlobalLorebookSelector();
     const globalLorebooksRaw = await getGlobalLorebooks();
-    const globalLorebooks = (Array.isArray(globalLorebooksRaw) ? globalLorebooksRaw : [])
-      .map(normalizeSortableName)
-      .filter(Boolean);
+    const globalLorebooks = sanitizeLorebookNameList(globalLorebooksRaw);
+    await renderGlobalLorebookSelector({ enabledBookNames: globalLorebooks });
 
     if (forceRefresh) {
       // 只移除世界书条目和加载提示，保留选择器

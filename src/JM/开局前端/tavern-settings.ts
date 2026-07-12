@@ -53,7 +53,7 @@ const REGEX_RULES: NamedRule[] = [
 ];
 
 const SCRIPT_RULES: NamedRule[] = [
-  { key: 'eraVariableFramework', label: 'ERA变量框架1.4.11', query: 'ERA变量框架1.4.11', mode: 'includes' },
+  { key: 'eraVariableFramework', label: 'ERA变量框架-1.0.5', query: 'ERA变量框架-1.0.5', mode: 'includes' },
 ];
 
 const WORLDBOOK_ENTRY_RULES: NamedRule[] = [
