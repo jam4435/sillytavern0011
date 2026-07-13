@@ -222,6 +222,44 @@ describe('世界书全本比对 helper', () => {
     expect(result.items[0].diffs.map(diff => diff.label)).toContain('其他条目字段');
   });
 
+  it('忽略缺省与显式默认的隐式字段差异，但保留真正的隐式设置差异', () => {
+    const baseEntry = entry(1, '隐式默认字段', '正文');
+    const explicitDefaultsEntry = entry(10, '隐式默认字段', '正文', {
+      addMemo: true,
+      matchPersonaDescription: false,
+      matchCharacterDescription: false,
+      matchCharacterPersonality: false,
+      matchCharacterDepthPrompt: false,
+      matchScenario: false,
+      matchCreatorNotes: false,
+      group: '',
+      groupOverride: false,
+      groupWeight: 100,
+      caseSensitive: null,
+      matchWholeWords: null,
+      useGroupScoring: null,
+      automationId: '',
+      ignoreBudget: false,
+      outletName: '',
+      triggers: [],
+      characterFilter: { isExclude: false, names: [], tags: [] },
+      extra: {},
+    });
+    const actualHiddenChangeEntry = { ...explicitDefaultsEntry, group: '真正不同的分组' };
+    const actualExtraChangeEntry = { ...explicitDefaultsEntry, extra: { source: 'target' } };
+
+    const equivalentResult = buildLorebookCompareResult('当前', '对比', [baseEntry], [explicitDefaultsEntry]);
+    const changedResult = buildLorebookCompareResult('当前', '对比', [baseEntry], [actualHiddenChangeEntry]);
+    const extraChangedResult = buildLorebookCompareResult('当前', '对比', [baseEntry], [actualExtraChangeEntry]);
+
+    expect(equivalentResult.summary.modified).toBe(0);
+    expect(equivalentResult.items).toHaveLength(0);
+    expect(changedResult.summary.modified).toBe(1);
+    expect(changedResult.items[0].diffs.map(diff => diff.label)).toContain('其他条目字段');
+    expect(extraChangedResult.summary.modified).toBe(1);
+    expect(extraChangedResult.items[0].diffs.map(diff => diff.label)).toContain('其他条目字段');
+  });
+
   it('删除计划只包含当前世界书独有条目，交换方向后新增和删除语义反转', () => {
     const baseOnly = entry(1, '当前独有', '仅当前有');
     const targetOnly = entry(10, '对比独有', '仅对比有');

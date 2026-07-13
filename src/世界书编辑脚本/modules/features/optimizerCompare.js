@@ -5,6 +5,30 @@ import { ensureNumericUID } from '../utils.js';
 
 const FOLDER_META_ENTRY_PREFIX = '__WI_META_FOLDERS__';
 const DEFAULT_SECONDARY_KEYWORDS = { logic: 'and_any', keys: [] };
+const DEFAULT_IMPLICIT_ENTRY_FIELDS = {
+  addMemo: true,
+  matchPersonaDescription: false,
+  matchCharacterDescription: false,
+  matchCharacterPersonality: false,
+  matchCharacterDepthPrompt: false,
+  matchScenario: false,
+  matchCreatorNotes: false,
+  group: '',
+  groupOverride: false,
+  groupWeight: 100,
+  caseSensitive: null,
+  matchWholeWords: null,
+  useGroupScoring: null,
+  automationId: '',
+  ignoreBudget: false,
+  outletName: '',
+  triggers: [],
+  characterFilter: {
+    isExclude: false,
+    names: [],
+    tags: [],
+  },
+};
 const ENTRY_SETTING_FIELD_PATHS = ['name', 'enabled', 'strategy.type', 'position', 'probability'];
 
 export function isCompareFolderMetaEntry(entry) {
@@ -295,7 +319,11 @@ function getEntrySettingsSnapshot(entry = {}) {
 function getComparableEntryData(entry = {}) {
   const cloned = _.cloneDeep(entry || {});
   delete cloned.uid;
-  return cloned;
+  const comparable = _.defaultsDeep(cloned, _.cloneDeep(DEFAULT_IMPLICIT_ENTRY_FIELDS));
+  if (comparable.extra == null || (_.isPlainObject(comparable.extra) && _.isEmpty(comparable.extra))) {
+    delete comparable.extra;
+  }
+  return comparable;
 }
 
 function getRenderedEntryCompareSurface(entry = {}) {
