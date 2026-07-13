@@ -8,8 +8,9 @@ import {
 } from '../features/aiActionsBatch.js';
 import { getRollbackPreview, rollbackLastTransaction } from '../features/history.js';
 import { cancelLlmGeneration, requestLlmText } from '../features/llmClient.js';
-import { getAiWorkspaceSettings, setAiWorkspaceSettings } from '../settings.js';
+import { flushAiWorkspaceSettings, getAiWorkspaceSettings, setAiWorkspaceSettings } from '../settings.js';
 import { errorCatched } from '../utils.js';
+import { canEnterAiWorkflowPhase, deriveAiWorkflowCapabilities } from './aiWorkflowState.js';
 
 const ROOT_ID = 'lorebook-ai-workspace';
 const MODEL_LIST_ID = 'lorebook-ai-model-list';
@@ -147,6 +148,34 @@ const root = () => $(`#${ROOT_ID}`, parentDoc());
 const settings = () => getAiWorkspaceSettings();
 const currentModeKey = () => (state.currentNav === 'plan' ? 'plan' : 'direct');
 const currentModeState = () => state.modes[currentModeKey()];
+
+function workflowSnapshot(modeKey = currentModeKey()) {
+  const mode = state.modes[modeKey];
+  return {
+    strategy: modeKey,
+    phase: mode.currentStep,
+    draft: {
+      instruction: mode.instruction || '',
+      selectedEntryUids: Array.from(mode.selectedEntryUids),
+      readonlyEntryUids: Array.from(mode.readonlyEntryUids),
+      excludedEntryUids: [],
+    },
+    planningResult: mode.planningResult,
+    planIsValid: !mode.planEditorError,
+    previewResult: mode.previewResult ? { ...mode.previewResult, entries: mode.previewResult.items || [] } : null,
+    generation: {
+      status: state.isGenerating ? (state.stopRequested ? 'stopping' : 'running') : 'idle',
+      kind: null,
+      runId: state.previewRunId,
+      generationId: state.activeGenerationId || 0,
+    },
+    application: {
+      status: mode.currentStep === 'complete' ? 'complete' : 'idle',
+      result: mode.lastApplyResult,
+    },
+    error: null,
+  };
+}
 
 function getNavItemLabel(navKey = state.currentNav) {
   return STRATEGIES.find(item => item.key === navKey)?.label || '直接修改';
@@ -681,13 +710,15 @@ function invalidateModeOutputs(modeKey, { clearPlan = modeKey === 'plan' } = {})
   const mode = state.modes[modeKey];
   mode.previewResult = null;
   mode.debugInfo = {};
+  mode.lastApplyResult = null;
   if (clearPlan) {
     mode.planningResult = null;
-    if (mode.currentStep === 'planning' || mode.currentStep === 'result') {
-      mode.currentStep = 'instruction';
+    mode.planEditorError = '';
+    if (mode.currentStep !== 'prepare') {
+      mode.currentStep = 'prepare';
     }
-  } else if (mode.currentStep === 'result') {
-    mode.currentStep = 'instruction';
+  } else if (mode.currentStep === 'review' || mode.currentStep === 'complete') {
+    mode.currentStep = 'prepare';
   }
 }
 
@@ -1443,6 +1474,8 @@ function renderPreview(modeKey, previewResult = null) {
 
   const summary = mode.previewResult?.summary || { total: 0, succeeded: 0, failed: 0, changed: 0, unchanged: 0 };
   $summary.text(buildPreviewSummaryText(mode.previewResult));
+  $summary.attr('data-outcome', mode.previewResult?.outcome || (summary.failed ? 'partial' : 'complete'));
+  $('#ai-workspace-apply span', parentDoc()).text(`应用 ${summary.changed || 0} 条修改`);
 
   const $errors = $('#ai-workspace-preview-errors', parentDoc());
   const diagnosticsSummary = buildDiagnosticsErrorSummary(mode.previewResult);
@@ -1484,7 +1517,7 @@ function renderPreview(modeKey, previewResult = null) {
       ? item.diffs.map(diff => renderPreviewDiff(diff)).join('')
       : '<div class="ai-preview-diff-after">无实际变更。</div>';
     $list.append(`
-      <div class="ai-preview-item${Number(item.uid) === activeUid ? ' is-active' : ''}" data-preview-uid="${item.uid}" title="点击查看完整修改">
+      <div class="ai-preview-item${Number(item.uid) === activeUid ? ' is-active' : ''}" data-preview-uid="${item.uid}" role="button" tabindex="0" title="点击查看完整修改">
         <div class="ai-preview-item-header">
           <div class="ai-preview-item-title">${_.escape(item.title)} (UID: ${item.uid})</div>
           <button type="button" class="ai-preview-exclude" data-preview-uid="${item.uid}">排除</button>
@@ -1797,6 +1830,7 @@ async function handlePreviewModalRegenerate() {
   const saved = settings();
   const uid = Number($('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid'));
   const item = mode.previewResult?.items?.find(previewItem => Number(previewItem?.uid) === uid);
+  const runId = ++state.previewRunId;
   if (!item) {
     return;
   }
@@ -1804,6 +1838,7 @@ async function handlePreviewModalRegenerate() {
   $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', true).text('正在重新生成...');
   $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', true);
   state.stopRequested = false;
+  setGeneratingState(true);
 
   try {
     const previewResult = await generateAiPreview({
@@ -1821,11 +1856,16 @@ async function handlePreviewModalRegenerate() {
       customApi: saved.apiMode === 'custom' ? saved.customApi : null,
       shouldStream: saved.stream === true,
       onGenerationStart: generationId => {
-        state.activeGenerationId = generationId;
+        if (runId === state.previewRunId) {
+          state.activeGenerationId = generationId;
+        }
       },
       shouldStop: () => state.stopRequested === true,
     });
 
+    if (runId !== state.previewRunId) {
+      return;
+    }
     const newItem = previewResult?.items?.[0];
     if (!newItem) {
       throw new Error(previewResult?.errors?.[0]?.error || '重新生成失败');
@@ -1845,8 +1885,12 @@ async function handlePreviewModalRegenerate() {
     setModeStatus(modeKey, error?.message || '重新生成失败。');
     window.toastr?.error(error?.message || '重新生成失败');
   } finally {
-    $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', false).text('重新生成此条');
-    $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', false);
+    if (runId === state.previewRunId) {
+      state.stopRequested = false;
+      setGeneratingState(false);
+      $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', false).text('重新生成此条');
+      $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', false);
+    }
   }
 }
 
@@ -2051,10 +2095,10 @@ function buildSourceOptions() {
 function buildPreviewModalMarkup() {
   return `
     <div id="ai-workspace-preview-modal" class="ai-preview-modal" style="display:none;">
-      <div class="ai-preview-modal-dialog">
+      <div class="ai-preview-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-workspace-preview-modal-title">
         <div class="ai-preview-modal-header">
           <h4 id="ai-workspace-preview-modal-title">条目完整预览</h4>
-          <span class="ai-preview-modal-close" tabindex="0">&times;</span>
+          <button type="button" class="ai-preview-modal-close ai-icon-button" aria-label="关闭预览"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="ai-preview-modal-body">
           <div id="ai-workspace-preview-modal-summary" class="ai-text"></div>
@@ -2230,6 +2274,7 @@ function buildStepIndicator(modeKey) {
   const mode = state.modes[modeKey];
   const steps = MODE_STEPS[modeKey];
   const currentIndex = steps.indexOf(mode.currentStep);
+  const workflow = workflowSnapshot(modeKey);
   return `
     <div class="ai-workflow-progress">
       <div class="ai-stepper" aria-label="AI 修改步骤">
@@ -2237,6 +2282,7 @@ function buildStepIndicator(modeKey) {
         .map((step, index) => {
           const isActive = step === mode.currentStep;
           const isComplete = index < currentIndex;
+          const canEnter = isActive || canEnterAiWorkflowPhase(workflow, step);
           return `
           <button
             type="button"
@@ -2244,6 +2290,7 @@ function buildStepIndicator(modeKey) {
             data-ai-step="${step}"
             aria-label="${STEP_LABELS[step]}"
             ${isActive ? 'aria-current="step"' : ''}
+            ${canEnter ? '' : 'disabled'}
           >
             <span class="ai-step-index">${index + 1}</span>
             <span class="ai-step-label">${STEP_LABELS[step]}</span>
@@ -2604,6 +2651,15 @@ function buildDesktopShellMarkup() {
           <div class="ai-tool-drawer-body">${buildApiSettingsMarkup()}</div>
         </aside>
       </div>
+      <dialog id="ai-workspace-rollback-dialog" class="ai-confirm-dialog" aria-labelledby="ai-workspace-rollback-dialog-title">
+        <div class="ai-confirm-dialog-body">
+          <div class="ai-confirm-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+          <h2 id="ai-workspace-rollback-dialog-title">撤销最近一次世界书操作</h2>
+          <p id="ai-workspace-rollback-dialog-summary"></p>
+          <div id="ai-workspace-rollback-dialog-items" class="ai-rollback-dialog-items"></div>
+          <div class="ai-confirm-actions"><button type="button" id="ai-workspace-rollback-dialog-cancel" class="ai-button-secondary">取消</button><button type="button" id="ai-workspace-rollback-dialog-confirm" class="ai-button-danger">确认撤销</button></div>
+        </div>
+      </dialog>
       ${buildPreviewModalMarkup()}
       ${buildAssistantModalMarkup()}
     </div>
@@ -3244,49 +3300,52 @@ function syncModeForm(modeKey) {
   setAssistantGeneratingState(false);
 }
 
+function updateWorkbenchHeader() {
+  const saved = settings();
+  const modelLabel = saved.apiMode === 'custom' ? saved.customApi?.model || '模型待配置' : '当前酒馆预设';
+  const referenceLength = (state.referenceMaterial || '').trim().length;
+  const contextLabel = state.chatContext.enabled
+    ? state.chatContextManual
+      ? '手工上下文'
+      : `${state.chatMessages.length} 条上下文`
+    : '上下文关闭';
+  $('[data-ai-open-settings] span', parentDoc()).text(modelLabel);
+  $('[data-ai-focus-context] span', parentDoc()).text(contextLabel);
+  $('[data-ai-open-assistant-tab="reference"] span', parentDoc()).text(referenceLength ? `${referenceLength} 字资料` : '添加资料');
+  syncNavigationState();
+}
+
 function renderCurrentPanel() {
   const $panel = $('#ai-workspace-desktop-panel', parentDoc());
   if (!$panel.length) {
     return;
   }
 
-  // 动态更新页面标题与描述
-  const navKey = state.currentNav;
-  $('#ai-workspace-main-title', parentDoc()).text(NAV_TITLES[navKey] || 'AI 工作区');
-  $('#ai-workspace-main-description', parentDoc()).text(NAV_DESCRIPTIONS[navKey] || '');
+  const modeKey = currentModeKey();
+  const mode = state.modes[modeKey];
+  $panel.html(buildModeWorkspace(modeKey));
+  updateWorkbenchHeader();
+  syncApiForm();
+  syncModeForm(modeKey);
 
-  let markup = '';
-  if (state.currentNav === 'api') {
-    markup = buildApiSettingsMarkup();
-  } else if (state.currentNav === 'generate') {
-    markup = buildGeneratorMarkup();
-  } else {
-    markup = buildModeWorkspace(currentModeKey());
-  }
-  $panel.html(markup);
-
-  syncNavigationState();
-
-  if (state.currentNav === 'api') {
-    syncApiForm();
-  } else if (state.currentNav === 'generate') {
-    setSharedStatus(state.sharedStatusText);
-  } else {
-    const modeKey = currentModeKey();
-    syncModeForm(modeKey);
+  if (mode.currentStep === 'prepare') {
     renderEntryList(modeKey);
     renderSelectionSummary(modeKey);
-    renderPlanningResult(modeKey, state.modes[modeKey].planningResult);
-    if (state.modes[modeKey].previewResult) {
-      renderPreview(modeKey, state.modes[modeKey].previewResult);
+  } else if (mode.currentStep === 'planReview') {
+    renderPlanningResult(modeKey, mode.planningResult);
+  } else if (mode.currentStep === 'review') {
+    if (mode.previewResult) {
+      renderPreview(modeKey, mode.previewResult);
     } else {
       clearPreview(modeKey);
-      renderDebugInfo(modeKey, state.modes[modeKey].debugInfo || {});
+      renderDebugInfo(modeKey, mode.debugInfo || {});
     }
-    setModeStatus(modeKey, state.modes[modeKey].statusText);
+  } else if (mode.currentStep === 'complete') {
     void refreshRollbackPanel(modeKey);
   }
-
+  renderAssistantHistory();
+  renderReferenceMaterial();
+  setModeStatus(modeKey, mode.statusText);
   setGeneratingState(state.isGenerating);
 }
 
@@ -3417,8 +3476,16 @@ function goToStep(modeKey, targetStep) {
   if (!MODE_STEPS[modeKey].includes(targetStep)) {
     return;
   }
+  if (state.isGenerating) {
+    setModeStatus(modeKey, '生成进行中，停止后才能切换阶段。');
+    return;
+  }
+  const snapshot = workflowSnapshot(modeKey);
+  if (!canEnterAiWorkflowPhase(snapshot, targetStep)) {
+    setModeStatus(modeKey, '当前阶段尚未完成，不能直接跳到后续步骤。');
+    return;
+  }
   mode.currentStep = targetStep;
-  persistSettings({ mirrorModeKey: modeKey });
   renderCurrentPanel();
 }
 
@@ -3473,7 +3540,7 @@ async function handlePlan() {
     mode.planningResult = planningResult;
     mode.selectedEntryUids = new Set(planningResult.editable_uids || []);
     mode.readonlyEntryUids = new Set(planningResult.readonly_uids || []);
-    mode.currentStep = 'planning';
+    mode.currentStep = 'planReview';
     setModeStatus(modeKey, '改造方案生成完成，已自动填充条目分组。');
     persistSettings({ mirrorModeKey: modeKey });
     renderCurrentPanel();
@@ -3549,7 +3616,7 @@ async function handlePreview() {
 
     mode.previewResult = previewResult;
     mode.debugInfo = previewResult?.debug || {};
-    mode.currentStep = 'result';
+    mode.currentStep = Array.isArray(previewResult?.items) && previewResult.items.length ? 'review' : mode.currentStep;
     setModeStatus(modeKey, getPreviewStatusText(previewResult));
     persistSettings({ mirrorModeKey: modeKey });
     renderCurrentPanel();
@@ -3607,14 +3674,22 @@ async function handleApply() {
       );
     }
 
+    mode.lastApplyResult = result;
+    const skippedUids = new Set((result.skipped || []).map(item => Number(item.uid)));
+    if (skippedUids.size > 0) {
+      mode.previewResult.items = (mode.previewResult.items || []).filter(item => skippedUids.has(Number(item.uid)));
+      rebuildPreviewResult(modeKey);
+      mode.currentStep = 'review';
+      setModeStatus(modeKey, `已应用 ${result.appliedCount} 条，保留 ${skippedUids.size} 条冲突结果供处理。`);
+    } else {
+      mode.previewResult = null;
+      mode.debugInfo = {};
+      mode.currentStep = 'complete';
+      setModeStatus(modeKey, 'AI 修改已应用完成。');
+    }
     await loadEntriesForMode(modeKey, { force: true, resetSelection: false, clearOutputs: false });
-    clearPreview(modeKey, '本次预览已应用。');
-    await refreshRollbackPanel(modeKey);
-    setModeStatus(
-      modeKey,
-      result.skippedCount ? `AI 修改已应用完成，${result.skippedCount} 条因冲突或缺失被跳过。` : 'AI 修改已应用完成。',
-    );
     persistSettings({ mirrorModeKey: modeKey });
+    renderCurrentPanel();
   } catch (error) {
     setModeStatus(modeKey, error?.message || '应用 AI 预览失败。');
     $('#ai-workspace-apply', parentDoc()).prop('disabled', false);
@@ -3630,6 +3705,10 @@ function ensureSelectionReady(modeKey) {
   }
   if (!mode.entries.length) {
     setModeStatus(modeKey, '当前世界书没有可用条目。');
+    return false;
+  }
+  if (modeKey === 'direct' && mode.selectedEntryUids.size === 0) {
+    setModeStatus(modeKey, '直接修改至少需要一条“修改”条目。');
     return false;
   }
   return true;
