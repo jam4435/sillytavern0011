@@ -1,6 +1,0 @@
-{
-  "name": "水墨江湖",
-  "description": "武侠水墨风游戏UI界面Demo",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

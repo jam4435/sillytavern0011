@@ -428,6 +428,7 @@ function inferMiscCategory(item: InventoryItem): { category: InventoryVisualCate
   if (/(令牌|腰牌|竹牌|木牌|印玺|印璽|玉玺|玉璽|符牌|借阅牌|借閱牌|度牒)/.test(name))
     return { category: '令牌印玺', matchedBy: 'name' };
   if (/(地图|地圖|舆图|輿圖|残图|殘圖|藏宝图|藏寶圖)/.test(name)) return { category: '地图', matchedBy: 'name' };
+  if (/(信物|凭证|憑證|暗记|暗記|身份牌|遗物|遺物|誓旗)/.test(name)) return { category: '任务信物', matchedBy: 'name' };
   if (/(信|书信|書信|手稿|手札|卷宗|案卷|抄本|残页|殘頁|庚帖|图纸|圖紙|经文|經文|度牒)/.test(name))
     return { category: '书信文书', matchedBy: 'name' };
   if (/(哨|钥匙|鑰匙|机关|機關|锁|鎖|镜|鏡|轮|輪|罗盘|羅盤|火折|火摺)/.test(name))
@@ -457,7 +458,10 @@ export function resolveInventoryVisual(item: InventoryItem): InventoryVisualResu
   const rankIndex = rankIndexByKey[item.rank] ?? rankIndexByKey[item.elixirInfo?.rank || ''] ?? 0;
   const legacyTier = legacyTierByRankIndex[rankIndex] ?? 0;
   return {
-    src: reviewedAssets[inferred.category]?.[rankIndex] ?? aiAssets[inferred.category]?.[rankIndex] ?? assets[inferred.category][legacyTier],
+    src:
+      reviewedAssets[inferred.category]?.[rankIndex] ??
+      aiAssets[inferred.category]?.[rankIndex] ??
+      assets[inferred.category][legacyTier],
     label: inferred.category,
     category: inferred.category,
     matchedBy: inferred.matchedBy,
