@@ -13,24 +13,10 @@ import { errorCatched } from '../utils.js';
 
 const ROOT_ID = 'lorebook-ai-workspace';
 const MODEL_LIST_ID = 'lorebook-ai-model-list';
-const NAV_ITEMS = [
-  { key: 'api', label: 'API设置', icon: 'fa-solid fa-sliders' },
+const STRATEGIES = [
   { key: 'direct', label: '直接修改', icon: 'fa-solid fa-wand-magic-sparkles' },
-  { key: 'plan', label: '计划修改', icon: 'fa-solid fa-clipboard-list' },
-  { key: 'generate', label: '世界书生成', icon: 'fa-solid fa-rocket' },
+  { key: 'plan', label: '先规划', icon: 'fa-solid fa-route' },
 ];
-const NAV_TITLES = {
-  api: 'API 设置',
-  direct: '直接修改',
-  plan: '计划修改',
-  generate: '世界书生成',
-};
-const NAV_DESCRIPTIONS = {
-  api: '配置用于 AI 工作区的语言模型 API。',
-  direct: '选择条目，给出指令，预览修改并写回。',
-  plan: '先让 AI 生成修改计划，确认后再执行预览与写回。',
-  generate: '（敬请期待）基于世界书内容生成新条目。',
-};
 const SOURCES = [
   ['openai', 'OpenAI'],
   ['openrouter', 'OpenRouter'],
@@ -42,20 +28,20 @@ const SOURCES = [
   ['custom', '自定义(OpenAI兼容)'],
 ];
 const MODE_STEPS = {
-  direct: ['selection', 'instruction', 'result'],
-  plan: ['selection', 'instruction', 'planning', 'result'],
+  direct: ['prepare', 'review', 'complete'],
+  plan: ['prepare', 'planReview', 'review', 'complete'],
 };
 const STEP_LABELS = {
-  selection: '条目选择',
-  instruction: '指令设定',
-  planning: '计划确认',
-  result: '修改结果',
+  prepare: '准备',
+  planReview: '计划审阅',
+  review: '修改审阅',
+  complete: '完成',
 };
 const STEP_DESCRIPTIONS = {
-  selection: '选择本次允许 AI 修改的条目，并标记只读参考条目。',
-  instruction: '填写修改目标、上下文资料、可编辑字段和提示词。',
-  planning: '检查 AI 规划的可修改/只读范围，必要时调整方案 JSON。',
-  result: '查看每条改动，编辑预览内容，然后应用或回滚。',
+  prepare: '设定目标、修改范围和指令。所有输入变化都会使旧结果失效。',
+  planReview: '检查 AI 提议的目标、规则与条目分组，再生成实际修改。',
+  review: '逐条核对差异、编辑或排除结果，然后显式应用。',
+  complete: '本次应用已完成；可撤销最近事务或开始下一次修改。',
 };
 const AI_WORKSPACE_SURFACE = 'rgba(0,0,0,.68)';
 const EMPTY_PREVIEW_TEXT = '尚未生成预览。';
@@ -67,7 +53,7 @@ function createEmptyModeState() {
     lorebookName: '',
     searchText: '',
     instruction: '',
-    currentStep: 'selection',
+    currentStep: 'prepare',
     editableFields: {
       title: true,
       content: true,
@@ -84,6 +70,8 @@ function createEmptyModeState() {
     previewResult: null,
     debugInfo: {},
     statusText: '',
+    planEditorError: '',
+    lastApplyResult: null,
     entries: [],
     loadedLorebookName: '',
   };
@@ -137,10 +125,16 @@ const state = {
   hydrated: false,
   chatContext: { enabled: false, messageCount: 10 },
   chatMessages: [],
+  chatContextManual: false,
+  chatContextManualText: '',
   referenceMaterial: '',
   assistantChatHistory: [],
   assistantModalTab: 'chat',
   assistantSelectedText: '',
+  lastFocusedElement: null,
+  persistTimer: null,
+  entryCluster: null,
+  resizeObserver: null,
   modes: {
     direct: createEmptyModeState(),
     plan: createEmptyModeState(),
@@ -155,7 +149,7 @@ const currentModeKey = () => (state.currentNav === 'plan' ? 'plan' : 'direct');
 const currentModeState = () => state.modes[currentModeKey()];
 
 function getNavItemLabel(navKey = state.currentNav) {
-  return NAV_ITEMS.find(item => item.key === navKey)?.label || 'AI 工作台';
+  return STRATEGIES.find(item => item.key === navKey)?.label || '直接修改';
 }
 
 function getStepDescription(step) {
@@ -209,7 +203,10 @@ function currentChatMessagesForRequest() {
   if (state.chatContext.enabled !== true) {
     return [];
   }
-  return buildManualChatContextMessages(currentChatContextText());
+  if (state.chatContextManual) {
+    return buildManualChatContextMessages(currentChatContextText());
+  }
+  return _.cloneDeep(state.chatMessages);
 }
 
 export function isDesktopAiWorkspace() {
@@ -217,11 +214,11 @@ export function isDesktopAiWorkspace() {
 }
 
 function normalizeNavMode(mode) {
-  return NAV_ITEMS.some(item => item.key === mode) ? mode : 'direct';
+  return STRATEGIES.some(item => item.key === mode) ? mode : 'direct';
 }
 
 function normalizeStep(modeKey, step) {
-  return MODE_STEPS[modeKey]?.includes(step) ? step : 'selection';
+  return MODE_STEPS[modeKey]?.includes(step) ? step : 'prepare';
 }
 
 function createModeState(saved = {}, fallback = {}) {
@@ -266,7 +263,8 @@ function hydrateStateFromSettings() {
     statusText: '',
   };
 
-  state.currentNav = normalizeNavMode(saved.navMode || 'direct');
+  const savedDraft = saved.draft || {};
+  state.currentNav = normalizeNavMode(savedDraft.strategy || saved.navMode || 'direct');
   state.modelStatusText = '';
   state.sharedStatusText = '';
   state.chatContext = {
@@ -274,10 +272,28 @@ function hydrateStateFromSettings() {
     messageCount: normalizeChatContextCount(saved.chatContext?.messageCount),
   };
   state.chatMessages = _.cloneDeep(saved.chatMessages || []);
+  state.chatContextManual = saved.chatContext?.manualEdited === true;
+  state.chatContextManualText = typeof saved.chatContext?.manualText === 'string' ? saved.chatContext.manualText : '';
   state.referenceMaterial = saved.referenceMaterial || '';
   state.assistantChatHistory = _.cloneDeep(saved.assistantChatHistory || []);
-  state.modes.direct = createModeState(saved.direct, { ...fallback, modeKey: 'direct' });
-  state.modes.plan = createModeState(saved.plan, { ...fallback, modeKey: 'plan' });
+  const legacyMode = state.currentNav === 'plan' ? saved.plan : saved.direct;
+  const task = createModeState(savedDraft, {
+    ...fallback,
+    ...(legacyMode || {}),
+    modeKey: state.currentNav,
+    currentStep: 'prepare',
+    planningResult: null,
+    previewResult: null,
+    debugInfo: {},
+    statusText: '',
+  });
+  task.currentStep = 'prepare';
+  task.planningResult = null;
+  task.previewResult = null;
+  task.debugInfo = {};
+  task.lastApplyResult = null;
+  state.modes.direct = task;
+  state.modes.plan = task;
   state.hydrated = true;
 }
 
@@ -348,14 +364,20 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
   if ($('#ai-workspace-chat-context-count', parentDoc()).length) {
     state.chatContext = currentChatContextSettings();
   }
-  if ($('#ai-workspace-chat-context-preview', parentDoc()).length) {
-    state.chatMessages = currentChatMessagesForRequest();
-  }
   setAiWorkspaceSettings({
     ...saved,
+    schemaVersion: 2,
     navMode: state.currentNav,
-    direct: serializeModeState('direct'),
-    plan: serializeModeState('plan'),
+    draft: {
+      ...serializeModeState(mirrorModeKey),
+      strategy: state.currentNav,
+      currentStep: undefined,
+      planningResult: undefined,
+      previewResult: undefined,
+      debugInfo: undefined,
+      statusText: undefined,
+      lastApplyResult: undefined,
+    },
     lorebookName: mirrorMode.lorebookName,
     editableFields: { ...mirrorMode.editableFields },
     promptSettings: { ...mirrorMode.promptSettings },
@@ -363,11 +385,25 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
     stream: isStreamEnabled(),
     contextBudget: currentContextBudget(),
     customApi: currentApiSettings(),
-    chatContext: state.chatContext,
+    chatContext: {
+      ...state.chatContext,
+      manualEdited: state.chatContextManual,
+      manualText: state.chatContextManual ? currentChatContextText() : '',
+    },
     chatMessages: state.chatMessages,
     referenceMaterial: state.referenceMaterial,
     assistantChatHistory: state.assistantChatHistory,
   });
+}
+
+function schedulePersist(modeKey = currentModeKey()) {
+  if (state.persistTimer) {
+    clearTimeout(state.persistTimer);
+  }
+  state.persistTimer = setTimeout(() => {
+    state.persistTimer = null;
+    persistSettings({ mirrorModeKey: modeKey });
+  }, 300);
 }
 
 function selectedFields(modeKey = currentModeKey()) {
@@ -431,9 +467,7 @@ function setModeStatus(modeKey, text) {
 
 function setSharedStatus(text) {
   state.sharedStatusText = text || '';
-  if (state.currentNav === 'api' || state.currentNav === 'generate') {
-    $('#ai-workspace-status', parentDoc()).text(state.sharedStatusText);
-  }
+  $('#ai-workspace-shared-status', parentDoc()).text(state.sharedStatusText);
 }
 
 function setModelStatus(text) {
@@ -446,7 +480,8 @@ function setGeneratingState(isGenerating) {
   $('#ai-workspace-plan', parentDoc()).prop('disabled', state.isGenerating);
   $('#ai-workspace-preview', parentDoc()).prop('disabled', state.isGenerating);
   $('#ai-workspace-stop', parentDoc()).prop('disabled', !state.isGenerating);
-  $('.ai-mode-nav-button', parentDoc()).prop('disabled', state.isGenerating);
+  $('.ai-strategy-button', parentDoc()).prop('disabled', state.isGenerating);
+  root().attr('data-run-state', state.isGenerating ? 'running' : 'idle');
   if (!state.isGenerating) {
     state.activeGenerationId = '';
   }
@@ -459,12 +494,12 @@ function setMobileNavExpanded(expanded) {
 }
 
 function syncNavigationState({ collapseMobile = false } = {}) {
-  const $buttons = $('.ai-mode-nav-button', parentDoc());
+  const $buttons = $('.ai-strategy-button', parentDoc());
   $buttons.removeClass('is-active').removeAttr('aria-current');
-  $(`.ai-mode-nav-button[data-ai-nav="${state.currentNav}"]`, parentDoc())
+  $(`.ai-strategy-button[data-ai-strategy="${state.currentNav}"]`, parentDoc())
     .addClass('is-active')
-    .attr('aria-current', 'page');
-  $('.ai-mobile-nav-current', parentDoc()).text(`当前：${getNavItemLabel()}`);
+    .attr('aria-pressed', 'true');
+  $buttons.not('.is-active').attr('aria-pressed', 'false');
   if (collapseMobile) {
     setMobileNavExpanded(false);
   }
@@ -490,7 +525,9 @@ function formatChatContextPreview(chatMessages = []) {
 }
 
 function renderChatContextPreview() {
-  const previewText = formatChatContextPreview(state.chatMessages);
+  const previewText = state.chatContextManual
+    ? state.chatContextManualText
+    : formatChatContextPreview(state.chatMessages);
   $('#ai-workspace-chat-context-count', parentDoc()).val(state.chatContext.messageCount);
   $('#ai-workspace-chat-context-enabled', parentDoc()).prop('checked', state.chatContext.enabled === true);
   $('#ai-workspace-chat-context-preview', parentDoc()).val(previewText);
@@ -499,9 +536,10 @@ function renderChatContextPreview() {
     state.chatContext.enabled !== true
       ? '未开启：生成计划或预览时不会注入聊天上下文。'
       : previewText.trim()
-        ? `聊天上下文已填写 ${previewText.trim().length} 个字符，将注入到 <聊天上下文>。`
+        ? `${state.chatContextManual ? '手工文本' : `结构化消息 ${state.chatMessages.length} 条`}，共 ${previewText.trim().length} 个字符。`
         : '已开启，但尚未获取聊天消息。';
   $('#ai-workspace-chat-context-status', parentDoc()).text(summary);
+  $('#ai-workspace-chat-context-mode', parentDoc()).text(state.chatContextManual ? '手工编辑' : '结构化消息');
 }
 
 function renderReferenceMaterial() {
@@ -656,7 +694,13 @@ function invalidateModeOutputs(modeKey, { clearPlan = modeKey === 'plan' } = {})
 function getFilteredEntries(modeKey) {
   const mode = state.modes[modeKey];
   const keyword = (mode.searchText || '').trim().toLowerCase();
-  return keyword ? mode.entries.filter(entry => (entry.name || '').toLowerCase().includes(keyword)) : mode.entries;
+  return keyword
+    ? mode.entries.filter(entry =>
+        [entry.name, entry.content, entry.uid]
+          .map(value => `${value ?? ''}`.toLowerCase())
+          .some(value => value.includes(keyword)),
+      )
+    : mode.entries;
 }
 
 function getEntryMode(modeKey, uid) {
@@ -692,32 +736,45 @@ function renderEntryList(modeKey) {
   }
 
   const entries = getFilteredEntries(modeKey);
-  $list.empty();
+  if (state.entryCluster) {
+    state.entryCluster.destroy(true);
+    state.entryCluster = null;
+  }
   if (!entries.length) {
-    $list.append('<div class="ai-empty">没有匹配的条目。</div>');
+    $list.html('<div class="ai-empty">没有匹配的条目。</div>');
     renderSelectionSummary(modeKey);
     return;
   }
 
-  entries.forEach(entry => {
+  const rows = entries.map(entry => {
     const uid = Number(entry.uid);
     const entryMode = getEntryMode(modeKey, uid);
-    const snippet = (entry.content || '').replace(/\s+/g, ' ').trim();
-    $list.append(`
-      <div class="ai-entry-item">
-        <select class="ai-entry-mode" data-entry-uid="${uid}">
-          <option value="none" ${entryMode === 'none' ? 'selected' : ''}>不参与</option>
-          <option value="editable" ${entryMode === 'editable' ? 'selected' : ''}>本批可修改</option>
-          <option value="readonly" ${entryMode === 'readonly' ? 'selected' : ''}>只读参考</option>
-        </select>
+    return `
+      <div class="ai-entry-item" data-entry-uid="${uid}">
         <div class="ai-entry-main">
           <div class="ai-entry-item-title">${_.escape(entry.name || `UID ${uid}`)}</div>
-          <div class="ai-entry-item-meta">UID: ${uid}</div>
-          <div class="ai-entry-item-snippet">${_.escape(snippet.slice(0, 180) || '无内容摘要')}</div>
+          <div class="ai-entry-item-meta">UID ${uid}</div>
+        </div>
+        <div class="ai-entry-mode-group" role="group" aria-label="${_.escape(entry.name || `UID ${uid}`)} 的参与方式">
+          <button type="button" class="ai-entry-mode-button${entryMode === 'editable' ? ' is-active is-editable' : ''}" data-entry-uid="${uid}" data-entry-mode="editable" aria-pressed="${entryMode === 'editable'}">修改</button>
+          <button type="button" class="ai-entry-mode-button${entryMode === 'readonly' ? ' is-active is-readonly' : ''}" data-entry-uid="${uid}" data-entry-mode="readonly" aria-pressed="${entryMode === 'readonly'}">只读</button>
+          <button type="button" class="ai-entry-mode-button${entryMode === 'none' ? ' is-active is-none' : ''}" data-entry-uid="${uid}" data-entry-mode="none" aria-pressed="${entryMode === 'none'}">排除</button>
         </div>
       </div>
-    `);
+    `;
   });
+
+  $list.html('<div id="ai-workspace-entry-scroll" class="clusterize-scroll ai-entry-scroll"><div id="ai-workspace-entry-content" class="clusterize-content"></div></div>');
+  if (typeof window.Clusterize === 'function') {
+    state.entryCluster = new window.Clusterize({
+      rows,
+      scrollId: 'ai-workspace-entry-scroll',
+      contentId: 'ai-workspace-entry-content',
+      no_data_text: '没有匹配的条目。',
+    });
+  } else {
+    $('#ai-workspace-entry-content', parentDoc()).html(rows.join(''));
+  }
 
   renderSelectionSummary(modeKey);
 }
@@ -845,7 +902,7 @@ function formatPreviewModalValue(value) {
   return value == null ? '' : String(value);
 }
 
-function normalizePlanEditorValue(rawValue) {
+function normalizePlanEditorValue(rawValue, validUids = null) {
   const parsed = JSON.parse(rawValue || '{}');
   const readonlyUids = _.uniq(
     (Array.isArray(parsed?.readonly_uids) ? parsed.readonly_uids : [])
@@ -860,6 +917,12 @@ function normalizePlanEditorValue(rawValue) {
   const overlap = readonlyUids.filter(uid => editableUids.includes(uid));
   if (overlap.length) {
     throw new Error(`readonly_uids 与 editable_uids 不能重叠: ${overlap.join(', ')}`);
+  }
+  if (validUids instanceof Set) {
+    const unknown = [...readonlyUids, ...editableUids].filter(uid => !validUids.has(uid));
+    if (unknown.length) {
+      throw new Error(`规划包含当前世界书不存在的 UID: ${_.uniq(unknown).join(', ')}`);
+    }
   }
 
   return {
@@ -890,6 +953,60 @@ function normalizePlanEditorValue(rawValue) {
         : [],
     },
   };
+}
+
+function planListFromTextarea(selector) {
+  return (($(`${selector}`, parentDoc()).val() || '').toString())
+    .split(/\r?\n/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function updatePlanningResultFromStructuredForm(modeKey) {
+  const mode = state.modes[modeKey];
+  if (!mode.planningResult) {
+    return;
+  }
+  mode.planningResult.plan = {
+    goal: ($('#ai-workspace-plan-goal', parentDoc()).val() || '').toString().trim(),
+    must_keep: planListFromTextarea('#ai-workspace-plan-must-keep'),
+    rewrite_rules: planListFromTextarea('#ai-workspace-plan-rewrite-rules'),
+    consistency_notes: planListFromTextarea('#ai-workspace-plan-consistency-notes'),
+  };
+  mode.planEditorError = '';
+  mode.previewResult = null;
+}
+
+function renderPlanScope(modeKey) {
+  const mode = state.modes[modeKey];
+  const $scope = $('#ai-workspace-plan-scope-list', parentDoc());
+  if (!$scope.length || !mode.planningResult) {
+    return;
+  }
+  const byUid = new Map(mode.entries.map(entry => [Number(entry.uid), entry]));
+  const rows = [
+    ...(mode.planningResult.editable_uids || []).map(uid => ({ uid: Number(uid), type: 'editable', label: '修改' })),
+    ...(mode.planningResult.readonly_uids || []).map(uid => ({ uid: Number(uid), type: 'readonly', label: '只读' })),
+  ];
+  if (!rows.length) {
+    $scope.html('<div class="ai-empty">规划没有选择任何条目，请调整范围或重新生成。</div>');
+    return;
+  }
+  $scope.html(
+    rows
+      .map(({ uid, type, label }) => {
+        const entry = byUid.get(uid);
+        return `<div class="ai-plan-scope-row">
+          <div><strong>${_.escape(entry?.name || `UID ${uid}`)}</strong><span>UID ${uid}</span></div>
+          <div class="ai-entry-mode-group" role="group" aria-label="调整 ${_.escape(entry?.name || `UID ${uid}`)} 的规划范围">
+            <button type="button" class="ai-entry-mode-button${type === 'editable' ? ' is-active is-editable' : ''}" data-entry-uid="${uid}" data-entry-mode="editable" aria-pressed="${type === 'editable'}">修改</button>
+            <button type="button" class="ai-entry-mode-button${type === 'readonly' ? ' is-active is-readonly' : ''}" data-entry-uid="${uid}" data-entry-mode="readonly" aria-pressed="${type === 'readonly'}">只读</button>
+            <button type="button" class="ai-entry-mode-button" data-entry-uid="${uid}" data-entry-mode="none" aria-pressed="false">排除</button>
+          </div>
+        </div>`;
+      })
+      .join(''),
+  );
 }
 
 function syncPlanSelectionFromPlanningResult(modeKey) {
@@ -1268,6 +1385,10 @@ function renderPlanningResult(modeKey, planningResult = null) {
   }
 
   $summary.text(lines.join(' | '));
+  $('#ai-workspace-plan-goal', parentDoc()).val(plan.goal || '');
+  $('#ai-workspace-plan-must-keep', parentDoc()).val((plan.must_keep || []).join('\n'));
+  $('#ai-workspace-plan-rewrite-rules', parentDoc()).val((plan.rewrite_rules || []).join('\n'));
+  $('#ai-workspace-plan-consistency-notes', parentDoc()).val((plan.consistency_notes || []).join('\n'));
   $json.val(
     JSON.stringify(
       {
@@ -1282,6 +1403,14 @@ function renderPlanningResult(modeKey, planningResult = null) {
       null,
       2,
     ),
+  );
+  renderPlanScope(modeKey);
+  $('#ai-workspace-plan-error', parentDoc())
+    .toggleClass('is-visible', Boolean(mode.planEditorError))
+    .text(mode.planEditorError || '');
+  $('#ai-workspace-preview', parentDoc()).prop(
+    'disabled',
+    Boolean(mode.planEditorError) || mode.selectedEntryUids.size === 0 || state.isGenerating,
   );
 }
 
@@ -1507,6 +1636,8 @@ async function refreshChatContext() {
       message: typeof message?.message === 'string' ? message.message : '',
     }))
     .filter(message => message.message.trim());
+  state.chatContextManual = false;
+  state.chatContextManualText = '';
 
   const loadedCount = state.chatMessages.length;
   renderChatContextPreview();
@@ -1518,7 +1649,8 @@ async function refreshChatContext() {
 function handleChatContextEdited() {
   const text = currentChatContextText().trim();
   state.chatContext = { ...currentChatContextSettings(), enabled: Boolean(text) };
-  state.chatMessages = currentChatMessagesForRequest();
+  state.chatContextManual = Boolean(text);
+  state.chatContextManualText = text;
   renderChatContextPreview();
   persistSettings({ mirrorModeKey: currentModeKey() });
   invalidateSharedInfoOutputs('聊天上下文已修改，请重新生成计划或预览。');
@@ -1528,6 +1660,8 @@ function handleChatContextEdited() {
 function handleChatContextClear() {
   state.chatContext = { ...state.chatContext, enabled: false };
   state.chatMessages = [];
+  state.chatContextManual = false;
+  state.chatContextManualText = '';
   renderChatContextPreview();
   persistSettings({ mirrorModeKey: currentModeKey() });
   invalidateSharedInfoOutputs('聊天上下文已清空，请重新生成计划或预览。');
@@ -2224,47 +2358,136 @@ function buildInstructionMarkup(modeKey) {
   `;
 }
 
+function buildPrepareMarkup(modeKey) {
+  const isPlan = modeKey === 'plan';
+  return `
+    <div class="ai-prepare-grid">
+      <section class="ai-workbench-panel ai-scope-panel" aria-labelledby="ai-scope-title">
+        <div class="ai-section-heading">
+          <div><span class="ai-section-kicker">01 / 范围</span><h2 id="ai-scope-title">选择世界书与条目</h2></div>
+          <button type="button" id="ai-workspace-refresh-entries" class="ai-icon-text-button"><i class="fa-solid fa-rotate"></i><span>刷新</span></button>
+        </div>
+        <div class="ai-field">
+          <label for="ai-workspace-lorebook-search">目标世界书</label>
+          <input id="ai-workspace-lorebook" type="hidden">
+          <div class="global-lorebook-adder ai-worldbook-adder">
+            <div class="global-lorebook-search-wrapper">
+              <i class="fa-solid fa-search"></i>
+              <input id="ai-workspace-lorebook-search" type="text" role="combobox" aria-autocomplete="list" aria-controls="ai-workspace-lorebook-search-results" aria-expanded="false" placeholder="搜索并选择目标世界书…">
+            </div>
+            <div id="ai-workspace-lorebook-search-results" class="add-worldbook-results" role="listbox"></div>
+          </div>
+          <div id="ai-workspace-current-lorebook" class="ai-current-lorebook" data-empty="true">
+            <span>当前目标</span><strong id="ai-workspace-current-lorebook-name">未选择</strong>
+          </div>
+        </div>
+        <div class="ai-scope-search-row">
+          <div class="ai-field ai-grow">
+            <label for="ai-workspace-search">筛选条目</label>
+            <input id="ai-workspace-search" type="search" placeholder="搜索标题、UID 或正文">
+          </div>
+          <div id="ai-workspace-selection-summary" class="ai-selection-counts" aria-live="polite">尚未加载条目</div>
+        </div>
+        <div class="ai-bulk-toolbar" aria-label="批量设置当前筛选结果">
+          <span>当前筛选：</span>
+          <button type="button" id="ai-workspace-select-visible">设为修改</button>
+          <button type="button" id="ai-workspace-mark-visible-readonly">设为只读</button>
+          <button type="button" id="ai-workspace-clear-selection">全部排除</button>
+        </div>
+        <div id="ai-workspace-entry-list" class="ai-entry-list" aria-label="世界书条目范围"></div>
+        <div class="ai-inline-note ${isPlan ? 'is-plan' : ''}">
+          <i class="fa-solid ${isPlan ? 'fa-route' : 'fa-circle-check'}"></i>
+          <span>${isPlan ? '手工选择会成为硬约束；不选择条目时，AI 将分析整本世界书并提出范围。' : '直接修改至少需要一条“修改”条目；“只读”条目只作为上下文。'}</span>
+        </div>
+      </section>
+
+      <section class="ai-workbench-panel ai-instruction-panel" aria-labelledby="ai-instruction-title">
+        <div class="ai-section-heading">
+          <div><span class="ai-section-kicker">02 / 指令</span><h2 id="ai-instruction-title">说明本次修改目标</h2></div>
+          <div class="ai-field-toggles" aria-label="允许修改的字段">
+            <label><input type="checkbox" id="ai-workspace-field-title"><span>标题</span></label>
+            <label><input type="checkbox" id="ai-workspace-field-content"><span>正文</span></label>
+            <label><input type="checkbox" id="ai-workspace-field-prompt"><span>关键词</span></label>
+          </div>
+        </div>
+        <div class="ai-field ai-instruction-field">
+          <label for="ai-workspace-instruction">发送给 AI 的指令</label>
+          <textarea id="ai-workspace-instruction" placeholder="例如：保留原意，压缩冗余描述，统一叙述语气，并补全准确关键词。"></textarea>
+        </div>
+        ${buildInfoResourcesMarkup()}
+        <details class="ai-prompt-settings ai-advanced-settings">
+          <summary><span>高级提示词</span><small>通常无需修改</small></summary>
+          <div class="ai-prompt-settings-body">
+            <div class="ai-field"><label for="ai-workspace-jailbreak-prompt-template">破限提示词</label><textarea id="ai-workspace-jailbreak-prompt-template" class="ai-prompt-template"></textarea></div>
+            <div class="ai-field"><label for="ai-workspace-builtin-prompt-template">指导提示词</label><textarea id="ai-workspace-builtin-prompt-template" class="ai-prompt-template"></textarea></div>
+            ${isPlan ? '<div class="ai-field"><label for="ai-workspace-planning-prompt-template">规划提示词</label><textarea id="ai-workspace-planning-prompt-template" class="ai-prompt-template"></textarea></div>' : ''}
+          </div>
+        </details>
+      </section>
+    </div>
+    <div class="ai-command-bar">
+      <div class="ai-command-status"><span class="ai-status-dot"></span><span id="ai-workspace-status" role="status" aria-live="polite"></span></div>
+      <div class="ai-command-actions">
+        <button type="button" id="ai-workspace-stop" class="ai-button-danger" disabled><i class="fa-solid fa-stop"></i>停止</button>
+        ${isPlan
+          ? '<button type="button" id="ai-workspace-plan" class="ai-button-primary"><span>生成修改计划</span><i class="fa-solid fa-arrow-right"></i></button>'
+          : '<button type="button" id="ai-workspace-preview" class="ai-button-primary"><span>生成修改预览</span><i class="fa-solid fa-arrow-right"></i></button>'}
+      </div>
+    </div>
+  `;
+}
+
 function buildPlanningMarkup() {
   return `
-    <div class="ai-panel modern-card">
-      <div class="ai-note">计划确认承载当前“生成改造方案”的结果。确认后将基于该方案生成最终修改预览。</div>
-      <div id="ai-workspace-plan-summary" class="ai-text">${EMPTY_PLAN_TEXT}</div>
-      <div class="ai-debug-grid">
-        <details class="ai-debug-block" open>
-          <summary>改造方案 JSON</summary>
-          <textarea id="ai-workspace-plan-json"></textarea>
+    <div class="ai-plan-review-grid">
+      <section class="ai-workbench-panel ai-plan-editor" aria-labelledby="ai-plan-editor-title">
+        <div class="ai-section-heading"><div><span class="ai-section-kicker">计划审阅</span><h2 id="ai-plan-editor-title">把方案调整到可执行</h2></div></div>
+        <div id="ai-workspace-plan-summary" class="ai-plan-summary" aria-live="polite">${EMPTY_PLAN_TEXT}</div>
+        <div class="ai-field"><label for="ai-workspace-plan-goal">总体目标</label><textarea id="ai-workspace-plan-goal" rows="3"></textarea></div>
+        <div class="ai-plan-fields-grid">
+          <div class="ai-field"><label for="ai-workspace-plan-must-keep">必须保留 <small>每行一项</small></label><textarea id="ai-workspace-plan-must-keep"></textarea></div>
+          <div class="ai-field"><label for="ai-workspace-plan-rewrite-rules">改写规则 <small>每行一项</small></label><textarea id="ai-workspace-plan-rewrite-rules"></textarea></div>
+          <div class="ai-field"><label for="ai-workspace-plan-consistency-notes">一致性注意 <small>每行一项</small></label><textarea id="ai-workspace-plan-consistency-notes"></textarea></div>
+        </div>
+        <details class="ai-prompt-settings ai-advanced-settings">
+          <summary><span>原始计划 JSON</span><small>高级编辑</small></summary>
+          <div class="ai-prompt-settings-body"><textarea id="ai-workspace-plan-json" class="ai-code-textarea"></textarea></div>
         </details>
-      </div>
-      <div class="ai-step-actions">
-        <button type="button" class="ai-secondary-button ai-button-secondary" data-ai-step-target="instruction">返回指令设定</button>
-        <button type="button" id="ai-workspace-preview" class="ai-button-primary">确认方案并生成修改结果</button>
-        <button type="button" id="ai-workspace-stop" class="ai-button-danger" disabled>停止生成</button>
-        <span id="ai-workspace-status" class="ai-text"></span>
+        <div id="ai-workspace-plan-error" class="ai-form-error" role="alert"></div>
+      </section>
+      <section class="ai-workbench-panel ai-plan-scope" aria-labelledby="ai-plan-scope-title">
+        <div class="ai-section-heading"><div><span class="ai-section-kicker">条目分组</span><h2 id="ai-plan-scope-title">确认修改与只读范围</h2></div></div>
+        <div id="ai-workspace-plan-scope-list" class="ai-plan-scope-list"></div>
+      </section>
+    </div>
+    <div class="ai-command-bar">
+      <div class="ai-command-status"><span class="ai-status-dot"></span><span id="ai-workspace-status" role="status" aria-live="polite"></span></div>
+      <div class="ai-command-actions">
+        <button type="button" class="ai-button-secondary" data-ai-step-target="prepare"><i class="fa-solid fa-arrow-left"></i>返回准备</button>
+        <button type="button" id="ai-workspace-stop" class="ai-button-danger" disabled><i class="fa-solid fa-stop"></i>停止</button>
+        <button type="button" id="ai-workspace-preview" class="ai-button-primary"><span>按此计划生成预览</span><i class="fa-solid fa-arrow-right"></i></button>
       </div>
     </div>
   `;
 }
 
 function buildResultMarkup(modeKey) {
-  const backStep = modeKey === 'plan' && state.modes.plan.planningResult ? 'planning' : 'instruction';
+  const backStep = modeKey === 'plan' && state.modes.plan.planningResult ? 'planReview' : 'prepare';
+  const changedCount = state.modes[modeKey].previewResult?.summary?.changed || 0;
   return `
-    <div class="ai-panel modern-card">
-      <div id="ai-workspace-preview-summary" class="ai-text">${EMPTY_PREVIEW_TEXT}</div>
+    <div class="ai-review-layout">
+      <section class="ai-workbench-panel ai-review-list-panel">
+        <div class="ai-section-heading"><div><span class="ai-section-kicker">修改审阅</span><h2>逐条检查结果</h2></div></div>
+        <div id="ai-workspace-preview-summary" class="ai-preview-summary" aria-live="polite">${EMPTY_PREVIEW_TEXT}</div>
       <div id="ai-workspace-preview-errors" class="ai-preview-errors"></div>
-      <div id="ai-workspace-rollback-panel" class="ai-rollback-panel"></div>
-      <div class="ai-result-grid ai-preview-layout">
         <div id="ai-workspace-preview-list" class="ai-scroll ai-preview-list"></div>
+      </section>
+      <section class="ai-workbench-panel ai-review-detail-panel">
         <div id="ai-workspace-preview-detail" class="ai-preview-detail"></div>
-      </div>
-      <div class="ai-step-actions">
-        <button type="button" class="ai-secondary-button ai-button-secondary" data-ai-step-target="${backStep}">返回上一步</button>
-        <button type="button" id="ai-workspace-preview" class="ai-button-primary">重新生成修改结果</button>
-        <button type="button" id="ai-workspace-stop" class="ai-button-danger" disabled>停止生成</button>
-        <button type="button" id="ai-workspace-apply" class="ai-button-primary" disabled>应用预览</button>
-        <button type="button" id="ai-workspace-rollback-preview" class="ai-button-secondary" disabled>回滚预览</button>
-        <button type="button" id="ai-workspace-rollback-execute" class="ai-button-danger" disabled>执行回滚</button>
-        <span id="ai-workspace-status" class="ai-text"></span>
-      </div>
+      </section>
+    </div>
+    <details class="ai-diagnostics-drawer">
+      <summary><i class="fa-solid fa-stethoscope"></i><span>请求诊断与原始数据</span></summary>
       <div class="ai-debug-grid">
         <details class="ai-debug-block">
           <summary>发送给 AI 的完整内容</summary>
@@ -2287,7 +2510,37 @@ function buildResultMarkup(modeKey) {
           <textarea id="ai-workspace-debug-diagnostics" readonly></textarea>
         </details>
       </div>
+    </details>
+    <div class="ai-command-bar">
+      <div class="ai-command-status"><span class="ai-status-dot"></span><span id="ai-workspace-status" role="status" aria-live="polite"></span></div>
+      <div class="ai-command-actions">
+        <button type="button" class="ai-button-secondary" data-ai-step-target="${backStep}"><i class="fa-solid fa-arrow-left"></i>返回</button>
+        <button type="button" id="ai-workspace-preview" class="ai-button-secondary"><i class="fa-solid fa-rotate"></i>重新生成</button>
+        <button type="button" id="ai-workspace-stop" class="ai-button-danger" disabled><i class="fa-solid fa-stop"></i>停止</button>
+        <button type="button" id="ai-workspace-apply" class="ai-button-primary" disabled><span>应用 ${changedCount} 条修改</span><i class="fa-solid fa-check"></i></button>
+      </div>
     </div>
+  `;
+}
+
+function buildCompleteMarkup(modeKey) {
+  const result = state.modes[modeKey].lastApplyResult || {};
+  const applied = Number(result.appliedCount || result.appliedUids?.length || 0);
+  const skipped = Number(result.skippedCount || result.skipped?.length || 0);
+  return `
+    <section class="ai-complete-panel" aria-labelledby="ai-complete-title">
+      <div class="ai-complete-mark"><i class="fa-solid fa-check"></i></div>
+      <span class="ai-section-kicker">任务完成</span>
+      <h2 id="ai-complete-title">修改已经安全写回</h2>
+      <p>成功应用 ${applied} 条${skipped ? `，另有 ${skipped} 条因冲突或缺失未写入` : ''}。写回已记录事务快照。</p>
+      <div class="ai-complete-actions"><button type="button" id="ai-workspace-start-new" class="ai-button-primary">开始下一次修改</button></div>
+      <div id="ai-workspace-rollback-panel" class="ai-rollback-card"></div>
+      <div class="ai-rollback-actions">
+        <button type="button" id="ai-workspace-rollback-preview" class="ai-button-secondary" disabled>查看最近事务</button>
+        <button type="button" id="ai-workspace-rollback-execute" class="ai-button-danger" disabled>撤销最近事务</button>
+      </div>
+      <span id="ai-workspace-status" role="status" aria-live="polite"></span>
+    </section>
   `;
 }
 
@@ -2295,106 +2548,62 @@ function buildModeWorkspace(modeKey) {
   const mode = state.modes[modeKey];
   let bodyMarkup = '';
   switch (mode.currentStep) {
-    case 'selection':
-      bodyMarkup = buildSelectionMarkup(modeKey);
+    case 'prepare':
+      bodyMarkup = buildPrepareMarkup(modeKey);
       break;
-    case 'instruction':
-      bodyMarkup = buildInstructionMarkup(modeKey);
-      break;
-    case 'planning':
+    case 'planReview':
       bodyMarkup = buildPlanningMarkup();
       break;
-    case 'result':
+    case 'review':
       bodyMarkup = buildResultMarkup(modeKey);
       break;
+    case 'complete':
+      bodyMarkup = buildCompleteMarkup(modeKey);
+      break;
     default:
-      bodyMarkup = buildSelectionMarkup(modeKey);
+      bodyMarkup = buildPrepareMarkup(modeKey);
       break;
   }
 
   return `
-    <div class="ai-page modern-page">
+    <div class="ai-workflow-page" data-stage="${mode.currentStep}">
       ${buildStepIndicator(modeKey)}
       ${bodyMarkup}
     </div>
   `;
 }
 
-function buildGeneratorMarkup() {
-  return `
-    <div class="ai-page modern-page">
-      <div class="ai-panel ai-placeholder-panel modern-card">
-        <div class="ai-coming-soon">敬请期待</div>
-        <div class="ai-note">该入口将在后续迭代中接入完整生成工作流。</div>
-        <div class="ai-status-line">
-          <span id="ai-workspace-status" class="ai-text">${state.sharedStatusText || ''}</span>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function buildDesktopShellMarkup() {
+  const saved = settings();
+  const modelLabel = saved.apiMode === 'custom' ? saved.customApi?.model || '自定义模型待配置' : '当前酒馆预设';
+  const referenceLength = (state.referenceMaterial || '').trim().length;
   return `
-    <div id="${ROOT_ID}" data-layout="desktop" class="ai-desktop-root">
-      <aside class="ai-desktop-nav modern-sidebar">
-        <div class="ai-mobile-nav-bar">
-          <button
-            type="button"
-            class="ai-mobile-nav-toggle"
-            aria-expanded="false"
-            aria-controls="ai-workspace-mobile-nav-list"
-            aria-label="展开 AI 工作台菜单"
-          >
-            <i class="fa-solid fa-bars"></i>
-          </button>
+    <div id="${ROOT_ID}" data-layout="wide" class="ai-workbench-root">
+      <header class="ai-workbench-header">
+        <div class="ai-workbench-brand">
+          <span class="ai-brand-mark"><i class="fa-solid fa-feather-pointed"></i></span>
+          <div><h1>AI 修改</h1><p>先定义边界，再审阅每一处写回</p></div>
         </div>
-        <div class="ai-nav-title modern-sidebar-header">
-          <i class="fa-solid fa-brain"></i>
-          <span>AI 工作台</span>
-          <button type="button" id="ai-workspace-open-assistant" class="ai-phone-title-button" aria-label="打开 AI 助手">
-            <i class="fa-solid fa-mobile-screen-button"></i>
-          </button>
+        <div class="ai-strategy-switch" role="group" aria-label="修改策略">
+          ${STRATEGIES.map(item => `<button type="button" class="ai-strategy-button${state.currentNav === item.key ? ' is-active' : ''}" data-ai-strategy="${item.key}" aria-pressed="${state.currentNav === item.key}"><i class="${item.icon}"></i><span>${item.label}</span></button>`).join('')}
         </div>
-        <div id="ai-workspace-mobile-nav-list" class="ai-nav-list modern-sidebar-nav-list">
-          <div class="ai-mobile-nav-menu-header">
-            <div class="ai-mobile-menu-title">
-              <span>AI 工作台</span>
-              <button type="button" class="ai-phone-title-button" data-ai-open-assistant-tab="chat" aria-label="打开 AI 助手">
-                <i class="fa-solid fa-mobile-screen-button"></i>
-              </button>
-            </div>
-            <strong class="ai-mobile-nav-current">当前：${_.escape(getNavItemLabel())}</strong>
-          </div>
-          ${NAV_ITEMS.map(
-            item => `
-            <button
-              type="button"
-              class="ai-mode-nav-button${state.currentNav === item.key ? ' is-active' : ''}${item.key === 'generate' ? ' is-disabled' : ''}"
-              data-ai-nav="${item.key}"
-              ${state.currentNav === item.key ? 'aria-current="page"' : ''}
-            >
-              <i class="${item.icon}"></i>
-              <span>${item.label}</span>
-              ${item.key === 'generate' ? '<small>敬请期待</small>' : ''}
-            </button>
-          `,
-          ).join('')}
+        <div class="ai-context-chips">
+          <button type="button" class="ai-context-chip" data-ai-open-settings><i class="fa-solid fa-microchip"></i><span>${_.escape(modelLabel)}</span></button>
+          <button type="button" class="ai-context-chip" data-ai-focus-context><i class="fa-regular fa-comments"></i><span>${state.chatContext.enabled ? `${state.chatMessages.length || 1} 条上下文` : '上下文关闭'}</span></button>
+          <button type="button" class="ai-context-chip" data-ai-open-assistant-tab="reference"><i class="fa-regular fa-folder-open"></i><span>${referenceLength ? `${referenceLength} 字资料` : '添加资料'}</span></button>
+          <button type="button" class="ai-icon-button" data-ai-open-assistant-tab="chat" aria-label="打开 AI 助手"><i class="fa-solid fa-sparkles"></i></button>
         </div>
-        <div class="ai-nav-footer modern-sidebar-footer">
-          <button type="button" class="ai-phone-title-button modern-sidebar-assistant-btn" data-ai-open-assistant-tab="chat" aria-label="打开 AI 助手">
-            <i class="fa-solid fa-mobile-screen-button"></i>
-            <span>AI 助手</span>
-          </button>
-        </div>
-      </aside>
-      <section class="ai-desktop-main modern-main-content">
-        <header class="modern-main-header">
-          <h1 id="ai-workspace-main-title">${_.escape(NAV_TITLES[state.currentNav] || 'AI 工作区')}</h1>
-          <p id="ai-workspace-main-description">${_.escape(NAV_DESCRIPTIONS[state.currentNav] || '')}</p>
-        </header>
+        <span id="ai-workspace-shared-status" class="ai-visually-hidden" aria-live="polite">${_.escape(state.sharedStatusText || '')}</span>
+      </header>
+      <main class="ai-workbench-main">
         <div id="ai-workspace-desktop-panel"></div>
-      </section>
+      </main>
+      <div id="ai-workspace-settings-modal" class="ai-tool-backdrop" style="display:none" aria-hidden="true">
+        <aside class="ai-tool-drawer" role="dialog" aria-modal="true" aria-labelledby="ai-workspace-settings-title">
+          <header><div><span class="ai-section-kicker">工作台设置</span><h2 id="ai-workspace-settings-title">模型与上下文预算</h2></div><button type="button" id="ai-workspace-settings-close" class="ai-icon-button" aria-label="关闭设置"><i class="fa-solid fa-xmark"></i></button></header>
+          <div class="ai-tool-drawer-body">${buildApiSettingsMarkup()}</div>
+        </aside>
+      </div>
       ${buildPreviewModalMarkup()}
       ${buildAssistantModalMarkup()}
     </div>
@@ -2407,7 +2616,7 @@ function ensureMarkup() {
     return;
   }
 
-  if (root().attr('data-layout') !== 'desktop') {
+  if (!root().length) {
     $container.empty().html(buildDesktopShellMarkup());
   }
 }

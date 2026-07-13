@@ -7,6 +7,19 @@ const VALID_SECONDARY_LOGIC = new Set(['and_any', 'and_all', 'not_all', 'not_any
 const AI_BATCH_CONCURRENCY = 2;
 const AI_ITEM_MAX_RETRIES = 1;
 
+export function resolveAiPreviewOutcome({ total = 0, succeeded = 0, failed = 0, cancelled = false } = {}) {
+  if (cancelled) {
+    return 'cancelled';
+  }
+  if (total > 0 && succeeded === total && failed === 0) {
+    return 'complete';
+  }
+  if (succeeded > 0) {
+    return 'partial';
+  }
+  return 'failed';
+}
+
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -383,8 +396,14 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
   });
 
   const changedCount = items.filter(item => item.changed).length;
+  const outcome = resolveAiPreviewOutcome({
+    total: targetEntries.length,
+    succeeded: items.length,
+    failed: errors.length,
+  });
 
   return {
+    outcome,
     lorebookName,
     instruction: trimmedInstruction,
     fieldOptions: normalizedFieldOptions,
@@ -395,6 +414,7 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
       total: targetEntries.length,
       succeeded: items.length,
       failed: errors.length,
+      cancelled: 0,
       changed: changedCount,
       unchanged: items.length - changedCount,
     },
@@ -415,13 +435,25 @@ export const applyAiPreview = errorCatched(async options => {
       changed: false,
       appliedCount: 0,
       skippedCount: 0,
+      appliedUids: [],
+      skipped: [],
       conflicts: [],
     };
   }
 
   const previewItemsByUid = new Map(changedItems.map(item => [ensureNumericUID(item.uid), _.cloneDeep(item)]));
   const conflicts = [];
-  let appliedCount = 0;
+  const appliedUids = [];
+  const skippedByUid = new Map();
+
+  const recordSkipped = (previewItem, uid, reason, detail = {}) => {
+    skippedByUid.set(uid, { uid, reason });
+    conflicts.push({
+      uid,
+      title: previewItem?.title || detail.title || `UID ${uid}`,
+      ...detail,
+    });
+  };
 
   const patchAllowedFields = (currentEntry, afterEntry, fieldOptions = {}) => {
     const normalizedFieldOptions = normalizeFieldOptions(fieldOptions);
@@ -455,6 +487,9 @@ export const applyAiPreview = errorCatched(async options => {
   const result = await updateWorldbookEntries(
     lorebookName,
     entries => {
+      appliedUids.length = 0;
+      skippedByUid.clear();
+      conflicts.length = 0;
       let hasChanges = false;
       const updatedEntries = entries.map(entry => {
         const numericUid = ensureNumericUID(entry.uid);
@@ -463,10 +498,17 @@ export const applyAiPreview = errorCatched(async options => {
           return entry;
         }
 
+        if (isReservedMetaEntry(entry)) {
+          recordSkipped(previewItem, numericUid, 'reserved-meta-entry', {
+            status: 'reserved',
+            message: '该条目是内部元数据条目，已跳过。',
+          });
+          return entry;
+        }
+
         if (!previewItem.beforeEntry) {
-          conflicts.push({
-            uid: numericUid,
-            title: previewItem.title || entry.name || `UID ${numericUid}`,
+          recordSkipped(previewItem, numericUid, 'missing-before-snapshot', {
+            title: entry.name || `UID ${numericUid}`,
             status: 'conflict',
             message: '缺少生成预览时的原始条目快照，已跳过。',
           });
@@ -474,9 +516,8 @@ export const applyAiPreview = errorCatched(async options => {
         }
 
         if (!_.isEqual(entry, previewItem.beforeEntry)) {
-          conflicts.push({
-            uid: numericUid,
-            title: previewItem.title || entry.name || `UID ${numericUid}`,
+          recordSkipped(previewItem, numericUid, 'snapshot-conflict', {
+            title: entry.name || `UID ${numericUid}`,
             status: 'conflict',
             beforeEntryHash: previewItem.beforeEntryHash || buildAiEntryHash(previewItem.beforeEntry),
             currentEntryHash: buildAiEntryHash(entry),
@@ -487,19 +528,22 @@ export const applyAiPreview = errorCatched(async options => {
 
         const nextEntry = patchAllowedFields(entry, previewItem.afterEntry, previewItem.editableFields || previewItem.fieldOptions);
         if (_.isEqual(entry, nextEntry)) {
+          recordSkipped(previewItem, numericUid, 'no-allowed-field-changes', {
+            title: entry.name || `UID ${numericUid}`,
+            status: 'unchanged',
+            message: '允许写回的字段没有实际变化，已跳过。',
+          });
           return entry;
         }
 
-        appliedCount += 1;
+        appliedUids.push(numericUid);
         hasChanges = true;
         return _.cloneDeep(nextEntry);
       });
 
       previewItemsByUid.forEach((previewItem, uid) => {
         if (!entries.some(entry => ensureNumericUID(entry.uid) === uid)) {
-          conflicts.push({
-            uid,
-            title: previewItem.title || `UID ${uid}`,
+          recordSkipped(previewItem, uid, 'entry-missing', {
             status: 'missing',
             message: '当前世界书中找不到该条目，已跳过。',
           });
@@ -524,8 +568,10 @@ export const applyAiPreview = errorCatched(async options => {
   return {
     success: true,
     changed: result.changed,
-    appliedCount,
-    skippedCount: conflicts.length,
+    appliedCount: appliedUids.length,
+    skippedCount: skippedByUid.size,
+    appliedUids: [...appliedUids],
+    skipped: [...skippedByUid.values()],
     conflicts,
   };
 }, 'applyAiPreview');

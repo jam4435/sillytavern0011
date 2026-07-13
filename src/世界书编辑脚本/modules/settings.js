@@ -4,6 +4,8 @@ import { getLocalStorageItem, setLocalStorageItem } from './utils.js';
 const DEFAULT_COPY_CONFLICT_STRATEGY_KEY = 'lorebook-default-copy-conflict-strategy';
 const VALID_COPY_CONFLICT_STRATEGIES = new Set(['overwrite', 'rename', 'keep-original']);
 const AI_WORKSPACE_SETTINGS_KEY = 'lorebook-ai-workspace-settings';
+export const AI_WORKSPACE_SCHEMA_VERSION = 2;
+export const AI_WORKSPACE_SAVE_DEBOUNCE_MS = 300;
 const PC_LAYOUT_MODE_KEY = 'lorebook-pc-layout-mode';
 const PC_MASTER_DETAIL_SPLIT_KEY = 'lorebook-pc-master-detail-split';
 const FLOATING_BUBBLE_POSITION_DESKTOP_KEY = 'lorebook-floating-bubble-position-desktop';
@@ -62,84 +64,46 @@ const DEFAULT_AI_PLANNING_PROMPT_TEMPLATE = `你当前处于规划阶段，不�
 禁止输出解释、Markdown、代码块或 JSON 之外的任何内容。
 只返回严格 JSON 对象，格式为 {"readonly_uids":[],"editable_uids":[],"plan":{"goal":"","must_keep":[],"rewrite_rules":[],"consistency_notes":[]}}.`;
 
-const DEFAULT_AI_WORKSPACE_SETTINGS = {
+const DEFAULT_AI_DRAFT = {
   lorebookName: '',
-  apiMode: 'preset',
-  stream: false,
-  chatContext: _.cloneDeep(DEFAULT_AI_CHAT_CONTEXT),
-  contextBudget: _.cloneDeep(DEFAULT_AI_CONTEXT_BUDGET),
-  chatMessages: [],
-  referenceMaterial: '',
-  assistantChatHistory: [],
+  searchText: '',
+  instruction: '',
+  editableFields: {
+    title: true,
+    content: true,
+    prompt: true,
+  },
   promptSettings: {
     jailbreakPromptTemplate: DEFAULT_AI_JAILBREAK_PROMPT_TEMPLATE,
     builtinPromptTemplate: DEFAULT_AI_BUILTIN_PROMPT_TEMPLATE,
     planningPromptTemplate: DEFAULT_AI_PLANNING_PROMPT_TEMPLATE,
   },
+  selectedEntryUids: [],
+  readonlyEntryUids: [],
+  excludedEntryUids: [],
+  chatContext: {
+    ...DEFAULT_AI_CHAT_CONTEXT,
+    mode: 'structured',
+    manualText: '',
+  },
+  chatMessages: [],
+  referenceMaterial: '',
+  assistantChatHistory: [],
+};
+
+const DEFAULT_AI_WORKSPACE_SETTINGS = {
+  schemaVersion: AI_WORKSPACE_SCHEMA_VERSION,
+  strategy: 'direct',
+  apiMode: 'preset',
+  stream: false,
+  contextBudget: _.cloneDeep(DEFAULT_AI_CONTEXT_BUDGET),
   customApi: {
     apiurl: '',
     key: '',
     model: '',
     source: 'openai',
   },
-  editableFields: {
-    title: true,
-    content: true,
-    prompt: true,
-  },
-  navMode: 'direct',
-  direct: {
-    lorebookName: '',
-    searchText: '',
-    instruction: '',
-    currentStep: 'selection',
-    editableFields: {
-      title: true,
-      content: true,
-      prompt: true,
-    },
-    promptSettings: {
-      jailbreakPromptTemplate: DEFAULT_AI_JAILBREAK_PROMPT_TEMPLATE,
-      builtinPromptTemplate: DEFAULT_AI_BUILTIN_PROMPT_TEMPLATE,
-      planningPromptTemplate: DEFAULT_AI_PLANNING_PROMPT_TEMPLATE,
-    },
-    selectedEntryUids: [],
-    readonlyEntryUids: [],
-    chatContext: _.cloneDeep(DEFAULT_AI_CHAT_CONTEXT),
-    chatMessages: [],
-    referenceMaterial: '',
-    assistantChatHistory: [],
-    planningResult: null,
-    previewResult: null,
-    debugInfo: null,
-    statusText: '',
-  },
-  plan: {
-    lorebookName: '',
-    searchText: '',
-    instruction: '',
-    currentStep: 'selection',
-    editableFields: {
-      title: true,
-      content: true,
-      prompt: true,
-    },
-    promptSettings: {
-      jailbreakPromptTemplate: DEFAULT_AI_JAILBREAK_PROMPT_TEMPLATE,
-      builtinPromptTemplate: DEFAULT_AI_BUILTIN_PROMPT_TEMPLATE,
-      planningPromptTemplate: DEFAULT_AI_PLANNING_PROMPT_TEMPLATE,
-    },
-    selectedEntryUids: [],
-    readonlyEntryUids: [],
-    chatContext: _.cloneDeep(DEFAULT_AI_CHAT_CONTEXT),
-    chatMessages: [],
-    referenceMaterial: '',
-    assistantChatHistory: [],
-    planningResult: null,
-    previewResult: null,
-    debugInfo: null,
-    statusText: '',
-  },
+  draft: _.cloneDeep(DEFAULT_AI_DRAFT),
 };
 
 function normalizeAiChatContext(chatContext = {}) {
@@ -149,6 +113,8 @@ function normalizeAiChatContext(chatContext = {}) {
     messageCount: Number.isFinite(messageCount)
       ? Math.min(50, Math.max(0, messageCount))
       : DEFAULT_AI_CHAT_CONTEXT.messageCount,
+    mode: chatContext?.mode === 'manual' ? 'manual' : 'structured',
+    manualText: typeof chatContext?.manualText === 'string' ? chatContext.manualText : '',
   };
 }
 
@@ -214,70 +180,186 @@ function normalizeAssistantChatHistory(chatHistory = []) {
     .filter(Boolean);
 }
 
-function buildAiModeSettings(settings = {}, fallback = {}) {
+function normalizeUidList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(value.map(uid => Number.parseInt(`${uid}`, 10)).filter(Number.isFinite))];
+}
+
+function normalizeAiDraft(draft = {}, fallback = {}) {
+  const source = { ...fallback, ...draft };
+  const selectedEntryUids = normalizeUidList(source.selectedEntryUids);
+  const selectedSet = new Set(selectedEntryUids);
+  const readonlyEntryUids = normalizeUidList(source.readonlyEntryUids).filter(uid => !selectedSet.has(uid));
+  const readonlySet = new Set(readonlyEntryUids);
+  const excludedEntryUids = normalizeUidList(source.excludedEntryUids)
+    .filter(uid => !selectedSet.has(uid) && !readonlySet.has(uid));
+
   return {
-    ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.direct),
-    ...fallback,
-    ...settings,
+    ..._.cloneDeep(DEFAULT_AI_DRAFT),
+    lorebookName: typeof source.lorebookName === 'string' ? source.lorebookName : '',
+    searchText: typeof source.searchText === 'string' ? source.searchText : '',
+    instruction: typeof source.instruction === 'string' ? source.instruction : '',
     editableFields: {
-      ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.direct.editableFields),
-      ...(fallback?.editableFields || {}),
-      ...(settings?.editableFields || {}),
+      ..._.cloneDeep(DEFAULT_AI_DRAFT.editableFields),
+      ...(source.editableFields || {}),
     },
     promptSettings: {
-      ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.direct.promptSettings),
-      ...(fallback?.promptSettings || {}),
-      ...(settings?.promptSettings || {}),
+      ..._.cloneDeep(DEFAULT_AI_DRAFT.promptSettings),
+      ...(source.promptSettings || {}),
     },
-    chatContext: normalizeAiChatContext(settings?.chatContext || fallback?.chatContext || DEFAULT_AI_CHAT_CONTEXT),
-    chatMessages: normalizeAiChatMessages(
-      Array.isArray(settings?.chatMessages) ? settings.chatMessages : fallback?.chatMessages,
-    ),
-    referenceMaterial: typeof settings?.referenceMaterial === 'string'
-      ? settings.referenceMaterial
-      : typeof fallback?.referenceMaterial === 'string'
-        ? fallback.referenceMaterial
-        : '',
-    assistantChatHistory: normalizeAssistantChatHistory(
-      Array.isArray(settings?.assistantChatHistory) ? settings.assistantChatHistory : fallback?.assistantChatHistory,
-    ),
-    selectedEntryUids: Array.isArray(settings?.selectedEntryUids)
-      ? [...settings.selectedEntryUids]
-      : Array.isArray(fallback?.selectedEntryUids)
-        ? [...fallback.selectedEntryUids]
-        : [],
-    readonlyEntryUids: Array.isArray(settings?.readonlyEntryUids)
-      ? [...settings.readonlyEntryUids]
-      : Array.isArray(fallback?.readonlyEntryUids)
-        ? [...fallback.readonlyEntryUids]
-        : [],
+    selectedEntryUids,
+    readonlyEntryUids,
+    excludedEntryUids,
+    chatContext: normalizeAiChatContext(source.chatContext),
+    chatMessages: normalizeAiChatMessages(source.chatMessages),
+    referenceMaterial: typeof source.referenceMaterial === 'string' ? source.referenceMaterial : '',
+    assistantChatHistory: normalizeAssistantChatHistory(source.assistantChatHistory),
   };
 }
 
-function stripLargeAiModeFields(mode = {}) {
-  return {
-    ...mode,
-    planningResult: null,
-    previewResult: null,
-    debugInfo: null,
-    statusText: typeof mode?.statusText === 'string' ? mode.statusText.slice(0, 500) : '',
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
+}
+
+function legacyStrategy(settings = {}) {
+  if (settings?.navMode === 'plan') {
+    return 'plan';
+  }
+  if (settings?.navMode === 'direct') {
+    return 'direct';
+  }
+  return settings?.strategy === 'plan' ? 'plan' : 'direct';
+}
+
+function legacyRootDraft(settings = {}) {
+  const draft = {};
+  [
+    'lorebookName',
+    'editableFields',
+    'promptSettings',
+    'chatContext',
+    'chatMessages',
+    'referenceMaterial',
+    'assistantChatHistory',
+    'selectedEntryUids',
+    'readonlyEntryUids',
+    'excludedEntryUids',
+  ].forEach(key => {
+    if (hasOwn(settings, key)) draft[key] = settings[key];
+  });
+  return draft;
+}
+
+/**
+ * 将旧版双模式设置或新版输入统一为只包含一份可持久化草稿的 v2 数据。
+ * 规划结果、预览、调试信息、阶段和状态文本不会进入返回值。
+ */
+export function normalizeAiWorkspaceSettings(settings = {}) {
+  const strategy = legacyStrategy(settings);
+  const isLegacyPayload = settings?.schemaVersion !== AI_WORKSPACE_SCHEMA_VERSION;
+  const explicitLegacyMode = hasOwn(settings, strategy);
+  const modeDraft = explicitLegacyMode ? settings?.[strategy] : null;
+  const baseDraft = isLegacyPayload
+    ? { ...legacyRootDraft(settings), ...(modeDraft || {}) }
+    : settings?.draft || {};
+  const draftInput = !isLegacyPayload && explicitLegacyMode
+    ? { ...settings.draft, ...modeDraft, ...legacyRootDraft(settings) }
+    : baseDraft;
+
+  const normalized = {
+    schemaVersion: AI_WORKSPACE_SCHEMA_VERSION,
+    strategy,
+    apiMode: settings?.apiMode === 'custom' ? 'custom' : 'preset',
+    stream: settings?.stream === true,
+    contextBudget: normalizeAiContextBudget(settings?.contextBudget),
+    customApi: {
+      ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.customApi),
+      ...(settings?.customApi || {}),
+    },
+    draft: normalizeAiDraft(draftInput),
   };
+
+  if (normalized.customApi.source === 'openai' && normalized.customApi.apiurl) {
+    normalized.customApi.source = 'custom';
+  }
+  return normalized;
 }
 
 function buildCompactAiWorkspaceSettings(settings = {}) {
-  return {
-    ...settings,
-    planningResult: null,
-    previewResult: null,
-    debugInfo: null,
-    statusText: typeof settings?.statusText === 'string' ? settings.statusText.slice(0, 500) : '',
-    contextBudget: normalizeAiContextBudget(settings?.contextBudget),
-    chatMessages: normalizeAiChatMessages(settings?.chatMessages),
-    assistantChatHistory: normalizeAssistantChatHistory(settings?.assistantChatHistory),
-    referenceMaterial: typeof settings?.referenceMaterial === 'string' ? settings.referenceMaterial : '',
-    direct: stripLargeAiModeFields(settings?.direct || {}),
-    plan: stripLargeAiModeFields(settings?.plan || {}),
+  const compact = normalizeAiWorkspaceSettings(settings);
+  compact.draft.chatMessages = [];
+  compact.draft.assistantChatHistory = [];
+  compact.draft.referenceMaterial = '';
+  compact.draft.chatContext.manualText = '';
+  return compact;
+}
+
+function attachLegacyAiWorkspaceAliases(settings) {
+  const draftKeys = [
+    'lorebookName',
+    'searchText',
+    'instruction',
+    'editableFields',
+    'promptSettings',
+    'selectedEntryUids',
+    'readonlyEntryUids',
+    'excludedEntryUids',
+    'chatContext',
+    'chatMessages',
+    'referenceMaterial',
+    'assistantChatHistory',
+  ];
+
+  const descriptors = {
+    navMode: {
+      get: () => settings.strategy,
+      set: value => {
+        if (value === 'direct' || value === 'plan') settings.strategy = value;
+      },
+    },
+    direct: {
+      get: () => settings.draft,
+      set: value => { settings.draft = normalizeAiDraft(value, settings.draft); },
+    },
+    plan: {
+      get: () => settings.draft,
+      set: value => { settings.draft = normalizeAiDraft(value, settings.draft); },
+    },
   };
+
+  draftKeys.forEach(key => {
+    descriptors[key] = {
+      get: () => settings.draft[key],
+      set: value => { settings.draft = normalizeAiDraft({ ...settings.draft, [key]: value }); },
+    };
+  });
+  Object.values(descriptors).forEach(descriptor => {
+    descriptor.enumerable = false;
+    descriptor.configurable = true;
+  });
+  Object.defineProperties(settings, descriptors);
+  return settings;
+}
+
+let pendingAiWorkspaceSettings = null;
+let pendingAiWorkspaceSaveTimer = null;
+
+function persistAiWorkspaceSettings(settings) {
+  try {
+    setLocalStorageItem(AI_WORKSPACE_SETTINGS_KEY, JSON.stringify(settings), { throwOnError: true });
+  } catch (error) {
+    const isQuotaExceeded = error?.name === 'QuotaExceededError' || error?.code === 22 || error?.code === 1014;
+    if (!isQuotaExceeded) {
+      throw error;
+    }
+
+    const compact = buildCompactAiWorkspaceSettings(settings);
+    setLocalStorageItem(AI_WORKSPACE_SETTINGS_KEY, JSON.stringify(compact), { throwOnError: true });
+    console.warn('世界书 AI 工作区设置超出 localStorage 配额，已自动改为轻量保存。');
+  }
 }
 
 // 读取高亮激活条目的设置
@@ -380,104 +462,47 @@ export function setDefaultCopyConflictStrategy(strategy) {
 }
 
 export function getAiWorkspaceSettings() {
+  if (pendingAiWorkspaceSettings) {
+    return attachLegacyAiWorkspaceAliases(_.cloneDeep(pendingAiWorkspaceSettings));
+  }
+
   const saved = getLocalStorageItem(AI_WORKSPACE_SETTINGS_KEY);
   if (!saved) {
-    return _.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS);
+    return attachLegacyAiWorkspaceAliases(_.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS));
   }
 
   try {
-    const parsed = JSON.parse(saved);
-    const merged = {
-      ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS),
-      ...parsed,
-      customApi: {
-        ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.customApi),
-        ...(parsed?.customApi || {}),
-      },
-      promptSettings: {
-        ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.promptSettings),
-        ...(parsed?.promptSettings || {}),
-      },
-      editableFields: {
-        ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.editableFields),
-        ...(parsed?.editableFields || {}),
-      },
-      chatContext: normalizeAiChatContext(parsed?.chatContext),
-      contextBudget: normalizeAiContextBudget(parsed?.contextBudget),
-      chatMessages: normalizeAiChatMessages(parsed?.chatMessages),
-      referenceMaterial: typeof parsed?.referenceMaterial === 'string' ? parsed.referenceMaterial : '',
-      assistantChatHistory: normalizeAssistantChatHistory(parsed?.assistantChatHistory),
-    };
-    const modeFallback = {
-      lorebookName: merged.lorebookName,
-      editableFields: merged.editableFields,
-      promptSettings: merged.promptSettings,
-      chatContext: merged.chatContext,
-      chatMessages: merged.chatMessages,
-      referenceMaterial: merged.referenceMaterial,
-      assistantChatHistory: merged.assistantChatHistory,
-      selectedEntryUids: [],
-      readonlyEntryUids: [],
-    };
-    merged.navMode = ['api', 'direct', 'plan', 'generate'].includes(parsed?.navMode) ? parsed.navMode : 'direct';
-    merged.direct = buildAiModeSettings(parsed?.direct, modeFallback);
-    merged.plan = buildAiModeSettings(parsed?.plan, modeFallback);
-    if (merged.customApi?.source === 'openai' && merged.customApi?.apiurl) {
-      merged.customApi.source = 'custom';
-    }
-    return merged;
+    return attachLegacyAiWorkspaceAliases(normalizeAiWorkspaceSettings(JSON.parse(saved)));
   } catch (error) {
     console.error('角色世界书: 解析 AI 工作区设置失败', error);
-    return _.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS);
+    return attachLegacyAiWorkspaceAliases(_.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS));
   }
 }
 
 export function setAiWorkspaceSettings(settings = {}) {
-  const merged = {
-    ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS),
-    ...settings,
-    customApi: {
-      ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.customApi),
-      ...(settings?.customApi || {}),
-    },
-    promptSettings: {
-      ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.promptSettings),
-      ...(settings?.promptSettings || {}),
-    },
-    editableFields: {
-      ..._.cloneDeep(DEFAULT_AI_WORKSPACE_SETTINGS.editableFields),
-      ...(settings?.editableFields || {}),
-    },
-    chatContext: normalizeAiChatContext(settings?.chatContext),
-    contextBudget: normalizeAiContextBudget(settings?.contextBudget),
-    chatMessages: normalizeAiChatMessages(settings?.chatMessages),
-    referenceMaterial: typeof settings?.referenceMaterial === 'string' ? settings.referenceMaterial : '',
-    assistantChatHistory: normalizeAssistantChatHistory(settings?.assistantChatHistory),
-  };
-  const modeFallback = {
-    lorebookName: merged.lorebookName,
-    editableFields: merged.editableFields,
-    promptSettings: merged.promptSettings,
-    chatContext: merged.chatContext,
-    chatMessages: merged.chatMessages,
-    referenceMaterial: merged.referenceMaterial,
-    assistantChatHistory: merged.assistantChatHistory,
-  };
-  merged.navMode = ['api', 'direct', 'plan', 'generate'].includes(settings?.navMode) ? settings.navMode : 'direct';
-  merged.direct = buildAiModeSettings(settings?.direct, modeFallback);
-  merged.plan = buildAiModeSettings(settings?.plan, modeFallback);
-  try {
-    setLocalStorageItem(AI_WORKSPACE_SETTINGS_KEY, JSON.stringify(merged), { throwOnError: true });
-  } catch (error) {
-    const isQuotaExceeded = error?.name === 'QuotaExceededError' || error?.code === 22 || error?.code === 1014;
-    if (!isQuotaExceeded) {
-      throw error;
-    }
-
-    const compact = buildCompactAiWorkspaceSettings(merged);
-    setLocalStorageItem(AI_WORKSPACE_SETTINGS_KEY, JSON.stringify(compact), { throwOnError: true });
-    console.warn('世界书 AI 工作区设置超出 localStorage 配额，已自动改为轻量保存。');
+  pendingAiWorkspaceSettings = normalizeAiWorkspaceSettings(settings);
+  if (pendingAiWorkspaceSaveTimer !== null) {
+    clearTimeout(pendingAiWorkspaceSaveTimer);
   }
+  pendingAiWorkspaceSaveTimer = setTimeout(() => {
+    flushAiWorkspaceSettings();
+  }, AI_WORKSPACE_SAVE_DEBOUNCE_MS);
+}
+
+/** 立即提交尚未落盘的 AI 草稿，供 pagehide 和需要同步保证的调用点使用。 */
+export function flushAiWorkspaceSettings() {
+  if (pendingAiWorkspaceSaveTimer !== null) {
+    clearTimeout(pendingAiWorkspaceSaveTimer);
+    pendingAiWorkspaceSaveTimer = null;
+  }
+  if (!pendingAiWorkspaceSettings) {
+    return false;
+  }
+
+  const settings = pendingAiWorkspaceSettings;
+  pendingAiWorkspaceSettings = null;
+  persistAiWorkspaceSettings(settings);
+  return true;
 }
 
 // --- 置顶条目管理 ---

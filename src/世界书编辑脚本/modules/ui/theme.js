@@ -243,6 +243,58 @@ function getInteriorSurfaceOpacity(layoutTheme) {
   return Math.min(1, Math.max(0, panelOpacity * (1 - imageOpacity * BACKGROUND_IMAGE_SURFACE_REVEAL_RATIO)));
 }
 
+function buildSemanticThemeTokens(layoutTheme, surfaceOpacity = 1) {
+  const isDark = isColorDark(layoutTheme.bgColor);
+  const contrastColor = isDark ? '#ffffff' : '#000000';
+  const surfaceColor = colorWithOpacity(layoutTheme.entryBgColor, surfaceOpacity);
+  const surfaceRaisedColor = colorWithOpacity(
+    colorMix(layoutTheme.entryBgColor, isDark ? 88 : 96, contrastColor),
+    surfaceOpacity,
+  );
+  const surfaceMutedColor = colorWithOpacity(
+    colorMix(layoutTheme.entryBgColor, isDark ? 96 : 98, contrastColor),
+    surfaceOpacity,
+  );
+  const mutedTextColor = colorMix(layoutTheme.textColor, isDark ? 72 : 68, layoutTheme.bgColor);
+  const borderColor = colorMix(layoutTheme.textColor, isDark ? 22 : 18, layoutTheme.bgColor);
+  const focusRingColor = colorMix(layoutTheme.accentColor, isDark ? 76 : 82, contrastColor);
+  const focusRing = `0 0 0 3px ${colorMix(focusRingColor, 36, 'transparent')}`;
+  const successColor = isDark ? '#76d7a0' : '#167545';
+  const warningColor = isDark ? '#f0c66d' : '#8a6100';
+  const dangerColor = isDark ? '#ff9292' : '#b4232c';
+  const shadowColor = isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)';
+
+  return {
+    '--panel-surface-raised-color': surfaceRaisedColor,
+    '--panel-surface-muted-color': surfaceMutedColor,
+    '--panel-muted-text-color': mutedTextColor,
+    '--panel-border-color': borderColor,
+    '--panel-success-color': successColor,
+    '--panel-success-bg-color': colorMix(surfaceRaisedColor, 86, successColor),
+    '--panel-warning-color': warningColor,
+    '--panel-warning-bg-color': colorMix(surfaceRaisedColor, 84, warningColor),
+    '--panel-danger-color': dangerColor,
+    '--panel-danger-bg-color': colorMix(surfaceRaisedColor, 86, dangerColor),
+    '--panel-focus-ring-color': focusRingColor,
+    '--panel-focus-ring': focusRing,
+    // AI workspace names are intentionally stable so detached drawers/dialogs can share this contract.
+    '--ai-surface-color': surfaceColor,
+    '--ai-surface-raised-color': surfaceRaisedColor,
+    '--ai-surface-muted-color': surfaceMutedColor,
+    '--ai-text-color-secondary': mutedTextColor,
+    '--ai-border-color': borderColor,
+    '--ai-success-color': successColor,
+    '--ai-success-bg-color': colorMix(surfaceRaisedColor, 86, successColor),
+    '--ai-warning-color': warningColor,
+    '--ai-warning-bg-color': colorMix(surfaceRaisedColor, 84, warningColor),
+    '--ai-danger-color': dangerColor,
+    '--ai-danger-bg-color': colorMix(surfaceRaisedColor, 86, dangerColor),
+    '--ai-focus-ring-color': focusRingColor,
+    '--ai-focus-ring': focusRing,
+    '--ai-shadow-color': shadowColor,
+  };
+}
+
 function toCssBackgroundImage(imageUrl) {
   const normalizedUrl = pickString(imageUrl, '');
   return normalizedUrl ? `url(${JSON.stringify(normalizedUrl)})` : 'none';
@@ -279,10 +331,7 @@ function applyTheme(theme) {
       interiorSurfaceOpacity,
     );
     const iconHoverBgColor = colorMix(layoutTheme.iconBgColor, 82, '#ffffff');
-    const isDark = isColorDark(layoutTheme.bgColor);
-    const aiSurfaceColor = colorMix(layoutTheme.bgColor, 88, '#ffffff');
-    const aiTextColorSecondary = colorMix(layoutTheme.textColor, 70, layoutTheme.bgColor);
-    const aiShadowColor = isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)';
+    const semanticThemeTokens = buildSemanticThemeTokens(layoutTheme, interiorSurfaceOpacity);
     const panelAccentTextColor = isColorDark(layoutTheme.accentColor) ? '#ffffff' : '#1a1a1a';
 
     if ($panel.length) {
@@ -293,6 +342,7 @@ function applyTheme(theme) {
         sharedTheme.mobileExpandButtonUnderCheckbox ? 'under-checkbox' : 'inline',
       );
       $panel.css({
+        ...semanticThemeTokens,
         '--panel-bg-color': panelBgColor,
         '--panel-text-color': layoutTheme.textColor,
         '--panel-accent-color': layoutTheme.accentColor,
@@ -317,15 +367,11 @@ function applyTheme(theme) {
         '--panel-surface-opacity': '1',
         '--panel-icon-bg-color': layoutTheme.iconBgColor,
         '--panel-icon-hover-bg-color': iconHoverBgColor,
-        '--panel-border-color': '#555',
         '--lorebook-name-white-space': truncateLongNames ? 'nowrap' : 'normal',
         '--lorebook-name-text-overflow': truncateLongNames ? 'ellipsis' : 'clip',
         '--lorebook-name-overflow-wrap': truncateLongNames ? 'normal' : 'anywhere',
         '--lorebook-name-word-break': truncateLongNames ? 'normal' : 'break-word',
         '--lorebook-title-align-items': truncateLongNames ? 'center' : 'flex-start',
-        '--ai-surface-color': aiSurfaceColor,
-        '--ai-text-color-secondary': aiTextColorSecondary,
-        '--ai-shadow-color': aiShadowColor,
         '--panel-accent-text-color': panelAccentTextColor,
       });
     }
@@ -333,6 +379,7 @@ function applyTheme(theme) {
     const $modal = $('#theme-settings-modal', parentDoc);
     if ($modal.length) {
       $modal.css({
+        ...semanticThemeTokens,
         '--modal-bg-color': layoutTheme.bgColor,
         '--modal-text-color': layoutTheme.textColor,
         '--modal-accent-color': layoutTheme.accentColor,
@@ -340,20 +387,19 @@ function applyTheme(theme) {
         '--panel-input-focus-bg-color': inputFocusBgColor,
         '--panel-icon-bg-color': layoutTheme.iconBgColor,
         '--panel-icon-hover-bg-color': iconHoverBgColor,
-        '--panel-border-color': '#555',
       });
     }
 
     const $importModal = $('#lorebook-import-modal', parentDoc);
     if ($importModal.length) {
       $importModal.css({
+        ...semanticThemeTokens,
         '--yaml-input-bg-color': layoutTheme.inputBgColor,
         '--panel-input-bg-color': layoutTheme.inputBgColor,
         '--panel-text-color': layoutTheme.textColor,
         '--panel-accent-color': layoutTheme.accentColor,
         '--panel-bg-color': layoutTheme.bgColor,
         '--panel-entry-bg-color': layoutTheme.entryBgColor,
-        '--panel-border-color': '#555',
       });
     }
   } catch (error) {

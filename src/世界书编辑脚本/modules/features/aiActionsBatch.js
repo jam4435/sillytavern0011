@@ -1,6 +1,7 @@
 import {
   collectAiTargetEntries as collectAiTargetEntriesFromSingle,
   buildAiEntryHash,
+  resolveAiPreviewOutcome,
 } from './aiActions.js';
 export {
   collectAiTargetEntries,
@@ -9,14 +10,14 @@ export {
 import { requestLlmText } from './llmClient.js';
 import { ensureNumericUID, errorCatched } from '../utils.js';
 
-const CLEAN_COMPATIBILITY_MODEL_PREFIXES = ['流式抗截断/', '假流式/'];
-const CLEAN_COMPATIBILITY_FAILURE_PATTERNS = [
+const COMPATIBILITY_MODEL_PREFIXES = ['流式抗截断/', '假流式/'];
+const COMPATIBILITY_FAILURE_PATTERNS = [
   /Got response status 503/i,
   /Service Unavailable/i,
   /无可用渠道/i,
   /distributor/i,
 ];
-const CLEAN_STOP_PREVIEW_MESSAGE = '已停止生成';
+const STOP_PREVIEW_MESSAGE = '已停止生成';
 
 const VALID_SECONDARY_LOGIC = new Set(['and_any', 'and_all', 'not_all', 'not_any']);
 const AI_BATCH_REQUEST_MAX_RETRIES = 0;
@@ -27,15 +28,6 @@ const DEFAULT_CONTEXT_BUDGET = {
   maxInputTokens: 12000,
   reserveOutputTokens: 4096,
 };
-const COMPATIBILITY_MODEL_PREFIXES = ['流式抗截断/', '假流式/'];
-const COMPATIBILITY_FAILURE_PATTERNS = [
-  /Got response status 503/i,
-  /Service Unavailable/i,
-  /无可用渠道/i,
-  /distributor/i,
-];
-const STOP_PREVIEW_MESSAGE = '已停止生成';
-
 function getSillyTavernApi() {
   const parentWin = typeof window.parent !== 'undefined' ? window.parent : window;
   return (typeof SillyTavern !== 'undefined' ? SillyTavern : parentWin.SillyTavern) || null;
@@ -259,34 +251,6 @@ function getEditableFieldLabels(fieldOptions) {
     .map(([key]) => (key === 'prompt' ? 'keywords' : key));
 }
 
-function buildBatchPromptDuplicate(lorebookName, instruction, entries, fieldOptions, promptSettings = {}) {
-  const entriesPayload = buildEntriesPayload(entries, fieldOptions);
-  const editableEntries = JSON.parse(entriesPayload).entries;
-  const enabledFields = getEditableFieldLabels(fieldOptions).join('、');
-  const requestedUids = editableEntries.map(entry => entry.uid).join(', ');
-  const jailbreakPromptTemplate = typeof promptSettings?.jailbreakPromptTemplate === 'string'
-    ? promptSettings.jailbreakPromptTemplate.trim()
-    : '';
-  const builtinPromptTemplate = typeof promptSettings?.builtinPromptTemplate === 'string'
-    ? promptSettings.builtinPromptTemplate.trim()
-    : '';
-  const renderedBuiltinPrompt = builtinPromptTemplate.replaceAll('{{editableFields}}', enabledFields || '无');
-
-  return [
-    renderedBuiltinPrompt,
-    `用户要求：${instruction}`,
-    `本次必须返回的 UID：${requestedUids}`,
-    '',
-    '当前可编辑内容（JSON）：',
-    entriesPayload,
-    '',
-    '请返回严格符合下面结构的 JSON：',
-    buildBatchResponseShape(fieldOptions),
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
 function escapeXmlText(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -416,164 +380,6 @@ function buildWorkspaceInfoSectionXml(contextEntries = {}, { includePlan = false
   }
 
   return ['<信息>', ...sections, '</信息>'].join('\n');
-}
-
-function buildInfoSectionXmlDuplicate(readonlyEntries = [], modifiedEntries = []) {
-  const usedNames = new Set();
-  const sections = [
-    buildInfoGroupXml('只读条目', readonlyEntries, usedNames),
-    buildInfoGroupXml('已修改批次', modifiedEntries, usedNames),
-  ].filter(Boolean);
-
-  if (!sections.length) {
-    return '';
-  }
-
-  return ['<信息>', ...sections, '</信息>'].join('\n');
-}
-
-function buildContextualBatchPromptDuplicate(
-  lorebookName,
-  instruction,
-  entries,
-  fieldOptions,
-  promptSettings = {},
-  contextEntries = {},
-) {
-  const entriesPayload = buildEntriesPayload(entries, fieldOptions);
-  const editableEntries = JSON.parse(entriesPayload).entries;
-  const enabledFields = getEditableFieldLabels(fieldOptions).join('、');
-  const requestedUids = editableEntries.map(entry => entry.uid).join(', ');
-  const builtinPromptTemplate = typeof promptSettings?.builtinPromptTemplate === 'string'
-    ? promptSettings.builtinPromptTemplate.trim()
-    : '';
-  const renderedBuiltinPrompt = builtinPromptTemplate.replaceAll('{{editableFields}}', enabledFields || '无');
-  const infoSection = buildInfoSectionXml(
-    contextEntries.readonlyEntries || [],
-    contextEntries.modifiedEntries || [],
-  );
-
-  return [
-    infoSection,
-    '',
-    '<条目>',
-    entriesPayload,
-    '</条目>',
-    '',
-    '<用户指令>',
-    instruction,
-    `本次必须返回的 UID：${requestedUids}`,
-    '</用户指令>',
-    '',
-    '<提示词>',
-    renderedBuiltinPrompt,
-    '补充约束：只能修改<条目>中的 UID，<信息> 仅供理解上下文，不得直接输出，不得把<信息>中的条目当作返回对象。',
-    `允许读取和修改的字段：${enabledFields || '无'}`,
-    '</提示词>',
-    '',
-    '请只返回严格符合下列结构的 JSON：',
-    buildBatchResponseShape(fieldOptions),
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
-function buildContextualBatchPromptV2Duplicate(
-  lorebookName,
-  instruction,
-  entries,
-  fieldOptions,
-  promptSettings = {},
-  contextEntries = {},
-) {
-  const entriesPayload = buildEntriesPayload(entries, fieldOptions);
-  const editableEntries = JSON.parse(entriesPayload).entries;
-  const enabledFields = getEditableFieldLabels(fieldOptions).join('、');
-  const requestedUids = editableEntries.map(entry => entry.uid).join(', ');
-  const jailbreakPromptTemplate = typeof promptSettings?.jailbreakPromptTemplate === 'string'
-    ? promptSettings.jailbreakPromptTemplate.trim()
-    : '';
-  const builtinPromptTemplate = typeof promptSettings?.builtinPromptTemplate === 'string'
-    ? promptSettings.builtinPromptTemplate.trim()
-    : '';
-  const renderedJailbreakPrompt = jailbreakPromptTemplate.replaceAll('{{editableFields}}', enabledFields || '无');
-  const renderedBuiltinPrompt = builtinPromptTemplate.replaceAll('{{editableFields}}', enabledFields || '无');
-  const usedNames = new Set();
-  const infoSections = [
-    buildPlanSectionXml(contextEntries.plan || null),
-    buildInfoGroupXml('只读条目', contextEntries.readonlyEntries || [], usedNames),
-    buildInfoGroupXml('已修改批次', contextEntries.modifiedEntries || [], usedNames),
-  ].filter(Boolean);
-  const infoSection = infoSections.length ? ['<信息>', ...infoSections, '</信息>'].join('\n') : '';
-
-  return [
-    renderedJailbreakPrompt,
-    infoSection,
-    '',
-    '<条目>',
-    entriesPayload,
-    '</条目>',
-    '',
-    '<用户指令>',
-    instruction,
-    `本次必须返回的 UID：${requestedUids}`,
-    '</用户指令>',
-    '',
-    '<提示词>',
-    renderedBuiltinPrompt,
-    '补充约束：只能修改<条目>中的 UID，<信息> 仅供理解上下文，不得直接输出，不得把<信息>中的条目当作返回对象。',
-    `允许读取和修改的字段：${enabledFields || '无'}`,
-    '</提示词>',
-    '',
-    '请只返回严格符合下列结构的 JSON：',
-    buildBatchResponseShape(fieldOptions),
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
-function buildPlanningPromptDuplicate(lorebookName, instruction, entries, promptSettings = {}) {
-  const entriesPayload = buildPlanningEntriesPayload(entries);
-  const jailbreakPromptTemplate = typeof promptSettings?.jailbreakPromptTemplate === 'string'
-    ? promptSettings.jailbreakPromptTemplate.trim()
-    : '';
-  const planningPromptTemplate = typeof promptSettings?.planningPromptTemplate === 'string'
-    ? promptSettings.planningPromptTemplate.trim()
-    : '';
-
-  return [
-    jailbreakPromptTemplate,
-    '<条目全集>',
-    entriesPayload,
-    '</条目全集>',
-    '',
-    '<用户指令>',
-    instruction,
-    '</用户指令>',
-    '',
-    '<提示词>',
-    builtinPromptTemplate,
-    planningPromptTemplate,
-    '</提示词>',
-    '',
-    '请只返回严格符合下列结构的 JSON：',
-    JSON.stringify(
-      {
-        readonly_uids: [1, 2],
-        editable_uids: [3, 4],
-        plan: {
-          goal: '',
-          must_keep: [''],
-          rewrite_rules: [''],
-          consistency_notes: [''],
-        },
-      },
-      null,
-      2,
-    ),
-  ]
-    .filter(Boolean)
-    .join('\n');
 }
 
 async function getTokenCountDetails(text) {
@@ -849,143 +655,8 @@ function repairJsonCandidate(candidate) {
   return repaired;
 }
 
-function parseParsedBatchPayloadDuplicate(parsed) {
-  if (Array.isArray(parsed?.entries)) {
-    return parsed.entries;
-  }
-  if (Array.isArray(parsed?.result?.entries)) {
-    return parsed.result.entries;
-  }
-  if (Array.isArray(parsed)) {
-    return parsed;
-  }
-  if (isPlainObject(parsed) && Number.isFinite(ensureNumericUID(parsed.uid))) {
-    return [parsed];
-  }
-  throw new Error('JSON 根节点不是 entries 数组');
-}
-
-function parseAiBatchResponseDuplicate(rawText) {
-  const candidate = extractJsonCandidate(rawText);
-
-  try {
-    const parsed = JSON.parse(candidate);
-    if (Array.isArray(parsed?.entries)) {
-      return parsed.entries;
-    }
-    if (Array.isArray(parsed?.result?.entries)) {
-      return parsed.result.entries;
-    }
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
-    if (isPlainObject(parsed) && Number.isFinite(ensureNumericUID(parsed.uid))) {
-      return [parsed];
-    }
-    throw new Error('JSON 根节点不是 entries 数组');
-  } catch (error) {
-    throw new Error(`AI 返回的 JSON 无法解析: ${error.message}`);
-  }
-}
-
-function parseAiBatchResponseWithRepairDuplicate(rawText) {
-  const candidate = extractJsonCandidate(rawText);
-
-  try {
-    return parseParsedBatchPayload(JSON.parse(candidate));
-  } catch (error) {
-    const repairedCandidate = repairJsonCandidate(candidate);
-    if (repairedCandidate !== candidate) {
-      try {
-        return parseParsedBatchPayload(JSON.parse(repairedCandidate));
-      } catch {
-        // fall through to the original parse error below
-      }
-    }
-    throw new Error(`AI 返回的 JSON 无法解析: ${error.message}`);
-  }
-}
-
-function parseAiPlanResponseDuplicate(rawText, validUids = []) {
-  const candidate = extractJsonCandidate(rawText);
-  const parsed = JSON.parse(candidate);
-  const validUidSet = new Set((validUids || []).map(uid => ensureNumericUID(uid)).filter(uid => uid >= 0));
-  const readonlyUids = _.uniq((Array.isArray(parsed?.readonly_uids) ? parsed.readonly_uids : [])
-    .map(uid => ensureNumericUID(uid))
-    .filter(uid => validUidSet.has(uid)));
-  const editableUids = _.uniq((Array.isArray(parsed?.editable_uids) ? parsed.editable_uids : [])
-    .map(uid => ensureNumericUID(uid))
-    .filter(uid => validUidSet.has(uid)));
-  const overlap = readonlyUids.filter(uid => editableUids.includes(uid));
-  if (overlap.length) {
-    throw new Error(`规划结果中 readonly_uids 与 editable_uids 重叠: ${overlap.join(', ')}`);
-  }
-
-  const rawPlan = isPlainObject(parsed?.plan) ? parsed.plan : {};
-  return {
-    readonly_uids: readonlyUids,
-    editable_uids: editableUids,
-    plan: {
-      goal: typeof rawPlan.goal === 'string' ? rawPlan.goal.trim() : '',
-      must_keep: sanitizeStringArray(rawPlan.must_keep),
-      rewrite_rules: sanitizeStringArray(rawPlan.rewrite_rules),
-      consistency_notes: sanitizeStringArray(rawPlan.consistency_notes),
-    },
-    parsedJsonCandidate: candidate,
-  };
-}
-
-function buildPlanSectionXmlDuplicate(plan = null) {
-  if (!isPlainObject(plan)) {
-    return '';
-  }
-
-  const lines = [];
-  if (typeof plan.goal === 'string' && plan.goal.trim()) {
-    lines.push('<目标>');
-    lines.push(escapeXmlText(plan.goal.trim()));
-    lines.push('</目标>');
-  }
-
-  const pushRuleSection = (tagName, items = []) => {
-    const normalized = sanitizeStringArray(items);
-    if (!normalized.length) {
-      return;
-    }
-    lines.push(`<${tagName}>`);
-    normalized.forEach(item => {
-      lines.push('  <规则>');
-      lines.push(`  ${escapeXmlText(item)}`);
-      lines.push('  </规则>');
-    });
-    lines.push(`</${tagName}>`);
-  };
-
-  pushRuleSection('必须保留', plan.must_keep);
-  pushRuleSection('改写规则', plan.rewrite_rules);
-  pushRuleSection('一致性说明', plan.consistency_notes);
-
-  if (!lines.length) {
-    return '';
-  }
-
-  return ['<改造方案>', ...lines, '</改造方案>'].join('\n');
-}
-
 function buildDetailedErrorMessage(summary, details = []) {
   return [summary, ...details.filter(Boolean)].join('\n');
-}
-
-function formatErrorDetailsDuplicate(error) {
-  if (!error) {
-    return '未知错误';
-  }
-
-  const lines = [];
-  if (error.name) lines.push(`错误类型: ${error.name}`);
-  if (error.message) lines.push(`错误信息: ${error.message}`);
-  if (error.stack) lines.push(`错误堆栈:\n${error.stack}`);
-  return lines.join('\n');
 }
 
 function normalizeAiDraft(rawDraft, entry, fieldOptions) {
@@ -1021,308 +692,6 @@ function normalizeAiDraft(rawDraft, entry, fieldOptions) {
   }
 
   return nextEntry;
-}
-
-function buildPreviewDiffsDuplicate(beforeEntry, afterEntry, fieldOptions) {
-  const normalizedFieldOptions = normalizeFieldOptions(fieldOptions);
-  const diffs = [];
-  const beforePrompts = getPromptSnapshot(beforeEntry);
-  const afterPrompts = getPromptSnapshot(afterEntry);
-
-  const pushDiff = (label, beforeValue, afterValue) => {
-    if (!_.isEqual(beforeValue, afterValue)) {
-      diffs.push({ label, before: beforeValue, after: afterValue });
-    }
-  };
-
-  if (normalizedFieldOptions.title) {
-    pushDiff('标题', beforeEntry?.name || '', afterEntry?.name || '');
-  }
-
-  if (normalizedFieldOptions.content) {
-    const beforeContent = beforeEntry?.content || '';
-    const afterContent = afterEntry?.content || '';
-    if (!_.isEqual(beforeContent, afterContent)) {
-      diffs.push({
-        label: '内容差异',
-        type: 'content-snippets',
-        snippets: buildContentDiffSnippets(beforeContent, afterContent),
-        before: summarizeText(beforeContent),
-        after: summarizeText(afterContent),
-      });
-    }
-  }
-
-  if (normalizedFieldOptions.prompt) {
-    pushDiff('关键词', beforePrompts.primary, afterPrompts.primary);
-    pushDiff('次级关键词逻辑', beforePrompts.secondary_logic, afterPrompts.secondary_logic);
-    pushDiff('次级关键词', beforePrompts.secondary, afterPrompts.secondary);
-  }
-
-  return diffs;
-}
-
-function stripCompatibilityModelPrefixDuplicate(model = '') {
-  const normalizedModel = typeof model === 'string' ? model.trim() : '';
-  for (const prefix of COMPATIBILITY_MODEL_PREFIXES) {
-    if (normalizedModel.startsWith(prefix)) {
-      return normalizedModel.slice(prefix.length).trim();
-    }
-  }
-  return normalizedModel;
-}
-
-function buildCompatibilityAttemptConfigsDuplicate(customApi, shouldStream) {
-  const originalModel = typeof customApi?.model === 'string' ? customApi.model.trim() : '';
-  const baseModel = stripCompatibilityModelPrefix(originalModel);
-  const normalizedShouldStream = shouldStream === true;
-  const models = _.uniq(
-    [
-      originalModel,
-      baseModel,
-      baseModel ? `流式抗截断/${baseModel}` : '',
-      baseModel ? `假流式/${baseModel}` : '',
-    ].filter(Boolean),
-  );
-  const streamValues = _.uniq([normalizedShouldStream, !normalizedShouldStream]);
-
-  return models
-    .flatMap(model =>
-      streamValues.map(streamValue => ({
-        model,
-        shouldStream: streamValue,
-        customApi: { ...(customApi || {}), model },
-      })),
-    )
-    .filter(
-      config => !(
-        config.model === originalModel
-        && config.shouldStream === normalizedShouldStream
-      ),
-    );
-}
-
-function summarizeAttemptErrorDuplicate(errorText = '') {
-  if (typeof errorText !== 'string') {
-    return '未知错误';
-  }
-
-  const lines = errorText
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean);
-
-  const summary = [];
-  for (const line of lines) {
-    if (
-      line.startsWith('完整发送内容') ||
-      line.startsWith('完整返回内容') ||
-      line.startsWith('提取出的 JSON') ||
-      line.startsWith('错误堆栈:')
-    ) {
-      break;
-    }
-    summary.push(line);
-    if (summary.length >= 3) {
-      break;
-    }
-  }
-
-  return summary.join(' | ') || '未知错误';
-}
-
-function shouldRunCompatibilityDiagnosticsDuplicate(customApi, attemptResult) {
-  if ((customApi?.source || '').trim() !== 'custom') {
-    return false;
-  }
-  if (!attemptResult || attemptResult.success) {
-    return false;
-  }
-
-  const haystack = [
-    attemptResult.errorDetails,
-    attemptResult.rawResponse,
-    ...(Array.isArray(attemptResult.errors) ? attemptResult.errors.map(item => item.error) : []),
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  return COMPATIBILITY_FAILURE_PATTERNS.some(pattern => pattern.test(haystack));
-}
-
-function buildAttemptErrorsDuplicate({ targetEntries, lastError, requestPrompt, rawText, parsedJsonCandidate }) {
-  return targetEntries.map(entry => ({
-    uid: ensureNumericUID(entry.uid),
-    title: entry.name || `UID ${entry.uid}`,
-    error: buildDetailedErrorMessage('本次批量请求失败', [
-      formatErrorDetails(lastError),
-      `完整发送内容\n${requestPrompt || '(空)'}`,
-      `完整返回内容:\n${rawText || '(空)'}`,
-      `提取出的 JSON:\n${parsedJsonCandidate || '(空)'}`,
-    ]),
-  }));
-}
-
-function buildAttemptItemsDuplicate({ targetEntries, parsedDrafts, normalizedFieldOptions, rawText }) {
-  const items = [];
-  const errors = [];
-  const draftsByUid = new Map(
-    parsedDrafts
-      .map(draft => [ensureNumericUID(draft?.uid), draft])
-      .filter(([uid, draft]) => uid >= 0 && isPlainObject(draft)),
-  );
-
-  targetEntries.forEach(entry => {
-    const uid = ensureNumericUID(entry.uid);
-    const draft = draftsByUid.get(uid);
-
-    if (!draft) {
-      errors.push({
-        uid,
-        title: entry.name || `UID ${entry.uid}`,
-        error: buildDetailedErrorMessage('AI 返回中缺少该 UID 对应的结果', [
-          `缺失 UID: ${uid}`,
-          `实际返回 UID: ${Array.from(draftsByUid.keys()).join(', ') || '(无)'}`,
-          `完整返回内容:\n${rawText || '(空)'}`,
-        ]),
-      });
-      return;
-    }
-
-    try {
-      const afterEntry = normalizeAiDraft(draft, entry, normalizedFieldOptions);
-      const diffs = buildPreviewDiffs(entry, afterEntry, normalizedFieldOptions);
-
-      items.push({
-        uid,
-        title: entry.name || `UID ${entry.uid}`,
-        beforeEntry: _.cloneDeep(entry),
-        afterEntry,
-        diffs,
-        changed: diffs.length > 0,
-      });
-    } catch (entryError) {
-      errors.push({
-        uid,
-        title: entry.name || `UID ${entry.uid}`,
-        error: buildDetailedErrorMessage('该条目的 AI 返回数据解析失败', [
-          `UID: ${uid}`,
-          `错误信息: ${entryError?.message || '未知错误'}`,
-          `AI 返回的 draft: ${JSON.stringify(draft, null, 2)}`,
-        ]),
-      });
-    }
-  });
-
-  return { items, errors };
-}
-
-async function executePreviewAttemptDuplicate(options = {}) {
-  const {
-    attemptLabel = '',
-    lorebookName,
-    trimmedInstruction,
-    targetEntries,
-    normalizedFieldOptions,
-    promptSettings,
-    customApi,
-    shouldStream,
-    invokeClient,
-    onGenerationStart,
-    requestPrompt,
-    shouldStop,
-    batchLabel = '',
-  } = options;
-
-  let parsedDrafts = [];
-  let rawText = '';
-  let lastError = null;
-  let parsedJsonCandidate = '';
-  let errorDetails = '';
-  const startedAt = Date.now();
-
-  for (let attempt = 0; attempt <= AI_BATCH_REQUEST_MAX_RETRIES; attempt++) {
-    if (shouldStop?.()) {
-      lastError = new Error(STOP_PREVIEW_MESSAGE);
-      errorDetails = formatErrorDetails(lastError);
-      break;
-    }
-
-    try {
-      console.info('[世界书 AI] 完整发送内容', { batchLabel, attemptLabel, requestPrompt });
-      rawText = await invokeClient(requestPrompt, {
-        lorebookName,
-        entries: _.cloneDeep(targetEntries),
-        instruction: trimmedInstruction,
-        promptSettings,
-        customApi,
-        onGenerationStart,
-        shouldStream,
-      });
-      console.info('[世界书 AI] 完整返回内容', { batchLabel, attemptLabel, rawText });
-
-      try {
-        parsedJsonCandidate = extractJsonCandidate(rawText);
-        parsedDrafts = parseAiBatchResponseWithRepair(rawText);
-      } catch (error) {
-        throw new Error(
-          buildDetailedErrorMessage(error.message, [
-            `第 ${attempt + 1} 次请求`,
-            `完整返回内容:\n${rawText || '(空)'}`,
-            `提取出的 JSON:\n${parsedJsonCandidate || '(空)'}`,
-          ]),
-        );
-      }
-
-      lastError = null;
-      break;
-    } catch (error) {
-      lastError = error;
-      errorDetails = formatErrorDetails(error);
-      console.error('[世界书 AI] 本次批量请求失败', {
-        batchLabel,
-        第几次尝试: attempt + 1,
-        attemptLabel,
-        错误详情: errorDetails,
-      });
-      if (shouldStop?.()) {
-        break;
-      }
-    }
-  }
-
-  const { items, errors } = lastError
-    ? {
-      items: [],
-      errors: buildAttemptErrors({
-        targetEntries,
-        lastError,
-        requestPrompt,
-        rawText,
-        parsedJsonCandidate,
-      }),
-    }
-    : buildAttemptItems({
-      targetEntries,
-      parsedDrafts,
-      normalizedFieldOptions,
-      rawText,
-    });
-
-  return {
-    attemptLabel,
-    model: customApi?.model || '',
-    shouldStream: Boolean(shouldStream),
-    durationMs: Date.now() - startedAt,
-    success: !lastError && errors.length === 0,
-    errorSummary: errors.length ? summarizeAttemptError(errors[0]?.error || errorDetails) : '',
-    requestPrompt,
-    rawResponse: rawText,
-    parsedJsonCandidate,
-    errorDetails,
-    items,
-    errors,
-  };
 }
 
 function buildCompatibilityDiagnosticsReport({ attempts = [], adoptedAttempt = null, stopped = false }) {
@@ -1399,8 +768,18 @@ function buildSingleBatchResult({
   stopped,
   batchPlan,
 }) {
-  const items = adoptedAttempt?.items || [];
+  const resultAttempt = adoptedAttempt?.success ? adoptedAttempt : resolvedAttempt;
+  const items = resultAttempt?.items || [];
+  const errors = resultAttempt?.errors || [];
+  const warnings = resultAttempt?.warnings || [];
   const changedCount = items.filter(item => item.changed).length;
+  const cancelledCount = stopped ? Math.max(0, targetEntries.length - items.length - errors.length) : 0;
+  const outcome = resolveAiPreviewOutcome({
+    total: targetEntries.length,
+    succeeded: items.length,
+    failed: errors.length,
+    cancelled: stopped,
+  });
   const attempts = diagnosticsTriggered ? diagnosticAttempts : [];
   const initialAttempt = attempts[0] || resolvedAttempt || null;
   const successAttemptCount = attempts.filter(attempt => attempt.success).length;
@@ -1418,18 +797,19 @@ function buildSingleBatchResult({
     : null;
 
   return {
+    outcome,
     lorebookName,
     instruction: trimmedInstruction,
     fieldOptions: normalizedFieldOptions,
     targetCount: targetEntries.length,
     items,
-    errors: adoptedAttempt?.success ? [] : (resolvedAttempt?.errors || []),
-    warnings: adoptedAttempt?.warnings || [],
+    errors,
+    warnings,
     debug: {
-      requestPrompt: resolvedAttempt?.requestPrompt || '',
-      rawResponse: resolvedAttempt?.rawResponse || '',
-      parsedJsonCandidate: resolvedAttempt?.parsedJsonCandidate || '',
-      errorDetails: resolvedAttempt?.errorDetails || '',
+      requestPrompt: resultAttempt?.requestPrompt || '',
+      rawResponse: resultAttempt?.rawResponse || '',
+      parsedJsonCandidate: resultAttempt?.parsedJsonCandidate || '',
+      errorDetails: resultAttempt?.errorDetails || '',
       diagnosticsReport: mergeTextSections([
         buildBatchPlanReport(batchPlan ? [batchPlan] : []),
         diagnosticsTriggered
@@ -1444,10 +824,11 @@ function buildSingleBatchResult({
     },
     summary: {
       total: targetEntries.length,
-      succeeded: adoptedAttempt?.success ? items.length : 0,
-      failed: adoptedAttempt?.success ? 0 : targetEntries.length,
-      changed: adoptedAttempt?.success ? changedCount : 0,
-      unchanged: adoptedAttempt?.success ? items.length - changedCount : 0,
+      succeeded: items.length,
+      failed: errors.length,
+      cancelled: cancelledCount,
+      changed: changedCount,
+      unchanged: items.length - changedCount,
       diagnostics: diagnosticsSummary,
       batching: batchPlan
         ? {
@@ -1458,10 +839,10 @@ function buildSingleBatchResult({
         : null,
     },
     resolvedConfig: {
-      model: resolvedAttempt?.model || '',
-      shouldStream: Boolean(resolvedAttempt?.shouldStream),
-      success: Boolean(adoptedAttempt?.success),
-      attemptLabel: resolvedAttempt?.attemptLabel || '',
+      model: resultAttempt?.model || resultAttempt?.resolvedConfig?.model || '',
+      shouldStream: Boolean(resultAttempt?.shouldStream ?? resultAttempt?.resolvedConfig?.shouldStream),
+      success: Boolean(resultAttempt?.success),
+      attemptLabel: resultAttempt?.attemptLabel || resultAttempt?.resolvedConfig?.attemptLabel || '',
     },
   };
 }
@@ -1522,7 +903,7 @@ async function executeSingleBatch(options = {}) {
   });
 
   const attempts = [initialAttempt];
-  let stopped = Boolean(shouldStop?.());
+  let stopped = Boolean(initialAttempt.stopped || shouldStop?.());
   const diagnosticsTriggered = shouldRunCompatibilityDiagnostics(customApi, initialAttempt);
   let adoptedAttempt = initialAttempt.success ? initialAttempt : null;
   let resolvedAttempt = adoptedAttempt || initialAttempt;
@@ -1560,7 +941,7 @@ async function executeSingleBatch(options = {}) {
       if (!adoptedAttempt && attemptResult.success) {
         adoptedAttempt = attemptResult;
       }
-      if (shouldStop?.()) {
+      if (attemptResult.stopped || shouldStop?.()) {
         stopped = true;
         break;
       }
@@ -2017,7 +1398,7 @@ function buildPreviewDiffs(beforeEntry, afterEntry, fieldOptions) {
 
 function stripCompatibilityModelPrefix(model = '') {
   const normalizedModel = typeof model === 'string' ? model.trim() : '';
-  for (const prefix of CLEAN_COMPATIBILITY_MODEL_PREFIXES) {
+  for (const prefix of COMPATIBILITY_MODEL_PREFIXES) {
     if (normalizedModel.startsWith(prefix)) {
       return normalizedModel.slice(prefix.length).trim();
     }
@@ -2100,7 +1481,7 @@ function shouldRunCompatibilityDiagnostics(customApi, attemptResult) {
     .filter(Boolean)
     .join('\n');
 
-  return CLEAN_COMPATIBILITY_FAILURE_PATTERNS.some(pattern => pattern.test(haystack));
+  return COMPATIBILITY_FAILURE_PATTERNS.some(pattern => pattern.test(haystack));
 }
 
 function buildAttemptErrors({ targetEntries, lastError, requestPrompt, rawText, parsedJsonCandidate }) {
@@ -2210,11 +1591,13 @@ async function executePreviewAttempt(options = {}) {
   let lastError = null;
   let parsedJsonCandidate = '';
   let errorDetails = '';
+  let stopped = false;
   const startedAt = Date.now();
 
   for (let attempt = 0; attempt <= AI_BATCH_REQUEST_MAX_RETRIES; attempt++) {
     if (shouldStop?.()) {
-      lastError = new Error(CLEAN_STOP_PREVIEW_MESSAGE);
+      stopped = true;
+      lastError = new Error(STOP_PREVIEW_MESSAGE);
       errorDetails = formatErrorDetails(lastError);
       break;
     }
@@ -2258,12 +1641,15 @@ async function executePreviewAttempt(options = {}) {
         错误详情: errorDetails,
       });
       if (shouldStop?.()) {
+        stopped = true;
         break;
       }
     }
   }
 
-  const { items, errors, warnings } = lastError
+  const { items, errors, warnings } = stopped
+    ? { items: [], errors: [], warnings: [] }
+    : lastError
     ? {
       items: [],
       errors: buildAttemptErrors({
@@ -2298,7 +1684,17 @@ async function executePreviewAttempt(options = {}) {
     : null;
 
   return {
+    attemptLabel,
+    model: customApi?.model || '',
+    shouldStream: Boolean(shouldStream),
+    stopped,
     success: !lastError,
+    errorSummary: errors.length
+      ? summarizeAttemptError(errors[0]?.error || errorDetails)
+      : errorDetails
+        ? summarizeAttemptError(errorDetails)
+        : '',
+    requestPrompt,
     items,
     errors,
     warnings,
@@ -2465,7 +1861,7 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     let modifiedContextEntries = [];
 
     for (let batchCursor = 0; batchCursor < batchPlans.length; batchCursor++) {
-      let batchPlan = batchPlans[batchCursor];
+      const batchPlan = batchPlans[batchCursor];
       const actualPrompt = buildContextualBatchPromptV2(
         lorebookName,
         trimmedInstruction,
@@ -2548,7 +1944,7 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
         );
       }
 
-      if (shouldStop?.()) {
+      if (batchResult.outcome === 'cancelled' || shouldStop?.()) {
         break;
       }
     }
@@ -2557,6 +1953,14 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     const errors = batchResults.flatMap(result => result.errors || []);
     const warnings = batchResults.flatMap(result => result.warnings || []);
     const changedCount = items.filter(item => item.changed).length;
+    const stopped = Boolean(shouldStop?.()) || batchResults.some(result => result.outcome === 'cancelled');
+    const cancelledCount = stopped ? Math.max(0, targetEntries.length - items.length - errors.length) : 0;
+    const outcome = resolveAiPreviewOutcome({
+      total: targetEntries.length,
+      succeeded: items.length,
+      failed: errors.length,
+      cancelled: stopped,
+    });
     const debug = mergeDebugOutput(batchPlans, batchResults);
     const diagnostics = mergeDiagnosticsSummary(batchResults);
     const batching = mergeBatchingSummary(batchPlans);
@@ -2578,6 +1982,7 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     });
 
     return {
+      outcome,
       lorebookName,
       instruction: trimmedInstruction,
       fieldOptions: normalizedFieldOptions,
@@ -2590,6 +1995,7 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
         total: targetEntries.length,
         succeeded: items.length,
         failed: errors.length,
+        cancelled: cancelledCount,
         changed: changedCount,
         unchanged: items.length - changedCount,
         diagnostics,
