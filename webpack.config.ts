@@ -3,7 +3,11 @@ import HtmlInlineScriptWebpackPlugin from 'html-inline-script-webpack-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import _ from 'lodash';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
+<<<<<<< HEAD
 import { ChildProcess, execFile, spawn } from 'node:child_process';
+=======
+import { ChildProcess, exec, spawn } from 'node:child_process';
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -28,11 +32,14 @@ interface Entry {
   script: string;
   html?: string;
 }
+<<<<<<< HEAD
 type WebpackEnv = Record<string, string | boolean | undefined>;
 
 // 酒馆插件目录不走酒馆助手构建流程。
 const IGNORED_ENTRY_DIRECTORIES = new Set([path.normalize('src/顶部工具栏插件')]);
 const IGNORED_ENTRY_ROOT_DIRECTORIES = new Set([path.normalize('示例')]);
+=======
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
 
 function parse_entry(script_file: string) {
   const html = path.join(path.dirname(script_file), 'index.html');
@@ -53,6 +60,7 @@ function common_path(lhs: string, rhs: string) {
   return lhs_parts.join(path.sep);
 }
 
+<<<<<<< HEAD
 function should_ignore_entry(script_file: string) {
   const normalized_file = path.normalize(script_file);
   const normalized_dir = path.normalize(path.dirname(script_file));
@@ -68,11 +76,16 @@ function should_ignore_entry(script_file: string) {
   );
 }
 
+=======
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
 function glob_script_files() {
   const results: string[] = [];
 
   fs.globSync(`{示例,src}/**/index.{ts,tsx,js,jsx}`)
+<<<<<<< HEAD
     .filter(file => !should_ignore_entry(file))
+=======
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
     .filter(
       file => process.env.CI !== 'true' || !fs.readFileSync(path.join(import.meta.dirname, file)).includes('@no-ci'),
     )
@@ -128,6 +141,7 @@ function watch_tavern_helper(compiler: webpack.Compiler) {
 }
 
 let watcher: FSWatcher;
+<<<<<<< HEAD
 function runBackgroundNodeScript(args: string[], label: string) {
   try {
     const child = execFile(process.execPath, args, { cwd: import.meta.dirname });
@@ -145,6 +159,10 @@ function runBackgroundNodeScript(args: string[], label: string) {
 
 const dump = () => {
   runBackgroundNodeScript(['dump_schema.ts'], 'schema_dump');
+=======
+const dump = () => {
+  exec('pnpm dump', { cwd: import.meta.dirname });
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
   console.info('\x1b[36m[schema_dump]\x1b[0m 已将所有 schema.ts 转换为 schema.json');
 };
 const dump_debounced = _.debounce(dump, 500, { leading: true, trailing: false });
@@ -166,7 +184,11 @@ function schema_dump(compiler: webpack.Compiler) {
 
 let child_process: ChildProcess;
 const bundle = () => {
+<<<<<<< HEAD
   runBackgroundNodeScript(['tavern_sync.mjs', 'bundle', 'all'], 'tavern_sync');
+=======
+  exec('pnpm sync bundle all', { cwd: import.meta.dirname });
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
   console.info('\x1b[36m[tavern_sync]\x1b[0m 已打包所有配置了的角色卡/世界书/预设');
 };
 const bundle_debounced = _.debounce(bundle, 500, { leading: true, trailing: false });
@@ -177,8 +199,13 @@ function tavern_sync(compiler: webpack.Compiler) {
   }
   compiler.hooks.watchRun.tap('watch_tavern_sync', () => {
     if (!child_process) {
+<<<<<<< HEAD
       child_process = spawn(process.execPath, ['tavern_sync.mjs', 'watch', 'all', '-f'], {
         shell: false,
+=======
+      child_process = spawn('pnpm', ['sync', 'watch', 'all', '-f'], {
+        shell: true,
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: import.meta.dirname,
         env: { ...process.env, FORCE_COLOR: '1' },
@@ -218,17 +245,22 @@ function tavern_sync(compiler: webpack.Compiler) {
   });
 }
 
+<<<<<<< HEAD
 function env_flag_enabled(env: WebpackEnv | undefined, key: string) {
   const value = env?.[key];
   return value === true || value === 'true' || value === '1';
 }
 
 function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: any) => webpack.Configuration {
+=======
+function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Configuration {
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
   const should_obfuscate = fs
     .readFileSync(path.join(import.meta.dirname, entry.script), 'utf-8')
     .includes('@obfuscate');
   const script_filepath = path.parse(entry.script);
 
+<<<<<<< HEAD
   return (env, argv) => {
     const is_fast_build = env_flag_enabled(env, 'fast');
 
@@ -237,6 +269,13 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
       outputModule: true,
     },
     devtool: is_fast_build ? false : argv.mode === 'production' ? 'source-map' : 'eval-source-map',
+=======
+  return (_env, argv) => ({
+    experiments: {
+      outputModule: true,
+    },
+    devtool: argv.mode === 'production' ? 'source-map' : 'eval-source-map',
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
     watchOptions: {
       ignored: ['**/dist', '**/node_modules'],
     },
@@ -470,7 +509,10 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
             filename: path.parse(entry.html).base,
             scriptLoading: 'module',
             cache: false,
+<<<<<<< HEAD
             hash: false,
+=======
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
           }),
           new HtmlInlineScriptWebpackPlugin(),
           new MiniCssExtractPlugin(),
@@ -484,7 +526,11 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
       .concat(
         { apply: watch_tavern_helper },
         { apply: schema_dump },
+<<<<<<< HEAD
         ...(env_flag_enabled(env, 'srcOnly') ? [] : [{ apply: tavern_sync }]),
+=======
+        { apply: tavern_sync },
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
         new VueLoaderPlugin(),
         unpluginAutoImport({
           dts: true,
@@ -497,6 +543,10 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
             { from: 'klona', imports: ['klona'] },
             { from: 'vue-final-modal', imports: ['useModal'] },
             { from: 'zod', imports: ['z'] },
+<<<<<<< HEAD
+=======
+            { from: 'type-fest', imports: [['*', 'TypeFest']], type: true },
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
           ],
         }),
         unpluginVueComponents({
@@ -527,6 +577,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
           : [],
       ),
     optimization: {
+<<<<<<< HEAD
       minimize: !is_fast_build,
       minimizer: is_fast_build
         ? []
@@ -537,6 +588,13 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                     format: { quote_style: 1 },
                     mangle: { reserved: ['_', 'toastr', 'YAML', '$', 'z'] },
                   },
+=======
+      minimize: true,
+      minimizer: [
+        argv.mode === 'production'
+          ? new TerserPlugin({
+              terserOptions: { format: { quote_style: 1 }, mangle: { reserved: ['_', 'toastr', 'YAML', '$', 'z'] } },
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
                 })
               : new TerserPlugin({
                   extractComments: false,
@@ -616,7 +674,10 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
       );
     },
   });
+<<<<<<< HEAD
   };
+=======
+>>>>>>> 563a54227d547b8c7ade58fb3242b38f89cefd18
 }
 
 export default config.entries.map(parse_configuration);
