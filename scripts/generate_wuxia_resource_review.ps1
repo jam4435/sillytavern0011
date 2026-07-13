@@ -16,19 +16,14 @@ $martialDatabasePath = Join-Path $projectRoot 'src\武侠\data\_合并后功法.
 $inventoryCatalogPath = Join-Path $projectRoot 'src\武侠\utils\inventoryIconCatalog.ts'
 $generatedMedicineVersions = @(
   [ordered]@{
+    id = 'game-reference-v4'
+    label = 'AI 游戏参考 V4'
+    directory = Join-Path $projectRoot 'src\武侠\assets\icons\generated\medicine-v4'
+  },
+  [ordered]@{
     id = 'guofeng-v3'
     label = 'AI 国风 V3'
     directory = Join-Path $projectRoot 'src\武侠\assets\icons\generated\medicine-v3'
-  },
-  [ordered]@{
-    id = 'pixel-v2'
-    label = 'AI 像素 V2'
-    directory = Join-Path $projectRoot 'src\武侠\assets\icons\generated\medicine-v2'
-  },
-  [ordered]@{
-    id = 'generated-v1'
-    label = 'AI 生成 V1'
-    directory = Join-Path $projectRoot 'src\武侠\assets\icons\generated\medicine-v1'
   }
 )
 

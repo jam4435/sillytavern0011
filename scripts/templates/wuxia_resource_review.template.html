@@ -1041,7 +1041,7 @@
           `;
         }).join('');
 
-        const summary = `共 ${DATA.sourceStats.inventoryCategoryCount} 个外观细分类、${DATA.sourceStats.inventoryReviewCellCount} 个品阶审核格；药品另加入 ${DATA.sourceStats.generatedInventoryCandidateCount || 0} 张生成候选（V1、像素 V2、低饱和国风 V3），可与游戏资源逐格对照。`;
+        const summary = `共 ${DATA.sourceStats.inventoryCategoryCount} 个外观细分类、${DATA.sourceStats.inventoryReviewCellCount} 个品阶审核格；药品另加入 ${DATA.sourceStats.generatedInventoryCandidateCount || 0} 张生成候选（国风 V3、游戏素材参考 V4），可与游戏资源逐格对照。`;
         return `<div class="section-summary"><h2>顶层类型 · 外观细分类 · 品阶图片</h2><p>${escapeHtml(summary)}</p></div>${groupMarkup || '<div class="empty-state">当前筛选条件下没有物品图标。</div>'}`;
       }
 
