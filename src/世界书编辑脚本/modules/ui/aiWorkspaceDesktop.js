@@ -301,7 +301,7 @@ function hydrateStateFromSettings() {
     messageCount: normalizeChatContextCount(saved.chatContext?.messageCount),
   };
   state.chatMessages = _.cloneDeep(saved.chatMessages || []);
-  state.chatContextManual = saved.chatContext?.manualEdited === true;
+  state.chatContextManual = saved.chatContext?.mode === 'manual';
   state.chatContextManualText = typeof saved.chatContext?.manualText === 'string' ? saved.chatContext.manualText : '';
   state.referenceMaterial = saved.referenceMaterial || '';
   state.assistantChatHistory = _.cloneDeep(saved.assistantChatHistory || []);
@@ -396,10 +396,19 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
   setAiWorkspaceSettings({
     ...saved,
     schemaVersion: 2,
+    strategy: state.currentNav,
     navMode: state.currentNav,
     draft: {
       ...serializeModeState(mirrorModeKey),
       strategy: state.currentNav,
+      chatContext: {
+        ...state.chatContext,
+        mode: state.chatContextManual ? 'manual' : 'structured',
+        manualText: state.chatContextManual ? currentChatContextText() : '',
+      },
+      chatMessages: state.chatMessages,
+      referenceMaterial: state.referenceMaterial,
+      assistantChatHistory: state.assistantChatHistory,
       currentStep: undefined,
       planningResult: undefined,
       previewResult: undefined,
@@ -416,7 +425,7 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
     customApi: currentApiSettings(),
     chatContext: {
       ...state.chatContext,
-      manualEdited: state.chatContextManual,
+      mode: state.chatContextManual ? 'manual' : 'structured',
       manualText: state.chatContextManual ? currentChatContextText() : '',
     },
     chatMessages: state.chatMessages,
@@ -569,6 +578,9 @@ function renderChatContextPreview() {
         : '已开启，但尚未获取聊天消息。';
   $('#ai-workspace-chat-context-status', parentDoc()).text(summary);
   $('#ai-workspace-chat-context-mode', parentDoc()).text(state.chatContextManual ? '手工编辑' : '结构化消息');
+  if (root().length) {
+    updateWorkbenchHeader();
+  }
 }
 
 function renderReferenceMaterial() {
@@ -584,6 +596,9 @@ function syncReferenceMaterialStatus() {
     .text(statusText)
     .attr('data-empty', trimmed ? 'false' : 'true');
   $('#ai-workspace-assistant-reference-status', parentDoc()).text(assistantStatusText);
+  if (root().length) {
+    updateWorkbenchHeader();
+  }
 }
 
 function renderAssistantHistory() {
@@ -639,15 +654,33 @@ function switchAssistantTab(tab = 'chat') {
 }
 
 function openAssistantModal(tab = state.assistantModalTab || 'chat') {
+  state.lastFocusedElement = parentDoc().activeElement;
   renderReferenceMaterial();
   renderAssistantHistory();
   switchAssistantTab(tab);
   $('#ai-workspace-assistant-modal', parentDoc()).css('display', 'flex').attr('aria-hidden', 'false');
+  setTimeout(() => $('#ai-workspace-assistant-close', parentDoc()).trigger('focus'), 0);
 }
 
 function closeAssistantModal() {
   $('#ai-workspace-assistant-modal', parentDoc()).hide().attr('aria-hidden', 'true');
   hideAssistantSelectionToolbar();
+  state.lastFocusedElement?.focus?.();
+  state.lastFocusedElement = null;
+}
+
+function openSettingsDrawer() {
+  state.lastFocusedElement = parentDoc().activeElement;
+  syncApiForm();
+  $('#ai-workspace-settings-modal', parentDoc()).css('display', 'flex').attr('aria-hidden', 'false');
+  setTimeout(() => $('#ai-workspace-settings-close', parentDoc()).trigger('focus'), 0);
+}
+
+function closeSettingsDrawer() {
+  $('#ai-workspace-settings-modal', parentDoc()).hide().attr('aria-hidden', 'true');
+  updateWorkbenchHeader();
+  state.lastFocusedElement?.focus?.();
+  state.lastFocusedElement = null;
 }
 
 function hideAssistantSelectionToolbar() {
@@ -758,6 +791,9 @@ function renderSelectionSummary(modeKey) {
   $('#ai-workspace-selection-summary', parentDoc()).text(
     `可修改 ${mode.selectedEntryUids.size} 条，只读 ${mode.readonlyEntryUids.size} 条，可见 ${entries.length} 条，总计 ${mode.entries.length} 条`,
   );
+  if (modeKey === currentModeKey()) {
+    syncWorkflowCapabilities(modeKey);
+  }
 }
 
 function renderEntryList(modeKey) {
@@ -1549,8 +1585,10 @@ async function refreshRollbackPanel(modeKey) {
       $panel.empty();
       return;
     }
+    const operationType = preview.meta?.operationType || 'mutation';
+    const isAiTransaction = ['ai-edit-entry', 'ai-edit-selected'].includes(operationType);
     $panel.html(
-      `可回滚最近一次操作：恢复 ${preview.summary.restoreCount} 条，移除 ${preview.summary.removeCount} 条，修改 ${preview.summary.modifyCount} 条。`,
+      `<strong>${isAiTransaction ? '最近一次 AI 修改' : `最近一次世界书操作（${_.escape(operationType)}）`}</strong><span>撤销后将恢复 ${preview.summary.restoreCount} 条、移除 ${preview.summary.removeCount} 条、还原 ${preview.summary.modifyCount} 条。</span>`,
     );
   } catch {
     $panel.empty();
@@ -1568,14 +1606,16 @@ async function handleRollbackPreview() {
     return;
   }
   const lines = preview.items.slice(0, 20).map(item => `${item.type} UID ${item.uid}: ${item.title}`);
-  const message = [
-    `回滚预览：恢复 ${preview.summary.restoreCount} 条，移除 ${preview.summary.removeCount} 条，修改 ${preview.summary.modifyCount} 条。`,
-    ...lines,
-    preview.items.length > 20 ? `另有 ${preview.items.length - 20} 条未显示。` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
-  window.alert?.(message);
+  $('#ai-workspace-rollback-dialog-summary', parentDoc()).text(
+    `将恢复 ${preview.summary.restoreCount} 条，移除 ${preview.summary.removeCount} 条，还原 ${preview.summary.modifyCount} 条。事务类型：${preview.meta?.operationType || 'mutation'}。`,
+  );
+  $('#ai-workspace-rollback-dialog-items', parentDoc()).html(
+    [...lines, preview.items.length > 20 ? `另有 ${preview.items.length - 20} 条未显示。` : '']
+      .filter(Boolean)
+      .map(line => `<div>${_.escape(line)}</div>`)
+      .join(''),
+  );
+  $('#ai-workspace-rollback-dialog', parentDoc()).get(0)?.showModal?.();
 }
 
 async function handleRollbackExecute() {
@@ -1586,18 +1626,19 @@ async function handleRollbackExecute() {
     setModeStatus(modeKey, '当前没有可回滚的 AI 应用。');
     return;
   }
-  if (!window.confirm?.('确定要回滚最近一次 AI 应用吗？')) {
-    return;
-  }
   const result = await rollbackLastTransaction(mode.lorebookName);
   if (!result.success) {
     setModeStatus(modeKey, result.error?.message || '回滚失败。');
     return;
   }
   await loadEntriesForMode(modeKey, { force: true, resetSelection: false, clearOutputs: true });
+  mode.currentStep = 'prepare';
+  mode.lastApplyResult = null;
   clearPreview(modeKey, '最近一次 AI 应用已回滚。');
   await refreshRollbackPanel(modeKey);
   setModeStatus(modeKey, '回滚完成。');
+  $('#ai-workspace-rollback-dialog', parentDoc()).get(0)?.close?.();
+  renderCurrentPanel();
 }
 
 function closePreviewModal() {
@@ -2169,7 +2210,7 @@ function buildInfoResourcesMarkup() {
   return `
     <div class="ai-info-panel">
       <details class="ai-prompt-settings ai-context-panel">
-        <summary>当前聊天中有需要提供给ai的信息时开启</summary>
+        <summary><span>聊天上下文</span><small id="ai-workspace-chat-context-mode">结构化消息</small></summary>
         <div class="ai-prompt-settings-body">
           <label class="ai-toggle-line">
             <input type="checkbox" id="ai-workspace-chat-context-enabled">
@@ -3173,6 +3214,14 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-assistant-phone-header{border-radius:0}
       #${ROOT_ID} .ai-preview-modal{position:fixed;inset:0;width:auto;height:auto;overflow:auto}
       #${ROOT_ID} .ai-preview-modal-dialog{max-height:calc(100% - 48px);margin:24px auto}
+      #${ROOT_ID} .ai-confirm-dialog{width:min(560px,calc(100% - 24px));padding:0;border:1px solid var(--ai-border-color,#555);border-radius:14px;background:var(--ai-surface-raised-color,#242424);color:var(--panel-text-color,#eee);box-shadow:0 24px 70px var(--ai-shadow-color,rgba(0,0,0,.35))}
+      #${ROOT_ID} .ai-confirm-dialog::backdrop{background:rgba(0,0,0,.58);backdrop-filter:blur(4px)}
+      #${ROOT_ID} .ai-confirm-dialog-body{padding:22px;text-align:center}
+      #${ROOT_ID} .ai-confirm-icon{width:46px;height:46px;margin:0 auto 10px;display:grid;place-items:center;border-radius:50%;color:var(--ai-warning-color,#f1c26d);background:var(--ai-warning-bg-color,rgba(210,151,51,.13))}
+      #${ROOT_ID} .ai-confirm-dialog h2{margin:6px 0;font-size:18px}
+      #${ROOT_ID} .ai-confirm-dialog p{color:var(--ai-text-color-secondary,#aaa);font-size:12px;line-height:1.5}
+      #${ROOT_ID} .ai-rollback-dialog-items{max-height:240px;overflow:auto;margin:12px 0;padding:8px;border:1px solid var(--ai-border-color,#555);border-radius:8px;text-align:left;font-size:11px;background:var(--ai-surface-muted-color,rgba(0,0,0,.14))}
+      #${ROOT_ID} .ai-confirm-actions{display:flex;justify-content:center;gap:8px;margin-top:14px}
       @keyframes ai-workspace-pulse{50%{opacity:.35;transform:scale(.78)}}
 
       @container ai-workspace (max-width:959px){
@@ -3315,6 +3364,18 @@ function updateWorkbenchHeader() {
   syncNavigationState();
 }
 
+function syncWorkflowCapabilities(modeKey = currentModeKey()) {
+  const capabilities = deriveAiWorkflowCapabilities(workflowSnapshot(modeKey));
+  $('#ai-workspace-plan', parentDoc()).prop('disabled', !capabilities.canStartPlanning);
+  const canPreview = state.modes[modeKey].currentStep === 'review'
+    ? capabilities.canRegenerate
+    : capabilities.canGeneratePreview;
+  $('#ai-workspace-preview', parentDoc()).prop('disabled', !canPreview);
+  $('#ai-workspace-apply', parentDoc()).prop('disabled', !capabilities.canApply);
+  $('#ai-workspace-stop', parentDoc()).prop('disabled', !capabilities.canStop);
+  $('.ai-strategy-button', parentDoc()).prop('disabled', !capabilities.canSwitchStrategy);
+}
+
 function renderCurrentPanel() {
   const $panel = $('#ai-workspace-desktop-panel', parentDoc());
   if (!$panel.length) {
@@ -3347,10 +3408,12 @@ function renderCurrentPanel() {
   renderReferenceMaterial();
   setModeStatus(modeKey, mode.statusText);
   setGeneratingState(state.isGenerating);
+  syncWorkflowCapabilities(modeKey);
 }
 
 function hideLorebookSearchResults() {
   $('#ai-workspace-lorebook-search-results', parentDoc()).empty().hide();
+  $('#ai-workspace-lorebook-search', parentDoc()).attr('aria-expanded', 'false');
 }
 
 function filteredLorebookNames(searchText = '') {
@@ -3382,7 +3445,7 @@ function renderLorebookSearchResults(searchText = '') {
       names
         .map(
           name => `
-      <div class="add-worldbook-result-item${name === activeLorebook ? ' is-active' : ''}" data-lorebook-name="${_.escape(name)}">
+      <div class="add-worldbook-result-item${name === activeLorebook ? ' is-active' : ''}" data-lorebook-name="${_.escape(name)}" role="option" tabindex="0" aria-selected="${name === activeLorebook}">
         ${_.escape(name)}
       </div>
     `,
@@ -3390,6 +3453,7 @@ function renderLorebookSearchResults(searchText = '') {
         .join(''),
     )
     .show();
+  $('#ai-workspace-lorebook-search', parentDoc()).attr('aria-expanded', 'true');
 }
 
 async function populateLorebooks() {
@@ -3717,38 +3781,17 @@ function ensureSelectionReady(modeKey) {
 function bindEvents() {
   $(parentDoc())
     .off('.aiWorkspaceDesktop')
-    .on('click.aiWorkspaceDesktop', '.ai-mobile-nav-toggle', function () {
-      const isExpanded = $(this).attr('aria-expanded') === 'true';
-      setMobileNavExpanded(!isExpanded);
-    })
-    .on('click.aiWorkspaceDesktop', '.ai-mode-nav-button', async function () {
-      const targetNav = ($(this).attr('data-ai-nav') || '').trim();
-      if (!targetNav) {
+    .on('click.aiWorkspaceDesktop', '.ai-strategy-button', function () {
+      const targetStrategy = normalizeNavMode(($(this).attr('data-ai-strategy') || '').trim());
+      if (!targetStrategy || targetStrategy === state.currentNav || state.isGenerating) {
         return;
       }
-      if (targetNav === state.currentNav || state.isGenerating) {
-        setMobileNavExpanded(false);
-        return;
-      }
-      if (state.currentNav === 'direct' || state.currentNav === 'plan') {
-        captureModeInputs(currentModeKey());
-        persistSettings({ mirrorModeKey: currentModeKey() });
-      }
-      state.currentNav = normalizeNavMode(targetNav);
-      persistSettings({ mirrorModeKey: currentModeKey() });
+      captureModeInputs(currentModeKey());
+      state.currentNav = targetStrategy;
+      invalidateModeOutputs(targetStrategy, { clearPlan: true });
+      state.modes[targetStrategy].currentStep = 'prepare';
+      schedulePersist(targetStrategy);
       renderCurrentPanel();
-      setMobileNavExpanded(false);
-      if (state.currentNav === 'direct' || state.currentNav === 'plan') {
-        ensureModeLorebook(currentModeKey());
-        await loadEntriesForMode(currentModeKey(), {
-          force: true,
-          resetSelection: false,
-          clearOutputs: false,
-          invalidateOutputsOnChange: true,
-        });
-        renderCurrentPanel();
-        setMobileNavExpanded(false);
-      }
     })
     .on('click.aiWorkspaceDesktop', '[data-ai-step]', function () {
       if (state.currentNav !== 'direct' && state.currentNav !== 'plan') {
@@ -3763,12 +3806,7 @@ function bindEvents() {
       }
       captureModeInputs(currentModeKey());
       const targetStep = ($(this).attr('data-ai-step-target') || '').trim();
-      if (targetStep === 'instruction' && !ensureSelectionReady(currentModeKey())) {
-        return;
-      }
-      state.modes[currentModeKey()].currentStep = normalizeStep(currentModeKey(), targetStep);
-      persistSettings({ mirrorModeKey: currentModeKey() });
-      renderCurrentPanel();
+      goToStep(currentModeKey(), normalizeStep(currentModeKey(), targetStep));
     })
     .on('focus.aiWorkspaceDesktop input.aiWorkspaceDesktop', '#ai-workspace-lorebook-search', function () {
       renderLorebookSearchResults($(this).val() || '');
@@ -3794,13 +3832,18 @@ function bindEvents() {
         mode.selectedEntryUids.clear();
         mode.readonlyEntryUids.clear();
         invalidateModeOutputs(modeKey);
-        mode.currentStep = 'selection';
+        mode.currentStep = 'prepare';
         hideLorebookSearchResults();
         persistSettings({ mirrorModeKey: modeKey });
         await loadEntriesForMode(modeKey, { force: true, resetSelection: true, clearOutputs: false });
         renderCurrentPanel();
       },
     )
+    .on('keydown.aiWorkspaceDesktop', '#ai-workspace-lorebook-search-results .add-worldbook-result-item', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      $(this).trigger('click');
+    })
     .on('change.aiWorkspaceDesktop input.aiWorkspaceDesktop', '#ai-workspace-chat-context-count', () => {
       state.chatContext = currentChatContextSettings();
       renderChatContextPreview();
@@ -3873,49 +3916,74 @@ function bindEvents() {
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-clear-selection', () => {
       const modeKey = currentModeKey();
-      state.modes[modeKey].selectedEntryUids.clear();
-      state.modes[modeKey].readonlyEntryUids.clear();
+      getFilteredEntries(modeKey).forEach(entry => setEntryMode(modeKey, Number(entry.uid), 'none'));
       invalidateModeOutputs(modeKey);
       persistSettings({ mirrorModeKey: modeKey });
       renderEntryList(modeKey);
     })
-    .on('change.aiWorkspaceDesktop', '.ai-entry-mode', function () {
+    .on('click.aiWorkspaceDesktop', '.ai-entry-mode-button', function () {
       const modeKey = currentModeKey();
-      setEntryMode(modeKey, Number($(this).attr('data-entry-uid')), ($(this).val() || 'none').trim());
-      invalidateModeOutputs(modeKey);
+      const mode = state.modes[modeKey];
+      const isPlanReview = modeKey === 'plan' && mode.currentStep === 'planReview' && Boolean(mode.planningResult);
+      setEntryMode(modeKey, Number($(this).attr('data-entry-uid')), ($(this).attr('data-entry-mode') || 'none').trim());
+      if (isPlanReview) {
+        mode.previewResult = null;
+        mode.debugInfo = {};
+      } else {
+        invalidateModeOutputs(modeKey);
+      }
       persistSettings({ mirrorModeKey: modeKey });
-      renderSelectionSummary(modeKey);
+      if (isPlanReview) {
+        mode.planningResult.editable_uids = Array.from(mode.selectedEntryUids);
+        mode.planningResult.readonly_uids = Array.from(mode.readonlyEntryUids);
+        renderPlanningResult(modeKey);
+      } else {
+        renderEntryList(modeKey);
+      }
     })
     .on(
-      'change.aiWorkspaceDesktop input.aiWorkspaceDesktop',
+      'input.aiWorkspaceDesktop change.aiWorkspaceDesktop',
       '#ai-workspace-field-title, #ai-workspace-field-content, #ai-workspace-field-prompt, #ai-workspace-instruction, #ai-workspace-jailbreak-prompt-template, #ai-workspace-builtin-prompt-template, #ai-workspace-planning-prompt-template',
       () => {
         const modeKey = currentModeKey();
         captureModeInputs(modeKey);
         invalidateModeOutputs(modeKey);
-        persistSettings({ mirrorModeKey: modeKey });
+        schedulePersist(modeKey);
+        syncWorkflowCapabilities(modeKey);
       },
     )
-    .on('input.aiWorkspaceDesktop', '#ai-workspace-plan-json', () => {
-      if (state.currentNav !== 'plan') {
-        return;
-      }
-      setModeStatus('plan', '规划已修改，离开输入框后保存。');
+    .on('change.aiWorkspaceDesktop', '#ai-workspace-plan-goal, #ai-workspace-plan-must-keep, #ai-workspace-plan-rewrite-rules, #ai-workspace-plan-consistency-notes', () => {
+      if (state.currentNav !== 'plan') return;
+      const modeKey = currentModeKey();
+      updatePlanningResultFromStructuredForm(modeKey);
+      renderPlanningResult(modeKey);
+      setModeStatus(modeKey, '规划已更新，可继续生成修改预览。');
     })
-    .on('change.aiWorkspaceDesktop', '#ai-workspace-plan-json', function () {
+    .on('input.aiWorkspaceDesktop', '#ai-workspace-plan-json', function () {
       if (state.currentNav !== 'plan') {
         return;
       }
       const modeKey = currentModeKey();
       try {
-        state.modes[modeKey].planningResult = normalizePlanEditorValue($(this).val() || '{}');
+        const validUids = new Set(state.modes[modeKey].entries.map(entry => Number(entry.uid)));
+        state.modes[modeKey].planningResult = normalizePlanEditorValue($(this).val() || '{}', validUids);
+        state.modes[modeKey].planEditorError = '';
         syncPlanSelectionFromPlanningResult(modeKey);
-        clearPreview(modeKey, '规划已修改，请重新生成修改结果。');
-        renderPlanningResult(modeKey);
-        persistSettings({ mirrorModeKey: modeKey });
+        state.modes[modeKey].previewResult = null;
+        const plan = state.modes[modeKey].planningResult.plan || {};
+        $('#ai-workspace-plan-goal', parentDoc()).val(plan.goal || '');
+        $('#ai-workspace-plan-must-keep', parentDoc()).val((plan.must_keep || []).join('\n'));
+        $('#ai-workspace-plan-rewrite-rules', parentDoc()).val((plan.rewrite_rules || []).join('\n'));
+        $('#ai-workspace-plan-consistency-notes', parentDoc()).val((plan.consistency_notes || []).join('\n'));
+        renderPlanScope(modeKey);
+        $('#ai-workspace-plan-error', parentDoc()).removeClass('is-visible').empty();
+        $('#ai-workspace-preview', parentDoc()).prop('disabled', state.modes[modeKey].selectedEntryUids.size === 0);
         setModeStatus(modeKey, '规划已更新，可继续确认并生成修改结果。');
       } catch (error) {
-        setModeStatus(modeKey, `规划 JSON 无法解析：${error.message}`);
+        state.modes[modeKey].planEditorError = error.message;
+        $('#ai-workspace-plan-error', parentDoc()).addClass('is-visible').text(`规划 JSON 无法解析：${error.message}`);
+        $('#ai-workspace-preview', parentDoc()).prop('disabled', true);
+        setModeStatus(modeKey, '请先修正规划 JSON。');
       }
     })
     .on(
@@ -3923,27 +3991,51 @@ function bindEvents() {
       '#ai-workspace-apiurl, #ai-workspace-apikey, #ai-workspace-model, #ai-workspace-stream, #ai-workspace-budget-enabled, #ai-workspace-budget-max-input, #ai-workspace-budget-reserve-output',
       () => {
         persistSettings({ mirrorModeKey: currentModeKey() });
-        ['direct', 'plan'].forEach(modeKey => {
-          state.modes[modeKey].previewResult = null;
-          state.modes[modeKey].debugInfo = {};
-        });
+        invalidateModeOutputs(currentModeKey(), { clearPlan: true });
         setSharedStatus('API 配置已变化，后续结果请重新生成。');
       },
     )
     .on('change.aiWorkspaceDesktop', '#ai-workspace-source-select', () => {
       toggleCustomApi();
       persistSettings({ mirrorModeKey: currentModeKey() });
+      invalidateModeOutputs(currentModeKey(), { clearPlan: true });
       setSharedStatus('API 配置已变化，后续结果请重新生成。');
     })
     .on('change.aiWorkspaceDesktop', 'input[name="ai-workspace-api-mode"]', () => {
       toggleCustomApi();
       persistSettings({ mirrorModeKey: currentModeKey() });
+      invalidateModeOutputs(currentModeKey(), { clearPlan: true });
       setSharedStatus('API 配置已变化，后续结果请重新生成。');
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-load-models', event => {
       event.preventDefault();
       event.stopPropagation();
       void handleLoadModels();
+    })
+    .on('click.aiWorkspaceDesktop', '[data-ai-open-settings]', () => {
+      openSettingsDrawer();
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-settings-close', () => {
+      flushAiWorkspaceSettings();
+      closeSettingsDrawer();
+      renderCurrentPanel();
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-settings-modal', function (event) {
+      if (event.target === this) {
+        flushAiWorkspaceSettings();
+        closeSettingsDrawer();
+        renderCurrentPanel();
+      }
+    })
+    .on('click.aiWorkspaceDesktop', '[data-ai-focus-context]', () => {
+      const mode = currentModeState();
+      if (mode.currentStep !== 'prepare') {
+        mode.currentStep = 'prepare';
+        renderCurrentPanel();
+      }
+      const details = $('.ai-context-panel', parentDoc()).get(0);
+      if (details) details.open = true;
+      $('#ai-workspace-chat-context-enabled', parentDoc()).trigger('focus');
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-plan', async () => {
       await handlePlan();
@@ -3961,7 +4053,27 @@ function bindEvents() {
       await handleRollbackPreview();
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-rollback-execute', async () => {
+      await handleRollbackPreview();
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-rollback-dialog-cancel', () => {
+      $('#ai-workspace-rollback-dialog', parentDoc()).get(0)?.close?.();
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-rollback-dialog-confirm', async () => {
       await handleRollbackExecute();
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-start-new', () => {
+      const modeKey = currentModeKey();
+      const mode = state.modes[modeKey];
+      mode.currentStep = 'prepare';
+      mode.instruction = '';
+      mode.selectedEntryUids.clear();
+      mode.readonlyEntryUids.clear();
+      mode.planningResult = null;
+      mode.previewResult = null;
+      mode.debugInfo = {};
+      mode.lastApplyResult = null;
+      persistSettings({ mirrorModeKey: modeKey });
+      renderCurrentPanel();
     })
     .on('click.aiWorkspaceDesktop', '.ai-preview-exclude', function (event) {
       event.preventDefault();
@@ -3969,9 +4081,19 @@ function bindEvents() {
       excludePreviewItem(currentModeKey(), Number($(this).attr('data-preview-uid')));
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-list .ai-preview-item', function () {
-      renderPreviewDetail(currentModeKey(), Number($(this).attr('data-preview-uid')));
+      const uid = Number($(this).attr('data-preview-uid'));
+      if ((root().width() || 0) < 960) {
+        openPreviewModal(uid);
+      } else {
+        renderPreviewDetail(currentModeKey(), uid);
+      }
       $('#ai-workspace-preview-list .ai-preview-item', parentDoc()).removeClass('is-active');
       $(this).addClass('is-active');
+    })
+    .on('keydown.aiWorkspaceDesktop', '#ai-workspace-preview-list .ai-preview-item', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      $(this).trigger('click');
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-detail-regenerate', async () => {
       const uid = Number($('#ai-workspace-preview-detail', parentDoc()).attr('data-preview-uid'));
@@ -4008,6 +4130,10 @@ function bindEvents() {
     .on('keydown.aiWorkspaceDesktop', event => {
       if (event.key === 'Escape' && $('#ai-workspace-assistant-modal', parentDoc()).is(':visible')) {
         closeAssistantModal();
+      } else if (event.key === 'Escape' && $('#ai-workspace-settings-modal', parentDoc()).is(':visible')) {
+        flushAiWorkspaceSettings();
+        closeSettingsDrawer();
+        renderCurrentPanel();
       }
     })
     .on('click.aiWorkspaceDesktop', '.ai-assistant-tab', function () {
@@ -4114,6 +4240,7 @@ function bindEvents() {
 
 export function initDesktopAiWorkspace() {
   ensureStyles();
+  ensureUnifiedStyles();
   ensureMarkup();
   if (!state.hydrated) {
     hydrateStateFromSettings();
@@ -4123,6 +4250,18 @@ export function initDesktopAiWorkspace() {
     return;
   }
   bindEvents();
+  const workbenchContainer = container().get(0);
+  if (workbenchContainer && typeof ResizeObserver === 'function') {
+    state.resizeObserver?.disconnect?.();
+    state.resizeObserver = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect?.width || root().width() || 0;
+      root().attr('data-layout', width >= 960 ? 'wide' : width >= 640 ? 'compact' : 'narrow');
+    });
+    state.resizeObserver.observe(workbenchContainer);
+  }
+  $(window).off('pagehide.aiWorkspaceDesktop').on('pagehide.aiWorkspaceDesktop', () => {
+    flushAiWorkspaceSettings();
+  });
   state.initialized = true;
 }
 
@@ -4147,22 +4286,20 @@ export const refreshDesktopAiWorkspace = errorCatched(async () => {
   }
 
   ensureStyles();
+  ensureUnifiedStyles();
   ensureMarkup();
   renderCurrentPanel();
 
   await populateLorebooks();
-  ensureModeLorebook('direct');
-  ensureModeLorebook('plan');
+  ensureModeLorebook(currentModeKey());
 
-  if (state.currentNav === 'direct' || state.currentNav === 'plan') {
-    const modeKey = currentModeKey();
-    await loadEntriesForMode(modeKey, {
-      force: true,
-      resetSelection: false,
-      clearOutputs: false,
-      invalidateOutputsOnChange: true,
-    });
-  }
+  const modeKey = currentModeKey();
+  await loadEntriesForMode(modeKey, {
+    force: true,
+    resetSelection: false,
+    clearOutputs: false,
+    invalidateOutputsOnChange: true,
+  });
 
   persistSettings({ mirrorModeKey: currentModeKey() });
   renderCurrentPanel();
