@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import martialArtsDatabase from '../data/_合并后功法.json';
 import type { InventoryItem, MartialArt } from '../types';
 import { getRankVisual, resolveInventoryIcon, resolveMartialArtIcon } from './iconCatalog';
 
@@ -30,6 +31,44 @@ describe('iconCatalog', () => {
     );
     expect(resolveMartialArtIcon('九阳真经', baseArt)).toEqual(
       expect.objectContaining({ label: '九阳神功', matchedBy: 'alias' }),
+    );
+  });
+
+  it('会按招式意象为未精确匹配的功法选择图标', () => {
+    expect(resolveMartialArtIcon('天罡北斗阵', { ...baseArt, type: '外功' })).toEqual(
+      expect.objectContaining({ category: '阵法', matchedBy: 'semantic' }),
+    );
+    expect(resolveMartialArtIcon('玄冥神掌', { ...baseArt, type: '拳掌' })).toEqual(
+      expect.objectContaining({ category: '阴柔内功', matchedBy: 'semantic' }),
+    );
+    expect(resolveMartialArtIcon('虎爪绝户手', { ...baseArt, type: '拳掌' })).toEqual(
+      expect.objectContaining({ category: '擒拿', matchedBy: 'semantic' }),
+    );
+    expect(resolveMartialArtIcon('边军断魂枪', { ...baseArt, type: '枪戟' })).toEqual(
+      expect.objectContaining({ category: '枪戟', matchedBy: 'semantic' }),
+    );
+  });
+
+  it('功法库全部功法都有图标且不会落入未知兜底', () => {
+    const resolved = martialArtsDatabase.功法.map(art =>
+      resolveMartialArtIcon(art.功法名称, { ...baseArt, type: art.类型 }),
+    );
+
+    expect(resolved).toHaveLength(373);
+    expect(resolved.every(icon => Boolean(icon.src))).toBe(true);
+    expect(resolved.every(icon => icon.matchedBy !== 'fallback')).toBe(true);
+    expect(new Set(resolved.map(icon => icon.src)).size).toBeGreaterThanOrEqual(20);
+  });
+
+  it('功法解析不会误用行囊书册图，并兼容旧功法类型', () => {
+    expect(resolveMartialArtIcon('玉女心经', { ...baseArt, type: '内功' })).toEqual(
+      expect.objectContaining({ matchedBy: 'type', category: '内功' }),
+    );
+    expect(resolveMartialArtIcon('太祖长拳', { ...baseArt, type: '拳脚' })).toEqual(
+      expect.objectContaining({ matchedBy: 'semantic', category: '拳法' }),
+    );
+    expect(resolveMartialArtIcon('杨家枪法', { ...baseArt, type: '枪法' })).toEqual(
+      expect.objectContaining({ matchedBy: 'semantic', category: '枪戟' }),
     );
   });
 

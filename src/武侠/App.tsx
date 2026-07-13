@@ -801,7 +801,7 @@ const App: React.FC = () => {
         {/* Navigation Sidebar */}
         <nav className={`nav-sidebar ${isSidebarOpen ? 'open' : ''}`}>
           <div className="logo-box">
-            <span className="logo-char">侠</span>
+            <Icons.Brand className="logo-mark" />
           </div>
 
           <NavButton

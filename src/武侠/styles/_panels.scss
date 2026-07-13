@@ -1104,6 +1104,13 @@
   }
 }
 
+.martial-art-panel {
+  .workbench-item-icon img,
+  .workbench-detail-icon img {
+    image-rendering: pixelated;
+  }
+}
+
 .workbench-detail-title-group {
   min-width: 0;
 }

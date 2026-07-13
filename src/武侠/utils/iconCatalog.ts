@@ -1,5 +1,6 @@
 import type { InventoryItem, MartialArt } from '../types';
 import { resolveInventoryVisual } from './inventoryIconCatalog';
+import { resolveMartialVisual } from './martialIconCatalog';
 
 import anranXiaohunZhangUrl from '../assets/icons/jinyong/anran_xiaohun_zhang.png?url';
 import bafangCangdaoUrl from '../assets/icons/jinyong/bafang_cangdao.png?url';
@@ -44,7 +45,7 @@ import yijinJingUrl from '../assets/icons/jinyong/yijin_jing.jpg?url';
 import yunvXinjingUrl from '../assets/icons/jinyong/yunv_xinjing.png?url';
 
 export type CatalogIconKind = 'martial' | 'inventory' | 'fallback';
-export type IconMatchReason = 'name' | 'alias' | 'type' | 'fallback';
+export type IconMatchReason = 'name' | 'alias' | 'semantic' | 'type' | 'fallback';
 
 export interface CatalogIcon {
   id: string;
@@ -481,14 +482,15 @@ export const iconCatalog: CatalogIcon[] = [
 const normalizedNames = (icon: CatalogIcon): string[] => icon.names.map(normalizeName);
 const normalizedAliases = (icon: CatalogIcon): string[] => icon.aliases.map(normalizeName);
 
-function findIconByName(name: string): ResolvedIcon | null {
+function findIconByName(name: string, kind?: CatalogIconKind): ResolvedIcon | null {
   const normalized = normalizeName(name);
-  const exact = iconCatalog.find(icon => normalizedNames(icon).includes(normalized));
+  const candidates = kind ? iconCatalog.filter(icon => icon.kind === kind) : iconCatalog;
+  const exact = candidates.find(icon => normalizedNames(icon).includes(normalized));
   if (exact) {
     return { src: exact.src, label: exact.label, matchedBy: 'name' };
   }
 
-  const alias = iconCatalog.find(icon => normalizedAliases(icon).includes(normalized));
+  const alias = candidates.find(icon => normalizedAliases(icon).includes(normalized));
   if (alias) {
     return { src: alias.src, label: alias.label, matchedBy: 'alias' };
   }
@@ -496,42 +498,17 @@ function findIconByName(name: string): ResolvedIcon | null {
   return null;
 }
 
-function findIconByCategory(category: string): CatalogIcon | undefined {
-  return iconCatalog.find(icon => icon.categories.includes(category));
-}
-
-const fallbackIcon = iconCatalog.find(icon => icon.id === 'chuanguo_yuxi')!;
-
-const martialTypeFallback: Record<string, string> = {
-  内功: '内功',
-  外功: '外功',
-  轻功: '轻功',
-  剑法: '剑法',
-  刀法: '刀法',
-  拳掌: '拳掌',
-  指法: '指法',
-  暗器: '暗器',
-  枪戟: '枪戟',
-  棍锤: '棍锤',
-};
-
 export function resolveInventoryIcon(item: InventoryItem): ResolvedIcon {
   return resolveInventoryVisual(item);
 }
 
 export function resolveMartialArtIcon(name: string, art?: Pick<MartialArt, 'type'>): ResolvedIcon {
-  const byName = findIconByName(name);
+  const byName = findIconByName(name, 'martial');
   if (byName) {
     return byName;
   }
 
-  const fallbackCategory = art?.type ? martialTypeFallback[art.type] : undefined;
-  const typeIcon = fallbackCategory ? findIconByCategory(fallbackCategory) : undefined;
-  if (typeIcon) {
-    return { src: typeIcon.src, label: typeIcon.label, matchedBy: 'type' };
-  }
-
-  return { src: fallbackIcon.src, label: fallbackIcon.label, matchedBy: 'fallback' };
+  return resolveMartialVisual(name, art);
 }
 
 export function getRankVisual(rank?: string, variant: 'item' | 'secret' | 'martial' = 'item'): RankVisual {

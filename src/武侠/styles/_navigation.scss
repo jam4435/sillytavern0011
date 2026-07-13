@@ -256,14 +256,15 @@
   }
 }
 
-.logo-char {
-  font-family: var(--font-serif);
+.logo-mark {
   color: rgba(212, 175, 55, 0.9);
-  font-weight: 700;
-  font-size: 1.5rem;
-  text-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
   position: relative;
   z-index: 1;
+  filter: drop-shadow(0 0 7px rgba(212, 175, 55, 0.42));
+
+  svg {
+    display: block;
+  }
 }
 
 // =========================================
