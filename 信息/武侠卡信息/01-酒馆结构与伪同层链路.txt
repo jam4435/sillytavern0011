@@ -8,7 +8,7 @@
 1. 聊天文件里仍保存完整消息楼层，`getChatMessages()` / `setChatMessages()` 操作的也是完整消息对象。来源：@types/function/chat_message.d.ts:1-20,31-59,106-153
 2. 酒馆显示正则把最新楼层显示替换成 loader，loader 再把 `dist/武侠/index.html` 拉进消息 iframe。来源：角色卡/金庸群侠传/index.yaml:9035-9047；角色卡/金庸群侠传/正则/游戏页面.txt:1-7
 3. 后台脚本删掉旧楼层 DOM，只让用户在页面上看到 `.last_mes`。来源：角色卡/金庸群侠传/脚本/隐藏楼层.js:1-13
-4. 游戏状态不在 React store 里自足保存，而是回读 `stat_data`；变量变化主要通过 MVU 事件和 ERA 指令落库。来源：@types/iframe/exported.mvu.d.ts:1-10,54-177；@types/function/variables.d.ts:65-148；src/武侠/utils/variableReader.ts:434-434,2285-2538
+4. 游戏状态不在 React store 里自足保存，而是回读 `stat_data`；变量变化既可能通过高层 chat variable API 直接落库，也可能通过 ERA 指令进入消息变量块，再由 MVU/事件通知前端刷新。来源：@types/iframe/exported.mvu.d.ts:1-10,54-177；@types/function/variables.d.ts:65-148；src/shared/directVariableWrite.ts:136-153；src/武侠/utils/variableReader.ts:434-434,2285-2538
 5. 事件脚本是独立后台 iframe，会在 `CHAT_CHANGED`、`MESSAGE_SENT`、`era:writeDone` 等事件上继续读写变量。来源：@types/iframe/event.d.ts:193-224,289-320,381-385,473-478；src/事件脚本/era-main.js:76-201
 
 二、什么叫“伪同层”

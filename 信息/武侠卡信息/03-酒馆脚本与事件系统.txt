@@ -123,7 +123,7 @@
 
 1. `writeDirect*`
 
-- 直接 `updateVariablesWith(..., { type: 'chat' })` 修改 `stat_data`，然后手动补发一个带 `actions.directChatWrite` 的 `era:writeDone`。来源：src/事件脚本/era-write-helper.js:258-310；@types/function/variables.d.ts:93-148
+- 直接 `updateVariablesWith(..., { type: 'chat' })` 修改 `stat_data`，再由共享写入器发送 `wuxia:directVariableWriteDone` 来源事件；不会生成 ERA 指令，也不会伪造 `era:writeDone`。来源：src/事件脚本/era-write-helper.js:237-280；src/shared/directVariableWrite.ts:3,136-153；@types/function/variables.d.ts:93-148
 - 适合脚本自维护字段，如 `事件系统` 状态、`世界事件`、`前端变量.事件结局状态`、`附近传闻`、`后续事件线索`和计数器。来源：src/事件脚本/era-world-events.js:110-134,163-265；src/事件脚本/era-write-helper.js:237-284
 
 2. `writeEra*`
