@@ -755,7 +755,16 @@
     (() => {
       'use strict';
 
-      const DATA = JSON.parse(document.getElementById('auditData').textContent);
+      const rawAuditData = document.getElementById('auditData').textContent.trim();
+      if (rawAuditData === '__AUDIT_' + 'DATA__') {
+        document.getElementById('content').innerHTML =
+          '<div class="empty-state">当前打开的是生成器模板，正在转到生成后的审核台...</div>';
+        const generatedUrl = new URL('../../src/武侠/docs/12-游戏资源图标审核台.html', window.location.href);
+        window.location.replace(generatedUrl.href);
+        return;
+      }
+
+      const DATA = JSON.parse(rawAuditData);
       const STORAGE_KEY = 'wuxia:resource-review:v1';
       const STATUS_LABELS = { accept: '合适', pending: '待定', reject: '不合适' };
       const state = {
