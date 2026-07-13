@@ -49,7 +49,7 @@ export function normalizeParticipantEventDefinition(eventName, eventData, { isDe
     };
   }
 
-  if (isDebut) {
+  if (isDebut || eventName.includes('成长条目-')) {
     return { valid: true, data: eventData, errors: [] };
   }
 
@@ -57,6 +57,7 @@ export function normalizeParticipantEventDefinition(eventName, eventData, { isDe
   const eventLocation = normalizeLocationPath(eventData.事件地点);
   const eventLocationSegments = getLocationPathSegments(eventLocation);
   const eventHook = typeof eventData.事件引子 === 'string' ? eventData.事件引子.trim() : '';
+  const eventSummary = typeof eventData.事件概要 === 'string' ? eventData.事件概要.trim() : '';
   const rawParticipants = eventData.参与人物;
 
   if (!eventLocation) {
@@ -67,6 +68,10 @@ export function normalizeParticipantEventDefinition(eventName, eventData, { isDe
 
   if (!eventHook) {
     errors.push(`事件 ${eventName} 缺少非空的事件引子`);
+  }
+
+  if (!eventSummary) {
+    errors.push(`事件 ${eventName} 缺少非空的事件概要`);
   }
 
   if (!Array.isArray(rawParticipants)) {
@@ -93,6 +98,7 @@ export function normalizeParticipantEventDefinition(eventName, eventData, { isDe
       ...eventData,
       事件地点: eventLocation,
       事件引子: eventHook,
+      事件概要: eventSummary,
       参与人物: participants,
     },
     errors: [],

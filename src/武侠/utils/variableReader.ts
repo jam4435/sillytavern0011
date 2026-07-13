@@ -21,6 +21,7 @@ import type {
     InventoryItemVariableData,
     MartialArt,
     NPC,
+    WorldEventVariableData,
     WorldTime,
 } from '../types';
 
@@ -176,6 +177,7 @@ interface GameVariables {
   user数据?: UserProfile & { 用户名?: string };
 
   前端变量?: FrontendVariableData;
+  世界事件?: Record<string, WorldEventVariableData>;
 
   // 角色数据（NPC 信息存储在这里）
   角色数据?: Record<string, CharacterData | unknown>;

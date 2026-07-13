@@ -268,6 +268,7 @@ export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传
 - 只允许输出 <VariableThink>、<VariableInsert>、<VariableEdit>、<VariableDelete> 块。
 - <VariableInsert>、<VariableEdit>、<VariableDelete> 内必须是严格 JSON 对象；不要注释、不要尾随逗号、不要 JSON5。
 - JSON 根路径必须使用实际 ERA 键名：世界信息、user数据、角色数据、参与事件、后续事件线索、附近传闻。不要输出“玩家数据”或“同场景角色”这类说明别名。
+- 世界事件和前端变量由前端维护，只可作为参考，禁止对它们输出 Insert/Edit/Delete。
 - 如果没有需要写入的变量变化，可以不输出 Insert/Edit/Delete 块。
 
 【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】

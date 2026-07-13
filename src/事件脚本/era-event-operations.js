@@ -39,6 +39,11 @@ import {
   buildOccupancyCleanupPatch,
   buildParticipantEntryPlan,
 } from './era-participant-entry.js';
+import {
+  ensureWorldEventsArchived,
+  getEventSummary,
+  syncParticipationOutcomeStates,
+} from './era-world-events.js';
 
 const EVENT_KIND_PATTERN = /(事件条目-|登场事件-|成长条目-)/;
 const CHAPTER_EVENT_PATTERN = /^第[0-9一二三四五六七八九十百千万]+回-/;
@@ -613,6 +618,11 @@ async function processExpiredEventsCompletion(eventNames, eventDefinitions) {
   // 应用差分
   await applyEventDiff(合并后的差分);
 
+  const archived = await ensureWorldEventsArchived(eventNames, eventDefinitions, latestVars);
+  if (!archived) {
+    throw new Error('已过期事件的世界事件归档未能持久化');
+  }
+
   // 添加到已完成事件
   const completedPayload = {
     事件系统: { 已完成事件: 已完成事件对象 },
@@ -983,7 +993,7 @@ function buildPlayerParticipationDescription(eventName, eventData, currentTime) 
 export function buildPlayerParticipationEntry(eventName, eventData, currentTime) {
   return {
     描述: buildPlayerParticipationDescription(eventName, eventData, currentTime),
-    结局: '',
+    结局: getEventSummary(eventData),
     insert: getInitialParticipationActionDiff(eventData, 'insert'),
     update: getInitialParticipationActionDiff(eventData, 'update'),
     delete: getInitialParticipationActionDiff(eventData, 'delete'),
@@ -1040,6 +1050,7 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
     );
 
     await writeEraInsert({ 参与事件: participationPatch }, `player-joins-events-${eventsToJoin.length}`);
+    await syncParticipationOutcomeStates(eventDefinitions);
     logSuccess(`玩家已参与 ${eventsToJoin.length} 个事件:`, eventsToJoin.map(getEventShortName));
 
     debugGroupEnd();
@@ -1064,6 +1075,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
   debugGroup(`⏹️ 批量结算事件 (${eventNames.length}个)`);
 
   try {
+    await syncParticipationOutcomeStates(eventDefinitions);
     const currentVars = await getVariables({ type: 'chat' });
     const statData = currentVars.stat_data;
     const 参与事件 = statData.参与事件 || {};
@@ -1118,6 +1130,11 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     debugGroup('🔄 批量应用人物差分');
     await applyEventDiff(合并后的差分);
     debugGroupEnd();
+
+    const archived = await ensureWorldEventsArchived(eventNames, eventDefinitions, currentVars);
+    if (!archived) {
+      throw new Error('世界事件归档未能持久化，保留参与事件等待重试');
+    }
 
     // 2. 批量将事件移至"已完成"
     const completedPayload = {

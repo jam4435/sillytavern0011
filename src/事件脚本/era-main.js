@@ -39,9 +39,10 @@
     isLocationWithinRumorScope,
     normalizeLocationPath,
   } = await import('./era-participant-entry.js');
+  const { reconcileWorldEventArchive, syncParticipationOutcomeStates } = await import('./era-world-events.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
-  const EVENT_SCRIPT_VERSION = '2026-07-12-string-event-hooks';
+  const EVENT_SCRIPT_VERSION = '2026-07-13-world-event-archive';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
@@ -170,6 +171,7 @@
 
     try {
       const variables = await getVariables({ type: 'chat' });
+      await syncParticipationOutcomeStates(eventDefinitions, variables);
 
       // 输出完整的世界信息和事件系统
       if (isDebugEnabled()) {
@@ -502,6 +504,7 @@
 
     eventDefinitions = await loadEventDefinitionsFromWorldbook();
     await initializeEventList(eventDefinitions, { shouldPostResyncVerify });
+    await reconcileWorldEventArchive(eventDefinitions);
 
     // 初始化完成后输出当前状态
     try {

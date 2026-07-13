@@ -125,8 +125,22 @@ export interface PermanentAttributeModifierVariableData {
   属性修正?: InventoryAttributeModifierMap;
 }
 
+export type EventOutcomeStatus = '原定' | '偏离' | '未知';
+
+export interface WorldEventVariableData {
+  时间: {
+    年?: number;
+    月?: number;
+    日?: number;
+    时?: number;
+  };
+  地点: string;
+  概要: string;
+}
+
 export interface FrontendVariableData {
   永久属性修正?: Record<string, PermanentAttributeModifierVariableData>;
+  事件结局状态?: Record<string, EventOutcomeStatus>;
   [key: string]: unknown;
 }
 

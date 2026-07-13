@@ -8,6 +8,7 @@ import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryAp
 import { dataLogger, variableTraceLogger } from './logger';
 import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
 import { buildDynamicLocationConstraintPrompt } from './locationContext';
+import { selectWorldEventsForPrompt } from '../../shared/worldEventContext';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
 const OUTPUT_PROMPT_ENTRY_NAME = '输出提示词';
@@ -514,6 +515,10 @@ function buildFallbackVariableSnapshot(assistantMessageId: number): string {
     世界信息: statData.世界信息 ?? variables.世界信息 ?? null,
     user数据: userData,
     参与事件: statData.参与事件 ?? null,
+    世界事件: selectWorldEventsForPrompt(
+      statData.世界事件,
+      getNestedRecord(statData, '前端变量')?.事件结局状态,
+    ),
     后续事件线索: statData.后续事件线索 ?? null,
     附近传闻: statData.附近传闻 ?? null,
     角色数据: collectSameSceneCharacters(statData, playerLocation),

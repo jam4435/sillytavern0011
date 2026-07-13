@@ -355,6 +355,10 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
       $meta: { necessary: 'self', updatable: true },
     },
     参与事件: {},
+    世界事件: {},
+    前端变量: {
+      事件结局状态: {},
+    },
     user数据: {
       用户名: name,
       性别: gender,
