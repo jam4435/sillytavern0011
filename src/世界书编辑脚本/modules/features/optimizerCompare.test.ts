@@ -55,8 +55,12 @@ describe('世界书全本比对 helper', () => {
       [entry(10, '修改条目', '新正文'), entry(11, '新增条目', '仅对比有')],
     );
 
+    const modified = getCompareItemsForFilter(result, 'modified');
     const added = getCompareItemsForFilter(result, 'added');
 
+    expect(modified).toHaveLength(1);
+    expect(modified[0].item.title).toBe('修改条目');
+    expect(modified[0].originalIndex).toBe(result.items.findIndex(item => item.type === 'modified'));
     expect(added).toHaveLength(1);
     expect(added[0].item.title).toBe('新增条目');
     expect(added[0].originalIndex).toBe(result.items.findIndex(item => item.type === 'added'));

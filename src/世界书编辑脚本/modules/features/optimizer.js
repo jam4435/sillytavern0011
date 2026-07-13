@@ -612,6 +612,17 @@ function getActiveCompareFilter($modal) {
   return ($modal.data('compare-filter') || 'all').toString();
 }
 
+function bindLorebookCompareFilterEvents(parentDoc) {
+  const selector = `#${LOREBOOK_COMPARE_MODAL_ID} .compare-filter-button`;
+  $(parentDoc)
+    .off('click', selector)
+    .on('click.lorebookCompareFilter', selector, function () {
+      const $modal = $(`#${LOREBOOK_COMPARE_MODAL_ID}`, parentDoc);
+      $modal.data('compare-filter', ($(this).attr('data-compare-filter') || 'all').trim());
+      renderLorebookCompareResult();
+    });
+}
+
 function renderCompareValuePanelV2(label, value, emptyText = '(空)') {
   return `
     <div class="compare-diff-panel">
@@ -1499,6 +1510,7 @@ const swapLorebookCompareDirection = errorCatched(async $button => {
 
 export function initOptimizer() {
   const parentDoc = window.parent.document;
+  bindLorebookCompareFilterEvents(parentDoc);
   if ($('#lorebook-optimize-modal', parentDoc).length > 0) return;
   ensureLorebookCompareStyles();
 
@@ -1724,12 +1736,6 @@ export function initOptimizer() {
         }
       }
     }
-  });
-
-  $(parentDoc).on('click', `#${LOREBOOK_COMPARE_MODAL_ID} .compare-filter-button`, function () {
-    const $modal = $(`#${LOREBOOK_COMPARE_MODAL_ID}`, parentDoc);
-    $modal.data('compare-filter', ($(this).attr('data-compare-filter') || 'all').trim());
-    renderLorebookCompareResult();
   });
 
   $(parentDoc).on(

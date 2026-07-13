@@ -1,4 +1,5 @@
 import type { InventoryItem } from '../types';
+import { generatedInventoryAssets } from './inventoryGeneratedIconAssets';
 
 import medicinePill1 from '../assets/icons/jinyong/medicine_pill_1.png?url';
 import medicinePill2 from '../assets/icons/jinyong/medicine_pill_2.jpg?url';
@@ -139,6 +140,19 @@ import miscQuest2 from '../assets/icons/jinyong/misc_quest_2.jpg?url';
 import miscQuest3 from '../assets/icons/jinyong/misc_quest_3.jpg?url';
 import miscQuest4 from '../assets/icons/jinyong/misc_quest_4.jpg?url';
 
+import reviewedEquipSaberDivine from '../assets/icons/reviewed/equip_saber_divine_game.jpg?url';
+import reviewedEquipSaberExceptional from '../assets/icons/reviewed/equip_saber_exceptional_game.png?url';
+import reviewedEquipSwordSupreme from '../assets/icons/reviewed/equip_sword_supreme_game.png?url';
+import reviewedMedicineElixirDivine from '../assets/icons/reviewed/medicine_elixir_divine_game.jpg?url';
+import reviewedMedicineHerbExceptional from '../assets/icons/reviewed/medicine_herb_exceptional_game.jpg?url';
+import reviewedMedicineHerbRare from '../assets/icons/reviewed/medicine_herb_rare_game.jpg?url';
+import reviewedMedicineHerbSupreme from '../assets/icons/reviewed/medicine_herb_supreme_game.jpg?url';
+import reviewedMedicinePelletRare from '../assets/icons/reviewed/medicine_pellet_rare_game.jpg?url';
+import reviewedMedicinePoisonExceptional from '../assets/icons/reviewed/medicine_poison_exceptional_game.jpg?url';
+import reviewedMedicinePoisonFine from '../assets/icons/reviewed/medicine_poison_fine_game.jpg?url';
+import reviewedMedicineSachetFine from '../assets/icons/reviewed/medicine_sachet_fine_game.jpg?url';
+import reviewedMedicineSalveExceptional from '../assets/icons/reviewed/medicine_salve_exceptional_game.jpg?url';
+
 export type InventoryVisualCategory =
   | '丹药'
   | '药丸'
@@ -187,25 +201,28 @@ export interface InventoryVisualResult {
   matchedBy: 'name' | 'type' | 'fallback';
 }
 
-type RankAssets = readonly [string, string, string, string];
+type LegacyRankAssets = readonly [string, string, string, string];
+type RankAssetOverrides = readonly (string | undefined)[];
 
-const rankTierByKey: Record<string, number> = {
+const rankIndexByKey: Record<string, number> = {
   WHITE: 0,
-  GREEN: 0,
-  BLUE: 1,
-  PURPLE: 2,
-  GOLD: 3,
-  RED: 3,
+  GREEN: 1,
+  BLUE: 2,
+  PURPLE: 3,
+  GOLD: 4,
+  RED: 5,
   凡品: 0,
-  精品: 0,
-  珍品: 1,
-  极品: 2,
-  絕品: 3,
-  绝品: 3,
-  神品: 3,
+  精品: 1,
+  珍品: 2,
+  极品: 3,
+  絕品: 4,
+  绝品: 4,
+  神品: 5,
 };
 
-const assets: Record<InventoryVisualCategory, RankAssets> = {
+const legacyTierByRankIndex = [0, 0, 1, 2, 3, 3] as const;
+
+const assets: Record<InventoryVisualCategory, LegacyRankAssets> = {
   丹药: [medicinePill1, medicinePill2, medicinePill3, medicinePill4],
   药丸: [medicinePellet1, medicinePellet2, medicinePellet3, medicinePellet4],
   药散: [medicinePowder1, medicinePowder2, medicinePowder3, medicinePowder3],
@@ -245,6 +262,79 @@ const assets: Record<InventoryVisualCategory, RankAssets> = {
   容器杂具: [miscContainer1, miscContainer2, miscContainer3, miscContainer4],
   机关奇物: [miscMechanism1, miscMechanism2, miscMechanism3, miscMechanism4],
   任务信物: [miscQuest1, miscQuest2, miscQuest3, miscQuest4],
+};
+
+const aiAssets = generatedInventoryAssets as Partial<Record<InventoryVisualCategory, readonly string[]>>;
+
+// Candidate-specific approvals override cell-level approvals. Unreviewed supported cells use AI assets.
+const reviewedAssets: Partial<Record<InventoryVisualCategory, RankAssetOverrides>> = {
+  丹药: [
+    medicinePill1,
+    generatedInventoryAssets.丹药[1],
+    undefined,
+    undefined,
+    medicinePill4,
+    reviewedMedicineElixirDivine,
+  ],
+  药丸: [
+    medicinePellet1,
+    generatedInventoryAssets.药丸[1],
+    reviewedMedicinePelletRare,
+    generatedInventoryAssets.药丸[3],
+    generatedInventoryAssets.药丸[4],
+    generatedInventoryAssets.药丸[5],
+  ],
+  药散: [medicinePowder1, ...generatedInventoryAssets.药散.slice(1)],
+  药酒: [
+    medicineWine1,
+    generatedInventoryAssets.药酒[1],
+    medicineWine2,
+    medicineWine3,
+    medicineWine4,
+    generatedInventoryAssets.药酒[5],
+  ],
+  膏药: [
+    medicineSalve1,
+    generatedInventoryAssets.膏药[1],
+    generatedInventoryAssets.膏药[2],
+    reviewedMedicineSalveExceptional,
+    medicineSalve3,
+    generatedInventoryAssets.膏药[5],
+  ],
+  香囊: [
+    medicineIncense1,
+    reviewedMedicineSachetFine,
+    medicineIncense2,
+    generatedInventoryAssets.香囊[3],
+    medicineIncense4,
+    generatedInventoryAssets.香囊[5],
+  ],
+  灵果: [
+    medicineFruit1,
+    generatedInventoryAssets.灵果[1],
+    medicineFruit2,
+    medicineFruit3,
+    medicineFruit4,
+    generatedInventoryAssets.灵果[5],
+  ],
+  毒物: [
+    medicinePoison1,
+    reviewedMedicinePoisonFine,
+    medicinePoison2,
+    reviewedMedicinePoisonExceptional,
+    medicinePoison4,
+    medicinePoison4,
+  ],
+  药材: [
+    medicineHerb1,
+    medicineHerb1,
+    reviewedMedicineHerbRare,
+    reviewedMedicineHerbExceptional,
+    reviewedMedicineHerbSupreme,
+    generatedInventoryAssets.药材[5],
+  ],
+  剑: [equipSword1, equipSword1, equipSword2, equipSword3, reviewedEquipSwordSupreme, equipSword4],
+  刀: [equipSaber1, equipSaber1, equipSaber2, reviewedEquipSaberExceptional, equipSaber4, reviewedEquipSaberDivine],
 };
 
 const normalize = (value: string | undefined): string =>
@@ -364,9 +454,10 @@ export function resolveInventoryVisual(item: InventoryItem): InventoryVisualResu
         : item.type === 'SECRET'
           ? inferSecretCategory(item)
           : inferMiscCategory(item);
-  const tier = rankTierByKey[item.rank] ?? rankTierByKey[item.elixirInfo?.rank || ''] ?? 0;
+  const rankIndex = rankIndexByKey[item.rank] ?? rankIndexByKey[item.elixirInfo?.rank || ''] ?? 0;
+  const legacyTier = legacyTierByRankIndex[rankIndex] ?? 0;
   return {
-    src: assets[inferred.category][tier],
+    src: reviewedAssets[inferred.category]?.[rankIndex] ?? aiAssets[inferred.category]?.[rankIndex] ?? assets[inferred.category][legacyTier],
     label: inferred.category,
     category: inferred.category,
     matchedBy: inferred.matchedBy,
