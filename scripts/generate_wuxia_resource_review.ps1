@@ -14,12 +14,8 @@ if (-not $OutputPath) {
 $templatePath = Join-Path $projectRoot 'scripts\templates\wuxia_resource_review.template.html'
 $martialDatabasePath = Join-Path $projectRoot 'src\武侠\data\_合并后功法.json'
 $inventoryCatalogPath = Join-Path $projectRoot 'src\武侠\utils\inventoryIconCatalog.ts'
+$generatedInventorySupplementDirectory = Join-Path $projectRoot 'src\武侠\assets\icons\generated\inventory-v1'
 $generatedMedicineVersions = @(
-  [ordered]@{
-    id = 'game-reference-v4'
-    label = 'AI 游戏参考 V4'
-    directory = Join-Path $projectRoot 'src\武侠\assets\icons\generated\medicine-v4'
-  },
   [ordered]@{
     id = 'guofeng-v3'
     label = 'AI 国风 V3'
@@ -123,10 +119,14 @@ function Add-EmbeddedAsset {
 
 $martialDatabase = Get-Content -Raw -LiteralPath $martialDatabasePath | ConvertFrom-Json
 $imageExtensions = @('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')
-$namedGameFiles = @(
+$allGameImageFiles = @(
   Get-ChildItem -LiteralPath $GameIconsRoot -File |
+    Where-Object { $imageExtensions -contains $_.Extension.ToLowerInvariant() }
+)
+$namedGameFiles = @(
+  $allGameImageFiles |
     Where-Object {
-      $imageExtensions -contains $_.Extension.ToLowerInvariant() -and $_.BaseName -match '[\u4e00-\u9fff]'
+      $_.BaseName -match '[\u4e00-\u9fff]'
     } |
     ForEach-Object {
       [pscustomobject]@{
@@ -245,8 +245,88 @@ $generatedMedicineSlugByCategory = @{
   '药材' = 'herb'
 }
 
+$generatedInventorySupplementSlugByCategory = @{
+  '枪戟' = 'spear'
+  '棍棒' = 'staff'
+  '弓' = 'bow'
+  '斧' = 'axe'
+  '锤' = 'hammer'
+  '鞭' = 'whip'
+  '扇' = 'fan'
+  '护手' = 'glove'
+  '暗器' = 'hidden'
+  '衣甲' = 'armor'
+  '鞋履' = 'shoes'
+  '饰品' = 'accessory'
+  '令牌印玺' = 'token'
+  '地图' = 'map'
+  '书信文书' = 'document'
+  '矿石金属' = 'ore'
+  '兽材' = 'beast'
+  '珠玉' = 'gem'
+  '容器杂具' = 'container'
+  '机关奇物' = 'mechanism'
+  '任务信物' = 'quest'
+}
+
+$filenameGameCandidatePatterns = [ordered]@{
+  '丹药' = '^(?:dan(?:\d+)?|nedan|goldyao\d*)$|丹'
+  '药丸' = '丸|pill|^dan(?:2|5|22|23|24|25|28|40)$'
+  '药散' = '散|powder|^dan(?:7|20)$'
+  '药酒' = 'wine|酒|醉'
+  '膏药' = '膏|salve|medicine|^dan(?:3|20)$'
+  '香囊' = 'amulet|香囊|藥囊|药囊|bag'
+  '灵果' = 'fruit|靈果|灵果|仙果|朱果|^dan(?:21|27)$|herbal1_10'
+  '毒物' = 'poison|toxic|venom|snake|frog|corpse|毒|蠍|蝎|蜈蚣'
+  '药材' = 'herb|ginseng|藥材|药材|草|芝|參|参'
+  '剑' = 'sword|劍|剑'
+  '刀' = 'saber|blade|knife|刀'
+  '枪戟' = 'spear|lance|halberd|槍|枪|戟|矛|槊'
+  '棍棒' = 'staff|club|stick|棍|棒|杖'
+  '弓' = 'bow|弓|弩'
+  '斧' = 'axe|斧|鉞|钺'
+  '锤' = 'hammer|錘|锤|槌'
+  '扇' = 'fan|扇'
+  '鞭' = 'whip|鞭'
+  '护手' = 'glove|gauntlet|掌套|拳套|護手|护手'
+  '暗器' = 'dart|needle|hidden|暗器|針|针|鏢|镖'
+  '衣甲' = 'armor|armour|robe|shirt|cloth|衣|甲|袍|衫|鎧|铠'
+  '鞋履' = 'shoe|boot|鞋|靴|履'
+  '饰品' = 'accessory|amulet|ring|necklace|bracelet|飾|饰|佩|簪|釵|钗|墜|坠'
+  '内功经诀' = 'book|scroll|manual|經|经|訣|诀|心法|神功|內功|内功'
+  '剑谱' = 'sword|劍|剑|劍譜|剑谱'
+  '刀谱' = 'saber|blade|刀|刀譜|刀谱'
+  '拳掌谱' = 'fist|palm|拳|掌|指|爪'
+  '轻功身法' = 'qinggong|step|步|輕功|轻功|身法'
+  '医毒典籍' = 'medicine|medical|poison|醫|医|藥|药|毒'
+  '阵法杂典' = 'formation|array|陣|阵|譜|谱|圖|图'
+  '令牌印玺' = 'token|seal|badge|令|牌|印|璽|玺'
+  '地图' = 'map|地圖|地图|輿圖|舆图'
+  '书信文书' = 'letter|document|paper|scroll|信|書|书|文書|文书|手稿|卷宗'
+  '矿石金属' = 'ore|metal|iron|gold|silver|礦|矿|鐵|铁|銅|铜|銀|银'
+  '兽材' = 'beast|bone|horn|skin|fur|骨|角|皮|鱗|鳞|羽|爪'
+  '珠玉' = 'gem|jade|pearl|crystal|珠|玉|寶石|宝石|水晶|翡翠|瑪瑙|玛瑙'
+  '容器杂具' = 'container|box|bag|bottle|jar|pot|箱|匣|盒|瓶|罐|壺|壶|袋|囊'
+  '机关奇物' = 'mechanism|gear|key|lock|機關|机关|鑰匙|钥匙|鎖|锁|羅盤|罗盘'
+  '任务信物' = 'quest|token|item|信物|憑證|凭证|遺物|遗物|殘片|残片'
+}
+
+$filenameGameCandidateLimitPerCategory = 18
+$filenameGameFilesByCategory = @{}
+foreach ($entry in $filenameGameCandidatePatterns.GetEnumerator()) {
+  $filenameGameFilesByCategory[$entry.Key] = @(
+    $allGameImageFiles |
+      Where-Object { $_.BaseName -match $entry.Value } |
+      Sort-Object Name, FullName |
+      Select-Object -First $filenameGameCandidateLimitPerCategory
+  )
+}
+
 $inventoryCategoryByName = @{}
 $generatedInventoryCandidateCount = 0
+$generatedMedicineCandidateCount = 0
+$generatedSupplementCandidateCount = 0
+$filenameGameCandidateCount = 0
 $categoryLinePattern = [regex]'(?m)^\s*([^:\r\n]+):\s*\[([^\]]+)\],'
 foreach ($match in $categoryLinePattern.Matches($assetsBlockMatch.Groups['body'].Value)) {
   $category = $match.Groups[1].Value.Trim().Trim("'", '"')
@@ -254,6 +334,7 @@ foreach ($match in $categoryLinePattern.Matches($assetsBlockMatch.Groups['body']
   if ($assetVariables.Count -ne 4 -or -not $categoryToTopType.ContainsKey($category)) { continue }
 
   $rankEntries = [Collections.Generic.List[object]]::new()
+  $rankIndex = 0
   foreach ($rankDefinition in $rankDefinitions) {
     $assetVariable = $assetVariables[$rankDefinition.tier]
     if (-not $importPathByVariable.ContainsKey($assetVariable)) {
@@ -262,6 +343,22 @@ foreach ($match in $categoryLinePattern.Matches($assetsBlockMatch.Groups['body']
     $assetPath = $importPathByVariable[$assetVariable]
     $displaySource = $assetPath.Substring($projectRoot.Length + 1)
     $assetId = Add-EmbeddedAsset -Path $assetPath -DisplaySource $displaySource
+    $gameCandidates = [Collections.Generic.List[object]]::new()
+    if ($filenameGameFilesByCategory.ContainsKey($category)) {
+      $categoryGameFiles = @($filenameGameFilesByCategory[$category])
+      for ($candidateIndex = $rankIndex; $candidateIndex -lt $categoryGameFiles.Count; $candidateIndex += $rankDefinitions.Count) {
+        $gameFile = $categoryGameFiles[$candidateIndex]
+        $gameAssetId = Add-EmbeddedAsset -Path $gameFile.FullName -DisplaySource $gameFile.FullName
+        $gameCandidates.Add([ordered]@{
+          key = "inventory::$($categoryToTopType[$category])::$category::$($rankDefinition.label)::game-name::$($gameFile.Name)"
+          assetId = $gameAssetId
+          fileName = $gameFile.Name
+          sourcePath = $gameFile.FullName
+          sourceType = '游戏文件名候选'
+        })
+        $filenameGameCandidateCount++
+      }
+    }
     $generatedCandidates = [Collections.Generic.List[object]]::new()
     if ($generatedMedicineSlugByCategory.ContainsKey($category)) {
       $generatedFileName = 'medicine_{0}_{1}.jpg' -f $generatedMedicineSlugByCategory[$category], $rankDefinition.generatedSlug
@@ -278,7 +375,25 @@ foreach ($match in $categoryLinePattern.Matches($assetsBlockMatch.Groups['body']
             sourceType = $generatedVersion.label
           })
           $generatedInventoryCandidateCount++
+          $generatedMedicineCandidateCount++
         }
+      }
+    }
+    if ($generatedInventorySupplementSlugByCategory.ContainsKey($category)) {
+      $supplementFileName = 'inventory_{0}_{1}.jpg' -f $generatedInventorySupplementSlugByCategory[$category], $rankDefinition.generatedSlug
+      $supplementPath = Join-Path $generatedInventorySupplementDirectory $supplementFileName
+      if (Test-Path -LiteralPath $supplementPath) {
+        $supplementDisplaySource = $supplementPath.Substring($projectRoot.Length + 1)
+        $supplementAssetId = Add-EmbeddedAsset -Path $supplementPath -DisplaySource $supplementDisplaySource
+        $generatedCandidates.Add([ordered]@{
+          key = "inventory::$($categoryToTopType[$category])::$category::$($rankDefinition.label)::supplement-v1"
+          assetId = $supplementAssetId
+          fileName = $supplementFileName
+          sourcePath = $supplementDisplaySource
+          sourceType = 'AI 补图 V1'
+        })
+        $generatedInventoryCandidateCount++
+        $generatedSupplementCandidateCount++
       }
     }
     $rankEntries.Add([ordered]@{
@@ -288,8 +403,10 @@ foreach ($match in $categoryLinePattern.Matches($assetsBlockMatch.Groups['body']
       assetId = $assetId
       fileName = [IO.Path]::GetFileName($assetPath)
       reusedWithinCategory = ($assetVariables | Where-Object { $_ -eq $assetVariable }).Count -gt 1
+      gameCandidates = $gameCandidates
       generatedCandidates = $generatedCandidates
     })
+    $rankIndex++
   }
 
   $inventoryCategoryByName[$category] = [ordered]@{
@@ -315,12 +432,15 @@ $payload = [ordered]@{
   generatedAt = $generatedAt
   sourceStats = [ordered]@{
     martialDatabaseCount = $martialDatabase.功法.Count
-    gameImageCount = (Get-ChildItem -LiteralPath $GameIconsRoot -File | Where-Object { $imageExtensions -contains $_.Extension.ToLowerInvariant() }).Count
+    gameImageCount = $allGameImageFiles.Count
     matchedMartialArtCount = $martialGroups.Count
     martialCandidateCount = $directCandidateCount
     inventoryCategoryCount = $inventoryCategoryByName.Count
     inventoryReviewCellCount = $inventoryCategoryByName.Count * $rankDefinitions.Count
+    filenameGameCandidateCount = $filenameGameCandidateCount
     generatedInventoryCandidateCount = $generatedInventoryCandidateCount
+    generatedMedicineCandidateCount = $generatedMedicineCandidateCount
+    generatedSupplementCandidateCount = $generatedSupplementCandidateCount
   }
   martialArts = $martialGroups
   inventoryGroups = $inventoryGroups
