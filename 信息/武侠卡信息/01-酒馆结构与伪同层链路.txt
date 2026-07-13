@@ -1,5 +1,5 @@
 酒馆结构与伪同层卡运行链路
-更新时间: 2026-06-08
+更新时间: 2026-07-14
 
 一、先说结论
 
@@ -48,7 +48,7 @@
 
 6. 事件脚本层
 
-- `src/事件脚本/index.ts` 只加载主控文件；`era-main.js` 负责初始化、监听与调度；`era-event-loader.js` 扫当前角色绑定世界书；`era-event-checker.js` 负责触发/结束判断；`era-event-operations.js` 负责状态迁移；`era-write-helper.js` 负责 direct write 与 ERA write。来源：src/事件脚本/index.ts:1-7；src/事件脚本/era-main.js:76-201,369-431；src/事件脚本/era-event-loader.js:9-107；src/事件脚本/era-event-checker.js:16-54；src/事件脚本/era-event-operations.js:71-112,231-231,543-745,885-944；src/事件脚本/era-write-helper.js:40-59,66-149,258-310
+- `src/事件脚本/index.ts` 只加载主控文件；`era-main.js` 负责初始化、监听与调度；`era-event-loader.js` 扫当前角色绑定世界书；`era-event-checker.js` 负责触发/结束判断；`era-event-operations.js` 负责参与、结算、差分应用和线索；`era-world-events.js` 负责 `事件概要 -> 参与事件结局快照 -> 世界事件归档 -> 前端变量.事件结局状态` 的归档与旧存档迁移；`era-write-helper.js` 负责 direct write 与 ERA write。来源：src/事件脚本/index.ts:1-7；src/事件脚本/era-main.js:24-47,467-508；src/事件脚本/era-event-loader.js:64-188；src/事件脚本/era-event-checker.js:16-54；src/事件脚本/era-event-operations.js:993-1166；src/事件脚本/era-world-events.js:63-265；src/事件脚本/era-write-helper.js:237-284
 
 四、当前实际运行链路
 

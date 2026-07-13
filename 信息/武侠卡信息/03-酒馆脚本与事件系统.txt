@@ -1,5 +1,5 @@
 酒馆脚本与事件系统梳理
-更新时间: 2026-06-08
+更新时间: 2026-07-14
 
 一、范围与定位
 
@@ -41,8 +41,11 @@
 2. `era-main.js`：初始化、注册监听器、调度 `checkEvents()`、处理地点触发和后续线索计数。来源：src/事件脚本/era-main.js:76-201,369-431
 3. `era-event-loader.js`：扫描当前角色已绑定世界书，按条目名前缀和 JSON 内容构造 `eventDefinitions`。来源：src/事件脚本/era-event-loader.js:9-107；@types/function/worldbook.d.ts:13-32,64-155
 4. `era-event-checker.js`：判断是否到触发时间、是否超过结束时间。来源：src/事件脚本/era-event-checker.js:16-54
-5. `era-event-operations.js`：初始化事件列表、批量开始/结束事件、玩家参与事件、生成后续线索。来源：src/事件脚本/era-event-operations.js:71-112,231-231,543-745,885-944
-6. `era-write-helper.js`：去重签名窗口、构建 insert/update/delete patch，并提供 direct write 与 ERA write 两类落库接口。来源：src/事件脚本/era-write-helper.js:40-59,66-149,258-310
+5. `era-participant-entry.js`：校验普通事件定义、规范化地点与参与人物，并构造玩家参与事件的结局快照。来源：src/事件脚本/era-participant-entry.js:43-105；src/事件脚本/era-event-operations.js:993-1053
+6. `era-event-operations.js`：初始化事件列表、批量开始/结束事件、玩家参与事件、归档前结算和生成后续线索。来源：src/事件脚本/era-event-operations.js:399-632,993-1166,1240-1338
+7. `era-world-events.js`：计算 `原定 / 偏离 / 未知` 状态，迁移旧参与事件，并把完成结果归档到 `世界事件`。来源：src/事件脚本/era-world-events.js:9-134,137-266
+8. `era-write-helper.js`：去重签名窗口、构建 insert/update/delete patch，并提供 direct write 与 ERA write 两类落库接口。来源：src/事件脚本/era-write-helper.js:40-59,66-149,237-284
+9. `src/shared/worldEventContext.ts`：提供结局/差分比较和最多 16 条世界事件的提示词筛选规则，供事件脚本与武侠前端复用。来源：src/shared/worldEventContext.ts:1-75,87-123
 
 四、事件定义从哪里来
 
@@ -52,7 +55,7 @@
 2. `getWorldbook(name)` 逐本读取条目。来源：@types/function/worldbook.d.ts:13-32,64-155；角色卡/金庸群侠传/脚本/调试.js:31-50
 3. loader 侧会识别 `事件条目-`、`登场事件-`、`成长条目-` 等命名前缀并 `JSON.parse(entry.content)`。来源：src/事件脚本/era-event-loader.js:9-107
 
-当前仓内默认维护的世界书真源已切到 `世界书/金庸群侠传1/世界书/*`，方便在文件夹和酒馆之间单独 push/pull；`角色卡/金庸群侠传/世界书/*` 虽然仍是完整卡拆分副本，但已过时，不作为默认编辑目标。来源：角色卡/金庸群侠传/index.yaml:1-45,3739-3750,8601-8612；世界书/金庸群侠传1/世界书/输出提示词.txt:1-60
+当前仓内默认维护的世界书真源是 `世界书/金庸群侠传1/世界书/*`，方便在文件夹和酒馆之间单独 push/pull；`角色卡/金庸群侠传/世界书/*` 是卡包拆分副本，不作为默认编辑目标。发布角色卡或用角色卡副本导入世界书前，必须把真源修改同步到该副本或重新生成卡包。事件脚本读取的是酒馆里当前角色实际绑定的世界书，不会读取仓库真源；若脚本已升级而绑定世界书仍是缺少 `事件概要` 的旧版本，普通事件会在加载校验阶段全部被跳过，只有免校验的登场事件仍能加载。来源：src/事件脚本/era-event-loader.js:64-160；src/事件脚本/era-participant-entry.js:43-105；角色卡/金庸群侠传/index.yaml:1-45,3739-3750,8601-8612
 
 五、事件系统维护的关键状态
 
@@ -62,19 +65,53 @@
 - `事件系统.未发生事件 / 进行中事件 / 已完成事件`
 - `user数据.所在位置`
 - `参与事件`
+- `世界事件`
+- `前端变量.事件结局状态`
 - `附近传闻`
 - `后续事件线索`
 - `后续事件线索计数`
 - `角色数据`
 
-来源：src/事件脚本/era-main.js:76-201；src/事件脚本/era-event-operations.js:71-112,543-745,885-944；@types/function/variables.d.ts:65-148
+其中新增的结局与归档结构为：
 
-六、初始化与监听链路
+- `参与事件.<事件名>`：`{ 描述, 结局, insert, update, delete }`。`结局` 和三类差分共同表示玩家参与后的当前预期最终结果。
+- `世界事件.<完整事件名>`：`{ 时间, 地点, 概要 }`。保存已完成普通事件的实际结果，不保存登场事件。
+- `前端变量.事件结局状态.<完整事件名>`：`原定 | 偏离 | 未知`。只给前端归类和筛选使用，不属于 AI 可写变量。
+
+来源：src/事件脚本/README.md:137-163；src/事件脚本/era-world-events.js:9-16,63-142；src/shared/worldEventContext.ts:1-14
+
+六、事件概要、参与结局与世界事件归档
+
+1. 事件定义与参与初始化
+
+- 普通事件必须提供非空字符串 `事件概要`，表示事件按原定发展完成后的持久结果；登场事件和成长事件不要求该字段，也不进入世界事件归档。来源：src/事件脚本/era-participant-entry.js:43-105；src/事件脚本/era-world-events.js:27-32
+- 玩家加入事件时，系统把 `事件概要` 复制到 `参与事件.结局`，并深拷贝事件定义中的 `insert / update / delete`。此后参与事件结算只使用这份可编辑快照。来源：src/事件脚本/era-event-operations.js:993-1053,1072-1136
+- AI 只有在人物生死、长期状态、关系、阵营、关键物品、事件目标或后续事件成立条件发生实质变化时才修改 `结局`，并同步修改对应差分；普通对话、顺序变化和无长期影响的插曲不得触发重写。来源：世界书/金庸群侠传1/世界书/变量指导.txt:29-50
+
+2. 原定、偏离与未知
+
+- 后台在初始化、参与事件相关 ERA 写入完成后，以及事件结算前重新同步状态。来源：src/事件脚本/era-main.js:163-176,502-508；src/事件脚本/era-event-operations.js:1052-1053,1078-1081
+- `结局` 比较只去除首尾空白；差分比较会排序对象键、忽略 `$` 开头的 ERA 元数据，并把缺失差分视为 `{}`。当前结局或任一有效差分与事件定义不同即为 `偏离`，全部一致为 `原定`。来源：src/shared/worldEventContext.ts:21-65
+- `未知` 只用于旧存档无法恢复具体参与结局的情况，不为未参与事件创建状态。来源：src/事件脚本/era-world-events.js:63-107,197-265
+
+3. 完成归档与失败保护
+
+- 未参与事件使用定义中的 `事件概要` 归档；参与事件使用当前 `参与事件.结局` 归档。智能初始化时直接完成的过期普通事件也执行相同归档，登场事件不归档。来源：src/事件脚本/era-world-events.js:137-195；src/事件脚本/era-event-operations.js:601-632,1072-1166
+- `世界事件` 与 `前端变量.事件结局状态` 都通过 direct chat variable write 保存，不通过 ERA 指令写进消息楼层。归档后会重新读取变量确认记录有效，确认成功后才允许删除参与事件；失败时保留参与快照等待重试。来源：src/事件脚本/era-world-events.js:110-134,163-195；src/事件脚本/era-event-operations.js:1134-1166
+- 旧存档中，空结局且差分未变会补入原定概要并标记 `原定`；空结局但差分已变会写入“具体结果尚未记录”的回退文本并标记 `未知`；已完成且参与过、但参与快照已丢失的事件会以旧存档回退文本归档并标记 `未知`。已有有效世界事件不会被重复覆盖。来源：src/事件脚本/era-world-events.js:15-16,63-107,197-265
+
+4. 提示词边界
+
+- `世界事件` 在变量中保存全部记录，但主提示词和额外变量更新模型最多接收 16 条：先保留最近 8 条 `偏离 / 未知`，再按时间补足最近普通事件。发送内容只有事件名、时间、地点和概要。来源：src/shared/worldEventContext.ts:87-123；世界书/金庸群侠传1/世界书/输出提示词.txt:24-50,145-154
+- `前端变量` 只参与后台筛选，绝不整体序列化给 AI；`变量指导` 同时明确 `世界事件` 与 `前端变量` 都是前端只读区域。来源：世界书/金庸群侠传1/世界书/输出提示词.txt:145-154；世界书/金庸群侠传1/世界书/变量指导.txt:7-14,52-60
+- 当前阶段只完成归档和受控上下文注入，尚未实现额外 API 的后续事件推衍或后台人物自主推衍。
+
+七、初始化与监听链路
 
 1. 初始化
 
-- `initialize()` 先读 `getVariables({ type: 'chat' })`，确认 `stat_data` 和 `世界信息.时间` 存在，再加载世界书事件并初始化事件池。来源：src/事件脚本/era-main.js:369-431；@types/function/variables.d.ts:65-148
-- 如果初次失败，会等待 `GameInitialized` 全局信号；这个信号由前端新开局完成后发出。来源：src/事件脚本/era-main.js:369-431；src/武侠/utils/gameInitializer.ts:238-456
+- `initialize()` 先读 `getVariables({ type: 'chat' })`，确认 `stat_data` 和 `世界信息.时间` 存在，再加载世界书事件、初始化事件池、迁移参与结局并补建世界事件归档。来源：src/事件脚本/era-main.js:467-508；@types/function/variables.d.ts:65-148
+- 如果初次失败，会等待 `GameInitialized` 全局信号；这个信号由前端新开局完成后发出。来源：src/事件脚本/era-main.js:519-574；src/武侠/utils/gameInitializer.ts:238-456
 
 2. 监听
 
@@ -82,12 +119,12 @@
 - `MESSAGE_SENT`：处理后续事件线索计数器，并调度一次事件检查。来源：src/事件脚本/era-main.js:76-201；@types/iframe/event.d.ts:289-289
 - `era:writeDone`：感知变量写完后的状态变化，但会跳过纯 resync、directChatWrite 和 apiWrite。来源：src/事件脚本/era-main.js:76-201；src/事件脚本/era-write-helper.js:258-310
 
-七、`writeDirect*` 与 `writeEra*` 的边界
+八、`writeDirect*` 与 `writeEra*` 的边界
 
 1. `writeDirect*`
 
 - 直接 `updateVariablesWith(..., { type: 'chat' })` 修改 `stat_data`，然后手动补发一个带 `actions.directChatWrite` 的 `era:writeDone`。来源：src/事件脚本/era-write-helper.js:258-310；@types/function/variables.d.ts:93-148
-- 适合脚本自维护字段，如 `事件系统` 状态、`附近传闻`、`后续事件线索`、计数器。来源：src/事件脚本/era-event-operations.js:543-745,885-944；src/事件脚本/era-write-helper.js:258-310
+- 适合脚本自维护字段，如 `事件系统` 状态、`世界事件`、`前端变量.事件结局状态`、`附近传闻`、`后续事件线索`和计数器。来源：src/事件脚本/era-world-events.js:110-134,163-265；src/事件脚本/era-write-helper.js:237-284
 
 2. `writeEra*`
 
@@ -98,25 +135,26 @@
 
 当前仓内的正确方向是：事件 bookkeeping 尽量 direct write，人物与剧情差分再考虑走 ERA write；不要把所有字段都回流到最后一条 AI 消息。来源：src/事件脚本/era-write-helper.js:258-310；src/事件脚本/era-event-operations.js:543-745,885-944
 
-八、世界书、事件脚本、导出脚本三者的边界
+九、世界书、事件脚本、导出脚本三者的边界
 
-1. 世界书负责“内容定义”：事件 JSON、登场人物档案、变量写入规则、叙事约束。维护上默认看 `世界书/金庸群侠传1/世界书/*`，不要优先改 `角色卡/金庸群侠传/世界书/*` 那份过时副本。普通事件的 `事件引子` 是非空字符串，`附近传闻` 范围固定由 `事件地点` 前两级派生。来源：世界书/金庸群侠传1/世界书/变量指导.txt:1-60；世界书/金庸群侠传1/世界书/cot.txt:1-23；世界书/金庸群侠传1/世界书/射雕事件条目-第1回-01-郭杨邀饮说书人.yaml:1-70；世界书/金庸群侠传1/世界书/神雕事件条目-第1回-01-南湖采莲遇武三通.yaml:1-50
+1. 世界书负责“内容定义”：事件 JSON、事件概要、登场人物档案、变量写入规则、叙事约束。维护上默认修改 `世界书/金庸群侠传1/世界书/*`，发布时再同步到酒馆实际绑定的世界书或角色卡拆分副本。普通事件的 `事件引子` 与 `事件概要` 都是非空字符串。来源：世界书/金庸群侠传1/世界书/变量指导.txt:1-60；世界书/金庸群侠传1/世界书/射雕事件条目-第1回-01-郭杨邀饮说书人.yaml:1-70；src/事件脚本/era-participant-entry.js:43-105
 2. ERA 脚本负责“变量写入基础设施”：监听 `era:*`、拼补丁块、广播写入完成事件。来源：角色卡/金庸群侠传/脚本/ERA变量框架-魔改.js:1-20
 3. `src/事件脚本` 负责“何时触发、如何推进、何时结束、写哪些状态”。来源：src/事件脚本/era-main.js:76-201；src/事件脚本/era-event-operations.js:543-745,885-944
 4. `隐藏楼层.js` 不属于事件系统；`调试.js` 也不属于事件推进链，只是诊断工具。来源：角色卡/金庸群侠传/脚本/隐藏楼层.js:1-13；角色卡/金庸群侠传/脚本/调试.js:1-102
 
-九、当前主要风险
+十、当前主要风险
 
-1. `参与事件` key 体系仍有完整名/短名不一致风险，会影响“已参与”判断和结算。来源：src/事件脚本/era-event-operations.js:543-745
-2. 事件定义默认只在初始化和 `CHAT_CHANGED` 时重读，没有直接监听 `WORLDINFO_UPDATED` / `WORLDINFO_ENTRIES_LOADED`。来源：src/事件脚本/era-main.js:76-201；@types/iframe/event.d.ts:223-224,272-273,381-385,473-478
-3. `checkEvents()` 和世界书扫描仍是线性成本，事件量变大时成本会随条目数上升。来源：src/事件脚本/era-main.js:76-201；src/事件脚本/era-event-loader.js:9-107
-4. 只要角色差分继续走 `writeEra*`，最新 AI 消息体积就会继续膨胀。来源：角色卡/金庸群侠传/脚本/ERA变量框架-魔改.js:1-20；src/事件脚本/era-write-helper.js:66-149
+1. 世界书真源、酒馆中的独立世界书和角色卡拆分副本是三个发布面。只更新真源而没有 push/重新打包，会让新脚本读取旧事件结构；缺少必填 `事件概要` 时，普通事件会整批加载失败。来源：src/事件脚本/era-event-loader.js:64-160；src/事件脚本/era-participant-entry.js:43-105
+2. 事件定义默认只在初始化和 `CHAT_CHANGED` 时重读，没有直接监听 `WORLDINFO_UPDATED` / `WORLDINFO_ENTRIES_LOADED`；在线更新世界书后通常需要重载脚本或切换聊天。来源：src/事件脚本/era-main.js:467-574；@types/iframe/event.d.ts:223-224,272-273,381-385,473-478
+3. `checkEvents()` 和世界书扫描仍是线性成本，事件量变大时成本会随条目数上升。来源：src/事件脚本/era-main.js:163-291；src/事件脚本/era-event-loader.js:64-188
+4. 参与事件的角色差分仍会经过 `writeEra*`，最新 AI 消息体积仍可能增长；世界事件和隐藏状态已经改为 direct write，不应再回流 ERA。来源：src/事件脚本/era-event-operations.js:1021-1053；src/事件脚本/era-world-events.js:110-134,163-265
+5. 世界推衍与后台人物自主推衍尚未实现；当前世界事件区只是可靠归档和有限提示词上下文，不能当作完整模拟器。
 
-十、结论
+十一、结论
 
 当前“酒馆脚本与事件系统”应拆成两层理解：
 
 1. `隐藏楼层` 是伪同层视觉层，不解决状态逻辑。
 2. `ERA变量框架-魔改 + src/事件脚本` 才是变量写入与事件推进的实际运行链。
 
-后续改动时，优先守住三条边界：世界书定义边界、direct write / ERA write 边界、导出卡包脚本和仓内源码脚本的边界。只要这三条没混，事件系统会稳很多。来源：角色卡/金庸群侠传/index.yaml:9060-9111,11756-11779；src/事件脚本/era-main.js:76-201；src/事件脚本/era-write-helper.js:258-310
+后续改动时，优先守住四条边界：世界书定义与运行时归档的边界、AI 可写区与前端只读区的边界、direct write 与 ERA write 的边界、真源与实际发布世界书/角色卡副本的边界。来源：src/事件脚本/era-world-events.js:63-265；世界书/金庸群侠传1/世界书/变量指导.txt:7-14,29-60；src/事件脚本/era-write-helper.js:237-284

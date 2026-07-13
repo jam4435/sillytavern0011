@@ -1,3 +1,4 @@
+
 ```
 <!doctype html>
 <html lang="zh">
@@ -125,42 +126,11 @@
       .header-info {
         flex-grow: 1;
       }
-      .char-name-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-      }
       .char-name {
         font-size: 24px;
         font-weight: 700;
         color: var(--accent-light-color);
         letter-spacing: 1px;
-      }
-      .inline-editable-value {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-      }
-      .edit-trigger {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 24px;
-        padding: 0;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.08);
-        color: var(--text-secondary-color);
-        cursor: pointer;
-        font-size: 13px;
-        line-height: 1;
-      }
-      .edit-trigger:hover {
-        background: rgba(187, 134, 252, 0.16);
-        border-color: rgba(187, 134, 252, 0.32);
-        color: var(--accent-light-color);
       }
       .meta-info {
         display: flex;
@@ -427,10 +397,8 @@
       /* --- 折叠功能样式 --- */
       .collapsible-section {
         overflow: hidden;
-        transition:
-          max-height 0.4s ease-in-out,
-          opacity 0.4s ease-in-out;
-        max-height: 4000px; /* 设置一个足够大的值以容纳所有内容 */
+        transition: max-height 0.4s ease-in-out, opacity 0.4s ease-in-out;
+        max-height: 2000px; /* 设置一个足够大的值以容纳所有内容 */
         opacity: 1;
       }
 
@@ -448,9 +416,7 @@
         height: 32px;
         border-radius: 50%;
         background-color: rgba(255, 255, 255, 0.1);
-        transition:
-          background-color 0.3s,
-          transform 0.3s;
+        transition: background-color 0.3s, transform 0.3s;
         flex-shrink: 0;
         margin-left: 15px;
       }
@@ -463,9 +429,7 @@
         width: 20px;
         height: 20px;
         fill: var(--text-secondary-color);
-        transition:
-          transform 0.3s,
-          fill 0.3s;
+        transition: transform 0.3s, fill 0.3s;
       }
 
       .status-container.collapsed .collapse-toggle svg {
@@ -484,39 +448,23 @@
 
     <script>
       // --- 全局数据管理器，确保数据只加载一次 ---
-      if (!window.JM_StatusDataManager || window.JM_StatusDataManager.version !== '2026-07-image-index-fallback') {
-        window.JM_StatusDataManager = (function () {
+      window.JM_StatusDataManager =
+        window.JM_StatusDataManager ||
+        (function () {
           let dataPromise = null;
-          const MANAGER_VERSION = '2026-07-image-index-fallback';
 
           async function fetchDataInternal() {
             const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
-            const IMAGE_INDEX_URLS = [
-              'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/imageIndex.json',
-              'https://raw.githubusercontent.com/jam4435/my-image-hosting/ff27fd0f4b449daf0cc2fbc88e14003f6faa9778/jm/imageIndex.json',
-            ];
+            const IMAGE_INDEX_URL =
+              'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/imageIndex.json';
             const SYNONYMS_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/synonyms.json';
             const FACE_INDEX_URL = GITHUB_BASE_URL.replace('/jm/', '/face/') + 'face_index.json';
-            const fetchJsonWithFallback = async (urls, label) => {
-              let lastError = null;
-              for (const url of urls) {
-                try {
-                  const response = await fetch(url);
-                  if (!response.ok) throw new Error(`${label}加载失败: ${response.status}`);
-                  return await response.json();
-                } catch (error) {
-                  lastError = error;
-                  console.warn(`[状态栏 全局] ${label}加载失败，尝试备用源。`, error);
-                }
-              }
-              throw lastError || new Error(`${label}加载失败`);
-            };
 
             console.log('[状态栏 全局] 开始加载核心数据...');
 
             try {
-              const [imageIndexData, synonymResponse, faceResponse] = await Promise.all([
-                fetchJsonWithFallback(IMAGE_INDEX_URLS, '图片索引'),
+              const [imageResponse, synonymResponse, faceResponse] = await Promise.all([
+                fetch(IMAGE_INDEX_URL),
                 fetch(SYNONYMS_URL),
                 fetch(FACE_INDEX_URL),
               ]);
@@ -529,7 +477,8 @@
                 keywordRegex: null,
               };
 
-              data.imageIndex = imageIndexData;
+              if (!imageResponse.ok) throw new Error(`图片索引加载失败: ${imageResponse.status}`);
+              data.imageIndex = await imageResponse.json();
 
               if (synonymResponse.ok) {
                 const synonymData = await synonymResponse.json();
@@ -566,19 +515,14 @@
           }
 
           return {
-            version: MANAGER_VERSION,
             getData: function () {
               if (!dataPromise) {
-                dataPromise = fetchDataInternal().catch(error => {
-                  dataPromise = null;
-                  throw error;
-                });
+                dataPromise = fetchDataInternal();
               }
               return dataPromise;
             },
           };
         })();
-      }
 
       // --- IndexedDB 助手，用于存储用户上传的头像 ---
       const idbHelper = {
@@ -638,561 +582,292 @@
       document.addEventListener('DOMContentLoaded', () => {
         // 查找所有状态栏面板并为每个初始化
         const panels = document.querySelectorAll('.jm-state-panel');
-        console.log('[状态栏 全局] DOMContentLoaded，检测到状态栏面板数量:', panels.length);
+        
+        panels.forEach(panel => {
+          function displayError(message, details = '') {
+            const panelId = panel.id || '未知';
+            console.error(`[状态栏 ${panelId}] ` + message, details);
+            panel.innerHTML = `<div style="color: var(--red-color); padding: 20px; font-family: monospace; white-space: pre-wrap;"><h3>状态栏错误</h3><p>${message}</p><details><summary>详细信息</summary><p>${details}</p></details></div>`;
+          }
 
-        panels.forEach((panel, panelIndex) => {
-          const panelId = panel.id || panel.dataset.panelKey || `panel-${panelIndex}`;
-          const debugPrefix = `[状态栏 ${panelId}]`;
-          let debugHooksInstalled = false;
-          function debugLog(message, details) {
-            if (details === undefined) console.log(`${debugPrefix} ${message}`);
-            else console.log(`${debugPrefix} ${message}`, details);
+        try {
+          const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
+          const rawData = `$2`;
+          const jsonData = JSON.parse(rawData.trim());
+
+          function safeGet(obj, path, defaultValue = undefined) {
+            const keys = Array.isArray(path) ? path : path.split('.');
+            let result = obj;
+            for (const key of keys) {
+              result = result?.[key];
+              if (result === undefined) return defaultValue;
+            }
+            return result;
           }
-          function debugError(message, error, details) {
-            if (details === undefined) console.error(`${debugPrefix} ${message}`, error);
-            else console.error(`${debugPrefix} ${message}`, error, details);
+
+          function uniq(arr) {
+            return Array.from(new Set(arr));
           }
-          function previewValue(value, maxLength) {
-            const limit = typeof maxLength === 'number' ? maxLength : 240;
-            let text = '';
-            if (typeof value === 'string') {
-              text = value;
-            } else {
-              try {
-                text = JSON.stringify(value);
-              } catch (error) {
-                text = String(value);
+
+          // --- 数据现在由全局管理器提供 ---
+          let imageIndex, synonymMap, allKeywords, keywordRegex, fallbackAvatars;
+
+          // --- 每个面板实例独有的状态 ---
+          let currentGalleryImages = [];
+          let currentGalleryIndex = 0;
+          let currentGalleryBaseUrl = '';
+          let portraitClickListener = null; // 用于管理头像点击事件
+
+          function getDeterministicRandomIndex(seed, max) {
+            if (!seed || max === 0) return 0;
+            let hash = 0;
+            for (let i = 0; i < seed.length; i++) {
+              const char = seed.charCodeAt(i);
+              hash = (hash << 5) - hash + char;
+              hash |= 0; // Convert to 32bit integer
+            }
+            return Math.abs(hash) % max;
+          }
+
+          async function fetchData() {
+            try {
+              const sharedData = await window.JM_StatusDataManager.getData();
+              // 将共享数据赋值给面板实例的变量
+              imageIndex = sharedData.imageIndex;
+              synonymMap = sharedData.synonymMap;
+              fallbackAvatars = sharedData.fallbackAvatars;
+              allKeywords = sharedData.allKeywords;
+              keywordRegex = sharedData.keywordRegex;
+
+              console.log(`[状态栏 ${panel.id}] 已从全局管理器获取数据。`);
+              return true;
+            } catch (error) {
+              const panelId = panel.id || '未知';
+              console.error(`[状态栏 ${panelId}] 从全局管理器获取数据失败:`, error);
+              displayError('核心数据加载失败', `错误: ${error.message}`);
+              return false;
+            }
+          }
+
+          function findImagesByKeyword(textToSearch) {
+            if (!textToSearch || typeof textToSearch !== 'string') {
+              return [];
+            }
+            let preliminaryMatches = [];
+            for (const keyword of allKeywords) {
+              if (textToSearch.includes(keyword)) {
+                preliminaryMatches.push(keyword);
               }
             }
-            if (text.length > limit) {
-              return `${text.slice(0, limit)}...(共 ${text.length} 字符)`;
-            }
-            return text;
-          }
-          function describeValue(value) {
-            if (Array.isArray(value)) return `array(${value.length})`;
-            if (value === null) return 'null';
-            return typeof value;
-          }
-          function requireElement(selector, stageLabel) {
-            const element = panel.querySelector(selector);
-            if (element) return element;
-            const error = new Error(`未找到关键节点: ${selector}`);
-            debugError(`${stageLabel} 缺少关键节点。`, error, {
-              selector,
-              panelHtmlPreview: previewValue(panel.innerHTML, 600),
-            });
-            throw error;
-          }
-          function reportSuspiciousRenderValue(path, value) {
-            if (typeof value === 'string' && /<[^>]+>/.test(value)) {
-              console.error(`${debugPrefix} 检测到可能破坏 innerHTML 渲染的原始文本。`, {
-                path,
-                valuePreview: previewValue(value, 400),
-              });
-              return;
-            }
-            if (Array.isArray(value)) {
-              value.forEach((item, index) => {
-                if (item !== null && typeof item === 'object') {
-                  console.error(`${debugPrefix} 检测到数组项不是纯文本，可能影响渲染。`, {
-                    path: `${path}[${index}]`,
-                    itemType: describeValue(item),
-                    itemPreview: previewValue(item, 400),
-                  });
-                }
-              });
-              return;
-            }
-            if (value !== null && typeof value === 'object') {
-              Object.entries(value).forEach(([nestedKey, nestedValue]) => {
-                reportSuspiciousRenderValue(`${path}.${nestedKey}`, nestedValue);
-              });
-            }
-          }
-          function validateRenderData(data) {
-            if (!data || typeof data !== 'object' || Array.isArray(data)) {
-              console.error(`${debugPrefix} 解析后的状态数据不是可渲染对象。`, {
-                dataType: describeValue(data),
-                dataPreview: previewValue(data, 400),
-              });
-              return;
-            }
-            Object.entries(data).forEach(([key, value]) => {
-              reportSuspiciousRenderValue(key, value);
-            });
-          }
-          function escapeHtml(value) {
-            return String(value === undefined || value === null ? '' : value)
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-              .replace(/"/g, '&quot;')
-              .replace(/'/g, '&#39;');
-          }
-          function installDebugHooks() {
-            if (debugHooksInstalled) return;
-            if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
-            window.addEventListener('error', event => {
-              debugError('捕获到全局 error 事件。', event.error || event.message, {
-                filename: event.filename,
-                lineno: event.lineno,
-                colno: event.colno,
-              });
-            });
-            window.addEventListener('unhandledrejection', event => {
-              debugError('捕获到未处理的 Promise 拒绝。', event.reason);
-            });
-            debugHooksInstalled = true;
-            debugLog('调试钩子已安装。');
-          }
-          function displayError(message, details) {
-            const detailText = details === undefined ? '' : String(details);
-            console.error(`${debugPrefix} ${message}`, detailText);
-            panel.innerHTML = `<div style="color: var(--red-color); padding: 20px; font-family: monospace; white-space: pre-wrap;"><h3>状态栏错误</h3><p>${escapeHtml(message)}</p><details><summary>详细信息</summary><p>${escapeHtml(detailText)}</p></details></div>`;
-          }
-
-          let rawData = '';
-          let jsonData = null;
-          try {
-            installDebugHooks();
-            debugLog('开始初始化。');
-            const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/jam4435/my-image-hosting/main/jm/';
-            const STATE_BLOCK_REGEX = /<(state\d+)>([\s\S]+?)<\/\1>/g;
-            rawData = `$2`;
-            const trimmedRawData = rawData.trim();
-            debugLog('收到原始状态数据。', {
-              rawDataLength: rawData.length,
-              rawDataPreview: previewValue(rawData, 500),
-            });
-            if (!trimmedRawData) {
-              throw new Error('rawData 为空，无法渲染状态栏。');
-            }
-            jsonData = JSON.parse(trimmedRawData);
-            debugLog('rawData JSON 解析成功。', {
-              rawDataLength: rawData.length,
-              name: jsonData && jsonData.Name !== undefined ? jsonData.Name : undefined,
-              identity: jsonData && jsonData.Status && jsonData.Status.Identity !== undefined ? jsonData.Status.Identity : undefined,
-              jsonType: describeValue(jsonData),
-            });
-            validateRenderData(jsonData);
-
-            function safeGet(obj, path, defaultValue) {
-              const fallbackValue = arguments.length >= 3 ? defaultValue : undefined;
-              const keys = Array.isArray(path) ? path : path.split('.');
-              let result = obj;
-              for (const key of keys) {
-                if (result === undefined || result === null) return fallbackValue;
-                result = result[key];
-                if (result === undefined) return fallbackValue;
-              }
-              return result;
-            }
-
-            function uniq(arr) {
-              return Array.from(new Set(arr));
-            }
-
-            function ensureObject(value) {
-              return _.isPlainObject(value) ? value : {};
-            }
-
-            function ensureString(value) {
-              return value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value);
-            }
-
-            const NAME_EDIT_TRIGGER_HTML =
-              '<button class="edit-trigger jm-edit-name-trigger" type="button" title="编辑名字">&#9998;</button>';
-            const OCCUPATION_EDIT_TRIGGER_HTML =
-              '<button class="edit-trigger jm-edit-occupation-trigger" type="button" title="编辑职业">&#9998;</button>';
-
-            // --- 数据现在由全局管理器提供 ---
-            let imageIndex, synonymMap, allKeywords, keywordRegex, fallbackAvatars;
-
-            // --- 每个面板实例独有的状态 ---
-            let currentGalleryImages = [];
-            let currentGalleryIndex = 0;
-            let currentGalleryBaseUrl = '';
-            let portraitClickListener = null; // 用于管理头像点击事件
-
-            function getDeterministicRandomIndex(seed, max) {
-              if (!seed || max === 0) return 0;
-              let hash = 0;
-              for (let i = 0; i < seed.length; i++) {
-                const char = seed.charCodeAt(i);
-                hash = (hash << 5) - hash + char;
-                hash |= 0; // Convert to 32bit integer
-              }
-              return Math.abs(hash) % max;
-            }
-
-            async function fetchData() {
-              try {
-                const sharedData = await window.JM_StatusDataManager.getData();
-                // 将共享数据赋值给面板实例的变量
-                imageIndex = sharedData.imageIndex;
-                synonymMap = sharedData.synonymMap;
-                fallbackAvatars = sharedData.fallbackAvatars;
-                allKeywords = sharedData.allKeywords;
-                keywordRegex = sharedData.keywordRegex;
-
-                debugLog('已从全局管理器获取数据。', {
-                  imageKeywordCount: Object.keys(imageIndex).length,
-                  synonymCount: Object.keys(synonymMap).length,
-                  fallbackAvatarCount: fallbackAvatars.length,
-                });
-                return true;
-              } catch (error) {
-                debugError('从全局管理器获取数据失败。', error);
-                displayError('核心数据加载失败', `错误: ${error.message}`);
-                return false;
-              }
-            }
-
-            function findImagesByKeyword(textToSearch) {
-              if (!textToSearch || typeof textToSearch !== 'string') {
-                return [];
-              }
-              let preliminaryMatches = [];
-              for (const keyword of allKeywords) {
-                if (textToSearch.includes(keyword)) {
-                  preliminaryMatches.push(keyword);
-                }
-              }
-              const preciseMatches = preliminaryMatches.filter(shortMatch => {
-                return !preliminaryMatches.some(
-                  longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch),
-                );
-              });
-              const mainKeywordMatches = preciseMatches.map(match => {
-                const mainKeyword = synonymMap[match] || match;
-                return { keyword: mainKeyword, index: textToSearch.indexOf(match) };
-              });
-              mainKeywordMatches.sort((a, b) => a.index - b.index);
-
-              let foundImages = [];
-              for (const match of mainKeywordMatches) {
-                const imageList = imageIndex[match.keyword];
-                if (Array.isArray(imageList)) {
-                  const filteredList = imageList.filter(img => img !== '非头像.abc');
-                  foundImages = foundImages.concat(filteredList);
-                }
-              }
-              return uniq(foundImages);
-            }
-
-            function linkifyAllText() {
-              if (!keywordRegex) {
-                debugLog('跳过关键词链接化，keywordRegex 尚未初始化。');
-                return;
-              }
-
-              const textNodes = panel.querySelectorAll('.details-value, .narrative-content');
-              debugLog('开始关键词链接化。', {
-                candidateCount: textNodes.length,
-              });
-
-              textNodes.forEach(el => {
-                // 如果已经有链接，或者没有文本内容，则跳过
-                if (el.querySelector('a.image-link') || !el.textContent) return;
-
-                const originalText = el.textContent;
-
-                // 使用预编译的正则表达式进行替换
-                // 重置正则表达式的 lastIndex 以确保从头开始搜索
-                keywordRegex.lastIndex = 0;
-
-                // 仅当实际存在匹配时才进行替换操作，避免不必要的innerHTML重写
-                if (keywordRegex.test(originalText)) {
-                  keywordRegex.lastIndex = 0; // 重置以进行替换
-                  const newHtml = originalText.replace(keywordRegex, match => {
-                    const mainKeyword = synonymMap[match] || match;
-                    if (imageIndex[mainKeyword]) {
-                      return `<a href="#" class="image-link" data-keyword="${match}">${match}</a>`;
-                    }
-                    return match; // 如果关键词在 imageIndex 中没有对应项，则不创建链接
-                  });
-                  el.innerHTML = newHtml;
-                }
-              });
-              debugLog('关键词链接化完成。');
-            }
-
-            function parseStat(statValue) {
-              if (statValue === null || statValue === undefined) return null;
-              const normalizedValue = String(statValue)
-                .trim()
-                .replace(/（/g, '(')
-                .replace(/）/g, ')')
-                .replace(/[－−—–]/g, '-');
-              if (!normalizedValue) return null;
-              const rangeMatch = normalizedValue.match(
-                /^([+-]?\d+(?:\.\d+)?)\s*(?:→|->|=>|➡|⟶|➜)\s*([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/,
+            const preciseMatches = preliminaryMatches.filter(shortMatch => {
+              return !preliminaryMatches.some(
+                longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch),
               );
-              if (rangeMatch) {
-                return {
-                  mode: 'range',
-                  from: rangeMatch[1],
-                  to: rangeMatch[2],
-                  reason: rangeMatch[3] === undefined || rangeMatch[3] === null ? '' : rangeMatch[3].trim(),
-                };
+            });
+            const mainKeywordMatches = preciseMatches.map(match => {
+              const mainKeyword = synonymMap[match] || match;
+              return { keyword: mainKeyword, index: textToSearch.indexOf(match) };
+            });
+            mainKeywordMatches.sort((a, b) => a.index - b.index);
+
+            let foundImages = [];
+            for (const match of mainKeywordMatches) {
+              const imageList = imageIndex[match.keyword];
+              if (Array.isArray(imageList)) {
+                const filteredList = imageList.filter(img => img !== '非头像.abc');
+                foundImages = foundImages.concat(filteredList);
               }
-              const singleMatch = normalizedValue.match(/^([+-]?\d+(?:\.\d+)?)\s*(?:\((.*?)\))?$/);
-              if (singleMatch) {
-                return {
-                  mode: 'single',
-                  value: singleMatch[1],
-                  reason: singleMatch[2] === undefined || singleMatch[2] === null ? '' : singleMatch[2].trim(),
-                };
-              }
-              return null;
             }
+            return uniq(foundImages);
+          }
 
-            function isStatField(key) {
-              return key === 'Affection' || key === 'Libido';
-            }
+          function linkifyAllText() {
+            if (!keywordRegex) return;
 
-            // --- 新增：动态内容配置 ---
-            const DYNAMIC_CONTENT_CONFIG = {
-              // 格式 a: 数字变化 -> stat-box UI
-              Affection: { label: '好感度' },
-              Libido: { label: '性欲值' },
-              // 格式 b: 字符串 -> narrative-block UI
-              Thoughts: { label: '🧠 内心想法' },
-              RecentSex: { label: '📋 最近性行为' },
-              // 格式 c: 列表 -> modifications-list UI
-              ModificationsAndRestraints: { label: '身体改造与束具' },
-            };
+            panel.querySelectorAll('.details-value, .narrative-content').forEach(el => {
+              // 如果已经有链接，或者没有文本内容，则跳过
+              if (el.querySelector('a.image-link') || !el.textContent) return;
 
-            // --- 新增：UI渲染函数 ---
+              const originalText = el.textContent;
 
-            // 渲染 "stat-box" (用于好感度等)
-            function renderStat(label, value) {
-              const parsed = parseStat(value); // parseStat 是已有的函数
-              let valueHtml = '';
-              if (parsed) {
-                valueHtml =
-                  parsed.mode === 'range'
-                    ? `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`
-                    : `<div><span class="${Number(parsed.value) < 0 ? 'red' : 'green'}">${parsed.value}</span></div>${parsed.reason ? `<div class="stat-change-reason">(${parsed.reason})</div>` : ''}`;
-              } else {
-                valueHtml = String(value);
+              // 使用预编译的正则表达式进行替换
+              // 重置正则表达式的 lastIndex 以确保从头开始搜索
+              keywordRegex.lastIndex = 0;
+
+              // 仅当实际存在匹配时才进行替换操作，避免不必要的innerHTML重写
+              if (keywordRegex.test(originalText)) {
+                keywordRegex.lastIndex = 0; // 重置以进行替换
+                const newHtml = originalText.replace(keywordRegex, match => {
+                  const mainKeyword = synonymMap[match] || match;
+                  if (imageIndex[mainKeyword]) {
+                    return `<a href="#" class="image-link" data-keyword="${match}">${match}</a>`;
+                  }
+                  return match; // 如果关键词在 imageIndex 中没有对应项，则不创建链接
+                });
+                el.innerHTML = newHtml;
               }
-              return `
+            });
+          }
+
+          function parseStat(statString) {
+            if (typeof statString !== 'string') return null;
+            const match = statString.match(/(\d+)\s*→\s*(\d+)\s*\((.*?)\)/);
+            if (match) {
+              return { from: match[1], to: match[2], reason: match[3] };
+            }
+            return null;
+          }
+
+          // --- 新增：动态内容配置 ---
+          const DYNAMIC_CONTENT_CONFIG = {
+            // 格式 a: 数字变化 -> stat-box UI
+            Affection: { label: '好感度' },
+            Libido: { label: '性欲值' },
+            // 格式 b: 字符串 -> narrative-block UI
+            Thoughts: { label: '🧠 内心想法' },
+            RecentSex: { label: '📋 最近性行为' },
+            // 格式 c: 列表 -> modifications-list UI
+            ModificationsAndRestraints: { label: '身体改造与束具' },
+          };
+
+          // --- 新增：UI渲染函数 ---
+
+          // 渲染 "stat-box" (用于好感度等)
+          function renderStat(label, value) {
+            const parsed = parseStat(value); // parseStat 是已有的函数
+            let valueHtml = '';
+            if (parsed) {
+              valueHtml = `<div><span class="red">${parsed.from}</span> <span class="arrow">→</span> <span class="green">${parsed.to}</span></div><div class="stat-change-reason">(${parsed.reason})</div>`;
+            } else {
+              valueHtml = String(value);
+            }
+            return `
               <div class="stat-box">
                 <div class="stat-label">${label}</div>
                 <div class="stat-value">${valueHtml}</div>
               </div>
             `;
-            }
+          }
 
-            // 渲染 "narrative-block" (用于内心想法等)
-            function renderNarrative(label, value) {
-              return `
+          // 渲染 "narrative-block" (用于内心想法等)
+          function renderNarrative(label, value) {
+            return `
               <div class="narrative-block">
                 <span class="narrative-label">${label}</span>
                 <p class="narrative-content">${String(value)}</p>
               </div>
             `;
-            }
+          }
 
-            // 渲染 "list" (用于改造与束具等)
-            function renderList(label, items) {
-              if (!Array.isArray(items) || items.length === 0) return '';
-              const itemsHtml = items
-                .map(
-                  item => `
+          // 渲染 "list" (用于改造与束具等)
+          function renderList(label, items) {
+            if (!Array.isArray(items) || items.length === 0) return '';
+            const itemsHtml = items.map(item => `
               <li class="modifications-item">
                 <span class="details-value" data-keyword="${item}">${item}</span>
               </li>
-            `,
-                )
-                .join('');
-              return `
+            `).join('');
+            return `
               <div class="details-block">
                 <div class="details-header">${label}</div>
                 <ul class="modifications-list">${itemsHtml}</ul>
               </div>
             `;
-            }
+          }
 
-            const DYNAMIC_CONTENT_MAP = {
-              Status: {
-                title: '身份与当前状态',
-                icon: '🎖️',
-                labels: {
-                  Identity: '身份',
-                  Occupation: '职业',
-                  Affiliation: '从属',
-                  Temperament: '气质',
-                  Posture: '姿势',
-                },
+          const DYNAMIC_CONTENT_MAP = {
+            Status: {
+              title: '身份与当前状态',
+              icon: '🎖️',
+              labels: {
+                Identity: '身份',
+                Occupation: '职业',
+                Affiliation: '从属',
+                Temperament: '气质',
+                Posture: '姿势',
               },
-              Outfit: {
-                title: '服装与内衣',
-                icon: '👗',
-                labels: {
-                  Top: '上装',
-                  Bottom: '下装',
-                  Underwear: '内衣',
-                  Footwear: '鞋履',
-                },
+            },
+            Outfit: {
+              title: '服装与内衣',
+              icon: '👗',
+              labels: {
+                Top: '上装',
+                Bottom: '下装',
+                Underwear: '内衣',
+                Footwear: '鞋履',
               },
-              BodyDetails: {
-                title: '身体与性器细节',
-                icon: '🩸',
-                labels: {
-                  Mouth: '口腔',
-                  Breasts: '胸部',
-                  WombAndVagina: '子宫与阴道',
-                  Anus: '后庭',
-                  Hands: '手部',
-                  Legs: '腿部',
-                  Feet: '足部',
-                },
+            },
+            BodyDetails: {
+              title: '身体与性器细节',
+              icon: '🩸',
+              labels: {
+                Mouth: '口腔',
+                Breasts: '胸部',
+                WombAndVagina: '子宫与阴道',
+                Anus: '后庭',
+                Hands: '手部',
+                Legs: '腿部',
+                Feet: '足部',
               },
-            };
+            },
+          };
 
-            function getCurrentStateBlockIndex() {
-              if (typeof getIframeName !== 'function') return 0;
-              const iframeName = ensureString(getIframeName());
-              const match = iframeName.match(/^TH-message--(-?\d+)--(\d+)$/);
-              return match ? Number(match[2]) : 0;
-            }
+          function generateDynamicTabsAndContent(data) {
+            const EXCLUDED_KEYS = new Set([
+              'Name',
+              'Location',
+              'Time',
+              'Affection',
+              'Libido',
+              'Thoughts',
+              'RecentSex',
+              'ModificationsAndRestraints',
+              'Modifications',
+            ]);
 
-            function resolveCurrentStateBlock(messageText) {
-              const matches = [...ensureString(messageText).matchAll(STATE_BLOCK_REGEX)];
-              if (matches.length === 0) {
-                throw new Error('当前楼层中未找到 <stateN>...</stateN> 文本块。');
-              }
-              const stateBlockIndex = getCurrentStateBlockIndex();
-              const targetMatch =
-                matches[stateBlockIndex] ||
-                matches.find(match => ensureString(match[2]).trim() === ensureString(rawData).trim()) ||
-                matches[0];
-              return {
-                tagName: targetMatch[1],
-                start: targetMatch.index || 0,
-                end: (targetMatch.index || 0) + targetMatch[0].length,
-              };
-            }
+            let tabsHtml = '<div class="tabs">';
+            let contentsHtml = '';
+            let tabIndex = 0;
 
-            async function saveEditedStateText(nextData) {
-              const messageId = typeof getCurrentMessageId === 'function' ? getCurrentMessageId() : null;
-              if (typeof messageId !== 'number' || Number.isNaN(messageId)) {
-                throw new Error('无法获取当前楼层号。');
-              }
-              const currentMessage = getChatMessages(messageId)?.[0];
-              if (!currentMessage) {
-                throw new Error(`未找到楼层 ${messageId} 的消息内容。`);
-              }
-              const currentMessageText = ensureString(currentMessage.message);
-              const currentStateBlock = resolveCurrentStateBlock(currentMessageText);
-              const nextRawData = JSON.stringify(nextData, null, 2);
-              const replacement = `<${currentStateBlock.tagName}>${nextRawData}</${currentStateBlock.tagName}>`;
-              const nextMessageText =
-                currentMessageText.slice(0, currentStateBlock.start) + replacement + currentMessageText.slice(currentStateBlock.end);
-              await setChatMessages([{ message_id: messageId, message: nextMessageText }], { refresh: 'affected' });
-              rawData = nextRawData;
-            }
+            for (const key in data) {
+              if (
+                !EXCLUDED_KEYS.has(key) &&
+                typeof data[key] === 'object' &&
+                data[key] !== null &&
+                !Array.isArray(data[key])
+              ) {
+                const tabId = `dynamic-tab-${tabIndex}`;
+                const isActive = tabIndex === 0 ? 'active' : '';
+                const tabInfo = DYNAMIC_CONTENT_MAP[key] || { title: key, icon: '📋', labels: {} };
 
-            async function updateStateText({ newName, newOccupation }) {
-              const oldName = ensureString(jsonData.Name).trim();
-              const oldOccupation = ensureString(safeGet(jsonData, 'Status.Occupation', '')).trim();
-              if (newName === oldName && newOccupation === oldOccupation) return;
-              const nextData = _.cloneDeep(ensureObject(jsonData));
-              nextData.Name = newName;
-              nextData.Status = ensureObject(nextData.Status);
-              nextData.Status.Occupation = newOccupation;
-              await saveEditedStateText(nextData);
-              jsonData.Name = newName;
-              jsonData.Status = ensureObject(jsonData.Status);
-              jsonData.Status.Occupation = newOccupation;
-            }
+                tabsHtml += `<button class="tab-button ${isActive}" data-tab="${tabId}">${tabInfo.icon} ${tabInfo.title}</button>`;
 
-            async function editCharacterName() {
-              const oldName = ensureString(jsonData.Name).trim();
-              const oldOccupation = ensureString(safeGet(jsonData, 'Status.Occupation', '')).trim();
-              const promptedName = window.prompt('修改名字', oldName);
-              if (promptedName === null) return;
-              const newName = ensureString(promptedName).trim();
-              if (!newName) {
-                alert('名字不能为空。');
-                return;
-              }
-              await updateStateText({ newName, newOccupation: oldOccupation });
-            }
+                contentsHtml += `<div id="${tabId}" class="tab-content ${isActive}"><ul class="details-list">`;
 
-            async function editCharacterOccupation() {
-              const oldName = ensureString(jsonData.Name).trim();
-              const oldOccupation = ensureString(safeGet(jsonData, 'Status.Occupation', '')).trim();
-              const promptedOccupation = window.prompt('修改职业', oldOccupation);
-              if (promptedOccupation === null) return;
-              const newOccupation = ensureString(promptedOccupation).trim();
-              await updateStateText({ newName: oldName, newOccupation });
-            }
-
-            function generateDynamicTabsAndContent(data) {
-              const EXCLUDED_KEYS = new Set([
-                'Name',
-                'Location',
-                'Time',
-                'Affection',
-                'Libido',
-                'Thoughts',
-                'RecentSex',
-                'ModificationsAndRestraints',
-                'Modifications',
-              ]);
-
-              let tabsHtml = '<div class="tabs">';
-              let contentsHtml = '';
-              let tabIndex = 0;
-
-              for (const key in data) {
-                if (
-                  !EXCLUDED_KEYS.has(key) &&
-                  typeof data[key] === 'object' &&
-                  data[key] !== null &&
-                  !Array.isArray(data[key])
-                ) {
-                  const tabId = `dynamic-tab-${tabIndex}`;
-                  const isActive = tabIndex === 0 ? 'active' : '';
-                  const tabInfo = DYNAMIC_CONTENT_MAP[key] || { title: key, icon: '📋', labels: {} };
-
-                  tabsHtml += `<button class="tab-button ${isActive}" data-tab="${tabId}">${tabInfo.icon} ${tabInfo.title}</button>`;
-
-                  contentsHtml += `<div id="${tabId}" class="tab-content ${isActive}"><ul class="details-list">`;
-
-                  for (const subKey in data[key]) {
-                    const label = tabInfo.labels[subKey] || subKey;
-                    const value = data[key][subKey];
-                    const valueHtml =
-                      key === 'Status' && subKey === 'Occupation'
-                        ? `<span class="inline-editable-value"><span class="details-value">${escapeHtml(value)}</span>${OCCUPATION_EDIT_TRIGGER_HTML}</span>`
-                        : `<span class="details-value">${escapeHtml(value)}</span>`;
-                    contentsHtml += `
+                for (const subKey in data[key]) {
+                  const label = tabInfo.labels[subKey] || subKey;
+                  const value = data[key][subKey];
+                  contentsHtml += `
                     <li class="details-item">
                       <span class="details-label">${label}</span>
-                      ${valueHtml}
+                      <span class="details-value">${value}</span>
                     </li>
                   `;
-                  }
-
-                  contentsHtml += '</ul></div>';
-                  tabIndex++;
                 }
+
+                contentsHtml += '</ul></div>';
+                tabIndex++;
               }
-
-              tabsHtml += '</div>';
-
-              return { tabsHtml, contentsHtml };
             }
 
-            function updatePanel(data) {
-              debugLog('开始渲染面板。', { name: data && data.Name !== undefined ? data.Name : undefined, identity: safeGet(data, 'Status.Identity', '') });
-              // 1. 设置只包含静态部分的HTML框架
-              panel.innerHTML = `
+            tabsHtml += '</div>';
+
+            return { tabsHtml, contentsHtml };
+          }
+
+          function updatePanel(data) {
+            // 1. 设置只包含静态部分的HTML框架
+            panel.innerHTML = `
                         <div class="header">
                             <div class="portrait">
                                 <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="角色肖像" data-field="portrait" />
@@ -1201,13 +876,10 @@
                                 <input type="file" class="jm-portrait-upload" style="display:none" accept="image/*" />
                             </div>
                             <div class="header-info">
-                                <div class="char-name-row">
-                                    <div class="char-name" data-field="name"></div>
-                                    ${NAME_EDIT_TRIGGER_HTML}
-                                </div>
+                                <div class="char-name" data-field="Name"></div>
                                 <div class="meta-info">
-                                    <span class="location">📍 <span data-field="location"></span></span>
-                                    <span class="timestamp">🕰️ <span data-field="time"></span></span>
+                                    <span class="location">📍 <span data-field="Location"></span></span>
+                                    <span class="timestamp">🕰️ <span data-field="Time"></span></span>
                                 </div>
                             </div>
                             <div class="collapse-toggle" title="展开/折叠">
@@ -1237,652 +909,552 @@
                         </div>
                     `;
 
-              requireElement('#jm-dynamic-content-area', 'updatePanel');
-              const tabsContainer = requireElement('.tabs-container', 'updatePanel');
-              const tabContentContainer = requireElement('.tab-content-container', 'updatePanel');
-              requireElement('.jm-image-gallery', 'updatePanel');
-              requireElement('[data-field="portrait"]', 'updatePanel');
+            // 2. 填充静态头部数据
+            const staticFields = {
+              Name: data.Name,
+              Location: data.Location,
+              Time: data.Time,
+            };
 
-              // 2. 填充静态头部数据
-              const fieldMap = { name: 'Name', location: 'Location', time: 'Time' };
-              panel.querySelectorAll('[data-field]').forEach(el => {
-                const fieldName = el.getAttribute('data-field') || '';
-                const dataKey = fieldMap[fieldName];
-                if (!dataKey) return;
-                el.textContent = data[dataKey] || '';
-              });
-
-              // 3. 渲染所有动态内容
-              try {
-                renderDynamicContent(data);
-              } catch (error) {
-                debugError('动态内容渲染失败。', error, {
-                  dataPreview: previewValue(data, 600),
-                });
-                throw error;
+            for (const field in staticFields) {
+              const el = panel.querySelector(`[data-field="${field}"]`);
+              if (el && staticFields[field] !== undefined) {
+                el.textContent = staticFields[field];
               }
-
-              // 4. 生成并插入动态的Tabs和内容 (这部分逻辑不变)
-              const { tabsHtml, contentsHtml } = generateDynamicTabsAndContent(data);
-              tabsContainer.innerHTML = tabsHtml;
-              tabContentContainer.innerHTML = contentsHtml;
-              debugLog('面板渲染完成。', {
-                tabCount: panel.querySelectorAll('.tab-button').length,
-                htmlLength: panel.innerHTML.length,
-                dynamicContentLength: requireElement('#jm-dynamic-content-area', 'updatePanel').innerHTML.length,
-              });
             }
 
-            // --- 修改：主渲染循环 (支持自动格式检测和原始顺序) ---
-            function renderDynamicContent(data) {
-              const container = requireElement('#jm-dynamic-content-area', 'renderDynamicContent');
+            // 3. 渲染所有动态内容
+            renderDynamicContent(data);
 
-              // 定义哪些字段是头部信息，需要被排除
-              const HEADER_FIELDS = new Set(['Name', 'Location', 'Time']);
+            // 4. 生成并插入动态的Tabs和内容 (这部分逻辑不变)
+            const { tabsHtml, contentsHtml } = generateDynamicTabsAndContent(data);
+            panel.querySelector('.tabs-container').innerHTML = tabsHtml;
+            panel.querySelector('.tab-content-container').innerHTML = contentsHtml;
+          }
 
-              // 收集所有需要渲染的字段，并保持原始顺序
-              const itemsToRender = Object.keys(data)
-                .filter(
-                  key =>
-                    (!HEADER_FIELDS.has(key) && // 排除头部字段
-                      typeof data[key] !== 'object') ||
-                    Array.isArray(data[key]), // 排除对象（留给Tab），但保留数组
-                )
-                .map(key => {
-                  // 从配置中获取标签，如果没有则使用字段名
-                  const config = DYNAMIC_CONTENT_CONFIG[key];
-                  return {
-                    key,
-                    label: config ? config.label : key,
-                    value: data[key],
-                  };
-                });
+          // --- 修改：主渲染循环 (支持自动格式检测和原始顺序) ---
+          function renderDynamicContent(data) {
+            const container = panel.querySelector('#jm-dynamic-content-area');
+            if (!container) return;
 
-              debugLog('动态内容字段列表。', {
-                itemCount: itemsToRender.length,
-                items: itemsToRender.map(item => ({
-                  key: item.key,
-                  type: describeValue(item.value),
-                  valuePreview: previewValue(item.value, 120),
-                })),
+            // 定义哪些字段是头部信息，需要被排除
+            const HEADER_FIELDS = new Set(['Name', 'Location', 'Time']);
+
+            // 收集所有需要渲染的字段，并保持原始顺序
+            const itemsToRender = Object.keys(data)
+              .filter(key =>
+                !HEADER_FIELDS.has(key) && // 排除头部字段
+                typeof data[key] !== 'object' || Array.isArray(data[key]) // 排除对象（留给Tab），但保留数组
+              )
+              .map(key => {
+                // 从配置中获取标签，如果没有则使用字段名
+                const config = DYNAMIC_CONTENT_CONFIG[key];
+                return {
+                  key,
+                  label: config ? config.label : key,
+                  value: data[key],
+                };
               });
 
-              // 用于收集所有 stat 项，以便统一渲染
-              const statItems = [];
-              let dynamicHtml = '';
+            // 用于收集所有 stat 项，以便统一渲染
+            const statItems = [];
+            let dynamicHtml = '';
 
-              itemsToRender.forEach(item => {
-                try {
-                  let type = 'narrative'; // 默认类型
-                  const value = item.value;
+            itemsToRender.forEach(item => {
+              let type = 'narrative'; // 默认类型
+              let value = item.value;
 
-                  // 自动检测UI类型
-                  if (isStatField(item.key)) {
-                    type = 'stat';
-                  } else if (Array.isArray(value)) {
-                    type = 'list';
-                  }
-
-                  if (type === 'stat') {
-                    statItems.push(item);
-                  } else {
-                    // 如果遇到非 stat 项，且之前有 stat 项，则先渲染 stat 容器
-                    if (statItems.length > 0) {
-                      dynamicHtml += `<div class="core-stats">${statItems.map(statItem => renderStat(statItem.label, statItem.value)).join('')}</div>`;
-                      statItems.length = 0; // 清空 stat 项
-                    }
-                    // 渲染当前项
-                    switch (type) {
-                      case 'narrative':
-                        dynamicHtml += renderNarrative(item.label, item.value);
-                        break;
-                      case 'list':
-                        dynamicHtml += renderList(item.label, item.value);
-                        break;
-                    }
-                  }
-                } catch (error) {
-                  debugError(`渲染动态字段 ${item.key} 失败。`, error, {
-                    fieldKey: item.key,
-                    fieldType: describeValue(item.value),
-                    fieldValuePreview: previewValue(item.value, 400),
-                  });
-                  throw error;
-                }
-              });
-
-              // 确保最后的 stat 项也被渲染
-              if (statItems.length > 0) {
-                dynamicHtml += `<div class="core-stats">${statItems.map(statItem => renderStat(statItem.label, statItem.value)).join('')}</div>`;
+              // 自动检测UI类型
+              if (typeof value === 'string' && parseStat(value)) {
+                type = 'stat';
+              } else if (Array.isArray(value)) {
+                type = 'list';
               }
 
-              container.innerHTML = dynamicHtml;
-              debugLog('动态内容写入完成。', {
-                htmlLength: dynamicHtml.length,
-              });
-            }
-
-            async function updatePortrait(data) {
-              const portraitImg = requireElement('[data-field="portrait"]', 'updatePortrait');
-
-              // 统一管理事件监听器，先移除旧的
-              if (portraitClickListener) {
-                portraitImg.removeEventListener('click', portraitClickListener);
-                portraitClickListener = null;
-              }
-
-              const charName = safeGet(data, 'Name', '');
-              const storageKey = `jm_user_portrait_${charName}`;
-              debugLog('开始更新头像。', {
-                charName,
-                storageKey,
-              });
-
-              try {
-                const savedPortraitBlob = await idbHelper.get(storageKey);
-                if (savedPortraitBlob) {
-                  const objectURL = URL.createObjectURL(savedPortraitBlob);
-                  portraitImg.src = objectURL;
-                  // 浏览器加载后立即释放，避免内存泄漏
-                  portraitImg.onload = () => URL.revokeObjectURL(portraitImg.src);
-
-                  portraitClickListener = () => {
-                    // 每次点击都创建一个新的URL给画廊使用
-                    const galleryURL = URL.createObjectURL(savedPortraitBlob);
-                    openGallery([galleryURL], 0, '');
-                  };
-                  portraitImg.addEventListener('click', portraitClickListener);
-                  debugLog('已应用用户上传头像。', {
-                    blobSize: savedPortraitBlob.size,
-                  });
-                  return; // 找到用户头像后，终止函数
-                }
-              } catch (error) {
-                debugError('从 IndexedDB 加载头像失败。', error, {
-                  storageKey,
-                });
-              }
-
-              const occupationText = safeGet(data, 'Status.Occupation', '');
-              const nameText = safeGet(data, 'Name', '');
-              const textToSearch = occupationText + ' ' + nameText;
-
-              let matchedImages = [];
-
-              if (textToSearch.trim() && allKeywords) {
-                // 1. 找到所有精确匹配的关键词
-                let potentialKeywords = allKeywords.filter(k => textToSearch.includes(k));
-                potentialKeywords = potentialKeywords.filter(
-                  shortMatch =>
-                    !potentialKeywords.some(
-                      longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch),
-                    ),
-                );
-
-                // 2. 将关键词分为“头像”和“概念”两类
-                const portraitKeywords = potentialKeywords.filter(k => {
-                  const mainKeyword = synonymMap[k] || k;
-                  const imageList = imageIndex[mainKeyword] || [];
-                  return Array.isArray(imageList) && !imageList.includes('非头像.abc');
-                });
-
-                const conceptKeywords = potentialKeywords.filter(k => {
-                  const mainKeyword = synonymMap[k] || k;
-                  const imageList = imageIndex[mainKeyword] || [];
-                  return Array.isArray(imageList) && imageList.includes('非头像.abc');
-                });
-
-                // 3. 优先使用“头像”类关键词，否则使用“概念”类作为后备
-                const keywordsToUse = portraitKeywords.length > 0 ? portraitKeywords : conceptKeywords;
-
-                // 4. 按出现顺序排序并提取图片
-                if (keywordsToUse.length > 0) {
-                  keywordsToUse.sort((a, b) => textToSearch.indexOf(a) - textToSearch.indexOf(b));
-                  for (const keyword of keywordsToUse) {
-                    const mainKeyword = synonymMap[keyword] || keyword;
-                    const imageList = imageIndex[mainKeyword] || [];
-                    if (Array.isArray(imageList)) {
-                      const filtered = imageList.filter(img => img !== '非头像.abc');
-                      matchedImages = matchedImages.concat(filtered);
-                    }
-                  }
-                  matchedImages = uniq(matchedImages);
-                }
-              }
-
-              // 5. 更新图片源或使用备用头像
-              if (matchedImages.length > 0) {
-                portraitImg.src = GITHUB_BASE_URL + matchedImages[0];
-                portraitClickListener = () => openGallery(matchedImages, 0, GITHUB_BASE_URL);
-                portraitImg.addEventListener('click', portraitClickListener);
-                debugLog('已应用匹配到的头像资源。', {
-                  matchedImageCount: matchedImages.length,
-                  firstImage: matchedImages[0],
-                });
-              } else if (fallbackAvatars.length > 0) {
-                const charName = safeGet(data, 'Name', 'default');
-                const fallbackIndex = getDeterministicRandomIndex(charName, fallbackAvatars.length);
-                const fallbackAvatar = fallbackAvatars[fallbackIndex];
-                const FACE_BASE_URL = GITHUB_BASE_URL.replace('/jm/', '/face/');
-                portraitImg.src = FACE_BASE_URL + fallbackAvatar;
-                portraitClickListener = () => openGallery([fallbackAvatar], 0, FACE_BASE_URL);
-                portraitImg.addEventListener('click', portraitClickListener);
-                debugLog('已应用备用头像。', {
-                  fallbackIndex,
-                  fallbackAvatar,
-                });
+              if (type === 'stat') {
+                statItems.push(item);
               } else {
+                // 如果遇到非 stat 项，且之前有 stat 项，则先渲染 stat 容器
+                if (statItems.length > 0) {
+                  dynamicHtml += `<div class="core-stats">${statItems.map(statItem => renderStat(statItem.label, statItem.value)).join('')}</div>`;
+                  statItems.length = 0; // 清空 stat 项
+                }
+                // 渲染当前项
+                switch (type) {
+                  case 'narrative':
+                    dynamicHtml += renderNarrative(item.label, item.value);
+                    break;
+                  case 'list':
+                    dynamicHtml += renderList(item.label, item.value);
+                    break;
+                }
+              }
+            });
+
+            // 确保最后的 stat 项也被渲染
+            if (statItems.length > 0) {
+              dynamicHtml += `<div class="core-stats">${statItems.map(statItem => renderStat(statItem.label, statItem.value)).join('')}</div>`;
+            }
+
+            container.innerHTML = dynamicHtml;
+          }
+
+          async function updatePortrait(data) {
+            const portraitImg = panel.querySelector('[data-field="portrait"]');
+            if (!portraitImg) return;
+
+            // 统一管理事件监听器，先移除旧的
+            if (portraitClickListener) {
+              portraitImg.removeEventListener('click', portraitClickListener);
+              portraitClickListener = null;
+            }
+
+            const charName = safeGet(data, 'Name', '');
+            const storageKey = `jm_user_portrait_${charName}`;
+
+            try {
+              const savedPortraitBlob = await idbHelper.get(storageKey);
+              if (savedPortraitBlob) {
+                const objectURL = URL.createObjectURL(savedPortraitBlob);
+                portraitImg.src = objectURL;
+                // 浏览器加载后立即释放，避免内存泄漏
+                portraitImg.onload = () => URL.revokeObjectURL(portraitImg.src);
+
+                portraitClickListener = () => {
+                  // 每次点击都创建一个新的URL给画廊使用
+                  const galleryURL = URL.createObjectURL(savedPortraitBlob);
+                  openGallery([galleryURL], 0, '');
+                };
+                portraitImg.addEventListener('click', portraitClickListener);
+                return; // 找到用户头像后，终止函数
+              }
+            } catch (error) {
+              console.error('从 IndexedDB 加载头像失败:', error);
+            }
+
+            const occupationText = safeGet(data, 'Status.Occupation', '');
+            const nameText = safeGet(data, 'Name', '');
+            const textToSearch = occupationText + ' ' + nameText;
+
+            let matchedImages = [];
+
+            if (textToSearch.trim() && allKeywords) {
+              // 1. 找到所有精确匹配的关键词
+              let potentialKeywords = allKeywords.filter(k => textToSearch.includes(k));
+              potentialKeywords = potentialKeywords.filter(
+                shortMatch =>
+                  !potentialKeywords.some(
+                    longMatch => longMatch.length > shortMatch.length && longMatch.includes(shortMatch),
+                  ),
+              );
+
+              // 2. 将关键词分为“头像”和“概念”两类
+              const portraitKeywords = potentialKeywords.filter(k => {
+                const mainKeyword = synonymMap[k] || k;
+                const imageList = imageIndex[mainKeyword] || [];
+                return Array.isArray(imageList) && !imageList.includes('非头像.abc');
+              });
+
+              const conceptKeywords = potentialKeywords.filter(k => {
+                const mainKeyword = synonymMap[k] || k;
+                const imageList = imageIndex[mainKeyword] || [];
+                return Array.isArray(imageList) && imageList.includes('非头像.abc');
+              });
+
+              // 3. 优先使用“头像”类关键词，否则使用“概念”类作为后备
+              const keywordsToUse = portraitKeywords.length > 0 ? portraitKeywords : conceptKeywords;
+
+              // 4. 按出现顺序排序并提取图片
+              if (keywordsToUse.length > 0) {
+                keywordsToUse.sort((a, b) => textToSearch.indexOf(a) - textToSearch.indexOf(b));
+                for (const keyword of keywordsToUse) {
+                  const mainKeyword = synonymMap[keyword] || keyword;
+                  const imageList = imageIndex[mainKeyword] || [];
+                  if (Array.isArray(imageList)) {
+                    const filtered = imageList.filter(img => img !== '非头像.abc');
+                    matchedImages = matchedImages.concat(filtered);
+                  }
+                }
+                matchedImages = uniq(matchedImages);
+              }
+            }
+
+            // 5. 更新图片源或使用备用头像
+            if (matchedImages.length > 0) {
+              portraitImg.src = GITHUB_BASE_URL + matchedImages[0];
+              portraitClickListener = () => openGallery(matchedImages, 0, GITHUB_BASE_URL);
+              portraitImg.addEventListener('click', portraitClickListener);
+            } else if (fallbackAvatars.length > 0) {
+              const charName = safeGet(data, 'Name', 'default');
+              const fallbackIndex = getDeterministicRandomIndex(charName, fallbackAvatars.length);
+              const fallbackAvatar = fallbackAvatars[fallbackIndex];
+              const FACE_BASE_URL = GITHUB_BASE_URL.replace('/jm/', '/face/');
+              portraitImg.src = FACE_BASE_URL + fallbackAvatar;
+              portraitClickListener = () => openGallery([fallbackAvatar], 0, FACE_BASE_URL);
+              portraitImg.addEventListener('click', portraitClickListener);
+            } else {
+              portraitImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+            }
+          }
+
+
+          function openGallery(images, startIndex, baseUrl) {
+            const gallery = panel.querySelector('.jm-image-gallery');
+            const prevArrow = gallery.querySelector('.gallery-prev');
+            const nextArrow = gallery.querySelector('.gallery-next');
+
+            currentGalleryImages = images;
+            currentGalleryIndex = startIndex;
+            currentGalleryBaseUrl = baseUrl; // 设置当前图库的基础URL
+            updateGalleryImage();
+            gallery.style.display = 'flex';
+
+            // 根据图片数量决定是否显示箭头
+            if (currentGalleryImages.length <= 1) {
+              prevArrow.style.display = 'none';
+              nextArrow.style.display = 'none';
+            } else {
+              prevArrow.style.display = 'block';
+              nextArrow.style.display = 'block';
+            }
+          }
+
+          function updateGalleryImage() {
+            if (currentGalleryImages.length > 0) {
+              const galleryImage = panel.querySelector('.gallery-image');
+              galleryImage.src = currentGalleryBaseUrl + currentGalleryImages[currentGalleryIndex];
+              // 重置缩放和位置
+              galleryImage.style.transform = 'scale(1) translate(0, 0)';
+            }
+          }
+
+          function setupPortraitUpload(data) {
+            const uploadTrigger = panel.querySelector('.portrait-upload-trigger');
+            const resetTrigger = panel.querySelector('.portrait-reset-trigger');
+            const uploadInput = panel.querySelector('.jm-portrait-upload');
+            const portraitImg = panel.querySelector('[data-field="portrait"]');
+
+            if (!uploadTrigger || !uploadInput || !portraitImg || !resetTrigger) return;
+
+            const charName = safeGet(data, 'Name', '');
+            const storageKey = `jm_user_portrait_${charName}`;
+
+            // 异步检查 IndexedDB 中是否存在头像，并更新重置按钮状态
+            (async () => {
+              try {
+                if (await idbHelper.get(storageKey)) {
+                  resetTrigger.style.display = 'flex';
+                } else {
+                  resetTrigger.style.display = 'none';
+                }
+              } catch (e) {
+                console.error('检查头像是否存在时出错:', e);
+                resetTrigger.style.display = 'none';
+              }
+            })();
+
+            uploadTrigger.onclick = () => uploadInput.click();
+
+            resetTrigger.onclick = async () => {
+              try {
+                await idbHelper.delete(storageKey);
+                resetTrigger.style.display = 'none';
                 portraitImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                console.error(`${debugPrefix} 未找到任何可用头像资源。`, {
-                  charName,
-                  textToSearch,
-                });
+                await updatePortrait(jsonData); // 重新加载默认头像
+              } catch (error) {
+                alert(`无法重置头像: ${error.name}: ${error.message}`);
               }
+            };
+
+            uploadInput.onchange = event => {
+              const file = event.target.files?.[0];
+              if (!file) {
+                uploadInput.value = '';
+                return;
+              }
+
+              if (file.size > 1000 * 1024) {
+                alert('图片文件太大 (最大 1000KB)。请选择一张小一点的图片，或使用图片压缩工具。');
+                uploadInput.value = '';
+                return;
+              }
+
+              const reader = new FileReader();
+              reader.onload = e => {
+                const img = new Image();
+                img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  let { width, height } = img;
+                  const maxSize = 400;
+
+                  if (width > height && width > maxSize) {
+                    height = (height * maxSize) / width;
+                    width = maxSize;
+                  } else if (height > maxSize) {
+                    width = (width * maxSize) / height;
+                    height = maxSize;
+                  }
+
+                  canvas.width = width;
+                  canvas.height = height;
+                  const ctx = canvas.getContext('2d');
+                  ctx.drawImage(img, 0, 0, width, height);
+
+                  // 将 Canvas 内容转换为 Blob 对象，而不是 Base64
+                  canvas.toBlob(
+                    async blob => {
+                      if (!blob) {
+                        alert('图片处理失败，无法创建 Blob 对象。');
+                        uploadInput.value = '';
+                        return;
+                      }
+
+                      if (blob.size > 800 * 1024) {
+                        alert('压缩后的图片仍然太大。请选择一张更小的图片。');
+                        uploadInput.value = '';
+                        return;
+                      }
+
+                      try {
+                        await idbHelper.set(storageKey, blob);
+                        await updatePortrait(jsonData); // 重新加载头像以应用更改和事件
+                        resetTrigger.style.display = 'flex';
+                        console.log(`头像已保存，压缩后大小约 ${Math.round(blob.size / 1024)}KB`);
+                      } catch (error) {
+                        console.error('保存头像到 IndexedDB 失败:', error);
+                        if (error.name === 'QuotaExceededError') {
+                          alert(
+                            '浏览器存储空间不足。IndexedDB 也已满。\n请清理浏览器数据或使用更小的图片。',
+                          );
+                        } else {
+                          alert(`头像保存失败: ${error.message}`);
+                        }
+                      } finally {
+                        uploadInput.value = ''; // 无论成功失败都清空，以便再次选择同个文件
+                      }
+                    },
+                    'image/jpeg',
+                    0.7,
+                  );
+                };
+                img.onerror = () => {
+                  alert('无法加载所选文件，可能不是有效的图片格式。');
+                  uploadInput.value = '';
+                };
+                img.src = e.target.result;
+              };
+              reader.onerror = () => {
+                alert('读取文件失败。');
+                uploadInput.value = '';
+              };
+              reader.readAsDataURL(file);
+            };
+          }
+
+          function setupEventListeners() {
+            // 折叠/展开功能
+            const collapseToggle = panel.querySelector('.collapse-toggle');
+            if (collapseToggle) {
+              collapseToggle.addEventListener('click', () => {
+                panel.classList.toggle('collapsed');
+              });
             }
 
-            function openGallery(images, startIndex, baseUrl) {
-              const gallery = requireElement('.jm-image-gallery', 'openGallery');
-              const prevArrow = requireElement('.gallery-prev', 'openGallery');
-              const nextArrow = requireElement('.gallery-next', 'openGallery');
+            // 使用事件委托，高效处理所有图片链接点击
+            panel.addEventListener('click', function (e) {
+              const link = e.target.closest('.image-link');
+              if (link) {
+                e.preventDefault();
+                const keyword = link.dataset.keyword;
+                if (keyword) {
+                  const matchedImages = findImagesByKeyword(keyword);
+                  if (matchedImages.length > 0) {
+                    openGallery(matchedImages, 0, GITHUB_BASE_URL);
+                  }
+                }
+              }
+            });
 
-              currentGalleryImages = images;
-              currentGalleryIndex = startIndex;
-              currentGalleryBaseUrl = baseUrl; // 设置当前图库的基础URL
+            panel.querySelectorAll('.tab-button').forEach(button => {
+              button.addEventListener('click', () => {
+                const targetTabId = button.dataset.tab;
+                panel.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                panel.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                button.classList.add('active');
+                panel.querySelector(`#${targetTabId}`).classList.add('active');
+              });
+            });
+            const gallery = panel.querySelector('.jm-image-gallery');
+            gallery.querySelector('.gallery-close').addEventListener('click', () => {
+              const galleryImage = gallery.querySelector('.gallery-image');
+              // 如果是 Object URL, 释放它以防止内存泄漏
+              if (galleryImage.src.startsWith('blob:')) {
+                URL.revokeObjectURL(galleryImage.src);
+              }
+              gallery.style.display = 'none';
+            });
+            gallery.querySelector('.gallery-prev').addEventListener('click', () => {
+              currentGalleryIndex =
+                (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
               updateGalleryImage();
-              gallery.style.display = 'flex';
+            });
+            gallery.querySelector('.gallery-next').addEventListener('click', () => {
+              currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
+              updateGalleryImage();
+            });
 
-              // 根据图片数量决定是否显示箭头
-              if (currentGalleryImages.length <= 1) {
-                prevArrow.style.display = 'none';
-                nextArrow.style.display = 'none';
-              } else {
-                prevArrow.style.display = 'block';
-                nextArrow.style.display = 'block';
-              }
-            }
+            // --- 新增：图片缩放和拖动功能 ---
+            const galleryImage = gallery.querySelector('.gallery-image');
+            let isDragging = false;
+            let startX,
+              startY,
+              lastX = 0,
+              lastY = 0;
+            let scale = 1;
+            let lastTouchDistance = null;
 
-            function updateGalleryImage() {
-              if (currentGalleryImages.length > 0) {
-                const galleryImage = requireElement('.gallery-image', 'updateGalleryImage');
-                galleryImage.src = currentGalleryBaseUrl + currentGalleryImages[currentGalleryIndex];
-                // 重置缩放和位置
-                galleryImage.style.transform = 'scale(1) translate(0, 0)';
-              }
-            }
+            // --- 桌面端：鼠标事件 ---
+            galleryImage.addEventListener('wheel', e => {
+              e.preventDefault();
+              const rect = galleryImage.getBoundingClientRect();
+              const offsetX = e.clientX - rect.left;
+              const offsetY = e.clientY - rect.top;
 
-            function setupPortraitUpload(data) {
-              const uploadTrigger = requireElement('.portrait-upload-trigger', 'setupPortraitUpload');
-              const resetTrigger = requireElement('.portrait-reset-trigger', 'setupPortraitUpload');
-              const uploadInput = requireElement('.jm-portrait-upload', 'setupPortraitUpload');
-              const portraitImg = requireElement('[data-field="portrait"]', 'setupPortraitUpload');
+              const oldScale = scale;
+              scale += e.deltaY * -0.001;
+              scale = Math.min(Math.max(0.5, scale), 5);
 
-              const charName = safeGet(data, 'Name', '');
-              const storageKey = `jm_user_portrait_${charName}`;
+              lastX = offsetX - (offsetX - lastX) * (scale / oldScale);
+              lastY = offsetY - (offsetY - lastY) * (scale / oldScale);
 
-              // 异步检查 IndexedDB 中是否存在头像，并更新重置按钮状态
-              (async () => {
-                try {
-                  if (await idbHelper.get(storageKey)) {
-                    resetTrigger.style.display = 'flex';
-                  } else {
-                    resetTrigger.style.display = 'none';
-                  }
-                } catch (e) {
-                  console.error('检查头像是否存在时出错:', e);
-                  resetTrigger.style.display = 'none';
-                }
-              })();
+              updateTransform();
+            });
 
-              uploadTrigger.onclick = () => uploadInput.click();
+            galleryImage.addEventListener('mousedown', e => {
+              e.preventDefault();
+              isDragging = true;
+              galleryImage.classList.add('dragging');
+              startX = e.pageX - lastX;
+              startY = e.pageY - lastY;
+            });
 
-              resetTrigger.onclick = async () => {
-                try {
-                  await idbHelper.delete(storageKey);
-                  resetTrigger.style.display = 'none';
-                  portraitImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                  await updatePortrait(jsonData); // 重新加载默认头像
-                } catch (error) {
-                  alert(`无法重置头像: ${error.name}: ${error.message}`);
-                }
-              };
+            galleryImage.addEventListener('mouseleave', () => {
+              isDragging = false;
+              galleryImage.classList.remove('dragging');
+            });
 
-              uploadInput.onchange = event => {
-                const target = event && event.target ? event.target : null;
-                const fileList = target && target.files ? target.files : null;
-                const file = fileList && fileList.length > 0 ? fileList[0] : null;
-                if (!file) {
-                  uploadInput.value = '';
-                  return;
-                }
+            galleryImage.addEventListener('mouseup', () => {
+              isDragging = false;
+              galleryImage.classList.remove('dragging');
+            });
 
-                if (file.size > 1000 * 1024) {
-                  alert('图片文件太大 (最大 1000KB)。请选择一张小一点的图片，或使用图片压缩工具。');
-                  uploadInput.value = '';
-                  return;
-                }
-
-                const reader = new FileReader();
-                reader.onload = e => {
-                  const img = new Image();
-                  img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let { width, height } = img;
-                    const maxSize = 400;
-
-                    if (width > height && width > maxSize) {
-                      height = (height * maxSize) / width;
-                      width = maxSize;
-                    } else if (height > maxSize) {
-                      width = (width * maxSize) / height;
-                      height = maxSize;
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    // 将 Canvas 内容转换为 Blob 对象，而不是 Base64
-                    canvas.toBlob(
-                      async blob => {
-                        if (!blob) {
-                          alert('图片处理失败，无法创建 Blob 对象。');
-                          uploadInput.value = '';
-                          return;
-                        }
-
-                        if (blob.size > 800 * 1024) {
-                          alert('压缩后的图片仍然太大。请选择一张更小的图片。');
-                          uploadInput.value = '';
-                          return;
-                        }
-
-                        try {
-                          await idbHelper.set(storageKey, blob);
-                          await updatePortrait(jsonData); // 重新加载头像以应用更改和事件
-                          resetTrigger.style.display = 'flex';
-                          console.log(`头像已保存，压缩后大小约 ${Math.round(blob.size / 1024)}KB`);
-                        } catch (error) {
-                          console.error('保存头像到 IndexedDB 失败:', error);
-                          if (error.name === 'QuotaExceededError') {
-                            alert('浏览器存储空间不足。IndexedDB 也已满。\n请清理浏览器数据或使用更小的图片。');
-                          } else {
-                            alert(`头像保存失败: ${error.message}`);
-                          }
-                        } finally {
-                          uploadInput.value = ''; // 无论成功失败都清空，以便再次选择同个文件
-                        }
-                      },
-                      'image/jpeg',
-                      0.7,
-                    );
-                  };
-                  img.onerror = () => {
-                    alert('无法加载所选文件，可能不是有效的图片格式。');
-                    uploadInput.value = '';
-                  };
-                  img.src = e.target.result;
-                };
-                reader.onerror = () => {
-                  alert('读取文件失败。');
-                  uploadInput.value = '';
-                };
-                reader.readAsDataURL(file);
-              };
-            }
-
-            function setupEventListeners() {
-              debugLog('开始绑定事件。');
-              // 折叠/展开功能
-              const collapseToggle = panel.querySelector('.collapse-toggle');
-              if (collapseToggle) {
-                collapseToggle.addEventListener('click', () => {
-                  panel.classList.toggle('collapsed');
-                });
-              }
-
-              // 使用事件委托，高效处理所有图片链接点击
-              panel.addEventListener('click', function (e) {
-                const link = e.target.closest('.image-link');
-                if (link) {
-                  e.preventDefault();
-                  const keyword = link.dataset.keyword;
-                  if (keyword) {
-                    const matchedImages = findImagesByKeyword(keyword);
-                    if (matchedImages.length > 0) {
-                      openGallery(matchedImages, 0, GITHUB_BASE_URL);
-                    }
-                  }
-                }
-              });
-
-              panel.querySelectorAll('.tab-button').forEach(button => {
-                button.addEventListener('click', () => {
-                  const targetTabId = button.dataset.tab;
-                  panel.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-                  panel.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-                  button.classList.add('active');
-                  requireElement(`#${targetTabId}`, 'tab 切换').classList.add('active');
-                });
-              });
-              panel.querySelectorAll('.jm-edit-name-trigger').forEach(button => {
-                button.addEventListener('click', event => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  editCharacterName().catch(error => {
-                    debugError('编辑名字失败。', error);
-                    alert(error?.message || '保存失败，请重试。');
-                  });
-                });
-              });
-              panel.querySelectorAll('.jm-edit-occupation-trigger').forEach(button => {
-                button.addEventListener('click', event => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  editCharacterOccupation().catch(error => {
-                    debugError('编辑职业失败。', error);
-                    alert(error?.message || '保存失败，请重试。');
-                  });
-                });
-              });
-              const gallery = requireElement('.jm-image-gallery', 'setupEventListeners');
-              requireElement('.gallery-close', 'setupEventListeners').addEventListener('click', () => {
-                const galleryImage = requireElement('.gallery-image', 'setupEventListeners');
-                // 如果是 Object URL, 释放它以防止内存泄漏
-                if (galleryImage.src.startsWith('blob:')) {
-                  URL.revokeObjectURL(galleryImage.src);
-                }
-                gallery.style.display = 'none';
-              });
-              requireElement('.gallery-prev', 'setupEventListeners').addEventListener('click', () => {
-                currentGalleryIndex =
-                  (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
-                updateGalleryImage();
-              });
-              requireElement('.gallery-next', 'setupEventListeners').addEventListener('click', () => {
-                currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
-                updateGalleryImage();
-              });
-
-              // --- 新增：图片缩放和拖动功能 ---
-              const galleryImage = requireElement('.gallery-image', 'setupEventListeners');
-              let isDragging = false;
-              let startX,
-                startY,
-                lastX = 0,
-                lastY = 0;
-              let scale = 1;
-              let lastTouchDistance = null;
-
-              // --- 桌面端：鼠标事件 ---
-              galleryImage.addEventListener('wheel', e => {
+            galleryImage.addEventListener('mousemove', e => {
+              if (isDragging) {
                 e.preventDefault();
-                const rect = galleryImage.getBoundingClientRect();
-                const offsetX = e.clientX - rect.left;
-                const offsetY = e.clientY - rect.top;
-
-                const oldScale = scale;
-                scale += e.deltaY * -0.001;
-                scale = Math.min(Math.max(0.5, scale), 5);
-
-                lastX = offsetX - (offsetX - lastX) * (scale / oldScale);
-                lastY = offsetY - (offsetY - lastY) * (scale / oldScale);
-
+                lastX = e.pageX - startX;
+                lastY = e.pageY - startY;
                 updateTransform();
-              });
+              }
+            });
 
-              galleryImage.addEventListener('mousedown', e => {
-                e.preventDefault();
+            galleryImage.addEventListener('dblclick', () => {
+              resetTransform();
+            });
+
+            // --- 移动端：触摸事件 ---
+            galleryImage.addEventListener('touchstart', e => {
+              if (e.touches.length === 1) {
                 isDragging = true;
                 galleryImage.classList.add('dragging');
-                startX = e.pageX - lastX;
-                startY = e.pageY - lastY;
-              });
-
-              galleryImage.addEventListener('mouseleave', () => {
-                isDragging = false;
-                galleryImage.classList.remove('dragging');
-              });
-
-              galleryImage.addEventListener('mouseup', () => {
-                isDragging = false;
-                galleryImage.classList.remove('dragging');
-              });
-
-              galleryImage.addEventListener('mousemove', e => {
-                if (isDragging) {
-                  e.preventDefault();
-                  lastX = e.pageX - startX;
-                  lastY = e.pageY - startY;
-                  updateTransform();
-                }
-              });
-
-              galleryImage.addEventListener('dblclick', () => {
-                resetTransform();
-              });
-
-              // --- 移动端：触摸事件 ---
-              galleryImage.addEventListener('touchstart', e => {
-                if (e.touches.length === 1) {
-                  isDragging = true;
-                  galleryImage.classList.add('dragging');
-                  startX = e.touches.pageX - lastX;
-                  startY = e.touches.pageY - lastY;
-                } else if (e.touches.length === 2) {
-                  isDragging = false; // 捏合时停止拖动
-                  lastTouchDistance = Math.hypot(e.touches.pageX - e.touches.pageX, e.touches.pageY - e.touches.pageY);
-                }
-              });
-
-              galleryImage.addEventListener('touchend', e => {
-                isDragging = false;
-                galleryImage.classList.remove('dragging');
-                lastTouchDistance = null;
-              });
-
-              galleryImage.addEventListener('touchmove', e => {
-                e.preventDefault();
-                if (isDragging && e.touches.length === 1) {
-                  lastX = e.touches.pageX - startX;
-                  lastY = e.touches.pageY - startY;
-                  updateTransform();
-                } else if (e.touches.length === 2 && lastTouchDistance) {
-                  const rect = galleryImage.getBoundingClientRect();
-                  const touch1 = { x: e.touches.pageX, y: e.touches.pageY };
-                  const touch2 = { x: e.touches.pageX, y: e.touches.pageY };
-                  const centerX = (touch1.x + touch2.x) / 2 - rect.left;
-                  const centerY = (touch1.y + touch2.y) / 2 - rect.top;
-
-                  const newTouchDistance = Math.hypot(touch1.x - touch2.x, touch1.y - touch2.y);
-
-                  const oldScale = scale;
-                  const scaleChange = newTouchDistance / lastTouchDistance;
-                  scale *= scaleChange;
-                  scale = Math.min(Math.max(0.5, scale), 5);
-                  lastTouchDistance = newTouchDistance;
-
-                  lastX = centerX - (centerX - lastX) * (scale / oldScale);
-                  lastY = centerY - (centerY - lastY) * (scale / oldScale);
-
-                  updateTransform();
-                }
-              });
-
-              function updateTransform() {
-                // 只有当缩放大于1时才应用位移
-                const canPan = scale > 1;
-                const translateX = canPan ? lastX : 0;
-                const translateY = canPan ? lastY : 0;
-                if (!canPan) {
-                  lastX = 0;
-                  lastY = 0;
-                }
-                galleryImage.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+                startX = e.touches.pageX - lastX;
+                startY = e.touches.pageY - lastY;
+              } else if (e.touches.length === 2) {
+                isDragging = false; // 捏合时停止拖动
+                lastTouchDistance = Math.hypot(e.touches.pageX - e.touches.pageX, e.touches.pageY - e.touches.pageY);
               }
+            });
 
-              function resetTransform() {
-                scale = 1;
-                lastX = 0;
-                lastY = 0;
+            galleryImage.addEventListener('touchend', e => {
+              isDragging = false;
+              galleryImage.classList.remove('dragging');
+              lastTouchDistance = null;
+            });
+
+            galleryImage.addEventListener('touchmove', e => {
+              e.preventDefault();
+              if (isDragging && e.touches.length === 1) {
+                lastX = e.touches.pageX - startX;
+                lastY = e.touches.pageY - startY;
+                updateTransform();
+              } else if (e.touches.length === 2 && lastTouchDistance) {
+                const rect = galleryImage.getBoundingClientRect();
+                const touch1 = { x: e.touches.pageX, y: e.touches.pageY };
+                const touch2 = { x: e.touches.pageX, y: e.touches.pageY };
+                const centerX = (touch1.x + touch2.x) / 2 - rect.left;
+                const centerY = (touch1.y + touch2.y) / 2 - rect.top;
+
+                const newTouchDistance = Math.hypot(touch1.x - touch2.x, touch1.y - touch2.y);
+
+                const oldScale = scale;
+                const scaleChange = newTouchDistance / lastTouchDistance;
+                scale *= scaleChange;
+                scale = Math.min(Math.max(0.5, scale), 5);
+                lastTouchDistance = newTouchDistance;
+
+                lastX = centerX - (centerX - lastX) * (scale / oldScale);
+                lastY = centerY - (centerY - lastY) * (scale / oldScale);
+
                 updateTransform();
               }
-              setupPortraitUpload(jsonData);
-              debugLog('事件绑定完成。');
-            }
-
-            async function runStage(stageName, handler) {
-              debugLog(`${stageName} 开始。`);
-              try {
-                const result = await handler();
-                debugLog(`${stageName} 完成。`);
-                return result;
-              } catch (error) {
-                debugError(`${stageName} 失败。`, error, {
-                  rawDataPreview: previewValue(rawData, 500),
-                  panelHtmlPreview: previewValue(panel.innerHTML, 600),
-                });
-                throw error;
-              }
-            }
-
-            async function main() {
-              debugLog('main() 开始执行。');
-              await runStage('首屏渲染', async () => {
-                updatePanel(jsonData);
-                panel.classList.add('collapsed');
-              });
-
-              const dataLoaded = await runStage('核心数据加载', async () => fetchData());
-              if (dataLoaded) {
-                await runStage('头像更新', async () => updatePortrait(jsonData));
-                await runStage('文本链接化', async () => linkifyAllText());
-              } else {
-                console.warn(`${debugPrefix} 无法加载图片索引，图片相关功能将不可用。`);
-              }
-              await runStage('事件绑定', async () => setupEventListeners());
-              debugLog('main() 执行完成。');
-            }
-
-            main().catch(error => {
-              displayError(
-                '脚本执行失败。这通常是由于状态栏初始化或渲染阶段发生错误导致的。',
-                error && error.stack ? error.stack : error && error.message ? error.message : String(error),
-              );
             });
-          } catch (error) {
-            debugError('初始化阶段失败。', error, {
-              rawDataLength: rawData.length,
-              rawDataPreview: previewValue(rawData, 600),
-            });
-            displayError(
-              '脚本执行失败。这通常是由于AI输出的JSON格式不正确导致的。',
-              `错误信息: ${error && error.stack ? error.stack : error.message}. 捕获到的原始数据: ${previewValue(rawData, 1200)}`,
-            );
+
+            function updateTransform() {
+              // 只有当缩放大于1时才应用位移
+              const canPan = scale > 1;
+              const translateX = canPan ? lastX : 0;
+              const translateY = canPan ? lastY : 0;
+              if (!canPan) {
+                lastX = 0;
+                lastY = 0;
+              }
+              galleryImage.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+            }
+
+            function resetTransform() {
+              scale = 1;
+              lastX = 0;
+              lastY = 0;
+              updateTransform();
+            }
+            setupPortraitUpload(jsonData);
           }
+
+          async function main() {
+            updatePanel(jsonData);
+            // 设置默认折叠状态
+            panel.classList.add('collapsed');
+            
+            const dataLoaded = await fetchData();
+            if (dataLoaded) {
+              await updatePortrait(jsonData); // 等待头像加载完成
+              linkifyAllText();
+            } else {
+              console.warn(`[状态栏 ${panel.id}] 无法加载图片索引，图片相关功能将不可用。`);
+            }
+            setupEventListeners();
+          }
+
+          main();
+        } catch (error) {
+          displayError(
+            '脚本执行失败。这通常是由于AI输出的JSON格式不正确导致的。',
+            `错误信息: ${error.message}. 捕获到的原始数据: ${rawData}`,
+          );
+        }
         }); // 结束 forEach 循环
       });
     </script>
   </body>
 </html>
+
 ```
