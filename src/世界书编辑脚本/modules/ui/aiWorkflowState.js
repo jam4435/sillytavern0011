@@ -17,6 +17,65 @@ function uniqueUids(uids) {
   return [...new Set(uids.map(normalizeUid).filter(uid => uid !== null))];
 }
 
+function normalizePlanUidList(value, fieldName) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error(`${fieldName} 必须是 UID 数组`);
+  const normalized = value.map(uid => Number(uid));
+  const invalid = normalized.filter(uid => !Number.isInteger(uid) || uid < 0);
+  if (invalid.length) throw new Error(`${fieldName} 包含非法 UID: ${invalid.join(', ')}`);
+  const duplicates = normalized.filter((uid, index) => normalized.indexOf(uid) !== index);
+  if (duplicates.length) throw new Error(`${fieldName} 包含重复 UID: ${[...new Set(duplicates)].join(', ')}`);
+  return normalized;
+}
+
+function normalizePlanTextList(value, fieldName) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error(`${fieldName} 必须是文本数组`);
+  return value.map(item => `${item ?? ''}`.trim()).filter(Boolean);
+}
+
+export function normalizeAiPlanEditorValue(rawValue, validUids = null) {
+  const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue || '{}') : rawValue;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('计划 JSON 顶层必须是对象');
+  }
+
+  const uidFields = [
+    'readonly_uids',
+    'editable_uids',
+    'locked_editable_uids',
+    'locked_readonly_uids',
+    'planned_editable_uids',
+    'planned_readonly_uids',
+  ];
+  const normalizedUidFields = Object.fromEntries(
+    uidFields.map(fieldName => [fieldName, normalizePlanUidList(parsed[fieldName], fieldName)]),
+  );
+  const overlap = normalizedUidFields.readonly_uids.filter(uid => normalizedUidFields.editable_uids.includes(uid));
+  if (overlap.length) {
+    throw new Error(`readonly_uids 与 editable_uids 不能重叠: ${overlap.join(', ')}`);
+  }
+  if (validUids instanceof Set) {
+    const unknown = [...new Set(uidFields.flatMap(fieldName => normalizedUidFields[fieldName]))]
+      .filter(uid => !validUids.has(uid));
+    if (unknown.length) throw new Error(`规划包含当前世界书不存在的 UID: ${unknown.join(', ')}`);
+  }
+
+  const plan = parsed.plan === undefined ? {} : parsed.plan;
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
+    throw new Error('plan 必须是对象');
+  }
+  return {
+    ...normalizedUidFields,
+    plan: {
+      goal: typeof plan.goal === 'string' ? plan.goal.trim() : '',
+      must_keep: normalizePlanTextList(plan.must_keep, 'plan.must_keep'),
+      rewrite_rules: normalizePlanTextList(plan.rewrite_rules, 'plan.rewrite_rules'),
+      consistency_notes: normalizePlanTextList(plan.consistency_notes, 'plan.consistency_notes'),
+    },
+  };
+}
+
 function normalizeSelectionDraft(draft = {}) {
   const selectedEntryUids = uniqueUids(draft.selectedEntryUids);
   const selectedSet = new Set(selectedEntryUids);
@@ -231,7 +290,7 @@ function finishPreviewGeneration(state, action) {
     previewResult: hasEntries ? previewResult : state.previewResult,
     generation: idleGeneration(state.generation.generationId),
     error: hasEntries ? null : action.error || null,
-    lastGenerationStatus: previewResult?.status || (hasEntries ? 'complete' : 'failed'),
+    lastGenerationStatus: previewResult?.outcome || previewResult?.status || (hasEntries ? 'complete' : 'failed'),
   };
 }
 
@@ -352,11 +411,12 @@ export function aiWorkflowReducer(state, action = {}) {
     case 'APPLY_SUCCEEDED': {
       if (state.application.status !== 'applying') return state;
       const result = action.result || {};
-      const unresolvedUids = resultUids(result, ['conflicts', 'missing', 'failed', 'failures']);
+      const unresolvedUids = resultUids(result, ['skipped', 'conflicts', 'missing', 'failed', 'failures']);
       const unresolved = new Set(unresolvedUids);
       const remainingEntries = getPreviewEntries(state.previewResult).filter(entry => unresolved.has(itemUid(entry)));
-      const succeededUids = resultUids(result, ['succeeded', 'successful', 'applied']);
-      const partialWithoutDetails = result.status === 'partial' && unresolvedUids.length === 0;
+      const succeededUids = resultUids(result, ['appliedUids', 'succeeded', 'successful', 'applied']);
+      const partialWithoutDetails = (result.status === 'partial' || Number(result.skippedCount) > 0)
+        && unresolvedUids.length === 0;
       const shouldRemainInReview = remainingEntries.length > 0 || partialWithoutDetails || succeededUids.length === 0;
       return {
         ...state,

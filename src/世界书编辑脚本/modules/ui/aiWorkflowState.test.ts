@@ -5,6 +5,7 @@ import {
   deriveAiWorkflowCapabilities,
   getAiEntryDisposition,
   getAiInputInvalidationScope,
+  normalizeAiPlanEditorValue,
 } from './aiWorkflowState.js';
 
 function reduce(state: ReturnType<typeof createAiWorkflowState>, action: Record<string, unknown>) {
@@ -127,6 +128,18 @@ describe('AI 工作流状态层', () => {
     expect(deriveAiWorkflowCapabilities(state).canGeneratePreview).toBe(true);
   });
 
+  it('计划 JSON 拒绝非法、重复、未知和重叠 UID', () => {
+    const validUids = new Set([1, 2, 3]);
+    expect(() => normalizeAiPlanEditorValue('{"editable_uids":[1,1]}', validUids)).toThrow('重复 UID');
+    expect(() => normalizeAiPlanEditorValue('{"editable_uids":["x"]}', validUids)).toThrow('非法 UID');
+    expect(() => normalizeAiPlanEditorValue('{"editable_uids":[9]}', validUids)).toThrow('不存在的 UID');
+    expect(() => normalizeAiPlanEditorValue('{"editable_uids":[1],"readonly_uids":[1]}', validUids)).toThrow('不能重叠');
+    expect(normalizeAiPlanEditorValue('{"editable_uids":[1],"readonly_uids":[2]}', validUids)).toMatchObject({
+      editable_uids: [1],
+      readonly_uids: [2],
+    });
+  });
+
   it('用 runId 忽略陈旧异步结果，并保留取消前已经存在的审阅结果', () => {
     let state = createAiWorkflowState({ draft: { instruction: '调整', selectedEntryUids: [1] } });
     state = reduce(state, { type: 'START_GENERATION', runId: 'new-run' });
@@ -164,7 +177,12 @@ describe('AI 工作流状态层', () => {
     state = reduce(state, { type: 'START_APPLY' });
     state = reduce(state, {
       type: 'APPLY_SUCCEEDED',
-      result: { status: 'partial', succeeded: [{ uid: 1 }], conflicts: [{ uid: 2 }], missing: [3] },
+      result: {
+        appliedCount: 1,
+        skippedCount: 2,
+        appliedUids: [1],
+        skipped: [{ uid: 2, reason: 'conflict' }, { uid: 3, reason: 'missing' }],
+      },
     });
     expect(state.phase).toBe('review');
     expect(state.previewResult.entries.map((entry: { uid: number }) => entry.uid)).toEqual([2, 3]);
@@ -173,7 +191,7 @@ describe('AI 工作流状态层', () => {
     state = reduce(state, { type: 'START_APPLY' });
     state = reduce(state, {
       type: 'APPLY_SUCCEEDED',
-      result: { status: 'complete', succeeded: [2, 3], conflicts: [], missing: [] },
+      result: { appliedCount: 2, skippedCount: 0, appliedUids: [2, 3], skipped: [] },
     });
     expect(state.phase).toBe('complete');
     expect(state.application.status).toBe('complete');

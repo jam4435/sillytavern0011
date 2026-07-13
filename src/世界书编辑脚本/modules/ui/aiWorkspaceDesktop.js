@@ -10,7 +10,11 @@ import { getRollbackPreview, rollbackLastTransaction } from '../features/history
 import { cancelLlmGeneration, requestLlmText } from '../features/llmClient.js';
 import { flushAiWorkspaceSettings, getAiWorkspaceSettings, setAiWorkspaceSettings } from '../settings.js';
 import { errorCatched } from '../utils.js';
-import { canEnterAiWorkflowPhase, deriveAiWorkflowCapabilities } from './aiWorkflowState.js';
+import {
+  canEnterAiWorkflowPhase,
+  deriveAiWorkflowCapabilities,
+  normalizeAiPlanEditorValue,
+} from './aiWorkflowState.js';
 
 const ROOT_ID = 'lorebook-ai-workspace';
 const MODEL_LIST_ID = 'lorebook-ai-model-list';
@@ -132,7 +136,7 @@ const state = {
   assistantChatHistory: [],
   assistantModalTab: 'chat',
   assistantSelectedText: '',
-  lastFocusedElement: null,
+  focusReturnTargets: {},
   persistTimer: null,
   entryCluster: null,
   resizeObserver: null,
@@ -637,6 +641,37 @@ function setAssistantGeneratingState(isGenerating) {
   $('#ai-workspace-assistant-send', parentDoc()).prop('disabled', state.isAssistantGenerating);
 }
 
+function rememberOverlayFocus(overlayName) {
+  state.focusReturnTargets[overlayName] = parentDoc().activeElement;
+}
+
+function restoreOverlayFocus(overlayName) {
+  const target = state.focusReturnTargets[overlayName];
+  delete state.focusReturnTargets[overlayName];
+  target?.focus?.();
+}
+
+function trapOverlayFocus(event, overlayElement) {
+  if (event.key !== 'Tab' || !overlayElement) return false;
+  const $focusable = $(overlayElement, parentDoc())
+    .find('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])')
+    .filter(':visible');
+  if (!$focusable.length) return false;
+  const first = $focusable.get(0);
+  const last = $focusable.get($focusable.length - 1);
+  if (event.shiftKey && parentDoc().activeElement === first) {
+    event.preventDefault();
+    last.focus();
+    return true;
+  }
+  if (!event.shiftKey && parentDoc().activeElement === last) {
+    event.preventDefault();
+    first.focus();
+    return true;
+  }
+  return false;
+}
+
 function switchAssistantTab(tab = 'chat') {
   const nextTab = tab === 'reference' ? 'reference' : 'chat';
   state.assistantModalTab = nextTab;
@@ -654,7 +689,7 @@ function switchAssistantTab(tab = 'chat') {
 }
 
 function openAssistantModal(tab = state.assistantModalTab || 'chat') {
-  state.lastFocusedElement = parentDoc().activeElement;
+  rememberOverlayFocus('assistant');
   renderReferenceMaterial();
   renderAssistantHistory();
   switchAssistantTab(tab);
@@ -665,12 +700,11 @@ function openAssistantModal(tab = state.assistantModalTab || 'chat') {
 function closeAssistantModal() {
   $('#ai-workspace-assistant-modal', parentDoc()).hide().attr('aria-hidden', 'true');
   hideAssistantSelectionToolbar();
-  state.lastFocusedElement?.focus?.();
-  state.lastFocusedElement = null;
+  restoreOverlayFocus('assistant');
 }
 
 function openSettingsDrawer() {
-  state.lastFocusedElement = parentDoc().activeElement;
+  rememberOverlayFocus('settings');
   syncApiForm();
   $('#ai-workspace-settings-modal', parentDoc()).css('display', 'flex').attr('aria-hidden', 'false');
   setTimeout(() => $('#ai-workspace-settings-close', parentDoc()).trigger('focus'), 0);
@@ -679,8 +713,7 @@ function openSettingsDrawer() {
 function closeSettingsDrawer() {
   $('#ai-workspace-settings-modal', parentDoc()).hide().attr('aria-hidden', 'true');
   updateWorkbenchHeader();
-  state.lastFocusedElement?.focus?.();
-  state.lastFocusedElement = null;
+  restoreOverlayFocus('settings');
 }
 
 function hideAssistantSelectionToolbar() {
@@ -967,59 +1000,6 @@ function formatPreviewModalValue(value) {
     return JSON.stringify(value, null, 2);
   }
   return value == null ? '' : String(value);
-}
-
-function normalizePlanEditorValue(rawValue, validUids = null) {
-  const parsed = JSON.parse(rawValue || '{}');
-  const readonlyUids = _.uniq(
-    (Array.isArray(parsed?.readonly_uids) ? parsed.readonly_uids : [])
-      .map(uid => Number(uid))
-      .filter(uid => Number.isFinite(uid)),
-  );
-  const editableUids = _.uniq(
-    (Array.isArray(parsed?.editable_uids) ? parsed.editable_uids : [])
-      .map(uid => Number(uid))
-      .filter(uid => Number.isFinite(uid)),
-  );
-  const overlap = readonlyUids.filter(uid => editableUids.includes(uid));
-  if (overlap.length) {
-    throw new Error(`readonly_uids 与 editable_uids 不能重叠: ${overlap.join(', ')}`);
-  }
-  if (validUids instanceof Set) {
-    const unknown = [...readonlyUids, ...editableUids].filter(uid => !validUids.has(uid));
-    if (unknown.length) {
-      throw new Error(`规划包含当前世界书不存在的 UID: ${_.uniq(unknown).join(', ')}`);
-    }
-  }
-
-  return {
-    readonly_uids: readonlyUids,
-    editable_uids: editableUids,
-    locked_editable_uids: Array.isArray(parsed?.locked_editable_uids)
-      ? parsed.locked_editable_uids.map(uid => Number(uid)).filter(uid => Number.isFinite(uid))
-      : [],
-    locked_readonly_uids: Array.isArray(parsed?.locked_readonly_uids)
-      ? parsed.locked_readonly_uids.map(uid => Number(uid)).filter(uid => Number.isFinite(uid))
-      : [],
-    planned_editable_uids: Array.isArray(parsed?.planned_editable_uids)
-      ? parsed.planned_editable_uids.map(uid => Number(uid)).filter(uid => Number.isFinite(uid))
-      : [],
-    planned_readonly_uids: Array.isArray(parsed?.planned_readonly_uids)
-      ? parsed.planned_readonly_uids.map(uid => Number(uid)).filter(uid => Number.isFinite(uid))
-      : [],
-    plan: {
-      goal: typeof parsed?.plan?.goal === 'string' ? parsed.plan.goal.trim() : '',
-      must_keep: Array.isArray(parsed?.plan?.must_keep)
-        ? parsed.plan.must_keep.map(item => `${item || ''}`.trim()).filter(Boolean)
-        : [],
-      rewrite_rules: Array.isArray(parsed?.plan?.rewrite_rules)
-        ? parsed.plan.rewrite_rules.map(item => `${item || ''}`.trim()).filter(Boolean)
-        : [],
-      consistency_notes: Array.isArray(parsed?.plan?.consistency_notes)
-        ? parsed.plan.consistency_notes.map(item => `${item || ''}`.trim()).filter(Boolean)
-        : [],
-    },
-  };
 }
 
 function planListFromTextarea(selector) {
@@ -1553,7 +1533,7 @@ function renderPreview(modeKey, previewResult = null) {
       ? item.diffs.map(diff => renderPreviewDiff(diff)).join('')
       : '<div class="ai-preview-diff-after">无实际变更。</div>';
     $list.append(`
-      <div class="ai-preview-item${Number(item.uid) === activeUid ? ' is-active' : ''}" data-preview-uid="${item.uid}" role="button" tabindex="0" title="点击查看完整修改">
+      <div class="ai-preview-item${Number(item.uid) === activeUid ? ' is-active' : ''}" data-preview-uid="${item.uid}" role="option" tabindex="${Number(item.uid) === activeUid ? '0' : '-1'}" aria-selected="${Number(item.uid) === activeUid}" title="点击查看完整修改">
         <div class="ai-preview-item-header">
           <div class="ai-preview-item-title">${_.escape(item.title)} (UID: ${item.uid})</div>
           <button type="button" class="ai-preview-exclude" data-preview-uid="${item.uid}">排除</button>
@@ -1643,6 +1623,7 @@ async function handleRollbackExecute() {
 
 function closePreviewModal() {
   $('#ai-workspace-preview-modal', parentDoc()).hide();
+  restoreOverlayFocus('preview');
 }
 
 function invalidateSharedInfoOutputs(message = '信息区已变化，请重新生成改造方案或预览。') {
@@ -1942,6 +1923,7 @@ function openPreviewModal(uid) {
     return;
   }
 
+  rememberOverlayFocus('preview');
   const sections = buildPreviewModalSections(item, mode);
   $('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid', uid);
   $('#ai-workspace-preview-modal-title', parentDoc()).text(`${item.title || '条目'} (UID: ${item.uid})`);
@@ -1972,6 +1954,7 @@ function openPreviewModal(uid) {
   $('#ai-workspace-preview-modal-save', parentDoc()).prop('disabled', false);
   $('#ai-workspace-preview-modal-regenerate', parentDoc()).prop('disabled', state.isGenerating);
   $('#ai-workspace-preview-modal', parentDoc()).css('display', 'block');
+  setTimeout(() => $('.ai-preview-modal-close', parentDoc()).trigger('focus'), 0);
 }
 
 function getSillyTavernApi() {
@@ -2568,7 +2551,7 @@ function buildResultMarkup(modeKey) {
         <div class="ai-section-heading"><div><span class="ai-section-kicker">修改审阅</span><h2>逐条检查结果</h2></div></div>
         <div id="ai-workspace-preview-summary" class="ai-preview-summary" aria-live="polite">${EMPTY_PREVIEW_TEXT}</div>
       <div id="ai-workspace-preview-errors" class="ai-preview-errors"></div>
-        <div id="ai-workspace-preview-list" class="ai-scroll ai-preview-list"></div>
+        <div id="ai-workspace-preview-list" class="ai-scroll ai-preview-list" role="listbox" aria-label="AI 修改结果"></div>
       </section>
       <section class="ai-workbench-panel ai-review-detail-panel">
         <div id="ai-workspace-preview-detail" class="ai-preview-detail"></div>
@@ -3137,6 +3120,7 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-entry-scroll{height:100%;overflow:auto}
       #${ROOT_ID} .ai-entry-item{min-height:58px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 9px;border-bottom:1px solid color-mix(in srgb,var(--ai-border-color,#555) 70%,transparent);background:transparent}
       #${ROOT_ID} .ai-entry-item:hover{background:var(--panel-entry-hover-bg-color,rgba(255,255,255,.04))}
+      #${ROOT_ID} .add-worldbook-result-item.is-keyboard-active{outline:var(--ai-focus-ring,2px solid var(--ai-focus-ring-color,#9fc8e4));outline-offset:-2px;background:var(--panel-entry-hover-bg-color,rgba(255,255,255,.06))}
       #${ROOT_ID} .ai-entry-main{min-width:0;flex:1 1 auto}
       #${ROOT_ID} .ai-entry-item-title{font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       #${ROOT_ID} .ai-entry-item-meta{margin-top:3px;color:var(--ai-text-color-secondary,#999);font:10px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace}
@@ -3240,6 +3224,7 @@ function ensureUnifiedStyles() {
         #${ROOT_ID} .ai-step-description{display:none}
       }
       @container ai-workspace (max-width:639px){
+        #${ROOT_ID} button,#${ROOT_ID} input,#${ROOT_ID} select{min-height:44px}
         #${ROOT_ID} .ai-workbench-header{grid-template-columns:1fr auto;padding:9px 10px}
         #${ROOT_ID} .ai-workbench-brand{display:none}
         #${ROOT_ID} .ai-strategy-switch{justify-self:start}
@@ -3263,6 +3248,10 @@ function ensureUnifiedStyles() {
         #${ROOT_ID} .ai-command-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
         #${ROOT_ID} .ai-command-actions .ai-button-primary{grid-column:1/-1;min-height:44px;order:-1}
         #${ROOT_ID} .ai-command-actions button{min-height:44px}
+        #${ROOT_ID} .ai-entry-mode-button{min-height:44px!important;padding-inline:10px}
+        #${ROOT_ID} .ai-bulk-toolbar button{min-height:44px}
+        #${ROOT_ID} .ai-field-toggles span{min-height:44px;display:flex;align-items:center;padding-inline:12px}
+        #${ROOT_ID} .ai-icon-button{width:44px;flex-basis:44px}
         #${ROOT_ID} .ai-tool-drawer,#${ROOT_ID} .ai-assistant-phone{width:100%;border-left:0}
         #${ROOT_ID} .ai-preview-modal-dialog{width:100%;min-height:100%;max-height:none;margin:0;border-radius:0}
         #${ROOT_ID} .ai-complete-panel{margin:12px auto;padding:20px 14px}
@@ -3413,7 +3402,7 @@ function renderCurrentPanel() {
 
 function hideLorebookSearchResults() {
   $('#ai-workspace-lorebook-search-results', parentDoc()).empty().hide();
-  $('#ai-workspace-lorebook-search', parentDoc()).attr('aria-expanded', 'false');
+  $('#ai-workspace-lorebook-search', parentDoc()).attr('aria-expanded', 'false').removeAttr('aria-activedescendant');
 }
 
 function filteredLorebookNames(searchText = '') {
@@ -3433,10 +3422,12 @@ function renderLorebookSearchResults(searchText = '') {
   const activeLorebook = currentModeState().lorebookName;
   if (!state.worldbookNames.length) {
     $results.html('<div class="add-worldbook-no-results">没有可用世界书</div>').show();
+    $('#ai-workspace-lorebook-search', parentDoc()).attr('aria-expanded', 'true').removeAttr('aria-activedescendant');
     return;
   }
   if (!names.length) {
     $results.html('<div class="add-worldbook-no-results">没有找到匹配的世界书</div>').show();
+    $('#ai-workspace-lorebook-search', parentDoc()).attr('aria-expanded', 'true').removeAttr('aria-activedescendant');
     return;
   }
 
@@ -3444,8 +3435,8 @@ function renderLorebookSearchResults(searchText = '') {
     .html(
       names
         .map(
-          name => `
-      <div class="add-worldbook-result-item${name === activeLorebook ? ' is-active' : ''}" data-lorebook-name="${_.escape(name)}" role="option" tabindex="0" aria-selected="${name === activeLorebook}">
+          (name, index) => `
+      <div id="ai-workspace-lorebook-option-${index}" class="add-worldbook-result-item${name === activeLorebook ? ' is-active' : ''}" data-lorebook-name="${_.escape(name)}" role="option" tabindex="-1" aria-selected="${name === activeLorebook}">
         ${_.escape(name)}
       </div>
     `,
@@ -3454,6 +3445,20 @@ function renderLorebookSearchResults(searchText = '') {
     )
     .show();
   $('#ai-workspace-lorebook-search', parentDoc()).attr('aria-expanded', 'true');
+}
+
+function moveLorebookSearchActiveOption(direction) {
+  const $options = $('#ai-workspace-lorebook-search-results [role="option"]', parentDoc());
+  if (!$options.length) return;
+  const currentIndex = $options.index($options.filter('.is-keyboard-active'));
+  const nextIndex = currentIndex < 0
+    ? direction > 0 ? 0 : $options.length - 1
+    : (currentIndex + direction + $options.length) % $options.length;
+  const $next = $options.eq(nextIndex);
+  $options.removeClass('is-keyboard-active');
+  $next.addClass('is-keyboard-active');
+  $('#ai-workspace-lorebook-search', parentDoc()).attr('aria-activedescendant', $next.attr('id'));
+  $next.get(0)?.scrollIntoView?.({ block: 'nearest' });
 }
 
 async function populateLorebooks() {
@@ -3814,6 +3819,23 @@ function bindEvents() {
     .on('input.aiWorkspaceDesktop', '#ai-workspace-lorebook-search', function () {
       renderLorebookSearchResults($(this).val() || '');
     })
+    .on('keydown.aiWorkspaceDesktop', '#ai-workspace-lorebook-search', function (event) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (!$('#ai-workspace-lorebook-search-results', parentDoc()).is(':visible')) {
+          renderLorebookSearchResults($(this).val() || '');
+        }
+        moveLorebookSearchActiveOption(event.key === 'ArrowDown' ? 1 : -1);
+      } else if (event.key === 'Enter') {
+        const $active = $('#ai-workspace-lorebook-search-results .is-keyboard-active', parentDoc());
+        if ($active.length) {
+          event.preventDefault();
+          $active.trigger('click');
+        }
+      } else if (event.key === 'Escape') {
+        hideLorebookSearchResults();
+      }
+    })
     .on('blur.aiWorkspaceDesktop', '#ai-workspace-lorebook-search', () => {
       setTimeout(() => hideLorebookSearchResults(), 200);
     })
@@ -3966,7 +3988,7 @@ function bindEvents() {
       const modeKey = currentModeKey();
       try {
         const validUids = new Set(state.modes[modeKey].entries.map(entry => Number(entry.uid)));
-        state.modes[modeKey].planningResult = normalizePlanEditorValue($(this).val() || '{}', validUids);
+        state.modes[modeKey].planningResult = normalizeAiPlanEditorValue($(this).val() || '{}', validUids);
         state.modes[modeKey].planEditorError = '';
         syncPlanSelectionFromPlanningResult(modeKey);
         state.modes[modeKey].previewResult = null;
@@ -4087,13 +4109,32 @@ function bindEvents() {
       } else {
         renderPreviewDetail(currentModeKey(), uid);
       }
-      $('#ai-workspace-preview-list .ai-preview-item', parentDoc()).removeClass('is-active');
-      $(this).addClass('is-active');
+      $('#ai-workspace-preview-list .ai-preview-item', parentDoc())
+        .removeClass('is-active')
+        .attr({ 'aria-selected': 'false', tabindex: '-1' });
+      $(this).addClass('is-active').attr({ 'aria-selected': 'true', tabindex: '0' });
     })
     .on('keydown.aiWorkspaceDesktop', '#ai-workspace-preview-list .ai-preview-item', function (event) {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        $(this).trigger('click');
+        return;
+      }
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
-      $(this).trigger('click');
+      const $items = $('#ai-workspace-preview-list .ai-preview-item', parentDoc());
+      const currentIndex = $items.index(this);
+      const nextIndex = event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? $items.length - 1
+          : Math.max(0, Math.min($items.length - 1, currentIndex + (event.key === 'ArrowDown' ? 1 : -1)));
+      const $next = $items.eq(nextIndex);
+      $items.removeClass('is-active').attr({ 'aria-selected': 'false', tabindex: '-1' });
+      $next.addClass('is-active').attr({ 'aria-selected': 'true', tabindex: '0' }).trigger('focus');
+      if ((root().width() || 0) >= 960) {
+        renderPreviewDetail(currentModeKey(), Number($next.attr('data-preview-uid')));
+      }
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-detail-regenerate', async () => {
       const uid = Number($('#ai-workspace-preview-detail', parentDoc()).attr('data-preview-uid'));
@@ -4128,7 +4169,13 @@ function bindEvents() {
       }
     })
     .on('keydown.aiWorkspaceDesktop', event => {
-      if (event.key === 'Escape' && $('#ai-workspace-assistant-modal', parentDoc()).is(':visible')) {
+      const overlay = $(event.target).closest('#ai-workspace-settings-modal, #ai-workspace-assistant-modal, #ai-workspace-preview-modal').get(0);
+      if (trapOverlayFocus(event, overlay)) {
+        return;
+      }
+      if (event.key === 'Escape' && $('#ai-workspace-preview-modal', parentDoc()).is(':visible')) {
+        closePreviewModal();
+      } else if (event.key === 'Escape' && $('#ai-workspace-assistant-modal', parentDoc()).is(':visible')) {
         closeAssistantModal();
       } else if (event.key === 'Escape' && $('#ai-workspace-settings-modal', parentDoc()).is(':visible')) {
         flushAiWorkspaceSettings();
