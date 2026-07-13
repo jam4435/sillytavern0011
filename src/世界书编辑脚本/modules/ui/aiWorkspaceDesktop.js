@@ -1634,7 +1634,7 @@ async function handleRollbackExecute() {
   await loadEntriesForMode(modeKey, { force: true, resetSelection: false, clearOutputs: true });
   mode.currentStep = 'prepare';
   mode.lastApplyResult = null;
-  clearPreview(modeKey, '最近一次 AI 应用已回滚。');
+  clearPreview(modeKey, '最近一次世界书操作已回滚。');
   await refreshRollbackPanel(modeKey);
   setModeStatus(modeKey, '回滚完成。');
   $('#ai-workspace-rollback-dialog', parentDoc()).get(0)?.close?.();

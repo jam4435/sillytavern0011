@@ -8,13 +8,13 @@
 
 - 以仓库当前代码为准，不保留容易过期的行数统计
 - `信息.txt`、`修改计划.txt`、导出 JSON、临时文件等不属于架构主体，不在本文档展开
-- `AI 修改`、PC 主从布局、主题与浏览器设置备份现在都是相对独立的子系统
+- `AI 修改`、PC 主从布局、主题与浏览器设置备份现在都是相对独立的子系统；AI 修改自身只保留一套容器响应式工作台
 
 ## 2. 核心设计理念
 
 - **分层模块化**：`commands/` 负责操作编排，`features/` 负责业务能力，`ui/` 负责界面，`api.js` 负责酒馆接口封装
-- **双布局并存**：移动端的有效布局固定为抽屉式，PC 使用独立保存的抽屉式或主从布局偏好；跨设备模式时同步面板属性并重渲染当前页
-- **状态分层**：主列表共享状态集中在 `state.js`；AI 工作区有模块内状态；跨会话偏好写入 `settings.js` 或主题存储
+- **主面板双布局、AI 单实现**：主面板移动端固定为抽屉式，PC 保存抽屉式或主从布局偏好；AI 修改页不再按设备维护两套实现，而是按自身容器宽度响应式切换
+- **状态分层**：主列表共享状态集中在 `state.js`；AI 工作流由纯逻辑状态层约束阶段和能力；跨会话只保存输入草稿与偏好，不恢复规划、预览等运行结果
 - **命令驱动 + 局部直绑并存**：主面板遵循 `events.js -> commands/*.js`
   的命令分发；AI 工作区、编辑器、优化器、悬浮球等复杂交互在对应 UI 模块或 `events.js` 内部直绑
 - **事务化写回**：世界书更新通过 `api.js` 统一提交，高风险操作用 `history.js` 记录提交前快照
@@ -61,6 +61,7 @@ src/世界书编辑脚本/
         ├── aiActionDialog.js
         ├── aiWorkspace.js
         ├── aiWorkspaceDesktop.js
+        ├── aiWorkflowState.js
         ├── contentEditor.js
         ├── detail.js
         ├── editor.js
@@ -104,8 +105,8 @@ src/世界书编辑脚本/
 | 模块                       | 职责                                                                                                                                |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `activationTracker.js`     | 追踪 `WORLD_INFO_ACTIVATED` 激活过的条目并提供高亮筛选                                                                              |
-| `aiActions.js`             | 轻量 AI 改写能力：收集条目、生成单条/已选条目预览、应用预览                                                                         |
-| `aiActionsBatch.js`        | AI 工作区主引擎：规划、直接/计划预览、提示词组装、聊天上下文/参考资料/只读条目注入、token 分批、JSON 修复解析、兼容性诊断、应用预览 |
+| `aiActions.js`             | 轻量 AI 改写与统一写回能力：收集条目、生成单条/已选条目预览，并按 UID 返回应用成功、冲突、缺失及原因                                 |
+| `aiActionsBatch.js`        | AI 工作区主引擎：规划、直接/计划预览、提示词组装、上下文注入、token 顺序分批、JSON 修复解析、诊断，以及统一预览结果归并              |
 | `batchActions.js`          | 批量字段更新、复制到其他世界书、删除、调序、全选；复制支持覆盖、重命名、保留原名策略                                                |
 | `browserSettingsBackup.js` | 浏览器设置备份：按白名单导出/导入 localStorage，并在导出时脱敏自定义 API Key 和上传背景图 data URL                                  |
 | `bulkImport.js`            | YAML 批量导入条目及导入弹窗                                                                                                         |
@@ -130,8 +131,9 @@ src/世界书编辑脚本/
 | `largeContentPreview.js`   | 长内容折叠预览卡片                                                                                    |
 | `floatingBatchDropdown.js` | 标题栏批量菜单的浮动定位                                                                              |
 | `aiActionDialog.js`        | 轻量 AI 改写弹窗，适合单条或已选条目的快速预览/应用                                                   |
-| `aiWorkspace.js`           | 抽屉/移动端 AI 工作区实现，并在 PC 主从布局下委托给 `aiWorkspaceDesktop.js`                           |
-| `aiWorkspaceDesktop.js`    | PC 主从布局 AI 工作区，提供 API 设置、直接修改、计划修改等导航和分步流程；`世界书生成` 目前是占位入口 |
+| `aiWorkspace.js`           | AI 工作区稳定外观层，只导出 `initAiWorkspace`、`refreshAiWorkspace`、`resetAiWorkspace` 并委托给唯一实现 |
+| `aiWorkspaceDesktop.js`    | 单一容器响应式 AI 修改工作台（文件名为历史兼容），包含准备、计划审阅、修改审阅、完成态及工具抽屉     |
+| `aiWorkflowState.js`       | AI 工作流纯逻辑层：阶段守卫、派生按钮能力、输入失效矩阵、生成生命周期及条目三态选择                   |
 | `masterEntryTokens.js`     | 主从布局条目 token 徽标计算与刷新                                                                     |
 | `expandManager.js`         | 抽屉/移动端条目展开折叠状态同步                                                                       |
 | `theme.js`                 | 版本化主题存储、布局主题切换、CSS 变量应用、主题弹窗、浏览器设置导入导出入口                          |
@@ -149,7 +151,7 @@ index.js
 → 监听 APP_READY、CHAT_CHANGED、WORLD_INFO_ACTIVATED、GENERATION_FINISHED
 ```
 
-`initPanel()` 会初始化 AI 工作区；`initAiWorkspace()` 根据当前布局决定使用抽屉版还是 PC 主从版。
+`initPanel()` 会初始化 AI 工作区。无论主面板当前是抽屉还是 PC 主从布局，`initAiWorkspace()` 都进入同一实现；工作台使用容器宽度在宽屏主从、紧凑单栏和窄屏全屏抽屉之间切换，切换时不重建任务状态。
 
 ### 5.2 主面板命令链
 
@@ -207,16 +209,23 @@ index.js
 
 ```text
 AI 页签
-→ ui/aiWorkspace*.js 读取 settings.js 中的 API、提示词、direct/plan 状态
-→ 选择可编辑条目、只读条目、修改指令；按 `chatContext.enabled` 决定是否注入聊天上下文
-→ 手机弹窗式 AI 助手维护助手对话和参考资料，主工作区只显示资料状态
-→ aiActionsBatch.js 生成规划或预览
+→ ui/aiWorkspace.js 进入 ui/aiWorkspaceDesktop.js 的唯一响应式工作台
+→ settings.js 读取 schemaVersion: 2 的策略、目标世界书和单一 draft
+→ aiWorkflowState.js 派生当前阶段、可进入阶段和主动作能力
+→ 条目范围以“修改 / 只读 / 排除”三态选择；搜索覆盖标题、UID、正文
+→ API 设置与 AI 助手通过工具抽屉编辑，未实现的世界书生成入口不渲染
+→ aiActionsBatch.js 生成结构化规划或预览
 → llmClient.js 调用酒馆预设或自定义 OpenAI 兼容接口
-→ ui/aiWorkspace*.js 展示预览、调试信息、诊断和可编辑结果
-→ aiActionsBatch.js / api.js 写回世界书并记录事务
+→ 工作台展示结构化计划、字段差异、诊断和可编辑结果
+→ aiActions.js / api.js 按 UID 部分写回并记录事务
+→ 成功进入完成态；部分冲突只移除成功项，保留冲突项供重试
 ```
 
-`direct` 模式直接从选中条目生成预览；`plan` 模式先产出 `readonly_uids`、`editable_uids` 和整体方案，再用计划驱动预览。
+工作流固定为 `准备 → 修改审阅 → 完成`；选择 `先规划` 策略时插入 `计划审阅`。直接策略至少需要一条可修改条目，规划策略允许零手动选择并分析整本世界书。阶段跳转由状态层守卫，不能进入尚未满足条件的未来阶段。
+
+计划审阅以目标、保留项、改写规则、一致性要求和条目分组为结构化真值，并与高级区原始 JSON 双向同步；JSON 非法、UID 重复、未知或分组重叠时禁止继续。聊天上下文默认保存结构化消息，用户手工编辑后明确切换为手工文本模式，刷新上下文才恢复结构化模式。
+
+预览统一返回 `outcome: complete | partial | cancelled | failed`，部分成功和停止结果不会丢弃已完成条目。多批次保持顺序执行，单条重新生成与整次任务共享 generationId、runId 和停止生命周期。应用结果返回 `appliedUids` 与逐 UID 的 `skipped: { uid, reason }[]`；写回仍执行字段白名单、完整 `beforeEntry` 冲突检测、隐藏元条目过滤和事务快照。
 
 ### 5.6 状态分层
 
@@ -225,13 +234,12 @@ AI 页签
 1. `state.js`
    主列表运行时状态：世界书条目缓存、筛选、搜索结果、选择、展开、详情区、文件夹、对比、最近事务、布局和替换锁。
 
-2. `ui/aiWorkspace.js` / `ui/aiWorkspaceDesktop.js`
-   AI 工作区运行时状态：当前导航、当前步骤、生成状态、停止标记、模型列表、聊天上下文开启状态、参考资料、手机弹窗式
-   AI 助手对话，以及 `direct` / `plan` 各自的条目选择、规划和预览。参考资料只在 AI 助手弹窗内编辑，主界面通过状态行和手机按钮进入。
+2. `ui/aiWorkspaceDesktop.js` / `ui/aiWorkflowState.js`
+   AI 工作区会话状态：当前阶段、规划、预览、调试、进度、当前详情、generationId/runId 和停止标记。这些状态不跨页面刷新恢复；策略切换或输入变更会按失效矩阵清除不再可信的派生结果。
 
 3. `settings.js` / `theme.js`
    跨会话浏览器设置：主题、搜索栏、全屏、PC 布局、分栏宽度、悬浮球位置、复制冲突策略、置顶条目、AI
-   API/提示词/工作区状态。AI 设置过大时会降级为轻量保存；localStorage 不可用时的内存兜底刷新后会丢失。
+   API 设置和 `schemaVersion: 2` 的单一 AI `draft`。草稿保存策略、目标世界书、条目范围、指令、字段、提示词、聊天上下文和共享资料，约 300ms 防抖写入；旧 `navMode/direct/plan` 只迁移当前活动草稿。设置过大时会降级为轻量保存；localStorage 不可用时的内存兜底刷新后会丢失。
 
 4. 世界书隐藏元条目 `folderMeta.js` 用 `__WI_META_FOLDERS__` 条目保存文件夹结构；渲染和 AI 收集时会过滤这些元条目。
 
@@ -267,7 +275,7 @@ UI 命令或 AI 应用
 | 改入口按钮、主面板、最小化或悬浮球     | `ui/panel.js`、`events.js`、`settings.js`                                                 |
 | 改 PC 主从布局                         | `ui/detail.js`、`ui/list.js`、`ui/entry.js`、`ui/theme.js`、`settings.js`                 |
 | 改列表、筛选、选择、虚拟滚动           | `ui/list.js`、`ui/entry.js`、`events.js`、`state.js`                                      |
-| 改 AI 工作区界面                       | `ui/aiWorkspace.js`、`ui/aiWorkspaceDesktop.js`                                           |
+| 改 AI 工作区界面或阶段守卫             | `ui/aiWorkspace.js`、`ui/aiWorkspaceDesktop.js`、`ui/aiWorkflowState.js`                  |
 | 改 AI 规划 / 批量预览 / JSON 解析      | `features/aiActionsBatch.js`                                                              |
 | 改轻量 AI 弹窗                         | `ui/aiActionDialog.js`、`features/aiActions.js`、`commands/entryCommands.js`              |
 | 改实际 LLM 请求方式                    | `features/llmClient.js`                                                                   |
