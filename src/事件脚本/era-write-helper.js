@@ -60,6 +60,10 @@ function markDone(signature) {
   recentSignatures.set(signature, Date.now());
 }
 
+function releasePending(signature) {
+  pendingSignatures.delete(signature);
+}
+
 function isEmptyPatch(value) {
   return isPlainObject(value) && Object.keys(value).length === 0;
 }
@@ -266,12 +270,12 @@ export async function writeDirectChatVariables(action, payload, reason = 'direct
     );
 
     log(`直接写入完成: ${reason}`);
+    releasePending(signature);
     return true;
   } catch (error) {
+    releasePending(signature);
     logWarning(`直接写入失败: ${reason}`, error);
     return false;
-  } finally {
-    markDone(signature);
   }
 }
 

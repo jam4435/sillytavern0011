@@ -1,5 +1,5 @@
 import { getEndTime, getEventParticipationKeys } from './era-utils.js';
-import { writeDirectInsert, writeDirectUpdate } from './era-write-helper.js';
+import { writeDirectDelete, writeDirectInsert, writeDirectUpdate } from './era-write-helper.js';
 import {
   haveEventDiffsChanged,
   hasEventOutcomeChanged,
@@ -162,7 +162,24 @@ export function buildWorldEventArchivePatch(eventNames, eventDefinitions, statDa
 
 export async function ensureWorldEventsArchived(eventNames, eventDefinitions, variables) {
   const currentVariables = variables || (await getVariables({ type: 'chat' }));
-  const patch = buildWorldEventArchivePatch(eventNames, eventDefinitions, currentVariables?.stat_data || {});
+  const currentStatData = currentVariables?.stat_data || {};
+  const malformedEntries = Object.fromEntries(
+    eventNames
+      .filter(
+        eventName =>
+          Object.prototype.hasOwnProperty.call(currentStatData?.世界事件 || {}, eventName) &&
+          !isWorldEventRecord(currentStatData.世界事件[eventName]),
+      )
+      .map(eventName => [eventName, {}]),
+  );
+  if (Object.keys(malformedEntries).length > 0) {
+    await writeDirectDelete(
+      { 世界事件: malformedEntries },
+      `delete-malformed-world-events-${Object.keys(malformedEntries).length}`,
+    );
+  }
+
+  const patch = buildWorldEventArchivePatch(eventNames, eventDefinitions, currentStatData);
   if (Object.keys(patch).length > 0) {
     await writeDirectInsert(
       { 世界事件: patch },
@@ -188,6 +205,7 @@ export async function reconcileWorldEventArchive(eventDefinitions) {
     ? statData.前端变量.事件结局状态
     : {};
   const worldEventPatch = {};
+  const malformedWorldEventDeletes = {};
   const unknownStatusInserts = {};
   const unknownStatusUpdates = {};
 
@@ -195,6 +213,10 @@ export async function reconcileWorldEventArchive(eventDefinitions) {
     const eventData = eventDefinitions?.[eventName];
     if (!eventData || !isOrdinaryWorldEvent(eventName) || isWorldEventRecord(existingWorldEvents[eventName])) {
       continue;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(existingWorldEvents, eventName)) {
+      malformedWorldEventDeletes[eventName] = {};
     }
 
     const found = findParticipationEntry(statData.参与事件, eventName);
@@ -212,6 +234,12 @@ export async function reconcileWorldEventArchive(eventDefinitions) {
     worldEventPatch[eventName] = buildWorldEventRecord(eventData, ending);
   }
 
+  if (Object.keys(malformedWorldEventDeletes).length > 0) {
+    await writeDirectDelete(
+      { 世界事件: malformedWorldEventDeletes },
+      `delete-malformed-legacy-world-events-${Object.keys(malformedWorldEventDeletes).length}`,
+    );
+  }
   if (Object.keys(worldEventPatch).length > 0) {
     await writeDirectInsert(
       { 世界事件: worldEventPatch },

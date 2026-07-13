@@ -16,6 +16,7 @@ const currentTime = { 年: 1210, 月: 8, 日: 8, 时: 7 };
 const eventData = {
   事件地点: '蒙古/大漠/荒山',
   事件引子: '听说大漠荒山近日有人交手。',
+  事件概要: '郭靖与梅超风结束荒山冲突，各自状态与去向得到确定。',
   参与人物: ['郭靖', '梅超风'],
 };
 
@@ -26,6 +27,7 @@ describe('normalizeParticipantEventDefinition', () => {
       {
         事件地点: ' 蒙古/大漠/荒山 ',
         事件引子: ' 听说大漠荒山近日有人交手。 ',
+        事件概要: ' 郭靖与梅超风结束荒山冲突，各自状态与去向得到确定。 ',
         参与人物: ['郭靖', ' 郭靖 ', '梅超风'],
       },
       { isDebut: false },
@@ -34,11 +36,16 @@ describe('normalizeParticipantEventDefinition', () => {
     expect(result.valid).toBe(true);
     expect(result.data.事件地点).toBe('蒙古/大漠/荒山');
     expect(result.data.事件引子).toBe('听说大漠荒山近日有人交手。');
+    expect(result.data.事件概要).toBe('郭靖与梅超风结束荒山冲突，各自状态与去向得到确定。');
     expect(result.data.参与人物).toEqual(['郭靖', '梅超风']);
   });
 
   it('rejects ordinary events without a location or participants', () => {
-    const result = normalizeParticipantEventDefinition('无效事件', {}, { isDebut: false });
+    const result = normalizeParticipantEventDefinition(
+      '无效事件',
+      { 事件概要: '事件结束后的持久结果已经得到确定。' },
+      { isDebut: false },
+    );
 
     expect(result.valid).toBe(false);
     expect(result.errors).toHaveLength(3);
@@ -47,7 +54,12 @@ describe('normalizeParticipantEventDefinition', () => {
   it('rejects non-string participant values', () => {
     const result = normalizeParticipantEventDefinition(
       '无效参与人物事件',
-      { 事件地点: '蒙古/大漠', 事件引子: '听说大漠有异动。', 参与人物: ['郭靖', 123] },
+      {
+        事件地点: '蒙古/大漠',
+        事件引子: '听说大漠有异动。',
+        事件概要: '郭靖查清大漠异动的缘由，并确定相关人物的去向。',
+        参与人物: ['郭靖', 123],
+      },
       { isDebut: false },
     );
 
@@ -61,6 +73,7 @@ describe('normalizeParticipantEventDefinition', () => {
       {
         事件地点: '大宋/临安府/牛家村',
         事件引子: { '大宋/临安府': '你听说牛家村近日有异动。' },
+        事件概要: '郭啸天查清牛家村异动，村中局势恢复稳定。',
         参与人物: ['郭啸天'],
       },
       { isDebut: false },
@@ -76,6 +89,7 @@ describe('normalizeParticipantEventDefinition', () => {
       {
         事件地点: '大宋',
         事件引子: '你听说大宋近日有异动。',
+        事件概要: '郭啸天查清大宋异动，相关人物的处境得到确定。',
         参与人物: ['郭啸天'],
       },
       { isDebut: false },
@@ -92,6 +106,17 @@ describe('normalizeParticipantEventDefinition', () => {
     });
 
     expect(result).toEqual({ valid: true, data: event, errors: [] });
+  });
+
+  it('rejects ordinary events without an event summary', () => {
+    const result = normalizeParticipantEventDefinition(
+      '缺少概要事件',
+      { 事件地点: '蒙古/大漠', 事件引子: '听说大漠有异动。', 参与人物: ['郭靖'] },
+      { isDebut: false },
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('事件 缺少概要事件 缺少非空的事件概要');
   });
 });
 
@@ -247,6 +272,7 @@ describe('player participation ending snapshot', () => {
       触发条件: { 年: 1219, 月: 10, 日: 20, 时: 13 },
       事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
       事件详情: '郭靖在张家口初遇黄蓉。',
+      事件概要: '郭靖结识黄蓉并请她吃饭，两人由此建立初步情谊。',
       insert: {
         郭靖: { 人物经历: { 原结局: '请黄蓉吃饭。' } },
       },
@@ -264,7 +290,7 @@ describe('player participation ending snapshot', () => {
 
     expect(entry).toEqual({
       描述: '1219年10月20日13时 到 1219年10月20日15时，郭靖在张家口初遇黄蓉。',
-      结局: '',
+      结局: '郭靖结识黄蓉并请她吃饭，两人由此建立初步情谊。',
       insert: {
         郭靖: { 人物经历: { 原结局: '请黄蓉吃饭。' } },
       },
