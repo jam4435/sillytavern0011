@@ -20,7 +20,6 @@ import {
   Settings,
   Sparkles,
   Sword,
-  Swords,
   Search,
   ToggleLeft,
   ToggleRight,
@@ -50,7 +49,6 @@ const IconWrapper = ({ children, className = "" }: IconWrapperProps) => (
 );
 
 export const Icons = {
-  Brand: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Swords size={size || 30} color={color} strokeWidth={1.65} /></IconWrapper>,
   Quest: ({ className, size, color }: IconProps) => <IconWrapper className={className}><Scroll size={size || 20} color={color} /></IconWrapper>,
   Character: ({ className, size, color }: IconProps) => <IconWrapper className={className}><User size={size || 20} color={color} /></IconWrapper>,
   Map: ({ className, size, color }: IconProps) => <IconWrapper className={className}><MapIcon size={size || 20} color={color} /></IconWrapper>,

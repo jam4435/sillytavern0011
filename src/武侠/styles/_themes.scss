@@ -219,12 +219,15 @@
     display: none;
   }
 
-  .logo-mark,
   .nav-btn.active,
   .nav-btn:hover,
   .loc-icon,
   .title-bar {
     color: #8b1a1a;
+  }
+
+  .logo-mark {
+    filter: sepia(0.28) saturate(0.74) contrast(1.18);
   }
 
   .nav-btn {

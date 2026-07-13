@@ -257,14 +257,14 @@
 }
 
 .logo-mark {
-  color: rgba(212, 175, 55, 0.9);
+  width: 2.45rem;
+  height: 2.45rem;
+  border-radius: 50%;
+  object-fit: cover;
   position: relative;
   z-index: 1;
-  filter: drop-shadow(0 0 7px rgba(212, 175, 55, 0.42));
-
-  svg {
-    display: block;
-  }
+  image-rendering: pixelated;
+  filter: contrast(1.12) saturate(0.82) drop-shadow(0 0 7px rgba(212, 175, 55, 0.32));
 }
 
 // =========================================

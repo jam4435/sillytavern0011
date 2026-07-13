@@ -49,6 +49,29 @@ describe('iconCatalog', () => {
     );
   });
 
+  it('罗汉伏虎拳使用对应招式图而不是佛门通用特效', () => {
+    const luohanFuhu = resolveMartialArtIcon('罗汉伏虎拳', { ...baseArt, type: '拳掌' });
+    const buddhistInner = resolveMartialArtIcon('神足经', { ...baseArt, type: '内功' });
+
+    expect(luohanFuhu).toEqual(expect.objectContaining({ category: '罗汉拳', label: '罗汉伏虎拳' }));
+    expect(luohanFuhu.src).not.toBe(buddhistInner.src);
+  });
+
+  it('佛门功法按内功、护体、拳掌、指法和兵器分别取图', () => {
+    const inner = resolveMartialArtIcon('神足经', { ...baseArt, type: '内功' });
+    const guard = resolveMartialArtIcon('袈裟伏魔功', { ...baseArt, type: '外功' });
+    const palm = resolveMartialArtIcon('大金刚掌', { ...baseArt, type: '拳掌' });
+    const finger = resolveMartialArtIcon('拈花指', { ...baseArt, type: '指法' });
+    const weapon = resolveMartialArtIcon('大韦陀杵', { ...baseArt, type: '棍锤' });
+
+    expect(inner.category).toBe('佛门内功');
+    expect(guard.category).toBe('佛门护体');
+    expect(palm.category).toBe('佛门拳掌');
+    expect(finger.category).toBe('佛门指法');
+    expect(weapon.category).toBe('佛门重兵器');
+    expect(new Set([inner.src, guard.src, palm.src, finger.src, weapon.src]).size).toBe(5);
+  });
+
   it('功法库全部功法都有图标且不会落入未知兜底', () => {
     const resolved = martialArtsDatabase.功法.map(art =>
       resolveMartialArtIcon(art.功法名称, { ...baseArt, type: art.类型 }),

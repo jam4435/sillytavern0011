@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import brandXiakeEmblemUrl from './assets/icons/jinyong/brand_xiake_emblem.png?url';
 import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
 import ChatInput from './components/ChatInput';
@@ -801,7 +802,7 @@ const App: React.FC = () => {
         {/* Navigation Sidebar */}
         <nav className={`nav-sidebar ${isSidebarOpen ? 'open' : ''}`}>
           <div className="logo-box">
-            <Icons.Brand className="logo-mark" />
+            <img className="logo-mark" src={brandXiakeEmblemUrl} alt="" aria-hidden="true" />
           </div>
 
           <NavButton

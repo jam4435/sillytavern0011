@@ -1,6 +1,8 @@
 import type { MartialArt } from '../types';
 
-import buddhistInnerUrl from '../assets/icons/jinyong/martial_buddhist_inner.jpg?url';
+import buddhistFingerUrl from '../assets/icons/jinyong/martial_buddhist_finger.png?url';
+import buddhistGuardUrl from '../assets/icons/jinyong/martial_buddhist_guard.png?url';
+import buddhistInnerUrl from '../assets/icons/jinyong/martial_buddhist_inner_gold.png?url';
 import bodyUrl from '../assets/icons/jinyong/martial_body.png?url';
 import fingerUrl from '../assets/icons/jinyong/martial_finger.png?url';
 import fistUrl from '../assets/icons/jinyong/martial_fist.png?url';
@@ -9,6 +11,7 @@ import grappleUrl from '../assets/icons/jinyong/martial_grapple.png?url';
 import hiddenNeedleUrl from '../assets/icons/jinyong/martial_hidden_needle.jpg?url';
 import innerYangUrl from '../assets/icons/jinyong/martial_inner_yang.png?url';
 import innerYinUrl from '../assets/icons/jinyong/martial_inner_yin.png?url';
+import luohanFuhuUrl from '../assets/icons/jinyong/martial_luohan_fuhu.png?url';
 import palmUrl from '../assets/icons/jinyong/martial_palm.png?url';
 import palmDragonUrl from '../assets/icons/jinyong/martial_palm_dragon.png?url';
 import poisonUrl from '../assets/icons/jinyong/martial_poison.png?url';
@@ -42,16 +45,46 @@ interface MartialVisualRule {
 }
 
 const semanticRules: MartialVisualRule[] = [
+  { pattern: /^罗汉(?:伏虎)?拳$/, src: luohanFuhuUrl, label: '罗汉伏虎拳', category: '罗汉拳' },
   { pattern: /阵|互搏|两仪/, src: formationUrl, label: '阵法气机', category: '阵法' },
   { pattern: /吼|啸|音|琴|箫|筝|唱|腹语|潮生曲/, src: soundUrl, label: '音律真气', category: '音律' },
   { pattern: /毒|砂|蜈蚣|腐尸|化血|碧磷|无形粉|三笑/, src: poisonUrl, label: '毒功', category: '毒功' },
   { pattern: /降龙|龙象|龙爪|擒龙|龙/, src: palmDragonUrl, label: '龙形劲力', category: '龙形武学' },
   { pattern: /擒拿|擒|爪|抓|锁喉|错骨|夺白刃/, src: grappleUrl, label: '擒拿手', category: '擒拿' },
   {
-    pattern: /易筋|神足|罗汉|金刚|般若|禅|达摩|伏魔|袈裟|韦陀|佛光|须弥|释迦|天竺|拈花|寂灭|因陀罗/,
+    pattern: /易筋|神足|金刚不坏|禅唱|佛门|少林内功/,
     src: buddhistInnerUrl,
-    label: '佛门真功',
-    category: '佛门武学',
+    label: '佛门禅定内功',
+    category: '佛门内功',
+    types: ['内功'],
+  },
+  {
+    pattern: /袈裟|护体|金钟|铁布衫/,
+    src: buddhistGuardUrl,
+    label: '佛门护体功',
+    category: '佛门护体',
+    types: ['外功', '内功'],
+  },
+  {
+    pattern: /金刚|般若|达摩|罗汉|韦陀|佛光|须弥|释迦|千手|伏虎|托钵/,
+    src: luohanFuhuUrl,
+    label: '佛门拳掌',
+    category: '佛门拳掌',
+    types: ['拳掌'],
+  },
+  {
+    pattern: /金刚|天竺|拈花|多罗叶|无相劫|摩诃|大智无定|去烦恼|寂灭/,
+    src: buddhistFingerUrl,
+    label: '佛门指劲',
+    category: '佛门指法',
+    types: ['指法'],
+  },
+  {
+    pattern: /伏魔|韦陀|方便铲|金刚圈|禅杖|罗汉杖/,
+    src: staffUrl,
+    label: '佛门重兵器',
+    category: '佛门重兵器',
+    types: ['棍锤'],
   },
   { pattern: /九阳|纯阳|烈|炎|火|阳刚|乾坤/, src: innerYangUrl, label: '纯阳真气', category: '阳刚内功' },
   { pattern: /九阴|玄冥|寒|阴|冰|北冥|化功|葵花/, src: innerYinUrl, label: '阴柔真气', category: '阴柔内功' },
