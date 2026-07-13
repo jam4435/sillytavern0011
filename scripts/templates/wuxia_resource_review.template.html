@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>武侠资源图标审核台</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #171412;
+      --ink-soft: #473e38;
+      --paper: #f1ede4;
+      --paper-bright: #faf8f2;
+      --line: #cfc5b5;
+      --line-strong: #a99a85;
+      --gold: #a47728;
+      --gold-dark: #705018;
+      --cinnabar: #9b2f27;
+      --jade: #2f765d;
+      --amber: #a66718;
+      --muted: #746b62;
+      --shadow: rgba(40, 31, 24, 0.12);
+      --radius: 6px;
+    }
+
+    * {
+      box-sizing: border-box;
+      letter-spacing: 0;
+    }
+
+    html {
+      background: #d8d0c3;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.16)),
+        repeating-linear-gradient(0deg, rgba(68, 55, 43, 0.025) 0, rgba(68, 55, 43, 0.025) 1px, transparent 1px, transparent 5px),
+        var(--paper);
+      font-family: "Noto Serif SC", "Source Han Serif SC", "Microsoft YaHei", serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      color: inherit;
+      font: inherit;
+    }
+
+    button,
+    select,
+    input[type="search"],
+    textarea,
+    .file-button {
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--paper-bright);
+    }
+
+    button,
+    .file-button {
+      min-height: 34px;
+      padding: 6px 11px;
+      cursor: pointer;
+    }
+
+    button:hover,
+    .file-button:hover {
+      border-color: var(--gold-dark);
+      background: #fffdf8;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    .file-button:focus-within {
+      outline: 2px solid var(--cinnabar);
+      outline-offset: 2px;
+    }
+
+    .app-header {
+      position: sticky;
+      z-index: 20;
+      top: 0;
+      border-bottom: 1px solid #302925;
+      color: #f5efe3;
+      background: #1c1815;
+      box-shadow: 0 6px 20px rgba(28, 22, 18, 0.2);
+    }
+
+    .header-main,
+    .header-stats,
+    .tabs,
+    .toolbar,
+    main {
+      width: min(1600px, 100%);
+      margin-inline: auto;
+    }
+
+    .header-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 20px 10px;
+    }
+
+    .title-block {
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      color: #fffaf0;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      margin: 5px 0 0;
+      color: #cfc3b2;
+      font-size: 12px;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .header-actions button,
+    .header-actions .file-button {
+      border-color: #6f6254;
+      color: #f5efe3;
+      background: #2a2420;
+    }
+
+    .header-actions button:hover,
+    .header-actions .file-button:hover {
+      border-color: #c39a51;
+      background: #38302a;
+    }
+
+    .file-button input {
+      display: none;
+    }
+
+    .header-stats {
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) repeat(4, minmax(80px, auto));
+      gap: 8px;
+      padding: 0 20px 12px;
+    }
+
+    .progress-shell {
+      display: grid;
+      align-items: center;
+      grid-template-columns: minmax(100px, 1fr) auto;
+      gap: 10px;
+    }
+
+    .progress-track {
+      height: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #4a4038;
+    }
+
+    .progress-bar {
+      width: 0;
+      height: 100%;
+      background: #c39a51;
+      transition: width 160ms ease;
+    }
+
+    .progress-label,
+    .stat-pill {
+      color: #ddd2c3;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .stat-pill strong {
+      color: #fffaf0;
+      font-size: 14px;
+    }
+
+    .tabs-shell {
+      border-bottom: 1px solid var(--line-strong);
+      background: #e3ddd2;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 0 20px;
+    }
+
+    .tab-button {
+      min-height: 44px;
+      border: 0;
+      border-bottom: 3px solid transparent;
+      border-radius: 0;
+      color: var(--ink-soft);
+      background: transparent;
+      font-weight: 700;
+    }
+
+    .tab-button[aria-selected="true"] {
+      border-bottom-color: var(--cinnabar);
+      color: var(--cinnabar);
+      background: rgba(255, 255, 255, 0.36);
+    }
+
+    .toolbar-shell {
+      border-bottom: 1px solid var(--line);
+      background: rgba(250, 248, 242, 0.86);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(140px, 190px)) auto;
+      gap: 10px;
+      padding: 12px 20px;
+    }
+
+    .toolbar input,
+    .toolbar select {
+      width: 100%;
+      min-height: 38px;
+      padding: 7px 10px;
+    }
+
+    .toolbar label {
+      display: grid;
+      gap: 3px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .toolbar label span {
+      padding-left: 2px;
+    }
+
+    .storage-state {
+      align-self: end;
+      min-height: 38px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--muted);
+      background: #ece7de;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    main {
+      padding: 18px 20px 50px;
+    }
+
+    .section-summary {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    .section-summary h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .section-summary p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .martial-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .martial-row {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(250, 248, 242, 0.82);
+      box-shadow: 0 4px 14px var(--shadow);
+    }
+
+    .martial-heading {
+      padding: 16px;
+      border-right: 1px solid var(--line);
+      background: #e8e1d6;
+    }
+
+    .martial-heading h3 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      line-height: 1.3;
+    }
+
+    .meta-tags,
+    .candidate-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag,
+    .match-tag,
+    .rank-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 7px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      color: var(--ink-soft);
+      background: rgba(255, 255, 255, 0.48);
+      font-size: 11px;
+    }
+
+    .match-tag.exact {
+      border-color: rgba(47, 118, 93, 0.48);
+      color: var(--jade);
+      background: rgba(47, 118, 93, 0.08);
+    }
+
+    .match-tag.related {
+      border-color: rgba(166, 103, 24, 0.46);
+      color: var(--amber);
+      background: rgba(166, 103, 24, 0.08);
+    }
+
+    .candidate-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 10px;
+      padding: 12px;
+    }
+
+    .review-card {
+      display: grid;
+      grid-template-columns: 100px minmax(0, 1fr);
+      gap: 11px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper-bright);
+    }
+
+    .review-card[data-status="accept"],
+    .review-cell[data-status="accept"] {
+      border-color: rgba(47, 118, 93, 0.62);
+      box-shadow: inset 3px 0 0 var(--jade);
+    }
+
+    .review-card[data-status="pending"],
+    .review-cell[data-status="pending"] {
+      border-color: rgba(166, 103, 24, 0.62);
+      box-shadow: inset 3px 0 0 var(--amber);
+    }
+
+    .review-card[data-status="reject"],
+    .review-cell[data-status="reject"] {
+      border-color: rgba(155, 47, 39, 0.62);
+      box-shadow: inset 3px 0 0 var(--cinnabar);
+    }
+
+    .icon-frame {
+      width: 100px;
+      height: 100px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid #b7ab99;
+      border-radius: 5px;
+      background:
+        repeating-conic-gradient(#e5ded1 0 25%, #f6f2ea 0 50%) 0 / 14px 14px;
+    }
+
+    .icon-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+
+    .candidate-copy {
+      min-width: 0;
+    }
+
+    .file-name {
+      display: block;
+      overflow: hidden;
+      margin: 6px 0 7px;
+      color: var(--ink);
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .source-path {
+      display: block;
+      overflow: hidden;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-family: Consolas, "Microsoft YaHei", monospace;
+      font-size: 10px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .review-controls {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .review-button {
+      min-width: 0;
+      min-height: 30px;
+      padding: 3px 7px;
+      color: var(--muted);
+      font-family: "Microsoft YaHei", sans-serif;
+      font-weight: 700;
+    }
+
+    .review-button[data-review-status="accept"].active {
+      border-color: var(--jade);
+      color: #fff;
+      background: var(--jade);
+    }
+
+    .review-button[data-review-status="pending"].active {
+      border-color: var(--amber);
+      color: #fff;
+      background: var(--amber);
+    }
+
+    .review-button[data-review-status="reject"].active {
+      border-color: var(--cinnabar);
+      color: #fff;
+      background: var(--cinnabar);
+    }
+
+    .note-input {
+      width: 100%;
+      min-height: 52px;
+      margin-top: 7px;
+      padding: 6px 7px;
+      resize: vertical;
+      color: var(--ink-soft);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .inventory-group + .inventory-group {
+      margin-top: 22px;
+    }
+
+    .inventory-group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .inventory-group-header h3 {
+      margin: 0;
+      color: var(--cinnabar);
+      font-size: 17px;
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--paper-bright);
+      box-shadow: 0 5px 16px var(--shadow);
+    }
+
+    .inventory-table {
+      width: 100%;
+      min-width: 1120px;
+      border-collapse: separate;
+      border-spacing: 0;
+      table-layout: fixed;
+    }
+
+    .inventory-table th,
+    .inventory-table td {
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    .inventory-table th:last-child,
+    .inventory-table td:last-child {
+      border-right: 0;
+    }
+
+    .inventory-table tbody tr:last-child th,
+    .inventory-table tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .inventory-table thead th {
+      position: sticky;
+      z-index: 3;
+      top: 0;
+      padding: 9px 7px;
+      color: #f4ecdf;
+      background: #332c27;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .inventory-table .category-column {
+      position: sticky;
+      z-index: 4;
+      left: 0;
+      width: 116px;
+      padding: 12px 9px;
+      background: #e8e1d6;
+      text-align: left;
+    }
+
+    .inventory-table thead .category-column {
+      z-index: 5;
+      background: #26211e;
+    }
+
+    .review-cell {
+      width: 165px;
+      padding: 8px;
+      background: #faf8f2;
+    }
+
+    .review-cell .icon-frame {
+      width: 76px;
+      height: 76px;
+      margin-inline: auto;
+    }
+
+    .cell-file {
+      display: block;
+      overflow: hidden;
+      margin: 5px 0 0;
+      font-family: Consolas, "Microsoft YaHei", monospace;
+      font-size: 9px;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .reuse-label {
+      display: block;
+      min-height: 18px;
+      color: var(--amber);
+      font-size: 9px;
+      text-align: center;
+    }
+
+    .review-cell .note-input {
+      min-height: 44px;
+    }
+
+    .empty-state {
+      padding: 54px 20px;
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
+      color: var(--muted);
+      background: rgba(250, 248, 242, 0.58);
+      text-align: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 50;
+      right: 18px;
+      bottom: 18px;
+      max-width: min(390px, calc(100% - 36px));
+      padding: 10px 13px;
+      border: 1px solid #6c5d50;
+      border-radius: var(--radius);
+      color: #fff8ed;
+      background: #29231f;
+      box-shadow: 0 8px 28px rgba(27, 21, 17, 0.28);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: 160ms ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 900px) {
+      .app-header {
+        position: static;
+      }
+
+      .header-main {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .header-actions {
+        justify-content: flex-start;
+      }
+
+      .header-stats {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .progress-shell {
+        grid-column: 1 / -1;
+      }
+
+      .toolbar {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .toolbar label:first-child,
+      .storage-state {
+        grid-column: 1 / -1;
+      }
+
+      .martial-row {
+        grid-template-columns: 1fr;
+      }
+
+      .martial-heading {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+    }
+
+    @media (max-width: 560px) {
+      .header-main,
+      .header-stats,
+      .tabs,
+      .toolbar,
+      main {
+        padding-right: 12px;
+        padding-left: 12px;
+      }
+
+      h1 {
+        font-size: 19px;
+      }
+
+      .header-actions {
+        width: 100%;
+      }
+
+      .header-actions button,
+      .header-actions .file-button {
+        flex: 1 1 auto;
+        text-align: center;
+      }
+
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar label:first-child,
+      .storage-state {
+        grid-column: auto;
+      }
+
+      .candidate-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .review-card {
+        grid-template-columns: 84px minmax(0, 1fr);
+      }
+
+      .review-card .icon-frame {
+        width: 84px;
+        height: 84px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-main">
+      <div class="title-block">
+        <h1>武侠资源图标审核台</h1>
+        <p class="subtitle">功法同名候选与物品细分类品阶图 · 生成于 __GENERATED_AT__</p>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="exportButton">导出审核 JSON</button>
+        <label class="file-button" tabindex="0">导入审核 JSON<input id="importInput" type="file" accept="application/json,.json"></label>
+        <button type="button" id="clearButton">清空审核</button>
+      </div>
+    </div>
+    <div class="header-stats">
+      <div class="progress-shell">
+        <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+        <span class="progress-label" id="progressLabel">0 / 0</span>
+      </div>
+      <span class="stat-pill">合适 <strong id="acceptedCount">0</strong></span>
+      <span class="stat-pill">待定 <strong id="pendingCount">0</strong></span>
+      <span class="stat-pill">不合适 <strong id="rejectedCount">0</strong></span>
+      <span class="stat-pill">未审核 <strong id="unreviewedCount">0</strong></span>
+    </div>
+  </header>
+
+  <div class="tabs-shell">
+    <nav class="tabs" aria-label="审核数据类型">
+      <button class="tab-button" type="button" data-tab="martial" aria-selected="true">功法同名资源</button>
+      <button class="tab-button" type="button" data-tab="inventory" aria-selected="false">物品细分类 × 品阶</button>
+    </nav>
+  </div>
+
+  <div class="toolbar-shell">
+    <div class="toolbar">
+      <label><span>搜索</span><input id="searchInput" type="search" placeholder="功法、类型、文件名或细分类"></label>
+      <label><span>审核状态</span><select id="statusFilter"><option value="all">全部状态</option><option value="unreviewed">仅未审核</option><option value="accept">仅合适</option><option value="pending">仅待定</option><option value="reject">仅不合适</option></select></label>
+      <label id="matchFilterLabel"><span>匹配方式</span><select id="matchFilter"><option value="all">全部匹配</option><option value="精确同名">精确同名</option><option value="名称相关">名称相关</option></select></label>
+      <label id="topTypeFilterLabel" class="hidden"><span>顶层类型</span><select id="topTypeFilter"><option value="all">全部类型</option></select></label>
+      <div class="storage-state" id="storageState">本地审核状态：准备中</div>
+    </div>
+  </div>
+
+  <main id="content"></main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script id="auditData" type="application/json">__AUDIT_DATA__</script>
+  <script>
+    (() => {
+      'use strict';
+
+      const DATA = JSON.parse(document.getElementById('auditData').textContent);
+      const STORAGE_KEY = 'wuxia:resource-review:v1';
+      const STATUS_LABELS = { accept: '合适', pending: '待定', reject: '不合适' };
+      const state = {
+        activeTab: 'martial',
+        query: '',
+        status: 'all',
+        matchType: 'all',
+        topType: 'all',
+        reviews: {},
+        storageAvailable: true,
+      };
+
+      const content = document.getElementById('content');
+      const searchInput = document.getElementById('searchInput');
+      const statusFilter = document.getElementById('statusFilter');
+      const matchFilter = document.getElementById('matchFilter');
+      const topTypeFilter = document.getElementById('topTypeFilter');
+      const matchFilterLabel = document.getElementById('matchFilterLabel');
+      const topTypeFilterLabel = document.getElementById('topTypeFilterLabel');
+      const storageState = document.getElementById('storageState');
+      const toast = document.getElementById('toast');
+      let toastTimer = 0;
+
+      const escapeHtml = value => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+
+      function allReviewKeys() {
+        const martialKeys = DATA.martialArts.flatMap(art => art.candidates.map(candidate => candidate.key));
+        const inventoryKeys = DATA.inventoryGroups.flatMap(group =>
+          group.categories.flatMap(category => category.ranks.map(rank => rank.key)),
+        );
+        return [...martialKeys, ...inventoryKeys];
+      }
+
+      const reviewKeys = allReviewKeys();
+
+      function showToast(message) {
+        clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add('show');
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+      }
+
+      function loadReviews() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            state.reviews = parsed.reviews && typeof parsed.reviews === 'object' ? parsed.reviews : parsed;
+          }
+          storageState.textContent = '本地审核状态：已启用';
+        } catch (error) {
+          state.storageAvailable = false;
+          storageState.textContent = '本地审核状态：不可用，请定期导出 JSON';
+        }
+      }
+
+      function saveReviews() {
+        if (!state.storageAvailable) return;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, reviews: state.reviews }));
+        } catch (error) {
+          state.storageAvailable = false;
+          storageState.textContent = '本地审核状态：写入失败，请导出 JSON';
+        }
+      }
+
+      function getReview(key) {
+        return state.reviews[key] || {};
+      }
+
+      function reviewMatchesStatus(key) {
+        const status = getReview(key).status || 'unreviewed';
+        return state.status === 'all' || state.status === status;
+      }
+
+      function updateStats() {
+        const counts = { accept: 0, pending: 0, reject: 0, unreviewed: 0 };
+        reviewKeys.forEach(key => {
+          const status = getReview(key).status;
+          if (status && counts[status] !== undefined) counts[status] += 1;
+          else counts.unreviewed += 1;
+        });
+        const reviewed = reviewKeys.length - counts.unreviewed;
+        const percent = reviewKeys.length ? (reviewed / reviewKeys.length) * 100 : 0;
+        document.getElementById('progressBar').style.width = `${percent}%`;
+        document.getElementById('progressLabel').textContent = `${reviewed} / ${reviewKeys.length}`;
+        document.getElementById('acceptedCount').textContent = counts.accept;
+        document.getElementById('pendingCount').textContent = counts.pending;
+        document.getElementById('rejectedCount').textContent = counts.reject;
+        document.getElementById('unreviewedCount').textContent = counts.unreviewed;
+      }
+
+      function reviewControls(key) {
+        const review = getReview(key);
+        return `
+          <div class="review-controls" role="group" aria-label="审核结论">
+            <button class="review-button ${review.status === 'accept' ? 'active' : ''}" type="button" data-key="${escapeHtml(key)}" data-review-status="accept" title="标记为合适" aria-label="标记为合适">✓</button>
+            <button class="review-button ${review.status === 'pending' ? 'active' : ''}" type="button" data-key="${escapeHtml(key)}" data-review-status="pending" title="标记为待定" aria-label="标记为待定">?</button>
+            <button class="review-button ${review.status === 'reject' ? 'active' : ''}" type="button" data-key="${escapeHtml(key)}" data-review-status="reject" title="标记为不合适" aria-label="标记为不合适">×</button>
+          </div>
+          <textarea class="note-input" data-note-key="${escapeHtml(key)}" placeholder="审核备注">${escapeHtml(review.note || '')}</textarea>
+        `;
+      }
+
+      function renderMartial() {
+        const query = state.query.toLowerCase();
+        const rows = DATA.martialArts.map(art => {
+          const candidates = art.candidates.filter(candidate => {
+            const haystack = `${art.name} ${art.type} ${art.rank} ${candidate.fileName} ${candidate.matchType}`.toLowerCase();
+            return (!query || haystack.includes(query))
+              && (state.matchType === 'all' || candidate.matchType === state.matchType)
+              && reviewMatchesStatus(candidate.key);
+          });
+          return { art, candidates };
+        }).filter(row => row.candidates.length > 0);
+
+        const summary = `功法库 ${DATA.sourceStats.martialDatabaseCount} 门；发现 ${DATA.sourceStats.matchedMartialArtCount} 门有文件名候选，共 ${DATA.sourceStats.martialCandidateCount} 张。名称相关项需要重点核对。`;
+        if (!rows.length) {
+          return `<div class="section-summary"><h2>功法同名资源</h2><p>${escapeHtml(summary)}</p></div><div class="empty-state">当前筛选条件下没有候选资源。</div>`;
+        }
+
+        return `
+          <div class="section-summary"><h2>功法同名资源</h2><p>${escapeHtml(summary)}</p></div>
+          <div class="martial-list">
+            ${rows.map(({ art, candidates }) => `
+              <article class="martial-row">
+                <header class="martial-heading">
+                  <h3>${escapeHtml(art.name)}</h3>
+                  <div class="meta-tags"><span class="tag">${escapeHtml(art.type)}</span><span class="tag">${escapeHtml(art.rank)}</span><span class="tag">候选 ${candidates.length}</span></div>
+                </header>
+                <div class="candidate-grid">
+                  ${candidates.map(candidate => {
+                    const asset = DATA.assets[candidate.assetId];
+                    const review = getReview(candidate.key);
+                    const matchClass = candidate.matchType === '精确同名' ? 'exact' : 'related';
+                    return `
+                      <div class="review-card" data-status="${escapeHtml(review.status || '')}">
+                        <div class="icon-frame"><img loading="lazy" src="${asset.dataUrl}" alt="${escapeHtml(art.name)}候选图标"></div>
+                        <div class="candidate-copy">
+                          <div class="candidate-meta"><span class="match-tag ${matchClass}">${escapeHtml(candidate.matchType)}</span></div>
+                          <span class="file-name" title="${escapeHtml(candidate.fileName)}">${escapeHtml(candidate.fileName)}</span>
+                          <span class="source-path" title="${escapeHtml(candidate.sourcePath)}">${escapeHtml(candidate.sourcePath)}</span>
+                          ${reviewControls(candidate.key)}
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </article>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      function renderInventory() {
+        const query = state.query.toLowerCase();
+        const visibleGroups = DATA.inventoryGroups.filter(group => state.topType === 'all' || group.topType === state.topType);
+        const groupMarkup = visibleGroups.map(group => {
+          const categories = group.categories.map(category => {
+            const ranks = category.ranks.filter(rank => {
+              const haystack = `${group.topType} ${category.category} ${rank.rank} ${rank.fileName}`.toLowerCase();
+              return (!query || haystack.includes(query)) && reviewMatchesStatus(rank.key);
+            });
+            return { category, ranks };
+          }).filter(row => row.ranks.length > 0);
+
+          if (!categories.length) return '';
+          const rankOrder = ['凡品', '精品', '珍品', '极品', '绝品', '神品'];
+          return `
+            <section class="inventory-group">
+              <div class="inventory-group-header"><h3>${escapeHtml(group.topType)}</h3><span class="tag">${categories.length} 个细分类</span></div>
+              <div class="table-scroll">
+                <table class="inventory-table">
+                  <thead><tr><th class="category-column">外观细分类</th>${rankOrder.map(rank => `<th>${rank}</th>`).join('')}</tr></thead>
+                  <tbody>
+                    ${categories.map(({ category, ranks }) => {
+                      const rankByName = Object.fromEntries(ranks.map(rank => [rank.rank, rank]));
+                      return `<tr><th class="category-column">${escapeHtml(category.category)}</th>${rankOrder.map(rankName => {
+                        const rank = rankByName[rankName];
+                        if (!rank) return '<td class="review-cell"></td>';
+                        const asset = DATA.assets[rank.assetId];
+                        const review = getReview(rank.key);
+                        return `
+                          <td class="review-cell" data-status="${escapeHtml(review.status || '')}">
+                            <div class="icon-frame"><img loading="lazy" src="${asset.dataUrl}" alt="${escapeHtml(`${category.category}${rank.rank}图标`)}"></div>
+                            <span class="cell-file" title="${escapeHtml(asset.source)}">${escapeHtml(rank.fileName)}</span>
+                            <span class="reuse-label">${rank.reusedWithinCategory ? '同细分类跨档复用' : '&nbsp;'}</span>
+                            ${reviewControls(rank.key)}
+                          </td>
+                        `;
+                      }).join('')}</tr>`;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          `;
+        }).join('');
+
+        const summary = `共 ${DATA.sourceStats.inventoryCategoryCount} 个外观细分类、${DATA.sourceStats.inventoryReviewCellCount} 个品阶审核格；凡/精及绝/神按当前规则可能复用同图。`;
+        return `<div class="section-summary"><h2>顶层类型 · 外观细分类 · 品阶图片</h2><p>${escapeHtml(summary)}</p></div>${groupMarkup || '<div class="empty-state">当前筛选条件下没有物品图标。</div>'}`;
+      }
+
+      function render() {
+        document.querySelectorAll('[data-tab]').forEach(button => {
+          button.setAttribute('aria-selected', String(button.dataset.tab === state.activeTab));
+        });
+        matchFilterLabel.classList.toggle('hidden', state.activeTab !== 'martial');
+        topTypeFilterLabel.classList.toggle('hidden', state.activeTab !== 'inventory');
+        content.innerHTML = state.activeTab === 'martial' ? renderMartial() : renderInventory();
+        updateStats();
+      }
+
+      function setReviewStatus(key, status) {
+        const current = getReview(key);
+        state.reviews[key] = {
+          ...current,
+          status: current.status === status ? undefined : status,
+          updatedAt: new Date().toISOString(),
+        };
+        if (!state.reviews[key].status && !state.reviews[key].note) delete state.reviews[key];
+        saveReviews();
+        render();
+      }
+
+      function setReviewNote(key, note) {
+        const current = getReview(key);
+        const trimmed = note.trim();
+        state.reviews[key] = { ...current, note: trimmed, updatedAt: new Date().toISOString() };
+        if (!state.reviews[key].status && !trimmed) delete state.reviews[key];
+        saveReviews();
+      }
+
+      document.addEventListener('click', event => {
+        const tabButton = event.target.closest('[data-tab]');
+        if (tabButton) {
+          state.activeTab = tabButton.dataset.tab;
+          render();
+          return;
+        }
+        const reviewButton = event.target.closest('[data-review-status]');
+        if (reviewButton) setReviewStatus(reviewButton.dataset.key, reviewButton.dataset.reviewStatus);
+      });
+
+      document.addEventListener('input', event => {
+        if (event.target.matches('[data-note-key]')) setReviewNote(event.target.dataset.noteKey, event.target.value);
+      });
+
+      searchInput.addEventListener('input', () => {
+        state.query = searchInput.value.trim();
+        render();
+      });
+      statusFilter.addEventListener('change', () => { state.status = statusFilter.value; render(); });
+      matchFilter.addEventListener('change', () => { state.matchType = matchFilter.value; render(); });
+      topTypeFilter.addEventListener('change', () => { state.topType = topTypeFilter.value; render(); });
+
+      document.getElementById('exportButton').addEventListener('click', () => {
+        const payload = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          sourceGeneratedAt: DATA.generatedAt,
+          summary: {
+            total: reviewKeys.length,
+            reviewed: reviewKeys.filter(key => getReview(key).status).length,
+          },
+          reviews: state.reviews,
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `武侠资源图标审核-${new Date().toISOString().slice(0, 10)}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        showToast('审核结果已导出');
+      });
+
+      document.getElementById('importInput').addEventListener('change', async event => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+          const parsed = JSON.parse(await file.text());
+          const reviews = parsed.reviews && typeof parsed.reviews === 'object' ? parsed.reviews : parsed;
+          state.reviews = { ...state.reviews, ...reviews };
+          saveReviews();
+          render();
+          showToast('审核结果已导入');
+        } catch (error) {
+          showToast('导入失败：不是有效的审核 JSON');
+        } finally {
+          event.target.value = '';
+        }
+      });
+
+      document.getElementById('clearButton').addEventListener('click', () => {
+        if (!confirm('确定清空全部审核结论和备注吗？')) return;
+        state.reviews = {};
+        saveReviews();
+        render();
+        showToast('审核状态已清空');
+      });
+
+      DATA.inventoryGroups.forEach(group => {
+        const option = document.createElement('option');
+        option.value = group.topType;
+        option.textContent = group.topType;
+        topTypeFilter.appendChild(option);
+      });
+
+      loadReviews();
+      render();
+    })();
+  </script>
+</body>
+</html>
