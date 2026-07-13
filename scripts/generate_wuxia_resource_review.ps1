@@ -14,6 +14,18 @@ if (-not $OutputPath) {
 $templatePath = Join-Path $projectRoot 'scripts\templates\wuxia_resource_review.template.html'
 $martialDatabasePath = Join-Path $projectRoot 'src\武侠\data\_合并后功法.json'
 $inventoryCatalogPath = Join-Path $projectRoot 'src\武侠\utils\inventoryIconCatalog.ts'
+$generatedMedicineVersions = @(
+  [ordered]@{
+    id = 'generated-v1'
+    label = 'AI 生成 V1'
+    directory = Join-Path $projectRoot 'src\武侠\assets\icons\generated\medicine-v1'
+  },
+  [ordered]@{
+    id = 'pixel-v2'
+    label = 'AI 像素 V2'
+    directory = Join-Path $projectRoot 'src\武侠\assets\icons\generated\medicine-v2'
+  }
+)
 
 foreach ($requiredPath in @($templatePath, $martialDatabasePath, $inventoryCatalogPath, $GameIconsRoot)) {
   if (-not (Test-Path -LiteralPath $requiredPath)) {
@@ -213,15 +225,28 @@ if (-not $assetsBlockMatch.Success) {
 }
 
 $rankDefinitions = @(
-  [ordered]@{ label = '凡品'; tier = 0 },
-  [ordered]@{ label = '精品'; tier = 0 },
-  [ordered]@{ label = '珍品'; tier = 1 },
-  [ordered]@{ label = '极品'; tier = 2 },
-  [ordered]@{ label = '绝品'; tier = 3 },
-  [ordered]@{ label = '神品'; tier = 3 }
+  [ordered]@{ label = '凡品'; tier = 0; generatedSlug = 'common' },
+  [ordered]@{ label = '精品'; tier = 0; generatedSlug = 'fine' },
+  [ordered]@{ label = '珍品'; tier = 1; generatedSlug = 'rare' },
+  [ordered]@{ label = '极品'; tier = 2; generatedSlug = 'exceptional' },
+  [ordered]@{ label = '绝品'; tier = 3; generatedSlug = 'supreme' },
+  [ordered]@{ label = '神品'; tier = 3; generatedSlug = 'divine' }
 )
 
+$generatedMedicineSlugByCategory = @{
+  '丹药' = 'elixir'
+  '药丸' = 'pellet'
+  '药散' = 'powder'
+  '药酒' = 'wine'
+  '膏药' = 'salve'
+  '香囊' = 'sachet'
+  '灵果' = 'fruit'
+  '毒物' = 'poison'
+  '药材' = 'herb'
+}
+
 $inventoryCategoryByName = @{}
+$generatedInventoryCandidateCount = 0
 $categoryLinePattern = [regex]'(?m)^\s*([^:\r\n]+):\s*\[([^\]]+)\],'
 foreach ($match in $categoryLinePattern.Matches($assetsBlockMatch.Groups['body'].Value)) {
   $category = $match.Groups[1].Value.Trim().Trim("'", '"')
@@ -237,6 +262,25 @@ foreach ($match in $categoryLinePattern.Matches($assetsBlockMatch.Groups['body']
     $assetPath = $importPathByVariable[$assetVariable]
     $displaySource = $assetPath.Substring($projectRoot.Length + 1)
     $assetId = Add-EmbeddedAsset -Path $assetPath -DisplaySource $displaySource
+    $generatedCandidates = [Collections.Generic.List[object]]::new()
+    if ($generatedMedicineSlugByCategory.ContainsKey($category)) {
+      $generatedFileName = 'medicine_{0}_{1}.jpg' -f $generatedMedicineSlugByCategory[$category], $rankDefinition.generatedSlug
+      foreach ($generatedVersion in $generatedMedicineVersions) {
+        $generatedPath = Join-Path $generatedVersion.directory $generatedFileName
+        if (Test-Path -LiteralPath $generatedPath) {
+          $generatedDisplaySource = $generatedPath.Substring($projectRoot.Length + 1)
+          $generatedAssetId = Add-EmbeddedAsset -Path $generatedPath -DisplaySource $generatedDisplaySource
+          $generatedCandidates.Add([ordered]@{
+            key = "inventory::$($categoryToTopType[$category])::$category::$($rankDefinition.label)::$($generatedVersion.id)"
+            assetId = $generatedAssetId
+            fileName = $generatedFileName
+            sourcePath = $generatedDisplaySource
+            sourceType = $generatedVersion.label
+          })
+          $generatedInventoryCandidateCount++
+        }
+      }
+    }
     $rankEntries.Add([ordered]@{
       key = "inventory::$($categoryToTopType[$category])::$category::$($rankDefinition.label)"
       rank = $rankDefinition.label
@@ -244,6 +288,7 @@ foreach ($match in $categoryLinePattern.Matches($assetsBlockMatch.Groups['body']
       assetId = $assetId
       fileName = [IO.Path]::GetFileName($assetPath)
       reusedWithinCategory = ($assetVariables | Where-Object { $_ -eq $assetVariable }).Count -gt 1
+      generatedCandidates = $generatedCandidates
     })
   }
 
@@ -275,6 +320,7 @@ $payload = [ordered]@{
     martialCandidateCount = $directCandidateCount
     inventoryCategoryCount = $inventoryCategoryByName.Count
     inventoryReviewCellCount = $inventoryCategoryByName.Count * $rankDefinitions.Count
+    generatedInventoryCandidateCount = $generatedInventoryCandidateCount
   }
   martialArts = $martialGroups
   inventoryGroups = $inventoryGroups

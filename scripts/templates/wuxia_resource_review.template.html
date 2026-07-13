@@ -362,19 +362,22 @@
     }
 
     .review-card[data-status="accept"],
-    .review-cell[data-status="accept"] {
+    .review-cell[data-status="accept"],
+    .inventory-candidate[data-status="accept"] {
       border-color: rgba(47, 118, 93, 0.62);
       box-shadow: inset 3px 0 0 var(--jade);
     }
 
     .review-card[data-status="pending"],
-    .review-cell[data-status="pending"] {
+    .review-cell[data-status="pending"],
+    .inventory-candidate[data-status="pending"] {
       border-color: rgba(166, 103, 24, 0.62);
       box-shadow: inset 3px 0 0 var(--amber);
     }
 
     .review-card[data-status="reject"],
-    .review-cell[data-status="reject"] {
+    .review-cell[data-status="reject"],
+    .inventory-candidate[data-status="reject"] {
       border-color: rgba(155, 47, 39, 0.62);
       box-shadow: inset 3px 0 0 var(--cinnabar);
     }
@@ -496,7 +499,7 @@
 
     .inventory-table {
       width: 100%;
-      min-width: 1120px;
+      min-width: 1940px;
       border-collapse: separate;
       border-spacing: 0;
       table-layout: fixed;
@@ -546,15 +549,48 @@
     }
 
     .review-cell {
-      width: 165px;
-      padding: 8px;
+      width: 298px;
+      padding: 6px;
       background: #faf8f2;
     }
 
-    .review-cell .icon-frame {
-      width: 76px;
-      height: 76px;
+    .inventory-candidates {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+      gap: 6px;
+    }
+
+    .inventory-candidate {
+      min-width: 0;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #fffdf8;
+    }
+
+    .inventory-candidate .icon-frame {
+      width: 72px;
+      height: 72px;
       margin-inline: auto;
+    }
+
+    .inventory-source {
+      display: block;
+      width: fit-content;
+      margin: 5px auto 0;
+      padding: 2px 5px;
+      border: 1px solid #c9bba7;
+      border-radius: 3px;
+      color: #65584d;
+      background: #f2ece2;
+      font-size: 9px;
+      font-weight: 700;
+    }
+
+    .inventory-source.generated {
+      border-color: rgba(155, 47, 39, 0.35);
+      color: var(--cinnabar);
+      background: rgba(155, 47, 39, 0.06);
     }
 
     .cell-file {
@@ -576,8 +612,14 @@
       text-align: center;
     }
 
-    .review-cell .note-input {
+    .inventory-candidate .review-button {
+      min-height: 26px;
+      padding-inline: 3px;
+    }
+
+    .inventory-candidate .note-input {
       min-height: 44px;
+      font-size: 10px;
     }
 
     .empty-state {
@@ -795,10 +837,27 @@
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;');
 
+      function getInventoryCandidates(rank) {
+        const currentAsset = DATA.assets[rank.assetId];
+        return [
+          {
+            key: rank.key,
+            assetId: rank.assetId,
+            fileName: rank.fileName,
+            sourcePath: currentAsset.source,
+            sourceType: '游戏资源',
+            reusedWithinCategory: rank.reusedWithinCategory,
+          },
+          ...(rank.generatedCandidates || []),
+        ];
+      }
+
       function allReviewKeys() {
         const martialKeys = DATA.martialArts.flatMap(art => art.candidates.map(candidate => candidate.key));
         const inventoryKeys = DATA.inventoryGroups.flatMap(group =>
-          group.categories.flatMap(category => category.ranks.map(rank => rank.key)),
+          group.categories.flatMap(category =>
+            category.ranks.flatMap(rank => getInventoryCandidates(rank).map(candidate => candidate.key)),
+          ),
         );
         return [...martialKeys, ...inventoryKeys];
       }
@@ -929,10 +988,13 @@
         const visibleGroups = DATA.inventoryGroups.filter(group => state.topType === 'all' || group.topType === state.topType);
         const groupMarkup = visibleGroups.map(group => {
           const categories = group.categories.map(category => {
-            const ranks = category.ranks.filter(rank => {
-              const haystack = `${group.topType} ${category.category} ${rank.rank} ${rank.fileName}`.toLowerCase();
-              return (!query || haystack.includes(query)) && reviewMatchesStatus(rank.key);
-            });
+            const ranks = category.ranks.map(rank => {
+              const candidates = getInventoryCandidates(rank).filter(candidate => {
+                const haystack = `${group.topType} ${category.category} ${rank.rank} ${candidate.fileName} ${candidate.sourceType}`.toLowerCase();
+                return (!query || haystack.includes(query)) && reviewMatchesStatus(candidate.key);
+              });
+              return { rank, candidates };
+            }).filter(entry => entry.candidates.length > 0);
             return { category, ranks };
           }).filter(row => row.ranks.length > 0);
 
@@ -946,18 +1008,28 @@
                   <thead><tr><th class="category-column">外观细分类</th>${rankOrder.map(rank => `<th>${rank}</th>`).join('')}</tr></thead>
                   <tbody>
                     ${categories.map(({ category, ranks }) => {
-                      const rankByName = Object.fromEntries(ranks.map(rank => [rank.rank, rank]));
+                      const rankByName = Object.fromEntries(ranks.map(entry => [entry.rank.rank, entry]));
                       return `<tr><th class="category-column">${escapeHtml(category.category)}</th>${rankOrder.map(rankName => {
-                        const rank = rankByName[rankName];
-                        if (!rank) return '<td class="review-cell"></td>';
-                        const asset = DATA.assets[rank.assetId];
-                        const review = getReview(rank.key);
+                        const entry = rankByName[rankName];
+                        if (!entry) return '<td class="review-cell"></td>';
                         return `
-                          <td class="review-cell" data-status="${escapeHtml(review.status || '')}">
-                            <div class="icon-frame"><img loading="lazy" src="${asset.dataUrl}" alt="${escapeHtml(`${category.category}${rank.rank}图标`)}"></div>
-                            <span class="cell-file" title="${escapeHtml(asset.source)}">${escapeHtml(rank.fileName)}</span>
-                            <span class="reuse-label">${rank.reusedWithinCategory ? '同细分类跨档复用' : '&nbsp;'}</span>
-                            ${reviewControls(rank.key)}
+                          <td class="review-cell">
+                            <div class="inventory-candidates">
+                              ${entry.candidates.map(candidate => {
+                                const asset = DATA.assets[candidate.assetId];
+                                const review = getReview(candidate.key);
+                                const isGenerated = candidate.sourceType.startsWith('AI');
+                                return `
+                                  <div class="inventory-candidate" data-status="${escapeHtml(review.status || '')}">
+                                    <div class="icon-frame"><img loading="lazy" src="${asset.dataUrl}" alt="${escapeHtml(`${category.category}${entry.rank.rank}${candidate.sourceType}图标`)}"></div>
+                                    <span class="inventory-source ${isGenerated ? 'generated' : ''}">${escapeHtml(candidate.sourceType)}</span>
+                                    <span class="cell-file" title="${escapeHtml(candidate.sourcePath)}">${escapeHtml(candidate.fileName)}</span>
+                                    <span class="reuse-label">${candidate.reusedWithinCategory ? '同细分类跨档复用' : '&nbsp;'}</span>
+                                    ${reviewControls(candidate.key)}
+                                  </div>
+                                `;
+                              }).join('')}
+                            </div>
                           </td>
                         `;
                       }).join('')}</tr>`;
@@ -969,7 +1041,7 @@
           `;
         }).join('');
 
-        const summary = `共 ${DATA.sourceStats.inventoryCategoryCount} 个外观细分类、${DATA.sourceStats.inventoryReviewCellCount} 个品阶审核格；凡/精及绝/神按当前规则可能复用同图。`;
+        const summary = `共 ${DATA.sourceStats.inventoryCategoryCount} 个外观细分类、${DATA.sourceStats.inventoryReviewCellCount} 个品阶审核格；药品另加入 ${DATA.sourceStats.generatedInventoryCandidateCount || 0} 张生成候选（V1 与武侠像素 V2），可与游戏资源逐格对照。`;
         return `<div class="section-summary"><h2>顶层类型 · 外观细分类 · 品阶图片</h2><p>${escapeHtml(summary)}</p></div>${groupMarkup || '<div class="empty-state">当前筛选条件下没有物品图标。</div>'}`;
       }
 
