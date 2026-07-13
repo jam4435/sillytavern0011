@@ -848,9 +848,13 @@ function renderCompareActionButton(action, label, index, title = '') {
 }
 
 function renderCompareItemActionButtons(item, index) {
-  const buttons = [
-    renderCompareActionButton('open-lorebook-compare-editor', '正文对比编辑', index, '打开只处理正文内容的左右对比编辑器'),
-  ];
+  const buttons = [];
+
+  if (item.type !== 'modified' || item.hasContentDiff) {
+    buttons.push(
+      renderCompareActionButton('open-lorebook-compare-editor', '正文对比编辑', index, '打开只处理正文内容的左右对比编辑器'),
+    );
+  }
 
   if (item.type === 'added') {
     buttons.push(renderCompareActionButton('apply-lorebook-compare-added', '添加此条', index, '向当前世界书添加此条差异条目'));

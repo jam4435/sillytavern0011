@@ -326,14 +326,6 @@ function getComparableEntryData(entry = {}) {
   return comparable;
 }
 
-function getRenderedEntryCompareSurface(entry = {}) {
-  return {
-    content: typeof entry.content === 'string' ? entry.content : '',
-    keywords: getKeywordFields(entry),
-    settings: getEntrySettingsSnapshot(entry),
-  };
-}
-
 function hasKeywordFieldDiff(baseEntry, targetEntry) {
   return !_.isEqual(getKeywordFields(baseEntry), getKeywordFields(targetEntry));
 }
@@ -344,13 +336,6 @@ function hasEntrySettingsFieldDiff(baseEntry, targetEntry) {
 
 function hasEntryDataDiff(baseEntry, targetEntry) {
   return !_.isEqual(getComparableEntryData(baseEntry), getComparableEntryData(targetEntry));
-}
-
-function hasUnrenderedEntryDataDiff(baseEntry, targetEntry) {
-  return (
-    hasEntryDataDiff(baseEntry, targetEntry) &&
-    _.isEqual(getRenderedEntryCompareSurface(baseEntry), getRenderedEntryCompareSurface(targetEntry))
-  );
 }
 
 function applyTargetKeywordFields(currentEntry, targetEntry) {
@@ -454,14 +439,6 @@ export function buildEntryDiffs(baseEntry, targetEntry) {
       beforeText: beforeSnapshot.content,
       afterText: afterSnapshot.content,
       ...buildInlineContentDiff(beforeSnapshot.content, afterSnapshot.content),
-    });
-  }
-
-  if (hasUnrenderedEntryDataDiff(baseEntry, targetEntry)) {
-    diffs.push({
-      label: '其他条目字段',
-      before: '当前条目存在未展开字段差异',
-      after: '可用“覆盖整条”同步完整条目数据',
     });
   }
 

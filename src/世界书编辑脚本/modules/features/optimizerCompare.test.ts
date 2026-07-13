@@ -202,7 +202,7 @@ describe('世界书全本比对 helper', () => {
     });
   });
 
-  it('只有未展开字段差异时也会生成修改结果以支持覆盖整条', () => {
+  it('只有未展开字段差异时不生成修改结果', () => {
     const baseEntry = entry(1, '隐藏字段变化', '正文', {
       effect: { sticky: null, cooldown: null, delay: null },
     });
@@ -211,18 +211,11 @@ describe('世界书全本比对 helper', () => {
     });
     const result = buildLorebookCompareResult('当前', '对比', [baseEntry], [targetEntry]);
 
-    expect(result.summary.modified).toBe(1);
-    expect(result.items[0]).toMatchObject({
-      type: 'modified',
-      hasEntryDataDiff: true,
-      hasContentDiff: false,
-      hasKeywordDiff: false,
-      hasEntrySettingsDiff: false,
-    });
-    expect(result.items[0].diffs.map(diff => diff.label)).toContain('其他条目字段');
+    expect(result.summary.modified).toBe(0);
+    expect(result.items).toHaveLength(0);
   });
 
-  it('忽略缺省与显式默认的隐式字段差异，但保留真正的隐式设置差异', () => {
+  it('未展开字段不会单独生成修改条目', () => {
     const baseEntry = entry(1, '隐式默认字段', '正文');
     const explicitDefaultsEntry = entry(10, '隐式默认字段', '正文', {
       addMemo: true,
@@ -254,10 +247,10 @@ describe('世界书全本比对 helper', () => {
 
     expect(equivalentResult.summary.modified).toBe(0);
     expect(equivalentResult.items).toHaveLength(0);
-    expect(changedResult.summary.modified).toBe(1);
-    expect(changedResult.items[0].diffs.map(diff => diff.label)).toContain('其他条目字段');
-    expect(extraChangedResult.summary.modified).toBe(1);
-    expect(extraChangedResult.items[0].diffs.map(diff => diff.label)).toContain('其他条目字段');
+    expect(changedResult.summary.modified).toBe(0);
+    expect(changedResult.items).toHaveLength(0);
+    expect(extraChangedResult.summary.modified).toBe(0);
+    expect(extraChangedResult.items).toHaveLength(0);
   });
 
   it('删除计划只包含当前世界书独有条目，交换方向后新增和删除语义反转', () => {
