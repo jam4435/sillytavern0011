@@ -6,6 +6,7 @@ import { parseCustomAvatarEntityKey, parsePresetAvatarId } from './avatarCatalog
 import {
   clearAvatarSelection,
   createAvatarEntityKey,
+  listAvatarSelectionEntityKeys,
   readAvatarSelection,
 } from './avatarStorage';
 
@@ -107,9 +108,11 @@ async function writeAvatarRef(kind: 'player' | 'npc', avatarRef: string, name?: 
     eventName: exists ? 'era:updateByObject' : 'era:insertByObject',
     attribution: 'background',
     detail: {
-      前端变量: {
-        头像: avatarPatch,
-        头像版本: AVATAR_VARIABLE_VERSION,
+      stat_data: {
+        前端变量: {
+          头像: avatarPatch,
+          头像版本: AVATAR_VARIABLE_VERSION,
+        },
       },
     },
     expectedAction: 'apiWrite',
@@ -191,8 +194,11 @@ export async function migrateAvatarState(): Promise<AvatarMigrationResult> {
   }
   const avatarVersion = Number(frontend.头像版本);
   const hasCurrentAvatarShape = isRecord(frontend.头像) && isRecord(frontend.头像.人物);
+  const filledAvatarGap = playerAvatarRef !== existingAvatarState.玩家
+    || Object.keys(npcAvatarRefs).some(name => npcAvatarRefs[name] !== existingAvatarState.人物[name]);
   const needsVariableMigration = avatarVersion !== AVATAR_VARIABLE_VERSION
     || !hasCurrentAvatarShape
+    || filledAvatarGap
     || removedLegacyFieldCount > 0;
 
   if (needsVariableMigration) {
@@ -238,12 +244,13 @@ export async function migrateAvatarState(): Promise<AvatarMigrationResult> {
     );
   }
 
-  const entityKeys = [
+  const entityKeys = [...new Set([
     playerEntityKey,
     ...Object.keys(characters)
       .filter(name => !name.startsWith('$'))
       .map(name => createAvatarEntityKey('npc', name)),
-  ];
+    ...listAvatarSelectionEntityKeys(),
+  ])];
   let clearedLocalSelectionCount = 0;
   for (const entityKey of entityKeys) {
     if (readAvatarSelection(entityKey)) {

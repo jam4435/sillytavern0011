@@ -145,6 +145,21 @@ export function clearAvatarSelection(entityKey: string, chatId?: string): void {
   localStorage.removeItem(getAvatarSelectionStorageKey(entityKey, chatId));
 }
 
+export function listAvatarSelectionEntityKeys(chatId: string = getCurrentChatId()): string[] {
+  const prefix = getAvatarSelectionStorageKey('', chatId);
+  const entityKeys: string[] = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key?.startsWith(prefix)) {
+      const entityKey = key.slice(prefix.length);
+      if (entityKey) {
+        entityKeys.push(entityKey);
+      }
+    }
+  }
+  return [...new Set(entityKeys)];
+}
+
 export function imageFileToDataUrl(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) {
     return Promise.reject(new Error('请选择图片文件'));

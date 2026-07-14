@@ -63,7 +63,7 @@ describe('avatarState', () => {
         角色数据: {
           $template: { 性别: '', 头像: '' },
           黄蓉: { 头像: 'preset:huang_rong_fc3' },
-          郭靖: { 头像: 'preset:guo_jing_fc2' },
+          郭靖: { 头像: 'preset:male_palace_1' },
           小龙女: { 头像: 'preset:xiao_longnv_fc2' },
         },
       },
@@ -71,6 +71,7 @@ describe('avatarState', () => {
     saveAvatarSelection(createAvatarEntityKey('player'), toPresetAvatarRef('player_male_02'));
     saveAvatarSelection(createAvatarEntityKey('npc', '黄蓉'), toPresetAvatarRef('huang_rong_fc3'));
     saveAvatarSelection(createAvatarEntityKey('npc', '郭靖'), toPresetAvatarRef('guo_jing_fc2'));
+    saveAvatarSelection(createAvatarEntityKey('npc', '已移除人物'), toPresetAvatarRef('male_palace_2'));
 
     const result = await migrateAvatarState();
     const statData = (chatVariables.stat_data ?? {}) as Record<string, unknown>;
@@ -93,9 +94,34 @@ describe('avatarState', () => {
     expect(result).toEqual(expect.objectContaining({
       migrated: true,
       removedLegacyFieldCount: 5,
-      clearedLocalSelectionCount: 3,
+      clearedLocalSelectionCount: 4,
     }));
     expect(runDirectWriteMock).toHaveBeenCalledOnce();
+  });
+
+  it('版本与容器已存在时，仍会用 local selection 填补缺失的实体键', async () => {
+    chatVariables = {
+      stat_data: {
+        前端变量: {
+          头像: { 人物: {} },
+          头像版本: 1,
+        },
+        user数据: { 用户名: '测试少侠' },
+        角色数据: { 黄蓉: { 性别: '女' } },
+      },
+    };
+    saveAvatarSelection(createAvatarEntityKey('player'), toPresetAvatarRef('player_male_02'));
+    saveAvatarSelection(createAvatarEntityKey('npc', '黄蓉'), toPresetAvatarRef('huang_rong_fc3'));
+
+    await migrateAvatarState();
+
+    const statData = chatVariables.stat_data as Record<string, unknown>;
+    expect(parseAvatarVariableState(statData.前端变量)).toEqual({
+      玩家: 'preset:player_male_02',
+      人物: { 黄蓉: 'preset:huang_rong_fc3' },
+    });
+    expect(runDirectWriteMock).toHaveBeenCalledOnce();
+    expect(readAvatarSelection(createAvatarEntityKey('player'))).toBeNull();
   });
 
   it('active picker 写前端变量，清除 NPC 时删除稀疏键', async () => {
@@ -103,9 +129,11 @@ describe('avatarState', () => {
     expect(emitWriteMock).toHaveBeenLastCalledWith(expect.objectContaining({
       eventName: 'era:insertByObject',
       detail: {
-        前端变量: {
-          头像: { 玩家: 'preset:player_male_02' },
-          头像版本: 1,
+        stat_data: {
+          前端变量: {
+            头像: { 玩家: 'preset:player_male_02' },
+            头像版本: 1,
+          },
         },
       },
     }));

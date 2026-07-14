@@ -179,6 +179,61 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.后续事件线索计数[sourceName]).toBe(3);
     expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
   });
+
+  it('retries a failed participation deletion without applying the event diff twice or losing the ending', async () => {
+    const settlingDefinition = attachEventMetadata(
+      {
+        ...eventDefinition,
+        update: { 郭靖: { 状态: '事件完成' } },
+      },
+      deriveEventRuntimeDescriptor('射雕事件条目-第7回-01-宝马风波.yaml'),
+    );
+    const definitions = { [sourceName]: settlingDefinition, [targetName]: targetDefinition };
+    const actualEnding = '郭靖改变了张家口风波的原定结局。';
+    variables.stat_data.角色数据 = { 郭靖: { 状态: '事件前' } };
+    variables.stat_data.参与事件 = {
+      [sourceName]: {
+        描述: '1219年10月10日9时 到 1219年10月10日11时，郭靖在张家口经历了一场风波。',
+        结局: actualEnding,
+        insert: {},
+        update: { 郭靖: { 状态: '事件完成' } },
+        delete: {},
+      },
+    };
+
+    let failParticipationDelete = true;
+    vi.mocked(globalThis.updateVariablesWith).mockImplementation(updater => {
+      const nextVariables = updater(clone(variables)) as typeof variables;
+      const deletedParticipation =
+        variables.stat_data.参与事件[sourceName] && !nextVariables.stat_data.参与事件[sourceName];
+      if (failParticipationDelete && deletedParticipation) {
+        failParticipationDelete = false;
+        throw new Error('participation delete failed');
+      }
+      variables = nextVariables;
+      return clone(variables);
+    });
+
+    let diffApplyCount = 0;
+    eventOn('era:updateByObject', (payload: any) => {
+      diffApplyCount += 1;
+      variables.stat_data.角色数据.郭靖.状态 = payload.角色数据.郭靖.状态;
+      window.setTimeout(() => {
+        void eventEmit('era:writeDone', { actions: { apply: true } });
+      }, 0);
+    });
+
+    await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(false);
+    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBe('差分已应用');
+    expect(variables.stat_data.参与事件[sourceName].结局).toBe(actualEnding);
+    expect(diffApplyCount).toBe(1);
+
+    await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
+    expect(diffApplyCount).toBe(1);
+    expect(variables.stat_data.角色数据.郭靖.状态).toBe('事件完成');
+    expect(variables.stat_data.世界事件[sourceName].概要).toBe(actualEnding);
+    expect(variables.stat_data.参与事件[sourceName]).toBeUndefined();
+  });
 });
 
 describe('serialized turn completion', () => {
