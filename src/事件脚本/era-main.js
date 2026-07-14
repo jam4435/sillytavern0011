@@ -40,6 +40,7 @@
   } = await import('./era-participant-entry.js');
   const { reconcileWorldEventArchive, syncParticipationOutcomeStates } = await import('./era-world-events.js');
   const { needsEventRuntimeStateReset, resetLegacyEventRuntimeState } = await import('./era-runtime-state.js');
+  const { buildFollowupCounterPlan, createSerialTaskQueue } = await import('./era-turn-queue.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
   const EVENT_SCRIPT_VERSION = '2026-07-15-event-lifecycle-v2';
@@ -421,25 +422,11 @@
         return;
       }
 
-      const updates = {};
-      const expiredKeys = [];
-
-      for (const key in followupCounters) {
-        if (eligibleCounterKeys instanceof Set && !eligibleCounterKeys.has(key)) {
-          log(`计数器 ${key} 为本轮新建，保持 ${followupCounters[key]}`);
-          continue;
-        }
-        const currentCount = followupCounters[key];
-        const newCount = currentCount - 1;
-
-        if (newCount > 0) {
-          updates[key] = newCount;
-          log(`计数器 ${key}: ${currentCount} -> ${newCount}`);
-        } else {
-          expiredKeys.push(key);
-          log(`计数器 ${key}: ${currentCount} -> 0 (将过期)`);
-        }
-      }
+      const { updates, expiredKeys, retainedKeys } = buildFollowupCounterPlan(
+        followupCounters,
+        eligibleCounterKeys,
+      );
+      retainedKeys.forEach(key => log(`计数器 ${key} 为本轮新建，保持 ${followupCounters[key]}`));
 
       // 发送更新指令
       if (Object.keys(updates).length > 0) {
@@ -474,22 +461,21 @@
   let isCheckingEvents = false;
   let pendingCheckReason = null;
   let checkEventsTimer = null;
-  let eventWorkQueue = Promise.resolve();
   let lastSuccessfulInitializationAt = 0;
   // 线索倒计时按 messageId 去重：同一助手楼层（含 regenerate 产生的同 messageId 新 swipe）
   // 只扣一次，避免重复扣减。切换聊天时重置。
   let lastCountedMessageId = null;
   let pendingTurnCounterKeys = null;
 
+  const enqueueSerialTask = createSerialTaskQueue(error => {
+    logError('串行事件任务失败', error);
+  });
+
   function enqueueEventWork(reason, work) {
-    const run = eventWorkQueue.then(async () => {
+    return enqueueSerialTask(async () => {
       log(`🧵 开始串行事件任务: ${reason}`);
       return work();
     });
-    eventWorkQueue = run.catch(error => {
-      logError(`串行事件任务失败: ${reason}`, error);
-    });
-    return run;
   }
 
   async function runScheduledCheck(reason) {

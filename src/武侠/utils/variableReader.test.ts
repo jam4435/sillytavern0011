@@ -584,13 +584,19 @@ describe('readGameDataSync avatar projection', () => {
     getMartialArtDataMock.mockReturnValue(null);
   });
 
-  it('投影 user数据.头像 与 角色数据.<名>.头像', () => {
+  it('只从前端变量投影玩家与人物头像', () => {
     getAllVariablesMock.mockReturnValue({
       stat_data: {
+        前端变量: {
+          头像: {
+            玩家: 'preset:male_palace_1',
+            人物: { 黄蓉: 'preset:huang_rong_fc3' },
+          },
+        },
         user数据: {
           用户名: '乔峰',
           性别: '男',
-          头像: 'preset:male_palace_1',
+          头像: 'preset:player_male_02',
           境界: '不入流',
           修为: 0,
           所在位置: '牛家村',
@@ -601,7 +607,7 @@ describe('readGameDataSync avatar projection', () => {
         角色数据: {
           黄蓉: {
             性别: '女',
-            头像: 'preset:huang_rong_fc3',
+            头像: 'preset:huang_rong_fc2',
             所在位置: '桃花岛',
             功法: {},
             关系网: {},
@@ -616,12 +622,13 @@ describe('readGameDataSync avatar projection', () => {
     expect(result?.social.find(npc => npc.name === '黄蓉')?.avatarRef).toBe('preset:huang_rong_fc3');
   });
 
-  it('旧存档缺少头像字段时保持兼容', () => {
+  it('未迁移的旧头像字段不再成为 active game 真值', () => {
     getAllVariablesMock.mockReturnValue({
       stat_data: {
         user数据: {
           用户名: '乔峰',
           性别: '男',
+          头像: 'preset:player_male_01',
           境界: '不入流',
           修为: 0,
           所在位置: '牛家村',
@@ -632,6 +639,7 @@ describe('readGameDataSync avatar projection', () => {
         角色数据: {
           黄蓉: {
             性别: '女',
+            头像: 'preset:huang_rong_fc3',
             所在位置: '桃花岛',
             功法: {},
             关系网: {},
