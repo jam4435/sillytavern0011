@@ -70,7 +70,6 @@ type PlayerProfile = {
 };
 
 type NpcProfile = {
-  姓名?: string;
   所在位置?: string;
   境界?: string;
   修为?: number;
@@ -267,9 +266,8 @@ function buildNpcCharacters(statData: StatDataRecord): CombatCharacter[] {
     }
 
     const npc = value as NpcProfile;
-    const displayName = typeof npc.姓名 === 'string' && npc.姓名.trim() ? npc.姓名.trim() : name;
     result.push({
-      displayName,
+      displayName: name,
       normalizedLocation: normalizeLocationPath(typeof npc.所在位置 === 'string' ? npc.所在位置 : ''),
       realm: typeof npc.境界 === 'string' && npc.境界.trim() ? npc.境界.trim() : '不入流',
       cultivation: Number.isFinite(npc.修为) ? Number(npc.修为) : 0,
