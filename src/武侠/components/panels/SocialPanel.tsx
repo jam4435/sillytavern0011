@@ -177,6 +177,20 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
     [avatarVersion, selectedNpc, selectedNpcAvatarRef],
   );
 
+  useEffect(() => {
+    if (!selectedNpc || !Object.hasOwn(optimisticAvatarRefs, selectedNpc.name)) {
+      return;
+    }
+    const optimisticRef = optimisticAvatarRefs[selectedNpc.name];
+    if (selectedNpc.avatarRef === optimisticRef || (optimisticRef === null && selectedNpc.avatarRef === undefined)) {
+      setOptimisticAvatarRefs(current => {
+        const next = { ...current };
+        delete next[selectedNpc.name];
+        return next;
+      });
+    }
+  }, [optimisticAvatarRefs, selectedNpc]);
+
   const handleSelectNpc = (npc: NPC) => {
     setSelectedId(npc.id);
     setDetailOpen(true);
