@@ -939,12 +939,13 @@ function renderSelectionSummary(modeKey) {
   }
 }
 
-function renderEntryList(modeKey) {
+export function renderEntryList(modeKey) {
   const $list = $('#ai-workspace-entry-list', parentDoc());
   if (!$list.length) {
     return;
   }
 
+  const mode = state.modes[modeKey];
   const entries = getFilteredEntries(modeKey);
   if (state.entryCluster) {
     destroyAiEntryVirtualList(state.entryCluster, true);

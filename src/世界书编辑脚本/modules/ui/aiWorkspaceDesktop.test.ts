@@ -1,11 +1,29 @@
 import _ from 'lodash';
+import $ from 'jquery';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 let buildAssistantModalMarkup: typeof import('./aiWorkspaceDesktop.js').buildAssistantModalMarkup;
+let renderEntryList: typeof import('./aiWorkspaceDesktop.js').renderEntryList;
 
 beforeAll(async () => {
   vi.stubGlobal('_', _);
-  ({ buildAssistantModalMarkup } = await import('./aiWorkspaceDesktop.js'));
+  vi.stubGlobal('$', $);
+  ({ buildAssistantModalMarkup, renderEntryList } = await import('./aiWorkspaceDesktop.js'));
+});
+
+describe('AI 世界书条目范围渲染', () => {
+  it('初始化空模式时可以完成首屏渲染，不会中断后续世界书名称加载', () => {
+    document.body.innerHTML = `
+      <div id="lorebook-ai-workspace">
+        <div id="ai-workspace-entry-list"></div>
+        <div id="ai-workspace-selection-summary"></div>
+      </div>
+    `;
+
+    expect(() => renderEntryList('direct')).not.toThrow();
+    expect(document.querySelector('#ai-workspace-entry-list')).toHaveTextContent('这个世界书没有可处理的条目');
+    expect(document.querySelector('#ai-workspace-selection-summary')).toHaveTextContent('总计 0 条');
+  });
 });
 
 describe('AI 助手手机窗语义', () => {
