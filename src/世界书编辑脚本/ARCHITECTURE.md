@@ -59,6 +59,7 @@ src/世界书编辑脚本/
     │
     └── ui/
         ├── aiActionDialog.js
+        ├── aiEntryVirtualList.js
         ├── aiWorkspace.js
         ├── aiWorkspaceDesktop.js
         ├── aiWorkflowState.js
@@ -132,7 +133,8 @@ src/世界书编辑脚本/
 | `floatingBatchDropdown.js` | 标题栏批量菜单的浮动定位                                                                              |
 | `aiActionDialog.js`        | 轻量 AI 改写弹窗，适合单条或已选条目的快速预览/应用                                                   |
 | `aiWorkspace.js`           | AI 工作区稳定外观层，只导出 `initAiWorkspace`、`refreshAiWorkspace`、`resetAiWorkspace` 并委托给唯一实现 |
-| `aiWorkspaceDesktop.js`    | 单一容器响应式 AI 修改工作台（文件名为历史兼容），包含准备、计划审阅、修改审阅、完成态及工具抽屉     |
+| `aiEntryVirtualList.js`    | AI 条目列表的内部虚拟化适配器：向 Clusterize 传宿主 document 的 DOM 节点，并在依赖缺失或构造失败时降级为普通列表 |
+| `aiWorkspaceDesktop.js`    | 单一容器响应式 AI 修改工作台（文件名为历史兼容），包含四阶段工作流、条目加载状态、API 抽屉及手机式助手 dialog |
 | `aiWorkflowState.js`       | AI 工作流纯逻辑层：阶段守卫、派生按钮能力、输入失效矩阵、生成生命周期及条目三态选择                   |
 | `masterEntryTokens.js`     | 主从布局条目 token 徽标计算与刷新                                                                     |
 | `expandManager.js`         | 抽屉/移动端条目展开折叠状态同步                                                                       |
@@ -213,7 +215,7 @@ AI 页签
 → settings.js 读取 schemaVersion: 2 的策略、目标世界书和单一 draft
 → aiWorkflowState.js 派生当前阶段、可进入阶段和主动作能力
 → 条目范围以“修改 / 只读 / 排除”三态选择；搜索覆盖标题、UID、正文
-→ API 设置与 AI 助手通过工具抽屉编辑，未实现的世界书生成入口不渲染
+→ API 设置通过工具抽屉编辑；AI 助手使用独立原生 dialog 手机窗，未实现的世界书生成入口不渲染
 → aiActionsBatch.js 生成结构化规划或预览
 → llmClient.js 调用酒馆预设或自定义 OpenAI 兼容接口
 → 工作台展示结构化计划、字段差异、诊断和可编辑结果
@@ -222,6 +224,10 @@ AI 页签
 ```
 
 工作流固定为 `准备 → 修改审阅 → 完成`；选择 `先规划` 策略时插入 `计划审阅`。直接策略至少需要一条可修改条目，规划策略允许零手动选择并分析整本世界书。阶段跳转由状态层守卫，不能进入尚未满足条件的未来阶段。
+
+AI 条目虚拟列表必须把父页面创建的 `scrollElem` / `contentElem` 节点直接交给 Clusterize，不能依赖脚本 iframe 内的 ID 查询。世界书读取使用递增加载 runId，只有当前目标可更新条目和计数；界面分别呈现加载中、真实空世界书和加载失败。Clusterize 缺失或初始化异常时保留全部普通条目行，并显示虚拟滚动降级提示。隐藏文件夹元条目仍在业务收集层过滤。
+
+AI 助手与 API 设置抽屉不共享外壳样式。助手是原生 `<dialog>`：宽度不小于 720px 时为右侧 404px 悬浮手机窗，441–719px 居中显示并保留边距，最多 440px 时才自然全屏。内部使用状态区、聊天/资料 tabs、消息 `role="log"`、固定输入栏和备忘录式资料页；打开、Esc/背景关闭、焦点恢复、tab 键盘切换及 reduced-motion 都由同一实现处理。参考资料仍绑定同一个 `referenceMaterial`，不改变请求注入语义。
 
 计划审阅以目标、保留项、改写规则、一致性要求和条目分组为结构化真值，并与高级区原始 JSON 双向同步；JSON 非法、UID 重复、未知或分组重叠时禁止继续。聊天上下文默认保存结构化消息，用户手工编辑后明确切换为手工文本模式，刷新上下文才恢复结构化模式。
 

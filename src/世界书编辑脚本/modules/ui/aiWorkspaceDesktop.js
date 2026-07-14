@@ -15,6 +15,7 @@ import {
   deriveAiWorkflowCapabilities,
   normalizeAiPlanEditorValue,
 } from './aiWorkflowState.js';
+import { createAiEntryVirtualList, destroyAiEntryVirtualList } from './aiEntryVirtualList.js';
 
 const ROOT_ID = 'lorebook-ai-workspace';
 const MODEL_LIST_ID = 'lorebook-ai-model-list';
@@ -77,6 +78,9 @@ function createEmptyModeState() {
     statusText: '',
     planEditorError: '',
     lastApplyResult: null,
+    entryLoadState: 'idle',
+    entryLoadError: '',
+    entryListWarning: '',
     entries: [],
     loadedLorebookName: '',
   };
@@ -136,7 +140,11 @@ const state = {
   assistantChatHistory: [],
   assistantModalTab: 'chat',
   assistantSelectedText: '',
+  assistantRenderedCount: 0,
+  assistantHasUnread: false,
+  assistantTabScrollPositions: { chat: 0, reference: 0 },
   focusReturnTargets: {},
+  entryLoadRunId: 0,
   persistTimer: null,
   entryCluster: null,
   resizeObserver: null,
@@ -600,9 +608,26 @@ function syncReferenceMaterialStatus() {
     .text(statusText)
     .attr('data-empty', trimmed ? 'false' : 'true');
   $('#ai-workspace-assistant-reference-status', parentDoc()).text(assistantStatusText);
+  $('#ai-workspace-assistant-reference-count', parentDoc()).text(`${trimmed.length} 字`);
+  $('#ai-workspace-assistant-reference-editor-count', parentDoc()).text(`${trimmed.length} 字`);
+  $('#ai-workspace-assistant-reference-autosave', parentDoc()).text('已自动保存');
   if (root().length) {
     updateWorkbenchHeader();
   }
+}
+
+function isAssistantHistoryNearBottom(element) {
+  if (!element) return true;
+  return element.scrollHeight - element.scrollTop - element.clientHeight <= 72;
+}
+
+function scrollAssistantHistoryToBottom({ smooth = false } = {}) {
+  const element = $('#ai-workspace-assistant-history', parentDoc()).get(0);
+  if (!element) return;
+  element.scrollTo?.({ top: element.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  if (typeof element.scrollTo !== 'function') element.scrollTop = element.scrollHeight;
+  state.assistantHasUnread = false;
+  $('#ai-workspace-assistant-new-reply', parentDoc()).prop('hidden', true);
 }
 
 function renderAssistantHistory() {
@@ -611,34 +636,84 @@ function renderAssistantHistory() {
     return;
   }
 
+  const historyElement = $history.get(0);
+  const dialogOpen = Boolean($('#ai-workspace-assistant-modal', parentDoc()).get(0)?.open);
+  const wasNearBottom = !dialogOpen || isAssistantHistoryNearBottom(historyElement);
+  const hasNewMessage = state.assistantChatHistory.length > state.assistantRenderedCount;
   $history.empty();
   if (!state.assistantChatHistory.length) {
-    $history.append('<div class="ai-empty">还没有对话内容。</div>');
+    $history.append(`
+      <div class="ai-assistant-empty">
+        <span class="ai-assistant-empty-mark"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+        <strong>开始整理世界书资料</strong>
+        <p>描述你想梳理的设定，助手会给出可直接加入资料区的文本。</p>
+        <div class="ai-assistant-suggestions" aria-label="建议问题">
+          <button type="button" class="ai-assistant-suggestion" data-assistant-suggestion="请帮我整理现有参考资料，提炼成清晰、无重复的设定要点。">整理现有资料</button>
+          <button type="button" class="ai-assistant-suggestion" data-assistant-suggestion="请帮我提炼这个世界观的核心规则、势力关系与重要限制。">提炼世界观</button>
+          <button type="button" class="ai-assistant-suggestion" data-assistant-suggestion="请生成一份简洁、可执行的叙事风格约束，供后续修改世界书时参考。">生成风格约束</button>
+        </div>
+      </div>
+    `);
+    state.assistantRenderedCount = 0;
+    state.assistantHasUnread = false;
+    $('#ai-workspace-assistant-new-reply', parentDoc()).prop('hidden', true);
+    updateAssistantChrome();
     return;
   }
 
   state.assistantChatHistory.forEach((item, index) => {
     const isAssistant = item.role === 'assistant';
     $history.append(`
-      <div class="ai-assistant-message${isAssistant ? ' is-assistant' : ' is-user'}">
+      <article class="ai-assistant-message${isAssistant ? ' is-assistant' : ' is-user'}">
         <div class="ai-assistant-message-meta">${isAssistant ? 'AI 助手' : '用户'}</div>
         <div class="ai-assistant-message-body">${_.escape(item.content || '')}</div>
         <div class="ai-assistant-actions">
-          ${isAssistant ? `<button type="button" class="ai-assistant-pick ai-button-secondary" data-history-index="${index}">选取到资料区</button>` : ''}
-          <button type="button" class="ai-assistant-delete ai-button-danger" data-history-index="${index}">删除</button>
+          ${isAssistant ? `<button type="button" class="ai-assistant-pick" data-history-index="${index}"><i class="fa-regular fa-bookmark"></i>加入资料</button>` : ''}
+          <button type="button" class="ai-assistant-delete" data-history-index="${index}" aria-label="删除这条${isAssistant ? '助手回复' : '用户消息'}" title="删除"><i class="fa-regular fa-trash-can"></i></button>
         </div>
-      </div>
+      </article>
     `);
   });
+
+  state.assistantRenderedCount = state.assistantChatHistory.length;
+  if (hasNewMessage && wasNearBottom) {
+    setTimeout(() => scrollAssistantHistoryToBottom(), 0);
+  } else if (hasNewMessage && dialogOpen) {
+    state.assistantHasUnread = true;
+    $('#ai-workspace-assistant-new-reply', parentDoc()).prop('hidden', false);
+  }
+  updateAssistantChrome();
 }
 
 function setAssistantStatus(text) {
-  $('#ai-workspace-assistant-status', parentDoc()).text(text || '');
+  const normalizedText = text || '';
+  $('#ai-workspace-assistant-status', parentDoc())
+    .text(normalizedText)
+    .attr('data-tone', /失败|错误|不可用|请先|请输入/.test(normalizedText) ? 'danger' : 'neutral');
+  updateAssistantChrome();
 }
 
 function setAssistantGeneratingState(isGenerating) {
   state.isAssistantGenerating = Boolean(isGenerating);
-  $('#ai-workspace-assistant-send', parentDoc()).prop('disabled', state.isAssistantGenerating);
+  updateAssistantChrome();
+}
+
+function updateAssistantChrome() {
+  const saved = settings();
+  const modelLabel = saved.apiMode === 'custom' ? saved.customApi?.model || '模型待配置' : '酒馆当前模型';
+  $('#ai-workspace-assistant-runtime-state', parentDoc()).text(
+    state.isAssistantGenerating ? 'AI 助手 · 整理中' : 'AI 助手 · 就绪',
+  );
+  $('#ai-workspace-assistant-model', parentDoc()).text(modelLabel);
+  $('#ai-workspace-assistant-send', parentDoc())
+    .prop('disabled', state.isAssistantGenerating)
+    .attr('aria-busy', state.isAssistantGenerating ? 'true' : 'false')
+    .html(`<i class="fa-solid ${state.isAssistantGenerating ? 'fa-spinner fa-spin' : 'fa-arrow-up'}"></i>`);
+  $('#ai-workspace-assistant-clear', parentDoc()).prop(
+    'disabled',
+    state.isAssistantGenerating || state.assistantChatHistory.length === 0,
+  );
+  $('.ai-assistant-phone', parentDoc()).attr('aria-busy', state.isAssistantGenerating ? 'true' : 'false');
 }
 
 function rememberOverlayFocus(overlayName) {
@@ -672,18 +747,24 @@ function trapOverlayFocus(event, overlayElement) {
   return false;
 }
 
-function switchAssistantTab(tab = 'chat') {
+function switchAssistantTab(tab = 'chat', { focusTab = false } = {}) {
   const nextTab = tab === 'reference' ? 'reference' : 'chat';
+  const previousTab = state.assistantModalTab;
+  const previousPanel = $(`.ai-assistant-tab-panel[data-assistant-panel="${previousTab}"]`, parentDoc()).get(0);
+  if (previousPanel) state.assistantTabScrollPositions[previousTab] = previousPanel.scrollTop || 0;
   state.assistantModalTab = nextTab;
   $('.ai-assistant-tab', parentDoc()).each(function () {
     const isActive = ($(this).attr('data-assistant-tab') || 'chat') === nextTab;
     $(this)
       .toggleClass('is-active', isActive)
-      .attr('aria-selected', isActive ? 'true' : 'false');
+      .attr('aria-selected', isActive ? 'true' : 'false')
+      .attr('tabindex', isActive ? '0' : '-1');
+    if (isActive && focusTab) this.focus();
   });
   $('.ai-assistant-tab-panel', parentDoc()).each(function () {
     const isActive = ($(this).attr('data-assistant-panel') || 'chat') === nextTab;
-    $(this).css('display', isActive ? 'flex' : 'none');
+    $(this).prop('hidden', !isActive);
+    if (isActive) this.scrollTop = state.assistantTabScrollPositions[nextTab] || 0;
   });
   hideAssistantSelectionToolbar();
 }
@@ -693,14 +774,37 @@ function openAssistantModal(tab = state.assistantModalTab || 'chat') {
   renderReferenceMaterial();
   renderAssistantHistory();
   switchAssistantTab(tab);
-  $('#ai-workspace-assistant-modal', parentDoc()).css('display', 'flex').attr('aria-hidden', 'false');
-  setTimeout(() => $('#ai-workspace-assistant-close', parentDoc()).trigger('focus'), 0);
+  updateAssistantChrome();
+  const dialog = $('#ai-workspace-assistant-modal', parentDoc()).get(0);
+  if (dialog && !dialog.open) {
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.setAttribute('open', '');
+  }
+  setTimeout(() => {
+    if (tab === 'reference') {
+      $('#ai-workspace-reference-material', parentDoc()).trigger('focus');
+    } else if (!state.assistantChatHistory.length) {
+      $('.ai-assistant-suggestion', parentDoc()).first().trigger('focus');
+    } else {
+      $('#ai-workspace-assistant-input', parentDoc()).trigger('focus');
+      scrollAssistantHistoryToBottom();
+    }
+  }, 0);
 }
 
 function closeAssistantModal() {
-  $('#ai-workspace-assistant-modal', parentDoc()).hide().attr('aria-hidden', 'true');
+  const dialog = $('#ai-workspace-assistant-modal', parentDoc()).get(0);
+  if (dialog?.open && typeof dialog.close === 'function') dialog.close();
+  else dialog?.removeAttribute?.('open');
   hideAssistantSelectionToolbar();
   restoreOverlayFocus('assistant');
+}
+
+function resizeAssistantComposer() {
+  const textarea = $('#ai-workspace-assistant-input', parentDoc()).get(0);
+  if (!textarea) return;
+  textarea.style.height = 'auto';
+  textarea.style.height = `${Math.max(44, Math.min(120, textarea.scrollHeight || 44))}px`;
 }
 
 function openSettingsDrawer() {
@@ -821,9 +925,15 @@ function setEntryMode(modeKey, uid, entryMode) {
 function renderSelectionSummary(modeKey) {
   const mode = state.modes[modeKey];
   const entries = getFilteredEntries(modeKey);
-  $('#ai-workspace-selection-summary', parentDoc()).text(
-    `可修改 ${mode.selectedEntryUids.size} 条，只读 ${mode.readonlyEntryUids.size} 条，可见 ${entries.length} 条，总计 ${mode.entries.length} 条`,
-  );
+  const countText = `可修改 ${mode.selectedEntryUids.size} 条，只读 ${mode.readonlyEntryUids.size} 条，可见 ${entries.length} 条，总计 ${mode.entries.length} 条`;
+  const stateText = mode.entryLoadState === 'loading'
+    ? '正在加载条目…'
+    : mode.entryLoadState === 'error'
+      ? `加载失败：${mode.entryLoadError || '未知错误'}`
+      : mode.entryListWarning;
+  $('#ai-workspace-selection-summary', parentDoc())
+    .text(stateText ? `${countText} · ${stateText}` : countText)
+    .attr('data-tone', mode.entryLoadState === 'error' ? 'danger' : mode.entryListWarning ? 'warning' : 'neutral');
   if (modeKey === currentModeKey()) {
     syncWorkflowCapabilities(modeKey);
   }
@@ -837,11 +947,36 @@ function renderEntryList(modeKey) {
 
   const entries = getFilteredEntries(modeKey);
   if (state.entryCluster) {
-    state.entryCluster.destroy(true);
+    destroyAiEntryVirtualList(state.entryCluster, true);
     state.entryCluster = null;
   }
+  mode.entryListWarning = '';
+  if (mode.entryLoadState === 'loading') {
+    $list.html(`
+      <div class="ai-entry-state" role="status">
+        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+        <strong>正在加载世界书条目</strong>
+        <span>读取完成后会自动显示。</span>
+      </div>
+    `);
+    renderSelectionSummary(modeKey);
+    return;
+  }
+  if (mode.entryLoadState === 'error') {
+    $list.html(`
+      <div class="ai-entry-state is-error" role="alert">
+        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+        <strong>条目加载失败</strong>
+        <span>${_.escape(mode.entryLoadError || '无法读取这个世界书。')}</span>
+        <button type="button" class="ai-entry-retry ai-button-secondary">重新加载</button>
+      </div>
+    `);
+    renderSelectionSummary(modeKey);
+    return;
+  }
   if (!entries.length) {
-    $list.html('<div class="ai-empty">没有匹配的条目。</div>');
+    const emptyText = mode.entries.length ? '没有匹配当前搜索的条目。' : '这个世界书没有可处理的条目。';
+    $list.html(`<div class="ai-entry-state"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><strong>${emptyText}</strong></div>`);
     renderSelectionSummary(modeKey);
     return;
   }
@@ -865,15 +1000,19 @@ function renderEntryList(modeKey) {
   });
 
   $list.html('<div id="ai-workspace-entry-scroll" class="clusterize-scroll ai-entry-scroll"><div id="ai-workspace-entry-content" class="clusterize-content"></div></div>');
-  if (typeof window.Clusterize === 'function') {
-    state.entryCluster = new window.Clusterize({
-      rows,
-      scrollId: 'ai-workspace-entry-scroll',
-      contentId: 'ai-workspace-entry-content',
-      no_data_text: '没有匹配的条目。',
-    });
-  } else {
-    $('#ai-workspace-entry-content', parentDoc()).html(rows.join(''));
+  const scrollElement = $('#ai-workspace-entry-scroll', parentDoc()).get(0);
+  const contentElement = $('#ai-workspace-entry-content', parentDoc()).get(0);
+  const virtualList = createAiEntryVirtualList({
+    Clusterize: window.Clusterize,
+    scrollElement,
+    contentElement,
+    rows,
+    options: { no_data_text: '没有匹配的条目。' },
+  });
+  state.entryCluster = virtualList.instance;
+  if (virtualList.degraded) {
+    mode.entryListWarning = '虚拟滚动不可用，已切换普通列表。';
+    console.warn('[世界书编辑器] AI 条目虚拟列表已降级。', virtualList.error);
   }
 
   renderSelectionSummary(modeKey);
@@ -1756,6 +1895,10 @@ async function handleAssistantSend() {
   const saved = settings();
   const modeKey = currentModeKey();
 
+  if (state.isAssistantGenerating) {
+    setAssistantStatus('AI 助手正在整理上一条消息，请稍候。');
+    return;
+  }
   if (!userInput) {
     setAssistantStatus('请输入要发送给 AI 助手的内容。');
     return;
@@ -1771,6 +1914,8 @@ async function handleAssistantSend() {
   const previousHistory = state.assistantChatHistory;
   const assistantPrompt = buildAssistantPrompt(userInput, saved, previousHistory);
   state.assistantChatHistory = previousHistory.concat({ role: 'user', content: userInput });
+  $('#ai-workspace-assistant-input', parentDoc()).val('');
+  resizeAssistantComposer();
   renderAssistantHistory();
   persistSettings({ mirrorModeKey: modeKey });
   setAssistantGeneratingState(true);
@@ -1785,7 +1930,6 @@ async function handleAssistantSend() {
     });
 
     state.assistantChatHistory = state.assistantChatHistory.concat({ role: 'assistant', content: response });
-    $('#ai-workspace-assistant-input', parentDoc()).val('');
     renderAssistantHistory();
     persistSettings({ mirrorModeKey: modeKey });
     setAssistantStatus('AI 助手回复完成。');
@@ -1812,6 +1956,7 @@ function deleteAssistantHistoryItem(index) {
   }
 
   state.assistantChatHistory.splice(numericIndex, 1);
+  state.assistantRenderedCount = Math.min(state.assistantRenderedCount, state.assistantChatHistory.length);
   renderAssistantHistory();
   persistSettings({ mirrorModeKey: currentModeKey() });
   setAssistantStatus('已删除该条助手历史。');
@@ -1824,6 +1969,8 @@ function clearAssistantHistory() {
   }
 
   state.assistantChatHistory = [];
+  state.assistantRenderedCount = 0;
+  state.assistantHasUnread = false;
   renderAssistantHistory();
   persistSettings({ mirrorModeKey: currentModeKey() });
   setAssistantStatus('助手历史已清空。');
@@ -2138,54 +2285,63 @@ function buildPreviewModalMarkup() {
   `;
 }
 
-function buildAssistantModalMarkup() {
+export function buildAssistantModalMarkup() {
   return `
-    <div id="ai-workspace-assistant-modal" class="ai-assistant-modal" style="display:none;" aria-hidden="true">
-      <div class="ai-assistant-phone" role="dialog" aria-modal="true" aria-labelledby="ai-workspace-assistant-title">
-        <div class="ai-assistant-phone-header">
-          <div>
-            <div id="ai-workspace-assistant-title" class="ai-assistant-phone-title">AI 助手</div>
-            <div id="ai-workspace-assistant-reference-status" class="ai-assistant-phone-subtitle">资料为空</div>
+    <dialog id="ai-workspace-assistant-modal" class="ai-assistant-modal" aria-modal="true" aria-labelledby="ai-workspace-assistant-title">
+      <div class="ai-assistant-phone">
+        <div class="ai-assistant-device-screen">
+          <div class="ai-assistant-device-status">
+            <span id="ai-workspace-assistant-runtime-state">AI 助手 · 就绪</span>
+            <span id="ai-workspace-assistant-reference-count">0 字</span>
           </div>
-          <button type="button" id="ai-workspace-assistant-close" class="ai-icon-button" aria-label="关闭 AI 助手">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-        <div class="ai-assistant-tabs" role="tablist" aria-label="AI 助手视图">
-          <button type="button" class="ai-assistant-tab is-active" data-assistant-tab="chat" role="tab" aria-selected="true">聊天</button>
-          <button type="button" class="ai-assistant-tab" data-assistant-tab="reference" role="tab" aria-selected="false">资料</button>
-        </div>
-        <div class="ai-assistant-phone-body">
-          <section class="ai-assistant-tab-panel" data-assistant-panel="chat">
-            <div class="ai-assistant-chat-area">
-              <div id="ai-workspace-assistant-history" class="ai-scroll ai-assistant-history"></div>
-              <div id="ai-workspace-assistant-selection-toolbar" class="ai-assistant-selection-toolbar" style="display:none;">
-                <button type="button" id="ai-workspace-assistant-selection-add">加入资料区</button>
-              </div>
+          <header class="ai-assistant-phone-header">
+            <span class="ai-assistant-avatar" aria-hidden="true"><i class="fa-solid fa-sparkles"></i></span>
+            <div class="ai-assistant-identity">
+              <div id="ai-workspace-assistant-title" class="ai-assistant-phone-title">随身设定助手</div>
+              <div id="ai-workspace-assistant-model" class="ai-assistant-phone-subtitle">酒馆当前模型</div>
             </div>
-            <div class="ai-assistant-footer">
-              <div class="ai-assistant-actions-row">
-                <button type="button" id="ai-workspace-assistant-clear" class="ai-button-secondary">清空历史</button>
-                <span id="ai-workspace-assistant-status" class="ai-text"></span>
-              </div>
-              <div class="ai-assistant-composer">
-                <textarea id="ai-workspace-assistant-input" class="ai-assistant-input" placeholder="让助手整理设定、提炼要点或生成可放入资料区的文本。"></textarea>
-                <button type="button" id="ai-workspace-assistant-send" class="ai-send-button" aria-label="发送给 AI 助手">
-                  <i class="fa-solid fa-paper-plane"></i>
-                </button>
-              </div>
+            <div class="ai-assistant-header-actions">
+              <button type="button" id="ai-workspace-assistant-clear" class="ai-icon-button" aria-label="清空助手历史" title="清空历史"><i class="fa-regular fa-trash-can"></i></button>
+              <button type="button" id="ai-workspace-assistant-close" class="ai-icon-button" aria-label="关闭 AI 助手"><i class="fa-solid fa-xmark"></i></button>
             </div>
-          </section>
-          <section class="ai-assistant-tab-panel" data-assistant-panel="reference" style="display:none;">
-            <div class="ai-field ai-reference-editor-field">
-              <label for="ai-workspace-reference-material">参考资料</label>
-              <textarea id="ai-workspace-reference-material" class="ai-reference-material" placeholder="粘贴设定、百科、剧情摘要、风格约束等补充资料。"></textarea>
-            </div>
-            <div class="ai-note">这里的内容会注入到 &lt;参考资料&gt;。聊天中选中的文本会追加到这里。</div>
-          </section>
+          </header>
+          <div class="ai-assistant-tabs" role="tablist" aria-label="AI 助手视图">
+            <button type="button" id="ai-workspace-assistant-chat-tab" class="ai-assistant-tab is-active" data-assistant-tab="chat" role="tab" aria-selected="true" aria-controls="ai-workspace-assistant-chat-panel" tabindex="0"><i class="fa-regular fa-message"></i><span>聊天</span></button>
+            <button type="button" id="ai-workspace-assistant-reference-tab" class="ai-assistant-tab" data-assistant-tab="reference" role="tab" aria-selected="false" aria-controls="ai-workspace-assistant-reference-panel" tabindex="-1"><i class="fa-regular fa-note-sticky"></i><span>资料</span></button>
+          </div>
+          <div class="ai-assistant-phone-body">
+            <section id="ai-workspace-assistant-chat-panel" class="ai-assistant-tab-panel" data-assistant-panel="chat" role="tabpanel" aria-labelledby="ai-workspace-assistant-chat-tab">
+              <div class="ai-assistant-chat-area">
+                <div id="ai-workspace-assistant-history" class="ai-scroll ai-assistant-history" role="log" aria-live="polite" aria-relevant="additions text"></div>
+                <div id="ai-workspace-assistant-selection-toolbar" class="ai-assistant-selection-toolbar" style="display:none;">
+                  <button type="button" id="ai-workspace-assistant-selection-add">加入资料区</button>
+                </div>
+                <button type="button" id="ai-workspace-assistant-new-reply" class="ai-assistant-new-reply" hidden><i class="fa-solid fa-arrow-down"></i>有新回复</button>
+              </div>
+              <footer class="ai-assistant-footer">
+                <span id="ai-workspace-assistant-status" class="ai-assistant-live-status" role="status" aria-live="polite"></span>
+                <div class="ai-assistant-composer">
+                  <textarea id="ai-workspace-assistant-input" class="ai-assistant-input" rows="1" placeholder="输入想整理的设定…"></textarea>
+                  <button type="button" id="ai-workspace-assistant-send" class="ai-send-button" aria-label="发送给 AI 助手"><i class="fa-solid fa-arrow-up"></i></button>
+                </div>
+                <span class="ai-assistant-composer-hint">Ctrl / ⌘ + Enter 发送</span>
+              </footer>
+            </section>
+            <section id="ai-workspace-assistant-reference-panel" class="ai-assistant-tab-panel ai-assistant-reference-panel" data-assistant-panel="reference" role="tabpanel" aria-labelledby="ai-workspace-assistant-reference-tab" hidden>
+              <div class="ai-assistant-memo-header">
+                <div><span class="ai-section-kicker">参考资料</span><strong>将注入 AI 修改请求</strong></div>
+                <span id="ai-workspace-assistant-reference-editor-count">0 字</span>
+              </div>
+              <div class="ai-field ai-reference-editor-field">
+                <label class="ai-visually-hidden" for="ai-workspace-reference-material">参考资料</label>
+                <textarea id="ai-workspace-reference-material" class="ai-reference-material" placeholder="粘贴设定、百科、剧情摘要、风格约束等补充资料。"></textarea>
+              </div>
+              <div class="ai-assistant-memo-footer"><span><i class="fa-solid fa-cloud-arrow-up"></i><span id="ai-workspace-assistant-reference-autosave">已自动保存</span></span><span id="ai-workspace-assistant-reference-status">资料为空</span></div>
+            </section>
+          </div>
         </div>
       </div>
-    </div>
+    </dialog>
   `;
 }
 
@@ -2752,8 +2908,6 @@ function ensureStyles() {
       #${ROOT_ID} textarea{min-height:120px;resize:vertical}
       #${ROOT_ID} .ai-readonly-textarea{min-height:180px;font-family:Consolas,Monaco,monospace}
       #${ROOT_ID} .ai-chat-context-textarea{min-height:180px;font-family:Consolas,Monaco,monospace}
-      #${ROOT_ID} .ai-reference-material{min-height:220px}
-      #${ROOT_ID} .ai-assistant-input{min-height:120px}
       #${ROOT_ID} .ai-prompt-template{min-height:220px;font-family:Consolas,Monaco,monospace}
       #${ROOT_ID} .ai-prompt-settings{border:1px solid var(--panel-border-color,#444);border-radius:6px;background:var(--panel-entry-bg-color,#242424)}
       #${ROOT_ID} .ai-prompt-settings summary{cursor:pointer;padding:10px 12px;font-size:13px;font-weight:600;color:var(--panel-text-color,#ddd);background:rgba(255,255,255,.03)}
@@ -2798,43 +2952,7 @@ function ensureStyles() {
       #${ROOT_ID} .ai-entry-item-snippet{margin-top:4px}
       #${ROOT_ID} .ai-preview-errors{display:none;color:#ffb4b4;white-space:pre-wrap}
       #${ROOT_ID} .ai-preview-errors.has-errors{display:block}
-      #${ROOT_ID} .ai-assistant-history{min-height:180px;max-height:320px;padding:12px}
-      #${ROOT_ID} .ai-assistant-message{padding:10px 12px;border:1px solid var(--panel-border-color,#3d3d3d);border-radius:6px;background:rgba(255,255,255,.03)}
-      #${ROOT_ID} .ai-assistant-message + .ai-assistant-message{margin-top:10px}
-      #${ROOT_ID} .ai-assistant-message.is-assistant{border-color:rgba(159,200,228,.45);background:rgba(159,200,228,.08)}
-      #${ROOT_ID} .ai-assistant-message-meta{font-size:12px;color:var(--panel-text-color,#bbb);margin-bottom:6px}
-      #${ROOT_ID} .ai-assistant-message-body{white-space:pre-wrap;word-break:break-word;line-height:1.5}
-      #${ROOT_ID} .ai-assistant-actions{margin-top:8px}
-      #${ROOT_ID} .ai-assistant-actions button{padding:6px 10px;font-size:12px}
-      #${ROOT_ID} .ai-assistant-modal{position:fixed;inset:0;z-index:10007;background:rgba(0,0,0,.58);display:none;align-items:center;justify-content:flex-end;padding:24px max(24px,5vw);box-sizing:border-box}
-      #${ROOT_ID} .ai-assistant-phone{width:min(420px,calc(100vw - 48px));height:min(720px,calc(100vh - 48px));min-height:520px;border:1px solid rgba(255,255,255,.18);border-radius:8px;background:var(--panel-bg-color,#252525);box-shadow:0 20px 60px rgba(0,0,0,.55);display:flex;flex-direction:column;overflow:hidden;position:relative}
-      #${ROOT_ID} .ai-assistant-phone-header{padding:12px 14px;background:var(--panel-entry-bg-color,#2f2f2f);border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;gap:12px}
-      #${ROOT_ID} .ai-assistant-phone-title{font-size:15px;font-weight:700}
-      #${ROOT_ID} .ai-assistant-phone-subtitle{font-size:12px;color:var(--panel-text-color,#cfd8dc);margin-top:2px}
       #${ROOT_ID} .ai-icon-button{width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:transparent;border-color:rgba(255,255,255,.16)}
-      #${ROOT_ID} .ai-assistant-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;background:var(--panel-entry-bg-color,#2a2a2a);border-bottom:1px solid rgba(255,255,255,.08)}
-      #${ROOT_ID} .ai-assistant-tab{padding:7px 8px;border-radius:8px;background:transparent;border-color:transparent;color:var(--panel-text-color,#d9d9d9)}
-      #${ROOT_ID} .ai-assistant-tab.is-active{background:rgba(159,200,228,.18);border-color:rgba(159,200,228,.35);color:var(--panel-text-color,#fff)}
-      #${ROOT_ID} .ai-assistant-phone-body{min-height:0;flex:1 1 auto;display:flex;flex-direction:column;background:rgba(255,255,255,.02)}
-      #${ROOT_ID} .ai-assistant-tab-panel{min-height:0;flex:1 1 auto;display:flex;flex-direction:column;gap:0}
-      #${ROOT_ID} .ai-assistant-chat-area{position:relative;min-height:0;flex:1 1 auto;display:flex;flex-direction:column}
-      #${ROOT_ID} .ai-assistant-history{min-height:0;max-height:none;flex:1 1 auto;padding:12px;display:flex;flex-direction:column;gap:10px;border:0;border-radius:0;background:transparent;user-select:text;-webkit-user-select:text}
-      #${ROOT_ID} .ai-assistant-message{max-width:86%;padding:9px 11px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(255,255,255,.07);box-shadow:none}
-      #${ROOT_ID} .ai-assistant-message + .ai-assistant-message{margin-top:0}
-      #${ROOT_ID} .ai-assistant-message.is-assistant{align-self:flex-start;border-color:rgba(159,200,228,.25);background:rgba(159,200,228,.12)}
-      #${ROOT_ID} .ai-assistant-message.is-user{align-self:flex-end;background:rgba(111,180,140,.18);border-color:rgba(111,180,140,.28)}
-      #${ROOT_ID} .ai-assistant-message-meta{font-size:11px;opacity:.72;margin-bottom:4px}
-      #${ROOT_ID} .ai-assistant-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-      #${ROOT_ID} .ai-assistant-actions button{border-radius:6px;padding:5px 8px;font-size:12px}
-      #${ROOT_ID} .ai-assistant-footer{border-top:1px solid rgba(255,255,255,.08);background:var(--panel-entry-bg-color,#292929);padding:8px;display:flex;flex-direction:column;gap:8px}
-      #${ROOT_ID} .ai-assistant-actions-row{display:flex;align-items:center;gap:8px;min-height:30px}
-      #${ROOT_ID} .ai-assistant-composer{display:grid;grid-template-columns:minmax(0,1fr) 38px;gap:8px;align-items:end}
-      #${ROOT_ID} .ai-assistant-input{min-height:44px;max-height:120px;resize:vertical;border-radius:8px}
-      #${ROOT_ID} .ai-send-button{width:38px;height:38px;padding:0;border-radius:8px;display:inline-flex;align-items:center;justify-content:center}
-      #${ROOT_ID} .ai-reference-editor-field{min-height:0;flex:1 1 auto;padding:12px}
-      #${ROOT_ID} .ai-reference-editor-field .ai-reference-material{min-height:360px;flex:1 1 auto;border-radius:8px;background:#151f1c;border-color:rgba(255,255,255,.12)}
-      #${ROOT_ID} .ai-assistant-selection-toolbar{position:absolute;z-index:3;transform:translate(-50%,-100%);background:var(--panel-bg-color,#242424);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:5px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
-      #${ROOT_ID} .ai-assistant-selection-toolbar button{padding:6px 10px;border-radius:6px;background:rgba(159,200,228,.18);border-color:rgba(159,200,228,.35);white-space:nowrap}
       #${ROOT_ID} .ai-preview-item{padding:12px;border-bottom:1px solid var(--panel-border-color,#3e3e3e);cursor:pointer}
       #${ROOT_ID} .ai-preview-item:hover{background:rgba(255,255,255,.04)}
       #${ROOT_ID} .ai-preview-item.is-active{background:rgba(154,122,206,.18)}
@@ -2848,12 +2966,12 @@ function ensureStyles() {
       #${ROOT_ID} .ai-preview-diff-before,#${ROOT_ID} .ai-preview-diff-after{font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
       #${ROOT_ID} .ai-preview-diff-before{color:var(--panel-text-color,#b8b8b8);opacity:.8}
       #${ROOT_ID} .ai-preview-diff-after{color:var(--panel-text-color,#f3df94)}
-      #${ROOT_ID} .ai-preview-modal{position:fixed;z-index:10006;left:0;top:0;width:100vw;height:100vh;background-color:rgba(0,0,0,.7);overflow-y:auto;box-sizing:border-box}
-      #${ROOT_ID} .ai-preview-modal-dialog{background:var(--panel-bg-color,#2c2c2c);color:var(--panel-text-color,#eee);border:1px solid var(--panel-border-color,#555);width:90%;max-width:900px;border-radius:8px;box-shadow:0 5px 15px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:calc(100vh - 150px);margin:80px auto 50px auto}
+      #${ROOT_ID} .ai-preview-modal{position:fixed;z-index:10006;inset:0;width:auto;height:auto;background-color:rgba(0,0,0,.7);overflow-y:auto;box-sizing:border-box}
+      #${ROOT_ID} .ai-preview-modal-dialog{background:var(--panel-bg-color,#2c2c2c);color:var(--panel-text-color,#eee);border:1px solid var(--panel-border-color,#555);width:90%;max-width:900px;border-radius:8px;box-shadow:0 5px 15px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:calc(100% - 150px);margin:80px auto 50px auto}
       #${ROOT_ID} .ai-preview-modal-header{padding:10px 15px;background:var(--panel-accent-color,#3a6a8e);color:#fff;border-top-left-radius:8px;border-top-right-radius:8px;display:flex;justify-content:space-between;align-items:center}
       #${ROOT_ID} .ai-preview-modal-header h4{margin:0;font-size:16px}
       #${ROOT_ID} .ai-preview-modal-close{font-size:28px;font-weight:700;cursor:pointer;line-height:1}
-      #${ROOT_ID} .ai-preview-modal-body{padding:15px;max-height:70vh;overflow-y:auto}
+      #${ROOT_ID} .ai-preview-modal-body{padding:15px;max-height:70%;overflow-y:auto}
       #${ROOT_ID} .ai-preview-modal-section + .ai-preview-modal-section{margin-top:14px}
       #${ROOT_ID} .ai-preview-modal-section-title{font-weight:600;margin-bottom:6px;color:var(--panel-accent-color,#9fc8e4)}
       #${ROOT_ID} .ai-preview-modal-panel{display:grid;gap:10px}
@@ -2880,7 +2998,7 @@ function ensureStyles() {
         #${ROOT_ID} .ai-mobile-nav-toggle{width:26px;height:26px;border-radius:999px;font-size:14px}
         #${ROOT_ID} .ai-mobile-nav-toggle:active,#${ROOT_ID} .ai-mobile-nav-toggle:focus-visible{background:rgba(255,255,255,.1);outline:0}
         #${ROOT_ID} .ai-nav-title{display:none}
-        #${ROOT_ID} .ai-nav-list{position:absolute;top:32px;right:0;left:auto;width:min(260px,calc(100vw - 32px));display:none;flex-direction:column;gap:6px;overflow:visible;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:${AI_WORKSPACE_SURFACE};padding:8px;box-shadow:0 10px 24px rgba(0,0,0,.42);z-index:8}
+        #${ROOT_ID} .ai-nav-list{position:absolute;top:32px;right:0;left:auto;width:min(260px,calc(100% - 32px));display:none;flex-direction:column;gap:6px;overflow:visible;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:${AI_WORKSPACE_SURFACE};padding:8px;box-shadow:0 10px 24px rgba(0,0,0,.42);z-index:8}
         #${ROOT_ID} .ai-nav-list.is-open{display:flex}
         #${ROOT_ID} .ai-mobile-nav-menu-header{display:flex;flex-direction:column;gap:3px;padding:4px 4px 8px 4px;border-bottom:1px solid rgba(255,255,255,.12);color:var(--panel-text-color,#eee)}
         #${ROOT_ID} .ai-mobile-nav-menu-header span{font-size:12px;opacity:.72}
@@ -2905,12 +3023,6 @@ function ensureStyles() {
         #${ROOT_ID} .ai-preview-detail-actions{width:100%;justify-content:flex-start}
         #${ROOT_ID} .ai-reference-compact{align-items:stretch;flex-direction:column}
         #${ROOT_ID} .ai-phone-inline-button{justify-content:center;width:100%}
-        #${ROOT_ID} .ai-assistant-modal{padding:0;align-items:stretch;justify-content:stretch}
-        #${ROOT_ID} .ai-assistant-phone{width:100vw;height:100dvh;max-width:none;min-height:0;border-radius:0;border:0}
-        #${ROOT_ID} .ai-assistant-phone-header{padding-top:max(12px,env(safe-area-inset-top))}
-        #${ROOT_ID} .ai-assistant-footer{padding-bottom:max(8px,env(safe-area-inset-bottom))}
-        #${ROOT_ID} .ai-assistant-message{max-width:90%}
-        #${ROOT_ID} .ai-reference-editor-field .ai-reference-material{min-height:260px}
       }
     </style>
   `);
@@ -3190,12 +3302,98 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-complete-panel p{color:var(--ai-text-color-secondary,#aaa);line-height:1.6}
       #${ROOT_ID} .ai-complete-actions,#${ROOT_ID} .ai-rollback-actions{display:flex;justify-content:center;gap:8px;margin-top:14px}
       #${ROOT_ID} .ai-rollback-card{margin-top:22px;padding:11px;border:1px solid var(--ai-border-color,#555);border-radius:9px;background:var(--ai-surface-muted-color,rgba(0,0,0,.14));font-size:11px;color:var(--ai-text-color-secondary,#aaa)}
-      #${ROOT_ID} .ai-tool-backdrop,#${ROOT_ID} .ai-assistant-modal{position:fixed;inset:0;z-index:10007;display:none;align-items:stretch;justify-content:flex-end;padding:0;background:rgba(0,0,0,.52);backdrop-filter:blur(4px)}
-      #${ROOT_ID} .ai-tool-drawer,#${ROOT_ID} .ai-assistant-phone{width:min(460px,100%);height:100%;max-width:100%;max-height:none;margin:0;border:0;border-left:1px solid var(--ai-border-color,#555);border-radius:0;background:var(--ai-surface-raised-color,var(--panel-bg-color,#242424));box-shadow:-18px 0 50px var(--ai-shadow-color,rgba(0,0,0,.28));display:flex;flex-direction:column}
+      #${ROOT_ID} .ai-tool-backdrop{position:fixed;inset:0;z-index:10007;display:none;align-items:stretch;justify-content:flex-end;padding:0;background:rgba(0,0,0,.52);backdrop-filter:blur(4px)}
+      #${ROOT_ID} .ai-tool-drawer{width:min(460px,100%);height:100%;max-width:100%;max-height:none;margin:0;border:0;border-left:1px solid var(--ai-border-color,#555);border-radius:0;background:var(--ai-surface-raised-color,var(--panel-bg-color,#242424));box-shadow:-18px 0 50px var(--ai-shadow-color,rgba(0,0,0,.28));display:flex;flex-direction:column}
       #${ROOT_ID} .ai-tool-drawer>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border-bottom:1px solid var(--ai-border-color,#555)}
       #${ROOT_ID} .ai-tool-drawer-body{flex:1 1 auto;min-height:0;overflow:auto;padding:12px}
       #${ROOT_ID} .ai-tool-drawer .ai-page{min-height:0}
-      #${ROOT_ID} .ai-assistant-phone-header{border-radius:0}
+      #${ROOT_ID} .ai-entry-state{height:100%;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa))}
+      #${ROOT_ID} .ai-entry-state>i{font-size:22px;color:var(--panel-accent-color,#9fc8e4)}
+      #${ROOT_ID} .ai-entry-state strong{color:var(--panel-text-color,#eee);font-size:13px}
+      #${ROOT_ID} .ai-entry-state span{max-width:420px;font-size:11px;line-height:1.5}
+      #${ROOT_ID} .ai-entry-state.is-error>i,#${ROOT_ID} .ai-selection-counts[data-tone='danger']{color:var(--ai-danger-color,#ef8e8e)}
+      #${ROOT_ID} .ai-selection-counts[data-tone='warning']{color:var(--ai-warning-color,#f1c26d)}
+
+      #${ROOT_ID} .ai-assistant-modal{position:fixed;inset:0;z-index:10008;width:auto;height:auto;max-width:none;max-height:none;margin:0;padding:16px 24px;border:0;background:transparent;color:var(--panel-text-color,#eee);overflow:hidden;box-sizing:border-box;align-items:center;justify-content:flex-end}
+      #${ROOT_ID} .ai-assistant-modal:not([open]){display:none}
+      #${ROOT_ID} .ai-assistant-modal[open]{display:flex}
+      #${ROOT_ID} .ai-assistant-modal::backdrop{background:rgba(4,7,10,.62);backdrop-filter:blur(5px)}
+      #${ROOT_ID} .ai-assistant-phone{position:relative;width:404px;height:min(760px,calc(100% - 32px));min-height:min(520px,calc(100% - 32px));max-width:100%;max-height:calc(100% - 32px);margin:0;padding:5px;border:1px solid color-mix(in srgb,var(--ai-border-color,#555) 80%,white 8%);border-radius:26px;background:color-mix(in srgb,var(--ai-surface-raised-color,#242424) 88%,black);box-shadow:0 28px 80px rgba(0,0,0,.48),0 0 0 1px rgba(255,255,255,.04) inset;display:flex;overflow:hidden;box-sizing:border-box;animation:ai-assistant-phone-in .18s ease-out}
+      #${ROOT_ID} .ai-assistant-device-screen{width:100%;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;border-radius:21px;background:var(--ai-surface-color,var(--panel-bg-color,#202224))}
+      #${ROOT_ID} .ai-assistant-device-status{flex:0 0 auto;min-height:28px;padding:7px 14px 5px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));background:var(--ai-surface-muted-color,rgba(0,0,0,.18));font-size:10px;font-weight:650;letter-spacing:.02em}
+      #${ROOT_ID} .ai-assistant-phone-header{flex:0 0 auto;min-height:58px;padding:8px 10px 9px;display:grid;grid-template-columns:42px minmax(0,1fr) auto;align-items:center;gap:9px;border-bottom:1px solid var(--ai-border-color,rgba(255,255,255,.1));background:var(--ai-surface-raised-color,var(--panel-bg-color,#25282b))}
+      #${ROOT_ID} .ai-assistant-avatar{width:38px;height:38px;display:grid;place-items:center;border-radius:13px;color:var(--panel-accent-text-color,#fff);background:linear-gradient(145deg,var(--panel-accent-color,#6b86a2),color-mix(in srgb,var(--panel-accent-color,#6b86a2) 52%,#67518b));box-shadow:0 5px 14px color-mix(in srgb,var(--panel-accent-color,#6b86a2) 28%,transparent)}
+      #${ROOT_ID} .ai-assistant-identity{min-width:0}
+      #${ROOT_ID} .ai-assistant-phone-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:750;letter-spacing:.01em}
+      #${ROOT_ID} .ai-assistant-phone-subtitle{margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:10px}
+      #${ROOT_ID} .ai-assistant-header-actions{display:flex;align-items:center;gap:3px}
+      #${ROOT_ID} .ai-assistant-header-actions .ai-icon-button{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:var(--ai-text-color-secondary,var(--panel-text-color,#bbb))}
+      #${ROOT_ID} .ai-assistant-header-actions .ai-icon-button:hover{background:var(--ai-surface-muted-color,rgba(255,255,255,.07));color:var(--panel-text-color,#fff)}
+      #${ROOT_ID} .ai-assistant-tabs{flex:0 0 auto;min-height:48px;padding:5px 7px;display:grid;grid-template-columns:1fr 1fr;gap:5px;border-bottom:1px solid var(--ai-border-color,rgba(255,255,255,.09));background:var(--ai-surface-raised-color,var(--panel-bg-color,#25282b))}
+      #${ROOT_ID} .ai-assistant-tab{min-height:38px;padding:7px 10px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;border-radius:11px;background:transparent;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:12px;font-weight:680}
+      #${ROOT_ID} .ai-assistant-tab.is-active{border-color:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 34%,transparent);background:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 14%,transparent);color:var(--panel-text-color,#fff)}
+      #${ROOT_ID} .ai-assistant-phone-body{min-height:0;flex:1 1 auto;display:flex;overflow:hidden;background:var(--ai-surface-color,var(--panel-bg-color,#202224))}
+      #${ROOT_ID} .ai-assistant-tab-panel{min-width:0;min-height:0;flex:1 1 auto;display:flex;flex-direction:column;overflow:hidden}
+      #${ROOT_ID} .ai-assistant-tab-panel[hidden]{display:none!important}
+      #${ROOT_ID} .ai-assistant-chat-area{position:relative;min-height:0;flex:1 1 auto;display:flex;overflow:hidden}
+      #${ROOT_ID} .ai-assistant-history{min-height:0;max-height:none;flex:1 1 auto;padding:14px 12px 18px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;overscroll-behavior:contain;border:0;border-radius:0;background:linear-gradient(180deg,color-mix(in srgb,var(--ai-surface-color,#202224) 92%,var(--panel-accent-color,#6b86a2) 3%),var(--ai-surface-color,#202224));user-select:text;-webkit-user-select:text;scrollbar-gutter:stable}
+      #${ROOT_ID} .ai-assistant-empty{min-height:100%;padding:24px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa))}
+      #${ROOT_ID} .ai-assistant-empty-mark{width:48px;height:48px;display:grid;place-items:center;border-radius:17px;color:var(--panel-accent-color,#9fc8e4);background:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 13%,transparent);font-size:18px}
+      #${ROOT_ID} .ai-assistant-empty strong{color:var(--panel-text-color,#eee);font-size:14px}
+      #${ROOT_ID} .ai-assistant-empty p{max-width:280px;margin:0;font-size:11px;line-height:1.6}
+      #${ROOT_ID} .ai-assistant-suggestions{width:100%;margin-top:7px;display:grid;gap:7px}
+      #${ROOT_ID} .ai-assistant-suggestion{width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--ai-border-color,rgba(255,255,255,.12));border-radius:13px;background:var(--ai-surface-muted-color,rgba(255,255,255,.035));color:var(--panel-text-color,#ddd);font-size:11px;text-align:left}
+      #${ROOT_ID} .ai-assistant-suggestion:hover{border-color:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 48%,transparent);background:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 8%,transparent)}
+      #${ROOT_ID} .ai-assistant-message{width:fit-content;max-width:82%;padding:9px 11px 7px;border:1px solid var(--ai-border-color,rgba(255,255,255,.1));border-radius:6px 16px 16px 16px;background:var(--ai-surface-raised-color,var(--panel-bg-color,#2a2d30));box-shadow:0 4px 12px rgba(0,0,0,.12)}
+      #${ROOT_ID} .ai-assistant-message + .ai-assistant-message{margin-top:0}
+      #${ROOT_ID} .ai-assistant-message.is-assistant{align-self:flex-start;border-color:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 22%,var(--ai-border-color,#555));background:color-mix(in srgb,var(--ai-surface-raised-color,#292c2f) 94%,var(--panel-accent-color,#9fc8e4))}
+      #${ROOT_ID} .ai-assistant-message.is-user{align-self:flex-end;border-radius:16px 6px 16px 16px;border-color:color-mix(in srgb,var(--ai-success-color,#72d3a5) 25%,var(--ai-border-color,#555));background:color-mix(in srgb,var(--ai-success-bg-color,rgba(78,180,126,.13)) 68%,var(--ai-surface-raised-color,#292c2f))}
+      #${ROOT_ID} .ai-assistant-message-meta{margin-bottom:4px;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:9px;font-weight:650}
+      #${ROOT_ID} .ai-assistant-message-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.55}
+      #${ROOT_ID} .ai-assistant-actions{margin-top:7px;display:flex;align-items:center;justify-content:flex-end;gap:4px}
+      #${ROOT_ID} .ai-assistant-actions button{min-height:30px;padding:4px 8px;border:0;border-radius:9px;background:transparent;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:10px}
+      #${ROOT_ID} .ai-assistant-actions button:hover{background:rgba(255,255,255,.06);color:var(--panel-text-color,#fff)}
+      #${ROOT_ID} .ai-assistant-delete{width:30px;padding:0!important}
+      #${ROOT_ID} .ai-assistant-new-reply{position:absolute;left:50%;bottom:10px;z-index:2;transform:translateX(-50%);min-height:38px;padding:7px 12px;display:inline-flex;align-items:center;gap:6px;border:1px solid color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 38%,transparent);border-radius:999px;background:var(--ai-surface-raised-color,#2a2d30);box-shadow:0 7px 20px rgba(0,0,0,.28);font-size:10px}
+      #${ROOT_ID} .ai-assistant-new-reply[hidden]{display:none}
+      #${ROOT_ID} .ai-assistant-footer{flex:0 0 auto;padding:7px 9px 9px;border-top:1px solid var(--ai-border-color,rgba(255,255,255,.1));background:var(--ai-surface-raised-color,var(--panel-bg-color,#25282b))}
+      #${ROOT_ID} .ai-assistant-live-status{min-height:0;display:block;padding:0 5px;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:10px;line-height:1.4}
+      #${ROOT_ID} .ai-assistant-live-status:not(:empty){min-height:19px;padding-bottom:5px}
+      #${ROOT_ID} .ai-assistant-live-status[data-tone='danger']{color:var(--ai-danger-color,#ef8e8e)}
+      #${ROOT_ID} .ai-assistant-composer{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:end;gap:7px}
+      #${ROOT_ID} .ai-assistant-input{min-height:44px;max-height:120px;padding:11px 13px;resize:none;overflow-y:auto;border:1px solid var(--ai-border-color,rgba(255,255,255,.14));border-radius:16px;background:var(--ai-surface-muted-color,rgba(0,0,0,.18));font-size:12px;line-height:1.45}
+      #${ROOT_ID} .ai-assistant-input:focus{border-color:var(--panel-accent-color,#9fc8e4);outline:2px solid color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 23%,transparent);outline-offset:1px}
+      #${ROOT_ID} .ai-send-button{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;display:grid;place-items:center;border:0;border-radius:50%;background:var(--panel-accent-color,#6685a2);color:var(--panel-accent-text-color,#fff);box-shadow:0 5px 14px color-mix(in srgb,var(--panel-accent-color,#6685a2) 25%,transparent)}
+      #${ROOT_ID} .ai-assistant-composer-hint{display:block;padding:5px 5px 0;color:var(--ai-text-color-secondary,var(--panel-text-color,#888));font-size:9px;text-align:right}
+      #${ROOT_ID} .ai-assistant-selection-toolbar{position:absolute;z-index:3;transform:translate(-50%,-100%);padding:4px;border:1px solid var(--ai-border-color,#555);border-radius:11px;background:var(--ai-surface-raised-color,#292c2f);box-shadow:0 8px 24px rgba(0,0,0,.38)}
+      #${ROOT_ID} .ai-assistant-selection-toolbar button{min-height:34px;padding:6px 10px;border-radius:8px;background:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 15%,transparent);font-size:10px;white-space:nowrap}
+      #${ROOT_ID} .ai-assistant-reference-panel{overflow:hidden;background:var(--ai-surface-color,var(--panel-bg-color,#202224))}
+      #${ROOT_ID} .ai-assistant-memo-header{flex:0 0 auto;padding:14px 15px 10px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:1px solid var(--ai-border-color,rgba(255,255,255,.09))}
+      #${ROOT_ID} .ai-assistant-memo-header>div{display:flex;flex-direction:column;gap:3px}
+      #${ROOT_ID} .ai-assistant-memo-header strong{font-size:13px}
+      #${ROOT_ID} .ai-assistant-memo-header>span{color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:10px}
+      #${ROOT_ID} .ai-reference-editor-field{min-height:0;flex:1 1 auto;padding:10px 12px}
+      #${ROOT_ID} .ai-reference-editor-field .ai-reference-material{height:100%;min-height:0;padding:13px;border:1px solid var(--ai-border-color,rgba(255,255,255,.1));border-radius:14px;resize:none;background:var(--ai-surface-muted-color,rgba(0,0,0,.16));font-size:12px;line-height:1.6}
+      #${ROOT_ID} .ai-assistant-memo-footer{flex:0 0 auto;min-height:40px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--ai-border-color,rgba(255,255,255,.09));color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:10px}
+      #${ROOT_ID} .ai-assistant-memo-footer>span:first-child{display:inline-flex;align-items:center;gap:5px;color:var(--ai-success-color,#72d3a5)}
+      @keyframes ai-assistant-phone-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+      @media (max-width:719px){
+        #${ROOT_ID} .ai-assistant-modal{padding:12px;justify-content:center}
+        #${ROOT_ID} .ai-assistant-phone{width:min(404px,100%);height:calc(100% - 24px);min-height:0;max-height:none;border-radius:22px}
+        #${ROOT_ID} .ai-assistant-device-screen{border-radius:17px}
+      }
+      @media (max-width:440px){
+        #${ROOT_ID} .ai-assistant-modal{padding:0;align-items:stretch;justify-content:stretch}
+        #${ROOT_ID} .ai-assistant-phone{width:100%;height:100%;max-width:none;max-height:none;padding:0;border:0;border-radius:0;box-shadow:none}
+        #${ROOT_ID} .ai-assistant-device-screen{border-radius:0}
+        #${ROOT_ID} .ai-assistant-device-status{padding-top:max(7px,env(safe-area-inset-top))}
+        #${ROOT_ID} .ai-assistant-footer,#${ROOT_ID} .ai-assistant-memo-footer{padding-bottom:max(9px,env(safe-area-inset-bottom))}
+        #${ROOT_ID} .ai-assistant-message{max-width:88%}
+      }
+      @media (prefers-reduced-motion:reduce){
+        #${ROOT_ID} .ai-assistant-phone{animation:none}
+        #${ROOT_ID} .ai-assistant-history{scroll-behavior:auto}
+      }
       #${ROOT_ID} .ai-preview-modal{position:fixed;inset:0;width:auto;height:auto;overflow:auto}
       #${ROOT_ID} .ai-preview-modal-dialog{max-height:calc(100% - 48px);margin:24px auto}
       #${ROOT_ID} .ai-confirm-dialog{width:min(560px,calc(100% - 24px));padding:0;border:1px solid var(--ai-border-color,#555);border-radius:14px;background:var(--ai-surface-raised-color,#242424);color:var(--panel-text-color,#eee);box-shadow:0 24px 70px var(--ai-shadow-color,rgba(0,0,0,.35))}
@@ -3252,7 +3450,7 @@ function ensureUnifiedStyles() {
         #${ROOT_ID} .ai-bulk-toolbar button{min-height:44px}
         #${ROOT_ID} .ai-field-toggles span{min-height:44px;display:flex;align-items:center;padding-inline:12px}
         #${ROOT_ID} .ai-icon-button{width:44px;flex-basis:44px}
-        #${ROOT_ID} .ai-tool-drawer,#${ROOT_ID} .ai-assistant-phone{width:100%;border-left:0}
+        #${ROOT_ID} .ai-tool-drawer{width:100%;border-left:0}
         #${ROOT_ID} .ai-preview-modal-dialog{width:100%;min-height:100%;max-height:none;margin:0;border-radius:0}
         #${ROOT_ID} .ai-complete-panel{margin:12px auto;padding:20px 14px}
         #${ROOT_ID} .ai-debug-grid{grid-template-columns:1fr}
@@ -3335,7 +3533,7 @@ function syncModeForm(modeKey) {
   renderReferenceMaterial();
   renderAssistantHistory();
   setAssistantStatus('');
-  setAssistantGeneratingState(false);
+  setAssistantGeneratingState(state.isAssistantGenerating);
 }
 
 function updateWorkbenchHeader() {
@@ -3350,6 +3548,7 @@ function updateWorkbenchHeader() {
   $('[data-ai-open-settings] span', parentDoc()).text(modelLabel);
   $('[data-ai-focus-context] span', parentDoc()).text(contextLabel);
   $('[data-ai-open-assistant-tab="reference"] span', parentDoc()).text(referenceLength ? `${referenceLength} 字资料` : '添加资料');
+  updateAssistantChrome();
   syncNavigationState();
 }
 
@@ -3478,10 +3677,14 @@ async function loadEntriesForMode(
   { force = false, resetSelection = false, clearOutputs = false, invalidateOutputsOnChange = false } = {},
 ) {
   const mode = state.modes[modeKey];
+  const runId = ++state.entryLoadRunId;
 
   if (!mode.lorebookName) {
     mode.entries = [];
     mode.loadedLorebookName = '';
+    mode.entryLoadState = 'idle';
+    mode.entryLoadError = '';
+    mode.entryListWarning = '';
     if (resetSelection) {
       mode.selectedEntryUids.clear();
       mode.readonlyEntryUids.clear();
@@ -3497,7 +3700,7 @@ async function loadEntriesForMode(
   }
 
   if (!force && mode.entries.length && mode.loadedLorebookName === mode.lorebookName) {
-    return;
+    return { status: 'cached', entries: mode.entries };
   }
 
   if (resetSelection) {
@@ -3508,14 +3711,49 @@ async function loadEntriesForMode(
     invalidateModeOutputs(modeKey);
   }
 
+  const requestedLorebookName = mode.lorebookName;
   const previousEntries = Array.isArray(mode.entries) ? mode.entries : [];
   const hadOutputs = Boolean(mode.previewResult || mode.planningResult);
-  setModeStatus(modeKey, `正在加载世界书“${mode.lorebookName}”的条目...`);
-  const entries = await collectAiTargetEntries(mode.lorebookName, []);
-  const nextEntries = entries.map(entry => mapWorkspaceEntry(entry));
+  mode.entryLoadState = 'loading';
+  mode.entryLoadError = '';
+  mode.entryListWarning = '';
+  if (mode.loadedLorebookName !== requestedLorebookName) {
+    mode.entries = [];
+  }
+  if (state.currentNav === modeKey) {
+    renderEntryList(modeKey);
+  }
+  setModeStatus(modeKey, `正在加载世界书“${requestedLorebookName}”的条目...`);
+
+  let nextEntries;
+  try {
+    const entries = await collectAiTargetEntries(requestedLorebookName, []);
+    if (runId !== state.entryLoadRunId || mode.lorebookName !== requestedLorebookName) {
+      return { status: 'stale', entries: [] };
+    }
+    nextEntries = entries.map(entry => mapWorkspaceEntry(entry));
+  } catch (error) {
+    if (runId !== state.entryLoadRunId || mode.lorebookName !== requestedLorebookName) {
+      return { status: 'stale', entries: [] };
+    }
+    mode.entries = [];
+    mode.loadedLorebookName = '';
+    mode.entryLoadState = 'error';
+    mode.entryLoadError = error?.message || '无法读取世界书条目。';
+    mode.entryListWarning = '';
+    if (state.currentNav === modeKey) {
+      renderEntryList(modeKey);
+      renderSelectionSummary(modeKey);
+    }
+    setModeStatus(modeKey, `世界书“${requestedLorebookName}”加载失败：${mode.entryLoadError}`);
+    return { status: 'failed', error };
+  }
+
   const entriesChanged = !areWorkspaceEntriesEqual(previousEntries, nextEntries);
   mode.entries = nextEntries;
-  mode.loadedLorebookName = mode.lorebookName;
+  mode.loadedLorebookName = requestedLorebookName;
+  mode.entryLoadState = 'ready';
+  mode.entryLoadError = '';
 
   let outputsInvalidated = false;
   if (invalidateOutputsOnChange && entriesChanged && hadOutputs) {
@@ -3538,6 +3776,7 @@ async function loadEntriesForMode(
       ? `已加载 ${mode.entries.length} 条可处理条目。检测到世界书内容已变化，已自动清空旧的规划/预览结果。`
       : `已加载 ${mode.entries.length} 条可处理条目。`,
   );
+  return { status: 'complete', entries: mode.entries };
 }
 
 function goToStep(modeKey, targetStep) {
@@ -3772,6 +4011,14 @@ function ensureSelectionReady(modeKey) {
     setModeStatus(modeKey, '请先选择目标世界书。');
     return false;
   }
+  if (mode.entryLoadState === 'loading') {
+    setModeStatus(modeKey, '世界书条目仍在加载，请稍候。');
+    return false;
+  }
+  if (mode.entryLoadState === 'error') {
+    setModeStatus(modeKey, '条目加载失败，请重新加载后再继续。');
+    return false;
+  }
   if (!mode.entries.length) {
     setModeStatus(modeKey, '当前世界书没有可用条目。');
     return false;
@@ -3903,6 +4150,15 @@ function bindEvents() {
       handleChatContextEdited();
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-refresh-entries', async () => {
+      await loadEntriesForMode(currentModeKey(), {
+        force: true,
+        resetSelection: false,
+        clearOutputs: false,
+        invalidateOutputsOnChange: true,
+      });
+      renderCurrentPanel();
+    })
+    .on('click.aiWorkspaceDesktop', '.ai-entry-retry', async () => {
       await loadEntriesForMode(currentModeKey(), {
         force: true,
         resetSelection: false,
@@ -4186,6 +4442,18 @@ function bindEvents() {
     .on('click.aiWorkspaceDesktop', '.ai-assistant-tab', function () {
       switchAssistantTab($(this).attr('data-assistant-tab') || 'chat');
     })
+    .on('keydown.aiWorkspaceDesktop', '.ai-assistant-tab', function (event) {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const nextTab = event.key === 'Home'
+        ? 'chat'
+        : event.key === 'End'
+          ? 'reference'
+          : ($(this).attr('data-assistant-tab') || 'chat') === 'chat'
+            ? 'reference'
+            : 'chat';
+      switchAssistantTab(nextTab, { focusTab: true });
+    })
     .on('input.aiWorkspaceDesktop', '#ai-workspace-preview-modal-content textarea[data-preview-field]', () => {
       if (state.currentNav !== 'direct' && state.currentNav !== 'plan') {
         return;
@@ -4240,6 +4508,24 @@ function bindEvents() {
     .on('click.aiWorkspaceDesktop', '#ai-workspace-assistant-clear', () => {
       clearAssistantHistory();
     })
+    .on('click.aiWorkspaceDesktop', '.ai-assistant-suggestion', function () {
+      $('#ai-workspace-assistant-input', parentDoc())
+        .val($(this).attr('data-assistant-suggestion') || '')
+        .trigger('focus');
+      resizeAssistantComposer();
+    })
+    .on('input.aiWorkspaceDesktop', '#ai-workspace-assistant-input', () => {
+      resizeAssistantComposer();
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-assistant-new-reply', () => {
+      scrollAssistantHistoryToBottom({ smooth: true });
+    })
+    .on('scroll.aiWorkspaceDesktop', '#ai-workspace-assistant-history', function () {
+      if (isAssistantHistoryNearBottom(this)) {
+        state.assistantHasUnread = false;
+        $('#ai-workspace-assistant-new-reply', parentDoc()).prop('hidden', true);
+      }
+    })
     .on('keydown.aiWorkspaceDesktop', '#ai-workspace-assistant-input', async event => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
@@ -4283,6 +4569,13 @@ function bindEvents() {
         hideLorebookSearchResults();
       }
     });
+
+  $('#ai-workspace-assistant-modal', parentDoc())
+    .off('cancel.aiWorkspaceDesktop')
+    .on('cancel.aiWorkspaceDesktop', event => {
+      event.preventDefault();
+      closeAssistantModal();
+    });
 }
 
 export function initDesktopAiWorkspace() {
@@ -4323,6 +4616,9 @@ export function resetDesktopAiWorkspace() {
   state.activeGenerationId = '';
   state.stopRequested = false;
   state.previewRunId += 1;
+  state.entryLoadRunId += 1;
+  destroyAiEntryVirtualList(state.entryCluster, true);
+  state.entryCluster = null;
   ensureMarkup();
   renderCurrentPanel();
 }
