@@ -90,4 +90,18 @@ describe('SocialPanel avatar picker', () => {
 
     expect(screen.getByAltText('黄蓉头像')).toHaveAttribute('src', 'data:image/png;base64,custom');
   });
+
+  it('NPC 头像变量写入失败时回滚并提示', async () => {
+    setNpcAvatarRefMock.mockRejectedValueOnce(new Error('写入失败'));
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    render(<SocialPanel npcs={[createNpc()]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '设置黄蓉头像' }));
+    fireEvent.click(screen.getByRole('button', { name: /黄蓉二/ }));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('写入失败'));
+    await waitFor(() => {
+      expect(screen.getByAltText('黄蓉头像')).toHaveAttribute('src', expect.stringContaining('huang_rong_fc2.png'));
+    });
+  });
 });

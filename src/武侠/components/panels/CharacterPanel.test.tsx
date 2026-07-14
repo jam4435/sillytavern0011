@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterProfile } from '../../types';
 import { setPlayerAvatarRef } from '../../utils/avatarState';
@@ -60,5 +60,19 @@ describe('CharacterPanel avatar controls', () => {
 
     expect(setPlayerAvatarRefMock).toHaveBeenCalledWith('preset:player_male_02');
     expect(screen.getByAltText('郭靖头像')).toHaveAttribute('src', expect.stringContaining('choose_face_b02.png'));
+  });
+
+  it('变量写入失败时回滚乐观头像并提示', async () => {
+    setPlayerAvatarRefMock.mockRejectedValueOnce(new Error('写入失败'));
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    render(<CharacterPanel stats={baseStats} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '设置玩家头像' }));
+    fireEvent.click(screen.getByRole('button', { name: /少侠二/ }));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('写入失败'));
+    await waitFor(() => {
+      expect(screen.getByAltText('郭靖头像')).toHaveAttribute('src', expect.stringContaining('choose_face_b01.png'));
+    });
   });
 });
