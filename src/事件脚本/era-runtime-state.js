@@ -28,6 +28,7 @@ export function buildEventRuntimeStateResetPlan(statData) {
     前端变量: {
       ...currentFrontendVariables,
       事件结局状态: {},
+      事件结算进度: {},
       事件运行时键版本: EVENT_RUNTIME_KEY_VERSION,
     },
   };

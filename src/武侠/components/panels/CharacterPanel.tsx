@@ -1,4 +1,4 @@
-import React, { CSSProperties, useCallback, useMemo, useRef, useState } from 'react';
+import React, { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AvatarImage from '../AvatarImage';
 import AvatarPreviewModal from '../AvatarPreviewModal';
 import { Icons } from '../Icons';
@@ -10,15 +10,14 @@ import {
   toPresetAvatarRef,
 } from '../../utils/avatarCatalog';
 import {
-  clearAvatarSelection,
   clearCustomAvatar,
   createAvatarEntityKey,
   imageFileToDataUrl,
-  readAvatarSelection,
+  readCustomAvatar,
   resolveAvatarSource,
-  saveAvatarSelection,
   saveCustomAvatar,
 } from '../../utils/avatarStorage';
+import { clearPlayerAvatarRef, setPlayerAvatarRef } from '../../utils/avatarState';
 import { gameLogger } from '../../utils/logger';
 import {
   checkBreakthrough,
@@ -96,6 +95,8 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
   const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState(false);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [avatarVersion, setAvatarVersion] = useState(0);
+  const [optimisticAvatarRef, setOptimisticAvatarRef] = useState<string | null | undefined>(undefined);
+  const [isAvatarWriting, setIsAvatarWriting] = useState(false);
   const avatarUploadInputRef = useRef<HTMLInputElement | null>(null);
 
   const age = worldTime && stats.birthYear ? worldTime.year - stats.birthYear : null;
@@ -114,9 +115,10 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
   const networkEntries = stats.network ? Object.entries(stats.network) : [];
   const playerGender = stats.gender === '女' ? '女' : '男';
   const genderAvatarOptions = useMemo(() => getAvatarsByGender(playerGender), [playerGender]);
+  const activeAvatarRef = optimisticAvatarRef === undefined ? stats.avatarRef : optimisticAvatarRef || undefined;
   const selectedAvatarRef = useMemo(
-    () => readAvatarSelection(PLAYER_AVATAR_ENTITY_KEY)?.avatarRef || stats.avatarRef || getDefaultAvatarRefForGender(playerGender),
-    [avatarVersion, playerGender, stats.avatarRef],
+    () => activeAvatarRef || getDefaultAvatarRefForGender(playerGender),
+    [activeAvatarRef, avatarVersion, playerGender],
   );
   const realmStyles = {
     '--realm-color': realmColor,
@@ -129,24 +131,60 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
     () =>
       resolveAvatarSource({
         entityKey: PLAYER_AVATAR_ENTITY_KEY,
-        avatarRef: stats.avatarRef,
+        avatarRef: activeAvatarRef,
         name: stats.name,
         gender: playerGender,
       }),
-    [avatarVersion, playerGender, stats.avatarRef, stats.name],
+    [activeAvatarRef, avatarVersion, playerGender, stats.name],
   );
+
+  useEffect(() => {
+    if (
+      optimisticAvatarRef !== undefined
+      && (stats.avatarRef === optimisticAvatarRef || (optimisticAvatarRef === null && stats.avatarRef === undefined))
+    ) {
+      setOptimisticAvatarRef(undefined);
+    }
+  }, [optimisticAvatarRef, stats.avatarRef]);
 
   const refreshAvatars = useCallback(() => {
     setAvatarVersion(version => version + 1);
     onAvatarUpdated?.();
   }, [onAvatarUpdated]);
 
-  const handleSelectPresetAvatar = useCallback(
-    (avatarId: string) => {
-      saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, toPresetAvatarRef(avatarId));
+  const commitAvatarRef = useCallback(
+    async (avatarRef: string | null): Promise<boolean> => {
+      if (isAvatarWriting) {
+        return false;
+      }
+      const previousOptimisticRef = optimisticAvatarRef;
+      setOptimisticAvatarRef(avatarRef);
+      setIsAvatarWriting(true);
       refreshAvatars();
+      try {
+        if (avatarRef) {
+          await setPlayerAvatarRef(avatarRef);
+        } else {
+          await clearPlayerAvatarRef();
+        }
+        return true;
+      } catch (error) {
+        setOptimisticAvatarRef(previousOptimisticRef);
+        refreshAvatars();
+        window.alert(error instanceof Error ? error.message : '头像变量写入失败');
+        return false;
+      } finally {
+        setIsAvatarWriting(false);
+      }
     },
-    [refreshAvatars],
+    [isAvatarWriting, optimisticAvatarRef, refreshAvatars],
+  );
+
+  const handleSelectPresetAvatar = useCallback(
+    async (avatarId: string) => {
+      await commitAvatarRef(toPresetAvatarRef(avatarId));
+    },
+    [commitAvatarRef],
   );
 
   const handleAvatarUpload = useCallback(
@@ -156,11 +194,22 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
         return;
       }
 
+      const previousCustomAvatar = readCustomAvatar(PLAYER_AVATAR_ENTITY_KEY);
       try {
         const imageData = await imageFileToDataUrl(file);
         saveCustomAvatar(PLAYER_AVATAR_ENTITY_KEY, imageData, file.name);
-        saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, toCustomAvatarRef(PLAYER_AVATAR_ENTITY_KEY));
-        refreshAvatars();
+        const succeeded = await commitAvatarRef(toCustomAvatarRef(PLAYER_AVATAR_ENTITY_KEY));
+        if (!succeeded) {
+          if (previousCustomAvatar) {
+            saveCustomAvatar(
+              PLAYER_AVATAR_ENTITY_KEY,
+              previousCustomAvatar.imageData,
+              previousCustomAvatar.fileName,
+            );
+          } else {
+            clearCustomAvatar(PLAYER_AVATAR_ENTITY_KEY);
+          }
+        }
       } catch (error) {
         window.alert(error instanceof Error ? error.message : '头像上传失败');
       } finally {
@@ -169,14 +218,15 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
         }
       }
     },
-    [refreshAvatars],
+    [commitAvatarRef],
   );
 
-  const handleClearAvatarOverride = useCallback(() => {
-    clearAvatarSelection(PLAYER_AVATAR_ENTITY_KEY);
-    clearCustomAvatar(PLAYER_AVATAR_ENTITY_KEY);
-    refreshAvatars();
-  }, [refreshAvatars]);
+  const handleClearAvatarOverride = useCallback(async () => {
+    if (await commitAvatarRef(null)) {
+      clearCustomAvatar(PLAYER_AVATAR_ENTITY_KEY);
+      refreshAvatars();
+    }
+  }, [commitAvatarRef, refreshAvatars]);
 
   const handleBreakthrough = useCallback(async () => {
     if (!canBreakthrough) {

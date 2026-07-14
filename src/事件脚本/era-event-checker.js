@@ -9,6 +9,7 @@ import {
   compareTime,
   calculateDateOffset,
   getEndTime,
+  getEventDurationHours,
 } from './era-utils.js';
 
 // ==================== 检查时间条件 ====================
@@ -19,28 +20,24 @@ export function isTimeForEvent(currentTime, eventData, eventName = '') {
     return false;
   }
 
-  // ============== 弹性时间核心逻辑 ==============
-  const endTime = getEndTime(eventData);
-  let effectiveTriggerTime = triggerTime; // 默认使用原始触发时间
+  // 正式开始只认原定时间；提前十天的窗口仅用于传闻和玩家精确到场触发。
+  return compareTime(currentTime, triggerTime, '>=');
+}
 
-  // 1. 计算事件持续时间
-  let eventDuration = 0;
-  if (triggerTime && endTime) {
-    const triggerDays = (triggerTime.年 || 0) * 365 + (triggerTime.月 || 0) * 30 + (triggerTime.日 || 0);
-    const endDays = (endTime.年 || 0) * 365 + (endTime.月 || 0) * 30 + (endTime.日 || 0);
-    eventDuration = endDays - triggerDays;
+export function isEventDiscoverable(currentTime, eventData) {
+  const triggerTime = eventData?.触发条件;
+  const durationHours = getEventDurationHours(eventData);
+  if (!triggerTime || triggerTime.类型 !== '时间' || durationHours === null) {
+    return false;
   }
 
-  // 2. 判断是否为短期事件
-  const isShortEvent = eventDuration <= CONFIG.SHORT_EVENT_THRESHOLD_DAYS;
-
-  // 3. 如果是短期事件，计算弹性开始时间
-  if (isShortEvent) {
-    effectiveTriggerTime = calculateDateOffset(triggerTime, -CONFIG.ELASTIC_TRIGGER_DAYS);
+  const isShortEvent = durationHours <= CONFIG.SHORT_EVENT_THRESHOLD_DAYS * 24;
+  if (!isShortEvent || compareTime(currentTime, triggerTime, '>=')) {
+    return false;
   }
-  // ============== 弹性时间核心逻辑结束 ==============
 
-  return compareTime(currentTime, effectiveTriggerTime, '>=');
+  const discoverableFrom = calculateDateOffset(triggerTime, -CONFIG.ELASTIC_TRIGGER_DAYS);
+  return compareTime(currentTime, discoverableFrom, '>=');
 }
 
 export function isTimeAfterEventEnd(currentTime, endTime) {
@@ -49,5 +46,5 @@ export function isTimeAfterEventEnd(currentTime, endTime) {
     return false;
   }
 
-  return compareTime(currentTime, endTime, '>');
+  return compareTime(currentTime, endTime, '>=');
 }

@@ -134,9 +134,9 @@ export async function syncParticipationOutcomeStates(eventDefinitions, variables
   return plan;
 }
 
-export function buildWorldEventRecord(eventData, ending) {
+export function buildWorldEventRecord(eventData, ending, actualEndTime) {
   return {
-    时间: cloneJson(getEndTime(eventData) || {}),
+    时间: cloneJson(actualEndTime || getEndTime(eventData) || {}),
     地点: typeof eventData?.事件地点 === 'string' ? eventData.事件地点.trim() : '',
     概要: typeof ending === 'string' && ending.trim() ? ending.trim() : getEventSummary(eventData),
   };
@@ -145,6 +145,9 @@ export function buildWorldEventRecord(eventData, ending) {
 export function buildWorldEventArchivePatch(eventNames, eventDefinitions, statData) {
   const participation = isPlainObject(statData?.参与事件) ? statData.参与事件 : {};
   const existingWorldEvents = isPlainObject(statData?.世界事件) ? statData.世界事件 : {};
+  const inProgressEvents = isPlainObject(statData?.事件系统?.进行中事件)
+    ? statData.事件系统.进行中事件
+    : {};
   const patch = {};
 
   for (const eventName of eventNames) {
@@ -154,7 +157,7 @@ export function buildWorldEventArchivePatch(eventNames, eventDefinitions, statDa
     }
 
     const found = findParticipationEntry(participation, eventName);
-    patch[eventName] = buildWorldEventRecord(eventData, found?.entry?.结局);
+    patch[eventName] = buildWorldEventRecord(eventData, found?.entry?.结局, inProgressEvents[eventName]);
   }
 
   return patch;

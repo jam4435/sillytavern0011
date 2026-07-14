@@ -21,7 +21,7 @@
     formatDate,
   } = await import('./era-utils.js');
   const { loadEventDefinitionsFromWorldbook } = await import('./era-event-loader.js');
-  const { isTimeForEvent, isTimeAfterEventEnd } = await import('./era-event-checker.js');
+  const { isTimeForEvent, isEventDiscoverable, isTimeAfterEventEnd } = await import('./era-event-checker.js');
   const {
     initializeEventList,
     batchStartEvents,
@@ -29,7 +29,7 @@
     playerJoinsEvents,
     batchEndEvents,
     applyTimedParticipantEntries,
-    ensureFollowupCluesForInProgressEvents,
+    areEventPredecessorsCompleted,
     cleanupFollowupCluesForActiveParticipation,
     cleanupInvalidParticipationEntries,
   } = await import('./era-event-operations.js');
@@ -42,7 +42,7 @@
   const { needsEventRuntimeStateReset, resetLegacyEventRuntimeState } = await import('./era-runtime-state.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
-  const EVENT_SCRIPT_VERSION = '2026-07-14-canonical-runtime-keys';
+  const EVENT_SCRIPT_VERSION = '2026-07-15-event-lifecycle-v2';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
@@ -170,8 +170,17 @@
     }
 
     try {
-      const variables = await getVariables({ type: 'chat' });
+      let variables = await getVariables({ type: 'chat' });
       await syncParticipationOutcomeStates(eventDefinitions, variables);
+
+      const pendingSettlementEvents = Object.keys(variables?.stat_data?.前端变量?.事件结算进度 || {}).filter(
+        eventName => eventDefinitions[eventName],
+      );
+      if (pendingSettlementEvents.length > 0) {
+        logWarning(`发现 ${pendingSettlementEvents.length} 个未完成结算，优先重试:`, pendingSettlementEvents);
+        await batchEndEvents(pendingSettlementEvents, eventDefinitions);
+        variables = await getVariables({ type: 'chat' });
+      }
 
       // 输出完整的世界信息和事件系统
       if (isDebugEnabled()) {
@@ -186,6 +195,8 @@
 
       const currentTime = variables.stat_data.世界信息.时间;
       const 未发生事件 = variables.stat_data.事件系统.未发生事件 || {};
+      const 已完成事件 = variables.stat_data.事件系统.已完成事件 || {};
+      const playerLocation = normalizeLocationPath(variables.stat_data.user数据?.所在位置);
 
       let timeString = `${currentTime.年}年${currentTime.月}月${currentTime.日}日`;
       if (currentTime.时 !== undefined) {
@@ -200,6 +211,7 @@
 
       // 收集所有需要触发的事件（区分普通事件和登场事件）
       const eventsToStart = [];
+      const earlyEventsToStart = [];
       const debutEventsToComplete = [];
 
       for (const eventName of 未发生列表) {
@@ -215,6 +227,15 @@
             logSuccess(`事件 ${eventName} 触发条件满足！`);
             eventsToStart.push(eventName);
           }
+        } else if (
+          eventData &&
+          !isDebutEvent(eventData) &&
+          isEventDiscoverable(currentTime, eventData) &&
+          playerLocation === normalizeLocationPath(eventData.事件地点) &&
+          areEventPredecessorsCompleted(eventName, eventDefinitions, 已完成事件)
+        ) {
+          logSuccess(`玩家在弹性窗口精确到达事件地点，提前启动 ${eventName}`);
+          earlyEventsToStart.push(eventName);
         } else {
           log(`事件 ${eventName} 触发条件不满足`);
         }
@@ -224,9 +245,18 @@
       // 批量触发普通事件
       if (eventsToStart.length > 0) {
         log(`📋 发现 ${eventsToStart.length} 个普通事件需要触发:`, eventsToStart);
-        await batchStartEvents(eventsToStart, eventDefinitions);
+        await batchStartEvents(eventsToStart, eventDefinitions, { currentTime });
       } else {
         log('没有普通事件需要触发');
+      }
+
+      if (earlyEventsToStart.length > 0) {
+        log(`📍 玩家到场，提前启动 ${earlyEventsToStart.length} 个事件:`, earlyEventsToStart);
+        await batchStartEvents(earlyEventsToStart, eventDefinitions, {
+          currentTime,
+          earlyEventNames: earlyEventsToStart,
+        });
+        await playerJoinsEvents(earlyEventsToStart, eventDefinitions);
       }
 
       // 批量完成登场事件（直接从未发生 -> 已完成）
@@ -243,8 +273,6 @@
       const 最新参与事件 = updatedVariables?.stat_data?.参与事件 || {};
 
       await cleanupInvalidParticipationEntries(reason);
-
-      await ensureFollowupCluesForInProgressEvents(Object.keys(最新进行中事件), eventDefinitions, 'check-in-progress');
 
       // ==================== 批量检查进行中事件 ====================
       debugGroup('⏳ 批量检查进行中事件');
@@ -285,8 +313,18 @@
 
       // ==================== 检查玩家位置触发（弹性时间+层级式地点匹配）====================
       const 仍在进行事件 = 进行中列表.filter(eventName => !eventsToEnd.includes(eventName));
-      if (仍在进行事件.length > 0) {
-        await checkPlayerLocationTriggers(仍在进行事件, eventDefinitions, updatedVariables, 最新参与事件);
+      const 最新未发生事件 = updatedVariables?.stat_data?.事件系统?.未发生事件 || {};
+      const 可发现未发生事件 = Object.keys(最新未发生事件).filter(eventName =>
+        isEventDiscoverable(updatedVariables.stat_data.世界信息.时间, eventDefinitions[eventName]),
+      );
+      if (仍在进行事件.length > 0 || 可发现未发生事件.length > 0) {
+        await checkPlayerLocationTriggers(
+          仍在进行事件,
+          可发现未发生事件,
+          eventDefinitions,
+          updatedVariables,
+          最新参与事件,
+        );
       }
     } catch (error) {
       logError('主检查函数出错:', error);
@@ -297,7 +335,13 @@
   }
 
   // ==================== 检查玩家位置触发 ====================
-  async function checkPlayerLocationTriggers(进行中列表, eventDefinitions, updatedVariables, 最新参与事件) {
+  async function checkPlayerLocationTriggers(
+    进行中列表,
+    可发现未发生列表,
+    eventDefinitions,
+    updatedVariables,
+    最新参与事件,
+  ) {
     debugGroup('📍 检查玩家位置触发');
     const playerLocation = normalizeLocationPath(updatedVariables.stat_data.user数据?.所在位置);
     log(`玩家位置: ${playerLocation}`);
@@ -305,7 +349,10 @@
     const 附近传闻 = {};
     const eventsToJoin = [];
 
-    for (const eventName of 进行中列表) {
+    const activeEvents = new Set(进行中列表);
+    const candidateEvents = [...new Set([...进行中列表, ...可发现未发生列表])];
+
+    for (const eventName of candidateEvents) {
       const eventData = eventDefinitions[eventName];
       if (!eventData) continue;
 
@@ -329,7 +376,7 @@
         }
 
         // 只有当playerLocation与eventData.事件地点完全相同时，才调用playerJoinsEvent
-        if (eventLocation === playerLocation && !alreadyJoined) {
+        if (activeEvents.has(eventName) && eventLocation === playerLocation && !alreadyJoined) {
           logSuccess(`玩家到达事件地点: ${eventName}`);
           eventsToJoin.push(eventName);
         }
@@ -355,7 +402,7 @@
   }
 
   // ==================== 处理后续事件线索计数器 ====================
-  async function processFollowupCounters({ decrementCounters = true, reason = 'manual' } = {}) {
+  async function processFollowupCounters({ decrementCounters = true, reason = 'manual', eligibleCounterKeys } = {}) {
     debugGroup('🔢 处理后续事件线索计数器');
 
     try {
@@ -378,6 +425,10 @@
       const expiredKeys = [];
 
       for (const key in followupCounters) {
+        if (eligibleCounterKeys instanceof Set && !eligibleCounterKeys.has(key)) {
+          log(`计数器 ${key} 为本轮新建，保持 ${followupCounters[key]}`);
+          continue;
+        }
         const currentCount = followupCounters[key];
         const newCount = currentCount - 1;
 
@@ -423,10 +474,23 @@
   let isCheckingEvents = false;
   let pendingCheckReason = null;
   let checkEventsTimer = null;
+  let eventWorkQueue = Promise.resolve();
   let lastSuccessfulInitializationAt = 0;
   // 线索倒计时按 messageId 去重：同一助手楼层（含 regenerate 产生的同 messageId 新 swipe）
   // 只扣一次，避免重复扣减。切换聊天时重置。
   let lastCountedMessageId = null;
+  let pendingTurnCounterKeys = null;
+
+  function enqueueEventWork(reason, work) {
+    const run = eventWorkQueue.then(async () => {
+      log(`🧵 开始串行事件任务: ${reason}`);
+      return work();
+    });
+    eventWorkQueue = run.catch(error => {
+      logError(`串行事件任务失败: ${reason}`, error);
+    });
+    return run;
+  }
 
   async function runScheduledCheck(reason) {
     if (isCheckingEvents) {
@@ -459,7 +523,7 @@
       checkEventsTimer = null;
       const reasonToRun = pendingCheckReason || reason;
       pendingCheckReason = null;
-      void runScheduledCheck(reasonToRun);
+      void enqueueEventWork(`check:${reasonToRun}`, () => runScheduledCheck(reasonToRun));
     }, 100);
   }
 
@@ -607,6 +671,7 @@
     log('💬 检测到聊天切换，重新初始化');
     isInitialized = false;
     lastCountedMessageId = null;
+    pendingTurnCounterKeys = null;
     await initialize();
   });
 
@@ -619,6 +684,10 @@
   // 避免发送后生成失败/取消/报错/未形成助手回合时仍被扣一次。
   eventOn(tavern_events.MESSAGE_SENT, async () => {
     log('📨 检测到消息发送，触发事件检查');
+    const turnStartVariables = await getVariables({ type: 'chat' });
+    pendingTurnCounterKeys = new Set(
+      Object.keys(turnStartVariables?.stat_data?.后续事件线索计数 || {}),
+    );
     scheduleCheckEvents('message-sent');
   });
 
@@ -634,9 +703,17 @@
       return;
     }
     lastCountedMessageId = messageId;
-    log(`✅ 检测到武侠回合成功完成 (messageId=${messageId}, chatId=${chatId})，扣减线索倒计时`);
-    await processFollowupCounters({ decrementCounters: true, reason: 'wuxia-turn-completed' });
-    scheduleCheckEvents('wuxia-turn-completed');
+    const eligibleCounterKeys = pendingTurnCounterKeys;
+    pendingTurnCounterKeys = null;
+    log(`✅ 检测到武侠回合成功完成 (messageId=${messageId}, chatId=${chatId})，串行结算事件与线索倒计时`);
+    await enqueueEventWork(`turn-completed:${messageId}`, async () => {
+      await runScheduledCheck('wuxia-turn-completed');
+      await processFollowupCounters({
+        decrementCounters: true,
+        reason: 'wuxia-turn-completed',
+        eligibleCounterKeys,
+      });
+    });
   });
 
   eventOn('era:writeDone', async detail => {

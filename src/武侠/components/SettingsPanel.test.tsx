@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SettingsPanel from './SettingsPanel';
 import {
   createDefaultDisplaySettings,
@@ -13,6 +13,8 @@ const variableEditorCapability: VariableEditorCapability = {
   source: 'internal-default',
   reason: 'test',
 };
+
+const getVariablesMock = vi.mocked(globalThis.getVariables);
 
 function renderSettingsPanel(settings: DisplaySettings, onSettingsChange = vi.fn()) {
   render(
@@ -167,5 +169,100 @@ describe('SettingsPanel theme controls', () => {
         variableContextRounds: 2,
       },
     });
+  });
+});
+
+describe('SettingsPanel variable groups', () => {
+  beforeEach(() => {
+    getVariablesMock.mockReset();
+    getVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: '1220年1月1日10时' },
+        附近传闻: { 城外异动: '可见传闻' },
+        后续事件线索: { 射雕第7回: '可见线索' },
+        事件系统: { 进行中事件: {} },
+        参与事件: { 射雕第6回: { 结局: '已完成' } },
+        user数据: { 姓名: '墨逸', 位置: '大宋/临安府/临安城' },
+        角色数据: { 黄蓉: { 位置: '大宋/临安府/临安城' } },
+        前端变量: { 隐藏标记: '不可搜索' },
+        后续事件线索计数: { 隐藏计数: 3 },
+        世界事件: { 隐藏历史: '不可搜索' },
+      },
+    });
+  });
+
+  const openVariableTab = async () => {
+    renderSettingsPanel(createDefaultDisplaySettings());
+    fireEvent.click(screen.getByRole('button', { name: '变量' }));
+    return screen.findByRole('tablist', { name: '变量类别' });
+  };
+
+  it('shows semantic groups first and only the selected group real scopes second', async () => {
+    await openVariableTab();
+
+    const groupTabs = within(screen.getByRole('tablist', { name: '变量类别' }));
+    expect(groupTabs.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['世界', '事件', '玩家', '人物']);
+    expect(groupTabs.getByRole('tab', { name: '世界' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '附近传闻' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '后续事件线索' })).toBeInTheDocument();
+
+    fireEvent.click(groupTabs.getByRole('tab', { name: '事件' }));
+
+    expect(screen.getByRole('tablist', { name: '事件变量分区' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '事件系统' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '参与事件' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '世界信息' })).not.toBeInTheDocument();
+
+    fireEvent.click(groupTabs.getByRole('tab', { name: '人物' }));
+
+    expect(screen.getByRole('tab', { name: '角色数据' })).toHaveAttribute('aria-selected', 'true');
+    expect(within(screen.getByLabelText('人物列表')).getByRole('button', { name: /黄蓉/ })).toBeInTheDocument();
+  });
+
+  it('never exposes system-only roots in navigation, tree, or global search', async () => {
+    await openVariableTab();
+
+    expect(screen.queryByRole('tab', { name: '前端变量' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '后续事件线索计数' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '世界事件' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: '全局路径' }));
+    const searchInput = screen.getByLabelText('全局搜索');
+
+    for (const hiddenRoot of ['前端变量', '后续事件线索计数', '世界事件']) {
+      fireEvent.change(searchInput, { target: { value: hiddenRoot } });
+      expect(screen.getByText('没有命中的变量路径')).toBeInTheDocument();
+    }
+
+    fireEvent.change(searchInput, { target: { value: '射雕第7回' } });
+    expect(screen.getByRole('button', { name: /stat_data › 后续事件线索 › 射雕第7回/ })).toBeInTheDocument();
+  });
+
+  it('falls back by fixed group order when roots are missing', async () => {
+    getVariablesMock.mockReturnValue({
+      stat_data: {
+        事件系统: { 已完成事件: {} },
+        user数据: { 姓名: '墨逸' },
+        前端变量: { 隐藏标记: true },
+      },
+    });
+
+    await openVariableTab();
+
+    expect(screen.getByRole('tab', { name: '事件' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '世界' })).toBeDisabled();
+    expect(screen.getByRole('tab', { name: '人物' })).toBeDisabled();
+    expect(screen.getByRole('tab', { name: '事件系统' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('tab', { name: '参与事件' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the real stat_data path when selecting an editable leaf', async () => {
+    await openVariableTab();
+
+    fireEvent.click(screen.getByRole('tab', { name: '玩家' }));
+    fireEvent.click(screen.getByTitle('姓名'));
+
+    expect(screen.getByTitle('stat_data.user数据.姓名')).toHaveTextContent('stat_data › user数据 › 姓名');
+    expect(screen.getByLabelText('值')).toHaveValue('墨逸');
   });
 });

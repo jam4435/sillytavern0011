@@ -180,7 +180,6 @@ export function getAvatarCandidates(input: AvatarResolveInput): AvatarCatalogEnt
     seenIds.add(avatar.id);
   };
 
-  addCandidate(getAvatarFromRef(readAvatarSelection(input.entityKey)?.avatarRef));
   addCandidate(getAvatarFromRef(input.avatarRef));
   for (const avatar of findAvatarsByName(input.name)) {
     addCandidate(avatar);
@@ -223,22 +222,6 @@ export function resolveAvatarSource(input: AvatarResolveInput): ResolvedAvatarSo
 
     return null;
   };
-
-  const localSelection = readAvatarSelection(input.entityKey);
-  const selectionSource = resolveRef(localSelection?.avatarRef);
-  if (selectionSource) {
-    return selectionSource;
-  }
-
-  const localCustom = readCustomAvatar(input.entityKey);
-  if (localCustom) {
-    return {
-      src: localCustom.imageData,
-      label: input.name || '自定义头像',
-      source: 'custom',
-      fallbackInitial,
-    };
-  }
 
   const refSource = resolveRef(input.avatarRef);
   if (refSource) {

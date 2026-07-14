@@ -58,6 +58,7 @@ type TavernChatMessage = {
 interface UserProfile {
   用户名?: string;
   性别?: string;
+  /** @deprecated 仅供头像变量 v1 迁移读取。 */
   头像?: string;
   外貌?: string;
   出生年份?: number;
@@ -118,6 +119,7 @@ interface UserProfile {
  */
 interface CharacterData {
   性别?: string;
+  /** @deprecated 仅供头像变量 v1 迁移读取。 */
   头像?: string;
   外貌?: string;
   性格?: string;
@@ -1173,6 +1175,7 @@ function createCharacterNpc(
   name: string,
   characterData: CharacterData,
   category: NPC['category'],
+  avatarRef?: string,
   relationshipLabel?: string,
   legacyNpc?: LegacySocialNpc,
 ): NPC {
@@ -1181,7 +1184,7 @@ function createCharacterNpc(
   return {
     id: `npc:${category}:${name}`,
     name,
-    avatarRef: characterData.头像 || undefined,
+    avatarRef,
     relationship: legacyNpc?.关系值 ?? 0,
     relationshipLabel: relationshipLabel?.trim() || undefined,
     category,
@@ -1250,6 +1253,7 @@ function isCharacterDataRecord(value: unknown): value is CharacterData {
 function parseSocial(variables: GameVariables, 用户档案?: UserProfile): NPC[] {
   const legacySocialList = Array.isArray(variables.侠缘) ? variables.侠缘 : [];
   const legacyByName = new Map<string, LegacySocialNpc>();
+  const avatarRefs = variables.前端变量?.头像?.人物 || {};
   for (const npc of legacySocialList) {
     const name = npc.姓名?.trim();
     if (name) {
@@ -1276,7 +1280,7 @@ function parseSocial(variables: GameVariables, 用户档案?: UserProfile): NPC[
     const legacyNpc = legacyByName.get(name);
 
     if (isCharacterDataRecord(characterRecord)) {
-      result.push(createCharacterNpc(name, characterRecord, 'acquaintance', relationshipLabel, legacyNpc));
+      result.push(createCharacterNpc(name, characterRecord, 'acquaintance', avatarRefs[name], relationshipLabel, legacyNpc));
     } else if (legacyNpc) {
       result.push(createLegacySocialNpc(legacyNpc, 'acquaintance', relationshipLabel));
     } else {
@@ -1307,7 +1311,7 @@ function parseSocial(variables: GameVariables, 用户档案?: UserProfile): NPC[
       continue;
     }
 
-    result.push(createCharacterNpc(name, characterRecord, 'local', undefined, legacyByName.get(name)));
+    result.push(createCharacterNpc(name, characterRecord, 'local', avatarRefs[name], undefined, legacyByName.get(name)));
     seenNames.add(name);
   }
 
@@ -3222,7 +3226,7 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
     state.stats = {
       name: userName,
       gender: 用户档案.性别 || '未知',
-      avatarRef: 用户档案.头像 || undefined,
+      avatarRef: variables.前端变量?.头像?.玩家,
       appearance: 用户档案.外貌 || '',
       birthYear: 用户档案.出生年份 || (worldTime ? worldTime.year - 20 : 1179),
       status: 用户档案.状态 || '健康',

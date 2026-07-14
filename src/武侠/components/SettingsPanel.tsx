@@ -76,6 +76,7 @@ type VariableStatus = 'idle' | 'success' | 'error';
 type AutoAdvanceStatus = 'idle' | 'running' | 'stopping' | 'done' | 'error';
 type AutoAdvanceResultStatus = 'running' | 'success' | 'error';
 type VariableSearchMode = 'scope' | 'global';
+type VariableGroupId = 'world' | 'event' | 'player' | 'character';
 type SettingsCollapsibleId =
   | 'appearanceTheme'
   | 'appearanceText'
@@ -126,6 +127,37 @@ const SUMMARY_API_SOURCES = [
   ['deepseek', 'DeepSeek'],
   ['custom', '自定义（OpenAI兼容）'],
 ] as const;
+
+const VARIABLE_GROUPS: ReadonlyArray<{
+  id: VariableGroupId;
+  label: string;
+  scopeKeys: ReadonlyArray<string>;
+}> = [
+  { id: 'world', label: '世界', scopeKeys: ['世界信息', '附近传闻', '后续事件线索'] },
+  { id: 'event', label: '事件', scopeKeys: ['事件系统', '参与事件'] },
+  { id: 'player', label: '玩家', scopeKeys: ['user数据'] },
+  { id: 'character', label: '人物', scopeKeys: ['角色数据'] },
+];
+
+const getVariableGroupScopeEntries = (
+  statData: Record<string, unknown>,
+  groupId: VariableGroupId,
+): Array<[string, unknown]> => {
+  const group = VARIABLE_GROUPS.find(item => item.id === groupId);
+  if (!group) {
+    return [];
+  }
+
+  return group.scopeKeys.flatMap(scopeKey =>
+    Object.prototype.hasOwnProperty.call(statData, scopeKey) ? [[scopeKey, statData[scopeKey]]] : [],
+  );
+};
+
+const getVisibleVariableScopeEntries = (statData: Record<string, unknown>): Array<[string, unknown]> =>
+  VARIABLE_GROUPS.flatMap(group => getVariableGroupScopeEntries(statData, group.id));
+
+const getVariableGroupIdForScope = (scopeKey: string | null): VariableGroupId | null =>
+  VARIABLE_GROUPS.find(group => scopeKey !== null && group.scopeKeys.includes(scopeKey))?.id ?? null;
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -408,7 +440,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const normalizedCurrentPresetName = currentPresetName.trim();
   const hasCurrentPreset = normalizedCurrentPresetName.length > 0;
   const currentPresetRegexRules = getCurrentPresetRegexRules(settings, normalizedCurrentPresetName);
-  const visibleVariableScopeEntries = statData ? getVisibleEntries(statData) : [];
+  const visibleVariableScopeEntries = statData ? getVisibleVariableScopeEntries(statData) : [];
   const fallbackVariableScope = visibleVariableScopeEntries[0] ? String(visibleVariableScopeEntries[0][0]) : null;
   const resolvedActiveVariableScope =
     activeVariableScope && visibleVariableScopeEntries.some(([key]) => String(key) === activeVariableScope)
@@ -418,6 +450,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     visibleVariableScopeEntries.find(([key]) => String(key) === resolvedActiveVariableScope) ?? null;
   const activeVariableScopePath = activeVariableScopeEntry ? [activeVariableScopeEntry[0]] : [];
   const activeVariableScopeValue = activeVariableScopeEntry?.[1];
+  const firstAvailableVariableGroup = VARIABLE_GROUPS.find(group =>
+    visibleVariableScopeEntries.some(([key]) => group.scopeKeys.includes(String(key))),
+  );
+  const resolvedActiveVariableGroup =
+    getVariableGroupIdForScope(resolvedActiveVariableScope) ?? firstAvailableVariableGroup?.id ?? VARIABLE_GROUPS[0].id;
+  const activeVariableGroup =
+    VARIABLE_GROUPS.find(group => group.id === resolvedActiveVariableGroup) ?? VARIABLE_GROUPS[0];
+  const activeVariableGroupScopeEntries = statData
+    ? getVariableGroupScopeEntries(statData, resolvedActiveVariableGroup)
+    : [];
+  const searchableStatData = Object.fromEntries(visibleVariableScopeEntries);
   const roleVariableEntries =
     resolvedActiveVariableScope === '角色数据' && isVariableRecord(activeVariableScopeValue)
       ? getVisibleEntries(activeVariableScopeValue)
@@ -456,7 +499,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       : new Set<string>();
   const globalVariableResults =
     statData && variableSearchMode === 'global'
-      ? searchVariablePaths(statData, normalizedVariableSearch, {
+      ? searchVariablePaths(searchableStatData, normalizedVariableSearch, {
           includeValues: variableIncludeValueSearch,
           maxResults: 160,
         })
@@ -535,7 +578,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   );
 
   const resetVariableBrowser = useCallback((nextStatData: Record<string, unknown>) => {
-    const nextScopeEntry = getVisibleEntries(nextStatData)[0];
+    const nextScopeEntry = getVisibleVariableScopeEntries(nextStatData)[0];
     const nextScopeKey = nextScopeEntry ? String(nextScopeEntry[0]) : null;
     const nextScopeValue = nextScopeEntry?.[1];
     const nextCharacterEntry =
@@ -636,6 +679,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setSelectedVariablePath([scopeKey]);
     },
     [statData],
+  );
+
+  const handleVariableGroupSelect = useCallback(
+    (groupId: VariableGroupId) => {
+      if (!statData || groupId === resolvedActiveVariableGroup) {
+        return;
+      }
+
+      const firstScopeEntry = getVariableGroupScopeEntries(statData, groupId)[0];
+      if (firstScopeEntry) {
+        handleVariableScopeSelect(String(firstScopeEntry[0]));
+      }
+    },
+    [handleVariableScopeSelect, resolvedActiveVariableGroup, statData],
   );
 
   const handleCharacterSelect = useCallback((characterName: string) => {
@@ -2395,7 +2452,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="variables-toolbar">
               <div className="variables-toolbar-main">
                 <div className="variables-field variables-search-field">
-                  <label className="variables-field-label">
+                  <label className="variables-field-label" htmlFor="wuxia-variable-search">
                     {variableSearchMode === 'global'
                       ? '全局搜索'
                       : resolvedActiveVariableScope === '角色数据'
@@ -2405,6 +2462,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <div className="variables-search-box">
                     <Icons.Search size={16} />
                     <input
+                      id="wuxia-variable-search"
                       type="text"
                       value={variableSearch}
                       onChange={handleVariableSearchChange}
@@ -2450,6 +2508,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <div className="variables-mode-switch" role="tablist" aria-label="变量搜索模式">
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={variableSearchMode === 'scope'}
                     className={`variables-mode-btn ${variableSearchMode === 'scope' ? 'active' : ''}`}
                     onClick={() => handleVariableSearchModeChange('scope')}
                   >
@@ -2457,6 +2517,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </button>
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={variableSearchMode === 'global'}
                     className={`variables-mode-btn ${variableSearchMode === 'global' ? 'active' : ''}`}
                     onClick={() => handleVariableSearchModeChange('global')}
                   >
@@ -2477,21 +2539,57 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </div>
               </div>
 
-              {variableSearchMode === 'scope' && visibleVariableScopeEntries.length > 0 && (
-                <div className="variables-scope-strip">
-                  {visibleVariableScopeEntries.map(([key]) => {
-                    const scopeKey = String(key);
-                    return (
-                      <button
-                        key={scopeKey}
-                        type="button"
-                        className={`variables-scope-chip ${resolvedActiveVariableScope === scopeKey ? 'active' : ''}`}
-                        onClick={() => handleVariableScopeSelect(scopeKey)}
-                      >
-                        {scopeKey}
-                      </button>
-                    );
-                  })}
+              {variableSearchMode === 'scope' && (
+                <div className="variables-navigation" aria-label="变量分组导航">
+                  <div className="variables-group-strip" role="tablist" aria-label="变量类别">
+                    {VARIABLE_GROUPS.map(group => {
+                      const isAvailable = statData
+                        ? getVariableGroupScopeEntries(statData, group.id).length > 0
+                        : false;
+                      const isActive = resolvedActiveVariableGroup === group.id;
+                      return (
+                        <button
+                          key={group.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={isActive}
+                          aria-controls="wuxia-variable-scope-navigation"
+                          className={`variables-scope-chip variables-group-chip ${isActive ? 'active' : ''}`}
+                          disabled={!isAvailable}
+                          onClick={() => handleVariableGroupSelect(group.id)}
+                        >
+                          {group.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {activeVariableGroupScopeEntries.length > 0 && (
+                    <div
+                      id="wuxia-variable-scope-navigation"
+                      className="variables-scope-strip"
+                      role="tablist"
+                      aria-label={`${activeVariableGroup.label}变量分区`}
+                    >
+                      {activeVariableGroupScopeEntries.map(([key]) => {
+                        const scopeKey = String(key);
+                        const isActive = resolvedActiveVariableScope === scopeKey;
+                        return (
+                          <button
+                            key={scopeKey}
+                            type="button"
+                            role="tab"
+                            aria-selected={isActive}
+                            aria-controls="wuxia-variable-browser"
+                            className={`variables-scope-chip ${isActive ? 'active' : ''}`}
+                            onClick={() => handleVariableScopeSelect(scopeKey)}
+                          >
+                            {scopeKey}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2500,6 +2598,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <div className="variables-search-box">
                     <Icons.Search size={16} />
                     <input
+                      aria-label="人物名搜索"
                       type="text"
                       value={characterSearch}
                       onChange={handleCharacterSearchChange}
@@ -2515,7 +2614,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             {variableStatusText && <div className={`variables-status ${variableStatus}`}>{variableStatusText}</div>}
 
             <div className={`variables-browser${isVariableDetailOpen ? ' detail-open' : ''}`}>
-              <div className="variables-tree" aria-label="变量浏览">
+              <div id="wuxia-variable-browser" className="variables-tree" aria-label="变量浏览">
                 {!statData ? (
                   <div className="variables-empty">
                     <Icons.Variables size={32} />
@@ -3159,6 +3258,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, ca
     if (isLongText) {
       return (
         <textarea
+          aria-label="值"
           className="variable-leaf-input variable-leaf-textarea"
           value={value}
           disabled={!canEdit}
@@ -3171,6 +3271,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, ca
 
     return (
       <input
+        aria-label="值"
         className="variable-leaf-input"
         type="text"
         value={value}
@@ -3183,6 +3284,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, ca
   if (typeof value === 'number') {
     return (
       <input
+        aria-label="值"
         className="variable-leaf-input variable-leaf-number"
         type="number"
         value={Number.isFinite(value) ? String(value) : ''}
@@ -3201,6 +3303,7 @@ const VariableLeafEditor: React.FC<VariableLeafEditorProps> = ({ value, path, ca
   if (typeof value === 'boolean') {
     return (
       <button
+        aria-label="值"
         className={`variable-boolean-toggle ${value ? 'active' : ''}`}
         disabled={!canEdit}
         onClick={() => onValueChange(path, !value)}

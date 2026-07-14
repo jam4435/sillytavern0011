@@ -404,6 +404,14 @@ function getNestedRecord(source: Record<string, unknown>, key: string): Record<s
   return isRecord(value) ? value : null;
 }
 
+function omitLegacyAvatarField(source: Record<string, unknown>): Record<string, unknown> {
+  if (!Object.hasOwn(source, '头像')) {
+    return source;
+  }
+  const { 头像: _frontendOwnedAvatar, ...rest } = source;
+  return rest;
+}
+
 function getFirstStringValue(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === 'string' && value.trim()) {
@@ -446,7 +454,7 @@ function collectRelevantCharacters(
     const isCurrentEventNpc = !!participationText && participationText.includes(name);
     const isMentionedInLatestBody = !!latestAssistantBody && latestAssistantBody.includes(name);
     if (isSameScene || isCurrentEventNpc || isMentionedInLatestBody) {
-      result[name] = sanitizeForPrompt(character);
+      result[name] = sanitizeForPrompt(omitLegacyAvatarField(character));
     }
     return result;
   }, {});
@@ -491,7 +499,7 @@ export function buildExtraVariableProjection(
 
   return sanitizeForPrompt({
     世界信息: Object.hasOwn(worldInfo, '时间') ? { 时间: worldInfo.时间 } : {},
-    user数据: userData,
+    user数据: omitLegacyAvatarField(userData),
     角色数据: collectRelevantCharacters(statData, playerLocation, latestAssistantBody, participationEvents),
     参与事件: participationEvents,
     前端变量: {

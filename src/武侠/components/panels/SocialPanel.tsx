@@ -4,15 +4,15 @@ import AvatarPreviewModal from '../AvatarPreviewModal';
 import { ActivePanel, type NPC } from '../../types';
 import { toCustomAvatarRef, toPresetAvatarRef } from '../../utils/avatarCatalog';
 import {
-  clearAvatarSelection,
   clearCustomAvatar,
   createAvatarEntityKey,
   getAvatarCandidates,
   imageFileToDataUrl,
+  readCustomAvatar,
   resolveAvatarSource,
-  saveAvatarSelection,
   saveCustomAvatar,
 } from '../../utils/avatarStorage';
+import { clearNpcAvatarRef, setNpcAvatarRef } from '../../utils/avatarState';
 import { Icons } from '../Icons';
 import { EmptyState } from './EmptyState';
 
@@ -115,6 +115,8 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [avatarPickerId, setAvatarPickerId] = useState<string | null>(null);
   const [avatarVersion, setAvatarVersion] = useState(0);
+  const [optimisticAvatarRefs, setOptimisticAvatarRefs] = useState<Record<string, string | null>>({});
+  const [avatarWriteTarget, setAvatarWriteTarget] = useState<string | null>(null);
   const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState(false);
   const avatarUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [openSections, setOpenSections] = useState<Record<SocialSectionKey, boolean>>({
@@ -145,6 +147,11 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
   }, [orderedNpcs, selectedId]);
 
   const selectedNpc = orderedNpcs.find(npc => npc.id === selectedId) || orderedNpcs[0] || null;
+  const selectedNpcAvatarRef = selectedNpc
+    ? (Object.hasOwn(optimisticAvatarRefs, selectedNpc.name)
+        ? optimisticAvatarRefs[selectedNpc.name] || undefined
+        : selectedNpc.avatarRef)
+    : undefined;
   const selectedRelation = selectedNpc ? getRelationshipMeta(selectedNpc) : null;
   const traitEntries = selectedNpc ? Object.entries(selectedNpc.template.traits) : [];
   const selectedAvatarSource = useMemo(
@@ -152,22 +159,22 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
       selectedNpc
         ? resolveAvatarSource({
           entityKey: createAvatarEntityKey('npc', selectedNpc.name),
-          avatarRef: selectedNpc.avatarRef,
+          avatarRef: selectedNpcAvatarRef,
           name: selectedNpc.name,
         })
         : null,
-    [avatarVersion, selectedNpc],
+    [avatarVersion, selectedNpc, selectedNpcAvatarRef],
   );
   const selectedAvatarCandidates = useMemo(
     () =>
       selectedNpc
         ? getAvatarCandidates({
           entityKey: createAvatarEntityKey('npc', selectedNpc.name),
-          avatarRef: selectedNpc.avatarRef,
+          avatarRef: selectedNpcAvatarRef,
           name: selectedNpc.name,
         })
         : [],
-    [avatarVersion, selectedNpc],
+    [avatarVersion, selectedNpc, selectedNpcAvatarRef],
   );
 
   const handleSelectNpc = (npc: NPC) => {
@@ -190,9 +197,42 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
     setAvatarVersion(version => version + 1);
   };
 
-  const handleSelectPresetAvatar = (npc: NPC, avatarId: string) => {
-    saveAvatarSelection(createAvatarEntityKey('npc', npc.name), toPresetAvatarRef(avatarId));
+  const commitNpcAvatarRef = async (npc: NPC, avatarRef: string | null): Promise<boolean> => {
+    if (avatarWriteTarget) {
+      return false;
+    }
+    const hadPreviousOptimisticRef = Object.hasOwn(optimisticAvatarRefs, npc.name);
+    const previousOptimisticRef = optimisticAvatarRefs[npc.name];
+    setOptimisticAvatarRefs(current => ({ ...current, [npc.name]: avatarRef }));
+    setAvatarWriteTarget(npc.name);
     refreshAvatars();
+    try {
+      if (avatarRef) {
+        await setNpcAvatarRef(npc.name, avatarRef);
+      } else {
+        await clearNpcAvatarRef(npc.name);
+      }
+      return true;
+    } catch (error) {
+      setOptimisticAvatarRefs(current => {
+        const next = { ...current };
+        if (hadPreviousOptimisticRef) {
+          next[npc.name] = previousOptimisticRef;
+        } else {
+          delete next[npc.name];
+        }
+        return next;
+      });
+      refreshAvatars();
+      window.alert(error instanceof Error ? error.message : '头像变量写入失败');
+      return false;
+    } finally {
+      setAvatarWriteTarget(null);
+    }
+  };
+
+  const handleSelectPresetAvatar = async (npc: NPC, avatarId: string) => {
+    await commitNpcAvatarRef(npc, toPresetAvatarRef(avatarId));
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>, npc: NPC) => {
@@ -202,11 +242,18 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
     }
 
     const entityKey = createAvatarEntityKey('npc', npc.name);
+    const previousCustomAvatar = readCustomAvatar(entityKey);
     try {
       const imageData = await imageFileToDataUrl(file);
       saveCustomAvatar(entityKey, imageData, file.name);
-      saveAvatarSelection(entityKey, toCustomAvatarRef(entityKey));
-      refreshAvatars();
+      const succeeded = await commitNpcAvatarRef(npc, toCustomAvatarRef(entityKey));
+      if (!succeeded) {
+        if (previousCustomAvatar) {
+          saveCustomAvatar(entityKey, previousCustomAvatar.imageData, previousCustomAvatar.fileName);
+        } else {
+          clearCustomAvatar(entityKey);
+        }
+      }
     } catch (error) {
       window.alert(error instanceof Error ? error.message : '头像上传失败');
     } finally {
@@ -216,11 +263,12 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
     }
   };
 
-  const handleClearAvatarOverride = (npc: NPC) => {
+  const handleClearAvatarOverride = async (npc: NPC) => {
     const entityKey = createAvatarEntityKey('npc', npc.name);
-    clearAvatarSelection(entityKey);
-    clearCustomAvatar(entityKey);
-    refreshAvatars();
+    if (await commitNpcAvatarRef(npc, null)) {
+      clearCustomAvatar(entityKey);
+      refreshAvatars();
+    }
   };
 
   const renderSection = (section: SocialSectionKey) => {

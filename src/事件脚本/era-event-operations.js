@@ -17,7 +17,8 @@ import {
   buildParticipationDeletePatch,
   isDebutEvent,
   normalizeOrdinaryEventReference,
-  calculateDateOffset,
+  calculateTimeOffset,
+  getEventDurationHours,
   compareTime,
   formatDate,
   debugGroup,
@@ -33,7 +34,6 @@ import {
   writeEraCommand,
   writeEraInsert,
   writeEraUpdate,
-  writeEraDelete,
 } from './era-write-helper.js';
 import {
   PARTICIPANT_ENTRY_SOURCE,
@@ -43,12 +43,14 @@ import {
 import {
   ensureWorldEventsArchived,
   getEventSummary,
+  isOrdinaryWorldEvent,
   syncParticipationOutcomeStates,
 } from './era-world-events.js';
 
 const CHAPTER_SEQUENCE_PATTERN = /^(.*?第[0-9一二三四五六七八九十百千万]+回[0-9]+)-/;
 const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件'];
 const EVENT_DIFF_ACTIONS = ['insert', 'update', 'delete'];
+const EVENT_SETTLEMENT_PROGRESS_KEY = '事件结算进度';
 const POST_RESYNC_VERIFY_DELAY_MS = 1200;
 const followupReferenceIndexCache = new WeakMap();
 
@@ -180,9 +182,56 @@ function getFollowupReferenceIndex(eventDefinitions) {
   const index = {
     sourceToTarget,
     clueKeysByTargetKey,
+    predecessorsByTargetKey: [...sourceToTarget.entries()].reduce((entries, [sourceEventName, targetEventName]) => {
+        const existing = entries.get(targetEventName) || new Set();
+        existing.add(sourceEventName);
+        entries.set(targetEventName, existing);
+        return entries;
+      }, new Map()),
   };
   followupReferenceIndexCache.set(eventDefinitions, index);
   return index;
+}
+
+export function getValidEventPredecessors(eventName, eventDefinitions) {
+  return [...(getFollowupReferenceIndex(eventDefinitions).predecessorsByTargetKey.get(eventName) || [])];
+}
+
+export function areEventPredecessorsCompleted(eventName, eventDefinitions, completedEvents) {
+  return getValidEventPredecessors(eventName, eventDefinitions).every(predecessorName =>
+    Object.prototype.hasOwnProperty.call(completedEvents || {}, predecessorName),
+  );
+}
+
+export function buildActualEventWindow(eventData, currentTime, earlyStart = false) {
+  const plannedStart = eventData?.触发条件 || null;
+  const plannedEnd = getEndTime(eventData || {});
+  if (!earlyStart || !currentTime || !plannedEnd) {
+    return { startTime: plannedStart, endTime: plannedEnd };
+  }
+
+  const durationHours = getEventDurationHours(eventData);
+  return {
+    startTime: cloneJson(currentTime),
+    endTime: durationHours === null ? plannedEnd : calculateTimeOffset(currentTime, { 时: durationHours }),
+  };
+}
+
+export function resolveActualEventWindow(eventData, actualEndTime) {
+  const plannedEnd = getEndTime(eventData || {});
+  const endTime = actualEndTime || plannedEnd;
+  const durationHours = getEventDurationHours(eventData);
+  if (!endTime || durationHours === null) {
+    return { startTime: eventData?.触发条件 || null, endTime };
+  }
+
+  const endMatchesPlan = JSON.stringify(endTime) === JSON.stringify(plannedEnd);
+  return {
+    startTime: endMatchesPlan
+      ? eventData?.触发条件 || null
+      : calculateTimeOffset(endTime, { 时: -durationHours }),
+    endTime,
+  };
 }
 
 function normalizeEventRecordName(sourceEventName, recordName) {
@@ -747,14 +796,20 @@ async function cleanupParticipantOccupancy(eventNames) {
 }
 
 // ==================== 批量开始事件 ====================
-export async function batchStartEvents(eventNames, eventDefinitions) {
+export async function batchStartEvents(eventNames, eventDefinitions, options = {}) {
   if (eventNames.length === 0) return;
 
   debugGroup(`▶️ 批量开始事件 (${eventNames.length}个)`);
 
   try {
-    // 1. 批量添加到"进行中"
-    const 进行中事件对象 = Object.fromEntries(eventNames.map(name => [name, getEndTime(eventDefinitions[name])]));
+    // 1. 批量添加到"进行中"。提前到场事件保留原事件小时级时长，其他事件使用原定结束时间。
+    const earlyEventNames = new Set(options.earlyEventNames || []);
+    const 进行中事件对象 = Object.fromEntries(
+      eventNames.map(name => [
+        name,
+        buildActualEventWindow(eventDefinitions[name], options.currentTime, earlyEventNames.has(name)).endTime,
+      ]),
+    );
 
     const insertPayload = {
       事件系统: {
@@ -778,8 +833,6 @@ export async function batchStartEvents(eventNames, eventDefinitions) {
     log('🚀 2. 发送 era:deleteByObject 指令 (批量从未发生中删除):', deletePayload);
     await writeDirectDelete(deletePayload, 'batch-start-delete-unstarted');
     log('✅ 步骤2完成: 批量从未发生事件中删除');
-
-    await ensureFollowupCluesForInProgressEvents(eventNames, eventDefinitions, 'batch-start');
 
     // 验证操作后的状态
     const verifyVars = await getVariables({ type: 'chat' });
@@ -900,24 +953,14 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
   debugGroupEnd();
 }
 
-function buildPlayerParticipationDescription(eventName, eventData, currentTime) {
-  let startTime = eventData.触发条件;
-  let endTime = getEndTime(eventData);
-
-  // 假设compareTime返回天数差值
-  const timeDiffDays = compareTime(eventData.触发条件, currentTime, 'diff');
-  if (timeDiffDays > 0) {
-    // 玩家提前触发
-    startTime = currentTime;
-    endTime = calculateDateOffset(endTime, -timeDiffDays);
-  }
-
+function buildPlayerParticipationDescription(eventName, eventData, actualEndTime) {
+  const { startTime, endTime } = resolveActualEventWindow(eventData, actualEndTime);
   return `${formatDate(startTime)} 到 ${formatDate(endTime)}，${eventData.事件详情}`;
 }
 
-export function buildPlayerParticipationEntry(eventName, eventData, currentTime) {
+export function buildPlayerParticipationEntry(eventName, eventData, currentTime, actualEndTime) {
   return {
-    描述: buildPlayerParticipationDescription(eventName, eventData, currentTime),
+    描述: buildPlayerParticipationDescription(eventName, eventData, actualEndTime),
     结局: getEventSummary(eventData),
     insert: getInitialParticipationActionDiff(eventData, 'insert', eventName),
     update: getInitialParticipationActionDiff(eventData, 'update', eventName),
@@ -949,6 +992,7 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
     const currentVars = await getVariables({ type: 'chat' });
     const currentParticipation = currentVars?.stat_data?.参与事件;
     const currentTime = currentVars?.stat_data?.世界信息?.时间 || {};
+    const inProgressEvents = currentVars?.stat_data?.事件系统?.进行中事件 || {};
     const eventsToJoin = uniqueEventNames.filter(eventName => !hasParticipationEntry(currentParticipation, eventName));
 
     if (eventsToJoin.length === 0) {
@@ -970,7 +1014,10 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
     const participationPatch = Object.fromEntries(
       eventsToJoin.map(eventName => {
         const eventData = eventDefinitions[eventName];
-        return [eventName, buildPlayerParticipationEntry(eventName, eventData, currentTime)];
+        return [
+          eventName,
+          buildPlayerParticipationEntry(eventName, eventData, currentTime, inProgressEvents[eventName]),
+        ];
       }),
     );
 
@@ -995,7 +1042,7 @@ export async function playerJoinsEvent(eventName, eventData) {
 
 // ==================== 批量结束事件并应用差分 ====================
 export async function batchEndEvents(eventNames, eventDefinitions) {
-  if (eventNames.length === 0) return;
+  if (eventNames.length === 0) return true;
 
   debugGroup(`⏹️ 批量结算事件 (${eventNames.length}个)`);
 
@@ -1004,6 +1051,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     const currentVars = await getVariables({ type: 'chat' });
     const statData = currentVars.stat_data;
     const 参与事件 = statData.参与事件 || {};
+    const settlementProgress = statData?.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {};
 
     // 收集所有需要应用的差分
     const 合并后的差分 = {
@@ -1016,7 +1064,9 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     const 进行中删除对象 = {};
     const 参与删除对象 = {};
 
-    // 遍历所有要结束的事件，合并差分
+    const eventsNeedingDiff = [];
+
+    // 遍历所有要结束的事件，合并差分。已经持久记录完成差分的事件在重试时不会再次结算。
     for (const eventName of eventNames) {
       const eventData = eventDefinitions[eventName];
       if (!eventData) {
@@ -1030,15 +1080,25 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
 
       const participationEntry = playerParticipated ? getParticipationEntry(参与事件, eventName) : null;
 
-      // 步骤 2: 未参与事件使用事件定义差分；玩家参与事件使用参与事件内的结局快照。
-      for (const actionKey of EVENT_DIFF_ACTIONS) {
-        if (playerParticipated) {
-          const participationDelta = getParticipationActionDiff(participationEntry, actionKey);
-          if (Object.keys(participationDelta).length > 0) {
-            mergeEventActionDelta(合并后的差分, actionKey, participationDelta, eventName, statData, `参与事件.${actionKey}`);
+      if (settlementProgress[eventName] !== '差分已应用') {
+        eventsNeedingDiff.push(eventName);
+        // 步骤 2: 未参与事件使用事件定义差分；玩家参与事件使用参与事件内的结局快照。
+        for (const actionKey of EVENT_DIFF_ACTIONS) {
+          if (playerParticipated) {
+            const participationDelta = getParticipationActionDiff(participationEntry, actionKey);
+            if (Object.keys(participationDelta).length > 0) {
+              mergeEventActionDelta(
+                合并后的差分,
+                actionKey,
+                participationDelta,
+                eventName,
+                statData,
+                `参与事件.${actionKey}`,
+              );
+            }
+          } else {
+            mergeEventActionDelta(合并后的差分, actionKey, eventData[actionKey] || {}, eventName, statData, actionKey);
           }
-        } else {
-          mergeEventActionDelta(合并后的差分, actionKey, eventData[actionKey] || {}, eventName, statData, actionKey);
         }
       }
 
@@ -1055,6 +1115,19 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     debugGroup('🔄 批量应用人物差分');
     await applyEventDiff(合并后的差分);
     debugGroupEnd();
+
+    if (eventsNeedingDiff.length > 0) {
+      const progressPatch = Object.fromEntries(eventsNeedingDiff.map(eventName => [eventName, '差分已应用']));
+      await writeDirectInsert(
+        { 前端变量: { [EVENT_SETTLEMENT_PROGRESS_KEY]: progressPatch } },
+        'batch-end-mark-diff-applied',
+      );
+      const progressVars = await getVariables({ type: 'chat' });
+      const persistedProgress = progressVars?.stat_data?.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {};
+      if (eventsNeedingDiff.some(eventName => persistedProgress[eventName] !== '差分已应用')) {
+        throw new Error('事件差分结算进度未能持久化，保留进行中事件等待重试');
+      }
+    }
 
     const archived = await ensureWorldEventsArchived(eventNames, eventDefinitions, currentVars);
     if (!archived) {
@@ -1087,15 +1160,50 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
         参与事件: 参与删除对象,
       };
       log('🚀 4. 发送 era:deleteByObject 指令 (批量从参与事件中删除):', deleteParticipationPayload);
-      await writeEraDelete(deleteParticipationPayload, 'batch-end-delete-participation');
+      await writeDirectDelete(deleteParticipationPayload, 'batch-end-delete-participation');
       log('✅ 步骤4完成: 批量从参与事件中删除');
     }
 
     // 5. 清理仅属于本批已结束事件的人物占用；被其他事件覆盖的占用不会误删
     await cleanupParticipantOccupancy(eventNames);
 
-    // 验证操作后的状态
+    // 6. 完成后才原子写入后续线索与计数；进行中阶段不会生成线索。
+    await writeFollowupEvents(eventNames, eventDefinitions, { reason: 'batch-end' });
+
+    // 7. 验证最终状态；任一项缺失都保留未完成标记供下一轮明确报错和重试。
     const verifyVars = await getVariables({ type: 'chat' });
+    const verifyStat = verifyVars?.stat_data || {};
+    const expectedFollowups = buildFollowupPayloads(eventNames, eventDefinitions);
+    const completionPersisted = eventNames.every(eventName => {
+      const worldEventPersisted =
+        !isOrdinaryWorldEvent(eventDefinitions[eventName]) || isPlainObject(verifyStat?.世界事件?.[eventName]);
+      const occupancyCleared = Object.values(verifyStat?.事件系统?.人物事件占用 || {}).every(
+        occupancyValue => occupancyValue?.事件名 !== eventName,
+      );
+      return (
+        Object.prototype.hasOwnProperty.call(verifyStat?.事件系统?.已完成事件 || {}, eventName) &&
+        !Object.prototype.hasOwnProperty.call(verifyStat?.事件系统?.进行中事件 || {}, eventName) &&
+        !hasParticipationEntry(verifyStat?.参与事件, eventName) &&
+        worldEventPersisted &&
+        occupancyCleared
+      );
+    });
+    const followupsPersisted = Object.keys(expectedFollowups.followupPayload).every(
+      key =>
+        verifyStat?.后续事件线索?.[key] === expectedFollowups.followupPayload[key] &&
+        verifyStat?.后续事件线索计数?.[key] === expectedFollowups.followupCountPayload[key],
+    );
+
+    if (!completionPersisted || !followupsPersisted) {
+      throw new Error('事件完成状态未完整落库（世界事件/已完成/进行中/参与事件/后续线索），等待下一轮重试');
+    }
+
+    const progressCleanup = Object.fromEntries(eventNames.map(eventName => [eventName, {}]));
+    await writeDirectDelete(
+      { 前端变量: { [EVENT_SETTLEMENT_PROGRESS_KEY]: progressCleanup } },
+      'batch-end-clear-settlement-progress',
+    );
+
     if (isDebugEnabled()) {
       debugGroupCollapsed('🔍 批量结算后的完整状态');
       console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data || {})));
@@ -1103,12 +1211,6 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     }
 
     logSuccess(`批量结算完成 ${eventNames.length} 个事件:`, eventNames);
-
-    // ==================== 生成事件后续清理计数 ====================
-    await writeFollowupEvents(eventNames, eventDefinitions, {
-      includeCounters: true,
-      reason: 'batch-end',
-    });
 
     // 显示通知（限制数量避免刷屏）
     if (eventNames.length <= 5) {
@@ -1118,11 +1220,13 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     } else {
       toastr.success(`✅ ${eventNames.length} 个事件已完成`, '', { timeOut: 3000 });
     }
+    return true;
   } catch (error) {
     logError(`批量结算事件失败`, error);
+    return false;
+  } finally {
+    debugGroupEnd();
   }
-
-  debugGroupEnd();
 }
 
 // ==================== 后续事件线索 ====================
@@ -1157,7 +1261,7 @@ function buildFollowupPayloads(eventNames, eventDefinitions) {
   return { followupPayload, followupCountPayload };
 }
 
-async function writeFollowupEvents(eventNames, eventDefinitions, { includeCounters, reason }) {
+async function writeFollowupEvents(eventNames, eventDefinitions, { reason }) {
   debugGroup(`🔗 生成事件后续: ${reason}`);
 
   const { followupPayload, followupCountPayload } = buildFollowupPayloads(eventNames, eventDefinitions);
@@ -1171,45 +1275,24 @@ async function writeFollowupEvents(eventNames, eventDefinitions, { includeCounte
   const existingClues = currentVars?.stat_data?.后续事件线索 || {};
   const existingCounters = currentVars?.stat_data?.后续事件线索计数 || {};
 
-  const cluePatch = Object.fromEntries(
-    Object.entries(followupPayload).filter(([key, value]) => existingClues[key] !== value),
-  );
-  if (Object.keys(cluePatch).length > 0) {
-    const followupEventPayload = { 后续事件线索: cluePatch };
-
-    log('🚀 发送 era:insertByObject 指令 (写入后续事件线索):', followupEventPayload);
-    await writeDirectInsert(followupEventPayload, `insert-followup-clues-${reason}`);
-    logSuccess(`✅ 已写入 ${Object.keys(cluePatch).length} 个后续事件线索`);
-  } else {
-    log('后续事件线索无变化，跳过写入');
-  }
-
-  if (!includeCounters) {
-    debugGroupEnd();
-    return;
-  }
-
+  const cluePatch = Object.fromEntries(Object.entries(followupPayload).filter(([key]) => !(key in existingClues)));
   const counterPatch = Object.fromEntries(
-    Object.entries(followupCountPayload).filter(([key, value]) => existingCounters[key] !== value),
+    Object.entries(followupCountPayload).filter(([key]) => !(key in existingCounters)),
   );
-  if (Object.keys(counterPatch).length > 0) {
-    const followupCountEventPayload = { 后续事件线索计数: counterPatch };
+  if (Object.keys(cluePatch).length > 0 || Object.keys(counterPatch).length > 0) {
+    const followupPairPayload = {
+      后续事件线索: cluePatch,
+      后续事件线索计数: counterPatch,
+    };
 
-    log('🚀 发送 era:insertByObject 指令 (写入后续事件线索计数):', followupCountEventPayload);
-    await writeDirectInsert(followupCountEventPayload, `insert-followup-counters-${reason}`);
-    logSuccess(`✅ 已写入 ${Object.keys(counterPatch).length} 个后续事件线索计数`);
+    log('🚀 同一次直接写入后续事件线索与计数:', followupPairPayload);
+    await writeDirectInsert(followupPairPayload, `insert-followup-pairs-${reason}`);
+    logSuccess(`✅ 已成对写入 ${new Set([...Object.keys(cluePatch), ...Object.keys(counterPatch)]).size} 个后续事件`);
   } else {
-    log('后续事件线索计数无变化，跳过写入');
+    log('后续事件线索及计数无变化，跳过写入');
   }
 
   debugGroupEnd();
-}
-
-export async function ensureFollowupCluesForInProgressEvents(eventNames, eventDefinitions, reason = 'in-progress') {
-  await writeFollowupEvents(eventNames, eventDefinitions, {
-    includeCounters: false,
-    reason,
-  });
 }
 
 export async function cleanupFollowupCluesForActiveParticipation(eventDefinitions, reason = 'manual') {

@@ -20,7 +20,7 @@ export const CONFIG = {
   DEFAULT_FOLLOWUP_LIFETIME: 3,
 };
 
-export const EVENT_RUNTIME_KEY_VERSION = 1;
+export const EVENT_RUNTIME_KEY_VERSION = 2;
 
 export const EVENT_KIND = Object.freeze({
   ORDINARY: 'ordinary',
@@ -426,6 +426,19 @@ export function calculateTimeOffset(dateObject, duration) {
   };
 
   return result;
+}
+
+// 将事件系统使用的简化历法时间转换为总小时数。所有持续时长和平移都必须复用此口径。
+export function timeToTotalHours(timeObject) {
+  const totalDays = (timeObject?.年 || 0) * 365 + (timeObject?.月 || 0) * 30 + (timeObject?.日 || 0);
+  return totalDays * 24 + (timeObject?.时 || 0);
+}
+
+export function getEventDurationHours(eventData) {
+  const triggerTime = eventData?.触发条件;
+  const endTime = getEndTime(eventData || {});
+  if (!triggerTime || !endTime) return null;
+  return Math.max(0, timeToTotalHours(endTime) - timeToTotalHours(triggerTime));
 }
 
 // 获取事件的结束时间

@@ -39,6 +39,7 @@ import {
 import { ActivePanel, InventoryItem } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
+import { migrateAvatarState } from './utils/avatarState';
 import { equipInventoryItem, useMedicineItem } from './utils/itemManager';
 import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inventoryAttributePreview';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
@@ -219,6 +220,17 @@ const App: React.FC = () => {
       initLogger.log('savedGameExists 设置为:', sessionState !== 'empty');
 
       await loadMartialArtsDatabase();
+
+      if (sessionState !== 'empty') {
+        try {
+          const migration = await migrateAvatarState();
+          if (migration.migrated) {
+            initLogger.log('[avatar] 头像引用已迁移到前端变量', migration);
+          }
+        } catch (error) {
+          initLogger.error('[avatar] 头像变量迁移失败，本次保留旧数据以便重试', error);
+        }
+      }
 
       if (sessionState === 'active') {
         initLogger.log('检测到存档，直接进入游戏界面');

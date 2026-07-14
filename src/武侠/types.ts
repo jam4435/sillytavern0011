@@ -135,6 +135,11 @@ export interface FrontendVariableData {
   永久属性修正?: Record<string, PermanentAttributeModifierVariableData>;
   事件结局状态?: Record<string, EventOutcomeStatus>;
   事件运行时键版本?: number;
+  头像?: {
+    玩家?: string;
+    人物?: Record<string, string>;
+  };
+  头像版本?: number;
   [key: string]: unknown;
 }
 
