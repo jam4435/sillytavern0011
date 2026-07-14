@@ -1,8 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterProfile } from '../../types';
-import { createAvatarEntityKey, getAvatarSelectionStorageKey } from '../../utils/avatarStorage';
+import { setPlayerAvatarRef } from '../../utils/avatarState';
 import { CharacterPanel } from './CharacterPanel';
+
+vi.mock('../../utils/avatarState', () => ({
+  setPlayerAvatarRef: vi.fn(async () => undefined),
+  clearPlayerAvatarRef: vi.fn(async () => undefined),
+}));
+
+const setPlayerAvatarRefMock = vi.mocked(setPlayerAvatarRef);
 
 const baseStats: CharacterProfile = {
   name: '郭靖',
@@ -42,6 +49,7 @@ const baseStats: CharacterProfile = {
 describe('CharacterPanel avatar controls', () => {
   beforeEach(() => {
     localStorage.clear();
+    setPlayerAvatarRefMock.mockClear();
   });
 
   it('玩家可在状态页切换内置头像', () => {
@@ -50,8 +58,7 @@ describe('CharacterPanel avatar controls', () => {
     fireEvent.click(screen.getByRole('button', { name: '设置玩家头像' }));
     fireEvent.click(screen.getByRole('button', { name: /少侠二/ }));
 
-    expect(localStorage.getItem(getAvatarSelectionStorageKey(createAvatarEntityKey('player')))).toContain(
-      'preset:player_male_02',
-    );
+    expect(setPlayerAvatarRefMock).toHaveBeenCalledWith('preset:player_male_02');
+    expect(screen.getByAltText('郭靖头像')).toHaveAttribute('src', expect.stringContaining('choose_face_b02.png'));
   });
 });

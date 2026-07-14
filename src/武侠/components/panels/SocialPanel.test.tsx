@@ -1,15 +1,21 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NPC } from '../../types';
 import { toCustomAvatarRef } from '../../utils/avatarCatalog';
 import {
   createAvatarEntityKey,
-  getAvatarSelectionStorageKey,
   getAvatarStorageKey,
-  saveAvatarSelection,
   saveCustomAvatar,
 } from '../../utils/avatarStorage';
+import { setNpcAvatarRef } from '../../utils/avatarState';
 import { SocialPanel } from './SocialPanel';
+
+vi.mock('../../utils/avatarState', () => ({
+  setNpcAvatarRef: vi.fn(async () => undefined),
+  clearNpcAvatarRef: vi.fn(async () => undefined),
+}));
+
+const setNpcAvatarRefMock = vi.mocked(setNpcAvatarRef);
 
 function createNpc(name = '黄蓉'): NPC {
   return {
@@ -35,6 +41,7 @@ function createNpc(name = '黄蓉'): NPC {
 describe('SocialPanel avatar picker', () => {
   beforeEach(() => {
     localStorage.clear();
+    setNpcAvatarRefMock.mockClear();
   });
 
   it('姓名匹配时显示头像，并可在多个候选间选择', () => {
@@ -46,9 +53,7 @@ describe('SocialPanel avatar picker', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /黄蓉二/ }));
 
-    expect(localStorage.getItem(getAvatarSelectionStorageKey(createAvatarEntityKey('npc', '黄蓉')))).toContain(
-      'preset:huang_rong_fc3',
-    );
+    expect(setNpcAvatarRefMock).toHaveBeenCalledWith('黄蓉', 'preset:huang_rong_fc3');
   });
 
   it('点击头像可打开大图预览', () => {
@@ -72,17 +77,16 @@ describe('SocialPanel avatar picker', () => {
     await waitFor(() => {
       expect(localStorage.getItem(getAvatarStorageKey(createAvatarEntityKey('npc', '黄蓉')))).toContain('huangrong.png');
     });
-    expect(localStorage.getItem(getAvatarSelectionStorageKey(createAvatarEntityKey('npc', '黄蓉')))).toContain(
-      'custom:npc:黄蓉',
-    );
+    expect(setNpcAvatarRefMock).toHaveBeenCalledWith('黄蓉', 'custom:npc:黄蓉');
   });
 
   it('已有本地自定义覆盖时优先显示自定义图', () => {
     const entityKey = createAvatarEntityKey('npc', '黄蓉');
     saveCustomAvatar(entityKey, 'data:image/png;base64,custom', 'custom.png');
-    saveAvatarSelection(entityKey, toCustomAvatarRef(entityKey));
+    const npc = createNpc();
+    npc.avatarRef = toCustomAvatarRef(entityKey);
 
-    render(<SocialPanel npcs={[createNpc()]} />);
+    render(<SocialPanel npcs={[npc]} />);
 
     expect(screen.getByAltText('黄蓉头像')).toHaveAttribute('src', 'data:image/png;base64,custom');
   });

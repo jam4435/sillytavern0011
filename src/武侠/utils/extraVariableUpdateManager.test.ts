@@ -139,11 +139,12 @@ describe('executeExtraVariableUpdate', () => {
         世界信息: { 时间: '1219年10月20日13时', 天气: '晴' },
         user数据: {
           所在位置: '大宋/临安府/城门',
+          头像: 'preset:legacy-player-avatar',
           属性: { 根骨: 60, $缓存: '隐藏' },
           $meta: { 不应发送: true },
         },
         角色数据: {
-          郭靖: { 所在位置: '大宋/临安府/城门', 身份: { 侠士: '初入江湖' }, $template: {} },
+          郭靖: { 所在位置: '大宋/临安府/城门', 头像: 'preset:legacy-npc-avatar', 身份: { 侠士: '初入江湖' }, $template: {} },
           黄蓉: { 所在位置: '大宋/临安府/客栈', 身份: { 少女: '聪慧' } },
           洪七公: { 所在位置: '大宋/嘉兴府/烟雨楼', 身份: { 丐帮帮主: '北丐' } },
           欧阳锋: { 所在位置: '西域/白驼山/山庄', 身份: { 西毒: '宗师' } },
@@ -293,6 +294,8 @@ describe('executeExtraVariableUpdate', () => {
     expect(serialized).not.toContain('附近传闻');
     expect(serialized).not.toContain('后续事件线索');
     expect(serialized).not.toContain('随机数');
+    expect(serialized).not.toContain('legacy-player-avatar');
+    expect(serialized).not.toContain('legacy-npc-avatar');
     expect(serialized).not.toContain('$');
     expect(serialized).toContain('大宋/临安府/客栈');
   });

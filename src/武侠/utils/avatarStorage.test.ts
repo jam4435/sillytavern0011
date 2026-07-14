@@ -52,7 +52,7 @@ describe('avatarStorage', () => {
     expect(readCustomAvatar('player', 'chat-b')).toBeNull();
   });
 
-  it('本地 selection 覆盖变量头像 ref', () => {
+  it('active game 显式变量 ref 不再被旧 local selection 覆盖', () => {
     const entityKey = createAvatarEntityKey('npc', '黄蓉');
     saveAvatarSelection(entityKey, toPresetAvatarRef('huang_rong_fc3'));
 
@@ -62,17 +62,17 @@ describe('avatarStorage', () => {
       name: '黄蓉',
     });
 
-    expect(source.label).toBe('黄蓉二');
+    expect(source.label).toBe('黄蓉');
     expect(source.source).toBe('preset');
-    expect(source.objectPosition).toBe('48.7% 54.9%');
+    expect(source.objectPosition).toBe('70.2% 59.6%');
   });
 
-  it('本地自定义头像优先，并可清除 selection', () => {
+  it('只有显式 custom ref 才会解析本地 base64，selection 仅供迁移使用', () => {
     const entityKey = createAvatarEntityKey('npc', '黄蓉');
     saveCustomAvatar(entityKey, 'data:image/png;base64,custom', 'custom.png');
     saveAvatarSelection(entityKey, toCustomAvatarRef(entityKey));
 
-    expect(resolveAvatarSource({ entityKey, name: '黄蓉' })).toEqual(
+    expect(resolveAvatarSource({ entityKey, avatarRef: toCustomAvatarRef(entityKey), name: '黄蓉' })).toEqual(
       expect.objectContaining({
         src: 'data:image/png;base64,custom',
         source: 'custom',
