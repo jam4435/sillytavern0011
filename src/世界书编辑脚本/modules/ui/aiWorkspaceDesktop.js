@@ -44,7 +44,7 @@ const STEP_LABELS = {
   complete: '完成',
 };
 const STEP_DESCRIPTIONS = {
-  prepare: '设定目标、修改范围和指令。所有输入变化都会使旧结果失效。',
+  prepare: '设定目标、条目范围和修改指令；改动后需要重新生成审阅结果。',
   planReview: '检查 AI 提议的目标、规则与条目分组，再生成实际修改。',
   review: '逐条核对差异、编辑或排除结果，然后显式应用。',
   complete: '本次应用已完成；可撤销最近事务或开始下一次修改。',
@@ -2296,7 +2296,7 @@ export function buildAssistantModalMarkup() {
             <span id="ai-workspace-assistant-reference-count">0 字</span>
           </div>
           <header class="ai-assistant-phone-header">
-            <span class="ai-assistant-avatar" aria-hidden="true"><i class="fa-solid fa-sparkles"></i></span>
+            <span class="ai-assistant-avatar" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
             <div class="ai-assistant-identity">
               <div id="ai-workspace-assistant-title" class="ai-assistant-phone-title">随身设定助手</div>
               <div id="ai-workspace-assistant-model" class="ai-assistant-phone-subtitle">酒馆当前模型</div>
@@ -2346,15 +2346,15 @@ export function buildAssistantModalMarkup() {
   `;
 }
 
-function buildInfoResourcesMarkup() {
+export function buildInfoResourcesMarkup() {
   return `
     <div class="ai-info-panel">
       <details class="ai-prompt-settings ai-context-panel">
         <summary><span>聊天上下文</span><small id="ai-workspace-chat-context-mode">结构化消息</small></summary>
         <div class="ai-prompt-settings-body">
-          <label class="ai-toggle-line">
+          <label class="ai-toggle-line ai-control-line">
             <input type="checkbox" id="ai-workspace-chat-context-enabled">
-            开启聊天上下文
+            <span>开启聊天上下文</span>
           </label>
           <div class="ai-row">
             <div class="ai-field">
@@ -2388,13 +2388,13 @@ function buildInfoResourcesMarkup() {
   `;
 }
 
-function buildApiSettingsMarkup() {
+export function buildApiSettingsMarkup() {
   return `
     <div class="ai-page modern-page">
       <div class="ai-panel modern-card">
-        <div class="ai-toolbar">
-          <label><input type="radio" name="ai-workspace-api-mode" value="preset"> 使用当前预设</label>
-          <label><input type="radio" name="ai-workspace-api-mode" value="custom"> 覆盖当前预设 API 配置</label>
+        <div class="ai-api-mode-options" role="radiogroup" aria-label="API 配置来源">
+          <label class="ai-control-line"><input type="radio" name="ai-workspace-api-mode" value="preset"><span>使用当前预设</span></label>
+          <label class="ai-control-line"><input type="radio" name="ai-workspace-api-mode" value="custom"><span>覆盖当前预设 API 配置</span></label>
         </div>
         <div id="ai-workspace-custom-api">
           <div id="ai-workspace-custom-api-fields">
@@ -2425,12 +2425,12 @@ function buildApiSettingsMarkup() {
             </div>
           </div>
           <div class="ai-toolbar ai-api-toolbar">
-            <label><input type="checkbox" id="ai-workspace-stream"> 流式生成</label>
+            <label class="ai-control-line"><input type="checkbox" id="ai-workspace-stream"><span>流式生成</span></label>
             <span id="ai-workspace-models-status" class="ai-text"></span>
           </div>
           <div id="ai-workspace-api-hint" class="ai-note"></div>
           <div class="ai-budget-panel">
-            <label><input type="checkbox" id="ai-workspace-budget-enabled"> 启用上下文预算</label>
+            <label class="ai-control-line"><input type="checkbox" id="ai-workspace-budget-enabled"><span>启用上下文预算</span></label>
             <div class="ai-row">
               <div class="ai-field">
                 <label for="ai-workspace-budget-max-input">最大输入 tokens</label>
@@ -2451,7 +2451,7 @@ function buildApiSettingsMarkup() {
   `;
 }
 
-function buildStepIndicator(modeKey) {
+export function buildStepIndicator(modeKey) {
   const mode = state.modes[modeKey];
   const steps = MODE_STEPS[modeKey];
   const currentIndex = steps.indexOf(mode.currentStep);
@@ -2481,7 +2481,10 @@ function buildStepIndicator(modeKey) {
         })
         .join('')}
       </div>
-      <div class="ai-step-description">${getStepDescription(mode.currentStep)}</div>
+      <div class="ai-step-description" role="note">
+        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+        <span><strong>当前阶段提示</strong>${getStepDescription(mode.currentStep)}</span>
+      </div>
     </div>
   `;
 }
@@ -2801,7 +2804,7 @@ function buildModeWorkspace(modeKey) {
   `;
 }
 
-function buildDesktopShellMarkup() {
+export function buildDesktopShellMarkup() {
   const saved = settings();
   const modelLabel = saved.apiMode === 'custom' ? saved.customApi?.model || '自定义模型待配置' : '当前酒馆预设';
   const referenceLength = (state.referenceMaterial || '').trim().length;
@@ -2819,7 +2822,7 @@ function buildDesktopShellMarkup() {
           <button type="button" class="ai-context-chip" data-ai-open-settings><i class="fa-solid fa-microchip"></i><span>${_.escape(modelLabel)}</span></button>
           <button type="button" class="ai-context-chip" data-ai-focus-context><i class="fa-regular fa-comments"></i><span>${state.chatContext.enabled ? `${state.chatMessages.length || 1} 条上下文` : '上下文关闭'}</span></button>
           <button type="button" class="ai-context-chip" data-ai-open-assistant-tab="reference"><i class="fa-regular fa-folder-open"></i><span>${referenceLength ? `${referenceLength} 字资料` : '添加资料'}</span></button>
-          <button type="button" class="ai-icon-button" data-ai-open-assistant-tab="chat" aria-label="打开 AI 助手"><i class="fa-solid fa-sparkles"></i></button>
+          <button type="button" class="ai-icon-button" data-ai-open-assistant-tab="chat" aria-label="打开随身 AI 助手" title="打开随身 AI 助手"><i class="fa-solid fa-mobile-screen-button"></i></button>
         </div>
         <span id="ai-workspace-shared-status" class="ai-visually-hidden" aria-live="polite">${_.escape(state.sharedStatusText || '')}</span>
       </header>
@@ -3199,7 +3202,7 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-workbench-main{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-gutter:stable}
       #${ROOT_ID} #ai-workspace-desktop-panel{min-height:100%}
       #${ROOT_ID} .ai-workflow-page{min-height:100%;display:flex;flex-direction:column;gap:12px;padding:12px 12px 0}
-      #${ROOT_ID} .ai-workflow-progress{position:sticky;top:0;z-index:8;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding:9px 12px;border:1px solid var(--ai-border-color,#555);border-radius:11px;background:color-mix(in srgb,var(--ai-surface-raised-color,#282828) 94%,transparent);backdrop-filter:blur(12px);box-shadow:0 6px 18px var(--ai-shadow-color,rgba(0,0,0,.16))}
+      #${ROOT_ID} .ai-workflow-progress{position:sticky;top:0;z-index:8;display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--ai-border-color,#555);border-radius:11px;background:color-mix(in srgb,var(--ai-surface-raised-color,#282828) 94%,transparent);backdrop-filter:blur(12px);box-shadow:0 6px 18px var(--ai-shadow-color,rgba(0,0,0,.16))}
       #${ROOT_ID} .ai-stepper{display:flex;align-items:center;min-width:0}
       #${ROOT_ID} .ai-step-button{display:flex;align-items:center;gap:7px;padding:0;border:0;background:transparent;color:var(--ai-text-color-secondary,#aaa);cursor:pointer}
       #${ROOT_ID} .ai-step-button:disabled{cursor:default;opacity:.55}
@@ -3210,7 +3213,9 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-step-label{font-size:12px;font-weight:650;white-space:nowrap}
       #${ROOT_ID} .ai-step-connector{height:1px;min-width:22px;flex:1 1 44px;margin:0 8px;background:var(--ai-border-color,#555)}
       #${ROOT_ID} .ai-step-connector.is-complete{background:var(--ai-success-color,#72d3a5)}
-      #${ROOT_ID} .ai-step-description{max-width:430px;color:var(--ai-text-color-secondary,#aaa);font-size:11px;line-height:1.35;text-align:right}
+      #${ROOT_ID} .ai-step-description{max-width:none;padding-top:7px;display:flex;align-items:center;gap:7px;border-top:1px solid color-mix(in srgb,var(--ai-border-color,#555) 65%,transparent);color:var(--ai-text-color-secondary,#aaa);font-size:11px;line-height:1.4;text-align:left}
+      #${ROOT_ID} .ai-step-description>i{flex:0 0 auto;color:var(--panel-accent-color,#9fc8e4)}
+      #${ROOT_ID} .ai-step-description strong{margin-right:7px;color:var(--panel-text-color,#eee);font-weight:650}
       #${ROOT_ID} .ai-prepare-grid{display:grid;grid-template-columns:minmax(360px,42%) minmax(420px,1fr);gap:12px;align-items:start;min-height:0}
       #${ROOT_ID} .ai-workbench-panel{min-width:0;border:1px solid var(--ai-border-color,#555);border-radius:12px;background:var(--ai-surface-color,var(--panel-bg-color,#242424));padding:14px;box-shadow:0 8px 26px var(--ai-shadow-color,rgba(0,0,0,.14))}
       #${ROOT_ID} .ai-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
@@ -3219,7 +3224,11 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-field{display:flex;flex-direction:column;gap:6px;min-width:0}
       #${ROOT_ID} .ai-field>label{font-size:11px;font-weight:650;color:var(--ai-text-color-secondary,#bbb)}
       #${ROOT_ID} .ai-field small{font-weight:400;opacity:.72}
-      #${ROOT_ID} input,#${ROOT_ID} select,#${ROOT_ID} textarea{width:100%;border:1px solid var(--ai-border-color,var(--panel-border-color,#555));border-radius:8px;background:var(--panel-input-bg-color,#181818);color:var(--panel-text-color,#eee);padding:9px 10px}
+      #${ROOT_ID} input:not([type='checkbox']):not([type='radio']),#${ROOT_ID} select,#${ROOT_ID} textarea{width:100%;border:1px solid var(--ai-border-color,var(--panel-border-color,#555));border-radius:8px;background:var(--panel-input-bg-color,#181818);color:var(--panel-text-color,#eee);padding:9px 10px}
+      #${ROOT_ID} input[type='checkbox'],#${ROOT_ID} input[type='radio']{width:16px;height:16px;min-width:16px;min-height:16px;flex:0 0 16px;margin:0;padding:0;accent-color:var(--panel-accent-color,#9fc8e4)}
+      #${ROOT_ID} .ai-control-line{width:fit-content;max-width:100%;min-height:44px;display:inline-flex;align-items:center;gap:8px;color:var(--panel-text-color,#eee);font-size:12px;line-height:1.35;cursor:pointer}
+      #${ROOT_ID} .ai-control-line>span{min-width:0}
+      #${ROOT_ID} .ai-api-mode-options{display:flex;align-items:center;gap:4px 18px;flex-wrap:wrap;margin-bottom:4px}
       #${ROOT_ID} textarea{resize:vertical;line-height:1.5}
       #${ROOT_ID} .ai-instruction-field textarea{min-height:150px}
       #${ROOT_ID} .ai-current-lorebook{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px;padding:7px 9px;border-radius:8px;background:var(--ai-surface-muted-color,rgba(0,0,0,.18));font-size:11px;color:var(--ai-text-color-secondary,#aaa)}
@@ -3423,7 +3432,7 @@ function ensureUnifiedStyles() {
         #${ROOT_ID} .ai-step-description{display:none}
       }
       @container ai-workspace (max-width:639px){
-        #${ROOT_ID} button,#${ROOT_ID} input,#${ROOT_ID} select{min-height:44px}
+        #${ROOT_ID} button,#${ROOT_ID} input:not([type='checkbox']):not([type='radio']),#${ROOT_ID} select{min-height:44px}
         #${ROOT_ID} .ai-workbench-header{grid-template-columns:1fr auto;padding:9px 10px}
         #${ROOT_ID} .ai-workbench-brand{display:none}
         #${ROOT_ID} .ai-strategy-switch{justify-self:start}

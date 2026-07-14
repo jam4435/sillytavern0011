@@ -22,6 +22,7 @@ vi.mock('../utils/frontendDerivedVariables', () => ({
 }));
 
 vi.mock('../utils/locationContext', () => ({
+  extractExplicitMapTargetsFromText: vi.fn(() => []),
   syncDynamicLocationContextVariable: vi.fn(async () => ({ 已解析: true })),
 }));
 

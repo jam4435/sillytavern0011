@@ -10,6 +10,7 @@ import {
 } from './variableReader';
 import { captureNextCombinedPromptForDebug } from './promptDebug';
 import { syncFrontendDerivedVariables } from './frontendDerivedVariables';
+import { extractExplicitMapTargetsFromText } from './locationContext';
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -368,7 +369,9 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
       expectedMessageId: context.assistantMessage.message_id,
       expectedAction: 'resync',
     });
-    await syncFrontendDerivedVariables();
+    await syncFrontendDerivedVariables({
+      explicitMapTargets: extractExplicitMapTargetsFromText(getActiveMessageText(context.userMessage)),
+    });
 
     const combinedPromptCapture = captureNextCombinedPromptForDebug(prompt => {
       combinedPrompt = prompt;

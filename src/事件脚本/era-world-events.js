@@ -1,4 +1,4 @@
-import { getEndTime, getEventParticipationKeys } from './era-utils.js';
+import { getEndTime, getEventParticipationKeys, isOrdinaryEvent } from './era-utils.js';
 import { writeDirectDelete, writeDirectInsert, writeDirectUpdate } from './era-write-helper.js';
 import {
   haveEventDiffsChanged,
@@ -24,8 +24,8 @@ function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-export function isOrdinaryWorldEvent(eventName) {
-  return typeof eventName === 'string' && eventName.includes('事件条目-') && !eventName.includes('登场事件');
+export function isOrdinaryWorldEvent(eventData) {
+  return isOrdinaryEvent(eventData);
 }
 
 export function getEventSummary(eventData) {
@@ -70,7 +70,7 @@ export function buildParticipationOutcomeSyncPlan(eventDefinitions, statData) {
   const statusUpdates = {};
 
   for (const [eventName, eventData] of Object.entries(eventDefinitions || {})) {
-    if (!isOrdinaryWorldEvent(eventName)) continue;
+    if (!isOrdinaryWorldEvent(eventData)) continue;
 
     const found = findParticipationEntry(participation, eventName);
     if (!found) continue;
@@ -149,7 +149,7 @@ export function buildWorldEventArchivePatch(eventNames, eventDefinitions, statDa
 
   for (const eventName of eventNames) {
     const eventData = eventDefinitions?.[eventName];
-    if (!eventData || !isOrdinaryWorldEvent(eventName) || isWorldEventRecord(existingWorldEvents[eventName])) {
+    if (!eventData || !isOrdinaryWorldEvent(eventData) || isWorldEventRecord(existingWorldEvents[eventName])) {
       continue;
     }
 
@@ -190,7 +190,7 @@ export async function ensureWorldEventsArchived(eventNames, eventDefinitions, va
   const verifiedVariables = await getVariables({ type: 'chat' });
   const worldEvents = verifiedVariables?.stat_data?.世界事件 || {};
   return eventNames
-    .filter(eventName => isOrdinaryWorldEvent(eventName) && eventDefinitions?.[eventName])
+    .filter(eventName => isOrdinaryWorldEvent(eventDefinitions?.[eventName]))
     .every(eventName => isWorldEventRecord(worldEvents[eventName]));
 }
 
@@ -211,7 +211,7 @@ export async function reconcileWorldEventArchive(eventDefinitions) {
 
   for (const [eventName, participationFlag] of Object.entries(completedEvents)) {
     const eventData = eventDefinitions?.[eventName];
-    if (!eventData || !isOrdinaryWorldEvent(eventName) || isWorldEventRecord(existingWorldEvents[eventName])) {
+    if (!eventData || !isOrdinaryWorldEvent(eventData) || isWorldEventRecord(existingWorldEvents[eventName])) {
       continue;
     }
 

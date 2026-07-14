@@ -65,6 +65,9 @@ export type SummaryApiSelection = { type: 'preset' } | { type: 'profile'; profil
 /** 变量更新模式：正文伴随或额外模型 */
 export type SummaryVariableUpdateMode = 'inline' | 'extra';
 
+/** 额外变量更新读取的前序完整对话轮数 */
+export type VariableContextRounds = 1 | 2;
+
 /** 阈值设置 */
 export interface SummaryThresholds {
   /** 待处理队列角色数阈值 (默认5) */
@@ -105,6 +108,8 @@ export interface SummarySettings {
   promptTemplate: string;
   /** 额外变量更新提示词模板 */
   variablePromptTemplate: string;
+  /** 最新正文之前作为只读上下文发送的完整 user + assistant 轮数 */
+  variableContextRounds: VariableContextRounds;
   /** 触发阈值 */
   thresholds: SummaryThresholds;
 }
@@ -271,10 +276,10 @@ export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传
 - 事件系统、世界事件、前端变量、附近传闻、后续事件线索、后续事件线索计数由前端或事件脚本维护，只可作为参考，禁止对它们输出 Insert/Edit/Delete。
 - 如果没有需要写入的变量变化，可以不输出 Insert/Edit/Delete 块。
 
-【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】
+【正文上下文；最新 assistant 正文是唯一变化来源，前序完整轮次只读】
 {{recentBodies}}
 
-【当前变量上下文，来自输出提示词渲染结果或等价快照】
+【当前变量上下文；专用严格 JSON 投影】
 {{variableContext}}
 
 【变量指导】
@@ -373,6 +378,7 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   variableApiSelection: PRESET_SUMMARY_API_SELECTION,
   promptTemplate: DEFAULT_SUMMARY_PROMPT_TEMPLATE,
   variablePromptTemplate: DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
+  variableContextRounds: 1,
   thresholds: {
     pendingQueueThreshold: 5,
     totalEntriesThreshold: 50,
@@ -767,7 +773,16 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
     variablePromptTemplate:
       typeof summarySettings.variablePromptTemplate === 'string'
         ? summarySettings.variablePromptTemplate
+            .replace(
+              '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】',
+              '【正文上下文；最新 assistant 正文是唯一变化来源，前序完整轮次只读】',
+            )
+            .replace(
+              '【当前变量上下文，来自输出提示词渲染结果或等价快照】',
+              '【当前变量上下文；专用严格 JSON 投影】',
+            )
         : defaults.variablePromptTemplate,
+    variableContextRounds: summarySettings.variableContextRounds === 2 ? 2 : 1,
     thresholds: {
       ...defaults.thresholds,
       ...summarySettings.thresholds,

@@ -1,25 +1,26 @@
 <variable>
 <status_current_variables>
-# 当前世界信息：
-世界信息:{{ERA:世界信息}}
-
-# {{user}}数据
 <%
-// 去引号的紧凑JSON格式，节省token
-function toCompact(obj) {
-  if (obj === null || obj === undefined) return 'null';
-  if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
-  if (typeof obj === 'string') return obj.includes(',') || obj.includes(':') || obj.includes('\n') ? `"${obj}"` : obj;
-  if (Array.isArray(obj)) {
-    if (obj.length === 0) return '[]';
-    return '[' + obj.map(v => toCompact(v)).join(',') + ']';
+// PROMPT_SERIALIZER_START
+function sanitizePromptValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(item => sanitizePromptValue(item));
   }
-  const entries = Object.entries(obj)
-    .filter(([k]) => k !== '$meta' && k !== '$template')
-    .map(([k, v]) => k + ':' + toCompact(v));
-  if (entries.length === 0) return '{}';
-  return '{' + entries.join(',') + '}';
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !key.startsWith('$'))
+      .map(([key, child]) => [key, sanitizePromptValue(child)]),
+  );
 }
+
+function toStrictJson(value) {
+  const result = JSON.stringify(sanitizePromptValue(value));
+  return result === undefined ? 'null' : result;
+}
+// PROMPT_SERIALIZER_END
 
 function selectWorldEventsForPrompt(worldEvents, outcomeStatuses, limit = 16, priorityLimit = 8) {
   if (!worldEvents || typeof worldEvents !== 'object' || Array.isArray(worldEvents)) return {};
@@ -62,8 +63,8 @@ function getAptitudeLevel(value) {
 function describeInitialAttributes(attrs) {
   if (!attrs || typeof attrs !== 'object') return '';
   const entries = Object.entries(attrs)
-    .filter(([k]) => k !== '$meta' && k !== '$template')
-    .map(([k, v]) => `${k}${v}（${getAptitudeLevel(v)}）`);
+    .filter(([key]) => !key.startsWith('$'))
+    .map(([key, value]) => `${key}${value}（${getAptitudeLevel(value)}）`);
   if (entries.length === 0) return '';
   return '初始属性：' + entries.join('|');
 }
@@ -75,12 +76,39 @@ function trimTrailingPunctuation(text) {
 function describeTalents(talents) {
   if (!talents || typeof talents !== 'object') return '';
   const entries = Object.entries(talents)
-    .filter(([k]) => k !== '$meta' && k !== '$template')
-    .map(([k, v], index) => `${index + 1}.${k}：${trimTrailingPunctuation(v)}`);
+    .filter(([key]) => !key.startsWith('$'))
+    .map(([key, value], index) => `${index + 1}.${key}：${trimTrailingPunctuation(value)}`);
   if (entries.length === 0) return '';
   return '天赋：\n' + entries.join('\n');
 }
 
+function normalizeFullLocationPath(value) {
+  if (typeof value !== 'string') return '';
+  const segments = value.trim().replace(/[\\＞>›→]+/g, '/').split('/').map(part => part.trim()).filter(Boolean);
+  return segments.length === 3 ? segments.join('/') : '';
+}
+
+function uniqueFullLocationPaths(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(normalizeFullLocationPath).filter(Boolean))];
+}
+
+const 原始世界事件 = getvar('stat_data.世界事件', { scope: 'local' });
+const 事件结局状态 = getvar('stat_data.前端变量.事件结局状态', { scope: 'local' });
+const 世界事件上下文 = selectWorldEventsForPrompt(原始世界事件, 事件结局状态);
+if (Object.keys(世界事件上下文).length > 0) {
+-%>
+# 只读历史：已完成的世界事件（只说明过去，不代表当前人物状态）
+世界事件:<%- toStrictJson(世界事件上下文) %>
+
+<% } -%>
+
+# 当前状态：以下时间与人物变量表示此刻
+# 当前世界信息
+世界信息:{{ERA:世界信息}}
+
+# {{user}}数据
+<%
 const p = variables.stat_data.user数据;
 const worldTime = variables.stat_data.世界信息?.时间;
 
@@ -90,7 +118,7 @@ if (p && worldTime) {
   const initialAttributesText = describeInitialAttributes(p.初始属性);
   const talentsText = describeTalents(p.天赋);
   for (const key in p) {
-    if (key === '$meta' || key === '$template') continue;
+    if (key.startsWith('$')) continue;
     if (key === '初始属性' || key === '天赋') continue;
     if (key === '出生年份') {
       userData['年龄'] = (worldTime.年 || 0) - (p.出生年份 || 0);
@@ -99,7 +127,7 @@ if (p && worldTime) {
     }
   }
 -%>
-user数据:<%- toCompact(userData) %>
+user数据:<%- toStrictJson(userData) %>
 <% if (initialAttributesText) { -%>
 <%- initialAttributesText %>
 <% } -%>
@@ -110,7 +138,7 @@ user数据:<%- toCompact(userData) %>
 <%
 } else {
 -%>
-[玩家数据加载失败]
+<context_error>玩家数据或世界时间加载失败</context_error>
 <% } -%>
 user初始属性代表的资质分级：0-4 低劣|5-8 普通|9-12 上佳|13-16 出众|17-20 绝顶
 天赋和初始属性不要在文中直白写出，而是通过人物表现自然地表露
@@ -133,23 +161,26 @@ if (原始参与事件 && typeof 原始参与事件 === 'object') {
     }
   }
 }
-if (参与事件 && Object.keys(参与事件).length > 0) {
+if (Object.keys(参与事件).length > 0) {
 -%>
 
-# 所在地正在或将要发生的事件
-参与事件:<%- toCompact(参与事件) %>
-
+# 当前事件上下文：方括号是只读背景，JSON中的四个字段按规则有条件可写
+<参与事件>
+<% for (const [事件键, 事件] of Object.entries(参与事件)) {
+  const 只读描述 = String(事件.描述).replace(/\s+/g, ' ').trim();
+  const 可写快照 = {
+    结局: 事件.结局,
+    insert: 事件.insert,
+    update: 事件.update,
+    delete: 事件.delete,
+  };
+-%>
+<<%- 事件键 %>>
+[只读时间、地点与事件背景：<%- 只读描述 %>]
+<%- toStrictJson(可写快照) %>
+</<%- 事件键 %>>
 <% } -%>
-
-<%
-const 原始世界事件 = getvar('stat_data.世界事件', { scope: 'local' });
-const 事件结局状态 = getvar('stat_data.前端变量.事件结局状态', { scope: 'local' });
-const 世界事件上下文 = selectWorldEventsForPrompt(原始世界事件, 事件结局状态);
-if (Object.keys(世界事件上下文).length > 0) {
--%>
-
-# 已完成的世界事件
-世界事件:<%- toCompact(世界事件上下文) %>
+</参与事件>
 
 <% } -%>
 
@@ -157,7 +188,7 @@ if (Object.keys(世界事件上下文).length > 0) {
 const 后续事件线索 = getvar('stat_data.后续事件线索', { scope: 'local' });
 if (后续事件线索 && Object.keys(后续事件线索).length > 0) {
 -%>
-# 后续事件线索
+# 后续事件线索（只读）
 {{ERA:后续事件线索}}
 <% } -%>
 
@@ -165,9 +196,40 @@ if (后续事件线索 && Object.keys(后续事件线索).length > 0) {
 const 附近传闻 = getvar('stat_data.附近传闻', { scope: 'local' });
 if (附近传闻 && Object.keys(附近传闻).length > 0) {
 -%>
-# 附近传闻
+# 附近传闻（只读）
 {{ERA:附近传闻}}
 <% } -%>
+
+<%
+const 原始周围地点 = getvar('stat_data.前端变量.周围地点', { scope: 'local' });
+const 周围地点 = 原始周围地点 && typeof 原始周围地点 === 'object' && !Array.isArray(原始周围地点)
+  ? 原始周围地点
+  : {};
+const 普通移动来源 = Array.isArray(原始周围地点)
+  ? 原始周围地点
+  : (Array.isArray(周围地点.普通移动) ? 周围地点.普通移动 : 周围地点.相邻三级地点);
+const 地点分组 = {
+  普通移动: uniqueFullLocationPaths(普通移动来源),
+  事件目标: uniqueFullLocationPaths(周围地点.事件目标),
+  地图指定: uniqueFullLocationPaths(周围地点.地图指定),
+};
+const 可用地点数量 = Object.values(地点分组).reduce((sum, paths) => sum + paths.length, 0);
+-%>
+
+<可用地点>
+<% for (const [分组名, 路径列表] of Object.entries(地点分组)) { -%>
+[<%- 分组名 %>]<% if (路径列表.length === 0) { %>（无）<% } %>
+<% for (const 路径 of 路径列表) { -%>
+- <%- 路径 %>
+<% } -%>
+<% } -%>
+[写入规则]
+<% if (可用地点数量 === 0) { -%>
+当前没有任何可用的完整地点路径，本轮禁止修改任何 `所在位置`。
+<% } else { -%>
+任何 `所在位置` 的新值都只能逐字等于上方列出的某个完整路径；不得缩写、改写或自造地点。
+<% } -%>
+</可用地点>
 
 <%
 const allCharacters = variables.stat_data.角色数据;
@@ -179,10 +241,10 @@ if (playerLocation && allCharacters) {
     if (allCharacters.hasOwnProperty(charName) && charName !== '$template') {
       const character = allCharacters[charName];
       if (character.所在位置 === playerLocation) {
-        // 复制角色数据，排除姓名和初始属性
+        // 姓名由人物对象键表达；这里只排除初始属性和内部字段
         const filtered = {};
         for (const key in character) {
-          if (key !== '姓名' && key !== '初始属性' && key !== '$meta' && key !== '$template') {
+          if (key !== '初始属性' && !key.startsWith('$')) {
             filtered[key] = character[key];
           }
         }
@@ -194,12 +256,12 @@ if (playerLocation && allCharacters) {
 
 if (Object.keys(presentCharacters).length > 0) {
 -%>
-# 同场景角色
-角色数据:<%- toCompact(presentCharacters) -%>
+# 同场景角色（当前状态）
+角色数据:<%- toStrictJson(presentCharacters) -%>
 <%
 } else {
 -%>
-[此地无甚知名人物]
+角色数据:{}
 <% } -%>
 
 </status_current_variables>

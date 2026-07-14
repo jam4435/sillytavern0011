@@ -8,7 +8,9 @@ vi.mock('./mapLoader', () => ({
 import { loadMapData } from './mapLoader';
 import {
   buildDynamicLocationContext,
+  collectEventTargetPaths,
   createDynamicLocationContextVariable,
+  extractExplicitMapTargetsFromText,
   formatDynamicLocationConstraint,
   syncDynamicLocationContextVariable,
 } from './locationContext';
@@ -56,7 +58,7 @@ const mapData: MapData = {
 };
 
 describe('locationContext', () => {
-  it('从二级/三级相对路径解析当前区域，并生成三级地点和相邻二级地点白名单', () => {
+  it('从二级/三级相对路径解析当前区域，并展开当前与相邻区域的三级地点白名单', () => {
     const context = buildDynamicLocationContext(mapData, '临安府/牛家村', 1);
 
     expect(context.currentRegions.map(region => region.path)).toEqual(['大宋/临安府']);
@@ -64,7 +66,7 @@ describe('locationContext', () => {
     expect(context.allowedLocationPaths).toEqual([
       '大宋/临安府/牛家村',
       '大宋/临安府/西湖',
-      '大宋/嘉兴府',
+      '大宋/嘉兴府/烟雨楼',
     ]);
   });
 
@@ -89,9 +91,39 @@ describe('locationContext', () => {
       buildDynamicLocationContext(mapData, '大宋/临安府/牛家村', 1),
     );
 
-    expect(Object.keys(value)).toEqual(['相邻三级地点', '相邻二级地点']);
-    expect(value.相邻三级地点).toContain('大宋/临安府/西湖');
-    expect(value.相邻二级地点).toEqual(['大宋/嘉兴府']);
+    expect(Object.keys(value)).toEqual(['普通移动', '事件目标', '地图指定']);
+    expect(value.普通移动).toContain('大宋/临安府/西湖');
+    expect(value.普通移动).toContain('大宋/嘉兴府/烟雨楼');
+    expect(value.事件目标).toEqual([]);
+    expect(value.地图指定).toEqual([]);
+  });
+
+  it('过滤相邻区域中尚未解锁的三级地点', () => {
+    const lockedMap = structuredClone(mapData);
+    lockedMap.大宋.子区域.嘉兴府.地点.烟雨楼 = {
+      ...lockedMap.大宋.子区域.嘉兴府.地点.烟雨楼,
+      初始探索: false,
+      解锁条件: '完成前置事件',
+    };
+
+    const locked = buildDynamicLocationContext(lockedMap, '大宋/临安府/牛家村', 1);
+    const explored = buildDynamicLocationContext(lockedMap, '大宋/临安府/牛家村', 1, ['大宋/嘉兴府/烟雨楼']);
+
+    expect(locked.allowedLocationPaths).not.toContain('大宋/嘉兴府/烟雨楼');
+    expect(explored.allowedLocationPaths).toContain('大宋/嘉兴府/烟雨楼');
+  });
+
+  it('从传闻、后续线索和地图指令提取完整三级地点', () => {
+    expect(collectEventTargetPaths({
+      附近传闻: { 比武招亲: '擂台人声鼎沸 [1219年10月20日13时/金国/中都/擂台]' },
+      后续事件线索: {
+        后续: '(1219年10月21日8时，大宋/嘉兴府/烟雨楼，似乎还会有事情发生)有人等候',
+        错误层级: '(1219年10月21日8时，大宋/嘉兴府/烟雨楼/楼顶，似乎还会有事情发生)不应授权',
+      },
+    })).toEqual(['金国/中都/擂台', '大宋/嘉兴府/烟雨楼']);
+    expect(extractExplicitMapTargetsFromText(
+      '出发\n[地图指令]从大宋/临安府/牛家村移动到大理/大理城/天龙寺',
+    )).toEqual(['大理/大理城/天龙寺']);
   });
 
   it('把最新周围地点写入 stat_data.前端变量，并清理旧顶层与旧世界信息变量', async () => {
@@ -103,7 +135,7 @@ describe('locationContext', () => {
 
     const value = await syncDynamicLocationContextVariable();
 
-    expect(value?.相邻三级地点).toContain('大宋/临安府/牛家村');
+    expect(value?.普通移动).toContain('大宋/临安府/牛家村');
     expect(updateVariablesWithMock).toHaveBeenCalledWith(expect.any(Function), { type: 'chat' });
     const updater = updateVariablesWithMock.mock.calls[0][0] as (
       variables: Record<string, unknown>,
@@ -115,8 +147,9 @@ describe('locationContext', () => {
       stat_data: {
         前端变量: {
           周围地点: {
-            相邻三级地点: expect.arrayContaining(['大宋/临安府/牛家村']),
-            相邻二级地点: expect.arrayContaining(['大宋/嘉兴府']),
+            普通移动: expect.arrayContaining(['大宋/临安府/牛家村']),
+            事件目标: [],
+            地图指定: [],
           },
         },
         世界信息: {

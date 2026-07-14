@@ -16,7 +16,6 @@
     logSuccess,
     logWarning,
     isDebugEnabled,
-    getEventShortName,
     hasParticipationEntry,
     isDebutEvent,
     formatDate,
@@ -40,9 +39,10 @@
     normalizeLocationPath,
   } = await import('./era-participant-entry.js');
   const { reconcileWorldEventArchive, syncParticipationOutcomeStates } = await import('./era-world-events.js');
+  const { needsEventRuntimeStateReset, resetLegacyEventRuntimeState } = await import('./era-runtime-state.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
-  const EVENT_SCRIPT_VERSION = '2026-07-13-world-event-archive';
+  const EVENT_SCRIPT_VERSION = '2026-07-14-canonical-runtime-keys';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
@@ -208,7 +208,7 @@
 
         debugGroupCollapsed(`检查事件: ${eventName}`);
         if (eventData && isTimeForEvent(currentTime, eventData, eventName)) {
-          if (isDebutEvent(eventName)) {
+          if (isDebutEvent(eventData)) {
             logSuccess(`登场事件 ${eventName} 触发条件满足，将直接完成！`);
             debutEventsToComplete.push(eventName);
           } else {
@@ -320,13 +320,12 @@
       if (playerLocation && eventLocation) {
         // 附近传闻范围固定由事件地点前两级派生；到达完整事件地点后只加入事件，不再显示传闻。
         if (hookText && isLocationWithinRumorScope(playerLocation, rumorScope) && !alreadyJoined && eventLocation !== playerLocation) {
-          const shortName = getEventShortName(eventName);
           const time = eventData.触发条件;
           const location = eventData.事件地点;
           const timeString = formatDate(time);
 
-          附近传闻[shortName] = `${hookText} [${timeString}/${location}]`;
-          log(`发现传闻: ${shortName}`);
+          附近传闻[eventName] = `${hookText} [${timeString}/${location}]`;
+          log(`发现传闻: ${eventName}`);
         }
 
         // 只有当playerLocation与eventData.事件地点完全相同时，才调用playerJoinsEvent
@@ -499,8 +498,19 @@
       return false;
     }
 
-    const shouldPostResyncVerify =
+    let shouldPostResyncVerify =
       options.forcePostResyncVerify === true || shouldPostResyncVerifyForStat(preCheckVars.stat_data);
+
+    if (needsEventRuntimeStateReset(preCheckVars.stat_data)) {
+      const resetSucceeded = await resetLegacyEventRuntimeState(preCheckVars.stat_data);
+      if (!resetSucceeded) {
+        isInitializing = false;
+        isInitialized = false;
+        return false;
+      }
+      preCheckVars = await getVariables({ type: 'chat' });
+      shouldPostResyncVerify = true;
+    }
 
     eventDefinitions = await loadEventDefinitionsFromWorldbook();
     await initializeEventList(eventDefinitions, { shouldPostResyncVerify });

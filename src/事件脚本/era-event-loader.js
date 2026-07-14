@@ -4,7 +4,8 @@
 // 包含: 从世界书加载事件定义
 
 import {
-  CONFIG,
+  attachEventMetadata,
+  deriveEventRuntimeDescriptor,
   log,
   logError,
   logSuccess,
@@ -12,7 +13,6 @@ import {
   debugGroup,
   debugGroupEnd,
   debugTable,
-  isDebutEvent,
 } from './era-utils.js';
 import { normalizeParticipantEventDefinition } from './era-participant-entry.js';
 
@@ -30,30 +30,6 @@ function hashString(value) {
   }
 
   return (hash >>> 0).toString(36);
-}
-
-function resolveEventName(entryName) {
-  const matchedPrefix = CONFIG.EVENT_KEY_PREFIXES.find(prefix => entryName && entryName.startsWith(prefix));
-  if (matchedPrefix) {
-    return {
-      eventName: entryName.substring(matchedPrefix.length),
-      matchedBy: matchedPrefix,
-      matchType: 'prefix',
-    };
-  }
-
-  for (const pattern of CONFIG.EVENT_KEY_PATTERNS) {
-    const match = entryName && entryName.match(pattern);
-    if (match) {
-      return {
-        eventName: entryName,
-        matchedBy: pattern,
-        matchType: 'pattern',
-      };
-    }
-  }
-
-  return null;
 }
 
 function buildEventEntryFingerprint(entry) {
@@ -102,14 +78,12 @@ export async function loadEventDefinitionsFromWorldbook() {
       for (const entry of entries) {
         log(`[DEBUG] 正在检查条目名称: "${entry.name}"`);
 
-        const resolvedEvent = resolveEventName(entry.name);
-        const eventName = resolvedEvent?.eventName || null;
+        const descriptor = deriveEventRuntimeDescriptor(entry.name);
+        const eventName = descriptor?.runtimeKey || null;
 
         log(`[DEBUG] 是否为事件条目? ${!!eventName}`);
-        if (resolvedEvent) {
-          log(
-            `[DEBUG] ${resolvedEvent.matchType === 'prefix' ? '精确前缀匹配' : '正则模式匹配'}: ${resolvedEvent.matchedBy}`,
-          );
+        if (descriptor) {
+          log(`[DEBUG] 派生运行时键: ${descriptor.runtimeKey} (${descriptor.kind})`);
         }
 
         // 检查条目名称 (name 字段)
@@ -119,6 +93,7 @@ export async function loadEventDefinitionsFromWorldbook() {
           matchedEventEntries.push({
             entry,
             eventName,
+            descriptor,
             entryFingerprint,
           });
         }
@@ -132,10 +107,16 @@ export async function loadEventDefinitionsFromWorldbook() {
       return cachedEventDefinitions;
     }
 
-    for (const { entry, eventName, entryFingerprint } of matchedEventEntries) {
+    for (const { entry, eventName, descriptor, entryFingerprint } of matchedEventEntries) {
+      if (eventDefinitions[eventName]) {
+        logError(`事件运行时键冲突，已跳过后加载条目: ${eventName} (${entry.name})`);
+        toastr.error(`事件运行时键冲突: ${eventName}`);
+        continue;
+      }
+
       const cachedEntryDefinition = parsedEventEntryCache.get(entryFingerprint);
       if (cachedEntryDefinition) {
-        eventDefinitions[eventName] = cachedEntryDefinition;
+        eventDefinitions[eventName] = attachEventMetadata(cachedEntryDefinition, descriptor);
         logSuccess(`复用缓存事件: ${eventName}`);
         continue;
       }
@@ -143,7 +124,7 @@ export async function loadEventDefinitionsFromWorldbook() {
       try {
         const eventData = JSON.parse(entry.content);
         const normalized = normalizeParticipantEventDefinition(eventName, eventData, {
-          isDebut: isDebutEvent(eventName),
+          kind: descriptor.kind,
         });
         if (!normalized.valid) {
           normalized.errors.forEach(error => logError(error));
@@ -152,7 +133,7 @@ export async function loadEventDefinitionsFromWorldbook() {
         }
 
         parsedEventEntryCache.set(entryFingerprint, normalized.data);
-        eventDefinitions[eventName] = normalized.data;
+        eventDefinitions[eventName] = attachEventMetadata(normalized.data, descriptor);
         logSuccess(`加载事件: ${eventName}`);
       } catch (e) {
         logError(`解析事件条目JSON失败 (条目: ${entry.name}):`, e);

@@ -12,6 +12,7 @@ import { messageLogger, variableTraceLogger } from '../utils/logger';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
 import { captureNextCombinedPromptForDebug } from '../utils/promptDebug';
 import { syncFrontendDerivedVariables } from '../utils/frontendDerivedVariables';
+import { extractExplicitMapTargetsFromText } from '../utils/locationContext';
 import {
   executeExtraVariableUpdate,
   prepareExtraVariableUpdateTurn,
@@ -444,7 +445,9 @@ export function useMessageHandler({
         await flushPendingGameDataCompletion('before-generate');
         messageLogger.log('✅ [步骤 2] 待补全变量同步完成');
 
-        const frontendVariables = await syncFrontendDerivedVariables();
+        const frontendVariables = await syncFrontendDerivedVariables({
+          explicitMapTargets: extractExplicitMapTargetsFromText(message),
+        });
         messageLogger.log('🗺️ 前端变量刷新:', frontendVariables ? '完成' : '失败');
 
         messageLogger.log('📌 [步骤 2] 调用 generate() 触发 AI 生成');

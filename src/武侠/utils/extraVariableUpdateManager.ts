@@ -7,15 +7,11 @@ import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableW
 import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryApiConfig } from './summaryApiClient';
 import { dataLogger, variableTraceLogger } from './logger';
 import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
-import { buildDynamicLocationConstraintPrompt } from './locationContext';
-import { selectWorldEventsForPrompt } from '../../shared/worldEventContext';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
-const OUTPUT_PROMPT_ENTRY_NAME = '输出提示词';
 const SNAPSHOT_STORAGE_KEY = 'wuxia_extra_variable_guidance_snapshot';
 const EXTRA_VARIABLE_UPDATE_TIMEOUT_MS = 360000;
 const ERA_SYNC_TIMEOUT_MS = 20000;
-const MAX_CONTEXT_BODY_MESSAGES = 5;
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -78,7 +74,6 @@ let extraVariableUpdateReserved = false;
 const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/gi;
 const ERA_VARIABLE_BLOCK_STRIP_REGEX = /\s*<Variable(Think|Insert|Edit|Delete)>\s*[\s\S]*?<\/Variable\1>\s*/gi;
 const ACTION_BLOCK_TAGS = new Set(['VariableInsert', 'VariableEdit', 'VariableDelete']);
-const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
 const VARIABLE_ROOT_KEY_ALIASES: Record<string, string> = {
   玩家数据: 'user数据',
   同场景角色: '角色数据',
@@ -375,67 +370,33 @@ async function readWorldbookEntryContent(entryName: string): Promise<string> {
   return location.entry.content || '';
 }
 
-function hasUnrenderedTemplateMarkup(text: string): boolean {
-  return /<%|%>|{{\s*(?:ERA:|user|char|lastMessageId|lastMessage|time|date)\b/i.test(text);
-}
-
-async function renderOutputPromptContext(assistantMessageId: number): Promise<string> {
-  const rawOutputPrompt = await readWorldbookEntryContent(OUTPUT_PROMPT_ENTRY_NAME);
-  try {
-    if (
-      typeof EjsTemplate === 'undefined' ||
-      typeof EjsTemplate.prepareContext !== 'function' ||
-      typeof EjsTemplate.evaltemplate !== 'function'
-    ) {
-      throw new Error('当前环境没有可用的 EjsTemplate。');
-    }
-
-    const context = await EjsTemplate.prepareContext({}, assistantMessageId);
-    let rendered = await EjsTemplate.evaltemplate(rawOutputPrompt, context);
-
-    if (typeof substitudeMacros === 'function') {
-      rendered = substitudeMacros(rendered);
-    }
-    if (typeof formatAsTavernRegexedString === 'function') {
-      rendered = formatAsTavernRegexedString(rendered, 'world_info', 'prompt', { depth: 0 });
-    }
-
-    if (!rendered.trim() || hasUnrenderedTemplateMarkup(rendered)) {
-      throw new Error('输出提示词渲染后仍包含未处理的模板标记。');
-    }
-
-    const sanitizedRendered = stripEraVariableBlocksForPrompt(rendered.trim());
-    if (!sanitizedRendered) {
-      throw new Error('输出提示词渲染内容清洗后为空。');
-    }
-
-    return sanitizedRendered;
-  } catch (error) {
-    dataLogger.warn('渲染输出提示词失败，改用前端变量快照:', error);
-    return buildFallbackVariableSnapshot(assistantMessageId);
-  }
-}
-
-function sanitizeForPrompt(value: unknown, depth = 0): unknown {
-  if (depth > 8) {
-    return '[超过最大深度]';
-  }
-
+function sanitizeForPrompt(value: unknown, ancestors = new WeakSet<object>()): unknown {
   if (Array.isArray(value)) {
-    return value.map(item => sanitizeForPrompt(item, depth + 1));
+    if (ancestors.has(value)) {
+      return '[循环引用]';
+    }
+    ancestors.add(value);
+    const result = value.map(item => sanitizeForPrompt(item, ancestors));
+    ancestors.delete(value);
+    return result;
   }
 
   if (!isRecord(value)) {
     return value;
   }
 
-  return Object.entries(value).reduce<Record<string, unknown>>((result, [key, childValue]) => {
-    if (HIDDEN_VARIABLE_KEYS.has(key)) {
-      return result;
+  if (ancestors.has(value)) {
+    return '[循环引用]';
+  }
+  ancestors.add(value);
+  const result = Object.entries(value).reduce<Record<string, unknown>>((sanitized, [key, childValue]) => {
+    if (!key.startsWith('$')) {
+      sanitized[key] = sanitizeForPrompt(childValue, ancestors);
     }
-    result[key] = sanitizeForPrompt(childValue, depth + 1);
-    return result;
+    return sanitized;
   }, {});
+  ancestors.delete(value);
+  return result;
 }
 
 function getNestedRecord(source: Record<string, unknown>, key: string): Record<string, unknown> | null {
@@ -452,17 +413,26 @@ function getFirstStringValue(...values: unknown[]): string {
   return '';
 }
 
-function collectSameSceneCharacters(
+function collectRelevantCharacters(
   statData: Record<string, unknown>,
   playerLocation: string,
+  latestAssistantBody: string,
+  participationEvents: unknown,
 ): Record<string, unknown> {
   const characters = getNestedRecord(statData, '角色数据');
-  if (!characters || !playerLocation) {
+  if (!characters) {
     return {};
   }
 
+  let participationText = '';
+  try {
+    participationText = JSON.stringify(participationEvents ?? {});
+  } catch (error) {
+    dataLogger.warn('序列化参与事件以筛选相关 NPC 失败:', error);
+  }
+
   return Object.entries(characters).reduce<Record<string, unknown>>((result, [name, character]) => {
-    if (HIDDEN_VARIABLE_KEYS.has(name) || !isRecord(character)) {
+    if (name.startsWith('$') || !isRecord(character)) {
       return result;
     }
 
@@ -472,7 +442,10 @@ function collectSameSceneCharacters(
       character.位置,
       character.地点,
     );
-    if (characterLocation === playerLocation) {
+    const isSameScene = !!playerLocation && characterLocation === playerLocation;
+    const isCurrentEventNpc = !!participationText && participationText.includes(name);
+    const isMentionedInLatestBody = !!latestAssistantBody && latestAssistantBody.includes(name);
+    if (isSameScene || isCurrentEventNpc || isMentionedInLatestBody) {
       result[name] = sanitizeForPrompt(character);
     }
     return result;
@@ -496,12 +469,17 @@ function readAllVariablesSnapshot(assistantMessageId: number): Record<string, un
   }
 }
 
-function buildFallbackVariableSnapshot(assistantMessageId: number): string {
-  const variables = readAllVariablesSnapshot(assistantMessageId);
+export function buildExtraVariableProjection(
+  variables: Record<string, unknown>,
+  latestAssistantBody: string,
+): Record<string, unknown> {
   const statDataSource = isRecord(variables.stat_data) ? variables.stat_data : variables;
-  const statData = sanitizeForPrompt(statDataSource) as Record<string, unknown>;
+  const statData = statDataSource as Record<string, unknown>;
   const userData: Record<string, unknown> =
     getNestedRecord(statData, 'user数据') || getNestedRecord(statData, '玩家数据') || {};
+  const worldInfo = getNestedRecord(statData, '世界信息') || {};
+  const frontendVariables = getNestedRecord(statData, '前端变量') || {};
+  const participationEvents = statData.参与事件 ?? {};
   const playerLocation = getFirstStringValue(
     userData.当前位置,
     userData.所在位置,
@@ -511,23 +489,33 @@ function buildFallbackVariableSnapshot(assistantMessageId: number): string {
     statData.地点,
   );
 
-  const snapshot = {
-    世界信息: statData.世界信息 ?? variables.世界信息 ?? null,
+  return sanitizeForPrompt({
+    世界信息: Object.hasOwn(worldInfo, '时间') ? { 时间: worldInfo.时间 } : {},
     user数据: userData,
-    参与事件: statData.参与事件 ?? null,
-    世界事件: selectWorldEventsForPrompt(
-      statData.世界事件,
-      getNestedRecord(statData, '前端变量')?.事件结局状态,
-    ),
-    后续事件线索: statData.后续事件线索 ?? null,
-    附近传闻: statData.附近传闻 ?? null,
-    角色数据: collectSameSceneCharacters(statData, playerLocation),
-  };
+    角色数据: collectRelevantCharacters(statData, playerLocation, latestAssistantBody, participationEvents),
+    参与事件: participationEvents,
+    前端变量: {
+      周围地点: frontendVariables.周围地点 ?? {},
+    },
+  }) as Record<string, unknown>;
+}
 
-  return [
-    '以下为前端构造的当前变量快照。键名为实际 ERA 根路径；角色数据仅包含同场景角色。',
-    JSON.stringify(snapshot, null, 2),
+function buildVariableProjectionSnapshot(
+  assistantMessageId: number,
+  latestAssistantBody: string,
+): { projection: Record<string, unknown>; variableContext: string; locationContext: string } {
+  const projection = buildExtraVariableProjection(readAllVariablesSnapshot(assistantMessageId), latestAssistantBody);
+  const variableContext = JSON.stringify(projection);
+  const locationContext = [
+    '【合法地点完整路径】',
+    '完整路径已包含在上方专用变量投影的`前端变量.周围地点`中，不在此重复发送。仅当最新正文确实发生移动时，位置新值才可逐字采用其中已有路径；不得缩写或杜撰。',
   ].join('\n');
+
+  return {
+    projection,
+    variableContext,
+    locationContext,
+  };
 }
 
 function getSafeSwipeIndex(message: ChatMessageWithSwipes, swipes: string[]): number {
@@ -616,14 +604,24 @@ function createWriteVerification({
   };
 }
 
-function getRecentBodyMessages(targetMessageId: number, latestRawReply: string): string {
+type PromptBodyMessage = {
+  messageId: number;
+  role: 'user' | 'assistant';
+  text: string;
+};
+
+function getRecentBodyMessages(
+  targetMessageId: number,
+  latestRawReply: string,
+  contextRounds: 1 | 2,
+): { serialized: string; latestAssistantBody: string } {
   const messages = getChatMessages('0-{{lastMessageId}}', {
-    role: 'assistant',
     hide_state: 'unhidden',
     include_swipes: true,
   }) as ChatMessageWithSwipes[];
 
   const bodies = messages
+    .filter(message => message.role === 'user' || message.role === 'assistant')
     .map(message => {
       const rawText =
         message.message_id === targetMessageId && latestRawReply.trim()
@@ -638,17 +636,55 @@ function getRecentBodyMessages(targetMessageId: number, latestRawReply: string):
       }
       return {
         messageId: message.message_id,
+        role: message.role as 'user' | 'assistant',
         text: normalized,
       };
     })
-    .filter((item): item is { messageId: number; text: string } => item !== null)
-    .slice(-MAX_CONTEXT_BODY_MESSAGES);
+    .filter((item): item is PromptBodyMessage => item !== null)
+    .sort((left, right) => left.messageId - right.messageId);
 
-  if (bodies.length === 0 && latestRawReply.trim()) {
-    return `#${targetMessageId}\n${normalizeBodyMessageForPrompt(latestRawReply)}`;
+  const targetMessage = bodies.find(
+    message => message.messageId === targetMessageId && message.role === 'assistant',
+  );
+  const latestAssistantBody =
+    normalizeBodyMessageForPrompt(latestRawReply) || targetMessage?.text || '';
+  const precedingMessages = bodies.filter(message => message.messageId < targetMessageId);
+  const completeRounds: Array<[PromptBodyMessage, PromptBodyMessage]> = [];
+  let pendingUser: PromptBodyMessage | null = null;
+
+  for (const message of precedingMessages) {
+    if (message.role === 'user') {
+      pendingUser = message;
+      continue;
+    }
+    if (pendingUser) {
+      completeRounds.push([pendingUser, message]);
+      pendingUser = null;
+    }
   }
 
-  return bodies.map(item => `#${item.messageId}\n${item.text}`).join('\n\n---\n\n');
+  const readonlyRounds = completeRounds.slice(-contextRounds).map(([userMessage, assistantMessage]) => ({
+    user: {
+      messageId: userMessage.messageId,
+      content: userMessage.text,
+    },
+    assistant: {
+      messageId: assistantMessage.messageId,
+      content: assistantMessage.text,
+    },
+  }));
+
+  return {
+    latestAssistantBody,
+    serialized: JSON.stringify({
+      readonlyContextRounds: readonlyRounds,
+      latestAssistantBody: {
+        messageId: targetMessageId,
+        content: latestAssistantBody || '(无可用正文)',
+        isOnlyChangeSource: true,
+      },
+    }),
+  };
 }
 
 function renderVariablePromptTemplate(
@@ -677,18 +713,19 @@ async function buildExtraVariableUpdatePrompt({
   assistantMessageId: number;
   latestRawReply: string;
 }): Promise<string> {
-  const [variableGuidance, renderedOutputPromptContext, locationConstraintPrompt] = await Promise.all([
-    readWorldbookEntryContent(VARIABLE_GUIDANCE_ENTRY_NAME),
-    renderOutputPromptContext(assistantMessageId),
-    buildDynamicLocationConstraintPrompt(),
-  ]);
-  const recentBodies = getRecentBodyMessages(assistantMessageId, latestRawReply);
+  const variableGuidance = await readWorldbookEntryContent(VARIABLE_GUIDANCE_ENTRY_NAME);
+  const recentBodies = getRecentBodyMessages(
+    assistantMessageId,
+    latestRawReply,
+    settings.variableContextRounds,
+  );
+  const variableProjection = buildVariableProjectionSnapshot(assistantMessageId, recentBodies.latestAssistantBody);
 
   return renderVariablePromptTemplate(settings.variablePromptTemplate, {
-    recentBodies: recentBodies || '(无可用正文)',
-    variableContext: renderedOutputPromptContext,
+    recentBodies: recentBodies.serialized,
+    variableContext: variableProjection.variableContext,
     variableGuidance,
-    locationContext: locationConstraintPrompt,
+    locationContext: variableProjection.locationContext,
   });
 }
 

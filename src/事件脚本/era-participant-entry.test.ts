@@ -10,7 +10,7 @@ import {
   normalizeParticipantEventDefinition,
 } from './era-participant-entry.js';
 import { buildPlayerParticipationEntry } from './era-event-operations.js';
-import { buildInvalidParticipationDeletePatch, isParticipationEntry } from './era-utils.js';
+import { EVENT_KIND, buildInvalidParticipationDeletePatch, isParticipationEntry } from './era-utils.js';
 
 const currentTime = { 年: 1210, 月: 8, 日: 8, 时: 7 };
 const eventData = {
@@ -30,7 +30,7 @@ describe('normalizeParticipantEventDefinition', () => {
         事件概要: ' 郭靖与梅超风结束荒山冲突，各自状态与去向得到确定。 ',
         参与人物: ['郭靖', ' 郭靖 ', '梅超风'],
       },
-      { isDebut: false },
+      { kind: EVENT_KIND.ORDINARY },
     );
 
     expect(result.valid).toBe(true);
@@ -44,7 +44,7 @@ describe('normalizeParticipantEventDefinition', () => {
     const result = normalizeParticipantEventDefinition(
       '无效事件',
       { 事件概要: '事件结束后的持久结果已经得到确定。' },
-      { isDebut: false },
+      { kind: EVENT_KIND.ORDINARY },
     );
 
     expect(result.valid).toBe(false);
@@ -60,7 +60,7 @@ describe('normalizeParticipantEventDefinition', () => {
         事件概要: '郭靖查清大漠异动的缘由，并确定相关人物的去向。',
         参与人物: ['郭靖', 123],
       },
-      { isDebut: false },
+      { kind: EVENT_KIND.ORDINARY },
     );
 
     expect(result.valid).toBe(false);
@@ -76,7 +76,7 @@ describe('normalizeParticipantEventDefinition', () => {
         事件概要: '郭啸天查清牛家村异动，村中局势恢复稳定。',
         参与人物: ['郭啸天'],
       },
-      { isDebut: false },
+      { kind: EVENT_KIND.ORDINARY },
     );
 
     expect(result.valid).toBe(false);
@@ -92,7 +92,7 @@ describe('normalizeParticipantEventDefinition', () => {
         事件概要: '郭啸天查清大宋异动，相关人物的处境得到确定。',
         参与人物: ['郭啸天'],
       },
-      { isDebut: false },
+      { kind: EVENT_KIND.ORDINARY },
     );
 
     expect(result.valid).toBe(false);
@@ -102,7 +102,7 @@ describe('normalizeParticipantEventDefinition', () => {
   it('does not require participant fields for debut events', () => {
     const event = { 事件类型: '登场事件', insert: {} };
     const result = normalizeParticipantEventDefinition('射雕登场事件-第4回人物', event, {
-      isDebut: true,
+      kind: EVENT_KIND.DEBUT,
     });
 
     expect(result).toEqual({ valid: true, data: event, errors: [] });
@@ -112,7 +112,7 @@ describe('normalizeParticipantEventDefinition', () => {
     const result = normalizeParticipantEventDefinition(
       '缺少概要事件',
       { 事件地点: '蒙古/大漠', 事件引子: '听说大漠有异动。', 参与人物: ['郭靖'] },
-      { isDebut: false },
+      { kind: EVENT_KIND.ORDINARY },
     );
 
     expect(result.valid).toBe(false);
@@ -274,14 +274,14 @@ describe('player participation ending snapshot', () => {
       事件详情: '郭靖在张家口初遇黄蓉。',
       事件概要: '郭靖结识黄蓉并请她吃饭，两人由此建立初步情谊。',
       insert: {
-        郭靖: { 人物经历: { 原结局: '请黄蓉吃饭。' } },
+        郭靖: { 人物经历: { '第7回-02-初遇黄蓉': '请黄蓉吃饭。' } },
       },
       update: {
         黄蓉: { 所在位置: '大宋/张家口' },
       },
     };
 
-    const entry = buildPlayerParticipationEntry('射雕事件条目-第7回-02-初遇黄蓉', sourceEvent, {
+    const entry = buildPlayerParticipationEntry('射雕第7回02-初遇黄蓉', sourceEvent, {
       年: 1219,
       月: 10,
       日: 20,
@@ -292,7 +292,7 @@ describe('player participation ending snapshot', () => {
       描述: '1219年10月20日13时 到 1219年10月20日15时，郭靖在张家口初遇黄蓉。',
       结局: '郭靖结识黄蓉并请她吃饭，两人由此建立初步情谊。',
       insert: {
-        郭靖: { 人物经历: { 原结局: '请黄蓉吃饭。' } },
+        郭靖: { 人物经历: { '射雕第7回02-初遇黄蓉': '请黄蓉吃饭。' } },
       },
       update: {
         黄蓉: { 所在位置: '大宋/张家口' },
@@ -300,13 +300,13 @@ describe('player participation ending snapshot', () => {
       delete: {},
     });
 
-    entry.insert.郭靖.人物经历.原结局 = '已修改';
-    expect(sourceEvent.insert.郭靖.人物经历.原结局).toBe('请黄蓉吃饭。');
+    entry.insert.郭靖.人物经历['射雕第7回02-初遇黄蓉'] = '已修改';
+    expect(sourceEvent.insert.郭靖.人物经历['第7回-02-初遇黄蓉']).toBe('请黄蓉吃饭。');
   });
 
   it('rejects task-progress shaped participation entries for cleanup', () => {
     const participation = {
-      '射雕事件条目-第7回-02-初遇黄蓉': {
+      '射雕第7回02-初遇黄蓉': {
         描述: '事件描述',
         结局: '',
         insert: {},
@@ -320,7 +320,7 @@ describe('player participation ending snapshot', () => {
       },
     };
 
-    expect(isParticipationEntry(participation['射雕事件条目-第7回-02-初遇黄蓉'])).toBe(true);
+    expect(isParticipationEntry(participation['射雕第7回02-初遇黄蓉'])).toBe(true);
     expect(isParticipationEntry(participation.MQ__DOT__Ⅰ_金国初遇)).toBe(false);
     expect(buildInvalidParticipationDeletePatch(participation)).toEqual({
       MQ__DOT__Ⅰ_金国初遇: {},

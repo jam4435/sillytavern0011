@@ -2333,6 +2333,28 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 额外更新会禁用当前角色世界书的「变量指导」条目，正文输出后使用上方选择的 API 单独生成变量块。
               </p>
 
+              <div className="settings-row">
+                <label className="settings-label" htmlFor="extra-variable-context-rounds">
+                  只读上下文轮数
+                </label>
+                <div className="settings-control">
+                  <select
+                    id="extra-variable-context-rounds"
+                    value={settings.summarySettings.variableContextRounds}
+                    onChange={e =>
+                      updateSummarySetting('variableContextRounds', e.target.value === '2' ? 2 : 1)
+                    }
+                    className="settings-select"
+                  >
+                    <option value={1}>1 轮</option>
+                    <option value={2}>2 轮</option>
+                  </select>
+                  <span className="settings-hint-inline">
+                    最新 assistant 正文始终是唯一变化来源；此前完整 user + assistant 轮次仅供理解上下文。
+                  </span>
+                </div>
+              </div>
+
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">变量提示词模板</h5>
                 <p className="settings-hint">

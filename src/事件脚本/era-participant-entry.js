@@ -1,3 +1,5 @@
+import { EVENT_KIND } from './era-utils.js';
+
 export const PARTICIPANT_ENTRY_SOURCE = {
   TIME: '时间触发',
   PLAYER: '玩家参与',
@@ -40,7 +42,7 @@ export function isLocationWithinRumorScope(playerLocation, rumorScope) {
   return getHierarchicalLocationPaths(playerLocation).includes(rumorScope);
 }
 
-export function normalizeParticipantEventDefinition(eventName, eventData, { isDebut = false } = {}) {
+export function normalizeParticipantEventDefinition(eventName, eventData, { kind = EVENT_KIND.ORDINARY } = {}) {
   if (!isPlainObject(eventData)) {
     return {
       valid: false,
@@ -49,7 +51,7 @@ export function normalizeParticipantEventDefinition(eventName, eventData, { isDe
     };
   }
 
-  if (isDebut || eventName.includes('成长条目-')) {
+  if (kind !== EVENT_KIND.ORDINARY) {
     return { valid: true, data: eventData, errors: [] };
   }
 

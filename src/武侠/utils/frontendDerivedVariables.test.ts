@@ -7,7 +7,7 @@ import {
 } from './frontendDerivedVariables';
 
 describe('frontendDerivedVariables', () => {
-  it('按固定列生成战力区，并且只纳入严格同三级地点的人物', () => {
+  it('按稀疏行生成战力区，并且只纳入严格同三级地点的人物', () => {
     setMartialArtsDatabase([
       {
         功法名称: '凌波微步',
@@ -113,9 +113,8 @@ describe('frontendDerivedVariables', () => {
     });
 
     expect(table).toBe([
-      '角色|内功|外功|轻功|剑法|刀法|拳掌|指法|暗器|枪戟|棍锤',
-      '少侠|无|无|凌波微步=85;水上漂=64|无|无|降龙十八掌=140;劈空掌=40|无|无|无|无',
-      '洪七公|无|无|无|无|无|降龙十八掌=125|无|无|无|无',
+      '少侠|基础:50|轻功:凌波微步=85;水上漂=64|拳掌:降龙十八掌=140;劈空掌=40',
+      '洪七公|基础:44|拳掌:降龙十八掌=125',
     ].join('\n'));
     expect(table).not.toContain('黄蓉');
   });
@@ -234,9 +233,31 @@ describe('frontendDerivedVariables', () => {
       },
     });
 
-    expect(table).toBe([
-      '角色|内功|外功|轻功|剑法|刀法|拳掌|指法|暗器|枪戟|棍锤',
-      '少侠|无|无|无|无|无|劈空掌=18|无|无|无|无',
-    ].join('\n'));
+    expect(table).toBe('少侠|基础:0|拳掌:劈空掌=18');
+  });
+
+  it('没有具名功法时按结算后战斗属性提供境界基础招式保底', () => {
+    setMartialArtsDatabase([]);
+
+    const table = buildCombatPowerZoneFromStatData({
+      user数据: {
+        用户名: '高手',
+        所在位置: '大宋/临安府/牛家村',
+        境界: '一流-初期',
+        初始属性: {
+          臂力: 10,
+          根骨: 10,
+          机敏: 10,
+          悟性: 10,
+          洞察: 10,
+          风姿: 10,
+          福缘: 0,
+        },
+        功法: {},
+      },
+    });
+
+    expect(table).toMatch(/^高手\|基础:[1-9]\d*$/);
+    expect(table).not.toContain('无');
   });
 });

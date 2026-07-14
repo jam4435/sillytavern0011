@@ -9,7 +9,6 @@ import {
   compareTime,
   calculateDateOffset,
   getEndTime,
-  getEventShortName,
 } from './era-utils.js';
 
 // ==================== 检查时间条件 ====================

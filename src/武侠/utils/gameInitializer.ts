@@ -358,6 +358,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     世界事件: {},
     前端变量: {
       事件结局状态: {},
+      事件运行时键版本: 1,
     },
     user数据: {
       用户名: name,

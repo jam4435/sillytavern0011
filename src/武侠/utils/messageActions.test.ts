@@ -18,6 +18,7 @@ vi.mock('./promptDebug', () => ({
 }));
 
 vi.mock('./locationContext', () => ({
+  extractExplicitMapTargetsFromText: vi.fn(() => []),
   syncDynamicLocationContextVariable: vi.fn(async () => ({ 已解析: true })),
 }));
 

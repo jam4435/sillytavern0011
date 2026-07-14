@@ -15,13 +15,148 @@ function readLocalStorageFlag(key) {
 export const CONFIG = {
   DEBUG_MODE: false,
   TIME_DEBUG_MODE: false,
-  EVENT_KEY_PREFIXES: ['事件条目-', '成长条目-'],
-  EVENT_KEY_PATTERNS: [/事件条目-/, /登场事件-/, /成长条目-/],
-  DEBUT_EVENT_PATTERN: /登场事件-/,
   ELASTIC_TRIGGER_DAYS: 10,
   SHORT_EVENT_THRESHOLD_DAYS: 30,
   DEFAULT_FOLLOWUP_LIFETIME: 3,
 };
+
+export const EVENT_RUNTIME_KEY_VERSION = 1;
+
+export const EVENT_KIND = Object.freeze({
+  ORDINARY: 'ordinary',
+  DEBUT: 'debut',
+  GROWTH: 'growth',
+});
+
+const EVENT_METADATA = Symbol('era-event-metadata');
+const CHAPTER_NUMBER = '[0-9一二三四五六七八九十百千万]+';
+const ORDINARY_ENTRY_PATTERN = new RegExp(`^(.*?)(?:事件条目-)(第${CHAPTER_NUMBER}回)-(\\d+)-(.+)$`);
+const DEBUT_ENTRY_PATTERN = new RegExp(`^(.*?)(?:登场事件-)(第${CHAPTER_NUMBER}回)(?:人物)?$`);
+const GROWTH_ENTRY_PATTERN = new RegExp(`^(.*?)(?:成长条目-)(第${CHAPTER_NUMBER}回)(?:人物)?(?:-(.+))?$`);
+const CANONICAL_ORDINARY_PATTERN = new RegExp(`^(.*?)(第${CHAPTER_NUMBER}回)(\\d+)-(.+)$`);
+const LEGACY_ORDINARY_PATTERN = new RegExp(`^(.*?)(第${CHAPTER_NUMBER}回)-(\\d+)-(.+)$`);
+
+function stripEventFileSuffix(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\.(json|ya?ml|txt)$/i, '');
+}
+
+/**
+ * 从世界书物理条目名派生唯一运行时键。物理名保持不变，变量层只使用 runtimeKey。
+ */
+export function deriveEventRuntimeDescriptor(entryName) {
+  const sourceName = String(entryName || '').trim();
+  const normalizedName = stripEventFileSuffix(sourceName);
+
+  const ordinaryMatch = normalizedName.match(ORDINARY_ENTRY_PATTERN);
+  if (ordinaryMatch) {
+    const [, series, chapter, sequence, title] = ordinaryMatch;
+    return {
+      runtimeKey: `${series}${chapter}${sequence}-${title}`,
+      kind: EVENT_KIND.ORDINARY,
+      series,
+      chapter,
+      sequence,
+      title,
+      sourceName,
+    };
+  }
+
+  const debutMatch = normalizedName.match(DEBUT_ENTRY_PATTERN);
+  if (debutMatch) {
+    const [, series, chapter] = debutMatch;
+    return {
+      runtimeKey: `${series}${chapter}-人物登场`,
+      kind: EVENT_KIND.DEBUT,
+      series,
+      chapter,
+      sourceName,
+    };
+  }
+
+  const growthMatch = normalizedName.match(GROWTH_ENTRY_PATTERN);
+  if (growthMatch) {
+    const [, series, chapter, title] = growthMatch;
+    return {
+      runtimeKey: `${series}${chapter}-人物成长${title ? `-${title}` : ''}`,
+      kind: EVENT_KIND.GROWTH,
+      series,
+      chapter,
+      title: title || '人物成长',
+      sourceName,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * 将事件来源信息附着到定义对象；元数据不参与 JSON 序列化，也不会进入变量差分。
+ */
+export function attachEventMetadata(eventData, descriptor) {
+  if (!isPlainObject(eventData) || !descriptor) return eventData;
+  if (eventData[EVENT_METADATA]) return eventData;
+
+  Object.defineProperty(eventData, EVENT_METADATA, {
+    configurable: false,
+    enumerable: false,
+    writable: false,
+    value: Object.freeze({ ...descriptor }),
+  });
+  return eventData;
+}
+
+export function getEventMetadata(eventData) {
+  return isPlainObject(eventData) ? eventData[EVENT_METADATA] || null : null;
+}
+
+export function isEventKind(eventData, kind) {
+  return getEventMetadata(eventData)?.kind === kind;
+}
+
+// 判断事件是否为登场事件。事件种类只读 loader 附着的元数据，不再解析运行时键文本。
+export function isDebutEvent(eventData) {
+  return isEventKind(eventData, EVENT_KIND.DEBUT);
+}
+
+export function isOrdinaryEvent(eventData) {
+  return isEventKind(eventData, EVENT_KIND.ORDINARY);
+}
+
+function getCanonicalEventSeries(eventKey) {
+  return stripEventFileSuffix(eventKey).match(CANONICAL_ORDINARY_PATTERN)?.[1] || '';
+}
+
+/**
+ * 规范化事件定义中的后续事件/人物经历引用。只有看起来确实是章节事件的名称才会被改写。
+ */
+export function normalizeOrdinaryEventReference(reference, sourceEventKey = '') {
+  const rawReference = stripEventFileSuffix(reference);
+  if (!rawReference) return rawReference;
+
+  const physicalDescriptor = deriveEventRuntimeDescriptor(rawReference);
+  if (physicalDescriptor?.kind === EVENT_KIND.ORDINARY) {
+    const sourceSeries = getCanonicalEventSeries(sourceEventKey);
+    return physicalDescriptor.series || !sourceSeries
+      ? physicalDescriptor.runtimeKey
+      : `${sourceSeries}${physicalDescriptor.runtimeKey}`;
+  }
+
+  const canonicalMatch = rawReference.match(CANONICAL_ORDINARY_PATTERN);
+  if (canonicalMatch) {
+    const explicitSeries = canonicalMatch[1];
+    if (explicitSeries) return rawReference;
+    return `${getCanonicalEventSeries(sourceEventKey)}${rawReference}`;
+  }
+
+  const legacyMatch = rawReference.match(LEGACY_ORDINARY_PATTERN);
+  if (!legacyMatch) return rawReference;
+
+  const [, explicitSeries, chapter, sequence, title] = legacyMatch;
+  const series = explicitSeries || getCanonicalEventSeries(sourceEventKey);
+  return `${series}${chapter}${sequence}-${title}`;
+}
 
 // ==================== 日志工具 ====================
 export const isDebugEnabled = () => CONFIG.DEBUG_MODE || readLocalStorageFlag('era_event_debug');
@@ -146,19 +281,9 @@ function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-// 判断事件是否为登场事件
-export function isDebutEvent(eventName) {
-  return CONFIG.DEBUT_EVENT_PATTERN.test(eventName);
-}
-
-// 从完整事件文件名中提取核心名称
-export function getEventShortName(eventName) {
-  const match = eventName.match(/-([^-]+)\.(json|ya?ml)$/i);
-  return match ? match[1] : eventName;
-}
-
 export function getEventParticipationKeys(eventName) {
-  return [...new Set([eventName, getEventShortName(eventName)])];
+  const runtimeKey = stripEventFileSuffix(eventName);
+  return runtimeKey ? [runtimeKey] : [];
 }
 
 export function isParticipationEntry(value) {

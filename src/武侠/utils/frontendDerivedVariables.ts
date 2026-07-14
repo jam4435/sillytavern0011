@@ -18,6 +18,7 @@ import {
 } from './martialArtsDatabase';
 import {
   buildCurrentDynamicLocationContext,
+  collectEventTargetPaths,
   createDynamicLocationContextVariable,
   updateLocationContextInVariables,
   type DynamicLocationContextVariable,
@@ -44,7 +45,6 @@ const POWER_ZONE_TYPES: MartialArtsType[] = [
   '棍锤',
 ];
 
-const POWER_ZONE_HEADER = ['角色', ...POWER_ZONE_TYPES].join('|');
 const DEFAULT_INITIAL_ATTRIBUTES: InitialAttributes = {
   臂力: 10,
   根骨: 10,
@@ -95,6 +95,10 @@ type FrontendDerivedVariables = {
   随机数: string;
   修为变化参考: number;
 };
+
+export interface SyncFrontendDerivedVariablesOptions {
+  explicitMapTargets?: string[];
+}
 
 type MartialArtPowerEntry = {
   name: string;
@@ -337,6 +341,18 @@ function calculateMartialArtPower(
   return Math.round(total);
 }
 
+export function calculateBasicTechniquePower(
+  realm: string,
+  combatAttributes: Pick<ReturnType<typeof calculateCombatAttributes>, '臂力' | '根骨' | '机敏' | '洞察'>,
+): number {
+  if (parseRealm(realm).major === '不入流') {
+    return 0;
+  }
+  return Math.round(
+    (combatAttributes.臂力 + combatAttributes.根骨 + combatAttributes.机敏 + combatAttributes.洞察) * 0.15,
+  );
+}
+
 function buildCharacterPowerRow(character: CombatCharacter): string {
   const completedMartialArts = completeMartialArts(
     character.martialArts,
@@ -373,16 +389,17 @@ function buildCharacterPowerRow(character: CombatCharacter): string {
     entriesByType[martialArt.type].push({ name, power });
   }
 
-  const cells = POWER_ZONE_TYPES.map(type => {
+  const cells = POWER_ZONE_TYPES.flatMap(type => {
     const entries = entriesByType[type]
       .sort((left, right) => right.power - left.power || left.name.localeCompare(right.name, 'zh-CN'));
     if (entries.length === 0) {
-      return '无';
+      return [];
     }
-    return entries.map(entry => `${entry.name}=${entry.power}`).join(';');
+    return [`${type}:${entries.map(entry => `${entry.name}=${entry.power}`).join(';')}`];
   });
 
-  return [character.displayName, ...cells].join('|');
+  const basicTechniquePower = calculateBasicTechniquePower(character.realm, combatAttributes);
+  return [character.displayName, `基础:${basicTechniquePower}`, ...cells].join('|');
 }
 
 function calculateEffectiveCultivationBonus(character: CombatCharacter): number {
@@ -425,7 +442,7 @@ export function buildCombatPowerZoneFromStatData(statData: StatDataRecord): stri
   const npcRows = buildNpcCharacters(statData)
     .filter(character => playerLocation && character.normalizedLocation === playerLocation)
     .sort((left, right) => left.displayName.localeCompare(right.displayName, 'zh-CN'));
-  const rows: string[] = [POWER_ZONE_HEADER];
+  const rows: string[] = [];
 
   if (player) {
     rows.push(buildCharacterPowerRow(player));
@@ -506,14 +523,17 @@ export function buildFrontendRandomNumbers(count = DEFAULT_RANDOM_NUMBER_COUNT):
     .join('\n');
 }
 
-export async function syncFrontendDerivedVariables(): Promise<FrontendDerivedVariables | null> {
+export async function syncFrontendDerivedVariables(
+  options: SyncFrontendDerivedVariablesOptions = {},
+): Promise<FrontendDerivedVariables | null> {
   try {
-    const [locationContext] = await Promise.all([
-      buildCurrentDynamicLocationContext().then(createDynamicLocationContextVariable),
-      loadMartialArtsDatabase(),
-    ]);
+    const [dynamicLocationContext] = await Promise.all([buildCurrentDynamicLocationContext(), loadMartialArtsDatabase()]);
     const currentVariables = getVariables({ type: 'chat' }) as Record<string, unknown>;
     const statData = getStatDataRecord(currentVariables);
+    const locationContext = createDynamicLocationContextVariable(dynamicLocationContext, {
+      eventTargetPaths: collectEventTargetPaths(statData),
+      explicitMapTargets: options.explicitMapTargets,
+    });
     const battleZone = buildCombatPowerZoneFromStatData(statData);
     const cultivationReference = buildCultivationChangeReferenceFromStatData(statData);
     const randomNumbers = buildFrontendRandomNumbers();

@@ -145,4 +145,41 @@ describe('settingsManager ui theme', () => {
     expect(document.documentElement.style.getPropertyValue('--wuxia-modal-opacity')).toBe('0.7');
     expect(document.documentElement.style.colorScheme).toBe('light');
   });
+
+  it('defaults and migrates the extra-variable readonly context rounds to one or two', () => {
+    expect(createDefaultDisplaySettings().summarySettings.variableContextRounds).toBe(1);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { variableContextRounds: 2 } }),
+    );
+    expect(loadSettings().summarySettings.variableContextRounds).toBe(2);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { variableContextRounds: 8 } }),
+    );
+    expect(loadSettings().summarySettings.variableContextRounds).toBe(1);
+  });
+
+  it('updates legacy default-template labels without changing custom placeholders', () => {
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({
+        summarySettings: {
+          variablePromptTemplate:
+            '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】\n{{recentBodies}}\n【当前变量上下文，来自输出提示词渲染结果或等价快照】\n{{variableContext}}\n{{variableGuidance}}\n{{locationContext}}',
+        },
+      }),
+    );
+
+    const template = loadSettings().summarySettings.variablePromptTemplate;
+    expect(template).toContain('最新 assistant 正文是唯一变化来源');
+    expect(template).toContain('专用严格 JSON 投影');
+    expect(template).toContain('{{recentBodies}}');
+    expect(template).toContain('{{variableContext}}');
+    expect(template).toContain('{{variableGuidance}}');
+    expect(template).toContain('{{locationContext}}');
+    expect(template).not.toContain('最近 5 层正文');
+  });
 });

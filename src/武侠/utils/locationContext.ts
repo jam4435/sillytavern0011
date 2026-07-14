@@ -1,6 +1,7 @@
 import type { MapData, MapRegion } from '../types';
 import { loadMapData } from './mapLoader';
 import { FRONTEND_VARIABLES_KEY } from './frontendVariableKeys';
+import { isLocationUnlocked } from './mapUtils';
 
 const DEFAULT_ADJACENT_REGION_LIMIT = 4;
 export const LOCATION_CONTEXT_VARIABLE_KEY = '周围地点';
@@ -30,8 +31,14 @@ export interface DynamicLocationContext {
 }
 
 export interface DynamicLocationContextVariable {
-  相邻三级地点: string[];
-  相邻二级地点: string[];
+  普通移动: string[];
+  事件目标: string[];
+  地图指定: string[];
+}
+
+export interface DynamicLocationContextVariableOptions {
+  eventTargetPaths?: string[];
+  explicitMapTargets?: string[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -42,7 +49,7 @@ function omitKeys(record: Record<string, unknown>, keys: string[]): Record<strin
   return Object.fromEntries(Object.entries(record).filter(([key]) => !keys.includes(key)));
 }
 
-function normalizeLocationPath(value: string): string {
+export function normalizeLocationPath(value: string): string {
   return value
     .trim()
     .replace(/[\\＞>›→]+/g, '/')
@@ -107,10 +114,16 @@ function resolveCurrentRegions(regions: MapRegionReference[], currentLocation: s
   return uniqueRegions(regions.filter(region => Object.hasOwn(region.region.地点, normalized)));
 }
 
-function toRegionOption(region: MapRegionReference): LocationRegionOption {
+function toRegionOption(region: MapRegionReference, exploredLocations: string[]): LocationRegionOption {
   return {
     path: region.path,
-    locations: Object.keys(region.region.地点).map(locationName => `${region.path}/${locationName}`),
+    locations: Object.entries(region.region.地点)
+      .map(([locationName, location]) => ({
+        path: `${region.path}/${locationName}`,
+        location,
+      }))
+      .filter(({ path, location }) => isLocationUnlocked(path, location, exploredLocations))
+      .map(({ path }) => path),
   };
 }
 
@@ -144,6 +157,7 @@ export function buildDynamicLocationContext(
   mapData: MapData,
   currentLocation: string,
   adjacentRegionLimit = DEFAULT_ADJACENT_REGION_LIMIT,
+  exploredLocations: string[] = [],
 ): DynamicLocationContext {
   const allRegions = flattenMapRegions(mapData);
   const resolvedRegions = resolveCurrentRegions(allRegions, currentLocation);
@@ -158,11 +172,12 @@ export function buildDynamicLocationContext(
     };
   }
 
-  const currentRegions = resolvedRegions.map(toRegionOption);
-  const adjacentRegions = resolveAdjacentRegions(allRegions, resolvedRegions, adjacentRegionLimit).map(toRegionOption);
+  const currentRegions = resolvedRegions.map(region => toRegionOption(region, exploredLocations));
+  const adjacentRegions = resolveAdjacentRegions(allRegions, resolvedRegions, adjacentRegionLimit)
+    .map(region => toRegionOption(region, exploredLocations));
   const allowedLocationPaths = [
     ...currentRegions.flatMap(region => region.locations),
-    ...adjacentRegions.map(region => region.path),
+    ...adjacentRegions.flatMap(region => region.locations),
   ];
 
   return {
@@ -202,13 +217,13 @@ export function formatDynamicLocationConstraint(context: DynamicLocationContext)
     formatPathList(context.currentRegions.map(region => region.path)),
     '当前二级地点内可到达的三级地点：',
     formatPathList(currentRegionLocations),
-    '可直接进入的相邻二级地点（按地图坐标由近到远）：',
-    formatPathList(context.adjacentRegions.map(region => region.path)) || '- (无)',
+    '相邻二级地点内已解锁的三级地点（按地图坐标由近到远）：',
+    formatPathList(context.adjacentRegions.flatMap(region => region.locations)) || '- (无)',
     '强制规则：',
     '1. 仅当剧情中确实发生移动时，才修改 user数据.所在位置。',
-    '2. 新值必须逐字等于上方某个三级地点完整路径，或某个相邻二级地点完整路径；以上两组路径是唯一写入白名单。',
+    '2. 新值必须逐字等于上方某个三级地点完整路径；以上路径是唯一写入白名单。',
     '3. 不得缩写路径、只写末级名称、杜撰地点，或写入白名单之外的值。',
-    '4. 进入相邻二级地点后，其三级地点将在下一回合开放，不得本回合跨越二级地点直接写入其中的三级地点。',
+    '4. 二级地点本身不可作为移动目标；移动必须落到具体三级地点。',
   ].join('\n');
 }
 
@@ -222,7 +237,13 @@ export function getCurrentPlayerLocation(): string {
 
 export async function buildCurrentDynamicLocationContext(): Promise<DynamicLocationContext> {
   const mapData = await loadMapData();
-  return buildDynamicLocationContext(mapData, getCurrentPlayerLocation());
+  const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+  const statData = isRecord(variables.stat_data) ? variables.stat_data : variables;
+  const userData = isRecord(statData.user数据) ? statData.user数据 : {};
+  const exploredLocations = Array.isArray(userData.已探索地点)
+    ? userData.已探索地点.filter((value): value is string => typeof value === 'string')
+    : [];
+  return buildDynamicLocationContext(mapData, getCurrentPlayerLocation(), DEFAULT_ADJACENT_REGION_LIMIT, exploredLocations);
 }
 
 export async function buildDynamicLocationConstraintPrompt(): Promise<string> {
@@ -236,11 +257,49 @@ export async function buildDynamicLocationConstraintPrompt(): Promise<string> {
 
 export function createDynamicLocationContextVariable(
   context: DynamicLocationContext,
+  options: DynamicLocationContextVariableOptions = {},
 ): DynamicLocationContextVariable {
+  const eventTargets = normalizeCompleteLocationPaths(options.eventTargetPaths || []);
+  const explicitMapTargets = normalizeCompleteLocationPaths(options.explicitMapTargets || []);
   return {
-    相邻三级地点: context.currentRegions.flatMap(region => region.locations),
-    相邻二级地点: context.adjacentRegions.map(region => region.path),
+    普通移动: [...new Set(context.allowedLocationPaths)],
+    事件目标: eventTargets,
+    地图指定: explicitMapTargets,
   };
+}
+
+function normalizeCompleteLocationPaths(paths: string[]): string[] {
+  return [...new Set(paths
+    .map(normalizeLocationPath)
+    .filter(path => path.split('/').filter(Boolean).length === 3))];
+}
+
+export function extractExplicitMapTargetsFromText(text: string): string[] {
+  const targets: string[] = [];
+  const pattern = /\[地图指令\]从[^\r\n]+?移动到([^\r\n]+)/g;
+  for (const match of text.matchAll(pattern)) {
+    targets.push(match[1].trim());
+  }
+  return normalizeCompleteLocationPaths(targets);
+}
+
+export function collectEventTargetPaths(statData: Record<string, unknown>): string[] {
+  const targets: string[] = [];
+  const nearbyRumors = isRecord(statData.附近传闻) ? statData.附近传闻 : {};
+  const followupClues = isRecord(statData.后续事件线索) ? statData.后续事件线索 : {};
+
+  for (const value of Object.values(nearbyRumors)) {
+    if (typeof value !== 'string') continue;
+    const match = value.match(/\[[^\]/]+\/(.+)]\s*$/);
+    if (match?.[1]) targets.push(match[1]);
+  }
+  for (const value of Object.values(followupClues)) {
+    if (typeof value !== 'string') continue;
+    const match = value.match(/^\([^，]+，([^，]+)，似乎还会有事情发生\)/);
+    if (match?.[1]) targets.push(match[1]);
+  }
+
+  return normalizeCompleteLocationPaths(targets);
 }
 
 function getWorldInfoRecord(variables: Record<string, unknown>): Record<string, unknown> {
@@ -297,10 +356,16 @@ export function updateLocationContextInVariables(
   return nextStatData;
 }
 
-export async function syncDynamicLocationContextVariable(): Promise<DynamicLocationContextVariable | null> {
+export async function syncDynamicLocationContextVariable(
+  options: Pick<DynamicLocationContextVariableOptions, 'explicitMapTargets'> = {},
+): Promise<DynamicLocationContextVariable | null> {
   try {
-    const value = createDynamicLocationContextVariable(await buildCurrentDynamicLocationContext());
     const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+    const statData = isRecord(variables.stat_data) ? variables.stat_data : variables;
+    const value = createDynamicLocationContextVariable(await buildCurrentDynamicLocationContext(), {
+      eventTargetPaths: collectEventTargetPaths(statData),
+      explicitMapTargets: options.explicitMapTargets,
+    });
     const frontendVariables = getFrontendVariablesRecord(variables);
     if (
       JSON.stringify(frontendVariables[LOCATION_CONTEXT_VARIABLE_KEY]) === JSON.stringify(value) &&

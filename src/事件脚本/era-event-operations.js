@@ -10,12 +10,13 @@ import {
   logSuccess,
   logWarning,
   getEndTime,
-  getEventShortName,
+  getEventMetadata,
   hasParticipationEntry,
   getParticipationEntry,
   buildInvalidParticipationDeletePatch,
   buildParticipationDeletePatch,
   isDebutEvent,
+  normalizeOrdinaryEventReference,
   calculateDateOffset,
   compareTime,
   formatDate,
@@ -45,9 +46,7 @@ import {
   syncParticipationOutcomeStates,
 } from './era-world-events.js';
 
-const EVENT_KIND_PATTERN = /(事件条目-|登场事件-|成长条目-)/;
-const CHAPTER_EVENT_PATTERN = /^第[0-9一二三四五六七八九十百千万]+回-/;
-const CHAPTER_SEQUENCE_PATTERN = /^(第[0-9一二三四五六七八九十百千万]+回-[0-9]+-)/;
+const CHAPTER_SEQUENCE_PATTERN = /^(.*?第[0-9一二三四五六七八九十百千万]+回[0-9]+)-/;
 const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件'];
 const EVENT_DIFF_ACTIONS = ['insert', 'update', 'delete'];
 const POST_RESYNC_VERIFY_DELAY_MS = 1200;
@@ -121,23 +120,9 @@ async function ensureEventSystemPatchPersisted(eventSystemPatch, reason) {
   };
 }
 
-function getEventFamilyParts(eventName) {
-  const text = String(eventName || '');
-  const match = text.match(EVENT_KIND_PATTERN);
-  if (!match) return null;
-
-  const kindPrefix = match[1];
-  const kindIndex = match.index || 0;
-  const fullPrefix = text.slice(0, kindIndex + kindPrefix.length);
-  const novelPrefix = text.slice(0, kindIndex);
-  const coreName = text.slice(kindIndex + kindPrefix.length);
-
-  return { novelPrefix, kindPrefix, fullPrefix, coreName };
-}
-
 function stripJsonSuffix(value) {
   const text = String(value || '').trim();
-  return text.endsWith('.json') ? text.slice(0, -5) : text;
+  return text.replace(/\.(json|ya?ml|txt)$/i, '');
 }
 
 function resolveEventReference(sourceEventName, targetEventName, eventDefinitions) {
@@ -145,70 +130,20 @@ function resolveEventReference(sourceEventName, targetEventName, eventDefinition
   if (!rawTarget) return rawTarget;
   if (eventDefinitions[rawTarget]) return rawTarget;
 
-  const sourceParts = getEventFamilyParts(sourceEventName);
-  const targetParts = getEventFamilyParts(rawTarget);
-  const candidates = [];
-  const addCandidate = candidate => {
-    if (candidate && !candidates.includes(candidate)) {
-      candidates.push(candidate);
-    }
-  };
+  const canonicalTarget = normalizeOrdinaryEventReference(rawTarget, sourceEventName);
+  if (eventDefinitions[canonicalTarget]) return canonicalTarget;
 
-  addCandidate(rawTarget);
-
-  if (sourceParts) {
-    if (targetParts) {
-      addCandidate(`${sourceParts.novelPrefix}${targetParts.kindPrefix}${targetParts.coreName}`);
-      addCandidate(`${sourceParts.fullPrefix}${targetParts.coreName}`);
-      addCandidate(targetParts.coreName);
-    } else {
-      addCandidate(`${sourceParts.fullPrefix}${rawTarget}`);
-    }
-  }
-
-  if (targetParts) {
-    addCandidate(targetParts.coreName);
-  }
-
-  for (const candidate of candidates) {
-    if (eventDefinitions[candidate]) {
-      return candidate;
-    }
-  }
-
-  if (sourceParts) {
-    const coreTarget = targetParts ? targetParts.coreName : rawTarget;
-    const suffixMatches = Object.keys(eventDefinitions).filter(name => {
-      const parts = getEventFamilyParts(name);
-      return (
-        parts &&
-        parts.novelPrefix === sourceParts.novelPrefix &&
-        parts.kindPrefix === sourceParts.kindPrefix &&
-        parts.coreName === coreTarget
-      );
+  const sequencePrefix = canonicalTarget.match(CHAPTER_SEQUENCE_PATTERN)?.[1];
+  if (sequencePrefix) {
+    const sourceSeries = getEventMetadata(eventDefinitions[sourceEventName])?.series;
+    const sequenceMatches = Object.keys(eventDefinitions).filter(name => {
+      const metadata = getEventMetadata(eventDefinitions[name]);
+      return metadata?.series === sourceSeries && name.startsWith(`${sequencePrefix}-`);
     });
-    if (suffixMatches.length === 1) {
-      return suffixMatches[0];
-    }
-
-    const sequencePrefix = coreTarget.match(CHAPTER_SEQUENCE_PATTERN)?.[1];
-    if (sequencePrefix) {
-      const sequenceMatches = Object.keys(eventDefinitions).filter(name => {
-        const parts = getEventFamilyParts(name);
-        return (
-          parts &&
-          parts.novelPrefix === sourceParts.novelPrefix &&
-          parts.kindPrefix === sourceParts.kindPrefix &&
-          parts.coreName.startsWith(sequencePrefix)
-        );
-      });
-      if (sequenceMatches.length === 1) {
-        return sequenceMatches[0];
-      }
-    }
+    if (sequenceMatches.length === 1) return sequenceMatches[0];
   }
 
-  return rawTarget;
+  return canonicalTarget;
 }
 
 function addValueToSetMap(map, key, value) {
@@ -228,7 +163,6 @@ function getFollowupReferenceIndex(eventDefinitions) {
 
   const sourceToTarget = new Map();
   const clueKeysByTargetKey = new Map();
-  const clueKeysByTargetShortName = new Map();
 
   for (const [sourceEventName, eventData] of Object.entries(eventDefinitions)) {
     const followupInfo = eventData?.后续事件;
@@ -238,37 +172,21 @@ function getFollowupReferenceIndex(eventDefinitions) {
     const targetEventData = eventDefinitions[targetEventKey];
     if (!targetEventData) continue;
 
-    const clueKey = `${getEventShortName(sourceEventName)}的后续`;
+    const clueKey = sourceEventName;
     sourceToTarget.set(sourceEventName, targetEventKey);
     addValueToSetMap(clueKeysByTargetKey, targetEventKey, clueKey);
-    addValueToSetMap(clueKeysByTargetShortName, getEventShortName(targetEventKey), clueKey);
   }
 
   const index = {
     sourceToTarget,
     clueKeysByTargetKey,
-    clueKeysByTargetShortName,
   };
   followupReferenceIndexCache.set(eventDefinitions, index);
   return index;
 }
 
 function normalizeEventRecordName(sourceEventName, recordName) {
-  const sourceParts = getEventFamilyParts(sourceEventName);
-  const rawRecordName = stripJsonSuffix(recordName);
-  const recordParts = getEventFamilyParts(rawRecordName);
-  const strippedRecordName = recordParts ? `${recordParts.novelPrefix}${recordParts.coreName}` : rawRecordName;
-
-  if (!sourceParts?.novelPrefix) {
-    return strippedRecordName;
-  }
-  if (strippedRecordName.startsWith(sourceParts.novelPrefix)) {
-    return strippedRecordName;
-  }
-  if (CHAPTER_EVENT_PATTERN.test(strippedRecordName)) {
-    return `${sourceParts.novelPrefix}${strippedRecordName}`;
-  }
-  return strippedRecordName;
+  return normalizeOrdinaryEventReference(recordName, sourceEventName);
 }
 
 function normalizeCharacterDeltaForEvent(delta, eventName) {
@@ -309,9 +227,16 @@ function getParticipationActionDiff(participationEntry, actionKey) {
   return isPlainObject(diff) ? diff : {};
 }
 
-function getInitialParticipationActionDiff(eventData, actionKey) {
+function getInitialParticipationActionDiff(eventData, actionKey, eventName) {
   const delta = eventData?.[actionKey];
-  return isPlainObject(delta) ? cloneJson(delta) : {};
+  if (!isPlainObject(delta)) return {};
+
+  return Object.fromEntries(
+    Object.entries(delta).map(([characterName, characterDelta]) => [
+      characterName,
+      normalizeCharacterDeltaForEvent(characterDelta, eventName),
+    ]),
+  );
 }
 
 function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, statData, sourceLabel) {
@@ -404,7 +329,7 @@ export async function initializeEventList(eventDefinitions, options = {}) {
       const eventData = eventDefinitions[eventName];
       const triggerTime = eventData.触发条件;
       const endTime = getEndTime(eventData);
-      const isDebut = isDebutEvent(eventName);
+      const isDebut = isDebutEvent(eventData);
 
       // 检查是否已超过结束时间
       if (endTime && isTimeAfterEventEnd(currentTime, endTime)) {
@@ -666,7 +591,7 @@ export async function applyParticipantEntry(eventName, eventData, source) {
 export async function applyParticipantEntries(eventNames, eventDefinitions, source, options = {}) {
   const uniqueEventNames = [...new Set(eventNames)].filter(eventName => {
     const eventData = eventDefinitions[eventName];
-    return eventData && !isDebutEvent(eventName);
+    return eventData && !isDebutEvent(eventData);
   });
 
   if (uniqueEventNames.length === 0) {
@@ -786,7 +711,7 @@ export async function applyTimedParticipantEntries(eventNames, eventDefinitions,
 
     if (
       !eventData ||
-      isDebutEvent(eventName) ||
+      isDebutEvent(eventData) ||
       !triggerTime ||
       triggerTime.类型 !== '时间' ||
       !compareTime(currentTime, triggerTime, '>=') ||
@@ -994,9 +919,9 @@ export function buildPlayerParticipationEntry(eventName, eventData, currentTime)
   return {
     描述: buildPlayerParticipationDescription(eventName, eventData, currentTime),
     结局: getEventSummary(eventData),
-    insert: getInitialParticipationActionDiff(eventData, 'insert'),
-    update: getInitialParticipationActionDiff(eventData, 'update'),
-    delete: getInitialParticipationActionDiff(eventData, 'delete'),
+    insert: getInitialParticipationActionDiff(eventData, 'insert', eventName),
+    update: getInitialParticipationActionDiff(eventData, 'update', eventName),
+    delete: getInitialParticipationActionDiff(eventData, 'delete', eventName),
   };
 }
 
@@ -1045,13 +970,13 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
     const participationPatch = Object.fromEntries(
       eventsToJoin.map(eventName => {
         const eventData = eventDefinitions[eventName];
-        return [getEventShortName(eventName), buildPlayerParticipationEntry(eventName, eventData, currentTime)];
+        return [eventName, buildPlayerParticipationEntry(eventName, eventData, currentTime)];
       }),
     );
 
     await writeEraInsert({ 参与事件: participationPatch }, `player-joins-events-${eventsToJoin.length}`);
     await syncParticipationOutcomeStates(eventDefinitions);
-    logSuccess(`玩家已参与 ${eventsToJoin.length} 个事件:`, eventsToJoin.map(getEventShortName));
+    logSuccess(`玩家已参与 ${eventsToJoin.length} 个事件:`, eventsToJoin);
 
     debugGroupEnd();
     return eventsToJoin;
@@ -1062,7 +987,7 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
   }
 }
 
-// ==================== 玩家参与事件 (重构版：时间平移+简化键名) ====================
+// ==================== 玩家参与事件 (时间平移 + 规范运行时键) ====================
 export async function playerJoinsEvent(eventName, eventData) {
   const joinedEvents = await playerJoinsEvents([eventName], { [eventName]: eventData });
   return joinedEvents.length > 0;
@@ -1208,8 +1133,7 @@ function buildFollowupPayloads(eventNames, eventDefinitions) {
 
   for (const eventName of eventNames) {
     if (eventDefinitions[eventName] && eventDefinitions[eventName].后续事件) {
-      const shortName = getEventShortName(eventName);
-      const key = `${shortName}的后续`;
+      const key = eventName;
       const followupInfo = eventDefinitions[eventName].后续事件;
       const targetEventKey = followupIndex.sourceToTarget.get(eventName);
       const description = followupInfo.描述 || '';
@@ -1308,10 +1232,7 @@ export async function cleanupFollowupCluesForActiveParticipation(eventDefinition
   }
 
   for (const participationKey of participationKeys) {
-    const clueSets = [
-      followupIndex.clueKeysByTargetKey.get(participationKey),
-      followupIndex.clueKeysByTargetShortName.get(participationKey),
-    ];
+    const clueSets = [followupIndex.clueKeysByTargetKey.get(participationKey)];
 
     for (const clueSet of clueSets) {
       if (!clueSet) continue;

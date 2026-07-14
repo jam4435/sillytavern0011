@@ -8,17 +8,18 @@ import {
   reconcileWorldEventArchive,
   syncParticipationOutcomeStates,
 } from './era-world-events.js';
+import { attachEventMetadata, deriveEventRuntimeDescriptor } from './era-utils.js';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-const eventName = '射雕事件条目-第7回-02-初遇黄蓉.yaml';
-const eventDefinition = {
+const eventName = '射雕第7回02-初遇黄蓉';
+const eventDefinition = attachEventMetadata({
   事件地点: '大宋/张家口',
   事件概要: '郭靖结识黄蓉并请她吃饭，两人由此建立初步情谊。',
   事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
   insert: { 郭靖: { 人物经历: { 初遇黄蓉: '在张家口结识黄蓉。' } } },
   update: { 黄蓉: { 所在位置: '大宋/张家口' } },
   delete: {},
-};
+}, deriveEventRuntimeDescriptor('射雕事件条目-第7回-02-初遇黄蓉.yaml'));
 
 function participation(ending = eventDefinition.事件概要) {
   return {
@@ -176,13 +177,17 @@ describe('world event archive', () => {
     expect(variables.stat_data.前端变量.事件结局状态).toEqual({});
   });
 
-  it('backfills an unrecoverable participated event as unknown', async () => {
-    const legacyEventName = '射雕事件条目-第8回-01-旧存档事件.yaml';
+  it('backfills an unrecoverable participated canonical event as unknown', async () => {
+    const missingEventName = '射雕第8回01-旧存档事件';
+    const missingEventDefinition = attachEventMetadata(
+      { ...eventDefinition },
+      deriveEventRuntimeDescriptor('射雕事件条目-第8回-01-旧存档事件.yaml'),
+    );
     let variables: any = {
       stat_data: {
         参与事件: {},
         世界事件: {},
-        事件系统: { 已完成事件: { [legacyEventName]: 1 } },
+        事件系统: { 已完成事件: { [missingEventName]: 1 } },
         前端变量: { 事件结局状态: {} },
       },
     };
@@ -192,10 +197,10 @@ describe('world event archive', () => {
       return variables;
     });
 
-    await reconcileWorldEventArchive({ [legacyEventName]: eventDefinition });
+    await reconcileWorldEventArchive({ [missingEventName]: missingEventDefinition });
 
-    expect(variables.stat_data.世界事件[legacyEventName].概要).toContain('旧存档未保存玩家参与后的具体结局');
-    expect(variables.stat_data.前端变量.事件结局状态[legacyEventName]).toBe(EVENT_OUTCOME_STATUS.UNKNOWN);
+    expect(variables.stat_data.世界事件[missingEventName].概要).toContain('旧存档未保存玩家参与后的具体结局');
+    expect(variables.stat_data.前端变量.事件结局状态[missingEventName]).toBe(EVENT_OUTCOME_STATUS.UNKNOWN);
     expect(eventEmitMock.mock.calls.some(([name]) => String(name).startsWith('era:'))).toBe(false);
   });
 });

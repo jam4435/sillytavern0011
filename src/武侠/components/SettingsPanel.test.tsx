@@ -152,4 +152,20 @@ describe('SettingsPanel theme controls', () => {
       }),
     );
   });
+
+  it('updates only the extra-variable readonly context round count', () => {
+    const settings = createDefaultDisplaySettings();
+    const onSettingsChange = renderSettingsPanel(settings);
+
+    fireEvent.click(screen.getByRole('button', { name: /额外模型/ }));
+    fireEvent.change(screen.getByLabelText('只读上下文轮数'), { target: { value: '2' } });
+
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      ...settings,
+      summarySettings: {
+        ...settings.summarySettings,
+        variableContextRounds: 2,
+      },
+    });
+  });
 });
