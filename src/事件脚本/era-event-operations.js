@@ -1065,6 +1065,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     const 参与删除对象 = {};
 
     const eventsNeedingDiff = [];
+    const participationByEvent = {};
 
     // 遍历所有要结束的事件，合并差分。已经持久记录完成差分的事件在重试时不会再次结算。
     for (const eventName of eventNames) {
@@ -1075,12 +1076,22 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       }
 
       // 步骤 1: 明确判断玩家是否参与
-      const playerParticipated = hasParticipationEntry(参与事件, eventName);
+      const progressEntry = settlementProgress[eventName];
+      const completedParticipationFlag = statData?.事件系统?.已完成事件?.[eventName] === 1;
+      const playerParticipated =
+        hasParticipationEntry(参与事件, eventName) ||
+        (isPlainObject(progressEntry) && progressEntry.玩家参与 === true) ||
+        completedParticipationFlag;
+      participationByEvent[eventName] = playerParticipated;
       log(`事件 ${eventName}: 玩家是否参与? ${playerParticipated}`);
 
-      const participationEntry = playerParticipated ? getParticipationEntry(参与事件, eventName) : null;
+      const participationEntry = hasParticipationEntry(参与事件, eventName)
+        ? getParticipationEntry(参与事件, eventName)
+        : null;
 
-      if (settlementProgress[eventName] !== '差分已应用') {
+      const diffWasApplied =
+        progressEntry === '差分已应用' || (isPlainObject(progressEntry) && progressEntry.差分已应用 === true);
+      if (!diffWasApplied) {
         eventsNeedingDiff.push(eventName);
         // 步骤 2: 未参与事件使用事件定义差分；玩家参与事件使用参与事件内的结局快照。
         for (const actionKey of EVENT_DIFF_ACTIONS) {
@@ -1117,14 +1128,23 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     debugGroupEnd();
 
     if (eventsNeedingDiff.length > 0) {
-      const progressPatch = Object.fromEntries(eventsNeedingDiff.map(eventName => [eventName, '差分已应用']));
+      const progressPatch = Object.fromEntries(
+        eventsNeedingDiff.map(eventName => [
+          eventName,
+          { 差分已应用: true, 玩家参与: participationByEvent[eventName] === true },
+        ]),
+      );
       await writeDirectInsert(
         { 前端变量: { [EVENT_SETTLEMENT_PROGRESS_KEY]: progressPatch } },
         'batch-end-mark-diff-applied',
       );
       const progressVars = await getVariables({ type: 'chat' });
       const persistedProgress = progressVars?.stat_data?.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {};
-      if (eventsNeedingDiff.some(eventName => persistedProgress[eventName] !== '差分已应用')) {
+      if (
+        eventsNeedingDiff.some(
+          eventName => !isPlainObject(persistedProgress[eventName]) || persistedProgress[eventName].差分已应用 !== true,
+        )
+      ) {
         throw new Error('事件差分结算进度未能持久化，保留进行中事件等待重试');
       }
     }

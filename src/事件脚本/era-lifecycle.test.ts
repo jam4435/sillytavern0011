@@ -172,7 +172,10 @@ describe('completion persistence and follow-up pairs', () => {
     });
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(false);
-    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBe('差分已应用');
+    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toEqual({
+      差分已应用: true,
+      玩家参与: false,
+    });
     expect(variables.stat_data.后续事件线索[sourceName]).toBeUndefined();
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
@@ -224,7 +227,10 @@ describe('completion persistence and follow-up pairs', () => {
     });
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(false);
-    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBe('差分已应用');
+    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toEqual({
+      差分已应用: true,
+      玩家参与: true,
+    });
     expect(variables.stat_data.参与事件[sourceName].结局).toBe(actualEnding);
     expect(diffApplyCount).toBe(1);
 
@@ -233,6 +239,44 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.角色数据.郭靖.状态).toBe('事件完成');
     expect(variables.stat_data.世界事件[sourceName].概要).toBe(actualEnding);
     expect(variables.stat_data.参与事件[sourceName]).toBeUndefined();
+  });
+
+  it('preserves the participation flag when completed-state write fails after participation is removed', async () => {
+    const definitions = { [sourceName]: eventDefinition, [targetName]: targetDefinition };
+    variables.stat_data.参与事件 = {
+      [sourceName]: {
+        描述: '玩家参与了事件。',
+        结局: '玩家改变了事件。',
+        insert: {},
+        update: {},
+        delete: {},
+      },
+    };
+
+    let failCompletedWrite = true;
+    vi.mocked(globalThis.updateVariablesWith).mockImplementation(updater => {
+      const nextVariables = updater(clone(variables)) as typeof variables;
+      const insertedCompletedState =
+        variables.stat_data.事件系统.已完成事件[sourceName] === undefined &&
+        nextVariables.stat_data.事件系统.已完成事件[sourceName] !== undefined;
+      if (failCompletedWrite && insertedCompletedState) {
+        failCompletedWrite = false;
+        throw new Error('completed-state write failed');
+      }
+      variables = nextVariables;
+      return clone(variables);
+    });
+
+    await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(false);
+    expect(variables.stat_data.参与事件[sourceName]).toBeUndefined();
+    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toEqual({
+      差分已应用: true,
+      玩家参与: true,
+    });
+
+    await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
+    expect(variables.stat_data.事件系统.已完成事件[sourceName]).toBe(1);
+    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
   });
 });
 
