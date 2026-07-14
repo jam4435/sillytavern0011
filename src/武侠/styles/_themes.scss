@@ -18,6 +18,14 @@
   --yellow-600: #b8860b;
   --yellow-100: #1a1410;
   --yellow-50: #3d3028;
+  --wuxia-ink-text-strong: #1a1410;
+  --wuxia-ink-text: #3d3028;
+  --wuxia-ink-text-muted: #5b5048;
+  --wuxia-ink-paper: rgba(250, 246, 238, 0.82);
+  --wuxia-ink-paper-strong: rgba(255, 252, 247, 0.94);
+  --wuxia-ink-border: rgba(61, 48, 40, 0.34);
+  --wuxia-ink-border-soft: rgba(61, 48, 40, 0.22);
+  --wuxia-ink-focus-ring: rgba(139, 26, 26, 0.14);
 }
 
 [data-ui-theme='ink-wash'] {
@@ -474,7 +482,7 @@
   .save-tree-subtitle,
   .save-node-meta,
   .save-node-preview {
-    color: #7a6e62;
+    color: var(--wuxia-ink-text-muted);
   }
 
   .send-button,
@@ -775,8 +783,335 @@
   }
 
   .settings-preview .preview-text {
-    border-color: rgba(61, 48, 40, 0.18);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+    border-color: var(--wuxia-ink-border);
+    box-shadow:
+      0 5px 14px rgba(61, 48, 40, 0.06),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+  }
+
+  // 设置页：深色主题组件使用的是编译期色值，水墨主题需显式补齐宣纸表面与墨色层级。
+  .settings-panel {
+    color: var(--wuxia-ink-text-strong);
+  }
+
+  .settings-row,
+  .summary-subsection,
+  .regex-scope-section + .regex-scope-section,
+  .debug-log-body,
+  .debug-stats {
+    border-color: var(--wuxia-ink-border-soft);
+  }
+
+  .settings-preview {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.38), transparent 56%),
+      var(--wuxia-ink-paper);
+    border-color: var(--wuxia-ink-border);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  }
+
+  .preview-label {
+    color: var(--wuxia-ink-text-muted);
+    font-weight: 600;
+  }
+
+  .settings-text-input,
+  .settings-color-input,
+  .settings-number-input,
+  .settings-select,
+  .settings-textarea,
+  .regex-input {
+    background: var(--wuxia-ink-paper-strong);
+    border-color: var(--wuxia-ink-border);
+    color: var(--wuxia-ink-text-strong);
+    box-shadow: inset 0 1px 2px rgba(61, 48, 40, 0.06);
+
+    &::placeholder {
+      color: var(--wuxia-ink-text-muted);
+      opacity: 0.88;
+    }
+
+    &:focus {
+      border-color: rgba(139, 26, 26, 0.64);
+      box-shadow:
+        0 0 0 3px var(--wuxia-ink-focus-ring),
+        inset 0 1px 2px rgba(61, 48, 40, 0.05);
+    }
+  }
+
+  .settings-select option {
+    background: #f7f1e7;
+    color: var(--wuxia-ink-text-strong);
+  }
+
+  // 正则页
+  .regex-section-title,
+  .regex-rule-desc {
+    color: var(--wuxia-ink-text-strong);
+  }
+
+  .regex-section-caption,
+  .regex-empty,
+  .regex-rule-index,
+  .regex-field label {
+    color: var(--wuxia-ink-text-muted);
+  }
+
+  .regex-section-meta {
+    background: rgba(139, 26, 26, 0.08);
+    border-color: rgba(139, 26, 26, 0.42);
+    color: #7f2119;
+  }
+
+  .regex-rule-item {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent 54%),
+      var(--wuxia-ink-paper);
+    border-color: var(--wuxia-ink-border);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+
+    &:hover {
+      border-color: rgba(139, 26, 26, 0.44);
+    }
+
+    &.disabled {
+      opacity: 0.68;
+    }
+  }
+
+  .regex-rule-header {
+    &:hover {
+      background-color: rgba(139, 26, 26, 0.06);
+    }
+
+    &:active {
+      background-color: rgba(139, 26, 26, 0.1);
+    }
+  }
+
+  .regex-rule-body {
+    border-top-color: var(--wuxia-ink-border-soft);
+  }
+
+  .regex-toggle-btn,
+  .regex-expand-btn,
+  .regex-delete-btn {
+    color: var(--wuxia-ink-text-muted);
+  }
+
+  .regex-toggle-btn.active {
+    color: #2f6b38;
+  }
+
+  .regex-error {
+    color: #8b1a1a;
+  }
+
+  .regex-input.invalid {
+    background: rgba(139, 26, 26, 0.05);
+    border-color: rgba(139, 26, 26, 0.62);
+  }
+
+  .regex-rule-origin--manual {
+    background: rgba(61, 48, 40, 0.1);
+    color: var(--wuxia-ink-text);
+  }
+
+  .regex-rule-origin--global {
+    background: rgba(47, 107, 56, 0.1);
+    color: #2f6b38;
+  }
+
+  .regex-rule-origin--preset {
+    background: rgba(139, 90, 10, 0.1);
+    color: #7a4d06;
+  }
+
+  // 额外模型、自动总结与额外变量
+  .summary-api-fields,
+  .summary-status,
+  .summary-result,
+  .summary-api-status {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 58%),
+      var(--wuxia-ink-paper);
+    border-color: var(--wuxia-ink-border);
+  }
+
+  .summary-subsection-title,
+  .summary-status-header,
+  .summary-result-header,
+  .summary-status-item strong,
+  .summary-result-item strong,
+  .summary-pending-list li {
+    color: var(--wuxia-ink-text-strong);
+  }
+
+  .summary-stream-toggle,
+  .summary-status-item,
+  .summary-result-item,
+  .summary-pending-list,
+  .summary-api-status {
+    color: var(--wuxia-ink-text);
+  }
+
+  .summary-api-mode,
+  .summary-toggle-btn,
+  .settings-reset-template-btn {
+    background: rgba(255, 252, 247, 0.7);
+    border-color: var(--wuxia-ink-border);
+    color: var(--wuxia-ink-text);
+
+    &:hover {
+      background: rgba(139, 26, 26, 0.06);
+      border-color: rgba(139, 26, 26, 0.48);
+      color: #7f2119;
+    }
+  }
+
+  .summary-api-mode.active {
+    background: rgba(139, 26, 26, 0.08);
+    border-color: rgba(139, 26, 26, 0.56);
+    color: #7f2119;
+  }
+
+  .summary-toggle-btn.active {
+    background: rgba(47, 107, 56, 0.09);
+    border-color: rgba(47, 107, 56, 0.52);
+    color: #2f6b38;
+  }
+
+  .summary-status-header,
+  .summary-result-header,
+  .summary-pending-list {
+    border-color: var(--wuxia-ink-border-soft);
+  }
+
+  .summary-api-status.info {
+    background: rgba(255, 252, 247, 0.7);
+  }
+
+  .summary-api-status.success {
+    background: rgba(47, 107, 56, 0.09);
+    border-color: rgba(47, 107, 56, 0.4);
+    color: #2f6b38;
+  }
+
+  .summary-api-status.warning {
+    background: rgba(139, 90, 10, 0.09);
+    border-color: rgba(139, 90, 10, 0.42);
+    color: #7a4d06;
+  }
+
+  .summary-status-badge.ok,
+  .summary-result-badge.success {
+    background: rgba(47, 107, 56, 0.1);
+    color: #2f6b38;
+  }
+
+  .summary-status-badge.warning,
+  .summary-result-badge.warning {
+    background: rgba(139, 90, 10, 0.1);
+    color: #7a4d06;
+  }
+
+  .summary-result-item.success strong {
+    color: #2f6b38;
+  }
+
+  .summary-result-item.failed strong {
+    color: #8b1a1a;
+  }
+
+  // 调试页
+  .debug-empty,
+  .debug-empty .debug-hint,
+  .debug-log-time,
+  .debug-log-length,
+  .debug-log-status,
+  .debug-stats {
+    color: var(--wuxia-ink-text-muted);
+  }
+
+  .debug-log-status {
+    background: rgba(255, 252, 247, 0.68);
+    border-color: var(--wuxia-ink-border);
+
+    &.running {
+      color: #7a4d06;
+      border-color: rgba(139, 90, 10, 0.42);
+    }
+
+    &.success {
+      color: #2f6b38;
+      border-color: rgba(47, 107, 56, 0.4);
+    }
+
+    &.error {
+      color: #8b1a1a;
+      border-color: rgba(139, 26, 26, 0.42);
+    }
+  }
+
+  .debug-log-item {
+    background: var(--wuxia-ink-paper);
+    border-color: var(--wuxia-ink-border);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+
+    &:hover {
+      border-color: rgba(139, 26, 26, 0.4);
+    }
+
+    &.expanded {
+      background: var(--wuxia-ink-paper-strong);
+    }
+
+    &.prompt {
+      border-left: 3px solid #8b1a1a;
+    }
+
+    &.assistant {
+      border-left-color: #2f6b38;
+    }
+  }
+
+  .debug-log-header:hover {
+    background-color: rgba(139, 26, 26, 0.05);
+  }
+
+  .debug-log-type.user,
+  .debug-log-type.prompt {
+    color: #7f2119;
+  }
+
+  .debug-log-type.assistant {
+    color: #2f6b38;
+  }
+
+  .debug-log-preview {
+    color: var(--wuxia-ink-text);
+  }
+
+  .debug-log-content {
+    background:
+      linear-gradient(135deg, rgba(139, 26, 26, 0.025), transparent 50%),
+      var(--wuxia-ink-paper-strong);
+    border: 1px solid var(--wuxia-ink-border);
+    box-shadow: inset 0 1px 2px rgba(61, 48, 40, 0.05);
+
+    pre {
+      color: var(--wuxia-ink-text-strong);
+    }
+  }
+
+  .debug-expand-btn,
+  .debug-copy-btn {
+    color: var(--wuxia-ink-text);
+  }
+
+  .debug-copy-btn {
+    background: rgba(255, 252, 247, 0.72);
+    border-color: var(--wuxia-ink-border);
   }
 
   .martial-art-card {
@@ -1246,8 +1581,8 @@
   .variables-mode-btn,
   .variables-scope-chip,
   .variables-null-btn {
-    background: rgba(255, 250, 244, 0.68);
-    border-color: rgba(61, 48, 40, 0.18);
+    background: rgba(255, 250, 244, 0.82);
+    border-color: rgba(61, 48, 40, 0.3);
     color: #1a1410;
     box-shadow: none;
   }
@@ -1267,6 +1602,12 @@
     background: transparent;
     color: #1a1410;
     box-shadow: none;
+
+    &:focus {
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
 
     &::placeholder {
       color: #7a6e62;
@@ -1333,7 +1674,7 @@
   .variable-detail-field-label,
   .variable-null-value,
   .variable-unknown-value {
-    color: #7a6e62;
+    color: var(--wuxia-ink-text-muted);
   }
 
   .variables-result-path,
@@ -1345,10 +1686,31 @@
     color: #1a1410;
   }
 
+  .variable-node-toggle {
+    color: var(--wuxia-ink-text-muted);
+  }
+
+  .variable-node-type {
+    background: var(--wuxia-ink-paper-strong);
+    border-color: var(--wuxia-ink-border);
+    color: var(--wuxia-ink-text);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+    font-weight: 600;
+  }
+
+  .variable-node-preview {
+    color: var(--wuxia-ink-text);
+  }
+
+  .variable-node.branch > .variable-node-row .variable-node-preview,
+  .variable-node-empty {
+    color: var(--wuxia-ink-text-muted);
+  }
+
   .variables-result-item,
   .variables-character-item {
     span:last-child {
-      color: #7a6e62;
+      color: var(--wuxia-ink-text-muted);
     }
 
     &:hover {
@@ -1381,13 +1743,13 @@
   }
 
   .variable-detail-panel.empty {
-    color: #7a6e62;
+    color: var(--wuxia-ink-text-muted);
   }
 
   .variable-detail-meta span {
-    background: rgba(255, 255, 255, 0.42);
-    border-color: rgba(61, 48, 40, 0.16);
-    color: #5b5048;
+    background: rgba(255, 252, 247, 0.78);
+    border-color: rgba(61, 48, 40, 0.28);
+    color: var(--wuxia-ink-text);
   }
 
   .variable-detail-back-btn,
