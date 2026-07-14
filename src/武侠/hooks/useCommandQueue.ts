@@ -21,11 +21,10 @@ export function useCommandQueue() {
 
   /** 设置唯一的地图移动指令；新目标会替换旧目标。 */
   const setTravelCommand = useCallback((location: string, origin: string) => {
-    const target = location.split('/').filter(Boolean).pop() || location;
     const command: PendingCommand = {
       id: `travel_${Date.now()}_${Math.random()}`,
       type: 'TRAVEL' as CommandType,
-      text: `[地图指令]从${origin}移动到${target}`,
+      text: `[地图指令]从${origin}移动到${location}`,
       data: {
         location,
         origin,

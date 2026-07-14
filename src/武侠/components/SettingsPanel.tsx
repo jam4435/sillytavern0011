@@ -2302,7 +2302,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </div>
               </div>
 
-              <div className="summary-api-mode-group" role="radiogroup" aria-label="正文变量更新模式">
+              <div className="summary-api-mode-group" role="radiogroup" aria-label="变量更新模式">
                 <label
                   className={`summary-api-mode ${settings.summarySettings.variableUpdateMode !== 'extra' ? 'active' : ''}`}
                 >
@@ -2313,7 +2313,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     disabled={isSummaryVariableModeUpdating}
                     onChange={() => void updateVariableUpdateMode('inline')}
                   />
-                  <span>随正文更新变量</span>
+                  <span>正文伴随的变量更新</span>
                 </label>
                 <label
                   className={`summary-api-mode ${settings.summarySettings.variableUpdateMode === 'extra' ? 'active' : ''}`}

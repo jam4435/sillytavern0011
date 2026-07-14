@@ -64,6 +64,23 @@ describe('useCommandQueue', () => {
     expect(syncPlayerAttributesMock).toHaveBeenCalledTimes(1);
   });
 
+  it('地图指令会把完整三级地点路径发送给正文模型', async () => {
+    const { result } = renderHook(() => useCommandQueue());
+    const send = vi.fn(async () => undefined);
+
+    act(() => {
+      result.current.setTravelCommand('大宋/嘉兴府/烟雨楼', '大宋/临安府/牛家村');
+    });
+
+    await act(async () => {
+      await result.current.sendMessageWithCommands('出发', send);
+    });
+
+    expect(send).toHaveBeenCalledWith(
+      '出发\n[地图指令]从大宋/临安府/牛家村移动到大宋/嘉兴府/烟雨楼',
+    );
+  });
+
   it('玩家消息发送失败时不会递减状态效果', async () => {
     const { result } = renderHook(() => useCommandQueue());
     const send = vi.fn(async () => {

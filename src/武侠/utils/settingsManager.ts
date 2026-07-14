@@ -62,7 +62,7 @@ export interface SummaryApiProfile {
 /** 额外模型 API 选择 */
 export type SummaryApiSelection = { type: 'preset' } | { type: 'profile'; profileId: string };
 
-/** 正文变量更新模式 */
+/** 变量更新模式：正文伴随或额外模型 */
 export type SummaryVariableUpdateMode = 'inline' | 'extra';
 
 /** 阈值设置 */
@@ -91,7 +91,7 @@ export interface PendingCharacterSummary {
 export interface SummarySettings {
   /** 是否启用自动总结 */
   enabled: boolean;
-  /** 正文变量更新模式 */
+  /** 变量更新模式：正文伴随或额外模型 */
   variableUpdateMode: SummaryVariableUpdateMode;
   /** 是否启用流式生成 */
   stream: boolean;
