@@ -94,8 +94,8 @@ describe('getRandomAppearance', () => {
       for (const template of templates) {
         expect(
           template.templates.length,
-          `${label} ${template.range.min}-${template.range.max} 不能是空模板池`,
-        ).toBeGreaterThan(0);
+          `${label} ${template.range.min}-${template.range.max} 至少需要四条模板`,
+        ).toBeGreaterThanOrEqual(4);
       }
 
       for (let value = 0; value <= 20; value += 1) {
@@ -133,12 +133,16 @@ describe('getRandomAppearance', () => {
   });
 
   it.each([
-    ['低风姿、强臂力、弱根骨', '男' as const, appearanceAttributes(0, 20, 0)],
-    ['高风姿、弱臂力、强根骨', '女' as const, appearanceAttributes(20, 0, 20)],
-    ['默认属性组合', '男' as const, appearanceAttributes(6, 6, 6)],
-  ])('%s会组合三个对应区间的描述', (_name, gender, attributes) => {
+    ['低风姿、强臂力、弱根骨', '男' as const, appearanceAttributes(0, 20, 0), true],
+    ['高风姿、弱臂力、强根骨', '女' as const, appearanceAttributes(20, 0, 20), true],
+    ['双低体魄', '男' as const, appearanceAttributes(6, 0, 0), false],
+    ['双高体魄', '女' as const, appearanceAttributes(6, 20, 20), false],
+    ['默认属性组合', '男' as const, appearanceAttributes(6, 6, 6), false],
+  ])('%s会组合三个对应区间的描述', (_name, gender, attributes, shouldContrast) => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    expectAppearanceParts(getRandomAppearance(gender, attributes), gender, attributes);
+    const appearance = getRandomAppearance(gender, attributes);
+    expectAppearanceParts(appearance, gender, attributes);
+    expect(appearance.includes('，却')).toBe(shouldContrast);
   });
 
   it('随机数位于首尾时会分别选择三个模板池的首项和末项', () => {
