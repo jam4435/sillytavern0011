@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NewGameSetup from './NewGameSetup';
 import { createAvatarEntityKey, getAvatarStorageKey } from '../utils/avatarStorage';
+import { APPEARANCE_TEMPLATES } from '../utils/gameInitializer';
 
 vi.mock('../utils/martialArtsDatabase', () => ({
   getAllMartialArtNames: vi.fn(() => []),
@@ -18,6 +19,21 @@ function goToIdentityStep() {
   for (let index = 0; index < 5; index += 1) {
     fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
   }
+}
+
+function setAttributeSlider(attribute: '臂力' | '根骨' | '风姿', value: number) {
+  const attributeCard = screen.getByText(attribute, { selector: '.attr-name' }).closest('.attribute-card');
+  expect(attributeCard).toBeTruthy();
+  fireEvent.change(within(attributeCard as HTMLElement).getByRole('slider'), { target: { value: String(value) } });
+}
+
+function firstTemplateFor(
+  templates: Array<{ range: { min: number; max: number }; templates: string[] }>,
+  value: number,
+) {
+  const matches = templates.filter(template => value >= template.range.min && value <= template.range.max);
+  expect(matches).toHaveLength(1);
+  return matches[0].templates[0];
 }
 
 describe('NewGameSetup avatar selection', () => {
@@ -61,15 +77,14 @@ describe('NewGameSetup appearance generation', () => {
     localStorage.clear();
   });
 
-  it('风姿为0时只从对应的低风姿模板生成外貌', () => {
+  it('骰子会把风姿、臂力和根骨三个滑块值都传入外貌生成', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     renderSetup();
 
     fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
-
-    const charismaCard = screen.getByText('风姿', { selector: '.attr-name' }).closest('.attribute-card');
-    expect(charismaCard).toBeTruthy();
-    fireEvent.change(within(charismaCard as HTMLElement).getByRole('slider'), { target: { value: '0' } });
+    setAttributeSlider('风姿', 0);
+    setAttributeSlider('根骨', 0);
+    setAttributeSlider('臂力', 20);
 
     for (let index = 0; index < 4; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
@@ -77,8 +92,9 @@ describe('NewGameSetup appearance generation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '🎲 随机' }));
 
-    expect(screen.getByPlaceholderText('描述你的外貌和身材特征...')).toHaveValue(
-      '面容丑陋，五官歪斜，身材瘦弱，让人不忍直视。',
-    );
+    const appearance = screen.getByPlaceholderText('描述你的外貌和身材特征...');
+    expect(appearance).toHaveValue(expect.stringContaining(firstTemplateFor(APPEARANCE_TEMPLATES.face.男, 0)));
+    expect(appearance).toHaveValue(expect.stringContaining(firstTemplateFor(APPEARANCE_TEMPLATES.frame, 0)));
+    expect(appearance).toHaveValue(expect.stringContaining(firstTemplateFor(APPEARANCE_TEMPLATES.strength, 20)));
   });
 });
