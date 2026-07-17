@@ -528,19 +528,22 @@ export interface NewGameFormDataV2 {
 }
 
 /**
- * 外貌描述模板（根据风姿值生成）
+ * 单项外貌描述模板的属性区间。
  */
-export interface AppearanceTemplate {
-  gender: '男' | '女';
-  charismaRange: { min: number; max: number };
+export interface AppearanceRangeTemplate {
+  range: { min: number; max: number };
   templates: string[];
 }
 
 /**
- * 外貌描述模板说明
- * 外貌字段现在包含了原来的身材描述
- * AppearanceTemplate 可根据风姿、臂力、根骨综合生成外貌描述
+ * 外貌描述模板数据。
+ * face 由性别和风姿决定，frame 由根骨决定，strength 由臂力决定。
  */
+export interface AppearanceTemplateData {
+  face: Record<'男' | '女', AppearanceRangeTemplate[]>;
+  frame: AppearanceRangeTemplate[];
+  strength: AppearanceRangeTemplate[];
+}
 
 // ============================================
 // 地图系统类型定义
