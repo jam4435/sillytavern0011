@@ -4,7 +4,8 @@
  */
 
 import type {
-  AppearanceTemplate,
+  AppearanceRangeTemplate,
+  AppearanceTemplateData,
   AttributePointCost,
   InitialAttributes,
   OriginItemInfo,
@@ -112,20 +113,45 @@ export function calculateLuckAttributeCost(targetValue: number): number {
   return totalCost;
 }
 
-export const APPEARANCE_TEMPLATES: AppearanceTemplate[] = appearanceTemplatesData as AppearanceTemplate[];
+export const APPEARANCE_TEMPLATES: AppearanceTemplateData = appearanceTemplatesData as AppearanceTemplateData;
 
-export function getRandomAppearance(gender: '男' | '女', charisma: number): string {
-  const templates = APPEARANCE_TEMPLATES.filter(
-    t => t.gender === gender && charisma >= t.charismaRange.min && charisma <= t.charismaRange.max,
-  );
+type AppearanceAttributes = Pick<InitialAttributes, '风姿' | '臂力' | '根骨'>;
 
-  if (templates.length === 0) {
-    return gender === '男' ? '容貌普通，身材匀称，不太起眼。' : '容貌普通，身材匀称，相貌平平。';
+function findAppearanceRange(
+  ranges: AppearanceRangeTemplate[],
+  value: number,
+): AppearanceRangeTemplate | undefined {
+  return ranges.find(({ range }) => value >= range.min && value <= range.max);
+}
+
+function pickAppearanceFragment(range: AppearanceRangeTemplate | undefined, fallback: string): string {
+  if (!range || range.templates.length === 0) {
+    return fallback;
   }
 
-  const template = templates[0];
-  const randomIndex = Math.floor(Math.random() * template.templates.length);
-  return template.templates[randomIndex];
+  const randomIndex = Math.floor(Math.random() * range.templates.length);
+  return range.templates[randomIndex] ?? fallback;
+}
+
+function getAppearanceRangeIndex(ranges: AppearanceRangeTemplate[], value: number): number {
+  const index = ranges.findIndex(({ range }) => value >= range.min && value <= range.max);
+  return index >= 0 ? index : 2;
+}
+
+export function getRandomAppearance(gender: '男' | '女', attributes: AppearanceAttributes): string {
+  const faceRange = findAppearanceRange(APPEARANCE_TEMPLATES.face[gender], attributes.风姿);
+  const frameRange = findAppearanceRange(APPEARANCE_TEMPLATES.frame, attributes.根骨);
+  const strengthRange = findAppearanceRange(APPEARANCE_TEMPLATES.strength, attributes.臂力);
+
+  const face = pickAppearanceFragment(faceRange, gender === '男' ? '五官端正，神情平和' : '眉目端正，神情平和');
+  const frame = pickAppearanceFragment(frameRange, '骨架匀称，气息平稳');
+  const strength = pickAppearanceFragment(strengthRange, '四肢松紧适中，举止自然');
+
+  const frameIndex = getAppearanceRangeIndex(APPEARANCE_TEMPLATES.frame, attributes.根骨);
+  const strengthIndex = getAppearanceRangeIndex(APPEARANCE_TEMPLATES.strength, attributes.臂力);
+  const bodyConnector = Math.abs(frameIndex - strengthIndex) >= 2 ? '，却' : '，';
+
+  return `${face}；${frame}${bodyConnector}${strength}。`;
 }
 
 export interface EventLocation {

@@ -7,6 +7,7 @@ import {
   calculateLuckAttributeCost,
   CHARACTER_TRAITS,
   DEFAULT_ATTRIBUTES,
+  getRandomAppearance,
   getOriginRealmAndCultivation,
   getTriggeredTraitsByAttribute,
   MAX_ATTRIBUTE_VALUE,
@@ -954,20 +955,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
 
   // 随机生成外貌（包含身材描述）
   const randomAppearance = () => {
-    const maleAppearances = [
-      '剑眉星目，器宇不凡，身形修长，稳健如松',
-      '面如冠玉，唇红齿白，体格健壮，虎背熊腰',
-      '英气逼人，目光如电，身姿矫健，动若脱兔',
-      '眉清目秀，温文尔雅，体态匀称，气度从容',
-      '容貌俊朗，神采飞扬，身材高大，气势不凡'
-    ];
-    const femaleAppearances = [
-      '明眸皓齿，清丽脱俗，身材高挑，风姿绰约',
-      '柳眉杏眼，肤若凝脂，娇小玲珑，灵动可人',
-      '英姿飒爽，巾帼不让须眉，身姿矫健，英气勃勃'
-    ];
-    const options = gender === '男' ? maleAppearances : femaleAppearances;
-    setAppearance(options[Math.floor(Math.random() * options.length)]);
+    setAppearance(
+      getRandomAppearance(gender, {
+        风姿: attributes.风姿,
+        臂力: attributes.臂力,
+        根骨: attributes.根骨,
+      }),
+    );
   };
 
   // 获取选中的出身详情
@@ -2477,7 +2471,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   <div className="form-group">
                     <label className="form-label">
                       外貌描述
-                      <span className="label-hint">（包含身材特征，基于风姿{attributes.风姿}、臂力{attributes.臂力}和根骨{attributes.根骨}）</span>
+                      <span className="label-hint">（基于风姿{attributes.风姿}、臂力{attributes.臂力}和根骨{attributes.根骨}生成）</span>
                     </label>
                     <div className="input-with-btn">
                       <div className="input-wrapper">
