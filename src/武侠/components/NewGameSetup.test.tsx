@@ -93,8 +93,9 @@ describe('NewGameSetup appearance generation', () => {
     fireEvent.click(screen.getByRole('button', { name: '🎲 随机' }));
 
     const appearance = screen.getByPlaceholderText('描述你的外貌和身材特征...');
-    expect(appearance).toHaveValue(expect.stringContaining(firstTemplateFor(APPEARANCE_TEMPLATES.face.男, 0)));
-    expect(appearance).toHaveValue(expect.stringContaining(firstTemplateFor(APPEARANCE_TEMPLATES.frame, 0)));
-    expect(appearance).toHaveValue(expect.stringContaining(firstTemplateFor(APPEARANCE_TEMPLATES.strength, 20)));
+    const appearanceValue = (appearance as HTMLTextAreaElement).value;
+    expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.face.男, 0));
+    expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.frame, 0));
+    expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.strength, 20));
   });
 });

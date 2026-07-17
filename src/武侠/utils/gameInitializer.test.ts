@@ -92,7 +92,10 @@ describe('getRandomAppearance', () => {
 
     for (const [label, templates] of templateGroups) {
       for (const template of templates) {
-        expect(template.templates.length, `${label} ${template.range.min}-${template.range.max} 不能是空模板池`).toBeGreaterThan(0);
+        expect(
+          template.templates.length,
+          `${label} ${template.range.min}-${template.range.max} 不能是空模板池`,
+        ).toBeGreaterThan(0);
       }
 
       for (let value = 0; value <= 20; value += 1) {
