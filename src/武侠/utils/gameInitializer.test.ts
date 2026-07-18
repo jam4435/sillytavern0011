@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   APPEARANCE_TEMPLATES,
   DEFAULT_ATTRIBUTES,
   generateVariableData,
   getRandomAppearance,
+  initializeNewGameSession,
   type NewGameFormData,
 } from './gameInitializer';
 
@@ -53,6 +54,25 @@ function createFormData(avatarRef?: string): NewGameFormData {
   };
 }
 
+const initializeGlobalMock = vi.fn();
+const eventEmitMock = vi.fn().mockResolvedValue(undefined);
+const setChatMessagesMock = vi.fn().mockResolvedValue(undefined);
+const updateVariablesWithMock = globalThis.updateVariablesWith as ReturnType<typeof vi.fn>;
+const getVariablesMock = globalThis.getVariables as ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  updateVariablesWithMock.mockReset();
+  getVariablesMock.mockReset();
+  initializeGlobalMock.mockReset();
+  eventEmitMock.mockReset().mockResolvedValue(undefined);
+  setChatMessagesMock.mockReset().mockResolvedValue(undefined);
+  Object.assign(globalThis, {
+    initializeGlobal: initializeGlobalMock,
+    eventEmit: eventEmitMock,
+    setChatMessages: setChatMessagesMock,
+  });
+});
+
 describe('generateVariableData avatar fields', () => {
   it('内置头像只写入前端变量', () => {
     const data = generateVariableData(createFormData('preset:guo_jing_fc2')) as {
@@ -78,6 +98,45 @@ describe('generateVariableData avatar fields', () => {
     expect(data.user数据).not.toHaveProperty('头像');
     expect(JSON.stringify(data)).not.toContain('data:image');
     expect(JSON.stringify(data)).not.toContain('base64');
+  });
+});
+
+describe('initializeNewGameSession startup signal', () => {
+  it('等待变量写入并回读确认后才发送 GameInitialized', async () => {
+    let chatVariables: Record<string, any> = {};
+    updateVariablesWithMock.mockImplementation(async updater => {
+      chatVariables = await updater(chatVariables);
+      return chatVariables;
+    });
+    getVariablesMock.mockImplementation(() => chatVariables);
+
+    const result = await initializeNewGameSession(createFormData());
+
+    expect(result.success).toBe(true);
+    expect(updateVariablesWithMock).toHaveBeenCalledTimes(1);
+    expect(getVariablesMock).toHaveBeenCalledWith({ type: 'chat' });
+    expect(initializeGlobalMock).toHaveBeenCalledWith('GameInitialized', expect.objectContaining({ formData: expect.any(Object) }));
+    expect(eventEmitMock).toHaveBeenCalledWith('GameInitialized', expect.objectContaining({ formData: expect.any(Object) }));
+    expect(getVariablesMock.mock.invocationCallOrder[0]).toBeLessThan(initializeGlobalMock.mock.invocationCallOrder[0]);
+    expect(getVariablesMock.mock.invocationCallOrder[0]).toBeLessThan(eventEmitMock.mock.invocationCallOrder[0]);
+  });
+
+  it('回读的世界时间或运行时键版本不一致时失败且不发送信号', async () => {
+    updateVariablesWithMock.mockResolvedValue({ stat_data: {} });
+    getVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1, 月: 1, 日: 1, 时: 1 } },
+        前端变量: { 事件运行时键版本: 2 },
+      },
+    });
+
+    const result = await initializeNewGameSession(createFormData());
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('回读校验失败');
+    expect(initializeGlobalMock).not.toHaveBeenCalled();
+    expect(eventEmitMock).not.toHaveBeenCalled();
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
   });
 });
 

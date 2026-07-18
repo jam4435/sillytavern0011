@@ -43,15 +43,17 @@ import {
 import {
   ensureWorldEventsArchived,
   getEventSummary,
+  buildWorldEventRecord,
   isOrdinaryWorldEvent,
   syncParticipationOutcomeStates,
 } from './era-world-events.js';
+import { writeDirectChatTransaction } from '../shared/directVariableWrite';
+import { isWorldEventRecord } from '../shared/worldEventContext';
 
 const CHAPTER_SEQUENCE_PATTERN = /^(.*?第[0-9一二三四五六七八九十百千万]+回[0-9]+)-/;
 const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件'];
 const EVENT_DIFF_ACTIONS = ['insert', 'update', 'delete'];
 const EVENT_SETTLEMENT_PROGRESS_KEY = '事件结算进度';
-const POST_RESYNC_VERIFY_DELAY_MS = 1200;
 const followupReferenceIndexCache = new WeakMap();
 
 function isPlainObject(value) {
@@ -82,8 +84,56 @@ function countPersistedEventKeys(currentEventSystem, eventSystemPatch) {
   }, 0);
 }
 
-function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function applyOpeningObjectPatch(target, action, patch) {
+  if (!isPlainObject(patch)) return;
+
+  const apply = (node, nodePatch, operation) => {
+    if (!isPlainObject(nodePatch)) return;
+    for (const [key, value] of Object.entries(nodePatch)) {
+      if (operation === 'insert') {
+        if (node[key] === undefined) node[key] = cloneJson(value);
+        else if (isPlainObject(node[key]) && isPlainObject(value)) apply(node[key], value, operation);
+      } else if (operation === 'update') {
+        if (node[key] === undefined) continue;
+        if (isPlainObject(node[key]) && isPlainObject(value)) apply(node[key], value, operation);
+        else node[key] = cloneJson(value);
+      } else if (operation === 'delete') {
+        if (node[key] === undefined) continue;
+        if (isPlainObject(node[key]) && isPlainObject(value) && Object.keys(value).length > 0) apply(node[key], value, operation);
+        else delete node[key];
+      } else {
+        node[key] = cloneJson(value);
+      }
+    }
+  };
+
+  apply(target, patch, action);
+}
+
+function applyOpeningCharacterDelta(statData, eventData, eventName) {
+  if (!isPlainObject(statData.角色数据)) statData.角色数据 = {};
+
+  for (const action of EVENT_DIFF_ACTIONS) {
+    const delta = eventData?.[action];
+    if (!isPlainObject(delta)) continue;
+    for (const [characterName, characterPatch] of Object.entries(delta)) {
+      if (action !== 'insert' && !statData.角色数据[characterName]) {
+        logWarning(`开局历史事件 ${eventName} 的角色 ${characterName} 不存在，跳过 ${action}`);
+        continue;
+      }
+      if (!isPlainObject(statData.角色数据[characterName])) statData.角色数据[characterName] = {};
+      applyOpeningObjectPatch(statData.角色数据[characterName], action, characterPatch);
+    }
+  }
+}
+
+function applyOpeningDebutDelta(statData, eventData, eventName) {
+  if (!isPlainObject(statData.角色数据)) statData.角色数据 = {};
+  for (const [characterName, characterPatch] of Object.entries(eventData?.insert || {})) {
+    if (!isPlainObject(statData.角色数据[characterName])) statData.角色数据[characterName] = {};
+    applyOpeningObjectPatch(statData.角色数据[characterName], 'insert', characterPatch);
+    log(`[开局登场] 添加角色 ${characterName} (${eventName})`);
+  }
 }
 
 async function ensureEventSystemPatchPersisted(eventSystemPatch, reason) {
@@ -309,198 +359,156 @@ function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, statData
   }
 }
 
-// ==================== 批量初始化未发生事件列表（智能优化版）====================
+// ==================== 开局事件状态单事务初始化 ====================
 export async function initializeEventList(eventDefinitions, options = {}) {
-  debugGroup('🔧 智能批量初始化事件列表');
-
-  const eventNames = Object.keys(eventDefinitions);
+  const eventNames = Object.keys(eventDefinitions || {});
   if (eventNames.length === 0) {
-    logWarning('没有可初始化的事件');
-    debugGroupEnd();
-    return;
+    return { initialized: true, added: 0, committed: false };
   }
 
-  try {
-    const variables = await getVariables({ type: 'chat' });
+  let result = { initialized: false, added: 0, committed: false, eventNames: [] };
 
-    // ✅ 修复：添加完整的安全检查
-    if (!variables || !variables.stat_data) {
-      logError('无法读取变量或 stat_data 未初始化');
-      logError('请确保已执行初始化脚本设置 stat_data');
-      debugGroupEnd();
-      return;
-    }
-
-    // ✅ 修复：检查必要的数据结构
-    if (!variables.stat_data.世界信息 || !variables.stat_data.世界信息.时间) {
-      logError('世界信息或时间数据未初始化');
-      debugGroupEnd();
-      return;
-    }
-
-    if (!isPlainObject(variables.stat_data.事件系统?.人物事件占用)) {
-      await writeDirectInsert({ 事件系统: { 人物事件占用: {} } }, 'initialize-participant-occupancy');
-    }
-
-    const currentTime = variables.stat_data.世界信息.时间;
-    const 未发生事件 = variables?.stat_data?.事件系统?.未发生事件 || {};
-    const 进行中事件 = variables?.stat_data?.事件系统?.进行中事件 || {};
-    const 已完成事件 = variables?.stat_data?.事件系统?.已完成事件 || {};
-
-    const timeString = formatDate(currentTime);
-    log('当前时间:', timeString);
-    log('当前未发生事件:', Object.keys(未发生事件));
-    log('当前进行中事件:', Object.keys(进行中事件));
-    log('当前已完成事件:', Object.keys(已完成事件));
-
-    // 过滤出真正需要添加的新事件（不在任何事件列表中的）
-    const newEvents = eventNames.filter(
-      name => !(name in 未发生事件) && !(name in 进行中事件) && !(name in 已完成事件),
-    );
-
-    if (newEvents.length === 0) {
-      logSuccess('所有事件都已在系统中，无需添加');
-      debugGroupEnd();
-      return;
-    }
-
-    logSuccess(`找到 ${newEvents.length} 个新事件需要添加:`, newEvents);
-
-    // ==================== 智能分类新事件 ====================
-    debugGroup('🧠 智能分类事件状态');
-
-    const 未开始事件 = []; // 触发时间未到
-    const 应立即触发事件 = []; // 触发时间已到但未超过结束时间（普通事件）
-    const 应立即完成的登场事件 = []; // 登场事件：触发时间已到，直接完成
-    const 已过期事件 = []; // 已超过结束时间，直接完成
-
-    for (const eventName of newEvents) {
-      const eventData = eventDefinitions[eventName];
-      const triggerTime = eventData.触发条件;
-      const endTime = getEndTime(eventData);
-      const isDebut = isDebutEvent(eventData);
-
-      // 检查是否已超过结束时间
-      if (endTime && isTimeAfterEventEnd(currentTime, endTime)) {
-        已过期事件.push(eventName);
-        log(`📅 ${eventName}: 已过期（结束时间 ${formatDate(endTime)}）`);
+  await writeDirectChatTransaction(
+    variables => {
+      if (!variables?.stat_data?.世界信息?.时间) {
+        throw new Error('无法初始化事件：stat_data.世界信息.时间尚未落库');
       }
-      // 检查是否到了触发时间
-      else if (isTimeForEvent(currentTime, eventData, eventName)) {
-        // 登场事件特殊处理：直接完成，不进入进行中
-        if (isDebut) {
-          应立即完成的登场事件.push(eventName);
-          log(`🎭 ${eventName}: 登场事件，直接完成（触发时间 ${formatDate(triggerTime)}）`);
-        } else {
-          应立即触发事件.push(eventName);
-          log(`▶️ ${eventName}: 应立即触发（触发时间 ${formatDate(triggerTime)}）`);
+
+      const statData = variables.stat_data;
+      const currentTime = statData.世界信息.时间;
+      statData.事件系统 = isPlainObject(statData.事件系统) ? statData.事件系统 : {};
+      statData.事件系统.未发生事件 = isPlainObject(statData.事件系统.未发生事件)
+        ? statData.事件系统.未发生事件
+        : {};
+      statData.事件系统.进行中事件 = isPlainObject(statData.事件系统.进行中事件)
+        ? statData.事件系统.进行中事件
+        : {};
+      statData.事件系统.已完成事件 = isPlainObject(statData.事件系统.已完成事件)
+        ? statData.事件系统.已完成事件
+        : {};
+      statData.事件系统.人物事件占用 = isPlainObject(statData.事件系统.人物事件占用)
+        ? statData.事件系统.人物事件占用
+        : {};
+      statData.世界事件 = isPlainObject(statData.世界事件) ? statData.世界事件 : {};
+      statData.前端变量 = isPlainObject(statData.前端变量) ? statData.前端变量 : {};
+
+      const sparseFuture = options.sparseFuture === true;
+      const legacyUnstartedKeys = Object.keys(statData.事件系统.未发生事件);
+      const knownEventKeys = new Set([
+        ...legacyUnstartedKeys,
+        ...Object.keys(statData.事件系统.进行中事件),
+        ...Object.keys(statData.事件系统.已完成事件),
+      ]);
+
+      const checkpoint = options.applyCheckpoint === true ? options.checkpoint : null;
+      if (checkpoint && Array.isArray(checkpoint.completedRuntimeKeys)) {
+        for (const runtimeKey of checkpoint.completedRuntimeKeys) {
+          statData.事件系统.已完成事件[runtimeKey] = 0;
+          // A checkpoint already contains the effects of these events (and,
+          // when present, a character snapshot).  Treat them as known before
+          // planning new entries so opening initialization cannot replay their
+          // character diffs on top of the snapshot.
+          knownEventKeys.add(runtimeKey);
         }
       }
-      // 还未到触发时间
-      else {
-        未开始事件.push(eventName);
-        log(`⏰ ${eventName}: 未到触发时间（触发时间 ${formatDate(triggerTime)}）`);
+      if (checkpoint && isPlainObject(checkpoint.characterState)) {
+        statData.角色数据 = isPlainObject(statData.角色数据) ? statData.角色数据 : {};
+        for (const [characterName, characterState] of Object.entries(checkpoint.characterState)) {
+          statData.角色数据[characterName] = cloneJson(characterState);
+        }
+      } else if (checkpoint && Array.isArray(checkpoint.operations)) {
+        for (const operation of checkpoint.operations) {
+          for (const action of EVENT_DIFF_ACTIONS) {
+            applyOpeningObjectPatch(
+              statData.角色数据 || (statData.角色数据 = {}),
+              action,
+              operation?.[action],
+            );
+          }
+        }
       }
-    }
 
-    log(
-      `分类结果: 未开始=${未开始事件.length}, 应触发=${应立即触发事件.length}, 登场事件=${应立即完成的登场事件.length}, 已过期=${已过期事件.length}`,
-    );
-    debugGroupEnd();
-
-    const 未开始事件对象 = Object.fromEntries(未开始事件.map(name => [name, eventDefinitions[name].触发条件]));
-    const 进行中事件对象 = Object.fromEntries(应立即触发事件.map(name => [name, getEndTime(eventDefinitions[name])]));
-    const 初始化完成事件对象 = Object.fromEntries([...应立即完成的登场事件, ...已过期事件].map(name => [name, 0]));
-    const expectedEventSystemPatch = {};
-    if (未开始事件.length > 0) {
-      expectedEventSystemPatch.未发生事件 = 未开始事件对象;
-    }
-    if (应立即触发事件.length > 0) {
-      expectedEventSystemPatch.进行中事件 = 进行中事件对象;
-    }
-    if (Object.keys(初始化完成事件对象).length > 0) {
-      expectedEventSystemPatch.已完成事件 = 初始化完成事件对象;
-    }
-
-    // ==================== 1. 添加未开始的事件到"未发生事件" ====================
-    if (未开始事件.length > 0) {
-      debugGroup(`📝 添加 ${未开始事件.length} 个未开始事件`);
-
-      const payload = {
-        事件系统: { 未发生事件: 未开始事件对象 },
-      };
-
-      log('🚀 发送 era:insertByObject 指令:', payload);
-      await writeDirectInsert(payload, 'initialize-unstarted-events');
-      logSuccess(`✅ 已添加 ${未开始事件.length} 个未开始事件`);
-
-      debugGroupEnd();
-    }
-
-    // ==================== 2. 批量触发应立即开始的事件 ====================
-    if (应立即触发事件.length > 0) {
-      debugGroup(`▶️ 批量触发 ${应立即触发事件.length} 个事件`);
-
-      const payload = {
-        事件系统: { 进行中事件: 进行中事件对象 },
-      };
-
-      log('🚀 发送 era:insertByObject 指令:', payload);
-      await writeDirectInsert(payload, 'initialize-in-progress-events');
-      logSuccess(`✅ 已触发 ${应立即触发事件.length} 个事件`);
-
-      await ensureFollowupCluesForInProgressEvents(应立即触发事件, eventDefinitions, 'initialize-in-progress');
-
-      debugGroupEnd();
-    }
-
-    // ==================== 2.5 批量完成登场事件（直接应用insert并标记完成）====================
-    if (应立即完成的登场事件.length > 0) {
-      await processDebutEventsCompletion(应立即完成的登场事件, eventDefinitions);
-    }
-
-    // ==================== 3. 批量完成已过期的事件 ====================
-    if (已过期事件.length > 0) {
-      await processExpiredEventsCompletion(已过期事件, eventDefinitions);
-    }
-
-    // ==================== 汇总统计 ====================
-    const totalAdded = 未开始事件.length + 应立即触发事件.length + 应立即完成的登场事件.length + 已过期事件.length;
-    logSuccess(`📊 初始化完成: 共处理 ${totalAdded} 个新事件`);
-    logSuccess(
-      `   └─ 未开始: ${未开始事件.length} | 已触发: ${应立即触发事件.length} | 登场完成: ${应立即完成的登场事件.length} | 已过期: ${已过期事件.length}`,
-    );
-
-    if (totalAdded > 0) {
-      toastr.success(
-        `✅ 智能初始化: ${totalAdded}个事件 (登场${应立即完成的登场事件.length}个, 过期${已过期事件.length}个)`,
+      const newEvents = eventNames.filter(
+        eventName =>
+          !knownEventKeys.has(eventName),
       );
-    }
 
-    // 验证最终结果。仅在新开局/重同步风险场景下执行延迟复核，普通重初始化走即时校验即可。
-    const shouldPostResyncVerify = options.shouldPostResyncVerify === true;
-    const initialVerification = await ensureEventSystemPatchPersisted(expectedEventSystemPatch, 'direct-write');
-    let verifyVars = initialVerification.variables;
-    if (shouldPostResyncVerify && initialVerification.expectedEventCount > 0) {
-      await wait(POST_RESYNC_VERIFY_DELAY_MS);
-      const postResyncVerification = await ensureEventSystemPatchPersisted(expectedEventSystemPatch, 'post-resync');
-      verifyVars = postResyncVerification.variables;
-    } else if (initialVerification.expectedEventCount > 0) {
-      log('事件初始化即时校验完成，跳过延迟复核');
-    }
+      if (sparseFuture) {
+        statData.事件系统.未发生事件 = {};
+      }
 
-    if (isDebugEnabled()) {
-      debugGroupCollapsed('🔍 初始化后的事件系统状态');
-      console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data?.事件系统 || {})));
-      debugGroupEnd();
-    }
-  } catch (error) {
-    logError('智能批量初始化事件列表失败:', error);
+      for (const eventName of newEvents) {
+        const eventData = eventDefinitions[eventName];
+        const endTime = getEndTime(eventData);
+        const expired = endTime && isTimeAfterEventEnd(currentTime, endTime);
+        const due = isTimeForEvent(currentTime, eventData, eventName);
+
+        if (!expired && !due) {
+          if (!sparseFuture) {
+            statData.事件系统.未发生事件[eventName] = cloneJson(eventData.触发条件);
+          }
+          continue;
+        }
+
+        if (!expired && due && !isDebutEvent(eventData)) {
+          statData.事件系统.进行中事件[eventName] = cloneJson(endTime);
+          continue;
+        }
+
+        statData.事件系统.已完成事件[eventName] = 0;
+        if (isDebutEvent(eventData)) {
+          applyOpeningDebutDelta(statData, eventData, eventName);
+        } else {
+          applyOpeningCharacterDelta(statData, eventData, eventName);
+          if (!isWorldEventRecord(statData.世界事件[eventName])) {
+            statData.世界事件[eventName] = buildWorldEventRecord(eventData, undefined, endTime);
+          }
+        }
+      }
+
+      if (sparseFuture) {
+        statData.前端变量.事件调度状态 = {
+          schemaVersion: 1,
+          manifestHash: options.manifestHash || '',
+          lastCheckedTime: cloneJson(currentTime),
+        };
+      }
+
+      result = {
+        initialized: true,
+        added: newEvents.length,
+        committed: newEvents.length > 0,
+        eventNames: newEvents,
+        futureEventNames: newEvents.filter(
+          eventName =>
+            !Object.prototype.hasOwnProperty.call(statData.事件系统.进行中事件, eventName) &&
+            !Object.prototype.hasOwnProperty.call(statData.事件系统.已完成事件, eventName),
+        ),
+      };
+      return variables;
+    },
+    'initialize-opening-event-state',
+    { operation: 'replace', refreshHint: 'character-data' },
+  );
+
+  const verifiedVariables = await getVariables({ type: 'chat' });
+  const verifiedSystem = verifiedVariables?.stat_data?.事件系统 || {};
+  const persisted = result.eventNames.every(
+    eventName =>
+      result.futureEventNames?.includes(eventName) ||
+      Object.prototype.hasOwnProperty.call(verifiedSystem.未发生事件 || {}, eventName) ||
+      Object.prototype.hasOwnProperty.call(verifiedSystem.进行中事件 || {}, eventName) ||
+      Object.prototype.hasOwnProperty.call(verifiedSystem.已完成事件 || {}, eventName),
+  );
+  if (!persisted) {
+    throw new Error('开局事件状态单事务提交后校验失败');
   }
 
-  debugGroupEnd();
+  logSuccess(`开局事件初始化完成：处理 ${result.added} 个新事件，direct commit=${result.committed ? 1 : 0}`);
+  return result;
 }
 
+// 开局初始化已统一走上方的单事务规划器；旧的多写入实现已移除。
 // ==================== 处理登场事件完成的辅助函数 ====================
 async function processDebutEventsCompletion(eventNames, eventDefinitions) {
   debugGroup(`🎭 批量完成 ${eventNames.length} 个登场事件`);
@@ -1149,98 +1157,109 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       }
     }
 
-    const archived = await ensureWorldEventsArchived(eventNames, eventDefinitions, currentVars);
-    if (!archived) {
-      throw new Error('世界事件归档未能持久化，保留参与事件等待重试');
-    }
+    // 差分进度已经独立落库；其余事件终态在一次 direct transaction 内提交。
+    // 如果该事务失败，事件结算进度仍会保留，下一轮会跳过已应用的人物差分后重试。
+    const finalFollowups = buildFollowupPayloads(eventNames, eventDefinitions);
+    await writeDirectChatTransaction(
+      variables => {
+        const nextStat = variables?.stat_data;
+        if (!nextStat) throw new Error('事件终态提交时 stat_data 不存在');
 
-    // 2. 批量将事件移至"已完成"
-    const completedPayload = {
-      事件系统: {
-        已完成事件: 已完成事件对象,
+        nextStat.事件系统 = isPlainObject(nextStat.事件系统) ? nextStat.事件系统 : {};
+        nextStat.事件系统.进行中事件 = isPlainObject(nextStat.事件系统.进行中事件)
+          ? nextStat.事件系统.进行中事件
+          : {};
+        nextStat.事件系统.已完成事件 = isPlainObject(nextStat.事件系统.已完成事件)
+          ? nextStat.事件系统.已完成事件
+          : {};
+        nextStat.事件系统.人物事件占用 = isPlainObject(nextStat.事件系统.人物事件占用)
+          ? nextStat.事件系统.人物事件占用
+          : {};
+        nextStat.参与事件 = isPlainObject(nextStat.参与事件) ? nextStat.参与事件 : {};
+        nextStat.世界事件 = isPlainObject(nextStat.世界事件) ? nextStat.世界事件 : {};
+        nextStat.后续事件线索 = isPlainObject(nextStat.后续事件线索) ? nextStat.后续事件线索 : {};
+        nextStat.后续事件线索计数 = isPlainObject(nextStat.后续事件线索计数)
+          ? nextStat.后续事件线索计数
+          : {};
+        nextStat.前端变量 = isPlainObject(nextStat.前端变量) ? nextStat.前端变量 : {};
+        nextStat.前端变量[EVENT_SETTLEMENT_PROGRESS_KEY] = isPlainObject(
+          nextStat.前端变量[EVENT_SETTLEMENT_PROGRESS_KEY],
+        )
+          ? nextStat.前端变量[EVENT_SETTLEMENT_PROGRESS_KEY]
+          : {};
+
+        for (const eventName of eventNames) {
+          const eventData = eventDefinitions[eventName];
+          const foundParticipation = getParticipationEntry(nextStat.参与事件, eventName);
+          if (isOrdinaryWorldEvent(eventData) && !isWorldEventRecord(nextStat.世界事件[eventName])) {
+            nextStat.世界事件[eventName] = buildWorldEventRecord(
+              eventData,
+              foundParticipation?.结局,
+              nextStat.事件系统.进行中事件[eventName],
+            );
+          }
+
+          nextStat.事件系统.已完成事件[eventName] = participationByEvent[eventName] ? 1 : 0;
+          delete nextStat.事件系统.进行中事件[eventName];
+          for (const participationKey of Object.keys(buildParticipationDeletePatch(nextStat.参与事件, eventName))) {
+            delete nextStat.参与事件[participationKey];
+          }
+
+          for (const [characterName, occupancyValue] of Object.entries(nextStat.事件系统.人物事件占用)) {
+            if (occupancyValue?.事件名 === eventName) delete nextStat.事件系统.人物事件占用[characterName];
+          }
+          delete nextStat.前端变量[EVENT_SETTLEMENT_PROGRESS_KEY][eventName];
+        }
+
+        for (const [key, clue] of Object.entries(finalFollowups.followupPayload)) {
+          if (!(key in nextStat.后续事件线索)) nextStat.后续事件线索[key] = clue;
+          if (!(key in nextStat.后续事件线索计数)) {
+            nextStat.后续事件线索计数[key] = finalFollowups.followupCountPayload[key];
+          }
+        }
+        return variables;
       },
-    };
-    log('🚀 2. 发送 era:insertByObject 指令 (批量移至已完成):', completedPayload);
-    await writeDirectInsert(completedPayload, 'batch-end-completed');
-    log('✅ 步骤2完成: 批量移至已完成');
+      `batch-end-finalize-${eventNames.length}`,
+      { operation: 'replace', refreshHint: 'event-state' },
+    );
 
-    // 3. 批量从"进行中"删除
-    const deleteInProgressPayload = {
-      事件系统: {
-        进行中事件: 进行中删除对象,
-      },
-    };
-    log('🚀 3. 发送 era:deleteByObject 指令 (批量从进行中删除):', deleteInProgressPayload);
-    await writeDirectDelete(deleteInProgressPayload, 'batch-end-delete-in-progress');
-    log('✅ 步骤3完成: 批量从进行中删除');
-
-    // 4. 如果有玩家参与的事件，批量从"参与事件"中删除
-    if (Object.keys(参与删除对象).length > 0) {
-      const deleteParticipationPayload = {
-        参与事件: 参与删除对象,
-      };
-      log('🚀 4. 发送 era:deleteByObject 指令 (批量从参与事件中删除):', deleteParticipationPayload);
-      await writeDirectDelete(deleteParticipationPayload, 'batch-end-delete-participation');
-      log('✅ 步骤4完成: 批量从参与事件中删除');
-    }
-
-    // 5. 清理仅属于本批已结束事件的人物占用；被其他事件覆盖的占用不会误删
-    await cleanupParticipantOccupancy(eventNames);
-
-    // 6. 完成后才原子写入后续线索与计数；进行中阶段不会生成线索。
-    await writeFollowupEvents(eventNames, eventDefinitions, { reason: 'batch-end' });
-
-    // 7. 验证最终状态；任一项缺失都保留未完成标记供下一轮明确报错和重试。
-    const verifyVars = await getVariables({ type: 'chat' });
-    const verifyStat = verifyVars?.stat_data || {};
-    const expectedFollowups = buildFollowupPayloads(eventNames, eventDefinitions);
-    const completionPersisted = eventNames.every(eventName => {
-      const worldEventPersisted =
-        !isOrdinaryWorldEvent(eventDefinitions[eventName]) || isPlainObject(verifyStat?.世界事件?.[eventName]);
-      const occupancyCleared = Object.values(verifyStat?.事件系统?.人物事件占用 || {}).every(
+    const finalVerifyVars = await getVariables({ type: 'chat' });
+    const finalVerifyStat = finalVerifyVars?.stat_data || {};
+    const finalCompletionPersisted = eventNames.every(eventName => {
+      const eventData = eventDefinitions[eventName];
+      const archiveReady = !isOrdinaryWorldEvent(eventData) || isWorldEventRecord(finalVerifyStat.世界事件?.[eventName]);
+      const occupancyCleared = Object.values(finalVerifyStat.事件系统?.人物事件占用 || {}).every(
         occupancyValue => occupancyValue?.事件名 !== eventName,
       );
       return (
-        Object.prototype.hasOwnProperty.call(verifyStat?.事件系统?.已完成事件 || {}, eventName) &&
-        !Object.prototype.hasOwnProperty.call(verifyStat?.事件系统?.进行中事件 || {}, eventName) &&
-        !hasParticipationEntry(verifyStat?.参与事件, eventName) &&
-        worldEventPersisted &&
+        Object.prototype.hasOwnProperty.call(finalVerifyStat.事件系统?.已完成事件 || {}, eventName) &&
+        !Object.prototype.hasOwnProperty.call(finalVerifyStat.事件系统?.进行中事件 || {}, eventName) &&
+        !hasParticipationEntry(finalVerifyStat.参与事件, eventName) &&
+        !Object.prototype.hasOwnProperty.call(
+          finalVerifyStat.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {},
+          eventName,
+        ) &&
+        archiveReady &&
         occupancyCleared
       );
     });
-    const followupsPersisted = Object.keys(expectedFollowups.followupPayload).every(
+    const finalFollowupsPersisted = Object.keys(finalFollowups.followupPayload).every(
       key =>
-        verifyStat?.后续事件线索?.[key] === expectedFollowups.followupPayload[key] &&
-        verifyStat?.后续事件线索计数?.[key] === expectedFollowups.followupCountPayload[key],
+        finalVerifyStat.后续事件线索?.[key] === finalFollowups.followupPayload[key] &&
+        finalVerifyStat.后续事件线索计数?.[key] === finalFollowups.followupCountPayload[key],
     );
-
-    if (!completionPersisted || !followupsPersisted) {
-      throw new Error('事件完成状态未完整落库（世界事件/已完成/进行中/参与事件/后续线索），等待下一轮重试');
+    if (!finalCompletionPersisted || !finalFollowupsPersisted) {
+      throw new Error('事件完成终态单次提交后校验失败');
     }
 
-    const progressCleanup = Object.fromEntries(eventNames.map(eventName => [eventName, {}]));
-    await writeDirectDelete(
-      { 前端变量: { [EVENT_SETTLEMENT_PROGRESS_KEY]: progressCleanup } },
-      'batch-end-clear-settlement-progress',
-    );
-
-    if (isDebugEnabled()) {
-      debugGroupCollapsed('🔍 批量结算后的完整状态');
-      console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data || {})));
-      debugGroupEnd();
-    }
-
-    logSuccess(`批量结算完成 ${eventNames.length} 个事件:`, eventNames);
-
-    // 显示通知（限制数量避免刷屏）
+    logSuccess(`批量结算完成 ${eventNames.length} 个事件（进度提交 + 终态提交）:`, eventNames);
     if (eventNames.length <= 5) {
-      eventNames.forEach(name => {
-        toastr.success(`✅ 事件完成: ${name}`, '', { timeOut: 2000 });
-      });
+      eventNames.forEach(name => toastr.success(`✅ 事件完成: ${name}`, '', { timeOut: 2000 }));
     } else {
       toastr.success(`✅ ${eventNames.length} 个事件已完成`, '', { timeOut: 3000 });
     }
     return true;
+
   } catch (error) {
     logError(`批量结算事件失败`, error);
     return false;

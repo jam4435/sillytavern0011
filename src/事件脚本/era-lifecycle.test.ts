@@ -8,6 +8,7 @@ import {
   buildActualEventWindow,
   buildPlayerParticipationEntry,
   getValidEventPredecessors,
+  initializeEventList,
 } from './era-event-operations.js';
 import { createSerialTaskQueue, buildFollowupCounterPlan } from './era-turn-queue.js';
 import { attachEventMetadata, deriveEventRuntimeDescriptor } from './era-utils.js';
@@ -129,6 +130,97 @@ describe('completion persistence and follow-up pairs', () => {
     });
   });
 
+  it('initializes an opening event window with one direct transaction and no in-progress follow-up', async () => {
+    variables.stat_data.世界信息.时间 = { 年: 1219, 月: 10, 日: 20, 时: 14 };
+    variables.stat_data.事件系统 = {
+      未发生事件: {},
+      进行中事件: {},
+      已完成事件: {},
+      人物事件占用: {},
+    };
+    let commitCount = 0;
+    vi.mocked(globalThis.updateVariablesWith).mockImplementation(updater => {
+      commitCount += 1;
+      variables = updater(clone(variables)) as typeof variables;
+      return clone(variables);
+    });
+
+    await expect(initializeEventList({ [sourceName]: eventDefinition })).resolves.toMatchObject({
+      added: 1,
+      committed: true,
+    });
+
+    expect(commitCount).toBe(1);
+    expect(variables.stat_data.事件系统.进行中事件[sourceName]).toEqual(eventDefinition.事件结束时间);
+    expect(variables.stat_data.后续事件线索).toEqual({});
+    expect(variables.stat_data.后续事件线索计数).toEqual({});
+  });
+
+  it('replays expired opening history in the same transaction', async () => {
+    variables.stat_data.世界信息.时间 = { 年: 1219, 月: 11, 日: 1, 时: 0 };
+    variables.stat_data.事件系统 = {
+      未发生事件: {},
+      进行中事件: {},
+      已完成事件: {},
+      人物事件占用: {},
+    };
+    const expiredDefinition = attachEventMetadata(
+      {
+        ...eventDefinition,
+        insert: { 郭靖: { 状态: '已登场' } },
+        事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
+      },
+      deriveEventRuntimeDescriptor('射雕事件条目-第7回-01-宝马风波.yaml'),
+    );
+    let commitCount = 0;
+    vi.mocked(globalThis.updateVariablesWith).mockImplementation(updater => {
+      commitCount += 1;
+      variables = updater(clone(variables)) as typeof variables;
+      return clone(variables);
+    });
+
+    await expect(initializeEventList({ [sourceName]: expiredDefinition })).resolves.toMatchObject({ added: 1 });
+
+    expect(commitCount).toBe(1);
+    expect(variables.stat_data.事件系统.已完成事件[sourceName]).toBe(0);
+    expect(variables.stat_data.角色数据.郭靖.状态).toBe('已登场');
+    expect(variables.stat_data.世界事件[sourceName].概要).toBe(eventDefinition.事件概要);
+  });
+
+  it('does not replay checkpoint-completed character diffs on top of a snapshot', async () => {
+    variables.stat_data.世界信息.时间 = { 年: 1219, 月: 11, 日: 1, 时: 0 };
+    variables.stat_data.事件系统 = {
+      未发生事件: {},
+      进行中事件: {},
+      已完成事件: {},
+      人物事件占用: {},
+    };
+    const historicalDefinition = attachEventMetadata(
+      {
+        ...eventDefinition,
+        insert: { 郭靖: { 状态: '重复应用' } },
+        事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
+      },
+      deriveEventRuntimeDescriptor('射雕事件条目-第7回-01-宝马风波.yaml'),
+    );
+
+    await expect(
+      initializeEventList(
+        { [sourceName]: historicalDefinition },
+        {
+          checkpoint: {
+            completedRuntimeKeys: [sourceName],
+            characterState: { 郭靖: { 状态: '检查点快照' } },
+          },
+          applyCheckpoint: true,
+        },
+      ),
+    ).resolves.toMatchObject({ added: 0, committed: false });
+
+    expect(variables.stat_data.角色数据.郭靖.状态).toBe('检查点快照');
+    expect(variables.stat_data.事件系统.已完成事件[sourceName]).toBe(0);
+  });
+
   it('stores an early actual end without creating any in-progress follow-up data', async () => {
     variables.stat_data.事件系统.未发生事件 = { [sourceName]: eventDefinition.触发条件 };
     variables.stat_data.事件系统.进行中事件 = {};
@@ -164,8 +256,8 @@ describe('completion persistence and follow-up pairs', () => {
     let writeCount = 0;
     vi.mocked(globalThis.updateVariablesWith).mockImplementation(updater => {
       writeCount += 1;
-      if (writeCount === 5) {
-        throw new Error('follow-up write failed');
+      if (writeCount === 2) {
+        throw new Error('final settlement transaction failed');
       }
       variables = updater(clone(variables)) as typeof variables;
       return clone(variables);
@@ -241,7 +333,7 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.参与事件[sourceName]).toBeUndefined();
   });
 
-  it('preserves the participation flag when completed-state write fails after participation is removed', async () => {
+  it('preserves the participation snapshot and flag when the atomic final settlement write fails', async () => {
     const definitions = { [sourceName]: eventDefinition, [targetName]: targetDefinition };
     variables.stat_data.参与事件 = {
       [sourceName]: {
@@ -268,7 +360,7 @@ describe('completion persistence and follow-up pairs', () => {
     });
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(false);
-    expect(variables.stat_data.参与事件[sourceName]).toBeUndefined();
+    expect(variables.stat_data.参与事件[sourceName].结局).toBe('玩家改变了事件。');
     expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toEqual({
       差分已应用: true,
       玩家参与: true,

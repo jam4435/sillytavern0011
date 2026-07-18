@@ -5,11 +5,13 @@ export const ERA_VARIABLE_WRITE_DONE_EVENT = 'wuxia:eraVariableWriteDone';
 
 export type DirectVariableWriteSource = 'event-script' | 'variable-editor' | 'frontend' | 'restore';
 export type DirectVariableWriteOperation = 'insert' | 'update' | 'delete' | 'assign' | 'replace';
+export type DirectVariableWriteRefreshHint = 'none' | 'event-state' | 'character-data' | 'full';
 export type EraVariableWriteAttribution = 'ai' | 'background';
 export type EraVariableWriteEventName =
   | 'era:apiWrite'
   | 'era:updateByObject'
   | 'era:insertByObject'
+  | 'era:deleteByObject'
   | 'era:deleteByPath'
   | 'manual_sync';
 
@@ -17,6 +19,8 @@ export interface DirectVariableWriteMetadata {
   source: DirectVariableWriteSource;
   operation: DirectVariableWriteOperation;
   reason: string;
+  /** 缺省为 full，旧调用不需要升级即可保持原有补全行为。 */
+  refreshHint?: DirectVariableWriteRefreshHint;
 }
 
 export interface DirectVariableWriteDoneDetail extends DirectVariableWriteMetadata {
@@ -44,10 +48,26 @@ export interface EraVariableWriteRequest extends EraVariableWriteMetadata {
   expectedAction?: string;
 }
 
-type EraWriteDoneLikeDetail = {
+export interface DirectChatTransactionOptions {
+  source?: DirectVariableWriteSource;
+  operation?: DirectVariableWriteOperation;
+  refreshHint?: DirectVariableWriteRefreshHint;
+}
+
+export type DirectChatVariableUpdater = (
+  variables: Record<string, unknown>,
+) => Record<string, unknown>;
+
+const normalizeRefreshHint = (
+  refreshHint: DirectVariableWriteRefreshHint | undefined,
+): DirectVariableWriteRefreshHint => refreshHint ?? 'full';
+
+export type EraVariableWriteConfirmation = {
   message_id?: number | null;
   actions?: Record<string, unknown>;
 };
+
+type EraWriteDoneLikeDetail = EraVariableWriteConfirmation;
 
 type EraWriteDoneSummary = {
   rawMessageId: unknown;
@@ -144,6 +164,7 @@ export async function runDirectChatVariableWrite<TResult>(
     source: metadata.source,
     operation: metadata.operation,
     reason: metadata.reason,
+    refreshHint: normalizeRefreshHint(metadata.refreshHint),
   };
 
   variableTraceLogger.log('[runDirectChatVariableWrite] 直接变量写入已完成，准备发送来源事件', eventDetail);
@@ -152,7 +173,36 @@ export async function runDirectChatVariableWrite<TResult>(
   return result;
 }
 
-export async function emitSourcedEraVariableWriteAndWait({
+/**
+ * 在同一个 updateVariablesWith 回调中执行一组变量变更，并只发出一次直接写入完成事件。
+ *
+ * 与 writeDirectChatVariables 不同，此入口不先读取当前变量；调用方可以在 updater 内
+ * 基于酒馆传入的同一份 variables 快照完成规划和提交，避免多次 getVariables/updateVariablesWith
+ * 之间出现竞态。updater 必须返回要写回的完整变量对象。
+ */
+export async function writeDirectChatTransaction(
+  updater: DirectChatVariableUpdater,
+  reason = 'direct-chat-transaction',
+  options: DirectChatTransactionOptions = {},
+): Promise<Record<string, unknown>> {
+  return runDirectChatVariableWrite(
+    {
+      source: options.source ?? 'event-script',
+      operation: options.operation ?? 'replace',
+      reason,
+      refreshHint: options.refreshHint,
+    },
+    () => updateVariablesWith(updater, { type: 'chat' }) as Record<string, unknown>,
+  );
+}
+
+/**
+ * 注册完成监听器后再发出 ERA 事件，并等待与 message/action 匹配的 writeDone。
+ *
+ * 该底层入口只等待原始 era:writeDone，不会再发送 sourced 完成事件。事件脚本的
+ * writeEraCommand 应使用此入口，避免 raw + sourced 两个事件让前端执行两次全量扫描。
+ */
+export async function emitEraVariableWriteAndWait({
   source,
   operation,
   reason,
@@ -160,12 +210,11 @@ export async function emitSourcedEraVariableWriteAndWait({
   attribution = 'background',
   detail,
   timeoutMs = 10000,
-  timeoutMessage,
+  timeoutMessage = `ERA ${eventName} 写入完成信号超时`,
   expectedMessageId,
   expectedAction,
-}: EraVariableWriteRequest): Promise<EraVariableWriteDoneDetail> {
+}: EraVariableWriteRequest): Promise<EraVariableWriteConfirmation> {
   const waitId = createVariableWriteId();
-  let matchedDetail: EraWriteDoneLikeDetail | undefined;
   let timer: ReturnType<typeof window.setTimeout> | null = null;
   let listener: { stop: () => void } | null = null;
   let observedWriteDoneCount = 0;
@@ -186,7 +235,7 @@ export async function emitSourcedEraVariableWriteAndWait({
     if (!listener) {
       return;
     }
-    variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 停止等待监听器', {
+    variableTraceLogger.log('[emitEraVariableWriteAndWait] 停止等待监听器', {
       ...waitContext,
       reason: reasonText,
       observedWriteDoneCount,
@@ -195,10 +244,10 @@ export async function emitSourcedEraVariableWriteAndWait({
     listener = null;
   };
 
-  const waitForWriteDone = new Promise<void>((resolve, reject) => {
+  const waitForWriteDone = new Promise<EraVariableWriteConfirmation>((resolve, reject) => {
     timer = window.setTimeout(() => {
       stopListener('timeout');
-      variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 等待 era:writeDone 超时', {
+      variableTraceLogger.error('[emitEraVariableWriteAndWait] 等待 era:writeDone 超时', {
         ...waitContext,
         observedWriteDoneCount,
         lastObservedWriteDone,
@@ -207,13 +256,13 @@ export async function emitSourcedEraVariableWriteAndWait({
       reject(new Error(timeoutMessage));
     }, timeoutMs);
 
-    variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 已注册 era:writeDone 等待监听器', waitContext);
+    variableTraceLogger.log('[emitEraVariableWriteAndWait] 已注册 era:writeDone 等待监听器', waitContext);
     listener = eventOn('era:writeDone', (writeDoneDetail: unknown) => {
       observedWriteDoneCount += 1;
       lastObservedWriteDone = summarizeEraWriteDone(writeDoneDetail);
       lastIgnoredReason = getWriteDoneMismatchReason(writeDoneDetail, expectedMessageId, expectedAction);
       if (!matchesEraWriteDone(writeDoneDetail, expectedMessageId, expectedAction)) {
-        variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 忽略不匹配的 era:writeDone', {
+        variableTraceLogger.log('[emitEraVariableWriteAndWait] 忽略不匹配的 era:writeDone', {
           ...waitContext,
           observedWriteDoneCount,
           lastIgnoredReason,
@@ -222,8 +271,7 @@ export async function emitSourcedEraVariableWriteAndWait({
         return;
       }
 
-      matchedDetail = writeDoneDetail;
-      variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 匹配到目标 era:writeDone', {
+      variableTraceLogger.log('[emitEraVariableWriteAndWait] 匹配到目标 era:writeDone', {
         ...waitContext,
         observedWriteDoneCount,
         matched: lastObservedWriteDone,
@@ -232,27 +280,43 @@ export async function emitSourcedEraVariableWriteAndWait({
       if (timer) {
         window.clearTimeout(timer);
       }
-      resolve();
+      resolve(writeDoneDetail);
     });
   });
 
   try {
-    variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 开始发送事件并等待 era:writeDone', waitContext);
+    variableTraceLogger.log('[emitEraVariableWriteAndWait] 开始发送事件并等待 era:writeDone', waitContext);
     await (detail === undefined ? eventEmit(eventName) : eventEmit(eventName, detail));
-    variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 事件已发出，开始等待匹配的 era:writeDone', waitContext);
+    variableTraceLogger.log('[emitEraVariableWriteAndWait] 事件已发出，开始等待匹配的 era:writeDone', waitContext);
   } catch (error) {
     stopListener('emit-failed');
     if (timer) {
       window.clearTimeout(timer);
     }
-    variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 发送事件失败', {
+    variableTraceLogger.error('[emitEraVariableWriteAndWait] 发送事件失败', {
       ...waitContext,
       error,
     });
     throw error instanceof Error ? error : new Error(String(error));
   }
 
-  await waitForWriteDone;
+  return waitForWriteDone;
+}
+
+/**
+ * ERA 写入等待器的带来源包装。需要让 UI/追踪器知道写入来源时使用此入口；它复用
+ * emitEraVariableWriteAndWait 的先监听后 emit 及精确匹配逻辑。
+ */
+export async function emitSourcedEraVariableWriteAndWait(request: EraVariableWriteRequest): Promise<EraVariableWriteDoneDetail> {
+  const {
+    source,
+    operation,
+    reason,
+    eventName,
+    attribution = 'background',
+    refreshHint,
+  } = request;
+  const matchedDetail = await emitEraVariableWriteAndWait(request);
 
   const eventDetail: EraVariableWriteDoneDetail = {
     version: 1,
@@ -262,6 +326,7 @@ export async function emitSourcedEraVariableWriteAndWait({
     reason,
     eventName,
     attribution,
+    refreshHint: normalizeRefreshHint(refreshHint),
     message_id: normalizeMessageId(matchedDetail?.message_id),
     actions: normalizeActions(matchedDetail?.actions),
   };

@@ -1,11 +1,12 @@
 {
   "scripts": {
-    "build:dev": "webpack --mode development",
-    "build:src:dev": "webpack --mode development --env srcOnly=true",
-    "build": "webpack --mode production",
-    "build:src": "webpack --mode production --env srcOnly=true",
-    "build:src:fast": "webpack --mode production --env srcOnly=true --env fast=true",
-    "watch": "webpack --mode development --watch --progress",
+    "generate:events": "node scripts/generate-wuxia-event-assets.mjs",
+    "build:dev": "pnpm generate:events && webpack --mode development",
+    "build:src:dev": "pnpm generate:events && webpack --mode development --env srcOnly=true",
+    "build": "pnpm generate:events && webpack --mode production",
+    "build:src": "pnpm generate:events && webpack --mode production --env srcOnly=true",
+    "build:src:fast": "pnpm generate:events && webpack --mode production --env srcOnly=true --env fast=true",
+    "watch": "pnpm generate:events && webpack --mode development --watch --progress",
     "test": "vitest run",
     "test:safe": "vitest run --configLoader native --pool threads --reporter minimal",
     "test:watch": "vitest",

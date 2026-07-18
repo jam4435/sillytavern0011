@@ -44,9 +44,17 @@ src/事件脚本/
 
 ### era-event-loader.js - 事件加载
 
-| 函数                                  | 说明                     |
-| ------------------------------------- | ------------------------ |
-| `loadEventDefinitionsFromWorldbook()` | 从角色世界书加载事件定义 |
+| 函数                                  | 说明 |
+| ------------------------------------- | ---- |
+| `loadEventManifest()`                 | 加载生成式事件目录与索引 |
+| `loadEventDefinitions(runtimeKeys)`   | 按运行时键按需加载事件分片 |
+| `loadEventCheckpointAtOrBefore(time)` | 加载目标时间之前最近的开局检查点 |
+| `loadEventDefinitionsFromWorldbook()` | 显式调试回退：从角色世界书加载事件定义 |
+
+生产环境事件数据由 `scripts/generate-wuxia-event-assets.mjs` 从 `世界书/**/*.yaml` 生成到
+`src/事件脚本/generated/event-data/`，构建时会自动执行 `pnpm generate:events`。事件定义不再在
+开局时扫描并解析整本角色世界书，而是先读 manifest，再按当前事件窗口、进行中事件和待结算事件
+加载对应分片；`ERA_EVENT_DATA_PROVIDER=worldbook`（或 localStorage 同名开关）仅用于调试回退。
 
 事件条目命名规则：
 
@@ -164,6 +172,7 @@ stat_data
 ├── 前端变量:
 │   ├── 事件结局状态: { 完整事件名: "原定"|"偏离"|"未知" }
 │   ├── 事件结算进度: { 完整事件名: { 差分已应用: true, 玩家参与: true|false } } // 失败重试用，成功后删除
+│   ├── 事件调度状态: { schemaVersion: 1, manifestHash: "...", lastCheckedTime: { 年, 月, 日, 时 } }
 │   └── 事件运行时键版本: 2
 ├── 附近传闻: { 简化事件名: 引子文本 }
 ├── 后续事件线索: { key: 描述 }
@@ -193,3 +202,12 @@ V5.2 版本的优化：
 4. **性能提升** - 50个事件初始化从8秒降至0.3秒
 
 后续事件线索与计数只在来源事件完成后通过同一次直接变量写入成对创建，初始计数为3；新建计数不会在创建它的同一回合立即递减。
+
+当前版本的开局路径进一步采用：
+
+1. **单快照提交** - 开局事件规划、过期历史归档、角色差分和运行时索引在一次 `updateVariablesWith` 中提交，并在提交后统一回读校验。
+2. **生成式资源** - manifest 提供触发时间、结束时间、地点、前置关系和分片索引；检查点保存历史完成键与角色快照，避免逐条重放历史事件。
+3. **稀疏未来状态** - 生成式 provider 不再把数百个未来事件写入 `未发生事件`，而由调度索引计算当前候选集；旧存档仍保留原有桶并增量迁移，不覆盖已有角色状态。
+4. **写入信号合并** - direct 写入等待对应完成信号并传播失败；事件状态刷新按 refresh hint 选择性执行，避免一次写入触发多轮全量扫描。
+
+生成器默认报告无法解析为事件图边的后续引用（例如“全书完”“待定”或不存在的事件）。这些引用会记录在 manifest 的 `unresolvedReferences` 中；发布前可运行 `pnpm generate:events -- --strict` 将其作为阻断错误检查。

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   DIRECT_VARIABLE_WRITE_DONE_EVENT,
   ERA_VARIABLE_WRITE_DONE_EVENT,
+  type DirectVariableWriteRefreshHint,
 } from '../../shared/directVariableWrite';
 import { GameState } from '../types';
 import {
@@ -25,6 +26,33 @@ interface UseEventListenersOptions {
 }
 
 const UNKNOWN_CHAT_ID = 'unknown';
+
+const normalizeRefreshHint = (detail: unknown): DirectVariableWriteRefreshHint => {
+  const hint = detail && typeof detail === 'object' && !Array.isArray(detail)
+    ? (detail as { refreshHint?: unknown }).refreshHint
+    : undefined;
+  return hint === 'none' || hint === 'event-state' || hint === 'character-data' || hint === 'full'
+    ? hint
+    : 'full';
+};
+
+const getEraWriteSignature = (detail: unknown): string | null => {
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) {
+    return null;
+  }
+
+  const writeDone = detail as {
+    message_id?: unknown;
+    actions?: Record<string, unknown>;
+  };
+  const messageId = Number.isInteger(writeDone.message_id) ? Number(writeDone.message_id) : null;
+  const actions = writeDone.actions && typeof writeDone.actions === 'object' && !Array.isArray(writeDone.actions)
+    ? Object.keys(writeDone.actions)
+      .filter(action => writeDone.actions?.[action] === true)
+      .sort()
+    : [];
+  return `${messageId ?? 'none'}:${actions.join(',')}`;
+};
 
 const normalizeChatId = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -78,6 +106,8 @@ export function useEventListeners({
       currentChatId: lastKnownChatIdRef.current,
     });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let rawEraCompletionTimer: ReturnType<typeof setTimeout> | null = null;
+    let pendingRawEraSignature: string | null = null;
 
     const refreshGameState = () => {
       const newData = readGameDataPure();
@@ -94,6 +124,27 @@ export function useEventListeners({
         refreshTimer = null;
         refreshGameState();
       }, delay);
+    };
+
+    const scheduleCompletionForHint = (reason: string, refreshHint: DirectVariableWriteRefreshHint) => {
+      if (refreshHint === 'none' || refreshHint === 'event-state') {
+        return;
+      }
+      // character-data 尚未携带可安全裁剪的 scope，保留 fullScan 以兼容旧写入调用。
+      scheduleGameDataCompletion(reason, { fullScan: true });
+    };
+
+    const scheduleRawEraCompletion = (detail?: unknown) => {
+      if (rawEraCompletionTimer) {
+        clearTimeout(rawEraCompletionTimer);
+      }
+      pendingRawEraSignature = getEraWriteSignature(detail);
+      rawEraCompletionTimer = setTimeout(() => {
+        rawEraCompletionTimer = null;
+        pendingRawEraSignature = null;
+        scheduleCompletionForHint('era-write-done', 'full');
+        scheduleRefresh(50);
+      }, 0);
     };
 
     const handleMessageUpdate = (eventData?: unknown) => {
@@ -127,24 +178,45 @@ export function useEventListeners({
       eventLogger.log('[era:writeDone] 检测到变量写入完成，调度纯读刷新');
       variableTraceLogger.log('[useEventListeners] 收到 era:writeDone', detail ?? null);
       onEraWriteDone?.(detail);
-      scheduleGameDataCompletion('era-write-done', { fullScan: true });
-      scheduleRefresh(50);
+      // sourced 完成事件通常紧随 raw writeDone 发出。将 raw 的补全延后一个宏任务，
+      // 让 sourced 事件可以取消它，避免同一次 ERA 写入触发两次 fullScan。
+      scheduleRawEraCompletion(detail);
     };
 
     const handleDirectWriteDone = (detail?: unknown) => {
       eventLogger.log(`[${DIRECT_VARIABLE_WRITE_DONE_EVENT}] 检测到 direct 变量写入完成，调度纯读刷新`);
       variableTraceLogger.log(`[useEventListeners] 收到 ${DIRECT_VARIABLE_WRITE_DONE_EVENT}`, detail ?? null);
       onDirectVariableWriteDone?.(detail);
-      scheduleGameDataCompletion('direct-write-done', { fullScan: true });
-      scheduleRefresh(50);
+      const refreshHint = normalizeRefreshHint(detail);
+      scheduleCompletionForHint('direct-write-done', refreshHint);
+      if (refreshHint !== 'none') {
+        scheduleRefresh(50);
+      }
     };
 
     const handleEraVariableWriteDone = (detail?: unknown) => {
       eventLogger.log(`[${ERA_VARIABLE_WRITE_DONE_EVENT}] 检测到带来源的 ERA 变量写入完成，调度纯读刷新`);
       variableTraceLogger.log(`[useEventListeners] 收到 ${ERA_VARIABLE_WRITE_DONE_EVENT}`, detail ?? null);
       onEraVariableWriteDone?.(detail);
-      scheduleGameDataCompletion('era-variable-write-done', { fullScan: true });
-      scheduleRefresh(50);
+      const refreshHint = normalizeRefreshHint(detail);
+      const sourcedSignature = getEraWriteSignature(detail);
+      if (
+        rawEraCompletionTimer
+        && pendingRawEraSignature !== null
+        && sourcedSignature !== null
+        && pendingRawEraSignature === sourcedSignature
+      ) {
+        clearTimeout(rawEraCompletionTimer);
+        rawEraCompletionTimer = null;
+        pendingRawEraSignature = null;
+        variableTraceLogger.log('[useEventListeners] sourced ERA 完成事件已合并 raw writeDone 刷新', {
+          signature: sourcedSignature,
+        });
+      }
+      scheduleCompletionForHint('era-variable-write-done', refreshHint);
+      if (refreshHint !== 'none') {
+        scheduleRefresh(50);
+      }
     };
 
     eventLogger.log('注册 MESSAGE_SENT 监听器...');
@@ -201,6 +273,9 @@ export function useEventListeners({
       });
       if (refreshTimer) {
         clearTimeout(refreshTimer);
+      }
+      if (rawEraCompletionTimer) {
+        clearTimeout(rawEraCompletionTimer);
       }
       messageSentListener.stop();
       messageReceivedListener.stop();

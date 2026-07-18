@@ -30,6 +30,54 @@ interface Entry {
 }
 type WebpackEnv = Record<string, string | boolean | undefined>;
 
+const EVENT_DATA_SOURCE_DIRECTORY = path.join(
+  import.meta.dirname,
+  'src',
+  '事件脚本',
+  'generated',
+  'event-data',
+);
+
+class EventDataAssetPlugin {
+  apply(compiler: webpack.Compiler) {
+    compiler.hooks.thisCompilation.tap('EventDataAssetPlugin', compilation => {
+      compilation.hooks.processAssets.tap(
+        {
+          name: 'EventDataAssetPlugin',
+          stage: webpack.Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL,
+        },
+        () => {
+          if (!fs.existsSync(EVENT_DATA_SOURCE_DIRECTORY)) {
+            throw new Error('缺少生成式事件资产，请先运行 pnpm generate:events');
+          }
+          const emitDirectory = (directory: string) => {
+            compilation.contextDependencies.add(directory);
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const sourcePath = path.join(directory, entry.name);
+              if (entry.isDirectory()) {
+                emitDirectory(sourcePath);
+                continue;
+              }
+              if (!entry.isFile()) continue;
+              compilation.fileDependencies.add(sourcePath);
+              const relativePath = path.relative(EVENT_DATA_SOURCE_DIRECTORY, sourcePath).split(path.sep).join('/');
+              compilation.emitAsset(
+                `event-data/${relativePath}`,
+                new webpack.sources.RawSource(fs.readFileSync(sourcePath)),
+              );
+            }
+          };
+          emitDirectory(EVENT_DATA_SOURCE_DIRECTORY);
+        },
+      );
+    });
+  }
+}
+
+function is_event_script_entry(script: string) {
+  return path.normalize(script) === path.normalize('src/事件脚本/index.ts');
+}
+
 // 酒馆插件目录不走酒馆助手构建流程。
 const IGNORED_ENTRY_DIRECTORIES = new Set([path.normalize('src/顶部工具栏插件')]);
 const IGNORED_ENTRY_ROOT_DIRECTORIES = new Set([path.normalize('示例')]);
@@ -485,6 +533,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
         { apply: watch_tavern_helper },
         { apply: schema_dump },
         ...(env_flag_enabled(env, 'srcOnly') ? [] : [{ apply: tavern_sync }]),
+        ...(is_event_script_entry(entry.script) ? [new EventDataAssetPlugin()] : []),
         new VueLoaderPlugin(),
         unpluginAutoImport({
           dts: true,

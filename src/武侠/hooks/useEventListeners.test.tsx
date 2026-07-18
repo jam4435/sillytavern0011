@@ -144,6 +144,63 @@ describe('useEventListeners', () => {
     expect(setCurrentOptions).toHaveBeenCalledWith(['选项']);
   });
 
+  it('纯事件状态直接写入只刷新投影，不触发 fullScan', async () => {
+    renderHook(() =>
+      useEventListeners({
+        updateGameState: vi.fn(),
+        setCurrentMaintext: vi.fn(),
+        setCurrentOptions: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await emitMockEvent(DIRECT_VARIABLE_WRITE_DONE_EVENT, {
+        version: 1,
+        writeId: 'event-state-1',
+        source: 'event-script',
+        operation: 'update',
+        reason: 'event-state-write',
+        refreshHint: 'event-state',
+      });
+      vi.advanceTimersByTime(60);
+    });
+
+    expect(scheduleGameDataCompletionMock).not.toHaveBeenCalled();
+    expect(readGameDataPureMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('同一 ERA 写入的 raw 与 sourced 完成通知只执行一次 fullScan', async () => {
+    renderHook(() =>
+      useEventListeners({
+        updateGameState: vi.fn(),
+        setCurrentMaintext: vi.fn(),
+        setCurrentOptions: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await emitMockEvent('era:writeDone', {
+        message_id: 88,
+        actions: { apiWrite: true },
+      });
+      await emitMockEvent(ERA_VARIABLE_WRITE_DONE_EVENT, {
+        version: 1,
+        writeId: 'era-88',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'same-write',
+        eventName: 'era:updateByObject',
+        message_id: 88,
+        actions: { apiWrite: true },
+        refreshHint: 'full',
+      });
+      vi.advanceTimersByTime(60);
+    });
+
+    expect(scheduleGameDataCompletionMock).toHaveBeenCalledTimes(1);
+    expect(scheduleGameDataCompletionMock).toHaveBeenCalledWith('era-variable-write-done', { fullScan: true });
+  });
+
   it('同聊天的 CHAT_CHANGED 只刷新，不清空当前回合追踪', async () => {
     const updateGameState = vi.fn();
     const setCurrentMaintext = vi.fn();

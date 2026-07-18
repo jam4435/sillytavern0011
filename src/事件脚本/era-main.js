@@ -19,8 +19,15 @@
     hasParticipationEntry,
     isDebutEvent,
     formatDate,
+    attachEventMetadata,
+    deriveEventRuntimeDescriptor,
   } = await import('./era-utils.js');
-  const { loadEventDefinitionsFromWorldbook } = await import('./era-event-loader.js');
+  const {
+    loadEventDefinitions,
+    loadEventDefinitionsFromWorldbook,
+    loadEventManifest,
+    loadEventCheckpointAtOrBefore,
+  } = await import('./era-event-loader.js');
   const { isTimeForEvent, isEventDiscoverable, isTimeAfterEventEnd } = await import('./era-event-checker.js');
   const {
     initializeEventList,
@@ -41,9 +48,10 @@
   const { reconcileWorldEventArchive, syncParticipationOutcomeStates } = await import('./era-world-events.js');
   const { needsEventRuntimeStateReset, resetLegacyEventRuntimeState } = await import('./era-runtime-state.js');
   const { buildFollowupCounterPlan, createSerialTaskQueue } = await import('./era-turn-queue.js');
+  const { getManifestEventCandidateKeys } = await import('./era-event-scheduler.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
-  const EVENT_SCRIPT_VERSION = '2026-07-15-event-lifecycle-v2';
+  const EVENT_SCRIPT_VERSION = '2026-07-18-event-performance-v3';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
@@ -77,6 +85,73 @@
   const isPlainObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
 
   const isEmptyObject = value => isPlainObject(value) && Object.keys(value).length === 0;
+
+  const eventTimeToHours = time => {
+    if (!time || typeof time !== 'object') return null;
+    return (Number(time.年 || 0) * 365 + Number(time.月 || 0) * 30 + Number(time.日 || 0)) * 24 + Number(time.时 || 0);
+  };
+
+  const buildManifestDefinition = entry => {
+    const descriptor = deriveEventRuntimeDescriptor(entry.sourceName);
+    const data = {
+      事件地点: entry.location || '',
+      触发条件: entry.triggerTime || {},
+      事件结束时间: entry.endTime || undefined,
+      事件引子: entry.intro || '',
+      事件详情: entry.title ? `${entry.title}事件` : '',
+      事件概要: entry.summary || '',
+      参与人物: Array.isArray(entry.participants) ? [...entry.participants] : [],
+      insert: {},
+      update: {},
+      delete: {},
+      ...(entry.followup
+        ? { 后续事件: { 事件名: entry.followup, 描述: '' } }
+        : {}),
+    };
+    return attachEventMetadata(data, descriptor);
+  };
+
+  const isGeneratedProviderDebugMode = () => {
+    if (globalThis.ERA_EVENT_DATA_PROVIDER === 'worldbook') return true;
+    try {
+      return globalThis.localStorage?.getItem('era_event_data_provider') === 'worldbook';
+    } catch {
+      return false;
+    }
+  };
+
+  async function loadStartupEventDefinitions(statData, manifest, checkpoint = null) {
+    if (!manifest) return loadEventDefinitionsFromWorldbook();
+
+    const eventEntries = Array.isArray(manifest.events) ? manifest.events : [];
+    const currentHour = eventTimeToHours(statData?.世界信息?.时间) ?? Number.MAX_SAFE_INTEGER;
+    const eventSystem = statData?.事件系统 || {};
+    const activeKeys = Object.keys(eventSystem.进行中事件 || {});
+    const participationKeys = Object.keys(statData?.参与事件 || {});
+    const pendingKeys = Object.keys(statData?.前端变量?.事件结算进度 || {});
+    const knownCompletedKeys = new Set([
+      ...Object.keys(eventSystem.已完成事件 || {}),
+      ...(Array.isArray(checkpoint?.completedRuntimeKeys) ? checkpoint.completedRuntimeKeys : []),
+    ]);
+    const fullKeys = new Set([...activeKeys, ...participationKeys, ...pendingKeys]);
+    const futureWindowEnd = currentHour + 10 * 24;
+    const currentWindowStart = currentHour - 10 * 24;
+
+    for (const entry of eventEntries) {
+      const endHour = entry.endHour;
+      const triggerHour = entry.triggerHour;
+      if (
+        (Number.isFinite(endHour) && endHour <= currentHour && !knownCompletedKeys.has(entry.runtimeKey)) ||
+        (Number.isFinite(triggerHour) && triggerHour <= futureWindowEnd && (!Number.isFinite(endHour) || endHour >= currentWindowStart))
+      ) {
+        fullKeys.add(entry.runtimeKey);
+      }
+    }
+
+    const lightweight = Object.fromEntries(eventEntries.map(entry => [entry.runtimeKey, buildManifestDefinition(entry)]));
+    const fullDefinitions = fullKeys.size > 0 ? await loadEventDefinitions([...fullKeys]) : {};
+    return Object.assign(lightweight, fullDefinitions);
+  }
 
   const shouldPostResyncVerifyForStat = stat => {
     const eventSystem = stat?.事件系统;
@@ -207,7 +282,8 @@
 
       // ==================== 批量检查未发生事件 ====================
       debugGroup('📋 批量检查未发生事件');
-      const 未发生列表 = Object.keys(未发生事件);
+      const manifestCandidates = getManifestEventCandidateKeys(eventManifest, currentTime, variables.stat_data);
+      const 未发生列表 = manifestCandidates || Object.keys(未发生事件);
       log(`未发生事件数: ${未发生列表.length}`);
 
       // 收集所有需要触发的事件（区分普通事件和登场事件）
@@ -315,7 +391,12 @@
       // ==================== 检查玩家位置触发（弹性时间+层级式地点匹配）====================
       const 仍在进行事件 = 进行中列表.filter(eventName => !eventsToEnd.includes(eventName));
       const 最新未发生事件 = updatedVariables?.stat_data?.事件系统?.未发生事件 || {};
-      const 可发现未发生事件 = Object.keys(最新未发生事件).filter(eventName =>
+      const latestManifestCandidates = getManifestEventCandidateKeys(
+        eventManifest,
+        updatedVariables.stat_data.世界信息.时间,
+        updatedVariables.stat_data,
+      );
+      const 可发现未发生事件 = (latestManifestCandidates || Object.keys(最新未发生事件)).filter(eventName =>
         isEventDiscoverable(updatedVariables.stat_data.世界信息.时间, eventDefinitions[eventName]),
       );
       if (仍在进行事件.length > 0 || 可发现未发生事件.length > 0) {
@@ -456,6 +537,7 @@
 
   // ==================== 初始化流程 ====================
   let eventDefinitions = {};
+  let eventManifest = null;
   let isInitializing = false;
   let isInitialized = false;
   let isCheckingEvents = false;
@@ -513,125 +595,149 @@
     }, 100);
   }
 
-  async function initialize(options = {}) {
+  async function initialize() {
     if (isInitializing) {
       log('⏳ 初始化正在进行中，跳过重复调用');
       return false;
     }
 
     isInitializing = true;
+    isInitialized = false;
     if (isDebugEnabled()) {
       console.log('%c===== ERA 事件系统 V5.2 初始化 =====', 'color: #00aaff; font-size: 14px; font-weight: bold;');
     }
 
-    // 预检查：确保 stat_data 已初始化
-    let preCheckVars;
     try {
-      preCheckVars = await getVariables({ type: 'chat' });
+      // 预检查：确保 stat_data 已初始化
+      let preCheckVars = await getVariables({ type: 'chat' });
       if (!preCheckVars || !preCheckVars.stat_data) {
         logWarning('⏳ stat_data 尚未初始化，等待前端创建角色后自动重试...');
-        isInitializing = false;
-        isInitialized = false;
         return false;
       }
 
       if (!preCheckVars.stat_data.世界信息 || !preCheckVars.stat_data.世界信息.时间) {
         logWarning('⏳ 世界信息或时间数据尚未初始化，等待前端创建角色后自动重试...');
-        isInitializing = false;
-        isInitialized = false;
         return false;
       }
-    } catch (error) {
-      logWarning('⏳ 读取变量失败，等待前端创建角色后自动重试...', error);
-      isInitializing = false;
-      isInitialized = false;
-      return false;
-    }
 
-    let shouldPostResyncVerify =
-      options.forcePostResyncVerify === true || shouldPostResyncVerifyForStat(preCheckVars.stat_data);
-
-    if (needsEventRuntimeStateReset(preCheckVars.stat_data)) {
-      const resetSucceeded = await resetLegacyEventRuntimeState(preCheckVars.stat_data);
-      if (!resetSucceeded) {
-        isInitializing = false;
-        isInitialized = false;
-        return false;
+      if (needsEventRuntimeStateReset(preCheckVars.stat_data)) {
+        const resetSucceeded = await resetLegacyEventRuntimeState(preCheckVars.stat_data);
+        if (!resetSucceeded) {
+          return false;
+        }
+        preCheckVars = await getVariables({ type: 'chat' });
       }
-      preCheckVars = await getVariables({ type: 'chat' });
-      shouldPostResyncVerify = true;
-    }
 
-    eventDefinitions = await loadEventDefinitionsFromWorldbook();
-    await initializeEventList(eventDefinitions, { shouldPostResyncVerify });
-    await reconcileWorldEventArchive(eventDefinitions);
+      const manifest = isGeneratedProviderDebugMode() ? null : await loadEventManifest();
+      const statForCheckpoint = preCheckVars.stat_data;
+      const eventSystemForCheckpoint = statForCheckpoint.事件系统 || {};
+      const canApplyOpeningCheckpoint =
+        !!manifest &&
+        EVENT_SYSTEM_BUCKETS.every(key => isEmptyObject(eventSystemForCheckpoint[key])) &&
+        isEmptyObject(statForCheckpoint.参与事件 || {}) &&
+        isEmptyObject(statForCheckpoint.世界事件 || {}) &&
+        isEmptyObject(statForCheckpoint.前端变量?.事件结算进度 || {}) &&
+        Object.keys(statForCheckpoint.角色数据 || {}).length === 0;
+      const checkpoint = canApplyOpeningCheckpoint
+        ? await loadEventCheckpointAtOrBefore(statForCheckpoint.世界信息.时间)
+        : null;
+      eventManifest = manifest;
+      eventDefinitions = await loadStartupEventDefinitions(preCheckVars.stat_data, manifest, checkpoint);
+      await initializeEventList(eventDefinitions, {
+        checkpoint,
+        applyCheckpoint: canApplyOpeningCheckpoint,
+        sparseFuture: Boolean(manifest),
+        manifestHash: manifest?.contentHash || '',
+      });
+      await reconcileWorldEventArchive(eventDefinitions);
 
-    // 初始化完成后输出当前状态
-    try {
-      const vars = await getVariables({ type: 'chat' });
+      // 初始化完成后输出当前状态
+      try {
+        const vars = await getVariables({ type: 'chat' });
+
+        if (isDebugEnabled()) {
+          debugGroupCollapsed('🌍 当前世界信息（完整JSON）');
+          console.log(JSON.parse(JSON.stringify(vars?.stat_data?.世界信息 || {})));
+          debugGroupEnd();
+
+          debugGroupCollapsed('🎮 当前事件系统（完整JSON）');
+          console.log(JSON.parse(JSON.stringify(vars?.stat_data?.事件系统 || {})));
+          debugGroupEnd();
+        }
+
+        log('✅ 初始化完成，完整数据已输出到控制台（点击展开查看）');
+      } catch (error) {
+        logError('输出初始状态失败:', error);
+      }
 
       if (isDebugEnabled()) {
-        debugGroupCollapsed('🌍 当前世界信息（完整JSON）');
-        console.log(JSON.parse(JSON.stringify(vars?.stat_data?.世界信息 || {})));
-        debugGroupEnd();
-
-        debugGroupCollapsed('🎮 当前事件系统（完整JSON）');
-        console.log(JSON.parse(JSON.stringify(vars?.stat_data?.事件系统 || {})));
-        debugGroupEnd();
+        console.log('%c===== 初始化完成 =====', 'color: #00aaff; font-size: 14px; font-weight: bold;');
       }
 
-      log('✅ 初始化完成，完整数据已输出到控制台（点击展开查看）');
+      // 初始化后自动执行一次事件检查
+      log('🔄 初始化完成，开始自动检查事件...');
+      await checkEvents(eventDefinitions, 'initialize');
+      isInitialized = true;
+      lastSuccessfulInitializationAt = Date.now();
+      log('🏁 初始化流程结束，事件监听器已激活');
+      return true;
     } catch (error) {
-      logError('输出初始状态失败:', error);
+      isInitialized = false;
+      logError('❌ ERA 事件系统初始化失败（变量尚未就绪或初始化步骤抛错）:', error);
+      return false;
+    } finally {
+      isInitializing = false;
+      if (pendingFrontendInitialization && !frontendInitializationScheduled) {
+        const pending = pendingFrontendInitialization;
+        pendingFrontendInitialization = null;
+        scheduleFrontendInitialization(pending.reason, pending.signal);
+      }
     }
-
-    if (isDebugEnabled()) {
-      console.log('%c===== 初始化完成 =====', 'color: #00aaff; font-size: 14px; font-weight: bold;');
-    }
-
-    // 初始化后自动执行一次事件检查
-    log('🔄 初始化完成，开始自动检查事件...');
-    await checkEvents(eventDefinitions, 'initialize');
-    isInitializing = false;
-    isInitialized = true;
-    lastSuccessfulInitializationAt = Date.now();
-    log('🏁 初始化流程结束，事件监听器已激活');
-    return true;
   }
 
-  let frontendInitializationTimer = null;
+  let frontendInitializationScheduled = false;
+  let pendingFrontendInitialization = null;
 
-  function scheduleFrontendInitialization(reason, signal, delay = 500, options = {}) {
-    if (frontendInitializationTimer) {
-      clearTimeout(frontendInitializationTimer);
+  // GameInitialized 信号在变量回读确认后才会发送，因此这里无需再人为等待 500ms。
+  // 用微任务合并同一轮中 waitGlobalInitialized 与 eventOn 的重复通知。
+  function scheduleFrontendInitialization(reason, signal) {
+    pendingFrontendInitialization = { reason, signal };
+    if (frontendInitializationScheduled) {
+      log(`🧩 已有待执行前端开局初始化，合并请求: ${reason}`);
+      return;
     }
 
-    frontendInitializationTimer = setTimeout(async () => {
-      frontendInitializationTimer = null;
-      const signalTimestamp = typeof signal?.timestamp === 'number' ? signal.timestamp : 0;
+    frontendInitializationScheduled = true;
+    queueMicrotask(async () => {
+      frontendInitializationScheduled = false;
+      const request = pendingFrontendInitialization;
+      pendingFrontendInitialization = null;
+      if (!request) return;
+
+      const { reason: requestReason, signal: requestSignal } = request;
+      const signalTimestamp = typeof requestSignal?.timestamp === 'number' ? requestSignal.timestamp : 0;
 
       if (isInitializing) {
-        log(`🎮 初始化仍在进行，延后处理前端开局初始化信号: ${reason}`, signal);
-        scheduleFrontendInitialization(reason, signal, 300, options);
+        // 初始化的 finally 会重新调度这个请求，避免定时器自旋或丢失开局信号。
+        pendingFrontendInitialization = request;
+        log(`🎮 初始化仍在进行，等待当前流程结束后处理前端开局初始化信号: ${requestReason}`, requestSignal);
         return;
       }
 
       if (signalTimestamp > 0 && isInitialized && lastSuccessfulInitializationAt >= signalTimestamp) {
-        log(`🎮 前端开局初始化信号已被最近一次初始化覆盖，跳过重复初始化: ${reason}`, signal);
+        log(`🎮 前端开局初始化信号已被最近一次初始化覆盖，跳过重复初始化: ${requestReason}`, requestSignal);
         return;
       }
 
-      log(`🎮 检测到前端开局初始化信号，重新初始化事件系统: ${reason}`, signal);
-      isInitialized = false;
-
-      const success = await initialize(options);
+      log(`🎮 检测到前端开局初始化信号，重新初始化事件系统: ${requestReason}`, requestSignal);
+      const success = await initialize();
       if (success) {
         logSuccess('🎉 ERA 事件系统已随前端开局重新初始化！');
         toastr.success('ERA 事件系统已自动初始化');
       } else {
         logError('ERA 事件系统重新初始化失败，请检查变量结构或世界书事件条目');
       }
-    }, delay);
+    });
   }
 
   // ==================== 启动系统 ====================
@@ -645,7 +751,7 @@
       .then(signal => {
         log('🎮 收到 GameInitialized 信号:', signal);
         logSuccess('🎉 前端已完成角色创建，开始自动初始化 ERA 事件系统...');
-        scheduleFrontendInitialization('waitGlobalInitialized', signal, 500, { forcePostResyncVerify: true });
+        scheduleFrontendInitialization('waitGlobalInitialized', signal);
       })
       .catch(error => {
         logError('等待 GameInitialized 信号失败:', error);
@@ -662,7 +768,7 @@
   });
 
   eventOn('GameInitialized', signal => {
-    scheduleFrontendInitialization('GameInitialized-event', signal, 500, { forcePostResyncVerify: true });
+    scheduleFrontendInitialization('GameInitialized-event', signal);
   });
 
   // MESSAGE_SENT 只做事件检查，不再扣减线索倒计时。
@@ -720,9 +826,7 @@
 
     if (isEmptyOpeningEventSystemWrite(detail)) {
       log('📝 检测到新开局空事件系统写入，重新初始化事件列表');
-      scheduleFrontendInitialization('opening-empty-event-system-api-write', detail, 300, {
-        forcePostResyncVerify: true,
-      });
+      scheduleFrontendInitialization('opening-empty-event-system-api-write', detail);
       return;
     }
 

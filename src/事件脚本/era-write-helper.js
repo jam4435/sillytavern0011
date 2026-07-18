@@ -1,5 +1,8 @@
 import { log, logWarning } from './era-utils.js';
-import { runDirectChatVariableWrite } from '../shared/directVariableWrite';
+import {
+  emitEraVariableWriteAndWait,
+  runDirectChatVariableWrite,
+} from '../shared/directVariableWrite';
 
 const RECENT_SIGNATURE_TTL_MS = 3000;
 const pendingSignatures = new Set();
@@ -257,6 +260,7 @@ export async function writeDirectChatVariables(action, payload, reason = 'direct
         source: 'event-script',
         operation: action,
         reason,
+        refreshHint: 'event-state',
       },
       () =>
         updateVariablesWith(variables => {
@@ -284,7 +288,7 @@ export const writeDirectUpdate = (payload, reason) => writeDirectChatVariables('
 export const writeDirectDelete = (payload, reason) => writeDirectChatVariables('delete', payload, reason);
 export const writeDirectAssign = (payload, reason) => writeDirectChatVariables('assign', payload, reason);
 
-export async function writeEraCommand(command, payload, reason = command) {
+export async function writeEraCommand(command, payload, reason = command, options = {}) {
   const signature = `era:${command}:${stableStringify(payload)}`;
   if (isDuplicateSignature(signature)) {
     log(`跳过重复 ERA 写入: ${reason}`);
@@ -293,13 +297,23 @@ export async function writeEraCommand(command, payload, reason = command) {
 
   markPending(signature);
   try {
-    eventEmit(command, payload);
-    await new Promise(resolve => {
-      const timeout = setTimeout(resolve, 1500);
-      eventOnce('era:writeDone', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
+    const operation = command === 'era:insertByObject'
+      ? 'insert'
+      : command === 'era:updateByObject'
+        ? 'update'
+        : command === 'era:deleteByObject' || command === 'era:deleteByPath'
+          ? 'delete'
+          : 'replace';
+    await emitEraVariableWriteAndWait({
+      source: 'event-script',
+      operation,
+      reason,
+      eventName: command,
+      detail: payload,
+      timeoutMs: options.timeoutMs ?? 10000,
+      timeoutMessage: options.timeoutMessage ?? `ERA ${command} 写入完成信号超时: ${reason}`,
+      expectedMessageId: options.expectedMessageId,
+      expectedAction: options.expectedAction,
     });
     return true;
   } finally {

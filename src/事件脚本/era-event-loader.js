@@ -15,6 +15,7 @@ import {
   debugTable,
 } from './era-utils.js';
 import { normalizeParticipantEventDefinition } from './era-participant-entry.js';
+import { getGeneratedEventDataProvider } from './era-event-data-provider.js';
 
 const parsedEventEntryCache = new Map();
 let cachedEventDefinitionsSignature = '';
@@ -34,6 +35,64 @@ function hashString(value) {
 
 function buildEventEntryFingerprint(entry) {
   return [entry?.uid ?? '', entry?.name ?? '', hashString(entry?.content ?? '')].join('|');
+}
+
+function isWorldbookDebugProviderEnabled() {
+  if (globalThis.ERA_EVENT_DATA_PROVIDER === 'worldbook') return true;
+  try {
+    return globalThis.localStorage?.getItem('era_event_data_provider') === 'worldbook';
+  } catch {
+    return false;
+  }
+}
+
+function normalizeGeneratedDefinitions(definitions, manifest) {
+  const metadataByKey = new Map(manifest.events.map(event => [event.runtimeKey, event]));
+  const normalizedDefinitions = {};
+  for (const [runtimeKey, eventData] of Object.entries(definitions)) {
+    const manifestEntry = metadataByKey.get(runtimeKey);
+    if (!manifestEntry) throw new Error(`manifest 中不存在已加载事件: ${runtimeKey}`);
+    const descriptor = deriveEventRuntimeDescriptor(manifestEntry.sourceName);
+    if (!descriptor || descriptor.runtimeKey !== runtimeKey || descriptor.kind !== manifestEntry.kind) {
+      throw new Error(`manifest 事件来源信息与 runtimeKey 不一致: ${runtimeKey}`);
+    }
+    const normalized = normalizeParticipantEventDefinition(runtimeKey, eventData, { kind: manifestEntry.kind });
+    if (!normalized.valid) throw new Error(normalized.errors.join('\n'));
+    normalizedDefinitions[runtimeKey] = attachEventMetadata(normalized.data, descriptor);
+  }
+  return normalizedDefinitions;
+}
+
+/**
+ * Load the generated manifest without scanning the character worldbook.
+ */
+export async function loadEventManifest(options = {}) {
+  const provider = options.provider || getGeneratedEventDataProvider(options.providerOptions);
+  return provider.loadManifest();
+}
+
+/**
+ * Production loader.  The worldbook path is available only through the
+ * explicit `era_event_data_provider=worldbook` debug switch.
+ */
+export async function loadEventDefinitions(runtimeKeys = null, options = {}) {
+  if (isWorldbookDebugProviderEnabled() && !options.provider) {
+    logWarning('事件数据使用显式 worldbook 调试回退；生产环境请清除 era_event_data_provider');
+    const allDefinitions = await loadEventDefinitionsFromWorldbook();
+    if (runtimeKeys == null) return allDefinitions;
+    return Object.fromEntries(runtimeKeys.filter(key => allDefinitions[key]).map(key => [key, allDefinitions[key]]));
+  }
+
+  const provider = options.provider || getGeneratedEventDataProvider(options.providerOptions);
+  const manifest = await provider.loadManifest();
+  const definitions = await provider.loadDefinitions(runtimeKeys);
+  return normalizeGeneratedDefinitions(definitions, manifest);
+}
+
+export async function loadEventCheckpointAtOrBefore(time, options = {}) {
+  if (isWorldbookDebugProviderEnabled() && !options.provider) return null;
+  const provider = options.provider || getGeneratedEventDataProvider(options.providerOptions);
+  return provider.loadCheckpointAtOrBefore(time);
 }
 
 // ==================== 从世界书加载事件定义 ====================

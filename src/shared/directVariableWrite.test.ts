@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DIRECT_VARIABLE_WRITE_DONE_EVENT,
   ERA_VARIABLE_WRITE_DONE_EVENT,
+  emitEraVariableWriteAndWait,
   emitSourcedEraVariableWriteAndWait,
   runDirectChatVariableWrite,
+  writeDirectChatTransaction,
 } from './directVariableWrite';
 import { eventEmitMock, listeners } from '../武侠/test/setup';
 
@@ -62,6 +64,74 @@ describe('runDirectChatVariableWrite', () => {
     )).rejects.toThrow(error);
 
     expect(eventEmitMock).not.toHaveBeenCalled();
+  });
+
+  it('缺省 refreshHint 保持 full，并支持单次 direct transaction', async () => {
+    eventEmitMock.mockImplementationOnce(async (_eventName, detail) => {
+      expect(detail).toEqual(expect.objectContaining({ refreshHint: 'full' }));
+    });
+
+    await runDirectChatVariableWrite(
+      {
+        source: 'frontend',
+        operation: 'update',
+        reason: 'legacy-write',
+      },
+      async () => ({ stat_data: {} }),
+    );
+    expect(eventEmitMock).toHaveBeenCalledWith(
+      DIRECT_VARIABLE_WRITE_DONE_EVENT,
+      expect.objectContaining({ refreshHint: 'full' }),
+    );
+
+    const updateVariablesWithMock = vi.mocked(globalThis.updateVariablesWith);
+    updateVariablesWithMock.mockImplementationOnce(updater => updater({ stat_data: {} }));
+    eventEmitMock.mockClear();
+    await writeDirectChatTransaction(
+      variables => ({ ...variables, stat_data: { eventState: true } }),
+      'single-transaction',
+      { refreshHint: 'event-state' },
+    );
+    expect(updateVariablesWithMock).toHaveBeenCalledTimes(1);
+    expect(eventEmitMock).toHaveBeenCalledWith(
+      DIRECT_VARIABLE_WRITE_DONE_EVENT,
+      expect.objectContaining({
+        reason: 'single-transaction',
+        refreshHint: 'event-state',
+      }),
+    );
+  });
+
+  it('底层 ERA 等待器先监听后 emit，且不发送 sourced 完成事件', async () => {
+    const executionOrder: string[] = [];
+
+    eventOn('era:updateByObject', async () => {
+      executionOrder.push('era:updateByObject');
+      const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
+      await Promise.all(writeDoneListeners.map(listener => listener({
+        message_id: 51,
+        actions: { apply: true },
+      })));
+      await Promise.all(writeDoneListeners.map(listener => listener({
+        message_id: 52,
+        actions: { apiWrite: true },
+      })));
+    });
+
+    const result = await emitEraVariableWriteAndWait({
+      source: 'event-script',
+      operation: 'update',
+      reason: 'event-diff-update',
+      eventName: 'era:updateByObject',
+      detail: { 角色数据: { 郭靖: { 状态: '已完成' } } },
+      expectedMessageId: 52,
+      expectedAction: 'apiWrite',
+      timeoutMessage: 'timeout',
+    });
+
+    expect(result).toEqual({ message_id: 52, actions: { apiWrite: true } });
+    expect(executionOrder).toEqual(['era:updateByObject']);
+    expect(eventEmitMock.mock.calls.some(([eventName]) => eventName === ERA_VARIABLE_WRITE_DONE_EVENT)).toBe(false);
   });
 
   it('ERA 写入确认后发送带来源的完成事件', async () => {

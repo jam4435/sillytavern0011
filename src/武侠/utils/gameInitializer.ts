@@ -517,20 +517,45 @@ export async function initializeNewGameSession(formData: NewGameFormData): Promi
     const openingLine = getRandomOpeningLine();
     const variableData = generateVariableData(formData);
 
-    updateVariablesWith(
+    // 变量写入是后续 ERA 事件初始化的前置条件，必须等待酒馆确认写入完成。
+    await updateVariablesWith(
       variables => ({
         ...variables,
         stat_data: variableData,
       }),
       { type: 'chat' },
     );
+
+    // 写入完成后回读一次，避免在异步落盘前发送 GameInitialized，导致事件脚本读到旧的 stat_data。
+    const persistedVariables = await getVariables({ type: 'chat' });
+    const persistedStatData = persistedVariables?.stat_data;
+    const expectedStatData = variableData as {
+      世界信息: { 时间: { 年: number; 月: number; 日: number; 时: number } };
+      前端变量: { 事件运行时键版本: number };
+    };
+    const expectedTime = expectedStatData.世界信息.时间;
+    const persistedTime = persistedStatData?.世界信息?.时间;
+    const runtimeKeyVersion = persistedStatData?.前端变量?.事件运行时键版本;
+    const timeConfirmed =
+      persistedTime?.年 === expectedTime.年 &&
+      persistedTime?.月 === expectedTime.月 &&
+      persistedTime?.日 === expectedTime.日 &&
+      persistedTime?.时 === expectedTime.时;
+    if (!timeConfirmed || runtimeKeyVersion !== expectedStatData.前端变量.事件运行时键版本) {
+      throw new Error('新游戏变量写入后回读校验失败，未发送 GameInitialized 信号');
+    }
+
     clearAvatarSelection(createAvatarEntityKey('player'));
 
     await setChatMessages([{ message_id: 0, is_hidden: true }], { refresh: 'none' });
 
     const initializationSignal = { timestamp: Date.now(), formData };
     initializeGlobal('GameInitialized', initializationSignal);
-    eventEmit('GameInitialized', initializationSignal);
+    // 不等待事件脚本的完整初始化，避免前端开局请求被 ERA 的历史事件处理阻塞。
+    // 但要接住异步监听器错误，避免产生 unhandled rejection。
+    void eventEmit('GameInitialized', initializationSignal).catch(error => {
+      initLogger.error('❌ 发送 GameInitialized 信号失败:', error);
+    });
 
     return { success: true, content: openingLine };
   } catch (error) {
