@@ -6,6 +6,7 @@
 // next to the script entry (event-data/*). Consumers may override this URL
 // for a CDN or an unpacked development directory.
 const DEFAULT_EVENT_DATA_BASE_URL = './event-data/';
+const MODULE_BASE_URL = new URL(/* webpackIgnore: true */ '.', import.meta.url).href;
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -21,17 +22,17 @@ function normalizeBaseUrl(baseUrl) {
   return value.endsWith('/') ? value : `${value}/`;
 }
 
+function resolveBaseUrl(baseUrl) {
+  return new URL(normalizeBaseUrl(baseUrl), MODULE_BASE_URL).href;
+}
+
 function resolveAssetUrl(baseUrl, file) {
-  try {
-    return new URL(file, new URL(normalizeBaseUrl(baseUrl), import.meta.url)).href;
-  } catch {
-    return `${normalizeBaseUrl(baseUrl)}${file}`;
-  }
+  return new URL(file, baseUrl).href;
 }
 
 export class GeneratedEventDataProvider {
   constructor({ baseUrl, fetcher } = {}) {
-    this.baseUrl = normalizeBaseUrl(baseUrl || globalThis.ERA_EVENT_DATA_BASE_URL || DEFAULT_EVENT_DATA_BASE_URL);
+    this.baseUrl = resolveBaseUrl(baseUrl || globalThis.ERA_EVENT_DATA_BASE_URL || DEFAULT_EVENT_DATA_BASE_URL);
     this.fetcher = fetcher || globalThis.fetch?.bind(globalThis);
     this.manifestPromise = null;
     this.shardPromises = new Map();

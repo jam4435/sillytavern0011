@@ -7,6 +7,37 @@ function response(body: unknown) {
 }
 
 describe('GeneratedEventDataProvider', () => {
+  it('resolves the default event-data directory from the provider module URL', async () => {
+    const fetcher = vi.fn(async () => response({ schemaVersion: 1, events: [], shards: [], checkpoints: [] }));
+    const provider = new GeneratedEventDataProvider({ fetcher });
+
+    await provider.loadManifest();
+
+    const requestedUrl = String(fetcher.mock.calls[0][0]);
+    expect(new URL(requestedUrl).pathname).toMatch(/\/event-data\/manifest\.json$/);
+    expect(requestedUrl).not.toMatch(/^\.\.?\//);
+  });
+
+  it('resolves a relative override from the provider module URL', async () => {
+    const fetcher = vi.fn(async () => response({ schemaVersion: 1, events: [], shards: [], checkpoints: [] }));
+    const provider = new GeneratedEventDataProvider({ baseUrl: '../custom-event-data', fetcher });
+
+    await provider.loadManifest();
+
+    const requestedUrl = String(fetcher.mock.calls[0][0]);
+    expect(new URL(requestedUrl).pathname).toMatch(/\/custom-event-data\/manifest\.json$/);
+    expect(requestedUrl).not.toMatch(/^\.\.?\//);
+  });
+
+  it('preserves an absolute CDN override', async () => {
+    const fetcher = vi.fn(async () => response({ schemaVersion: 1, events: [], shards: [], checkpoints: [] }));
+    const provider = new GeneratedEventDataProvider({ baseUrl: 'https://cdn.example.test/wuxia-events', fetcher });
+
+    await provider.loadManifest();
+
+    expect(fetcher).toHaveBeenCalledWith('https://cdn.example.test/wuxia-events/manifest.json');
+  });
+
   it('loads only requested shards and reuses the shard promise', async () => {
     const manifest = {
       schemaVersion: 1,
