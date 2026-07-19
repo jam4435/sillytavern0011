@@ -52660,9 +52660,10 @@ const _default_implicit_keys = {
     useGroupScoring: null,
     automationId: '',
 };
-function to_original_worldbook_entry(entry, index) {
+function to_original_worldbook_entry(entry, index, { should_preserve_uid = false } = {}) {
+    const uid = should_preserve_uid ? (entry.uid ?? index) : index;
     let result = lodash_default()({})
-        .set('uid', index)
+        .set('uid', uid)
         .set('displayIndex', index)
         .set('comment', entry.name)
         .set('disable', !entry.enabled)
@@ -52706,9 +52707,22 @@ function to_original_worldbook_entry(entry, index) {
     return result.value();
 }
 function bundle_worldbook(worldbook) {
-    return {
-        entries: Object.fromEntries(worldbook.entries.map((entry, index) => [index, to_original_worldbook_entry(entry, index)])),
-    };
+    const entries = {};
+    const used_uids = new Set(worldbook.entries
+        .map(entry => entry.uid)
+        .filter(uid => uid !== undefined && uid !== null)
+        .map(uid => String(uid)));
+    worldbook.entries.forEach((entry, index) => {
+        let uid = entry.uid ?? index;
+        if (entry.uid === undefined) {
+            while (used_uids.has(String(uid))) {
+                uid++;
+            }
+        }
+        used_uids.add(String(uid));
+        entries[uid] = to_original_worldbook_entry({ ...entry, uid }, index, { should_preserve_uid: true });
+    });
+    return { entries };
 }
 
 ;// ./node_modules/.pnpm/crc@4.3.2/node_modules/crc/mjs/calculators/crc1.js
@@ -55427,9 +55441,12 @@ class Syncer_interface {
         this.is_zh = is_zh;
         this.tavern_type = tavern_type;
     }
-    async get_parsed_tavern({ queit = false } = {}) {
+    async get_raw_tavern({ queit = false } = {}) {
         const socket = await wait_socket();
-        const data = await socket.emitWithAck(`pull_${this.type}`, { name: this.name, queit });
+        return await socket.emitWithAck(`pull_${this.type}`, { name: this.name, queit });
+    }
+    async get_parsed_tavern({ queit = false } = {}) {
+        const data = await this.get_raw_tavern({ queit });
         return typeof data === 'string' ? data : detailed_parse(this.tavern_type, data);
     }
     get_parsed_local() {
@@ -55508,18 +55525,32 @@ ${this.do_beautify_config(tavern_data, language)}`;
         if (typeof local_data === 'string') {
             throw Error(`推送${this.type_zh} '${this.name}' 失败: ${local_data}`);
         }
+        let raw_tavern_data = null;
+        let tavern_data = null;
         if (!should_force) {
-            const tavern_data = await this.get_parsed_tavern({ queit: true });
-            if (typeof tavern_data === 'string') {
-                throw Error(`推送${this.type_zh} '${this.name}' 失败: ${tavern_data};\n如果想直接创建角色卡/世界书/预设, 请在命令尾部添加 '-f' 或 '--force' 选项, 如: 'node tavern_sync.mjs push 猴子打字机 -f'`);
+            raw_tavern_data = await this.get_raw_tavern({ queit: true });
+            if (typeof raw_tavern_data === 'string') {
+                throw Error(`推送${this.type_zh} '${this.name}' 失败: ${raw_tavern_data};\n如果想直接创建角色卡/世界书/预设, 请在命令尾部添加 '-f' 或 '--force' 选项, 如: 'node tavern_sync.mjs push 猴子打字机 -f'`);
             }
+            tavern_data = detailed_parse(this.tavern_type, raw_tavern_data);
             const { error_data } = this.check_safe(local_data, tavern_data);
             if (!lodash_default().isEmpty(error_data)) {
                 throw Error(dist.stringify({ [`推送${this.type_zh} '${this.name}' 失败`]: error_data }) +
                     `如果想无视条目差异, 请在命令尾部添加 '-f' 或 '--force' 选项, 如: 'node tavern_sync.mjs push 猴子打字机 -f'`);
             }
         }
-        const { result_data, error_data } = this.do_push(local_data);
+        else {
+            try {
+                raw_tavern_data = await this.get_raw_tavern({ queit: true });
+                if (typeof raw_tavern_data === 'string') {
+                    raw_tavern_data = null;
+                }
+            }
+            catch (error) {
+                raw_tavern_data = null;
+            }
+        }
+        const { result_data, error_data } = this.do_push(local_data, { raw_tavern_data, tavern_data, should_force });
         if (!lodash_default().isEmpty(error_data)) {
             throw Error(dist.stringify({ [`推送${this.type_zh} '${this.name}' 失败`]: error_data }));
         }
@@ -55796,7 +55827,6 @@ const Worldbook_entry = object({
     content: schemas_string(),
 })
     .transform(data => {
-    _.unset(data, 'uid');
     if (data.strategy.keys.length === 0) {
         _.unset(data, 'strategy.keys');
     }
@@ -58359,8 +58389,95 @@ class Worldbook_syncer extends Syncer_interface {
         });
         return document.toString({ blockQuote: 'literal' });
     }
+    get_worldbook_entries_for_uid_backfill(raw_tavern_data) {
+        if (!raw_tavern_data || typeof raw_tavern_data === 'string') {
+            return [];
+        }
+        if (Array.isArray(raw_tavern_data)) {
+            return raw_tavern_data;
+        }
+        if (Array.isArray(raw_tavern_data.entries)) {
+            return raw_tavern_data.entries;
+        }
+        if (raw_tavern_data.entries && typeof raw_tavern_data.entries === 'object') {
+            return Object.values(raw_tavern_data.entries);
+        }
+        return [];
+    }
+    get_worldbook_entry_name_for_uid_backfill(entry) {
+        const name = entry?.name ?? entry?.comment;
+        return typeof name === 'string' ? name : undefined;
+    }
+    get_worldbook_uid_key(uid) {
+        return uid === undefined || uid === null ? null : String(uid);
+    }
+    get_duplicated_worldbook_entry_names(entries) {
+        const counts = new Map();
+        entries.forEach(entry => {
+            const name = this.get_worldbook_entry_name_for_uid_backfill(entry);
+            if (name === undefined) {
+                return;
+            }
+            counts.set(name, (counts.get(name) ?? 0) + 1);
+        });
+        return [...counts.entries()]
+            .filter(([, count]) => count > 1)
+            .map(([name]) => name)
+            .sort();
+    }
+    backfill_worldbook_entry_uids(local_data, raw_tavern_data) {
+        const error_data = {
+            本地存在以下同名条目: this.get_duplicated_worldbook_entry_names(local_data.entries),
+            酒馆存在以下同名条目: [],
+        };
+        const tavern_entries = this.get_worldbook_entries_for_uid_backfill(raw_tavern_data);
+        error_data.酒馆存在以下同名条目 = this.get_duplicated_worldbook_entry_names(tavern_entries);
+        if (error_data.本地存在以下同名条目.length > 0 || error_data.酒馆存在以下同名条目.length > 0) {
+            return lodash_default().pickBy(error_data, value => value.length > 0);
+        }
+        const tavern_uid_by_name = new Map();
+        const reserved_uid_keys = new Set();
+        tavern_entries.forEach(entry => {
+            const uid = entry?.uid;
+            const uid_key = this.get_worldbook_uid_key(uid);
+            if (uid_key !== null) {
+                reserved_uid_keys.add(uid_key);
+            }
+            const name = this.get_worldbook_entry_name_for_uid_backfill(entry);
+            if (name !== undefined && uid_key !== null) {
+                tavern_uid_by_name.set(name, uid);
+            }
+        });
+        const assigned_uid_keys = new Set();
+        local_data.entries.forEach(entry => {
+            if (!tavern_uid_by_name.has(entry.name)) {
+                return;
+            }
+            const uid = tavern_uid_by_name.get(entry.name);
+            const uid_key = this.get_worldbook_uid_key(uid);
+            lodash_default().set(entry, 'uid', uid);
+            if (uid_key !== null) {
+                assigned_uid_keys.add(uid_key);
+            }
+        });
+        local_data.entries.forEach(entry => {
+            if (tavern_uid_by_name.has(entry.name)) {
+                return;
+            }
+            const uid_key = this.get_worldbook_uid_key(entry.uid);
+            if (uid_key === null) {
+                return;
+            }
+            if (reserved_uid_keys.has(uid_key) || assigned_uid_keys.has(uid_key)) {
+                lodash_default().unset(entry, 'uid');
+                return;
+            }
+            assigned_uid_keys.add(uid_key);
+        });
+        return {};
+    }
     // TODO: 拆分 component
-    do_push(local_data) {
+    do_push(local_data, { raw_tavern_data } = {}) {
         let error_data = {
             未能找到以下外链提示词文件: [],
             通过补全文件后缀找到了多个文件: [],
@@ -58400,6 +58517,10 @@ class Worldbook_syncer extends Syncer_interface {
         local_data.entries.forEach(entry => {
             lodash_default().set(entry, 'content', replace_raw_string(entry.content));
         });
+        error_data = {
+            ...error_data,
+            ...this.backfill_worldbook_entry_uids(local_data, raw_tavern_data),
+        };
         return {
             result_data: local_data,
             error_data: lodash_default().pickBy(error_data, value => value.length > 0),
@@ -63027,4 +63148,3 @@ program
     .showHelpAfterError(true)
     .showSuggestionAfterError(true)
     .parse();
-

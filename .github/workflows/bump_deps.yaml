@@ -35,9 +35,10 @@ jobs:
           tar -xf @types.zip -C @types
           rm -f @types.zip
 
-      - run: |-
-          rm -f tavern_sync.mjs
-          wget https://raw.githubusercontent.com/StageDog/tavern_sync/refs/heads/main/dist/tavern_sync.mjs
+      # tavern_sync.mjs contains repository-local customizations.
+      # Update it manually after reviewing upstream changes instead of replacing it automatically.
+      - name: Protect customized tavern_sync.mjs
+        run: git diff --exit-code -- tavern_sync.mjs
 
       - name: Check if only pnpm-lock.yaml is changed
         id: should_commit
