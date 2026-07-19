@@ -114,6 +114,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
           <textarea
             ref={textareaRef}
             className="chat-input-field"
+            aria-label="玩家行动"
+            data-wuxia-automation="player-input"
             value={message}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
@@ -143,6 +145,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
         {/* 发送按钮 */}
         <button
           className={`chat-send-btn ${message.trim() ? 'active' : ''}`}
+          aria-label="发送玩家行动"
+          data-wuxia-automation="send-turn"
           onClick={handleSend}
           disabled={inputDisabled || !message.trim()}
           title="发送 (Enter)"

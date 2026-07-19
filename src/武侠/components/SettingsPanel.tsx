@@ -2398,9 +2398,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <select
                     id="extra-variable-context-rounds"
                     value={settings.summarySettings.variableContextRounds}
-                    onChange={e =>
-                      updateSummarySetting('variableContextRounds', e.target.value === '2' ? 2 : 1)
-                    }
+                    onChange={e => updateSummarySetting('variableContextRounds', e.target.value === '2' ? 2 : 1)}
                     className="settings-select"
                   >
                     <option value={1}>1 轮</option>
@@ -2943,6 +2941,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <div
                     key={section.id}
                     className={`debug-log-item ${section.id.includes('input') ? 'prompt' : 'assistant'} ${expandedLogId === section.id ? 'expanded' : ''}`}
+                    data-wuxia-automation="debug-section"
+                    data-wuxia-debug-section={section.id}
+                    data-wuxia-debug-status={section.status}
                   >
                     <div
                       className="debug-log-header"

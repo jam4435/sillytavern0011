@@ -76,9 +76,7 @@ describe('useCommandQueue', () => {
       await result.current.sendMessageWithCommands('出发', send);
     });
 
-    expect(send).toHaveBeenCalledWith(
-      '出发\n[地图指令]从大宋/临安府/牛家村移动到大宋/嘉兴府/烟雨楼',
-    );
+    expect(send).toHaveBeenCalledWith('出发\n[地图指令]从大宋/临安府/牛家村移动到大宋/嘉兴府/烟雨楼');
   });
 
   it('玩家消息发送失败时不会递减状态效果', async () => {
@@ -87,11 +85,30 @@ describe('useCommandQueue', () => {
       throw new Error('send failed');
     });
 
-    await expect(act(async () => {
-      await result.current.sendMessageWithCommands('行走江湖', send);
-    })).rejects.toThrow('send failed');
+    await expect(
+      act(async () => {
+        await result.current.sendMessageWithCommands('行走江湖', send);
+      }),
+    ).rejects.toThrow('send failed');
 
     expect(decrementStatusEffectTurnsMock).not.toHaveBeenCalled();
+  });
+
+  it('生成结果为空时保留待发送指令且不递减状态效果', async () => {
+    const { result } = renderHook(() => useCommandQueue());
+    const send = vi.fn(async () => '');
+
+    act(() => {
+      result.current.setTravelCommand('大宋/嘉兴府/烟雨楼', '大宋/临安府/牛家村');
+    });
+
+    await act(async () => {
+      await result.current.sendMessageWithCommands('出发', send);
+    });
+
+    expect(decrementStatusEffectTurnsMock).not.toHaveBeenCalled();
+    expect(syncPlayerAttributesMock).not.toHaveBeenCalled();
+    expect(result.current.commands).toHaveLength(1);
   });
 
   it('取消药品指令会恢复完整物品快照并删除对应副作用', async () => {

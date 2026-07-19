@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import brandXiakeEmblemUrl from './assets/icons/jinyong/brand_xiake_emblem.png?url';
 import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
@@ -67,13 +67,16 @@ import {
   scheduleGameDataCompletion,
   syncPlayerAttributesFromVariables,
 } from './utils/variableReader';
+import {
+  createWuxiaAutomation,
+  WUXIA_AUTOMATION_API_VERSION,
+  type WuxiaAutomationRuntimeState,
+} from './utils/wuxiaAutomation';
 
 const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
 
 function formatAttributePreviewSummary(rows: AttributePreviewRow[]): string {
-  return rows
-    .map(({ attribute, delta }) => `${attribute}${delta >= 0 ? '+' : ''}${delta}`)
-    .join('，');
+  return rows.map(({ attribute, delta }) => `${attribute}${delta >= 0 ? '+' : ''}${delta}`).join('，');
 }
 
 const App: React.FC = () => {
@@ -376,25 +379,22 @@ const App: React.FC = () => {
   const handleInventoryItemAction = useCallback(
     async (item: InventoryItem) => {
       try {
-        const previewRows =
-          gameState.stats.baseAttributes
-            ? buildItemAttributePreview(
-                item,
-                gameState.inventory,
-                gameState.statusEffects,
-                gameState.stats.baseAttributes,
-                gameState.stats.attributes,
-              )
-            : [];
+        const previewRows = gameState.stats.baseAttributes
+          ? buildItemAttributePreview(
+              item,
+              gameState.inventory,
+              gameState.statusEffects,
+              gameState.stats.baseAttributes,
+              gameState.stats.attributes,
+            )
+          : [];
         const previewSummary = formatAttributePreviewSummary(previewRows);
 
         if (item.type === 'EQUIP') {
           const result = await equipInventoryItem(item.name);
           if (result) {
             addUseItemCommand(
-              previewSummary
-                ? `装备${item.name}，（属性已变化：${previewSummary}）`
-                : result.commandText,
+              previewSummary ? `装备${item.name}，（属性已变化：${previewSummary}）` : result.commandText,
               {
                 itemName: result.itemName,
                 equipmentRollback: result.rollback,
@@ -431,17 +431,73 @@ const App: React.FC = () => {
         showError(`物品操作失败：${error instanceof Error ? error.message : String(error)}`);
       }
     },
-    [addUseItemCommand, gameState.inventory, gameState.stats.attributes, gameState.stats.baseAttributes, gameState.statusEffects, refreshGameStateFromVariables, showError],
+    [
+      addUseItemCommand,
+      gameState.inventory,
+      gameState.stats.attributes,
+      gameState.stats.baseAttributes,
+      gameState.statusEffects,
+      refreshGameStateFromVariables,
+      showError,
+    ],
   );
 
   const handlePlayerSend = useCallback(
-    async (message: string) => {
-      await sendMessageWithCommands(message, handleSendMessage);
+    async (message: string): Promise<string> => {
+      const rawReply = await sendMessageWithCommands(message, handleSendMessage);
       setIsCommandQueueOpen(false);
       refreshGameStateFromVariables();
+      return rawReply;
     },
     [handleSendMessage, refreshGameStateFromVariables, sendMessageWithCommands],
   );
+
+  const automationRuntimeRef = useRef<WuxiaAutomationRuntimeState>({
+    page: currentPage,
+    busy: isLoading,
+    maintext: currentMaintext,
+    options: currentOptions,
+    latestDebugRound,
+    variableChanges,
+  });
+  automationRuntimeRef.current = {
+    page: currentPage,
+    busy: isLoading,
+    maintext: currentMaintext,
+    options: currentOptions,
+    latestDebugRound,
+    variableChanges,
+  };
+
+  const automationPlayerTurnRef = useRef(handlePlayerSend);
+  automationPlayerTurnRef.current = handlePlayerSend;
+  const automationControllerRef = useRef<ReturnType<typeof createWuxiaAutomation> | null>(null);
+  if (!automationControllerRef.current) {
+    automationControllerRef.current = createWuxiaAutomation({
+      getRuntimeState: () => automationRuntimeRef.current,
+      runPlayerTurn: input => automationPlayerTurnRef.current(input),
+    });
+  }
+
+  useEffect(() => {
+    const controller = automationControllerRef.current;
+    if (!controller) {
+      return;
+    }
+
+    window.WuxiaAutomation = controller.api;
+    document.documentElement.dataset.wuxiaAutomationVersion = String(WUXIA_AUTOMATION_API_VERSION);
+    initializeGlobal('WuxiaAutomation', controller.api);
+    void eventEmit('wuxia:automation-ready', { version: WUXIA_AUTOMATION_API_VERSION });
+
+    return () => {
+      controller.dispose();
+      if (window.WuxiaAutomation === controller.api) {
+        delete window.WuxiaAutomation;
+      }
+      delete document.documentElement.dataset.wuxiaAutomationVersion;
+    };
+  }, []);
 
   const handleMapNavClick = useCallback(() => {
     setMapDraftDestination(null);

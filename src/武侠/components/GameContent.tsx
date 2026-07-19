@@ -35,7 +35,8 @@ const normalizeMaintextForDisplay = (text: string): string =>
 
 const STYLE_BLOCK_REGEX = /<style\b[\s\S]*?<\/style>/gi;
 const STYLE_ONLY_HTML_REGEX = /^(?:\s*<!--[\s\S]*?-->\s*)*<style\b[\s\S]*?<\/style>\s*$/i;
-const HTML_BLOCK_START_REGEX = /^(?:\s*<!--[\s\S]*?-->\s*)*(?:<style\b[\s\S]*?<\/style>\s*)*<(?:div|details|section|article|ul|ol|li|table|pre|blockquote|h[1-6]|p)\b/i;
+const HTML_BLOCK_START_REGEX =
+  /^(?:\s*<!--[\s\S]*?-->\s*)*(?:<style\b[\s\S]*?<\/style>\s*)*<(?:div|details|section|article|ul|ol|li|table|pre|blockquote|h[1-6]|p)\b/i;
 const STYLE_BLOCK_TOKEN_PREFIX = '\uE000STYLE_BLOCK_';
 const STYLE_BLOCK_TOKEN_SUFFIX = '\uE000';
 
@@ -62,15 +63,10 @@ function restoreStyleBlocks(html: string, styleBlocks: string[]): string {
  * 显示从楼层读取的内容：
  * - maintext（正文）：完整显示
  * - options（选项）：显示为可点击按钮
- * 
+ *
  * 武侠风格优化版
  */
-const GameContent: React.FC<GameContentProps> = ({
-  maintext,
-  options,
-  onSelectOption,
-  settings,
-}) => {
+const GameContent: React.FC<GameContentProps> = ({ maintext, options, onSelectOption, settings }) => {
   // 调试日志 - 组件渲染
   uiLogger.log('');
   uiLogger.log('🎨 [GameContent] 组件渲染');
@@ -82,19 +78,20 @@ const GameContent: React.FC<GameContentProps> = ({
   uiLogger.log('   settings:', settings ? '有设置' : '无设置');
 
   // 计算内联样式（基于设置）
-  const contentStyle = useMemo<React.CSSProperties>(() => settings ? {
-      fontSize: 'var(--content-font-size)',
-      color: 'var(--content-font-color)',
-      lineHeight: 'var(--content-line-height)',
-    } : {},
-    [settings]
+  const contentStyle = useMemo<React.CSSProperties>(
+    () =>
+      settings
+        ? {
+            fontSize: 'var(--content-font-size)',
+            color: 'var(--content-font-color)',
+            lineHeight: 'var(--content-line-height)',
+          }
+        : {},
+    [settings],
   );
 
   // 检测内容是否包含 HTML 标签
-  const normalizedMaintext = useMemo(
-    () => normalizeMaintextForDisplay(maintext || ''),
-    [maintext],
-  );
+  const normalizedMaintext = useMemo(() => normalizeMaintextForDisplay(maintext || ''), [maintext]);
   const containsHTML = useMemo(() => /<[^>]+>/.test(normalizedMaintext), [normalizedMaintext]);
   uiLogger.log('   内容是否包含 HTML:', containsHTML);
 
@@ -123,26 +120,26 @@ const GameContent: React.FC<GameContentProps> = ({
           }
 
           // 段落内的单个换行转换为 <br>
-          const lines = restoredParagraph.split('\n').map(line => line.trim()).filter(line => line);
+          const lines = restoredParagraph
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line);
           return `<div class="maintext-paragraph">${lines.join('<br />')}</div>`;
         })
         .join('');
-      return (
-        <div
-          className="maintext-html"
-          style={contentStyle}
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
-        />
-      );
+      return <div className="maintext-html" style={contentStyle} dangerouslySetInnerHTML={{ __html: htmlContent }} />;
     } else {
       // 纯文本内容，按段落分割渲染（连续换行为段落分隔）
       const paragraphs = normalizedMaintext
         .split(/\n{2,}/) // 连续换行分割为段落
         .map(p => p.trim())
         .filter(p => p);
-      
+
       return paragraphs.map((paragraph, pIndex) => {
-        const lines = paragraph.split('\n').map(l => l.trim()).filter(l => l);
+        const lines = paragraph
+          .split('\n')
+          .map(l => l.trim())
+          .filter(l => l);
         return (
           <p key={pIndex} className="maintext-line" style={contentStyle}>
             {lines.map((line, lIndex) => (
@@ -157,12 +154,13 @@ const GameContent: React.FC<GameContentProps> = ({
     }
   }, [containsHTML, contentStyle, normalizedMaintext]);
 
-  const parsedOptions = useMemo(() =>
-    options.map(option => ({
-      option,
-      ...parseOptionText(option),
-    })),
-    [options]
+  const parsedOptions = useMemo(
+    () =>
+      options.map(option => ({
+        option,
+        ...parseOptionText(option),
+      })),
+    [options],
   );
 
   // 如果没有任何内容，显示占位符
@@ -179,13 +177,11 @@ const GameContent: React.FC<GameContentProps> = ({
   uiLogger.log('✅ [GameContent] 渲染正文内容');
 
   return (
-    <div className="game-content">
+    <div className="game-content" data-wuxia-automation="latest-reply">
       {/* 主文本区域（完整显示，支持 HTML 渲染） */}
       {maintext && (
         <div className="maintext-container">
-          <div className="maintext-content">
-            {renderedContent}
-          </div>
+          <div className="maintext-content">{renderedContent}</div>
         </div>
       )}
 
@@ -199,6 +195,8 @@ const GameContent: React.FC<GameContentProps> = ({
                 <button
                   key={index}
                   className="option-btn"
+                  data-wuxia-automation="story-option"
+                  data-wuxia-option-index={index}
                   onClick={() => onSelectOption?.(option)}
                 >
                   {letter && <span className="option-letter">{letter}</span>}

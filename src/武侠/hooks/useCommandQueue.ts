@@ -37,21 +37,18 @@ export function useCommandQueue() {
   }, []);
 
   /** 添加物品/装备指令，并保存撤销所需数据。 */
-  const addUseItemCommand = useCallback(
-    (commandText: string, data: PendingCommand['data']) => {
-      const command: PendingCommand = {
-        id: `use_item_${Date.now()}_${Math.random()}`,
-        type: 'USE_ITEM' as CommandType,
-        text: commandText,
-        data,
-        timestamp: Date.now(),
-      };
+  const addUseItemCommand = useCallback((commandText: string, data: PendingCommand['data']) => {
+    const command: PendingCommand = {
+      id: `use_item_${Date.now()}_${Math.random()}`,
+      type: 'USE_ITEM' as CommandType,
+      text: commandText,
+      data,
+      timestamp: Date.now(),
+    };
 
-      setCommands(prev => [...prev, command]);
-      uiLogger.log('[useCommandQueue] 添加使用物品指令:', command);
-    },
-    [],
-  );
+    setCommands(prev => [...prev, command]);
+    uiLogger.log('[useCommandQueue] 添加使用物品指令:', command);
+  }, []);
 
   /**
    * 取消指令
@@ -95,14 +92,21 @@ export function useCommandQueue() {
 
   /** 将当前队列附加到玩家消息；发送成功后只移除本次附加的指令。 */
   const sendMessageWithCommands = useCallback(
-    async (message: string, handleSendMessage: (content: string) => void | Promise<unknown>) => {
+    async <Result>(
+      message: string,
+      handleSendMessage: (content: string) => Result | Promise<Result>,
+    ): Promise<Result> => {
       const queuedCommands = commands;
       const combinedMessage = [message.trim(), ...queuedCommands.map(command => command.text)]
         .filter(Boolean)
         .join('\n');
 
       uiLogger.log('[useCommandQueue] 发送玩家消息并附加指令:', combinedMessage);
-      await handleSendMessage(combinedMessage);
+      const result = await handleSendMessage(combinedMessage);
+      if (typeof result === 'string' && !result.trim()) {
+        uiLogger.warn('[useCommandQueue] 玩家回合没有生成回复，保留待发送指令且不递减状态效果');
+        return result;
+      }
       try {
         await decrementStatusEffectTurns();
         await syncPlayerAttributesFromVariables();
@@ -115,6 +119,7 @@ export function useCommandQueue() {
         setCommands(previous => previous.filter(command => !sentCommandIds.has(command.id)));
         uiLogger.log('[useCommandQueue] 已移除本次发送的指令');
       }
+      return result;
     },
     [commands],
   );
