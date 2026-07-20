@@ -17,6 +17,7 @@ import unpluginVueComponents from 'unplugin-vue-components/webpack';
 import { VueLoaderPlugin } from 'vue-loader';
 import webpack from 'webpack';
 import WebpackObfuscator from 'webpack-obfuscator';
+import { attachWuxiaAutomationRelay } from './tools/wuxia-bridge/relay.mjs';
 const require = createRequire(import.meta.url);
 const HTMLInlineCSSWebpackPlugin = require('html-inline-css-webpack-plugin').default;
 
@@ -153,7 +154,14 @@ function watch_tavern_helper(compiler: webpack.Compiler) {
   if (compiler.options.watch) {
     if (!io) {
       const port = config.port ?? 6621;
-      io = new Server(port, { cors: { origin: '*' } });
+      io = new Server(port, {
+        cors: { origin: '*' },
+        maxHttpBufferSize: 16 * 1024 * 1024,
+      });
+      attachWuxiaAutomationRelay(io, {
+        token: process.env.WUXIA_BRIDGE_TOKEN,
+        allowedOrigins: process.env.WUXIA_BRIDGE_ALLOWED_ORIGINS,
+      });
       console.info(`\x1b[36m[tavern_helper]\x1b[0m 已启动酒馆监听服务`);
       io.on('connect', socket => {
         console.info(`\x1b[36m[tavern_helper]\x1b[0m 成功连接到酒馆网页 '${socket.id}', 初始化推送...`);
@@ -619,6 +627,11 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
     },
     externals: ({ context, request }, callback) => {
       if (!context || !request) {
+        return callback();
+      }
+
+      // 自动化桥与 CLI 共用同一 Socket.IO 版本；桥脚本必须能在无外网环境下运行。
+      if (request === 'socket.io-client') {
         return callback();
       }
 
