@@ -31,8 +31,7 @@ export type WuxiaRpcError = {
   details?: unknown;
 };
 export type WuxiaRpcResponse =
-  | { id: string; ok: true; result: unknown }
-  | { id: string; ok: false; error: WuxiaRpcError };
+  { id: string; ok: true; result: unknown } | { id: string; ok: false; error: WuxiaRpcError };
 
 export function isRecord(value: unknown): value is Record<string, unknown>;
 export function createRequestId(prefix?: string): string;
@@ -48,4 +47,3 @@ export function createErrorResponse(
   options?: { retryable?: boolean; outcome?: 'known' | 'unknown'; details?: unknown },
 ): WuxiaRpcResponse;
 export function validateRpcRequest(value: unknown): { ok: true } | { ok: false; message: string };
-

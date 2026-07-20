@@ -1,9 +1,4 @@
-import {
-  WUXIA_ERROR_CODES,
-  WUXIA_METHODS,
-  createRequestId,
-  isRecord,
-} from '../wuxia-bridge/protocol.mjs';
+import { WUXIA_ERROR_CODES, WUXIA_METHODS, createRequestId, isRecord } from '../wuxia-bridge/protocol.mjs';
 import { callWuxiaBridge } from './client.mjs';
 
 const EXIT_CODES = Object.freeze({
@@ -68,9 +63,7 @@ export function parseCliArgs(argv) {
     input,
     url: options.url,
     requestTimeoutMs:
-      options['timeout-ms'] === undefined
-        ? undefined
-        : parseNumberOption(options['timeout-ms'], 'timeout-ms', 600_000),
+      options['timeout-ms'] === undefined ? undefined : parseNumberOption(options['timeout-ms'], 'timeout-ms', 600_000),
     target: {
       ...(options['bridge-id'] ? { bridgeId: options['bridge-id'] } : {}),
       ...(options['session-id'] ? { sessionId: options['session-id'] } : {}),
@@ -200,4 +193,3 @@ export async function runCli(argv, dependencies = {}) {
 }
 
 export { EXIT_CODES };
-

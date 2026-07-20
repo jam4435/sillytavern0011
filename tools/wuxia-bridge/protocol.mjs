@@ -89,4 +89,3 @@ export function validateRpcRequest(value) {
 
   return { ok: true };
 }
-

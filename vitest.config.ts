@@ -25,7 +25,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/武侠/test/setup.ts'],
-        include: ['./src/**/*.test.{ts,tsx}'],
+    include: ['./src/**/*.test.{ts,tsx}', './tools/**/*.test.{js,mjs,ts}'],
     restoreMocks: true,
     clearMocks: true,
   },

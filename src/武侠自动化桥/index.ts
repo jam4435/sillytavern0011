@@ -228,32 +228,35 @@ function startBridge() {
     }
   }
 
-  socket.on(WUXIA_EVENTS.REQUEST, async (unknownRequest: unknown, acknowledge: (response: WuxiaRpcResponse) => void) => {
-    if (typeof acknowledge !== 'function') return;
-    const validation = validateRpcRequest(unknownRequest);
-    if (!validation.ok) {
-      acknowledge(
-        createErrorResponse(
-          isRecord(unknownRequest) ? unknownRequest.id : '',
-          WUXIA_ERROR_CODES.INVALID_REQUEST,
-          validation.message,
-        ),
-      );
-      return;
-    }
+  socket.on(
+    WUXIA_EVENTS.REQUEST,
+    async (unknownRequest: unknown, acknowledge: (response: WuxiaRpcResponse) => void) => {
+      if (typeof acknowledge !== 'function') return;
+      const validation = validateRpcRequest(unknownRequest);
+      if (!validation.ok) {
+        acknowledge(
+          createErrorResponse(
+            isRecord(unknownRequest) ? unknownRequest.id : '',
+            WUXIA_ERROR_CODES.INVALID_REQUEST,
+            validation.message,
+          ),
+        );
+        return;
+      }
 
-    const request = unknownRequest as WuxiaRpcRequest;
-    pruneResponseCache();
-    let entry = responseCache.get(request.id);
-    if (!entry) {
-      entry = {
-        expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS,
-        response: dispatchRequest(request),
-      };
-      responseCache.set(request.id, entry);
-    }
-    acknowledge(await entry.response);
-  });
+      const request = unknownRequest as WuxiaRpcRequest;
+      pruneResponseCache();
+      let entry = responseCache.get(request.id);
+      if (!entry) {
+        entry = {
+          expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS,
+          response: dispatchRequest(request),
+        };
+        responseCache.set(request.id, entry);
+      }
+      acknowledge(await entry.response);
+    },
+  );
 
   socket.on('connect', emitState);
   socket.on('connect_error', error => {
@@ -281,4 +284,3 @@ function startBridge() {
 }
 
 $(() => startBridge());
-

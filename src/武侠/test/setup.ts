@@ -34,7 +34,8 @@ Object.assign(globalThis, {
   getVariables: vi.fn(() => ({ stat_data: {} })),
   getAllVariables: vi.fn(() => ({ stat_data: {} })),
   updateVariablesWith: vi.fn((updater: (variables: Record<string, unknown>) => Record<string, unknown>) =>
-    updater({ stat_data: {} })),
+    updater({ stat_data: {} }),
+  ),
   getChatMessages: vi.fn(() => []),
   tavern_events: {
     MESSAGE_SENT: 'message_sent',
@@ -50,7 +51,7 @@ Object.assign(globalThis, {
 
 afterEach(() => {
   listeners.clear();
-  window.sessionStorage.clear();
+  if (typeof window !== 'undefined') window.sessionStorage.clear();
   vi.clearAllTimers();
   vi.useRealTimers();
 });

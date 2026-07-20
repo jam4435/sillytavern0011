@@ -141,7 +141,8 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
 
     const readyStates = targetedStates.filter(state => state.automationReady);
     if (readyStates.length === 0) {
-      const code = targetedStates.length > 0 ? WUXIA_ERROR_CODES.AUTOMATION_NOT_READY : WUXIA_ERROR_CODES.BRIDGE_OFFLINE;
+      const code =
+        targetedStates.length > 0 ? WUXIA_ERROR_CODES.AUTOMATION_NOT_READY : WUXIA_ERROR_CODES.BRIDGE_OFFLINE;
       const message =
         code === WUXIA_ERROR_CODES.AUTOMATION_NOT_READY
           ? '酒馆桥已连接，但武侠游戏界面尚未初始化。'
@@ -263,4 +264,3 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
     },
   };
 }
-
