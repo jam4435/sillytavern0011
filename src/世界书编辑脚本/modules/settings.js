@@ -89,6 +89,10 @@ const DEFAULT_AI_DRAFT = {
   chatMessages: [],
   referenceMaterial: '',
   assistantChatHistory: [],
+  assistantEntryContext: {
+    editable: false,
+    readonly: false,
+  },
 };
 
 const DEFAULT_AI_WORKSPACE_SETTINGS = {
@@ -175,7 +179,18 @@ function normalizeAssistantChatHistory(chatHistory = []) {
         return null;
       }
 
-      return { role, content };
+      const editableCount = Math.max(0, Number.parseInt(`${item?.entryContext?.editableCount ?? 0}`, 10) || 0);
+      const readonlyCount = Math.max(0, Number.parseInt(`${item?.entryContext?.readonlyCount ?? 0}`, 10) || 0);
+      const entryContext =
+        editableCount || readonlyCount
+          ? {
+              lorebookName: typeof item?.entryContext?.lorebookName === 'string' ? item.entryContext.lorebookName : '',
+              editableCount,
+              readonlyCount,
+            }
+          : null;
+
+      return { role, content, ...(entryContext ? { entryContext } : {}) };
     })
     .filter(Boolean);
 }
@@ -217,6 +232,10 @@ function normalizeAiDraft(draft = {}, fallback = {}) {
     chatMessages: normalizeAiChatMessages(source.chatMessages),
     referenceMaterial: typeof source.referenceMaterial === 'string' ? source.referenceMaterial : '',
     assistantChatHistory: normalizeAssistantChatHistory(source.assistantChatHistory),
+    assistantEntryContext: {
+      editable: source.assistantEntryContext?.editable === true,
+      readonly: source.assistantEntryContext?.readonly === true,
+    },
   };
 }
 
@@ -244,6 +263,7 @@ function legacyRootDraft(settings = {}) {
     'chatMessages',
     'referenceMaterial',
     'assistantChatHistory',
+    'assistantEntryContext',
     'selectedEntryUids',
     'readonlyEntryUids',
     'excludedEntryUids',
@@ -311,6 +331,7 @@ function attachLegacyAiWorkspaceAliases(settings) {
     'chatMessages',
     'referenceMaterial',
     'assistantChatHistory',
+    'assistantEntryContext',
   ];
 
   const descriptors = {

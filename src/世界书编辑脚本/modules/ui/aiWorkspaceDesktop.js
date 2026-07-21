@@ -103,6 +103,42 @@ function mapWorkspaceEntry(entry = {}) {
   };
 }
 
+function serializeAssistantContextEntry(entry = {}) {
+  const promptSnapshot = entry.promptSnapshot || {};
+  return {
+    uid: Number(entry.uid),
+    name: entry.name || '',
+    content: entry.content || '',
+    keywords: {
+      primary: Array.isArray(promptSnapshot.primary) ? promptSnapshot.primary : [],
+      secondary_logic: promptSnapshot.secondaryLogic || 'and_any',
+      secondary: Array.isArray(promptSnapshot.secondary) ? promptSnapshot.secondary : [],
+    },
+  };
+}
+
+export function buildAssistantEntryContextBlock(entryContext = {}) {
+  const editableEntries = Array.isArray(entryContext.editableEntries) ? entryContext.editableEntries : [];
+  const readonlyEntries = Array.isArray(entryContext.readonlyEntries) ? entryContext.readonlyEntries : [];
+  if (!editableEntries.length && !readonlyEntries.length) {
+    return '';
+  }
+
+  return [
+    '<当前选中的世界书条目>',
+    JSON.stringify(
+      {
+        worldbook_name: entryContext.lorebookName || '',
+        editable_entries: editableEntries.map(serializeAssistantContextEntry),
+        readonly_entries: readonlyEntries.map(serializeAssistantContextEntry),
+      },
+      null,
+      2,
+    ),
+    '</当前选中的世界书条目>',
+  ].join('\n');
+}
+
 function areWorkspaceEntriesEqual(previousEntries = [], nextEntries = []) {
   if (previousEntries.length !== nextEntries.length) {
     return false;
@@ -138,6 +174,7 @@ const state = {
   chatContextManualText: '',
   referenceMaterial: '',
   assistantChatHistory: [],
+  assistantEntryContext: { editable: false, readonly: false },
   assistantModalTab: 'chat',
   assistantSelectedText: '',
   assistantRenderedCount: 0,
@@ -317,6 +354,10 @@ function hydrateStateFromSettings() {
   state.chatContextManualText = typeof saved.chatContext?.manualText === 'string' ? saved.chatContext.manualText : '';
   state.referenceMaterial = saved.referenceMaterial || '';
   state.assistantChatHistory = _.cloneDeep(saved.assistantChatHistory || []);
+  state.assistantEntryContext = {
+    editable: saved.assistantEntryContext?.editable === true,
+    readonly: saved.assistantEntryContext?.readonly === true,
+  };
   const legacyMode = state.currentNav === 'plan' ? saved.plan : saved.direct;
   const task = createModeState(savedDraft, {
     ...fallback,
@@ -421,6 +462,7 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
       chatMessages: state.chatMessages,
       referenceMaterial: state.referenceMaterial,
       assistantChatHistory: state.assistantChatHistory,
+      assistantEntryContext: { ...state.assistantEntryContext },
       currentStep: undefined,
       planningResult: undefined,
       previewResult: undefined,
@@ -443,6 +485,7 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
     chatMessages: state.chatMessages,
     referenceMaterial: state.referenceMaterial,
     assistantChatHistory: state.assistantChatHistory,
+    assistantEntryContext: { ...state.assistantEntryContext },
   });
 }
 
@@ -616,6 +659,44 @@ function syncReferenceMaterialStatus() {
   }
 }
 
+function collectAssistantEntryContext(modeKey = currentModeKey()) {
+  const mode = state.modes[modeKey] || createEmptyModeState();
+  const editableEntries = state.assistantEntryContext.editable
+    ? mode.entries.filter(entry => mode.selectedEntryUids.has(Number(entry.uid)))
+    : [];
+  const readonlyEntries = state.assistantEntryContext.readonly
+    ? mode.entries.filter(entry => mode.readonlyEntryUids.has(Number(entry.uid)))
+    : [];
+  const characterCount = [...editableEntries, ...readonlyEntries].reduce(
+    (total, entry) => total + (entry.name || '').length + (entry.content || '').length,
+    0,
+  );
+
+  return {
+    lorebookName: mode.lorebookName || '',
+    editableEntries,
+    readonlyEntries,
+    characterCount,
+  };
+}
+
+function syncAssistantEntryContextControls(modeKey = currentModeKey()) {
+  const mode = state.modes[modeKey] || createEmptyModeState();
+  const context = collectAssistantEntryContext(modeKey);
+  $('#ai-workspace-assistant-include-editable', parentDoc()).prop('checked', state.assistantEntryContext.editable);
+  $('#ai-workspace-assistant-include-readonly', parentDoc()).prop('checked', state.assistantEntryContext.readonly);
+  $('#ai-workspace-assistant-editable-count', parentDoc()).text(mode.selectedEntryUids.size);
+  $('#ai-workspace-assistant-readonly-count', parentDoc()).text(mode.readonlyEntryUids.size);
+
+  const includedParts = [];
+  if (state.assistantEntryContext.editable) includedParts.push(`修改 ${context.editableEntries.length} 条`);
+  if (state.assistantEntryContext.readonly) includedParts.push(`只读 ${context.readonlyEntries.length} 条`);
+  const statusText = includedParts.length
+    ? `发送时附带 ${includedParts.join('、')}，约 ${context.characterCount} 字。`
+    : '当前不会附带世界书条目。';
+  $('#ai-workspace-assistant-entry-context-status', parentDoc()).text(statusText);
+}
+
 function isAssistantHistoryNearBottom(element) {
   if (!element) return true;
   return element.scrollHeight - element.scrollTop - element.clientHeight <= 72;
@@ -663,10 +744,18 @@ function renderAssistantHistory() {
 
   state.assistantChatHistory.forEach((item, index) => {
     const isAssistant = item.role === 'assistant';
+    const entryContext = item.entryContext || {};
+    const entryContextParts = [];
+    if (entryContext.editableCount) entryContextParts.push(`修改 ${entryContext.editableCount}`);
+    if (entryContext.readonlyCount) entryContextParts.push(`只读 ${entryContext.readonlyCount}`);
+    const entryContextBadge = entryContextParts.length
+      ? `<div class="ai-assistant-message-context"><i class="fa-solid fa-paperclip"></i><span>${_.escape(entryContext.lorebookName || '世界书')} · ${entryContextParts.join(' · ')}</span></div>`
+      : '';
     $history.append(`
       <article class="ai-assistant-message${isAssistant ? ' is-assistant' : ' is-user'}">
         <div class="ai-assistant-message-meta">${isAssistant ? 'AI 助手' : '用户'}</div>
         <div class="ai-assistant-message-body">${_.escape(item.content || '')}</div>
+        ${entryContextBadge}
         <div class="ai-assistant-actions">
           ${isAssistant ? `<button type="button" class="ai-assistant-pick" data-history-index="${index}"><i class="fa-regular fa-bookmark"></i>加入资料</button>` : ''}
           <button type="button" class="ai-assistant-delete" data-history-index="${index}" aria-label="删除这条${isAssistant ? '助手回复' : '用户消息'}" title="删除"><i class="fa-regular fa-trash-can"></i></button>
@@ -714,6 +803,7 @@ function updateAssistantChrome() {
     state.isAssistantGenerating || state.assistantChatHistory.length === 0,
   );
   $('.ai-assistant-phone', parentDoc()).attr('aria-busy', state.isAssistantGenerating ? 'true' : 'false');
+  syncAssistantEntryContextControls();
 }
 
 function rememberOverlayFocus(overlayName) {
@@ -774,6 +864,7 @@ function openAssistantModal(tab = state.assistantModalTab || 'chat') {
   renderReferenceMaterial();
   renderAssistantHistory();
   switchAssistantTab(tab);
+  syncAssistantEntryContextControls();
   updateAssistantChrome();
   const dialog = $('#ai-workspace-assistant-modal', parentDoc()).get(0);
   if (dialog && !dialog.open) {
@@ -935,6 +1026,7 @@ function renderSelectionSummary(modeKey) {
     .text(stateText ? `${countText} · ${stateText}` : countText)
     .attr('data-tone', mode.entryLoadState === 'error' ? 'danger' : mode.entryListWarning ? 'warning' : 'neutral');
   if (modeKey === currentModeKey()) {
+    syncAssistantEntryContextControls(modeKey);
     syncWorkflowCapabilities(modeKey);
   }
 }
