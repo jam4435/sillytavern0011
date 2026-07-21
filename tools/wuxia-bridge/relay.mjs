@@ -315,6 +315,28 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
     return null;
   }
 
+  async function recoverReplacedBridgeTurn(request, originalState, timeoutMs, shouldStop) {
+    const replacementPollMs = Number(options.replacementPollMs ?? 250);
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+
+    while (!shouldStop() && Date.now() <= deadline) {
+      const state = chooseRecoveryBridge(originalState, request.target);
+      const socketReplaced = state && state.socket.id !== originalState.socket.id;
+      const instanceReplaced =
+        state &&
+        originalState.automationInstanceId &&
+        state.automationInstanceId &&
+        state.automationInstanceId !== originalState.automationInstanceId;
+      if (socketReplaced || instanceReplaced) {
+        logger.info?.(`[wuxia] 检测到自动化实例换代，提前对账回合: ${request.id}`);
+        return recoverTimedOutTurn(request, originalState);
+      }
+      await delay(Math.max(10, replacementPollMs));
+    }
+
+    return null;
+  }
+
   async function forwardRequest(request) {
     const selected = chooseBridge(request);
     if (selected.error) return selected.error;
@@ -328,11 +350,25 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
     }
 
     if (isRunTurn) runInFlight.add(runKey);
+    let requestSettled = false;
     try {
       const timeoutMs = isRunTurn
         ? Number(options.turnTimeoutMs ?? state.turnTimeoutMs ?? WUXIA_TURN_TIMEOUT_MS.STANDARD)
         : Number(options.snapshotTimeoutMs ?? DEFAULT_SNAPSHOT_TIMEOUT_MS);
-      const response = await state.socket.timeout(timeoutMs).emitWithAck(WUXIA_EVENTS.REQUEST, request);
+      const responsePromise = state.socket
+        .timeout(timeoutMs)
+        .emitWithAck(WUXIA_EVENTS.REQUEST, request)
+        .finally(() => {
+          requestSettled = true;
+        });
+      const response = isRunTurn
+        ? await Promise.race([
+            responsePromise,
+            recoverReplacedBridgeTurn(request, state, timeoutMs, () => requestSettled).then(
+              recovered => recovered ?? new Promise(() => {}),
+            ),
+          ])
+        : await responsePromise;
       if (!isRecord(response) || response.id !== request.id || typeof response.ok !== 'boolean') {
         return createErrorResponse(request.id, WUXIA_ERROR_CODES.INTERNAL, '酒馆桥返回了无效响应。');
       }

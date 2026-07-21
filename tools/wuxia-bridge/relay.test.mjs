@@ -30,6 +30,7 @@ describe('wuxia Socket.IO relay', () => {
       turnTimeoutMs: 500,
       recoveryTimeoutMs: 120,
       recoveryPollMs: 20,
+      replacementPollMs: 20,
     });
     await new Promise(resolve => httpServer.listen(0, '127.0.0.1', resolve));
     const address = httpServer.address();
@@ -185,6 +186,76 @@ describe('wuxia Socket.IO relay', () => {
         assistantMessageId: 4,
         rawReply: '新的剧情',
         variableVerification: { verdict: 'applied' },
+      },
+    });
+  });
+
+  it('recovers immediately when a new frontend instance replaces the request instance', async () => {
+    const bridge = await connectReadyBridge();
+    bridge.emit(WUXIA_EVENTS.STATE, {
+      automationReady: true,
+      apiVersion: 1,
+      automationInstanceId: 'frontend-old',
+      chatId: 'bridge-1-chat',
+      page: 'game',
+      busy: false,
+    });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    let runRequestCount = 0;
+    bridge.on(WUXIA_EVENTS.REQUEST, (request, acknowledge) => {
+      if (request.method === WUXIA_METHODS.RUN_TURN) {
+        runRequestCount += 1;
+        setTimeout(
+          () =>
+            bridge.emit(WUXIA_EVENTS.STATE, {
+              automationReady: true,
+              apiVersion: 1,
+              automationInstanceId: 'frontend-new',
+              chatId: 'bridge-1-chat',
+              page: 'game',
+              busy: false,
+            }),
+          40,
+        );
+        return;
+      }
+      acknowledge({
+        id: request.id,
+        ok: true,
+        result: {
+          ready: true,
+          busy: false,
+          chatId: 'bridge-1-chat',
+          recentMessages: [
+            { messageId: 5, role: 'user', text: '进入客栈' },
+            { messageId: 6, role: 'assistant', text: '已经进入客栈' },
+          ],
+          debug: {
+            main: { status: 'success', userInput: '进入客栈' },
+            variable: { status: 'success', modeSnapshot: 'extra' },
+          },
+          variableChanges: {
+            status: 'settled',
+            parseErrors: [],
+            declaredChanges: [{ path: ['user数据', '所在位置'] }],
+            actualChanges: [{ path: ['user数据', '所在位置'] }],
+          },
+        },
+      });
+    });
+    const cli = await connect('cli');
+    const startedAt = Date.now();
+    const response = await call(cli, WUXIA_METHODS.RUN_TURN, { params: { input: '进入客栈' } });
+
+    expect(Date.now() - startedAt).toBeLessThan(400);
+    expect(runRequestCount).toBe(1);
+    expect(response).toMatchObject({
+      ok: true,
+      result: {
+        recovered: true,
+        recoveryReason: 'turn-timeout-snapshot-reconciled',
+        userMessageId: 5,
+        assistantMessageId: 6,
       },
     });
   });
