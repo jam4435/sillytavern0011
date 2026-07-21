@@ -51,7 +51,7 @@
   const { getManifestEventCandidateKeys } = await import('./era-event-scheduler.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
-  const EVENT_SCRIPT_VERSION = '2026-07-18-event-performance-v3';
+  const EVENT_SCRIPT_VERSION = '2026-07-21-opening-participation-v4';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
@@ -345,23 +345,16 @@
 
       // ⚠️ 重新读取变量，因为事件状态可能已改变
       log('🔄 重新读取变量以获取最新的事件状态...');
+      await cleanupInvalidParticipationEntries(reason);
+      // 清理可能会删除伪参与条目，必须回读后再判断是否已经参与；否则本轮会被旧快照阻塞。
       const updatedVariables = await getVariables({ type: 'chat' });
       const 最新进行中事件 = updatedVariables?.stat_data?.事件系统?.进行中事件 || {};
       const 最新参与事件 = updatedVariables?.stat_data?.参与事件 || {};
-
-      await cleanupInvalidParticipationEntries(reason);
 
       // ==================== 批量检查进行中事件 ====================
       debugGroup('⏳ 批量检查进行中事件');
       const 进行中列表 = Object.keys(最新进行中事件);
       log(`进行中事件数: ${进行中列表.length}`);
-
-      await applyTimedParticipantEntries(
-        进行中列表,
-        eventDefinitions,
-        updatedVariables.stat_data.世界信息.时间,
-        updatedVariables,
-      );
 
       // 收集所有需要结束的事件
       const eventsToEnd = [];
@@ -407,6 +400,22 @@
           updatedVariables,
           最新参与事件,
         );
+      }
+
+      // 玩家到场判断必须优先于 NPC 自动入场。NPC 位置写入可能较慢或确认失败，
+      // 但不能因此把开局参与事件推迟到下一回合；玩家参与也应优先取得人物占用权。
+      if (仍在进行事件.length > 0) {
+        const participantVariables = await getVariables({ type: 'chat' });
+        try {
+          await applyTimedParticipantEntries(
+            仍在进行事件,
+            eventDefinitions,
+            participantVariables.stat_data.世界信息.时间,
+            participantVariables,
+          );
+        } catch (error) {
+          logError('定时参与人物入场失败，已保留本轮玩家参与判定:', error);
+        }
       }
     } catch (error) {
       logError('主检查函数出错:', error);

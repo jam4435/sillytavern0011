@@ -133,4 +133,167 @@ describe('ERA 主线初始化控制', () => {
 
     expect(initializeEventListMock).toHaveBeenCalledTimes(2);
   });
+
+  it('开局先登记玩家参与，再处理可能失败的定时人物入场', async () => {
+    const eventName = '射雕测试事件-开局到场';
+    const eventLocation = '大宋/嘉兴府/牛家村';
+    const variables = validVariables();
+    variables.stat_data.user数据 = { 所在位置: eventLocation };
+    variables.stat_data.事件系统.进行中事件 = {
+      [eventName]: { 年: 1199, 月: 8, 日: 16, 时: 11 },
+    };
+    getVariablesMock.mockReturnValue(variables);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const operations = await import('./era-event-operations.js');
+    const definition = {
+      事件地点: eventLocation,
+      触发条件: { 类型: '时间', 年: 1199, 月: 8, 日: 15, 时: 10 },
+      事件结束时间: { 年: 1199, 月: 8, 日: 16, 时: 11 },
+      事件详情: '测试事件',
+      事件概要: '测试概要',
+      参与人物: [],
+      insert: {},
+      update: {},
+      delete: {},
+    };
+
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [{ runtimeKey: eventName, location: eventLocation }],
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue({ [eventName]: definition });
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(false);
+    vi.mocked(checker.isEventDiscoverable).mockReturnValue(false);
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
+    vi.mocked(operations.playerJoinsEvents).mockClear();
+    vi.mocked(operations.applyTimedParticipantEntries).mockClear().mockRejectedValueOnce(new Error('NPC 入场写入超时'));
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?opening-participation-priority-test');
+
+    await vi.waitFor(() => expect(operations.applyTimedParticipantEntries).toHaveBeenCalledTimes(1));
+    expect(operations.playerJoinsEvents).toHaveBeenCalledWith([eventName], expect.objectContaining({
+      [eventName]: definition,
+    }));
+    expect(vi.mocked(operations.playerJoinsEvents).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(operations.applyTimedParticipantEntries).mock.invocationCallOrder[0],
+    );
+    expect(logErrorMock).toHaveBeenCalledWith(
+      '定时参与人物入场失败，已保留本轮玩家参与判定:',
+      expect.objectContaining({ message: 'NPC 入场写入超时' }),
+    );
+  });
+
+  it('清理非法参与条目后使用回读快照在同轮重新加入', async () => {
+    const eventName = '射雕测试事件-清理后加入';
+    const eventLocation = '大宋/嘉兴府/牛家村';
+    const variables = validVariables() as ReturnType<typeof validVariables> & {
+      stat_data: ReturnType<typeof validVariables>['stat_data'] & { 参与事件: Record<string, unknown> };
+    };
+    variables.stat_data.user数据 = { 所在位置: eventLocation };
+    variables.stat_data.参与事件 = { [eventName]: { 非法字段: true } };
+    variables.stat_data.事件系统.进行中事件 = {
+      [eventName]: { 年: 1199, 月: 8, 日: 16, 时: 11 },
+    };
+    getVariablesMock.mockReturnValue(variables);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const operations = await import('./era-event-operations.js');
+    const utils = await import('./era-utils.js');
+    const definition = {
+      事件地点: eventLocation,
+      触发条件: { 类型: '时间', 年: 1199, 月: 8, 日: 15, 时: 10 },
+      事件结束时间: { 年: 1199, 月: 8, 日: 16, 时: 11 },
+      事件详情: '测试事件',
+      事件概要: '测试概要',
+      参与人物: [],
+      insert: {},
+      update: {},
+      delete: {},
+    };
+
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [{ runtimeKey: eventName, location: eventLocation }],
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue({ [eventName]: definition });
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(false);
+    vi.mocked(checker.isEventDiscoverable).mockReturnValue(false);
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
+    vi.mocked(utils.hasParticipationEntry).mockImplementation(
+      (participation, name) => Object.prototype.hasOwnProperty.call(participation || {}, name),
+    );
+    vi.mocked(operations.cleanupInvalidParticipationEntries).mockImplementation(async () => {
+      variables.stat_data.参与事件 = {};
+      return 1;
+    });
+    vi.mocked(operations.playerJoinsEvents).mockClear();
+    vi.mocked(operations.applyTimedParticipantEntries).mockResolvedValue(undefined);
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?opening-participation-cleanup-test');
+
+    await vi.waitFor(() => expect(operations.playerJoinsEvents).toHaveBeenCalledTimes(1));
+    expect(operations.playerJoinsEvents).toHaveBeenCalledWith([eventName], expect.any(Object));
+  });
+
+  it('定时人物入场只处理本轮尚未结束的事件', async () => {
+    const activeEvent = '射雕测试事件-仍在进行';
+    const endedEvent = '射雕测试事件-已经结束';
+    const variables = validVariables();
+    variables.stat_data.事件系统.进行中事件 = {
+      [activeEvent]: { 年: 1199, 月: 8, 日: 16, 时: 11 },
+      [endedEvent]: { 年: 1199, 月: 8, 日: 14, 时: 11 },
+    };
+    getVariablesMock.mockReturnValue(variables);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const operations = await import('./era-event-operations.js');
+    const definitions = Object.fromEntries(
+      [activeEvent, endedEvent].map(eventName => [
+        eventName,
+        {
+          事件地点: '大宋/嘉兴府/牛家村',
+          触发条件: { 类型: '时间', 年: 1199, 月: 8, 日: 13, 时: 10 },
+          事件结束时间: variables.stat_data.事件系统.进行中事件[eventName],
+          事件详情: '测试事件',
+          事件概要: '测试概要',
+          参与人物: [],
+          insert: {},
+          update: {},
+          delete: {},
+        },
+      ]),
+    );
+
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [activeEvent, endedEvent].map(runtimeKey => ({ runtimeKey })),
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue(definitions);
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(false);
+    vi.mocked(checker.isEventDiscoverable).mockReturnValue(false);
+    vi.mocked(checker.isTimeAfterEventEnd).mockImplementation((_currentTime, endTime) => endTime.日 === 14);
+    vi.mocked(operations.batchEndEvents).mockResolvedValue(true);
+    vi.mocked(operations.applyTimedParticipantEntries).mockClear().mockResolvedValue(undefined);
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?opening-active-participants-only-test');
+
+    await vi.waitFor(() => expect(operations.applyTimedParticipantEntries).toHaveBeenCalledTimes(1));
+    expect(operations.batchEndEvents).toHaveBeenCalledWith([endedEvent], expect.any(Object));
+    expect(operations.applyTimedParticipantEntries).toHaveBeenCalledWith(
+      [activeEvent],
+      expect.any(Object),
+      variables.stat_data.世界信息.时间,
+      variables,
+    );
+  });
 });
