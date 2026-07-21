@@ -3,9 +3,11 @@ import type { WuxiaAutomationApi, WuxiaAutomationSnapshot } from '../武侠/util
 import {
   WUXIA_ERROR_CODES,
   WUXIA_EVENTS,
+  WUXIA_GLOBAL_EVENTS,
   WUXIA_METHODS,
   WUXIA_PROTOCOL_VERSION,
   WUXIA_SOCKET_NAMESPACE,
+  WUXIA_AUTOMATION_GLOBAL_PREFIX,
   createErrorResponse,
   createRequestId,
   isRecord,
@@ -28,6 +30,12 @@ type BridgeConfig = {
 type ResponseCacheEntry = {
   expiresAt: number;
   response: Promise<WuxiaRpcResponse>;
+};
+
+type AutomationAnnouncement = {
+  version: number | null;
+  instanceId: string;
+  globalName: string;
 };
 
 class BridgeRequestError extends Error {
@@ -74,6 +82,18 @@ function getLatestMessageId(snapshot: WuxiaAutomationSnapshot): number | null {
   return latest?.messageId ?? null;
 }
 
+function readAutomationAnnouncement(value: unknown): AutomationAnnouncement | null {
+  if (!isRecord(value)) return null;
+  const instanceId = readString(value, ['instanceId'], '');
+  const globalName = readString(value, ['globalName'], '');
+  if (!instanceId || !globalName || !globalName.startsWith(`${WUXIA_AUTOMATION_GLOBAL_PREFIX}:`)) return null;
+  return {
+    version: Number.isInteger(value.version) ? Number(value.version) : null,
+    instanceId,
+    globalName,
+  };
+}
+
 function normalizeError(requestId: string, error: unknown): WuxiaRpcResponse {
   if (error instanceof BridgeRequestError) {
     return createErrorResponse(requestId, error.code, error.message, { retryable: error.retryable });
@@ -94,6 +114,9 @@ function startBridge() {
 
   let disposed = false;
   let automation: WuxiaAutomationApi | null = null;
+  let automationInstanceId = '';
+  let automationGlobalName = '';
+  let acquisitionGeneration = 0;
   let runInFlight = false;
   const bridgeId = String(getScriptId());
   const sessionId = getSessionId();
@@ -115,7 +138,7 @@ function startBridge() {
     transports: ['websocket', 'polling'],
   });
 
-  function getUsableSnapshot(): WuxiaAutomationSnapshot {
+  async function getUsableSnapshot(): Promise<WuxiaAutomationSnapshot> {
     if (!automation) {
       throw new BridgeRequestError(
         WUXIA_ERROR_CODES.AUTOMATION_NOT_READY,
@@ -123,13 +146,14 @@ function startBridge() {
         true,
       );
     }
-    if (automation.version !== WUXIA_PROTOCOL_VERSION) {
+    const automationVersion = await automation.version;
+    if (automationVersion !== WUXIA_PROTOCOL_VERSION) {
       throw new BridgeRequestError(
         WUXIA_ERROR_CODES.VERSION_MISMATCH,
-        `自动化接口版本为 ${String(automation.version)}，桥接协议要求版本 ${WUXIA_PROTOCOL_VERSION}。`,
+        `自动化接口版本为 ${String(automationVersion)}，桥接协议要求版本 ${WUXIA_PROTOCOL_VERSION}。`,
       );
     }
-    const snapshot = automation.getSnapshot();
+    const snapshot = await automation.getSnapshot();
     if (!snapshot.ready) {
       automation = null;
       throw new BridgeRequestError(
@@ -141,44 +165,65 @@ function startBridge() {
     return snapshot;
   }
 
-  function emitState() {
+  async function emitState() {
     if (!socket.connected || disposed) return;
     try {
-      const snapshot = getUsableSnapshot();
+      const snapshot = await getUsableSnapshot();
       socket.emit(WUXIA_EVENTS.STATE, {
         automationReady: true,
-        apiVersion: automation?.version ?? null,
+        apiVersion: snapshot.version,
+        automationInstanceId,
+        automationGlobalName,
         chatId: snapshot.chatId,
         page: snapshot.page,
         busy: snapshot.busy || runInFlight,
         latestMessageId: getLatestMessageId(snapshot),
       });
-    } catch {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn('[wuxia-bridge] 自动化接口尚不可用。', error);
       socket.emit(WUXIA_EVENTS.STATE, {
         automationReady: false,
         apiVersion: automation?.version ?? null,
+        automationInstanceId,
+        automationGlobalName,
         chatId: '',
-        page: '',
+        page: `error:${errorMessage}`,
         busy: runInFlight,
         latestMessageId: null,
       });
     }
   }
 
-  async function acquireAutomation() {
+  async function acquireAutomation(globalName = WUXIA_AUTOMATION_GLOBAL_PREFIX, instanceId = 'legacy') {
+    const generation = ++acquisitionGeneration;
     try {
-      const candidate = await waitGlobalInitialized<WuxiaAutomationApi>('WuxiaAutomation');
-      if (disposed) return;
-      automation = candidate;
-      emitState();
+      const initialized = await waitGlobalInitialized<WuxiaAutomationApi | undefined>(globalName);
+      const candidate = initialized ?? (globalThis as Record<string, unknown>)[globalName];
+      if (disposed || generation !== acquisitionGeneration) return;
+      if (!candidate || typeof (candidate as WuxiaAutomationApi).getSnapshot !== 'function') {
+        throw new Error(`全局接口 ${globalName} 已初始化，但当前脚本作用域中没有可调用对象。`);
+      }
+      automation = candidate as WuxiaAutomationApi;
+      automationInstanceId = instanceId;
+      automationGlobalName = globalName;
+      void emitState();
     } catch (error) {
-      if (!disposed) console.warn('[wuxia-bridge] 等待自动化接口失败。', error);
+      if (!disposed && generation === acquisitionGeneration) {
+        console.warn(`[wuxia-bridge] 等待自动化接口 ${globalName} 失败。`, error);
+      }
     }
+  }
+
+  function requestAutomationDiscovery() {
+    void eventEmit(WUXIA_GLOBAL_EVENTS.DISCOVER, { bridgeId, sessionId }).catch(error => {
+      if (!disposed) console.warn('[wuxia-bridge] 请求发现武侠自动化接口失败。', error);
+    });
   }
 
   async function dispatchRequest(request: WuxiaRpcRequest): Promise<WuxiaRpcResponse> {
     try {
-      const snapshot = getUsableSnapshot();
+      const snapshot = await getUsableSnapshot();
       if (request.method === WUXIA_METHODS.GET_SNAPSHOT) {
         return { id: request.id, ok: true, result: snapshot };
       }
@@ -200,7 +245,7 @@ function startBridge() {
       const settleTimeoutMs = request.params.settleTimeoutMs;
       const settleDelayMs = request.params.settleDelayMs;
       runInFlight = true;
-      emitState();
+      void emitState();
       try {
         const result = await automation!.runTurn(input, {
           ...(settleTimeoutMs === undefined ? {} : { settleTimeoutMs }),
@@ -209,7 +254,7 @@ function startBridge() {
         return { id: request.id, ok: true, result };
       } finally {
         runInFlight = false;
-        emitState();
+        void emitState();
       }
     } catch (error) {
       return normalizeError(request.id, error);
@@ -258,20 +303,39 @@ function startBridge() {
     },
   );
 
-  socket.on('connect', emitState);
+  socket.on('connect', () => {
+    void emitState();
+    requestAutomationDiscovery();
+  });
   socket.on('connect_error', error => {
     if (!disposed) console.warn(`[wuxia-bridge] 无法连接 ${config.url}: ${error.message}`);
   });
 
-  const readyListener = eventOn('wuxia:automation-ready', () => {
+  const readyListener = eventOn(WUXIA_GLOBAL_EVENTS.READY, detail => {
+    const announcement = readAutomationAnnouncement(detail);
+    if (announcement) {
+      void acquireAutomation(announcement.globalName, announcement.instanceId);
+      return;
+    }
     void acquireAutomation();
   });
-  const chatChangedListener = eventOn(tavern_events.CHAT_CHANGED, emitState);
+  const disposedListener = eventOn(WUXIA_GLOBAL_EVENTS.DISPOSED, detail => {
+    const announcement = readAutomationAnnouncement(detail);
+    if (!announcement || announcement.instanceId !== automationInstanceId) return;
+    acquisitionGeneration += 1;
+    automation = null;
+    automationInstanceId = '';
+    automationGlobalName = '';
+    void emitState();
+  });
+  const chatChangedListener = eventOn(tavern_events.CHAT_CHANGED, () => void emitState());
 
   function dispose() {
     if (disposed) return;
     disposed = true;
+    acquisitionGeneration += 1;
     readyListener.stop();
+    disposedListener.stop();
     chatChangedListener.stop();
     socket.removeAllListeners();
     socket.disconnect();
@@ -281,6 +345,7 @@ function startBridge() {
 
   $(window).off(`pagehide${SCRIPT_EVENT_NAMESPACE}`).one(`pagehide${SCRIPT_EVENT_NAMESPACE}`, dispose);
   void acquireAutomation();
+  requestAutomationDiscovery();
 }
 
 $(() => startBridge());

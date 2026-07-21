@@ -7,6 +7,14 @@ export const WUXIA_EVENTS = Object.freeze({
   STATE: 'wuxia:state',
 });
 
+export const WUXIA_GLOBAL_EVENTS = Object.freeze({
+  DISCOVER: 'wuxia:automation-discover',
+  READY: 'wuxia:automation-ready',
+  DISPOSED: 'wuxia:automation-disposed',
+});
+
+export const WUXIA_AUTOMATION_GLOBAL_PREFIX = 'WuxiaAutomation';
+
 export const WUXIA_METHODS = Object.freeze({
   STATUS: 'status',
   GET_SNAPSHOT: 'getSnapshot',
@@ -35,6 +43,14 @@ export function isRecord(value) {
 export function createRequestId(prefix = 'wuxia') {
   const uuid = globalThis.crypto?.randomUUID?.();
   return uuid ? `${prefix}-${uuid}` : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function createAutomationGlobalName(instanceId) {
+  const normalizedInstanceId = String(instanceId ?? '').trim();
+  if (!normalizedInstanceId || normalizedInstanceId.length > 160) {
+    throw new TypeError('武侠自动化实例 id 长度必须为 1-160。');
+  }
+  return `${WUXIA_AUTOMATION_GLOBAL_PREFIX}:${normalizedInstanceId}`;
 }
 
 export function createRpcError(code, message, options = {}) {

@@ -72,6 +72,11 @@ import {
   WUXIA_AUTOMATION_API_VERSION,
   type WuxiaAutomationRuntimeState,
 } from './utils/wuxiaAutomation';
+import {
+  WUXIA_GLOBAL_EVENTS,
+  createAutomationGlobalName,
+  createRequestId,
+} from '../../tools/wuxia-bridge/protocol.mjs';
 
 const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
 
@@ -471,31 +476,43 @@ const App: React.FC = () => {
 
   const automationPlayerTurnRef = useRef(handlePlayerSend);
   automationPlayerTurnRef.current = handlePlayerSend;
-  const automationControllerRef = useRef<ReturnType<typeof createWuxiaAutomation> | null>(null);
-  if (!automationControllerRef.current) {
-    automationControllerRef.current = createWuxiaAutomation({
+
+  useEffect(() => {
+    const controller = createWuxiaAutomation({
       getRuntimeState: () => automationRuntimeRef.current,
       runPlayerTurn: input => automationPlayerTurnRef.current(input),
     });
-  }
-
-  useEffect(() => {
-    const controller = automationControllerRef.current;
-    if (!controller) {
-      return;
-    }
+    const instanceId = createRequestId('frontend');
+    const globalName = createAutomationGlobalName(instanceId);
+    const announceReady = () =>
+      eventEmit(WUXIA_GLOBAL_EVENTS.READY, {
+        version: WUXIA_AUTOMATION_API_VERSION,
+        instanceId,
+        globalName,
+      });
 
     window.WuxiaAutomation = controller.api;
     document.documentElement.dataset.wuxiaAutomationVersion = String(WUXIA_AUTOMATION_API_VERSION);
-    initializeGlobal('WuxiaAutomation', controller.api);
-    void eventEmit('wuxia:automation-ready', { version: WUXIA_AUTOMATION_API_VERSION });
+    document.documentElement.dataset.wuxiaAutomationInstance = instanceId;
+    initializeGlobal(globalName, controller.api);
+    const discoveryListener = eventOn(WUXIA_GLOBAL_EVENTS.DISCOVER, () => {
+      void announceReady();
+    });
+    void announceReady();
 
     return () => {
+      discoveryListener.stop();
       controller.dispose();
       if (window.WuxiaAutomation === controller.api) {
         delete window.WuxiaAutomation;
       }
       delete document.documentElement.dataset.wuxiaAutomationVersion;
+      delete document.documentElement.dataset.wuxiaAutomationInstance;
+      void eventEmit(WUXIA_GLOBAL_EVENTS.DISPOSED, {
+        version: WUXIA_AUTOMATION_API_VERSION,
+        instanceId,
+        globalName,
+      });
     };
   }, []);
 
