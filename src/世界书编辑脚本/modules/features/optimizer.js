@@ -19,6 +19,12 @@ import {
   buildCompareRemovedEntryDeletePlan,
   getCompareItemsForFilter,
 } from './optimizerCompare.js';
+import {
+  buildGlobalSearchRegex,
+  replaceGlobalSearchMatches,
+  resolveSearchReplaceInput,
+  SEARCH_REPLACE_MODES,
+} from './optimizerSearchReplace.js';
 
 const LOREBOOK_COMPARE_MODAL_ID = 'lorebook-compare-preview-modal';
 const LOREBOOK_COMPARE_STYLE_ID = 'lorebook-compare-preview-styles';
@@ -1512,9 +1518,23 @@ const swapLorebookCompareDirection = errorCatched(async $button => {
   }
 }, 'swapLorebookCompareDirection');
 
+function bindGlobalSearchModeEvents(parentDoc) {
+  const selector =
+    '#lorebook-optimize-modal #global-search-use-extended, #lorebook-optimize-modal #global-search-use-regex';
+
+  $(parentDoc)
+    .off('change.optimizerSearchMode', selector)
+    .on('change.optimizerSearchMode', selector, function () {
+      if (this.checked) {
+        $(selector, parentDoc).not(this).prop('checked', false);
+      }
+    });
+}
+
 export function initOptimizer() {
   const parentDoc = window.parent.document;
   bindLorebookCompareFilterEvents(parentDoc);
+  bindGlobalSearchModeEvents(parentDoc);
   if ($('#lorebook-optimize-modal', parentDoc).length > 0) return;
   ensureLorebookCompareStyles();
 
@@ -1582,13 +1602,16 @@ export function initOptimizer() {
                                 <label><input type="checkbox" class="search-scope-checkbox" value="content" checked> 内容</label>
                                 <label><input type="checkbox" class="search-scope-checkbox" value="keys"> 关键词</label>
                             </div>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <label style="display: flex; align-items: center; gap: 5px;">
+                            <div class="search-mode-container">
+                                <label class="search-mode-option">
+                                    <input type="checkbox" id="global-search-use-extended">
+                                    <span>扩展查找（\\n、\\r、\\t、\\0、\\xHH）</span>
+                                </label>
+                                <label class="search-mode-option">
                                     <input type="checkbox" id="global-search-use-regex">
                                     <span>使用正则</span>
                                 </label>
-                                <div style="flex-grow: 1;"></div>
-                                <button data-action="preview-global-search-replace">预览</button>
+                                <button class="global-search-preview-button" data-action="preview-global-search-replace">预览</button>
                             </div>
                         </div>
                     </div>
@@ -2176,18 +2199,37 @@ export const runClicheCleanup = errorCatched(async (lorebookName, isGlobal) => {
   );
 }, 'runClicheCleanup');
 
+function readGlobalSearchReplaceConfig($optimizeModal) {
+  const searchTerm = String($('#global-search-input', $optimizeModal).val() ?? '');
+  const replaceTerm = String($('#global-replace-input', $optimizeModal).val() ?? '');
+  const scopes = $('.search-scope-checkbox:checked', $optimizeModal)
+    .map((i, el) => $(el).val())
+    .get();
+  const useRegex = $('#global-search-use-regex', $optimizeModal).is(':checked');
+  const useExtended = $('#global-search-use-extended', $optimizeModal).is(':checked');
+  const resolved = resolveSearchReplaceInput({ searchTerm, replaceTerm, useRegex, useExtended });
+
+  return { ...resolved, scopes };
+}
+
+function cloneSearchRegex(searchRegex) {
+  return new RegExp(searchRegex.source, searchRegex.flags);
+}
+
 // 【新功能】全局搜索与替换的核心实现
 export const previewGlobalSearchAndReplace = errorCatched(async (lorebookName, isGlobal) => {
   const parentDoc = window.parent.document;
   const $optimizeModal = $('#lorebook-optimize-modal', parentDoc);
   const $previewModal = $('#search-preview-modal', parentDoc);
 
-  const searchTerm = $('#global-search-input', $optimizeModal).val();
-  const replaceTerm = $('#global-replace-input', $optimizeModal).val();
-  const scopes = $('.search-scope-checkbox:checked', $optimizeModal)
-    .map((i, el) => $(el).val())
-    .get();
-  const useRegex = $('#global-search-use-regex', $optimizeModal).is(':checked');
+  let operation;
+  try {
+    operation = readGlobalSearchReplaceConfig($optimizeModal);
+  } catch (error) {
+    alert(error.message);
+    return;
+  }
+  const { searchTerm, replaceTerm, scopes, mode } = operation;
 
   if (!searchTerm) {
     alert('请输入要搜索的内容。');
@@ -2198,14 +2240,12 @@ export const previewGlobalSearchAndReplace = errorCatched(async (lorebookName, i
     return;
   }
 
-  // 如果使用正则，验证正则表达式是否有效
-  if (useRegex) {
-    try {
-      new RegExp(searchTerm);
-    } catch (e) {
-      alert('无效的正则表达式：' + e.message);
-      return;
-    }
+  let searchRegex;
+  try {
+    searchRegex = buildGlobalSearchRegex(searchTerm, mode);
+  } catch (error) {
+    alert('无效的正则表达式：' + error.message);
+    return;
   }
 
   const selectedUids = getSelectedEntries(lorebookName);
@@ -2232,15 +2272,7 @@ export const previewGlobalSearchAndReplace = errorCatched(async (lorebookName, i
         return;
       }
 
-      // 创建搜索正则表达式
-      const regexPattern = useRegex ? searchTerm : _.escapeRegExp(searchTerm);
-      // 尝试使用 s 标志（dotAll），如果浏览器不支持则回退到不使用
-      let localSearchRegex;
-      try {
-        localSearchRegex = new RegExp(regexPattern, 'gs');
-      } catch (e) {
-        localSearchRegex = new RegExp(regexPattern, 'g');
-      }
+      const localSearchRegex = cloneSearchRegex(searchRegex);
 
       // 快速检查是否有匹配（用于提前退出）
       if (!localSearchRegex.test(text)) {
@@ -2256,7 +2288,7 @@ export const previewGlobalSearchAndReplace = errorCatched(async (lorebookName, i
       let matchCount = 0;
 
       while ((match = localSearchRegex.exec(text)) !== null) {
-        const matchedString = match;
+        const matchedString = match[0];
         if (matchedString.length === 0) {
           localSearchRegex.lastIndex++;
           continue;
@@ -2276,16 +2308,10 @@ export const previewGlobalSearchAndReplace = errorCatched(async (lorebookName, i
         const context = text.substring(startIndex, endIndex);
 
         // 高亮显示原始匹配项 - 分割字符串逐段处理避免转义问题
-        let matchRegexForHighlight;
-        if (useRegex) {
-          try {
-            matchRegexForHighlight = new RegExp(searchTerm, 'gs');
-          } catch (e) {
-            matchRegexForHighlight = new RegExp(searchTerm, 'g');
-          }
-        } else {
-          matchRegexForHighlight = new RegExp(_.escapeRegExp(matchedString), 'g');
-        }
+        const matchRegexForHighlight =
+          mode === SEARCH_REPLACE_MODES.REGEX
+            ? cloneSearchRegex(searchRegex)
+            : buildGlobalSearchRegex(matchedString, SEARCH_REPLACE_MODES.NORMAL);
 
         let originalHighlighted = '';
         let lastIndex = 0;
@@ -2308,17 +2334,11 @@ export const previewGlobalSearchAndReplace = errorCatched(async (lorebookName, i
 
         // 执行替换并高亮替换结果
         // 这里也需要使用和搜索时相同的正则标志（包括 s 标志）
-        let replaceRegex;
-        if (useRegex) {
-          try {
-            replaceRegex = new RegExp(searchTerm, 'gs');
-          } catch (e) {
-            replaceRegex = new RegExp(searchTerm, 'g');
-          }
-        } else {
-          replaceRegex = new RegExp(_.escapeRegExp(matchedString), 'g');
-        }
-        const replacedContext = context.replace(replaceRegex, replaceTerm);
+        const replaceRegex =
+          mode === SEARCH_REPLACE_MODES.REGEX
+            ? cloneSearchRegex(searchRegex)
+            : buildGlobalSearchRegex(matchedString, SEARCH_REPLACE_MODES.NORMAL);
+        const replacedContext = replaceGlobalSearchMatches(context, replaceRegex, replaceTerm, mode);
 
         // 对替换后的结果进行高亮
         let changedHighlighted = '';
@@ -2329,7 +2349,7 @@ export const previewGlobalSearchAndReplace = errorCatched(async (lorebookName, i
         } else {
           // 否则高亮替换后的内容
           lastIndex = 0;
-          const replacedMatchRegex = new RegExp(_.escapeRegExp(replaceTerm), 'g');
+          const replacedMatchRegex = buildGlobalSearchRegex(replaceTerm, SEARCH_REPLACE_MODES.NORMAL);
           let replacedMatch;
           while ((replacedMatch = replacedMatchRegex.exec(replacedContext)) !== null) {
             // 防止空匹配导致无限循环
@@ -2410,7 +2430,7 @@ export const previewGlobalSearchAndReplace = errorCatched(async (lorebookName, i
     .off('click')
     .on('click', async () => {
       $previewModal.hide();
-      const success = await executeGlobalSearchAndReplace(lorebookName, isGlobal);
+      const success = await executeGlobalSearchAndReplace(lorebookName, isGlobal, operation);
       if (success) {
         const parentDoc = window.parent.document;
         const $entriesWrapper = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"]`, parentDoc);
@@ -2431,43 +2451,48 @@ export const previewGlobalSearchAndReplace = errorCatched(async (lorebookName, i
   $previewModal.css('display', 'block');
 }, 'previewGlobalSearchAndReplace');
 
-export const executeGlobalSearchAndReplace = errorCatched(async (lorebookName, isGlobal) => {
+export const executeGlobalSearchAndReplace = errorCatched(async (lorebookName, isGlobal, previewOperation = null) => {
   const parentDoc = window.parent.document;
   const $optimizeModal = $('#lorebook-optimize-modal', parentDoc);
-  const searchTerm = $('#global-search-input', $optimizeModal).val();
-  const replaceTerm = $('#global-replace-input', $optimizeModal).val();
-  const scopes = $('.search-scope-checkbox:checked', $optimizeModal)
-    .map((i, el) => $(el).val())
-    .get();
-  const useRegex = $('#global-search-use-regex', $optimizeModal).is(':checked');
+  let operation;
+  try {
+    operation = previewOperation || readGlobalSearchReplaceConfig($optimizeModal);
+  } catch (error) {
+    alert(error.message);
+    return false;
+  }
+  const { searchTerm, replaceTerm, scopes, mode } = operation;
 
   if (!searchTerm) {
     // Although preview checks this, it's good practice to have it here too.
     return false;
   }
 
-  // 根据是否使用正则创建搜索表达式
-  const regexPattern = useRegex ? searchTerm : _.escapeRegExp(searchTerm);
-  // 尝试使用 s 标志（dotAll），如果浏览器不支持则回退到不使用
   let searchRegex;
   try {
-    searchRegex = new RegExp(regexPattern, 'gs');
-  } catch (e) {
-    searchRegex = new RegExp(regexPattern, 'g');
+    searchRegex = buildGlobalSearchRegex(searchTerm, mode);
+  } catch (error) {
+    alert('无效的正则表达式：' + error.message);
+    return false;
   }
   const updaters = {};
 
   if (scopes.includes('name')) {
-    updaters['name'] = text => (typeof text === 'string' ? text.replace(searchRegex, replaceTerm) : text);
+    updaters['name'] = text =>
+      typeof text === 'string'
+        ? replaceGlobalSearchMatches(text, cloneSearchRegex(searchRegex), replaceTerm, mode)
+        : text;
   }
   if (scopes.includes('content')) {
-    updaters['content'] = text => (typeof text === 'string' ? text.replace(searchRegex, replaceTerm) : text);
+    updaters['content'] = text =>
+      typeof text === 'string'
+        ? replaceGlobalSearchMatches(text, cloneSearchRegex(searchRegex), replaceTerm, mode)
+        : text;
   }
   if (scopes.includes('keys')) {
     updaters['strategy.keys'] = keys => {
       const keyString = Array.isArray(keys) ? keys.join(', ') : '';
-      return keyString
-        .replace(searchRegex, replaceTerm)
+      return replaceGlobalSearchMatches(keyString, cloneSearchRegex(searchRegex), replaceTerm, mode)
         .split(',')
         .map(k => k.trim())
         .filter(Boolean);

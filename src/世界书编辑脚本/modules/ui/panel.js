@@ -2564,13 +2564,47 @@ export function initPanel() {
                     box-sizing: border-box;
                     padding: 8px;
                 }
-                #global-search-replace-area input {
+                #global-search-replace-area input[type="text"] {
                     flex-grow: 1;
                     background-color: #222;
                     color: #eee;
                     border: 1px solid #555;
                     padding: 8px;
                     border-radius: 4px;
+                }
+                #global-search-replace-area .search-scope-container,
+                #global-search-replace-area .search-mode-container {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px 15px;
+                    align-items: center;
+                }
+                #global-search-replace-area .search-mode-option,
+                #global-search-replace-area .search-scope-container label {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    cursor: pointer;
+                }
+                #global-search-replace-area input[type="checkbox"] {
+                    flex: 0 0 auto;
+                    margin: 0;
+                    accent-color: #3a6a8e;
+                }
+                #global-search-replace-area .global-search-preview-button {
+                    flex: 0 0 auto;
+                    margin-left: auto;
+                }
+                #search-preview-modal .original-text,
+                #search-preview-modal .changed-text {
+                    white-space: pre-wrap;
+                    overflow-wrap: anywhere;
+                }
+                @media (max-width: 520px) {
+                    #global-search-replace-area .global-search-preview-button {
+                        width: 100%;
+                        margin-left: 0;
+                    }
                 }
  
                  /* --- 统一的移动端媒体查询 --- */

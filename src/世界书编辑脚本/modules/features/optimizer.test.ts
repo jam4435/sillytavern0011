@@ -1,19 +1,88 @@
 import $ from 'jquery';
 import _ from 'lodash';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  buildGlobalSearchRegex,
+  decodeExtendedSearchText,
+  replaceGlobalSearchMatches,
+  resolveSearchReplaceInput,
+  SEARCH_REPLACE_MODES,
+} from './optimizerSearchReplace.js';
 
 Object.assign(globalThis, { $, _ });
 
 const compareFilterSelector = '#lorebook-compare-preview-modal .compare-filter-button';
 let initOptimizer: typeof import('./optimizer.js').initOptimizer;
+let previewGlobalSearchAndReplace: typeof import('./optimizer.js').previewGlobalSearchAndReplace;
 
 beforeAll(async () => {
-  ({ initOptimizer } = await import('./optimizer.js'));
+  ({ initOptimizer, previewGlobalSearchAndReplace } = await import('./optimizer.js'));
 });
 
 afterEach(() => {
   $(document).off('click', compareFilterSelector);
+  $(document).off('.optimizerSearchMode');
   document.body.innerHTML = '';
+  vi.restoreAllMocks();
+});
+
+describe('全局搜索替换扩展模式', () => {
+  it('单次解析常用转义并保留未知转义', () => {
+    expect(decodeExtendedSearchText(String.raw`\n\r\t\0\x41\\`)).toBe('\n\r\t\0A\\');
+    expect(decodeExtendedSearchText(String.raw`\\n`)).toBe(String.raw`\n`);
+    expect(decodeExtendedSearchText(String.raw`\q`)).toBe(String.raw`\q`);
+  });
+
+  it.each([String.raw`\x`, String.raw`\x1`, String.raw`\xG1`])('拒绝非法十六进制转义：%s', input => {
+    expect(() => decodeExtendedSearchText(input)).toThrow(/\\x/);
+  });
+
+  it('扩展模式按字面匹配并按字面插入替换文本', () => {
+    const operation = resolveSearchReplaceInput({
+      searchTerm: String.raw`.\n`,
+      replaceTerm: String.raw`$&\t`,
+      useExtended: true,
+    });
+    const regex = buildGlobalSearchRegex(operation.searchTerm, operation.mode);
+
+    expect(replaceGlobalSearchMatches('.\n结束', regex, operation.replaceTerm, operation.mode)).toBe('$&\t结束');
+  });
+
+  it('正则模式保留捕获组替换语义', () => {
+    const regex = buildGlobalSearchRegex('(武)(侠)', SEARCH_REPLACE_MODES.REGEX);
+    expect(replaceGlobalSearchMatches('武侠', regex, '$2$1', SEARCH_REPLACE_MODES.REGEX)).toBe('侠武');
+  });
+
+  it('扩展查找与正则选项双向互斥', () => {
+    initOptimizer();
+    const $extended = $('#global-search-use-extended');
+    const $regex = $('#global-search-use-regex');
+
+    expect($extended[0]).not.toBeChecked();
+    expect($regex[0]).not.toBeChecked();
+
+    $regex.prop('checked', true);
+    $extended.prop('checked', true).trigger('change');
+    expect($extended[0]).toBeChecked();
+    expect($regex[0]).not.toBeChecked();
+
+    $extended.prop('checked', true);
+    $regex.prop('checked', true).trigger('change');
+    expect($regex[0]).toBeChecked();
+    expect($extended[0]).not.toBeChecked();
+  });
+
+  it('非法扩展转义会在预览前提示并阻止打开预览弹窗', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    initOptimizer();
+    $('#global-search-input').val(String.raw`\xG1`);
+    $('#global-search-use-extended').prop('checked', true);
+
+    await previewGlobalSearchAndReplace('测试世界书', false);
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/\\x/));
+    expect($('#search-preview-modal')[0]).not.toBeVisible();
+  });
 });
 
 describe('世界书全本比对筛选', () => {
