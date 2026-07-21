@@ -36,6 +36,7 @@ export interface WuxiaAutomationRuntimeState {
   options: string[];
   latestDebugRound: LatestDebugRound | null;
   variableChanges: VariableChangeSummary | null;
+  turnTimeoutMs: number;
 }
 
 export interface WuxiaAutomationRecentMessage {
@@ -50,6 +51,7 @@ export interface WuxiaAutomationSnapshot {
   ready: boolean;
   page: PageState;
   busy: boolean;
+  turnTimeoutMs: number;
   chatId: string;
   maintext: string;
   options: string[];
@@ -61,9 +63,7 @@ export interface WuxiaAutomationSnapshot {
 }
 
 export type WuxiaAutomationWriteSignalName =
-  | 'era:writeDone'
-  | 'wuxia:eraVariableWriteDone'
-  | 'wuxia:directVariableWriteDone';
+  'era:writeDone' | 'wuxia:eraVariableWriteDone' | 'wuxia:directVariableWriteDone';
 
 export interface WuxiaAutomationWriteSignal {
   name: WuxiaAutomationWriteSignalName;
@@ -418,6 +418,7 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
       ready: !disposed,
       page: runtime.page,
       busy: disposed || runtime.busy || activeRequestId !== null,
+      turnTimeoutMs: runtime.turnTimeoutMs,
       chatId: readChatId(),
       maintext: runtime.maintext,
       options: cloneForAutomation(runtime.options),

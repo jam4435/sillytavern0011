@@ -105,6 +105,7 @@ function createRuntime(): WuxiaAutomationRuntimeState {
     options: ['A. 前进'],
     latestDebugRound: null,
     variableChanges: null,
+    turnTimeoutMs: 180_000,
   };
 }
 
@@ -133,6 +134,7 @@ describe('WuxiaAutomation', () => {
       ready: true,
       page: 'game',
       busy: false,
+      turnTimeoutMs: 180_000,
       chatId: 'test-chat',
       maintext: '旧正文',
     });

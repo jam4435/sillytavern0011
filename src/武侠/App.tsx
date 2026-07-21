@@ -74,6 +74,7 @@ import {
 } from './utils/wuxiaAutomation';
 import {
   WUXIA_GLOBAL_EVENTS,
+  WUXIA_TURN_TIMEOUT_MS,
   createAutomationGlobalName,
   createRequestId,
 } from '../../tools/wuxia-bridge/protocol.mjs';
@@ -464,6 +465,10 @@ const App: React.FC = () => {
     options: currentOptions,
     latestDebugRound,
     variableChanges,
+    turnTimeoutMs:
+      displaySettings.summarySettings.variableUpdateMode === 'extra'
+        ? WUXIA_TURN_TIMEOUT_MS.EXTENDED
+        : WUXIA_TURN_TIMEOUT_MS.STANDARD,
   });
   automationRuntimeRef.current = {
     page: currentPage,
@@ -472,6 +477,10 @@ const App: React.FC = () => {
     options: currentOptions,
     latestDebugRound,
     variableChanges,
+    turnTimeoutMs:
+      displaySettings.summarySettings.variableUpdateMode === 'extra'
+        ? WUXIA_TURN_TIMEOUT_MS.EXTENDED
+        : WUXIA_TURN_TIMEOUT_MS.STANDARD,
   };
 
   const automationPlayerTurnRef = useRef(handlePlayerSend);

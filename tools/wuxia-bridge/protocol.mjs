@@ -15,6 +15,13 @@ export const WUXIA_GLOBAL_EVENTS = Object.freeze({
 
 export const WUXIA_AUTOMATION_GLOBAL_PREFIX = 'WuxiaAutomation';
 
+export const WUXIA_TURN_TIMEOUT_MS = Object.freeze({
+  STANDARD: 3 * 60 * 1_000,
+  EXTENDED: 6 * 60 * 1_000,
+  RECOVERY: 60 * 1_000,
+  CLIENT_GRACE: 15 * 1_000,
+});
+
 export const WUXIA_METHODS = Object.freeze({
   STATUS: 'status',
   GET_SNAPSHOT: 'getSnapshot',

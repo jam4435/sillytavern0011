@@ -28,6 +28,8 @@ describe('wuxia Socket.IO relay', () => {
       logger: silentLogger,
       snapshotTimeoutMs: 500,
       turnTimeoutMs: 500,
+      recoveryTimeoutMs: 120,
+      recoveryPollMs: 20,
     });
     await new Promise(resolve => httpServer.listen(0, '127.0.0.1', resolve));
     const address = httpServer.address();
@@ -128,6 +130,62 @@ describe('wuxia Socket.IO relay', () => {
     expect(response).toMatchObject({
       ok: false,
       error: { code: WUXIA_ERROR_CODES.OUTCOME_UNKNOWN, outcome: 'unknown', retryable: false },
+    });
+  });
+
+  it('recovers a timed-out turn from the latest snapshot without resending it', async () => {
+    const bridge = await connectReadyBridge();
+    let runRequestCount = 0;
+    bridge.on(WUXIA_EVENTS.REQUEST, (request, acknowledge) => {
+      if (request.method === WUXIA_METHODS.RUN_TURN) {
+        runRequestCount += 1;
+        return;
+      }
+      acknowledge({
+        id: request.id,
+        ok: true,
+        result: {
+          ready: true,
+          busy: false,
+          chatId: 'bridge-1-chat',
+          statData: { user数据: { 修为: 2 } },
+          capturedAt: Date.now(),
+          recentMessages: [
+            { messageId: 3, role: 'user', text: '向前走' },
+            { messageId: 4, role: 'assistant', text: '新的剧情' },
+          ],
+          debug: {
+            id: 'round-1',
+            startedAt: 1,
+            updatedAt: 2,
+            main: { status: 'success', userInput: '向前走', output: '新的剧情' },
+            variable: { status: 'success', modeSnapshot: 'extra' },
+          },
+          variableChanges: {
+            status: 'settled',
+            parseErrors: [],
+            declaredChanges: [{ path: ['user数据', '修为'] }],
+            actualChanges: [{ path: ['user数据', '修为'] }],
+            aiReply: { comparisons: [{ status: 'applied' }] },
+          },
+        },
+      });
+    });
+    const cli = await connect('cli');
+    const response = await call(cli, WUXIA_METHODS.RUN_TURN, { params: { input: '向前走' } });
+
+    expect(runRequestCount).toBe(1);
+    expect(response).toMatchObject({
+      ok: true,
+      result: {
+        ok: true,
+        recovered: true,
+        recoveryReason: 'turn-timeout-snapshot-reconciled',
+        userMessageId: 3,
+        assistantMessageId: 4,
+        rawReply: '新的剧情',
+        variableVerification: { verdict: 'applied' },
+      },
     });
   });
 });

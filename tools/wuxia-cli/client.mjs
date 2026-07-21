@@ -5,6 +5,7 @@ import {
   WUXIA_METHODS,
   WUXIA_PROTOCOL_VERSION,
   WUXIA_SOCKET_NAMESPACE,
+  WUXIA_TURN_TIMEOUT_MS,
   createErrorResponse,
 } from '../wuxia-bridge/protocol.mjs';
 
@@ -35,7 +36,10 @@ export async function callWuxiaBridge(request, options = {}) {
   const token = options.token ?? process.env.WUXIA_BRIDGE_TOKEN ?? '';
   const connectionTimeoutMs = Number(options.connectionTimeoutMs ?? 5_000);
   const requestTimeoutMs = Number(
-    options.requestTimeoutMs ?? (request.method === WUXIA_METHODS.RUN_TURN ? 310_000 : 20_000),
+    options.requestTimeoutMs ??
+      (request.method === WUXIA_METHODS.RUN_TURN
+        ? WUXIA_TURN_TIMEOUT_MS.EXTENDED + WUXIA_TURN_TIMEOUT_MS.RECOVERY + WUXIA_TURN_TIMEOUT_MS.CLIENT_GRACE
+        : 20_000),
   );
   const socket = io(url, {
     autoConnect: false,

@@ -4,13 +4,113 @@ import {
   WUXIA_METHODS,
   WUXIA_PROTOCOL_VERSION,
   WUXIA_SOCKET_NAMESPACE,
+  WUXIA_TURN_TIMEOUT_MS,
   createErrorResponse,
   isRecord,
   validateRpcRequest,
 } from './protocol.mjs';
 
 const DEFAULT_SNAPSHOT_TIMEOUT_MS = 15_000;
-const DEFAULT_TURN_TIMEOUT_MS = 300_000;
+
+const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+function normalizeTurnTimeout(value) {
+  return value === WUXIA_TURN_TIMEOUT_MS.EXTENDED ? WUXIA_TURN_TIMEOUT_MS.EXTENDED : WUXIA_TURN_TIMEOUT_MS.STANDARD;
+}
+
+function normalizeInput(value) {
+  return normalizeString(value, 8_000).replace(/\s+/g, ' ');
+}
+
+function countComparisonStatuses(variableChanges) {
+  const counts = {};
+  const comparisons =
+    isRecord(variableChanges?.aiReply) && Array.isArray(variableChanges.aiReply.comparisons)
+      ? variableChanges.aiReply.comparisons
+      : [];
+  for (const comparison of comparisons) {
+    const status = isRecord(comparison) ? normalizeString(comparison.status, 32) : '';
+    if (status) counts[status] = (counts[status] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function recoverTurnReport(request, snapshot) {
+  if (!isRecord(snapshot) || snapshot.busy === true) return null;
+  const input = normalizeInput(request.params?.input);
+  const debug = isRecord(snapshot.debug) ? snapshot.debug : null;
+  const main = isRecord(debug?.main) ? debug.main : null;
+  if (!input || normalizeInput(main?.userInput) !== input || !['success', 'error'].includes(main?.status)) return null;
+
+  const messages = Array.isArray(snapshot.recentMessages) ? snapshot.recentMessages.filter(isRecord) : [];
+  const matchingUsers = messages.filter(message => message.role === 'user' && normalizeInput(message.text) === input);
+  const userMessage = matchingUsers.at(-1);
+  if (!userMessage || !Number.isInteger(userMessage.messageId)) return null;
+  const assistantMessage = messages.find(
+    message =>
+      message.role === 'assistant' && Number.isInteger(message.messageId) && message.messageId > userMessage.messageId,
+  );
+  if (!assistantMessage) return null;
+
+  const variable = isRecord(debug?.variable) ? debug.variable : null;
+  const variableMode = normalizeString(variable?.modeSnapshot, 16);
+  if (variableMode === 'extra' && !['success', 'error', 'skipped'].includes(variable?.status)) return null;
+
+  const variableChanges = isRecord(snapshot.variableChanges) ? snapshot.variableChanges : null;
+  const parseErrors = Array.isArray(variableChanges?.parseErrors)
+    ? variableChanges.parseErrors.map(error => String(error))
+    : [];
+  const declaredCount = Array.isArray(variableChanges?.declaredChanges) ? variableChanges.declaredChanges.length : 0;
+  const actualCount = Array.isArray(variableChanges?.actualChanges) ? variableChanges.actualChanges.length : 0;
+  const expected = declaredCount > 0;
+  const comparisonStatusCounts = countComparisonStatuses(variableChanges);
+  const failedComparisons = (comparisonStatusCounts['not-applied'] ?? 0) + (comparisonStatusCounts.diverged ?? 0);
+  const successfulComparisons =
+    (comparisonStatusCounts.applied ?? 0) +
+    (comparisonStatusCounts['no-op'] ?? 0) +
+    (comparisonStatusCounts['api-only'] ?? 0);
+  const variableError = variable?.status === 'error' ? normalizeString(variable.error, 2_000) || '变量更新失败。' : '';
+  const mainError = main.status === 'error' ? normalizeString(main.error, 2_000) || '主模型生成失败。' : '';
+  const settled = variableChanges?.status === 'settled';
+  const verdict = !expected
+    ? 'not-requested'
+    : parseErrors.length > 0 || failedComparisons > 0 || variableError
+      ? 'failed'
+      : settled && (successfulComparisons > 0 || actualCount > 0)
+        ? 'applied'
+        : 'inconclusive';
+  const error = mainError || variableError || (verdict === 'failed' ? '变量更新验证失败。' : '');
+
+  return {
+    ok: !error,
+    recovered: true,
+    recoveryReason: 'turn-timeout-snapshot-reconciled',
+    requestId: request.id,
+    input: request.params.input.trim(),
+    chatId: normalizeString(snapshot.chatId, 512),
+    startedAt: Number(debug?.startedAt) || Date.now(),
+    finishedAt: Number(debug?.updatedAt) || Number(snapshot.capturedAt) || Date.now(),
+    userMessageId: userMessage.messageId,
+    assistantMessageId: assistantMessage.messageId,
+    rawReply:
+      typeof assistantMessage.text === 'string' ? assistantMessage.text : normalizeString(main.output, 1_000_000),
+    statDataBefore: null,
+    statDataAfter: isRecord(snapshot.statData) ? snapshot.statData : null,
+    debug,
+    variableChanges,
+    variableVerification: {
+      expected,
+      signalObserved: settled,
+      timedOut: false,
+      verdict,
+      declaredCount,
+      comparisonStatusCounts,
+      parseErrors,
+      signals: [],
+    },
+    ...(error ? { error } : {}),
+  };
+}
 
 function normalizeString(value, maxLength = 256) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
@@ -50,6 +150,7 @@ function publicBridgeState(socket, state) {
     chatId: state.chatId,
     page: state.page,
     busy: state.busy,
+    turnTimeoutMs: state.turnTimeoutMs,
     connectedAt: state.connectedAt,
     updatedAt: state.updatedAt,
   };
@@ -67,6 +168,7 @@ function normalizeBridgeState(socket, previous, value) {
     chatId: normalizeString(data.chatId, 512),
     page: normalizeString(data.page, 64),
     busy: data.busy === true,
+    turnTimeoutMs: normalizeTurnTimeout(data.turnTimeoutMs),
     connectedAt: previous.connectedAt,
     updatedAt: Date.now(),
     socket,
@@ -166,6 +268,53 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
     return { state: readyStates[0] };
   }
 
+  function chooseRecoveryBridge(originalState, target) {
+    const readyStates = [...bridgeStates.values()].filter(state => state.automationReady);
+    const exact = readyStates.filter(state => matchesTarget(state, target));
+    if (exact.length > 0) return exact.at(-1);
+    return readyStates.find(
+      state =>
+        state.bridgeId === originalState.bridgeId || (originalState.chatId && state.chatId === originalState.chatId),
+    );
+  }
+
+  async function recoverTimedOutTurn(request, originalState) {
+    const recoveryTimeoutMs = Number(options.recoveryTimeoutMs ?? WUXIA_TURN_TIMEOUT_MS.RECOVERY);
+    const recoveryPollMs = Number(options.recoveryPollMs ?? 1_000);
+    const deadline = Date.now() + Math.max(0, recoveryTimeoutMs);
+    let attempt = 0;
+
+    do {
+      const state = chooseRecoveryBridge(originalState, request.target);
+      if (state) {
+        const snapshotRequest = {
+          id: `${request.id}-recovery-${attempt}`.slice(0, 160),
+          method: WUXIA_METHODS.GET_SNAPSHOT,
+          params: {},
+        };
+        try {
+          const response = await state.socket
+            .timeout(Number(options.snapshotTimeoutMs ?? DEFAULT_SNAPSHOT_TIMEOUT_MS))
+            .emitWithAck(WUXIA_EVENTS.REQUEST, snapshotRequest);
+          if (isRecord(response) && response.ok === true) {
+            const report = recoverTurnReport(request, response.result);
+            if (report) {
+              logger.info?.(`[wuxia] 已通过快照恢复超时回合: ${request.id}`);
+              return { id: request.id, ok: true, result: report };
+            }
+          }
+        } catch {
+          // 当前 iframe 可能仍在换代；在恢复窗口内继续寻找新桥。
+        }
+      }
+      attempt += 1;
+      if (Date.now() >= deadline) break;
+      await delay(Math.max(10, recoveryPollMs));
+    } while (Date.now() <= deadline);
+
+    return null;
+  }
+
   async function forwardRequest(request) {
     const selected = chooseBridge(request);
     if (selected.error) return selected.error;
@@ -181,7 +330,7 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
     if (isRunTurn) runInFlight.add(runKey);
     try {
       const timeoutMs = isRunTurn
-        ? Number(options.turnTimeoutMs ?? DEFAULT_TURN_TIMEOUT_MS)
+        ? Number(options.turnTimeoutMs ?? state.turnTimeoutMs ?? WUXIA_TURN_TIMEOUT_MS.STANDARD)
         : Number(options.snapshotTimeoutMs ?? DEFAULT_SNAPSHOT_TIMEOUT_MS);
       const response = await state.socket.timeout(timeoutMs).emitWithAck(WUXIA_EVENTS.REQUEST, request);
       if (!isRecord(response) || response.id !== request.id || typeof response.ok !== 'boolean') {
@@ -190,6 +339,8 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
       return response;
     } catch (error) {
       if (isRunTurn) {
+        const recovered = await recoverTimedOutTurn(request, state);
+        if (recovered) return recovered;
         return createErrorResponse(
           request.id,
           WUXIA_ERROR_CODES.OUTCOME_UNKNOWN,
@@ -220,6 +371,7 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
         chatId: '',
         page: '',
         busy: false,
+        turnTimeoutMs: WUXIA_TURN_TIMEOUT_MS.STANDARD,
         connectedAt: Date.now(),
         updatedAt: Date.now(),
         socket,

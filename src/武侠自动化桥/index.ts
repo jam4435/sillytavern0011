@@ -7,6 +7,7 @@ import {
   WUXIA_METHODS,
   WUXIA_PROTOCOL_VERSION,
   WUXIA_SOCKET_NAMESPACE,
+  WUXIA_TURN_TIMEOUT_MS,
   WUXIA_AUTOMATION_GLOBAL_PREFIX,
   createErrorResponse,
   createRequestId,
@@ -116,6 +117,7 @@ function startBridge() {
   let automation: WuxiaAutomationApi | null = null;
   let automationInstanceId = '';
   let automationGlobalName = '';
+  let turnTimeoutMs = WUXIA_TURN_TIMEOUT_MS.STANDARD;
   let acquisitionGeneration = 0;
   let runInFlight = false;
   const bridgeId = String(getScriptId());
@@ -169,6 +171,7 @@ function startBridge() {
     if (!socket.connected || disposed) return;
     try {
       const snapshot = await getUsableSnapshot();
+      turnTimeoutMs = snapshot.turnTimeoutMs;
       socket.emit(WUXIA_EVENTS.STATE, {
         automationReady: true,
         apiVersion: snapshot.version,
@@ -177,6 +180,7 @@ function startBridge() {
         chatId: snapshot.chatId,
         page: snapshot.page,
         busy: snapshot.busy || runInFlight,
+        turnTimeoutMs,
         latestMessageId: getLatestMessageId(snapshot),
       });
     } catch (error) {
@@ -190,6 +194,7 @@ function startBridge() {
         chatId: '',
         page: `error:${errorMessage}`,
         busy: runInFlight,
+        turnTimeoutMs,
         latestMessageId: null,
       });
     }
