@@ -15,8 +15,8 @@ import {
   buildCompareEntryOverwritePlan,
   buildCompareEntrySettingsOverwritePlan,
   buildCompareKeywordOverwritePlan,
-  buildLorebookCompareResult as buildLorebookCompareResultFromEntries,
   buildCompareRemovedEntryDeletePlan,
+  buildLorebookCompareResult as buildLorebookCompareResultFromEntries,
   getCompareItemsForFilter,
 } from './optimizerCompare.js';
 import {
@@ -768,7 +768,9 @@ function renderCompareInlineColumnHtml(label, lines, changedClass, debugInfo = n
         data-debug-ends-with-newline="${finalDebugInfo.endsWithNewline ? 'true' : 'false'}"
         data-debug-summary="${_.escape(formatContentDebugSummary(finalDebugInfo))}"`
     : '';
-  return `<div class="compare-inline-column"><div class="compare-inline-column-header">${_.escape(label)}</div><div class="compare-inline-column-body"${debugAttrs}>${(lines || [])
+  return `<div class="compare-inline-column"><div class="compare-inline-column-header">${_.escape(label)}</div><div class="compare-inline-column-body"${debugAttrs}>${(
+    lines || []
+  )
     .map(line => `<div class="compare-inline-line">${renderCompareInlineLineHtml(line, changedClass)}</div>`)
     .join('')}</div></div>`;
 }
@@ -858,35 +860,67 @@ function renderCompareItemActionButtons(item, index) {
 
   if (item.type !== 'modified' || item.hasContentDiff) {
     buttons.push(
-      renderCompareActionButton('open-lorebook-compare-editor', '正文对比编辑', index, '打开只处理正文内容的左右对比编辑器'),
+      renderCompareActionButton(
+        'open-lorebook-compare-editor',
+        '正文对比编辑',
+        index,
+        '打开只处理正文内容的左右对比编辑器',
+      ),
     );
   }
 
   if (item.type === 'added') {
-    buttons.push(renderCompareActionButton('apply-lorebook-compare-added', '添加此条', index, '向当前世界书添加此条差异条目'));
+    buttons.push(
+      renderCompareActionButton('apply-lorebook-compare-added', '添加此条', index, '向当前世界书添加此条差异条目'),
+    );
   } else if (item.type === 'removed') {
     buttons.push(
-      renderCompareActionButton('apply-lorebook-compare-removed-delete', '删除此条', index, '从当前世界书删除此条多余条目'),
+      renderCompareActionButton(
+        'apply-lorebook-compare-removed-delete',
+        '删除此条',
+        index,
+        '从当前世界书删除此条多余条目',
+      ),
     );
   } else if (item.type === 'modified') {
     if (item.hasContentDiff) {
       buttons.push(
-        renderCompareActionButton('apply-lorebook-compare-content-overwrite', '覆盖正文', index, '用对比世界书正文覆盖当前条目正文'),
+        renderCompareActionButton(
+          'apply-lorebook-compare-content-overwrite',
+          '覆盖正文',
+          index,
+          '用对比世界书正文覆盖当前条目正文',
+        ),
       );
     }
     if (item.hasKeywordDiff) {
       buttons.push(
-        renderCompareActionButton('apply-lorebook-compare-keyword-overwrite', '覆盖关键词', index, '用对比世界书主/次关键词覆盖当前条目关键词'),
+        renderCompareActionButton(
+          'apply-lorebook-compare-keyword-overwrite',
+          '覆盖关键词',
+          index,
+          '用对比世界书主/次关键词覆盖当前条目关键词',
+        ),
       );
     }
     if (item.hasEntrySettingsDiff) {
       buttons.push(
-        renderCompareActionButton('apply-lorebook-compare-settings-overwrite', '覆盖设置', index, '覆盖标题、启用状态、模式、插入位置和概率'),
+        renderCompareActionButton(
+          'apply-lorebook-compare-settings-overwrite',
+          '覆盖设置',
+          index,
+          '覆盖标题、启用状态、模式、插入位置和概率',
+        ),
       );
     }
     if (item.hasEntryDataDiff) {
       buttons.push(
-        renderCompareActionButton('apply-lorebook-compare-entry-overwrite', '覆盖整条', index, '用对比世界书完整条目覆盖当前条目，但保留当前 UID'),
+        renderCompareActionButton(
+          'apply-lorebook-compare-entry-overwrite',
+          '覆盖整条',
+          index,
+          '用对比世界书完整条目覆盖当前条目，但保留当前 UID',
+        ),
       );
     }
   }
@@ -967,9 +1001,7 @@ function updateCompareBatchActionState($modal, result) {
     .prop('disabled', contentOverwrite === 0)
     .attr(
       'title',
-      contentOverwrite > 0
-        ? `用对比世界书正文覆盖 ${contentOverwrite} 个当前世界书条目`
-        : '没有可覆盖正文的修改条目',
+      contentOverwrite > 0 ? `用对比世界书正文覆盖 ${contentOverwrite} 个当前世界书条目` : '没有可覆盖正文的修改条目',
     );
   $keywordButton
     .text(keywordOverwrite > 0 ? `批量覆盖关键词 (${keywordOverwrite})` : '批量覆盖关键词')
@@ -1071,7 +1103,12 @@ async function refreshLorebookComparePreview(result) {
     getComparableLorebookEntries(result.baseName, { forceFresh: true }),
     getComparableLorebookEntries(result.targetName, { forceFresh: true }),
   ]);
-  const nextResult = buildLorebookCompareResultFromEntries(result.baseName, result.targetName, baseEntries, targetEntries);
+  const nextResult = buildLorebookCompareResultFromEntries(
+    result.baseName,
+    result.targetName,
+    baseEntries,
+    targetEntries,
+  );
   $modal.data('compare-result', nextResult);
   renderLorebookCompareResult();
 }
@@ -1605,7 +1642,7 @@ export function initOptimizer() {
                             <div class="search-mode-container">
                                 <label class="search-mode-option">
                                     <input type="checkbox" id="global-search-use-extended">
-                                    <span>扩展查找（\\n、\\r、\\t、\\0、\\xHH）</span>
+                                    <span>扩展查找（\\n、\\r、\\t...）</span>
                                 </label>
                                 <label class="search-mode-option">
                                     <input type="checkbox" id="global-search-use-regex">
