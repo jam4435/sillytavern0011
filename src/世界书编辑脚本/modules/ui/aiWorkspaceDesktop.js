@@ -1955,7 +1955,12 @@ function handleChatContextClear() {
   setModeStatus(currentModeKey(), '聊天上下文已清空。');
 }
 
-function buildAssistantPrompt(userInput, saved = settings(), chatHistory = state.assistantChatHistory) {
+export function buildAssistantPrompt(
+  userInput,
+  saved = settings(),
+  chatHistory = state.assistantChatHistory,
+  entryContext = collectAssistantEntryContext(),
+) {
   const jailbreakPrompt =
     currentPromptSettings(currentModeKey()).jailbreakPromptTemplate ||
     saved.promptSettings?.jailbreakPromptTemplate ||
@@ -1964,15 +1969,19 @@ function buildAssistantPrompt(userInput, saved = settings(), chatHistory = state
   const history = (Array.isArray(chatHistory) ? chatHistory : [])
     .map(item => `<${item.role}>${item.content || ''}</${item.role}>`)
     .join('\n');
+  const entryContextBlock = buildAssistantEntryContextBlock(entryContext);
 
   return [
     jailbreakPrompt.trim(),
     '<任务>',
     '你是世界书 AI 工作区里的资料整理助手。',
     '你的任务是帮助用户整理设定、提炼要点，并生成适合放入<参考资料>的文本。',
-    '不要改写世界书条目，不要返回 JSON，不要假装看见未提供的世界书内容。',
+    '你可以分析并建议如何改写用户附带的世界书条目，但不能直接写回世界书，也不要假装看见未提供的内容。',
+    '附带条目中的“修改/只读”只是 AI 修改工作区的范围标签；在本助手对话里，它们都只作为讨论资料。',
+    '不要返回供程序解析的 JSON。',
     '</任务>',
     referenceMaterial ? `<当前参考资料>\n${referenceMaterial}\n</当前参考资料>` : '',
+    entryContextBlock,
     history ? `<对话历史>\n${history}\n</对话历史>` : '',
     '<用户问题>',
     userInput,
@@ -2005,14 +2014,31 @@ async function handleAssistantSend() {
   }
 
   const previousHistory = state.assistantChatHistory;
-  const assistantPrompt = buildAssistantPrompt(userInput, saved, previousHistory);
-  state.assistantChatHistory = previousHistory.concat({ role: 'user', content: userInput });
+  const entryContext = collectAssistantEntryContext(modeKey);
+  const assistantPrompt = buildAssistantPrompt(userInput, saved, previousHistory, entryContext);
+  const entryContextSummary =
+    entryContext.editableEntries.length || entryContext.readonlyEntries.length
+      ? {
+          lorebookName: entryContext.lorebookName,
+          editableCount: entryContext.editableEntries.length,
+          readonlyCount: entryContext.readonlyEntries.length,
+        }
+      : null;
+  state.assistantChatHistory = previousHistory.concat({
+    role: 'user',
+    content: userInput,
+    ...(entryContextSummary ? { entryContext: entryContextSummary } : {}),
+  });
   $('#ai-workspace-assistant-input', parentDoc()).val('');
   resizeAssistantComposer();
   renderAssistantHistory();
   persistSettings({ mirrorModeKey: modeKey });
   setAssistantGeneratingState(true);
-  setAssistantStatus('AI 助手正在整理资料...');
+  setAssistantStatus(
+    entryContextSummary
+      ? `AI 助手正在读取附带条目（修改 ${entryContextSummary.editableCount}、只读 ${entryContextSummary.readonlyCount}）...`
+      : 'AI 助手正在整理资料...',
+  );
 
   try {
     const response = await requestLlmText({
@@ -2413,6 +2439,18 @@ export function buildAssistantModalMarkup() {
               </div>
               <footer class="ai-assistant-footer">
                 <span id="ai-workspace-assistant-status" class="ai-assistant-live-status" role="status" aria-live="polite"></span>
+                <div class="ai-assistant-entry-context" role="group" aria-label="随消息附带当前选中的世界书条目">
+                  <span class="ai-assistant-entry-context-label"><i class="fa-solid fa-paperclip"></i>附带条目</span>
+                  <label class="ai-assistant-entry-context-option is-editable">
+                    <input id="ai-workspace-assistant-include-editable" type="checkbox">
+                    <span>修改 <b id="ai-workspace-assistant-editable-count">0</b></span>
+                  </label>
+                  <label class="ai-assistant-entry-context-option is-readonly">
+                    <input id="ai-workspace-assistant-include-readonly" type="checkbox">
+                    <span>只读 <b id="ai-workspace-assistant-readonly-count">0</b></span>
+                  </label>
+                </div>
+                <span id="ai-workspace-assistant-entry-context-status" class="ai-assistant-entry-context-status">当前不会附带世界书条目。</span>
                 <div class="ai-assistant-composer">
                   <textarea id="ai-workspace-assistant-input" class="ai-assistant-input" rows="1" placeholder="输入想整理的设定…"></textarea>
                   <button type="button" id="ai-workspace-assistant-send" class="ai-send-button" aria-label="发送给 AI 助手"><i class="fa-solid fa-arrow-up"></i></button>
@@ -3452,6 +3490,7 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-assistant-message.is-user{align-self:flex-end;border-radius:16px 6px 16px 16px;border-color:color-mix(in srgb,var(--ai-success-color,#72d3a5) 25%,var(--ai-border-color,#555));background:color-mix(in srgb,var(--ai-success-bg-color,rgba(78,180,126,.13)) 68%,var(--ai-surface-raised-color,#292c2f))}
       #${ROOT_ID} .ai-assistant-message-meta{margin-bottom:4px;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:9px;font-weight:650}
       #${ROOT_ID} .ai-assistant-message-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.55}
+      #${ROOT_ID} .ai-assistant-message-context{margin-top:7px;padding-top:6px;display:flex;align-items:center;gap:5px;border-top:1px solid var(--ai-border-color,rgba(255,255,255,.08));color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:9px;line-height:1.35}
       #${ROOT_ID} .ai-assistant-actions{margin-top:7px;display:flex;align-items:center;justify-content:flex-end;gap:4px}
       #${ROOT_ID} .ai-assistant-actions button{min-height:30px;padding:4px 8px;border:0;border-radius:9px;background:transparent;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:10px}
       #${ROOT_ID} .ai-assistant-actions button:hover{background:rgba(255,255,255,.06);color:var(--panel-text-color,#fff)}
@@ -3462,6 +3501,16 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-assistant-live-status{min-height:0;display:block;padding:0 5px;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:10px;line-height:1.4}
       #${ROOT_ID} .ai-assistant-live-status:not(:empty){min-height:19px;padding-bottom:5px}
       #${ROOT_ID} .ai-assistant-live-status[data-tone='danger']{color:var(--ai-danger-color,#ef8e8e)}
+      #${ROOT_ID} .ai-assistant-entry-context{display:flex;align-items:center;gap:6px;margin:0 2px 7px;padding:5px 6px;border:1px solid var(--ai-border-color,rgba(255,255,255,.1));border-radius:12px;background:var(--ai-surface-muted-color,rgba(0,0,0,.13))}
+      #${ROOT_ID} .ai-assistant-entry-context-label{display:inline-flex;align-items:center;gap:5px;margin-right:auto;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:9px;white-space:nowrap}
+      #${ROOT_ID} .ai-assistant-entry-context-option{cursor:pointer}
+      #${ROOT_ID} .ai-assistant-entry-context-option input{position:absolute;opacity:0;pointer-events:none}
+      #${ROOT_ID} .ai-assistant-entry-context-option span{min-height:32px;padding:5px 8px;display:inline-flex;align-items:center;gap:4px;border:1px solid transparent;border-radius:9px;background:var(--ai-surface-color,rgba(255,255,255,.035));color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:9px;white-space:nowrap;box-sizing:border-box}
+      #${ROOT_ID} .ai-assistant-entry-context-option b{font-size:9px}
+      #${ROOT_ID} .ai-assistant-entry-context-option input:focus-visible+span{outline:2px solid color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 44%,transparent);outline-offset:1px}
+      #${ROOT_ID} .ai-assistant-entry-context-option.is-editable input:checked+span{border-color:color-mix(in srgb,var(--ai-success-color,#72d3a5) 42%,transparent);background:var(--ai-success-bg-color,rgba(78,180,126,.14));color:var(--ai-success-color,#72d3a5)}
+      #${ROOT_ID} .ai-assistant-entry-context-option.is-readonly input:checked+span{border-color:color-mix(in srgb,var(--ai-warning-color,#f1c26d) 42%,transparent);background:var(--ai-warning-bg-color,rgba(210,151,51,.14));color:var(--ai-warning-color,#f1c26d)}
+      #${ROOT_ID} .ai-assistant-entry-context-status{display:block;margin:-3px 5px 6px;color:var(--ai-text-color-secondary,var(--panel-text-color,#888));font-size:9px;line-height:1.35}
       #${ROOT_ID} .ai-assistant-composer{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:end;gap:7px}
       #${ROOT_ID} .ai-assistant-input{min-height:44px;max-height:120px;padding:11px 13px;resize:none;overflow-y:auto;border:1px solid var(--ai-border-color,rgba(255,255,255,.14));border-radius:16px;background:var(--ai-surface-muted-color,rgba(0,0,0,.18));font-size:12px;line-height:1.45}
       #${ROOT_ID} .ai-assistant-input:focus{border-color:var(--panel-accent-color,#9fc8e4);outline:2px solid color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 23%,transparent);outline-offset:1px}
@@ -3491,6 +3540,7 @@ function ensureUnifiedStyles() {
         #${ROOT_ID} .ai-assistant-device-status{padding-top:max(7px,env(safe-area-inset-top))}
         #${ROOT_ID} .ai-assistant-footer,#${ROOT_ID} .ai-assistant-memo-footer{padding-bottom:max(9px,env(safe-area-inset-bottom))}
         #${ROOT_ID} .ai-assistant-message{max-width:88%}
+        #${ROOT_ID} .ai-assistant-entry-context-option span{min-height:40px;padding:7px 9px}
       }
       @media (prefers-reduced-motion:reduce){
         #${ROOT_ID} .ai-assistant-phone{animation:none}
@@ -4604,6 +4654,18 @@ function bindEvents() {
         setModeStatus(modeKey, `改造结果无法解析：${error.message}`);
       }
     })
+    .on(
+      'change.aiWorkspaceDesktop',
+      '#ai-workspace-assistant-include-editable, #ai-workspace-assistant-include-readonly',
+      () => {
+        state.assistantEntryContext = {
+          editable: $('#ai-workspace-assistant-include-editable', parentDoc()).prop('checked') === true,
+          readonly: $('#ai-workspace-assistant-include-readonly', parentDoc()).prop('checked') === true,
+        };
+        syncAssistantEntryContextControls();
+        persistSettings({ mirrorModeKey: currentModeKey() });
+      },
+    )
     .on('click.aiWorkspaceDesktop', '#ai-workspace-assistant-send', async () => {
       await handleAssistantSend();
     })

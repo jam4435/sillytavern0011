@@ -3,6 +3,8 @@ import $ from 'jquery';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 let buildAssistantModalMarkup: typeof import('./aiWorkspaceDesktop.js').buildAssistantModalMarkup;
+let buildAssistantEntryContextBlock: typeof import('./aiWorkspaceDesktop.js').buildAssistantEntryContextBlock;
+let buildAssistantPrompt: typeof import('./aiWorkspaceDesktop.js').buildAssistantPrompt;
 let buildApiSettingsMarkup: typeof import('./aiWorkspaceDesktop.js').buildApiSettingsMarkup;
 let buildDesktopShellMarkup: typeof import('./aiWorkspaceDesktop.js').buildDesktopShellMarkup;
 let buildInfoResourcesMarkup: typeof import('./aiWorkspaceDesktop.js').buildInfoResourcesMarkup;
@@ -14,7 +16,9 @@ beforeAll(async () => {
   vi.stubGlobal('$', $);
   ({
     buildApiSettingsMarkup,
+    buildAssistantEntryContextBlock,
     buildAssistantModalMarkup,
+    buildAssistantPrompt,
     buildDesktopShellMarkup,
     buildInfoResourcesMarkup,
     buildStepIndicator,
@@ -105,5 +109,57 @@ describe('AI 助手手机窗语义', () => {
     expect(document.querySelector('#ai-workspace-assistant-send')).toBeInstanceOf(HTMLButtonElement);
     expect(document.querySelector('#ai-workspace-assistant-selection-add')).toBeInstanceOf(HTMLButtonElement);
     expect(document.querySelector('#ai-workspace-assistant-new-reply')).toHaveAttribute('hidden');
+    expect(document.querySelector('#ai-workspace-assistant-include-editable')).toBeInstanceOf(HTMLInputElement);
+    expect(document.querySelector('#ai-workspace-assistant-include-readonly')).toBeInstanceOf(HTMLInputElement);
+    expect(document.querySelector('#ai-workspace-assistant-entry-context-status')).toHaveAttribute(
+      'id',
+      'ai-workspace-assistant-entry-context-status',
+    );
+  });
+
+  it('把勾选的修改与只读条目按分组注入助手提示词', () => {
+    const entryContext = {
+      lorebookName: '群星志',
+      editableEntries: [
+        {
+          uid: 11,
+          name: '北境',
+          content: '终年落雪。',
+          promptSnapshot: { primary: ['北境'], secondaryLogic: 'and_any', secondary: ['雪'] },
+        },
+      ],
+      readonlyEntries: [{ uid: 12, name: '王都', content: '位于南方。', promptSnapshot: {} }],
+    };
+
+    const block = buildAssistantEntryContextBlock(entryContext);
+    const prompt = buildAssistantPrompt(
+      '比较两地设定',
+      { promptSettings: { jailbreakPromptTemplate: '' } },
+      [],
+      entryContext,
+    );
+
+    expect(block).toContain('<当前选中的世界书条目>');
+    expect(JSON.parse(block.split('\n').slice(1, -1).join('\n'))).toMatchObject({
+      worldbook_name: '群星志',
+      editable_entries: [{ uid: 11, name: '北境', content: '终年落雪。' }],
+      readonly_entries: [{ uid: 12, name: '王都', content: '位于南方。' }],
+    });
+    expect(prompt).toContain(block);
+    expect(prompt).toContain('修改/只读');
+  });
+
+  it('没有附带条目时不注入空的世界书上下文块', () => {
+    const block = buildAssistantEntryContextBlock({
+      lorebookName: '群星志',
+      editableEntries: [],
+      readonlyEntries: [],
+      excludedEntries: [{ uid: 99, name: '排除项', content: '不应出现' }],
+    });
+    const prompt = buildAssistantPrompt('继续整理', { promptSettings: {} }, [], {});
+
+    expect(block).toBe('');
+    expect(prompt).not.toContain('<当前选中的世界书条目>');
+    expect(prompt).not.toContain('排除项');
   });
 });

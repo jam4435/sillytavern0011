@@ -122,4 +122,30 @@ describe('AI 工作区设置 schema v2', () => {
       draft: { lorebookName: '兼容世界书', instruction: '兼容调用', readonlyEntryUids: [9] },
     });
   });
+
+  it('助手条目上下文开关默认关闭，并只接受严格布尔值', () => {
+    expect(settingsModule.normalizeAiWorkspaceSettings({}).draft.assistantEntryContext).toEqual({
+      editable: false,
+      readonly: false,
+    });
+
+    const normalized = settingsModule.normalizeAiWorkspaceSettings({
+      schemaVersion: 2,
+      draft: {
+        assistantEntryContext: { editable: true, readonly: 'true' },
+        assistantChatHistory: [
+          {
+            role: 'user',
+            content: '请比较这些条目',
+            entryContext: { lorebookName: '测试世界书', editableCount: '2', readonlyCount: 1 },
+          },
+        ],
+      },
+    });
+
+    expect(normalized.draft.assistantEntryContext).toEqual({ editable: true, readonly: false });
+    expect(normalized.draft.assistantChatHistory[0]).toMatchObject({
+      entryContext: { lorebookName: '测试世界书', editableCount: 2, readonlyCount: 1 },
+    });
+  });
 });
