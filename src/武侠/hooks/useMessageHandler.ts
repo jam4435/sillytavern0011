@@ -62,6 +62,7 @@ interface UseMessageHandlerOptions {
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
 const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
+const WUXIA_TURN_LIFECYCLE_EVENT = 'wuxia:turn-lifecycle';
 const WUXIA_TURN_COMPLETED_EVENT = 'wuxia:turn-completed';
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -75,13 +76,14 @@ const readCurrentChatIdForTurn = (): string => {
     const currentWindow = globalThis as typeof globalThis & {
       SillyTavern?: { getCurrentChatId?: () => string | number | null | undefined };
     };
-    const parentWindow = typeof window !== 'undefined'
-      ? window.parent as Window & typeof globalThis & {
-        SillyTavern?: { getCurrentChatId?: () => string | number | null | undefined };
-      }
-      : undefined;
-    const chatId = currentWindow.SillyTavern?.getCurrentChatId?.()
-      ?? parentWindow?.SillyTavern?.getCurrentChatId?.();
+    const parentWindow =
+      typeof window !== 'undefined'
+        ? (window.parent as Window &
+            typeof globalThis & {
+              SillyTavern?: { getCurrentChatId?: () => string | number | null | undefined };
+            })
+        : undefined;
+    const chatId = currentWindow.SillyTavern?.getCurrentChatId?.() ?? parentWindow?.SillyTavern?.getCurrentChatId?.();
     if (typeof chatId === 'string') {
       const normalized = chatId.trim();
       return normalized || 'unknown';
@@ -146,16 +148,16 @@ function createInitialExtraVariableDecisionPatch(
     decision,
     decision.shouldRunExtra
       ? {
-        status: 'idle',
-        startedAt: now,
-        error: '',
-      }
+          status: 'idle',
+          startedAt: now,
+          error: '',
+        }
       : {
-        status: 'skipped',
-        startedAt: now,
-        finishedAt: now,
-        error: '',
-      },
+          status: 'skipped',
+          startedAt: now,
+          finishedAt: now,
+          error: '',
+        },
   );
 }
 
@@ -284,9 +286,7 @@ export function useMessageHandler({
   );
 
   const prepareExtraVariableUpdateForDecision = useCallback(
-    async (
-      decision: ExtraVariableRunDecision,
-    ): Promise<ExtraVariableUpdateReservation | null> => {
+    async (decision: ExtraVariableRunDecision): Promise<ExtraVariableUpdateReservation | null> => {
       if (!decision.shouldRunExtra) {
         return null;
       }
@@ -399,7 +399,7 @@ export function useMessageHandler({
       setIsLoading(true);
       showLoading('正在生成回复...');
       messageLogger.log('🔄 isLoading 设置为 true');
-      beginDebugRound(message);
+      const debugRoundId = beginDebugRound(message);
       const extraVariableDecision = createExtraVariableRunDecision('send', summarySettings);
       patchLatestDebugRound({
         variable: createInitialExtraVariableDecisionPatch(extraVariableDecision),
@@ -409,6 +409,11 @@ export function useMessageHandler({
       let createdLatestMessageId: number | null = null;
 
       try {
+        await eventEmit(WUXIA_TURN_LIFECYCLE_EVENT, {
+          phase: 'start',
+          roundId: debugRoundId,
+          chatId: readCurrentChatIdForTurn(),
+        });
         extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
         const beforeSendLastMessageId = getLatestMessageId();
         onVariableTurnStart?.();
@@ -645,6 +650,12 @@ export function useMessageHandler({
       } finally {
         extraVariableUpdateReservation?.release();
         setIsLoading(false);
+        void eventEmit(WUXIA_TURN_LIFECYCLE_EVENT, {
+          phase: 'finish',
+          roundId: debugRoundId,
+          chatId: readCurrentChatIdForTurn(),
+          messageId: createdLatestMessageId,
+        });
         if (createdLatestMessageId !== null) {
           // 由后台楼层脚本延迟切换宿主消息节点；此处不等待，避免刷新节点时打断当前调用栈。
           void eventEmit(SYNC_LATEST_MESSAGE_SHELL_EVENT, createdLatestMessageId);
@@ -747,7 +758,7 @@ export function useMessageHandler({
 
     setIsLoading(true);
     showLoading('正在重新生成回复...');
-    beginDebugRound('重新生成最新回复');
+    const debugRoundId = beginDebugRound('重新生成最新回复');
     const extraVariableDecision = createExtraVariableRunDecision('regenerate', summarySettings);
     patchLatestDebugRound({
       variable: createInitialExtraVariableDecisionPatch(extraVariableDecision),
@@ -757,6 +768,11 @@ export function useMessageHandler({
     let targetAssistantMessageId: number | null = null;
 
     try {
+      await eventEmit(WUXIA_TURN_LIFECYCLE_EVENT, {
+        phase: 'start',
+        roundId: debugRoundId,
+        chatId: readCurrentChatIdForTurn(),
+      });
       onVariableTurnStart?.();
       extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
       const result = await regenerateLastAssistantSwipe({
@@ -843,6 +859,12 @@ export function useMessageHandler({
     } finally {
       extraVariableUpdateReservation?.release();
       setIsLoading(false);
+      void eventEmit(WUXIA_TURN_LIFECYCLE_EVENT, {
+        phase: 'finish',
+        roundId: debugRoundId,
+        chatId: readCurrentChatIdForTurn(),
+        messageId: targetAssistantMessageId,
+      });
       if (targetAssistantMessageId !== null) {
         // 与发送链路一致：等待当前回合结束后再同步宿主楼层，避免中途重绑打断前端状态。
         void eventEmit(SYNC_LATEST_MESSAGE_SHELL_EVENT, targetAssistantMessageId);

@@ -36,6 +36,7 @@ import {
   useToast,
   useVariableChangeTracker,
 } from './hooks';
+import { readLatestDebugRoundSnapshot } from './hooks/useDebugLogs';
 import { ActivePanel, InventoryItem } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
@@ -488,7 +489,16 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const controller = createWuxiaAutomation({
-      getRuntimeState: () => automationRuntimeRef.current,
+      getRuntimeState: () => {
+        const runtime = automationRuntimeRef.current;
+        const persistedDebugRound = readLatestDebugRoundSnapshot();
+        const latestDebugRound =
+          persistedDebugRound &&
+          (!runtime.latestDebugRound || persistedDebugRound.updatedAt > runtime.latestDebugRound.updatedAt)
+            ? persistedDebugRound
+            : runtime.latestDebugRound;
+        return { ...runtime, latestDebugRound };
+      },
       runPlayerTurn: input => automationPlayerTurnRef.current(input),
     });
     const instanceId = createRequestId('frontend');

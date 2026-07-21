@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 const DEBUG_ROUND_STORAGE_KEY = 'wuxia_latest_debug_round';
 
@@ -73,11 +73,7 @@ function createEmptyDebugRound(): LatestDebugRound {
 }
 
 function normalizeDebugStageStatus(value: unknown): ExtendedDebugStageStatus {
-  return value === 'running'
-    || value === 'success'
-    || value === 'error'
-    || value === 'idle'
-    || value === 'skipped'
+  return value === 'running' || value === 'success' || value === 'error' || value === 'idle' || value === 'skipped'
     ? value
     : 'idle';
 }
@@ -147,7 +143,7 @@ function normalizeLoadedDebugRound(value: unknown): LatestDebugRound | null {
   };
 }
 
-function loadLatestDebugRound(): LatestDebugRound | null {
+export function readLatestDebugRoundSnapshot(): LatestDebugRound | null {
   try {
     const stored = localStorage.getItem(DEBUG_ROUND_STORAGE_KEY);
     if (!stored) {
@@ -172,7 +168,29 @@ function saveLatestDebugRound(round: LatestDebugRound | null): void {
 }
 
 export function useDebugLogs() {
-  const [latestDebugRound, setLatestDebugRound] = useState<LatestDebugRound | null>(() => loadLatestDebugRound());
+  const [latestDebugRound, setLatestDebugRound] = useState<LatestDebugRound | null>(() =>
+    readLatestDebugRoundSnapshot(),
+  );
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== DEBUG_ROUND_STORAGE_KEY) {
+        return;
+      }
+      if (!event.newValue) {
+        setLatestDebugRound(null);
+        return;
+      }
+      try {
+        setLatestDebugRound(normalizeLoadedDebugRound(JSON.parse(event.newValue)));
+      } catch {
+        // 忽略其他 iframe 写入的无效调试数据。
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   const beginDebugRound = useCallback((userInput: string): string => {
     const now = Date.now();
@@ -198,15 +216,20 @@ export function useDebugLogs() {
       if (!previous) {
         return previous;
       }
+      const stored = readLatestDebugRoundSnapshot();
+      if (stored && stored.id !== previous.id && stored.updatedAt >= previous.updatedAt) {
+        return stored;
+      }
+      const base = stored?.id === previous.id && stored.updatedAt > previous.updatedAt ? stored : previous;
       const next: LatestDebugRound = {
-        ...previous,
+        ...base,
         updatedAt: Date.now(),
         main: {
-          ...previous.main,
+          ...base.main,
           ...patch.main,
         },
         variable: {
-          ...previous.variable,
+          ...base.variable,
           ...patch.variable,
         },
       };

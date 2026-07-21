@@ -6,7 +6,7 @@ vi.mock('../utils/variableReader', () => ({
   getLastMessageContent: vi.fn(() => '最新正文'),
   normalizeDisplayedMessageContent: vi.fn((text: string) => text),
   parseAIResponse: vi.fn((text: string) => ({ content: text })),
-  parseOptions: vi.fn((text: string) => text.includes('<option>') ? ['选项'] : []),
+  parseOptions: vi.fn((text: string) => (text.includes('<option>') ? ['选项'] : [])),
 }));
 
 vi.mock('../utils/messageActions', () => ({
@@ -51,10 +51,7 @@ vi.mock('../utils/logger', () => ({
 
 import { DEFAULT_SUMMARY_SETTINGS } from '../utils/settingsManager';
 import { useMessageHandler } from './useMessageHandler';
-import {
-  executeExtraVariableUpdate,
-  prepareExtraVariableUpdateTurn,
-} from '../utils/extraVariableUpdateManager';
+import { executeExtraVariableUpdate, prepareExtraVariableUpdateTurn } from '../utils/extraVariableUpdateManager';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -80,9 +77,7 @@ const prepareExtraVariableUpdateTurnMock = vi.mocked(prepareExtraVariableUpdateT
 const executeExtraVariableUpdateMock = vi.mocked(executeExtraVariableUpdate);
 const regenerateLastAssistantSwipeMock = vi.mocked(regenerateLastAssistantSwipe);
 
-const createSummarySettings = (
-  variableUpdateMode: 'inline' | 'extra',
-) => ({
+const createSummarySettings = (variableUpdateMode: 'inline' | 'extra') => ({
   ...DEFAULT_SUMMARY_SETTINGS,
   variableUpdateMode,
 });
@@ -164,6 +159,17 @@ describe('useMessageHandler extra-variable decision', () => {
         status: 'skipped',
         skipReason: expect.stringContaining('inline'),
       }),
+    });
+    expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:turn-lifecycle', {
+      phase: 'start',
+      roundId: 'debug-round-id',
+      chatId: expect.any(String),
+    });
+    expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:turn-lifecycle', {
+      phase: 'finish',
+      roundId: 'debug-round-id',
+      chatId: expect.any(String),
+      messageId: 2,
     });
   });
 
