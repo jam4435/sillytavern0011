@@ -5,6 +5,9 @@ import { describe, expect, it } from 'vitest';
 
 const assetRoot = path.join(process.cwd(), 'src', '事件脚本', 'generated', 'event-data');
 const manifest = JSON.parse(fs.readFileSync(path.join(assetRoot, 'manifest.json'), 'utf8'));
+const openingEventSummary = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '事件信息汇总.json'), 'utf8'),
+);
 
 describe('generated wuxia event assets', () => {
   it('contains every current event exactly once', () => {
@@ -44,6 +47,28 @@ describe('generated wuxia event assets', () => {
       if (event.followup && !runtimeKeys.has(event.followup)) {
         expect(unresolved.has(`${event.runtimeKey}\0${event.followup}`)).toBe(true);
       }
+    }
+  });
+
+  it('keeps the opening event summary synchronized with ordinary worldbook events', () => {
+    const ordinaryEvents = manifest.events.filter((event: any) => event.kind === 'ordinary');
+    const summaryByName = new Map(openingEventSummary.map((event: any) => [event.事件名称, event]));
+
+    expect(openingEventSummary).toHaveLength(ordinaryEvents.length);
+    expect(summaryByName.size).toBe(ordinaryEvents.length);
+
+    for (const event of ordinaryEvents) {
+      const triggerTime = {
+        年: event.triggerTime.年,
+        月: event.triggerTime.月,
+        日: event.triggerTime.日,
+        ...(Object.prototype.hasOwnProperty.call(event.triggerTime, '时') ? { 时: event.triggerTime.时 } : {}),
+      };
+      expect(summaryByName.get(event.sourceName.replace('事件条目-', ''))).toEqual({
+        事件名称: event.sourceName.replace('事件条目-', ''),
+        事件地点: event.location,
+        触发时间: triggerTime,
+      });
     }
   });
 });

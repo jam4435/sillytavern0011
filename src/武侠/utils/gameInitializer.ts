@@ -117,10 +117,7 @@ export const APPEARANCE_TEMPLATES: AppearanceTemplateData = appearanceTemplatesD
 
 type AppearanceAttributes = Pick<InitialAttributes, '风姿' | '臂力' | '根骨'>;
 
-function findAppearanceRange(
-  ranges: AppearanceRangeTemplate[],
-  value: number,
-): AppearanceRangeTemplate | undefined {
+function findAppearanceRange(ranges: AppearanceRangeTemplate[], value: number): AppearanceRangeTemplate | undefined {
   return ranges.find(({ range }) => value >= range.min && value <= range.max);
 }
 
@@ -158,6 +155,7 @@ export interface EventLocation {
   year: number;
   month: number;
   day: number;
+  hour?: number;
   location: string;
   eventName?: string;
 }
@@ -168,6 +166,7 @@ export interface StoryEvent {
   year: number;
   month: number;
   day: number;
+  hour?: number;
   location: string;
 }
 
@@ -192,6 +191,7 @@ interface EventJsonItem {
     年: number;
     月: number;
     日: number;
+    时?: number;
   };
 }
 
@@ -201,6 +201,7 @@ export const STORY_EVENTS: StoryEvent[] = (eventsData as EventJsonItem[]).map((e
   year: event.触发时间.年,
   month: event.触发时间.月,
   day: event.触发时间.日,
+  ...(event.触发时间.时 !== undefined ? { hour: event.触发时间.时 } : {}),
   location: event.事件地点,
 }));
 
@@ -368,7 +369,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
         年: locationInfo.year,
         月: locationInfo.month,
         日: locationInfo.day,
-        时: 11,
+        时: locationInfo.hour ?? 11,
         $meta: { updatable: true, necessary: 'all' },
       },
       $meta: { necessary: 'all', updatable: true },

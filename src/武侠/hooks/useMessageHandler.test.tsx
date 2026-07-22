@@ -104,6 +104,7 @@ const createHookOptions = (summarySettings: ReturnType<typeof createSummarySetti
 describe('useMessageHandler extra-variable decision', () => {
   let messages: MockChatMessage[];
   let nextMessageId: number;
+  let turnLockAckResponder: EventOnReturn;
 
   beforeEach(() => {
     messages = [];
@@ -138,6 +139,34 @@ describe('useMessageHandler extra-variable decision', () => {
     executeExtraVariableUpdateMock.mockReset();
     regenerateLastAssistantSwipeMock.mockReset();
     globals.eventEmit.mockClear();
+    localStorage.clear();
+    turnLockAckResponder = eventOn('wuxia:turn-lifecycle', async (payload: Record<string, unknown>) => {
+      if (payload.phase !== 'start') return;
+      await eventEmit('wuxia:turn-lock-ack', {
+        phase: 'locked',
+        roundId: payload.roundId,
+        chatId: payload.chatId,
+        scriptRuntimeId: 'hidden-floor-test',
+        lockedAt: Date.now(),
+      });
+    });
+  });
+
+  it('回合锁未确认时不会创建用户楼层', async () => {
+    vi.useFakeTimers();
+    turnLockAckResponder.stop();
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      const send = result.current.handleSendMessage('不应落楼层');
+      await vi.advanceTimersByTimeAsync(2_000);
+      await send;
+    });
+
+    expect(globals.createChatMessages).not.toHaveBeenCalled();
+    expect(globals.generate).not.toHaveBeenCalled();
+    expect(options.showError).toHaveBeenCalledWith(expect.stringContaining('回合锁未确认'));
   });
 
   it('send + inline 会显式标记 skipped，且不会触发额外变量链路', async () => {

@@ -1,12 +1,16 @@
 import { io, type Socket } from 'socket.io-client';
-import type { WuxiaAutomationApi, WuxiaAutomationSnapshot } from '../武侠/utils/wuxiaAutomation';
+import {
+  WuxiaAutomationDisposedError,
+  type WuxiaAutomationApi,
+  type WuxiaAutomationSnapshot,
+} from '../武侠/utils/wuxiaAutomation';
 import {
   WUXIA_ERROR_CODES,
   WUXIA_EVENTS,
   WUXIA_GLOBAL_EVENTS,
   WUXIA_METHODS,
   WUXIA_PROTOCOL_VERSION,
-  WUXIA_SOCKET_NAMESPACE,
+  WUXIA_RELAY_DEFAULT_URL,
   WUXIA_TURN_TIMEOUT_MS,
   WUXIA_AUTOMATION_GLOBAL_PREFIX,
   createErrorResponse,
@@ -17,7 +21,7 @@ import {
   type WuxiaRpcResponse,
 } from '../../tools/wuxia-bridge/protocol.mjs';
 
-const DEFAULT_SERVER_URL = `http://127.0.0.1:6621${WUXIA_SOCKET_NAMESPACE}`;
+const DEFAULT_SERVER_URL = WUXIA_RELAY_DEFAULT_URL;
 const RESPONSE_CACHE_LIMIT = 100;
 const RESPONSE_CACHE_TTL_MS = 15 * 60 * 1_000;
 const SCRIPT_EVENT_NAMESPACE = '.wuxiaAutomationBridge';
@@ -37,6 +41,11 @@ type AutomationAnnouncement = {
   version: number | null;
   instanceId: string;
   globalName: string;
+};
+
+type RunInFlight = {
+  requestId: string;
+  automationInstanceId: string;
 };
 
 class BridgeRequestError extends Error {
@@ -96,6 +105,12 @@ function readAutomationAnnouncement(value: unknown): AutomationAnnouncement | nu
 }
 
 function normalizeError(requestId: string, error: unknown): WuxiaRpcResponse {
+  if (error instanceof WuxiaAutomationDisposedError) {
+    return createErrorResponse(requestId, WUXIA_ERROR_CODES.OUTCOME_UNKNOWN, error.message, {
+      retryable: false,
+      outcome: 'unknown',
+    });
+  }
   if (error instanceof BridgeRequestError) {
     return createErrorResponse(requestId, error.code, error.message, { retryable: error.retryable });
   }
@@ -119,7 +134,7 @@ function startBridge() {
   let automationGlobalName = '';
   let turnTimeoutMs = WUXIA_TURN_TIMEOUT_MS.STANDARD;
   let acquisitionGeneration = 0;
-  let runInFlight = false;
+  let runInFlight: RunInFlight | null = null;
   const bridgeId = String(getScriptId());
   const sessionId = getSessionId();
   const responseCache = new Map<string, ResponseCacheEntry>();
@@ -179,7 +194,7 @@ function startBridge() {
         automationGlobalName,
         chatId: snapshot.chatId,
         page: snapshot.page,
-        busy: snapshot.busy || runInFlight,
+        busy: snapshot.busy || runInFlight !== null,
         turnTimeoutMs,
         latestMessageId: getLatestMessageId(snapshot),
       });
@@ -193,7 +208,7 @@ function startBridge() {
         automationGlobalName,
         chatId: '',
         page: `error:${errorMessage}`,
-        busy: runInFlight,
+        busy: runInFlight !== null,
         turnTimeoutMs,
         latestMessageId: null,
       });
@@ -209,9 +224,17 @@ function startBridge() {
       if (!candidate || typeof (candidate as WuxiaAutomationApi).getSnapshot !== 'function') {
         throw new Error(`全局接口 ${globalName} 已初始化，但当前脚本作用域中没有可调用对象。`);
       }
+      const previousInstanceId = automationInstanceId;
       automation = candidate as WuxiaAutomationApi;
       automationInstanceId = instanceId;
       automationGlobalName = globalName;
+      if (
+        previousInstanceId &&
+        previousInstanceId !== instanceId &&
+        runInFlight?.automationInstanceId === previousInstanceId
+      ) {
+        runInFlight = null;
+      }
       void emitState();
     } catch (error) {
       if (!disposed && generation === acquisitionGeneration) {
@@ -242,23 +265,30 @@ function startBridge() {
           true,
         );
       }
-      if (snapshot.busy || runInFlight) {
+      if (snapshot.busy || runInFlight !== null) {
         throw new BridgeRequestError(WUXIA_ERROR_CODES.BUSY, '当前已有生成或自动化回合正在运行。', true);
       }
 
       const input = String(request.params.input).trim();
       const settleTimeoutMs = request.params.settleTimeoutMs;
       const settleDelayMs = request.params.settleDelayMs;
-      runInFlight = true;
+      const requestAutomation = automation!;
+      const runToken: RunInFlight = {
+        requestId: request.id,
+        automationInstanceId,
+      };
+      runInFlight = runToken;
       void emitState();
       try {
-        const result = await automation!.runTurn(input, {
+        const result = await requestAutomation.runTurn(input, {
           ...(settleTimeoutMs === undefined ? {} : { settleTimeoutMs }),
           ...(settleDelayMs === undefined ? {} : { settleDelayMs }),
         });
         return { id: request.id, ok: true, result };
       } finally {
-        runInFlight = false;
+        if (runInFlight === runToken) {
+          runInFlight = null;
+        }
         void emitState();
       }
     } catch (error) {
@@ -328,6 +358,9 @@ function startBridge() {
     const announcement = readAutomationAnnouncement(detail);
     if (!announcement || announcement.instanceId !== automationInstanceId) return;
     acquisitionGeneration += 1;
+    if (runInFlight?.automationInstanceId === announcement.instanceId) {
+      runInFlight = null;
+    }
     automation = null;
     automationInstanceId = '';
     automationGlobalName = '';

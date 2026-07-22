@@ -1,0 +1,758 @@
+{
+  "schema_version": "2.0",
+  "branch_id": "BRANCH-EXPANDED-HAREM-NTL-R18",
+  "status": "draft",
+  "sources": [
+    "work/context/character-registry.json",
+    "work/context/relationship-ledger.json",
+    "work/context/relationship-expansion-options.json",
+    "work/context/audits/partner-status.json",
+    "work/context/outline-index.json"
+  ],
+  "roster": {
+    "canon_harem": ["云霄", "蓝灵娥", "有琴玄雅", "酒玖"],
+    "direct_harem": ["文净道人", "姮娥", "琼霄", "碧霄", "金光圣母", "龙吉", "心兰", "酒雨诗"],
+    "hidden_netori": ["金灵圣母", "孔宣", "铁扇", "江林儿", "殷氏", "姜思儿", "云华仙子"],
+    "dual_consciousness_extension": ["苏妲己", "心兰"]
+  },
+  "relationship_rules": [
+    "云霄、蓝灵娥、有琴玄雅、酒玖是默认后宫；八名直接后宫和七条 NTL 暗线不改变这一核心排序。",
+    "女方所谓‘身心归于李长寿’，指道心、情念和亲密关系上的自主排他选择，不使用控魂术、魅术、红绳强制、醉酒失控或救命恩情代替选择。",
+    "后宫内圈彼此知情；只有李长寿、后宫成员及可信化身在场时可以不隐藏，有外人或可能被神念、天机窥探时恢复公开身份。",
+    "七条 NTL 线在秘密承诺成立后，女方停止与原伴侣的恋爱性身体接触；对外只保留称谓、法会同行、共同镇守、家族礼仪和必要照料。",
+    "七条 NTL 线仍按原作维持明面关系与公开因果；秘密转向不得提前破坏婚礼、子女、族运、封神站位和关键人物动机。",
+    "实际年龄必须严格超过十八岁；亲密占位符还要求明确成年身体与成年呈现。少女或幼态外形只能写非色情感情互动。",
+    "苏妲己线保留心兰先行拘魂夺舍的大劫开端，但在苏妲己无力表达或反抗的阶段只写观察、冲突和情感萌芽；待她恢复表达、拒绝与主动追求能力后才建立关系。",
+    "苏妲己和心兰成为主动追求者后，正文不需要每次机械重复两份口头确认；但共享身体的场景包必须确认两套意识都清醒、愿意且能够中止。",
+    "所有亲密内容只在场景包中使用【色情场景】占位符，本规划只规定情感、因果、前后状态和禁改事实。"
+  ],
+  "worldbuilding_rules": [
+    "采用洪荒炼气士的时间尺度：十年只是短闭关，百年才足以让关系发生稳定变化；感情推进依靠多次共事、论道、守阵和共劫。",
+    "仙神分隔不等于失联。神念、传声玉符、化身、挪移和天机推演都可能暴露关系，因此秘密线必须同时处理道韵、因果线和熟人感知。",
+    "李长寿的私下往来优先使用纸道人、复合大阵、分层传信、遮掩道韵和预设撤离路线；不凭空增加万能法宝。",
+    "大能道侣数十上百年各守道场并不反常，掩护重点不是现代式‘出差’，而是镇守天外、坐镇龙宫、梳理地脉、稳固元神、镇压道伤、照看族运和避开量劫牵引。",
+    "秘密最容易在生死关头暴露：女方若越过原伴侣先护李长寿，圣人、大能、月老体系或天道因果可能察觉。每条 NTL 线都要设计一次险些因本能护持而暴露的考验。",
+    "内圈私会使用小琼峰复合大阵、太白宫密室、玄都城阵眼、混沌海短暂脱离天道感知等原作可承载空间，不使用现代办公室、旅店或普通远行。",
+    "感情确认使用论道同路、互托后背、共享生死预案、交付真容或本体秘密等洪荒表达，不照搬现代约会、排班和名分谈判。",
+    "公开掩护因人而异：截教大能用道场和护教职责，龙族用四海镇守和族运礼制，天庭仙神用神职值守，凡俗家庭用生产调养、军阵驻守和家族事务。",
+    "新增场景优先附着在原有疗伤、论道、守阵、传信、战后复盘、迁移准备与避劫安排中，每场只推动一层关系状态。"
+  ],
+  "emotional_framework": {
+    "protagonist_core": "李长寿不会突然因美色广收道侣。他的爱首先表现为把某人写入自己的生存预案、为她准备退路、交付真实情报并愿意共同承担因果；真正转折是他承认此人对自己不可替代。",
+    "progression": [
+      "识其人：先看见美貌和身份之外的道心、责任、骄傲与缺口。",
+      "共其事：至少两次在原作任务或量劫中平等合作。",
+      "历其劫：一方在可以退走时仍选择留下，但救命恩情本身不等于爱情。",
+      "见其心：在无外人、无术法影响时论道或战后复盘，暴露真正恐惧和愿望。",
+      "定其情：由女方自主选择，李长寿必须明确回应并把她纳入长期预案。",
+      "同其道：加入后仍保留自身道场、神职、族群责任和离开的能力。"
+    ],
+    "inner_circle": "云霄负责大局和因果判断，灵娥维系小琼峰日常，有琴承担外部职责，酒玖缓和紧张；新增成员不是向所谓正宫请罪，而是由李长寿先向既有道侣坦白，再由当事人彼此论明边界。",
+    "ntl_emotional_rule": "每条 NTL 线必须先证明女方为何不再把原伴侣视作道心归宿，再证明李长寿为何成为不可替代之人；秘密承诺成立后才启动身体边界与公开表演，不能先拒绝原伴侣再补爱情。",
+    "female_agency": "每名女性都保留一项不会因加入后宫消失的目标，如护教、镇守、族运、神职、修道或养育。主动追求不等于永久同意，也不等于失去改变决定的能力。",
+    "scene_rhythm": "核心线约六至八场，直接后宫约四至六场，NTL 线约五至七场；种子、共事、转折、确认、后果至少横跨三个章节段。"
+  },
+  "phases": [
+    {
+      "phase_id": "PHASE-01",
+      "chapter_range": "1-180",
+      "purpose": "建立默认四人的情感根基，并让扩展角色先以道心、职责和立场进入读者视野。",
+      "active_characters": ["蓝灵娥", "有琴玄雅", "酒玖", "琼霄", "碧霄", "文净道人"],
+      "required_outputs": [
+        "蓝灵娥成年分界与共同成长",
+        "有琴由感恩转为自主仰慕",
+        "酒玖的长期生活默契",
+        "三霄与文净只埋人物印象和立场伏笔"
+      ]
+    },
+    {
+      "phase_id": "PHASE-02",
+      "chapter_range": "181-360",
+      "purpose": "确立云霄主感情线；启动心兰、金光和三霄的独立关系理由；江林儿、姜思儿只建立秘密信任。",
+      "active_characters": [
+        "云霄",
+        "有琴玄雅",
+        "酒玖",
+        "文净道人",
+        "琼霄",
+        "碧霄",
+        "金光圣母",
+        "心兰",
+        "江林儿",
+        "姜思儿",
+        "孔宣",
+        "龙吉"
+      ],
+      "required_outputs": [
+        "云霄从知音走向互认",
+        "心兰面对假身份真相",
+        "金光开始从赵公明单向爱慕中醒来",
+        "江林儿和姜思儿暂不越界",
+        "龙吉维持纯师生"
+      ]
+    },
+    {
+      "phase_id": "PHASE-03",
+      "chapter_range": "361-530",
+      "purpose": "扩展成员通过共事和共劫形成不可替代性；启动江林儿、姜思儿、铁扇和云华的隐秘转向前置。",
+      "active_characters": [
+        "有琴玄雅",
+        "酒玖",
+        "姮娥",
+        "金光圣母",
+        "心兰",
+        "酒雨诗",
+        "铁扇",
+        "云华仙子",
+        "江林儿",
+        "姜思儿",
+        "龙吉",
+        "孔宣"
+      ],
+      "required_outputs": [
+        "心兰在真实身份下重新认识主角",
+        "酒雨诗确认现世自我",
+        "铁扇从救命恩情转为价值观认同",
+        "云华完成唯一可用的生前分歧点",
+        "两条早期 NTL 只到情感转折"
+      ]
+    },
+    {
+      "phase_id": "PHASE-04",
+      "chapter_range": "531-650",
+      "purpose": "第一批扩展成员进入知情内圈；建立洪荒式遮掩体系；完成江林儿、姜思儿和铁扇的秘密承诺。",
+      "active_characters": [
+        "文净道人",
+        "姮娥",
+        "琼霄",
+        "碧霄",
+        "金光圣母",
+        "心兰",
+        "酒雨诗",
+        "铁扇",
+        "江林儿",
+        "姜思儿",
+        "孔宣"
+      ],
+      "required_outputs": [
+        "直接后宫分批确认",
+        "小琼峰内圈完成第一次因果风险讨论",
+        "三条 NTL 建立秘密承诺与身体边界",
+        "孔宣仍先完成原作与玄都关系"
+      ]
+    },
+    {
+      "phase_id": "PHASE-05",
+      "chapter_range": "651-723",
+      "purpose": "在封神高压期处理金灵、殷氏、孔宣和苏妲己双意识线，让感情选择经受量劫考验。",
+      "active_characters": [
+        "金灵圣母",
+        "殷氏",
+        "孔宣",
+        "铁扇",
+        "江林儿",
+        "姜思儿",
+        "云华仙子",
+        "心兰",
+        "苏妲己",
+        "龙吉"
+      ],
+      "required_outputs": [
+        "金灵在婚礼与双胎因果完成后转向",
+        "殷氏在生产危机结束且恢复自主后转向",
+        "孔宣与玄都成侣后才进入 NTL",
+        "苏妲己恢复声音和拒绝能力后主动追求",
+        "龙吉完成出师与权力解绑"
+      ]
+    },
+    {
+      "phase_id": "PHASE-06",
+      "chapter_range": "724-761",
+      "purpose": "终局收束：默认四人公开成立，扩展成员完成内圈位置，七条 NTL 继续保持原作明面关系。",
+      "active_characters": [
+        "云霄",
+        "蓝灵娥",
+        "有琴玄雅",
+        "酒玖",
+        "文净道人",
+        "姮娥",
+        "琼霄",
+        "碧霄",
+        "金光圣母",
+        "龙吉",
+        "心兰",
+        "酒雨诗",
+        "金灵圣母",
+        "孔宣",
+        "铁扇",
+        "江林儿",
+        "殷氏",
+        "姜思儿",
+        "云华仙子",
+        "苏妲己"
+      ],
+      "required_outputs": [
+        "小琼峰内圈共识",
+        "每人保留自身道途与职责",
+        "明面称谓和私下关系表",
+        "终局只公开默认四人，不一次点破全部暗线"
+      ]
+    }
+  ],
+  "arcs": [
+    {
+      "arc_id": "XARC-YUNXIAO",
+      "characters": ["云霄"],
+      "route": "canon_harem",
+      "priority": "core",
+      "activation_window": "181-761",
+      "public_state": "由谨慎道友发展为公开道侣。",
+      "private_state": "李长寿最早愿意交付真容、后背和大劫预案的人，也是内圈的因果主心骨。",
+      "milestones": [
+        {
+          "chapter_range": "181-321",
+          "beat": "知音互认",
+          "required_change": "通过护关、论道、赠画与桃林五问，让欣赏落到彼此道心。"
+        },
+        {
+          "chapter_range": "322-590",
+          "beat": "共同承担大劫",
+          "required_change": "增加战后复盘、互留退路和不必言明的守候，形成稳定伴侣感。"
+        },
+        {
+          "chapter_range": "591-761",
+          "beat": "共同制定内圈边界",
+          "required_change": "她自主接受扩展关系，但不承担管理其他女性的现代式职责。"
+        }
+      ],
+      "hard_blocks": ["不削弱云霄独立判断和截教立场", "不把知情接受写成忍让"],
+      "locator_tasks": ["复用既有云霄场景；新增一次大劫前私谈和一次内圈因果讨论"],
+      "scene_budget": 8
+    },
+    {
+      "arc_id": "XARC-LINGE",
+      "characters": ["蓝灵娥"],
+      "route": "canon_harem",
+      "priority": "core",
+      "activation_window": "6-761",
+      "public_state": "长期师兄妹，终局公开道侣。",
+      "private_state": "最了解李长寿日常、恐惧和退路的人，从被保护者成长为能替他守住小琼峰的人。",
+      "milestones": [
+        {
+          "chapter_range": "6-189",
+          "beat": "成年后的共同成长",
+          "required_change": "突出她修行、守阵和独立判断，不把幼年照料恋爱化。"
+        },
+        {
+          "chapter_range": "190-590",
+          "beat": "单向依恋获得回应",
+          "required_change": "用迁移准备、丧师安慰和小琼峰日常让李长寿逐步承认她不可替代。"
+        },
+        {
+          "chapter_range": "591-761",
+          "beat": "守住共同道场",
+          "required_change": "终局以共同生活和共同守峰落地，不只以争宠确认存在。"
+        }
+      ],
+      "hard_blocks": ["第1—5章禁止恋爱化", "单向偷吻不能替代关系确认"],
+      "locator_tasks": ["定位第6章成年分界、师父劫后和终局迁居三类场景"],
+      "scene_budget": 8
+    },
+    {
+      "arc_id": "XARC-YOUQIN",
+      "characters": ["有琴玄雅"],
+      "route": "canon_harem",
+      "priority": "core",
+      "activation_window": "7-761",
+      "public_state": "长期单向仰慕，终局得到明确接受。",
+      "private_state": "李长寿认可其正直、守密和在明知危险时仍坚持本心；她加入后仍自主远行。",
+      "milestones": [
+        {
+          "chapter_range": "7-189",
+          "beat": "感恩转为见道",
+          "required_change": "让她爱上的不是救命者，而是李长寿在稳健背后的责任。"
+        },
+        {
+          "chapter_range": "309-586",
+          "beat": "表白后不立即收束",
+          "required_change": "李长寿先尊重和观察她的长期选择，再给出特殊回应。"
+        },
+        {
+          "chapter_range": "587-761",
+          "beat": "接受与远行并存",
+          "required_change": "远行是修道选择，归来是双方承诺，不改成现代异地恋措辞。"
+        }
+      ],
+      "hard_blocks": ["不以救命之恩索取感情", "不取消远行和天庭职责"],
+      "locator_tasks": ["复用有琴线；定位终局前李长寿清楚回应的双锚点"],
+      "scene_budget": 7
+    },
+    {
+      "arc_id": "XARC-JIUJIU",
+      "characters": ["酒玖"],
+      "route": "canon_harem",
+      "priority": "core",
+      "activation_window": "24-761",
+      "public_state": "对外保留师叔侄称谓。",
+      "private_state": "以酒、阵法、炼丹和临天殿共事形成最松弛的伴侣关系。",
+      "milestones": [
+        { "chapter_range": "24-530", "beat": "长期默契", "required_change": "让轻喜剧互动背后逐步出现托付和依赖。" },
+        {
+          "chapter_range": "531-700",
+          "beat": "清醒确认",
+          "required_change": "七情影响消退后，以一次无酒、无旁人的谈话确认真实心意。"
+        },
+        { "chapter_range": "701-761", "beat": "平等同道", "required_change": "保留临天殿职责、道场和个人空间。" }
+      ],
+      "hard_blocks": ["醉酒与七情失控不作关系确认", "先处理辈分权力差"],
+      "locator_tasks": ["定位第580章后清醒回访和终局临天殿交接"],
+      "scene_budget": 7
+    },
+    {
+      "arc_id": "XARC-WENJING",
+      "characters": ["文净道人"],
+      "route": "direct_harem",
+      "priority": "high",
+      "activation_window": "173-723",
+      "public_state": "灵山护法、危险大能和暗线合作者。",
+      "private_state": "李长寿始终承认她的危险、能力和选择，而非把她净化成温顺角色；由此取代玄都执念。",
+      "milestones": [
+        {
+          "chapter_range": "173-344",
+          "beat": "敌我试探",
+          "required_change": "让她注意到李长寿不会因其出身和外貌轻视她。"
+        },
+        {
+          "chapter_range": "454-601",
+          "beat": "独属情报默契",
+          "required_change": "以轮回与灵山暗线建立只有二人能承担的风险。"
+        },
+        {
+          "chapter_range": "602-723",
+          "beat": "主动改换道心归处",
+          "required_change": "先明确放下玄都，再由她主动选择李长寿。"
+        }
+      ],
+      "hard_blocks": ["不把任务服从当爱情", "保留其危险性和政治立场"],
+      "locator_tasks": ["定位锁神蝶事件后、轮回暗线和灵山决战后的三次私谈"],
+      "scene_budget": 5
+    },
+    {
+      "arc_id": "XARC-HENGE",
+      "characters": ["姮娥"],
+      "route": "direct_harem",
+      "priority": "medium",
+      "activation_window": "453-760",
+      "public_state": "太阴星君，与李长寿保持神职上的分寸。",
+      "private_state": "在整理被抹去的记忆时重新选择自己当下的道途，而不是被旧婚姻或孤独定义。",
+      "milestones": [
+        { "chapter_range": "453-480", "beat": "秘密委托", "required_change": "先建立守密和尊重，不把脆弱当机会。" },
+        {
+          "chapter_range": "481-650",
+          "beat": "旧我与今我分离",
+          "required_change": "通过太阴大道和大羿旧事说明她为何愿意重新开始。"
+        },
+        {
+          "chapter_range": "651-760",
+          "beat": "选择当下同道",
+          "required_change": "她主动把李长寿纳入月宫与未来道途，同时保留星君职责。"
+        }
+      ],
+      "hard_blocks": ["不以孤独或记忆缺损取得关系", "不贬低大羿旧事"],
+      "locator_tasks": ["定位455章谈话后、记忆线回收和终局月宫回访"],
+      "scene_budget": 4
+    },
+    {
+      "arc_id": "XARC-QIONGXIAO",
+      "characters": ["琼霄"],
+      "route": "direct_harem",
+      "priority": "medium",
+      "activation_window": "167-723",
+      "public_state": "云霄之妹、截教盟友。",
+      "private_state": "以看穿李长寿压力、敢于当面拆穿其伪装的方式形成区别于云霄的关系。",
+      "milestones": [
+        {
+          "chapter_range": "167-260",
+          "beat": "玩笑下的观察",
+          "required_change": "玩笑只埋种子，显示她能看到李长寿的紧绷。"
+        },
+        { "chapter_range": "261-530", "beat": "独立共事", "required_change": "安排一次不依附云霄的守阵或传信任务。" },
+        {
+          "chapter_range": "531-723",
+          "beat": "姐妹知情后的选择",
+          "required_change": "先与云霄论明，再亲自向李长寿表达。"
+        }
+      ],
+      "hard_blocks": ["不能顺带收入", "不复制云霄性格"],
+      "locator_tasks": ["定位三霄聚会后的单独留步和封神前姐妹私谈"],
+      "scene_budget": 4
+    },
+    {
+      "arc_id": "XARC-BIXIAO",
+      "characters": ["碧霄"],
+      "route": "direct_harem",
+      "priority": "medium",
+      "activation_window": "182-723",
+      "public_state": "与李长寿有过冲突的截教大能。",
+      "private_state": "从不服、看懂到主动护持，走强对抗而非被压服路线。",
+      "milestones": [
+        { "chapter_range": "182-260", "beat": "冲突保留", "required_change": "不因一次救助抹去立场差异。" },
+        { "chapter_range": "261-530", "beat": "见证担当", "required_change": "通过多次避劫安排和截教危机累积尊重。" },
+        {
+          "chapter_range": "531-723",
+          "beat": "从护短到表态",
+          "required_change": "由她在清醒状态主动挑战李长寿的回避。"
+        }
+      ],
+      "hard_blocks": ["不写强迫屈服", "不借云霄关系自动加入"],
+      "locator_tasks": ["定位初次冲突复盘、截教危机后致谢和终局前表态"],
+      "scene_budget": 4
+    },
+    {
+      "arc_id": "XARC-JINGUANG",
+      "characters": ["金光圣母"],
+      "route": "direct_harem",
+      "priority": "medium",
+      "activation_window": "225-723",
+      "public_state": "截教同门，对赵公明的旧爱慕已经放下。",
+      "private_state": "李长寿给予她不以失恋者或替代品为前提的重新选择。",
+      "milestones": [
+        { "chapter_range": "225-393", "beat": "承认失落", "required_change": "让她保有自尊和一段真正的空白期。" },
+        {
+          "chapter_range": "394-560",
+          "beat": "与旧爱和解",
+          "required_change": "通过护教和同门关系完成放下，不立刻转投。"
+        },
+        { "chapter_range": "561-723", "beat": "从共同护教到相知", "required_change": "至少两次独立共事后再确认关系。" }
+      ],
+      "hard_blocks": ["不写成失恋接盘", "不破坏赵公明和金灵公开因果"],
+      "locator_tasks": ["定位赵金关系确认后的独处、截教任务和终局选择"],
+      "scene_budget": 4
+    },
+    {
+      "arc_id": "XARC-LONGJI",
+      "characters": ["龙吉"],
+      "route": "direct_harem",
+      "priority": "medium",
+      "activation_window": "313-761",
+      "public_state": "天庭公主和太白弟子。",
+      "private_state": "前中期只写师徒成长；封神职责结束、正式出师后，以独立仙神身份重新认识李长寿。",
+      "milestones": [
+        {
+          "chapter_range": "313-675",
+          "beat": "纯师徒",
+          "required_change": "突出谋略学习、争辩和独立执行，不推进恋爱。"
+        },
+        {
+          "chapter_range": "676-730",
+          "beat": "完成职责与出师",
+          "required_change": "新增解除直接师徒权力关系的仪式或谈话。"
+        },
+        {
+          "chapter_range": "731-761",
+          "beat": "成年人重新相识",
+          "required_change": "由龙吉在成年呈现下主动选择，李长寿确认她可以无代价拒绝。"
+        }
+      ],
+      "hard_blocks": ["未出师前禁止恋爱推进", "幼态外形禁止亲密占位符"],
+      "locator_tasks": ["定位封神任务结束、出师和终局迁居锚点"],
+      "scene_budget": 4
+    },
+    {
+      "arc_id": "XARC-XINLAN",
+      "characters": ["心兰"],
+      "route": "direct_harem",
+      "priority": "high",
+      "activation_window": "281-723",
+      "public_state": "青丘狐族修士，与齐源红绳旧事已经结束。",
+      "private_state": "从爱上假身份背后的人格，到在真相完整揭开后重新选择李长寿本人。",
+      "milestones": [
+        {
+          "chapter_range": "281-284",
+          "beat": "误认破裂",
+          "required_change": "保留愤怒、受伤和离开，不让魅术反噬替她作决定。"
+        },
+        {
+          "chapter_range": "378-560",
+          "beat": "真实身份下重建",
+          "required_change": "解除红绳和齐源错位，以狐族与人教事务重新共事。"
+        },
+        {
+          "chapter_range": "561-678",
+          "beat": "主动选择本人",
+          "required_change": "她清楚说出爱的是李长寿的道心与人格，而非齐源外貌。"
+        },
+        {
+          "chapter_range": "679-723",
+          "beat": "处理苏妲己共身",
+          "required_change": "不代替苏妲己说话，把大劫任务和私人感情分开。"
+        }
+      ],
+      "hard_blocks": ["身份欺骗必须正面解决", "红绳和魅术影响不算自主选择"],
+      "locator_tasks": ["定位284章后回访、红绳解除和执行妲己任务前的私谈"],
+      "scene_budget": 6
+    },
+    {
+      "arc_id": "XARC-JIUYUSHI",
+      "characters": ["酒雨诗"],
+      "route": "direct_harem",
+      "priority": "low",
+      "activation_window": "378-761",
+      "public_state": "度仙门独立修行者。",
+      "private_state": "以当前转世身份从零认识李长寿，不继承前世对齐源的感情。",
+      "milestones": [
+        { "chapter_range": "378-530", "beat": "确认今生自我", "required_change": "明确记忆只是经历，不是义务。" },
+        { "chapter_range": "531-700", "beat": "独立共事", "required_change": "安排两次门内迁移、守阵或传信合作。" },
+        {
+          "chapter_range": "701-761",
+          "beat": "低调加入",
+          "required_change": "以共同守峰和修道选择落地，不抢核心线篇幅。"
+        }
+      ],
+      "hard_blocks": ["第378章前不启用", "不继承前世同意"],
+      "locator_tasks": ["定位378章谈话后、度仙门迁移和终局安置"],
+      "scene_budget": 3
+    },
+    {
+      "arc_id": "XARC-JINLING-NTL",
+      "characters": ["金灵圣母"],
+      "route": "hidden_netori",
+      "priority": "extreme_rewrite",
+      "activation_window": "521-751",
+      "public_state": "继续作为赵公明公开道侣、妻子和双胎母亲。",
+      "private_state": "婚礼和双胎因果完成后，她因李长寿多次把赵公明、孩子和截教都写入保命预案，逐渐发现真正能与自己共担大劫的是李长寿。",
+      "milestones": [
+        { "chapter_range": "521-693", "beat": "特殊信任但不越界", "required_change": "保留赵金感情、婚礼和双胎因果。" },
+        {
+          "chapter_range": "694-720",
+          "beat": "由护持转为不可替代",
+          "required_change": "至少三次私谈，从对布局者的感激发展到对同道者的依恋。"
+        },
+        {
+          "chapter_range": "721-751",
+          "beat": "秘密承诺",
+          "required_change": "承诺后主动与赵公明分居；以照看双胎、稳固元神和坐镇截教道场维持公开夫妻表象。"
+        }
+      ],
+      "hard_blocks": ["不改变双胎来源", "不把赵公明贬为无能者", "承诺前不追溯禁止原夫妻接触"],
+      "locator_tasks": ["定位婚礼后保命预案、赵公明死劫化解后和终局前的三次独处"],
+      "scene_budget": 6
+    },
+    {
+      "arc_id": "XARC-KONGXUAN-NTL",
+      "characters": ["孔宣"],
+      "route": "hidden_netori",
+      "priority": "extreme_rewrite",
+      "activation_window": "621-761",
+      "public_state": "继续与玄都以道侣身份共同镇守玄都城。",
+      "private_state": "孔宣逐渐确认：玄都是旧日所求，李长寿却真正理解她的阴阳选择、凤族因果和守城责任。",
+      "milestones": [
+        {
+          "chapter_range": "621-626",
+          "beat": "原作关系成立",
+          "required_change": "保留孔宣自主选择女性身份并与玄都成侣。"
+        },
+        {
+          "chapter_range": "627-680",
+          "beat": "理解者发生转移",
+          "required_change": "通过守城阵图、凤族退路和混沌海共事累积情感。"
+        },
+        {
+          "chapter_range": "681-761",
+          "beat": "秘密承诺与分区镇守",
+          "required_change": "承诺后与玄都分守不同阵眼，以守城道韵和凤族事务解释长期不亲近。"
+        }
+      ],
+      "hard_blocks": ["不否认她最初对玄都的真情", "阴阳身份始终由孔宣决定"],
+      "locator_tasks": ["定位626章后致谢、玄都城分阵和混沌海战后复盘"],
+      "scene_budget": 5
+    },
+    {
+      "arc_id": "XARC-IRONFAN-NTL",
+      "characters": ["铁扇"],
+      "route": "hidden_netori",
+      "priority": "extreme_rewrite",
+      "activation_window": "403-650",
+      "public_state": "继续与青牛维持公开伴侣身份。",
+      "private_state": "青牛给她照料，李长寿则给她摆脱修罗族、西方教和血海因果的完整出路；她由感激走向选择真正能理解其自由的人。",
+      "milestones": [
+        {
+          "chapter_range": "403-510",
+          "beat": "救援与尊重",
+          "required_change": "只建立她对幕后布局者的注意，不贬低青牛。"
+        },
+        {
+          "chapter_range": "511-560",
+          "beat": "共同寻找修罗族出路",
+          "required_change": "安排两次无青牛在场的平等决策。"
+        },
+        {
+          "chapter_range": "561-650",
+          "beat": "秘密承诺",
+          "required_change": "承诺后以镇压元屠煞气、血海道伤和修罗族事务分隔与青牛的道场。"
+        }
+      ],
+      "hard_blocks": ["不把青牛降智或恶化", "救命与创伤状态不直接构成爱情"],
+      "locator_tasks": ["定位510章后复盘、528章救援告别和血海事务分隔"],
+      "scene_budget": 5
+    },
+    {
+      "arc_id": "XARC-JIANGLINER-NTL",
+      "characters": ["江林儿"],
+      "route": "hidden_netori",
+      "priority": "extreme_rewrite",
+      "activation_window": "142-530",
+      "public_state": "继续作为忘情上人的夫人和度仙门长辈。",
+      "private_state": "忘情承载旧情，李长寿却在师门危机中真正尊重她的判断并让她参与布局；她由被安置者变成共同谋事者。",
+      "milestones": [
+        { "chapter_range": "142-225", "beat": "旧情复合", "required_change": "完整保留原作与忘情成侣，不提前越界。" },
+        {
+          "chapter_range": "226-360",
+          "beat": "共同守护度仙门",
+          "required_change": "通过迁移、弟子安置和资源布局建立与李长寿的独属默契。"
+        },
+        {
+          "chapter_range": "361-530",
+          "beat": "秘密承诺",
+          "required_change": "承诺后以坐镇不同峰脉、照看门人和稳固道基与忘情分居。"
+        }
+      ],
+      "hard_blocks": ["不把忘情写成无能老人", "正面处理师祖与徒孙伦理"],
+      "locator_tasks": ["定位225章后师门分工、度仙门迁移和稳固峰脉场景"],
+      "scene_budget": 5
+    },
+    {
+      "arc_id": "XARC-YINSHI-NTL",
+      "characters": ["殷氏"],
+      "route": "hidden_netori",
+      "priority": "extreme_rewrite",
+      "activation_window": "656-723",
+      "public_state": "继续作为李靖妻子和哪吒母亲。",
+      "private_state": "她先认识到李长寿并非施恩者，而是唯一愿意把她本人、胎儿和哪吒选择同时纳入计划的人；在危机结束后才产生主动感情。",
+      "milestones": [
+        {
+          "chapter_range": "656-676",
+          "beat": "保胎与生产危机",
+          "required_change": "只写信任和知情，不在怀孕、生产、创伤失衡时推进关系。"
+        },
+        {
+          "chapter_range": "677-700",
+          "beat": "恢复后自主答谢",
+          "required_change": "让殷氏在无恩情压力时多次主动寻李长寿论及哪吒和自身命途。"
+        },
+        {
+          "chapter_range": "701-723",
+          "beat": "秘密承诺",
+          "required_change": "承诺后以调养元气、照看哪吒和李靖长期镇守军阵维持分居。"
+        }
+      ],
+      "hard_blocks": ["不在孕产或创伤状态取得关系", "不改变哪吒核心因果", "不把李靖写成粗暴反派"],
+      "locator_tasks": ["定位哪吒危机结束后的答谢、李靖赴军阵和终局前私会"],
+      "scene_budget": 4
+    },
+    {
+      "arc_id": "XARC-JIANGSIER-NTL",
+      "characters": ["姜思儿"],
+      "route": "hidden_netori",
+      "priority": "extreme_rewrite",
+      "activation_window": "193-560",
+      "public_state": "继续作为敖乙妻子和龙族政治纽带。",
+      "private_state": "她不再只是敖乙婚约的附属，而是在四海族运危机中成为独立决策者；李长寿最先承认并依赖这一点。",
+      "milestones": [
+        {
+          "chapter_range": "193-225",
+          "beat": "婚约与婚礼",
+          "required_change": "保留敖乙与姜思儿的真实感情及龙族公开因果。"
+        },
+        {
+          "chapter_range": "226-390",
+          "beat": "独立参与龙族布局",
+          "required_change": "新增她与李长寿直接讨论族运和退路的场景。"
+        },
+        {
+          "chapter_range": "391-560",
+          "beat": "秘密承诺",
+          "required_change": "承诺后以分镇不同海眼、梳理族运和龙族礼制维持明面婚姻。"
+        }
+      ],
+      "hard_blocks": ["不把婚姻写成从未有真情", "不降智敖乙", "不改龙族联盟结果"],
+      "locator_tasks": ["定位婚礼后答谢、四海危机决策和分镇海眼节点"],
+      "scene_budget": 5
+    },
+    {
+      "arc_id": "XARC-YUNHUA-NTL",
+      "characters": ["云华仙子"],
+      "route": "hidden_netori",
+      "priority": "extreme_rewrite",
+      "activation_window": "445-460",
+      "public_state": "杨天佑生前维持夫妻表象；其死后维持忠贞遗孀形象。",
+      "private_state": "李长寿给予她在天庭律令、夫妻情义和子女安危之间真正选择的空间；这是她转向的唯一可信理由。",
+      "milestones": [
+        {
+          "chapter_range": "445-449",
+          "beat": "案件中的知情选择",
+          "required_change": "增加她看见李长寿为保全一家所承担因果的场景。"
+        },
+        {
+          "chapter_range": "449-450",
+          "beat": "生前唯一分歧窗口",
+          "required_change": "若坚持 NTL，只建立秘密道心承诺并立即设置身体边界，不在灾变前强塞亲密。"
+        },
+        {
+          "chapter_range": "451-460",
+          "beat": "遗孀掩护",
+          "required_change": "杨天佑死后由哀痛、共同护住子女和长期信任继续发展；不再假称仍有活着的原伴侣。"
+        }
+      ],
+      "hard_blocks": [
+        "不改变杨天佑死亡和杨戬动机",
+        "不趁丧偶创伤立即推进亲密",
+        "若449—450无自然锚点则退为丧偶后后宫线"
+      ],
+      "locator_tasks": ["精查445—450章云华获知真相、短暂分离和杨天佑死前锚点"],
+      "scene_budget": 4
+    },
+    {
+      "arc_id": "XARC-DAJI-DUAL",
+      "characters": ["苏妲己", "心兰"],
+      "route": "dual_consciousness_harem",
+      "priority": "extreme_rewrite",
+      "activation_window": "678-723",
+      "public_state": "对外仍由妲己身份完成商周大劫中的公开角色。",
+      "private_state": "心兰已经选择李长寿；苏妲己最初无力反抗夺舍，但在长期旁观李长寿如何保护凡人和保留她的退路后，自主恢复意志并成为主动追求者。",
+      "milestones": [
+        {
+          "chapter_range": "678-680",
+          "beat": "被夺舍后的观察者",
+          "required_change": "保留苏妲己无力反抗的开端，但李长寿为她留下清醒、传声和脱离的可能；此阶段不建立亲密关系。"
+        },
+        {
+          "chapter_range": "681-700",
+          "beat": "恢复声音并主动靠近",
+          "required_change": "苏妲己先能质问、拒绝和与心兰争夺身体控制，再因独立经历而爱上李长寿；至少两场只属于苏妲己的意识对话。"
+        },
+        {
+          "chapter_range": "701-723",
+          "beat": "两名主动追求者形成共身关系",
+          "required_change": "正文可自然表现两人的轮换、争宠和默契，不机械重复确认；场景状态必须保证两人都清醒、愿意且能中止。"
+        }
+      ],
+      "hard_blocks": [
+        "苏妲己无力反抗阶段禁止亲密占位符",
+        "心兰不能代替苏妲己作选择",
+        "必须先确认苏妲己实际年龄超过十八岁",
+        "帝辛或圣人任务压力下的顺从不算选择"
+      ],
+      "locator_tasks": ["精查678—680夺舍段、设计两场苏妲己独立意识对话、定位723章原魂去向的重写点"],
+      "scene_budget": 6
+    }
+  ],
+  "next_stage": [
+    "先运行章节拥挤度检查，把20条关系弧的种子、共事、转折和确认分散到不同章节。",
+    "先定位默认四人和八条直接后宫的安全双锚点，再单独处理七条 NTL 和苏妲己双意识线。",
+    "为每条 NTL 线建立明面关系、私下关系、秘密承诺章节和暴露风险状态机；身体边界从承诺章节开始，不追溯此前原作关系。",
+    "对云华449—450章做单独可行性复核；若无法自然成立，保留用户所要的大意但改成丧偶后的秘密后宫线。",
+    "为苏妲己新增年龄与自主意志检查节点；未通过前只生成非色情感情场景。",
+    "场景包只写情感目标、洪荒因果、前后状态、双锚点和【色情场景】占位要求；正文继续交给 DeepSeek，审核后才生成补丁。"
+  ]
+}

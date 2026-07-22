@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   APPEARANCE_TEMPLATES,
   DEFAULT_ATTRIBUTES,
+  STORY_EVENTS,
   generateVariableData,
   getRandomAppearance,
   initializeNewGameSession,
@@ -101,6 +102,38 @@ describe('generateVariableData avatar fields', () => {
   });
 });
 
+describe('opening event time', () => {
+  it('开局事件汇总提供小时并使用所选事件的真实触发小时', () => {
+    const selectedEvent = STORY_EVENTS.find(event => event.name === '射雕第7回-02-初遇黄蓉');
+    expect(selectedEvent).toMatchObject({
+      year: 1219,
+      month: 10,
+      day: 20,
+      hour: 13,
+      location: '金国/张家口/张家口镇',
+    });
+
+    const data = generateVariableData({
+      ...createFormData(),
+      locationInfo: {
+        year: selectedEvent!.year,
+        month: selectedEvent!.month,
+        day: selectedEvent!.day,
+        hour: selectedEvent!.hour,
+        location: selectedEvent!.location,
+        eventName: selectedEvent!.name,
+      },
+    }) as { 世界信息: { 时间: { 时: number } } };
+
+    expect(data.世界信息.时间.时).toBe(13);
+  });
+
+  it('没有小时的旧数据和自定义开局继续回退到11时', () => {
+    const data = generateVariableData(createFormData()) as { 世界信息: { 时间: { 时: number } } };
+    expect(data.世界信息.时间.时).toBe(11);
+  });
+});
+
 describe('initializeNewGameSession startup signal', () => {
   it('等待变量写入并回读确认后才发送 GameInitialized', async () => {
     let chatVariables: Record<string, any> = {};
@@ -115,8 +148,14 @@ describe('initializeNewGameSession startup signal', () => {
     expect(result.success).toBe(true);
     expect(updateVariablesWithMock).toHaveBeenCalledTimes(1);
     expect(getVariablesMock).toHaveBeenCalledWith({ type: 'chat' });
-    expect(initializeGlobalMock).toHaveBeenCalledWith('GameInitialized', expect.objectContaining({ formData: expect.any(Object) }));
-    expect(eventEmitMock).toHaveBeenCalledWith('GameInitialized', expect.objectContaining({ formData: expect.any(Object) }));
+    expect(initializeGlobalMock).toHaveBeenCalledWith(
+      'GameInitialized',
+      expect.objectContaining({ formData: expect.any(Object) }),
+    );
+    expect(eventEmitMock).toHaveBeenCalledWith(
+      'GameInitialized',
+      expect.objectContaining({ formData: expect.any(Object) }),
+    );
     expect(getVariablesMock.mock.invocationCallOrder[0]).toBeLessThan(initializeGlobalMock.mock.invocationCallOrder[0]);
     expect(getVariablesMock.mock.invocationCallOrder[0]).toBeLessThan(eventEmitMock.mock.invocationCallOrder[0]);
   });

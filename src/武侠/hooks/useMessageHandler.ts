@@ -19,6 +19,8 @@ import {
   type ExtraVariableUpdateProgress,
   type ExtraVariableUpdateReservation,
 } from '../utils/extraVariableUpdateManager';
+import { recordIframeLifecycleEvent } from '../utils/iframeLifecycleBlackBox';
+import { acquireWuxiaTurnLock, releaseWuxiaTurnLock } from '../utils/turnLock';
 import type { LatestDebugRoundPatch } from './useDebugLogs';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -62,7 +64,6 @@ interface UseMessageHandlerOptions {
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
 const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
-const WUXIA_TURN_LIFECYCLE_EVENT = 'wuxia:turn-lifecycle';
 const WUXIA_TURN_COMPLETED_EVENT = 'wuxia:turn-completed';
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -407,13 +408,12 @@ export function useMessageHandler({
 
       let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
       let createdLatestMessageId: number | null = null;
+      const turnChatId = readCurrentChatIdForTurn();
+      let turnLockRequestStarted = false;
 
       try {
-        await eventEmit(WUXIA_TURN_LIFECYCLE_EVENT, {
-          phase: 'start',
-          roundId: debugRoundId,
-          chatId: readCurrentChatIdForTurn(),
-        });
+        turnLockRequestStarted = true;
+        await acquireWuxiaTurnLock(debugRoundId, turnChatId);
         extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
         const beforeSendLastMessageId = getLatestMessageId();
         onVariableTurnStart?.();
@@ -443,6 +443,11 @@ export function useMessageHandler({
         messageLogger.log('返回值类型:', typeof createUserResult);
         const userMessage = getNewestMessageAfter(beforeSendLastMessageId, 'user');
         createdLatestMessageId = userMessage?.message_id ?? null;
+        recordIframeLifecycleEvent('wuxia-frontend', 'turn-user-message-created', {
+          roundId: debugRoundId,
+          chatId: turnChatId,
+          messageId: createdLatestMessageId,
+        });
 
         // ========== 步骤 2: 调用 generate() 触发 AI 生成 ==========
         messageLogger.log('');
@@ -458,6 +463,11 @@ export function useMessageHandler({
         messageLogger.log('📌 [步骤 2] 调用 generate() 触发 AI 生成');
         messageLogger.log('generate 参数:', { should_stream: true });
         messageLogger.log('⏳ 等待 AI 回复中...');
+        recordIframeLifecycleEvent('wuxia-frontend', 'turn-main-generation-started', {
+          roundId: debugRoundId,
+          chatId: turnChatId,
+          userMessageId: createdLatestMessageId,
+        });
 
         const generateStartTime = Date.now();
         const combinedPromptCapture = captureNextCombinedPromptForDebug(prompt => {
@@ -473,6 +483,12 @@ export function useMessageHandler({
         }
         const resultText = typeof result === 'string' ? result : result.content;
         const generateEndTime = Date.now();
+        recordIframeLifecycleEvent('wuxia-frontend', 'turn-main-generation-returned', {
+          roundId: debugRoundId,
+          chatId: turnChatId,
+          outputLength: resultText?.length ?? 0,
+          durationMs: generateEndTime - generateStartTime,
+        });
 
         messageLogger.log('✅ [步骤 2] generate() 调用完成');
         messageLogger.log('耗时:', generateEndTime - generateStartTime, 'ms');
@@ -526,6 +542,11 @@ export function useMessageHandler({
           messageLogger.log('createChatMessages 返回值:', createAssistantResult);
           const assistantMessage = getNewestMessageAfter(beforeSendLastMessageId, 'assistant');
           createdLatestMessageId = assistantMessage?.message_id ?? createdLatestMessageId;
+          recordIframeLifecycleEvent('wuxia-frontend', 'turn-assistant-message-created', {
+            roundId: debugRoundId,
+            chatId: turnChatId,
+            messageId: assistantMessage?.message_id ?? null,
+          });
           if (assistantMessage?.message_id !== undefined) {
             onVariableAiWriteTarget?.(assistantMessage.message_id);
           }
@@ -646,16 +667,27 @@ export function useMessageHandler({
         });
 
         showError(`生成失败：${errorMessage}`);
+        recordIframeLifecycleEvent('wuxia-frontend', 'turn-failed', {
+          roundId: debugRoundId,
+          chatId: turnChatId,
+          error: errorMessage,
+          latestCreatedMessageId: createdLatestMessageId,
+        });
         return '';
       } finally {
         extraVariableUpdateReservation?.release();
         setIsLoading(false);
-        void eventEmit(WUXIA_TURN_LIFECYCLE_EVENT, {
-          phase: 'finish',
-          roundId: debugRoundId,
-          chatId: readCurrentChatIdForTurn(),
-          messageId: createdLatestMessageId,
-        });
+        if (turnLockRequestStarted) {
+          try {
+            await releaseWuxiaTurnLock(debugRoundId, turnChatId, createdLatestMessageId);
+          } catch (error) {
+            recordIframeLifecycleEvent('wuxia-frontend', 'turn-lock-release-failed', {
+              roundId: debugRoundId,
+              chatId: turnChatId,
+              error: getErrorMessage(error),
+            });
+          }
+        }
         if (createdLatestMessageId !== null) {
           // 由后台楼层脚本延迟切换宿主消息节点；此处不等待，避免刷新节点时打断当前调用栈。
           void eventEmit(SYNC_LATEST_MESSAGE_SHELL_EVENT, createdLatestMessageId);
@@ -766,13 +798,12 @@ export function useMessageHandler({
 
     let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
     let targetAssistantMessageId: number | null = null;
+    const turnChatId = readCurrentChatIdForTurn();
+    let turnLockRequestStarted = false;
 
     try {
-      await eventEmit(WUXIA_TURN_LIFECYCLE_EVENT, {
-        phase: 'start',
-        roundId: debugRoundId,
-        chatId: readCurrentChatIdForTurn(),
-      });
+      turnLockRequestStarted = true;
+      await acquireWuxiaTurnLock(debugRoundId, turnChatId);
       onVariableTurnStart?.();
       extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
       const result = await regenerateLastAssistantSwipe({
@@ -859,12 +890,17 @@ export function useMessageHandler({
     } finally {
       extraVariableUpdateReservation?.release();
       setIsLoading(false);
-      void eventEmit(WUXIA_TURN_LIFECYCLE_EVENT, {
-        phase: 'finish',
-        roundId: debugRoundId,
-        chatId: readCurrentChatIdForTurn(),
-        messageId: targetAssistantMessageId,
-      });
+      if (turnLockRequestStarted) {
+        try {
+          await releaseWuxiaTurnLock(debugRoundId, turnChatId, targetAssistantMessageId);
+        } catch (error) {
+          recordIframeLifecycleEvent('wuxia-frontend', 'turn-lock-release-failed', {
+            roundId: debugRoundId,
+            chatId: turnChatId,
+            error: getErrorMessage(error),
+          });
+        }
+      }
       if (targetAssistantMessageId !== null) {
         // 与发送链路一致：等待当前回合结束后再同步宿主楼层，避免中途重绑打断前端状态。
         void eventEmit(SYNC_LATEST_MESSAGE_SHELL_EVENT, targetAssistantMessageId);

@@ -12,10 +12,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { parse as parseYaml } from 'yaml';
+import { buildOpeningEventSummary } from './lib/wuxia-event-summary.mjs';
 
 const root = process.cwd();
 const sourceRoot = path.join(root, '世界书');
 const outputRoot = path.join(root, 'src', '事件脚本', 'generated', 'event-data');
+const openingEventSummaryPath = path.join(root, 'src', '武侠', 'data', '事件信息汇总.json');
 const RUNTIME_KEY_VERSION = 2;
 const SHARD_MAX_EVENTS = 50;
 const SHARD_MAX_BYTES = 350 * 1024;
@@ -359,6 +361,13 @@ function collectEvents() {
   return { events, unresolvedReferences };
 }
 
+function writeOpeningEventSummary(events) {
+  const summary = buildOpeningEventSummary(events);
+  fs.mkdirSync(path.dirname(openingEventSummaryPath), { recursive: true });
+  fs.writeFileSync(openingEventSummaryPath, `${JSON.stringify(summary, null, 2)}\n`);
+  return summary;
+}
+
 function createShards(events) {
   const shards = [];
   let current = [];
@@ -504,9 +513,11 @@ function writeAssets(events, unresolvedReferences) {
 function main() {
   const { events, unresolvedReferences } = collectEvents();
   const manifest = writeAssets(events, unresolvedReferences);
+  const openingEventSummary = writeOpeningEventSummary(events);
   console.log(
     `生成事件运行时资产: ${manifest.eventCount} 个事件, ${manifest.shardCount} 个分片, ${manifest.checkpoints.length} 个检查点`,
   );
+  console.log(`同步开局事件汇总: ${openingEventSummary.length} 个普通事件`);
   console.log(`manifest hash: ${manifest.contentHash}`);
   if (unresolvedReferences.length > 0) {
     if (STRICT_VALIDATION) {

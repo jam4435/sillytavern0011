@@ -3,6 +3,11 @@ import App from './App';
 import './styles/main.scss';
 import { ensureLoaderRegexSafety } from './utils/loaderRegexGuard';
 import { getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
+import {
+  clearPendingIframeReloadReason,
+  readPendingIframeReloadReason,
+  recordIframeLifecycleEvent,
+} from './utils/iframeLifecycleBlackBox';
 
 // 保存 root 实例以便卸载
 let root: ReactDOM.Root | null = null;
@@ -19,6 +24,21 @@ $(() => {
     ...getRuntimeDebugInfo(),
     hasRootElement: true,
   });
+  const runtime = getRuntimeDebugInfo();
+  const pendingReload = readPendingIframeReloadReason();
+  recordIframeLifecycleEvent(
+    'wuxia-frontend',
+    'iframe-boot',
+    {
+      iframeName: runtime.iframeName,
+      href: runtime.href,
+      pendingReloadReason: pendingReload?.reason ?? 'none',
+      pendingReloadSource: pendingReload?.source ?? '',
+      pendingReloadMarkerId: pendingReload?.id ?? '',
+    },
+    runtime.runtimeId,
+  );
+  if (pendingReload) clearPendingIframeReloadReason(pendingReload.id);
 
   root = ReactDOM.createRoot(rootElement);
   root.render(<App />);
@@ -32,8 +52,22 @@ $(() => {
 
 // 卸载处理
 $(window).on('pagehide', () => {
+  const runtime = getRuntimeDebugInfo();
+  const pendingReload = readPendingIframeReloadReason();
+  recordIframeLifecycleEvent(
+    'wuxia-frontend',
+    'iframe-pagehide',
+    {
+      iframeName: runtime.iframeName,
+      reason: pendingReload?.reason ?? 'external-or-unknown',
+      reasonSource: pendingReload?.source ?? '',
+      reloadMarkerId: pendingReload?.id ?? '',
+      hasRoot: Boolean(root),
+    },
+    runtime.runtimeId,
+  );
   variableTraceLogger.warn('[index] 收到 pagehide，准备卸载 React root', {
-    ...getRuntimeDebugInfo(),
+    ...runtime,
     hasRoot: Boolean(root),
   });
   if (root) {

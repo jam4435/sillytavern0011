@@ -470,6 +470,7 @@ export interface CharacterBuild {
     year: number;
     month: number;
     day: number;
+    hour?: number;
     location: string;
     eventName?: string;
   };
@@ -520,6 +521,7 @@ export interface NewGameFormDataV2 {
     year: number;
     month: number;
     day: number;
+    hour?: number;
     location: string;
     eventName?: string;
   };

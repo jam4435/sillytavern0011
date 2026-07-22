@@ -1919,8 +1919,20 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .header-checkbox {
                     width: 16px;
                     height: 16px;
+                    margin: 0;
                     cursor: pointer;
                     accent-color: var(--panel-accent-color);
+                }
+
+                #${LOREBOOK_PANEL_ID} .lorebook-title-select-all {
+                    box-sizing: border-box;
+                    width: 28px;
+                    height: 28px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                    cursor: pointer;
                 }
                 
                 /* 修改表头样式以包含复选框 */

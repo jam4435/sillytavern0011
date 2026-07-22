@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LatestDebugRound } from '../hooks/useDebugLogs';
 import type { VariableChangeSummary } from './variableChanges';
-import { createWuxiaAutomation, type WuxiaAutomationRuntimeState } from './wuxiaAutomation';
+import {
+  createWuxiaAutomation,
+  WuxiaAutomationDisposedError,
+  type WuxiaAutomationRuntimeState,
+} from './wuxiaAutomation';
 
 const getVariablesMock = globalThis.getVariables as ReturnType<typeof vi.fn>;
 const getChatMessagesMock = globalThis.getChatMessages as ReturnType<typeof vi.fn>;
@@ -211,6 +215,30 @@ describe('WuxiaAutomation', () => {
     resolveTurn?.('第一轮回复');
     await firstTurn;
     expect(runPlayerTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it('实例卸载时会结束仍在等待的自动化 Promise', async () => {
+    const runtime = createRuntime();
+    let resolveTurn: ((reply: string) => void) | undefined;
+    const runPlayerTurn = vi.fn(
+      () =>
+        new Promise<string>(resolve => {
+          resolveTurn = resolve;
+        }),
+    );
+    const { api, dispose } = createWuxiaAutomation({
+      getRuntimeState: () => runtime,
+      runPlayerTurn,
+    });
+
+    const turn = api.runTurn('等待中的回合', { settleDelayMs: 0 });
+    expect(api.getSnapshot().busy).toBe(true);
+    dispose();
+
+    await expect(turn).rejects.toBeInstanceOf(WuxiaAutomationDisposedError);
+    expect(api.getSnapshot()).toMatchObject({ ready: false, busy: true });
+    resolveTurn?.('迟到的旧实例回复');
+    await Promise.resolve();
   });
 
   it('把调试中的变量错误作为结构化失败返回', async () => {

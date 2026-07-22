@@ -190,6 +190,135 @@ describe('wuxia Socket.IO relay', () => {
     });
   });
 
+  it('returns a matching persisted main-model error without waiting for the turn timeout', async () => {
+    const bridge = await connectReadyBridge();
+    let turnStartedAt = 0;
+    bridge.on(WUXIA_EVENTS.REQUEST, (request, acknowledge) => {
+      if (request.method === WUXIA_METHODS.RUN_TURN) {
+        turnStartedAt = Date.now();
+        return;
+      }
+      acknowledge({
+        id: request.id,
+        ok: true,
+        result: {
+          ready: true,
+          busy: true,
+          chatId: 'bridge-1-chat',
+          capturedAt: Date.now(),
+          recentMessages: [{ messageId: 7, role: 'user', text: '进入黑松林' }],
+          debug: {
+            id: 'round-error',
+            startedAt: turnStartedAt,
+            updatedAt: Date.now(),
+            main: {
+              status: 'error',
+              userInput: '进入黑松林',
+              error: 'Got response status 429',
+            },
+            variable: { status: 'idle', modeSnapshot: 'extra' },
+          },
+        },
+      });
+    });
+    const cli = await connect('cli');
+    const startedAt = Date.now();
+    const response = await call(cli, WUXIA_METHODS.RUN_TURN, { params: { input: '进入黑松林' } });
+
+    expect(Date.now() - startedAt).toBeLessThan(400);
+    expect(response).toMatchObject({
+      ok: true,
+      result: {
+        ok: false,
+        recovered: true,
+        recoveryReason: 'turn-persisted-debug-error',
+        failedStage: 'main',
+        userMessageId: 7,
+        error: 'Got response status 429',
+        debug: { main: { status: 'error' } },
+      },
+    });
+  });
+
+  it('ignores a persisted error from an older round with the same input', async () => {
+    const bridge = await connectReadyBridge();
+    bridge.on(WUXIA_EVENTS.REQUEST, (request, acknowledge) => {
+      if (request.method === WUXIA_METHODS.RUN_TURN) return;
+      acknowledge({
+        id: request.id,
+        ok: true,
+        result: {
+          ready: true,
+          busy: false,
+          chatId: 'bridge-1-chat',
+          capturedAt: Date.now(),
+          recentMessages: [{ messageId: 3, role: 'user', text: '继续观察' }],
+          debug: {
+            id: 'old-round-error',
+            startedAt: Date.now() - 60_000,
+            updatedAt: Date.now() - 59_000,
+            main: { status: 'error', userInput: '继续观察', error: '旧回合错误' },
+          },
+        },
+      });
+    });
+    const cli = await connect('cli');
+    const response = await call(cli, WUXIA_METHODS.RUN_TURN, { params: { input: '继续观察' } });
+
+    expect(response).toMatchObject({
+      ok: false,
+      error: { code: WUXIA_ERROR_CODES.OUTCOME_UNKNOWN, outcome: 'unknown' },
+    });
+  });
+
+  it('returns a matching persisted variable-model error after main generation succeeded', async () => {
+    const bridge = await connectReadyBridge();
+    let turnStartedAt = 0;
+    bridge.on(WUXIA_EVENTS.REQUEST, (request, acknowledge) => {
+      if (request.method === WUXIA_METHODS.RUN_TURN) {
+        turnStartedAt = Date.now();
+        return;
+      }
+      acknowledge({
+        id: request.id,
+        ok: true,
+        result: {
+          ready: true,
+          busy: true,
+          chatId: 'bridge-1-chat',
+          capturedAt: Date.now(),
+          recentMessages: [
+            { messageId: 8, role: 'user', text: '检查行囊' },
+            { messageId: 9, role: 'assistant', text: '你检查了行囊。' },
+          ],
+          debug: {
+            id: 'round-variable-error',
+            startedAt: turnStartedAt,
+            updatedAt: Date.now(),
+            main: { status: 'success', userInput: '检查行囊', output: '你检查了行囊。' },
+            variable: { status: 'error', modeSnapshot: 'extra', error: '变量模型连接失败' },
+          },
+        },
+      });
+    });
+    const cli = await connect('cli');
+    const response = await call(cli, WUXIA_METHODS.RUN_TURN, { params: { input: '检查行囊' } });
+
+    expect(response).toMatchObject({
+      ok: true,
+      result: {
+        ok: false,
+        recovered: true,
+        recoveryReason: 'turn-persisted-debug-error',
+        failedStage: 'variable',
+        userMessageId: 8,
+        assistantMessageId: 9,
+        rawReply: '你检查了行囊。',
+        error: '变量模型连接失败',
+      },
+    });
+  });
+
   it('recovers immediately when a new frontend instance replaces the request instance', async () => {
     const bridge = await connectReadyBridge();
     bridge.emit(WUXIA_EVENTS.STATE, {
@@ -256,6 +385,62 @@ describe('wuxia Socket.IO relay', () => {
         recoveryReason: 'turn-timeout-snapshot-reconciled',
         userMessageId: 5,
         assistantMessageId: 6,
+      },
+    });
+  });
+
+  it('reconciles an outcome-unknown response returned when the browser automation instance is disposed', async () => {
+    const bridge = await connectReadyBridge();
+    bridge.on(WUXIA_EVENTS.REQUEST, (request, acknowledge) => {
+      if (request.method === WUXIA_METHODS.RUN_TURN) {
+        acknowledge({
+          id: request.id,
+          ok: false,
+          error: {
+            code: WUXIA_ERROR_CODES.OUTCOME_UNKNOWN,
+            message: '自动化实例已换代',
+            retryable: false,
+            outcome: 'unknown',
+          },
+        });
+        return;
+      }
+      acknowledge({
+        id: request.id,
+        ok: true,
+        result: {
+          ready: true,
+          busy: false,
+          chatId: 'bridge-1-chat',
+          recentMessages: [
+            { messageId: 10, role: 'user', text: '继续赶路' },
+            { messageId: 11, role: 'assistant', text: '你抵达了黑松林。' },
+          ],
+          debug: {
+            startedAt: Date.now(),
+            main: { status: 'success', userInput: '继续赶路', output: '你抵达了黑松林。' },
+            variable: { status: 'success', modeSnapshot: 'extra' },
+          },
+          variableChanges: {
+            status: 'settled',
+            parseErrors: [],
+            declaredChanges: [],
+            actualChanges: [],
+          },
+        },
+      });
+    });
+    const cli = await connect('cli');
+    const response = await call(cli, WUXIA_METHODS.RUN_TURN, { params: { input: '继续赶路' } });
+
+    expect(response).toMatchObject({
+      ok: true,
+      result: {
+        ok: true,
+        recovered: true,
+        recoveryReason: 'turn-timeout-snapshot-reconciled',
+        userMessageId: 10,
+        assistantMessageId: 11,
       },
     });
   });

@@ -17,7 +17,6 @@ import unpluginVueComponents from 'unplugin-vue-components/webpack';
 import { VueLoaderPlugin } from 'vue-loader';
 import webpack from 'webpack';
 import WebpackObfuscator from 'webpack-obfuscator';
-import { attachWuxiaAutomationRelay } from './tools/wuxia-bridge/relay.mjs';
 const require = createRequire(import.meta.url);
 const HTMLInlineCSSWebpackPlugin = require('html-inline-css-webpack-plugin').default;
 
@@ -157,10 +156,6 @@ function watch_tavern_helper(compiler: webpack.Compiler) {
       io = new Server(port, {
         cors: { origin: '*' },
         maxHttpBufferSize: 16 * 1024 * 1024,
-      });
-      attachWuxiaAutomationRelay(io, {
-        token: process.env.WUXIA_BRIDGE_TOKEN,
-        allowedOrigins: process.env.WUXIA_BRIDGE_ALLOWED_ORIGINS,
       });
       console.info(`\x1b[36m[tavern_helper]\x1b[0m 已启动酒馆监听服务`);
       io.on('connect', socket => {

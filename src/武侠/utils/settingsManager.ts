@@ -110,6 +110,10 @@ export interface SummarySettings {
   variablePromptTemplate: string;
   /** 最新正文之前作为只读上下文发送的完整 user + assistant 轮数 */
   variableContextRounds: VariableContextRounds;
+  /** 额外变量正文中需要精确移除的 XML 附属块标签名，每行或逗号分隔 */
+  variablePromptExcludedTags: string;
+  /** 额外变量正文的开始边界；命中时丢弃边界及其之前的内容，每行一个 */
+  variablePromptBodyStartMarkers: string;
   /** 触发阈值 */
   thresholds: SummaryThresholds;
 }
@@ -266,26 +270,34 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你是一个专业的文学编�
 </summary>`;
 
 /** 默认额外变量更新提示词模板 */
-export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传》ERA 变量更新模型。你的任务是根据最新正文和当前变量上下文，补充正文造成的变量变化。
+export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传》ERA 变量更新模型。你只负责根据最新 assistant 正文更新已经提供的 ERA 变量，不续写剧情。
 
-严格规则：
-- 不要续写正文，不要解释，不要输出寒暄。
-- 只允许输出 <VariableThink>、<VariableInsert>、<VariableEdit>、<VariableDelete> 块。
-- <VariableInsert>、<VariableEdit>、<VariableDelete> 内必须是严格 JSON 对象；不要注释、不要尾随逗号、不要 JSON5。
-- JSON 根路径必须使用实际 ERA 键名，并且只允许修改：世界信息.时间、user数据、角色数据、当前上下文中已经存在的参与事件快照。不要输出“玩家数据”或“同场景角色”这类说明别名。
-- 事件系统、世界事件、前端变量、附近传闻、后续事件线索、后续事件线索计数由前端或事件脚本维护，只可作为参考，禁止对它们输出 Insert/Edit/Delete。
-- 如果没有需要写入的变量变化，可以不输出 Insert/Edit/Delete 块。
+强制判定顺序：
+1. 只有 latestAssistantBody 是本轮变化来源；readonlyContextRounds 只用于理解上下文。
+2. 逐级对照“当前变量上下文”中的真实键名。目标键已经存在只能使用 VariableEdit；目标键不存在才可使用 VariableInsert；VariableDelete 只能删除已存在的键。
+3. 同一事实已经存在且正文没有改变它时，不要重复 Insert，也不要无意义 Edit。
+4. 只允许修改：世界信息.时间、user数据、角色数据、当前上下文中已存在的参与事件之结局/insert/update/delete。方括号说明和可用地点都只读。
+5. 如果没有需要持久化的变化，只输出简短 VariableThink，不输出 Insert/Edit/Delete。
+
+输出要求：
+- 只允许输出 <VariableThink>、<VariableInsert>、<VariableEdit>、<VariableDelete> 块，不要寒暄或解释。
+- VariableThink 只写“路径｜当前是否存在｜正文变化｜操作”的简短核对结果，不复述正文，不展开思维链。
+- Insert/Edit/Delete 内必须是严格 JSON 对象；不要注释、尾随逗号或 JSON5。
+- 相同类型的操作合并到一个块中。
 
 【正文上下文；最新 assistant 正文是唯一变化来源，前序完整轮次只读】
 {{recentBodies}}
 
-【当前变量上下文；专用严格 JSON 投影】
+【当前变量上下文；JSON 是真实可写快照，方括号内容只读】
 {{variableContext}}
 
-【变量指导】
+【领域规则】
 {{variableGuidance}}
 
 {{locationContext}}`;
+
+export const DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS = ['tucao', 'current_event', 'progress'].join('\n');
+export const DEFAULT_VARIABLE_PROMPT_BODY_START_MARKERS = '</konatan_planning~>';
 
 export const DEFAULT_SUMMARY_API_CONFIG: SummaryApiConfig = {
   apiurl: '',
@@ -379,6 +391,8 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   promptTemplate: DEFAULT_SUMMARY_PROMPT_TEMPLATE,
   variablePromptTemplate: DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
   variableContextRounds: 1,
+  variablePromptExcludedTags: DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS,
+  variablePromptBodyStartMarkers: DEFAULT_VARIABLE_PROMPT_BODY_START_MARKERS,
   thresholds: {
     pendingQueueThreshold: 5,
     totalEntriesThreshold: 50,
@@ -777,12 +791,17 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
               '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】',
               '【正文上下文；最新 assistant 正文是唯一变化来源，前序完整轮次只读】',
             )
-            .replace(
-              '【当前变量上下文，来自输出提示词渲染结果或等价快照】',
-              '【当前变量上下文；专用严格 JSON 投影】',
-            )
+            .replace('【当前变量上下文，来自输出提示词渲染结果或等价快照】', '【当前变量上下文；专用严格 JSON 投影】')
         : defaults.variablePromptTemplate,
     variableContextRounds: summarySettings.variableContextRounds === 2 ? 2 : 1,
+    variablePromptExcludedTags:
+      typeof summarySettings.variablePromptExcludedTags === 'string'
+        ? summarySettings.variablePromptExcludedTags
+        : defaults.variablePromptExcludedTags,
+    variablePromptBodyStartMarkers:
+      typeof summarySettings.variablePromptBodyStartMarkers === 'string'
+        ? summarySettings.variablePromptBodyStartMarkers
+        : defaults.variablePromptBodyStartMarkers,
     thresholds: {
       ...defaults.thresholds,
       ...summarySettings.thresholds,

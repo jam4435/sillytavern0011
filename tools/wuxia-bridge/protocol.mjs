@@ -1,5 +1,8 @@
 export const WUXIA_PROTOCOL_VERSION = 1;
 export const WUXIA_SOCKET_NAMESPACE = '/wuxia';
+export const WUXIA_RELAY_DEFAULT_HOST = '127.0.0.1';
+export const WUXIA_RELAY_DEFAULT_PORT = 6622;
+export const WUXIA_RELAY_DEFAULT_URL = `http://${WUXIA_RELAY_DEFAULT_HOST}:${WUXIA_RELAY_DEFAULT_PORT}${WUXIA_SOCKET_NAMESPACE}`;
 
 export const WUXIA_EVENTS = Object.freeze({
   CALL: 'wuxia:call',

@@ -74,6 +74,8 @@ let extraVariableUpdateReserved = false;
 const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/gi;
 const ERA_VARIABLE_BLOCK_STRIP_REGEX = /\s*<Variable(Think|Insert|Edit|Delete)>\s*[\s\S]*?<\/Variable\1>\s*/gi;
 const ACTION_BLOCK_TAGS = new Set(['VariableInsert', 'VariableEdit', 'VariableDelete']);
+const EXTRA_VARIABLE_READONLY_ENTITY_KEYS = new Set(['头像', '出生年份', '年龄', '初始属性', '天赋']);
+const PARTICIPATION_WRITABLE_KEYS = ['结局', 'insert', 'update', 'delete'] as const;
 const VARIABLE_ROOT_KEY_ALIASES: Record<string, string> = {
   玩家数据: 'user数据',
   同场景角色: '角色数据',
@@ -110,8 +112,82 @@ function stripEraVariableBlocksForPrompt(text: string): string {
     .trim();
 }
 
-function normalizeBodyMessageForPrompt(rawText: string): string {
-  return stripEraVariableBlocksForPrompt(normalizeDisplayedMessageContent(stripEraVariableBlocksForPrompt(rawText)))
+function parseConfiguredPromptItems(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,，]+/)
+        .map(item => item.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function stripAssistantPrefixThroughLastMarker(text: string, configuredMarkers: string): string {
+  let lastBoundaryEnd = -1;
+  for (const marker of parseConfiguredPromptItems(configuredMarkers)) {
+    const markerIndex = text.lastIndexOf(marker);
+    if (markerIndex >= 0) {
+      lastBoundaryEnd = Math.max(lastBoundaryEnd, markerIndex + marker.length);
+    }
+  }
+  return lastBoundaryEnd >= 0 ? text.slice(lastBoundaryEnd) : text;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeConfiguredTagName(value: string): string {
+  const trimmed = value.trim();
+  const wrappedTagMatch = trimmed.match(/^<\/?\s*([A-Za-z_][\w:.-]*)\s*\/?\s*>$/);
+  const candidate = wrappedTagMatch?.[1] || trimmed;
+  return /^[A-Za-z_][\w:.-]*$/.test(candidate) ? candidate : '';
+}
+
+function stripConfiguredAssistantBlocks(text: string, configuredTags: string): string {
+  return parseConfiguredPromptItems(configuredTags).reduce((result, configuredTag) => {
+    const tagName = normalizeConfiguredTagName(configuredTag);
+    if (!tagName) {
+      return result;
+    }
+    const escapedTagName = escapeRegExp(tagName);
+    return result
+      .replace(new RegExp(`<${escapedTagName}(?:\\s[^<>]*?)?>[\\s\\S]*?<\\/${escapedTagName}\\s*>`, 'gi'), '\n')
+      .replace(new RegExp(`<${escapedTagName}(?:\\s[^<>]*?)?\\s*\\/>`, 'gi'), '\n');
+  }, text);
+}
+
+function applyTavernPromptRegex(text: string, role: 'user' | 'assistant', depth: number): string {
+  try {
+    return formatAsTavernRegexedString(text, role === 'assistant' ? 'ai_output' : 'user_input', 'prompt', {
+      depth,
+    });
+  } catch (error) {
+    dataLogger.warn('应用酒馆提示词正则失败，额外变量正文将继续使用未格式化文本:', error);
+    return text;
+  }
+}
+
+function normalizeBodyMessageForPrompt(
+  rawText: string,
+  role: 'user' | 'assistant',
+  depth: number,
+  settings: SummarySettings,
+): string {
+  const withoutAssistantPrefix =
+    role === 'assistant'
+      ? stripAssistantPrefixThroughLastMarker(rawText, settings.variablePromptBodyStartMarkers)
+      : rawText;
+  const tavernRegexed = applyTavernPromptRegex(withoutAssistantPrefix, role, depth);
+  const withoutConfiguredBlocks =
+    role === 'assistant'
+      ? stripConfiguredAssistantBlocks(tavernRegexed, settings.variablePromptExcludedTags)
+      : tavernRegexed;
+
+  return stripEraVariableBlocksForPrompt(
+    normalizeDisplayedMessageContent(stripEraVariableBlocksForPrompt(withoutConfiguredBlocks)),
+  )
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -404,12 +480,8 @@ function getNestedRecord(source: Record<string, unknown>, key: string): Record<s
   return isRecord(value) ? value : null;
 }
 
-function omitLegacyAvatarField(source: Record<string, unknown>): Record<string, unknown> {
-  if (!Object.hasOwn(source, '头像')) {
-    return source;
-  }
-  const { 头像: _frontendOwnedAvatar, ...rest } = source;
-  return rest;
+function omitReadonlyEntityFields(source: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(source).filter(([key]) => !EXTRA_VARIABLE_READONLY_ENTITY_KEYS.has(key)));
 }
 
 function getFirstStringValue(...values: unknown[]): string {
@@ -454,7 +526,7 @@ function collectRelevantCharacters(
     const isCurrentEventNpc = !!participationText && participationText.includes(name);
     const isMentionedInLatestBody = !!latestAssistantBody && latestAssistantBody.includes(name);
     if (isSameScene || isCurrentEventNpc || isMentionedInLatestBody) {
-      result[name] = sanitizeForPrompt(omitLegacyAvatarField(character));
+      result[name] = sanitizeForPrompt(omitReadonlyEntityFields(character));
     }
     return result;
   }, {});
@@ -486,7 +558,6 @@ export function buildExtraVariableProjection(
   const userData: Record<string, unknown> =
     getNestedRecord(statData, 'user数据') || getNestedRecord(statData, '玩家数据') || {};
   const worldInfo = getNestedRecord(statData, '世界信息') || {};
-  const frontendVariables = getNestedRecord(statData, '前端变量') || {};
   const participationEvents = statData.参与事件 ?? {};
   const playerLocation = getFirstStringValue(
     userData.当前位置,
@@ -497,27 +568,124 @@ export function buildExtraVariableProjection(
     statData.地点,
   );
 
+  const writableParticipationEvents = isRecord(participationEvents)
+    ? Object.entries(participationEvents).reduce<Record<string, unknown>>((result, [eventName, eventValue]) => {
+        if (!isRecord(eventValue)) {
+          return result;
+        }
+        result[eventName] = Object.fromEntries(
+          PARTICIPATION_WRITABLE_KEYS.filter(key => Object.hasOwn(eventValue, key)).map(key => [key, eventValue[key]]),
+        );
+        return result;
+      }, {})
+    : {};
+
   return sanitizeForPrompt({
     世界信息: Object.hasOwn(worldInfo, '时间') ? { 时间: worldInfo.时间 } : {},
-    user数据: omitLegacyAvatarField(userData),
+    user数据: omitReadonlyEntityFields(userData),
     角色数据: collectRelevantCharacters(statData, playerLocation, latestAssistantBody, participationEvents),
-    参与事件: participationEvents,
-    前端变量: {
-      周围地点: frontendVariables.周围地点 ?? {},
-    },
+    参与事件: writableParticipationEvents,
   }) as Record<string, unknown>;
+}
+
+function formatVariableContext(projection: Record<string, unknown>, participationEvents: unknown): string {
+  const lines = [
+    '<variable>',
+    '<status_current_variables>',
+    '# 当前状态：以下 JSON 使用真实变量键名',
+    '# 当前世界信息',
+    `世界信息:${JSON.stringify(projection.世界信息 ?? {})}`,
+    '',
+    '# user数据',
+    `user数据:${JSON.stringify(projection.user数据 ?? {})}`,
+  ];
+  const writableParticipationEvents = isRecord(projection.参与事件) ? projection.参与事件 : {};
+
+  if (isRecord(participationEvents) && Object.keys(writableParticipationEvents).length > 0) {
+    lines.push('', '# 当前事件上下文：方括号是只读背景，JSON中的四个字段按规则有条件可写', '<参与事件>');
+    for (const [eventName, writableSnapshot] of Object.entries(writableParticipationEvents)) {
+      const eventValue = isRecord(participationEvents[eventName]) ? participationEvents[eventName] : {};
+      const readonlyDescription = String(eventValue.描述 ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      lines.push(
+        `<${eventName}>`,
+        `[只读时间、地点与事件背景：${readonlyDescription || '无'}]`,
+        JSON.stringify(writableSnapshot),
+        `</${eventName}>`,
+      );
+    }
+    lines.push('</参与事件>');
+  }
+
+  lines.push(
+    '',
+    '# 相关角色（同场景、参与事件或最新正文提及）',
+    `角色数据:${JSON.stringify(projection.角色数据 ?? {})}`,
+    '</status_current_variables>',
+    '</variable>',
+  );
+  return lines.join('\n');
+}
+
+function normalizeFullLocationPath(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const segments = value
+    .trim()
+    .replace(/[\\＞>›→]+/g, '/')
+    .split('/')
+    .map(part => part.trim())
+    .filter(Boolean);
+  return segments.length === 3 ? segments.join('/') : '';
+}
+
+function uniqueFullLocationPaths(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(new Set(value.map(normalizeFullLocationPath).filter(Boolean)));
+}
+
+function formatLocationContext(surroundingLocations: unknown): string {
+  const locationGroups = isRecord(surroundingLocations) ? surroundingLocations : {};
+  const ordinarySource = Array.isArray(surroundingLocations)
+    ? surroundingLocations
+    : Array.isArray(locationGroups.普通移动)
+      ? locationGroups.普通移动
+      : locationGroups.相邻三级地点;
+  const groups = {
+    普通移动: uniqueFullLocationPaths(ordinarySource),
+    事件目标: uniqueFullLocationPaths(locationGroups.事件目标),
+    地图指定: uniqueFullLocationPaths(locationGroups.地图指定),
+  };
+  const availableLocationCount = Object.values(groups).reduce((sum, paths) => sum + paths.length, 0);
+  const lines = ['<可用地点>'];
+  for (const [groupName, paths] of Object.entries(groups)) {
+    lines.push(`[${groupName}]${paths.length === 0 ? '（无）' : ''}`, ...paths.map(path => `- ${path}`));
+  }
+  lines.push(
+    '[写入规则]',
+    availableLocationCount === 0
+      ? '当前没有任何可用的合法地点完整路径，本轮禁止修改任何“所在位置”。'
+      : '任何“所在位置”的新值都只能逐字等于上方列出的某个合法地点完整路径；不得缩写、改写或自造地点。',
+    '</可用地点>',
+  );
+  return lines.join('\n');
 }
 
 function buildVariableProjectionSnapshot(
   assistantMessageId: number,
   latestAssistantBody: string,
 ): { projection: Record<string, unknown>; variableContext: string; locationContext: string } {
-  const projection = buildExtraVariableProjection(readAllVariablesSnapshot(assistantMessageId), latestAssistantBody);
-  const variableContext = JSON.stringify(projection);
-  const locationContext = [
-    '【合法地点完整路径】',
-    '完整路径已包含在上方专用变量投影的`前端变量.周围地点`中，不在此重复发送。仅当最新正文确实发生移动时，位置新值才可逐字采用其中已有路径；不得缩写或杜撰。',
-  ].join('\n');
+  const variables = readAllVariablesSnapshot(assistantMessageId);
+  const statDataSource = isRecord(variables.stat_data) ? variables.stat_data : variables;
+  const statData = statDataSource as Record<string, unknown>;
+  const projection = buildExtraVariableProjection(variables, latestAssistantBody);
+  const variableContext = formatVariableContext(projection, statData.参与事件);
+  const frontendVariables = getNestedRecord(statData, '前端变量') || {};
+  const locationContext = formatLocationContext(frontendVariables.周围地点);
 
   return {
     projection,
@@ -622,15 +790,19 @@ function getRecentBodyMessages(
   targetMessageId: number,
   latestRawReply: string,
   contextRounds: 1 | 2,
+  settings: SummarySettings,
 ): { serialized: string; latestAssistantBody: string } {
   const messages = getChatMessages('0-{{lastMessageId}}', {
     hide_state: 'unhidden',
     include_swipes: true,
   }) as ChatMessageWithSwipes[];
 
-  const bodies = messages
+  const promptMessages = messages
     .filter(message => message.role === 'user' || message.role === 'assistant')
-    .map(message => {
+    .sort((left, right) => left.message_id - right.message_id);
+  const lastPromptMessageIndex = promptMessages.length - 1;
+  const bodies = promptMessages
+    .map((message, messageIndex) => {
       const rawText =
         message.message_id === targetMessageId && latestRawReply.trim()
           ? latestRawReply
@@ -638,7 +810,12 @@ function getRecentBodyMessages(
       if (!rawText.trim() || isFrontendLoaderOnlyMessage(rawText)) {
         return null;
       }
-      const normalized = normalizeBodyMessageForPrompt(rawText);
+      const normalized = normalizeBodyMessageForPrompt(
+        rawText,
+        message.role as 'user' | 'assistant',
+        Math.max(0, lastPromptMessageIndex - messageIndex),
+        settings,
+      );
       if (!normalized) {
         return null;
       }
@@ -648,14 +825,11 @@ function getRecentBodyMessages(
         text: normalized,
       };
     })
-    .filter((item): item is PromptBodyMessage => item !== null)
-    .sort((left, right) => left.messageId - right.messageId);
+    .filter((item): item is PromptBodyMessage => item !== null);
 
-  const targetMessage = bodies.find(
-    message => message.messageId === targetMessageId && message.role === 'assistant',
-  );
+  const targetMessage = bodies.find(message => message.messageId === targetMessageId && message.role === 'assistant');
   const latestAssistantBody =
-    normalizeBodyMessageForPrompt(latestRawReply) || targetMessage?.text || '';
+    targetMessage?.text || normalizeBodyMessageForPrompt(latestRawReply, 'assistant', 0, settings) || '';
   const precedingMessages = bodies.filter(message => message.messageId < targetMessageId);
   const completeRounds: Array<[PromptBodyMessage, PromptBodyMessage]> = [];
   let pendingUser: PromptBodyMessage | null = null;
@@ -726,6 +900,7 @@ async function buildExtraVariableUpdatePrompt({
     assistantMessageId,
     latestRawReply,
     settings.variableContextRounds,
+    settings,
   );
   const variableProjection = buildVariableProjectionSnapshot(assistantMessageId, recentBodies.latestAssistantBody);
 

@@ -162,6 +162,25 @@ describe('settingsManager ui theme', () => {
     expect(loadSettings().summarySettings.variableContextRounds).toBe(1);
   });
 
+  it('defaults and persists the extra-variable body cleaning rules', () => {
+    const defaults = createDefaultDisplaySettings().summarySettings;
+    expect(defaults.variablePromptExcludedTags).toBe('tucao\ncurrent_event\nprogress');
+    expect(defaults.variablePromptBodyStartMarkers).toBe('</konatan_planning~>');
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({
+        summarySettings: {
+          variablePromptExcludedTags: 'aside\nmetadata',
+          variablePromptBodyStartMarkers: '</thinking>',
+        },
+      }),
+    );
+    const loaded = loadSettings().summarySettings;
+    expect(loaded.variablePromptExcludedTags).toBe('aside\nmetadata');
+    expect(loaded.variablePromptBodyStartMarkers).toBe('</thinking>');
+  });
+
   it('updates legacy default-template labels without changing custom placeholders', () => {
     window.localStorage.setItem(
       'wuxia_display_settings',

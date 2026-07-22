@@ -4,12 +4,12 @@ import {
   WUXIA_EVENTS,
   WUXIA_METHODS,
   WUXIA_PROTOCOL_VERSION,
-  WUXIA_SOCKET_NAMESPACE,
+  WUXIA_RELAY_DEFAULT_URL,
   WUXIA_TURN_TIMEOUT_MS,
   createErrorResponse,
 } from '../wuxia-bridge/protocol.mjs';
 
-export const DEFAULT_WUXIA_BRIDGE_URL = `http://127.0.0.1:6621${WUXIA_SOCKET_NAMESPACE}`;
+export const DEFAULT_WUXIA_BRIDGE_URL = WUXIA_RELAY_DEFAULT_URL;
 
 function waitForConnection(socket) {
   return new Promise((resolve, reject) => {
@@ -58,7 +58,7 @@ export async function callWuxiaBridge(request, options = {}) {
     await waitForConnection(socket);
   } catch (error) {
     socket.disconnect();
-    return createErrorResponse(request.id, WUXIA_ERROR_CODES.SERVER_OFFLINE, `无法连接武侠监听服务 ${url}。`, {
+    return createErrorResponse(request.id, WUXIA_ERROR_CODES.SERVER_OFFLINE, `无法连接武侠 Relay ${url}。`, {
       retryable: true,
       details: error instanceof Error ? error.message : String(error),
     });
@@ -73,7 +73,7 @@ export async function callWuxiaBridge(request, options = {}) {
       isRunTurn ? WUXIA_ERROR_CODES.OUTCOME_UNKNOWN : WUXIA_ERROR_CODES.TIMEOUT,
       isRunTurn
         ? 'CLI 等待剧情结果时连接中断或超时；请先读取 snapshot 对账，禁止自动重试。'
-        : '等待酒馆监听服务响应超时。',
+        : '等待武侠 Relay 响应超时。',
       {
         retryable: !isRunTurn,
         ...(isRunTurn ? { outcome: 'unknown' } : {}),

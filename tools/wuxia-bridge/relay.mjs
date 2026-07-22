@@ -35,6 +35,90 @@ function countComparisonStatuses(variableChanges) {
   return counts;
 }
 
+function getMatchingTerminalDebugError(request, snapshot, notBefore = 0) {
+  if (!isRecord(snapshot)) return null;
+  const input = normalizeInput(request.params?.input);
+  const debug = isRecord(snapshot.debug) ? snapshot.debug : null;
+  const main = isRecord(debug?.main) ? debug.main : null;
+  if (!input || normalizeInput(main?.userInput) !== input) return null;
+
+  const startedAt = Number(debug?.startedAt);
+  if (notBefore > 0 && (!Number.isFinite(startedAt) || startedAt < notBefore)) return null;
+
+  const variable = isRecord(debug?.variable) ? debug.variable : null;
+  if (main?.status === 'error') {
+    return {
+      stage: 'main',
+      message: normalizeString(main.error, 20_000) || '主模型生成失败。',
+      debug,
+    };
+  }
+  if (main?.status === 'success' && variable?.status === 'error') {
+    return {
+      stage: 'variable',
+      message: normalizeString(variable.error, 20_000) || '变量更新失败。',
+      debug,
+    };
+  }
+  return null;
+}
+
+function recoverPersistedTurnErrorReport(request, snapshot, notBefore = 0) {
+  const matchedError = getMatchingTerminalDebugError(request, snapshot, notBefore);
+  if (!matchedError) return null;
+
+  const messages = Array.isArray(snapshot.recentMessages) ? snapshot.recentMessages.filter(isRecord) : [];
+  const matchingUsers = messages.filter(
+    message => message.role === 'user' && normalizeInput(message.text) === normalizeInput(request.params?.input),
+  );
+  const userMessage = matchingUsers.at(-1);
+  const assistantMessage =
+    userMessage && Number.isInteger(userMessage.messageId)
+      ? messages.find(
+          message =>
+            message.role === 'assistant' &&
+            Number.isInteger(message.messageId) &&
+            message.messageId > userMessage.messageId,
+        )
+      : null;
+  const main = matchedError.debug.main;
+
+  return {
+    ok: false,
+    recovered: true,
+    recoveryReason: 'turn-persisted-debug-error',
+    failedStage: matchedError.stage,
+    requestId: request.id,
+    input: request.params.input.trim(),
+    chatId: normalizeString(snapshot.chatId, 512),
+    startedAt: Number(matchedError.debug.startedAt) || Date.now(),
+    finishedAt: Number(matchedError.debug.updatedAt) || Number(snapshot.capturedAt) || Date.now(),
+    ...(Number.isInteger(userMessage?.messageId) ? { userMessageId: userMessage.messageId } : {}),
+    ...(Number.isInteger(assistantMessage?.messageId) ? { assistantMessageId: assistantMessage.messageId } : {}),
+    rawReply:
+      typeof assistantMessage?.text === 'string' ? assistantMessage.text : normalizeString(main.output, 1_000_000),
+    statDataBefore: null,
+    statDataAfter: isRecord(snapshot.statData) ? snapshot.statData : null,
+    debug: matchedError.debug,
+    variableChanges: isRecord(snapshot.variableChanges) ? snapshot.variableChanges : null,
+    variableVerification: createFailureVerification(),
+    error: matchedError.message,
+  };
+}
+
+function createFailureVerification() {
+  return {
+    expected: false,
+    signalObserved: false,
+    timedOut: false,
+    verdict: 'not-requested',
+    declaredCount: 0,
+    comparisonStatusCounts: {},
+    parseErrors: [],
+    signals: [],
+  };
+}
+
 function recoverTurnReport(request, snapshot) {
   if (!isRecord(snapshot) || snapshot.busy === true) return null;
   const input = normalizeInput(request.params?.input);
@@ -252,7 +336,7 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
       const message =
         code === WUXIA_ERROR_CODES.AUTOMATION_NOT_READY
           ? '酒馆桥已连接，但武侠游戏界面尚未初始化。'
-          : '没有酒馆自动化桥连接到 pnpm watch。';
+          : '没有酒馆自动化桥连接到武侠 Relay。';
       return { error: createErrorResponse(request.id, code, message, { retryable: true }) };
     }
     if (readyStates.length > 1) {
@@ -278,7 +362,7 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
     );
   }
 
-  async function recoverTimedOutTurn(request, originalState) {
+  async function recoverTimedOutTurn(request, originalState, notBefore = 0) {
     const recoveryTimeoutMs = Number(options.recoveryTimeoutMs ?? WUXIA_TURN_TIMEOUT_MS.RECOVERY);
     const recoveryPollMs = Number(options.recoveryPollMs ?? 1_000);
     const deadline = Date.now() + Math.max(0, recoveryTimeoutMs);
@@ -297,6 +381,11 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
             .timeout(Number(options.snapshotTimeoutMs ?? DEFAULT_SNAPSHOT_TIMEOUT_MS))
             .emitWithAck(WUXIA_EVENTS.REQUEST, snapshotRequest);
           if (isRecord(response) && response.ok === true) {
+            const failedReport = recoverPersistedTurnErrorReport(request, response.result, notBefore);
+            if (failedReport) {
+              logger.info?.(`[wuxia] 已从持久化调试恢复回合错误: ${request.id}`);
+              return { id: request.id, ok: true, result: failedReport };
+            }
             const report = recoverTurnReport(request, response.result);
             if (report) {
               logger.info?.(`[wuxia] 已通过快照恢复超时回合: ${request.id}`);
@@ -315,7 +404,43 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
     return null;
   }
 
-  async function recoverReplacedBridgeTurn(request, originalState, timeoutMs, shouldStop) {
+  async function watchPersistedTurnError(request, originalState, timeoutMs, shouldStop, notBefore) {
+    const pollMs = Number(options.persistedErrorPollMs ?? options.recoveryPollMs ?? 1_000);
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+    let attempt = 0;
+
+    while (!shouldStop() && Date.now() <= deadline) {
+      const state = chooseRecoveryBridge(originalState, request.target);
+      if (state) {
+        const snapshotRequest = {
+          id: `${request.id}-error-${attempt}`.slice(0, 160),
+          method: WUXIA_METHODS.GET_SNAPSHOT,
+          params: {},
+        };
+        try {
+          const response = await state.socket
+            .timeout(Number(options.snapshotTimeoutMs ?? DEFAULT_SNAPSHOT_TIMEOUT_MS))
+            .emitWithAck(WUXIA_EVENTS.REQUEST, snapshotRequest);
+          if (isRecord(response) && response.ok === true) {
+            const report = recoverPersistedTurnErrorReport(request, response.result, notBefore);
+            if (report) {
+              logger.info?.(`[wuxia] 发现本回合持久化调试错误，提前返回: ${request.id}`);
+              return { id: request.id, ok: true, result: report };
+            }
+          }
+        } catch {
+          // 页面可能正在换代；下一次轮询会重新选择可用桥。
+        }
+      }
+      attempt += 1;
+      if (shouldStop() || Date.now() >= deadline) break;
+      await delay(Math.max(10, pollMs));
+    }
+
+    return null;
+  }
+
+  async function recoverReplacedBridgeTurn(request, originalState, timeoutMs, shouldStop, notBefore) {
     const replacementPollMs = Number(options.replacementPollMs ?? 250);
     const deadline = Date.now() + Math.max(0, timeoutMs);
 
@@ -329,7 +454,7 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
         state.automationInstanceId !== originalState.automationInstanceId;
       if (socketReplaced || instanceReplaced) {
         logger.info?.(`[wuxia] 检测到自动化实例换代，提前对账回合: ${request.id}`);
-        return recoverTimedOutTurn(request, originalState);
+        return recoverTimedOutTurn(request, originalState, notBefore);
       }
       await delay(Math.max(10, replacementPollMs));
     }
@@ -351,6 +476,7 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
 
     if (isRunTurn) runInFlight.add(runKey);
     let requestSettled = false;
+    const requestStartedAt = Date.now();
     try {
       const timeoutMs = isRunTurn
         ? Number(options.turnTimeoutMs ?? state.turnTimeoutMs ?? WUXIA_TURN_TIMEOUT_MS.STANDARD)
@@ -364,7 +490,10 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
       const response = isRunTurn
         ? await Promise.race([
             responsePromise,
-            recoverReplacedBridgeTurn(request, state, timeoutMs, () => requestSettled).then(
+            recoverReplacedBridgeTurn(request, state, timeoutMs, () => requestSettled, requestStartedAt).then(
+              recovered => recovered ?? new Promise(() => {}),
+            ),
+            watchPersistedTurnError(request, state, timeoutMs, () => requestSettled, requestStartedAt).then(
               recovered => recovered ?? new Promise(() => {}),
             ),
           ])
@@ -372,10 +501,19 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
       if (!isRecord(response) || response.id !== request.id || typeof response.ok !== 'boolean') {
         return createErrorResponse(request.id, WUXIA_ERROR_CODES.INTERNAL, '酒馆桥返回了无效响应。');
       }
+      if (
+        isRunTurn &&
+        response.ok === false &&
+        isRecord(response.error) &&
+        response.error.code === WUXIA_ERROR_CODES.OUTCOME_UNKNOWN
+      ) {
+        const recovered = await recoverTimedOutTurn(request, state, requestStartedAt);
+        if (recovered) return recovered;
+      }
       return response;
     } catch (error) {
       if (isRunTurn) {
-        const recovered = await recoverTimedOutTurn(request, state);
+        const recovered = await recoverTimedOutTurn(request, state, requestStartedAt);
         if (recovered) return recovered;
         return createErrorResponse(
           request.id,

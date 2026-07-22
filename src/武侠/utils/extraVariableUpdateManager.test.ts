@@ -36,7 +36,7 @@ type AssistantMessage = {
 
 type TestChatMessage = Omit<AssistantMessage, 'role'> & { role: 'user' | 'assistant' };
 
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 const emitSourcedEraVariableWriteAndWaitMock = vi.mocked(emitSourcedEraVariableWriteAndWait);
 const requestConfiguredTextMock = vi.mocked(requestConfiguredText);
@@ -48,7 +48,7 @@ const globalScope = globalThis as typeof globalThis & {
   updateWorldbookWith: ReturnType<typeof vi.fn>;
   getCharWorldbookNames: ReturnType<typeof vi.fn>;
   substitudeMacros: (text: string) => string;
-  formatAsTavernRegexedString: (text: string) => string;
+  formatAsTavernRegexedString: ReturnType<typeof vi.fn>;
   EjsTemplate: {
     prepareContext: ReturnType<typeof vi.fn>;
     evaltemplate: ReturnType<typeof vi.fn>;
@@ -140,11 +140,22 @@ describe('executeExtraVariableUpdate', () => {
         user数据: {
           所在位置: '大宋/临安府/城门',
           头像: 'preset:legacy-player-avatar',
+          出生年份: 1201,
+          年龄: 18,
+          初始属性: { 根骨: 10 },
+          天赋: { 过目不忘: '只读' },
           属性: { 根骨: 60, $缓存: '隐藏' },
           $meta: { 不应发送: true },
         },
         角色数据: {
-          郭靖: { 所在位置: '大宋/临安府/城门', 头像: 'preset:legacy-npc-avatar', 身份: { 侠士: '初入江湖' }, $template: {} },
+          郭靖: {
+            所在位置: '大宋/临安府/城门',
+            头像: 'preset:legacy-npc-avatar',
+            初始属性: { 根骨: 18 },
+            天赋: { 坚毅: '只读' },
+            身份: { 侠士: '初入江湖' },
+            $template: {},
+          },
           黄蓉: { 所在位置: '大宋/临安府/客栈', 身份: { 少女: '聪慧' } },
           洪七公: { 所在位置: '大宋/嘉兴府/烟雨楼', 身份: { 丐帮帮主: '北丐' } },
           欧阳锋: { 所在位置: '西域/白驼山/山庄', 身份: { 西毒: '宗师' } },
@@ -172,9 +183,7 @@ describe('executeExtraVariableUpdate', () => {
         ...assistantMessage,
         message: String(nextMessage.message ?? assistantMessage.message),
         swipe_id: Number.isInteger(nextMessage.swipe_id) ? Number(nextMessage.swipe_id) : assistantMessage.swipe_id,
-        swipes: Array.isArray(nextMessage.swipes)
-          ? clone(nextMessage.swipes as string[])
-          : assistantMessage.swipes,
+        swipes: Array.isArray(nextMessage.swipes) ? clone(nextMessage.swipes as string[]) : assistantMessage.swipes,
         swipes_data: Array.isArray(nextMessage.swipes_data)
           ? clone(nextMessage.swipes_data as Record<string, unknown>[])
           : assistantMessage.swipes_data,
@@ -188,12 +197,14 @@ describe('executeExtraVariableUpdate', () => {
       setChatMessages: setChatMessagesMock,
       getCharWorldbookNames: vi.fn(() => ({ primary: 'wuxia', additional: [] })),
       getWorldbook: vi.fn(async () => clone(worldbookEntries)),
-      updateWorldbookWith: vi.fn(async (_worldbookName: string, updater: (entries: typeof worldbookEntries) => typeof worldbookEntries) => {
-        worldbookEntries = updater(clone(worldbookEntries));
-        return clone(worldbookEntries);
-      }),
+      updateWorldbookWith: vi.fn(
+        async (_worldbookName: string, updater: (entries: typeof worldbookEntries) => typeof worldbookEntries) => {
+          worldbookEntries = updater(clone(worldbookEntries));
+          return clone(worldbookEntries);
+        },
+      ),
       substitudeMacros: (text: string) => text,
-      formatAsTavernRegexedString: (text: string) => text,
+      formatAsTavernRegexedString: vi.fn((text: string) => text),
       EjsTemplate: {
         prepareContext: vi.fn(async () => ({})),
         evaltemplate: vi.fn(async (template: string) => template),
@@ -207,9 +218,11 @@ describe('executeExtraVariableUpdate', () => {
         return [clone(assistantMessage)];
       }
       if (messageId === '0-{{lastMessageId}}') {
-        return clone(chatMessages.map(message =>
-          message.message_id === assistantMessage.message_id ? assistantMessage : message,
-        ));
+        return clone(
+          chatMessages.map(message =>
+            message.message_id === assistantMessage.message_id ? assistantMessage : message,
+          ),
+        );
       }
       return [];
     });
@@ -252,18 +265,22 @@ describe('executeExtraVariableUpdate', () => {
     expect(result.appended).toBe(true);
     expect(result.actionBlockCount).toBe(1);
     expect(result.finalMessageText).toContain('<VariableEdit>');
-    expect(requestConfiguredTextMock).toHaveBeenCalledWith(expect.objectContaining({
-      prompt: expect.stringContaining('合法地点完整路径'),
-    }));
-    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(expect.objectContaining({
-      source: 'frontend',
-      operation: 'update',
-      reason: 'extra-variable-api-write',
-      eventName: 'era:apiWrite',
-      attribution: 'ai',
-      expectedMessageId: 28,
-      expectedAction: 'apiWrite',
-    }));
+    expect(requestConfiguredTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('合法地点完整路径'),
+      }),
+    );
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        expectedMessageId: 28,
+        expectedAction: 'apiWrite',
+      }),
+    );
   });
 
   it('自定义模板未放置 locationContext 时不会强行追加地点约束', async () => {
@@ -277,16 +294,18 @@ describe('executeExtraVariableUpdate', () => {
       latestRawReply: '正文内容',
     });
 
-    expect(requestConfiguredTextMock).toHaveBeenCalledWith(expect.objectContaining({
-      prompt: expect.not.stringContaining('合法地点完整路径'),
-    }));
+    expect(requestConfiguredTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.not.stringContaining('合法地点完整路径'),
+      }),
+    );
   });
 
   it('构造严格范围投影，递归清理所有 $ 字段并只选择相关 NPC', () => {
     const projection = buildExtraVariableProjection(variableSnapshot, '洪七公忽然现身。');
     const serialized = JSON.stringify(projection);
 
-    expect(Object.keys(projection)).toEqual(['世界信息', 'user数据', '角色数据', '参与事件', '前端变量']);
+    expect(Object.keys(projection)).toEqual(['世界信息', 'user数据', '角色数据', '参与事件']);
     expect(projection.世界信息).toEqual({ 时间: '1219年10月20日13时' });
     expect(Object.keys(projection.角色数据 as Record<string, unknown>)).toEqual(['郭靖', '黄蓉', '洪七公']);
     expect(serialized).not.toContain('欧阳锋');
@@ -296,8 +315,15 @@ describe('executeExtraVariableUpdate', () => {
     expect(serialized).not.toContain('随机数');
     expect(serialized).not.toContain('legacy-player-avatar');
     expect(serialized).not.toContain('legacy-npc-avatar');
+    expect(serialized).not.toContain('出生年份');
+    expect(serialized).not.toContain('年龄');
+    expect(serialized).not.toContain('初始属性');
+    expect(serialized).not.toContain('天赋');
     expect(serialized).not.toContain('$');
-    expect(serialized).toContain('大宋/临安府/客栈');
+    expect(projection.参与事件).toEqual({
+      射雕第7回02: { update: { 黄蓉: { 好感: 1 } } },
+    });
+    expect(serialized).not.toContain('黄蓉正在事件中');
   });
 
   it('默认只发送一轮完整只读上下文，并把最新 assistant 正文标记为唯一变化来源', async () => {
@@ -328,6 +354,47 @@ describe('executeExtraVariableUpdate', () => {
     });
     expect(prompt).not.toContain('触发本轮的用户输入');
     expect(prompt).not.toContain('更早用户正文');
+  });
+
+  it('先应用当前酒馆提示词正则，再按额外变量设置精确剥离规划前缀和附属标签', async () => {
+    requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
+    globalScope.formatAsTavernRegexedString.mockImplementation((text: string) =>
+      text.replace(/<preset_hidden>[\s\S]*?<\/preset_hidden>/g, ''),
+    );
+
+    await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+        variablePromptTemplate: '{{recentBodies}}',
+        variablePromptExcludedTags: 'tucao\ncurrent_event, progress',
+        variablePromptBodyStartMarkers: '</konatan_planning~>',
+      },
+      assistantMessageId: 28,
+      latestRawReply: [
+        '主模型规划内容',
+        '</konatan_planning~>',
+        '真正正文。',
+        '<tucao>吐槽</tucao>',
+        '<current_event>事件摘要</current_event>',
+        '<progress>进度</progress>',
+        '<preset_hidden>由当前预设正则处理</preset_hidden>',
+        '<unknown>未配置标签需要保留</unknown>',
+      ].join('\n'),
+    });
+
+    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
+    const context = JSON.parse(prompt) as { latestAssistantBody: { content: string } };
+    expect(context.latestAssistantBody.content).toContain('真正正文。');
+    expect(context.latestAssistantBody.content).toContain('<unknown>未配置标签需要保留</unknown>');
+    expect(context.latestAssistantBody.content).not.toContain('主模型规划内容');
+    expect(context.latestAssistantBody.content).not.toContain('吐槽');
+    expect(context.latestAssistantBody.content).not.toContain('事件摘要');
+    expect(context.latestAssistantBody.content).not.toContain('进度');
+    expect(context.latestAssistantBody.content).not.toContain('由当前预设正则处理');
+    expect(globalScope.formatAsTavernRegexedString).toHaveBeenCalledWith(expect.any(String), 'ai_output', 'prompt', {
+      depth: 0,
+    });
   });
 
   it('可配置发送两轮完整只读上下文', async () => {
@@ -377,6 +444,9 @@ describe('executeExtraVariableUpdate', () => {
     const fallbackProjection = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt;
 
     expect(fallbackProjection).toBe(normalProjection);
-    expect(() => JSON.parse(String(fallbackProjection))).not.toThrow();
+    expect(fallbackProjection).toContain('<status_current_variables>');
+    expect(fallbackProjection).toContain('[只读时间、地点与事件背景：黄蓉正在事件中]');
+    expect(fallbackProjection).toContain('{"update":{"黄蓉":{"好感":1}}}');
+    expect(fallbackProjection).not.toContain('前端变量');
   });
 });

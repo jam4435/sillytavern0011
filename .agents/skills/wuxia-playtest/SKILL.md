@@ -7,7 +7,8 @@ description:
 
 # 武侠剧情测试
 
-从仓库根目录运行 CLI。CLI 通过 `pnpm watch` 和酒馆助手后台桥调用真实的 `WuxiaAutomation`，不要自行操作变量或伪造楼层。
+从仓库根目录运行 CLI。CLI 通过独立的 `pnpm wuxia:relay` 和酒馆助手后台桥调用真实的
+`WuxiaAutomation`，不要自行操作变量或伪造楼层。Relay 不需要 `pnpm watch` 或酒馆助手实时监听。
 
 ## 标准流程
 
@@ -57,7 +58,7 @@ pnpm --silent wuxia turn --input "前往客栈打探消息"
 
 ## 故障判断
 
-- `SERVER_OFFLINE`：`pnpm watch` 未运行或 6621 不可达。
+- `SERVER_OFFLINE`：`pnpm wuxia:relay` 未运行或 6622 不可达。
 - `BRIDGE_OFFLINE`：角色卡中的“武侠自动化桥（本地开发）”未启用，或脚本未加载。
 - `AUTOMATION_NOT_READY`：尚未进入武侠游戏页，或状态栏正在热重载。
 - `BUSY`：已有生成正在运行；等待完成后重新读取快照，不要排队新的回合。

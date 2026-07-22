@@ -22,34 +22,6 @@ function toStrictJson(value) {
 }
 // PROMPT_SERIALIZER_END
 
-function selectWorldEventsForPrompt(worldEvents, outcomeStatuses, limit = 16, priorityLimit = 8) {
-  if (!worldEvents || typeof worldEvents !== 'object' || Array.isArray(worldEvents)) return {};
-  const statuses = outcomeStatuses && typeof outcomeStatuses === 'object' && !Array.isArray(outcomeStatuses)
-    ? outcomeStatuses
-    : {};
-  const getTimeValue = record => {
-    const time = record?.时间 || {};
-    return (Number(time.年) || 0) * 1000000 + (Number(time.月) || 0) * 10000 +
-      (Number(time.日) || 0) * 100 + (Number(time.时) || 0);
-  };
-  const records = Object.entries(worldEvents)
-    .filter(([, record]) => record && typeof record === 'object' && !Array.isArray(record) &&
-      record.时间 && typeof record.时间 === 'object' && typeof record.地点 === 'string' &&
-      typeof record.概要 === 'string' && record.概要.trim())
-    .sort((left, right) => getTimeValue(right[1]) - getTimeValue(left[1]) || left[0].localeCompare(right[0]));
-  const selected = new Map();
-  for (const [eventName, record] of records) {
-    if (selected.size >= Math.min(priorityLimit, limit)) break;
-    if (statuses[eventName] === '偏离' || statuses[eventName] === '未知') selected.set(eventName, record);
-  }
-  for (const [eventName, record] of records) {
-    if (selected.size >= limit) break;
-    selected.set(eventName, record);
-  }
-  return Object.fromEntries([...selected.entries()]
-    .sort((left, right) => getTimeValue(left[1]) - getTimeValue(right[1]) || left[0].localeCompare(right[0])));
-}
-
 function getAptitudeLevel(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return '未知';
@@ -73,6 +45,16 @@ function trimTrailingPunctuation(text) {
   return String(text).trim().replace(/[。！？；;，,、]+$/, '');
 }
 
+function formatNearbyRumorForPrompt(value) {
+  const source = String(value ?? '').replace(/\s+/g, ' ').trim().replace(/\|/g, '／');
+  const match = source.match(/^(.*?)\s*\[([^/\]]+)\/(.+)\]$/);
+  if (!match) return `未知日期|未知地点|${source}`;
+  const date = match[2].match(/\d+年\d+月\d+日/)?.[0] || '未知日期';
+  const location = match[3].trim().replace(/\|/g, '／');
+  const rumor = match[1].trim().replace(/\|/g, '／');
+  return `${date}|${location}|${rumor}`;
+}
+
 function describeTalents(talents) {
   if (!talents || typeof talents !== 'object') return '';
   const entries = Object.entries(talents)
@@ -93,15 +75,7 @@ function uniqueFullLocationPaths(value) {
   return [...new Set(value.map(normalizeFullLocationPath).filter(Boolean))];
 }
 
-const 原始世界事件 = getvar('stat_data.世界事件', { scope: 'local' });
-const 事件结局状态 = getvar('stat_data.前端变量.事件结局状态', { scope: 'local' });
-const 世界事件上下文 = selectWorldEventsForPrompt(原始世界事件, 事件结局状态);
-if (Object.keys(世界事件上下文).length > 0) {
 -%>
-# 只读历史：已完成的世界事件（只说明过去，不代表当前人物状态）
-世界事件:<%- toStrictJson(世界事件上下文) %>
-
-<% } -%>
 
 # 当前状态：以下时间与人物变量表示此刻
 # 当前世界信息
@@ -119,7 +93,7 @@ if (p && worldTime) {
   const talentsText = describeTalents(p.天赋);
   for (const key in p) {
     if (key.startsWith('$')) continue;
-    if (key === '初始属性' || key === '天赋' || key === '头像') continue;
+    if (key === '初始属性' || key === '天赋') continue;
     if (key === '出生年份') {
       userData['年龄'] = (worldTime.年 || 0) - (p.出生年份 || 0);
     } else {
@@ -197,7 +171,9 @@ const 附近传闻 = getvar('stat_data.附近传闻', { scope: 'local' });
 if (附近传闻 && Object.keys(附近传闻).length > 0) {
 -%>
 # 附近传闻（只读）
-{{ERA:附近传闻}}
+<% for (const 传闻 of Object.values(附近传闻)) { -%>
+<%- formatNearbyRumorForPrompt(传闻) %>
+<% } -%>
 <% } -%>
 
 <%
@@ -244,7 +220,7 @@ if (playerLocation && allCharacters) {
         // 姓名由人物对象键表达；这里只排除初始属性和内部字段
         const filtered = {};
         for (const key in character) {
-          if (key !== '初始属性' && key !== '头像' && !key.startsWith('$')) {
+          if (key !== '初始属性' && !key.startsWith('$')) {
             filtered[key] = character[key];
           }
         }

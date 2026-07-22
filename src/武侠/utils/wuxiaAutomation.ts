@@ -1,5 +1,6 @@
 import type { LatestDebugRound } from '../hooks/useDebugLogs';
 import type { PageState } from '../types';
+import { readIframeLifecycleBlackBox, type IframeLifecycleBlackBoxEntry } from './iframeLifecycleBlackBox';
 import type { VariableChangeSummary, VariableComparisonStatus } from './variableChanges';
 
 export const WUXIA_AUTOMATION_API_VERSION = 1 as const;
@@ -59,6 +60,7 @@ export interface WuxiaAutomationSnapshot {
   debug: LatestDebugRound | null;
   variableChanges: VariableChangeSummary | null;
   recentMessages: WuxiaAutomationRecentMessage[];
+  iframeLifecycle: IframeLifecycleBlackBoxEntry[];
   capturedAt: number;
 }
 
@@ -121,6 +123,13 @@ export interface WuxiaAutomationApi {
 export interface WuxiaAutomationDependencies {
   getRuntimeState: () => WuxiaAutomationRuntimeState;
   runPlayerTurn: (input: string) => Promise<string>;
+}
+
+export class WuxiaAutomationDisposedError extends Error {
+  constructor() {
+    super('武侠自动化实例已换代，当前回合需要通过持久化快照确认结果。');
+    this.name = 'WuxiaAutomationDisposedError';
+  }
 }
 
 type WriteSignalObserver = {
@@ -409,6 +418,29 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
 } {
   let disposed = false;
   let activeRequestId: string | null = null;
+  const disposeWaiters = new Set<() => void>();
+
+  const settleOnDispose = <T>(operation: Promise<T>): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      let settled = false;
+      const finish = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        disposeWaiters.delete(rejectForDispose);
+        callback();
+      };
+      const rejectForDispose = () => finish(() => reject(new WuxiaAutomationDisposedError()));
+
+      disposeWaiters.add(rejectForDispose);
+      if (disposed) {
+        rejectForDispose();
+        return;
+      }
+      operation.then(
+        value => finish(() => resolve(value)),
+        error => finish(() => reject(error)),
+      );
+    });
 
   const getSnapshot = (): WuxiaAutomationSnapshot => {
     const runtime = dependencies.getRuntimeState();
@@ -426,6 +458,7 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
       debug: cloneForAutomation(runtime.latestDebugRound),
       variableChanges: cloneForAutomation(runtime.variableChanges),
       recentMessages: toRecentMessages(messages),
+      iframeLifecycle: cloneForAutomation(readIframeLifecycleBlackBox().slice(-80)),
       capturedAt: Date.now(),
     };
   };
@@ -475,7 +508,7 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
     const observer = createWriteSignalObserver();
 
     try {
-      const rawReply = await dependencies.runPlayerTurn(input);
+      const rawReply = await settleOnDispose(dependencies.runPlayerTurn(input));
       const messagesAfterTurn = readAllMessages();
       const userMessage = findNewestMessageAfter(messagesAfterTurn, previousLatestMessageId, 'user');
       const assistantMessage = findNewestMessageAfter(messagesAfterTurn, previousLatestMessageId, 'assistant');
@@ -528,6 +561,9 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
         ...(!normalizedRawReply.trim() || error ? { error: error || '本轮没有取得 AI 回复。' } : {}),
       };
     } catch (unknownError) {
+      if (unknownError instanceof WuxiaAutomationDisposedError) {
+        throw unknownError;
+      }
       const runtime = dependencies.getRuntimeState();
       const error = unknownError instanceof Error ? unknownError.message : String(unknownError);
       return {
@@ -560,8 +596,11 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
       runTurn,
     },
     dispose: () => {
+      if (disposed) return;
       disposed = true;
       activeRequestId = null;
+      disposeWaiters.forEach(rejectForDispose => rejectForDispose());
+      disposeWaiters.clear();
     },
   };
 }

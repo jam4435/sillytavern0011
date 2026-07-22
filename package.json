@@ -11,6 +11,7 @@
     "test:safe": "vitest run --configLoader native --pool threads --reporter minimal",
     "test:watch": "vitest",
     "wuxia": "node tools/wuxia-cli/index.mjs",
+    "wuxia:relay": "node tools/wuxia-bridge/server.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,html,vue}\" --no-error-on-unmatched-pattern",
     "lint": "eslint",
     "lint:fix": "eslint --fix",

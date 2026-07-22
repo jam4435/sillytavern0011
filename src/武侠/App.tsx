@@ -73,6 +73,7 @@ import {
   WUXIA_AUTOMATION_API_VERSION,
   type WuxiaAutomationRuntimeState,
 } from './utils/wuxiaAutomation';
+import { recordIframeLifecycleEvent } from './utils/iframeLifecycleBlackBox';
 import {
   WUXIA_GLOBAL_EVENTS,
   WUXIA_TURN_TIMEOUT_MS,
@@ -514,12 +515,21 @@ const App: React.FC = () => {
     document.documentElement.dataset.wuxiaAutomationVersion = String(WUXIA_AUTOMATION_API_VERSION);
     document.documentElement.dataset.wuxiaAutomationInstance = instanceId;
     initializeGlobal(globalName, controller.api);
+    recordIframeLifecycleEvent('wuxia-frontend', 'automation-instance-ready', {
+      instanceId,
+      globalName,
+    });
     const discoveryListener = eventOn(WUXIA_GLOBAL_EVENTS.DISCOVER, () => {
       void announceReady();
     });
     void announceReady();
 
     return () => {
+      recordIframeLifecycleEvent('wuxia-frontend', 'automation-instance-disposed', {
+        instanceId,
+        globalName,
+        snapshotBusy: controller.api.getSnapshot().busy,
+      });
       discoveryListener.stop();
       controller.dispose();
       if (window.WuxiaAutomation === controller.api) {
@@ -661,7 +671,7 @@ const App: React.FC = () => {
                 year: formData.locationInfo.year,
                 month: formData.locationInfo.month,
                 day: formData.locationInfo.day,
-                hour: 11,
+                hour: formData.locationInfo.hour ?? 11,
               },
               stats: {
                 ...prev.stats,

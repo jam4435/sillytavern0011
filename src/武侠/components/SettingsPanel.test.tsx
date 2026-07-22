@@ -170,6 +170,24 @@ describe('SettingsPanel theme controls', () => {
       },
     });
   });
+
+  it('loads the precise body cleaning rules in the extra-variable settings group', () => {
+    const settings = createDefaultDisplaySettings();
+    const onSettingsChange = renderSettingsPanel(settings);
+
+    fireEvent.click(screen.getByRole('button', { name: /额外模型/ }));
+    expect(screen.getByLabelText('忽略的附属标签')).toHaveValue('tucao\ncurrent_event\nprogress');
+    expect(screen.getByLabelText('正文开始边界')).toHaveValue('</konatan_planning~>');
+
+    fireEvent.change(screen.getByLabelText('忽略的附属标签'), { target: { value: 'aside\nmetadata' } });
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      ...settings,
+      summarySettings: {
+        ...settings.summarySettings,
+        variablePromptExcludedTags: 'aside\nmetadata',
+      },
+    });
+  });
 });
 
 describe('SettingsPanel variable groups', () => {

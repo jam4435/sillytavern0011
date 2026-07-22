@@ -1828,14 +1828,17 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
     .html('<i class="fa-solid fa-plus"></i>')
     .attr('title', '新建条目')
     .attr('data-action', 'add-entry');
-  const $selectAllButton = $('<button></button>')
-    .addClass('lorebook-batch-action-button')
-    .css('background-color', '#336699')
-    .html('<i class="fa-solid fa-check-double"></i>')
-    .attr('title', '全选或取消全选')
-    .attr('data-action', 'select-all')
+  const $selectAllToggle = $('<label></label>')
+    .addClass('lorebook-title-select-all')
+    .attr('title', '全选当前显示条目');
+  const $selectAllCheckbox = $('<input>')
+    .attr('type', 'checkbox')
+    .addClass('header-checkbox')
+    .attr('title', '全选当前显示条目')
+    .attr('aria-label', '全选当前显示条目')
     .attr('data-lorebook-name', lorebookName)
     .attr('data-is-global', isGlobal ? 'true' : 'false');
+  $selectAllToggle.append($selectAllCheckbox);
 
   if (isMobile()) {
     const $titleInfoWrapper = $('<div></div>').addClass('lorebook-title-info-wrapper');
@@ -1851,7 +1854,7 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
       .append($aiActionContainer)
       .append($rollbackButton)
       .append($createFolderButton)
-      .append($selectAllButton)
+      .append($selectAllToggle)
       .append($batchToggleContainer)
       .append($filterContainer)
       .append($adjustPositionButton)
@@ -1861,15 +1864,8 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
   } else if (isDesktopMaster) {
     const $titleMain = $('<div></div>').addClass('lorebook-title-main');
     const $compactActions = $('<div></div>').addClass('lorebook-title-compact-actions');
-    const $selectAllToggle = $('<label></label>').addClass('lorebook-title-select-all').attr('title', 'select all');
-    const $selectAllCheckbox = $('<input>')
-      .attr('type', 'checkbox')
-      .addClass('header-checkbox')
-      .attr('title', '更多操作')
-      .attr('data-is-global', isGlobal ? 'true' : 'false');
     $sortButton.addClass('master-sort-button').attr('title', currentSortText).html('<i class="fa-solid fa-arrow-down-wide-short"></i>');
     $titleMain.append($titleText).append($titleMeta);
-    $selectAllToggle.append($selectAllCheckbox.attr('data-lorebook-name', lorebookName));
     $compactActions
       .append($sortContainer)
       .append($searchContainer)
@@ -1961,6 +1957,7 @@ export const updateHeaderCheckboxState = errorCatched((lorebookName, isGlobal) =
       ? '部分条目已选，点击处理当前范围'
       : '全选当前显示条目';
   allCheckboxes.attr('title', controlTitle);
+  allCheckboxes.attr('aria-label', controlTitle).closest('.lorebook-title-select-all').attr('title', controlTitle);
   $selectAllButtonMobile.attr('title', controlTitle);
 
   syncFolderCheckboxStates(lorebookName, isGlobal);

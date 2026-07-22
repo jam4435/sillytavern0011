@@ -2411,6 +2411,55 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
 
               <div className="summary-subsection">
+                <h5 className="summary-subsection-title">额外变量正文清洗</h5>
+                <p className="settings-hint">
+                  会先按当前酒馆的提示词正则处理正文，再应用这里的精确规则。每行一项，也可用逗号分隔；未知标签不会被删除。
+                </p>
+                <label className="settings-label" htmlFor="extra-variable-excluded-tags">
+                  忽略的附属标签
+                </label>
+                <textarea
+                  id="extra-variable-excluded-tags"
+                  value={settings.summarySettings.variablePromptExcludedTags}
+                  onChange={e => updateSummarySetting('variablePromptExcludedTags', e.target.value)}
+                  placeholder={'tucao\ncurrent_event\nprogress'}
+                  className="settings-textarea"
+                  rows={3}
+                />
+                <p className="settings-hint">填写标签名，不带尖括号；只删除完整的成对标签块或自闭合标签。</p>
+
+                <label className="settings-label" htmlFor="extra-variable-body-start-markers">
+                  正文开始边界
+                </label>
+                <textarea
+                  id="extra-variable-body-start-markers"
+                  value={settings.summarySettings.variablePromptBodyStartMarkers}
+                  onChange={e => updateSummarySetting('variablePromptBodyStartMarkers', e.target.value)}
+                  placeholder="</konatan_planning~>"
+                  className="settings-textarea"
+                  rows={2}
+                />
+                <p className="settings-hint">
+                  命中边界时，只保留最后一个已配置边界之后的内容，用于剥离回复前缀中的规划文本。
+                </p>
+                <button
+                  className="settings-reset-template-btn"
+                  onClick={() =>
+                    onSettingsChange({
+                      ...settings,
+                      summarySettings: {
+                        ...settings.summarySettings,
+                        variablePromptExcludedTags: DEFAULT_SUMMARY_SETTINGS.variablePromptExcludedTags,
+                        variablePromptBodyStartMarkers: DEFAULT_SUMMARY_SETTINGS.variablePromptBodyStartMarkers,
+                      },
+                    })
+                  }
+                >
+                  恢复默认清洗规则
+                </button>
+              </div>
+
+              <div className="summary-subsection">
                 <h5 className="summary-subsection-title">变量提示词模板</h5>
                 <p className="settings-hint">
                   可用变量：{'{{recentBodies}}'}、{'{{variableContext}}'}、{'{{variableGuidance}}'}、
