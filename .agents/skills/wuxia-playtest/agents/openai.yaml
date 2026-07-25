@@ -1,5 +1,0 @@
-interface:
-  display_name: '武侠剧情测试'
-  short_description: '通过本地 CLI 推进酒馆剧情并核验提示词与变量更新'
-  default_prompt:
-    'Use $wuxia-playtest to inspect the current game, advance one turn, and verify its prompt and variable updates.'

@@ -14,13 +14,16 @@ import { captureNextCombinedPromptForDebug } from '../utils/promptDebug';
 import { syncFrontendDerivedVariables } from '../utils/frontendDerivedVariables';
 import { extractExplicitMapTargetsFromText } from '../utils/locationContext';
 import {
+  ensureTurnVariableBlocksCommitted,
   executeExtraVariableUpdate,
   prepareExtraVariableUpdateTurn,
   type ExtraVariableUpdateProgress,
   type ExtraVariableUpdateReservation,
 } from '../utils/extraVariableUpdateManager';
+import { observeEraWriteDone } from '../utils/eraWriteWait';
 import { recordIframeLifecycleEvent } from '../utils/iframeLifecycleBlackBox';
 import { acquireWuxiaTurnLock, releaseWuxiaTurnLock } from '../utils/turnLock';
+import { runWith429Retry } from '../utils/rateLimitRetry';
 import type { LatestDebugRoundPatch } from './useDebugLogs';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -63,6 +66,8 @@ interface UseMessageHandlerOptions {
 }
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
+const COMPLETE_VARIABLE_ACTION_BLOCK_REGEX =
+  /<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>/;
 const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
 const WUXIA_TURN_COMPLETED_EVENT = 'wuxia:turn-completed';
 
@@ -152,12 +157,26 @@ function createInitialExtraVariableDecisionPatch(
           status: 'idle',
           startedAt: now,
           error: '',
+          retry429Count: 0,
+          retry429LastDelayMs: 0,
+          applyStatus: 'idle',
+          applyError: '',
+          applyVerification: '',
+          postProcessStatus: 'idle',
+          postProcessError: '',
         }
       : {
           status: 'skipped',
           startedAt: now,
           finishedAt: now,
           error: '',
+          retry429Count: 0,
+          retry429LastDelayMs: 0,
+          applyStatus: 'idle',
+          applyError: '',
+          applyVerification: '',
+          postProcessStatus: 'idle',
+          postProcessError: '',
         },
   );
 }
@@ -166,7 +185,6 @@ function createExtraVariableProgressPatch(
   progress: ExtraVariableUpdateProgress,
 ): NonNullable<LatestDebugRoundPatch['variable']> {
   const patch: NonNullable<LatestDebugRoundPatch['variable']> = {
-    status: 'running',
   };
   if (typeof progress.prompt === 'string') {
     patch.input = progress.prompt;
@@ -192,6 +210,27 @@ function createExtraVariableProgressPatch(
   if (typeof progress.syncVerification === 'string') {
     patch.syncVerification = progress.syncVerification;
   }
+  if (typeof progress.retry429Count === 'number') {
+    patch.retry429Count = progress.retry429Count;
+  }
+  if (typeof progress.retry429LastDelayMs === 'number') {
+    patch.retry429LastDelayMs = progress.retry429LastDelayMs;
+  }
+  if (progress.applyStatus) {
+    patch.applyStatus = progress.applyStatus;
+  }
+  if (typeof progress.applyVerification === 'string') {
+    patch.applyVerification = progress.applyVerification;
+  }
+  if (typeof progress.applyError === 'string') {
+    patch.applyError = progress.applyError;
+  }
+  if (Array.isArray(progress.phaseTimeline)) {
+    patch.phaseTimeline = progress.phaseTimeline.map(phase => ({ ...phase }));
+  }
+  if (typeof progress.currentPhase === 'string') {
+    patch.currentPhase = progress.currentPhase;
+  }
   return patch;
 }
 
@@ -209,6 +248,11 @@ function summarizeExtraVariableProgress(progress: ExtraVariableUpdateProgress) {
     finalMessageTextLength: typeof progress.finalMessageText === 'string' ? progress.finalMessageText.length : 0,
     appendVerification: progress.appendVerification ?? '',
     syncVerification: progress.syncVerification ?? '',
+    applyStatus: progress.applyStatus ?? '',
+    applyVerification: progress.applyVerification ?? '',
+    applyError: progress.applyError ?? '',
+    currentPhase: progress.currentPhase ?? '',
+    phaseCount: progress.phaseTimeline?.length ?? 0,
   };
 }
 
@@ -325,12 +369,22 @@ export function useMessageHandler({
       }
 
       showLoading('正在额外更新变量...');
+      let extraDeclarationsRegistered = false;
       patchLatestDebugRound({
         variable: createExtraVariableDecisionPatch(decision, {
           status: 'running',
           startedAt: Date.now(),
           finishedAt: undefined,
           error: '',
+          retry429Count: 0,
+          retry429LastDelayMs: 0,
+          applyStatus: 'idle',
+          applyError: '',
+          applyVerification: '',
+          postProcessStatus: 'idle',
+          postProcessError: '',
+          phaseTimeline: [],
+          currentPhase: '',
         }),
       });
 
@@ -358,6 +412,17 @@ export function useMessageHandler({
           patchLatestDebugRound({
             variable: createExtraVariableDecisionPatch(decision, createExtraVariableProgressPatch(progress)),
           });
+          // 变量块已确认写入 assistant 楼层后立即交给 tracker。不能等 ERA 后处理结束，
+          // 否则已发生的 AI 变量差异会被暂时误记为 background。
+          if (
+            !extraDeclarationsRegistered
+            && progress.appended === true
+            && typeof progress.appendedBlocks === 'string'
+            && progress.appendedBlocks.trim()
+          ) {
+            extraDeclarationsRegistered = true;
+            onVariableExtraDeclaredBlocks?.(progress.appendedBlocks, assistantMessageId);
+          }
         },
       });
 
@@ -366,7 +431,11 @@ export function useMessageHandler({
         actionBlockCount: extraUpdateResult.actionBlockCount,
         appended: extraUpdateResult.appended,
       });
-      if (typeof extraUpdateResult.appendedBlocks === 'string' && extraUpdateResult.appendedBlocks.trim()) {
+      if (
+        !extraDeclarationsRegistered
+        && typeof extraUpdateResult.appendedBlocks === 'string'
+        && extraUpdateResult.appendedBlocks.trim()
+      ) {
         onVariableExtraDeclaredBlocks?.(extraUpdateResult.appendedBlocks, assistantMessageId);
       }
       patchLatestDebugRound({
@@ -380,6 +449,11 @@ export function useMessageHandler({
           appendVerification: extraUpdateResult.appendVerification || '',
           syncReadbackText: extraUpdateResult.syncReadbackText || '',
           syncVerification: extraUpdateResult.syncVerification || '',
+          retry429Count: extraUpdateResult.retry429Count ?? 0,
+          retry429LastDelayMs: extraUpdateResult.retry429LastDelayMs ?? 0,
+          applyStatus: extraUpdateResult.applyStatus || 'idle',
+          applyVerification: extraUpdateResult.applyVerification || '',
+          applyError: extraUpdateResult.applyError || '',
           finishedAt: Date.now(),
         }),
       });
@@ -390,7 +464,11 @@ export function useMessageHandler({
   );
 
   const handleSendMessage = useCallback(
-    async (message: string): Promise<string> => {
+    async (
+      message: string,
+      options: { waitForBridgeResponseDelivery?: boolean } = {},
+    ): Promise<string> => {
+      const waitForBridgeResponseDelivery = options.waitForBridgeResponseDelivery === true;
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       messageLogger.log('🚀 开始发送消息流程');
       messageLogger.log('📝 用户输入:', message);
@@ -475,8 +553,24 @@ export function useMessageHandler({
         });
         let result: string | GenerateToolCallResult;
         try {
-          result = await generate({
+          result = await runWith429Retry(() => generate({
             should_stream: true,
+          }), {
+            requestLabel: '正文模型',
+            onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
+              patchLatestDebugRound({
+                main: {
+                  retry429Count: retryNumber,
+                  retry429LastDelayMs: delayMs,
+                },
+              });
+              messageLogger.warn('[useMessageHandler] 正文模型返回 429，准备自动重试', {
+                retryNumber,
+                maxRetries,
+                delayMs,
+                error,
+              });
+            },
           });
         } finally {
           combinedPromptCapture?.stop();
@@ -527,20 +621,34 @@ export function useMessageHandler({
             options: { refresh: 'none' },
           });
 
-          const createAssistantResult = await createChatMessages(
-            [
+          const inlineEraWriteObserver = COMPLETE_VARIABLE_ACTION_BLOCK_REGEX.test(resultText)
+            ? observeEraWriteDone({ expectedAction: 'resync' })
+            : null;
+          let assistantMessage: ChatMessageWithSwipes | null = null;
+          try {
+            const createAssistantResult = await createChatMessages(
+              [
+                {
+                  role: 'assistant',
+                  message: resultText,
+                },
+              ],
               {
-                role: 'assistant',
-                message: resultText,
+                refresh: 'none',
               },
-            ],
-            {
-              refresh: 'none',
-            },
-          );
-          messageLogger.log('✅ [步骤 4] assistant 消息楼层创建完成');
-          messageLogger.log('createChatMessages 返回值:', createAssistantResult);
-          const assistantMessage = getNewestMessageAfter(beforeSendLastMessageId, 'assistant');
+            );
+            messageLogger.log('✅ [步骤 4] assistant 消息楼层创建完成');
+            messageLogger.log('createChatMessages 返回值:', createAssistantResult);
+            assistantMessage = getNewestMessageAfter(beforeSendLastMessageId, 'assistant');
+            if (inlineEraWriteObserver && assistantMessage?.message_id !== undefined) {
+              await inlineEraWriteObserver.waitForMessageId(assistantMessage.message_id, {
+                timeoutMs: 20000,
+                timeoutMessage: 'ERA 没有确认当前 assistant 楼层的 inline 变量写入，已停止事件结算。',
+              });
+            }
+          } finally {
+            inlineEraWriteObserver?.stop();
+          }
           createdLatestMessageId = assistantMessage?.message_id ?? createdLatestMessageId;
           recordIframeLifecycleEvent('wuxia-frontend', 'turn-assistant-message-created', {
             roundId: debugRoundId,
@@ -571,6 +679,7 @@ export function useMessageHandler({
             },
           });
 
+          let committedVariableBlocks = resultText;
           if (extraVariableDecision.shouldRunExtra) {
             if (!assistantMessage?.message_id) {
               const errorMessage = '正文已生成，但没有找到可追加变量块的 assistant 楼层。';
@@ -594,6 +703,7 @@ export function useMessageHandler({
               if (extraUpdateResult?.appended && extraUpdateResult.finalMessageText) {
                 refreshAssistantStateFromFinalText(extraUpdateResult.finalMessageText);
               }
+              committedVariableBlocks = `${resultText}\n${extraUpdateResult?.appendedBlocks || ''}`;
             } catch (error) {
               const errorMessage = getErrorMessage(error);
               messageLogger.error('额外变量更新失败:', error);
@@ -613,16 +723,33 @@ export function useMessageHandler({
             }
           }
 
+          if (!assistantMessage?.message_id) {
+            showError('正文已生成，但没有找到可确认变量提交的 assistant 楼层。');
+            return resultText;
+          }
+          try {
+            await ensureTurnVariableBlocksCommitted({
+              assistantMessageId: assistantMessage.message_id,
+              blocksText: committedVariableBlocks,
+            });
+          } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            messageLogger.error('本回合变量提交确认失败:', error);
+            showError(`正文已生成，但变量提交确认失败：${errorMessage}`);
+            return resultText;
+          }
+
           messageLogger.log('✅ [步骤 5] 前端状态已更新');
           messageLogger.log('注意: React 状态更新是异步的，新值将在下次渲染时生效');
 
           // 回合成功完成（文本已生成、助手楼层已写入、extra 模式下 ERA 写入已确认）
           // → 通知事件脚本扣减线索倒计时（替代 MESSAGE_SENT 的发送即扣）。
-          const completedMessageId = assistantMessage?.message_id ?? createdLatestMessageId ?? null;
+          const completedMessageId = assistantMessage.message_id;
           if (completedMessageId !== null && Number.isInteger(completedMessageId)) {
-            void eventEmit(WUXIA_TURN_COMPLETED_EVENT, {
+            await eventEmit(WUXIA_TURN_COMPLETED_EVENT, {
               messageId: completedMessageId,
-              chatId: readCurrentChatIdForTurn(),
+              chatId: turnChatId,
+              roundId: debugRoundId,
             });
           }
 
@@ -679,7 +806,13 @@ export function useMessageHandler({
         setIsLoading(false);
         if (turnLockRequestStarted) {
           try {
-            await releaseWuxiaTurnLock(debugRoundId, turnChatId, createdLatestMessageId);
+            await releaseWuxiaTurnLock(
+              debugRoundId,
+              turnChatId,
+              createdLatestMessageId,
+              undefined,
+              waitForBridgeResponseDelivery,
+            );
           } catch (error) {
             recordIframeLifecycleEvent('wuxia-frontend', 'turn-lock-release-failed', {
               roundId: debugRoundId,
@@ -688,7 +821,7 @@ export function useMessageHandler({
             });
           }
         }
-        if (createdLatestMessageId !== null) {
+        if (createdLatestMessageId !== null && !waitForBridgeResponseDelivery) {
           // 由后台楼层脚本延迟切换宿主消息节点；此处不等待，避免刷新节点时打断当前调用栈。
           void eventEmit(SYNC_LATEST_MESSAGE_SHELL_EVENT, createdLatestMessageId);
         }
@@ -829,6 +962,7 @@ export function useMessageHandler({
       setCurrentMaintext(result.maintext);
       setCurrentOptions(result.options);
 
+      let committedVariableBlocks = result.rawReply;
       if (extraVariableDecision.shouldRunExtra) {
         try {
           const extraUpdateResult = await runExtraVariableUpdate({
@@ -846,6 +980,7 @@ export function useMessageHandler({
               setCurrentOptions(parseOptions(latestContent));
             }
           }
+          committedVariableBlocks = `${result.rawReply}\n${extraUpdateResult?.appendedBlocks || ''}`;
         } catch (error) {
           const errorMessage = getErrorMessage(error);
           messageLogger.error('重新生成后的额外变量更新失败:', error);
@@ -865,13 +1000,26 @@ export function useMessageHandler({
         }
       }
 
+      try {
+        await ensureTurnVariableBlocksCommitted({
+          assistantMessageId: result.assistantMessageId,
+          blocksText: committedVariableBlocks,
+        });
+      } catch (error) {
+        const errorMessage = getErrorMessage(error);
+        messageLogger.error('重新生成后的变量提交确认失败:', error);
+        showError(`重新生成已完成，但变量提交确认失败：${errorMessage}`);
+        return;
+      }
+
       // 回合成功完成（重新生成成功，助手楼层新 swipe 已写入、ERA 已确认）
       // → 通知事件脚本扣减线索倒计时。regenerate 的 messageId 不变，事件脚本按 messageId 去重，
       // 因此同一楼层多次 regenerate 只扣一次。
       if (targetAssistantMessageId !== null && Number.isInteger(targetAssistantMessageId)) {
-        void eventEmit(WUXIA_TURN_COMPLETED_EVENT, {
+        await eventEmit(WUXIA_TURN_COMPLETED_EVENT, {
           messageId: targetAssistantMessageId,
-          chatId: readCurrentChatIdForTurn(),
+          chatId: turnChatId,
+          roundId: debugRoundId,
         });
       }
 

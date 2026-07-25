@@ -119,7 +119,8 @@ function should_ignore_entry(script_file: string) {
 function glob_script_files() {
   const results: string[] = [];
 
-  fs.globSync(`{示例,src}/**/index.{ts,tsx,js,jsx}`)
+  // 只将正式源码目录作为构建入口；示例仅供参考，不参与任何 build/watch。
+  fs.globSync(`src/**/index.{ts,tsx,js,jsx}`)
     .filter(file => !should_ignore_entry(file))
     .filter(
       file => process.env.CI !== 'true' || !fs.readFileSync(path.join(import.meta.dirname, file)).includes('@no-ci'),

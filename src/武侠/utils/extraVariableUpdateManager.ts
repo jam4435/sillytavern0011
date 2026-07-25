@@ -4,14 +4,26 @@ import {
   type SummaryVariableUpdateMode,
 } from './settingsManager';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
+import { scheduleUnthrottledInterval, scheduleUnthrottledTimeout } from '../../shared/unthrottledTimer';
 import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryApiConfig } from './summaryApiClient';
 import { dataLogger, variableTraceLogger } from './logger';
+import { recordIframeLifecycleEvent } from './iframeLifecycleBlackBox';
 import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
+import { runWith429Retry } from './rateLimitRetry';
+import {
+  parseDeclaredVariableChanges,
+  readCurrentStatDataSnapshot,
+  stableStringify,
+  type VariableDeclaredChange,
+} from './variableChanges';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
 const SNAPSHOT_STORAGE_KEY = 'wuxia_extra_variable_guidance_snapshot';
 const EXTRA_VARIABLE_UPDATE_TIMEOUT_MS = 360000;
 const ERA_SYNC_TIMEOUT_MS = 20000;
+const ERA_PERSISTENCE_FOREGROUND_VERIFY_TIMEOUT_MS = 15000;
+const ERA_PERSISTENCE_BACKGROUND_VERIFY_TIMEOUT_MS = 8 * 60 * 1000;
+const ERA_PERSISTENCE_VERIFY_DELAYS_MS = [120, 250, 500, 1000, 2000] as const;
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -54,9 +66,38 @@ export type ExtraVariableUpdateResult = {
   appendVerification?: string;
   syncReadbackText?: string;
   syncVerification?: string;
+  retry429Count?: number;
+  retry429LastDelayMs?: number;
+  applyStatus?: ExtraVariableApplyStatus;
+  applyVerification?: string;
+  applyError?: string;
 };
 
-export type ExtraVariableUpdateProgress = Partial<ExtraVariableUpdateResult>;
+export type ExtraVariablePhaseStatus = 'running' | 'success' | 'error';
+
+export type ExtraVariablePhaseTiming = {
+  name: string;
+  status: ExtraVariablePhaseStatus;
+  startedAt: number;
+  updatedAt: number;
+  finishedAt?: number;
+  durationMs: number;
+  watchdogTickCount: number;
+  error?: string;
+};
+
+export type ExtraVariableUpdateProgress = Partial<ExtraVariableUpdateResult> & {
+  phaseTimeline?: ExtraVariablePhaseTiming[];
+  currentPhase?: string;
+};
+
+export type ExtraVariableApplyStatus =
+  | 'idle'
+  | 'waiting-write-done'
+  | 'verifying'
+  | 'success'
+  | 'pending'
+  | 'error';
 
 type MessageWriteVerification = {
   messageId: number;
@@ -70,6 +111,8 @@ type MessageWriteVerification = {
 
 let extraVariableUpdateBusy = false;
 let extraVariableUpdateReserved = false;
+let extraVariableApplyPending = false;
+let pendingPersistenceVerification: PendingPersistenceVerification | null = null;
 
 const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/gi;
 const ERA_VARIABLE_BLOCK_STRIP_REGEX = /\s*<Variable(Think|Insert|Edit|Delete)>\s*[\s\S]*?<\/Variable\1>\s*/gi;
@@ -82,7 +125,8 @@ const VARIABLE_ROOT_KEY_ALIASES: Record<string, string> = {
 };
 
 export function getIsExtraVariableUpdating(): boolean {
-  return extraVariableUpdateBusy || extraVariableUpdateReserved;
+  refreshPendingPersistenceVerification('busy-check');
+  return extraVariableUpdateBusy || extraVariableUpdateReserved || extraVariableApplyPending;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -91,6 +135,335 @@ function getErrorMessage(error: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function delayWhilePageVisible(milliseconds: number): Promise<boolean> {
+  if (isPageHidden()) return Promise.resolve(false);
+
+  return new Promise(resolve => {
+    let settled = false;
+    let timer: ReturnType<typeof scheduleUnthrottledTimeout> | null = null;
+    const finish = (completed: boolean) => {
+      if (settled) return;
+      settled = true;
+      try {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      } catch {
+        // 测试环境或 iframe 销毁时无需继续清理。
+      }
+      timer?.cancel();
+      resolve(completed);
+    };
+    const onVisibilityChange = () => {
+      if (isPageHidden()) finish(false);
+    };
+
+    try {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      timer = scheduleUnthrottledTimeout(() => finish(true), milliseconds);
+    } catch {
+      finish(false);
+    }
+  });
+}
+
+function delayUnthrottled(milliseconds: number): Promise<void> {
+  return new Promise(resolve => {
+    scheduleUnthrottledTimeout(resolve, milliseconds);
+  });
+}
+
+function readPathValue(source: unknown, path: readonly (string | number)[]): unknown {
+  let current: unknown = source;
+  for (const segment of path) {
+    if (Array.isArray(current) && typeof segment === 'number') {
+      current = current[segment];
+      continue;
+    }
+    if (!isRecord(current)) {
+      return undefined;
+    }
+    current = current[String(segment)];
+  }
+  return current;
+}
+
+function collapseDeclaredChangesForPersistence(
+  declaredChanges: VariableDeclaredChange[],
+): VariableDeclaredChange[] {
+  const byPath = new Map<string, VariableDeclaredChange>();
+  const pathKey = (path: readonly (string | number)[]) => JSON.stringify(path);
+  const actionPriority: Record<VariableDeclaredChange['action'], number> = {
+    insert: 1,
+    edit: 2,
+    delete: 3,
+  };
+
+  for (const change of declaredChanges) {
+    const key = pathKey(change.path);
+    const existing = byPath.get(key);
+    if (!existing) {
+      byPath.set(key, change);
+      continue;
+    }
+
+    const existingPriority = actionPriority[existing.action];
+    const nextPriority = actionPriority[change.action];
+    if (nextPriority > existingPriority || (nextPriority === existingPriority && change.action !== 'insert')) {
+      byPath.set(key, change);
+    }
+  }
+
+  const collapsed = [...byPath.values()];
+  const deletePaths = collapsed
+    .filter(change => change.action === 'delete')
+    .map(change => change.path);
+  return collapsed.filter(change => {
+    if (change.action === 'delete') return true;
+    return !deletePaths.some(
+      deletePath =>
+        deletePath.length <= change.path.length
+        && deletePath.every((segment, index) => segment === change.path[index]),
+    );
+  });
+}
+
+export type PersistenceVerification = {
+  verified: boolean;
+  verification: string;
+  pendingPaths: string[];
+};
+
+type PendingPersistenceVerification = {
+  assistantMessageId: number;
+  declaredChanges: VariableDeclaredChange[];
+  onProgress?: (progress: ExtraVariableUpdateProgress) => void;
+  startedAt: number;
+  generation: number;
+};
+
+let persistenceVerificationGeneration = 0;
+
+function isPageHidden(): boolean {
+  try {
+    return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  } catch {
+    return false;
+  }
+}
+
+function verifyDeclaredChangesPersisted(declaredChanges: VariableDeclaredChange[]): PersistenceVerification {
+  const expectedChanges = collapseDeclaredChangesForPersistence(declaredChanges);
+  if (expectedChanges.length === 0) {
+    return {
+      verified: true,
+      verification: '本轮没有可比较的变量叶子声明，无需等待聊天变量快照。',
+      pendingPaths: [],
+    };
+  }
+
+  const statData = readCurrentStatDataSnapshot();
+  if (!statData) {
+    return {
+      verified: false,
+      verification: '聊天级 stat_data 暂不可读，正在等待持久化快照。',
+      pendingPaths: expectedChanges.map(change => change.displayPath),
+    };
+  }
+
+  const pendingPaths = expectedChanges
+    .filter(change => {
+      const actualValue = readPathValue(statData, change.path);
+      return change.action === 'delete'
+        ? actualValue !== undefined
+        : stableStringify(actualValue) !== stableStringify(change.value);
+    })
+    .map(change => change.displayPath);
+
+  return pendingPaths.length === 0
+    ? {
+        verified: true,
+        verification: `聊天级 stat_data 已确认 ${expectedChanges.length} 条最终变量声明。`,
+        pendingPaths: [],
+      }
+    : {
+        verified: false,
+        verification: `ERA 已返回写入完成信号，但聊天变量快照尚未刷新：${pendingPaths.join('、')}`,
+        pendingPaths,
+      };
+}
+
+async function waitForDeclaredChangesPersisted(
+  declaredChanges: VariableDeclaredChange[],
+  timeoutMs: number,
+  options: { stopWhenHidden?: boolean } = {},
+): Promise<PersistenceVerification> {
+  const stopWhenHidden = options.stopWhenHidden !== false;
+  const startedAt = Date.now();
+  let attempt = 0;
+  let latest = verifyDeclaredChangesPersisted(declaredChanges);
+  while (!latest.verified && Date.now() - startedAt < timeoutMs) {
+    // 顶层窗口的 setTimeout 在整个酒馆标签页隐藏时同样会被 Chromium 节流。
+    // 此时继续“前台等待 15 秒”可能实际占用数分钟；立即转入可机会性回读的后台验证。
+    if (stopWhenHidden && isPageHidden()) break;
+    const remaining = timeoutMs - (Date.now() - startedAt);
+    const delayMs = Math.min(
+      ERA_PERSISTENCE_VERIFY_DELAYS_MS[Math.min(attempt, ERA_PERSISTENCE_VERIFY_DELAYS_MS.length - 1)],
+      Math.max(0, remaining),
+    );
+    if (delayMs <= 0) break;
+    if (stopWhenHidden) {
+      const completedDelay = await delayWhilePageVisible(delayMs);
+      if (!completedDelay) break;
+    } else {
+      await delayUnthrottled(delayMs);
+    }
+    attempt += 1;
+    latest = verifyDeclaredChangesPersisted(declaredChanges);
+  }
+  return latest;
+}
+
+export async function ensureTurnVariableBlocksCommitted({
+  assistantMessageId,
+  blocksText,
+  timeoutMs = ERA_PERSISTENCE_FOREGROUND_VERIFY_TIMEOUT_MS,
+}: {
+  assistantMessageId: number;
+  blocksText: string;
+  timeoutMs?: number;
+}): Promise<PersistenceVerification> {
+  const hasActionOpeningTag = /<Variable(?:Insert|Edit|Delete)>/.test(blocksText);
+  if (!hasActionOpeningTag) {
+    return {
+      verified: true,
+      verification: '本回合没有变量动作块，无需等待 ERA 提交。',
+      pendingPaths: [],
+    };
+  }
+
+  const completeActionBlocks = blocksText.match(
+    /<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>/g,
+  ) ?? [];
+  if (completeActionBlocks.length === 0) {
+    throw new Error('本回合包含未闭合的变量动作标签，无法确认 ERA 提交。');
+  }
+
+  const declaredState = parseDeclaredVariableChanges(blocksText);
+  if (declaredState.parseErrors.length > 0) {
+    throw new Error(`本回合变量动作块无法完整解析：${declaredState.parseErrors.join('；')}`);
+  }
+  if (declaredState.declaredChanges.length === 0) {
+    throw new Error('本回合变量动作块没有可验证的变量声明，无法确认 ERA 提交。');
+  }
+
+  const verification = await waitForDeclaredChangesPersisted(
+    declaredState.declaredChanges,
+    timeoutMs,
+    { stopWhenHidden: false },
+  );
+  if (!verification.verified) {
+    throw new Error(
+      `assistant 楼层 ${assistantMessageId} 的变量尚未全部落库，已停止事件结算：${
+        verification.pendingPaths.join('、') || verification.verification
+      }`,
+    );
+  }
+
+  return verification;
+}
+
+function finishPendingPersistenceVerification(
+  pending: PendingPersistenceVerification,
+  verification: PersistenceVerification,
+  trigger: string,
+): boolean {
+  if (pendingPersistenceVerification?.generation !== pending.generation) return false;
+
+  const elapsedMs = Date.now() - pending.startedAt;
+  if (verification.verified) {
+    pendingPersistenceVerification = null;
+    extraVariableApplyPending = false;
+    variableTraceLogger.log('[extraVariableUpdate] 延迟变量快照验证成功', {
+      assistantMessageId: pending.assistantMessageId,
+      elapsedMs,
+      trigger,
+    });
+    pending.onProgress?.({ applyStatus: 'success', applyVerification: verification.verification });
+    return true;
+  }
+
+  if (elapsedMs < ERA_PERSISTENCE_BACKGROUND_VERIFY_TIMEOUT_MS) return false;
+
+  pendingPersistenceVerification = null;
+  extraVariableApplyPending = false;
+  const error = `等待聊天变量快照超过 ${Math.round(ERA_PERSISTENCE_BACKGROUND_VERIFY_TIMEOUT_MS / 60000)} 分钟：${verification.pendingPaths.join('、')}`;
+  variableTraceLogger.error('[extraVariableUpdate] 延迟变量快照验证超时', {
+    assistantMessageId: pending.assistantMessageId,
+    elapsedMs,
+    pendingPaths: verification.pendingPaths,
+    trigger,
+  });
+  pending.onProgress?.({ applyStatus: 'error', applyVerification: verification.verification, applyError: error });
+  return true;
+}
+
+function refreshPendingPersistenceVerification(trigger: string): boolean {
+  const pending = pendingPersistenceVerification;
+  if (!pending) return false;
+  return finishPendingPersistenceVerification(
+    pending,
+    verifyDeclaredChangesPersisted(pending.declaredChanges),
+    trigger,
+  );
+}
+
+function continueDeclaredChangesPersistenceVerification({
+  assistantMessageId,
+  declaredChanges,
+  onProgress,
+}: {
+  assistantMessageId: number;
+  declaredChanges: VariableDeclaredChange[];
+  onProgress?: (progress: ExtraVariableUpdateProgress) => void;
+}): void {
+  const generation = ++persistenceVerificationGeneration;
+  extraVariableApplyPending = true;
+  const pending: PendingPersistenceVerification = {
+    assistantMessageId,
+    declaredChanges,
+    onProgress,
+    startedAt: Date.now(),
+    generation,
+  };
+  pendingPersistenceVerification = pending;
+
+  const scheduleRetry = (callback: () => void, delayMs: number) => {
+    try {
+      scheduleUnthrottledTimeout(callback, delayMs);
+    } catch (error) {
+      // iframe 正在换代时计时器宿主可能已经销毁；busy 查询仍会机会性回读，
+      // 因此这里只记录而不把注册失败升级成未处理异常。
+      variableTraceLogger.warn('[extraVariableUpdate] 后台变量快照重试计时器注册失败', {
+        assistantMessageId,
+        generation,
+        error,
+      });
+    }
+  };
+  const retry = () => {
+    if (pendingPersistenceVerification?.generation !== generation) return;
+    if (refreshPendingPersistenceVerification('background-timer')) return;
+    scheduleRetry(retry, ERA_PERSISTENCE_VERIFY_DELAYS_MS.at(-1) ?? 2000);
+  };
+
+  // 先用微任务回读一次：writeDone 监听链后的内存快照通常会在当前任务结束前可见，
+  // 且微任务不会被隐藏页的普通计时器节流。
+  queueMicrotask(() => {
+    if (pendingPersistenceVerification?.generation !== generation) return;
+    if (refreshPendingPersistenceVerification('microtask')) return;
+    scheduleRetry(retry, ERA_PERSISTENCE_VERIFY_DELAYS_MS[0]);
+  });
 }
 
 function stripCodeFence(text: string): string {
@@ -715,8 +1088,46 @@ function normalizeNewlines(text: string): string {
   return text.replace(/\r\n/g, '\n');
 }
 
+function getDeclaredChangeSignature(change: VariableDeclaredChange): string {
+  return stableStringify({
+    action: change.action,
+    blockTag: change.blockTag,
+    path: change.path,
+    value: change.value,
+  });
+}
+
+function containsSemanticallyEquivalentBlocks(readbackText: string, blocksText: string): boolean {
+  const expectedChanges = parseDeclaredVariableChanges(blocksText).declaredChanges;
+  if (expectedChanges.length === 0) {
+    return false;
+  }
+
+  const availableCounts = new Map<string, number>();
+  for (const change of parseDeclaredVariableChanges(readbackText).declaredChanges) {
+    const signature = getDeclaredChangeSignature(change);
+    availableCounts.set(signature, (availableCounts.get(signature) || 0) + 1);
+  }
+
+  for (const change of expectedChanges) {
+    const signature = getDeclaredChangeSignature(change);
+    const available = availableCounts.get(signature) || 0;
+    if (available <= 0) {
+      return false;
+    }
+    availableCounts.set(signature, available - 1);
+  }
+  return true;
+}
+
 function containsAppendedBlocks(readbackText: string, blocksText: string): boolean {
-  return normalizeNewlines(readbackText).includes(normalizeNewlines(blocksText));
+  if (normalizeNewlines(readbackText).includes(normalizeNewlines(blocksText))) {
+    return true;
+  }
+
+  // ERA 或消息渲染链可能重排 JSON 缩进/换行。只要同一组操作、路径和值仍在当前
+  // 楼层中，就不能把一次已经成功的写入误判为“变量块消失”。
+  return containsSemanticallyEquivalentBlocks(readbackText, blocksText);
 }
 
 function normalizeArray<T>(value: T[] | undefined, expectedLength: number, fallback: () => T): T[] {
@@ -1022,15 +1433,104 @@ export async function executeExtraVariableUpdate({
   }
 
   beginExtraVariableUpdate();
+  let retry429Count = 0;
+  let retry429LastDelayMs = 0;
+  const phaseTimeline: ExtraVariablePhaseTiming[] = [];
+  const publishPhaseTimeline = (currentPhase: string) => {
+    onProgress?.({
+      currentPhase,
+      phaseTimeline: phaseTimeline.map(phase => ({ ...phase })),
+    });
+  };
+  const runPhase = async <T>(name: string, task: () => T | Promise<T>): Promise<T> => {
+    const startedAt = Date.now();
+    const phase: ExtraVariablePhaseTiming = {
+      name,
+      status: 'running',
+      startedAt,
+      updatedAt: startedAt,
+      durationMs: 0,
+      watchdogTickCount: 0,
+    };
+    phaseTimeline.push(phase);
+    publishPhaseTimeline(name);
+    let previousWatchdogAt = startedAt;
+    const watchdog = scheduleUnthrottledInterval(() => {
+      const tickedAt = Date.now();
+      phase.updatedAt = tickedAt;
+      phase.durationMs = phase.updatedAt - startedAt;
+      phase.watchdogTickCount += 1;
+      publishPhaseTimeline(name);
+      if (name === 'wait-era-write-done' && phase.watchdogTickCount % 6 === 0) {
+        recordIframeLifecycleEvent('extra-variable-update', 'extra-variable-phase-watchdog', {
+          assistantMessageId,
+          phase: name,
+          tickCount: phase.watchdogTickCount,
+          elapsedMs: phase.durationMs,
+          tickLagMs: tickedAt - previousWatchdogAt - 5000,
+          watchdogTimerSource: watchdog.source,
+        });
+      }
+      previousWatchdogAt = tickedAt;
+    }, 5000);
+    recordIframeLifecycleEvent('extra-variable-update', 'extra-variable-phase-started', {
+      assistantMessageId,
+      phase: name,
+      startedAt,
+      watchdogTimerSource: watchdog.source,
+    });
+
+    try {
+      const result = await task();
+      const finishedAt = Date.now();
+      Object.assign(phase, {
+        status: 'success' as const,
+        updatedAt: finishedAt,
+        finishedAt,
+        durationMs: finishedAt - startedAt,
+      });
+      recordIframeLifecycleEvent('extra-variable-update', 'extra-variable-phase-finished', {
+        assistantMessageId,
+        phase: name,
+        status: 'success',
+        durationMs: finishedAt - startedAt,
+        watchdogTickCount: phase.watchdogTickCount,
+      });
+      publishPhaseTimeline('');
+      return result;
+    } catch (error) {
+      const finishedAt = Date.now();
+      Object.assign(phase, {
+        status: 'error' as const,
+        updatedAt: finishedAt,
+        finishedAt,
+        durationMs: finishedAt - startedAt,
+        error: getErrorMessage(error),
+      });
+      recordIframeLifecycleEvent('extra-variable-update', 'extra-variable-phase-finished', {
+        assistantMessageId,
+        phase: name,
+        status: 'error',
+        durationMs: finishedAt - startedAt,
+        watchdogTickCount: phase.watchdogTickCount,
+        error: getErrorMessage(error),
+      });
+      publishPhaseTimeline('');
+      throw error;
+    } finally {
+      watchdog.cancel();
+    }
+  };
   try {
     variableTraceLogger.log('[extraVariableUpdate] 开始执行额外变量更新', {
       assistantMessageId,
       variableUpdateMode: settings.variableUpdateMode,
       latestRawReplyLength: latestRawReply.length,
     });
-    await ensureVariableGuidanceDisabled();
+    await runPhase('disable-variable-guidance', () => ensureVariableGuidanceDisabled());
     const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
-    const prompt = await buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply });
+    const prompt = await runPhase('build-variable-prompt', () =>
+      buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply }));
     onPromptBuilt?.(prompt);
     onProgress?.({ prompt });
     variableTraceLogger.log('[extraVariableUpdate] 额外变量提示词已构建', {
@@ -1038,26 +1538,49 @@ export async function executeExtraVariableUpdate({
       promptLength: prompt.length,
       prompt,
     });
-    const rawResponse = await requestConfiguredText({
-      prompt,
-      settings: requestSettings,
-      timeoutMs: EXTRA_VARIABLE_UPDATE_TIMEOUT_MS,
-      shouldStream: false,
-      generationIdPrefix: 'wuxia-variable-update',
-      skipWorldInfoAndAuthorNote: true,
-    });
+    const rawResponse = await runPhase('request-variable-model', () =>
+      runWith429Retry(() => requestConfiguredText({
+        prompt,
+        settings: requestSettings,
+        timeoutMs: EXTRA_VARIABLE_UPDATE_TIMEOUT_MS,
+        shouldStream: false,
+        generationIdPrefix: 'wuxia-variable-update',
+        skipWorldInfoAndAuthorNote: true,
+      }), {
+        requestLabel: '额外变量模型',
+        onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
+          retry429Count = retryNumber;
+          retry429LastDelayMs = delayMs;
+          onProgress?.({ retry429Count, retry429LastDelayMs });
+          variableTraceLogger.warn('[extraVariableUpdate] 额外变量模型返回 429，准备自动重试', {
+            assistantMessageId,
+            retryNumber,
+            maxRetries,
+            delayMs,
+            error,
+          });
+        },
+      }));
     variableTraceLogger.log('[extraVariableUpdate] 额外模型已返回', {
       assistantMessageId,
       rawResponseLength: rawResponse.length,
       rawResponse,
     });
     onProgress?.({ prompt, rawResponse });
-    const { blocksText, actionBlockCount } = extractValidVariableBlocks(rawResponse);
+    const { blocksText, actionBlockCount, declaredState } = await runPhase('parse-variable-response', () => {
+      const extracted = extractValidVariableBlocks(rawResponse);
+      return {
+        ...extracted,
+        declaredState: parseDeclaredVariableChanges(extracted.blocksText),
+      };
+    });
     variableTraceLogger.log('[extraVariableUpdate] 变量块提取完成', {
       assistantMessageId,
       actionBlockCount,
       blocksTextLength: blocksText.length,
       blocksText,
+      declaredChangeCount: declaredState.declaredChanges.length,
+      declaredParseErrors: declaredState.parseErrors,
     });
     onProgress?.({ prompt, rawResponse, appendedBlocks: blocksText, actionBlockCount });
 
@@ -1071,10 +1594,13 @@ export async function executeExtraVariableUpdate({
         actionBlockCount,
         prompt,
         rawResponse,
+        retry429Count,
+        retry429LastDelayMs,
       };
     }
 
-    const appendVerification = await appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText);
+    const appendVerification = await runPhase('append-variable-blocks', () =>
+      appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText));
     variableTraceLogger.log('[extraVariableUpdate] 变量块已追加到目标楼层', {
       assistantMessageId,
       actionBlockCount,
@@ -1091,6 +1617,8 @@ export async function executeExtraVariableUpdate({
       finalMessageText: appendVerification.readbackText,
       appendReadbackText: appendVerification.readbackText,
       appendVerification: appendVerification.verification,
+      applyStatus: 'waiting-write-done',
+      applyVerification: '变量块已追加，正在等待匹配的 ERA 原始写入完成信号。',
     });
 
     if (!appendVerification.verified) {
@@ -1104,28 +1632,37 @@ export async function executeExtraVariableUpdate({
         expectedAction: 'apiWrite',
         timeoutMs: ERA_SYNC_TIMEOUT_MS,
       });
-      const eraWriteResult = await emitSourcedEraVariableWriteAndWait({
-        source: 'frontend',
-        operation: 'update',
-        reason: 'extra-variable-api-write',
-        eventName: 'era:apiWrite',
-        attribution: 'ai',
-        timeoutMs: ERA_SYNC_TIMEOUT_MS,
-        timeoutMessage: 'ERA 没有响应 era:apiWrite，额外变量更新已停止。',
-        expectedMessageId: assistantMessageId,
-        expectedAction: 'apiWrite',
-      });
+      const eraWriteResult = await runPhase('wait-era-write-done', () =>
+        emitSourcedEraVariableWriteAndWait({
+          source: 'frontend',
+          operation: 'update',
+          reason: 'extra-variable-api-write',
+          eventName: 'era:apiWrite',
+          attribution: 'ai',
+          timeoutMs: ERA_SYNC_TIMEOUT_MS,
+          timeoutMessage: 'ERA 没有响应 era:apiWrite，额外变量更新已停止。',
+          expectedMessageId: assistantMessageId,
+          expectedAction: 'apiWrite',
+        }));
       variableTraceLogger.log('[extraVariableUpdate] 收到匹配的 ERA 同步完成信号', {
         assistantMessageId,
         actionBlockCount,
         matchedMessageId: eraWriteResult.message_id ?? null,
         matchedActions: eraWriteResult.actions,
       });
+      onProgress?.({
+        applyStatus: 'verifying',
+        applyVerification: 'ERA 已返回匹配的写入完成信号，正在回读聊天级 stat_data。',
+      });
     } catch (error) {
       variableTraceLogger.error('[extraVariableUpdate] 等待 ERA 同步失败', {
         assistantMessageId,
         actionBlockCount,
         error,
+      });
+      onProgress?.({
+        applyStatus: 'error',
+        applyError: getErrorMessage(error),
       });
       try {
         const syncReadback = readAssistantMessageActiveText(assistantMessageId);
@@ -1152,15 +1689,20 @@ export async function executeExtraVariableUpdate({
       }
     }
 
-    const syncReadback = readAssistantMessageActiveText(assistantMessageId);
-    const syncVerification = createWriteVerification({
-      messageId: assistantMessageId,
-      swipeId: syncReadback.swipeId,
-      beforeText: appendVerification.beforeText,
-      attemptedText: appendVerification.attemptedText,
-      readbackText: syncReadback.activeText,
-      blocksText,
-      stage: 'ERA 同步后',
+    const { syncReadback, syncVerification } = await runPhase('readback-era-result', () => {
+      const readback = readAssistantMessageActiveText(assistantMessageId);
+      return {
+        syncReadback: readback,
+        syncVerification: createWriteVerification({
+          messageId: assistantMessageId,
+          swipeId: readback.swipeId,
+          beforeText: appendVerification.beforeText,
+          attemptedText: appendVerification.attemptedText,
+          readbackText: readback.activeText,
+          blocksText,
+          stage: 'ERA 同步后',
+        }),
+      };
     });
     onProgress?.({
       finalMessageText: syncReadback.activeText,
@@ -1180,6 +1722,28 @@ export async function executeExtraVariableUpdate({
       );
     }
 
+    const persistenceVerification = await runPhase('verify-variable-persistence', () =>
+      waitForDeclaredChangesPersisted(
+        declaredState.declaredChanges,
+        ERA_PERSISTENCE_FOREGROUND_VERIFY_TIMEOUT_MS,
+      ));
+    const applyStatus: ExtraVariableApplyStatus = persistenceVerification.verified ? 'success' : 'pending';
+    onProgress?.({
+      applyStatus,
+      applyVerification: persistenceVerification.verification,
+    });
+    if (!persistenceVerification.verified) {
+      variableTraceLogger.warn('[extraVariableUpdate] 原始 ERA 写入已确认，但变量快照仍未刷新，转入后台验证', {
+        assistantMessageId,
+        pendingPaths: persistenceVerification.pendingPaths,
+      });
+      continueDeclaredChangesPersistenceVerification({
+        assistantMessageId,
+        declaredChanges: declaredState.declaredChanges,
+        onProgress,
+      });
+    }
+
     return {
       appended: true,
       actionBlockCount,
@@ -1191,6 +1755,10 @@ export async function executeExtraVariableUpdate({
       appendVerification: appendVerification.verification,
       syncReadbackText: syncReadback.activeText,
       syncVerification: syncVerification.verification,
+      retry429Count,
+      retry429LastDelayMs,
+      applyStatus,
+      applyVerification: persistenceVerification.verification,
     };
   } finally {
     variableTraceLogger.log('[extraVariableUpdate] 本轮额外变量更新结束', { assistantMessageId });

@@ -1,4 +1,6 @@
 import { variableTraceLogger } from '../武侠/utils/logger';
+import { recordIframeLifecycleEvent } from '../武侠/utils/iframeLifecycleBlackBox';
+import { scheduleUnthrottledTimeout, type UnthrottledTimerHandle } from './unthrottledTimer';
 
 export const DIRECT_VARIABLE_WRITE_DONE_EVENT = 'wuxia:directVariableWriteDone';
 export const ERA_VARIABLE_WRITE_DONE_EVENT = 'wuxia:eraVariableWriteDone';
@@ -47,6 +49,11 @@ export interface EraVariableWriteRequest extends EraVariableWriteMetadata {
   expectedMessageId?: number;
   expectedAction?: string;
 }
+
+type EraWriteDispatchFailure = {
+  error: unknown;
+  observedAt: number;
+};
 
 export interface DirectChatTransactionOptions {
   source?: DirectVariableWriteSource;
@@ -215,11 +222,13 @@ export async function emitEraVariableWriteAndWait({
   expectedAction,
 }: EraVariableWriteRequest): Promise<EraVariableWriteConfirmation> {
   const waitId = createVariableWriteId();
-  let timer: ReturnType<typeof window.setTimeout> | null = null;
+  const startedAt = Date.now();
+  let timer: UnthrottledTimerHandle | null = null;
   let listener: { stop: () => void } | null = null;
   let observedWriteDoneCount = 0;
   let lastObservedWriteDone: EraWriteDoneSummary | { invalidDetail: true; detailType: string } | null = null;
   let lastIgnoredReason: string | null = null;
+  let dispatchFailure: EraWriteDispatchFailure | null = null;
   const waitContext = {
     waitId,
     source,
@@ -230,6 +239,13 @@ export async function emitEraVariableWriteAndWait({
     expectedMessageId: expectedMessageId ?? null,
     expectedAction: expectedAction ?? null,
     timeoutMs,
+  };
+  const recordWaitEvent = (event: string, details: Record<string, unknown> = {}) => {
+    recordIframeLifecycleEvent('era-write-wait', event, {
+      ...waitContext,
+      elapsedMs: Date.now() - startedAt,
+      ...details,
+    });
   };
   const stopListener = (reasonText: string) => {
     if (!listener) {
@@ -245,22 +261,48 @@ export async function emitEraVariableWriteAndWait({
   };
 
   const waitForWriteDone = new Promise<EraVariableWriteConfirmation>((resolve, reject) => {
-    timer = window.setTimeout(() => {
+    const timeoutScheduledAt = Date.now();
+    timer = scheduleUnthrottledTimeout(() => {
       stopListener('timeout');
+      recordWaitEvent('era-write-wait-timeout', {
+        timerLagMs: Date.now() - timeoutScheduledAt - timeoutMs,
+        timerSource: timer?.source ?? null,
+        observedWriteDoneCount,
+        lastObservedWriteDone,
+        lastIgnoredReason,
+        dispatchFailureAt: dispatchFailure?.observedAt ?? null,
+      });
       variableTraceLogger.error('[emitEraVariableWriteAndWait] 等待 era:writeDone 超时', {
         ...waitContext,
         observedWriteDoneCount,
         lastObservedWriteDone,
         lastIgnoredReason,
+        dispatchFailure: dispatchFailure
+          ? {
+              observedAt: dispatchFailure.observedAt,
+              error: dispatchFailure.error,
+            }
+          : null,
       });
       reject(new Error(timeoutMessage));
     }, timeoutMs);
 
     variableTraceLogger.log('[emitEraVariableWriteAndWait] 已注册 era:writeDone 等待监听器', waitContext);
+    recordWaitEvent('era-write-wait-registered', {
+      timeoutScheduledAt,
+      timeoutExpectedAt: timeoutScheduledAt + timeoutMs,
+      timerSource: timer.source,
+    });
     listener = eventOn('era:writeDone', (writeDoneDetail: unknown) => {
       observedWriteDoneCount += 1;
       lastObservedWriteDone = summarizeEraWriteDone(writeDoneDetail);
       lastIgnoredReason = getWriteDoneMismatchReason(writeDoneDetail, expectedMessageId, expectedAction);
+      recordWaitEvent('era-write-done-observed', {
+        observedWriteDoneCount,
+        matched: lastIgnoredReason === null,
+        ignoredReason: lastIgnoredReason,
+        observed: lastObservedWriteDone,
+      });
       if (!matchesEraWriteDone(writeDoneDetail, expectedMessageId, expectedAction)) {
         variableTraceLogger.log('[emitEraVariableWriteAndWait] 忽略不匹配的 era:writeDone', {
           ...waitContext,
@@ -278,26 +320,53 @@ export async function emitEraVariableWriteAndWait({
       });
       stopListener('matched');
       if (timer) {
-        window.clearTimeout(timer);
+        timer.cancel();
       }
+      recordWaitEvent('era-write-done-matched', {
+        observedWriteDoneCount,
+        matched: lastObservedWriteDone,
+      });
       resolve(writeDoneDetail);
     });
   });
 
+  variableTraceLogger.log('[emitEraVariableWriteAndWait] 开始发送事件并等待原始 era:writeDone', waitContext);
+  const dispatchStartedAt = Date.now();
+  recordWaitEvent('era-write-dispatch-started');
   try {
-    variableTraceLogger.log('[emitEraVariableWriteAndWait] 开始发送事件并等待 era:writeDone', waitContext);
-    await (detail === undefined ? eventEmit(eventName) : eventEmit(eventName, detail));
-    variableTraceLogger.log('[emitEraVariableWriteAndWait] 事件已发出，开始等待匹配的 era:writeDone', waitContext);
+    const dispatch = detail === undefined ? eventEmit(eventName) : eventEmit(eventName, detail);
+    void dispatch.then(
+      () => {
+        recordWaitEvent('era-write-dispatch-settled', {
+          dispatchDurationMs: Date.now() - dispatchStartedAt,
+        });
+        variableTraceLogger.log('[emitEraVariableWriteAndWait] 事件监听链已结束', waitContext);
+      },
+      error => {
+        // eventEmit 会等待该事件的所有异步监听器。原始 ERA 已经写入时，后续监听器失败
+        // 或耗时不能反向否定本次写入；保留错误，供 writeDone 超时日志关联诊断。
+        dispatchFailure = { error, observedAt: Date.now() };
+        recordWaitEvent('era-write-dispatch-failed', {
+          dispatchDurationMs: Date.now() - dispatchStartedAt,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        variableTraceLogger.error('[emitEraVariableWriteAndWait] 事件监听链异常，继续等待原始 era:writeDone', {
+          ...waitContext,
+          error,
+        });
+      },
+    );
   } catch (error) {
-    stopListener('emit-failed');
-    if (timer) {
-      window.clearTimeout(timer);
-    }
-    variableTraceLogger.error('[emitEraVariableWriteAndWait] 发送事件失败', {
+    // 同步抛错同样只记录。若 ERA 处理器已经开始工作，仍应以匹配的 raw writeDone 为准。
+    dispatchFailure = { error, observedAt: Date.now() };
+    recordWaitEvent('era-write-dispatch-threw', {
+      dispatchDurationMs: Date.now() - dispatchStartedAt,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    variableTraceLogger.error('[emitEraVariableWriteAndWait] 发送事件时同步异常，继续等待原始 era:writeDone', {
       ...waitContext,
       error,
     });
-    throw error instanceof Error ? error : new Error(String(error));
   }
 
   return waitForWriteDone;
@@ -331,8 +400,21 @@ export async function emitSourcedEraVariableWriteAndWait(request: EraVariableWri
     actions: normalizeActions(matchedDetail?.actions),
   };
 
-  await eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
-  variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 已发送带来源的 ERA 完成事件', eventDetail);
+  try {
+    const notification = eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
+    void notification.then(
+      () => variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 带来源 ERA 完成通知监听链已结束', eventDetail),
+      error => variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 带来源 ERA 完成通知监听链异常', {
+        ...eventDetail,
+        error,
+      }),
+    );
+  } catch (error) {
+    variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 发送带来源 ERA 完成通知时同步异常', {
+      ...eventDetail,
+      error,
+    });
+  }
 
   return eventDetail;
 }

@@ -27,8 +27,13 @@ vi.mock('../utils/locationContext', () => ({
 }));
 
 vi.mock('../utils/extraVariableUpdateManager', () => ({
+  ensureTurnVariableBlocksCommitted: vi.fn(),
   executeExtraVariableUpdate: vi.fn(),
   prepareExtraVariableUpdateTurn: vi.fn(),
+}));
+
+vi.mock('../utils/eraWriteWait', () => ({
+  observeEraWriteDone: vi.fn(),
 }));
 
 vi.mock('../utils/logger', () => ({
@@ -51,7 +56,12 @@ vi.mock('../utils/logger', () => ({
 
 import { DEFAULT_SUMMARY_SETTINGS } from '../utils/settingsManager';
 import { useMessageHandler } from './useMessageHandler';
-import { executeExtraVariableUpdate, prepareExtraVariableUpdateTurn } from '../utils/extraVariableUpdateManager';
+import {
+  ensureTurnVariableBlocksCommitted,
+  executeExtraVariableUpdate,
+  prepareExtraVariableUpdateTurn,
+} from '../utils/extraVariableUpdateManager';
+import { observeEraWriteDone } from '../utils/eraWriteWait';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -75,6 +85,8 @@ const globals = globalThis as typeof globalThis & {
 
 const prepareExtraVariableUpdateTurnMock = vi.mocked(prepareExtraVariableUpdateTurn);
 const executeExtraVariableUpdateMock = vi.mocked(executeExtraVariableUpdate);
+const ensureTurnVariableBlocksCommittedMock = vi.mocked(ensureTurnVariableBlocksCommitted);
+const observeEraWriteDoneMock = vi.mocked(observeEraWriteDone);
 const regenerateLastAssistantSwipeMock = vi.mocked(regenerateLastAssistantSwipe);
 
 const createSummarySettings = (variableUpdateMode: 'inline' | 'extra') => ({
@@ -137,6 +149,15 @@ describe('useMessageHandler extra-variable decision', () => {
 
     prepareExtraVariableUpdateTurnMock.mockReset();
     executeExtraVariableUpdateMock.mockReset();
+    ensureTurnVariableBlocksCommittedMock.mockReset().mockResolvedValue({
+      verified: true,
+      verification: '测试变量已提交',
+      pendingPaths: [],
+    });
+    observeEraWriteDoneMock.mockReset().mockReturnValue({
+      waitForMessageId: vi.fn(async () => ({ message_id: 2, actions: { resync: true } })),
+      stop: vi.fn(),
+    });
     regenerateLastAssistantSwipeMock.mockReset();
     globals.eventEmit.mockClear();
     localStorage.clear();
@@ -199,6 +220,143 @@ describe('useMessageHandler extra-variable decision', () => {
       roundId: 'debug-round-id',
       chatId: expect.any(String),
       messageId: 2,
+    });
+    expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:turn-completed', {
+      messageId: 2,
+      chatId: expect.any(String),
+      roundId: 'debug-round-id',
+    });
+  });
+
+  it('send + inline 会先等匹配 resync 和 stat_data 回读，再发送回合完成', async () => {
+    globals.generate = vi.fn(async () =>
+      '正文回复\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":1,"日":1,"时":1}}}</VariableEdit>');
+    const waitForMessageId = vi.fn(async () => ({ message_id: 2, actions: { resync: true } }));
+    const stop = vi.fn();
+    observeEraWriteDoneMock.mockReturnValue({ waitForMessageId, stop });
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('测试同轮时间与参与事件变化');
+    });
+
+    expect(observeEraWriteDoneMock).toHaveBeenCalledWith({ expectedAction: 'resync' });
+    expect(waitForMessageId).toHaveBeenCalledWith(2, expect.objectContaining({ timeoutMs: 20000 }));
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(ensureTurnVariableBlocksCommittedMock).toHaveBeenCalledWith({
+      assistantMessageId: 2,
+      blocksText: expect.stringContaining('<VariableEdit>'),
+    });
+    const completedCallIndex = globals.eventEmit.mock.calls.findIndex(
+      ([eventName]) => eventName === 'wuxia:turn-completed',
+    );
+    expect(completedCallIndex).toBeGreaterThanOrEqual(0);
+    expect(ensureTurnVariableBlocksCommittedMock.mock.invocationCallOrder[0]).toBeLessThan(
+      globals.eventEmit.mock.invocationCallOrder[completedCallIndex],
+    );
+  });
+
+  it('变量回读未确认时不发送回合完成，但仍释放 lifecycle 屏障', async () => {
+    globals.generate = vi.fn(async () =>
+      '正文回复\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":1,"日":1,"时":1}}}</VariableEdit>');
+    ensureTurnVariableBlocksCommittedMock.mockRejectedValue(new Error('时间与参与事件尚未同时落库'));
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('测试变量确认失败');
+    });
+
+    expect(globals.eventEmit).not.toHaveBeenCalledWith('wuxia:turn-completed', expect.anything());
+    expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:turn-lifecycle', {
+      phase: 'finish',
+      roundId: 'debug-round-id',
+      chatId: expect.any(String),
+      messageId: 2,
+    });
+    expect(options.showError).toHaveBeenCalledWith(
+      expect.stringContaining('正文已生成，但变量提交确认失败'),
+    );
+  });
+
+  it('自动化回合会等待桥响应送达后再请求最新楼层同步', async () => {
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('自动化测试发送', { waitForBridgeResponseDelivery: true });
+    });
+
+    expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:turn-lifecycle', {
+      phase: 'finish',
+      roundId: 'debug-round-id',
+      chatId: expect.any(String),
+      messageId: 2,
+      waitForResponseDelivery: true,
+    });
+    expect(globals.eventEmit).not.toHaveBeenCalledWith('wuxia:sync-latest-message-shell', 2);
+  });
+
+  it('send 遇到两次 429 后只落一次用户和 assistant 楼层', async () => {
+    globals.generate = vi.fn()
+      .mockRejectedValueOnce({ status: 429, retryAfterMs: 0 })
+      .mockRejectedValueOnce({ response: { status: 429 }, retryAfterMs: 0 })
+      .mockResolvedValue('重试后的正文');
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('测试限流重试');
+    });
+
+    expect(globals.generate).toHaveBeenCalledTimes(3);
+    expect(globals.createChatMessages).toHaveBeenCalledTimes(2);
+    expect(messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    expect(messages[1]?.message).toBe('重试后的正文');
+    expect(options.showError).not.toHaveBeenCalled();
+  });
+
+  it('send 连续三次 429 后停止重试且不创建 assistant 楼层', async () => {
+    globals.generate = vi.fn().mockRejectedValue({ status: 429, retryAfterMs: 0, message: 'Too Many Requests' });
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('测试限流耗尽');
+    });
+
+    expect(globals.generate).toHaveBeenCalledTimes(3);
+    expect(globals.createChatMessages).toHaveBeenCalledTimes(1);
+    expect(messages.map(message => message.role)).toEqual(['user']);
+    expect(options.showError).toHaveBeenCalledWith(expect.stringContaining('已自动重试 2 次'));
+  });
+
+  it('自动推进链路继承正文 429 重试且不会重复创建楼层', async () => {
+    globals.generate = vi.fn()
+      .mockRejectedValueOnce({ status: 429, retryAfterMs: 0 })
+      .mockResolvedValue('自动化重试后的正文');
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    let autoAdvanceResult: Awaited<ReturnType<typeof result.current.handleAutoAdvanceTurn>> | undefined;
+    await act(async () => {
+      autoAdvanceResult = await result.current.handleAutoAdvanceTurn('自动化测试行动');
+    });
+
+    expect(globals.generate).toHaveBeenCalledTimes(2);
+    expect(globals.createChatMessages).toHaveBeenCalledTimes(2);
+    expect(messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    expect(autoAdvanceResult).toMatchObject({
+      userMessageId: 1,
+      assistantMessageId: 2,
+      rawReply: '自动化重试后的正文',
+    });
+    expect(options.patchLatestDebugRound).toHaveBeenCalledWith({
+      main: {
+        retry429Count: 1,
+        retry429LastDelayMs: 0,
+      },
     });
   });
 

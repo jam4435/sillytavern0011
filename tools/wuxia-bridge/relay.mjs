@@ -125,7 +125,6 @@ function recoverTurnReport(request, snapshot) {
   const debug = isRecord(snapshot.debug) ? snapshot.debug : null;
   const main = isRecord(debug?.main) ? debug.main : null;
   if (!input || normalizeInput(main?.userInput) !== input || !['success', 'error'].includes(main?.status)) return null;
-
   const messages = Array.isArray(snapshot.recentMessages) ? snapshot.recentMessages.filter(isRecord) : [];
   const matchingUsers = messages.filter(message => message.role === 'user' && normalizeInput(message.text) === input);
   const userMessage = matchingUsers.at(-1);
@@ -235,13 +234,44 @@ function publicBridgeState(socket, state) {
     page: state.page,
     busy: state.busy,
     turnTimeoutMs: state.turnTimeoutMs,
+    stateRevision: state.stateRevision,
+    snapshotCapturedAt: state.snapshotCapturedAt,
     connectedAt: state.connectedAt,
     updatedAt: state.updatedAt,
   };
 }
 
+function normalizeOptionalNonNegativeInteger(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? Number(value) : null;
+}
+
+function normalizeOptionalTimestamp(value) {
+  return Number.isFinite(value) && Number(value) >= 0 ? Number(value) : null;
+}
+
+function isOlderBridgeState(previous, stateRevision, snapshotCapturedAt) {
+  if (stateRevision !== null) {
+    if (previous.stateRevision !== null) return stateRevision <= previous.stateRevision;
+    return false;
+  }
+
+  // 新桥已经开始发送 revision 后，拒绝同连接上无 revision 的迟到旧包；
+  // 纯旧桥始终没有 revision，仍保持到达顺序兼容。
+  if (previous.stateRevision !== null) return true;
+  return (
+    snapshotCapturedAt !== null &&
+    previous.snapshotCapturedAt !== null &&
+    snapshotCapturedAt < previous.snapshotCapturedAt
+  );
+}
+
 function normalizeBridgeState(socket, previous, value) {
   const data = isRecord(value) ? value : {};
+  const stateRevision = normalizeOptionalNonNegativeInteger(data.stateRevision);
+  const snapshotCapturedAt = normalizeOptionalTimestamp(data.snapshotCapturedAt);
+  if (isOlderBridgeState(previous, stateRevision, snapshotCapturedAt)) {
+    return previous;
+  }
   return {
     bridgeId: previous.bridgeId,
     sessionId: previous.sessionId,
@@ -253,6 +283,8 @@ function normalizeBridgeState(socket, previous, value) {
     page: normalizeString(data.page, 64),
     busy: data.busy === true,
     turnTimeoutMs: normalizeTurnTimeout(data.turnTimeoutMs),
+    stateRevision,
+    snapshotCapturedAt,
     connectedAt: previous.connectedAt,
     updatedAt: Date.now(),
     socket,
@@ -546,6 +578,8 @@ export function attachWuxiaAutomationRelay(io, options = {}) {
         page: '',
         busy: false,
         turnTimeoutMs: WUXIA_TURN_TIMEOUT_MS.STANDARD,
+        stateRevision: null,
+        snapshotCapturedAt: null,
         connectedAt: Date.now(),
         updatedAt: Date.now(),
         socket,

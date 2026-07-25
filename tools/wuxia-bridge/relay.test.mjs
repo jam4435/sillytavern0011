@@ -98,6 +98,47 @@ describe('wuxia Socket.IO relay', () => {
     expect(response).toMatchObject({ ok: true, result: { chatId: 'bridge-1-chat', ready: true } });
   });
 
+  it('rejects a delayed stale state update from the same bridge', async () => {
+    const bridge = await connectReadyBridge();
+    bridge.emit(WUXIA_EVENTS.STATE, {
+      automationReady: true,
+      apiVersion: 1,
+      automationInstanceId: 'frontend-live',
+      chatId: 'bridge-1-chat',
+      page: 'game',
+      busy: false,
+      stateRevision: 2,
+      snapshotCapturedAt: 20,
+    });
+    bridge.emit(WUXIA_EVENTS.STATE, {
+      automationReady: true,
+      apiVersion: 1,
+      automationInstanceId: 'frontend-live',
+      chatId: 'bridge-1-chat',
+      page: 'booting',
+      busy: false,
+      stateRevision: 1,
+      snapshotCapturedAt: 10,
+    });
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    const cli = await connect('cli');
+    const response = await call(cli, WUXIA_METHODS.STATUS);
+    expect(response).toMatchObject({
+      ok: true,
+      result: {
+        bridges: [
+          expect.objectContaining({
+            automationInstanceId: 'frontend-live',
+            page: 'game',
+            stateRevision: 2,
+            snapshotCapturedAt: 20,
+          }),
+        ],
+      },
+    });
+  });
+
   it('refuses to choose silently when multiple bridges are ready', async () => {
     await connectReadyBridge('bridge-1');
     await connectReadyBridge('bridge-2');

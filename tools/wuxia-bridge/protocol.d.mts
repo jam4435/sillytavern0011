@@ -1,9 +1,25 @@
 export const WUXIA_PROTOCOL_VERSION: 1;
 export const WUXIA_SOCKET_NAMESPACE: '/wuxia';
+export const WUXIA_RELAY_DEFAULT_HOST: '127.0.0.1';
+export const WUXIA_RELAY_DEFAULT_PORT: 6622;
+export const WUXIA_RELAY_DEFAULT_URL: string;
 export const WUXIA_EVENTS: Readonly<{
   CALL: 'wuxia:call';
   REQUEST: 'wuxia:request';
   STATE: 'wuxia:state';
+}>;
+export const WUXIA_GLOBAL_EVENTS: Readonly<{
+  DISCOVER: 'wuxia:automation-discover';
+  READY: 'wuxia:automation-ready';
+  DISPOSED: 'wuxia:automation-disposed';
+  STATE_CHANGED: 'wuxia:automation-state-changed';
+}>;
+export const WUXIA_AUTOMATION_GLOBAL_PREFIX: 'WuxiaAutomation';
+export const WUXIA_TURN_TIMEOUT_MS: Readonly<{
+  STANDARD: number;
+  EXTENDED: number;
+  RECOVERY: number;
+  CLIENT_GRACE: number;
 }>;
 export const WUXIA_METHODS: Readonly<{
   STATUS: 'status';
@@ -35,6 +51,7 @@ export type WuxiaRpcResponse =
 
 export function isRecord(value: unknown): value is Record<string, unknown>;
 export function createRequestId(prefix?: string): string;
+export function createAutomationGlobalName(instanceId: unknown): string;
 export function createRpcError(
   code: string,
   message: string,

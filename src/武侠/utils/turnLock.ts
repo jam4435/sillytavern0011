@@ -2,6 +2,7 @@ import { recordIframeLifecycleEvent } from './iframeLifecycleBlackBox';
 
 export const WUXIA_TURN_LIFECYCLE_EVENT = 'wuxia:turn-lifecycle';
 export const WUXIA_TURN_LOCK_ACK_EVENT = 'wuxia:turn-lock-ack';
+export const WUXIA_TURN_RESPONSE_DELIVERED_EVENT = 'wuxia:turn-response-delivered';
 export const WUXIA_TURN_LOCK_ACK_TIMEOUT_MS = 2_000;
 
 export interface WuxiaTurnLockAck {
@@ -95,8 +96,14 @@ export async function releaseWuxiaTurnLock(
   chatId: string,
   messageId: number | null,
   timeoutMs = WUXIA_TURN_LOCK_ACK_TIMEOUT_MS,
+  waitForResponseDelivery = false,
 ): Promise<void> {
-  recordIframeLifecycleEvent('wuxia-frontend', 'turn-lock-release-requested', { roundId, chatId, messageId });
+  recordIframeLifecycleEvent('wuxia-frontend', 'turn-lock-release-requested', {
+    roundId,
+    chatId,
+    messageId,
+    waitForResponseDelivery,
+  });
   let timer: number | undefined;
   const emission = Promise.resolve()
     .then(() =>
@@ -105,6 +112,7 @@ export async function releaseWuxiaTurnLock(
         roundId,
         chatId,
         messageId,
+        ...(waitForResponseDelivery ? { waitForResponseDelivery: true } : {}),
       }),
     )
     .then(
@@ -126,8 +134,14 @@ export async function releaseWuxiaTurnLock(
       chatId,
       messageId,
       timeoutMs,
+      waitForResponseDelivery,
     });
     return;
   }
-  recordIframeLifecycleEvent('wuxia-frontend', 'turn-lock-released', { roundId, chatId, messageId });
+  recordIframeLifecycleEvent('wuxia-frontend', 'turn-lock-released', {
+    roundId,
+    chatId,
+    messageId,
+    waitForResponseDelivery,
+  });
 }

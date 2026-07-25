@@ -4,6 +4,8 @@ import {
   type WuxiaAutomationApi,
   type WuxiaAutomationSnapshot,
 } from '../武侠/utils/wuxiaAutomation';
+import { WUXIA_TURN_RESPONSE_DELIVERED_EVENT } from '../武侠/utils/turnLock';
+import { forwardIframeLifecycleEvent } from '../武侠/utils/iframeLifecycleBlackBox';
 import {
   WUXIA_ERROR_CODES,
   WUXIA_EVENTS,
@@ -134,6 +136,8 @@ function startBridge() {
   let automationGlobalName = '';
   let turnTimeoutMs = WUXIA_TURN_TIMEOUT_MS.STANDARD;
   let acquisitionGeneration = 0;
+  let stateQueryGeneration = 0;
+  let stateRevision = 0;
   let runInFlight: RunInFlight | null = null;
   const bridgeId = String(getScriptId());
   const sessionId = getSessionId();
@@ -155,24 +159,23 @@ function startBridge() {
     transports: ['websocket', 'polling'],
   });
 
-  async function getUsableSnapshot(): Promise<WuxiaAutomationSnapshot> {
-    if (!automation) {
+  async function getUsableSnapshot(candidate = automation): Promise<WuxiaAutomationSnapshot> {
+    if (!candidate) {
       throw new BridgeRequestError(
         WUXIA_ERROR_CODES.AUTOMATION_NOT_READY,
         '武侠游戏界面尚未初始化，请先进入游戏页面。',
         true,
       );
     }
-    const automationVersion = await automation.version;
+    const automationVersion = await candidate.version;
     if (automationVersion !== WUXIA_PROTOCOL_VERSION) {
       throw new BridgeRequestError(
         WUXIA_ERROR_CODES.VERSION_MISMATCH,
         `自动化接口版本为 ${String(automationVersion)}，桥接协议要求版本 ${WUXIA_PROTOCOL_VERSION}。`,
       );
     }
-    const snapshot = await automation.getSnapshot();
+    const snapshot = await candidate.getSnapshot();
     if (!snapshot.ready) {
-      automation = null;
       throw new BridgeRequestError(
         WUXIA_ERROR_CODES.AUTOMATION_NOT_READY,
         '武侠游戏界面正在重载，请稍后重新读取快照。',
@@ -182,40 +185,78 @@ function startBridge() {
     return snapshot;
   }
 
-  async function emitState() {
+  function isCurrentStateQuery(
+    queryGeneration: number,
+    candidate: WuxiaAutomationApi | null,
+    instanceId: string,
+  ): boolean {
+    return (
+      !disposed &&
+      stateQueryGeneration === queryGeneration &&
+      automation === candidate &&
+      automationInstanceId === instanceId
+    );
+  }
+
+  function emitSnapshotState(snapshot: WuxiaAutomationSnapshot): void {
     if (!socket.connected || disposed) return;
+    turnTimeoutMs = snapshot.turnTimeoutMs;
+    stateRevision += 1;
+    socket.emit(WUXIA_EVENTS.STATE, {
+      automationReady: true,
+      apiVersion: snapshot.version,
+      automationInstanceId,
+      automationGlobalName,
+      chatId: snapshot.chatId,
+      page: snapshot.page,
+      busy: snapshot.busy || runInFlight !== null,
+      turnTimeoutMs,
+      stateRevision,
+      snapshotCapturedAt: snapshot.capturedAt,
+      latestMessageId: getLatestMessageId(snapshot),
+    });
+  }
+
+  function emitUnavailableState(error: unknown): void {
+    if (!socket.connected || disposed) return;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn('[wuxia-bridge] 自动化接口尚不可用。', error);
+    stateRevision += 1;
+    socket.emit(WUXIA_EVENTS.STATE, {
+      automationReady: false,
+      apiVersion: automation?.version ?? null,
+      automationInstanceId,
+      automationGlobalName,
+      chatId: '',
+      page: `error:${errorMessage}`,
+      busy: runInFlight !== null,
+      turnTimeoutMs,
+      stateRevision,
+      latestMessageId: null,
+    });
+  }
+
+  async function emitState() {
+    const queryGeneration = ++stateQueryGeneration;
+    const candidate = automation;
+    const instanceId = automationInstanceId;
+    if (!socket.connected || disposed || !candidate) {
+      if (!disposed && socket.connected && isCurrentStateQuery(queryGeneration, candidate, instanceId)) {
+        emitUnavailableState(new Error('武侠游戏界面尚未初始化，请先进入游戏页面。'));
+      }
+      return;
+    }
     try {
-      const snapshot = await getUsableSnapshot();
-      turnTimeoutMs = snapshot.turnTimeoutMs;
-      socket.emit(WUXIA_EVENTS.STATE, {
-        automationReady: true,
-        apiVersion: snapshot.version,
-        automationInstanceId,
-        automationGlobalName,
-        chatId: snapshot.chatId,
-        page: snapshot.page,
-        busy: snapshot.busy || runInFlight !== null,
-        turnTimeoutMs,
-        latestMessageId: getLatestMessageId(snapshot),
-      });
+      const snapshot = await getUsableSnapshot(candidate);
+      if (!isCurrentStateQuery(queryGeneration, candidate, instanceId)) return;
+      emitSnapshotState(snapshot);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn('[wuxia-bridge] 自动化接口尚不可用。', error);
-      socket.emit(WUXIA_EVENTS.STATE, {
-        automationReady: false,
-        apiVersion: automation?.version ?? null,
-        automationInstanceId,
-        automationGlobalName,
-        chatId: '',
-        page: `error:${errorMessage}`,
-        busy: runInFlight !== null,
-        turnTimeoutMs,
-        latestMessageId: null,
-      });
+      if (!isCurrentStateQuery(queryGeneration, candidate, instanceId)) return;
+      emitUnavailableState(error);
     }
   }
 
-  async function acquireAutomation(globalName = WUXIA_AUTOMATION_GLOBAL_PREFIX, instanceId = 'legacy') {
+  async function acquireAutomation(globalName: string = WUXIA_AUTOMATION_GLOBAL_PREFIX, instanceId = 'legacy') {
     const generation = ++acquisitionGeneration;
     try {
       const initialized = await waitGlobalInitialized<WuxiaAutomationApi | undefined>(globalName);
@@ -251,8 +292,21 @@ function startBridge() {
 
   async function dispatchRequest(request: WuxiaRpcRequest): Promise<WuxiaRpcResponse> {
     try {
-      const snapshot = await getUsableSnapshot();
+      const requestAutomation = automation;
+      if (!requestAutomation) {
+        throw new BridgeRequestError(
+          WUXIA_ERROR_CODES.AUTOMATION_NOT_READY,
+          '武侠游戏界面尚未初始化，请先进入游戏页面。',
+          true,
+        );
+      }
+      const snapshot = await getUsableSnapshot(requestAutomation);
       if (request.method === WUXIA_METHODS.GET_SNAPSHOT) {
+        // 读取快照本身就是比缓存状态更新的事实来源；同时使尚未返回的旧状态查询失效。
+        if (automation === requestAutomation) {
+          stateQueryGeneration += 1;
+          emitSnapshotState(snapshot);
+        }
         return { id: request.id, ok: true, result: snapshot };
       }
       if (request.method !== WUXIA_METHODS.RUN_TURN || !isRecord(request.params)) {
@@ -272,7 +326,6 @@ function startBridge() {
       const input = String(request.params.input).trim();
       const settleTimeoutMs = request.params.settleTimeoutMs;
       const settleDelayMs = request.params.settleDelayMs;
-      const requestAutomation = automation!;
       const runToken: RunInFlight = {
         requestId: request.id,
         automationInstanceId,
@@ -334,7 +387,56 @@ function startBridge() {
         };
         responseCache.set(request.id, entry);
       }
-      acknowledge(await entry.response);
+      const response = await entry.response;
+      const responseReadyAt = Date.now();
+      const isRunTurnRequest = request.method === WUXIA_METHODS.RUN_TURN;
+      if (isRunTurnRequest) {
+        forwardIframeLifecycleEvent('wuxia-bridge', 'bridge-run-turn-response-ready', {
+          requestId: request.id,
+          method: request.method,
+          ok: response.ok,
+        });
+      }
+      acknowledge(response);
+      if (isRunTurnRequest) {
+        forwardIframeLifecycleEvent('wuxia-bridge', 'bridge-run-turn-acknowledge-returned', {
+          requestId: request.id,
+          method: request.method,
+          ok: response.ok,
+          acknowledgeDurationMs: Date.now() - responseReadyAt,
+        });
+      }
+      if (isRunTurnRequest && response.ok === true && isRecord(response.result)) {
+        const debug = isRecord(response.result.debug) ? response.result.debug : null;
+        const roundId = typeof debug?.id === 'string' ? debug.id : '';
+        if (roundId) {
+          const deliveredPayload = {
+            requestId: request.id,
+            roundId,
+            messageId: Number.isInteger(response.result.assistantMessageId)
+              ? Number(response.result.assistantMessageId)
+              : null,
+            deliveredAt: Date.now(),
+          };
+          forwardIframeLifecycleEvent('wuxia-bridge', 'bridge-turn-response-delivery-started', deliveredPayload);
+          void eventEmit(WUXIA_TURN_RESPONSE_DELIVERED_EVENT, deliveredPayload).then(
+            () => {
+              forwardIframeLifecycleEvent('wuxia-bridge', 'bridge-turn-response-delivery-finished', {
+                ...deliveredPayload,
+                deliveryDurationMs: Date.now() - deliveredPayload.deliveredAt,
+              });
+            },
+            error => {
+              forwardIframeLifecycleEvent('wuxia-bridge', 'bridge-turn-response-delivery-failed', {
+                ...deliveredPayload,
+                deliveryDurationMs: Date.now() - deliveredPayload.deliveredAt,
+                error: error instanceof Error ? error.message : String(error),
+              });
+              console.warn('[wuxia-bridge] 回合响应已 ACK，但通知楼层脚本恢复刷新失败。', error);
+            },
+          );
+        }
+      }
     },
   );
 
@@ -366,6 +468,11 @@ function startBridge() {
     automationGlobalName = '';
     void emitState();
   });
+  const stateChangedListener = eventOn(WUXIA_GLOBAL_EVENTS.STATE_CHANGED, detail => {
+    const announcement = readAutomationAnnouncement(detail);
+    if (!announcement || announcement.instanceId !== automationInstanceId) return;
+    void emitState();
+  });
   const chatChangedListener = eventOn(tavern_events.CHAT_CHANGED, () => void emitState());
 
   function dispose() {
@@ -374,6 +481,7 @@ function startBridge() {
     acquisitionGeneration += 1;
     readyListener.stop();
     disposedListener.stop();
+    stateChangedListener.stop();
     chatChangedListener.stop();
     socket.removeAllListeners();
     socket.disconnect();

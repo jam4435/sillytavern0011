@@ -14,6 +14,7 @@ export const WUXIA_GLOBAL_EVENTS = Object.freeze({
   DISCOVER: 'wuxia:automation-discover',
   READY: 'wuxia:automation-ready',
   DISPOSED: 'wuxia:automation-disposed',
+  STATE_CHANGED: 'wuxia:automation-state-changed',
 });
 
 export const WUXIA_AUTOMATION_GLOBAL_PREFIX = 'WuxiaAutomation';

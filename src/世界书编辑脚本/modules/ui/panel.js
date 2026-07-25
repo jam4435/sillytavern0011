@@ -2668,6 +2668,9 @@ export function initPanel() {
                     #${LOREBOOK_PANEL_ID} .lorebook-actions-wrapper > * {
                         flex-shrink: 0; /* 防止按钮被压缩 */
                     }
+                    #${LOREBOOK_PANEL_ID} .lorebook-actions-wrapper > .lorebook-title-select-all {
+                        margin-left: auto;
+                    }
                     #${LOREBOOK_PANEL_ID} .lorebook-search-sort-wrapper {
                         display: flex;
                         flex: 1 1 auto; /* 允许搜索排序容器伸缩 */

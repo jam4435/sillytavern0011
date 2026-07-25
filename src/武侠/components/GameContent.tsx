@@ -177,11 +177,13 @@ const GameContent: React.FC<GameContentProps> = ({ maintext, options, onSelectOp
   uiLogger.log('✅ [GameContent] 渲染正文内容');
 
   return (
-    <div className="game-content" data-wuxia-automation="latest-reply">
+    <div className="game-content">
       {/* 主文本区域（完整显示，支持 HTML 渲染） */}
       {maintext && (
         <div className="maintext-container">
-          <div className="maintext-content">{renderedContent}</div>
+          <div className="maintext-content" data-wuxia-automation="latest-reply">
+            {renderedContent}
+          </div>
         </div>
       )}
 

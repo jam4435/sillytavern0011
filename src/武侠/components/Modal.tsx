@@ -36,7 +36,12 @@ const Modal: React.FC<ModalProps> = ({
             <div className="title-bar"></div>
             <h2 className="modal-title">{title}</h2>
           </div>
-          <button onClick={onClose} className="modal-close-btn">
+          <button
+            onClick={onClose}
+            className="modal-close-btn"
+            aria-label={`关闭${title}`}
+            data-wuxia-automation="close-modal"
+          >
             <Icons.Close />
           </button>
         </div>

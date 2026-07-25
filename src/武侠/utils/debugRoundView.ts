@@ -1,6 +1,19 @@
-import type { ExtendedDebugStageStatus, LatestDebugRound } from '../hooks/useDebugLogs';
+import type { DebugVariableApplyStatus, ExtendedDebugStageStatus, LatestDebugRound } from '../hooks/useDebugLogs';
 
 const normalizeDebugText = (value: string | undefined): string => (value || '').trim();
+
+const buildRetry429Lines = (stage: LatestDebugRound['main'] | LatestDebugRound['variable']): string[] => {
+  const retryCount = stage.retry429Count ?? 0;
+  if (retryCount <= 0) {
+    return [];
+  }
+  return [
+    '【HTTP 429 自动重试】',
+    `已重试：${retryCount} 次`,
+    `最近等待：${stage.retry429LastDelayMs ?? 0}ms`,
+    '',
+  ];
+};
 
 const getVariableTriggerLabel = (trigger: LatestDebugRound['variable']['trigger']): string => {
   if (trigger === 'send') {
@@ -33,6 +46,26 @@ const buildVariableDecisionLines = (debugRound: LatestDebugRound): string[] => {
   ];
 };
 
+const buildVariablePhaseLines = (debugRound: LatestDebugRound): string[] => {
+  const { variable } = debugRound;
+  const phases = variable.phaseTimeline ?? [];
+  if (phases.length === 0) {
+    return [];
+  }
+
+  return [
+    '【变量流水线耗时】',
+    ...(variable.currentPhase ? [`当前等待：${variable.currentPhase}`] : []),
+    ...phases.map(phase => {
+      const status = phase.status === 'running' ? '进行中' : phase.status === 'success' ? '完成' : '失败';
+      const watchdog = phase.watchdogTickCount > 0 ? `，watchdog ${phase.watchdogTickCount} 次` : '';
+      const error = phase.error ? `，错误：${phase.error}` : '';
+      return `${phase.name}：${status}，${phase.durationMs}ms${watchdog}${error}`;
+    }),
+    '',
+  ];
+};
+
 export function getDebugStageStatusLabel(status: ExtendedDebugStageStatus): string {
   if (status === 'running') {
     return '进行中';
@@ -47,6 +80,15 @@ export function getDebugStageStatusLabel(status: ExtendedDebugStageStatus): stri
     return '已跳过';
   }
   return '未运行';
+}
+
+export function getVariableApplyStatusLabel(status: DebugVariableApplyStatus): string {
+  if (status === 'waiting-write-done') return '等待 ERA 写入确认';
+  if (status === 'verifying') return '等待变量快照刷新';
+  if (status === 'success') return '变量已持久化';
+  if (status === 'pending') return '持久化仍在等待';
+  if (status === 'error') return '变量应用失败';
+  return '未开始应用';
 }
 
 export function shouldShowVariableDebug(debugRound: LatestDebugRound | null): boolean {
@@ -68,12 +110,23 @@ export function shouldShowVariableDebug(debugRound: LatestDebugRound | null): bo
     || variable.appendVerification
     || variable.syncReadbackText
     || variable.syncVerification
+    || (variable.retry429Count ?? 0) > 0
+    || variable.applyStatus !== 'idle'
+    || variable.applyError
+    || variable.applyVerification
+    || variable.postProcessStatus !== 'idle'
+    || variable.postProcessError
     || variable.error,
   );
 }
 
 export function buildMainInputDebugContent(debugRound: LatestDebugRound): string {
-  const sections = ['【用户输入】', debugRound.main.userInput || '(空)', ''];
+  const sections = [
+    '【用户输入】',
+    debugRound.main.userInput || '(空)',
+    '',
+    ...buildRetry429Lines(debugRound.main),
+  ];
   const combinedPrompt = normalizeDebugText(debugRound.main.combinedPrompt);
 
   sections.push('【合并提示词】');
@@ -105,7 +158,10 @@ export function buildVariableInputDebugContent(debugRound: LatestDebugRound): st
 
 export function buildVariableOutputDebugContent(debugRound: LatestDebugRound): string {
   const { variable } = debugRound;
-  const sections: string[] = [];
+  const sections: string[] = [
+    ...buildRetry429Lines(variable),
+    ...buildVariablePhaseLines(debugRound),
+  ];
   const rawResponse = normalizeDebugText(variable.output);
   const appendedBlocks = normalizeDebugText(variable.appendedBlocks);
   const appendReadbackText = normalizeDebugText(variable.appendReadbackText);
@@ -134,7 +190,18 @@ export function buildVariableOutputDebugContent(debugRound: LatestDebugRound): s
 
   sections.push('【合法变量块】', variable.appendedBlocks || '(无)', '');
   sections.push('【写入后回读验证】', variable.appendVerification || '(未验证)', '');
-  sections.push('【ERA 同步后回读验证】', variable.syncVerification || '(未同步或未回读)');
+  sections.push('【ERA 楼层同步后回读验证】', variable.syncVerification || '(未同步或未回读)');
+  sections.push('【ERA 变量应用状态】', getVariableApplyStatusLabel(variable.applyStatus));
+  if (variable.applyVerification) {
+    sections.push('【变量快照验证】', variable.applyVerification);
+  }
+  if (variable.applyError) {
+    sections.push('【变量应用错误】', variable.applyError);
+  }
+  if (variable.postProcessStatus !== 'idle' || variable.postProcessError) {
+    sections.push('【后处理状态】', getDebugStageStatusLabel(variable.postProcessStatus));
+    if (variable.postProcessError) sections.push(variable.postProcessError);
+  }
 
   if (isError || (appendReadbackText && appendReadbackText !== syncReadbackText)) {
     sections.push('', '【写入后回读文本】', variable.appendReadbackText || '(未回读)');

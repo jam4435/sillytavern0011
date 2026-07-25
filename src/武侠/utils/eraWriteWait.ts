@@ -1,4 +1,6 @@
-type EraWriteDoneDetail = {
+import { scheduleUnthrottledTimeout } from '../../shared/unthrottledTimer';
+
+export type EraWriteDoneDetail = {
   message_id?: number | null;
   actions?: Record<string, unknown>;
 };
@@ -14,6 +16,14 @@ export type EraWaitOptions = {
 type EraWriteDoneWaiter = {
   promise: Promise<void>;
   finish: (error?: Error) => void;
+};
+
+export type EraWriteDoneObserver = {
+  waitForMessageId: (
+    messageId: number,
+    options: { timeoutMs?: number; timeoutMessage: string },
+  ) => Promise<EraWriteDoneDetail>;
+  stop: () => void;
 };
 
 function matchesEraWriteDone(
@@ -56,7 +66,7 @@ export function createEraWriteDoneWaiter({
       if (listener) {
         listener.stop();
       }
-      window.clearTimeout(timer);
+      timer.cancel();
       if (error) {
         reject(error);
       } else {
@@ -64,7 +74,7 @@ export function createEraWriteDoneWaiter({
       }
     };
 
-    const timer = window.setTimeout(() => {
+    const timer = scheduleUnthrottledTimeout(() => {
       finish(new Error(timeoutMessage));
     }, timeoutMs);
 
@@ -91,6 +101,101 @@ export function waitForEraWriteDone({
     expectedMessageId,
     expectedAction,
   }).promise;
+}
+
+export function observeEraWriteDone({
+  expectedAction,
+  maxBuffered = 8,
+}: {
+  expectedAction: string;
+  maxBuffered?: number;
+}): EraWriteDoneObserver {
+  const buffered = new Map<number, EraWriteDoneDetail>();
+  let stopped = false;
+  let pending:
+    | {
+        messageId: number;
+        resolve: (detail: EraWriteDoneDetail) => void;
+        reject: (error: Error) => void;
+        timer: ReturnType<typeof scheduleUnthrottledTimeout>;
+      }
+    | undefined;
+
+  const stopListener = eventOn('era:writeDone', (detail: unknown) => {
+    if (
+      stopped
+      || !detail
+      || typeof detail !== 'object'
+      || Array.isArray(detail)
+    ) {
+      return;
+    }
+
+    const writeDone = detail as EraWriteDoneDetail;
+    if (!Number.isInteger(writeDone.message_id) || writeDone.actions?.[expectedAction] !== true) {
+      return;
+    }
+
+    const messageId = Number(writeDone.message_id);
+    if (pending?.messageId === messageId) {
+      const current = pending;
+      pending = undefined;
+      current.timer.cancel();
+      current.resolve(writeDone);
+      return;
+    }
+
+    buffered.delete(messageId);
+    buffered.set(messageId, writeDone);
+    while (buffered.size > Math.max(1, maxBuffered)) {
+      const oldestMessageId = buffered.keys().next().value;
+      if (oldestMessageId === undefined) break;
+      buffered.delete(oldestMessageId);
+    }
+  });
+
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    stopListener.stop();
+    buffered.clear();
+    if (pending) {
+      const current = pending;
+      pending = undefined;
+      current.timer.cancel();
+      current.reject(new Error('ERA 写入观察已停止。'));
+    }
+  };
+
+  return {
+    waitForMessageId(messageId, { timeoutMs = 20000, timeoutMessage }) {
+      if (stopped) {
+        return Promise.reject(new Error('ERA 写入观察已停止。'));
+      }
+      if (!Number.isInteger(messageId)) {
+        return Promise.reject(new Error(`无效的 assistant message_id：${String(messageId)}`));
+      }
+      if (pending) {
+        return Promise.reject(new Error('同一个 ERA 写入观察器不能同时等待多个 assistant 楼层。'));
+      }
+
+      const bufferedDetail = buffered.get(messageId);
+      if (bufferedDetail) {
+        buffered.delete(messageId);
+        return Promise.resolve(bufferedDetail);
+      }
+
+      return new Promise<EraWriteDoneDetail>((resolve, reject) => {
+        const timer = scheduleUnthrottledTimeout(() => {
+          if (pending?.messageId !== messageId) return;
+          pending = undefined;
+          reject(new Error(timeoutMessage));
+        }, timeoutMs);
+        pending = { messageId, resolve, reject, timer };
+      });
+    },
+    stop,
+  };
 }
 
 export async function emitEraEventAndWait(

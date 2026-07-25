@@ -1,0 +1,320 @@
+{
+  "shard": 3,
+  "reviewed": 210,
+  "confirmedCount": 37,
+  "likelyCount": 2,
+  "flagged": [
+    {
+      "id": "神雕第19回-04-杨过搓绳攀出石窟遭樊一翁袭击",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第19回-04-杨过搓绳攀出石窟遭樊一翁袭击.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "搓制树皮索明确“花了两三个时辰直到天色昏暗”，已超过 1 小时。",
+      "minimumPlausibleHours": 2
+    },
+    {
+      "id": "神雕第20回-06-蒙古军攻襄阳郭靖守城显神威",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第20回-06-蒙古军攻襄阳郭靖守城显神威.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "随军南行“不数日”才到襄阳，抵达后又至“翌晨”攻城，明确跨越数日及一夜。",
+      "minimumPlausibleHours": 48
+    },
+    {
+      "id": "神雕第21回-03-杨过假寐行刺未遂郭靖以内力通脉",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第21回-03-杨过假寐行刺未遂郭靖以内力通脉.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "郭靖为杨过通脉后“二人一同打坐直到天明才复元”，明显跨夜。",
+      "minimumPlausibleHours": 6
+    },
+    {
+      "id": "神雕第21回-08-小龙女夜访与杨龙花园偷听",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第21回-08-小龙女夜访与杨龙花园偷听.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "杨过、小龙女在花园“直坐到天明”，明确跨夜。",
+      "minimumPlausibleHours": 4
+    },
+    {
+      "id": "神雕第22回-02-杨过醒转襄阳见黄蓉小龙女",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第22回-02-杨过醒转襄阳见黄蓉小龙女.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "详情明确杨过“将养了半日已好了大半”，半日已远超 1 小时。",
+      "minimumPlausibleHours": 12
+    },
+    {
+      "id": "神雕第22回-11-杨过李莫愁寻奶豹乳哺婴",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第22回-11-杨过李莫愁寻奶豹乳哺婴.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "从寻村、步行数十里、捕豹哺婴直至“天快黑了”，随后又生火过夜，明显不是 1 小时。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "神雕第23回-08-杨过吮毒救人昏迷醒转天竺僧诊断",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第23回-08-杨过吮毒救人昏迷醒转天竺僧诊断.yaml",
+      "durationHours": 4,
+      "verdict": "confirm",
+      "reason": "杨过昏倒后醒来时“已是第七日”，明确为七日跨度。",
+      "minimumPlausibleHours": 168
+    },
+    {
+      "id": "神雕第24回-04-小龙女托马赠剑",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第24回-04-小龙女托马赠剑.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "小龙女“连夜驰回襄阳”，其后事件已“过午夜”，明确超过 1 小时。",
+      "minimumPlausibleHours": 2
+    },
+    {
+      "id": "神雕第24回-07-尹赵小镇风波与法王相遇",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第24回-07-尹赵小镇风波与法王相遇.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "尹赵二人从清晨急奔到中午、午后，傍晚才到市镇，文本明确覆盖大半日。",
+      "minimumPlausibleHours": 10
+    },
+    {
+      "id": "神雕第24回-08-周伯通盗王旗",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第24回-08-周伯通盗王旗.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "众人天黑后歇马、再行“直至天明”，并于次日继续行程，明确跨夜。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "神雕第24回-09-法王拉拢赵志敬谋夺掌教",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第24回-09-法王拉拢赵志敬谋夺掌教.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "详情从午牌到酒筵、夜间藏旗，并写至周伯通入夜盗旗，明确跨越下午至夜间。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "神雕第25回-02-小龙女杀蛛救周伯通夜战金轮法王",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第25回-02-小龙女杀蛛救周伯通夜战金轮法王.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "双方在洞口相持“到天明”，明确跨夜。",
+      "minimumPlausibleHours": 6
+    },
+    {
+      "id": "神雕第25回-03-法王蛛网封洞周伯通传左右互搏",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第25回-03-法王蛛网封洞周伯通传左右互搏.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "小龙女学习左右互搏“只几个时辰”即融会贯通，明确多小时。",
+      "minimumPlausibleHours": 3
+    },
+    {
+      "id": "神雕第25回-05-小龙女追踪三道人终南山下",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第25回-05-小龙女追踪三道人终南山下.yaml",
+      "durationHours": 1,
+      "verdict": "likely",
+      "reason": "追踪三道人“朝行晚宿”至终南山脚，连续长途行旅显然不可信为 1 小时，但未给出可精确换算的日数。",
+      "minimumPlausibleHours": null
+    },
+    {
+      "id": "神雕第26回-08-杨过荒谷遇神雕发现剑冢",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第26回-08-杨过荒谷遇神雕发现剑冢.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "杨过抵谷后“过了多日伤口渐渐愈合”，明确是多日疗伤。",
+      "minimumPlausibleHours": 48
+    },
+    {
+      "id": "神雕第26回-09-杨过山洪中悟重剑剑道",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第26回-09-杨过山洪中悟重剑剑道.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "杨过“练剑数日”，其后又经历整日山洪练剑并连夜辞别，明确远超 1 小时。",
+      "minimumPlausibleHours": 48
+    },
+    {
+      "id": "神雕第26回-10-杨过夜入襄阳",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第26回-10-杨过夜入襄阳.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "杨过先在城外睡“几个时辰”，再等到初更入城，明确超过 1 小时。",
+      "minimumPlausibleHours": 2
+    },
+    {
+      "id": "神雕第27回-05-杨过飞入棘阵劫郭襄抢红马北上终南山",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第27回-05-杨过飞入棘阵劫郭襄抢红马北上终南山.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "杨过北行二百里并写明“不数日间已到了终南山下”，明确跨多日。",
+      "minimumPlausibleHours": 48
+    },
+    {
+      "id": "神雕第29回-05-杨龙寒玉床疗伤李莫愁偷袭被杨过智困棺中",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第29回-05-杨龙寒玉床疗伤李莫愁偷袭被杨过智困棺中.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "详情开头直接说明小龙女“连日来”持续以逆行经脉疗伤，这是当前疗伤过程而非往事转述。",
+      "minimumPlausibleHours": 48
+    },
+    {
+      "id": "神雕第30回-05-一灯赠药四人相认赶赴绝情谷周伯通现身",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第30回-05-一灯赠药四人相认赶赴绝情谷周伯通现身.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "本段先为当下会谈，明确“次晨四人赶路”，并持续写到日间疾行，跨越一夜。",
+      "minimumPlausibleHours": 12
+    },
+    {
+      "id": "神雕第32回-05-众人分头追赶公孙止李莫愁",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-05-众人分头追赶公孙止李莫愁.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "追踪李莫愁时明确“扰攘了一夜天色渐明”，已跨夜。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "神雕第32回-11-小龙女深夜失踪",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-11-小龙女深夜失踪.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "两人从夕阳时同行、睡至中夜，小龙女失踪后众人再分头搜索，明确跨越数小时。",
+      "minimumPlausibleHours": 4
+    },
+    {
+      "id": "神雕第32回-14-杨过程英陆无双结拜传功",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-14-杨过程英陆无双结拜传功.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "砍伐情花树直至第六日、第七日服药，继而传功“将近一月”，为明确长期过程。",
+      "minimumPlausibleHours": 720
+    },
+    {
+      "id": "神雕第32回-15-杨过飘然离去海边练剑",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-15-杨过飘然离去海边练剑.yaml",
+      "durationHours": 4,
+      "verdict": "confirm",
+      "reason": "详情含月余苦候、数月游历及训练，并明确海边练剑已有六年，4 小时严重失真。",
+      "minimumPlausibleHours": 52560
+    },
+    {
+      "id": "神雕第34回-04-一灯求见杨过长啸逼瑛姑恩怨揭晓",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第34回-04-一灯求见杨过长啸逼瑛姑恩怨揭晓.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "一灯正在潭外“苦苦求恳七日七夜”，为当前场景的持续行动。",
+      "minimumPlausibleHours": 168
+    },
+    {
+      "id": "神雕第34回-05-杨过周伯通百花谷比武",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第34回-05-杨过周伯通百花谷比武.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "比武、讲述、传授掌法后，三人一雕在林中过夜，次日才返黑龙潭。",
+      "minimumPlausibleHours": 10
+    },
+    {
+      "id": "神雕第35回-04-郭襄回襄阳受父母管教",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第35回-04-郭襄回襄阳受父母管教.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "郭襄先已外出两日夜，回城后又绝食两天、到第三日才被劝回，当前叙事明确跨多日。",
+      "minimumPlausibleHours": 72
+    },
+    {
+      "id": "神雕第35回-07-黄蓉夜探堕泪碑发现神秘聚会",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第35回-07-黄蓉夜探堕泪碑发现神秘聚会.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "黄蓉四鼓出城探查，回城时“天已微明”，明确经过夜间数小时。",
+      "minimumPlausibleHours": 3
+    },
+    {
+      "id": "神雕第35回-08-英雄大宴郭靖被推为盟主",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第35回-08-英雄大宴郭靖被推为盟主.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "写明当日继续接客、翌日举行四百桌大宴，并到当晚盟主推举，明确跨日。",
+      "minimumPlausibleHours": 24
+    },
+    {
+      "id": "神雕第36回-04-耶律齐大战蓝天和连胜群雄",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第36回-04-耶律齐大战蓝天和连胜群雄.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "耶律齐先连败多人，随后再连败七人，直到“天色将黑”，显著超过 1 小时。",
+      "minimumPlausibleHours": 6
+    },
+    {
+      "id": "神雕第37回-06-郭襄留书出走寻杨过",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-06-郭襄留书出走寻杨过.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "郭襄夜间出城，次日清晨家人发现未归，明确跨夜。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "神雕第37回-09-杨过癫狂至嘉兴铁枪庙救柯镇恶知父过",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-09-杨过癫狂至嘉兴铁枪庙救柯镇恶知父过.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "杨过数日不食不睡，又南行第三日才至嘉兴，明确多日长途行程。",
+      "minimumPlausibleHours": 72
+    },
+    {
+      "id": "神雕第37回-10-杨过得讯郭襄被擒赴蒙古军营寻访",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-10-杨过得讯郭襄被擒赴蒙古军营寻访.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "先不一日赶近军营，继而连续四夜查遍四营，又再查数日，明确远超 1 小时。",
+      "minimumPlausibleHours": 120
+    },
+    {
+      "id": "神雕第38回-01-郭襄夜逃金轮法王三拦收徒激将赴绝情谷",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第38回-01-郭襄夜逃金轮法王三拦收徒激将赴绝情谷.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "郭襄半夜逃亡、疾驰至天明并已出五六十里，明确跨夜。",
+      "minimumPlausibleHours": 4
+    },
+    {
+      "id": "神雕第38回-07-郭襄述谷底情形众人搓绳下谷寻杨过不见黄蓉探潭无果",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第38回-07-郭襄述谷底情形众人搓绳下谷寻杨过不见黄蓉探潭无果.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "众人搓绳至天黑，整晚未歇直到次晨后又轮流下谷寻人，明确跨夜。",
+      "minimumPlausibleHours": 12
+    },
+    {
+      "id": "神雕第39回-01-黄蓉七人回襄阳夜闯蒙古营入城",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第39回-01-黄蓉七人回襄阳夜闯蒙古营入城.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "一行人日夜兼程返襄阳，抵城后又至二更夜闯敌营并突围，文本明确跨越长时段。",
+      "minimumPlausibleHours": 12
+    },
+    {
+      "id": "神雕第39回-04-杨过绝情谷底重逢小龙女携手出谷",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第39回-04-杨过绝情谷底重逢小龙女携手出谷.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "杨龙重逢后“长谈一夜”，次日才攀绳出谷，明确跨夜。",
+      "minimumPlausibleHours": 12
+    },
+    {
+      "id": "神雕第39回-09-襄阳大捷庆功宴郭靖杨过携手入城议赴华山",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第39回-09-襄阳大捷庆功宴郭靖杨过携手入城议赴华山.yaml",
+      "durationHours": 1,
+      "verdict": "confirm",
+      "reason": "入城庆贺后，当夜举行祝捷宴并“直饮至深夜大醉而散”，显著超过 1 小时。",
+      "minimumPlausibleHours": 5
+    },
+    {
+      "id": "神雕第40回-01-华山祭奠洪七公与欧阳锋",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第40回-01-华山祭奠洪七公与欧阳锋.yaml",
+      "durationHours": 1,
+      "verdict": "likely",
+      "reason": "伤者骑马每日只行数十里，叙事以“不一日”抵华山；慢行长途不可信为 1 小时，但未给出可精确换算的行程日数。",
+      "minimumPlausibleHours": null
+    }
+  ]
+}

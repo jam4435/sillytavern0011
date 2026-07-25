@@ -187,4 +187,30 @@ describe('regenerateLastAssistantSwipe', () => {
     expect(result.assistantMessageId).toBe(2);
     expect(result.rawReply).toBe('新正文');
   });
+
+  it('重新生成遇到两次 429 后只提交一个新 swipe', async () => {
+    globals.generate = vi.fn()
+      .mockRejectedValueOnce({ status: 429, retryAfterMs: 0 })
+      .mockRejectedValueOnce({ cause: { statusCode: 429 }, retryAfterMs: 0 })
+      .mockResolvedValue('限流后新正文');
+
+    const result = await regenerateLastAssistantSwipe();
+
+    expect(globals.generate).toHaveBeenCalledTimes(3);
+    expect(messages[1].swipes).toHaveLength(2);
+    expect(messages[1].swipes?.filter(text => text.includes('限流后新正文'))).toHaveLength(1);
+    expect(emitEraEventAndWaitMock).toHaveBeenCalledTimes(2);
+    expect(result.rawReply).toBe('限流后新正文');
+  });
+
+  it('重新生成连续三次 429 后恢复原 swipe', async () => {
+    globals.generate = vi.fn().mockRejectedValue({ status: 429, retryAfterMs: 0, message: 'HTTP 429' });
+
+    await expect(regenerateLastAssistantSwipe()).rejects.toThrow('已自动重试 2 次');
+
+    expect(globals.generate).toHaveBeenCalledTimes(3);
+    expect(messages[1].swipe_id).toBe(0);
+    expect(messages[1].message).toBe('旧正文\n\n<era_data>{"mk":"old"}</era_data>');
+    expect(emitEraEventAndWaitMock).not.toHaveBeenCalledWith('era:apiWrite', expect.anything());
+  });
 });

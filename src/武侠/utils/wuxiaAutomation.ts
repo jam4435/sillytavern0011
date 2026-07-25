@@ -1,6 +1,12 @@
 import type { LatestDebugRound } from '../hooks/useDebugLogs';
 import type { PageState } from '../types';
-import { readIframeLifecycleBlackBox, type IframeLifecycleBlackBoxEntry } from './iframeLifecycleBlackBox';
+import { scheduleUnthrottledTimeout, type UnthrottledTimerHandle } from '../../shared/unthrottledTimer';
+import {
+  installIframeLifecycleEventForwarder,
+  readIframeLifecycleBlackBox,
+  recordIframeLifecycleEvent,
+  type IframeLifecycleBlackBoxEntry,
+} from './iframeLifecycleBlackBox';
 import type { VariableChangeSummary, VariableComparisonStatus } from './variableChanges';
 
 export const WUXIA_AUTOMATION_API_VERSION = 1 as const;
@@ -166,7 +172,7 @@ function delay(milliseconds: number): Promise<void> {
   if (milliseconds <= 0) {
     return Promise.resolve();
   }
-  return new Promise(resolve => window.setTimeout(resolve, milliseconds));
+  return new Promise(resolve => scheduleUnthrottledTimeout(resolve, milliseconds));
 }
 
 function readChatId(): string {
@@ -310,13 +316,14 @@ function createWriteSignalObserver(): WriteSignalObserver {
 
       return new Promise(resolve => {
         let settled = false;
+        let timer: UnthrottledTimerHandle | null = null;
         const finish = (observed: boolean) => {
           if (settled) {
             return;
           }
           settled = true;
           waiters.delete(check);
-          window.clearTimeout(timer);
+          timer?.cancel();
           resolve(observed);
         };
         const check = () => {
@@ -324,7 +331,7 @@ function createWriteSignalObserver(): WriteSignalObserver {
             finish(true);
           }
         };
-        const timer = window.setTimeout(() => finish(false), timeoutMs);
+        timer = scheduleUnthrottledTimeout(() => finish(false), timeoutMs);
         waiters.add(check);
       });
     },
@@ -419,6 +426,7 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
   let disposed = false;
   let activeRequestId: string | null = null;
   const disposeWaiters = new Set<() => void>();
+  const lifecycleForwarder = installIframeLifecycleEventForwarder();
 
   const settleOnDispose = <T>(operation: Promise<T>): Promise<T> =>
     new Promise<T>((resolve, reject) => {
@@ -509,6 +517,10 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
 
     try {
       const rawReply = await settleOnDispose(dependencies.runPlayerTurn(input));
+      recordIframeLifecycleEvent('wuxia-automation', 'automation-run-turn-player-returned', {
+        requestId,
+        elapsedMs: Date.now() - startedAt,
+      });
       const messagesAfterTurn = readAllMessages();
       const userMessage = findNewestMessageAfter(messagesAfterTurn, previousLatestMessageId, 'user');
       const assistantMessage = findNewestMessageAfter(messagesAfterTurn, previousLatestMessageId, 'assistant');
@@ -525,11 +537,32 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
         DEFAULT_SETTLE_TIMEOUT_MS,
         MAX_SETTLE_TIMEOUT_MS,
       );
+      recordIframeLifecycleEvent('wuxia-automation', 'automation-run-turn-write-signal-wait-started', {
+        requestId,
+        assistantMessageId: assistantMessageId ?? null,
+        expectedVariableWrite,
+        settleTimeoutMs,
+        elapsedMs: Date.now() - startedAt,
+        observedSignalCount: observer.signals.length,
+      });
       const signalObserved = expectedVariableWrite
         ? await observer.waitForAssistantWrite(assistantMessageId, settleTimeoutMs)
         : observer.signals.some(signal => signalMatchesAssistant(signal, assistantMessageId));
+      recordIframeLifecycleEvent('wuxia-automation', 'automation-run-turn-write-signal-wait-finished', {
+        requestId,
+        assistantMessageId: assistantMessageId ?? null,
+        expectedVariableWrite,
+        signalObserved,
+        elapsedMs: Date.now() - startedAt,
+        observedSignalCount: observer.signals.length,
+      });
       await delay(normalizeDuration(options.settleDelayMs, DEFAULT_SETTLE_DELAY_MS, 1_000));
 
+      const reportAssemblyStartedAt = Date.now();
+      recordIframeLifecycleEvent('wuxia-automation', 'automation-run-turn-report-assembly-started', {
+        requestId,
+        elapsedMs: reportAssemblyStartedAt - startedAt,
+      });
       const runtimeSettled = dependencies.getRuntimeState();
       const debug = cloneForAutomation(runtimeSettled.latestDebugRound);
       const variableChanges = cloneForAutomation(runtimeSettled.variableChanges);
@@ -542,6 +575,12 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
         observer.signals,
         variableChanges,
       );
+      recordIframeLifecycleEvent('wuxia-automation', 'automation-run-turn-report-ready', {
+        requestId,
+        elapsedMs: Date.now() - startedAt,
+        reportAssemblyDurationMs: Date.now() - reportAssemblyStartedAt,
+        verdict: variableVerification.verdict,
+      });
 
       return {
         ok: Boolean(normalizedRawReply.trim()) && !error,
@@ -586,6 +625,11 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
       if (activeRequestId === requestId) {
         activeRequestId = null;
       }
+      recordIframeLifecycleEvent('wuxia-automation', 'automation-run-turn-finalized', {
+        requestId,
+        elapsedMs: Date.now() - startedAt,
+        activeRequestCleared: activeRequestId === null,
+      });
     }
   };
 
@@ -601,6 +645,7 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
       activeRequestId = null;
       disposeWaiters.forEach(rejectForDispose => rejectForDispose());
       disposeWaiters.clear();
+      lifecycleForwarder.stop();
     },
   };
 }

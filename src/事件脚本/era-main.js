@@ -51,7 +51,7 @@
   const { getManifestEventCandidateKeys } = await import('./era-event-scheduler.js');
   const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
 
-  const EVENT_SCRIPT_VERSION = '2026-07-21-opening-participation-v4';
+  const EVENT_SCRIPT_VERSION = '2026-07-26-turn-commit-barrier-v1';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
@@ -239,6 +239,13 @@
   async function checkEvents(eventDefinitions, reason = 'manual') {
     debugGroup(`🔄 事件系统检查周期: ${reason}`);
 
+    if (activeTurnBarrier) {
+      markPendingTurnEventCheck(reason);
+      log(`🔒 回合 ${activeTurnBarrier.roundId} 尚未提交，延后事件检查: ${reason}`);
+      debugGroupEnd();
+      return;
+    }
+
     if (Object.keys(eventDefinitions).length === 0) {
       logWarning('没有加载任何事件定义');
       debugGroupEnd();
@@ -247,6 +254,11 @@
 
     try {
       let variables = await getVariables({ type: 'chat' });
+      if (activeTurnBarrier) {
+        markPendingTurnEventCheck(reason);
+        log(`🔒 回合写入期间变量尚未稳定，延后事件检查: ${reason}`);
+        return;
+      }
       await syncParticipationOutcomeStates(eventDefinitions, variables);
 
       const pendingSettlementEvents = Object.keys(variables?.stat_data?.前端变量?.事件结算进度 || {}).filter(
@@ -374,8 +386,13 @@
 
       // 批量结束事件
       if (eventsToEnd.length > 0) {
-        log(`⏹️ 发现 ${eventsToEnd.length} 个事件需要结束:`, eventsToEnd);
-        await batchEndEvents(eventsToEnd, eventDefinitions);
+        if (activeTurnBarrier) {
+          markPendingTurnEventCheck(reason);
+          log(`🔒 回合写入期间禁止结束事件，已延后 ${eventsToEnd.length} 个事件:`, eventsToEnd);
+        } else {
+          log(`⏹️ 发现 ${eventsToEnd.length} 个事件需要结束:`, eventsToEnd);
+          await batchEndEvents(eventsToEnd, eventDefinitions);
+        }
       } else {
         log('没有事件需要结束');
       }
@@ -552,6 +569,11 @@
   let isCheckingEvents = false;
   let pendingCheckReason = null;
   let checkEventsTimer = null;
+  let activeTurnBarrier = null;
+  let pendingTurnEventCheck = false;
+  let pendingTurnEventCheckReason = null;
+  const completedTurnRoundIds = new Set();
+  const abortedTurnRoundIds = new Set();
   let lastSuccessfulInitializationAt = 0;
   // 线索倒计时按 messageId 去重：同一助手楼层（含 regenerate 产生的同 messageId 新 swipe）
   // 只扣一次，避免重复扣减。切换聊天时重置。
@@ -569,7 +591,38 @@
     });
   }
 
+  function markPendingTurnEventCheck(reason) {
+    pendingTurnEventCheck = true;
+    pendingTurnEventCheckReason = reason || pendingTurnEventCheckReason || 'turn-active';
+    if (checkEventsTimer) {
+      clearTimeout(checkEventsTimer);
+      checkEventsTimer = null;
+    }
+  }
+
+  function clearPendingTurnEventCheck() {
+    const pending = {
+      requested: pendingTurnEventCheck,
+      reason: pendingTurnEventCheckReason,
+    };
+    pendingTurnEventCheck = false;
+    pendingTurnEventCheckReason = null;
+    return pending;
+  }
+
+  function isMatchingTurnBarrier(detail) {
+    if (!activeTurnBarrier) return false;
+    if (typeof detail?.roundId !== 'string' || detail.roundId !== activeTurnBarrier.roundId) return false;
+    return !detail.chatId || !activeTurnBarrier.chatId || detail.chatId === activeTurnBarrier.chatId;
+  }
+
   async function runScheduledCheck(reason) {
+    if (activeTurnBarrier) {
+      markPendingTurnEventCheck(reason);
+      log(`🔒 回合 ${activeTurnBarrier.roundId} 尚未提交，合并事件检查: ${reason}`);
+      return;
+    }
+
     if (isCheckingEvents) {
       pendingCheckReason = reason;
       log(`🔁 事件检查正在进行，合并请求: ${reason}`);
@@ -580,6 +633,10 @@
     let currentReason = reason;
     try {
       do {
+        if (activeTurnBarrier) {
+          markPendingTurnEventCheck(currentReason);
+          return;
+        }
         pendingCheckReason = null;
         await checkEvents(eventDefinitions, currentReason);
         currentReason = pendingCheckReason;
@@ -590,6 +647,12 @@
   }
 
   function scheduleCheckEvents(reason) {
+    if (activeTurnBarrier) {
+      markPendingTurnEventCheck(reason);
+      log(`🔒 回合 ${activeTurnBarrier.roundId} 尚未提交，仅记录待检查请求: ${reason}`);
+      return;
+    }
+
     pendingCheckReason = reason;
     if (checkEventsTimer) {
       log(`🧩 已有待执行事件检查，合并请求: ${reason}`);
@@ -685,7 +748,7 @@
 
       // 初始化后自动执行一次事件检查
       log('🔄 初始化完成，开始自动检查事件...');
-      await checkEvents(eventDefinitions, 'initialize');
+      await runScheduledCheck('initialize');
       isInitialized = true;
       lastSuccessfulInitializationAt = Date.now();
       log('🏁 初始化流程结束，事件监听器已激活');
@@ -770,14 +833,66 @@
   // ==================== 事件监听器 ====================
   eventOn(tavern_events.CHAT_CHANGED, async () => {
     log('💬 检测到聊天切换，重新初始化');
+    activeTurnBarrier = null;
+    clearPendingTurnEventCheck();
+    pendingCheckReason = null;
+    if (checkEventsTimer) {
+      clearTimeout(checkEventsTimer);
+      checkEventsTimer = null;
+    }
     isInitialized = false;
     lastCountedMessageId = null;
+    completedTurnRoundIds.clear();
+    abortedTurnRoundIds.clear();
     pendingTurnCounterKeys = null;
     await initialize();
   });
 
   eventOn('GameInitialized', signal => {
     scheduleFrontendInitialization('GameInitialized-event', signal);
+  });
+
+  eventOn('wuxia:turn-lifecycle', detail => {
+    const phase = detail?.phase;
+    const roundId = typeof detail?.roundId === 'string' ? detail.roundId : '';
+    if (!roundId) return;
+
+    if (phase === 'start') {
+      if (activeTurnBarrier?.roundId === roundId) {
+        return;
+      }
+      if (activeTurnBarrier) {
+        logWarning(
+          `已有回合 ${activeTurnBarrier.roundId} 持有事件写入屏障，忽略并发回合 ${roundId} 的屏障请求`,
+        );
+        return;
+      }
+      activeTurnBarrier = {
+        roundId,
+        chatId: typeof detail?.chatId === 'string' ? detail.chatId : '',
+        startedAt: Date.now(),
+      };
+      if (checkEventsTimer || pendingCheckReason) {
+        markPendingTurnEventCheck(pendingCheckReason || 'scheduled-before-turn-start');
+        pendingCheckReason = null;
+      }
+      log(`🔒 已开启回合事件写入屏障: ${roundId}`);
+      return;
+    }
+
+    if (phase === 'finish' && isMatchingTurnBarrier(detail)) {
+      const abortedRoundId = activeTurnBarrier.roundId;
+      activeTurnBarrier = null;
+      abortedTurnRoundIds.add(abortedRoundId);
+      while (abortedTurnRoundIds.size > 32) {
+        const oldestRoundId = abortedTurnRoundIds.values().next().value;
+        if (oldestRoundId === undefined) break;
+        abortedTurnRoundIds.delete(oldestRoundId);
+      }
+      clearPendingTurnEventCheck();
+      pendingTurnCounterKeys = null;
+      logWarning(`🔓 回合 ${abortedRoundId} 未发送完成提交，已解除屏障并保留事件等待后续稳定检查`);
+    }
   });
 
   // MESSAGE_SENT 只做事件检查，不再扣减线索倒计时。
@@ -794,26 +909,56 @@
 
   // 武侠前端在回合成功完成（助手消息已生成 + 必要 ERA 写入已确认 + 未取消/报错）后发出此事件。
   // 仅在此处扣减线索倒计时，确保只在真实完成一个 AI 回合时计数。
-  eventOn('wuxia:turn-completed', async ({ messageId, chatId } = {}) => {
+  eventOn('wuxia:turn-completed', async ({ messageId, chatId, roundId } = {}) => {
     if (!Number.isInteger(messageId)) {
       log('⚠️ wuxia:turn-completed 缺少有效 messageId，跳过扣减');
       return;
     }
-    if (messageId === lastCountedMessageId) {
-      log(`🔁 回合已完成过 (messageId=${messageId})，跳过重复扣减`);
+    if (typeof roundId !== 'string' || !roundId) {
+      log('⚠️ wuxia:turn-completed 缺少有效 roundId，跳过事件检查');
       return;
     }
-    lastCountedMessageId = messageId;
+    if (completedTurnRoundIds.has(roundId)) {
+      log(`🔁 回合已完成过 (roundId=${roundId})，跳过重复完成信号`);
+      return;
+    }
+    if (activeTurnBarrier && !isMatchingTurnBarrier({ roundId, chatId })) {
+      logWarning(`忽略与当前屏障不匹配的回合完成信号: ${roundId}`);
+      return;
+    }
+    if (!activeTurnBarrier && abortedTurnRoundIds.has(roundId)) {
+      logWarning(`忽略已经按失败路径解除的迟到回合完成信号: ${roundId}`);
+      return;
+    }
+
+    activeTurnBarrier = null;
+    abortedTurnRoundIds.delete(roundId);
+    completedTurnRoundIds.add(roundId);
+    while (completedTurnRoundIds.size > 32) {
+      const oldestRoundId = completedTurnRoundIds.values().next().value;
+      if (oldestRoundId === undefined) break;
+      completedTurnRoundIds.delete(oldestRoundId);
+    }
+    const deferredCheck = clearPendingTurnEventCheck();
     const eligibleCounterKeys = pendingTurnCounterKeys;
     pendingTurnCounterKeys = null;
-    log(`✅ 检测到武侠回合成功完成 (messageId=${messageId}, chatId=${chatId})，串行结算事件与线索倒计时`);
+    const shouldDecrementCounters = messageId !== lastCountedMessageId;
+    log(
+      `✅ 检测到武侠回合成功完成 (roundId=${roundId}, messageId=${messageId}, chatId=${chatId})，`
+      + `解除屏障并串行结算事件${deferredCheck.requested ? `（待检查原因: ${deferredCheck.reason}）` : ''}`,
+    );
     await enqueueEventWork(`turn-completed:${messageId}`, async () => {
       await runScheduledCheck('wuxia-turn-completed');
-      await processFollowupCounters({
-        decrementCounters: true,
-        reason: 'wuxia-turn-completed',
-        eligibleCounterKeys,
-      });
+      if (shouldDecrementCounters) {
+        await processFollowupCounters({
+          decrementCounters: true,
+          reason: 'wuxia-turn-completed',
+          eligibleCounterKeys,
+        });
+        lastCountedMessageId = messageId;
+      } else {
+        log(`🔁 assistant 楼层 ${messageId} 已扣减过线索，仅执行本轮事件稳定检查`);
+      }
     });
   });
 
@@ -830,6 +975,12 @@
         logSuccess('🎉 stat_data 已就绪，ERA事件系统自动初始化成功！');
         toastr.success('ERA 事件系统已自动启动');
       }
+      return;
+    }
+
+    if (activeTurnBarrier) {
+      markPendingTurnEventCheck('era-write-done');
+      log(`🔒 回合 ${activeTurnBarrier.roundId} 写入期间收到 era:writeDone，仅记录待检查请求`);
       return;
     }
 

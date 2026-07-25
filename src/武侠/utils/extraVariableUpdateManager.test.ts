@@ -21,7 +21,12 @@ vi.mock('./variableReader', () => ({
 }));
 
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
-import { buildExtraVariableProjection, executeExtraVariableUpdate } from './extraVariableUpdateManager';
+import {
+  buildExtraVariableProjection,
+  ensureTurnVariableBlocksCommitted,
+  executeExtraVariableUpdate,
+  getIsExtraVariableUpdating,
+} from './extraVariableUpdateManager';
 import { requestConfiguredText } from './summaryApiClient';
 
 type AssistantMessage = {
@@ -69,6 +74,7 @@ describe('executeExtraVariableUpdate', () => {
   let variableSnapshot: Record<string, unknown>;
 
   beforeEach(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
     assistantMessage = {
       message_id: 28,
       role: 'assistant',
@@ -228,20 +234,28 @@ describe('executeExtraVariableUpdate', () => {
     });
 
     requestConfiguredTextMock.mockResolvedValue('<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>');
-    emitSourcedEraVariableWriteAndWaitMock.mockResolvedValue({
-      version: 1,
-      writeId: 'extra-sync-1',
-      source: 'frontend',
-      operation: 'update',
-      reason: 'extra-variable-api-write',
-      eventName: 'era:apiWrite',
-      attribution: 'ai',
-      message_id: 28,
-      actions: { apiWrite: true },
+    // 模拟 ERA 在 writeDone 前已把变量写入聊天级 stat_data；否则这里会
+    // 故意停留在“等待变量快照刷新”，与真实成功写入的场景不符。
+    emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
+      const statData = variableSnapshot.stat_data as Record<string, unknown>;
+      const userData = statData.user数据 as Record<string, unknown>;
+      userData.修为 = 120;
+      return {
+        version: 1,
+        writeId: 'extra-sync-1',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        message_id: 28,
+        actions: { apiWrite: true },
+      };
     });
   });
 
   it('追加变量块时使用 refresh:none，并以严格目标参数等待 ERA 完成', async () => {
+    const onProgress = vi.fn();
     const settings = {
       ...DEFAULT_SUMMARY_SETTINGS,
       variableUpdateMode: 'extra' as const,
@@ -251,6 +265,7 @@ describe('executeExtraVariableUpdate', () => {
       settings,
       assistantMessageId: 28,
       latestRawReply: '正文内容',
+      onProgress,
     });
 
     expect(setChatMessagesMock).toHaveBeenCalledWith(
@@ -281,6 +296,172 @@ describe('executeExtraVariableUpdate', () => {
         expectedAction: 'apiWrite',
       }),
     );
+    const latestPhaseProgress = onProgress.mock.calls
+      .map(([progress]) => progress)
+      .filter(progress => Array.isArray(progress.phaseTimeline))
+      .at(-1);
+    expect(latestPhaseProgress).toEqual(expect.objectContaining({
+      currentPhase: '',
+      phaseTimeline: expect.arrayContaining([
+        expect.objectContaining({ name: 'request-variable-model', status: 'success' }),
+        expect.objectContaining({ name: 'append-variable-blocks', status: 'success' }),
+        expect.objectContaining({ name: 'wait-era-write-done', status: 'success' }),
+        expect.objectContaining({ name: 'verify-variable-persistence', status: 'success' }),
+      ]),
+    }));
+  });
+
+  it('ERA 同步后仅重排变量块格式时，按等价变量操作通过回读验证', async () => {
+    emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
+      const compactBlocks = '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>';
+      assistantMessage = {
+        ...assistantMessage,
+        message: assistantMessage.message.replace(/<VariableEdit>[\s\S]*?<\/VariableEdit>/, compactBlocks),
+        swipes: assistantMessage.swipes.map(swipe =>
+          swipe.replace(/<VariableEdit>[\s\S]*?<\/VariableEdit>/, compactBlocks)),
+      };
+      const statData = variableSnapshot.stat_data as Record<string, unknown>;
+      (statData.user数据 as Record<string, unknown>).修为 = 120;
+      return {
+        version: 1,
+        writeId: 'extra-sync-reformatted',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        message_id: 28,
+        actions: { apiWrite: true },
+      };
+    });
+
+    const result = await executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    });
+
+    expect(result.syncVerification).toContain('通过');
+    expect(result.applyStatus).toBe('success');
+  });
+
+  it('页面隐藏时不让前台持久化轮询被节流成数分钟，并在 busy 回读时释放锁', async () => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    emitSourcedEraVariableWriteAndWaitMock.mockResolvedValue({
+      version: 1,
+      writeId: 'extra-sync-hidden',
+      source: 'frontend',
+      operation: 'update',
+      reason: 'extra-variable-api-write',
+      eventName: 'era:apiWrite',
+      attribution: 'ai',
+      message_id: 28,
+      actions: { apiWrite: true },
+    });
+
+    const startedAt = Date.now();
+    const result = await executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    });
+
+    expect(Date.now() - startedAt).toBeLessThan(1000);
+    expect(result.applyStatus).toBe('pending');
+    expect(getIsExtraVariableUpdating()).toBe(true);
+
+    const statData = variableSnapshot.stat_data as Record<string, unknown>;
+    (statData.user数据 as Record<string, unknown>).修为 = 120;
+    expect(getIsExtraVariableUpdating()).toBe(false);
+  });
+
+  it('持久化轮询期间转入后台时立即退出前台等待', async () => {
+    emitSourcedEraVariableWriteAndWaitMock.mockResolvedValue({
+      version: 1,
+      writeId: 'extra-sync-became-hidden',
+      source: 'frontend',
+      operation: 'update',
+      reason: 'extra-variable-api-write',
+      eventName: 'era:apiWrite',
+      attribution: 'ai',
+      message_id: 28,
+      actions: { apiWrite: true },
+    });
+    const onProgress = vi.fn((progress: { currentPhase?: string }) => {
+      if (progress.currentPhase !== 'verify-variable-persistence') return;
+      queueMicrotask(() => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+    });
+
+    const startedAt = Date.now();
+    const result = await executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+      onProgress,
+    });
+
+    expect(Date.now() - startedAt).toBeLessThan(1000);
+    expect(result.applyStatus).toBe('pending');
+
+    const statData = variableSnapshot.stat_data as Record<string, unknown>;
+    (statData.user数据 as Record<string, unknown>).修为 = 120;
+    expect(getIsExtraVariableUpdating()).toBe(false);
+  });
+
+  it('额外变量模型遇到两次 429 后只追加和应用一次变量块', async () => {
+    const onProgress = vi.fn();
+    requestConfiguredTextMock
+      .mockRejectedValueOnce({ status: 429, retryAfterMs: 0 })
+      .mockRejectedValueOnce({ response: { statusCode: 429 }, retryAfterMs: 0 })
+      .mockResolvedValue('<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>');
+
+    const result = await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+      },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+      onProgress,
+    });
+
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(3);
+    expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
+    expect(result.appended).toBe(true);
+    expect(result).toMatchObject({ retry429Count: 2, retry429LastDelayMs: 0 });
+    expect(onProgress).toHaveBeenCalledWith({ retry429Count: 1, retry429LastDelayMs: 0 });
+    expect(onProgress).toHaveBeenCalledWith({ retry429Count: 2, retry429LastDelayMs: 0 });
+  });
+
+  it('额外变量模型 429 耗尽时不写入，并释放执行锁供下一次调用', async () => {
+    requestConfiguredTextMock.mockRejectedValue({ status: 429, retryAfterMs: 0, message: 'HTTP 429' });
+
+    await expect(executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+      },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    })).rejects.toThrow('已自动重试 2 次');
+
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(3);
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+
+    requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
+    await expect(executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+      },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    })).resolves.toEqual(expect.objectContaining({ appended: false }));
   });
 
   it('自定义模板未放置 locationContext 时不会强行追加地点约束', async () => {
@@ -448,5 +629,48 @@ describe('executeExtraVariableUpdate', () => {
     expect(fallbackProjection).toContain('[只读时间、地点与事件背景：黄蓉正在事件中]');
     expect(fallbackProjection).toContain('{"update":{"黄蓉":{"好感":1}}}');
     expect(fallbackProjection).not.toContain('前端变量');
+  });
+});
+
+describe('ensureTurnVariableBlocksCommitted', () => {
+  it('按 ERA 的最终相序折叠同一路径的多次编辑', async () => {
+    getVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: { 修为: 120 },
+      },
+    });
+
+    await expect(ensureTurnVariableBlocksCommitted({
+      assistantMessageId: 28,
+      blocksText: [
+        '<VariableEdit>{"user数据":{"修为":110}}</VariableEdit>',
+        '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>',
+      ].join('\n'),
+    })).resolves.toMatchObject({ verified: true });
+  });
+
+  it('Edit 后 Delete 时只验证最终删除状态', async () => {
+    getVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {},
+      },
+    });
+
+    await expect(ensureTurnVariableBlocksCommitted({
+      assistantMessageId: 28,
+      blocksText: [
+        '<VariableEdit>{"user数据":{"临时状态":"受伤"}}</VariableEdit>',
+        '<VariableDelete>{"user数据":{"临时状态":{}}}</VariableDelete>',
+      ].join('\n'),
+    })).resolves.toMatchObject({ verified: true });
+  });
+
+  it('动作标签残缺时拒绝把回合视为已提交', async () => {
+    getVariablesMock.mockReturnValue({ stat_data: {} });
+
+    await expect(ensureTurnVariableBlocksCommitted({
+      assistantMessageId: 28,
+      blocksText: '<VariableEdit>{"世界信息":{"时间":{"年":1200}}}',
+    })).rejects.toThrow('未闭合');
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LatestDebugRound } from '../hooks/useDebugLogs';
 import {
+  buildMainInputDebugContent,
   buildVariableInputDebugContent,
   buildVariableOutputDebugContent,
   getDebugStageStatusLabel,
@@ -74,5 +75,36 @@ describe('debugRoundView', () => {
     expect(output).toContain('【合法变量块】');
     expect(output).toContain('【写入后回读验证】');
     expect(getDebugStageStatusLabel('skipped')).toBe('已跳过');
+  });
+
+  it('正文和额外变量调试都展示 429 重试次数与最近等待', () => {
+    const debugRound = createDebugRound();
+    debugRound.main.retry429Count = 2;
+    debugRound.main.retry429LastDelayMs = 2_000;
+    debugRound.variable.retry429Count = 1;
+    debugRound.variable.retry429LastDelayMs = 1_000;
+
+    expect(buildMainInputDebugContent(debugRound)).toContain('已重试：2 次');
+    expect(buildMainInputDebugContent(debugRound)).toContain('最近等待：2000ms');
+    expect(buildVariableOutputDebugContent(debugRound)).toContain('已重试：1 次');
+    expect(buildVariableOutputDebugContent(debugRound)).toContain('最近等待：1000ms');
+  });
+
+  it('变量调试展示当前等待阶段和 watchdog 次数', () => {
+    const debugRound = createDebugRound();
+    debugRound.variable.currentPhase = 'append-variable-blocks';
+    debugRound.variable.phaseTimeline = [{
+      name: 'append-variable-blocks',
+      status: 'running',
+      startedAt: 1_000,
+      updatedAt: 11_000,
+      durationMs: 10_000,
+      watchdogTickCount: 2,
+    }];
+
+    const output = buildVariableOutputDebugContent(debugRound);
+    expect(output).toContain('【变量流水线耗时】');
+    expect(output).toContain('当前等待：append-variable-blocks');
+    expect(output).toContain('10000ms，watchdog 2 次');
   });
 });

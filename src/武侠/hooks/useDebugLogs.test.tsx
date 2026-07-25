@@ -16,6 +16,7 @@ describe('useDebugLogs 跨 iframe 同步', () => {
     });
     const running = readLatestDebugRoundSnapshot();
     expect(running?.main.status).toBe('running');
+    expect(running?.main.retry429Count).toBe(0);
 
     const completed = {
       ...running!,
@@ -24,6 +25,17 @@ describe('useDebugLogs 跨 iframe 同步', () => {
         ...running!.variable,
         status: 'success',
         finishedAt: running!.updatedAt + 1,
+        retry429Count: 1,
+        retry429LastDelayMs: 1_000,
+        currentPhase: 'append-variable-blocks',
+        phaseTimeline: [{
+          name: 'append-variable-blocks',
+          status: 'running',
+          startedAt: running!.updatedAt,
+          updatedAt: running!.updatedAt + 1,
+          durationMs: 1,
+          watchdogTickCount: 0,
+        }],
       },
     };
     const serialized = JSON.stringify(completed);
@@ -33,6 +45,18 @@ describe('useDebugLogs 跨 iframe 同步', () => {
     });
 
     expect(result.current.latestDebugRound?.variable.status).toBe('success');
+    expect(result.current.latestDebugRound?.variable).toMatchObject({
+      retry429Count: 1,
+      retry429LastDelayMs: 1_000,
+      currentPhase: 'append-variable-blocks',
+      phaseTimeline: [
+        expect.objectContaining({
+          name: 'append-variable-blocks',
+          status: 'running',
+          durationMs: 1,
+        }),
+      ],
+    });
   });
 
   it('旧 iframe 不会覆盖已经开始的新回合', () => {

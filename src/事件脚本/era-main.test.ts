@@ -4,6 +4,7 @@ import { eventOnMock } from '../武侠/test/setup';
 const logErrorMock = vi.fn();
 const initializeEventListMock = vi.fn();
 const getVariablesMock = globalThis.getVariables as ReturnType<typeof vi.fn>;
+const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 vi.mock('./era-utils.js', () => ({
   log: vi.fn(),
@@ -295,5 +296,110 @@ describe('ERA 主线初始化控制', () => {
       variables.stat_data.世界信息.时间,
       variables,
     );
+  });
+
+  it('回合屏障会等时间、参与事件结局和差分全部稳定后再结算', async () => {
+    const eventName = '射雕测试事件-同轮稳定结算';
+    const variables = validVariables() as ReturnType<typeof validVariables> & {
+      stat_data: ReturnType<typeof validVariables>['stat_data'] & {
+        参与事件: Record<string, {
+          结局: string;
+          update: Record<string, unknown>;
+        }>;
+      };
+    };
+    variables.stat_data.事件系统.进行中事件 = {
+      [eventName]: { 年: 1199, 月: 8, 日: 15, 时: 12 },
+    };
+    variables.stat_data.参与事件 = {
+      [eventName]: {
+        结局: '旧结局',
+        update: { 郭靖: { 状态: '旧状态' } },
+      },
+    };
+    getVariablesMock.mockReturnValue(variables);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const operations = await import('./era-event-operations.js');
+    const definition = {
+      事件地点: '大宋/嘉兴府/牛家村',
+      触发条件: { 类型: '时间', 年: 1199, 月: 8, 日: 15, 时: 10 },
+      事件结束时间: { 年: 1199, 月: 8, 日: 15, 时: 12 },
+      事件详情: '测试事件',
+      事件概要: '原定结局',
+      参与人物: [],
+      insert: {},
+      update: {},
+      delete: {},
+    };
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [{ runtimeKey: eventName }],
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue({ [eventName]: definition });
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(false);
+    vi.mocked(checker.isEventDiscoverable).mockReturnValue(false);
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
+    vi.mocked(operations.batchEndEvents).mockResolvedValue(true);
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?turn-commit-barrier-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+
+    vi.mocked(operations.batchEndEvents).mockClear();
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(true);
+    let endingObservedAtSettlement = '';
+    let updateObservedAtSettlement: Record<string, unknown> = {};
+    vi.mocked(operations.batchEndEvents).mockImplementation(async () => {
+      endingObservedAtSettlement = variables.stat_data.参与事件[eventName].结局;
+      updateObservedAtSettlement = clone(variables.stat_data.参与事件[eventName].update);
+      return true;
+    });
+
+    const findLatestListener = (eventName: string) =>
+      eventOnMock.mock.calls.filter(([name]) => name === eventName).at(-1)?.[1] as
+        | ((detail?: Record<string, unknown>) => unknown)
+        | undefined;
+    const lifecycleListener = findLatestListener('wuxia:turn-lifecycle');
+    const messageSentListener = findLatestListener(tavern_events.MESSAGE_SENT);
+    const writeDoneListener = findLatestListener('era:writeDone');
+    const completedListener = findLatestListener('wuxia:turn-completed');
+    expect(lifecycleListener).toBeTypeOf('function');
+    expect(messageSentListener).toBeTypeOf('function');
+    expect(writeDoneListener).toBeTypeOf('function');
+    expect(completedListener).toBeTypeOf('function');
+
+    lifecycleListener?.({ phase: 'start', roundId: 'round-barrier-1', chatId: 'chat-1' });
+    await messageSentListener?.({});
+
+    variables.stat_data.世界信息.时间 = { 年: 1199, 月: 8, 日: 15, 时: 13 };
+    await writeDoneListener?.({
+      message_id: 28,
+      actions: { resync: true },
+    });
+    expect(operations.batchEndEvents).not.toHaveBeenCalled();
+
+    variables.stat_data.参与事件[eventName] = {
+      结局: '玩家改写后的结局',
+      update: { 郭靖: { 状态: '玩家改写后的状态' } },
+    };
+    await writeDoneListener?.({
+      message_id: 28,
+      actions: { resync: true },
+    });
+    expect(operations.batchEndEvents).not.toHaveBeenCalled();
+
+    await completedListener?.({
+      messageId: 28,
+      chatId: 'chat-1',
+      roundId: 'round-barrier-1',
+    });
+
+    expect(operations.batchEndEvents).toHaveBeenCalledTimes(1);
+    expect(operations.batchEndEvents).toHaveBeenCalledWith([eventName], expect.any(Object));
+    expect(endingObservedAtSettlement).toBe('玩家改写后的结局');
+    expect(updateObservedAtSettlement).toEqual({ 郭靖: { 状态: '玩家改写后的状态' } });
   });
 });

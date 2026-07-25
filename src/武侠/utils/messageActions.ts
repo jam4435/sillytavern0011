@@ -11,6 +11,8 @@ import {
 import { captureNextCombinedPromptForDebug } from './promptDebug';
 import { syncFrontendDerivedVariables } from './frontendDerivedVariables';
 import { extractExplicitMapTargetsFromText } from './locationContext';
+import { messageLogger } from './logger';
+import { runWith429Retry } from './rateLimitRetry';
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -380,12 +382,22 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
 
     let generated: string | GenerateToolCallResult;
     try {
-      generated = await generate({
+      generated = await runWith429Retry(() => generate({
         should_stream: true,
         overrides: {
           chat_history: {
             prompts,
           },
+        },
+      }), {
+        requestLabel: '正文重新生成模型',
+        onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
+          messageLogger.warn('[messageActions] 重新生成模型返回 429，准备自动重试', {
+            retryNumber,
+            maxRetries,
+            delayMs,
+            error,
+          });
         },
       });
     } finally {

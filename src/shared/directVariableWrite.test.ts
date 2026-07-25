@@ -134,6 +134,44 @@ describe('runDirectChatVariableWrite', () => {
     expect(eventEmitMock.mock.calls.some(([eventName]) => eventName === ERA_VARIABLE_WRITE_DONE_EVENT)).toBe(false);
   });
 
+  it('原始 era:writeDone 已匹配时不等待无关后处理监听器', async () => {
+    let releasePostProcess: (() => void) | undefined;
+    const postProcessPending = new Promise<void>(resolve => {
+      releasePostProcess = resolve;
+    });
+    let settled = false;
+
+    eventOn('era:updateByObject', async () => {
+      const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
+      await Promise.all(writeDoneListeners.map(listener => listener({
+        message_id: 77,
+        actions: { apiWrite: true },
+      })));
+      await postProcessPending;
+    });
+
+    const resultPromise = emitEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'extra-variable-api-write',
+      eventName: 'era:updateByObject',
+      expectedMessageId: 77,
+      expectedAction: 'apiWrite',
+      timeoutMessage: 'timeout',
+    }).then(result => {
+      settled = true;
+      return result;
+    });
+
+    try {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      expect(settled).toBe(true);
+      await expect(resultPromise).resolves.toEqual({ message_id: 77, actions: { apiWrite: true } });
+    } finally {
+      releasePostProcess?.();
+    }
+  });
+
   it('ERA 写入确认后发送带来源的完成事件', async () => {
     const executionOrder: string[] = [];
 

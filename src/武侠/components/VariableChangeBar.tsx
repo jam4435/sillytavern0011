@@ -34,23 +34,6 @@ const COMPARE_STATUS_LABELS: Record<VariableComparisonStatus, string> = {
 
 const getTotalCount = (count: number, omittedCount: number): number => count + omittedCount;
 
-const copyTextToClipboard = async (text: string): Promise<void> => {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.setAttribute('readonly', 'true');
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand('copy');
-  document.body.removeChild(textarea);
-};
-
 const PRODUCER_META: Record<VariableChangeProducer, { label: string; tone: SourceTone }> = {
   era: { label: 'ERA/API', tone: 'era' },
   'event-script': { label: '事件脚本', tone: 'event-script' },
@@ -117,12 +100,10 @@ const summarizeActualChange = (change: VariableActualChange) => ({
 const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
   const [expandedSegment, setExpandedSegment] = useState<ExpandedSegment | null>(null);
   const [lastExpandedSegment, setLastExpandedSegment] = useState<ExpandedSegment>('ai');
-  const [copiedText, setCopiedText] = useState('');
 
   useEffect(() => {
     setExpandedSegment(null);
     setLastExpandedSegment('ai');
-    setCopiedText('');
   }, [summary?.turnId]);
 
   useEffect(() => {
@@ -170,10 +151,9 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
     summary.aiReply.declaredChanges.length,
     summary.aiReply.omittedDeclaredCount,
   );
-  const aiObservedTotal = getTotalCount(
-    summary.aiReply.observedChanges.length,
-    summary.aiReply.omittedObservedCount,
-  );
+  const aiAppliedTotal = summary.aiReply.comparisons.filter(
+    comparison => Boolean(comparison.declaredChange) && comparison.status === 'applied',
+  ).length;
   const backgroundTotal = getTotalCount(
     summary.background.observedChanges.length,
     summary.background.omittedObservedCount,
@@ -181,12 +161,6 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
   const aiReplyComparisons = summary.aiReply.comparisons.filter(
     comparison => Boolean(comparison.declaredChange),
   );
-
-  const handleCopy = async (label: string, text: string) => {
-    await copyTextToClipboard(text);
-    setCopiedText(label);
-    window.setTimeout(() => setCopiedText(''), 1200);
-  };
 
   const toggleSegment = (segment: ExpandedSegment) => {
     setLastExpandedSegment(segment);
@@ -208,7 +182,7 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
           aria-expanded={expandedSegment === 'ai'}
         >
           <span className="variable-change-segment-label">AI回复</span>
-          <span className="variable-change-segment-count">声{declaredTotal}/实{aiObservedTotal}</span>
+          <span className="variable-change-segment-count">声{declaredTotal}/实{aiAppliedTotal}</span>
         </button>
 
         <button
@@ -234,14 +208,12 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
 
       {expandedSegment && (
         <div className="variable-change-detail">
-          {copiedText && <div className="variable-change-copy-toast">已复制 {copiedText}</div>}
-
           {expandedSegment === 'ai' ? (
             <>
               <section className="variable-change-section">
                 <div className="variable-change-section-heading">
                   <span>AI回复变量</span>
-                  <span>声{declaredTotal} / 实{aiObservedTotal}</span>
+                  <span>声{declaredTotal} / 实{aiAppliedTotal}</span>
                 </div>
                 {aiReplyComparisons.length > 0 ? (
                   <div className="variable-change-list">
@@ -249,7 +221,6 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
                       <AiComparisonRow
                         key={comparison.id}
                         comparison={comparison}
-                        onCopy={handleCopy}
                       />
                     ))}
                     {summary.aiReply.omittedDeclaredCount > 0 && (
@@ -302,7 +273,7 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
               {summary.background.observedChanges.length > 0 ? (
                 <div className="variable-change-list">
                   {summary.background.observedChanges.map(change => (
-                    <ActualChangeRow key={change.id} change={change} onCopy={handleCopy} />
+                    <ActualChangeRow key={change.id} change={change} />
                   ))}
                   {summary.background.omittedObservedCount > 0 && (
                     <div className="variable-change-omitted">
@@ -323,17 +294,11 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
 
 interface AiComparisonRowProps {
   comparison: VariableAiComparison;
-  onCopy: (label: string, text: string) => Promise<void>;
 }
 
-const AiComparisonRow: React.FC<AiComparisonRowProps> = ({ comparison, onCopy }) => {
+const AiComparisonRow: React.FC<AiComparisonRowProps> = ({ comparison }) => {
   const declared = comparison.declaredChange;
   const observed = comparison.observedChange;
-  const copyValue = declared
-    ? declared.action === 'delete'
-      ? '删除目标节点'
-      : formatVariableDetailValue(declared.value)
-    : formatVariableDetailValue(observed?.afterValue);
 
   return (
     <div className="variable-change-row declared">
@@ -343,10 +308,6 @@ const AiComparisonRow: React.FC<AiComparisonRowProps> = ({ comparison, onCopy })
         <span className={`variable-change-compare-status ${comparison.status}`}>
           {COMPARE_STATUS_LABELS[comparison.status]}
         </span>
-        <CopyButtons
-          onCopyPath={() => onCopy('路径', comparison.copyPath)}
-          onCopyValue={() => onCopy('值', copyValue)}
-        />
       </div>
 
       <div className="variable-change-row-body variable-change-row-body-ai">
@@ -386,10 +347,9 @@ const AiComparisonRow: React.FC<AiComparisonRowProps> = ({ comparison, onCopy })
 
 interface ActualChangeRowProps {
   change: VariableActualChange;
-  onCopy: (label: string, text: string) => Promise<void>;
 }
 
-const ActualChangeRow: React.FC<ActualChangeRowProps> = ({ change, onCopy }) => {
+const ActualChangeRow: React.FC<ActualChangeRowProps> = ({ change }) => {
   const source = getProducerMeta(change.producer);
   return (
     <div className="variable-change-row actual">
@@ -402,10 +362,6 @@ const ActualChangeRow: React.FC<ActualChangeRowProps> = ({ change, onCopy }) => 
         >
           {source.label}
         </span>
-        <CopyButtons
-          onCopyPath={() => onCopy('路径', change.copyPath)}
-          onCopyValue={() => onCopy('值', formatVariableDetailValue(change.afterValue))}
-        />
       </div>
       <div className="variable-change-row-body diff">
         <span className="variable-change-value old" title={formatVariableDetailValue(change.beforeValue)}>
@@ -419,21 +375,5 @@ const ActualChangeRow: React.FC<ActualChangeRowProps> = ({ change, onCopy }) => 
     </div>
   );
 };
-
-interface CopyButtonsProps {
-  onCopyPath: () => void;
-  onCopyValue: () => void;
-}
-
-const CopyButtons: React.FC<CopyButtonsProps> = ({ onCopyPath, onCopyValue }) => (
-  <span className="variable-change-copy-actions">
-    <button type="button" onClick={onCopyPath} title="复制路径" aria-label="复制路径">
-      <Icons.Copy size={13} />
-    </button>
-    <button type="button" onClick={onCopyValue} title="复制值" aria-label="复制值">
-      <Icons.FileText size={13} />
-    </button>
-  </span>
-);
 
 export default VariableChangeBar;

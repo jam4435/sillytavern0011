@@ -487,6 +487,7 @@ const App: React.FC = () => {
 
   const automationPlayerTurnRef = useRef(handlePlayerSend);
   automationPlayerTurnRef.current = handlePlayerSend;
+  const automationIdentityRef = useRef<{ instanceId: string; globalName: string } | null>(null);
 
   useEffect(() => {
     const controller = createWuxiaAutomation({
@@ -504,6 +505,7 @@ const App: React.FC = () => {
     });
     const instanceId = createRequestId('frontend');
     const globalName = createAutomationGlobalName(instanceId);
+    const identity = { instanceId, globalName };
     const announceReady = () =>
       eventEmit(WUXIA_GLOBAL_EVENTS.READY, {
         version: WUXIA_AUTOMATION_API_VERSION,
@@ -515,6 +517,7 @@ const App: React.FC = () => {
     document.documentElement.dataset.wuxiaAutomationVersion = String(WUXIA_AUTOMATION_API_VERSION);
     document.documentElement.dataset.wuxiaAutomationInstance = instanceId;
     initializeGlobal(globalName, controller.api);
+    automationIdentityRef.current = identity;
     recordIframeLifecycleEvent('wuxia-frontend', 'automation-instance-ready', {
       instanceId,
       globalName,
@@ -532,6 +535,9 @@ const App: React.FC = () => {
       });
       discoveryListener.stop();
       controller.dispose();
+      if (automationIdentityRef.current === identity) {
+        automationIdentityRef.current = null;
+      }
       if (window.WuxiaAutomation === controller.api) {
         delete window.WuxiaAutomation;
       }
@@ -544,6 +550,19 @@ const App: React.FC = () => {
       });
     };
   }, []);
+
+  useEffect(() => {
+    const identity = automationIdentityRef.current;
+    if (!identity) return;
+    void eventEmit(WUXIA_GLOBAL_EVENTS.STATE_CHANGED, {
+      version: WUXIA_AUTOMATION_API_VERSION,
+      ...identity,
+      page: currentPage,
+      busy: isLoading,
+    }).catch(error => {
+      gameLogger.warn('[automation] 广播运行状态变化失败:', error);
+    });
+  }, [currentPage, isLoading]);
 
   const handleMapNavClick = useCallback(() => {
     setMapDraftDestination(null);
@@ -958,6 +977,7 @@ const App: React.FC = () => {
           <NavButton
             icon={<Icons.Settings />}
             label="设置"
+            automationId="open-settings"
             isActive={activePanel === ActivePanel.SETTINGS}
             onClick={() => handleNavClick(ActivePanel.SETTINGS)}
           />
@@ -1103,15 +1123,21 @@ const App: React.FC = () => {
 const NavButton = ({
   icon,
   label,
+  automationId,
   isActive,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
+  automationId?: string;
   isActive: boolean;
   onClick: () => void;
 }) => (
-  <button onClick={onClick} className={`nav-btn ${isActive ? 'active' : ''}`}>
+  <button
+    onClick={onClick}
+    className={`nav-btn ${isActive ? 'active' : ''}`}
+    data-wuxia-automation={automationId}
+  >
     {isActive && <div className="nav-btn-indicator"></div>}
     <div className="nav-icon-wrapper">{icon}</div>
     <span className="nav-label">{label}</span>

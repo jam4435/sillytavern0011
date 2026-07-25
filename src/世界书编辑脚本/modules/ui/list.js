@@ -1854,12 +1854,12 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
       .append($aiActionContainer)
       .append($rollbackButton)
       .append($createFolderButton)
-      .append($selectAllToggle)
       .append($batchToggleContainer)
       .append($filterContainer)
       .append($adjustPositionButton)
       .append($deleteButton)
-      .append($addButton);
+      .append($addButton)
+      .append($selectAllToggle);
     $lorebookTitle.append($titleInfoWrapper).append($actionsWrapper);
   } else if (isDesktopMaster) {
     const $titleMain = $('<div></div>').addClass('lorebook-title-main');

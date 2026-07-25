@@ -317,6 +317,35 @@ function mergeCharacterDeltaForEvent(target, source, eventName) {
   return mergePlainObject(target, normalizeCharacterDeltaForEvent(source, eventName));
 }
 
+function isEmptyPlainObject(value) {
+  return isPlainObject(value) && Object.keys(value).length === 0;
+}
+
+// ERA 的 insertByObject 不能覆盖已存在的叶子路径。事件结算重试或同一事件的
+// 多来源差分命中既有经历时，把真正新增的叶子保留为 insert，把不同值转为 update，
+// 相同值则跳过，从而让差分重放保持幂等。
+function splitInsertPatchAgainstExisting(patch, existingValue) {
+  const insert = {};
+  const update = {};
+  for (const [key, value] of Object.entries(patch || {})) {
+    const existingChild = isPlainObject(existingValue) ? existingValue[key] : undefined;
+    if (existingChild === undefined) {
+      insert[key] = cloneJson(value);
+      continue;
+    }
+    if (isPlainObject(value) && isPlainObject(existingChild)) {
+      const nested = splitInsertPatchAgainstExisting(value, existingChild);
+      if (!isEmptyPlainObject(nested.insert)) insert[key] = nested.insert;
+      if (!isEmptyPlainObject(nested.update)) update[key] = nested.update;
+      continue;
+    }
+    if (JSON.stringify(existingChild) !== JSON.stringify(value)) {
+      update[key] = cloneJson(value);
+    }
+  }
+  return { insert, update };
+}
+
 function getParticipationActionDiff(participationEntry, actionKey) {
   if (!isPlainObject(participationEntry)) {
     return {};
@@ -351,10 +380,24 @@ function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, statData
       continue;
     }
 
+    const normalizedPatch = normalizeCharacterDeltaForEvent(delta[charName], eventName);
+    if (actionKey === 'insert' && characterExists) {
+      const split = splitInsertPatchAgainstExisting(normalizedPatch, statData.角色数据[charName]);
+      if (!isEmptyPlainObject(split.insert)) {
+        if (!mergedDiff.insert[charName]) mergedDiff.insert[charName] = {};
+        mergePlainObject(mergedDiff.insert[charName], split.insert);
+      }
+      if (!isEmptyPlainObject(split.update)) {
+        if (!mergedDiff.update[charName]) mergedDiff.update[charName] = {};
+        mergePlainObject(mergedDiff.update[charName], split.update);
+      }
+      log(`[INSERT] 已按既有路径拆分角色差分: ${charName} (${sourceLabel})`);
+      continue;
+    }
     if (!mergedDiff[actionKey][charName]) {
       mergedDiff[actionKey][charName] = {};
     }
-    mergeCharacterDeltaForEvent(mergedDiff[actionKey][charName], delta[charName], eventName);
+    mergePlainObject(mergedDiff[actionKey][charName], normalizedPatch);
     log(`[${actionKey.toUpperCase()}] 准备${actionKey === 'delete' ? '删除' : '修改'}角色: ${charName} (${sourceLabel})`);
   }
 }

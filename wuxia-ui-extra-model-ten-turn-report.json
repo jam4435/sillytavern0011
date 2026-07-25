@@ -1,0 +1,35 @@
+{
+  "startedAt": "2026-07-24T16:29:24.033Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 10,
+    "actions": [
+      "先观察周遭局势与同伴状态，确认当前最紧迫的目标",
+      "沿安全路线谨慎前进，同时留意可疑人物和异常线索",
+      "利用已有情报进行一次低风险试探，避免暴露行踪",
+      "与同伴核对线索，决定下一步最稳妥的行动",
+      "继续推进当前目标，优先保证隐蔽与安全",
+      "在合适地点短暂停留，整理新获得的消息和物资",
+      "避开可能的危险区域，沿替代路线向目标方向前行",
+      "观察敌我动向，寻找有利时机取得更多情报",
+      "根据局势调整计划，稳步完成当前阶段目标",
+      "在安全处休整并总结线索，为下一阶段行动做好准备"
+    ],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-ui-extra-model-ten-turn-report.json",
+    "inspectOnly": false,
+    "continueOnError": false
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "先观察周遭局势与同伴状态，确认当前最紧迫的目标",
+      "success": false,
+      "error": "locator.waitFor: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator('[data-wuxia-automation=\"debug-section\"][data-wuxia-debug-section=\"variable-input\"]').first().locator('[data-wuxia-automation=\"debug-section-content\"]').first() to be visible\n\n    at readDebugSections (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:268:21)\n    at async runTurn (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:313:17)\n    at async main (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:378:22)"
+    }
+  ],
+  "success": false,
+  "completedAt": "2026-07-24T16:30:34.227Z"
+}

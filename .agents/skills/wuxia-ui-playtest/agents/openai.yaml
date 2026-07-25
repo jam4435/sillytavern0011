@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wuxia Playtest"
+  short_description: "UI-driven Wuxia turns with CLI diagnostics"
+  default_prompt: "Use $wuxia-ui-playtest to safely advance a Wuxia turn and diagnose its result."

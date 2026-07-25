@@ -34,6 +34,7 @@ import {
   buildVariableInputDebugContent,
   buildVariableOutputDebugContent,
   getDebugStageStatusLabel,
+  getVariableApplyStatusLabel,
   shouldShowVariableDebug,
 } from '../utils/debugRoundView';
 import { loadSummaryModelList, validateSummaryApiConfig } from '../utils/summaryApiClient';
@@ -1624,6 +1625,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </button>
           <button
             className={`settings-tab ${activeTab === 'debug' ? 'active' : ''}`}
+            data-wuxia-automation="open-debug-tab"
             onClick={() => setActiveTab('debug')}
           >
             <Icons.Debug size={16} />
@@ -2996,6 +2998,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   >
                     <div
                       className="debug-log-header"
+                      data-wuxia-automation="debug-section-toggle"
                       onClick={() => setExpandedLogId(expandedLogId === section.id ? null : section.id)}
                     >
                       <div className="debug-log-info">
@@ -3037,7 +3040,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     {expandedLogId === section.id && (
                       <div className="debug-log-body">
                         <div className="debug-log-content">
-                          <pre>{section.content}</pre>
+                          <pre data-wuxia-automation="debug-section-content">{section.content}</pre>
                         </div>
                         <div className="debug-log-footer">
                           <button
@@ -3068,6 +3071,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <span>正文 {getDebugStageStatusLabel(latestDebugRound.main.status)}</span>
                 <span>•</span>
                 <span>变量 {getDebugStageStatusLabel(latestDebugRound.variable.status)}</span>
+                {latestDebugRound.variable.applyStatus !== 'idle' && (
+                  <>
+                    <span>•</span>
+                    <span>应用 {getVariableApplyStatusLabel(latestDebugRound.variable.applyStatus)}</span>
+                  </>
+                )}
               </div>
             )}
           </div>

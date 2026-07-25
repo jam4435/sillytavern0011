@@ -1,0 +1,192 @@
+{
+  "shard": 1,
+  "reviewed": 210,
+  "confirmedCount": 21,
+  "likelyCount": 2,
+  "flagged": [
+    {
+      "id": "射雕第1回-05-包惜弱巧救颜烈",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第1回-05-包惜弱巧救颜烈.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "详情明确写有“ 一夜噩梦，次日清晨 ”才发现颜烈离去，当前事件跨夜。",
+      "minimumPlausibleHours": 6
+    },
+    {
+      "id": "射雕第3回-03-郭靖巧救哲别",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第3回-03-郭靖巧救哲别.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "先目睹大战，详情随后明确写“数日后”哲别才逃至郭靖家门，属于同一事件的连续经过。",
+      "minimumPlausibleHours": 72
+    },
+    {
+      "id": "射雕第6回-06-大破联军",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第6回-06-大破联军.yaml",
+      "durationHours": 6,
+      "verdict": "confirm",
+      "reason": "详情在突围和缓兵后明确写“八日后”发动夜袭，6 小时不能覆盖该跨度。",
+      "minimumPlausibleHours": 192
+    },
+    {
+      "id": "射雕第7回-03-黑松林解围",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第7回-03-黑松林解围.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "侯通海约郭靖“次日”赴黑松林，之后才发生黄蓉解围；详情明确跨至翌日。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "射雕第6回-01-崖顶疑阵",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第6回-01-崖顶疑阵.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "朱聪、全金发见郭靖上崖后“一夜未归”，并在“次日”上崖探查，事件叙述明确跨夜。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "射雕第11回-05-郭靖黄蓉出走",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第11回-05-郭靖黄蓉出走.yaml",
+      "durationHours": 2146,
+      "verdict": "confirm",
+      "reason": "详情明确称二人“在接下来的半年里”同游共栖，标注约三个月明显不足。",
+      "minimumPlausibleHours": 4320
+    },
+    {
+      "id": "射雕第12回-03-亢龙有悔",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第12回-03-亢龙有悔.yaml",
+      "durationHours": 283,
+      "verdict": "confirm",
+      "reason": "传第一掌后，详情明确写“此后一月有余”陆续传掌、日夜苦练，约 12 天不足。",
+      "minimumPlausibleHours": 720
+    },
+    {
+      "id": "射雕第15回-02-郭杨结义北上",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第15回-02-郭杨结义北上.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "二人深夜结义后，详情明确到“次日清晨”辞别启程，超过两小时。",
+      "minimumPlausibleHours": 6
+    },
+    {
+      "id": "射雕第15回-03-溪边重逢",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第15回-03-溪边重逢.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "两人在深夜相认后“相依而眠，直至次日清晨”，明确跨夜。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "射雕第16回-05-勇闯桃花岛",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第16回-05-勇闯桃花岛.yaml",
+      "durationHours": 2,
+      "verdict": "likely",
+      "reason": "同一事件内从嘉兴醉仙楼经舟山雇船、出海、登桃花岛，并在岛内迷路至疲惫睡去；多段陆海移动和后续过程显然不可信为两小时。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "射雕第16回-06-巧遇周伯通",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第16回-06-巧遇周伯通.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "郭靖“中夜”被箫声惊醒，救人、抵御箫声后“天亮后”才攀谈，明确跨夜至晨。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "射雕第17回-02-初研双手互搏",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第17回-02-初研双手互搏.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "详情写明“在接下来的数日里”学全空明拳并练习双手互搏，明确多日训练。",
+      "minimumPlausibleHours": 72
+    },
+    {
+      "id": "射雕第17回-05-周伯通哄传真经",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第17回-05-周伯通哄传真经.yaml",
+      "durationHours": 120,
+      "verdict": "confirm",
+      "reason": "周伯通口述上下卷并指导修习“十几天”，五日标注明显不足。",
+      "minimumPlausibleHours": 240
+    },
+    {
+      "id": "射雕第21回-03-荒岛疗伤",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第21回-03-荒岛疗伤.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "抵岛、安顿岩洞后，黄蓉“夜里”点篝火整夜守护师父；叙事至少延续至当夜。",
+      "minimumPlausibleHours": 12
+    },
+    {
+      "id": "射雕第21回-07-荒岛重逢",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第21回-07-荒岛重逢.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "郭靖与欧阳锋抓断桅“在海上漂流数日”后才抵达荒岛，明确多日漂流。",
+      "minimumPlausibleHours": 72
+    },
+    {
+      "id": "射雕第21回-08-协力救侄",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第21回-08-协力救侄.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "首次移岩失败后，详情明确写“次日”才利用涨潮成功救出欧阳克。",
+      "minimumPlausibleHours": 8
+    },
+    {
+      "id": "射雕第22回-06-真经初成",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第22回-06-真经初成.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "郭靖、黄蓉在洪七公护法下“日夜苦练。七天后”第一段功夫练成。",
+      "minimumPlausibleHours": 168
+    },
+    {
+      "id": "射雕第22回-07-木筏被盗",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第22回-07-木筏被盗.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "详情包含“经过数日的努力”制筏，并计划“次日清晨”启航、至破晓被盗，明确超过两小时。",
+      "minimumPlausibleHours": 12
+    },
+    {
+      "id": "射雕第22回-09-海上重逢",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第22回-09-海上重逢.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "重新启航后，详情明确到“航行第三日晚间”才听到欧阳锋呼救。",
+      "minimumPlausibleHours": 48
+    },
+    {
+      "id": "射雕第25回-02-三雄赛脚力",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第25回-02-三雄赛脚力.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "周伯通与欧阳锋往返临安、嘉兴五百余里，详情明确写“一日一夜间”。",
+      "minimumPlausibleHours": 24
+    },
+    {
+      "id": "射雕第25回-06-华筝南下寻郭靖",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第25回-06-华筝南下寻郭靖.yaml",
+      "durationHours": 2,
+      "verdict": "likely",
+      "reason": "华筝在蒙古获讯后由白雕引路南下，最终到临安郊外牛家村；如此远距离跨区域行程不可信为两小时。",
+      "minimumPlausibleHours": null
+    },
+    {
+      "id": "射雕第26回-01-牛家村混战",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第26回-01-牛家村混战.yaml",
+      "durationHours": 4,
+      "verdict": "confirm",
+      "reason": "黄药师停战后为郭靖疗伤，详情明确写“完成七日七夜的修行”。",
+      "minimumPlausibleHours": 168
+    },
+    {
+      "id": "射雕第31回-05-真经总纲",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第31回-05-真经总纲.yaml",
+      "durationHours": 2,
+      "verdict": "confirm",
+      "reason": "一灯与天竺僧人“花费十余日”翻译总纲并讲解，明确多日过程。",
+      "minimumPlausibleHours": 240
+    }
+  ]
+}

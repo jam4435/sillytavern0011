@@ -4,6 +4,7 @@ import {
   type SummaryApiMode,
   type SummarySettings,
 } from './settingsManager';
+import { parseRetryAfterMs, type HttpStatusError } from './rateLimitRetry';
 
 const CUSTOM_GENERATE_URL = '/api/backends/chat-completions/generate';
 const STATUS_URL = '/api/backends/chat-completions/status';
@@ -347,7 +348,13 @@ async function requestCustomChatCompletion({
     const rawText = await response.text();
     if (!response.ok) {
       const message = rawText.trim() || response.statusText || `HTTP ${response.status}`;
-      throw new Error(message);
+      const httpError = new Error(message) as HttpStatusError;
+      httpError.status = response.status;
+      const retryAfterMs = parseRetryAfterMs(response.headers.get('Retry-After'));
+      if (retryAfterMs !== null) {
+        httpError.retryAfterMs = retryAfterMs;
+      }
+      throw httpError;
     }
 
     let parsedData: unknown = null;

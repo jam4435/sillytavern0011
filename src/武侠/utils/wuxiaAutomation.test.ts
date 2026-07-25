@@ -161,6 +161,10 @@ describe('WuxiaAutomation', () => {
       );
       statData = { user数据: { 气血: 2 } };
       runtime.latestDebugRound = createDebugRound(rawReply);
+      runtime.latestDebugRound.main.retry429Count = 2;
+      runtime.latestDebugRound.main.retry429LastDelayMs = 2_000;
+      runtime.latestDebugRound.variable.retry429Count = 1;
+      runtime.latestDebugRound.variable.retry429LastDelayMs = 1_000;
       runtime.variableChanges = createVariableSummary('applied');
       await eventEmit('era:writeDone', { message_id: 2, actions: { apply: true } });
       return rawReply;
@@ -191,6 +195,43 @@ describe('WuxiaAutomation', () => {
       },
     });
     expect(report.debug?.main.combinedPrompt).toBe('组合提示词');
+    expect(report.debug?.main).toMatchObject({ retry429Count: 2, retry429LastDelayMs: 2_000 });
+    expect(report.debug?.variable).toMatchObject({ retry429Count: 1, retry429LastDelayMs: 1_000 });
+  });
+
+  it('429 重试耗尽作为确定失败返回，自动化层不会重放整轮行动', async () => {
+    const runtime = createRuntime();
+    const messages: Array<Record<string, unknown>> = [];
+    getChatMessagesMock.mockImplementation(() => messages);
+    const runPlayerTurn = vi.fn(async () => {
+      messages.push({ message_id: 1, role: 'user', message: '继续观察' });
+      runtime.latestDebugRound = createDebugRound('');
+      runtime.latestDebugRound.main.status = 'error';
+      runtime.latestDebugRound.main.error = 'HTTP 429（已自动重试 2 次）';
+      runtime.latestDebugRound.main.retry429Count = 2;
+      runtime.latestDebugRound.main.retry429LastDelayMs = 2_000;
+      return '';
+    });
+    const { api } = createWuxiaAutomation({
+      getRuntimeState: () => runtime,
+      runPlayerTurn,
+    });
+
+    const report = await api.runTurn('继续观察', { settleDelayMs: 0 });
+
+    expect(runPlayerTurn).toHaveBeenCalledTimes(1);
+    expect(report).toMatchObject({
+      ok: false,
+      userMessageId: 1,
+      error: 'HTTP 429（已自动重试 2 次）',
+      debug: {
+        main: {
+          retry429Count: 2,
+          retry429LastDelayMs: 2_000,
+        },
+      },
+    });
+    expect(report.assistantMessageId).toBeUndefined();
   });
 
   it('拒绝并发回合，避免覆盖调试轮次', async () => {

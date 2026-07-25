@@ -126,3 +126,112 @@ return waitForWriteDone
 3. iframe 重建导致的任务交叠在总延迟中占多大比例。
 
 后续修复应优先增加带 writeId 的保存队列耗时日志，然后再调整 Promise 等待边界；不要通过单纯延长 CLI 超时时间掩盖问题。
+
+九、2026-07-23 已实施的修复与当前结论
+
+本节覆盖第六、七节中“建议/尚未实施”的状态；第七节保留为问题发现时的历史记录。
+
+1. 已实施：原始 ERA 写入确认与慢后处理解耦。
+   - directVariableWrite.ts 现在先注册匹配 writeId / waitId 的 raw era:writeDone 监听器，再触发 era:apiWrite。
+   - eventEmit 对其他异步监听器的等待、异常或耗时只记录诊断，不再作为本次原始写入失败或继续卡住的依据。
+   - 因此，事件结算、人物差分、武学补全等后处理不应再把“变量模型已经回复且 ERA 原始写入已确认”的阶段长期维持为 variable.status=running。
+
+2. 已实施：额外变量流程拆为模型阶段、应用阶段和后处理阶段。
+   - variable.status 负责请求额外模型、解析、追加变量块；模型正常输出并追加后应完成该阶段。
+   - variable.applyStatus 使用 waiting-write-done、verifying、success、pending、error 表示 ERA 原始写入和聊天级 stat_data 回读。
+   - variable.postProcessStatus 单独记录事件结算、差分写入、补全等派生任务；它不应反向改变变量模型成功与否。
+   - 调试面板已增加阶段时间线、ERA 应用状态、快照验证、后处理状态和 429 重试次数/等待时间。
+
+3. 已实施：提前登记本轮额外模型声明，并对快照回读做有限重试。
+   - 变量块追加到 assistant 楼层后即交给 tracker，避免在 ERA 后处理期间把本轮 AI 变更误判为 background。
+   - raw era:writeDone 已到、但 stat_data 尚未刷新时，先标为 verifying / pending 并延迟回读，不再立即判定为 not-applied。
+   - 正文模型和额外变量模型遇到 HTTP 429 时，均在各自请求边界内最多重试两次，不会重放整轮、重复创建楼层或重复写 ERA。
+
+4. 已实施：回合锁、桥响应送达和隐藏楼层刷新顺序修复。
+   - useMessageHandler 的发送和重生路径统一申请/释放 turn lock。
+   - 自动化桥可在回合响应送达 CLI 后再通知隐藏楼层恢复刷新；隐藏楼层脚本记录 turn-response-delivered、延后刷新和送达超时。
+   - iframeLifecycleBlackBox 记录正文生成、assistant 楼层创建、ERA 等待、锁释放和桥响应送达，用于定位刷新/重载造成的状态回退。
+
+5. 已实施：桥状态新鲜度与超时对账。
+   - bridge / relay 使用 stateRevision 和 snapshotCapturedAt 避免旧的 booting 状态覆盖新的 game 状态。
+   - runTurn 超时后以 snapshot 对账已落下的 user / assistant 楼层及调试终态；无法唯一确认时才返回 OUTCOME_UNKNOWN，禁止重放原行动。
+
+十、现在是否仍会堵塞
+
+结论：仍可能显示 BUSY，但当前主要是“有意保护性堵塞”，不是此前由 eventEmit 慢监听链导致的无边界假堵塞。
+
+1. 正文模型尚在 generate() 中、额外模型尚在请求/解析中、或尚未收到匹配 raw era:writeDone 时，BUSY 合理且必须阻止下一轮。
+2. raw era:writeDone 已确认但聊天级 stat_data 尚未包含本轮声明时，extraVariableApplyPending 会继续使 isExtraVariableUpdateBusy() 为 true。此时 applyStatus 应为 verifying 或 pending，目的是防止下一轮读取旧变量快照。
+3. 当前后台持久化回读的上限为 8 分钟；在这段期间，模型正文和变量块可能都已成功，bridge 仍会因为 extraVariableApplyPending 显示 busy。这是最近多轮实测中“CLI 六分钟超时、稍后快照显示全部成功”的直接原因。
+4. 当前写入确认与后处理已经解耦，因此 postProcessStatus=running/slow 本身不应再单独维持变量模型为 running；若仍出现“raw era:writeDone 已匹配、stat_data 已确认，且 busy 长期不释放”，应判为新缺陷，而不是正常等待。
+
+十一、现存问题、疑点与下一步
+
+1. 保护性 Busy 的语义仍偏粗：extraVariableApplyPending 同时代表“短暂快照可见性延迟”和“最长八分钟的后台核验”。CLI/用户只能看到 busy，难以区分可继续等待、已完成但观察滞后、或真正卡死。
+2. 需要决定产品策略：
+   - 保守策略：stat_data 未确认前始终锁住下一轮，保持现在的安全性，但可能等待最长八分钟。
+   - 分层策略：raw era:writeDone 后允许结束模型回合，但对下一轮单独做“变量快照未确认”拦截/提示；这样 CLI 不再把模型阶段误报为堵塞，但仍不允许基于旧存档继续。
+3. 尚未确认具体哪个 SillyTavern 保存任务会造成慢快照。虽然已有 raw writeDone、快照验证和 iframe 生命周期日志，但仍缺少所有 saveChatConditional / ERA 队列任务按 writeId 关联的 enqueue、queueStart、saveStart、saveEnd 耗时链。
+4. 旧实例与新 iframe 的补全任务是否仍会重叠、以及 cocktail-plus invalidate 404 是否影响保存队列，仍只是疑点；现有证据不足以作为主因。
+5. 若再次复现，应记录同一 roundId 的 applyStatus、applyVerification、postProcessStatus、phaseTimeline、raw era:writeDone 时间、snapshot 的 busy 和 stat_data。只有“原始写入和 stat_data 均确认后仍 Busy”才应进入锁释放/桥状态方向排查。
+
+十二、ERA 源码级持久化诊断（2026-07-24）
+
+已在 src/ERA变量框架 中加入独立持久化诊断缓冲 era_diagnostics_v1，记录 ERA 事件队列、单任务阶段、API
+变量块批量追加、setChatMessages、updateVariablesWith、SelectedMks 收尾和 writeDone 监听链耗时。操作超过
+5 秒会记录 slow，此后每 15 秒记录 watchdog；iframe 重载后记录仍保留。
+
+复现后按最后一个未完成阶段判断：
+
+1. utils-message / set-chat-message：楼层保存或其底层保存队列慢。
+2. utils-era-data / update-stat-data、update-meta-data：聊天变量 updateVariablesWith 持久化慢。
+3. events-dispatcher / phase:finalize-selected-mk：ERA 的 SelectedMks 收尾校准慢或抛错。
+4. events-queue / process-queue-unhandled-rejection 且 isProcessing=true：ERA 队列异常后未释放锁。
+5. write-done-emitting 已出现、write-done-listeners-settled 很晚：ERA 核心写入已结束，慢点在外部
+   era:writeDone 监听链。
+
+当前恢复出的 ERA 源码已经包含 API 写入队列和批量合并，旧版“六个 API handler 并发覆盖消息”的判断不再
+直接适用于当前版本。仍存在的确定风险是 processQueue 缺少最外层 try/finally：dispatcher 的 finally 中
+updateLatestSelectedMk 一旦抛错，isProcessing 可能永久保持 true。另一个待实测量化的问题是一次 WRITE
+仍会分别提交 stat_data、EditLog 和 SelectedMks，多次 updateVariablesWith 可能放大 SillyTavern 保存队列延迟。
+
+十三、额外变量块同步回读误判修复（2026-07-24）
+
+Chrome 三轮实测的 assistant #10 中，`<VariableEdit>` / `<VariableInsert>` 仍可从楼层信息读到，且对应
+stat_data 已实际写入；但额外变量流程在 ERA 同步后把“刚追加的变量块不存在”作为错误，令调试状态停在
+error / verifying，并使 bridge 保持 BUSY。该错误来自 `extraVariableUpdateManager` 使用整段文本的逐字包含
+比较；ERA 或消息链仅重排 JSON 缩进、换行或压缩格式时，语义不变也会被误判为变量块消失。
+
+已修复：保留逐字命中作为快速路径；未命中时解析两侧的 VariableInsert/Edit/Delete，按操作类型、变量路径和
+值逐项比较。只有语义也不一致才判定块真的丢失。新增回归用例覆盖“同步后同一 VariableEdit 被压缩为单行
+JSON”仍应通过。此修复只消除格式差异导致的假阳性；若目标楼层确实不含本轮声明，仍会报错并保持安全阻塞。
+
+十四、ERA API 写入队列 flush 计时器修复（2026-07-24）
+
+后续实测精确定位到另一条独立堵塞链：正文和变量模型已完成，`era:apiWrite` 外层监听也很快返回，但
+`wait-era-write-done` 又等待约 173 秒。期间 API 写入任务已经进入 `command.ts` 的独立队列，真正负责执行
+`flushApiWriteQueue()` 的 75 ms 原生 iframe `setTimeout` 却被严重延迟；队列未 flush 就不会产生匹配的
+`era:writeDone`，因此自动化必须保持 BUSY。这不是变量块回读、回合锁或桥响应投递造成的等待。
+
+已修复：可见页面保留顶层 75 ms 合并窗口；隐藏页面改用 microtask 启动 flush，可见期间转为隐藏时也会把
+未启动的计时器提升为 microtask。保留已有 single-flight 和 flush 后队列非空自动续排；调度注册失败时立即
+flush，防止任务永久留队。诊断记录 `scheduledAt`、`expectedAt`、`actualStartAt`、`lagMs`、`timerSource`、
+调度/启动时队列长度及页面可见状态。后续复现应先检查 `timerSource` 和 `scheduled-flush-started.lagMs`：隐藏页
+应为 `microtask-hidden` / `microtask-promoted`；启动正常但 writeDone 很晚，则继续检查 setChatMessages、ERA
+WRITE 任务及其收尾阶段。
+
+十五、隐藏页持久化验证分钟级等待修复（2026-07-24）
+
+更新后三轮实测确认 bridge 的 booting 陈旧状态已消失，但第 2 轮在 `verify-variable-persistence` 停留约
+221.6 秒。该阶段配置的前台上限实际只有 15 秒；根因是轮询继续使用顶层窗口 `setTimeout`，而整个酒馆
+标签页隐藏时顶层计时器也会被 Chromium 节流。变量快照可能早已完成，验证器却直到数分钟后才获得下一次
+回读机会。因此这 221.6 秒不能直接解释为 SillyTavern 存档本身耗时 221.6 秒。
+
+已修复：页面已隐藏时不进入前台定时轮询；验证期间收到 `visibilitychange=hidden` 时取消当前延迟并立即转入
+后台。后台验证先安排不受普通计时器节流的微任务回读，并让每次 busy 状态查询在返回前机会性核对最新
+`stat_data`；普通定时器只保留为兜底。后台任务增加 generation 隔离，旧轮延迟回调不能释放或覆盖新轮锁。
+只要快照已经可见，自动化的下一次状态读取即可立即清除 `extraVariableApplyPending`，不再等待被节流的计时器。
+
+同轮 `era:apiWrite` 到匹配 writeDone 仍约 20.5 秒，是另一条独立慢链。需根据 ERA 诊断中的
+`phase:rollback-latest-message`、`phase:apply-variable-blocks`、`phase:finalize-selected-mk` 与
+`write-done-*` 记录判定具体慢点；本次没有在缺少分阶段证据时改写 ERA 核心提交顺序。
