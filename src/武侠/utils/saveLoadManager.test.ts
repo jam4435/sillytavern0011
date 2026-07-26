@@ -430,6 +430,44 @@ describe('history checkout', () => {
     expect(triggerSlashMock).toHaveBeenCalledWith('/branch-create 2');
   });
 
+  it('可复用分支的聊天文件已删除时当场标记 broken 并直接分叉当前聊天', async () => {
+    currentChat().messages = [
+      { message_id: 0, role: 'assistant', message: '开场' },
+      { message_id: 1, role: 'user', message: '前进' },
+      { message_id: 2, role: 'assistant', message: '中途' },
+      { message_id: 3, role: 'user', message: '继续' },
+      { message_id: 4, role: 'assistant', message: '结尾' },
+    ];
+    const scanned = await scanCurrentChat();
+    const target = findNodeByPreview(scanned.tree, '中途')!;
+    // 模拟昨天创建、之后被用户删除的分支聊天：分支头仍指向目标节点
+    const tree = loadHistoryTree();
+    tree.branches['history_branch_ghosttest'] = {
+      id: 'history_branch_ghosttest',
+      chatId: 'ghost-branch-chat',
+      chatName: '已删除分支',
+      originNodeId: target.id,
+      headNodeId: target.id,
+      createdAt: 1,
+      status: 'active',
+    };
+    tree.nodes[target.id] = {
+      ...tree.nodes[target.id],
+      locators: [
+        { ...tree.nodes[target.id].locators[0], chatId: 'ghost-branch-chat', chatName: '已删除分支' },
+        ...tree.nodes[target.id].locators,
+      ],
+    };
+    persistTreeDirect(tree);
+
+    const result = await checkoutNode(target.id);
+
+    expect(result.status).toBe('commit');
+    expect(result.actionKind).toBe('fork_branch');
+    expect(triggerSlashMock).toHaveBeenCalledWith('/branch-create 2');
+    expect(loadHistoryTree().branches['history_branch_ghosttest'].status).toBe('broken');
+  });
+
   it('节点唯一 locator 指向已删除聊天时报聊天不可用而不是格式错误', async () => {
     currentChat().messages = [
       { message_id: 0, role: 'assistant', message: '开场' },

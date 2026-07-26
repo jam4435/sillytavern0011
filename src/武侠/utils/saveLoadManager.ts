@@ -504,13 +504,17 @@ function chooseLocatorForBranch(node: HistoryNode, branch: HistoryBranch): Histo
   return node.locators.find(locator => locator.chatId === branch.chatId) ?? null;
 }
 
-function chooseAnyUsableLocator(
+/**
+ * 按可用性挑选分叉来源 locator。历史树里的旧聊天文件随时可能被用户删除，因此：
+ * 1. 优先当前聊天（无需访问旧文件，必然可用）；
+ * 2. 其余 locator 逐个校验聊天文件是否仍存在，已删除的当场把对应分支标记 broken 并跳过，
+ *    避免"每点一次分叉只报废一个死分支"的反复失败体验。
+ */
+async function chooseAvailableLocator(
   tree: WuxiaHistoryTreeV2,
   node: HistoryNode,
   preferredChatId?: string,
-): HistoryLocator | null {
-  // 优先当前聊天的 locator：历史树里的旧聊天文件随时可能被用户删除，
-  // 而节点若在当前聊天中就存在，则完全不需要碰旧文件。
+): Promise<HistoryLocator> {
   const rankOf = (item: { locator: HistoryLocator; branch: HistoryBranch | undefined }): number => {
     const broken = item.branch?.status === 'broken';
     if (!broken && item.locator.chatId === preferredChatId) return 0;
@@ -523,17 +527,44 @@ function chooseAnyUsableLocator(
       branch: tree.branches[branchIdForChat(locator.chatId)],
     }))
     .sort((left, right) => rankOf(left) - rankOf(right));
-  return ranked[0]?.locator ?? null;
+  let lastUnavailable: HistoryChatUnavailableError | null = null;
+  for (const { locator } of ranked) {
+    if (locator.chatId === preferredChatId) return locator;
+    try {
+      await assertHistoryChatAvailable({ id: locator.chatId, name: locator.chatName });
+      return locator;
+    } catch (error) {
+      if (error instanceof HistoryChatUnavailableError) {
+        markBranchStatus(branchIdForChat(locator.chatId), 'broken');
+        lastUnavailable = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+  if (lastUnavailable) throw lastUnavailable;
+  throw new Error('目标历史节点没有可用的聊天定位信息。');
 }
 
-function getExistingLeafTarget(
+async function getExistingLeafTarget(
   tree: WuxiaHistoryTreeV2,
   node: HistoryNode,
-): { branch: HistoryBranch; locator: HistoryLocator } | null {
+): Promise<{ branch: HistoryBranch; locator: HistoryLocator } | null> {
   for (const branch of Object.values(tree.branches)) {
     if (branch.headNodeId !== node.id || branch.status === 'broken') continue;
     const locator = chooseLocatorForBranch(node, branch);
-    if (locator) return { branch, locator };
+    if (!locator) continue;
+    try {
+      await assertHistoryChatAvailable({ id: branch.chatId, name: branch.chatName });
+    } catch (error) {
+      if (error instanceof HistoryChatUnavailableError) {
+        // 分支聊天文件已被删除：标记后继续找其他可复用分支，而不是让本次 checkout 失败
+        markBranchStatus(branch.id, 'broken');
+        continue;
+      }
+      throw error;
+    }
+    return { branch, locator };
   }
   return null;
 }
@@ -622,6 +653,15 @@ async function assertHistoryChatAvailable(chat: HistoryChatIdentity): Promise<vo
   }
 }
 
+/**
+ * 预填草稿必须剥离原消息中的 era_data 块：旧 MK 若随草稿重新发送，会与 ERA 为新消息
+ * 注入的 MK 重复，破坏主干序列。
+ */
+function cleanDraftUserMessage(text: string): string {
+  ERA_DATA_BLOCK_REGEX.lastIndex = 0;
+  return text.replace(ERA_DATA_BLOCK_REGEX, '').trim();
+}
+
 async function readHistoryUserMessage(chat: HistoryChatIdentity, messageId: number | null): Promise<string> {
   if (messageId === null) return '';
   const current = await readCurrentChatIdentity();
@@ -631,7 +671,7 @@ async function readHistoryUserMessage(chat: HistoryChatIdentity, messageId: numb
       hide_state: 'all',
       include_swipes: false,
     })[0];
-    return message?.role === 'user' ? String(message.message ?? '') : '';
+    return message?.role === 'user' ? cleanDraftUserMessage(String(message.message ?? '')) : '';
   }
 
   const groupId = getCurrentGroupId();
@@ -672,7 +712,7 @@ async function readHistoryUserMessage(chat: HistoryChatIdentity, messageId: numb
   );
   const rawMessage = messages[messageId];
   if (!rawMessage || rawMessage.is_user !== true) return '';
-  return String(rawMessage.mes ?? rawMessage.message ?? '');
+  return cleanDraftUserMessage(String(rawMessage.mes ?? rawMessage.message ?? ''));
 }
 
 async function openHistoryChatById(chatId: string): Promise<void> {
@@ -1008,7 +1048,7 @@ async function selectCheckoutAction(
     }
   }
   if (!forceBranch) {
-    const existing = getExistingLeafTarget(tree, node);
+    const existing = await getExistingLeafTarget(tree, node);
     if (existing) {
       return {
         actionKind: 'existing_branch',
@@ -1021,8 +1061,7 @@ async function selectCheckoutAction(
   const currentChatId = await readCurrentChatIdentity()
     .then(chat => chat.id)
     .catch(() => undefined);
-  const locator = chooseAnyUsableLocator(tree, node, currentChatId);
-  if (!locator) throw new Error('目标历史节点没有可用的聊天定位信息。');
+  const locator = await chooseAvailableLocator(tree, node, currentChatId);
   return {
     actionKind: 'fork_branch',
     locator,
