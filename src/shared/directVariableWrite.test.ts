@@ -8,10 +8,12 @@ import {
   writeDirectChatTransaction,
 } from './directVariableWrite';
 import { eventEmitMock, listeners } from '../武侠/test/setup';
+import { clearHistoryCheckoutJournal, createHistoryCheckoutJournal } from './historyCheckoutJournal';
 
 describe('runDirectChatVariableWrite', () => {
   beforeEach(() => {
     eventEmitMock.mockClear();
+    clearHistoryCheckoutJournal();
   });
 
   it('写入成功后返回原结果并发送项目事件', async () => {
@@ -52,18 +54,62 @@ describe('runDirectChatVariableWrite', () => {
   it('写入失败时不发送完成事件', async () => {
     const error = new Error('write failed');
 
-    await expect(runDirectChatVariableWrite(
-      {
-        source: 'event-script',
-        operation: 'replace',
-        reason: 'test-failure',
-      },
-      async () => {
-        throw error;
-      },
-    )).rejects.toThrow(error);
+    await expect(
+      runDirectChatVariableWrite(
+        {
+          source: 'event-script',
+          operation: 'replace',
+          reason: 'test-failure',
+        },
+        async () => {
+          throw error;
+        },
+      ),
+    ).rejects.toThrow(error);
 
     expect(eventEmitMock).not.toHaveBeenCalled();
+  });
+
+  it('checkout journal 存在时阻止前端派生写入，但不阻止事件脚本显式写入', async () => {
+    createHistoryCheckoutJournal({
+      targetNodeId: 'target',
+      targetLocator: {
+        chatId: 'chat-a',
+        chatName: 'A',
+        userMessageId: 1,
+        assistantMessageId: 2,
+        swipeId: 0,
+      },
+      sourceHeadNodeId: 'source',
+      sourceChatId: 'chat-a',
+      sourceChatName: 'A',
+    });
+    const frontendWriter = vi.fn();
+
+    await expect(
+      runDirectChatVariableWrite(
+        {
+          source: 'frontend',
+          operation: 'update',
+          reason: 'startup-completion',
+        },
+        frontendWriter,
+      ),
+    ).rejects.toThrow('历史分叉同步期间已暂停前端派生变量写入');
+    expect(frontendWriter).not.toHaveBeenCalled();
+
+    const eventWriter = vi.fn(async () => ({ ok: true }));
+    await expect(
+      runDirectChatVariableWrite(
+        {
+          source: 'event-script',
+          operation: 'update',
+          reason: 'history-verification-derived-state',
+        },
+        eventWriter,
+      ),
+    ).resolves.toEqual({ ok: true });
+    expect(eventWriter).toHaveBeenCalledTimes(1);
   });
 
   it('缺省 refreshHint 保持 full，并支持单次 direct transaction', async () => {
@@ -108,14 +154,22 @@ describe('runDirectChatVariableWrite', () => {
     eventOn('era:updateByObject', async () => {
       executionOrder.push('era:updateByObject');
       const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
-      await Promise.all(writeDoneListeners.map(listener => listener({
-        message_id: 51,
-        actions: { apply: true },
-      })));
-      await Promise.all(writeDoneListeners.map(listener => listener({
-        message_id: 52,
-        actions: { apiWrite: true },
-      })));
+      await Promise.all(
+        writeDoneListeners.map(listener =>
+          listener({
+            message_id: 51,
+            actions: { apply: true },
+          }),
+        ),
+      );
+      await Promise.all(
+        writeDoneListeners.map(listener =>
+          listener({
+            message_id: 52,
+            actions: { apiWrite: true },
+          }),
+        ),
+      );
     });
 
     const result = await emitEraVariableWriteAndWait({
@@ -143,10 +197,14 @@ describe('runDirectChatVariableWrite', () => {
 
     eventOn('era:updateByObject', async () => {
       const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
-      await Promise.all(writeDoneListeners.map(listener => listener({
-        message_id: 77,
-        actions: { apiWrite: true },
-      })));
+      await Promise.all(
+        writeDoneListeners.map(listener =>
+          listener({
+            message_id: 77,
+            actions: { apiWrite: true },
+          }),
+        ),
+      );
       await postProcessPending;
     });
 
@@ -178,10 +236,14 @@ describe('runDirectChatVariableWrite', () => {
     eventOn('era:updateByObject', async () => {
       executionOrder.push('era:updateByObject');
       const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
-      await Promise.all(writeDoneListeners.map(listener => listener({
-        message_id: 42,
-        actions: { apiWrite: true, ignored: false },
-      })));
+      await Promise.all(
+        writeDoneListeners.map(listener =>
+          listener({
+            message_id: 42,
+            actions: { apiWrite: true, ignored: false },
+          }),
+        ),
+      );
     });
     eventOn(ERA_VARIABLE_WRITE_DONE_EVENT, () => {
       executionOrder.push(ERA_VARIABLE_WRITE_DONE_EVENT);
@@ -198,16 +260,18 @@ describe('runDirectChatVariableWrite', () => {
       timeoutMessage: 'timeout',
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      version: 1,
-      source: 'frontend',
-      operation: 'update',
-      reason: 'summary-write',
-      eventName: 'era:updateByObject',
-      attribution: 'background',
-      message_id: 42,
-      actions: { apiWrite: true },
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        version: 1,
+        source: 'frontend',
+        operation: 'update',
+        reason: 'summary-write',
+        eventName: 'era:updateByObject',
+        attribution: 'background',
+        message_id: 42,
+        actions: { apiWrite: true },
+      }),
+    );
     expect(eventEmitMock).toHaveBeenCalledWith(
       ERA_VARIABLE_WRITE_DONE_EVENT,
       expect.objectContaining({
@@ -219,19 +283,20 @@ describe('runDirectChatVariableWrite', () => {
         actions: { apiWrite: true },
       }),
     );
-    expect(executionOrder).toEqual([
-      'era:updateByObject',
-      ERA_VARIABLE_WRITE_DONE_EVENT,
-    ]);
+    expect(executionOrder).toEqual(['era:updateByObject', ERA_VARIABLE_WRITE_DONE_EVENT]);
   });
 
   it('未显式指定 attribution 时默认标记为 background', async () => {
     eventOn('era:updateByObject', async () => {
       const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
-      await Promise.all(writeDoneListeners.map(listener => listener({
-        message_id: 7,
-        actions: { apiWrite: true },
-      })));
+      await Promise.all(
+        writeDoneListeners.map(listener =>
+          listener({
+            message_id: 7,
+            actions: { apiWrite: true },
+          }),
+        ),
+      );
     });
 
     const result = await emitSourcedEraVariableWriteAndWait({
@@ -243,11 +308,13 @@ describe('runDirectChatVariableWrite', () => {
       timeoutMessage: 'timeout',
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      attribution: 'background',
-      message_id: 7,
-      actions: { apiWrite: true },
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        attribution: 'background',
+        message_id: 7,
+        actions: { apiWrite: true },
+      }),
+    );
     expect(eventEmitMock).toHaveBeenCalledWith(
       ERA_VARIABLE_WRITE_DONE_EVENT,
       expect.objectContaining({

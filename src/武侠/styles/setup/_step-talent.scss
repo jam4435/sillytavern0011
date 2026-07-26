@@ -129,6 +129,25 @@
   border-radius: 6px;
   transition: all 0.2s ease;
 
+  // 窄屏换行，避免被 overflow-x: hidden 静默裁掉日期与操作按钮
+  @media (max-width: 640px) {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+
+    .build-info {
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .build-note {
+      max-width: 100%;
+    }
+
+    .build-actions {
+      margin-left: auto;
+    }
+  }
+
   &:hover {
     background: rgba(255, 255, 255, 0.04);
     border-color: rgba(255, 255, 255, 0.1);

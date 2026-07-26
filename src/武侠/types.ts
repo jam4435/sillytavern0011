@@ -268,6 +268,48 @@ export interface WuxiaSaveTreeData {
   nodes: WuxiaSaveNode[];
 }
 
+export interface HistoryLocator {
+  chatId: string;
+  chatName: string;
+  userMessageId: number | null;
+  assistantMessageId: number;
+  swipeId: number;
+}
+
+export interface HistoryNode {
+  id: string;
+  parentId: string | null;
+  locators: HistoryLocator[];
+  messageKey: string | null;
+  label: string | null;
+  pinned: boolean;
+  preview: string;
+  location: string;
+  worldTimeText: string;
+  createdAt: number;
+  verification: {
+    selectedMksHash: string;
+    eventStateHash: string;
+  } | null;
+}
+
+export interface HistoryBranch {
+  id: string;
+  chatId: string;
+  chatName: string;
+  originNodeId: string | null;
+  headNodeId: string | null;
+  createdAt: number;
+  status: 'active' | 'available' | 'recovery_failed' | 'broken';
+}
+
+export interface WuxiaHistoryTreeV2 {
+  version: 2;
+  updatedAt: number;
+  nodes: Record<string, HistoryNode>;
+  branches: Record<string, HistoryBranch>;
+}
+
 // ============================================
 // 页面流程状态类型（酒馆助手规范）
 // ============================================

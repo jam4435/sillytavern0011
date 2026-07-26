@@ -1,9 +1,11 @@
 import { RotateCcw } from 'lucide-react';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { uiLogger } from '../utils/logger';
 
 interface ChatInputProps {
   onSend: (message: string) => void | Promise<unknown>;
+  prefill?: { key: string; message: string } | null;
+  onMessageChange?: (message: string) => void;
   extraActions?: React.ReactNode;
   onRegenerate?: () => void | Promise<void>;
   canRegenerate?: boolean;
@@ -18,6 +20,8 @@ interface ChatInputProps {
  */
 const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
+  prefill = null,
+  onMessageChange,
   extraActions,
   onRegenerate,
   canRegenerate = false,
@@ -31,6 +35,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputDisabled = disabled || isSubmitting;
   const regenerateDisabled = disabled || isSubmitting || isRegenerating || !canRegenerate || !onRegenerate;
+  const prefillKey = prefill?.key ?? null;
+  const prefillMessage = prefill?.message ?? '';
 
   // 自动调整文本框高度
   const adjustHeight = useCallback(() => {
@@ -42,8 +48,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, []);
 
+  useEffect(() => {
+    if (!prefillKey) return;
+    setMessage(prefillMessage);
+    const frame = window.requestAnimationFrame(adjustHeight);
+    return () => window.cancelAnimationFrame(frame);
+  }, [adjustHeight, prefillKey, prefillMessage]);
+
+  useEffect(() => {
+    if (!prefillKey || inputDisabled) return;
+    textareaRef.current?.focus();
+  }, [inputDisabled, prefillKey]);
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
+    onMessageChange?.(e.target.value);
     adjustHeight();
   };
 

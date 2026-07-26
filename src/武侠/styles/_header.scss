@@ -65,6 +65,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  flex: 1 1 auto;
+  min-width: 0; // 长地名可收缩省略而非挤爆 header
 }
 
 .loc-value {
@@ -86,6 +88,9 @@
   font-size: 0.95rem;
   letter-spacing: 0.08em;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .time-value {
@@ -160,6 +165,8 @@
   margin-left: 0;
   width: 28px;
   height: 28px;
+  min-width: 28px; // 覆盖 .fullscreen-btn 的 44px 触控下限，header 内保持紧凑
+  min-height: 28px;
   padding: 0.35rem;
   background: rgba(28, 25, 23, 0.32);
   border: 1px solid rgba(139, 90, 43, 0.3);
@@ -355,4 +362,34 @@
   transition: opacity 0.3s ease;
   pointer-events: none;
   z-index: -1;
+}
+
+// =========================================
+// 移动端适配
+// =========================================
+
+@media (max-width: 767px) {
+  // 左侧固定汉堡按钮占据 12-56px，header 内容须让位
+  .game-header {
+    height: 3.75rem;
+    padding: 0 0.85rem 0 4rem;
+  }
+
+  .header-right {
+    flex-shrink: 0;
+    gap: 0.6rem;
+  }
+
+  .header-action-btn,
+  .header-fullscreen-btn-small {
+    width: 2.5rem;
+    height: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
 }

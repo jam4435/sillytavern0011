@@ -167,6 +167,13 @@
     &:hover .delete-custom-trait-btn {
       opacity: 1;
     }
+
+    // 触屏设备无 hover，删除按钮必须常显
+    @media (hover: none) {
+      .delete-custom-trait-btn {
+        opacity: 1;
+      }
+    }
   }
 
   .trait-header {
@@ -275,7 +282,7 @@
 
 // 可选天赋滚动容器
 .traits-scroll-container {
-  max-height: 400px;
+  max-height: min(400px, 55vh);
   overflow-y: auto;
   padding-right: 0.5rem;
   margin-right: -0.5rem;
@@ -302,7 +309,7 @@
 
 // 自定义天赋滚动容器
 .custom-traits-scroll {
-  max-height: 250px;
+  max-height: min(250px, 40vh);
   overflow-y: auto;
   padding-right: 0.5rem;
   margin-right: -0.5rem;

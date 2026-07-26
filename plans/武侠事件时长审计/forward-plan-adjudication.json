@@ -1,0 +1,1060 @@
+{
+  "reviewed": 101,
+  "counts": {
+    "hard_conflict": 6,
+    "likely_conflict": 2,
+    "satisfied": 9,
+    "realized_within_current": 59,
+    "cancelled_or_changed": 5,
+    "retelling_or_reference": 20
+  },
+  "seriesCounts": {
+    "射雕": {
+      "hard_conflict": 0,
+      "likely_conflict": 0,
+      "satisfied": 4,
+      "realized_within_current": 17,
+      "cancelled_or_changed": 2,
+      "retelling_or_reference": 6
+    },
+    "神雕": {
+      "hard_conflict": 6,
+      "likely_conflict": 2,
+      "satisfied": 5,
+      "realized_within_current": 42,
+      "cancelled_or_changed": 3,
+      "retelling_or_reference": 14
+    }
+  },
+  "assessmentsByVerdict": {
+    "hard_conflict": [
+      {
+        "id": "神雕第2回-13-杨过铁枪庙智助欧阳锋退柯镇恶",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第2回-13-杨过铁枪庙智助欧阳锋退柯镇恶.yaml",
+        "nextEventId": "神雕第2回-14-柯镇恶中毒返店决心东行桃花岛",
+        "gapToNextStartHours": 1,
+        "verdict": "hard_conflict",
+        "marker": "明日",
+        "reason": "欧阳锋明确预判柯镇恶“今晚不来明日必至”；下一条正是柯镇恶再来并中毒，却被排在同日22时、距本条结束仅1小时，未跨入次日日历。",
+        "minimumRequiredGapHours": 3
+      },
+      {
+        "id": "神雕第11回-09-郭靖重逢杨过赵志敬告状引书房对质",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第11回-09-郭靖重逢杨过赵志敬告状引书房对质.yaml",
+        "nextEventId": "神雕第11回-10-杨过书房斥全真道郝大通断剑黄蓉出手相试",
+        "gapToNextStartHours": 1,
+        "verdict": "hard_conflict",
+        "marker": "明日",
+        "reason": "黄蓉明确宣布明日为英雄大宴正日、明日再议正事；下一条却仍落在同一日且仅隔一小时，并直接转入书房对质，缺少所需的日历日推进。",
+        "minimumRequiredGapHours": 12
+      },
+      {
+        "id": "神雕第22回-04-黄蓉得知杨过中毒真相",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第22回-04-黄蓉得知杨过中毒真相.yaml",
+        "nextEventId": "神雕第22回-05-武氏兄弟为郭芙出城相斗",
+        "gapToNextStartHours": 1,
+        "verdict": "hard_conflict",
+        "marker": "明日",
+        "reason": "法王信中明言次日回拜，黄蓉亦提出次日联手护郭靖；紧邻时间线仍停在当夜一小时后，未留出下一日。",
+        "minimumRequiredGapHours": 20
+      },
+      {
+        "id": "神雕第24回-01-天竺僧论毒辞行",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第24回-01-天竺僧论毒辞行.yaml",
+        "nextEventId": "神雕第24回-02-郭芙清晨质问杨过",
+        "gapToNextStartHours": 1,
+        "verdict": "hard_conflict",
+        "marker": "明日一早",
+        "reason": "三人明确说明日一早动身赴绝情谷；紧邻事件仅一小时后即以“天刚黎明”开始，日期没有推进，无法容纳该次日安排。",
+        "minimumRequiredGapHours": 10
+      },
+      {
+        "id": "神雕第33回-07-西山一窟鬼遇万兽山庄起冲突",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第33回-07-西山一窟鬼遇万兽山庄起冲突.yaml",
+        "nextEventId": "神雕第33回-08-群兽围攻西山一窟鬼神雕侠杨过现身",
+        "gapToNextStartHours": 1,
+        "verdict": "hard_conflict",
+        "marker": "明晚",
+        "reason": "长须鬼与史孟捷明确订明晚决斗；紧邻事件在两小时后跨零即爆发群斗，显著早于约期且无改约说明。",
+        "minimumRequiredGapHours": 18
+      },
+      {
+        "id": "神雕第39回-09-襄阳大捷庆功宴郭靖杨过携手入城议赴华山",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第39回-09-襄阳大捷庆功宴郭靖杨过携手入城议赴华山.yaml",
+        "nextEventId": "神雕第40回-01-华山祭奠洪七公与欧阳锋",
+        "gapToNextStartHours": 287,
+        "verdict": "hard_conflict",
+        "marker": "明日",
+        "reason": "群雄明确同意明日启程赴华山；下一事件虽仍称“襄阳大捷次日清晨”，触发日期却隔十二日，叙事与时间字段明显不符。",
+        "minimumRequiredGapHours": null
+      }
+    ],
+    "likely_conflict": [
+      {
+        "id": "神雕第14回-07-双剑合璧大败金轮法王临别赠药",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第14回-07-双剑合璧大败金轮法王临别赠药.yaml",
+        "nextEventId": "神雕第14回-08-黄蓉赠金环夜劝小龙女萌离去之念",
+        "gapToNextStartHours": 1,
+        "verdict": "likely_conflict",
+        "marker": "明日",
+        "reason": "杨过答应留宿一宵、明日再动身；下一条虽叙为当晚留宿内容，却在字段上仅隔一小时且仍同日，不能稳妥容纳完整夜宿至次日的下限。",
+        "minimumRequiredGapHours": 8
+      },
+      {
+        "id": "神雕第21回-01-黄蓉夜告郭靖防杨过并议二孩之名",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第21回-01-黄蓉夜告郭靖防杨过并议二孩之名.yaml",
+        "nextEventId": "神雕第21回-02-杨过偷听夫妻对话加增杀心",
+        "gapToNextStartHours": 1,
+        "verdict": "likely_conflict",
+        "marker": "明日",
+        "reason": "郭靖明确决定明日搬往军营；下一条字段仍为同日且仅隔一小时，未留出跨夜至次日的可靠空间，虽尚未写到实际搬营。",
+        "minimumRequiredGapHours": 8
+      }
+    ],
+    "satisfied": [
+      {
+        "id": "射雕第5回-05-悬崖奇遇",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第5回-05-悬崖奇遇.yaml",
+        "nextEventId": "射雕第5回-06-秘授玄功",
+        "gapToNextStartHours": 52,
+        "verdict": "satisfied",
+        "marker": "三日后",
+        "reason": "下一条在八月二十三日开始，已进入约定的第三个日历日并承接崖顶传功。",
+        "minimumRequiredGapHours": 48
+      },
+      {
+        "id": "射雕第23回-06-夜探皇宫",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第23回-06-夜探皇宫.yaml",
+        "nextEventId": "射雕第23回-07-翠寒堂之战",
+        "gapToNextStartHours": 24,
+        "verdict": "satisfied",
+        "marker": "次日",
+        "reason": "约定次日再战西毒后，下一条在下一日夜间进入宫中激战，日历日要求得到满足。",
+        "minimumRequiredGapHours": 2
+      },
+      {
+        "id": "射雕第28回-02-破解武穆遗书之秘",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第28回-02-破解武穆遗书之秘.yaml",
+        "nextEventId": "射雕第28回-03-铁掌峰顶遇险得书",
+        "gapToNextStartHours": 197,
+        "verdict": "satisfied",
+        "marker": "七日后",
+        "reason": "七日后铁掌山之约的对应事件在八日多后发生；它不早于约定下限。",
+        "minimumRequiredGapHours": 168
+      },
+      {
+        "id": "射雕第34回-10-洪七公止斗",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第34回-10-洪七公止斗.yaml",
+        "nextEventId": "射雕第35回-01-烟雨楼前混战",
+        "gapToNextStartHours": 11,
+        "verdict": "satisfied",
+        "marker": "次日",
+        "reason": "各方被约束等待次日中秋之约，下一条在次日清晨开始，符合日历日意义。",
+        "minimumRequiredGapHours": 3
+      },
+      {
+        "id": "神雕第7回-12-杨过下山寻师客店夜探闻豺狼谷约斗",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第7回-12-杨过下山寻师客店夜探闻豺狼谷约斗.yaml",
+        "nextEventId": "神雕第8回-01-杨过夜闹客店戏弄二道",
+        "gapToNextStartHours": 47,
+        "verdict": "satisfied",
+        "marker": "翌日",
+        "reason": "杨过拟于翌日跟随道人寻小龙女；后续先写翌晨行动，约两日余空档足以容纳该日历日转换。",
+        "minimumRequiredGapHours": 12
+      },
+      {
+        "id": "神雕第15回-09-铁铺造剪冯默风认亲",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第15回-09-铁铺造剪冯默风认亲.yaml",
+        "nextEventId": "神雕第16回-01-冯默风铁锤拐杖烧衣斗李莫愁",
+        "gapToNextStartHours": 23,
+        "verdict": "satisfied",
+        "marker": "明日",
+        "reason": "“明日更难抵敌”后的下一事件已落在次日早晨；23小时差符合跨日而非机械二十四小时的判断。",
+        "minimumRequiredGapHours": 12
+      },
+      {
+        "id": "神雕第30回-05-一灯赠药四人相认赶赴绝情谷周伯通现身",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第30回-05-一灯赠药四人相认赶赴绝情谷周伯通现身.yaml",
+        "nextEventId": "神雕第30回-06-抵达绝情谷杨过救程英陆无双中情花刺",
+        "gapToNextStartHours": 23,
+        "verdict": "satisfied",
+        "marker": "次晨",
+        "reason": "四人次晨启程已获约一昼夜转场，后续到达绝情谷的远行也有叙事承接。",
+        "minimumRequiredGapHours": 12
+      },
+      {
+        "id": "神雕第32回-13-杨过服断肠草众人告别",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-13-杨过服断肠草众人告别.yaml",
+        "nextEventId": "神雕第32回-14-杨过程英陆无双结拜传功",
+        "gapToNextStartHours": 163,
+        "verdict": "satisfied",
+        "marker": "七日后",
+        "reason": "下一事件落在三月十五日，按日历已到首服后第七日，并承接第二次服药。",
+        "minimumRequiredGapHours": 144
+      },
+      {
+        "id": "神雕第34回-05-杨过周伯通百花谷比武",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第34回-05-杨过周伯通百花谷比武.yaml",
+        "nextEventId": "神雕第34回-06-众人和解慈恩逝世瑛姑赠狐",
+        "gapToNextStartHours": 23,
+        "verdict": "satisfied",
+        "marker": "次日",
+        "reason": "三人一雕睡后次日返黑龙潭，后续起点为翌晨，日历与叙述均相符。",
+        "minimumRequiredGapHours": 12
+      }
+    ],
+    "realized_within_current": [
+      {
+        "id": "射雕第1回-05-包惜弱巧救颜烈",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第1回-05-包惜弱巧救颜烈.yaml",
+        "nextEventId": "射雕第1回-06-牛家村风雪惊变",
+        "gapToNextStartHours": 1915,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "颜烈次晨离去已在本条叙述中发生，不是对下一条的待兑现安排。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第1回-06-牛家村风雪惊变",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第1回-06-牛家村风雪惊变.yaml",
+        "nextEventId": "射雕第2回-01-完颜洪烈表露身份",
+        "gapToNextStartHours": 32,
+        "verdict": "realized_within_current",
+        "marker": "数月后",
+        "reason": "数月后的惊变即为本条所叙事件，属于本条相对前情的时间跳跃。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第3回-03-郭靖巧救哲别",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第3回-03-郭靖巧救哲别.yaml",
+        "nextEventId": "射雕第3回-04-郭靖与拖雷结为安答",
+        "gapToNextStartHours": 24734,
+        "verdict": "realized_within_current",
+        "marker": "数日后",
+        "reason": "哲别数日后负伤到郭靖家并获救，已完整包含在本条内。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第4回-03-夺兔之争",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第4回-03-夺兔之争.yaml",
+        "nextEventId": "射雕第4回-04-巧遇七怪",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "次日的夺兔冲突就是本条主体，并非给下一条设置的约会或计划。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第6回-01-崖顶疑阵",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第6回-01-崖顶疑阵.yaml",
+        "nextEventId": "射雕第6回-02-密谋除汗",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "朱聪、全金发次日上崖探查是本条内已叙明的行动。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第6回-06-大破联军",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第6回-06-大破联军.yaml",
+        "nextEventId": "射雕第6回-07-金刀驸马",
+        "gapToNextStartHours": 355,
+        "verdict": "realized_within_current",
+        "marker": "八日后",
+        "reason": "八日后的夜袭、统一蒙古均已包含在本条叙事中。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第7回-03-黑松林解围",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第7回-03-黑松林解围.yaml",
+        "nextEventId": "射雕第7回-04-比武招亲",
+        "gapToNextStartHours": 2320,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "侯通海约定的次日黑松林决斗已在本条中发生并被黄蓉化解。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第15回-02-郭杨结义北上",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第15回-02-郭杨结义北上.yaml",
+        "nextEventId": "射雕第15回-03-溪边重逢",
+        "gapToNextStartHours": 33,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "郭杨次晨启程北上已属本条内容；七月初一的相会尚未由紧接的溪边重逢承担。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第15回-03-溪边重逢",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第15回-03-溪边重逢.yaml",
+        "nextEventId": "射雕第15回-04-义助丐帮斗淫贼",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "相依至次日清晨是本条内的经过；当晚援助丐帮的计划也由本条紧接叙述带出。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第21回-08-协力救侄",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第21回-08-协力救侄.yaml",
+        "nextEventId": "射雕第22回-01-智斗西毒",
+        "gapToNextStartHours": 12,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "木缆失败后的次日借潮救人已经在本条中完成。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第22回-06-真经初成",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第22回-06-真经初成.yaml",
+        "nextEventId": "射雕第22回-07-木筏被盗",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "七天后",
+        "reason": "七天后的练成是本条内已经完成的修炼结果，不是对木筏被盗的前置计划。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第22回-09-海上重逢",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第22回-09-海上重逢.yaml",
+        "nextEventId": "射雕第22回-10-恩将仇报",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "第三日",
+        "reason": "航行至第三日晚及救起欧阳叔侄均已发生在本条中。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第36回-03-郭靖得知真相",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第36回-03-郭靖得知真相.yaml",
+        "nextEventId": "射雕第36回-04-郭靖重返蒙古",
+        "gapToNextStartHours": 1692,
+        "verdict": "realized_within_current",
+        "marker": "第三日",
+        "reason": "柯镇恶在第三日遇到郭靖是本条既成情节；下一条的半年寻人属于其后叙事。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第37回-02-智擒西毒",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第37回-02-智擒西毒.yaml",
+        "nextEventId": "射雕第37回-03-秃木峰顶相会",
+        "gapToNextStartHours": 221,
+        "verdict": "realized_within_current",
+        "marker": "数日后",
+        "reason": "数日后第二次设陷阱、第二饶欧阳锋已经在本条叙述内完成。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第40回-04-侠侣定盟",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第40回-04-侠侣定盟.yaml",
+        "nextEventId": "射雕第40回-05-华筝传书",
+        "gapToNextStartHours": 376,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "洪七公次晨离去、三人随即启程均已是本条内的既成经过。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第40回-06-义救念慈",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第40回-06-义救念慈.yaml",
+        "nextEventId": "射雕第40回-07-智退敌军",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "靖蓉次日作别穆念慈、穆念慈赴嘉兴是本条中已经叙明的后续。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第40回-07-智退敌军",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第40回-07-智退敌军.yaml",
+        "nextEventId": "射雕第40回-08-空城退敌",
+        "gapToNextStartHours": 301,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "黄蓉次日扮使臣犒师蒙古先锋已被本条完整叙述。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第1回-06-武修文迷途遇郭芙柯镇恶",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第1回-06-武修文迷途遇郭芙柯镇恶.yaml",
+        "nextEventId": "神雕第1回-07-李莫愁血洗陆家庄",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "武修文睡至次日天明并遇郭芙、柯镇恶，均已发生在本条内。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第2回-14-柯镇恶中毒返店决心东行桃花岛",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第2回-14-柯镇恶中毒返店决心东行桃花岛.yaml",
+        "nextEventId": "神雕第2回-15-途遇武氏兄弟黄蓉葬武三娘收养二子",
+        "gapToNextStartHours": 105,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "次日一早柯镇恶中毒归来及当日下午雇船东行已在本条内完成。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第2回-15-途遇武氏兄弟黄蓉葬武三娘收养二子",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第2回-15-途遇武氏兄弟黄蓉葬武三娘收养二子.yaml",
+        "nextEventId": "神雕第3回-01-舟中议婚",
+        "gapToNextStartHours": 287,
+        "verdict": "realized_within_current",
+        "marker": "次晨",
+        "reason": "次晨安葬武三娘是本条内部的后续经过，不是下一条需承接的计划。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第3回-03-杨过推石遁走藏匿山中",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第3回-03-杨过推石遁走藏匿山中.yaml",
+        "nextEventId": "神雕第3回-04-郭靖收徒黄蓉分教只传文",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "次日清晨、当晚、夜半及回屋均已在本条叙完；不是留给下一条兑现的约定。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第3回-06-桃林再斗蛤蟆功初显威",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第3回-06-桃林再斗蛤蟆功初显威.yaml",
+        "nextEventId": "神雕第3回-07-杨过蛤蟆功败露愤而投海",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "“次日清晨”是本条开场叙事时间，随后冲突已在本条完成，并未向后约定。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第5回-08-杨过初睡寒玉床练内功",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第5回-08-杨过初睡寒玉床练内功.yaml",
+        "nextEventId": "神雕第5回-09-杨过拜师古墓派",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次晨",
+        "reason": "整夜练功至次晨醒转已写入本条；次晨拜师虽相接，但时间词本身已经在本条实现。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第5回-10-杨过捉麻雀练古墓轻功",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第5回-10-杨过捉麻雀练古墓轻功.yaml",
+        "nextEventId": "神雕第6回-01-送蜜浆杨过戏斗鹿清笃",
+        "gapToNextStartHours": 173,
+        "verdict": "realized_within_current",
+        "marker": "第五日／第八日",
+        "reason": "八日捕雀、出墓和上重阳宫均由本条完整叙述；这应由本条时长承载。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第6回-02-小龙女传授天罗地网势",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第6回-02-小龙女传授天罗地网势.yaml",
+        "nextEventId": "神雕第6回-03-小龙女讲述古墓派来历与玉女心经",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "三个月内／十余日／中秋过后",
+        "reason": "数月训练与季节推进均是本条总结性经过，非下一事件的未来约束。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第6回-06-师徒合练玉女心经外功",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第6回-06-师徒合练玉女心经外功.yaml",
+        "nextEventId": "神雕第6回-07-发现花丛练玉女心经内功",
+        "gapToNextStartHours": 599,
+        "verdict": "realized_within_current",
+        "marker": "数月后",
+        "reason": "外功练成和其后困顿皆已在本条发生；下条只是承接内功难题。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第7回-08-山谷搭茅屋养伤修炼一年有余",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第7回-08-山谷搭茅屋养伤修炼一年有余.yaml",
+        "nextEventId": "神雕第7回-09-欧阳锋现身山谷与小龙女相斗父子重逢",
+        "gapToNextStartHours": 24,
+        "verdict": "realized_within_current",
+        "marker": "次晨／数月过去／月余",
+        "reason": "养伤、练功及年余隐居均被当前事件结束时间覆盖，时间词不是向后安排。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第8回-01-杨过夜闹客店戏弄二道",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第8回-01-杨过夜闹客店戏弄二道.yaml",
+        "nextEventId": "神雕第8回-02-杨过扮牧童驯牛赴豺狼谷",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "道士离去及杨过次晨出店均已叙在本条，下一条仅继续赶路。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第9回-03-客店扮道士避李莫愁",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第9回-03-客店扮道士避李莫愁.yaml",
+        "nextEventId": "神雕第9回-04-借剑斗丐退二老",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "同宿至次日清晨的动作均为本条内部经过。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第9回-06-智取耶律晋乔装侍从",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第9回-06-智取耶律晋乔装侍从.yaml",
+        "nextEventId": "神雕第9回-07-龙驹寨耶律家夜遇刺客",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次晨／两日／第三日",
+        "reason": "起程、两日未闻铃声及第三日抵寨均是本条叙述的行程压缩，不是对下一条的约会。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第9回-07-龙驹寨耶律家夜遇刺客",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第9回-07-龙驹寨耶律家夜遇刺客.yaml",
+        "nextEventId": "神雕第10回-01-耶律齐显神技释完颜萍",
+        "gapToNextStartHours": 347,
+        "verdict": "realized_within_current",
+        "marker": "第三日",
+        "reason": "“第三日抵达”是当前龙驹寨场景的时间背景，并未提出后续日期要求。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第10回-08-洪七公大睡杨过独守三日",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第10回-08-洪七公大睡杨过独守三日.yaml",
+        "nextEventId": "神雕第11回-01-洪七公现身降龙掌退五丑欧阳锋突至隔人较劲",
+        "gapToNextStartHours": 24,
+        "verdict": "realized_within_current",
+        "marker": "第四日",
+        "reason": "三日守护及第四日行动均在本条中完成，且本条已有三日时长。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第11回-03-二老连日比武杨过劝退不成反陷内力比拼",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第11回-03-二老连日比武杨过劝退不成反陷内力比拼.yaml",
+        "nextEventId": "神雕第11回-04-二老借杨过口传演武打狗棒法对蛇杖",
+        "gapToNextStartHours": 47,
+        "verdict": "realized_within_current",
+        "marker": "次晨／第五晚",
+        "reason": "连续四日斗武、第五晚劝退及当日内力比拼均已写在当前条。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第11回-05-天下无狗被破洪七公叹服二老相抱大笑同逝",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第11回-05-天下无狗被破洪七公叹服二老相抱大笑同逝.yaml",
+        "nextEventId": "神雕第11回-06-杨过华山葬双雄救瘦马结伴南行",
+        "gapToNextStartHours": 43,
+        "verdict": "realized_within_current",
+        "marker": "第三日／次晨／七日七夜",
+        "reason": "棒法第三日、翌晨破招及杨过守尸七日均由本条叙完，应归当前条时长。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第11回-06-杨过华山葬双雄救瘦马结伴南行",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第11回-06-杨过华山葬双雄救瘦马结伴南行.yaml",
+        "nextEventId": "神雕第11回-07-杨过乔装潦倒混入破庙逢郭芙武氏兄弟",
+        "gapToNextStartHours": 2160,
+        "verdict": "realized_within_current",
+        "marker": "第二日／七八日后",
+        "reason": "救马、数日喂养与七八日恢复均为本条内的连续经过，后续有充足留白也不构成向后约束。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第11回-08-王十三引杨过大胜关陆家庄英雄大宴",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第11回-08-王十三引杨过大胜关陆家庄英雄大宴.yaml",
+        "nextEventId": "神雕第11回-09-郭靖重逢杨过赵志敬告状引书房对质",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "“次日上道”到当晚抵宴皆是当前事件的叙事内容，非对下一条的待兑现计划。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第12回-01-杨过陪郭芙出游窥学打狗棒法",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第12回-01-杨过陪郭芙出游窥学打狗棒法.yaml",
+        "nextEventId": "神雕第12回-02-树上偷听靖蓉议婚与黄蓉演棒",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "“次日早晨”是当前出游场景的开场定位；偷看打狗棒法在后续即时承接。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第14回-05-酒楼遇险金轮法王挟持郭芙要挟黄蓉",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第14回-05-酒楼遇险金轮法王挟持郭芙要挟黄蓉.yaml",
+        "nextEventId": "神雕第14回-06-杨过舍身救黄蓉初使双剑合璧",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "“次日中午”仅定位酒楼场景，未形成尚待后续兑现的计划。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第14回-09-小龙女深夜不辞而别杨过狂追寻师",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第14回-09-小龙女深夜不辞而别杨过狂追寻师.yaml",
+        "nextEventId": "神雕第14回-10-杨过奋身救郭芙黄蓉秘传打狗棒法全诀",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次晨",
+        "reason": "次晨出走、过午赶路与入林发现险情均为本条内部连续动作。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第15回-02-程英茅屋照料杨过暗露心事",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第15回-02-程英茅屋照料杨过暗露心事.yaml",
+        "nextEventId": "神雕第15回-03-陆无双报信三人定计迎敌",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "两次“次日”及夜间相处均已叙入当前条，非对下一事件的时间承诺。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第15回-06-黄药师结交杨过传授绝艺",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第15回-06-黄药师结交杨过传授绝艺.yaml",
+        "nextEventId": "神雕第15回-07-杨过探傻姑追寻父仇",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日／数日过后",
+        "reason": "疗伤后相交、数日授艺和临别均被本条叙述吸收；“将来相助”是条件性承诺，并非下一条的具体日期。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第16回-05-杨过悲愤狂奔荒野杀蒙古兵埋婴",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第16回-05-杨过悲愤狂奔荒野杀蒙古兵埋婴.yaml",
+        "nextEventId": "神雕第16回-06-杨过遇达尔巴助金轮法王疗伤",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次晨",
+        "reason": "当夜树上宿睡、次晨任马信步均为当前事件内部经过。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第16回-07-杨过金轮法王结盟论武",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第16回-07-杨过金轮法王结盟论武.yaml",
+        "nextEventId": "神雕第16回-08-金轮法王引杨过见忽必烈",
+        "gapToNextStartHours": 43,
+        "verdict": "realized_within_current",
+        "marker": "次晨／数日后",
+        "reason": "彻夜苦思、七日昏迷与数日后悟道均为本条的内在时间推进，不是下一事件的预约。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第23回-08-杨过吮毒救人昏迷醒转天竺僧诊断",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第23回-08-杨过吮毒救人昏迷醒转天竺僧诊断.yaml",
+        "nextEventId": "神雕第24回-01-天竺僧论毒辞行",
+        "gapToNextStartHours": 6,
+        "verdict": "realized_within_current",
+        "marker": "第七日",
+        "reason": "“已是第七日”叙述的是杨过昏迷后在本条内醒转的既成经过。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第24回-08-周伯通盗王旗",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第24回-08-周伯通盗王旗.yaml",
+        "nextEventId": "神雕第24回-09-法王拉拢赵志敬谋夺掌教",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "夜行至天明、次日抵平原均已在本条叙事中完成，不能外推为下一条的时长要求。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第26回-08-杨过荒谷遇神雕发现剑冢",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第26回-08-杨过荒谷遇神雕发现剑冢.yaml",
+        "nextEventId": "神雕第26回-09-杨过山洪中悟重剑剑道",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次晨",
+        "reason": "黄昏宿草、次晨醒来及“多日”养伤均在本条已经展开完成。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第26回-09-杨过山洪中悟重剑剑道",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第26回-09-杨过山洪中悟重剑剑道.yaml",
+        "nextEventId": "神雕第26回-10-杨过夜入襄阳",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次晨",
+        "reason": "次晨、练剑数日及雨日悟剑属于该条覆盖的训练蒙太奇。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第27回-01-郭靖欲斩郭芙手臂黄蓉救女点穴放行",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第27回-01-郭靖欲斩郭芙手臂黄蓉救女点穴放行.yaml",
+        "nextEventId": "神雕第27回-02-黄蓉持令送女出城市镇告别赠软猬甲",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "数日后",
+        "reason": "郭芙躲避数日后回家是本条开场的既成背景。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第32回-14-杨过程英陆无双结拜传功",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-14-杨过程英陆无双结拜传功.yaml",
+        "nextEventId": "神雕第32回-15-杨过飘然离去海边练剑",
+        "gapToNextStartHours": 743,
+        "verdict": "realized_within_current",
+        "marker": "第六日、第七日",
+        "reason": "砍树至第六日、第二次服药至第七日及后续授功均为本条内部蒙太奇。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第35回-04-郭襄回襄阳受父母管教",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第35回-04-郭襄回襄阳受父母管教.yaml",
+        "nextEventId": "神雕第35回-05-鲁有脚遭霍都暗算身亡",
+        "gapToNextStartHours": 65,
+        "verdict": "realized_within_current",
+        "marker": "第三日",
+        "reason": "郭襄绝食至第三日获母亲开解是本条内部发展。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第35回-08-英雄大宴郭靖被推为盟主",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第35回-08-英雄大宴郭靖被推为盟主.yaml",
+        "nextEventId": "神雕第35回-09-郭襄闺房小宴群怪赠奇珍",
+        "gapToNextStartHours": 161,
+        "verdict": "realized_within_current",
+        "marker": "翌日",
+        "reason": "翌日英雄大宴及当晚推盟主均已写在当前事件内。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第37回-06-郭襄留书出走寻杨过",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-06-郭襄留书出走寻杨过.yaml",
+        "nextEventId": "神雕第37回-07-郭襄遇金轮法王二鬼遇害",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "郭襄出走后次晨家人发现留书的过程已在当前条内完成。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第37回-09-杨过癫狂至嘉兴铁枪庙救柯镇恶知父过",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-09-杨过癫狂至嘉兴铁枪庙救柯镇恶知父过.yaml",
+        "nextEventId": "神雕第37回-10-杨过得讯郭襄被擒赴蒙古军营寻访",
+        "gapToNextStartHours": 381,
+        "verdict": "realized_within_current",
+        "marker": "数日间、第三日",
+        "reason": "数日狂奔与踏雪南行第三日抵嘉兴，都是本条内的连续经历。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第37回-10-杨过得讯郭襄被擒赴蒙古军营寻访",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-10-杨过得讯郭襄被擒赴蒙古军营寻访.yaml",
+        "nextEventId": "神雕第38回-01-郭襄夜逃金轮法王三拦收徒激将赴绝情谷",
+        "gapToNextStartHours": 23,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "次夜查西营、连查四晚及随后数日核实均是本事件自身的搜寻跨度。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第38回-03-黄蓉随玉蜂遇周伯通发现蜂翅刺字解出绝情谷底",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第38回-03-黄蓉随玉蜂遇周伯通发现蜂翅刺字解出绝情谷底.yaml",
+        "nextEventId": "神雕第38回-04-杨过绝情谷苦候小龙女未至心碎一夜白头跳崖",
+        "gapToNextStartHours": 23,
+        "verdict": "realized_within_current",
+        "marker": "次晨",
+        "reason": "到谷留宿后次晨读蜂翅字、决定西行均已在本条完成。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第38回-07-郭襄述谷底情形众人搓绳下谷寻杨过不见黄蓉探潭无果",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第38回-07-郭襄述谷底情形众人搓绳下谷寻杨过不见黄蓉探潭无果.yaml",
+        "nextEventId": "神雕第38回-08-金轮法王骗郭襄解穴逃脱挟持郭襄失踪",
+        "gapToNextStartHours": 23,
+        "verdict": "realized_within_current",
+        "marker": "次晨",
+        "reason": "搓索整夜至次晨、下谷搜寻和返上崖顶都是当前事件内完成的过程。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第39回-02-蒙古大军猛攻襄阳大战十二时辰",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第39回-02-蒙古大军猛攻襄阳大战十二时辰.yaml",
+        "nextEventId": "神雕第39回-03-蒙古军筑高台金轮法王以郭襄要挟郭靖投降",
+        "gapToNextStartHours": 4,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "“次日天甫黎明”的攻城战正是本条所叙十二时辰战事的开端。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第39回-04-杨过绝情谷底重逢小龙女携手出谷",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第39回-04-杨过绝情谷底重逢小龙女携手出谷.yaml",
+        "nextEventId": "神雕第39回-05-黄药师校场部署二十八宿大阵",
+        "gapToNextStartHours": 47,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "杨龙长谈一夜、次日攀绳出谷均已在当前事件内容中完成。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第40回-01-华山祭奠洪七公与欧阳锋",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第40回-01-华山祭奠洪七公与欧阳锋.yaml",
+        "nextEventId": "神雕第40回-02-骇退妄人重定新五绝",
+        "gapToNextStartHours": 1,
+        "verdict": "realized_within_current",
+        "marker": "次日",
+        "reason": "次日清晨离襄阳、缓行至华山及养伤好转均由当前事件自身叙明。",
+        "minimumRequiredGapHours": null
+      }
+    ],
+    "cancelled_or_changed": [
+      {
+        "id": "射雕第22回-07-木筏被盗",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第22回-07-木筏被盗.yaml",
+        "nextEventId": "射雕第22回-08-巧计破筏",
+        "gapToNextStartHours": 1,
+        "verdict": "cancelled_or_changed",
+        "marker": "次日",
+        "reason": "众人原计划次日清晨启航，但欧阳叔侄先行盗走木筏，计划被明确打断并转为破筏应对。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第40回-09-兄弟重逢",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第40回-09-兄弟重逢.yaml",
+        "nextEventId": "射雕第40回-10-英雄论对",
+        "gapToNextStartHours": 192,
+        "verdict": "cancelled_or_changed",
+        "marker": "次日",
+        "reason": "郭靖预期拖雷次日再攻并拟刺杀，但成吉思汗急召拖雷班师，明确消弭了该预期冲突。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第8回-05-石屋夜戏陆无双杀杨过反被点穴",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第8回-05-石屋夜戏陆无双杀杨过反被点穴.yaml",
+        "nextEventId": "神雕第8回-06-三仇家上门杨过救陆无双断骨",
+        "gapToNextStartHours": 1,
+        "verdict": "cancelled_or_changed",
+        "marker": "明日",
+        "reason": "陆无双的“明日定要斩”只是受制时的赌咒；紧接着仇家闯入、她被救伤，剧情明确打断并改变该打算。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第18回-10-公孙止情花酷刑逼婚小龙女被迫允诺",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第18回-10-公孙止情花酷刑逼婚小龙女被迫允诺.yaml",
+        "nextEventId": "神雕第18回-11-杨过忍痛立志公孙绿萼冒死救情郎",
+        "gapToNextStartHours": 1,
+        "verdict": "cancelled_or_changed",
+        "marker": "明日／十二个时辰内",
+        "reason": "公孙止约定洞房后明早给药，但公孙绿萼立即救人盗药，剧情明确改变并阻断了原约。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第30回-01-杨过伪装猎户接待二丐偷听阴谋",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第30回-01-杨过伪装猎户接待二丐偷听阴谋.yaml",
+        "nextEventId": "神雕第30回-02-杨过堆雪人戏弄瘦丐一灯慈恩借宿讲佛",
+        "gapToNextStartHours": 1,
+        "verdict": "cancelled_or_changed",
+        "marker": "明早",
+        "reason": "“明早装机捉狐狸”是杨过伪装猎户时的托词，非真实行程安排。",
+        "minimumRequiredGapHours": null
+      }
+    ],
+    "retelling_or_reference": [
+      {
+        "id": "射雕第1回-03-郭杨结识丘处机",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第1回-03-郭杨结识丘处机.yaml",
+        "nextEventId": "射雕第1回-04-丘处机力战追兵",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "十年后",
+        "reason": "十年传艺是远期约定，紧接的追兵血战并非该约定的兑现事件，不能以它衡量十年期限。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第2回-04-醉仙楼赌约",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第2回-04-醉仙楼赌约.yaml",
+        "nextEventId": "射雕第3回-01-醉仙楼十八年之约",
+        "gapToNextStartHours": 3,
+        "verdict": "retelling_or_reference",
+        "marker": "十八年后",
+        "reason": "十八年赌约在紧接条目中被复述和细化，尚非届期兑现，不能要求下一条跨越十八年。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第3回-01-醉仙楼十八年之约",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第3回-01-醉仙楼十八年之约.yaml",
+        "nextEventId": "射雕第3回-02-李萍大漠产子",
+        "gapToNextStartHours": 5336,
+        "verdict": "retelling_or_reference",
+        "marker": "十八年后",
+        "reason": "这是长期赌约的叙述性约定；下一条转入郭靖出生，未构成赌约的对应兑现节点。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第5回-03-夜半切磋",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第5回-03-夜半切磋.yaml",
+        "nextEventId": "射雕第5回-04-弯弓射雕",
+        "gapToNextStartHours": 3278,
+        "verdict": "retelling_or_reference",
+        "marker": "十八年后",
+        "reason": "书信中确认的是既有的十八年之约，下一条狩猎不承担该约的届期兑现。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第17回-01-周伯通忆往事",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第17回-01-周伯通忆往事.yaml",
+        "nextEventId": "射雕第17回-02-初研双手互搏",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "数年后",
+        "reason": "数年后的桃花岛问罪属于周伯通讲述的十五年前往事，不约束当前场景的下一事件。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "射雕第33回-04-孤岛定盟",
+        "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第33回-04-孤岛定盟.yaml",
+        "nextEventId": "射雕第34回-01-岛上惊变",
+        "gapToNextStartHours": 12,
+        "verdict": "retelling_or_reference",
+        "marker": "来日",
+        "reason": "“来日大难”是对未来风险的泛指，留岛盟约也非下一条必须即时兑现的定期安排。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第4回-05-丘处机讲述王重阳林朝英往事",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第4回-05-丘处机讲述王重阳林朝英往事.yaml",
+        "nextEventId": "神雕第4回-06-丘处机细说古墓派小龙女遭劫",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "八年后／次日",
+        "reason": "时间词全部属于丘处机讲述的王重阳、林朝英旧事，不约束当前场景的后续事件。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第5回-09-杨过拜师古墓派",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第5回-09-杨过拜师古墓派.yaml",
+        "nextEventId": "神雕第5回-10-杨过捉麻雀练古墓轻功",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "次晨／将来",
+        "reason": "“次晨”是当前场景定位；“将来胜得过”是条件性说法，均非须由下一条按时兑现的计划。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第17回-01-绝情谷清晨杨过品情花遇公孙绿萼",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第17回-01-绝情谷清晨杨过品情花遇公孙绿萼.yaml",
+        "nextEventId": "神雕第17回-02-杨过巧言逗笑公孙绿萼互道姓名诉心事",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "十二个时辰内",
+        "reason": "情花毒的十二时辰规则是条件性说明，并非人物作出的未来行动计划。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第19回-03-裘千尺述说前尘往事",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第19回-03-裘千尺述说前尘往事.yaml",
+        "nextEventId": "神雕第19回-04-杨过搓绳攀出石窟遭樊一翁袭击",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "七日七夜／第三日",
+        "reason": "七日闭关、第三日反制与十四年囚禁皆是裘千尺转述的旧事，不约束当前石窟后的时间。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第22回-06-杨过明志护郭靖金轮来袭",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第22回-06-杨过明志护郭靖金轮来袭.yaml",
+        "nextEventId": "神雕第22回-07-杨过智引敌寇黄蓉临盆生女",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "来日",
+        "reason": "“来日大难”只是对将临危机的泛指，并非约定某日执行的事项。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第24回-07-尹赵小镇风波与法王相遇",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第24回-07-尹赵小镇风波与法王相遇.yaml",
+        "nextEventId": "神雕第24回-08-周伯通盗王旗",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "数日后",
+        "reason": "法王、尼摩星在荒谷将养数日是插入的既往经历，非本场景向后的计划。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第25回-05-小龙女追踪三道人终南山下",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第25回-05-小龙女追踪三道人终南山下.yaml",
+        "nextEventId": "神雕第25回-06-尹志平接任全真掌教蒙古敕封",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "十年后",
+        "reason": "全真五子对十年后门派前景的担忧是条件性远景判断，不构成近期约期。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第32回-12-杨过寻到留字黄蓉编造南海神尼",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-12-杨过寻到留字黄蓉编造南海神尼.yaml",
+        "nextEventId": "神雕第32回-13-杨过服断肠草众人告别",
+        "gapToNextStartHours": 7,
+        "verdict": "retelling_or_reference",
+        "marker": "十六年后",
+        "reason": "十六年之约是小龙女留字所设的远期重会条件，不限制紧邻的断肠草处置。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第33回-02-小王将军述说神雕侠救父诛奸",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第33回-02-小王将军述说神雕侠救父诛奸.yaml",
+        "nextEventId": "神雕第33回-03-宋五述说神雕侠夜审丁大全",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "第三日",
+        "reason": "陈大方死后第三日暴毙是围炉讲述的旧事。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第33回-03-宋五述说神雕侠夜审丁大全",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第33回-03-宋五述说神雕侠夜审丁大全.yaml",
+        "nextEventId": "神雕第33回-04-宋五述神雕侠赎命及中年妇人述杀人救人",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "第二天",
+        "reason": "神雕侠次日入宫递供状是宋五转述的往事。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第35回-10-黄蓉郭靖商议应对怪客生日",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第35回-10-黄蓉郭靖商议应对怪客生日.yaml",
+        "nextEventId": "神雕第36回-01-丐帮大会开台比武选帮主",
+        "gapToNextStartHours": 19,
+        "verdict": "retelling_or_reference",
+        "marker": "来日",
+        "reason": "“来日龙争虎斗”是对可能伤员的泛指，非确定的下一日计划。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第36回-02-郭襄后花园思念杨过许三愿",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第36回-02-郭襄后花园思念杨过许三愿",
+        "nextEventId": "神雕第36回-03-大头鬼传讯带郭襄赴校场",
+        "gapToNextStartHours": 1,
+        "verdict": "retelling_or_reference",
+        "marker": "十六年后",
+        "reason": "这里是黄蓉回顾杨龙十六年旧约并据此猜疑，不是本场景的新约期。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第38回-01-郭襄夜逃金轮法王三拦收徒激将赴绝情谷",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第38回-01-郭襄夜逃金轮法王三拦收徒激将赴绝情谷.yaml",
+        "nextEventId": "神雕第38回-02-黄蓉程英陆无双出城寻郭襄至风陵渡",
+        "gapToNextStartHours": 23,
+        "verdict": "retelling_or_reference",
+        "marker": "后日",
+        "reason": "候选词未在事件行动中形成可核对的“后日”约定；实际明确的是法王即时携郭襄返营。",
+        "minimumRequiredGapHours": null
+      },
+      {
+        "id": "神雕第39回-03-蒙古军筑高台金轮法王以郭襄要挟郭靖投降",
+        "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第39回-03-蒙古军筑高台金轮法王以郭襄要挟郭靖投降.yaml",
+        "nextEventId": "神雕第39回-04-杨过绝情谷底重逢小龙女携手出谷",
+        "gapToNextStartHours": 19,
+        "verdict": "retelling_or_reference",
+        "marker": "次日",
+        "reason": "“大战次日清晨”是相对上一场十二时辰战事的时间定位，不是本条对下一事件的未来约定。",
+        "minimumRequiredGapHours": null
+      }
+    ]
+  },
+  "validation": {
+    "assessmentCount": 101,
+    "uniqueIdCount": 101,
+    "duplicateIds": [],
+    "countsMatch": true,
+    "seriesCountsMatch": true
+  }
+}

@@ -1,0 +1,365 @@
+// 由 scratchpad-nba2k-data 数据落地生成；来源与推定说明见同目录 README.md
+import type { TeamData } from '../engine/types';
+
+export const TEAMS: TeamData[] = [
+  {
+    "id": "ATL",
+    "name": "Atlanta Hawks",
+    "cn": "亚特兰大老鹰",
+    "conference": "East",
+    "division": "Southeast",
+    "overall": 86,
+    "colors": {
+      "primary": "#E03A3E",
+      "secondary": "#C1D32F"
+    }
+  },
+  {
+    "id": "BOS",
+    "name": "Boston Celtics",
+    "cn": "波士顿凯尔特人",
+    "conference": "East",
+    "division": "Atlantic",
+    "overall": 82,
+    "colors": {
+      "primary": "#007A33",
+      "secondary": "#BA9653"
+    }
+  },
+  {
+    "id": "BKN",
+    "name": "Brooklyn Nets",
+    "cn": "布鲁克林篮网",
+    "conference": "East",
+    "division": "Atlantic",
+    "overall": 78,
+    "colors": {
+      "primary": "#000000",
+      "secondary": "#FFFFFF"
+    }
+  },
+  {
+    "id": "CHA",
+    "name": "Charlotte Hornets",
+    "cn": "夏洛特黄蜂",
+    "conference": "East",
+    "division": "Southeast",
+    "overall": 81,
+    "colors": {
+      "primary": "#1D1160",
+      "secondary": "#00788C"
+    }
+  },
+  {
+    "id": "CHI",
+    "name": "Chicago Bulls",
+    "cn": "芝加哥公牛",
+    "conference": "East",
+    "division": "Central",
+    "overall": 84,
+    "colors": {
+      "primary": "#CE1141",
+      "secondary": "#000000"
+    }
+  },
+  {
+    "id": "CLE",
+    "name": "Cleveland Cavaliers",
+    "cn": "克利夫兰骑士",
+    "conference": "East",
+    "division": "Central",
+    "overall": 90,
+    "colors": {
+      "primary": "#860038",
+      "secondary": "#FDBB30"
+    }
+  },
+  {
+    "id": "DAL",
+    "name": "Dallas Mavericks",
+    "cn": "达拉斯小牛",
+    "conference": "West",
+    "division": "Southwest",
+    "overall": 83,
+    "colors": {
+      "primary": "#00538C",
+      "secondary": "#B8C4CA"
+    }
+  },
+  {
+    "id": "DEN",
+    "name": "Denver Nuggets",
+    "cn": "丹佛掘金",
+    "conference": "West",
+    "division": "Northwest",
+    "overall": 79,
+    "colors": {
+      "primary": "#418FDE",
+      "secondary": "#FDB927"
+    }
+  },
+  {
+    "id": "DET",
+    "name": "Detroit Pistons",
+    "cn": "底特律活塞",
+    "conference": "East",
+    "division": "Central",
+    "overall": 83,
+    "colors": {
+      "primary": "#C8102E",
+      "secondary": "#006BB6"
+    }
+  },
+  {
+    "id": "GSW",
+    "name": "Golden State Warriors",
+    "cn": "金州勇士",
+    "conference": "West",
+    "division": "Pacific",
+    "overall": 91,
+    "colors": {
+      "primary": "#1D428A",
+      "secondary": "#FFC72C"
+    }
+  },
+  {
+    "id": "HOU",
+    "name": "Houston Rockets",
+    "cn": "休斯顿火箭",
+    "conference": "West",
+    "division": "Southwest",
+    "overall": 87,
+    "colors": {
+      "primary": "#CE1141",
+      "secondary": "#C4CED4"
+    }
+  },
+  {
+    "id": "IND",
+    "name": "Indiana Pacers",
+    "cn": "印第安纳步行者",
+    "conference": "East",
+    "division": "Central",
+    "overall": 84,
+    "colors": {
+      "primary": "#002D62",
+      "secondary": "#FDBB30"
+    }
+  },
+  {
+    "id": "LAC",
+    "name": "Los Angeles Clippers",
+    "cn": "洛杉矶快船",
+    "conference": "West",
+    "division": "Pacific",
+    "overall": 88,
+    "colors": {
+      "primary": "#C8102E",
+      "secondary": "#1D428A"
+    }
+  },
+  {
+    "id": "LAL",
+    "name": "Los Angeles Lakers",
+    "cn": "洛杉矶湖人",
+    "conference": "West",
+    "division": "Pacific",
+    "overall": 77,
+    "colors": {
+      "primary": "#552583",
+      "secondary": "#FDB927"
+    }
+  },
+  {
+    "id": "MEM",
+    "name": "Memphis Grizzlies",
+    "cn": "孟菲斯灰熊",
+    "conference": "West",
+    "division": "Southwest",
+    "overall": 86,
+    "colors": {
+      "primary": "#5D76A9",
+      "secondary": "#12173F"
+    }
+  },
+  {
+    "id": "MIA",
+    "name": "Miami Heat",
+    "cn": "迈阿密热火",
+    "conference": "East",
+    "division": "Southeast",
+    "overall": 85,
+    "colors": {
+      "primary": "#98002E",
+      "secondary": "#F9A01B"
+    }
+  },
+  {
+    "id": "MIL",
+    "name": "Milwaukee Bucks",
+    "cn": "密尔沃基雄鹿",
+    "conference": "East",
+    "division": "Central",
+    "overall": 81,
+    "colors": {
+      "primary": "#00471B",
+      "secondary": "#EEE1C6"
+    }
+  },
+  {
+    "id": "MIN",
+    "name": "Minnesota Timberwolves",
+    "cn": "明尼苏达森林狼",
+    "conference": "West",
+    "division": "Northwest",
+    "overall": 80,
+    "colors": {
+      "primary": "#005083",
+      "secondary": "#00A94F"
+    }
+  },
+  {
+    "id": "NOP",
+    "name": "New Orleans Pelicans",
+    "cn": "新奥尔良鹈鹕",
+    "conference": "West",
+    "division": "Southwest",
+    "overall": 85,
+    "colors": {
+      "primary": "#0C2340",
+      "secondary": "#C8102E"
+    }
+  },
+  {
+    "id": "NYK",
+    "name": "New York Knicks",
+    "cn": "纽约尼克斯",
+    "conference": "East",
+    "division": "Atlantic",
+    "overall": 79,
+    "colors": {
+      "primary": "#006BB6",
+      "secondary": "#F58426"
+    }
+  },
+  {
+    "id": "OKC",
+    "name": "Oklahoma City Thunder",
+    "cn": "俄克拉荷马城雷霆",
+    "conference": "West",
+    "division": "Northwest",
+    "overall": 89,
+    "colors": {
+      "primary": "#007AC1",
+      "secondary": "#EF3B24"
+    }
+  },
+  {
+    "id": "ORL",
+    "name": "Orlando Magic",
+    "cn": "奥兰多魔术",
+    "conference": "East",
+    "division": "Southeast",
+    "overall": 81,
+    "colors": {
+      "primary": "#0077C0",
+      "secondary": "#C4CED4"
+    }
+  },
+  {
+    "id": "PHI",
+    "name": "Philadelphia 76ers",
+    "cn": "费城76人",
+    "conference": "East",
+    "division": "Atlantic",
+    "overall": 74,
+    "colors": {
+      "primary": "#006BB6",
+      "secondary": "#ED174C"
+    }
+  },
+  {
+    "id": "PHX",
+    "name": "Phoenix Suns",
+    "cn": "菲尼克斯太阳",
+    "conference": "West",
+    "division": "Pacific",
+    "overall": 81,
+    "colors": {
+      "primary": "#1D1160",
+      "secondary": "#E56020"
+    }
+  },
+  {
+    "id": "POR",
+    "name": "Portland Trail Blazers",
+    "cn": "波特兰开拓者",
+    "conference": "West",
+    "division": "Northwest",
+    "overall": 82,
+    "colors": {
+      "primary": "#E03A3E",
+      "secondary": "#000000"
+    }
+  },
+  {
+    "id": "SAC",
+    "name": "Sacramento Kings",
+    "cn": "萨克拉门托国王",
+    "conference": "West",
+    "division": "Pacific",
+    "overall": 82,
+    "colors": {
+      "primary": "#5A2D81",
+      "secondary": "#63727A"
+    }
+  },
+  {
+    "id": "SAS",
+    "name": "San Antonio Spurs",
+    "cn": "圣安东尼奥马刺",
+    "conference": "West",
+    "division": "Southwest",
+    "overall": 91,
+    "colors": {
+      "primary": "#000000",
+      "secondary": "#C4CED4"
+    }
+  },
+  {
+    "id": "TOR",
+    "name": "Toronto Raptors",
+    "cn": "多伦多猛龙",
+    "conference": "East",
+    "division": "Atlantic",
+    "overall": 84,
+    "colors": {
+      "primary": "#CE1141",
+      "secondary": "#000000"
+    }
+  },
+  {
+    "id": "UTA",
+    "name": "Utah Jazz",
+    "cn": "犹他爵士",
+    "conference": "West",
+    "division": "Northwest",
+    "overall": 81,
+    "colors": {
+      "primary": "#002B5C",
+      "secondary": "#F9A01B"
+    }
+  },
+  {
+    "id": "WAS",
+    "name": "Washington Wizards",
+    "cn": "华盛顿奇才",
+    "conference": "East",
+    "division": "Southeast",
+    "overall": 85,
+    "colors": {
+      "primary": "#002B5C",
+      "secondary": "#E31837"
+    }
+  }
+];

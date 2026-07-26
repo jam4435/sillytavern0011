@@ -5,14 +5,20 @@
 .start-screen {
   position: relative;
   width: 100%;
-  min-height: var(--TH-viewport-height, 100vh);
+  min-height: var(--TH-viewport-height, 100dvh);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 2.5rem 1.25rem;
+  overflow-y: auto;
   background-color: var(--bg-dark);
   cursor: pointer;
   z-index: 100;
+
+  &:focus-visible {
+    outline: none;
+  }
 }
 
 .start-bg-layer {
@@ -53,6 +59,7 @@
   flex-direction: column;
   align-items: center;
   gap: 3rem;
+  margin: auto; // 内容高于视口时保证顶部可滚动可见
 }
 
 .start-title-group {
@@ -64,6 +71,7 @@
   font-size: clamp(3.1rem, 8vw, 5.2rem);
   color: var(--yellow-100);
   margin: 0;
+  margin-right: -0.12em; // 抵消尾字 letter-spacing，保证光学居中
   text-shadow: 0 0 40px rgba(202, 138, 4, 0.4);
   letter-spacing: 0.12em;
   animation: titleGlow 3s ease-in-out infinite;
@@ -83,7 +91,7 @@
   font-family: var(--font-serif);
   font-size: 1.15rem;
   color: var(--stone-600);
-  margin: 1rem 0 0 0;
+  margin: 1rem -0.18em 0 0;
   letter-spacing: 0.18em;
 }
 
@@ -150,13 +158,15 @@
 
 .start-footer {
   position: absolute;
-  bottom: 2rem;
+  left: 0;
+  right: 0;
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
   text-align: center;
 }
 
 .footer-text {
   font-size: 0.75rem;
-  color: var(--stone-800);
+  color: var(--stone-500);
   letter-spacing: 0.1em;
 }
 
@@ -167,11 +177,13 @@
 .splash-screen {
   position: relative;
   width: 100%;
-  min-height: var(--TH-viewport-height, 100vh);
+  min-height: var(--TH-viewport-height, 100dvh);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 2.5rem 1.25rem;
+  overflow-y: auto;
   background-color: var(--bg-dark);
   z-index: 100;
 }
@@ -205,6 +217,7 @@
   flex-direction: column;
   align-items: center;
   gap: 4rem;
+  margin: auto; // 内容高于视口时保证顶部可滚动可见
 }
 
 .splash-header {
@@ -239,7 +252,7 @@
   font-family: var(--font-serif);
   font-size: 1.25rem;
   color: var(--stone-500);
-  margin: 1.5rem 0 0 0;
+  margin: 1.5rem -0.18em 0 0;
   letter-spacing: 0.18em;
 }
 
@@ -247,7 +260,8 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  min-width: 280px;
+  width: min(280px, 100%);
+  min-width: 0;
 }
 
 .menu-btn {
@@ -285,49 +299,58 @@
     border-color: var(--stone-700);
     color: var(--stone-400);
   }
+
+  &:focus-visible {
+    outline: 2px solid var(--yellow-600);
+    outline-offset: 3px;
+  }
 }
 
 .btn-icon {
+  display: inline-flex;
+  align-items: center;
   font-size: 1.5rem;
 }
 
 .btn-text {
-  flex: 1;
+  margin-right: -0.2em; // 抵消尾字 letter-spacing
 }
 
 .splash-decoration {
   display: flex;
   align-items: center;
   gap: 2rem;
-  color: var(--stone-700);
+  color: var(--stone-600);
 }
 
 .deco-line {
   width: 4rem;
   height: 1px;
-  background: linear-gradient(to right, transparent, var(--stone-700), transparent);
+  background: linear-gradient(to right, transparent, var(--stone-600), transparent);
 }
 
 .deco-symbol {
   font-size: 2rem;
-  opacity: 0.5;
+  opacity: 0.8;
 }
 
 .splash-footer {
   position: absolute;
-  bottom: 2rem;
+  left: 0;
+  right: 0;
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
   text-align: center;
 }
 
 .version-text {
   font-size: 0.75rem;
-  color: var(--stone-700);
+  color: var(--stone-500);
   margin: 0 0 0.25rem 0;
 }
 
 .credit-text {
-  font-size: 0.625rem;
-  color: var(--stone-800);
+  font-size: 0.72rem;
+  color: var(--stone-500);
   margin: 0;
 }
 
@@ -337,7 +360,7 @@
 
 .booting-screen {
   width: 100%;
-  min-height: var(--TH-viewport-height, 100vh);
+  min-height: var(--TH-viewport-height, 100dvh);
   background: var(--bg-dark);
 }
 
@@ -348,7 +371,7 @@
 .opening-screen {
   position: relative;
   width: 100%;
-  min-height: var(--TH-viewport-height, 100vh);
+  min-height: var(--TH-viewport-height, 100dvh);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -415,9 +438,11 @@
 
 .opening-title {
   margin: 0;
+  max-width: 100%;
   font-family: var(--font-display);
-  font-size: clamp(3.25rem, 12vw, 7.5rem);
-  line-height: 0.95;
+  font-size: clamp(2.4rem, 11vw, 7.5rem);
+  line-height: 1.08; // 书法体字形常越出 em 框，0.95 会被父级 overflow 裁掉笔锋
+  overflow-wrap: anywhere;
   color: var(--yellow-100);
   text-shadow: 0 0 44px rgba(202, 138, 4, 0.36);
 }
@@ -457,5 +482,81 @@
     border: 1px solid rgba(202, 138, 4, 0.18);
     border-radius: 0.5rem;
     overflow: hidden;
+  }
+}
+
+// =========================================
+// 开屏/标题屏移动端与矮视口适配
+// =========================================
+
+@media (max-width: $breakpoint-md) {
+  .start-content {
+    gap: 2rem;
+  }
+
+  .start-subtitle {
+    font-size: 1rem;
+  }
+
+  .divider-line {
+    width: 2.5rem;
+  }
+
+  .splash-content {
+    gap: 2.5rem;
+  }
+
+  .splash-tagline {
+    font-size: clamp(0.95rem, 3.6vw, 1.25rem);
+    margin-top: 1rem;
+  }
+
+  .menu-btn {
+    padding: 0.85rem 1.25rem;
+    font-size: 1.1rem;
+    letter-spacing: 0.14em;
+    gap: 0.75rem;
+  }
+
+  .splash-decoration {
+    gap: 1.25rem;
+  }
+
+  .deco-line {
+    width: 3rem;
+  }
+
+  .deco-symbol {
+    font-size: 1.6rem;
+  }
+}
+
+@media (max-height: 640px) {
+  .start-content {
+    gap: 1.5rem;
+  }
+
+  .splash-content {
+    gap: 1.75rem;
+  }
+
+  .splash-tagline {
+    margin-top: 0.75rem;
+  }
+
+  // 矮视口下页脚改为随内容排布，避免压在正文上
+  .start-footer,
+  .splash-footer {
+    position: static;
+    margin-top: 1.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-bg-ink,
+  .start-title,
+  .hint-text,
+  .hint-cursor {
+    animation: none;
   }
 }

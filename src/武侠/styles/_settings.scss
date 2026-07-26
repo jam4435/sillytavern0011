@@ -24,6 +24,12 @@
   padding-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   margin-bottom: 1.5rem;
+  // 标签栏是主导航，长内容滚动时保持可见
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-dark); // 水墨主题下 --bg-dark 已被重映射为纸色
+  padding-top: 0.25rem;
 }
 
 .settings-tab {
@@ -1292,6 +1298,7 @@
 
 .debug-stats {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
@@ -2952,5 +2959,82 @@
   .variable-leaf-textarea {
     min-height: 10rem;
     max-height: 16rem;
+  }
+}
+
+// =========================================
+// 移动端适配（补充）
+// =========================================
+
+@media (max-width: $breakpoint-md) {
+  // 标签+控件行改为上下堆叠，滑块占满整行（原布局下滑块被挤到 ~60px）
+  .settings-row:not(.settings-row-vertical) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .settings-label {
+    min-width: 0;
+  }
+
+  .settings-control {
+    justify-content: space-between;
+  }
+
+  .settings-slider {
+    flex: 1;
+    width: auto;
+    // 4px 高的 range 输入触控区就是 4px：拉高命中区，用背景条模拟轨道
+    height: 1.75rem;
+    background: linear-gradient($stone-800, $stone-800) center / 100% 4px no-repeat;
+    border-radius: 0;
+
+    &::-webkit-slider-thumb {
+      width: 20px;
+      height: 20px;
+    }
+
+    &::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  .settings-text-input {
+    min-width: 0;
+  }
+
+  .debug-log-info {
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+  }
+
+  .regex-section-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .regex-section-meta {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .regex-rule-actions {
+    gap: 0.5rem;
+  }
+
+  .regex-expand-btn,
+  .regex-delete-btn,
+  .regex-toggle-btn,
+  .debug-expand-btn {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+
+  .variables-mode-btn,
+  .variables-scope-chip {
+    min-height: 2.5rem;
   }
 }

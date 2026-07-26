@@ -110,7 +110,26 @@ export const ERA_API_EVENTS = {
   UPDATE_BY_PATH: 'era:updateByPath',
   DELETE_BY_OBJECT: 'era:deleteByObject',
   DELETE_BY_PATH: 'era:deleteByPath',
+  TRANSACTION_BY_OBJECT: 'era:transactionByObject',
 } as const;
+
+export type EraTransactionOperation = {
+  type: 'insert' | 'update' | 'delete';
+  payload: Record<string, unknown>;
+};
+
+export interface EraTransactionDetail {
+  transactionId: string;
+  operations: EraTransactionOperation[];
+}
+
+export interface ApiWriteEventPayload {
+  flushId: string;
+  sourceDiagnosticIds: string[];
+  messageId: number;
+  transactionIds?: string[];
+  transactionId?: string;
+}
 
 /**
  * @constant {object} ERA_EVENT_EMITTER
@@ -179,4 +198,12 @@ export interface WriteDonePayload {
    * 这对于需要感知状态是否在同一消息上连续更新的外部脚本很有用。
    */
   consecutiveProcessingCount: number;
+  /**
+   * 当本轮写入只包含一个批事务时，标识该事务；普通单操作写入不设置。
+   */
+  transactionId?: string;
+  /**
+   * 同一个 75ms 写入窗口可能合并多个批事务；此字段保留全部事务 ID 供调用方匹配和去重。
+   */
+  transactionIds?: string[];
 }

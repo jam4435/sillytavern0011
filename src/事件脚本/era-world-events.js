@@ -1,10 +1,6 @@
 import { getEndTime, getEventParticipationKeys, isOrdinaryEvent } from './era-utils.js';
-import { writeDirectDelete, writeDirectInsert, writeDirectUpdate } from './era-write-helper.js';
-import {
-  haveEventDiffsChanged,
-  hasEventOutcomeChanged,
-  isWorldEventRecord,
-} from '../shared/worldEventContext';
+import { writeDirectDelete, writeDirectInsert, writeDirectUpdate, writeEraTransaction } from './era-write-helper.js';
+import { haveEventDiffsChanged, hasEventOutcomeChanged, isWorldEventRecord } from '../shared/worldEventContext';
 
 export const EVENT_OUTCOME_STATUS = Object.freeze({
   ORIGINAL: '原定',
@@ -62,9 +58,7 @@ function buildLegacyCompletedUnknownEnding(eventData) {
 
 export function buildParticipationOutcomeSyncPlan(eventDefinitions, statData) {
   const participation = isPlainObject(statData?.参与事件) ? statData.参与事件 : {};
-  const existingStatuses = isPlainObject(statData?.前端变量?.事件结局状态)
-    ? statData.前端变量.事件结局状态
-    : {};
+  const existingStatuses = isPlainObject(statData?.前端变量?.事件结局状态) ? statData.前端变量.事件结局状态 : {};
   const conclusionUpdates = {};
   const statusInserts = {};
   const statusUpdates = {};
@@ -113,8 +107,8 @@ export async function syncParticipationOutcomeStates(eventDefinitions, variables
   const plan = buildParticipationOutcomeSyncPlan(eventDefinitions, statData);
 
   if (Object.keys(plan.conclusionUpdates).length > 0) {
-    await writeDirectUpdate(
-      { 参与事件: plan.conclusionUpdates },
+    await writeEraTransaction(
+      [{ type: 'update', payload: { 参与事件: plan.conclusionUpdates } }],
       `migrate-participation-endings-${Object.keys(plan.conclusionUpdates).length}`,
     );
   }
@@ -145,9 +139,7 @@ export function buildWorldEventRecord(eventData, ending, actualEndTime) {
 export function buildWorldEventArchivePatch(eventNames, eventDefinitions, statData) {
   const participation = isPlainObject(statData?.参与事件) ? statData.参与事件 : {};
   const existingWorldEvents = isPlainObject(statData?.世界事件) ? statData.世界事件 : {};
-  const inProgressEvents = isPlainObject(statData?.事件系统?.进行中事件)
-    ? statData.事件系统.进行中事件
-    : {};
+  const inProgressEvents = isPlainObject(statData?.事件系统?.进行中事件) ? statData.事件系统.进行中事件 : {};
   const patch = {};
 
   for (const eventName of eventNames) {
@@ -175,19 +167,16 @@ export async function ensureWorldEventsArchived(eventNames, eventDefinitions, va
       )
       .map(eventName => [eventName, {}]),
   );
-  if (Object.keys(malformedEntries).length > 0) {
-    await writeDirectDelete(
-      { 世界事件: malformedEntries },
-      `delete-malformed-world-events-${Object.keys(malformedEntries).length}`,
-    );
-  }
-
   const patch = buildWorldEventArchivePatch(eventNames, eventDefinitions, currentStatData);
+  const operations = [];
+  if (Object.keys(malformedEntries).length > 0) {
+    operations.push({ type: 'delete', payload: { 世界事件: malformedEntries } });
+  }
   if (Object.keys(patch).length > 0) {
-    await writeDirectInsert(
-      { 世界事件: patch },
-      `archive-world-events-${Object.keys(patch).length}`,
-    );
+    operations.push({ type: 'insert', payload: { 世界事件: patch } });
+  }
+  if (operations.length > 0) {
+    await writeEraTransaction(operations, `archive-world-events-${Object.keys(patch).length}`);
   }
 
   const verifiedVariables = await getVariables({ type: 'chat' });
@@ -197,16 +186,18 @@ export async function ensureWorldEventsArchived(eventNames, eventDefinitions, va
     .every(eventName => isWorldEventRecord(worldEvents[eventName]));
 }
 
-export async function reconcileWorldEventArchive(eventDefinitions) {
+export async function reconcileWorldEventArchive(eventDefinitions, options = {}) {
+  if (options.legacyRepair !== true) {
+    return { archived: 0, unknown: 0, skipped: true };
+  }
+
   await syncParticipationOutcomeStates(eventDefinitions);
 
   const variables = await getVariables({ type: 'chat' });
   const statData = variables?.stat_data || {};
   const completedEvents = isPlainObject(statData?.事件系统?.已完成事件) ? statData.事件系统.已完成事件 : {};
   const existingWorldEvents = isPlainObject(statData.世界事件) ? statData.世界事件 : {};
-  const existingStatuses = isPlainObject(statData?.前端变量?.事件结局状态)
-    ? statData.前端变量.事件结局状态
-    : {};
+  const existingStatuses = isPlainObject(statData?.前端变量?.事件结局状态) ? statData.前端变量.事件结局状态 : {};
   const worldEventPatch = {};
   const malformedWorldEventDeletes = {};
   const unknownStatusInserts = {};

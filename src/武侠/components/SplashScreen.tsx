@@ -1,5 +1,6 @@
 import React from 'react';
 import FullscreenButton from './FullscreenButton';
+import { Icons } from './Icons';
 
 interface SplashScreenProps {
   hasSavedGame: boolean;
@@ -36,21 +37,25 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ hasSavedGame, onNewGame, on
 
         {/* 菜单按钮 */}
         <div className="splash-menu">
-          <button className="menu-btn primary" onClick={onNewGame}>
-            <span className="btn-icon">⚔</span>
+          <button type="button" className="menu-btn primary" onClick={onNewGame}>
+            <span className="btn-icon" aria-hidden="true">
+              <Icons.Combat size={20} color="currentColor" />
+            </span>
             <span className="btn-text">新的故事</span>
           </button>
 
           {hasSavedGame && (
-            <button className="menu-btn secondary" onClick={onContinue}>
-              <span className="btn-icon">📜</span>
+            <button type="button" className="menu-btn secondary" onClick={onContinue}>
+              <span className="btn-icon" aria-hidden="true">
+                <Icons.Scroll size={20} color="currentColor" />
+              </span>
               <span className="btn-text">续写江湖</span>
             </button>
           )}
         </div>
 
         {/* 装饰元素 */}
-        <div className="splash-decoration">
+        <div className="splash-decoration" aria-hidden="true">
           <div className="deco-line left"></div>
           <div className="deco-symbol">☯</div>
           <div className="deco-line right"></div>

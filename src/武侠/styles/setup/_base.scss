@@ -7,7 +7,7 @@
 .setup-screen {
   position: relative;
   width: 100%;
-  height: var(--TH-viewport-height, 100vh);
+  height: var(--TH-viewport-height, 100dvh);
   display: flex;
   flex-direction: column;
   background-color: #0a0908;
@@ -310,9 +310,40 @@
   .setup-title .title-text {
     font-size: 1.8rem;
     letter-spacing: 0.2em;
+    margin-right: -0.2em; // 抵消尾字 letter-spacing
+  }
+
+  .setup-title .title-decoration {
+    font-size: 1.2rem;
   }
 
   .glass-card {
     padding: 1rem 1.25rem;
+  }
+
+  // 返回按钮缩小并上移，避免压住居中的步骤指示器
+  .setup-back-btn {
+    top: 0.6rem;
+    left: 0.6rem;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.8rem;
+  }
+
+  .setup-steps.seven-steps {
+    padding-top: 3.2rem;
+  }
+
+  // 高频小按钮放大到可触控尺寸
+  .attr-controls .attr-btn,
+  .cost-btn,
+  .edit-note-btn,
+  .delete-build-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .remove-btn {
+    min-width: 32px;
+    min-height: 32px;
   }
 }

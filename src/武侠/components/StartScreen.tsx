@@ -22,6 +22,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
       className="start-screen"
       onClick={handleStart}
       role="button"
+      aria-label="开始游戏"
       tabIndex={0}
       onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') {

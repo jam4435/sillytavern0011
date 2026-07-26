@@ -1,5 +1,6 @@
 import { variableTraceLogger } from '../武侠/utils/logger';
 import { recordIframeLifecycleEvent } from '../武侠/utils/iframeLifecycleBlackBox';
+import { isHistoryCheckoutPending } from './historyCheckoutJournal';
 import { scheduleUnthrottledTimeout, type UnthrottledTimerHandle } from './unthrottledTimer';
 
 export const DIRECT_VARIABLE_WRITE_DONE_EVENT = 'wuxia:directVariableWriteDone';
@@ -61,9 +62,13 @@ export interface DirectChatTransactionOptions {
   refreshHint?: DirectVariableWriteRefreshHint;
 }
 
-export type DirectChatVariableUpdater = (
-  variables: Record<string, unknown>,
-) => Record<string, unknown>;
+function assertFrontendWriteAllowed(source: DirectVariableWriteSource): void {
+  if (source === 'frontend' && isHistoryCheckoutPending()) {
+    throw new Error('历史分叉同步期间已暂停前端派生变量写入。');
+  }
+}
+
+export type DirectChatVariableUpdater = (variables: Record<string, unknown>) => Record<string, unknown>;
 
 const normalizeRefreshHint = (
   refreshHint: DirectVariableWriteRefreshHint | undefined,
@@ -164,6 +169,7 @@ export async function runDirectChatVariableWrite<TResult>(
   metadata: DirectVariableWriteMetadata,
   writer: () => TResult | Promise<TResult>,
 ): Promise<TResult> {
+  assertFrontendWriteAllowed(metadata.source);
   const result = await writer();
   const eventDetail: DirectVariableWriteDoneDetail = {
     version: 1,
@@ -221,6 +227,7 @@ export async function emitEraVariableWriteAndWait({
   expectedMessageId,
   expectedAction,
 }: EraVariableWriteRequest): Promise<EraVariableWriteConfirmation> {
+  assertFrontendWriteAllowed(source);
   const waitId = createVariableWriteId();
   const startedAt = Date.now();
   let timer: UnthrottledTimerHandle | null = null;
@@ -376,15 +383,10 @@ export async function emitEraVariableWriteAndWait({
  * ERA 写入等待器的带来源包装。需要让 UI/追踪器知道写入来源时使用此入口；它复用
  * emitEraVariableWriteAndWait 的先监听后 emit 及精确匹配逻辑。
  */
-export async function emitSourcedEraVariableWriteAndWait(request: EraVariableWriteRequest): Promise<EraVariableWriteDoneDetail> {
-  const {
-    source,
-    operation,
-    reason,
-    eventName,
-    attribution = 'background',
-    refreshHint,
-  } = request;
+export async function emitSourcedEraVariableWriteAndWait(
+  request: EraVariableWriteRequest,
+): Promise<EraVariableWriteDoneDetail> {
+  const { source, operation, reason, eventName, attribution = 'background', refreshHint } = request;
   const matchedDetail = await emitEraVariableWriteAndWait(request);
 
   const eventDetail: EraVariableWriteDoneDetail = {
@@ -403,11 +405,13 @@ export async function emitSourcedEraVariableWriteAndWait(request: EraVariableWri
   try {
     const notification = eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
     void notification.then(
-      () => variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 带来源 ERA 完成通知监听链已结束', eventDetail),
-      error => variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 带来源 ERA 完成通知监听链异常', {
-        ...eventDetail,
-        error,
-      }),
+      () =>
+        variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 带来源 ERA 完成通知监听链已结束', eventDetail),
+      error =>
+        variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 带来源 ERA 完成通知监听链异常', {
+          ...eventDetail,
+          error,
+        }),
     );
   } catch (error) {
     variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 发送带来源 ERA 完成通知时同步异常', {

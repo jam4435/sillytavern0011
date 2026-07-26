@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 
 const promptPath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/输出提示词.txt');
 const promptSource = readFileSync(promptPath, 'utf8');
+const worldHistoryPromptPath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/战斗骰子.txt');
+const worldHistoryPromptSource = readFileSync(worldHistoryPromptPath, 'utf8');
 
 type PromptSerializer = (value: unknown) => string;
 type PromptRenderer = (
@@ -11,9 +13,7 @@ type PromptRenderer = (
 ) => string;
 
 function loadPromptSerializer(): PromptSerializer {
-  const serializerSource = promptSource.match(
-    /\/\/ PROMPT_SERIALIZER_START([\s\S]*?)\/\/ PROMPT_SERIALIZER_END/,
-  )?.[1];
+  const serializerSource = promptSource.match(/\/\/ PROMPT_SERIALIZER_START([\s\S]*?)\/\/ PROMPT_SERIALIZER_END/)?.[1];
 
   if (!serializerSource) {
     throw new Error('输出提示词缺少可测试的严格 JSON 序列化代码块');
@@ -22,13 +22,13 @@ function loadPromptSerializer(): PromptSerializer {
   return new Function(`${serializerSource}\nreturn toStrictJson;`)() as PromptSerializer;
 }
 
-function compilePromptRenderer(): PromptRenderer {
+function compilePromptRenderer(source = promptSource): PromptRenderer {
   const ejsBlock = /<%([\s\S]*?)%>/g;
   let cursor = 0;
   let body = "let __output = '';\n";
 
-  for (const match of promptSource.matchAll(ejsBlock)) {
-    body += `__output += ${JSON.stringify(promptSource.slice(cursor, match.index))};\n`;
+  for (const match of source.matchAll(ejsBlock)) {
+    body += `__output += ${JSON.stringify(source.slice(cursor, match.index))};\n`;
     let code = match[1];
     if (code.trimEnd().endsWith('-')) {
       code = code.trimEnd().slice(0, -1);
@@ -41,7 +41,7 @@ function compilePromptRenderer(): PromptRenderer {
     cursor = (match.index || 0) + match[0].length;
   }
 
-  body += `__output += ${JSON.stringify(promptSource.slice(cursor))};\nreturn __output;`;
+  body += `__output += ${JSON.stringify(source.slice(cursor))};\nreturn __output;`;
   return new Function('variables', 'getvar', body) as PromptRenderer;
 }
 
@@ -55,9 +55,7 @@ describe('武侠输出提示词契约', () => {
         黄蓉: '知己/90',
         $template: { 不应发送: true },
       },
-      经历: [
-        { 内容: '括号[]与反斜杠\\仍需保留', $cache: '内部' },
-      ],
+      经历: [{ 内容: '括号[]与反斜杠\\仍需保留', $cache: '内部' }],
     };
     const expected = {
       备注: '他说"取{秘籍}"，明日再来\n路径：C:\\江湖\\客栈',
@@ -80,11 +78,13 @@ describe('武侠输出提示词契约', () => {
     expect(promptSource).toContain('<context_error>玩家数据或世界时间加载失败</context_error>');
     expect(promptSource).toContain('结局: 事件.结局');
     expect(promptSource).toContain('当前没有任何可用的完整地点路径，本轮禁止修改任何 `所在位置`');
-    expect(promptSource).toContain('selectWorldEventsForPrompt(worldEvents, outcomeStatuses, limit = 16, priorityLimit = 8)');
+    expect(worldHistoryPromptSource).toContain(
+      'selectWorldEventsForPrompt(worldEvents, outcomeStatuses, limit = 16, priorityLimit = 8)',
+    );
   });
 
   it('可执行渲染只读历史、分事件快照和分组地点白名单', () => {
-    const render = compilePromptRenderer();
+    const render = compilePromptRenderer(`${worldHistoryPromptSource}\n${promptSource}`);
     const eventKey = '射雕第7回02-初遇黄蓉';
     const values: Record<string, unknown> = {
       'stat_data.世界事件': {
@@ -120,7 +120,7 @@ describe('武侠输出提示词契约', () => {
 
     const output = render(variables, path => values[path]);
 
-    expect(output.indexOf('# 只读历史')).toBeLessThan(output.indexOf('# 当前状态'));
+    expect(output.indexOf('# 世界历史（只读）')).toBeLessThan(output.indexOf('# 当前状态'));
     expect(output).toContain(`<${eventKey}>`);
     expect(output).toContain('[只读时间、地点与事件背景：1219年10月20日13时 到 15时');
     expect(output).toContain('{"结局":"三人相识。","insert":{},"update":{"黄蓉"');

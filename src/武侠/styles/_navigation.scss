@@ -410,3 +410,40 @@
     }
   }
 }
+
+// =========================================
+// 移动端抽屉优化
+// =========================================
+
+@media (max-width: 767px) {
+  .nav-sidebar {
+    // 抽屉是覆盖层，不必迁就桌面图标栏宽度；9px 标签升级为横排可读标签
+    width: 13rem;
+    align-items: stretch;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+    overscroll-behavior: contain;
+    transition:
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      visibility 0.3s;
+
+    // 关闭态不可见也不可聚焦（避免 Tab 进隐藏按钮）
+    &:not(.open) {
+      visibility: hidden;
+    }
+  }
+
+  .nav-btn {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.8rem 0.9rem;
+  }
+
+  .nav-label {
+    font-size: 0.85rem;
+    letter-spacing: 0.12em;
+    margin-top: 0;
+  }
+}

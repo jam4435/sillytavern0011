@@ -6,9 +6,9 @@
   display: flex;
   flex-direction: column; // Mobile: Top/Bottom split
   width: 100%;
-  height: var(--TH-viewport-height, 100vh);
-  min-height: var(--TH-viewport-height, 100vh);
-  max-height: var(--TH-viewport-height, 100vh);
+  height: var(--TH-viewport-height, 100dvh);
+  min-height: var(--TH-viewport-height, 100dvh);
+  max-height: var(--TH-viewport-height, 100dvh);
   background-color: var(--bg-dark);
   color: var(--stone-200);
   position: relative;
@@ -206,6 +206,8 @@ html:-ms-fullscreen {
   top: 1rem;
   right: 1rem;
   z-index: 100;
+  min-width: 44px;
+  min-height: 44px;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid var(--stone-700);
   color: var(--stone-400);
@@ -221,13 +223,18 @@ html:-ms-fullscreen {
     border-color: var(--yellow-800);
     color: var(--yellow-600);
   }
+
+  &:focus-visible {
+    outline: 2px solid var(--yellow-600);
+    outline-offset: 2px;
+  }
 }
 
 /* 页面特定位置调整 */
 .splash-fullscreen-btn {
   position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
+  top: max(1.5rem, env(safe-area-inset-top));
+  right: max(1.5rem, env(safe-area-inset-right));
 }
 
 .header-fullscreen-btn {

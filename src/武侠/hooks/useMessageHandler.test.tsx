@@ -7,10 +7,18 @@ vi.mock('../utils/variableReader', () => ({
   normalizeDisplayedMessageContent: vi.fn((text: string) => text),
   parseAIResponse: vi.fn((text: string) => ({ content: text })),
   parseOptions: vi.fn((text: string) => (text.includes('<option>') ? ['选项'] : [])),
+  readGameDataPure: vi.fn(() => ({
+    currentLocation: '襄阳/城内/客栈',
+    gameTime: '1199年8月16日11时',
+  })),
 }));
 
 vi.mock('../utils/messageActions', () => ({
   regenerateLastAssistantSwipe: vi.fn(),
+}));
+
+vi.mock('../utils/saveLoadManager', () => ({
+  finalizeCurrentTurn: vi.fn(async () => {}),
 }));
 
 vi.mock('../utils/promptDebug', () => ({
@@ -229,8 +237,9 @@ describe('useMessageHandler extra-variable decision', () => {
   });
 
   it('send + inline 会先等匹配 resync 和 stat_data 回读，再发送回合完成', async () => {
-    globals.generate = vi.fn(async () =>
-      '正文回复\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":1,"日":1,"时":1}}}</VariableEdit>');
+    globals.generate = vi.fn(
+      async () => '正文回复\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":1,"日":1,"时":1}}}</VariableEdit>',
+    );
     const waitForMessageId = vi.fn(async () => ({ message_id: 2, actions: { resync: true } }));
     const stop = vi.fn();
     observeEraWriteDoneMock.mockReturnValue({ waitForMessageId, stop });
@@ -258,8 +267,9 @@ describe('useMessageHandler extra-variable decision', () => {
   });
 
   it('变量回读未确认时不发送回合完成，但仍释放 lifecycle 屏障', async () => {
-    globals.generate = vi.fn(async () =>
-      '正文回复\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":1,"日":1,"时":1}}}</VariableEdit>');
+    globals.generate = vi.fn(
+      async () => '正文回复\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":1,"日":1,"时":1}}}</VariableEdit>',
+    );
     ensureTurnVariableBlocksCommittedMock.mockRejectedValue(new Error('时间与参与事件尚未同时落库'));
     const options = createHookOptions(createSummarySettings('inline'));
     const { result } = renderHook(() => useMessageHandler(options));
@@ -275,9 +285,7 @@ describe('useMessageHandler extra-variable decision', () => {
       chatId: expect.any(String),
       messageId: 2,
     });
-    expect(options.showError).toHaveBeenCalledWith(
-      expect.stringContaining('正文已生成，但变量提交确认失败'),
-    );
+    expect(options.showError).toHaveBeenCalledWith(expect.stringContaining('正文已生成，但变量提交确认失败'));
   });
 
   it('自动化回合会等待桥响应送达后再请求最新楼层同步', async () => {
@@ -299,7 +307,8 @@ describe('useMessageHandler extra-variable decision', () => {
   });
 
   it('send 遇到两次 429 后只落一次用户和 assistant 楼层', async () => {
-    globals.generate = vi.fn()
+    globals.generate = vi
+      .fn()
       .mockRejectedValueOnce({ status: 429, retryAfterMs: 0 })
       .mockRejectedValueOnce({ response: { status: 429 }, retryAfterMs: 0 })
       .mockResolvedValue('重试后的正文');
@@ -333,7 +342,8 @@ describe('useMessageHandler extra-variable decision', () => {
   });
 
   it('自动推进链路继承正文 429 重试且不会重复创建楼层', async () => {
-    globals.generate = vi.fn()
+    globals.generate = vi
+      .fn()
       .mockRejectedValueOnce({ status: 429, retryAfterMs: 0 })
       .mockResolvedValue('自动化重试后的正文');
     const options = createHookOptions(createSummarySettings('inline'));

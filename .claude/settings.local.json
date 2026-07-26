@@ -29,7 +29,15 @@
       "Bash(awk 'NR==6' \"f:/Develop/AI/sillytavern/酒馆资料/era框架.txt\")",
       "Bash(npx tsc *)",
       "PowerShell(npx tsc --noEmit -p tsconfig.json 2>&1)",
-      "PowerShell(npx vitest run 2>&1)"
+      "PowerShell(npx vitest run 2>&1)",
+      "WebFetch(domain:altarofgaming.com)",
+      "Bash(grep -n '```' tavern_sync.mjs)",
+      "Bash(ls -la \"C:/Users/DELL/.claude/\" | head -40)",
+      "Bash(python -)",
+      "Bash(PYTHONIOENCODING=utf-8 python -)"
     ]
-  }
+  },
+  "disabledMcpjsonServers": [
+    "chrome-devtools"
+  ]
 }

@@ -1,0 +1,137 @@
+{
+  "reviewed": 16,
+  "currentDurationConflictCount": 2,
+  "adjacentGapConflictCount": 5,
+  "dependentShiftConflictCount": 4,
+  "compatibleBackgroundCount": 5,
+  "assessments": [
+    {
+      "id": "射雕第22回-07-木筏被盗",
+      "primaryVerdict": "current_duration_conflict",
+      "secondaryVerdict": null,
+      "previousEventId": "射雕第22回-06-真经初成",
+      "gapFromPreviousEndHours": 1,
+      "reason": "原条将“经过数日制筏”、备粮、计划次晨启航和破晓被盗写成同一事件的连续过程；这不是脱困前的静态背景，2小时无法覆盖，应重新计入本条时长。"
+    },
+    {
+      "id": "射雕第37回-05-西毒脱困",
+      "primaryVerdict": "adjacent_gap_conflict",
+      "secondaryVerdict": null,
+      "previousEventId": "射雕第37回-04-计困欧阳锋",
+      "gapFromPreviousEndHours": 1,
+      "reason": "上一条刚烧毁羊梯把欧阳锋困在峰顶，本条随即称其“被困秃木峰顶数日”后脱困；1小时的相邻留白直接不足。"
+    },
+    {
+      "id": "神雕第3回-02-初到桃花岛斗蟋蟀起冲突",
+      "primaryVerdict": "adjacent_gap_conflict",
+      "secondaryVerdict": null,
+      "previousEventId": "神雕第3回-01-舟中议婚",
+      "gapFromPreviousEndHours": 1,
+      "reason": "本条写杨过与郭芙初见后的嫌隙“过了几日”才淡去，并在该日发生蟋蟀冲突；前条结束后仅1小时，不能承接这段明确经过。"
+    },
+    {
+      "id": "神雕第3回-06-桃林再斗蛤蟆功初显威",
+      "primaryVerdict": "dependent_shift_conflict",
+      "secondaryVerdict": "adjacent_gap_conflict",
+      "previousEventId": "神雕第3回-05-杨过偷学武功暗练蛤蟆功",
+      "gapFromPreviousEndHours": 1,
+      "reason": "前条本身概括数月读书、暗练和偷学，本条又明确为“次日清晨”。前条修正为长期事件后，本条触发必须随其整体顺延；现有1小时也不能直接到次晨。"
+    },
+    {
+      "id": "神雕第3回-08-郭靖决意送杨过赴全真教",
+      "primaryVerdict": "compatible_background",
+      "secondaryVerdict": null,
+      "previousEventId": "神雕第3回-07-杨过蛤蟆功败露愤而投海",
+      "gapFromPreviousEndHours": 4115,
+      "reason": "“白天杨过蛤蟆功暴露……当晚谈话”是在六个月后的当前场景中回顾此前变故；现有约171日留白不因这段回顾产生相邻排程矛盾。"
+    },
+    {
+      "id": "神雕第4回-11-全真小较杨过受辱蛤蟆功伤鹿清笃逃古墓",
+      "primaryVerdict": "dependent_shift_conflict",
+      "secondaryVerdict": null,
+      "previousEventId": "神雕第4回-10-赵志敬只传口诀不教功夫",
+      "gapFromPreviousEndHours": 1,
+      "reason": "“传了大半年”并非孤立回忆：前条完整叙述赵志敬从夏至冬、数月只授口诀的过程。本条小较在该过程之后，故应随前条长时段修复整体后移。"
+    },
+    {
+      "id": "神雕第5回-09-杨过拜师古墓派",
+      "primaryVerdict": "dependent_shift_conflict",
+      "secondaryVerdict": "adjacent_gap_conflict",
+      "previousEventId": "神雕第5回-08-杨过初睡寒玉床练内功",
+      "gapFromPreviousEndHours": 1,
+      "reason": "本条的“次晨”紧接前条整夜练功；前条应先扩展至翌晨，本条的拜师触发随之顺延，现有1小时也无法保持该承接。"
+    },
+    {
+      "id": "神雕第8回-07-李莫愁师徒追至杨过牛腹藏身救无双",
+      "primaryVerdict": "compatible_background",
+      "secondaryVerdict": null,
+      "previousEventId": "神雕第8回-06-三仇家上门杨过救陆无双断骨",
+      "gapFromPreviousEndHours": 1,
+      "reason": "“李莫愁师徒连日连夜追赶”交代的是另一组人物自赤霞庄起的并行追踪状态；当前边界是石屋内三仇家战后李莫愁现身，不能把并行追踪全部强加到相邻1小时上。"
+    },
+    {
+      "id": "神雕第9回-07-龙驹寨耶律家夜遇刺客",
+      "primaryVerdict": "dependent_shift_conflict",
+      "secondaryVerdict": "adjacent_gap_conflict",
+      "previousEventId": "神雕第9回-06-智取耶律晋乔装侍从",
+      "gapFromPreviousEndHours": 1,
+      "reason": "前条已叙次晨起程、随后两日行旅；本条又在“第三日”抵达龙驹寨。前条补足行旅时长后本条必须整体后移，现有1小时亦不能承接第三日。"
+    },
+    {
+      "id": "神雕第12回-01-杨过陪郭芙出游窥学打狗棒法",
+      "primaryVerdict": "adjacent_gap_conflict",
+      "secondaryVerdict": null,
+      "previousEventId": "神雕第11回-12-郭芙搭话杨过触五湖废人对联伤怀武氏兄弟不悦",
+      "gapFromPreviousEndHours": 5,
+      "reason": "前条在傍晚安置杨过并约定“明儿”再谈，本条明确“次日早晨”用早点后出游；5小时不能从前条结束自然跨至次晨。"
+    },
+    {
+      "id": "神雕第14回-05-酒楼遇险金轮法王挟持郭芙要挟黄蓉",
+      "primaryVerdict": "adjacent_gap_conflict",
+      "secondaryVerdict": null,
+      "previousEventId": "神雕第14回-04-杨龙月下同行悟双剑合璧",
+      "gapFromPreviousEndHours": 1,
+      "reason": "正文将郭芙清晨被擒、黄蓉搜寻以及杨龙“次日中午”到酒楼明确串为当前危机的前置经过；与前条仅1小时的排程不相容。"
+    },
+    {
+      "id": "神雕第14回-07-双剑合璧大败金轮法王临别赠药",
+      "primaryVerdict": "compatible_background",
+      "secondaryVerdict": null,
+      "previousEventId": "神雕第14回-06-杨过舍身救黄蓉初使双剑合璧",
+      "gapFromPreviousEndHours": 1,
+      "reason": "“休息一宵、明日再动身”只是黄蓉在本条末尾提出并获同意的未来安排，未叙述已进入翌日，不能据此否定当前相邻排程。"
+    },
+    {
+      "id": "神雕第15回-08-李莫愁留帖黄药师离去程英赠袍",
+      "primaryVerdict": "current_duration_conflict",
+      "secondaryVerdict": "dependent_shift_conflict",
+      "previousEventId": "神雕第15回-07-黄药师赠剑传艺",
+      "gapFromPreviousEndHours": 1,
+      "reason": "除标注“详见事件06”的授艺重述外，本条仍自行叙及晚饭后、天明程英赠袍、晚间留书未成等连续发展；因此1小时不足应重计本条时长，且与已需扩展的授艺段存在顺延依赖。"
+    },
+    {
+      "id": "神雕第22回-02-杨过醒转襄阳见黄蓉小龙女",
+      "primaryVerdict": "adjacent_gap_conflict",
+      "secondaryVerdict": null,
+      "previousEventId": "神雕第22回-01-杨过舍身救郭靖力竭昏迷",
+      "gapFromPreviousEndHours": 1,
+      "reason": "杨过在前一场恶战后昏迷，本条明确已服药“将养了半日”才醒转；这段恢复正是前一事件结束至当前触发所需的留白，1小时不足。"
+    },
+    {
+      "id": "神雕第29回-05-杨龙寒玉床疗伤李莫愁偷袭被杨过智困棺中",
+      "primaryVerdict": "compatible_background",
+      "secondaryVerdict": null,
+      "previousEventId": "神雕第29回-04-李莫愁引众人溪底秘道入古墓困武三通",
+      "gapFromPreviousEndHours": 1,
+      "reason": "“连日来”是杨龙在古墓中持续疗伤的并行状态；上一条记录的是黄蓉等人另一路进入古墓、受困石室，二者可并行，不能把疗伤全算为二事件间留白。"
+    },
+    {
+      "id": "神雕第34回-04-一灯求见杨过长啸逼瑛姑恩怨揭晓",
+      "primaryVerdict": "compatible_background",
+      "secondaryVerdict": null,
+      "previousEventId": "神雕第34回-03-杨过郭襄黑龙潭寻瑛姑",
+      "gapFromPreviousEndHours": 1,
+      "reason": "一灯已求见七日七夜、慈恩此前激斗一日一夜均是当前会面交代的既有经历；当前实际动作是杨过长啸一顿饭时分逼瑛姑现身，不能据既往经历改相邻触发。"
+    }
+  ]
+}

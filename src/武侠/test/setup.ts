@@ -45,7 +45,18 @@ Object.assign(globalThis, {
     CHAT_CHANGED: 'chat_id_changed',
   },
   SillyTavern: {
+    characterId: '0',
+    groupId: '',
+    characters: [{ name: '测试角色', avatar: 'test-character.png' }],
+    groups: [],
+    chat: [],
     getCurrentChatId: vi.fn(() => 'test-chat'),
+    getRequestHeaders: vi.fn(() => ({
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': 'test-token',
+    })),
+    openCharacterChat: vi.fn(async () => undefined),
+    openGroupChat: vi.fn(async () => undefined),
   },
 });
 

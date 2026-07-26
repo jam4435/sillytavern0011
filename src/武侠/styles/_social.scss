@@ -351,6 +351,28 @@
   text-overflow: ellipsis;
   overflow: hidden;
   overflow-wrap: anywhere;
+
+  // 亲疏层级（与 .social-relation-seal 四态呼应）
+  &.strong {
+    border-color: rgba(250, 204, 21, 0.5);
+    background: rgba(133, 77, 14, 0.28);
+    color: rgba(254, 243, 199, 0.94);
+  }
+
+  &.known {
+    border-color: rgba(202, 138, 4, 0.36);
+    background: rgba(113, 63, 18, 0.22);
+    color: rgba(254, 243, 199, 0.86);
+  }
+
+  &.faint {
+    border-color: rgba(120, 113, 108, 0.28);
+  }
+
+  &.local {
+    border-color: rgba(120, 113, 108, 0.22);
+    color: rgba(168, 162, 158, 0.72);
+  }
 }
 
 .social-section-empty {
@@ -880,6 +902,11 @@
     align-items: start;
     min-height: 0;
     padding: 1rem;
+  }
+
+  // 印章绝对定位在右上角，文案区须让位避免重叠
+  .social-hero-copy {
+    padding-right: 3.2rem;
   }
 
   .social-portrait {

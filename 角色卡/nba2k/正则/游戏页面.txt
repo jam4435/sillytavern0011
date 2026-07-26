@@ -1,0 +1,7 @@
+```
+<body>
+<script>
+$('body').load('http://localhost:5500/dist/nba2k/index.html')
+</script>
+</body>
+```

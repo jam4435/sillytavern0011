@@ -89,7 +89,8 @@
       color: #ffd780;
       font-weight: bold;
       min-width: 2rem;
-      text-align: center;
+      margin-left: auto; // 数值与消耗贴右成组，七张卡对齐一列
+      text-align: right;
     }
 
     .attr-cost {

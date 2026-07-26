@@ -6,11 +6,12 @@
 .char-layout {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
   height: 100%;
 
   @media (min-width: 768px) {
     flex-direction: row;
+    gap: 2rem;
   }
 }
 
@@ -20,6 +21,21 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+
+  @media (max-width: 767px) {
+    max-width: none;
+    gap: 1.1rem;
+
+    .portrait-container {
+      width: 100%;
+      max-width: 17.5rem;
+      margin: 0 auto;
+    }
+
+    .character-avatar-actions {
+      justify-content: center;
+    }
+  }
 }
 
 .portrait-container {
@@ -259,16 +275,21 @@
   flex: 2;
   display: flex;
   flex-direction: column;
-  gap: 2.5rem;
+  gap: 1.5rem;
+
+  @media (min-width: 768px) {
+    gap: 2rem;
+  }
 }
 
 .stats-bars-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.5rem;
+  gap: 1.25rem;
 
-  @media (min-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
   }
 }
 
@@ -280,14 +301,25 @@
   padding-bottom: 0.5rem;
   margin-bottom: 1rem;
   color: var(--yellow-700);
+  font-family: var(--font-serif);
   font-size: 0.875rem;
-  letter-spacing: 0.1em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
 }
 
 .attr-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.7rem;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .attr-item {
@@ -363,7 +395,7 @@
 }
 
 .character-panel-stat-block {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
 }
 
 .character-stat-bar {
@@ -415,6 +447,15 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 0.3rem;
+  border-radius: 4px;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+
+  &:hover {
+    border-color: rgba(217, 119, 6, 0.35);
+    background-color: rgba(255, 255, 255, 0.05);
+  }
 }
 
 .character-attribute-head {
@@ -451,7 +492,7 @@
 
 .character-realm-container {
   position: relative;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
   padding: 1.25rem;
   background:
     radial-gradient(circle at top right, var(--realm-color-muted) 0%, transparent 42%),
@@ -460,6 +501,10 @@
   box-shadow:
     inset 0 0 20px rgba(0, 0, 0, 0.3),
     0 0 15px var(--realm-color-glow);
+
+  @media (max-width: 640px) {
+    padding: 1rem;
+  }
 }
 
 .realm-corner {
@@ -528,6 +573,10 @@
   font-weight: 700;
   font-family: 'LXGW WenKai', 'KaiTi', 'STKaiti', 'Kaiti SC', 'Noto Serif SC', serif;
   text-shadow: 0 0 10px var(--realm-color-soft);
+
+  @media (max-width: 640px) {
+    font-size: 1.3rem;
+  }
 }
 
 .character-realm-cultivation {
@@ -559,7 +608,7 @@
 }
 
 .character-network-section {
-  margin-top: 1.5rem;
+  margin-top: 0;
 }
 
 .character-network-list {
@@ -571,8 +620,17 @@
 .character-network-chip {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
   font-size: 0.85rem;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+
+  &:hover {
+    border-color: rgba(217, 119, 6, 0.35);
+    background: rgba(255, 255, 255, 0.06);
+  }
 }
 
 .character-network-name {
@@ -592,11 +650,17 @@
 .character-biography {
   color: #a8a29e;
   font-size: 0.9rem;
-  line-height: 1.6;
+  line-height: 1.65;
   background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 1rem;
-  max-height: 150px;
+  max-height: 220px;
   overflow-y: auto;
+
+  @media (max-width: 640px) {
+    max-height: 170px;
+    padding: 0.75rem 0.85rem;
+  }
 }
 
 .character-biography-entry + .character-biography-entry {
@@ -1172,12 +1236,25 @@
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 
+  // 与 .section-header 的琥珀小标题 + 菱形母题保持一致
   h4 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     margin: 0 0 0.7rem;
-    color: rgba(250, 204, 21, 0.88);
+    color: var(--yellow-700);
     font-family: var(--font-serif);
-    font-size: 0.88rem;
-    letter-spacing: 0.1em;
+    font-size: 0.875rem;
+    letter-spacing: 0.14em;
+
+    &::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      flex: 0 0 auto;
+      background: currentColor;
+      transform: rotate(45deg);
+    }
   }
 }
 
@@ -1255,11 +1332,36 @@
   cursor: not-allowed;
 }
 
-@media (max-width: 768px) {
+// 与弹窗全屏断点（$breakpoint-md=640px）对齐：641-768px 区间弹窗仍带 2rem 边距，
+// 若在此区间切换滑出层，会出现悬浮的无边框深色矩形
+@media (max-width: $breakpoint-md) {
   .inventory-workbench,
   .workbench-panel {
     display: block;
     overflow: hidden;
+  }
+
+  .workbench-filter-block {
+    gap: 0.4rem;
+    padding: 0.5rem;
+  }
+
+  // 18 个筛选 chip 换行会吃掉 40% 竖向空间，改为横向滑动条
+  .workbench-filter-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .workbench-filter-chip {
+    flex: 0 0 auto;
+    min-height: 2.25rem;
+    padding: 0.3rem 0.7rem;
   }
 
   .workbench-list-pane {
@@ -1309,6 +1411,10 @@
     padding: 1rem;
   }
 
+  .workbench-detail-content {
+    padding: 1rem;
+  }
+
   .workbench-detail-icon {
     width: 4.8rem;
   }
@@ -1321,6 +1427,8 @@
     align-items: stretch;
     flex-direction: column;
     gap: 0.7rem;
+    padding: 0.85rem 1rem;
+    min-height: 0;
   }
 
   .workbench-trait {
@@ -1357,6 +1465,10 @@
 
   @media (min-width: 768px) {
     padding: 1.2rem 1.6rem 1.8rem;
+  }
+
+  @media (max-width: 640px) {
+    padding: 0.75rem 0.8rem 1rem;
   }
 }
 
@@ -1543,7 +1655,7 @@
 }
 
 .maintext-content {
-  line-height: 2.2;
+  line-height: var(--content-line-height, 2.2);
   font-size: 1.1rem;
   color: rgba(231, 229, 228, 0.95);
   font-family: var(--font-serif);
@@ -1551,8 +1663,9 @@
 }
 
 // HTML 内容渲染区域（正则替换产生的 HTML）
+// 行高必须走 var(--content-line-height)，否则设置页的「行高」在 HTML 正文路径上被静默忽略
 .maintext-html {
-  line-height: 2.2;
+  line-height: var(--content-line-height, 2.2);
   font-size: 1.1rem;
   color: rgba(231, 229, 228, 0.95);
   font-family: var(--font-serif);
@@ -1568,7 +1681,7 @@
   .maintext-paragraph {
     margin: 0 0 1.5rem 0;
     text-indent: 2em;
-    line-height: 2.2;
+    line-height: var(--content-line-height, 2.2);
 
     &:last-child {
       margin-bottom: 0;
@@ -1600,7 +1713,7 @@
 
   // 段落内的换行不需要额外间距
   br {
-    line-height: 2.2;
+    line-height: var(--content-line-height, 2.2);
   }
 }
 
@@ -2207,6 +2320,12 @@
   gap: 0.875rem;
 }
 
+@media (max-width: 640px) {
+  .options-list .option-btn {
+    padding: 0.85rem 1rem;
+  }
+}
+
 .option-btn {
   position: relative;
   background: linear-gradient(135deg, rgba(28, 25, 23, 0.6) 0%, rgba(41, 37, 36, 0.4) 100%);
@@ -2303,6 +2422,7 @@
   position: relative;
   width: 40px;
   height: 40px;
+  flex-shrink: 0;
   background: transparent;
   border: 2px solid #44403c;
   color: #57534e;
@@ -2353,6 +2473,12 @@
     &::before {
       display: none;
     }
+  }
+
+  @media (max-width: 640px) {
+    width: 36px;
+    height: 36px;
+    font-size: 1.3rem;
   }
 }
 

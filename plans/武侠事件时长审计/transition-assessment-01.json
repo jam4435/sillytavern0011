@@ -1,0 +1,333 @@
+{
+  "reviewed": 36,
+  "hardConflictCount": 4,
+  "likelyConflictCount": 0,
+  "compatibleCount": 31,
+  "retellingCount": 1,
+  "assessments": [
+    {
+      "id": "射雕第1回-03-郭杨结识丘处机",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第1回-03-郭杨结识丘处机.yaml",
+      "previousEventId": "射雕第1回-02-曲三夜斗禁宫卫",
+      "gapFromPreviousEndHours": 2803,
+      "verdict": "compatible",
+      "reason": "“十年后”是丘处机与郭杨约定未来传艺的期限，不是本事件相对上一事件的起始时间。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第1回-05-包惜弱巧救颜烈",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第1回-05-包惜弱巧救颜烈.yaml",
+      "previousEventId": "射雕第1回-04-丘处机力战追兵",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "事件起于清扫血迹后发现伤者；“次日清晨”说明救治后的结果，属于当前事件内部时间。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第1回-06-牛家村风雪惊变",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第1回-06-牛家村风雪惊变.yaml",
+      "previousEventId": "射雕第1回-05-包惜弱巧救颜烈",
+      "gapFromPreviousEndHours": 1915,
+      "verdict": "compatible",
+      "reason": "开头明确“数月后”，实际约80日的留白足以承接该概略月数。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第2回-04-醉仙楼赌约",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第2回-04-醉仙楼赌约.yaml",
+      "previousEventId": "射雕第2回-03-法华寺血战",
+      "gapFromPreviousEndHours": 84,
+      "verdict": "compatible",
+      "reason": "“数日后，伤势稍愈”与84小时（约三日半）相容；“十八年后”只是赌约的未来期限。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第3回-01-醉仙楼十八年之约",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第3回-01-醉仙楼十八年之约.yaml",
+      "previousEventId": "射雕第2回-04-醉仙楼赌约",
+      "gapFromPreviousEndHours": 3,
+      "verdict": "compatible",
+      "reason": "“十八年后”是双方约定的比武日期，不表示当前事件已跳过十八年。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第3回-02-李萍大漠产子",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第3回-02-李萍大漠产子.yaml",
+      "previousEventId": "射雕第3回-01-醉仙楼十八年之约",
+      "gapFromPreviousEndHours": 5336,
+      "verdict": "compatible",
+      "reason": "“十余日后”描述李萍产后恢复，是当前事件内部经历；相邻留白本身也远超该量级。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第3回-03-郭靖巧救哲别",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第3回-03-郭靖巧救哲别.yaml",
+      "previousEventId": "射雕第3回-02-李萍大漠产子",
+      "gapFromPreviousEndHours": 51944,
+      "verdict": "compatible",
+      "reason": "“数日后”衔接的是本事件中郭靖目睹战事与救哲别两个段落；六年留白不存在不足。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第4回-03-夺兔之争",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第4回-03-夺兔之争.yaml",
+      "previousEventId": "射雕第4回-02-人豹之争",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "hard_conflict",
+      "reason": "开头“次日”明确要求转入下一日，但上一事件结束后仅1小时，且两者仍落在同一日凌晨。",
+      "minimumRequiredGapHours": 24
+    },
+    {
+      "id": "射雕第4回-04-巧遇七怪",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第4回-04-巧遇七怪.yaml",
+      "previousEventId": "射雕第4回-03-夺兔之争",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“苦寻六年”是江南七怪既有的搜寻经历，不是本事件相对前一事件的时间跳跃。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第5回-03-夜半切磋",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第5回-03-夜半切磋.yaml",
+      "previousEventId": "射雕第5回-02-指腹为婚",
+      "gapFromPreviousEndHours": 58352,
+      "verdict": "compatible",
+      "reason": "“十八年后”出自丘处机书信中对赌约的说明，并非本场夜半试探的起始锚点。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第5回-05-悬崖奇遇",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第5回-05-悬崖奇遇.yaml",
+      "previousEventId": "射雕第5回-04-弯弓射雕",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“三日后月半之夜”是马钰在本事件末尾作出的未来约会，不约束当前触发时间。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第6回-01-崖顶疑阵",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第6回-01-崖顶疑阵.yaml",
+      "previousEventId": "射雕第5回-08-内功初显",
+      "gapFromPreviousEndHours": 6,
+      "verdict": "compatible",
+      "reason": "“次日”叙述朱聪、全金发跟踪郭靖后登崖探查的后续，属于当前场景内部的隔夜经过。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第6回-06-大破联军",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第6回-06-大破联军.yaml",
+      "previousEventId": "射雕第6回-05-力战四鬼",
+      "gapFromPreviousEndHours": 160,
+      "verdict": "compatible",
+      "reason": "“八日后”位于本事件所叙战局的发展之中，不应用当前事件自身的蒙太奇时长反推其触发时间。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第7回-03-黑松林解围",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第7回-03-黑松林解围.yaml",
+      "previousEventId": "射雕第7回-02-初遇黄蓉",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "hard_conflict",
+      "reason": "侯通海在上一段后约郭靖“次日”赴黑松林；当前事件正是该赴约，1小时留白不能到达次日。",
+      "minimumRequiredGapHours": 24
+    },
+    {
+      "id": "射雕第11回-05-郭靖黄蓉出走",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第11回-05-郭靖黄蓉出走.yaml",
+      "previousEventId": "射雕第11回-04-郭靖拒婚",
+      "gapFromPreviousEndHours": 95,
+      "verdict": "compatible",
+      "reason": "“接下来的半年”是郭黄出走后由本事件覆盖的游历蒙太奇，不是从上一事件结束到本事件触发所需的留白。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第15回-02-郭杨结义北上",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第15回-02-郭杨结义北上.yaml",
+      "previousEventId": "射雕第15回-01-段天德吐露真相",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“次日清晨”发生在结义之后、当前事件内部；开头的“随即邀请”反而支持与上一事件紧接。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第15回-03-溪边重逢",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第15回-03-溪边重逢.yaml",
+      "previousEventId": "射雕第15回-02-郭杨结义北上",
+      "gapFromPreviousEndHours": 33,
+      "verdict": "compatible",
+      "reason": "当前事件内两人在溪边过夜至“次日清晨”；相邻留白33小时也不构成不足。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第16回-02-杨康救父",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第16回-02-杨康救父.yaml",
+      "previousEventId": "射雕第16回-01-祠堂夜斗",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“半年内不要回北京”只是杨康给完颜洪烈的避祸建议，不是当前事件的时间跨度。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第17回-01-周伯通忆往事",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第17回-01-周伯通忆往事.yaml",
+      "previousEventId": "射雕第16回-08-九阴真经的由来",
+      "gapFromPreviousEndHours": 9,
+      "verdict": "retelling",
+      "reason": "标题及正文均为周伯通在当前山洞场景讲述十五年前往事；“数年后”“十五年”属于回忆内容，不能用于改当前触发时间。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第21回-08-协力救侄",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第21回-08-协力救侄.yaml",
+      "previousEventId": "射雕第21回-07-荒岛重逢",
+      "gapFromPreviousEndHours": 28,
+      "verdict": "compatible",
+      "reason": "“次日”描述当前救援过程中改以潮水浮力救人的第二次尝试，非当前事件的触发锚点。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第22回-06-真经初成",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第22回-06-真经初成.yaml",
+      "previousEventId": "射雕第22回-05-巧计惊西毒",
+      "gapFromPreviousEndHours": 19,
+      "verdict": "compatible",
+      "reason": "“七天后”是郭黄在本事件中日夜练功后的结果，属单条事件内部蒙太奇，不评价为相邻留白。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第22回-07-木筏被盗",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第22回-07-木筏被盗.yaml",
+      "previousEventId": "射雕第22回-06-真经初成",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“经过数日的努力”是当前木筏制作段落的内容，不可据此要求上一事件结束后先留出数日。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第22回-09-海上重逢",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第22回-09-海上重逢.yaml",
+      "previousEventId": "射雕第22回-08-巧计破筏",
+      "gapFromPreviousEndHours": 16,
+      "verdict": "compatible",
+      "reason": "“航行第三日晚间”从三人重新扎筏、再次启航之后计算，是当前事件内部航程。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第23回-06-夜探皇宫",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第23回-06-夜探皇宫.yaml",
+      "previousEventId": "射雕第23回-05-火烧三元楼",
+      "gapFromPreviousEndHours": 26,
+      "verdict": "compatible",
+      "reason": "“次日再战西毒”是本事件中人物作出的后续约定；26小时的实际间隔亦足以跨日。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第25回-02-三雄赛脚力",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第25回-02-三雄赛脚力.yaml",
+      "previousEventId": "射雕第25回-01-黄药师主婚",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“一日一夜间往返五百余里”是当前赛脚力事件本身的持续过程，按约定不以它审计相邻事件留白。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第26回-01-牛家村混战",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第26回-01-牛家村混战.yaml",
+      "previousEventId": "射雕第25回-11-裘千仞谎传死讯",
+      "gapFromPreviousEndHours": 10,
+      "verdict": "compatible",
+      "reason": "“助其完成七日七夜的修行”发生在当前冲突被止息之后，属于事件内部后续。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第28回-02-破解武穆遗书之秘",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第28回-02-破解武穆遗书之秘.yaml",
+      "previousEventId": "射雕第28回-01-黄蓉智夺帮主位",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“七日后的铁掌山”是裘千丈提出的约战日期，非本事件起始与上一事件之间的经过。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第29回-02-茅屋斗智",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第29回-02-茅屋斗智.yaml",
+      "previousEventId": "射雕第29回-01-黑沼脱险",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“数月未解”限定的是瑛姑此前研究的算题，不是郭黄从上一事件进入茅屋所经历的时长。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第31回-05-真经总纲",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第31回-05-真经总纲.yaml",
+      "previousEventId": "射雕第31回-04-恩怨消解",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "一灯“花费十余日”翻译总纲、讲解与养伤，均为当前事件内的后续蒙太奇。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第32回-05-江畔定情",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第32回-05-江畔定情.yaml",
+      "previousEventId": "射雕第32回-04-湍江险滩恶斗",
+      "gapFromPreviousEndHours": 113,
+      "verdict": "compatible",
+      "reason": "“每一天都当成三天四天来过”是黄蓉的情感比喻；实际113小时留白也已超过四日。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第34回-10-洪七公止斗",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第34回-10-洪七公止斗.yaml",
+      "previousEventId": "射雕第34回-09-西毒东邪再会",
+      "gapFromPreviousEndHours": 108,
+      "verdict": "compatible",
+      "reason": "“等待次日中秋之约”是洪七公止斗后的未来安排，不是当前事件起始的“次日”；108小时也非不足。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第36回-03-郭靖得知真相",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第36回-03-郭靖得知真相.yaml",
+      "previousEventId": "射雕第36回-02-黄蓉智斗欧阳锋",
+      "gapFromPreviousEndHours": 27,
+      "verdict": "hard_conflict",
+      "reason": "正文明确柯镇恶“逃离铁枪庙后，在第三日”才遇到郭靖；27小时未达到第三日所要求的至少两整日留白。",
+      "minimumRequiredGapHours": 48
+    },
+    {
+      "id": "射雕第36回-04-郭靖重返蒙古",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第36回-04-郭靖重返蒙古.yaml",
+      "previousEventId": "射雕第36回-03-郭靖得知真相",
+      "gapFromPreviousEndHours": 1692,
+      "verdict": "hard_conflict",
+      "reason": "开头明确郭靖“寻找黄蓉半年”；相邻仅约70.5日，显著短于半年，且不只是当前事件内部过程。",
+      "minimumRequiredGapHours": 4320
+    },
+    {
+      "id": "射雕第37回-02-智擒西毒",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第37回-02-智擒西毒.yaml",
+      "previousEventId": "射雕第37回-01-夜探军营",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“数日后”连接的是本事件内的第一次与第二次设陷阱，当前开头首先叙述第一次行动。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第39回-08-华山之巅会师",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第39回-08-华山之巅会师.yaml",
+      "previousEventId": "射雕第39回-07-洪七公斥退裘千仞",
+      "gapFromPreviousEndHours": 231,
+      "verdict": "compatible",
+      "reason": "“连日来的心路历程”是郭靖向洪七公回顾的心理过程，且231小时留白本身已逾九日。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "射雕第40回-04-侠侣定盟",
+      "file": "世界书/金庸群侠传1/世界书/射雕事件条目-第40回-04-侠侣定盟.yaml",
+      "previousEventId": "射雕第40回-03-疯丐争锋",
+      "gapFromPreviousEndHours": 100,
+      "verdict": "compatible",
+      "reason": "“次日清晨”出现在华山论剑结束后的当前事件内部；100小时相邻留白亦足够跨日。",
+      "minimumRequiredGapHours": null
+    }
+  ]
+}

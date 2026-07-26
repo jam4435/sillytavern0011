@@ -1,0 +1,1049 @@
+// =========================================
+// NBA2K16 生涯模拟 - 主样式入口
+// =========================================
+
+$bg: #101418;
+$panel: #1a2027;
+$panel-2: #232b34;
+$line: #33404d;
+$text: #e8edf2;
+$muted: #8fa0b0;
+$accent: #f5a623; // 篮球橙
+$accent-2: #2f81f7;
+$wood: #b98a56; // 木地板色
+$wood-dark: #a97b4a;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: $bg;
+  color: $text;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-size: 14px;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.nba2k-app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 10px 12px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+// ---------- 记分牌 ----------
+.scoreboard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(180deg, $panel-2, $panel);
+  border: 1px solid $line;
+  border-radius: 10px;
+  padding: 8px 14px;
+
+  .sb-team {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    &.away {
+      justify-content: flex-end;
+    }
+    &.has-ball .sb-name::after {
+      content: ' 🏀';
+    }
+  }
+  .sb-badge {
+    color: #fff;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  .sb-name {
+    color: $muted;
+  }
+  .sb-score {
+    font-size: 28px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .sb-clock {
+    text-align: center;
+    .sb-quarter {
+      color: $accent;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .sb-time {
+      font-size: 22px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    .sb-possession {
+      color: $muted;
+      font-size: 11px;
+    }
+  }
+}
+
+// ---------- 球场俯视图 ----------
+.court-view {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  background: radial-gradient(ellipse at center, $wood 0%, $wood-dark 100%);
+  border: 2px solid #7a5732;
+
+  .court-floor {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 3;
+  }
+  .court-lines line,
+  .court-lines circle,
+  .court-lines path,
+  .court-lines rect {
+    stroke: rgba(255, 255, 255, 0.75);
+    stroke-width: 2.5;
+  }
+  .backboard {
+    stroke: #eee;
+    stroke-width: 5;
+  }
+  .rim {
+    stroke: #ff6b35;
+    stroke-width: 3;
+  }
+
+  .player-token {
+    cursor: default;
+    &.clickable {
+      cursor: pointer;
+    }
+    .token-initials {
+      fill: #fff;
+      font-size: 16px;
+      font-weight: 800;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+    .token-number {
+      fill: rgba(255, 255, 255, 0.9);
+      font-size: 11px;
+      text-anchor: middle;
+      pointer-events: none;
+    }
+    .token-name {
+      fill: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      text-anchor: middle;
+      paint-order: stroke;
+      stroke: rgba(0, 0, 0, 0.6);
+      stroke-width: 3;
+      pointer-events: none;
+    }
+    .stamina-ring {
+      stroke: #4caf50;
+      stroke-width: 3;
+      opacity: 0.9;
+    }
+    .ball-halo {
+      fill: rgba(245, 166, 35, 0.25);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    .ball-dot {
+      fill: $accent;
+      stroke: #7a4a12;
+      stroke-width: 1.5;
+    }
+    &.away .stamina-ring {
+      stroke: #ef5350;
+    }
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.round-summary {
+  text-align: center;
+  color: $accent;
+  font-size: 13px;
+  min-height: 18px;
+}
+
+// ---------- 行动面板 ----------
+.action-panel {
+  background: $panel;
+  border: 1px solid $line;
+  border-radius: 10px;
+  padding: 10px 12px;
+
+  .ap-title {
+    color: $muted;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .ap-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .ap-action {
+    background: $panel-2;
+    color: $text;
+    border: 1px solid $line;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    &.offense:hover:not(:disabled) {
+      background: $accent;
+      color: #1a1207;
+      border-color: $accent;
+    }
+    &.defense:hover:not(:disabled) {
+      background: $accent-2;
+      border-color: $accent-2;
+    }
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+  }
+  .ap-actor-row,
+  .ap-partner-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+  .ap-actor {
+    background: transparent;
+    color: $muted;
+    border: 1px solid $line;
+    border-radius: 999px;
+    padding: 4px 12px;
+    cursor: pointer;
+    &.active {
+      color: $text;
+      border-color: $accent;
+      background: rgba(245, 166, 35, 0.12);
+    }
+  }
+  .ap-cancel {
+    background: transparent;
+    color: $muted;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+}
+
+// ---------- 技术统计 ----------
+.toggle-box-score {
+  align-self: center;
+  background: transparent;
+  color: $muted;
+  border: 1px solid $line;
+  border-radius: 999px;
+  padding: 3px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.box-score {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  table {
+    flex: 1;
+    min-width: 280px;
+    border-collapse: collapse;
+    background: $panel;
+    border: 1px solid $line;
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 12px;
+    th,
+    td {
+      padding: 4px 8px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    th {
+      background: $panel-2;
+      color: $muted;
+    }
+    .bs-name {
+      text-align: left;
+    }
+  }
+}
+
+// ---------- 叙事区 ----------
+.narrative {
+  background: $panel;
+  border: 1px solid $line;
+  border-radius: 10px;
+  padding: 12px 14px;
+
+  .narrative-loading {
+    color: $accent;
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  .narrative-text {
+    white-space: pre-wrap;
+    line-height: 1.75;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .narrative-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    button {
+      text-align: left;
+      background: $panel-2;
+      color: $text;
+      border: 1px solid $line;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      &:hover {
+        border-color: $accent;
+      }
+    }
+  }
+}
+
+// ---------- 自由输入 ----------
+.free-input {
+  display: flex;
+  gap: 8px;
+  input {
+    flex: 1;
+    background: $panel;
+    color: $text;
+    border: 1px solid $line;
+    border-radius: 8px;
+    padding: 10px 12px;
+    outline: none;
+    &:focus {
+      border-color: $accent;
+    }
+  }
+  button {
+    background: $accent;
+    color: #1a1207;
+    border: none;
+    border-radius: 8px;
+    padding: 0 20px;
+    font-weight: 700;
+    cursor: pointer;
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// ---------- 生涯面板 ----------
+.career-panel {
+  background: $panel;
+  border: 1px solid $line;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .cp-header {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cp-identity {
+    display: flex;
+    flex-direction: column;
+    .cp-name {
+      font-size: 20px;
+      font-weight: 800;
+    }
+    .cp-team {
+      font-weight: 600;
+    }
+    .cp-season {
+      color: $muted;
+      font-size: 12px;
+    }
+  }
+  .cp-stats {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+    color: $muted;
+  }
+  .cp-schedule {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: $panel-2;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    .cp-todo {
+      color: $accent;
+    }
+  }
+  .cp-section {
+    .cp-section-title {
+      color: $muted;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .cp-row {
+      padding: 4px 0;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.07);
+    }
+  }
+  .cp-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    button {
+      background: $panel-2;
+      color: $text;
+      border: 1px solid $line;
+      border-radius: 8px;
+      padding: 9px 14px;
+      cursor: pointer;
+      &:hover:not(:disabled) {
+        border-color: $accent;
+      }
+      &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+    }
+    .cp-start-match {
+      background: $accent;
+      color: #1a1207;
+      font-weight: 700;
+      border-color: $accent;
+    }
+  }
+}
+
+// ---------- 开局标题画面：球馆聚光灯 + 复古球衣海报 ----------
+$display-font: 'Impact', 'Haettenschweiler', 'Arial Narrow', 'Microsoft YaHei', sans-serif;
+
+.splash {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  // 聚光灯 + 场馆深色 + 底部木地板反光
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 8%, rgba(245, 166, 35, 0.22), transparent 60%),
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255, 255, 255, 0.07), transparent 55%),
+    linear-gradient(180deg, #0a0d11 0%, #10151b 62%, #1a1208 88%, #241708 100%);
+
+  // 中圈弧线装饰
+  .splash-court-arc {
+    position: absolute;
+    left: 50%;
+    bottom: -34vh;
+    width: 68vh;
+    height: 68vh;
+    transform: translateX(-50%);
+    border: 2px solid rgba(245, 166, 35, 0.16);
+    border-radius: 50%;
+    pointer-events: none;
+    &.arc-2 {
+      width: 96vh;
+      height: 96vh;
+      bottom: -48vh;
+      border-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  // 对角橙色斜带
+  .splash-stripe {
+    position: absolute;
+    top: -20%;
+    right: -32%;
+    width: 70%;
+    height: 160%;
+    background: linear-gradient(180deg, rgba(245, 166, 35, 0.09), rgba(245, 166, 35, 0.015));
+    transform: rotate(18deg);
+    pointer-events: none;
+  }
+
+  .splash-stage {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 16px 24px;
+    text-align: center;
+  }
+
+  .splash-kicker {
+    font-size: 12px;
+    letter-spacing: 0.42em;
+    color: rgba(245, 166, 35, 0.85);
+    margin-bottom: 6px;
+    animation: splash-drop 0.6s 0.1s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  }
+
+  .splash-logo {
+    margin: 0;
+    line-height: 0.9;
+    font-family: $display-font;
+    font-style: italic;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    animation: splash-slam 0.55s cubic-bezier(0.2, 0.9, 0.25, 1.25) both;
+
+    .logo-nba {
+      font-size: clamp(46px, 9vw, 88px);
+      color: #f2f5f8;
+      letter-spacing: 0.02em;
+      text-shadow:
+        3px 3px 0 #0a0d11,
+        6px 6px 0 rgba(245, 166, 35, 0.55);
+    }
+    .logo-2k {
+      font-size: clamp(64px, 13vw, 128px);
+      color: $accent;
+      letter-spacing: 0.01em;
+      text-shadow:
+        3px 3px 0 #0a0d11,
+        7px 7px 0 rgba(255, 255, 255, 0.12),
+        0 0 42px rgba(245, 166, 35, 0.4);
+    }
+  }
+
+  .splash-cn {
+    font-size: clamp(17px, 3vw, 24px);
+    font-weight: 900;
+    letter-spacing: 0.6em;
+    margin: 14px 0 0 0.6em;
+    color: #e8edf2;
+    animation: splash-drop 0.6s 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  }
+
+  .splash-rule {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 16px 0 34px;
+    animation: splash-drop 0.6s 0.4s both;
+    i {
+      display: block;
+      width: 72px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(245, 166, 35, 0.7));
+      &:last-child {
+        transform: scaleX(-1);
+      }
+    }
+    em {
+      font-style: normal;
+      font-size: 13px;
+      color: $muted;
+      letter-spacing: 0.2em;
+    }
+  }
+
+  .splash-modes {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .mode-card {
+    position: relative;
+    overflow: hidden;
+    width: min(320px, 86vw);
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px 22px 16px;
+    background: linear-gradient(165deg, rgba(35, 43, 52, 0.92), rgba(20, 26, 33, 0.92));
+    border: 1px solid rgba(245, 166, 35, 0.35);
+    border-radius: 4px;
+    color: $text;
+    cursor: pointer;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+    transition: transform 0.22s, border-color 0.22s, box-shadow 0.22s;
+    animation: splash-drop 0.6s 0.55s both;
+    &.alt {
+      animation-delay: 0.68s;
+      border-color: rgba(120, 170, 255, 0.35);
+      .mode-num {
+        color: rgba(120, 170, 255, 0.8);
+      }
+      &::before {
+        background: linear-gradient(100deg, transparent 30%, rgba(120, 170, 255, 0.14) 50%, transparent 70%);
+      }
+    }
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(100deg, transparent 30%, rgba(245, 166, 35, 0.16) 50%, transparent 70%);
+      transform: translateX(-120%);
+      transition: transform 0.5s;
+    }
+    &:hover {
+      transform: translateY(-4px);
+      border-color: $accent;
+      box-shadow: 0 14px 38px rgba(0, 0, 0, 0.5);
+      &::before {
+        transform: translateX(120%);
+      }
+      .mode-go {
+        color: $accent;
+        transform: translateX(4px);
+      }
+    }
+    .mode-num {
+      font-family: $display-font;
+      font-style: italic;
+      font-size: 26px;
+      color: rgba(245, 166, 35, 0.8);
+    }
+    .mode-title {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+    }
+    .mode-desc {
+      font-size: 12.5px;
+      color: $muted;
+      line-height: 1.7;
+      min-height: 42px;
+    }
+    .mode-go {
+      align-self: flex-end;
+      font-size: 13px;
+      font-weight: 700;
+      color: $muted;
+      transition: transform 0.2s, color 0.2s;
+    }
+  }
+
+  // 底部 LED 跑马灯
+  .splash-ticker {
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    border-top: 1px solid rgba(245, 166, 35, 0.25);
+    background: rgba(6, 8, 10, 0.82);
+    padding: 8px 0;
+    .ticker-track {
+      display: flex;
+      gap: 28px;
+      width: max-content;
+      animation: ticker-roll 60s linear infinite;
+    }
+    .ticker-item {
+      font-size: 12px;
+      color: $muted;
+      white-space: nowrap;
+      letter-spacing: 0.08em;
+      b {
+        font-family: $display-font;
+        font-style: italic;
+        margin-right: 4px;
+      }
+    }
+  }
+}
+
+// 注意：入场动画只用 transform，不用 opacity/filter 隐藏内容——
+// 酒馆侧的动画优化扩展可能暂停 iframe 内动画，opacity:0 初始帧会导致整页黑屏。
+@keyframes splash-slam {
+  from {
+    transform: scale(1.08) rotate(-1deg);
+  }
+  to {
+    transform: scale(1) rotate(0);
+  }
+}
+@keyframes splash-drop {
+  from {
+    transform: translateY(-6px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes ticker-roll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+// ---------- 自定义新秀 ----------
+.create-player {
+  max-width: 1020px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+
+  .cp-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+    h2 {
+      margin: 0;
+      font-family: $display-font;
+      font-style: italic;
+      font-size: 30px;
+      letter-spacing: 0.06em;
+      color: $accent;
+    }
+    .cp-ovr-chip {
+      margin-left: auto;
+      background: $panel;
+      border: 1px solid $line;
+      border-radius: 999px;
+      padding: 6px 14px;
+      color: $muted;
+      font-size: 13px;
+      b {
+        color: $accent;
+        font-size: 16px;
+      }
+    }
+  }
+
+  .cp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1fr;
+    gap: 20px;
+    @media (max-width: 860px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .cp-label {
+    display: block;
+    color: $muted;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    margin: 16px 0 6px;
+    b {
+      color: $accent;
+    }
+  }
+
+  .cp-input {
+    width: 100%;
+    background: $panel;
+    color: $text;
+    border: 1px solid $line;
+    border-radius: 6px;
+    padding: 10px 12px;
+    outline: none;
+    font-size: 14px;
+    &:focus {
+      border-color: $accent;
+    }
+  }
+
+  .cp-pos-row {
+    display: flex;
+    gap: 6px;
+  }
+  .cp-pos {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    background: $panel;
+    color: $muted;
+    border: 1px solid $line;
+    border-radius: 6px;
+    padding: 8px 2px;
+    cursor: pointer;
+    b {
+      font-family: $display-font;
+      font-style: italic;
+      font-size: 17px;
+      color: $text;
+    }
+    span {
+      font-size: 10px;
+    }
+    &.active {
+      border-color: $accent;
+      background: rgba(245, 166, 35, 0.12);
+      b {
+        color: $accent;
+      }
+    }
+  }
+
+  .cp-slider {
+    width: 100%;
+    accent-color: $accent;
+  }
+
+  .cp-arch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cp-arch {
+    text-align: left;
+    background: $panel;
+    border: 1px solid $line;
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: $text;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    transition: border-color 0.15s, transform 0.15s;
+    &:hover {
+      border-color: rgba(245, 166, 35, 0.5);
+    }
+    &.active {
+      border-color: $accent;
+      background: rgba(245, 166, 35, 0.1);
+      transform: translateX(4px);
+    }
+    .arch-name {
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      .arch-fit {
+        font-style: normal;
+        font-size: 10px;
+        color: #4caf50;
+        border: 1px solid rgba(76, 175, 80, 0.5);
+        border-radius: 4px;
+        padding: 1px 5px;
+        margin-left: 8px;
+        vertical-align: 2px;
+      }
+    }
+    .arch-tag {
+      font-size: 12px;
+      color: $muted;
+    }
+  }
+
+  .cp-preview {
+    display: flex;
+    flex-direction: column;
+  }
+  .cp-radar {
+    width: 100%;
+    max-width: 240px;
+    align-self: center;
+    .radar-ring {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.1);
+    }
+    .radar-axis {
+      stroke: rgba(255, 255, 255, 0.07);
+    }
+    .radar-shape {
+      fill: rgba(245, 166, 35, 0.3);
+      stroke: $accent;
+      stroke-width: 2;
+      stroke-linejoin: round;
+    }
+    .radar-label {
+      fill: $muted;
+      font-size: 10.5px;
+      text-anchor: middle;
+    }
+  }
+
+  .cp-create {
+    margin-top: 18px;
+    background: $accent;
+    color: #1a1207;
+    border: none;
+    border-radius: 6px;
+    padding: 13px;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    &:hover:not(:disabled) {
+      filter: brightness(1.08);
+    }
+  }
+}
+
+.cp-back {
+  background: transparent;
+  color: $muted;
+  border: 1px solid $line;
+  border-radius: 999px;
+  padding: 5px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  &:hover {
+    color: $text;
+    border-color: $accent;
+  }
+}
+.setup-back {
+  margin-bottom: 10px;
+}
+
+// ---------- 开局 ----------
+.setup-screen {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+
+  .setup-title {
+    text-align: center;
+    font-size: 28px;
+    margin: 0 0 4px;
+    color: $accent;
+  }
+  .setup-sub {
+    text-align: center;
+    color: $muted;
+    margin: 0 0 20px;
+  }
+  .setup-conf-title {
+    color: $muted;
+    font-size: 13px;
+    margin: 14px 0 8px;
+  }
+  .setup-team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+  }
+  .setup-team {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: $panel;
+    color: $text;
+    border: 1px solid $line;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    &.active {
+      background: $panel-2;
+      box-shadow: 0 0 0 2px $accent;
+    }
+    .setup-team-id {
+      color: #fff;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 2px 5px;
+      border-radius: 5px;
+    }
+  }
+  .setup-roster-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 6px;
+  }
+  .setup-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: $panel;
+    color: $text;
+    border: 1px solid $line;
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    &.active {
+      box-shadow: 0 0 0 2px $accent;
+    }
+    .sp-ovr {
+      background: $panel-2;
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-weight: 800;
+      color: $accent;
+    }
+    .sp-pos {
+      margin-left: auto;
+      color: $muted;
+      font-size: 12px;
+    }
+  }
+  .setup-finish {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    input {
+      flex: 1;
+      background: $panel;
+      color: $text;
+      border: 1px solid $line;
+      border-radius: 8px;
+      padding: 10px 12px;
+      outline: none;
+    }
+    .setup-start {
+      background: $accent;
+      color: #1a1207;
+      border: none;
+      border-radius: 8px;
+      padding: 0 26px;
+      font-weight: 800;
+      font-size: 15px;
+      cursor: pointer;
+    }
+  }
+}

@@ -1,0 +1,342 @@
+{
+  "reviewed": 37,
+  "hardConflictCount": 4,
+  "likelyConflictCount": 0,
+  "compatibleCount": 27,
+  "retellingCount": 6,
+  "assessments": [
+    {
+      "id": "神雕第19回-03-裘千尺述说前尘往事",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第19回-03-裘千尺述说前尘往事.yaml",
+      "previousEventId": "神雕第19回-02-地底石窟认母遇裘千尺",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "retelling",
+      "reason": "“七日七夜”“第三日”均属裘千尺讲述的旧事，不是当前石窟场景与上一事件之间的留白。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第20回-06-蒙古军攻襄阳郭靖守城显神威",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第20回-06-蒙古军攻襄阳郭靖守城显神威.yaml",
+      "previousEventId": "神雕第20回-05-忽必烈招揽群雄共谋刺郭靖",
+      "gapFromPreviousEndHours": 5,
+      "verdict": "compatible",
+      "reason": "“不数日抵达”及翌晨攻城叙述的是本事件内的南行与战事展开；上一事件尾部正是启程，不能据此要求额外的事件间留白。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第22回-07-杨过智引敌寇黄蓉临盆生女",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第22回-07-杨过智引敌寇黄蓉临盆生女.yaml",
+      "previousEventId": "神雕第22回-06-杨过明志护郭靖金轮来袭",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“连日惊动胎息”说明黄蓉此前的身体状态，并非本场战斗与上一事件之间已经过了连日。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第23回-08-杨过吮毒救人昏迷醒转天竺僧诊断",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第23回-08-杨过吮毒救人昏迷醒转天竺僧诊断.yaml",
+      "previousEventId": "神雕第23回-07-李莫愁现身混战骑豹逃脱",
+      "gapFromPreviousEndHours": 193,
+      "verdict": "compatible",
+      "reason": "当前叙述中的“已是第七日”与193小时留白相容，且余量足以容纳救回襄阳等过程。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第24回-01-天竺僧论毒辞行",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第24回-01-天竺僧论毒辞行.yaml",
+      "previousEventId": "神雕第23回-08-杨过吮毒救人昏迷醒转天竺僧诊断",
+      "gapFromPreviousEndHours": 6,
+      "verdict": "compatible",
+      "reason": "开头“昏睡七日后”是在承接、概述上一事件内已经叙明的苏醒过程，不要求两事件触发时间再间隔七日。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第24回-08-周伯通盗王旗",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第24回-08-周伯通盗王旗.yaml",
+      "previousEventId": "神雕第24回-07-尹赵小镇风波与法王相遇",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“次日”出现于本事件内的夜行后续，开头仍是饭铺中直接承接的离开动作。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第26回-01-小龙女剑败全真群道",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第26回-01-小龙女剑败全真群道.yaml",
+      "previousEventId": "神雕第25回-09-赵志敬诛杀忠义弟子小龙女现身救场",
+      "gapFromPreviousEndHours": 23,
+      "verdict": "compatible",
+      "reason": "“连日郁郁于心”是小龙女追踪期间的情绪背景，不是本次出手前必须另留的连日空档。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第26回-06-杨过现身救小龙女",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第26回-06-杨过现身救小龙女.yaml",
+      "previousEventId": "神雕第26回-05-尹志平舍身救小龙女",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“月余之功”指全真五子先前创制阵法所花时间，和相邻战斗场景的间隔无关。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第26回-08-杨过荒谷遇神雕发现剑冢",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第26回-08-杨过荒谷遇神雕发现剑冢.yaml",
+      "previousEventId": "神雕第26回-07-郭芙斩断杨过右臂",
+      "gapFromPreviousEndHours": 23,
+      "verdict": "compatible",
+      "reason": "“次晨”与23小时间隔能够相容；其后的多日疗伤属于当前事件内部经过。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第26回-09-杨过山洪中悟重剑剑道",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第26回-09-杨过山洪中悟重剑剑道.yaml",
+      "previousEventId": "神雕第26回-08-杨过荒谷遇神雕发现剑冢",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "hard_conflict",
+      "reason": "当前开头明确为“次晨醒转”，上一事件结束到当前触发却只有1小时且仍为同日，无法跨越一夜至次晨。",
+      "minimumRequiredGapHours": 20
+    },
+    {
+      "id": "神雕第27回-01-郭靖欲斩郭芙手臂黄蓉救女点穴放行",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第27回-01-郭靖欲斩郭芙手臂黄蓉救女点穴放行.yaml",
+      "previousEventId": "神雕第26回-10-杨过夜入襄阳",
+      "gapFromPreviousEndHours": 43,
+      "verdict": "hard_conflict",
+      "reason": "“郭芙在外躲避数日后终于回家”明确要求至少数日；43小时不足两整日。",
+      "minimumRequiredGapHours": 48
+    },
+    {
+      "id": "神雕第27回-05-杨过飞入棘阵劫郭襄抢红马北上终南山",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第27回-05-杨过飞入棘阵劫郭襄抢红马北上终南山.yaml",
+      "previousEventId": "神雕第27回-04-黄蓉李莫愁斗智斗力棘藤布阵智夺郭襄",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“数月前”仅回指杨过先前获授的阵法要诀，不是当前劫走郭襄前的时间跳跃。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第28回-03-藏经阁越涧潜水归古墓",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第28回-03-藏经阁越涧潜水归古墓.yaml",
+      "previousEventId": "神雕第28回-02-周伯通闯宫与赵志敬之死",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "郭襄“吃了多日豹乳”描述的是她此前被安置期间的状态，不能单独推出本事件与上一事件之间须有多日。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第29回-05-杨龙寒玉床疗伤李莫愁偷袭被杨过智困棺中",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第29回-05-杨龙寒玉床疗伤李莫愁偷袭被杨过智困棺中.yaml",
+      "previousEventId": "神雕第29回-04-李莫愁引众人溪底秘道入古墓困武三通",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“连日来”修饰杨龙此前持续疗伤的背景，当前冲穴与李莫愁偷袭可在同一连续场景发生。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第30回-05-一灯赠药四人相认赶赴绝情谷周伯通现身",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第30回-05-一灯赠药四人相认赶赴绝情谷周伯通现身.yaml",
+      "previousEventId": "神雕第30回-04-慈恩攻击一灯杨过玄铁剑救师点化",
+      "gapFromPreviousEndHours": 17,
+      "verdict": "compatible",
+      "reason": "“次晨四人赶路”与约17小时的过夜留白相容。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第32回-08-周伯通驱蜂困李莫愁李莫愁葬身火窟",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-08-周伯通驱蜂困李莫愁李莫愁葬身火窟.yaml",
+      "previousEventId": "神雕第32回-07-杨过掷丹入谷小龙女晕倒",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "周伯通“经多日钻研”玉蜂指挥法，是自终南山火焚以来的背景经历，不要求此处有多日空档。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第32回-12-杨过寻到留字黄蓉编造南海神尼",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-12-杨过寻到留字黄蓉编造南海神尼.yaml",
+      "previousEventId": "神雕第32回-11-小龙女深夜失踪",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "retelling",
+      "reason": "“十六年后”是崖壁留字所约的未来重会时间，非当前触发时间；其余年数亦为黄蓉编造神尼来历。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第32回-13-杨过服断肠草众人告别",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-13-杨过服断肠草众人告别.yaml",
+      "previousEventId": "神雕第32回-12-杨过寻到留字黄蓉编造南海神尼",
+      "gapFromPreviousEndHours": 7,
+      "verdict": "retelling",
+      "reason": "“一十六年”出自陆无双对分别因由的转述，不是本场服药与告别前已过去的时间。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第32回-14-杨过程英陆无双结拜传功",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-14-杨过程英陆无双结拜传功.yaml",
+      "previousEventId": "神雕第32回-13-杨过服断肠草众人告别",
+      "gapFromPreviousEndHours": 163,
+      "verdict": "compatible",
+      "reason": "第六日、第七日及近月传功均是当前事件所覆盖的蒙太奇，163小时留白不需承担其全部时长。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第32回-15-杨过飘然离去海边练剑",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第32回-15-杨过飘然离去海边练剑.yaml",
+      "previousEventId": "神雕第32回-14-杨过程英陆无双结拜传功",
+      "gapFromPreviousEndHours": 743,
+      "verdict": "compatible",
+      "reason": "约31日留白与开头“月余”相容；后续数月、数年练剑为本事件内部蒙太奇。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第33回-02-小王将军述说神雕侠救父诛奸",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第33回-02-小王将军述说神雕侠救父诛奸.yaml",
+      "previousEventId": "神雕第33回-01-风陵渡安渡老店三姊弟投店围炉夜话",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "retelling",
+      "reason": "“第三日”“连夜”“迟了两日”均为围炉客人转述王将军旧案，不是店内夜话相邻场景的实际间隔。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第34回-04-一灯求见杨过长啸逼瑛姑恩怨揭晓",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第34回-04-一灯求见杨过长啸逼瑛姑恩怨揭晓.yaml",
+      "previousEventId": "神雕第34回-03-杨过郭襄黑龙潭追狐遇瑛姑",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "一灯苦候七日及慈恩一日一夜之战都是当前潭外会面前已存在的状态，不要求杨过追狐场景后另留七日。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第35回-01-万兽山庄庆功宴",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第35回-01-万兽山庄庆功宴.yaml",
+      "previousEventId": "神雕第34回-06-众人和解慈恩逝世瑛姑赠狐",
+      "gapFromPreviousEndHours": 23,
+      "verdict": "compatible",
+      "reason": "约23小时可承接回庄与“是晚”宴席；“连日奔波”只是郭襄此前累积的疲惫。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第35回-04-郭襄回襄阳受父母管教",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第35回-04-郭襄回襄阳受父母管教.yaml",
+      "previousEventId": "神雕第35回-03-郭芙刺伤史孟捷杨过道破往事",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "郭襄饿两天、第三日受哄以及英雄帖会期均在本事件内部展开，不应归入上一事件结束后的1小时。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第35回-08-英雄大宴郭靖被推为盟主",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第35回-08-英雄大宴郭靖被推为盟主.yaml",
+      "previousEventId": "神雕第35回-07-黄蓉夜探堕泪碑发现神秘聚会",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "“翌日英雄大宴”发生在本事件描述的当日接待之后；该词不把事件触发点本身限定为距上项满一日。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第37回-01-达尔巴揭穿霍都清理师门",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-01-达尔巴揭穿霍都清理师门.yaml",
+      "previousEventId": "神雕第36回-08-第三件寿礼群侠献俘",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "retelling",
+      "reason": "“十六年前”“十余年”只是在揭露霍都身分时回顾其逃亡、潜伏和夺棒经过。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第37回-05-黄蓉向郭襄讲述三世恩怨坦承南海神尼",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-05-黄蓉向郭襄讲述三世恩怨坦承南海神尼.yaml",
+      "previousEventId": "神雕第37回-04-耶律齐接任丐帮帮主",
+      "gapFromPreviousEndHours": 5,
+      "verdict": "retelling",
+      "reason": "黄蓉讲述郭杨三世恩怨和十六年信约，属于向郭襄的回顾与说明，不能反推当前触发时间。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第37回-06-郭襄留书出走寻杨过",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-06-郭襄留书出走寻杨过.yaml",
+      "previousEventId": "神雕第37回-05-黄蓉向郭襄讲述三世恩怨坦承南海神尼",
+      "gapFromPreviousEndHours": 881,
+      "verdict": "compatible",
+      "reason": "当前从傍晚至次晨的行动均可容纳在881小时留白内，“次日”也在该事件内部。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第37回-09-杨过癫狂至嘉兴铁枪庙救柯镇恶知父过",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-09-杨过癫狂至嘉兴铁枪庙救柯镇恶知父过.yaml",
+      "previousEventId": "神雕第37回-08-杨过问黄药师南海神尼真相大白",
+      "gapFromPreviousEndHours": 1,
+      "verdict": "compatible",
+      "reason": "数日狂奔、第三日到嘉兴均是杨过冲出酒楼后的本事件行程；其持续时长不作为前后事件留白审计对象。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第37回-10-杨过得讯郭襄被擒赴蒙古军营寻访",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第37回-10-杨过得讯郭襄被擒赴蒙古军营寻访",
+      "previousEventId": "神雕第37回-09-杨过癫狂至嘉兴铁枪庙救柯镇恶知父过",
+      "gapFromPreviousEndHours": 381,
+      "verdict": "compatible",
+      "reason": "381小时足以覆盖“次日”启程及后续多夜查营；这些时间词也主要描述当前事件内的搜查过程。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第38回-02-黄蓉程英陆无双出城寻郭襄至风陵渡",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第38回-02-黄蓉程英陆无双出城寻郭襄至风陵渡.yaml",
+      "previousEventId": "神雕第38回-01-郭襄夜逃金轮法王三拦收徒激将赴绝情谷",
+      "gapFromPreviousEndHours": 23,
+      "verdict": "hard_conflict",
+      "reason": "开头明确“郭襄出走十余日后”，而上一事件结束至当前触发仅23小时，明显不足十日。",
+      "minimumRequiredGapHours": 240
+    },
+    {
+      "id": "神雕第38回-03-黄蓉随玉蜂遇周伯通发现蜂翅刺字解出绝情谷底",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第38回-03-黄蓉随玉蜂遇周伯通发现蜂翅刺字解出绝情谷底.yaml",
+      "previousEventId": "神雕第38回-02-黄蓉程英陆无双出城寻郭襄至风陵渡",
+      "gapFromPreviousEndHours": 2,
+      "verdict": "compatible",
+      "reason": "本事件先写追蜂至傍晚、再写“次晨”读字，次晨为事件内部推进，非2小时留白的要求。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第38回-07-郭襄述谷底情形众人搓绳下谷寻杨过不见黄蓉探潭无果",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第38回-07-郭襄述谷底情形众人搓绳下谷寻杨过不见黄蓉探潭无果.yaml",
+      "previousEventId": "神雕第38回-06-黄蓉等赶到绝情谷大战法王黄药师现身法王被擒双雕殉情郭襄获救",
+      "gapFromPreviousEndHours": 13,
+      "verdict": "compatible",
+      "reason": "搓索至天黑、通宵工作到次晨都发生于当前事件；13小时不需单独容纳这段内部蒙太奇。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第39回-02-蒙古大军猛攻襄阳大战十二时辰",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第39回-02-蒙古大军猛攻襄阳大战十二时辰.yaml",
+      "previousEventId": "神雕第39回-01-黄蓉七人回襄阳夜闯蒙古营入城",
+      "gapFromPreviousEndHours": 11,
+      "verdict": "hard_conflict",
+      "reason": "“次日天甫黎明”明确指向隔夜后的清晨；上一事件结束时为当日9时，11小时既未到次日也未到清晨。",
+      "minimumRequiredGapHours": 20
+    },
+    {
+      "id": "神雕第39回-03-蒙古军筑高台金轮法王以郭襄要挟郭靖投降",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第39回-03-蒙古军筑高台金轮法王以郭襄要挟郭靖投降.yaml",
+      "previousEventId": "神雕第39回-02-蒙古大军猛攻襄阳大战十二时辰",
+      "gapFromPreviousEndHours": 4,
+      "verdict": "compatible",
+      "reason": "“大战次日清晨”是相对前一场从前日夜至本晨结束的大战而言；前项结束于本晨后，4小时至正午不矛盾。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第39回-08-杨过飞石击杀蒙哥大汗宋军大胜",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第39回-08-杨过飞石击杀蒙哥大汗宋军大胜.yaml",
+      "previousEventId": "神雕第39回-07-杨过小龙女神雕冲高台战金轮法王救郭襄",
+      "gapFromPreviousEndHours": 23,
+      "verdict": "compatible",
+      "reason": "“二十年来第一次”是郭芙对杨过长期态度的回顾，和23小时相邻留白无关。",
+      "minimumRequiredGapHours": null
+    },
+    {
+      "id": "神雕第40回-01-华山祭奠洪七公与欧阳锋",
+      "file": "世界书/金庸群侠传1/世界书/神雕事件条目-第40回-01-华山祭奠洪七公与欧阳锋.yaml",
+      "previousEventId": "神雕第39回-09-襄阳大捷庆功宴郭靖杨过携手入城议赴华山",
+      "gapFromPreviousEndHours": 287,
+      "verdict": "compatible",
+      "reason": "287小时足以容纳“次日”离城、每日缓行及抵达华山；文本与留白相容。",
+      "minimumRequiredGapHours": null
+    }
+  ]
+}

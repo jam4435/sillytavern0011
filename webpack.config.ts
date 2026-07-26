@@ -17,6 +17,7 @@ import unpluginVueComponents from 'unplugin-vue-components/webpack';
 import { VueLoaderPlugin } from 'vue-loader';
 import webpack from 'webpack';
 import WebpackObfuscator from 'webpack-obfuscator';
+import { shouldBundleXyflowDependency } from './src/武侠/utils/xyflowBundlePolicy.mjs';
 const require = createRequire(import.meta.url);
 const HTMLInlineCSSWebpackPlugin = require('html-inline-css-webpack-plugin').default;
 
@@ -30,13 +31,7 @@ interface Entry {
 }
 type WebpackEnv = Record<string, string | boolean | undefined>;
 
-const EVENT_DATA_SOURCE_DIRECTORY = path.join(
-  import.meta.dirname,
-  'src',
-  '事件脚本',
-  'generated',
-  'event-data',
-);
+const EVENT_DATA_SOURCE_DIRECTORY = path.join(import.meta.dirname, 'src', '事件脚本', 'generated', 'event-data');
 
 class EventDataAssetPlugin {
   apply(compiler: webpack.Compiler) {
@@ -284,400 +279,405 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
   return (env, argv) => {
     const is_fast_build = env_flag_enabled(env, 'fast');
 
-    return ({
-    experiments: {
-      outputModule: true,
-    },
-    devtool: is_fast_build ? false : argv.mode === 'production' ? 'source-map' : 'eval-source-map',
-    watchOptions: {
-      ignored: ['**/dist', '**/node_modules'],
-    },
-    entry: path.join(import.meta.dirname, entry.script),
-    target: 'browserslist',
-    output: {
-      devtoolNamespace: 'tavern_helper_template',
-      devtoolModuleFilenameTemplate: info => {
-        const resource_path = decodeURIComponent(info.resourcePath.replace(/^\.\//, ''));
-        const is_direct = info.allLoaders === '';
-        const is_vue_script =
-          resource_path.match(/\.vue$/) &&
-          info.query.match(/\btype=script\b/) &&
-          !info.allLoaders.match(/\bts-loader\b/);
+    return {
+      experiments: {
+        outputModule: true,
+      },
+      devtool: is_fast_build ? false : argv.mode === 'production' ? 'source-map' : 'eval-source-map',
+      watchOptions: {
+        ignored: ['**/dist', '**/node_modules'],
+      },
+      entry: path.join(import.meta.dirname, entry.script),
+      target: 'browserslist',
+      output: {
+        devtoolNamespace: 'tavern_helper_template',
+        devtoolModuleFilenameTemplate: info => {
+          const resource_path = decodeURIComponent(info.resourcePath.replace(/^\.\//, ''));
+          const is_direct = info.allLoaders === '';
+          const is_vue_script =
+            resource_path.match(/\.vue$/) &&
+            info.query.match(/\btype=script\b/) &&
+            !info.allLoaders.match(/\bts-loader\b/);
 
-        return `${is_direct === true ? 'src' : 'webpack'}://${info.namespace}/${resource_path}${is_direct || is_vue_script ? '' : '?' + info.hash}`;
-      },
-      filename: `${script_filepath.name}.js`,
-      path: path.join(
-        import.meta.dirname,
-        'dist',
-        path.relative(import.meta.dirname, script_filepath.dir).replace(/^[^\\/]+[\\/]/, ''),
-      ),
-      chunkFilename: `${script_filepath.name}.[contenthash].chunk.js`,
-      asyncChunks: true,
-      clean: true,
-      publicPath: '',
-      library: {
-        type: 'module',
-      },
-    },
-    module: {
-      rules: [
-        {
-          test: /\.vue$/,
-          use: 'vue-loader',
-          exclude: /node_modules/,
+          return `${is_direct === true ? 'src' : 'webpack'}://${info.namespace}/${resource_path}${is_direct || is_vue_script ? '' : '?' + info.hash}`;
         },
-        {
-          oneOf: [
-            {
-              test: /\.tsx?$/,
-              loader: 'ts-loader',
-              options: {
-                transpileOnly: true,
-                onlyCompileBundledFiles: true,
-                compilerOptions: {
-                  noUnusedLocals: false,
-                  noUnusedParameters: false,
+        filename: `${script_filepath.name}.js`,
+        path: path.join(
+          import.meta.dirname,
+          'dist',
+          path.relative(import.meta.dirname, script_filepath.dir).replace(/^[^\\/]+[\\/]/, ''),
+        ),
+        chunkFilename: `${script_filepath.name}.[contenthash].chunk.js`,
+        asyncChunks: true,
+        clean: true,
+        publicPath: '',
+        library: {
+          type: 'module',
+        },
+      },
+      module: {
+        rules: [
+          {
+            test: /\.vue$/,
+            use: 'vue-loader',
+            exclude: /node_modules/,
+          },
+          {
+            oneOf: [
+              {
+                test: /\.tsx?$/,
+                loader: 'ts-loader',
+                options: {
+                  transpileOnly: true,
+                  onlyCompileBundledFiles: true,
+                  compilerOptions: {
+                    noUnusedLocals: false,
+                    noUnusedParameters: false,
+                  },
                 },
+                resourceQuery: /raw/,
+                type: 'asset/source',
+                exclude: /node_modules/,
               },
-              resourceQuery: /raw/,
-              type: 'asset/source',
-              exclude: /node_modules/,
-            },
-            {
-              test: /\.(sa|sc)ss$/,
-              use: ['postcss-loader', 'sass-loader'],
-              resourceQuery: /raw/,
-              type: 'asset/source',
-              exclude: /node_modules/,
-            },
-            {
-              test: /\.css$/,
-              use: ['postcss-loader'],
-              resourceQuery: /raw/,
-              type: 'asset/source',
-              exclude: /node_modules/,
-            },
-            {
-              resourceQuery: /raw/,
-              type: 'asset/source',
-              exclude: /node_modules/,
-            },
-            {
-              test: /\.tsx?$/,
-              loader: 'ts-loader',
-              options: {
-                transpileOnly: true,
-                onlyCompileBundledFiles: true,
-                compilerOptions: {
-                  noUnusedLocals: false,
-                  noUnusedParameters: false,
-                },
+              {
+                test: /\.(sa|sc)ss$/,
+                use: ['postcss-loader', 'sass-loader'],
+                resourceQuery: /raw/,
+                type: 'asset/source',
+                exclude: /node_modules/,
               },
-              resourceQuery: /url/,
-              type: 'asset/inline',
-              exclude: /node_modules/,
-            },
-            {
-              test: /\.(sa|sc)ss$/,
-              use: ['postcss-loader', 'sass-loader'],
-              resourceQuery: /url/,
-              type: 'asset/inline',
-              exclude: /node_modules/,
-            },
-            {
-              test: /\.css$/,
-              use: ['postcss-loader'],
-              resourceQuery: /url/,
-              type: 'asset/inline',
-              exclude: /node_modules/,
-            },
-            {
-              resourceQuery: /url/,
-              type: 'asset/inline',
-              exclude: /node_modules/,
-            },
-            {
-              test: /\.tsx?$/,
-              loader: 'ts-loader',
-              options: {
-                transpileOnly: true,
-                onlyCompileBundledFiles: true,
-                compilerOptions: {
-                  noUnusedLocals: false,
-                  noUnusedParameters: false,
-                },
+              {
+                test: /\.css$/,
+                use: ['postcss-loader'],
+                resourceQuery: /raw/,
+                type: 'asset/source',
+                exclude: /node_modules/,
               },
-              exclude: /node_modules/,
-            },
-            {
-              test: /\.html$/,
-              use: 'html-loader',
-              exclude: /node_modules/,
-            },
-            {
-              test: /\.md$/,
-              use: [
-                {
-                  loader: 'html-loader',
+              {
+                resourceQuery: /raw/,
+                type: 'asset/source',
+                exclude: /node_modules/,
+              },
+              {
+                test: /\.tsx?$/,
+                loader: 'ts-loader',
+                options: {
+                  transpileOnly: true,
+                  onlyCompileBundledFiles: true,
+                  compilerOptions: {
+                    noUnusedLocals: false,
+                    noUnusedParameters: false,
+                  },
                 },
-                {
-                  loader: 'remark-loader',
-                  options: {
-                    remarkOptions: {
-                      plugins: [RemarkHTML],
+                resourceQuery: /url/,
+                type: 'asset/inline',
+                exclude: /node_modules/,
+              },
+              {
+                test: /\.(sa|sc)ss$/,
+                use: ['postcss-loader', 'sass-loader'],
+                resourceQuery: /url/,
+                type: 'asset/inline',
+                exclude: /node_modules/,
+              },
+              {
+                test: /\.css$/,
+                use: ['postcss-loader'],
+                resourceQuery: /url/,
+                type: 'asset/inline',
+                exclude: /node_modules/,
+              },
+              {
+                resourceQuery: /url/,
+                type: 'asset/inline',
+                exclude: /node_modules/,
+              },
+              {
+                test: /\.tsx?$/,
+                loader: 'ts-loader',
+                options: {
+                  transpileOnly: true,
+                  onlyCompileBundledFiles: true,
+                  compilerOptions: {
+                    noUnusedLocals: false,
+                    noUnusedParameters: false,
+                  },
+                },
+                exclude: /node_modules/,
+              },
+              {
+                test: /\.html$/,
+                use: 'html-loader',
+                exclude: /node_modules/,
+              },
+              {
+                test: /\.md$/,
+                use: [
+                  {
+                    loader: 'html-loader',
+                  },
+                  {
+                    loader: 'remark-loader',
+                    options: {
+                      remarkOptions: {
+                        plugins: [RemarkHTML],
+                      },
                     },
                   },
-                },
-              ],
-            },
-            {
-              test: /\.ya?ml$/,
-              loader: 'yaml-loader',
-              options: { asStream: true },
-              resourceQuery: /stream/,
-            },
-            {
-              test: /\.ya?ml$/,
-              loader: 'yaml-loader',
-            },
-          ].concat(
-            entry.html === undefined
-              ? ([
-                  {
-                    test: /\.vue\.s(a|c)ss$/,
-                    use: [
-                      { loader: 'vue-style-loader', options: { ssrId: true } },
-                      { loader: 'css-loader', options: { url: false } },
-                      'postcss-loader',
-                      'sass-loader',
-                    ],
-                    exclude: /node_modules/,
-                  },
-                  {
-                    test: /\.vue\.css$/,
-                    use: [
-                      { loader: 'vue-style-loader', options: { ssrId: true } },
-                      { loader: 'css-loader', options: { url: false } },
-                      'postcss-loader',
-                    ],
-                    exclude: /node_modules/,
-                  },
-                  {
-                    test: /\.s(a|c)ss$/,
-                    use: [
-                      'style-loader',
-                      { loader: 'css-loader', options: { url: false } },
-                      'postcss-loader',
-                      'sass-loader',
-                    ],
-                    exclude: /node_modules/,
-                  },
-                  {
-                    test: /\.css$/,
-                    use: ['style-loader', { loader: 'css-loader', options: { url: false } }, 'postcss-loader'],
-                    exclude: /node_modules/,
-                  },
-                ] as any[])
-              : ([
-                  {
-                    test: /\.s(a|c)ss$/,
-                    use: [
-                      MiniCssExtractPlugin.loader,
-                      { loader: 'css-loader', options: { url: false } },
-                      'postcss-loader',
-                      'sass-loader',
-                    ],
-                    exclude: /node_modules/,
-                  },
-                  {
-                    test: /\.css$/,
-                    use: [
-                      MiniCssExtractPlugin.loader,
-                      { loader: 'css-loader', options: { url: false } },
-                      'postcss-loader',
-                    ],
-                    exclude: /node_modules/,
-                  },
-                ] as any[]),
-          ),
-        },
-      ],
-    },
-    resolve: {
-      extensions: ['.ts', '.js', '.tsx', '.jsx', '.css'],
-      plugins: [
-        new TsconfigPathsPlugin({
-          extensions: ['.ts', '.js', '.tsx', '.jsx'],
-          configFile: path.join(import.meta.dirname, 'tsconfig.json'),
-        }),
-      ],
-      alias: {},
-    },
-    plugins: (entry.html === undefined
-      ? [new MiniCssExtractPlugin()]
-      : [
-          new HtmlWebpackPlugin({
-            template: path.join(import.meta.dirname, entry.html),
-            filename: path.parse(entry.html).base,
-            scriptLoading: 'module',
-            cache: false,
-            hash: false,
-          }),
-          new HtmlInlineScriptWebpackPlugin(),
-          new MiniCssExtractPlugin(),
-          new HTMLInlineCSSWebpackPlugin({
-            styleTagFactory({ style }: { style: string }) {
-              return `<style>${style}</style>`;
-            },
-          }),
-        ]
-    )
-      .concat(
-        { apply: watch_tavern_helper },
-        { apply: schema_dump },
-        ...(env_flag_enabled(env, 'srcOnly') ? [] : [{ apply: tavern_sync }]),
-        ...(is_event_script_entry(entry.script) ? [new EventDataAssetPlugin()] : []),
-        new VueLoaderPlugin(),
-        unpluginAutoImport({
-          dts: true,
-          dtsMode: 'overwrite',
-          imports: [
-            'vue',
-            'pinia',
-            '@vueuse/core',
-            { from: 'dedent', imports: [['default', 'dedent']] },
-            { from: 'klona', imports: ['klona'] },
-            { from: 'vue-final-modal', imports: ['useModal'] },
-            { from: 'zod', imports: ['z'] },
-          ],
-        }),
-        unpluginVueComponents({
-          dts: true,
-          syncMode: 'overwrite',
-          // globs: ['src/panel/component/*.vue'],
-          resolvers: [VueUseComponentsResolver(), VueUseDirectiveResolver()],
-        }),
-        new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }),
-        new webpack.DefinePlugin({
-          __VUE_OPTIONS_API__: false,
-          __VUE_PROD_DEVTOOLS__: process.env.CI !== 'true',
-          __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
-        }),
-      )
-      .concat(
-        should_obfuscate
-          ? [
-              new WebpackObfuscator({
-                controlFlowFlattening: true,
-                numbersToExpressions: true,
-                selfDefending: true,
-                simplify: true,
-                splitStrings: true,
-                seed: 1,
-              }),
-            ]
-          : [],
-      ),
-    optimization: {
-      minimize: !is_fast_build,
-      minimizer: is_fast_build
-        ? []
-        : [
-            argv.mode === 'production'
-              ? new TerserPlugin({
-                  terserOptions: {
-                    format: { quote_style: 1 },
-                    mangle: { reserved: ['_', 'toastr', 'YAML', '$', 'z'] },
-                  },
-                })
-              : new TerserPlugin({
-                  extractComments: false,
-                  terserOptions: {
-                    format: { beautify: true, indent_level: 2 },
-                    compress: false,
-                    mangle: false,
-                  },
-                }),
-          ],
-      splitChunks: {
-        chunks: 'async',
-        minSize: 20000,
-        minChunks: 1,
-        maxAsyncRequests: 30,
-        maxInitialRequests: 30,
-        cacheGroups: {
-          vendor: {
-            name: 'vendor',
-            test: /[\\/]node_modules[\\/]/,
-            priority: -10,
+                ],
+              },
+              {
+                test: /\.ya?ml$/,
+                loader: 'yaml-loader',
+                options: { asStream: true },
+                resourceQuery: /stream/,
+              },
+              {
+                test: /\.ya?ml$/,
+                loader: 'yaml-loader',
+              },
+            ].concat(
+              entry.html === undefined
+                ? ([
+                    {
+                      test: /\.vue\.s(a|c)ss$/,
+                      use: [
+                        { loader: 'vue-style-loader', options: { ssrId: true } },
+                        { loader: 'css-loader', options: { url: false } },
+                        'postcss-loader',
+                        'sass-loader',
+                      ],
+                      exclude: /node_modules/,
+                    },
+                    {
+                      test: /\.vue\.css$/,
+                      use: [
+                        { loader: 'vue-style-loader', options: { ssrId: true } },
+                        { loader: 'css-loader', options: { url: false } },
+                        'postcss-loader',
+                      ],
+                      exclude: /node_modules/,
+                    },
+                    {
+                      test: /\.s(a|c)ss$/,
+                      use: [
+                        'style-loader',
+                        { loader: 'css-loader', options: { url: false } },
+                        'postcss-loader',
+                        'sass-loader',
+                      ],
+                      exclude: /node_modules/,
+                    },
+                    {
+                      test: /\.css$/,
+                      use: ['style-loader', { loader: 'css-loader', options: { url: false } }, 'postcss-loader'],
+                      exclude: /node_modules/,
+                    },
+                  ] as any[])
+                : ([
+                    {
+                      test: /\.s(a|c)ss$/,
+                      use: [
+                        MiniCssExtractPlugin.loader,
+                        { loader: 'css-loader', options: { url: false } },
+                        'postcss-loader',
+                        'sass-loader',
+                      ],
+                      exclude: /node_modules/,
+                    },
+                    {
+                      test: /\.css$/,
+                      use: [
+                        MiniCssExtractPlugin.loader,
+                        { loader: 'css-loader', options: { url: false } },
+                        'postcss-loader',
+                      ],
+                      exclude: /node_modules/,
+                    },
+                  ] as any[]),
+            ),
           },
-          default: {
-            name: 'default',
-            minChunks: 2,
-            priority: -20,
-            reuseExistingChunk: true,
+        ],
+      },
+      resolve: {
+        extensions: ['.ts', '.js', '.tsx', '.jsx', '.css'],
+        plugins: [
+          new TsconfigPathsPlugin({
+            extensions: ['.ts', '.js', '.tsx', '.jsx'],
+            configFile: path.join(import.meta.dirname, 'tsconfig.json'),
+          }),
+        ],
+        alias: {},
+      },
+      plugins: (entry.html === undefined
+        ? [new MiniCssExtractPlugin()]
+        : [
+            new HtmlWebpackPlugin({
+              template: path.join(import.meta.dirname, entry.html),
+              filename: path.parse(entry.html).base,
+              scriptLoading: 'module',
+              cache: false,
+              hash: false,
+            }),
+            new HtmlInlineScriptWebpackPlugin(),
+            new MiniCssExtractPlugin(),
+            new HTMLInlineCSSWebpackPlugin({
+              styleTagFactory({ style }: { style: string }) {
+                return `<style>${style}</style>`;
+              },
+            }),
+          ]
+      )
+        .concat(
+          { apply: watch_tavern_helper },
+          { apply: schema_dump },
+          ...(env_flag_enabled(env, 'srcOnly') ? [] : [{ apply: tavern_sync }]),
+          ...(is_event_script_entry(entry.script) ? [new EventDataAssetPlugin()] : []),
+          new VueLoaderPlugin(),
+          unpluginAutoImport({
+            dts: true,
+            dtsMode: 'overwrite',
+            imports: [
+              'vue',
+              'pinia',
+              '@vueuse/core',
+              { from: 'dedent', imports: [['default', 'dedent']] },
+              { from: 'klona', imports: ['klona'] },
+              { from: 'vue-final-modal', imports: ['useModal'] },
+              { from: 'zod', imports: ['z'] },
+            ],
+          }),
+          unpluginVueComponents({
+            dts: true,
+            syncMode: 'overwrite',
+            // globs: ['src/panel/component/*.vue'],
+            resolvers: [VueUseComponentsResolver(), VueUseDirectiveResolver()],
+          }),
+          new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }),
+          new webpack.DefinePlugin({
+            __VUE_OPTIONS_API__: false,
+            __VUE_PROD_DEVTOOLS__: process.env.CI !== 'true',
+            __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
+          }),
+        )
+        .concat(
+          should_obfuscate
+            ? [
+                new WebpackObfuscator({
+                  controlFlowFlattening: true,
+                  numbersToExpressions: true,
+                  selfDefending: true,
+                  simplify: true,
+                  splitStrings: true,
+                  seed: 1,
+                }),
+              ]
+            : [],
+        ),
+      optimization: {
+        minimize: !is_fast_build,
+        minimizer: is_fast_build
+          ? []
+          : [
+              argv.mode === 'production'
+                ? new TerserPlugin({
+                    terserOptions: {
+                      format: { quote_style: 1 },
+                      mangle: { reserved: ['_', 'toastr', 'YAML', '$', 'z'] },
+                    },
+                  })
+                : new TerserPlugin({
+                    extractComments: false,
+                    terserOptions: {
+                      format: { beautify: true, indent_level: 2 },
+                      compress: false,
+                      mangle: false,
+                    },
+                  }),
+            ],
+        splitChunks: {
+          chunks: 'async',
+          minSize: 20000,
+          minChunks: 1,
+          maxAsyncRequests: 30,
+          maxInitialRequests: 30,
+          cacheGroups: {
+            vendor: {
+              name: 'vendor',
+              test: /[\\/]node_modules[\\/]/,
+              priority: -10,
+            },
+            default: {
+              name: 'default',
+              minChunks: 2,
+              priority: -20,
+              reuseExistingChunk: true,
+            },
           },
         },
       },
-    },
-    externals: ({ context, request }, callback) => {
-      if (!context || !request) {
-        return callback();
-      }
+      externals: ({ context, request }, callback) => {
+        if (!context || !request) {
+          return callback();
+        }
 
-      // 自动化桥与 CLI 共用同一 Socket.IO 版本；桥脚本必须能在无外网环境下运行。
-      if (
-        ['socket.io-client', 'socket.io-parser', 'engine.io-client', 'engine.io-parser', '@socket.io/component-emitter'].includes(
-          request,
-        )
-      ) {
-        return callback();
-      }
+        // 自动化桥与 CLI 共用同一 Socket.IO 版本；桥脚本必须能在无外网环境下运行。
+        if (
+          [
+            'socket.io-client',
+            'socket.io-parser',
+            'engine.io-client',
+            'engine.io-parser',
+            '@socket.io/component-emitter',
+          ].includes(request)
+        ) {
+          return callback();
+        }
 
-      if (
-        request.startsWith('-') ||
-        request.startsWith('.') ||
-        request.startsWith('/') ||
-        request.startsWith('!') ||
-        request.startsWith('http') ||
-        request.startsWith('@/') ||
-        request.startsWith('@util/') ||
-        path.isAbsolute(request) ||
-        fs.existsSync(path.join(context, request)) ||
-        fs.existsSync(request)
-      ) {
-        return callback();
-      }
+        if (
+          request.startsWith('-') ||
+          request.startsWith('.') ||
+          request.startsWith('/') ||
+          request.startsWith('!') ||
+          request.startsWith('http') ||
+          request.startsWith('@/') ||
+          request.startsWith('@util/') ||
+          path.isAbsolute(request) ||
+          fs.existsSync(path.join(context, request)) ||
+          fs.existsSync(request)
+        ) {
+          return callback();
+        }
 
-      if (
-        ['vue', 'vue-router'].every(key => request !== key) &&
-        ['pixi', 'react', 'vue'].some(key => request.includes(key))
-      ) {
-        return callback();
-      }
-      const global = {
-        jquery: '$',
-        lodash: '_',
-        showdown: 'showdown',
-        toastr: 'toastr',
-        vue: 'Vue',
-        'vue-router': 'VueRouter',
-        yaml: 'YAML',
-        zod: 'z',
-      };
-      if (request in global) {
-        return callback(null, 'var ' + global[request as keyof typeof global]);
-      }
-      const cdn = {
-        sass: 'https://jspm.dev/sass',
-      };
-      return callback(
-        null,
-        'module-import ' + (cdn[request as keyof typeof cdn] ?? `https://testingcf.jsdelivr.net/npm/${request}/+esm`),
-      );
-    },
-  });
+        if (
+          shouldBundleXyflowDependency(request) ||
+          (['vue', 'vue-router'].every(key => request !== key) &&
+            ['pixi', 'react', 'vue'].some(key => request.includes(key)))
+        ) {
+          return callback();
+        }
+        const global = {
+          jquery: '$',
+          lodash: '_',
+          showdown: 'showdown',
+          toastr: 'toastr',
+          vue: 'Vue',
+          'vue-router': 'VueRouter',
+          yaml: 'YAML',
+          zod: 'z',
+        };
+        if (request in global) {
+          return callback(null, 'var ' + global[request as keyof typeof global]);
+        }
+        const cdn = {
+          sass: 'https://jspm.dev/sass',
+        };
+        return callback(
+          null,
+          'module-import ' + (cdn[request as keyof typeof cdn] ?? `https://testingcf.jsdelivr.net/npm/${request}/+esm`),
+        );
+      },
+    };
   };
 }
 

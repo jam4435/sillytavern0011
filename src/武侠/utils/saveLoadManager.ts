@@ -1,321 +1,1398 @@
-import type { GameState, WuxiaSaveNode, WuxiaSaveTreeData } from '../types';
-import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
+import { z } from 'zod';
+import {
+  clearHistoryCheckoutJournal,
+  clearHistoryCheckoutReturnIntent,
+  createHistoryCheckoutJournal,
+  isHistoryCheckoutJournalExpired,
+  isHistoryCheckoutPending,
+  notifyHistoryCheckoutCommit,
+  notifyHistoryCheckoutExpired,
+  notifyHistoryCheckoutFailure,
+  readHistoryCheckoutJournal,
+  readHistoryCheckoutReturnIntent,
+  renewHistoryCheckoutJournal,
+  updateHistoryCheckoutJournal,
+  writeHistoryCheckoutDraft,
+  writeHistoryCheckoutReturnIntent,
+  HISTORY_CHECKOUT_COMMIT_EVENT,
+  HISTORY_CHECKOUT_STATE_EVENT,
+  type HistoryCheckoutJournal,
+} from '../../shared/historyCheckoutJournal';
+import type {
+  GameState,
+  HistoryBranch,
+  HistoryLocator,
+  HistoryNode,
+  WuxiaHistoryTreeV2,
+  WuxiaSaveNode,
+  WuxiaSaveTreeData,
+} from '../types';
+import {
+  flushPendingGameDataCompletion,
+  isFrontendLoaderOnlyMessage,
+  normalizeDisplayedMessageContent,
+} from './variableReader';
 
-export const WUXIA_SAVE_TREE_KEY = 'wuxia_save_tree';
+export const WUXIA_HISTORY_TREE_V2_KEY = 'wuxia_history_tree_v2';
+export const WUXIA_HISTORY_PREPARE_VERIFICATION_EVENT = 'wuxia:history-checkout-prepare-verification';
+export { HISTORY_CHECKOUT_COMMIT_EVENT, HISTORY_CHECKOUT_STATE_EVENT, isHistoryCheckoutPending };
 
-type ChatMessageWithSwipes = {
+export type CheckoutActionKind = 'existing_branch' | 'in_place_swipe' | 'fork_branch';
+
+export const HistoryLocatorSchema = z
+  .object({
+    chatId: z.string(),
+    chatName: z.string(),
+    userMessageId: z.number().int().nullable(),
+    assistantMessageId: z.number().int(),
+    swipeId: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const HistoryNodeSchema = z
+  .object({
+    id: z.string(),
+    parentId: z.string().nullable(),
+    locators: z.array(HistoryLocatorSchema),
+    messageKey: z.string().nullable(),
+    label: z.string().nullable(),
+    pinned: z.boolean(),
+    preview: z.string(),
+    location: z.string(),
+    worldTimeText: z.string(),
+    createdAt: z.number().finite(),
+    verification: z
+      .object({
+        selectedMksHash: z.string(),
+        eventStateHash: z.string(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+export const HistoryBranchSchema = z
+  .object({
+    id: z.string(),
+    chatId: z.string(),
+    chatName: z.string(),
+    originNodeId: z.string().nullable(),
+    headNodeId: z.string().nullable(),
+    createdAt: z.number().finite(),
+    status: z.enum(['active', 'available', 'recovery_failed', 'broken']),
+  })
+  .strict();
+
+export const WuxiaHistoryTreeV2Schema = z
+  .object({
+    version: z.literal(2),
+    updatedAt: z.number().finite(),
+    nodes: z.record(z.string(), HistoryNodeSchema),
+    branches: z.record(z.string(), HistoryBranchSchema),
+  })
+  .strict();
+
+type TavernHistoryMessage = {
   message_id: number;
-  role: 'system' | 'assistant' | 'user';
+  role?: 'system' | 'assistant' | 'user';
+  is_user?: boolean;
+  is_system?: boolean;
+  is_hidden?: boolean;
   message?: string;
-  name?: string;
+  mes?: string;
   swipes?: string[];
   swipe_id?: number;
 };
 
-export interface SaveTreeViewState {
-  tree: WuxiaSaveTreeData;
-  currentChatName: string;
-  currentNodeId: string | null;
-  latestSaveTarget: {
-    messageId: number;
-    preview: string;
-  } | null;
+export interface HistoryChatIdentity {
+  id: string;
+  name: string;
 }
 
-function createEmptyTree(): WuxiaSaveTreeData {
+export interface HistoryTreeViewState {
+  tree: WuxiaHistoryTreeV2;
+  currentNodeId: string | null;
+  currentBranchId: string;
+  currentChat: HistoryChatIdentity;
+}
+
+export interface HistoryScanOptions {
+  originNodeId?: string | null;
+  location?: string;
+  worldTimeText?: string;
+}
+
+export interface FinalizeHistoryTurnOptions {
+  location?: string;
+  worldTimeText?: string;
+}
+
+export interface CheckoutHistoryOptions {
+  forceBranch?: boolean;
+}
+
+export interface HistoryCheckoutResult {
+  status: 'commit' | 'recovery_failed' | 'broken';
+  actionKind: CheckoutActionKind;
+  nodeId: string;
+  currentNodeId: string | null;
+  currentBranchId: string | null;
+  currentChat: HistoryChatIdentity | null;
+  error: string | null;
+}
+
+export interface CurrentHistoryContext extends HistoryTreeViewState {
+  currentBranch: HistoryBranch;
+  currentNode: HistoryNode | null;
+}
+
+type HistoryVerification = NonNullable<HistoryNode['verification']>;
+
+const ERA_MESSAGE_KEY_REGEX =
+  /<era_data>[\s\S]*?["']?era-message-key["']?\s*[=:]\s*["']([^"']+)["'][\s\S]*?<\/era_data>/i;
+const ERA_DATA_BLOCK_REGEX = /\s*<era_data>[\s\S]*?<\/era_data>\s*/gi;
+const VARIABLE_BLOCK_REGEX =
+  /\s*<Variable(?:Think|Insert|Edit|Delete)>[\s\S]*?<\/Variable(?:Think|Insert|Edit|Delete)>\s*/gi;
+const PREVIEW_LENGTH = 120;
+
+function createEmptyTree(now = Date.now()): WuxiaHistoryTreeV2 {
   return {
-    version: 1,
-    updatedAt: Date.now(),
-    nodes: [],
+    version: 2,
+    updatedAt: now,
+    nodes: {},
+    branches: {},
   };
+}
+
+function cloneTree(tree: WuxiaHistoryTreeV2): WuxiaHistoryTreeV2 {
+  return WuxiaHistoryTreeV2Schema.parse(structuredClone(tree));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function normalizeNode(value: unknown): WuxiaSaveNode | null {
-  if (!isRecord(value)) {
-    return null;
+function canonicalize(value: unknown, seen: WeakSet<object>): string {
+  if (value === null) return 'null';
+  if (value === undefined) return '"__undefined__"';
+  if (typeof value === 'number') {
+    if (Number.isNaN(value)) return '"__nan__"';
+    if (!Number.isFinite(value)) return value > 0 ? '"__infinity__"' : '"__negative_infinity__"';
+    return Object.is(value, -0) ? '0' : String(value);
   }
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'bigint') return JSON.stringify(`${value.toString()}n`);
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'symbol' || typeof value === 'function') return JSON.stringify(String(value));
 
-  const id = typeof value.id === 'string' ? value.id : '';
-  const checkpointName = typeof value.checkpointName === 'string' ? value.checkpointName : '';
-  const messageId = typeof value.messageId === 'number' ? value.messageId : Number(value.messageId);
-
-  if (!id || !checkpointName || !Number.isFinite(messageId)) {
-    return null;
+  if (seen.has(value as object)) {
+    throw new TypeError('无法为循环引用生成稳定哈希。');
   }
+  seen.add(value as object);
+  try {
+    if (Array.isArray(value)) {
+      return `[${value.map(item => canonicalize(item, seen)).join(',')}]`;
+    }
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record).sort();
+    return `{${keys.map(key => `${JSON.stringify(key)}:${canonicalize(record[key], seen)}`).join(',')}}`;
+  } finally {
+    seen.delete(value as object);
+  }
+}
 
+export function stableHistoryHash(value: unknown): string {
+  const text = canonicalize(value, new WeakSet<object>());
+  let high = 0x9e3779b9;
+  let low = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    low ^= code;
+    low = Math.imul(low, 0x01000193) >>> 0;
+    high ^= low + code + ((high << 6) >>> 0) + (high >>> 2);
+    high >>>= 0;
+  }
+  return `${high.toString(16).padStart(8, '0')}${low.toString(16).padStart(8, '0')}`;
+}
+
+function createStableId(prefix: string, value: unknown): string {
+  return `${prefix}_${stableHistoryHash(value)}`;
+}
+
+function branchIdForChat(chatId: string): string {
+  return createStableId('history_branch', chatId);
+}
+
+function cleanStoryText(text: string): string {
+  ERA_DATA_BLOCK_REGEX.lastIndex = 0;
+  VARIABLE_BLOCK_REGEX.lastIndex = 0;
+  return normalizeDisplayedMessageContent(text)
+    .replace(ERA_DATA_BLOCK_REGEX, '\n')
+    .replace(VARIABLE_BLOCK_REGEX, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function createPreview(text: string): string {
+  const normalized = cleanStoryText(text).replace(/\s+/g, ' ').trim();
+  return normalized.length <= PREVIEW_LENGTH ? normalized : `${normalized.slice(0, PREVIEW_LENGTH)}...`;
+}
+
+function extractMessageKey(text: string): string | null {
+  return text.match(ERA_MESSAGE_KEY_REGEX)?.[1]?.trim() || null;
+}
+
+function getMessageRole(message: TavernHistoryMessage): 'system' | 'assistant' | 'user' {
+  if (message.role) return message.role;
+  if (message.is_user) return 'user';
+  if (message.is_system) return 'system';
+  return 'assistant';
+}
+
+function getSwipeTexts(message: TavernHistoryMessage): { texts: string[]; activeSwipeId: number } {
+  if (Array.isArray(message.swipes) && message.swipes.length > 0) {
+    const requested = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
+    return {
+      texts: [...message.swipes],
+      activeSwipeId: Math.max(0, Math.min(requested, message.swipes.length - 1)),
+    };
+  }
   return {
-    id,
-    label: typeof value.label === 'string' && value.label.trim() ? value.label : checkpointName,
-    checkpointName,
-    messageId,
-    parentId: typeof value.parentId === 'string' ? value.parentId : null,
-    createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
-    playerName: typeof value.playerName === 'string' ? value.playerName : '',
-    location: typeof value.location === 'string' ? value.location : '',
-    worldTimeText: typeof value.worldTimeText === 'string' ? value.worldTimeText : '',
-    preview: typeof value.preview === 'string' ? value.preview : '',
+    texts: [message.message ?? message.mes ?? ''],
+    activeSwipeId: 0,
   };
 }
 
-function readStoredTree(): WuxiaSaveTreeData {
+function getNodeId(parentId: string | null, messageKey: string | null, text: string, swipeId: number): string {
+  return createStableId('history_node', {
+    parentId,
+    identity: messageKey ? `mk:${messageKey}` : `content:${stableHistoryHash(cleanStoryText(text))}`,
+    swipeId,
+  });
+}
+
+function locatorEquals(left: HistoryLocator, right: HistoryLocator): boolean {
+  return (
+    left.chatId === right.chatId &&
+    left.assistantMessageId === right.assistantMessageId &&
+    left.swipeId === right.swipeId
+  );
+}
+
+function appendLocator(node: HistoryNode, locator: HistoryLocator): HistoryNode {
+  if (node.locators.some(current => locatorEquals(current, locator))) return node;
+  return { ...node, locators: [...node.locators, locator] };
+}
+
+export function loadHistoryTree(): WuxiaHistoryTreeV2 {
   try {
     const variables = getVariables({ type: 'character' });
-    const rawTree = variables?.[WUXIA_SAVE_TREE_KEY];
-    if (!isRecord(rawTree)) {
-      return createEmptyTree();
-    }
-
-    const rawNodes = Array.isArray(rawTree.nodes) ? rawTree.nodes : [];
-    const nodes = rawNodes.map(normalizeNode).filter((node): node is WuxiaSaveNode => Boolean(node));
-
-    return {
-      version: 1,
-      updatedAt: typeof rawTree.updatedAt === 'number' ? rawTree.updatedAt : Date.now(),
-      nodes,
-    };
+    const parsed = WuxiaHistoryTreeV2Schema.safeParse(variables?.[WUXIA_HISTORY_TREE_V2_KEY]);
+    if (parsed.success) return parsed.data;
+    return createEmptyTree();
   } catch (error) {
-    console.warn('[金庸群侠传] 读取存档树失败:', error);
+    console.warn('[金庸群侠传] 读取 v2 历史树失败，使用空树:', error);
     return createEmptyTree();
   }
 }
 
-function writeStoredTree(tree: WuxiaSaveTreeData): WuxiaSaveTreeData {
-  const nextTree: WuxiaSaveTreeData = {
-    version: 1,
-    updatedAt: Date.now(),
-    nodes: tree.nodes,
-  };
-
+function persistHistoryTree(tree: WuxiaHistoryTreeV2): WuxiaHistoryTreeV2 {
+  const parsed = WuxiaHistoryTreeV2Schema.parse({ ...tree, updatedAt: Date.now() });
   updateVariablesWith(
     variables => ({
       ...variables,
-      [WUXIA_SAVE_TREE_KEY]: nextTree,
+      [WUXIA_HISTORY_TREE_V2_KEY]: parsed,
     }),
     { type: 'character' },
   );
-
-  return nextTree;
+  return parsed;
 }
 
-function getActiveMessageText(message: ChatMessageWithSwipes): string {
-  const swipes = Array.isArray(message.swipes) ? message.swipes : [];
-  const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
-  return message.message || swipes[swipeIndex] || swipes[0] || '';
+async function readCurrentChatIdentity(): Promise<HistoryChatIdentity> {
+  const currentId = String(SillyTavern.getCurrentChatId?.() ?? '').trim();
+  const slashName = await triggerSlash('/getchatname').catch(() => '');
+  const name = String(slashName ?? '').trim() || currentId;
+  return { id: currentId || name, name };
 }
 
-function findLatestSaveTarget(): SaveTreeViewState['latestSaveTarget'] {
-  const messages = getChatMessages('0-{{lastMessageId}}', {
-    role: 'assistant',
+function readAllHistoryMessages(): TavernHistoryMessage[] {
+  return getChatMessages('0-{{lastMessageId}}', {
+    role: 'all',
     hide_state: 'all',
     include_swipes: true,
-  }) as ChatMessageWithSwipes[];
+  }) as unknown as TavernHistoryMessage[];
+}
 
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    const rawText = getActiveMessageText(message);
-    if (!rawText.trim() || isFrontendLoaderOnlyMessage(rawText)) {
+function buildViewState(tree: WuxiaHistoryTreeV2, currentChat: HistoryChatIdentity): HistoryTreeViewState {
+  const currentBranchId = branchIdForChat(currentChat.id);
+  const currentBranch = tree.branches[currentBranchId];
+  return {
+    tree,
+    currentNodeId: currentBranch?.headNodeId ?? null,
+    currentBranchId,
+    currentChat,
+  };
+}
+
+export async function scanCurrentChat(options: HistoryScanOptions = {}): Promise<HistoryTreeViewState> {
+  const now = Date.now();
+  const currentChat = await readCurrentChatIdentity();
+  const branchId = branchIdForChat(currentChat.id);
+  const tree = cloneTree(loadHistoryTree());
+  const previousBranch = tree.branches[branchId];
+
+  for (const node of Object.values(tree.nodes)) {
+    node.locators = node.locators.filter(locator => locator.chatId !== currentChat.id);
+  }
+
+  let currentParentId: string | null = null;
+  let pendingUserMessageId: number | null = null;
+  let creationOffset = 0;
+
+  for (const message of readAllHistoryMessages()) {
+    if (!Number.isInteger(message.message_id) || message.is_hidden === true) continue;
+    const role = getMessageRole(message);
+    if (role === 'user') {
+      pendingUserMessageId = message.message_id;
       continue;
     }
+    if (role !== 'assistant') continue;
 
-    const cleaned = normalizeDisplayedMessageContent(rawText);
-    if (!cleaned) {
-      continue;
+    const { texts, activeSwipeId } = getSwipeTexts(message);
+    let activeNodeId: string | null = null;
+    for (let swipeId = 0; swipeId < texts.length; swipeId += 1) {
+      const rawText = texts[swipeId] ?? '';
+      const cleaned = cleanStoryText(rawText);
+      if (!rawText.trim() || !cleaned || isFrontendLoaderOnlyMessage(rawText)) {
+        continue;
+      }
+
+      const messageKey = extractMessageKey(rawText);
+      const id = getNodeId(currentParentId, messageKey, rawText, swipeId);
+      const locator: HistoryLocator = {
+        chatId: currentChat.id,
+        chatName: currentChat.name,
+        userMessageId: pendingUserMessageId,
+        assistantMessageId: message.message_id,
+        swipeId,
+      };
+      const existing = tree.nodes[id];
+      const node: HistoryNode = existing
+        ? appendLocator(existing, locator)
+        : {
+            id,
+            parentId: currentParentId,
+            locators: [locator],
+            messageKey,
+            label: null,
+            pinned: false,
+            preview: createPreview(rawText),
+            location: '',
+            worldTimeText: '',
+            createdAt: now + creationOffset++,
+            verification: null,
+          };
+      tree.nodes[id] = node;
+      if (swipeId === activeSwipeId) activeNodeId = id;
     }
 
-    return {
-      messageId: message.message_id,
-      preview: createPreview(cleaned, 96),
+    if (activeNodeId) currentParentId = activeNodeId;
+    pendingUserMessageId = null;
+  }
+
+  const currentHead = currentParentId ? tree.nodes[currentParentId] : null;
+  if (currentHead && (options.location !== undefined || options.worldTimeText !== undefined)) {
+    tree.nodes[currentHead.id] = {
+      ...currentHead,
+      location: options.location ?? currentHead.location,
+      worldTimeText: options.worldTimeText ?? currentHead.worldTimeText,
     };
   }
 
+  for (const branch of Object.values(tree.branches)) {
+    if (branch.id !== branchId && branch.status === 'active') branch.status = 'available';
+  }
+  tree.branches[branchId] = {
+    id: branchId,
+    chatId: currentChat.id,
+    chatName: currentChat.name,
+    originNodeId: previousBranch?.originNodeId ?? options.originNodeId ?? null,
+    headNodeId: currentParentId,
+    createdAt: previousBranch?.createdAt ?? now,
+    status: 'active',
+  };
+
+  return buildViewState(persistHistoryTree(tree), currentChat);
+}
+
+function readCurrentVerification(): HistoryVerification {
+  const variables = getVariables({ type: 'chat' });
+  const statData = isRecord(variables?.stat_data) ? variables.stat_data : {};
+  const metaData = isRecord(variables?.ERAMetaData) ? variables.ERAMetaData : {};
+  const selectedMks = Array.isArray(metaData.SelectedMks) ? metaData.SelectedMks : [];
+  return {
+    selectedMksHash: stableHistoryHash(selectedMks),
+    eventStateHash: stableHistoryHash({
+      事件系统: statData.事件系统 ?? null,
+      参与事件: statData.参与事件 ?? null,
+      世界事件: statData.世界事件 ?? null,
+      后续事件线索: statData.后续事件线索 ?? null,
+      后续事件线索计数: statData.后续事件线索计数 ?? null,
+    }),
+  };
+}
+
+export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = {}): Promise<HistoryTreeViewState> {
+  const scanned = await scanCurrentChat(options);
+  if (!scanned.currentNodeId) return scanned;
+
+  const tree = cloneTree(scanned.tree);
+  const node = tree.nodes[scanned.currentNodeId];
+  if (!node) return scanned;
+  tree.nodes[node.id] = {
+    ...node,
+    location: options.location ?? node.location,
+    worldTimeText: options.worldTimeText ?? node.worldTimeText,
+    verification: readCurrentVerification(),
+  };
+  return buildViewState(persistHistoryTree(tree), scanned.currentChat);
+}
+
+export function renameNode(nodeId: string, label: string | null): WuxiaHistoryTreeV2 {
+  const tree = cloneTree(loadHistoryTree());
+  const node = tree.nodes[nodeId];
+  if (!node) throw new Error(`历史节点不存在：${nodeId}`);
+  tree.nodes[nodeId] = { ...node, label: label?.trim() || null };
+  return persistHistoryTree(tree);
+}
+
+export function setNodePinned(nodeId: string, pinned: boolean): WuxiaHistoryTreeV2 {
+  const tree = cloneTree(loadHistoryTree());
+  const node = tree.nodes[nodeId];
+  if (!node) throw new Error(`历史节点不存在：${nodeId}`);
+  tree.nodes[nodeId] = { ...node, pinned };
+  return persistHistoryTree(tree);
+}
+
+export async function getCurrentContext(): Promise<CurrentHistoryContext> {
+  const state = await scanCurrentChat();
+  return {
+    ...state,
+    currentBranch: state.tree.branches[state.currentBranchId],
+    currentNode: state.currentNodeId ? (state.tree.nodes[state.currentNodeId] ?? null) : null,
+  };
+}
+
+function getNodeSuccessors(tree: WuxiaHistoryTreeV2, nodeId: string): HistoryNode[] {
+  return Object.values(tree.nodes).filter(node => node.parentId === nodeId);
+}
+
+function getLatestAssistantMessageId(messages: TavernHistoryMessage[]): number | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (Number.isInteger(message.message_id) && message.is_hidden !== true && getMessageRole(message) === 'assistant') {
+      const { texts } = getSwipeTexts(message);
+      if (texts.some(text => cleanStoryText(text).length > 0 && !isFrontendLoaderOnlyMessage(text))) {
+        return message.message_id;
+      }
+    }
+  }
   return null;
 }
 
-function createPreview(text: string, maxLength: number): string {
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (normalized.length <= maxLength) {
-    return normalized;
+function chooseLocatorForBranch(node: HistoryNode, branch: HistoryBranch): HistoryLocator | null {
+  return node.locators.find(locator => locator.chatId === branch.chatId) ?? null;
+}
+
+function chooseAnyUsableLocator(tree: WuxiaHistoryTreeV2, node: HistoryNode): HistoryLocator | null {
+  const ranked = node.locators
+    .map(locator => ({
+      locator,
+      branch: tree.branches[branchIdForChat(locator.chatId)],
+    }))
+    .sort((left, right) => {
+      const leftRank = left.branch?.status === 'broken' ? 1 : 0;
+      const rightRank = right.branch?.status === 'broken' ? 1 : 0;
+      return leftRank - rightRank;
+    });
+  return ranked[0]?.locator ?? null;
+}
+
+function getExistingLeafTarget(
+  tree: WuxiaHistoryTreeV2,
+  node: HistoryNode,
+): { branch: HistoryBranch; locator: HistoryLocator } | null {
+  for (const branch of Object.values(tree.branches)) {
+    if (branch.headNodeId !== node.id || branch.status === 'broken') continue;
+    const locator = chooseLocatorForBranch(node, branch);
+    if (locator) return { branch, locator };
   }
-  return `${normalized.slice(0, maxLength)}...`;
+  return null;
 }
 
-function createId(prefix: string): string {
-  const random = Math.random().toString(36).slice(2, 8);
-  return `${prefix}_${Date.now().toString(36)}_${random}`;
+export async function canSwitchSwipeInPlace(nodeId: string): Promise<boolean> {
+  const tree = loadHistoryTree();
+  const node = tree.nodes[nodeId];
+  if (!node || getNodeSuccessors(tree, nodeId).length > 0) return false;
+  const current = await readCurrentChatIdentity();
+  const locator = node.locators.find(item => item.chatId === current.id);
+  if (!locator) return false;
+  return locator.assistantMessageId === getLatestAssistantMessageId(readAllHistoryMessages());
 }
 
-function createCheckpointName(): string {
-  return createId('wuxia_cp');
+export class HistoryChatUnavailableError extends Error {
+  constructor(
+    public readonly chatId: string,
+    public readonly chatName: string,
+    cause?: unknown,
+  ) {
+    super(`历史聊天不可用：${chatName}（${chatId}）`, { cause });
+    this.name = 'HistoryChatUnavailableError';
+  }
 }
 
-function getWorldTimeText(gameState: GameState): string {
-  if (gameState.gameTime) {
-    return gameState.gameTime;
+function normalizeChatFileName(value: unknown): string {
+  return String(value ?? '')
+    .trim()
+    .replace(/\.jsonl$/i, '');
+}
+
+function getCurrentGroupId(): string {
+  return String(SillyTavern.groupId ?? '').trim();
+}
+
+function getCurrentCharacterIdentity(): { name: string; avatarUrl: string } {
+  const characterId = Number(SillyTavern.characterId);
+  const character = Number.isInteger(characterId)
+    ? (SillyTavern.characters?.[characterId] as { name?: unknown; avatar?: unknown } | undefined)
+    : undefined;
+  const name = String(character?.name ?? '').trim();
+  const avatarUrl = String(character?.avatar ?? '').trim();
+  if (!avatarUrl) {
+    throw new Error('无法读取当前角色信息，不能安全访问历史聊天。');
+  }
+  return { name, avatarUrl };
+}
+
+async function assertHistoryChatAvailable(chat: HistoryChatIdentity): Promise<void> {
+  const groupId = getCurrentGroupId();
+  if (groupId) {
+    const group = (SillyTavern.groups as Array<{ id?: unknown; chats?: unknown }>).find(
+      candidate => String(candidate?.id ?? '') === groupId,
+    );
+    if (!group) {
+      throw new Error(`无法读取当前群组（${groupId}）的聊天列表。`);
+    }
+    const chatIds = Array.isArray(group.chats) ? group.chats.map(normalizeChatFileName) : [];
+    if (!chatIds.includes(chat.id)) {
+      throw new HistoryChatUnavailableError(chat.id, chat.name);
+    }
+    return;
   }
 
-  const time = gameState.worldTime;
-  if (!time) {
-    return '';
-  }
+  const { avatarUrl } = getCurrentCharacterIdentity();
 
-  return `${time.year}年${time.month}月${time.day}日${time.hour}时`;
-}
-
-function getDefaultLabel(gameState: GameState): string {
-  const location = gameState.currentLocation || gameState.stats.location || '江湖途中';
-  const time = getWorldTimeText(gameState);
-  return time ? `${location} · ${time}` : location;
-}
-
-function parseCheckpointList(rawResult: string): Array<{ checkpointName: string; messageId?: number }> {
-  if (!rawResult?.trim()) {
-    return [];
-  }
-
-  let parsed: unknown = rawResult;
+  let response: Response;
   try {
-    parsed = JSON.parse(rawResult);
-  } catch {
-    parsed = rawResult
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(Boolean);
+    response = await fetch('/api/characters/chats', {
+      method: 'POST',
+      headers: SillyTavern.getRequestHeaders(),
+      body: JSON.stringify({ avatar_url: avatarUrl }),
+    });
+  } catch (error) {
+    throw new Error('无法读取角色聊天列表，历史切换尚未执行。', { cause: error });
+  }
+  if (!response.ok) {
+    throw new Error(`无法读取角色聊天列表（HTTP ${response.status}），历史切换尚未执行。`);
   }
 
-  const items = Array.isArray(parsed) ? parsed : [parsed];
-  return items
-    .map(item => {
-      if (typeof item === 'number') {
-        return null;
-      }
-
-      if (typeof item === 'string') {
-        const checkpointMatch = item.match(/wuxia_cp_[A-Za-z0-9_-]+/);
-        const numberMatch = item.match(/\d+/);
-        const checkpointName = checkpointMatch?.[0] || item.trim();
-        return {
-          checkpointName,
-          messageId: numberMatch ? Number(numberMatch[0]) : undefined,
-        };
-      }
-
-      if (isRecord(item)) {
-        const checkpointName = String(item.checkpointName ?? item.checkpoint ?? item.name ?? item.link ?? '').trim();
-        const rawMessageId = item.messageId ?? item.message_id ?? item.mesId ?? item.mes_id;
-        const messageId = typeof rawMessageId === 'number' ? rawMessageId : Number(rawMessageId);
-        if (!checkpointName) {
-          return null;
-        }
-        return {
-          checkpointName,
-          messageId: Number.isFinite(messageId) ? messageId : undefined,
-        };
-      }
-
-      return null;
-    })
-    .filter((item): item is { checkpointName: string; messageId?: number } => Boolean(item?.checkpointName));
+  const payload: unknown = await response.json();
+  const entries = Array.isArray(payload) ? payload : isRecord(payload) ? Object.values(payload) : [];
+  const chatIds = entries.map(entry => (isRecord(entry) ? normalizeChatFileName(entry.file_name) : '')).filter(Boolean);
+  if (!chatIds.includes(chat.id)) {
+    throw new HistoryChatUnavailableError(chat.id, chat.name);
+  }
 }
 
-function mergeUntrackedCheckpoints(
-  tree: WuxiaSaveTreeData,
-  checkpointLinks: Array<{ checkpointName: string; messageId?: number }>,
-): WuxiaSaveTreeData {
-  const known = new Set(tree.nodes.map(node => node.checkpointName));
-  const additions: WuxiaSaveNode[] = checkpointLinks
-    .filter(link => !known.has(link.checkpointName))
-    .map(link => ({
-      id: createId('unfiled'),
-      label: `未归档 · ${link.checkpointName}`,
-      checkpointName: link.checkpointName,
-      messageId: link.messageId ?? 0,
-      parentId: null,
-      createdAt: Date.now(),
-      playerName: '',
-      location: '',
-      worldTimeText: '',
-      preview: '此 checkpoint 由酒馆记录发现，尚未写入金庸群侠传存档树。',
-    }));
-
-  if (additions.length === 0) {
-    return tree;
+async function readHistoryUserMessage(chat: HistoryChatIdentity, messageId: number | null): Promise<string> {
+  if (messageId === null) return '';
+  const current = await readCurrentChatIdentity();
+  if (current.id === chat.id) {
+    const message = getChatMessages(messageId, {
+      role: 'all',
+      hide_state: 'all',
+      include_swipes: false,
+    })[0];
+    return message?.role === 'user' ? String(message.message ?? '') : '';
   }
 
+  const groupId = getCurrentGroupId();
+  const endpoint = groupId ? '/api/chats/group/get' : '/api/chats/get';
+  const requestBody = groupId
+    ? { id: chat.id }
+    : (() => {
+        const character = getCurrentCharacterIdentity();
+        return {
+          ch_name: character.name,
+          file_name: chat.id,
+          avatar_url: character.avatarUrl,
+        };
+      })();
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: SillyTavern.getRequestHeaders(),
+      body: JSON.stringify(requestBody),
+      cache: 'no-cache',
+    });
+  } catch (error) {
+    throw new Error(`无法读取历史分支中的玩家行动：${chat.name}（${chat.id}）`, { cause: error });
+  }
+  if (!response.ok) {
+    if (response.status === 404) throw new HistoryChatUnavailableError(chat.id, chat.name);
+    throw new Error(`无法读取历史分支中的玩家行动（HTTP ${response.status}）。`);
+  }
+
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) {
+    throw new Error('历史聊天响应格式无效，无法预填原玩家行动。');
+  }
+  const messages = payload.filter(
+    (item): item is Record<string, unknown> => isRecord(item) && ('mes' in item || 'message' in item),
+  );
+  const rawMessage = messages[messageId];
+  if (!rawMessage || rawMessage.is_user !== true) return '';
+  return String(rawMessage.mes ?? rawMessage.message ?? '');
+}
+
+async function openHistoryChatById(chatId: string): Promise<void> {
+  const groupId = getCurrentGroupId();
+  if (groupId) {
+    if (typeof SillyTavern.openGroupChat !== 'function') {
+      throw new Error('当前酒馆版本未提供群聊文件切换接口。');
+    }
+    await SillyTavern.openGroupChat(groupId, chatId);
+    return;
+  }
+  if (typeof SillyTavern.openCharacterChat !== 'function') {
+    throw new Error('当前酒馆版本未提供角色聊天文件切换接口。');
+  }
+  await SillyTavern.openCharacterChat(chatId);
+}
+
+async function navigateToHistoryChat(chat: HistoryChatIdentity): Promise<void> {
+  await assertHistoryChatAvailable(chat);
+  let navigationError: unknown = null;
+  try {
+    await openHistoryChatById(chat.id);
+  } catch (error) {
+    navigationError = error;
+  }
+
+  const navigated = await readCurrentChatIdentity().catch(() => null);
+  if (!navigated) {
+    throw new Error(`打开历史聊天后无法确认当前位置：${chat.name}（${chat.id}）`, {
+      cause: navigationError ?? undefined,
+    });
+  }
+  if (navigated.id !== chat.id) {
+    throw new Error(`酒馆未切换到指定历史聊天：${chat.name}（${chat.id}）`, {
+      cause: navigationError ?? undefined,
+    });
+  }
+}
+
+async function openChat(locator: HistoryLocator): Promise<void> {
+  const current = await readCurrentChatIdentity();
+  if (current.id === locator.chatId) return;
+  await navigateToHistoryChat({ id: locator.chatId, name: locator.chatName });
+}
+
+async function openChatByIdentity(chat: HistoryChatIdentity): Promise<void> {
+  const current = await readCurrentChatIdentity();
+  if (current.id === chat.id) return;
+  await navigateToHistoryChat(chat);
+}
+
+async function activateSwipe(locator: HistoryLocator): Promise<void> {
+  await setChatMessages([{ message_id: locator.assistantMessageId, swipe_id: locator.swipeId }], { refresh: 'none' });
+}
+
+type RawSillyTavernSwipeMessage = SillyTavern.ChatMessage & {
+  send_date?: unknown;
+  gen_started?: unknown;
+  gen_finished?: unknown;
+};
+
+function activateSwipeForBranchSnapshot(locator: HistoryLocator): () => void {
+  const message = SillyTavern.chat?.[locator.assistantMessageId] as RawSillyTavernSwipeMessage | undefined;
+  if (!message) {
+    throw new Error(`目标 assistant 楼层不存在：${locator.assistantMessageId}`);
+  }
+
+  const previous = {
+    swipeId: message.swipe_id,
+    mes: message.mes,
+    sendDate: message.send_date,
+    genStarted: message.gen_started,
+    genFinished: message.gen_finished,
+    extra: structuredClone(message.extra ?? {}),
+  };
+  if (locator.swipeId === 0 && !Array.isArray(message.swipes)) {
+    return () => undefined;
+  }
+  if (!Array.isArray(message.swipes) || typeof message.swipes[locator.swipeId] !== 'string') {
+    throw new Error(`目标楼层没有 swipe ${locator.swipeId}，无法创建精确分支。`);
+  }
+  if (!Array.isArray(message.swipe_info)) {
+    message.swipe_info = message.swipes.map(() => ({
+      send_date: message.send_date,
+      gen_started: undefined,
+      gen_finished: undefined,
+      extra: {},
+    }));
+  }
+
+  const swipeInfo = message.swipe_info[locator.swipeId] as
+    { send_date?: unknown; gen_started?: unknown; gen_finished?: unknown; extra?: unknown } | undefined;
+  message.swipe_id = locator.swipeId;
+  message.mes = message.swipes[locator.swipeId];
+  message.send_date = swipeInfo?.send_date;
+  message.gen_started = swipeInfo?.gen_started;
+  message.gen_finished = swipeInfo?.gen_finished;
+  message.extra = structuredClone(isRecord(swipeInfo?.extra) ? swipeInfo.extra : {});
+
+  return () => {
+    message.swipe_id = previous.swipeId;
+    message.mes = previous.mes;
+    message.send_date = previous.sendDate;
+    message.gen_started = previous.genStarted;
+    message.gen_finished = previous.genFinished;
+    message.extra = previous.extra;
+  };
+}
+
+function currentChatMatchesForkSnapshot(locator: HistoryLocator): boolean {
+  const messages = readAllHistoryMessages();
+  const target = messages.find(message => message.message_id === locator.assistantMessageId);
+  if (!target || getMessageRole(target) !== 'assistant') return false;
+  const { activeSwipeId } = getSwipeTexts(target);
+  const hasLaterMessage = messages.some(message => Number(message.message_id) > locator.assistantMessageId);
+  return !hasLaterMessage && activeSwipeId === locator.swipeId;
+}
+
+const historyEraSyncTiming = {
+  timeoutMs: 30_000,
+  quietMs: 600,
+};
+
+export function configureHistoryEraSyncTiming(timing: Partial<typeof historyEraSyncTiming>): void {
+  Object.assign(historyEraSyncTiming, timing);
+}
+
+/**
+ * ERA 框架对 manual_full_sync 只做入队（内部 75ms 合批异步处理），eventEmit 返回时
+ * 重算尚未开始。这里必须等到出现 actions.resync 的 era:writeDone，并且写入链静默一段
+ * 时间后才能继续，否则事件检查和封存校验会读到未回滚的旧状态，导致校验失败并让事件
+ * 系统在错误状态上自动派发事件。
+ */
+async function waitForEraFullResync(): Promise<void> {
+  const { timeoutMs, quietMs } = historyEraSyncTiming;
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let sawResync = false;
+    let quietTimer: ReturnType<typeof setTimeout> | null = null;
+    let listener: { stop: () => void } | null = null;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (quietTimer) clearTimeout(quietTimer);
+      clearTimeout(timeoutTimer);
+      listener?.stop();
+      if (error) reject(error);
+      else resolve();
+    };
+    const timeoutTimer = setTimeout(() => {
+      finish(new Error('等待 ERA 完全重算完成超时，历史校验中止；请在谱牒中重试恢复。'));
+    }, timeoutMs);
+    const armQuietTimer = () => {
+      if (quietTimer) clearTimeout(quietTimer);
+      quietTimer = setTimeout(() => finish(), quietMs);
+    };
+    listener = eventOn('era:writeDone', (detail?: unknown) => {
+      const actions = isRecord(detail) && isRecord(detail.actions) ? detail.actions : null;
+      if (actions?.resync === true) sawResync = true;
+      if (sawResync) armQuietTimer();
+    });
+    void eventEmit('manual_full_sync').catch((error: unknown) => {
+      finish(error instanceof Error ? error : new Error(String(error)));
+    });
+  });
+}
+
+async function runFullHistorySync(prepareVerification = false): Promise<void> {
+  await waitForEraFullResync();
+  if (prepareVerification) {
+    const journal = readHistoryCheckoutJournal();
+    await eventEmit(WUXIA_HISTORY_PREPARE_VERIFICATION_EVENT, {
+      transactionId: journal?.transactionId ?? '',
+    });
+  }
+}
+
+function getNodePath(tree: WuxiaHistoryTreeV2, headNodeId: string): HistoryNode[] {
+  const path: HistoryNode[] = [];
+  const seen = new Set<string>();
+  let currentId: string | null = headNodeId;
+  while (currentId) {
+    if (seen.has(currentId)) throw new Error('历史树存在循环 parentId，无法恢复来源分支。');
+    seen.add(currentId);
+    const node: HistoryNode | undefined = tree.nodes[currentId];
+    if (!node) throw new Error(`来源分支路径缺少节点：${currentId}`);
+    path.push(node);
+    currentId = node.parentId;
+  }
+  return path.reverse();
+}
+
+function getContinuationDraftUserMessageId(
+  tree: WuxiaHistoryTreeV2,
+  targetNodeId: string,
+  locator: HistoryLocator,
+): number | null {
+  const branch = tree.branches[branchIdForChat(locator.chatId)];
+  if (!branch?.headNodeId) return null;
+  const path = getNodePath(tree, branch.headNodeId);
+  const targetIndex = path.findIndex(node => node.id === targetNodeId);
+  if (targetIndex < 0 || targetIndex >= path.length - 1) return null;
+  const nextNode = path[targetIndex + 1];
+  const nextLocator = nextNode.locators.find(candidate => candidate.chatId === locator.chatId);
+  return nextLocator?.userMessageId ?? null;
+}
+
+function resolveBranchSourceLocator(node: HistoryNode, journal: HistoryCheckoutJournal): HistoryLocator {
+  if (journal.branchSourceLocator) return journal.branchSourceLocator;
+  const sourceLocator = node.locators.find(locator => locator.chatId === journal.sourceChatId);
+  return sourceLocator ?? journal.targetLocator;
+}
+
+async function restoreCheckoutSourcePath(tree: WuxiaHistoryTreeV2, journal: HistoryCheckoutJournal): Promise<void> {
+  await openChatByIdentity({ id: journal.sourceChatId, name: journal.sourceChatName });
+  if (journal.sourceHeadNodeId) {
+    const patches = getNodePath(tree, journal.sourceHeadNodeId)
+      .map(node => node.locators.find(locator => locator.chatId === journal.sourceChatId))
+      .filter((locator): locator is HistoryLocator => Boolean(locator))
+      .sort((left, right) => left.assistantMessageId - right.assistantMessageId)
+      .map(locator => ({
+        message_id: locator.assistantMessageId,
+        swipe_id: locator.swipeId,
+      }));
+    if (patches.length > 0) {
+      await setChatMessages(patches, { refresh: 'none' });
+    }
+  }
+  await runFullHistorySync();
+}
+
+function markBranchStatus(
+  branchId: string | null,
+  status: HistoryBranch['status'],
+  fallback?: { chatId: string; chatName: string; originNodeId: string | null },
+): WuxiaHistoryTreeV2 {
+  const tree = cloneTree(loadHistoryTree());
+  if (branchId && tree.branches[branchId]) {
+    tree.branches[branchId] = { ...tree.branches[branchId], status };
+  } else if (branchId && fallback) {
+    tree.branches[branchId] = {
+      id: branchId,
+      chatId: fallback.chatId,
+      chatName: fallback.chatName,
+      originNodeId: fallback.originNodeId,
+      headNodeId: fallback.originNodeId,
+      createdAt: Date.now(),
+      status,
+    };
+  }
+  return persistHistoryTree(tree);
+}
+
+class HistoryVerificationError extends Error {}
+
+function commitVerification(
+  state: HistoryTreeViewState,
+  targetNodeId: string,
+  baseline: HistoryVerification | null,
+): HistoryTreeViewState {
+  const verification = readCurrentVerification();
+  if (
+    baseline &&
+    (baseline.selectedMksHash !== verification.selectedMksHash ||
+      baseline.eventStateHash !== verification.eventStateHash)
+  ) {
+    markBranchStatus(state.currentBranchId, 'broken');
+    const mksSame = baseline.selectedMksHash === verification.selectedMksHash;
+    const eventSame = baseline.eventStateHash === verification.eventStateHash;
+    throw new HistoryVerificationError(
+      `历史节点校验失败：ERA 主干或事件状态与封存记录不一致（主干${mksSame ? '一致' : '不一致'}，事件状态${eventSame ? '一致' : '不一致'}）。`,
+    );
+  }
+
+  const tree = cloneTree(state.tree);
+  const node = tree.nodes[targetNodeId];
+  if (!node) throw new HistoryVerificationError('切换后的聊天中没有找到目标历史节点。');
+  tree.nodes[targetNodeId] = { ...node, verification: baseline ?? verification };
+  tree.branches[state.currentBranchId] = {
+    ...tree.branches[state.currentBranchId],
+    status: 'active',
+    headNodeId: targetNodeId,
+  };
+  return buildViewState(persistHistoryTree(tree), state.currentChat);
+}
+
+function makeCheckoutResult(
+  status: HistoryCheckoutResult['status'],
+  actionKind: CheckoutActionKind,
+  nodeId: string,
+  state: HistoryTreeViewState | null,
+  error: string | null,
+): HistoryCheckoutResult {
   return {
-    ...tree,
-    nodes: [...tree.nodes, ...additions],
+    status,
+    actionKind,
+    nodeId,
+    currentNodeId: state?.currentNodeId ?? null,
+    currentBranchId: state?.currentBranchId ?? null,
+    currentChat: state?.currentChat ?? null,
+    error,
+  };
+}
+
+async function selectCheckoutAction(
+  tree: WuxiaHistoryTreeV2,
+  node: HistoryNode,
+  forceBranch: boolean,
+): Promise<{
+  actionKind: CheckoutActionKind;
+  locator: HistoryLocator;
+  targetBranchId: string | null;
+  draftUserMessageId: number | null;
+}> {
+  if (!forceBranch && (await canSwitchSwipeInPlace(node.id))) {
+    const current = await readCurrentChatIdentity();
+    const locator = node.locators.find(item => item.chatId === current.id);
+    if (locator) {
+      return {
+        actionKind: 'in_place_swipe',
+        locator,
+        targetBranchId: branchIdForChat(current.id),
+        draftUserMessageId: null,
+      };
+    }
+  }
+  if (!forceBranch) {
+    const existing = getExistingLeafTarget(tree, node);
+    if (existing) {
+      return {
+        actionKind: 'existing_branch',
+        locator: existing.locator,
+        targetBranchId: existing.branch.id,
+        draftUserMessageId: null,
+      };
+    }
+  }
+  const locator = chooseAnyUsableLocator(tree, node);
+  if (!locator) throw new Error('目标历史节点没有可用的聊天定位信息。');
+  return {
+    actionKind: 'fork_branch',
+    locator,
+    targetBranchId: null,
+    draftUserMessageId: getContinuationDraftUserMessageId(tree, node.id, locator),
+  };
+}
+
+async function executeCheckout(
+  nodeId: string,
+  options: CheckoutHistoryOptions,
+  existingJournal: HistoryCheckoutJournal | null,
+): Promise<HistoryCheckoutResult> {
+  let state: HistoryTreeViewState | null = null;
+  let actionKind: CheckoutActionKind = 'fork_branch';
+  try {
+    const tree = loadHistoryTree();
+    const node = tree.nodes[nodeId];
+    if (!node) throw new Error(`历史节点不存在：${nodeId}`);
+
+    const sourceChat = await readCurrentChatIdentity();
+    const sourceBranch = tree.branches[branchIdForChat(sourceChat.id)];
+    let journal = existingJournal;
+    if (!journal) {
+      await flushPendingGameDataCompletion('before-history-checkout');
+      const selected = await selectCheckoutAction(tree, node, options.forceBranch === true);
+      actionKind = selected.actionKind;
+      const draftMessage =
+        selected.actionKind === 'fork_branch'
+          ? await readHistoryUserMessage(
+              { id: selected.locator.chatId, name: selected.locator.chatName },
+              selected.draftUserMessageId,
+            )
+          : '';
+      journal = createHistoryCheckoutJournal({
+        targetNodeId: nodeId,
+        targetLocator: selected.locator,
+        actionKind,
+        branchSourceLocator: selected.actionKind === 'fork_branch' ? selected.locator : null,
+        draftUserMessageId: selected.draftUserMessageId,
+        draftMessage,
+        sourceHeadNodeId: sourceBranch?.headNodeId ?? '',
+        sourceChatId: sourceChat.id,
+        sourceChatName: sourceChat.name,
+      });
+    } else if (journal.actionKind) {
+      actionKind = journal.actionKind;
+    } else if (journal.stage === 'create_branch' || journal.branchSourceLocator) {
+      actionKind = 'fork_branch';
+    } else {
+      actionKind = (await selectCheckoutAction(tree, node, false)).actionKind;
+    }
+
+    if (actionKind === 'fork_branch' && journal.draftUserMessageId === undefined) {
+      const branchSourceLocator = resolveBranchSourceLocator(node, journal);
+      const draftUserMessageId = getContinuationDraftUserMessageId(tree, node.id, branchSourceLocator);
+      const draftMessage = await readHistoryUserMessage(
+        { id: branchSourceLocator.chatId, name: branchSourceLocator.chatName },
+        draftUserMessageId,
+      );
+      journal =
+        updateHistoryCheckoutJournal({
+          actionKind: 'fork_branch',
+          branchSourceLocator,
+          draftUserMessageId,
+          draftMessage,
+        }) ?? journal;
+    }
+
+    if (journal.stage === 'navigate_source') {
+      if (actionKind === 'fork_branch') {
+        const branchSourceLocator = resolveBranchSourceLocator(node, journal);
+        await openChat(branchSourceLocator);
+        journal = updateHistoryCheckoutJournal({ stage: 'create_branch' }) ?? journal;
+      } else {
+        await openChat(journal.targetLocator);
+        journal = updateHistoryCheckoutJournal({ stage: 'activate_swipe' }) ?? journal;
+      }
+    }
+
+    if (journal.stage === 'create_branch') {
+      const branchSourceLocator = resolveBranchSourceLocator(node, journal);
+      const current = await readCurrentChatIdentity();
+      let branchedChat: HistoryChatIdentity;
+      if (current.id !== branchSourceLocator.chatId && currentChatMatchesForkSnapshot(branchSourceLocator)) {
+        // /branch-create 会切换聊天并销毁当前 iframe。新 iframe 从 create_branch
+        // 恢复时，可以用截断后的末楼和 swipe 确认当前聊天就是已创建的分支。
+        branchedChat = current;
+      } else {
+        if (current.id !== branchSourceLocator.chatId) {
+          await openChat(branchSourceLocator);
+        }
+        const restoreInMemorySwipe = activateSwipeForBranchSnapshot(branchSourceLocator);
+        try {
+          await triggerSlash(`/branch-create ${branchSourceLocator.assistantMessageId}`);
+          branchedChat = await readCurrentChatIdentity();
+        } finally {
+          // 这里只恢复已经脱离当前聊天数组的内存对象，不会写回来源聊天文件。
+          // 若 branch-create 在切换前失败，也能避免来源聊天在内存中停在错误 swipe。
+          restoreInMemorySwipe();
+        }
+      }
+      if (branchedChat.id === branchSourceLocator.chatId) {
+        throw new Error('酒馆没有切换到新分支聊天。');
+      }
+      journal =
+        updateHistoryCheckoutJournal({
+          stage: 'sync_era',
+          actionKind: 'fork_branch',
+          branchSourceLocator,
+          targetLocator: {
+            ...branchSourceLocator,
+            chatId: branchedChat.id,
+            chatName: branchedChat.name,
+          },
+        }) ?? journal;
+      actionKind = 'fork_branch';
+    }
+
+    if (journal.stage === 'activate_swipe') {
+      await openChat(journal.targetLocator);
+      await activateSwipe(journal.targetLocator);
+      journal = updateHistoryCheckoutJournal({ stage: 'sync_era' }) ?? journal;
+    }
+
+    if (journal.stage === 'sync_era') {
+      await openChat(journal.targetLocator);
+      await runFullHistorySync(true);
+      journal = updateHistoryCheckoutJournal({ stage: 'verify' }) ?? journal;
+    }
+
+    if (journal.stage === 'verify') {
+      state = await scanCurrentChat({
+        originNodeId: actionKind === 'fork_branch' ? nodeId : undefined,
+      });
+      if (state.currentNodeId !== nodeId) {
+        throw new HistoryVerificationError('切换后的活动叶节点不是目标节点。');
+      }
+      state = commitVerification(state, nodeId, node.verification);
+      journal = updateHistoryCheckoutJournal({ stage: 'commit' }) ?? journal;
+    }
+
+    if (!state) {
+      state = await scanCurrentChat({
+        originNodeId: actionKind === 'fork_branch' ? nodeId : undefined,
+      });
+    }
+    if (
+      actionKind === 'fork_branch' &&
+      journal.draftUserMessageId !== null &&
+      journal.draftUserMessageId !== undefined
+    ) {
+      writeHistoryCheckoutDraft({
+        transactionId: journal.transactionId,
+        chatId: state.currentChat.id,
+        message: journal.draftMessage ?? '',
+      });
+    }
+    const resumed = Boolean(existingJournal);
+    clearHistoryCheckoutJournal();
+    notifyHistoryCheckoutCommit(resumed);
+    void eventEmit('wuxia:sync-latest-message-shell', {
+      messageId: journal.targetLocator.assistantMessageId,
+      reason: 'history-checkout-commit',
+    });
+    return makeCheckoutResult('commit', actionKind, nodeId, state, null);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const unavailableChat = error instanceof HistoryChatUnavailableError ? error : null;
+    const broken = error instanceof HistoryVerificationError || Boolean(unavailableChat);
+    const journal = readHistoryCheckoutJournal();
+    const currentChat = unavailableChat ? null : await readCurrentChatIdentity().catch(() => null);
+    const branchId = unavailableChat
+      ? branchIdForChat(unavailableChat.chatId)
+      : (state?.currentBranchId ??
+        (currentChat
+          ? branchIdForChat(currentChat.id)
+          : journal
+            ? branchIdForChat(journal.targetLocator.chatId)
+            : null));
+    if (branchId) {
+      const unavailableOriginNodeId =
+        unavailableChat && journal?.sourceChatId === unavailableChat.chatId ? journal.sourceHeadNodeId || null : nodeId;
+      markBranchStatus(
+        branchId,
+        broken ? 'broken' : 'recovery_failed',
+        unavailableChat
+          ? {
+              chatId: unavailableChat.chatId,
+              chatName: unavailableChat.chatName,
+              originNodeId: unavailableOriginNodeId,
+            }
+          : currentChat
+            ? { chatId: currentChat.id, chatName: currentChat.name, originNodeId: nodeId }
+            : undefined,
+      );
+    }
+    notifyHistoryCheckoutFailure();
+    return makeCheckoutResult(broken ? 'broken' : 'recovery_failed', actionKind, nodeId, state, message);
+  }
+}
+
+export async function checkoutNode(
+  nodeId: string,
+  options: CheckoutHistoryOptions = {},
+): Promise<HistoryCheckoutResult> {
+  const unresolved = readHistoryCheckoutJournal();
+  if (unresolved) {
+    return makeCheckoutResult(
+      'recovery_failed',
+      unresolved.actionKind ??
+        (unresolved.stage === 'create_branch' || unresolved.branchSourceLocator ? 'fork_branch' : 'existing_branch'),
+      nodeId,
+      null,
+      '已有未完成的历史分叉。请先选择“重试恢复”或“返回来源聊天”，不能叠加创建另一条分叉。',
+    );
+  }
+  return executeCheckout(nodeId, options, null);
+}
+
+export interface CheckoutRecoveryState {
+  journal: HistoryCheckoutJournal | null;
+  pending: boolean;
+  expired: boolean;
+}
+
+export function getCheckoutRecoveryState(now = Date.now()): CheckoutRecoveryState {
+  const journal = readHistoryCheckoutJournal();
+  return {
+    journal,
+    pending: Boolean(journal && !isHistoryCheckoutJournalExpired(journal, now)),
+    expired: Boolean(journal && isHistoryCheckoutJournalExpired(journal, now)),
+  };
+}
+
+export async function resumeCheckout(): Promise<HistoryCheckoutResult | null> {
+  const journal = readHistoryCheckoutJournal();
+  if (!journal) return null;
+  if (readHistoryCheckoutReturnIntent() === journal.transactionId) {
+    return returnToCheckoutSource();
+  }
+  if (isHistoryCheckoutJournalExpired(journal)) {
+    markBranchStatus(branchIdForChat(journal.targetLocator.chatId), 'recovery_failed', {
+      chatId: journal.targetLocator.chatId,
+      chatName: journal.targetLocator.chatName,
+      originNodeId: journal.targetNodeId,
+    });
+    notifyHistoryCheckoutExpired();
+    return makeCheckoutResult(
+      'recovery_failed',
+      journal.actionKind ??
+        (journal.stage === 'create_branch' || journal.branchSourceLocator ? 'fork_branch' : 'existing_branch'),
+      journal.targetNodeId,
+      null,
+      '历史切换恢复窗口已超过 120 秒。',
+    );
+  }
+  return executeCheckout(journal.targetNodeId, {}, journal);
+}
+
+export async function retryCheckoutRecovery(): Promise<HistoryCheckoutResult | null> {
+  const journal = readHistoryCheckoutJournal();
+  if (!journal) return null;
+  clearHistoryCheckoutReturnIntent();
+  const renewed = renewHistoryCheckoutJournal(journal);
+  return executeCheckout(renewed.targetNodeId, {}, renewed);
+}
+
+export async function returnToCheckoutSource(): Promise<HistoryCheckoutResult | null> {
+  const journal = readHistoryCheckoutJournal();
+  if (!journal) return null;
+  writeHistoryCheckoutReturnIntent(journal.transactionId);
+  let state: HistoryTreeViewState | null = null;
+  try {
+    const tree = loadHistoryTree();
+    await restoreCheckoutSourcePath(tree, journal);
+    state = await scanCurrentChat();
+    const targetBranchId = branchIdForChat(journal.targetLocator.chatId);
+    if (journal.targetLocator.chatId !== journal.sourceChatId && state.tree.branches[targetBranchId]) {
+      const updatedTree = markBranchStatus(targetBranchId, 'recovery_failed');
+      state = buildViewState(updatedTree, state.currentChat);
+    }
+    clearHistoryCheckoutJournal();
+    notifyHistoryCheckoutCommit(true);
+    return makeCheckoutResult(
+      'commit',
+      'existing_branch',
+      journal.sourceHeadNodeId || journal.targetNodeId,
+      state,
+      null,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const unavailableChat = error instanceof HistoryChatUnavailableError ? error : null;
+    const status: HistoryBranch['status'] = unavailableChat ? 'broken' : 'recovery_failed';
+    const failedChat = unavailableChat ?? {
+      chatId: journal.sourceChatId,
+      chatName: journal.sourceChatName,
+    };
+    markBranchStatus(branchIdForChat(failedChat.chatId), status, {
+      chatId: failedChat.chatId,
+      chatName: failedChat.chatName,
+      originNodeId: journal.sourceHeadNodeId || null,
+    });
+    notifyHistoryCheckoutFailure();
+    return makeCheckoutResult(
+      unavailableChat ? 'broken' : 'recovery_failed',
+      'existing_branch',
+      journal.sourceHeadNodeId || journal.targetNodeId,
+      state,
+      message,
+    );
+  }
+}
+
+// Compatibility projection for the current SaveLoadPanel. The v1 character
+// variable is deliberately never read or written.
+export interface SaveTreeViewState {
+  tree: WuxiaSaveTreeData;
+  currentChatName: string;
+  currentNodeId: string | null;
+  latestSaveTarget: { messageId: number; preview: string } | null;
+}
+
+function projectLegacyNode(node: HistoryNode): WuxiaSaveNode {
+  const locator = node.locators[0];
+  return {
+    id: node.id,
+    label: node.label || node.preview || '未命名节点',
+    checkpointName: locator?.chatName ?? '',
+    messageId: locator?.assistantMessageId ?? -1,
+    parentId: node.parentId,
+    createdAt: node.createdAt,
+    playerName: '',
+    location: node.location,
+    worldTimeText: node.worldTimeText,
+    preview: node.preview,
   };
 }
 
 export async function readSaveTreeState(gameState: GameState): Promise<SaveTreeViewState> {
-  const currentChatName = (await triggerSlash('/getchatname').catch(() => '')).trim();
-  const checkpointListResult = await triggerSlash('/checkpoint-list links=true').catch(() => '');
-  const checkpointLinks = parseCheckpointList(checkpointListResult);
-  const storedTree = readStoredTree();
-  const tree = mergeUntrackedCheckpoints(storedTree, checkpointLinks);
-  const currentNode =
-    tree.nodes.find(node => node.checkpointName === currentChatName) ||
-    tree.nodes.find(node => currentChatName.includes(node.checkpointName));
-
+  const state = await scanCurrentChat({
+    location: gameState.currentLocation || gameState.stats.location,
+    worldTimeText: getWorldTimeText(gameState),
+  });
+  const nodes = Object.values(state.tree.nodes).map(projectLegacyNode);
+  const currentNode = state.currentNodeId ? state.tree.nodes[state.currentNodeId] : null;
+  const currentLocator = currentNode?.locators.find(locator => locator.chatId === state.currentChat.id);
   return {
-    tree,
-    currentChatName,
-    currentNodeId: currentNode?.id ?? null,
-    latestSaveTarget: findLatestSaveTarget(),
+    tree: { version: 1, updatedAt: state.tree.updatedAt, nodes },
+    currentChatName: state.currentChat.name,
+    currentNodeId: state.currentNodeId,
+    latestSaveTarget:
+      currentNode && currentLocator
+        ? { messageId: currentLocator.assistantMessageId, preview: currentNode.preview }
+        : null,
   };
 }
 
 export async function createCurrentCheckpoint(label: string, gameState: GameState): Promise<WuxiaSaveNode> {
-  const saveTarget = findLatestSaveTarget();
-  if (!saveTarget) {
-    throw new Error('没有找到可保存的剧情楼层。请先完成一轮回复后再保存。');
-  }
-
-  const currentState = await readSaveTreeState(gameState);
-  const parentId = currentState.currentNodeId;
-  const checkpointName = createCheckpointName();
-  const safeLabel = label.trim() || getDefaultLabel(gameState);
-
-  await triggerSlash(`/checkpoint-create mesId=${saveTarget.messageId} ${checkpointName}`);
-
-  const node: WuxiaSaveNode = {
-    id: createId('save'),
-    label: safeLabel,
-    checkpointName,
-    messageId: saveTarget.messageId,
-    parentId,
-    createdAt: Date.now(),
-    playerName: gameState.stats.name,
+  let state = await finalizeCurrentTurn({
     location: gameState.currentLocation || gameState.stats.location,
     worldTimeText: getWorldTimeText(gameState),
-    preview: saveTarget.preview,
-  };
-
-  const nextTree = writeStoredTree({
-    version: 1,
-    updatedAt: Date.now(),
-    nodes: [...currentState.tree.nodes, node],
   });
-
-  await triggerSlash('/forcesave').catch(() => '');
-  return nextTree.nodes.find(item => item.id === node.id) || node;
+  if (!state.currentNodeId) throw new Error('没有找到可封存的剧情楼层。');
+  const nodeId = state.currentNodeId;
+  renameNode(nodeId, label);
+  const tree = setNodePinned(nodeId, true);
+  state = buildViewState(tree, state.currentChat);
+  return projectLegacyNode(state.tree.nodes[nodeId]!);
 }
 
 export async function openCheckpoint(node: WuxiaSaveNode): Promise<void> {
-  await triggerSlash(`/go ${node.checkpointName}`);
+  const result = await checkoutNode(node.id);
+  if (result.status !== 'commit') throw new Error(result.error || '读取历史节点失败。');
 }
 
 export async function createBranchFromNode(node: WuxiaSaveNode): Promise<void> {
-  if (!Number.isFinite(node.messageId) || node.messageId < 0) {
-    throw new Error('该节点没有有效楼层号，无法另开分叉。');
-  }
-  await triggerSlash(`/branch-create ${node.messageId}`);
+  const result = await checkoutNode(node.id, { forceBranch: true });
+  if (result.status !== 'commit') throw new Error(result.error || '创建历史分支失败。');
+}
+
+function getWorldTimeText(gameState: GameState): string {
+  if (gameState.gameTime) return gameState.gameTime;
+  const time = gameState.worldTime;
+  return time ? `${time.year}年${time.month}月${time.day}日${time.hour}时` : '';
 }
 
 export function getSuggestedSaveLabel(gameState: GameState): string {
-  return getDefaultLabel(gameState);
+  const location = gameState.currentLocation || gameState.stats.location || '江湖途中';
+  const time = getWorldTimeText(gameState);
+  return time ? `${location} · ${time}` : location;
 }

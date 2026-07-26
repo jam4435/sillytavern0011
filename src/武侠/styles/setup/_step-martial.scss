@@ -421,9 +421,20 @@
   }
 }
 
+// 抽取获得的武功：不可再点选，给出虚线态反馈
+.martial-card.drawn,
+.trait-card.drawn {
+  border-style: dashed;
+  cursor: default;
+}
+
+.martial-card.drawn .martial-cost {
+  color: var(--stone-500);
+}
+
 // 武功滚动容器
 .martial-scroll-container {
-  max-height: 450px;
+  max-height: min(450px, 55vh);
   overflow-y: auto;
   padding-right: 0.5rem;
   margin-right: -0.5rem;

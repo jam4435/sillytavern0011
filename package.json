@@ -98,6 +98,7 @@
     "@vueuse/core": "^13.9.0",
     "@vueuse/integrations": "^13.9.0",
     "@vueuse/shared": "^13.9.0",
+    "@xyflow/react": "^12.11.2",
     "async-wait-until": "^2.0.31",
     "axios": "1.14.0",
     "compare-versions": "^6.1.1",

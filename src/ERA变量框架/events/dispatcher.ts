@@ -7,6 +7,7 @@ import {
   emitWriteDoneEvent,
   insertByObject,
   insertByPath,
+  transactionByObject,
   updateByObject,
   updateByPath,
 } from '../api/command';
@@ -15,7 +16,7 @@ import { ApplyVarChange } from '../core/crud/patcher';
 import { ensureMkForLatestMessage, readMessageKey, updateLatestSelectedMk } from '../core/key/mk';
 import { rollbackByMk } from '../core/rollback';
 import { resyncStateOnHistoryChange } from '../core/sync';
-import { ERA_API_EVENTS, ERA_EVENT_EMITTER, LOGS_PATH, SEL_PATH } from '../utils/constants';
+import { ApiWriteEventPayload, ERA_API_EVENTS, ERA_EVENT_EMITTER, LOGS_PATH, SEL_PATH } from '../utils/constants';
 import { getEraData, removeMetaFields } from '../utils/era_data';
 import {
   createEraDiagnosticId,
@@ -106,6 +107,8 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
   let currentConsecutiveCount = 1;
   let taskOutcome: 'success' | 'error' = 'success';
   let currentPhase = 'start';
+  let transactionIds: string[] = [];
+  let finalizationError: unknown;
 
   setActiveEraDiagnosticTask(diagnosticId);
   updateEraDiagnosticState('activeTask', {
@@ -152,10 +155,11 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
 
   try {
     // **前置保障**: 确保最新消息有 MK 并设置日志上下文。
-    const { mk, message_id: msgId, isNewKey } = await runPhase(
-      'ensure-latest-message-mk',
-      () => ensureMkForLatestMessage(),
-    );
+    const {
+      mk,
+      message_id: msgId,
+      isNewKey,
+    } = await runPhase('ensure-latest-message-mk', () => ensureMkForLatestMessage());
     logContext.mk = mk;
     message_id = msgId;
 
@@ -196,6 +200,17 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
       // 如果是 API 触发的写入，则标记
       if (eventType === ERA_EVENT_EMITTER.API_WRITE) {
         actionsTaken.apiWrite = true;
+        const apiWriteDetail = detail as Partial<ApiWriteEventPayload> | undefined;
+        transactionIds = Array.from(
+          new Set([
+            ...(Array.isArray(apiWriteDetail?.transactionIds)
+              ? apiWriteDetail.transactionIds.filter(id => typeof id === 'string' && id.trim() !== '')
+              : []),
+            ...(typeof apiWriteDetail?.transactionId === 'string' && apiWriteDetail.transactionId.trim() !== ''
+              ? [apiWriteDetail.transactionId]
+              : []),
+          ]),
+        );
       }
 
       // 在变量写入完成后，强制重新渲染消息以触发宏
@@ -216,19 +231,26 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
       else if (eventType === ERA_API_EVENTS.UPDATE_BY_PATH) updateByPath(detail.path, detail.value);
       else if (eventType === ERA_API_EVENTS.DELETE_BY_OBJECT) deleteByObject(detail);
       else if (eventType === ERA_API_EVENTS.DELETE_BY_PATH) deleteByPath(detail.path);
+      else if (eventType === ERA_API_EVENTS.TRANSACTION_BY_OBJECT) transactionByObject(detail);
     } else if (eventGroup === 'UPDATE_MK_ONLY') {
       // 监听此事件仅用于为用户消息创建 MK。
       await runPhase('update-selected-mk-only', () => updateLatestSelectedMk());
     }
   } catch (error) {
     taskOutcome = 'error';
-    recordEraDiagnosticError('events-dispatcher', 'task-body-error', error, {
-      eventType,
-      eventGroup,
-      currentPhase,
-      message_id,
-      actionsTaken,
-    }, diagnosticId);
+    recordEraDiagnosticError(
+      'events-dispatcher',
+      'task-body-error',
+      error,
+      {
+        eventType,
+        eventGroup,
+        currentPhase,
+        message_id,
+        actionsTaken,
+      },
+      diagnosticId,
+    );
     logger.error('dispatchAndExecuteTask', `事件 ${eventType} 处理异常: ${error}`, error);
   } finally {
     try {
@@ -263,16 +285,21 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
           const statWithoutMeta = removeMetaFields(statData);
 
           currentPhase = 'emit-write-done';
-          recordEraDiagnostic('events-dispatcher', 'write-done-ready', {
-            eventType,
-            eventGroup,
-            message_id,
-            mk: logContext.mk,
-            actionsTaken,
-            selectedMksCount: Array.isArray(selectedMks) ? selectedMks.length : null,
-            editLogCount: _.isObject(editLogs) ? Object.keys(editLogs).length : null,
-            consecutiveProcessingCount: currentConsecutiveCount,
-          }, diagnosticId);
+          recordEraDiagnostic(
+            'events-dispatcher',
+            'write-done-ready',
+            {
+              eventType,
+              eventGroup,
+              message_id,
+              mk: logContext.mk,
+              actionsTaken,
+              selectedMksCount: Array.isArray(selectedMks) ? selectedMks.length : null,
+              editLogCount: _.isObject(editLogs) ? Object.keys(editLogs).length : null,
+              consecutiveProcessingCount: currentConsecutiveCount,
+            },
+            diagnosticId,
+          );
           emitWriteDoneEvent({
             mk: logContext.mk,
             message_id: message_id,
@@ -282,6 +309,8 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
             stat: statData,
             statWithoutMeta: statWithoutMeta,
             consecutiveProcessingCount: currentConsecutiveCount,
+            ...(transactionIds.length > 0 ? { transactionIds } : {}),
+            ...(transactionIds.length === 1 ? { transactionId: transactionIds[0] } : {}),
           });
         }
       }
@@ -294,14 +323,20 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
       //await new Promise(resolve => setTimeout(resolve, 50));
     } catch (error) {
       taskOutcome = 'error';
-      recordEraDiagnosticError('events-dispatcher', 'task-finalize-error', error, {
-        eventType,
-        eventGroup,
-        currentPhase,
-        message_id,
-        actionsTaken,
-      }, diagnosticId);
-      throw error;
+      recordEraDiagnosticError(
+        'events-dispatcher',
+        'task-finalize-error',
+        error,
+        {
+          eventType,
+          eventGroup,
+          currentPhase,
+          message_id,
+          actionsTaken,
+        },
+        diagnosticId,
+      );
+      finalizationError = error;
     } finally {
       finishTaskWatchdog(taskOutcome, {
         eventType,
@@ -313,6 +348,10 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
       updateEraDiagnosticState('activeTask', null);
       setActiveEraDiagnosticTask(previousDiagnosticTask);
     }
+  }
+
+  if (finalizationError) {
+    throw finalizationError;
   }
 
   return mkToIgnore;

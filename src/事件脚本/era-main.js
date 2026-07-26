@@ -22,12 +22,8 @@
     attachEventMetadata,
     deriveEventRuntimeDescriptor,
   } = await import('./era-utils.js');
-  const {
-    loadEventDefinitions,
-    loadEventDefinitionsFromWorldbook,
-    loadEventManifest,
-    loadEventCheckpointAtOrBefore,
-  } = await import('./era-event-loader.js');
+  const { loadEventDefinitions, loadEventDefinitionsFromWorldbook, loadEventManifest, loadEventCheckpointAtOrBefore } =
+    await import('./era-event-loader.js');
   const { isTimeForEvent, isEventDiscoverable, isTimeAfterEventEnd } = await import('./era-event-checker.js');
   const {
     initializeEventList,
@@ -40,18 +36,17 @@
     cleanupFollowupCluesForActiveParticipation,
     cleanupInvalidParticipationEntries,
   } = await import('./era-event-operations.js');
-  const {
-    getRumorScopeFromEventLocation,
-    isLocationWithinRumorScope,
-    normalizeLocationPath,
-  } = await import('./era-participant-entry.js');
+  const { getRumorScopeFromEventLocation, isLocationWithinRumorScope, normalizeLocationPath } =
+    await import('./era-participant-entry.js');
   const { reconcileWorldEventArchive, syncParticipationOutcomeStates } = await import('./era-world-events.js');
   const { needsEventRuntimeStateReset, resetLegacyEventRuntimeState } = await import('./era-runtime-state.js');
   const { buildFollowupCounterPlan, createSerialTaskQueue } = await import('./era-turn-queue.js');
   const { getManifestEventCandidateKeys } = await import('./era-event-scheduler.js');
-  const { writeDirectAssign, writeDirectUpdate, writeDirectDelete } = await import('./era-write-helper.js');
+  const { writeDirectAssign, writeEraTransaction } = await import('./era-write-helper.js');
+  const { readHistoryCheckoutJournal, isHistoryCheckoutJournalExpired } =
+    await import('../shared/historyCheckoutJournal');
 
-  const EVENT_SCRIPT_VERSION = '2026-07-26-turn-commit-barrier-v1';
+  const EVENT_SCRIPT_VERSION = '2026-07-26-era-transaction-v1';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
@@ -104,9 +99,7 @@
       insert: {},
       update: {},
       delete: {},
-      ...(entry.followup
-        ? { 后续事件: { 事件名: entry.followup, 描述: '' } }
-        : {}),
+      ...(entry.followup ? { 后续事件: { 事件名: entry.followup, 描述: '' } } : {}),
     };
     return attachEventMetadata(data, descriptor);
   };
@@ -142,13 +135,17 @@
       const triggerHour = entry.triggerHour;
       if (
         (Number.isFinite(endHour) && endHour <= currentHour && !knownCompletedKeys.has(entry.runtimeKey)) ||
-        (Number.isFinite(triggerHour) && triggerHour <= futureWindowEnd && (!Number.isFinite(endHour) || endHour >= currentWindowStart))
+        (Number.isFinite(triggerHour) &&
+          triggerHour <= futureWindowEnd &&
+          (!Number.isFinite(endHour) || endHour >= currentWindowStart))
       ) {
         fullKeys.add(entry.runtimeKey);
       }
     }
 
-    const lightweight = Object.fromEntries(eventEntries.map(entry => [entry.runtimeKey, buildManifestDefinition(entry)]));
+    const lightweight = Object.fromEntries(
+      eventEntries.map(entry => [entry.runtimeKey, buildManifestDefinition(entry)]),
+    );
     const fullDefinitions = fullKeys.size > 0 ? await loadEventDefinitions([...fullKeys]) : {};
     return Object.assign(lightweight, fullDefinitions);
   }
@@ -236,8 +233,13 @@
   };
 
   // ==================== 主检查函数（批量优化版）====================
-  async function checkEvents(eventDefinitions, reason = 'manual') {
+  async function checkEvents(eventDefinitions, reason = 'manual', options = {}) {
     debugGroup(`🔄 事件系统检查周期: ${reason}`);
+
+    if (options.allowPendingHistoryCheckout !== true && pauseForPendingHistoryCheckout(`check:${reason}`)) {
+      debugGroupEnd();
+      return;
+    }
 
     if (activeTurnBarrier) {
       markPendingTurnEventCheck(reason);
@@ -409,15 +411,14 @@
       const 可发现未发生事件 = (latestManifestCandidates || Object.keys(最新未发生事件)).filter(eventName =>
         isEventDiscoverable(updatedVariables.stat_data.世界信息.时间, eventDefinitions[eventName]),
       );
-      if (仍在进行事件.length > 0 || 可发现未发生事件.length > 0) {
-        await checkPlayerLocationTriggers(
-          仍在进行事件,
-          可发现未发生事件,
-          eventDefinitions,
-          updatedVariables,
-          最新参与事件,
-        );
-      }
+      // 即使当前没有候选事件也要执行一次，以清除历史检出后遗留的附近传闻派生缓存。
+      await checkPlayerLocationTriggers(
+        仍在进行事件,
+        可发现未发生事件,
+        eventDefinitions,
+        updatedVariables,
+        最新参与事件,
+      );
 
       // 玩家到场判断必须优先于 NPC 自动入场。NPC 位置写入可能较慢或确认失败，
       // 但不能因此把开局参与事件推迟到下一回合；玩家参与也应优先取得人物占用权。
@@ -474,7 +475,12 @@
       // 层级式地点匹配
       if (playerLocation && eventLocation) {
         // 附近传闻范围固定由事件地点前两级派生；到达完整事件地点后只加入事件，不再显示传闻。
-        if (hookText && isLocationWithinRumorScope(playerLocation, rumorScope) && !alreadyJoined && eventLocation !== playerLocation) {
+        if (
+          hookText &&
+          isLocationWithinRumorScope(playerLocation, rumorScope) &&
+          !alreadyJoined &&
+          eventLocation !== playerLocation
+        ) {
           const time = eventData.触发条件;
           const location = eventData.事件地点;
           const timeString = formatDate(time);
@@ -529,30 +535,28 @@
         return;
       }
 
-      const { updates, expiredKeys, retainedKeys } = buildFollowupCounterPlan(
-        followupCounters,
-        eligibleCounterKeys,
-      );
+      const { updates, expiredKeys, retainedKeys } = buildFollowupCounterPlan(followupCounters, eligibleCounterKeys);
       retainedKeys.forEach(key => log(`计数器 ${key} 为本轮新建，保持 ${followupCounters[key]}`));
 
-      // 发送更新指令
+      const counterOperations = [];
       if (Object.keys(updates).length > 0) {
-        const updatePayload = { 后续事件线索计数: updates };
-        log('🚀 发送 era:updateByObject 指令 (更新计数器):', updatePayload);
-        await writeDirectUpdate(updatePayload, 'update-followup-counters');
-        logSuccess(`✅ 已更新 ${Object.keys(updates).length} 个计数器`);
+        counterOperations.push({
+          type: 'update',
+          payload: { 后续事件线索计数: updates },
+        });
       }
-
-      // 发送删除指令
       if (expiredKeys.length > 0) {
-        const deletePayload = {
-          后续事件线索: Object.fromEntries(expiredKeys.map(key => [key, {}])),
-          后续事件线索计数: Object.fromEntries(expiredKeys.map(key => [key, {}])),
-        };
-
-        log('🚀 发送 era:deleteByObject 指令 (删除过期的后续事件线索):', deletePayload);
-        await writeDirectDelete(deletePayload, 'delete-expired-followups');
-        logSuccess(`✅ 已删除 ${expiredKeys.length} 个过期的后续事件线索`);
+        counterOperations.push({
+          type: 'delete',
+          payload: {
+            后续事件线索: Object.fromEntries(expiredKeys.map(key => [key, {}])),
+            后续事件线索计数: Object.fromEntries(expiredKeys.map(key => [key, {}])),
+          },
+        });
+      }
+      if (counterOperations.length > 0) {
+        await writeEraTransaction(counterOperations, `followup-counter-turn-${reason}`);
+        logSuccess(`✅ 后续线索事务完成：更新 ${Object.keys(updates).length} 个，删除 ${expiredKeys.length} 个`);
       }
     } catch (error) {
       logError('处理后续事件线索计数器失败:', error);
@@ -579,6 +583,8 @@
   // 只扣一次，避免重复扣减。切换聊天时重置。
   let lastCountedMessageId = null;
   let pendingTurnCounterKeys = null;
+  let historyCheckoutResumeTimer = null;
+  let pendingHistoryCheckoutReason = null;
 
   const enqueueSerialTask = createSerialTaskQueue(error => {
     logError('串行事件任务失败', error);
@@ -589,6 +595,73 @@
       log(`🧵 开始串行事件任务: ${reason}`);
       return work();
     });
+  }
+
+  function getPendingHistoryCheckoutJournal() {
+    const journal = readHistoryCheckoutJournal();
+    if (!journal || isHistoryCheckoutJournalExpired(journal) || journal.stage === 'commit') return null;
+    return journal;
+  }
+
+  function scheduleHistoryCheckoutResume(reason) {
+    pendingHistoryCheckoutReason = reason || pendingHistoryCheckoutReason || 'history-checkout';
+    if (historyCheckoutResumeTimer) return;
+
+    historyCheckoutResumeTimer = setTimeout(async () => {
+      historyCheckoutResumeTimer = null;
+      const pendingJournal = getPendingHistoryCheckoutJournal();
+      if (pendingJournal) {
+        scheduleHistoryCheckoutResume(pendingHistoryCheckoutReason);
+        return;
+      }
+
+      const resumeReason = pendingHistoryCheckoutReason || 'history-checkout-resume';
+      pendingHistoryCheckoutReason = null;
+      log(`🌿 历史检出事务已提交或超时，恢复事件系统: ${resumeReason}`);
+      if (!isInitialized) {
+        await initialize();
+      } else {
+        scheduleCheckEvents(resumeReason);
+      }
+    }, 100);
+  }
+
+  function pauseForPendingHistoryCheckout(reason) {
+    const journal = getPendingHistoryCheckoutJournal();
+    if (!journal) return false;
+    log(`🌿 历史检出事务进行中 (${journal.transactionId}/${journal.stage})，暂停事件初始化与检查`);
+    scheduleHistoryCheckoutResume(reason);
+    return true;
+  }
+
+  function serializeHistoryEventState(variables) {
+    return JSON.stringify({
+      事件系统: variables?.stat_data?.事件系统 || {},
+      参与事件: variables?.stat_data?.参与事件 || {},
+      世界事件: variables?.stat_data?.世界事件 || {},
+      后续事件线索: variables?.stat_data?.后续事件线索 || {},
+      后续事件线索计数: variables?.stat_data?.后续事件线索计数 || {},
+      角色数据: variables?.stat_data?.角色数据 || {},
+    });
+  }
+
+  async function runNonRootStableCheck(reason, { initializeFirst = false } = {}) {
+    const beforeCheckVariables = await getVariables({ type: 'chat' });
+    const beforeCheckState = serializeHistoryEventState(beforeCheckVariables);
+    if (initializeFirst) {
+      const initialized = await initialize();
+      if (!initialized) return false;
+    }
+
+    await enqueueEventWork(`${reason}-stable-check`, () => runScheduledCheck(reason));
+    const afterCheckVariables = await getVariables({ type: 'chat' });
+    if (beforeCheckState !== serializeHistoryEventState(afterCheckVariables)) {
+      await eventEmit('wuxia:history-event-state-stable', {
+        chatId: SillyTavern.getCurrentChatId?.() || '',
+        reason,
+      });
+    }
+    return true;
   }
 
   function markPendingTurnEventCheck(reason) {
@@ -616,7 +689,11 @@
     return !detail.chatId || !activeTurnBarrier.chatId || detail.chatId === activeTurnBarrier.chatId;
   }
 
-  async function runScheduledCheck(reason) {
+  async function runScheduledCheck(reason, options = {}) {
+    if (options.allowPendingHistoryCheckout !== true && pauseForPendingHistoryCheckout(`scheduled:${reason}`)) {
+      return;
+    }
+
     if (activeTurnBarrier) {
       markPendingTurnEventCheck(reason);
       log(`🔒 回合 ${activeTurnBarrier.roundId} 尚未提交，合并事件检查: ${reason}`);
@@ -638,7 +715,7 @@
           return;
         }
         pendingCheckReason = null;
-        await checkEvents(eventDefinitions, currentReason);
+        await checkEvents(eventDefinitions, currentReason, options);
         currentReason = pendingCheckReason;
       } while (currentReason);
     } finally {
@@ -647,6 +724,10 @@
   }
 
   function scheduleCheckEvents(reason) {
+    if (pauseForPendingHistoryCheckout(`schedule:${reason}`)) {
+      return;
+    }
+
     if (activeTurnBarrier) {
       markPendingTurnEventCheck(reason);
       log(`🔒 回合 ${activeTurnBarrier.roundId} 尚未提交，仅记录待检查请求: ${reason}`);
@@ -667,7 +748,12 @@
     }, 100);
   }
 
-  async function initialize() {
+  async function initialize(options = {}) {
+    const rootBootstrap = options.rootBootstrap === true;
+    if (options.allowPendingHistoryCheckout !== true && pauseForPendingHistoryCheckout('initialize')) {
+      return false;
+    }
+
     if (isInitializing) {
       log('⏳ 初始化正在进行中，跳过重复调用');
       return false;
@@ -692,11 +778,13 @@
         return false;
       }
 
+      let performedLegacyRuntimeMigration = false;
       if (needsEventRuntimeStateReset(preCheckVars.stat_data)) {
         const resetSucceeded = await resetLegacyEventRuntimeState(preCheckVars.stat_data);
         if (!resetSucceeded) {
           return false;
         }
+        performedLegacyRuntimeMigration = true;
         preCheckVars = await getVariables({ type: 'chat' });
       }
 
@@ -704,6 +792,7 @@
       const statForCheckpoint = preCheckVars.stat_data;
       const eventSystemForCheckpoint = statForCheckpoint.事件系统 || {};
       const canApplyOpeningCheckpoint =
+        rootBootstrap &&
         !!manifest &&
         EVENT_SYSTEM_BUCKETS.every(key => isEmptyObject(eventSystemForCheckpoint[key])) &&
         isEmptyObject(statForCheckpoint.参与事件 || {}) &&
@@ -718,10 +807,13 @@
       await initializeEventList(eventDefinitions, {
         checkpoint,
         applyCheckpoint: canApplyOpeningCheckpoint,
+        rootBootstrap,
         sparseFuture: Boolean(manifest),
         manifestHash: manifest?.contentHash || '',
       });
-      await reconcileWorldEventArchive(eventDefinitions);
+      if (performedLegacyRuntimeMigration) {
+        await reconcileWorldEventArchive(eventDefinitions, { legacyRepair: true });
+      }
 
       // 初始化完成后输出当前状态
       try {
@@ -746,9 +838,13 @@
         console.log('%c===== 初始化完成 =====', 'color: #00aaff; font-size: 14px; font-weight: bold;');
       }
 
-      // 初始化后自动执行一次事件检查
-      log('🔄 初始化完成，开始自动检查事件...');
-      await runScheduledCheck('initialize');
+      if (rootBootstrap) {
+        // 仅新游戏根初始化允许立即物化当前事件窗口。
+        log('🔄 新游戏根初始化完成，开始自动检查事件...');
+        await runScheduledCheck('initialize-root-bootstrap');
+      } else {
+        log('🌿 已有聊天初始化仅刷新 schema 与调度缓存，跳过历史事件追补');
+      }
       isInitialized = true;
       lastSuccessfulInitializationAt = Date.now();
       log('🏁 初始化流程结束，事件监听器已激活');
@@ -802,7 +898,7 @@
       }
 
       log(`🎮 检测到前端开局初始化信号，重新初始化事件系统: ${requestReason}`, requestSignal);
-      const success = await initialize();
+      const success = await initialize({ rootBootstrap: true });
       if (success) {
         logSuccess('🎉 ERA 事件系统已随前端开局重新初始化！');
         toastr.success('ERA 事件系统已自动初始化');
@@ -814,6 +910,9 @@
 
   // ==================== 启动系统 ====================
   const initialSuccess = await initialize();
+  if (initialSuccess && !getPendingHistoryCheckoutJournal()) {
+    await runNonRootStableCheck('startup-existing-chat');
+  }
 
   // 如果首次初始化失败，设置等待前端初始化的监听
   if (!initialSuccess) {
@@ -845,7 +944,37 @@
     completedTurnRoundIds.clear();
     abortedTurnRoundIds.clear();
     pendingTurnCounterKeys = null;
-    await initialize();
+    if (pauseForPendingHistoryCheckout('chat-changed-history-checkout')) {
+      return;
+    }
+    await runNonRootStableCheck('chat-changed', { initializeFirst: true });
+  });
+
+  eventOn('wuxia:history-checkout-prepare-verification', async detail => {
+    const journal = getPendingHistoryCheckoutJournal();
+    if (!journal) {
+      throw new Error('历史检出校验准备失败：没有进行中的 checkout journal');
+    }
+    if (
+      typeof detail?.transactionId === 'string' &&
+      detail.transactionId &&
+      detail.transactionId !== journal.transactionId
+    ) {
+      throw new Error(`历史检出校验准备失败：事务不匹配 (${detail.transactionId} != ${journal.transactionId})`);
+    }
+
+    await enqueueEventWork(`history-checkout-prepare-verification:${journal.transactionId}`, async () => {
+      const initialized = await initialize({
+        rootBootstrap: false,
+        allowPendingHistoryCheckout: true,
+      });
+      if (!initialized) {
+        throw new Error('历史检出校验准备失败：事件系统非 root 初始化未完成');
+      }
+      await runScheduledCheck('history-checkout-prepare-verification', {
+        allowPendingHistoryCheckout: true,
+      });
+    });
   });
 
   eventOn('GameInitialized', signal => {
@@ -862,9 +991,7 @@
         return;
       }
       if (activeTurnBarrier) {
-        logWarning(
-          `已有回合 ${activeTurnBarrier.roundId} 持有事件写入屏障，忽略并发回合 ${roundId} 的屏障请求`,
-        );
+        logWarning(`已有回合 ${activeTurnBarrier.roundId} 持有事件写入屏障，忽略并发回合 ${roundId} 的屏障请求`);
         return;
       }
       activeTurnBarrier = {
@@ -901,9 +1028,7 @@
   eventOn(tavern_events.MESSAGE_SENT, async () => {
     log('📨 检测到消息发送，触发事件检查');
     const turnStartVariables = await getVariables({ type: 'chat' });
-    pendingTurnCounterKeys = new Set(
-      Object.keys(turnStartVariables?.stat_data?.后续事件线索计数 || {}),
-    );
+    pendingTurnCounterKeys = new Set(Object.keys(turnStartVariables?.stat_data?.后续事件线索计数 || {}));
     scheduleCheckEvents('message-sent');
   });
 
@@ -944,8 +1069,8 @@
     pendingTurnCounterKeys = null;
     const shouldDecrementCounters = messageId !== lastCountedMessageId;
     log(
-      `✅ 检测到武侠回合成功完成 (roundId=${roundId}, messageId=${messageId}, chatId=${chatId})，`
-      + `解除屏障并串行结算事件${deferredCheck.requested ? `（待检查原因: ${deferredCheck.reason}）` : ''}`,
+      `✅ 检测到武侠回合成功完成 (roundId=${roundId}, messageId=${messageId}, chatId=${chatId})，` +
+        `解除屏障并串行结算事件${deferredCheck.requested ? `（待检查原因: ${deferredCheck.reason}）` : ''}`,
     );
     await enqueueEventWork(`turn-completed:${messageId}`, async () => {
       await runScheduledCheck('wuxia-turn-completed');

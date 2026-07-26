@@ -510,14 +510,15 @@ WRITE(A), WRITE(B) → WRITE(B)
 
 ERA 不直接向其他脚本暴露函数；外部调用方通过 `eventEmit` 发起请求。
 
-| 事件                 | detail                             |
-| -------------------- | ---------------------------------- |
-| `era:insertByObject` | 要插入的对象                       |
-| `era:updateByObject` | 要更新的对象                       |
-| `era:deleteByObject` | 描述删除路径的对象                 |
-| `era:insertByPath`   | `{ path: string, value: unknown }` |
-| `era:updateByPath`   | `{ path: string, value: unknown }` |
-| `era:deleteByPath`   | `{ path: string }`                 |
+| 事件                      | detail                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------- |
+| `era:insertByObject`      | 要插入的对象                                                                                |
+| `era:updateByObject`      | 要更新的对象                                                                                |
+| `era:deleteByObject`      | 描述删除路径的对象                                                                          |
+| `era:transactionByObject` | `{ transactionId, operations: Array<{ type: 'insert' \| 'update' \| 'delete', payload }> }` |
+| `era:insertByPath`        | `{ path: string, value: unknown }`                                                          |
+| `era:updateByPath`        | `{ path: string, value: unknown }`                                                          |
+| `era:deleteByPath`        | `{ path: string }`                                                                          |
 
 ```js
 eventEmit('era:insertByObject', {
@@ -532,7 +533,19 @@ eventEmit('era:updateByPath', {
 eventEmit('era:deleteByPath', {
   path: 'player.gold',
 });
+
+eventEmit('era:transactionByObject', {
+  transactionId: 'event-settlement-42',
+  operations: [
+    { type: 'update', payload: { player: { hp: 80 } } },
+    { type: 'delete', payload: { quests: { active: { old_event: {} } } } },
+    { type: 'insert', payload: { quests: { completed: { old_event: true } } } },
+  ],
+});
 ```
+
+批事务会先完整校验并克隆全部 operation，再按声明顺序一次性加入现有 API 写入队列。同一 flush 只更新一次 assistant 消息、发出一次
+`era:apiWrite`，并在 `era:writeDone` 中返回 `transactionIds`（单事务时同时返回 `transactionId`）。
 
 真实执行链：
 
@@ -558,24 +571,23 @@ era:* API
 - 只有相邻且同类型的任务或正文块会合并，Insert/Edit/Delete 的先后边界会被保留。
 - 合法 JSON 块使用紧凑 JSON 重写；无法解析的块保持原文。
 
-路径 API 使用 `_.set({}, path, value)` 构造嵌套对象。外部调用没有 request
-ID、同步返回值或失败结果。写入队列一次 flush 只更新一次消息并发送一次 `era:apiWrite`。
+路径 API 使用 `_.set({}, path, value)` 构造嵌套对象。普通单操作外部调用没有 request ID、同步返回值或失败结果；批事务使用
+`transactionId` 关联最终 `writeDone`。写入队列一次 flush 只更新一次消息并发送一次 `era:apiWrite`。
 
 API flush 使用可见性自适应调度：
 
 - 页面可见时保留 75 ms 合并窗口，并通过 `scheduleUnthrottledTimeout` 优先把 timer 注册到顶层窗口；
 - 页面隐藏时不再等待 timer，而是用 `queueMicrotask` 在当前 JavaScript 调用栈结束后启动 flush；
-- 已注册 75 ms timer 后页面转为隐藏，会取消 timer 并提升为 microtask；即使取消失败，调度 ID 校验也会
-  忽略陈旧回调；
+- 已注册 75 ms timer 后页面转为隐藏，会取消 timer 并提升为 microtask；即使取消失败，调度 ID 校验也会忽略陈旧回调；
 - timer 或 microtask 注册失败时立即 fallback flush，避免任务永久留在队列中；
 - single-flight 和 flush 完成后队列非空自动续排机制继续防止并发写入及遗漏后续任务。
 
-隐藏页路径仍会合并同一调用栈内的同步入队；跨异步 continuation 的任务不保证共享 75 ms 批次，这是避免
-Chromium 将后台 timer 延迟十几秒至数分钟所作的取舍。
+隐藏页路径仍会合并同一调用栈内的同步入队；跨异步 continuation 的任务不保证共享 75
+ms 批次，这是避免 Chromium 将后台 timer 延迟十几秒至数分钟所作的取舍。
 
-调度诊断记录 `scheduledAt`、`expectedAt`、`actualStartAt`、`lagMs`、`timerSource`、调度/启动时队列长度和
-页面可见状态。`timerSource` 可能为 `top`、`parent`、`self`、`microtask-hidden`、
-`microtask-promoted` 或 `immediate-fallback`。
+调度诊断记录
+`scheduledAt`、`expectedAt`、`actualStartAt`、`lagMs`、`timerSource`、调度/启动时队列长度和页面可见状态。`timerSource`
+可能为 `top`、`parent`、`self`、`microtask-hidden`、 `microtask-promoted` 或 `immediate-fallback`。
 
 ## 12. `era:writeDone`
 
@@ -597,6 +609,8 @@ type WriteDonePayload = {
   stat: unknown;
   statWithoutMeta: unknown;
   consecutiveProcessingCount: number;
+  transactionIds?: string[];
+  transactionId?: string;
 };
 ```
 
@@ -617,6 +631,7 @@ eventOn('era:writeDone', detail => {
 - `editLogs` 不执行反转义，且当前通常含 JSON 字符串。
 - API 接收任务的 `actions.api` 不会跨任务传给后续 `era:apiWrite`；实际 API 完成广播通常表现为
   `api: false, apiWrite: true`。
+- API flush 含批事务时，`transactionIds` 会原样透传；恰好一个事务时同时提供 `transactionId`。
 - `writeDone` 当前没有显式 `success` 或 `error` 字段。
 
 ## 13. ERA 宏
@@ -698,7 +713,7 @@ era_diagnostics_v1
 在 ERA 脚本 iframe 的控制台中：
 
 ```js
-window.ERADiagnostics.read();  // 读取全部记录
+window.ERADiagnostics.read(); // 读取全部记录
 window.ERADiagnostics.state(); // 查看当前队列、任务和 API flush 状态
 window.ERADiagnostics.clear(); // 清空记录
 ```
@@ -711,8 +726,8 @@ JSON.parse(localStorage.getItem('era_diagnostics_v1') || '[]');
 
 重点判断：
 
-- `flush-api-write-queue-scheduled` 后长期没有 `scheduled-flush-started`：调度没有获得执行机会；新版本隐藏页
-  正常应使用 `timerSource: microtask-hidden`，且 `lagMs` 通常接近 0；
+- `flush-api-write-queue-scheduled` 后长期没有 `scheduled-flush-started`：调度没有获得执行机会；新版本隐藏页正常应使用
+  `timerSource: microtask-hidden`，且 `lagMs` 通常接近 0；
 - `timerSource: microtask-promoted`：任务最初在可见页使用 75 ms timer，随后因页面转为隐藏而提升；
 - `timerSource: immediate-fallback`：timer 或 microtask 注册抛错，框架已改为立即 flush；同时检查相邻的
   `schedule-flush-timer-error`；
@@ -720,8 +735,8 @@ JSON.parse(localStorage.getItem('era_diagnostics_v1') || '[]');
 - 最后停在 `utils-era-data / update-stat-data` 或 `update-meta-data`：`updateVariablesWith` / 聊天变量保存慢。
 - 最后停在 `events-dispatcher / phase:finalize-selected-mk`：ERA 收尾校准慢或抛错。
 - 出现 `events-queue / process-queue-unhandled-rejection` 且 `isProcessing=true`：队列因异常未解锁。
-- `write-done-emitting` 已出现，但 `write-done-listeners-settled` 很晚：ERA 核心写入已结束，慢点在外部
-  `era:writeDone` 监听链。
+- `write-done-emitting` 已出现，但 `write-done-listeners-settled` 很晚：ERA 核心写入已结束，慢点在外部 `era:writeDone`
+  监听链。
 
 ## 16. 构建
 
@@ -749,8 +764,8 @@ dist/ERA变量框架/index.js
 - 所有相对导入均可解析；
 - Webpack 开发构建成功。
 
-上述逐字节结果仅是源码恢复基线。此后 `api/command.ts` 已接入新的可见性自适应调度器，当前源码和 bundle
-会有意偏离旧 bundle；应以当前回归测试、构建结果和运行诊断为验收依据。
+上述逐字节结果仅是源码恢复基线。此后 `api/command.ts`
+已接入新的可见性自适应调度器，当前源码和 bundle 会有意偏离旧 bundle；应以当前回归测试、构建结果和运行诊断为验收依据。
 
 原脚本与新构建文件整体仍不会逐字节相同，因为 `api/command.ts` 的新 source
 map 现在记录了真实还原源码，而原脚本携带的是过期源码。验收应比较实际模块代码和差分行为，不应再以旧 `sourcesContent`
@@ -763,8 +778,8 @@ map 现在记录了真实还原源码，而原脚本携带的是过期源码。�
 - 消息删除后的 EditLog 回滚与 `SelectedMks` 同步；
 - `era:apiWrite` 合并次数、`era:writeDone`、最终 `stat_data` 和消息正文。
 
-当前目录还包含 API 调度的永久回归测试，覆盖隐藏页 microtask、可见页 75 ms timer、可见转隐藏提升、
-陈旧回调隔离、注册失败立即 flush、flush 后续排，以及隐藏页同步入队后的正文合并。
+当前目录还包含 API 调度的永久回归测试，覆盖隐藏页 microtask、可见页 75 ms
+timer、可见转隐藏提升、陈旧回调隔离、注册失败立即 flush、flush 后续排，以及隐藏页同步入队后的正文合并。
 
 除每次运行自然生成的 MK 时间戳外，原 bundle 与新构建在上述场景中的所有观察结果一致。
 

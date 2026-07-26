@@ -46,6 +46,7 @@ import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inv
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
 import { getUserCurrentLocation } from './utils/mapUtils';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
+import { finalizeCurrentTurn, resumeCheckout } from './utils/saveLoadManager';
 import {
   applyRegexRules,
   applySettingsToDOM,
@@ -80,11 +81,27 @@ import {
   createAutomationGlobalName,
   createRequestId,
 } from '../../tools/wuxia-bridge/protocol.mjs';
+import {
+  HISTORY_CHECKOUT_COMMIT_EVENT,
+  HISTORY_CHECKOUT_DRAFT_EVENT,
+  HISTORY_CHECKOUT_STATE_EVENT,
+  clearHistoryCheckoutDraft,
+  isHistoryCheckoutPending,
+  readHistoryCheckoutDraft,
+  updateHistoryCheckoutDraftMessage,
+  type HistoryCheckoutDraft,
+} from '../shared/historyCheckoutJournal';
 
 const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
+const WUXIA_HISTORY_EVENT_STATE_STABLE_EVENT = 'wuxia:history-event-state-stable';
 
 function formatAttributePreviewSummary(rows: AttributePreviewRow[]): string {
   return rows.map(({ attribute, delta }) => `${attribute}${delta >= 0 ? '+' : ''}${delta}`).join('，');
+}
+
+function readCurrentHistoryDraft(): HistoryCheckoutDraft | null {
+  const chatId = String(SillyTavern.getCurrentChatId?.() ?? '').trim();
+  return chatId ? readHistoryCheckoutDraft(chatId) : null;
 }
 
 const App: React.FC = () => {
@@ -120,6 +137,11 @@ const App: React.FC = () => {
   } = useGameState();
   const { commands, setTravelCommand, addUseItemCommand, cancelCommand, sendMessageWithCommands } = useCommandQueue();
   const [playerAvatarVersion, setPlayerAvatarVersion] = useState(0);
+  const [historyCheckoutPending, setHistoryCheckoutPending] = useState(() => isHistoryCheckoutPending());
+  const [historyInputDraft, setHistoryInputDraft] = useState<HistoryCheckoutDraft | null>(() =>
+    readCurrentHistoryDraft(),
+  );
+  const historyResumeAttemptedRef = useRef(false);
 
   const playerAvatarSource = useMemo(
     () =>
@@ -181,6 +203,69 @@ const App: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const syncCheckoutLock = () => setHistoryCheckoutPending(isHistoryCheckoutPending());
+    const handleCheckoutCommit = () => {
+      syncCheckoutLock();
+      scheduleGameDataCompletion('history-checkout-commit', { fullScan: true });
+    };
+    window.addEventListener(HISTORY_CHECKOUT_STATE_EVENT, syncCheckoutLock);
+    window.addEventListener(HISTORY_CHECKOUT_COMMIT_EVENT, handleCheckoutCommit);
+    window.addEventListener('storage', syncCheckoutLock);
+    const timer = window.setInterval(syncCheckoutLock, 1_000);
+    syncCheckoutLock();
+    return () => {
+      window.removeEventListener(HISTORY_CHECKOUT_STATE_EVENT, syncCheckoutLock);
+      window.removeEventListener(HISTORY_CHECKOUT_COMMIT_EVENT, handleCheckoutCommit);
+      window.removeEventListener('storage', syncCheckoutLock);
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncHistoryDraft = () => setHistoryInputDraft(readCurrentHistoryDraft());
+    window.addEventListener(HISTORY_CHECKOUT_DRAFT_EVENT, syncHistoryDraft);
+    window.addEventListener('storage', syncHistoryDraft);
+    syncHistoryDraft();
+    return () => {
+      window.removeEventListener(HISTORY_CHECKOUT_DRAFT_EVENT, syncHistoryDraft);
+      window.removeEventListener('storage', syncHistoryDraft);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (historyResumeAttemptedRef.current || !isHistoryCheckoutPending()) return;
+    historyResumeAttemptedRef.current = true;
+    void resumeCheckout()
+      .then(result => {
+        setHistoryCheckoutPending(isHistoryCheckoutPending());
+        if (result && result.status !== 'commit') {
+          showError(result.error || '历史分叉自动恢复失败，请打开江湖行迹谱处理。');
+        }
+      })
+      .catch(error => {
+        setHistoryCheckoutPending(isHistoryCheckoutPending());
+        showError(`历史分叉自动恢复失败：${error instanceof Error ? error.message : String(error)}`);
+      });
+  }, [showError]);
+
+  useEffect(() => {
+    const listener = eventOn(WUXIA_HISTORY_EVENT_STATE_STABLE_EVENT, async () => {
+      if (isHistoryCheckoutPending()) return;
+      try {
+        const gameData = readGameDataPure();
+        const time = gameData?.worldTime;
+        await finalizeCurrentTurn({
+          location: gameData?.currentLocation || gameData?.stats?.location || '',
+          worldTimeText: gameData?.gameTime || (time ? `${time.year}年${time.month}月${time.day}日${time.hour}时` : ''),
+        });
+      } catch (error) {
+        gameLogger.error('[history] 聊天切换后的事件状态封存失败', error);
+      }
+    });
+    return () => listener.stop();
+  }, []);
+
   // 使用事件监听 hook
   useEventListeners({
     updateGameState,
@@ -210,13 +295,13 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    if (currentPage !== 'game' || isLoading) {
+    if (currentPage !== 'game' || isLoading || historyCheckoutPending) {
       setCanRegenerate(false);
       return;
     }
 
     setCanRegenerate(canRegenerateLastAssistantSwipe());
-  }, [currentPage, currentMaintext, currentOptions, isLoading]);
+  }, [currentPage, currentMaintext, currentOptions, historyCheckoutPending, isLoading]);
 
   // 检查是否存在存档，如果存在则直接进入游戏
   useEffect(() => {
@@ -452,17 +537,60 @@ const App: React.FC = () => {
 
   const handlePlayerSend = useCallback(
     async (message: string): Promise<string> => {
+      if (historyCheckoutPending) {
+        showError('历史分叉仍在同步中，暂时不能发送新行动。');
+        return '';
+      }
       const rawReply = await sendMessageWithCommands(message, handleSendMessage);
+      if (historyInputDraft) {
+        clearHistoryCheckoutDraft(historyInputDraft.transactionId);
+        setHistoryInputDraft(null);
+      }
       setIsCommandQueueOpen(false);
       refreshGameStateFromVariables();
       return rawReply;
     },
-    [handleSendMessage, refreshGameStateFromVariables, sendMessageWithCommands],
+    [
+      handleSendMessage,
+      historyCheckoutPending,
+      historyInputDraft,
+      refreshGameStateFromVariables,
+      sendMessageWithCommands,
+      showError,
+    ],
+  );
+
+  const handleHistoryDraftChange = useCallback(
+    (message: string) => {
+      if (!historyInputDraft) return;
+      updateHistoryCheckoutDraftMessage(historyInputDraft.transactionId, message);
+    },
+    [historyInputDraft],
+  );
+
+  const handleSafeRegenerate = useCallback(async () => {
+    if (historyCheckoutPending) {
+      showError('历史分叉仍在同步中，暂时不能重新生成。');
+      return;
+    }
+    await handleRegenerateLastAssistant();
+  }, [handleRegenerateLastAssistant, historyCheckoutPending, showError]);
+
+  const handleSafeAutoAdvance = useCallback(
+    async (message: string) => {
+      if (historyCheckoutPending) {
+        const error = new Error('历史分叉仍在同步中，暂时不能推进新回合。');
+        showError(error.message);
+        throw error;
+      }
+      return handleAutoAdvanceTurn(message);
+    },
+    [handleAutoAdvanceTurn, historyCheckoutPending, showError],
   );
 
   const automationRuntimeRef = useRef<WuxiaAutomationRuntimeState>({
     page: currentPage,
-    busy: isLoading,
+    busy: isLoading || historyCheckoutPending,
     maintext: currentMaintext,
     options: currentOptions,
     latestDebugRound,
@@ -474,7 +602,7 @@ const App: React.FC = () => {
   });
   automationRuntimeRef.current = {
     page: currentPage,
-    busy: isLoading,
+    busy: isLoading || historyCheckoutPending,
     maintext: currentMaintext,
     options: currentOptions,
     latestDebugRound,
@@ -839,8 +967,8 @@ const App: React.FC = () => {
             variableEditorCapability={variableEditorCapability}
             latestDebugRound={latestDebugRound}
             onClearDebugLogs={clearDebugLogs}
-            onAutoAdvanceTurn={handleAutoAdvanceTurn}
-            isGenerating={isLoading}
+            onAutoAdvanceTurn={handleSafeAutoAdvance}
+            isGenerating={isLoading || historyCheckoutPending}
           />
         );
       case ActivePanel.SAVE_LOAD:
@@ -1077,6 +1205,15 @@ const App: React.FC = () => {
           {/* 底部聊天输入区域 */}
           <ChatInput
             onSend={handlePlayerSend}
+            prefill={
+              historyInputDraft
+                ? {
+                    key: historyInputDraft.transactionId,
+                    message: historyInputDraft.message,
+                  }
+                : null
+            }
+            onMessageChange={handleHistoryDraftChange}
             extraActions={
               <div className="command-queue-anchor">
                 <CommandQueueButton commands={commands} onClick={() => setIsCommandQueueOpen(open => !open)} />
@@ -1089,10 +1226,10 @@ const App: React.FC = () => {
                 )}
               </div>
             }
-            onRegenerate={handleRegenerateLastAssistant}
-            canRegenerate={canRegenerate}
-            isRegenerating={isLoading}
-            disabled={isLoading}
+            onRegenerate={handleSafeRegenerate}
+            canRegenerate={canRegenerate && !historyCheckoutPending}
+            isRegenerating={isLoading || historyCheckoutPending}
+            disabled={isLoading || historyCheckoutPending}
             placeholder="书写你的江湖故事..."
           />
         </main>
@@ -1133,11 +1270,7 @@ const NavButton = ({
   isActive: boolean;
   onClick: () => void;
 }) => (
-  <button
-    onClick={onClick}
-    className={`nav-btn ${isActive ? 'active' : ''}`}
-    data-wuxia-automation={automationId}
-  >
+  <button onClick={onClick} className={`nav-btn ${isActive ? 'active' : ''}`} data-wuxia-automation={automationId}>
     {isActive && <div className="nav-btn-indicator"></div>}
     <div className="nav-icon-wrapper">{icon}</div>
     <span className="nav-label">{label}</span>

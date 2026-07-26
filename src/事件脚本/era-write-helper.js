@@ -1,8 +1,5 @@
 import { log, logWarning } from './era-utils.js';
-import {
-  emitEraVariableWriteAndWait,
-  runDirectChatVariableWrite,
-} from '../shared/directVariableWrite';
+import { emitEraVariableWriteAndWait, runDirectChatVariableWrite } from '../shared/directVariableWrite';
 
 const RECENT_SIGNATURE_TTL_MS = 3000;
 const pendingSignatures = new Set();
@@ -237,6 +234,336 @@ function applyPatchToStat(statData, action, patch) {
   }
 }
 
+function hashStableString(value) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function normalizeTransactionOperation(operation) {
+  if (!isPlainObject(operation) || !isPlainObject(operation.payload)) {
+    return null;
+  }
+
+  const type = String(operation.type || '').trim();
+  if (!['insert', 'update', 'delete'].includes(type)) {
+    return null;
+  }
+
+  return {
+    type,
+    payload: cloneJson(operation.payload),
+  };
+}
+
+function buildTransactionExpectation(currentVariables, operations) {
+  const expectedVariables = cloneJson(currentVariables || {});
+  if (!isPlainObject(expectedVariables.stat_data)) {
+    expectedVariables.stat_data = {};
+  }
+
+  const effectiveOperations = [];
+  for (const operation of operations) {
+    const effectivePatch = buildEffectivePatch(operation.type, expectedVariables.stat_data, operation.payload);
+    if (!effectivePatch) continue;
+    effectiveOperations.push({
+      type: operation.type,
+      payload: effectivePatch,
+    });
+    applyPatchToStat(expectedVariables.stat_data, operation.type, effectivePatch);
+  }
+
+  return {
+    expectedStat: expectedVariables.stat_data,
+    effectiveOperations,
+  };
+}
+
+function patchMatchesExpected(actual, expected, patch, operationType) {
+  if (!isPlainObject(patch)) {
+    return deepEqual(actual, expected);
+  }
+
+  for (const [key, childPatch] of Object.entries(patch)) {
+    const actualChild = actual?.[key];
+    const expectedChild = expected?.[key];
+    if (isPlainObject(childPatch) && Object.keys(childPatch).length > 0 && isPlainObject(expectedChild)) {
+      if (!patchMatchesExpected(actualChild, expectedChild, childPatch, operationType)) {
+        return false;
+      }
+      continue;
+    }
+
+    if (operationType === 'delete' && expectedChild === undefined) {
+      if (actualChild !== undefined) return false;
+      continue;
+    }
+
+    if (!deepEqual(actualChild, expectedChild)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function transactionExpectationMatches(actualStat, expectedStat, effectiveOperations) {
+  return effectiveOperations.every(operation =>
+    patchMatchesExpected(actualStat, expectedStat, operation.payload, operation.type),
+  );
+}
+
+function objectContainsPatch(container, patch) {
+  if (!isPlainObject(patch)) {
+    return deepEqual(container, patch);
+  }
+  if (!isPlainObject(container)) return false;
+  return Object.entries(patch).every(([key, value]) =>
+    isPlainObject(value) ? objectContainsPatch(container[key], value) : deepEqual(container[key], value),
+  );
+}
+
+function getLatestMessageText(message) {
+  if (!message) return '';
+  for (const key of ['message', 'mes', 'content']) {
+    if (typeof message[key] === 'string') return message[key];
+  }
+  return '';
+}
+
+function parseVariableBlocks(message) {
+  const text = getLatestMessageText(message);
+  if (!text.includes('<Variable')) return [];
+
+  const blocks = [];
+  const regex = /<(VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    try {
+      const payload = JSON.parse(match[2]);
+      if (isPlainObject(payload)) {
+        blocks.push({ tag: match[1], payload });
+      }
+    } catch {
+      // 非 JSON 变量块无法稳定匹配，交给最终 stat_data 回读判断。
+    }
+  }
+  return blocks;
+}
+
+function transactionBlocksWritten(message, operations) {
+  const expectedTags = {
+    insert: 'VariableInsert',
+    update: 'VariableEdit',
+    delete: 'VariableDelete',
+  };
+  const blocks = parseVariableBlocks(message);
+  return operations.every(operation =>
+    blocks.some(
+      block => block.tag === expectedTags[operation.type] && objectContainsPatch(block.payload, operation.payload),
+    ),
+  );
+}
+
+function getTransactionMatchValue(detail, keys) {
+  if (!isPlainObject(detail)) return undefined;
+  for (const key of keys) {
+    if (typeof detail[key] === 'string') return detail[key];
+  }
+  if (isPlainObject(detail.transaction)) {
+    for (const key of keys) {
+      if (typeof detail.transaction[key] === 'string') return detail.transaction[key];
+    }
+  }
+  return undefined;
+}
+
+function matchesTransactionWriteDone(detail, transactionId, transactionSignature) {
+  if (isPlainObject(detail) && Array.isArray(detail.transactionIds) && detail.transactionIds.includes(transactionId)) {
+    return true;
+  }
+  const observedTransactionId = getTransactionMatchValue(detail, ['transactionId', 'transaction_id', 'id']);
+  if (observedTransactionId) {
+    return observedTransactionId === transactionId;
+  }
+
+  const observedSignature = getTransactionMatchValue(detail, [
+    'transactionSignature',
+    'transaction_signature',
+    'signature',
+  ]);
+  return !!observedSignature && observedSignature === transactionSignature;
+}
+
+function getTransactionContextKey() {
+  let chatId = '';
+  let messageId = null;
+  let swipeId = null;
+  try {
+    chatId = String(SillyTavern?.getCurrentChatId?.() || '');
+  } catch {
+    // ignore
+  }
+  try {
+    const latestMessage = getChatMessages(-1, { include_swipes: true })?.[0];
+    messageId = latestMessage?.message_id ?? latestMessage?.messageId ?? latestMessage?.id ?? null;
+    swipeId = latestMessage?.swipe_id ?? latestMessage?.swipeId ?? null;
+  } catch {
+    // 未能读取楼层时仍可依赖操作签名；未知结果路径会再次回读。
+  }
+  return stableStringify({ chatId, messageId, swipeId });
+}
+
+async function waitForTransactionWriteDone(transactionId, transactionSignature, detail, timeoutMs, timeoutMessage) {
+  let timer = null;
+  let listener = null;
+  let rejectWait = null;
+  let settled = false;
+
+  const cleanup = () => {
+    listener?.stop();
+    listener = null;
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+
+  const waitForWriteDone = new Promise((resolve, reject) => {
+    rejectWait = reject;
+    timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    listener = eventOn('era:writeDone', writeDoneDetail => {
+      if (!matchesTransactionWriteDone(writeDoneDetail, transactionId, transactionSignature)) {
+        return;
+      }
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(writeDoneDetail);
+    });
+  });
+
+  const rejectUnknownDispatch = error => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    rejectWait?.(error instanceof Error ? error : new Error(String(error)));
+  };
+
+  try {
+    const dispatch = eventEmit('era:transactionByObject', detail);
+    void Promise.resolve(dispatch).catch(error => {
+      logWarning(`ERA 事务事件监听链异常，进入未知结果回读: ${transactionId}`, error);
+      rejectUnknownDispatch(error);
+    });
+  } catch (error) {
+    logWarning(`ERA 事务事件发送异常，进入未知结果回读: ${transactionId}`, error);
+    rejectUnknownDispatch(error);
+  }
+
+  return waitForWriteDone;
+}
+
+async function rereadTransactionState(expectedStat, effectiveOperations, reason) {
+  let latestMessage = null;
+  try {
+    latestMessage = getChatMessages(-1, { include_swipes: true })?.[0] || null;
+  } catch (error) {
+    logWarning(`ERA 事务未知结果后回读最新消息失败: ${reason}`, error);
+  }
+
+  const latestVariables = await getVariables({ type: 'chat' });
+  const persisted = transactionExpectationMatches(latestVariables?.stat_data || {}, expectedStat, effectiveOperations);
+  const messageWritten = transactionBlocksWritten(latestMessage, effectiveOperations);
+  return { persisted, messageWritten, latestMessage, latestVariables };
+}
+
+export async function writeEraTransaction(operations, reason = 'era-transaction', options = {}) {
+  const normalizedOperations = (Array.isArray(operations) ? operations : [])
+    .map(normalizeTransactionOperation)
+    .filter(Boolean);
+  if (normalizedOperations.length === 0) {
+    log(`跳过空 ERA 事务: ${reason}`);
+    return false;
+  }
+
+  const currentVariables = await getVariables({ type: 'chat' });
+  const { expectedStat, effectiveOperations } = buildTransactionExpectation(currentVariables, normalizedOperations);
+  if (effectiveOperations.length === 0) {
+    log(`跳过无有效变更的 ERA 事务: ${reason}`);
+    return true;
+  }
+
+  const transactionSignature = stableStringify({
+    context: getTransactionContextKey(),
+    operations: effectiveOperations,
+  });
+  const signature = `era-transaction:${transactionSignature}`;
+  if (isDuplicateSignature(signature)) {
+    log(`跳过重复 ERA 事务: ${reason}`);
+    return false;
+  }
+
+  const transactionId =
+    options.transactionId || `event-script-${hashStableString(transactionSignature)}-${transactionSignature.length}`;
+  const detail = {
+    transactionId,
+    transactionSignature,
+    operations: effectiveOperations,
+  };
+
+  markPending(signature);
+  try {
+    await waitForTransactionWriteDone(
+      transactionId,
+      transactionSignature,
+      detail,
+      options.timeoutMs ?? 10000,
+      options.timeoutMessage ?? `ERA 事务写入完成信号超时: ${reason}`,
+    );
+    markDone(signature);
+    log(`ERA 事务写入完成: ${reason}`);
+    return true;
+  } catch (error) {
+    logWarning(`ERA 事务结果未知，开始回读消息与最终变量: ${reason}`, error);
+    let reread = await rereadTransactionState(expectedStat, effectiveOperations, reason);
+    if (reread.persisted || reread.messageWritten) {
+      logWarning(
+        `ERA 事务${reread.persisted ? '最终变量已落库' : '变量块已写入消息'}但 writeDone 未确认，` +
+          `执行 manual_sync 且禁止自动重发: ${reason}`,
+      );
+      try {
+        await eventEmit('manual_sync');
+      } catch (syncError) {
+        logWarning(`ERA 事务兜底 manual_sync 失败: ${reason}`, syncError);
+      }
+      if (!reread.persisted) {
+        reread = await rereadTransactionState(expectedStat, effectiveOperations, reason);
+      }
+    }
+
+    if (reread.persisted) {
+      markDone(signature);
+      return true;
+    }
+
+    if (reread.messageWritten) {
+      markDone(signature);
+      logWarning(`ERA 事务块已写入但 manual_sync 后仍未确认最终变量，保留短期去重: ${reason}`);
+    } else {
+      releasePending(signature);
+      logWarning(`ERA 事务回读未确认消息块或最终变量，禁止本次调用自动重发: ${reason}`);
+    }
+    return false;
+  }
+}
+
 export async function writeDirectChatVariables(action, payload, reason = 'direct-chat-write') {
   const currentVariables = await getVariables({ type: 'chat' });
   const currentStat = currentVariables?.stat_data || {};
@@ -263,14 +590,17 @@ export async function writeDirectChatVariables(action, payload, reason = 'direct
         refreshHint: 'event-state',
       },
       () =>
-        updateVariablesWith(variables => {
-          const nextVariables = variables || {};
-          if (!isPlainObject(nextVariables.stat_data)) {
-            nextVariables.stat_data = {};
-          }
-          applyPatchToStat(nextVariables.stat_data, action, effectivePatch);
-          return nextVariables;
-        }, { type: 'chat' }),
+        updateVariablesWith(
+          variables => {
+            const nextVariables = variables || {};
+            if (!isPlainObject(nextVariables.stat_data)) {
+              nextVariables.stat_data = {};
+            }
+            applyPatchToStat(nextVariables.stat_data, action, effectivePatch);
+            return nextVariables;
+          },
+          { type: 'chat' },
+        ),
     );
 
     log(`直接写入完成: ${reason}`);
@@ -297,13 +627,14 @@ export async function writeEraCommand(command, payload, reason = command, option
 
   markPending(signature);
   try {
-    const operation = command === 'era:insertByObject'
-      ? 'insert'
-      : command === 'era:updateByObject'
-        ? 'update'
-        : command === 'era:deleteByObject' || command === 'era:deleteByPath'
-          ? 'delete'
-          : 'replace';
+    const operation =
+      command === 'era:insertByObject'
+        ? 'insert'
+        : command === 'era:updateByObject'
+          ? 'update'
+          : command === 'era:deleteByObject' || command === 'era:deleteByPath'
+            ? 'delete'
+            : 'replace';
     await emitEraVariableWriteAndWait({
       source: 'event-script',
       operation,

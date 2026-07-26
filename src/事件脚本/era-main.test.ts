@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { eventOnMock } from '../武侠/test/setup';
+import { eventEmitMock, eventOnMock } from '../武侠/test/setup';
 
 const logErrorMock = vi.fn();
 const initializeEventListMock = vi.fn();
+const readHistoryCheckoutJournalMock = vi.fn();
+const reconcileWorldEventArchiveMock = vi.fn();
+const syncParticipationOutcomeStatesMock = vi.fn();
+const cleanupInvalidParticipationEntriesMock = vi.fn();
+const writeDirectAssignMock = vi.fn();
 const getVariablesMock = globalThis.getVariables as ReturnType<typeof vi.fn>;
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 vi.mock('./era-utils.js', () => ({
   log: vi.fn(),
@@ -41,7 +46,7 @@ vi.mock('./era-event-operations.js', () => ({
   applyTimedParticipantEntries: vi.fn(),
   areEventPredecessorsCompleted: vi.fn(() => true),
   cleanupFollowupCluesForActiveParticipation: vi.fn(),
-  cleanupInvalidParticipationEntries: vi.fn(),
+  cleanupInvalidParticipationEntries: cleanupInvalidParticipationEntriesMock,
 }));
 
 vi.mock('./era-participant-entry.js', () => ({
@@ -51,8 +56,8 @@ vi.mock('./era-participant-entry.js', () => ({
 }));
 
 vi.mock('./era-world-events.js', () => ({
-  reconcileWorldEventArchive: vi.fn(),
-  syncParticipationOutcomeStates: vi.fn(),
+  reconcileWorldEventArchive: reconcileWorldEventArchiveMock,
+  syncParticipationOutcomeStates: syncParticipationOutcomeStatesMock,
 }));
 
 vi.mock('./era-runtime-state.js', () => ({
@@ -66,9 +71,13 @@ vi.mock('./era-turn-queue.js', () => ({
 }));
 
 vi.mock('./era-write-helper.js', () => ({
-  writeDirectAssign: vi.fn(),
-  writeDirectUpdate: vi.fn(),
-  writeDirectDelete: vi.fn(),
+  writeDirectAssign: writeDirectAssignMock,
+  writeEraTransaction: vi.fn(),
+}));
+
+vi.mock('../shared/historyCheckoutJournal', () => ({
+  readHistoryCheckoutJournal: readHistoryCheckoutJournalMock,
+  isHistoryCheckoutJournalExpired: vi.fn(() => false),
 }));
 
 const validVariables = () => ({
@@ -85,11 +94,123 @@ describe('ERA 主线初始化控制', () => {
     vi.resetModules();
     logErrorMock.mockReset();
     initializeEventListMock.mockReset();
+    reconcileWorldEventArchiveMock.mockReset();
+    syncParticipationOutcomeStatesMock.mockReset();
+    cleanupInvalidParticipationEntriesMock.mockReset();
+    writeDirectAssignMock.mockReset();
+    eventEmitMock.mockClear();
+    readHistoryCheckoutJournalMock.mockReset().mockReturnValue(null);
     getVariablesMock.mockReset().mockReturnValue(validVariables());
     Object.assign(globalThis, {
       waitGlobalInitialized: vi.fn(() => new Promise(() => {})),
       toastr: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
     });
+  });
+
+  it('history checkout journal pending 时暂停初始化，commit 后恢复', async () => {
+    vi.useFakeTimers();
+    initializeEventListMock.mockResolvedValue(undefined);
+    readHistoryCheckoutJournalMock.mockReturnValue({
+      version: 1,
+      transactionId: 'checkout-test',
+      stage: 'activate_swipe',
+      targetNodeId: 'node-1',
+      targetLocator: {
+        chatId: 'test-chat',
+        chatName: 'test',
+        userMessageId: 1,
+        assistantMessageId: 2,
+        swipeId: 1,
+      },
+      sourceHeadNodeId: 'node-0',
+      sourceChatId: 'test-chat',
+      sourceChatName: 'test',
+      startedAt: Date.now(),
+    });
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?history-checkout-pause-test');
+    expect(initializeEventListMock).not.toHaveBeenCalled();
+
+    readHistoryCheckoutJournalMock.mockReturnValue({
+      ...readHistoryCheckoutJournalMock.mock.results.at(-1)?.value,
+      stage: 'commit',
+    });
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('checkout 校验握手可在 journal pending 时完成非 root 初始化和稳定事件检查', async () => {
+    const eventName = '射雕测试事件-checkout校验';
+    const checkoutVariables = validVariables() as ReturnType<typeof validVariables> & {
+      stat_data: ReturnType<typeof validVariables>['stat_data'] & { 附近传闻: Record<string, string> };
+    };
+    checkoutVariables.stat_data.附近传闻 = { 旧分支传闻: '应在 checkout 校验前清除' };
+    getVariablesMock.mockReturnValue(checkoutVariables);
+    initializeEventListMock.mockResolvedValue(undefined);
+    readHistoryCheckoutJournalMock.mockReturnValue({
+      version: 1,
+      transactionId: 'checkout-verify-test',
+      stage: 'verify',
+      targetNodeId: 'node-verify',
+      targetLocator: {
+        chatId: 'test-chat',
+        chatName: 'test',
+        userMessageId: 1,
+        assistantMessageId: 2,
+        swipeId: 0,
+      },
+      sourceHeadNodeId: 'node-source',
+      sourceChatId: 'test-chat',
+      sourceChatName: 'test',
+      startedAt: Date.now(),
+    });
+    const loader = await import('./era-event-loader.js');
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [{ runtimeKey: eventName }],
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue({
+      [eventName]: {
+        触发条件: { 类型: '时间', 年: 1300, 月: 1, 日: 1, 时: 0 },
+        事件结束时间: { 年: 1300, 月: 1, 日: 2, 时: 0 },
+        事件详情: 'checkout 校验事件',
+        事件概要: 'checkout 校验事件',
+        参与人物: [],
+        insert: {},
+        update: {},
+        delete: {},
+      },
+    });
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?history-checkout-prepare-verification-test');
+    await vi.waitFor(() =>
+      expect(eventOnMock.mock.calls.some(([name]) => name === 'wuxia:history-checkout-prepare-verification')).toBe(
+        true,
+      ),
+    );
+    expect(initializeEventListMock).not.toHaveBeenCalled();
+
+    const prepareListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'wuxia:history-checkout-prepare-verification')
+      .at(-1)?.[1] as ((detail: { transactionId: string }) => Promise<void>) | undefined;
+    await prepareListener?.({ transactionId: 'checkout-verify-test' });
+
+    expect(initializeEventListMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ rootBootstrap: false }),
+    );
+    expect(syncParticipationOutcomeStatesMock).toHaveBeenCalledTimes(1);
+    expect(cleanupInvalidParticipationEntriesMock).toHaveBeenCalledTimes(1);
+    expect(writeDirectAssignMock).toHaveBeenCalledWith({ 附近传闻: {} }, 'update-nearby-rumors');
+    expect(initializeEventListMock.mock.invocationCallOrder[0]).toBeLessThan(
+      syncParticipationOutcomeStatesMock.mock.invocationCallOrder[0],
+    );
+    expect(syncParticipationOutcomeStatesMock.mock.invocationCallOrder[0]).toBeLessThan(
+      cleanupInvalidParticipationEntriesMock.mock.invocationCallOrder[0],
+    );
+    expect(eventEmitMock.mock.calls.some(([name]) => name === 'wuxia:history-event-state-stable')).toBe(false);
   });
 
   it('initializeEventList 抛错时初始化返回失败且不显示成功 toast', async () => {
@@ -108,8 +229,7 @@ describe('ERA 主线初始化控制', () => {
     expect(globalThis.toastr.success).not.toHaveBeenCalled();
 
     const gameInitializedListener = eventOnMock.mock.calls.find(([name]) => name === 'GameInitialized')?.[1] as
-      | ((signal: { timestamp: number }) => unknown)
-      | undefined;
+      ((signal: { timestamp: number }) => unknown) | undefined;
     initializeEventListMock.mockResolvedValue(undefined);
     gameInitializedListener?.({ timestamp: Date.now() });
     await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(2));
@@ -123,8 +243,7 @@ describe('ERA 主线初始化控制', () => {
     await import('./era-main.js?initialize-dedupe-test');
     await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
     const gameInitializedListener = eventOnMock.mock.calls.find(([name]) => name === 'GameInitialized')?.[1] as
-      | ((signal: { timestamp: number }) => unknown)
-      | undefined;
+      ((signal: { timestamp: number }) => unknown) | undefined;
     expect(gameInitializedListener).toBeTypeOf('function');
 
     const signal = { timestamp: Date.now() + 1000 };
@@ -174,11 +293,19 @@ describe('ERA 主线初始化控制', () => {
 
     // @ts-expect-error 测试用模块 query
     await import('./era-main.js?opening-participation-priority-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const gameInitializedListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'GameInitialized')
+      .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
+    gameInitializedListener?.({ timestamp: Date.now() + 100_000 });
 
     await vi.waitFor(() => expect(operations.applyTimedParticipantEntries).toHaveBeenCalledTimes(1));
-    expect(operations.playerJoinsEvents).toHaveBeenCalledWith([eventName], expect.objectContaining({
-      [eventName]: definition,
-    }));
+    expect(operations.playerJoinsEvents).toHaveBeenCalledWith(
+      [eventName],
+      expect.objectContaining({
+        [eventName]: definition,
+      }),
+    );
     expect(vi.mocked(operations.playerJoinsEvents).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(operations.applyTimedParticipantEntries).mock.invocationCallOrder[0],
     );
@@ -226,8 +353,8 @@ describe('ERA 主线初始化控制', () => {
     vi.mocked(checker.isTimeForEvent).mockReturnValue(false);
     vi.mocked(checker.isEventDiscoverable).mockReturnValue(false);
     vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
-    vi.mocked(utils.hasParticipationEntry).mockImplementation(
-      (participation, name) => Object.prototype.hasOwnProperty.call(participation || {}, name),
+    vi.mocked(utils.hasParticipationEntry).mockImplementation((participation, name) =>
+      Object.prototype.hasOwnProperty.call(participation || {}, name),
     );
     vi.mocked(operations.cleanupInvalidParticipationEntries).mockImplementation(async () => {
       variables.stat_data.参与事件 = {};
@@ -238,6 +365,11 @@ describe('ERA 主线初始化控制', () => {
 
     // @ts-expect-error 测试用模块 query
     await import('./era-main.js?opening-participation-cleanup-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const gameInitializedListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'GameInitialized')
+      .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
+    gameInitializedListener?.({ timestamp: Date.now() + 100_000 });
 
     await vi.waitFor(() => expect(operations.playerJoinsEvents).toHaveBeenCalledTimes(1));
     expect(operations.playerJoinsEvents).toHaveBeenCalledWith([eventName], expect.any(Object));
@@ -287,6 +419,11 @@ describe('ERA 主线初始化控制', () => {
 
     // @ts-expect-error 测试用模块 query
     await import('./era-main.js?opening-active-participants-only-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const gameInitializedListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'GameInitialized')
+      .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
+    gameInitializedListener?.({ timestamp: Date.now() + 100_000 });
 
     await vi.waitFor(() => expect(operations.applyTimedParticipantEntries).toHaveBeenCalledTimes(1));
     expect(operations.batchEndEvents).toHaveBeenCalledWith([endedEvent], expect.any(Object));
@@ -298,14 +435,95 @@ describe('ERA 主线初始化控制', () => {
     );
   });
 
+  it('普通 CHAT_CHANGED 不做 direct 历史补算，但会 ERA 检查并在状态稳定后通知重封存', async () => {
+    const historicalEvent = '射雕测试事件-已有存档历史事件';
+    const variables = validVariables();
+    variables.stat_data.事件系统 = {
+      未发生事件: {},
+      进行中事件: {
+        [historicalEvent]: { 年: 1000, 月: 1, 日: 2, 时: 0 },
+      },
+      已完成事件: {},
+    };
+    getVariablesMock.mockReturnValue(variables);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const operations = await import('./era-event-operations.js');
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [{ runtimeKey: historicalEvent, triggerHour: 1, endHour: 2 }],
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue({
+      [historicalEvent]: {
+        触发条件: { 类型: '时间', 年: 1000, 月: 1, 日: 1, 时: 0 },
+        事件结束时间: { 年: 1000, 月: 1, 日: 2, 时: 0 },
+        事件详情: '早已结束的历史事件',
+        事件概要: '不应在当前楼层追补',
+        参与人物: [],
+        insert: { 郭靖: { 状态: '不应应用' } },
+        update: {},
+        delete: {},
+      },
+    });
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(true);
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(true);
+    vi.mocked(operations.batchEndEvents).mockImplementation(async () => {
+      delete variables.stat_data.事件系统.进行中事件[historicalEvent];
+      variables.stat_data.事件系统.已完成事件[historicalEvent] = 0;
+      return true;
+    });
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?chat-changed-existing-save-no-catch-up-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() =>
+      expect(eventEmitMock).toHaveBeenCalledWith(
+        'wuxia:history-event-state-stable',
+        expect.objectContaining({ reason: 'startup-existing-chat' }),
+      ),
+    );
+
+    variables.stat_data.事件系统.进行中事件 = {
+      [historicalEvent]: { 年: 1000, 月: 1, 日: 2, 时: 0 },
+    };
+    variables.stat_data.事件系统.已完成事件 = {};
+    vi.mocked(operations.batchEndEvents).mockClear();
+    eventEmitMock.mockClear();
+
+    const chatChangedListener = eventOnMock.mock.calls
+      .filter(([name]) => name === tavern_events.CHAT_CHANGED)
+      .at(-1)?.[1] as (() => unknown) | undefined;
+    expect(chatChangedListener).toBeTypeOf('function');
+    await chatChangedListener?.();
+
+    expect(initializeEventListMock).toHaveBeenCalledTimes(2);
+    expect(initializeEventListMock).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      expect.objectContaining({ rootBootstrap: false }),
+    );
+    expect(operations.batchCompleteDebutEvents).not.toHaveBeenCalled();
+    expect(operations.batchEndEvents).toHaveBeenCalledWith([historicalEvent], expect.any(Object));
+    expect(reconcileWorldEventArchiveMock).not.toHaveBeenCalled();
+    expect(eventEmitMock).toHaveBeenCalledWith(
+      'wuxia:history-event-state-stable',
+      expect.objectContaining({ reason: 'chat-changed' }),
+    );
+  });
+
   it('回合屏障会等时间、参与事件结局和差分全部稳定后再结算', async () => {
     const eventName = '射雕测试事件-同轮稳定结算';
     const variables = validVariables() as ReturnType<typeof validVariables> & {
       stat_data: ReturnType<typeof validVariables>['stat_data'] & {
-        参与事件: Record<string, {
-          结局: string;
-          update: Record<string, unknown>;
-        }>;
+        参与事件: Record<
+          string,
+          {
+            结局: string;
+            update: Record<string, unknown>;
+          }
+        >;
       };
     };
     variables.stat_data.事件系统.进行中事件 = {
@@ -360,8 +578,7 @@ describe('ERA 主线初始化控制', () => {
 
     const findLatestListener = (eventName: string) =>
       eventOnMock.mock.calls.filter(([name]) => name === eventName).at(-1)?.[1] as
-        | ((detail?: Record<string, unknown>) => unknown)
-        | undefined;
+        ((detail?: Record<string, unknown>) => unknown) | undefined;
     const lifecycleListener = findLatestListener('wuxia:turn-lifecycle');
     const messageSentListener = findLatestListener(tavern_events.MESSAGE_SENT);
     const writeDoneListener = findLatestListener('era:writeDone');

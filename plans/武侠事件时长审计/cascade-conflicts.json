@@ -1,0 +1,24 @@
+{
+  "conflicts": [
+    {
+      "series": "射雕",
+      "id": "射雕第36回-06-成吉思汗西征",
+      "freeze": "trigger",
+      "deficitHours": 3264,
+      "frozenTrigger": "1221-04-01 08:00",
+      "requiredTrigger": "1221-08-15 08:00",
+      "pushedBy": "射雕第36回-05-郭靖拒婚"
+    },
+    {
+      "series": "神雕",
+      "id": "神雕第20回-06-蒙古军攻襄阳郭靖守城显神威",
+      "freeze": "trigger",
+      "deficitHours": 9888,
+      "frozenTrigger": "1243-10-20 14:00",
+      "requiredTrigger": "1244-12-05 14:00",
+      "pushedBy": "神雕第20回-05-忽必烈招揽群雄共谋刺郭靖"
+    }
+  ],
+  "shiftedProposals": 198,
+  "newCascades": 143
+}

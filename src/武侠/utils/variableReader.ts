@@ -8,36 +8,37 @@
  */
 
 import type {
-    ActiveStatusEffect,
-    ActiveStatusEffectVariableData,
-    CurrentAttributes,
-    EquipmentSlots,
-    FrontendVariableData,
-    GameEvent,
-    GameState,
-    InitialAttributes,
-    InventoryAttributeModifierMap,
-    InventoryItem,
-    InventoryItemVariableData,
-    MartialArt,
-    NPC,
-    WorldEventVariableData,
-    WorldTime,
+  ActiveStatusEffect,
+  ActiveStatusEffectVariableData,
+  CurrentAttributes,
+  EquipmentSlots,
+  FrontendVariableData,
+  GameEvent,
+  GameState,
+  InitialAttributes,
+  InventoryAttributeModifierMap,
+  InventoryItem,
+  InventoryItemVariableData,
+  MartialArt,
+  NPC,
+  WorldEventVariableData,
+  WorldTime,
 } from '../types';
 
 import {
-    calculateAllAttributes,
-    type AttributeModifierSource,
-    type MartialArtForCalculation,
+  calculateAllAttributes,
+  type AttributeModifierSource,
+  type MartialArtForCalculation,
 } from './attributeCalculator';
 import {
-    completeMartialArts,
-    getMartialArtData,
-    loadMartialArtsDatabase,
-    type CompleteMartialArt,
-    type SimpleMartialArt,
+  completeMartialArts,
+  getMartialArtData,
+  loadMartialArtsDatabase,
+  type CompleteMartialArt,
+  type SimpleMartialArt,
 } from './martialArtsDatabase';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
+import { isHistoryCheckoutPending } from '../../shared/historyCheckoutJournal';
 import { dataLogger } from './logger';
 
 // 使用酒馆的 ChatMessage 类型（与本地 types.ts 中的 ChatMessage 区分）
@@ -1040,9 +1041,7 @@ function formatEventValue(value: unknown): string {
       const actionValue = value[action];
       return isRecord(actionValue) && Object.keys(actionValue).some(key => !key.startsWith('$'));
     });
-    const endingNote = typeof value.结局 === 'string' && value.结局.trim()
-      ? `\n结局：${value.结局.trim()}`
-      : '';
+    const endingNote = typeof value.结局 === 'string' && value.结局.trim() ? `\n结局：${value.结局.trim()}` : '';
     const diffNote = changedActions.length > 0 ? `\n结局差分：${changedActions.join(', ')}` : '';
     return `${value.描述}${endingNote}${diffNote}`;
   }
@@ -1085,12 +1084,8 @@ function parseEvents(variables: GameVariables): GameEvent[] {
 
   pushRecordEvents(events, variables.附近传闻, 'RUMOR', 'rumor', (_name, value) => formatEventValue(value));
 
-  pushRecordEvents(
-    events,
-    filterParticipationEvents(variables.参与事件),
-    'ACTIVE',
-    'participating',
-    (_name, value) => formatEventValue(value),
+  pushRecordEvents(events, filterParticipationEvents(variables.参与事件), 'ACTIVE', 'participating', (_name, value) =>
+    formatEventValue(value),
   );
 
   pushRecordEvents(events, eventSystem.进行中事件, 'ACTIVE', 'active', (_name, value) => {
@@ -1280,7 +1275,9 @@ function parseSocial(variables: GameVariables, 用户档案?: UserProfile): NPC[
     const legacyNpc = legacyByName.get(name);
 
     if (isCharacterDataRecord(characterRecord)) {
-      result.push(createCharacterNpc(name, characterRecord, 'acquaintance', avatarRefs[name], relationshipLabel, legacyNpc));
+      result.push(
+        createCharacterNpc(name, characterRecord, 'acquaintance', avatarRefs[name], relationshipLabel, legacyNpc),
+      );
     } else if (legacyNpc) {
       result.push(createLegacySocialNpc(legacyNpc, 'acquaintance', relationshipLabel));
     } else {
@@ -1311,7 +1308,9 @@ function parseSocial(variables: GameVariables, 用户档案?: UserProfile): NPC[
       continue;
     }
 
-    result.push(createCharacterNpc(name, characterRecord, 'local', avatarRefs[name], undefined, legacyByName.get(name)));
+    result.push(
+      createCharacterNpc(name, characterRecord, 'local', avatarRefs[name], undefined, legacyByName.get(name)),
+    );
     seenNames.add(name);
   }
 
@@ -1638,7 +1637,9 @@ function stringifySortedRecord(record: Record<string, unknown> | undefined): str
     return '{}';
   }
 
-  return JSON.stringify(Object.fromEntries(Object.entries(record).sort(([left], [right]) => left.localeCompare(right))));
+  return JSON.stringify(
+    Object.fromEntries(Object.entries(record).sort(([left], [right]) => left.localeCompare(right))),
+  );
 }
 
 function createPlayerAttributeSignature(
@@ -1675,7 +1676,10 @@ function updateCharacterCache(cacheKey: string, realm: string, attributeSignatur
  *
  * @param user数据 变量表中的玩家数据对象
  */
-export async function autoUpdatePlayerAttributes(user数据?: UserProfile, 前端变量?: FrontendVariableData): Promise<void> {
+export async function autoUpdatePlayerAttributes(
+  user数据?: UserProfile,
+  前端变量?: FrontendVariableData,
+): Promise<void> {
   // 防止重复调用
   if (isUpdatingPlayerAttributes) {
     dataLogger.log('[autoUpdatePlayerAttributes] 正在更新中，跳过重复调用');
@@ -1725,7 +1729,12 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile, 前�
   const equipmentSlots = parseEquipmentSlots(user数据.装备栏);
   const statusEffects = parseStatusEffects(user数据.状态效果);
   const activeModifiers = collectActiveAttributeModifiers(user数据, equipmentSlots, statusEffects, 前端变量);
-  const attributeSignature = createPlayerAttributeSignature(initialAttrs, currentRealm, martialArtsForCalc, activeModifiers);
+  const attributeSignature = createPlayerAttributeSignature(
+    initialAttrs,
+    currentRealm,
+    martialArtsForCalc,
+    activeModifiers,
+  );
 
   // 使用缓存检测是否需要更新
   const cached = characterStateCache.get(cacheKey);
@@ -1767,8 +1776,14 @@ export async function autoUpdatePlayerAttributes(user数据?: UserProfile, 前�
 
   // 使用 attributeCalculator 计算战斗属性和资源属性
   const { combat, resources } = calculateAllAttributes(initialAttrs, currentRealm, martialArtsForCalc, activeModifiers);
-  const hpPair = adjustResourcePairByMaxDelta(parseResourcePair(user数据.属性?.气血, resources.气血上限), resources.气血上限);
-  const mpPair = adjustResourcePairByMaxDelta(parseResourcePair(user数据.属性?.内力, resources.内力上限), resources.内力上限);
+  const hpPair = adjustResourcePairByMaxDelta(
+    parseResourcePair(user数据.属性?.气血, resources.气血上限),
+    resources.气血上限,
+  );
+  const mpPair = adjustResourcePairByMaxDelta(
+    parseResourcePair(user数据.属性?.内力, resources.内力上限),
+    resources.内力上限,
+  );
 
   dataLogger.log('[autoUpdatePlayerAttributes] 计算后战斗属性:', combat);
   dataLogger.log('[autoUpdatePlayerAttributes] 计算后资源属性:', resources);
@@ -2120,7 +2135,7 @@ interface PendingMartialArtVerification {
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const cloneJsonValue = <T,>(value: T): T => {
+const cloneJsonValue = <T>(value: T): T => {
   if (value === undefined) {
     return value;
   }
@@ -2255,26 +2270,28 @@ function prefixVerificationLeaves(
 function readChatStatDataSnapshot(): GameVariables {
   try {
     const chatVariables = getVariables({ type: 'chat' }) as { stat_data?: GameVariables } | null | undefined;
-    return isRecord(chatVariables?.stat_data) ? chatVariables.stat_data as GameVariables : {};
+    return isRecord(chatVariables?.stat_data) ? (chatVariables.stat_data as GameVariables) : {};
   } catch (error) {
     dataLogger.error('[variableReader] 读取 chat.stat_data 失败:', error);
     return {};
   }
 }
 
-function verifyMartialArtWrites(
-  pendingVerifications: PendingMartialArtVerification[],
-): {
+function verifyMartialArtWrites(pendingVerifications: PendingMartialArtVerification[]): {
   succeeded: PendingMartialArtVerification[];
-  failed: Array<PendingMartialArtVerification & {
-    mismatches: Array<{ path: string; expected: unknown; actual: unknown }>;
-  }>;
+  failed: Array<
+    PendingMartialArtVerification & {
+      mismatches: Array<{ path: string; expected: unknown; actual: unknown }>;
+    }
+  >;
 } {
   const chatStatData = readChatStatDataSnapshot();
   const succeeded: PendingMartialArtVerification[] = [];
-  const failed: Array<PendingMartialArtVerification & {
-    mismatches: Array<{ path: string; expected: unknown; actual: unknown }>;
-  }> = [];
+  const failed: Array<
+    PendingMartialArtVerification & {
+      mismatches: Array<{ path: string; expected: unknown; actual: unknown }>;
+    }
+  > = [];
 
   for (const pending of pendingVerifications) {
     const mismatches = pending.verificationLeaves
@@ -2399,7 +2416,9 @@ function shouldUpdateMartialArtByCache(
   }
 
   if (cached.mastery !== currentMastery) {
-    dataLogger.log(`[shouldUpdateMartialArtByCache] ${cacheKey}: 掌握程度变动 ${cached.mastery} -> ${currentMastery}，但目标叶子已同步`);
+    dataLogger.log(
+      `[shouldUpdateMartialArtByCache] ${cacheKey}: 掌握程度变动 ${cached.mastery} -> ${currentMastery}，但目标叶子已同步`,
+    );
     return { shouldUpdate: false, isNew: false, masteryChanged: true, updateType };
   }
 
@@ -2473,9 +2492,7 @@ function martialArtSignature(art: SimpleMartialArt | undefined): string {
     return '';
   }
 
-  const traits = art.特性
-    ? Object.entries(art.特性).sort(([a], [b]) => a.localeCompare(b))
-    : [];
+  const traits = art.特性 ? Object.entries(art.特性).sort(([a], [b]) => a.localeCompare(b)) : [];
 
   return JSON.stringify({
     mastery: art.掌握程度 || '初窥门径',
@@ -2529,7 +2546,11 @@ function collectChangedMartialArts(
   const changedCharacters: CharacterRecord = {};
 
   for (const [characterName, nextCharacter] of Object.entries(nextCharacters)) {
-    if (characterName.startsWith('$') || isPlayerCharacterEntry(characterName, playerName) || !isRecord(nextCharacter)) {
+    if (
+      characterName.startsWith('$') ||
+      isPlayerCharacterEntry(characterName, playerName) ||
+      !isRecord(nextCharacter)
+    ) {
       continue;
     }
 
@@ -2602,7 +2623,11 @@ function collectChangedCharacterAttributes(
   const playerName = getUserName(nextVariables.user数据) || getUserName(previousVariables.user数据);
 
   for (const [characterName, nextCharacter] of Object.entries(nextCharacters)) {
-    if (characterName.startsWith('$') || isPlayerCharacterEntry(characterName, playerName) || !isRecord(nextCharacter)) {
+    if (
+      characterName.startsWith('$') ||
+      isPlayerCharacterEntry(characterName, playerName) ||
+      !isRecord(nextCharacter)
+    ) {
       continue;
     }
 
@@ -2628,7 +2653,10 @@ function collectChangedCharacterAttributes(
   return Object.keys(changedCharacters).length > 0 ? changedCharacters : undefined;
 }
 
-function mergeMartialArtsScope(target: MartialArtsCompletionScope, source: MartialArtsCompletionScope): MartialArtsCompletionScope {
+function mergeMartialArtsScope(
+  target: MartialArtsCompletionScope,
+  source: MartialArtsCompletionScope,
+): MartialArtsCompletionScope {
   if (source.player) {
     target.player = { ...(target.player || {}), ...source.player };
   }
@@ -2654,7 +2682,10 @@ function mergeMartialArtsScope(target: MartialArtsCompletionScope, source: Marti
   return target;
 }
 
-function mergeCompletionScope(target: GameDataCompletionScope, source: GameDataCompletionScope): GameDataCompletionScope {
+function mergeCompletionScope(
+  target: GameDataCompletionScope,
+  source: GameDataCompletionScope,
+): GameDataCompletionScope {
   if (source.playerAttributes) {
     target.playerAttributes = source.playerAttributes;
   }
@@ -2735,13 +2766,15 @@ export async function autoUpdateMartialArts(
         功法数据,
         writePlan,
       );
-      
+
       if (!shouldUpdate) {
         updateMartialArtCache(cacheKey, completedData.掌握程度, !writePlan.hasChanges);
         continue;
       }
 
-      dataLogger.log(`[autoUpdateMartialArts] 玩家功法 ${功法名}: 需要处理 (新增=${isNew}, 掌握程度变动=${masteryChanged}, 操作=${updateType})`);
+      dataLogger.log(
+        `[autoUpdateMartialArts] 玩家功法 ${功法名}: 需要处理 (新增=${isNew}, 掌握程度变动=${masteryChanged}, 操作=${updateType})`,
+      );
 
       if (hasNestedEntries(writePlan.insertPatch)) {
         玩家功法Insert[功法名] = writePlan.insertPatch;
@@ -2774,7 +2807,13 @@ export async function autoUpdateMartialArts(
     const 角色功法Update: Record<string, { 功法: Record<string, Partial<MartialArtUpdateData>> }> = {};
 
     for (const [角色名, 角色] of Object.entries(角色数据)) {
-      if (角色名.startsWith('$') || isPlayerCharacterEntry(角色名, user数据) || typeof 角色 !== 'object' || 角色 === null) continue;
+      if (
+        角色名.startsWith('$') ||
+        isPlayerCharacterEntry(角色名, user数据) ||
+        typeof 角色 !== 'object' ||
+        角色 === null
+      )
+        continue;
 
       const 角色Data = 角色 as CharacterData;
       if (!角色Data.功法) continue;
@@ -2796,13 +2835,15 @@ export async function autoUpdateMartialArts(
           功法数据,
           writePlan,
         );
-        
+
         if (!shouldUpdate) {
           updateMartialArtCache(cacheKey, completedData.掌握程度, !writePlan.hasChanges);
           continue;
         }
 
-        dataLogger.log(`[autoUpdateMartialArts] 角色 ${角色名} 功法 ${功法名}: 需要处理 (新增=${isNew}, 掌握程度变动=${masteryChanged}, 操作=${updateType})`);
+        dataLogger.log(
+          `[autoUpdateMartialArts] 角色 ${角色名} 功法 ${功法名}: 需要处理 (新增=${isNew}, 掌握程度变动=${masteryChanged}, 操作=${updateType})`,
+        );
 
         if (hasNestedEntries(writePlan.insertPatch)) {
           该角色功法Insert[功法名] = writePlan.insertPatch;
@@ -2817,7 +2858,10 @@ export async function autoUpdateMartialArts(
           cacheKey,
           displayName: `角色 ${角色名} 功法 ${功法名}`,
           mastery: completedData.掌握程度,
-          verificationLeaves: prefixVerificationLeaves(['角色数据', 角色名, '功法', 功法名], writePlan.verificationLeaves),
+          verificationLeaves: prefixVerificationLeaves(
+            ['角色数据', 角色名, '功法', 功法名],
+            writePlan.verificationLeaves,
+          ),
         });
       }
 
@@ -2884,11 +2928,14 @@ export async function autoUpdateMartialArts(
       }
 
       if (verificationResult.failed.length > 0) {
-        dataLogger.error('[autoUpdateMartialArts] 功法写入回读验证失败，本次不记成功:', verificationResult.failed.map(failed => ({
-          cacheKey: failed.cacheKey,
-          displayName: failed.displayName,
-          mismatches: failed.mismatches,
-        })));
+        dataLogger.error(
+          '[autoUpdateMartialArts] 功法写入回读验证失败，本次不记成功:',
+          verificationResult.failed.map(failed => ({
+            cacheKey: failed.cacheKey,
+            displayName: failed.displayName,
+            mismatches: failed.mismatches,
+          })),
+        );
       }
 
       dataLogger.log('[autoUpdateMartialArts] 功法处理结束:', {
@@ -2955,6 +3002,10 @@ function queueCompletionRequest(options: GameDataCompletionOptions): void {
 }
 
 async function runCompletionOnce(fullScan: boolean, scope: GameDataCompletionScope | null): Promise<void> {
+  if (isHistoryCheckoutPending()) {
+    dataLogger.log('[gameDataCompletion] 历史分叉同步中，跳过前端派生变量补全');
+    return;
+  }
   if (fullScan) {
     const variables = getGameVariables();
     if (Object.keys(variables).length === 0) {
@@ -3022,6 +3073,10 @@ export function scheduleGameDataCompletion(
   reason: string = 'manual',
   options: GameDataCompletionOptions = {},
 ): Promise<void> {
+  if (isHistoryCheckoutPending()) {
+    dataLogger.log(`[gameDataCompletion] 历史分叉同步中，忽略调度: ${reason}`);
+    return Promise.resolve();
+  }
   dataLogger.log(`[gameDataCompletion] 已调度: ${reason}`);
   queueCompletionRequest(options);
   const waitPromise = ensureCompletionWaitPromise();
@@ -3041,7 +3096,10 @@ export async function flushPendingGameDataCompletion(reason: string = 'manual-fl
     pendingFullCompletion = true;
   }
 
-  if (!completionPromise && (pendingFullCompletion || hasPendingCompletionScope(pendingCompletionScope) || completionTimer)) {
+  if (
+    !completionPromise &&
+    (pendingFullCompletion || hasPendingCompletionScope(pendingCompletionScope) || completionTimer)
+  ) {
     await runCompletionLoop();
     return;
   }
@@ -3211,7 +3269,12 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
 
     const equipmentSlots = parseEquipmentSlots(用户档案.装备栏);
     const statusEffects = parseStatusEffects(用户档案.状态效果);
-    const activeModifiers = collectActiveAttributeModifiers(用户档案, equipmentSlots, statusEffects, variables.前端变量);
+    const activeModifiers = collectActiveAttributeModifiers(
+      用户档案,
+      equipmentSlots,
+      statusEffects,
+      variables.前端变量,
+    );
 
     dataLogger.log('[variableReader] Step 4d1 - 装备栏:', equipmentSlots);
     dataLogger.log('[variableReader] Step 4d2 - 状态效果:', statusEffects);

@@ -19,7 +19,7 @@
 import _ from 'lodash';
 import { scheduleUnthrottledTimeout } from '../../shared/unthrottledTimer';
 import { createApiWriteScheduler } from './writeScheduler';
-import { ERA_EVENT_EMITTER, WriteDonePayload } from '../utils/constants';
+import { ERA_EVENT_EMITTER, EraTransactionDetail, EraTransactionOperation, WriteDonePayload } from '../utils/constants';
 import { J, unescapeEraData } from '../utils/data';
 import {
   createEraDiagnosticId,
@@ -39,6 +39,7 @@ interface ApiWriteJob {
   blockTag: 'VariableInsert' | 'VariableEdit' | 'VariableDelete';
   blockContent: object;
   diagnosticIds?: string[];
+  transactionIds?: string[];
 }
 
 const API_WRITE_FLUSH_DELAY = 75;
@@ -62,7 +63,11 @@ function cloneJson<T>(value: T): T {
 }
 
 function stripCodeFence(text: unknown) {
-  return String(text ?? '').trim().replace(/^\x60{3}(?:json)?\s*/i, '').replace(/\x60{3}$/i, '').trim();
+  return String(text ?? '')
+    .trim()
+    .replace(/^\x60{3}(?:json)?\s*/i, '')
+    .replace(/\x60{3}$/i, '')
+    .trim();
 }
 
 function parseBlockContent(rawContent: string) {
@@ -135,7 +140,12 @@ function mergeJobInto(targetJob: ApiWriteJob, sourceJob: ApiWriteJob) {
   } else {
     mergeDeleteUnion(targetJob.blockContent, sourceJob.blockContent);
   }
-  targetJob.diagnosticIds = Array.from(new Set([...(targetJob.diagnosticIds ?? []), ...(sourceJob.diagnosticIds ?? [])]));
+  targetJob.diagnosticIds = Array.from(
+    new Set([...(targetJob.diagnosticIds ?? []), ...(sourceJob.diagnosticIds ?? [])]),
+  );
+  targetJob.transactionIds = Array.from(
+    new Set([...(targetJob.transactionIds ?? []), ...(sourceJob.transactionIds ?? [])]),
+  );
   return true;
 }
 
@@ -146,6 +156,7 @@ function mergeAdjacentJobs(jobs: ApiWriteJob[]) {
       blockTag: job.blockTag,
       blockContent: cloneJson(job.blockContent || {}),
       diagnosticIds: [...(job.diagnosticIds ?? [])],
+      transactionIds: [...(job.transactionIds ?? [])],
     };
     const lastJob = merged[merged.length - 1];
     if (lastJob && mergeJobInto(lastJob, normalizedJob)) {
@@ -230,12 +241,14 @@ async function flushApiWriteQueue() {
     }
     const flushId = createEraDiagnosticId('era-api-flush');
     const sourceDiagnosticIds = jobs.flatMap(job => job.diagnosticIds ?? []);
+    const transactionIds = Array.from(new Set(jobs.flatMap(job => job.transactionIds ?? [])));
     const finishWatchdog = startEraDiagnosticWatchdog({
       source: 'api-command',
       event: 'flush-api-write-queue',
       correlationId: flushId,
       details: {
         sourceDiagnosticIds,
+        transactionIds,
         jobCount: jobs.length,
         queuedAfterSplice: apiWriteQueue.length,
       },
@@ -263,7 +276,13 @@ async function flushApiWriteQueue() {
 
       logger.log(
         'flushApiWriteQueue',
-        '批量写入 ' + jobs.length + ' 个 API 任务，合并后 ' + mergedJobs.length + ' 个变量块到消息 ID ' + lastAiMessage.message_id + '...',
+        '批量写入 ' +
+          jobs.length +
+          ' 个 API 任务，合并后 ' +
+          mergedJobs.length +
+          ' 个变量块到消息 ID ' +
+          lastAiMessage.message_id +
+          '...',
       );
       updateEraDiagnosticState('apiWriteFlush', {
         flushId,
@@ -273,16 +292,21 @@ async function flushApiWriteQueue() {
         messageId: lastAiMessage.message_id,
         phase: 'set-chat-message',
       });
-      recordEraDiagnostic('api-command', 'flush-message-selected', {
-        sourceDiagnosticIds,
-        messageId: lastAiMessage.message_id,
-        jobCount: jobs.length,
-        mergedJobCount: mergedJobs.length,
-        originalContentLength: originalContent.length,
-        compactedOriginalLength: compactedOriginal.length,
-        appendedBlocksLength: appendedBlocks.length,
-        newContentLength: newContent.length,
-      }, flushId);
+      recordEraDiagnostic(
+        'api-command',
+        'flush-message-selected',
+        {
+          sourceDiagnosticIds,
+          messageId: lastAiMessage.message_id,
+          jobCount: jobs.length,
+          mergedJobCount: mergedJobs.length,
+          originalContentLength: originalContent.length,
+          compactedOriginalLength: compactedOriginal.length,
+          appendedBlocksLength: appendedBlocks.length,
+          newContentLength: newContent.length,
+        },
+        flushId,
+      );
       await updateMessageContent(lastAiMessage, newContent, flushId);
 
       updateEraDiagnosticState('apiWriteFlush', {
@@ -298,16 +322,31 @@ async function flushApiWriteQueue() {
         flushId,
         sourceDiagnosticIds,
         messageId: lastAiMessage.message_id,
+        ...(transactionIds.length > 0 ? { transactionIds } : {}),
+        ...(transactionIds.length === 1 ? { transactionId: transactionIds[0] } : {}),
       });
       void emission.then(
-        () => recordEraDiagnostic('api-command', 'api-write-listeners-settled', {
-          messageId: lastAiMessage.message_id,
-          durationMs: Date.now() - emittedAt,
-        }, flushId),
-        error => recordEraDiagnosticError('api-command', 'api-write-listeners-failed', error, {
-          messageId: lastAiMessage.message_id,
-          durationMs: Date.now() - emittedAt,
-        }, flushId),
+        () =>
+          recordEraDiagnostic(
+            'api-command',
+            'api-write-listeners-settled',
+            {
+              messageId: lastAiMessage.message_id,
+              durationMs: Date.now() - emittedAt,
+            },
+            flushId,
+          ),
+        error =>
+          recordEraDiagnosticError(
+            'api-command',
+            'api-write-listeners-failed',
+            error,
+            {
+              messageId: lastAiMessage.message_id,
+              durationMs: Date.now() - emittedAt,
+            },
+            flushId,
+          ),
       );
       finishWatchdog('success', {
         messageId: lastAiMessage.message_id,
@@ -316,10 +355,16 @@ async function flushApiWriteQueue() {
       logger.log('flushApiWriteQueue', '已触发 ' + ERA_EVENT_EMITTER.API_WRITE + ' 事件。');
     } catch (error) {
       finishWatchdog('error', { error: error instanceof Error ? error.message : String(error) });
-      recordEraDiagnosticError('api-command', 'flush-api-write-queue-error', error, {
-        sourceDiagnosticIds,
-        jobCount: jobs.length,
-      }, flushId);
+      recordEraDiagnosticError(
+        'api-command',
+        'flush-api-write-queue-error',
+        error,
+        {
+          sourceDiagnosticIds,
+          jobCount: jobs.length,
+        },
+        flushId,
+      );
       throw error;
     } finally {
       updateEraDiagnosticState('apiWriteFlush', null);
@@ -492,6 +537,21 @@ function scheduleApiWriteFlush() {
  * eventEmit('era:deleteByPath', { path: 'player.inventory[0]' });
  */
 
+/**
+ * @section API Event: 'era:transactionByObject'
+ * @description 按顺序批量执行对象插入、更新或删除，并在同一个 API 写入窗口内提交。
+ * @param {EraTransactionDetail} detail - 带唯一事务 ID 的非空操作列表。
+ * @example
+ * eventEmit('era:transactionByObject', {
+ *   transactionId: 'checkout-42',
+ *   operations: [
+ *     { type: 'delete', payload: { player: { obsolete: {} } } },
+ *     { type: 'insert', payload: { player: { route: 'B' } } },
+ *     { type: 'update', payload: { player: { hp: 80 } } }
+ *   ]
+ * });
+ */
+
 // ==================================================================
 // 内部核心函数
 // ==================================================================
@@ -507,29 +567,51 @@ function scheduleApiWriteFlush() {
  * 它将指定的变量修改块追加到最后一条 AI 消息的末尾，然后调度一个 'era:apiWrite' 事件。
  * @param {ApiWriteJob} job - 要执行的写入任务。
  */
-function performApiWrite(job: ApiWriteJob) {
-  const diagnosticId = createEraDiagnosticId('era-api-write');
+function performApiWrites(jobs: ApiWriteJob[]) {
   const parentDiagnosticId = getActiveEraDiagnosticTask();
-  apiWriteQueue.push({
-    blockTag: job.blockTag,
-    blockContent: cloneJson(job.blockContent || {}),
-    diagnosticIds: [diagnosticId],
+  // 先完整克隆整批任务，再一次性追加。任一 payload 无法序列化时，队列不会留下半个事务。
+  const queuedJobs = jobs.map(job => {
+    const diagnosticId = createEraDiagnosticId('era-api-write');
+    return {
+      blockTag: job.blockTag,
+      blockContent: cloneJson(job.blockContent || {}),
+      diagnosticIds: [diagnosticId],
+      transactionIds: [...(job.transactionIds ?? [])],
+    } satisfies ApiWriteJob;
   });
-  recordEraDiagnostic('api-command', 'api-write-enqueued', {
-    parentDiagnosticId,
-    blockTag: job.blockTag,
-    topLevelKeys: Object.keys(job.blockContent || {}),
-    queueLength: apiWriteQueue.length,
-    flushScheduled: apiWriteScheduler.hasPending(),
-    flushRunning: apiWriteFlushPromise !== null,
-  }, diagnosticId);
+
+  apiWriteQueue.push(...queuedJobs);
+  queuedJobs.forEach(job => {
+    const diagnosticId = job.diagnosticIds?.[0];
+    recordEraDiagnostic(
+      'api-command',
+      'api-write-enqueued',
+      {
+        parentDiagnosticId,
+        blockTag: job.blockTag,
+        topLevelKeys: Object.keys(job.blockContent || {}),
+        transactionIds: job.transactionIds ?? [],
+        queueLength: apiWriteQueue.length,
+        flushScheduled: apiWriteScheduler.hasPending(),
+        flushRunning: apiWriteFlushPromise !== null,
+      },
+      diagnosticId,
+    );
+  });
   updateEraDiagnosticState('apiWriteQueue', {
     length: apiWriteQueue.length,
     flushScheduled: apiWriteScheduler.hasPending(),
     flushRunning: apiWriteFlushPromise !== null,
   });
-  logger.log('performApiWrite', 'API 任务入队 (' + job.blockTag + ')，当前队列长度: ' + apiWriteQueue.length);
+  logger.log(
+    'performApiWrites',
+    'API 任务批量入队 ' + queuedJobs.length + ' 个，当前队列长度: ' + apiWriteQueue.length,
+  );
   scheduleApiWriteFlush();
+}
+
+function performApiWrite(job: ApiWriteJob) {
+  performApiWrites([job]);
 }
 
 // ==================================================================
@@ -590,6 +672,62 @@ export function deleteByPath(path: string) {
   performApiWrite({ blockTag: 'VariableDelete', blockContent: block });
 }
 
+function getTransactionBlockTag(operation: EraTransactionOperation): ApiWriteJob['blockTag'] {
+  if (operation.type === 'insert') {
+    return 'VariableInsert';
+  }
+  if (operation.type === 'update') {
+    return 'VariableEdit';
+  }
+  return 'VariableDelete';
+}
+
+function assertValidTransactionDetail(detail: unknown): asserts detail is EraTransactionDetail {
+  if (!_.isPlainObject(detail)) {
+    throw new TypeError('era:transactionByObject 的 detail 必须是普通对象。');
+  }
+
+  const transaction = detail as Partial<EraTransactionDetail>;
+  if (typeof transaction.transactionId !== 'string' || transaction.transactionId.trim() === '') {
+    throw new TypeError('era:transactionByObject 的 transactionId 必须是非空字符串。');
+  }
+  if (!Array.isArray(transaction.operations) || transaction.operations.length === 0) {
+    throw new TypeError('era:transactionByObject 的 operations 必须是非空数组。');
+  }
+
+  transaction.operations.forEach((operation, index) => {
+    if (!_.isPlainObject(operation)) {
+      throw new TypeError(`era:transactionByObject 的 operations[${index}] 必须是普通对象。`);
+    }
+    if (!['insert', 'update', 'delete'].includes(operation.type)) {
+      throw new TypeError(`era:transactionByObject 的 operations[${index}].type 必须是 insert、update 或 delete。`);
+    }
+    if (!_.isPlainObject(operation.payload)) {
+      throw new TypeError(`era:transactionByObject 的 operations[${index}].payload 必须是普通对象。`);
+    }
+  });
+}
+
+/**
+ * **【处理器】** 按声明顺序把一组对象操作加入同一个 API 写入窗口。
+ *
+ * 每个 operation 都保留为现有队列中的独立任务；相邻同类任务仍由既有合并规则压缩。
+ * 同步入队可确保 75ms 调度只更新一次消息并只触发一次 `era:apiWrite`。
+ */
+export function transactionByObject(detail: EraTransactionDetail) {
+  assertValidTransactionDetail(detail);
+  const transactionId = detail.transactionId.trim();
+  const jobs = detail.operations.map(
+    operation =>
+      ({
+        blockTag: getTransactionBlockTag(operation),
+        blockContent: operation.payload,
+        transactionIds: [transactionId],
+      }) satisfies ApiWriteJob,
+  );
+  performApiWrites(jobs);
+}
+
 // ==================================================================
 // 事件广播器实现 (由 variable_change_processor.ts 等内部模块调用)
 // ==================================================================
@@ -628,24 +766,42 @@ export function emitWriteDoneEvent(payload: WriteDonePayload) {
 
   const correlationId = getActiveEraDiagnosticTask() ?? createEraDiagnosticId('era-write-done');
   const emittedAt = Date.now();
-  recordEraDiagnostic('api-command', 'write-done-emitting', {
-    messageId: payload.message_id,
-    mk: payload.mk,
-    actions: payload.actions,
-    consecutiveProcessingCount: payload.consecutiveProcessingCount,
-  }, correlationId);
+  recordEraDiagnostic(
+    'api-command',
+    'write-done-emitting',
+    {
+      messageId: payload.message_id,
+      mk: payload.mk,
+      actions: payload.actions,
+      consecutiveProcessingCount: payload.consecutiveProcessingCount,
+    },
+    correlationId,
+  );
   const emission = eventEmit(ERA_EVENT_EMITTER.WRITE_DONE, unescapedPayload);
   void emission.then(
-    () => recordEraDiagnostic('api-command', 'write-done-listeners-settled', {
-      messageId: payload.message_id,
-      mk: payload.mk,
-      durationMs: Date.now() - emittedAt,
-    }, correlationId),
-    error => recordEraDiagnosticError('api-command', 'write-done-listeners-failed', error, {
-      messageId: payload.message_id,
-      mk: payload.mk,
-      durationMs: Date.now() - emittedAt,
-    }, correlationId),
+    () =>
+      recordEraDiagnostic(
+        'api-command',
+        'write-done-listeners-settled',
+        {
+          messageId: payload.message_id,
+          mk: payload.mk,
+          durationMs: Date.now() - emittedAt,
+        },
+        correlationId,
+      ),
+    error =>
+      recordEraDiagnosticError(
+        'api-command',
+        'write-done-listeners-failed',
+        error,
+        {
+          messageId: payload.message_id,
+          mk: payload.mk,
+          durationMs: Date.now() - emittedAt,
+        },
+        correlationId,
+      ),
   );
   logger.log(
     'emitWriteDoneEvent',

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { eventEmitMock } from '../武侠/test/setup';
 
 import { isEventDiscoverable, isTimeAfterEventEnd, isTimeForEvent } from './era-event-checker.js';
 import {
@@ -7,17 +8,41 @@ import {
   batchStartEvents,
   buildActualEventWindow,
   buildPlayerParticipationEntry,
+  cleanupInvalidParticipationEntries,
   getValidEventPredecessors,
   initializeEventList,
 } from './era-event-operations.js';
 import { createSerialTaskQueue, buildFollowupCounterPlan } from './era-turn-queue.js';
 import { attachEventMetadata, deriveEventRuntimeDescriptor } from './era-utils.js';
 
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const isRecord = (value: unknown): value is Record<string, any> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+function applyOperation(target: Record<string, any>, operation: { type: string; payload: Record<string, any> }) {
+  const visit = (node: Record<string, any>, patch: Record<string, any>) => {
+    for (const [key, value] of Object.entries(patch)) {
+      if (operation.type === 'insert') {
+        if (node[key] === undefined) node[key] = clone(value);
+        else if (isRecord(node[key]) && isRecord(value)) visit(node[key], value);
+      } else if (operation.type === 'update') {
+        if (node[key] === undefined) continue;
+        if (isRecord(node[key]) && isRecord(value)) visit(node[key], value);
+        else node[key] = clone(value);
+      } else if (isRecord(value) && Object.keys(value).length > 0 && isRecord(node[key])) {
+        visit(node[key], value);
+      } else {
+        delete node[key];
+      }
+    }
+  };
+  visit(target, operation.payload);
+}
 const sourceName = '射雕第7回01-宝马风波';
 const secondSourceName = '射雕第7回02-初遇黄蓉';
 const targetName = '射雕第7回03-比武招亲';
 const actualEndTime = { 年: 1219, 月: 10, 日: 10, 时: 11 };
+let transactionMessageId = 100;
 
 const eventDefinition = attachEventMetadata(
   {
@@ -93,9 +118,9 @@ describe('early-start predecessor gates', () => {
 
     expect(getValidEventPredecessors(targetName, definitions)).toEqual([sourceName, secondSourceName]);
     expect(areEventPredecessorsCompleted(targetName, definitions, { [sourceName]: 0 })).toBe(false);
-    expect(
-      areEventPredecessorsCompleted(targetName, definitions, { [sourceName]: 0, [secondSourceName]: 1 }),
-    ).toBe(true);
+    expect(areEventPredecessorsCompleted(targetName, definitions, { [sourceName]: 0, [secondSourceName]: 1 })).toBe(
+      true,
+    );
   });
 });
 
@@ -103,6 +128,7 @@ describe('completion persistence and follow-up pairs', () => {
   let variables: any;
 
   beforeEach(() => {
+    eventEmitMock.mockClear();
     variables = {
       stat_data: {
         世界信息: { 时间: clone(actualEndTime) },
@@ -121,13 +147,83 @@ describe('completion persistence and follow-up pairs', () => {
       },
     };
     vi.mocked(globalThis.getVariables).mockImplementation(() => clone(variables));
+    transactionMessageId += 1;
+    vi.mocked(globalThis.getChatMessages).mockReturnValue([{ message_id: transactionMessageId, swipe_id: 0 }] as never);
     vi.mocked(globalThis.updateVariablesWith).mockImplementation(updater => {
       variables = updater(clone(variables)) as typeof variables;
       return clone(variables);
     });
+    eventOn('era:transactionByObject', async ({ transactionId, operations }: any) => {
+      globalThis.updateVariablesWith(
+        current => {
+          const next = clone(current) as typeof variables;
+          for (const operation of operations) {
+            applyOperation(next.stat_data, operation);
+          }
+          return next;
+        },
+        { type: 'chat' },
+      );
+      await eventEmit('era:writeDone', {
+        transactionId,
+        transactionIds: [transactionId],
+        actions: { apiWrite: true },
+      });
+    });
     Object.assign(globalThis, {
       toastr: { success: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn() },
     });
+  });
+
+  it('does not materialize historical events when initializing an existing chat', async () => {
+    variables.stat_data.世界信息.时间 = { 年: 1219, 月: 11, 日: 1, 时: 0 };
+    variables.stat_data.事件系统 = {
+      未发生事件: {},
+      进行中事件: {},
+      已完成事件: {},
+      人物事件占用: {},
+    };
+    const expiredDefinition = attachEventMetadata(
+      {
+        ...eventDefinition,
+        insert: { 郭靖: { 状态: '不应在当前楼层补做' } },
+        事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
+      },
+      deriveEventRuntimeDescriptor('射雕事件条目-第7回-01-宝马风波.yaml'),
+    );
+
+    await expect(
+      initializeEventList({ [sourceName]: expiredDefinition }, { sparseFuture: true, manifestHash: 'existing-save' }),
+    ).resolves.toMatchObject({ added: 0, committed: false });
+
+    expect(variables.stat_data.事件系统.已完成事件[sourceName]).toBeUndefined();
+    expect(variables.stat_data.事件系统.进行中事件[sourceName]).toBeUndefined();
+    expect(variables.stat_data.角色数据.郭靖).toBeUndefined();
+    expect(variables.stat_data.世界事件[sourceName]).toBeUndefined();
+    expect(variables.stat_data.前端变量.事件调度状态).toMatchObject({
+      manifestHash: 'existing-save',
+    });
+  });
+
+  it('cleans an invalid participation entry through an ERA transaction', async () => {
+    variables.stat_data.参与事件 = {
+      [sourceName]: { 非法字段: true },
+    };
+
+    await expect(cleanupInvalidParticipationEntries('test')).resolves.toBe(1);
+
+    expect(variables.stat_data.参与事件[sourceName]).toBeUndefined();
+    expect(eventEmitMock).toHaveBeenCalledWith(
+      'era:transactionByObject',
+      expect.objectContaining({
+        operations: [
+          {
+            type: 'delete',
+            payload: { 参与事件: { [sourceName]: {} } },
+          },
+        ],
+      }),
+    );
   });
 
   it('initializes an opening event window with one direct transaction and no in-progress follow-up', async () => {
@@ -145,7 +241,9 @@ describe('completion persistence and follow-up pairs', () => {
       return clone(variables);
     });
 
-    await expect(initializeEventList({ [sourceName]: eventDefinition })).resolves.toMatchObject({
+    await expect(
+      initializeEventList({ [sourceName]: eventDefinition }, { rootBootstrap: true }),
+    ).resolves.toMatchObject({
       added: 1,
       committed: true,
     });
@@ -179,7 +277,9 @@ describe('completion persistence and follow-up pairs', () => {
       return clone(variables);
     });
 
-    await expect(initializeEventList({ [sourceName]: expiredDefinition })).resolves.toMatchObject({ added: 1 });
+    await expect(
+      initializeEventList({ [sourceName]: expiredDefinition }, { rootBootstrap: true }),
+    ).resolves.toMatchObject({ added: 1 });
 
     expect(commitCount).toBe(1);
     expect(variables.stat_data.事件系统.已完成事件[sourceName]).toBe(0);
@@ -213,6 +313,7 @@ describe('completion persistence and follow-up pairs', () => {
             characterState: { 郭靖: { 状态: '检查点快照' } },
           },
           applyCheckpoint: true,
+          rootBootstrap: true,
         },
       ),
     ).resolves.toMatchObject({ added: 0, committed: false });
@@ -226,10 +327,14 @@ describe('completion persistence and follow-up pairs', () => {
     variables.stat_data.事件系统.进行中事件 = {};
     const earlyTime = { 年: 1219, 月: 10, 日: 10, 时: 9 };
 
-    await batchStartEvents([sourceName], { [sourceName]: eventDefinition }, {
-      currentTime: earlyTime,
-      earlyEventNames: [sourceName],
-    });
+    await batchStartEvents(
+      [sourceName],
+      { [sourceName]: eventDefinition },
+      {
+        currentTime: earlyTime,
+        earlyEventNames: [sourceName],
+      },
+    );
 
     expect(variables.stat_data.事件系统.进行中事件[sourceName]).toEqual(actualEndTime);
     expect(variables.stat_data.事件系统.未发生事件[sourceName]).toBeUndefined();
@@ -251,12 +356,12 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
   });
 
-  it('retains settlement progress and safely fills a failed follow-up write on retry', async () => {
+  it('keeps settlement atomic and safely fills a failed follow-up write on retry', async () => {
     const definitions = { [sourceName]: eventDefinition, [targetName]: targetDefinition };
     let writeCount = 0;
     vi.mocked(globalThis.updateVariablesWith).mockImplementation(updater => {
       writeCount += 1;
-      if (writeCount === 2) {
+      if (writeCount === 1) {
         throw new Error('final settlement transaction failed');
       }
       variables = updater(clone(variables)) as typeof variables;
@@ -264,10 +369,8 @@ describe('completion persistence and follow-up pairs', () => {
     });
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(false);
-    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toEqual({
-      差分已应用: true,
-      玩家参与: false,
-    });
+    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
+    expect(variables.stat_data.事件系统.进行中事件[sourceName]).toEqual(actualEndTime);
     expect(variables.stat_data.后续事件线索[sourceName]).toBeUndefined();
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
@@ -275,7 +378,7 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
   });
 
-  it('retries a failed participation deletion without applying the event diff twice or losing the ending', async () => {
+  it('retries a failed atomic participation settlement without losing the ending', async () => {
     const settlingDefinition = attachEventMetadata(
       {
         ...eventDefinition,
@@ -309,31 +412,17 @@ describe('completion persistence and follow-up pairs', () => {
       return clone(variables);
     });
 
-    let diffApplyCount = 0;
-    eventOn('era:updateByObject', (payload: any) => {
-      diffApplyCount += 1;
-      variables.stat_data.角色数据.郭靖.状态 = payload.角色数据.郭靖.状态;
-      window.setTimeout(() => {
-        void eventEmit('era:writeDone', { actions: { apply: true } });
-      }, 0);
-    });
-
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(false);
-    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toEqual({
-      差分已应用: true,
-      玩家参与: true,
-    });
     expect(variables.stat_data.参与事件[sourceName].结局).toBe(actualEnding);
-    expect(diffApplyCount).toBe(1);
+    expect(variables.stat_data.角色数据.郭靖.状态).toBe('事件前');
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
-    expect(diffApplyCount).toBe(1);
     expect(variables.stat_data.角色数据.郭靖.状态).toBe('事件完成');
     expect(variables.stat_data.世界事件[sourceName].概要).toBe(actualEnding);
     expect(variables.stat_data.参与事件[sourceName]).toBeUndefined();
   });
 
-  it('preserves the participation snapshot and flag when the atomic final settlement write fails', async () => {
+  it('preserves the participation snapshot when the atomic settlement write fails', async () => {
     const definitions = { [sourceName]: eventDefinition, [targetName]: targetDefinition };
     variables.stat_data.参与事件 = {
       [sourceName]: {
@@ -361,10 +450,7 @@ describe('completion persistence and follow-up pairs', () => {
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(false);
     expect(variables.stat_data.参与事件[sourceName].结局).toBe('玩家改变了事件。');
-    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toEqual({
-      差分已应用: true,
-      玩家参与: true,
-    });
+    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
     expect(variables.stat_data.事件系统.已完成事件[sourceName]).toBe(1);

@@ -1,0 +1,77 @@
+{
+  "reviewed": 8,
+  "items": [
+    {
+      "planSourceId": "神雕第2回-13-杨过铁枪庙智助欧阳锋退柯镇恶",
+      "plannedAction": "若柯镇恶当夜不来，则预期其明日再至铁枪庙寻仇。",
+      "marker": "明日",
+      "actualTargetEventId": "神雕第2回-13-杨过铁枪庙智助欧阳锋退柯镇恶",
+      "actualTargetTrigger": {"年": 1238, "月": 8, "日": 15, "时": 20},
+      "verdict": "unrelated",
+      "reason": "这是带条件的预判而非待兑现约期。柯镇恶在本条当夜已经到庙，条件“今晚不来”未成立；第2回-14的中毒归店不是这项明日预判的兑现。"
+    },
+    {
+      "planSourceId": "神雕第11回-09-郭靖重逢杨过赵志敬告状引书房对质",
+      "plannedAction": "次日举行英雄大宴正日，并在翌日再议正事。",
+      "marker": "明日",
+      "actualTargetEventId": null,
+      "actualTargetTrigger": null,
+      "verdict": "unrelated",
+      "reason": "向后核至第11回-10、-11、-12，均仍是当晚书房与安置情节；第11回-12只再次预告明日大宴，未出现正日活动的实际事件，故不能把同夜书房对质误作兑现或冲突目标。"
+    },
+    {
+      "planSourceId": "神雕第22回-04-黄蓉得知杨过中毒真相",
+      "plannedAction": "金轮法王信约明日回拜；黄蓉随即安排明日与小龙女联手护郭靖。",
+      "marker": "明日",
+      "actualTargetEventId": "神雕第22回-06-杨过明志护郭靖金轮来袭",
+      "actualTargetTrigger": {"年": 1243, "月": 10, "日": 24, "时": 6},
+      "verdict": "hard",
+      "reason": "第22回-05只是同夜插入的武氏兄弟支线；真正对应的金轮来袭在第22回-06，但其触发仍为十月二十四日，未跨到信中所称“明日”，构成明确日历日冲突。"
+    },
+    {
+      "planSourceId": "神雕第24回-01-天竺僧论毒辞行",
+      "plannedAction": "武三通、天竺僧、朱子柳明日一早动身赴绝情谷取解药。",
+      "marker": "明日一早",
+      "actualTargetEventId": null,
+      "actualTargetTrigger": null,
+      "verdict": "unrelated",
+      "reason": "后续五条转入郭芙、杨过、小龙女和尹赵支线；未描写三人启程或到达。第24回-02的清晨质问只是插入场景，不能据此认定赴谷计划提前执行或被违反。"
+    },
+    {
+      "planSourceId": "神雕第33回-07-西山一窟鬼遇万兽山庄起冲突",
+      "plannedAction": "西山一窟鬼与史孟捷约定明晚决斗。",
+      "marker": "明晚",
+      "actualTargetEventId": "神雕第33回-08-群兽围攻西山一窟鬼神雕侠杨过现身",
+      "actualTargetTrigger": {"年": 1259, "月": 10, "日": 8, "时": 0},
+      "verdict": "cancelled",
+      "reason": "紧邻第33回-08是群兽围攻引发的即时混战，不是约定的次晚决斗；本章到此结束，未见该约兑现。应视为突发冲突打断约战，而非把零点混战判为明晚决斗提前发生。"
+    },
+    {
+      "planSourceId": "神雕第39回-09-襄阳大捷庆功宴郭靖杨过携手入城议赴华山",
+      "plannedAction": "群雄同意明日启程赴华山祭扫洪七公之墓。",
+      "marker": "明日",
+      "actualTargetEventId": "神雕第40回-01-华山祭奠洪七公与欧阳锋",
+      "actualTargetTrigger": {"年": 1260, "月": 4, "日": 1, "时": 8},
+      "verdict": "hard",
+      "reason": "第40回-01正文明确写“襄阳大捷次日清晨”出发，正是该计划的兑现事件；但其触发字段从三月二十日跳至四月一日，日期与明确的次日叙述直接矛盾。"
+    },
+    {
+      "planSourceId": "神雕第14回-07-双剑合璧大败金轮法王临别赠药",
+      "plannedAction": "杨过、小龙女留宿一宵，明日再动身。",
+      "marker": "明日",
+      "actualTargetEventId": "神雕第14回-09-小龙女深夜不辞而别杨过狂追寻师",
+      "actualTargetTrigger": {"年": 1243, "月": 3, "日": 9, "时": 22},
+      "verdict": "cancelled",
+      "reason": "第14回-08是当晚黄蓉劝说的插入场景；真正到次晨的第14回-09中，小龙女已不辞而别，杨过改为追寻她，原定同行动身被剧情明确改变。"
+    },
+    {
+      "planSourceId": "神雕第21回-01-黄蓉夜告郭靖防杨过并议二孩之名",
+      "plannedAction": "郭靖决定明日搬到军营以避杨过。",
+      "marker": "明日",
+      "actualTargetEventId": "神雕第21回-04-郭靖杨过巡城论道",
+      "actualTargetTrigger": {"年": 1243, "月": 10, "日": 22, "时": 14},
+      "verdict": "likely",
+      "reason": "第21回-02、-03为当夜刺杀未遂与通脉，不能作为计划目标；第21回-04正文已到天明、郭靖离府巡视防务，但未明说已搬入军营。叙事上可视作次日军务转场，字段未跨日且具体搬营未落笔，故仅保留为可能的时间问题。"
+    }
+  ]
+}

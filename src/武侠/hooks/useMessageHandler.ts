@@ -7,6 +7,7 @@ import {
   normalizeDisplayedMessageContent,
   parseAIResponse,
   parseOptions,
+  readGameDataPure,
 } from '../utils/variableReader';
 import { messageLogger, variableTraceLogger } from '../utils/logger';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
@@ -24,6 +25,7 @@ import { observeEraWriteDone } from '../utils/eraWriteWait';
 import { recordIframeLifecycleEvent } from '../utils/iframeLifecycleBlackBox';
 import { acquireWuxiaTurnLock, releaseWuxiaTurnLock } from '../utils/turnLock';
 import { runWith429Retry } from '../utils/rateLimitRetry';
+import { finalizeCurrentTurn } from '../utils/saveLoadManager';
 import type { LatestDebugRoundPatch } from './useDebugLogs';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -66,12 +68,21 @@ interface UseMessageHandlerOptions {
 }
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
-const COMPLETE_VARIABLE_ACTION_BLOCK_REGEX =
-  /<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>/;
+const COMPLETE_VARIABLE_ACTION_BLOCK_REGEX = /<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>/;
 const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
 const WUXIA_TURN_COMPLETED_EVENT = 'wuxia:turn-completed';
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+async function finalizeHistoryNodeAfterEvents(): Promise<void> {
+  const gameData = readGameDataPure();
+  const time = gameData?.worldTime;
+  const worldTimeText = gameData?.gameTime || (time ? `${time.year}年${time.month}月${time.day}日${time.hour}时` : '');
+  await finalizeCurrentTurn({
+    location: gameData?.currentLocation || gameData?.stats?.location || '',
+    worldTimeText,
+  });
+}
 
 /**
  * 读取当前聊天 ID（用于回合成功完成事件的去重与归档）。
@@ -184,8 +195,7 @@ function createInitialExtraVariableDecisionPatch(
 function createExtraVariableProgressPatch(
   progress: ExtraVariableUpdateProgress,
 ): NonNullable<LatestDebugRoundPatch['variable']> {
-  const patch: NonNullable<LatestDebugRoundPatch['variable']> = {
-  };
+  const patch: NonNullable<LatestDebugRoundPatch['variable']> = {};
   if (typeof progress.prompt === 'string') {
     patch.input = progress.prompt;
   }
@@ -415,10 +425,10 @@ export function useMessageHandler({
           // 变量块已确认写入 assistant 楼层后立即交给 tracker。不能等 ERA 后处理结束，
           // 否则已发生的 AI 变量差异会被暂时误记为 background。
           if (
-            !extraDeclarationsRegistered
-            && progress.appended === true
-            && typeof progress.appendedBlocks === 'string'
-            && progress.appendedBlocks.trim()
+            !extraDeclarationsRegistered &&
+            progress.appended === true &&
+            typeof progress.appendedBlocks === 'string' &&
+            progress.appendedBlocks.trim()
           ) {
             extraDeclarationsRegistered = true;
             onVariableExtraDeclaredBlocks?.(progress.appendedBlocks, assistantMessageId);
@@ -432,9 +442,9 @@ export function useMessageHandler({
         appended: extraUpdateResult.appended,
       });
       if (
-        !extraDeclarationsRegistered
-        && typeof extraUpdateResult.appendedBlocks === 'string'
-        && extraUpdateResult.appendedBlocks.trim()
+        !extraDeclarationsRegistered &&
+        typeof extraUpdateResult.appendedBlocks === 'string' &&
+        extraUpdateResult.appendedBlocks.trim()
       ) {
         onVariableExtraDeclaredBlocks?.(extraUpdateResult.appendedBlocks, assistantMessageId);
       }
@@ -464,10 +474,7 @@ export function useMessageHandler({
   );
 
   const handleSendMessage = useCallback(
-    async (
-      message: string,
-      options: { waitForBridgeResponseDelivery?: boolean } = {},
-    ): Promise<string> => {
+    async (message: string, options: { waitForBridgeResponseDelivery?: boolean } = {}): Promise<string> => {
       const waitForBridgeResponseDelivery = options.waitForBridgeResponseDelivery === true;
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       messageLogger.log('🚀 开始发送消息流程');
@@ -553,25 +560,29 @@ export function useMessageHandler({
         });
         let result: string | GenerateToolCallResult;
         try {
-          result = await runWith429Retry(() => generate({
-            should_stream: true,
-          }), {
-            requestLabel: '正文模型',
-            onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
-              patchLatestDebugRound({
-                main: {
-                  retry429Count: retryNumber,
-                  retry429LastDelayMs: delayMs,
-                },
-              });
-              messageLogger.warn('[useMessageHandler] 正文模型返回 429，准备自动重试', {
-                retryNumber,
-                maxRetries,
-                delayMs,
-                error,
-              });
+          result = await runWith429Retry(
+            () =>
+              generate({
+                should_stream: true,
+              }),
+            {
+              requestLabel: '正文模型',
+              onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
+                patchLatestDebugRound({
+                  main: {
+                    retry429Count: retryNumber,
+                    retry429LastDelayMs: delayMs,
+                  },
+                });
+                messageLogger.warn('[useMessageHandler] 正文模型返回 429，准备自动重试', {
+                  retryNumber,
+                  maxRetries,
+                  delayMs,
+                  error,
+                });
+              },
             },
-          });
+          );
         } finally {
           combinedPromptCapture?.stop();
         }
@@ -751,6 +762,12 @@ export function useMessageHandler({
               chatId: turnChatId,
               roundId: debugRoundId,
             });
+            try {
+              await finalizeHistoryNodeAfterEvents();
+            } catch (error) {
+              messageLogger.error('回合已完成，但自动历史节点封存失败:', error);
+              showError(`回合已完成，但自动历史节点封存失败：${getErrorMessage(error)}`);
+            }
           }
 
           dismissToast();
@@ -1021,6 +1038,12 @@ export function useMessageHandler({
           chatId: turnChatId,
           roundId: debugRoundId,
         });
+        try {
+          await finalizeHistoryNodeAfterEvents();
+        } catch (error) {
+          messageLogger.error('重新生成已完成，但自动历史节点封存失败:', error);
+          showError(`重新生成已完成，但自动历史节点封存失败：${getErrorMessage(error)}`);
+        }
       }
 
       dismissToast();

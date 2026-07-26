@@ -149,7 +149,7 @@
 .chat-input-wrapper {
   position: relative;
   flex-shrink: 0; // 重要：防止输入框被压缩
-  padding: 0;
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
   background: linear-gradient(
     to bottom,
     rgba(12, 10, 9, 0) 0%,
@@ -273,9 +273,14 @@
   resize: none;
   outline: none;
   min-height: 42px;
-  max-height: 132px;
+  max-height: 150px; // 与 ChatInput.tsx 的 JS 高度上限保持一致
   overflow-y: auto;
   transition: all 0.25s ease;
+
+  // iOS Safari 在字号 <16px 时聚焦会自动缩放整页
+  @media (max-width: 767px) {
+    font-size: 16px;
+  }
 
   &::placeholder {
     color: rgba(168, 162, 158, 0.5);
