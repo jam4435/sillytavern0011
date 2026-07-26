@@ -3361,6 +3361,282 @@
     background: rgba(139, 26, 26, 0.1);
   }
 
+  // ===== 江湖谱牒（存档与分叉）水墨适配 =====
+  // 注意：底稿多用 background 简写叠渐变，这里必须同样用简写覆盖，只写 background-color 盖不掉渐变
+  .save-history {
+    --history-gold: #7a4d06;
+    --history-gold-bright: #8b1a1a;
+    --history-ink: rgba(255, 252, 247, 0.9);
+    --history-line: rgba(61, 48, 40, 0.24);
+    color: var(--wuxia-ink-text);
+    background: var(--wuxia-ink-paper-strong);
+
+    &::before {
+      opacity: 0.5;
+      background-image:
+        linear-gradient(rgba(61, 48, 40, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(61, 48, 40, 0.04) 1px, transparent 1px);
+    }
+  }
+
+  .history-masthead {
+    border-bottom-color: var(--wuxia-ink-border-soft);
+    background: rgba(241, 235, 223, 0.66);
+  }
+
+  .history-heading h3 {
+    color: var(--wuxia-ink-text-strong);
+  }
+
+  .history-count,
+  .history-icon-btn {
+    color: var(--wuxia-ink-text);
+    border-color: var(--wuxia-ink-border-soft);
+    background: rgba(255, 252, 247, 0.72);
+  }
+
+  .history-icon-btn:hover:not(:disabled) {
+    color: #8b1a1a;
+    border-color: rgba(139, 26, 26, 0.45);
+    background: rgba(139, 26, 26, 0.06);
+  }
+
+  .history-journal-banner {
+    color: #7a4d06;
+    border-bottom-color: rgba(122, 77, 6, 0.3);
+    background: rgba(184, 134, 11, 0.1);
+  }
+
+  .history-status-line {
+    color: var(--wuxia-ink-text-muted);
+    border-top-color: var(--wuxia-ink-border-soft);
+    background: rgba(241, 235, 223, 0.7);
+
+    &.error {
+      color: #8b1a1a;
+    }
+
+    &.success {
+      color: #2f6b38;
+    }
+  }
+
+  .history-canvas {
+    border-right-color: var(--wuxia-ink-border-soft);
+    border-bottom-color: var(--wuxia-ink-border-soft);
+    background: rgba(246, 241, 231, 0.6);
+
+    .react-flow__edge-path {
+      stroke: rgba(61, 48, 40, 0.35);
+    }
+
+    // 当前路径边线颜色由组件内联 style 注入，需 !important 破解（见水墨覆盖坑点②）
+    .react-flow__edge.current-path .react-flow__edge-path {
+      stroke: rgba(139, 26, 26, 0.8) !important;
+      filter: drop-shadow(0 0 3px rgba(139, 26, 26, 0.2));
+    }
+
+    .react-flow__background circle {
+      fill: rgba(61, 48, 40, 0.14);
+    }
+
+    // MiniMap 的遮罩/描边来自组件 props 的 SVG 填充，同样需 !important
+    .react-flow__minimap-mask {
+      fill: rgba(232, 226, 214, 0.72) !important;
+    }
+
+    .react-flow__minimap-node {
+      stroke: rgba(61, 48, 40, 0.3) !important;
+    }
+
+    .react-flow__controls {
+      border-color: var(--wuxia-ink-border);
+      box-shadow: 0 7px 20px rgba(61, 48, 40, 0.16);
+    }
+
+    .react-flow__controls-button {
+      color: var(--wuxia-ink-text);
+      border-bottom-color: var(--wuxia-ink-border-soft);
+      background: rgba(255, 252, 247, 0.94);
+
+      &:hover {
+        background: rgba(139, 26, 26, 0.08);
+      }
+    }
+
+    .react-flow__minimap {
+      border-color: var(--wuxia-ink-border-soft);
+      background: rgba(241, 235, 223, 0.9);
+    }
+  }
+
+  .history-empty-inner {
+    color: var(--wuxia-ink-text-muted);
+
+    svg {
+      color: rgba(61, 48, 40, 0.5);
+    }
+
+    h4 {
+      color: var(--wuxia-ink-text-strong);
+    }
+  }
+
+  .history-node {
+    color: var(--wuxia-ink-text);
+    border-color: var(--wuxia-ink-border);
+    background: var(--wuxia-ink-paper-strong);
+    box-shadow:
+      inset 0 1px rgba(255, 255, 255, 0.5),
+      0 6px 18px rgba(61, 48, 40, 0.14);
+
+    &::before {
+      background: var(--branch-color, rgba(122, 77, 6, 0.55));
+    }
+
+    &:hover {
+      border-color: rgba(139, 26, 26, 0.5);
+    }
+
+    &.selected {
+      border-color: rgba(139, 26, 26, 0.65);
+      box-shadow:
+        inset 0 0 0 1px rgba(139, 26, 26, 0.1),
+        0 0 0 3px var(--wuxia-ink-focus-ring),
+        0 10px 24px rgba(61, 48, 40, 0.18);
+    }
+
+    &.current {
+      color: var(--wuxia-ink-text-strong);
+      border-color: #8b1a1a;
+      background: radial-gradient(circle at 12% 18%, rgba(139, 26, 26, 0.1), transparent 46%), rgba(255, 252, 247, 0.98);
+      box-shadow:
+        0 0 0 1px rgba(139, 26, 26, 0.16),
+        0 0 20px rgba(139, 26, 26, 0.12);
+    }
+
+    &.path:not(.current) {
+      border-color: rgba(122, 77, 6, 0.5);
+    }
+
+    &.unverified .history-node-kicker::after {
+      color: #7a4d06;
+    }
+
+    &.failed,
+    &.broken {
+      border-color: rgba(139, 26, 26, 0.55);
+      background: linear-gradient(135deg, rgba(139, 26, 26, 0.08), transparent 60%), rgba(255, 252, 247, 0.94);
+    }
+  }
+
+  .history-node-kicker {
+    color: var(--wuxia-ink-text-muted);
+  }
+
+  .history-node-title {
+    color: var(--wuxia-ink-text-strong);
+  }
+
+  .history-node-preview {
+    color: rgba(61, 48, 40, 0.78);
+  }
+
+  .history-detail {
+    background: rgba(241, 235, 223, 0.8);
+  }
+
+  .history-detail-eyebrow {
+    color: #7a4d06;
+  }
+
+  .history-detail-title {
+    color: var(--wuxia-ink-text-strong);
+  }
+
+  .history-detail-meta {
+    color: var(--wuxia-ink-text-muted);
+    border-block-color: var(--wuxia-ink-border-soft);
+  }
+
+  .history-detail-preview {
+    color: rgba(44, 36, 31, 0.85);
+  }
+
+  .history-flag {
+    color: var(--wuxia-ink-text);
+    border-color: var(--wuxia-ink-border-soft);
+    background: rgba(255, 252, 247, 0.7);
+
+    &.warn {
+      color: #7a4d06;
+      border-color: rgba(122, 77, 6, 0.4);
+    }
+
+    &.danger {
+      color: #8b1a1a;
+      border-color: rgba(139, 26, 26, 0.4);
+    }
+  }
+
+  .history-label-editor input {
+    color: var(--wuxia-ink-text-strong);
+    border-color: var(--wuxia-ink-border);
+    background: var(--wuxia-ink-paper);
+
+    &:focus {
+      border-color: rgba(139, 26, 26, 0.5);
+      box-shadow: 0 0 0 2px var(--wuxia-ink-focus-ring);
+    }
+  }
+
+  .history-detail-actions {
+    border-top-color: var(--wuxia-ink-border-soft);
+  }
+
+  .history-primary-action {
+    color: #fdf6ec;
+    border-color: rgba(139, 26, 26, 0.6);
+    background: linear-gradient(135deg, #8b1a1a, #5c1a14);
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.14);
+
+    &:hover:not(:disabled) {
+      border-color: rgba(139, 26, 26, 0.85);
+      box-shadow:
+        inset 0 1px rgba(255, 255, 255, 0.18),
+        0 0 16px rgba(139, 26, 26, 0.2);
+    }
+
+    &.current {
+      color: var(--wuxia-ink-text-muted);
+      border-color: var(--wuxia-ink-border-soft);
+      background: rgba(222, 212, 196, 0.6);
+    }
+  }
+
+  .history-secondary-action {
+    color: var(--wuxia-ink-text);
+    border-color: var(--wuxia-ink-border-soft);
+    background: rgba(255, 252, 247, 0.72);
+
+    &:hover:not(:disabled) {
+      color: #8b1a1a;
+      border-color: rgba(139, 26, 26, 0.45);
+    }
+
+    &.active {
+      color: #8b1a1a;
+      border-color: rgba(139, 26, 26, 0.5);
+      background: rgba(139, 26, 26, 0.07);
+    }
+  }
+
+  .history-confirm {
+    color: var(--wuxia-ink-text);
+    border-color: rgba(122, 77, 6, 0.4);
+    background: rgba(184, 134, 11, 0.08);
+  }
+
   *::-webkit-scrollbar-track {
     background: rgba(222, 212, 196, 0.56);
   }

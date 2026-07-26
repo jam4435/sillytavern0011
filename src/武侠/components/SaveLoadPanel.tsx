@@ -180,6 +180,21 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
       branch => branch.headNodeId === selectedNode.id && branch.status !== 'broken',
     ),
   );
+  // 选中的分支头所在脉络若包含当前分支的分叉起点，说明它就是当前分支的来源主线，
+  // 此时切换语义是"返回主分支"而不是一般的"切换到该分支"
+  const selectedIsMainReturn = useMemo(() => {
+    if (!view || !selectedNode || !selectedIsOtherBranchLeaf) return false;
+    const originNodeId = view.currentBranchId ? (view.tree.branches[view.currentBranchId]?.originNodeId ?? null) : null;
+    if (!originNodeId) return false;
+    const seen = new Set<string>();
+    let cursor: string | null = selectedNode.id;
+    while (cursor && !seen.has(cursor)) {
+      if (cursor === originNodeId) return true;
+      seen.add(cursor);
+      cursor = view.tree.nodes[cursor]?.parentId ?? null;
+    }
+    return false;
+  }, [view, selectedNode, selectedIsOtherBranchLeaf]);
   const checkoutPending = Boolean(journal && !isHistoryCheckoutJournalExpired(journal));
   const recoveryAvailable = Boolean(
     journal &&
@@ -235,7 +250,11 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
     setConfirmingNodeId(null);
     setWorkState({
       type: 'loading',
-      message: selectedIsOtherBranchLeaf ? '正在切换聊天分支……' : '正在创建非破坏性历史分叉……',
+      message: selectedIsMainReturn
+        ? '正在返回主分支……'
+        : selectedIsOtherBranchLeaf
+          ? '正在切换聊天分支……'
+          : '正在创建非破坏性历史分叉……',
     });
     try {
       const result = await checkoutNode(node.id);
@@ -253,7 +272,9 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
           result.actionKind === 'fork_branch'
             ? '新分支已建立；原路线的下一次玩家行动已放入输入框，等待你修改后手动发送。'
             : result.actionKind === 'existing_branch'
-              ? '已切换到既有分支。'
+              ? selectedIsMainReturn
+                ? '已返回主分支。'
+                : '已切换到既有分支。'
               : '已切换最新楼层的异文。',
       });
     } catch (error) {
@@ -300,11 +321,13 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
 
   const primaryLabel = selectedIsCurrent
     ? '当前进度'
-    : selectedIsOtherBranchLeaf
-      ? '切换到该分支'
-      : canSwitchInPlace
-        ? '切换至此异文'
-        : '从此处继续';
+    : selectedIsMainReturn
+      ? '返回主分支'
+      : selectedIsOtherBranchLeaf
+        ? '切换到该分支'
+        : canSwitchInPlace
+          ? '切换至此异文'
+          : '从此处继续';
 
   return (
     <div className="save-history">
@@ -387,7 +410,15 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
             {selectedNode ? (
               <>
                 <div className="history-detail-eyebrow">
-                  <span>{selectedIsCurrent ? '当前路径' : selectedIsOtherBranchLeaf ? '既有分支' : '历史节点'}</span>
+                  <span>
+                    {selectedIsCurrent
+                      ? '当前路径'
+                      : selectedIsMainReturn
+                        ? '主分支'
+                        : selectedIsOtherBranchLeaf
+                          ? '既有分支'
+                          : '历史节点'}
+                  </span>
                   <span>{formatDate(selectedNode.createdAt)}</span>
                 </div>
                 <h4 className="history-detail-title">

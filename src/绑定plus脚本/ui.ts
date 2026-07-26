@@ -8,6 +8,7 @@ import {
   applyPersonaPlusBindings,
   applyPresetPromptEnabledSnapshot,
   buildContextBindingTarget,
+  cleanOrphanPersonaEntries,
   composePersonaDescription,
   createBindingPlusBackupFile,
   deleteBindingGroup,
@@ -54,6 +55,7 @@ import {
   recordPersonaSnapshot,
   resetBindingPlusTheme,
   refreshConnectionProfileCatalog,
+  refreshPersonaAvatarFileIds,
   runApiConfigSelfTest,
   resolveBindingPlusThemeTokens,
   restoreLastPersonaSnapshot,
@@ -1281,8 +1283,10 @@ function createPanelHtml(): string {
                       <div class="edit-actions-bar compact-toolbar">
                         <button class="persona-btn" id="bindingplus-backup-export-btn" type="button">导出配置</button>
                         <button class="persona-btn" id="bindingplus-backup-import-btn" type="button">导入配置</button>
+                        <button class="persona-btn" id="bindingplus-clean-orphan-personas-btn" type="button">清理残留人设条目</button>
                         <input id="bindingplus-backup-import-input" type="file" accept=".json,application/json" style="display:none;">
                       </div>
+                      <div id="bindingplus-orphan-persona-summary" class="text-note">清理残留人设条目：删除酒馆设置里没有对应头像文件的 user 人设残留（即已删除但仍显示在人设列表里的幽灵条目）。</div>
                       <div id="persona-context-binding-storage-list" class="persona-plus-list"></div>
                     </div>
                   </div>
@@ -4755,6 +4759,8 @@ export function showPanel(): void {
   renderApiConfigSelfTestSection();
   void refreshPlusBindingSection();
   void refreshApiConnectionCatalog({ quiet: true, rerender: activeDetailPage === 'api' });
+  // 预热真实头像文件缓存，让绑定下拉等同步路径也能过滤幽灵人设条目
+  void refreshPersonaAvatarFileIds();
   lastContextSignature = buildContextSignature();
 
   console.log('用户设定脚本: 面板已显示');
@@ -4804,6 +4810,8 @@ async function renderPersonaList(autoSelectCurrent: boolean = false): Promise<vo
   const parentDoc = window.parent.document;
   const listContainer = $('#persona-list-container', parentDoc);
   const keyword = personaSearchKeyword.trim().toLowerCase();
+  // 先刷新真实头像文件缓存，过滤 power_user.personas 里残留的幽灵人设条目
+  await refreshPersonaAvatarFileIds();
   const personas = getPersonaListFromDOM().filter(persona => {
     if (!keyword) {
       return true;
@@ -7768,6 +7776,32 @@ function bindPanelEvents(): void {
         return;
       }
       void importBindingPlusBackupFromFile(file);
+    });
+
+  $(parentDoc)
+    .off(`click${PANEL_EVENT_NAMESPACE}`, '#bindingplus-clean-orphan-personas-btn')
+    .on(`click${PANEL_EVENT_NAMESPACE}`, '#bindingplus-clean-orphan-personas-btn', () => {
+      if (!confirm('将从酒馆设置中删除没有对应头像文件的 user 人设残留条目（不会影响真实存在的人设），继续吗？')) {
+        return;
+      }
+      void (async () => {
+        const $summary = $('#bindingplus-orphan-persona-summary', parentDoc);
+        $summary.text('正在清理残留人设条目...');
+        const result = await cleanOrphanPersonaEntries();
+        $summary.text(result.message);
+        if (!result.success) {
+          toastr.error(result.message);
+          return;
+        }
+        if (result.removed.length > 0) {
+          toastr.success(result.message);
+        } else {
+          toastr.info(result.message);
+        }
+        if (activeDetailPage === 'persona') {
+          await renderPersonaList(!getEditingAvatarId());
+        }
+      })();
     });
 
   $(parentDoc)

@@ -228,6 +228,7 @@ export const HistoryTreeCanvas: React.FC<HistoryTreeCanvasProps> = ({
       panOnDrag
       zoomOnScroll
       fitView
+      onlyRenderVisibleElements
       minZoom={0.24}
       maxZoom={1.7}
       proOptions={{ hideAttribution: true }}

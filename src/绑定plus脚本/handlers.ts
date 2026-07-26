@@ -1037,6 +1037,172 @@ function getCurrentPersonaAvatarIdSafe(): string {
   }
 }
 
+/**
+ * 服务器上真实存在的 Persona 头像文件 id 缓存.
+ *
+ * `power_user.personas` 里可能残留已删除人设的孤儿条目（只有 avatarId→名字），
+ * 酒馆自带人设管理列表由真实头像文件生成，看不到这些条目。
+ * 这里以文件列表为准过滤，避免把幽灵人设显示出来。
+ * 为 null 表示还没成功拉取过，此时不做过滤（宁可多显示也不误杀）。
+ */
+let personaAvatarFileIdCache: Set<string> | null = null;
+
+interface ParentSillyTavernContext {
+  getRequestHeaders?: () => Record<string, string>;
+  powerUserSettings?: {
+    personas?: Record<string, string>;
+    persona_descriptions?: Record<string, unknown>;
+    default_persona?: string | null;
+  };
+  saveSettingsDebounced?: () => void;
+}
+
+function getParentSillyTavernContext(): ParentSillyTavernContext | null {
+  try {
+    const parentWindow = window.parent as Window &
+      typeof globalThis & {
+        SillyTavern?: { getContext?: () => ParentSillyTavernContext };
+      };
+    const context = parentWindow.SillyTavern?.getContext?.();
+    return context && typeof context === 'object' ? context : null;
+  } catch (error) {
+    console.warn('用户设定脚本: 读取父窗口 SillyTavern context 失败', error);
+    return null;
+  }
+}
+
+async function fetchPersonaAvatarFileIds(): Promise<Set<string> | null> {
+  try {
+    const context = getParentSillyTavernContext();
+    if (typeof context?.getRequestHeaders !== 'function') {
+      return null;
+    }
+    const response = await fetch(`${window.parent.location.origin}/api/avatars/get`, {
+      method: 'POST',
+      headers: context.getRequestHeaders(),
+    });
+    if (!response.ok) {
+      console.warn('用户设定脚本: 拉取 Persona 头像文件列表失败', response.status);
+      return null;
+    }
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      return null;
+    }
+    return new Set(data.map(item => ensureString(item).trim()).filter(Boolean));
+  } catch (error) {
+    console.warn('用户设定脚本: 拉取 Persona 头像文件列表失败', error);
+    return null;
+  }
+}
+
+/**
+ * 刷新真实头像文件缓存。拉取失败时保留旧缓存不变。
+ */
+export async function refreshPersonaAvatarFileIds(): Promise<void> {
+  const fileIds = await fetchPersonaAvatarFileIds();
+  if (fileIds) {
+    personaAvatarFileIdCache = fileIds;
+  }
+}
+
+export interface OrphanPersonaCleanupResult {
+  success: boolean;
+  removed: { avatarId: string; name: string }[];
+  message: string;
+}
+
+/**
+ * 清理 `power_user.personas` / `persona_descriptions` 里没有对应真实头像文件的残留条目.
+ *
+ * 必须先成功拉到真实文件列表才会动手删除，拉取失败时直接放弃，避免误删。
+ */
+export async function cleanOrphanPersonaEntries(): Promise<OrphanPersonaCleanupResult> {
+  const fileIds = await fetchPersonaAvatarFileIds();
+  if (!fileIds) {
+    return {
+      success: false,
+      removed: [],
+      message: '无法获取真实头像文件列表（接口不可用或请求失败），已取消清理。',
+    };
+  }
+  personaAvatarFileIdCache = fileIds;
+
+  const context = getParentSillyTavernContext();
+  const powerUser = context?.powerUserSettings;
+  const personaMap = powerUser?.personas;
+  if (!powerUser || !personaMap || typeof personaMap !== 'object') {
+    return {
+      success: false,
+      removed: [],
+      message: '无法访问酒馆 powerUserSettings.personas，已取消清理。',
+    };
+  }
+
+  const descriptionMap =
+    powerUser.persona_descriptions && typeof powerUser.persona_descriptions === 'object'
+      ? powerUser.persona_descriptions
+      : null;
+  const removed: { avatarId: string; name: string }[] = [];
+
+  Object.keys(personaMap).forEach(avatarId => {
+    if (fileIds.has(avatarId)) {
+      return;
+    }
+    removed.push({ avatarId, name: ensureString(personaMap[avatarId]).trim() || avatarId });
+    delete personaMap[avatarId];
+    if (descriptionMap) {
+      delete descriptionMap[avatarId];
+    }
+  });
+
+  if (descriptionMap) {
+    Object.keys(descriptionMap).forEach(avatarId => {
+      if (fileIds.has(avatarId)) {
+        return;
+      }
+      if (!removed.some(item => item.avatarId === avatarId)) {
+        removed.push({ avatarId, name: avatarId });
+      }
+      delete descriptionMap[avatarId];
+    });
+  }
+
+  if (removed.length === 0) {
+    return { success: true, removed, message: '没有发现残留的 user 人设条目。' };
+  }
+
+  if (
+    typeof powerUser.default_persona === 'string' &&
+    powerUser.default_persona &&
+    !fileIds.has(powerUser.default_persona)
+  ) {
+    powerUser.default_persona = null;
+  }
+
+  let saved = true;
+  if (typeof context?.saveSettingsDebounced === 'function') {
+    context.saveSettingsDebounced();
+  } else {
+    const parentWindow = window.parent as Window &
+      typeof globalThis & { SillyTavern?: { saveSettingsDebounced?: () => void } };
+    if (typeof parentWindow.SillyTavern?.saveSettingsDebounced === 'function') {
+      parentWindow.SillyTavern.saveSettingsDebounced();
+    } else {
+      saved = false;
+    }
+  }
+
+  const names = removed.map(item => item.name).join('、');
+  return {
+    success: true,
+    removed,
+    message: saved
+      ? `已清理 ${removed.length} 个残留条目：${names}`
+      : `已清理 ${removed.length} 个残留条目：${names}；但未找到 saveSettingsDebounced，请手动触发一次酒馆设置保存以持久化。`,
+  };
+}
+
 function getPersonaListFromHelperApi(): PersonaInfo[] {
   if (typeof getPersonaIds !== 'function' || typeof getPersona !== 'function') {
     return [];
@@ -1046,6 +1212,7 @@ function getPersonaListFromHelperApi(): PersonaInfo[] {
   return safeArray<string>(getPersonaIds())
     .map(avatarId => ensureString(avatarId).trim())
     .filter(Boolean)
+    .filter(avatarId => !personaAvatarFileIdCache || personaAvatarFileIdCache.has(avatarId))
     .map(avatarId => {
       try {
         const persona = getPersona(avatarId);
