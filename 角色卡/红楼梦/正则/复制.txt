@@ -1,0 +1,5 @@
+```
+【占位】发布态内联 bundle。此文件是构建产物：前端 SPA（src/红楼梦/）经 webpack 打包为单 HTML 后，整体粘贴到本文件的代码围栏内（结构：<!doctype html>…内联 CSS…<div id="root">…内联 JS bundle…）。
+发布时启用「复制」正则（匹配锚串）、禁用「游戏页面」正则；开发期相反。
+CSS 需包含视口适配：html,body,#root{min-height:var(--TH-viewport-height,100vh);height:auto}
+```

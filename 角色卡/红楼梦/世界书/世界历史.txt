@@ -1,0 +1,59 @@
+<%
+// ================== 世界历史注入（照搬金庸卡战斗骰子.txt 前半，题材无关） ==================
+// 最多 16 条，优先最近 8 条「偏离/未知」事件，管道三段式 日期|地点|概要
+function compactPromptField(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim().replace(/\|/g, '／');
+}
+
+function formatPromptDate(time) {
+  const value = time && typeof time === 'object' ? time : {};
+  const year = Number(value.年);
+  const month = Number(value.月);
+  const day = Number(value.日);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return '未知日期';
+  return `${year}年${month}月${day}日`;
+}
+
+function getEventTimeValue(record) {
+  const time = record?.时间 || {};
+  return (Number(time.年) || 0) * 1000000 + (Number(time.月) || 0) * 10000 +
+    (Number(time.日) || 0) * 100 + (Number(time.时) || 0);
+}
+
+function selectWorldEventsForPrompt(worldEvents, outcomeStatuses, limit = 16, priorityLimit = 8) {
+  if (!worldEvents || typeof worldEvents !== 'object' || Array.isArray(worldEvents)) return [];
+  const statuses = outcomeStatuses && typeof outcomeStatuses === 'object' && !Array.isArray(outcomeStatuses)
+    ? outcomeStatuses
+    : {};
+  const records = Object.entries(worldEvents)
+    .filter(([, record]) => record && typeof record === 'object' && !Array.isArray(record) &&
+      record.时间 && typeof record.时间 === 'object' && typeof record.地点 === 'string' &&
+      typeof record.概要 === 'string' && record.概要.trim())
+    .sort((left, right) => getEventTimeValue(right[1]) - getEventTimeValue(left[1]) || left[0].localeCompare(right[0]));
+  const selected = new Map();
+  for (const [eventName, record] of records) {
+    if (selected.size >= Math.min(priorityLimit, limit)) break;
+    if (statuses[eventName] === '偏离' || statuses[eventName] === '未知') selected.set(eventName, record);
+  }
+  for (const [eventName, record] of records) {
+    if (selected.size >= limit) break;
+    selected.set(eventName, record);
+  }
+  return [...selected.entries()]
+    .sort((left, right) => getEventTimeValue(left[1]) - getEventTimeValue(right[1]) || left[0].localeCompare(right[0]));
+}
+
+const 原始世界事件 = getvar('stat_data.世界事件', { scope: 'local' });
+const 事件结局状态 = getvar('stat_data.前端变量.事件结局状态', { scope: 'local' });
+const 世界事件上下文 = selectWorldEventsForPrompt(原始世界事件, 事件结局状态);
+if (世界事件上下文.length > 0) {
+-%>
+# 世界历史（只读）
+<% for (const [, 事件] of 世界事件上下文) { -%>
+<%- formatPromptDate(事件.时间) %>|<%- compactPromptField(事件.地点) %>|<%- compactPromptField(事件.概要) %>
+<% } -%>
+
+<% } -%>
+
+<%- /* 设计决策（D2，2026-07-26）：本卡为剧情向，不设战斗/较量判定协议与前端预生成随机数。
+     本条目只保留上方的世界历史注入（金庸卡战斗骰子.txt 的前半，题材无关照搬）。 */ -%>

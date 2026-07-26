@@ -1,0 +1,115 @@
+<variable>
+<status_current_variables>
+<%
+// ================== 通用工具函数（照搬金庸卡，题材无关） ==================
+// 递归剔除 $ 开头的内部键（$meta/$template 永不进提示词）
+function sanitizePromptValue(value) {
+  if (Array.isArray(value)) return value.map(item => sanitizePromptValue(item));
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !key.startsWith('$'))
+      .map(([key, child]) => [key, sanitizePromptValue(child)]),
+  );
+}
+// 去引号紧凑 JSON 序列化（省 token）
+function toCompact(obj) {
+  if (obj === null || obj === undefined) return 'null';
+  if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
+  if (typeof obj === 'string') return obj.includes(',') || obj.includes(':') || obj.includes('\n') ? `"${obj}"` : obj;
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return '[]';
+    return '[' + obj.map(v => toCompact(v)).join(',') + ']';
+  }
+  const entries = Object.entries(obj)
+    .filter(([k]) => k !== '$meta' && k !== '$template')
+    .map(([k, v]) => k + ':' + toCompact(v));
+  if (entries.length === 0) return '{}';
+  return '{' + entries.join(',') + '}';
+}
+-%>
+# 当前状态：以下时间与人物变量表示此刻
+
+# 当前世界信息：
+世界信息:{{ERA:世界信息}}
+
+# {{user}}数据
+<%
+// 出生年份→年龄即时换算（变量存不变量，提示词给导出量）
+const p = getvar('stat_data.user数据', { scope: 'local' });
+const worldTime = getvar('stat_data.世界信息', { scope: 'local' })?.时间;
+if (p && worldTime) {
+  const userData = {};
+  for (const key in p) {
+    if (key === '$meta' || key === '$template') continue;
+    if (key === '出生年份') {
+      userData['年龄'] = (worldTime.年 || 0) - (p.出生年份 || 0);
+    } else { userData[key] = p[key]; }
+  }
+-%>
+user数据:<%- toCompact(sanitizePromptValue(userData)) %>
+才艺造诣由低到高分五档：略通<粗通<娴熟<精妙<出神入化；才艺与造诣不要在文中直白报出，而是通过人物言行自然表露
+<% } else { -%>
+[玩家数据加载失败]
+<% } -%>
+<%
+// ================== 当前事件上下文（只读背景 + 可写快照双区，照搬） ==================
+const 参与事件 = getvar('stat_data.参与事件', { scope: 'local' });
+if (参与事件 && Object.keys(参与事件).length > 0) {
+-%>
+
+# 所在地正在或将要发生的事件
+{{ERA:参与事件}}
+
+<% } -%>
+<%
+const 后续事件线索 = getvar('stat_data.后续事件线索', { scope: 'local' });
+if (后续事件线索 && Object.keys(后续事件线索).length > 0) {
+-%>
+# 后续事件线索（只读）
+{{ERA:后续事件线索}}
+
+<% } -%>
+<%
+const 附近传闻 = getvar('stat_data.附近传闻', { scope: 'local' });
+if (附近传闻 && Object.keys(附近传闻).length > 0) {
+-%>
+# 附近传闻（只读）
+{{ERA:附近传闻}}
+
+<% } -%>
+<%- /* TODO【待前端】：<可用地点> 三分组白名单（普通移动/事件目标/地图指定）。
+     移植自 世界书\金庸群侠传1\世界书\输出提示词.txt 的 normalizeFullLocationPath 等函数；
+     地图层级已定为三段路径（如 荣国府/大观园/潇湘馆），=== 3 校验保持不变。
+     依赖前端写入 前端变量.周围地点 后启用。 */ -%>
+<%
+// ================== 同场景角色过滤（照搬：只注入与玩家同位置的角色） ==================
+const allCharacters = getvar('stat_data.角色数据', { scope: 'local' });
+const playerLocation = getvar('stat_data.user数据', { scope: 'local' })?.所在位置;
+const presentCharacters = {};
+if (playerLocation && allCharacters) {
+  for (const charName in allCharacters) {
+    if (allCharacters.hasOwnProperty(charName) && charName !== '$template' && charName !== '$meta') {
+      const character = allCharacters[charName];
+      if (character && character.所在位置 === playerLocation) {
+        const filtered = {};
+        for (const key in character) {
+          if (key !== '姓名' && key !== '$meta' && key !== '$template') {
+            filtered[key] = character[key];
+          }
+        }
+        presentCharacters[charName] = filtered;
+      }
+    }
+  }
+}
+if (Object.keys(presentCharacters).length > 0) {
+-%>
+# 同场景角色（当前状态）
+角色数据:<%- toCompact(sanitizePromptValue(presentCharacters)) %>
+<% } else { -%>
+# 同场景角色（当前状态）
+[此地无甚要紧人物]
+<% } -%>
+</status_current_variables>
+</variable>

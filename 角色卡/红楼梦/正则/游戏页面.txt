@@ -1,0 +1,7 @@
+```
+<body>
+<script>
+$('body').load('http://localhost:5500/dist/红楼梦/index.html')
+</script>
+</body>
+```

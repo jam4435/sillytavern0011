@@ -34,7 +34,17 @@
       "Bash(grep -n '```' tavern_sync.mjs)",
       "Bash(ls -la \"C:/Users/DELL/.claude/\" | head -40)",
       "Bash(python -)",
-      "Bash(PYTHONIOENCODING=utf-8 python -)"
+      "Bash(PYTHONIOENCODING=utf-8 python -)",
+      "Bash(mkdir -p \"角色卡/红楼梦/世界书\" \"角色卡/红楼梦/脚本\" \"角色卡/红楼梦/正则\")",
+      "Bash(cp \"角色卡/金庸群侠传/脚本/隐藏楼层.js\" \"角色卡/红楼梦/脚本/隐藏楼层.js\")",
+      "Bash(cp \"角色卡/金庸群侠传/脚本/ERA变量框架-魔改.js\" \"角色卡/红楼梦/脚本/ERA变量框架-魔改.js\")",
+      "Bash(cp \"角色卡/金庸群侠传/脚本/调试.js\" \"角色卡/红楼梦/脚本/调试.js\")",
+      "Bash(python -c \"import json;json.load\\(open\\(r'C:/Users/DELL/.claude/settings.json'\\)\\);print\\('OK'\\)\")",
+      "Read(//f/download/**)",
+      "Bash(ls -d \"/c/Users/DELL/AppData/Roaming/Claude Code\" \"/c/Users/DELL/AppData/Roaming/claude-code\" \"/c/Users/DELL/AppData/Local/Claude Code\" \"/c/Users/DELL/AppData/Roaming/Claude\" 2>&1; echo \"---\"; ls \"/c/Users/DELL/.claude/\" 2>&1)",
+      "Bash(cp \"F:/download/红楼梦.txt\" \"角色卡/红楼梦/原文/红楼梦.txt\")",
+      "Bash(node \"C:/Users/DELL/AppData/Local/Temp/claude/F--Develop-AI-sillytavern/babbc9fc-f33e-44d4-987e-d099c4d3c67b/scratchpad/split-hongloumeng.mjs\")",
+      "WebFetch(domain:docs.claude.com)"
     ]
   },
   "disabledMcpjsonServers": [
