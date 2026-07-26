@@ -46,7 +46,9 @@
       "Bash(node \"C:/Users/DELL/AppData/Local/Temp/claude/F--Develop-AI-sillytavern/babbc9fc-f33e-44d4-987e-d099c4d3c67b/scratchpad/split-hongloumeng.mjs\")",
       "WebFetch(domain:docs.claude.com)",
       "Bash(node -e ' *)",
-      "Bash(node \"C:/Users/DELL/AppData/Local/Temp/claude/F--Develop-AI-sillytavern/babbc9fc-f33e-44d4-987e-d099c4d3c67b/scratchpad/gen-worldbook-entries.mjs\")"
+      "Bash(node \"C:/Users/DELL/AppData/Local/Temp/claude/F--Develop-AI-sillytavern/babbc9fc-f33e-44d4-987e-d099c4d3c67b/scratchpad/gen-worldbook-entries.mjs\")",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget"
     ]
   },
   "disabledMcpjsonServers": [

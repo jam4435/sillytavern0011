@@ -707,6 +707,16 @@ const App: React.FC = () => {
     closeModal();
   }, [activePanel, closeModal, gameState.currentLocation, mapDraftDestination, setTravelCommand]);
 
+  // 事件页点击地点徽章：直接设置地图移动指令并关闭面板，让玩家看到待发送指令
+  const handleEventTravelTo = useCallback(
+    (destination: string) => {
+      const origin = getUserCurrentLocation() || gameState.currentLocation || '未知位置';
+      setTravelCommand(destination, origin);
+      closeModal();
+    },
+    [closeModal, gameState.currentLocation, setTravelCommand],
+  );
+
   // 应用正则替换到主文本
   const processedMaintext = useMemo(() => {
     if (!currentMaintext || activeRegexRules.length === 0) {
@@ -937,7 +947,14 @@ const App: React.FC = () => {
           />
         );
       case ActivePanel.EVENTS:
-        return <EventsPanel events={gameState.events} />;
+        return (
+          <EventsPanel
+            events={gameState.events}
+            gameTime={gameState.gameTime}
+            currentLocation={gameState.currentLocation}
+            onTravelTo={handleEventTravelTo}
+          />
+        );
       case ActivePanel.MAP:
         return (
           <MapPanel

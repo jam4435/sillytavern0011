@@ -233,8 +233,26 @@ function cleanStoryText(text: string): string {
     .trim();
 }
 
+/**
+ * 预览文本先过一遍酒馆"仅格式显示"正则（含预设正则），把思维链等不该展示的段落滤掉，
+ * 否则两行预览会被思维链占满、露不出正文。
+ * 注意：只用于预览展示；节点身份哈希仍基于 cleanStoryText(原文)，不能受正则配置影响。
+ */
+function applyTavernDisplayRegexes(text: string): string {
+  try {
+    if (typeof formatAsTavernRegexedString === 'function') {
+      return formatAsTavernRegexedString(text, 'ai_output', 'display');
+    }
+  } catch {
+    // 正则应用失败时回退原文：预览质量下降但不阻塞扫描
+  }
+  return text;
+}
+
 function createPreview(text: string): string {
-  const normalized = cleanStoryText(text).replace(/\s+/g, ' ').trim();
+  const normalized = cleanStoryText(applyTavernDisplayRegexes(text))
+    .replace(/\s+/g, ' ')
+    .trim();
   return normalized.length <= PREVIEW_LENGTH ? normalized : `${normalized.slice(0, PREVIEW_LENGTH)}...`;
 }
 
@@ -420,8 +438,9 @@ export async function scanCurrentChat(options: HistoryScanOptions = {}): Promise
         swipeId,
       };
       const existing = tree.nodes[id];
+      // 已有节点也刷新 preview：预览受"仅格式显示"正则影响，正则配置变化后旧预览需要跟上
       const node: HistoryNode = existing
-        ? appendLocator(existing, locator)
+        ? { ...appendLocator(existing, locator), preview: createPreview(rawText) }
         : {
             id,
             parentId: currentParentId,

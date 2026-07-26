@@ -1029,22 +1029,26 @@ function filterParticipationEvents(record: Record<string, unknown> | undefined):
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+type CalendarRecord = { 年?: number; 月?: number; 日?: number; 时?: number };
+
+function isCalendarRecord(value: unknown): value is CalendarRecord {
+  return isRecord(value) && ('年' in value || '月' in value || '日' in value);
+}
+
+function formatCalendarRecord(time: CalendarRecord): string {
+  return `${time.年 ?? '?'}年${time.月 ?? '?'}月${time.日 ?? '?'}日${time.时 === undefined ? '' : `${time.时}时`}`;
+}
+
+// 与事件脚本 era-utils 一致的简化历法换算：年365天、月30天
+function toCalendarDays(time: CalendarRecord): number {
+  return (time.年 || 0) * 365 + (time.月 || 0) * 30 + (time.日 || 0);
+}
+
 function formatEventValue(value: unknown): string {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return value === 1 ? '玩家参与' : '未参与';
-  if (isRecord(value) && ('年' in value || '月' in value || '日' in value)) {
-    const time = value as { 年?: number; 月?: number; 日?: number; 时?: number };
-    return `${time.年 ?? '?'}年${time.月 ?? '?'}月${time.日 ?? '?'}日${time.时 === undefined ? '' : `${time.时}时`}`;
-  }
-  if (isRecord(value) && typeof value.描述 === 'string') {
-    const changedActions = ['insert', 'update', 'delete'].filter(action => {
-      const actionValue = value[action];
-      return isRecord(actionValue) && Object.keys(actionValue).some(key => !key.startsWith('$'));
-    });
-    const endingNote = typeof value.结局 === 'string' && value.结局.trim() ? `\n结局：${value.结局.trim()}` : '';
-    const diffNote = changedActions.length > 0 ? `\n结局差分：${changedActions.join(', ')}` : '';
-    return `${value.描述}${endingNote}${diffNote}`;
-  }
+  if (isCalendarRecord(value)) return formatCalendarRecord(value);
+  if (isRecord(value) && typeof value.描述 === 'string') return value.描述;
   if (value === null || value === undefined) return '';
 
   try {
@@ -1054,23 +1058,34 @@ function formatEventValue(value: unknown): string {
   }
 }
 
-function pushRecordEvents(
-  target: GameEvent[],
-  record: Record<string, unknown> | undefined,
-  type: GameEvent['type'],
-  idPrefix: string,
-  buildDescription: (eventName: string, value: unknown) => string,
-) {
-  if (!record) return;
+// 附近传闻由事件脚本拼为 `引子文本 [事件开始时间/事件地点]`；时间段不含斜杠，地点是含斜杠的完整路径
+const RUMOR_META_PATTERN = /^([\s\S]*?)\s*\[([^/[\]]+)\/([^[\]]+)\]$/;
 
-  for (const [eventName, value] of Object.entries(record)) {
-    target.push({
-      id: `${idPrefix}_${target.length}`,
-      title: getDisplayEventName(eventName),
-      type,
-      description: buildDescription(eventName, value),
-    });
+function parseRumorMeta(raw: string): { description: string; timeText?: string; location?: string } {
+  const match = raw.match(RUMOR_META_PATTERN);
+  if (!match) return { description: raw };
+  return { description: match[1].trim(), timeText: match[2].trim(), location: match[3].trim() };
+}
+
+function collectEventOccupancy(
+  occupancy: NonNullable<NonNullable<GameVariables['事件系统']>['人物事件占用']>,
+  eventName: string,
+): { location?: string; involvedCharacters?: string[] } {
+  const involved: string[] = [];
+  let location: string | undefined;
+
+  for (const [characterName, record] of Object.entries(occupancy)) {
+    if (!isRecord(record) || record.事件名 !== eventName || characterName.startsWith('$')) continue;
+    involved.push(characterName);
+    if (!location && typeof record.地点 === 'string' && record.地点.trim()) {
+      location = record.地点.trim();
+    }
   }
+
+  return {
+    location,
+    involvedCharacters: involved.length > 0 ? involved : undefined,
+  };
 }
 
 /**
@@ -1078,22 +1093,78 @@ function pushRecordEvents(
  *
  * 不展示全部未发生事件，避免初始化后把数百条事件渲染进前端。
  */
-function parseEvents(variables: GameVariables): GameEvent[] {
+function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent[] {
   const events: GameEvent[] = [];
   const eventSystem = variables.事件系统 || {};
+  const occupancy = eventSystem.人物事件占用 || {};
+  const ongoing = eventSystem.进行中事件 || {};
+  const nowDays = worldTime ? worldTime.year * 365 + worldTime.month * 30 + worldTime.day : undefined;
 
-  pushRecordEvents(events, variables.附近传闻, 'RUMOR', 'rumor', (_name, value) => formatEventValue(value));
+  const remainingDaysUntil = (endTime: unknown): number | undefined => {
+    if (nowDays === undefined || !isCalendarRecord(endTime)) return undefined;
+    const remaining = toCalendarDays(endTime) - nowDays;
+    return remaining >= 0 ? remaining : undefined;
+  };
 
-  pushRecordEvents(events, filterParticipationEvents(variables.参与事件), 'ACTIVE', 'participating', (_name, value) =>
-    formatEventValue(value),
-  );
+  for (const [eventName, value] of Object.entries(variables.附近传闻 || {})) {
+    const raw = typeof value === 'string' ? value : formatEventValue(value);
+    if (!raw.trim()) continue;
+    events.push({
+      id: `rumor_${events.length}`,
+      title: getDisplayEventName(eventName),
+      type: 'RUMOR',
+      ...parseRumorMeta(raw),
+    });
+  }
 
-  pushRecordEvents(events, eventSystem.进行中事件, 'ACTIVE', 'active', (_name, value) => {
-    const endTime = formatEventValue(value);
-    return endTime ? `进行中，预计结束于 ${endTime}` : '进行中';
-  });
+  // 玩家参与中的事件：展示描述与当前结局走向，不暴露 insert/update/delete 差分细节
+  const participation = filterParticipationEvents(variables.参与事件) || {};
+  for (const [eventName, value] of Object.entries(participation)) {
+    const record = value as Record<string, unknown>;
+    const outcome = typeof record.结局 === 'string' ? record.结局.trim() : '';
+    const endTime = ongoing[eventName];
+    events.push({
+      id: `participating_${events.length}`,
+      title: getDisplayEventName(eventName),
+      type: 'ACTIVE',
+      category: 'participation',
+      description: typeof record.描述 === 'string' ? record.描述 : '',
+      details: outcome || undefined,
+      timeText: isCalendarRecord(endTime) ? formatCalendarRecord(endTime) : undefined,
+      remainingDays: remainingDaysUntil(endTime),
+      ...collectEventOccupancy(occupancy, eventName),
+    });
+  }
 
-  pushRecordEvents(events, variables.后续事件线索, 'AFTERMATH', 'followup', (_name, value) => formatEventValue(value));
+  // 江湖中进行、玩家未卷入的事件：进行中事件只存结束时间，地点与人物从占用表反查
+  const participationKeys = new Set(Object.keys(variables.参与事件 || {}));
+  for (const [eventName, endTime] of Object.entries(ongoing)) {
+    if (participationKeys.has(eventName)) continue;
+    events.push({
+      id: `active_${events.length}`,
+      title: getDisplayEventName(eventName),
+      type: 'ACTIVE',
+      category: 'world',
+      description: '',
+      timeText: isCalendarRecord(endTime) ? formatCalendarRecord(endTime) : undefined,
+      remainingDays: remainingDaysUntil(endTime),
+      ...collectEventOccupancy(occupancy, eventName),
+    });
+  }
+
+  const clueCounters = variables.后续事件线索计数 || {};
+  for (const [eventName, value] of Object.entries(variables.后续事件线索 || {})) {
+    const description = formatEventValue(value);
+    if (!description.trim() || description === '{}') continue;
+    const counter = Number(clueCounters[eventName]);
+    events.push({
+      id: `followup_${events.length}`,
+      title: getDisplayEventName(eventName),
+      type: 'AFTERMATH',
+      description,
+      remainingTurns: Number.isFinite(counter) && counter > 0 ? counter : undefined,
+    });
+  }
 
   const completedCount = Object.keys(eventSystem.已完成事件 || {}).length;
   if (completedCount > 0) {
@@ -3319,7 +3390,7 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
   }
 
   // 事件 - 从事件系统读取（避免全量渲染未发生事件）
-  state.events = parseEvents(variables);
+  state.events = parseEvents(variables, worldTime);
 
   // 社交
   state.social = parseSocial(variables, 用户档案);

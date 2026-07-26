@@ -422,13 +422,20 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
 }, 'generateAiPreview');
 
 export const applyAiPreview = errorCatched(async options => {
-  const { lorebookName, previewItems = [] } = options || {};
+  const { lorebookName, previewItems = [], uids = null } = options || {};
 
   if (!lorebookName) {
     throw new Error('缺少 lorebookName');
   }
 
-  const changedItems = (previewItems || []).filter(item => item?.changed && item?.afterEntry);
+  const uidFilter = Array.isArray(uids) ? new Set(uids.map(uid => ensureNumericUID(uid))) : null;
+  const changedItems = (previewItems || []).filter(
+    item =>
+      item?.changed &&
+      item?.afterEntry &&
+      item?.accepted !== false &&
+      (!uidFilter || uidFilter.has(ensureNumericUID(item.uid))),
+  );
   if (changedItems.length === 0) {
     return {
       success: true,

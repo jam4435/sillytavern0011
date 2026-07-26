@@ -225,7 +225,7 @@ export function deriveAiWorkflowCapabilities(state) {
   const generationBusy = isGenerationBusy(state);
   const busy = isWorkflowBusy(state);
   const acceptedPreviewCount = getPreviewEntries(state.previewResult)
-    .filter(entry => entry?.accepted !== false && entry?.selected !== false).length;
+    .filter(entry => entry?.accepted !== false && entry?.selected !== false && entry?.changed !== false).length;
   const canStartPlanning = !busy
     && state.phase === 'prepare'
     && state.strategy === 'plan'

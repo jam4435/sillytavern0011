@@ -280,4 +280,39 @@ describe('应用 AI 预览结果契约', () => {
       }),
     );
   });
+
+  it('跳过 accepted:false 的软排除项，并支持 uids 子集过滤', async () => {
+    const entry1 = makeEntry(1);
+    const entry2 = makeEntry(2);
+    const entry3 = makeEntry(3);
+    let writtenEntries: Entry[] = [];
+
+    apiMocks.updateWorldbookEntries.mockImplementation(async (_name, mutator) => {
+      const currentEntries = [entry1, entry2, entry3].map(entry => _.cloneDeep(entry));
+      writtenEntries = mutator(currentEntries);
+      return { success: true, changed: !_.isEqual(currentEntries, writtenEntries) };
+    });
+
+    const buildItem = (source: Entry, overrides: Record<string, unknown> = {}) => ({
+      uid: source.uid,
+      title: source.name,
+      changed: true,
+      beforeEntry: _.cloneDeep(source),
+      afterEntry: { ..._.cloneDeep(source), name: `新标题-${source.uid}` },
+      editableFields: { title: true, content: false, prompt: false },
+      ...overrides,
+    });
+
+    const result = await applyAiPreview({
+      lorebookName: '测试世界书',
+      previewItems: [buildItem(entry1), buildItem(entry2, { accepted: false }), buildItem(entry3)],
+      uids: [1, 2],
+    });
+
+    expect(result.appliedUids).toEqual([1]);
+    expect(result.skipped).toEqual([]);
+    expect(writtenEntries.find(entry => entry.uid === 1)?.name).toBe('新标题-1');
+    expect(writtenEntries.find(entry => entry.uid === 2)).toEqual(entry2);
+    expect(writtenEntries.find(entry => entry.uid === 3)).toEqual(entry3);
+  });
 });

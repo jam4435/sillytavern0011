@@ -1283,6 +1283,50 @@
     border-left-color: rgba(181, 90, 30, 0.4);
   }
 
+  .event-now-bar {
+    background: rgba(250, 246, 238, 0.5);
+    border-color: rgba(61, 48, 40, 0.14);
+    border-left-color: rgba(181, 90, 30, 0.5);
+  }
+
+  .event-now-time {
+    color: #1a1410;
+  }
+
+  .event-now-location {
+    color: #5b5048;
+  }
+
+  .event-meta-badge {
+    border-color: rgba(61, 48, 40, 0.24);
+    color: #5b5048;
+
+    &.event-meta-badge--countdown {
+      color: #b55a1e;
+      border-color: rgba(181, 90, 30, 0.42);
+
+      &.urgent {
+        color: #a03d2d;
+        border-color: rgba(160, 61, 45, 0.5);
+      }
+    }
+  }
+
+  button.event-meta-badge--travel {
+    color: #3d3028;
+    border-color: rgba(181, 90, 30, 0.4);
+
+    .event-travel-hint {
+      color: #b55a1e;
+    }
+
+    &:hover {
+      background: rgba(181, 90, 30, 0.1);
+      border-color: rgba(181, 90, 30, 0.6);
+      color: #1a1410;
+    }
+  }
+
   .event-empty-box {
     border-color: rgba(61, 48, 40, 0.18);
     background: rgba(255, 255, 255, 0.24);
@@ -3382,6 +3426,16 @@
   .history-masthead {
     border-bottom-color: var(--wuxia-ink-border-soft);
     background: rgba(241, 235, 223, 0.66);
+  }
+
+  // 标题印章：黑金侧是暗棕红鎏金，纸底上发脏；水墨侧改成干净的朱砂印（朱底纸白刻纹）
+  .history-seal {
+    color: #fdf6ec;
+    border-color: rgba(92, 26, 20, 0.55);
+    background: linear-gradient(145deg, #9c2121, #7a1616);
+    box-shadow:
+      inset 0 0 0 3px rgba(253, 246, 236, 0.16),
+      0 2px 10px rgba(139, 26, 26, 0.24);
   }
 
   .history-heading h3 {

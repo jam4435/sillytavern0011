@@ -378,6 +378,32 @@ describe('history tree v2 scanning', () => {
     expect(node.pinned).toBe(true);
   });
 
+  it('预览经酒馆显示正则过滤思维链，重扫刷新旧预览且节点身份不变', async () => {
+    currentChat().messages = [
+      { message_id: 0, role: 'assistant', message: '<thinking>内心盘算不该出现</thinking>正文开场白' },
+    ];
+    const before = await scanCurrentChat();
+    const beforeNode = before.tree.nodes[before.currentNodeId!]!;
+    expect(beforeNode.preview).toContain('内心盘算不该出现');
+
+    Object.assign(globalThis, {
+      formatAsTavernRegexedString: vi.fn((text: string, source: string, destination: string) => {
+        expect(source).toBe('ai_output');
+        expect(destination).toBe('display');
+        return text.replace(/<thinking>[\s\S]*?<\/thinking>/g, '');
+      }),
+    });
+    try {
+      const after = await scanCurrentChat();
+      const afterNode = after.tree.nodes[after.currentNodeId!]!;
+      // 同一节点（身份哈希基于原文，不受正则影响），预览已刷新
+      expect(after.currentNodeId).toBe(before.currentNodeId);
+      expect(afterNode.preview).toBe('正文开场白');
+    } finally {
+      delete (globalThis as Record<string, unknown>).formatAsTavernRegexedString;
+    }
+  });
+
   it('filterTreeToRelatedComponent 只保留与 anchor 连通的脉络及其分支', () => {
     const makeNode = (id: string, parentId: string | null) => ({
       id,

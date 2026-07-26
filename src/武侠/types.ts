@@ -194,6 +194,18 @@ export interface GameEvent {
   type: 'RUMOR' | 'ACTIVE' | 'AFTERMATH';
   description: string;
   details?: string;
+  /** ACTIVE 细分：participation=玩家参与中，world=江湖中进行、玩家未卷入 */
+  category?: 'participation' | 'world';
+  /** 事件地点完整路径，可作为地图移动目标 */
+  location?: string;
+  /** 相关时间文本：传闻=事件开始时间，进行中=预计结束时间 */
+  timeText?: string;
+  /** 距事件结束剩余天数（按 365/30 简化历法与当前世界时间求差） */
+  remainingDays?: number;
+  /** 后续线索剩余可追回合数 */
+  remainingTurns?: number;
+  /** 卷入该事件的人物（来自事件系统.人物事件占用） */
+  involvedCharacters?: string[];
 }
 
 export interface NPC {
