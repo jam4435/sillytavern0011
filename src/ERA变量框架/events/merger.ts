@@ -122,6 +122,47 @@ export function getEventGroup(eventType: string): string {
 }
 
 /**
+ * 从事件 detail 中提取调用方携带的同步请求 ID（`syncId` 单值或 `syncIds` 数组）。
+ * 非字符串或空白项被忽略，结果去重。
+ */
+export function collectSyncIdsFromDetail(detail: unknown): string[] {
+  if (!_.isPlainObject(detail)) return [];
+  const record = detail as { syncId?: unknown; syncIds?: unknown };
+  const ids: string[] = [];
+  if (typeof record.syncId === 'string' && record.syncId.trim() !== '') ids.push(record.syncId);
+  if (Array.isArray(record.syncIds)) {
+    for (const id of record.syncIds) {
+      if (typeof id === 'string' && id.trim() !== '') ids.push(id);
+    }
+  }
+  return _.uniq(ids);
+}
+
+/**
+ * 合并两个同属 SYNC 组的相邻事件。
+ * - 只要任意一方是 `manual_full_sync`，合并结果就是 `manual_full_sync`，
+ *   避免完整重算被后到的普通 SYNC（如 chat_changed）覆盖降级。
+ * - 双方 detail 中的同步请求 ID 全部保留，确保 era:writeDone 能回传给每个等待方。
+ */
+function mergeSyncJobs(prevJob: EventJob, currentJob: EventJob): EventJob {
+  const isFullSync = prevJob.type === 'manual_full_sync' || currentJob.type === 'manual_full_sync';
+  const syncIds = _.uniq([...collectSyncIdsFromDetail(prevJob.detail), ...collectSyncIdsFromDetail(currentJob.detail)]);
+  if (isFullSync && currentJob.type !== 'manual_full_sync') {
+    logger.debug(
+      'mergeSyncJobs',
+      `SYNC 合并保留完整重算：${prevJob.type} + ${currentJob.type} -> manual_full_sync（同步 ID: [${syncIds.join(', ')}]）`,
+    );
+  }
+  const baseDetail = _.isPlainObject(currentJob.detail) ? (currentJob.detail as Record<string, unknown>) : {};
+  return {
+    type: isFullSync ? 'manual_full_sync' : currentJob.type,
+    detail: syncIds.length > 0 ? { ...baseDetail, syncIds } : currentJob.detail,
+    timestamp: currentJob.timestamp,
+    diagnosticId: currentJob.diagnosticId,
+  };
+}
+
+/**
  * **【事件合并器】**
  * 对一批事件进行智能合并，包括处理事件对冲和合并同组可覆盖事件。
  * @param {EventJob[]} batchToProcess - 从队列中取出的一批原始事件。
@@ -194,8 +235,9 @@ export function mergeEventBatch(batchToProcess: EventJob[]): EventJob[] {
 
     // 如果满足合并条件
     if (areInSameGroup && isMergeableGroup) {
-      // 用当前事件覆盖掉结果数组中的最后一个事件
-      finalJobs[finalJobs.length - 1] = currentJob;
+      // 用当前事件覆盖掉结果数组中的最后一个事件；
+      // SYNC 组走专用合并，保留 manual_full_sync 强度与双方的同步请求 ID
+      finalJobs[finalJobs.length - 1] = prevGroup === 'SYNC' ? mergeSyncJobs(prevJob, currentJob) : currentJob;
     } else {
       // 否则，将当前事件追加到结果数组
       finalJobs.push(currentJob);

@@ -611,6 +611,7 @@ type WriteDonePayload = {
   consecutiveProcessingCount: number;
   transactionIds?: string[];
   transactionId?: string;
+  syncIds?: string[];
 };
 ```
 
@@ -632,6 +633,8 @@ eventOn('era:writeDone', detail => {
 - API 接收任务的 `actions.api` 不会跨任务传给后续 `era:apiWrite`；实际 API 完成广播通常表现为
   `api: false, apiWrite: true`。
 - API flush 含批事务时，`transactionIds` 会原样透传；恰好一个事务时同时提供 `transactionId`。
+- SYNC 事件（如 `manual_full_sync`）的 detail 携带 `syncId`/`syncIds` 时，处理完成后在 `syncIds`
+  中原样回传（含同批合并的全部 ID），供等待方精确匹配"自己发起的同步已完成"。
 - `writeDone` 当前没有显式 `success` 或 `error` 字段。
 
 ## 13. ERA 宏
@@ -876,7 +879,6 @@ Insert/Edit/Delete 通过多次 `updateEraStatData`
 | 同消息连续 Edit          | `intraMessageState` 只写不读，后续日志 `value_old` 可能不准确 | 优先读楼内状态，再查历史            |
 | EditLog 类型契约         | 类型声明为数组，实际通常存 JSON 字符串                        | 统一存数组，或广播前规范化          |
 | 数组数据形态             | 对象数组会被字符串化，且注释误称“删除 null”                   | 明确兼容需求；无必要则保留标准 JSON |
-| 完全重算合并             | `manual_full_sync` 可能被后到的普通 SYNC 覆盖                 | 给同步任务定义强度，完整重算优先    |
 | 事件时间窗               | 收集 500/1500 ms，小于规则 600/1600 ms                        | 收集窗口覆盖规则截止时间            |
 | 后续批次                 | 处理期间新批次不重新防抖                                      | 每批重新计算收集截止时间            |
 | 宏快速检测               | 与不区分大小写、允许空白的正式正则不一致                      | 删除快速判断或统一规则              |

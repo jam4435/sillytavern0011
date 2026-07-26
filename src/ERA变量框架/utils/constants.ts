@@ -206,4 +206,9 @@ export interface WriteDonePayload {
    * 同一个 75ms 写入窗口可能合并多个批事务；此字段保留全部事务 ID 供调用方匹配和去重。
    */
   transactionIds?: string[];
+  /**
+   * 当本轮是 SYNC 任务且触发事件的 detail 携带 `syncId`/`syncIds` 时，原样回传全部同步请求 ID。
+   * 外部脚本（如历史检出）以此精确匹配"自己发起的那次同步已完成"，而不是任意一次 resync。
+   */
+  syncIds?: string[];
 }

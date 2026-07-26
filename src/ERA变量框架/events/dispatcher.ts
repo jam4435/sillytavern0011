@@ -28,7 +28,7 @@ import {
   updateEraDiagnosticState,
 } from '../utils/diagnostics';
 import { logContext, Logger } from '../utils/log';
-import { EventJob, getEventGroup } from './merger';
+import { collectSyncIdsFromDetail, EventJob, getEventGroup } from './merger';
 
 const logger = new Logger('events-dispatcher');
 
@@ -108,6 +108,7 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
   let taskOutcome: 'success' | 'error' = 'success';
   let currentPhase = 'start';
   let transactionIds: string[] = [];
+  let syncIds: string[] = [];
   let finalizationError: unknown;
 
   setActiveEraDiagnosticTask(diagnosticId);
@@ -218,6 +219,9 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
     } else if (eventGroup === 'SYNC') {
       logger.debug('dispatchAndExecuteTask - task dispatch', `事件 ${eventType} 触发状态同步流程...`);
       const isFullSync = eventType === 'manual_full_sync';
+      // 提取调用方在 detail 中携带的同步请求 ID，处理完成后原样通过 era:writeDone 回传，
+      // 供外部脚本区分"自己发起的同步"与其他 SYNC（例如 chat_changed）产生的 resync 信号。
+      syncIds = collectSyncIdsFromDetail(detail);
       await runPhase('resync-history', () => resyncStateOnHistoryChange(isFullSync));
       actionsTaken.resync = true;
       // 在同步完成后，强制重新渲染消息以触发宏
@@ -311,6 +315,7 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
             consecutiveProcessingCount: currentConsecutiveCount,
             ...(transactionIds.length > 0 ? { transactionIds } : {}),
             ...(transactionIds.length === 1 ? { transactionId: transactionIds[0] } : {}),
+            ...(syncIds.length > 0 ? { syncIds } : {}),
           });
         }
       }

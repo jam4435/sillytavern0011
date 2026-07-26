@@ -791,14 +791,23 @@ export function configureHistoryEraSyncTiming(timing: Partial<typeof historyEraS
   Object.assign(historyEraSyncTiming, timing);
 }
 
+function matchesHistoryFullSyncSignal(detail: unknown, syncId: string): boolean {
+  if (!isRecord(detail)) return false;
+  const actions = isRecord(detail.actions) ? detail.actions : null;
+  if (actions?.resync !== true) return false;
+  return Array.isArray(detail.syncIds) && detail.syncIds.includes(syncId);
+}
+
 /**
- * ERA 框架对 manual_full_sync 只做入队（内部 75ms 合批异步处理），eventEmit 返回时
- * 重算尚未开始。这里必须等到出现 actions.resync 的 era:writeDone，并且写入链静默一段
- * 时间后才能继续，否则事件检查和封存校验会读到未回滚的旧状态，导致校验失败并让事件
- * 系统在错误状态上自动派发事件。
+ * ERA 框架对 manual_full_sync 只做入队（内部合批异步处理），eventEmit 返回时重算尚未开始。
+ * 而且 /branch-create 切聊天产生的 chat_changed 等普通 SYNC 也会发出 actions.resync 的
+ * era:writeDone——不能把任意一次 resync 当成完成信号，否则完全重算还在中途就放行校验，
+ * 事件系统会在错误状态上自动派发事件、封存哈希也对不上。因此这里给 manual_full_sync 带上
+ * 唯一 syncId，只认 ERA 回传了该 syncId 的 era:writeDone，之后再等写入链静默一段时间。
  */
 async function waitForEraFullResync(): Promise<void> {
   const { timeoutMs, quietMs } = historyEraSyncTiming;
+  const syncId = `wuxia-history-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   await new Promise<void>((resolve, reject) => {
     let settled = false;
     let sawResync = false;
@@ -821,11 +830,10 @@ async function waitForEraFullResync(): Promise<void> {
       quietTimer = setTimeout(() => finish(), quietMs);
     };
     listener = eventOn('era:writeDone', (detail?: unknown) => {
-      const actions = isRecord(detail) && isRecord(detail.actions) ? detail.actions : null;
-      if (actions?.resync === true) sawResync = true;
+      if (!sawResync && matchesHistoryFullSyncSignal(detail, syncId)) sawResync = true;
       if (sawResync) armQuietTimer();
     });
-    void eventEmit('manual_full_sync').catch((error: unknown) => {
+    void eventEmit('manual_full_sync', { syncId }).catch((error: unknown) => {
       finish(error instanceof Error ? error : new Error(String(error)));
     });
   });

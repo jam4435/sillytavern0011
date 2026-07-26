@@ -103,6 +103,27 @@ describe('ERA dispatcher transaction correlation', () => {
     );
   });
 
+  it('SYNC 事件携带 syncId 时 writeDone 回传 syncIds 供等待方匹配', async () => {
+    const { dispatchAndExecuteTask } = await import('./dispatcher');
+
+    await dispatchAndExecuteTask(
+      {
+        type: 'manual_full_sync',
+        detail: { syncId: 'wuxia-history-99' },
+        timestamp: Date.now(),
+      },
+      null,
+    );
+
+    expect(command.emitWriteDoneEvent).toHaveBeenCalledOnce();
+    expect(command.emitWriteDoneEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        syncIds: ['wuxia-history-99'],
+        actions: expect.objectContaining({ resync: true }),
+      }),
+    );
+  });
+
   it('transactionByObject API 事件只把完整 detail 交给批事务处理器', async () => {
     const { dispatchAndExecuteTask } = await import('./dispatcher');
     const detail = {

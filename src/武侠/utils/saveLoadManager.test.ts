@@ -251,13 +251,17 @@ beforeEach(() => {
   Object.assign(globalThis, { triggerSlash: triggerSlashMock });
   localStorage.clear();
   eventEmitMock.mockClear();
-  // 生产环境中 manual_full_sync 由 ERA 框架异步重算后以 era:writeDone(resync) 回应；
-  // 测试里同步回发该信号，并去掉静默等待窗口。
+  // 生产环境中 manual_full_sync 由 ERA 框架异步重算后以 era:writeDone(resync) 回应，
+  // 并在 syncIds 中回传请求方携带的 syncId；测试里同步回发该信号，并去掉静默等待窗口。
   respondFullSyncWithResync = true;
   configureHistoryEraSyncTiming({ timeoutMs: 500, quietMs: 0 });
-  eventOn('manual_full_sync', () => {
+  eventOn('manual_full_sync', (detail?: { syncId?: string }) => {
     if (!respondFullSyncWithResync) return;
-    void eventEmit('era:writeDone', { message_id: 0, actions: { resync: true } });
+    void eventEmit('era:writeDone', {
+      message_id: 0,
+      actions: { resync: true },
+      syncIds: typeof detail?.syncId === 'string' ? [detail.syncId] : [],
+    });
   });
 });
 
@@ -392,7 +396,52 @@ describe('history checkout', () => {
     expect(result.actionKind).toBe('in_place_swipe');
     expect(currentChat().messages[0].swipe_id).toBe(1);
     expect(triggerSlashMock.mock.calls.some(([command]) => String(command).startsWith('/branch-create'))).toBe(false);
-    expect(eventEmitMock).toHaveBeenCalledWith('manual_full_sync');
+    expect(eventEmitMock).toHaveBeenCalledWith('manual_full_sync', { syncId: expect.any(String) });
+    expect(localStorage.getItem(HISTORY_CHECKOUT_JOURNAL_KEY)).toBeNull();
+  });
+
+  it('不带匹配 syncId 的 resync writeDone（如 chat_changed 同步）不会提前放行校验', async () => {
+    respondFullSyncWithResync = false;
+    configureHistoryEraSyncTiming({ timeoutMs: 60, quietMs: 0 });
+    // 模拟 /branch-create 切聊天后 chat_changed 触发的增量同步：resync=true 但没有回传 syncIds
+    eventOn('manual_full_sync', () => {
+      void eventEmit('era:writeDone', { message_id: 0, actions: { resync: true } });
+    });
+    currentChat().messages = [
+      { message_id: 0, role: 'assistant', swipe_id: 0, swipes: ['路线甲', '路线乙'], message: '路线甲' },
+    ];
+    const scanned = await scanCurrentChat();
+    const target = findNodeByPreview(scanned.tree, '路线乙')!;
+
+    const result = await checkoutNode(target.id);
+
+    expect(result.status).toBe('recovery_failed');
+    expect(result.error).toContain('超时');
+    expect(readHistoryCheckoutJournal()).not.toBeNull();
+    const branches = Object.values(loadHistoryTree().branches);
+    expect(branches.every(branch => branch.status !== 'broken')).toBe(true);
+  });
+
+  it('ERA 合批后以 syncIds 数组回传时同样能匹配完成信号', async () => {
+    respondFullSyncWithResync = false;
+    configureHistoryEraSyncTiming({ timeoutMs: 500, quietMs: 0 });
+    // 模拟 manual_full_sync 与 chat_changed 在 ERA 队列里合批：detail 被并入 syncIds 数组回传
+    eventOn('manual_full_sync', (detail?: { syncId?: string }) => {
+      void eventEmit('era:writeDone', {
+        message_id: 0,
+        actions: { resync: true },
+        syncIds: ['other-waiter', ...(typeof detail?.syncId === 'string' ? [detail.syncId] : [])],
+      });
+    });
+    currentChat().messages = [
+      { message_id: 0, role: 'assistant', swipe_id: 0, swipes: ['路线甲', '路线乙'], message: '路线甲' },
+    ];
+    const scanned = await scanCurrentChat();
+    const target = findNodeByPreview(scanned.tree, '路线乙')!;
+
+    const result = await checkoutNode(target.id);
+
+    expect(result.status).toBe('commit');
     expect(localStorage.getItem(HISTORY_CHECKOUT_JOURNAL_KEY)).toBeNull();
   });
 
