@@ -22,6 +22,7 @@ import {
   returnToCheckoutSource,
   scanCurrentChat,
   setNodePinned,
+  filterTreeToRelatedComponent,
   stableHistoryHash,
 } from './saveLoadManager';
 
@@ -375,6 +376,59 @@ describe('history tree v2 scanning', () => {
     const node = loadHistoryTree().nodes[scanned.currentNodeId!]!;
     expect(node.label).toBe('客栈夜话');
     expect(node.pinned).toBe(true);
+  });
+
+  it('filterTreeToRelatedComponent 只保留与 anchor 连通的脉络及其分支', () => {
+    const makeNode = (id: string, parentId: string | null) => ({
+      id,
+      parentId,
+      locators: [],
+      messageKey: null,
+      label: null,
+      pinned: false,
+      preview: id,
+      location: '',
+      worldTimeText: '',
+      createdAt: 1,
+      verification: null,
+    });
+    const makeBranch = (id: string, headNodeId: string | null, originNodeId: string | null = null) => ({
+      id,
+      chatId: `chat-${id}`,
+      chatName: `chat-${id}`,
+      originNodeId,
+      headNodeId,
+      createdAt: 1,
+      status: 'available' as const,
+    });
+    // 脉络 A：a1 → a2 → a3，a2 还有旁支 a2b；脉络 B（另一历史局）：b1 → b2
+    const tree = {
+      version: 2 as const,
+      updatedAt: 0,
+      nodes: {
+        a1: makeNode('a1', null),
+        a2: makeNode('a2', 'a1'),
+        a2b: makeNode('a2b', 'a1'),
+        a3: makeNode('a3', 'a2'),
+        b1: makeNode('b1', null),
+        b2: makeNode('b2', 'b1'),
+      },
+      branches: {
+        'branch-a': makeBranch('branch-a', 'a3'),
+        'branch-a-fork': makeBranch('branch-a-fork', 'a2b', 'a1'),
+        'branch-b': makeBranch('branch-b', 'b2'),
+      },
+    };
+
+    const filtered = filterTreeToRelatedComponent(tree, 'a3');
+    expect(Object.keys(filtered.nodes).sort()).toEqual(['a1', 'a2', 'a2b', 'a3']);
+    expect(Object.keys(filtered.branches).sort()).toEqual(['branch-a', 'branch-a-fork']);
+
+    // anchor 缺失或为 null 时原样返回
+    expect(filterTreeToRelatedComponent(tree, null)).toBe(tree);
+    expect(filterTreeToRelatedComponent(tree, 'missing')).toBe(tree);
+    // 全树连通时不做多余拷贝
+    expect(filterTreeToRelatedComponent(filtered, 'a1')).toBe(filtered);
   });
 
   it('stableHistoryHash 不受对象键顺序影响', () => {

@@ -4,6 +4,7 @@ import {
   GitBranch,
   Loader2,
   MapPin,
+  Network,
   Pin,
   PinOff,
   RefreshCw,
@@ -24,6 +25,7 @@ import type { GameState, HistoryLocator, HistoryNode } from '../types';
 import {
   canSwitchSwipeInPlace,
   checkoutNode,
+  filterTreeToRelatedComponent,
   renameNode,
   resumeCheckout,
   retryCheckoutRecovery,
@@ -118,6 +120,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
   const [canSwitchInPlace, setCanSwitchInPlace] = useState(false);
   const [journal, setJournal] = useState<HistoryCheckoutJournal | null>(() => readHistoryCheckoutJournal());
   const [lastCheckout, setLastCheckout] = useState<HistoryCheckoutResult | null>(null);
+  const [showAllLineages, setShowAllLineages] = useState(false);
   const [workState, setWorkState] = useState<WorkState>({
     type: 'loading',
     message: '正在展开江湖谱牒……',
@@ -161,7 +164,12 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
     void refresh(true);
   }, [refresh]);
 
-  const selectedNode = selectedNodeId && view ? (view.tree.nodes[selectedNodeId] ?? null) : null;
+  // 谱牒默认只展示与当前聊天连通的脉络；其他历史局的节点仍保留在数据里，可用开关查看
+  const displayTree = useMemo(
+    () => (view ? (showAllLineages ? view.tree : filterTreeToRelatedComponent(view.tree, view.currentNodeId)) : null),
+    [view, showAllLineages],
+  );
+  const selectedNode = selectedNodeId && displayTree ? (displayTree.nodes[selectedNodeId] ?? null) : null;
   const currentLocator = useMemo(() => getCurrentLocator(view), [view]);
   const selectedBranchStatus = view && selectedNode ? getNodeBranchStatus(view, selectedNode.id) : null;
   const selectedIsCurrent = Boolean(selectedNode && selectedNode.id === view?.currentNodeId);
@@ -311,7 +319,16 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
           </div>
         </div>
         <div className="history-masthead-actions">
-          <span className="history-count">{Object.keys(view?.tree.nodes ?? {}).length} 段行迹</span>
+          <span className="history-count">{Object.keys(displayTree?.nodes ?? {}).length} 段行迹</span>
+          <button
+            type="button"
+            className={`history-icon-btn ${showAllLineages ? 'active' : ''}`}
+            aria-label={showAllLineages ? '只看当前脉络' : '显示全部行迹'}
+            title={showAllLineages ? '只看当前脉络' : '显示全部行迹（含其他历史局）'}
+            onClick={() => setShowAllLineages(current => !current)}
+          >
+            <Network size={15} />
+          </button>
           <button
             type="button"
             className="history-icon-btn"
@@ -340,10 +357,13 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
 
       <div className="history-workspace">
         <section className="history-canvas" aria-label="自动逻辑历史树">
-          {view && Object.keys(view.tree.nodes).length > 0 ? (
-            <HistoryTreeErrorBoundary resetKey={`${view.tree.updatedAt}:${view.currentNodeId ?? ''}`}>
+          {view && displayTree && Object.keys(displayTree.nodes).length > 0 ? (
+            <HistoryTreeErrorBoundary
+              resetKey={`${view.tree.updatedAt}:${view.currentNodeId ?? ''}:${showAllLineages ? 'all' : 'related'}`}
+            >
               <HistoryTreeCanvas
-                tree={view.tree}
+                key={showAllLineages ? 'all-lineages' : 'related-lineages'}
+                tree={displayTree}
                 currentNodeId={view.currentNodeId}
                 currentBranchId={view.currentBranchId}
                 currentLocator={currentLocator}

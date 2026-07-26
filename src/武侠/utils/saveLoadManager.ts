@@ -323,6 +323,49 @@ function readAllHistoryMessages(): TavernHistoryMessage[] {
   }) as unknown as TavernHistoryMessage[];
 }
 
+/**
+ * 只保留包含 anchor 节点的连通脉络（沿 parentId 无向连通）。
+ * 历史树按角色累积所有历史局的节点；谱牒展示时用此函数隐藏与当前聊天无关的其他开局脉络。
+ * anchor 为空或不在树中时原样返回。仅用于展示过滤，不改动持久化数据。
+ */
+export function filterTreeToRelatedComponent(
+  tree: WuxiaHistoryTreeV2,
+  anchorNodeId: string | null,
+): WuxiaHistoryTreeV2 {
+  if (!anchorNodeId || !tree.nodes[anchorNodeId]) return tree;
+  const childrenByParent = new Map<string, string[]>();
+  for (const node of Object.values(tree.nodes)) {
+    if (!node.parentId) continue;
+    const siblings = childrenByParent.get(node.parentId);
+    if (siblings) siblings.push(node.id);
+    else childrenByParent.set(node.parentId, [node.id]);
+  }
+  const keep = new Set<string>();
+  const queue: string[] = [anchorNodeId];
+  while (queue.length > 0) {
+    const id = queue.pop()!;
+    if (keep.has(id)) continue;
+    keep.add(id);
+    const parentId = tree.nodes[id]?.parentId;
+    if (parentId && tree.nodes[parentId] && !keep.has(parentId)) queue.push(parentId);
+    for (const childId of childrenByParent.get(id) ?? []) {
+      if (!keep.has(childId)) queue.push(childId);
+    }
+  }
+  if (keep.size === Object.keys(tree.nodes).length) return tree;
+  return {
+    ...tree,
+    nodes: Object.fromEntries(Object.entries(tree.nodes).filter(([id]) => keep.has(id))),
+    branches: Object.fromEntries(
+      Object.entries(tree.branches).filter(
+        ([, branch]) =>
+          (branch.headNodeId !== null && keep.has(branch.headNodeId)) ||
+          (branch.originNodeId !== null && keep.has(branch.originNodeId)),
+      ),
+    ),
+  };
+}
+
 function buildViewState(tree: WuxiaHistoryTreeV2, currentChat: HistoryChatIdentity): HistoryTreeViewState {
   const currentBranchId = branchIdForChat(currentChat.id);
   const currentBranch = tree.branches[currentBranchId];
