@@ -504,17 +504,25 @@ function chooseLocatorForBranch(node: HistoryNode, branch: HistoryBranch): Histo
   return node.locators.find(locator => locator.chatId === branch.chatId) ?? null;
 }
 
-function chooseAnyUsableLocator(tree: WuxiaHistoryTreeV2, node: HistoryNode): HistoryLocator | null {
+function chooseAnyUsableLocator(
+  tree: WuxiaHistoryTreeV2,
+  node: HistoryNode,
+  preferredChatId?: string,
+): HistoryLocator | null {
+  // 优先当前聊天的 locator：历史树里的旧聊天文件随时可能被用户删除，
+  // 而节点若在当前聊天中就存在，则完全不需要碰旧文件。
+  const rankOf = (item: { locator: HistoryLocator; branch: HistoryBranch | undefined }): number => {
+    const broken = item.branch?.status === 'broken';
+    if (!broken && item.locator.chatId === preferredChatId) return 0;
+    if (!broken) return 1;
+    return 2;
+  };
   const ranked = node.locators
     .map(locator => ({
       locator,
       branch: tree.branches[branchIdForChat(locator.chatId)],
     }))
-    .sort((left, right) => {
-      const leftRank = left.branch?.status === 'broken' ? 1 : 0;
-      const rightRank = right.branch?.status === 'broken' ? 1 : 0;
-      return leftRank - rightRank;
-    });
+    .sort((left, right) => rankOf(left) - rankOf(right));
   return ranked[0]?.locator ?? null;
 }
 
@@ -656,7 +664,8 @@ async function readHistoryUserMessage(chat: HistoryChatIdentity, messageId: numb
 
   const payload: unknown = await response.json();
   if (!Array.isArray(payload)) {
-    throw new Error('历史聊天响应格式无效，无法预填原玩家行动。');
+    // 酒馆对不存在的聊天文件返回 200 + 空对象而不是 404，视同聊天不可用。
+    throw new HistoryChatUnavailableError(chat.id, chat.name);
   }
   const messages = payload.filter(
     (item): item is Record<string, unknown> => isRecord(item) && ('mes' in item || 'message' in item),
@@ -1009,7 +1018,10 @@ async function selectCheckoutAction(
       };
     }
   }
-  const locator = chooseAnyUsableLocator(tree, node);
+  const currentChatId = await readCurrentChatIdentity()
+    .then(chat => chat.id)
+    .catch(() => undefined);
+  const locator = chooseAnyUsableLocator(tree, node, currentChatId);
   if (!locator) throw new Error('目标历史节点没有可用的聊天定位信息。');
   return {
     actionKind: 'fork_branch',

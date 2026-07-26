@@ -164,7 +164,8 @@ beforeEach(() => {
       const body = JSON.parse(String(options?.body ?? '{}')) as { file_name?: string; id?: string };
       const chat = chats[body.file_name ?? body.id ?? ''];
       if (!chat) {
-        return { ok: false, status: 404, json: async () => ({}) } as Response;
+        // 真实酒馆对不存在的聊天文件返回 200 + 空对象而不是 404
+        return { ok: true, status: 200, json: async () => ({}) } as Response;
       }
       return {
         ok: true,
@@ -398,6 +399,56 @@ describe('history checkout', () => {
     expect(triggerSlashMock.mock.calls.some(([command]) => String(command).startsWith('/branch-create'))).toBe(false);
     expect(eventEmitMock).toHaveBeenCalledWith('manual_full_sync', { syncId: expect.any(String) });
     expect(localStorage.getItem(HISTORY_CHECKOUT_JOURNAL_KEY)).toBeNull();
+  });
+
+  it('节点 locator 含已删除的旧聊天时，分叉优先使用当前聊天的 locator', async () => {
+    currentChat().messages = [
+      { message_id: 0, role: 'assistant', message: '开场' },
+      { message_id: 1, role: 'user', message: '前进' },
+      { message_id: 2, role: 'assistant', message: '中途' },
+      { message_id: 3, role: 'user', message: '继续' },
+      { message_id: 4, role: 'assistant', message: '结尾' },
+    ];
+    const scanned = await scanCurrentChat();
+    const target = findNodeByPreview(scanned.tree, '中途')!;
+    // 模拟历史树里残留的、指向已被用户删除的旧聊天的 locator（排在最前）
+    const tree = loadHistoryTree();
+    tree.nodes[target.id] = {
+      ...tree.nodes[target.id],
+      locators: [
+        { ...tree.nodes[target.id].locators[0], chatId: 'ghost-chat', chatName: '已删除聊天' },
+        ...tree.nodes[target.id].locators,
+      ],
+    };
+    persistTreeDirect(tree);
+
+    const result = await checkoutNode(target.id, { forceBranch: true });
+
+    expect(result.status).toBe('commit');
+    expect(result.actionKind).toBe('fork_branch');
+    expect(result.currentChat?.id).toMatch(/^fork-/);
+    expect(triggerSlashMock).toHaveBeenCalledWith('/branch-create 2');
+  });
+
+  it('节点唯一 locator 指向已删除聊天时报聊天不可用而不是格式错误', async () => {
+    currentChat().messages = [
+      { message_id: 0, role: 'assistant', message: '开场' },
+      { message_id: 1, role: 'user', message: '前进' },
+      { message_id: 2, role: 'assistant', message: '中途' },
+    ];
+    const scanned = await scanCurrentChat();
+    const target = findNodeByPreview(scanned.tree, '中途')!;
+    const tree = loadHistoryTree();
+    tree.nodes[target.id] = {
+      ...tree.nodes[target.id],
+      locators: [{ ...tree.nodes[target.id].locators[0], chatId: 'ghost-chat', chatName: '已删除聊天' }],
+    };
+    persistTreeDirect(tree);
+
+    const result = await checkoutNode(target.id, { forceBranch: true });
+
+    expect(result.status).toBe('broken');
+    expect(result.error).toContain('历史聊天不可用');
   });
 
   it('不带匹配 syncId 的 resync writeDone（如 chat_changed 同步）不会提前放行校验', async () => {
