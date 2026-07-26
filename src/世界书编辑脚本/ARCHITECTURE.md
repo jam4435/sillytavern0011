@@ -233,6 +233,8 @@ AI 助手与 API 设置抽屉不共享外壳样式。助手是原生 `<dialog>`�
 
 预览统一返回 `outcome: complete | partial | cancelled | failed`，部分成功和停止结果不会丢弃已完成条目。多批次保持顺序执行，单条重新生成与整次任务共享 generationId、runId 和停止生命周期。应用结果返回 `appliedUids` 与逐 UID 的 `skipped: { uid, reason }[]`；写回仍执行字段白名单、完整 `beforeEntry` 冲突检测、隐藏元条目过滤和事务快照。
 
+修改审阅阶段的单条操作：排除是 `accepted: false` 软标记，可随时恢复，被排除项灰显且不计入应用；应用只写回未排除且有变更的条目，若有被排除的有效修改会先确认丢弃。玩家手工编辑预览字段时先整体解析校验再一次性写入（解析失败不产生半写状态），首次编辑会备份 AI 原始 `afterEntry` 并打 `userEdited` 标记，支持“恢复 AI 原始建议”；对已手改条目执行单条重新生成前需确认覆盖。`applyAiPreview` 额外支持 `accepted` 软排除过滤和可选 `uids` 子集参数。
+
 ### 5.6 状态分层
 
 当前代码有四类状态边界：
