@@ -44,7 +44,9 @@
       "Bash(ls -d \"/c/Users/DELL/AppData/Roaming/Claude Code\" \"/c/Users/DELL/AppData/Roaming/claude-code\" \"/c/Users/DELL/AppData/Local/Claude Code\" \"/c/Users/DELL/AppData/Roaming/Claude\" 2>&1; echo \"---\"; ls \"/c/Users/DELL/.claude/\" 2>&1)",
       "Bash(cp \"F:/download/红楼梦.txt\" \"角色卡/红楼梦/原文/红楼梦.txt\")",
       "Bash(node \"C:/Users/DELL/AppData/Local/Temp/claude/F--Develop-AI-sillytavern/babbc9fc-f33e-44d4-987e-d099c4d3c67b/scratchpad/split-hongloumeng.mjs\")",
-      "WebFetch(domain:docs.claude.com)"
+      "WebFetch(domain:docs.claude.com)",
+      "Bash(node -e ' *)",
+      "Bash(node \"C:/Users/DELL/AppData/Local/Temp/claude/F--Develop-AI-sillytavern/babbc9fc-f33e-44d4-987e-d099c4d3c67b/scratchpad/gen-worldbook-entries.mjs\")"
     ]
   },
   "disabledMcpjsonServers": [
