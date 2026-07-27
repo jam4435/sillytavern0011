@@ -34,6 +34,119 @@ function normalizePlanTextList(value, fieldName) {
   return value.map(item => `${item ?? ''}`.trim()).filter(Boolean);
 }
 
+const AI_PLAN_TASK_COMPLEXITIES = Object.freeze(['low', 'medium', 'high']);
+const DEFAULT_AI_PLAN_TASK_OBJECTIVE = '按用户指令处理该条目';
+const DEFAULT_AI_PLAN_TASK_OUTPUT_TOKENS = 1024;
+const MIN_AI_PLAN_TASK_OUTPUT_TOKENS = 64;
+const MAX_AI_PLAN_TASK_OUTPUT_TOKENS = 64000;
+
+function createDefaultPlanTask(uid) {
+  return {
+    uid,
+    objective: DEFAULT_AI_PLAN_TASK_OBJECTIVE,
+    complexity: 'medium',
+    estimated_output_tokens: DEFAULT_AI_PLAN_TASK_OUTPUT_TOKENS,
+    depends_on_uids: [],
+    related_uids: [],
+  };
+}
+
+function normalizePlanEntryTask(value, index) {
+  const fieldName = `plan.entry_tasks[${index}]`;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${fieldName} 必须是对象`);
+  }
+
+  const uid = Number(value.uid);
+  if (!Number.isInteger(uid) || uid < 0) {
+    throw new Error(`${fieldName}.uid 包含非法 UID: ${value.uid}`);
+  }
+
+  if (typeof value.objective !== 'string' || !value.objective.trim()) {
+    throw new Error(`${fieldName}.objective 必须是非空文本`);
+  }
+  const complexity = typeof value.complexity === 'string' ? value.complexity.trim() : '';
+  if (!AI_PLAN_TASK_COMPLEXITIES.includes(complexity)) {
+    throw new Error(`${fieldName}.complexity 必须是 low、medium 或 high`);
+  }
+
+  const estimatedOutputTokens = Number(value.estimated_output_tokens);
+  if (
+    !Number.isInteger(estimatedOutputTokens)
+    || estimatedOutputTokens < MIN_AI_PLAN_TASK_OUTPUT_TOKENS
+    || estimatedOutputTokens > MAX_AI_PLAN_TASK_OUTPUT_TOKENS
+  ) {
+    throw new Error(
+      `${fieldName}.estimated_output_tokens 必须是 ${MIN_AI_PLAN_TASK_OUTPUT_TOKENS}-${MAX_AI_PLAN_TASK_OUTPUT_TOKENS} 的整数`,
+    );
+  }
+
+  const dependsOnUids = normalizePlanUidList(value.depends_on_uids, `${fieldName}.depends_on_uids`);
+  const relatedUids = normalizePlanUidList(value.related_uids, `${fieldName}.related_uids`);
+  if (dependsOnUids.includes(uid)) throw new Error(`${fieldName}.depends_on_uids 不能引用自身 UID ${uid}`);
+  if (relatedUids.includes(uid)) throw new Error(`${fieldName}.related_uids 不能引用自身 UID ${uid}`);
+
+  return {
+    uid,
+    objective: value.objective.trim(),
+    complexity,
+    estimated_output_tokens: estimatedOutputTokens,
+    depends_on_uids: dependsOnUids,
+    related_uids: relatedUids,
+  };
+}
+
+function normalizePlanEntryTasks(value, editableUids, readonlyUids, validUids) {
+  if (value === undefined) return editableUids.map(createDefaultPlanTask);
+  if (!Array.isArray(value)) throw new Error('plan.entry_tasks 必须是数组');
+
+  const tasks = value.map(normalizePlanEntryTask);
+  const taskUids = tasks.map(task => task.uid);
+  const duplicateTaskUids = taskUids.filter((uid, index) => taskUids.indexOf(uid) !== index);
+  if (duplicateTaskUids.length) {
+    throw new Error(`plan.entry_tasks 包含重复任务 UID: ${[...new Set(duplicateTaskUids)].join(', ')}`);
+  }
+
+  const editableSet = new Set(editableUids);
+  const readonlySet = new Set(readonlyUids);
+  const taskUidSet = new Set(taskUids);
+  const missingTaskUids = editableUids.filter(uid => !taskUidSet.has(uid));
+  const nonEditableTaskUids = taskUids.filter(uid => !editableSet.has(uid));
+  if (missingTaskUids.length) {
+    throw new Error(`plan.entry_tasks 缺少可修改 UID 的任务: ${missingTaskUids.join(', ')}`);
+  }
+  if (nonEditableTaskUids.length) {
+    throw new Error(`plan.entry_tasks 包含非可修改或已排除 UID 的任务: ${nonEditableTaskUids.join(', ')}`);
+  }
+
+  for (const task of tasks) {
+    const referencedUids = [...task.depends_on_uids, ...task.related_uids];
+    if (validUids instanceof Set) {
+      const unknownUids = referencedUids.filter(uid => !validUids.has(uid));
+      if (unknownUids.length) {
+        throw new Error(
+          `plan.entry_tasks[UID ${task.uid}] 引用了当前世界书不存在的 UID: ${[...new Set(unknownUids)].join(', ')}`,
+        );
+      }
+    }
+
+    const invalidDependencies = task.depends_on_uids.filter(uid => !editableSet.has(uid) && !readonlySet.has(uid));
+    if (invalidDependencies.length) {
+      throw new Error(
+        `plan.entry_tasks[UID ${task.uid}].depends_on_uids 引用了未知或已排除 UID: ${invalidDependencies.join(', ')}`,
+      );
+    }
+    const invalidRelations = task.related_uids.filter(uid => !editableSet.has(uid));
+    if (invalidRelations.length) {
+      throw new Error(
+        `plan.entry_tasks[UID ${task.uid}].related_uids 只能引用可修改 UID: ${invalidRelations.join(', ')}`,
+      );
+    }
+  }
+
+  return tasks;
+}
+
 export function normalizeAiPlanEditorValue(rawValue, validUids = null) {
   const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue || '{}') : rawValue;
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -65,6 +178,12 @@ export function normalizeAiPlanEditorValue(rawValue, validUids = null) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
     throw new Error('plan 必须是对象');
   }
+  const entryTasks = normalizePlanEntryTasks(
+    plan.entry_tasks,
+    normalizedUidFields.editable_uids,
+    normalizedUidFields.readonly_uids,
+    validUids,
+  );
   return {
     ...normalizedUidFields,
     plan: {
@@ -72,6 +191,7 @@ export function normalizeAiPlanEditorValue(rawValue, validUids = null) {
       must_keep: normalizePlanTextList(plan.must_keep, 'plan.must_keep'),
       rewrite_rules: normalizePlanTextList(plan.rewrite_rules, 'plan.rewrite_rules'),
       consistency_notes: normalizePlanTextList(plan.consistency_notes, 'plan.consistency_notes'),
+      entry_tasks: entryTasks,
     },
   };
 }

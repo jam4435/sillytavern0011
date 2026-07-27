@@ -4,9 +4,11 @@ import {
   applyAiPreview,
   buildContentDiffSnippets,
   collectAiTargetEntries,
+  DIRECT_PLAN_RECOMMEND_THRESHOLD,
   generateAiPlan,
   generateAiPreview,
 } from '../features/aiActionsBatch.js';
+import { buildPlannedBatches } from '../features/aiBatchPlanner.js';
 import { getRollbackPreview, rollbackLastTransaction } from '../features/history.js';
 import { cancelLlmGeneration, requestLlmText } from '../features/llmClient.js';
 import { flushAiWorkspaceSettings, getAiWorkspaceSettings, setAiWorkspaceSettings } from '../settings.js';
@@ -182,6 +184,8 @@ const state = {
   persistTimer: null,
   entryCluster: null,
   resizeObserver: null,
+  directPlanRecommendationDismissedSignature: '',
+  directPlanRecommendationResolver: null,
   modes: {
     direct: createEmptyModeState(),
     plan: createEmptyModeState(),
@@ -194,6 +198,25 @@ const root = () => $(`#${ROOT_ID}`, parentDoc());
 const settings = () => getAiWorkspaceSettings();
 const currentModeKey = () => (state.currentNav === 'plan' ? 'plan' : 'direct');
 const currentModeState = () => state.modes[currentModeKey()];
+
+function resetDirectPlanRecommendation() {
+  state.directPlanRecommendationDismissedSignature = '';
+}
+
+function buildDirectPlanRecommendationSignature(mode = state.modes.direct) {
+  return JSON.stringify({
+    lorebookName: mode.lorebookName || '',
+    instruction: mode.instruction || '',
+    editableFields: mode.editableFields || {},
+    promptSettings: mode.promptSettings || {},
+    selectedEntryUids: Array.from(mode.selectedEntryUids || [])
+      .map(Number)
+      .sort((a, b) => a - b),
+    readonlyEntryUids: Array.from(mode.readonlyEntryUids || [])
+      .map(Number)
+      .sort((a, b) => a - b),
+  });
+}
 
 function workflowSnapshot(modeKey = currentModeKey()) {
   const mode = state.modes[modeKey];
@@ -816,7 +839,9 @@ function restoreOverlayFocus(overlayName) {
 function trapOverlayFocus(event, overlayElement) {
   if (event.key !== 'Tab' || !overlayElement) return false;
   const $focusable = $(overlayElement, parentDoc())
-    .find('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])')
+    .find(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])',
+    )
     .filter(':visible');
   if (!$focusable.length) return false;
   const first = $focusable.get(0);
@@ -1014,11 +1039,12 @@ function renderSelectionSummary(modeKey) {
   const mode = state.modes[modeKey];
   const entries = getFilteredEntries(modeKey);
   const countText = `可修改 ${mode.selectedEntryUids.size} 条，只读 ${mode.readonlyEntryUids.size} 条，可见 ${entries.length} 条，总计 ${mode.entries.length} 条`;
-  const stateText = mode.entryLoadState === 'loading'
-    ? '正在加载条目…'
-    : mode.entryLoadState === 'error'
-      ? `加载失败：${mode.entryLoadError || '未知错误'}`
-      : mode.entryListWarning;
+  const stateText =
+    mode.entryLoadState === 'loading'
+      ? '正在加载条目…'
+      : mode.entryLoadState === 'error'
+        ? `加载失败：${mode.entryLoadError || '未知错误'}`
+        : mode.entryListWarning;
   $('#ai-workspace-selection-summary', parentDoc())
     .text(stateText ? `${countText} · ${stateText}` : countText)
     .attr('data-tone', mode.entryLoadState === 'error' ? 'danger' : mode.entryListWarning ? 'warning' : 'neutral');
@@ -1066,7 +1092,9 @@ export function renderEntryList(modeKey) {
   }
   if (!entries.length) {
     const emptyText = mode.entries.length ? '没有匹配当前搜索的条目。' : '这个世界书没有可处理的条目。';
-    $list.html(`<div class="ai-entry-state"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><strong>${emptyText}</strong></div>`);
+    $list.html(
+      `<div class="ai-entry-state"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><strong>${emptyText}</strong></div>`,
+    );
     renderSelectionSummary(modeKey);
     return;
   }
@@ -1089,7 +1117,9 @@ export function renderEntryList(modeKey) {
     `;
   });
 
-  $list.html('<div id="ai-workspace-entry-scroll" class="clusterize-scroll ai-entry-scroll"><div id="ai-workspace-entry-content" class="clusterize-content"></div></div>');
+  $list.html(
+    '<div id="ai-workspace-entry-scroll" class="clusterize-scroll ai-entry-scroll"><div id="ai-workspace-entry-content" class="clusterize-content"></div></div>',
+  );
   const scrollElement = $('#ai-workspace-entry-scroll', parentDoc()).get(0);
   const contentElement = $('#ai-workspace-entry-content', parentDoc()).get(0);
   const virtualList = createAiEntryVirtualList({
@@ -1247,10 +1277,73 @@ export function formatPreviewModalValue(value) {
 }
 
 function planListFromTextarea(selector) {
-  return (($(`${selector}`, parentDoc()).val() || '').toString())
+  return ($(`${selector}`, parentDoc()).val() || '')
+    .toString()
     .split(/\r?\n/)
     .map(item => item.trim())
     .filter(Boolean);
+}
+
+function parsePlanUidList(rawValue = '') {
+  const normalized = `${rawValue || ''}`.trim();
+  if (!normalized) {
+    return [];
+  }
+  return _.uniq(
+    normalized
+      .split(/[\s,，、]+/)
+      .map(value => Number.parseInt(value, 10))
+      .filter(Number.isFinite),
+  );
+}
+
+function createDefaultPlanTask(uid, instruction = '') {
+  return {
+    uid: Number(uid),
+    objective: instruction.trim() || `完成 UID ${uid} 的修改任务`,
+    complexity: 'medium',
+    estimated_output_tokens: 1024,
+    depends_on_uids: [],
+    related_uids: [],
+  };
+}
+
+function reconcilePlanningTasks(modeKey) {
+  const mode = state.modes[modeKey];
+  if (!mode.planningResult) {
+    return;
+  }
+  const plan = mode.planningResult.plan || {};
+  const existingTasks = Array.isArray(plan.entry_tasks) ? plan.entry_tasks : [];
+  const existingByUid = new Map(existingTasks.map(task => [Number(task?.uid), task]));
+  const editableUids = Array.from(mode.selectedEntryUids).map(Number);
+  const editableSet = new Set(editableUids);
+  const entryTasks = editableUids.map(uid => {
+    const task = existingByUid.get(uid) || createDefaultPlanTask(uid, mode.instruction);
+    return {
+      ...task,
+      uid,
+      related_uids: (Array.isArray(task.related_uids) ? task.related_uids : [])
+        .map(Number)
+        .filter(relatedUid => editableSet.has(relatedUid) && relatedUid !== uid),
+    };
+  });
+  mode.planningResult.plan = { ...plan, entry_tasks: entryTasks };
+}
+
+function validatePlanningEditorState(modeKey) {
+  const mode = state.modes[modeKey];
+  const validUids = new Set(mode.entries.map(entry => Number(entry.uid)));
+  try {
+    mode.planningResult = normalizeAiPlanEditorValue(mode.planningResult, validUids);
+    syncPlanSelectionFromPlanningResult(modeKey);
+    reconcilePlanningTasks(modeKey);
+    mode.planEditorError = '';
+    return true;
+  } catch (error) {
+    mode.planEditorError = error?.message || '规划内容无效。';
+    return false;
+  }
 }
 
 function updatePlanningResultFromStructuredForm(modeKey) {
@@ -1259,13 +1352,31 @@ function updatePlanningResultFromStructuredForm(modeKey) {
     return;
   }
   mode.planningResult.plan = {
+    ...(mode.planningResult.plan || {}),
     goal: ($('#ai-workspace-plan-goal', parentDoc()).val() || '').toString().trim(),
     must_keep: planListFromTextarea('#ai-workspace-plan-must-keep'),
     rewrite_rules: planListFromTextarea('#ai-workspace-plan-rewrite-rules'),
     consistency_notes: planListFromTextarea('#ai-workspace-plan-consistency-notes'),
   };
-  mode.planEditorError = '';
   mode.previewResult = null;
+  validatePlanningEditorState(modeKey);
+}
+
+function updatePlanningTaskFromStructuredForm(modeKey, taskUid) {
+  const mode = state.modes[modeKey];
+  const numericUid = Number(taskUid);
+  const task = mode.planningResult?.plan?.entry_tasks?.find(item => Number(item?.uid) === numericUid);
+  const $row = $(`.ai-plan-task-row[data-task-uid="${numericUid}"]`, parentDoc());
+  if (!task || !$row.length) {
+    return;
+  }
+  task.objective = ($row.find('[data-task-field="objective"]').val() || '').toString().trim();
+  task.complexity = ($row.find('[data-task-field="complexity"]').val() || 'medium').toString();
+  task.estimated_output_tokens = Number.parseInt($row.find('[data-task-field="estimated_output_tokens"]').val(), 10);
+  task.depends_on_uids = parsePlanUidList($row.find('[data-task-field="depends_on_uids"]').val());
+  task.related_uids = parsePlanUidList($row.find('[data-task-field="related_uids"]').val());
+  mode.previewResult = null;
+  validatePlanningEditorState(modeKey);
 }
 
 function renderPlanScope(modeKey) {
@@ -1300,6 +1411,104 @@ function renderPlanScope(modeKey) {
   );
 }
 
+function renderPlanningTasks(modeKey) {
+  const mode = state.modes[modeKey];
+  const tasks = Array.isArray(mode.planningResult?.plan?.entry_tasks) ? mode.planningResult.plan.entry_tasks : [];
+  const byUid = new Map(mode.entries.map(entry => [Number(entry.uid), entry]));
+  const $tasks = $('#ai-workspace-plan-task-list', parentDoc());
+  const $batches = $('#ai-workspace-plan-batch-preview', parentDoc());
+  if (!$tasks.length || !$batches.length) {
+    return;
+  }
+  if (!tasks.length) {
+    $tasks.html('<div class="ai-empty">当前没有可修改任务。将条目调整为“修改”后会自动补充任务。</div>');
+    $batches.html('<div class="ai-empty">没有可预览的执行批次。</div>');
+    return;
+  }
+
+  $tasks.html(
+    tasks
+      .map(task => {
+        const uid = Number(task.uid);
+        const entry = byUid.get(uid);
+        return `
+          <article class="ai-plan-task-row" data-task-uid="${uid}">
+            <div class="ai-plan-task-heading">
+              <strong>${_.escape(entry?.name || `UID ${uid}`)}</strong>
+              <span>UID ${uid}</span>
+            </div>
+            <div class="ai-field ai-plan-task-objective">
+              <label>任务目标</label>
+              <textarea rows="2" data-task-field="objective">${_.escape(task.objective || '')}</textarea>
+            </div>
+            <div class="ai-plan-task-meta">
+              <div class="ai-field">
+                <label>复杂度</label>
+                <select data-task-field="complexity">
+                  ${[
+                    ['low', '低'],
+                    ['medium', '中'],
+                    ['high', '高'],
+                  ]
+                    .map(
+                      ([value, label]) =>
+                        `<option value="${value}"${task.complexity === value ? ' selected' : ''}>${label}</option>`,
+                    )
+                    .join('')}
+                </select>
+              </div>
+              <div class="ai-field">
+                <label>预估输出 tokens</label>
+                <input type="number" min="64" max="64000" step="64" data-task-field="estimated_output_tokens" value="${Number(task.estimated_output_tokens) || 1024}">
+              </div>
+              <div class="ai-field">
+                <label>硬依赖 UID</label>
+                <input type="text" data-task-field="depends_on_uids" value="${_.escape((task.depends_on_uids || []).join(', '))}" placeholder="例如：12, 15">
+              </div>
+              <div class="ai-field">
+                <label>关联 UID</label>
+                <input type="text" data-task-field="related_uids" value="${_.escape((task.related_uids || []).join(', '))}" placeholder="尽量同批">
+              </div>
+            </div>
+          </article>
+        `;
+      })
+      .join(''),
+  );
+
+  try {
+    const preview = buildPlannedBatches({
+      entries: mode.entries.filter(entry => mode.selectedEntryUids.has(Number(entry.uid))),
+      entryTasks: tasks,
+      readonlyUids: Array.from(mode.readonlyEntryUids),
+      reserveOutputTokens: currentContextBudget().reserveOutputTokens,
+    });
+    const warnings = Array.isArray(preview?.warnings) ? preview.warnings : [];
+    const batches = Array.isArray(preview?.batches) ? preview.batches : [];
+    $batches.html(`
+      <div class="ai-plan-batch-summary">
+        安全输出容量 ${preview.safeOutputCapacity || 0} tokens · 预计 ${batches.length} 批 · 总权重 ${Math.ceil(preview.totalEstimatedOutputWeight || 0)}
+      </div>
+      ${batches
+        .map((batch, index) => {
+          const uids = Array.isArray(batch.uids)
+            ? batch.uids
+            : (batch.tasks || []).map(task => Number(task?.uid)).filter(Number.isFinite);
+          const titles = uids.map(uid => byUid.get(Number(uid))?.name || `UID ${uid}`);
+          return `<div class="ai-plan-batch-row${batch.oversized ? ' is-warning' : ''}">
+            <div><strong>批次 ${index + 1}</strong><span>${Math.ceil(batch.estimatedOutputWeight || 0)} tokens 权重${batch.cyclicGroups?.length ? ' · 循环依赖组' : ''}${batch.oversized ? ' · 超出安全容量' : ''}</span></div>
+            <p>${titles.map(title => _.escape(title)).join(' → ')}</p>
+          </div>`;
+        })
+        .join('')}
+      ${warnings.length ? `<div class="ai-plan-batch-warnings">${warnings.map(warning => `<div>${_.escape(typeof warning === 'string' ? warning : warning.message || warning.title || '批次风险')}</div>`).join('')}</div>` : ''}
+    `);
+  } catch (error) {
+    mode.planEditorError = error?.message || '无法生成规划批次预览。';
+    $batches.html(`<div class="ai-empty is-error">${_.escape(mode.planEditorError)}</div>`);
+  }
+}
+
 function syncPlanSelectionFromPlanningResult(modeKey) {
   const mode = state.modes[modeKey];
   const validUidSet = new Set(
@@ -1317,6 +1526,7 @@ function syncPlanSelectionFromPlanningResult(modeKey) {
   );
 
   mode.planningResult = {
+    ...(mode.planningResult || {}),
     readonly_uids: readonlyUids,
     editable_uids: editableUids,
     locked_editable_uids: mode.planningResult?.locked_editable_uids || [],
@@ -1665,9 +1875,11 @@ function renderPlanningResult(modeKey, planningResult = null) {
   if (!mode.planningResult) {
     $summary.text(EMPTY_PLAN_TEXT);
     $json.val('');
+    $('#ai-workspace-plan-task-list, #ai-workspace-plan-batch-preview', parentDoc()).empty();
     return;
   }
 
+  reconcilePlanningTasks(modeKey);
   const plan = mode.planningResult.plan || {};
   const lines = [
     `只读 ${mode.planningResult.readonly_uids?.length || 0} 条，可修改 ${mode.planningResult.editable_uids?.length || 0} 条`,
@@ -1696,22 +1908,9 @@ function renderPlanningResult(modeKey, planningResult = null) {
   $('#ai-workspace-plan-must-keep', parentDoc()).val((plan.must_keep || []).join('\n'));
   $('#ai-workspace-plan-rewrite-rules', parentDoc()).val((plan.rewrite_rules || []).join('\n'));
   $('#ai-workspace-plan-consistency-notes', parentDoc()).val((plan.consistency_notes || []).join('\n'));
-  $json.val(
-    JSON.stringify(
-      {
-        readonly_uids: mode.planningResult.readonly_uids || [],
-        editable_uids: mode.planningResult.editable_uids || [],
-        locked_editable_uids: mode.planningResult.locked_editable_uids || [],
-        locked_readonly_uids: mode.planningResult.locked_readonly_uids || [],
-        planned_editable_uids: mode.planningResult.planned_editable_uids || [],
-        planned_readonly_uids: mode.planningResult.planned_readonly_uids || [],
-        plan: mode.planningResult.plan || {},
-      },
-      null,
-      2,
-    ),
-  );
+  $json.val(JSON.stringify(mode.planningResult, null, 2));
   renderPlanScope(modeKey);
+  renderPlanningTasks(modeKey);
   $('#ai-workspace-plan-error', parentDoc())
     .toggleClass('is-visible', Boolean(mode.planEditorError))
     .text(mode.planEditorError || '');
@@ -1736,12 +1935,8 @@ function renderPreviewPlaceholder(modeKey, { text = EMPTY_PREVIEW_TEXT, errorTex
     return;
   }
 
-  $summary
-    .text(text)
-    .attr('data-outcome', running ? 'running' : errorText ? 'failed' : 'idle');
-  $('#ai-workspace-preview-errors', parentDoc())
-    .toggleClass('has-errors', Boolean(errorText))
-    .text(errorText);
+  $summary.text(text).attr('data-outcome', running ? 'running' : errorText ? 'failed' : 'idle');
+  $('#ai-workspace-preview-errors', parentDoc()).toggleClass('has-errors', Boolean(errorText)).text(errorText);
   $('#ai-workspace-preview-list', parentDoc()).html(`
     <div class="ai-review-pending${errorText ? ' is-error' : ''}" role="status" aria-live="polite">
       <i class="fa-solid ${running ? 'fa-wand-magic-sparkles' : errorText ? 'fa-triangle-exclamation' : 'fa-list-check'}"></i>
@@ -1749,9 +1944,7 @@ function renderPreviewPlaceholder(modeKey, { text = EMPTY_PREVIEW_TEXT, errorTex
       <span>${_.escape(running ? '结果会在生成完成后直接出现在这里，你可以随时停止。' : errorText ? '请查看错误信息后重新生成，或返回调整输入。' : '生成后可在此逐条审阅、编辑或排除。')}</span>
     </div>
   `);
-  $('#ai-workspace-preview-detail', parentDoc())
-    .removeAttr('data-preview-uid')
-    .html(`
+  $('#ai-workspace-preview-detail', parentDoc()).removeAttr('data-preview-uid').html(`
       <div class="ai-review-pending ai-review-pending-detail${errorText ? ' is-error' : ''}">
         <i class="fa-solid ${running ? 'fa-circle-notch fa-spin' : errorText ? 'fa-bug' : 'fa-arrow-pointer'}"></i>
         <span>${_.escape(running ? '等待首条结果…' : errorText ? '修正配置或指令后可在当前页重试。' : '生成结果后，选择左侧条目查看完整差异。')}</span>
@@ -2729,11 +2922,11 @@ export function buildApiSettingsMarkup() {
           </div>
           <div id="ai-workspace-api-hint" class="ai-note"></div>
           <div class="ai-budget-panel">
-            <label class="ai-control-line"><input type="checkbox" id="ai-workspace-budget-enabled"><span>启用上下文预算</span></label>
+            <label class="ai-control-line"><input type="checkbox" id="ai-workspace-budget-enabled"><span>启用输入 token 警告</span></label>
             <div class="ai-row">
               <div class="ai-field">
-                <label for="ai-workspace-budget-max-input">最大输入 tokens</label>
-                <input id="ai-workspace-budget-max-input" type="number" min="1000" max="200000" step="500">
+                <label for="ai-workspace-budget-max-input">输入警戒 tokens</label>
+                <input id="ai-workspace-budget-max-input" type="number" min="1000" max="2000000" step="1000">
               </div>
               <div class="ai-field">
                 <label for="ai-workspace-budget-reserve-output">预留输出 tokens</label>
@@ -2959,15 +3152,17 @@ function buildPrepareMarkup(modeKey) {
       <div class="ai-command-status"><span class="ai-status-dot"></span><span id="ai-workspace-status" role="status" aria-live="polite"></span></div>
       <div class="ai-command-actions">
         <button type="button" id="ai-workspace-stop" class="ai-button-danger" disabled><i class="fa-solid fa-stop"></i>停止</button>
-        ${isPlan
-          ? '<button type="button" id="ai-workspace-plan" class="ai-button-primary"><span>生成修改计划</span><i class="fa-solid fa-arrow-right"></i></button>'
-          : '<button type="button" id="ai-workspace-preview" class="ai-button-primary"><span>生成修改预览</span><i class="fa-solid fa-arrow-right"></i></button>'}
+        ${
+          isPlan
+            ? '<button type="button" id="ai-workspace-plan" class="ai-button-primary"><span>生成修改计划</span><i class="fa-solid fa-arrow-right"></i></button>'
+            : '<button type="button" id="ai-workspace-preview" class="ai-button-primary"><span>生成修改预览</span><i class="fa-solid fa-arrow-right"></i></button>'
+        }
       </div>
     </div>
   `;
 }
 
-function buildPlanningMarkup() {
+export function buildPlanningMarkup() {
   return `
     <div class="ai-plan-review-grid">
       <section class="ai-workbench-panel ai-plan-editor" aria-labelledby="ai-plan-editor-title">
@@ -2979,6 +3174,10 @@ function buildPlanningMarkup() {
           <div class="ai-field"><label for="ai-workspace-plan-rewrite-rules">改写规则 <small>每行一项</small></label><textarea id="ai-workspace-plan-rewrite-rules"></textarea></div>
           <div class="ai-field"><label for="ai-workspace-plan-consistency-notes">一致性注意 <small>每行一项</small></label><textarea id="ai-workspace-plan-consistency-notes"></textarea></div>
         </div>
+        <section class="ai-plan-task-section" aria-labelledby="ai-plan-task-title">
+          <div class="ai-section-heading"><div><span class="ai-section-kicker">任务图</span><h3 id="ai-plan-task-title">逐条调整复杂度与关系</h3></div></div>
+          <div id="ai-workspace-plan-task-list" class="ai-plan-task-list"></div>
+        </section>
         <details class="ai-prompt-settings ai-advanced-settings">
           <summary><span>原始计划 JSON</span><small>高级编辑</small></summary>
           <div class="ai-prompt-settings-body"><textarea id="ai-workspace-plan-json" class="ai-code-textarea"></textarea></div>
@@ -2988,6 +3187,8 @@ function buildPlanningMarkup() {
       <section class="ai-workbench-panel ai-plan-scope" aria-labelledby="ai-plan-scope-title">
         <div class="ai-section-heading"><div><span class="ai-section-kicker">条目分组</span><h2 id="ai-plan-scope-title">确认修改与只读范围</h2></div></div>
         <div id="ai-workspace-plan-scope-list" class="ai-plan-scope-list"></div>
+        <div class="ai-section-heading ai-plan-batch-heading"><div><span class="ai-section-kicker">执行预览</span><h3>按依赖与输出量动态分批</h3></div></div>
+        <div id="ai-workspace-plan-batch-preview" class="ai-plan-batch-preview" aria-live="polite"></div>
       </section>
     </div>
     <div class="ai-command-bar">
@@ -3130,7 +3331,7 @@ export function buildDesktopShellMarkup() {
       </main>
       <div id="ai-workspace-settings-modal" class="ai-tool-backdrop" style="display:none" aria-hidden="true">
         <aside class="ai-tool-drawer" role="dialog" aria-modal="true" aria-labelledby="ai-workspace-settings-title">
-          <header><div><span class="ai-section-kicker">工作台设置</span><h2 id="ai-workspace-settings-title">模型与上下文预算</h2></div><button type="button" id="ai-workspace-settings-close" class="ai-icon-button" aria-label="关闭设置"><i class="fa-solid fa-xmark"></i></button></header>
+          <header><div><span class="ai-section-kicker">工作台设置</span><h2 id="ai-workspace-settings-title">模型与 token 警告</h2></div><button type="button" id="ai-workspace-settings-close" class="ai-icon-button" aria-label="关闭设置"><i class="fa-solid fa-xmark"></i></button></header>
           <div class="ai-tool-drawer-body">${buildApiSettingsMarkup()}</div>
         </aside>
       </div>
@@ -3141,6 +3342,17 @@ export function buildDesktopShellMarkup() {
           <p id="ai-workspace-rollback-dialog-summary"></p>
           <div id="ai-workspace-rollback-dialog-items" class="ai-rollback-dialog-items"></div>
           <div class="ai-confirm-actions"><button type="button" id="ai-workspace-rollback-dialog-cancel" class="ai-button-secondary">取消</button><button type="button" id="ai-workspace-rollback-dialog-confirm" class="ai-button-danger">确认撤销</button></div>
+        </div>
+      </dialog>
+      <dialog id="ai-workspace-direct-plan-dialog" class="ai-confirm-dialog" aria-labelledby="ai-workspace-direct-plan-dialog-title">
+        <div class="ai-confirm-dialog-body">
+          <div class="ai-confirm-icon"><i class="fa-solid fa-route"></i></div>
+          <h2 id="ai-workspace-direct-plan-dialog-title">修改条目较多，建议先规划</h2>
+          <p>当前选择超过 ${DIRECT_PLAN_RECOMMEND_THRESHOLD} 个修改条目。先生成整体计划有助于保持跨批次的一致性、依赖顺序和输出格式。</p>
+          <div class="ai-confirm-actions">
+            <button type="button" id="ai-workspace-direct-plan-continue" class="ai-button-secondary">继续直接修改</button>
+            <button type="button" id="ai-workspace-direct-plan-confirm" class="ai-button-primary">改用先规划</button>
+          </div>
         </div>
       </dialog>
       ${buildPreviewModalMarkup()}
@@ -3590,12 +3802,30 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-plan-summary{margin-bottom:12px;padding:10px;border-left:3px solid var(--panel-accent-color,#9fc8e4);border-radius:7px;background:var(--ai-surface-muted-color,rgba(0,0,0,.15));color:var(--ai-text-color-secondary,#bbb);font-size:11px;line-height:1.5}
       #${ROOT_ID} .ai-plan-fields-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:10px}
       #${ROOT_ID} .ai-plan-fields-grid textarea{min-height:150px}
+      #${ROOT_ID} .ai-plan-task-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--ai-border-color,#555)}
+      #${ROOT_ID} .ai-plan-task-section h3,#${ROOT_ID} .ai-plan-batch-heading h3{margin:2px 0 0;font-size:13px}
+      #${ROOT_ID} .ai-plan-task-list{display:grid;gap:8px;max-height:560px;overflow:auto}
+      #${ROOT_ID} .ai-plan-task-row{padding:10px;border:1px solid var(--ai-border-color,#555);border-radius:9px;background:var(--ai-surface-muted-color,rgba(0,0,0,.12))}
+      #${ROOT_ID} .ai-plan-task-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+      #${ROOT_ID} .ai-plan-task-heading strong{font-size:12px}
+      #${ROOT_ID} .ai-plan-task-heading span{color:var(--ai-text-color-secondary,#999);font:9px ui-monospace,SFMono-Regular,Consolas,monospace}
+      #${ROOT_ID} .ai-plan-task-objective textarea{min-height:64px}
+      #${ROOT_ID} .ai-plan-task-meta{display:grid;grid-template-columns:minmax(90px,.6fr) minmax(130px,.8fr) repeat(2,minmax(140px,1fr));gap:7px;margin-top:7px}
       #${ROOT_ID} .ai-code-textarea{min-height:260px;font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
       #${ROOT_ID} .ai-plan-scope-list{max-height:540px;overflow:auto;display:grid;gap:5px}
       #${ROOT_ID} .ai-plan-scope-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border:1px solid var(--ai-border-color,#555);border-radius:8px;background:var(--ai-surface-muted-color,rgba(0,0,0,.12))}
       #${ROOT_ID} .ai-plan-scope-row>div:first-child{min-width:0}
       #${ROOT_ID} .ai-plan-scope-row strong{display:block;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       #${ROOT_ID} .ai-plan-scope-row span{display:block;margin-top:2px;color:var(--ai-text-color-secondary,#999);font:9px ui-monospace,SFMono-Regular,Consolas,monospace}
+      #${ROOT_ID} .ai-plan-batch-heading{margin-top:16px;padding-top:14px;border-top:1px solid var(--ai-border-color,#555)}
+      #${ROOT_ID} .ai-plan-batch-preview{display:grid;gap:6px}
+      #${ROOT_ID} .ai-plan-batch-summary{padding:8px;border-radius:7px;background:var(--ai-surface-muted-color,rgba(0,0,0,.14));color:var(--ai-text-color-secondary,#aaa);font-size:10px}
+      #${ROOT_ID} .ai-plan-batch-row{padding:9px;border:1px solid var(--ai-border-color,#555);border-radius:8px}
+      #${ROOT_ID} .ai-plan-batch-row.is-warning{border-color:var(--ai-warning-color,#d29733);background:var(--ai-warning-bg-color,rgba(210,151,51,.1))}
+      #${ROOT_ID} .ai-plan-batch-row>div{display:flex;justify-content:space-between;gap:8px;font-size:10px}
+      #${ROOT_ID} .ai-plan-batch-row span{color:var(--ai-text-color-secondary,#999)}
+      #${ROOT_ID} .ai-plan-batch-row p{margin:6px 0 0;color:var(--ai-text-color-secondary,#bbb);font-size:10px;line-height:1.5}
+      #${ROOT_ID} .ai-plan-batch-warnings{padding:8px;border-radius:7px;color:var(--ai-warning-color,#f1c26d);background:var(--ai-warning-bg-color,rgba(210,151,51,.1));font-size:10px}
       #${ROOT_ID} .ai-form-error{display:none;margin-top:9px;padding:9px;border-radius:8px;color:var(--ai-danger-color,#ef8e8e);background:var(--ai-danger-bg-color,rgba(200,70,70,.12));font-size:11px}
       #${ROOT_ID} .ai-form-error.is-visible{display:block}
       #${ROOT_ID} .ai-review-layout{display:grid;grid-template-columns:minmax(280px,32%) minmax(0,1fr);gap:12px;min-height:520px}
@@ -3754,6 +3984,7 @@ function ensureUnifiedStyles() {
         #${ROOT_ID} .ai-prepare-grid,#${ROOT_ID} .ai-plan-review-grid,#${ROOT_ID} .ai-review-layout{grid-template-columns:1fr}
         #${ROOT_ID} .ai-entry-list{height:330px}
         #${ROOT_ID} .ai-plan-fields-grid{grid-template-columns:1fr}
+        #${ROOT_ID} .ai-plan-task-meta{grid-template-columns:1fr 1fr}
         #${ROOT_ID} .ai-review-layout{min-height:0}
         #${ROOT_ID} .ai-review-detail-panel{display:none}
         #${ROOT_ID} .ai-preview-list{max-height:none}
@@ -3887,7 +4118,9 @@ function updateWorkbenchHeader() {
     : '上下文关闭';
   $('[data-ai-open-settings] span', parentDoc()).text(modelLabel);
   $('[data-ai-focus-context] span', parentDoc()).text(contextLabel);
-  $('[data-ai-open-assistant-tab="reference"] span', parentDoc()).text(referenceLength ? `${referenceLength} 字资料` : '添加资料');
+  $('[data-ai-open-assistant-tab="reference"] span', parentDoc()).text(
+    referenceLength ? `${referenceLength} 字资料` : '添加资料',
+  );
   updateAssistantChrome();
   syncNavigationState();
 }
@@ -3895,9 +4128,8 @@ function updateWorkbenchHeader() {
 function syncWorkflowCapabilities(modeKey = currentModeKey()) {
   const capabilities = deriveAiWorkflowCapabilities(workflowSnapshot(modeKey));
   $('#ai-workspace-plan', parentDoc()).prop('disabled', !capabilities.canStartPlanning);
-  const canPreview = state.modes[modeKey].currentStep === 'review'
-    ? capabilities.canRegenerate
-    : capabilities.canGeneratePreview;
+  const canPreview =
+    state.modes[modeKey].currentStep === 'review' ? capabilities.canRegenerate : capabilities.canGeneratePreview;
   $('#ai-workspace-preview', parentDoc()).prop('disabled', !canPreview);
   $('#ai-workspace-apply', parentDoc()).prop('disabled', !capabilities.canApply);
   $('#ai-workspace-stop', parentDoc()).prop('disabled', !capabilities.canStop);
@@ -3994,9 +4226,12 @@ function moveLorebookSearchActiveOption(direction) {
   const $options = $('#ai-workspace-lorebook-search-results [role="option"]', parentDoc());
   if (!$options.length) return;
   const currentIndex = $options.index($options.filter('.is-keyboard-active'));
-  const nextIndex = currentIndex < 0
-    ? direction > 0 ? 0 : $options.length - 1
-    : (currentIndex + direction + $options.length) % $options.length;
+  const nextIndex =
+    currentIndex < 0
+      ? direction > 0
+        ? 0
+        : $options.length - 1
+      : (currentIndex + direction + $options.length) % $options.length;
   const $next = $options.eq(nextIndex);
   $options.removeClass('is-keyboard-active');
   $next.addClass('is-keyboard-active');
@@ -4144,6 +4379,61 @@ function goToStep(modeKey, targetStep) {
 function hasEditableSelection(modeKey) {
   return state.modes[modeKey].selectedEntryUids.size > 0;
 }
+
+function resolveDirectPlanRecommendation(choice = 'direct') {
+  const resolver = state.directPlanRecommendationResolver;
+  state.directPlanRecommendationResolver = null;
+  const dialog = $('#ai-workspace-direct-plan-dialog', parentDoc()).get(0);
+  if (dialog?.open && typeof dialog.close === 'function') {
+    dialog.close(choice);
+  } else {
+    dialog?.removeAttribute?.('open');
+  }
+  resolver?.(choice);
+}
+
+function requestDirectPlanRecommendation() {
+  const dialog = $('#ai-workspace-direct-plan-dialog', parentDoc()).get(0);
+  if (!dialog) {
+    return Promise.resolve('direct');
+  }
+  if (state.directPlanRecommendationResolver) {
+    resolveDirectPlanRecommendation('direct');
+  }
+  return new Promise(resolve => {
+    state.directPlanRecommendationResolver = resolve;
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute('open', '');
+    }
+  });
+}
+
+function transferDirectDraftToPlanning() {
+  const direct = state.modes.direct;
+  state.modes.plan = {
+    ...createEmptyModeState(),
+    ...direct,
+    editableFields: { ...direct.editableFields },
+    promptSettings: { ...direct.promptSettings },
+    selectedEntryUids: new Set(direct.selectedEntryUids),
+    readonlyEntryUids: new Set(direct.readonlyEntryUids),
+    entries: [...direct.entries],
+    currentStep: 'prepare',
+    planningResult: null,
+    previewResult: null,
+    debugInfo: {},
+    lastApplyResult: null,
+    planEditorError: '',
+    statusText: '',
+  };
+  state.currentNav = 'plan';
+  resetDirectPlanRecommendation();
+  persistSettings({ mirrorModeKey: 'plan' });
+  renderCurrentPanel();
+}
+
 async function handlePlan() {
   const modeKey = 'plan';
   captureModeInputs(modeKey);
@@ -4176,6 +4466,7 @@ async function handlePlan() {
       lockedEditableUids: Array.from(mode.selectedEntryUids),
       lockedReadonlyUids: Array.from(mode.readonlyEntryUids),
       promptSettings: mode.promptSettings,
+      contextBudget: currentContextBudget(),
       customApi: saved.apiMode === 'custom' ? saved.customApi : null,
       shouldStream: saved.stream === true,
       onGenerationStart: generationId => {
@@ -4218,9 +4509,7 @@ async function handlePreview() {
 
   const mode = state.modes[modeKey];
   const saved = settings();
-  const runId = ++state.previewRunId;
-  if (!mode.lorebookName) return setModeStatus(modeKey, '请先选择目标世界书。');
-  if (!hasEditableSelection(modeKey)) return setModeStatus(modeKey, '请至少选择一条“本批可修改”条目。');
+  if (!ensureSelectionReady(modeKey)) return;
   if (!mode.instruction.trim()) return setModeStatus(modeKey, '请输入 AI 指令。');
   if (saved.apiMode === 'custom') {
     const validationMessage = validateCustomApiConfig(saved.customApi, { requireModel: true });
@@ -4228,7 +4517,20 @@ async function handlePreview() {
       return setModeStatus(modeKey, validationMessage);
     }
   }
+  if (modeKey === 'direct' && mode.selectedEntryUids.size > DIRECT_PLAN_RECOMMEND_THRESHOLD) {
+    const signature = buildDirectPlanRecommendationSignature(mode);
+    if (state.directPlanRecommendationDismissedSignature !== signature) {
+      const choice = await requestDirectPlanRecommendation();
+      if (choice === 'plan') {
+        transferDirectDraftToPlanning();
+        await handlePlan();
+        return;
+      }
+      state.directPlanRecommendationDismissedSignature = signature;
+    }
+  }
 
+  const runId = ++state.previewRunId;
   state.stopRequested = false;
   mode.previewResult = null;
   mode.debugInfo = {};
@@ -4400,6 +4702,7 @@ function bindEvents() {
         return;
       }
       captureModeInputs(currentModeKey());
+      resetDirectPlanRecommendation();
       state.currentNav = targetStrategy;
       invalidateModeOutputs(targetStrategy, { clearPlan: true });
       state.modes[targetStrategy].currentStep = 'prepare';
@@ -4461,6 +4764,7 @@ function bindEvents() {
         mode.searchText = '';
         mode.selectedEntryUids.clear();
         mode.readonlyEntryUids.clear();
+        resetDirectPlanRecommendation();
         invalidateModeOutputs(modeKey);
         mode.currentStep = 'prepare';
         hideLorebookSearchResults();
@@ -4469,11 +4773,15 @@ function bindEvents() {
         renderCurrentPanel();
       },
     )
-    .on('keydown.aiWorkspaceDesktop', '#ai-workspace-lorebook-search-results .add-worldbook-result-item', function (event) {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      $(this).trigger('click');
-    })
+    .on(
+      'keydown.aiWorkspaceDesktop',
+      '#ai-workspace-lorebook-search-results .add-worldbook-result-item',
+      function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        $(this).trigger('click');
+      },
+    )
     .on('change.aiWorkspaceDesktop input.aiWorkspaceDesktop', '#ai-workspace-chat-context-count', () => {
       state.chatContext = currentChatContextSettings();
       renderChatContextPreview();
@@ -4542,6 +4850,7 @@ function bindEvents() {
     .on('click.aiWorkspaceDesktop', '#ai-workspace-select-visible', () => {
       const modeKey = currentModeKey();
       getFilteredEntries(modeKey).forEach(entry => setEntryMode(modeKey, Number(entry.uid), 'editable'));
+      if (modeKey === 'direct') resetDirectPlanRecommendation();
       invalidateModeOutputs(modeKey);
       persistSettings({ mirrorModeKey: modeKey });
       renderEntryList(modeKey);
@@ -4549,6 +4858,7 @@ function bindEvents() {
     .on('click.aiWorkspaceDesktop', '#ai-workspace-mark-visible-readonly', () => {
       const modeKey = currentModeKey();
       getFilteredEntries(modeKey).forEach(entry => setEntryMode(modeKey, Number(entry.uid), 'readonly'));
+      if (modeKey === 'direct') resetDirectPlanRecommendation();
       invalidateModeOutputs(modeKey);
       persistSettings({ mirrorModeKey: modeKey });
       renderEntryList(modeKey);
@@ -4556,6 +4866,7 @@ function bindEvents() {
     .on('click.aiWorkspaceDesktop', '#ai-workspace-clear-selection', () => {
       const modeKey = currentModeKey();
       getFilteredEntries(modeKey).forEach(entry => setEntryMode(modeKey, Number(entry.uid), 'none'));
+      if (modeKey === 'direct') resetDirectPlanRecommendation();
       invalidateModeOutputs(modeKey);
       persistSettings({ mirrorModeKey: modeKey });
       renderEntryList(modeKey);
@@ -4565,6 +4876,7 @@ function bindEvents() {
       const mode = state.modes[modeKey];
       const isPlanReview = modeKey === 'plan' && mode.currentStep === 'planReview' && Boolean(mode.planningResult);
       setEntryMode(modeKey, Number($(this).attr('data-entry-uid')), ($(this).attr('data-entry-mode') || 'none').trim());
+      if (modeKey === 'direct') resetDirectPlanRecommendation();
       if (isPlanReview) {
         mode.previewResult = null;
         mode.debugInfo = {};
@@ -4575,6 +4887,8 @@ function bindEvents() {
       if (isPlanReview) {
         mode.planningResult.editable_uids = Array.from(mode.selectedEntryUids);
         mode.planningResult.readonly_uids = Array.from(mode.readonlyEntryUids);
+        reconcilePlanningTasks(modeKey);
+        validatePlanningEditorState(modeKey);
         renderPlanningResult(modeKey);
       } else {
         renderEntryList(modeKey);
@@ -4586,17 +4900,35 @@ function bindEvents() {
       () => {
         const modeKey = currentModeKey();
         captureModeInputs(modeKey);
+        if (modeKey === 'direct') resetDirectPlanRecommendation();
         invalidateModeOutputs(modeKey);
         schedulePersist(modeKey);
         syncWorkflowCapabilities(modeKey);
       },
     )
-    .on('change.aiWorkspaceDesktop', '#ai-workspace-plan-goal, #ai-workspace-plan-must-keep, #ai-workspace-plan-rewrite-rules, #ai-workspace-plan-consistency-notes', () => {
+    .on(
+      'change.aiWorkspaceDesktop',
+      '#ai-workspace-plan-goal, #ai-workspace-plan-must-keep, #ai-workspace-plan-rewrite-rules, #ai-workspace-plan-consistency-notes',
+      () => {
+        if (state.currentNav !== 'plan') return;
+        const modeKey = currentModeKey();
+        updatePlanningResultFromStructuredForm(modeKey);
+        renderPlanningResult(modeKey);
+        setModeStatus(modeKey, '规划已更新，可继续生成修改预览。');
+      },
+    )
+    .on('change.aiWorkspaceDesktop', '.ai-plan-task-row [data-task-field]', function () {
       if (state.currentNav !== 'plan') return;
       const modeKey = currentModeKey();
-      updatePlanningResultFromStructuredForm(modeKey);
+      const taskUid = Number($(this).closest('.ai-plan-task-row').attr('data-task-uid'));
+      updatePlanningTaskFromStructuredForm(modeKey, taskUid);
       renderPlanningResult(modeKey);
-      setModeStatus(modeKey, '规划已更新，可继续生成修改预览。');
+      setModeStatus(
+        modeKey,
+        state.modes[modeKey].planEditorError
+          ? '任务关系或输出估算无效，请先修正。'
+          : '任务规划已更新，批次预览已重新计算。',
+      );
     })
     .on('input.aiWorkspaceDesktop', '#ai-workspace-plan-json', function () {
       if (state.currentNav !== 'plan') {
@@ -4605,9 +4937,17 @@ function bindEvents() {
       const modeKey = currentModeKey();
       try {
         const validUids = new Set(state.modes[modeKey].entries.map(entry => Number(entry.uid)));
-        state.modes[modeKey].planningResult = normalizeAiPlanEditorValue($(this).val() || '{}', validUids);
+        const rawPlan = JSON.parse($(this).val() || '{}');
+        const needsLegacyTasks = rawPlan?.plan?.entry_tasks === undefined;
+        state.modes[modeKey].planningResult = normalizeAiPlanEditorValue(rawPlan, validUids);
+        if (needsLegacyTasks) {
+          state.modes[modeKey].planningResult.plan.entry_tasks = (
+            state.modes[modeKey].planningResult.editable_uids || []
+          ).map(uid => createDefaultPlanTask(uid, state.modes[modeKey].instruction));
+        }
         state.modes[modeKey].planEditorError = '';
         syncPlanSelectionFromPlanningResult(modeKey);
+        reconcilePlanningTasks(modeKey);
         state.modes[modeKey].previewResult = null;
         const plan = state.modes[modeKey].planningResult.plan || {};
         $('#ai-workspace-plan-goal', parentDoc()).val(plan.goal || '');
@@ -4615,9 +4955,16 @@ function bindEvents() {
         $('#ai-workspace-plan-rewrite-rules', parentDoc()).val((plan.rewrite_rules || []).join('\n'));
         $('#ai-workspace-plan-consistency-notes', parentDoc()).val((plan.consistency_notes || []).join('\n'));
         renderPlanScope(modeKey);
-        $('#ai-workspace-plan-error', parentDoc()).removeClass('is-visible').empty();
-        $('#ai-workspace-preview', parentDoc()).prop('disabled', state.modes[modeKey].selectedEntryUids.size === 0);
-        setModeStatus(modeKey, '规划已更新，可继续确认并生成修改结果。');
+        renderPlanningTasks(modeKey);
+        const planError = state.modes[modeKey].planEditorError;
+        $('#ai-workspace-plan-error', parentDoc())
+          .toggleClass('is-visible', Boolean(planError))
+          .text(planError || '');
+        $('#ai-workspace-preview', parentDoc()).prop(
+          'disabled',
+          Boolean(planError) || state.modes[modeKey].selectedEntryUids.size === 0,
+        );
+        setModeStatus(modeKey, planError ? '请先修正规划任务关系。' : '规划已更新，可继续确认并生成修改结果。');
       } catch (error) {
         state.modes[modeKey].planEditorError = error.message;
         $('#ai-workspace-plan-error', parentDoc()).addClass('is-visible').text(`规划 JSON 无法解析：${error.message}`);
@@ -4627,11 +4974,19 @@ function bindEvents() {
     })
     .on(
       'change.aiWorkspaceDesktop input.aiWorkspaceDesktop',
-      '#ai-workspace-apiurl, #ai-workspace-apikey, #ai-workspace-model, #ai-workspace-stream, #ai-workspace-budget-enabled, #ai-workspace-budget-max-input, #ai-workspace-budget-reserve-output',
+      '#ai-workspace-apiurl, #ai-workspace-apikey, #ai-workspace-model, #ai-workspace-stream, #ai-workspace-budget-reserve-output',
       () => {
         persistSettings({ mirrorModeKey: currentModeKey() });
         invalidateModeOutputs(currentModeKey(), { clearPlan: true });
         setSharedStatus('API 配置已变化，后续结果请重新生成。');
+      },
+    )
+    .on(
+      'change.aiWorkspaceDesktop input.aiWorkspaceDesktop',
+      '#ai-workspace-budget-enabled, #ai-workspace-budget-max-input',
+      () => {
+        persistSettings({ mirrorModeKey: currentModeKey() });
+        setSharedStatus('输入 token 警告设置已更新，不会触发自动分批。');
       },
     )
     .on('change.aiWorkspaceDesktop', '#ai-workspace-source-select', () => {
@@ -4681,6 +5036,12 @@ function bindEvents() {
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-preview', async () => {
       await handlePreview();
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-direct-plan-confirm', () => {
+      resolveDirectPlanRecommendation('plan');
+    })
+    .on('click.aiWorkspaceDesktop', '#ai-workspace-direct-plan-continue', () => {
+      resolveDirectPlanRecommendation('direct');
     })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-stop', () => {
       handleStop();
@@ -4761,11 +5122,12 @@ function bindEvents() {
       event.preventDefault();
       const $items = $('#ai-workspace-preview-list .ai-preview-item', parentDoc());
       const currentIndex = $items.index(this);
-      const nextIndex = event.key === 'Home'
-        ? 0
-        : event.key === 'End'
-          ? $items.length - 1
-          : Math.max(0, Math.min($items.length - 1, currentIndex + (event.key === 'ArrowDown' ? 1 : -1)));
+      const nextIndex =
+        event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? $items.length - 1
+            : Math.max(0, Math.min($items.length - 1, currentIndex + (event.key === 'ArrowDown' ? 1 : -1)));
       const $next = $items.eq(nextIndex);
       $items.removeClass('is-active').attr({ 'aria-selected': 'false', tabindex: '-1' });
       $next.addClass('is-active').attr({ 'aria-selected': 'true', tabindex: '0' }).trigger('focus');
@@ -4806,7 +5168,9 @@ function bindEvents() {
       }
     })
     .on('keydown.aiWorkspaceDesktop', event => {
-      const overlay = $(event.target).closest('#ai-workspace-settings-modal, #ai-workspace-assistant-modal, #ai-workspace-preview-modal').get(0);
+      const overlay = $(event.target)
+        .closest('#ai-workspace-settings-modal, #ai-workspace-assistant-modal, #ai-workspace-preview-modal')
+        .get(0);
       if (trapOverlayFocus(event, overlay)) {
         return;
       }
@@ -4826,13 +5190,14 @@ function bindEvents() {
     .on('keydown.aiWorkspaceDesktop', '.ai-assistant-tab', function (event) {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
-      const nextTab = event.key === 'Home'
-        ? 'chat'
-        : event.key === 'End'
-          ? 'reference'
-          : ($(this).attr('data-assistant-tab') || 'chat') === 'chat'
+      const nextTab =
+        event.key === 'Home'
+          ? 'chat'
+          : event.key === 'End'
             ? 'reference'
-            : 'chat';
+            : ($(this).attr('data-assistant-tab') || 'chat') === 'chat'
+              ? 'reference'
+              : 'chat';
       switchAssistantTab(nextTab, { focusTab: true });
     })
     .on('input.aiWorkspaceDesktop', '#ai-workspace-preview-modal-content textarea[data-preview-field]', () => {
@@ -4968,6 +5333,12 @@ function bindEvents() {
       event.preventDefault();
       closeAssistantModal();
     });
+  $('#ai-workspace-direct-plan-dialog', parentDoc())
+    .off('cancel.aiWorkspaceDesktop')
+    .on('cancel.aiWorkspaceDesktop', event => {
+      event.preventDefault();
+      resolveDirectPlanRecommendation('direct');
+    });
 }
 
 export function initDesktopAiWorkspace() {
@@ -4991,13 +5362,17 @@ export function initDesktopAiWorkspace() {
     });
     state.resizeObserver.observe(workbenchContainer);
   }
-  $(window).off('pagehide.aiWorkspaceDesktop').on('pagehide.aiWorkspaceDesktop', () => {
-    flushAiWorkspaceSettings();
-  });
+  $(window)
+    .off('pagehide.aiWorkspaceDesktop')
+    .on('pagehide.aiWorkspaceDesktop', () => {
+      flushAiWorkspaceSettings();
+    });
   state.initialized = true;
 }
 
 export function resetDesktopAiWorkspace() {
+  resolveDirectPlanRecommendation('direct');
+  resetDirectPlanRecommendation();
   hydrateStateFromSettings();
   state.worldbookNames = [];
   state.modelOptions = [];

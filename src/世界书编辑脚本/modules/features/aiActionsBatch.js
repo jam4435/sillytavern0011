@@ -9,6 +9,13 @@ export {
 } from './aiActions.js';
 import { requestLlmText } from './llmClient.js';
 import { ensureNumericUID, errorCatched } from '../utils.js';
+import {
+  DIRECT_BATCH_SIZE,
+  DIRECT_PLAN_RECOMMEND_THRESHOLD,
+  buildDirectBatches,
+  buildPlannedBatches,
+} from './aiBatchPlanner.js';
+export { DIRECT_BATCH_SIZE, DIRECT_PLAN_RECOMMEND_THRESHOLD } from './aiBatchPlanner.js';
 
 const COMPATIBILITY_MODEL_PREFIXES = ['流式抗截断/', '假流式/'];
 const COMPATIBILITY_FAILURE_PATTERNS = [
@@ -20,7 +27,6 @@ const COMPATIBILITY_FAILURE_PATTERNS = [
 const STOP_PREVIEW_MESSAGE = '已停止生成';
 
 const AI_BATCH_REQUEST_MAX_RETRIES = 0;
-const AI_BATCH_MAX_ENTRY_TOKENS = 4000;
 const AI_BATCH_TOKEN_FALLBACK_DIVISOR = 4;
 const DEFAULT_CONTEXT_BUDGET = {
   enabled: true,
@@ -153,17 +159,12 @@ function normalizeContextBudget(contextBudget = {}) {
   return {
     enabled: contextBudget?.enabled !== false,
     maxInputTokens: Number.isFinite(maxInputTokens)
-      ? Math.min(200000, Math.max(1000, maxInputTokens))
+      ? Math.min(2000000, Math.max(1000, maxInputTokens))
       : DEFAULT_CONTEXT_BUDGET.maxInputTokens,
     reserveOutputTokens: Number.isFinite(reserveOutputTokens)
       ? Math.min(64000, Math.max(256, reserveOutputTokens))
       : DEFAULT_CONTEXT_BUDGET.reserveOutputTokens,
   };
-}
-
-function getMaxInputTokens(contextBudget = {}) {
-  const normalized = normalizeContextBudget(contextBudget);
-  return normalized.enabled ? normalized.maxInputTokens : AI_BATCH_MAX_ENTRY_TOKENS;
 }
 
 function normalizeFieldOptions(fieldOptions = {}) {
@@ -405,74 +406,58 @@ async function buildBatchPlans({
   promptSettings,
   contextEntries = {},
   contextBudget = {},
+  sourceMode = 'direct',
+  planningResult = null,
 }) {
+  const normalizedBudget = normalizeContextBudget(contextBudget);
+  const scheduling = sourceMode === 'plan'
+    ? buildPlannedBatches({
+        entries: targetEntries,
+        entryTasks: planningResult?.plan?.entry_tasks || [],
+        readonlyUids: contextEntries.readonlyEntries?.map(entry => ensureNumericUID(entry?.uid)) || [],
+        reserveOutputTokens: normalizedBudget.reserveOutputTokens,
+      })
+    : {
+        batches: buildDirectBatches(targetEntries),
+        warnings: [],
+        safeOutputCapacity: null,
+        totalEstimatedOutputWeight: null,
+      };
+
   const plans = [];
-  let currentEntries = [];
-  let currentPrompt = '';
-  let currentEntryTokenCount = 0;
-  let currentEntryTokenSource = 'fallback';
-  const maxInputTokens = getMaxInputTokens(contextBudget);
-
-  const finalizeCurrent = () => {
-    if (!currentEntries.length) {
-      return;
-    }
-
-    plans.push({
-      entries: currentEntries,
-      requestPrompt: currentPrompt,
-      entryTokenCount: currentEntryTokenCount,
-      tokenCountSource: currentEntryTokenSource,
-      isOversized: currentEntryTokenCount > maxInputTokens,
-    });
-  };
-
-  for (const entry of targetEntries) {
-    const candidateEntries = [...currentEntries, entry];
-    const candidatePrompt = buildContextualBatchPromptV2(
+  for (const batch of scheduling.batches) {
+    const entries = Array.isArray(batch.entries) ? batch.entries : [];
+    const requestPrompt = buildContextualBatchPromptV2(
       lorebookName,
       instruction,
-      candidateEntries,
+      entries,
       fieldOptions,
       promptSettings,
       contextEntries,
     );
-    const candidateEntryTokenDetails = await getTokenCountDetails(candidatePrompt);
-    const candidateEntryTokenCount = candidateEntryTokenDetails.count;
-    const shouldSplit = candidateEntryTokenCount > maxInputTokens;
-
-    if (shouldSplit && currentEntries.length > 0) {
-      finalizeCurrent();
-      currentEntries = [entry];
-      currentPrompt = buildContextualBatchPromptV2(
-        lorebookName,
-        instruction,
-        currentEntries,
-        fieldOptions,
-        promptSettings,
-        contextEntries,
-      );
-      const currentEntryTokenDetails = await getTokenCountDetails(currentPrompt);
-      currentEntryTokenCount = currentEntryTokenDetails.count;
-      currentEntryTokenSource = currentEntryTokenDetails.source;
-      continue;
-    }
-
-    currentEntries = candidateEntries;
-    currentPrompt = candidatePrompt;
-    currentEntryTokenCount = candidateEntryTokenCount;
-    currentEntryTokenSource = candidateEntryTokenDetails.source;
+    const tokenDetails = await getTokenCountDetails(requestPrompt);
+    plans.push({
+      ...batch,
+      entries,
+      requestPrompt,
+      entryTokenCount: tokenDetails.count,
+      tokenCountSource: tokenDetails.source,
+      isOversized: normalizedBudget.enabled && tokenDetails.count > normalizedBudget.maxInputTokens,
+      maxInputTokens: normalizedBudget.maxInputTokens,
+    });
   }
-
-  finalizeCurrent();
-
-  return plans.map((plan, index) => ({
-    ...plan,
-    batchIndex: index,
-    batchNumber: index + 1,
-    entryCount: plan.entries.length,
-    maxInputTokens,
-  }));
+  return {
+    plans: plans.map((plan, index) => ({
+      ...plan,
+      batchIndex: index,
+      batchNumber: index + 1,
+      entryCount: plan.entries.length,
+    })),
+    warnings: scheduling.warnings || [],
+    strategy: sourceMode === 'plan' ? 'planned-output-graph' : 'direct-entry-count',
+    safeOutputCapacity: scheduling.safeOutputCapacity,
+    totalEstimatedOutputWeight: scheduling.totalEstimatedOutputWeight,
+  };
 }
 
 async function callDefaultAiClient(prompt, options = {}) {
@@ -713,13 +698,11 @@ function buildBatchPlanReport(plans = []) {
     return '';
   }
 
-  const lines = [
-    `本次预览按 ${plans.length} 批发送，最终请求达到预算即切分。`,
-  ];
+  const lines = [`本次预览按 ${plans.length} 批串行发送；输入 token 仅用于警告，不参与分批。`];
 
   plans.forEach(plan => {
     lines.push(
-      `批次 ${plan.batchNumber}: ${plan.entryCount} 条，最终请求约 ${plan.entryTokenCount} tokens${plan.maxInputTokens ? ` / 预算 ${plan.maxInputTokens}` : ''}${plan.isOversized ? '（单批已超预算，按最小批次发送）' : ''}`,
+      `批次 ${plan.batchNumber}: ${plan.entryCount} 条，最终请求约 ${plan.entryTokenCount} tokens${plan.maxInputTokens ? ` / 警戒值 ${plan.maxInputTokens}` : ''}${plan.isOversized ? '（超过警戒值，仍继续发送）' : ''}`,
     );
   });
 
@@ -957,6 +940,104 @@ function emitPreviewProgress(onProgress, payload = {}) {
   });
 }
 
+function makeDependencyError(entry, dependencyUids, reason = '依赖条目未成功生成') {
+  const uid = ensureNumericUID(entry?.uid);
+  return {
+    uid,
+    title: entry?.name || `UID ${uid}`,
+    error: `${reason}：${_.uniq(dependencyUids).join(', ')}。该条目未发送给 AI。`,
+  };
+}
+
+function findBlockedPlanUids(tasks = [], availableUids = new Set(), readonlyUids = new Set()) {
+  const taskUidSet = new Set(tasks.map(task => ensureNumericUID(task?.uid)));
+  const blocked = new Map();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    tasks.forEach(task => {
+      const uid = ensureNumericUID(task?.uid);
+      if (blocked.has(uid)) return;
+      const missing = (task?.depends_on_uids || []).filter(dependencyUid => {
+        const normalized = ensureNumericUID(dependencyUid);
+        if (readonlyUids.has(normalized) || availableUids.has(normalized)) return false;
+        if (taskUidSet.has(normalized) && !blocked.has(normalized)) return false;
+        return true;
+      });
+      if (missing.length) {
+        blocked.set(uid, missing);
+        changed = true;
+      }
+    });
+  }
+  return blocked;
+}
+
+function enforceBatchDependencyResults(batchResult, batchPlan) {
+  if (!Array.isArray(batchPlan?.tasks) || !batchPlan.tasks.length) {
+    return batchResult;
+  }
+  const successful = new Set((batchResult.items || []).map(item => ensureNumericUID(item?.uid)));
+  const taskUidSet = new Set(batchPlan.tasks.map(task => ensureNumericUID(task?.uid)));
+  const failedByDependency = new Map();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    batchPlan.tasks.forEach(task => {
+      const uid = ensureNumericUID(task?.uid);
+      if (!successful.has(uid) || failedByDependency.has(uid)) return;
+      const failedDependencies = (task.depends_on_uids || [])
+        .map(ensureNumericUID)
+        .filter(dependencyUid => taskUidSet.has(dependencyUid) && !successful.has(dependencyUid));
+      if (failedDependencies.length) {
+        failedByDependency.set(uid, failedDependencies);
+        successful.delete(uid);
+        changed = true;
+      }
+    });
+  }
+
+  (batchPlan.cyclicGroups || []).forEach(group => {
+    const normalizedGroup = group.map(ensureNumericUID);
+    if (normalizedGroup.some(uid => !successful.has(uid))) {
+      normalizedGroup.forEach(uid => {
+        if (successful.has(uid)) {
+          successful.delete(uid);
+          failedByDependency.set(uid, normalizedGroup.filter(memberUid => memberUid !== uid));
+        }
+      });
+    }
+  });
+
+  if (!failedByDependency.size) {
+    return batchResult;
+  }
+  const entriesByUid = new Map((batchPlan.entries || []).map(entry => [ensureNumericUID(entry?.uid), entry]));
+  const dependencyErrors = Array.from(failedByDependency, ([uid, dependencies]) =>
+    makeDependencyError(entriesByUid.get(uid), dependencies, '同批依赖条目未成功生成'));
+  const items = (batchResult.items || []).filter(item => successful.has(ensureNumericUID(item?.uid)));
+  const errors = [...(batchResult.errors || []), ...dependencyErrors];
+  const changedCount = items.filter(item => item.changed).length;
+  return {
+    ...batchResult,
+    outcome: resolveAiPreviewOutcome({
+      total: batchPlan.entries.length,
+      succeeded: items.length,
+      failed: errors.length,
+      cancelled: batchResult.outcome === 'cancelled',
+    }),
+    items,
+    errors,
+    summary: {
+      ...batchResult.summary,
+      succeeded: items.length,
+      failed: errors.length,
+      changed: changedCount,
+      unchanged: items.length - changedCount,
+    },
+  };
+}
+
 function mergeDiagnosticsSummary(results = []) {
   const diagnosticSummaries = results
     .map(result => result?.summary?.diagnostics)
@@ -1160,6 +1241,8 @@ function buildPlanningPrompt(lorebookName, instruction, entries, promptSettings 
     planningPromptTemplate,
     '</提示词>',
     '',
+    '强制规划契约：plan.entry_tasks 必须逐一覆盖 editable_uids；每项必须包含 uid、objective、complexity、estimated_output_tokens、depends_on_uids、related_uids。complexity 只能是 low/medium/high，输出估算必须是 64-64000 的整数。依赖可引用修改或只读条目，关联只能引用修改条目。',
+    '',
     '请只返回严格符合下列结构的 JSON：',
     JSON.stringify(
       {
@@ -1170,6 +1253,16 @@ function buildPlanningPrompt(lorebookName, instruction, entries, promptSettings 
           must_keep: [''],
           rewrite_rules: [''],
           consistency_notes: [''],
+          entry_tasks: [
+            {
+              uid: 3,
+              objective: '',
+              complexity: 'medium',
+              estimated_output_tokens: 1024,
+              depends_on_uids: [],
+              related_uids: [4],
+            },
+          ],
         },
       },
       null,
@@ -1259,6 +1352,59 @@ function parseAiPlanResponse(rawText, validUids = []) {
   }
 
   const rawPlan = isPlainObject(parsed?.plan) ? parsed.plan : {};
+  const rawEntryTasks = Array.isArray(rawPlan.entry_tasks) ? rawPlan.entry_tasks : [];
+  const taskUids = rawEntryTasks.map(task => ensureNumericUID(task?.uid));
+  const duplicateTaskUids = taskUids.filter((uid, index) => uid >= 0 && taskUids.indexOf(uid) !== index);
+  if (duplicateTaskUids.length) {
+    throw new Error(`规划任务包含重复 UID: ${_.uniq(duplicateTaskUids).join(', ')}`);
+  }
+  const normalizeTaskUidList = (value, fieldName, taskUid) => {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) {
+      throw new Error(`UID ${taskUid} 的 ${fieldName} 必须是 UID 数组`);
+    }
+    const normalized = value.map(uid => ensureNumericUID(uid));
+    const invalid = normalized.filter(uid => uid < 0 || !validUidSet.has(uid));
+    if (invalid.length) {
+      throw new Error(`UID ${taskUid} 的 ${fieldName} 包含不存在的 UID: ${_.uniq(invalid).join(', ')}`);
+    }
+    const duplicates = normalized.filter((uid, index) => normalized.indexOf(uid) !== index);
+    if (duplicates.length) {
+      throw new Error(`UID ${taskUid} 的 ${fieldName} 包含重复 UID: ${_.uniq(duplicates).join(', ')}`);
+    }
+    if (normalized.includes(taskUid)) {
+      throw new Error(`UID ${taskUid} 不能依赖或关联自身`);
+    }
+    return normalized;
+  };
+  const entryTasks = rawEntryTasks.map(task => {
+    if (!isPlainObject(task)) {
+      throw new Error('plan.entry_tasks 中的任务必须是对象');
+    }
+    const uid = ensureNumericUID(task.uid);
+    if (uid < 0 || !validUidSet.has(uid)) {
+      throw new Error(`规划任务包含不存在的 UID: ${task.uid}`);
+    }
+    const complexity = task.complexity || 'medium';
+    if (!['low', 'medium', 'high'].includes(complexity)) {
+      throw new Error(`UID ${uid} 的 complexity 必须是 low、medium 或 high`);
+    }
+    const rawEstimate = task.estimated_output_tokens ?? 1024;
+    const parsedEstimate = Number.parseInt(`${rawEstimate}`, 10);
+    if (!Number.isFinite(parsedEstimate) || parsedEstimate <= 0) {
+      throw new Error(`UID ${uid} 的 estimated_output_tokens 必须是正整数`);
+    }
+    return {
+      uid,
+      objective: typeof task.objective === 'string' && task.objective.trim()
+        ? task.objective.trim()
+        : '按用户指令处理该条目',
+      complexity,
+      estimated_output_tokens: Math.min(64000, Math.max(64, parsedEstimate)),
+      depends_on_uids: normalizeTaskUidList(task.depends_on_uids, 'depends_on_uids', uid),
+      related_uids: normalizeTaskUidList(task.related_uids, 'related_uids', uid),
+    };
+  });
   return {
     readonly_uids: readonlyUids,
     editable_uids: editableUids,
@@ -1267,6 +1413,7 @@ function parseAiPlanResponse(rawText, validUids = []) {
       must_keep: sanitizeStringArray(rawPlan.must_keep),
       rewrite_rules: sanitizeStringArray(rawPlan.rewrite_rules),
       consistency_notes: sanitizeStringArray(rawPlan.consistency_notes),
+      entry_tasks: entryTasks,
     },
     parsedJsonCandidate: candidate,
   };
@@ -1301,6 +1448,11 @@ function buildPlanSectionXml(plan = null) {
   pushRuleSection('必须保留', plan.must_keep);
   pushRuleSection('改写规则', plan.rewrite_rules);
   pushRuleSection('一致性说明', plan.consistency_notes);
+  if (Array.isArray(plan.entry_tasks) && plan.entry_tasks.length) {
+    lines.push('<执行任务>');
+    lines.push(escapeXmlText(JSON.stringify(plan.entry_tasks, null, 2)));
+    lines.push('</执行任务>');
+  }
 
   if (!lines.length) {
     return '';
@@ -1309,7 +1461,12 @@ function buildPlanSectionXml(plan = null) {
   return ['<改造方案>', ...lines, '</改造方案>'].join('\n');
 }
 
-function mergePlanSelectionWithLocks(parsedPlan, lockedEditableUids = [], lockedReadonlyUids = []) {
+function mergePlanSelectionWithLocks(
+  parsedPlan,
+  lockedEditableUids = [],
+  lockedReadonlyUids = [],
+  instruction = '按用户指令处理该条目',
+) {
   const lockedEditable = normalizeUidList(lockedEditableUids);
   const lockedReadonly = normalizeUidList(lockedReadonlyUids).filter(uid => !lockedEditable.includes(uid));
   const plannedReadonly = normalizeUidList(parsedPlan?.readonly_uids)
@@ -1317,14 +1474,46 @@ function mergePlanSelectionWithLocks(parsedPlan, lockedEditableUids = [], locked
   const plannedEditable = normalizeUidList(parsedPlan?.editable_uids)
     .filter(uid => !lockedEditable.includes(uid) && !lockedReadonly.includes(uid) && !plannedReadonly.includes(uid));
 
+  const readonlyUids = _.uniq([...lockedReadonly, ...plannedReadonly]);
+  const editableUids = _.uniq([...lockedEditable, ...plannedEditable]);
+  const allowedContextUids = new Set([...editableUids, ...readonlyUids]);
+  const taskByUid = new Map(
+    (Array.isArray(parsedPlan?.plan?.entry_tasks) ? parsedPlan.plan.entry_tasks : [])
+      .filter(task => editableUids.includes(ensureNumericUID(task?.uid)))
+      .map(task => [ensureNumericUID(task.uid), task]),
+  );
+  const entryTasks = editableUids.map(uid => {
+    const task = taskByUid.get(uid) || {
+      uid,
+      objective: instruction || '按用户指令处理该条目',
+      complexity: 'medium',
+      estimated_output_tokens: 1024,
+      depends_on_uids: [],
+      related_uids: [],
+    };
+    const invalidDependencies = (task.depends_on_uids || []).filter(dependencyUid => !allowedContextUids.has(dependencyUid));
+    if (invalidDependencies.length) {
+      throw new Error(`UID ${uid} 依赖已排除的 UID: ${_.uniq(invalidDependencies).join(', ')}`);
+    }
+    const invalidRelated = (task.related_uids || []).filter(relatedUid => !editableUids.includes(relatedUid));
+    if (invalidRelated.length) {
+      throw new Error(`UID ${uid} 关联了非修改条目 UID: ${_.uniq(invalidRelated).join(', ')}`);
+    }
+    return task;
+  });
+
   return {
     ...parsedPlan,
-    readonly_uids: _.uniq([...lockedReadonly, ...plannedReadonly]),
-    editable_uids: _.uniq([...lockedEditable, ...plannedEditable]),
+    readonly_uids: readonlyUids,
+    editable_uids: editableUids,
     locked_editable_uids: lockedEditable,
     locked_readonly_uids: lockedReadonly,
     planned_editable_uids: plannedEditable,
     planned_readonly_uids: plannedReadonly,
+    plan: {
+      ...(parsedPlan?.plan || {}),
+      entry_tasks: entryTasks,
+    },
   };
 }
 
@@ -1705,6 +1894,7 @@ export const generateAiPlan = errorCatched(async (options = {}) => {
     referenceMaterial = '',
     lockedEditableUids = [],
     lockedReadonlyUids = [],
+    contextBudget = {},
   } = options;
   const trimmedInstruction = instruction.trim();
 
@@ -1732,11 +1922,13 @@ export const generateAiPlan = errorCatched(async (options = {}) => {
     customApi,
     onGenerationStart,
     shouldStream,
+    maxOutputTokens: normalizeContextBudget(contextBudget).reserveOutputTokens,
   });
   const parsed = mergePlanSelectionWithLocks(
     parseAiPlanResponse(rawResponse, allEntries.map(entry => entry.uid)),
     lockedEditableUids,
     lockedReadonlyUids,
+    trimmedInstruction,
   );
 
   return {
@@ -1793,9 +1985,26 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
   if (targetEntries.length === 0) {
     throw new Error('没有可供 AI 处理的条目');
   }
+  const effectivePlanningResult = sourceMode === 'plan'
+    && !Array.isArray(planningResult?.plan?.entry_tasks)
+    ? {
+        ...(planningResult || {}),
+        plan: {
+          ...(planningResult?.plan || {}),
+          entry_tasks: targetEntries.map(entry => ({
+            uid: ensureNumericUID(entry?.uid),
+            objective: trimmedInstruction || '按用户指令处理该条目',
+            complexity: 'medium',
+            estimated_output_tokens: 1024,
+            depends_on_uids: [],
+            related_uids: [],
+          })),
+        },
+      }
+    : planningResult;
 
   const invokeClient = typeof client === 'function' ? client : callDefaultAiClient;
-  const batchPlans = await buildBatchPlans({
+  const batchScheduling = await buildBatchPlans({
     lorebookName,
     instruction: trimmedInstruction,
     targetEntries,
@@ -1803,13 +2012,17 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     promptSettings,
     contextBudget,
     contextEntries: {
-      plan: planningResult?.plan || null,
+      plan: effectivePlanningResult?.plan || null,
       chatMessages,
       referenceMaterial,
       readonlyEntries,
       modifiedEntries: [],
     },
+    sourceMode,
+    planningResult: effectivePlanningResult,
   });
+  const batchPlans = batchScheduling.plans;
+  const schedulingWarnings = [...(batchScheduling.warnings || [])];
 
   console.groupCollapsed('[世界书 AI] 批量预览请求');
   try {
@@ -1840,17 +2053,55 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     let totalSucceeded = 0;
     let totalFailed = 0;
     let modifiedContextEntries = [];
+    let processedBatchCount = 0;
+    const successfulPlanUids = new Set();
+    const readonlyUidSet = new Set(readonlyEntries.map(entry => ensureNumericUID(entry?.uid)));
+    const dependencyErrors = [];
 
     for (let batchCursor = 0; batchCursor < batchPlans.length; batchCursor++) {
       const batchPlan = batchPlans[batchCursor];
+      processedBatchCount = batchCursor + 1;
+      const blockedPlanUids = findBlockedPlanUids(
+        batchPlan.tasks || [],
+        successfulPlanUids,
+        readonlyUidSet,
+      );
+      const eligibleEntries = batchPlan.entries.filter(entry => !blockedPlanUids.has(ensureNumericUID(entry?.uid)));
+      blockedPlanUids.forEach((dependencies, uid) => {
+        const entry = batchPlan.entries.find(candidate => ensureNumericUID(candidate?.uid) === uid);
+        dependencyErrors.push(makeDependencyError(entry, dependencies));
+      });
+      totalFailed += blockedPlanUids.size;
+      if (!eligibleEntries.length) {
+        emitPreviewProgress(onProgress, {
+          phase: 'running',
+          batchTotal: batchPlans.length,
+          batchCompleted: batchPlan.batchIndex + 1,
+          totalEntries: targetEntries.length,
+          succeeded: totalSucceeded,
+          failed: totalFailed,
+          title: `批次 ${batchPlan.batchNumber}/${batchPlans.length} 因依赖失败已跳过`,
+        });
+        continue;
+      }
+      const eligibleUidSet = new Set(eligibleEntries.map(entry => ensureNumericUID(entry?.uid)));
+      const executionPlan = {
+        ...batchPlan,
+        entries: eligibleEntries,
+        entryCount: eligibleEntries.length,
+        tasks: (batchPlan.tasks || []).filter(task => eligibleUidSet.has(ensureNumericUID(task?.uid))),
+        cyclicGroups: (batchPlan.cyclicGroups || [])
+          .map(group => group.filter(uid => eligibleUidSet.has(ensureNumericUID(uid))))
+          .filter(group => group.length > 1),
+      };
       const actualPrompt = buildContextualBatchPromptV2(
         lorebookName,
         trimmedInstruction,
-        batchPlan.entries,
+        executionPlan.entries,
         normalizedFieldOptions,
         promptSettings,
         {
-          plan: planningResult?.plan || null,
+          plan: effectivePlanningResult?.plan || null,
           chatMessages,
           referenceMaterial,
           readonlyEntries,
@@ -1858,32 +2109,19 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
         },
       );
       const actualPromptTokenDetails = await getTokenCountDetails(actualPrompt);
-      const maxInputTokens = getMaxInputTokens(contextBudget);
-      if (actualPromptTokenDetails.count > maxInputTokens && batchPlan.entries.length > 1) {
-        const splitIndex = Math.max(1, Math.floor(batchPlan.entries.length / 2));
-        const splitPlans = [
-          {
-            ...batchPlan,
-            entries: batchPlan.entries.slice(0, splitIndex),
-            entryCount: splitIndex,
-          },
-          {
-            ...batchPlan,
-            entries: batchPlan.entries.slice(splitIndex),
-            entryCount: batchPlan.entries.length - splitIndex,
-          },
-        ];
-        batchPlans.splice(batchCursor, 1, ...splitPlans);
-        batchPlans.forEach((plan, index) => {
-          plan.batchIndex = index;
-          plan.batchNumber = index + 1;
-        });
-        batchCursor -= 1;
-        continue;
+      const normalizedBudget = normalizeContextBudget(contextBudget);
+      executionPlan.entryTokenCount = actualPromptTokenDetails.count;
+      executionPlan.tokenCountSource = actualPromptTokenDetails.source;
+      executionPlan.isOversized = normalizedBudget.enabled
+        && actualPromptTokenDetails.count > normalizedBudget.maxInputTokens;
+      batchPlan.entryTokenCount = executionPlan.entryTokenCount;
+      batchPlan.tokenCountSource = executionPlan.tokenCountSource;
+      batchPlan.isOversized = executionPlan.isOversized;
+      if (executionPlan.isOversized) {
+        schedulingWarnings.push(
+          `批次 ${batchPlan.batchNumber} 输入约 ${actualPromptTokenDetails.count} tokens${actualPromptTokenDetails.source === 'fallback' ? '（字符估算）' : ''}，超过警戒值 ${normalizedBudget.maxInputTokens}，已按原计划继续发送。`,
+        );
       }
-      batchPlan.entryTokenCount = actualPromptTokenDetails.count;
-      batchPlan.tokenCountSource = actualPromptTokenDetails.source;
-      batchPlan.isOversized = actualPromptTokenDetails.count > maxInputTokens;
 
       emitPreviewProgress(onProgress, {
         phase: 'running',
@@ -1892,11 +2130,11 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
         totalEntries: targetEntries.length,
         succeeded: totalSucceeded,
         failed: totalFailed,
-        title: `批量预览 ${batchPlan.batchNumber}/${batchPlans.length}（${batchPlan.entryCount} 条，条目约 ${batchPlan.entryTokenCount} tokens）`,
+        title: `批量预览 ${batchPlan.batchNumber}/${batchPlans.length}（${executionPlan.entryCount} 条，请求约 ${executionPlan.entryTokenCount} tokens）`,
       });
 
-      const batchResult = await executeSingleBatch({
-        batchPlan,
+      let batchResult = await executeSingleBatch({
+        batchPlan: executionPlan,
         totalBatches: batchPlans.length,
         lorebookName,
         trimmedInstruction,
@@ -1909,17 +2147,19 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
         shouldStop,
         readonlyEntries,
         modifiedEntries: modifiedContextEntries,
-        planningResult,
+        planningResult: effectivePlanningResult,
         chatMessages,
         referenceMaterial,
         contextBudget,
         sourceMode,
       });
+      batchResult = enforceBatchDependencyResults(batchResult, executionPlan);
       batchResults.push(batchResult);
 
       totalSucceeded += batchResult.summary.succeeded;
       totalFailed += batchResult.summary.failed;
       if (Array.isArray(batchResult.items) && batchResult.items.length > 0) {
+        batchResult.items.forEach(item => successfulPlanUids.add(ensureNumericUID(item?.uid)));
         modifiedContextEntries = modifiedContextEntries.concat(
           batchResult.items.map(item => _.cloneDeep(item.afterEntry)),
         );
@@ -1931,8 +2171,24 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     }
 
     const items = batchResults.flatMap(result => result.items || []);
-    const errors = batchResults.flatMap(result => result.errors || []);
-    const warnings = batchResults.flatMap(result => result.warnings || []);
+    const errors = [...dependencyErrors, ...batchResults.flatMap(result => result.errors || [])];
+    const normalizedSchedulingWarnings = schedulingWarnings.map(warning => {
+      if (typeof warning === 'string') {
+        return { title: '批次警告', warning };
+      }
+      if (warning?.warning) {
+        return warning;
+      }
+      return {
+        ...warning,
+        title: '规划排批警告',
+        warning: warning?.message || '规划批次存在输出风险。',
+      };
+    });
+    const warnings = _.uniqBy(
+      [...normalizedSchedulingWarnings, ...batchResults.flatMap(result => result.warnings || [])],
+      warning => `${warning?.title || ''}\n${warning?.warning || warning || ''}`,
+    );
     const changedCount = items.filter(item => item.changed).length;
     const stopped = Boolean(shouldStop?.()) || batchResults.some(result => result.outcome === 'cancelled');
     const cancelledCount = stopped ? Math.max(0, targetEntries.length - items.length - errors.length) : 0;
@@ -1944,7 +2200,12 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     });
     const debug = mergeDebugOutput(batchPlans, batchResults);
     const diagnostics = mergeDiagnosticsSummary(batchResults);
-    const batching = mergeBatchingSummary(batchPlans);
+    const batching = {
+      ...mergeBatchingSummary(batchPlans),
+      strategy: batchScheduling.strategy,
+      safeOutputCapacity: batchScheduling.safeOutputCapacity,
+      totalEstimatedOutputWeight: batchScheduling.totalEstimatedOutputWeight,
+    };
     const resolvedConfig = batchResults.find(result => result.resolvedConfig)?.resolvedConfig || {
       model: customApi?.model || '',
       shouldStream: Boolean(shouldStream),
@@ -1955,11 +2216,11 @@ export const generateAiPreview = errorCatched(async (options = {}) => {
     emitPreviewProgress(onProgress, {
       phase: 'running',
       batchTotal: batchPlans.length,
-      batchCompleted: batchResults.length,
+      batchCompleted: processedBatchCount,
       totalEntries: targetEntries.length,
       succeeded: items.length,
       failed: errors.length,
-      title: `批量预览完成（${batchResults.length}/${batchPlans.length} 批）`,
+      title: `批量预览完成（${processedBatchCount}/${batchPlans.length} 批）`,
     });
 
     return {

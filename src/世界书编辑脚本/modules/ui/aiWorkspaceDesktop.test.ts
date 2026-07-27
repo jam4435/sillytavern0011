@@ -8,6 +8,7 @@ let buildAssistantPrompt: typeof import('./aiWorkspaceDesktop.js').buildAssistan
 let buildApiSettingsMarkup: typeof import('./aiWorkspaceDesktop.js').buildApiSettingsMarkup;
 let buildDesktopShellMarkup: typeof import('./aiWorkspaceDesktop.js').buildDesktopShellMarkup;
 let buildInfoResourcesMarkup: typeof import('./aiWorkspaceDesktop.js').buildInfoResourcesMarkup;
+let buildPlanningMarkup: typeof import('./aiWorkspaceDesktop.js').buildPlanningMarkup;
 let buildPreviewModalSections: typeof import('./aiWorkspaceDesktop.js').buildPreviewModalSections;
 let buildStepIndicator: typeof import('./aiWorkspaceDesktop.js').buildStepIndicator;
 let formatPreviewModalValue: typeof import('./aiWorkspaceDesktop.js').formatPreviewModalValue;
@@ -23,6 +24,7 @@ beforeAll(async () => {
     buildAssistantPrompt,
     buildDesktopShellMarkup,
     buildInfoResourcesMarkup,
+    buildPlanningMarkup,
     buildPreviewModalSections,
     buildStepIndicator,
     formatPreviewModalValue,
@@ -49,11 +51,7 @@ describe('AI 工作台紧凑控件布局', () => {
   it('聊天上下文与 API 选项都使用文字同行的控件标签', () => {
     document.body.innerHTML = `${buildInfoResourcesMarkup()}${buildApiSettingsMarkup()}`;
 
-    const controlIds = [
-      'ai-workspace-chat-context-enabled',
-      'ai-workspace-stream',
-      'ai-workspace-budget-enabled',
-    ];
+    const controlIds = ['ai-workspace-chat-context-enabled', 'ai-workspace-stream', 'ai-workspace-budget-enabled'];
     controlIds.forEach(id => {
       const control = document.querySelector<HTMLInputElement>(`#${id}`);
       expect(control?.closest('label')).toHaveClass('ai-control-line');
@@ -82,6 +80,39 @@ describe('AI 工作台紧凑控件布局', () => {
     const trigger = document.querySelector('[data-ai-open-assistant-tab="chat"]');
     expect(trigger).toHaveAttribute('title', '打开随身 AI 助手');
     expect(trigger?.querySelector('i')).toHaveClass('fa-mobile-screen-button');
+  });
+
+  it('把输入 token 配置呈现为非阻断警告，并允许 200 万 token 警戒值', () => {
+    document.body.innerHTML = buildApiSettingsMarkup();
+
+    const enabled = document.querySelector<HTMLInputElement>('#ai-workspace-budget-enabled');
+    const maxInput = document.querySelector<HTMLInputElement>('#ai-workspace-budget-max-input');
+    expect(enabled?.closest('label')).toHaveTextContent('启用输入 token 警告');
+    expect(maxInput?.labels?.[0]).toHaveTextContent('输入警戒 tokens');
+    expect(maxInput).toHaveAttribute('max', '2000000');
+  });
+
+  it('直接模式推荐规划使用可确认或继续的原生 dialog', () => {
+    document.body.innerHTML = buildDesktopShellMarkup();
+
+    const dialog = document.querySelector<HTMLDialogElement>('#ai-workspace-direct-plan-dialog');
+    expect(dialog).toBeInstanceOf(HTMLDialogElement);
+    expect(dialog).toHaveTextContent('修改条目较多，建议先规划');
+    expect(dialog).toHaveTextContent('超过 8 个修改条目');
+    expect(dialog?.querySelector('#ai-workspace-direct-plan-confirm')).toHaveTextContent('改用先规划');
+    expect(dialog?.querySelector('#ai-workspace-direct-plan-continue')).toHaveTextContent('继续直接修改');
+  });
+});
+
+describe('AI 计划审阅任务图', () => {
+  it('提供任务结构化编辑、原始 JSON 与动态批次预览节点', () => {
+    document.body.innerHTML = buildPlanningMarkup();
+
+    expect(document.querySelector('#ai-workspace-plan-task-list')).toBeInTheDocument();
+    expect(document.querySelector('#ai-workspace-plan-batch-preview')).toHaveAttribute('aria-live', 'polite');
+    expect(document.querySelector('#ai-workspace-plan-json')).toBeInstanceOf(HTMLTextAreaElement);
+    expect(document.body).toHaveTextContent('逐条调整复杂度与关系');
+    expect(document.body).toHaveTextContent('按依赖与输出量动态分批');
   });
 });
 
@@ -146,12 +177,14 @@ describe('AI 助手手机窗语义', () => {
     expect(block).toContain('<当前选中的世界书条目>');
     expect(JSON.parse(block.split('\n').slice(1, -1).join('\n'))).toMatchObject({
       worldbook_name: '群星志',
-      editable_entries: [{
-        uid: 11,
-        name: '北境',
-        content: '终年落雪。',
-        keywords: { primary: ['北境'] },
-      }],
+      editable_entries: [
+        {
+          uid: 11,
+          name: '北境',
+          content: '终年落雪。',
+          keywords: { primary: ['北境'] },
+        },
+      ],
       readonly_entries: [{ uid: 12, name: '王都', content: '位于南方。' }],
     });
     expect(block).not.toMatch(/secondary_logic|secondary/);

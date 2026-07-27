@@ -59,10 +59,13 @@ const DEFAULT_AI_BUILTIN_PROMPT_TEMPLATE = `你是世界书条目修改助手。
 只返回严格 JSON 对象，格式为 {"entries":[...]}.`;
 
 const DEFAULT_AI_PLANNING_PROMPT_TEMPLATE = `你当前处于规划阶段，不允许改写正文。
-你只能完成三件事：判断哪些条目应作为只读背景、判断哪些条目应作为待修改条目、给出整体改造方案。
+你需要判断哪些条目应作为只读背景、哪些条目应作为待修改条目，并为每个待修改条目给出可执行任务。
 规则：readonly_uids 和 editable_uids 不能重叠；只能从输入提供的 UID 中选择；必须保留<锁定选择>中的硬约束。
+plan.entry_tasks 必须覆盖全部 editable_uids，且每个 UID 只能出现一次。
+complexity 只能是 low、medium、high；estimated_output_tokens 是 64 到 64000 的整数。
+depends_on_uids 表示必须先完成的依赖，可引用修改或只读条目；related_uids 表示尽量同批的相关修改条目。
 禁止输出解释、Markdown、代码块或 JSON 之外的任何内容。
-只返回严格 JSON 对象，格式为 {"readonly_uids":[],"editable_uids":[],"plan":{"goal":"","must_keep":[],"rewrite_rules":[],"consistency_notes":[]}}.`;
+只返回严格 JSON 对象，格式为 {"readonly_uids":[],"editable_uids":[],"plan":{"goal":"","must_keep":[],"rewrite_rules":[],"consistency_notes":[],"entry_tasks":[{"uid":1,"objective":"","complexity":"medium","estimated_output_tokens":1024,"depends_on_uids":[],"related_uids":[]}]}}.`;
 
 const DEFAULT_AI_DRAFT = {
   lorebookName: '',
@@ -135,7 +138,7 @@ function normalizeAiContextBudget(contextBudget = {}) {
   return {
     enabled: contextBudget?.enabled !== false,
     maxInputTokens: Number.isFinite(maxInputTokens)
-      ? Math.min(200000, Math.max(1000, maxInputTokens))
+      ? Math.min(2000000, Math.max(1000, maxInputTokens))
       : DEFAULT_AI_CONTEXT_BUDGET.maxInputTokens,
     reserveOutputTokens: Number.isFinite(reserveOutputTokens)
       ? Math.min(64000, Math.max(256, reserveOutputTokens))

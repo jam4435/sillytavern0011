@@ -5,13 +5,17 @@ const apiMocks = vi.hoisted(() => ({
   getWorldbookSafe: vi.fn(),
   updateWorldbookEntries: vi.fn(),
 }));
+const llmMocks = vi.hoisted(() => ({
+  requestLlmText: vi.fn(),
+}));
 
 vi.mock('../api.js', () => apiMocks);
+vi.mock('./llmClient.js', () => llmMocks);
 
 Object.assign(globalThis, { _ });
 
 import { applyAiPreview, generateAiPreview as generateQuickAiPreview } from './aiActions.js';
-import { generateAiPreview } from './aiActionsBatch.js';
+import { generateAiPlan, generateAiPreview } from './aiActionsBatch.js';
 
 type Entry = {
   uid: number;
@@ -42,6 +46,7 @@ describe('AI 预览结果契约', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     apiMocks.getWorldbookSafe.mockReset();
     apiMocks.updateWorldbookEntries.mockReset();
+    llmMocks.requestLlmText.mockReset();
   });
 
   it('保留批量返回中的部分成功、缺失 UID 错误和实际请求配置', async () => {
@@ -69,6 +74,47 @@ describe('AI 预览结果契约', () => {
       success: true,
       attemptLabel: '当前配置',
     });
+  });
+
+  it('规划请求使用输出上限并解析逐条任务契约', async () => {
+    const entries = [makeEntry(1), makeEntry(2)];
+    apiMocks.getWorldbookSafe.mockResolvedValue({ success: true, data: entries });
+    llmMocks.requestLlmText.mockResolvedValue(JSON.stringify({
+      readonly_uids: [2],
+      editable_uids: [1],
+      plan: {
+        goal: '重写主条目',
+        must_keep: [],
+        rewrite_rules: [],
+        consistency_notes: [],
+        entry_tasks: [{
+          uid: 1,
+          objective: '补全主条目',
+          complexity: 'high',
+          estimated_output_tokens: 1800,
+          depends_on_uids: [2],
+          related_uids: [],
+        }],
+      },
+    }));
+
+    const result = await generateAiPlan({
+      lorebookName: '测试世界书',
+      instruction: '补全设定',
+      contextBudget: { reserveOutputTokens: 8192 },
+    });
+
+    expect(result.plan.entry_tasks).toEqual([
+      expect.objectContaining({
+        uid: 1,
+        complexity: 'high',
+        estimated_output_tokens: 1800,
+        depends_on_uids: [2],
+      }),
+    ]);
+    expect(llmMocks.requestLlmText).toHaveBeenCalledWith(
+      expect.objectContaining({ maxOutputTokens: 8192 }),
+    );
   });
 
   it('停止生成时返回 cancelled 且不把未执行条目记为失败', async () => {
@@ -154,20 +200,18 @@ describe('AI 预览结果契约', () => {
     });
   });
 
-  it('多批次保持顺序执行', async () => {
-    const entries = [
-      makeEntry(1, { content: '甲'.repeat(5000) }),
-      makeEntry(2, { content: '乙'.repeat(5000) }),
-      makeEntry(3, { content: '丙'.repeat(5000) }),
-    ];
+  it('直接模式每五条分批并保持顺序执行，输入 token 不改变批次', async () => {
+    const entries = Array.from({ length: 11 }, (_, index) =>
+      makeEntry(index + 1, { content: `${index + 1}`.repeat(5000) }));
     apiMocks.getWorldbookSafe.mockResolvedValue({ success: true, data: entries });
     const callOrder: number[] = [];
+    const batchSizes: number[] = [];
     let activeCalls = 0;
     let maxActiveCalls = 0;
 
     const result = await generateAiPreview({
       lorebookName: '测试世界书',
-      entryUids: [1, 2, 3],
+      entryUids: entries.map(entry => entry.uid),
       instruction: '保持原样',
       contextBudget: { enabled: true, maxInputTokens: 1000, reserveOutputTokens: 256 },
       client: vi.fn(async (_prompt, options) => {
@@ -175,6 +219,7 @@ describe('AI 预览结果契约', () => {
         maxActiveCalls = Math.max(maxActiveCalls, activeCalls);
         const uid = options.entries[0].uid;
         callOrder.push(uid);
+        batchSizes.push(options.entries.length);
         await Promise.resolve();
         activeCalls -= 1;
         return JSON.stringify({
@@ -191,9 +236,144 @@ describe('AI 预览结果契约', () => {
     });
 
     expect(result.outcome).toBe('complete');
-    expect(callOrder).toEqual([1, 2, 3]);
+    expect(callOrder).toEqual([1, 6, 11]);
+    expect(batchSizes).toEqual([5, 5, 1]);
     expect(maxActiveCalls).toBe(1);
     expect(result.summary.batching.totalBatches).toBe(3);
+    expect(result.summary.batching.strategy).toBe('direct-entry-count');
+  });
+
+  it('超长只读上下文只产生输入警告，不拆分三个空修改条目', async () => {
+    const targets = [
+      makeEntry(1, { content: '' }),
+      makeEntry(2, { content: '' }),
+      makeEntry(3, { content: '' }),
+    ];
+    const readonly = Array.from({ length: 20 }, (_, index) =>
+      makeEntry(100 + index, { content: '只读背景'.repeat(2000) }));
+    apiMocks.getWorldbookSafe.mockResolvedValue({ success: true, data: [...targets, ...readonly] });
+    const client = vi.fn(async (_prompt, options) =>
+      JSON.stringify({
+        entries: options.entries.map((entry: Entry) => ({
+          uid: entry.uid,
+          title: entry.name,
+          content: entry.content,
+          prompts: { primary: entry.strategy.keys },
+        })),
+      }));
+
+    const result = await generateAiPreview({
+      lorebookName: '测试世界书',
+      entryUids: targets.map(entry => entry.uid),
+      readonlyEntryUids: readonly.map(entry => entry.uid),
+      instruction: '补全空条目',
+      contextBudget: { enabled: true, maxInputTokens: 1000, reserveOutputTokens: 4096 },
+      client,
+    });
+
+    expect(client).toHaveBeenCalledTimes(1);
+    expect(result.summary.batching.totalBatches).toBe(1);
+    expect(result.summary.batching.oversizedBatches).toBe(1);
+    expect(result.warnings.some((warning: { warning?: string }) =>
+      warning.warning?.includes('超过警戒值'))).toBe(true);
+  });
+
+  it('规划模式按跨批依赖排序，并把前批最新结果注入后批', async () => {
+    const entries = [makeEntry(2, { name: 'B' }), makeEntry(1, { name: 'A' })];
+    apiMocks.getWorldbookSafe.mockResolvedValue({ success: true, data: entries });
+    const callOrder: number[] = [];
+    const prompts: string[] = [];
+    const client = vi.fn(async (prompt, options) => {
+      prompts.push(prompt);
+      callOrder.push(options.entries[0].uid);
+      const entry = options.entries[0] as Entry;
+      return JSON.stringify({
+        entries: [{
+          uid: entry.uid,
+          title: entry.uid === 1 ? '新 A' : '新 B',
+          content: entry.content,
+          prompts: { primary: entry.strategy.keys },
+        }],
+      });
+    });
+
+    const result = await generateAiPreview({
+      lorebookName: '测试世界书',
+      entryUids: [2, 1],
+      instruction: '按依赖修改',
+      sourceMode: 'plan',
+      planningResult: {
+        plan: {
+          entry_tasks: [
+            {
+              uid: 2,
+              objective: '根据 A 修改 B',
+              complexity: 'medium',
+              estimated_output_tokens: 1024,
+              depends_on_uids: [1],
+              related_uids: [],
+            },
+            {
+              uid: 1,
+              objective: '先修改 A',
+              complexity: 'medium',
+              estimated_output_tokens: 1024,
+              depends_on_uids: [],
+              related_uids: [],
+            },
+          ],
+        },
+      },
+      contextBudget: { enabled: false, maxInputTokens: 1000, reserveOutputTokens: 2048 },
+      client,
+    });
+
+    expect(result.outcome).toBe('complete');
+    expect(callOrder).toEqual([1, 2]);
+    expect(prompts[1]).toContain('新 A');
+    expect(result.summary.batching.strategy).toBe('planned-output-graph');
+  });
+
+  it('规划依赖失败时跳过下游条目', async () => {
+    const entries = [makeEntry(1, { name: 'A' }), makeEntry(2, { name: 'B' })];
+    apiMocks.getWorldbookSafe.mockResolvedValue({ success: true, data: entries });
+    const client = vi.fn(async () => JSON.stringify({ entries: [] }));
+
+    const result = await generateAiPreview({
+      lorebookName: '测试世界书',
+      entryUids: [1, 2],
+      instruction: '按依赖修改',
+      sourceMode: 'plan',
+      planningResult: {
+        plan: {
+          entry_tasks: [
+            {
+              uid: 1,
+              objective: '先修改 A',
+              complexity: 'medium',
+              estimated_output_tokens: 1024,
+              depends_on_uids: [],
+              related_uids: [],
+            },
+            {
+              uid: 2,
+              objective: '根据 A 修改 B',
+              complexity: 'medium',
+              estimated_output_tokens: 1024,
+              depends_on_uids: [1],
+              related_uids: [],
+            },
+          ],
+        },
+      },
+      contextBudget: { enabled: false, maxInputTokens: 1000, reserveOutputTokens: 2048 },
+      client,
+    });
+
+    expect(client).toHaveBeenCalledTimes(1);
+    expect(result.outcome).toBe('failed');
+    expect(result.errors.map((error: { uid: number }) => error.uid)).toEqual([2, 1]);
+    expect(result.errors[0].error).toContain('依赖条目未成功生成');
   });
 
   it('批量改写契约不发送次级关键词，并忽略模型返回的次级字段', async () => {

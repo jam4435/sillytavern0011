@@ -151,6 +151,181 @@ describe('AI 工作流状态层', () => {
     });
   });
 
+  it('旧计划缺少 entry_tasks 时为每个可修改条目合成默认任务并保留旧字段', () => {
+    expect(normalizeAiPlanEditorValue({
+      editable_uids: [3, 1],
+      readonly_uids: [2],
+      locked_editable_uids: [3],
+      planned_editable_uids: [1],
+      plan: {
+        goal: ' 统一设定 ',
+        must_keep: [' 核心事实 '],
+      },
+    }, new Set([1, 2, 3]))).toEqual({
+      readonly_uids: [2],
+      editable_uids: [3, 1],
+      locked_editable_uids: [3],
+      locked_readonly_uids: [],
+      planned_editable_uids: [1],
+      planned_readonly_uids: [],
+      plan: {
+        goal: '统一设定',
+        must_keep: ['核心事实'],
+        rewrite_rules: [],
+        consistency_notes: [],
+        entry_tasks: [
+          {
+            uid: 3,
+            objective: '按用户指令处理该条目',
+            complexity: 'medium',
+            estimated_output_tokens: 1024,
+            depends_on_uids: [],
+            related_uids: [],
+          },
+          {
+            uid: 1,
+            objective: '按用户指令处理该条目',
+            complexity: 'medium',
+            estimated_output_tokens: 1024,
+            depends_on_uids: [],
+            related_uids: [],
+          },
+        ],
+      },
+    });
+  });
+
+  it('规范化 entry_tasks，并允许依赖可修改或只读条目', () => {
+    const normalized = normalizeAiPlanEditorValue({
+      editable_uids: [1, 2],
+      readonly_uids: [3],
+      plan: {
+        entry_tasks: [
+          {
+            uid: '1',
+            objective: ' 建立基础设定 ',
+            complexity: 'high',
+            estimated_output_tokens: '1800',
+            depends_on_uids: [3],
+            related_uids: [2],
+          },
+          {
+            uid: 2,
+            objective: '补充关系',
+            complexity: 'low',
+            estimated_output_tokens: 64,
+            depends_on_uids: [1],
+          },
+        ],
+      },
+    }, new Set([1, 2, 3, 4]));
+
+    expect(normalized.plan.entry_tasks).toEqual([
+      {
+        uid: 1,
+        objective: '建立基础设定',
+        complexity: 'high',
+        estimated_output_tokens: 1800,
+        depends_on_uids: [3],
+        related_uids: [2],
+      },
+      {
+        uid: 2,
+        objective: '补充关系',
+        complexity: 'low',
+        estimated_output_tokens: 64,
+        depends_on_uids: [1],
+        related_uids: [],
+      },
+    ]);
+  });
+
+  it('entry_tasks 必须唯一且完整覆盖最终可修改 UID', () => {
+    const base = {
+      editable_uids: [1, 2],
+      readonly_uids: [3],
+    };
+    const task = (uid: number) => ({
+      uid,
+      objective: `任务 ${uid}`,
+      complexity: 'medium',
+      estimated_output_tokens: 1024,
+      depends_on_uids: [],
+      related_uids: [],
+    });
+
+    expect(() => normalizeAiPlanEditorValue({
+      ...base,
+      plan: { entry_tasks: [task(1), task(1)] },
+    })).toThrow('重复任务 UID');
+    expect(() => normalizeAiPlanEditorValue({
+      ...base,
+      plan: { entry_tasks: [task(1)] },
+    })).toThrow('缺少可修改 UID');
+    expect(() => normalizeAiPlanEditorValue({
+      ...base,
+      plan: { entry_tasks: [task(1), task(2), task(3)] },
+    })).toThrow('非可修改或已排除 UID');
+  });
+
+  it('entry_tasks 拒绝非法复杂度、输出估算和任务内容', () => {
+    const normalizeTask = (patch: Record<string, unknown>) => normalizeAiPlanEditorValue({
+      editable_uids: [1],
+      plan: {
+        entry_tasks: [{
+          uid: 1,
+          objective: '改写',
+          complexity: 'medium',
+          estimated_output_tokens: 1024,
+          depends_on_uids: [],
+          related_uids: [],
+          ...patch,
+        }],
+      },
+    });
+
+    expect(() => normalizeTask({ objective: ' ' })).toThrow('objective 必须是非空文本');
+    expect(() => normalizeTask({ complexity: 'extreme' })).toThrow('low、medium 或 high');
+    expect(() => normalizeTask({ estimated_output_tokens: 63 })).toThrow('64-64000');
+    expect(() => normalizeTask({ estimated_output_tokens: 64001 })).toThrow('64-64000');
+    expect(() => normalizeTask({ estimated_output_tokens: 100.5 })).toThrow('64-64000');
+  });
+
+  it('entry_tasks 拒绝自身、重复、未知、排除和非法关联引用', () => {
+    const validUids = new Set([1, 2, 3, 4]);
+    const normalizeReferences = (dependsOnUids: number[], relatedUids: number[] = []) => normalizeAiPlanEditorValue({
+      editable_uids: [1, 2],
+      readonly_uids: [3],
+      plan: {
+        entry_tasks: [
+          {
+            uid: 1,
+            objective: '任务 1',
+            complexity: 'medium',
+            estimated_output_tokens: 1024,
+            depends_on_uids: dependsOnUids,
+            related_uids: relatedUids,
+          },
+          {
+            uid: 2,
+            objective: '任务 2',
+            complexity: 'medium',
+            estimated_output_tokens: 1024,
+            depends_on_uids: [],
+            related_uids: [],
+          },
+        ],
+      },
+    }, validUids);
+
+    expect(() => normalizeReferences([1])).toThrow('不能引用自身');
+    expect(() => normalizeReferences([3, 3])).toThrow('重复 UID');
+    expect(() => normalizeReferences([9])).toThrow('不存在的 UID');
+    expect(() => normalizeReferences([4])).toThrow('未知或已排除 UID');
+    expect(() => normalizeReferences([], [3])).toThrow('只能引用可修改 UID');
+    expect(() => normalizeReferences([], [4])).toThrow('只能引用可修改 UID');
+  });
+
   it('用 runId 忽略陈旧异步结果，并保留取消前已经存在的审阅结果', () => {
     let state = createAiWorkflowState({ draft: { instruction: '调整', selectedEntryUids: [1] } });
     state = reduce(state, { type: 'START_GENERATION', runId: 'new-run' });
