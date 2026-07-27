@@ -72,7 +72,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '噩梦++',
     gender: 'female',
     description: '帝国女性内部改良。合法身份是盾牌也是脚镣，沉默游行是抗议也是备案名单。她要在告解室、互助会和政府演讲台之间走出一条不沾血的钢丝——而那位女权革命家的微笑比警察的警棍更难读懂。',
-    enabled: false,
+    enabled: true,
   },
   {
     key: 'akentor_male_defector',
@@ -80,7 +80,7 @@ export const hardIdentityRouteOptions: readonly HardIdentityRouteOption[] = [
     difficulty: '较难',
     gender: 'male',
     description: '阿肯托尔对帝国的叛逆。他背叛了帝国，却发现自己站在另一座将塌的塔上——阿肯托尔要财富，革命军要平权，姐妹会只要复仇。每一方都递来橄榄枝，每一枝都藏着铁蒺藜',
-    enabled: false,
+    enabled: true,
   },
   {
     key: 'external_revolutionary_army',

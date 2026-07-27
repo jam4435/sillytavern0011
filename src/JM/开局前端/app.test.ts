@@ -85,7 +85,7 @@ describe('开局前端入口设置', () => {
     expect(localStorage.getItem(hardIdentityRouteStorageKey)).toBeNull();
   });
 
-  it('开放默认、路线一、路线二、路线三、路线四和路线九，其余高难身份路线暗色禁用', () => {
+  it('开放默认、路线一至六和路线九，路线七、八暗色禁用', () => {
     init();
 
     const enabledRoutes = [
@@ -94,11 +94,11 @@ describe('开局前端入口设置', () => {
       'imperial_male_lowborn',
       'imperial_female_survival',
       'imperial_female_revolutionary',
+      'imperial_female_reformist',
+      'akentor_male_defector',
       'imperial_male_thorn_crown',
     ];
     const disabledRoutes = [
-      'imperial_female_reformist',
-      'akentor_male_defector',
       'external_revolutionary_army',
       'external_roaring_sisterhood',
     ];
@@ -120,13 +120,13 @@ describe('开局前端入口设置', () => {
   });
 
   it('旧缓存中的未开放高难身份路线会回退到不启用', () => {
-    localStorage.setItem(hardIdentityRouteStorageKey, 'imperial_female_reformist');
+    localStorage.setItem(hardIdentityRouteStorageKey, 'external_revolutionary_army');
 
     init();
 
     const noneRouteInput = document.getElementById('setting-hard-identity-route-none') as HTMLInputElement | null;
     const disabledRouteInput = document.getElementById(
-      'setting-hard-identity-route-imperial_female_reformist',
+      'setting-hard-identity-route-external_revolutionary_army',
     ) as HTMLInputElement | null;
 
     expect(noneRouteInput?.checked).toBe(true);
