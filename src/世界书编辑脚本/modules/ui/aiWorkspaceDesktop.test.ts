@@ -8,6 +8,7 @@ let buildAssistantPrompt: typeof import('./aiWorkspaceDesktop.js').buildAssistan
 let buildApiSettingsMarkup: typeof import('./aiWorkspaceDesktop.js').buildApiSettingsMarkup;
 let buildDesktopShellMarkup: typeof import('./aiWorkspaceDesktop.js').buildDesktopShellMarkup;
 let buildInfoResourcesMarkup: typeof import('./aiWorkspaceDesktop.js').buildInfoResourcesMarkup;
+let buildPreviewModalSections: typeof import('./aiWorkspaceDesktop.js').buildPreviewModalSections;
 let buildStepIndicator: typeof import('./aiWorkspaceDesktop.js').buildStepIndicator;
 let renderEntryList: typeof import('./aiWorkspaceDesktop.js').renderEntryList;
 
@@ -21,6 +22,7 @@ beforeAll(async () => {
     buildAssistantPrompt,
     buildDesktopShellMarkup,
     buildInfoResourcesMarkup,
+    buildPreviewModalSections,
     buildStepIndicator,
     renderEntryList,
   } = await import('./aiWorkspaceDesktop.js'));
@@ -142,9 +144,15 @@ describe('AI 助手手机窗语义', () => {
     expect(block).toContain('<当前选中的世界书条目>');
     expect(JSON.parse(block.split('\n').slice(1, -1).join('\n'))).toMatchObject({
       worldbook_name: '群星志',
-      editable_entries: [{ uid: 11, name: '北境', content: '终年落雪。' }],
+      editable_entries: [{
+        uid: 11,
+        name: '北境',
+        content: '终年落雪。',
+        keywords: { primary: ['北境'] },
+      }],
       readonly_entries: [{ uid: 12, name: '王都', content: '位于南方。' }],
     });
+    expect(block).not.toMatch(/secondary_logic|secondary/);
     expect(prompt).toContain(block);
     expect(prompt).toContain('修改/只读');
   });
@@ -161,5 +169,34 @@ describe('AI 助手手机窗语义', () => {
     expect(block).toBe('');
     expect(prompt).not.toContain('<当前选中的世界书条目>');
     expect(prompt).not.toContain('排除项');
+  });
+});
+
+describe('AI 修改审阅字段', () => {
+  it('只显示标题、正文和主关键词，不暴露次级关键词编辑项', () => {
+    const beforeEntry = {
+      name: '旧标题',
+      content: '旧正文',
+      strategy: {
+        keys: ['旧关键词'],
+        keys_secondary: { logic: 'not_any', keys: ['旧次级'] },
+      },
+    };
+    const afterEntry = {
+      name: '新标题',
+      content: '新正文',
+      strategy: {
+        keys: ['新关键词'],
+        keys_secondary: { logic: 'and_all', keys: ['新次级'] },
+      },
+    };
+
+    const sections = buildPreviewModalSections(
+      { beforeEntry, afterEntry },
+      { editableFields: { title: true, content: true, prompt: true } },
+    );
+
+    expect(sections.map(section => section.key)).toEqual(['title', 'content', 'keywords']);
+    expect(sections.map(section => section.title)).toEqual(['标题', '内容', '关键词']);
   });
 });

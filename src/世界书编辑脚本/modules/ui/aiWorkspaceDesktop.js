@@ -90,8 +90,6 @@ function createEmptyModeState() {
 function buildEntryPromptSnapshot(entry = {}) {
   return {
     primary: Array.isArray(entry?.strategy?.keys) ? [...entry.strategy.keys] : [],
-    secondaryLogic: entry?.strategy?.keys_secondary?.logic || 'and_any',
-    secondary: Array.isArray(entry?.strategy?.keys_secondary?.keys) ? [...entry.strategy.keys_secondary.keys] : [],
   };
 }
 
@@ -112,8 +110,6 @@ function serializeAssistantContextEntry(entry = {}) {
     content: entry.content || '',
     keywords: {
       primary: Array.isArray(promptSnapshot.primary) ? promptSnapshot.primary : [],
-      secondary_logic: promptSnapshot.secondaryLogic || 'and_any',
-      secondary: Array.isArray(promptSnapshot.secondary) ? promptSnapshot.secondary : [],
     },
   };
 }
@@ -1381,16 +1377,6 @@ function buildManualPreviewDiffs(beforeEntry, afterEntry, fieldOptions = {}) {
       Array.isArray(beforeEntry?.strategy?.keys) ? beforeEntry.strategy.keys : [],
       Array.isArray(afterEntry?.strategy?.keys) ? afterEntry.strategy.keys : [],
     );
-    pushDiff(
-      '次级关键词逻辑',
-      beforeEntry?.strategy?.keys_secondary?.logic || 'and_any',
-      afterEntry?.strategy?.keys_secondary?.logic || 'and_any',
-    );
-    pushDiff(
-      '次级关键词',
-      Array.isArray(beforeEntry?.strategy?.keys_secondary?.keys) ? beforeEntry.strategy.keys_secondary.keys : [],
-      Array.isArray(afterEntry?.strategy?.keys_secondary?.keys) ? afterEntry.strategy.keys_secondary.keys : [],
-    );
   }
 
   return diffs;
@@ -1460,17 +1446,11 @@ function restorePreviewItemOriginal(modeKey, uid) {
   return item;
 }
 
-function buildPreviewModalSections(item, mode) {
+export function buildPreviewModalSections(item, mode) {
   const beforeEntry = item?.beforeEntry || {};
   const afterEntry = item?.afterEntry || {};
   const beforeKeywords = Array.isArray(beforeEntry?.strategy?.keys) ? beforeEntry.strategy.keys : [];
   const afterKeywords = Array.isArray(afterEntry?.strategy?.keys) ? afterEntry.strategy.keys : [];
-  const beforeSecondaryKeywords = Array.isArray(beforeEntry?.strategy?.keys_secondary?.keys)
-    ? beforeEntry.strategy.keys_secondary.keys
-    : [];
-  const afterSecondaryKeywords = Array.isArray(afterEntry?.strategy?.keys_secondary?.keys)
-    ? afterEntry.strategy.keys_secondary.keys
-    : [];
   const sections = [];
 
   if (mode?.editableFields?.title) {
@@ -1486,18 +1466,6 @@ function buildPreviewModalSections(item, mode) {
   }
   if (mode?.editableFields?.prompt) {
     sections.push({ key: 'keywords', title: '关键词', before: beforeKeywords, after: afterKeywords });
-    sections.push({
-      key: 'secondary_logic',
-      title: '次级关键词逻辑',
-      before: beforeEntry?.strategy?.keys_secondary?.logic || 'and_any',
-      after: afterEntry?.strategy?.keys_secondary?.logic || 'and_any',
-    });
-    sections.push({
-      key: 'secondary_keywords',
-      title: '次级关键词',
-      before: beforeSecondaryKeywords,
-      after: afterSecondaryKeywords,
-    });
   }
   if (!sections.length) {
     sections.push({
@@ -1535,7 +1503,7 @@ function applyPreviewEditsFromFields(modeKey, uid, fieldsSelector) {
     const field = ($(this).attr('data-preview-field') || '').trim();
     const value = $(this).val() || '';
     try {
-      if (field === 'keywords' || field === 'secondary_keywords') {
+      if (field === 'keywords') {
         fieldWrites.push({ field, value: parseKeywordsEditorValue(value) });
       } else {
         fieldWrites.push({ field, value });
@@ -1562,12 +1530,6 @@ function applyPreviewEditsFromFields(modeKey, uid, fieldsSelector) {
       afterEntry.content = `${value}`;
     } else if (field === 'keywords') {
       afterEntry.strategy.keys = value;
-    } else if (field === 'secondary_logic') {
-      afterEntry.strategy.keys_secondary = afterEntry.strategy.keys_secondary || {};
-      afterEntry.strategy.keys_secondary.logic = `${value}`.trim() || 'and_any';
-    } else if (field === 'secondary_keywords') {
-      afterEntry.strategy.keys_secondary = afterEntry.strategy.keys_secondary || {};
-      afterEntry.strategy.keys_secondary.keys = value;
     }
   });
   item.afterEntry = afterEntry;
@@ -1761,18 +1723,39 @@ function clearPreview(modeKey, text = EMPTY_PREVIEW_TEXT) {
   mode.previewResult = null;
   mode.debugInfo = {};
   closePreviewModal();
+  renderPreviewPlaceholder(modeKey, { text });
+}
 
+function renderPreviewPlaceholder(modeKey, { text = EMPTY_PREVIEW_TEXT, errorText = '', running = false } = {}) {
+  const mode = state.modes[modeKey];
   const $summary = $('#ai-workspace-preview-summary', parentDoc());
   if (!$summary.length) {
     return;
   }
 
-  $summary.text(text);
-  $('#ai-workspace-preview-errors', parentDoc()).removeClass('has-errors').empty();
-  $('#ai-workspace-preview-list', parentDoc()).empty();
-  renderPreviewDetail(modeKey, null);
+  $summary
+    .text(text)
+    .attr('data-outcome', running ? 'running' : errorText ? 'failed' : 'idle');
+  $('#ai-workspace-preview-errors', parentDoc())
+    .toggleClass('has-errors', Boolean(errorText))
+    .text(errorText);
+  $('#ai-workspace-preview-list', parentDoc()).html(`
+    <div class="ai-review-pending${errorText ? ' is-error' : ''}" role="status" aria-live="polite">
+      <i class="fa-solid ${running ? 'fa-wand-magic-sparkles' : errorText ? 'fa-triangle-exclamation' : 'fa-list-check'}"></i>
+      <strong>${_.escape(running ? 'AI 正在整理修改结果' : errorText ? '本次生成未完成' : '等待生成修改结果')}</strong>
+      <span>${_.escape(running ? '结果会在生成完成后直接出现在这里，你可以随时停止。' : errorText ? '请查看错误信息后重新生成，或返回调整输入。' : '生成后可在此逐条审阅、编辑或排除。')}</span>
+    </div>
+  `);
+  $('#ai-workspace-preview-detail', parentDoc())
+    .removeAttr('data-preview-uid')
+    .html(`
+      <div class="ai-review-pending ai-review-pending-detail${errorText ? ' is-error' : ''}">
+        <i class="fa-solid ${running ? 'fa-circle-notch fa-spin' : errorText ? 'fa-bug' : 'fa-arrow-pointer'}"></i>
+        <span>${_.escape(running ? '等待首条结果…' : errorText ? '修正配置或指令后可在当前页重试。' : '生成结果后，选择左侧条目查看完整差异。')}</span>
+      </div>
+    `);
   $('#ai-workspace-apply', parentDoc()).prop('disabled', true);
-  renderDebugInfo(modeKey, {});
+  renderDebugInfo(modeKey, mode.debugInfo || {});
 }
 
 function renderPreview(modeKey, previewResult = null) {
@@ -3616,6 +3599,12 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-review-list-panel,#${ROOT_ID} .ai-review-detail-panel{min-height:0}
       #${ROOT_ID} .ai-preview-summary{padding:9px;border-radius:8px;background:var(--ai-surface-muted-color,rgba(0,0,0,.15));color:var(--ai-text-color-secondary,#aaa);font-size:11px;line-height:1.45}
       #${ROOT_ID} .ai-preview-list{max-height:560px;overflow:auto;margin-top:8px;border:1px solid var(--ai-border-color,#555);border-radius:9px}
+      #${ROOT_ID} .ai-review-pending{min-height:190px;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;color:var(--ai-text-color-secondary,#aaa);background:radial-gradient(circle at 50% 18%,color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 10%,transparent),transparent 58%)}
+      #${ROOT_ID} .ai-review-pending>i{font-size:24px;color:var(--panel-accent-color,#9fc8e4)}
+      #${ROOT_ID} .ai-review-pending>strong{color:var(--panel-text-color,#eee);font-size:13px}
+      #${ROOT_ID} .ai-review-pending>span{max-width:360px;font-size:11px;line-height:1.55}
+      #${ROOT_ID} .ai-review-pending.is-error>i{color:var(--ai-danger-color,#ef8e8e)}
+      #${ROOT_ID} .ai-review-pending-detail{min-height:360px;border:1px dashed color-mix(in srgb,var(--ai-border-color,#555) 78%,transparent);border-radius:12px;background:var(--ai-surface-muted-color,rgba(0,0,0,.09))}
       #${ROOT_ID} .ai-preview-item{padding:10px;border-bottom:1px solid var(--ai-border-color,#555);cursor:pointer}
       #${ROOT_ID} .ai-preview-item.is-active{background:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 12%,transparent)}
       #${ROOT_ID} .ai-preview-detail{min-height:100%;padding:0;border:0;background:transparent;overflow:visible}
@@ -3738,6 +3727,7 @@ function ensureUnifiedStyles() {
       @media (prefers-reduced-motion:reduce){
         #${ROOT_ID} .ai-assistant-phone{animation:none}
         #${ROOT_ID} .ai-assistant-history{scroll-behavior:auto}
+        #${ROOT_ID} .ai-review-pending .fa-spin{animation:none}
       }
       #${ROOT_ID} .ai-preview-modal{position:fixed;inset:0;width:auto;height:auto;overflow:auto}
       #${ROOT_ID} .ai-preview-modal-dialog{max-height:calc(100% - 48px);margin:24px auto}
@@ -3931,8 +3921,12 @@ function renderCurrentPanel() {
     if (mode.previewResult) {
       renderPreview(modeKey, mode.previewResult);
     } else {
-      clearPreview(modeKey);
-      renderDebugInfo(modeKey, mode.debugInfo || {});
+      const errorText = mode.debugInfo?.errorDetails ? mode.statusText || '生成预览失败。' : '';
+      renderPreviewPlaceholder(modeKey, {
+        text: state.isGenerating ? '正在生成预览，结果将逐批汇总…' : mode.statusText || EMPTY_PREVIEW_TEXT,
+        errorText,
+        running: state.isGenerating,
+      });
     }
   } else if (mode.currentStep === 'complete') {
     void refreshRollbackPanel(modeKey);
@@ -4231,9 +4225,12 @@ async function handlePreview() {
   }
 
   state.stopRequested = false;
+  mode.previewResult = null;
+  mode.debugInfo = {};
+  mode.currentStep = 'review';
+  setModeStatus(modeKey, '正在生成预览…');
   setGeneratingState(true);
-  clearPreview(modeKey, '正在生成预览...');
-  setModeStatus(modeKey, '正在生成预览...');
+  renderCurrentPanel();
 
   try {
     const previewResult = await generateAiPreview({
@@ -4259,7 +4256,9 @@ async function handlePreview() {
       onProgress: progress => {
         if (runId !== state.previewRunId) return;
         const prefix = progress?.title ? `${progress.title}：` : '';
-        setModeStatus(modeKey, `${prefix}成功 ${progress.succeeded} 条，失败 ${progress.failed} 条`);
+        const progressText = `${prefix}成功 ${progress.succeeded} 条，失败 ${progress.failed} 条`;
+        setModeStatus(modeKey, progressText);
+        $('#ai-workspace-preview-summary', parentDoc()).text(progressText);
       },
     });
 
@@ -4278,7 +4277,9 @@ async function handlePreview() {
       const message = error?.message || '生成预览失败。';
       mode.previewResult = null;
       mode.debugInfo = { errorDetails: error?.stack || message };
+      mode.currentStep = 'review';
       setModeStatus(modeKey, message);
+      setGeneratingState(false);
       persistSettings({ mirrorModeKey: modeKey });
       renderCurrentPanel();
     }

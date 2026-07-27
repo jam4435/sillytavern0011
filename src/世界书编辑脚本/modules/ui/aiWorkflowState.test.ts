@@ -26,6 +26,16 @@ describe('AI 工作流状态层', () => {
       nextGenerationKind: 'preview',
       primaryAction: 'preview',
     });
+
+    state = reduce(state, { type: 'START_GENERATION', runId: 'preview-1' });
+    expect(state).toMatchObject({
+      phase: 'review',
+      generation: { status: 'running', kind: 'preview', runId: 'preview-1' },
+    });
+    expect(deriveAiWorkflowCapabilities(state)).toMatchObject({
+      primaryAction: 'stop',
+      canEnterPhase: { review: true },
+    });
   });
 
   it('计划策略允许零锁定选择并明确使用整本世界书', () => {
@@ -111,6 +121,7 @@ describe('AI 工作流状态层', () => {
     expect(reduce(state, { type: 'GO_TO_PHASE', phase: 'planReview' })).toBe(state);
 
     state = reduce(state, { type: 'START_GENERATION', runId: 'plan-1' });
+    expect(state.phase).toBe('prepare');
     expect(state.generation).toMatchObject({ status: 'running', kind: 'plan', runId: 'plan-1' });
     state = reduce(state, {
       type: 'PLANNING_SUCCEEDED',
@@ -166,6 +177,29 @@ describe('AI 工作流状态层', () => {
     state = reduce(state, { type: 'GENERATION_CANCELLED', runId: 'regen-1' });
     expect(state.phase).toBe('review');
     expect(state.previewResult).toEqual({ status: 'partial', entries: [{ uid: 1 }] });
+  });
+
+  it('首次预览失败后停留在审阅页，并把主动作切换为重新生成', () => {
+    let state = createAiWorkflowState({
+      draft: { instruction: '调整', selectedEntryUids: [1] },
+    });
+    state = reduce(state, { type: 'START_GENERATION', runId: 'preview-failed' });
+    state = reduce(state, {
+      type: 'GENERATION_FAILED',
+      runId: 'preview-failed',
+      error: '请求失败',
+    });
+
+    expect(state).toMatchObject({
+      phase: 'review',
+      previewResult: null,
+      error: '请求失败',
+    });
+    expect(deriveAiWorkflowCapabilities(state)).toMatchObject({
+      canRegenerate: true,
+      canApply: false,
+      primaryAction: 'regenerate',
+    });
   });
 
   it('部分应用只保留冲突和缺失条目，全部成功后进入完成态', () => {

@@ -19,7 +19,6 @@ const COMPATIBILITY_FAILURE_PATTERNS = [
 ];
 const STOP_PREVIEW_MESSAGE = '已停止生成';
 
-const VALID_SECONDARY_LOGIC = new Set(['and_any', 'and_all', 'not_all', 'not_any']);
 const AI_BATCH_REQUEST_MAX_RETRIES = 0;
 const AI_BATCH_MAX_ENTRY_TOKENS = 4000;
 const AI_BATCH_TOKEN_FALLBACK_DIVISOR = 4;
@@ -182,10 +181,6 @@ function getKeywordSnapshot(entry) {
 function getPromptSnapshot(entry) {
   return {
     primary: Array.isArray(entry?.strategy?.keys) ? [...entry.strategy.keys] : [],
-    secondary_logic: VALID_SECONDARY_LOGIC.has(entry?.strategy?.keys_secondary?.logic)
-      ? entry.strategy.keys_secondary.logic
-      : 'and_any',
-    secondary: Array.isArray(entry?.strategy?.keys_secondary?.keys) ? [...entry.strategy.keys_secondary.keys] : [],
   };
 }
 
@@ -307,12 +302,6 @@ function buildInfoGroupXml(sectionName, entries = [], usedNames = new Set()) {
     lines.push('    <关键词>');
     lines.push(escapeXmlText(JSON.stringify(prompts.primary || [])));
     lines.push('    </关键词>');
-    lines.push('    <次级关键词逻辑>');
-    lines.push(escapeXmlText(prompts.secondary_logic || 'and_any'));
-    lines.push('    </次级关键词逻辑>');
-    lines.push('    <次级关键词>');
-    lines.push(escapeXmlText(JSON.stringify(prompts.secondary || [])));
-    lines.push('    </次级关键词>');
     lines.push('  </条目>');
   });
   lines.push(`</${sectionName}>`);
@@ -681,14 +670,6 @@ function normalizeAiDraft(rawDraft, entry, fieldOptions) {
         : [];
     nextEntry.strategy = _.cloneDeep(nextEntry.strategy || {});
     nextEntry.strategy.keys = sanitizeStringArray(keywordDraft, promptSnapshot.primary);
-    nextEntry.strategy.keys_secondary = _.cloneDeep(nextEntry.strategy.keys_secondary || {});
-    nextEntry.strategy.keys_secondary.logic = VALID_SECONDARY_LOGIC.has(draft?.prompts?.secondary_logic)
-      ? draft.prompts.secondary_logic
-      : promptSnapshot.secondary_logic;
-    nextEntry.strategy.keys_secondary.keys = sanitizeStringArray(
-      draft?.prompts?.secondary,
-      promptSnapshot.secondary,
-    );
   }
 
   return nextEntry;

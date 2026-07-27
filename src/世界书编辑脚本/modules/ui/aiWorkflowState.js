@@ -215,7 +215,10 @@ export function canEnterAiWorkflowPhase(state, phase) {
   if (!AI_WORKFLOW_PHASES.includes(phase)) return false;
   if (phase === 'prepare') return true;
   if (phase === 'planReview') return state.strategy === 'plan' && Boolean(state.planningResult);
-  if (phase === 'review') return getPreviewEntries(state.previewResult).length > 0;
+  if (phase === 'review') {
+    return getPreviewEntries(state.previewResult).length > 0
+      || (isGenerationBusy(state) && ['preview', 'regenerate'].includes(state.generation.kind));
+  }
   return state.application.status === 'complete' && Boolean(state.application.result);
 }
 
@@ -246,7 +249,7 @@ export function deriveAiWorkflowCapabilities(state) {
       : state.phase === 'planReview'
         ? 'preview'
         : state.phase === 'review'
-          ? 'apply'
+          ? acceptedPreviewCount > 0 ? 'apply' : 'regenerate'
           : null;
 
   let blockReason = null;
@@ -363,6 +366,7 @@ export function aiWorkflowReducer(state, action = {}) {
         : state.generation.generationId + 1;
       return {
         ...state,
+        phase: ['preview', 'regenerate'].includes(kind) ? 'review' : state.phase,
         generation: {
           status: 'running',
           kind,

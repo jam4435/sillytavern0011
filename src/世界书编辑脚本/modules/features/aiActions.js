@@ -3,7 +3,6 @@ import { requestLlmText } from './llmClient.js';
 import { ensureNumericUID, errorCatched } from '../utils.js';
 
 const RESERVED_META_ENTRY_PREFIX = '__WI_META_';
-const VALID_SECONDARY_LOGIC = new Set(['and_any', 'and_all', 'not_all', 'not_any']);
 const AI_BATCH_CONCURRENCY = 2;
 const AI_ITEM_MAX_RETRIES = 1;
 
@@ -54,10 +53,6 @@ function normalizeFieldOptions(fieldOptions = {}) {
 function getPromptSnapshot(entry) {
   return {
     primary: Array.isArray(entry?.strategy?.keys) ? [...entry.strategy.keys] : [],
-    secondary_logic: VALID_SECONDARY_LOGIC.has(entry?.strategy?.keys_secondary?.logic)
-      ? entry.strategy.keys_secondary.logic
-      : 'and_any',
-    secondary: Array.isArray(entry?.strategy?.keys_secondary?.keys) ? [...entry.strategy.keys_secondary.keys] : [],
   };
 }
 
@@ -189,14 +184,6 @@ function normalizeAiDraft(rawDraft, entry, fieldOptions) {
     const promptDraft = isPlainObject(draft.prompts) ? draft.prompts : {};
     nextEntry.strategy = _.cloneDeep(nextEntry.strategy || {});
     nextEntry.strategy.keys = sanitizeStringArray(promptDraft.primary, getPromptSnapshot(entry).primary);
-    nextEntry.strategy.keys_secondary = _.cloneDeep(nextEntry.strategy.keys_secondary || {});
-    nextEntry.strategy.keys_secondary.logic = VALID_SECONDARY_LOGIC.has(promptDraft.secondary_logic)
-      ? promptDraft.secondary_logic
-      : getPromptSnapshot(entry).secondary_logic;
-    nextEntry.strategy.keys_secondary.keys = sanitizeStringArray(
-      promptDraft.secondary,
-      getPromptSnapshot(entry).secondary,
-    );
   }
 
   return nextEntry;
@@ -223,9 +210,7 @@ function buildPreviewDiffs(beforeEntry, afterEntry, fieldOptions) {
   }
 
   if (normalizedFieldOptions.prompt) {
-    pushDiff('主提示词', beforePrompts.primary, afterPrompts.primary);
-    pushDiff('次提示词逻辑', beforePrompts.secondary_logic, afterPrompts.secondary_logic);
-    pushDiff('次提示词', beforePrompts.secondary, afterPrompts.secondary);
+    pushDiff('关键词', beforePrompts.primary, afterPrompts.primary);
   }
 
   return diffs;
@@ -478,14 +463,6 @@ export const applyAiPreview = errorCatched(async options => {
       const afterPrompts = getPromptSnapshot(afterEntry);
       nextEntry.strategy = _.cloneDeep(nextEntry.strategy || {});
       nextEntry.strategy.keys = sanitizeStringArray(afterPrompts.primary, getPromptSnapshot(currentEntry).primary);
-      nextEntry.strategy.keys_secondary = _.cloneDeep(nextEntry.strategy.keys_secondary || {});
-      nextEntry.strategy.keys_secondary.logic = VALID_SECONDARY_LOGIC.has(afterPrompts.secondary_logic)
-        ? afterPrompts.secondary_logic
-        : getPromptSnapshot(currentEntry).secondary_logic;
-      nextEntry.strategy.keys_secondary.keys = sanitizeStringArray(
-        afterPrompts.secondary,
-        getPromptSnapshot(currentEntry).secondary,
-      );
     }
 
     return nextEntry;

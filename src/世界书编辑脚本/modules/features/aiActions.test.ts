@@ -10,7 +10,7 @@ vi.mock('../api.js', () => apiMocks);
 
 Object.assign(globalThis, { _ });
 
-import { applyAiPreview } from './aiActions.js';
+import { applyAiPreview, generateAiPreview as generateQuickAiPreview } from './aiActions.js';
 import { generateAiPreview } from './aiActionsBatch.js';
 
 type Entry = {
@@ -133,8 +133,6 @@ describe('AI 预览结果契约', () => {
             content: entry.content,
             prompts: {
               primary: entry.strategy.keys,
-              secondary_logic: entry.strategy.keys_secondary.logic,
-              secondary: entry.strategy.keys_secondary.keys,
             },
           }],
         });
@@ -186,8 +184,6 @@ describe('AI 预览结果契约', () => {
             content: entry.content,
             prompts: {
               primary: entry.strategy.keys,
-              secondary_logic: entry.strategy.keys_secondary.logic,
-              secondary: entry.strategy.keys_secondary.keys,
             },
           })),
         });
@@ -198,6 +194,83 @@ describe('AI 预览结果契约', () => {
     expect(callOrder).toEqual([1, 2, 3]);
     expect(maxActiveCalls).toBe(1);
     expect(result.summary.batching.totalBatches).toBe(3);
+  });
+
+  it('批量改写契约不发送次级关键词，并忽略模型返回的次级字段', async () => {
+    const entry = makeEntry(1, {
+      strategy: {
+        keys: ['旧关键词'],
+        keys_secondary: { logic: 'not_any', keys: ['必须保留'] },
+      },
+    });
+    apiMocks.getWorldbookSafe.mockResolvedValue({ success: true, data: [entry] });
+    let sentPrompt = '';
+
+    const result = await generateAiPreview({
+      lorebookName: '测试世界书',
+      entryUids: [1],
+      instruction: '更新关键词',
+      fieldOptions: { title: false, content: false, prompt: true },
+      client: vi.fn(async prompt => {
+        sentPrompt = prompt;
+        return JSON.stringify({
+          entries: [{
+            uid: 1,
+            prompts: {
+              primary: ['新关键词'],
+              secondary_logic: 'and_all',
+              secondary: ['模型越权修改'],
+            },
+          }],
+        });
+      }),
+    });
+
+    expect(sentPrompt).not.toMatch(/次级关键词|secondary_logic|secondary/);
+    expect(result.items[0].afterEntry.strategy).toEqual({
+      keys: ['新关键词'],
+      keys_secondary: { logic: 'not_any', keys: ['必须保留'] },
+    });
+    expect(result.items[0].diffs).toEqual([
+      expect.objectContaining({ label: '关键词', before: ['旧关键词'], after: ['新关键词'] }),
+    ]);
+  });
+
+  it('快速改写契约同样只处理主关键词', async () => {
+    const entry = makeEntry(1, {
+      strategy: {
+        keys: ['旧关键词'],
+        keys_secondary: { logic: 'and_all', keys: ['保留次级'] },
+      },
+    });
+    apiMocks.getWorldbookSafe.mockResolvedValue({ success: true, data: [entry] });
+    let sentPrompt = '';
+
+    const result = await generateQuickAiPreview({
+      lorebookName: '测试世界书',
+      entryUids: [1],
+      instruction: '更新关键词',
+      fieldOptions: { title: false, content: false, prompt: true },
+      client: vi.fn(async prompt => {
+        sentPrompt = prompt;
+        return JSON.stringify({
+          prompts: {
+            primary: ['快速新关键词'],
+            secondary_logic: 'not_all',
+            secondary: ['不应写入'],
+          },
+        });
+      }),
+    });
+
+    expect(sentPrompt).not.toMatch(/secondary_logic|secondary/);
+    expect(result.items[0].afterEntry.strategy).toEqual({
+      keys: ['快速新关键词'],
+      keys_secondary: { logic: 'and_all', keys: ['保留次级'] },
+    });
+    expect(result.items[0].diffs).toEqual([
+      expect.objectContaining({ label: '关键词' }),
+    ]);
   });
 });
 
@@ -314,5 +387,41 @@ describe('应用 AI 预览结果契约', () => {
     expect(writtenEntries.find(entry => entry.uid === 1)?.name).toBe('新标题-1');
     expect(writtenEntries.find(entry => entry.uid === 2)).toEqual(entry2);
     expect(writtenEntries.find(entry => entry.uid === 3)).toEqual(entry3);
+  });
+
+  it('应用关键词修改时保留当前条目的次级关键词配置', async () => {
+    const original = makeEntry(1, {
+      strategy: {
+        keys: ['旧关键词'],
+        keys_secondary: { logic: 'not_any', keys: ['保留次级'] },
+      },
+    });
+    let writtenEntries: Entry[] = [];
+    apiMocks.updateWorldbookEntries.mockImplementation(async (_name, mutator) => {
+      const currentEntries = [_.cloneDeep(original)];
+      writtenEntries = mutator(currentEntries);
+      return { success: true, changed: !_.isEqual(currentEntries, writtenEntries) };
+    });
+
+    const afterEntry = _.cloneDeep(original);
+    afterEntry.strategy.keys = ['新关键词'];
+    afterEntry.strategy.keys_secondary = { logic: 'and_all', keys: ['模型越权修改'] };
+    const result = await applyAiPreview({
+      lorebookName: '测试世界书',
+      previewItems: [{
+        uid: 1,
+        title: original.name,
+        changed: true,
+        beforeEntry: _.cloneDeep(original),
+        afterEntry,
+        editableFields: { title: false, content: false, prompt: true },
+      }],
+    });
+
+    expect(result.appliedUids).toEqual([1]);
+    expect(writtenEntries[0].strategy).toEqual({
+      keys: ['新关键词'],
+      keys_secondary: { logic: 'not_any', keys: ['保留次级'] },
+    });
   });
 });
