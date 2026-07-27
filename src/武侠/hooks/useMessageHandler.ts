@@ -77,7 +77,9 @@ const getErrorMessage = (error: unknown): string => (error instanceof Error ? er
 async function finalizeHistoryNodeAfterEvents(): Promise<void> {
   const gameData = readGameDataPure();
   const time = gameData?.worldTime;
-  const worldTimeText = gameData?.gameTime || (time ? `${time.year}年${time.month}月${time.day}日${time.hour}时` : '');
+  const worldTimeText =
+    gameData?.gameTime ||
+    (time ? `${time.year}年${time.month}月${time.day}日${time.hour}时${String(time.minute).padStart(2, '0')}分` : '');
   await finalizeCurrentTurn({
     location: gameData?.currentLocation || gameData?.stats?.location || '',
     worldTimeText,

@@ -5,6 +5,10 @@ const promptPath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/
 const promptSource = readFileSync(promptPath, 'utf8');
 const worldHistoryPromptPath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/战斗骰子.txt');
 const worldHistoryPromptSource = readFileSync(worldHistoryPromptPath, 'utf8');
+const cotPromptPath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/cot.txt');
+const cotPromptSource = readFileSync(cotPromptPath, 'utf8');
+const variableGuidancePath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/变量指导.txt');
+const variableGuidanceSource = readFileSync(variableGuidancePath, 'utf8');
 
 type PromptSerializer = (value: unknown) => string;
 type PromptRenderer = (
@@ -81,6 +85,23 @@ describe('武侠输出提示词契约', () => {
     expect(worldHistoryPromptSource).toContain(
       'selectWorldEventsForPrompt(worldEvents, outcomeStatuses, limit = 16, priorityLimit = 8)',
     );
+  });
+
+  it('约束分钟时间、实际耗时和事件节点时间一致性', () => {
+    expect(cotPromptSource).toContain('只有正文实际呈现了可感知的耗时，才推进世界时间');
+    expect(cotPromptSource).toContain('数十分钟');
+    expect(cotPromptSource).toContain('数小时');
+    expect(cotPromptSource).toContain('数日');
+    expect(cotPromptSource).toContain('仍在开端或第一个节点时');
+    expect(cotPromptSource).not.toContain('按事件进行比例');
+
+    expect(variableGuidanceSource).toContain('{"年":整数,"月":整数,"日":整数,"时":整数,"分":整数}');
+    expect(variableGuidanceSource).toContain('`分`必须是 0–59 的整数');
+    expect(variableGuidanceSource).toContain('旧存档没有`分`时按 0 分理解');
+    expect(variableGuidanceSource).toContain('一个回复不等于固定的一小时');
+    expect(variableGuidanceSource).toContain('跨城远行、长期养伤、闭关修炼等可经过数日');
+    expect(variableGuidanceSource).toContain('禁止直接写到事件结束时间');
+    expect(variableGuidanceSource).not.toContain('关键桥段完整结束时，将时间推进到事件描述给出的结束时间');
   });
 
   it('可执行渲染只读历史、分事件快照和分组地点白名单', () => {

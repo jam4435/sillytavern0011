@@ -579,6 +579,40 @@ describe('readGameDataSync inventory rank field', () => {
   });
 });
 
+describe('readGameDataSync world time projection', () => {
+  beforeEach(() => {
+    getMartialArtDataMock.mockReturnValue(null);
+  });
+
+  it('读取分钟并把精确时间显示给玩家', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1219, 月: 10, 日: 20, 时: 13, 分: 37 } },
+        user数据: { 用户名: '墨逸', 性别: '男', 境界: '不入流' },
+      },
+    });
+
+    const result = readGameDataSync();
+
+    expect(result?.worldTime).toEqual({ year: 1219, month: 10, day: 20, hour: 13, minute: 37 });
+    expect(result?.gameTime).toContain('13时37分');
+  });
+
+  it('旧存档缺分时按0读取，并保留午夜0时', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1219, 月: 10, 日: 20, 时: 0 } },
+        user数据: { 用户名: '墨逸', 性别: '男', 境界: '不入流' },
+      },
+    });
+
+    const result = readGameDataSync();
+
+    expect(result?.worldTime).toEqual({ year: 1219, month: 10, day: 20, hour: 0, minute: 0 });
+    expect(result?.gameTime).toContain('0时00分');
+  });
+});
+
 describe('readGameDataSync avatar projection', () => {
   beforeEach(() => {
     getMartialArtDataMock.mockReturnValue(null);

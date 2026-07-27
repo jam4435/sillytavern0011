@@ -257,7 +257,11 @@ const App: React.FC = () => {
         const time = gameData?.worldTime;
         await finalizeCurrentTurn({
           location: gameData?.currentLocation || gameData?.stats?.location || '',
-          worldTimeText: gameData?.gameTime || (time ? `${time.year}年${time.month}月${time.day}日${time.hour}时` : ''),
+          worldTimeText:
+            gameData?.gameTime ||
+            (time
+              ? `${time.year}年${time.month}月${time.day}日${time.hour}时${String(time.minute).padStart(2, '0')}分`
+              : ''),
         });
       } catch (error) {
         gameLogger.error('[history] 聊天切换后的事件状态封存失败', error);
@@ -829,6 +833,7 @@ const App: React.FC = () => {
                 month: formData.locationInfo.month,
                 day: formData.locationInfo.day,
                 hour: formData.locationInfo.hour ?? 11,
+                minute: 0,
               },
               stats: {
                 ...prev.stats,

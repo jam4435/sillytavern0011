@@ -370,6 +370,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
         月: locationInfo.month,
         日: locationInfo.day,
         时: locationInfo.hour ?? 11,
+        分: 0,
         $meta: { updatable: true, necessary: 'all' },
       },
       $meta: { necessary: 'all', updatable: true },
@@ -531,7 +532,7 @@ export async function initializeNewGameSession(formData: NewGameFormData): Promi
     const persistedVariables = await getVariables({ type: 'chat' });
     const persistedStatData = persistedVariables?.stat_data;
     const expectedStatData = variableData as {
-      世界信息: { 时间: { 年: number; 月: number; 日: number; 时: number } };
+      世界信息: { 时间: { 年: number; 月: number; 日: number; 时: number; 分: number } };
       前端变量: { 事件运行时键版本: number };
     };
     const expectedTime = expectedStatData.世界信息.时间;
@@ -541,7 +542,8 @@ export async function initializeNewGameSession(formData: NewGameFormData): Promi
       persistedTime?.年 === expectedTime.年 &&
       persistedTime?.月 === expectedTime.月 &&
       persistedTime?.日 === expectedTime.日 &&
-      persistedTime?.时 === expectedTime.时;
+      persistedTime?.时 === expectedTime.时 &&
+      persistedTime?.分 === expectedTime.分;
     if (!timeConfirmed || runtimeKeyVersion !== expectedStatData.前端变量.事件运行时键版本) {
       throw new Error('新游戏变量写入后回读校验失败，未发送 GameInitialized 信号');
     }

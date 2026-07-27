@@ -174,6 +174,7 @@ interface GameVariables {
       月?: number;
       日?: number;
       时?: number;
+      分?: number;
     };
   };
 
@@ -492,10 +493,11 @@ function parseWorldTime(世界信息?: GameVariables['世界信息']): WorldTime
   if (!时间) return undefined;
 
   return {
-    year: 时间.年 || 1199,
-    month: 时间.月 || 1,
-    day: 时间.日 || 1,
-    hour: 时间.时 || 12,
+    year: 时间.年 ?? 1199,
+    month: 时间.月 ?? 1,
+    day: 时间.日 ?? 1,
+    hour: 时间.时 ?? 12,
+    minute: 时间.分 ?? 0,
   };
 }
 
@@ -546,8 +548,9 @@ function formatGameTime(worldTime?: WorldTime): string {
           ? `${['廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'][worldTime.day - 21]}`
           : '三十';
   const hourName = 时辰名[Math.floor(worldTime.hour / 2) % 12];
+  const minuteText = String(worldTime.minute).padStart(2, '0');
 
-  return `${yearName} ${monthName} ${dayName} ${hourName}`;
+  return `${yearName} ${monthName} ${dayName} ${hourName} ${worldTime.hour}时${minuteText}分`;
 }
 
 /**

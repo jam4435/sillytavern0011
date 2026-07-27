@@ -2260,7 +2260,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                               <span className="event-name">{event.name}</span>
                               <span className="event-time">
                                 {event.year}年{event.month}月{event.day}日
-                                {event.hour !== undefined ? `${event.hour}时` : ''}
+                                {event.hour !== undefined ? `${event.hour}时00分` : '11时00分'}
                               </span>
                               <span className="event-location">{event.location}</span>
                               {selectedEventId === event.id && (
@@ -2662,8 +2662,8 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         <span className="preview-label">时间</span>
                         <span className="preview-value">
                           {useEventLocation && selectedEvent
-                            ? `${selectedEvent.year}年${selectedEvent.month}月${selectedEvent.day}日${selectedEvent.hour !== undefined ? `${selectedEvent.hour}时` : ''}`
-                            : `${customYear}年${customMonth}月${customDay}日`}
+                            ? `${selectedEvent.year}年${selectedEvent.month}月${selectedEvent.day}日${selectedEvent.hour ?? 11}时00分`
+                            : `${customYear}年${customMonth}月${customDay}日11时00分`}
                         </span>
                       </div>
                       <div className="preview-item">

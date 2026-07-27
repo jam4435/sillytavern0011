@@ -1548,7 +1548,9 @@ export async function createBranchFromNode(node: WuxiaSaveNode): Promise<void> {
 function getWorldTimeText(gameState: GameState): string {
   if (gameState.gameTime) return gameState.gameTime;
   const time = gameState.worldTime;
-  return time ? `${time.year}年${time.month}月${time.day}日${time.hour}时` : '';
+  return time
+    ? `${time.year}年${time.month}月${time.day}日${time.hour}时${String(time.minute).padStart(2, '0')}分`
+    : '';
 }
 
 export function getSuggestedSaveLabel(gameState: GameState): string {

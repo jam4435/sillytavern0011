@@ -6,13 +6,14 @@ const DEFAULT_WORLD_TIME: WorldTime = {
   year: 1199,
   month: 8,
   day: 15,
-  hour: 11
+  hour: 11,
+  minute: 0
 };
 
 // 默认游戏状态
 export const DEFAULT_GAME_STATE: GameState = {
   currentLocation: '临安府/牛家村',
-  gameTime: '己未年 八月 十五 午时',
+  gameTime: '己未年 八月 十五 巳时 11时00分',
   worldTime: DEFAULT_WORLD_TIME,
   mode: GameMode.DIALOGUE,
   stats: {

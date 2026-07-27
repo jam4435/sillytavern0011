@@ -253,6 +253,7 @@ export interface WorldTime {
   month: number;
   day: number;
   hour: number;
+  minute: number;
 }
 
 export interface GameState {

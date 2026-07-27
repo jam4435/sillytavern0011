@@ -123,14 +123,16 @@ describe('opening event time', () => {
         location: selectedEvent!.location,
         eventName: selectedEvent!.name,
       },
-    }) as { 世界信息: { 时间: { 时: number } } };
+    }) as { 世界信息: { 时间: { 时: number; 分: number } } };
 
     expect(data.世界信息.时间.时).toBe(13);
+    expect(data.世界信息.时间.分).toBe(0);
   });
 
-  it('没有小时的旧数据和自定义开局继续回退到11时', () => {
-    const data = generateVariableData(createFormData()) as { 世界信息: { 时间: { 时: number } } };
+  it('没有小时的旧数据和自定义开局继续回退到11时0分', () => {
+    const data = generateVariableData(createFormData()) as { 世界信息: { 时间: { 时: number; 分: number } } };
     expect(data.世界信息.时间.时).toBe(11);
+    expect(data.世界信息.时间.分).toBe(0);
   });
 });
 
@@ -168,6 +170,24 @@ describe('initializeNewGameSession startup signal', () => {
         前端变量: { 事件运行时键版本: 2 },
       },
     });
+
+    const result = await initializeNewGameSession(createFormData());
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('回读校验失败');
+    expect(initializeGlobalMock).not.toHaveBeenCalled();
+    expect(eventEmitMock).not.toHaveBeenCalled();
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
+  });
+
+  it('新游戏回读缺少分时失败且不发送初始化信号', async () => {
+    let chatVariables: Record<string, any> = {};
+    updateVariablesWithMock.mockImplementation(async updater => {
+      chatVariables = JSON.parse(JSON.stringify(await updater(chatVariables)));
+      delete chatVariables.stat_data.世界信息.时间.分;
+      return chatVariables;
+    });
+    getVariablesMock.mockImplementation(() => chatVariables);
 
     const result = await initializeNewGameSession(createFormData());
 

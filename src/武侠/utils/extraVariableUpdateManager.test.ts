@@ -142,7 +142,7 @@ describe('executeExtraVariableUpdate', () => {
     ];
     variableSnapshot = {
       stat_data: {
-        世界信息: { 时间: '1219年10月20日13时', 天气: '晴' },
+        世界信息: { 时间: { 年: 1219, 月: 10, 日: 20, 时: 13, 分: 15 }, 天气: '晴' },
         user数据: {
           所在位置: '大宋/临安府/城门',
           头像: 'preset:legacy-player-avatar',
@@ -487,7 +487,7 @@ describe('executeExtraVariableUpdate', () => {
     const serialized = JSON.stringify(projection);
 
     expect(Object.keys(projection)).toEqual(['世界信息', 'user数据', '角色数据', '参与事件']);
-    expect(projection.世界信息).toEqual({ 时间: '1219年10月20日13时' });
+    expect(projection.世界信息).toEqual({ 时间: { 年: 1219, 月: 10, 日: 20, 时: 13, 分: 15 } });
     expect(Object.keys(projection.角色数据 as Record<string, unknown>)).toEqual(['郭靖', '黄蓉', '洪七公']);
     expect(serialized).not.toContain('欧阳锋');
     expect(serialized).not.toContain('世界事件');
