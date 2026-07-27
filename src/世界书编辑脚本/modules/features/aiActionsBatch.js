@@ -78,7 +78,7 @@ function formatDiffSnippet(lines, start, end) {
   return `${prefix}${body}${suffix}`.trim();
 }
 
-function buildContentDiffSnippets(beforeText, afterText, options = {}) {
+export function buildContentDiffSnippets(beforeText, afterText, options = {}) {
   const contextLines = Number.isInteger(options.contextLines) ? options.contextLines : 1;
   const maxSnippets = Number.isInteger(options.maxSnippets) ? options.maxSnippets : 6;
   const lookahead = Number.isInteger(options.lookahead) ? options.lookahead : 12;

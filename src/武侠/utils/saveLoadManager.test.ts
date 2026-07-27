@@ -378,29 +378,59 @@ describe('history tree v2 scanning', () => {
     expect(node.pinned).toBe(true);
   });
 
-  it('预览经酒馆显示正则过滤思维链，重扫刷新旧预览且节点身份不变', async () => {
+  it('预览按酒馆显示正则滤掉思维链，跳过全吞型正则，重扫刷新旧预览且节点身份不变', async () => {
+    const story = '正文开场白：'.concat('少年负剑入江湖，'.repeat(30));
     currentChat().messages = [
-      { message_id: 0, role: 'assistant', message: '<thinking>内心盘算不该出现</thinking>正文开场白' },
+      { message_id: 0, role: 'assistant', message: `内心盘算不该出现</think>${story}<tucao>吐槽也不该出现</tucao>` },
     ];
     const before = await scanCurrentChat();
-    const beforeNode = before.tree.nodes[before.currentNodeId!]!;
-    expect(beforeNode.preview).toContain('内心盘算不该出现');
+    expect(before.tree.nodes[before.currentNodeId!]!.preview).toContain('内心盘算不该出现');
 
     Object.assign(globalThis, {
-      formatAsTavernRegexedString: vi.fn((text: string, source: string, destination: string) => {
-        expect(source).toBe('ai_output');
-        expect(destination).toBe('display');
-        return text.replace(/<thinking>[\s\S]*?<\/thinking>/g, '');
-      }),
+      getTavernRegexes: vi.fn(() => [
+        // 美化思维链：真实预设里替换物是 HTML/CSS，预览侧应当作删除
+        {
+          enabled: true,
+          source: { ai_output: true },
+          destination: { display: true },
+          find_regex: '/[\\s\\S]*?<\\/think>/g',
+          replace_string: '<style>.thinking{}</style>',
+        },
+        {
+          enabled: true,
+          source: { ai_output: true },
+          destination: { display: true },
+          find_regex: '/<tucao>[\\s\\S]*?<\\/tucao>/g',
+          replace_string: '',
+        },
+        // 仅提示词侧的正则不得影响预览
+        {
+          enabled: true,
+          source: { ai_output: true },
+          destination: { display: false, prompt: true },
+          find_regex: '/正文开场白/g',
+          replace_string: '',
+        },
+        // "游戏页面"式全吞正则：应被安全阀跳过
+        {
+          enabled: true,
+          source: { ai_output: true },
+          destination: { display: true },
+          find_regex: '/.+/s',
+          replace_string: '<body>loader</body>',
+        },
+      ]),
     });
     try {
       const after = await scanCurrentChat();
       const afterNode = after.tree.nodes[after.currentNodeId!]!;
-      // 同一节点（身份哈希基于原文，不受正则影响），预览已刷新
+      // 同一节点（身份哈希基于原文，不受正则影响），预览已刷新为正文
       expect(after.currentNodeId).toBe(before.currentNodeId);
-      expect(afterNode.preview).toBe('正文开场白');
+      expect(afterNode.preview.startsWith('正文开场白：')).toBe(true);
+      expect(afterNode.preview).not.toContain('内心盘算');
+      expect(afterNode.preview).not.toContain('吐槽');
     } finally {
-      delete (globalThis as Record<string, unknown>).formatAsTavernRegexedString;
+      delete (globalThis as Record<string, unknown>).getTavernRegexes;
     }
   });
 

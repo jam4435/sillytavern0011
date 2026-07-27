@@ -51,6 +51,7 @@ export const DEFAULT_GAME_STATE: GameState = {
   equipment: {},
   statusEffects: [],
   events: [],
+  chronicle: [],
   social: []
 };
 

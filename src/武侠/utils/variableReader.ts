@@ -10,6 +10,7 @@
 import type {
   ActiveStatusEffect,
   ActiveStatusEffectVariableData,
+  ChronicleEntry,
   CurrentAttributes,
   EquipmentSlots,
   FrontendVariableData,
@@ -1166,17 +1167,44 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
     });
   }
 
-  const completedCount = Object.keys(eventSystem.已完成事件 || {}).length;
-  if (completedCount > 0) {
-    events.push({
-      id: 'completed_summary',
-      title: '已归档事件',
-      type: 'AFTERMATH',
-      description: `已完成 ${completedCount} 个事件`,
+  return events;
+}
+
+/**
+ * 将 stat_data.世界事件 归档转换为江湖史册条目。
+ *
+ * 事件结局状态只为玩家参与过的事件写入，因此有状态即为"亲历"，
+ * 无状态的归档（含智能初始化直接完成的史前事件）归入背景。
+ */
+function parseChronicle(variables: GameVariables): ChronicleEntry[] {
+  const entries: ChronicleEntry[] = [];
+  const outcomeStatuses = variables.前端变量?.事件结局状态 || {};
+
+  for (const [eventName, record] of Object.entries(variables.世界事件 || {})) {
+    if (eventName.startsWith('$') || !isRecord(record)) continue;
+    const summary = typeof record.概要 === 'string' ? record.概要.trim() : '';
+    if (!summary) continue;
+
+    const time = isCalendarRecord(record.时间) ? record.时间 : undefined;
+    const location = typeof record.地点 === 'string' && record.地点.trim() ? record.地点.trim() : undefined;
+    const outcomeStatus = outcomeStatuses[eventName];
+
+    entries.push({
+      id: `chronicle_${entries.length}`,
+      title: getDisplayEventName(eventName),
+      year: time?.年,
+      timeText: time ? formatCalendarRecord(time) : '年代不详',
+      sortDays: time ? toCalendarDays(time) : 0,
+      location,
+      summary,
+      outcomeStatus,
+      personal: outcomeStatus !== undefined,
     });
   }
 
-  return events;
+  // 最近的事排最前；同日按标题稳定排序
+  entries.sort((a, b) => b.sortDays - a.sortDays || a.title.localeCompare(b.title, 'zh'));
+  return entries;
 }
 
 /**
@@ -3391,6 +3419,7 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
 
   // 事件 - 从事件系统读取（避免全量渲染未发生事件）
   state.events = parseEvents(variables, worldTime);
+  state.chronicle = parseChronicle(variables);
 
   // 社交
   state.social = parseSocial(variables, 用户档案);

@@ -309,6 +309,187 @@ button.event-meta-badge--travel {
   margin-left: 0.5rem;
 }
 
+// =========================================
+// 江湖史册（已归档世界事件时间线）
+// =========================================
+
+.chronicle-header {
+  // 复用 .event-section-header 的排版，但作为可点击按钮
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: var(--stone-300);
+  }
+}
+
+.chronicle-toggle-icon {
+  margin-left: auto;
+  display: inline-flex;
+  opacity: 0.7;
+}
+
+.chronicle-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chronicle-world-toggle {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 2px;
+  padding: 0.2rem 0.65rem;
+  color: var(--stone-400);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover,
+  &.active {
+    border-color: rgba(217, 119, 6, 0.45);
+    color: #d97706;
+  }
+}
+
+.chronicle-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.chronicle-year {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--stone-300);
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.6rem;
+
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent);
+  }
+}
+
+.chronicle-year-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.chronicle-entry {
+  padding: 0.6rem 0.8rem;
+  background: rgba(255, 255, 255, 0.015);
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.045);
+  }
+
+  &.personal {
+    border-left-color: rgba(217, 119, 6, 0.55);
+  }
+
+  &.background {
+    opacity: 0.6;
+
+    &:hover,
+    &.expanded {
+      opacity: 0.9;
+    }
+  }
+}
+
+.chronicle-entry-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+}
+
+.chronicle-entry-time {
+  color: var(--stone-500);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.chronicle-entry-title {
+  color: var(--stone-300);
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+// 朱批印记
+.chronicle-status-seal {
+  padding: 0.05rem 0.4rem;
+  border-radius: 2px;
+  font-family: var(--font-serif);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+
+  &.chronicle-status-seal--diverged {
+    color: #c14b3a;
+    border: 1px solid rgba(193, 75, 58, 0.55);
+  }
+
+  &.chronicle-status-seal--unknown {
+    color: var(--stone-500);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+  }
+}
+
+.chronicle-entry-location {
+  margin-top: 0.25rem;
+  color: var(--stone-500);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+}
+
+.chronicle-entry-summary {
+  margin: 0.35rem 0 0;
+  color: var(--stone-400);
+  font-size: 0.85rem;
+  line-height: 1.6;
+
+  &.clamped {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+.chronicle-status-note {
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
+  border-top: 1px dashed rgba(193, 75, 58, 0.35);
+  color: #c14b3a;
+  font-family: var(--font-serif);
+  font-size: 0.78rem;
+  font-style: italic;
+  letter-spacing: 0.08em;
+}
+
 .event-empty-box {
   padding: 2.5rem 1.5rem;
   text-align: center;
@@ -396,5 +577,17 @@ button.event-meta-badge--travel {
   .event-meta-badge {
     font-size: 0.68rem;
     padding: 0.1rem 0.45rem;
+  }
+
+  .chronicle-entry {
+    padding: 0.5rem 0.6rem;
+  }
+
+  .chronicle-entry-title {
+    font-size: 0.86rem;
+  }
+
+  .chronicle-entry-summary {
+    font-size: 0.8rem;
   }
 }

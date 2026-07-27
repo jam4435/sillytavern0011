@@ -1327,6 +1327,74 @@
     }
   }
 
+  .chronicle-header {
+    border-bottom-color: rgba(61, 48, 40, 0.14);
+
+    &:hover {
+      color: #3d3028;
+    }
+  }
+
+  .chronicle-world-toggle {
+    border-color: rgba(61, 48, 40, 0.24);
+    color: #5b5048;
+
+    &:hover,
+    &.active {
+      border-color: rgba(181, 90, 30, 0.5);
+      color: #b55a1e;
+    }
+  }
+
+  .chronicle-year {
+    color: #3d3028;
+
+    &::after {
+      background: linear-gradient(90deg, rgba(61, 48, 40, 0.2), transparent);
+    }
+  }
+
+  .chronicle-entry {
+    background: rgba(250, 246, 238, 0.5);
+    border-left-color: rgba(61, 48, 40, 0.2);
+
+    &:hover {
+      background: rgba(255, 252, 247, 0.82);
+    }
+
+    &.personal {
+      border-left-color: rgba(181, 90, 30, 0.55);
+    }
+  }
+
+  .chronicle-entry-time,
+  .chronicle-entry-location {
+    color: #7a6e62;
+  }
+
+  .chronicle-entry-title {
+    color: #1a1410;
+  }
+
+  .chronicle-entry-summary {
+    color: #5b5048;
+  }
+
+  .chronicle-status-seal--diverged {
+    color: #9e2b25;
+    border-color: rgba(158, 43, 37, 0.5);
+  }
+
+  .chronicle-status-seal--unknown {
+    color: #7a6e62;
+    border-color: rgba(61, 48, 40, 0.26);
+  }
+
+  .chronicle-status-note {
+    color: #9e2b25;
+    border-top-color: rgba(158, 43, 37, 0.35);
+  }
+
   .event-empty-box {
     border-color: rgba(61, 48, 40, 0.18);
     background: rgba(255, 255, 255, 0.24);

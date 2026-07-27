@@ -2,6 +2,7 @@ import { getWorldbookNamesSafe } from '../api.js';
 import { AI_CONTENT_ID } from '../config.js';
 import {
   applyAiPreview,
+  buildContentDiffSnippets,
   collectAiTargetEntries,
   generateAiPlan,
   generateAiPreview,
@@ -1207,6 +1208,11 @@ function getPreviewStatusText(previewResult) {
   return '预览生成完成。';
 }
 
+function clampDiffText(text, maxChars = 600) {
+  const value = `${text ?? ''}`;
+  return value.length > maxChars ? `${value.slice(0, maxChars)}…（已截断，完整内容见详情）` : value;
+}
+
 function renderPreviewDiff(diff) {
   if (diff?.type === 'content-snippets' && Array.isArray(diff.snippets) && diff.snippets.length) {
     return diff.snippets
@@ -1214,8 +1220,8 @@ function renderPreviewDiff(diff) {
         (snippet, index) => `
       <div class="ai-preview-diff">
         <div class="ai-preview-diff-label">${_.escape(diff.label)}${diff.snippets.length > 1 ? ` #${index + 1}` : ''}</div>
-        <div class="ai-preview-diff-before">当前: ${_.escape(snippet.before || '')}</div>
-        <div class="ai-preview-diff-after">预览: ${_.escape(snippet.after || '')}</div>
+        <div class="ai-preview-diff-before">当前: ${_.escape(clampDiffText(snippet.before))}</div>
+        <div class="ai-preview-diff-after">预览: ${_.escape(clampDiffText(snippet.after))}</div>
       </div>
     `,
       )
@@ -1225,8 +1231,8 @@ function renderPreviewDiff(diff) {
   return `
     <div class="ai-preview-diff">
       <div class="ai-preview-diff-label">${_.escape(diff.label)}</div>
-      <div class="ai-preview-diff-before">当前: ${_.escape(JSON.stringify(diff.before, null, 2))}</div>
-      <div class="ai-preview-diff-after">预览: ${_.escape(JSON.stringify(diff.after, null, 2))}</div>
+      <div class="ai-preview-diff-before">当前: ${_.escape(clampDiffText(JSON.stringify(diff.before, null, 2)))}</div>
+      <div class="ai-preview-diff-after">预览: ${_.escape(clampDiffText(JSON.stringify(diff.after, null, 2)))}</div>
     </div>
   `;
 }
@@ -1358,15 +1364,11 @@ function buildManualPreviewDiffs(beforeEntry, afterEntry, fieldOptions = {}) {
     const beforeContent = beforeEntry?.content || '';
     const afterContent = afterEntry?.content || '';
     if (!_.isEqual(beforeContent, afterContent)) {
+      const snippets = buildContentDiffSnippets(beforeContent, afterContent);
       diffs.push({
         label: '内容差异',
         type: 'content-snippets',
-        snippets: [
-          {
-            before: beforeContent,
-            after: afterContent,
-          },
-        ],
+        snippets: snippets.length ? snippets : [{ before: beforeContent, after: afterContent }],
         before: beforeContent,
         after: afterContent,
       });
@@ -1840,6 +1842,25 @@ function renderPreview(modeKey, previewResult = null) {
     `);
   });
 
+  const failedErrors = (Array.isArray(mode.previewResult?.errors) ? mode.previewResult.errors : []).filter(
+    error =>
+      error &&
+      error.uid !== undefined &&
+      error.uid !== null &&
+      !mode.previewResult.items.some(item => Number(item?.uid) === Number(error.uid)),
+  );
+  failedErrors.forEach(error => {
+    $list.append(`
+      <div class="ai-preview-item is-failed" data-preview-uid="${error.uid}">
+        <div class="ai-preview-item-header">
+          <div class="ai-preview-item-title">${_.escape(error.title || `UID ${error.uid}`)} (UID: ${error.uid}) <span class="ai-failed-badge">生成失败</span></div>
+          <button type="button" class="ai-preview-retry" data-preview-uid="${error.uid}"${state.isGenerating ? ' disabled' : ''}>重试此条</button>
+        </div>
+        <div class="ai-preview-diff-before">${_.escape(summarizePreviewError(error.error || ''))}</div>
+      </div>
+    `);
+  });
+
   renderPreviewDetail(modeKey, activeUid);
   renderDebugInfo(modeKey, mode.previewResult?.debug || {});
   $('#ai-workspace-apply', parentDoc()).prop('disabled', applyableCount === 0);
@@ -2171,7 +2192,11 @@ function handlePreviewModalSave() {
     `${item.afterEntry.name || item.beforeEntry?.name || item.title || '条目'} (UID: ${item.uid})`,
   );
   $('#ai-workspace-preview-modal-summary', parentDoc()).text(
-    item.changed ? '预览修改已保存，可继续编辑或直接应用。' : '当前无实际变更，但修改内容已保存。',
+    item.accepted === false
+      ? '预览修改已保存；该条已排除，恢复后才会应用。'
+      : item.changed
+        ? '预览修改已保存，可继续编辑或直接应用。'
+        : '当前无实际变更，但修改内容已保存。',
   );
   syncPreviewModalRestoreButton(item);
   setModeStatus(modeKey, '改造结果已更新，可直接应用。');
@@ -2253,8 +2278,91 @@ async function handlePreviewModalRegenerate() {
   }
 }
 
+async function retryFailedPreviewEntry(modeKey, uid) {
+  const mode = state.modes[modeKey];
+  const saved = settings();
+  const numericUid = Number(uid);
+  if (!mode.previewResult || !Number.isFinite(numericUid)) {
+    return;
+  }
+  if (state.isGenerating) {
+    return setModeStatus(modeKey, '当前有生成任务进行中，请稍后再重试。');
+  }
+
+  const errors = Array.isArray(mode.previewResult.errors) ? mode.previewResult.errors : [];
+  const failedError = errors.find(error => Number(error?.uid) === numericUid);
+  if (!failedError) {
+    return;
+  }
+
+  const runId = ++state.previewRunId;
+  state.stopRequested = false;
+  setGeneratingState(true);
+  setModeStatus(modeKey, `正在重试生成 UID ${numericUid}...`);
+  $(`.ai-preview-retry[data-preview-uid="${numericUid}"]`, parentDoc()).prop('disabled', true).text('重试中...');
+
+  try {
+    const previewResult = await generateAiPreview({
+      lorebookName: mode.lorebookName,
+      entryUids: [numericUid],
+      readonlyEntryUids: Array.from(mode.readonlyEntryUids),
+      planningResult: mode.planningResult,
+      instruction: mode.instruction,
+      chatMessages: currentChatMessagesForRequest(),
+      referenceMaterial: state.referenceMaterial,
+      fieldOptions: mode.editableFields,
+      promptSettings: mode.promptSettings,
+      contextBudget: saved.contextBudget,
+      sourceMode: modeKey,
+      customApi: saved.apiMode === 'custom' ? saved.customApi : null,
+      shouldStream: saved.stream === true,
+      onGenerationStart: generationId => {
+        if (runId === state.previewRunId) {
+          state.activeGenerationId = generationId;
+        }
+      },
+      shouldStop: () => state.stopRequested === true,
+    });
+
+    if (runId !== state.previewRunId) {
+      return;
+    }
+    const newItem = previewResult?.items?.[0];
+    if (!newItem) {
+      throw new Error(previewResult?.errors?.[0]?.error || '重试失败');
+    }
+
+    mode.previewResult.errors = errors.filter(error => Number(error?.uid) !== numericUid);
+    mode.previewResult.items.push(newItem);
+    rebuildPreviewResult(modeKey);
+    renderPreview(modeKey);
+    persistSettings({ mirrorModeKey: modeKey });
+    setModeStatus(modeKey, `已重试生成 UID ${numericUid}，结果已加入预览列表。`);
+    window.toastr?.success('重试成功，结果已加入预览列表');
+  } catch (error) {
+    if (runId === state.previewRunId) {
+      failedError.error = error?.message || `${error}`;
+      renderPreview(modeKey);
+      setModeStatus(modeKey, `重试 UID ${numericUid} 失败：${error?.message || error}`);
+      window.toastr?.error(error?.message || '重试失败');
+    }
+  } finally {
+    if (runId === state.previewRunId) {
+      state.stopRequested = false;
+      setGeneratingState(false);
+    }
+  }
+}
+
 function syncPreviewModalRestoreButton(item) {
   $('#ai-workspace-preview-modal-restore', parentDoc()).toggle(Boolean(item?.userEdited && item?.aiOriginalAfterEntry));
+}
+
+function previewModalSummaryText(item) {
+  if (item?.accepted === false) {
+    return '该条已排除，应用时不会写回；你仍可编辑内容，在列表或详情中恢复后生效。';
+  }
+  return item?.changed ? '你可以直接编辑右侧预览内容。' : '当前无实际变更，可手动编辑后再应用。';
 }
 
 function openPreviewModal(uid) {
@@ -2268,9 +2376,7 @@ function openPreviewModal(uid) {
   const sections = buildPreviewModalSections(item, mode);
   $('#ai-workspace-preview-modal', parentDoc()).attr('data-preview-uid', uid);
   $('#ai-workspace-preview-modal-title', parentDoc()).text(`${item.title || '条目'} (UID: ${item.uid})`);
-  $('#ai-workspace-preview-modal-summary', parentDoc()).text(
-    item.changed ? '你可以直接编辑右侧预览内容。' : '当前无实际变更，但你仍可直接编辑右侧预览内容。',
-  );
+  $('#ai-workspace-preview-modal-summary', parentDoc()).text(previewModalSummaryText(item));
   $('#ai-workspace-preview-modal-content', parentDoc()).html(
     sections
       .map(
@@ -3177,6 +3283,10 @@ function ensureStyles() {
       #${ROOT_ID} .ai-user-edited-badge{margin-left:6px;padding:2px 5px;border-radius:999px;font-size:9px;color:#a9d3f5;background:rgba(110,170,220,.13)}
       #${ROOT_ID} .ai-preview-restore-original{flex:0 0 auto;padding:4px 8px;font-size:12px;border-color:rgba(120,170,220,.5);color:#c6dcf0;background:rgba(120,170,220,.08)}
       #${ROOT_ID} .ai-preview-restore-original:hover{background:rgba(120,170,220,.16)}
+      #${ROOT_ID} .ai-preview-item.is-failed{border-color:rgba(220,120,120,.45);cursor:default}
+      #${ROOT_ID} .ai-failed-badge{margin-left:6px;padding:2px 5px;border-radius:999px;font-size:9px;color:#f0c6c6;background:rgba(220,120,120,.2)}
+      #${ROOT_ID} .ai-preview-retry{flex:0 0 auto;padding:4px 8px;font-size:12px;border-color:rgba(230,190,120,.5);color:#f0e0c0;background:rgba(230,190,120,.08)}
+      #${ROOT_ID} .ai-preview-retry:hover{background:rgba(230,190,120,.16)}
       #${ROOT_ID} .ai-preview-detail-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
       #${ROOT_ID} .ai-preview-diff + .ai-preview-diff{margin-top:8px}
       #${ROOT_ID} .ai-preview-diff-label{color:var(--panel-accent-color,#9fc8e4);margin-bottom:2px}
@@ -4615,7 +4725,15 @@ function bindEvents() {
         openPreviewModal(uid);
       }
     })
+    .on('click.aiWorkspaceDesktop', '.ai-preview-retry', async function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      await retryFailedPreviewEntry(currentModeKey(), Number($(this).attr('data-preview-uid')));
+    })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-preview-list .ai-preview-item', function () {
+      if ($(this).hasClass('is-failed')) {
+        return;
+      }
       const uid = Number($(this).attr('data-preview-uid'));
       if ((root().width() || 0) < 960) {
         openPreviewModal(uid);
@@ -4645,7 +4763,7 @@ function bindEvents() {
       const $next = $items.eq(nextIndex);
       $items.removeClass('is-active').attr({ 'aria-selected': 'false', tabindex: '-1' });
       $next.addClass('is-active').attr({ 'aria-selected': 'true', tabindex: '0' }).trigger('focus');
-      if ((root().width() || 0) >= 960) {
+      if ((root().width() || 0) >= 960 && !$next.hasClass('is-failed')) {
         renderPreviewDetail(currentModeKey(), Number($next.attr('data-preview-uid')));
       }
     })
@@ -4751,9 +4869,7 @@ function bindEvents() {
         $('#ai-workspace-preview-modal-title', parentDoc()).text(
           `${item.afterEntry.name || item.beforeEntry?.name || item.title || '条目'} (UID: ${item.uid})`,
         );
-        $('#ai-workspace-preview-modal-summary', parentDoc()).text(
-          item.changed ? '你可以直接编辑右侧预览内容。' : '当前无实际变更，但你仍可直接编辑右侧预览内容。',
-        );
+        $('#ai-workspace-preview-modal-summary', parentDoc()).text(previewModalSummaryText(item));
         syncPreviewModalRestoreButton(item);
         setModeStatus(modeKey, '改造结果已更新，可直接应用。');
       } catch (error) {

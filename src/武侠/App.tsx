@@ -950,6 +950,7 @@ const App: React.FC = () => {
         return (
           <EventsPanel
             events={gameState.events}
+            chronicle={gameState.chronicle}
             gameTime={gameState.gameTime}
             currentLocation={gameState.currentLocation}
             onTravelTo={handleEventTravelTo}

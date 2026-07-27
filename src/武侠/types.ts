@@ -208,6 +208,25 @@ export interface GameEvent {
   involvedCharacters?: string[];
 }
 
+/** 江湖史册条目：来自 stat_data.世界事件 的已归档事件 */
+export interface ChronicleEntry {
+  id: string;
+  title: string;
+  /** 归档时间的年份，用于时间线分组；缺失时归入"年代不详" */
+  year?: number;
+  /** 完整时间文本 */
+  timeText: string;
+  /** 365/30 历法总天数，用于排序 */
+  sortDays: number;
+  location?: string;
+  /** 归档概要：参与事件为实际结局，未参与为原定概要 */
+  summary: string;
+  /** 结局状态；仅玩家参与过的事件存在，undefined 即未卷入的背景事件 */
+  outcomeStatus?: EventOutcomeStatus;
+  /** 是否玩家亲历（参与过） */
+  personal: boolean;
+}
+
 export interface NPC {
   id: string;
   name: string;
@@ -246,6 +265,7 @@ export interface GameState {
   equipment: EquipmentSlots;
   statusEffects: ActiveStatusEffect[];
   events: GameEvent[];
+  chronicle: ChronicleEntry[];
   social: NPC[];
 }
 

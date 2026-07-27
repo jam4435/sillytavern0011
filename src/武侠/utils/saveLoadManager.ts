@@ -233,26 +233,65 @@ function cleanStoryText(text: string): string {
     .trim();
 }
 
-/**
- * 预览文本先过一遍酒馆"仅格式显示"正则（含预设正则），把思维链等不该展示的段落滤掉，
- * 否则两行预览会被思维链占满、露不出正文。
- * 注意：只用于预览展示；节点身份哈希仍基于 cleanStoryText(原文)，不能受正则配置影响。
- */
-function applyTavernDisplayRegexes(text: string): string {
+function readAllTavernRegexes(): TavernRegex[] {
+  if (typeof getTavernRegexes !== 'function') return [];
   try {
-    if (typeof formatAsTavernRegexedString === 'function') {
-      return formatAsTavernRegexedString(text, 'ai_output', 'display');
+    // 旧式 scope 参数一次返回按实际作用顺序排序的全集（预设 + 全局 + 角色局部）
+    return getTavernRegexes({ scope: 'all' } as unknown as Parameters<typeof getTavernRegexes>[0]);
+  } catch {
+    try {
+      return (['preset', 'global', 'character'] as const).flatMap(type => getTavernRegexes({ type }));
+    } catch {
+      return [];
+    }
+  }
+}
+
+const TAVERN_FIND_REGEX_PATTERN = /^\/([\s\S]+)\/([a-z]*)$/i;
+
+function compileTavernFindRegex(source: string): RegExp | null {
+  const raw = String(source ?? '').trim();
+  if (!raw) return null;
+  try {
+    const match = raw.match(TAVERN_FIND_REGEX_PATTERN);
+    if (match) return new RegExp(match[1], match[2].includes('g') ? match[2] : `${match[2]}g`);
+    return new RegExp(raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 预览要的是正文。把启用的 ai_output + 仅格式显示 酒馆正则（含预设正则）一律当"删除"
+ * 使用：它们圈中的思维链、吐槽、事件附块等都不是正文；而美化类正则的替换物是 HTML/CSS，
+ * 对纯文本预览只是噪音，因此忽略 replace_string，一律替换为空。
+ * 安全阀：单条正则若几乎吞掉全文（例如把整条消息替换成前端加载器的"游戏页面"类全吞正则），
+ * 跳过该条，避免预览被清空。
+ * 注意：只用于预览展示；节点身份哈希仍基于 cleanStoryText(原文)，不受正则配置影响。
+ */
+function stripNonStoryContentForPreview(text: string): string {
+  let result = text;
+  try {
+    for (const regex of readAllTavernRegexes()) {
+      if (regex?.enabled !== true || regex.source?.ai_output !== true || regex.destination?.display !== true) {
+        continue;
+      }
+      const compiled = compileTavernFindRegex(regex.find_regex);
+      if (!compiled) continue;
+      const next = result.replace(compiled, '');
+      if (next.trim().length < 40 && result.trim().length > 200) continue;
+      result = next;
     }
   } catch {
-    // 正则应用失败时回退原文：预览质量下降但不阻塞扫描
+    // 正则读取或应用失败时保留当前结果：预览质量下降但不阻塞扫描
   }
-  return text;
+  return result;
 }
 
 function createPreview(text: string): string {
-  const normalized = cleanStoryText(applyTavernDisplayRegexes(text))
-    .replace(/\s+/g, ' ')
-    .trim();
+  const filtered = cleanStoryText(stripNonStoryContentForPreview(text)).replace(/\s+/g, ' ').trim();
+  // 过滤后为空（例如正则圈走了全部内容）时回退未过滤文本，保证预览不至于空白
+  const normalized = filtered || cleanStoryText(text).replace(/\s+/g, ' ').trim();
   return normalized.length <= PREVIEW_LENGTH ? normalized : `${normalized.slice(0, PREVIEW_LENGTH)}...`;
 }
 
