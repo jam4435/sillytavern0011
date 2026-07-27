@@ -10,6 +10,7 @@ let buildDesktopShellMarkup: typeof import('./aiWorkspaceDesktop.js').buildDeskt
 let buildInfoResourcesMarkup: typeof import('./aiWorkspaceDesktop.js').buildInfoResourcesMarkup;
 let buildPreviewModalSections: typeof import('./aiWorkspaceDesktop.js').buildPreviewModalSections;
 let buildStepIndicator: typeof import('./aiWorkspaceDesktop.js').buildStepIndicator;
+let formatPreviewModalValue: typeof import('./aiWorkspaceDesktop.js').formatPreviewModalValue;
 let renderEntryList: typeof import('./aiWorkspaceDesktop.js').renderEntryList;
 
 beforeAll(async () => {
@@ -24,6 +25,7 @@ beforeAll(async () => {
     buildInfoResourcesMarkup,
     buildPreviewModalSections,
     buildStepIndicator,
+    formatPreviewModalValue,
     renderEntryList,
   } = await import('./aiWorkspaceDesktop.js'));
 });
@@ -196,7 +198,11 @@ describe('AI 修改审阅字段', () => {
       { editableFields: { title: true, content: true, prompt: true } },
     );
 
-    expect(sections.map(section => section.key)).toEqual(['title', 'content', 'keywords']);
-    expect(sections.map(section => section.title)).toEqual(['标题', '内容', '关键词']);
+    expect(sections.map(section => section.key)).toEqual(['title', 'keywords', 'content']);
+    expect(sections.map(section => section.title)).toEqual(['标题', '关键词', '内容']);
+  });
+
+  it('关键词以单行 JSON 数组显示，不插入格式化换行', () => {
+    expect(formatPreviewModalValue(['关键词一', '关键词二'])).toBe('["关键词一","关键词二"]');
   });
 });

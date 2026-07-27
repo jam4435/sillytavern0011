@@ -1233,11 +1233,14 @@ function renderPreviewDiff(diff) {
   `;
 }
 
-function formatPreviewModalValue(value) {
+export function formatPreviewModalValue(value) {
   if (typeof value === 'string') {
     return value;
   }
-  if (Array.isArray(value) || (value && typeof value === 'object')) {
+  if (Array.isArray(value)) {
+    return JSON.stringify(value);
+  }
+  if (value && typeof value === 'object') {
     return JSON.stringify(value, null, 2);
   }
   return value == null ? '' : String(value);
@@ -1456,6 +1459,9 @@ export function buildPreviewModalSections(item, mode) {
   if (mode?.editableFields?.title) {
     sections.push({ key: 'title', title: '标题', before: beforeEntry?.name || '', after: afterEntry?.name || '' });
   }
+  if (mode?.editableFields?.prompt) {
+    sections.push({ key: 'keywords', title: '关键词', before: beforeKeywords, after: afterKeywords });
+  }
   if (mode?.editableFields?.content) {
     sections.push({
       key: 'content',
@@ -1463,9 +1469,6 @@ export function buildPreviewModalSections(item, mode) {
       before: beforeEntry?.content || '',
       after: afterEntry?.content || '',
     });
-  }
-  if (mode?.editableFields?.prompt) {
-    sections.push({ key: 'keywords', title: '关键词', before: beforeKeywords, after: afterKeywords });
   }
   if (!sections.length) {
     sections.push({
@@ -2364,7 +2367,7 @@ function openPreviewModal(uid) {
     sections
       .map(
         section => `
-      <div class="ai-preview-modal-section">
+      <div class="ai-preview-modal-section" data-field-key="${section.key}">
         <div class="ai-preview-modal-section-title">${_.escape(section.title)}</div>
         <div class="ai-preview-modal-panel">
           <div class="ai-preview-modal-field">
@@ -3613,6 +3616,8 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-preview-modal-panel{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ai-border-color,#555)}
       #${ROOT_ID} .ai-preview-modal-field{padding:9px;background:var(--ai-surface-color,#222)}
       #${ROOT_ID} .ai-preview-modal-field textarea{min-height:180px;border:0;border-radius:6px;font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
+      #${ROOT_ID} .ai-preview-modal-section[data-field-key='title'] .ai-preview-modal-field textarea{height:36px;min-height:36px;resize:vertical}
+      #${ROOT_ID} .ai-preview-modal-section[data-field-key='keywords'] .ai-preview-modal-field textarea{height:52px;min-height:36px;resize:vertical}
       #${ROOT_ID} .ai-changed-badge{padding:2px 5px;border-radius:999px;color:var(--ai-success-color,#72d3a5);background:var(--ai-success-bg-color,rgba(78,180,126,.13));font-size:9px}
       #${ROOT_ID} .ai-diagnostics-drawer{margin-bottom:12px;border:1px solid var(--ai-border-color,#555);border-radius:9px;background:var(--ai-surface-color,#222)}
       #${ROOT_ID} .ai-diagnostics-drawer>summary{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;color:var(--ai-text-color-secondary,#aaa);font-size:11px}
