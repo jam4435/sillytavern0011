@@ -19,12 +19,20 @@ import {
   normalizeAiPlanEditorValue,
 } from './aiWorkflowState.js';
 import { createAiEntryVirtualList, destroyAiEntryVirtualList } from './aiEntryVirtualList.js';
+import {
+  initAiGenerationWorkspace,
+  isAiGenerationWorkspaceBusy,
+  refreshAiGenerationWorkspace,
+  renderAiGenerationWorkspace,
+  resetAiGenerationWorkspace,
+} from './aiGenerationWorkspace.js';
 
 const ROOT_ID = 'lorebook-ai-workspace';
 const MODEL_LIST_ID = 'lorebook-ai-model-list';
-const STRATEGIES = [
+const WORKSPACE_MODES = [
   { key: 'direct', label: '直接修改', icon: 'fa-solid fa-wand-magic-sparkles' },
   { key: 'plan', label: '先规划', icon: 'fa-solid fa-route' },
+  { key: 'generate', label: '世界书生成', icon: 'fa-solid fa-seedling' },
 ];
 const SOURCES = [
   ['openai', 'OpenAI'],
@@ -247,7 +255,7 @@ function workflowSnapshot(modeKey = currentModeKey()) {
 }
 
 function getNavItemLabel(navKey = state.currentNav) {
-  return STRATEGIES.find(item => item.key === navKey)?.label || '直接修改';
+  return WORKSPACE_MODES.find(item => item.key === navKey)?.label || '直接修改';
 }
 
 function getStepDescription(step) {
@@ -312,7 +320,7 @@ export function isDesktopAiWorkspace() {
 }
 
 function normalizeNavMode(mode) {
-  return STRATEGIES.some(item => item.key === mode) ? mode : 'direct';
+  return WORKSPACE_MODES.some(item => item.key === mode) ? mode : 'direct';
 }
 
 function normalizeStep(modeKey, step) {
@@ -362,7 +370,7 @@ function hydrateStateFromSettings() {
   };
 
   const savedDraft = saved.draft || {};
-  state.currentNav = normalizeNavMode(savedDraft.strategy || saved.navMode || 'direct');
+  state.currentNav = normalizeNavMode(saved.activeMode || savedDraft.strategy || saved.navMode || 'direct');
   state.modelStatusText = '';
   state.sharedStatusText = '';
   state.chatContext = {
@@ -463,17 +471,24 @@ function currentContextBudget() {
 function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
   const saved = settings();
   const mirrorMode = state.modes[mirrorModeKey] || state.modes.direct;
+  const modifyStrategy = state.currentNav === 'plan'
+    ? 'plan'
+    : state.currentNav === 'direct'
+      ? 'direct'
+      : saved.modifyStrategy || saved.strategy || 'direct';
   if ($('#ai-workspace-chat-context-count', parentDoc()).length) {
     state.chatContext = currentChatContextSettings();
   }
   setAiWorkspaceSettings({
     ...saved,
-    schemaVersion: 2,
-    strategy: state.currentNav,
-    navMode: state.currentNav,
+    schemaVersion: 3,
+    activeMode: state.currentNav,
+    modifyStrategy,
+    strategy: modifyStrategy,
+    navMode: modifyStrategy,
     draft: {
       ...serializeModeState(mirrorModeKey),
-      strategy: state.currentNav,
+      strategy: modifyStrategy,
       chatContext: {
         ...state.chatContext,
         mode: state.chatContextManual ? 'manual' : 'structured',
@@ -3313,10 +3328,10 @@ export function buildDesktopShellMarkup() {
       <header class="ai-workbench-header">
         <div class="ai-workbench-brand">
           <span class="ai-brand-mark"><i class="fa-solid fa-feather-pointed"></i></span>
-          <div><h1>AI 修改</h1><p>先定义边界，再审阅每一处写回</p></div>
+          <div><h1 id="ai-workspace-brand-title">AI 世界书工作台</h1><p id="ai-workspace-brand-subtitle">先定义边界，再审阅每一处写回</p></div>
         </div>
-        <div class="ai-strategy-switch" role="group" aria-label="修改策略">
-          ${STRATEGIES.map(item => `<button type="button" class="ai-strategy-button${state.currentNav === item.key ? ' is-active' : ''}" data-ai-strategy="${item.key}" aria-pressed="${state.currentNav === item.key}"><i class="${item.icon}"></i><span>${item.label}</span></button>`).join('')}
+        <div class="ai-strategy-switch" role="group" aria-label="工作模式">
+          ${WORKSPACE_MODES.map(item => `<button type="button" class="ai-strategy-button${state.currentNav === item.key ? ' is-active' : ''}" data-ai-strategy="${item.key}" aria-pressed="${state.currentNav === item.key}"><i class="${item.icon}"></i><span>${item.label}</span></button>`).join('')}
         </div>
         <div class="ai-context-chips">
           <button type="button" class="ai-context-chip" data-ai-open-settings><i class="fa-solid fa-microchip"></i><span>${_.escape(modelLabel)}</span></button>
@@ -4111,11 +4126,16 @@ function updateWorkbenchHeader() {
   const saved = settings();
   const modelLabel = saved.apiMode === 'custom' ? saved.customApi?.model || '模型待配置' : '当前酒馆预设';
   const referenceLength = (state.referenceMaterial || '').trim().length;
+  const isGenerationMode = state.currentNav === 'generate';
   const contextLabel = state.chatContext.enabled
     ? state.chatContextManual
       ? '手工上下文'
       : `${state.chatMessages.length} 条上下文`
     : '上下文关闭';
+  $('#ai-workspace-brand-title', parentDoc()).text(isGenerationMode ? '世界书生成' : 'AI 世界书工作台');
+  $('#ai-workspace-brand-subtitle', parentDoc()).text(
+    isGenerationMode ? '把资料变成可追踪、可审阅、可继续生长的知识结构' : '先定义边界，再审阅每一处写回',
+  );
   $('[data-ai-open-settings] span', parentDoc()).text(modelLabel);
   $('[data-ai-focus-context] span', parentDoc()).text(contextLabel);
   $('[data-ai-open-assistant-tab="reference"] span', parentDoc()).text(
@@ -4139,6 +4159,15 @@ function syncWorkflowCapabilities(modeKey = currentModeKey()) {
 function renderCurrentPanel() {
   const $panel = $('#ai-workspace-desktop-panel', parentDoc());
   if (!$panel.length) {
+    return;
+  }
+
+  if (state.currentNav === 'generate') {
+    renderAiGenerationWorkspace($panel, { worldbookNames: state.worldbookNames });
+    updateWorkbenchHeader();
+    syncApiForm();
+    setGeneratingState(false);
+    $('.ai-strategy-button', parentDoc()).prop('disabled', isAiGenerationWorkspaceBusy());
     return;
   }
 
@@ -4697,16 +4726,27 @@ function bindEvents() {
   $(parentDoc())
     .off('.aiWorkspaceDesktop')
     .on('click.aiWorkspaceDesktop', '.ai-strategy-button', function () {
-      const targetStrategy = normalizeNavMode(($(this).attr('data-ai-strategy') || '').trim());
-      if (!targetStrategy || targetStrategy === state.currentNav || state.isGenerating) {
+      const targetMode = normalizeNavMode(($(this).attr('data-ai-strategy') || '').trim());
+      if (
+        !targetMode
+        || targetMode === state.currentNav
+        || state.isGenerating
+        || isAiGenerationWorkspaceBusy()
+      ) {
         return;
       }
-      captureModeInputs(currentModeKey());
+      if (state.currentNav === 'direct' || state.currentNav === 'plan') {
+        captureModeInputs(currentModeKey());
+      }
       resetDirectPlanRecommendation();
-      state.currentNav = targetStrategy;
-      invalidateModeOutputs(targetStrategy, { clearPlan: true });
-      state.modes[targetStrategy].currentStep = 'prepare';
-      schedulePersist(targetStrategy);
+      state.currentNav = targetMode;
+      if (targetMode === 'direct' || targetMode === 'plan') {
+        invalidateModeOutputs(targetMode, { clearPlan: true });
+        state.modes[targetMode].currentStep = 'prepare';
+        schedulePersist(targetMode);
+      } else {
+        persistSettings({ mirrorModeKey: currentModeKey() });
+      }
       renderCurrentPanel();
     })
     .on('click.aiWorkspaceDesktop', '[data-ai-step]', function () {
@@ -5348,6 +5388,7 @@ export function initDesktopAiWorkspace() {
   if (!state.hydrated) {
     hydrateStateFromSettings();
   }
+  initAiGenerationWorkspace({ worldbookNames: state.worldbookNames });
   renderCurrentPanel();
   if (state.initialized) {
     return;
@@ -5386,6 +5427,7 @@ export function resetDesktopAiWorkspace() {
   state.entryLoadRunId += 1;
   destroyAiEntryVirtualList(state.entryCluster, true);
   state.entryCluster = null;
+  resetAiGenerationWorkspace();
   ensureMarkup();
   renderCurrentPanel();
 }
@@ -5401,6 +5443,12 @@ export const refreshDesktopAiWorkspace = errorCatched(async () => {
   renderCurrentPanel();
 
   await populateLorebooks();
+  await refreshAiGenerationWorkspace({ worldbookNames: state.worldbookNames, render: state.currentNav === 'generate' });
+  if (state.currentNav === 'generate') {
+    persistSettings({ mirrorModeKey: currentModeKey() });
+    renderCurrentPanel();
+    return;
+  }
   ensureModeLorebook(currentModeKey());
 
   const modeKey = currentModeKey();

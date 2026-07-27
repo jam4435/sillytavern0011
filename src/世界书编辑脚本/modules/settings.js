@@ -4,7 +4,7 @@ import { getLocalStorageItem, setLocalStorageItem } from './utils.js';
 const DEFAULT_COPY_CONFLICT_STRATEGY_KEY = 'lorebook-default-copy-conflict-strategy';
 const VALID_COPY_CONFLICT_STRATEGIES = new Set(['overwrite', 'rename', 'keep-original']);
 const AI_WORKSPACE_SETTINGS_KEY = 'lorebook-ai-workspace-settings';
-export const AI_WORKSPACE_SCHEMA_VERSION = 2;
+export const AI_WORKSPACE_SCHEMA_VERSION = 3;
 export const AI_WORKSPACE_SAVE_DEBOUNCE_MS = 300;
 const PC_LAYOUT_MODE_KEY = 'lorebook-pc-layout-mode';
 const PC_MASTER_DETAIL_SPLIT_KEY = 'lorebook-pc-master-detail-split';
@@ -100,7 +100,9 @@ const DEFAULT_AI_DRAFT = {
 
 const DEFAULT_AI_WORKSPACE_SETTINGS = {
   schemaVersion: AI_WORKSPACE_SCHEMA_VERSION,
-  strategy: 'direct',
+  activeMode: 'direct',
+  modifyStrategy: 'direct',
+  activeGenerationProjectId: null,
   apiMode: 'preset',
   stream: false,
   contextBudget: _.cloneDeep(DEFAULT_AI_CONTEXT_BUDGET),
@@ -247,6 +249,9 @@ function hasOwn(object, key) {
 }
 
 function legacyStrategy(settings = {}) {
+  if (settings?.modifyStrategy === 'plan') {
+    return 'plan';
+  }
   if (settings?.navMode === 'plan') {
     return 'plan';
   }
@@ -277,24 +282,34 @@ function legacyRootDraft(settings = {}) {
 }
 
 /**
- * 将旧版双模式设置或新版输入统一为只包含一份可持久化草稿的 v2 数据。
+ * 将旧版双模式设置或新版输入统一为只包含一份修改草稿的 v3 数据。
  * 规划结果、预览、调试信息、阶段和状态文本不会进入返回值。
  */
 export function normalizeAiWorkspaceSettings(settings = {}) {
-  const strategy = legacyStrategy(settings);
+  const modifyStrategy = legacyStrategy(settings);
+  const activeMode = ['direct', 'plan', 'generate'].includes(settings?.activeMode)
+    ? settings.activeMode
+    : modifyStrategy;
   const isLegacyPayload = settings?.schemaVersion !== AI_WORKSPACE_SCHEMA_VERSION;
-  const explicitLegacyMode = hasOwn(settings, strategy);
-  const modeDraft = explicitLegacyMode ? settings?.[strategy] : null;
-  const baseDraft = isLegacyPayload
-    ? { ...legacyRootDraft(settings), ...(modeDraft || {}) }
-    : settings?.draft || {};
+  const explicitLegacyMode = hasOwn(settings, modifyStrategy);
+  const modeDraft = explicitLegacyMode ? settings?.[modifyStrategy] : null;
+  const baseDraft = settings?.schemaVersion === 2
+    ? settings?.draft || {}
+    : isLegacyPayload
+      ? { ...legacyRootDraft(settings), ...(modeDraft || {}) }
+      : settings?.draft || {};
   const draftInput = !isLegacyPayload && explicitLegacyMode
     ? { ...settings.draft, ...modeDraft, ...legacyRootDraft(settings) }
     : baseDraft;
 
   const normalized = {
     schemaVersion: AI_WORKSPACE_SCHEMA_VERSION,
-    strategy,
+    activeMode,
+    modifyStrategy,
+    activeGenerationProjectId:
+      typeof settings?.activeGenerationProjectId === 'string' && settings.activeGenerationProjectId.trim()
+        ? settings.activeGenerationProjectId.trim()
+        : null,
     apiMode: settings?.apiMode === 'custom' ? 'custom' : 'preset',
     stream: settings?.stream === true,
     contextBudget: normalizeAiContextBudget(settings?.contextBudget),
@@ -338,10 +353,19 @@ function attachLegacyAiWorkspaceAliases(settings) {
   ];
 
   const descriptors = {
-    navMode: {
-      get: () => settings.strategy,
+    strategy: {
+      get: () => settings.modifyStrategy,
       set: value => {
-        if (value === 'direct' || value === 'plan') settings.strategy = value;
+        if (value === 'direct' || value === 'plan') settings.modifyStrategy = value;
+      },
+    },
+    navMode: {
+      get: () => settings.modifyStrategy,
+      set: value => {
+        if (value === 'direct' || value === 'plan') {
+          settings.modifyStrategy = value;
+          settings.activeMode = value;
+        }
       },
     },
     direct: {

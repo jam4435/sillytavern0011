@@ -20,7 +20,7 @@ afterAll(() => {
   settingsModule.flushAiWorkspaceSettings();
 });
 
-describe('AI 工作区设置 schema v2', () => {
+describe('AI 工作区设置 schema v3', () => {
   it('迁移当前活动的旧 plan 草稿并丢弃所有运行态字段', () => {
     const normalized = settingsModule.normalizeAiWorkspaceSettings({
       navMode: 'plan',
@@ -40,8 +40,9 @@ describe('AI 工作区设置 schema v2', () => {
     });
 
     expect(normalized).toMatchObject({
-      schemaVersion: 2,
-      strategy: 'plan',
+      schemaVersion: 3,
+      activeMode: 'plan',
+      modifyStrategy: 'plan',
       draft: {
         lorebookName: '计划世界书',
         instruction: '计划模式指令',
@@ -65,14 +66,17 @@ describe('AI 工作区设置 schema v2', () => {
       direct: { instruction: '直接草稿', selectedEntryUids: [5] },
       plan: { instruction: '计划草稿', selectedEntryUids: [6] },
     });
-    expect(normalized.strategy).toBe('direct');
+    expect(normalized.modifyStrategy).toBe('direct');
+    expect(normalized.activeMode).toBe('direct');
     expect(normalized.draft).toMatchObject({ instruction: '直接草稿', selectedEntryUids: [5] });
   });
 
   it('只将一份草稿防抖落盘，读取时仍兼容旧属性访问', () => {
     vi.useFakeTimers();
     settingsModule.setAiWorkspaceSettings({
-      schemaVersion: 2,
+      schemaVersion: 3,
+      activeMode: 'plan',
+      modifyStrategy: 'plan',
       strategy: 'plan',
       draft: {
         lorebookName: '测试世界书',
@@ -95,7 +99,8 @@ describe('AI 工作区设置 schema v2', () => {
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
     vi.advanceTimersByTime(1);
     const persisted = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}');
-    expect(persisted).toMatchObject({ schemaVersion: 2, strategy: 'plan' });
+    expect(persisted).toMatchObject({ schemaVersion: 3, activeMode: 'plan', modifyStrategy: 'plan' });
+    expect(persisted).not.toHaveProperty('strategy');
     expect(persisted).not.toHaveProperty('navMode');
     expect(persisted).not.toHaveProperty('direct');
     expect(persisted).not.toHaveProperty('plan');
@@ -117,8 +122,9 @@ describe('AI 工作区设置 schema v2', () => {
 
     const persisted = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}');
     expect(persisted).toMatchObject({
-      schemaVersion: 2,
-      strategy: 'plan',
+      schemaVersion: 3,
+      activeMode: 'plan',
+      modifyStrategy: 'plan',
       draft: { lorebookName: '兼容世界书', instruction: '兼容调用', readonlyEntryUids: [9] },
     });
   });
@@ -130,7 +136,7 @@ describe('AI 工作区设置 schema v2', () => {
     });
 
     const normalized = settingsModule.normalizeAiWorkspaceSettings({
-      schemaVersion: 2,
+      schemaVersion: 3,
       draft: {
         assistantEntryContext: { editable: true, readonly: 'true' },
         assistantChatHistory: [
@@ -146,6 +152,48 @@ describe('AI 工作区设置 schema v2', () => {
     expect(normalized.draft.assistantEntryContext).toEqual({ editable: true, readonly: false });
     expect(normalized.draft.assistantChatHistory[0]).toMatchObject({
       entryContext: { lorebookName: '测试世界书', editableCount: 2, readonlyCount: 1 },
+    });
+  });
+
+  it('从 v2 迁移单一修改草稿，并保留生成模式选择与活动项目', () => {
+    const normalized = settingsModule.normalizeAiWorkspaceSettings({
+      schemaVersion: 2,
+      strategy: 'plan',
+      activeMode: 'generate',
+      activeGenerationProjectId: 'project-42',
+      draft: {
+        lorebookName: 'v2 世界书',
+        instruction: '保留这份草稿',
+        selectedEntryUids: [42],
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      schemaVersion: 3,
+      activeMode: 'generate',
+      modifyStrategy: 'plan',
+      activeGenerationProjectId: 'project-42',
+      draft: {
+        lorebookName: 'v2 世界书',
+        instruction: '保留这份草稿',
+        selectedEntryUids: [42],
+      },
+    });
+  });
+
+  it('非法生成项目 ID 和工作模式回退到修改策略', () => {
+    expect(
+      settingsModule.normalizeAiWorkspaceSettings({
+        schemaVersion: 3,
+        activeMode: 'unknown',
+        modifyStrategy: 'plan',
+        activeGenerationProjectId: '   ',
+      }),
+    ).toMatchObject({
+      schemaVersion: 3,
+      activeMode: 'plan',
+      modifyStrategy: 'plan',
+      activeGenerationProjectId: null,
     });
   });
 });

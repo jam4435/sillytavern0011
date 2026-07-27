@@ -528,6 +528,18 @@ export const rebindCharWorldbooksSafe = errorCatched(async charWorldbooks => {
   return await rebindFn('current', charWorldbooks);
 }, 'rebindCharWorldbooks');
 
+export const getCharWorldbooksSafe = errorCatched(async () => {
+  const getFn = window.parent.getCharWorldbookNames || window.getCharWorldbookNames;
+  if (typeof getFn !== 'function') {
+    throw new Error('核心函数 getCharWorldbookNames 不可用。请确保酒馆助手已更新到最新版本。');
+  }
+  const value = await getFn('current');
+  return {
+    primary: value?.primary || null,
+    additional: Array.isArray(value?.additional) ? [...value.additional] : [],
+  };
+}, 'getCharWorldbooksSafe');
+
 // 新增：封装酒馆助手的 importRawWorldbook 函数
 export const importWorldbookSafe = errorCatched(async (filename, content) => {
   const importFn = window.parent.importRawWorldbook || window.importRawWorldbook;
@@ -582,3 +594,33 @@ export const rebindChatWorldbookSafe = errorCatched(async worldbookName => {
   }
   return await rebindFn('current', worldbookName);
 }, 'rebindChatWorldbookSafe');
+
+export const getChatWorldbookSafe = errorCatched(async () => {
+  const getFn = window.parent.getChatWorldbookName || window.getChatWorldbookName;
+  if (typeof getFn !== 'function') {
+    throw new Error('核心函数 getChatWorldbookName 不可用。请确保酒馆助手已更新到最新版本。');
+  }
+  return (await getFn('current')) || null;
+}, 'getChatWorldbookSafe');
+
+export const getWorldbookBindingStatus = errorCatched(async worldbookName => {
+  if (!worldbookName) {
+    throw new Error('检查世界书绑定状态时缺少世界书名。');
+  }
+  const [character, chat, globalNames] = await Promise.all([
+    getCharWorldbooksSafe(),
+    getChatWorldbookSafe(),
+    getGlobalLorebooks(),
+  ]);
+  const bindings = {
+    characterPrimary: character.primary === worldbookName,
+    characterAdditional: character.additional.includes(worldbookName),
+    chat: chat === worldbookName,
+    global: globalNames.includes(worldbookName),
+  };
+  return {
+    worldbookName,
+    bound: Object.values(bindings).some(Boolean),
+    bindings,
+  };
+}, 'getWorldbookBindingStatus');

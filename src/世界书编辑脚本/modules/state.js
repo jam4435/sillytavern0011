@@ -79,6 +79,7 @@ export const folderSessionState = {};
 export let compareSessionState = null;
 export const mutationHistoryState = {
   lastTransactions: {},
+  createdWorldbookTransactions: {},
   undoStackByLorebook: {},
   redoStackByLorebook: {},
 };
@@ -254,6 +255,22 @@ export function getLastMutationTransaction(lorebookName) {
 
 export function clearLastMutationTransaction(lorebookName) {
   delete mutationHistoryState.lastTransactions[lorebookName];
+}
+
+export function setCreatedWorldbookTransaction(lorebookName, transaction) {
+  if (!lorebookName) return;
+  mutationHistoryState.createdWorldbookTransactions[lorebookName] = transaction
+    ? _.cloneDeep(transaction)
+    : null;
+}
+
+export function getCreatedWorldbookTransaction(lorebookName) {
+  const transaction = mutationHistoryState.createdWorldbookTransactions[lorebookName];
+  return transaction ? _.cloneDeep(transaction) : null;
+}
+
+export function clearCreatedWorldbookTransaction(lorebookName) {
+  delete mutationHistoryState.createdWorldbookTransactions[lorebookName];
 }
 
 /**

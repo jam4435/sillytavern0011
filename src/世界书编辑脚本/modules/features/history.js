@@ -1,6 +1,9 @@
 import {
+  clearCreatedWorldbookTransaction,
   clearLastMutationTransaction,
+  getCreatedWorldbookTransaction,
   getLastMutationTransaction,
+  setCreatedWorldbookTransaction,
   setLastMutationTransaction,
 } from '../state.js';
 import { getPositionLabel } from '../position.js';
@@ -96,6 +99,46 @@ export function getLastTransactionMeta(lorebookName) {
     committedAt: transaction.committedAt,
     ..._.cloneDeep(transaction.meta || {}),
   };
+}
+
+export function recordCreatedWorldbookTransaction(lorebookName, entries, meta = {}) {
+  if (!lorebookName) {
+    throw new Error('创建世界书事务缺少 lorebookName。');
+  }
+  const transaction = {
+    lorebookName,
+    snapshot: cloneSnapshot(entries),
+    meta: {
+      operationType: 'worldbook-create',
+      ..._.cloneDeep(meta || {}),
+    },
+    createdAt: Date.now(),
+  };
+  setCreatedWorldbookTransaction(lorebookName, transaction);
+  return _.cloneDeep(transaction);
+}
+
+export function getCreatedWorldbookTransactionMeta(lorebookName) {
+  const transaction = getCreatedWorldbookTransaction(lorebookName);
+  if (!transaction) return null;
+  return {
+    lorebookName,
+    createdAt: transaction.createdAt,
+    ..._.cloneDeep(transaction.meta || {}),
+  };
+}
+
+export function getCreatedWorldbookTransactionSnapshot(lorebookName) {
+  const transaction = getCreatedWorldbookTransaction(lorebookName);
+  return transaction ? _.cloneDeep(transaction) : null;
+}
+
+export function consumeCreatedWorldbookTransaction(lorebookName) {
+  const transaction = getCreatedWorldbookTransaction(lorebookName);
+  if (transaction) {
+    clearCreatedWorldbookTransaction(lorebookName);
+  }
+  return transaction;
 }
 
 function getEntryTitle(entry) {

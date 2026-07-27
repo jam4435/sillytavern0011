@@ -1,39 +1,39 @@
 import { createLorebookEntries, getWorldbookSafe } from '../api.js';
-import { normalizePositionSelection } from '../position.js';
 import { errorCatched } from '../utils.js';
+import { parseWorldbookYaml, yamlDocumentToWorldbookEntry } from './worldbookYaml.js';
 
 const IMPORT_MODAL_ID = 'lorebook-import-modal';
 
-function ensureJsYaml() {
-  return new Promise((resolve, reject) => {
-    if (window.jsyaml) return resolve();
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js';
-    script.onload = () => resolve();
-    script.onerror = () => {
-      alert('错误：无法加载YAML解析器，批量导入功能不可用。');
-      reject(new Error('Failed to load js-yaml.'));
-    };
-    document.head.appendChild(script);
-  });
+export function buildBulkImportEntries(yamlText, existingEntries = []) {
+  const documents = parseWorldbookYaml(yamlText);
+  const maxUid = Math.max(
+    0,
+    ...existingEntries.map(entry => (typeof entry.uid === 'number' ? entry.uid : Number.parseInt(entry.uid, 10) || 0)),
+  );
+  return documents.map((document, index) => yamlDocumentToWorldbookEntry(document, { uid: maxUid + index + 1 }));
 }
 
-function normalizeYamlDocumentsByUid(yamlText) {
-  const normalized = yamlText.replace(/\r\n/g, '\n');
-  if (/^\s*---(?:\s|$)/m.test(normalized)) {
-    return normalized;
+export async function importWorldbookYaml(lorebookName, yamlText) {
+  const existingEntriesResult = await getWorldbookSafe(lorebookName);
+  if (!existingEntriesResult.success) {
+    throw existingEntriesResult.error || new Error(`无法读取世界书“${lorebookName}”。`);
   }
-
-  const parts = normalized
-    .split(/(?=^uid:\s*[^\n]*$)/m)
-    .map(part => part.trim())
-    .filter(Boolean);
-
-  if (parts.length <= 1) {
-    return normalized;
+  const entriesToCreate = buildBulkImportEntries(yamlText, existingEntriesResult.data);
+  const result = await createLorebookEntries(lorebookName, entriesToCreate, {
+    trackHistory: true,
+    transactionType: 'bulk-import',
+    transactionMeta: {
+      importedCount: entriesToCreate.length,
+    },
+  });
+  if (!result.success) {
+    throw result.error || new Error('导入失败');
   }
-
-  return parts.map((part, index) => (index === 0 ? part : `---\n${part}`)).join('\n');
+  return {
+    success: true,
+    entryUids: entriesToCreate.map(entry => entry.uid),
+    entries: entriesToCreate,
+  };
 }
 
 export const handleBulkImport = errorCatched(async (lorebookName, isGlobal) => {
@@ -41,17 +41,7 @@ export const handleBulkImport = errorCatched(async (lorebookName, isGlobal) => {
   const $modal = $(`#${IMPORT_MODAL_ID}`, parentDoc);
   const $confirmBtn = $modal.find(`#${IMPORT_MODAL_ID}-confirm`);
   const $errorDisplay = $modal.find(`#${IMPORT_MODAL_ID}-error`);
-  let yamlText = $modal.find(`#${IMPORT_MODAL_ID}-textarea`).val();
-  const uidStep = 1;
-
-  // Pre-process the text to replace all tabs with 2 spaces to prevent indentation errors.
-  yamlText = yamlText.replace(/\t/g, '  ');
-  yamlText = normalizeYamlDocumentsByUid(yamlText);
-
-  if (!Number.isInteger(uidStep) || uidStep < 1) {
-    $errorDisplay.text('错误：UID 间隔必须是大于等于 1 的整数。').show();
-    return false;
-  }
+  const yamlText = $modal.find(`#${IMPORT_MODAL_ID}-textarea`).val();
 
   if (!yamlText.trim()) {
     $errorDisplay.text('错误：输入内容不能为空。').show();
@@ -62,89 +52,10 @@ export const handleBulkImport = errorCatched(async (lorebookName, isGlobal) => {
   $errorDisplay.hide();
 
   try {
-    await ensureJsYaml();
-
-    const yamlTypeToApiType = { Constant: 'constant', Normal: 'selective' };
-    const yamlPositionToApiPosition = {
-      'Before Character Definition': 'before_character_definition',
-      'After Character Definition': 'after_character_definition',
-      'Before Example Messages': 'before_example_messages',
-      'After Example Messages': 'after_example_messages',
-      'Before Author Note': 'before_author_note',
-      'After Author Note': 'after_author_note',
-      'At Depth as System': 'at_depth_as_system',
-      'At Depth as Assistant': 'at_depth_as_assistant',
-      'At Depth as User': 'at_depth_as_user',
-    };
-
-    // Use js-yaml's `loadAll` to safely handle multiple documents,
-    // which is more robust than splitting the string manually.
-    const documents = window.jsyaml.loadAll(yamlText);
-
-    // 获取现有条目以计算最大UID
-    const existingEntriesResult = await getWorldbookSafe(lorebookName);
-    const existingEntries = existingEntriesResult.success ? existingEntriesResult.data : [];
-    let maxUid = 0;
-    if (existingEntries && existingEntries.length > 0) {
-      maxUid = Math.max(...existingEntries.map(e => (typeof e.uid === 'number' ? e.uid : parseInt(e.uid) || 0)));
-    }
-
-    const entriesToCreate = [];
-    for (const doc of documents) {
-      // Skip any empty documents that might result from extra `---`
-      if (!doc || typeof doc !== 'object') continue;
-
-      if (!doc.trigger || !doc.trigger.Title || !doc.content) {
-        // Try to find a title for a better error message
-        const entryIdentifier = doc.trigger?.Title || doc.uid || '未知条目';
-        throw new Error(`条目 "${entryIdentifier}" 缺少 "trigger.Title" 或 "content" 字段。`);
-      }
-
-      const positionSelection = normalizePositionSelection(yamlPositionToApiPosition[doc.trigger.position]);
-      const position = {
-        type: positionSelection.type,
-        depth: doc.trigger.depth !== undefined ? doc.trigger.depth : 0,
-        order: doc.trigger.order !== undefined ? doc.trigger.order : 100,
-      };
-      if (positionSelection.type === 'at_depth') {
-        position.role = positionSelection.role;
-      }
-
-      entriesToCreate.push({
-        uid: maxUid + 1 + entriesToCreate.length,
-        name: doc.trigger.Title,
-        content: doc.content,
-        enabled: doc.enabled !== undefined ? doc.enabled : true,
-        probability: doc.probability !== undefined ? doc.probability : 100,
-        strategy: {
-          type: yamlTypeToApiType[doc.trigger.type] || 'selective',
-          keys: doc.trigger.Comma_separated_list
-            ? doc.trigger.Comma_separated_list.split(',')
-                .map(k => k.trim())
-                .filter(Boolean)
-            : [],
-        },
-        position,
-      });
-    }
-
-    if (entriesToCreate.length === 0) throw new Error('未找到任何有效的条目。请检查YAML格式。');
-
-    const result = await createLorebookEntries(lorebookName, entriesToCreate, {
-      transactionType: 'bulk-import',
-      transactionMeta: {
-        importedCount: entriesToCreate.length,
-      },
-    });
-    if (!result.success) {
-      throw result.error || new Error('导入失败');
-    }
-    alert(`成功导入 ${entriesToCreate.length} 个条目到 "${lorebookName}"！`);
+    const result = await importWorldbookYaml(lorebookName, yamlText);
+    alert(`成功导入 ${result.entryUids.length} 个条目到 "${lorebookName}"！`);
     $modal.hide();
-    return {
-      success: true,
-      entryUids: entriesToCreate.map(entry => entry.uid),
-    };
+    return result;
   } catch (error) {
     console.error('角色世界书: 批量导入失败', error);
     $errorDisplay.text(`导入失败: ${error.message}`).show();
