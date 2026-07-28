@@ -571,8 +571,8 @@
         "韩小莹"
       ],
       "predecessor": [],
-      "followup": "射雕第5回01-豹口救人",
-      "hash": "c8155666567ab03f81325a93cf6c4e6d0dd94b5166deab01507eb5ef100946d7",
+      "followup": "射雕第5回04-弯弓射雕",
+      "hash": "be7f89032ea8a5c73814a2d8f25700e08eb3af6350ed7c2546ddd7d709180cee",
       "shardId": "shard-0001"
     },
     {
@@ -1111,8 +1111,8 @@
       "predecessor": [
         "射雕第4回05-荒山恶战"
       ],
-      "followup": "射雕第5回01-豹口救人",
-      "hash": "06b82e302105f27cf854272bcf72a90963f8522fa625265ed0d2afcccdfa7a6c",
+      "followup": "射雕第5回04-弯弓射雕",
+      "hash": "01e9e53f45a51c3eeeb2a6750441cd6be2349bf7ae658184ef85b3057dc38139",
       "shardId": "shard-0001"
     },
     {
@@ -1158,10 +1158,7 @@
         "柯镇恶",
         "铁木真"
       ],
-      "predecessor": [
-        "射雕第3回01-醉仙楼十八年之约",
-        "射雕第4回06-郭靖拜师"
-      ],
+      "predecessor": [],
       "followup": "射雕第5回02-指腹为婚",
       "hash": "d01b13cd63a9455e8539a39a64304e66bf4480c2c401359d078ce162acecfe58",
       "shardId": "shard-0001"
@@ -1294,6 +1291,8 @@
         "哲别"
       ],
       "predecessor": [
+        "射雕第3回01-醉仙楼十八年之约",
+        "射雕第4回06-郭靖拜师",
         "射雕第5回03-夜半切磋"
       ],
       "followup": "射雕第5回05-悬崖奇遇",
@@ -4811,8 +4810,8 @@
       "predecessor": [
         "射雕第16回07-义结金兰"
       ],
-      "followup": "射雕第17回01-周伯通忆往事",
-      "hash": "c23978efa5fbf50899c17a6c5f34875539ac325e4a4dcae31006c5b8cdc1372e",
+      "followup": "射雕第17回05-周伯通哄传真经",
+      "hash": "48584610d555b4acc83647d1d2e7ea655c89dcbffd2424c49e6eacb6438d0d70",
       "shardId": "shard-0003"
     },
     {
@@ -4848,9 +4847,7 @@
         "郭靖",
         "周伯通"
       ],
-      "predecessor": [
-        "射雕第16回08-九阴真经的由来"
-      ],
+      "predecessor": [],
       "followup": "射雕第17回02-初研双手互搏",
       "hash": "263509fac60c20a2b5662861a76abf4b8cf5a315612ca2dfc74c320cb3a3314b",
       "shardId": "shard-0003"
@@ -5009,6 +5006,7 @@
         "郭靖"
       ],
       "predecessor": [
+        "射雕第16回08-九阴真经的由来",
         "射雕第17回04-郭靖舍血救义兄"
       ],
       "followup": "射雕第17回06-蜡丸传信诉情意",
@@ -5092,8 +5090,8 @@
       "predecessor": [
         "射雕第17回06-蜡丸传信诉情意"
       ],
-      "followup": "射雕第18回01-西毒求亲",
-      "hash": "e209374401bd38b8f86fd69993604c3c6fc2e238f010d6e995d2ee1f68bc1b97",
+      "followup": "射雕第18回05-三道试题",
+      "hash": "e3887a991311f3db792781fda1c7da0d021137cbcd44cfa41ed5195cd4aa02eb",
       "shardId": "shard-0003"
     },
     {
@@ -5132,9 +5130,7 @@
         "黄药师",
         "黄蓉"
       ],
-      "predecessor": [
-        "射雕第17回07-群蛇围困山洞"
-      ],
+      "predecessor": [],
       "followup": "射雕第18回02-三雄斗乐",
       "hash": "30732679d1aab5ab343f2c8d374b11b37cdeaf2581be77d95a47b70fd2db5e4a",
       "shardId": "shard-0003"
@@ -5306,6 +5302,7 @@
         "欧阳克"
       ],
       "predecessor": [
+        "射雕第17回07-群蛇围困山洞",
         "射雕第18回04-高手过招"
       ],
       "followup": "射雕第19回01-真经风波",
@@ -7534,8 +7531,8 @@
       "predecessor": [
         "射雕第25回04-欧阳克智破密室"
       ],
-      "followup": "射雕第25回06-华筝南下寻郭靖",
-      "hash": "695dc56183425f498c044cf5372e9fe6ad7b2a8ef9bba4971feb7df55d4c95fe",
+      "followup": "射雕第25回07-杨康谎报死讯",
+      "hash": "c22d1fe192ee800a6fe3026b4f724ab47f9f9959417f3a6600ad6a295a4073f6",
       "shardId": "shard-0004"
     },
     {
@@ -7573,9 +7570,7 @@
         "华筝",
         "拖雷"
       ],
-      "predecessor": [
-        "射雕第25回05-杨康刺杀欧阳克"
-      ],
+      "predecessor": [],
       "followup": "射雕第25回07-杨康谎报死讯",
       "hash": "e0a32be6a0327bfd2200c474a87583f450652dd392b4cc03ee1066b55448f939",
       "shardId": "shard-0004"
@@ -7616,6 +7611,7 @@
         "丘处机"
       ],
       "predecessor": [
+        "射雕第25回05-杨康刺杀欧阳克",
         "射雕第25回06-华筝南下寻郭靖"
       ],
       "followup": "射雕第25回08-杨康巧得帮主令",
@@ -7882,8 +7878,8 @@
       "predecessor": [
         "射雕第26回01-牛家村混战"
       ],
-      "followup": "射雕第26回03-林中恶斗",
-      "hash": "805574f151b2b8047db6329b000d67e4bef61228913e2c8c1502c653640373ec",
+      "followup": "射雕第26回05-画中密语",
+      "hash": "6083240bdcdb942dd2f88a789508c4b649b61540ab7a6746eb5b4df6fc174c8b",
       "shardId": "shard-0004"
     },
     {
@@ -7930,9 +7926,7 @@
         "全金发",
         "柯镇恶"
       ],
-      "predecessor": [
-        "射雕第26回02-傻姑身世揭晓"
-      ],
+      "predecessor": [],
       "followup": "射雕第26回04-郭靖守信拒婚",
       "hash": "311bee7f1c7145c62d87ce3c3c9aab847977d545600a769e48d648c8e4cc7202",
       "shardId": "shard-0004"
@@ -8014,6 +8008,7 @@
         "黄蓉"
       ],
       "predecessor": [
+        "射雕第26回02-傻姑身世揭晓",
         "射雕第26回04-郭靖守信拒婚"
       ],
       "followup": "射雕第26回06-岳阳楼会丐帮",
@@ -8993,8 +8988,8 @@
       "predecessor": [
         "射雕第31回05-真经总纲"
       ],
-      "followup": "射雕第32回01-穆念慈铁掌峰决裂",
-      "hash": "f84e626886516a402bb86353a695157e42c86dd6e3cf3c7fa1fe6f50c4fe527b",
+      "followup": "射雕第32回04-湍江险滩恶斗",
+      "hash": "63a85df02e78202c392f580742cb4d8a68d0ca4935a30e27bf50e608720ffe70",
       "shardId": "shard-0005"
     },
     {
@@ -9031,9 +9026,7 @@
         "黄蓉",
         "穆念慈"
       ],
-      "predecessor": [
-        "射雕第31回06-桃源遇故"
-      ],
+      "predecessor": [],
       "followup": "射雕第32回02-武穆遗书揭秘",
       "hash": "235ec4141d9af7a5681183ed62c396fc37424c4c33a9a4e279d7f2526b62aa0d",
       "shardId": "shard-0005"
@@ -9156,6 +9149,7 @@
         "瑛姑"
       ],
       "predecessor": [
+        "射雕第31回06-桃源遇故",
         "射雕第32回03-夜探敌船"
       ],
       "followup": "射雕第32回05-江畔定情",
@@ -12916,8 +12910,8 @@
       "predecessor": [
         "神雕第2回14-柯镇恶中毒返店决心东行桃花岛"
       ],
-      "followup": "神雕第3回01-舟中议婚",
-      "hash": "78b45b3abd17e7d4269c6554e0dd553d527f71ff18f0027c6c2667744184367c",
+      "followup": "神雕第3回02-初到桃花岛斗蟋蟀起冲突",
+      "hash": "6b3ba4ab8f390b7602605529b316c046204793ff3f8afff5ec870fa62207b934",
       "shardId": "shard-0007"
     },
     {
@@ -12954,9 +12948,7 @@
         "黄蓉",
         "杨过"
       ],
-      "predecessor": [
-        "神雕第2回15-途遇武氏兄弟黄蓉葬武三娘收养二子"
-      ],
+      "predecessor": [],
       "followup": "神雕第3回02-初到桃花岛斗蟋蟀起冲突",
       "hash": "3e633e73f5a88d461e2ba78a0db486cf5af5d554f17743270cef498c1fcb49f9",
       "shardId": "shard-0007"
@@ -12998,6 +12990,7 @@
         "武敦儒"
       ],
       "predecessor": [
+        "神雕第2回15-途遇武氏兄弟黄蓉葬武三娘收养二子",
         "神雕第3回01-舟中议婚"
       ],
       "followup": "神雕第3回03-杨过推石遁走藏匿山中",
@@ -19345,8 +19338,8 @@
       "predecessor": [
         "神雕第16回12-绿衫四弟子渔网擒周伯通"
       ],
-      "followup": "神雕第17回01-绝情谷清晨杨过品情花遇公孙绿萼",
-      "hash": "aca8907ef6e76ddd052ad039f06be63684b6f3b0cccbf13e68b7e8df43f7d0b5",
+      "followup": "神雕第17回03-六人被邀见谷主经竹林踏桩至大石屋",
+      "hash": "ecd65c5a6544f8184a8090887c6e43c80d15d259dc09947688dd0b7bc2f7c6b5",
       "shardId": "shard-0010"
     },
     {
@@ -19381,9 +19374,7 @@
       "participants": [
         "杨过"
       ],
-      "predecessor": [
-        "神雕第16回13-六人追踪入绝情谷"
-      ],
+      "predecessor": [],
       "followup": "神雕第17回02-杨过巧言逗笑公孙绿萼互道姓名诉心事",
       "hash": "d005f7dc7806541225e66d001da8e9e6d1fc500f11624cf338bef2f9d144f476",
       "shardId": "shard-0010"
@@ -19465,6 +19456,7 @@
         "尼摩星"
       ],
       "predecessor": [
+        "神雕第16回13-六人追踪入绝情谷",
         "神雕第17回02-杨过巧言逗笑公孙绿萼互道姓名诉心事"
       ],
       "followup": "神雕第17回04-樊一翁接客众人试手公孙止正式出场",
@@ -27815,8 +27807,8 @@
       "predecessor": [
         "神雕第37回09-杨过癫狂至嘉兴铁枪庙救柯镇恶知父过"
       ],
-      "followup": null,
-      "hash": "f0b5e0b94f2b09a67d274c2a7c182b88f9e1980db78087b796a237ca9fc4d507",
+      "followup": "神雕第38回04-杨过绝情谷苦候小龙女未至心碎一夜白头跳崖",
+      "hash": "d96a79a819e14f6c99863cc54eebb12ae64a9912c2d7a99fbb7dbc4d1fac4572",
       "shardId": "shard-0014"
     },
     {
@@ -27974,6 +27966,7 @@
         "杨过"
       ],
       "predecessor": [
+        "神雕第37回10-杨过得讯郭襄被擒赴蒙古军营寻访",
         "神雕第38回03-黄蓉随玉蜂遇周伯通发现蜂翅刺字解出绝情谷底"
       ],
       "followup": "神雕第38回05-郭襄法王赶到绝情谷目睹杨过跳崖郭襄亦跳法王救之不及",
@@ -28876,7 +28869,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "射雕第14回01-归云庄群雄戏假铁掌",
       "lastRuntimeKey": "射雕第37回-人物登场",
-      "byteLength": 112451
+      "byteLength": 112454
     },
     {
       "id": "shard-0004",
@@ -28884,7 +28877,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "射雕第21回08-协力救侄",
       "lastRuntimeKey": "射雕第28回02-破解武穆遗书之秘",
-      "byteLength": 133348
+      "byteLength": 133345
     },
     {
       "id": "shard-0005",
@@ -28892,7 +28885,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "射雕第28回03-铁掌峰顶遇险得书",
       "lastRuntimeKey": "射雕第36回08-郭靖平息内乱",
-      "byteLength": 125475
+      "byteLength": 125469
     },
     {
       "id": "shard-0006",
@@ -28908,7 +28901,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "神雕第2回05-青袍人弹石退李莫愁救程英掳无双",
       "lastRuntimeKey": "神雕第10回-人物登场",
-      "byteLength": 212752
+      "byteLength": 212773
     },
     {
       "id": "shard-0008",
@@ -28932,7 +28925,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "神雕第15回04-李莫愁悲歌来袭破壁入屋",
       "lastRuntimeKey": "神雕第20回05-忽必烈招揽群雄共谋刺郭靖",
-      "byteLength": 301164
+      "byteLength": 301167
     },
     {
       "id": "shard-0011",
@@ -28964,7 +28957,7 @@
       "eventCount": 38,
       "firstRuntimeKey": "神雕第36回04-耶律齐大战蓝天和连胜群雄",
       "lastRuntimeKey": "神雕第40回06-潇尹携猿离去杨过辞别众人",
-      "byteLength": 240429
+      "byteLength": 240670
     }
   ],
   "checkpoints": [
@@ -38020,5 +38013,5 @@
     }
   },
   "unresolvedReferences": [],
-  "contentHash": "fff27a00297c8e53666116339150a82e40d9f197cfd1b3bb858129602679a811"
+  "contentHash": "f976884f274089a69cfef2c8a0c44e269c149604dd4622a1ace383858b476cee"
 }
