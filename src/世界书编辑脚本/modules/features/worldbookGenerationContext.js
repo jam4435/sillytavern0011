@@ -141,6 +141,7 @@ export function buildGenerationContext(project, options = {}) {
       name: project?.name || '',
       revision: Number(project?.revision || 0),
       scale: project?.scale || project?.blueprint?.scale || 'medium',
+      scalePreference: project?.scalePreference || 'auto',
       goal: project?.goal || project?.description || '',
     },
     request: {

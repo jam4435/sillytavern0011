@@ -74,16 +74,22 @@ describe('世界书生成项目纯逻辑', () => {
     });
     const applied = applyGenerationProposal(original, {
       baseRevision: 0,
+      intent: 'entries',
       summary: '更新第一条',
+      audit: { deterministic: { valid: true }, semantic: { valid: true } },
       operations: [{ type: 'updateEntry', entryId: 'E001', patch: { title: '新标题', content: '新内容' } }],
     });
 
     expect(applied.revision).toBe(1);
+    expect(applied.stage).toBe('entry-review');
+    expect(applied.audits).toHaveLength(1);
     expect(applied.entryDrafts[0]).toMatchObject({ title: '新标题', content: '新内容' });
     expect(applied.revisionHistory.undo).toHaveLength(1);
 
     const undone = undoGenerationProject(applied);
     expect(undone.revision).toBe(2);
+    expect(undone.stage).toBe('prepare');
+    expect(undone.audits).toHaveLength(0);
     expect(undone.entryDrafts[0]).toMatchObject({ title: '旧标题', content: '旧内容' });
 
     const redone = redoGenerationProject(undone);
@@ -123,6 +129,28 @@ describe('世界书生成项目纯逻辑', () => {
     expect(undoGenerationProject(applied).entryDrafts.every(entry => entry.stale === false)).toBe(true);
   });
 
+  it('接受对应最终条目后清除已重新生成节点的过期标记', () => {
+    const project = createGenerationProject({
+      stage: 'blueprint-review',
+      blueprint: {
+        scale: 'small',
+        nodes: [
+          { entryId: 'fresh', title: '已重生成', stale: true },
+          { entryId: 'waiting', title: '仍待生成', stale: true },
+        ],
+      },
+    });
+    const applied = applyGenerationProposal(project, {
+      baseRevision: 0,
+      intent: 'entries',
+      affectedIds: ['fresh'],
+      operations: [{ type: 'replaceEntryDrafts', entries: [{ entryId: 'fresh', content: '新正文' }] }],
+    });
+
+    expect(applied.blueprint.nodes.find(node => node.entryId === 'fresh')?.stale).toBe(false);
+    expect(applied.blueprint.nodes.find(node => node.entryId === 'waiting')?.stale).toBe(true);
+  });
+
   it('拒绝过期或存在未解决冲突的提案，并允许显式拒绝当前提案', () => {
     const project = createGenerationProject();
     expect(() =>
@@ -148,6 +176,21 @@ describe('世界书生成项目纯逻辑', () => {
       { recoverRunningJobs: true },
     );
     expect(recovered.jobs.map(job => job.status)).toEqual(['interrupted', 'complete']);
+  });
+
+  it('项目内仅保留最近 100 个可撤销修订', () => {
+    let project = createGenerationProject({ goal: '0' });
+    for (let index = 1; index <= 105; index += 1) {
+      project = applyGenerationProposal(project, {
+        baseRevision: project.revision,
+        summary: `修订 ${index}`,
+        operations: [{ type: 'set', path: ['goal'], value: `${index}` }],
+      });
+    }
+    expect(project.revision).toBe(105);
+    expect(project.revisionHistory.undo).toHaveLength(100);
+    expect(project.revisionHistory.undo[0].revision).toBe(6);
+    expect(project.revisionHistory.undo.at(-1)?.revision).toBe(105);
   });
 });
 

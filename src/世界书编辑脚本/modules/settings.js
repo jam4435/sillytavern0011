@@ -249,8 +249,8 @@ function hasOwn(object, key) {
 }
 
 function legacyStrategy(settings = {}) {
-  if (settings?.modifyStrategy === 'plan') {
-    return 'plan';
+  if (settings?.modifyStrategy === 'plan' || settings?.modifyStrategy === 'direct') {
+    return settings.modifyStrategy;
   }
   if (settings?.navMode === 'plan') {
     return 'plan';

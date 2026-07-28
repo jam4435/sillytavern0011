@@ -46,7 +46,7 @@ function keywordsOf(value) {
 }
 
 function isNormal(value) {
-  const type = value?.strategy?.type ?? value?.trigger?.type ?? value?.type;
+  const type = value?.strategy?.type ?? value?.trigger?.type ?? value?.triggerType ?? value?.type;
   return ['Normal', 'normal', 'selective'].includes(type);
 }
 

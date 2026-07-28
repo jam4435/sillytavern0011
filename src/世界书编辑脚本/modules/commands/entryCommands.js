@@ -282,6 +282,8 @@ async function openAiEntryEdit({ lorebookName, numericUid }) {
   direct.statusText = '';
   direct.currentStep = 'instruction';
   settings.lorebookName = lorebookName;
+  settings.activeMode = 'direct';
+  settings.modifyStrategy = 'direct';
   settings.navMode = 'direct';
   settings.direct = direct;
   settings.selectedEntryUids = [Number(numericUid)];

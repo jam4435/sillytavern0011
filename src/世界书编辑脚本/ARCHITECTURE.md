@@ -8,13 +8,13 @@
 
 - 以仓库当前代码为准，不保留容易过期的行数统计
 - `信息.txt`、`修改计划.txt`、导出 JSON、临时文件等不属于架构主体，不在本文档展开
-- `AI 修改`、PC 主从布局、主题与浏览器设置备份现在都是相对独立的子系统；AI 修改自身只保留一套容器响应式工作台
+- AI 工作台、PC 主从布局、主题与浏览器设置备份是相对独立的子系统；AI 工作台只保留一套容器响应式实现
 
 ## 2. 核心设计理念
 
 - **分层模块化**：`commands/` 负责操作编排，`features/` 负责业务能力，`ui/` 负责界面，`api.js` 负责酒馆接口封装
-- **主面板双布局、AI 单实现**：主面板移动端固定为抽屉式，PC 保存抽屉式或主从布局偏好；AI 修改页不再按设备维护两套实现，而是按自身容器宽度响应式切换
-- **状态分层**：主列表共享状态集中在 `state.js`；AI 工作流由纯逻辑状态层约束阶段和能力；跨会话只保存输入草稿与偏好，不恢复规划、预览等运行结果
+- **主面板双布局、AI 单实现**：主面板移动端固定为抽屉式，PC 保存抽屉式或主从布局偏好；AI 工作台不按设备维护两套实现，而是按自身容器宽度响应式切换
+- **状态分层**：主列表共享状态集中在 `state.js`；修改工作流的运行结果只在会话内存在；生成工作流则以独立 IndexedDB 项目保存蓝图、条目、对话、任务和修订
 - **命令驱动 + 局部直绑并存**：主面板遵循 `events.js -> commands/*.js`
   的命令分发；AI 工作区、编辑器、优化器、悬浮球等复杂交互在对应 UI 模块或 `events.js` 内部直绑
 - **事务化写回**：世界书更新通过 `api.js` 统一提交，高风险操作用 `history.js` 记录提交前快照
@@ -113,6 +113,14 @@ src/世界书编辑脚本/
 | `batchActions.js`          | 批量字段更新、复制到其他世界书、删除、调序、全选；复制支持覆盖、重命名、保留原名策略                                                |
 | `browserSettingsBackup.js` | 浏览器设置备份：按白名单导出/导入 localStorage，并在导出时脱敏自定义 API Key 和上传背景图 data URL                                  |
 | `bulkImport.js`            | YAML 批量导入条目及导入弹窗                                                                                                         |
+| `worldbookYaml.js`         | 共享 YAML codec：多文档解析、协议校验、内部条目转换和无 UID 连续序列化                                                              |
+| `worldbookGenerationSchema.js` | 生成项目、蓝图、提案、任务和审计的数据契约与规范化                                                                               |
+| `generationProjectStore.js` | IndexedDB 生成项目与修订持久层；提供多项目、归档、复制、导入导出、100 次修订裁剪和内存降级                                        |
+| `worldbookGenerationProject.js` | 提案接受/拒绝、受影响分支失效以及项目撤销/重做                                                                                |
+| `worldbookGenerationContext.js` | 按消息作用域组装资料、祖先、XML 同组、相关条目、摘要和最近对话                                                                 |
+| `worldbookGenerationOrchestrator.js` | 蓝图、分组正文、对话提案、多轮审计修复、调用上限、停止和失败恢复的 AI 调度                                                 |
+| `worldbookGenerationAudit.js` | 对蓝图和最终条目执行架构、激活、顺序、位置、XML、格式和内容审计                                                                |
+| `worldbookGenerationApply.js` | 追加/最小更新原子写回、新书创建事务、绑定动作、基线冲突检查和严格创建回滚                                                      |
 | `entryTogglePresets.js`    | 按世界书名称保存条目组预设，记录条目 UID、启用状态和策略类型；受控改名时迁移预设命名空间                                            |
 | `folderMeta.js`            | 用隐藏元条目保存文件夹元数据，提供文件夹 CRUD、条目归属修改和渲染过滤                                                               |
 | `history.js`               | 最近一次高风险操作的事务快照、回滚预览、执行回滚                                                                                    |
@@ -137,6 +145,7 @@ src/世界书编辑脚本/
 | `aiWorkspace.js`           | AI 工作区稳定外观层，只导出 `initAiWorkspace`、`refreshAiWorkspace`、`resetAiWorkspace` 并委托给唯一实现 |
 | `aiEntryVirtualList.js`    | AI 条目列表的内部虚拟化适配器：向 Clusterize 传宿主 document 的 DOM 节点，并在依赖缺失或构造失败时降级为普通列表 |
 | `aiWorkspaceDesktop.js`    | 单一容器响应式 AI 修改工作台（文件名为历史兼容），包含四阶段工作流、条目加载状态、API 抽屉及手机式助手 dialog |
+| `aiGenerationWorkspace.js` | 生成项目工作区：资料、蓝图、条目、审计视图，持续对话轨道，提案检查点、YAML 交付和新书绑定操作                        |
 | `aiWorkflowState.js`       | AI 工作流纯逻辑层：阶段守卫、派生按钮能力、输入失效矩阵、生成生命周期及条目三态选择                   |
 | `masterEntryTokens.js`     | 主从布局条目 token 徽标计算与刷新                                                                     |
 | `expandManager.js`         | 抽屉/移动端条目展开折叠状态同步                                                                       |
@@ -214,10 +223,10 @@ index.js
 ```text
 AI 页签
 → ui/aiWorkspace.js 进入 ui/aiWorkspaceDesktop.js 的唯一响应式工作台
-→ settings.js 读取 schemaVersion: 2 的策略、目标世界书和单一 draft
+→ settings.js 读取 schemaVersion: 3 的 activeMode、修改策略、活动生成项目 ID 和共享模型设置
 → aiWorkflowState.js 派生当前阶段、可进入阶段和主动作能力
 → 条目范围以“修改 / 只读 / 排除”三态选择；搜索覆盖标题、UID、正文
-→ API 设置通过工具抽屉编辑；AI 助手使用独立原生 dialog 手机窗，并可按需附带当前选中的修改/只读条目；未实现的世界书生成入口不渲染
+→ API 设置通过工具抽屉编辑；AI 助手使用独立原生 dialog 手机窗，并可按需附带当前选中的修改/只读条目
 → aiActionsBatch.js 生成结构化规划或预览
 → llmClient.js 调用酒馆预设或自定义 OpenAI 兼容接口
 → 修改预览请求正式开始时立即进入修改审阅页，并在原位展示加载进度、停止、失败诊断和重试入口
@@ -240,23 +249,50 @@ AI 助手与 API 设置抽屉不共享外壳样式。助手是原生 `<dialog>`�
 
 带 UID 的生成失败条目会以占位行出现在预览列表中，支持单条重试；重试成功后并入预览条目并从 `errors` 中移除。左列表的正文差异统一使用 `aiActionsBatch.js` 导出的 `buildContentDiffSnippets` 行级片段（含上下文与重同步），渲染层对超长片段做字符截断，完整内容仍在右侧详情的编辑区查看。
 
-### 5.6 状态分层
+### 5.6 世界书生成链路
 
-当前代码有四类状态边界：
+`世界书生成` 是和 `直接修改 / 先规划` 同级的工作模式，但不写入修改策略字段。它委托给
+`aiGenerationWorkspace.js`，按 `准备 → 结构审阅 → 条目审阅 → 完成` 推进：
+
+```text
+资料、项目规则与目标
+→ worldbookGenerationOrchestrator.js 生成带 baseRevision 的蓝图提案
+→ 确定性审计与最多两轮硬错误修复
+→ 用户接受完整结构蓝图
+→ 按领域、父子依赖和 XML 组串行生成批次；每批完成即保存
+→ 全局确定性审计 + 一轮语义审计
+→ 用户接受最终条目提案，可按完整主题/XML 组取舍并重新审计
+→ 导出 YAML / 原子追加已有世界书 / 创建新世界书
+```
+
+每项目同一时刻只保存一个未决修改提案；普通问答可以继续，但有未决提案时新的修改请求不会覆盖它。对话消息携带意图、作用域和有效期。上下文只组装相关资料、必要祖先、同一 XML 组、相关已有条目、长期规则、滚动摘要和最近 8 条消息；完整对话仍随项目持久化。冲突资料形成阻断卡，不按时间自动覆盖。
+
+调用计划默认串行，单操作上限 20 次；超过上限需要用户确认。停止会保留成功批次，失败任务可独立重试，依赖失败的下游任务标记为跳过。所有 AI 结构或正文变动先进入提案；接受提案后才增加项目修订。人工编辑已接受条目同样记录为可撤销修订。
+
+共享 `worldbookYaml.js` 负责多文档 YAML 往返和协议校验。旧 YAML 的 `uid` 只兼容读取，内部忽略且永不序列化；Normal 条目必须有主关键词。XML 开始/结束边界继承直属分点的稳定关键词作为可移植保底。批量导入与生成交付使用同一 codec。
+
+追加已有世界书会在最终写入前重读完整目标，隐藏元条目不发给 AI 但参与 UID 分配；既有最小更新必须通过 UID 和生成时指纹检查。新增与必要结构更新一次原子提交并共用事务回滚。新建世界书记忆创建快照，只有内容完全未变且没有角色、聊天或全局绑定时才允许整本删除；绑定动作独立于创建事务。
+
+### 5.7 状态分层
+
+当前代码有五类状态边界：
 
 1. `state.js`
    主列表运行时状态：世界书条目缓存、筛选、搜索结果、选择、展开、详情区、文件夹、对比、最近事务、布局和替换锁。
 
 2. `ui/aiWorkspaceDesktop.js` / `ui/aiWorkflowState.js`
-   AI 工作区会话状态：当前阶段、规划、预览、调试、进度、当前详情、generationId/runId 和停止标记。这些状态不跨页面刷新恢复；策略切换或输入变更会按失效矩阵清除不再可信的派生结果。
+   AI 修改会话状态：当前阶段、规划、预览、调试、进度、当前详情、generationId/runId 和停止标记。这些状态不跨页面刷新恢复；策略切换或输入变更会按失效矩阵清除不再可信的派生结果。
 
-3. `settings.js` / `theme.js`
+3. `generationProjectStore.js`
+   生成项目完整状态存入 IndexedDB `lorebook-ai-generation-projects` 的 `projects` 与 `revisions`；刷新后运行任务恢复为 `interrupted`。写入失败时保留内存副本，并在工作区提示导出项目 JSON。
+
+4. `settings.js` / `theme.js`
    跨会话浏览器设置：主题、搜索栏、全屏、PC 布局、分栏宽度、悬浮球位置、复制冲突策略、置顶条目、AI
-   API 设置和 `schemaVersion: 2` 的单一 AI `draft`。草稿保存策略、目标世界书、条目范围、指令、字段、提示词、聊天上下文、共享资料和助手条目附带开关，约 300ms 防抖写入；附带开关默认关闭，旧 `navMode/direct/plan` 只迁移当前活动草稿。上下文设置中的输入 token 值只作为警戒线，输出预留值仍用于实际生成上限和规划排批。设置过大时会降级为轻量保存；localStorage 不可用时的内存兜底刷新后会丢失。
+   API 设置和 `schemaVersion: 3` 的修改 `draft`、`activeMode`、`modifyStrategy`、`activeGenerationProjectId`。v2 自动迁移且不改变既有 direct/plan 草稿；localStorage 不保存生成项目正文。
 
-4. 世界书隐藏元条目 `folderMeta.js` 用 `__WI_META_FOLDERS__` 条目保存文件夹结构；渲染和 AI 收集时会过滤这些元条目。
+5. 世界书隐藏元条目 `folderMeta.js` 用 `__WI_META_FOLDERS__` 条目保存文件夹结构；渲染和 AI 收集时会过滤这些元条目。
 
-### 5.7 写回与回滚
+### 5.8 写回与回滚
 
 世界书变更统一通过 `api.js` 的封装提交：
 
@@ -288,8 +324,10 @@ UI 命令或 AI 应用
 | 改入口按钮、主面板、最小化或悬浮球     | `ui/panel.js`、`events.js`、`settings.js`                                                 |
 | 改 PC 主从布局                         | `ui/detail.js`、`ui/list.js`、`ui/entry.js`、`ui/theme.js`、`settings.js`                 |
 | 改列表、筛选、选择、虚拟滚动           | `ui/list.js`、`ui/entry.js`、`events.js`、`state.js`                                      |
-| 改 AI 工作区界面或阶段守卫             | `ui/aiWorkspace.js`、`ui/aiWorkspaceDesktop.js`、`ui/aiWorkflowState.js`                  |
+| 改 AI 工作区界面或阶段守卫             | `ui/aiWorkspace.js`、`ui/aiWorkspaceDesktop.js`、`ui/aiGenerationWorkspace.js`、`ui/aiWorkflowState.js` |
 | 改 AI 规划 / 批量预览 / JSON 解析      | `features/aiActionsBatch.js`                                                              |
+| 改世界书生成项目或调度                  | `features/worldbookGeneration*.js`、`features/generationProjectStore.js`                  |
+| 改 YAML 协议或批量导入                  | `features/worldbookYaml.js`、`features/bulkImport.js`                                     |
 | 改轻量 AI 弹窗                         | `ui/aiActionDialog.js`、`features/aiActions.js`、`commands/entryCommands.js`              |
 | 改实际 LLM 请求方式                    | `features/llmClient.js`                                                                   |
 | 改世界书导入、导出、创建、重命名、重绑 | `commands/worldbookCommands.js`、`api.js`、`features/entryTogglePresets.js`、`ui/list.js` |
@@ -316,7 +354,7 @@ UI 命令或 AI 应用
 | 主列表按钮无响应         | 检查 `data-action`、`events.js` 上下文识别和 `commands/*.js` 注册                              |
 | PC/移动端布局不一致      | 检查 `settings.js` 的 PC 布局设置、`detail.js` 的 `data-pc-layout-mode`、`theme.js` 的布局主题 |
 | 列表刷新后选择或详情丢失 | 检查 `state.js` 的选择、详情、文件夹会话，以及 `list.js` 的刷新恢复逻辑                        |
-| AI 工作区切页后状态丢失  | 检查 `settings.js` 的 `direct` / `plan` 持久化结构和 `refreshAiWorkspace()`                    |
+| AI 工作区切页后状态丢失  | 修改模式检查 `settings.js`；生成模式检查活动项目 ID、IndexedDB 存储状态和 `refreshAiGenerationWorkspace()` |
 | 生成预览失败             | 检查 `llmClient.js`、`aiActionsBatch.js` 的提示词、分批、JSON 解析、诊断信息和自定义 API 配置  |
 | 预览有结果但应用无变化   | 检查 diff 是否为空、`applyAiPreview()` 的 changed 条目过滤和 `api.js` 写回结果                 |
 | 回滚按钮不可用           | 检查本次操作是否开启 `trackHistory`，以及 `history.js` 是否提交了最近事务                      |
@@ -328,6 +366,6 @@ UI 命令或 AI 应用
 - **核心库**: jQuery
 - **虚拟滚动**: Clusterize.js
 - **拖拽排序**: jQuery UI Sortable
-- **YAML 解析**: js-yaml
+- **YAML 解析与校验**: `yaml` + `zod`
 - **AI 调用**: 酒馆生成接口 + 自定义 OpenAI 兼容接口
 - **构建工具**: Webpack

@@ -135,6 +135,29 @@ describe('世界书生成确定性审计', () => {
     expect(report.errors.some(issue => issue.code === 'conditional-keyword-coverage')).toBe(true);
   });
 
+  it('兼容规范化蓝图的 triggerType、顶层 depth 与 order 字段', () => {
+    const report = auditGenerationBlueprint({
+      scale: 'small',
+      nodes: [
+        {
+          entryId: 'E001',
+          nodeId: 'E001',
+          parentId: null,
+          title: '缺失关键词的规范节点',
+          role: 'flat',
+          triggerType: 'Normal',
+          keywords: [],
+          position: 'after_character_definition',
+          depth: 0,
+          order: 10,
+          xml: { groupId: null, tag: null, boundary: 'none' },
+        },
+      ],
+    });
+
+    expect(report.errors.some(issue => issue.code === 'normal-without-keywords')).toBe(true);
+  });
+
   it('阻止 XML 边界、坐标和 order 不完整', () => {
     const report = auditGenerationBlueprint({
       scale: 'small',

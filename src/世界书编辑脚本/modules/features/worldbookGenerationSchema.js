@@ -48,7 +48,7 @@ export const GenerationProposalSchema = z.object({
   conflicts: z.array(z.unknown()),
   requiredJobs: z.array(z.unknown()),
   createdAt: z.string(),
-});
+}).passthrough();
 
 export const GenerationJobSchema = z.object({
   jobId: z.string().min(1),
@@ -91,13 +91,16 @@ export const GenerationProjectSchema = z.object({
   projectRules: z.array(z.unknown()),
   conversations: z.array(z.unknown()),
   conversationSummary: z.string(),
+  conversationSummaryCount: z.number().int().nonnegative(),
   blueprint: z.object({
     scale: z.enum(['small', 'medium', 'large']),
     nodes: z.array(GenerationBlueprintNodeSchema),
   }),
   entryDrafts: z.array(z.unknown()),
   existingWorldbookBaseline: z.unknown().nullable(),
+  lastApplyResult: z.unknown().nullable(),
   audit: GenerationAuditReportSchema,
+  audits: z.array(z.unknown()),
   jobs: z.array(GenerationJobSchema),
   pendingProposal: GenerationProposalSchema.nullable(),
   revisionHistory: z.object({
@@ -209,6 +212,7 @@ export function normalizeGenerationProposal(proposal = {}, fallbackRevision = 0)
   if (!proposal || typeof proposal !== 'object') return null;
   const now = new Date().toISOString();
   return {
+    ...cloneGenerationValue(proposal),
     id: asString(proposal.id).trim() || createGenerationId('proposal'),
     intent: asString(proposal.intent || proposal.type, 'modify'),
     baseRevision: asNonNegativeInteger(proposal.baseRevision, fallbackRevision),
@@ -228,6 +232,7 @@ export function normalizeGenerationJob(job = {}, fallbackRevision = 0, options =
   const now = new Date().toISOString();
   const status = GENERATION_JOB_STATUSES.includes(job.status) ? job.status : 'pending';
   return {
+    ...cloneGenerationValue(job),
     jobId: asString(job.jobId || job.id).trim() || createGenerationId('job'),
     type: asString(job.type, 'unknown'),
     baseRevision: asNonNegativeInteger(job.baseRevision, fallbackRevision),
@@ -243,12 +248,30 @@ export function normalizeGenerationJob(job = {}, fallbackRevision = 0, options =
 }
 
 export function normalizeGenerationAuditReport(audit = {}, revision = 0) {
+  const sections = [audit?.deterministic, audit?.semantic].filter(
+    section => section && typeof section === 'object',
+  );
+  const sectionErrors = sections.flatMap(section =>
+    Array.isArray(section.errors)
+      ? section.errors
+      : asArray(section.issues).filter(issue => issue?.severity === 'error'),
+  );
+  const sectionWarnings = sections.flatMap(section =>
+    Array.isArray(section.warnings)
+      ? section.warnings
+      : asArray(section.issues).filter(issue => issue?.severity === 'warning'),
+  );
   return {
-    errors: asArray(audit?.errors).map(cloneGenerationValue),
-    warnings: asArray(audit?.warnings).map(cloneGenerationValue),
+    errors: [...asArray(audit?.errors), ...sectionErrors].map(cloneGenerationValue),
+    warnings: [...asArray(audit?.warnings), ...sectionWarnings].map(cloneGenerationValue),
     categories: audit?.categories && typeof audit.categories === 'object'
       ? cloneGenerationValue(audit.categories)
-      : {},
+      : sections.length
+        ? {
+            deterministic: cloneGenerationValue(audit.deterministic),
+            semantic: cloneGenerationValue(audit.semantic),
+          }
+        : {},
     checkedAt: typeof audit?.checkedAt === 'string' ? audit.checkedAt : null,
     revision: asNonNegativeInteger(audit?.revision, revision),
   };
@@ -295,6 +318,13 @@ export function normalizeGenerationProject(project = {}, options = {}) {
     ? project.target.type
     : 'export';
   const stage = GENERATION_PROJECT_STAGES.includes(project.stage) ? project.stage : 'prepare';
+  const hasAuditCollection = Array.isArray(project.audits);
+  const audits = hasAuditCollection
+    ? project.audits.map(cloneGenerationValue)
+    : project.audits && typeof project.audits === 'object'
+      ? [cloneGenerationValue(project.audits)]
+      : [];
+  if (!hasAuditCollection && project.audit && audits.length === 0) audits.push(cloneGenerationValue(project.audit));
 
   return {
     schemaVersion: GENERATION_PROJECT_SCHEMA_VERSION,
@@ -318,11 +348,14 @@ export function normalizeGenerationProject(project = {}, options = {}) {
     projectRules: asArray(project.projectRules).map(cloneGenerationValue),
     conversations: asArray(project.conversations).map(cloneGenerationValue),
     conversationSummary: asString(project.conversationSummary),
+    conversationSummaryCount: asNonNegativeInteger(project.conversationSummaryCount, 0),
     blueprint: normalizeGenerationBlueprint(project.blueprint),
     entryDrafts: asArray(project.entryDrafts).map(normalizeEntryDraft),
     existingWorldbookBaseline:
       project.existingWorldbookBaseline === undefined ? null : cloneGenerationValue(project.existingWorldbookBaseline),
-    audit: normalizeGenerationAuditReport(project.audit || project.audits, revision),
+    lastApplyResult: project.lastApplyResult === undefined ? null : cloneGenerationValue(project.lastApplyResult),
+    audit: normalizeGenerationAuditReport(project.audit || audits.at(-1), revision),
+    audits,
     jobs: asArray(project.jobs).map(job =>
       normalizeGenerationJob(job, revision, { recoverRunningJobs: options.recoverRunningJobs === true }),
     ),

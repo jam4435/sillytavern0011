@@ -82,6 +82,15 @@ describe('AI 工作台紧凑控件布局', () => {
     expect(trigger?.querySelector('i')).toHaveClass('fa-mobile-screen-button');
   });
 
+  it('把世界书生成作为不会回落到修改策略的第三工作模式', () => {
+    document.body.innerHTML = buildDesktopShellMarkup();
+
+    const modes = Array.from(document.querySelectorAll<HTMLElement>('[data-ai-strategy]'));
+    expect(modes.map(mode => mode.dataset.aiStrategy)).toEqual(['direct', 'plan', 'generate']);
+    expect(modes.at(-1)).toHaveTextContent('世界书生成');
+    expect(modes.at(-1)?.closest('[role="group"]')).toHaveAttribute('aria-label', '工作模式');
+  });
+
   it('把输入 token 配置呈现为非阻断警告，并允许 200 万 token 警戒值', () => {
     document.body.innerHTML = buildApiSettingsMarkup();
 

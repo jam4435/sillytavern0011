@@ -178,6 +178,8 @@ async function applySelectedEntriesAiParticipation(lorebookName, aiMode, modeKey
   const settings = getAiWorkspaceSettings();
   settings.lorebookName = lorebookName;
   if (modeKey && ['direct', 'plan'].includes(modeKey)) {
+    settings.activeMode = modeKey;
+    settings.modifyStrategy = modeKey;
     settings.navMode = modeKey;
     settings[modeKey] = applyMode(settings[modeKey]);
   } else {
@@ -246,6 +248,8 @@ async function openAiWorkspaceForSelectedEntries(lorebookName, modeKey, options 
   }
 
   settings.lorebookName = lorebookName;
+  settings.activeMode = modeKey;
+  settings.modifyStrategy = modeKey;
   settings.navMode = modeKey;
   settings[modeKey] = nextMode;
   mirrorAiWorkspaceModeToLegacyState(settings, modeKey);

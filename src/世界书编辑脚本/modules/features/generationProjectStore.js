@@ -80,7 +80,7 @@ function storageFailure(error, project = null, revisionRecord = null) {
 
 export function getGenerationProjectStoreStatus() {
   return {
-    saved: lastStorageError === null,
+    saved: lastStorageError === null && memoryProjects.size === 0,
     error: lastStorageError,
     memoryProjectCount: memoryProjects.size,
   };
@@ -90,8 +90,11 @@ async function readAllFromStore(storeName, options = {}) {
   const database = await openGenerationProjectDatabase(options);
   try {
     const transaction = database.transaction(storeName, 'readonly');
-    const result = await requestAsPromise(transaction.objectStore(storeName).getAll());
-    await transactionAsPromise(transaction);
+    const transactionDone = transactionAsPromise(transaction);
+    const [result] = await Promise.all([
+      requestAsPromise(transaction.objectStore(storeName).getAll()),
+      transactionDone,
+    ]);
     return result;
   } finally {
     database.close();
@@ -102,7 +105,7 @@ export async function listGenerationProjects(options = {}) {
   let stored = [];
   try {
     stored = await readAllFromStore('projects', options);
-    lastStorageError = null;
+    if (memoryProjects.size === 0) lastStorageError = null;
   } catch (error) {
     storageFailure(error);
   }
@@ -130,9 +133,12 @@ export async function getGenerationProject(projectId, options = {}) {
     const database = await openGenerationProjectDatabase(options);
     try {
       const transaction = database.transaction('projects', 'readonly');
-      const stored = await requestAsPromise(transaction.objectStore('projects').get(projectId));
-      await transactionAsPromise(transaction);
-      lastStorageError = null;
+      const transactionDone = transactionAsPromise(transaction);
+      const [stored] = await Promise.all([
+        requestAsPromise(transaction.objectStore('projects').get(projectId)),
+        transactionDone,
+      ]);
+      if (memoryProjects.size === 0) lastStorageError = null;
       return stored ? normalizeGenerationProject(stored, { recoverRunningJobs: true }) : null;
     } finally {
       database.close();
@@ -166,6 +172,7 @@ export async function saveGenerationProject(inputProject, optionsOrRevision = {}
     const database = await openGenerationProjectDatabase(options);
     try {
       const transaction = database.transaction(['projects', 'revisions'], 'readwrite');
+      const transactionDone = transactionAsPromise(transaction);
       transaction.objectStore('projects').put(storedProject);
       const revisionStore = transaction.objectStore('revisions');
       if (revisionRecord) revisionStore.put(revisionRecord);
@@ -178,10 +185,10 @@ export async function saveGenerationProject(inputProject, optionsOrRevision = {}
           .slice(0, Math.max(0, projectRevisions.length - GENERATION_PROJECT_REVISION_LIMIT))
           .forEach(record => revisionStore.delete([record.projectId, record.revision]));
       };
-      await transactionAsPromise(transaction);
+      await transactionDone;
       memoryProjects.delete(project.id);
       memoryRevisions.delete(project.id);
-      lastStorageError = null;
+      if (memoryProjects.size === 0) lastStorageError = null;
       return project;
     } finally {
       database.close();
@@ -204,6 +211,7 @@ export async function deleteGenerationProject(projectId, options = {}) {
     const database = await openGenerationProjectDatabase(options);
     try {
       const transaction = database.transaction(['projects', 'revisions'], 'readwrite');
+      const transactionDone = transactionAsPromise(transaction);
       transaction.objectStore('projects').delete(projectId);
       const revisions = transaction.objectStore('revisions');
       const allRequest = revisions.getAll();
@@ -212,7 +220,7 @@ export async function deleteGenerationProject(projectId, options = {}) {
           .filter(record => record.projectId === projectId)
           .forEach(record => revisions.delete([record.projectId, record.revision]));
       };
-      await transactionAsPromise(transaction);
+      await transactionDone;
       lastStorageError = null;
       return true;
     } finally {
@@ -269,6 +277,7 @@ export async function importGenerationProject(input, options = {}) {
   }
   const rawProject = parsed?.format === 'lorebook-ai-generation-project' ? parsed.project : parsed;
   if (!rawProject || typeof rawProject !== 'object') throw new Error('生成项目 JSON 缺少 project 数据');
+  if (!rawProject.id && !rawProject.name) throw new Error('生成项目 JSON 缺少项目标识和名称');
 
   let project = normalizeGenerationProject(rawProject, { recoverRunningJobs: true });
   const existing = await getGenerationProject(project.id, options);
@@ -311,9 +320,10 @@ export async function clearGenerationProjectStore(options = {}) {
     const database = await openGenerationProjectDatabase(options);
     try {
       const transaction = database.transaction(['projects', 'revisions'], 'readwrite');
+      const transactionDone = transactionAsPromise(transaction);
       transaction.objectStore('projects').clear();
       transaction.objectStore('revisions').clear();
-      await transactionAsPromise(transaction);
+      await transactionDone;
     } finally {
       database.close();
     }

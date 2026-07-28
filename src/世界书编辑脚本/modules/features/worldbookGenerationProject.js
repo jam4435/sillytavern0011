@@ -2,6 +2,7 @@ import {
   cloneGenerationValue,
   createGenerationProject,
   createGenerationId,
+  normalizeGenerationAuditReport,
   normalizeGenerationProject,
   normalizeGenerationProposal,
 } from './worldbookGenerationSchema.js';
@@ -281,8 +282,53 @@ export function applyGenerationProposal(inputProject, inputProposal = inputProje
       }
     });
   }
+  if (['entries', 'modify_entries'].includes(proposal.intent)) {
+    const generatedIds = new Set(project.entryDrafts.map(entry => entry.entryId || entry.nodeId).filter(Boolean));
+    project.blueprint.nodes.forEach((node, index) => {
+      if (node.stale && generatedIds.has(node.entryId)) {
+        const operation = { type: 'set', path: ['blueprint', 'nodes', index, 'stale'], value: false };
+        inverseOperations.unshift(applyCanonicalOperation(project, operation));
+        appliedForwardOperations.push(operation);
+      }
+    });
+  }
 
   project.pendingProposal = null;
+  if (proposal.audit !== undefined) {
+    const operation = {
+      type: 'insert',
+      path: ['audits'],
+      index: project.audits.length,
+      value: cloneGenerationValue(proposal.audit),
+    };
+    inverseOperations.unshift(applyCanonicalOperation(project, operation));
+    appliedForwardOperations.push(operation);
+    const auditOperation = {
+      type: 'set',
+      path: ['audit'],
+      value: normalizeGenerationAuditReport(
+        {
+          ...proposal.audit,
+          checkedAt: new Date().toISOString(),
+          revision: project.revision + 1,
+        },
+        project.revision + 1,
+      ),
+    };
+    inverseOperations.unshift(applyCanonicalOperation(project, auditOperation));
+    appliedForwardOperations.push(auditOperation);
+  }
+  let nextStage = project.stage;
+  if (['blueprint', 'modify_blueprint', 'expand_branch'].includes(proposal.intent)) {
+    nextStage = 'blueprint-review';
+  } else if (['entries', 'modify_entries'].includes(proposal.intent)) {
+    nextStage = 'entry-review';
+  }
+  if (nextStage !== project.stage) {
+    const operation = { type: 'set', path: ['stage'], value: nextStage };
+    inverseOperations.unshift(applyCanonicalOperation(project, operation));
+    appliedForwardOperations.push(operation);
+  }
   project.revision += 1;
   const createdAt = new Date().toISOString();
   const record = {

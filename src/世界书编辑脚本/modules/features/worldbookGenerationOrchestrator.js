@@ -5,6 +5,7 @@ import {
   auditGeneratedEntries,
 } from './worldbookGenerationAudit.js';
 import { applyXmlFallbackKeywords } from './worldbookYaml.js';
+import { captureGenerationTargetBaseline } from './worldbookGenerationApply.js';
 
 const DEFAULT_CALL_LIMIT = 20;
 const DEFAULT_REPAIR_LIMIT = 2;
@@ -69,7 +70,11 @@ function normalizeBlueprintPayload(payload, project) {
     throw new Error('AI 未返回任何蓝图节点。');
   }
   return {
-    scale: candidate?.scale || project?.scale || 'medium',
+    scale:
+      candidate?.scale ||
+      (project?.scalePreference && project.scalePreference !== 'auto' ? project.scalePreference : null) ||
+      project?.scale ||
+      'medium',
     summary: candidate?.summary || payload?.summary || '',
     nodes: nodes.map((node, index) => ({
       ...node,
@@ -147,7 +152,41 @@ export function buildGenerationBatches(project) {
     batch.nodes.push(clone(node));
   });
 
-  return [...batchByKey.values()];
+  const batches = [...batchByKey.values()];
+  const batchKeyByNodeId = new Map();
+  batches.forEach(batch => batch.nodeIds.forEach(nodeId => batchKeyByNodeId.set(nodeId, batch.key)));
+  batches.forEach(batch => {
+    const dependencies = new Set();
+    batch.nodes.forEach(node => {
+      const dependencyIds = [
+        node?.parentId,
+        node?.parentNodeId,
+        ...asArray(node?.dependsOnEntryIds || node?.dependsOnNodeIds || node?.dependencies),
+      ].filter(Boolean);
+      dependencyIds.forEach(dependencyId => {
+        const dependencyBatchKey = batchKeyByNodeId.get(dependencyId);
+        if (dependencyBatchKey && dependencyBatchKey !== batch.key) dependencies.add(dependencyBatchKey);
+      });
+    });
+    batch.dependsOnBatchKeys = [...dependencies];
+  });
+
+  const ordered = [];
+  const remaining = [...batches];
+  const emittedKeys = new Set();
+  while (remaining.length > 0) {
+    const readyIndex = remaining.findIndex(batch =>
+      batch.dependsOnBatchKeys.every(key => emittedKeys.has(key) || !batchByKey.has(key)),
+    );
+    if (readyIndex < 0) {
+      ordered.push(...remaining);
+      break;
+    }
+    const [ready] = remaining.splice(readyIndex, 1);
+    ordered.push(ready);
+    emittedKeys.add(ready.key);
+  }
+  return ordered;
 }
 
 export function buildGenerationCallPlan(project, kind = 'blueprint') {
@@ -179,14 +218,21 @@ export function buildGenerationCallPlan(project, kind = 'blueprint') {
   }
 
   const batches = buildGenerationBatches(project);
-  const jobs = batches.map((batch, index) => ({
+  const jobs = batches.map(batch => ({
     id: createId('job'),
     type: 'entry-batch',
     batchKey: batch.key,
     scopeIds: batch.nodeIds,
-    dependsOnJobIds: index === 0 ? [] : [],
+    dependsOnJobIds: [],
     maxAttempts: 1 + DEFAULT_REPAIR_LIMIT,
   }));
+  const jobByBatchKey = new Map(jobs.map(job => [job.batchKey, job]));
+  jobs.forEach(job => {
+    const batch = batches.find(item => item.key === job.batchKey);
+    job.dependsOnJobIds = asArray(batch?.dependsOnBatchKeys)
+      .map(key => jobByBatchKey.get(key)?.id)
+      .filter(Boolean);
+  });
   jobs.push({ id: createId('job'), type: 'semantic-audit', dependsOnJobIds: jobs.map(job => job.id), maxAttempts: 1 });
   const estimatedCalls = batches.length + 1;
   return {
@@ -233,6 +279,18 @@ function assertOperationCurrent(operation, project, callLimit) {
 
 async function invokeModel(operation, project, prompt, options, meta = {}) {
   const callLimit = Math.max(1, Number(options?.callLimit || DEFAULT_CALL_LIMIT));
+  const sharedSettings = options?.sharedSettings || {};
+  const resolvedCustomApi =
+    options?.customApi !== undefined
+      ? options.customApi
+      : sharedSettings.apiMode === 'custom'
+        ? sharedSettings.customApi
+        : null;
+  const resolvedShouldStream =
+    options?.shouldStream !== undefined ? options.shouldStream === true : sharedSettings.stream === true;
+  const resolvedMaxOutputTokens =
+    options?.maxOutputTokens ??
+    sharedSettings?.contextBudget?.reserveOutputTokens;
   assertOperationCurrent(operation, project, callLimit);
   operation.callCount += 1;
   options?.onCallStart?.({
@@ -243,11 +301,11 @@ async function invokeModel(operation, project, prompt, options, meta = {}) {
 
   const requestOptions = {
     prompt,
-    customApi: options?.customApi || null,
+    customApi: resolvedCustomApi,
     promptSettings: options?.promptSettings || null,
     timeoutMs: options?.timeoutMs,
-    shouldStream: options?.shouldStream === true,
-    maxOutputTokens: options?.maxOutputTokens,
+    shouldStream: resolvedShouldStream,
+    maxOutputTokens: resolvedMaxOutputTokens,
     onGenerationStart: generationId => {
       operation.generationIds.add(generationId);
       options?.onGenerationStart?.(generationId, operation.id);
@@ -308,6 +366,47 @@ function withOperationState(project, jobs, pendingProposal = undefined) {
   return nextProject;
 }
 
+function appendConversationState(project, messageOptions, assistantContent, extra = {}) {
+  const nextProject = clone(project || {});
+  const now = new Date().toISOString();
+  nextProject.conversations = [
+    ...asArray(nextProject.conversations),
+    {
+      id: createId('conversation-message'),
+      role: 'user',
+      content: `${messageOptions?.message || ''}`,
+      intent: messageOptions?.intent || 'discussion',
+      scope: clone(messageOptions?.scope || { type: 'global', ids: [] }),
+      lifetime: messageOptions?.lifetime || 'once',
+      createdAt: now,
+    },
+    {
+      id: createId('conversation-message'),
+      role: 'assistant',
+      content: `${assistantContent || ''}`,
+      intent: messageOptions?.intent || 'discussion',
+      scope: clone(messageOptions?.scope || { type: 'global', ids: [] }),
+      lifetime: 'once',
+      createdAt: now,
+      ...clone(extra),
+    },
+  ];
+  const summarizedCount = Math.max(0, Number(nextProject.conversationSummaryCount || 0));
+  const olderMessages = nextProject.conversations.slice(0, -8);
+  const newOlderMessages = olderMessages.slice(summarizedCount);
+  if (newOlderMessages.length > 0) {
+    const addition = newOlderMessages
+      .map(message => `${message.role === 'assistant' ? 'AI' : '用户'}：${`${message.content || ''}`.replace(/\s+/g, ' ').slice(0, 240)}`)
+      .join('\n');
+    nextProject.conversationSummary = [nextProject.conversationSummary, addition]
+      .filter(Boolean)
+      .join('\n')
+      .slice(-6000);
+    nextProject.conversationSummaryCount = olderMessages.length;
+  }
+  return nextProject;
+}
+
 function buildBlueprintPrompt(project, options, previousBlueprint = null, issues = []) {
   const context = buildGenerationContext(project, {
     ...options,
@@ -316,11 +415,13 @@ function buildBlueprintPrompt(project, options, previousBlueprint = null, issues
   });
   return [
     '你是 SillyTavern 世界书结构规划器。只返回一个 JSON 对象，不要 Markdown。',
-    '输出格式：{"blueprint":{"scale":"small|medium|large","summary":"","nodes":[...]}}。',
+    '输出格式：{"blueprint":{"scale":"small|medium|large","summary":"","nodes":[...]},"conflicts":[]}。',
     '每个节点必须包含 nodeId、parentId、role、title、triggerType、keywords、position、depth、order、',
     'xml:{groupId,tag,boundary}、contentBrief、dependsOnEntryIds。',
     '小型世界必须平铺；中型只能有一套总分；大型按领域建立总分。Normal 必须有关键词。',
+    `用户规模偏好：${project?.scalePreference || 'auto'}。auto 时按资料实际复杂度判断。`,
     'XML 开始、组内节点、结束必须同位置且 order 严格包裹；条件 XML 组开闭节点共享直属分点主关键词。',
+    '若两份用户资料在同一事实或规则上互相矛盾，把双方 sourceId、冲突说明和 resolved:false 放入 conflicts；不得自行采用较新资料。',
     previousBlueprint ? `需要修复的当前蓝图：\n${JSON.stringify(previousBlueprint, null, 2)}` : '',
     issues.length ? `必须修复的问题：\n${JSON.stringify(issues, null, 2)}` : '',
     `项目上下文：\n${serializeGenerationContext(context)}`,
@@ -340,6 +441,8 @@ function buildEntriesPrompt(project, batch, options, previousEntries = [], issue
     '"strategy":{"type":"constant|selective","keys":[]},"position":{"type":"before_character_definition|after_character_definition|before_example_messages|after_example_messages|before_author_note|after_author_note|at_depth","role":"system|user|assistant","depth":0,"order":10}}}]}。',
     '必须覆盖给定批次全部节点且不得新增节点。Normal 对应 selective 并至少有一个关键词。',
     '正文使用简体中文和高密度事实；不要输出 UID。XML 组不可拆分，开闭标签必须完整。',
+    '若上下文资料彼此冲突，返回 conflicts:[{sourceIds:[],message:"",resolved:false}]，不要自行选择较新版本。',
+    '仅当追加目标的父级导航、条件父点关键词或局部 order 确有必要同步时，可另返回 existingUpdates:[{targetUid,nodeId,patch:{content,strategy:{keys},position:{order}}}]；不得修改其他既有字段。',
     previousEntries.length ? `需要修复的当前条目：\n${JSON.stringify(previousEntries, null, 2)}` : '',
     issues.length ? `必须修复的问题：\n${JSON.stringify(issues, null, 2)}` : '',
     `本批蓝图：\n${JSON.stringify(batch.nodes, null, 2)}`,
@@ -363,6 +466,11 @@ function buildSemanticAuditPrompt(project, entries, options) {
 }
 
 export async function generateWorldbookBlueprint(project, requestOptions = {}) {
+  try {
+    project = await captureGenerationTargetBaseline(project);
+  } catch (error) {
+    return { outcome: 'failed', reason: 'baseline-unavailable', error, project: clone(project) };
+  }
   if (project?.pendingProposal) {
     return {
       outcome: 'blocked',
@@ -378,6 +486,7 @@ export async function generateWorldbookBlueprint(project, requestOptions = {}) {
   job.status = 'running';
   let blueprint = null;
   let audit = null;
+  let conflicts = [];
 
   try {
     for (let attempt = 0; attempt <= DEFAULT_REPAIR_LIMIT; attempt += 1) {
@@ -389,7 +498,10 @@ export async function generateWorldbookBlueprint(project, requestOptions = {}) {
         requestOptions,
         { jobId: job.id, type: attempt === 0 ? 'blueprint' : 'blueprint-repair', attempt: attempt + 1 },
       );
-      blueprint = normalizeBlueprintPayload(parseJsonResponse(response, '蓝图生成'), project);
+      const payload = parseJsonResponse(response, '蓝图生成');
+      blueprint = normalizeBlueprintPayload(payload, project);
+      const reportedConflicts = asArray(payload?.conflicts);
+      if (reportedConflicts.length > 0) conflicts = reportedConflicts;
       audit = auditGenerationBlueprint(blueprint);
       if (getSeverityErrors(audit).length === 0) break;
     }
@@ -416,6 +528,7 @@ export async function generateWorldbookBlueprint(project, requestOptions = {}) {
       [{ type: 'replaceBlueprint', blueprint }],
       affectedIds,
       [job],
+      conflicts,
     );
     job.status = 'complete';
     job.result = { audit: clone(audit), nodeCount: affectedIds.length };
@@ -451,7 +564,16 @@ function findBatchIssues(report, batch) {
 }
 
 export async function generateWorldbookEntries(project, requestOptions = {}) {
-  if (project?.pendingProposal) {
+  try {
+    project = await captureGenerationTargetBaseline(project);
+  } catch (error) {
+    return { outcome: 'failed', reason: 'baseline-unavailable', error, project: clone(project) };
+  }
+  const retryJob = requestOptions.retryJobId
+    ? asArray(project?.jobs).find(job => (job.id || job.jobId) === requestOptions.retryJobId)
+    : null;
+  const pendingEntryOperation = project?.pendingProposal?.operations?.find(operation => operation?.type === 'replaceEntryDrafts');
+  if (project?.pendingProposal && !retryJob) {
     return {
       outcome: 'blocked',
       reason: 'pending-proposal',
@@ -468,7 +590,35 @@ export async function generateWorldbookEntries(project, requestOptions = {}) {
     };
   }
 
-  const plan = buildGenerationCallPlan(project, 'entries');
+  let plan = buildGenerationCallPlan(project, 'entries');
+  if (requestOptions.retryJobId && !retryJob) {
+    return {
+      outcome: 'blocked',
+      reason: 'retry-job-missing',
+      error: new Error('找不到要重试的生成批次。'),
+      project: clone(project),
+    };
+  }
+  if (retryJob) {
+    const retryScope = new Set(asArray(retryJob.scopeIds));
+    const batches = asArray(plan.batches).filter(batch => batch.nodeIds.some(nodeId => retryScope.has(nodeId)));
+    plan = {
+      ...plan,
+      batches,
+      minimumCalls: batches.length + 1,
+      estimatedCalls: batches.length + 1,
+      maximumCalls: batches.length * (1 + DEFAULT_REPAIR_LIMIT) + 1,
+      requiresLimitIncrease: batches.length + 1 > DEFAULT_CALL_LIMIT,
+    };
+    if (batches.length === 0) {
+      return {
+        outcome: 'blocked',
+        reason: 'retry-scope-missing',
+        error: new Error('重试批次的节点已不在当前蓝图中，请重新生成受影响分支。'),
+        project: clone(project),
+      };
+    }
+  }
   const callLimit = Math.max(1, Number(requestOptions.callLimit || DEFAULT_CALL_LIMIT));
   if (plan.minimumCalls > callLimit && requestOptions.allowCallLimitIncrease !== true) {
     return {
@@ -479,6 +629,10 @@ export async function generateWorldbookEntries(project, requestOptions = {}) {
       project: clone(project),
     };
   }
+  const effectiveCallLimit =
+    requestOptions.allowCallLimitIncrease === true
+      ? Math.max(callLimit, plan.minimumCalls)
+      : callLimit;
 
   const operation = beginOperation('entries', project, requestOptions);
   const jobs = plan.batches.map(batch => {
@@ -487,15 +641,47 @@ export async function generateWorldbookEntries(project, requestOptions = {}) {
     job.batchKey = batch.key;
     return job;
   });
-  const completedEntries = [];
+  const retryScopeIds = new Set(asArray(retryJob?.scopeIds));
+  const checkpointDrafts = asArray(project?.jobs).flatMap(job =>
+    ['complete', 'interrupted'].includes(job?.status) ? asArray(job?.result?.entries) : [],
+  );
+  const previousDrafts = pendingEntryOperation?.entries?.length
+    ? asArray(pendingEntryOperation.entries)
+    : project?.entryDrafts?.length
+      ? asArray(project.entryDrafts)
+      : checkpointDrafts;
+  const completedEntries = retryJob
+    ? previousDrafts.filter(entry => entry?.targetUid === undefined && !retryScopeIds.has(getNodeId(entry)))
+    : [];
+  const proposedExistingUpdates = retryJob
+    ? previousDrafts.filter(entry => entry?.targetUid !== undefined && !retryScopeIds.has(getNodeId(entry)))
+    : [];
+  const proposalConflicts = [];
   const failedNodeIds = new Set();
+  const failedBatchKeys = new Set();
 
   try {
     for (let batchIndex = 0; batchIndex < plan.batches.length; batchIndex += 1) {
       const batch = plan.batches[batchIndex];
       const job = jobs[batchIndex];
+      const failedDependencies = asArray(batch.dependsOnBatchKeys).filter(key => failedBatchKeys.has(key));
+      if (failedDependencies.length > 0) {
+        job.status = 'skipped';
+        job.error = `依赖主题组未成功生成: ${failedDependencies.join(', ')}`;
+        job.result = { failedDependencies };
+        failedBatchKeys.add(batch.key);
+        batch.nodeIds.forEach(id => failedNodeIds.add(id));
+        continue;
+      }
       job.status = 'running';
+      await requestOptions.onBatchStart?.({
+        operationId: operation.id,
+        batchIndex,
+        batchCount: plan.batches.length,
+        job: clone(job),
+      });
       let batchEntries = [];
+      let batchExistingUpdates = [];
       let audit = null;
 
       for (let attempt = 0; attempt <= DEFAULT_REPAIR_LIMIT; attempt += 1) {
@@ -511,10 +697,25 @@ export async function generateWorldbookEntries(project, requestOptions = {}) {
               attempt > 0 ? batchEntries : [],
               findBatchIssues(audit, batch),
             ),
-            { ...requestOptions, callLimit: requestOptions.allowCallLimitIncrease ? Math.max(callLimit, plan.minimumCalls) : callLimit },
+            { ...requestOptions, callLimit: effectiveCallLimit },
             { jobId: job.id, type: attempt === 0 ? 'entry-batch' : 'entry-repair', attempt: attempt + 1 },
           );
-          batchEntries = normalizeEntryPayload(parseJsonResponse(response, '条目生成'));
+          const payload = parseJsonResponse(response, '条目生成');
+          proposalConflicts.push(...asArray(payload?.conflicts));
+          batchEntries = normalizeEntryPayload(payload);
+          batchExistingUpdates = asArray(payload?.existingUpdates).flatMap(update => {
+            const uid = Number(update?.uid ?? update?.targetUid);
+            if (!Number.isFinite(uid)) return [];
+            const fingerprint = project?.existingWorldbookBaseline?.fingerprints?.[uid];
+            return [{
+              ...(update?.entry || update?.patch || update),
+              targetUid: uid,
+              beforeFingerprint: fingerprint || update?.beforeFingerprint || null,
+              nodeId: update?.nodeId || `existing-${uid}`,
+              entryId: update?.entryId || update?.nodeId || `existing-${uid}`,
+              generationKind: 'minimal-existing-update',
+            }];
+          });
           const returnedNodeIds = new Set(batchEntries.map(getNodeId).filter(Boolean));
           const missingNodeIds = batch.nodeIds.filter(id => !returnedNodeIds.has(id));
           audit = auditGeneratedEntries(batchEntries, { blueprint: { scale: project.blueprint?.scale, nodes: batch.nodes } });
@@ -560,12 +761,14 @@ export async function generateWorldbookEntries(project, requestOptions = {}) {
         job.error = '本批经过两轮修复后仍存在硬错误。';
         job.result = { audit: clone(audit), entries: clone(batchEntries) };
         batch.nodeIds.forEach(id => failedNodeIds.add(id));
+        failedBatchKeys.add(batch.key);
       } else {
         job.status = 'complete';
         job.result = { audit: clone(audit), entries: clone(batchEntries) };
         completedEntries.push(...batchEntries);
+        proposedExistingUpdates.push(...batchExistingUpdates);
       }
-      requestOptions.onBatchComplete?.({
+      await requestOptions.onBatchComplete?.({
         operationId: operation.id,
         batchIndex,
         batchCount: plan.batches.length,
@@ -585,7 +788,7 @@ export async function generateWorldbookEntries(project, requestOptions = {}) {
     }
 
     let semanticAudit = { valid: true, errors: [], warnings: [], issues: [] };
-    if (!operation.cancelled && operation.callCount < callLimit) {
+    if (!operation.cancelled && operation.callCount < effectiveCallLimit) {
       const semanticJob = makeJob('semantic-audit', completedEntries.map(getNodeId));
       semanticJob.baseRevision = operation.baseRevision;
       semanticJob.status = 'running';
@@ -595,7 +798,7 @@ export async function generateWorldbookEntries(project, requestOptions = {}) {
           operation,
           project,
           buildSemanticAuditPrompt(project, completedEntries, requestOptions),
-          requestOptions,
+          { ...requestOptions, callLimit: effectiveCallLimit },
           { jobId: semanticJob.id, type: 'semantic-audit', attempt: 1 },
         );
         const payload = parseJsonResponse(response, '语义审计');
@@ -626,17 +829,104 @@ export async function generateWorldbookEntries(project, requestOptions = {}) {
       }
     }
 
+    const semanticErrors = getSeverityErrors(semanticAudit);
+    if (semanticErrors.length > 0) {
+      const resolvedSemanticIssues = new Set();
+      const affectedBatches = plan.batches.filter(batch =>
+        semanticErrors.some(issue => {
+          const issueNodeIds = asArray(issue?.nodeIds);
+          return issueNodeIds.length === 0 || issueNodeIds.some(id => batch.nodeIds.includes(id));
+        }),
+      );
+      for (const batch of affectedBatches) {
+        if (operation.callCount >= effectiveCallLimit) break;
+        const repairJob = makeJob('semantic-repair', batch.nodeIds);
+        repairJob.baseRevision = operation.baseRevision;
+        repairJob.batchKey = batch.key;
+        repairJob.status = 'running';
+        jobs.push(repairJob);
+        let currentBatchEntries = completedEntries.filter(entry => batch.nodeIds.includes(getNodeId(entry)));
+        const relevantIssues = semanticErrors.filter(issue => {
+          const issueNodeIds = asArray(issue?.nodeIds);
+          return issueNodeIds.length === 0 || issueNodeIds.some(id => batch.nodeIds.includes(id));
+        });
+
+        for (
+          let attempt = 0;
+          attempt < DEFAULT_REPAIR_LIMIT && operation.callCount < effectiveCallLimit;
+          attempt += 1
+        ) {
+          repairJob.attempts = attempt + 1;
+          try {
+            const response = await invokeModel(
+              operation,
+              project,
+              buildEntriesPrompt(project, batch, requestOptions, currentBatchEntries, relevantIssues),
+              { ...requestOptions, callLimit: effectiveCallLimit },
+              { jobId: repairJob.id, type: 'semantic-repair', attempt: attempt + 1 },
+            );
+            const repairedEntries = normalizeEntryPayload(parseJsonResponse(response, '语义问题修复'));
+            const repairAudit = auditGeneratedEntries(repairedEntries, {
+              blueprint: { scale: project.blueprint?.scale, nodes: batch.nodes },
+            });
+            currentBatchEntries = repairedEntries;
+            repairJob.result = { entries: clone(repairedEntries), audit: clone(repairAudit) };
+            if (getSeverityErrors(repairAudit).length === 0) break;
+          } catch (error) {
+            if (/停止生成|版本已变化/.test(error?.message || '')) throw error;
+            repairJob.error = error.message;
+            break;
+          }
+        }
+
+        const repairErrors = getSeverityErrors(repairJob.result?.audit);
+        if (repairJob.result && currentBatchEntries.length > 0 && repairErrors.length === 0) {
+          const batchIds = new Set(batch.nodeIds);
+          for (let index = completedEntries.length - 1; index >= 0; index -= 1) {
+            if (batchIds.has(getNodeId(completedEntries[index]))) completedEntries.splice(index, 1);
+          }
+          completedEntries.push(...currentBatchEntries);
+          repairJob.status = 'complete';
+          relevantIssues.forEach(issue => resolvedSemanticIssues.add(issue));
+        } else {
+          repairJob.status = 'failed';
+          repairJob.error = '语义问题修复未产生可通过确定性审计的完整主题组。';
+        }
+      }
+      const nextIssues = asArray(semanticAudit.issues).map(issue =>
+        resolvedSemanticIssues.has(issue)
+          ? {
+              ...issue,
+              severity: 'warning',
+              originalSeverity: issue.severity,
+              code: `${issue.code || 'semantic-issue'}-repaired`,
+              message: `${issue.message}（已局部修复，等待人工审阅）`,
+            }
+          : issue,
+      );
+      semanticAudit = {
+        ...semanticAudit,
+        valid: nextIssues.every(issue => issue?.severity !== 'error'),
+        errors: nextIssues.filter(issue => issue?.severity === 'error'),
+        warnings: nextIssues.filter(issue => issue?.severity !== 'error'),
+        issues: nextIssues,
+      };
+    }
+
     const entriesWithFallback = applyXmlFallbackKeywords(completedEntries, project.blueprint);
+    const uniqueExistingUpdates = [...new Map(
+      proposedExistingUpdates.map(update => [Number(update.targetUid), update]),
+    ).values()];
     const deterministicAudit = auditGeneratedEntries(entriesWithFallback, { blueprint: project.blueprint });
     const affectedIds = entriesWithFallback.map(getNodeId);
     const proposal = makeProposal(
       project,
       'entries',
       failedNodeIds.size > 0 ? `生成条目草稿（${failedNodeIds.size} 个节点失败）` : '生成全部世界书条目草稿',
-      [{ type: 'replaceEntryDrafts', entries: entriesWithFallback }],
-      affectedIds,
+      [{ type: 'replaceEntryDrafts', entries: [...entriesWithFallback, ...uniqueExistingUpdates] }],
+      [...affectedIds, ...uniqueExistingUpdates.map(update => getNodeId(update))],
       jobs,
-      [],
+      proposalConflicts,
     );
     proposal.failedNodeIds = [...failedNodeIds];
     proposal.audit = {
@@ -675,13 +965,14 @@ function buildConversationPrompt(project, messageOptions) {
     instruction: messageOptions?.message || '',
   });
   const mutatingIntents = new Set(['add_source', 'expand_branch', 'modify_blueprint', 'modify_entries', 'audit']);
-  const expectsProposal = mutatingIntents.has(messageOptions?.intent);
+  const expectsProposal = mutatingIntents.has(messageOptions?.intent) || messageOptions?.lifetime === 'project';
   return [
     '你是世界书生成项目的协作助手。只返回 JSON，不要 Markdown。',
     expectsProposal
       ? '本次请求会改变项目。返回 {"kind":"proposal","summary":"","scopeIds":[],"operations":[],"affectedIds":[],"conflicts":[],"requiredJobs":[]}。不得假装修改已直接生效。'
       : '本次是讨论或问答。返回 {"kind":"answer","answer":""}，不得附带修改操作。',
-    'operation.type 仅允许 addSource、addRule、updateNode、addNode、removeNode、replaceSubtree、updateEntry、requestAudit。',
+    'operation.type 仅允许 addSource、updateSource、addNode、updateNode、removeNode、replaceBlueprint、addEntry、updateEntry、removeEntry、replaceEntryDrafts、setAudit；',
+    '若需新增长期规则，使用 {"type":"insert","path":["projectRules"],"value":规则对象}。',
     `项目上下文：\n${serializeGenerationContext(context)}`,
   ].join('\n\n');
 }
@@ -689,6 +980,21 @@ function buildConversationPrompt(project, messageOptions) {
 export async function runGenerationConversation(project, messageOptions = {}) {
   if (!`${messageOptions?.message || ''}`.trim()) {
     return { outcome: 'failed', error: new Error('对话内容不能为空。'), project: clone(project) };
+  }
+  try {
+    project = await captureGenerationTargetBaseline(project);
+  } catch (error) {
+    return { outcome: 'failed', reason: 'baseline-unavailable', error, project: clone(project) };
+  }
+  const mutatingIntents = new Set(['add_source', 'expand_branch', 'modify_blueprint', 'modify_entries', 'audit']);
+  const expectsProposal = mutatingIntents.has(messageOptions?.intent) || messageOptions?.lifetime === 'project';
+  if (project?.pendingProposal && expectsProposal) {
+    return {
+      outcome: 'blocked',
+      reason: 'pending-proposal',
+      error: new Error('当前项目已有未决提案，请先接受或拒绝。'),
+      project: clone(project),
+    };
   }
   const operation = beginOperation('conversation', project, messageOptions);
   const job = makeJob('conversation', asArray(messageOptions?.scope?.ids));
@@ -703,48 +1009,89 @@ export async function runGenerationConversation(project, messageOptions = {}) {
       messageOptions,
       { jobId: job.id, type: 'conversation', attempt: 1 },
     );
-    const payload = parseJsonResponse(response, '协作对话');
+    let payload = parseJsonResponse(response, '协作对话');
+    if (payload?.kind === 'answer' && expectsProposal) {
+      if (messageOptions?.lifetime === 'project' && !mutatingIntents.has(messageOptions?.intent)) {
+        payload = { kind: 'proposal', summary: payload.answer || '新增项目长期规则', operations: [] };
+      } else {
+        throw new Error('本次请求要求修改项目，但 AI 只返回了普通回答。');
+      }
+    }
     if (payload?.kind === 'answer') {
       job.status = 'complete';
       job.result = { kind: 'answer' };
+      const nextProject = appendConversationState(
+        withOperationState(project, [job]),
+        messageOptions,
+        `${payload.answer || ''}`,
+        { responseKind: 'answer' },
+      );
       return {
         outcome: 'answer',
         operationId: operation.id,
         answer: `${payload.answer || ''}`,
         calls: operation.callCount,
-        project: withOperationState(project, [job]),
+        project: nextProject,
       };
     }
     if (project?.pendingProposal) {
       throw new Error('当前项目已有未决提案，请先接受或拒绝。');
     }
+    const operations = asArray(payload?.operations);
+    if (
+      messageOptions?.lifetime === 'project'
+      && !operations.some(operation => operation?.path?.[0] === 'projectRules')
+    ) {
+      operations.push({
+        type: 'insert',
+        path: ['projectRules'],
+        value: {
+          id: createId('project-rule'),
+          content: `${messageOptions.message || ''}`,
+          scope: clone(messageOptions.scope || { type: 'global', ids: [] }),
+          createdAt: new Date().toISOString(),
+        },
+      });
+    }
     const proposal = makeProposal(
       project,
-      'conversation',
+      messageOptions?.intent || 'conversation',
       payload?.summary || '对话修改提案',
-      asArray(payload?.operations),
+      operations,
       asArray(payload?.affectedIds || payload?.scopeIds),
       asArray(payload?.requiredJobs),
       asArray(payload?.conflicts),
     );
     job.status = 'complete';
     job.result = { kind: 'proposal', proposalId: proposal.id };
+    const nextProject = appendConversationState(
+      withOperationState(project, [job], proposal),
+      messageOptions,
+      proposal.summary,
+      { responseKind: 'proposal', proposalId: proposal.id },
+    );
     return {
       outcome: 'proposal',
       operationId: operation.id,
       proposal,
       calls: operation.callCount,
-      project: withOperationState(project, [job], proposal),
+      project: nextProject,
     };
   } catch (error) {
     job.status = /停止生成/.test(error?.message || '') ? 'cancelled' : 'failed';
     job.error = error.message;
+    const nextProject = appendConversationState(
+      withOperationState(project, [job]),
+      messageOptions,
+      `请求未完成：${error.message}`,
+      { responseKind: 'error' },
+    );
     return {
       outcome: job.status === 'cancelled' ? 'cancelled' : 'failed',
       operationId: operation.id,
       error,
       calls: operation.callCount,
-      project: withOperationState(project, [job]),
+      project: nextProject,
     };
   } finally {
     finishOperation(operation);
@@ -767,3 +1114,10 @@ export const generationOrchestratorInternals = {
   normalizeBlueprintPayload,
   normalizeEntryPayload,
 };
+
+export {
+  applyGenerationProjectToTarget,
+  bindCreatedWorldbook,
+  captureGenerationTargetBaseline,
+  rollbackCreatedWorldbook,
+} from './worldbookGenerationApply.js';

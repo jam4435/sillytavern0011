@@ -126,7 +126,7 @@ function getProjectEntries(project, options) {
 }
 
 function collectAuditErrors(project, entries) {
-  const projectReport = auditGenerationProject(project);
+  const projectReport = auditGenerationProject({ ...project, entryDrafts: entries });
   const entriesReport = auditGeneratedEntries(entries, { blueprint: project?.blueprint });
   const errors = [
     ...asArray(projectReport?.errors),
@@ -145,6 +145,20 @@ function collectAuditErrors(project, entries) {
     project: projectReport,
     entries: entriesReport,
   };
+}
+
+function resolveCreationTransaction(lorebookName, options = {}) {
+  const active = getCreatedWorldbookTransactionSnapshot(lorebookName);
+  if (active) return active;
+  const persisted = clone(options.creationTransaction);
+  if (
+    persisted?.lorebookName === lorebookName
+    && persisted?.meta?.operationType === 'worldbook-create'
+    && Array.isArray(persisted.snapshot)
+  ) {
+    return persisted;
+  }
+  return null;
 }
 
 function getAtPath(object, path) {
@@ -186,8 +200,34 @@ function normalizeUpdate(update, project) {
     beforeFingerprint:
       update?.beforeFingerprint ||
       update?.baseFingerprint ||
+      project?.existingWorldbookBaseline?.fingerprints?.[uid] ||
       (update?.beforeEntry ? fingerprintWorldbookEntry(update.beforeEntry) : null) ||
       (baseline ? fingerprintWorldbookEntry(baseline) : null),
+  };
+}
+
+export async function captureGenerationTargetBaseline(project) {
+  if (project?.target?.type !== 'append' || !project?.target?.lorebookName) {
+    return clone(project);
+  }
+  if (project.existingWorldbookBaseline?.entries?.length >= 0) {
+    return clone(project);
+  }
+  const result = await getWorldbookSafe(project.target.lorebookName);
+  if (!result?.success || !Array.isArray(result.data)) {
+    throw result?.error || new Error(`无法读取目标世界书“${project.target.lorebookName}”。`);
+  }
+  const entries = clone(result.data);
+  return {
+    ...clone(project),
+    existingWorldbookBaseline: {
+      lorebookName: project.target.lorebookName,
+      capturedAt: new Date().toISOString(),
+      entries,
+      fingerprints: Object.fromEntries(
+        entries.map(entry => [Number(entry.uid), fingerprintWorldbookEntry(entry)]),
+      ),
+    },
   };
 }
 
@@ -239,10 +279,8 @@ export async function appendGeneratedEntriesAtomically(lorebookName, drafts, upd
     currentEntries => {
       const conflicts = [];
       const currentByUid = new Map(currentEntries.map(entry => [Number(entry.uid), entry]));
-      const updateUids = new Set(normalizedUpdates.map(update => update.uid));
       const occupiedNames = new Map(
         currentEntries
-          .filter(entry => !updateUids.has(Number(entry.uid)))
           .map(entry => [getEntryName(entry), Number(entry.uid)])
           .filter(([name]) => name),
       );
@@ -351,7 +389,7 @@ async function createGeneratedWorldbook(lorebookName, drafts, project) {
       targetMode: 'new',
     });
   }
-  recordCreatedWorldbookTransaction(lorebookName, entries, {
+  const creationTransaction = recordCreatedWorldbookTransaction(lorebookName, entries, {
     projectId: project?.id || project?.projectId || null,
     entryCount: entries.length,
     snapshotFingerprint: hashString(JSON.stringify(stableSortObject(entries))),
@@ -363,6 +401,7 @@ async function createGeneratedWorldbook(lorebookName, drafts, project) {
     lorebookName,
     created: true,
     createdEntries: clone(entries),
+    creationTransaction: clone(creationTransaction),
     updatedUids: [],
     conflicts: [],
     error: null,
@@ -388,7 +427,8 @@ export async function applyGenerationProjectToTarget(project, options = {}) {
     project?.target?.name ||
     '';
   const rawDrafts = getProjectEntries(project, options);
-  const drafts = applyXmlFallbackKeywords(rawDrafts, project?.blueprint);
+  const generatedDrafts = rawDrafts.filter(draft => draft?.targetUid === undefined);
+  const drafts = applyXmlFallbackKeywords(generatedDrafts, project?.blueprint);
   const audit = collectAuditErrors(project, drafts);
   if (!audit.valid && options.ignoreAuditErrors !== true) {
     return buildApplyFailure(new Error('生成项目仍存在硬错误，已阻止写入。'), lorebookName, {
@@ -398,6 +438,22 @@ export async function applyGenerationProjectToTarget(project, options = {}) {
   }
   if (rawDrafts.length === 0) {
     return buildApplyFailure(new Error('没有可写入的已接受条目。'), lorebookName, { targetMode, audit });
+  }
+
+  if (projectTargetType === 'export' || targetMode === 'export') {
+    return {
+      success: true,
+      changed: false,
+      targetMode: 'export',
+      lorebookName: null,
+      created: false,
+      createdEntries: clone(drafts),
+      updatedUids: [],
+      conflicts: [],
+      audit,
+      error: null,
+      message: '最终条目已确认，可复制或下载 YAML。',
+    };
   }
 
   if (targetMode === 'new' || targetMode === 'create') {
@@ -411,8 +467,8 @@ export async function applyGenerationProjectToTarget(project, options = {}) {
   });
 }
 
-export async function bindCreatedWorldbook(lorebookName, mode) {
-  const transaction = getCreatedWorldbookTransactionSnapshot(lorebookName);
+export async function bindCreatedWorldbook(lorebookName, mode, options = {}) {
+  const transaction = resolveCreationTransaction(lorebookName, options);
   if (!transaction) {
     return { success: false, lorebookName, mode, error: new Error('没有可绑定的新建世界书事务。') };
   }
@@ -448,8 +504,8 @@ export async function bindCreatedWorldbook(lorebookName, mode) {
   }
 }
 
-export async function rollbackCreatedWorldbook(lorebookName) {
-  const transaction = getCreatedWorldbookTransactionSnapshot(lorebookName);
+export async function rollbackCreatedWorldbook(lorebookName, options = {}) {
+  const transaction = resolveCreationTransaction(lorebookName, options);
   if (!transaction) {
     return {
       success: false,
