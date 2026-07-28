@@ -16,11 +16,12 @@ import { refreshAiWorkspace } from './aiWorkspace.js';
 import { syncPanelLayoutMode } from './detail.js';
 import { switchTab, toggleLorebookPanel } from './panel.js';
 
-const THEME_VERSION = 3;
+const THEME_VERSION = 4;
 const DEFAULT_LAYOUT_MODE = 'master-detail';
 const VALID_LAYOUT_MODES = new Set(['drawer', 'master-detail']);
 const MAX_BACKGROUND_IMAGE_DATA_URL_LENGTH = 2 * 1024 * 1024;
 const BACKGROUND_IMAGE_SURFACE_REVEAL_RATIO = 0.45;
+const MIN_PANEL_OPACITY = 0.35;
 
 function normalizeLayoutMode(mode) {
   return VALID_LAYOUT_MODES.has(mode) ? mode : DEFAULT_LAYOUT_MODE;
@@ -101,6 +102,10 @@ function pickOpacity(value, fallback) {
   return Number.isFinite(numericValue) ? Math.min(1, Math.max(0, numericValue)) : fallback;
 }
 
+function pickPanelOpacity(value, fallback) {
+  return Math.max(MIN_PANEL_OPACITY, pickOpacity(value, fallback));
+}
+
 function normalizeSharedTheme(shared = {}, fallback = getDefaultSharedTheme()) {
   return {
     showTopbarButton: pickBoolean(shared.showTopbarButton, fallback.showTopbarButton),
@@ -124,7 +129,7 @@ function normalizeLayoutTheme(theme = {}, fallback = getDefaultMasterDetailTheme
     inputBgColor: pickColor(inputBgColor, fallback.inputBgColor),
     backgroundImageUrl: pickString(theme.backgroundImageUrl, fallback.backgroundImageUrl),
     backgroundImageOpacity: pickOpacity(theme.backgroundImageOpacity, fallback.backgroundImageOpacity),
-    panelOpacity: pickOpacity(theme.panelOpacity, fallback.panelOpacity),
+    panelOpacity: pickPanelOpacity(theme.panelOpacity, fallback.panelOpacity),
     iconBgColor: pickColor(theme.iconBgColor, fallback.iconBgColor),
   };
 }
@@ -234,7 +239,7 @@ function colorWithOpacity(color, opacity) {
 }
 
 function getInteriorSurfaceOpacity(layoutTheme) {
-  const panelOpacity = pickOpacity(layoutTheme.panelOpacity, 1);
+  const panelOpacity = pickPanelOpacity(layoutTheme.panelOpacity, 1);
   if (!pickString(layoutTheme.backgroundImageUrl, '')) {
     return panelOpacity;
   }
@@ -505,6 +510,7 @@ function fillThemeModal(theme, layoutMode = getPcLayoutModeSetting()) {
     '#panel-background-opacity-value',
     theme.backgroundImageOpacity,
   );
+  $('#panel-opacity-slider', parentDoc).attr('min', String(Math.round(MIN_PANEL_OPACITY * 100)));
   setRangePercent(parentDoc, '#panel-opacity-slider', '#panel-opacity-value', theme.panelOpacity);
   $('#panel-icon-bg-color-picker', parentDoc).val(rgbaToHex(theme.iconBgColor));
   $('#topbar-button-toggle', parentDoc).prop('checked', theme.showTopbarButton);

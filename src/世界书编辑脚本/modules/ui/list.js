@@ -1084,9 +1084,15 @@ export const updateBoundLorebooksList = errorCatched(async ($listContainer, forc
 
     if (boundLorebooks.length === 0) {
       $listContainer.find('.current-bound-books').remove();
+      $listContainer.find('.no-bound-lorebooks-message').remove();
+      $listContainer.append(
+        '<div class="no-entries-message no-bound-lorebooks-message">当前聊天没有绑定角色世界书。你仍可使用上方按钮新建、导入或绑定世界书。</div>',
+      );
       setTimeout(() => $listContainer.scrollTop(scrollTop), 10);
       return;
     }
+
+    $listContainer.find('.no-bound-lorebooks-message').remove();
 
     // 在搜索栏前添加当前绑定的世界书信息
     const boundBooksHtml = `

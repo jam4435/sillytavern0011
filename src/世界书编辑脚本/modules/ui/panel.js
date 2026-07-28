@@ -99,6 +99,23 @@ function getPanelRefs(parentDoc = getParentDoc()) {
   };
 }
 
+function hasCompletePanelStructure($panel) {
+  if (!$panel?.length) {
+    return false;
+  }
+
+  return [
+    '.panel-header',
+    '.tab-container',
+    '.content-container',
+    `#${CHARACTER_CONTENT_ID}`,
+    `#${GLOBAL_CONTENT_ID}`,
+    `#${AI_CONTENT_ID}`,
+    `#${LOREBOOK_LIST_CONTAINER_ID}`,
+    `#${GLOBAL_LOREBOOK_LIST_CONTAINER_ID}`,
+  ].every(selector => $panel.find(selector).length > 0);
+}
+
 function setPanelButtonActive($button, active) {
   if ($button.length) {
     $button.toggleClass('active', Boolean(active));
@@ -235,11 +252,16 @@ async function openLorebookPanelDefault() {
   $panel.find(`#${CHARACTER_CONTENT_ID}`).addClass(ACTIVE_CONTENT_CLASS);
 
   const $list = $panel.find(`#${LOREBOOK_LIST_CONTAINER_ID}`);
-  await updateBoundLorebooksList($list, true);
-
   $panel.css('display', 'flex');
   setPanelMinimizedState($panel, false);
   setPanelButtonActive($button, true);
+
+  $list.attr('aria-busy', 'true');
+  try {
+    await updateBoundLorebooksList($list, true);
+  } finally {
+    $list.removeAttr('aria-busy');
+  }
 }
 
 export const restoreLorebookPanel = errorCatched(async () => {
@@ -336,7 +358,6 @@ export const switchTab = errorCatched(async tabId => {
 
 export function initPanel() {
   const parentDoc = window.parent.document;
-  initAiWorkspace();
 
   if ($('#enhanced-lorebook-styles', parentDoc).length === 0) {
     const panelStyles = `
@@ -379,7 +400,7 @@ export function initPanel() {
                     width: 95%;
                     max-width: 1100px; /* 增加最大宽度 */
                     max-height: 80vh;
-                    background-color: transparent;
+                    background-color: var(--panel-bg-color);
                     color: var(--panel-text-color);
                     border: 1px solid var(--panel-border-color);
                     border-radius: 8px;
@@ -389,29 +410,26 @@ export function initPanel() {
                     box-sizing: border-box;
                     flex-direction: column;
                     margin: 0;
-                    isolation: isolate;
                 }
 
-                #${LOREBOOK_PANEL_ID}::before,
-                #${LOREBOOK_PANEL_ID}::after {
+                #${LOREBOOK_PANEL_ID}::before {
                     content: "";
                     position: absolute;
                     inset: 0;
                     border-radius: inherit;
                     pointer-events: none;
-                }
-                #${LOREBOOK_PANEL_ID}::before {
-                    z-index: -2;
-                    background-color: var(--panel-bg-color);
-                    opacity: var(--panel-surface-opacity, 1);
-                }
-                #${LOREBOOK_PANEL_ID}::after {
-                    z-index: -1;
+                    z-index: 0;
                     background-image: var(--panel-background-image, none);
                     background-position: center;
                     background-size: cover;
                     background-repeat: no-repeat;
                     opacity: var(--panel-background-image-opacity, 0);
+                }
+                #${LOREBOOK_PANEL_ID} > .panel-header,
+                #${LOREBOOK_PANEL_ID} > .tab-container,
+                #${LOREBOOK_PANEL_ID} > .content-container {
+                    position: relative;
+                    z-index: 1;
                 }
 
                 /* --- 全屏模式 --- */
@@ -3021,6 +3039,12 @@ export function initPanel() {
     'aria-label': 'Restore Lorebook Panel',
   });
 
+  const $existingPanel = $(`#${LOREBOOK_PANEL_ID}`, parentDoc);
+  if ($existingPanel.length && !hasCompletePanelStructure($existingPanel)) {
+    console.warn('角色世界书: 检测到残缺的旧面板结构，正在自动重建。');
+    $existingPanel.remove();
+  }
+
   if ($(`#${LOREBOOK_PANEL_ID}`, parentDoc).length === 0) {
     const panelHtml = `
             <div id="${LOREBOOK_PANEL_ID}">
@@ -3114,7 +3138,7 @@ export function initPanel() {
                         </div>
                         <div id="panel-opacity-group" class="form-group theme-form-group-stacked">
                             <label for="panel-opacity-slider">插件页面不透明度 <span id="panel-opacity-value">100%</span></label>
-                            <input type="range" id="panel-opacity-slider" min="0" max="100" step="1">
+                            <input type="range" id="panel-opacity-slider" min="35" max="100" step="1">
                         </div>
                         <div class="form-actions">
                             <button type="button" id="reset-theme-button">恢复当前布局默认颜色</button>
@@ -3126,6 +3150,9 @@ export function initPanel() {
       $('body', parentDoc).append(themeModalHtml);
     }
   }
+
+  // AI 工作台依赖上面的面板容器，必须在面板结构就绪后初始化。
+  initAiWorkspace();
 
   // The creation of other modals (editor, optimizer, etc.) will be handled by their respective modules.
 
