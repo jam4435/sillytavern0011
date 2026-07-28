@@ -573,7 +573,7 @@ function ensureThemeModalShape($modal) {
       </div>
       <div id="panel-opacity-group" class="form-group theme-form-group-stacked">
         <label for="panel-opacity-slider">插件页面不透明度 <span id="panel-opacity-value">100%</span></label>
-        <input type="range" id="panel-opacity-slider" min="0" max="100" step="1">
+        <input type="range" id="panel-opacity-slider" min="35" max="100" step="1">
       </div>
     `;
     const $inputColorGroup = $modal.find('#search-input-bg-color-picker').closest('.form-group');
