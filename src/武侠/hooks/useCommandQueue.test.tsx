@@ -59,7 +59,7 @@ describe('useCommandQueue', () => {
       await result.current.sendMessageWithCommands('行走江湖', send);
     });
 
-    expect(send).toHaveBeenCalledWith('行走江湖');
+    expect(send).toHaveBeenCalledWith('行走江湖', { rawPlayerInput: '行走江湖' });
     expect(decrementStatusEffectTurnsMock).toHaveBeenCalledTimes(1);
     expect(syncPlayerAttributesMock).toHaveBeenCalledTimes(1);
   });
@@ -76,7 +76,9 @@ describe('useCommandQueue', () => {
       await result.current.sendMessageWithCommands('出发', send);
     });
 
-    expect(send).toHaveBeenCalledWith('出发\n[地图指令]从大宋/临安府/牛家村移动到大宋/嘉兴府/烟雨楼');
+    expect(send).toHaveBeenCalledWith('出发\n[地图指令]从大宋/临安府/牛家村移动到大宋/嘉兴府/烟雨楼', {
+      rawPlayerInput: '出发',
+    });
   });
 
   it('玩家消息发送失败时不会递减状态效果', async () => {

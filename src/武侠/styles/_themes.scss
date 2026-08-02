@@ -583,6 +583,14 @@
       color: #8b1a1a;
     }
 
+    .command-popover-section + .command-popover-section {
+      border-top-color: rgba(61, 48, 40, 0.16);
+    }
+
+    .command-section-title {
+      color: #5b5048;
+    }
+
     .popover-close-btn {
       color: #5b5048;
 
@@ -621,6 +629,22 @@
           background: rgba(139, 26, 26, 0.1);
           color: #8b1a1a;
         }
+      }
+    }
+
+    .history-card {
+      background: rgba(255, 250, 244, 0.48);
+      border-color: rgba(61, 48, 40, 0.14);
+      color: #1a1410;
+
+      &:hover,
+      &:focus-visible {
+        background: rgba(255, 250, 244, 0.9);
+        border-color: rgba(139, 26, 26, 0.3);
+      }
+
+      .history-recall-icon {
+        color: #8b1a1a;
       }
     }
   }
@@ -839,9 +863,7 @@
   }
 
   .settings-preview {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.38), transparent 56%),
-      var(--wuxia-ink-paper);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.38), transparent 56%), var(--wuxia-ink-paper);
     border-color: var(--wuxia-ink-border);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
   }
@@ -900,9 +922,7 @@
   }
 
   .regex-rule-item {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent 54%),
-      var(--wuxia-ink-paper);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent 54%), var(--wuxia-ink-paper);
     border-color: var(--wuxia-ink-border);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 
@@ -968,9 +988,7 @@
   .summary-status,
   .summary-result,
   .summary-api-status {
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 58%),
-      var(--wuxia-ink-paper);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 58%), var(--wuxia-ink-paper);
     border-color: var(--wuxia-ink-border);
   }
 
@@ -1129,9 +1147,7 @@
   }
 
   .debug-log-content {
-    background:
-      linear-gradient(135deg, rgba(139, 26, 26, 0.025), transparent 50%),
-      var(--wuxia-ink-paper-strong);
+    background: linear-gradient(135deg, rgba(139, 26, 26, 0.025), transparent 50%), var(--wuxia-ink-paper-strong);
     border: 1px solid var(--wuxia-ink-border);
     box-shadow: inset 0 1px 2px rgba(61, 48, 40, 0.05);
 
@@ -3631,7 +3647,8 @@
     &.current {
       color: var(--wuxia-ink-text-strong);
       border-color: #8b1a1a;
-      background: radial-gradient(circle at 12% 18%, rgba(139, 26, 26, 0.1), transparent 46%), rgba(255, 252, 247, 0.98);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(139, 26, 26, 0.1), transparent 46%), rgba(255, 252, 247, 0.98);
       box-shadow:
         0 0 0 1px rgba(139, 26, 26, 0.16),
         0 0 20px rgba(139, 26, 26, 0.12);

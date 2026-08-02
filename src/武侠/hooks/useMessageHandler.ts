@@ -26,6 +26,7 @@ import { recordIframeLifecycleEvent } from '../utils/iframeLifecycleBlackBox';
 import { acquireWuxiaTurnLock, releaseWuxiaTurnLock } from '../utils/turnLock';
 import { runWith429Retry } from '../utils/rateLimitRetry';
 import { finalizeCurrentTurn } from '../utils/saveLoadManager';
+import { WUXIA_INPUT_HISTORY_DATA_KEY } from '../utils/inputHistory';
 import type { LatestDebugRoundPatch } from './useDebugLogs';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -46,6 +47,12 @@ export interface AutoAdvanceTurnResult {
   plainText: string;
   rawReply: string;
   variableWriteObserved: boolean;
+}
+
+export interface SendMessageOptions {
+  waitForBridgeResponseDelivery?: boolean;
+  /** 未附加地图/物品指令的真实玩家输入；仅显式传入时写入输入历史。 */
+  rawPlayerInput?: string;
 }
 
 interface UseMessageHandlerOptions {
@@ -476,8 +483,9 @@ export function useMessageHandler({
   );
 
   const handleSendMessage = useCallback(
-    async (message: string, options: { waitForBridgeResponseDelivery?: boolean } = {}): Promise<string> => {
+    async (message: string, options: SendMessageOptions = {}): Promise<string> => {
       const waitForBridgeResponseDelivery = options.waitForBridgeResponseDelivery === true;
+      const rawPlayerInput = options.rawPlayerInput?.trim() || '';
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       messageLogger.log('🚀 开始发送消息流程');
       messageLogger.log('📝 用户输入:', message);
@@ -519,6 +527,13 @@ export function useMessageHandler({
             {
               role: 'user',
               message: message,
+              ...(rawPlayerInput
+                ? {
+                    data: {
+                      [WUXIA_INPUT_HISTORY_DATA_KEY]: { text: rawPlayerInput },
+                    },
+                  }
+                : {}),
             },
           ],
           {

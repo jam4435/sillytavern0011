@@ -47,6 +47,7 @@ import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from
 import { getUserCurrentLocation } from './utils/mapUtils';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
 import { finalizeCurrentTurn, resumeCheckout } from './utils/saveLoadManager';
+import { readRecentInputHistory, type InputHistoryEntry } from './utils/inputHistory';
 import {
   applyRegexRules,
   applySettingsToDOM,
@@ -160,6 +161,9 @@ const App: React.FC = () => {
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
   const [isCommandQueueOpen, setIsCommandQueueOpen] = useState(false);
+  const [recentInputHistory, setRecentInputHistory] = useState<InputHistoryEntry[]>(() => readRecentInputHistory());
+  const [inputPrefill, setInputPrefill] = useState<{ key: string; message: string } | null>(null);
+  const inputPrefillSequenceRef = useRef(0);
   const [isPlayerAvatarPreviewOpen, setIsPlayerAvatarPreviewOpen] = useState(false);
   const [mapDraftDestination, setMapDraftDestination] = useState<string | null>(null);
   const {
@@ -195,6 +199,25 @@ const App: React.FC = () => {
     onVariableExtraDeclaredBlocks: handleVariableExtraDeclaredBlocks,
     onVariableAiWriteTarget: markVariableApiWriteAsAi,
   });
+
+  const refreshRecentInputHistory = useCallback(() => {
+    setRecentInputHistory(readRecentInputHistory());
+  }, []);
+
+  const handleAppMessageBoundary = useCallback(
+    (messageId?: number) => {
+      handleVariableMessageBoundary(messageId);
+      refreshRecentInputHistory();
+    },
+    [handleVariableMessageBoundary, refreshRecentInputHistory],
+  );
+
+  const handleAppChatChanged = useCallback(() => {
+    clearVariableChanges();
+    setInputPrefill(null);
+    setIsCommandQueueOpen(false);
+    refreshRecentInputHistory();
+  }, [clearVariableChanges, refreshRecentInputHistory]);
 
   useEffect(() => {
     variableTraceLogger.log('[App] 组件已挂载', getRuntimeDebugInfo());
@@ -276,8 +299,8 @@ const App: React.FC = () => {
     setCurrentMaintext,
     setCurrentOptions,
     onMessageSent: handleGlobalMessageSent,
-    onMessageBoundary: handleVariableMessageBoundary,
-    onChatChanged: clearVariableChanges,
+    onMessageBoundary: handleAppMessageBoundary,
+    onChatChanged: handleAppChatChanged,
     onEraWriteDone: handleEraWriteDone,
     onDirectVariableWriteDone: handleDirectVariableWriteDone,
     onEraVariableWriteDone: handleEraVariableWriteDone,
@@ -545,7 +568,13 @@ const App: React.FC = () => {
         showError('历史分叉仍在同步中，暂时不能发送新行动。');
         return '';
       }
-      const rawReply = await sendMessageWithCommands(message, handleSendMessage);
+      let rawReply: string;
+      try {
+        rawReply = await sendMessageWithCommands(message, handleSendMessage);
+      } finally {
+        setInputPrefill(null);
+      }
+      refreshRecentInputHistory();
       if (historyInputDraft) {
         clearHistoryCheckoutDraft(historyInputDraft.transactionId);
         setHistoryInputDraft(null);
@@ -559,6 +588,7 @@ const App: React.FC = () => {
       historyCheckoutPending,
       historyInputDraft,
       refreshGameStateFromVariables,
+      refreshRecentInputHistory,
       sendMessageWithCommands,
       showError,
     ],
@@ -566,8 +596,29 @@ const App: React.FC = () => {
 
   const handleHistoryDraftChange = useCallback(
     (message: string) => {
+      setInputPrefill(null);
       if (!historyInputDraft) return;
       updateHistoryCheckoutDraftMessage(historyInputDraft.transactionId, message);
+    },
+    [historyInputDraft],
+  );
+
+  const handleInputHistorySelect = useCallback(
+    (entry: InputHistoryEntry) => {
+      inputPrefillSequenceRef.current += 1;
+      setInputPrefill({
+        key: `input-history-${entry.messageId}-${inputPrefillSequenceRef.current}`,
+        message: entry.text,
+      });
+
+      if (historyInputDraft) {
+        const updatedDraft = updateHistoryCheckoutDraftMessage(historyInputDraft.transactionId, entry.text);
+        if (updatedDraft) {
+          setHistoryInputDraft(updatedDraft);
+        }
+      }
+
+      setIsCommandQueueOpen(false);
     },
     [historyInputDraft],
   );
@@ -898,7 +949,8 @@ const App: React.FC = () => {
 
   const handleOpeningSend = useCallback(
     async (message: string) => {
-      await handleSendMessage(message);
+      await handleSendMessage(message, { rawPlayerInput: message.trim() });
+      refreshRecentInputHistory();
 
       const lastContent = getLastMessageContent();
       if (lastContent) {
@@ -907,7 +959,7 @@ const App: React.FC = () => {
         setCurrentPage('game');
       }
     },
-    [handleSendMessage, setCurrentMaintext, setCurrentOptions, setCurrentPage],
+    [handleSendMessage, refreshRecentInputHistory, setCurrentMaintext, setCurrentOptions, setCurrentPage],
   );
 
   const getModalTitle = (panel: ActivePanel) => {
@@ -1229,12 +1281,13 @@ const App: React.FC = () => {
           <ChatInput
             onSend={handlePlayerSend}
             prefill={
-              historyInputDraft
+              inputPrefill ??
+              (historyInputDraft
                 ? {
                     key: historyInputDraft.transactionId,
                     message: historyInputDraft.message,
                   }
-                : null
+                : null)
             }
             onMessageChange={handleHistoryDraftChange}
             extraActions={
@@ -1243,7 +1296,9 @@ const App: React.FC = () => {
                 {isCommandQueueOpen && (
                   <CommandQueuePopover
                     commands={commands}
+                    recentHistory={recentInputHistory}
                     onCancel={cancelCommand}
+                    onHistorySelect={handleInputHistorySelect}
                     onClose={() => setIsCommandQueueOpen(false)}
                   />
                 )}

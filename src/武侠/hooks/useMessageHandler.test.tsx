@@ -78,6 +78,7 @@ type MockChatMessage = {
   message_id: number;
   role: ChatRole;
   message: string;
+  data?: Record<string, unknown>;
   swipes: string[];
   swipe_id: number;
 };
@@ -130,19 +131,22 @@ describe('useMessageHandler extra-variable decision', () => {
     messages = [];
     nextMessageId = 1;
 
-    globals.createChatMessages = vi.fn(async (entries: Array<{ role: ChatRole; message: string }>) => {
-      for (const entry of entries) {
-        messages.push({
-          message_id: nextMessageId,
-          role: entry.role,
-          message: entry.message,
-          swipes: [entry.message],
-          swipe_id: 0,
-        });
-        nextMessageId += 1;
-      }
-      return undefined;
-    });
+    globals.createChatMessages = vi.fn(
+      async (entries: Array<{ role: ChatRole; message: string; data?: Record<string, unknown> }>) => {
+        for (const entry of entries) {
+          messages.push({
+            message_id: nextMessageId,
+            role: entry.role,
+            message: entry.message,
+            ...(entry.data ? { data: clone(entry.data) } : {}),
+            swipes: [entry.message],
+            swipe_id: 0,
+          });
+          nextMessageId += 1;
+        }
+        return undefined;
+      },
+    );
     globals.generate = vi.fn(async () => '正文回复');
 
     getChatMessagesMock.mockImplementation((messageId?: unknown) => {
@@ -236,6 +240,25 @@ describe('useMessageHandler extra-variable decision', () => {
     });
   });
 
+  it('真实玩家发送只把未拼接指令的原始输入写入 user 楼层元数据', async () => {
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('前往烟雨楼\n[地图指令]从牛家村移动到烟雨楼', {
+        rawPlayerInput: '前往烟雨楼',
+      });
+    });
+
+    expect(messages[0]).toMatchObject({
+      role: 'user',
+      message: '前往烟雨楼\n[地图指令]从牛家村移动到烟雨楼',
+      data: {
+        wuxiaInputHistoryV1: { text: '前往烟雨楼' },
+      },
+    });
+  });
+
   it('send + inline 会先等匹配 resync 和 stat_data 回读，再发送回合完成', async () => {
     globals.generate = vi.fn(
       async () => '正文回复\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":1,"日":1,"时":1}}}</VariableEdit>',
@@ -322,6 +345,7 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(globals.generate).toHaveBeenCalledTimes(3);
     expect(globals.createChatMessages).toHaveBeenCalledTimes(2);
     expect(messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    expect(messages[0]?.data).toBeUndefined();
     expect(messages[1]?.message).toBe('重试后的正文');
     expect(options.showError).not.toHaveBeenCalled();
   });
@@ -357,6 +381,7 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(globals.generate).toHaveBeenCalledTimes(2);
     expect(globals.createChatMessages).toHaveBeenCalledTimes(2);
     expect(messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    expect(messages[0]?.data).toBeUndefined();
     expect(autoAdvanceResult).toMatchObject({
       userMessageId: 1,
       assistantMessageId: 2,

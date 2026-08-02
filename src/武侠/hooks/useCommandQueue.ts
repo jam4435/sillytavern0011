@@ -94,15 +94,16 @@ export function useCommandQueue() {
   const sendMessageWithCommands = useCallback(
     async <Result>(
       message: string,
-      handleSendMessage: (content: string) => Result | Promise<Result>,
+      handleSendMessage: (content: string, options: { rawPlayerInput: string }) => Result | Promise<Result>,
     ): Promise<Result> => {
       const queuedCommands = commands;
-      const combinedMessage = [message.trim(), ...queuedCommands.map(command => command.text)]
+      const rawPlayerInput = message.trim();
+      const combinedMessage = [rawPlayerInput, ...queuedCommands.map(command => command.text)]
         .filter(Boolean)
         .join('\n');
 
       uiLogger.log('[useCommandQueue] 发送玩家消息并附加指令:', combinedMessage);
-      const result = await handleSendMessage(combinedMessage);
+      const result = await handleSendMessage(combinedMessage, { rawPlayerInput });
       if (typeof result === 'string' && !result.trim()) {
         uiLogger.warn('[useCommandQueue] 玩家回合没有生成回复，保留待发送指令且不递减状态效果');
         return result;

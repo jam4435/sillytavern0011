@@ -158,10 +158,10 @@
   overflow: hidden;
   border: 1px solid $stone-800;
   border-radius: 4px;
-  background:
-    linear-gradient(135deg, rgba($amber-600, 0.045), transparent 42%),
-    rgba(255, 255, 255, 0.02);
-  transition: border-color $transition-normal, background $transition-normal;
+  background: linear-gradient(135deg, rgba($amber-600, 0.045), transparent 42%), rgba(255, 255, 255, 0.02);
+  transition:
+    border-color $transition-normal,
+    background $transition-normal;
 
   &.open {
     border-color: rgba($stone-700, 0.82);
@@ -186,7 +186,9 @@
   font-family: $font-serif;
   font-size: 0.94rem;
   cursor: pointer;
-  transition: background $transition-normal, color $transition-normal;
+  transition:
+    background $transition-normal,
+    color $transition-normal;
   text-align: left;
 
   &:hover {
@@ -536,7 +538,10 @@
   color: $stone-300;
   cursor: pointer;
   text-align: left;
-  transition: border-color $transition-normal, background $transition-normal, transform $transition-normal;
+  transition:
+    border-color $transition-normal,
+    background $transition-normal,
+    transform $transition-normal;
 
   &:hover {
     border-color: rgba($amber-600, 0.58);
@@ -545,9 +550,7 @@
 
   &.active {
     border-color: rgba($amber-600, 0.86);
-    background:
-      linear-gradient(135deg, rgba($amber-600, 0.14), transparent 56%),
-      rgba(255, 255, 255, 0.025);
+    background: linear-gradient(135deg, rgba($amber-600, 0.14), transparent 56%), rgba(255, 255, 255, 0.025);
     box-shadow: inset 0 0 0 1px rgba($amber-600, 0.16);
   }
 }
@@ -618,9 +621,7 @@
   padding: 1rem;
   border: 1px solid $stone-800;
   border-radius: 4px;
-  background:
-    linear-gradient(135deg, rgba($amber-600, 0.045), transparent 42%),
-    rgba(255, 255, 255, 0.02);
+  background: linear-gradient(135deg, rgba($amber-600, 0.045), transparent 42%), rgba(255, 255, 255, 0.02);
 
   .settings-row:first-of-type {
     padding-top: 0;
@@ -1821,9 +1822,7 @@
   padding: 0.9rem;
   border: 1px solid $stone-800;
   border-radius: 4px;
-  background:
-    linear-gradient(135deg, rgba($amber-600, 0.055), transparent 42%),
-    rgba(255, 255, 255, 0.02);
+  background: linear-gradient(135deg, rgba($amber-600, 0.055), transparent 42%), rgba(255, 255, 255, 0.02);
 }
 
 .auto-advance-prompt-input {
@@ -1947,7 +1946,9 @@
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.02);
   overflow: hidden;
-  transition: border-color $transition-normal, background $transition-normal;
+  transition:
+    border-color $transition-normal,
+    background $transition-normal;
 
   &.success {
     border-left: 3px solid $green-500;
@@ -2112,8 +2113,8 @@
   .auto-advance-result-header {
     grid-template-columns: max-content minmax(0, 1fr) max-content;
     grid-template-areas:
-      "title length icon"
-      "badge badge badge";
+      'title length icon'
+      'badge badge badge';
   }
 
   .auto-advance-result-title {
@@ -2170,8 +2171,7 @@
 }
 
 .variables-mode-switch,
-.variables-group-strip,
-.variables-scope-strip {
+.variables-group-strip {
   display: flex;
   align-items: center;
   gap: 0.45rem;
@@ -2179,18 +2179,13 @@
 }
 
 .variables-navigation {
-  display: grid;
-  gap: 0.55rem;
+  display: flex;
   padding-top: 0.1rem;
 }
 
 .variables-group-strip {
   width: fit-content;
   max-width: 100%;
-  padding: 0.2rem;
-  border: 1px solid rgba($stone-700, 0.72);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.12);
 }
 
 .variables-group-chip {
@@ -2203,20 +2198,6 @@
 
   &.active {
     box-shadow: inset 0 -2px 0 rgba($amber-600, 0.58);
-  }
-}
-
-.variables-scope-strip {
-  position: relative;
-  min-height: 2rem;
-  padding-left: 0.85rem;
-
-  &::before {
-    content: '';
-    align-self: stretch;
-    width: 1px;
-    margin-right: 0.1rem;
-    background: linear-gradient(180deg, transparent, rgba($amber-600, 0.42), transparent);
   }
 }
 
@@ -2310,7 +2291,9 @@
   border: 1px solid $stone-700;
   border-radius: 4px;
   color: $stone-500;
-  transition: border-color $transition-fast, background $transition-fast;
+  transition:
+    border-color $transition-fast,
+    background $transition-fast;
 
   &:focus-within {
     border-color: $amber-600;
@@ -2368,9 +2351,7 @@
   overflow-x: hidden;
   border: 1px solid $stone-800;
   border-radius: 4px;
-  background:
-    linear-gradient(90deg, rgba($amber-600, 0.04), transparent 36%),
-    rgba(0, 0, 0, 0.22);
+  background: linear-gradient(90deg, rgba($amber-600, 0.04), transparent 36%), rgba(0, 0, 0, 0.22);
 }
 
 .variables-browser-pane {
@@ -2381,6 +2362,10 @@
 
 .variables-scope-tree {
   min-height: 0;
+
+  > .variable-node.root + .variable-node.root {
+    border-top: 1px solid rgba($amber-600, 0.16);
+  }
 }
 
 .variables-search-results,
@@ -2427,9 +2412,7 @@
   &.active,
   &.selected {
     border-color: rgba($amber-600, 0.28);
-    background:
-      linear-gradient(90deg, rgba($amber-600, 0.1), transparent 55%),
-      rgba(255, 255, 255, 0.025);
+    background: linear-gradient(90deg, rgba($amber-600, 0.1), transparent 55%), rgba(255, 255, 255, 0.025);
   }
 }
 
@@ -2481,15 +2464,17 @@
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) max-content;
   grid-template-areas:
-    "toggle key type"
-    "toggle preview preview";
+    'toggle key type'
+    'toggle preview preview';
   align-items: start;
   gap: 0.35rem 0.55rem;
   min-height: 46px;
   padding: 0.55rem 0.7rem 0.55rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
   cursor: pointer;
-  transition: background $transition-fast, border-color $transition-fast;
+  transition:
+    background $transition-fast,
+    border-color $transition-fast;
 
   &:hover {
     background: rgba(255, 255, 255, 0.025);
@@ -2502,9 +2487,7 @@
 }
 
 .variable-node.selected > .variable-node-row {
-  background:
-    linear-gradient(90deg, rgba($amber-600, 0.13), transparent 62%),
-    rgba(255, 255, 255, 0.025);
+  background: linear-gradient(90deg, rgba($amber-600, 0.13), transparent 62%), rgba(255, 255, 255, 0.025);
   border-bottom-color: rgba($amber-600, 0.24);
 }
 
@@ -2601,9 +2584,7 @@
   padding: 0.9rem;
   border: 1px solid rgba($amber-600, 0.22);
   border-radius: 4px;
-  background:
-    linear-gradient(180deg, rgba($amber-600, 0.065), transparent 8rem),
-    rgba(0, 0, 0, 0.24);
+  background: linear-gradient(180deg, rgba($amber-600, 0.065), transparent 8rem), rgba(0, 0, 0, 0.24);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 
   &.empty {
@@ -2897,8 +2878,7 @@
   .variables-toolbar-actions,
   .variables-toolbar-meta,
   .variables-mode-switch,
-  .variables-group-strip,
-  .variables-scope-strip {
+  .variables-group-strip {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2906,14 +2886,6 @@
   .variables-group-strip {
     width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .variables-scope-strip {
-    padding-left: 0;
-
-    &::before {
-      display: none;
-    }
   }
 
   .variables-tree {
@@ -2929,9 +2901,9 @@
   .variable-node-row {
     grid-template-columns: 22px minmax(0, 1fr);
     grid-template-areas:
-      "toggle key"
-      "type type"
-      "preview preview";
+      'toggle key'
+      'type type'
+      'preview preview';
     padding: 0.7rem !important;
     border: 1px solid rgba(255, 255, 255, 0.055);
     border-radius: 4px;

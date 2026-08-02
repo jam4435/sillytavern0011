@@ -215,26 +215,44 @@ describe('SettingsPanel variable groups', () => {
     return screen.findByRole('tablist', { name: '变量类别' });
   };
 
-  it('shows semantic groups first and only the selected group real scopes second', async () => {
+  it('shows semantic groups and renders every real root of the selected group in the tree', async () => {
     await openVariableTab();
 
     const groupTabs = within(screen.getByRole('tablist', { name: '变量类别' }));
+    const variableTree = within(screen.getByLabelText('变量浏览'));
     expect(groupTabs.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['世界', '事件', '玩家', '人物']);
     expect(groupTabs.getByRole('tab', { name: '世界' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: '附近传闻' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: '后续事件线索' })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: /变量分区/ })).not.toBeInTheDocument();
+    expect(variableTree.getByTitle('世界信息')).toBeInTheDocument();
+    expect(variableTree.getByTitle('附近传闻')).toBeInTheDocument();
+    expect(variableTree.getByTitle('后续事件线索')).toBeInTheDocument();
 
     fireEvent.click(groupTabs.getByRole('tab', { name: '事件' }));
 
-    expect(screen.getByRole('tablist', { name: '事件变量分区' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: '事件系统' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: '参与事件' })).toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: '世界信息' })).not.toBeInTheDocument();
+    expect(variableTree.getByTitle('事件系统')).toBeInTheDocument();
+    expect(variableTree.getByTitle('参与事件')).toBeInTheDocument();
+    expect(variableTree.queryByTitle('世界信息')).not.toBeInTheDocument();
 
     fireEvent.click(groupTabs.getByRole('tab', { name: '人物' }));
 
-    expect(screen.getByRole('tab', { name: '角色数据' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('tab', { name: '角色数据' })).not.toBeInTheDocument();
     expect(within(screen.getByLabelText('人物列表')).getByRole('button', { name: /黄蓉/ })).toBeInTheDocument();
+  });
+
+  it('searches across every real root in the current category', async () => {
+    await openVariableTab();
+
+    const searchInput = screen.getByLabelText('当前类别搜索');
+    const variableTree = within(screen.getByLabelText('变量浏览'));
+
+    fireEvent.change(searchInput, { target: { value: '城外异动' } });
+    expect(variableTree.getByTitle('附近传闻')).toBeInTheDocument();
+    expect(variableTree.getAllByTitle('城外异动')).not.toHaveLength(0);
+    expect(variableTree.queryByTitle('世界信息')).not.toBeInTheDocument();
+
+    fireEvent.change(searchInput, { target: { value: '射雕第7回' } });
+    expect(variableTree.getByTitle('后续事件线索')).toBeInTheDocument();
+    expect(variableTree.getAllByTitle('射雕第7回')).not.toHaveLength(0);
   });
 
   it('never exposes system-only roots in navigation, tree, or global search', async () => {
@@ -270,8 +288,8 @@ describe('SettingsPanel variable groups', () => {
     expect(screen.getByRole('tab', { name: '事件' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: '世界' })).toBeDisabled();
     expect(screen.getByRole('tab', { name: '人物' })).toBeDisabled();
-    expect(screen.getByRole('tab', { name: '事件系统' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.queryByRole('tab', { name: '参与事件' })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('变量浏览')).getByTitle('事件系统')).toBeInTheDocument();
+    expect(within(screen.getByLabelText('变量浏览')).queryByTitle('参与事件')).not.toBeInTheDocument();
   });
 
   it('keeps the real stat_data path when selecting an editable leaf', async () => {

@@ -421,7 +421,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [expandedVariablePaths, setExpandedVariablePaths] = useState<Set<string>>(() => new Set());
   const [selectedVariablePath, setSelectedVariablePath] = useState<VariablePath | null>(null);
   const [isVariableDetailOpen, setIsVariableDetailOpen] = useState(false);
-  const [activeVariableScope, setActiveVariableScope] = useState<string | null>(null);
+  const [activeVariableGroup, setActiveVariableGroup] = useState<VariableGroupId | null>(null);
   const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
   const [characterSearch, setCharacterSearch] = useState('');
   const [variableSearch, setVariableSearch] = useState('');
@@ -442,29 +442,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const hasCurrentPreset = normalizedCurrentPresetName.length > 0;
   const currentPresetRegexRules = getCurrentPresetRegexRules(settings, normalizedCurrentPresetName);
   const visibleVariableScopeEntries = statData ? getVisibleVariableScopeEntries(statData) : [];
-  const fallbackVariableScope = visibleVariableScopeEntries[0] ? String(visibleVariableScopeEntries[0][0]) : null;
-  const resolvedActiveVariableScope =
-    activeVariableScope && visibleVariableScopeEntries.some(([key]) => String(key) === activeVariableScope)
-      ? activeVariableScope
-      : fallbackVariableScope;
-  const activeVariableScopeEntry =
-    visibleVariableScopeEntries.find(([key]) => String(key) === resolvedActiveVariableScope) ?? null;
-  const activeVariableScopePath = activeVariableScopeEntry ? [activeVariableScopeEntry[0]] : [];
-  const activeVariableScopeValue = activeVariableScopeEntry?.[1];
   const firstAvailableVariableGroup = VARIABLE_GROUPS.find(group =>
     visibleVariableScopeEntries.some(([key]) => group.scopeKeys.includes(String(key))),
   );
   const resolvedActiveVariableGroup =
-    getVariableGroupIdForScope(resolvedActiveVariableScope) ?? firstAvailableVariableGroup?.id ?? VARIABLE_GROUPS[0].id;
-  const activeVariableGroup =
-    VARIABLE_GROUPS.find(group => group.id === resolvedActiveVariableGroup) ?? VARIABLE_GROUPS[0];
+    activeVariableGroup && statData && getVariableGroupScopeEntries(statData, activeVariableGroup).length > 0
+      ? activeVariableGroup
+      : (firstAvailableVariableGroup?.id ?? VARIABLE_GROUPS[0].id);
   const activeVariableGroupScopeEntries = statData
     ? getVariableGroupScopeEntries(statData, resolvedActiveVariableGroup)
     : [];
   const searchableStatData = Object.fromEntries(visibleVariableScopeEntries);
+  const characterScopeEntry = activeVariableGroupScopeEntries.find(([key]) => String(key) === '角色数据') ?? null;
+  const characterScopeValue = characterScopeEntry?.[1];
   const roleVariableEntries =
-    resolvedActiveVariableScope === '角色数据' && isVariableRecord(activeVariableScopeValue)
-      ? getVisibleEntries(activeVariableScopeValue)
+    resolvedActiveVariableGroup === 'character' && isVariableRecord(characterScopeValue)
+      ? getVisibleEntries(characterScopeValue)
           .filter(([key]) => typeof key === 'string')
           .map(([key, value]) => ({
             name: String(key),
@@ -481,22 +474,21 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const selectedCharacterEntry = resolvedSelectedCharacterName
     ? (roleVariableEntries.find(entry => entry.name === resolvedSelectedCharacterName) ?? null)
     : null;
-  const variableBrowserRootPath =
-    resolvedActiveVariableScope === '角色数据' && resolvedSelectedCharacterName
-      ? [resolvedActiveVariableScope, resolvedSelectedCharacterName]
-      : activeVariableScopePath;
-  const variableBrowserRootValue =
-    resolvedActiveVariableScope === '角色数据' && selectedCharacterEntry
-      ? selectedCharacterEntry.value
-      : activeVariableScopeValue;
+  const variableBrowserRoots: Array<{ path: VariablePath; value: unknown }> =
+    resolvedActiveVariableGroup === 'character' && resolvedSelectedCharacterName && selectedCharacterEntry
+      ? [{ path: ['角色数据', resolvedSelectedCharacterName], value: selectedCharacterEntry.value }]
+      : activeVariableGroupScopeEntries.map(([key, value]) => ({ path: [key], value }));
   const scopeMatchPathKeys =
-    variableSearchMode === 'scope' && normalizedVariableSearch && variableBrowserRootValue !== undefined
-      ? collectVariableMatchPathKeys(
-          variableBrowserRootValue,
-          normalizedVariableSearch,
-          { includeValues: variableIncludeValueSearch },
-          variableBrowserRootPath,
-        )
+    variableSearchMode === 'scope' && normalizedVariableSearch
+      ? variableBrowserRoots.reduce((matchedPaths, root) => {
+          collectVariableMatchPathKeys(
+            root.value,
+            normalizedVariableSearch,
+            { includeValues: variableIncludeValueSearch },
+            root.path,
+          ).forEach(pathKey => matchedPaths.add(pathKey));
+          return matchedPaths;
+        }, new Set<string>())
       : new Set<string>();
   const globalVariableResults =
     statData && variableSearchMode === 'global'
@@ -588,7 +580,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         : undefined;
     const nextCharacterName = typeof nextCharacterEntry?.[0] === 'string' ? String(nextCharacterEntry[0]) : null;
 
-    setActiveVariableScope(nextScopeKey);
+    setActiveVariableGroup(getVariableGroupIdForScope(nextScopeKey));
     setSelectedCharacterName(nextCharacterName);
     setSelectedVariablePath(
       nextCharacterName && nextScopeKey
@@ -657,31 +649,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setIsVariableDetailOpen(false);
   }, []);
 
-  const handleVariableScopeSelect = useCallback(
-    (scopeKey: string) => {
-      setActiveVariableScope(scopeKey);
-      setVariableSearchMode('scope');
-      setExpandedVariablePaths(new Set());
-
-      if (!statData) {
-        return;
-      }
-
-      const scopeValue = statData[scopeKey];
-      if (scopeKey === '角色数据' && isVariableRecord(scopeValue)) {
-        const firstCharacterEntry = getVisibleEntries(scopeValue)[0];
-        const firstCharacterName = typeof firstCharacterEntry?.[0] === 'string' ? String(firstCharacterEntry[0]) : null;
-        setSelectedCharacterName(firstCharacterName);
-        setSelectedVariablePath(firstCharacterName ? [scopeKey, firstCharacterName] : [scopeKey]);
-        return;
-      }
-
-      setSelectedCharacterName(null);
-      setSelectedVariablePath([scopeKey]);
-    },
-    [statData],
-  );
-
   const handleVariableGroupSelect = useCallback(
     (groupId: VariableGroupId) => {
       if (!statData || groupId === resolvedActiveVariableGroup) {
@@ -690,10 +657,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
       const firstScopeEntry = getVariableGroupScopeEntries(statData, groupId)[0];
       if (firstScopeEntry) {
-        handleVariableScopeSelect(String(firstScopeEntry[0]));
+        const scopeKey = String(firstScopeEntry[0]);
+        const scopeValue = firstScopeEntry[1];
+        setActiveVariableGroup(groupId);
+        setVariableSearchMode('scope');
+        setExpandedVariablePaths(new Set());
+
+        if (groupId === 'character' && isVariableRecord(scopeValue)) {
+          const firstCharacterEntry = getVisibleEntries(scopeValue)[0];
+          const firstCharacterName =
+            typeof firstCharacterEntry?.[0] === 'string' ? String(firstCharacterEntry[0]) : null;
+          setSelectedCharacterName(firstCharacterName);
+          setSelectedVariablePath(firstCharacterName ? [scopeKey, firstCharacterName] : [scopeKey]);
+          return;
+        }
+
+        setSelectedCharacterName(null);
+        setSelectedVariablePath([scopeKey]);
       }
     },
-    [handleVariableScopeSelect, resolvedActiveVariableGroup, statData],
+    [resolvedActiveVariableGroup, statData],
   );
 
   const handleCharacterSelect = useCallback((characterName: string) => {
@@ -703,7 +686,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const handleGlobalResultSelect = useCallback((result: VariableSearchResult) => {
     const scopeKey = typeof result.path[0] === 'string' ? result.path[0] : String(result.path[0]);
-    setActiveVariableScope(scopeKey);
+    setActiveVariableGroup(getVariableGroupIdForScope(scopeKey));
     if (scopeKey === '角色数据' && typeof result.path[1] === 'string') {
       setSelectedCharacterName(result.path[1]);
     }
@@ -2504,9 +2487,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <label className="variables-field-label" htmlFor="wuxia-variable-search">
                     {variableSearchMode === 'global'
                       ? '全局搜索'
-                      : resolvedActiveVariableScope === '角色数据'
+                      : resolvedActiveVariableGroup === 'character'
                         ? '人物内部搜索'
-                        : '分区搜索'}
+                        : '当前类别搜索'}
                   </label>
                   <div className="variables-search-box">
                     <Icons.Search size={16} />
@@ -2518,9 +2501,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       placeholder={
                         variableSearchMode === 'global'
                           ? '字段名、完整路径，或开启包含值后搜索正文'
-                          : resolvedActiveVariableScope === '角色数据'
+                          : resolvedActiveVariableGroup === 'character'
                             ? '当前人物的字段名或路径'
-                            : '当前分区的字段名或路径'
+                            : '当前类别全部变量的字段名或路径'
                       }
                       className="settings-text-input variables-search-input"
                     />
@@ -2562,7 +2545,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     className={`variables-mode-btn ${variableSearchMode === 'scope' ? 'active' : ''}`}
                     onClick={() => handleVariableSearchModeChange('scope')}
                   >
-                    当前分区
+                    当前类别
                   </button>
                   <button
                     type="button"
@@ -2602,7 +2585,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                           type="button"
                           role="tab"
                           aria-selected={isActive}
-                          aria-controls="wuxia-variable-scope-navigation"
+                          aria-controls="wuxia-variable-browser"
                           className={`variables-scope-chip variables-group-chip ${isActive ? 'active' : ''}`}
                           disabled={!isAvailable}
                           onClick={() => handleVariableGroupSelect(group.id)}
@@ -2612,37 +2595,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       );
                     })}
                   </div>
-
-                  {activeVariableGroupScopeEntries.length > 0 && (
-                    <div
-                      id="wuxia-variable-scope-navigation"
-                      className="variables-scope-strip"
-                      role="tablist"
-                      aria-label={`${activeVariableGroup.label}变量分区`}
-                    >
-                      {activeVariableGroupScopeEntries.map(([key]) => {
-                        const scopeKey = String(key);
-                        const isActive = resolvedActiveVariableScope === scopeKey;
-                        return (
-                          <button
-                            key={scopeKey}
-                            type="button"
-                            role="tab"
-                            aria-selected={isActive}
-                            aria-controls="wuxia-variable-browser"
-                            className={`variables-scope-chip ${isActive ? 'active' : ''}`}
-                            onClick={() => handleVariableScopeSelect(scopeKey)}
-                          >
-                            {scopeKey}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
               )}
 
-              {variableSearchMode === 'scope' && resolvedActiveVariableScope === '角色数据' && (
+              {variableSearchMode === 'scope' && resolvedActiveVariableGroup === 'character' && (
                 <div className="variables-character-toolbar">
                   <div className="variables-search-box">
                     <Icons.Search size={16} />
@@ -2704,7 +2660,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   )
                 ) : (
                   <div className="variables-browser-pane">
-                    {resolvedActiveVariableScope === '角色数据' && (
+                    {resolvedActiveVariableGroup === 'character' && (
                       <div className="variables-character-list" aria-label="人物列表">
                         {roleVariableEntries.length > 0 ? (
                           roleVariableEntries.map(entry => (
@@ -2727,27 +2683,34 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     )}
 
                     <div className="variables-scope-tree">
-                      {variableBrowserRootValue === undefined || variableBrowserRootPath.length === 0 ? (
+                      {variableBrowserRoots.length === 0 ? (
                         <div className="variables-empty variables-empty-inline">
-                          <p>当前分区没有可显示内容</p>
+                          <p>当前类别没有可显示内容</p>
                         </div>
                       ) : normalizedVariableSearch && scopeMatchPathKeys.size === 0 ? (
                         <div className="variables-empty variables-empty-inline">
                           <p>当前视图没有命中的字段</p>
                         </div>
                       ) : (
-                        <VariableTreeNode
-                          label={variableBrowserRootPath[variableBrowserRootPath.length - 1]}
-                          value={variableBrowserRootValue}
-                          path={variableBrowserRootPath}
-                          depth={0}
-                          expandedPaths={expandedVariablePaths}
-                          matchedPathKeys={scopeMatchPathKeys}
-                          selectedPath={selectedVariablePath}
-                          normalizedSearch={normalizedVariableSearch}
-                          onToggle={toggleVariablePath}
-                          onSelect={handleVariableSelect}
-                        />
+                        variableBrowserRoots
+                          .filter(
+                            root => !normalizedVariableSearch || scopeMatchPathKeys.has(getVariablePathKey(root.path)),
+                          )
+                          .map(root => (
+                            <VariableTreeNode
+                              key={getVariablePathKey(root.path)}
+                              label={root.path[root.path.length - 1]}
+                              value={root.value}
+                              path={root.path}
+                              depth={0}
+                              expandedPaths={expandedVariablePaths}
+                              matchedPathKeys={scopeMatchPathKeys}
+                              selectedPath={selectedVariablePath}
+                              normalizedSearch={normalizedVariableSearch}
+                              onToggle={toggleVariablePath}
+                              onSelect={handleVariableSelect}
+                            />
+                          ))
                       )}
                     </div>
                   </div>
