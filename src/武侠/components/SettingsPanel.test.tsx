@@ -135,6 +135,23 @@ describe('SettingsPanel theme controls', () => {
     );
   });
 
+  it('offers the four content-font presets and emits the selected font', () => {
+    const settings = createDefaultDisplaySettings();
+    const onSettingsChange = renderSettingsPanel(settings);
+    const fontSelect = screen.getByLabelText('正文字体');
+
+    expect(
+      within(fontSelect)
+        .getAllByRole('option')
+        .map(option => option.textContent),
+    ).toEqual(['霞鹜文楷', '思源宋体', '马善政毛笔', '系统字体']);
+    expect(fontSelect).toHaveValue('wenkai');
+
+    fireEvent.change(fontSelect, { target: { value: 'serif' } });
+
+    expect(onSettingsChange).toHaveBeenCalledWith({ ...settings, contentFont: 'serif' });
+  });
+
   it('resets appearance back to the dark-gold theme', () => {
     const settings = {
       ...createDefaultDisplaySettings(),
@@ -149,6 +166,7 @@ describe('SettingsPanel theme controls', () => {
     expect(onSettingsChange).toHaveBeenCalledWith(
       expect.objectContaining({
         uiTheme: 'dark-gold',
+        contentFont: 'wenkai',
         ...getThemeAppearanceDefaults('dark-gold'),
         backgroundImage: null,
       }),
@@ -200,6 +218,7 @@ describe('SettingsPanel variable groups', () => {
         后续事件线索: { 射雕第7回: '可见线索' },
         事件系统: { 进行中事件: {} },
         参与事件: { 射雕第6回: { 结局: '已完成' } },
+        后续事件: { 射雕第8回: { 引子: '新的江湖风波' } },
         user数据: { 姓名: '墨逸', 位置: '大宋/临安府/临安城' },
         角色数据: { 黄蓉: { 位置: '大宋/临安府/临安城' } },
         前端变量: { 隐藏标记: '不可搜索' },
@@ -231,6 +250,7 @@ describe('SettingsPanel variable groups', () => {
 
     expect(variableTree.getByTitle('事件系统')).toBeInTheDocument();
     expect(variableTree.getByTitle('参与事件')).toBeInTheDocument();
+    expect(variableTree.getByTitle('后续事件')).toBeInTheDocument();
     expect(variableTree.queryByTitle('世界信息')).not.toBeInTheDocument();
 
     fireEvent.click(groupTabs.getByRole('tab', { name: '人物' }));
@@ -253,6 +273,11 @@ describe('SettingsPanel variable groups', () => {
     fireEvent.change(searchInput, { target: { value: '射雕第7回' } });
     expect(variableTree.getByTitle('后续事件线索')).toBeInTheDocument();
     expect(variableTree.getAllByTitle('射雕第7回')).not.toHaveLength(0);
+
+    fireEvent.click(within(screen.getByRole('tablist', { name: '变量类别' })).getByRole('tab', { name: '事件' }));
+    fireEvent.change(searchInput, { target: { value: '射雕第8回' } });
+    expect(variableTree.getByTitle('后续事件')).toBeInTheDocument();
+    expect(variableTree.getAllByTitle('射雕第8回')).not.toHaveLength(0);
   });
 
   it('never exposes system-only roots in navigation, tree, or global search', async () => {

@@ -267,7 +267,7 @@
   border-radius: 8px;
   padding: 0.7rem 2.7rem 0.7rem 0.95rem;
   color: #e7e5e4;
-  font-family: 'LXGW WenKai', 'Noto Serif SC', serif;
+  font-family: var(--font-wenkai);
   font-size: 0.98rem;
   line-height: 1.5;
   resize: none;
@@ -322,7 +322,7 @@
   font-size: 0.7rem;
   color: rgba(168, 162, 158, 0.4);
   pointer-events: none;
-  font-family: 'LXGW WenKai', 'Noto Serif SC', serif;
+  font-family: var(--font-wenkai);
 }
 
 // 发送按钮

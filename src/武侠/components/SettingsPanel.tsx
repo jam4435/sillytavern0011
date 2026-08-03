@@ -138,7 +138,7 @@ const VARIABLE_GROUPS: ReadonlyArray<{
   scopeKeys: ReadonlyArray<string>;
 }> = [
   { id: 'world', label: '世界', scopeKeys: ['世界信息', '附近传闻', '后续事件线索'] },
-  { id: 'event', label: '事件', scopeKeys: ['事件系统', '参与事件'] },
+  { id: 'event', label: '事件', scopeKeys: ['事件系统', '参与事件', '后续事件'] },
   { id: 'player', label: '玩家', scopeKeys: ['user数据'] },
   { id: 'character', label: '人物', scopeKeys: ['角色数据'] },
 ];

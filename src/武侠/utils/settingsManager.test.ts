@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   applySettingsToDOM,
+  CONTENT_FONT_FAMILIES,
   createDefaultDisplaySettings,
   getThemeAppearanceDefaults,
   loadSettings,
@@ -18,6 +19,7 @@ describe('settingsManager ui theme', () => {
     const settings = createDefaultDisplaySettings();
 
     expect(settings.uiTheme).toBe('dark-gold');
+    expect(settings.contentFont).toBe('wenkai');
     expect(settings.fontColor).toBe(getThemeAppearanceDefaults('dark-gold').fontColor);
     expect(settings.themeAppearanceByTheme['ink-wash'].fontColor).toBe(
       getThemeAppearanceDefaults('ink-wash').fontColor,
@@ -37,6 +39,7 @@ describe('settingsManager ui theme', () => {
     const settings = loadSettings();
 
     expect(settings.uiTheme).toBe('dark-gold');
+    expect(settings.contentFont).toBe('wenkai');
     expect(settings.fontSize).toBe(18);
     expect(settings.fontColor).toBe('#ffffff');
     expect(settings.themeAppearanceByTheme['dark-gold'].fontColor).toBe('#ffffff');
@@ -46,6 +49,12 @@ describe('settingsManager ui theme', () => {
     window.localStorage.setItem('wuxia_display_settings', JSON.stringify({ uiTheme: 'paper-blue' }));
 
     expect(loadSettings().uiTheme).toBe('dark-gold');
+  });
+
+  it('normalizes invalid stored content fonts to wenkai', () => {
+    window.localStorage.setItem('wuxia_display_settings', JSON.stringify({ contentFont: 'comic-sans' }));
+
+    expect(loadSettings().contentFont).toBe('wenkai');
   });
 
   it('migrates legacy active-theme appearance into the matching theme slot', () => {
@@ -89,6 +98,7 @@ describe('settingsManager ui theme', () => {
     const settings = {
       ...defaults,
       uiTheme: 'ink-wash' as const,
+      contentFont: 'calligraphy' as const,
       ...getThemeAppearanceDefaults('ink-wash'),
       backgroundImage: 'data:image/png;base64,ink',
       themeAppearanceByTheme: {
@@ -105,6 +115,7 @@ describe('settingsManager ui theme', () => {
     expect(loadSettings()).toEqual(
       expect.objectContaining({
         uiTheme: 'ink-wash',
+        contentFont: 'calligraphy',
         backgroundImage: 'data:image/png;base64,ink',
         themeAppearanceByTheme: expect.objectContaining({
           'ink-wash': expect.objectContaining({
@@ -120,6 +131,7 @@ describe('settingsManager ui theme', () => {
     const settings = {
       ...defaults,
       uiTheme: 'ink-wash' as const,
+      contentFont: 'system' as const,
       ...getThemeAppearanceDefaults('ink-wash'),
       chromeOpacity: 0.45,
       modalOpacity: 0.7,
@@ -140,6 +152,7 @@ describe('settingsManager ui theme', () => {
     expect(document.documentElement.style.getPropertyValue('--content-font-color')).toBe(
       getThemeAppearanceDefaults('ink-wash').fontColor,
     );
+    expect(document.documentElement.style.getPropertyValue('--content-font-family')).toBe(CONTENT_FONT_FAMILIES.system);
     expect(document.documentElement.style.getPropertyValue('--wuxia-ink-bg-image')).toContain('url(');
     expect(document.documentElement.style.getPropertyValue('--wuxia-chrome-opacity')).toBe('0.45');
     expect(document.documentElement.style.getPropertyValue('--wuxia-modal-opacity')).toBe('0.7');

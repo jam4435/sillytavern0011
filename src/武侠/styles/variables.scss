@@ -46,6 +46,7 @@ $amber-600: #d97706;
 // =========================================
 
 $font-serif: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+$font-wenkai: 'LXGW WenKai', 'Noto Serif SC', 'KaiTi', 'STKaiti', 'Kaiti SC', serif;
 $font-display: 'Ma Shan Zheng', cursive;
 $font-sans:
   system-ui,
@@ -158,7 +159,9 @@ $z-fullscreen: 100;
 
   // 字体
   --font-serif: #{$font-serif};
+  --font-wenkai: #{$font-wenkai};
   --font-display: #{$font-display};
+  --content-font-family: #{$font-wenkai};
 
   // 尺寸
   --header-height: #{$header-height};
