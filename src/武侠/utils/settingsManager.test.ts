@@ -181,6 +181,17 @@ describe('settingsManager ui theme', () => {
     expect(loaded.variablePromptBodyStartMarkers).toBe('</thinking>');
   });
 
+  it('places the latest assistant body and execution contract at the end of the default variable prompt', () => {
+    const template = createDefaultDisplaySettings().summarySettings.variablePromptTemplate;
+
+    expect(template).toContain('{{readonlyContextRounds}}');
+    expect(template).toContain('{{narrativeScale}}');
+    expect(template).toContain('{{latestAssistantBody}}');
+    expect(template.indexOf('{{narrativeScale}}')).toBeLessThan(template.indexOf('{{variableGuidance}}'));
+    expect(template.indexOf('{{variableGuidance}}')).toBeLessThan(template.indexOf('{{latestAssistantBody}}'));
+    expect(template.indexOf('{{latestAssistantBody}}')).toBeLessThan(template.indexOf('【最终执行要求】'));
+  });
+
   it('updates legacy default-template labels without changing custom placeholders', () => {
     window.localStorage.setItem(
       'wuxia_display_settings',

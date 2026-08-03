@@ -269,8 +269,7 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你是一个专业的文学编�
 [总结内容，按时间顺序，每个关键事件一行]
 </summary>`;
 
-/** 默认额外变量更新提示词模板 */
-export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传》ERA 变量更新模型。你只负责根据最新 assistant 正文更新已经提供的 ERA 变量，不续写剧情。
+const LEGACY_DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传》ERA 变量更新模型。你只负责根据最新 assistant 正文更新已经提供的 ERA 变量，不续写剧情。
 
 强制判定顺序：
 1. 只有 latestAssistantBody 是本轮变化来源；readonlyContextRounds 只用于理解上下文。
@@ -296,8 +295,60 @@ export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传
 
 {{locationContext}}`;
 
+/** 默认额外变量更新提示词模板 */
+export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传》ERA 变量更新模型。
+任务是核对最新 assistant 正文已经发生的持久变化；不得续写剧情。
+
+【前序只读完整轮次】
+{{readonlyContextRounds}}
+
+【当前变量上下文；JSON 是真实可写快照，方括号内容只读】
+{{variableContext}}
+
+【合法地点】
+{{locationContext}}
+
+【叙事表现标尺】
+{{narrativeScale}}
+
+【ERA 变量领域规则】
+{{variableGuidance}}
+
+【本轮唯一变化来源】
+{{latestAssistantBody}}
+
+【最终执行要求】
+强制判定顺序：
+1. 只有上方 latestAssistantBody 是本轮变化来源；前序对话只用于理解上下文。
+2. 逐级对照当前变量上下文中的真实键名。最终目标键已存在只能使用 VariableEdit，不存在才可使用 VariableInsert；VariableDelete 只能删除已存在的键。
+3. 正文没有改变的事实不得重复 Insert 或无意义 Edit。
+4. 只允许修改世界信息.时间、user数据、角色数据，以及当前上下文已有参与事件的结局/insert/update/delete。
+5. 方括号说明、叙事表现标尺、可用地点列表和其他只读内容不得写回变量。
+6. 没有需要持久化的变化时，只输出简短 VariableThink。
+
+输出要求：
+- 只允许输出 <VariableThink>、<VariableInsert>、<VariableEdit>、<VariableDelete> 块。
+- 不要寒暄、复述正文、续写剧情或输出其他 XML 标签。
+- VariableThink 使用“路径｜当前存在/不存在｜正文变化｜操作”，不展开思维链。
+- VariableInsert/VariableEdit/VariableDelete 内只能放严格 JSON 对象，不得使用注释、尾随逗号或 JSON5。
+- 相同类型的操作合并到一个块中。
+- 输出前再次核对：操作类型正确、路径逐层嵌套、地点逐字来自白名单。`;
+
 export const DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS = ['tucao', 'current_event', 'progress'].join('\n');
 export const DEFAULT_VARIABLE_PROMPT_BODY_START_MARKERS = '</konatan_planning~>';
+
+function migrateVariablePromptTemplate(template: string): string {
+  if (template === LEGACY_DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE) {
+    return DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE;
+  }
+
+  return template
+    .replace(
+      '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】',
+      '【正文上下文；最新 assistant 正文是唯一变化来源，前序完整轮次只读】',
+    )
+    .replace('【当前变量上下文，来自输出提示词渲染结果或等价快照】', '【当前变量上下文；专用严格 JSON 投影】');
+}
 
 export const DEFAULT_SUMMARY_API_CONFIG: SummaryApiConfig = {
   apiurl: '',
@@ -786,12 +837,7 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       typeof summarySettings.promptTemplate === 'string' ? summarySettings.promptTemplate : defaults.promptTemplate,
     variablePromptTemplate:
       typeof summarySettings.variablePromptTemplate === 'string'
-        ? summarySettings.variablePromptTemplate
-            .replace(
-              '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】',
-              '【正文上下文；最新 assistant 正文是唯一变化来源，前序完整轮次只读】',
-            )
-            .replace('【当前变量上下文，来自输出提示词渲染结果或等价快照】', '【当前变量上下文；专用严格 JSON 投影】')
+        ? migrateVariablePromptTemplate(summarySettings.variablePromptTemplate)
         : defaults.variablePromptTemplate,
     variableContextRounds: summarySettings.variableContextRounds === 2 ? 2 : 1,
     variablePromptExcludedTags:

@@ -18,6 +18,9 @@ import {
 } from './variableChanges';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
+const WORLD_BACKGROUND_ENTRY_NAME = '世界背景';
+const NARRATIVE_SCALE_START_MARKER = '<叙事表现标尺>';
+const NARRATIVE_SCALE_END_MARKER = '</叙事表现标尺>';
 const SNAPSHOT_STORAGE_KEY = 'wuxia_extra_variable_guidance_snapshot';
 const EXTRA_VARIABLE_UPDATE_TIMEOUT_MS = 360000;
 const ERA_SYNC_TIMEOUT_MS = 20000;
@@ -91,13 +94,7 @@ export type ExtraVariableUpdateProgress = Partial<ExtraVariableUpdateResult> & {
   currentPhase?: string;
 };
 
-export type ExtraVariableApplyStatus =
-  | 'idle'
-  | 'waiting-write-done'
-  | 'verifying'
-  | 'success'
-  | 'pending'
-  | 'error';
+export type ExtraVariableApplyStatus = 'idle' | 'waiting-write-done' | 'verifying' | 'success' | 'pending' | 'error';
 
 type MessageWriteVerification = {
   messageId: number;
@@ -188,9 +185,7 @@ function readPathValue(source: unknown, path: readonly (string | number)[]): unk
   return current;
 }
 
-function collapseDeclaredChangesForPersistence(
-  declaredChanges: VariableDeclaredChange[],
-): VariableDeclaredChange[] {
+function collapseDeclaredChangesForPersistence(declaredChanges: VariableDeclaredChange[]): VariableDeclaredChange[] {
   const byPath = new Map<string, VariableDeclaredChange>();
   const pathKey = (path: readonly (string | number)[]) => JSON.stringify(path);
   const actionPriority: Record<VariableDeclaredChange['action'], number> = {
@@ -215,15 +210,12 @@ function collapseDeclaredChangesForPersistence(
   }
 
   const collapsed = [...byPath.values()];
-  const deletePaths = collapsed
-    .filter(change => change.action === 'delete')
-    .map(change => change.path);
+  const deletePaths = collapsed.filter(change => change.action === 'delete').map(change => change.path);
   return collapsed.filter(change => {
     if (change.action === 'delete') return true;
     return !deletePaths.some(
       deletePath =>
-        deletePath.length <= change.path.length
-        && deletePath.every((segment, index) => segment === change.path[index]),
+        deletePath.length <= change.path.length && deletePath.every((segment, index) => segment === change.path[index]),
     );
   });
 }
@@ -342,9 +334,8 @@ export async function ensureTurnVariableBlocksCommitted({
     };
   }
 
-  const completeActionBlocks = blocksText.match(
-    /<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>/g,
-  ) ?? [];
+  const completeActionBlocks =
+    blocksText.match(/<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>/g) ?? [];
   if (completeActionBlocks.length === 0) {
     throw new Error('本回合包含未闭合的变量动作标签，无法确认 ERA 提交。');
   }
@@ -357,11 +348,9 @@ export async function ensureTurnVariableBlocksCommitted({
     throw new Error('本回合变量动作块没有可验证的变量声明，无法确认 ERA 提交。');
   }
 
-  const verification = await waitForDeclaredChangesPersisted(
-    declaredState.declaredChanges,
-    timeoutMs,
-    { stopWhenHidden: false },
-  );
+  const verification = await waitForDeclaredChangesPersisted(declaredState.declaredChanges, timeoutMs, {
+    stopWhenHidden: false,
+  });
   if (!verification.verified) {
     throw new Error(
       `assistant 楼层 ${assistantMessageId} 的变量尚未全部落库，已停止事件结算：${
@@ -819,6 +808,15 @@ async function readWorldbookEntryContent(entryName: string): Promise<string> {
   return location.entry.content || '';
 }
 
+function extractNarrativeScale(worldBackground: string): string {
+  const startIndex = worldBackground.indexOf(NARRATIVE_SCALE_START_MARKER);
+  const endIndex = worldBackground.indexOf(NARRATIVE_SCALE_END_MARKER);
+  if (startIndex < 0 || endIndex < startIndex) {
+    throw new Error(`世界书条目「${WORLD_BACKGROUND_ENTRY_NAME}」缺少完整的 ${NARRATIVE_SCALE_START_MARKER} 标记段。`);
+  }
+  return worldBackground.slice(startIndex + NARRATIVE_SCALE_START_MARKER.length, endIndex).trim();
+}
+
 function sanitizeForPrompt(value: unknown, ancestors = new WeakSet<object>()): unknown {
   if (Array.isArray(value)) {
     if (ancestors.has(value)) {
@@ -1202,7 +1200,12 @@ function getRecentBodyMessages(
   latestRawReply: string,
   contextRounds: 1 | 2,
   settings: SummarySettings,
-): { serialized: string; latestAssistantBody: string } {
+): {
+  serialized: string;
+  serializedReadonlyContextRounds: string;
+  serializedLatestAssistantBody: string;
+  latestAssistantBody: string;
+} {
   const messages = getChatMessages('0-{{lastMessageId}}', {
     hide_state: 'unhidden',
     include_swipes: true,
@@ -1267,16 +1270,20 @@ function getRecentBodyMessages(
     },
   }));
 
+  const latestAssistantBodyPayload = {
+    messageId: targetMessageId,
+    content: latestAssistantBody || '(无可用正文)',
+    isOnlyChangeSource: true,
+  };
+
   return {
     latestAssistantBody,
     serialized: JSON.stringify({
       readonlyContextRounds: readonlyRounds,
-      latestAssistantBody: {
-        messageId: targetMessageId,
-        content: latestAssistantBody || '(无可用正文)',
-        isOnlyChangeSource: true,
-      },
+      latestAssistantBody: latestAssistantBodyPayload,
     }),
+    serializedReadonlyContextRounds: JSON.stringify(readonlyRounds),
+    serializedLatestAssistantBody: JSON.stringify(latestAssistantBodyPayload),
   };
 }
 
@@ -1284,17 +1291,26 @@ function renderVariablePromptTemplate(
   template: string,
   values: {
     recentBodies: string;
+    readonlyContextRounds: string;
+    latestAssistantBody: string;
     variableContext: string;
     variableGuidance: string;
     locationContext: string;
+    narrativeScale: string;
   },
 ): string {
   const sourceTemplate = template.trim() ? template : DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE;
+  const variableGuidance = sourceTemplate.includes('{{narrativeScale}}')
+    ? values.variableGuidance
+    : `【叙事表现标尺】\n${values.narrativeScale}\n\n【ERA 变量领域规则】\n${values.variableGuidance}`;
   return sourceTemplate
     .replace(/\{\{recentBodies\}\}/g, values.recentBodies)
+    .replace(/\{\{readonlyContextRounds\}\}/g, values.readonlyContextRounds)
+    .replace(/\{\{latestAssistantBody\}\}/g, values.latestAssistantBody)
     .replace(/\{\{variableContext\}\}/g, values.variableContext)
-    .replace(/\{\{variableGuidance\}\}/g, values.variableGuidance)
-    .replace(/\{\{locationContext\}\}/g, values.locationContext);
+    .replace(/\{\{variableGuidance\}\}/g, variableGuidance)
+    .replace(/\{\{locationContext\}\}/g, values.locationContext)
+    .replace(/\{\{narrativeScale\}\}/g, values.narrativeScale);
 }
 
 async function buildExtraVariableUpdatePrompt({
@@ -1306,7 +1322,11 @@ async function buildExtraVariableUpdatePrompt({
   assistantMessageId: number;
   latestRawReply: string;
 }): Promise<string> {
-  const variableGuidance = await readWorldbookEntryContent(VARIABLE_GUIDANCE_ENTRY_NAME);
+  const [variableGuidance, worldBackground] = await Promise.all([
+    readWorldbookEntryContent(VARIABLE_GUIDANCE_ENTRY_NAME),
+    readWorldbookEntryContent(WORLD_BACKGROUND_ENTRY_NAME),
+  ]);
+  const narrativeScale = extractNarrativeScale(worldBackground);
   const recentBodies = getRecentBodyMessages(
     assistantMessageId,
     latestRawReply,
@@ -1317,9 +1337,12 @@ async function buildExtraVariableUpdatePrompt({
 
   return renderVariablePromptTemplate(settings.variablePromptTemplate, {
     recentBodies: recentBodies.serialized,
+    readonlyContextRounds: recentBodies.serializedReadonlyContextRounds,
+    latestAssistantBody: recentBodies.serializedLatestAssistantBody,
     variableContext: variableProjection.variableContext,
     variableGuidance,
     locationContext: variableProjection.locationContext,
+    narrativeScale,
   });
 }
 
@@ -1530,7 +1553,8 @@ export async function executeExtraVariableUpdate({
     await runPhase('disable-variable-guidance', () => ensureVariableGuidanceDisabled());
     const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
     const prompt = await runPhase('build-variable-prompt', () =>
-      buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply }));
+      buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply }),
+    );
     onPromptBuilt?.(prompt);
     onProgress?.({ prompt });
     variableTraceLogger.log('[extraVariableUpdate] 额外变量提示词已构建', {
@@ -1539,28 +1563,33 @@ export async function executeExtraVariableUpdate({
       prompt,
     });
     const rawResponse = await runPhase('request-variable-model', () =>
-      runWith429Retry(() => requestConfiguredText({
-        prompt,
-        settings: requestSettings,
-        timeoutMs: EXTRA_VARIABLE_UPDATE_TIMEOUT_MS,
-        shouldStream: false,
-        generationIdPrefix: 'wuxia-variable-update',
-        skipWorldInfoAndAuthorNote: true,
-      }), {
-        requestLabel: '额外变量模型',
-        onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
-          retry429Count = retryNumber;
-          retry429LastDelayMs = delayMs;
-          onProgress?.({ retry429Count, retry429LastDelayMs });
-          variableTraceLogger.warn('[extraVariableUpdate] 额外变量模型返回 429，准备自动重试', {
-            assistantMessageId,
-            retryNumber,
-            maxRetries,
-            delayMs,
-            error,
-          });
+      runWith429Retry(
+        () =>
+          requestConfiguredText({
+            prompt,
+            settings: requestSettings,
+            timeoutMs: EXTRA_VARIABLE_UPDATE_TIMEOUT_MS,
+            shouldStream: false,
+            generationIdPrefix: 'wuxia-variable-update',
+            skipWorldInfoAndAuthorNote: true,
+          }),
+        {
+          requestLabel: '额外变量模型',
+          onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
+            retry429Count = retryNumber;
+            retry429LastDelayMs = delayMs;
+            onProgress?.({ retry429Count, retry429LastDelayMs });
+            variableTraceLogger.warn('[extraVariableUpdate] 额外变量模型返回 429，准备自动重试', {
+              assistantMessageId,
+              retryNumber,
+              maxRetries,
+              delayMs,
+              error,
+            });
+          },
         },
-      }));
+      ),
+    );
     variableTraceLogger.log('[extraVariableUpdate] 额外模型已返回', {
       assistantMessageId,
       rawResponseLength: rawResponse.length,
@@ -1600,7 +1629,8 @@ export async function executeExtraVariableUpdate({
     }
 
     const appendVerification = await runPhase('append-variable-blocks', () =>
-      appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText));
+      appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText),
+    );
     variableTraceLogger.log('[extraVariableUpdate] 变量块已追加到目标楼层', {
       assistantMessageId,
       actionBlockCount,
@@ -1643,7 +1673,8 @@ export async function executeExtraVariableUpdate({
           timeoutMessage: 'ERA 没有响应 era:apiWrite，额外变量更新已停止。',
           expectedMessageId: assistantMessageId,
           expectedAction: 'apiWrite',
-        }));
+        }),
+      );
       variableTraceLogger.log('[extraVariableUpdate] 收到匹配的 ERA 同步完成信号', {
         assistantMessageId,
         actionBlockCount,
@@ -1723,10 +1754,8 @@ export async function executeExtraVariableUpdate({
     }
 
     const persistenceVerification = await runPhase('verify-variable-persistence', () =>
-      waitForDeclaredChangesPersisted(
-        declaredState.declaredChanges,
-        ERA_PERSISTENCE_FOREGROUND_VERIFY_TIMEOUT_MS,
-      ));
+      waitForDeclaredChangesPersisted(declaredState.declaredChanges, ERA_PERSISTENCE_FOREGROUND_VERIFY_TIMEOUT_MS),
+    );
     const applyStatus: ExtraVariableApplyStatus = persistenceVerification.verified ? 'success' : 'pending';
     onProgress?.({
       applyStatus,

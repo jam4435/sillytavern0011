@@ -2447,8 +2447,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">变量提示词模板</h5>
                 <p className="settings-hint">
-                  可用变量：{'{{recentBodies}}'}、{'{{variableContext}}'}、{'{{variableGuidance}}'}、
-                  {'{{locationContext}}'}。
+                  可用变量：{'{{readonlyContextRounds}}'}、{'{{latestAssistantBody}}'}、{'{{variableContext}}'}、
+                  {'{{narrativeScale}}'}、{'{{variableGuidance}}'}、{'{{locationContext}}'}；{'{{recentBodies}}'}
+                  保留用于兼容旧模板。
                 </p>
                 <textarea
                   value={settings.summarySettings.variablePromptTemplate}

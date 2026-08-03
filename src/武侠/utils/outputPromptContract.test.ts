@@ -9,6 +9,8 @@ const cotPromptPath = resolve(process.cwd(), '世界书/金庸群侠传1/世界�
 const cotPromptSource = readFileSync(cotPromptPath, 'utf8');
 const variableGuidancePath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/变量指导.txt');
 const variableGuidanceSource = readFileSync(variableGuidancePath, 'utf8');
+const worldBackgroundPath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/世界背景.yaml');
+const worldBackgroundSource = readFileSync(worldBackgroundPath, 'utf8');
 
 type PromptSerializer = (value: unknown) => string;
 type PromptRenderer = (
@@ -102,6 +104,15 @@ describe('武侠输出提示词契约', () => {
     expect(variableGuidanceSource).toContain('跨城远行、长期养伤、闭关修炼等可经过数日');
     expect(variableGuidanceSource).toContain('禁止直接写到事件结束时间');
     expect(variableGuidanceSource).not.toContain('关键桥段完整结束时，将时间推进到事件描述给出的结束时间');
+  });
+
+  it('世界背景提供可复用的写实叙事表现标尺', () => {
+    expect(worldBackgroundSource).toContain('<叙事表现标尺>');
+    expect(worldBackgroundSource).toContain('</叙事表现标尺>');
+    expect(worldBackgroundSource).toContain('高品阶功法不等于当前必胜');
+    expect(worldBackgroundSource).toContain('传说：基本失传的时代级武学');
+    expect(worldBackgroundSource).toContain('不得表现为元神出窍、时间凝固、空间冻结或破碎虚空');
+    expect(worldBackgroundSource).toContain('陆地神仙：江湖对极少数传奇人物的尊称，并非真正仙人');
   });
 
   it('可执行渲染只读历史、分事件快照和分组地点白名单', () => {

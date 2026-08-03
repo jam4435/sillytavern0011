@@ -91,6 +91,12 @@ describe('executeExtraVariableUpdate', () => {
         enabled: true,
         content: '仅输出合法变量块',
       },
+      {
+        uid: 2,
+        name: '世界背景',
+        enabled: true,
+        content: '<世界信息>宏观背景\n<叙事表现标尺>传说：基本失传，不得操纵时间空间。</叙事表现标尺>\n</世界信息>',
+      },
     ];
     chatMessages = [
       {
@@ -285,6 +291,12 @@ describe('executeExtraVariableUpdate', () => {
         prompt: expect.stringContaining('合法地点完整路径'),
       }),
     );
+    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
+    expect(prompt).toContain('传说：基本失传，不得操纵时间空间。');
+    expect(prompt).not.toContain('宏观背景');
+    expect(prompt.indexOf('传说：基本失传')).toBeLessThan(prompt.indexOf('仅输出合法变量块'));
+    expect(prompt.indexOf('仅输出合法变量块')).toBeLessThan(prompt.indexOf('"content":"正文内容"'));
+    expect(prompt.indexOf('"content":"正文内容"')).toBeLessThan(prompt.indexOf('【最终执行要求】'));
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(
       expect.objectContaining({
         source: 'frontend',
@@ -300,15 +312,17 @@ describe('executeExtraVariableUpdate', () => {
       .map(([progress]) => progress)
       .filter(progress => Array.isArray(progress.phaseTimeline))
       .at(-1);
-    expect(latestPhaseProgress).toEqual(expect.objectContaining({
-      currentPhase: '',
-      phaseTimeline: expect.arrayContaining([
-        expect.objectContaining({ name: 'request-variable-model', status: 'success' }),
-        expect.objectContaining({ name: 'append-variable-blocks', status: 'success' }),
-        expect.objectContaining({ name: 'wait-era-write-done', status: 'success' }),
-        expect.objectContaining({ name: 'verify-variable-persistence', status: 'success' }),
-      ]),
-    }));
+    expect(latestPhaseProgress).toEqual(
+      expect.objectContaining({
+        currentPhase: '',
+        phaseTimeline: expect.arrayContaining([
+          expect.objectContaining({ name: 'request-variable-model', status: 'success' }),
+          expect.objectContaining({ name: 'append-variable-blocks', status: 'success' }),
+          expect.objectContaining({ name: 'wait-era-write-done', status: 'success' }),
+          expect.objectContaining({ name: 'verify-variable-persistence', status: 'success' }),
+        ]),
+      }),
+    );
   });
 
   it('ERA 同步后仅重排变量块格式时，按等价变量操作通过回读验证', async () => {
@@ -318,7 +332,8 @@ describe('executeExtraVariableUpdate', () => {
         ...assistantMessage,
         message: assistantMessage.message.replace(/<VariableEdit>[\s\S]*?<\/VariableEdit>/, compactBlocks),
         swipes: assistantMessage.swipes.map(swipe =>
-          swipe.replace(/<VariableEdit>[\s\S]*?<\/VariableEdit>/, compactBlocks)),
+          swipe.replace(/<VariableEdit>[\s\S]*?<\/VariableEdit>/, compactBlocks),
+        ),
       };
       const statData = variableSnapshot.stat_data as Record<string, unknown>;
       (statData.user数据 as Record<string, unknown>).修为 = 120;
@@ -440,28 +455,32 @@ describe('executeExtraVariableUpdate', () => {
   it('额外变量模型 429 耗尽时不写入，并释放执行锁供下一次调用', async () => {
     requestConfiguredTextMock.mockRejectedValue({ status: 429, retryAfterMs: 0, message: 'HTTP 429' });
 
-    await expect(executeExtraVariableUpdate({
-      settings: {
-        ...DEFAULT_SUMMARY_SETTINGS,
-        variableUpdateMode: 'extra',
-      },
-      assistantMessageId: 28,
-      latestRawReply: '正文内容',
-    })).rejects.toThrow('已自动重试 2 次');
+    await expect(
+      executeExtraVariableUpdate({
+        settings: {
+          ...DEFAULT_SUMMARY_SETTINGS,
+          variableUpdateMode: 'extra',
+        },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+      }),
+    ).rejects.toThrow('已自动重试 2 次');
 
     expect(requestConfiguredTextMock).toHaveBeenCalledTimes(3);
     expect(setChatMessagesMock).not.toHaveBeenCalled();
     expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
 
     requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
-    await expect(executeExtraVariableUpdate({
-      settings: {
-        ...DEFAULT_SUMMARY_SETTINGS,
-        variableUpdateMode: 'extra',
-      },
-      assistantMessageId: 28,
-      latestRawReply: '正文内容',
-    })).resolves.toEqual(expect.objectContaining({ appended: false }));
+    await expect(
+      executeExtraVariableUpdate({
+        settings: {
+          ...DEFAULT_SUMMARY_SETTINGS,
+          variableUpdateMode: 'extra',
+        },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+      }),
+    ).resolves.toEqual(expect.objectContaining({ appended: false }));
   });
 
   it('自定义模板未放置 locationContext 时不会强行追加地点约束', async () => {
@@ -480,6 +499,23 @@ describe('executeExtraVariableUpdate', () => {
         prompt: expect.not.stringContaining('合法地点完整路径'),
       }),
     );
+  });
+
+  it('旧自定义模板只使用 variableGuidance 时仍复用世界背景中的表现标尺', async () => {
+    await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+        variablePromptTemplate: '{{variableGuidance}}',
+      },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    });
+
+    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
+    expect(prompt).toContain('传说：基本失传，不得操纵时间空间。');
+    expect(prompt).toContain('仅输出合法变量块');
+    expect(prompt).not.toContain('宏观背景');
   });
 
   it('构造严格范围投影，递归清理所有 $ 字段并只选择相关 NPC', () => {
@@ -640,13 +676,15 @@ describe('ensureTurnVariableBlocksCommitted', () => {
       },
     });
 
-    await expect(ensureTurnVariableBlocksCommitted({
-      assistantMessageId: 28,
-      blocksText: [
-        '<VariableEdit>{"user数据":{"修为":110}}</VariableEdit>',
-        '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>',
-      ].join('\n'),
-    })).resolves.toMatchObject({ verified: true });
+    await expect(
+      ensureTurnVariableBlocksCommitted({
+        assistantMessageId: 28,
+        blocksText: [
+          '<VariableEdit>{"user数据":{"修为":110}}</VariableEdit>',
+          '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>',
+        ].join('\n'),
+      }),
+    ).resolves.toMatchObject({ verified: true });
   });
 
   it('Edit 后 Delete 时只验证最终删除状态', async () => {
@@ -656,21 +694,25 @@ describe('ensureTurnVariableBlocksCommitted', () => {
       },
     });
 
-    await expect(ensureTurnVariableBlocksCommitted({
-      assistantMessageId: 28,
-      blocksText: [
-        '<VariableEdit>{"user数据":{"临时状态":"受伤"}}</VariableEdit>',
-        '<VariableDelete>{"user数据":{"临时状态":{}}}</VariableDelete>',
-      ].join('\n'),
-    })).resolves.toMatchObject({ verified: true });
+    await expect(
+      ensureTurnVariableBlocksCommitted({
+        assistantMessageId: 28,
+        blocksText: [
+          '<VariableEdit>{"user数据":{"临时状态":"受伤"}}</VariableEdit>',
+          '<VariableDelete>{"user数据":{"临时状态":{}}}</VariableDelete>',
+        ].join('\n'),
+      }),
+    ).resolves.toMatchObject({ verified: true });
   });
 
   it('动作标签残缺时拒绝把回合视为已提交', async () => {
     getVariablesMock.mockReturnValue({ stat_data: {} });
 
-    await expect(ensureTurnVariableBlocksCommitted({
-      assistantMessageId: 28,
-      blocksText: '<VariableEdit>{"世界信息":{"时间":{"年":1200}}}',
-    })).rejects.toThrow('未闭合');
+    await expect(
+      ensureTurnVariableBlocksCommitted({
+        assistantMessageId: 28,
+        blocksText: '<VariableEdit>{"世界信息":{"时间":{"年":1200}}}',
+      }),
+    ).rejects.toThrow('未闭合');
   });
 });
