@@ -82,6 +82,7 @@ const GameContent: React.FC<GameContentProps> = ({ maintext, options, onSelectOp
     () =>
       settings
         ? {
+            fontFamily: 'var(--content-font-family)',
             fontSize: 'var(--content-font-size)',
             color: 'var(--content-font-color)',
             lineHeight: 'var(--content-line-height)',

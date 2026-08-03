@@ -19,6 +19,7 @@ import inkWashPanelRectXlUrl from '../wuxia-sprites/panel/panel-rect-xl.png?url'
 
 export type RegexRuleOriginScope = 'manual' | 'global' | 'preset';
 export type WuxiaUiTheme = 'dark-gold' | 'ink-wash';
+export type ContentFont = 'wenkai' | 'serif' | 'calligraphy' | 'system';
 
 /** 正则替换规则 */
 export interface RegexRule {
@@ -190,6 +191,7 @@ export interface DisplaySettings {
   uiTheme: WuxiaUiTheme;
 
   // 正文字体设置
+  contentFont: ContentFont; // 字体预设
   fontSize: number; // 字体大小 (px)
   fontColor: string; // 字体颜色 (hex)
   lineHeight: number; // 行高倍数
@@ -359,6 +361,25 @@ export const DEFAULT_SUMMARY_API_CONFIG: SummaryApiConfig = {
 
 export const PRESET_SUMMARY_API_SELECTION: SummaryApiSelection = { type: 'preset' };
 export const DEFAULT_UI_THEME: WuxiaUiTheme = 'dark-gold';
+export const DEFAULT_CONTENT_FONT: ContentFont = 'wenkai';
+
+export const CONTENT_FONT_FAMILIES: Record<ContentFont, string> = {
+  wenkai: "'LXGW WenKai', 'Noto Serif SC', 'KaiTi', 'STKaiti', 'Kaiti SC', serif",
+  serif: "'Noto Serif SC', 'Songti SC', 'SimSun', serif",
+  calligraphy: "'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'Kaiti SC', serif",
+  system: "system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif",
+};
+
+export const CONTENT_FONT_OPTIONS: ReadonlyArray<{
+  value: ContentFont;
+  label: string;
+  fontFamily: string;
+}> = [
+  { value: 'wenkai', label: '霞鹜文楷', fontFamily: CONTENT_FONT_FAMILIES.wenkai },
+  { value: 'serif', label: '思源宋体', fontFamily: CONTENT_FONT_FAMILIES.serif },
+  { value: 'calligraphy', label: '马善政毛笔', fontFamily: CONTENT_FONT_FAMILIES.calligraphy },
+  { value: 'system', label: '系统字体', fontFamily: CONTENT_FONT_FAMILIES.system },
+];
 
 export const UI_THEME_LABELS: Record<WuxiaUiTheme, string> = {
   'dark-gold': '黑金',
@@ -493,6 +514,7 @@ export function createDefaultDisplaySettings(): DisplaySettings {
   return {
     uiTheme: DEFAULT_UI_THEME,
 
+    contentFont: DEFAULT_CONTENT_FONT,
     fontSize: 16,
     fontColor: defaultAppearance.fontColor,
     lineHeight: 1.8,
@@ -516,6 +538,7 @@ export const DEFAULT_SETTINGS: DisplaySettings = createDefaultDisplaySettings();
 /** 正文显示设置的默认值 */
 export const DEFAULT_DISPLAY_SETTINGS = {
   uiTheme: DEFAULT_SETTINGS.uiTheme,
+  contentFont: DEFAULT_SETTINGS.contentFont,
   fontSize: DEFAULT_SETTINGS.fontSize,
   fontColor: DEFAULT_SETTINGS.fontColor,
   lineHeight: DEFAULT_SETTINGS.lineHeight,
@@ -554,6 +577,12 @@ function normalizeOriginScope(originScope: unknown, fallbackScope: RegexRuleOrig
     return originScope;
   }
   return fallbackScope;
+}
+
+function normalizeContentFont(value: unknown): ContentFont {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(CONTENT_FONT_FAMILIES, value)
+    ? (value as ContentFont)
+    : DEFAULT_CONTENT_FONT;
 }
 
 function normalizeRegexRule(rule: Partial<RegexRule> | undefined, fallbackScope: RegexRuleOriginScope): RegexRule {
@@ -1103,6 +1132,7 @@ export function loadSettings(): DisplaySettings {
 
     return {
       uiTheme,
+      contentFont: normalizeContentFont(parsed.contentFont),
       fontSize: getNumberSetting(parsed.fontSize, defaultSettings.fontSize),
       fontColor: activeThemeAppearance.fontColor,
       lineHeight: getNumberSetting(parsed.lineHeight, defaultSettings.lineHeight),
@@ -1489,6 +1519,7 @@ export function generateCSSVariables(settings: DisplaySettings): Record<string, 
   const modalOpacity = buildOpacitySegments(settings.modalOpacity, themeDefaults.modalOpacity);
 
   return {
+    '--content-font-family': CONTENT_FONT_FAMILIES[settings.contentFont] || CONTENT_FONT_FAMILIES[DEFAULT_CONTENT_FONT],
     '--content-font-size': `${settings.fontSize}px`,
     '--content-font-color': settings.fontColor,
     '--content-line-height': `${settings.lineHeight}`,

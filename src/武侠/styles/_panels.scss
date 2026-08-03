@@ -1658,7 +1658,7 @@
   line-height: var(--content-line-height, 2.2);
   font-size: 1.1rem;
   color: rgba(231, 229, 228, 0.95);
-  font-family: var(--font-serif);
+  font-family: var(--content-font-family, var(--font-serif));
   letter-spacing: 0.02em;
 }
 
@@ -1668,7 +1668,7 @@
   line-height: var(--content-line-height, 2.2);
   font-size: 1.1rem;
   color: rgba(231, 229, 228, 0.95);
-  font-family: var(--font-serif);
+  font-family: var(--content-font-family, var(--font-serif));
   letter-spacing: 0.02em;
 
   // 确保内嵌的 style 标签不产生视觉影响

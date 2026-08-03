@@ -13,6 +13,8 @@ import {
   SummaryVariableUpdateMode,
   SummaryThresholds,
   DEFAULT_SUMMARY_API_CONFIG,
+  CONTENT_FONT_FAMILIES,
+  CONTENT_FONT_OPTIONS,
   WUXIA_UI_THEMES,
   createRegexRule,
   getCurrentPresetRegexRules,
@@ -27,6 +29,7 @@ import {
   updateThemeAppearanceSetting,
   validateRegex,
   type ThemeAppearanceSettingKey,
+  type ContentFont,
   type WuxiaUiTheme,
 } from '../utils/settingsManager';
 import {
@@ -974,6 +977,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           onSettingsChange({
             ...settings,
             uiTheme: defaultDisplaySettings.uiTheme,
+            contentFont: defaultDisplaySettings.contentFont,
             fontSize: defaultDisplaySettings.fontSize,
             fontColor: defaultDisplaySettings.fontColor,
             lineHeight: defaultDisplaySettings.lineHeight,
@@ -1664,6 +1668,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 onToggle={toggleSettingBlock}
               >
                 <div className="settings-row">
+                  <label className="settings-label" htmlFor="content-font-select">
+                    正文字体
+                  </label>
+                  <div className="settings-control">
+                    <select
+                      id="content-font-select"
+                      className="settings-select"
+                      value={settings.contentFont}
+                      onChange={event => updateSetting('contentFont', event.target.value as ContentFont)}
+                    >
+                      {CONTENT_FONT_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="settings-row">
                   <label className="settings-label">字体大小</label>
                   <div className="settings-control">
                     <input
@@ -1719,6 +1743,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <div
                     className="preview-text"
                     style={{
+                      fontFamily: CONTENT_FONT_FAMILIES[settings.contentFont],
                       fontSize: `${settings.fontSize}px`,
                       color: settings.fontColor,
                       lineHeight: settings.lineHeight,
