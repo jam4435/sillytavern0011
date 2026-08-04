@@ -4,7 +4,7 @@ import {
   WUXIA_EVENT_NOTIFICATION_GLOBAL_PREFIX,
 } from '../shared/wuxiaEventNotifications';
 
-const NOTICE_SOURCE = 'era-event-script';
+const NOTICE_SOURCE = 'event-script';
 
 let activeBridge = null;
 let instanceSequence = 0;
@@ -90,12 +90,13 @@ function registerPagehide(runtime) {
 export function initializeEventNotificationBridge() {
   if (activeBridge) disposeBridge(activeBridge);
 
-  const instanceId = createInstanceId();
-  const globalName = `${WUXIA_EVENT_NOTIFICATION_GLOBAL_PREFIX}:${instanceId}`;
+  const bridgeId = createInstanceId();
+  const globalName = `${WUXIA_EVENT_NOTIFICATION_GLOBAL_PREFIX}:${bridgeId}`;
   const announcement = {
     version: WUXIA_EVENT_NOTIFICATION_API_VERSION,
-    instanceId,
+    bridgeId,
     globalName,
+    startedAt: Date.now(),
   };
   const runtime = {
     announcement,
@@ -109,7 +110,7 @@ export function initializeEventNotificationBridge() {
 
   const api = Object.freeze({
     version: WUXIA_EVENT_NOTIFICATION_API_VERSION,
-    instanceId,
+    bridgeId,
     globalName,
     registerAdapter(registration) {
       try {

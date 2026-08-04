@@ -1,14 +1,6 @@
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Info,
-  MapPin,
-  ScrollText,
-  Sparkles,
-  X,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, MapPin, ScrollText, Sparkles, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { EventNotice, EventNoticeKind, EventNoticeLevel } from '../../shared/wuxiaEventNotifications';
+import type { EventNotice, EventNoticeKind } from '../../shared/wuxiaEventNotifications';
 
 const MAX_VISIBLE_NOTIFICATIONS = 5;
 const DEFAULT_DURATION_MS = 5_000;
@@ -71,10 +63,7 @@ const EventNotificationCard: React.FC<EventNotificationCardProps> = ({ notice, o
   );
 
   const urgent = notice.level === 'warning' || notice.level === 'error';
-  const style =
-    durationMs > 0
-      ? ({ '--event-notice-duration': `${durationMs}ms` } as React.CSSProperties)
-      : undefined;
+  const style = durationMs > 0 ? ({ '--event-notice-duration': `${durationMs}ms` } as React.CSSProperties) : undefined;
 
   return (
     <article

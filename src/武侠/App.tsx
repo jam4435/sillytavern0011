@@ -111,8 +111,7 @@ const App: React.FC = () => {
   // 使用自定义 hooks
   const { latestDebugRound, beginDebugRound, patchLatestDebugRound, clearDebugLogs } = useDebugLogs();
   const { toastState, showLoading, showError, dismissToast } = useToast();
-  const { notifications: eventNotifications, dismissNotification: dismissEventNotification } =
-    useEventNotifications();
+  const { notifications: eventNotifications, dismissNotification: dismissEventNotification } = useEventNotifications();
   const {
     currentPage,
     setCurrentPage,
@@ -1122,242 +1121,242 @@ const App: React.FC = () => {
       <div className={`app-container ${shouldStackCustomBackground ? 'has-custom-bg' : ''}`}>
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
 
-      {/* Background Ambience Layer */}
-      <div className="bg-layer">
-        <div
-          className="bg-img"
-          style={
-            shouldReplaceBaseBackground && displaySettings.backgroundImage
-              ? {
-                  backgroundImage: `url(${displaySettings.backgroundImage})`,
-                  opacity: displaySettings.backgroundOpacity,
-                  ...(displaySettings.backgroundBlur > 0
-                    ? { filter: `blur(${displaySettings.backgroundBlur}px)` }
-                    : {}),
-                }
-              : undefined
-          }
-        ></div>
-        {shouldStackCustomBackground && displaySettings.backgroundImage && (
-          <div className="bg-custom-img is-stacked" style={stackedBackgroundStyle}></div>
-        )}
-        <div className="bg-gradient-vert" style={backgroundOverlayStyle}></div>
-        <div className="bg-radial"></div>
-      </div>
+        {/* Background Ambience Layer */}
+        <div className="bg-layer">
+          <div
+            className="bg-img"
+            style={
+              shouldReplaceBaseBackground && displaySettings.backgroundImage
+                ? {
+                    backgroundImage: `url(${displaySettings.backgroundImage})`,
+                    opacity: displaySettings.backgroundOpacity,
+                    ...(displaySettings.backgroundBlur > 0
+                      ? { filter: `blur(${displaySettings.backgroundBlur}px)` }
+                      : {}),
+                  }
+                : undefined
+            }
+          ></div>
+          {shouldStackCustomBackground && displaySettings.backgroundImage && (
+            <div className="bg-custom-img is-stacked" style={stackedBackgroundStyle}></div>
+          )}
+          <div className="bg-gradient-vert" style={backgroundOverlayStyle}></div>
+          <div className="bg-radial"></div>
+        </div>
 
-      <div className="max-w-1920">
-        {/* 移动端菜单按钮 */}
-        <button
-          className={`nav-menu-toggle ${isSidebarOpen ? 'active' : ''}`}
-          onClick={toggleSidebar}
-          aria-label="切换菜单"
-        >
-          <div className="menu-icon">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-        </button>
+        <div className="max-w-1920">
+          {/* 移动端菜单按钮 */}
+          <button
+            className={`nav-menu-toggle ${isSidebarOpen ? 'active' : ''}`}
+            onClick={toggleSidebar}
+            aria-label="切换菜单"
+          >
+            <div className="menu-icon">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </button>
 
-        {/* 移动端侧边栏遮罩层 */}
-        <div className={`nav-sidebar-overlay ${isSidebarOpen ? 'active' : ''}`} onClick={closeSidebar} />
+          {/* 移动端侧边栏遮罩层 */}
+          <div className={`nav-sidebar-overlay ${isSidebarOpen ? 'active' : ''}`} onClick={closeSidebar} />
 
-        {/* Navigation Sidebar */}
-        <nav className={`nav-sidebar ${isSidebarOpen ? 'open' : ''}`}>
-          <div className="logo-box">
-            <img className="logo-mark" src={brandXiakeEmblemUrl} alt="" aria-hidden="true" />
-          </div>
-
-          <NavButton
-            icon={<Icons.Character />}
-            label="状态"
-            isActive={activePanel === ActivePanel.CHARACTER}
-            onClick={() => handleNavClick(ActivePanel.CHARACTER)}
-          />
-          <NavButton
-            icon={<Icons.Manual />}
-            label="功法"
-            isActive={activePanel === ActivePanel.MARTIAL_ARTS}
-            onClick={() => handleNavClick(ActivePanel.MARTIAL_ARTS)}
-          />
-          <NavButton
-            icon={<Icons.Inventory />}
-            label="行囊"
-            isActive={activePanel === ActivePanel.INVENTORY}
-            onClick={() => handleNavClick(ActivePanel.INVENTORY)}
-          />
-          <NavButton
-            icon={<Icons.Quest />}
-            label="事件"
-            isActive={activePanel === ActivePanel.EVENTS}
-            onClick={() => handleNavClick(ActivePanel.EVENTS)}
-          />
-          <NavButton
-            icon={<Icons.Map />}
-            label="地图"
-            isActive={activePanel === ActivePanel.MAP}
-            onClick={handleMapNavClick}
-          />
-          <NavButton
-            icon={<Icons.Social />}
-            label="侠缘"
-            isActive={activePanel === ActivePanel.SOCIAL}
-            onClick={() => handleNavClick(ActivePanel.SOCIAL)}
-          />
-          <NavButton
-            icon={<Icons.Settings />}
-            label="设置"
-            automationId="open-settings"
-            isActive={activePanel === ActivePanel.SETTINGS}
-            onClick={() => handleNavClick(ActivePanel.SETTINGS)}
-          />
-        </nav>
-
-        {/* Main Content */}
-        <main className="main-column">
-          <header className="game-header">
-            <div className="location-group">
-              <div className="loc-value">
-                <Icons.Compass className="loc-icon" />
-                <span className="loc-name">{gameState.currentLocation}</span>
-              </div>
-              <div className="time-value">{gameState.gameTime}</div>
+          {/* Navigation Sidebar */}
+          <nav className={`nav-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+            <div className="logo-box">
+              <img className="logo-mark" src={brandXiakeEmblemUrl} alt="" aria-hidden="true" />
             </div>
 
-            <div className="header-right">
-              <button
-                type="button"
-                className={`header-action-btn ${activePanel === ActivePanel.SAVE_LOAD ? 'active' : ''}`}
-                onClick={() => setActivePanel(ActivePanel.SAVE_LOAD)}
-                title="存档与分叉"
-                aria-label="存档与分叉"
-              >
-                <Icons.Variables size={14} />
-              </button>
-              <FullscreenButton className="header-fullscreen-btn header-fullscreen-btn-small" />
+            <NavButton
+              icon={<Icons.Character />}
+              label="状态"
+              isActive={activePanel === ActivePanel.CHARACTER}
+              onClick={() => handleNavClick(ActivePanel.CHARACTER)}
+            />
+            <NavButton
+              icon={<Icons.Manual />}
+              label="功法"
+              isActive={activePanel === ActivePanel.MARTIAL_ARTS}
+              onClick={() => handleNavClick(ActivePanel.MARTIAL_ARTS)}
+            />
+            <NavButton
+              icon={<Icons.Inventory />}
+              label="行囊"
+              isActive={activePanel === ActivePanel.INVENTORY}
+              onClick={() => handleNavClick(ActivePanel.INVENTORY)}
+            />
+            <NavButton
+              icon={<Icons.Quest />}
+              label="事件"
+              isActive={activePanel === ActivePanel.EVENTS}
+              onClick={() => handleNavClick(ActivePanel.EVENTS)}
+            />
+            <NavButton
+              icon={<Icons.Map />}
+              label="地图"
+              isActive={activePanel === ActivePanel.MAP}
+              onClick={handleMapNavClick}
+            />
+            <NavButton
+              icon={<Icons.Social />}
+              label="侠缘"
+              isActive={activePanel === ActivePanel.SOCIAL}
+              onClick={() => handleNavClick(ActivePanel.SOCIAL)}
+            />
+            <NavButton
+              icon={<Icons.Settings />}
+              label="设置"
+              automationId="open-settings"
+              isActive={activePanel === ActivePanel.SETTINGS}
+              onClick={() => handleNavClick(ActivePanel.SETTINGS)}
+            />
+          </nav>
 
-              <div className="status-bars-container">
-                <div className="bar-group">
-                  <span className="bar-label">血</span>
-                  <div className="bar-bg">
-                    <div
-                      className="bar-fill-hp"
-                      style={{
-                        width: `${Math.min(100, ((gameState.stats.attributes.hpCurrent ?? gameState.stats.attributes.hp) / Math.max(1, gameState.stats.attributes.hp)) * 100)}%`,
-                      }}
-                    ></div>
-                  </div>
+          {/* Main Content */}
+          <main className="main-column">
+            <header className="game-header">
+              <div className="location-group">
+                <div className="loc-value">
+                  <Icons.Compass className="loc-icon" />
+                  <span className="loc-name">{gameState.currentLocation}</span>
                 </div>
-                <div className="bar-group">
-                  <span className="bar-label">气</span>
-                  <div className="bar-bg">
-                    <div
-                      className="bar-fill-mp"
-                      style={{
-                        width: `${Math.min(100, ((gameState.stats.attributes.mpCurrent ?? gameState.stats.attributes.mp) / Math.max(1, gameState.stats.attributes.mp)) * 100)}%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
+                <div className="time-value">{gameState.gameTime}</div>
               </div>
 
-              <div className="player-info">
-                <div className="player-name">{gameState.stats.name}</div>
-                <div className="player-realm">{gameState.stats.realm}</div>
-              </div>
-
-              {playerAvatarSource.src ? (
+              <div className="header-right">
                 <button
                   type="button"
-                  className="avatar-small avatar-small--button"
-                  onClick={() => setIsPlayerAvatarPreviewOpen(true)}
-                  aria-label={`查看${gameState.stats.name}头像`}
+                  className={`header-action-btn ${activePanel === ActivePanel.SAVE_LOAD ? 'active' : ''}`}
+                  onClick={() => setActivePanel(ActivePanel.SAVE_LOAD)}
+                  title="存档与分叉"
+                  aria-label="存档与分叉"
                 >
-                  <div className="avatar-glow"></div>
-                  <AvatarImage
-                    src={playerAvatarSource.src}
-                    alt={`${gameState.stats.name}头像`}
-                    objectPosition={playerAvatarSource.objectPosition}
-                    rasterMode="square"
-                  />
+                  <Icons.Variables size={14} />
                 </button>
-              ) : (
-                <div className="avatar-small">
-                  <div className="avatar-glow"></div>
-                  <span>{playerAvatarSource.fallbackInitial}</span>
+                <FullscreenButton className="header-fullscreen-btn header-fullscreen-btn-small" />
+
+                <div className="status-bars-container">
+                  <div className="bar-group">
+                    <span className="bar-label">血</span>
+                    <div className="bar-bg">
+                      <div
+                        className="bar-fill-hp"
+                        style={{
+                          width: `${Math.min(100, ((gameState.stats.attributes.hpCurrent ?? gameState.stats.attributes.hp) / Math.max(1, gameState.stats.attributes.hp)) * 100)}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="bar-group">
+                    <span className="bar-label">气</span>
+                    <div className="bar-bg">
+                      <div
+                        className="bar-fill-mp"
+                        style={{
+                          width: `${Math.min(100, ((gameState.stats.attributes.mpCurrent ?? gameState.stats.attributes.mp) / Math.max(1, gameState.stats.attributes.mp)) * 100)}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
-          </header>
 
-          {/* 游戏主体内容区域 */}
-          <section className="game-content-wrapper">
-            <GameContent
-              maintext={processedMaintext}
-              options={currentOptions}
-              onSelectOption={handlePlayerSend}
-              settings={displaySettings}
-            />
-          </section>
+                <div className="player-info">
+                  <div className="player-name">{gameState.stats.name}</div>
+                  <div className="player-realm">{gameState.stats.realm}</div>
+                </div>
 
-          <div className="variable-change-dock">
-            <VariableChangeBar summary={variableChanges || null} />
-          </div>
-
-          {/* 底部聊天输入区域 */}
-          <ChatInput
-            onSend={handlePlayerSend}
-            prefill={
-              inputPrefill ??
-              (historyInputDraft
-                ? {
-                    key: historyInputDraft.transactionId,
-                    message: historyInputDraft.message,
-                  }
-                : null)
-            }
-            onMessageChange={handleHistoryDraftChange}
-            extraActions={
-              <div className="command-queue-anchor">
-                <CommandQueueButton commands={commands} onClick={() => setIsCommandQueueOpen(open => !open)} />
-                {isCommandQueueOpen && (
-                  <CommandQueuePopover
-                    commands={commands}
-                    recentHistory={recentInputHistory}
-                    onCancel={cancelCommand}
-                    onHistorySelect={handleInputHistorySelect}
-                    onClose={() => setIsCommandQueueOpen(false)}
-                  />
+                {playerAvatarSource.src ? (
+                  <button
+                    type="button"
+                    className="avatar-small avatar-small--button"
+                    onClick={() => setIsPlayerAvatarPreviewOpen(true)}
+                    aria-label={`查看${gameState.stats.name}头像`}
+                  >
+                    <div className="avatar-glow"></div>
+                    <AvatarImage
+                      src={playerAvatarSource.src}
+                      alt={`${gameState.stats.name}头像`}
+                      objectPosition={playerAvatarSource.objectPosition}
+                      rasterMode="square"
+                    />
+                  </button>
+                ) : (
+                  <div className="avatar-small">
+                    <div className="avatar-glow"></div>
+                    <span>{playerAvatarSource.fallbackInitial}</span>
+                  </div>
                 )}
               </div>
-            }
-            onRegenerate={handleSafeRegenerate}
-            canRegenerate={canRegenerate && !historyCheckoutPending}
-            isRegenerating={isLoading || historyCheckoutPending}
-            disabled={isLoading || historyCheckoutPending}
-            placeholder="书写你的江湖故事..."
-          />
-        </main>
-      </div>
+            </header>
 
-      {/* Modals */}
-      <Modal
-        isOpen={activePanel !== ActivePanel.NONE}
-        onClose={handleModalClose}
-        title={getModalTitle(activePanel)}
-        type={activePanel}
-      >
-        {renderModalContent()}
-      </Modal>
-      <AvatarPreviewModal
-        isOpen={isPlayerAvatarPreviewOpen}
-        onClose={() => setIsPlayerAvatarPreviewOpen(false)}
-        title={`${gameState.stats.name}头像`}
-        subtitle={playerAvatarSource.label}
-        src={playerAvatarSource.src}
-        type={ActivePanel.CHARACTER}
-        objectPosition={playerAvatarSource.objectPosition}
-      />
+            {/* 游戏主体内容区域 */}
+            <section className="game-content-wrapper">
+              <GameContent
+                maintext={processedMaintext}
+                options={currentOptions}
+                onSelectOption={handlePlayerSend}
+                settings={displaySettings}
+              />
+            </section>
+
+            <div className="variable-change-dock">
+              <VariableChangeBar summary={variableChanges || null} />
+            </div>
+
+            {/* 底部聊天输入区域 */}
+            <ChatInput
+              onSend={handlePlayerSend}
+              prefill={
+                inputPrefill ??
+                (historyInputDraft
+                  ? {
+                      key: historyInputDraft.transactionId,
+                      message: historyInputDraft.message,
+                    }
+                  : null)
+              }
+              onMessageChange={handleHistoryDraftChange}
+              extraActions={
+                <div className="command-queue-anchor">
+                  <CommandQueueButton commands={commands} onClick={() => setIsCommandQueueOpen(open => !open)} />
+                  {isCommandQueueOpen && (
+                    <CommandQueuePopover
+                      commands={commands}
+                      recentHistory={recentInputHistory}
+                      onCancel={cancelCommand}
+                      onHistorySelect={handleInputHistorySelect}
+                      onClose={() => setIsCommandQueueOpen(false)}
+                    />
+                  )}
+                </div>
+              }
+              onRegenerate={handleSafeRegenerate}
+              canRegenerate={canRegenerate && !historyCheckoutPending}
+              isRegenerating={isLoading || historyCheckoutPending}
+              disabled={isLoading || historyCheckoutPending}
+              placeholder="书写你的江湖故事..."
+            />
+          </main>
+        </div>
+
+        {/* Modals */}
+        <Modal
+          isOpen={activePanel !== ActivePanel.NONE}
+          onClose={handleModalClose}
+          title={getModalTitle(activePanel)}
+          type={activePanel}
+        >
+          {renderModalContent()}
+        </Modal>
+        <AvatarPreviewModal
+          isOpen={isPlayerAvatarPreviewOpen}
+          onClose={() => setIsPlayerAvatarPreviewOpen(false)}
+          title={`${gameState.stats.name}头像`}
+          subtitle={playerAvatarSource.label}
+          src={playerAvatarSource.src}
+          type={ActivePanel.CHARACTER}
+          objectPosition={playerAvatarSource.objectPosition}
+        />
       </div>
     </>
   );

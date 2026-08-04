@@ -21,7 +21,7 @@ export type EventNoticeKind =
 export interface EventNotice {
   version: typeof WUXIA_EVENT_NOTIFICATION_API_VERSION;
   id: string;
-  source: 'era-event-script';
+  source: 'event-script';
   kind: EventNoticeKind;
   level: EventNoticeLevel;
   message: string;
@@ -40,19 +40,18 @@ export interface WuxiaEventNotificationAdapterRegistration {
 
 export interface WuxiaEventNotificationApi {
   readonly version: typeof WUXIA_EVENT_NOTIFICATION_API_VERSION;
-  readonly instanceId: string;
-  readonly globalName: string;
   registerAdapter(registration: WuxiaEventNotificationAdapterRegistration): () => void;
 }
 
 export interface WuxiaEventNotificationBridgeReady {
   version: typeof WUXIA_EVENT_NOTIFICATION_API_VERSION;
-  instanceId: string;
+  bridgeId: string;
   globalName: string;
+  startedAt: number;
 }
 
 export interface WuxiaEventNotificationBridgeDisposed {
   version: typeof WUXIA_EVENT_NOTIFICATION_API_VERSION;
-  instanceId: string;
+  bridgeId: string;
   globalName: string;
 }

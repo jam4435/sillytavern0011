@@ -27,7 +27,7 @@ describe('EventNotificationStack', () => {
   });
 
   afterEach(() => {
-    vi.runOnlyPendingTimers();
+    vi.clearAllTimers();
     vi.useRealTimers();
   });
 
@@ -50,7 +50,10 @@ describe('EventNotificationStack', () => {
   it('遵循显式时长并在缺省时使用五秒', () => {
     const onDismiss = vi.fn();
     const { rerender } = render(
-      <EventNotificationStack notifications={[createNotice('short', 'success', 'event-completed', 1_000)]} onDismiss={onDismiss} />,
+      <EventNotificationStack
+        notifications={[createNotice('short', 'success', 'event-completed', 1_000)]}
+        onDismiss={onDismiss}
+      />,
     );
 
     act(() => vi.advanceTimersByTime(1_219));

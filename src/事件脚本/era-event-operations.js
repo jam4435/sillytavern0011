@@ -633,11 +633,7 @@ export async function applyTimedParticipantEntries(eventNames, eventDefinitions,
     const eventData = eventDefinitions[eventName];
     const endTime = getEndTime(eventData);
 
-    if (
-      !eventData ||
-      isDebutEvent(eventData) ||
-      (endTime && isTimeAfterEventEnd(currentTime, endTime))
-    ) {
+    if (!eventData || isDebutEvent(eventData) || (endTime && isTimeAfterEventEnd(currentTime, endTime))) {
       continue;
     }
 
