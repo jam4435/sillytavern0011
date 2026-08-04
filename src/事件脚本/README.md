@@ -45,16 +45,17 @@ src/事件脚本/
 
 ### era-event-loader.js - 事件加载
 
-| 函数                                  | 说明                                   |
-| ------------------------------------- | -------------------------------------- |
-| `loadEventManifest()`                 | 加载生成式事件目录与索引               |
-| `loadEventDefinitions(runtimeKeys)`   | 按运行时键按需加载事件分片             |
-| `loadEventCheckpointAtOrBefore(time)` | 加载目标时间之前最近的开局检查点       |
+| 函数                                  | 说明 |
+| ------------------------------------- | ---- |
+| `loadEventManifest()`                 | 加载生成式事件目录与索引 |
+| `loadEventDefinitions(runtimeKeys)`   | 按运行时键按需加载事件分片 |
+| `loadEventCheckpointAtOrBefore(time)` | 加载目标时间之前最近的开局检查点 |
 | `loadEventDefinitionsFromWorldbook()` | 显式调试回退：从角色世界书加载事件定义 |
 
 生产环境事件数据由 `scripts/generate-wuxia-event-assets.mjs` 从 `世界书/**/*.yaml` 生成到
-`src/事件脚本/generated/event-data/`，构建时会自动执行
-`pnpm generate:events`。事件定义不再在开局时扫描并解析整本角色世界书，而是先读 manifest，再按当前事件窗口、进行中事件和待结算事件加载对应分片；`ERA_EVENT_DATA_PROVIDER=worldbook`（或 localStorage 同名开关）仅用于调试回退。
+`src/事件脚本/generated/event-data/`，构建时会自动执行 `pnpm generate:events`。事件定义不再在
+开局时扫描并解析整本角色世界书，而是先读 manifest，再按当前事件窗口、进行中事件和待结算事件
+加载对应分片；`ERA_EVENT_DATA_PROVIDER=worldbook`（或 localStorage 同名开关）仅用于调试回退。
 
 事件条目命名规则：
 
@@ -63,14 +64,13 @@ src/事件脚本/
 
 ### era-event-checker.js - 事件检查
 
-| 函数                                                | 说明                                 |
-| --------------------------------------------------- | ------------------------------------ |
-| `isTimeForEvent(currentTime, eventData, eventName)` | 检查事件是否到达原定触发时间         |
-| `isEventDiscoverable(currentTime, eventData)`       | 检查事件是否进入提前十天的可发现窗口 |
-| `isTimeAfterEventEnd(currentTime, endTime)`         | 检查是否到达或超过实际结束时间       |
+| 函数                                                | 说明                                       |
+| --------------------------------------------------- | ------------------------------------------ |
+| `isTimeForEvent(currentTime, eventData, eventName)` | 检查事件是否到达原定触发时间                 |
+| `isEventDiscoverable(currentTime, eventData)`       | 检查事件是否进入提前十天的可发现窗口         |
+| `isTimeAfterEventEnd(currentTime, endTime)`         | 检查是否到达或超过实际结束时间               |
 
-**弹性时间机制**：短期事件（持续时间 ≤
-30天）提前10天只开放传闻。玩家精确到达完整事件地点、且全部有效前置事件已经完成时，事件才会提前启动；否则仍按原定时间启动。提前启动会保留原事件的小时级持续时长。
+**弹性时间机制**：短期事件（持续时间 ≤ 30天）提前10天只开放传闻。玩家精确到达完整事件地点、且全部有效前置事件已经完成时，事件才会提前启动；否则仍按原定时间启动。提前启动会保留原事件的小时级持续时长。
 
 ### era-event-operations.js - 事件操作
 
@@ -141,14 +141,12 @@ src/事件脚本/
 - `delete`: 删除属性
 - 普通事件必须提供非空 `事件概要`，它表示事件按原定发展完成后的持久结果
 - `参与事件.<事件名>.结局`: 玩家参与时以 `事件概要` 初始化；只有最终结果实质改变时才改写
-- `参与事件.<事件名>.insert/update/delete`: 玩家参与时由普通 `insert/update/delete`
-  复制生成的当前结局快照；事件结算时以这三块为准
+- `参与事件.<事件名>.insert/update/delete`: 玩家参与时由普通 `insert/update/delete` 复制生成的当前结局快照；事件结算时以这三块为准
 - 旧时间触发 `{ "类型":"时间", ... }` 继续支持；新条件支持 `时间`、`事件完成`、变量比较、嵌套 `全部/任一`
 - 条件事件使用绝对 `事件结束时间` 或相对 `事件持续时间` 二选一；条件事件不进入确定性 checkpoint
 - `后续事件`只生成目标事件线索，不构成前置门控。多个目标条件同时成立时自然并行，互斥由目标事件自己的条件表达
 - `参与事件.<事件名>.分支标记`只允许在已有 0/1 间修改；结算时快照归档到只读、可回退的 `事件分支结果`
-- 普通事件的 `事件引子` 必须是非空字符串；`附近传闻` 的出现范围固定由 `事件地点` 前两级派生，例如 `大宋/临安府/牛家村`
-  会在 `大宋/临安府` 及其下级地点显示，玩家到达完整 `事件地点` 后改为加入事件，不再显示传闻
+- 普通事件的 `事件引子` 必须是非空字符串；`附近传闻` 的出现范围固定由 `事件地点` 前两级派生，例如 `大宋/临安府/牛家村` 会在 `大宋/临安府` 及其下级地点显示，玩家到达完整 `事件地点` 后改为加入事件，不再显示传闻
 
 ## 数据结构
 
@@ -198,14 +196,15 @@ stat_data
 
 ## 事件通知适配接口
 
-事件脚本通过动态全局名 `WuxiaEventNotification:<bridgeId>` 发布 v1 通知接口。接口常量和 TypeScript 类型位于
-`src/shared/wuxiaEventNotifications.ts`；前端不应猜测当前动态名称，而应监听桥的生命周期事件：
+事件脚本通过动态全局名 `WuxiaEventNotification:<bridgeId>` 发布 v1 通知接口。接口常量和 TypeScript
+类型位于 `src/shared/wuxiaEventNotifications.ts`；前端不应猜测当前动态名称，而应监听桥的生命周期事件：
 
 - `wuxia:event-notification:discover`：前端加载或重载后发送，要求当前事件脚本重发就绪公告。
 - `wuxia:event-notification:ready`：事件脚本携带 `{ version, bridgeId, globalName, startedAt }` 宣布接口可用。
 - `wuxia:event-notification:disposed`：事件脚本实例卸载或被新实例替换时发送同形公告。
 
-前端收到兼容的 `ready` 后，通过 `waitGlobalInitialized(globalName)` 取得 `WuxiaEventNotificationApi`，再注册同步适配器：
+前端收到兼容的 `ready` 后，通过 `waitGlobalInitialized(globalName)` 取得
+`WuxiaEventNotificationApi`，再注册同步适配器：
 
 ```ts
 const api = await waitGlobalInitialized<WuxiaEventNotificationApi>(ready.globalName);
@@ -222,14 +221,14 @@ const unregister = api.registerAdapter({
 });
 ```
 
-`EventNotice` 包含 `version、id、source、kind、level、message、eventNames?、durationMs?、createdAt`。 `kind` 可为
-`system-ready`、`event-started`、`debut-event-completed`、`player-entered-event`、 `event-completed` 或
-`event-data-error`；`level` 可为 `info`、`success`、`warning` 或 `error`。
+`EventNotice` 包含 `version、id、source、kind、level、message、eventNames?、durationMs?、createdAt`。
+`kind` 可为 `system-ready`、`event-started`、`debut-event-completed`、`player-entered-event`、
+`event-completed` 或 `event-data-error`；`level` 可为 `info`、`success`、`warning` 或 `error`。
 
-适配器必须同步返回 `true` 表示通知已经入队。没有适配器、显式版本不兼容、返回非 `true`
-或抛错时，事件脚本会立即以原文案、原级别和原显式时长回退到酒馆 `toastr`，且通知错误不会打断事件事务。同一桥只保留
-`mountedAt` 最新的前端实例；旧实例迟到注册或调用旧的 `unregister` 都不会清除新实例。前端卸载时应调用
-`unregister()`，并在桥 `disposed` 后丢弃对应接口；所有卸载操作均可重复调用。
+适配器必须同步返回 `true` 表示通知已经入队。没有适配器、显式版本不兼容、返回非 `true` 或抛错时，
+事件脚本会立即以原文案、原级别和原显式时长回退到酒馆 `toastr`，且通知错误不会打断事件事务。
+同一桥只保留 `mountedAt` 最新的前端实例；旧实例迟到注册或调用旧的 `unregister` 都不会清除新实例。
+前端卸载时应调用 `unregister()`，并在桥 `disposed` 后丢弃对应接口；所有卸载操作均可重复调用。
 
 ## 性能优化
 
@@ -244,14 +243,9 @@ V5.2 版本的优化：
 
 当前版本的开局路径进一步采用：
 
-1. **单快照提交** - 开局事件规划、过期历史归档、角色差分和运行时索引在一次 `updateVariablesWith`
-   中提交，并在提交后统一回读校验。
-2. **生成式资源** -
-   manifest 保存完整条件、持续时间、多后续关系和分片索引；checkpoint 只保存纯时间事件的历史完成键与角色快照。
-3. **稀疏未来状态** - 生成式 provider 不再把数百个未来事件写入
-   `未发生事件`，而由调度索引计算当前候选集；旧存档仍保留原有桶并增量迁移，不覆盖已有角色状态。
-4. **写入信号合并** - direct 写入等待对应完成信号并传播失败；事件状态刷新按 refresh
-   hint 选择性执行，避免一次写入触发多轮全量扫描。
+1. **单快照提交** - 开局事件规划、过期历史归档、角色差分和运行时索引在一次 `updateVariablesWith` 中提交，并在提交后统一回读校验。
+2. **生成式资源** - manifest 保存完整条件、持续时间、多后续关系和分片索引；checkpoint 只保存纯时间事件的历史完成键与角色快照。
+3. **稀疏未来状态** - 生成式 provider 不再把数百个未来事件写入 `未发生事件`，而由调度索引计算当前候选集；旧存档仍保留原有桶并增量迁移，不覆盖已有角色状态。
+4. **写入信号合并** - direct 写入等待对应完成信号并传播失败；事件状态刷新按 refresh hint 选择性执行，避免一次写入触发多轮全量扫描。
 
-生成器默认报告无法解析为事件图边的后续引用（例如“全书完”“待定”或不存在的事件）。这些引用会记录在 manifest 的
-`unresolvedReferences` 中；发布前可运行 `pnpm generate:events -- --strict` 将其作为阻断错误检查。
+生成器默认报告无法解析为事件图边的后续引用（例如“全书完”“待定”或不存在的事件）。这些引用会记录在 manifest 的 `unresolvedReferences` 中；发布前可运行 `pnpm generate:events -- --strict` 将其作为阻断错误检查。
