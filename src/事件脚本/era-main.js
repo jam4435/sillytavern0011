@@ -44,8 +44,11 @@
   const { buildFollowupCounterPlan, createSerialTaskQueue } = await import('./era-turn-queue.js');
   const { getManifestEventCandidateKeys } = await import('./era-event-scheduler.js');
   const { writeDirectAssign, writeEraTransaction } = await import('./era-write-helper.js');
+  const { initializeEventNotificationBridge, notifyEvent } = await import('./era-notifications.js');
   const { readHistoryCheckoutJournal, isHistoryCheckoutJournalExpired } =
     await import('../shared/historyCheckoutJournal');
+
+  initializeEventNotificationBridge();
 
   const EVENT_SCRIPT_VERSION = '2026-08-04-conditional-branches-v1';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
@@ -931,7 +934,7 @@
       const success = await initialize({ rootBootstrap: true });
       if (success) {
         logSuccess('🎉 ERA 事件系统已随前端开局重新初始化！');
-        toastr.success('ERA 事件系统已自动初始化');
+        notifyEvent({ kind: 'system-ready', level: 'success', message: 'ERA 事件系统已自动初始化' });
       } else {
         logError('ERA 事件系统重新初始化失败，请检查变量结构或世界书事件条目');
       }
@@ -1128,7 +1131,7 @@
       const success = await initialize();
       if (success) {
         logSuccess('🎉 stat_data 已就绪，ERA事件系统自动初始化成功！');
-        toastr.success('ERA 事件系统已自动启动');
+        notifyEvent({ kind: 'system-ready', level: 'success', message: 'ERA 事件系统已自动启动' });
       }
       return;
     }
@@ -1176,6 +1179,10 @@
 
   if (isDebugEnabled()) {
     console.log('%c[ERA 事件系统 V5.2] 已启动 - 模块化重构版', 'color: #00ff00; font-size: 16px; font-weight: bold;');
-    toastr.success('ERA 事件系统 V5.2 已启动（模块化重构版）');
+    notifyEvent({
+      kind: 'system-ready',
+      level: 'success',
+      message: 'ERA 事件系统 V5.2 已启动（模块化重构版）',
+    });
   }
 })();

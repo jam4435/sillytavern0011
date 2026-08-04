@@ -42,6 +42,7 @@ import {
 } from './era-world-events.js';
 import { writeDirectChatTransaction } from '../shared/directVariableWrite';
 import { isWorldEventRecord } from '../shared/worldEventContext';
+import { notifyEvent } from './era-notifications.js';
 import {
   getSingleConditionTimeAnchor,
   isPureTimeTrigger,
@@ -703,10 +704,22 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
     // 显示通知（限制数量避免刷屏）
     if (eventNames.length <= 5) {
       eventNames.forEach(name => {
-        toastr.info(`📜 事件开始: ${name}`, '', { timeOut: 2000 });
+        notifyEvent({
+          kind: 'event-started',
+          level: 'info',
+          message: `📜 事件开始: ${name}`,
+          eventNames: [name],
+          durationMs: 2000,
+        });
       });
     } else {
-      toastr.info(`📜 ${eventNames.length} 个事件已开始`, '', { timeOut: 3000 });
+      notifyEvent({
+        kind: 'event-started',
+        level: 'info',
+        message: `📜 ${eventNames.length} 个事件已开始`,
+        eventNames,
+        durationMs: 3000,
+      });
     }
   } catch (error) {
     logError(`批量开始事件失败`, error);
@@ -816,10 +829,22 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
     // 显示通知
     if (eventNames.length <= 5) {
       eventNames.forEach(name => {
-        toastr.success(`🎭 登场事件完成: ${name}`, '', { timeOut: 2000 });
+        notifyEvent({
+          kind: 'debut-event-completed',
+          level: 'success',
+          message: `🎭 登场事件完成: ${name}`,
+          eventNames: [name],
+          durationMs: 2000,
+        });
       });
     } else {
-      toastr.success(`🎭 ${eventNames.length} 个登场事件已完成`, '', { timeOut: 3000 });
+      notifyEvent({
+        kind: 'debut-event-completed',
+        level: 'success',
+        message: `🎭 ${eventNames.length} 个登场事件已完成`,
+        eventNames,
+        durationMs: 3000,
+      });
     }
   } catch (error) {
     logError(`批量完成登场事件失败`, error);
@@ -886,9 +911,19 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
     }
 
     if (eventsToJoin.length === 1) {
-      toastr.warning(`⚠️ 你已到达事件地点: ${eventsToJoin[0]}！你的行为可能会改变事件的结局。`);
+      notifyEvent({
+        kind: 'player-entered-event',
+        level: 'warning',
+        message: `⚠️ 你已到达事件地点: ${eventsToJoin[0]}！你的行为可能会改变事件的结局。`,
+        eventNames: eventsToJoin,
+      });
     } else {
-      toastr.warning(`⚠️ 你已到达 ${eventsToJoin.length} 个事件地点！你的行为可能会改变事件的结局。`);
+      notifyEvent({
+        kind: 'player-entered-event',
+        level: 'warning',
+        message: `⚠️ 你已到达 ${eventsToJoin.length} 个事件地点！你的行为可能会改变事件的结局。`,
+        eventNames: eventsToJoin,
+      });
     }
 
     const participantPlan = await applyParticipantEntries(
@@ -1160,9 +1195,23 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
 
     logSuccess(`批量结算完成 ${eventNames.length} 个事件（单次 ERA 事务）:`, eventNames);
     if (eventNames.length <= 5) {
-      eventNames.forEach(name => toastr.success(`✅ 事件完成: ${name}`, '', { timeOut: 2000 }));
+      eventNames.forEach(name =>
+        notifyEvent({
+          kind: 'event-completed',
+          level: 'success',
+          message: `✅ 事件完成: ${name}`,
+          eventNames: [name],
+          durationMs: 2000,
+        }),
+      );
     } else {
-      toastr.success(`✅ ${eventNames.length} 个事件已完成`, '', { timeOut: 3000 });
+      notifyEvent({
+        kind: 'event-completed',
+        level: 'success',
+        message: `✅ ${eventNames.length} 个事件已完成`,
+        eventNames,
+        durationMs: 3000,
+      });
     }
     return true;
   } catch (error) {

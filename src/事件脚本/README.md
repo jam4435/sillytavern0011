@@ -12,6 +12,7 @@ src/事件脚本/
 ├── era-event-loader.js   # 事件加载模块
 ├── era-event-checker.js  # 事件检查模块
 ├── era-turn-queue.js     # 回合串行队列与线索计数规划
+├── era-notifications.js  # 前端通知适配与 toastr 回退桥
 └── era-event-operations.js # 事件操作模块
 ```
 
@@ -192,6 +193,42 @@ stat_data
 - `wuxia:turn-completed`: 回合成功后与事件检查共用串行队列，只递减回合开始前已有的线索计数
 - `era:writeDone`: ERA 变量更新完成时触发检查
 - `GameInitialized`: 前端初始化完成信号
+
+## 事件通知适配接口
+
+事件脚本通过动态全局名 `WuxiaEventNotification:<instanceId>` 发布 v1 通知接口。接口常量和 TypeScript
+类型位于 `src/shared/wuxiaEventNotifications.ts`；前端不应猜测当前动态名称，而应监听桥的生命周期事件：
+
+- `wuxia:event-notification:discover`：前端加载或重载后发送，要求当前事件脚本重发就绪公告。
+- `wuxia:event-notification:ready`：事件脚本携带 `{ version, instanceId, globalName }` 宣布接口可用。
+- `wuxia:event-notification:disposed`：事件脚本实例卸载或被新实例替换时发送同形公告。
+
+前端收到兼容的 `ready` 后，通过 `waitGlobalInitialized(globalName)` 取得
+`WuxiaEventNotificationApi`，再注册同步适配器：
+
+```ts
+const api = await waitGlobalInitialized<WuxiaEventNotificationApi>(ready.globalName);
+if (api.version !== WUXIA_EVENT_NOTIFICATION_API_VERSION) return;
+
+const unregister = api.registerAdapter({
+  ownerId: 'my-wuxia-ui',
+  mountedAt: Date.now(),
+  show(notice) {
+    // 先同步放入前端自己的通知队列，再返回 true。
+    enqueueNotice(notice);
+    return true;
+  },
+});
+```
+
+`EventNotice` 包含 `version、id、source、kind、level、message、eventNames?、durationMs?、createdAt`。
+`kind` 可为 `system-ready`、`event-started`、`debut-event-completed`、`player-entered-event`、
+`event-completed` 或 `event-data-error`；`level` 可为 `info`、`success`、`warning` 或 `error`。
+
+适配器必须同步返回 `true` 表示通知已经入队。没有适配器、显式版本不兼容、返回非 `true` 或抛错时，
+事件脚本会立即以原文案、原级别和原显式时长回退到酒馆 `toastr`，且通知错误不会打断事件事务。
+同一桥只保留 `mountedAt` 最新的前端实例；旧实例迟到注册或调用旧的 `unregister` 都不会清除新实例。
+前端卸载时应调用 `unregister()`，并在桥 `disposed` 后丢弃对应接口；所有卸载操作均可重复调用。
 
 ## 性能优化
 

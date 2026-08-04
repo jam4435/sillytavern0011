@@ -696,6 +696,42 @@
     }
   }
 
+  .event-notification-card {
+    color: #1a1410;
+    background:
+      linear-gradient(116deg, rgba(255, 255, 255, 0.42), transparent 42%),
+      linear-gradient(145deg, rgba(250, 246, 238, 0.97), rgba(225, 214, 196, 0.95));
+    border-color: color-mix(in srgb, var(--event-notice-accent) 44%, rgba(61, 48, 40, 0.3));
+    box-shadow:
+      0 14px 30px rgba(61, 48, 40, 0.18),
+      0 0 18px var(--event-notice-glow),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.42);
+    backdrop-filter: none;
+
+    &::before {
+      opacity: 0.16;
+      background-image: repeating-linear-gradient(
+        112deg,
+        transparent 0,
+        transparent 8px,
+        rgba(61, 48, 40, 0.08) 9px,
+        transparent 10px
+      );
+    }
+  }
+
+  .event-notification-message {
+    color: #3d3028;
+  }
+
+  .event-notification-count {
+    color: #5c1a14;
+  }
+
+  .event-notification-close {
+    color: rgba(61, 48, 40, 0.62);
+  }
+
   .chat-send-btn .send-btn-bg {
     background: rgba(26, 20, 16, 0.84);
     border-color: rgba(26, 20, 16, 0.5);

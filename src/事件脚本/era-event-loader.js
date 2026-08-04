@@ -16,6 +16,7 @@ import {
 } from './era-utils.js';
 import { normalizeParticipantEventDefinition } from './era-participant-entry.js';
 import { getGeneratedEventDataProvider } from './era-event-data-provider.js';
+import { notifyEvent } from './era-notifications.js';
 
 const parsedEventEntryCache = new Map();
 let cachedEventDefinitionsSignature = '';
@@ -169,7 +170,12 @@ export async function loadEventDefinitionsFromWorldbook() {
     for (const { entry, eventName, descriptor, entryFingerprint } of matchedEventEntries) {
       if (eventDefinitions[eventName]) {
         logError(`事件运行时键冲突，已跳过后加载条目: ${eventName} (${entry.name})`);
-        toastr.error(`事件运行时键冲突: ${eventName}`);
+        notifyEvent({
+          kind: 'event-data-error',
+          level: 'error',
+          message: `事件运行时键冲突: ${eventName}`,
+          eventNames: [eventName],
+        });
         continue;
       }
 
@@ -187,7 +193,12 @@ export async function loadEventDefinitionsFromWorldbook() {
         });
         if (!normalized.valid) {
           normalized.errors.forEach(error => logError(error));
-          toastr.error(`事件定义无效，已跳过: ${entry.name}`);
+          notifyEvent({
+            kind: 'event-data-error',
+            level: 'error',
+            message: `事件定义无效，已跳过: ${entry.name}`,
+            eventNames: [eventName],
+          });
           continue;
         }
 
@@ -196,7 +207,12 @@ export async function loadEventDefinitionsFromWorldbook() {
         logSuccess(`加载事件: ${eventName}`);
       } catch (e) {
         logError(`解析事件条目JSON失败 (条目: ${entry.name}):`, e);
-        toastr.error(`解析事件JSON失败: ${entry.name}`);
+        notifyEvent({
+          kind: 'event-data-error',
+          level: 'error',
+          message: `解析事件JSON失败: ${entry.name}`,
+          eventNames: [eventName],
+        });
       }
     }
 
@@ -221,7 +237,7 @@ export async function loadEventDefinitionsFromWorldbook() {
     }
   } catch (error) {
     logError('加载世界书事件时出错:', error);
-    toastr.error('加载世界书事件时出错');
+    notifyEvent({ kind: 'event-data-error', level: 'error', message: '加载世界书事件时出错' });
   }
 
   debugGroupEnd();
