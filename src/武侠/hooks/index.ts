@@ -1,4 +1,5 @@
 export { useDebugLogs, type LatestDebugRound, type LatestDebugRoundPatch } from './useDebugLogs';
+export { useEventNotifications } from './useEventNotifications';
 export { useToast } from './useToast';
 export { usePageFlow } from './usePageFlow';
 export { useGameState, DEFAULT_GAME_STATE } from './useGameState';

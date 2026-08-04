@@ -7,6 +7,7 @@ import CommandQueueButton from './components/CommandQueueButton';
 import CommandQueuePopover from './components/CommandQueuePopover';
 import FullscreenButton from './components/FullscreenButton';
 import GameContent from './components/GameContent';
+import EventNotificationStack from './components/EventNotificationStack';
 import { Icons } from './components/Icons';
 import Modal from './components/Modal';
 import NewGameSetup from './components/NewGameSetup';
@@ -28,6 +29,7 @@ import VariableChangeBar from './components/VariableChangeBar';
 import {
   useDebugLogs,
   useCommandQueue,
+  useEventNotifications,
   useEventListeners,
   useGameState,
   useMessageHandler,
@@ -109,6 +111,8 @@ const App: React.FC = () => {
   // 使用自定义 hooks
   const { latestDebugRound, beginDebugRound, patchLatestDebugRound, clearDebugLogs } = useDebugLogs();
   const { toastState, showLoading, showError, dismissToast } = useToast();
+  const { notifications: eventNotifications, dismissNotification: dismissEventNotification } =
+    useEventNotifications();
   const {
     currentPage,
     setCurrentPage,
@@ -1054,21 +1058,41 @@ const App: React.FC = () => {
   };
 
   // 根据页面状态渲染不同内容
+  const eventNotificationLayer = (
+    <EventNotificationStack notifications={eventNotifications} onDismiss={dismissEventNotification} />
+  );
+
   if (currentPage === 'booting') {
-    return <div className="booting-screen" aria-label="正在载入"></div>;
+    return (
+      <>
+        {eventNotificationLayer}
+        <div className="booting-screen" aria-label="正在载入"></div>
+      </>
+    );
   }
 
   if (currentPage === 'start') {
-    return <StartScreen onStart={handleStart} />;
+    return (
+      <>
+        {eventNotificationLayer}
+        <StartScreen onStart={handleStart} />
+      </>
+    );
   }
 
   if (currentPage === 'splash') {
-    return <SplashScreen hasSavedGame={savedGameExists} onNewGame={handleNewGame} onContinue={handleContinue} />;
+    return (
+      <>
+        {eventNotificationLayer}
+        <SplashScreen hasSavedGame={savedGameExists} onNewGame={handleNewGame} onContinue={handleContinue} />
+      </>
+    );
   }
 
   if (currentPage === 'setup') {
     return (
       <>
+        {eventNotificationLayer}
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
         <NewGameSetup onSubmit={handleSetupSubmit} onBack={handleSetupBack} isLoading={isLoading} />
       </>
@@ -1078,6 +1102,7 @@ const App: React.FC = () => {
   if (currentPage === 'opening') {
     return (
       <>
+        {eventNotificationLayer}
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
         <OpeningScreen
           welcomeLine={openingWelcomeLine}
@@ -1092,8 +1117,10 @@ const App: React.FC = () => {
 
   // 主游戏界面
   return (
-    <div className={`app-container ${shouldStackCustomBackground ? 'has-custom-bg' : ''}`}>
-      <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
+    <>
+      {eventNotificationLayer}
+      <div className={`app-container ${shouldStackCustomBackground ? 'has-custom-bg' : ''}`}>
+        <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
 
       {/* Background Ambience Layer */}
       <div className="bg-layer">
@@ -1331,7 +1358,8 @@ const App: React.FC = () => {
         type={ActivePanel.CHARACTER}
         objectPosition={playerAvatarSource.objectPosition}
       />
-    </div>
+      </div>
+    </>
   );
 };
 
