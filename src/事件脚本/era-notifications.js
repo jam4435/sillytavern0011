@@ -195,7 +195,8 @@ export function notifyEvent({ kind, level, message, eventNames, durationMs }) {
   };
 
   try {
-    if (!activeBridge?.disposed && activeBridge.adapter?.show(notice) === true) return true;
+    const adapter = activeBridge && !activeBridge.disposed ? activeBridge.adapter : null;
+    if (adapter?.show(notice) === true) return true;
   } catch (error) {
     console.warn('[ERA 通知桥] 前端通知适配器执行失败，回退酒馆弹窗。', error);
   }
