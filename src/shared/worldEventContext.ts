@@ -50,6 +50,10 @@ export function hasEventOutcomeChanged(participationEntry: unknown, eventDefinit
     return true;
   }
 
+  if (comparableJson(participationEntry.分支标记) !== comparableJson(eventDefinition.分支标记)) {
+    return true;
+  }
+
   return ['insert', 'update', 'delete'].some(
     action => comparableJson(participationEntry[action]) !== comparableJson(eventDefinition[action]),
   );

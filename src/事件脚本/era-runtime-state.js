@@ -1,8 +1,8 @@
 import { EVENT_RUNTIME_KEY_VERSION, logSuccess, logWarning } from './era-utils.js';
 import { writeDirectAssign, writeDirectDelete } from './era-write-helper.js';
 
-const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件', '人物事件占用'];
-const EVENT_STATE_ROOTS = ['参与事件', '世界事件', '附近传闻', '后续事件线索', '后续事件线索计数'];
+const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件', '已失效事件', '人物事件占用'];
+const EVENT_STATE_ROOTS = ['参与事件', '世界事件', '事件分支结果', '附近传闻', '后续事件线索', '后续事件线索计数'];
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);

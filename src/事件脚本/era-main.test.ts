@@ -43,6 +43,7 @@ vi.mock('./era-event-operations.js', () => ({
   batchCompleteDebutEvents: vi.fn(),
   playerJoinsEvents: vi.fn(),
   batchEndEvents: vi.fn(),
+  batchExpireEvents: vi.fn(),
   applyTimedParticipantEntries: vi.fn(),
   areEventPredecessorsCompleted: vi.fn(() => true),
   cleanupFollowupCluesForActiveParticipation: vi.fn(),

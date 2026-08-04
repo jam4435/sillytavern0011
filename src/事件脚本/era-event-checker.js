@@ -11,23 +11,49 @@ import {
   getEndTime,
   getEventDurationHours,
 } from './era-utils.js';
+import {
+  evaluateEventCondition,
+  getSingleConditionTimeAnchor,
+} from './era-event-schema.js';
 
-// ==================== 检查时间条件 ====================
-export function isTimeForEvent(currentTime, eventData, eventName = '') {
-  const triggerTime = eventData?.触发条件;
+function buildConditionContext(currentTime, statData, eventDefinitions) {
+  const completedEvents = statData?.事件系统?.已完成事件 || {};
+  return {
+    currentTime,
+    statData,
+    completedEvents,
+    compareTime,
+    readVariable(rawPath, fallback) {
+      const actual = fallback();
+      if (actual.exists) return actual;
 
-  if (!triggerTime || triggerTime.类型 !== '时间') {
-    return false;
-  }
-
-  // 正式开始只认原定时间；提前十天的窗口仅用于传闻和玩家精确到场触发。
-  return compareTime(currentTime, triggerTime, '>=');
+      const path = String(rawPath || '').replace(/^stat_data\.?/, '');
+      const match = path.match(/^事件分支结果\.([^.]+)\.([^.]+)$/);
+      if (!match) return actual;
+      const [, completedEventName, markerName] = match;
+      // Old non-participated completions can read the worldbook default virtually.
+      // A participated completion without an archived result remains unknown.
+      if (completedEvents[completedEventName] !== 0) return actual;
+      const defaultValue = eventDefinitions?.[completedEventName]?.分支标记?.[markerName];
+      return defaultValue === 0 || defaultValue === 1
+        ? { exists: true, value: defaultValue }
+        : actual;
+    },
+  };
 }
 
-export function isEventDiscoverable(currentTime, eventData) {
-  const triggerTime = eventData?.触发条件;
+// ==================== 检查时间条件 ====================
+export function isTimeForEvent(currentTime, eventData, eventName = '', statData = {}, eventDefinitions = {}) {
+  return evaluateEventCondition(
+    eventData?.触发条件,
+    buildConditionContext(currentTime, statData, eventDefinitions),
+  );
+}
+
+export function isEventDiscoverable(currentTime, eventData, statData = {}, eventDefinitions = {}) {
+  const triggerTime = getSingleConditionTimeAnchor(eventData?.触发条件);
   const durationHours = getEventDurationHours(eventData);
-  if (!triggerTime || triggerTime.类型 !== '时间' || durationHours === null) {
+  if (!triggerTime || durationHours === null) {
     return false;
   }
 
@@ -37,7 +63,12 @@ export function isEventDiscoverable(currentTime, eventData) {
   }
 
   const discoverableFrom = calculateDateOffset(triggerTime, -CONFIG.ELASTIC_TRIGGER_DAYS);
-  return compareTime(currentTime, discoverableFrom, '>=');
+  if (!compareTime(currentTime, discoverableFrom, '>=')) return false;
+
+  return evaluateEventCondition(eventData?.触发条件, {
+    ...buildConditionContext(currentTime, statData, eventDefinitions),
+    ignoreTimeConditions: true,
+  });
 }
 
 export function isTimeAfterEventEnd(currentTime, endTime) {

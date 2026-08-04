@@ -192,6 +192,7 @@ interface GameVariables {
     未发生事件?: Record<string, unknown>;
     进行中事件?: Record<string, unknown>;
     已完成事件?: Record<string, unknown>;
+    已失效事件?: Record<string, unknown>;
     人物事件占用?: Record<
       string,
       {
@@ -204,6 +205,7 @@ interface GameVariables {
   };
 
   参与事件?: Record<string, unknown>;
+  事件分支结果?: Record<string, Record<string, 0 | 1>>;
   附近传闻?: Record<string, unknown>;
   后续事件线索?: Record<string, unknown>;
   后续事件线索计数?: Record<string, unknown>;

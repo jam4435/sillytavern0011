@@ -1,4 +1,5 @@
 import { EVENT_KIND } from './era-utils.js';
+import { validateAndNormalizeEventDefinition } from './era-event-schema.js';
 
 export const PARTICIPANT_ENTRY_SOURCE = {
   TIME: '时间触发',
@@ -43,19 +44,15 @@ export function isLocationWithinRumorScope(playerLocation, rumorScope) {
 }
 
 export function normalizeParticipantEventDefinition(eventName, eventData, { kind = EVENT_KIND.ORDINARY } = {}) {
-  if (!isPlainObject(eventData)) {
-    return {
-      valid: false,
-      data: eventData,
-      errors: [`事件 ${eventName} 的定义不是对象`],
-    };
-  }
+  const shared = validateAndNormalizeEventDefinition(eventName, eventData);
+  if (!isPlainObject(shared.data)) return shared;
+  eventData = shared.data;
 
   if (kind !== EVENT_KIND.ORDINARY) {
-    return { valid: true, data: eventData, errors: [] };
+    return shared;
   }
 
-  const errors = [];
+  const errors = [...shared.errors];
   const eventLocation = normalizeLocationPath(eventData.事件地点);
   const eventLocationSegments = getLocationPathSegments(eventLocation);
   const eventHook = typeof eventData.事件引子 === 'string' ? eventData.事件引子.trim() : '';

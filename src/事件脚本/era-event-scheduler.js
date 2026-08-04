@@ -35,16 +35,23 @@ export function getManifestEventCandidateKeys(manifest, currentTime, statData) {
   const candidates = new Set();
   addThroughHour(candidates, Array.isArray(indexes.byTrigger) ? indexes.byTrigger : [], currentHour);
   addThroughHour(candidates, Array.isArray(indexes.byDiscovery) ? indexes.byDiscovery : [], currentHour);
+  const conditionalKeys = Array.isArray(indexes.conditional)
+    ? indexes.conditional
+    : (manifest.events || []).filter(entry => entry?.conditional).map(entry => entry.runtimeKey);
+  conditionalKeys.forEach(key => candidates.add(typeof key === 'string' ? key : key?.runtimeKey));
 
   const completed = statData?.事件系统?.已完成事件 || {};
+  const expired = statData?.事件系统?.已失效事件 || {};
   const active = statData?.事件系统?.进行中事件 || {};
   for (const key of Object.keys(active)) candidates.add(key);
 
   const entryByKey = new Map((manifest.events || []).map(entry => [entry.runtimeKey, entry]));
   return [...candidates].filter(key => {
     if (Object.prototype.hasOwnProperty.call(completed, key)) return false;
+    if (Object.prototype.hasOwnProperty.call(expired, key)) return false;
     if (Object.prototype.hasOwnProperty.call(active, key)) return true;
     const entry = entryByKey.get(key);
+    if (entry?.conditional) return true;
     // Discovery index also contains already-scheduled events; only retain
     // future events inside their ten-day discovery window.
     return Number.isFinite(entry?.discoveryHour) && Number(entry.discoveryHour) <= currentHour;

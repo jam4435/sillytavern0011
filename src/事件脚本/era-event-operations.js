@@ -19,7 +19,6 @@ import {
   normalizeOrdinaryEventReference,
   calculateTimeOffset,
   getEventDurationHours,
-  compareTime,
   formatDate,
   debugGroup,
   debugGroupCollapsed,
@@ -43,6 +42,12 @@ import {
 } from './era-world-events.js';
 import { writeDirectChatTransaction } from '../shared/directVariableWrite';
 import { isWorldEventRecord } from '../shared/worldEventContext';
+import {
+  getSingleConditionTimeAnchor,
+  isPureTimeTrigger,
+  normalizeBranchMarkers,
+  normalizeFollowupEvents,
+} from './era-event-schema.js';
 
 const CHAPTER_SEQUENCE_PATTERN = /^(.*?第[0-9一二三四五六七八九十百千万]+回[0-9]+)-/;
 const EVENT_DIFF_ACTIONS = ['insert', 'update', 'delete'];
@@ -152,54 +157,56 @@ function getFollowupReferenceIndex(eventDefinitions) {
     return followupReferenceIndexCache.get(eventDefinitions);
   }
 
-  const sourceToTarget = new Map();
+  const sourceToTargets = new Map();
   const clueKeysByTargetKey = new Map();
 
   for (const [sourceEventName, eventData] of Object.entries(eventDefinitions)) {
     const followupInfo = eventData?.后续事件;
     if (!followupInfo) continue;
 
-    const targetEventKey = resolveEventReference(sourceEventName, followupInfo.事件名, eventDefinitions);
-    const targetEventData = eventDefinitions[targetEventKey];
-    if (!targetEventData) continue;
-
-    const clueKey = sourceEventName;
-    sourceToTarget.set(sourceEventName, targetEventKey);
-    addValueToSetMap(clueKeysByTargetKey, targetEventKey, clueKey);
+    const targets = new Set();
+    for (const targetReference of Object.keys(normalizeFollowupEvents(followupInfo))) {
+      const targetEventKey = resolveEventReference(sourceEventName, targetReference, eventDefinitions);
+      if (!eventDefinitions[targetEventKey]) continue;
+      targets.add(targetEventKey);
+      // New clues use the target key. The source key is retained only so old
+      // saves can remove their legacy clue when the target is joined.
+      addValueToSetMap(clueKeysByTargetKey, targetEventKey, targetEventKey);
+      addValueToSetMap(clueKeysByTargetKey, targetEventKey, sourceEventName);
+    }
+    if (targets.size > 0) sourceToTargets.set(sourceEventName, targets);
   }
 
   const index = {
-    sourceToTarget,
+    sourceToTargets,
     clueKeysByTargetKey,
-    predecessorsByTargetKey: [...sourceToTarget.entries()].reduce((entries, [sourceEventName, targetEventName]) => {
-      const existing = entries.get(targetEventName) || new Set();
-      existing.add(sourceEventName);
-      entries.set(targetEventName, existing);
-      return entries;
-    }, new Map()),
   };
   followupReferenceIndexCache.set(eventDefinitions, index);
   return index;
 }
 
 export function getValidEventPredecessors(eventName, eventDefinitions) {
-  return [...(getFollowupReferenceIndex(eventDefinitions).predecessorsByTargetKey.get(eventName) || [])];
+  return [];
 }
 
 export function areEventPredecessorsCompleted(eventName, eventDefinitions, completedEvents) {
-  return getValidEventPredecessors(eventName, eventDefinitions).every(predecessorName =>
-    Object.prototype.hasOwnProperty.call(completedEvents || {}, predecessorName),
-  );
+  return true;
 }
 
 export function buildActualEventWindow(eventData, currentTime, earlyStart = false) {
-  const plannedStart = eventData?.触发条件 || null;
+  const plannedStart = getSingleConditionTimeAnchor(eventData?.触发条件);
   const plannedEnd = getEndTime(eventData || {});
+  const durationHours = getEventDurationHours(eventData);
+  if (eventData?.事件持续时间 && currentTime && durationHours !== null) {
+    return {
+      startTime: cloneJson(currentTime),
+      endTime: calculateTimeOffset(currentTime, { 时: durationHours }),
+    };
+  }
   if (!earlyStart || !currentTime || !plannedEnd) {
     return { startTime: plannedStart, endTime: plannedEnd };
   }
 
-  const durationHours = getEventDurationHours(eventData);
   return {
     startTime: cloneJson(currentTime),
     endTime: durationHours === null ? plannedEnd : calculateTimeOffset(currentTime, { 时: durationHours }),
@@ -211,12 +218,15 @@ export function resolveActualEventWindow(eventData, actualEndTime) {
   const endTime = actualEndTime || plannedEnd;
   const durationHours = getEventDurationHours(eventData);
   if (!endTime || durationHours === null) {
-    return { startTime: eventData?.触发条件 || null, endTime };
+    return { startTime: getSingleConditionTimeAnchor(eventData?.触发条件), endTime };
   }
 
   const endMatchesPlan = JSON.stringify(endTime) === JSON.stringify(plannedEnd);
   return {
-    startTime: endMatchesPlan ? eventData?.触发条件 || null : calculateTimeOffset(endTime, { 时: -durationHours }),
+    startTime:
+      endMatchesPlan && !eventData?.事件持续时间
+        ? getSingleConditionTimeAnchor(eventData?.触发条件)
+        : calculateTimeOffset(endTime, { 时: -durationHours }),
     endTime,
   };
 }
@@ -363,6 +373,7 @@ export async function initializeEventList(eventDefinitions, options = {}) {
       statData.事件系统.未发生事件 = isPlainObject(statData.事件系统.未发生事件) ? statData.事件系统.未发生事件 : {};
       statData.事件系统.进行中事件 = isPlainObject(statData.事件系统.进行中事件) ? statData.事件系统.进行中事件 : {};
       statData.事件系统.已完成事件 = isPlainObject(statData.事件系统.已完成事件) ? statData.事件系统.已完成事件 : {};
+      statData.事件系统.已失效事件 = isPlainObject(statData.事件系统.已失效事件) ? statData.事件系统.已失效事件 : {};
       statData.事件系统.人物事件占用 = isPlainObject(statData.事件系统.人物事件占用)
         ? statData.事件系统.人物事件占用
         : {};
@@ -375,6 +386,7 @@ export async function initializeEventList(eventDefinitions, options = {}) {
         ...legacyUnstartedKeys,
         ...Object.keys(statData.事件系统.进行中事件),
         ...Object.keys(statData.事件系统.已完成事件),
+        ...Object.keys(statData.事件系统.已失效事件),
       ]);
 
       const checkpoint = rootBootstrap && options.applyCheckpoint === true ? options.checkpoint : null;
@@ -414,7 +426,13 @@ export async function initializeEventList(eventDefinitions, options = {}) {
         const eventData = eventDefinitions[eventName];
         const endTime = getEndTime(eventData);
         const expired = endTime && isTimeAfterEventEnd(currentTime, endTime);
-        const due = isTimeForEvent(currentTime, eventData, eventName);
+        const conditional = !isPureTimeTrigger(eventData?.触发条件);
+        const due = isTimeForEvent(currentTime, eventData, eventName, statData, eventDefinitions);
+
+        if (expired && conditional) {
+          statData.事件系统.已失效事件[eventName] = cloneJson(endTime);
+          continue;
+        }
 
         if (!expired && !due) {
           if (!sparseFuture) {
@@ -455,7 +473,8 @@ export async function initializeEventList(eventDefinitions, options = {}) {
         futureEventNames: newEvents.filter(
           eventName =>
             !Object.prototype.hasOwnProperty.call(statData.事件系统.进行中事件, eventName) &&
-            !Object.prototype.hasOwnProperty.call(statData.事件系统.已完成事件, eventName),
+            !Object.prototype.hasOwnProperty.call(statData.事件系统.已完成事件, eventName) &&
+            !Object.prototype.hasOwnProperty.call(statData.事件系统.已失效事件, eventName),
         ),
       };
       return variables;
@@ -471,7 +490,8 @@ export async function initializeEventList(eventDefinitions, options = {}) {
       result.futureEventNames?.includes(eventName) ||
       Object.prototype.hasOwnProperty.call(verifiedSystem.未发生事件 || {}, eventName) ||
       Object.prototype.hasOwnProperty.call(verifiedSystem.进行中事件 || {}, eventName) ||
-      Object.prototype.hasOwnProperty.call(verifiedSystem.已完成事件 || {}, eventName),
+      Object.prototype.hasOwnProperty.call(verifiedSystem.已完成事件 || {}, eventName) ||
+      Object.prototype.hasOwnProperty.call(verifiedSystem.已失效事件 || {}, eventName),
   );
   if (!persisted) {
     throw new Error('开局事件状态单事务提交后校验失败');
@@ -610,15 +630,11 @@ export async function applyTimedParticipantEntries(eventNames, eventDefinitions,
 
   for (const eventName of eventNames) {
     const eventData = eventDefinitions[eventName];
-    const triggerTime = eventData?.触发条件;
     const endTime = getEndTime(eventData);
 
     if (
       !eventData ||
       isDebutEvent(eventData) ||
-      !triggerTime ||
-      triggerTime.类型 !== '时间' ||
-      !compareTime(currentTime, triggerTime, '>=') ||
       (endTime && isTimeAfterEventEnd(currentTime, endTime))
     ) {
       continue;
@@ -697,6 +713,25 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
   }
 
   debugGroupEnd();
+}
+
+export async function batchExpireEvents(eventNames, eventDefinitions) {
+  const uniqueEventNames = [...new Set(eventNames)].filter(eventName => eventDefinitions[eventName]);
+  if (uniqueEventNames.length === 0) return true;
+
+  const expiredPatch = Object.fromEntries(
+    uniqueEventNames.map(eventName => [eventName, cloneJson(getEndTime(eventDefinitions[eventName])) || 1]),
+  );
+  const unstartedDeletes = Object.fromEntries(uniqueEventNames.map(eventName => [eventName, {}]));
+  const committed = await writeEraTransaction(
+    [
+      { type: 'insert', payload: { 事件系统: { 已失效事件: expiredPatch } } },
+      { type: 'delete', payload: { 事件系统: { 未发生事件: unstartedDeletes } } },
+    ],
+    `batch-expire-${uniqueEventNames.length}`,
+  );
+  if (committed) logSuccess(`已将 ${uniqueEventNames.length} 个条件事件归档为失效:`, uniqueEventNames);
+  return committed;
 }
 
 // ==================== 批量完成登场事件（从未发生直接到已完成）====================
@@ -795,16 +830,19 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
 
 function buildPlayerParticipationDescription(eventName, eventData, actualEndTime) {
   const { startTime, endTime } = resolveActualEventWindow(eventData, actualEndTime);
-  return `${formatDate(startTime)} 到 ${formatDate(endTime)}，${eventData.事件详情}`;
+  const timeRange = startTime && endTime ? `${formatDate(startTime)} 到 ${formatDate(endTime)}，` : '';
+  return `${timeRange}${eventData.事件详情}`;
 }
 
 export function buildPlayerParticipationEntry(eventName, eventData, currentTime, actualEndTime) {
+  const branchMarkers = normalizeBranchMarkers(eventData?.分支标记);
   return {
     描述: buildPlayerParticipationDescription(eventName, eventData, actualEndTime),
     结局: getEventSummary(eventData),
     insert: getInitialParticipationActionDiff(eventData, 'insert', eventName),
     update: getInitialParticipationActionDiff(eventData, 'update', eventName),
     delete: getInitialParticipationActionDiff(eventData, 'delete', eventName),
+    ...(Object.keys(branchMarkers).length > 0 ? { 分支标记: cloneJson(branchMarkers) } : {}),
   };
 }
 
@@ -896,6 +934,46 @@ export async function playerJoinsEvent(eventName, eventData) {
   return joinedEvents.length > 0;
 }
 
+function buildSettlementBranchSnapshot(eventName, eventData, statData) {
+  const participationEntry = getParticipationEntry(statData?.参与事件, eventName);
+  if (participationEntry) {
+    // Old participated saves did not carry branch markers. Their result must
+    // remain unknown instead of guessing the current worldbook default.
+    return normalizeBranchMarkers(participationEntry.分支标记);
+  }
+  return normalizeBranchMarkers(eventData?.分支标记);
+}
+
+async function prepareSettlementSnapshots(eventNames, eventDefinitions, statData) {
+  const existingProgress = statData?.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {};
+  const progressPatch = {};
+
+  for (const eventName of eventNames) {
+    if (isPlainObject(existingProgress[eventName]) && isPlainObject(existingProgress[eventName].分支标记)) {
+      continue;
+    }
+    progressPatch[eventName] = {
+      分支标记: buildSettlementBranchSnapshot(eventName, eventDefinitions[eventName], statData),
+    };
+  }
+
+  if (Object.keys(progressPatch).length > 0) {
+    const committed = await writeEraTransaction(
+      [{ type: 'insert', payload: { 前端变量: { [EVENT_SETTLEMENT_PROGRESS_KEY]: progressPatch } } }],
+      `prepare-event-settlement-${eventNames.length}`,
+    );
+    if (!committed) throw new Error('事件结算预备事务未能确认提交');
+  }
+
+  const preparedVariables = await getVariables({ type: 'chat' });
+  const preparedStat = preparedVariables?.stat_data || {};
+  const preparedProgress = preparedStat?.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {};
+  if (!eventNames.every(eventName => isPlainObject(preparedProgress[eventName]?.分支标记))) {
+    throw new Error('事件结算分支标记快照校验失败');
+  }
+  return preparedStat;
+}
+
 // ==================== 批量结束事件并应用差分 ====================
 export async function batchEndEvents(eventNames, eventDefinitions) {
   if (eventNames.length === 0) return true;
@@ -905,7 +983,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
   try {
     await syncParticipationOutcomeStates(eventDefinitions);
     const currentVars = await getVariables({ type: 'chat' });
-    const statData = currentVars.stat_data;
+    const statData = await prepareSettlementSnapshots(eventNames, eventDefinitions, currentVars.stat_data);
     const 参与事件 = statData.参与事件 || {};
 
     const 合并后的差分 = {
@@ -918,6 +996,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     const 参与删除对象 = {};
     const 占用删除对象 = {};
     const participationByEvent = {};
+    const branchResults = {};
 
     for (const eventName of eventNames) {
       const eventData = eventDefinitions[eventName];
@@ -934,6 +1013,10 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       const participationEntry = hasParticipationEntry(参与事件, eventName)
         ? getParticipationEntry(参与事件, eventName)
         : null;
+      const frozenMarkers = normalizeBranchMarkers(
+        statData?.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY]?.[eventName]?.分支标记,
+      );
+      if (Object.keys(frozenMarkers).length > 0) branchResults[eventName] = cloneJson(frozenMarkers);
 
       for (const actionKey of EVENT_DIFF_ACTIONS) {
         if (playerParticipated) {
@@ -982,13 +1065,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
         )
         .map(eventName => [eventName, {}]),
     );
-    const legacySettlementDeletes = Object.fromEntries(
-      eventNames
-        .filter(eventName =>
-          Object.prototype.hasOwnProperty.call(statData?.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {}, eventName),
-        )
-        .map(eventName => [eventName, {}]),
-    );
+    const settlementProgressDeletes = Object.fromEntries(eventNames.map(eventName => [eventName, {}]));
 
     const settlementOperations = [];
     for (const actionKey of EVENT_DIFF_ACTIONS) {
@@ -1009,6 +1086,12 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       settlementOperations.push({
         type: 'insert',
         payload: { 世界事件: worldEventPatch },
+      });
+    }
+    if (Object.keys(branchResults).length > 0) {
+      settlementOperations.push({
+        type: 'insert',
+        payload: { 事件分支结果: branchResults },
       });
     }
     settlementOperations.push(
@@ -1033,12 +1116,10 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
         },
       });
     }
-    if (Object.keys(legacySettlementDeletes).length > 0) {
-      settlementOperations.push({
-        type: 'delete',
-        payload: { 前端变量: { [EVENT_SETTLEMENT_PROGRESS_KEY]: legacySettlementDeletes } },
-      });
-    }
+    settlementOperations.push({
+      type: 'delete',
+      payload: { 前端变量: { [EVENT_SETTLEMENT_PROGRESS_KEY]: settlementProgressDeletes } },
+    });
 
     const committed = await writeEraTransaction(settlementOperations, `batch-end-events-${eventNames.length}`);
     if (!committed) {
@@ -1063,13 +1144,15 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
           eventName,
         ) &&
         archiveReady &&
-        occupancyCleared
+        occupancyCleared &&
+        (!branchResults[eventName] ||
+          JSON.stringify(finalVerifyStat.事件分支结果?.[eventName]) === JSON.stringify(branchResults[eventName]))
       );
     });
-    const finalFollowupsPersisted = Object.keys(finalFollowups.followupPayload).every(
+    const finalFollowupsPersisted = Object.keys(followupPayload).every(
       key =>
-        finalVerifyStat.后续事件线索?.[key] === finalFollowups.followupPayload[key] &&
-        finalVerifyStat.后续事件线索计数?.[key] === finalFollowups.followupCountPayload[key],
+        finalVerifyStat.后续事件线索?.[key] === followupPayload[key] &&
+        finalVerifyStat.后续事件线索计数?.[key] === followupCountPayload[key],
     );
     if (!finalCompletionPersisted || !finalFollowupsPersisted) {
       throw new Error('事件完成终态单次提交后校验失败');
@@ -1094,28 +1177,20 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
 function buildFollowupPayloads(eventNames, eventDefinitions) {
   const followupPayload = {};
   const followupCountPayload = {};
-  const followupIndex = getFollowupReferenceIndex(eventDefinitions);
 
   for (const eventName of eventNames) {
-    if (eventDefinitions[eventName] && eventDefinitions[eventName].后续事件) {
-      const key = eventName;
-      const followupInfo = eventDefinitions[eventName].后续事件;
-      const targetEventKey = followupIndex.sourceToTarget.get(eventName);
-      const description = followupInfo.描述 || '';
+    const eventData = eventDefinitions[eventName];
+    for (const [targetReference, description] of Object.entries(normalizeFollowupEvents(eventData?.后续事件))) {
+      const targetEventKey = resolveEventReference(eventName, targetReference, eventDefinitions);
       const targetEventData = eventDefinitions[targetEventKey];
+      if (!targetEventData || Object.prototype.hasOwnProperty.call(followupPayload, targetEventKey)) continue;
 
-      if (targetEventData) {
-        const time = targetEventData.触发条件;
-        const location = targetEventData.事件地点;
-        const timeString = formatDate(time);
-
-        const formattedDescription = `(${timeString}，${location}，似乎还会有事情发生)${description}`;
-
-        followupPayload[key] = formattedDescription;
-        followupCountPayload[key] = CONFIG.DEFAULT_FOLLOWUP_LIFETIME;
-      }
-
-      log(`为事件 ${eventName} 生成后续: ${key}`);
+      const time = getSingleConditionTimeAnchor(targetEventData.触发条件);
+      const location = targetEventData.事件地点;
+      const contextParts = [time ? formatDate(time) : '', location, '似乎还会有事情发生'].filter(Boolean);
+      followupPayload[targetEventKey] = `(${contextParts.join('，')})${description}`;
+      followupCountPayload[targetEventKey] = CONFIG.DEFAULT_FOLLOWUP_LIFETIME;
+      log(`为事件 ${eventName} 生成后续线索: ${targetEventKey}`);
     }
   }
 

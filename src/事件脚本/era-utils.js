@@ -3,6 +3,8 @@
 // ================================================================================
 // 包含: 日志工具、时间计算、辅助函数
 
+import { getSingleConditionTimeAnchor } from './era-event-schema.js';
+
 // ==================== 配置项 ====================
 function readLocalStorageFlag(key) {
   try {
@@ -293,7 +295,9 @@ export function isParticipationEntry(value) {
     typeof value.结局 === 'string' &&
     isPlainObject(value.insert) &&
     isPlainObject(value.update) &&
-    isPlainObject(value.delete)
+    isPlainObject(value.delete) &&
+    (value.分支标记 === undefined ||
+      (isPlainObject(value.分支标记) && Object.values(value.分支标记).every(marker => marker === 0 || marker === 1)))
   );
 }
 
@@ -435,7 +439,12 @@ export function timeToTotalHours(timeObject) {
 }
 
 export function getEventDurationHours(eventData) {
-  const triggerTime = eventData?.触发条件;
+  const relativeDuration = eventData?.事件持续时间;
+  if (relativeDuration && typeof relativeDuration === 'object') {
+    return Math.max(0, Number(relativeDuration.日 || 0) * 24 + Number(relativeDuration.时 || 0));
+  }
+
+  const triggerTime = getSingleConditionTimeAnchor(eventData?.触发条件);
   const endTime = getEndTime(eventData || {});
   if (!triggerTime || !endTime) return null;
   return Math.max(0, timeToTotalHours(endTime) - timeToTotalHours(triggerTime));

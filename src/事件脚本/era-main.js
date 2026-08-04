@@ -25,14 +25,15 @@
   const { loadEventDefinitions, loadEventDefinitionsFromWorldbook, loadEventManifest, loadEventCheckpointAtOrBefore } =
     await import('./era-event-loader.js');
   const { isTimeForEvent, isEventDiscoverable, isTimeAfterEventEnd } = await import('./era-event-checker.js');
+  const { isPureTimeTrigger } = await import('./era-event-schema.js');
   const {
     initializeEventList,
     batchStartEvents,
     batchCompleteDebutEvents,
     playerJoinsEvents,
     batchEndEvents,
+    batchExpireEvents,
     applyTimedParticipantEntries,
-    areEventPredecessorsCompleted,
     cleanupFollowupCluesForActiveParticipation,
     cleanupInvalidParticipationEntries,
   } = await import('./era-event-operations.js');
@@ -75,7 +76,7 @@
 
   const isDirectChatWriteDone = detail => detail?.actions?.directChatWrite === true;
 
-  const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件'];
+  const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件', '已失效事件'];
 
   const isPlainObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
 
@@ -90,8 +91,9 @@
     const descriptor = deriveEventRuntimeDescriptor(entry.sourceName);
     const data = {
       事件地点: entry.location || '',
-      触发条件: entry.triggerTime || {},
+      触发条件: entry.triggerCondition || entry.triggerTime || {},
       事件结束时间: entry.endTime || undefined,
+      事件持续时间: entry.eventDuration || undefined,
       事件引子: entry.intro || '',
       事件详情: entry.title ? `${entry.title}事件` : '',
       事件概要: entry.summary || '',
@@ -99,7 +101,12 @@
       insert: {},
       update: {},
       delete: {},
-      ...(entry.followup ? { 后续事件: { 事件名: entry.followup, 描述: '' } } : {}),
+      ...(entry.followups
+        ? { 后续事件: { ...entry.followups } }
+        : entry.followup
+          ? { 后续事件: { [entry.followup]: '' } }
+          : {}),
+      ...(entry.branchMarkers ? { 分支标记: { ...entry.branchMarkers } } : {}),
     };
     return attachEventMetadata(data, descriptor);
   };
@@ -285,7 +292,6 @@
 
       const currentTime = variables.stat_data.世界信息.时间;
       const 未发生事件 = variables.stat_data.事件系统.未发生事件 || {};
-      const 已完成事件 = variables.stat_data.事件系统.已完成事件 || {};
       const playerLocation = normalizeLocationPath(variables.stat_data.user数据?.所在位置);
 
       let timeString = `${currentTime.年}年${currentTime.月}月${currentTime.日}日`;
@@ -304,13 +310,14 @@
       const eventsToStart = [];
       const earlyEventsToStart = [];
       const debutEventsToComplete = [];
+      const eventsToExpire = [];
 
       for (const eventName of 未发生列表) {
         const triggerCondition = 未发生事件[eventName];
         const eventData = eventDefinitions[eventName];
 
         debugGroupCollapsed(`检查事件: ${eventName}`);
-        if (eventData && isTimeForEvent(currentTime, eventData, eventName)) {
+        if (eventData && isTimeForEvent(currentTime, eventData, eventName, variables.stat_data, eventDefinitions)) {
           if (isDebutEvent(eventData)) {
             logSuccess(`登场事件 ${eventName} 触发条件满足，将直接完成！`);
             debutEventsToComplete.push(eventName);
@@ -321,16 +328,32 @@
         } else if (
           eventData &&
           !isDebutEvent(eventData) &&
-          isEventDiscoverable(currentTime, eventData) &&
-          playerLocation === normalizeLocationPath(eventData.事件地点) &&
-          areEventPredecessorsCompleted(eventName, eventDefinitions, 已完成事件)
+          isEventDiscoverable(currentTime, eventData, variables.stat_data, eventDefinitions) &&
+          playerLocation === normalizeLocationPath(eventData.事件地点)
         ) {
           logSuccess(`玩家在弹性窗口精确到达事件地点，提前启动 ${eventName}`);
           earlyEventsToStart.push(eventName);
+        } else if (
+          eventData &&
+          !isPureTimeTrigger(eventData.触发条件) &&
+          eventData.事件结束时间 &&
+          isTimeAfterEventEnd(currentTime, eventData.事件结束时间)
+        ) {
+          eventsToExpire.push(eventName);
+          log(`条件事件 ${eventName} 已越过绝对窗口，将归档为失效`);
         } else {
           log(`事件 ${eventName} 触发条件不满足`);
         }
         debugGroupEnd();
+      }
+
+      const definitionsToHydrate = [...new Set([...eventsToStart, ...earlyEventsToStart, ...debutEventsToComplete])];
+      if (definitionsToHydrate.length > 0 && eventManifest) {
+        Object.assign(eventDefinitions, await loadEventDefinitions(definitionsToHydrate));
+      }
+
+      if (eventsToExpire.length > 0) {
+        await batchExpireEvents(eventsToExpire, eventDefinitions);
       }
 
       // 批量触发普通事件
@@ -409,7 +432,12 @@
         updatedVariables.stat_data,
       );
       const 可发现未发生事件 = (latestManifestCandidates || Object.keys(最新未发生事件)).filter(eventName =>
-        isEventDiscoverable(updatedVariables.stat_data.世界信息.时间, eventDefinitions[eventName]),
+        isEventDiscoverable(
+          updatedVariables.stat_data.世界信息.时间,
+          eventDefinitions[eventName],
+          updatedVariables.stat_data,
+          eventDefinitions,
+        ),
       );
       // 即使当前没有候选事件也要执行一次，以清除历史检出后遗留的附近传闻派生缓存。
       await checkPlayerLocationTriggers(
@@ -639,6 +667,7 @@
       事件系统: variables?.stat_data?.事件系统 || {},
       参与事件: variables?.stat_data?.参与事件 || {},
       世界事件: variables?.stat_data?.世界事件 || {},
+      事件分支结果: variables?.stat_data?.事件分支结果 || {},
       后续事件线索: variables?.stat_data?.后续事件线索 || {},
       后续事件线索计数: variables?.stat_data?.后续事件线索计数 || {},
       角色数据: variables?.stat_data?.角色数据 || {},

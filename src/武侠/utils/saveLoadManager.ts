@@ -537,6 +537,7 @@ function readCurrentVerification(): HistoryVerification {
       事件系统: statData.事件系统 ?? null,
       参与事件: statData.参与事件 ?? null,
       世界事件: statData.世界事件 ?? null,
+      事件分支结果: statData.事件分支结果 ?? null,
       后续事件线索: statData.后续事件线索 ?? null,
       后续事件线索计数: statData.后续事件线索计数 ?? null,
     }),

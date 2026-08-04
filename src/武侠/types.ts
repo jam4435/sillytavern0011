@@ -134,7 +134,7 @@ export type WorldEventVariableData = WorldEventRecord;
 export interface FrontendVariableData {
   永久属性修正?: Record<string, PermanentAttributeModifierVariableData>;
   事件结局状态?: Record<string, EventOutcomeStatus>;
-  事件结算进度?: Record<string, { 差分已应用?: boolean; 玩家参与?: boolean } | string>;
+  事件结算进度?: Record<string, { 分支标记?: Record<string, 0 | 1> }>;
   事件调度状态?: {
     schemaVersion?: number;
     manifestHash?: string;
