@@ -138,7 +138,7 @@ if (原始参与事件 && typeof 原始参与事件 === 'object') {
 if (Object.keys(参与事件).length > 0) {
 -%>
 
-# 当前事件上下文：方括号是只读背景，JSON中的四个字段按规则有条件可写
+# 当前事件上下文：方括号是只读背景，JSON中的已有字段按规则有条件可写
 <参与事件>
 <% for (const [事件键, 事件] of Object.entries(参与事件)) {
   const 只读描述 = String(事件.描述).replace(/\s+/g, ' ').trim();
@@ -147,6 +147,7 @@ if (Object.keys(参与事件).length > 0) {
     insert: 事件.insert,
     update: 事件.update,
     delete: 事件.delete,
+    ...(事件.分支标记 && typeof 事件.分支标记 === 'object' ? { 分支标记: 事件.分支标记 } : {}),
   };
 -%>
 <<%- 事件键 %>>

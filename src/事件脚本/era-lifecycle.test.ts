@@ -3,13 +3,11 @@ import { eventEmitMock } from '../武侠/test/setup';
 
 import { isEventDiscoverable, isTimeAfterEventEnd, isTimeForEvent } from './era-event-checker.js';
 import {
-  areEventPredecessorsCompleted,
   batchEndEvents,
   batchStartEvents,
   buildActualEventWindow,
   buildPlayerParticipationEntry,
   cleanupInvalidParticipationEntries,
-  getValidEventPredecessors,
   initializeEventList,
 } from './era-event-operations.js';
 import { createSerialTaskQueue, buildFollowupCounterPlan } from './era-turn-queue.js';
@@ -39,7 +37,6 @@ function applyOperation(target: Record<string, any>, operation: { type: string; 
   visit(target, operation.payload);
 }
 const sourceName = '射雕第7回01-宝马风波';
-const secondSourceName = '射雕第7回02-初遇黄蓉';
 const targetName = '射雕第7回03-比武招亲';
 const actualEndTime = { 年: 1219, 月: 10, 日: 10, 时: 11 };
 let transactionMessageId = 100;
@@ -97,30 +94,28 @@ describe('event discovery and actual runtime windows', () => {
       '1219年10月10日9时 到 1219年10月10日11时，郭靖在张家口经历了一场风波。',
     );
   });
+
+  it('derives an actual end from relative duration when a conditional event starts', () => {
+    const currentTime = { 年: 1222, 月: 2, 日: 1, 时: 8 };
+    expect(
+      buildActualEventWindow(
+        { 触发条件: { 变量: 'user数据.声望', 大于: 10 }, 事件持续时间: { 日: 1, 时: 2 } },
+        currentTime,
+      ),
+    ).toEqual({
+      startTime: currentTime,
+      endTime: { 年: 1222, 月: 2, 日: 2, 时: 10 },
+    });
+  });
 });
 
-describe('early-start predecessor gates', () => {
-  it('requires every valid incoming predecessor while ignoring dangling placeholders', () => {
-    const secondSourceDefinition = {
-      ...eventDefinition,
-      后续事件: { 事件名: targetName, 描述: '另一条前置线索。' },
-    };
-    const danglingDefinition = {
-      ...eventDefinition,
-      后续事件: { 事件名: '第XX回-待定', 描述: '占位引用。' },
-    };
-    const definitions = {
+describe('follow-up relationships', () => {
+  it('does not turn a follow-up edge into an implicit predecessor gate', () => {
+    const statData = { 事件系统: { 已完成事件: {} } };
+    expect(isTimeForEvent(targetDefinition.触发条件, targetDefinition, targetName, statData, {
       [sourceName]: eventDefinition,
-      [secondSourceName]: secondSourceDefinition,
       [targetName]: targetDefinition,
-      '射雕第7回99-占位': danglingDefinition,
-    };
-
-    expect(getValidEventPredecessors(targetName, definitions)).toEqual([sourceName, secondSourceName]);
-    expect(areEventPredecessorsCompleted(targetName, definitions, { [sourceName]: 0 })).toBe(false);
-    expect(areEventPredecessorsCompleted(targetName, definitions, { [sourceName]: 0, [secondSourceName]: 1 })).toBe(
-      true,
-    );
+    })).toBe(true);
   });
 });
 
@@ -287,6 +282,29 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.世界事件[sourceName].概要).toBe(eventDefinition.事件概要);
   });
 
+  it('expires an unmet absolute-window condition without applying diffs or completing it', async () => {
+    variables.stat_data.世界信息.时间 = { 年: 1219, 月: 11, 日: 1, 时: 0 };
+    variables.stat_data.事件系统 = {
+      未发生事件: {},
+      进行中事件: {},
+      已完成事件: {},
+      已失效事件: {},
+      人物事件占用: {},
+    };
+    const conditionalDefinition = {
+      ...eventDefinition,
+      触发条件: { 变量: 'user数据.声望', 大于: 100 },
+      update: { 郭靖: { 状态: '不应应用' } },
+    };
+
+    await initializeEventList({ [sourceName]: conditionalDefinition }, { rootBootstrap: true });
+
+    expect(variables.stat_data.事件系统.已失效事件[sourceName]).toEqual(eventDefinition.事件结束时间);
+    expect(variables.stat_data.事件系统.已完成事件[sourceName]).toBeUndefined();
+    expect(variables.stat_data.角色数据.郭靖).toBeUndefined();
+    expect(variables.stat_data.世界事件[sourceName]).toBeUndefined();
+  });
+
   it('does not replay checkpoint-completed character diffs on top of a snapshot', async () => {
     variables.stat_data.世界信息.时间 = { 年: 1219, 月: 11, 日: 1, 时: 0 };
     variables.stat_data.事件系统 = {
@@ -342,7 +360,7 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.后续事件线索计数).toEqual({});
   });
 
-  it('archives the actual window and creates clue plus counter only after completion', async () => {
+  it('archives the actual window and creates an old-format clue under the target key', async () => {
     const definitions = { [sourceName]: eventDefinition, [targetName]: targetDefinition };
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
@@ -351,12 +369,12 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.事件系统.已完成事件[sourceName]).toBe(0);
     expect(variables.stat_data.事件系统.进行中事件[sourceName]).toBeUndefined();
     expect(variables.stat_data.参与事件[sourceName]).toBeUndefined();
-    expect(variables.stat_data.后续事件线索[sourceName]).toContain('江南似有新的风波');
-    expect(variables.stat_data.后续事件线索计数[sourceName]).toBe(3);
+    expect(variables.stat_data.后续事件线索[targetName]).toContain('江南似有新的风波');
+    expect(variables.stat_data.后续事件线索计数[targetName]).toBe(3);
     expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
   });
 
-  it('keeps settlement atomic and safely fills a failed follow-up write on retry', async () => {
+  it('does not enter final settlement when the ERA preparation transaction fails', async () => {
     const definitions = { [sourceName]: eventDefinition, [targetName]: targetDefinition };
     let writeCount = 0;
     vi.mocked(globalThis.updateVariablesWith).mockImplementation(updater => {
@@ -371,10 +389,10 @@ describe('completion persistence and follow-up pairs', () => {
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(false);
     expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
     expect(variables.stat_data.事件系统.进行中事件[sourceName]).toEqual(actualEndTime);
-    expect(variables.stat_data.后续事件线索[sourceName]).toBeUndefined();
+    expect(variables.stat_data.后续事件线索[targetName]).toBeUndefined();
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
-    expect(variables.stat_data.后续事件线索计数[sourceName]).toBe(3);
+    expect(variables.stat_data.后续事件线索计数[targetName]).toBe(3);
     expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
   });
 
@@ -422,8 +440,9 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.参与事件[sourceName]).toBeUndefined();
   });
 
-  it('preserves the participation snapshot when the atomic settlement write fails', async () => {
-    const definitions = { [sourceName]: eventDefinition, [targetName]: targetDefinition };
+  it('freezes branch markers across a failed final transaction and clears progress after retry', async () => {
+    const branchDefinition = { ...eventDefinition, 分支标记: { 黄蓉对郭靖变心: 0 } };
+    const definitions = { [sourceName]: branchDefinition, [targetName]: targetDefinition };
     variables.stat_data.参与事件 = {
       [sourceName]: {
         描述: '玩家参与了事件。',
@@ -431,6 +450,7 @@ describe('completion persistence and follow-up pairs', () => {
         insert: {},
         update: {},
         delete: {},
+        分支标记: { 黄蓉对郭靖变心: 1 },
       },
     };
 
@@ -450,11 +470,74 @@ describe('completion persistence and follow-up pairs', () => {
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(false);
     expect(variables.stat_data.参与事件[sourceName].结局).toBe('玩家改变了事件。');
-    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
+    expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toEqual({
+      分支标记: { 黄蓉对郭靖变心: 1 },
+    });
+
+    variables.stat_data.参与事件[sourceName].分支标记.黄蓉对郭靖变心 = 0;
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
     expect(variables.stat_data.事件系统.已完成事件[sourceName]).toBe(1);
+    expect(variables.stat_data.事件分支结果[sourceName]).toEqual({ 黄蓉对郭靖变心: 1 });
     expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
+  });
+
+  it('archives defaults for unparticipated events but keeps old participated saves unknown', async () => {
+    const branchDefinition = { ...eventDefinition, 分支标记: { 黄蓉对郭靖变心: 0 } };
+    await expect(
+      batchEndEvents([sourceName], { [sourceName]: branchDefinition, [targetName]: targetDefinition }),
+    ).resolves.toBe(true);
+    expect(variables.stat_data.事件分支结果[sourceName]).toEqual({ 黄蓉对郭靖变心: 0 });
+
+    variables.stat_data.事件系统.进行中事件[sourceName] = clone(actualEndTime);
+    delete variables.stat_data.事件系统.已完成事件[sourceName];
+    delete variables.stat_data.事件分支结果[sourceName];
+    variables.stat_data.参与事件[sourceName] = {
+      描述: '旧存档参与条目',
+      结局: '旧结局',
+      insert: {},
+      update: {},
+      delete: {},
+    };
+
+    await expect(
+      batchEndEvents([sourceName], { [sourceName]: branchDefinition, [targetName]: targetDefinition }),
+    ).resolves.toBe(true);
+    expect(variables.stat_data.事件分支结果[sourceName]).toBeUndefined();
+  });
+
+  it('writes every new-format follow-up clue and counter without selecting a branch', async () => {
+    const secondTarget = '射雕第8回01-并行后续';
+    const multiSource = {
+      ...eventDefinition,
+      后续事件: {
+        [targetName]: '第一条线索。',
+        [secondTarget]: '第二条线索。',
+      },
+    };
+    const definitions = {
+      [sourceName]: multiSource,
+      [targetName]: targetDefinition,
+      [secondTarget]: { ...targetDefinition, 触发条件: { 事件完成: '另一个事件' } },
+    };
+
+    await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
+
+    expect(variables.stat_data.后续事件线索[targetName]).toContain('第一条线索');
+    expect(variables.stat_data.后续事件线索[secondTarget]).toContain('第二条线索');
+    expect(variables.stat_data.后续事件线索计数).toMatchObject({ [targetName]: 3, [secondTarget]: 3 });
+  });
+
+  it('preserves the first clue and does not renew its counter when sources converge', async () => {
+    variables.stat_data.后续事件线索[targetName] = '先前来源留下的线索';
+    variables.stat_data.后续事件线索计数[targetName] = 1;
+
+    await expect(batchEndEvents([sourceName], { [sourceName]: eventDefinition, [targetName]: targetDefinition })).resolves.toBe(
+      true,
+    );
+
+    expect(variables.stat_data.后续事件线索[targetName]).toBe('先前来源留下的线索');
+    expect(variables.stat_data.后续事件线索计数[targetName]).toBe(1);
   });
 });
 

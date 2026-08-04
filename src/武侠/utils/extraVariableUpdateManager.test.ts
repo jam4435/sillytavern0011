@@ -174,7 +174,12 @@ describe('executeExtraVariableUpdate', () => {
           $template: { 所在位置: '' },
         },
         参与事件: {
-          射雕第7回02: { 描述: '黄蓉正在事件中', update: { 黄蓉: { 好感: 1 } }, $meta: '隐藏' },
+          射雕第7回02: {
+            描述: '黄蓉正在事件中',
+            update: { 黄蓉: { 好感: 1 } },
+            分支标记: { 黄蓉对郭靖变心: 0 },
+            $meta: '隐藏',
+          },
         },
         世界事件: { 旧闻: '不应发送' },
         附近传闻: { 传闻: '不应发送' },
@@ -538,7 +543,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(serialized).not.toContain('天赋');
     expect(serialized).not.toContain('$');
     expect(projection.参与事件).toEqual({
-      射雕第7回02: { update: { 黄蓉: { 好感: 1 } } },
+      射雕第7回02: { update: { 黄蓉: { 好感: 1 } }, 分支标记: { 黄蓉对郭靖变心: 0 } },
     });
     expect(serialized).not.toContain('黄蓉正在事件中');
   });
@@ -663,7 +668,9 @@ describe('executeExtraVariableUpdate', () => {
     expect(fallbackProjection).toBe(normalProjection);
     expect(fallbackProjection).toContain('<status_current_variables>');
     expect(fallbackProjection).toContain('[只读时间、地点与事件背景：黄蓉正在事件中]');
-    expect(fallbackProjection).toContain('{"update":{"黄蓉":{"好感":1}}}');
+    expect(fallbackProjection).toContain(
+      '{"update":{"黄蓉":{"好感":1}},"分支标记":{"黄蓉对郭靖变心":0}}',
+    );
     expect(fallbackProjection).not.toContain('前端变量');
   });
 });

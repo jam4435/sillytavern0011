@@ -83,6 +83,9 @@ describe('武侠输出提示词契约', () => {
     expect(promptSource).toContain('<参与事件>');
     expect(promptSource).toContain('<context_error>玩家数据或世界时间加载失败</context_error>');
     expect(promptSource).toContain('结局: 事件.结局');
+    expect(promptSource).toContain('{ 分支标记: 事件.分支标记 }');
+    expect(variableGuidanceSource).toContain('`事件分支结果`是系统结算归档，始终只读');
+    expect(variableGuidanceSource).toContain('`后续事件`只表示既有事件之间的关联和可能出现的线索');
     expect(promptSource).toContain('当前没有任何可用的完整地点路径，本轮禁止修改任何 `所在位置`');
     expect(worldHistoryPromptSource).toContain(
       'selectWorldEventsForPrompt(worldEvents, outcomeStatuses, limit = 16, priorityLimit = 8)',
@@ -134,6 +137,7 @@ describe('武侠输出提示词契约', () => {
           insert: {},
           update: { 黄蓉: { 所在位置: '大宋/张家口/大酒店' } },
           delete: {},
+          分支标记: { 黄蓉对郭靖变心: 1 },
         },
       },
       'stat_data.前端变量.周围地点': {
@@ -156,6 +160,7 @@ describe('武侠输出提示词契约', () => {
     expect(output).toContain(`<${eventKey}>`);
     expect(output).toContain('[只读时间、地点与事件背景：1219年10月20日13时 到 15时');
     expect(output).toContain('{"结局":"三人相识。","insert":{},"update":{"黄蓉"');
+    expect(output).toContain('"分支标记":{"黄蓉对郭靖变心":1}');
     expect(output).not.toContain('{"描述":');
     expect(output).toContain('[普通移动]\n\n- 大宋/张家口/城门');
     expect(output).toContain('[事件目标]\n\n- 蒙古/大漠/荒山');

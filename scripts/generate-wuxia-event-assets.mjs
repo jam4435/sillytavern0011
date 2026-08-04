@@ -13,6 +13,12 @@ import path from 'node:path';
 import process from 'node:process';
 import { parse as parseYaml } from 'yaml';
 import { buildOpeningEventSummary } from './lib/wuxia-event-summary.mjs';
+import {
+  getSingleConditionTimeAnchor,
+  isPureTimeTrigger,
+  normalizeFollowupEvents,
+  validateAndNormalizeEventDefinition,
+} from '../src/事件脚本/era-event-schema.js';
 
 const root = process.cwd();
 const sourceRoot = path.join(root, '世界书');
@@ -161,8 +167,10 @@ function isResolvableEventReference(reference) {
 }
 
 function normalizeEventData(runtimeKey, descriptor, data) {
-  if (!data || typeof data !== 'object' || Array.isArray(data))
-    throw new Error(`事件 ${runtimeKey} 的 YAML 内容必须是对象`);
+  const shared = validateAndNormalizeEventDefinition(runtimeKey, data);
+  if (!shared.valid) throw new Error(shared.errors.join('；'));
+  data = shared.data;
+  if (!data.触发条件) throw new Error(`事件 ${runtimeKey} 缺少有效触发条件`);
   if (descriptor.kind !== EVENT_KINDS.ordinary) return data;
   const location = normalizeLocation(data.事件地点);
   const hook = typeof data.事件引子 === 'string' ? data.事件引子.trim() : '';
@@ -307,17 +315,31 @@ function collectEvents() {
     if (keys.has(runtimeKey)) throw new Error(`runtimeKey 冲突: ${runtimeKey} (${sourceName})`);
     const parsed = parseYaml(fs.readFileSync(filePath, 'utf8'));
     const eventData = normalizeEventData(runtimeKey, descriptor, parsed);
-    const triggerHour = timeToHours(eventData.触发条件);
-    if (triggerHour === null) throw new Error(`事件 ${runtimeKey} 缺少有效触发条件`);
+    const triggerCondition = eventData.触发条件;
+    const triggerTime = getSingleConditionTimeAnchor(triggerCondition);
+    const triggerHour = timeToHours(triggerTime);
+    const conditional = !isPureTimeTrigger(triggerCondition);
+    if (!conditional && triggerHour === null) throw new Error(`事件 ${runtimeKey} 缺少有效时间触发条件`);
     const endHour = timeToHours(eventData.事件结束时间);
-    if (endHour !== null && endHour < triggerHour) throw new Error(`事件 ${runtimeKey} 的结束时间早于触发时间`);
-    const rawFollowup = eventData.后续事件?.事件名 ? canonicalReference(eventData.后续事件.事件名, runtimeKey) : null;
+    if (endHour !== null && triggerHour !== null && endHour < triggerHour)
+      throw new Error(`事件 ${runtimeKey} 的结束时间早于触发时间`);
+    const relativeDurationHours = eventData.事件持续时间
+      ? Number(eventData.事件持续时间.日 || 0) * 24 + Number(eventData.事件持续时间.时 || 0)
+      : null;
+    const normalizedFollowups = Object.fromEntries(
+      Object.entries(normalizeFollowupEvents(eventData.后续事件)).map(([reference, clue]) => [
+        canonicalReference(reference, runtimeKey),
+        clue,
+      ]),
+    );
     // Narrative labels such as “全书完”, “待定”, or “第3回-相关事件” are
     // intentionally not graph edges. They remain in the source definition but
     // do not participate in predecessor validation/indexing.
-    const followup = isResolvableEventReference(rawFollowup) ? rawFollowup : null;
+    const followups = Object.fromEntries(
+      Object.entries(normalizedFollowups).filter(([reference]) => isResolvableEventReference(reference)),
+    );
     const definition = JSON.parse(JSON.stringify(eventData));
-    if (followup) definition.后续事件 = { ...definition.后续事件, 事件名: followup };
+    if (eventData.后续事件) definition.后续事件 = normalizedFollowups;
     const definitionJson = JSON.stringify(stableValue(definition));
     keys.add(runtimeKey);
     events.push({
@@ -329,18 +351,23 @@ function collectEvents() {
       chapterNumber: romanChapterNumber(descriptor.chapter),
       sequence: descriptor.sequence ? Number(descriptor.sequence) : 0,
       title: descriptor.title || null,
-      triggerTime: eventData.触发条件,
+      triggerCondition,
+      triggerTime,
       triggerHour,
+      conditional,
       endTime: eventData.事件结束时间 || null,
       endHour,
-      durationHours: endHour === null ? null : Math.max(0, endHour - triggerHour),
-      discoveryHour: triggerHour - DISCOVERY_HOURS,
+      eventDuration: eventData.事件持续时间 || null,
+      durationHours:
+        relativeDurationHours ??
+        (endHour === null || triggerHour === null ? null : Math.max(0, endHour - triggerHour)),
+      discoveryHour: triggerHour === null ? null : triggerHour - DISCOVERY_HOURS,
       location: normalizeLocation(eventData.事件地点),
       intro: eventData.事件引子 || null,
       summary: eventData.事件概要 || null,
       participants: Array.isArray(eventData.参与人物) ? eventData.参与人物 : [],
-      predecessor: [],
-      followup,
+      followups,
+      branchMarkers: eventData.分支标记 || null,
       hash: sha256(definitionJson),
       definition,
     });
@@ -349,15 +376,12 @@ function collectEvents() {
   const byKey = new Map(events.map(event => [event.runtimeKey, event]));
   const unresolvedReferences = [];
   for (const event of events) {
-    if (!event.followup) continue;
-    const target = byKey.get(event.followup);
-    if (!target) {
-      unresolvedReferences.push({ sourceRuntimeKey: event.runtimeKey, targetRuntimeKey: event.followup });
-      continue;
+    for (const targetRuntimeKey of Object.keys(event.followups)) {
+      if (!byKey.has(targetRuntimeKey)) {
+        unresolvedReferences.push({ sourceRuntimeKey: event.runtimeKey, targetRuntimeKey });
+      }
     }
-    target.predecessor.push(event.runtimeKey);
   }
-  for (const event of events) event.predecessor.sort();
   return { events, unresolvedReferences };
 }
 
@@ -394,7 +418,7 @@ function createShards(events) {
 }
 
 function buildCheckpoints(events) {
-  const completedEvents = [...events].sort(
+  const completedEvents = events.filter(event => !event.conditional && Number.isFinite(event.triggerHour)).sort(
     (left, right) =>
       (left.endHour ?? left.triggerHour) - (right.endHour ?? right.triggerHour) || compareEvents(left, right),
   );
@@ -462,8 +486,10 @@ function writeAssets(events, unresolvedReferences) {
       intro: event.intro,
       summary: event.summary,
       participants: event.participants,
-      predecessor: event.predecessor,
-      followup: event.followup,
+      ...(event.conditional ? { triggerCondition: event.triggerCondition, conditional: true } : {}),
+      ...(event.eventDuration ? { eventDuration: event.eventDuration } : {}),
+      ...(Object.keys(event.followups).length > 0 ? { followups: event.followups } : {}),
+      ...(event.branchMarkers ? { branchMarkers: event.branchMarkers } : {}),
       hash: event.hash,
       shardId: shard.id,
     };
@@ -471,9 +497,11 @@ function writeAssets(events, unresolvedReferences) {
   const byLocation = {};
   for (const event of manifestEvents) (byLocation[event.location] ||= []).push(event.runtimeKey);
   const byTrigger = [...manifestEvents]
+    .filter(event => !event.conditional && Number.isFinite(event.triggerHour))
     .sort((a, b) => a.triggerHour - b.triggerHour || a.order - b.order)
     .map(event => ({ hour: event.triggerHour, runtimeKey: event.runtimeKey }));
   const byDiscovery = [...manifestEvents]
+    .filter(event => Number.isFinite(event.discoveryHour))
     .sort((a, b) => a.discoveryHour - b.discoveryHour || a.order - b.order)
     .map(event => ({ hour: event.discoveryHour, runtimeKey: event.runtimeKey }));
   const byEnd = [...manifestEvents]
@@ -501,7 +529,13 @@ function writeAssets(events, unresolvedReferences) {
       completedCount: checkpoint.completedCount,
       throughHour: checkpoint.throughHour,
     })),
-    indexes: { byTrigger, byDiscovery, byEnd, byLocation },
+    indexes: {
+      byTrigger,
+      byDiscovery,
+      byEnd,
+      byLocation,
+      conditional: manifestEvents.filter(event => event.conditional).map(event => event.runtimeKey),
+    },
     unresolvedReferences,
   };
   // Consumers compare this deterministic hash to detect catalog changes.

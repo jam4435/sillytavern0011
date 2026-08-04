@@ -10,19 +10,25 @@ import {
   calculateDateOffset,
   getEndTime,
   getEventDurationHours,
+  normalizeOrdinaryEventReference,
 } from './era-utils.js';
 import {
   evaluateEventCondition,
   getSingleConditionTimeAnchor,
 } from './era-event-schema.js';
 
-function buildConditionContext(currentTime, statData, eventDefinitions) {
+function buildConditionContext(currentTime, statData, eventDefinitions, sourceEventName = '') {
   const completedEvents = statData?.事件系统?.已完成事件 || {};
   return {
     currentTime,
     statData,
     completedEvents,
     compareTime,
+    isEventCompleted(reference) {
+      if (Object.prototype.hasOwnProperty.call(completedEvents, reference)) return true;
+      const normalizedReference = normalizeOrdinaryEventReference(reference, sourceEventName);
+      return Object.prototype.hasOwnProperty.call(completedEvents, normalizedReference);
+    },
     readVariable(rawPath, fallback) {
       const actual = fallback();
       if (actual.exists) return actual;
@@ -30,7 +36,10 @@ function buildConditionContext(currentTime, statData, eventDefinitions) {
       const path = String(rawPath || '').replace(/^stat_data\.?/, '');
       const match = path.match(/^事件分支结果\.([^.]+)\.([^.]+)$/);
       if (!match) return actual;
-      const [, completedEventName, markerName] = match;
+      const [, rawCompletedEventName, markerName] = match;
+      const completedEventName = Object.prototype.hasOwnProperty.call(completedEvents, rawCompletedEventName)
+        ? rawCompletedEventName
+        : normalizeOrdinaryEventReference(rawCompletedEventName, sourceEventName);
       // Old non-participated completions can read the worldbook default virtually.
       // A participated completion without an archived result remains unknown.
       if (completedEvents[completedEventName] !== 0) return actual;
@@ -46,11 +55,11 @@ function buildConditionContext(currentTime, statData, eventDefinitions) {
 export function isTimeForEvent(currentTime, eventData, eventName = '', statData = {}, eventDefinitions = {}) {
   return evaluateEventCondition(
     eventData?.触发条件,
-    buildConditionContext(currentTime, statData, eventDefinitions),
+    buildConditionContext(currentTime, statData, eventDefinitions, eventName),
   );
 }
 
-export function isEventDiscoverable(currentTime, eventData, statData = {}, eventDefinitions = {}) {
+export function isEventDiscoverable(currentTime, eventData, statData = {}, eventDefinitions = {}, eventName = '') {
   const triggerTime = getSingleConditionTimeAnchor(eventData?.触发条件);
   const durationHours = getEventDurationHours(eventData);
   if (!triggerTime || durationHours === null) {
@@ -66,7 +75,7 @@ export function isEventDiscoverable(currentTime, eventData, statData = {}, event
   if (!compareTime(currentTime, discoverableFrom, '>=')) return false;
 
   return evaluateEventCondition(eventData?.触发条件, {
-    ...buildConditionContext(currentTime, statData, eventDefinitions),
+    ...buildConditionContext(currentTime, statData, eventDefinitions, eventName),
     ignoreTimeConditions: true,
   });
 }

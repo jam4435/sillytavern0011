@@ -2,7 +2,7 @@ const ORDINARY_EVENT_KIND = 'ordinary';
 
 export function buildOpeningEventSummary(events) {
   return events
-    .filter(event => event.kind === ORDINARY_EVENT_KIND)
+    .filter(event => event.kind === ORDINARY_EVENT_KIND && !event.conditional && event.triggerTime)
     .map(event => {
       const triggerTime = event.triggerTime || {};
       const summaryTime = {

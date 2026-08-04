@@ -47,7 +47,7 @@
   const { readHistoryCheckoutJournal, isHistoryCheckoutJournalExpired } =
     await import('../shared/historyCheckoutJournal');
 
-  const EVENT_SCRIPT_VERSION = '2026-07-26-era-transaction-v1';
+  const EVENT_SCRIPT_VERSION = '2026-08-04-conditional-branches-v1';
   globalThis.__WUXIA_EVENT_SCRIPT_VERSION__ = EVENT_SCRIPT_VERSION;
   log(`事件脚本版本: ${EVENT_SCRIPT_VERSION}`);
 
@@ -226,7 +226,7 @@
       return true;
     }
 
-    return segments[0] === '参与事件';
+    return segments[0] === '参与事件' || segments[0] === '事件分支结果';
   };
 
   const getEventRelevantApiWritePaths = detail => {
@@ -328,7 +328,7 @@
         } else if (
           eventData &&
           !isDebutEvent(eventData) &&
-          isEventDiscoverable(currentTime, eventData, variables.stat_data, eventDefinitions) &&
+          isEventDiscoverable(currentTime, eventData, variables.stat_data, eventDefinitions, eventName) &&
           playerLocation === normalizeLocationPath(eventData.事件地点)
         ) {
           logSuccess(`玩家在弹性窗口精确到达事件地点，提前启动 ${eventName}`);
@@ -437,6 +437,7 @@
           eventDefinitions[eventName],
           updatedVariables.stat_data,
           eventDefinitions,
+          eventName,
         ),
       );
       // 即使当前没有候选事件也要执行一次，以清除历史检出后遗留的附近传闻派生缓存。

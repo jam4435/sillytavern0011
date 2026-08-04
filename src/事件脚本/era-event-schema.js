@@ -130,7 +130,12 @@ export function evaluateEventCondition(condition, context = {}) {
   }
   if (Object.prototype.hasOwnProperty.call(condition, '事件完成')) {
     const eventName = String(condition.事件完成 || '').trim();
-    return !!eventName && Object.prototype.hasOwnProperty.call(context.completedEvents || {}, eventName);
+    return (
+      !!eventName &&
+      (typeof context.isEventCompleted === 'function'
+        ? context.isEventCompleted(eventName)
+        : Object.prototype.hasOwnProperty.call(context.completedEvents || {}, eventName))
+    );
   }
   if (Object.prototype.hasOwnProperty.call(condition, '变量')) {
     return evaluateVariableCondition(condition, context.statData, context.readVariable);
@@ -201,7 +206,7 @@ export function validateAndNormalizeEventDefinition(eventName, eventData) {
   const rawFollowups = eventData.后续事件;
   const followups = normalizeFollowupEvents(rawFollowups);
   if (rawFollowups !== undefined) {
-    if (!isEventPlainObject(rawFollowups) || Object.keys(followups).length === 0) {
+    if (!isEventPlainObject(rawFollowups)) {
       errors.push(`事件 ${eventName}.后续事件 必须是旧单后续对象或目标事件到线索的字符串映射`);
     } else if (
       typeof rawFollowups.事件名 !== 'string' &&

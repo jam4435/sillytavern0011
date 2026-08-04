@@ -41,4 +41,21 @@ describe('manifest event scheduler', () => {
       lastCheckedTime: { 年: 1220, 月: 1, 日: 1, 时: 0 },
     });
   });
+
+  it('always considers conditional definitions until they complete or expire', () => {
+    const conditionalManifest = {
+      events: [{ runtimeKey: '条件事件', conditional: true, triggerHour: null, discoveryHour: null }],
+      indexes: { byTrigger: [], byDiscovery: [], conditional: ['条件事件'] },
+    };
+    expect(
+      getManifestEventCandidateKeys(conditionalManifest, { 年: 1, 月: 1, 日: 1, 时: 0 }, {
+        事件系统: { 已完成事件: {}, 已失效事件: {}, 进行中事件: {} },
+      }),
+    ).toEqual(['条件事件']);
+    expect(
+      getManifestEventCandidateKeys(conditionalManifest, { 年: 1, 月: 1, 日: 1, 时: 0 }, {
+        事件系统: { 已完成事件: {}, 已失效事件: { 条件事件: 1 }, 进行中事件: {} },
+      }),
+    ).toEqual([]);
+  });
 });

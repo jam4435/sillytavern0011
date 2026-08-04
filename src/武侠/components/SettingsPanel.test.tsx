@@ -224,6 +224,7 @@ describe('SettingsPanel variable groups', () => {
         前端变量: { 隐藏标记: '不可搜索' },
         后续事件线索计数: { 隐藏计数: 3 },
         世界事件: { 隐藏历史: '不可搜索' },
+        事件分支结果: { 隐藏分支: { 变心: 1 } },
       },
     });
   });
@@ -286,11 +287,12 @@ describe('SettingsPanel variable groups', () => {
     expect(screen.queryByRole('tab', { name: '前端变量' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: '后续事件线索计数' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: '世界事件' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '事件分支结果' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: '全局路径' }));
     const searchInput = screen.getByLabelText('全局搜索');
 
-    for (const hiddenRoot of ['前端变量', '后续事件线索计数', '世界事件']) {
+    for (const hiddenRoot of ['前端变量', '后续事件线索计数', '世界事件', '事件分支结果']) {
       fireEvent.change(searchInput, { target: { value: hiddenRoot } });
       expect(screen.getByText('没有命中的变量路径')).toBeInTheDocument();
     }

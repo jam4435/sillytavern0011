@@ -35,7 +35,7 @@ describe('generated wuxia event assets', () => {
     }
   });
 
-  it('resolves all graph edges and records legacy dangling references explicitly', () => {
+  it('records follow-up associations without generating predecessor gates', () => {
     const runtimeKeys = new Set(manifest.events.map((event: any) => event.runtimeKey));
     const unresolved = new Set(
       manifest.unresolvedReferences.map(
@@ -43,15 +43,35 @@ describe('generated wuxia event assets', () => {
       ),
     );
     for (const event of manifest.events) {
-      for (const predecessor of event.predecessor) expect(runtimeKeys.has(predecessor)).toBe(true);
-      if (event.followup && !runtimeKeys.has(event.followup)) {
-        expect(unresolved.has(`${event.runtimeKey}\0${event.followup}`)).toBe(true);
+      expect(event.predecessor).toBeUndefined();
+      for (const followup of Object.keys(event.followups || {})) {
+        if (!runtimeKeys.has(followup)) {
+          expect(unresolved.has(`${event.runtimeKey}\0${followup}`)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('keeps conditional definitions out of deterministic checkpoint indexes', () => {
+    const conditionalKeys = new Set(manifest.indexes.conditional || []);
+    const checkpointKeys = new Set<string>();
+    for (const checkpoint of manifest.checkpoints) {
+      const payload = JSON.parse(fs.readFileSync(path.join(assetRoot, checkpoint.file), 'utf8'));
+      payload.completedRuntimeKeys.forEach((key: string) => checkpointKeys.add(key));
+    }
+    for (const event of manifest.events) {
+      expect(event.triggerCondition || event.triggerTime).toBeDefined();
+      if (event.conditional) {
+        expect(conditionalKeys.has(event.runtimeKey)).toBe(true);
+        expect(checkpointKeys.has(event.runtimeKey)).toBe(false);
       }
     }
   });
 
   it('keeps the opening event summary synchronized with ordinary worldbook events', () => {
-    const ordinaryEvents = manifest.events.filter((event: any) => event.kind === 'ordinary');
+    const ordinaryEvents = manifest.events.filter(
+      (event: any) => event.kind === 'ordinary' && !event.conditional && event.triggerTime,
+    );
     const summaryByName = new Map(openingEventSummary.map((event: any) => [event.事件名称, event]));
 
     expect(openingEventSummary).toHaveLength(ordinaryEvents.length);

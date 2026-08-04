@@ -115,7 +115,7 @@ const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|Variab
 const ERA_VARIABLE_BLOCK_STRIP_REGEX = /\s*<Variable(Think|Insert|Edit|Delete)>\s*[\s\S]*?<\/Variable\1>\s*/gi;
 const ACTION_BLOCK_TAGS = new Set(['VariableInsert', 'VariableEdit', 'VariableDelete']);
 const EXTRA_VARIABLE_READONLY_ENTITY_KEYS = new Set(['头像', '出生年份', '年龄', '初始属性', '天赋']);
-const PARTICIPATION_WRITABLE_KEYS = ['结局', 'insert', 'update', 'delete'] as const;
+const PARTICIPATION_WRITABLE_KEYS = ['结局', 'insert', 'update', 'delete', '分支标记'] as const;
 const VARIABLE_ROOT_KEY_ALIASES: Record<string, string> = {
   玩家数据: 'user数据',
   同场景角色: '角色数据',
@@ -973,7 +973,7 @@ function formatVariableContext(projection: Record<string, unknown>, participatio
   const writableParticipationEvents = isRecord(projection.参与事件) ? projection.参与事件 : {};
 
   if (isRecord(participationEvents) && Object.keys(writableParticipationEvents).length > 0) {
-    lines.push('', '# 当前事件上下文：方括号是只读背景，JSON中的四个字段按规则有条件可写', '<参与事件>');
+    lines.push('', '# 当前事件上下文：方括号是只读背景，JSON中的已有字段按规则有条件可写', '<参与事件>');
     for (const [eventName, writableSnapshot] of Object.entries(writableParticipationEvents)) {
       const eventValue = isRecord(participationEvents[eventName]) ? participationEvents[eventName] : {};
       const readonlyDescription = String(eventValue.描述 ?? '')

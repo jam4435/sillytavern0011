@@ -277,7 +277,7 @@ const LEGACY_DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传
 1. 只有 latestAssistantBody 是本轮变化来源；readonlyContextRounds 只用于理解上下文。
 2. 逐级对照“当前变量上下文”中的真实键名。目标键已经存在只能使用 VariableEdit；目标键不存在才可使用 VariableInsert；VariableDelete 只能删除已存在的键。
 3. 同一事实已经存在且正文没有改变它时，不要重复 Insert，也不要无意义 Edit。
-4. 只允许修改：世界信息.时间、user数据、角色数据、当前上下文中已存在的参与事件之结局/insert/update/delete。方括号说明和可用地点都只读。
+4. 只允许修改：世界信息.时间、user数据、角色数据、当前上下文中已存在的参与事件之结局/insert/update/delete，以及已有分支标记的 0/1 值。分支标记只能 Edit，禁止新增、删除或改成其他值；事件分支结果永远只读。方括号说明和可用地点都只读。
 5. 如果没有需要持久化的变化，只输出简短 VariableThink，不输出 Insert/Edit/Delete。
 
 输出要求：
@@ -324,7 +324,7 @@ export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传
 1. 只有上方 latestAssistantBody 是本轮变化来源；前序对话只用于理解上下文。
 2. 逐级对照当前变量上下文中的真实键名。最终目标键已存在只能使用 VariableEdit，不存在才可使用 VariableInsert；VariableDelete 只能删除已存在的键。
 3. 正文没有改变的事实不得重复 Insert 或无意义 Edit。
-4. 只允许修改世界信息.时间、user数据、角色数据，以及当前上下文已有参与事件的结局/insert/update/delete。
+4. 只允许修改世界信息.时间、user数据、角色数据，以及当前上下文已有参与事件的结局/insert/update/delete和已有分支标记的 0/1 值。分支标记只能 Edit，禁止新增、删除或改成其他值；禁止写事件分支结果。
 5. 方括号说明、叙事表现标尺、可用地点列表和其他只读内容不得写回变量。
 6. 没有需要持久化的变化时，只输出简短 VariableThink。
 
