@@ -90,17 +90,32 @@ describe('debugRoundView', () => {
     expect(buildVariableOutputDebugContent(debugRound)).toContain('最近等待：1000ms');
   });
 
+  it('正文和额外变量调试都展示自动推进普通失败重试', () => {
+    const debugRound = createDebugRound();
+    debugRound.main.retryFailureCount = 2;
+    debugRound.main.retryFailureLastDelayMs = 2_000;
+    debugRound.variable.retryFailureCount = 1;
+    debugRound.variable.retryFailureLastDelayMs = 1_000;
+
+    expect(buildMainInputDebugContent(debugRound)).toContain('【自动推进失败重试】');
+    expect(buildMainInputDebugContent(debugRound)).toContain('最近等待：2000ms');
+    expect(buildVariableOutputDebugContent(debugRound)).toContain('【自动推进失败重试】');
+    expect(buildVariableOutputDebugContent(debugRound)).toContain('最近等待：1000ms');
+  });
+
   it('变量调试展示当前等待阶段和 watchdog 次数', () => {
     const debugRound = createDebugRound();
     debugRound.variable.currentPhase = 'append-variable-blocks';
-    debugRound.variable.phaseTimeline = [{
-      name: 'append-variable-blocks',
-      status: 'running',
-      startedAt: 1_000,
-      updatedAt: 11_000,
-      durationMs: 10_000,
-      watchdogTickCount: 2,
-    }];
+    debugRound.variable.phaseTimeline = [
+      {
+        name: 'append-variable-blocks',
+        status: 'running',
+        startedAt: 1_000,
+        updatedAt: 11_000,
+        durationMs: 10_000,
+        watchdogTickCount: 2,
+      },
+    ];
 
     const output = buildVariableOutputDebugContent(debugRound);
     expect(output).toContain('【变量流水线耗时】');

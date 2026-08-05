@@ -9,6 +9,7 @@ import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryAp
 import { dataLogger, variableTraceLogger } from './logger';
 import { recordIframeLifecycleEvent } from './iframeLifecycleBlackBox';
 import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
+import { runWithAutoAdvanceFailureRetry } from './autoAdvanceRetry';
 import { runWith429Retry } from './rateLimitRetry';
 import {
   parseDeclaredVariableChanges,
@@ -21,7 +22,6 @@ const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
 const WORLD_BACKGROUND_ENTRY_NAME = '世界背景';
 const NARRATIVE_SCALE_START_MARKER = '<叙事表现标尺>';
 const NARRATIVE_SCALE_END_MARKER = '</叙事表现标尺>';
-const SNAPSHOT_STORAGE_KEY = 'wuxia_extra_variable_guidance_snapshot';
 const EXTRA_VARIABLE_UPDATE_TIMEOUT_MS = 360000;
 const ERA_SYNC_TIMEOUT_MS = 20000;
 const ERA_PERSISTENCE_FOREGROUND_VERIFY_TIMEOUT_MS = 15000;
@@ -46,14 +46,6 @@ type WorldbookEntryLocation = {
   entry: WorldbookEntry;
 };
 
-type VariableGuidanceSnapshot = {
-  worldbookName: string;
-  uid: number;
-  name: string;
-  wasEnabled: boolean;
-  savedAt: number;
-};
-
 export type ExtraVariableUpdateReservation = {
   release: () => void;
 };
@@ -71,6 +63,8 @@ export type ExtraVariableUpdateResult = {
   syncVerification?: string;
   retry429Count?: number;
   retry429LastDelayMs?: number;
+  retryFailureCount?: number;
+  retryFailureLastDelayMs?: number;
   applyStatus?: ExtraVariableApplyStatus;
   applyVerification?: string;
   applyError?: string;
@@ -316,22 +310,10 @@ async function waitForDeclaredChangesPersisted(
   return latest;
 }
 
-export async function ensureTurnVariableBlocksCommitted({
-  assistantMessageId,
-  blocksText,
-  timeoutMs = ERA_PERSISTENCE_FOREGROUND_VERIFY_TIMEOUT_MS,
-}: {
-  assistantMessageId: number;
-  blocksText: string;
-  timeoutMs?: number;
-}): Promise<PersistenceVerification> {
+export function assertValidTurnVariableBlocks(blocksText: string): boolean {
   const hasActionOpeningTag = /<Variable(?:Insert|Edit|Delete)>/.test(blocksText);
   if (!hasActionOpeningTag) {
-    return {
-      verified: true,
-      verification: '本回合没有变量动作块，无需等待 ERA 提交。',
-      pendingPaths: [],
-    };
+    return false;
   }
 
   const completeActionBlocks =
@@ -347,6 +329,27 @@ export async function ensureTurnVariableBlocksCommitted({
   if (declaredState.declaredChanges.length === 0) {
     throw new Error('本回合变量动作块没有可验证的变量声明，无法确认 ERA 提交。');
   }
+
+  return true;
+}
+
+export async function ensureTurnVariableBlocksCommitted({
+  assistantMessageId,
+  blocksText,
+  timeoutMs = ERA_PERSISTENCE_FOREGROUND_VERIFY_TIMEOUT_MS,
+}: {
+  assistantMessageId: number;
+  blocksText: string;
+  timeoutMs?: number;
+}): Promise<PersistenceVerification> {
+  if (!assertValidTurnVariableBlocks(blocksText)) {
+    return {
+      verified: true,
+      verification: '本回合没有变量动作块，无需等待 ERA 提交。',
+      pendingPaths: [],
+    };
+  }
+  const declaredState = parseDeclaredVariableChanges(blocksText);
 
   const verification = await waitForDeclaredChangesPersisted(declaredState.declaredChanges, timeoutMs, {
     stopWhenHidden: false,
@@ -605,41 +608,6 @@ async function findWorldbookEntryByExactName(entryName: string): Promise<Worldbo
   return null;
 }
 
-function readGuidanceSnapshot(): VariableGuidanceSnapshot | null {
-  try {
-    const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as Partial<VariableGuidanceSnapshot>;
-    if (
-      typeof parsed.worldbookName === 'string' &&
-      typeof parsed.uid === 'number' &&
-      typeof parsed.name === 'string' &&
-      typeof parsed.wasEnabled === 'boolean'
-    ) {
-      return {
-        worldbookName: parsed.worldbookName,
-        uid: parsed.uid,
-        name: parsed.name,
-        wasEnabled: parsed.wasEnabled,
-        savedAt: typeof parsed.savedAt === 'number' ? parsed.savedAt : Date.now(),
-      };
-    }
-  } catch (error) {
-    dataLogger.warn('读取变量指导世界书快照失败:', error);
-  }
-  return null;
-}
-
-function writeGuidanceSnapshot(snapshot: VariableGuidanceSnapshot): void {
-  localStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot));
-}
-
-function clearGuidanceSnapshot(): void {
-  localStorage.removeItem(SNAPSHOT_STORAGE_KEY);
-}
-
 async function setWorldbookEntryEnabled(
   worldbookName: string,
   uid: number,
@@ -673,75 +641,36 @@ async function setWorldbookEntryEnabled(
   return matchedBy;
 }
 
-async function ensureVariableGuidanceDisabled(): Promise<VariableGuidanceSnapshot> {
+async function ensureVariableGuidanceEnabled(enabled: boolean): Promise<boolean> {
   const location = await findWorldbookEntryByExactName(VARIABLE_GUIDANCE_ENTRY_NAME);
   if (!location) {
     throw new Error(`未找到当前角色世界书中的精确条目「${VARIABLE_GUIDANCE_ENTRY_NAME}」。`);
   }
 
-  const existingSnapshot = readGuidanceSnapshot();
-  const canReuseSnapshot =
-    existingSnapshot?.worldbookName === location.worldbookName && existingSnapshot.name === location.entry.name;
-  const snapshot = canReuseSnapshot
-    ? { ...existingSnapshot, uid: location.entry.uid }
-    : {
-        worldbookName: location.worldbookName,
-        uid: location.entry.uid,
-        name: location.entry.name,
-        wasEnabled: location.entry.enabled,
-        savedAt: Date.now(),
-      };
-  if (existingSnapshot && !canReuseSnapshot) {
-    dataLogger.warn('检测到不属于当前变量指导条目的旧快照，已用当前条目状态替换。', {
-      oldSnapshot: existingSnapshot,
-      currentWorldbookName: location.worldbookName,
-      currentUid: location.entry.uid,
-      currentName: location.entry.name,
-    });
-  }
-  writeGuidanceSnapshot(snapshot);
-
-  if (location.entry.enabled) {
-    await setWorldbookEntryEnabled(location.worldbookName, location.entry.uid, location.entry.name, false);
+  if (location.entry.enabled === enabled) {
+    return false;
   }
 
-  return snapshot;
-}
-
-async function restoreVariableGuidanceFromSnapshot(): Promise<string> {
-  const snapshot = readGuidanceSnapshot();
-  if (!snapshot) {
-    return `未找到已记录的「${VARIABLE_GUIDANCE_ENTRY_NAME}」原始状态，无需恢复。`;
-  }
-
-  const restored = await setWorldbookEntryEnabled(
-    snapshot.worldbookName,
-    snapshot.uid,
-    snapshot.name,
-    snapshot.wasEnabled,
+  const matchedBy = await setWorldbookEntryEnabled(
+    location.worldbookName,
+    location.entry.uid,
+    location.entry.name,
+    enabled,
   );
-  if (!restored) {
-    throw new Error(`无法在世界书「${snapshot.worldbookName}」中找到要恢复的「${snapshot.name}」条目。`);
-  }
-  if (restored === 'name') {
-    dataLogger.warn(`变量指导条目 uid 已变化，已按名称在世界书「${snapshot.worldbookName}」中完成恢复。`, {
-      snapshotUid: snapshot.uid,
-      entryName: snapshot.name,
-    });
+  if (!matchedBy) {
+    throw new Error(`无法在世界书「${location.worldbookName}」中找到「${location.entry.name}」条目。`);
   }
 
-  clearGuidanceSnapshot();
-  return snapshot.wasEnabled
-    ? `已恢复「${VARIABLE_GUIDANCE_ENTRY_NAME}」为启用。`
-    : `已恢复「${VARIABLE_GUIDANCE_ENTRY_NAME}」为原本的禁用状态。`;
+  return true;
 }
 
 export async function applyVariableUpdateModeWorldbookState(mode: SummaryVariableUpdateMode): Promise<string> {
-  if (mode === 'extra') {
-    await ensureVariableGuidanceDisabled();
-    return `已禁用当前角色世界书中的「${VARIABLE_GUIDANCE_ENTRY_NAME}」，之后将额外调用模型更新变量。`;
-  }
-  return restoreVariableGuidanceFromSnapshot();
+  const enabled = mode === 'inline';
+  const changed = await ensureVariableGuidanceEnabled(enabled);
+  const stateLabel = enabled ? '启用' : '禁用';
+  return changed
+    ? `已${stateLabel}当前角色世界书中的「${VARIABLE_GUIDANCE_ENTRY_NAME}」。`
+    : `当前角色世界书中的「${VARIABLE_GUIDANCE_ENTRY_NAME}」已经是${stateLabel}状态。`;
 }
 
 function reserveExtraVariableUpdate(): ExtraVariableUpdateReservation {
@@ -779,7 +708,7 @@ export async function prepareExtraVariableUpdateTurn(
         throw new Error(validationMessage);
       }
     }
-    await ensureVariableGuidanceDisabled();
+    await ensureVariableGuidanceEnabled(false);
     return reservation;
   } catch (error) {
     reservation.release();
@@ -1438,12 +1367,14 @@ export async function executeExtraVariableUpdate({
   settings,
   assistantMessageId,
   latestRawReply,
+  retryAutoAdvanceFailures = false,
   onPromptBuilt,
   onProgress,
 }: {
   settings: SummarySettings;
   assistantMessageId: number;
   latestRawReply: string;
+  retryAutoAdvanceFailures?: boolean;
   onPromptBuilt?: (prompt: string) => void;
   onProgress?: (progress: ExtraVariableUpdateProgress) => void;
 }): Promise<ExtraVariableUpdateResult> {
@@ -1458,6 +1389,8 @@ export async function executeExtraVariableUpdate({
   beginExtraVariableUpdate();
   let retry429Count = 0;
   let retry429LastDelayMs = 0;
+  let retryFailureCount = 0;
+  let retryFailureLastDelayMs = 0;
   const phaseTimeline: ExtraVariablePhaseTiming[] = [];
   const publishPhaseTimeline = (currentPhase: string) => {
     onProgress?.({
@@ -1550,7 +1483,7 @@ export async function executeExtraVariableUpdate({
       variableUpdateMode: settings.variableUpdateMode,
       latestRawReplyLength: latestRawReply.length,
     });
-    await runPhase('disable-variable-guidance', () => ensureVariableGuidanceDisabled());
+    await runPhase('disable-variable-guidance', () => ensureVariableGuidanceEnabled(false));
     const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
     const prompt = await runPhase('build-variable-prompt', () =>
       buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply }),
@@ -1562,8 +1495,9 @@ export async function executeExtraVariableUpdate({
       promptLength: prompt.length,
       prompt,
     });
-    const rawResponse = await runPhase('request-variable-model', () =>
-      runWith429Retry(
+    let prevalidatedExtraction: ReturnType<typeof extractValidVariableBlocks> | null = null;
+    const requestVariableModel = async () => {
+      const rawResponse = await runWith429Retry(
         () =>
           requestConfiguredText({
             prompt,
@@ -1588,7 +1522,33 @@ export async function executeExtraVariableUpdate({
             });
           },
         },
-      ),
+      );
+      if (retryAutoAdvanceFailures) {
+        if (!rawResponse.trim()) {
+          throw new Error('额外变量模型返回空回复');
+        }
+        prevalidatedExtraction = extractValidVariableBlocks(rawResponse);
+      }
+      return rawResponse;
+    };
+    const rawResponse = await runPhase('request-variable-model', () =>
+      retryAutoAdvanceFailures
+        ? runWithAutoAdvanceFailureRetry(requestVariableModel, {
+            requestLabel: '额外变量模型',
+            onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
+              retryFailureCount = retryNumber;
+              retryFailureLastDelayMs = delayMs;
+              onProgress?.({ retryFailureCount, retryFailureLastDelayMs });
+              variableTraceLogger.warn('[extraVariableUpdate] 额外变量模型失败，准备自动推进重试', {
+                assistantMessageId,
+                retryNumber,
+                maxRetries,
+                delayMs,
+                error,
+              });
+            },
+          })
+        : requestVariableModel(),
     );
     variableTraceLogger.log('[extraVariableUpdate] 额外模型已返回', {
       assistantMessageId,
@@ -1597,7 +1557,7 @@ export async function executeExtraVariableUpdate({
     });
     onProgress?.({ prompt, rawResponse });
     const { blocksText, actionBlockCount, declaredState } = await runPhase('parse-variable-response', () => {
-      const extracted = extractValidVariableBlocks(rawResponse);
+      const extracted = prevalidatedExtraction ?? extractValidVariableBlocks(rawResponse);
       return {
         ...extracted,
         declaredState: parseDeclaredVariableChanges(extracted.blocksText),
@@ -1625,6 +1585,8 @@ export async function executeExtraVariableUpdate({
         rawResponse,
         retry429Count,
         retry429LastDelayMs,
+        retryFailureCount,
+        retryFailureLastDelayMs,
       };
     }
 
@@ -1786,6 +1748,8 @@ export async function executeExtraVariableUpdate({
       syncVerification: syncVerification.verification,
       retry429Count,
       retry429LastDelayMs,
+      retryFailureCount,
+      retryFailureLastDelayMs,
       applyStatus,
       applyVerification: persistenceVerification.verification,
     };

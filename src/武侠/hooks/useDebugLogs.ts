@@ -4,13 +4,7 @@ const DEBUG_ROUND_STORAGE_KEY = 'wuxia_latest_debug_round';
 
 export type DebugStageStatus = 'idle' | 'running' | 'success' | 'error';
 export type ExtendedDebugStageStatus = DebugStageStatus | 'skipped';
-export type DebugVariableApplyStatus =
-  | 'idle'
-  | 'waiting-write-done'
-  | 'verifying'
-  | 'success'
-  | 'pending'
-  | 'error';
+export type DebugVariableApplyStatus = 'idle' | 'waiting-write-done' | 'verifying' | 'success' | 'pending' | 'error';
 export type DebugTrigger = '' | 'send' | 'regenerate';
 export type DebugVariableModeSnapshot = '' | 'inline' | 'extra';
 export type DebugVariablePhaseStatus = 'running' | 'success' | 'error';
@@ -35,6 +29,10 @@ export interface DebugStage {
   retry429Count?: number;
   /** 最近一次 HTTP 429 重试前的等待时长。 */
   retry429LastDelayMs?: number;
+  /** 自动推进中非 429 模型失败、空回复或响应校验失败的重试次数。 */
+  retryFailureCount?: number;
+  /** 最近一次自动推进普通失败重试前的等待时长。 */
+  retryFailureLastDelayMs?: number;
 }
 
 export interface LatestDebugRound {
@@ -86,6 +84,8 @@ function createEmptyDebugRound(): LatestDebugRound {
       status: 'idle',
       retry429Count: 0,
       retry429LastDelayMs: 0,
+      retryFailureCount: 0,
+      retryFailureLastDelayMs: 0,
       userInput: '',
       combinedPrompt: '',
       output: '',
@@ -94,6 +94,8 @@ function createEmptyDebugRound(): LatestDebugRound {
       status: 'idle',
       retry429Count: 0,
       retry429LastDelayMs: 0,
+      retryFailureCount: 0,
+      retryFailureLastDelayMs: 0,
       trigger: '',
       modeSnapshot: '',
       skipReason: '',
@@ -139,12 +141,12 @@ function normalizeDebugVariableModeSnapshot(value: unknown): DebugVariableModeSn
 }
 
 function normalizeDebugVariableApplyStatus(value: unknown): DebugVariableApplyStatus {
-  return value === 'waiting-write-done'
-    || value === 'verifying'
-    || value === 'success'
-    || value === 'pending'
-    || value === 'error'
-    || value === 'idle'
+  return value === 'waiting-write-done' ||
+    value === 'verifying' ||
+    value === 'success' ||
+    value === 'pending' ||
+    value === 'error' ||
+    value === 'idle'
     ? value
     : 'idle';
 }
@@ -166,16 +168,18 @@ function normalizeDebugVariablePhaseTimeline(value: unknown): DebugVariablePhase
     }
     const status: DebugVariablePhaseStatus =
       phase.status === 'success' || phase.status === 'error' ? phase.status : 'running';
-    return [{
-      name,
-      status,
-      startedAt,
-      updatedAt: normalizeNumber(phase.updatedAt) ?? startedAt,
-      finishedAt: normalizeNumber(phase.finishedAt),
-      durationMs: normalizeNumber(phase.durationMs) ?? 0,
-      watchdogTickCount: normalizeNumber(phase.watchdogTickCount) ?? 0,
-      error: normalizeString(phase.error),
-    }];
+    return [
+      {
+        name,
+        status,
+        startedAt,
+        updatedAt: normalizeNumber(phase.updatedAt) ?? startedAt,
+        finishedAt: normalizeNumber(phase.finishedAt),
+        durationMs: normalizeNumber(phase.durationMs) ?? 0,
+        watchdogTickCount: normalizeNumber(phase.watchdogTickCount) ?? 0,
+        error: normalizeString(phase.error),
+      },
+    ];
   });
 }
 
@@ -206,6 +210,8 @@ function normalizeLoadedDebugRound(value: unknown): LatestDebugRound | null {
       error: normalizeString(main.error),
       retry429Count: normalizeNumber(main.retry429Count) ?? 0,
       retry429LastDelayMs: normalizeNumber(main.retry429LastDelayMs) ?? 0,
+      retryFailureCount: normalizeNumber(main.retryFailureCount) ?? 0,
+      retryFailureLastDelayMs: normalizeNumber(main.retryFailureLastDelayMs) ?? 0,
       userInput: normalizeString(main.userInput),
       combinedPrompt: normalizeString(main.combinedPrompt),
       output: normalizeString(main.output),
@@ -217,6 +223,8 @@ function normalizeLoadedDebugRound(value: unknown): LatestDebugRound | null {
       error: normalizeString(variable.error),
       retry429Count: normalizeNumber(variable.retry429Count) ?? 0,
       retry429LastDelayMs: normalizeNumber(variable.retry429LastDelayMs) ?? 0,
+      retryFailureCount: normalizeNumber(variable.retryFailureCount) ?? 0,
+      retryFailureLastDelayMs: normalizeNumber(variable.retryFailureLastDelayMs) ?? 0,
       trigger: normalizeDebugTrigger(variable.trigger),
       modeSnapshot: normalizeDebugVariableModeSnapshot(variable.modeSnapshot),
       skipReason: normalizeString(variable.skipReason),
@@ -299,6 +307,8 @@ export function useDebugLogs() {
         startedAt: now,
         retry429Count: 0,
         retry429LastDelayMs: 0,
+        retryFailureCount: 0,
+        retryFailureLastDelayMs: 0,
         userInput,
         combinedPrompt: '',
         output: '',

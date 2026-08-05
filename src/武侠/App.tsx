@@ -50,7 +50,10 @@ import { migrateAvatarState } from './utils/avatarState';
 import { equipInventoryItem, useMedicineItem } from './utils/itemManager';
 import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inventoryAttributePreview';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
-import { getIsExtraVariableUpdating } from './utils/extraVariableUpdateManager';
+import {
+  applyVariableUpdateModeWorldbookState,
+  getIsExtraVariableUpdating,
+} from './utils/extraVariableUpdateManager';
 import {
   readLatestAssistantSnapshot,
   saveLatestAssistantSnapshot,
@@ -171,6 +174,7 @@ const App: React.FC = () => {
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
+  const initialVariableUpdateModeRef = useRef(displaySettings.summarySettings.variableUpdateMode);
   const [currentPresetName, setCurrentPresetName] = useState(() => getLoadedPresetNameSafe());
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
@@ -424,6 +428,12 @@ const App: React.FC = () => {
   useEffect(() => {
     applySettingsToDOM(displaySettings);
   }, [displaySettings]);
+
+  useEffect(() => {
+    void applyVariableUpdateModeWorldbookState(initialVariableUpdateModeRef.current)
+      .then(status => initLogger.log(`[变量更新模式] 初始化校验完成：${status}`))
+      .catch(error => initLogger.error('[变量更新模式] 初始化校验世界书状态失败:', error));
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') {

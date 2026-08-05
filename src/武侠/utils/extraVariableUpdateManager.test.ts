@@ -22,6 +22,7 @@ vi.mock('./variableReader', () => ({
 
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import {
+  applyVariableUpdateModeWorldbookState,
   buildExtraVariableProjection,
   ensureTurnVariableBlocksCommitted,
   executeExtraVariableUpdate,
@@ -265,6 +266,32 @@ describe('executeExtraVariableUpdate', () => {
     });
   });
 
+  it('inline 模式强制启用变量指导，即使它原本处于禁用状态', async () => {
+    worldbookEntries[0].enabled = false;
+
+    const status = await applyVariableUpdateModeWorldbookState('inline');
+
+    expect(worldbookEntries[0].enabled).toBe(true);
+    expect(status).toContain('已启用');
+    expect(globalScope.updateWorldbookWith).toHaveBeenCalledTimes(1);
+  });
+
+  it('extra 模式强制禁用变量指导，即使它原本处于启用状态', async () => {
+    const status = await applyVariableUpdateModeWorldbookState('extra');
+
+    expect(worldbookEntries[0].enabled).toBe(false);
+    expect(status).toContain('已禁用');
+    expect(globalScope.updateWorldbookWith).toHaveBeenCalledTimes(1);
+  });
+
+  it('模式与变量指导状态已经一致时不重复写世界书', async () => {
+    const status = await applyVariableUpdateModeWorldbookState('inline');
+
+    expect(worldbookEntries[0].enabled).toBe(true);
+    expect(status).toContain('已经是启用状态');
+    expect(globalScope.updateWorldbookWith).not.toHaveBeenCalled();
+  });
+
   it('追加变量块时使用 refresh:none，并以严格目标参数等待 ERA 完成', async () => {
     const onProgress = vi.fn();
     const settings = {
@@ -488,6 +515,43 @@ describe('executeExtraVariableUpdate', () => {
     ).resolves.toEqual(expect.objectContaining({ appended: false }));
   });
 
+  it('自动推进会在落变量块前重试额外模型普通失败和空回复', async () => {
+    vi.useFakeTimers();
+    requestConfiguredTextMock
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockResolvedValueOnce('')
+      .mockResolvedValue('<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>');
+    const onProgress = vi.fn();
+
+    try {
+      const updatePromise = executeExtraVariableUpdate({
+        settings: {
+          ...DEFAULT_SUMMARY_SETTINGS,
+          variableUpdateMode: 'extra',
+        },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+        retryAutoAdvanceFailures: true,
+        onProgress,
+      });
+      await vi.advanceTimersByTimeAsync(3000);
+      const result = await updatePromise;
+
+      expect(requestConfiguredTextMock).toHaveBeenCalledTimes(3);
+      expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
+      expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({
+        appended: true,
+        retryFailureCount: 2,
+        retryFailureLastDelayMs: 2000,
+      });
+      expect(onProgress).toHaveBeenCalledWith({ retryFailureCount: 1, retryFailureLastDelayMs: 1000 });
+      expect(onProgress).toHaveBeenCalledWith({ retryFailureCount: 2, retryFailureLastDelayMs: 2000 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('自定义模板未放置 locationContext 时不会强行追加地点约束', async () => {
     await executeExtraVariableUpdate({
       settings: {
@@ -668,9 +732,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(fallbackProjection).toBe(normalProjection);
     expect(fallbackProjection).toContain('<status_current_variables>');
     expect(fallbackProjection).toContain('[只读时间、地点与事件背景：黄蓉正在事件中]');
-    expect(fallbackProjection).toContain(
-      '{"update":{"黄蓉":{"好感":1}},"分支标记":{"黄蓉对郭靖变心":0}}',
-    );
+    expect(fallbackProjection).toContain('{"update":{"黄蓉":{"好感":1}},"分支标记":{"黄蓉对郭靖变心":0}}');
     expect(fallbackProjection).not.toContain('前端变量');
   });
 });

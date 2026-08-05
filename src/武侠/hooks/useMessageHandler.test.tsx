@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../utils/variableReader', () => ({
   flushPendingGameDataCompletion: vi.fn(async () => {}),
@@ -35,6 +35,12 @@ vi.mock('../utils/locationContext', () => ({
 }));
 
 vi.mock('../utils/extraVariableUpdateManager', () => ({
+  assertValidTurnVariableBlocks: vi.fn((text: string) => {
+    if (text.includes('{invalid json}')) {
+      throw new Error('本回合变量动作块无法完整解析');
+    }
+    return text.includes('<VariableInsert>') || text.includes('<VariableEdit>') || text.includes('<VariableDelete>');
+  }),
   ensureTurnVariableBlocksCommitted: vi.fn(),
   executeExtraVariableUpdate: vi.fn(),
   prepareExtraVariableUpdateTurn: vi.fn(),
@@ -185,6 +191,10 @@ describe('useMessageHandler extra-variable decision', () => {
     });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('回合锁未确认时不会创建用户楼层', async () => {
     vi.useFakeTimers();
     turnLockAckResponder.stop();
@@ -325,10 +335,7 @@ describe('useMessageHandler extra-variable decision', () => {
       chatId: expect.any(String),
       messageId: 2,
     });
-    expect(globals.eventEmit).not.toHaveBeenCalledWith(
-      'wuxia:sync-latest-message-shell',
-      expect.anything(),
-    );
+    expect(globals.eventEmit).not.toHaveBeenCalledWith('wuxia:sync-latest-message-shell', expect.anything());
   });
 
   it('send 遇到两次 429 后只落一次用户和 assistant 楼层', async () => {
@@ -395,6 +402,89 @@ describe('useMessageHandler extra-variable decision', () => {
         retry429LastDelayMs: 0,
       },
     });
+  });
+
+  it('自动推进会重试正文普通失败且不会重复创建楼层', async () => {
+    vi.useFakeTimers();
+    globals.generate = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockResolvedValue('普通失败重试后的正文');
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    let autoAdvanceResult: Awaited<ReturnType<typeof result.current.handleAutoAdvanceTurn>> | undefined;
+    await act(async () => {
+      const turnPromise = result.current.handleAutoAdvanceTurn('自动化测试行动');
+      await vi.advanceTimersByTimeAsync(1000);
+      autoAdvanceResult = await turnPromise;
+    });
+
+    expect(globals.generate).toHaveBeenCalledTimes(2);
+    expect(globals.createChatMessages).toHaveBeenCalledTimes(2);
+    expect(messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    expect(autoAdvanceResult?.rawReply).toBe('普通失败重试后的正文');
+    expect(options.patchLatestDebugRound).toHaveBeenCalledWith({
+      main: {
+        retryFailureCount: 1,
+        retryFailureLastDelayMs: 1000,
+      },
+    });
+  });
+
+  it('自动推进 inline 模式会在落 assistant 楼层前重试非法变量块', async () => {
+    vi.useFakeTimers();
+    globals.generate = vi
+      .fn()
+      .mockResolvedValueOnce('正文\n<VariableEdit>{invalid json}</VariableEdit>')
+      .mockResolvedValue('正文\n<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>');
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      const turnPromise = result.current.handleAutoAdvanceTurn('自动化测试行动');
+      await vi.advanceTimersByTimeAsync(1000);
+      await turnPromise;
+    });
+
+    expect(globals.generate).toHaveBeenCalledTimes(2);
+    expect(globals.createChatMessages).toHaveBeenCalledTimes(2);
+    expect(messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    expect(messages[1]?.message).toContain('"修为":120');
+  });
+
+  it('自动推进 extra 模式会启用额外变量模型失败重试', async () => {
+    prepareExtraVariableUpdateTurnMock.mockResolvedValue({ release: vi.fn() });
+    executeExtraVariableUpdateMock.mockResolvedValue({
+      appended: false,
+      actionBlockCount: 0,
+      rawResponse: '<VariableThink>无需更新</VariableThink>',
+    });
+    const options = createHookOptions(createSummarySettings('extra'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleAutoAdvanceTurn('自动化测试行动');
+    });
+
+    expect(executeExtraVariableUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ retryAutoAdvanceFailures: true }),
+    );
+  });
+
+  it('自动推进 extra 模式在额外变量重试耗尽后明确失败', async () => {
+    prepareExtraVariableUpdateTurnMock.mockResolvedValue({ release: vi.fn() });
+    executeExtraVariableUpdateMock.mockRejectedValue(new Error('额外变量模型失败（已自动重试 2 次）'));
+    const options = createHookOptions(createSummarySettings('extra'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await expect(
+      act(async () => {
+        await result.current.handleAutoAdvanceTurn('自动化测试行动');
+      }),
+    ).rejects.toThrow('已自动重试 2 次');
+    expect(options.showError).toHaveBeenCalledWith(expect.stringContaining('额外变量更新失败'));
+    expect(globals.eventEmit).not.toHaveBeenCalledWith('wuxia:turn-completed', expect.anything());
   });
 
   it('send + extra 会先记录决策，再执行 prepare 和额外变量更新', async () => {
@@ -498,10 +588,7 @@ describe('useMessageHandler extra-variable decision', () => {
         skipReason: expect.stringContaining('inline'),
       }),
     });
-    expect(globals.eventEmit).not.toHaveBeenCalledWith(
-      'wuxia:sync-latest-message-shell',
-      expect.anything(),
-    );
+    expect(globals.eventEmit).not.toHaveBeenCalledWith('wuxia:sync-latest-message-shell', expect.anything());
   });
 
   it('regenerate + extra 会先记录决策，再执行 prepare 和额外变量更新', async () => {
@@ -560,10 +647,7 @@ describe('useMessageHandler extra-variable decision', () => {
       '<VariableEdit>{"user数据":{"修为":130}}</VariableEdit>',
       12,
     );
-    expect(globals.eventEmit).not.toHaveBeenCalledWith(
-      'wuxia:sync-latest-message-shell',
-      expect.anything(),
-    );
+    expect(globals.eventEmit).not.toHaveBeenCalledWith('wuxia:sync-latest-message-shell', expect.anything());
   });
 
   it('regenerate + extra + prepare 失败时，设置页调试仍保留 variable 决策与错误', async () => {

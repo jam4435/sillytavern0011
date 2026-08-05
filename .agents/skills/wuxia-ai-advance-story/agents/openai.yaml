@@ -1,0 +1,7 @@
+interface:
+  display_name: "武侠ai推进剧情"
+  short_description: "通过真实酒馆界面推进武侠剧情并诊断回合结果"
+  default_prompt: "使用 $wuxia-ai-advance-story 安全推进或检查一轮武侠剧情。"
+
+policy:
+  allow_implicit_invocation: false

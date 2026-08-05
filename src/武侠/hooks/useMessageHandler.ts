@@ -15,6 +15,7 @@ import { captureNextCombinedPromptForDebug } from '../utils/promptDebug';
 import { syncFrontendDerivedVariables } from '../utils/frontendDerivedVariables';
 import { extractExplicitMapTargetsFromText } from '../utils/locationContext';
 import {
+  assertValidTurnVariableBlocks,
   ensureTurnVariableBlocksCommitted,
   executeExtraVariableUpdate,
   prepareExtraVariableUpdateTurn,
@@ -25,6 +26,7 @@ import { observeEraWriteDone } from '../utils/eraWriteWait';
 import { recordIframeLifecycleEvent } from '../utils/iframeLifecycleBlackBox';
 import { acquireWuxiaTurnLock, releaseWuxiaTurnLock } from '../utils/turnLock';
 import { runWith429Retry } from '../utils/rateLimitRetry';
+import { MAX_AUTO_ADVANCE_FAILURE_RETRIES, runWithAutoAdvanceFailureRetry } from '../utils/autoAdvanceRetry';
 import { finalizeCurrentTurn } from '../utils/saveLoadManager';
 import { WUXIA_INPUT_HISTORY_DATA_KEY } from '../utils/inputHistory';
 import type { LatestDebugRoundPatch } from './useDebugLogs';
@@ -52,6 +54,8 @@ export interface AutoAdvanceTurnResult {
 export interface SendMessageOptions {
   /** 未附加地图/物品指令的真实玩家输入；仅显式传入时写入输入历史。 */
   rawPlayerInput?: string;
+  /** 自动推进专用：重试尚未落盘的模型失败，并把最终失败抛给串行推进控制器。 */
+  autoAdvance?: boolean;
 }
 
 interface UseMessageHandlerOptions {
@@ -78,6 +82,13 @@ const COMPLETE_VARIABLE_ACTION_BLOCK_REGEX = /<(VariableInsert|VariableEdit|Vari
 const WUXIA_TURN_COMPLETED_EVENT = 'wuxia:turn-completed';
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+class PostGenerationStepError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'PostGenerationStepError';
+  }
+}
 
 async function finalizeHistoryNodeAfterEvents(): Promise<void> {
   const gameData = readGameDataPure();
@@ -177,6 +188,8 @@ function createInitialExtraVariableDecisionPatch(
           error: '',
           retry429Count: 0,
           retry429LastDelayMs: 0,
+          retryFailureCount: 0,
+          retryFailureLastDelayMs: 0,
           applyStatus: 'idle',
           applyError: '',
           applyVerification: '',
@@ -190,6 +203,8 @@ function createInitialExtraVariableDecisionPatch(
           error: '',
           retry429Count: 0,
           retry429LastDelayMs: 0,
+          retryFailureCount: 0,
+          retryFailureLastDelayMs: 0,
           applyStatus: 'idle',
           applyError: '',
           applyVerification: '',
@@ -232,6 +247,12 @@ function createExtraVariableProgressPatch(
   }
   if (typeof progress.retry429LastDelayMs === 'number') {
     patch.retry429LastDelayMs = progress.retry429LastDelayMs;
+  }
+  if (typeof progress.retryFailureCount === 'number') {
+    patch.retryFailureCount = progress.retryFailureCount;
+  }
+  if (typeof progress.retryFailureLastDelayMs === 'number') {
+    patch.retryFailureLastDelayMs = progress.retryFailureLastDelayMs;
   }
   if (progress.applyStatus) {
     patch.applyStatus = progress.applyStatus;
@@ -375,11 +396,13 @@ export function useMessageHandler({
       assistantMessageId,
       latestRawReply,
       logLabel,
+      retryAutoAdvanceFailures = false,
     }: {
       decision: ExtraVariableRunDecision;
       assistantMessageId: number;
       latestRawReply: string;
       logLabel: string;
+      retryAutoAdvanceFailures?: boolean;
     }) => {
       if (!decision.shouldRunExtra) {
         return null;
@@ -395,6 +418,8 @@ export function useMessageHandler({
           error: '',
           retry429Count: 0,
           retry429LastDelayMs: 0,
+          retryFailureCount: 0,
+          retryFailureLastDelayMs: 0,
           applyStatus: 'idle',
           applyError: '',
           applyVerification: '',
@@ -409,6 +434,7 @@ export function useMessageHandler({
         settings: summarySettings,
         assistantMessageId,
         latestRawReply,
+        retryAutoAdvanceFailures,
         onPromptBuilt: prompt => {
           variableTraceLogger.log(`[useMessageHandler] ${logLabel}提示词已写入调试状态`, {
             assistantMessageId,
@@ -426,6 +452,11 @@ export function useMessageHandler({
             assistantMessageId,
             ...summarizeExtraVariableProgress(progress),
           });
+          if (typeof progress.retryFailureCount === 'number' && progress.retryFailureCount > 0) {
+            showLoading(
+              `额外变量更新失败，正在自动重试 ${progress.retryFailureCount}/${MAX_AUTO_ADVANCE_FAILURE_RETRIES}...`,
+            );
+          }
           patchLatestDebugRound({
             variable: createExtraVariableDecisionPatch(decision, createExtraVariableProgressPatch(progress)),
           });
@@ -468,6 +499,8 @@ export function useMessageHandler({
           syncVerification: extraUpdateResult.syncVerification || '',
           retry429Count: extraUpdateResult.retry429Count ?? 0,
           retry429LastDelayMs: extraUpdateResult.retry429LastDelayMs ?? 0,
+          retryFailureCount: extraUpdateResult.retryFailureCount ?? 0,
+          retryFailureLastDelayMs: extraUpdateResult.retryFailureLastDelayMs ?? 0,
           applyStatus: extraUpdateResult.applyStatus || 'idle',
           applyVerification: extraUpdateResult.applyVerification || '',
           applyError: extraUpdateResult.applyError || '',
@@ -574,29 +607,63 @@ export function useMessageHandler({
         });
         let result: string | GenerateToolCallResult;
         try {
-          result = await runWith429Retry(
-            () =>
-              generate({
-                should_stream: true,
-              }),
-            {
-              requestLabel: '正文模型',
-              onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
-                patchLatestDebugRound({
-                  main: {
-                    retry429Count: retryNumber,
-                    retry429LastDelayMs: delayMs,
-                  },
-                });
-                messageLogger.warn('[useMessageHandler] 正文模型返回 429，准备自动重试', {
-                  retryNumber,
-                  maxRetries,
-                  delayMs,
-                  error,
-                });
+          const requestMainModel = async () => {
+            const generated = await runWith429Retry(
+              () =>
+                generate({
+                  should_stream: true,
+                }),
+              {
+                requestLabel: '正文模型',
+                onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
+                  patchLatestDebugRound({
+                    main: {
+                      retry429Count: retryNumber,
+                      retry429LastDelayMs: delayMs,
+                    },
+                  });
+                  messageLogger.warn('[useMessageHandler] 正文模型返回 429，准备自动重试', {
+                    retryNumber,
+                    maxRetries,
+                    delayMs,
+                    error,
+                  });
+                },
               },
-            },
-          );
+            );
+
+            if (options.autoAdvance) {
+              const generatedText = typeof generated === 'string' ? generated : generated.content;
+              if (!generatedText?.trim()) {
+                throw new Error('正文模型返回空回复');
+              }
+              if (extraVariableDecision.modeSnapshot === 'inline') {
+                assertValidTurnVariableBlocks(generatedText);
+              }
+            }
+            return generated;
+          };
+
+          result = options.autoAdvance
+            ? await runWithAutoAdvanceFailureRetry(requestMainModel, {
+                requestLabel: '正文模型',
+                onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
+                  patchLatestDebugRound({
+                    main: {
+                      retryFailureCount: retryNumber,
+                      retryFailureLastDelayMs: delayMs,
+                    },
+                  });
+                  showLoading(`正文生成失败，正在自动重试 ${retryNumber}/${maxRetries}...`);
+                  messageLogger.warn('[useMessageHandler] 正文模型失败，准备自动推进重试', {
+                    retryNumber,
+                    maxRetries,
+                    delayMs,
+                    error,
+                  });
+                },
+              })
+            : await requestMainModel();
         } finally {
           combinedPromptCapture?.stop();
         }
@@ -625,7 +692,7 @@ export function useMessageHandler({
           messageLogger.log('📌 [步骤 3] 解析 AI 回复');
 
           const maintext = resultText;
-          const options = parseOptions(resultText);
+          const replyOptions = parseOptions(resultText);
           onVariableAssistantReply?.(resultText);
 
           messageLogger.log('🔧 调试模式：直接显示 AI 完整回复');
@@ -634,8 +701,8 @@ export function useMessageHandler({
           messageLogger.log('  - 长度:', maintext.length);
           messageLogger.log('  - 前 300 字符:', maintext.substring(0, 300));
           messageLogger.log('parseOptions 结果:');
-          messageLogger.log('  - 选项数量:', options.length);
-          messageLogger.log('  - 选项列表:', options);
+          messageLogger.log('  - 选项数量:', replyOptions.length);
+          messageLogger.log('  - 选项列表:', replyOptions);
 
           // ========== 步骤 4: 创建 assistant 楼层 ==========
           messageLogger.log('');
@@ -691,10 +758,10 @@ export function useMessageHandler({
           messageLogger.log('当前 currentMaintext 长度:', currentMaintext.length);
           messageLogger.log('当前 currentOptions:', currentOptions);
           messageLogger.log('即将设置 maintext 长度:', maintext.length);
-          messageLogger.log('即将设置 options:', options);
+          messageLogger.log('即将设置 options:', replyOptions);
 
           setCurrentMaintext(maintext);
-          setCurrentOptions(options);
+          setCurrentOptions(replyOptions);
 
           patchLatestDebugRound({
             main: {
@@ -715,6 +782,9 @@ export function useMessageHandler({
                   finishedAt: Date.now(),
                 }),
               });
+              if (options.autoAdvance) {
+                throw new PostGenerationStepError(errorMessage);
+              }
               showError(errorMessage);
               return resultText;
             }
@@ -724,6 +794,7 @@ export function useMessageHandler({
                 assistantMessageId: assistantMessage.message_id,
                 latestRawReply: resultText,
                 logLabel: '额外变量更新',
+                retryAutoAdvanceFailures: options.autoAdvance === true,
               });
               if (extraUpdateResult?.appended && extraUpdateResult.finalMessageText) {
                 refreshAssistantStateFromFinalText(extraUpdateResult.finalMessageText);
@@ -743,13 +814,26 @@ export function useMessageHandler({
                   finishedAt: Date.now(),
                 }),
               });
-              showError(`正文已生成，但额外变量更新失败：${errorMessage}`);
+              const postGenerationError = new PostGenerationStepError(
+                `正文已生成，但额外变量更新失败：${errorMessage}`,
+                { cause: error },
+              );
+              if (options.autoAdvance) {
+                throw postGenerationError;
+              }
+              showError(postGenerationError.message);
               return resultText;
             }
           }
 
           if (!assistantMessage?.message_id) {
-            showError('正文已生成，但没有找到可确认变量提交的 assistant 楼层。');
+            const postGenerationError = new PostGenerationStepError(
+              '正文已生成，但没有找到可确认变量提交的 assistant 楼层。',
+            );
+            if (options.autoAdvance) {
+              throw postGenerationError;
+            }
+            showError(postGenerationError.message);
             return resultText;
           }
           try {
@@ -760,7 +844,13 @@ export function useMessageHandler({
           } catch (error) {
             const errorMessage = getErrorMessage(error);
             messageLogger.error('本回合变量提交确认失败:', error);
-            showError(`正文已生成，但变量提交确认失败：${errorMessage}`);
+            const postGenerationError = new PostGenerationStepError(`正文已生成，但变量提交确认失败：${errorMessage}`, {
+              cause: error,
+            });
+            if (options.autoAdvance) {
+              throw postGenerationError;
+            }
+            showError(postGenerationError.message);
             return resultText;
           }
 
@@ -816,21 +906,28 @@ export function useMessageHandler({
         messageLogger.error('错误信息:', errorMessage);
         messageLogger.log('错误堆栈:', errorStack);
 
-        patchLatestDebugRound({
-          main: {
-            status: 'error',
-            error: `${errorMessage}\n\n${errorStack}`,
-            finishedAt: Date.now(),
-          },
-        });
+        if (!(error instanceof PostGenerationStepError)) {
+          patchLatestDebugRound({
+            main: {
+              status: 'error',
+              error: `${errorMessage}\n\n${errorStack}`,
+              finishedAt: Date.now(),
+            },
+          });
+        }
 
-        showError(`生成失败：${errorMessage}`);
+        if (!options.autoAdvance) {
+          showError(`生成失败：${errorMessage}`);
+        }
         recordIframeLifecycleEvent('wuxia-frontend', 'turn-failed', {
           roundId: debugRoundId,
           chatId: turnChatId,
           error: errorMessage,
           latestCreatedMessageId: createdLatestMessageId,
         });
+        if (options.autoAdvance) {
+          throw error;
+        }
         return '';
       } finally {
         extraVariableUpdateReservation?.release();
@@ -891,7 +988,7 @@ export function useMessageHandler({
 
       try {
         const beforeLastMessageId = getLatestMessageId();
-        const rawReply = await handleSendMessage(prompt);
+        const rawReply = await handleSendMessage(prompt, { autoAdvance: true });
         if (!rawReply.trim()) {
           throw new Error('本轮没有取得 AI 回复');
         }

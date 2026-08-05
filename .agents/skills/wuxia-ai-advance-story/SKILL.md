@@ -1,5 +1,5 @@
 ---
-name: wuxia-ui-playtest
+name: wuxia-ai-advance-story
 description: 通过外部 Playwright/CDP UI runner 推进或检查 SillyTavern 武侠游戏的真实回合，并按需使用旧 CLI 做状态、快照、stat_data 和变量持久化诊断。用于剧情推进、多轮 UI 回归、提示词与变量调试、会话定位或武侠自动化故障排查；默认调用 pnpm wuxia:ui。真实推进会新增聊天楼层并修改当前存档。
 ---
 

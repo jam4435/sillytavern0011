@@ -7,12 +7,17 @@ const buildRetry429Lines = (stage: LatestDebugRound['main'] | LatestDebugRound['
   if (retryCount <= 0) {
     return [];
   }
-  return [
-    '【HTTP 429 自动重试】',
-    `已重试：${retryCount} 次`,
-    `最近等待：${stage.retry429LastDelayMs ?? 0}ms`,
-    '',
-  ];
+  return ['【HTTP 429 自动重试】', `已重试：${retryCount} 次`, `最近等待：${stage.retry429LastDelayMs ?? 0}ms`, ''];
+};
+
+const buildAutoAdvanceFailureRetryLines = (
+  stage: LatestDebugRound['main'] | LatestDebugRound['variable'],
+): string[] => {
+  const retryCount = stage.retryFailureCount ?? 0;
+  if (retryCount <= 0) {
+    return [];
+  }
+  return ['【自动推进失败重试】', `已重试：${retryCount} 次`, `最近等待：${stage.retryFailureLastDelayMs ?? 0}ms`, ''];
 };
 
 const getVariableTriggerLabel = (trigger: LatestDebugRound['variable']['trigger']): string => {
@@ -98,25 +103,26 @@ export function shouldShowVariableDebug(debugRound: LatestDebugRound | null): bo
 
   const { variable } = debugRound;
   return Boolean(
-    variable.status !== 'idle'
-    || variable.trigger
-    || variable.modeSnapshot
-    || variable.skipReason
-    || variable.input
-    || variable.output
-    || variable.appendedBlocks
-    || variable.finalMessageText
-    || variable.appendReadbackText
-    || variable.appendVerification
-    || variable.syncReadbackText
-    || variable.syncVerification
-    || (variable.retry429Count ?? 0) > 0
-    || variable.applyStatus !== 'idle'
-    || variable.applyError
-    || variable.applyVerification
-    || variable.postProcessStatus !== 'idle'
-    || variable.postProcessError
-    || variable.error,
+    variable.status !== 'idle' ||
+    variable.trigger ||
+    variable.modeSnapshot ||
+    variable.skipReason ||
+    variable.input ||
+    variable.output ||
+    variable.appendedBlocks ||
+    variable.finalMessageText ||
+    variable.appendReadbackText ||
+    variable.appendVerification ||
+    variable.syncReadbackText ||
+    variable.syncVerification ||
+    (variable.retry429Count ?? 0) > 0 ||
+    (variable.retryFailureCount ?? 0) > 0 ||
+    variable.applyStatus !== 'idle' ||
+    variable.applyError ||
+    variable.applyVerification ||
+    variable.postProcessStatus !== 'idle' ||
+    variable.postProcessError ||
+    variable.error,
   );
 }
 
@@ -126,6 +132,7 @@ export function buildMainInputDebugContent(debugRound: LatestDebugRound): string
     debugRound.main.userInput || '(空)',
     '',
     ...buildRetry429Lines(debugRound.main),
+    ...buildAutoAdvanceFailureRetryLines(debugRound.main),
   ];
   const combinedPrompt = normalizeDebugText(debugRound.main.combinedPrompt);
 
@@ -160,6 +167,7 @@ export function buildVariableOutputDebugContent(debugRound: LatestDebugRound): s
   const { variable } = debugRound;
   const sections: string[] = [
     ...buildRetry429Lines(variable),
+    ...buildAutoAdvanceFailureRetryLines(variable),
     ...buildVariablePhaseLines(debugRound),
   ];
   const rawResponse = normalizeDebugText(variable.output);
