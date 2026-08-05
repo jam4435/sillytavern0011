@@ -1017,13 +1017,15 @@ export function useMessageHandler({
       } catch (error) {
         const errorMessage = getErrorMessage(error);
         messageLogger.error('自动推进失败:', error);
-        patchLatestDebugRound({
-          main: {
-            status: 'error',
-            error: errorMessage,
-            finishedAt: Date.now(),
-          },
-        });
+        if (!(error instanceof PostGenerationStepError)) {
+          patchLatestDebugRound({
+            main: {
+              status: 'error',
+              error: errorMessage,
+              finishedAt: Date.now(),
+            },
+          });
+        }
         showError(`自动推进失败：${errorMessage}`);
         throw error;
       } finally {
