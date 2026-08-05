@@ -4,7 +4,6 @@ import {
   type WuxiaAutomationApi,
   type WuxiaAutomationSnapshot,
 } from '../武侠/utils/wuxiaAutomation';
-import { WUXIA_TURN_RESPONSE_DELIVERED_EVENT } from '../武侠/utils/turnLock';
 import { forwardIframeLifecycleEvent } from '../武侠/utils/iframeLifecycleBlackBox';
 import {
   WUXIA_ERROR_CODES,
@@ -405,37 +404,6 @@ function startBridge() {
           ok: response.ok,
           acknowledgeDurationMs: Date.now() - responseReadyAt,
         });
-      }
-      if (isRunTurnRequest && response.ok === true && isRecord(response.result)) {
-        const debug = isRecord(response.result.debug) ? response.result.debug : null;
-        const roundId = typeof debug?.id === 'string' ? debug.id : '';
-        if (roundId) {
-          const deliveredPayload = {
-            requestId: request.id,
-            roundId,
-            messageId: Number.isInteger(response.result.assistantMessageId)
-              ? Number(response.result.assistantMessageId)
-              : null,
-            deliveredAt: Date.now(),
-          };
-          forwardIframeLifecycleEvent('wuxia-bridge', 'bridge-turn-response-delivery-started', deliveredPayload);
-          void eventEmit(WUXIA_TURN_RESPONSE_DELIVERED_EVENT, deliveredPayload).then(
-            () => {
-              forwardIframeLifecycleEvent('wuxia-bridge', 'bridge-turn-response-delivery-finished', {
-                ...deliveredPayload,
-                deliveryDurationMs: Date.now() - deliveredPayload.deliveredAt,
-              });
-            },
-            error => {
-              forwardIframeLifecycleEvent('wuxia-bridge', 'bridge-turn-response-delivery-failed', {
-                ...deliveredPayload,
-                deliveryDurationMs: Date.now() - deliveredPayload.deliveredAt,
-                error: error instanceof Error ? error.message : String(error),
-              });
-              console.warn('[wuxia-bridge] 回合响应已 ACK，但通知楼层脚本恢复刷新失败。', error);
-            },
-          );
-        }
       }
     },
   );

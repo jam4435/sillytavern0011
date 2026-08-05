@@ -447,168 +447,55 @@ function buildVariableBlock(job) {
 
 ## 2. `隐藏楼层.js`
 
-一个 jQuery `$(() => { ... })` IIFE，**不碰变量，纯 DOM + 生命周期协调**。与 nba2k 卡逐字节相同。
+一个 jQuery `$(() => { ... })` IIFE，**不碰变量，只负责固定宿主 DOM、回合协调和生命周期诊断**。金庸群侠传当前实现已与 nba2k / 红楼梦的旧同步脚本分开。
 
-### 2.1 常量与状态（原文摘录）
+### 2.1 固定宿主，而不是同步最新楼层
 
-```js
-const SYNC_LATEST_MESSAGE_SHELL_EVENT      = 'wuxia:sync-latest-message-shell';
-const WUXIA_TURN_LIFECYCLE_EVENT           = 'wuxia:turn-lifecycle';
-const WUXIA_TURN_LOCK_ACK_EVENT            = 'wuxia:turn-lock-ack';
-const WUXIA_TURN_RESPONSE_DELIVERED_EVENT  = 'wuxia:turn-response-delivered';
-const TURN_LOCK_TIMEOUT_MS                 = 8 * 60 * 1000;   // 回合锁兜底 8 分钟
-const TURN_RESPONSE_DELIVERY_TIMEOUT_MS    = 30 * 1000;       // 二段「回复送达」兜底 30 秒
-const BLACK_BOX_STORAGE_KEY                = 'wuxia_iframe_lifecycle_black_box_v1';
-const PENDING_RELOAD_REASON_STORAGE_KEY    = 'wuxia_iframe_pending_reload_reason_v1';
-const MAX_BLACK_BOX_ENTRIES                = 240;
-const PENDING_RELOAD_REASON_MAX_AGE_MS     = 30 * 1000;
-const COLLAPSE_MAX_WAIT_MS                 = 2000;            // 防抖被反复重置时的封顶等待
-const URGENT_COLLAPSE_REASONS = new Set([
-  'turn-finish-event',
-  'turn-lock-timeout',
-  'turn-response-delivered',
-  'turn-response-delivery-timeout',
-  'explicit-latest-message-shell-sync',
-]);
-const SCRIPT_RUNTIME_ID = `hidden-floor-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-```
-
-### 2.2 「隐藏楼层」的用途与实现
-
-**用途**：这类卡的 UI 是一整个 React 应用，跑在**最后一楼消息里的 iframe**中。酒馆原生会渲染全部历史楼层 DOM —— 每一楼都可能带一份 loader/iframe，导致内存暴涨、重复挂载、滚动错乱。所以脚本把 `#chat` 里除最后一楼外的 DOM **全部删掉**，让宿主只剩「一个楼层外壳 + 一个 iframe」。真正的历史仍在酒馆的聊天数据里（ERA 的 `SelectedMks` / EditLog 都基于聊天数据而非 DOM），DOM 只是显示层。
-
-**实现要点**（`syncAndCollapseToLastMessage`）：
+React 应用运行在一个消息楼层 iframe 中。脚本首次折叠时采用现有 `.last_mes`（否则采用最大 `mesid` 的节点），把真实 DOM 引用保存在 `stableShellElement`；同一聊天之后始终保留它：
 
 ```js
-$latest.addClass('last_mes');
-$messages.not($latest).remove();
+const $stableShell = getStableShell($('#chat > .mes'), triggerReason);
+$stableShell.addClass('last_mes');
+$('#chat > .mes').not($stableShell).remove();
 $('#show_more_messages').remove();
 ```
 
-前置的三道保护：
+新 user / assistant 楼层仍写入酒馆聊天数据，但使用 `refresh:none` 时不要求为它们建立新的显示外壳。脚本**不读取最新 messageId 来改宿主、不改 `mesid` / `.mesIDDisplay`、不刷新单楼层**，所以自动推进与重新生成不会主动销毁 iframe。
 
-1. **回合锁挂起**：`if (activeTurnRoundId || pendingResponseDeliveryRoundId) { ...记录 pendingMessageId...; return; }` —— 生成期间绝不动 DOM。
-2. **编辑框保护**：
-   ```js
-   // 编辑框打开时不要删 DOM，否则会打断酒馆的编辑控件。
-   if ($('#curEditTextarea').length > 0) { scheduleCollapse(250, expectedMessageId, 'editor-open-retry'); return; }
-   ```
-3. **`refresh:none` 新楼层没有宿主 DOM 时，复用旧外壳并改 mesid**（这是全脚本最精妙的一段，注释原文）：
-   ```js
-   // refresh:none 创建的新消息不会生成宿主 DOM。复用当前伪同层外壳时，必须同步
-   // mesid 和楼层标题，酒馆的编辑按钮才会定位到真实最新消息。
-   const $shell = $messages.filter('.last_mes').last().length > 0 ? $messages.filter('.last_mes').last() : $messages.last();
-   $shell.attr('mesid', String(latestMessageId));
-   $shell.data('mesid', latestMessageId);
-   $shell.find('.mesIDDisplay').text(String(latestMessageId));
-   await refreshOneMessage(latestMessageId, $shell);
-   ```
-   失败时**完整回滚 mesid / data / 标题**，并清掉 pending reload 标记。`syncInProgress` 做互斥。
+若酒馆本体或其他插件已经删除固定节点，脚本记录 `stable-shell-lost`，再采用当前存在的 shell 并记录 `stable-shell-adopted`；这只是在外部重绘后恢复折叠，不是本脚本发起刷新。
 
-**折叠调度器 `scheduleCollapse(delay, expectedMessageId, triggerReason)`**：
+### 2.2 折叠保护与触发源
 
-- `URGENT_COLLAPSE_REASONS` 里的原因 → `priority = 'urgent'`，`effectiveDelay = 0`，且**已排队的 urgent 不会被普通 DOM 变化推迟**：
-  ```js
-  if (collapseTimerPriority === 'urgent' && priority !== 'urgent') {
-    // 回合完成或显式同步已经排队时，普通 DOM 变化不能把它推迟。
-    return;
-  }
-  ```
-- 普通原因 `effectiveDelay = Math.min(delay, COLLAPSE_MAX_WAIT_MS - elapsed)` —— **防抖有 2 秒封顶**，避免 MutationObserver 疯狂触发导致永远不执行。
-- 每次触发都记 `triggerReasonCounts` / `resetCount` / `waitMs` 到黑匣子。
+1. `activeTurnRoundId` 存在时推迟清理，记录 `stable-shell-collapse-deferred-by-turn-lock`。
+2. `#curEditTextarea` 存在时每 250 ms 重试，避免删除酒馆原生编辑控件。
+3. 普通折叠防抖最多等待 2 秒；finish / timeout 是 urgent，已经排队后不会被普通 MutationObserver 事件延后。
+4. `#chat` / `#sheld` MutationObserver 和常见消息渲染、编辑、swipe、删除事件都会请求折叠。
+5. `CHAT_CHANGED` 才清空固定宿主与锁，并通过带 `reloadIframe:chat-changed` 标记的 `reloadIframe()` 建立新聊天实例。
 
-**触发源**：
-- `MutationObserver` on `#chat`（childList，reason `chat-child-list-mutation`）与 `#sheld`（reason `shell-child-list-mutation`，同时重新 `observeChat()`）
-- 酒馆事件：`MESSAGE_EDITED / MESSAGE_UPDATED / MESSAGE_SWIPED / MESSAGE_DELETED / MORE_MESSAGES_LOADED / USER_MESSAGE_RENDERED / CHARACTER_MESSAGE_RENDERED` → `scheduleCollapse(120, undefined, 'tavern-event:'+type)`
-- 前端显式：`eventOn('wuxia:sync-latest-message-shell', id => scheduleCollapse(50, Number(id), 'explicit-latest-message-shell-sync'))`
+### 2.3 回合锁 ACK 与 ERA 屏障
 
-### 2.3 回合锁 ACK 机制（本卡最值得复用的设计）
+前端仍在创建真实 user 楼层前发送 `wuxia:turn-lifecycle(start)`，等待同一 `roundId` 的 `wuxia:turn-lock-ack`；2 秒没有 ACK 时不建楼、不调模型。finish 继续被 `era-main.js` 用来释放 `activeTurnBarrier`，同时让隐藏楼层脚本执行一次固定宿主折叠：
 
-**要解决的问题**：前端 React 跑在最后一楼的 iframe 里。如果生成过程中脚本把那一楼的 DOM 删了/换了，**iframe 会被销毁重建，正在 `await generate()` 的前端逻辑直接蒸发**。所以必须让前端能「先锁住宿主，再开始一轮」。
-
-**握手时序**（脚本侧 = `隐藏楼层.js`；前端侧 = `src/武侠/utils/turnLock.ts` + `hooks/useMessageHandler.ts`）：
-
-```
-前端 acquireWuxiaTurnLock(roundId, chatId)
-  ├─ eventOn('wuxia:turn-lock-ack', ...)      先挂监听
-  ├─ eventEmit('wuxia:turn-lifecycle', { phase:'start', roundId, chatId })
-  └─ 等待 ACK，超时 WUXIA_TURN_LOCK_ACK_TIMEOUT_MS = 2_000 ms
-                        ↓
-脚本 eventOn('wuxia:turn-lifecycle') → payload.phase === 'start'
-  ├─ lockTurn(roundId, chatId)   // activeTurnRoundId = roundId，起 8 分钟兜底 timer
-  └─ eventEmit('wuxia:turn-lock-ack', {
-       phase: 'locked', roundId, chatId,
-       scriptRuntimeId: SCRIPT_RUNTIME_ID, lockedAt: Date.now(),
-     })
-                        ↓
-前端拿到 roundId 匹配的 ACK → 才 createChatMessages(user) → generate() → createChatMessages(assistant)
-                        ↓
-前端 releaseWuxiaTurnLock(roundId, chatId, messageId, timeout, waitForResponseDelivery)
-  └─ eventEmit('wuxia:turn-lifecycle', { phase:'finish', roundId, chatId, messageId, waitForResponseDelivery? })
-                        ↓
-脚本 unlockTurn(...) → scheduleCollapse(0, messageId, 'turn-finish-event')   // urgent，立即折叠
+```text
+acquire(start) -> hidden-floor ACK -> create/generate/write -> release(finish)
+                                                        ├─ ERA 释放事件屏障
+                                                        └─ hidden-floor 清理额外 DOM
 ```
 
-脚本侧关键代码（原文）：
+8 分钟超时时，隐藏楼层脚本用原 `roundId / chatId / messageId` 补发 finish，让 ERA 屏障也能释放，再做本地幂等解锁。旧回合迟到的 finish 不能解开新 roundId。
 
-```js
-eventOn(WUXIA_TURN_LIFECYCLE_EVENT, payload => {
-  if (!payload || typeof payload !== 'object') return;
-  if (payload.phase === 'start') {
-    const roundId = lockTurn(payload.roundId, payload.chatId);
-    void eventEmit(WUXIA_TURN_LOCK_ACK_EVENT, {
-      phase: 'locked', roundId, chatId: payload.chatId,
-      scriptRuntimeId: SCRIPT_RUNTIME_ID, lockedAt: Date.now(),
-    })
-      .then(() => recordBlackBox('turn-lock-ack-sent', { roundId, chatId: payload.chatId }))
-      .catch(error => recordBlackBox('turn-lock-ack-failed', { roundId, error: String(error) }));
-    return;
-  }
-  if (payload.phase === 'finish') {
-    unlockTurn(payload.roundId, payload.messageId, 'turn-finish-event', payload.waitForResponseDelivery === true);
-  }
-});
-```
-
-前端侧的失败语义（`turnLock.ts`）——**ACK 没到就直接失败，不建楼、不调模型**：
-
-```
-throw new Error('回合锁未确认，为避免生成过程中替换 iframe，本轮尚未创建用户楼层。');
-```
-
-**三项防死锁设计**：
-
-1. **roundId 校验**：`unlockTurn` 里 `if (expectedRoundId && activeTurnRoundId && expectedRoundId !== activeTurnRoundId) { recordBlackBox('turn-unlock-ignored', {reason:'round-id-mismatch'}); return; }` —— 旧回合的迟到 finish 不会解开新回合的锁。ACK 侧同理（`isMatchingAck` 只认同 roundId）。
-2. **8 分钟兜底 timer**：`turnLockTimer` 到期 → warn → `unlockTurn(..., 'turn-lock-timeout')`。前端崩了也能自愈。
-3. **`CHAT_CHANGED` 强制清锁**：切聊天时清空 `activeTurnRoundId / pendingMessageId / pendingResponseDelivery*`、清所有 timer，然后 `reloadIframe()`。
-
-**二段锁：`waitForResponseDelivery`**
-`phase:'finish'` 带 `waitForResponseDelivery: true` 时，脚本**不立刻折叠**，而是转入「等待回复送达」态：
-
-```js
-if (waitForResponseDelivery && releasedRoundId) {
-  pendingResponseDeliveryRoundId  = releasedRoundId;
-  pendingResponseDeliveryMessageId = latestPendingMessageId;
-  responseDeliveryTimer = setTimeout(() => { ... finishDeferredResponseDelivery(..., 'turn-response-delivery-timeout'); },
-                                     TURN_RESPONSE_DELIVERY_TIMEOUT_MS); // 30s
-  recordBlackBox('turn-refresh-deferred-for-response-delivery', { roundId, messageId });
-  return;
-}
-```
-直到前端发 `wuxia:turn-response-delivered`（或 30 秒超时）才 `scheduleCollapse(0, ..., 'turn-response-delivered')`。用途：ERA `era:apiWrite` 追加变量块 → `era:writeDone` 这一段还在跑，此时换 DOM 依然危险。
+旧的“回复送达后二次解锁”已删除：当前 UI runner 通过 iframe 内部自动化标记读取状态，不依赖宿主换代，也没有生产调用方需要二段送达事件。
 
 ### 2.4 黑匣子（诊断）
 
 ```js
 localStorage['wuxia_iframe_lifecycle_black_box_v1']   // 环形，最多 240 条
-// entry: { id, timestamp, source:'hidden-floor', event, runtimeId, details }
-localStorage['wuxia_iframe_pending_reload_reason_v1'] // 单条，30 秒过期
+localStorage['wuxia_iframe_pending_reload_reason_v1'] // 仅聊天切换 reload 标记，30 秒过期
 ```
-记录的事件名：`hidden-floor-script-boot / turn-lock-acquired / turn-lock-ack-sent / turn-lock-ack-failed / turn-lock-released / turn-unlock-ignored / turn-lock-timeout / turn-refresh-deferred-for-response-delivery / turn-response-delivery-released / turn-response-delivery-ignored / turn-response-delivery-timeout / shell-sync-deferred-by-turn-lock / refresh-one-message-started / refresh-one-message-returned / iframe-reload-requested / collapse-debounce-fired / hidden-floor-script-pagehide`。
 
-`markPendingReloadReason()` 在 `refreshOneMessage` / `reloadIframe` 前落盘一条「即将重载，原因是 X」，iframe 重建后 `pagehide` 处理器读回来，把「这次重载是我自己干的 vs 外部原因」区分开。**这是排查 iframe 莫名重载的关键手段，强烈建议照搬。**
+重点事件包括 `hidden-floor-script-boot / turn-lock-acquired / turn-lock-ack-sent / turn-lock-released / turn-unlock-ignored / turn-lock-timeout / stable-shell-collapse-deferred-by-turn-lock / stable-shell-adopted / stable-shell-lost / collapse-debounce-fired / iframe-reload-requested / hidden-floor-script-pagehide`。
 
-清理（`pagehide`）：记一条黑匣子 → 清 collapseTimer → `chatObserver?.disconnect()` / `shellObserver?.disconnect()` → `clearTurnLockTimer()`。
+同一聊天的正常回合不应出现新的 `pagehide / boot / automation-instance`；`reloadIframe:chat-changed` 表示正常聊天切换，`external-or-unknown` 表示换代来自手动刷新、酒馆重绘、其他插件或热更新。
 
 ---
 
@@ -636,11 +523,11 @@ const EVENT_KEY_PREFIX = "事件条目-";
 
 | 模块 / 机制 | 处置 | 说明 |
 | --- | --- | --- |
-| `隐藏楼层.js` 折叠逻辑（MutationObserver + scheduleCollapse + 只留 last_mes） | **原样照搬** | 已验证跨卡通用（与 nba2k 卡逐字节相同）；不依赖任何变量结构 |
-| `隐藏楼层.js` 回合锁 ACK / 二段送达锁 / 黑匣子 | **原样照搬** | 同上。只有当新卡前端不是「iframe 内 SPA」时才不需要 |
-| `隐藏楼层.js` 的 `wuxia:` 事件名前缀 | **原样照搬（建议）** | nba2k 也没改前缀。**若改名，必须同步改前端 `turnLock.ts` 的四个常量**，两边任一漏改 = 前端每回合抛「回合锁未确认」 |
-| `隐藏楼层.js` 的超时常量（8 min / 30 s / 2000 ms / 250 ms / 120 ms / 50 ms） | **需要改配置（通常不用改）** | 8 分钟对应「最慢的一次 generate」；若新卡走多轮 agent 流程可能要调大 |
-| 依赖的酒馆助手 API（`getLastMessageId` / `refreshOneMessage` / `reloadIframe` / `SillyTavern.getCurrentChatId`）与 DOM 选择器（`#chat > .mes`、`#sheld`、`.last_mes`、`[mesid]`、`.mesIDDisplay`、`#curEditTextarea`、`#show_more_messages`） | **原样照搬，但需版本验证** | 这些是酒馆内部 DOM 约定，酒馆大版本升级后要回归 |
+| `隐藏楼层.js` 固定宿主折叠（MutationObserver + scheduleCollapse + `stableShellElement`） | **按当前金庸版照搬** | 不依赖变量结构；不要退回每轮选择最新 `.last_mes` 的旧策略 |
+| `隐藏楼层.js` 回合锁 ACK / 8 分钟超时 / 黑匣子 | **按需照搬** | iframe 内 SPA 仍需要；旧二段送达锁不再需要 |
+| `隐藏楼层.js` 的 `wuxia:` 事件名前缀 | **原样照搬（建议）** | 若改名，必须同步改前端 `turnLock.ts` 的 lifecycle / ACK 常量，两边任一漏改都会导致回合锁未确认 |
+| `隐藏楼层.js` 的时间常量（8 min / 2000 ms / 250 ms / 120 ms） | **需要改配置（通常不用改）** | 8 分钟对应最慢 generate 的兜底；防抖封顶和编辑器重试通常保持默认 |
+| 依赖的酒馆助手 API（`reloadIframe` / `SillyTavern.getCurrentChatId`）与 DOM 选择器（`#chat > .mes`、`#sheld`、`.last_mes`、`[mesid]`、`#curEditTextarea`、`#show_more_messages`） | **照搬但需版本验证** | 这些是酒馆 DOM 约定，大版本升级后要回归；不再依赖单楼层刷新 API |
 | ERA 框架 bundle 本体（21 模块） | **原样照搬** | 变量结构无关，纯通用引擎 |
 | ERA `魔改` 的 `api/command.ts`（75 ms 批队列 + 合并 + 压缩） | **原样照搬** | 只要新卡也是「前端一回合发多条 `era:*`」的模式就该用魔改版 |
 | ERA 脚本按钮三枚（`写入变量修改` / `手动同步状态` / `强制完全重算`） | **原样照搬** | 按钮名是 `getButtonEvent('...')` 硬编码的，**名字不能改** |
@@ -655,7 +542,7 @@ const EVENT_KEY_PREFIX = "事件条目-";
 
 ### 4.2 复刻时必须一并带走的隐性约定
 
-1. **前端建楼必须 `refresh:none`**，否则酒馆会重渲染 DOM、iframe 重建。隐藏楼层脚本里那段「复用外壳改 mesid + `refreshOneMessage`」的补偿逻辑，就是为 `refresh:none` 兜底的。
+1. **前端建楼和编辑必须 `refresh:none`**，否则酒馆会重渲染 DOM、iframe 重建。最新聊天内容从 `getChatMessages()` 直接读取，显示宿主不需要伪装成最新楼层。
 2. **`era:*` 写入没有回执**，前端必须自己等匹配的 `era:writeDone`（按 `mk` / `message_id` 匹配），且**只等原始写入，不等同一事件上更慢的 UI 刷新/后台补全监听器**。
 3. **直接写入（`updateVariablesWith`）不得伪造 `era:writeDone`**，另发自己的完成信号（本卡用 `wuxia:directVariableWriteDone`）。
 4. **变量结构里避开三个保留 token** `__DOT__` `__DQUOTE__` `__SQUOTE__`，避开 key 里的 `.` `"` `'`，避开「对象数组」。

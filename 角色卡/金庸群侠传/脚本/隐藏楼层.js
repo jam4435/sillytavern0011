@@ -1,10 +1,7 @@
   $(() => {
-    const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
     const WUXIA_TURN_LIFECYCLE_EVENT = 'wuxia:turn-lifecycle';
     const WUXIA_TURN_LOCK_ACK_EVENT = 'wuxia:turn-lock-ack';
-    const WUXIA_TURN_RESPONSE_DELIVERED_EVENT = 'wuxia:turn-response-delivered';
     const TURN_LOCK_TIMEOUT_MS = 8 * 60 * 1000;
-    const TURN_RESPONSE_DELIVERY_TIMEOUT_MS = 30 * 1000;
     const BLACK_BOX_STORAGE_KEY = 'wuxia_iframe_lifecycle_black_box_v1';
     const PENDING_RELOAD_REASON_STORAGE_KEY = 'wuxia_iframe_pending_reload_reason_v1';
     const MAX_BLACK_BOX_ENTRIES = 240;
@@ -13,9 +10,6 @@
     const URGENT_COLLAPSE_REASONS = new Set([
       'turn-finish-event',
       'turn-lock-timeout',
-      'turn-response-delivered',
-      'turn-response-delivery-timeout',
-      'explicit-latest-message-shell-sync',
     ]);
     const SCRIPT_RUNTIME_ID = `hidden-floor-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     let collapseTimer = null;
@@ -27,13 +21,11 @@
     let chatElement = null;
     let chatObserver = null;
     let shellObserver = null;
-    let syncInProgress = false;
+    let stableShellElement = null;
     let activeTurnRoundId = null;
+    let activeTurnChatId = null;
     let pendingMessageId = null;
     let turnLockTimer = null;
-    let pendingResponseDeliveryRoundId = null;
-    let pendingResponseDeliveryMessageId = null;
-    let responseDeliveryTimer = null;
 
     function cloneDetails(details) {
       try {
@@ -112,16 +104,6 @@
       }
     }
 
-    function clearPendingReloadReason(markerId) {
-      try {
-        const current = readPendingReloadReason();
-        if (markerId && current && current.id !== markerId) return;
-        localStorage.removeItem(PENDING_RELOAD_REASON_STORAGE_KEY);
-      } catch {
-        // 黑匣子不得影响楼层显示流程。
-      }
-    }
-
     function normalizeMessageId(value) {
       if (value === null || value === undefined || value === '') {
         return null;
@@ -137,42 +119,8 @@
       }
     }
 
-    function clearResponseDeliveryTimer() {
-      if (responseDeliveryTimer) {
-        clearTimeout(responseDeliveryTimer);
-        responseDeliveryTimer = null;
-      }
-    }
-
-    function finishDeferredResponseDelivery(roundId, messageId, reason) {
-      if (
-        pendingResponseDeliveryRoundId &&
-        roundId &&
-        pendingResponseDeliveryRoundId !== roundId
-      ) {
-        recordBlackBox('turn-response-delivery-ignored', {
-          expectedRoundId: pendingResponseDeliveryRoundId,
-          receivedRoundId: roundId,
-          reason: 'round-id-mismatch',
-        });
-        return;
-      }
-
-      const completedRoundId = pendingResponseDeliveryRoundId || roundId || null;
-      const latestMessageId = normalizeMessageId(messageId) ?? pendingResponseDeliveryMessageId;
-      pendingResponseDeliveryRoundId = null;
-      pendingResponseDeliveryMessageId = null;
-      clearResponseDeliveryTimer();
-      recordBlackBox('turn-response-delivery-released', {
-        roundId: completedRoundId,
-        messageId: latestMessageId,
-        reason,
-      });
-      scheduleCollapse(0, latestMessageId, reason);
-    }
-
-    function unlockTurn(expectedRoundId, messageId, reason = 'turn-finished', waitForResponseDelivery = false) {
-      if (expectedRoundId && activeTurnRoundId && expectedRoundId !== activeTurnRoundId) {
+    function unlockTurn(expectedRoundId, messageId, reason = 'turn-finished') {
+      if (expectedRoundId && expectedRoundId !== activeTurnRoundId) {
         recordBlackBox('turn-unlock-ignored', {
           expectedRoundId,
           activeTurnRoundId,
@@ -187,39 +135,18 @@
         roundId: releasedRoundId,
         messageId: latestPendingMessageId,
         reason,
-        waitForResponseDelivery,
       });
       activeTurnRoundId = null;
+      activeTurnChatId = null;
       pendingMessageId = null;
       clearTurnLockTimer();
-      if (waitForResponseDelivery && releasedRoundId) {
-        pendingResponseDeliveryRoundId = releasedRoundId;
-        pendingResponseDeliveryMessageId = latestPendingMessageId;
-        clearResponseDeliveryTimer();
-        responseDeliveryTimer = setTimeout(() => {
-          recordBlackBox('turn-response-delivery-timeout', {
-            roundId: pendingResponseDeliveryRoundId,
-            messageId: pendingResponseDeliveryMessageId,
-            timeoutMs: TURN_RESPONSE_DELIVERY_TIMEOUT_MS,
-          });
-          finishDeferredResponseDelivery(
-            pendingResponseDeliveryRoundId,
-            pendingResponseDeliveryMessageId,
-            'turn-response-delivery-timeout',
-          );
-        }, TURN_RESPONSE_DELIVERY_TIMEOUT_MS);
-        recordBlackBox('turn-refresh-deferred-for-response-delivery', {
-          roundId: releasedRoundId,
-          messageId: latestPendingMessageId,
-        });
-        return;
-      }
       scheduleCollapse(0, latestPendingMessageId, reason);
     }
 
     function lockTurn(roundId, chatId) {
       const previousRoundId = activeTurnRoundId;
       activeTurnRoundId = typeof roundId === 'string' && roundId ? roundId : `turn-${Date.now()}`;
+      activeTurnChatId = chatId ?? null;
       recordBlackBox('turn-lock-acquired', {
         roundId: activeTurnRoundId,
         previousRoundId,
@@ -227,40 +154,93 @@
       });
       clearTurnLockTimer();
       turnLockTimer = setTimeout(() => {
-        console.warn('[隐藏楼层] 武侠回合锁超时，自动恢复最新楼层同步。', activeTurnRoundId);
-        recordBlackBox('turn-lock-timeout', { roundId: activeTurnRoundId });
-        unlockTurn(activeTurnRoundId, null, 'turn-lock-timeout');
+        const timedOutRoundId = activeTurnRoundId;
+        const timedOutChatId = activeTurnChatId;
+        const timedOutMessageId = pendingMessageId;
+        console.warn('[隐藏楼层] 武侠回合锁超时，自动恢复楼层折叠。', timedOutRoundId);
+        recordBlackBox('turn-lock-timeout', {
+          roundId: timedOutRoundId,
+          chatId: timedOutChatId,
+          messageId: timedOutMessageId,
+        });
+        // 通知同一事件总线上的 ERA 等回合屏障；本脚本随后自行解锁，避免遗留等待状态。
+        void eventEmit(WUXIA_TURN_LIFECYCLE_EVENT, {
+          phase: 'finish',
+          roundId: timedOutRoundId,
+          chatId: timedOutChatId,
+          messageId: timedOutMessageId,
+          timeoutSourceRuntimeId: SCRIPT_RUNTIME_ID,
+        }).catch(error => {
+          recordBlackBox('turn-lock-timeout-finish-emit-failed', {
+            roundId: timedOutRoundId,
+            chatId: timedOutChatId,
+            error: String(error),
+          });
+        });
+        unlockTurn(timedOutRoundId, timedOutMessageId, 'turn-lock-timeout');
       }, TURN_LOCK_TIMEOUT_MS);
       return activeTurnRoundId;
     }
 
-    function getMessageElement($messages, messageId) {
-      return $messages.filter(`[mesid="${messageId}"]`).last();
+    function getExistingShell($messages) {
+      const $last = $messages.filter('.last_mes').last();
+      if ($last.length > 0) {
+        return $last;
+      }
+
+      let maxMessageId = -1;
+      $messages.each((_index, element) => {
+        const messageId = Number($(element).attr('mesid'));
+        if (Number.isFinite(messageId) && messageId > maxMessageId) {
+          maxMessageId = messageId;
+        }
+      });
+      return maxMessageId >= 0 ? $messages.filter(`[mesid="${maxMessageId}"]`).last() : $messages.last();
     }
 
-    async function syncAndCollapseToLastMessage(expectedMessageId, triggerReason = 'unspecified') {
+    function getStableShell($messages, triggerReason) {
+      const isStableShellAttached =
+        stableShellElement &&
+        stableShellElement.parentElement === chatElement &&
+        stableShellElement.classList.contains('mes');
+      if (isStableShellAttached) {
+        return $(stableShellElement);
+      }
+
+      if (stableShellElement) {
+        recordBlackBox('stable-shell-lost', {
+          triggerReason,
+          previousMessageId: stableShellElement.getAttribute('mesid'),
+        });
+        stableShellElement = null;
+      }
+
+      const $shell = getExistingShell($messages);
+      if ($shell.length === 0) {
+        return $shell;
+      }
+      stableShellElement = $shell[0];
+      recordBlackBox('stable-shell-adopted', {
+        triggerReason,
+        messageId: $shell.attr('mesid') ?? null,
+      });
+      return $shell;
+    }
+
+    function collapseToStableShell(expectedMessageId, triggerReason = 'unspecified') {
       observeChat();
 
-      if (activeTurnRoundId || pendingResponseDeliveryRoundId) {
+      if (activeTurnRoundId) {
         const normalizedMessageId = normalizeMessageId(expectedMessageId);
-        const waitingForResponseDelivery = !activeTurnRoundId && Boolean(pendingResponseDeliveryRoundId);
-        const previousPendingMessageId = waitingForResponseDelivery
-          ? pendingResponseDeliveryMessageId
-          : pendingMessageId;
-        if (normalizedMessageId !== null && waitingForResponseDelivery) {
-          pendingResponseDeliveryMessageId = normalizedMessageId;
-        } else if (normalizedMessageId !== null) {
+        const previousPendingMessageId = pendingMessageId;
+        if (normalizedMessageId !== null) {
           pendingMessageId = normalizedMessageId;
         }
-        const latestPendingMessageId = waitingForResponseDelivery
-          ? pendingResponseDeliveryMessageId
-          : pendingMessageId;
-        if (latestPendingMessageId !== previousPendingMessageId) {
-          recordBlackBox('shell-sync-deferred-by-turn-lock', {
+        if (pendingMessageId !== previousPendingMessageId) {
+          recordBlackBox('stable-shell-collapse-deferred-by-turn-lock', {
             triggerReason,
-            roundId: activeTurnRoundId || pendingResponseDeliveryRoundId,
+            roundId: activeTurnRoundId,
             expectedMessageId: normalizedMessageId,
-            waitingForResponseDelivery,
           });
         }
         return;
@@ -272,78 +252,18 @@
         return;
       }
 
-      const latestMessageId = getLastMessageId();
-      if (Number.isFinite(expectedMessageId) && expectedMessageId !== latestMessageId) {
-        return;
-      }
-
-      let $messages = $('#chat > .mes');
+      const $messages = $('#chat > .mes');
       if ($messages.length === 0) {
         return;
       }
 
-      let $latest = getMessageElement($messages, latestMessageId);
-      if ($latest.length === 0) {
-        if (syncInProgress) {
-          return;
-        }
-
-        // refresh:none 创建的新消息不会生成宿主 DOM。复用当前伪同层外壳时，必须同步
-        // mesid 和楼层标题，酒馆的编辑按钮才会定位到真实最新消息。
-        const $shell =
-          $messages.filter('.last_mes').last().length > 0 ? $messages.filter('.last_mes').last() : $messages.last();
-        if ($shell.length === 0) {
-          return;
-        }
-
-        const previousMessageId = $shell.attr('mesid');
-        const previousMessageIdLabel = $shell.find('.mesIDDisplay').text();
-        const reloadMarker = markPendingReloadReason(`refreshOneMessage:${triggerReason}`, {
-          previousMessageId: previousMessageId ?? null,
-          latestMessageId,
-          expectedMessageId: normalizeMessageId(expectedMessageId),
-        });
-        syncInProgress = true;
-        try {
-          $shell.attr('mesid', String(latestMessageId));
-          $shell.data('mesid', latestMessageId);
-          $shell.find('.mesIDDisplay').text(String(latestMessageId));
-          recordBlackBox('refresh-one-message-started', {
-            markerId: reloadMarker?.id ?? '',
-            triggerReason,
-            latestMessageId,
-          });
-          await refreshOneMessage(latestMessageId, $shell);
-          recordBlackBox('refresh-one-message-returned', {
-            markerId: reloadMarker?.id ?? '',
-            triggerReason,
-            latestMessageId,
-          });
-        } catch (error) {
-          clearPendingReloadReason(reloadMarker?.id);
-          if (previousMessageId === undefined) {
-            $shell.removeAttr('mesid');
-            $shell.removeData('mesid');
-          } else {
-            $shell.attr('mesid', previousMessageId);
-            $shell.data('mesid', Number(previousMessageId));
-          }
-          $shell.find('.mesIDDisplay').text(previousMessageIdLabel);
-          console.error('[隐藏楼层] 同步最新楼层显示失败:', error);
-          return;
-        } finally {
-          syncInProgress = false;
-        }
-
-        $messages = $('#chat > .mes');
-        $latest = getMessageElement($messages, latestMessageId);
-        if ($latest.length === 0) {
-          return;
-        }
+      const $stableShell = getStableShell($messages, triggerReason);
+      if ($stableShell.length === 0) {
+        return;
       }
 
-      $latest.addClass('last_mes');
-      $messages.not($latest).remove();
+      $stableShell.addClass('last_mes');
+      $messages.not($stableShell).remove();
       $('#show_more_messages').remove();
     }
 
@@ -360,7 +280,7 @@
 
       if (collapseTimer) {
         if (collapseTimerPriority === 'urgent' && priority !== 'urgent') {
-          // 回合完成或显式同步已经排队时，普通 DOM 变化不能把它推迟。
+          // 回合完成后的折叠已经排队时，普通 DOM 变化不能把它推迟。
           return;
         }
         clearTimeout(collapseTimer);
@@ -391,7 +311,7 @@
         collapseResetCount = 0;
         collapseTriggerReasonCounts = {};
         recordBlackBox('collapse-debounce-fired', diagnostics);
-        void syncAndCollapseToLastMessage(expectedMessageId, triggerReason);
+        collapseToStableShell(expectedMessageId, triggerReason);
       }, effectiveDelay);
     }
 
@@ -411,7 +331,7 @@
       chatObserver?.observe(chatElement, { childList: true });
     }
 
-    // 移除除了最后一楼以外的楼层
+    // 同一聊天只保留首次采用的宿主楼层 DOM，避免重建其中的武侠 iframe。
     observeChat();
     recordBlackBox('hidden-floor-script-boot', {
       chatId: SillyTavern.getCurrentChatId(),
@@ -431,10 +351,6 @@
       if (eventType) {
         eventOn(eventType, () => scheduleCollapse(120, undefined, `tavern-event:${eventType}`));
       }
-    });
-
-    eventOn(SYNC_LATEST_MESSAGE_SHELL_EVENT, messageId => {
-      scheduleCollapse(50, Number(messageId), 'explicit-latest-message-shell-sync');
     });
 
     eventOn(WUXIA_TURN_LIFECYCLE_EVENT, payload => {
@@ -459,20 +375,11 @@
         return;
       }
       if (payload.phase === 'finish') {
-        unlockTurn(
-          payload.roundId,
-          payload.messageId,
-          'turn-finish-event',
-          payload.waitForResponseDelivery === true,
-        );
+        if (payload.timeoutSourceRuntimeId === SCRIPT_RUNTIME_ID) {
+          return;
+        }
+        unlockTurn(payload.roundId, payload.messageId, 'turn-finish-event');
       }
-    });
-
-    eventOn(WUXIA_TURN_RESPONSE_DELIVERED_EVENT, payload => {
-      if (!payload || typeof payload !== 'object') {
-        return;
-      }
-      finishDeferredResponseDelivery(payload.roundId, payload.messageId, 'turn-response-delivered');
     });
 
     const shellElement = $('#sheld')[0] || document.body;
@@ -494,12 +401,11 @@
           nextChatId: chat_id,
           activeTurnRoundId,
         });
+        stableShellElement = null;
         activeTurnRoundId = null;
+        activeTurnChatId = null;
         pendingMessageId = null;
         clearTurnLockTimer();
-        pendingResponseDeliveryRoundId = null;
-        pendingResponseDeliveryMessageId = null;
-        clearResponseDeliveryTimer();
         current_chat_id = chat_id;
         reloadIframe();
         return;

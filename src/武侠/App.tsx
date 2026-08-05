@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FilePenLine } from 'lucide-react';
 import brandXiakeEmblemUrl from './assets/icons/jinyong/brand_xiake_emblem.png?url';
 import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
@@ -9,6 +10,9 @@ import FullscreenButton from './components/FullscreenButton';
 import GameContent from './components/GameContent';
 import EventNotificationStack from './components/EventNotificationStack';
 import { Icons } from './components/Icons';
+import LatestReplyEditorModal, {
+  type LatestReplyEditorSaveOutcome,
+} from './components/LatestReplyEditorModal';
 import Modal from './components/Modal';
 import NewGameSetup from './components/NewGameSetup';
 import SaveLoadPanel from './components/SaveLoadPanel';
@@ -46,6 +50,12 @@ import { migrateAvatarState } from './utils/avatarState';
 import { equipInventoryItem, useMedicineItem } from './utils/itemManager';
 import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inventoryAttributePreview';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
+import { getIsExtraVariableUpdating } from './utils/extraVariableUpdateManager';
+import {
+  readLatestAssistantSnapshot,
+  saveLatestAssistantSnapshot,
+  type LatestAssistantSnapshot,
+} from './utils/latestAssistantEditor';
 import { getUserCurrentLocation } from './utils/mapUtils';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
 import { finalizeCurrentTurn, resumeCheckout } from './utils/saveLoadManager';
@@ -67,6 +77,7 @@ import { resolveVariableEditorCapability } from './utils/variableEditorPolicy';
 import {
   detectGameSessionState,
   getLastMessageContent,
+  normalizeDisplayedMessageContent,
   parseOptions,
   readGameDataPure,
   scheduleGameDataCompletion,
@@ -168,6 +179,8 @@ const App: React.FC = () => {
   const [inputPrefill, setInputPrefill] = useState<{ key: string; message: string } | null>(null);
   const inputPrefillSequenceRef = useRef(0);
   const [isPlayerAvatarPreviewOpen, setIsPlayerAvatarPreviewOpen] = useState(false);
+  const [isLatestReplyEditorOpen, setIsLatestReplyEditorOpen] = useState(false);
+  const [latestReplySnapshot, setLatestReplySnapshot] = useState<LatestAssistantSnapshot | null>(null);
   const [mapDraftDestination, setMapDraftDestination] = useState<string | null>(null);
   const {
     variableChanges,
@@ -219,6 +232,8 @@ const App: React.FC = () => {
     clearVariableChanges();
     setInputPrefill(null);
     setIsCommandQueueOpen(false);
+    setIsLatestReplyEditorOpen(false);
+    setLatestReplySnapshot(null);
     refreshRecentInputHistory();
   }, [clearVariableChanges, refreshRecentInputHistory]);
 
@@ -498,6 +513,106 @@ const App: React.FC = () => {
       setGameState(prev => ({ ...prev, ...savedData }));
     }
   }, [setGameState]);
+
+  const canEditLatestReply = useMemo(() => {
+    if (currentPage !== 'game' || isLoading || historyCheckoutPending) return false;
+    try {
+      return Boolean(readLatestAssistantSnapshot());
+    } catch {
+      return false;
+    }
+  }, [currentMaintext, currentOptions, currentPage, historyCheckoutPending, isLoading]);
+
+  const handleOpenLatestReplyEditor = useCallback(() => {
+    if (isLoading || historyCheckoutPending) {
+      showError('当前回合或历史分叉仍在处理中，暂时不能编辑最新回复。');
+      return;
+    }
+    if (getIsExtraVariableUpdating()) {
+      showError('额外变量仍在写入或校验中，请稍后再编辑最新回复。');
+      return;
+    }
+
+    const snapshot = readLatestAssistantSnapshot();
+    if (!snapshot) {
+      showError('当前最后一条消息不是可编辑的有效 AI 回复。');
+      return;
+    }
+
+    closeModal();
+    setIsCommandQueueOpen(false);
+    setLatestReplySnapshot(snapshot);
+    setIsLatestReplyEditorOpen(true);
+  }, [closeModal, historyCheckoutPending, isLoading, showError]);
+
+  const handleReloadLatestReply = useCallback(() => readLatestAssistantSnapshot(), []);
+
+  const handleSaveLatestReply = useCallback(
+    async (snapshot: LatestAssistantSnapshot, draftText: string): Promise<LatestReplyEditorSaveOutcome> => {
+      if (isLoading || historyCheckoutPending) {
+        throw new Error('当前回合或历史分叉仍在处理中，不能覆写最新回复。');
+      }
+      if (getIsExtraVariableUpdating()) {
+        throw new Error('额外变量仍在写入或校验中，请等待完成后再保存。');
+      }
+
+      const result = await saveLatestAssistantSnapshot(snapshot, draftText);
+      const warnings: string[] = [];
+      try {
+        const displayText = normalizeDisplayedMessageContent(result.finalText) || result.finalText;
+        setCurrentMaintext(displayText);
+        setCurrentOptions(parseOptions(result.finalText));
+        if (result.variableActionsChanged) {
+          refreshGameStateFromVariables();
+        }
+      } catch (error) {
+        gameLogger.warn('[latest-reply-editor] 回复已保存，但主界面投影刷新失败:', error);
+        warnings.push(`主界面刷新失败，可重新打开前端恢复：${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      try {
+        const latestGameData = readGameDataPure();
+        await finalizeCurrentTurn({
+          location: latestGameData?.currentLocation || latestGameData?.stats?.location || '',
+          worldTimeText:
+            latestGameData?.gameTime ||
+            (latestGameData?.worldTime
+              ? `${latestGameData.worldTime.年}年${latestGameData.worldTime.月}月${latestGameData.worldTime.日}日 ${String(latestGameData.worldTime.时).padStart(2, '0')}:${String(latestGameData.worldTime.分).padStart(2, '0')}`
+              : ''),
+        });
+      } catch (error) {
+        gameLogger.warn('[latest-reply-editor] 回复已保存，但历史预览刷新失败:', error);
+        warnings.push(`历史预览刷新失败，可稍后在存档面板重试：${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      let committedSnapshot: LatestAssistantSnapshot | null = null;
+      try {
+        committedSnapshot = readLatestAssistantSnapshot();
+      } catch (error) {
+        gameLogger.warn('[latest-reply-editor] 回复已保存，但回读最新快照失败:', error);
+        warnings.push(`最新楼层回读失败：${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (!committedSnapshot) {
+        warnings.push('保存后最新楼层发生变化；再次编辑前请重新打开校订窗口。');
+      }
+      return {
+        snapshot:
+          committedSnapshot ?? {
+            ...snapshot,
+            rawText: result.finalText,
+            messageMirrorText: result.finalText,
+          },
+        warning: warnings.length > 0 ? warnings.join('；') : undefined,
+      };
+    },
+    [
+      historyCheckoutPending,
+      isLoading,
+      refreshGameStateFromVariables,
+      setCurrentMaintext,
+      setCurrentOptions,
+    ],
+  );
 
   const handleInventoryItemAction = useCallback(
     async (item: InventoryItem) => {
@@ -1317,17 +1432,30 @@ const App: React.FC = () => {
               }
               onMessageChange={handleHistoryDraftChange}
               extraActions={
-                <div className="command-queue-anchor">
-                  <CommandQueueButton commands={commands} onClick={() => setIsCommandQueueOpen(open => !open)} />
-                  {isCommandQueueOpen && (
-                    <CommandQueuePopover
-                      commands={commands}
-                      recentHistory={recentInputHistory}
-                      onCancel={cancelCommand}
-                      onHistorySelect={handleInputHistorySelect}
-                      onClose={() => setIsCommandQueueOpen(false)}
-                    />
-                  )}
+                <div className="chat-extra-actions">
+                  <div className="command-queue-anchor">
+                    <CommandQueueButton commands={commands} onClick={() => setIsCommandQueueOpen(open => !open)} />
+                    {isCommandQueueOpen && (
+                      <CommandQueuePopover
+                        commands={commands}
+                        recentHistory={recentInputHistory}
+                        onCancel={cancelCommand}
+                        onHistorySelect={handleInputHistorySelect}
+                        onClose={() => setIsCommandQueueOpen(false)}
+                      />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="latest-reply-trigger"
+                    onClick={handleOpenLatestReplyEditor}
+                    disabled={!canEditLatestReply}
+                    title={canEditLatestReply ? '查看并编辑最新 AI 回复原文' : '当前没有可编辑的最新 AI 回复'}
+                    aria-label="编辑最新 AI 回复"
+                    data-wuxia-automation="open-latest-reply-editor"
+                  >
+                    <FilePenLine size={19} aria-hidden="true" />
+                  </button>
                 </div>
               }
               onRegenerate={handleSafeRegenerate}
@@ -1356,6 +1484,16 @@ const App: React.FC = () => {
           src={playerAvatarSource.src}
           type={ActivePanel.CHARACTER}
           objectPosition={playerAvatarSource.objectPosition}
+        />
+        <LatestReplyEditorModal
+          isOpen={isLatestReplyEditorOpen}
+          snapshot={latestReplySnapshot}
+          onClose={() => {
+            setIsLatestReplyEditorOpen(false);
+            setLatestReplySnapshot(null);
+          }}
+          onReload={handleReloadLatestReply}
+          onSave={handleSaveLatestReply}
         />
       </div>
     </>

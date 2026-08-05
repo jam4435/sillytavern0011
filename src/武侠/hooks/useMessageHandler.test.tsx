@@ -311,12 +311,12 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(options.showError).toHaveBeenCalledWith(expect.stringContaining('正文已生成，但变量提交确认失败'));
   });
 
-  it('自动化回合会等待桥响应送达后再请求最新楼层同步', async () => {
+  it('发送完成后释放 lifecycle 屏障，且不会请求最新楼层同步', async () => {
     const options = createHookOptions(createSummarySettings('inline'));
     const { result } = renderHook(() => useMessageHandler(options));
 
     await act(async () => {
-      await result.current.handleSendMessage('自动化测试发送', { waitForBridgeResponseDelivery: true });
+      await result.current.handleSendMessage('自动化测试发送');
     });
 
     expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:turn-lifecycle', {
@@ -324,9 +324,11 @@ describe('useMessageHandler extra-variable decision', () => {
       roundId: 'debug-round-id',
       chatId: expect.any(String),
       messageId: 2,
-      waitForResponseDelivery: true,
     });
-    expect(globals.eventEmit).not.toHaveBeenCalledWith('wuxia:sync-latest-message-shell', 2);
+    expect(globals.eventEmit).not.toHaveBeenCalledWith(
+      'wuxia:sync-latest-message-shell',
+      expect.anything(),
+    );
   });
 
   it('send 遇到两次 429 后只落一次用户和 assistant 楼层', async () => {
@@ -496,7 +498,10 @@ describe('useMessageHandler extra-variable decision', () => {
         skipReason: expect.stringContaining('inline'),
       }),
     });
-    expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:sync-latest-message-shell', 9);
+    expect(globals.eventEmit).not.toHaveBeenCalledWith(
+      'wuxia:sync-latest-message-shell',
+      expect.anything(),
+    );
   });
 
   it('regenerate + extra 会先记录决策，再执行 prepare 和额外变量更新', async () => {
@@ -555,7 +560,10 @@ describe('useMessageHandler extra-variable decision', () => {
       '<VariableEdit>{"user数据":{"修为":130}}</VariableEdit>',
       12,
     );
-    expect(globals.eventEmit).toHaveBeenCalledWith('wuxia:sync-latest-message-shell', 12);
+    expect(globals.eventEmit).not.toHaveBeenCalledWith(
+      'wuxia:sync-latest-message-shell',
+      expect.anything(),
+    );
   });
 
   it('regenerate + extra + prepare 失败时，设置页调试仍保留 variable 决策与错误', async () => {

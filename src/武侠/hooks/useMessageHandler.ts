@@ -50,7 +50,6 @@ export interface AutoAdvanceTurnResult {
 }
 
 export interface SendMessageOptions {
-  waitForBridgeResponseDelivery?: boolean;
   /** 未附加地图/物品指令的真实玩家输入；仅显式传入时写入输入历史。 */
   rawPlayerInput?: string;
 }
@@ -76,7 +75,6 @@ interface UseMessageHandlerOptions {
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
 const COMPLETE_VARIABLE_ACTION_BLOCK_REGEX = /<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>/;
-const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
 const WUXIA_TURN_COMPLETED_EVENT = 'wuxia:turn-completed';
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -484,7 +482,6 @@ export function useMessageHandler({
 
   const handleSendMessage = useCallback(
     async (message: string, options: SendMessageOptions = {}): Promise<string> => {
-      const waitForBridgeResponseDelivery = options.waitForBridgeResponseDelivery === true;
       const rawPlayerInput = options.rawPlayerInput?.trim() || '';
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       messageLogger.log('🚀 开始发送消息流程');
@@ -840,13 +837,7 @@ export function useMessageHandler({
         setIsLoading(false);
         if (turnLockRequestStarted) {
           try {
-            await releaseWuxiaTurnLock(
-              debugRoundId,
-              turnChatId,
-              createdLatestMessageId,
-              undefined,
-              waitForBridgeResponseDelivery,
-            );
+            await releaseWuxiaTurnLock(debugRoundId, turnChatId, createdLatestMessageId);
           } catch (error) {
             recordIframeLifecycleEvent('wuxia-frontend', 'turn-lock-release-failed', {
               roundId: debugRoundId,
@@ -854,10 +845,6 @@ export function useMessageHandler({
               error: getErrorMessage(error),
             });
           }
-        }
-        if (createdLatestMessageId !== null && !waitForBridgeResponseDelivery) {
-          // 由后台楼层脚本延迟切换宿主消息节点；此处不等待，避免刷新节点时打断当前调用栈。
-          void eventEmit(SYNC_LATEST_MESSAGE_SHELL_EVENT, createdLatestMessageId);
         }
         messageLogger.log('');
         messageLogger.log('🏁 流程结束');
@@ -1088,10 +1075,6 @@ export function useMessageHandler({
             error: getErrorMessage(error),
           });
         }
-      }
-      if (targetAssistantMessageId !== null) {
-        // 与发送链路一致：等待当前回合结束后再同步宿主楼层，避免中途重绑打断前端状态。
-        void eventEmit(SYNC_LATEST_MESSAGE_SHELL_EVENT, targetAssistantMessageId);
       }
       messageLogger.log('🏁 重新生成流程结束');
       messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

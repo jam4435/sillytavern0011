@@ -5,7 +5,6 @@ import {
   WUXIA_GLOBAL_EVENTS,
   WUXIA_METHODS,
 } from '../../tools/wuxia-bridge/protocol.mjs';
-import { WUXIA_TURN_RESPONSE_DELIVERED_EVENT } from '../武侠/utils/turnLock';
 
 const mocks = vi.hoisted(() => ({
   io: vi.fn(),
@@ -327,20 +326,8 @@ describe('武侠自动化桥接口发现', () => {
     });
     expect(busyResponse).toMatchObject({ ok: false, error: { code: WUXIA_ERROR_CODES.BUSY } });
 
-    let deliveredResponse: unknown = null;
-    const deliveredResponseListener = eventOn(WUXIA_TURN_RESPONSE_DELIVERED_EVENT, payload => {
-      deliveredResponse = payload;
-    });
     resolveNewTurn({ ok: true, debug: { id: 'round-new' }, assistantMessageId: 12 });
     await expect(newResponse).resolves.toMatchObject({ ok: true, result: { ok: true } });
-    await vi.waitFor(() =>
-      expect(deliveredResponse).toMatchObject({
-        requestId: 'new-turn',
-        roundId: 'round-new',
-        messageId: 12,
-      }),
-    );
-    deliveredResponseListener.stop();
     await vi.waitFor(() => expect(getLastState(mocks.socket)).toMatchObject({ busy: false }));
   });
 

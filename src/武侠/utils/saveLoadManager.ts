@@ -1325,10 +1325,6 @@ async function executeCheckout(
     const resumed = Boolean(existingJournal);
     clearHistoryCheckoutJournal();
     notifyHistoryCheckoutCommit(resumed);
-    void eventEmit('wuxia:sync-latest-message-shell', {
-      messageId: journal.targetLocator.assistantMessageId,
-      reason: 'history-checkout-commit',
-    });
     return makeCheckoutResult('commit', actionKind, nodeId, state, null);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
