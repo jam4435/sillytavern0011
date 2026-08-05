@@ -552,6 +552,37 @@ describe('executeExtraVariableUpdate', () => {
     }
   });
 
+  it('自动推进会在落变量块前重试额外模型非法变量块', async () => {
+    vi.useFakeTimers();
+    requestConfiguredTextMock
+      .mockResolvedValueOnce('<VariableEdit>{invalid json}</VariableEdit>')
+      .mockResolvedValue('<VariableThink>无变化</VariableThink>');
+
+    try {
+      const updatePromise = executeExtraVariableUpdate({
+        settings: {
+          ...DEFAULT_SUMMARY_SETTINGS,
+          variableUpdateMode: 'extra',
+        },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+        retryAutoAdvanceFailures: true,
+      });
+      await vi.advanceTimersByTimeAsync(1000);
+      const result = await updatePromise;
+
+      expect(requestConfiguredTextMock).toHaveBeenCalledTimes(2);
+      expect(setChatMessagesMock).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        appended: false,
+        retryFailureCount: 1,
+        retryFailureLastDelayMs: 1000,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('自定义模板未放置 locationContext 时不会强行追加地点约束', async () => {
     await executeExtraVariableUpdate({
       settings: {

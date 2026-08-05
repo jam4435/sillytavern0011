@@ -107,6 +107,7 @@ let pendingPersistenceVerification: PendingPersistenceVerification | null = null
 
 const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/gi;
 const ERA_VARIABLE_BLOCK_STRIP_REGEX = /\s*<Variable(Think|Insert|Edit|Delete)>\s*[\s\S]*?<\/Variable\1>\s*/gi;
+const VARIABLE_BLOCK_TAGS = ['VariableThink', 'VariableInsert', 'VariableEdit', 'VariableDelete'] as const;
 const ACTION_BLOCK_TAGS = new Set(['VariableInsert', 'VariableEdit', 'VariableDelete']);
 const EXTRA_VARIABLE_READONLY_ENTITY_KEYS = new Set(['头像', '出生年份', '年龄', '初始属性', '天赋']);
 const PARTICIPATION_WRITABLE_KEYS = ['结局', 'insert', 'update', 'delete', '分支标记'] as const;
@@ -314,6 +315,14 @@ export function assertValidTurnVariableBlocks(blocksText: string): boolean {
   const hasActionOpeningTag = /<Variable(?:Insert|Edit|Delete)>/.test(blocksText);
   if (!hasActionOpeningTag) {
     return false;
+  }
+
+  for (const blockTag of VARIABLE_BLOCK_TAGS.slice(1)) {
+    const openingCount = blocksText.match(new RegExp(`<${blockTag}>`, 'gi'))?.length ?? 0;
+    const closingCount = blocksText.match(new RegExp(`</${blockTag}>`, 'gi'))?.length ?? 0;
+    if (openingCount !== closingCount) {
+      throw new Error(`本回合包含未闭合的 ${blockTag} 标签，无法确认 ERA 提交。`);
+    }
   }
 
   const completeActionBlocks =
@@ -1282,6 +1291,14 @@ function extractValidVariableBlocks(rawResponse: string): {
   const blocks: string[] = [];
   let actionBlockCount = 0;
 
+  for (const blockTag of VARIABLE_BLOCK_TAGS) {
+    const openingCount = rawResponse.match(new RegExp(`<${blockTag}>`, 'gi'))?.length ?? 0;
+    const closingCount = rawResponse.match(new RegExp(`</${blockTag}>`, 'gi'))?.length ?? 0;
+    if (openingCount !== closingCount) {
+      throw new Error(`额外变量模型返回未闭合的 ${blockTag} 标签。`);
+    }
+  }
+
   VARIABLE_BLOCK_REGEX.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = VARIABLE_BLOCK_REGEX.exec(rawResponse)) !== null) {
@@ -1528,6 +1545,9 @@ export async function executeExtraVariableUpdate({
           throw new Error('额外变量模型返回空回复');
         }
         prevalidatedExtraction = extractValidVariableBlocks(rawResponse);
+        if (!prevalidatedExtraction.blocksText) {
+          throw new Error('额外变量模型没有返回可识别的变量块');
+        }
       }
       return rawResponse;
     };
