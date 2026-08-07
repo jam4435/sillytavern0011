@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../utils/variableReader', () => ({
   flushPendingGameDataCompletion: vi.fn(async () => {}),
   getLastMessageContent: vi.fn(() => '最新正文'),
+  normalizeAssistantReplyForPersistence: vi.fn((text: string) =>
+    text.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(),
+  ),
   normalizeDisplayedMessageContent: vi.fn((text: string) => text),
   parseAIResponse: vi.fn((text: string) => ({ content: text })),
   parseOptions: vi.fn((text: string) => (text.includes('<option>') ? ['选项'] : [])),
@@ -357,6 +360,42 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(messages[0]?.data).toBeUndefined();
     expect(messages[1]?.message).toBe('重试后的正文');
     expect(options.showError).not.toHaveBeenCalled();
+  });
+
+  it('send 写入楼层前清洗异常换行，同时 rawReply 和调试输出保留模型原文', async () => {
+    const rawReply = '\r\n<tucao>\r\n吐槽内容  \r\n</tucao>\r\n \t\r\n\r\n\r\n正文\r\n\r\n\r\n';
+    const persistedReply = '<tucao>\n吐槽内容\n</tucao>\n\n正文';
+    globals.generate = vi.fn(async () => rawReply);
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    let returnedReply = '';
+    await act(async () => {
+      returnedReply = await result.current.handleSendMessage('测试换行清洗');
+    });
+
+    expect(messages[1]?.message).toBe(persistedReply);
+    expect(messages[1]?.message).not.toMatch(/\n{3,}/);
+    expect(messages[1]?.message).not.toMatch(/\n$/);
+    expect(options.onVariableAssistantReply).toHaveBeenNthCalledWith(1, persistedReply);
+    expect(options.onVariableAssistantReply).toHaveBeenNthCalledWith(2, persistedReply, 2);
+    expect(options.patchLatestDebugRound).toHaveBeenCalledWith({
+      main: expect.objectContaining({ output: rawReply }),
+    });
+    expect(returnedReply).toBe(rawReply);
+  });
+
+  it('清洗后为空的回复不会创建 assistant 楼层', async () => {
+    globals.generate = vi.fn(async () => '\r\n \t\r\n\r\n');
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('测试空回复');
+    });
+
+    expect(messages.map(message => message.role)).toEqual(['user']);
+    expect(options.showError).toHaveBeenCalledWith('生成失败：AI 回复为空，请重试');
   });
 
   it('send 连续三次 429 后停止重试且不创建 assistant 楼层', async () => {

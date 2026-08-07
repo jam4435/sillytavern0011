@@ -342,6 +342,21 @@ const FRONTEND_LOADER_BODY_TAG_REGEX = /<\/?body\b[^>]*>/gi;
 const FRONTEND_LOADER_HINT_REGEX = /(localhost|127\.0\.0\.1):5500\/dist\/武侠\/index\.html|\$\(['"]body['"]\)\.load\(/i;
 
 /**
+ * 规范即将写入酒馆 assistant 楼层的模型回复。
+ *
+ * 这里只处理换行与行尾空白，不解析或删除任何正文/变量结构块，确保实际楼层与后续提示词
+ * 不会保留模型偶发输出的大段空行。
+ */
+export function normalizeAssistantReplyForPersistence(messageContent: string): string {
+  if (!messageContent) return '';
+  return messageContent
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
  * 剥离 ERA 变量块，保留真正需要展示/解析的楼层正文。
  */
 export function stripEraVariableBlocks(messageContent: string): string {

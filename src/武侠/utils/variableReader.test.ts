@@ -20,7 +20,12 @@ vi.mock('./logger', () => ({
 
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { getMartialArtData, loadMartialArtsDatabase } from './martialArtsDatabase';
-import { __resetVariableReaderTestState, autoUpdateMartialArts, readGameDataSync } from './variableReader';
+import {
+  __resetVariableReaderTestState,
+  autoUpdateMartialArts,
+  normalizeAssistantReplyForPersistence,
+  readGameDataSync,
+} from './variableReader';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -31,6 +36,33 @@ const getMartialArtDataMock = vi.mocked(getMartialArtData);
 const loadMartialArtsDatabaseMock = vi.mocked(loadMartialArtsDatabase);
 const getVariablesMock = globalThis.getVariables as ReturnType<typeof vi.fn>;
 const getAllVariablesMock = globalThis.getAllVariables as ReturnType<typeof vi.fn>;
+
+describe('normalizeAssistantReplyForPersistence', () => {
+  it('压缩 tucao 后的大段空行并统一换行与行尾空白', () => {
+    const rawReply = '\r\n<tucao>\r\n吐槽内容  \r\n</tucao>\r\n \t\r\n\r\n\r\n正文\r\n\r\n\r\n';
+
+    expect(normalizeAssistantReplyForPersistence(rawReply)).toBe('<tucao>\n吐槽内容\n</tucao>\n\n正文');
+  });
+
+  it('保留正常段落、结构块内容和非行尾缩进', () => {
+    const reply = [
+      '第一段',
+      '',
+      '第二段',
+      '<VariableEdit>',
+      '{',
+      '  "user数据": { "修为": 120 }',
+      '}',
+      '</VariableEdit>',
+      '<option>',
+      '  继续前进',
+      '</option>',
+    ].join('\n');
+
+    expect(normalizeAssistantReplyForPersistence(reply)).toBe(reply);
+    expect(normalizeAssistantReplyForPersistence(normalizeAssistantReplyForPersistence(reply))).toBe(reply);
+  });
+});
 
 const 金雁功数据库 = {
   类型: '轻功',

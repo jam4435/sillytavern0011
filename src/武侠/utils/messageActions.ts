@@ -4,6 +4,7 @@ import {
   flushPendingGameDataCompletion,
   getLastMessageContent,
   isFrontendLoaderOnlyMessage,
+  normalizeAssistantReplyForPersistence,
   normalizeDisplayedMessageContent,
   parseOptions,
   readGameDataPure,
@@ -404,7 +405,8 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
       combinedPromptCapture?.stop();
     }
 
-    const resultText = typeof generated === 'string' ? generated : generated.content;
+    const rawResultText = typeof generated === 'string' ? generated : generated.content;
+    const resultText = normalizeAssistantReplyForPersistence(rawResultText);
     if (!resultText?.trim()) {
       throw new Error('重新生成失败：AI 回复为空。');
     }
@@ -424,7 +426,7 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
       assistantMessageId: context.assistantMessage.message_id,
       userInput: getActiveMessageText(context.userMessage),
       combinedPrompt,
-      rawReply: resultText,
+      rawReply: rawResultText,
     };
   } catch (error) {
     if (transaction) {

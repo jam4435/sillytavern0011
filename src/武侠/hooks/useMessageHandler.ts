@@ -4,6 +4,7 @@ import type { SummarySettings } from '../utils/settingsManager';
 import {
   flushPendingGameDataCompletion,
   getLastMessageContent,
+  normalizeAssistantReplyForPersistence,
   normalizeDisplayedMessageContent,
   parseAIResponse,
   parseOptions,
@@ -667,23 +668,25 @@ export function useMessageHandler({
         } finally {
           combinedPromptCapture?.stop();
         }
-        const resultText = typeof result === 'string' ? result : result.content;
+        const rawResultText = typeof result === 'string' ? result : result.content;
+        const resultText = normalizeAssistantReplyForPersistence(rawResultText);
         const generateEndTime = Date.now();
         recordIframeLifecycleEvent('wuxia-frontend', 'turn-main-generation-returned', {
           roundId: debugRoundId,
           chatId: turnChatId,
-          outputLength: resultText?.length ?? 0,
+          outputLength: rawResultText?.length ?? 0,
           durationMs: generateEndTime - generateStartTime,
         });
 
         messageLogger.log('✅ [步骤 2] generate() 调用完成');
         messageLogger.log('耗时:', generateEndTime - generateStartTime, 'ms');
         messageLogger.log('返回值类型:', typeof result);
-        messageLogger.log('返回文本是否为空:', !resultText);
-        messageLogger.log('返回文本长度:', resultText ? resultText.length : 0);
-        messageLogger.log('返回文本前 500 字符:', resultText ? resultText.substring(0, 500) : '(null/undefined)');
-        if (resultText && resultText.length > 500) {
-          messageLogger.log('返回文本后 200 字符:', resultText.substring(resultText.length - 200));
+        messageLogger.log('返回文本是否为空:', !rawResultText);
+        messageLogger.log('返回文本长度:', rawResultText ? rawResultText.length : 0);
+        messageLogger.log('持久化文本长度:', resultText.length);
+        messageLogger.log('返回文本前 500 字符:', rawResultText ? rawResultText.substring(0, 500) : '(null/undefined)');
+        if (rawResultText && rawResultText.length > 500) {
+          messageLogger.log('返回文本后 200 字符:', rawResultText.substring(rawResultText.length - 200));
         }
 
         if (resultText) {
@@ -709,7 +712,7 @@ export function useMessageHandler({
           messageLogger.log('📌 [步骤 4] 创建 assistant 消息楼层');
           messageLogger.log('调用 createChatMessages() 参数:', {
             role: 'assistant',
-            messageLength: result.length,
+            messageLength: resultText.length,
             options: { refresh: 'none' },
           });
 
@@ -766,7 +769,7 @@ export function useMessageHandler({
           patchLatestDebugRound({
             main: {
               status: 'success',
-              output: resultText,
+              output: rawResultText,
               finishedAt: Date.now(),
             },
           });
@@ -786,7 +789,7 @@ export function useMessageHandler({
                 throw new PostGenerationStepError(errorMessage);
               }
               showError(errorMessage);
-              return resultText;
+              return rawResultText;
             }
             try {
               const extraUpdateResult = await runExtraVariableUpdate({
@@ -822,7 +825,7 @@ export function useMessageHandler({
                 throw postGenerationError;
               }
               showError(postGenerationError.message);
-              return resultText;
+              return rawResultText;
             }
           }
 
@@ -834,7 +837,7 @@ export function useMessageHandler({
               throw postGenerationError;
             }
             showError(postGenerationError.message);
-            return resultText;
+            return rawResultText;
           }
           try {
             await ensureTurnVariableBlocksCommitted({
@@ -851,7 +854,7 @@ export function useMessageHandler({
               throw postGenerationError;
             }
             showError(postGenerationError.message);
-            return resultText;
+            return rawResultText;
           }
 
           messageLogger.log('✅ [步骤 5] 前端状态已更新');
@@ -875,7 +878,7 @@ export function useMessageHandler({
           }
 
           dismissToast();
-          return resultText;
+          return rawResultText;
         } else {
           // ========== 错误处理: AI 回复为空 ==========
           messageLogger.log('');

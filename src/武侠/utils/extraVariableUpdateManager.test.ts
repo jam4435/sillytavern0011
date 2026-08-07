@@ -318,6 +318,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(result.appended).toBe(true);
     expect(result.actionBlockCount).toBe(1);
     expect(result.finalMessageText).toContain('<VariableEdit>');
+    expect(result.finalMessageText).toMatch(/^正文内容\n\n<VariableEdit>/);
     expect(requestConfiguredTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
         prompt: expect.stringContaining('合法地点完整路径'),

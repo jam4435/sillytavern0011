@@ -8,6 +8,9 @@ vi.mock('./variableReader', () => ({
   flushPendingGameDataCompletion: vi.fn(async () => {}),
   getLastMessageContent: vi.fn(),
   isFrontendLoaderOnlyMessage: vi.fn(() => false),
+  normalizeAssistantReplyForPersistence: vi.fn((text: string) =>
+    text.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(),
+  ),
   normalizeDisplayedMessageContent: vi.fn((text: string) => text),
   parseOptions: vi.fn((text: string) => (text.includes('<option>') ? ['选项'] : [])),
   readGameDataPure: vi.fn(() => ({ 时间: '测试' })),
@@ -201,6 +204,21 @@ describe('regenerateLastAssistantSwipe', () => {
     expect(messages[1].swipes?.filter(text => text.includes('限流后新正文'))).toHaveLength(1);
     expect(emitEraEventAndWaitMock).toHaveBeenCalledTimes(2);
     expect(result.rawReply).toBe('限流后新正文');
+  });
+
+  it('重新生成写入新 swipe 前清洗异常换行并同步 message 镜像', async () => {
+    const rawReply = '\r\n<tucao>\r\n重新生成吐槽  \r\n</tucao>\r\n\r\n\r\n\r\n新正文\r\n\r\n\r\n';
+    const persistedReply = '<tucao>\n重新生成吐槽\n</tucao>\n\n新正文';
+    globals.generate = vi.fn(async () => rawReply);
+
+    const result = await regenerateLastAssistantSwipe();
+
+    expect(messages[1].swipes?.[0]).toBe('旧正文\n\n<era_data>{"mk":"old"}</era_data>');
+    expect(messages[1].swipes?.[1]).toBe(persistedReply);
+    expect(messages[1].message).toBe(persistedReply);
+    expect(messages[1].message).not.toMatch(/\n{3,}/);
+    expect(messages[1].message).not.toMatch(/\n$/);
+    expect(result.rawReply).toBe(rawReply);
   });
 
   it('重新生成连续三次 429 后恢复原 swipe', async () => {
