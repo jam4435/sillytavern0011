@@ -13,6 +13,11 @@ function getCacheKey(src: string, mode: AvatarRasterMode): string {
 function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise(resolve => {
     const image = new Image();
+    // Remote avatar assets are served with Access-Control-Allow-Origin so the
+    // canvas crop can read their pixels without tainting the canvas.
+    if (/^https?:\/\//i.test(src)) {
+      image.crossOrigin = 'anonymous';
+    }
     image.onload = () => resolve(image);
     image.onerror = () => resolve(null);
     image.src = src;

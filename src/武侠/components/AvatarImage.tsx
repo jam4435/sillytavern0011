@@ -20,13 +20,22 @@ export const AvatarImage: React.FC<AvatarImageProps> = ({
   fit = 'cover',
   rasterMode = 'square',
   style,
+  onError,
+  loading = 'lazy',
   ...rest
 }) => {
   const [displaySrc, setDisplaySrc] = useState(() => getCachedAvatarRasterizedSrc(src, rasterMode) || src);
+  const [hasLoadError, setHasLoadError] = useState(false);
+  const fallbackSrc = useMemo(() => {
+    const initial = alt.trim().charAt(0) || '侠';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#241b15"/><text x="50" y="58" text-anchor="middle" fill="#f4e8c9" font-size="52" font-family="serif">${initial}</text></svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  }, [alt]);
 
   useEffect(() => {
     let cancelled = false;
     const cached = getCachedAvatarRasterizedSrc(src, rasterMode);
+    setHasLoadError(false);
     setDisplaySrc(cached || src);
 
     rasterizeAvatarSource(src, rasterMode).then(rasterizedSrc => {
@@ -41,6 +50,7 @@ export const AvatarImage: React.FC<AvatarImageProps> = ({
   }, [rasterMode, src]);
 
   const usingRasterizedSource = displaySrc !== src;
+  const resolvedSrc = hasLoadError ? fallbackSrc : displaySrc;
   const imageStyle = useMemo(
     () => ({
       ...style,
@@ -50,7 +60,19 @@ export const AvatarImage: React.FC<AvatarImageProps> = ({
     [fit, objectPosition, style, usingRasterizedSource],
   );
 
-  return <img {...rest} src={displaySrc} alt={alt} style={imageStyle} />;
+  return (
+    <img
+      {...rest}
+      src={resolvedSrc}
+      alt={alt}
+      loading={loading}
+      style={imageStyle}
+      onError={event => {
+        setHasLoadError(true);
+        onError?.(event);
+      }}
+    />
+  );
 };
 
 export default AvatarImage;
