@@ -66,8 +66,19 @@ function describeTalents(talents) {
 
 function normalizeFullLocationPath(value) {
   if (typeof value !== 'string') return '';
-  const segments = value.trim().replace(/[\\＞>›→]+/g, '/').split('/').map(part => part.trim()).filter(Boolean);
-  return segments.length === 3 ? segments.join('/') : '';
+  const segments = value.trim().replace(/[\\＞>›→]+/g, '/').split('/').map(part => part.trim());
+  if ((segments.length !== 3 && segments.length !== 4) || segments.some(part => !part)) return '';
+  return segments.join('/');
+}
+
+function getLocationScopePath(value) {
+  const normalized = normalizeFullLocationPath(value);
+  return normalized ? normalized.split('/').slice(0, 3).join('/') : '';
+}
+
+function isSameLocationScope(left, right) {
+  const leftScope = getLocationScopePath(left);
+  return Boolean(leftScope) && leftScope === getLocationScopePath(right);
 }
 
 function uniqueFullLocationPaths(value) {
@@ -182,18 +193,28 @@ const 原始周围地点 = getvar('stat_data.前端变量.周围地点', { scope
 const 周围地点 = 原始周围地点 && typeof 原始周围地点 === 'object' && !Array.isArray(原始周围地点)
   ? 原始周围地点
   : {};
-const 普通移动来源 = Array.isArray(原始周围地点)
-  ? 原始周围地点
-  : (Array.isArray(周围地点.普通移动) ? 周围地点.普通移动 : 周围地点.相邻三级地点);
 const 地点分组 = {
-  普通移动: uniqueFullLocationPaths(普通移动来源),
+  普通移动: uniqueFullLocationPaths(周围地点.普通移动),
   事件目标: uniqueFullLocationPaths(周围地点.事件目标),
   地图指定: uniqueFullLocationPaths(周围地点.地图指定),
 };
-const 可用地点数量 = Object.values(地点分组).reduce((sum, paths) => sum + paths.length, 0);
+const 当前完整位置 = normalizeFullLocationPath(variables.stat_data.user数据?.所在位置);
+const 当前活动区 = getLocationScopePath(周围地点.当前活动区) || getLocationScopePath(当前完整位置);
+const 合法活动区 = [...new Set([
+  当前活动区,
+  ...Object.values(地点分组).flat().map(getLocationScopePath),
+].filter(Boolean))];
 -%>
 
 <可用地点>
+［路径语义］
+- 格式为“一级/二级/三级[/四级]”：一级是世界大域或政权，二级是地图旅行区域，三级是严格活动区，第四级是可选的具体镜头场景。
+- 当前完整位置：<%- 当前完整位置 || '（无效）' %>
+- 当前严格活动区：<%- 当前活动区 || '（无效）' %>
+[合法严格活动区]
+<% for (const 路径 of 合法活动区) { -%>
+- <%- 路径 %>
+<% } -%>
 <% for (const [分组名, 路径列表] of Object.entries(地点分组)) { -%>
 [<%- 分组名 %>]<% if (路径列表.length === 0) { %>（无）<% } %>
 <% for (const 路径 of 路径列表) { -%>
@@ -201,10 +222,12 @@ const 可用地点数量 = Object.values(地点分组).reduce((sum, paths) => su
 <% } -%>
 <% } -%>
 [写入规则]
-<% if (可用地点数量 === 0) { -%>
-当前没有任何可用的完整地点路径，本轮禁止修改任何 `所在位置`。
+<% if (合法活动区.length === 0) { -%>
+当前没有可用的合法严格活动区，本轮禁止修改任何 `所在位置`。
 <% } else { -%>
-任何 `所在位置` 的新值都只能逐字等于上方列出的某个完整路径；不得缩写、改写或自造地点。
+任何 `所在位置` 的前三段必须逐字等于上方合法严格活动区；可以只写三级，也可以追加一个不含“/”的第四级具体场景。
+第四级不参加白名单匹配；只有正文确实发生局部移动时才修改，未移动时不得改写同义词，同一场景优先复用已有名称。
+事件目标的第四级是推荐初始场景而非强制字面值；同一前三段只表示处于同一事件活动区，不表示人物已经面对面同场。
 <% } -%>
 </可用地点>
 
@@ -217,7 +240,7 @@ if (playerLocation && allCharacters) {
   for (const charName in allCharacters) {
     if (allCharacters.hasOwnProperty(charName) && charName !== '$template') {
       const character = allCharacters[charName];
-      if (character.所在位置 === playerLocation) {
+      if (isSameLocationScope(character.所在位置, playerLocation)) {
         // 姓名由人物对象键表达；这里只排除初始属性和内部字段
         const filtered = {};
         for (const key in character) {
@@ -233,8 +256,9 @@ if (playerLocation && allCharacters) {
 
 if (Object.keys(presentCharacters).length > 0) {
 -%>
-# 同场景角色（当前状态）
+# 同一严格活动区角色（当前状态；用完整所在位置判断具体同场）
 角色数据:<%- toStrictJson(presentCharacters) -%>
+同一前三段不代表人物已经面对面同场。只有完整场景一致，或正文先明确描述靠近、会合、追来、闯入等过程，人物才能直接互动或参战。
 <%
 } else {
 -%>
