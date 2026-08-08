@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">侠字朱砂印</title>
+  <defs>
+    <filter id="seal-softness" x="-12%" y="-12%" width="124%" height="124%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="9" result="grain" />
+      <feDisplacementMap in="SourceGraphic" in2="grain" scale="0.45" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </defs>
+
+  <g transform="rotate(-1.5 32 32)" fill="#a92f25" filter="url(#seal-softness)">
+    <path
+      fill-rule="evenodd"
+      d="M9.8 8.4 54.2 9l1.4 45.1-45.8 1.5L8.4 10.2Zm4.4 5.2.6 36.8 35.7-1.1-.8-35.2Z"
+      opacity="0.96"
+    />
+    <text
+      x="32"
+      y="46.5"
+      text-anchor="middle"
+      font-family="STKaiti, KaiTi, 'Kaiti SC', 'Noto Serif CJK SC', serif"
+      font-size="42"
+      font-weight="700"
+      letter-spacing="-2"
+    >侠</text>
+
+    <path d="m10.5 21.2 3.9-.3.1 2.2-3.9.5Zm39.7 25 4.2-.2.1 2.4-4.1.1ZM28.1 9l3.8.1-.1 2.1-3.6-.1Z" opacity="0.38" />
+  </g>
+</svg>
