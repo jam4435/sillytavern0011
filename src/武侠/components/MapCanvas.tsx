@@ -1,8 +1,8 @@
 import { LocateFixed, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import mapImageUrl from '../地图.jpg?url';
 import { DISPLAY_AREA_MARKERS, MAP_HEIGHT, MAP_WIDTH } from '../data/mapCoordinates';
 import { MapArea, MapCoordinate, MapData, MapRegion } from '../types';
+import { getRemoteMapUrl } from '../utils/avatarRemote';
 import LocationPopover from './LocationPopover';
 
 interface MapCanvasProps {
@@ -43,6 +43,7 @@ interface GestureState {
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
+const mapImageUrl = getRemoteMapUrl('地图.jpg');
 
 function resolveLocationCoordinate(mapData: MapData, locationPath: string): MapCoordinate | null {
   const [exactArea, exactRegion, exactLocation] = locationPath.split('/');
