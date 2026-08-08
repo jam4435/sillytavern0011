@@ -37,8 +37,13 @@
     cleanupFollowupCluesForActiveParticipation,
     cleanupInvalidParticipationEntries,
   } = await import('./era-event-operations.js');
-  const { getRumorScopeFromEventLocation, isLocationWithinRumorScope, normalizeLocationPath } =
+  const {
+    getRumorScopeFromEventLocation,
+    isLocationWithinRumorScope,
+    normalizeLocationPath,
+  } =
     await import('./era-participant-entry.js');
+  const { isSameLocationScope } = await import('../shared/locationPath.js');
   const { reconcileWorldEventArchive, syncParticipationOutcomeStates } = await import('./era-world-events.js');
   const { needsEventRuntimeStateReset, resetLegacyEventRuntimeState } = await import('./era-runtime-state.js');
   const { buildFollowupCounterPlan, createSerialTaskQueue } = await import('./era-turn-queue.js');
@@ -332,7 +337,7 @@
           eventData &&
           !isDebutEvent(eventData) &&
           isEventDiscoverable(currentTime, eventData, variables.stat_data, eventDefinitions, eventName) &&
-          playerLocation === normalizeLocationPath(eventData.事件地点)
+          isSameLocationScope(playerLocation, eventData.事件地点)
         ) {
           logSuccess(`玩家在弹性窗口精确到达事件地点，提前启动 ${eventName}`);
           earlyEventsToStart.push(eventName);
@@ -506,12 +511,12 @@
 
       // 层级式地点匹配
       if (playerLocation && eventLocation) {
-        // 附近传闻范围固定由事件地点前两级派生；到达完整事件地点后只加入事件，不再显示传闻。
+        // 附近传闻范围固定由事件地点前两级派生；到达同一严格三级活动区后不再显示传闻。
         if (
           hookText &&
           isLocationWithinRumorScope(playerLocation, rumorScope) &&
           !alreadyJoined &&
-          eventLocation !== playerLocation
+          !isSameLocationScope(eventLocation, playerLocation)
         ) {
           const time = eventData.触发条件;
           const location = eventData.事件地点;
@@ -521,8 +526,8 @@
           log(`发现传闻: ${eventName}`);
         }
 
-        // 只有当playerLocation与eventData.事件地点完全相同时，才调用playerJoinsEvent
-        if (activeEvents.has(eventName) && eventLocation === playerLocation && !alreadyJoined) {
+        // 第四级是叙事场景；事件参与只比较前三段严格活动区。
+        if (activeEvents.has(eventName) && isSameLocationScope(eventLocation, playerLocation) && !alreadyJoined) {
           logSuccess(`玩家到达事件地点: ${eventName}`);
           eventsToJoin.push(eventName);
         }

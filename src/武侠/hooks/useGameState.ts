@@ -12,7 +12,7 @@ const DEFAULT_WORLD_TIME: WorldTime = {
 
 // 默认游戏状态
 export const DEFAULT_GAME_STATE: GameState = {
-  currentLocation: '临安府/牛家村',
+  currentLocation: '大宋/临安府/牛家村',
   gameTime: '己未年 八月 十五 巳时 11时00分',
   worldTime: DEFAULT_WORLD_TIME,
   mode: GameMode.DIALOGUE,

@@ -56,6 +56,7 @@ import xiaoLongnvAltUrl from '../assets/avatars/jinyong/xiao_longnv_alt.png?url'
 import xiaoLongnvFc2Url from '../assets/avatars/jinyong/xiao_longnv_fc2.png?url';
 import youngYingzhengAltUrl from '../assets/avatars/jinyong/young_yingzheng_alt.png?url';
 import youngYingzhengUrl from '../assets/avatars/jinyong/young_yingzheng.png?url';
+import { GENERATED_NPC_AVATAR_ASSETS } from './generatedAvatarCatalog';
 
 export type AvatarGender = '男' | '女';
 export type AvatarUsage = 'player' | 'npc';
@@ -148,6 +149,24 @@ function createNpcAvatar(
   };
 }
 
+// AI-generated portraits are ordinary bundled assets, not machine-local file
+// paths. The filename is the canonical character name, and generated entries
+// are placed before legacy portraits so automatic matching picks them first.
+const GENERATED_NPC_NAME_ALIASES: Partial<Record<string, string[]>> = {
+  黄蓉: ['黃蓉'],
+  小龙女: ['小龍女'],
+};
+
+const GENERATED_NPC_AVATAR_CATALOG: AvatarCatalogEntry[] = GENERATED_NPC_AVATAR_ASSETS.map(asset =>
+  createNpcAvatar(
+    `generated_${asset.name}`,
+    asset.name,
+    asset.gender,
+    asset.src,
+    [asset.name, ...(GENERATED_NPC_NAME_ALIASES[asset.name] || [])],
+  ),
+);
+
 const PLAYER_AVATAR_CATALOG: AvatarCatalogEntry[] = [
   createPlayerAvatar('player_male_01', '少侠一', '男', chooseFaceB01Url),
   createPlayerAvatar('player_male_02', '少侠二', '男', chooseFaceB02Url),
@@ -173,6 +192,9 @@ const PLAYER_AVATAR_CATALOG: AvatarCatalogEntry[] = [
 ];
 
 const NPC_AVATAR_CATALOG: AvatarCatalogEntry[] = [
+  // Generated portraits take precedence for automatic name matching; legacy
+  // portraits remain available as manually selectable alternatives.
+  ...GENERATED_NPC_AVATAR_CATALOG,
   createNpcAvatar('male_palace_1', '男主皇宫正装', '男', malePalace1Url, ['男主皇宮正裝', '男主皇宫正装', '男主']),
   createNpcAvatar('male_palace_2', '男主皇宫正装二', '男', malePalace2Url, ['男主皇宮正裝2', '男主皇宫正装2']),
   createNpcAvatar('male_kui', '男葵正装', '男', maleKuiUrl, ['男葵正装', '男葵正裝']),

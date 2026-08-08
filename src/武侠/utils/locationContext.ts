@@ -1,4 +1,9 @@
 import type { MapData, MapRegion } from '../types';
+import {
+  getLocationScopePath,
+  normalizeLocationPath,
+  parseLocationPath,
+} from '../../shared/locationPath.js';
 import { loadMapData } from './mapLoader';
 import { FRONTEND_VARIABLES_KEY } from './frontendVariableKeys';
 import { isLocationUnlocked } from './mapUtils';
@@ -23,6 +28,7 @@ export interface LocationRegionOption {
 
 export interface DynamicLocationContext {
   currentLocation: string;
+  currentScopePath: string;
   currentRegions: LocationRegionOption[];
   adjacentRegions: LocationRegionOption[];
   allowedLocationPaths: string[];
@@ -31,6 +37,7 @@ export interface DynamicLocationContext {
 }
 
 export interface DynamicLocationContextVariable {
+  当前活动区: string;
   普通移动: string[];
   事件目标: string[];
   地图指定: string[];
@@ -49,13 +56,7 @@ function omitKeys(record: Record<string, unknown>, keys: string[]): Record<strin
   return Object.fromEntries(Object.entries(record).filter(([key]) => !keys.includes(key)));
 }
 
-export function normalizeLocationPath(value: string): string {
-  return value
-    .trim()
-    .replace(/[\\＞>›→]+/g, '/')
-    .replace(/\s*\/\s*/g, '/')
-    .replace(/^\/+|\/+$/g, '');
-}
+export { normalizeLocationPath } from '../../shared/locationPath.js';
 
 function flattenMapRegions(mapData: MapData): MapRegionReference[] {
   return Object.entries(mapData).flatMap(([areaName, area]) =>
@@ -73,45 +74,14 @@ function uniqueRegions(regions: MapRegionReference[]): MapRegionReference[] {
 }
 
 function resolveCurrentRegions(regions: MapRegionReference[], currentLocation: string): MapRegionReference[] {
-  const normalized = normalizeLocationPath(currentLocation);
-  if (!normalized) {
-    return [];
-  }
+  const parsed = parseLocationPath(currentLocation);
+  if (!parsed) return [];
 
-  const segments = normalized.split('/').filter(Boolean);
-  const last = segments.at(-1) || '';
-  const previous = segments.at(-2) || '';
-  const beforePrevious = segments.at(-3) || '';
-
-  const exactLocationPathMatches = regions.filter(region =>
-    beforePrevious === region.areaName &&
-    previous === region.regionName &&
-    Object.hasOwn(region.region.地点, last),
+  return regions.filter(region =>
+    parsed.area === region.areaName &&
+    parsed.region === region.regionName &&
+    Object.hasOwn(region.region.地点, parsed.location),
   );
-  if (exactLocationPathMatches.length > 0) {
-    return uniqueRegions(exactLocationPathMatches);
-  }
-
-  const exactRegionPathMatches = regions.filter(
-    region => previous === region.areaName && last === region.regionName,
-  );
-  if (exactRegionPathMatches.length > 0) {
-    return uniqueRegions(exactRegionPathMatches);
-  }
-
-  const relativeLocationPathMatches = regions.filter(
-    region => previous === region.regionName && Object.hasOwn(region.region.地点, last),
-  );
-  if (relativeLocationPathMatches.length > 0) {
-    return uniqueRegions(relativeLocationPathMatches);
-  }
-
-  const regionNameMatches = regions.filter(region => normalized === region.regionName);
-  if (regionNameMatches.length > 0) {
-    return uniqueRegions(regionNameMatches);
-  }
-
-  return uniqueRegions(regions.filter(region => Object.hasOwn(region.region.地点, normalized)));
 }
 
 function toRegionOption(region: MapRegionReference, exploredLocations: string[]): LocationRegionOption {
@@ -160,10 +130,13 @@ export function buildDynamicLocationContext(
   exploredLocations: string[] = [],
 ): DynamicLocationContext {
   const allRegions = flattenMapRegions(mapData);
+  const normalizedCurrentLocation = normalizeLocationPath(currentLocation);
+  const currentScopePath = getLocationScopePath(currentLocation);
   const resolvedRegions = resolveCurrentRegions(allRegions, currentLocation);
   if (resolvedRegions.length === 0) {
     return {
-      currentLocation,
+      currentLocation: normalizedCurrentLocation,
+      currentScopePath,
       currentRegions: [],
       adjacentRegions: [],
       allowedLocationPaths: [],
@@ -181,7 +154,8 @@ export function buildDynamicLocationContext(
   ];
 
   return {
-    currentLocation,
+    currentLocation: normalizedCurrentLocation,
+    currentScopePath,
     currentRegions,
     adjacentRegions,
     allowedLocationPaths: [...new Set(allowedLocationPaths)],
@@ -199,31 +173,31 @@ export function formatDynamicLocationConstraint(context: DynamicLocationContext)
   if (!context.resolved) {
     return [
       title,
-      `当前 user数据.所在位置：${context.currentLocation || '(空)'}`,
-      '当前值无法在地点表中定位到二级地点。',
+      `当前 user数据.所在位置：${context.currentLocation || '(无效路径)'}`,
+      '当前值不是地点表中的合法三级/四级完整路径。',
       '强制规则：本轮不得修改 user数据.所在位置，必须保留当前值。',
     ].join('\n');
   }
 
   const currentRegionLocations = context.currentRegions.flatMap(region => region.locations);
-  const currentRegionHeading = context.ambiguous
-    ? '当前值存在同名地点，可能所属的二级地点：'
-    : '当前所属二级地点：';
-
   return [
     title,
-    `当前 user数据.所在位置：${context.currentLocation}`,
-    currentRegionHeading,
+    '路径格式：一级/二级/三级[/四级]。',
+    '一级是世界大域或政权；二级是地图旅行区域；三级是严格活动区；第四级是可选的具体镜头场景。',
+    `当前完整位置：${context.currentLocation}`,
+    `当前严格活动区：${context.currentScopePath}`,
+    '当前二级地图区域：',
     formatPathList(context.currentRegions.map(region => region.path)),
-    '当前二级地点内可到达的三级地点：',
+    '当前二级区域内可到达的严格三级活动区：',
     formatPathList(currentRegionLocations),
-    '相邻二级地点内已解锁的三级地点（按地图坐标由近到远）：',
+    '相邻二级区域内已解锁的严格三级活动区（按地图坐标由近到远）：',
     formatPathList(context.adjacentRegions.flatMap(region => region.locations)) || '- (无)',
     '强制规则：',
-    '1. 仅当剧情中确实发生移动时，才修改 user数据.所在位置。',
-    '2. 新值必须逐字等于上方某个三级地点完整路径；以上路径是唯一写入白名单。',
-    '3. 不得缩写路径、只写末级名称、杜撰地点，或写入白名单之外的值。',
-    '4. 二级地点本身不可作为移动目标；移动必须落到具体三级地点。',
+    '1. 只有剧情中确实发生移动时才修改“所在位置”；未移动时不得改写第四级同义词。',
+    '2. 新值只能是完整三级路径，或在完整三级路径后追加一个第四级场景。',
+    '3. 前三级必须逐字等于合法活动区；不得缩写、改写或杜撰前三段。',
+    '4. 第四级可按正文生成，不参加活动区白名单；同一场景优先复用已有名称。',
+    '5. 同一前三段只表示处于同一事件活动区，不表示人物已经面对面同场。',
   ].join('\n');
 }
 
@@ -262,6 +236,7 @@ export function createDynamicLocationContextVariable(
   const eventTargets = normalizeCompleteLocationPaths(options.eventTargetPaths || []);
   const explicitMapTargets = normalizeCompleteLocationPaths(options.explicitMapTargets || []);
   return {
+    当前活动区: context.currentScopePath,
     普通移动: [...new Set(context.allowedLocationPaths)],
     事件目标: eventTargets,
     地图指定: explicitMapTargets,
@@ -271,7 +246,7 @@ export function createDynamicLocationContextVariable(
 function normalizeCompleteLocationPaths(paths: string[]): string[] {
   return [...new Set(paths
     .map(normalizeLocationPath)
-    .filter(path => path.split('/').filter(Boolean).length === 3))];
+    .filter(Boolean))];
 }
 
 export function extractExplicitMapTargetsFromText(text: string): string[] {
@@ -287,6 +262,14 @@ export function collectEventTargetPaths(statData: Record<string, unknown>): stri
   const targets: string[] = [];
   const nearbyRumors = isRecord(statData.附近传闻) ? statData.附近传闻 : {};
   const followupClues = isRecord(statData.后续事件线索) ? statData.后续事件线索 : {};
+  const participationEvents = isRecord(statData.参与事件) ? statData.参与事件 : {};
+  const participantOccupancy = isRecord(statData.人物事件占用) ? statData.人物事件占用 : {};
+  const activeEventNames = new Set(Object.keys(participationEvents));
+
+  for (const value of Object.values(participantOccupancy)) {
+    if (!isRecord(value) || typeof value.事件名 !== 'string' || !activeEventNames.has(value.事件名)) continue;
+    if (typeof value.地点 === 'string') targets.push(value.地点);
+  }
 
   for (const value of Object.values(nearbyRumors)) {
     if (typeof value !== 'string') continue;

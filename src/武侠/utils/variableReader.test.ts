@@ -383,7 +383,7 @@ describe('readGameDataSync inventory rank field', () => {
           性别: '男',
           境界: '不入流',
           修为: 0,
-          所在位置: '牛家村',
+          所在位置: '大宋/临安府/牛家村',
           包裹: {
             九阴残篇: {
               类型: '秘籍',
@@ -425,7 +425,7 @@ describe('readGameDataSync inventory rank field', () => {
           性别: '女',
           境界: '不入流',
           修为: 0,
-          所在位置: '桃花岛',
+          所在位置: '海外/桃花岛/桃花岛腹地',
           包裹: {
             软猬甲: {
               类型: '装备',
@@ -499,7 +499,7 @@ describe('readGameDataSync inventory rank field', () => {
           性别: '女',
           境界: '不入流',
           修为: 0,
-          所在位置: '桃花岛',
+          所在位置: '海外/桃花岛/桃花岛腹地',
           初始属性: {
             臂力: 10,
             根骨: 10,
@@ -665,7 +665,7 @@ describe('readGameDataSync avatar projection', () => {
           头像: 'preset:player_male_02',
           境界: '不入流',
           修为: 0,
-          所在位置: '牛家村',
+          所在位置: '大宋/临安府/牛家村',
           关系网: {
             黄蓉: '旧识',
           },
@@ -674,7 +674,7 @@ describe('readGameDataSync avatar projection', () => {
           黄蓉: {
             性别: '女',
             头像: 'preset:huang_rong_fc2',
-            所在位置: '桃花岛',
+            所在位置: '海外/桃花岛/桃花岛腹地',
             功法: {},
             关系网: {},
           },
@@ -697,7 +697,7 @@ describe('readGameDataSync avatar projection', () => {
           头像: 'preset:player_male_01',
           境界: '不入流',
           修为: 0,
-          所在位置: '牛家村',
+          所在位置: '大宋/临安府/牛家村',
           关系网: {
             黄蓉: '旧识',
           },
@@ -706,7 +706,7 @@ describe('readGameDataSync avatar projection', () => {
           黄蓉: {
             性别: '女',
             头像: 'preset:huang_rong_fc3',
-            所在位置: '桃花岛',
+            所在位置: '海外/桃花岛/桃花岛腹地',
             功法: {},
             关系网: {},
           },

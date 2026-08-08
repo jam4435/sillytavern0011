@@ -4,21 +4,26 @@
  */
 
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
-import { MapLocation } from '../types';
+import {
+  getLocationScopePath,
+  parseLocationPath as parseStrictLocationPath,
+} from '../../shared/locationPath.js';
+import type { MapLocation } from '../types';
 import { gameLogger } from './logger';
 
 declare function getAllVariables(): Record<string, unknown>;
 
 /**
  * 检查地点是否已解锁
- * @param locationPath 地点路径（格式：大区域/中区域/小地点）
+ * @param locationPath 地点路径（格式：一级/二级/三级[/四级]）
  * @param location 地点数据
  * @param exploredLocations 已探索地点列表
  * @returns 是否已解锁
  */
 export function isLocationUnlocked(locationPath: string, location: MapLocation, exploredLocations: string[]): boolean {
+  const scopePath = getLocationScopePath(locationPath);
   // 1. 已探索的地点
-  if (exploredLocations.includes(locationPath)) {
+  if (scopePath && exploredLocations.some(explored => getLocationScopePath(explored) === scopePath)) {
     return true;
   }
 
@@ -74,15 +79,19 @@ export function getUserCurrentLocation(): string | null {
  * @param locationPath 地点路径
  */
 export async function addExploredLocation(locationPath: string): Promise<void> {
+  const scopePath = getLocationScopePath(locationPath);
+  if (!scopePath) {
+    throw new Error(`无法记录无效地点路径：${locationPath}`);
+  }
   const exploredLocations = getExploredLocations();
 
   // 如果已经探索过，不重复添加
-  if (exploredLocations.includes(locationPath)) {
+  if (exploredLocations.some(explored => getLocationScopePath(explored) === scopePath)) {
     return;
   }
 
   // 添加到已探索列表
-  const newExploredLocations = [...exploredLocations, locationPath];
+  const newExploredLocations = [...exploredLocations.map(getLocationScopePath).filter(Boolean), scopePath];
 
   // 使用 eventEmit 更新变量
   await emitSourcedEraVariableWriteAndWait({
@@ -100,40 +109,39 @@ export async function addExploredLocation(locationPath: string): Promise<void> {
     },
     expectedAction: 'apiWrite',
     timeoutMs: 3000,
-    timeoutMessage: `地点 ${locationPath} 解锁请求已发出，但 ERA 没有确认写入完成。`,
+    timeoutMessage: `地点 ${scopePath} 解锁请求已发出，但 ERA 没有确认写入完成。`,
   });
 
-  gameLogger.log(`[mapUtils] 添加已探索地点: ${locationPath}`);
+  gameLogger.log(`[mapUtils] 添加已探索地点: ${scopePath}`);
 }
 
 /**
  * 解析地点路径
- * @param locationPath 地点路径（格式：大区域/中区域/小地点）
+ * @param locationPath 地点路径（格式：一级/二级/三级[/四级]）
  * @returns 解析后的路径对象
  */
 export function parseLocationPath(locationPath: string): {
   area: string;
   region: string;
   location: string;
+  scene: string | null;
+  scopePath: string;
+  fullPath: string;
 } | null {
-  const parts = locationPath.split('/');
-  if (parts.length !== 3) {
+  const parsed = parseStrictLocationPath(locationPath);
+  if (!parsed) {
     gameLogger.warn(`[mapUtils] 无效的地点路径: ${locationPath}`);
     return null;
   }
 
-  return {
-    area: parts[0],
-    region: parts[1],
-    location: parts[2],
-  };
+  return parsed;
 }
 
 /**
  * 构建地点路径
- * @param area 大区域
- * @param region 中区域
- * @param location 小地点
+ * @param area 一级世界大域或政权
+ * @param region 二级地图旅行区域
+ * @param location 三级严格活动区
  * @returns 地点路径
  */
 export function buildLocationPath(area: string, region: string, location: string): string {

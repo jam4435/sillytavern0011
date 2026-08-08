@@ -151,7 +151,8 @@ describe('executeExtraVariableUpdate', () => {
       stat_data: {
         世界信息: { 时间: { 年: 1219, 月: 10, 日: 20, 时: 13, 分: 15 }, 天气: '晴' },
         user数据: {
-          所在位置: '大宋/临安府/城门',
+          所在位置: '大宋/临安府/牛家村/村西树林',
+          修为: 100,
           头像: 'preset:legacy-player-avatar',
           出生年份: 1201,
           年龄: 18,
@@ -162,15 +163,15 @@ describe('executeExtraVariableUpdate', () => {
         },
         角色数据: {
           郭靖: {
-            所在位置: '大宋/临安府/城门',
+            所在位置: '大宋/临安府/牛家村/村西树林',
             头像: 'preset:legacy-npc-avatar',
             初始属性: { 根骨: 18 },
             天赋: { 坚毅: '只读' },
             身份: { 侠士: '初入江湖' },
             $template: {},
           },
-          黄蓉: { 所在位置: '大宋/临安府/客栈', 身份: { 少女: '聪慧' } },
-          洪七公: { 所在位置: '大宋/嘉兴府/烟雨楼', 身份: { 丐帮帮主: '北丐' } },
+          黄蓉: { 所在位置: '大宋/临安府/牛家村/曲三酒馆', 身份: { 少女: '聪慧' } },
+          洪七公: { 所在位置: '大宋/嘉兴府/嘉兴城/烟雨楼', 身份: { 丐帮帮主: '北丐' } },
           欧阳锋: { 所在位置: '西域/白驼山/山庄', 身份: { 西毒: '宗师' } },
           $template: { 所在位置: '' },
         },
@@ -187,7 +188,8 @@ describe('executeExtraVariableUpdate', () => {
         后续事件线索: { 线索: '不应发送' },
         前端变量: {
           周围地点: {
-            普通移动: ['大宋/临安府/城门', '大宋/临安府/客栈'],
+            当前活动区: '大宋/临安府/牛家村',
+            普通移动: ['大宋/临安府/牛家村', '大宋/临安府/临安城'],
             $内部: ['不应发送'],
           },
           随机数: '不应发送',
@@ -321,7 +323,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(result.finalMessageText).toMatch(/^正文内容\n\n<VariableEdit>/);
     expect(requestConfiguredTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        prompt: expect.stringContaining('合法地点完整路径'),
+        prompt: expect.stringContaining('合法严格活动区'),
       }),
     );
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
@@ -356,6 +358,120 @@ describe('executeExtraVariableUpdate', () => {
         ]),
       }),
     );
+  });
+
+  it('额外变量模型 Edit 不存在路径时立即失败且不进入 ERA 写入或后台等待', async () => {
+    requestConfiguredTextMock.mockResolvedValue(
+      '<VariableEdit>{"user数据":{"人物经历":{"酒馆结识郭杨":"与郭杨拼桌共饮。"}}}</VariableEdit>',
+    );
+
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+      }),
+    ).rejects.toThrow(
+      '额外变量模型声明了不存在的 Edit 路径：stat_data › user数据 › 人物经历 › 酒馆结识郭杨。不存在的字段必须使用 VariableInsert。',
+    );
+
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+    expect(getIsExtraVariableUpdating()).toBe(false);
+  });
+
+  it('额外变量模型 Insert 已存在路径时立即失败且不进入 ERA 写入', async () => {
+    requestConfiguredTextMock.mockResolvedValue('<VariableInsert>{"user数据":{"修为":120}}</VariableInsert>');
+
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+      }),
+    ).rejects.toThrow(
+      '额外变量模型声明了已存在的 Insert 路径：stat_data › user数据 › 修为。已存在的字段必须使用 VariableEdit。',
+    );
+
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+    expect(getIsExtraVariableUpdating()).toBe(false);
+  });
+
+  it('额外变量模型 Delete 不存在路径时立即失败且不进入 ERA 写入', async () => {
+    requestConfiguredTextMock.mockResolvedValue(
+      '<VariableDelete>{"user数据":{"不存在的临时状态":{}}}</VariableDelete>',
+    );
+
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+      }),
+    ).rejects.toThrow(
+      '额外变量模型声明了不存在的 Delete 路径：stat_data › user数据 › 不存在的临时状态。VariableDelete 只能删除已存在的字段。',
+    );
+
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+    expect(getIsExtraVariableUpdating()).toBe(false);
+  });
+
+  it('允许同一严格活动区内自由修改第四级场景', async () => {
+    requestConfiguredTextMock.mockResolvedValue(
+      '<VariableEdit>{"user数据":{"所在位置":"大宋/临安府/牛家村/曲三酒馆"}}</VariableEdit>',
+    );
+    emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
+      const statData = variableSnapshot.stat_data as Record<string, unknown>;
+      (statData.user数据 as Record<string, unknown>).所在位置 = '大宋/临安府/牛家村/曲三酒馆';
+      return { message_id: 28, actions: { apiWrite: true } };
+    });
+
+    await expect(executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '众人回到曲三酒馆。',
+    })).resolves.toMatchObject({ applyStatus: 'success' });
+  });
+
+  it('允许移动到白名单活动区并自由填写第四级场景', async () => {
+    requestConfiguredTextMock.mockResolvedValue(
+      '<VariableEdit>{"user数据":{"所在位置":"大宋/临安府/临安城/皇宫偏殿"}}</VariableEdit>',
+    );
+    emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
+      const statData = variableSnapshot.stat_data as Record<string, unknown>;
+      (statData.user数据 as Record<string, unknown>).所在位置 = '大宋/临安府/临安城/皇宫偏殿';
+      return { message_id: 28, actions: { apiWrite: true } };
+    });
+
+    await expect(executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '抵达临安皇宫偏殿。',
+    })).resolves.toMatchObject({ applyStatus: 'success' });
+  });
+
+  it('杜撰严格活动区或写成五级路径时立即失败', async () => {
+    requestConfiguredTextMock.mockResolvedValueOnce(
+      '<VariableEdit>{"user数据":{"所在位置":"大宋/临安府/不存在的村/树林"}}</VariableEdit>',
+    );
+    await expect(executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '错误移动。',
+    })).rejects.toThrow('未授权活动区 大宋/临安府/不存在的村');
+
+    requestConfiguredTextMock.mockResolvedValueOnce(
+      '<VariableEdit>{"user数据":{"所在位置":"大宋/临安府/牛家村/村西树林/树下"}}</VariableEdit>',
+    );
+    await expect(executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '错误移动。',
+    })).rejects.toThrow('地点必须是三级或四级完整路径');
+
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
   });
 
   it('ERA 同步后仅重排变量块格式时，按等价变量操作通过回读验证', async () => {
@@ -393,37 +509,44 @@ describe('executeExtraVariableUpdate', () => {
     expect(result.applyStatus).toBe('success');
   });
 
-  it('页面隐藏时不让前台持久化轮询被节流成数分钟，并在 busy 回读时释放锁', async () => {
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
-    emitSourcedEraVariableWriteAndWaitMock.mockResolvedValue({
-      version: 1,
-      writeId: 'extra-sync-hidden',
-      source: 'frontend',
-      operation: 'update',
-      reason: 'extra-variable-api-write',
-      eventName: 'era:apiWrite',
-      attribution: 'ai',
-      message_id: 28,
-      actions: { apiWrite: true },
+  it('合法 Insert 被 ERA 归一化后立即报落库不一致并释放锁', async () => {
+    requestConfiguredTextMock.mockResolvedValue(
+      '<VariableInsert>{"角色数据":{"二柱":{"属性":{"根骨":35},"功法":{}}}}</VariableInsert>',
+    );
+    emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
+      const statData = variableSnapshot.stat_data as Record<string, unknown>;
+      (statData.角色数据 as Record<string, unknown>).二柱 = {
+        属性: { 根骨: 0 },
+        功法: { $template: {} },
+      };
+      return {
+        version: 1,
+        writeId: 'extra-sync-hidden',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        message_id: 28,
+        actions: { apiWrite: true },
+      };
     });
 
     const startedAt = Date.now();
-    const result = await executeExtraVariableUpdate({
-      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
-      assistantMessageId: 28,
-      latestRawReply: '正文内容',
-    });
+
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+      }),
+    ).rejects.toThrow('ERA 已返回写入完成，但变量声明未按原值落库');
 
     expect(Date.now() - startedAt).toBeLessThan(1000);
-    expect(result.applyStatus).toBe('pending');
-    expect(getIsExtraVariableUpdating()).toBe(true);
-
-    const statData = variableSnapshot.stat_data as Record<string, unknown>;
-    (statData.user数据 as Record<string, unknown>).修为 = 120;
     expect(getIsExtraVariableUpdating()).toBe(false);
   });
 
-  it('持久化轮询期间转入后台时立即退出前台等待', async () => {
+  it('ERA writeDone 后允许一次微任务回读同步聊天变量快照', async () => {
     emitSourcedEraVariableWriteAndWaitMock.mockResolvedValue({
       version: 1,
       writeId: 'extra-sync-became-hidden',
@@ -435,27 +558,24 @@ describe('executeExtraVariableUpdate', () => {
       message_id: 28,
       actions: { apiWrite: true },
     });
-    const onProgress = vi.fn((progress: { currentPhase?: string }) => {
-      if (progress.currentPhase !== 'verify-variable-persistence') return;
-      queueMicrotask(() => {
-        Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
-        document.dispatchEvent(new Event('visibilitychange'));
-      });
+    let statDataReadCount = 0;
+    getVariablesMock.mockImplementation(() => {
+      statDataReadCount += 1;
+      if (statDataReadCount >= 3) {
+        const statData = variableSnapshot.stat_data as Record<string, unknown>;
+        (statData.user数据 as Record<string, unknown>).修为 = 120;
+      }
+      return clone(variableSnapshot);
     });
 
-    const startedAt = Date.now();
     const result = await executeExtraVariableUpdate({
       settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
       assistantMessageId: 28,
       latestRawReply: '正文内容',
-      onProgress,
     });
 
-    expect(Date.now() - startedAt).toBeLessThan(1000);
-    expect(result.applyStatus).toBe('pending');
-
-    const statData = variableSnapshot.stat_data as Record<string, unknown>;
-    (statData.user数据 as Record<string, unknown>).修为 = 120;
+    expect(statDataReadCount).toBe(3);
+    expect(result.applyStatus).toBe('success');
     expect(getIsExtraVariableUpdating()).toBe(false);
   });
 

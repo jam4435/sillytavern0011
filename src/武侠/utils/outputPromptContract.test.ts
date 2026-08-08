@@ -86,7 +86,10 @@ describe('武侠输出提示词契约', () => {
     expect(promptSource).toContain('{ 分支标记: 事件.分支标记 }');
     expect(variableGuidanceSource).toContain('`事件分支结果`是系统结算归档，始终只读');
     expect(variableGuidanceSource).toContain('`后续事件`只表示既有事件之间的关联和可能出现的线索');
-    expect(promptSource).toContain('当前没有任何可用的完整地点路径，本轮禁止修改任何 `所在位置`');
+    expect(promptSource).toContain('当前没有可用的合法严格活动区，本轮禁止修改任何 `所在位置`');
+    expect(promptSource).toContain('同一前三段不代表人物已经面对面同场');
+    expect(variableGuidanceSource).toContain('第四级不参加白名单匹配');
+    expect(worldHistoryPromptSource).toContain('角色|位置:完整路径|基础:数值');
     expect(worldHistoryPromptSource).toContain(
       'selectWorldEventsForPrompt(worldEvents, outcomeStatuses, limit = 16, priorityLimit = 8)',
     );
@@ -141,16 +144,20 @@ describe('武侠输出提示词契约', () => {
         },
       },
       'stat_data.前端变量.周围地点': {
-        普通移动: ['大宋/张家口/城门', '只有/二级'],
-        事件目标: ['蒙古/大漠/荒山'],
+        当前活动区: '大宋/张家口/张家口镇',
+        普通移动: ['大宋/张家口/张家口镇', '只有/二级'],
+        事件目标: ['蒙古/大漠/荒山/山顶'],
         地图指定: [],
       },
     };
     const variables = {
       stat_data: {
         世界信息: { 时间: { 年: 1219, 月: 10, 日: 20, 时: 13 } },
-        user数据: { 出生年份: 1200, 所在位置: '大宋/张家口/城门', $meta: { hidden: true } },
-        角色数据: {},
+        user数据: { 出生年份: 1200, 所在位置: '大宋/张家口/张家口镇/城门', $meta: { hidden: true } },
+        角色数据: {
+          同区异场: { 所在位置: '大宋/张家口/张家口镇/客店', 状态: '健康' },
+          其他地区: { 所在位置: '金国/中都/中都城/街头', 状态: '健康' },
+        },
       },
     };
 
@@ -162,10 +169,15 @@ describe('武侠输出提示词契约', () => {
     expect(output).toContain('{"结局":"三人相识。","insert":{},"update":{"黄蓉"');
     expect(output).toContain('"分支标记":{"黄蓉对郭靖变心":1}');
     expect(output).not.toContain('{"描述":');
-    expect(output).toContain('[普通移动]\n\n- 大宋/张家口/城门');
-    expect(output).toContain('[事件目标]\n\n- 蒙古/大漠/荒山');
+    expect(output).toContain('当前完整位置：大宋/张家口/张家口镇/城门');
+    expect(output).toContain('当前严格活动区：大宋/张家口/张家口镇');
+    expect(output).toContain('[普通移动]\n\n- 大宋/张家口/张家口镇');
+    expect(output).toContain('[事件目标]\n\n- 蒙古/大漠/荒山/山顶');
     expect(output).toContain('[地图指定]（无）');
     expect(output).not.toContain('只有/二级');
+    expect(output).toContain('同区异场');
+    expect(output).toContain('大宋/张家口/张家口镇/客店');
+    expect(output).not.toContain('其他地区');
     expect(output).not.toContain('$meta');
   });
 });

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FilePenLine } from 'lucide-react';
-import brandXiakeEmblemUrl from './assets/icons/jinyong/brand_xiake_emblem.png?url';
+import brandXiakeSealUrl from './assets/icons/jinyong/brand_xiake_seal.svg?url';
 import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
 import ChatInput from './components/ChatInput';
@@ -1289,7 +1289,7 @@ const App: React.FC = () => {
           {/* Navigation Sidebar */}
           <nav className={`nav-sidebar ${isSidebarOpen ? 'open' : ''}`}>
             <div className="logo-box">
-              <img className="logo-mark" src={brandXiakeEmblemUrl} alt="" aria-hidden="true" />
+              <img className="logo-mark" src={brandXiakeSealUrl} alt="" aria-hidden="true" />
             </div>
 
             <NavButton

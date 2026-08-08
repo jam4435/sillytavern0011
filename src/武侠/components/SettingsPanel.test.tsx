@@ -301,6 +301,23 @@ describe('SettingsPanel variable groups', () => {
     expect(screen.getByRole('button', { name: /stat_data › 后续事件线索 › 射雕第7回/ })).toBeInTheDocument();
   });
 
+  it('publishes the complete raw chat stat_data for read-only automation diagnostics', async () => {
+    await openVariableTab();
+
+    const snapshot = document.querySelector('[data-wuxia-automation="stat-data-snapshot"]');
+    expect(snapshot).toHaveAttribute('data-wuxia-stat-data-status', 'ready');
+    expect(snapshot).toHaveAttribute('data-wuxia-stat-data-error', '');
+    expect(JSON.parse(snapshot?.textContent || '')).toEqual(
+      (getVariablesMock.mock.results[0]?.value as { stat_data: Record<string, unknown> }).stat_data,
+    );
+    expect(JSON.parse(snapshot?.textContent || '')).toMatchObject({
+      前端变量: { 隐藏标记: '不可搜索' },
+      后续事件线索计数: { 隐藏计数: 3 },
+      世界事件: { 隐藏历史: '不可搜索' },
+      事件分支结果: { 隐藏分支: { 变心: 1 } },
+    });
+  });
+
   it('falls back by fixed group order when roots are missing', async () => {
     getVariablesMock.mockReturnValue({
       stat_data: {

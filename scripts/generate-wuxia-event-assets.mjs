@@ -19,11 +19,17 @@ import {
   normalizeFollowupEvents,
   validateAndNormalizeEventDefinition,
 } from '../src/事件脚本/era-event-schema.js';
+import {
+  getLocationScopePath,
+  normalizeLocationPath,
+  parseLocationPath,
+} from '../src/shared/locationPath.js';
 
 const root = process.cwd();
 const sourceRoot = path.join(root, '世界书');
 const outputRoot = path.join(root, 'src', '事件脚本', 'generated', 'event-data');
 const openingEventSummaryPath = path.join(root, 'src', '武侠', 'data', '事件信息汇总.json');
+const locationTablePath = path.join(root, 'src', '武侠', '射雕神雕地点表.yaml');
 const RUNTIME_KEY_VERSION = 2;
 const SHARD_MAX_EVENTS = 50;
 const SHARD_MAX_BYTES = 350 * 1024;
@@ -36,6 +42,12 @@ const CHAPTER_NUMBER = '[0-9一二三四五六七八九十百千万]+';
 const ORDINARY_ENTRY_PATTERN = new RegExp(`^(.*?)(?:事件条目-)(第${CHAPTER_NUMBER}回)-(\\d+)-(.+)$`);
 const DEBUT_ENTRY_PATTERN = new RegExp(`^(.*?)(?:登场事件-)(第${CHAPTER_NUMBER}回)(?:人物)?$`);
 const GROWTH_ENTRY_PATTERN = new RegExp(`^(.*?)(?:成长条目-)(第${CHAPTER_NUMBER}回)(?:人物)?(?:-(.+))?$`);
+const locationTable = parseYaml(fs.readFileSync(locationTablePath, 'utf8'));
+const validLocationScopes = new Set(
+  Object.entries(locationTable).flatMap(([area, regions]) =>
+    Object.entries(regions).flatMap(([region, locations]) => locations.map(location => `${area}/${region}/${location}`)),
+  ),
+);
 
 function stripSuffix(value) {
   return String(value || '')
@@ -137,13 +149,7 @@ function hoursToTime(hours) {
 }
 
 function normalizeLocation(location) {
-  return typeof location === 'string'
-    ? location
-        .split('/')
-        .map(value => value.trim())
-        .filter(Boolean)
-        .join('/')
-    : '';
+  return normalizeLocationPath(location);
 }
 
 function canonicalReference(reference, sourceRuntimeKey) {
@@ -171,6 +177,28 @@ function normalizeEventData(runtimeKey, descriptor, data) {
   if (!shared.valid) throw new Error(shared.errors.join('；'));
   data = shared.data;
   if (!data.触发条件) throw new Error(`事件 ${runtimeKey} 缺少有效触发条件`);
+  const locationErrors = [];
+  const validateNestedLocations = (value, pathSegments = []) => {
+    if (Array.isArray(value)) {
+      value.forEach((child, index) => validateNestedLocations(child, [...pathSegments, index]));
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value)) {
+      const nextPath = [...pathSegments, key];
+      if (key === '所在位置') {
+        const parsed = parseLocationPath(child);
+        if (!parsed) locationErrors.push(`${nextPath.join('.')} 必须是三级或四级完整路径`);
+        else if (!validLocationScopes.has(parsed.scopePath)) {
+          locationErrors.push(`${nextPath.join('.')} 的严格活动区不在地点表中: ${parsed.scopePath}`);
+        }
+      } else {
+        validateNestedLocations(child, nextPath);
+      }
+    }
+  };
+  validateNestedLocations(data);
+  if (locationErrors.length > 0) throw new Error(`事件 ${runtimeKey} 地点无效: ${locationErrors.join('；')}`);
   if (descriptor.kind !== EVENT_KINDS.ordinary) return data;
   const location = normalizeLocation(data.事件地点);
   const hook = typeof data.事件引子 === 'string' ? data.事件引子.trim() : '';
@@ -186,7 +214,8 @@ function normalizeEventData(runtimeKey, descriptor, data) {
       ]
     : [];
   const errors = [];
-  if (location.split('/').filter(Boolean).length < 2) errors.push('事件地点至少需要两级路径');
+  if (!parseLocationPath(location)) errors.push('事件地点必须是三级或四级完整路径');
+  else if (!validLocationScopes.has(getLocationScopePath(location))) errors.push('事件地点的严格活动区不在地点表中');
   if (!hook) errors.push('事件引子不能为空');
   if (!summary) errors.push('事件概要不能为空');
   if (!Array.isArray(data.参与人物) || participants.length === 0) errors.push('参与人物必须是非空字符串数组');
@@ -495,7 +524,10 @@ function writeAssets(events, unresolvedReferences) {
     };
   });
   const byLocation = {};
-  for (const event of manifestEvents) (byLocation[event.location] ||= []).push(event.runtimeKey);
+  for (const event of manifestEvents) {
+    const scopePath = getLocationScopePath(event.location);
+    if (scopePath) (byLocation[scopePath] ||= []).push(event.runtimeKey);
+  }
   const byTrigger = [...manifestEvents]
     .filter(event => !event.conditional && Number.isFinite(event.triggerHour))
     .sort((a, b) => a.triggerHour - b.triggerHour || a.order - b.order)

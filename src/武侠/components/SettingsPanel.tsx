@@ -81,6 +81,7 @@ type AutoAdvanceStatus = 'idle' | 'running' | 'stopping' | 'done' | 'error';
 type AutoAdvanceResultStatus = 'running' | 'success' | 'error';
 type VariableSearchMode = 'scope' | 'global';
 type VariableGroupId = 'world' | 'event' | 'player' | 'character';
+type AutomationStatDataSnapshotStatus = 'idle' | 'ready' | 'error';
 type SettingsCollapsibleId =
   | 'appearanceTheme'
   | 'appearanceText'
@@ -430,6 +431,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [variableSearch, setVariableSearch] = useState('');
   const [variableSearchMode, setVariableSearchMode] = useState<VariableSearchMode>('scope');
   const [variableIncludeValueSearch, setVariableIncludeValueSearch] = useState(false);
+  const [automationStatDataSnapshotStatus, setAutomationStatDataSnapshotStatus] =
+    useState<AutomationStatDataSnapshotStatus>('idle');
+  const [automationStatDataSnapshotJson, setAutomationStatDataSnapshotJson] = useState('');
+  const [automationStatDataSnapshotError, setAutomationStatDataSnapshotError] = useState('');
+  const [automationStatDataSnapshotCapturedAt, setAutomationStatDataSnapshotCapturedAt] = useState('');
 
   // 自动推进相关状态
   const [autoAdvancePrompt, setAutoAdvancePrompt] = useState(DEFAULT_AUTO_ADVANCE_PROMPT);
@@ -596,6 +602,31 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setCharacterSearch('');
     setIsVariableDetailOpen(false);
   }, []);
+
+  const refreshAutomationStatDataSnapshot = useCallback(() => {
+    try {
+      const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+      const rawStatData = variables.stat_data;
+      if (!isVariableRecord(rawStatData)) {
+        throw new Error('没有可读取的聊天级 stat_data');
+      }
+
+      setAutomationStatDataSnapshotJson(JSON.stringify(rawStatData));
+      setAutomationStatDataSnapshotStatus('ready');
+      setAutomationStatDataSnapshotError('');
+      setAutomationStatDataSnapshotCapturedAt(new Date().toISOString());
+    } catch (error) {
+      setAutomationStatDataSnapshotJson('');
+      setAutomationStatDataSnapshotStatus('error');
+      setAutomationStatDataSnapshotError(getErrorMessage(error));
+      setAutomationStatDataSnapshotCapturedAt(new Date().toISOString());
+    }
+  }, []);
+
+  const handleOpenVariablesTab = useCallback(() => {
+    setActiveTab('variables');
+    refreshAutomationStatDataSnapshot();
+  }, [refreshAutomationStatDataSnapshot]);
 
   const refreshStatData = useCallback(
     (force = false) => {
@@ -1594,7 +1625,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </button>
           <button
             className={`settings-tab ${activeTab === 'variables' ? 'active' : ''}`}
-            onClick={() => setActiveTab('variables')}
+            data-wuxia-automation="open-variables-tab"
+            onClick={handleOpenVariablesTab}
           >
             <Icons.Variables size={16} />
             <span className="settings-tab-label" data-short-label="变量">
@@ -2507,6 +2539,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 变量查看与编辑 */}
         {activeTab === 'variables' && (
           <div className="settings-section variables-section">
+            <pre
+              hidden
+              data-wuxia-automation="stat-data-snapshot"
+              data-wuxia-stat-data-status={automationStatDataSnapshotStatus}
+              data-wuxia-stat-data-captured-at={automationStatDataSnapshotCapturedAt}
+              data-wuxia-stat-data-error={automationStatDataSnapshotError}
+            >
+              {automationStatDataSnapshotJson}
+            </pre>
             <div className="variables-toolbar">
               <div className="variables-toolbar-main">
                 <div className="variables-field variables-search-field">

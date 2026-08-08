@@ -1,5 +1,9 @@
 import type { InitialAttributes } from '../types';
 import {
+  getLocationScopePath,
+  normalizeLocationPath,
+} from '../../shared/locationPath.js';
+import {
   applyAttributeModifiers,
   calculateCombatAttributes,
   getRealmCoefficient,
@@ -109,14 +113,6 @@ type FrontendVariablesRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function normalizeLocationPath(value: string): string {
-  return value
-    .trim()
-    .replace(/[\\＞>›→]+/g, '/')
-    .replace(/\s*\/\s*/g, '/')
-    .replace(/^\/+|\/+$/g, '');
 }
 
 function sanitizeInitialAttributes(input: Partial<InitialAttributes> | undefined): InitialAttributes {
@@ -399,7 +395,7 @@ function buildCharacterPowerRow(character: CombatCharacter): string {
   });
 
   const basicTechniquePower = calculateBasicTechniquePower(character.realm, combatAttributes);
-  return [character.displayName, `基础:${basicTechniquePower}`, ...cells].join('|');
+  return [character.displayName, `位置:${character.normalizedLocation}`, `基础:${basicTechniquePower}`, ...cells].join('|');
 }
 
 function calculateEffectiveCultivationBonus(character: CombatCharacter): number {
@@ -438,9 +434,9 @@ export function buildCultivationChangeReferenceFromStatData(statData: StatDataRe
 
 export function buildCombatPowerZoneFromStatData(statData: StatDataRecord): string {
   const player = buildPlayerCharacter(statData);
-  const playerLocation = player?.normalizedLocation || '';
+  const playerScope = getLocationScopePath(player?.normalizedLocation || '');
   const npcRows = buildNpcCharacters(statData)
-    .filter(character => playerLocation && character.normalizedLocation === playerLocation)
+    .filter(character => playerScope && getLocationScopePath(character.normalizedLocation) === playerScope)
     .sort((left, right) => left.displayName.localeCompare(right.displayName, 'zh-CN'));
   const rows: string[] = [];
 

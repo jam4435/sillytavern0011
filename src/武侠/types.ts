@@ -641,7 +641,7 @@ export interface MapCoordinate {
 }
 
 /**
- * 小地点（第三级）
+ * 严格活动区（第三级）；具体镜头场景是变量路径中的可选第四级，不进入地图结构
  */
 export interface MapLocation {
   描述: string;

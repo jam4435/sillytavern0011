@@ -4,6 +4,12 @@ import {
   type SummaryVariableUpdateMode,
 } from './settingsManager';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
+import {
+  getLocationScopePath,
+  isSameLocationScope,
+  normalizeLocationPath,
+  parseLocationPath,
+} from '../../shared/locationPath.js';
 import { scheduleUnthrottledInterval, scheduleUnthrottledTimeout } from '../../shared/unthrottledTimer';
 import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryApiConfig } from './summaryApiClient';
 import { dataLogger, variableTraceLogger } from './logger';
@@ -25,7 +31,6 @@ const NARRATIVE_SCALE_END_MARKER = '</叙事表现标尺>';
 const EXTRA_VARIABLE_UPDATE_TIMEOUT_MS = 360000;
 const ERA_SYNC_TIMEOUT_MS = 20000;
 const ERA_PERSISTENCE_FOREGROUND_VERIFY_TIMEOUT_MS = 15000;
-const ERA_PERSISTENCE_BACKGROUND_VERIFY_TIMEOUT_MS = 8 * 60 * 1000;
 const ERA_PERSISTENCE_VERIFY_DELAYS_MS = [120, 250, 500, 1000, 2000] as const;
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -102,8 +107,6 @@ type MessageWriteVerification = {
 
 let extraVariableUpdateBusy = false;
 let extraVariableUpdateReserved = false;
-let extraVariableApplyPending = false;
-let pendingPersistenceVerification: PendingPersistenceVerification | null = null;
 
 const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/gi;
 const ERA_VARIABLE_BLOCK_STRIP_REGEX = /\s*<Variable(Think|Insert|Edit|Delete)>\s*[\s\S]*?<\/Variable\1>\s*/gi;
@@ -117,8 +120,7 @@ const VARIABLE_ROOT_KEY_ALIASES: Record<string, string> = {
 };
 
 export function getIsExtraVariableUpdating(): boolean {
-  refreshPendingPersistenceVerification('busy-check');
-  return extraVariableUpdateBusy || extraVariableUpdateReserved || extraVariableApplyPending;
+  return extraVariableUpdateBusy || extraVariableUpdateReserved;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -180,6 +182,90 @@ function readPathValue(source: unknown, path: readonly (string | number)[]): unk
   return current;
 }
 
+function hasPath(source: unknown, path: readonly (string | number)[]): boolean {
+  let current: unknown = source;
+  for (const segment of path) {
+    if (Array.isArray(current) && typeof segment === 'number') {
+      if (segment < 0 || segment >= current.length) return false;
+      current = current[segment];
+      continue;
+    }
+    if (!isRecord(current) || !Object.prototype.hasOwnProperty.call(current, String(segment))) {
+      return false;
+    }
+    current = current[String(segment)];
+  }
+  return true;
+}
+
+function assertDeclaredActionPathsValid(declaredChanges: VariableDeclaredChange[]): void {
+  if (declaredChanges.length === 0) return;
+
+  const statData = readCurrentStatDataSnapshot();
+  if (!statData) {
+    throw new Error('聊天级 stat_data 暂不可读，无法校验额外变量模型声明的 Insert/Edit/Delete 路径。');
+  }
+
+  const insertChanges = declaredChanges.filter(change => change.action === 'insert');
+  const existingInsertPaths = insertChanges
+    .filter(change => hasPath(statData, change.path))
+    .map(change => change.displayPath);
+  if (existingInsertPaths.length > 0) {
+    throw new Error(
+      `额外变量模型声明了已存在的 Insert 路径：${existingInsertPaths.join('、')}。已存在的字段必须使用 VariableEdit。`,
+    );
+  }
+
+  const editChanges = declaredChanges.filter(change => change.action === 'edit');
+  const missingPaths = editChanges.filter(change => !hasPath(statData, change.path)).map(change => change.displayPath);
+  if (missingPaths.length > 0) {
+    throw new Error(
+      `额外变量模型声明了不存在的 Edit 路径：${missingPaths.join('、')}。不存在的字段必须使用 VariableInsert。`,
+    );
+  }
+
+  const deleteChanges = declaredChanges.filter(change => change.action === 'delete');
+  const missingDeletePaths = deleteChanges
+    .filter(change => !hasPath(statData, change.path))
+    .map(change => change.displayPath);
+  if (missingDeletePaths.length > 0) {
+    throw new Error(
+      `额外变量模型声明了不存在的 Delete 路径：${missingDeletePaths.join('、')}。VariableDelete 只能删除已存在的字段。`,
+    );
+  }
+
+  const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : {};
+  const surroundingLocations = isRecord(frontendVariables.周围地点) ? frontendVariables.周围地点 : {};
+  const allowedLocationScopes = new Set<string>();
+  const addAllowedScope = (value: unknown) => {
+    const scopePath = getLocationScopePath(value);
+    if (scopePath) allowedLocationScopes.add(scopePath);
+  };
+  addAllowedScope(surroundingLocations.当前活动区);
+  for (const key of ['普通移动', '事件目标', '地图指定']) {
+    const paths = surroundingLocations[key];
+    if (Array.isArray(paths)) paths.forEach(addAllowedScope);
+  }
+
+  for (const change of declaredChanges) {
+    if (change.action === 'delete' || change.path.at(-1) !== '所在位置') continue;
+    const parsed = parseLocationPath(change.value);
+    if (!parsed) {
+      throw new Error(
+        `额外变量模型写入了无效地点 ${change.displayPath}=${JSON.stringify(change.value)}；地点必须是三级或四级完整路径。`,
+      );
+    }
+
+    const currentValue = readPathValue(statData, change.path);
+    if (isSameLocationScope(currentValue, parsed.fullPath)) continue;
+    if (!allowedLocationScopes.has(parsed.scopePath)) {
+      throw new Error(
+        `额外变量模型把 ${change.displayPath} 移动到未授权活动区 ${parsed.scopePath}；跨活动区移动只能使用“周围地点”中的合法前三段。`,
+      );
+    }
+  }
+}
+
 function collapseDeclaredChangesForPersistence(declaredChanges: VariableDeclaredChange[]): VariableDeclaredChange[] {
   const byPath = new Map<string, VariableDeclaredChange>();
   const pathKey = (path: readonly (string | number)[]) => JSON.stringify(path);
@@ -221,16 +307,6 @@ export type PersistenceVerification = {
   pendingPaths: string[];
 };
 
-type PendingPersistenceVerification = {
-  assistantMessageId: number;
-  declaredChanges: VariableDeclaredChange[];
-  onProgress?: (progress: ExtraVariableUpdateProgress) => void;
-  startedAt: number;
-  generation: number;
-};
-
-let persistenceVerificationGeneration = 0;
-
 function isPageHidden(): boolean {
   try {
     return typeof document !== 'undefined' && document.visibilityState === 'hidden';
@@ -260,10 +336,9 @@ function verifyDeclaredChangesPersisted(declaredChanges: VariableDeclaredChange[
 
   const pendingPaths = expectedChanges
     .filter(change => {
-      const actualValue = readPathValue(statData, change.path);
       return change.action === 'delete'
-        ? actualValue !== undefined
-        : stableStringify(actualValue) !== stableStringify(change.value);
+        ? hasPath(statData, change.path)
+        : stableStringify(readPathValue(statData, change.path)) !== stableStringify(change.value);
     })
     .map(change => change.displayPath);
 
@@ -280,6 +355,18 @@ function verifyDeclaredChangesPersisted(declaredChanges: VariableDeclaredChange[
       };
 }
 
+async function verifyDeclaredChangesAfterEraWrite(
+  declaredChanges: VariableDeclaredChange[],
+): Promise<PersistenceVerification> {
+  const immediateVerification = verifyDeclaredChangesPersisted(declaredChanges);
+  if (immediateVerification.verified) return immediateVerification;
+
+  // ERA writeDone 后只让出一次微任务，容纳同一任务尾部的聊天变量快照同步；
+  // 第二次仍不一致即视为真实写入失败或归一化，不再做计时轮询。
+  await Promise.resolve();
+  return verifyDeclaredChangesPersisted(declaredChanges);
+}
+
 async function waitForDeclaredChangesPersisted(
   declaredChanges: VariableDeclaredChange[],
   timeoutMs: number,
@@ -291,7 +378,7 @@ async function waitForDeclaredChangesPersisted(
   let latest = verifyDeclaredChangesPersisted(declaredChanges);
   while (!latest.verified && Date.now() - startedAt < timeoutMs) {
     // 顶层窗口的 setTimeout 在整个酒馆标签页隐藏时同样会被 Chromium 节流。
-    // 此时继续“前台等待 15 秒”可能实际占用数分钟；立即转入可机会性回读的后台验证。
+    // 此时继续“前台等待 15 秒”可能实际占用数分钟；立即结束验证并把不一致作为本轮错误返回。
     if (stopWhenHidden && isPageHidden()) break;
     const remaining = timeoutMs - (Date.now() - startedAt);
     const delayMs = Math.min(
@@ -372,99 +459,6 @@ export async function ensureTurnVariableBlocksCommitted({
   }
 
   return verification;
-}
-
-function finishPendingPersistenceVerification(
-  pending: PendingPersistenceVerification,
-  verification: PersistenceVerification,
-  trigger: string,
-): boolean {
-  if (pendingPersistenceVerification?.generation !== pending.generation) return false;
-
-  const elapsedMs = Date.now() - pending.startedAt;
-  if (verification.verified) {
-    pendingPersistenceVerification = null;
-    extraVariableApplyPending = false;
-    variableTraceLogger.log('[extraVariableUpdate] 延迟变量快照验证成功', {
-      assistantMessageId: pending.assistantMessageId,
-      elapsedMs,
-      trigger,
-    });
-    pending.onProgress?.({ applyStatus: 'success', applyVerification: verification.verification });
-    return true;
-  }
-
-  if (elapsedMs < ERA_PERSISTENCE_BACKGROUND_VERIFY_TIMEOUT_MS) return false;
-
-  pendingPersistenceVerification = null;
-  extraVariableApplyPending = false;
-  const error = `等待聊天变量快照超过 ${Math.round(ERA_PERSISTENCE_BACKGROUND_VERIFY_TIMEOUT_MS / 60000)} 分钟：${verification.pendingPaths.join('、')}`;
-  variableTraceLogger.error('[extraVariableUpdate] 延迟变量快照验证超时', {
-    assistantMessageId: pending.assistantMessageId,
-    elapsedMs,
-    pendingPaths: verification.pendingPaths,
-    trigger,
-  });
-  pending.onProgress?.({ applyStatus: 'error', applyVerification: verification.verification, applyError: error });
-  return true;
-}
-
-function refreshPendingPersistenceVerification(trigger: string): boolean {
-  const pending = pendingPersistenceVerification;
-  if (!pending) return false;
-  return finishPendingPersistenceVerification(
-    pending,
-    verifyDeclaredChangesPersisted(pending.declaredChanges),
-    trigger,
-  );
-}
-
-function continueDeclaredChangesPersistenceVerification({
-  assistantMessageId,
-  declaredChanges,
-  onProgress,
-}: {
-  assistantMessageId: number;
-  declaredChanges: VariableDeclaredChange[];
-  onProgress?: (progress: ExtraVariableUpdateProgress) => void;
-}): void {
-  const generation = ++persistenceVerificationGeneration;
-  extraVariableApplyPending = true;
-  const pending: PendingPersistenceVerification = {
-    assistantMessageId,
-    declaredChanges,
-    onProgress,
-    startedAt: Date.now(),
-    generation,
-  };
-  pendingPersistenceVerification = pending;
-
-  const scheduleRetry = (callback: () => void, delayMs: number) => {
-    try {
-      scheduleUnthrottledTimeout(callback, delayMs);
-    } catch (error) {
-      // iframe 正在换代时计时器宿主可能已经销毁；busy 查询仍会机会性回读，
-      // 因此这里只记录而不把注册失败升级成未处理异常。
-      variableTraceLogger.warn('[extraVariableUpdate] 后台变量快照重试计时器注册失败', {
-        assistantMessageId,
-        generation,
-        error,
-      });
-    }
-  };
-  const retry = () => {
-    if (pendingPersistenceVerification?.generation !== generation) return;
-    if (refreshPendingPersistenceVerification('background-timer')) return;
-    scheduleRetry(retry, ERA_PERSISTENCE_VERIFY_DELAYS_MS.at(-1) ?? 2000);
-  };
-
-  // 先用微任务回读一次：writeDone 监听链后的内存快照通常会在当前任务结束前可见，
-  // 且微任务不会被隐藏页的普通计时器节流。
-  queueMicrotask(() => {
-    if (pendingPersistenceVerification?.generation !== generation) return;
-    if (refreshPendingPersistenceVerification('microtask')) return;
-    scheduleRetry(retry, ERA_PERSISTENCE_VERIFY_DELAYS_MS[0]);
-  });
 }
 
 function stripCodeFence(text: string): string {
@@ -831,7 +825,7 @@ function collectRelevantCharacters(
       character.位置,
       character.地点,
     );
-    const isSameScene = !!playerLocation && characterLocation === playerLocation;
+    const isSameScene = isSameLocationScope(playerLocation, characterLocation);
     const isCurrentEventNpc = !!participationText && participationText.includes(name);
     const isMentionedInLatestBody = !!latestAssistantBody && latestAssistantBody.includes(name);
     if (isSameScene || isCurrentEventNpc || isMentionedInLatestBody) {
@@ -929,7 +923,7 @@ function formatVariableContext(projection: Record<string, unknown>, participatio
 
   lines.push(
     '',
-    '# 相关角色（同场景、参与事件或最新正文提及）',
+    '# 相关角色（同一严格活动区、参与事件或最新正文提及；完整所在位置用于判断具体同场）',
     `角色数据:${JSON.stringify(projection.角色数据 ?? {})}`,
     '</status_current_variables>',
     '</variable>',
@@ -937,48 +931,47 @@ function formatVariableContext(projection: Record<string, unknown>, participatio
   return lines.join('\n');
 }
 
-function normalizeFullLocationPath(value: unknown): string {
-  if (typeof value !== 'string') {
-    return '';
-  }
-  const segments = value
-    .trim()
-    .replace(/[\\＞>›→]+/g, '/')
-    .split('/')
-    .map(part => part.trim())
-    .filter(Boolean);
-  return segments.length === 3 ? segments.join('/') : '';
-}
-
 function uniqueFullLocationPaths(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return Array.from(new Set(value.map(normalizeFullLocationPath).filter(Boolean)));
+  return Array.from(new Set(value.map(normalizeLocationPath).filter(Boolean)));
 }
 
-function formatLocationContext(surroundingLocations: unknown): string {
+function formatLocationContext(surroundingLocations: unknown, currentLocation: unknown): string {
   const locationGroups = isRecord(surroundingLocations) ? surroundingLocations : {};
-  const ordinarySource = Array.isArray(surroundingLocations)
-    ? surroundingLocations
-    : Array.isArray(locationGroups.普通移动)
-      ? locationGroups.普通移动
-      : locationGroups.相邻三级地点;
   const groups = {
-    普通移动: uniqueFullLocationPaths(ordinarySource),
+    普通移动: uniqueFullLocationPaths(locationGroups.普通移动),
     事件目标: uniqueFullLocationPaths(locationGroups.事件目标),
     地图指定: uniqueFullLocationPaths(locationGroups.地图指定),
   };
-  const availableLocationCount = Object.values(groups).reduce((sum, paths) => sum + paths.length, 0);
-  const lines = ['<可用地点>'];
+  const normalizedCurrentLocation = normalizeLocationPath(currentLocation);
+  const currentScopePath = getLocationScopePath(locationGroups.当前活动区) || getLocationScopePath(currentLocation);
+  const allowedScopes = new Set<string>();
+  if (currentScopePath) allowedScopes.add(currentScopePath);
+  Object.values(groups).flat().forEach(path => {
+    const scopePath = getLocationScopePath(path);
+    if (scopePath) allowedScopes.add(scopePath);
+  });
+  const lines = [
+    '<可用地点>',
+    '[路径语义]',
+    '格式为“一级/二级/三级[/四级]”：一级是世界大域或政权，二级是地图旅行区域，三级是严格活动区，第四级是可选的具体镜头场景。',
+    `当前完整位置：${normalizedCurrentLocation || '（无效）'}`,
+    `当前严格活动区：${currentScopePath || '（无效）'}`,
+    '[合法严格活动区]',
+    ...[...allowedScopes].map(path => `- ${path}`),
+  ];
   for (const [groupName, paths] of Object.entries(groups)) {
     lines.push(`[${groupName}]${paths.length === 0 ? '（无）' : ''}`, ...paths.map(path => `- ${path}`));
   }
   lines.push(
     '[写入规则]',
-    availableLocationCount === 0
-      ? '当前没有任何可用的合法地点完整路径，本轮禁止修改任何“所在位置”。'
-      : '任何“所在位置”的新值都只能逐字等于上方列出的某个合法地点完整路径；不得缩写、改写或自造地点。',
+    allowedScopes.size === 0
+      ? '当前没有可用的合法严格活动区，本轮禁止修改任何“所在位置”。'
+      : '任何“所在位置”的前三段必须逐字等于上方合法严格活动区；可以保留三级，也可以追加一个不含“/”的第四级具体场景。',
+    '第四级不参加白名单匹配；只有正文确实发生局部移动时才修改，未移动时不得改写同义词，同一场景优先复用已有名称。',
+    '事件目标的第四级是推荐初始场景而非强制字面值；同一前三段只表示处于同一事件活动区，不表示人物已经面对面同场。',
     '</可用地点>',
   );
   return lines.join('\n');
@@ -994,7 +987,8 @@ function buildVariableProjectionSnapshot(
   const projection = buildExtraVariableProjection(variables, latestAssistantBody);
   const variableContext = formatVariableContext(projection, statData.参与事件);
   const frontendVariables = getNestedRecord(statData, '前端变量') || {};
-  const locationContext = formatLocationContext(frontendVariables.周围地点);
+  const projectedUserData = isRecord(projection.user数据) ? projection.user数据 : {};
+  const locationContext = formatLocationContext(frontendVariables.周围地点, projectedUserData.所在位置);
 
   return {
     projection,
@@ -1610,6 +1604,8 @@ export async function executeExtraVariableUpdate({
       };
     }
 
+    await runPhase('validate-variable-actions', () => assertDeclaredActionPathsValid(declaredState.declaredChanges));
+
     const appendVerification = await runPhase('append-variable-blocks', () =>
       appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText),
     );
@@ -1736,23 +1732,27 @@ export async function executeExtraVariableUpdate({
     }
 
     const persistenceVerification = await runPhase('verify-variable-persistence', () =>
-      waitForDeclaredChangesPersisted(declaredState.declaredChanges, ERA_PERSISTENCE_FOREGROUND_VERIFY_TIMEOUT_MS),
+      verifyDeclaredChangesAfterEraWrite(declaredState.declaredChanges),
     );
-    const applyStatus: ExtraVariableApplyStatus = persistenceVerification.verified ? 'success' : 'pending';
+    const applyStatus: ExtraVariableApplyStatus = persistenceVerification.verified ? 'success' : 'error';
     onProgress?.({
       applyStatus,
       applyVerification: persistenceVerification.verification,
     });
     if (!persistenceVerification.verified) {
-      variableTraceLogger.warn('[extraVariableUpdate] 原始 ERA 写入已确认，但变量快照仍未刷新，转入后台验证', {
+      const persistenceError = `ERA 已返回写入完成，但变量声明未按原值落库：${
+        persistenceVerification.pendingPaths.join('、') || persistenceVerification.verification
+      }`;
+      variableTraceLogger.error('[extraVariableUpdate] 原始 ERA 写入已确认，但变量声明未按原值落库', {
         assistantMessageId,
         pendingPaths: persistenceVerification.pendingPaths,
       });
-      continueDeclaredChangesPersistenceVerification({
-        assistantMessageId,
-        declaredChanges: declaredState.declaredChanges,
-        onProgress,
+      onProgress?.({
+        applyStatus: 'error',
+        applyVerification: persistenceVerification.verification,
+        applyError: persistenceError,
       });
+      throw new Error(persistenceError);
     }
 
     return {

@@ -1,5 +1,19 @@
 import { EVENT_KIND } from './era-utils.js';
 import { validateAndNormalizeEventDefinition } from './era-event-schema.js';
+import {
+  getLocationRegionPath,
+  normalizeLocationPath,
+  parseLocationPath,
+} from '../shared/locationPath.js';
+
+export {
+  getLocationScopePath,
+  getLocationScene,
+  isSameLocationScene,
+  isSameLocationScope,
+  normalizeLocationPath,
+  parseLocationPath,
+} from '../shared/locationPath.js';
 
 export const PARTICIPANT_ENTRY_SOURCE = {
   TIME: '时间触发',
@@ -11,18 +25,7 @@ function isPlainObject(value) {
 }
 
 export function getLocationPathSegments(location) {
-  if (typeof location !== 'string') {
-    return [];
-  }
-
-  return location
-    .split('/')
-    .map(segment => segment.trim())
-    .filter(Boolean);
-}
-
-export function normalizeLocationPath(location) {
-  return getLocationPathSegments(location).join('/');
+  return parseLocationPath(location)?.segments || [];
 }
 
 export function getHierarchicalLocationPaths(location) {
@@ -31,8 +34,7 @@ export function getHierarchicalLocationPaths(location) {
 }
 
 export function getRumorScopeFromEventLocation(eventLocation) {
-  const segments = getLocationPathSegments(eventLocation);
-  return segments.slice(0, 2).join('/');
+  return getLocationRegionPath(eventLocation);
 }
 
 export function isLocationWithinRumorScope(playerLocation, rumorScope) {
@@ -53,16 +55,17 @@ export function normalizeParticipantEventDefinition(eventName, eventData, { kind
   }
 
   const errors = [...shared.errors];
-  const eventLocation = normalizeLocationPath(eventData.事件地点);
+  const rawEventLocation = eventData.事件地点;
+  const eventLocation = normalizeLocationPath(rawEventLocation);
   const eventLocationSegments = getLocationPathSegments(eventLocation);
   const eventHook = typeof eventData.事件引子 === 'string' ? eventData.事件引子.trim() : '';
   const eventSummary = typeof eventData.事件概要 === 'string' ? eventData.事件概要.trim() : '';
   const rawParticipants = eventData.参与人物;
 
-  if (!eventLocation) {
+  if (typeof rawEventLocation !== 'string' || !rawEventLocation.trim()) {
     errors.push(`事件 ${eventName} 缺少非空的事件地点`);
-  } else if (eventLocationSegments.length < 2) {
-    errors.push(`事件 ${eventName} 的事件地点至少需要两级路径`);
+  } else if (!eventLocation || (eventLocationSegments.length !== 3 && eventLocationSegments.length !== 4)) {
+    errors.push(`事件 ${eventName} 的事件地点必须是三级或四级完整路径`);
   }
 
   if (!eventHook) {

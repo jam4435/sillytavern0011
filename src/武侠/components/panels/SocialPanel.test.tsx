@@ -101,7 +101,10 @@ describe('SocialPanel avatar picker', () => {
 
     await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('写入失败'));
     await waitFor(() => {
-      expect(screen.getByAltText('黄蓉头像')).toHaveAttribute('src', expect.stringContaining('huang_rong_fc2.png'));
+      expect(screen.getByAltText('黄蓉头像')).toHaveAttribute(
+        'src',
+        expect.stringContaining('generated/%E9%BB%84%E8%93%89.jpg'),
+      );
     });
   });
 });

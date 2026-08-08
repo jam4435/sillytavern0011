@@ -1,6 +1,7 @@
 import { ChevronRight, MapPin, Search, X } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { MapArea, MapData, MapLocation, MapRegion } from '../types';
+import { isSameLocationScope } from '../../shared/locationPath.js';
 import { gameLogger } from '../utils/logger';
 import { buildLocationPath, isLocationUnlocked } from '../utils/mapUtils';
 
@@ -76,7 +77,7 @@ const MapSidebar: React.FC<MapSidebarProps> = ({ mapData, exploredLocations, cur
   };
 
   const isCurrentLocation = (locationPath: string): boolean =>
-    currentLocation === locationPath || currentLocation.endsWith(locationPath.split('/').pop() || '');
+    isSameLocationScope(currentLocation, locationPath);
 
   const handleLocationClick = (locationPath: string, location: MapLocation) => {
     if (!isLocationUnlocked(locationPath, location, exploredLocations)) {

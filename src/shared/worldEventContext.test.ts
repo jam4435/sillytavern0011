@@ -4,7 +4,7 @@ import { hasEventOutcomeChanged, selectWorldEventsForPrompt } from './worldEvent
 const eventDefinition = {
   事件概要: '郭靖与黄蓉结识，两人建立初步情谊。',
   insert: { 郭靖: { 人物经历: { 初遇黄蓉: '在张家口结识黄蓉。' } } },
-  update: { 黄蓉: { 所在位置: '大宋/张家口' } },
+  update: { 黄蓉: { 所在位置: '金国/张家口/张家口镇' } },
   delete: {},
 };
 
@@ -18,7 +18,7 @@ describe('hasEventOutcomeChanged', () => {
           人物经历: { 初遇黄蓉: '在张家口结识黄蓉。' },
         },
       },
-      update: { 黄蓉: { 所在位置: '大宋/张家口', $meta: { necessary: 'all' } } },
+      update: { 黄蓉: { 所在位置: '金国/张家口/张家口镇', $meta: { necessary: 'all' } } },
       delete: {},
     };
 
@@ -32,7 +32,7 @@ describe('hasEventOutcomeChanged', () => {
         {
           ...eventDefinition,
           结局: eventDefinition.事件概要,
-          update: { 黄蓉: { 所在位置: '大宋/临安府' } },
+          update: { 黄蓉: { 所在位置: '大宋/临安府/临安城' } },
         },
         eventDefinition,
       ),

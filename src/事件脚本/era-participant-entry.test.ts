@@ -6,6 +6,7 @@ import {
   buildParticipantEntryPlan,
   getRumorScopeFromEventLocation,
   isLocationWithinRumorScope,
+  isSameLocationScope,
   normalizeLocationPath,
   normalizeParticipantEventDefinition,
 } from './era-participant-entry.js';
@@ -96,7 +97,7 @@ describe('normalizeParticipantEventDefinition', () => {
     );
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('事件 单级地点事件 的事件地点至少需要两级路径');
+    expect(result.errors).toContain('事件 单级地点事件 的事件地点必须是三级或四级完整路径');
   });
 
   it('does not require participant fields for debut events', () => {
@@ -123,6 +124,8 @@ describe('normalizeParticipantEventDefinition', () => {
 describe('derived rumor scope', () => {
   it('normalizes slash-separated location paths', () => {
     expect(normalizeLocationPath(' 大宋 / 临安府 / 牛家村 ')).toBe('大宋/临安府/牛家村');
+    expect(normalizeLocationPath(' 大宋 / 临安府 / 牛家村 / 村西树林 ')).toBe('大宋/临安府/牛家村/村西树林');
+    expect(normalizeLocationPath('临安府/牛家村')).toBe('');
   });
 
   it('derives the rumor scope from the first two event-location levels', () => {
@@ -133,19 +136,21 @@ describe('derived rumor scope', () => {
   it('shows rumors only inside the derived scope and below it', () => {
     const rumorScope = getRumorScopeFromEventLocation('大宋/临安府/牛家村');
 
-    expect(isLocationWithinRumorScope('大宋/临安府', rumorScope)).toBe(true);
     expect(isLocationWithinRumorScope('大宋/临安府/客栈', rumorScope)).toBe(true);
-    expect(isLocationWithinRumorScope('大宋', rumorScope)).toBe(false);
-    expect(isLocationWithinRumorScope('金国/中都', rumorScope)).toBe(false);
+    expect(isLocationWithinRumorScope('大宋/临安府/牛家村/村西树林', rumorScope)).toBe(true);
+    expect(isLocationWithinRumorScope('大宋/嘉兴府/嘉兴城', rumorScope)).toBe(false);
+    expect(isLocationWithinRumorScope('金国/中都/街区', rumorScope)).toBe(false);
   });
 
   it('lets the caller suppress rumor output at the exact event location', () => {
-    const eventLocation = '大宋/临安府/牛家村';
-    const playerLocation = eventLocation;
+    const eventLocation = '大宋/临安府/牛家村/村西树林';
+    const playerLocation = '大宋/临安府/牛家村/曲三酒馆';
     const rumorScope = getRumorScopeFromEventLocation(eventLocation);
     const alreadyJoined = false;
     const canShowRumor =
-      isLocationWithinRumorScope(playerLocation, rumorScope) && !alreadyJoined && eventLocation !== playerLocation;
+      isLocationWithinRumorScope(playerLocation, rumorScope) &&
+      !alreadyJoined &&
+      !isSameLocationScope(eventLocation, playerLocation);
 
     expect(canShowRumor).toBe(false);
   });

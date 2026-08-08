@@ -9,10 +9,13 @@ const SELECTORS = {
   latestReply: '[data-wuxia-automation="latest-reply"]',
   openSettings: '[data-wuxia-automation="open-settings"]',
   openDebugTab: '[data-wuxia-automation="open-debug-tab"]',
+  openVariablesTab: '[data-wuxia-automation="open-variables-tab"]',
   closeModal: '[data-wuxia-automation="close-modal"]',
   debugSection: '[data-wuxia-automation="debug-section"]',
   debugToggle: '[data-wuxia-automation="debug-section-toggle"]',
   debugContent: '[data-wuxia-automation="debug-section-content"]',
+  statDataSnapshot: '[data-wuxia-automation="stat-data-snapshot"]',
+  stopGenerationIcon: 'i.fa-circle-stop',
 };
 
 const EXPECTED_DEBUG_SECTIONS = ['main-input', 'main-output', 'variable-input', 'variable-output'];
@@ -31,7 +34,9 @@ function printUsage() {
   --settle-ms <ms>       旋转结束后的稳定等待，默认 5000
   --timeout-ms <ms>      单轮生成超时，默认 180000
   --output <path>        将完整报告写入 JSON 文件
-  --inspect-only         不发送行动，只读取当前回复和四个调试框
+  --inspect-only         不发送行动，只检查当前 iframe、空闲状态与回复（首次回合不要求调试框）
+  --stat-data-snapshot   仅配合 --inspect-only，按需读取变量页的完整聊天级 stat_data
+  --stop-generation      仅在页面正在生成时，通过酒馆终止按钮停止当前生成
   --continue-on-error    调试状态为 error 时继续下一轮
   --help                 显示帮助
 
@@ -64,6 +69,8 @@ function parseArgs(argv) {
     timeoutMs: 180_000,
     output: '',
     inspectOnly: false,
+    statDataSnapshot: false,
+    stopGeneration: false,
     continueOnError: false,
   };
 
@@ -82,6 +89,14 @@ function parseArgs(argv) {
       options.inspectOnly = true;
       continue;
     }
+    if (arg === '--stat-data-snapshot') {
+      options.statDataSnapshot = true;
+      continue;
+    }
+    if (arg === '--stop-generation') {
+      options.stopGeneration = true;
+      continue;
+    }
 
     const value = requireValue(argv, index, arg);
     index += 1;
@@ -95,10 +110,16 @@ function parseArgs(argv) {
     else throw new Error(`未知选项：${arg}`);
   }
 
-  if (!options.inspectOnly && options.actions.length === 0) {
+  if (options.statDataSnapshot && !options.inspectOnly) {
+    throw new Error('--stat-data-snapshot 只能与 --inspect-only 一起使用，避免默认逐轮读取完整变量');
+  }
+  if (options.stopGeneration && (options.inspectOnly || options.actions.length > 0 || options.turns !== 1)) {
+    throw new Error('--stop-generation 不能与推进、--inspect-only 或 --turns 一起使用');
+  }
+  if (!options.inspectOnly && !options.stopGeneration && options.actions.length === 0) {
     throw new Error('至少需要一个 --action；若只提供一个，会在每轮重复使用');
   }
-  if (!options.inspectOnly && options.actions.length !== 1 && options.actions.length !== options.turns) {
+  if (!options.inspectOnly && !options.stopGeneration && options.actions.length !== 1 && options.actions.length !== options.turns) {
     throw new Error(`--action 数量必须是 1 或与 --turns 相同；当前为 ${options.actions.length}/${options.turns}`);
   }
   return options;
@@ -159,6 +180,31 @@ async function inspectGeneration(browser, pageUrl) {
   };
 }
 
+async function inspectUiReadiness(browser, pageUrl) {
+  const { page, frame } = await findGameFrame(browser, pageUrl);
+  const generation = await inspectGeneration(browser, pageUrl);
+  const input = frame.locator(SELECTORS.input).first();
+  const send = frame.locator(SELECTORS.send).first();
+  const openSettings = frame.locator(SELECTORS.openSettings).first();
+
+  await input.waitFor({ state: 'visible', timeout: 10_000 });
+  await send.waitFor({ state: 'visible', timeout: 10_000 });
+
+  return {
+    pageUrl: page.url(),
+    frameUrl: frame.url(),
+    generating: generation.generating,
+    inputDisabled: await input.isDisabled(),
+    sendDisabled: await send.isDisabled(),
+    automation: {
+      playerInput: true,
+      sendTurn: true,
+      generationState: true,
+      openSettings: (await openSettings.count()) > 0,
+    },
+  };
+}
+
 async function waitForGenerationState(browser, pageUrl, expected, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let lastState = null;
@@ -177,6 +223,42 @@ async function waitForGenerationState(browser, pageUrl, expected, timeoutMs) {
     `等待生成状态变为 ${expected} 超时（${timeoutMs}ms）` +
       (lastState ? `；最后状态：${JSON.stringify(lastState)}` : ''),
   );
+}
+
+async function stopCurrentGeneration(browser, pageUrl) {
+  const before = await inspectGeneration(browser, pageUrl);
+  if (!before.generating) {
+    throw new Error('页面当前并未生成，拒绝点击终止按钮');
+  }
+
+  const { page, frame } = await findGameFrame(browser, pageUrl);
+  // 酒馆终止按钮属于宿主聊天页；保留 iframe 回退，兼容将来把控件移入游戏页的布局。
+  const candidates = [page.locator(SELECTORS.stopGenerationIcon).first(), frame.locator(SELECTORS.stopGenerationIcon).first()];
+  let stopIcon = null;
+  for (const candidate of candidates) {
+    if (await candidate.isVisible()) {
+      stopIcon = candidate;
+      break;
+    }
+  }
+  if (!stopIcon) {
+    throw new Error('页面正在生成，但找不到酒馆终止图标 i.fa-circle-stop');
+  }
+  const clicked = await stopIcon.evaluate(element => {
+    const control = element.closest('button, [role="button"], #mes_stop, .mes_stop') || element;
+    if (!(control instanceof HTMLElement)) return false;
+    control.click();
+    return true;
+  });
+  if (!clicked) throw new Error('酒馆终止图标不可点击');
+
+  const after = await waitForGenerationState(browser, pageUrl, false, 15_000);
+  return {
+    requestedAt: isoTime(),
+    frameUrlBefore: before.frameUrl,
+    frameUrlAfter: after.frameUrl,
+    stopped: true,
+  };
 }
 
 async function collectFrameDiagnostics(browser, pageUrl) {
@@ -252,37 +334,105 @@ async function openDebugPanel(browser, pageUrl) {
   await debugTab.click();
 }
 
+async function openVariablesPanel(browser, pageUrl) {
+  let { frame } = await findGameFrame(browser, pageUrl);
+  let variablesTab = frame.locator(SELECTORS.openVariablesTab).first();
+  if (await variablesTab.isVisible()) {
+    await variablesTab.click();
+    return;
+  }
+
+  let settingsButton = frame.locator(SELECTORS.openSettings).first();
+  if (!(await settingsButton.isVisible())) {
+    const menuButton = frame.getByRole('button', { name: '切换菜单' });
+    if (await menuButton.isVisible()) await menuButton.click();
+    ({ frame } = await findGameFrame(browser, pageUrl));
+    settingsButton = frame.locator(SELECTORS.openSettings).first();
+  }
+
+  await settingsButton.click();
+  ({ frame } = await findGameFrame(browser, pageUrl));
+  variablesTab = frame.locator(SELECTORS.openVariablesTab).first();
+  await variablesTab.waitFor({ state: 'visible', timeout: 10_000 });
+  await variablesTab.click();
+}
+
+async function closeModalIfOpen(browser, pageUrl) {
+  const { frame } = await findGameFrame(browser, pageUrl);
+  const closeButton = frame.locator(SELECTORS.closeModal).first();
+  if (!(await closeButton.isVisible())) return false;
+
+  // 调试弹窗可能被容器裁切到视口外；只关闭带自动化标记的弹窗。
+  await closeButton.evaluate(element => {
+    if (element instanceof HTMLElement) element.click();
+  });
+  await sleep(100);
+  return true;
+}
+
+async function readStatDataSnapshot(browser, pageUrl) {
+  try {
+    await openVariablesPanel(browser, pageUrl);
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const { frame } = await findGameFrame(browser, pageUrl);
+      const snapshot = frame.locator(SELECTORS.statDataSnapshot).first();
+      if ((await snapshot.count()) === 0) {
+        await sleep(100);
+        continue;
+      }
+
+      const status = (await snapshot.getAttribute('data-wuxia-stat-data-status')) || 'idle';
+      if (status === 'error') {
+        const error = (await snapshot.getAttribute('data-wuxia-stat-data-error')) || '未知错误';
+        throw new Error(`变量页读取完整 stat_data 失败：${error}`);
+      }
+      if (status === 'ready') {
+        const raw = (await snapshot.textContent()) || '';
+        try {
+          return {
+            capturedAt: (await snapshot.getAttribute('data-wuxia-stat-data-captured-at')) || '',
+            statData: JSON.parse(raw),
+          };
+        } catch (error) {
+          throw new Error(`变量页返回的 stat_data 不是合法 JSON：${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      await sleep(100);
+    }
+    throw new Error('等待变量页完整 stat_data 快照超时（10000ms）');
+  } finally {
+    await closeModalIfOpen(browser, pageUrl);
+  }
+}
+
 async function readDebugSections(browser, pageUrl, prompt) {
   await openDebugPanel(browser, pageUrl);
-  const { frame } = await findGameFrame(browser, pageUrl);
-  const sections = {};
+  try {
+    const { frame } = await findGameFrame(browser, pageUrl);
+    const sections = {};
 
-  for (const id of EXPECTED_DEBUG_SECTIONS) {
-    const section = frame.locator(`${SELECTORS.debugSection}[data-wuxia-debug-section="${id}"]`).first();
-    await section.waitFor({ state: 'visible', timeout: 10_000 });
-    const status = (await section.getAttribute('data-wuxia-debug-status')) || 'unknown';
-    let content = section.locator(SELECTORS.debugContent).first();
-    if ((await content.count()) === 0) {
-      await section.locator(SELECTORS.debugToggle).click();
-      content = section.locator(SELECTORS.debugContent).first();
-      await content.waitFor({ state: 'visible', timeout: 5_000 });
+    for (const id of EXPECTED_DEBUG_SECTIONS) {
+      const section = frame.locator(`${SELECTORS.debugSection}[data-wuxia-debug-section="${id}"]`).first();
+      await section.waitFor({ state: 'visible', timeout: 10_000 });
+      const status = (await section.getAttribute('data-wuxia-debug-status')) || 'unknown';
+      let content = section.locator(SELECTORS.debugContent).first();
+      if ((await content.count()) === 0) {
+        await section.locator(SELECTORS.debugToggle).click();
+        content = section.locator(SELECTORS.debugContent).first();
+        await content.waitFor({ state: 'visible', timeout: 5_000 });
+      }
+      sections[id] = { status, content: (await content.textContent()) || '' };
     }
-    sections[id] = { status, content: (await content.textContent()) || '' };
-  }
 
-  if (prompt && !sections['main-input'].content.includes(prompt)) {
-    throw new Error('调试页正文输入不包含本轮行动，疑似读取到了上一轮调试副本');
-  }
+    if (prompt && !sections['main-input'].content.includes(prompt)) {
+      throw new Error('调试页正文输入不包含本轮行动，疑似读取到了上一轮调试副本');
+    }
 
-  const closeButton = frame.locator(SELECTORS.closeModal).first();
-  if (await closeButton.isVisible()) {
-    // 调试弹窗可能被容器裁切到视口外；内容已读取完成后，无等待地尝试 DOM 关闭。
-    await closeButton.evaluateAll(elements => {
-      const button = elements[0];
-      if (button instanceof HTMLElement) button.click();
-    });
+    return sections;
+  } finally {
+    await closeModalIfOpen(browser, pageUrl);
   }
-  return sections;
 }
 
 async function readLatestReply(browser, pageUrl) {
@@ -294,6 +444,7 @@ async function runTurn(browser, options, turnIndex, prompt) {
   const startedAt = Date.now();
   log(`第 ${turnIndex}/${options.turns} 轮：准备发送「${prompt}」`);
 
+  await closeModalIfOpen(browser, options.pageUrl);
   const { page, frame } = await findGameFrame(browser, options.pageUrl);
   const preflight = await inspectGeneration(browser, options.pageUrl);
   if (preflight.generating) throw new Error('页面当前正在生成，拒绝重复发送新行动');
@@ -351,7 +502,7 @@ async function main() {
   log(`连接 Chrome：${options.endpoint}`);
   let browser;
   try {
-    browser = await chromium.connectOverCDP(options.endpoint, { timeout: 10_000 });
+    browser = await chromium.connectOverCDP(options.endpoint, { timeout: 30_000 });
   } catch (error) {
     const details = error instanceof Error ? error.message : String(error);
     throw new Error(
@@ -372,10 +523,22 @@ async function main() {
     if (options.inspectOnly) {
       await sleep(options.settleMs);
       report.inspect = {
+        readiness: await inspectUiReadiness(browser, options.pageUrl),
         reply: await readLatestReply(browser, options.pageUrl),
-        debug: await readDebugSections(browser, options.pageUrl, ''),
       };
+      if (options.statDataSnapshot) {
+        report.inspect.statDataSnapshot = await readStatDataSnapshot(browser, options.pageUrl);
+      }
       report.success = true;
+      return;
+    }
+    if (options.stopGeneration) {
+      report.termination = await stopCurrentGeneration(browser, options.pageUrl);
+      report.inspect = {
+        readiness: await inspectUiReadiness(browser, options.pageUrl),
+        reply: await readLatestReply(browser, options.pageUrl),
+      };
+      report.success = !report.inspect.readiness.generating;
       return;
     }
     for (let index = 0; index < options.turns; index += 1) {

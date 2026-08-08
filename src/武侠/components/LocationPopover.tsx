@@ -1,5 +1,6 @@
 import { LockKeyhole, MapPin, Navigation, X } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
+import { isSameLocationScope } from '../../shared/locationPath.js';
 import { MapLocation, MapRegion } from '../types';
 import { buildLocationPath, isLocationUnlocked } from '../utils/mapUtils';
 import { gameLogger } from '../utils/logger';
@@ -53,7 +54,7 @@ const LocationPopover: React.FC<LocationPopoverProps> = ({
 
   const isCurrentLocation = (locationName: string): boolean => {
     const path = buildLocationPath(areaName, regionName, locationName);
-    return currentLocation === path || currentLocation.endsWith(locationName);
+    return isSameLocationScope(currentLocation, path);
   };
 
   const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth;
