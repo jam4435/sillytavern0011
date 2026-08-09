@@ -73,6 +73,14 @@ export type ExtraVariableUpdateResult = {
   applyStatus?: ExtraVariableApplyStatus;
   applyVerification?: string;
   applyError?: string;
+  rejectedActions?: RejectedVariableAction[];
+  formatRepairAttempted?: boolean;
+};
+
+export type RejectedVariableAction = {
+  action: VariableDeclaredChange['action'];
+  path: string;
+  reason: string;
 };
 
 export type ExtraVariablePhaseStatus = 'running' | 'success' | 'error';
@@ -136,6 +144,16 @@ const VARIABLE_ROOT_KEY_ALIASES: Record<string, string> = {
   玩家数据: 'user数据',
   同场景角色: '角色数据',
 };
+
+class VariableJsonSyntaxError extends Error {
+  constructor(
+    readonly blockTag: string,
+    readonly jsonError: string,
+  ) {
+    super(`${blockTag} JSON 解析失败：${jsonError}`);
+    this.name = 'VariableJsonSyntaxError';
+  }
+}
 
 export function getIsExtraVariableUpdating(): boolean {
   return extraVariableUpdateBusy || extraVariableUpdateReserved;
@@ -216,42 +234,15 @@ function hasPath(source: unknown, path: readonly (string | number)[]): boolean {
   return true;
 }
 
-function assertDeclaredActionPathsValid(declaredChanges: VariableDeclaredChange[]): void {
-  if (declaredChanges.length === 0) return;
-
+function validateDeclaredActionPaths(declaredChanges: VariableDeclaredChange[]): {
+  accepted: VariableDeclaredChange[];
+  rejected: RejectedVariableAction[];
+} {
+  if (declaredChanges.length === 0) return { accepted: [], rejected: [] };
   const statData = readCurrentStatDataSnapshot();
   if (!statData) {
     throw new Error('聊天级 stat_data 暂不可读，无法校验额外变量模型声明的 Insert/Edit/Delete 路径。');
   }
-
-  const insertChanges = declaredChanges.filter(change => change.action === 'insert');
-  const existingInsertPaths = insertChanges
-    .filter(change => hasPath(statData, change.path))
-    .map(change => change.displayPath);
-  if (existingInsertPaths.length > 0) {
-    throw new Error(
-      `额外变量模型声明了已存在的 Insert 路径：${existingInsertPaths.join('、')}。已存在的字段必须使用 VariableEdit。`,
-    );
-  }
-
-  const editChanges = declaredChanges.filter(change => change.action === 'edit');
-  const missingPaths = editChanges.filter(change => !hasPath(statData, change.path)).map(change => change.displayPath);
-  if (missingPaths.length > 0) {
-    throw new Error(
-      `额外变量模型声明了不存在的 Edit 路径：${missingPaths.join('、')}。不存在的字段必须使用 VariableInsert。`,
-    );
-  }
-
-  const deleteChanges = declaredChanges.filter(change => change.action === 'delete');
-  const missingDeletePaths = deleteChanges
-    .filter(change => !hasPath(statData, change.path))
-    .map(change => change.displayPath);
-  if (missingDeletePaths.length > 0) {
-    throw new Error(
-      `额外变量模型声明了不存在的 Delete 路径：${missingDeletePaths.join('、')}。VariableDelete 只能删除已存在的字段。`,
-    );
-  }
-
   const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : {};
   const surroundingLocations = isRecord(frontendVariables.周围地点) ? frontendVariables.周围地点 : {};
   const allowedLocationScopes = new Set<string>();
@@ -265,23 +256,60 @@ function assertDeclaredActionPathsValid(declaredChanges: VariableDeclaredChange[
     if (Array.isArray(paths)) paths.forEach(addAllowedScope);
   }
 
+  const accepted: VariableDeclaredChange[] = [];
+  const rejected: RejectedVariableAction[] = [];
   for (const change of declaredChanges) {
-    if (change.action === 'delete' || change.path.at(-1) !== '所在位置') continue;
-    const parsed = parseLocationPath(change.value);
-    if (!parsed) {
-      throw new Error(
-        `额外变量模型写入了无效地点 ${change.displayPath}=${JSON.stringify(change.value)}；地点必须是三级或四级完整路径。`,
-      );
+    let reason = '';
+    if (change.action === 'insert' && hasPath(statData, change.path)) {
+      reason = '目标路径已经存在，必须使用 VariableEdit。';
+    } else if (change.action === 'edit' && !hasPath(statData, change.path)) {
+      reason = '目标路径不存在，必须使用 VariableInsert。';
+    } else if (change.action === 'delete' && !hasPath(statData, change.path)) {
+      reason = '目标路径不存在，VariableDelete 只能删除已有字段。';
+    } else if (change.action !== 'delete' && change.path.at(-1) === '所在位置') {
+      const parsed = parseLocationPath(change.value);
+      if (!parsed) {
+        reason = `地点 ${JSON.stringify(change.value)} 无效；地点必须是三级或四级完整路径。`;
+      } else {
+        const currentValue = readPathValue(statData, change.path);
+        if (!isSameLocationScope(currentValue, parsed.fullPath) && !allowedLocationScopes.has(parsed.scopePath)) {
+          reason = `未授权活动区 ${parsed.scopePath}；跨活动区移动只能使用“周围地点”中的合法前三段。`;
+        }
+      }
     }
 
-    const currentValue = readPathValue(statData, change.path);
-    if (isSameLocationScope(currentValue, parsed.fullPath)) continue;
-    if (!allowedLocationScopes.has(parsed.scopePath)) {
-      throw new Error(
-        `额外变量模型把 ${change.displayPath} 移动到未授权活动区 ${parsed.scopePath}；跨活动区移动只能使用“周围地点”中的合法前三段。`,
-      );
+    if (reason) {
+      rejected.push({ action: change.action, path: change.displayPath, reason });
+    } else {
+      accepted.push(change);
     }
   }
+
+  return { accepted, rejected };
+}
+
+function buildIndependentVariablePatch(path: readonly (string | number)[], value: unknown): unknown {
+  return [...path].reverse().reduce<unknown>((child, segment) => {
+    if (typeof segment === 'number') {
+      const array: unknown[] = [];
+      array[segment] = child;
+      return array;
+    }
+    return { [segment]: child };
+  }, value);
+}
+
+function serializeIndependentVariableBlocks(
+  thoughts: Array<{ text: string }>,
+  changes: VariableDeclaredChange[],
+): string {
+  const blocks = thoughts.map(thought => `<VariableThink>\n${thought.text}\n</VariableThink>`);
+  for (const change of changes) {
+    const leafValue = change.action === 'delete' ? {} : change.value;
+    const patch = buildIndependentVariablePatch(change.path, leafValue);
+    blocks.push(`<${change.blockTag}>\n${JSON.stringify(patch, null, 2)}\n</${change.blockTag}>`);
+  }
+  return blocks.join('\n\n').trim();
 }
 
 function collapseDeclaredChangesForPersistence(declaredChanges: VariableDeclaredChange[]): VariableDeclaredChange[] {
@@ -1350,7 +1378,7 @@ function extractValidVariableBlocks(rawResponse: string): {
       try {
         parsed = JSON.parse(body);
       } catch (error) {
-        throw new Error(`${blockTag} JSON 解析失败：${getErrorMessage(error)}`);
+        throw new VariableJsonSyntaxError(blockTag, getErrorMessage(error));
       }
       if (!isRecord(parsed)) {
         throw new Error(`${blockTag} 内容必须是 JSON 对象。`);
@@ -1366,6 +1394,18 @@ function extractValidVariableBlocks(rawResponse: string): {
     blocksText: blocks.join('\n\n').trim(),
     actionBlockCount,
   };
+}
+
+function assertVariableBlockTagsPreserved(originalResponse: string, repairedResponse: string): void {
+  const changedTags = VARIABLE_BLOCK_TAGS.filter(blockTag => {
+    const pattern = new RegExp(`<${blockTag}>`, 'gi');
+    const originalCount = originalResponse.match(pattern)?.length ?? 0;
+    const repairedCount = repairedResponse.match(pattern)?.length ?? 0;
+    return originalCount !== repairedCount;
+  });
+  if (changedTags.length > 0) {
+    throw new Error(`格式修复改变了变量块类型或数量：${changedTags.join('、')}，已拒绝修复结果。`);
+  }
 }
 
 async function appendVariableBlocksToAssistantMessage(
@@ -1581,9 +1621,17 @@ export async function executeExtraVariableUpdate({
         if (!rawResponse.trim()) {
           throw new Error('额外变量模型返回空回复');
         }
-        prevalidatedExtraction = extractValidVariableBlocks(rawResponse);
-        if (!prevalidatedExtraction.blocksText) {
-          throw new Error('额外变量模型没有返回可识别的变量块');
+        try {
+          prevalidatedExtraction = extractValidVariableBlocks(rawResponse);
+        } catch (error) {
+          // JSON 语法错误不重新生成整份变量决策，留给后续专用格式修复请求处理。
+          if (!(error instanceof VariableJsonSyntaxError)) throw error;
+          prevalidatedExtraction = null;
+        }
+        if (!prevalidatedExtraction?.blocksText) {
+          if (!/<Variable(?:Think|Insert|Edit|Delete)>/i.test(rawResponse)) {
+            throw new Error('额外变量模型没有返回可识别的变量块');
+          }
         }
       }
       return rawResponse;
@@ -1613,13 +1661,88 @@ export async function executeExtraVariableUpdate({
       rawResponse,
     });
     onProgress?.({ prompt, rawResponse });
-    const { blocksText, actionBlockCount, declaredState } = await runPhase('parse-variable-response', () => {
-      const extracted = prevalidatedExtraction ?? extractValidVariableBlocks(rawResponse);
-      return {
-        ...extracted,
-        declaredState: parseDeclaredVariableChanges(extracted.blocksText),
-      };
-    });
+    let effectiveRawResponse = rawResponse;
+    let formatRepairAttempted = false;
+    let extracted: ReturnType<typeof extractValidVariableBlocks> | null = prevalidatedExtraction;
+    if (!extracted) {
+      const initialParse = await runPhase('parse-variable-response', () => {
+        try {
+          return { extracted: extractValidVariableBlocks(rawResponse), jsonSyntaxError: null };
+        } catch (error) {
+          if (error instanceof VariableJsonSyntaxError) {
+            return { extracted: null, jsonSyntaxError: error };
+          }
+          throw error;
+        }
+      });
+      extracted = initialParse.extracted;
+
+      if (initialParse.jsonSyntaxError) {
+        formatRepairAttempted = true;
+        const repairPrompt = `你是变量块 JSON 格式修复器。下面返回中的 ${initialParse.jsonSyntaxError.blockTag} 存在 JSON 语法错误：${initialParse.jsonSyntaxError.jsonError}\n\n只修复 JSON 的括号、引号、逗号、转义或代码围栏格式；必须保持所有 VariableThink 语义、动作类型、变量路径、键名和值不变，不得新增、删除或重新判断任何变量。只输出修复后的完整变量块，不要解释。\n\n【待修复原文】\n${rawResponse}`;
+        const repairedRawResponse = await runPhase('repair-variable-json-format', () =>
+          requestConfiguredText({
+            prompt: repairPrompt,
+            settings: requestSettings,
+            timeoutMs: EXTRA_VARIABLE_UPDATE_TIMEOUT_MS,
+            shouldStream: false,
+            generationIdPrefix: 'wuxia-variable-json-repair',
+            skipWorldInfoAndAuthorNote: true,
+          }),
+        );
+        effectiveRawResponse = repairedRawResponse;
+        extracted = await runPhase('parse-repaired-variable-response', () => {
+          try {
+            assertVariableBlockTagsPreserved(rawResponse, repairedRawResponse);
+            return extractValidVariableBlocks(repairedRawResponse);
+          } catch (error) {
+            throw new Error(`变量 JSON 格式修复后仍无法解析：${getErrorMessage(error)}`);
+          }
+        });
+        variableTraceLogger.warn('[extraVariableUpdate] 已通过一次专用请求修复变量 JSON 格式', {
+          assistantMessageId,
+          originalRawResponse: rawResponse,
+          repairedRawResponse,
+        });
+      }
+    }
+
+    if (!extracted) {
+      throw new Error('额外变量模型没有返回可解析的变量块。');
+    }
+    const declaredState = parseDeclaredVariableChanges(extracted.blocksText);
+    if (declaredState.parseErrors.length > 0) {
+      throw new Error(`本回合变量动作块无法完整解析：${declaredState.parseErrors.join('；')}`);
+    }
+    if (declaredState.omittedDeclaredCount > 0) {
+      throw new Error(`本回合变量声明超过可安全校验的上限，仍有 ${declaredState.omittedDeclaredCount} 条未纳入校验，已停止写入。`);
+    }
+    const validation = await runPhase('validate-variable-actions', () =>
+      validateDeclaredActionPaths(declaredState.declaredChanges),
+    );
+    if (validation.rejected.length > 0) {
+      variableTraceLogger.warn('[extraVariableUpdate] 已隔离非法变量动作，其余动作继续应用', {
+        assistantMessageId,
+        rejectedActions: validation.rejected,
+      });
+    }
+    if (declaredState.declaredChanges.length > 0 && validation.accepted.length === 0) {
+      throw new Error(
+        `本回合所有变量动作均未通过独立校验：${validation.rejected
+          .map(item => `${item.path}（${item.reason}）`)
+          .join('；')}`,
+      );
+    }
+    const blocksText = serializeIndependentVariableBlocks(declaredState.thoughts, validation.accepted);
+    const actionBlockCount = validation.accepted.length;
+    const diagnosticRawResponse = formatRepairAttempted
+      ? `【原始返回（JSON 格式错误）】\n${rawResponse}\n\n【格式修复返回】\n${effectiveRawResponse}`
+      : rawResponse;
+    const rejectionSummary = validation.rejected.length > 0
+      ? `已隔离 ${validation.rejected.length} 条非法动作：${validation.rejected
+          .map(item => `${item.path}（${item.reason}）`)
+          .join('；')}`
+      : '';
     variableTraceLogger.log('[extraVariableUpdate] 变量块提取完成', {
       assistantMessageId,
       actionBlockCount,
@@ -1627,10 +1750,18 @@ export async function executeExtraVariableUpdate({
       blocksText,
       declaredChangeCount: declaredState.declaredChanges.length,
       declaredParseErrors: declaredState.parseErrors,
+      rejectedActions: validation.rejected,
     });
-    onProgress?.({ prompt, rawResponse, appendedBlocks: blocksText, actionBlockCount });
+    onProgress?.({
+      prompt,
+      rawResponse: diagnosticRawResponse,
+      appendedBlocks: blocksText,
+      actionBlockCount,
+      rejectedActions: validation.rejected,
+      formatRepairAttempted,
+    });
 
-    if (actionBlockCount === 0 || !blocksText) {
+    if (actionBlockCount === 0) {
       variableTraceLogger.log('[extraVariableUpdate] 没有可写入的合法动作块，跳过 ERA 同步', {
         assistantMessageId,
         actionBlockCount,
@@ -1639,15 +1770,15 @@ export async function executeExtraVariableUpdate({
         appended: false,
         actionBlockCount,
         prompt,
-        rawResponse,
+        rawResponse: diagnosticRawResponse,
         retry429Count,
         retry429LastDelayMs,
         retryFailureCount,
         retryFailureLastDelayMs,
+        rejectedActions: validation.rejected,
+        formatRepairAttempted,
       };
     }
-
-    await runPhase('validate-variable-actions', () => assertDeclaredActionPathsValid(declaredState.declaredChanges));
 
     const appendVerification = await runPhase('append-variable-blocks', () =>
       appendVariableBlocksToAssistantMessage(assistantMessageId, blocksText),
@@ -1663,13 +1794,18 @@ export async function executeExtraVariableUpdate({
       appended: true,
       actionBlockCount,
       prompt,
-      rawResponse,
+      rawResponse: diagnosticRawResponse,
       appendedBlocks: blocksText,
       finalMessageText: appendVerification.readbackText,
       appendReadbackText: appendVerification.readbackText,
       appendVerification: appendVerification.verification,
       applyStatus: 'waiting-write-done',
-      applyVerification: '变量块已追加，正在等待匹配的 ERA 原始写入完成信号。',
+      applyVerification: [
+        '变量块已追加，正在等待匹配的 ERA 原始写入完成信号。',
+        rejectionSummary,
+      ].filter(Boolean).join('\n'),
+      rejectedActions: validation.rejected,
+      formatRepairAttempted,
     });
 
     if (!appendVerification.verified) {
@@ -1704,7 +1840,10 @@ export async function executeExtraVariableUpdate({
       });
       onProgress?.({
         applyStatus: 'verifying',
-        applyVerification: 'ERA 已返回匹配的写入完成信号，正在回读聊天级 stat_data。',
+        applyVerification: [
+          'ERA 已返回匹配的写入完成信号，正在回读聊天级 stat_data。',
+          rejectionSummary,
+        ].filter(Boolean).join('\n'),
       });
     } catch (error) {
       variableTraceLogger.error('[extraVariableUpdate] 等待 ERA 同步失败', {
@@ -1775,12 +1914,12 @@ export async function executeExtraVariableUpdate({
     }
 
     const persistenceVerification = await runPhase('verify-variable-persistence', () =>
-      verifyDeclaredChangesAfterEraWrite(declaredState.declaredChanges),
+      verifyDeclaredChangesAfterEraWrite(validation.accepted),
     );
     const applyStatus: ExtraVariableApplyStatus = persistenceVerification.verified ? 'success' : 'error';
     onProgress?.({
       applyStatus,
-      applyVerification: persistenceVerification.verification,
+      applyVerification: [persistenceVerification.verification, rejectionSummary].filter(Boolean).join('\n'),
     });
     if (!persistenceVerification.verified) {
       const persistenceError = `ERA 已返回写入完成，但变量声明未按原值落库：${
@@ -1802,7 +1941,7 @@ export async function executeExtraVariableUpdate({
       appended: true,
       actionBlockCount,
       prompt,
-      rawResponse,
+      rawResponse: diagnosticRawResponse,
       appendedBlocks: blocksText,
       finalMessageText: syncReadback.activeText,
       appendReadbackText: appendVerification.readbackText,
@@ -1814,7 +1953,9 @@ export async function executeExtraVariableUpdate({
       retryFailureCount,
       retryFailureLastDelayMs,
       applyStatus,
-      applyVerification: persistenceVerification.verification,
+      applyVerification: [persistenceVerification.verification, rejectionSummary].filter(Boolean).join('\n'),
+      rejectedActions: validation.rejected,
+      formatRepairAttempted,
     };
   } finally {
     variableTraceLogger.log('[extraVariableUpdate] 本轮额外变量更新结束', { assistantMessageId });

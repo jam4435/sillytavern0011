@@ -372,9 +372,7 @@ describe('executeExtraVariableUpdate', () => {
         assistantMessageId: 28,
         latestRawReply: '正文内容',
       }),
-    ).rejects.toThrow(
-      '额外变量模型声明了不存在的 Edit 路径：stat_data › user数据 › 人物经历 › 酒馆结识郭杨。不存在的字段必须使用 VariableInsert。',
-    );
+    ).rejects.toThrow('本回合所有变量动作均未通过独立校验');
 
     expect(setChatMessagesMock).not.toHaveBeenCalled();
     expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
@@ -390,9 +388,7 @@ describe('executeExtraVariableUpdate', () => {
         assistantMessageId: 28,
         latestRawReply: '正文内容',
       }),
-    ).rejects.toThrow(
-      '额外变量模型声明了已存在的 Insert 路径：stat_data › user数据 › 修为。已存在的字段必须使用 VariableEdit。',
-    );
+    ).rejects.toThrow('本回合所有变量动作均未通过独立校验');
 
     expect(setChatMessagesMock).not.toHaveBeenCalled();
     expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
@@ -410,9 +406,7 @@ describe('executeExtraVariableUpdate', () => {
         assistantMessageId: 28,
         latestRawReply: '正文内容',
       }),
-    ).rejects.toThrow(
-      '额外变量模型声明了不存在的 Delete 路径：stat_data › user数据 › 不存在的临时状态。VariableDelete 只能删除已存在的字段。',
-    );
+    ).rejects.toThrow('本回合所有变量动作均未通过独立校验');
 
     expect(setChatMessagesMock).not.toHaveBeenCalled();
     expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
@@ -682,35 +676,109 @@ describe('executeExtraVariableUpdate', () => {
     }
   });
 
-  it('自动推进会在落变量块前重试额外模型非法变量块', async () => {
-    vi.useFakeTimers();
+  it('自动推进遇到 JSON 语法错误时只调用一次专用格式修复，不重新生成变量决策', async () => {
     requestConfiguredTextMock
       .mockResolvedValueOnce('<VariableEdit>{invalid json}</VariableEdit>')
-      .mockResolvedValue('<VariableThink>无变化</VariableThink>');
+      .mockResolvedValue('<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>');
 
-    try {
-      const updatePromise = executeExtraVariableUpdate({
-        settings: {
-          ...DEFAULT_SUMMARY_SETTINGS,
-          variableUpdateMode: 'extra',
-        },
+    const result = await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+      },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+      retryAutoAdvanceFailures: true,
+    });
+
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(2);
+    expect(requestConfiguredTextMock.mock.calls[1][0].prompt).toContain('JSON 格式修复器');
+    expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      appended: true,
+      applyStatus: 'success',
+      retryFailureCount: 0,
+      retryFailureLastDelayMs: 0,
+      formatRepairAttempted: true,
+    });
+  });
+
+  it('同一变量块中单条路径非法时只隔离该条并继续应用其他合法动作', async () => {
+    requestConfiguredTextMock.mockResolvedValue(
+      '<VariableEdit>{"user数据":{"修为":120,"人物经历":{"不存在的经历":"不应应用"}}}</VariableEdit>',
+    );
+
+    const result = await executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    });
+
+    expect(result).toMatchObject({
+      appended: true,
+      actionBlockCount: 1,
+      applyStatus: 'success',
+      rejectedActions: [
+        expect.objectContaining({
+          action: 'edit',
+          path: 'stat_data › user数据 › 人物经历 › 不存在的经历',
+        }),
+      ],
+    });
+    expect(result.appendedBlocks).toContain('"修为": 120');
+    expect(result.appendedBlocks).not.toContain('人物经历');
+    expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('JSON 语法修复成功后应用修复结果，路径语义错误不触发格式修复', async () => {
+    requestConfiguredTextMock
+      .mockResolvedValueOnce('<VariableEdit>{"user数据":{"修为":120}</VariableEdit>')
+      .mockResolvedValueOnce('<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>');
+
+    const result = await executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    });
+
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(2);
+    expect(requestConfiguredTextMock.mock.calls[1][0].prompt).toContain('必须保持所有 VariableThink 语义、动作类型、变量路径、键名和值不变');
+    expect(result).toMatchObject({ appended: true, applyStatus: 'success', formatRepairAttempted: true });
+    expect(result.rawResponse).toContain('【原始返回（JSON 格式错误）】');
+    expect(result.rawResponse).toContain('【格式修复返回】');
+
+    requestConfiguredTextMock.mockClear();
+    requestConfiguredTextMock.mockResolvedValue(
+      '<VariableEdit>{"user数据":{"人物经历":{"仍不存在":"路径错误"}}}</VariableEdit>',
+    );
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
         assistantMessageId: 28,
         latestRawReply: '正文内容',
-        retryAutoAdvanceFailures: true,
-      });
-      await vi.advanceTimersByTimeAsync(1000);
-      const result = await updatePromise;
+      }),
+    ).rejects.toThrow('本回合所有变量动作均未通过独立校验');
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(1);
+  });
 
-      expect(requestConfiguredTextMock).toHaveBeenCalledTimes(2);
-      expect(setChatMessagesMock).not.toHaveBeenCalled();
-      expect(result).toMatchObject({
-        appended: false,
-        retryFailureCount: 1,
-        retryFailureLastDelayMs: 1000,
-      });
-    } finally {
-      vi.useRealTimers();
-    }
+  it('JSON 修复响应改变变量块类型或仍然无法解析时拒绝写入且不再追加请求', async () => {
+    requestConfiguredTextMock
+      .mockResolvedValueOnce('<VariableEdit>{invalid json}</VariableEdit>')
+      .mockResolvedValueOnce('<VariableThink>无变化</VariableThink>');
+
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+      }),
+    ).rejects.toThrow('格式修复改变了变量块类型或数量');
+
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(2);
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+    expect(getIsExtraVariableUpdating()).toBe(false);
   });
 
   it('自定义模板未放置 locationContext 时不会强行追加地点约束', async () => {

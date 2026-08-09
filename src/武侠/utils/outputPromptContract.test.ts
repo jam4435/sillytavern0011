@@ -100,7 +100,8 @@ describe('武侠输出提示词契约', () => {
     expect(cotPromptSource).toContain('数十分钟');
     expect(cotPromptSource).toContain('数小时');
     expect(cotPromptSource).toContain('数日');
-    expect(cotPromptSource).toContain('仍在开端或第一个节点时');
+    expect(cotPromptSource).toContain('开端只能处于窗口前段');
+    expect(cotPromptSource).toContain('只有最终情节完整收束才到事件结束时间');
     expect(cotPromptSource).not.toContain('按事件进行比例');
 
     expect(variableGuidanceSource).toContain('{"年":整数,"月":整数,"日":整数,"时":整数,"分":整数}');
@@ -108,8 +109,21 @@ describe('武侠输出提示词契约', () => {
     expect(variableGuidanceSource).toContain('旧存档没有`分`时按 0 分理解');
     expect(variableGuidanceSource).toContain('一个回复不等于固定的一小时');
     expect(variableGuidanceSource).toContain('跨城远行、长期养伤、闭关修炼等可经过数日');
-    expect(variableGuidanceSource).toContain('禁止直接写到事件结束时间');
+    expect(variableGuidanceSource).toContain('只有完整收束、整个事件确实结束时，才将时间推进到事件结束时间');
     expect(variableGuidanceSource).not.toContain('关键桥段完整结束时，将时间推进到事件描述给出的结束时间');
+    expect(variableGuidanceSource).toContain('不得把该事件尚未结束的阶段性对话、观察、行动、冲突或关系变化按回合拆写');
+  });
+
+  it('cot 根据参与事件是否存在只输出对应的一套思维规则', () => {
+    const render = compilePromptRenderer(cotPromptSource);
+    const active = render({}, path => (path === 'stat_data.参与事件' ? { 射雕第1回01: {} } : undefined));
+    const idle = render({}, path => (path === 'stat_data.参与事件' ? {} : undefined));
+
+    expect(active).toContain('### 参与事件思维规则');
+    expect(active).toContain('“合理推进剧情”');
+    expect(active).not.toContain('### 无参与事件思维规则');
+    expect(idle).toContain('### 无参与事件思维规则');
+    expect(idle).not.toContain('### 参与事件思维规则');
   });
 
   it('世界背景提供可复用的写实叙事表现标尺', () => {
