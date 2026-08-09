@@ -29,7 +29,8 @@ export function buildTurnPrompt(params: {
     `攻防分：${resolution.attackScore} vs ${resolution.defenseScore}（基础成功率 ${resolution.baseRate}%）`,
     `情境修正：${modLines}（最终成功线 ${resolution.finalRate}）`,
     `判定等级：${resolution.tier}`,
-    '要求：按判定等级演出本回合（解说+场上对话），不得改变判定结果；结算比分、时间、体力与站位到变量块。',
+    `硬结算边界：${JSON.stringify(resolution.hardResult)}`,
+    '要求：按判定等级演出本回合（解说+场上对话）；比分、球权、阶段、耗时、体力和个人统计必须严格落在硬结算边界内，只能修改 allowedStatePaths；requiredStatUpdates 中 choiceGroup 相同的项目必须且只能选择一项，不得改变判定结果。',
     '</行动判定>',
   ];
 

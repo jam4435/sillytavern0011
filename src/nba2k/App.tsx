@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ActionChoice } from './components/ActionPanel';
+import type { ActionChoice, SubstitutionChoice } from './components/ActionPanel';
 import { ActionPanel } from './components/ActionPanel';
 import { BoxScore } from './components/BoxScore';
 import { CareerPanel } from './components/CareerPanel';
@@ -16,13 +16,26 @@ import { buildTurnPrompt } from './engine/promptBuilder';
 import { buildFormation } from './engine/positioning';
 import { resolveAction } from './engine/resolveAction';
 import type { MatchState, OnCourtStatus, Side, SituationContext } from './engine/types';
-import { getPlayer, getTeam, pickStarters, registerCustomPlayer, starterEntriesWith } from './utils/rosters';
+import { getPlayer, getRoster, getTeam, pickStarters, registerCustomPlayer, starterEntriesWith } from './utils/rosters';
 import { TEAMS } from './data/teams';
 import type { Nba2kStat } from './utils/statReader';
 import { getLastAssistantNarrative, isInMatch, parseOptions, readStat, stripNarrative } from './utils/statReader';
+import { runTurnTransaction } from './utils/turnTransaction';
 
 function freshStatus(): OnCourtStatus {
-  return { 体力: 100, 得分: 0, 篮板: 0, 助攻: 0, 抢断: 0, 盖帽: 0, 失误: 0, 犯规: 0, 手感: '平' };
+  return {
+    体力: 100,
+    得分: 0,
+    篮板: 0,
+    助攻: 0,
+    抢断: 0,
+    盖帽: 0,
+    失误: 0,
+    犯规: 0,
+    手感: '平',
+    连续命中: 0,
+    连续打铁: 0,
+  };
 }
 
 const App: React.FC = () => {
@@ -48,11 +61,19 @@ const App: React.FC = () => {
 
   useEffect(() => {
     void refresh();
+    let activeChatId = SillyTavern.getCurrentChatId();
     const regs = [
       eventOn(tavern_events.MESSAGE_RECEIVED, () => void refresh()),
       eventOn(tavern_events.MESSAGE_UPDATED, () => void refresh()),
       eventOn(tavern_events.MESSAGE_SWIPED, () => void refresh()),
-      eventOn(tavern_events.CHAT_CHANGED, () => void refresh()),
+      eventOn(tavern_events.CHAT_CHANGED, chatId => {
+        if (chatId !== activeChatId) {
+          activeChatId = chatId;
+          window.location.reload();
+          return;
+        }
+        void refresh();
+      }),
     ];
     return () => regs.forEach(r => r.stop?.());
   }, [refresh]);
@@ -64,11 +85,12 @@ const App: React.FC = () => {
       busyRef.current = true;
       setBusy(true);
       try {
-        await createChatMessages([{ role: 'user', message: text }]);
-        await generate({ user_input: text, should_stream: true });
+        const result = await runTurnTransaction(text);
+        setNarrative(stripNarrative(result.assistantText));
+        setOptions(parseOptions(result.assistantText));
       } catch (e) {
-        console.error('[nba2k] 生成失败', e);
-        toastr.error('生成失败，请重试');
+        console.error('[nba2k] 回合失败', e);
+        toastr.error(e instanceof Error ? e.message : '回合失败，请重试');
       } finally {
         busyRef.current = false;
         setBusy(false);
@@ -88,6 +110,7 @@ const App: React.FC = () => {
       await insertOrAssignVariables(
         {
           stat_data: {
+            版本: 2,
             生涯: {
               姓名: r.playerName,
               球队: r.teamId,
@@ -115,11 +138,12 @@ const App: React.FC = () => {
               ),
               日程: { 日期: '2015-10-27', 下一场: `vs ${firstOpponent.id}`, 待办: ['赛季首战'] },
             },
-            比赛: { 进行中: false },
+            比赛: null,
           },
         },
         { type: 'chat' },
       );
+      setStat(readStat());
       await sendTurn(
         `【开局】我是${r.playerName}，以${p?.cn ?? r.protagonistKey}的身份效力于${team?.cn}（${p?.pos}，总评${p?.overall}）。` +
           `2015-16 赛季即将开始，首战 ${firstOpponent.cn}。请以生涯纪录片的口吻开场，介绍我的处境（更衣室、教练、媒体期待），最后给出行动选项。`,
@@ -139,6 +163,7 @@ const App: React.FC = () => {
       await insertOrAssignVariables(
         {
           stat_data: {
+            版本: 2,
             生涯: {
               姓名: form.name,
               球队: form.teamId,
@@ -167,11 +192,12 @@ const App: React.FC = () => {
               ),
               日程: { 日期: '2015-10-27', 下一场: `vs ${firstOpponent.id}`, 待办: ['新秀首秀'] },
             },
-            比赛: { 进行中: false },
+            比赛: null,
           },
         },
         { type: 'chat' },
       );
+      setStat(readStat());
       await sendTurn(
         `【开局】我是${form.name}，一名${form.height_cm}cm 的${form.pos}新秀（总评${player.overall}，潜力${player.attrs.potential}），` +
           `刚与${team?.cn}签下新秀合同，球衣号码 ${form.number} 号。2015-16 赛季即将开始，首战 ${firstOpponent.cn}。` +
@@ -197,19 +223,29 @@ const App: React.FC = () => {
     const protagonistKey = (career as any).附身球员 ?? '';
     const homeEntries = homeId === myTeamId ? starterEntriesWith(homeId, protagonistKey) : starterEntriesWith(homeId, '');
     const awayEntries = awayId === myTeamId ? starterEntriesWith(awayId, protagonistKey) : starterEntriesWith(awayId, '');
-    // 开局主队球权、向右进攻
+    const homeCenter = getPlayer(homeEntries.find(entry => entry.pos === 'C')?.key ?? homeEntries.at(-1)?.key ?? '');
+    const awayCenter = getPlayer(awayEntries.find(entry => entry.pos === 'C')?.key ?? awayEntries.at(-1)?.key ?? '');
+    const jumpScore = (player: typeof homeCenter) =>
+      player ? player.height_cm * 0.6 + player.attrs.strength * 0.3 + player.overall * 0.1 : 0;
+    const openingPossession: Side = jumpScore(homeCenter) >= jumpScore(awayCenter) ? '主' : '客';
+    const offenseEntries = openingPossession === '主' ? homeEntries : awayEntries;
+    const defenseEntries = openingPossession === '主' ? awayEntries : homeEntries;
     const 站位 = buildFormation({
-      offense: homeEntries,
-      defense: awayEntries,
-      offenseSide: '主',
+      offense: offenseEntries,
+      defense: defenseEntries,
+      offenseSide: openingPossession,
       tactic: '基础',
       defenseScheme: '人盯人',
-      ballHolder: homeEntries[0]?.key ?? '',
-      attackRight: true,
+      ballHolder: offenseEntries[0]?.key ?? '',
+      attackRight: openingPossession === '主',
     });
+    const homeOnCourt = homeEntries.map(entry => entry.key);
+    const awayOnCourt = awayEntries.map(entry => entry.key);
+    const homeBench = getRoster(homeId).map(player => player.name).filter(key => !homeOnCourt.includes(key));
+    const awayBench = getRoster(awayId).map(player => player.name).filter(key => !awayOnCourt.includes(key));
     const 球员状态: Record<string, OnCourtStatus> = {};
-    [...homeEntries, ...awayEntries].forEach(e => {
-      球员状态[e.key] = freshStatus();
+    [...homeOnCourt, ...homeBench, ...awayOnCourt, ...awayBench].forEach(key => {
+      球员状态[key] = freshStatus();
     });
     const match: MatchState = {
       进行中: true,
@@ -217,17 +253,25 @@ const App: React.FC = () => {
       节次: 1,
       剩余秒数: 720,
       比分: { 主: 0, 客: 0 },
-      球权: '主',
+      球权: openingPossession,
       战术: { 主: '基础', 客: '人盯人' },
       站位,
+      本节球队犯规: { 主: 0, 客: 0 },
+      暂停: { 主: 7, 客: 7 },
+      阵容: {
+        主: { 场上: homeOnCourt, 替补: homeBench },
+        客: { 场上: awayOnCourt, 替补: awayBench },
+      },
+      回合阶段: '常规回合',
+      回合情境: `${openingPossession}队赢得跳球，常规对位`,
       球员状态,
-      回合摘要: '比赛开始，跳球',
+      回合摘要: `${openingPossession}队赢得跳球`,
     };
     await insertOrAssignVariables({ stat_data: { 比赛: match } }, { type: 'chat' });
     setStat(s => ({ ...s, 比赛: match }));
     await sendTurn(
       `【开赛】${getTeam(homeId)?.cn} vs ${getTeam(awayId)?.cn}，我效力于${mySide}队。` +
-        `请演出赛前入场、首发介绍与跳球（跳球结果按双方中锋身高与弹跳合理判断，主队球权已预设，如客队赢跳球请更新变量），然后把镜头交给我。`,
+        `前端已按双方中锋身高、力量与总评判定由${openingPossession}队赢得跳球。请演出赛前入场、首发介绍与这个既定跳球结果；不得修改球权、比分、时间或其他比赛变量，然后把镜头交给我。`,
     );
   }, [stat, sendTurn]);
 
@@ -258,14 +302,30 @@ const App: React.FC = () => {
           }
         }
       }
+      if (choice.action === '无球跑动') defenderKey = null;
       const defender = defenderKey ? (getPlayer(defenderKey) ?? null) : null;
       const defenderStatus = defenderKey ? match.球员状态[defenderKey] : undefined;
+      const defenders = oppSpots.map(spot => getPlayer(spot.球员)).filter((player): player is NonNullable<typeof player> => Boolean(player));
+
+      let partnerDefender = null;
+      if (choice.action === '挡拆' && choice.partnerKey) {
+        const partnerSpot = match.站位[mySide]?.find(spot => spot.球员 === choice.partnerKey);
+        if (partnerSpot) {
+          const candidates = oppSpots.filter(spot => spot.球员 !== defenderKey);
+          const nearest = [...candidates].sort(
+            (a, b) =>
+              Math.hypot(a.x - partnerSpot.x, a.y - partnerSpot.y) -
+              Math.hypot(b.x - partnerSpot.x, b.y - partnerSpot.y),
+          )[0];
+          partnerDefender = nearest ? (getPlayer(nearest.球员) ?? null) : null;
+        }
+      }
 
       const situation: SituationContext = {
         isHome: mySide === '主',
         isClutch: match.节次 >= 4 && match.剩余秒数 <= 120 && Math.abs(match.比分.主 - match.比分.客) <= 5,
         coverage: nearestDist > 18 ? 'open' : nearestDist < 8 ? 'tight' : 'normal',
-        mismatch: false,
+        mismatch: match.回合情境.includes('错位'),
         defenderFouls: defenderStatus?.犯规 ?? 0,
       };
 
@@ -274,7 +334,10 @@ const App: React.FC = () => {
         actor,
         actorStatus: match.球员状态[choice.actorKey] ?? freshStatus(),
         defender,
+        defenders,
         partner,
+        partnerDefender,
+        reboundSide: choice.action === '篮板' ? (match.球权 === mySide ? '进攻篮板' : '防守篮板') : undefined,
         situation,
       });
 
@@ -283,7 +346,102 @@ const App: React.FC = () => {
     [stat, sendTurn],
   );
 
+  /** 暂停与换人是确定性管理操作：先写状态，再让 AI 只演出既定结果。 */
+  const handleTimeout = useCallback(
+    async (side: Side) => {
+      const match = stat.比赛;
+      if (!match || match.暂停[side] <= 0 || busyRef.current) return;
+      const nextMatch: MatchState = {
+        ...match,
+        暂停: { ...match.暂停, [side]: match.暂停[side] - 1 },
+        回合阶段: '死球',
+        回合情境: `${side}队请求暂停，暂停后恢复常规回合`,
+        回合摘要: `${side}队请求暂停（剩余 ${match.暂停[side] - 1} 次）`,
+      };
+      await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
+      setStat(current => ({ ...current, 比赛: nextMatch }));
+      await sendTurn(
+        `【比赛管理】${side}队已由前端确定性扣除一次暂停，当前剩余${nextMatch.暂停[side]}次。` +
+          `请演出教练布置与球员反应；不得再次修改暂停、比分、时间或球权，结尾仅将比赛.回合阶段改为“常规回合”。`,
+      );
+    },
+    [stat, sendTurn],
+  );
+
+  const handleSubstitution = useCallback(
+    async ({ side, outKey, inKey }: SubstitutionChoice) => {
+      const match = stat.比赛;
+      if (!match || match.回合阶段 !== '死球' || busyRef.current) return;
+      const rotation = match.阵容[side];
+      if (!rotation.场上.includes(outKey) || !rotation.替补.includes(inKey)) return;
+
+      const nextLineup = {
+        场上: rotation.场上.map(key => (key === outKey ? inKey : key)),
+        替补: rotation.替补.map(key => (key === inKey ? outKey : key)),
+      };
+      const nextSpots = match.站位[side].map(spot => (spot.球员 === outKey ? { ...spot, 球员: inKey } : spot));
+      const nextMatch: MatchState = {
+        ...match,
+        阵容: { ...match.阵容, [side]: nextLineup },
+        站位: { ...match.站位, [side]: nextSpots },
+        球员状态: {
+          ...match.球员状态,
+          [inKey]: match.球员状态[inKey] ?? freshStatus(),
+        },
+        回合情境: `${side}队死球换人：${outKey}下，${inKey}上`,
+        回合摘要: `${getPlayer(outKey)?.cn ?? outKey}被${getPlayer(inKey)?.cn ?? inKey}换下`,
+      };
+      await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
+      setStat(current => ({ ...current, 比赛: nextMatch }));
+      await sendTurn(
+        `【比赛管理】前端已完成${side}队换人：${getPlayer(outKey)?.cn ?? outKey}下，${getPlayer(inKey)?.cn ?? inKey}上。` +
+          `请简短演出换人，不得修改阵容、比分、时间或球权，结尾仅将比赛.回合阶段改为“常规回合”。`,
+      );
+    },
+    [stat, sendTurn],
+  );
+
+  const handleReset = useCallback(() => {
+    if (!window.confirm('确定清除这段聊天中的 NBA2K 存档并重新开始吗？此操作不可撤销。')) return;
+    const variables = getVariables({ type: 'chat' });
+    delete variables.stat_data;
+    replaceVariables(variables, { type: 'chat' });
+    setStat(readStat());
+    setStartScreen('splash');
+    setNarrative('');
+    setOptions([]);
+    setFreeText('');
+    setShowBoxScore(false);
+  }, []);
+
+  const sendFreeText = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      if (isInMatch(stat)) {
+        await sendTurn(
+          `<场上对话>${trimmed}</场上对话>\n这是对话、垃圾话或战术表达，不是比赛动作；只回应交流，不推进时钟、比分、球权、体力、站位或其他比赛变量。`,
+        );
+        return;
+      }
+      await sendTurn(trimmed);
+    },
+    [stat, sendTurn],
+  );
+
   // ---------- 渲染 ----------
+
+  if (stat.validationErrors.length > 0) {
+    return (
+      <div className="nba2k-app state-recovery">
+        <div className="recovery-kicker">SAVE DATA REJECTED</div>
+        <h2>存档格式与 NBA2K v2 不兼容</h2>
+        <p>为防止错误变量让比赛界面崩溃，本次没有载入旧状态。</p>
+        <pre>{stat.validationErrors.join('\n')}</pre>
+        <button onClick={handleReset}>清除存档并重新开始</button>
+      </div>
+    );
+  }
 
   if (!stat.生涯) {
     if (startScreen === 'splash') return <SplashScreen onSelect={m => setStartScreen(m)} />;
@@ -299,6 +457,10 @@ const App: React.FC = () => {
 
   return (
     <div className="nba2k-app">
+      <div className="game-utility-bar">
+        <span>MYCAREER · SAVE V{stat.版本}</span>
+        <button disabled={busy} onClick={handleReset}>重新开始</button>
+      </div>
       {inMatch && match ? (
         <>
           <ScoreBoard match={match} />
@@ -314,7 +476,15 @@ const App: React.FC = () => {
             {showBoxScore ? '收起数据' : '技术统计'}
           </button>
           {showBoxScore && <BoxScore match={match} />}
-          <ActionPanel match={match} mySide={mySide} protagonist={protagonist} disabled={busy} onChoose={c => void handleAction(c)} />
+          <ActionPanel
+            match={match}
+            mySide={mySide}
+            protagonist={protagonist}
+            disabled={busy}
+            onChoose={c => void handleAction(c)}
+            onTimeout={side => void handleTimeout(side)}
+            onSubstitution={choice => void handleSubstitution(choice)}
+          />
         </>
       ) : (
         <CareerPanel
@@ -329,7 +499,7 @@ const App: React.FC = () => {
       <div className="narrative">
         {busy ? <div className="narrative-loading">比赛进行中…</div> : null}
         <div className="narrative-text">{narrative || '（等待剧情）'}</div>
-        {options.length > 0 && !busy && (
+        {options.length > 0 && !busy && !inMatch && (
           <div className="narrative-options">
             {options.map(o => (
               <button key={o} onClick={() => void sendTurn(o)}>
@@ -348,7 +518,7 @@ const App: React.FC = () => {
           onChange={e => setFreeText(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'Enter' && freeText.trim()) {
-              void sendTurn(freeText);
+              void sendFreeText(freeText);
               setFreeText('');
             }
           }}
@@ -356,7 +526,7 @@ const App: React.FC = () => {
         <button
           disabled={busy || !freeText.trim()}
           onClick={() => {
-            void sendTurn(freeText);
+            void sendFreeText(freeText);
             setFreeText('');
           }}
         >

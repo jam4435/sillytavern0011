@@ -4,6 +4,14 @@
 // 包含: 日志工具、时间计算、辅助函数
 
 import { getSingleConditionTimeAnchor } from './era-event-schema.js';
+import {
+  EVENT_KIND,
+  EVENT_RUNTIME_KEY_VERSION,
+  parseCanonicalEventKey,
+  stripEventFileSuffix,
+} from '../shared/eventKey.js';
+
+export { EVENT_KIND, EVENT_RUNTIME_KEY_VERSION } from '../shared/eventKey.js';
 
 // ==================== 配置项 ====================
 function readLocalStorageFlag(key) {
@@ -22,75 +30,13 @@ export const CONFIG = {
   DEFAULT_FOLLOWUP_LIFETIME: 3,
 };
 
-export const EVENT_RUNTIME_KEY_VERSION = 2;
-
-export const EVENT_KIND = Object.freeze({
-  ORDINARY: 'ordinary',
-  DEBUT: 'debut',
-  GROWTH: 'growth',
-});
-
 const EVENT_METADATA = Symbol('era-event-metadata');
-const CHAPTER_NUMBER = '[0-9一二三四五六七八九十百千万]+';
-const ORDINARY_ENTRY_PATTERN = new RegExp(`^(.*?)(?:事件条目-)(第${CHAPTER_NUMBER}回)-(\\d+)-(.+)$`);
-const DEBUT_ENTRY_PATTERN = new RegExp(`^(.*?)(?:登场事件-)(第${CHAPTER_NUMBER}回)(?:人物)?$`);
-const GROWTH_ENTRY_PATTERN = new RegExp(`^(.*?)(?:成长条目-)(第${CHAPTER_NUMBER}回)(?:人物)?(?:-(.+))?$`);
-const CANONICAL_ORDINARY_PATTERN = new RegExp(`^(.*?)(第${CHAPTER_NUMBER}回)(\\d+)-(.+)$`);
-const LEGACY_ORDINARY_PATTERN = new RegExp(`^(.*?)(第${CHAPTER_NUMBER}回)-(\\d+)-(.+)$`);
-
-function stripEventFileSuffix(value) {
-  return String(value || '')
-    .trim()
-    .replace(/\.(json|ya?ml|txt)$/i, '');
-}
 
 /**
  * 从世界书物理条目名派生唯一运行时键。物理名保持不变，变量层只使用 runtimeKey。
  */
 export function deriveEventRuntimeDescriptor(entryName) {
-  const sourceName = String(entryName || '').trim();
-  const normalizedName = stripEventFileSuffix(sourceName);
-
-  const ordinaryMatch = normalizedName.match(ORDINARY_ENTRY_PATTERN);
-  if (ordinaryMatch) {
-    const [, series, chapter, sequence, title] = ordinaryMatch;
-    return {
-      runtimeKey: `${series}${chapter}${sequence}-${title}`,
-      kind: EVENT_KIND.ORDINARY,
-      series,
-      chapter,
-      sequence,
-      title,
-      sourceName,
-    };
-  }
-
-  const debutMatch = normalizedName.match(DEBUT_ENTRY_PATTERN);
-  if (debutMatch) {
-    const [, series, chapter] = debutMatch;
-    return {
-      runtimeKey: `${series}${chapter}-人物登场`,
-      kind: EVENT_KIND.DEBUT,
-      series,
-      chapter,
-      sourceName,
-    };
-  }
-
-  const growthMatch = normalizedName.match(GROWTH_ENTRY_PATTERN);
-  if (growthMatch) {
-    const [, series, chapter, title] = growthMatch;
-    return {
-      runtimeKey: `${series}${chapter}-人物成长${title ? `-${title}` : ''}`,
-      kind: EVENT_KIND.GROWTH,
-      series,
-      chapter,
-      title: title || '人物成长',
-      sourceName,
-    };
-  }
-
-  return null;
+  return parseCanonicalEventKey(entryName);
 }
 
 /**
@@ -126,38 +72,8 @@ export function isOrdinaryEvent(eventData) {
   return isEventKind(eventData, EVENT_KIND.ORDINARY);
 }
 
-function getCanonicalEventSeries(eventKey) {
-  return stripEventFileSuffix(eventKey).match(CANONICAL_ORDINARY_PATTERN)?.[1] || '';
-}
-
-/**
- * 规范化事件定义中的后续事件/人物经历引用。只有看起来确实是章节事件的名称才会被改写。
- */
-export function normalizeOrdinaryEventReference(reference, sourceEventKey = '') {
-  const rawReference = stripEventFileSuffix(reference);
-  if (!rawReference) return rawReference;
-
-  const physicalDescriptor = deriveEventRuntimeDescriptor(rawReference);
-  if (physicalDescriptor?.kind === EVENT_KIND.ORDINARY) {
-    const sourceSeries = getCanonicalEventSeries(sourceEventKey);
-    return physicalDescriptor.series || !sourceSeries
-      ? physicalDescriptor.runtimeKey
-      : `${sourceSeries}${physicalDescriptor.runtimeKey}`;
-  }
-
-  const canonicalMatch = rawReference.match(CANONICAL_ORDINARY_PATTERN);
-  if (canonicalMatch) {
-    const explicitSeries = canonicalMatch[1];
-    if (explicitSeries) return rawReference;
-    return `${getCanonicalEventSeries(sourceEventKey)}${rawReference}`;
-  }
-
-  const legacyMatch = rawReference.match(LEGACY_ORDINARY_PATTERN);
-  if (!legacyMatch) return rawReference;
-
-  const [, explicitSeries, chapter, sequence, title] = legacyMatch;
-  const series = explicitSeries || getCanonicalEventSeries(sourceEventKey);
-  return `${series}${chapter}${sequence}-${title}`;
+export function normalizeOrdinaryEventReference(reference) {
+  return stripEventFileSuffix(reference);
 }
 
 // ==================== 日志工具 ====================

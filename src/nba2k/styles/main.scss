@@ -12,6 +12,7 @@ $accent: #f5a623; // 篮球橙
 $accent-2: #2f81f7;
 $wood: #b98a56; // 木地板色
 $wood-dark: #a97b4a;
+$display-font: 'Impact', 'Haettenschweiler', 'Arial Narrow', 'Microsoft YaHei', sans-serif;
 
 * {
   box-sizing: border-box;
@@ -25,10 +26,11 @@ body {
   color: $text;
   font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   font-size: 14px;
+  overflow-x: hidden;
 }
 
 #root {
-  min-height: 100vh;
+  width: 100%;
 }
 
 .nba2k-app {
@@ -42,25 +44,45 @@ body {
 
 // ---------- 记分牌 ----------
 .scoreboard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(180deg, $panel-2, $panel);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  background:
+    linear-gradient(100deg, rgba(245, 166, 35, 0.05), transparent 38%, rgba(47, 129, 247, 0.05)),
+    linear-gradient(180deg, $panel-2, $panel);
   border: 1px solid $line;
-  border-radius: 10px;
-  padding: 8px 14px;
+  border-top: 3px solid $accent;
+  border-radius: 4px;
+  padding: 9px 12px 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 
   .sb-team {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
     &.away {
-      justify-content: flex-end;
+      align-items: flex-end;
+      .sb-team-main {
+        flex-direction: row-reverse;
+      }
+      .sb-lineup,
+      .sb-team-meta {
+        justify-content: flex-end;
+      }
     }
-    &.has-ball .sb-name::after {
-      content: ' 🏀';
+    &.has-ball .sb-badge {
+      box-shadow: 0 0 0 2px $accent, 0 0 14px rgba(245, 166, 35, 0.28);
     }
+  }
+  .sb-team-main,
+  .sb-team-meta,
+  .sb-lineup {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
   }
   .sb-badge {
     color: #fff;
@@ -71,14 +93,45 @@ body {
   }
   .sb-name {
     color: $muted;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .sb-score {
     font-size: 28px;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
   }
+  .sb-team-meta {
+    color: $muted;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    b {
+      color: $text;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+  .sb-lineup {
+    flex-wrap: wrap;
+    gap: 3px;
+    span {
+      max-width: 76px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #aab7c2;
+      background: rgba(255, 255, 255, 0.045);
+      border-left: 2px solid rgba(245, 166, 35, 0.45);
+      padding: 2px 5px;
+      font-size: 9px;
+    }
+  }
   .sb-clock {
     text-align: center;
+    align-self: center;
+    padding: 0 13px;
+    border-inline: 1px solid rgba(255, 255, 255, 0.08);
     .sb-quarter {
       color: $accent;
       font-weight: 700;
@@ -92,6 +145,38 @@ body {
     .sb-possession {
       color: $muted;
       font-size: 11px;
+      white-space: nowrap;
+    }
+  }
+
+  @media (max-width: 640px) {
+    padding-inline: 8px;
+    .sb-name {
+      display: none;
+    }
+    .sb-score {
+      font-size: 23px;
+    }
+    .sb-lineup {
+      display: none;
+    }
+    .sb-team-meta {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1px;
+    }
+    .sb-team.away .sb-team-meta {
+      align-items: flex-end;
+    }
+    .sb-clock {
+      padding-inline: 7px;
+      .sb-time {
+        font-size: 19px;
+      }
+      .sb-possession {
+        max-width: 92px;
+        white-space: normal;
+      }
     }
   }
 }
@@ -188,20 +273,67 @@ body {
   text-align: center;
   color: $accent;
   font-size: 13px;
-  min-height: 18px;
+  padding-block: 1px;
 }
 
 // ---------- 行动面板 ----------
 .action-panel {
-  background: $panel;
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(115deg, rgba(245, 166, 35, 0.055), transparent 38%),
+    $panel;
   border: 1px solid $line;
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 4px;
+  padding: 11px 12px 12px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: $accent;
+  }
+  &.phase-defense::before {
+    background: $accent-2;
+  }
+  &.phase-rebound::before {
+    background: #52c27f;
+  }
+  &.phase-dead-ball::before {
+    background: $muted;
+  }
+
+  .ap-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 9px;
+  }
+  .ap-phase {
+    display: block;
+    color: $accent;
+    font-family: $display-font;
+    font-size: 15px;
+    font-style: italic;
+    letter-spacing: 0.12em;
+    line-height: 1;
+  }
+  &.phase-defense .ap-phase {
+    color: #72a9ff;
+  }
+  &.phase-rebound .ap-phase {
+    color: #62dc91;
+  }
+  &.phase-dead-ball .ap-phase {
+    color: $muted;
+  }
 
   .ap-title {
     color: $muted;
     font-size: 12px;
-    margin-bottom: 8px;
+    margin-top: 3px;
   }
   .ap-actions {
     display: flex;
@@ -227,6 +359,11 @@ body {
       background: $accent-2;
       border-color: $accent-2;
     }
+    &.rebound:hover:not(:disabled) {
+      color: #07170e;
+      background: #52c27f;
+      border-color: #52c27f;
+    }
     &:disabled {
       opacity: 0.45;
       cursor: not-allowed;
@@ -239,6 +376,11 @@ body {
     gap: 6px;
     margin-bottom: 8px;
     align-items: center;
+  }
+  .ap-partner-select {
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px dashed $line;
   }
   .ap-actor {
     background: transparent;
@@ -259,6 +401,80 @@ body {
     border: none;
     cursor: pointer;
     text-decoration: underline;
+  }
+  .ap-management {
+    display: flex;
+    justify-content: flex-end;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .ap-manage,
+  .ap-confirm-sub {
+    background: rgba(255, 255, 255, 0.035);
+    color: $muted;
+    border: 1px solid $line;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    b {
+      color: $accent;
+    }
+    &.active,
+    &:hover:not(:disabled) {
+      color: $text;
+      border-color: $accent;
+    }
+    &:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+  }
+  .ap-substitution {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 9px;
+    padding: 9px;
+    background: #11171d;
+    border: 1px solid $line;
+    .ap-actor-row {
+      margin: 4px 0 0;
+    }
+  }
+  .ap-sub-column > span {
+    color: $muted;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+  .ap-sub-arrow {
+    color: $accent;
+    font-size: 18px;
+  }
+  .ap-confirm-sub {
+    color: $text;
+    border-color: rgba(245, 166, 35, 0.6);
+  }
+  .ap-hint {
+    color: $muted;
+    font-size: 11px;
+    padding: 5px 0 1px;
+  }
+
+  @media (max-width: 620px) {
+    .ap-heading {
+      flex-direction: column;
+    }
+    .ap-management {
+      justify-content: flex-start;
+    }
+    .ap-substitution {
+      grid-template-columns: 1fr;
+    }
+    .ap-sub-arrow {
+      display: none;
+    }
   }
 }
 
@@ -296,9 +512,31 @@ body {
     th {
       background: $panel-2;
       color: $muted;
+      small {
+        display: block;
+        margin-top: 2px;
+        color: #71808e;
+        font-size: 9px;
+        font-weight: 400;
+      }
     }
     .bs-name {
       text-align: left;
+      i {
+        display: inline-block;
+        width: 27px;
+        margin-right: 5px;
+        color: $accent;
+        font-size: 8px;
+        font-style: normal;
+        letter-spacing: 0.05em;
+      }
+    }
+    .is-bench {
+      color: $muted;
+      .bs-name i {
+        color: #687786;
+      }
     }
   }
 }
@@ -318,8 +556,6 @@ body {
   .narrative-text {
     white-space: pre-wrap;
     line-height: 1.75;
-    max-height: 320px;
-    overflow-y: auto;
   }
   .narrative-options {
     display: flex;
@@ -462,11 +698,11 @@ body {
 }
 
 // ---------- 开局标题画面：球馆聚光灯 + 复古球衣海报 ----------
-$display-font: 'Impact', 'Haettenschweiler', 'Arial Narrow', 'Microsoft YaHei', sans-serif;
 
 .splash {
   position: relative;
-  min-height: 100vh;
+  width: 100%;
+  aspect-ratio: 16 / 10;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -480,17 +716,16 @@ $display-font: 'Impact', 'Haettenschweiler', 'Arial Narrow', 'Microsoft YaHei', 
   .splash-court-arc {
     position: absolute;
     left: 50%;
-    bottom: -34vh;
-    width: 68vh;
-    height: 68vh;
+    bottom: -34%;
+    width: 68%;
+    aspect-ratio: 1;
     transform: translateX(-50%);
     border: 2px solid rgba(245, 166, 35, 0.16);
     border-radius: 50%;
     pointer-events: none;
     &.arc-2 {
-      width: 96vh;
-      height: 96vh;
-      bottom: -48vh;
+      width: 96%;
+      bottom: -48%;
       border-color: rgba(255, 255, 255, 0.05);
     }
   }
@@ -657,7 +892,6 @@ $display-font: 'Impact', 'Haettenschweiler', 'Arial Narrow', 'Microsoft YaHei', 
       font-size: 12.5px;
       color: $muted;
       line-height: 1.7;
-      min-height: 42px;
     }
     .mode-go {
       align-self: flex-end;
@@ -693,6 +927,12 @@ $display-font: 'Impact', 'Haettenschweiler', 'Arial Narrow', 'Microsoft YaHei', 
         margin-right: 4px;
       }
     }
+  }
+}
+
+@media (max-width: 720px) {
+  .splash {
+    aspect-ratio: auto;
   }
 }
 

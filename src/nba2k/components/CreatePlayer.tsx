@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Position } from '../engine/types';
 import { TEAMS } from '../data/teams';
 import type { CustomPlayerForm } from '../utils/customPlayer';
-import { ARCHETYPES, HEIGHT_BY_POS, buildCustomPlayer, radarOf } from '../utils/customPlayer';
+import { ARCHETYPES, HEIGHT_BY_POS, buildCustomPlayer, compatibleArchetypes, radarOf } from '../utils/customPlayer';
 
 const POSITIONS: { pos: Position; label: string }[] = [
   { pos: 'PG', label: '控球后卫' },
@@ -51,10 +51,12 @@ export function CreatePlayer(props: { onCreate: (form: CustomPlayerForm) => void
   const [number, setNumber] = useState(8);
   const [teamId, setTeamId] = useState<string | null>(null);
 
-  const arch = ARCHETYPES.find(a => a.id === archetypeId)!;
+  const availableArchetypes = useMemo(() => compatibleArchetypes(pos), [pos]);
+  const arch = availableArchetypes.find(a => a.id === archetypeId) ?? availableArchetypes[0]!;
+  const selectedArchetypeId = arch.id;
   const preview = useMemo(
-    () => buildCustomPlayer({ name: name || '新秀', pos, archetypeId, height_cm: height, number, teamId: teamId ?? 'GSW' }),
-    [name, pos, archetypeId, height, number, teamId],
+    () => buildCustomPlayer({ name: name || '新秀', pos, archetypeId: selectedArchetypeId, height_cm: height, number, teamId: teamId ?? 'GSW' }),
+    [name, pos, selectedArchetypeId, height, number, teamId],
   );
   const range = HEIGHT_BY_POS[pos];
   const ready = name.trim().length > 0 && teamId;
@@ -85,6 +87,9 @@ export function CreatePlayer(props: { onCreate: (form: CustomPlayerForm) => void
                 onClick={() => {
                   setPos(p.pos);
                   setHeight(HEIGHT_BY_POS[p.pos].def);
+                  if (!ARCHETYPES.find(a => a.id === archetypeId)?.fits.includes(p.pos)) {
+                    setArchetypeId(compatibleArchetypes(p.pos)[0].id);
+                  }
                 }}
               >
                 <b>{p.pos}</b>
@@ -121,11 +126,11 @@ export function CreatePlayer(props: { onCreate: (form: CustomPlayerForm) => void
         <div className="cp-col">
           <label className="cp-label">球员模板</label>
           <div className="cp-arch-list">
-            {ARCHETYPES.map(a => (
-              <button key={a.id} className={`cp-arch ${archetypeId === a.id ? 'active' : ''}`} onClick={() => setArchetypeId(a.id)}>
+            {availableArchetypes.map(a => (
+              <button key={a.id} className={`cp-arch ${selectedArchetypeId === a.id ? 'active' : ''}`} onClick={() => setArchetypeId(a.id)}>
                 <span className="arch-name">
                   {a.name}
-                  {a.fits.includes(pos) ? <i className="arch-fit">适配 {pos}</i> : null}
+                  <i className="arch-fit">适配 {pos}</i>
                 </span>
                 <span className="arch-tag">{a.tagline}</span>
               </button>
@@ -148,7 +153,7 @@ export function CreatePlayer(props: { onCreate: (form: CustomPlayerForm) => void
           <button
             className="cp-create"
             disabled={!ready}
-            onClick={() => props.onCreate({ name: name.trim(), pos, archetypeId, height_cm: height, number, teamId: teamId! })}
+            onClick={() => props.onCreate({ name: name.trim(), pos, archetypeId: selectedArchetypeId, height_cm: height, number, teamId: teamId! })}
           >
             签下这份新秀合同
           </button>

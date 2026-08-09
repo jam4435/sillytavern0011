@@ -60,6 +60,8 @@ export interface OnCourtStatus {
   失误: number;
   犯规: number;
   手感: '热' | '平' | '冷';
+  连续命中: number;
+  连续打铁: number;
 }
 
 /** 球场俯视图坐标：x 0-100 左端线→右端线，y 0-100 下边线→上边线 */
@@ -72,6 +74,13 @@ export interface CourtSpot {
 
 export type Side = '主' | '客';
 
+export type TurnPhase = '常规回合' | '篮板争抢' | '死球';
+
+export interface LineupState {
+  场上: string[];
+  替补: string[];
+}
+
 export interface MatchState {
   进行中: boolean;
   对阵: { 主队: string; 客队: string };
@@ -81,6 +90,11 @@ export interface MatchState {
   球权: Side;
   战术: { 主: string; 客: string };
   站位: { 主: CourtSpot[]; 客: CourtSpot[] };
+  本节球队犯规: { 主: number; 客: number };
+  暂停: { 主: number; 客: number };
+  阵容: { 主: LineupState; 客: LineupState };
+  回合阶段: TurnPhase;
+  回合情境: string;
   球员状态: Record<string, OnCourtStatus>;
   回合摘要: string;
 }
@@ -103,12 +117,51 @@ export type ActionType =
 
 export type ResultTier = '大成功' | '成功' | '部分成功' | '失败' | '大失败';
 
+export interface NumericRange {
+  min: number;
+  max: number;
+}
+
+export type PossessionOutcome = '行动方获得' | '对手获得' | '行动方保留' | '对手保留' | '篮板待定';
+
+export type TrackedStat = '得分' | '篮板' | '助攻' | '抢断' | '盖帽' | '失误' | '犯规' | '连续命中' | '连续打铁';
+
+export interface RequiredStatUpdate {
+  target: 'actor' | 'defender' | 'partner';
+  stat: TrackedStat;
+  operation: 'add' | 'set';
+  value: NumericRange;
+  /** 同一分支内二选一的更新会共享 choiceGroup。 */
+  choiceGroup?: string;
+}
+
+/** 前端已经锁定、AI 只能在区间内落值的比赛结算边界。 */
+export interface ActionHardResult {
+  scoreDelta: {
+    actionSide: NumericRange;
+    opponentSide: NumericRange;
+  };
+  possession: PossessionOutcome;
+  nextPhase: TurnPhase[];
+  clockSeconds: NumericRange;
+  staminaDelta: {
+    actor: NumericRange;
+    partner?: NumericRange;
+  };
+  requiredStatUpdates: RequiredStatUpdate[];
+  allowedStatePaths: string[];
+  /** 挡拆成功后是否必须把错位写入回合情境。 */
+  mismatchCreated: boolean;
+}
+
 /** 一次判定的完整结果，交给 promptBuilder 注入 user 消息 */
 export interface ActionResolution {
   action: ActionType;
   actor: string;
   /** 对位/受方球员 key，无对位时为 null（如无球跑动） */
   defender: string | null;
+  /** 实际参与防守均值计算的全部球员 key。 */
+  defenders: string[];
   /** 挡拆掩护人、传球目标等第二参与者 */
   partner: string | null;
   attackScore: number;
@@ -118,6 +171,7 @@ export interface ActionResolution {
   finalRate: number;
   roll: number;
   tier: ResultTier;
+  hardResult: ActionHardResult;
   /** 面向 AI 的一句话结果描述 */
   summary: string;
 }
@@ -135,3 +189,5 @@ export interface SituationContext {
   /** 对位防守人犯规数 */
   defenderFouls: number;
 }
+
+export type ReboundSide = '进攻篮板' | '防守篮板';

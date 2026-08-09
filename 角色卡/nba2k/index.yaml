@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://testingcf.jsdelivr.net/gh/StageDog/tavern_sync/dist/schema/character.zh.json
 头像: 头像
-版本: "0.1.0"
+版本: "0.2.0"
 作者: ""
 备注: "NBA2K16 生涯模拟：球场俯视图前端 + 骰子判定 + AI 叙事"
 
@@ -13,6 +13,24 @@
 
 世界书名称: 与角色卡名称相同
 条目:
+  - 名称: 当前变量快照
+    uid: 100000
+    启用: true
+    激活策略:
+      类型: 蓝灯
+    插入位置:
+      类型: 指定深度
+      角色: 系统
+      深度: 0
+      顺序: 2
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: false
+    内容: |-
+      以下是本回合开始时的完整 stat_data 快照，只能按变量指导增量更新，不得凭空重建：
+      {{ERA:$ALLDATA}}
+
   - 名称: 变量指导
     uid: 100001
     启用: true

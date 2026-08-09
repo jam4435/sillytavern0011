@@ -7,7 +7,7 @@ export interface Archetype {
   id: string;
   name: string;
   tagline: string;
-  /** 推荐位置（仅用于 UI 提示，不限制选择） */
+  /** 模板允许创建的位置 */
   fits: Position[];
   attrs: PlayerAttrs;
 }
@@ -35,7 +35,7 @@ const base = (over: Partial<PlayerAttrs>): PlayerAttrs => ({
   ...over,
 });
 
-/** 新秀原型模板（总评约 72-75，潜力高） */
+/** 新秀原型模板（创建时会校准为 73 总评，潜力保持不变） */
 export const ARCHETYPES: Archetype[] = [
   {
     id: 'sharpshooter',
@@ -131,22 +131,66 @@ const OVERALL_KEYS: Record<Position, (keyof PlayerAttrs)[]> = {
   C: ['insideScoring', 'layup', 'dunk', 'strength', 'offRebound', 'defRebound', 'interiorD', 'block', 'speed', 'stamina'],
 };
 
-function overallOf(attrs: PlayerAttrs, pos: Position): number {
+export function overallOf(attrs: PlayerAttrs, pos: Position): number {
   const keys = OVERALL_KEYS[pos];
   return Math.round(keys.reduce((s, k) => s + attrs[k], 0) / keys.length);
 }
 
+const ATTRIBUTE_KEYS = Object.keys(base({})).filter((key): key is Exclude<keyof PlayerAttrs, 'potential'> => key !== 'potential');
+const TARGET_ROOKIE_OVERALL = 73;
+
+const clampAttribute = (value: number): number => Math.max(0, Math.min(99, Math.round(value)));
+
+/**
+ * 对所有非潜力属性先做统一平移，再在本位置计分项上均匀补齐舍入差。
+ * 这样既保留模板强弱项，也保证所有合法模板/位置组合稳定为 73 总评。
+ */
+export function calibrateRookieAttrs(source: PlayerAttrs, pos: Position): PlayerAttrs {
+  const attrs = { ...source };
+  const overallKeys = OVERALL_KEYS[pos];
+  const targetSum = TARGET_ROOKIE_OVERALL * overallKeys.length;
+  const sourceSum = overallKeys.reduce((sum, key) => sum + source[key], 0);
+  const uniformShift = Math.trunc((targetSum - sourceSum) / overallKeys.length);
+
+  for (const key of ATTRIBUTE_KEYS) attrs[key] = clampAttribute(source[key] + uniformShift);
+
+  let remaining = targetSum - overallKeys.reduce((sum, key) => sum + attrs[key], 0);
+  let cursor = 0;
+  while (remaining !== 0) {
+    const key = overallKeys[cursor % overallKeys.length];
+    const step = remaining > 0 ? 1 : -1;
+    const next = attrs[key] + step;
+    if (next >= 0 && next <= 99) {
+      attrs[key] = next;
+      remaining -= step;
+    }
+    cursor += 1;
+    if (cursor > overallKeys.length * 100) throw new Error(`无法将 ${pos} 新秀校准为 ${TARGET_ROOKIE_OVERALL} 总评`);
+  }
+
+  attrs.potential = clampAttribute(source.potential);
+  return attrs;
+}
+
+export function compatibleArchetypes(pos: Position): Archetype[] {
+  return ARCHETYPES.filter(archetype => archetype.fits.includes(pos));
+}
+
 export function buildCustomPlayer(form: CustomPlayerForm): PlayerData {
-  const arch = ARCHETYPES.find(a => a.id === form.archetypeId) ?? ARCHETYPES[5];
-  const attrs = { ...arch.attrs };
+  const arch = ARCHETYPES.find(a => a.id === form.archetypeId);
+  if (!arch) throw new Error(`未知球员模板：${form.archetypeId}`);
+  if (!arch.fits.includes(form.pos)) throw new Error(`${arch.name}不支持 ${form.pos} 位置`);
+
+  const attrs = calibrateRookieAttrs(arch.attrs, form.pos);
+  const heightRange = HEIGHT_BY_POS[form.pos];
   return {
-    name: `${CUSTOM_KEY_PREFIX}${form.name}`,
-    cn: form.name,
+    name: `${CUSTOM_KEY_PREFIX}${form.name.trim()}`,
+    cn: form.name.trim(),
     team: form.teamId,
     pos: form.pos,
     secondaryPos: null,
-    height_cm: form.height_cm,
-    number: form.number,
+    height_cm: Math.max(heightRange.min, Math.min(heightRange.max, Math.round(form.height_cm))),
+    number: Math.max(0, Math.min(99, Math.round(form.number))),
     overall: overallOf(attrs, form.pos),
     attrs,
   };

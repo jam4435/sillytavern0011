@@ -1,12 +1,12 @@
   $(() => {
-    const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'wuxia:sync-latest-message-shell';
-    const WUXIA_TURN_LIFECYCLE_EVENT = 'wuxia:turn-lifecycle';
-    const WUXIA_TURN_LOCK_ACK_EVENT = 'wuxia:turn-lock-ack';
-    const WUXIA_TURN_RESPONSE_DELIVERED_EVENT = 'wuxia:turn-response-delivered';
+    const SYNC_LATEST_MESSAGE_SHELL_EVENT = 'nba2k:sync-latest-message-shell';
+    const NBA2K_TURN_LIFECYCLE_EVENT = 'nba2k:turn-lifecycle';
+    const NBA2K_TURN_LOCK_ACK_EVENT = 'nba2k:turn-lock-ack';
+    const NBA2K_TURN_RESPONSE_DELIVERED_EVENT = 'nba2k:turn-response-delivered';
     const TURN_LOCK_TIMEOUT_MS = 8 * 60 * 1000;
     const TURN_RESPONSE_DELIVERY_TIMEOUT_MS = 30 * 1000;
-    const BLACK_BOX_STORAGE_KEY = 'wuxia_iframe_lifecycle_black_box_v1';
-    const PENDING_RELOAD_REASON_STORAGE_KEY = 'wuxia_iframe_pending_reload_reason_v1';
+    const BLACK_BOX_STORAGE_KEY = 'nba2k_iframe_lifecycle_black_box_v1';
+    const PENDING_RELOAD_REASON_STORAGE_KEY = 'nba2k_iframe_pending_reload_reason_v1';
     const MAX_BLACK_BOX_ENTRIES = 240;
     const PENDING_RELOAD_REASON_MAX_AGE_MS = 30 * 1000;
     const COLLAPSE_MAX_WAIT_MS = 2000;
@@ -227,7 +227,7 @@
       });
       clearTurnLockTimer();
       turnLockTimer = setTimeout(() => {
-        console.warn('[隐藏楼层] 武侠回合锁超时，自动恢复最新楼层同步。', activeTurnRoundId);
+        console.warn('[隐藏楼层] NBA2K 回合锁超时，自动恢复最新楼层同步。', activeTurnRoundId);
         recordBlackBox('turn-lock-timeout', { roundId: activeTurnRoundId });
         unlockTurn(activeTurnRoundId, null, 'turn-lock-timeout');
       }, TURN_LOCK_TIMEOUT_MS);
@@ -437,13 +437,13 @@
       scheduleCollapse(50, Number(messageId), 'explicit-latest-message-shell-sync');
     });
 
-    eventOn(WUXIA_TURN_LIFECYCLE_EVENT, payload => {
+    eventOn(NBA2K_TURN_LIFECYCLE_EVENT, payload => {
       if (!payload || typeof payload !== 'object') {
         return;
       }
       if (payload.phase === 'start') {
         const roundId = lockTurn(payload.roundId, payload.chatId);
-        void eventEmit(WUXIA_TURN_LOCK_ACK_EVENT, {
+        void eventEmit(NBA2K_TURN_LOCK_ACK_EVENT, {
           phase: 'locked',
           roundId,
           chatId: payload.chatId,
@@ -468,7 +468,7 @@
       }
     });
 
-    eventOn(WUXIA_TURN_RESPONSE_DELIVERED_EVENT, payload => {
+    eventOn(NBA2K_TURN_RESPONSE_DELIVERED_EVENT, payload => {
       if (!payload || typeof payload !== 'object') {
         return;
       }

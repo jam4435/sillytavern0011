@@ -24,24 +24,31 @@ import {
   normalizeLocationPath,
   parseLocationPath,
 } from '../src/shared/locationPath.js';
+import {
+  EVENT_KIND,
+  EVENT_RUNTIME_KEY_VERSION,
+  looksLikeEventEntryName,
+  parseCanonicalEventKey,
+  stripEventFileSuffix,
+} from '../src/shared/eventKey.js';
 
 const root = process.cwd();
 const sourceRoot = path.join(root, '世界书');
 const outputRoot = path.join(root, 'src', '事件脚本', 'generated', 'event-data');
 const openingEventSummaryPath = path.join(root, 'src', '武侠', 'data', '事件信息汇总.json');
 const locationTablePath = path.join(root, 'src', '武侠', '射雕神雕地点表.yaml');
-const RUNTIME_KEY_VERSION = 2;
+const RUNTIME_KEY_VERSION = EVENT_RUNTIME_KEY_VERSION;
 const SHARD_MAX_EVENTS = 50;
 const SHARD_MAX_BYTES = 350 * 1024;
 const CHECKPOINT_INTERVAL = 100;
 const DISCOVERY_HOURS = 10 * 24;
 const STRICT_VALIDATION = process.argv.includes('--strict');
 
-const EVENT_KINDS = Object.freeze({ ordinary: 'ordinary', debut: 'debut', growth: 'growth' });
-const CHAPTER_NUMBER = '[0-9一二三四五六七八九十百千万]+';
-const ORDINARY_ENTRY_PATTERN = new RegExp(`^(.*?)(?:事件条目-)(第${CHAPTER_NUMBER}回)-(\\d+)-(.+)$`);
-const DEBUT_ENTRY_PATTERN = new RegExp(`^(.*?)(?:登场事件-)(第${CHAPTER_NUMBER}回)(?:人物)?$`);
-const GROWTH_ENTRY_PATTERN = new RegExp(`^(.*?)(?:成长条目-)(第${CHAPTER_NUMBER}回)(?:人物)?(?:-(.+))?$`);
+const EVENT_KINDS = Object.freeze({
+  ordinary: EVENT_KIND.ORDINARY,
+  debut: EVENT_KIND.DEBUT,
+  growth: EVENT_KIND.GROWTH,
+});
 const locationTable = parseYaml(fs.readFileSync(locationTablePath, 'utf8'));
 const validLocationScopes = new Set(
   Object.entries(locationTable).flatMap(([area, regions]) =>
@@ -50,75 +57,11 @@ const validLocationScopes = new Set(
 );
 
 function stripSuffix(value) {
-  return String(value || '')
-    .trim()
-    .replace(/\.(json|ya?ml|txt)$/i, '');
+  return stripEventFileSuffix(value);
 }
 
 function descriptorFor(sourceName) {
-  const source = stripSuffix(sourceName);
-  const ordinary = source.match(ORDINARY_ENTRY_PATTERN);
-  if (ordinary) {
-    const [, series, chapter, sequence, title] = ordinary;
-    return {
-      runtimeKey: `${series}${chapter}${sequence}-${title}`,
-      kind: EVENT_KINDS.ordinary,
-      series,
-      chapter,
-      sequence,
-      title,
-    };
-  }
-  const debut = source.match(DEBUT_ENTRY_PATTERN);
-  if (debut) {
-    const [, series, chapter] = debut;
-    return { runtimeKey: `${series}${chapter}-人物登场`, kind: EVENT_KINDS.debut, series, chapter };
-  }
-  const growth = source.match(GROWTH_ENTRY_PATTERN);
-  if (growth) {
-    const [, series, chapter, title] = growth;
-    return {
-      runtimeKey: `${series}${chapter}-人物成长${title ? `-${title}` : ''}`,
-      kind: EVENT_KINDS.growth,
-      series,
-      chapter,
-      title: title || '人物成长',
-    };
-  }
-  return null;
-}
-
-function romanChapterNumber(value) {
-  const digits = String(value || '').replace(/^第|回$/g, '');
-  if (/^\d+$/.test(digits)) return Number(digits);
-  const values = {
-    一: 1,
-    二: 2,
-    三: 3,
-    四: 4,
-    五: 5,
-    六: 6,
-    七: 7,
-    八: 8,
-    九: 9,
-    十: 10,
-    百: 100,
-    千: 1000,
-    万: 10000,
-  };
-  let total = 0;
-  let current = 0;
-  for (const character of digits) {
-    const valueOfCharacter = values[character];
-    if (!valueOfCharacter) continue;
-    if (valueOfCharacter >= 10) {
-      total += (current || 1) * valueOfCharacter;
-      current = 0;
-    } else {
-      current = valueOfCharacter;
-    }
-  }
-  return total + current;
+  return parseCanonicalEventKey(sourceName);
 }
 
 function timeToHours(time) {
@@ -152,24 +95,8 @@ function normalizeLocation(location) {
   return normalizeLocationPath(location);
 }
 
-function canonicalReference(reference, sourceRuntimeKey) {
-  const raw = stripSuffix(reference);
-  if (!raw) return raw;
-  const sourceSeries = String(sourceRuntimeKey || '').match(/^.*?(?=第[0-9一二三四五六七八九十百千万]+回)/)?.[0] || '';
-  const ordinary = raw.match(ORDINARY_ENTRY_PATTERN);
-  if (ordinary) return `${ordinary[1] || sourceSeries}${ordinary[2]}${ordinary[3]}-${ordinary[4]}`;
-  const canonical = raw.match(/^(.*?)(第[0-9一二三四五六七八九十百千万]+回)(\d+)-(.+)$/);
-  if (canonical)
-    return canonical[1] || sourceSeries
-      ? `${canonical[1] || sourceSeries}${canonical[2]}${canonical[3]}-${canonical[4]}`
-      : raw;
-  const legacy = raw.match(/^(.*?)(第[0-9一二三四五六七八九十百千万]+回)-(\d+)-(.+)$/);
-  if (legacy) return `${legacy[1] || sourceSeries}${legacy[2]}${legacy[3]}-${legacy[4]}`;
-  return raw;
-}
-
 function isResolvableEventReference(reference) {
-  return /^(.*?)(第[0-9一二三四五六七八九十百千万]+回)(\d+)-(.+)$/.test(String(reference || ''));
+  return parseCanonicalEventKey(reference) !== null;
 }
 
 function normalizeEventData(runtimeKey, descriptor, data) {
@@ -238,7 +165,7 @@ function sha256(value) {
 }
 
 function eventSortKey(event) {
-  const chapter = romanChapterNumber(event.chapter);
+  const chapter = event.chapterNumber;
   const sequence = Number(event.sequence || 0);
   return [event.triggerHour ?? Number.MAX_SAFE_INTEGER, event.series, chapter, sequence, event.runtimeKey];
 }
@@ -280,12 +207,7 @@ function normalizeCharacterDelta(delta, eventRuntimeKey) {
   if (!normalized?.人物经历 || typeof normalized.人物经历 !== 'object' || Array.isArray(normalized.人物经历)) {
     return normalized;
   }
-  normalized.人物经历 = Object.fromEntries(
-    Object.entries(normalized.人物经历).map(([recordName, recordValue]) => [
-      canonicalReference(recordName, eventRuntimeKey),
-      recordValue,
-    ]),
-  );
+  normalized.人物经历 = Object.fromEntries(Object.entries(normalized.人物经历));
   return normalized;
 }
 
@@ -339,6 +261,9 @@ function collectEvents() {
   for (const filePath of sourceFiles.sort()) {
     const sourceName = path.basename(filePath);
     const descriptor = descriptorFor(sourceName);
+    if (!descriptor && looksLikeEventEntryName(sourceName)) {
+      throw new Error(`非规范事件文件名: ${sourceName}`);
+    }
     if (!descriptor) continue;
     const runtimeKey = descriptor.runtimeKey;
     if (keys.has(runtimeKey)) throw new Error(`runtimeKey 冲突: ${runtimeKey} (${sourceName})`);
@@ -355,12 +280,7 @@ function collectEvents() {
     const relativeDurationHours = eventData.事件持续时间
       ? Number(eventData.事件持续时间.日 || 0) * 24 + Number(eventData.事件持续时间.时 || 0)
       : null;
-    const normalizedFollowups = Object.fromEntries(
-      Object.entries(normalizeFollowupEvents(eventData.后续事件)).map(([reference, clue]) => [
-        canonicalReference(reference, runtimeKey),
-        clue,
-      ]),
-    );
+    const normalizedFollowups = normalizeFollowupEvents(eventData.后续事件);
     // Narrative labels such as “全书完”, “待定”, or “第3回-相关事件” are
     // intentionally not graph edges. They remain in the source definition but
     // do not participate in predecessor validation/indexing.
@@ -377,7 +297,7 @@ function collectEvents() {
       kind: descriptor.kind,
       series: descriptor.series,
       chapter: descriptor.chapter,
-      chapterNumber: romanChapterNumber(descriptor.chapter),
+      chapterNumber: descriptor.chapterNumber,
       sequence: descriptor.sequence ? Number(descriptor.sequence) : 0,
       title: descriptor.title || null,
       triggerCondition,

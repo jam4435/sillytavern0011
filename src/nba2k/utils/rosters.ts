@@ -16,7 +16,9 @@ export function getTeam(id: string): TeamData | undefined {
 }
 
 export function getRoster(teamId: string): PlayerData[] {
-  return PLAYERS.filter(p => p.team === teamId).sort((a, b) => b.overall - a.overall);
+  return [...PLAYERS.filter(p => p.team === teamId), ...[...customPlayers.values()].filter(p => p.team === teamId)].sort(
+    (a, b) => b.overall - a.overall,
+  );
 }
 
 export function getPlayer(key: string): PlayerData | undefined {
@@ -43,7 +45,19 @@ export function pickStarters(teamId: string): PlayerData[] {
 
 /** 首发五人的场上位置映射（与 pickStarters 顺序对应） */
 export function starterEntries(teamId: string): { key: string; pos: Position }[] {
-  return pickStarters(teamId).map((p, i) => ({ key: p.name, pos: POSITIONS[i] ?? p.pos }));
+  const roster = getRoster(teamId);
+  const entries: { key: string; pos: Position }[] = [];
+  for (const pos of POSITIONS) {
+    const candidate = roster.find(
+      p => !entries.some(entry => entry.key === p.name) && (p.pos === pos || p.secondaryPos === pos),
+    );
+    if (candidate) entries.push({ key: candidate.name, pos });
+  }
+  for (const player of roster) {
+    if (entries.length >= 5) break;
+    if (!entries.some(entry => entry.key === player.name)) entries.push({ key: player.name, pos: player.pos });
+  }
+  return entries;
 }
 
 /**

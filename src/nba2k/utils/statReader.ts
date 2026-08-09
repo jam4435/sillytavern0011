@@ -1,50 +1,64 @@
+import type { z } from 'zod';
 import type { MatchState } from '../engine/types';
+import {
+  careerStateSchema,
+  formatStatValidationIssues,
+  nba2kStatSchema,
+  offCourtStateSchema,
+} from '../schema';
 
-/** 生涯字段（stat_data.生涯） */
-export interface CareerState {
-  姓名: string;
-  球队: string;
-  位置: string;
-  赛季: string;
-  赛程索引: number;
-  能力: Record<string, number>;
-  徽章: string[];
-  赛季统计: Record<string, number>;
-  成长点: number;
-}
-
-/** 场外字段（stat_data.场外） */
-export interface OffCourtState {
-  资金: number;
-  声望: number;
-  粉丝: number;
-  经纪人: { 姓名: string; 好感: number; 等级: number } | null;
-  代言: { 品牌: string; 年薪: number; 要求: string; 状态: string }[];
-  合同: { 球队: string; 年限: number; 年薪: number; 到期赛季: string } | null;
-  关系: { 姓名: string; 身份: string; 好感: number; 阶段: string; 事件线: string }[];
-  队友好感: Record<string, number>;
-  日程: { 日期: string; 下一场: string; 待办: string[] };
-}
+export type CareerState = z.infer<typeof careerStateSchema>;
+export type OffCourtState = z.infer<typeof offCourtStateSchema>;
 
 export interface Nba2kStat {
+  版本: 2;
   比赛: MatchState | null;
   生涯: CareerState | null;
   场外: OffCourtState | null;
+  /** 非持久化字段；非空时 UI 必须进入错误恢复页。 */
+  validationErrors: string[];
+}
+
+const EMPTY_STAT: Nba2kStat = {
+  版本: 2,
+  比赛: null,
+  生涯: null,
+  场外: null,
+  validationErrors: [],
+};
+
+/** 供 readStat 与单元测试共用的无副作用解析入口。 */
+export function parseStatData(raw: unknown): Nba2kStat {
+  if (!raw || (typeof raw === 'object' && !Array.isArray(raw) && Object.keys(raw).length === 0)) {
+    return { ...EMPTY_STAT, validationErrors: [] };
+  }
+
+  const result = nba2kStatSchema.safeParse(raw);
+  if (!result.success) {
+    return {
+      ...EMPTY_STAT,
+      validationErrors: formatStatValidationIssues(result.error),
+    };
+  }
+
+  return {
+    ...result.data,
+    比赛: result.data.比赛 as MatchState | null,
+    validationErrors: [],
+  };
 }
 
 /** 从酒馆合并变量视图读取 stat_data 投影（只读，不回写） */
 export function readStat(): Nba2kStat {
-  let raw: Record<string, any> = {};
   try {
-    raw = getAllVariables()?.stat_data ?? {};
+    return parseStatData(getAllVariables()?.stat_data ?? {});
   } catch (e) {
     console.warn('[nba2k] 读取变量失败', e);
+    return {
+      ...EMPTY_STAT,
+      validationErrors: [`stat_data：读取变量失败（${e instanceof Error ? e.message : String(e)}）`],
+    };
   }
-  return {
-    比赛: raw.比赛 ?? null,
-    生涯: raw.生涯 ?? null,
-    场外: raw.场外 ?? null,
-  };
 }
 
 /** 判断是否处于比赛回合模式 */

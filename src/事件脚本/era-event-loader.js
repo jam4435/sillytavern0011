@@ -17,6 +17,7 @@ import {
 import { normalizeParticipantEventDefinition } from './era-participant-entry.js';
 import { getGeneratedEventDataProvider } from './era-event-data-provider.js';
 import { notifyEvent } from './era-notifications.js';
+import { looksLikeEventEntryName } from '../shared/eventKey.js';
 
 const parsedEventEntryCache = new Map();
 let cachedEventDefinitionsSignature = '';
@@ -140,6 +141,10 @@ export async function loadEventDefinitionsFromWorldbook() {
 
         const descriptor = deriveEventRuntimeDescriptor(entry.name);
         const eventName = descriptor?.runtimeKey || null;
+
+        if (!descriptor && looksLikeEventEntryName(entry.name)) {
+          throw new Error(`发现非规范事件条目名: ${entry.name}`);
+        }
 
         log(`[DEBUG] 是否为事件条目? ${!!eventName}`);
         if (descriptor) {
