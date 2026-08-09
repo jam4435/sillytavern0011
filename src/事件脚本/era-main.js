@@ -34,20 +34,18 @@
     batchEndEvents,
     batchExpireEvents,
     applyTimedParticipantEntries,
+    persistRelativeEventRebase,
     cleanupFollowupCluesForActiveParticipation,
     cleanupInvalidParticipationEntries,
   } = await import('./era-event-operations.js');
-  const {
-    getRumorScopeFromEventLocation,
-    isLocationWithinRumorScope,
-    normalizeLocationPath,
-  } =
+  const { getRumorScopeFromEventLocation, isLocationWithinRumorScope, normalizeLocationPath } =
     await import('./era-participant-entry.js');
   const { isSameLocationScope } = await import('../shared/locationPath.js');
   const { reconcileWorldEventArchive, syncParticipationOutcomeStates } = await import('./era-world-events.js');
   const { needsEventRuntimeStateReset, resetLegacyEventRuntimeState } = await import('./era-runtime-state.js');
   const { buildFollowupCounterPlan, createSerialTaskQueue } = await import('./era-turn-queue.js');
-  const { getManifestEventCandidateKeys } = await import('./era-event-scheduler.js');
+  const { buildRelativeEventRebasePlan, getManifestEventCandidateKeys, sortUnstartedEventsByTrigger } =
+    await import('./era-event-scheduler.js');
   const { writeDirectAssign, writeEraTransaction } = await import('./era-write-helper.js');
   const { initializeEventNotificationBridge, notifyEvent } = await import('./era-notifications.js');
   const { readHistoryCheckoutJournal, isHistoryCheckoutJournalExpired } =
@@ -87,6 +85,11 @@
   const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件', '已失效事件'];
 
   const isPlainObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
+
+  const withRuntimeTriggerOverride = (eventName, eventData, unstartedEvents) => {
+    const triggerOverride = unstartedEvents?.[eventName];
+    return eventData && isPlainObject(triggerOverride) ? { ...eventData, 触发条件: triggerOverride } : eventData;
+  };
 
   const isEmptyObject = value => isPlainObject(value) && Object.keys(value).length === 0;
 
@@ -300,7 +303,11 @@
 
       const currentTime = variables.stat_data.世界信息.时间;
       const 未发生事件 = variables.stat_data.事件系统.未发生事件 || {};
+      const 当前进行中事件 = variables.stat_data.事件系统.进行中事件 || {};
       const playerLocation = normalizeLocationPath(variables.stat_data.user数据?.所在位置);
+      const playerScopeIsOccupied = Object.keys(当前进行中事件).some(eventName =>
+        isSameLocationScope(playerLocation, eventDefinitions[eventName]?.事件地点),
+      );
 
       let timeString = `${currentTime.年}年${currentTime.月}月${currentTime.日}日`;
       if (currentTime.时 !== undefined) {
@@ -323,9 +330,15 @@
       for (const eventName of 未发生列表) {
         const triggerCondition = 未发生事件[eventName];
         const eventData = eventDefinitions[eventName];
+        const effectiveEventData = withRuntimeTriggerOverride(eventName, eventData, 未发生事件);
+        const hasRuntimeTriggerOverride =
+          isPlainObject(triggerCondition) && JSON.stringify(triggerCondition) !== JSON.stringify(eventData?.触发条件);
 
         debugGroupCollapsed(`检查事件: ${eventName}`);
-        if (eventData && isTimeForEvent(currentTime, eventData, eventName, variables.stat_data, eventDefinitions)) {
+        if (
+          eventData &&
+          isTimeForEvent(currentTime, effectiveEventData, eventName, variables.stat_data, eventDefinitions)
+        ) {
           if (isDebutEvent(eventData)) {
             logSuccess(`登场事件 ${eventName} 触发条件满足，将直接完成！`);
             debutEventsToComplete.push(eventName);
@@ -336,7 +349,9 @@
         } else if (
           eventData &&
           !isDebutEvent(eventData) &&
-          isEventDiscoverable(currentTime, eventData, variables.stat_data, eventDefinitions, eventName) &&
+          !hasRuntimeTriggerOverride &&
+          !playerScopeIsOccupied &&
+          isEventDiscoverable(currentTime, effectiveEventData, variables.stat_data, eventDefinitions, eventName) &&
           isSameLocationScope(playerLocation, eventData.事件地点)
         ) {
           logSuccess(`玩家在弹性窗口精确到达事件地点，提前启动 ${eventName}`);
@@ -364,21 +379,86 @@
         await batchExpireEvents(eventsToExpire, eventDefinitions);
       }
 
+      // 同一三级地点在同一检查周期命中的事件只启动最早一个。其余事件不进入
+      // 进行中/参与状态，而是按相对首事件的原始时间差改写现有“未发生事件”桶。
+      const dueAtPlayerScope = eventsToStart.filter(eventName =>
+        isSameLocationScope(playerLocation, eventDefinitions[eventName]?.事件地点),
+      );
+      const sameScopeCandidates = [...new Set([...dueAtPlayerScope, ...earlyEventsToStart])];
+      let rebasedFirstEventNames = [];
+      let rebasedDeferredEventNames = new Set();
+      let admissionBlockedEventNames = new Set();
+      const committedDueNames = Object.keys(
+        sortUnstartedEventsByTrigger(
+          Object.fromEntries(
+            dueAtPlayerScope
+              .filter(eventName => {
+                const override = 未发生事件[eventName];
+                return (
+                  isPlainObject(override) &&
+                  JSON.stringify(override) !== JSON.stringify(eventDefinitions[eventName]?.触发条件)
+                );
+              })
+              .map(eventName => [eventName, 未发生事件[eventName]]),
+          ),
+        ),
+      );
+
+      if (playerScopeIsOccupied) {
+        // 已有前台事件占用该三级地点时，新的到点事件也先留在未发生状态，
+        // 避免人物占用在事件真正结束前被下一事件覆盖。
+        admissionBlockedEventNames = new Set(sameScopeCandidates);
+      } else if (committedDueNames.length > 0) {
+        // 已经平移并落库的触发时间是一项调度承诺：到点后必须优先启动，
+        // 不能再与本轮新发现的候选按原始时间重新洗牌。
+        const committedFirst = committedDueNames[0];
+        admissionBlockedEventNames = new Set(sameScopeCandidates.filter(eventName => eventName !== committedFirst));
+      } else if (sameScopeCandidates.length > 1) {
+        const rebasePlan = buildRelativeEventRebasePlan(sameScopeCandidates, eventDefinitions, currentTime);
+        if (rebasePlan.firstEventName && Object.keys(rebasePlan.deferredConditions).length > 0) {
+          await persistRelativeEventRebase(rebasePlan.deferredConditions);
+          rebasedFirstEventNames = [rebasePlan.firstEventName];
+          rebasedDeferredEventNames = new Set(Object.keys(rebasePlan.deferredConditions));
+          log(
+            `🕰️ 同地点事件已相对平移，当前仅启动 ${rebasePlan.firstEventName}，后续顺序:`,
+            rebasePlan.orderedEventNames,
+          );
+        }
+      }
+
+      const rebasedGroupNames = new Set([
+        ...rebasedFirstEventNames,
+        ...rebasedDeferredEventNames,
+        ...admissionBlockedEventNames,
+      ]);
+      const ordinaryEventsToStart = eventsToStart.filter(eventName => !rebasedGroupNames.has(eventName));
+      const standaloneEarlyEventsToStart = earlyEventsToStart.filter(eventName => !rebasedGroupNames.has(eventName));
+      const runtimeRebasedOrdinaryNames = ordinaryEventsToStart.filter(eventName => {
+        const override = 未发生事件[eventName];
+        return (
+          isPlainObject(override) && JSON.stringify(override) !== JSON.stringify(eventDefinitions[eventName]?.触发条件)
+        );
+      });
+
       // 批量触发普通事件
-      if (eventsToStart.length > 0) {
-        log(`📋 发现 ${eventsToStart.length} 个普通事件需要触发:`, eventsToStart);
-        await batchStartEvents(eventsToStart, eventDefinitions, { currentTime });
+      if (ordinaryEventsToStart.length > 0) {
+        log(`📋 发现 ${ordinaryEventsToStart.length} 个普通事件需要触发:`, ordinaryEventsToStart);
+        await batchStartEvents(ordinaryEventsToStart, eventDefinitions, {
+          currentTime,
+          earlyEventNames: runtimeRebasedOrdinaryNames,
+        });
       } else {
         log('没有普通事件需要触发');
       }
 
-      if (earlyEventsToStart.length > 0) {
-        log(`📍 玩家到场，提前启动 ${earlyEventsToStart.length} 个事件:`, earlyEventsToStart);
-        await batchStartEvents(earlyEventsToStart, eventDefinitions, {
+      const playerAnchoredEventsToStart = [...standaloneEarlyEventsToStart, ...rebasedFirstEventNames];
+      if (playerAnchoredEventsToStart.length > 0) {
+        log(`📍 玩家到场，提前启动 ${playerAnchoredEventsToStart.length} 个事件:`, playerAnchoredEventsToStart);
+        await batchStartEvents(playerAnchoredEventsToStart, eventDefinitions, {
           currentTime,
-          earlyEventNames: earlyEventsToStart,
+          earlyEventNames: playerAnchoredEventsToStart,
         });
-        await playerJoinsEvents(earlyEventsToStart, eventDefinitions);
+        await playerJoinsEvents(playerAnchoredEventsToStart, eventDefinitions);
       }
 
       // 批量完成登场事件（直接从未发生 -> 已完成）
@@ -439,15 +519,16 @@
         updatedVariables.stat_data.世界信息.时间,
         updatedVariables.stat_data,
       );
-      const 可发现未发生事件 = (latestManifestCandidates || Object.keys(最新未发生事件)).filter(eventName =>
-        isEventDiscoverable(
+      const 可发现未发生事件 = (latestManifestCandidates || Object.keys(最新未发生事件)).filter(eventName => {
+        const effectiveEventData = withRuntimeTriggerOverride(eventName, eventDefinitions[eventName], 最新未发生事件);
+        return isEventDiscoverable(
           updatedVariables.stat_data.世界信息.时间,
-          eventDefinitions[eventName],
+          effectiveEventData,
           updatedVariables.stat_data,
           eventDefinitions,
           eventName,
-        ),
-      );
+        );
+      });
       // 即使当前没有候选事件也要执行一次，以清除历史检出后遗留的附近传闻派生缓存。
       await checkPlayerLocationTriggers(
         仍在进行事件,
@@ -497,9 +578,10 @@
 
     const activeEvents = new Set(进行中列表);
     const candidateEvents = [...new Set([...进行中列表, ...可发现未发生列表])];
+    const unstartedEvents = updatedVariables?.stat_data?.事件系统?.未发生事件 || {};
 
     for (const eventName of candidateEvents) {
-      const eventData = eventDefinitions[eventName];
+      const eventData = withRuntimeTriggerOverride(eventName, eventDefinitions[eventName], unstartedEvents);
       if (!eventData) continue;
 
       const eventLocation = normalizeLocationPath(eventData.事件地点);
@@ -526,7 +608,7 @@
           log(`发现传闻: ${eventName}`);
         }
 
-        // 第四级是叙事场景；事件参与只比较前三段严格活动区。
+        // 事件系统只比较前三段严格活动区。
         if (activeEvents.has(eventName) && isSameLocationScope(eventLocation, playerLocation) && !alreadyJoined) {
           logSuccess(`玩家到达事件地点: ${eventName}`);
           eventsToJoin.push(eventName);

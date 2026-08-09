@@ -43,6 +43,7 @@ import {
 import { writeDirectChatTransaction } from '../shared/directVariableWrite';
 import { isWorldEventRecord } from '../shared/worldEventContext';
 import { notifyEvent } from './era-notifications.js';
+import { sortUnstartedEventsByTrigger } from './era-event-scheduler.js';
 import {
   getSingleConditionTimeAnchor,
   isPureTimeTrigger,
@@ -502,6 +503,34 @@ export async function initializeEventList(eventDefinitions, options = {}) {
   return result;
 }
 
+export async function persistRelativeEventRebase(deferredConditions) {
+  const entries = Object.entries(deferredConditions || {});
+  if (entries.length === 0) return false;
+
+  let changed = false;
+  await writeDirectChatTransaction(
+    variables => {
+      const statData = variables?.stat_data;
+      if (!statData) throw new Error('无法写入相对事件时间：缺少 stat_data');
+      statData.事件系统 = isPlainObject(statData.事件系统) ? statData.事件系统 : {};
+      const existing = isPlainObject(statData.事件系统.未发生事件) ? statData.事件系统.未发生事件 : {};
+      const next = { ...existing };
+
+      // 先移除再按实际触发顺序重建，保证变量展示顺序与触发顺序一致。
+      for (const [eventName] of entries) delete next[eventName];
+      for (const [eventName, condition] of entries) next[eventName] = cloneJson(condition);
+      const ordered = sortUnstartedEventsByTrigger(next);
+      changed = JSON.stringify(existing) !== JSON.stringify(ordered);
+      statData.事件系统.未发生事件 = ordered;
+      return variables;
+    },
+    `rebase-relative-events-${entries.length}`,
+    { operation: 'replace', refreshHint: 'event-state' },
+  );
+
+  return changed;
+}
+
 // 开局初始化已统一走上方的单事务规划器；旧的多写入实现已移除。
 
 export async function applyParticipantEntry(eventName, eventData, source) {
@@ -633,11 +662,7 @@ export async function applyTimedParticipantEntries(eventNames, eventDefinitions,
     const eventData = eventDefinitions[eventName];
     const endTime = getEndTime(eventData);
 
-    if (
-      !eventData ||
-      isDebutEvent(eventData) ||
-      (endTime && isTimeAfterEventEnd(currentTime, endTime))
-    ) {
+    if (!eventData || isDebutEvent(eventData) || (endTime && isTimeAfterEventEnd(currentTime, endTime))) {
       continue;
     }
 

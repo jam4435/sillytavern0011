@@ -45,6 +45,7 @@ vi.mock('./era-event-operations.js', () => ({
   batchEndEvents: vi.fn(),
   batchExpireEvents: vi.fn(),
   applyTimedParticipantEntries: vi.fn(),
+  persistRelativeEventRebase: vi.fn(),
   areEventPredecessorsCompleted: vi.fn(() => true),
   cleanupFollowupCluesForActiveParticipation: vi.fn(),
   cleanupInvalidParticipationEntries: cleanupInvalidParticipationEntriesMock,
@@ -69,6 +70,16 @@ vi.mock('./era-runtime-state.js', () => ({
 vi.mock('./era-turn-queue.js', () => ({
   buildFollowupCounterPlan: vi.fn(),
   createSerialTaskQueue: vi.fn(() => (work: () => unknown) => work()),
+}));
+
+vi.mock('./era-event-scheduler.js', () => ({
+  buildRelativeEventRebasePlan: vi.fn(() => ({
+    firstEventName: null,
+    orderedEventNames: [],
+    deferredConditions: {},
+  })),
+  getManifestEventCandidateKeys: vi.fn(() => []),
+  sortUnstartedEventsByTrigger: vi.fn(value => value),
 }));
 
 vi.mock('./era-write-helper.js', () => ({
@@ -314,6 +325,224 @@ describe('ERA 主线初始化控制', () => {
       '定时参与人物入场失败，已保留本轮玩家参与判定:',
       expect.objectContaining({ message: 'NPC 入场写入超时' }),
     );
+  });
+
+  it('同一三级地点同批命中时只启动首事件并平移后续事件', async () => {
+    const firstEvent = '射雕第1回01-郭杨邀饮说书人';
+    const secondEvent = '射雕第1回02-曲三夜斗禁宫卫';
+    const eventLocation = '大宋/临安府/牛家村';
+    const variables = validVariables();
+    variables.stat_data.世界信息.时间 = { 年: 1200, 月: 8, 日: 15, 时: 17, 分: 10 } as never;
+    variables.stat_data.user数据 = { 所在位置: eventLocation };
+    getVariablesMock.mockReturnValue(variables);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    const definitions = {
+      [firstEvent]: {
+        事件地点: eventLocation,
+        触发条件: { 类型: '时间', 年: 1200, 月: 8, 日: 15, 时: 17 },
+        事件结束时间: { 年: 1200, 月: 8, 日: 15, 时: 19 },
+        事件详情: '第一事件',
+        事件概要: '第一事件完成',
+        参与人物: [],
+        insert: {},
+        update: {},
+        delete: {},
+      },
+      [secondEvent]: {
+        事件地点: eventLocation,
+        触发条件: { 类型: '时间', 年: 1200, 月: 8, 日: 15, 时: 20 },
+        事件结束时间: { 年: 1200, 月: 8, 日: 16, 时: 0 },
+        事件详情: '第二事件',
+        事件概要: '第二事件完成',
+        参与人物: [],
+        insert: {},
+        update: {},
+        delete: {},
+      },
+    };
+    const deferredCondition = { 类型: '时间', 年: 1200, 月: 8, 日: 15, 时: 20, 分: 10 };
+
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const operations = await import('./era-event-operations.js');
+    const scheduler = await import('./era-event-scheduler.js');
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [
+        { runtimeKey: firstEvent, location: eventLocation },
+        { runtimeKey: secondEvent, location: eventLocation },
+      ],
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue(definitions);
+    vi.mocked(scheduler.getManifestEventCandidateKeys).mockReturnValue([firstEvent, secondEvent]);
+    vi.mocked(scheduler.buildRelativeEventRebasePlan).mockReturnValue({
+      firstEventName: firstEvent,
+      orderedEventNames: [firstEvent, secondEvent],
+      deferredConditions: { [secondEvent]: deferredCondition },
+    });
+    vi.mocked(checker.isTimeForEvent).mockImplementation((_time, _definition, eventName) => eventName === firstEvent);
+    vi.mocked(checker.isEventDiscoverable).mockImplementation(
+      (_time, _definition, _stat, _definitions, eventName) => eventName === secondEvent,
+    );
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
+    vi.mocked(operations.persistRelativeEventRebase).mockClear().mockResolvedValue(true);
+    vi.mocked(operations.batchStartEvents).mockClear();
+    vi.mocked(operations.playerJoinsEvents).mockClear();
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?relative-event-rebase-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const gameInitializedListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'GameInitialized')
+      .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
+    gameInitializedListener?.({ timestamp: Date.now() + 200_000 });
+
+    await vi.waitFor(() =>
+      expect(operations.persistRelativeEventRebase).toHaveBeenCalledWith({ [secondEvent]: deferredCondition }),
+    );
+    expect(operations.batchStartEvents).toHaveBeenCalledWith([firstEvent], definitions, {
+      currentTime: variables.stat_data.世界信息.时间,
+      earlyEventNames: [firstEvent],
+    });
+    expect(operations.playerJoinsEvents).toHaveBeenCalledWith([firstEvent], definitions);
+    expect(vi.mocked(operations.batchStartEvents).mock.calls.flatMap(([eventNames]) => eventNames)).not.toContain(
+      secondEvent,
+    );
+  });
+
+  it('已平移的未发生事件在新触发时间前不能再次被弹性提前启动', async () => {
+    const eventName = '射雕第1回02-曲三夜斗禁宫卫';
+    const eventLocation = '大宋/临安府/牛家村';
+    const shiftedCondition = { 类型: '时间', 年: 1200, 月: 8, 日: 15, 时: 20, 分: 10 };
+    const variables = validVariables();
+    variables.stat_data.世界信息.时间 = { 年: 1200, 月: 8, 日: 15, 时: 19, 分: 0 } as never;
+    variables.stat_data.user数据 = { 所在位置: eventLocation };
+    variables.stat_data.事件系统.未发生事件 = { [eventName]: shiftedCondition };
+    getVariablesMock.mockReturnValue(variables);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    const definition = {
+      事件地点: eventLocation,
+      触发条件: { 类型: '时间', 年: 1200, 月: 8, 日: 15, 时: 20 },
+      事件结束时间: { 年: 1200, 月: 8, 日: 16, 时: 0 },
+      事件详情: '第二事件',
+      事件概要: '第二事件完成',
+      参与人物: [],
+      insert: {},
+      update: {},
+      delete: {},
+    };
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const operations = await import('./era-event-operations.js');
+    const scheduler = await import('./era-event-scheduler.js');
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [{ runtimeKey: eventName, location: eventLocation }],
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue({ [eventName]: definition });
+    vi.mocked(scheduler.getManifestEventCandidateKeys).mockReturnValue([eventName]);
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(false);
+    vi.mocked(checker.isEventDiscoverable).mockReturnValue(true);
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
+    vi.mocked(operations.batchStartEvents).mockClear();
+    vi.mocked(operations.playerJoinsEvents).mockClear();
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?rebased-event-lock-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const gameInitializedListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'GameInitialized')
+      .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
+    gameInitializedListener?.({ timestamp: Date.now() + 300_000 });
+    await vi.waitFor(() => expect(checker.isEventDiscoverable).toHaveBeenCalled());
+
+    expect(operations.batchStartEvents).not.toHaveBeenCalled();
+    expect(operations.playerJoinsEvents).not.toHaveBeenCalled();
+  });
+
+  it('已平移事件到点时优先启动且不会被新候选再次重排', async () => {
+    const committedEvent = '已承诺事件';
+    const newCandidate = '新候选事件';
+    const eventLocation = '大宋/临安府/牛家村';
+    const shiftedCondition = { 类型: '时间', 年: 1200, 月: 8, 日: 15, 时: 12 };
+    const variables = validVariables();
+    variables.stat_data.世界信息.时间 = { 年: 1200, 月: 8, 日: 15, 时: 12 } as never;
+    variables.stat_data.user数据 = { 所在位置: eventLocation };
+    variables.stat_data.事件系统.未发生事件 = { [committedEvent]: shiftedCondition };
+    getVariablesMock.mockReturnValue(variables);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    const definitions = {
+      [committedEvent]: {
+        事件地点: eventLocation,
+        触发条件: { 类型: '时间', 年: 1200, 月: 8, 日: 16, 时: 20 },
+        事件结束时间: { 年: 1200, 月: 8, 日: 17, 时: 0 },
+        事件详情: '已承诺事件',
+        事件概要: '已承诺事件完成',
+        参与人物: [],
+        insert: {},
+        update: {},
+        delete: {},
+      },
+      [newCandidate]: {
+        事件地点: eventLocation,
+        触发条件: { 类型: '时间', 年: 1200, 月: 8, 日: 16, 时: 18 },
+        事件结束时间: { 年: 1200, 月: 8, 日: 16, 时: 21 },
+        事件详情: '新候选事件',
+        事件概要: '新候选事件完成',
+        参与人物: [],
+        insert: {},
+        update: {},
+        delete: {},
+      },
+    };
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const operations = await import('./era-event-operations.js');
+    const scheduler = await import('./era-event-scheduler.js');
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [
+        { runtimeKey: committedEvent, location: eventLocation },
+        { runtimeKey: newCandidate, location: eventLocation },
+      ],
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue(definitions);
+    vi.mocked(scheduler.getManifestEventCandidateKeys).mockReturnValue([committedEvent, newCandidate]);
+    vi.mocked(scheduler.sortUnstartedEventsByTrigger).mockImplementation(value => value);
+    vi.mocked(scheduler.buildRelativeEventRebasePlan).mockClear();
+    vi.mocked(checker.isTimeForEvent).mockImplementation(
+      (_time, _definition, eventName) => eventName === committedEvent,
+    );
+    vi.mocked(checker.isEventDiscoverable).mockImplementation(
+      (_time, _definition, _stat, _definitions, eventName) => eventName === newCandidate,
+    );
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
+    vi.mocked(operations.persistRelativeEventRebase).mockClear();
+    vi.mocked(operations.batchStartEvents).mockClear();
+    vi.mocked(operations.playerJoinsEvents).mockClear();
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?committed-event-priority-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const gameInitializedListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'GameInitialized')
+      .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
+    gameInitializedListener?.({ timestamp: Date.now() + 400_000 });
+
+    await vi.waitFor(() => expect(operations.batchStartEvents).toHaveBeenCalled());
+    expect(scheduler.buildRelativeEventRebasePlan).not.toHaveBeenCalled();
+    expect(operations.persistRelativeEventRebase).not.toHaveBeenCalled();
+    expect(operations.batchStartEvents).toHaveBeenCalledWith([committedEvent], definitions, {
+      currentTime: variables.stat_data.世界信息.时间,
+      earlyEventNames: [committedEvent],
+    });
+    expect(vi.mocked(operations.batchStartEvents).mock.calls.flatMap(([eventNames]) => eventNames)).not.toContain(
+      newCandidate,
+    );
+    expect(operations.playerJoinsEvents).not.toHaveBeenCalledWith([newCandidate], definitions);
   });
 
   it('清理非法参与条目后使用回读快照在同轮重新加入', async () => {

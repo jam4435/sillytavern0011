@@ -221,9 +221,9 @@ export function compareTime(currentTime, targetTime, comparisonType) {
   const currentDays = (currentTime.年 || 0) * 365 + (currentTime.月 || 0) * 30 + (currentTime.日 || 0);
   const targetDays = (targetTime.年 || 0) * 365 + (targetTime.月 || 0) * 30 + (targetTime.日 || 0);
 
-  // 计算总小时数（兼容缺失的"时"字段，默认为0）
-  const currentTotalHours = currentDays * 24 + (currentTime.时 || 0);
-  const targetTotalHours = targetDays * 24 + (targetTime.时 || 0);
+  // 计算总分钟数（兼容缺失的"时"、"分"字段，默认为0）
+  const currentTotalMinutes = currentDays * 24 * 60 + (currentTime.时 || 0) * 60 + (currentTime.分 || 0);
+  const targetTotalMinutes = targetDays * 24 * 60 + (targetTime.时 || 0) * 60 + (targetTime.分 || 0);
 
   // 计算天数差值（保持原有逻辑，用于diff模式）
   const diff = currentDays - targetDays;
@@ -242,16 +242,16 @@ export function compareTime(currentTime, targetTime, comparisonType) {
         targetTimeStr += `${targetTime.时}时`;
       }
 
-      logTime(`  当前: ${currentTimeStr} (${currentDays}天, ${currentTotalHours}小时)`);
-      logTime(`  目标: ${targetTimeStr} (${targetDays}天, ${targetTotalHours}小时)`);
+      logTime(`  当前: ${currentTimeStr} (${currentDays}天, ${currentTotalMinutes}分钟)`);
+      logTime(`  目标: ${targetTimeStr} (${targetDays}天, ${targetTotalMinutes}分钟)`);
       logTime(`  差值: ${diff}天`);
     }
     return diff;
   }
 
-  // 使用总小时数进行比较，支持小时级精度
+  // 使用总分钟数进行比较，避免事件相对平移时丢失当前分钟。
   const result =
-    comparisonType === '>=' ? currentTotalHours >= targetTotalHours : currentTotalHours > targetTotalHours;
+    comparisonType === '>=' ? currentTotalMinutes >= targetTotalMinutes : currentTotalMinutes > targetTotalMinutes;
 
   if (isTimeDebugEnabled()) {
     logTime(`⏰ 时间比较 (${comparisonType}):`);
@@ -265,10 +265,10 @@ export function compareTime(currentTime, targetTime, comparisonType) {
       targetTimeStr += `${targetTime.时}时`;
     }
 
-    logTime(`  当前: ${currentTimeStr} (${currentDays}天, ${currentTotalHours}小时)`);
-    logTime(`  目标: ${targetTimeStr} (${targetDays}天, ${targetTotalHours}小时)`);
+    logTime(`  当前: ${currentTimeStr} (${currentDays}天, ${currentTotalMinutes}分钟)`);
+    logTime(`  目标: ${targetTimeStr} (${targetDays}天, ${targetTotalMinutes}分钟)`);
     logTime(
-      `  差值: ${diff}天, 小时差: ${currentTotalHours - targetTotalHours}小时 | 结果: ${
+      `  差值: ${diff}天, 分钟差: ${currentTotalMinutes - targetTotalMinutes}分钟 | 结果: ${
         result ? '✅ 满足' : '❌ 不满足'
       }`,
     );
@@ -364,7 +364,7 @@ export function calculateDateOffset(dateObject, days) {
     newYear -= 1;
   }
 
-  // 保留原有的"时"字段（如果存在）
+  // 保留原有的"时"、"分"字段（如果存在）
   const result = {
     年: newYear,
     月: newMonth,
@@ -374,42 +374,46 @@ export function calculateDateOffset(dateObject, days) {
   if (dateObject.时 !== undefined) {
     result.时 = dateObject.时;
   }
+  if (dateObject.分 !== undefined) {
+    result.分 = dateObject.分;
+  }
 
   return result;
 }
 
-// 对一个时间对象进行包含日和时的时间偏移计算，支持小时级精度
+// 对一个时间对象进行包含日、时、分的时间偏移计算。
 export function calculateTimeOffset(dateObject, duration) {
-  // 将基础时间转换为总小时数
+  // 将基础时间转换为总分钟数
   const baseDays = (dateObject.年 || 0) * 365 + (dateObject.月 || 0) * 30 + (dateObject.日 || 0);
-  const baseHours = dateObject.时 || 0;
-  const totalBaseHours = baseDays * 24 + baseHours;
+  const totalBaseMinutes = baseDays * 24 * 60 + (dateObject.时 || 0) * 60 + (dateObject.分 || 0);
 
-  // 将持续时间转换为总小时数
+  // 将持续时间转换为总分钟数
   const durationDays = duration.日 || 0;
   const durationHours = duration.时 || 0;
-  const totalDurationHours = durationDays * 24 + durationHours;
+  const durationMinutes = duration.分 || 0;
+  const totalDurationMinutes = durationDays * 24 * 60 + durationHours * 60 + durationMinutes;
 
-  // 计算新的总小时数
-  const newTotalHours = totalBaseHours + totalDurationHours;
+  // 计算新的总分钟数
+  const newTotalMinutes = totalBaseMinutes + totalDurationMinutes;
 
-  // 将总小时数转换回年月日时分格式
-  let remainingHours = newTotalHours;
+  // 将总分钟数转换回年月日时分格式
+  let remainingMinutes = newTotalMinutes;
 
   // 计算年
-  let newYear = Math.floor(remainingHours / (365 * 24));
-  remainingHours %= 365 * 24;
+  let newYear = Math.floor(remainingMinutes / (365 * 24 * 60));
+  remainingMinutes %= 365 * 24 * 60;
 
   // 计算月
-  let newMonth = Math.floor(remainingHours / (30 * 24));
-  remainingHours %= 30 * 24;
+  let newMonth = Math.floor(remainingMinutes / (30 * 24 * 60));
+  remainingMinutes %= 30 * 24 * 60;
 
   // 计算日
-  let newDay = Math.floor(remainingHours / 24);
-  remainingHours %= 24;
+  let newDay = Math.floor(remainingMinutes / (24 * 60));
+  remainingMinutes %= 24 * 60;
 
   // 计算时
-  const newHour = remainingHours;
+  const newHour = Math.floor(remainingMinutes / 60);
+  const newMinute = remainingMinutes % 60;
 
   // 处理日期为0的情况
   if (newDay === 0) {
@@ -429,13 +433,21 @@ export function calculateTimeOffset(dateObject, duration) {
     时: newHour,
   };
 
+  if (dateObject.分 !== undefined || duration.分 !== undefined) {
+    result.分 = newMinute;
+  }
+
   return result;
 }
 
 // 将事件系统使用的简化历法时间转换为总小时数。所有持续时长和平移都必须复用此口径。
 export function timeToTotalHours(timeObject) {
+  return timeToTotalMinutes(timeObject) / 60;
+}
+
+export function timeToTotalMinutes(timeObject) {
   const totalDays = (timeObject?.年 || 0) * 365 + (timeObject?.月 || 0) * 30 + (timeObject?.日 || 0);
-  return totalDays * 24 + (timeObject?.时 || 0);
+  return totalDays * 24 * 60 + (timeObject?.时 || 0) * 60 + (timeObject?.分 || 0);
 }
 
 export function getEventDurationHours(eventData) {
@@ -466,6 +478,9 @@ export function formatDate(timeObj) {
   let result = `${timeObj.年}年${timeObj.月}月${timeObj.日}日`;
   if (timeObj.时 !== undefined) {
     result += `${timeObj.时}时`;
+  }
+  if (timeObj.分 !== undefined) {
+    result += `${timeObj.分}分`;
   }
   return result;
 }
