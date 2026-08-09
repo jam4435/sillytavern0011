@@ -2,6 +2,7 @@ import { EVENT_KIND } from './era-utils.js';
 import { validateAndNormalizeEventDefinition } from './era-event-schema.js';
 import {
   getLocationRegionPath,
+  getLocationScopePath,
   normalizeLocationPath,
   parseLocationPath,
 } from '../shared/locationPath.js';
@@ -109,6 +110,7 @@ export function normalizeParticipantEventDefinition(eventName, eventData, { kind
 
 export function buildParticipantEntryPlan({ eventName, eventData, source, currentTime, characters, occupancy }) {
   const eventLocation = eventData?.事件地点;
+  const occupancyLocation = getLocationScopePath(eventLocation);
   const participants = Array.isArray(eventData?.参与人物) ? eventData.参与人物 : [];
   const characterData = isPlainObject(characters) ? characters : {};
   const currentOccupancy = isPlainObject(occupancy) ? occupancy : {};
@@ -152,7 +154,7 @@ export function buildParticipantEntryPlan({ eventName, eventData, source, curren
 
     occupancyInserts[characterName] = {
       事件名: eventName,
-      地点: eventLocation,
+      地点: occupancyLocation,
       来源: source,
       入场时间: { ...currentTime },
     };

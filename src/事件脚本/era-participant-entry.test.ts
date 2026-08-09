@@ -191,6 +191,27 @@ describe('buildParticipantEntryPlan', () => {
     expect(plan.missingCharacters).toEqual(['梅超风']);
   });
 
+  it('keeps a fourth-level scene on the character but stores only the three-level occupancy scope', () => {
+    const plan = buildParticipantEntryPlan({
+      eventName: '酒馆夜斗',
+      eventData: {
+        ...eventData,
+        事件地点: '大宋/临安府/牛家村/曲三酒馆',
+        参与人物: ['郭靖'],
+      },
+      source: PARTICIPANT_ENTRY_SOURCE.TIME,
+      currentTime,
+      characters: { 郭靖: { 所在位置: '大宋/临安府/牛家村/村西树林' } },
+      occupancy: {},
+    });
+
+    expect(plan.locationUpdates.郭靖).toEqual({ 所在位置: '大宋/临安府/牛家村/曲三酒馆' });
+    expect(plan.occupancyInserts.郭靖).toMatchObject({
+      事件名: '酒馆夜斗',
+      地点: '大宋/临安府/牛家村',
+    });
+  });
+
   it('is idempotent once the same event owns the participant', () => {
     const plan = buildParticipantEntryPlan({
       eventName: '荒山恶战',

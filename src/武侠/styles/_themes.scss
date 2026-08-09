@@ -702,39 +702,151 @@
   }
 
   .event-notification-card {
+    --event-notice-accent: #4f5141;
+    --event-notice-accent-strong: #30372f;
+    --event-notice-glow: rgba(61, 48, 40, 0.08);
+
+    min-height: 4.75rem;
+    padding: 0.38rem 0.16rem 0.34rem 0.28rem;
     color: #1a1410;
-    background:
-      linear-gradient(116deg, rgba(255, 255, 255, 0.42), transparent 42%),
-      linear-gradient(145deg, rgba(250, 246, 238, 0.97), rgba(225, 214, 196, 0.95));
-    border-color: color-mix(in srgb, var(--event-notice-accent) 44%, rgba(61, 48, 40, 0.3));
+    background: rgba(250, 246, 238, 0.96);
+    border: 14px solid transparent;
+    border-image-source: var(--wuxia-ink-panel-bar-md);
+    border-image-slice: 22 fill;
+    border-image-repeat: stretch;
+    border-radius: 0;
     box-shadow:
-      0 14px 30px rgba(61, 48, 40, 0.18),
-      0 0 18px var(--event-notice-glow),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.42);
+      0 12px 25px rgba(61, 48, 40, 0.14),
+      0 2px 4px rgba(61, 48, 40, 0.08);
     backdrop-filter: none;
 
     &::before {
-      opacity: 0.16;
-      background-image: repeating-linear-gradient(
-        112deg,
-        transparent 0,
-        transparent 8px,
-        rgba(61, 48, 40, 0.08) 9px,
-        transparent 10px
-      );
+      inset: -8px;
+      border: 0;
+      opacity: 0.26;
+      background:
+        radial-gradient(
+          ellipse at 14% 110%,
+          color-mix(in srgb, var(--event-notice-accent) 24%, transparent),
+          transparent 42%
+        ),
+        linear-gradient(
+          104deg,
+          transparent 0 68%,
+          color-mix(in srgb, var(--event-notice-accent) 8%, transparent) 86%,
+          transparent
+        );
+      mix-blend-mode: multiply;
+    }
+
+    &::after {
+      content: '江湖笺';
+      right: -0.26rem;
+      bottom: -0.32rem;
+      z-index: 0;
+      width: 1.08rem;
+      padding: 0.16rem 0.06rem 0.14rem;
+      color: rgba(139, 26, 26, 0.72);
+      background: rgba(139, 26, 26, 0.035);
+      border: 1px solid rgba(139, 26, 26, 0.46);
+      font-size: 0.55rem;
+      line-height: 1.05;
+      letter-spacing: 0.08em;
+      text-align: center;
+      writing-mode: vertical-rl;
+      transform: rotate(2deg);
+    }
+
+    &.success {
+      --event-notice-accent: #66704d;
+      --event-notice-accent-strong: #3f4b2e;
+    }
+
+    &.warning {
+      --event-notice-accent: #a36b24;
+      --event-notice-accent-strong: #7a4d06;
+    }
+
+    &.error {
+      --event-notice-accent: #a23b32;
+      --event-notice-accent-strong: #8b1a1a;
     }
   }
 
+  .event-notification-rail {
+    top: 0.22rem;
+    bottom: 0.22rem;
+    left: -0.12rem;
+    width: 2px;
+    opacity: 0.54;
+    background: linear-gradient(180deg, transparent, var(--event-notice-accent) 28% 72%, transparent);
+    box-shadow: none;
+  }
+
+  .event-notification-emblem {
+    width: 2.15rem;
+    height: 2.15rem;
+    color: var(--event-notice-accent-strong);
+    background: var(--wuxia-ink-icon-circle) center / 100% 100% no-repeat;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    transform: none;
+
+    > svg {
+      transform: none;
+      filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.48));
+    }
+
+    &::after {
+      display: none;
+    }
+  }
+
+  .event-notification-heading::after {
+    opacity: 0.36;
+    background: linear-gradient(90deg, var(--event-notice-accent), transparent);
+  }
+
+  .event-notification-title {
+    color: var(--event-notice-accent-strong);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.56);
+  }
+
   .event-notification-message {
-    color: #3d3028;
+    color: var(--wuxia-ink-text);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
   }
 
   .event-notification-count {
-    color: #5c1a14;
+    color: #fffaf2;
+    background: var(--event-notice-accent-strong);
+    border-color: transparent;
+    transform: rotate(-1deg);
   }
 
   .event-notification-close {
-    color: rgba(61, 48, 40, 0.62);
+    color: rgba(61, 48, 40, 0.68);
+    background: rgba(255, 252, 247, 0.34);
+    border-color: rgba(61, 48, 40, 0.14);
+    border-radius: 50%;
+
+    &:hover,
+    &:focus-visible {
+      color: #8b1a1a;
+      background: rgba(139, 26, 26, 0.07);
+      border-color: rgba(139, 26, 26, 0.26);
+    }
+  }
+
+  .event-notification-progress {
+    right: -0.25rem;
+    bottom: -0.38rem;
+    left: -0.25rem;
+    height: 2px;
+    opacity: 0.62;
+    background: linear-gradient(90deg, transparent, var(--event-notice-accent) 14% 86%, transparent);
+    box-shadow: none;
   }
 
   .chat-send-btn .send-btn-bg {

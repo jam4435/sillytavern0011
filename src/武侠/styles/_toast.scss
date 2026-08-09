@@ -192,65 +192,86 @@
   right: 1rem;
   z-index: 9998;
   display: grid;
-  width: min(22rem, calc(100% - 2rem));
-  gap: 0.65rem;
+  width: min(23rem, calc(100% - 2rem));
+  gap: 0.72rem;
+  isolation: isolate;
   pointer-events: none;
 }
 
 .event-notification-card {
-  --event-notice-accent: #b58950;
-  --event-notice-glow: rgba(181, 137, 80, 0.26);
+  --event-notice-accent: #c5a364;
+  --event-notice-accent-strong: #f0d596;
+  --event-notice-glow: rgba(181, 137, 80, 0.2);
 
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 0.75rem;
+  grid-template-columns: 2.2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.78rem;
   min-width: 0;
-  padding: 0.9rem 0.8rem 0.85rem 1rem;
+  min-height: 5rem;
+  padding: 0.82rem 0.78rem 0.78rem 1rem;
   overflow: hidden;
-  color: rgba(254, 252, 232, 0.94);
+  color: #f7edda;
   background:
-    linear-gradient(112deg, rgba(255, 255, 255, 0.045), transparent 38%),
-    linear-gradient(145deg, rgba(24, 19, 16, 0.97), rgba(38, 30, 24, 0.94));
-  border: 1px solid color-mix(in srgb, var(--event-notice-accent) 50%, rgba(120, 113, 108, 0.35));
-  border-radius: 3px 12px 3px 12px;
+    linear-gradient(90deg, var(--event-notice-accent), transparent 42%) top left / 54% 1px no-repeat,
+    linear-gradient(270deg, var(--event-notice-accent), transparent 42%) right bottom / 54% 1px no-repeat,
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--event-notice-accent) 13%, transparent), transparent 38%),
+    linear-gradient(112deg, rgba(255, 250, 230, 0.05), transparent 38%),
+    linear-gradient(145deg, rgba(15, 12, 10, 0.98), rgba(34, 27, 21, 0.97));
+  border: 1px solid color-mix(in srgb, var(--event-notice-accent) 54%, rgba(87, 72, 48, 0.5));
+  border-radius: 2px;
   box-shadow:
-    0 16px 34px rgba(0, 0, 0, 0.38),
-    0 0 24px var(--event-notice-glow),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.035);
-  backdrop-filter: blur(14px) saturate(0.92);
+    0 16px 34px rgba(0, 0, 0, 0.46),
+    0 0 22px var(--event-notice-glow),
+    inset 0 0 24px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(13px) saturate(0.86);
+  isolation: isolate;
   pointer-events: auto;
   animation: event-notice-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 
   &::before {
     content: '';
     position: absolute;
-    inset: 0;
-    opacity: 0.12;
-    background-image: repeating-linear-gradient(
-      112deg,
-      transparent 0,
-      transparent 8px,
-      rgba(255, 255, 255, 0.05) 9px,
-      transparent 10px
-    );
+    inset: 4px;
+    z-index: -1;
+    border: 1px solid color-mix(in srgb, var(--event-notice-accent) 19%, transparent);
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--event-notice-accent) 7%, transparent), transparent 32%),
+      repeating-linear-gradient(112deg, transparent 0 10px, rgba(255, 246, 220, 0.025) 11px 12px);
+    pointer-events: none;
+  }
+
+  &::after {
+    content: '江湖笺';
+    position: absolute;
+    right: 0.52rem;
+    bottom: 0.26rem;
+    z-index: -1;
+    color: color-mix(in srgb, var(--event-notice-accent) 22%, transparent);
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    writing-mode: vertical-rl;
     pointer-events: none;
   }
 
   &.success {
-    --event-notice-accent: #d1a85c;
-    --event-notice-glow: rgba(201, 155, 70, 0.24);
+    --event-notice-accent: #d5b66f;
+    --event-notice-accent-strong: #f5dfa6;
+    --event-notice-glow: rgba(201, 155, 70, 0.22);
   }
 
   &.warning {
-    --event-notice-accent: #d97706;
-    --event-notice-glow: rgba(217, 119, 6, 0.28);
+    --event-notice-accent: #d79638;
+    --event-notice-accent-strong: #ffd48a;
+    --event-notice-glow: rgba(217, 119, 6, 0.24);
   }
 
   &.error {
-    --event-notice-accent: #d86155;
-    --event-notice-glow: rgba(185, 28, 28, 0.26);
+    --event-notice-accent: #c76555;
+    --event-notice-accent-strong: #f2a599;
+    --event-notice-glow: rgba(185, 28, 28, 0.24);
   }
 
   &.is-exiting {
@@ -260,39 +281,46 @@
 
 .event-notification-rail {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 3px;
+  top: 0.65rem;
+  bottom: 0.65rem;
+  left: 0.45rem;
+  width: 2px;
   background: linear-gradient(
     180deg,
     transparent,
-    var(--event-notice-accent) 22%,
-    var(--event-notice-accent) 78%,
+    var(--event-notice-accent) 18%,
+    var(--event-notice-accent) 82%,
     transparent
   );
-  box-shadow: 0 0 12px var(--event-notice-accent);
+  box-shadow: 0 0 10px var(--event-notice-glow);
 }
 
 .event-notification-emblem {
   position: relative;
   display: grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
-  color: var(--event-notice-accent);
-  background: color-mix(in srgb, var(--event-notice-accent) 11%, transparent);
-  border: 1px solid color-mix(in srgb, var(--event-notice-accent) 48%, transparent);
-  border-radius: 50% 46% 52% 44%;
-  box-shadow: inset 0 0 12px color-mix(in srgb, var(--event-notice-accent) 13%, transparent);
+  width: 2.05rem;
+  height: 2.05rem;
+  color: var(--event-notice-accent-strong);
+  background: rgba(12, 10, 9, 0.72);
+  border: 1px solid color-mix(in srgb, var(--event-notice-accent) 64%, transparent);
+  border-radius: 1px;
+  box-shadow:
+    inset 0 0 12px color-mix(in srgb, var(--event-notice-accent) 12%, transparent),
+    0 0 14px var(--event-notice-glow);
+  transform: rotate(45deg) scale(0.78);
+
+  > svg {
+    position: relative;
+    z-index: 1;
+    transform: rotate(-45deg) scale(1.18);
+  }
 
   &::after {
     content: '';
     position: absolute;
     inset: 3px;
-    border: 1px solid color-mix(in srgb, var(--event-notice-accent) 24%, transparent);
-    border-radius: inherit;
-    transform: rotate(18deg);
+    border: 1px solid color-mix(in srgb, var(--event-notice-accent) 28%, transparent);
   }
 }
 
@@ -306,33 +334,44 @@
   align-items: baseline;
   gap: 0.5rem;
   min-width: 0;
-  margin-bottom: 0.22rem;
+  margin-bottom: 0.24rem;
+
+  &::after {
+    content: '';
+    flex: 1 1 1.5rem;
+    min-width: 0.75rem;
+    height: 1px;
+    margin-left: 0.12rem;
+    opacity: 0.44;
+    background: linear-gradient(90deg, var(--event-notice-accent), transparent);
+  }
 }
 
 .event-notification-title {
-  color: var(--event-notice-accent);
+  flex-shrink: 0;
+  color: var(--event-notice-accent-strong);
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: 1.08rem;
   line-height: 1.15;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-shadow: 0 0 12px var(--event-notice-glow);
 }
 
 .event-notification-count {
   flex-shrink: 0;
   padding: 0.08rem 0.38rem;
-  color: color-mix(in srgb, var(--event-notice-accent) 84%, white);
+  color: var(--event-notice-accent-strong);
   font-family: var(--font-serif);
   font-size: 0.66rem;
   letter-spacing: 0.08em;
-  border: 1px solid color-mix(in srgb, var(--event-notice-accent) 34%, transparent);
-  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--event-notice-accent) 42%, transparent);
+  border-radius: 2px;
 }
 
 .event-notification-message {
   margin: 0;
-  color: rgba(245, 237, 221, 0.88);
-  font-family: var(--font-wenkai);
+  color: rgba(245, 237, 221, 0.9);
+  font-family: var(--content-font-family, var(--font-wenkai));
   font-size: 0.82rem;
   line-height: 1.48;
   letter-spacing: 0.025em;
@@ -347,10 +386,10 @@
   height: 1.65rem;
   margin: -0.22rem -0.15rem 0 0;
   padding: 0;
-  color: rgba(214, 211, 209, 0.62);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 50%;
+  color: rgba(228, 213, 183, 0.58);
+  background: rgba(12, 10, 9, 0.18);
+  border: 1px solid color-mix(in srgb, var(--event-notice-accent) 16%, transparent);
+  border-radius: 1px;
   cursor: pointer;
   transition:
     color 160ms ease,
@@ -372,8 +411,8 @@
   bottom: 0;
   left: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--event-notice-accent) 18%, var(--event-notice-accent));
-  box-shadow: 0 0 8px var(--event-notice-accent);
+  background: linear-gradient(90deg, transparent, var(--event-notice-accent) 20%, var(--event-notice-accent-strong));
+  box-shadow: 0 0 8px var(--event-notice-glow);
   transform-origin: left center;
   animation: event-notice-countdown var(--event-notice-duration) linear forwards;
 }

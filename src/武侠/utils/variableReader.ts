@@ -40,6 +40,7 @@ import {
 } from './martialArtsDatabase';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { isHistoryCheckoutPending } from '../../shared/historyCheckoutJournal';
+import { getLocationScopePath } from '../../shared/locationPath.js';
 import { dataLogger } from './logger';
 
 // 使用酒馆的 ChatMessage 类型（与本地 types.ts 中的 ChatMessage 区分）
@@ -1099,7 +1100,7 @@ function collectEventOccupancy(
     if (!isRecord(record) || record.事件名 !== eventName || characterName.startsWith('$')) continue;
     involved.push(characterName);
     if (!location && typeof record.地点 === 'string' && record.地点.trim()) {
-      location = record.地点.trim();
+      location = getLocationScopePath(record.地点) || undefined;
     }
   }
 

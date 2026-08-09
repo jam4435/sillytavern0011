@@ -268,7 +268,10 @@ export function collectEventTargetPaths(statData: Record<string, unknown>): stri
 
   for (const value of Object.values(participantOccupancy)) {
     if (!isRecord(value) || typeof value.事件名 !== 'string' || !activeEventNames.has(value.事件名)) continue;
-    if (typeof value.地点 === 'string') targets.push(value.地点);
+    if (typeof value.地点 === 'string') {
+      const occupancyScope = getLocationScopePath(value.地点);
+      if (occupancyScope) targets.push(occupancyScope);
+    }
   }
 
   for (const value of Object.values(nearbyRumors)) {
