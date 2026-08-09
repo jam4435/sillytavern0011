@@ -111,6 +111,9 @@ function resolveReference(reference, source) {
   ) {
     return lookupTuple('神雕', 12, 1, raw).newKey;
   }
+  if (source.series === '射雕' && source.chapterNumber === 22 && source.sequence === 13 && raw === '第35回-铁枪庙中') {
+    return lookupTuple('射雕', 35, 4, raw).newKey;
+  }
 
   const nextChapterPlaceholder = raw.match(new RegExp(`^第(${OLD_CHAPTER})回-(?:续|后续|XX(?:-.*)?)$`));
   if (nextChapterPlaceholder) {
@@ -141,10 +144,12 @@ function rewriteExperiences(eventData, source) {
         throw new Error(`${source.oldFile}.${action}.${characterName}.人物经历 不是对象`);
       }
       const entries = Object.entries(experiences);
-      if (entries.length > 1) {
-        throw new Error(`${source.oldFile}.${action}.${characterName}.人物经历 含多个键，无法折叠`);
+      if (entries.some(([, experience]) => typeof experience !== 'string')) {
+        throw new Error(`${source.oldFile}.${action}.${characterName}.人物经历 含非字符串内容`);
       }
-      if (entries.length === 1) delta.人物经历 = { [source.newKey]: entries[0][1] };
+      if (entries.length > 0) {
+        delta.人物经历 = { [source.newKey]: entries.map(([, experience]) => experience).join('\n') };
+      }
     }
   }
 }
