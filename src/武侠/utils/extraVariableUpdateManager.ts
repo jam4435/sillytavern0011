@@ -114,6 +114,24 @@ const VARIABLE_BLOCK_TAGS = ['VariableThink', 'VariableInsert', 'VariableEdit', 
 const ACTION_BLOCK_TAGS = new Set(['VariableInsert', 'VariableEdit', 'VariableDelete']);
 const EXTRA_VARIABLE_READONLY_ENTITY_KEYS = new Set(['头像', '出生年份', '年龄', '初始属性', '天赋']);
 const PARTICIPATION_WRITABLE_KEYS = ['结局', 'insert', 'update', 'delete', '分支标记'] as const;
+const NORMAL_TURN_DECISION_CHECKLIST = `【普通回合变量检查清单】
+必须在 <VariableThink> 中按编号逐项给出简短结论；没有变化也要写“无”。
+1. 时间：最新正文是否明确经过时间？若是，按实际行为推进；短暂反应、观察和简短交谈不得机械推进。
+2. 地点：user 或 NPC 是否实际移动？只有发生移动才修改所在位置；换镜头、换说法或仍在同一场景不修改。
+3. 修炼与战斗：user 是否进行了修炼、战斗或其他可能产生修为的实际行为？若正文明确产生磨炼、领悟或修为收获，按只读“每日修为变化参考”结合行为时长、强度和成果估算修为；短暂运功、展示武功或仅仅出现战斗不自动增加修为。战斗另行结算正文明确发生的消耗、伤势和长期后果。
+4. user 持久变化：检查修为、气血、内力、状态、物品、功法、身份、经历和关系；只记录已经发生且值得长期保存的变化。
+5. NPC 持久变化：检查相关角色的地点、状态、物品、功法、身份、经历和关系；不得把短暂情绪或一次观察写成长期关系。
+6. 最终路径：先选完整绝对路径，再判断最终叶子是否存在；存在用 Edit，不存在用 Insert，删除已有叶子用 Delete。逐条列出最终动作或“无”。`;
+const PARTICIPATION_TURN_DECISION_CHECKLIST = `【参与事件回合变量检查清单】
+必须在 <VariableThink> 中按编号逐项给出简短结论；没有变化也要写“无”。
+1. 事件与阶段：逐个检查当前参与事件，判断最新正文是否涉及该事件，以及当前处于“未涉及/开端/发展/后段/收束/已完成”中的哪个阶段。事件存在不代表本轮必然推进；不得拆分或自造固定节点。
+2. 时间：只有正文把相关事件推进到更后阶段或明确经过时间时才前推。阶段与时间必须单调前进；开端处于时间窗前段，发展/后段处于开始与结束之间，只有完整收束才可到事件结束时间。
+3. 地点：user 与相关 NPC 是否实际移动、是否仍在事件活动区？仅在正文明确移动时修改；离开事件地时判断是否对事件结果造成实质偏离。
+4. 修炼与战斗：user 是否进行了修炼、战斗或其他可能产生修为的实际行为？若正文明确产生磨炼、领悟或修为收获，按只读“每日修为变化参考”结合行为时长、强度和成果估算修为；短暂运功、展示武功或仅仅出现战斗不自动增加修为。战斗另行结算明确消耗、伤势和长期后果，user 的变化直接写 user数据。
+5. NPC 变化路由：先检查相关参与事件的 insert/update/delete 是否已有相同人物与业务字段。已有且原定结果未变则不操作；已有但最终结果改变则只修改参与事件快照；快照未覆盖的新长期变化才写角色数据。禁止把事件快照已有结果提前重复写入角色数据。
+6. 结局与差分：只有人物生死、长期状态、关系、阵营、关键物品、事件目标或后续成立条件实质改变时，才修改结局及对应差分；普通对话、阶段推进和过程细节不修改结局。
+7. 其他持久变化：检查事件快照未覆盖的身份、功法、物品、经历、关系、气血、内力和状态；短暂情绪、观察和原定过程不写入。
+8. 最终路径：先确定变量归属和完整绝对路径，再判断最终叶子是否存在；存在用 Edit，不存在用 Insert，删除已有叶子用 Delete。逐条列出最终动作或“无”。`;
 const VARIABLE_ROOT_KEY_ALIASES: Record<string, string> = {
   玩家数据: 'user数据',
   同场景角色: '角色数据',
@@ -891,7 +909,28 @@ export function buildExtraVariableProjection(
   }) as Record<string, unknown>;
 }
 
-function formatVariableContext(projection: Record<string, unknown>, participationEvents: unknown): string {
+function formatDecisionChecklist(hasParticipationEvents: boolean, cultivationReference: unknown): string {
+  const readonlyCultivationReference =
+    typeof cultivationReference === 'number' && Number.isFinite(cultivationReference)
+      ? String(cultivationReference)
+      : '不可用';
+  return [
+    '<readonly_derived_context>',
+    `每日修为变化参考:${readonlyCultivationReference}`,
+    '该值以每日专心修炼为基准，仅供结合行为时长、强度和成果估算 user数据.修为变化；本身始终只读且不得作为写入目标，不可用时不得自行编造参考值。',
+    '</readonly_derived_context>',
+    '',
+    '<variable_decision_checklist>',
+    hasParticipationEvents ? PARTICIPATION_TURN_DECISION_CHECKLIST : NORMAL_TURN_DECISION_CHECKLIST,
+    '</variable_decision_checklist>',
+  ].join('\n');
+}
+
+function formatVariableContext(
+  projection: Record<string, unknown>,
+  participationEvents: unknown,
+  cultivationReference: unknown,
+): string {
   const lines = [
     '<variable>',
     '<status_current_variables>',
@@ -926,6 +965,8 @@ function formatVariableContext(projection: Record<string, unknown>, participatio
     '# 相关角色（同一严格活动区、参与事件或最新正文提及；完整所在位置用于判断具体同场）',
     `角色数据:${JSON.stringify(projection.角色数据 ?? {})}`,
     '</status_current_variables>',
+    '',
+    formatDecisionChecklist(Object.keys(writableParticipationEvents).length > 0, cultivationReference),
     '</variable>',
   );
   return lines.join('\n');
@@ -949,10 +990,12 @@ function formatLocationContext(surroundingLocations: unknown, currentLocation: u
   const currentScopePath = getLocationScopePath(locationGroups.当前活动区) || getLocationScopePath(currentLocation);
   const allowedScopes = new Set<string>();
   if (currentScopePath) allowedScopes.add(currentScopePath);
-  Object.values(groups).flat().forEach(path => {
-    const scopePath = getLocationScopePath(path);
-    if (scopePath) allowedScopes.add(scopePath);
-  });
+  Object.values(groups)
+    .flat()
+    .forEach(path => {
+      const scopePath = getLocationScopePath(path);
+      if (scopePath) allowedScopes.add(scopePath);
+    });
   const lines = [
     '<可用地点>',
     '[路径语义]',
@@ -985,8 +1028,8 @@ function buildVariableProjectionSnapshot(
   const statDataSource = isRecord(variables.stat_data) ? variables.stat_data : variables;
   const statData = statDataSource as Record<string, unknown>;
   const projection = buildExtraVariableProjection(variables, latestAssistantBody);
-  const variableContext = formatVariableContext(projection, statData.参与事件);
   const frontendVariables = getNestedRecord(statData, '前端变量') || {};
+  const variableContext = formatVariableContext(projection, statData.参与事件, frontendVariables.修为变化参考);
   const projectedUserData = isRecord(projection.user数据) ? projection.user数据 : {};
   const locationContext = formatLocationContext(frontendVariables.周围地点, projectedUserData.所在位置);
 

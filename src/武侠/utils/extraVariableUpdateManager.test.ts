@@ -193,6 +193,7 @@ describe('executeExtraVariableUpdate', () => {
             $内部: ['不应发送'],
           },
           随机数: '不应发送',
+          修为变化参考: 33,
         },
       },
     };
@@ -428,11 +429,13 @@ describe('executeExtraVariableUpdate', () => {
       return { message_id: 28, actions: { apiWrite: true } };
     });
 
-    await expect(executeExtraVariableUpdate({
-      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
-      assistantMessageId: 28,
-      latestRawReply: '众人回到曲三酒馆。',
-    })).resolves.toMatchObject({ applyStatus: 'success' });
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '众人回到曲三酒馆。',
+      }),
+    ).resolves.toMatchObject({ applyStatus: 'success' });
   });
 
   it('允许移动到白名单活动区并自由填写第四级场景', async () => {
@@ -445,31 +448,37 @@ describe('executeExtraVariableUpdate', () => {
       return { message_id: 28, actions: { apiWrite: true } };
     });
 
-    await expect(executeExtraVariableUpdate({
-      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
-      assistantMessageId: 28,
-      latestRawReply: '抵达临安皇宫偏殿。',
-    })).resolves.toMatchObject({ applyStatus: 'success' });
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '抵达临安皇宫偏殿。',
+      }),
+    ).resolves.toMatchObject({ applyStatus: 'success' });
   });
 
   it('杜撰严格活动区或写成五级路径时立即失败', async () => {
     requestConfiguredTextMock.mockResolvedValueOnce(
       '<VariableEdit>{"user数据":{"所在位置":"大宋/临安府/不存在的村/树林"}}</VariableEdit>',
     );
-    await expect(executeExtraVariableUpdate({
-      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
-      assistantMessageId: 28,
-      latestRawReply: '错误移动。',
-    })).rejects.toThrow('未授权活动区 大宋/临安府/不存在的村');
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '错误移动。',
+      }),
+    ).rejects.toThrow('未授权活动区 大宋/临安府/不存在的村');
 
     requestConfiguredTextMock.mockResolvedValueOnce(
       '<VariableEdit>{"user数据":{"所在位置":"大宋/临安府/牛家村/村西树林/树下"}}</VariableEdit>',
     );
-    await expect(executeExtraVariableUpdate({
-      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
-      assistantMessageId: 28,
-      latestRawReply: '错误移动。',
-    })).rejects.toThrow('地点必须是三级或四级完整路径');
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '错误移动。',
+      }),
+    ).rejects.toThrow('地点必须是三级或四级完整路径');
 
     expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
   });
@@ -885,7 +894,33 @@ describe('executeExtraVariableUpdate', () => {
     expect(fallbackProjection).toContain('<status_current_variables>');
     expect(fallbackProjection).toContain('[只读时间、地点与事件背景：黄蓉正在事件中]');
     expect(fallbackProjection).toContain('{"update":{"黄蓉":{"好感":1}},"分支标记":{"黄蓉对郭靖变心":0}}');
+    expect(fallbackProjection).toContain('每日修为变化参考:33');
+    expect(fallbackProjection).toContain('【参与事件回合变量检查清单】');
+    expect(fallbackProjection).toContain('未涉及/开端/发展/后段/收束/已完成');
     expect(fallbackProjection).not.toContain('前端变量');
+  });
+
+  it('参与事件为空时发送普通回合检查清单并保持修为参考只读', async () => {
+    requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
+    const statData = variableSnapshot.stat_data as Record<string, unknown>;
+    statData.参与事件 = {};
+
+    await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+        variablePromptTemplate: '{{variableContext}}',
+      },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    });
+
+    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
+    expect(prompt).toContain('每日修为变化参考:33');
+    expect(prompt).toContain('【普通回合变量检查清单】');
+    expect(prompt).not.toContain('【参与事件回合变量检查清单】');
+    expect(prompt).toContain('本身始终只读且不得作为写入目标');
+    expect(prompt).toContain('修炼、战斗或其他可能产生修为的实际行为');
   });
 });
 
