@@ -33,17 +33,17 @@ function applyOperation(target: Record<string, any>, operation: { type: string; 
   };
   visit(target, operation.payload);
 }
-const eventName = '射雕第7回02-初遇黄蓉';
+const eventName = '射雕第七回02-初遇黄蓉';
 const eventDefinition = attachEventMetadata(
   {
     事件地点: '大宋/张家口',
     事件概要: '郭靖结识黄蓉并请她吃饭，两人由此建立初步情谊。',
     事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
-    insert: { 郭靖: { 人物经历: { 初遇黄蓉: '在张家口结识黄蓉。' } } },
+    insert: { 郭靖: { 人物经历: { [eventName]: '在张家口结识黄蓉。' } } },
     update: { 黄蓉: { 所在位置: '大宋/张家口' } },
     delete: {},
   },
-  deriveEventRuntimeDescriptor('射雕事件条目-第7回-02-初遇黄蓉.yaml'),
+  deriveEventRuntimeDescriptor(eventName),
 );
 
 function participation(ending = eventDefinition.事件概要) {
@@ -270,10 +270,10 @@ describe('world event archive', () => {
   });
 
   it('backfills an unrecoverable participated canonical event as unknown', async () => {
-    const missingEventName = '射雕第8回01-旧存档事件';
+    const missingEventName = '射雕第八回01-旧存档事件';
     const missingEventDefinition = attachEventMetadata(
       { ...eventDefinition },
-      deriveEventRuntimeDescriptor('射雕事件条目-第8回-01-旧存档事件.yaml'),
+      deriveEventRuntimeDescriptor(missingEventName),
     );
     let variables: any = {
       stat_data: {

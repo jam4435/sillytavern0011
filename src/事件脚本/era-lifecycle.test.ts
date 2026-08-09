@@ -36,8 +36,8 @@ function applyOperation(target: Record<string, any>, operation: { type: string; 
   };
   visit(target, operation.payload);
 }
-const sourceName = '射雕第7回01-宝马风波';
-const targetName = '射雕第7回03-比武招亲';
+const sourceName = '射雕第七回01-宝马风波';
+const targetName = '射雕第七回03-比武招亲';
 const actualEndTime = { 年: 1219, 月: 10, 日: 10, 时: 11 };
 let transactionMessageId = 100;
 
@@ -53,9 +53,9 @@ const eventDefinition = attachEventMetadata(
     insert: {},
     update: {},
     delete: {},
-    后续事件: { 事件名: '第7回-03-比武招亲', 描述: '江南似有新的风波。' },
+    后续事件: { 事件名: targetName, 描述: '江南似有新的风波。' },
   },
-  deriveEventRuntimeDescriptor('射雕事件条目-第7回-01-宝马风波.yaml'),
+  deriveEventRuntimeDescriptor(sourceName),
 );
 
 const targetDefinition = attachEventMetadata(
@@ -71,7 +71,7 @@ const targetDefinition = attachEventMetadata(
     update: {},
     delete: {},
   },
-  deriveEventRuntimeDescriptor('射雕事件条目-第7回-03-比武招亲.yaml'),
+  deriveEventRuntimeDescriptor(targetName),
 );
 
 describe('event discovery and actual runtime windows', () => {

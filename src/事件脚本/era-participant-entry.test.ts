@@ -24,7 +24,7 @@ const eventData = {
 describe('normalizeParticipantEventDefinition', () => {
   it('deduplicates and trims ordinary event participants', () => {
     const result = normalizeParticipantEventDefinition(
-      '射雕事件条目-第4回-05-荒山恶战',
+      '射雕第四回05-荒山恶战',
       {
         事件地点: ' 蒙古/大漠/荒山 ',
         事件引子: ' 听说大漠荒山近日有人交手。 ',
@@ -102,7 +102,7 @@ describe('normalizeParticipantEventDefinition', () => {
 
   it('does not require participant fields for debut events', () => {
     const event = { 事件类型: '登场事件', insert: {} };
-    const result = normalizeParticipantEventDefinition('射雕登场事件-第4回人物', event, {
+    const result = normalizeParticipantEventDefinition('射雕第四回00-人物登场', event, {
       kind: EVENT_KIND.DEBUT,
     });
 
@@ -279,14 +279,14 @@ describe('player participation ending snapshot', () => {
       事件详情: '郭靖在张家口初遇黄蓉。',
       事件概要: '郭靖结识黄蓉并请她吃饭，两人由此建立初步情谊。',
       insert: {
-        郭靖: { 人物经历: { '第7回-02-初遇黄蓉': '请黄蓉吃饭。' } },
+        郭靖: { 人物经历: { '射雕第七回02-初遇黄蓉': '请黄蓉吃饭。' } },
       },
       update: {
         黄蓉: { 所在位置: '大宋/张家口' },
       },
     };
 
-    const entry = buildPlayerParticipationEntry('射雕第7回02-初遇黄蓉', sourceEvent, {
+    const entry = buildPlayerParticipationEntry('射雕第七回02-初遇黄蓉', sourceEvent, {
       年: 1219,
       月: 10,
       日: 20,
@@ -297,7 +297,7 @@ describe('player participation ending snapshot', () => {
       描述: '1219年10月20日13时 到 1219年10月20日15时，郭靖在张家口初遇黄蓉。',
       结局: '郭靖结识黄蓉并请她吃饭，两人由此建立初步情谊。',
       insert: {
-        郭靖: { 人物经历: { '射雕第7回02-初遇黄蓉': '请黄蓉吃饭。' } },
+        郭靖: { 人物经历: { '射雕第七回02-初遇黄蓉': '请黄蓉吃饭。' } },
       },
       update: {
         黄蓉: { 所在位置: '大宋/张家口' },
@@ -305,13 +305,13 @@ describe('player participation ending snapshot', () => {
       delete: {},
     });
 
-    entry.insert.郭靖.人物经历['射雕第7回02-初遇黄蓉'] = '已修改';
-    expect(sourceEvent.insert.郭靖.人物经历['第7回-02-初遇黄蓉']).toBe('请黄蓉吃饭。');
+    entry.insert.郭靖.人物经历['射雕第七回02-初遇黄蓉'] = '已修改';
+    expect(sourceEvent.insert.郭靖.人物经历['射雕第七回02-初遇黄蓉']).toBe('请黄蓉吃饭。');
   });
 
   it('rejects task-progress shaped participation entries for cleanup', () => {
     const participation = {
-      '射雕第7回02-初遇黄蓉': {
+      '射雕第七回02-初遇黄蓉': {
         描述: '事件描述',
         结局: '',
         insert: {},
@@ -325,7 +325,7 @@ describe('player participation ending snapshot', () => {
       },
     };
 
-    expect(isParticipationEntry(participation['射雕第7回02-初遇黄蓉'])).toBe(true);
+    expect(isParticipationEntry(participation['射雕第七回02-初遇黄蓉'])).toBe(true);
     expect(isParticipationEntry(participation.MQ__DOT__Ⅰ_金国初遇)).toBe(false);
     expect(buildInvalidParticipationDeletePatch(participation)).toEqual({
       MQ__DOT__Ⅰ_金国初遇: {},
