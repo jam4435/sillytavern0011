@@ -95,7 +95,7 @@ vi.mock('../shared/historyCheckoutJournal', () => ({
 const validVariables = () => ({
   stat_data: {
     世界信息: { 时间: { 年: 1199, 月: 8, 日: 15, 时: 11 } },
-    前端变量: { 事件运行时键版本: 2 },
+    前端变量: { 事件运行时键版本: 3 },
     事件系统: { 未发生事件: {}, 进行中事件: {}, 已完成事件: {} },
     user数据: {},
   },
@@ -328,8 +328,8 @@ describe('ERA 主线初始化控制', () => {
   });
 
   it('同一三级地点同批命中时只启动首事件并平移后续事件', async () => {
-    const firstEvent = '射雕第1回01-郭杨邀饮说书人';
-    const secondEvent = '射雕第1回02-曲三夜斗禁宫卫';
+    const firstEvent = '射雕第一回01-郭杨邀饮说书人';
+    const secondEvent = '射雕第一回02-曲三夜斗禁宫卫';
     const eventLocation = '大宋/临安府/牛家村';
     const variables = validVariables();
     variables.stat_data.世界信息.时间 = { 年: 1200, 月: 8, 日: 15, 时: 17, 分: 10 } as never;
@@ -412,7 +412,7 @@ describe('ERA 主线初始化控制', () => {
   });
 
   it('已平移的未发生事件在新触发时间前不能再次被弹性提前启动', async () => {
-    const eventName = '射雕第1回02-曲三夜斗禁宫卫';
+    const eventName = '射雕第一回02-曲三夜斗禁宫卫';
     const eventLocation = '大宋/临安府/牛家村';
     const shiftedCondition = { 类型: '时间', 年: 1200, 月: 8, 日: 15, 时: 20, 分: 10 };
     const variables = validVariables();

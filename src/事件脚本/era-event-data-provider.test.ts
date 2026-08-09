@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { GeneratedEventDataProvider } from './era-event-data-provider.js';
+import { EVENT_RUNTIME_KEY_VERSION } from './era-utils.js';
 
 function response(body: unknown) {
   return { ok: true, json: async () => body };
@@ -8,7 +9,9 @@ function response(body: unknown) {
 
 describe('GeneratedEventDataProvider', () => {
   it('resolves the default event-data directory from the provider module URL', async () => {
-    const fetcher = vi.fn(async () => response({ schemaVersion: 1, events: [], shards: [], checkpoints: [] }));
+    const fetcher = vi.fn(async () =>
+      response({ schemaVersion: 1, eventRuntimeKeyVersion: EVENT_RUNTIME_KEY_VERSION, events: [], shards: [], checkpoints: [] }),
+    );
     const provider = new GeneratedEventDataProvider({ fetcher });
 
     await provider.loadManifest();
@@ -19,7 +22,9 @@ describe('GeneratedEventDataProvider', () => {
   });
 
   it('resolves a relative override from the provider module URL', async () => {
-    const fetcher = vi.fn(async () => response({ schemaVersion: 1, events: [], shards: [], checkpoints: [] }));
+    const fetcher = vi.fn(async () =>
+      response({ schemaVersion: 1, eventRuntimeKeyVersion: EVENT_RUNTIME_KEY_VERSION, events: [], shards: [], checkpoints: [] }),
+    );
     const provider = new GeneratedEventDataProvider({ baseUrl: '../custom-event-data', fetcher });
 
     await provider.loadManifest();
@@ -30,7 +35,9 @@ describe('GeneratedEventDataProvider', () => {
   });
 
   it('preserves an absolute CDN override', async () => {
-    const fetcher = vi.fn(async () => response({ schemaVersion: 1, events: [], shards: [], checkpoints: [] }));
+    const fetcher = vi.fn(async () =>
+      response({ schemaVersion: 1, eventRuntimeKeyVersion: EVENT_RUNTIME_KEY_VERSION, events: [], shards: [], checkpoints: [] }),
+    );
     const provider = new GeneratedEventDataProvider({ baseUrl: 'https://cdn.example.test/wuxia-events', fetcher });
 
     await provider.loadManifest();
@@ -41,6 +48,7 @@ describe('GeneratedEventDataProvider', () => {
   it('loads only requested shards and reuses the shard promise', async () => {
     const manifest = {
       schemaVersion: 1,
+      eventRuntimeKeyVersion: EVENT_RUNTIME_KEY_VERSION,
       events: [
         { runtimeKey: '事件一', shardId: 'shard-0001' },
         { runtimeKey: '事件二', shardId: 'shard-0002' },
@@ -69,6 +77,7 @@ describe('GeneratedEventDataProvider', () => {
   it('selects the latest checkpoint not after the requested time', async () => {
     const manifest = {
       schemaVersion: 1,
+      eventRuntimeKeyVersion: EVENT_RUNTIME_KEY_VERSION,
       events: [],
       shards: [],
       checkpoints: [
@@ -78,15 +87,23 @@ describe('GeneratedEventDataProvider', () => {
     };
     const fetcher = vi.fn(async (url: string) => {
       if (url.endsWith('manifest.json')) return response(manifest);
-      if (url.endsWith('checkpoint-0001.json')) return response({ id: 'checkpoint-0001' });
-      if (url.endsWith('checkpoint-0002.json')) return response({ id: 'checkpoint-0002' });
+      if (url.endsWith('checkpoint-0001.json'))
+        return response({ id: 'checkpoint-0001', manifestRuntimeKeyVersion: EVENT_RUNTIME_KEY_VERSION });
+      if (url.endsWith('checkpoint-0002.json'))
+        return response({ id: 'checkpoint-0002', manifestRuntimeKeyVersion: EVENT_RUNTIME_KEY_VERSION });
       throw new Error(`unexpected URL: ${url}`);
     });
     const provider = new GeneratedEventDataProvider({ baseUrl: 'https://example.test/event-data/', fetcher });
 
     await expect(provider.loadCheckpointAtOrBefore(99)).resolves.toBeNull();
-    await expect(provider.loadCheckpointAtOrBefore(199)).resolves.toEqual({ id: 'checkpoint-0001' });
-    await expect(provider.loadCheckpointAtOrBefore(250)).resolves.toEqual({ id: 'checkpoint-0002' });
+    await expect(provider.loadCheckpointAtOrBefore(199)).resolves.toEqual({
+      id: 'checkpoint-0001',
+      manifestRuntimeKeyVersion: EVENT_RUNTIME_KEY_VERSION,
+    });
+    await expect(provider.loadCheckpointAtOrBefore(250)).resolves.toEqual({
+      id: 'checkpoint-0002',
+      manifestRuntimeKeyVersion: EVENT_RUNTIME_KEY_VERSION,
+    });
   });
 
   it('fails loudly when a production asset is missing', async () => {
@@ -95,5 +112,12 @@ describe('GeneratedEventDataProvider', () => {
       fetcher: vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })),
     });
     await expect(provider.loadManifest()).rejects.toThrow('manifest.json');
+  });
+
+  it('rejects assets produced for another runtime-key version', async () => {
+    const provider = new GeneratedEventDataProvider({
+      fetcher: vi.fn(async () => response({ schemaVersion: 1, eventRuntimeKeyVersion: 2, events: [], shards: [] })),
+    });
+    await expect(provider.loadManifest()).rejects.toThrow('需要 3');
   });
 });

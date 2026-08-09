@@ -184,7 +184,7 @@ describe('completion persistence and follow-up pairs', () => {
         insert: { 郭靖: { 状态: '不应在当前楼层补做' } },
         事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
       },
-      deriveEventRuntimeDescriptor('射雕事件条目-第7回-01-宝马风波.yaml'),
+      deriveEventRuntimeDescriptor(sourceName),
     );
 
     await expect(
@@ -263,7 +263,7 @@ describe('completion persistence and follow-up pairs', () => {
         insert: { 郭靖: { 状态: '已登场' } },
         事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
       },
-      deriveEventRuntimeDescriptor('射雕事件条目-第7回-01-宝马风波.yaml'),
+      deriveEventRuntimeDescriptor(sourceName),
     );
     let commitCount = 0;
     vi.mocked(globalThis.updateVariablesWith).mockImplementation(updater => {
@@ -319,7 +319,7 @@ describe('completion persistence and follow-up pairs', () => {
         insert: { 郭靖: { 状态: '重复应用' } },
         事件结束时间: { 年: 1219, 月: 10, 日: 20, 时: 15 },
       },
-      deriveEventRuntimeDescriptor('射雕事件条目-第7回-01-宝马风波.yaml'),
+      deriveEventRuntimeDescriptor(sourceName),
     );
 
     await expect(
@@ -402,7 +402,7 @@ describe('completion persistence and follow-up pairs', () => {
         ...eventDefinition,
         update: { 郭靖: { 状态: '事件完成' } },
       },
-      deriveEventRuntimeDescriptor('射雕事件条目-第7回-01-宝马风波.yaml'),
+      deriveEventRuntimeDescriptor(sourceName),
     );
     const definitions = { [sourceName]: settlingDefinition, [targetName]: targetDefinition };
     const actualEnding = '郭靖改变了张家口风波的原定结局。';
@@ -507,7 +507,7 @@ describe('completion persistence and follow-up pairs', () => {
   });
 
   it('writes every new-format follow-up clue and counter without selecting a branch', async () => {
-    const secondTarget = '射雕第8回01-并行后续';
+    const secondTarget = '射雕第八回01-并行后续';
     const multiSource = {
       ...eventDefinition,
       后续事件: {

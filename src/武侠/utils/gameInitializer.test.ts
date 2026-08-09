@@ -84,7 +84,7 @@ describe('generateVariableData avatar fields', () => {
 
     expect(data.前端变量.头像).toEqual({ 玩家: 'preset:guo_jing_fc2', 人物: {} });
     expect(data.前端变量.头像版本).toBe(1);
-    expect(data.前端变量.事件运行时键版本).toBe(2);
+    expect(data.前端变量.事件运行时键版本).toBe(3);
     expect(data.user数据).not.toHaveProperty('头像');
     expect(data.角色数据.$template).not.toHaveProperty('头像');
   });
@@ -104,7 +104,7 @@ describe('generateVariableData avatar fields', () => {
 
 describe('opening event time', () => {
   it('开局事件汇总提供小时并使用所选事件的真实触发小时', () => {
-    const selectedEvent = STORY_EVENTS.find(event => event.name === '射雕第7回-02-初遇黄蓉');
+    const selectedEvent = STORY_EVENTS.find(event => event.name === '射雕第七回02-初遇黄蓉');
     expect(selectedEvent).toMatchObject({
       year: 1219,
       month: 10,
@@ -167,7 +167,7 @@ describe('initializeNewGameSession startup signal', () => {
     getVariablesMock.mockReturnValue({
       stat_data: {
         世界信息: { 时间: { 年: 1, 月: 1, 日: 1, 时: 1 } },
-        前端变量: { 事件运行时键版本: 2 },
+        前端变量: { 事件运行时键版本: 3 },
       },
     });
 
