@@ -64,6 +64,11 @@ function canonicalKey(descriptor) {
 
 const sourceFiles = fs.readdirSync(eventRoot).filter(file => /\.ya?ml$/i.test(file));
 const catalog = sourceFiles.map(oldDescriptor).filter(Boolean);
+const canonicalFiles = sourceFiles.filter(file => parseCanonicalEventKey(file));
+if (catalog.length === 0 && canonicalFiles.length === 688) {
+  console.log('事件键已经是 v3 规范格式，无需再次迁移。');
+  process.exit(0);
+}
 if (catalog.length !== 688) throw new Error(`事件文件数应为 688，实际为 ${catalog.length}`);
 
 const byNewKey = new Map();
@@ -145,7 +150,15 @@ function rewriteExperiences(eventData, source) {
     const actionData = eventData[action];
     if (!actionData || typeof actionData !== 'object' || Array.isArray(actionData)) continue;
     for (const [characterName, delta] of Object.entries(actionData)) {
-      if (!delta || typeof delta !== 'object' || Array.isArray(delta) || delta.人物经历 === undefined) continue;
+      if (!delta || typeof delta !== 'object' || Array.isArray(delta)) continue;
+      if (delta.经历 !== undefined) {
+        if (delta.人物经历 !== undefined) {
+          throw new Error(`${source.oldFile}.${action}.${characterName} 同时含 经历 与 人物经历`);
+        }
+        delta.人物经历 = delta.经历;
+        delete delta.经历;
+      }
+      if (delta.人物经历 === undefined) continue;
       const experiences = delta.人物经历;
       if (!experiences || typeof experiences !== 'object' || Array.isArray(experiences)) {
         throw new Error(`${source.oldFile}.${action}.${characterName}.人物经历 不是对象`);

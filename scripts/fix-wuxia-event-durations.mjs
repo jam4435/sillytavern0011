@@ -12,7 +12,7 @@
 //     "version": 1,
 //     "entries": [
 //       {
-//         "id": "射雕第7回-03-黑松林解围",          // 事件条目 id 或登场事件 id（如 "射雕第1回-登场"）
+//         "id": "射雕第七回03-黑松林解围",          // 规范事件键（登场事件示例："射雕第一回00-人物登场"）
 //         "category": "single-duration | transition-gap | dependent-shift | forward-plan | cascade | debut-sync",
 //         "newTrigger": { "年": 1219, "月": 10, "日": 20, "时": 16 },   // 可省略表示不动
 //         "newEnd":     { "年": 1219, "月": 10, "日": 21, "时": 12 },   // 可省略表示不动

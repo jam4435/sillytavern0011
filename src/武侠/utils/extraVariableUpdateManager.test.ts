@@ -176,7 +176,7 @@ describe('executeExtraVariableUpdate', () => {
           $template: { 所在位置: '' },
         },
         参与事件: {
-          射雕第7回02: {
+          '射雕第七回02-测试事件': {
             描述: '黄蓉正在事件中',
             update: { 黄蓉: { 好感: 1 } },
             分支标记: { 黄蓉对郭靖变心: 0 },
@@ -836,7 +836,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(serialized).not.toContain('天赋');
     expect(serialized).not.toContain('$');
     expect(projection.参与事件).toEqual({
-      射雕第7回02: { update: { 黄蓉: { 好感: 1 } }, 分支标记: { 黄蓉对郭靖变心: 0 } },
+      '射雕第七回02-测试事件': { update: { 黄蓉: { 好感: 1 } }, 分支标记: { 黄蓉对郭靖变心: 0 } },
     });
     expect(serialized).not.toContain('黄蓉正在事件中');
   });

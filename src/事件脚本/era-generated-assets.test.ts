@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+import { EVENT_RUNTIME_KEY_VERSION, parseCanonicalEventKey } from '../shared/eventKey.js';
 
 const assetRoot = path.join(process.cwd(), 'src', '事件脚本', 'generated', 'event-data');
 const manifest = JSON.parse(fs.readFileSync(path.join(assetRoot, 'manifest.json'), 'utf8'));
@@ -11,17 +12,25 @@ const openingEventSummary = JSON.parse(
 
 describe('generated wuxia event assets', () => {
   it('contains every current event exactly once', () => {
-    expect(manifest.eventCount).toBeGreaterThan(0);
+    expect(manifest.eventRuntimeKeyVersion).toBe(EVENT_RUNTIME_KEY_VERSION);
+    expect(manifest.eventCount).toBe(688);
     expect(manifest.events).toHaveLength(manifest.eventCount);
     expect(new Set(manifest.events.map((event: any) => event.runtimeKey)).size).toBe(manifest.eventCount);
     expect(manifest.shardCount).toBe(manifest.shards.length);
     expect(manifest.checkpoints.length).toBeGreaterThan(0);
+    expect(manifest.events.filter((event: any) => event.kind === 'ordinary')).toHaveLength(630);
+    expect(manifest.events.filter((event: any) => event.kind === 'debut')).toHaveLength(58);
+    for (const event of manifest.events) {
+      expect(event.sourceName).toBe(event.runtimeKey);
+      expect(parseCanonicalEventKey(event.runtimeKey)).not.toBeNull();
+    }
   });
 
   it('materializes character state at each 100-event completion checkpoint', () => {
     for (const checkpoint of manifest.checkpoints) {
       const payload = JSON.parse(fs.readFileSync(path.join(assetRoot, checkpoint.file), 'utf8'));
       expect(payload.completedCount % 100).toBe(0);
+      expect(payload.manifestRuntimeKeyVersion).toBe(EVENT_RUNTIME_KEY_VERSION);
       expect(payload.completedRuntimeKeys).toHaveLength(payload.completedCount);
       expect(payload.characterState).toBeDefined();
     }
@@ -37,17 +46,11 @@ describe('generated wuxia event assets', () => {
 
   it('records follow-up associations without generating predecessor gates', () => {
     const runtimeKeys = new Set(manifest.events.map((event: any) => event.runtimeKey));
-    const unresolved = new Set(
-      manifest.unresolvedReferences.map(
-        (reference: any) => `${reference.sourceRuntimeKey}\0${reference.targetRuntimeKey}`,
-      ),
-    );
+    expect(manifest.unresolvedReferences).toEqual([]);
     for (const event of manifest.events) {
       expect(event.predecessor).toBeUndefined();
       for (const followup of Object.keys(event.followups || {})) {
-        if (!runtimeKeys.has(followup)) {
-          expect(unresolved.has(`${event.runtimeKey}\0${followup}`)).toBe(true);
-        }
+        expect(runtimeKeys.has(followup)).toBe(true);
       }
     }
   });
@@ -84,8 +87,8 @@ describe('generated wuxia event assets', () => {
         日: event.triggerTime.日,
         ...(Object.prototype.hasOwnProperty.call(event.triggerTime, '时') ? { 时: event.triggerTime.时 } : {}),
       };
-      expect(summaryByName.get(event.sourceName.replace('事件条目-', ''))).toEqual({
-        事件名称: event.sourceName.replace('事件条目-', ''),
+      expect(summaryByName.get(event.sourceName)).toEqual({
+        事件名称: event.sourceName,
         事件地点: event.location,
         触发时间: triggerTime,
       });

@@ -116,7 +116,7 @@ describe('武侠输出提示词契约', () => {
 
   it('cot 根据参与事件是否存在只输出对应的一套思维规则', () => {
     const render = compilePromptRenderer(cotPromptSource);
-    const active = render({}, path => (path === 'stat_data.参与事件' ? { 射雕第1回01: {} } : undefined));
+    const active = render({}, path => (path === 'stat_data.参与事件' ? { '射雕第一回01-测试事件': {} } : undefined));
     const idle = render({}, path => (path === 'stat_data.参与事件' ? {} : undefined));
 
     expect(active).toContain('### 参与事件思维规则');
@@ -137,7 +137,7 @@ describe('武侠输出提示词契约', () => {
 
   it('可执行渲染只读历史、分事件快照和分组地点白名单', () => {
     const render = compilePromptRenderer(`${worldHistoryPromptSource}\n${promptSource}`);
-    const eventKey = '射雕第7回02-初遇黄蓉';
+    const eventKey = '射雕第七回02-初遇黄蓉';
     const values: Record<string, unknown> = {
       'stat_data.世界事件': {
         往事: {
