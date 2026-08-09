@@ -5,6 +5,8 @@
 // Webpack emits src/事件脚本/generated/event-data/* as a sibling directory
 // next to the script entry (event-data/*). Consumers may override this URL
 // for a CDN or an unpacked development directory.
+import { EVENT_RUNTIME_KEY_VERSION } from '../shared/eventKey.js';
+
 const DEFAULT_EVENT_DATA_BASE_URL = './event-data/';
 const MODULE_BASE_URL = new URL(/* webpackIgnore: true */ '.', import.meta.url).href;
 
@@ -55,6 +57,11 @@ export class GeneratedEventDataProvider {
       this.manifestPromise = this.fetchJson('manifest.json').then(manifest => {
         if (!isPlainObject(manifest) || manifest.schemaVersion !== 1) {
           throw new Error('事件运行时 manifest schemaVersion 不受支持');
+        }
+        if (manifest.eventRuntimeKeyVersion !== EVENT_RUNTIME_KEY_VERSION) {
+          throw new Error(
+            `事件运行时 manifest 键版本不受支持: ${manifest.eventRuntimeKeyVersion}，需要 ${EVENT_RUNTIME_KEY_VERSION}`,
+          );
         }
         if (!Array.isArray(manifest.events) || !Array.isArray(manifest.shards)) {
           throw new Error('事件运行时 manifest 缺少 events/shards');
@@ -116,7 +123,17 @@ export class GeneratedEventDataProvider {
     }
     if (!candidate) return null;
     if (!this.checkpointPromises.has(candidate.id)) {
-      this.checkpointPromises.set(candidate.id, this.fetchJson(candidate.file));
+      this.checkpointPromises.set(
+        candidate.id,
+        this.fetchJson(candidate.file).then(checkpoint => {
+          if (checkpoint?.manifestRuntimeKeyVersion !== EVENT_RUNTIME_KEY_VERSION) {
+            throw new Error(
+              `事件检查点键版本不受支持: ${checkpoint?.manifestRuntimeKeyVersion}，需要 ${EVENT_RUNTIME_KEY_VERSION}`,
+            );
+          }
+          return checkpoint;
+        }),
+      );
     }
     return this.checkpointPromises.get(candidate.id);
   }

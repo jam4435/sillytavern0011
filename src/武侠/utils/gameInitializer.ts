@@ -21,6 +21,7 @@ import {
 } from './attributeCalculator';
 import { initLogger } from './logger';
 import { clearAvatarSelection, createAvatarEntityKey } from './avatarStorage';
+import { EVENT_RUNTIME_KEY_VERSION } from '../../shared/eventKey.js';
 
 // 从天赋数据库导入天赋相关内容，并重新导出供其他模块使用
 import { CHARACTER_TRAITS, getTriggeredTraitsByAttribute } from './traitsDatabase';
@@ -389,7 +390,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     事件分支结果: {},
     前端变量: {
       事件结局状态: {},
-      事件运行时键版本: 2,
+      事件运行时键版本: EVENT_RUNTIME_KEY_VERSION,
       头像: {
         ...(avatarRef ? { 玩家: avatarRef } : {}),
         人物: {},
