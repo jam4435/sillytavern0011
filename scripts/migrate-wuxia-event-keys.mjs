@@ -126,8 +126,9 @@ function resolveReference(reference, source) {
     return lookupTuple(source.series, readChapterNumber(nextChapterPlaceholder[1]), 1, raw).newKey;
   }
 
-  const physical = raw.match(new RegExp(`^(.*)?事件条目-第(${OLD_CHAPTER})回-(\\d+)(?:-(.+))?$`));
-  const runtime = raw.match(new RegExp(`^(.*)?第(${OLD_CHAPTER})回-?(\\d+)(?:-(.+))?$`));
+  const referenceForParsing = raw.replace(/-$/, '');
+  const physical = referenceForParsing.match(new RegExp(`^(.*)?事件条目-第(${OLD_CHAPTER})回-(\\d+)(?:-(.+))?$`));
+  const runtime = referenceForParsing.match(new RegExp(`^(.*)?第(${OLD_CHAPTER})回-?(\\d+)(?:-(.+))?$`));
   const match = physical || runtime;
   if (!match) throw new Error(`无法识别的后续事件引用: ${source.oldFile} -> ${raw}`);
   const [, explicitSeries = '', chapterText, sequenceText, referencedTitle = ''] = match;
