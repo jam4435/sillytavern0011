@@ -114,8 +114,14 @@ function resolveReference(reference, source) {
   if (source.series === '射雕' && source.chapterNumber === 22 && source.sequence === 13 && raw === '第35回-铁枪庙中') {
     return lookupTuple('射雕', 35, 4, raw).newKey;
   }
+  if (source.series === '射雕' && source.chapterNumber === 35 && source.sequence === 4 && raw === '第36回-大军西征') {
+    return lookupTuple('射雕', 36, 6, raw).newKey;
+  }
+  if (source.series === '射雕' && source.chapterNumber === 36 && source.sequence === 8 && raw === '第37回-从天而降') {
+    return lookupTuple('射雕', 37, 1, raw).newKey;
+  }
 
-  const nextChapterPlaceholder = raw.match(new RegExp(`^第(${OLD_CHAPTER})回-(?:续|后续|XX(?:-.*)?)$`));
+  const nextChapterPlaceholder = raw.match(new RegExp(`^第(${OLD_CHAPTER})回-(?:续|后续|相关事件|XX(?:-.*)?)$`));
   if (nextChapterPlaceholder) {
     return lookupTuple(source.series, readChapterNumber(nextChapterPlaceholder[1]), 1, raw).newKey;
   }
