@@ -249,9 +249,15 @@
     background: #1a1410;
   }
 
-  .logo-box,
   .avatar-small {
     background: var(--wuxia-ink-circle-frame) center / 100% 100% no-repeat;
+    border-color: transparent;
+    box-shadow: none;
+    animation: none;
+  }
+
+  .logo-box {
+    background: none;
     border-color: transparent;
     box-shadow: none;
     animation: none;
@@ -343,7 +349,6 @@
   }
 
   .maintext-container,
-  .opening-welcome,
   .glass-card,
   .save-ledger,
   .save-tree-panel,
