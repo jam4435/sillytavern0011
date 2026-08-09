@@ -22,38 +22,30 @@ const ordinaryEvent = {
 };
 
 describe('canonical event runtime keys', () => {
-  it('derives ordinary and debut keys from physical worldbook entry names', () => {
-    expect(deriveEventRuntimeDescriptor('射雕事件条目-第7回-02-初遇黄蓉.yaml')).toMatchObject({
-      runtimeKey: '射雕第7回02-初遇黄蓉',
+  it('uses canonical worldbook entry names directly as runtime keys', () => {
+    expect(deriveEventRuntimeDescriptor('射雕第七回02-初遇黄蓉.yaml')).toMatchObject({
+      runtimeKey: '射雕第七回02-初遇黄蓉',
+      sourceName: '射雕第七回02-初遇黄蓉',
       kind: EVENT_KIND.ORDINARY,
       series: '射雕',
     });
-    expect(deriveEventRuntimeDescriptor('射雕登场事件-第7回人物')).toMatchObject({
-      runtimeKey: '射雕第7回-人物登场',
+    expect(deriveEventRuntimeDescriptor('射雕第七回00-人物登场')).toMatchObject({
+      runtimeKey: '射雕第七回00-人物登场',
       kind: EVENT_KIND.DEBUT,
       series: '射雕',
     });
+    expect(deriveEventRuntimeDescriptor('射雕事件条目-第7回-02-初遇黄蓉')).toBeNull();
   });
 
-  it('normalizes short follow-up and biography references without changing unrelated labels', () => {
-    expect(normalizeOrdinaryEventReference('第7回-02-初遇黄蓉', '射雕第7回01-宝马风波')).toBe(
-      '射雕第7回02-初遇黄蓉',
-    );
-    expect(normalizeOrdinaryEventReference('第7回02-初遇黄蓉', '射雕第7回01-宝马风波')).toBe(
-      '射雕第7回02-初遇黄蓉',
-    );
-    expect(normalizeOrdinaryEventReference('射雕事件条目-第7回-02-初遇黄蓉.json')).toBe(
-      '射雕第7回02-初遇黄蓉',
-    );
-    expect(normalizeOrdinaryEventReference('事件条目-第7回-02-初遇黄蓉', '射雕第7回01-宝马风波')).toBe(
-      '射雕第7回02-初遇黄蓉',
-    );
-    expect(normalizeOrdinaryEventReference('原结局', '射雕第7回02-初遇黄蓉')).toBe('原结局');
-    expect(getEventParticipationKeys('射雕第7回02-初遇黄蓉')).toEqual(['射雕第7回02-初遇黄蓉']);
+  it('accepts exact canonical references and rejects event-like legacy references', () => {
+    expect(normalizeOrdinaryEventReference('射雕第七回02-初遇黄蓉')).toBe('射雕第七回02-初遇黄蓉');
+    expect(normalizeOrdinaryEventReference('原结局')).toBe('原结局');
+    expect(() => normalizeOrdinaryEventReference('第7回-02-初遇黄蓉')).toThrow('非规范事件引用');
+    expect(getEventParticipationKeys('射雕第七回02-初遇黄蓉')).toEqual(['射雕第七回02-初遇黄蓉']);
   });
 
   it('classifies debut events from attached metadata instead of their key text', () => {
-    const descriptor = deriveEventRuntimeDescriptor('射雕登场事件-第7回人物');
+    const descriptor = deriveEventRuntimeDescriptor('射雕第七回00-人物登场');
     const eventData = attachEventMetadata({ insert: {} }, descriptor);
 
     expect(isDebutEvent(eventData)).toBe(true);
@@ -69,12 +61,12 @@ describe('worldbook event loader', () => {
       getWorldbook: vi.fn(async () => [
         {
           uid: 1,
-          name: '射雕事件条目-第7回-02-初遇黄蓉',
+          name: '射雕第七回02-初遇黄蓉',
           content: JSON.stringify(ordinaryEvent),
         },
         {
           uid: 2,
-          name: '射雕登场事件-第7回人物',
+          name: '射雕第七回00-人物登场',
           content: JSON.stringify({ 事件类型: '登场事件', 触发条件: ordinaryEvent.触发条件, insert: {} }),
         },
       ]),
@@ -85,12 +77,12 @@ describe('worldbook event loader', () => {
   it('keys definitions by the derived runtime key and retains explicit kind metadata', async () => {
     const definitions = await loadEventDefinitionsFromWorldbook();
 
-    expect(Object.keys(definitions)).toEqual(['射雕第7回02-初遇黄蓉', '射雕第7回-人物登场']);
-    expect(getEventMetadata(definitions['射雕第7回02-初遇黄蓉'])).toMatchObject({
+    expect(Object.keys(definitions)).toEqual(['射雕第七回02-初遇黄蓉', '射雕第七回00-人物登场']);
+    expect(getEventMetadata(definitions['射雕第七回02-初遇黄蓉'])).toMatchObject({
       kind: EVENT_KIND.ORDINARY,
-      sourceName: '射雕事件条目-第7回-02-初遇黄蓉',
+      sourceName: '射雕第七回02-初遇黄蓉',
     });
-    expect(isDebutEvent(definitions['射雕第7回-人物登场'])).toBe(true);
+    expect(isDebutEvent(definitions['射雕第七回00-人物登场'])).toBe(true);
   });
 });
 
