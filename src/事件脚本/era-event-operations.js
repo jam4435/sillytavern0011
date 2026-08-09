@@ -10,7 +10,6 @@ import {
   logSuccess,
   logWarning,
   getEndTime,
-  getEventMetadata,
   hasParticipationEntry,
   getParticipationEntry,
   buildInvalidParticipationDeletePatch,
@@ -51,7 +50,6 @@ import {
   normalizeFollowupEvents,
 } from './era-event-schema.js';
 
-const CHAPTER_SEQUENCE_PATTERN = /^(.*?第[0-9一二三四五六七八九十百千万]+回[0-9]+)-/;
 const EVENT_DIFF_ACTIONS = ['insert', 'update', 'delete'];
 const EVENT_SETTLEMENT_PROGRESS_KEY = '事件结算进度';
 const followupReferenceIndexCache = new WeakMap();
@@ -118,30 +116,10 @@ function applyOpeningDebutDelta(statData, eventData, eventName) {
   }
 }
 
-function stripJsonSuffix(value) {
-  const text = String(value || '').trim();
-  return text.replace(/\.(json|ya?ml|txt)$/i, '');
-}
-
 function resolveEventReference(sourceEventName, targetEventName, eventDefinitions) {
-  const rawTarget = stripJsonSuffix(targetEventName);
-  if (!rawTarget) return rawTarget;
-  if (eventDefinitions[rawTarget]) return rawTarget;
-
-  const canonicalTarget = normalizeOrdinaryEventReference(rawTarget, sourceEventName);
-  if (eventDefinitions[canonicalTarget]) return canonicalTarget;
-
-  const sequencePrefix = canonicalTarget.match(CHAPTER_SEQUENCE_PATTERN)?.[1];
-  if (sequencePrefix) {
-    const sourceSeries = getEventMetadata(eventDefinitions[sourceEventName])?.series;
-    const sequenceMatches = Object.keys(eventDefinitions).filter(name => {
-      const metadata = getEventMetadata(eventDefinitions[name]);
-      return metadata?.series === sourceSeries && name.startsWith(`${sequencePrefix}-`);
-    });
-    if (sequenceMatches.length === 1) return sequenceMatches[0];
-  }
-
-  return canonicalTarget;
+  void sourceEventName;
+  void eventDefinitions;
+  return normalizeOrdinaryEventReference(targetEventName);
 }
 
 function addValueToSetMap(map, key, value) {

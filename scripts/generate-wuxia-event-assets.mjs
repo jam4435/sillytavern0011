@@ -43,6 +43,8 @@ const SHARD_MAX_BYTES = 350 * 1024;
 const CHECKPOINT_INTERVAL = 100;
 const DISCOVERY_HOURS = 10 * 24;
 const STRICT_VALIDATION = process.argv.includes('--strict');
+const NON_EVENT_FOLLOWUP_LABELS = new Set(['全书完', '待定', '无', '后续待续']);
+const EVENT_STATE_PATH_ROOTS = ['事件系统', '世界事件', '参与事件', '事件分支结果', '事件结局状态'];
 
 const EVENT_KINDS = Object.freeze({
   ordinary: EVENT_KIND.ORDINARY,
@@ -202,13 +204,67 @@ function mergePlainObject(target, source) {
   return target;
 }
 
-function normalizeCharacterDelta(delta, eventRuntimeKey) {
+function normalizeCharacterDelta(delta) {
   const normalized = cloneJson(delta || {});
   if (!normalized?.人物经历 || typeof normalized.人物经历 !== 'object' || Array.isArray(normalized.人物经历)) {
     return normalized;
   }
   normalized.人物经历 = Object.fromEntries(Object.entries(normalized.人物经历));
   return normalized;
+}
+
+function validateTriggerReferences(value, event, byKey, pathSegments = ['触发条件']) {
+  if (Array.isArray(value)) {
+    value.forEach((child, index) => validateTriggerReferences(child, event, byKey, [...pathSegments, index]));
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = [...pathSegments, key];
+    if (key === '事件完成') {
+      if (typeof child !== 'string' || !parseCanonicalEventKey(child) || !byKey.has(child)) {
+        throw new Error(`事件 ${event.runtimeKey} 的 ${childPath.join('.')} 不是已存在的规范事件键: ${child}`);
+      }
+      continue;
+    }
+    if (key === '变量' && typeof child === 'string' && EVENT_STATE_PATH_ROOTS.some(rootKey => child.includes(rootKey))) {
+      const referencedKeys = [...byKey.keys()].filter(runtimeKey => child.includes(runtimeKey));
+      if (referencedKeys.length !== 1) {
+        throw new Error(`事件 ${event.runtimeKey} 的 ${childPath.join('.')} 未唯一引用规范事件键: ${child}`);
+      }
+    }
+    validateTriggerReferences(child, event, byKey, childPath);
+  }
+}
+
+function validateMachineReferences(events, byKey) {
+  for (const event of events) {
+    for (const action of ['insert', 'update', 'delete']) {
+      for (const [characterName, delta] of Object.entries(event.definition[action] || {})) {
+        const experiences = delta?.人物经历;
+        if (experiences === undefined) continue;
+        if (!experiences || typeof experiences !== 'object' || Array.isArray(experiences)) {
+          throw new Error(`事件 ${event.runtimeKey}.${action}.${characterName}.人物经历 必须是对象`);
+        }
+        for (const experienceKey of Object.keys(experiences)) {
+          if (experienceKey !== event.runtimeKey) {
+            throw new Error(
+              `事件 ${event.runtimeKey}.${action}.${characterName}.人物经历 使用了非本事件规范键: ${experienceKey}`,
+            );
+          }
+        }
+      }
+    }
+
+    for (const reference of Object.keys(normalizeFollowupEvents(event.definition.后续事件))) {
+      if (NON_EVENT_FOLLOWUP_LABELS.has(reference)) continue;
+      if (!parseCanonicalEventKey(reference)) {
+        throw new Error(`事件 ${event.runtimeKey} 使用了非规范后续事件引用: ${reference}`);
+      }
+      if (!byKey.has(reference)) throw new Error(`事件 ${event.runtimeKey} 的后续事件不存在: ${reference}`);
+    }
+    validateTriggerReferences(event.definition.触发条件, event, byKey);
+  }
 }
 
 function deleteByObject(target, patch) {
@@ -233,11 +289,11 @@ function deleteByObject(target, patch) {
 function applyEventCharacterOperations(characterState, event) {
   for (const [characterName, delta] of Object.entries(event.definition.insert || {})) {
     const target = (characterState[characterName] ||= {});
-    mergePlainObject(target, normalizeCharacterDelta(delta, event.runtimeKey));
+    mergePlainObject(target, normalizeCharacterDelta(delta));
   }
   for (const [characterName, delta] of Object.entries(event.definition.update || {})) {
     const target = (characterState[characterName] ||= {});
-    mergePlainObject(target, normalizeCharacterDelta(delta, event.runtimeKey));
+    mergePlainObject(target, normalizeCharacterDelta(delta));
   }
   for (const [characterName, patch] of Object.entries(event.definition.delete || {})) {
     if (characterState[characterName]) deleteByObject(characterState[characterName], patch);
@@ -323,6 +379,7 @@ function collectEvents() {
   }
   events.sort(compareEvents);
   const byKey = new Map(events.map(event => [event.runtimeKey, event]));
+  validateMachineReferences(events, byKey);
   const unresolvedReferences = [];
   for (const event of events) {
     for (const targetRuntimeKey of Object.keys(event.followups)) {
@@ -330,6 +387,9 @@ function collectEvents() {
         unresolvedReferences.push({ sourceRuntimeKey: event.runtimeKey, targetRuntimeKey });
       }
     }
+  }
+  if (STRICT_VALIDATION && unresolvedReferences.length > 0) {
+    throw new Error(`严格校验失败: ${unresolvedReferences.length} 条后续事件引用在当前源文件中找不到目标`);
   }
   return { events, unresolvedReferences };
 }
@@ -506,9 +566,6 @@ function main() {
   console.log(`同步开局事件汇总: ${openingEventSummary.length} 个普通事件`);
   console.log(`manifest hash: ${manifest.contentHash}`);
   if (unresolvedReferences.length > 0) {
-    if (STRICT_VALIDATION) {
-      throw new Error(`严格校验失败: ${unresolvedReferences.length} 条后续事件引用在当前源文件中找不到目标`);
-    }
     console.warn(`警告: ${unresolvedReferences.length} 条后续事件引用在当前源文件中找不到目标，已保留为非图边。`);
   }
 }

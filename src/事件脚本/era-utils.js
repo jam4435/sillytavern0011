@@ -7,6 +7,7 @@ import { getSingleConditionTimeAnchor } from './era-event-schema.js';
 import {
   EVENT_KIND,
   EVENT_RUNTIME_KEY_VERSION,
+  looksLikeEventEntryName,
   parseCanonicalEventKey,
   stripEventFileSuffix,
 } from '../shared/eventKey.js';
@@ -73,7 +74,12 @@ export function isOrdinaryEvent(eventData) {
 }
 
 export function normalizeOrdinaryEventReference(reference) {
-  return stripEventFileSuffix(reference);
+  const rawReference = stripEventFileSuffix(reference);
+  if (!rawReference || parseCanonicalEventKey(rawReference)) return rawReference;
+  if (looksLikeEventEntryName(rawReference)) {
+    throw new Error(`非规范事件引用: ${rawReference}`);
+  }
+  return rawReference;
 }
 
 // ==================== 日志工具 ====================

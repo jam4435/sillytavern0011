@@ -174,14 +174,14 @@ export async function loadEventDefinitionsFromWorldbook() {
 
     for (const { entry, eventName, descriptor, entryFingerprint } of matchedEventEntries) {
       if (eventDefinitions[eventName]) {
-        logError(`事件运行时键冲突，已跳过后加载条目: ${eventName} (${entry.name})`);
+        logError(`事件运行时键冲突: ${eventName} (${entry.name})`);
         notifyEvent({
           kind: 'event-data-error',
           level: 'error',
           message: `事件运行时键冲突: ${eventName}`,
           eventNames: [eventName],
         });
-        continue;
+        throw new Error(`事件运行时键冲突: ${eventName}`);
       }
 
       const cachedEntryDefinition = parsedEventEntryCache.get(entryFingerprint);
@@ -204,7 +204,7 @@ export async function loadEventDefinitionsFromWorldbook() {
             message: `事件定义无效，已跳过: ${entry.name}`,
             eventNames: [eventName],
           });
-          continue;
+          throw new Error(normalized.errors.join('\n'));
         }
 
         parsedEventEntryCache.set(entryFingerprint, normalized.data);
@@ -218,6 +218,7 @@ export async function loadEventDefinitionsFromWorldbook() {
           message: `解析事件JSON失败: ${entry.name}`,
           eventNames: [eventName],
         });
+        throw e;
       }
     }
 
@@ -237,12 +238,14 @@ export async function loadEventDefinitionsFromWorldbook() {
       );
     } else {
       logWarning('⚠️ 未找到任何事件条目！请检查：');
-      logWarning("  1. 世界书条目名称是否以 '事件条目-' 开头");
+      logWarning('  1. 世界书条目名称是否符合“作品第中文数字回两位序号-标题”');
       logWarning('  2. 条目内容是否为有效的JSON格式');
     }
   } catch (error) {
     logError('加载世界书事件时出错:', error);
     notifyEvent({ kind: 'event-data-error', level: 'error', message: '加载世界书事件时出错' });
+    debugGroupEnd();
+    throw error;
   }
 
   debugGroupEnd();
