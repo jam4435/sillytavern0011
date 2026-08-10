@@ -413,6 +413,62 @@ describe('executeExtraVariableUpdate', () => {
     expect(getIsExtraVariableUpdating()).toBe(false);
   });
 
+  it('只写分钟造成回拨时定向修复完整时间，且整批只写入一次', async () => {
+    const statData = variableSnapshot.stat_data as Record<string, unknown>;
+    (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 55 };
+    statData.事件系统 = {
+      进行中事件: { '射雕第一回01-测试': { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 } },
+    };
+    requestConfiguredTextMock
+      .mockResolvedValueOnce(
+        '<VariableEdit>{"user数据":{"修为":120},"世界信息":{"时间":{"分":10}}}</VariableEdit>',
+      )
+      .mockResolvedValueOnce(
+        '<VariableThink>1200年8月15日12时55分 + 5分钟 = 1200年8月15日13时00分</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":13,"分":0}}}</VariableEdit>',
+      );
+    emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
+      (statData.user数据 as Record<string, unknown>).修为 = 120;
+      (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 };
+      return { message_id: 28, actions: { apiWrite: true } };
+    });
+
+    const result = await executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '众人又谈了片刻，酒席至此收束。',
+    });
+
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(2);
+    expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ appended: true, actionBlockCount: 6, timeRepairAttempted: true });
+    expect(result.appendedBlocks).toContain('"时间": {\n      "年": 1200,');
+    expect(result.appendedBlocks).toContain('"时": 13');
+    expect(result.appendedBlocks).toContain('"分": 0');
+    expect(result.appendedBlocks).not.toContain('"时间": {\n      "分": 10');
+  });
+
+  it('定向纠错三次都输出非时间路径时整批失败且不落库', async () => {
+    const statData = variableSnapshot.stat_data as Record<string, unknown>;
+    (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 55 };
+    requestConfiguredTextMock
+      .mockResolvedValueOnce('<VariableEdit>{"世界信息":{"时间":{"分":10}}}</VariableEdit>')
+      .mockResolvedValue('<VariableEdit>{"user数据":{"修为":999}}</VariableEdit>');
+
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+      }),
+    ).rejects.toThrow('纠错返回包含非时间路径');
+
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(4);
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+    expect(getIsExtraVariableUpdating()).toBe(false);
+  });
+
   it('允许同一严格活动区内自由修改第四级场景', async () => {
     requestConfiguredTextMock.mockResolvedValue(
       '<VariableEdit>{"user数据":{"所在位置":"大宋/临安府/牛家村/曲三酒馆"}}</VariableEdit>',

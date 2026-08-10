@@ -23,6 +23,12 @@ import {
   stableStringify,
   type VariableDeclaredChange,
 } from './variableChanges';
+import {
+  findEarliestRunningEventEnd,
+  isWorldTimePath,
+  validateWorldTimePatch,
+  type WorldTimeGuardResult,
+} from './worldTimeGuard';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
 const WORLD_BACKGROUND_ENTRY_NAME = '世界背景';
@@ -75,6 +81,7 @@ export type ExtraVariableUpdateResult = {
   applyError?: string;
   rejectedActions?: RejectedVariableAction[];
   formatRepairAttempted?: boolean;
+  timeRepairAttempted?: boolean;
 };
 
 export type RejectedVariableAction = {
@@ -124,7 +131,7 @@ const EXTRA_VARIABLE_READONLY_ENTITY_KEYS = new Set(['头像', '出生年份', '
 const PARTICIPATION_WRITABLE_KEYS = ['结局', 'insert', 'update', 'delete', '分支标记'] as const;
 const NORMAL_TURN_DECISION_CHECKLIST = `【普通回合变量检查清单】
 必须在 <VariableThink> 中按编号逐项给出简短结论；没有变化也要写“无”。
-1. 时间：最新正文是否明确经过时间？若是，按实际行为推进；短暂反应、观察和简短交谈不得机械推进。
+1. 时间：最新正文是否明确经过时间？若是，先核算“旧完整时间 + 正文耗时 = 新完整时间”，再将年/月/日/时/分五字段作为一个原子更新全部写出；短暂反应、观察和简短交谈不得机械推进。
 2. 地点：user 或 NPC 是否实际移动？只有发生移动才修改所在位置；换镜头、换说法或仍在同一场景不修改。
 3. 修炼与战斗：user 是否进行了修炼、战斗或其他可能产生修为的实际行为？若正文明确产生磨炼、领悟或修为收获，按只读“每日修为变化参考”结合行为时长、强度和成果估算修为；短暂运功、展示武功或仅仅出现战斗不自动增加修为。战斗另行结算正文明确发生的消耗、伤势和长期后果。
 4. user 持久变化：检查修为、气血、内力、状态、物品、功法、身份、经历和关系；只记录已经发生且值得长期保存的变化。
@@ -133,7 +140,7 @@ const NORMAL_TURN_DECISION_CHECKLIST = `【普通回合变量检查清单】
 const PARTICIPATION_TURN_DECISION_CHECKLIST = `【参与事件回合变量检查清单】
 必须在 <VariableThink> 中按编号逐项给出简短结论；没有变化也要写“无”。
 1. 事件与阶段：逐个检查当前参与事件，判断最新正文是否涉及该事件，以及当前处于“未涉及/开端/发展/后段/收束/已完成”中的哪个阶段。事件存在不代表本轮必然推进；不得拆分或自造固定节点。
-2. 时间：只有正文把相关事件推进到更后阶段或明确经过时间时才前推。阶段与时间必须单调前进；开端处于时间窗前段，发展/后段处于开始与结束之间，只有完整收束才可到事件结束时间。
+2. 时间：只有正文把相关事件推进到更后阶段或明确经过时间时才前推。先核算“旧完整时间 + 正文耗时 = 新完整时间”，再将年/月/日/时/分五字段作为一个原子更新全部写出。阶段与时间必须单调前进；只有完整收束才可准确到达事件结束时间，禁止越过边界顺带推进下一事件。
 3. 地点：user 与相关 NPC 是否实际移动、是否仍在事件活动区？仅在正文明确移动时修改；离开事件地时判断是否对事件结果造成实质偏离。
 4. 修炼与战斗：user 是否进行了修炼、战斗或其他可能产生修为的实际行为？若正文明确产生磨炼、领悟或修为收获，按只读“每日修为变化参考”结合行为时长、强度和成果估算修为；短暂运功、展示武功或仅仅出现战斗不自动增加修为。战斗另行结算明确消耗、伤势和长期后果，user 的变化直接写 user数据。
 5. NPC 变化路由：先检查相关参与事件的 insert/update/delete 是否已有相同人物与业务字段。已有且原定结果未变则不操作；已有但最终结果改变则只修改参与事件快照；快照未覆盖的新长期变化才写角色数据。禁止把事件快照已有结果提前重复写入角色数据。
@@ -304,10 +311,28 @@ function serializeIndependentVariableBlocks(
   changes: VariableDeclaredChange[],
 ): string {
   const blocks = thoughts.map(thought => `<VariableThink>\n${thought.text}\n</VariableThink>`);
-  for (const change of changes) {
+  const timeChanges = changes.filter(change => isWorldTimePath(change.path));
+  const nonTimeChanges = changes.filter(change => !isWorldTimePath(change.path));
+  for (const change of nonTimeChanges) {
     const leafValue = change.action === 'delete' ? {} : change.value;
     const patch = buildIndependentVariablePatch(change.path, leafValue);
     blocks.push(`<${change.blockTag}>\n${JSON.stringify(patch, null, 2)}\n</${change.blockTag}>`);
+  }
+  const latestTimeByPath = new Map<string, VariableDeclaredChange>();
+  for (const change of timeChanges) latestTimeByPath.set(JSON.stringify(change.path), change);
+  const timeChangesByTag = new Map<VariableDeclaredChange['blockTag'], VariableDeclaredChange[]>();
+  for (const change of latestTimeByPath.values()) {
+    const grouped = timeChangesByTag.get(change.blockTag) ?? [];
+    grouped.push(change);
+    timeChangesByTag.set(change.blockTag, grouped);
+  }
+  for (const blockTag of ['VariableEdit', 'VariableInsert', 'VariableDelete'] as const) {
+    const grouped = timeChangesByTag.get(blockTag);
+    if (!grouped?.length) continue;
+    const timePatch = Object.fromEntries(
+      grouped.map(change => [String(change.path[2]), change.action === 'delete' ? {} : change.value]),
+    );
+    blocks.push(`<${blockTag}>\n${JSON.stringify({ 世界信息: { 时间: timePatch } }, null, 2)}\n</${blockTag}>`);
   }
   return blocks.join('\n\n').trim();
 }
@@ -1396,6 +1421,272 @@ function extractValidVariableBlocks(rawResponse: string): {
   };
 }
 
+export type WorldTimeReplyValidationResult = {
+  changes: VariableDeclaredChange[];
+  thoughts: Array<{ text: string }>;
+  blocksText: string;
+  timeRepairAttempted: boolean;
+  repairRawResponse?: string;
+};
+
+function getWorldTimeGuardContext(): {
+  statData: Record<string, unknown>;
+  baseline: Record<string, unknown> | null;
+  eventEnd: ReturnType<typeof findEarliestRunningEventEnd>;
+} {
+  const statData = readCurrentStatDataSnapshot();
+  if (!statData) throw new Error('聊天级 stat_data 暂不可读，无法校验世界时间。');
+  const worldInfo = isRecord(statData.世界信息) ? statData.世界信息 : null;
+  const baseline = worldInfo && isRecord(worldInfo.时间) ? worldInfo.时间 : null;
+  return { statData, baseline, eventEnd: findEarliestRunningEventEnd(statData) };
+}
+
+function createWorldTimeRepairPrompt({
+  guard,
+  statData,
+  latestAssistantBody,
+  originalTimeBlocks,
+  previousFailure,
+  previousResponse,
+}: {
+  guard: Extract<WorldTimeGuardResult, { ok: false }>;
+  statData: Record<string, unknown>;
+  latestAssistantBody: string;
+  originalTimeBlocks: string;
+  previousFailure: string;
+  previousResponse: string;
+}): string {
+  const participationContext = {
+    参与事件: statData.参与事件 ?? {},
+    进行中事件: isRecord(statData.事件系统) ? statData.事件系统.进行中事件 ?? {} : {},
+  };
+  return `你是世界时间语义纠错器。原变量回复的时间声明未通过确定性校验。
+
+【校验失败】
+错误代码：${guard.code}
+原因：${guard.reason}
+当前完整时间：${JSON.stringify(guard.baseline)}
+非法候选时间：${JSON.stringify(guard.candidate)}
+进行中事件最早结束边界：${JSON.stringify(guard.eventEnd)}
+
+【最新 assistant 正文】
+${latestAssistantBody || '（空）'}
+
+【只读事件上下文】
+${JSON.stringify(sanitizeForPrompt(participationContext))}
+
+【原时间声明】
+${originalTimeBlocks || '（无可序列化声明）'}
+${previousFailure ? `\n【上一次纠错仍失败】\n${previousFailure}\n上一次返回：\n${previousResponse}` : ''}
+
+【唯一任务】
+1. 根据最新正文已经发生的可感知耗时，重算新时间；不得猜测或改写正文。
+2. 若正文实际没有需要持久化的耗时，只输出 VariableThink，不输出任何时间动作。
+3. 若需更新，VariableThink 必须简写“旧完整时间 + 耗时 = 新完整时间”，并完整声明年/月/日/时/分五字段。
+4. 新时间必须严格晚于当前时间，不得越过事件结束边界。事件完整收束时可准确等于边界。
+5. 只允许输出 <VariableThink> 以及路径为 世界信息.时间 的 VariableEdit/VariableInsert。不得输出正文、解释、选项或任何其他变量路径。
+6. 时间字段已存在用 Edit；仅旧档缺分时，分用 Insert、其余四字段用 Edit。`;
+}
+
+export async function validateOrRepairWorldTimeDeclarations({
+  settings,
+  declaredChanges,
+  thoughts,
+  latestAssistantBody,
+  forcedRepairReason = '',
+}: {
+  settings: SummarySettings;
+  declaredChanges: VariableDeclaredChange[];
+  thoughts: Array<{ text: string }>;
+  latestAssistantBody: string;
+  forcedRepairReason?: string;
+}): Promise<WorldTimeReplyValidationResult> {
+  if (!forcedRepairReason && !declaredChanges.some(change => isWorldTimePath(change.path))) {
+    return {
+      changes: declaredChanges,
+      thoughts,
+      blocksText: serializeIndependentVariableBlocks(thoughts, declaredChanges),
+      timeRepairAttempted: false,
+    };
+  }
+
+  const { statData, baseline, eventEnd } = getWorldTimeGuardContext();
+  const validatedGuard = validateWorldTimePatch({ baseline, declaredChanges, eventEnd });
+  if (validatedGuard.ok && !forcedRepairReason) {
+    return {
+      changes: declaredChanges,
+      thoughts,
+      blocksText: serializeIndependentVariableBlocks(thoughts, declaredChanges),
+      timeRepairAttempted: false,
+    };
+  }
+  const initialGuard: Extract<WorldTimeGuardResult, { ok: false }> = validatedGuard.ok
+    ? {
+        ok: false,
+        code: 'declared-action-invalid',
+        reason: forcedRepairReason,
+        baseline: validatedGuard.baseline,
+        candidate: validatedGuard.candidate,
+        eventEnd: validatedGuard.eventEnd,
+        timeChanges: validatedGuard.timeChanges,
+        nonTimeChanges: validatedGuard.nonTimeChanges,
+      }
+    : forcedRepairReason
+      ? { ...validatedGuard, code: 'declared-action-invalid', reason: forcedRepairReason }
+      : validatedGuard;
+
+  variableTraceLogger.warn('[worldTimeGuard] 拒绝非法世界时间，准备定向纠错', {
+    code: initialGuard.code,
+    reason: initialGuard.reason,
+    baseline: initialGuard.baseline,
+    candidate: initialGuard.candidate,
+    eventEnd: initialGuard.eventEnd,
+  });
+
+  const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
+  if (requestSettings.apiMode === 'custom') {
+    const validationMessage = validateSummaryApiConfig(requestSettings.apiConfig, { requireModel: true });
+    if (validationMessage) throw new Error(validationMessage);
+  }
+  const originalTimeBlocks = serializeIndependentVariableBlocks([], initialGuard.timeChanges);
+  let previousFailure = '';
+  let previousResponse = '';
+  let finalRawResponse = '';
+
+  const requestRepair = async () => {
+    const repairPrompt = createWorldTimeRepairPrompt({
+      guard: initialGuard,
+      statData,
+      latestAssistantBody,
+      originalTimeBlocks,
+      previousFailure,
+      previousResponse,
+    });
+    const rawResponse = await runWith429Retry(
+      () =>
+        requestConfiguredText({
+          prompt: repairPrompt,
+          settings: requestSettings,
+          timeoutMs: EXTRA_VARIABLE_UPDATE_TIMEOUT_MS,
+          shouldStream: false,
+          generationIdPrefix: 'wuxia-world-time-repair',
+          skipWorldInfoAndAuthorNote: true,
+        }),
+      { requestLabel: '世界时间定向纠错' },
+    );
+    finalRawResponse = rawResponse;
+    try {
+      const extracted = extractValidVariableBlocks(rawResponse);
+      const repairedState = parseDeclaredVariableChanges(extracted.blocksText);
+      if (repairedState.parseErrors.length > 0) {
+        throw new Error(`纠错变量块无法解析：${repairedState.parseErrors.join('；')}`);
+      }
+      if (repairedState.omittedDeclaredCount > 0) {
+        throw new Error('纠错返回超过可安全校验的声明上限。');
+      }
+      const forbiddenChanges = repairedState.declaredChanges.filter(change => !isWorldTimePath(change.path));
+      if (forbiddenChanges.length > 0) {
+        throw new Error(
+          `纠错返回包含非时间路径：${forbiddenChanges.map(change => change.displayPath).join('、')}`,
+        );
+      }
+      const pathValidation = validateDeclaredActionPaths(repairedState.declaredChanges);
+      if (pathValidation.rejected.length > 0) {
+        throw new Error(
+          `纠错时间动作的 Insert/Edit 与当前路径不匹配：${pathValidation.rejected
+            .map(item => `${item.path}（${item.reason}）`)
+            .join('；')}`,
+        );
+      }
+      const repairedGuard = validateWorldTimePatch({
+        baseline,
+        declaredChanges: pathValidation.accepted,
+        eventEnd,
+      });
+      if (!repairedGuard.ok) throw new Error(repairedGuard.reason);
+      return {
+        changes: [...initialGuard.nonTimeChanges, ...repairedGuard.timeChanges],
+        thoughts: [...thoughts, ...repairedState.thoughts],
+      };
+    } catch (error) {
+      previousFailure = getErrorMessage(error);
+      previousResponse = rawResponse;
+      throw error;
+    }
+  };
+
+  const repaired = await runWithAutoAdvanceFailureRetry(requestRepair, {
+    requestLabel: '世界时间定向纠错',
+    onRetry: ({ retryNumber, maxRetries, delayMs, error }) => {
+      variableTraceLogger.warn('[worldTimeGuard] 定向纠错失败，准备重试', {
+        retryNumber,
+        maxRetries,
+        delayMs,
+        error: getErrorMessage(error),
+      });
+    },
+  });
+  const blocksText = serializeIndependentVariableBlocks(repaired.thoughts, repaired.changes);
+  variableTraceLogger.log('[worldTimeGuard] 定向纠错已通过守卫校验', {
+    originalError: initialGuard.reason,
+    repairRawResponse: finalRawResponse,
+    repairedChangeCount: repaired.changes.length,
+  });
+  return {
+    ...repaired,
+    blocksText,
+    timeRepairAttempted: true,
+    repairRawResponse: finalRawResponse,
+  };
+}
+
+export async function validateOrRepairInlineWorldTimeReply({
+  settings,
+  rawReply,
+}: {
+  settings: SummarySettings;
+  rawReply: string;
+}): Promise<{ replyText: string; timeRepairAttempted: boolean; blocksText: string }> {
+  const extracted = extractValidVariableBlocks(rawReply);
+  const declaredState = parseDeclaredVariableChanges(extracted.blocksText);
+  if (declaredState.parseErrors.length > 0) {
+    throw new Error(`本回合变量动作块无法完整解析：${declaredState.parseErrors.join('；')}`);
+  }
+  if (declaredState.omittedDeclaredCount > 0) {
+    throw new Error(`本回合变量声明超过可安全校验的上限。`);
+  }
+  const originalTimeChanges = declaredState.declaredChanges.filter(change => isWorldTimePath(change.path));
+  if (originalTimeChanges.length === 0) {
+    return { replyText: rawReply, timeRepairAttempted: false, blocksText: extracted.blocksText };
+  }
+
+  const timePathValidation = validateDeclaredActionPaths(originalTimeChanges);
+  const forcedRepairReason = timePathValidation.rejected.length
+    ? `原时间动作的 Insert/Edit/Delete 与当前路径不匹配：${timePathValidation.rejected
+        .map(item => `${item.path}（${item.reason}）`)
+        .join('；')}`
+    : '';
+  const semanticChanges = [
+    ...declaredState.declaredChanges.filter(change => !isWorldTimePath(change.path)),
+    ...timePathValidation.accepted,
+  ];
+
+  const latestAssistantBody = normalizeDisplayedMessageContent(stripEraVariableBlocksForPrompt(rawReply));
+  const validated = await validateOrRepairWorldTimeDeclarations({
+    settings,
+    declaredChanges: semanticChanges,
+    thoughts: declaredState.thoughts,
+    latestAssistantBody,
+    forcedRepairReason,
+  });
+  if (!validated.timeRepairAttempted) {
+    return { replyText: rawReply, timeRepairAttempted: false, blocksText: extracted.blocksText };
+  }
+  const replyWithoutVariableBlocks = rawReply.replace(ERA_VARIABLE_BLOCK_STRIP_REGEX, '\n').trim();
+  const replyText = [replyWithoutVariableBlocks, validated.blocksText].filter(Boolean).join('\n\n').trim();
+  return { replyText, timeRepairAttempted: true, blocksText: validated.blocksText };
+}
+
 function assertVariableBlockTagsPreserved(originalResponse: string, repairedResponse: string): void {
   const changedTags = VARIABLE_BLOCK_TAGS.filter(blockTag => {
     const pattern = new RegExp(`<${blockTag}>`, 'gi');
@@ -1726,15 +2017,31 @@ export async function executeExtraVariableUpdate({
         rejectedActions: validation.rejected,
       });
     }
-    if (declaredState.declaredChanges.length > 0 && validation.accepted.length === 0) {
+    const rejectedTimeActions = validation.rejected.filter(item => item.path.startsWith('世界信息.时间'));
+    const forcedTimeRepairReason = rejectedTimeActions.length
+      ? `原时间动作的 Insert/Edit/Delete 与当前路径不匹配：${rejectedTimeActions
+          .map(item => `${item.path}（${item.reason}）`)
+          .join('；')}`
+      : '';
+    const hasDeclaredTimeAction = declaredState.declaredChanges.some(change => isWorldTimePath(change.path));
+    if (declaredState.declaredChanges.length > 0 && validation.accepted.length === 0 && !hasDeclaredTimeAction) {
       throw new Error(
         `本回合所有变量动作均未通过独立校验：${validation.rejected
           .map(item => `${item.path}（${item.reason}）`)
-          .join('；')}`,
+        .join('；')}`,
       );
     }
-    const blocksText = serializeIndependentVariableBlocks(declaredState.thoughts, validation.accepted);
-    const actionBlockCount = validation.accepted.length;
+    const timeValidation = await runPhase('validate-or-repair-world-time', () =>
+      validateOrRepairWorldTimeDeclarations({
+        settings,
+        declaredChanges: validation.accepted,
+        thoughts: declaredState.thoughts,
+        latestAssistantBody: normalizeDisplayedMessageContent(stripEraVariableBlocksForPrompt(latestRawReply)),
+        forcedRepairReason: forcedTimeRepairReason,
+      }),
+    );
+    const blocksText = timeValidation.blocksText;
+    const actionBlockCount = timeValidation.changes.length;
     const diagnosticRawResponse = formatRepairAttempted
       ? `【原始返回（JSON 格式错误）】\n${rawResponse}\n\n【格式修复返回】\n${effectiveRawResponse}`
       : rawResponse;
@@ -1751,6 +2058,7 @@ export async function executeExtraVariableUpdate({
       declaredChangeCount: declaredState.declaredChanges.length,
       declaredParseErrors: declaredState.parseErrors,
       rejectedActions: validation.rejected,
+      timeRepairAttempted: timeValidation.timeRepairAttempted,
     });
     onProgress?.({
       prompt,
@@ -1759,6 +2067,7 @@ export async function executeExtraVariableUpdate({
       actionBlockCount,
       rejectedActions: validation.rejected,
       formatRepairAttempted,
+      timeRepairAttempted: timeValidation.timeRepairAttempted,
     });
 
     if (actionBlockCount === 0) {
@@ -1777,6 +2086,7 @@ export async function executeExtraVariableUpdate({
         retryFailureLastDelayMs,
         rejectedActions: validation.rejected,
         formatRepairAttempted,
+        timeRepairAttempted: timeValidation.timeRepairAttempted,
       };
     }
 
@@ -1806,6 +2116,7 @@ export async function executeExtraVariableUpdate({
       ].filter(Boolean).join('\n'),
       rejectedActions: validation.rejected,
       formatRepairAttempted,
+      timeRepairAttempted: timeValidation.timeRepairAttempted,
     });
 
     if (!appendVerification.verified) {
@@ -1914,7 +2225,7 @@ export async function executeExtraVariableUpdate({
     }
 
     const persistenceVerification = await runPhase('verify-variable-persistence', () =>
-      verifyDeclaredChangesAfterEraWrite(validation.accepted),
+      verifyDeclaredChangesAfterEraWrite(timeValidation.changes),
     );
     const applyStatus: ExtraVariableApplyStatus = persistenceVerification.verified ? 'success' : 'error';
     onProgress?.({
@@ -1956,6 +2267,7 @@ export async function executeExtraVariableUpdate({
       applyVerification: [persistenceVerification.verification, rejectionSummary].filter(Boolean).join('\n'),
       rejectedActions: validation.rejected,
       formatRepairAttempted,
+      timeRepairAttempted: timeValidation.timeRepairAttempted,
     };
   } finally {
     variableTraceLogger.log('[extraVariableUpdate] 本轮额外变量更新结束', { assistantMessageId });

@@ -47,6 +47,11 @@ vi.mock('../utils/extraVariableUpdateManager', () => ({
   ensureTurnVariableBlocksCommitted: vi.fn(),
   executeExtraVariableUpdate: vi.fn(),
   prepareExtraVariableUpdateTurn: vi.fn(),
+  validateOrRepairInlineWorldTimeReply: vi.fn(async ({ rawReply }: { rawReply: string }) => ({
+    replyText: rawReply,
+    timeRepairAttempted: false,
+    blocksText: rawReply,
+  })),
 }));
 
 vi.mock('../utils/eraWriteWait', () => ({
@@ -77,6 +82,7 @@ import {
   ensureTurnVariableBlocksCommitted,
   executeExtraVariableUpdate,
   prepareExtraVariableUpdateTurn,
+  validateOrRepairInlineWorldTimeReply,
 } from '../utils/extraVariableUpdateManager';
 import { observeEraWriteDone } from '../utils/eraWriteWait';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
@@ -104,6 +110,7 @@ const globals = globalThis as typeof globalThis & {
 const prepareExtraVariableUpdateTurnMock = vi.mocked(prepareExtraVariableUpdateTurn);
 const executeExtraVariableUpdateMock = vi.mocked(executeExtraVariableUpdate);
 const ensureTurnVariableBlocksCommittedMock = vi.mocked(ensureTurnVariableBlocksCommitted);
+const validateOrRepairInlineWorldTimeReplyMock = vi.mocked(validateOrRepairInlineWorldTimeReply);
 const observeEraWriteDoneMock = vi.mocked(observeEraWriteDone);
 const regenerateLastAssistantSwipeMock = vi.mocked(regenerateLastAssistantSwipe);
 
@@ -175,6 +182,11 @@ describe('useMessageHandler extra-variable decision', () => {
       verification: '测试变量已提交',
       pendingPaths: [],
     });
+    validateOrRepairInlineWorldTimeReplyMock.mockReset().mockImplementation(async ({ rawReply }) => ({
+      replyText: rawReply,
+      timeRepairAttempted: false,
+      blocksText: rawReply,
+    }));
     observeEraWriteDoneMock.mockReset().mockReturnValue({
       waitForMessageId: vi.fn(async () => ({ message_id: 2, actions: { resync: true } })),
       stop: vi.fn(),
@@ -490,6 +502,52 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(globals.createChatMessages).toHaveBeenCalledTimes(2);
     expect(messages.map(message => message.role)).toEqual(['user', 'assistant']);
     expect(messages[1]?.message).toContain('"修为":120');
+  });
+
+  it('inline 时间回拨会只替换时间块，不重新生成正文且只落一个 assistant', async () => {
+    const badReply = '正文只生成一次\n<VariableEdit>{"世界信息":{"时间":{"分":10}}}</VariableEdit>';
+    const repairedReply =
+      '正文只生成一次\n<VariableThink>旧时间 + 5分钟 = 新时间</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":13,"分":0}}}</VariableEdit>';
+    globals.generate = vi.fn(async () => badReply);
+    validateOrRepairInlineWorldTimeReplyMock.mockResolvedValue({
+      replyText: repairedReply,
+      timeRepairAttempted: true,
+      blocksText: repairedReply.slice(repairedReply.indexOf('<VariableThink>')),
+    });
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('测试时间纠错');
+    });
+
+    expect(globals.generate).toHaveBeenCalledTimes(1);
+    expect(validateOrRepairInlineWorldTimeReplyMock).toHaveBeenCalledTimes(1);
+    expect(globals.createChatMessages).toHaveBeenCalledTimes(2);
+    expect(messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    expect(messages[1]?.message).toBe(repairedReply);
+    expect(messages[1]?.message).not.toContain('"分":10}}');
+    expect(ensureTurnVariableBlocksCommittedMock).toHaveBeenCalledWith(
+      expect.objectContaining({ blocksText: repairedReply }),
+    );
+  });
+
+  it('inline 时间定向纠错耗尽时不创建 assistant 也不等待 ERA', async () => {
+    globals.generate = vi.fn(async () => '正文\n<VariableEdit>{"世界信息":{"时间":{"分":10}}}</VariableEdit>');
+    validateOrRepairInlineWorldTimeReplyMock.mockRejectedValue(
+      new Error('世界时间定向纠错失败，已自动重试 2 次'),
+    );
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('测试纠错耗尽');
+    });
+
+    expect(messages.map(message => message.role)).toEqual(['user']);
+    expect(observeEraWriteDoneMock).not.toHaveBeenCalled();
+    expect(ensureTurnVariableBlocksCommittedMock).not.toHaveBeenCalled();
+    expect(options.showError).toHaveBeenCalledWith(expect.stringContaining('世界时间定向纠错失败'));
   });
 
   it('自动推进 extra 模式会启用额外变量模型失败重试', async () => {

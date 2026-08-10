@@ -324,17 +324,20 @@ export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传
 1. 只有上方 latestAssistantBody 是本轮变化来源；前序对话只用于理解上下文。
 2. 逐级对照当前变量上下文中的真实键名。最终目标键已存在只能使用 VariableEdit，不存在才可使用 VariableInsert；VariableDelete 只能删除已存在的键。
 3. 正文没有改变的事实不得重复 Insert 或无意义 Edit。
-4. 只允许修改世界信息.时间、user数据、角色数据，以及当前上下文已有参与事件的结局/insert/update/delete和已有分支标记的 0/1 值。分支标记只能 Edit，禁止新增、删除或改成其他值；禁止写事件分支结果。
-5. 方括号说明、叙事表现标尺、可用地点列表和其他只读内容不得写回变量。
-6. 没有需要持久化的变化时，只输出简短 VariableThink。
+4. 时间是禁止稀疏更新的原子对象。每次时间变化都必须先核算“旧完整时间 + 正文耗时 = 新完整时间”，并完整写出年/月/日/时/分五字段；未变字段也必须写出，不属于无意义 Edit。
+5. 例如当前 1200年8月15日12时55分，正文经过 15 分钟，新时间是 1200年8月15日13时10分；必须输出完整 {"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":13,"分":10}}}，禁止只写“分:10”。
+6. 只允许修改世界信息.时间、user数据、角色数据，以及当前上下文已有参与事件的结局/insert/update/delete和已有分支标记的 0/1 值。分支标记只能 Edit，禁止新增、删除或改成其他值；禁止写事件分支结果。
+7. 方括号说明、叙事表现标尺、可用地点列表和其他只读内容不得写回变量。
+8. 参与事件完整收束时只能准确落到事件结束边界，不得越过边界顺带推进下一事件。
+9. 没有需要持久化的变化时，只输出简短 VariableThink。
 
 输出要求：
 - 只允许输出 <VariableThink>、<VariableInsert>、<VariableEdit>、<VariableDelete> 块。
 - 不要寒暄、复述正文、续写剧情或输出其他 XML 标签。
-- VariableThink 使用“路径｜当前存在/不存在｜正文变化｜操作”，不展开思维链。
+- VariableThink 使用“路径｜当前存在/不存在｜正文变化｜操作”，不展开思维链；时间变化额外简写“旧完整时间 + 耗时 = 新完整时间”。
 - VariableInsert/VariableEdit/VariableDelete 内只能放严格 JSON 对象，不得使用注释、尾随逗号或 JSON5。
 - 相同类型的操作合并到一个块中。
-- 输出前再次核对：操作类型正确、路径逐层嵌套、地点逐字来自白名单。`;
+- 输出前再次核对：操作类型正确、路径逐层嵌套、时间五字段完整且向前、地点逐字来自白名单。`;
 
 export const DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS = ['tucao', 'current_event', 'progress'].join('\n');
 export const DEFAULT_VARIABLE_PROMPT_BODY_START_MARKERS = '</konatan_planning~>';
