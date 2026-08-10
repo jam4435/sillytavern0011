@@ -310,6 +310,10 @@ export const GameStateSchema = z
     rngState: z.number().int().nonnegative(),
     scenarioId: z.literal('brittany_1066_prologue'),
     contentPackIds: z.array(z.string()),
+    contentPackVersions: z.record(z.string(), z.string()).default({
+      'ck.core': '1.0.0',
+      'ck.prologue.brittany1066': '1.0.0',
+    }),
     currentDate: ISODateSchema,
     nextRegularPulseAt: ISODateSchema,
     worldActionCredit: z.number().nonnegative().default(0),

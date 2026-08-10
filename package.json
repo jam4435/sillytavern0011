@@ -6,6 +6,7 @@
     "build": "pnpm generate:events && webpack --mode production",
     "build:src": "pnpm generate:events && webpack --mode production --env srcOnly=true",
     "build:src:fast": "pnpm generate:events && webpack --mode production --env srcOnly=true --env fast=true",
+    "build:ck-card": "pnpm build:src && node scripts/build-ck-card.mjs && node tavern_sync.mjs bundle CK领主RPG",
     "watch": "pnpm generate:events && webpack --mode development --watch --progress",
     "test": "vitest run",
     "test:safe": "vitest run --configLoader native --pool threads --reporter minimal",

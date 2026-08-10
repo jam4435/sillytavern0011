@@ -136,6 +136,10 @@ export function createInitialState(seed = 10660915): GameState {
     rngState: seed,
     scenarioId: 'brittany_1066_prologue',
     contentPackIds: ['ck.core', 'ck.prologue.brittany1066'],
+    contentPackVersions: {
+      'ck.core': '1.0.0',
+      'ck.prologue.brittany1066': '1.0.0',
+    },
     currentDate: '1066-09-15',
     nextRegularPulseAt: '1066-09-22',
     worldActionCredit: 0,

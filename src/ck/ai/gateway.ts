@@ -13,29 +13,55 @@ const DecisionSchema = z.object({
 export type DirectorResult = { state: GameState; narration: string; committedCalls: ActionCall[]; rejected: string[]; usedFallback: boolean };
 
 function modelAvailable(): boolean {
-  return typeof generate === 'function';
+  return typeof generateRaw === 'function' || typeof generate === 'function';
 }
 
 function describeActionContract(): string {
   return actionDefinitions.map(item => `${item.id}: ${item.description}`).join('\n');
 }
 
-async function callText(prompt: string, presetName: string): Promise<string> {
+async function callModel(config: GenerateConfig & { ordered_prompts?: GenerateRawConfig['ordered_prompts'] }): Promise<string | GenerateToolCallResult> {
+  if (typeof generateRaw === 'function') return generateRaw(config as GenerateRawConfig);
+  return generate(config);
+}
+
+async function callText(prompt: string, presetName: string, onStream?: (text: string) => void): Promise<string> {
   if (!modelAvailable()) return '';
-  const output = await generate({ user_input: prompt, preset_name: presetName, should_stream: true });
-  return typeof output === 'string' ? output : JSON.stringify(output);
+  const generationId = `ck_text_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const listener = onStream && typeof eventOn === 'function' && typeof iframe_events !== 'undefined'
+    ? eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (text, receivedId) => {
+        if (receivedId === generationId) onStream(text);
+      })
+    : null;
+  try {
+    const output = await callModel({
+      user_input: prompt,
+      preset_name: presetName,
+      should_stream: true,
+      should_silence: true,
+      generation_id: generationId,
+      max_chat_history: 0,
+      ordered_prompts: ['user_input'],
+    });
+    return typeof output === 'string' ? output : JSON.stringify(output);
+  } finally {
+    listener?.stop();
+  }
 }
 
 async function callDecision(prompt: string, presetName: string): Promise<z.infer<typeof DecisionSchema> | null> {
   if (!modelAvailable()) return null;
-  const response = await generate({
+  const response = await callModel({
     user_input: prompt,
     preset_name: presetName,
     should_stream: false,
+    should_silence: true,
+    max_chat_history: 0,
+    ordered_prompts: ['user_input'],
     json_schema: {
       name: 'ck_scene_decision',
       strict: true,
-      schema: {
+      value: {
         type: 'object',
         properties: {
           speakerId: { type: 'string' },
@@ -62,14 +88,14 @@ function fallbackNarration(state: GameState, playerText: string, speakerIds: str
   return `${names || '在场众人'}听完了你的话。蜡烛在地图边缘摇晃；这项表态已按领地规则结算。\n\n「${playerText.slice(0, 120)}」`;
 }
 
-export async function runOrdinaryDialogue(state: GameState, sceneId: string, locationId: string, speakerIds: string[], playerText: string): Promise<string> {
+export async function runOrdinaryDialogue(state: GameState, sceneId: string, locationId: string, speakerIds: string[], playerText: string, onStream?: (text: string) => void): Promise<string> {
   const projection = projectScene(state, sceneId, locationId, speakerIds);
   const prompt = `你是中世纪领主 RPG 的场景导演。只能使用下列裁剪场景，不得推断远方秘密，也不得修改数据。\n场景：${JSON.stringify(projection)}\n玩家说：${playerText}\n用简体中文写 120—220 字对话，保持人物目标和时代语感。`;
-  const generated = await callText(prompt, state.settings.models.sceneDirector.presetName);
+  const generated = await callText(prompt, state.settings.models.sceneDirector.presetName, onStream);
   return generated || fallbackNarration(state, playerText, projection.activeCharacterIds);
 }
 
-export async function runConsequentialDialogue(state: GameState, sceneId: string, locationId: string, speakerIds: string[], playerText: string): Promise<DirectorResult> {
+export async function runConsequentialDialogue(state: GameState, sceneId: string, locationId: string, speakerIds: string[], playerText: string, onStream?: (text: string) => void): Promise<DirectorResult> {
   const projection = projectScene(state, sceneId, locationId, speakerIds);
   const decisionPrompt = `你是中世纪领主 RPG 的静默决策层。根据裁剪场景和玩家话语，替 NPC 作出至多 4 个注册行动。合法行动会自动生效，不能等待玩家确认。只能让 actor 调整 actor 自己对目标的态度，不能设绝对好感、凭空创造资源、指定战争胜者或查看未知秘密。\n可用行动：\n${describeActionContract()}\n场景：${JSON.stringify(projection)}\n玩家说：${playerText}\n如果没有合适硬变化，actionCalls 返回空数组。`;
   let decision = await callDecision(decisionPrompt, state.settings.models.sceneDirector.presetName);
@@ -89,7 +115,7 @@ export async function runConsequentialDialogue(state: GameState, sceneId: string
   }
   const committedSummary = nextState.eventLog.slice(state.eventLog.length).map(item => ({ type: item.type, payload: item.payload }));
   const narrationPrompt = `你是中世纪领主 RPG 的叙事层。硬结果已经提交，绝不能改写、撤销或补充未提交变化。\n人物输入：${playerText}\n已提交事实：${JSON.stringify(committedSummary)}\n决策意图：${decision?.intent ?? '规则回退'}\n用简体中文写 160—280 字，清楚表达承诺、拒绝、代价或反提案。`;
-  const narration = await callText(narrationPrompt, nextState.settings.models.sceneDirector.presetName);
+  const narration = await callText(narrationPrompt, nextState.settings.models.sceneDirector.presetName, onStream);
   return { state: nextState, narration: narration || fallbackNarration(nextState, playerText, projection.activeCharacterIds), committedCalls, rejected, usedFallback: !decision || !narration };
 }
 

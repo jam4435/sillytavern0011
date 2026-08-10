@@ -8,7 +8,7 @@ import { relationshipValue } from './domain/selectors';
 import { useGameStore } from './stores/game';
 
 const store = useGameStore();
-const { state, chronicle, busy, selectedCountyId, selectedCharacterId, rightTab, mapLayer, dialogueExpanded, currentSupport, daysLeft, player, currentLocation } = storeToRefs(store);
+const { state, chronicle, checkpoints, busy, streamingText, selectedCountyId, selectedCharacterId, rightTab, mapLayer, dialogueExpanded, currentSupport, daysLeft, player, currentLocation } = storeToRefs(store);
 const dialogueText = ref('');
 const consequential = ref(false);
 const checkpointName = ref('宴会前夜');
@@ -86,12 +86,24 @@ async function importPack(event: Event): Promise<void> {
   }
   importedPacks.value.push(parsed.pack);
   modReport.value = `已加载 ${parsed.pack.name} ${parsed.pack.version}；${registry.entities.size} 个声明式实体。当前存档未被污染。`;
-  state.value.contentPackIds = registry.packs.map(pack => pack.id);
+  store.setContentPacks(registry.packs.map(pack => ({ id: pack.id, version: pack.version })));
 }
 
 function updatePulseDays(event: Event): void {
   const value = Number((event.target as HTMLInputElement).value);
-  state.value.settings.regularWorldPulseDays = Math.max(3, Math.min(30, value));
+  store.setPulseDays(value);
+}
+
+function restoreCheckpoint(id: string, name: string): void {
+  if (window.confirm(`恢复到“${name}”？当前未命名进度将被覆盖。`)) {
+    store.restoreNamedCheckpoint(id);
+  }
+}
+
+function restartPrologue(): void {
+  if (window.confirm('确定重新开始序章？当前权威快照将被覆盖。')) {
+    store.resetGame();
+  }
 }
 </script>
 
@@ -240,7 +252,7 @@ function updatePulseDays(event: Event): void {
         <p class="dossier-note">本体剧本也走内容加载器。普通内容包只能声明条件、效果和数据，不执行任意 JavaScript。</p>
         <label class="file-import">导入 .ckpack.json5<input type="file" accept=".json5,.ckpack.json5" @change="importPack" /></label>
         <pre class="mod-report">{{ modReport }}</pre>
-        <ul class="pack-list"><li v-for="id in state.contentPackIds" :key="id">{{ id }}</li></ul>
+        <ul class="pack-list"><li v-for="id in state.contentPackIds" :key="id">{{ id }} <small>{{ state.contentPackVersions[id] ?? '版本未知' }}</small></li></ul>
       </div>
 
       <div v-else class="panel-content settings-panel">
@@ -248,7 +260,12 @@ function updatePulseDays(event: Event): void {
         <label>常规世界脉冲 <input type="range" min="3" max="30" :value="state.settings.regularWorldPulseDays" @change="updatePulseDays" /><b>{{ state.settings.regularWorldPulseDays }} 日</b></label>
         <dl><div><dt>亲密尺度</dt><dd>{{ state.settings.content.intimacy }}</dd></div><div><dt>暴力尺度</dt><dd>{{ state.settings.content.violence }}</dd></div><div><dt>神秘尺度</dt><dd>{{ state.settings.content.supernatural }}</dd></div><div><dt>硬年龄门槛</dt><dd>18（不可降低）</dd></div></dl>
         <div class="checkpoint-box"><input v-model="checkpointName" maxlength="40" /><button @click="store.checkpoint(checkpointName)">写入酒馆检查点</button></div>
-        <button class="danger-button" @click="confirm('确定重新开始序章？当前权威快照将被覆盖。') && store.resetGame()">重新开始序章</button>
+        <div v-if="checkpoints.length" class="checkpoint-list">
+          <button v-for="item in [...checkpoints].reverse()" :key="item.id" @click="restoreCheckpoint(item.id, item.name)">
+            <span>{{ item.name }}</span><small>{{ item.state.currentDate }} · r{{ item.state.revision }}</small>
+          </button>
+        </div>
+        <button class="danger-button" @click="restartPrologue">重新开始序章</button>
       </div>
 
       <footer class="panel-footer">
@@ -268,6 +285,7 @@ function updatePulseDays(event: Event): void {
       <div class="dialogue-body">
         <div class="scene-feed">
           <article v-for="entry in latestEntries" :key="entry.id" :class="entry.kind"><header><b>{{ entry.title }}</b><time>{{ entry.date }}</time></header><p>{{ entry.text }}</p></article>
+          <article v-if="streamingText" class="speech streaming"><header><b>场景导演</b><time>流式生成</time></header><p>{{ streamingText }}</p></article>
         </div>
         <form class="dialogue-compose" @submit.prevent="submitDialogue">
           <label><input v-model="consequential" type="checkbox" /><span>重大交涉</span><small>静默结算行动，再叙述已提交事实</small></label>

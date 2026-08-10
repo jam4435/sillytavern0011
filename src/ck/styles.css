@@ -139,3 +139,11 @@ body {
 @media (max-width: 520px) {
   .topbar { grid-template-columns:minmax(130px,1fr) 90px 108px }.brand-block { gap:6px }.brand-block h1 { font-size:14px;letter-spacing:.04em }.seal-mark { width:34px;height:34px;font-size:11px }.time-block { padding:4px }.time-block strong { font-size:13px }.deadline-block span { font-size:7px }.deadline-block strong { font-size:15px }.deadline-block small { font-size:8px }.county-map { min-height:300px }.county-label { font-size:9px }.county-inspector dl { grid-template-columns:1fr }.dialogue-body { grid-template-rows:1fr 200px }.scene-feed article { max-width:96% }.panel-tabs button { font-size:9px }.panel-content { padding-left:9px;padding-right:9px }
 }
+
+.checkpoint-list { display:grid; gap:6px; margin:8px 0 14px }
+.checkpoint-list button { display:flex; justify-content:space-between; gap:10px; align-items:center; border:1px solid #594027; background:#1b130e; color:#cdb893; padding:7px 9px; cursor:pointer; text-align:left }
+.checkpoint-list button:hover { border-color:#9b7040; color:#efd7aa }
+.checkpoint-list small { color:#7f6b50; white-space:nowrap }
+.pack-list small { margin-left:6px; color:#6f604d }
+.scene-feed article.streaming { border-left-color:#c08a4d; animation:ck-stream-pulse 1.4s ease-in-out infinite }
+@keyframes ck-stream-pulse { 0%,100% { opacity:.72 } 50% { opacity:1 } }

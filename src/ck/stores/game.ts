@@ -5,9 +5,16 @@ import { createInitialState, t } from '../content/basePack';
 import { executeAction, makeAction } from '../domain/engine';
 import { deadlineDays, supportCount } from '../domain/selectors';
 import type { GameState } from '../domain/schema';
-import { addCheckpoint, loadSave, saveState } from '../persistence/save';
-
-export type ChronicleEntry = { id: string; date: string; kind: 'system' | 'speech' | 'event' | 'error'; title: string; text: string };
+import {
+  addCheckpoint,
+  loadSave,
+  restoreCheckpoint,
+  restoreLatestHistoryBranch,
+  saveState,
+  writeNarrativeExchange,
+  type ChronicleEntry,
+  type SaveCheckpoint,
+} from '../persistence/save';
 
 function openingChronicle(): ChronicleEntry[] {
   return [{
@@ -22,8 +29,10 @@ function openingChronicle(): ChronicleEntry[] {
 export const useGameStore = defineStore('ck-game', () => {
   const persisted = loadSave();
   const state = ref<GameState>(persisted?.state ?? createInitialState());
-  const chronicle = ref<ChronicleEntry[]>(openingChronicle());
+  const chronicle = ref<ChronicleEntry[]>(persisted?.chronicle.length ? persisted.chronicle : openingChronicle());
+  const checkpoints = ref<SaveCheckpoint[]>(persisted?.checkpoints ?? []);
   const busy = ref(false);
+  const streamingText = ref('');
   const selectedCountyId = ref('rennes');
   const selectedCharacterId = ref('char_hoel');
   const rightTab = ref<'people' | 'mail' | 'activity' | 'council' | 'ledger' | 'log' | 'mods' | 'settings'>('people');
@@ -35,8 +44,15 @@ export const useGameStore = defineStore('ck-game', () => {
   const currentLocation = computed(() => state.value.locations[player.value.locationId]);
   const localCharacterIds = computed(() => Object.values(state.value.characters).filter(character => character.alive && character.locationId === player.value.locationId && character.id !== player.value.id).map(character => character.id));
 
-  function addEntry(kind: ChronicleEntry['kind'], title: string, text: string, occurredAt = state.value.currentDate): void {
+  function persist(): void {
+    const envelope = saveState(state.value, { chronicle: chronicle.value, checkpoints: checkpoints.value });
+    checkpoints.value = envelope.checkpoints;
+  }
+
+  function addEntry(kind: ChronicleEntry['kind'], title: string, text: string, occurredAt = state.value.currentDate, persistAfter = true): void {
     chronicle.value.push({ id: `${kind}_${Date.now()}_${chronicle.value.length}`, date: occurredAt, kind, title, text });
+    if (chronicle.value.length > 500) chronicle.value.splice(0, chronicle.value.length - 500);
+    if (persistAfter) persist();
   }
 
   function commitAction(actionId: string, targetIds: string[], params: Record<string, unknown> = {}, actorId = state.value.playerCharacterId, sourceId = 'ui.player', sceneId = `scene_${state.value.scenario.sceneCount}`): boolean {
@@ -47,8 +63,8 @@ export const useGameStore = defineStore('ck-game', () => {
       return false;
     }
     state.value = result.state;
-    saveState(state.value);
-    for (const event of result.events) addEntry('event', event.type, summarizeEvent(event.type, event.payload), event.occurredAt);
+    for (const event of result.events) addEntry('event', event.type, summarizeEvent(event.type, event.payload), event.occurredAt, false);
+    persist();
     return true;
   }
 
@@ -93,9 +109,9 @@ export const useGameStore = defineStore('ck-game', () => {
     if (!state.value.signals.some(signal => !signal.consumed)) return;
     const simulation = await runPendingWorldSimulation(state.value);
     state.value = simulation.state;
-    saveState(state.value);
-    addEntry('system', '西欧局势推演', simulation.plan.summary);
-    if (simulation.rejected.length) addEntry('error', '世界规则回退', simulation.rejected.join('；'));
+    addEntry('system', '西欧局势推演', simulation.plan.summary, state.value.currentDate, false);
+    if (simulation.rejected.length) addEntry('error', '世界规则回退', simulation.rejected.join('；'), state.value.currentDate, false);
+    persist();
   }
 
   async function advanceDays(days = 1): Promise<void> {
@@ -130,40 +146,92 @@ export const useGameStore = defineStore('ck-game', () => {
   async function talk(text: string, consequential: boolean): Promise<void> {
     if (!text.trim() || busy.value) return;
     busy.value = true;
-    addEntry('speech', '科南二世', text.trim());
+    streamingText.value = '';
+    addEntry('speech', '科南二世', text.trim(), state.value.currentDate, false);
+    persist();
     const sceneId = `dialogue_${state.value.revision}_${Date.now().toString(36)}`;
     try {
+      let narration = '';
       if (consequential) {
-        const result = await runConsequentialDialogue(state.value, sceneId, player.value.locationId, localCharacterIds.value, text.trim());
+        const result = await runConsequentialDialogue(state.value, sceneId, player.value.locationId, localCharacterIds.value, text.trim(), value => {
+          streamingText.value = value;
+        });
         state.value = result.state;
-        saveState(state.value);
-        addEntry('speech', '在场人物', result.narration);
-        if (result.rejected.length) addEntry('error', '规则回退', result.rejected.join('；'));
+        narration = result.narration;
+        addEntry('speech', '在场人物', narration, state.value.currentDate, false);
+        if (result.rejected.length) addEntry('error', '规则回退', result.rejected.join('；'), state.value.currentDate, false);
       } else {
-        const narration = await runOrdinaryDialogue(state.value, sceneId, player.value.locationId, localCharacterIds.value, text.trim());
-        addEntry('speech', '在场人物', narration);
+        narration = await runOrdinaryDialogue(state.value, sceneId, player.value.locationId, localCharacterIds.value, text.trim(), value => {
+          streamingText.value = value;
+        });
+        addEntry('speech', '在场人物', narration, state.value.currentDate, false);
       }
+      const envelope = await writeNarrativeExchange(state.value, chronicle.value, text.trim(), narration);
+      checkpoints.value = envelope.checkpoints;
     } catch (error) {
       addEntry('error', '场景导演未响应', error instanceof Error ? error.message : String(error));
     } finally {
+      streamingText.value = '';
       busy.value = false;
     }
   }
 
   async function checkpoint(name: string): Promise<void> {
-    await addCheckpoint(state.value, name, true);
-    addEntry('system', '检查点已写入酒馆', `${name}（revision ${state.value.revision}）`);
+    addEntry('system', '检查点已写入酒馆', `${name}（revision ${state.value.revision}）`, state.value.currentDate, false);
+    const envelope = await addCheckpoint(state.value, chronicle.value, name, true);
+    checkpoints.value = envelope.checkpoints;
+  }
+
+  function restoreNamedCheckpoint(id: string): void {
+    const restored = restoreCheckpoint(id);
+    if (!restored) {
+      addEntry('error', '检查点恢复失败', '检查点不存在，或完整状态哈希校验失败。');
+      return;
+    }
+    state.value = restored.state;
+    chronicle.value = restored.chronicle;
+    const envelope = loadSave();
+    checkpoints.value = envelope?.checkpoints ?? [];
+    addEntry('system', '已恢复检查点', `战役回到 revision ${state.value.revision}。`);
+  }
+
+  function reloadFromHost(historyChanged = false): void {
+    if (busy.value) return;
+    const envelope = historyChanged ? restoreLatestHistoryBranch() : loadSave();
+    if (envelope) {
+      state.value = envelope.state;
+      chronicle.value = envelope.chronicle.length ? envelope.chronicle : openingChronicle();
+      checkpoints.value = envelope.checkpoints;
+      return;
+    }
+    state.value = createInitialState();
+    chronicle.value = openingChronicle();
+    checkpoints.value = [];
+    persist();
+  }
+
+  function setPulseDays(days: number): void {
+    state.value.settings.regularWorldPulseDays = Math.max(3, Math.min(30, Math.round(days)));
+    persist();
+  }
+
+  function setContentPacks(packs: Array<{ id: string; version: string }>): void {
+    state.value.contentPackIds = packs.map(pack => pack.id);
+    state.value.contentPackVersions = Object.fromEntries(packs.map(pack => [pack.id, pack.version]));
+    persist();
   }
 
   function resetGame(): void {
     state.value = createInitialState(Date.now() >>> 0);
     chronicle.value = openingChronicle();
-    saveState(state.value, []);
+    checkpoints.value = [];
+    saveState(state.value, { chronicle: chronicle.value, checkpoints: [], branchAnchor: null });
   }
 
   return {
-    state, chronicle, busy, selectedCountyId, selectedCharacterId, rightTab, mapLayer, dialogueExpanded,
+    state, chronicle, checkpoints, busy, streamingText, selectedCountyId, selectedCharacterId, rightTab, mapLayer, dialogueExpanded,
     currentSupport, daysLeft, player, currentLocation, localCharacterIds,
-    addEntry, commitAction, selectRegent, sendProbeLetter, startTravel, advanceDays, advanceFeast, bargain, answerUltimatum, triggerSideStory, talk, checkpoint, resetGame,
+    addEntry, commitAction, selectRegent, sendProbeLetter, startTravel, advanceDays, advanceFeast, bargain, answerUltimatum, triggerSideStory, talk, checkpoint,
+    restoreNamedCheckpoint, reloadFromHost, setPulseDays, setContentPacks, resetGame,
   };
 });

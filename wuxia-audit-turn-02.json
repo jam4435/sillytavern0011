@@ -1,0 +1,28 @@
+{
+  "startedAt": "2026-08-10T05:23:20.399Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [
+      "合理推进剧情"
+    ],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-audit-turn-02.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "合理推进剧情",
+      "success": false,
+      "error": "Error: 等待生成状态变为 true 超时（15000ms）；最后状态：{\"generating\":false,\"visibilityState\":\"visible\",\"pageUrl\":\"http://127.0.0.1:8000/\",\"frameUrl\":\"blob:http://127.0.0.1:8000/8ad82d3a-cc20-4bc4-b206-79f030cc0679\"}\n    at waitForGenerationState (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:222:9)\n    at async runTurn (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:463:22)\n    at async main (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:547:22)"
+    }
+  ],
+  "success": false,
+  "completedAt": "2026-08-10T05:25:07.662Z"
+}
