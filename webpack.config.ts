@@ -621,6 +621,16 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
           return callback();
         }
 
+        // CK 领主 RPG 需要既能嵌入酒馆，也能作为独立 HTML 做回归测试。
+        // 仅对该入口及 Pinia 的 Vue 依赖关闭宿主全局外置，避免影响其他既有前端。
+        const normalizedContext = context.replaceAll('\\', '/');
+        if (
+          (normalizedContext.includes('/src/ck') && ['vue', 'pinia', 'zod', 'json5'].includes(request)) ||
+          (normalizedContext.includes('/node_modules/.pnpm/pinia@') && request === 'vue')
+        ) {
+          return callback();
+        }
+
         // 自动化桥与 CLI 共用同一 Socket.IO 版本；桥脚本必须能在无外网环境下运行。
         if (
           [

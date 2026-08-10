@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-08-09T18:04:45.008Z",
+  "startedAt": "2026-08-09T19:42:45.622Z",
   "options": {
     "endpoint": "http://127.0.0.1:9333",
     "pageUrl": "127.0.0.1:8000",
@@ -20,9 +20,9 @@
       "turn": 1,
       "prompt": "合理推进剧情",
       "success": false,
-      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-wuxia-automation=\"send-turn\"]').first()\n    - locator resolved to <button title=\"发送 (Enter)\" aria-label=\"发送玩家行动\" class=\"chat-send-btn active\" data-wuxia-automation=\"send-turn\">…</button>\n  - attempting click action\n    - waiting for element to be visible, enabled and stable\n    - element is visible, enabled and stable\n    - scrolling into view if needed\n    - done scrolling\n\n    at runTurn (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:460:14)\n    at async main (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:547:22)"
+      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: '切换菜单' })\n    - locator resolved to <button aria-label=\"切换菜单\" class=\"nav-menu-toggle \">…</button>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - element is outside of the viewport\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - element is outside of the viewport\n    - retrying click action\n      - waiting 100ms\n    10 × waiting for element to be visible, enabled and stable\n       - element is visible, enabled and stable\n       - scrolling into view if needed\n       - done scrolling\n       - element is outside of the viewport\n     - retrying click action\n       - waiting 500ms\n\n    at openDebugPanel (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:310:56)\n    at async readDebugSections (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:410:3)\n    at async runTurn (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:470:17)\n    at async main (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:547:22)"
     }
   ],
   "success": false,
-  "completedAt": "2026-08-09T18:06:02.633Z"
+  "completedAt": "2026-08-09T19:44:09.770Z"
 }
