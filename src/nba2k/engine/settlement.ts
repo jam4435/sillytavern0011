@@ -165,13 +165,13 @@ export function applySettlement(match: MatchState, settlement: NormalizedSettlem
   return quarterAdvance(next);
 }
 
-export function buildCanonicalAssistant(raw: string, settlement: NormalizedSettlement, nextMatch: MatchState): string {
+export function buildCanonicalAssistant(raw: string, settlement: NormalizedSettlement, nextMatch: MatchState, extraVariables: Record<string, unknown> = {}): string {
   const narrative = raw
     .replace(/<NBASettlement>[\s\S]*?<\/NBASettlement>/gi, '')
     .replace(/<Variable(Think|Insert|Edit|Delete)>[\s\S]*?<\/Variable\1>/gi, '')
     .trim();
   const publicSettlement = { contractId: settlement.contractId, branchId: settlement.branchId, clockSeconds: settlement.clockSeconds, shotClockSeconds: settlement.shotClockSeconds, staminaDelta: settlement.staminaDelta, summary: settlement.summary, source: settlement.source };
-  return `${narrative}\n<NBASettlement>${JSON.stringify(publicSettlement)}</NBASettlement>\n<VariableThink>比赛数值已由前端合同校验并规范化。</VariableThink>\n<VariableEdit>${JSON.stringify({ 比赛: nextMatch })}</VariableEdit>`;
+  return `${narrative}\n<NBASettlement>${JSON.stringify(publicSettlement)}</NBASettlement>\n<VariableThink>比赛数值已由前端合同校验并规范化。</VariableThink>\n<VariableEdit>${JSON.stringify({ 比赛: nextMatch, ...extraVariables })}</VariableEdit>`;
 }
 
 export interface SettlementAssistantResult {
@@ -187,6 +187,7 @@ export async function settleAssistantResponse(
   contract: SettlementContract,
   match: MatchState,
   repair: (prompt: string) => Promise<string>,
+  extraVariables?: (settlement: NormalizedSettlement, nextMatch: MatchState) => Record<string, unknown>,
 ): Promise<SettlementAssistantResult> {
   const initial = extractSettlementProposal(raw);
   const initialErrors = validateSettlementProposal(initial, contract);
@@ -215,5 +216,5 @@ export async function settleAssistantResponse(
   }
   const settlement = normalizeSettlement(proposal, contract, source);
   const nextMatch = applySettlement(match, settlement, contract);
-  return { assistantText: buildCanonicalAssistant(raw, settlement, nextMatch), settlement, nextMatch, validationErrors };
+  return { assistantText: buildCanonicalAssistant(raw, settlement, nextMatch, extraVariables?.(settlement, nextMatch)), settlement, nextMatch, validationErrors };
 }
