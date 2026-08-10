@@ -203,6 +203,10 @@ describe('settingsManager ui theme', () => {
     expect(template.indexOf('{{narrativeScale}}')).toBeLessThan(template.indexOf('{{variableGuidance}}'));
     expect(template.indexOf('{{variableGuidance}}')).toBeLessThan(template.indexOf('{{latestAssistantBody}}'));
     expect(template.indexOf('{{latestAssistantBody}}')).toBeLessThan(template.indexOf('【最终执行要求】'));
+    expect(template).toContain('时间是禁止稀疏更新的原子对象');
+    expect(template).toContain('旧完整时间 + 正文耗时 = 新完整时间');
+    expect(template).toContain('{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":13,"分":10}}}');
+    expect(template).toContain('禁止只写“分:10”');
   });
 
   it('updates legacy default-template labels without changing custom placeholders', () => {

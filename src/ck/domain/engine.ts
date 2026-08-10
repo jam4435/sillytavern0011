@@ -1,571 +1,163 @@
-import { addDays, daysBetween } from './date';
+import { addDays, ageOnDate, daysBetween } from './date';
+import { interactionAcceptance, interactionChannel, interactionDefinition } from './interactions';
 import { nextRandom, randomInt } from './random';
 import { characterAge, countyForLocation, findCountyPath, livingBloodHeirs, supportCount } from './selectors';
 import { ActionCallSchema, GameStateSchema, type ActionCall, type CommandResult, type DomainEvent, type GameState, type RelationshipDimension } from './schema';
 
-export type ActionDefinition = {
-  id: string;
-  version: 1;
-  label: string;
-  description: string;
-  category: 'social' | 'politics' | 'travel' | 'communication' | 'economy' | 'military' | 'time' | 'scenario';
-  targetKinds: Array<'character' | 'county' | 'location' | 'faction' | 'none'>;
-};
-
-export const actionDefinitions: ActionDefinition[] = [
-  { id: 'relationship.adjust', version: 1, label: '调整态度', description: '行动者基于本次互动调整自己对目标的态度。', category: 'social', targetKinds: ['character'] },
-  { id: 'social.praise', version: 1, label: '称赞', description: '称赞目标并留下可解释的关系修正。', category: 'social', targetKinds: ['character'] },
-  { id: 'social.insult', version: 1, label: '侮辱', description: '侮辱目标并承担关系代价。', category: 'social', targetKinds: ['character'] },
-  { id: 'social.threaten', version: 1, label: '威胁', description: '制造恐惧，同时损害信任。', category: 'social', targetKinds: ['character'] },
-  { id: 'regency.delegate', version: 1, label: '任命摄政', description: '旅行前授予有限权限。', category: 'politics', targetKinds: ['character'] },
-  { id: 'communication.send_letter', version: 1, label: '发送信件', description: '按地图距离投递，可能拒收、截获或泄露。', category: 'communication', targetKinds: ['character'] },
-  { id: 'travel.start', version: 1, label: '开始出巡', description: '选择安全路线或危险捷径前往南特。', category: 'travel', targetKinds: ['location'] },
-  { id: 'activity.advance', version: 1, label: '推进宴会', description: '推进当前宴会阶段并消耗一个时段。', category: 'scenario', targetKinds: ['none'] },
-  { id: 'politics.offer_support_bargain', version: 1, label: '交换支持', description: '以职位、承认、契约或补贴换取有效支持。', category: 'politics', targetKinds: ['character'] },
-  { id: 'economy.start_project', version: 1, label: '建设领地', description: '支付金钱，在所控制的伯爵领开始项目。', category: 'economy', targetKinds: ['county'] },
-  { id: 'intimacy.resolve', version: 1, label: '亲密互动', description: '仅适用于达到硬年龄门槛的成年人。', category: 'social', targetKinds: ['character'] },
-  { id: 'time.advance', version: 1, label: '推进日期', description: '执行即时调度器和世界脉冲。', category: 'time', targetKinds: ['none'] },
-  { id: 'world.consume_signals', version: 1, label: '提交世界推演', description: '在局势规划和关键人物行动完成后标记对应信号。', category: 'scenario', targetKinds: ['none'] },
-  { id: 'scenario.resolve_deadline', version: 1, label: '结算最后通牒', description: '按有效支持自动结算派系。', category: 'scenario', targetKinds: ['faction'] },
-  { id: 'scenario.answer_ultimatum', version: 1, label: '回应最后通牒', description: '接受降权或拒绝并进入派系战争。', category: 'scenario', targetKinds: ['faction'] },
-  { id: 'scenario.side_story', version: 1, label: '可选支线', description: '触发一次致命风险、成年亲密机会或暧昧梦兆。', category: 'scenario', targetKinds: ['character', 'none'] },
-  { id: 'military.declare_county_claim', version: 1, label: '发动宣称战争', description: '序章外保留的县级宣称战争。', category: 'military', targetKinds: ['character', 'county'] },
-  { id: 'military.issue_order', version: 1, label: '发布军事命令', description: '选择路线、目标与行动阶段。', category: 'military', targetKinds: ['county'] },
+export type ActionDefinition={id:string;version:1;label:string;description:string;category:'social'|'politics'|'travel'|'communication'|'economy'|'military'|'time'|'scenario';targetKinds:Array<'character'|'county'|'location'|'faction'|'interaction'|'event'|'none'>};
+export const actionDefinitions:ActionDefinition[]=[
+  {id:'relationship.adjust',version:1,label:'调整态度',description:'行动者调整自己对目标的一项态度，受单次/场景/单日限额约束。',category:'social',targetKinds:['character']},
+  {id:'social.praise',version:1,label:'称赞',description:'目标对行动者的好感增加。',category:'social',targetKinds:['character']},
+  {id:'social.insult',version:1,label:'侮辱',description:'目标对行动者的好感下降。',category:'social',targetKinds:['character']},
+  {id:'social.threaten',version:1,label:'威胁',description:'目标对行动者增加恐惧并降低信任。',category:'social',targetKinds:['character']},
+  {id:'council.appoint',version:1,label:'任命议员',description:'任命合法廷臣担任议会职位。',category:'politics',targetKinds:['character']},
+  {id:'regency.delegate',version:1,label:'任命摄政',description:'为离境统治建立有限摄政授权。',category:'politics',targetKinds:['character']},
+  {id:'communication.send_letter',version:1,label:'发送信件',description:'按地图距离投递，可能拒收或截获。',category:'communication',targetKinds:['character']},
+  {id:'travel.start',version:1,label:'开始旅行',description:'前往任意已加载地点。',category:'travel',targetKinds:['location']},
+  {id:'activity.advance',version:1,label:'推进活动',description:'推进指定活动阶段并消耗一个时段。',category:'scenario',targetKinds:['none']},
+  {id:'interaction.open',version:1,label:'发起互动',description:'以结构化意图打开自由谈判线程。',category:'politics',targetKinds:['character']},
+  {id:'interaction.resolve',version:1,label:'回应互动',description:'接受、拒绝或反提案；规则引擎结算合法结果。',category:'politics',targetKinds:['interaction']},
+  {id:'politics.offer_support_bargain',version:1,label:'交换支持',description:'兼容旧序章的正式支持交换。',category:'politics',targetKinds:['character']},
+  {id:'politics.modify_contract',version:1,label:'修改契约',description:'修改直属封臣的税收、征召或特权。',category:'politics',targetKinds:['character']},
+  {id:'politics.join_faction',version:1,label:'加入派系',description:'NPC基于利益加入合法派系。',category:'politics',targetKinds:['faction']},
+  {id:'politics.leave_faction',version:1,label:'退出派系',description:'NPC退出当前派系。',category:'politics',targetKinds:['faction']},
+  {id:'politics.arrest',version:1,label:'逮捕',description:'依据犯罪证据或承担暴政代价逮捕人物。',category:'politics',targetKinds:['character']},
+  {id:'economy.start_project',version:1,label:'建设领地',description:'在自己的伯爵领建设市场或瞭望塔。',category:'economy',targetKinds:['county']},
+  {id:'intimacy.resolve',version:1,label:'结算亲密关系',description:'仅在双方成年、同地且不含强迫时记录抽象亲密结果。',category:'social',targetKinds:['character']},
+  {id:'time.advance',version:1,label:'推进日期',description:'逐日运行调度器，重大事件立即截断。',category:'time',targetKinds:['none']},
+  {id:'event.choose',version:1,label:'处理事件',description:'处理当前必须回应的事件。',category:'scenario',targetKinds:['event']},
+  {id:'world.consume_signals',version:1,label:'提交世界推演',description:'消费已完成的世界信号。',category:'scenario',targetKinds:['none']},
+  {id:'scenario.answer_ultimatum',version:1,label:'回应最后通牒',description:'兼容行动：让步或进入派系战争。',category:'scenario',targetKinds:['faction']},
+  {id:'military.declare_county_claim',version:1,label:'发动宣称战争',description:'依据有效宣称发动县级战争。',category:'military',targetKinds:['character','county']},
+  {id:'military.issue_order',version:1,label:'发布军事命令',description:'选择目标、路线与行军阶段。',category:'military',targetKinds:['county']},
+  {id:'character.die',version:1,label:'人物死亡',description:'规则与事件使用的死亡/继承接口。',category:'scenario',targetKinds:['character']},
+  {id:'notification.read',version:1,label:'读取通知',description:'标记警报已读。',category:'scenario',targetKinds:['none']},
 ];
 
-type MutableContext = { state: GameState; call: ActionCall; events: DomainEvent[]; errors: CommandResult['errors'] };
+type MutableContext={state:GameState;call:ActionCall;events:DomainEvent[];errors:CommandResult['errors']};
+function cloneState(state:GameState):GameState{return GameStateSchema.parse(JSON.parse(JSON.stringify(state)));}
+function event(ctx:MutableContext,type:string,payload:Record<string,unknown>,actorId:string|null=ctx.call.actorId){ctx.events.push({id:`evt_${ctx.call.idempotencyKey}_${ctx.events.length}`,revision:ctx.state.revision+1,type,occurredAt:ctx.state.currentDate,actorId,sourceId:ctx.call.sourceId,idempotencyKey:ctx.call.idempotencyKey,payload});}
+function reject(ctx:MutableContext,code:string,message:string){ctx.errors.push({code,message});}
+function numberParam(call:ActionCall,key:string){const value=call.params[key];return typeof value==='number'&&Number.isFinite(value)?value:undefined;}
+function stringParam(call:ActionCall,key:string){const value=call.params[key];return typeof value==='string'?value:undefined;}
+function boolParam(call:ActionCall,key:string){const value=call.params[key];return typeof value==='boolean'?value:undefined;}
+function syncPlayerResources(state:GameState){const value=state.characterResources[state.playerCharacterId];if(!value)return;state.resources.gold=value.gold;state.resources.prestige=value.prestige;state.resources.piety=value.piety;state.resources.levies=value.levies;state.resources.stress=state.characters[state.playerCharacterId]?.stress??state.resources.stress;}
+function addNotification(ctx:MutableContext,kind:GameState['notifications'][string]['kind'],title:string,body:string,severity:GameState['notifications'][string]['severity'],relatedIds:string[]=[]){const id=`notice_${ctx.call.idempotencyKey}_${Object.keys(ctx.state.notifications).length}`;ctx.state.notifications[id]={id,kind,title,body,createdAt:ctx.state.currentDate,severity,relatedIds,read:false};}
+function addPendingEvent(ctx:MutableContext,input:Omit<GameState['pendingEvents'][string],'id'|'occurredAt'|'status'|'sourceId'>){const id=`pending_${input.type}_${ctx.state.currentDate}_${Object.keys(ctx.state.pendingEvents).length}`;if(ctx.state.pendingEvents[id])return;ctx.state.pendingEvents[id]={...input,id,occurredAt:ctx.state.currentDate,status:'pending',sourceId:ctx.call.sourceId};event(ctx,'event.pending_created',{eventId:id,type:input.type,severity:input.severity},null);}
 
-function cloneState(state: GameState): GameState {
-  // UI 会传入 Vue/Pinia 响应式代理；领域边界只接受可序列化数据，并在克隆后重新校验。
-  return GameStateSchema.parse(JSON.parse(JSON.stringify(state)));
+function relationshipAdjust(ctx:MutableContext,override?:{fromId?:string;toId?:string;dimension:RelationshipDimension;delta:number;reason:string}){
+  const fromId=override?.fromId??ctx.call.actorId;const toId=override?.toId??ctx.call.targetIds[0];
+  const dimension=override?.dimension??stringParam(ctx.call,'dimension') as RelationshipDimension;const delta=override?.delta??numberParam(ctx.call,'delta');const reason=override?.reason??stringParam(ctx.call,'reasonCode')??'unspecified';
+  if(!toId||!ctx.state.characters[toId]||!ctx.state.characters[fromId])return reject(ctx,'relationship.invalid_target','关系行动缺少有效人物。');
+  if(!['opinion','trust','fear','suspicion','attraction'].includes(dimension)||delta===undefined||!Number.isInteger(delta)||Math.abs(delta)>10)return reject(ctx,'relationship.delta_out_of_range','关系变化必须是 -10 到 +10 的整数。');
+  const sameScene=ctx.state.relationshipModifiers.filter(item=>item.fromId===fromId&&item.toId===toId&&item.dimension===dimension&&item.sceneId===ctx.call.sceneId).reduce((sum,item)=>sum+item.delta,0);
+  if(Math.abs(sameScene+delta)>15)return reject(ctx,'relationship.scene_cap','同一方向单场景净变化不能超过 15。');
+  const sameDay=ctx.state.relationshipModifiers.filter(item=>item.fromId===fromId&&item.toId===toId&&item.dimension===dimension&&item.createdAt===ctx.state.currentDate).reduce((sum,item)=>sum+item.delta,0);
+  if(Math.abs(sameDay+delta)>20)return reject(ctx,'relationship.day_cap','同一方向单日净变化不能超过 20。');
+  const modifier={id:`rel_${ctx.call.idempotencyKey}_${ctx.state.relationshipModifiers.length}`,fromId,toId,dimension,delta,reasonCode:reason,sourceId:ctx.call.sourceId,sceneId:ctx.call.sceneId,createdAt:ctx.state.currentDate,expiresAt:addDays(ctx.state.currentDate,90)};
+  ctx.state.relationshipModifiers.push(modifier);event(ctx,'relationship.adjusted',modifier);
 }
 
-function event(ctx: MutableContext, type: string, payload: Record<string, unknown>, actorId: string | null = ctx.call.actorId): void {
-  ctx.events.push({
-    id: `evt_${ctx.call.idempotencyKey}_${ctx.events.length}`,
-    revision: ctx.state.revision + 1,
-    type,
-    occurredAt: ctx.state.currentDate,
-    actorId,
-    sourceId: ctx.call.sourceId,
-    idempotencyKey: ctx.call.idempotencyKey,
-    payload,
-  });
-}
+function appointCouncil(ctx:MutableContext){const targetId=ctx.call.targetIds[0];const positionId=stringParam(ctx.call,'positionId');const position=positionId?ctx.state.council[positionId]:undefined;const target=targetId?ctx.state.characters[targetId]:undefined;if(!position||!target?.alive)return reject(ctx,'council.invalid','职位或人物无效。');if(position.liegeId!==ctx.call.actorId)return reject(ctx,'permission.denied','只能任命自己的议会。');if(target.liegeId!==ctx.call.actorId&&target.id!==ctx.call.actorId)return reject(ctx,'council.not_courtier','目标不属于你的宫廷或封臣体系。');position.holderId=target.id;position.appointedAt=ctx.state.currentDate;if(position.kind==='regent')ctx.state.regentId=target.id;event(ctx,'council.appointed',{positionId,targetId});}
+function delegateRegency(ctx:MutableContext){const targetId=ctx.call.targetIds[0];if(!targetId||!ctx.state.characters[targetId]?.alive)return reject(ctx,'regent.invalid','摄政必须是存活人物。');if(ctx.call.actorId!==ctx.state.playerCharacterId)return reject(ctx,'permission.denied','只有玩家统治者可任命摄政。');ctx.state.regentId=targetId;const position=Object.values(ctx.state.council).find(item=>item.kind==='regent'&&item.liegeId===ctx.call.actorId);if(position){position.holderId=targetId;position.appointedAt=ctx.state.currentDate;}event(ctx,'regency.delegated',{regentId:targetId,permissions:['routine_governance','defensive_orders','message_receipt']});}
 
-function reject(ctx: MutableContext, code: string, message: string, field?: string): void {
-  ctx.errors.push({ code, message, ...(field ? { field } : {}) });
-}
+function sendLetter(ctx:MutableContext){const recipientId=ctx.call.targetIds[0];const recipient=recipientId?ctx.state.characters[recipientId]:undefined;const sender=ctx.state.characters[ctx.call.actorId];if(!recipient||!sender)return reject(ctx,'letter.participant_invalid','寄信人或收信人不存在。');const from=countyForLocation(ctx.state,sender.locationId);const to=countyForLocation(ctx.state,recipient.locationId);if(!from||!to)return reject(ctx,'letter.route_missing','无法确定信使路线。');const route=findCountyPath(ctx.state,from,to);if(!route)return reject(ctx,'letter.route_missing','两个地点之间没有已知路线。');const delivery=Math.max(1,Math.ceil((route.length-1)/2)+1);const id=`letter_${ctx.call.idempotencyKey}`;ctx.state.communications[id]={id,senderId:sender.id,recipientId,courierId:null,subject:stringParam(ctx.call,'subject')??'无题',body:stringParam(ctx.call,'body')??'',sentAt:ctx.state.currentDate,deliverAt:addDays(ctx.state.currentDate,delivery),status:'in_transit',interceptedById:null,threadId:stringParam(ctx.call,'threadId')??`letters_${sender.id}_${recipientId}`};event(ctx,'communication.sent',{communicationId:id,recipientId,deliverAt:ctx.state.communications[id].deliverAt,route});}
 
-function stringParam(call: ActionCall, key: string): string | null {
-  const value = call.params[key];
-  return typeof value === 'string' ? value : null;
-}
+function startTravel(ctx:MutableContext){const leader=ctx.state.characters[ctx.call.actorId];const destinationId=ctx.call.targetIds[0];const destination=destinationId?ctx.state.locations[destinationId]:undefined;const from=leader?countyForLocation(ctx.state,leader.locationId):null;if(!leader||!destination||!from)return reject(ctx,'travel.invalid','无法确定旅行起点或目的地。');if(Object.values(ctx.state.travels).some(item=>item.leaderId===leader.id&&item.status==='travelling'))return reject(ctx,'travel.already_active','该人物已经在旅途中。');const shortest=findCountyPath(ctx.state,from,destination.countyId);if(!shortest)return reject(ctx,'travel.route_missing','目的地不可达。');const routeKind=stringParam(ctx.call,'routeKind')==='safe'?'safe':'direct';let route=shortest;if(routeKind==='safe'&&from==='rennes'&&destination.countyId==='nantes')route=['rennes','broerec','nantes'];const days=routeKind==='safe'?Math.max(3,route.length+1):Math.max(1,route.length-1);const id=`travel_${ctx.call.idempotencyKey}`;ctx.state.travels[id]={id,leaderId:leader.id,companionIds:Array.isArray(ctx.call.params.companionIds)?ctx.call.params.companionIds.filter((v):v is string=>typeof v==='string'):[],routeCountyIds:route,destinationLocationId:destination.id,routeKind,progressIndex:0,currentCountyId:route[0],departedAt:ctx.state.currentDate,arriveAt:addDays(ctx.state.currentDate,days),status:'travelling'};if(leader.id===ctx.state.playerCharacterId)ctx.state.activeTravelId=id;event(ctx,'travel.started',{travelId:id,route,routeKind,arriveAt:ctx.state.travels[id].arriveAt});}
 
-function numberParam(call: ActionCall, key: string): number | null {
-  const value = call.params[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
+const feastPhases=['planned','welcome','public_feast','free_conversation','private_audiences','departure'] as const;
+function consumeSegment(ctx:MutableContext){if(ctx.state.clock.segment==='morning')ctx.state.clock.segment='afternoon';else if(ctx.state.clock.segment==='afternoon')ctx.state.clock.segment='evening';else{ctx.state.clock.date=addDays(ctx.state.currentDate,1);ctx.state.currentDate=ctx.state.clock.date;ctx.state.clock.segment='morning';processDay(ctx);}}
+function advanceActivity(ctx:MutableContext){const id=stringParam(ctx.call,'activityId')??Object.values(ctx.state.activities).find(item=>item.status==='active')?.id;const activity=id?ctx.state.activities[id]:undefined;if(!activity)return reject(ctx,'activity.missing','没有可推进的活动。');if(ctx.state.currentDate<activity.startedAt)return reject(ctx,'activity.not_started',`活动将在 ${activity.startedAt} 开始。`);const index=feastPhases.indexOf(activity.phase as typeof feastPhases[number]);activity.phase=feastPhases[Math.min(feastPhases.length-1,index+1)];activity.status=activity.phase==='departure'?'completed':'active';event(ctx,'activity.phase_changed',{activityId:activity.id,phase:activity.phase});consumeSegment(ctx);}
 
-function relationshipAdjust(ctx: MutableContext, defaults?: { dimension: RelationshipDimension; delta: number; reason: string }): void {
-  const targetId = ctx.call.targetIds[0];
-  const dimension = (stringParam(ctx.call, 'dimension') ?? defaults?.dimension ?? 'opinion') as RelationshipDimension;
-  const requestedDelta = numberParam(ctx.call, 'delta') ?? defaults?.delta ?? 0;
-  const reasonCode = stringParam(ctx.call, 'reasonCode') ?? defaults?.reason ?? 'interaction';
-  if (!targetId || !ctx.state.characters[targetId]) return reject(ctx, 'target.invalid', '关系行动需要有效人物目标。', 'targetIds');
-  if (!['opinion', 'trust', 'fear', 'suspicion', 'attraction'].includes(dimension)) return reject(ctx, 'dimension.invalid', '未知关系维度。', 'params.dimension');
-  if (!Number.isInteger(requestedDelta) || requestedDelta < -10 || requestedDelta > 10) return reject(ctx, 'delta.out_of_range', '单次关系调整必须为 -10 至 10 的整数。', 'params.delta');
-  const sceneSameDirection = ctx.state.relationshipModifiers
-    .filter(modifier => modifier.fromId === ctx.call.actorId && modifier.toId === targetId && modifier.dimension === dimension && modifier.sceneId === ctx.call.sceneId)
-    .filter(modifier => Math.sign(modifier.delta) === Math.sign(requestedDelta))
-    .reduce((sum, modifier) => sum + Math.abs(modifier.delta), 0);
-  const daySameDirection = ctx.state.relationshipModifiers
-    .filter(modifier => modifier.fromId === ctx.call.actorId && modifier.toId === targetId && modifier.dimension === dimension && modifier.createdAt === ctx.state.currentDate)
-    .filter(modifier => Math.sign(modifier.delta) === Math.sign(requestedDelta))
-    .reduce((sum, modifier) => sum + Math.abs(modifier.delta), 0);
-  if (sceneSameDirection + Math.abs(requestedDelta) > 15) return reject(ctx, 'relationship.scene_cap', '同方向关系调整超过单场景 15 点上限。');
-  if (daySameDirection + Math.abs(requestedDelta) > 20) return reject(ctx, 'relationship.day_cap', '同方向关系调整超过单日 20 点上限。');
-  const modifier = {
-    id: `rel_${ctx.call.idempotencyKey}`,
-    fromId: ctx.call.actorId,
-    toId: targetId,
-    dimension,
-    delta: requestedDelta,
-    reasonCode,
-    sourceId: ctx.call.sourceId,
-    sceneId: ctx.call.sceneId,
-    createdAt: ctx.state.currentDate,
-    expiresAt: addDays(ctx.state.currentDate, 90),
-  };
-  ctx.state.relationshipModifiers.push(modifier);
-  event(ctx, 'relationship.adjusted', modifier);
-}
+function openInteraction(ctx:MutableContext){const targetId=ctx.call.targetIds[0];const intentId=stringParam(ctx.call,'intentId');if(!targetId||!intentId)return reject(ctx,'interaction.invalid','互动缺少目标或意图。');const definition=interactionDefinition(intentId);const channel=interactionChannel(ctx.state,ctx.call.actorId,targetId,intentId);if(!definition||!channel)return reject(ctx,'interaction.channel_unavailable','当前距离与身份不允许这项互动。');const terms=typeof ctx.call.params.terms==='object'&&ctx.call.params.terms?ctx.call.params.terms as Record<string,unknown>:{};const acceptance=interactionAcceptance(ctx.state,intentId,ctx.call.actorId,targetId,terms);const id=`interaction_${ctx.call.idempotencyKey}`;ctx.state.interactions[id]={id,intentId,initiatorId:ctx.call.actorId,targetId,channel,status:ctx.call.actorId===ctx.state.playerCharacterId?'negotiating':targetId===ctx.state.playerCharacterId?'awaiting_player':'negotiating',terms,acceptance:acceptance.total,acceptanceReasons:acceptance.reasons,messages:[],createdAt:ctx.state.currentDate,deadline:addDays(ctx.state.currentDate,14),sceneId:ctx.call.sceneId};event(ctx,'interaction.opened',{interactionId:id,intentId,targetId,channel,acceptance:acceptance.total});if(targetId===ctx.state.playerCharacterId)addNotification(ctx,'message',`${ctx.state.characters[ctx.call.actorId].nameKey}提出正式交涉`,definition.label,'warning',[id,ctx.call.actorId]);}
 
-function delegateRegency(ctx: MutableContext): void {
-  const regentId = ctx.call.targetIds[0];
-  if (!regentId || !ctx.state.characters[regentId]?.alive) return reject(ctx, 'regent.invalid', '摄政必须是存活人物。');
-  if (ctx.call.actorId !== ctx.state.playerCharacterId) return reject(ctx, 'permission.denied', '只有当前统治者可任命摄政。');
-  ctx.state.regentId = regentId;
-  ctx.state.scenario.selectedRegentId = regentId;
-  ctx.state.scenario.phase = 'planning';
-  event(ctx, 'regency.delegated', { regentId, permissions: ['routine_governance', 'defensive_orders', 'message_receipt'] });
-}
+function addSupport(ctx:MutableContext,initiatorId:string,supporterId:string,offerKind:string){if(Object.values(ctx.state.supportCommitments).some(item=>item.supporterId===supporterId&&item.beneficiaryId===initiatorId&&item.status==='active'))return;const cost=offerKind==='gold_gift'?35:offerKind==='border_subsidy'?45:0;const wallet=ctx.state.characterResources[initiatorId];if(!wallet||wallet.gold<cost)return reject(ctx,'resource.insufficient_gold','金库不足以兑现提议。');wallet.gold-=cost;const promiseId=`promise_${ctx.call.idempotencyKey}`;ctx.state.promises[promiseId]={id:promiseId,promisorId:initiatorId,beneficiaryId:supporterId,kind:offerKind,terms:{cost,formal:true},dueDate:addDays(ctx.state.currentDate,cost?1:120),status:cost?'fulfilled':'active',sourceId:ctx.call.sourceId};const commitmentId=`support_${ctx.call.idempotencyKey}`;ctx.state.supportCommitments[commitmentId]={id:commitmentId,supporterId,beneficiaryId:initiatorId,issueId:'ducal_authority',grantedAt:ctx.state.currentDate,expiresAt:addDays(ctx.state.currentDate,180),status:'active',conditionPromiseIds:[promiseId],sourceId:ctx.call.sourceId};const faction=ctx.state.factions.faction_liberty;if(faction){faction.power=Math.max(0,faction.power-22);faction.memberIds=faction.memberIds.filter(id=>id!==supporterId);}const situation=ctx.state.situations.situation_liberty_1066;if(situation){situation.metrics.currentSupport=supportCount(ctx.state);situation.metrics.factionPower=faction?.power??0;}event(ctx,'politics.support_committed',{supporterId,offerKind,promiseId,commitmentId,currentSupport:supportCount(ctx.state)});}
 
-function sendLetter(ctx: MutableContext): void {
-  const recipientId = ctx.call.targetIds[0];
-  const recipient = recipientId ? ctx.state.characters[recipientId] : undefined;
-  const sender = ctx.state.characters[ctx.call.actorId];
-  const subject = stringParam(ctx.call, 'subject') ?? '无题';
-  const body = stringParam(ctx.call, 'body') ?? '';
-  if (!recipientId || !recipient || !sender) return reject(ctx, 'letter.participant_invalid', '寄信人或收信人不存在。');
-  const fromCounty = countyForLocation(ctx.state, sender.locationId);
-  const toCounty = countyForLocation(ctx.state, recipient.locationId);
-  if (!fromCounty || !toCounty) return reject(ctx, 'letter.route_missing', '无法确定信使路线。');
-  const route = findCountyPath(ctx.state, fromCounty, toCounty);
-  if (!route) return reject(ctx, 'letter.route_missing', '两个地点之间没有已知路线。');
-  const deliveryDays = Math.max(1, Math.ceil((route.length - 1) / 2) + 1);
-  const id = `letter_${ctx.call.idempotencyKey}`;
-  ctx.state.communications[id] = {
-    id,
-    senderId: sender.id,
-    recipientId,
-    courierId: null,
-    subject,
-    body,
-    sentAt: ctx.state.currentDate,
-    deliverAt: addDays(ctx.state.currentDate, deliveryDays),
-    status: 'in_transit',
-    interceptedById: null,
-    threadId: stringParam(ctx.call, 'threadId') ?? `thread_${sender.id}_${recipientId}`,
-  };
-  event(ctx, 'communication.sent', { communicationId: id, recipientId, deliverAt: ctx.state.communications[id].deliverAt, route });
-}
+function modifyContract(ctx:MutableContext,liegeId:string,vassalId:string,terms:Record<string,unknown>){const contract=Object.values(ctx.state.contracts).find(item=>item.liegeId===liegeId&&item.vassalId===vassalId);if(!contract)return reject(ctx,'contract.missing','双方没有直属封建契约。');if(['low','normal','high'].includes(String(terms.taxLevel)))contract.taxLevel=terms.taxLevel as typeof contract.taxLevel;if(['low','normal','high'].includes(String(terms.levyLevel)))contract.levyLevel=terms.levyLevel as typeof contract.levyLevel;const privilege=typeof terms.privilege==='string'?terms.privilege:null;if(privilege&&!contract.privileges.includes(privilege))contract.privileges.push(privilege);contract.modifiedAt=ctx.state.currentDate;const faction=ctx.state.factions.faction_liberty;if(faction&&faction.status==='organizing')faction.power=Math.max(0,faction.power-14);event(ctx,'politics.contract_modified',{contractId:contract.id,vassalId,taxLevel:contract.taxLevel,levyLevel:contract.levyLevel,privileges:contract.privileges});}
 
-function startTravel(ctx: MutableContext): void {
-  const leader = ctx.state.characters[ctx.call.actorId];
-  const destinationLocationId = ctx.call.targetIds[0];
-  const destination = destinationLocationId ? ctx.state.locations[destinationLocationId] : undefined;
-  const fromCounty = leader ? countyForLocation(ctx.state, leader.locationId) : null;
-  if (!leader || !destination || !fromCounty) return reject(ctx, 'travel.invalid', '无法确定旅行起点或目的地。');
-  const shortest = findCountyPath(ctx.state, fromCounty, destination.countyId);
-  if (!shortest) return reject(ctx, 'travel.route_missing', '目的地不可达。');
-  const routeKind = stringParam(ctx.call, 'routeKind') === 'safe' ? 'safe' : 'direct';
-  const safeDetour = fromCounty === 'rennes' && destination.countyId === 'nantes' ? ['rennes', 'broerec', 'nantes'] : shortest;
-  const route = routeKind === 'safe' ? safeDetour : shortest;
-  const days = routeKind === 'safe' ? Math.max(3, route.length + 1) : Math.max(2, route.length);
-  const id = `travel_${ctx.call.idempotencyKey}`;
-  ctx.state.travels[id] = {
-    id,
-    leaderId: leader.id,
-    companionIds: Array.isArray(ctx.call.params.companionIds) ? ctx.call.params.companionIds.filter((value): value is string => typeof value === 'string') : [],
-    routeCountyIds: route,
-    destinationLocationId,
-    routeKind,
-    progressIndex: 0,
-    currentCountyId: route[0],
-    departedAt: ctx.state.currentDate,
-    arriveAt: addDays(ctx.state.currentDate, days),
-    status: 'travelling',
-  };
-  ctx.state.scenario.activeTravelId = id;
-  ctx.state.scenario.phase = 'travelling';
-  event(ctx, 'travel.started', { travelId: id, route, routeKind, arriveAt: ctx.state.travels[id].arriveAt });
-}
+function createMarriage(ctx:MutableContext,leftId:string,rightId:string){const left=ctx.state.characters[leftId],right=ctx.state.characters[rightId];if(!left||!right||characterAge(ctx.state,leftId)<18||characterAge(ctx.state,rightId)<18)return reject(ctx,'marriage.invalid','婚姻双方必须是存活成年人。');if(left.spouseIds.length||right.spouseIds.length)return reject(ctx,'marriage.already_married','至少一方已有婚姻。');left.spouseIds.push(rightId);right.spouseIds.push(leftId);const id=`marriage_${ctx.call.idempotencyKey}`;ctx.state.marriages[id]={id,partnerIds:[leftId,rightId],status:'married',allianceIds:[`alliance_${left.houseId}_${right.houseId}`],createdAt:ctx.state.currentDate,resolvedAt:ctx.state.currentDate};event(ctx,'marriage.created',{marriageId:id,partnerIds:[leftId,rightId],allianceId:ctx.state.marriages[id].allianceIds[0]});}
 
-const feastPhases = ['planned', 'welcome', 'public_feast', 'free_conversation', 'private_audiences', 'departure'] as const;
-
-function advanceActivity(ctx: MutableContext): void {
-  const activity = ctx.state.activities[ctx.state.scenario.feastId];
-  if (!activity) return reject(ctx, 'activity.missing', '序章宴会不存在。');
-  if (ctx.state.currentDate < activity.startedAt) return reject(ctx, 'activity.not_started', `宴会将在 ${activity.startedAt} 开始。`);
-  const currentIndex = feastPhases.indexOf(activity.phase as (typeof feastPhases)[number]);
-  const next = feastPhases[Math.min(currentIndex + 1, feastPhases.length - 1)];
-  activity.phase = next;
-  activity.status = next === 'departure' ? 'completed' : 'active';
-  ctx.state.scenario.phase = next === 'departure' ? 'return' : 'feast';
-  ctx.state.scenario.sceneCount += 1;
-  event(ctx, 'activity.phase_changed', { activityId: activity.id, phase: next });
-  if (stringParam(ctx.call, 'consumeTimeslot') !== 'false') advanceDaysInContext(ctx, 1);
-}
-
-const acceptableOffers: Record<string, string[]> = {
-  char_hoel: ['succession_recognition', 'council_office'],
-  char_geoffroy: ['contract_concession', 'gold_gift'],
-  char_morvan: ['marshal_office', 'border_subsidy'],
-};
-
-function offerSupportBargain(ctx: MutableContext): void {
-  const supporterId = ctx.call.targetIds[0];
-  const offerKind = stringParam(ctx.call, 'offerKind');
-  if (!supporterId || !ctx.state.scenario.supportTargetIds.includes(supporterId)) return reject(ctx, 'support.invalid_target', '该人物不是本次游说目标。');
-  if (ctx.state.characters[ctx.call.actorId]?.locationId !== ctx.state.characters[supporterId]?.locationId) return reject(ctx, 'support.not_co_located', '正式游说需要双方同地会面；远程只能先通过信件沟通。');
-  if (!offerKind || !acceptableOffers[supporterId]?.includes(offerKind)) return reject(ctx, 'support.offer_rejected', '这项提议没有满足该封臣的核心诉求。');
-  if (Object.values(ctx.state.supportCommitments).some(item => item.supporterId === supporterId && item.status === 'active')) return reject(ctx, 'support.duplicate', '该封臣已作出有效承诺。');
-  const costs: Record<string, number> = { gold_gift: 35, border_subsidy: 45, council_office: 0, marshal_office: 0, succession_recognition: 0, contract_concession: 0 };
-  const cost = costs[offerKind] ?? 0;
-  if (ctx.state.resources.gold < cost) return reject(ctx, 'resource.insufficient_gold', '金库不足以兑现这项提议。');
-  ctx.state.resources.gold -= cost;
-  const promiseId = `promise_${ctx.call.idempotencyKey}`;
-  const dueDate = addDays(ctx.state.currentDate, offerKind === 'gold_gift' ? 1 : 120);
-  ctx.state.promises[promiseId] = { id: promiseId, promisorId: ctx.call.actorId, beneficiaryId: supporterId, kind: offerKind, terms: { cost, formal: true }, dueDate, status: offerKind === 'gold_gift' ? 'fulfilled' : 'active', sourceId: ctx.call.sourceId };
-  const commitmentId = `support_${ctx.call.idempotencyKey}`;
-  ctx.state.supportCommitments[commitmentId] = { id: commitmentId, supporterId, beneficiaryId: ctx.call.actorId, issueId: 'ducal_authority', grantedAt: ctx.state.currentDate, expiresAt: addDays(ctx.state.scenario.deadline, 1), status: 'active', conditionPromiseIds: [promiseId], sourceId: ctx.call.sourceId };
-  ctx.state.factions.faction_liberty.power = Math.max(0, ctx.state.factions.faction_liberty.power - 22);
-  event(ctx, 'politics.support_committed', { supporterId, offerKind, promiseId, commitmentId, currentSupport: supportCount(ctx.state) });
-}
-
-function startProject(ctx: MutableContext): void {
-  const countyId = ctx.call.targetIds[0];
-  const county = countyId ? ctx.state.counties[countyId] : undefined;
-  const templateId = stringParam(ctx.call, 'templateId') ?? 'watchtower';
-  const owned = county && ctx.state.titles[county.titleId]?.holderId === ctx.call.actorId;
-  if (!county || !owned) return reject(ctx, 'project.permission_denied', '只能在自己直接持有的伯爵领建设。');
-  const cost = templateId === 'market' ? 60 : 45;
-  if (ctx.state.resources.gold < cost) return reject(ctx, 'resource.insufficient_gold', '金库不足。');
-  ctx.state.resources.gold -= cost;
-  const id = `project_${ctx.call.idempotencyKey}`;
-  ctx.state.projects[id] = { id, ownerId: ctx.call.actorId, countyId, templateId, startedAt: ctx.state.currentDate, completeAt: addDays(ctx.state.currentDate, templateId === 'market' ? 25 : 18), status: 'active' };
-  event(ctx, 'economy.project_started', { projectId: id, countyId, templateId, cost });
-}
-
-function resolveIntimacy(ctx: MutableContext): void {
-  const targetId = ctx.call.targetIds[0];
-  if (!targetId || !ctx.state.characters[targetId]) return reject(ctx, 'intimacy.invalid_target', '亲密行动缺少有效目标。');
-  if (characterAge(ctx.state, ctx.call.actorId) < 18 || characterAge(ctx.state, targetId) < 18) return reject(ctx, 'intimacy.age_gate', '未满 18 岁人物绝不能成为亲密行动参与者。');
-  const actor = ctx.state.characters[ctx.call.actorId];
-  const target = ctx.state.characters[targetId];
-  if (actor.locationId !== target.locationId) return reject(ctx, 'intimacy.not_co_located', '双方不在同一地点。');
-  const privatePlace = ['castle', 'estate', 'inn'].includes(ctx.state.locations[actor.locationId]?.kind ?? '');
-  if (!privatePlace) return reject(ctx, 'intimacy.no_opportunity', '当前地点不具备私密机会。');
-  relationshipAdjust(ctx, { dimension: 'trust', delta: 4, reason: 'mutual_intimacy' });
-  if (ctx.errors.length === 0) event(ctx, 'intimacy.resolved', { participantIds: [actor.id, target.id], narrationPolicy: 'adult_consensual_only' });
-}
-
-function declareCountyClaim(ctx: MutableContext): void {
-  const defenderId = ctx.call.targetIds[0];
-  const countyId = ctx.call.targetIds[1];
-  const county = countyId ? ctx.state.counties[countyId] : undefined;
-  if (!defenderId || !ctx.state.characters[defenderId] || !county) return reject(ctx, 'war.invalid_target', '战争需要有效防御者与目标伯爵领。');
-  const id = `war_${ctx.call.idempotencyKey}`;
-  ctx.state.wars[id] = { id, kind: 'county_claim', attackerId: ctx.call.actorId, defenderId, targetTitleId: county.titleId, attackerScore: 0, raisedByIds: [], objectiveCountyId: countyId, routeCountyIds: [], phase: 'declared', startedAt: ctx.state.currentDate, endedAt: null };
-  ctx.state.signals.push({ id: `signal_${id}`, type: 'major_change', kind: 'war_started', occurredAt: ctx.state.currentDate, scopeIds: [ctx.call.actorId, defenderId, countyId], payload: { warId: id }, consumed: false });
-  event(ctx, 'military.war_declared', { warId: id, kind: 'county_claim', countyId });
-}
-
-function issueMilitaryOrder(ctx: MutableContext): void {
-  const warId = stringParam(ctx.call, 'warId');
-  const war = warId ? ctx.state.wars[warId] : undefined;
-  const objectiveCountyId = ctx.call.targetIds[0];
-  const phase = stringParam(ctx.call, 'phase');
-  if (!war || !objectiveCountyId || !ctx.state.counties[objectiveCountyId]) return reject(ctx, 'war.order_invalid', '军事命令缺少战争或目标。');
-  if (war.attackerId !== ctx.call.actorId && war.defenderId !== ctx.call.actorId) return reject(ctx, 'war.permission_denied', '只有参战方能发布命令。');
-  const actorCounty = countyForLocation(ctx.state, ctx.state.characters[ctx.call.actorId].locationId);
-  const route = actorCounty ? findCountyPath(ctx.state, actorCounty, objectiveCountyId) : null;
-  if (!route) return reject(ctx, 'war.route_missing', '军队无法抵达目标。');
-  war.objectiveCountyId = objectiveCountyId;
-  war.routeCountyIds = route;
-  war.phase = phase === 'siege' ? 'siege' : phase === 'battle' ? 'battle' : 'marching';
-  if (!war.raisedByIds.includes(ctx.call.actorId)) war.raisedByIds.push(ctx.call.actorId);
-  event(ctx, 'military.order_issued', { warId: war.id, objectiveCountyId, route, phase: war.phase });
-}
-
-function resolveDeadline(ctx: MutableContext): void {
-  if (ctx.state.currentDate < ctx.state.scenario.deadline) return reject(ctx, 'scenario.too_early', '最后通牒尚未到期。');
-  const count = supportCount(ctx.state);
-  const faction = ctx.state.factions.faction_liberty;
-  if (count >= ctx.state.scenario.requiredSupport) {
-    faction.status = 'dissolved';
-    ctx.state.scenario.result = 'success';
-    ctx.state.scenario.phase = 'campaign';
-    ctx.state.resources.legitimacy = Math.min(100, ctx.state.resources.legitimacy + 8);
-    event(ctx, 'scenario.prologue_succeeded', { supportCount: count });
-  } else {
-    faction.status = 'ultimatum';
-    ctx.state.scenario.phase = 'ultimatum';
-    event(ctx, 'scenario.ultimatum_issued', { supportCount: count, options: ['concede', 'resist'] });
+function resolveInteraction(ctx:MutableContext){const threadId=ctx.call.targetIds[0];const thread=threadId?ctx.state.interactions[threadId]:undefined;if(!thread)return reject(ctx,'interaction.missing','互动线程不存在。');const decision=stringParam(ctx.call,'decision');const expectedActor=thread.status==='awaiting_player'?ctx.state.playerCharacterId:thread.targetId;if(ctx.call.actorId!==expectedActor)return reject(ctx,'interaction.actor_invalid','只有当前待回应者可以结算互动。');if(!['accept','reject','counter'].includes(decision??''))return reject(ctx,'interaction.decision_invalid','必须接受、拒绝或反提案。');const terms={...thread.terms,...(typeof ctx.call.params.terms==='object'&&ctx.call.params.terms?ctx.call.params.terms as Record<string,unknown>:{})};if(decision==='counter'){thread.status='awaiting_player';thread.terms=terms;thread.messages.push({speakerId:ctx.call.actorId,text:stringParam(ctx.call,'message')??'我可以考虑，但条件必须改变。',createdAt:ctx.state.currentDate});addNotification(ctx,'message','收到反提案',`${ctx.state.characters[ctx.call.actorId].nameKey}要求重新考虑条件。`,'warning',[thread.id,ctx.call.actorId]);event(ctx,'interaction.countered',{interactionId:thread.id,terms});return;}if(decision==='reject'){thread.status='rejected';event(ctx,'interaction.rejected',{interactionId:thread.id,intentId:thread.intentId});if(interactionDefinition(thread.intentId)?.formal&&['meeting','activity'].includes(thread.channel))consumeSegment(ctx);return;}
+  thread.status='accepted';thread.terms=terms;
+  switch(thread.intentId){
+    case'social.praise':relationshipAdjust(ctx,{fromId:thread.targetId,toId:thread.initiatorId,dimension:'opinion',delta:5,reason:'received_praise'});break;
+    case'social.threaten':relationshipAdjust(ctx,{fromId:thread.targetId,toId:thread.initiatorId,dimension:'fear',delta:6,reason:'threatened'});if(!ctx.errors.length)relationshipAdjust(ctx,{fromId:thread.targetId,toId:thread.initiatorId,dimension:'trust',delta:-4,reason:'threatened'});break;
+    case'politics.request_support':addSupport(ctx,thread.initiatorId,thread.targetId,String(terms.offerKind??({char_hoel:'succession_recognition',char_geoffroy:'contract_concession',char_morvan:'border_subsidy'}[thread.targetId]??'gold_gift')));break;
+    case'politics.modify_contract':{const contract=Object.values(ctx.state.contracts).find(item=>[item.liegeId,item.vassalId].includes(thread.initiatorId)&&[item.liegeId,item.vassalId].includes(thread.targetId));if(!contract)return reject(ctx,'contract.missing','双方没有直属封建契约。');modifyContract(ctx,contract.liegeId,contract.vassalId,terms);break;}
+    case'diplomacy.propose_marriage':createMarriage(ctx,String(terms.candidateAId??thread.initiatorId),String(terms.candidateBId??thread.targetId));break;
+    case'diplomacy.form_alliance':{const memoryId=`memory_${ctx.call.idempotencyKey}`;ctx.state.memories[memoryId]={id:memoryId,characterId:thread.targetId,subjectIds:[thread.initiatorId],kind:'alliance',summary:'双方缔结了相互援助的正式同盟。',intensity:70,createdAt:ctx.state.currentDate,expiresAt:null,visibility:'public'};ctx.state.characters[thread.targetId].memoryIds.push(memoryId);const faction=ctx.state.factions.faction_liberty;if(thread.initiatorId===ctx.state.playerCharacterId&&faction)faction.power=Math.max(0,faction.power-10);event(ctx,'diplomacy.alliance_formed',{participantIds:[thread.initiatorId,thread.targetId],memoryId});break;}
+    case'activity.invite':{const activity=Object.values(ctx.state.activities).find(item=>item.status==='planned'||item.status==='active');if(!activity)return reject(ctx,'activity.missing','没有可用活动。');if(!activity.invitedIds.includes(thread.targetId))activity.invitedIds.push(thread.targetId);event(ctx,'activity.invitation_accepted',{activityId:activity.id,targetId:thread.targetId});break;}
+    case'communication.write_letter':{ctx.call={...ctx.call,actorId:thread.initiatorId,targetIds:[thread.targetId],params:{subject:String(terms.subject??'私人通信'),body:String(terms.body??thread.messages.at(-1)?.text??'') }};sendLetter(ctx);break;}
+    case'politics.arrest':arrest(ctx,thread.initiatorId,thread.targetId);break;
   }
+  if(!ctx.errors.length){event(ctx,'interaction.accepted',{interactionId:thread.id,intentId:thread.intentId,terms});if(interactionDefinition(thread.intentId)?.formal&&['meeting','activity'].includes(thread.channel))consumeSegment(ctx);}
 }
 
-function consumeWorldSignals(ctx: MutableContext): void {
-  const ids = Array.isArray(ctx.call.params.signalIds) ? ctx.call.params.signalIds.filter((value): value is string => typeof value === 'string') : [];
-  for (const signal of ctx.state.signals) if (ids.includes(signal.id)) signal.consumed = true;
-  event(ctx, 'world.signals_consumed', { signalIds: ids });
+function legacySupportBargain(ctx:MutableContext){const targetId=ctx.call.targetIds[0];if(!targetId||ctx.state.characters[ctx.call.actorId]?.locationId!==ctx.state.characters[targetId]?.locationId)return reject(ctx,'support.not_co_located','正式游说需要双方同地。');addSupport(ctx,ctx.call.actorId,targetId,stringParam(ctx.call,'offerKind')??'gold_gift');}
+function directModifyContract(ctx:MutableContext){const targetId=ctx.call.targetIds[0];if(!targetId)return reject(ctx,'contract.invalid','缺少封臣。');modifyContract(ctx,ctx.call.actorId,targetId,ctx.call.params);}
+function joinFaction(ctx:MutableContext){const id=ctx.call.targetIds[0];const faction=id?ctx.state.factions[id]:undefined;if(!faction)return reject(ctx,'faction.missing','派系不存在。');if(ctx.call.actorId===faction.targetId)return reject(ctx,'faction.target_cannot_join','派系目标不能加入派系。');if(!faction.memberIds.includes(ctx.call.actorId))faction.memberIds.push(ctx.call.actorId);faction.power=Math.min(200,faction.power+Math.max(5,Math.round((ctx.state.characterResources[ctx.call.actorId]?.levies??100)/100)));event(ctx,'faction.member_joined',{factionId:id,memberId:ctx.call.actorId,power:faction.power});}
+function leaveFaction(ctx:MutableContext){const id=ctx.call.targetIds[0];const faction=id?ctx.state.factions[id]:undefined;if(!faction)return reject(ctx,'faction.missing','派系不存在。');faction.memberIds=faction.memberIds.filter(id=>id!==ctx.call.actorId);faction.power=Math.max(0,faction.power-12);event(ctx,'faction.member_left',{factionId:id,memberId:ctx.call.actorId,power:faction.power});}
+function arrest(ctx:MutableContext,actorId=ctx.call.actorId,targetId=ctx.call.targetIds[0]){const target=targetId?ctx.state.characters[targetId]:undefined;if(!target?.alive)return reject(ctx,'arrest.invalid','目标不存在或已经死亡。');const legal=Object.values(ctx.state.knowledge).some(item=>item.subjectId===targetId&&item.predicate==='organized_faction'&&item.certainty==='confirmed');target.imprisonedById=actorId;const faction=Object.values(ctx.state.factions).find(item=>item.memberIds.includes(targetId));if(faction){faction.memberIds=faction.memberIds.filter(id=>id!==targetId);faction.power=Math.max(0,faction.power-25);if(faction.leaderId===targetId)faction.status='weakened';}if(!legal){ctx.state.resources.legitimacy=Math.max(0,ctx.state.resources.legitimacy-12);addNotification(ctx,'alert','无正当理由的逮捕','封臣将此举视为暴政。','danger',[targetId]);}event(ctx,'politics.character_arrested',{targetId,legal,tyranny:legal?0:12});}
+
+function startProject(ctx:MutableContext){const countyId=ctx.call.targetIds[0];const county=countyId?ctx.state.counties[countyId]:undefined;const owned=county&&ctx.state.titles[county.titleId]?.holderId===ctx.call.actorId;if(!county||!owned)return reject(ctx,'project.permission_denied','只能在直接持有的伯爵领建设。');if(Object.values(ctx.state.projects).some(item=>item.countyId===countyId&&item.status==='active'))return reject(ctx,'project.already_active','该伯爵领已有工程。');const templateId=stringParam(ctx.call,'templateId')==='market'?'market':'watchtower';const cost=templateId==='market'?60:45;const wallet=ctx.state.characterResources[ctx.call.actorId];if(!wallet||wallet.gold<cost)return reject(ctx,'resource.insufficient_gold','金库不足。');wallet.gold-=cost;const id=`project_${ctx.call.idempotencyKey}`;ctx.state.projects[id]={id,ownerId:ctx.call.actorId,countyId,templateId,startedAt:ctx.state.currentDate,completeAt:addDays(ctx.state.currentDate,templateId==='market'?25:18),status:'active'};event(ctx,'economy.project_started',{projectId:id,countyId,templateId,cost});}
+
+function resolveIntimacy(ctx:MutableContext){const targetId=ctx.call.targetIds[0];const actor=ctx.state.characters[ctx.call.actorId],target=targetId?ctx.state.characters[targetId]:undefined;if(!actor?.alive||!target?.alive)return reject(ctx,'intimacy.invalid_target','亲密行动缺少有效人物。');if(characterAge(ctx.state,actor.id)<18||characterAge(ctx.state,target.id)<18)return reject(ctx,'intimacy.age_gate','任何未满 18 岁人物都不能进入亲密行动。');if(actor.locationId!==target.locationId)return reject(ctx,'intimacy.not_colocated','亲密行动要求双方同地。');if(boolParam(ctx.call,'coercive'))return reject(ctx,'intimacy.coercion_forbidden','强迫性犯罪只能作为非情色犯罪与司法后果记录。');const place=ctx.state.locations[actor.locationId];if(!place||!['castle','estate','inn'].includes(place.kind))return reject(ctx,'intimacy.no_privacy','当前地点不具备私密条件。');const memoryId=`memory_${ctx.call.idempotencyKey}`;ctx.state.memories[memoryId]={id:memoryId,characterId:target.id,subjectIds:[actor.id],kind:'adult_intimacy',summary:'双方在私密且自愿的条件下发展了成年亲密关系。',intensity:55,createdAt:ctx.state.currentDate,expiresAt:null,visibility:'private'};target.memoryIds.push(memoryId);relationshipAdjust(ctx,{fromId:target.id,toId:actor.id,dimension:'attraction',delta:5,reason:'consensual_intimacy'});if(!ctx.errors.length)event(ctx,'intimacy.resolved',{participantIds:[actor.id,target.id],mode:'non_explicit'});}
+
+function transferPlayerOnDeath(ctx:MutableContext,deceasedId:string){const deceased=ctx.state.characters[deceasedId];if(!deceased)return;deceased.alive=false;deceased.deathDate=ctx.state.currentDate;const heirId=livingBloodHeirs(ctx.state,deceasedId)[0];if(!heirId){addPendingEvent(ctx,{type:'game_over_no_heir',title:'血脉断绝',body:'没有任何有记录血缘的合法继承人，本局结束。',severity:'critical',scopeIds:[deceasedId],requiresResponse:true,choices:[{id:'acknowledge',label:'结束编年史'}]});event(ctx,'succession.game_ended',{deceasedId,reason:'no_living_blood_heir'},null);return;}const inherited:string[]=[];for(const title of Object.values(ctx.state.titles)){if(title.holderId!==deceasedId)continue;title.holderId=heirId;inherited.push(title.id);}ctx.state.characters[heirId].titleIds=[...new Set([...ctx.state.characters[heirId].titleIds,...inherited])];deceased.titleIds=deceased.titleIds.filter(id=>!inherited.includes(id));if(ctx.state.playerCharacterId===deceasedId){ctx.state.playerCharacterId=heirId;syncPlayerResources(ctx.state);}addPendingEvent(ctx,{type:'succession',title:'新的统治者',body:`${ctx.state.characters[heirId].nameKey}继承了主要头衔。`,severity:'critical',scopeIds:[deceasedId,heirId,...inherited],requiresResponse:true,choices:[{id:'acknowledge',label:'继续这段血脉'}]});event(ctx,'succession.player_changed',{deceasedId,heirId,inheritedTitleIds:inherited,knowledgePolicy:'public_and_possessed_archives_only'},null);}
+function killCharacter(ctx:MutableContext){const targetId=ctx.call.targetIds[0];if(!targetId||!ctx.state.characters[targetId])return reject(ctx,'character.invalid','人物不存在。');transferPlayerOnDeath(ctx,targetId);}
+
+function declareCountyClaim(ctx:MutableContext){const defenderId=ctx.call.targetIds[0],countyId=ctx.call.targetIds[1];const county=countyId?ctx.state.counties[countyId]:undefined;if(!defenderId||!ctx.state.characters[defenderId]||!county)return reject(ctx,'war.invalid_target','战争需要防御者与目标伯爵领。');const hasClaim=Object.values(ctx.state.claims).some(item=>item.claimantId===ctx.call.actorId&&item.titleId===county.titleId)||boolParam(ctx.call,'debugClaim')===true;if(!hasClaim&&ctx.call.sourceId!=='rules.faction')return reject(ctx,'war.no_claim','没有该伯爵领的有效宣称。');if(Object.values(ctx.state.wars).some(item=>item.endedAt===null&&(item.attackerId===ctx.call.actorId||item.defenderId===ctx.call.actorId)))return reject(ctx,'war.already_at_war','该人物已经处于战争。');const id=`war_${ctx.call.idempotencyKey}`;ctx.state.wars[id]={id,kind:'county_claim',attackerId:ctx.call.actorId,defenderId,targetTitleId:county.titleId,attackerScore:0,raisedByIds:[],objectiveCountyId:countyId,routeCountyIds:[],phase:'declared',startedAt:ctx.state.currentDate,endedAt:null};ctx.state.signals.push({id:`signal_${id}`,type:'major_change',kind:'war_started',occurredAt:ctx.state.currentDate,scopeIds:[ctx.call.actorId,defenderId,countyId],payload:{warId:id},consumed:false});addPendingEvent(ctx,{type:'war_declared',title:'战争爆发',body:`围绕 ${county.nameKey} 的宣称战争已经爆发。`,severity:'critical',scopeIds:[id,ctx.call.actorId,defenderId,countyId],requiresResponse:true,choices:[{id:'acknowledge',label:'查看战争'}]});event(ctx,'military.war_declared',{warId:id,kind:'county_claim',countyId});}
+function issueMilitaryOrder(ctx:MutableContext){const warId=stringParam(ctx.call,'warId');const war=warId?ctx.state.wars[warId]:undefined;const objective=ctx.call.targetIds[0];if(!war||!objective||!ctx.state.counties[objective])return reject(ctx,'war.order_invalid','军事命令缺少战争或目标。');if(![war.attackerId,war.defenderId].includes(ctx.call.actorId))return reject(ctx,'war.permission_denied','只有参战方能发布命令。');const from=countyForLocation(ctx.state,ctx.state.characters[ctx.call.actorId].locationId);const route=from?findCountyPath(ctx.state,from,objective):null;if(!route)return reject(ctx,'war.route_missing','军队无法抵达目标。');war.objectiveCountyId=objective;war.routeCountyIds=route;const phase=stringParam(ctx.call,'phase');war.phase=phase==='siege'?'siege':phase==='battle'?'battle':'marching';if(!war.raisedByIds.includes(ctx.call.actorId))war.raisedByIds.push(ctx.call.actorId);event(ctx,'military.order_issued',{warId,objectiveCountyId:objective,route,phase:war.phase});}
+
+function createFactionWar(ctx:MutableContext){const faction=ctx.state.factions.faction_liberty;if(!faction)return;faction.status='war';const situation=ctx.state.situations.situation_liberty_1066;if(situation){situation.status='war';situation.phase='civil_war';situation.resolution='war';}const id='war_liberty_revolt';if(!ctx.state.wars[id])ctx.state.wars[id]={id,kind:'faction_revolt',attackerId:faction.leaderId,defenderId:faction.targetId,targetTitleId:'d_brittany',attackerScore:0,raisedByIds:faction.memberIds,objectiveCountyId:'rennes',routeCountyIds:['penthievre','rennes'],phase:'declared',startedAt:ctx.state.currentDate,endedAt:null};ctx.state.signals.push({id:`signal_${id}_${ctx.state.currentDate}`,type:'major_change',kind:'war_started',occurredAt:ctx.state.currentDate,scopeIds:[faction.id,id],payload:{warId:id},consumed:false});event(ctx,'situation.civil_war_started',{warId:id});}
+function answerUltimatum(ctx:MutableContext,answer=stringParam(ctx.call,'answer')){const faction=ctx.state.factions.faction_liberty;if(!faction||faction.status!=='ultimatum')return reject(ctx,'situation.no_ultimatum','当前没有待回应的最后通牒。');const situation=ctx.state.situations.situation_liberty_1066;if(answer==='concede'){faction.status='dissolved';if(situation){situation.status='resolved';situation.phase='conceded';situation.resolution='authority_conceded';}ctx.state.resources.legitimacy=Math.max(0,ctx.state.resources.legitimacy-18);event(ctx,'situation.authority_conceded',{legitimacy:ctx.state.resources.legitimacy});}else if(answer==='resist')createFactionWar(ctx);else reject(ctx,'situation.answer_invalid','必须让步或抵抗。');}
+
+function resolveWarPeace(ctx:MutableContext,warId:string,choice:string){const war=ctx.state.wars[warId];if(!war||war.endedAt)return reject(ctx,'war.peace_invalid','战争不存在或已经结束。');if(!['enforce','white_peace','acknowledge'].includes(choice))return reject(ctx,'war.peace_choice_invalid','无效的议和选择。');if(choice==='enforce'&&war.kind==='county_claim'&&war.targetTitleId){const title=ctx.state.titles[war.targetTitleId];const oldHolder=title?.holderId;if(title){title.holderId=war.attackerId;if(oldHolder)ctx.state.characters[oldHolder].titleIds=ctx.state.characters[oldHolder].titleIds.filter(id=>id!==title.id);if(!ctx.state.characters[war.attackerId].titleIds.includes(title.id))ctx.state.characters[war.attackerId].titleIds.push(title.id);}}if(choice==='enforce'&&war.kind==='faction_revolt'){const faction=ctx.state.factions.faction_liberty;if(faction){faction.status='dissolved';faction.power=0;}const situation=ctx.state.situations.situation_liberty_1066;if(situation){situation.status='resolved';situation.phase='revolt_enforced';situation.resolution='faction_victory';}ctx.state.resources.legitimacy=Math.max(0,ctx.state.resources.legitimacy-25);}if(war.objectiveCountyId&&ctx.state.counties[war.objectiveCountyId].occupation?.warId===war.id)ctx.state.counties[war.objectiveCountyId].occupation=null;war.phase='ended';war.endedAt=ctx.state.currentDate;ctx.state.signals.push({id:`signal_${war.id}_ended_${ctx.state.currentDate}`,type:'major_change',kind:'war_ended',occurredAt:ctx.state.currentDate,scopeIds:[war.id,war.attackerId,war.defenderId],payload:{result:choice},consumed:false});event(ctx,'military.war_ended',{warId:war.id,result:choice,targetTitleId:war.targetTitleId});}
+
+function resolveEventChoice(ctx:MutableContext){const id=ctx.call.targetIds[0];const pending=id?ctx.state.pendingEvents[id]:undefined;const choice=stringParam(ctx.call,'choiceId');if(!pending||pending.status!=='pending')return reject(ctx,'event.missing','事件已经处理或不存在。');if(!pending.choices.some(item=>item.id===choice))return reject(ctx,'event.choice_invalid','无效事件选项。');if(pending.type==='liberty_ultimatum')answerUltimatum(ctx,choice==='concede'?'concede':'resist');else if(pending.type==='war_peace'){const warId=pending.scopeIds.find(scope=>Boolean(ctx.state.wars[scope]));if(warId)resolveWarPeace(ctx,warId,choice??'white_peace');}else if(pending.type==='activity_started'){const activityId=pending.scopeIds.find(scope=>Boolean(ctx.state.activities[scope]));const activity=activityId?ctx.state.activities[activityId]:undefined;if(activity&&choice==='attend'&&!activity.participantIds.includes(ctx.state.playerCharacterId))activity.participantIds.push(ctx.state.playerCharacterId);if(activity&&choice==='ignore')activity.invitedIds=activity.invitedIds.filter(id=>id!==ctx.state.playerCharacterId);}pending.status='resolved';event(ctx,'event.choice_committed',{eventId:id,choiceId:choice});}
+
+function processCommunications(ctx:MutableContext){for(const letter of Object.values(ctx.state.communications)){if(letter.status!=='in_transit'||letter.deliverAt>ctx.state.currentDate)continue;const random=nextRandom(ctx.state.rngState);ctx.state.rngState=random.state;if(random.value<0.08){letter.status='intercepted';letter.interceptedById='char_jean_dol';event(ctx,'communication.intercepted',{communicationId:letter.id,interceptedById:letter.interceptedById},null);}else if(random.value<0.14){letter.status='refused';event(ctx,'communication.refused',{communicationId:letter.id},letter.recipientId);}else{letter.status='delivered';event(ctx,'communication.delivered',{communicationId:letter.id},letter.recipientId);if(letter.recipientId===ctx.state.playerCharacterId)addNotification(ctx,'message',letter.subject,`来自 ${ctx.state.characters[letter.senderId]?.nameKey}`,'info',[letter.id,letter.senderId]);}}}
+function processTravels(ctx:MutableContext){for(const travel of Object.values(ctx.state.travels)){if(travel.status!=='travelling')continue;const duration=Math.max(1,daysBetween(travel.departedAt,travel.arriveAt));const elapsed=Math.max(0,daysBetween(travel.departedAt,ctx.state.currentDate));const index=Math.min(travel.routeCountyIds.length-1,Math.floor((elapsed/duration)*(travel.routeCountyIds.length-1)));if(index>travel.progressIndex&&ctx.state.currentDate<travel.arriveAt){travel.progressIndex=index;travel.currentCountyId=travel.routeCountyIds[index];const waypoint=ctx.state.counties[travel.currentCountyId]?.locationIds[1];if(waypoint)for(const id of[travel.leaderId,...travel.companionIds])if(ctx.state.characters[id])ctx.state.characters[id].locationId=waypoint;event(ctx,'travel.waypoint_reached',{travelId:travel.id,countyId:travel.currentCountyId,progressIndex:index},travel.leaderId);}if(travel.arriveAt>ctx.state.currentDate)continue;travel.status='arrived';travel.progressIndex=travel.routeCountyIds.length-1;travel.currentCountyId=travel.routeCountyIds.at(-1)!;for(const id of[travel.leaderId,...travel.companionIds])if(ctx.state.characters[id])ctx.state.characters[id].locationId=travel.destinationLocationId;if(travel.id===ctx.state.activeTravelId)ctx.state.activeTravelId=null;event(ctx,'travel.arrived',{travelId:travel.id,destinationLocationId:travel.destinationLocationId},travel.leaderId);}}
+function processActivities(ctx:MutableContext){for(const activity of Object.values(ctx.state.activities)){if(activity.status!=='planned'||activity.startedAt>ctx.state.currentDate)continue;activity.status='active';activity.phase='welcome';for(const id of activity.participantIds)if(ctx.state.characters[id]?.alive)ctx.state.characters[id].locationId=activity.locationId;event(ctx,'activity.started',{activityId:activity.id,participantIds:activity.participantIds,locationId:activity.locationId},activity.hostId);if(activity.invitedIds.includes(ctx.state.playerCharacterId)||activity.participantIds.includes(ctx.state.playerCharacterId))addPendingEvent(ctx,{type:'activity_started',title:'活动已经开始',body:`${activity.type==='feast'?'南特宴会':'一场活动'}已经开始。你可以关注或完全无视。`,severity:'major',scopeIds:[activity.id,activity.hostId],requiresResponse:true,choices:[{id:'attend',label:'关注此活动'},{id:'ignore',label:'无视并继续'}]});}}
+function processProjects(ctx:MutableContext){for(const project of Object.values(ctx.state.projects)){if(project.status!=='active'||project.completeAt>ctx.state.currentDate)continue;project.status='completed';const county=ctx.state.counties[project.countyId];if(county&&!county.buildingIds.includes(project.templateId))county.buildingIds.push(project.templateId);if(county&&project.templateId==='market'){county.baseTax+=0.8;county.development+=2;}if(county&&project.templateId==='watchtower')county.baseLevies+=120;event(ctx,'economy.project_completed',{projectId:project.id,countyId:project.countyId,templateId:project.templateId},project.ownerId);}}
+function processMonthlyEconomy(ctx:MutableContext){if(!ctx.state.currentDate.endsWith('-01'))return;for(const person of Object.values(ctx.state.characters)){if(!person.alive)continue;const wallet=ctx.state.characterResources[person.id];if(!wallet)continue;const held=person.titleIds.map(id=>ctx.state.titles[id]?.countyId).filter((id):id is string=>Boolean(id));let income=held.reduce((sum,id)=>sum+ctx.state.counties[id].baseTax*(ctx.state.counties[id].control/100),0);for(const contract of Object.values(ctx.state.contracts).filter(item=>item.liegeId===person.id)){const vassalIncome=ctx.state.characterResources[contract.vassalId]?.income??0;income+=vassalIncome*(contract.taxLevel==='high'?0.25:contract.taxLevel==='normal'?0.15:0.08);}wallet.income=Math.round(income*10)/10;wallet.gold+=Math.floor(income);wallet.levies=Math.max(wallet.levies,held.reduce((sum,id)=>sum+ctx.state.counties[id].baseLevies,0));}
+  const player=ctx.state.characters[ctx.state.playerCharacterId];if(player){player.stress=Math.max(0,player.stress-2);}
+  syncPlayerResources(ctx.state);event(ctx,'economy.monthly_tick',{date:ctx.state.currentDate});}
+function processHealth(ctx:MutableContext){if(!ctx.state.currentDate.endsWith('-01'))return;for(const person of Object.values(ctx.state.characters)){if(!person.alive)continue;const age=ageOnDate(person.birthDate,ctx.state.currentDate);if(age<45)continue;const random=nextRandom(ctx.state.rngState);ctx.state.rngState=random.state;const risk=Math.min(0.12,Math.max(0,(age-45)/900)+(5-person.health)/250);if(random.value<risk){person.health=Math.max(0,person.health-0.8);if(person.health<=0.6)transferPlayerOnDeath(ctx,person.id);}}}
+function processBirths(ctx:MutableContext){if(!ctx.state.currentDate.endsWith('-01'))return;for(const marriage of Object.values(ctx.state.marriages)){if(marriage.status!=='married')continue;const[leftId,rightId]=marriage.partnerIds;const left=ctx.state.characters[leftId],right=ctx.state.characters[rightId];if(!left?.alive||!right?.alive)continue;const mother=left.sex==='female'?left:right.sex==='female'?right:null;if(!mother||ageOnDate(mother.birthDate,ctx.state.currentDate)<18||ageOnDate(mother.birthDate,ctx.state.currentDate)>42)continue;const random=nextRandom(ctx.state.rngState);ctx.state.rngState=random.state;if(random.value>0.012*Math.min(left.fertility,right.fertility))continue;const sexRoll=nextRandom(ctx.state.rngState);ctx.state.rngState=sexRoll.state;const id=`char_child_${ctx.state.currentDate.replaceAll('-','')}_${Object.keys(ctx.state.characters).length}`;ctx.state.characters[id]={id,nameKey:'一名新生儿',originalName:'Infans',birthDate:ctx.state.currentDate,deathDate:null,sex:sexRoll.value<0.5?'female':'male',houseId:right.sex==='male'?right.houseId:left.houseId,dynastyId:right.sex==='male'?right.dynastyId:left.dynastyId,parentIds:[leftId,rightId],childIds:[],spouseIds:[],betrothedIds:[],titleIds:[],liegeId:right.liegeId??left.liegeId,locationId:mother.locationId,alive:true,imprisonedById:null,traits:['幼童'],attributes:{diplomacy:0,martial:0,stewardship:0,intrigue:0,learning:0,prowess:0},personality:{boldness:0,compassion:0,honor:0},health:5,fertility:0,stress:0,goals:['成长'],shortTermGoal:null,ambition:null,knowledgeIds:[],memoryIds:[],sourceType:'original'};left.childIds.push(id);right.childIds.push(id);ctx.state.characterResources[id]={gold:0,prestige:0,piety:0,levies:0,income:0};event(ctx,'family.child_born',{childId:id,parentIds:[leftId,rightId]},null);}}
+function processPromises(ctx:MutableContext){for(const promise of Object.values(ctx.state.promises)){if(promise.status!=='active'||promise.dueDate>=ctx.state.currentDate)continue;promise.status='broken';for(const support of Object.values(ctx.state.supportCommitments).filter(item=>item.conditionPromiseIds.includes(promise.id)&&item.status==='active'))support.status='withdrawn';event(ctx,'politics.promise_broken',{promiseId:promise.id,beneficiaryId:promise.beneficiaryId},promise.promisorId);}}
+function processWars(ctx:MutableContext){for(const war of Object.values(ctx.state.wars)){if(war.endedAt)continue;if(war.phase==='declared')war.phase='mobilizing';else if(war.phase==='mobilizing')war.phase='marching';else if(['marching','battle','siege'].includes(war.phase)){const roll=randomInt(ctx.state.rngState,2,7);ctx.state.rngState=roll.state;war.attackerScore=Math.min(100,war.attackerScore+roll.value);if(war.attackerScore>=60&&war.objectiveCountyId){ctx.state.counties[war.objectiveCountyId].occupation={warId:war.id,occupierTitleId:ctx.state.characters[war.attackerId]?.titleIds[0]??'unknown'};war.phase='negotiation';event(ctx,'military.siege_completed',{warId:war.id,objectiveCountyId:war.objectiveCountyId,occupationOnly:true},war.attackerId);if([war.attackerId,war.defenderId].includes(ctx.state.playerCharacterId))addPendingEvent(ctx,{type:'war_peace',title:'战争进入议和',body:'主要遭遇已经产生决定性优势。占领尚未转移头衔，必须通过和约结算。',severity:'critical',scopeIds:[war.id,war.objectiveCountyId],requiresResponse:true,choices:[{id:'enforce',label:'强制执行战争目标'},{id:'white_peace',label:'接受无条件停战'}]});}}}}
+function processHistoricalPressure(ctx:MutableContext){if(ctx.state.currentDate==='1066-09-28'&&!ctx.state.eventLog.some(item=>item.type==='world.norman_landing')){ctx.state.externalRealms.realm_england.warSummary='诺曼军已登陆英格兰南岸，胜负未定';ctx.state.externalRealms.realm_england.pressure=95;ctx.state.signals.push({id:'signal_norman_landing',type:'major_change',kind:'norman_landing',occurredAt:ctx.state.currentDate,scopeIds:['char_william','char_harold','realm_england'],payload:{forcedOutcome:false},consumed:false});addPendingEvent(ctx,{type:'norman_landing',title:'海峡对岸：诺曼军登陆',body:'威廉已经在英格兰南岸登陆，但战争结果不受剧本强制。',severity:'major',scopeIds:['char_william','char_harold','realm_england'],requiresResponse:true,choices:[{id:'acknowledge',label:'记入西欧概览'}]});event(ctx,'world.norman_landing',{forcedOutcome:false},null);}}
+function processSituation(ctx:MutableContext){const situation=ctx.state.situations.situation_liberty_1066;const faction=ctx.state.factions.faction_liberty;if(!situation||!faction||situation.status!=='active')return;situation.metrics.currentSupport=supportCount(ctx.state);situation.metrics.factionPower=faction.power;if(situation.deadline&&ctx.state.currentDate>=situation.deadline){if(situation.metrics.currentSupport>=2||faction.power<45){situation.status='resolved';situation.phase='defused';situation.resolution=situation.metrics.currentSupport>=2?'coalition_split':'power_broken';faction.status='dissolved';ctx.state.resources.legitimacy=Math.min(100,ctx.state.resources.legitimacy+8);event(ctx,'situation.liberty_resolved',{resolution:situation.resolution,support:situation.metrics.currentSupport,power:faction.power});addNotification(ctx,'situation','裂冠危机已经解除','派系未能形成有效最后通牒。','info',[situation.id]);}else if(faction.status!=='ultimatum'){faction.status='ultimatum';situation.phase='ultimatum';addPendingEvent(ctx,{type:'liberty_ultimatum',title:'降权派系最后通牒',body:'派系要求限制公爵权力。你可以让步，或拒绝并进入内战。',severity:'critical',scopeIds:[situation.id,faction.id],requiresResponse:true,choices:[{id:'concede',label:'签署降权宪章'},{id:'resist',label:'拒绝，召集军队'}]});event(ctx,'situation.ultimatum_issued',{support:situation.metrics.currentSupport,power:faction.power});}}}
+function processWorldPulse(ctx:MutableContext){if(ctx.state.currentDate<ctx.state.nextRegularPulseAt)return;const elapsed=ctx.state.settings.regularWorldPulseDays;ctx.state.worldActionCredit+=elapsed/7;const budget=Math.min(3,Math.floor(ctx.state.worldActionCredit));ctx.state.worldActionCredit=Math.max(0,ctx.state.worldActionCredit-budget);const keyIds=['char_jean_dol','char_hoel','char_geoffroy','char_morvan','char_william','char_geoffrey_anjou'];ctx.state.signals.push({id:`signal_pulse_${ctx.state.currentDate}`,type:'regular_pulse',kind:'political_cycle',occurredAt:ctx.state.currentDate,scopeIds:keyIds,payload:{elapsedDays:elapsed,decisionBudget:budget},consumed:false});ctx.state.nextRegularPulseAt=addDays(ctx.state.nextRegularPulseAt,elapsed);event(ctx,'world.regular_pulse',{elapsedDays:elapsed,decisionBudget:budget,nextAt:ctx.state.nextRegularPulseAt},null);}
+function processRegency(ctx:MutableContext){if(!ctx.state.regentId||!ctx.state.activeTravelId)return;const wallet=ctx.state.characterResources[ctx.state.playerCharacterId];if(wallet)wallet.gold=Math.max(0,wallet.gold-1);event(ctx,'regency.action_taken',{regentId:ctx.state.regentId,action:'routine_governance',cost:1},ctx.state.regentId);}
+
+function processDay(ctx:MutableContext){processActivities(ctx);processCommunications(ctx);processTravels(ctx);processProjects(ctx);processMonthlyEconomy(ctx);processHealth(ctx);processBirths(ctx);processPromises(ctx);processWars(ctx);processHistoricalPressure(ctx);processSituation(ctx);processWorldPulse(ctx);processRegency(ctx);syncPlayerResources(ctx.state);}
+function advanceDaysInContext(ctx:MutableContext,days:number){if(Object.values(ctx.state.pendingEvents).some(item=>item.status==='pending'&&item.requiresResponse))return reject(ctx,'time.pending_event','必须先处理当前重大事件。');const requested=Math.max(1,Math.min(30,Math.trunc(days)));let actual=0;for(let i=0;i<requested;i++){ctx.state.currentDate=addDays(ctx.state.currentDate,1);ctx.state.clock={date:ctx.state.currentDate,segment:'morning'};processDay(ctx);actual++;if(Object.values(ctx.state.pendingEvents).some(item=>item.status==='pending'&&item.requiresResponse&&item.occurredAt===ctx.state.currentDate))break;}event(ctx,'time.advanced',{requestedDays:requested,actualDays:actual,currentDate:ctx.state.currentDate,interrupted:actual<requested});}
+function consumeWorldSignals(ctx:MutableContext){const ids=Array.isArray(ctx.call.params.signalIds)?ctx.call.params.signalIds.filter((v):v is string=>typeof v==='string'):[];for(const signal of ctx.state.signals)if(ids.includes(signal.id))signal.consumed=true;event(ctx,'world.signals_consumed',{signalIds:ids});}
+
+export function executeAction(inputState:GameState,inputCall:ActionCall):CommandResult{
+  const parsed=ActionCallSchema.safeParse(inputCall);if(!parsed.success)return{status:'rejected',state:inputState,events:[],errors:[{code:'action.invalid',message:parsed.error.message}]};const call=parsed.data;
+  if(inputState.eventLog.some(item=>item.idempotencyKey===call.idempotencyKey))return{status:'duplicate',state:inputState,events:[],errors:[]};
+  if(call.expectedRevision!==inputState.revision)return{status:'rejected',state:inputState,events:[],errors:[{code:'revision.conflict',message:`预期 revision ${call.expectedRevision}，当前为 ${inputState.revision}。`}]};
+  if(!inputState.characters[call.actorId]?.alive)return{status:'rejected',state:inputState,events:[],errors:[{code:'actor.invalid',message:'行动者不存在或已死亡。'}]};
+  if(!actionDefinitions.some(item=>item.id===call.actionId))return{status:'rejected',state:inputState,events:[],errors:[{code:'action.unknown',message:`未注册行动 ${call.actionId}。`}]};
+  const ctx:MutableContext={state:cloneState(inputState),call,events:[],errors:[]};
+  switch(call.actionId){
+    case'relationship.adjust':relationshipAdjust(ctx);break;
+    case'social.praise':relationshipAdjust(ctx,{fromId:call.targetIds[0],toId:call.actorId,dimension:'opinion',delta:5,reason:'praise'});break;
+    case'social.insult':relationshipAdjust(ctx,{fromId:call.targetIds[0],toId:call.actorId,dimension:'opinion',delta:-5,reason:'insult'});break;
+    case'social.threaten':relationshipAdjust(ctx,{fromId:call.targetIds[0],toId:call.actorId,dimension:'fear',delta:6,reason:'threat'});if(!ctx.errors.length)relationshipAdjust(ctx,{fromId:call.targetIds[0],toId:call.actorId,dimension:'trust',delta:-4,reason:'threat'});break;
+    case'council.appoint':appointCouncil(ctx);break;case'regency.delegate':delegateRegency(ctx);break;case'communication.send_letter':sendLetter(ctx);break;case'travel.start':startTravel(ctx);break;case'activity.advance':advanceActivity(ctx);break;
+    case'interaction.open':openInteraction(ctx);break;case'interaction.resolve':resolveInteraction(ctx);break;case'politics.offer_support_bargain':legacySupportBargain(ctx);break;case'politics.modify_contract':directModifyContract(ctx);break;case'politics.join_faction':joinFaction(ctx);break;case'politics.leave_faction':leaveFaction(ctx);break;case'politics.arrest':arrest(ctx);break;
+    case'economy.start_project':startProject(ctx);break;case'intimacy.resolve':resolveIntimacy(ctx);break;case'time.advance':advanceDaysInContext(ctx,numberParam(call,'days')??1);break;case'event.choose':resolveEventChoice(ctx);break;case'world.consume_signals':consumeWorldSignals(ctx);break;case'scenario.answer_ultimatum':answerUltimatum(ctx);break;
+    case'military.declare_county_claim':declareCountyClaim(ctx);break;case'military.issue_order':issueMilitaryOrder(ctx);break;case'character.die':killCharacter(ctx);break;
+    case'notification.read':{const id=stringParam(call,'notificationId');if(id&&ctx.state.notifications[id])ctx.state.notifications[id].read=true;event(ctx,'notification.read',{notificationId:id??null});break;}
+  }
+  if(ctx.errors.length)return{status:'rejected',state:inputState,events:[],errors:ctx.errors};ctx.state.revision+=1;for(const item of ctx.events)item.revision=ctx.state.revision;ctx.state.eventLog.push(...ctx.events);syncPlayerResources(ctx.state);return{status:'committed',state:ctx.state,events:ctx.events,errors:[]};
 }
 
-function answerUltimatum(ctx: MutableContext): void {
-  const answer = stringParam(ctx.call, 'answer');
-  const faction = ctx.state.factions.faction_liberty;
-  if (faction.status !== 'ultimatum') return reject(ctx, 'scenario.no_ultimatum', '当前没有待回应的最后通牒。');
-  if (answer === 'concede') {
-    faction.status = 'dissolved';
-    ctx.state.scenario.result = 'conceded';
-    ctx.state.scenario.phase = 'campaign';
-    ctx.state.resources.legitimacy = Math.max(0, ctx.state.resources.legitimacy - 18);
-    event(ctx, 'scenario.authority_conceded', { legitimacy: ctx.state.resources.legitimacy });
-    return;
-  }
-  if (answer !== 'resist') return reject(ctx, 'scenario.answer_invalid', '必须选择 concede 或 resist。');
-  faction.status = 'war';
-  ctx.state.scenario.result = 'civil_war';
-  ctx.state.scenario.phase = 'campaign';
-  const id = 'war_liberty_revolt';
-  ctx.state.wars[id] = { id, kind: 'faction_revolt', attackerId: faction.leaderId, defenderId: ctx.state.playerCharacterId, targetTitleId: 'd_brittany', attackerScore: 0, raisedByIds: faction.memberIds, objectiveCountyId: 'rennes', routeCountyIds: ['penthievre', 'rennes'], phase: 'declared', startedAt: ctx.state.currentDate, endedAt: null };
-  ctx.state.signals.push({ id: `signal_${id}`, type: 'major_change', kind: 'war_started', occurredAt: ctx.state.currentDate, scopeIds: [faction.id, id], payload: { warId: id }, consumed: false });
-  event(ctx, 'scenario.civil_war_started', { warId: id });
-}
-
-function transferPlayerOnDeath(ctx: MutableContext, deceasedId: string): void {
-  const deceased = ctx.state.characters[deceasedId];
-  if (!deceased) return;
-  deceased.alive = false;
-  const heirId = livingBloodHeirs(ctx.state, deceasedId)[0];
-  if (!heirId) {
-    ctx.state.scenario.flags.gameEndedNoBloodHeir = true;
-    event(ctx, 'succession.game_ended', { deceasedId, reason: 'no_living_blood_heir' }, null);
-    return;
-  }
-  const inheritedTitleIds: string[] = [];
-  for (const title of Object.values(ctx.state.titles)) {
-    if (title.holderId !== deceasedId) continue;
-    title.holderId = heirId;
-    inheritedTitleIds.push(title.id);
-  }
-  ctx.state.characters[heirId].titleIds = [...new Set([...ctx.state.characters[heirId].titleIds, ...inheritedTitleIds])];
-  deceased.titleIds = deceased.titleIds.filter(id => !inheritedTitleIds.includes(id));
-  ctx.state.playerCharacterId = heirId;
-  event(ctx, 'succession.player_changed', { deceasedId, heirId, inheritedTitleIds, knowledgePolicy: 'public_and_possessed_archives_only' }, null);
-}
-
-function sideStory(ctx: MutableContext): void {
-  const kind = stringParam(ctx.call, 'kind');
-  if (!kind || !['lethal_risk', 'ambiguous_omen', 'adult_encounter'].includes(kind)) return reject(ctx, 'side_story.invalid', '未知支线。');
-  const flag = `sideStory_${kind}`;
-  if (ctx.state.scenario.flags[flag]) return reject(ctx, 'side_story.already_seen', '该支线在本序章已经发生过。');
-  if (kind === 'ambiguous_omen') {
-    ctx.state.scenario.flags[flag] = true;
-    const id = `knowledge_omen_${ctx.state.currentDate}`;
-    ctx.state.knowledge[id] = { id, subjectId: ctx.call.actorId, predicate: 'dream_of_broken_crown', value: '一顶裂开的王冠沉入黑水；没有规则确认这是真实魔法。', certainty: 'rumored', sourceId: ctx.call.sourceId, observedAt: ctx.state.currentDate, visibility: 'private' };
-    ctx.state.characters[ctx.call.actorId].knowledgeIds.push(id);
-    event(ctx, 'story.ambiguous_omen', { knowledgeId: id, supernaturalHardEffect: false });
-    return;
-  }
-  if (kind === 'adult_encounter') {
-    const targetId = ctx.call.targetIds[0];
-    if (!targetId || !ctx.state.characters[targetId]) return reject(ctx, 'side_story.target_missing', '成年亲密支线需要人物目标。');
-    if (ctx.state.settings.content.intimacy === 'abstract') return reject(ctx, 'side_story.content_disabled', '本存档将亲密内容设为抽象。');
-    if (characterAge(ctx.state, ctx.call.actorId) < 18 || characterAge(ctx.state, targetId) < 18) return reject(ctx, 'intimacy.age_gate', '未满 18 岁人物绝不能成为亲密行动目标。');
-    if (ctx.state.characters[ctx.call.actorId].locationId !== ctx.state.characters[targetId].locationId) return reject(ctx, 'intimacy.not_co_located', '双方不在同一地点。');
-    ctx.state.scenario.flags[flag] = true;
-    event(ctx, 'story.adult_opportunity', { participantIds: [ctx.call.actorId, targetId], state: 'opportunity', requiresConsent: true, forcedCrimeTemplateAllowed: false });
-    return;
-  }
-  const travel = ctx.state.scenario.activeTravelId ? ctx.state.travels[ctx.state.scenario.activeTravelId] : null;
-  if (!travel || travel.routeKind !== 'direct') return reject(ctx, 'side_story.no_lethal_route', '致命风险只在选择危险捷径时出现。');
-  ctx.state.scenario.flags[flag] = true;
-  const random = nextRandom(ctx.state.rngState);
-  ctx.state.rngState = random.state;
-  if (random.value < 0.12) {
-    event(ctx, 'story.lethal_ambush', { outcome: 'fatal', telegraphed: true });
-    transferPlayerOnDeath(ctx, ctx.call.actorId);
-  } else if (random.value < 0.5) {
-    ctx.state.characters[ctx.call.actorId].traits.push('负伤');
-    ctx.state.resources.stress = Math.min(300, ctx.state.resources.stress + 18);
-    event(ctx, 'story.lethal_ambush', { outcome: 'wounded', telegraphed: true });
-  } else {
-    ctx.state.resources.prestige += 12;
-    event(ctx, 'story.lethal_ambush', { outcome: 'escaped', telegraphed: true });
-  }
-}
-
-function processDay(ctx: MutableContext): void {
-  for (const activity of Object.values(ctx.state.activities)) {
-    if (activity.status !== 'planned' || activity.startedAt > ctx.state.currentDate) continue;
-    activity.status = 'active';
-    activity.phase = 'welcome';
-    for (const participantId of activity.participantIds) if (ctx.state.characters[participantId]?.alive) ctx.state.characters[participantId].locationId = activity.locationId;
-    event(ctx, 'activity.started', { activityId: activity.id, participantIds: activity.participantIds, locationId: activity.locationId }, activity.hostId);
-  }
-  for (const communication of Object.values(ctx.state.communications)) {
-    if (communication.status !== 'in_transit' || communication.deliverAt > ctx.state.currentDate) continue;
-    const random = nextRandom(ctx.state.rngState);
-    ctx.state.rngState = random.state;
-    if (random.value < 0.08) {
-      communication.status = 'intercepted';
-      communication.interceptedById = 'char_jean_dol';
-      event(ctx, 'communication.intercepted', { communicationId: communication.id, interceptedById: communication.interceptedById }, null);
-    } else if (random.value < 0.14) {
-      communication.status = 'refused';
-      event(ctx, 'communication.refused', { communicationId: communication.id }, communication.recipientId);
-    } else {
-      communication.status = 'delivered';
-      event(ctx, 'communication.delivered', { communicationId: communication.id }, communication.recipientId);
-    }
-  }
-  for (const travel of Object.values(ctx.state.travels)) {
-    if (travel.status !== 'travelling') continue;
-    const duration = Math.max(1, daysBetween(travel.departedAt, travel.arriveAt));
-    const elapsed = Math.max(0, daysBetween(travel.departedAt, ctx.state.currentDate));
-    const progressIndex = Math.min(travel.routeCountyIds.length - 1, Math.floor((elapsed / duration) * (travel.routeCountyIds.length - 1)));
-    if (progressIndex > travel.progressIndex && ctx.state.currentDate < travel.arriveAt) {
-      travel.progressIndex = progressIndex;
-      travel.currentCountyId = travel.routeCountyIds[progressIndex];
-      const waypoint = ctx.state.counties[travel.currentCountyId]?.locationIds[1];
-      if (waypoint) for (const id of [travel.leaderId, ...travel.companionIds]) if (ctx.state.characters[id]) ctx.state.characters[id].locationId = waypoint;
-      event(ctx, 'travel.waypoint_reached', { travelId: travel.id, countyId: travel.currentCountyId, progressIndex }, travel.leaderId);
-    }
-    if (travel.arriveAt > ctx.state.currentDate) continue;
-    travel.status = 'arrived';
-    travel.progressIndex = travel.routeCountyIds.length - 1;
-    travel.currentCountyId = travel.routeCountyIds[travel.routeCountyIds.length - 1];
-    const travellers = [travel.leaderId, ...travel.companionIds];
-    for (const id of travellers) if (ctx.state.characters[id]) ctx.state.characters[id].locationId = travel.destinationLocationId;
-    if (travel.id === ctx.state.scenario.activeTravelId) {
-      ctx.state.scenario.phase = 'arrival';
-      ctx.state.scenario.activeTravelId = null;
-      const feast = ctx.state.activities[ctx.state.scenario.feastId];
-      if (feast && !feast.participantIds.includes(travel.leaderId)) feast.participantIds.push(travel.leaderId);
-    }
-    event(ctx, 'travel.arrived', { travelId: travel.id, destinationLocationId: travel.destinationLocationId }, travel.leaderId);
-  }
-  const activeTravel = ctx.state.scenario.activeTravelId ? ctx.state.travels[ctx.state.scenario.activeTravelId] : null;
-  if (activeTravel && ctx.state.regentId && !ctx.state.scenario.flags.regencyWindowResolved && daysBetween(activeTravel.departedAt, ctx.state.currentDate) >= 2) {
-    ctx.state.scenario.flags.regencyWindowResolved = true;
-    if (ctx.state.regentId === 'char_mael') {
-      const cost = Math.min(18, ctx.state.resources.gold);
-      ctx.state.resources.gold -= cost;
-      ctx.state.resources.legitimacy = Math.min(100, ctx.state.resources.legitimacy + 3);
-      event(ctx, 'regency.action_taken', { regentId: ctx.state.regentId, action: 'abbey_tithe_exemption', goldCost: cost, legitimacyDelta: 3, withinDelegatedAuthority: true }, ctx.state.regentId);
-    } else {
-      ctx.state.resources.legitimacy = Math.max(0, ctx.state.resources.legitimacy - 2);
-      event(ctx, 'regency.action_taken', { regentId: ctx.state.regentId, action: 'tax_petition_deferred', legitimacyDelta: -2, withinDelegatedAuthority: true }, ctx.state.regentId);
-    }
-  }
-  for (const project of Object.values(ctx.state.projects)) {
-    if (project.status !== 'active' || project.completeAt > ctx.state.currentDate) continue;
-    project.status = 'completed';
-    ctx.state.counties[project.countyId].control = Math.min(100, ctx.state.counties[project.countyId].control + 5);
-    event(ctx, 'economy.project_completed', { projectId: project.id, countyId: project.countyId }, project.ownerId);
-  }
-  for (const promise of Object.values(ctx.state.promises)) {
-    if (promise.status === 'active' && promise.dueDate < ctx.state.currentDate) {
-      promise.status = 'broken';
-      for (const commitment of Object.values(ctx.state.supportCommitments)) {
-        if (commitment.conditionPromiseIds.includes(promise.id) && commitment.status === 'active') commitment.status = 'withdrawn';
-      }
-      event(ctx, 'politics.promise_broken', { promiseId: promise.id, beneficiaryId: promise.beneficiaryId }, promise.promisorId);
-    }
-  }
-  if (ctx.state.currentDate === '1066-09-28' && !ctx.state.signals.some(signal => signal.kind === 'norman_landing')) {
-    ctx.state.signals.push({ id: 'signal_norman_landing_10660928', type: 'major_change', kind: 'norman_landing', occurredAt: ctx.state.currentDate, scopeIds: ['char_william', 'd_normandy'], payload: { summary: '诺曼军队已在英格兰南岸登陆，结果未被预设。' }, consumed: false });
-    event(ctx, 'world.major_change_observed', { kind: 'norman_landing' }, null);
-  }
-  if (ctx.state.currentDate >= ctx.state.nextRegularPulseAt) {
-    const elapsed = Math.max(3, ctx.state.settings.regularWorldPulseDays);
-    ctx.state.worldActionCredit += elapsed / 7;
-    const budget = Math.min(3, Math.floor(ctx.state.worldActionCredit));
-    ctx.state.worldActionCredit -= budget;
-    const id = `signal_regular_${ctx.state.currentDate}`;
-    ctx.state.signals.push({ id, type: 'regular_pulse', kind: 'western_europe_pulse', occurredAt: ctx.state.currentDate, scopeIds: ['char_jean_dol', 'char_william', 'char_geoffrey_anjou'], payload: { elapsedDays: elapsed, decisionBudget: budget }, consumed: false });
-    ctx.state.nextRegularPulseAt = addDays(ctx.state.nextRegularPulseAt, elapsed);
-    event(ctx, 'world.regular_pulse_due', { signalId: id, elapsedDays: elapsed, decisionBudget: budget }, null);
-  }
-  for (const war of Object.values(ctx.state.wars)) {
-    if (war.phase === 'marching') {
-      war.phase = 'siege';
-      event(ctx, 'military.army_reached_objective', { warId: war.id, objectiveCountyId: war.objectiveCountyId }, null);
-    } else if (war.phase === 'siege') {
-      const random = randomInt(ctx.state.rngState, 2, 7);
-      ctx.state.rngState = random.state;
-      war.attackerScore = Math.min(100, war.attackerScore + random.value);
-      if (war.attackerScore >= 60 && war.objectiveCountyId) {
-        ctx.state.counties[war.objectiveCountyId].occupation = { warId: war.id, occupierTitleId: ctx.state.characters[war.attackerId]?.titleIds[0] ?? 'unknown' };
-        war.phase = 'negotiation';
-        event(ctx, 'military.siege_completed', { warId: war.id, objectiveCountyId: war.objectiveCountyId, occupationOnly: true }, war.attackerId);
-      }
-    }
-  }
-}
-
-function advanceDaysInContext(ctx: MutableContext, days: number): void {
-  const safeDays = Math.max(1, Math.min(30, Math.trunc(days)));
-  for (let index = 0; index < safeDays; index += 1) {
-    ctx.state.currentDate = addDays(ctx.state.currentDate, 1);
-    processDay(ctx);
-  }
-  event(ctx, 'time.advanced', { days: safeDays, currentDate: ctx.state.currentDate });
-}
-
-export function executeAction(inputState: GameState, inputCall: ActionCall): CommandResult {
-  const parsed = ActionCallSchema.safeParse(inputCall);
-  if (!parsed.success) return { status: 'rejected', state: inputState, events: [], errors: [{ code: 'action.invalid', message: parsed.error.message }] };
-  const call = parsed.data;
-  if (inputState.eventLog.some(item => item.idempotencyKey === call.idempotencyKey)) return { status: 'duplicate', state: inputState, events: [], errors: [] };
-  if (call.expectedRevision !== inputState.revision) return { status: 'rejected', state: inputState, events: [], errors: [{ code: 'revision.conflict', message: `预期 revision ${call.expectedRevision}，当前为 ${inputState.revision}。` }] };
-  if (!inputState.characters[call.actorId]?.alive) return { status: 'rejected', state: inputState, events: [], errors: [{ code: 'actor.invalid', message: '行动者不存在或已死亡。' }] };
-  if (!actionDefinitions.some(definition => definition.id === call.actionId)) return { status: 'rejected', state: inputState, events: [], errors: [{ code: 'action.unknown', message: `未注册行动 ${call.actionId}。` }] };
-
-  const ctx: MutableContext = { state: cloneState(inputState), call, events: [], errors: [] };
-  switch (call.actionId) {
-    case 'relationship.adjust': relationshipAdjust(ctx); break;
-    case 'social.praise': relationshipAdjust(ctx, { dimension: 'opinion', delta: 5, reason: 'praise' }); break;
-    case 'social.insult': relationshipAdjust(ctx, { dimension: 'opinion', delta: -5, reason: 'insult' }); break;
-    case 'social.threaten':
-      relationshipAdjust(ctx, { dimension: 'fear', delta: 6, reason: 'threat' });
-      if (ctx.errors.length === 0) {
-        const followup: MutableContext = { ...ctx, call: { ...call, params: { ...call.params, dimension: 'trust', delta: -4, reasonCode: 'threat' }, idempotencyKey: `${call.idempotencyKey}_trust` } };
-        relationshipAdjust(followup);
-      }
-      break;
-    case 'regency.delegate': delegateRegency(ctx); break;
-    case 'communication.send_letter': sendLetter(ctx); break;
-    case 'travel.start': startTravel(ctx); break;
-    case 'activity.advance': advanceActivity(ctx); break;
-    case 'politics.offer_support_bargain': offerSupportBargain(ctx); break;
-    case 'economy.start_project': startProject(ctx); break;
-    case 'intimacy.resolve': resolveIntimacy(ctx); break;
-    case 'time.advance': advanceDaysInContext(ctx, numberParam(call, 'days') ?? 1); break;
-    case 'world.consume_signals': consumeWorldSignals(ctx); break;
-    case 'scenario.resolve_deadline': resolveDeadline(ctx); break;
-    case 'scenario.answer_ultimatum': answerUltimatum(ctx); break;
-    case 'scenario.side_story': sideStory(ctx); break;
-    case 'military.declare_county_claim': declareCountyClaim(ctx); break;
-    case 'military.issue_order': issueMilitaryOrder(ctx); break;
-  }
-  if (ctx.errors.length > 0) return { status: 'rejected', state: inputState, events: [], errors: ctx.errors };
-  ctx.state.revision += 1;
-  for (const item of ctx.events) item.revision = ctx.state.revision;
-  ctx.state.eventLog.push(...ctx.events);
-  return { status: 'committed', state: ctx.state, events: ctx.events, errors: [] };
-}
-
-export function makeAction(state: GameState, actionId: string, actorId: string, targetIds: string[], params: Record<string, unknown>, sourceId: string, sceneId: string, idempotencyKey?: string): ActionCall {
-  return {
-    actionId,
-    version: 1,
-    actorId,
-    targetIds,
-    params,
-    sourceId,
-    sceneId,
-    idempotencyKey: idempotencyKey ?? `${actionId}_${state.revision}_${Date.now().toString(36)}`,
-    expectedRevision: state.revision,
-  };
-}
-
-export function replayActions(initial: GameState, calls: ActionCall[]): GameState {
-  return calls.reduce((state, call) => {
-    const result = executeAction(state, { ...call, expectedRevision: state.revision });
-    if (result.status !== 'committed') throw new Error(result.errors.map(item => item.message).join('; ') || '重放失败');
-    return result.state;
-  }, initial);
-}
-
-export function pulseNormalization(state: GameState): { elapsedDays: number; actionBudget: number } {
-  const elapsedDays = Math.max(3, Math.min(30, state.settings.regularWorldPulseDays));
-  return { elapsedDays, actionBudget: Math.min(3, Math.floor(state.worldActionCredit + elapsedDays / 7)) };
-}
-
-export function travelDuration(state: GameState, travelId: string): number {
-  const travel = state.travels[travelId];
-  return travel ? daysBetween(travel.departedAt, travel.arriveAt) : 0;
-}
+export function makeAction(state:GameState,actionId:string,actorId:string,targetIds:string[],params:Record<string,unknown>,sourceId:string,sceneId:string,idempotencyKey?:string):ActionCall{return{actionId,version:1,actorId,targetIds,params,sourceId,sceneId,idempotencyKey:idempotencyKey??`${sourceId}_${actionId}_${state.revision}_${Date.now().toString(36)}`,expectedRevision:state.revision};}
+export function replayActions(initial:GameState,calls:ActionCall[]):GameState{return calls.reduce((state,call)=>{const result=executeAction(state,{...call,expectedRevision:state.revision});if(result.status!=='committed')throw new Error(result.errors.map(item=>item.message).join('; ')||'重放失败');return result.state;},initial);}
+export function pulseNormalization(state:GameState){const elapsedDays=Math.max(3,Math.min(30,state.settings.regularWorldPulseDays));return{elapsedDays,actionBudget:Math.min(3,Math.floor(state.worldActionCredit+elapsedDays/7))};}
+export function travelDuration(state:GameState,travelId:string){const travel=state.travels[travelId];return travel?daysBetween(travel.departedAt,travel.arriveAt):0;}

@@ -5,7 +5,11 @@ vi.mock('../utils/variableReader', () => ({
   flushPendingGameDataCompletion: vi.fn(async () => {}),
   getLastMessageContent: vi.fn(() => '最新正文'),
   normalizeAssistantReplyForPersistence: vi.fn((text: string) =>
-    text.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(),
+    text
+      .replace(/\r\n?/g, '\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim(),
   ),
   normalizeDisplayedMessageContent: vi.fn((text: string) => text),
   parseAIResponse: vi.fn((text: string) => ({ content: text })),
@@ -534,9 +538,7 @@ describe('useMessageHandler extra-variable decision', () => {
 
   it('inline 时间定向纠错耗尽时不创建 assistant 也不等待 ERA', async () => {
     globals.generate = vi.fn(async () => '正文\n<VariableEdit>{"世界信息":{"时间":{"分":10}}}</VariableEdit>');
-    validateOrRepairInlineWorldTimeReplyMock.mockRejectedValue(
-      new Error('世界时间定向纠错失败，已自动重试 2 次'),
-    );
+    validateOrRepairInlineWorldTimeReplyMock.mockRejectedValue(new Error('世界时间定向纠错失败，已自动重试 2 次'));
     const options = createHookOptions(createSummarySettings('inline'));
     const { result } = renderHook(() => useMessageHandler(options));
 

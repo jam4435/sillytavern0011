@@ -280,6 +280,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
     const is_fast_build = env_flag_enabled(env, 'fast');
 
     return {
+      name: `${script_filepath.dir}-${script_filepath.name}`.replaceAll(/[\\/]/g, '-'),
       experiments: {
         outputModule: true,
       },

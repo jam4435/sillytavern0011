@@ -2,297 +2,124 @@
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import CountyMap from './components/CountyMap.vue';
-import { loadContentPacks, corePack, prologuePack, readContentPackFile, type ContentPack } from './content/loader';
 import { t } from './content/basePack';
-import { relationshipValue } from './domain/selectors';
-import { useGameStore } from './stores/game';
+import { corePack, loadContentPacks, readContentPackFile, sandboxPack, type ContentPack } from './content/loader';
+import { interactionDefinitions } from './domain/interactions';
+import { characterAge, relationshipValue } from './domain/selectors';
+import { useGameStore, type UtilityWindow } from './stores/game';
 
-const store = useGameStore();
-const { state, chronicle, checkpoints, busy, streamingText, selectedCountyId, selectedCharacterId, rightTab, mapLayer, dialogueExpanded, currentSupport, daysLeft, player, currentLocation } = storeToRefs(store);
-const dialogueText = ref('');
-const consequential = ref(false);
-const checkpointName = ref('宴会前夜');
-const importedPacks = ref<ContentPack[]>([]);
-const modReport = ref('本体与序章内容包已通过同一加载器。');
-const mobileTab = ref<'map' | 'dialogue' | 'panel'>('map');
+const store=useGameStore();
+const {state,chronicle,checkpoints,busy,streamingText,selectedKind,selectedObjectId,mapLayer,utilityWindow,dialogueOpen,player,playerTitle,currentLocation,activeSituation,currentSupport,pendingEvent,alerts,activeInteraction,selectedCounty,selectedCharacter,selectedActivity}=storeToRefs(store);
+const mobileTab=ref<'map'|'object'|'alerts'>('map');const personTab=ref<'realm'|'family'|'relations'|'claims'|'memories'>('realm');
+const dialogueText=ref('');const checkpointName=ref('我的检查点');const importedPacks=ref<ContentPack[]>([]);const modReport=ref('核心规则与布列塔尼沙盒通过同一声明式加载器运行。');
+const letterSubject=ref('私人来函');const letterBody=ref('愿我们坦率讨论彼此的利益与义务。');
 
-const tabs = [
-  ['people', '人物'], ['mail', '信箱'], ['activity', '活动'], ['council', '议会'], ['ledger', '政治账本'], ['log', '日志'], ['mods', '模组'], ['settings', '设置'],
-] as const;
-const layers = [
-  ['rule', '实际'], ['deJure', '法理'], ['occupation', '占领'], ['intel', '情报'], ['people', '人物'], ['route', '路线'],
-] as const;
-const selectedCounty = computed(() => state.value.counties[selectedCountyId.value]);
-const selectedTitle = computed(() => selectedCounty.value ? state.value.titles[selectedCounty.value.titleId] : null);
-const selectedHolder = computed(() => selectedTitle.value?.holderId ? state.value.characters[selectedTitle.value.holderId] : null);
-const selectedCharacter = computed(() => state.value.characters[selectedCharacterId.value]);
-const feast = computed(() => state.value.activities[state.value.scenario.feastId]);
-const supportsById = computed(() => new Set(Object.values(state.value.supportCommitments).filter(item => item.status === 'active').map(item => item.supporterId)));
-const latestEntries = computed(() => chronicle.value.slice(-14));
-const currentTravel = computed(() => state.value.scenario.activeTravelId ? state.value.travels[state.value.scenario.activeTravelId] : null);
-const canTravel = computed(() => Boolean(state.value.regentId) && !currentTravel.value && player.value.locationId !== 'loc_nantes_castle');
-const canFeast = computed(() => player.value.locationId === 'loc_nantes_castle' && feast.value.phase !== 'departure');
+const layers=[['rule','实际'],['deJure','法理'],['occupation','占领'],['intel','控制'],['people','人物'],['armies','军队'],['activities','活动'],['route','路线']] as const;
+const segments={morning:'晨间',afternoon:'午后',evening:'晚间'} as const;
+const selectedTitle=computed(()=>selectedCounty.value?state.value.titles[selectedCounty.value.titleId]??null:null);
+const selectedHolder=computed(()=>selectedTitle.value?.holderId?state.value.characters[selectedTitle.value.holderId]??null:null);
+const countyCharacters=computed(()=>selectedCounty.value?Object.values(state.value.characters).filter(character=>state.value.locations[character.locationId]?.countyId===selectedCounty.value?.id&&character.alive):[]);
+const selectedRelations=computed(()=>selectedCharacter.value?['opinion','trust','fear','suspicion'].map(dimension=>({dimension,value:relationshipValue(state.value,selectedCharacter.value!.id,player.value.id,dimension as 'opinion'|'trust'|'fear'|'suspicion')})):[]);
+const selectedClaims=computed(()=>selectedCharacter.value?Object.values(state.value.claims).filter(claim=>claim.claimantId===selectedCharacter.value!.id):[]);
+const selectedMemories=computed(()=>selectedCharacter.value?selectedCharacter.value.memoryIds.map(id=>state.value.memories[id]).filter(Boolean):[]);
+const selectedFamily=computed(()=>{const person=selectedCharacter.value;if(!person)return[];return[...new Set([...person.parentIds,...person.spouseIds,...person.childIds,...person.betrothedIds])].map(id=>state.value.characters[id]).filter(Boolean);});
+const displayedInteractions=computed(()=>selectedCharacter.value&&selectedCharacter.value.id!==player.value.id?interactionDefinitions:[]);
+const incomingInteractions=computed(()=>Object.values(state.value.interactions).filter(thread=>thread.status==='awaiting_player'));
+const activeActivities=computed(()=>Object.values(state.value.activities).filter(activity=>activity.status!=='completed'&&activity.status!=='cancelled'));
+const activeWars=computed(()=>Object.values(state.value.wars).filter(war=>!war.endedAt));
+const activeProjects=computed(()=>Object.values(state.value.projects).filter(project=>project.status==='active'));
+const unreadLetters=computed(()=>Object.values(state.value.communications).filter(letter=>letter.recipientId===player.value.id&&['delivered','intercepted'].includes(letter.status)));
+const latestChronicle=computed(()=>chronicle.value.slice(-8).reverse());
+const canMeetSelected=computed(()=>selectedCharacter.value?.locationId===player.value.locationId);
 
-const characterCards = computed(() => state.value.scenario.supportTargetIds.map(id => {
-  const character = state.value.characters[id];
-  const titleNames = character.titleIds.map(titleId => t(state.value.titles[titleId]?.nameKey ?? titleId));
-  return { ...character, titleNames, opinion: relationshipValue(state.value, id, player.value.id, 'opinion'), supported: supportsById.value.has(id) };
-}));
-
-const offers: Record<string, Array<{ id: string; label: string; cost: string }>> = {
-  char_hoel: [
-    { id: 'succession_recognition', label: '承认阿维丝继承序位', cost: '正式承诺 · 120日' },
-    { id: 'council_office', label: '许诺宫廷高位', cost: '职位承诺 · 120日' },
-  ],
-  char_geoffroy: [
-    { id: 'contract_concession', label: '重订征召契约', cost: '契约让步 · 120日' },
-    { id: 'gold_gift', label: '家族平反礼金', cost: '立即支付 35 金' },
-  ],
-  char_morvan: [
-    { id: 'marshal_office', label: '授予军事职位', cost: '职位承诺 · 120日' },
-    { id: 'border_subsidy', label: '拨付边防津贴', cost: '立即支付 45 金' },
-  ],
-};
-
-const phaseLabel = computed(() => ({
-  council: '密议', planning: '筹划', travelling: '出巡途中', arrival: '抵达南特', feast: '宴会', return: '散席', ultimatum: '最后通牒', campaign: '战役继续',
-}[state.value.scenario.phase]));
-
-function chooseCharacter(id: string): void {
-  selectedCharacterId.value = id;
-  rightTab.value = 'people';
-}
-
-async function submitDialogue(): Promise<void> {
-  const text = dialogueText.value.trim();
-  if (!text) return;
-  dialogueText.value = '';
-  await store.talk(text, consequential.value);
-}
-
-async function importPack(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-  const parsed = await readContentPackFile(file);
-  if (!parsed.ok) {
-    modReport.value = parsed.errors.join('\n');
-    return;
-  }
-  const registry = loadContentPacks([corePack, prologuePack, ...importedPacks.value, parsed.pack]);
-  if (registry.errors.length) {
-    modReport.value = registry.errors.map(error => `${error.code}: ${error.message}`).join('\n');
-    return;
-  }
-  importedPacks.value.push(parsed.pack);
-  modReport.value = `已加载 ${parsed.pack.name} ${parsed.pack.version}；${registry.entities.size} 个声明式实体。当前存档未被污染。`;
-  store.setContentPacks(registry.packs.map(pack => ({ id: pack.id, version: pack.version })));
-}
-
-function updatePulseDays(event: Event): void {
-  const value = Number((event.target as HTMLInputElement).value);
-  store.setPulseDays(value);
-}
-
-function restoreCheckpoint(id: string, name: string): void {
-  if (window.confirm(`恢复到“${name}”？当前未命名进度将被覆盖。`)) {
-    store.restoreNamedCheckpoint(id);
-  }
-}
-
-function restartPrologue(): void {
-  if (window.confirm('确定重新开始序章？当前权威快照将被覆盖。')) {
-    store.resetGame();
-  }
-}
+function openUtility(window:Exclude<UtilityWindow,null>){utilityWindow.value=utilityWindow.value===window?null:window;mobileTab.value='object';}
+function selectCounty(id:string){store.selectCounty(id);mobileTab.value='object';}
+function selectCharacter(id:string){store.selectCharacter(id);mobileTab.value='object';personTab.value='realm';}
+function selectActivity(id:string){store.selectActivity(id);mobileTab.value='object';}
+function beginInteraction(id:string){if(!selectedCharacter.value)return;if(id==='politics.arrest'){store.arrest(selectedCharacter.value.id);return;}const terms:Record<string,unknown>={};if(id==='politics.request_support')terms.offerKind=selectedCharacter.value.id==='char_morvan'?'border_subsidy':selectedCharacter.value.id==='char_geoffroy'?'contract_concession':'succession_recognition';if(id==='politics.modify_contract'){terms.taxLevel='low';terms.levyLevel='low';terms.privilege='council_rights';}if(id==='activity.invite')terms.activityId=activeActivities.value[0]?.id;store.beginInteraction(id,selectedCharacter.value.id,terms);}
+async function submitDialogue(){const text=dialogueText.value.trim();if(!text)return;dialogueText.value='';await store.talk(text);}
+function countyDestination(){return selectedCounty.value?.locationIds.map(id=>state.value.locations[id]).find(location=>location.kind==='castle')?.id??selectedCounty.value?.locationIds[0];}
+function travelToCounty(route:'direct'|'safe'){const destination=countyDestination();if(destination)store.startTravel(destination,route);}
+function sendSelectedLetter(){if(!selectedCharacter.value||!letterBody.value.trim())return;store.sendLetter(selectedCharacter.value.id,letterSubject.value,letterBody.value);}
+function handleCheckpoint(id:string,name:string){if(window.confirm(`恢复到“${name}”？当前未命名进度将被覆盖。`))store.restoreNamedCheckpoint(id);}
+function resetGame(){if(window.confirm('重新开始 1066 布列塔尼沙盒？当前权威快照将被覆盖。'))store.resetGame();}
+function setPulse(event:Event){store.setPulseDays(Number((event.target as HTMLInputElement).value));}
+async function importPack(event:Event){const file=(event.target as HTMLInputElement).files?.[0];if(!file)return;const parsed=await readContentPackFile(file);if(!parsed.ok){modReport.value=parsed.errors.join('\n');return;}const registry=loadContentPacks([corePack,sandboxPack,...importedPacks.value,parsed.pack]);if(registry.errors.length){modReport.value=registry.errors.map(error=>`${error.code}: ${error.message}`).join('\n');return;}importedPacks.value.push(parsed.pack);modReport.value=`已加载 ${parsed.pack.name} ${parsed.pack.version}；共 ${registry.entities.size} 个声明式实体。`;store.setContentPacks(registry.packs.map(pack=>({id:pack.id,version:pack.version})));}
 </script>
 
 <template>
   <main class="ck-shell" :class="`mobile-${mobileTab}`">
-    <header class="topbar">
-      <div class="brand-block">
-        <div class="seal-mark">CⅡ</div>
-        <div>
-          <p>公爵机要图室</p>
-          <h1>裂冠前夜</h1>
-        </div>
-      </div>
-      <div class="time-block">
-        <span class="eyebrow">ANNO DOMINI</span>
-        <strong>{{ state.currentDate }}</strong>
-        <span>{{ phaseLabel }}</span>
-      </div>
-      <div class="resource-strip">
-        <div><span>金库</span><b>{{ state.resources.gold }}</b></div>
-        <div><span>威望</span><b>{{ state.resources.prestige }}</b></div>
-        <div><span>合法性</span><b>{{ state.resources.legitimacy }}</b></div>
-        <div><span>兵员</span><b>{{ state.resources.levies }}</b></div>
-      </div>
-      <div class="deadline-block" :class="{ danger: daysLeft <= 3 }">
-        <span>降权派系最后通牒</span>
-        <strong>{{ Math.max(0, daysLeft) }} 日</strong>
-        <small>有效支持 {{ currentSupport }}/2</small>
-      </div>
+    <header class="realm-hud">
+      <button class="ruler-medallion" title="选择当前统治者" @click="selectCharacter(player.id)"><span>{{ t(player.nameKey).slice(0,1) }}</span><i></i></button>
+      <div class="ruler-title"><small>{{ t(playerTitle?.nameKey??'title.brittany') }}</small><strong>{{ t(player.nameKey) }}</strong><em>{{ player.originalName }}</em></div>
+      <div class="vitals"><span><i>健康</i><b>{{ player.health.toFixed(1) }}</b></span><span><i>压力</i><b>{{ player.stress }}</b></span><span><i>年龄</i><b>{{ characterAge(state,player.id) }}</b></span></div>
+      <div class="resources"><span title="金库">◈ <b>{{ state.resources.gold }}</b></span><span title="威望">♜ <b>{{ state.resources.prestige }}</b></span><span title="虔诚">✚ <b>{{ state.resources.piety }}</b></span><span title="兵员">⚔ <b>{{ state.resources.levies }}</b></span></div>
+      <div class="date-control"><div><small>ANNO DOMINI</small><strong>{{ state.currentDate }}</strong><em>{{ segments[state.clock.segment] }}</em></div><div class="time-buttons"><button :disabled="busy||Boolean(pendingEvent)" @click="store.advanceDays(1)">+1</button><button :disabled="busy||Boolean(pendingEvent)" @click="store.advanceDays(3)">+3</button><button :disabled="busy||Boolean(pendingEvent)" @click="store.advanceDays(7)">+7</button><button :disabled="busy||Boolean(pendingEvent)" title="推进到下一预定事件" @click="store.advanceToNext">▶|</button></div></div>
+      <nav class="system-nav"><button :class="{active:utilityWindow==='council'}" @click="openUtility('council')">议会</button><button :class="{active:utilityWindow==='factions'}" @click="openUtility('factions')">派系</button><button :class="{active:utilityWindow==='succession'}" @click="openUtility('succession')">继承</button><button :class="{active:utilityWindow==='chronicle'}" @click="openUtility('chronicle')">编年史</button><button @click="openUtility('settings')">⚙</button></nav>
     </header>
 
-    <nav class="mobile-nav" aria-label="手机页面">
-      <button :class="{ active: mobileTab === 'map' }" @click="mobileTab = 'map'">地图</button>
-      <button :class="{ active: mobileTab === 'dialogue' }" @click="mobileTab = 'dialogue'">对话</button>
-      <button :class="{ active: mobileTab === 'panel' }" @click="mobileTab = 'panel'">政务</button>
-    </nav>
+    <nav class="mobile-nav"><button :class="{active:mobileTab==='map'}" @click="mobileTab='map'">地图</button><button :class="{active:mobileTab==='object'}" @click="mobileTab='object'">对象</button><button :class="{active:mobileTab==='alerts'}" @click="mobileTab='alerts'">警报 <b>{{ alerts.length }}</b></button></nav>
 
-    <section class="map-column">
-      <div class="layer-bar">
-        <span>图层</span>
-        <button v-for="item in layers" :key="item[0]" :class="{ active: mapLayer === item[0] }" @click="mapLayer = item[0]">{{ item[1] }}</button>
-      </div>
-      <CountyMap :state="state" :selected-county-id="selectedCountyId" :layer="mapLayer" @select="selectedCountyId = $event" />
-      <div v-if="selectedCounty" class="county-inspector">
-        <div>
-          <span class="eyebrow">COMITATUS</span>
-          <h2>{{ t(selectedCounty.nameKey) }} <small>{{ selectedCounty.originalName }}</small></h2>
-        </div>
-        <dl>
-          <div><dt>实际持有人</dt><dd>{{ selectedHolder ? t(selectedHolder.nameKey) : '无主' }}</dd></div>
-          <div><dt>控制力</dt><dd>{{ selectedCounty.control }}%</dd></div>
-          <div><dt>战时占领</dt><dd>{{ selectedCounty.occupation ? '是（不转移称号）' : '无' }}</dd></div>
-          <div><dt>相邻伯爵领</dt><dd>{{ selectedCounty.adjacentCountyIds.map(id => t(state.counties[id].nameKey)).join(' · ') }}</dd></div>
-        </dl>
-      </div>
-    </section>
-
-    <aside class="side-panel">
-      <nav class="panel-tabs">
-        <button v-for="tab in tabs" :key="tab[0]" :class="{ active: rightTab === tab[0] }" @click="rightTab = tab[0]">{{ tab[1] }}</button>
-      </nav>
-
-      <div v-if="rightTab === 'people'" class="panel-content people-panel">
-        <div class="panel-heading"><span>三位摇摆封臣</span><b>{{ currentSupport }}/2</b></div>
-        <article v-for="character in characterCards" :key="character.id" class="person-card" :class="{ selected: selectedCharacterId === character.id, supported: character.supported }" @click="chooseCharacter(character.id)">
-          <div class="portrait-placeholder">{{ t(character.nameKey).slice(0, 1) }}</div>
-          <div class="person-copy">
-            <h3>{{ t(character.nameKey) }} <span v-if="character.sourceType === 'composite'">合成人物</span></h3>
-            <p>{{ character.titleNames.join('、') }}</p>
-            <small>{{ character.goals.join(' · ') }}</small>
-          </div>
-          <div class="opinion"><span>态度</span><b>{{ character.opinion >= 0 ? '+' : '' }}{{ character.opinion }}</b></div>
-        </article>
-        <section v-if="selectedCharacter" class="negotiation-dossier">
-          <p class="eyebrow">NEGOTIATIO</p>
-          <h3>与 {{ t(selectedCharacter.nameKey) }} 交涉</h3>
-          <p class="dossier-note">合法协议将立即落印；玩家不能因为结果不利而拒绝已经成立的 NPC 行动。承诺若被破坏，支持会自动撤回。</p>
-          <button v-for="offer in offers[selectedCharacter.id] ?? []" :key="offer.id" :disabled="supportsById.has(selectedCharacter.id) || selectedCharacter.locationId !== player.locationId" class="offer-button" @click="store.bargain(selectedCharacter.id, offer.id)">
-            <span>{{ offer.label }}</span><small>{{ offer.cost }}</small>
-          </button>
-          <small v-if="selectedCharacter.locationId !== player.locationId" class="distance-warning">对方不在此地：先写信，或在南特宴会当面交涉。</small>
-        </section>
-      </div>
-
-      <div v-else-if="rightTab === 'mail'" class="panel-content">
-        <div class="panel-heading"><span>封蜡信匣</span><b>{{ Object.keys(state.communications).length }}</b></div>
-        <div class="quick-letters">
-          <button v-for="id in state.scenario.supportTargetIds" :key="id" @click="store.sendProbeLetter(id)">致 {{ t(state.characters[id].nameKey) }}</button>
-        </div>
-        <article v-for="letter in state.communications" :key="letter.id" class="letter-card">
-          <div><b>{{ letter.subject }}</b><span :class="`status-${letter.status}`">{{ letter.status }}</span></div>
-          <p>{{ t(state.characters[letter.senderId].nameKey) }} → {{ t(state.characters[letter.recipientId].nameKey) }}</p>
-          <small>{{ letter.sentAt }} / 预计 {{ letter.deliverAt }}</small>
-        </article>
-        <p v-if="!Object.keys(state.communications).length" class="empty-note">没有在途信件。信件可能延迟、拒收、截获或泄露；首版不包含伪造和翻译失真。</p>
-      </div>
-
-      <div v-else-if="rightTab === 'activity'" class="panel-content">
-        <div class="panel-heading"><span>南特宴会</span><b>{{ feast.phase }}</b></div>
-        <ol class="phase-list">
-          <li v-for="phase in ['welcome','public_feast','free_conversation','private_audiences','departure']" :key="phase" :class="{ active: feast.phase === phase }">{{ {welcome:'迎宾',public_feast:'公开宴席',free_conversation:'自由交谈',private_audiences:'私下会面',departure:'散席'}[phase] }}</li>
-        </ol>
-        <div v-if="state.scenario.phase === 'council' || state.scenario.phase === 'planning'" class="action-block">
-          <h3>出巡准备</h3>
-          <p>先任命摄政，再选择路线。正式会面和宴会阶段会各消耗一个时段。</p>
-          <div class="route-buttons">
-            <button :disabled="!canTravel" @click="store.startTravel('direct')"><b>危险捷径</b><small>约 2 日 · 致命风险可见</small></button>
-            <button :disabled="!canTravel" @click="store.startTravel('safe')"><b>安全长路</b><small>约 4 日 · 绕行瓦讷</small></button>
-          </div>
-        </div>
-        <div v-if="currentTravel" class="travel-card">
-          <span>行程 {{ currentTravel.routeKind === 'safe' ? '安全长路' : '危险捷径' }}</span>
-          <b>{{ currentTravel.departedAt }} → {{ currentTravel.arriveAt }}</b>
-          <p>{{ currentTravel.routeCountyIds.map(id => t(state.counties[id].nameKey)).join(' → ') }}</p>
-        </div>
-        <div class="side-stories">
-          <button v-if="currentTravel?.routeKind === 'direct' && !state.scenario.flags.sideStory_lethal_risk" @click="store.triggerSideStory('lethal_risk')">接受一次已警示的致命伏击风险</button>
-          <button v-if="!state.scenario.flags.sideStory_ambiguous_omen" @click="store.triggerSideStory('ambiguous_omen')">记录一场暧昧梦兆</button>
-          <button v-if="player.locationId === 'loc_nantes_castle' && !state.scenario.flags.sideStory_adult_encounter" @click="store.triggerSideStory('adult_encounter')">与伊莎博私下接近（仅成年）</button>
-        </div>
-        <button v-if="canFeast" class="primary-action" @click="store.advanceFeast()">推进宴会阶段（+1 日）</button>
-      </div>
-
-      <div v-else-if="rightTab === 'council'" class="panel-content">
-        <div class="panel-heading"><span>摄政与议会</span><b>{{ state.regentId ? '已授权' : '待任命' }}</b></div>
-        <p class="dossier-note">摄政拥有日常治理、守备命令与代收通信的法定接口；宣战、割让领地和继承变更仍由统治者掌握。</p>
-        <button v-for="id in ['char_alan','char_mael']" :key="id" class="regent-card" :class="{ active: state.regentId === id }" @click="store.selectRegent(id)">
-          <b>{{ t(state.characters[id].nameKey) }}</b><span>{{ state.characters[id].traits.join(' · ') }}</span>
-        </button>
-      </div>
-
-      <div v-else-if="rightTab === 'ledger'" class="panel-content ledger-panel">
-        <div class="panel-heading"><span>政治账本</span><b>revision {{ state.revision }}</b></div>
-        <section><h3>有效支持</h3><p v-if="!Object.keys(state.supportCommitments).length">尚无。</p><div v-for="item in state.supportCommitments" :key="item.id" class="ledger-row"><b>{{ t(state.characters[item.supporterId].nameKey) }}</b><span>{{ item.status }} · 至 {{ item.expiresAt }}</span></div></section>
-        <section><h3>承诺与期限</h3><p v-if="!Object.keys(state.promises).length">尚无。</p><div v-for="item in state.promises" :key="item.id" class="ledger-row"><b>{{ item.kind }}</b><span>{{ item.status }} · {{ item.dueDate }}</span></div></section>
-        <section><h3>战争</h3><p v-if="!Object.keys(state.wars).length">当前无公开战争。</p><div v-for="war in state.wars" :key="war.id" class="ledger-row"><b>{{ war.kind }}</b><span>{{ war.phase }} · 战争分数 {{ war.attackerScore }}</span></div></section>
-      </div>
-
-      <div v-else-if="rightTab === 'log'" class="panel-content log-panel">
-        <div class="panel-heading"><span>修订日志</span><b>{{ state.eventLog.length }}</b></div>
-        <article v-for="entry in [...state.eventLog].reverse()" :key="entry.id"><time>{{ entry.occurredAt }} · r{{ entry.revision }}</time><b>{{ entry.type }}</b><p>{{ JSON.stringify(entry.payload) }}</p></article>
-      </div>
-
-      <div v-else-if="rightTab === 'mods'" class="panel-content">
-        <div class="panel-heading"><span>内容包</span><b>JSON5</b></div>
-        <p class="dossier-note">本体剧本也走内容加载器。普通内容包只能声明条件、效果和数据，不执行任意 JavaScript。</p>
-        <label class="file-import">导入 .ckpack.json5<input type="file" accept=".json5,.ckpack.json5" @change="importPack" /></label>
-        <pre class="mod-report">{{ modReport }}</pre>
-        <ul class="pack-list"><li v-for="id in state.contentPackIds" :key="id">{{ id }} <small>{{ state.contentPackVersions[id] ?? '版本未知' }}</small></li></ul>
-      </div>
-
-      <div v-else class="panel-content settings-panel">
-        <div class="panel-heading"><span>战役设置</span><b>每存档独立</b></div>
-        <label>常规世界脉冲 <input type="range" min="3" max="30" :value="state.settings.regularWorldPulseDays" @change="updatePulseDays" /><b>{{ state.settings.regularWorldPulseDays }} 日</b></label>
-        <dl><div><dt>亲密尺度</dt><dd>{{ state.settings.content.intimacy }}</dd></div><div><dt>暴力尺度</dt><dd>{{ state.settings.content.violence }}</dd></div><div><dt>神秘尺度</dt><dd>{{ state.settings.content.supernatural }}</dd></div><div><dt>硬年龄门槛</dt><dd>18（不可降低）</dd></div></dl>
-        <div class="checkpoint-box"><input v-model="checkpointName" maxlength="40" /><button @click="store.checkpoint(checkpointName)">写入酒馆检查点</button></div>
-        <div v-if="checkpoints.length" class="checkpoint-list">
-          <button v-for="item in [...checkpoints].reverse()" :key="item.id" @click="restoreCheckpoint(item.id, item.name)">
-            <span>{{ item.name }}</span><small>{{ item.state.currentDate }} · r{{ item.state.revision }}</small>
-          </button>
-        </div>
-        <button class="danger-button" @click="restartPrologue">重新开始序章</button>
-      </div>
-
-      <footer class="panel-footer">
-        <button @click="store.advanceDays(1)">推进 1 日</button>
-        <button @click="store.advanceDays(3)">推进 3 日</button>
-        <span>下次脉冲 {{ state.nextRegularPulseAt }}</span>
-      </footer>
-
-      <div v-if="state.scenario.phase === 'ultimatum'" class="ultimatum-overlay">
-        <span>ULTIMATUM</span><h2>公爵必须回答</h2><p>支持不足两份。接受降权仍可继续战役；拒绝则立即建立派系战争。</p>
-        <button @click="store.answerUltimatum('concede')">签署降权宪章</button><button class="war" @click="store.answerUltimatum('resist')">拒绝，召集军队</button>
-      </div>
+    <aside class="outliner">
+      <section class="alert-stack"><header><span>需要关注</span><b>{{ alerts.length+incomingInteractions.length }}</b></header>
+        <button v-for="thread in incomingInteractions" :key="thread.id" class="alert-item urgent" @click="store.openIncomingInteraction(thread.id)"><i>✉</i><span><b>正式提案</b><small>{{ t(state.characters[thread.initiatorId].nameKey) }}等待答复</small></span></button>
+        <button v-for="alert in alerts.slice(0,5)" :key="alert.id" class="alert-item" :class="alert.severity" @click="store.readNotification(alert.id)"><i>{{ alert.kind==='message'?'✉':'!' }}</i><span><b>{{ alert.title }}</b><small>{{ alert.body }}</small></span></button>
+        <p v-if="!alerts.length&&!incomingInteractions.length" class="quiet">没有必须立即处理的警报。</p>
+      </section>
+      <section v-if="activeSituation" class="situation-card"><header><span>当前局势</span><em>{{ activeSituation.phase }}</em></header><h2>{{ t(activeSituation.nameKey) }}</h2><div class="power-track"><i :style="{width:`${Math.min(100,state.factions.faction_liberty?.power??0)}%`}"></i></div><dl><div><dt>派系军力</dt><dd>{{ state.factions.faction_liberty?.power??0 }}%</dd></div><div><dt>有效支持</dt><dd>{{ currentSupport }}</dd></div><div><dt>节点</dt><dd>{{ activeSituation.deadline??'无期限' }}</dd></div></dl><small>这是一项局势，不是主线任务；可赴宴、谈判、联姻、让步、逮捕、结盟或开战。</small></section>
+      <section class="outliner-list"><header><span>追踪</span><button @click="openUtility('mail')">信箱</button></header>
+        <button v-for="activity in activeActivities" :key="activity.id" @click="selectActivity(activity.id)"><i>♨</i><span><b>{{ activity.type==='feast'?'南特宴会':'活动' }}</b><small>{{ activity.startedAt }} · {{ activity.status }}</small></span></button>
+        <button v-for="travel in Object.values(state.travels).filter(item=>item.status==='travelling')" :key="travel.id"><i>➝</i><span><b>旅行中</b><small>{{ travel.currentCountyId }} → {{ travel.arriveAt }}</small></span></button>
+        <button v-for="project in activeProjects" :key="project.id" @click="selectCounty(project.countyId)"><i>⚒</i><span><b>{{ t(state.counties[project.countyId].nameKey) }}建设</b><small>{{ project.templateId }} · {{ project.completeAt }}</small></span></button>
+        <button v-for="war in activeWars" :key="war.id"><i>⚔</i><span><b>{{ war.kind==='faction_revolt'?'派系内战':'宣称战争' }}</b><small>{{ war.phase }} · 分数 {{ war.attackerScore }}</small></span></button>
+      </section>
+      <section class="news-stream"><header><span>西欧消息</span><small>惰性模拟</small></header><article v-for="realm in Object.values(state.externalRealms).slice(0,5)" :key="realm.id"><i :class="realm.stanceToPlayer"></i><div><b>{{ t(realm.nameKey) }}</b><small>{{ realm.warSummary??`稳定度 ${realm.stability} · 压力 ${realm.pressure}` }}</small></div></article></section>
     </aside>
 
-    <section class="dialogue-dock" :class="{ collapsed: !dialogueExpanded }">
-      <button class="dock-handle" @click="dialogueExpanded = !dialogueExpanded"><span>现场交谈</span><small>{{ t(currentLocation.nameKey) }} · {{ busy ? '场景导演思考中…' : '时间暂停' }}</small><i>{{ dialogueExpanded ? '⌄' : '⌃' }}</i></button>
-      <div class="dialogue-body">
-        <div class="scene-feed">
-          <article v-for="entry in latestEntries" :key="entry.id" :class="entry.kind"><header><b>{{ entry.title }}</b><time>{{ entry.date }}</time></header><p>{{ entry.text }}</p></article>
-          <article v-if="streamingText" class="speech streaming"><header><b>场景导演</b><time>流式生成</time></header><p>{{ streamingText }}</p></article>
-        </div>
-        <form class="dialogue-compose" @submit.prevent="submitDialogue">
-          <label><input v-model="consequential" type="checkbox" /><span>重大交涉</span><small>静默结算行动，再叙述已提交事实</small></label>
-          <textarea v-model="dialogueText" :disabled="busy" rows="3" placeholder="当面交谈、提出条件、称赞或威胁……普通闲聊不会修改硬状态。" @keydown.ctrl.enter.prevent="submitDialogue" />
-          <button :disabled="busy || !dialogueText.trim()">{{ busy ? '推演中' : '发言' }}</button>
-        </form>
-      </div>
+    <section class="map-stage">
+      <div class="map-toolbar"><div><span>地图模式</span><button v-for="layer in layers" :key="layer[0]" :class="{active:mapLayer===layer[0]}" @click="mapLayer=layer[0]">{{ layer[1] }}</button></div><small>{{ t(currentLocation.nameKey) }} · 下次世界脉冲 {{ state.nextRegularPulseAt }}</small></div>
+      <CountyMap :state="state" :layer="mapLayer" :selected-county-id="selectedKind==='county'?selectedObjectId:null" :selected-character-id="selectedKind==='character'?selectedObjectId:null" @select-county="selectCounty" @select-character="selectCharacter" @select-activity="selectActivity"/>
+      <div class="chronicle-ribbon"><span>编年史</span><p>{{ chronicle.at(-1)?.text }}</p><time>{{ chronicle.at(-1)?.date }}</time></div>
     </section>
+
+    <aside class="object-panel">
+      <template v-if="utilityWindow">
+        <header class="object-header utility"><div><small>REALM LEDGER</small><h1>{{ {council:'公爵议会',factions:'派系',succession:'继承',chronicle:'编年史',mail:'通信',mods:'内容包',settings:'设置'}[utilityWindow] }}</h1></div><button @click="utilityWindow=null">×</button></header>
+        <div v-if="utilityWindow==='council'" class="object-body ledger-view"><p class="panel-intro">议员负责常规治理；离境前任命摄政可以维持日常行政。</p><article v-for="position in state.council" :key="position.id"><div><small>{{ position.kind }}</small><b>{{ position.holderId?t(state.characters[position.holderId].nameKey):'空缺' }}</b></div><select :value="position.holderId??''" @change="store.appointCouncil(position.id,($event.target as HTMLSelectElement).value)"><option value="" disabled>选择人物</option><option v-for="person in Object.values(state.characters).filter(item=>item.alive&&(item.liegeId===player.id||item.id===player.id))" :key="person.id" :value="person.id">{{ t(person.nameKey) }}</option></select></article></div>
+        <div v-else-if="utilityWindow==='factions'" class="object-body"><article v-for="faction in state.factions" :key="faction.id" class="faction-sheet"><h2>{{ t(faction.nameKey) }}</h2><p>{{ faction.kind }} · {{ faction.status }}</p><div class="power-track"><i :style="{width:`${Math.min(100,faction.power)}%`}"></i></div><dl><div><dt>领袖</dt><dd>{{ t(state.characters[faction.leaderId].nameKey) }}</dd></div><div><dt>成员</dt><dd>{{ faction.memberIds.length }}</dd></div><div><dt>军力</dt><dd>{{ faction.power }}/{{ faction.threshold }}</dd></div></dl><button v-for="id in faction.memberIds" :key="id" @click="selectCharacter(id)">{{ t(state.characters[id].nameKey) }}</button></article></div>
+        <div v-else-if="utilityWindow==='succession'" class="object-body"><article v-for="line in state.succession" :key="line.titleId" class="succession-line"><h3>{{ t(state.titles[line.titleId].nameKey) }}</h3><small>{{ line.law }}</small><button v-for="(id,index) in line.heirIds" :key="id" @click="selectCharacter(id)"><i>{{ index+1 }}</i><span>{{ t(state.characters[id]?.nameKey??id) }}</span></button></article></div>
+        <div v-else-if="utilityWindow==='chronicle'" class="object-body chronicle-list"><article v-for="entry in [...chronicle].reverse()" :key="entry.id" :class="entry.kind"><time>{{ entry.date }}</time><h3>{{ entry.title }}</h3><p>{{ entry.text }}</p></article></div>
+        <div v-else-if="utilityWindow==='mail'" class="object-body mail-list"><p v-if="!Object.keys(state.communications).length" class="quiet">目前没有信件。选择人物后可写信或发起远程正式互动。</p><article v-for="letter in Object.values(state.communications).reverse()" :key="letter.id"><header><b>{{ letter.subject }}</b><em>{{ letter.status }}</em></header><p>{{ t(state.characters[letter.senderId].nameKey) }} → {{ t(state.characters[letter.recipientId].nameKey) }}</p><small>{{ letter.sentAt }} / {{ letter.deliverAt }}</small></article></div>
+        <div v-else-if="utilityWindow==='mods'" class="object-body settings-view"><p>内容包只能声明数据、条件和效果，不执行任意 JavaScript。</p><label class="file-import">导入 .ckpack.json5<input type="file" accept=".json5,.ckpack.json5" @change="importPack"></label><pre>{{ modReport }}</pre><p v-for="id in state.contentPackIds" :key="id">{{ id }} · {{ state.contentPackVersions[id] }}</p></div>
+        <div v-else class="object-body settings-view"><label>世界脉冲：{{ state.settings.regularWorldPulseDays }} 日<input type="range" min="3" max="30" :value="state.settings.regularWorldPulseDays" @change="setPulse"></label><dl><div><dt>亲密</dt><dd>{{ state.settings.content.intimacy }}</dd></div><div><dt>暴力</dt><dd>{{ state.settings.content.violence }}</dd></div><div><dt>神秘</dt><dd>{{ state.settings.content.supernatural }}</dd></div><div><dt>年龄硬门槛</dt><dd>18</dd></div></dl><div class="checkpoint-form"><input v-model="checkpointName" maxlength="40"><button @click="store.checkpoint(checkpointName)">建立检查点</button></div><button v-for="item in [...checkpoints].reverse()" :key="item.id" class="checkpoint" :disabled="!item.compatible" @click="handleCheckpoint(item.id,item.name)"><span>{{ item.name }}</span><small>{{ item.state?.currentDate??'不兼容' }} · r{{ item.revision }}</small></button><button @click="openUtility('mods')">管理内容包</button><button class="danger" @click="resetGame">重新开始沙盒</button></div>
+      </template>
+
+      <template v-else-if="selectedCounty">
+        <header class="object-header county"><div><small>COMITATUS · {{ selectedCounty.originalName }}</small><h1>{{ t(selectedCounty.nameKey) }}</h1><p>{{ selectedCounty.terrain }} · 发展度 {{ selectedCounty.development }}</p></div><span class="county-shield">{{ t(selectedCounty.nameKey).slice(0,1) }}</span></header>
+        <div class="object-body"><section class="holder-block" @click="selectedHolder&&selectCharacter(selectedHolder.id)"><div class="mini-portrait">{{ selectedHolder?t(selectedHolder.nameKey).slice(0,1):'—' }}</div><div><small>实际持有人</small><b>{{ selectedHolder?t(selectedHolder.nameKey):'无主' }}</b><em>{{ selectedTitle?t(selectedTitle.nameKey):'' }}</em></div></section><div class="stat-grid"><span><small>控制</small><b>{{ selectedCounty.control }}%</b></span><span><small>税基</small><b>{{ selectedCounty.baseTax.toFixed(1) }}</b></span><span><small>兵员</small><b>{{ selectedCounty.baseLevies }}</b></span><span><small>地产</small><b>{{ selectedCounty.buildingIds.length }}</b></span></div>
+          <section class="detail-section"><header>地点与人物</header><button v-for="locationId in selectedCounty.locationIds" :key="locationId" class="line-button"><span>{{ t(state.locations[locationId].nameKey) }}</span><small>{{ state.locations[locationId].kind }}</small></button><button v-for="person in countyCharacters" :key="person.id" class="line-button" @click="selectCharacter(person.id)"><span>{{ t(person.nameKey) }}</span><small>{{ person.titleIds.map(id=>t(state.titles[id]?.nameKey??id)).join(' · ')||'无地人物' }}</small></button></section>
+          <section class="action-section"><header>伯爵领行动</header><div class="action-grid"><button :disabled="state.locations[player.locationId]?.countyId===selectedCounty.id||Boolean(state.activeTravelId)" @click="travelToCounty('direct')"><b>前往此地</b><small>最短路线</small></button><button :disabled="state.locations[player.locationId]?.countyId===selectedCounty.id||Boolean(state.activeTravelId)" @click="travelToCounty('safe')"><b>安全路线</b><small>耗时更长</small></button><button :disabled="selectedHolder?.id!==player.id" @click="store.startProject(selectedCounty.id,'market')"><b>建造市场</b><small>60 金 · 25 日</small></button><button :disabled="selectedHolder?.id!==player.id" @click="store.startProject(selectedCounty.id,'watchtower')"><b>建造瞭望塔</b><small>45 金 · 18 日</small></button></div></section>
+        </div>
+      </template>
+
+      <template v-else-if="selectedCharacter">
+        <header class="object-header person"><div class="large-portrait">{{ t(selectedCharacter.nameKey).slice(0,1) }}<i :class="selectedCharacter.sex"></i></div><div><small>{{ selectedCharacter.sourceType==='composite'?'合成人物':selectedCharacter.sourceType==='original'?'原创人物':'历史人物' }}</small><h1>{{ t(selectedCharacter.nameKey) }}</h1><p>{{ selectedCharacter.originalName }}</p><em>{{ selectedCharacter.titleIds.map(id=>t(state.titles[id]?.nameKey??id)).join(' · ')||'无领地' }}</em></div></header>
+        <nav class="object-tabs"><button v-for="tab in [['realm','领地'],['family','家庭'],['relations','关系'],['claims','宣称'],['memories','记忆']] as const" :key="tab[0]" :class="{active:personTab===tab[0]}" @click="personTab=tab[0]">{{ tab[1] }}</button></nav>
+        <div class="object-body person-body"><div class="trait-row"><span v-for="trait in selectedCharacter.traits" :key="trait">{{ trait }}</span></div><div class="attribute-row"><span v-for="(value,key) in selectedCharacter.attributes" :key="key"><small>{{ {diplomacy:'外交',martial:'军事',stewardship:'管理',intrigue:'谋略',learning:'学识',prowess:'勇武'}[key] }}</small><b>{{ value }}</b></span></div>
+          <template v-if="personTab==='realm'"><dl class="facts"><div><dt>位置</dt><dd>{{ t(state.locations[selectedCharacter.locationId]?.nameKey??selectedCharacter.locationId) }}</dd></div><div><dt>领主</dt><dd>{{ selectedCharacter.liegeId?t(state.characters[selectedCharacter.liegeId].nameKey):'独立' }}</dd></div><div><dt>健康 / 压力</dt><dd>{{ selectedCharacter.health.toFixed(1) }} / {{ selectedCharacter.stress }}</dd></div><div><dt>短期目标</dt><dd>{{ selectedCharacter.shortTermGoal??selectedCharacter.goals[0]??'未知' }}</dd></div><div><dt>野心</dt><dd>{{ selectedCharacter.ambition??'未知' }}</dd></div></dl><section class="detail-section"><header>头衔</header><button v-for="id in selectedCharacter.titleIds" :key="id" class="line-button"><span>{{ t(state.titles[id].nameKey) }}</span><small>{{ state.titles[id].rank }}</small></button></section></template>
+          <template v-else-if="personTab==='family'"><section class="family-tree"><button v-for="relative in selectedFamily" :key="relative.id" @click="selectCharacter(relative.id)"><span>{{ t(relative.nameKey).slice(0,1) }}</span><b>{{ t(relative.nameKey) }}</b><small>{{ relative.spouseIds.includes(selectedCharacter.id)?'配偶':relative.parentIds.includes(selectedCharacter.id)?'子女':'亲族' }}</small></button><p v-if="!selectedFamily.length">没有已记录的近亲。</p></section></template>
+          <template v-else-if="personTab==='relations'"><div class="relation-bars"><div v-for="item in selectedRelations" :key="item.dimension"><span>{{ {opinion:'对你的好感',trust:'信任',fear:'恐惧',suspicion:'怀疑'}[item.dimension] }}</span><i><b :style="{width:`${Math.min(100,Math.abs(item.value))*0.5}%`,marginLeft:item.value<0?`${50-Math.min(50,Math.abs(item.value)*0.5)}%`:'50%'}"></b></i><strong>{{ item.value>0?'+':'' }}{{ item.value }}</strong></div></div></template>
+          <template v-else-if="personTab==='claims'"><button v-for="claim in selectedClaims" :key="claim.id" class="claim-row"><b>{{ t(state.titles[claim.titleId]?.nameKey??claim.titleId) }}</b><small>{{ claim.strength }}</small></button><p v-if="!selectedClaims.length">没有已记录的宣称。</p></template>
+          <template v-else><article v-for="memory in selectedMemories" :key="memory.id" class="memory-row"><b>{{ memory.kind }}</b><p>{{ memory.summary }}</p><small>{{ memory.visibility }} · {{ memory.createdAt }}</small></article><p v-if="!selectedMemories.length">你没有权查看任何相关记忆。</p></template>
+          <section v-if="selectedCharacter.id!==player.id" class="action-section interactions"><header><span>互动</span><small>{{ canMeetSelected?'同地会面':'异地：书信或使者' }}</small></header><div class="action-grid"><button v-for="interaction in displayedInteractions" :key="interaction.id" @click="beginInteraction(interaction.id)"><b>{{ interaction.label }}</b><small>{{ interaction.category }}</small></button></div><details><summary>直接写信</summary><input v-model="letterSubject"><textarea v-model="letterBody" rows="3"></textarea><button @click="sendSelectedLetter">交给信使</button></details></section>
+        </div>
+      </template>
+
+      <template v-else-if="selectedActivity"><header class="object-header activity"><div><small>ACTIVITAS · {{ selectedActivity.status }}</small><h1>{{ selectedActivity.type==='feast'?'南特宴会':'领主活动' }}</h1><p>{{ t(state.locations[selectedActivity.locationId].nameKey) }}</p></div><span>♨</span></header><div class="object-body"><dl class="facts"><div><dt>主持人</dt><dd>{{ t(state.characters[selectedActivity.hostId].nameKey) }}</dd></div><div><dt>开始</dt><dd>{{ selectedActivity.startedAt }}</dd></div><div><dt>阶段</dt><dd>{{ selectedActivity.phase }}</dd></div><div><dt>意图</dt><dd>{{ selectedActivity.intent }}</dd></div></dl><section class="detail-section"><header>参与者</header><button v-for="id in selectedActivity.participantIds" :key="id" class="line-button" @click="selectCharacter(id)">{{ t(state.characters[id].nameKey) }}</button></section><div class="action-grid"><button :disabled="player.locationId!==selectedActivity.locationId||selectedActivity.status!=='active'" @click="store.advanceActivity(selectedActivity.id)"><b>参与当前阶段</b><small>消耗一个时段</small></button><button :disabled="player.locationId===selectedActivity.locationId" @click="store.startTravel(selectedActivity.locationId,'direct')"><b>前往活动</b><small>活动不会等待你</small></button></div></div></template>
+    </aside>
+
+    <div v-if="dialogueOpen" class="modal-scrim" @click.self="dialogueOpen=false"><section class="dialogue-window"><header><div class="mini-portrait">{{ activeInteraction?t(state.characters[activeInteraction.targetId].nameKey).slice(0,1):'…' }}</div><div><small>{{ activeInteraction?activeInteraction.channel:'当面闲谈' }} · 时间{{ activeInteraction&&['meeting','activity'].includes(activeInteraction.channel)?'在正式结算后推进':'暂停' }}</small><h2>{{ activeInteraction?t(state.characters[activeInteraction.targetId].nameKey):'现场交谈' }}</h2><p>{{ activeInteraction?interactionDefinitions.find(item=>item.id===activeInteraction.intentId)?.label:'非正式交流' }}</p></div><button @click="dialogueOpen=false">×</button></header><div v-if="activeInteraction" class="acceptance"><span>接受度</span><strong :class="{negative:activeInteraction.acceptance<0}">{{ activeInteraction.acceptance>0?'+':'' }}{{ activeInteraction.acceptance }}</strong><div><i v-for="reason in activeInteraction.acceptanceReasons" :key="reason.label">{{ reason.label }} {{ reason.value>0?'+':'' }}{{ reason.value }}</i></div></div><div class="dialogue-feed"><article v-for="entry in chronicle.slice(-6).filter(item=>item.kind==='speech')" :key="entry.id"><b>{{ entry.title }}</b><p>{{ entry.text }}</p></article><article v-if="streamingText" class="streaming"><b>正在回应</b><p>{{ streamingText }}</p></article></div><div v-if="activeInteraction?.status==='awaiting_player'" class="counter-actions"><p>对方提出反提案：{{ JSON.stringify(activeInteraction.terms) }}</p><button @click="store.respondInteraction('accept',activeInteraction.terms)">接受条件</button><button @click="store.respondInteraction('reject')">拒绝</button></div><form v-else-if="!activeInteraction||activeInteraction.status==='negotiating'" @submit.prevent="submitDialogue"><textarea v-model="dialogueText" rows="4" :disabled="busy" placeholder="自由表达你的理由、条件或威胁。正式硬结果只会通过当前互动意图提交。"></textarea><button :disabled="busy||!dialogueText.trim()">{{ busy?'推演中…':'发言并让对方决断' }}</button></form><p v-else class="interaction-result">这项互动已经{{ activeInteraction.status==='accepted'?'达成':'结束' }}。硬结果已写入战役状态。</p></section></div>
+
+    <div v-if="pendingEvent" class="event-scrim"><section class="event-window" :class="pendingEvent.severity"><small>重大事件 · {{ pendingEvent.occurredAt }}</small><h1>{{ pendingEvent.title }}</h1><p>{{ pendingEvent.body }}</p><div><button v-for="choice in pendingEvent.choices" :key="choice.id" @click="store.chooseEvent(pendingEvent.id,choice.id)"><b>{{ choice.label }}</b><small>{{ choice.hint }}</small></button></div></section></div>
   </main>
 </template>

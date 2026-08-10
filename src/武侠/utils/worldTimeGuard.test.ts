@@ -41,26 +41,10 @@ describe('validateWorldTimePatch', () => {
 
   it('按完整日期判断跨日、跨月和跨年', () => {
     const cases: Array<[WorldTimeTuple, WorldTimeTuple, boolean]> = [
-      [
-        { 年: 1200, 月: 8, 日: 15, 时: 23, 分: 55 },
-        { 年: 1200, 月: 8, 日: 16, 时: 0, 分: 10 },
-        true,
-      ],
-      [
-        { 年: 1200, 月: 8, 日: 30, 时: 23, 分: 55 },
-        { 年: 1200, 月: 9, 日: 1, 时: 0, 分: 10 },
-        true,
-      ],
-      [
-        { 年: 1200, 月: 12, 日: 30, 时: 23, 分: 55 },
-        { 年: 1201, 月: 1, 日: 1, 时: 0, 分: 10 },
-        true,
-      ],
-      [
-        { 年: 1200, 月: 8, 日: 15, 时: 23, 分: 55 },
-        { 年: 1200, 月: 8, 日: 15, 时: 0, 分: 10 },
-        false,
-      ],
+      [{ 年: 1200, 月: 8, 日: 15, 时: 23, 分: 55 }, { 年: 1200, 月: 8, 日: 16, 时: 0, 分: 10 }, true],
+      [{ 年: 1200, 月: 8, 日: 30, 时: 23, 分: 55 }, { 年: 1200, 月: 9, 日: 1, 时: 0, 分: 10 }, true],
+      [{ 年: 1200, 月: 12, 日: 30, 时: 23, 分: 55 }, { 年: 1201, 月: 1, 日: 1, 时: 0, 分: 10 }, true],
+      [{ 年: 1200, 月: 8, 日: 15, 时: 23, 分: 55 }, { 年: 1200, 月: 8, 日: 15, 时: 0, 分: 10 }, false],
     ];
 
     for (const [current, next, accepted] of cases) {
@@ -125,9 +109,10 @@ describe('validateWorldTimePatch', () => {
 
   it('阻止越过进行中事件边界，但允许准确落在边界', () => {
     const eventEnd = { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 };
-    expect(
-      validateWorldTimePatch({ baseline, declaredChanges: fullTime(eventEnd), eventEnd }),
-    ).toMatchObject({ ok: true, candidate: eventEnd });
+    expect(validateWorldTimePatch({ baseline, declaredChanges: fullTime(eventEnd), eventEnd })).toMatchObject({
+      ok: true,
+      candidate: eventEnd,
+    });
     expect(
       validateWorldTimePatch({
         baseline,
@@ -142,6 +127,7 @@ describe('findEarliestRunningEventEnd', () => {
   it('读取最早的进行中事件结束时间并忽略元数据', () => {
     expect(
       findEarliestRunningEventEnd({
+        参与事件: { 先: {}, 后: {} },
         事件系统: {
           进行中事件: {
             后: { 年: 1200, 月: 8, 日: 15, 时: 15 },
@@ -152,5 +138,15 @@ describe('findEarliestRunningEventEnd', () => {
       }),
     ).toEqual({ 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 });
   });
-});
 
+  it('不用未参与的后台进行中事件限制玩家时间', () => {
+    expect(
+      findEarliestRunningEventEnd({
+        参与事件: { 玩家事件: {} },
+        事件系统: {
+          进行中事件: { 后台事件: { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 } },
+        },
+      }),
+    ).toBeNull();
+  });
+});

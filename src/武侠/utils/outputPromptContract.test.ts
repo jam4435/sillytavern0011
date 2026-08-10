@@ -107,9 +107,15 @@ describe('武侠输出提示词契约', () => {
     expect(variableGuidanceSource).toContain('{"年":整数,"月":整数,"日":整数,"时":整数,"分":整数}');
     expect(variableGuidanceSource).toContain('`分`必须是 0–59 的整数');
     expect(variableGuidanceSource).toContain('旧存档没有`分`时按 0 分理解');
+    expect(variableGuidanceSource).toContain('禁止稀疏更新的原子对象');
+    expect(variableGuidanceSource).toContain('旧完整时间 + 正文耗时 = 新完整时间');
+    expect(variableGuidanceSource).toContain('{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":13,"分":10}}}');
+    expect(variableGuidanceSource).toContain('禁止只写 {"世界信息":{"时间":{"分":10}}}');
+    expect(variableGuidanceSource).not.toContain('例如修改分钟必须写成');
     expect(variableGuidanceSource).toContain('一个回复不等于固定的一小时');
     expect(variableGuidanceSource).toContain('跨城远行、长期养伤、闭关修炼等可经过数日');
-    expect(variableGuidanceSource).toContain('只有完整收束、整个事件确实结束时，才将时间推进到事件结束时间');
+    expect(variableGuidanceSource).toContain('只有完整收束、整个事件确实结束时，才将时间准确推进到事件结束时间');
+    expect(variableGuidanceSource).toContain('禁止越过边界顺带推进下一事件');
     expect(variableGuidanceSource).not.toContain('关键桥段完整结束时，将时间推进到事件描述给出的结束时间');
     expect(variableGuidanceSource).toContain('不得把该事件尚未结束的阶段性对话、观察、行动、冲突或关系变化按回合拆写');
   });

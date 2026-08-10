@@ -417,19 +417,27 @@ describe('executeExtraVariableUpdate', () => {
     const statData = variableSnapshot.stat_data as Record<string, unknown>;
     (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 55 };
     statData.事件系统 = {
-      进行中事件: { '射雕第一回01-测试': { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 } },
+      进行中事件: { '射雕第七回02-测试事件': { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 } },
     };
     requestConfiguredTextMock
-      .mockResolvedValueOnce(
-        '<VariableEdit>{"user数据":{"修为":120},"世界信息":{"时间":{"分":10}}}</VariableEdit>',
-      )
+      .mockResolvedValueOnce('<VariableEdit>{"user数据":{"修为":120},"世界信息":{"时间":{"分":10}}}</VariableEdit>')
       .mockResolvedValueOnce(
         '<VariableThink>1200年8月15日12时55分 + 5分钟 = 1200年8月15日13时00分</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":13,"分":0}}}</VariableEdit>',
       );
     emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
       (statData.user数据 as Record<string, unknown>).修为 = 120;
       (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 };
-      return { message_id: 28, actions: { apiWrite: true } };
+      return {
+        version: 1,
+        writeId: 'extra-sync-time-repair',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        message_id: 28,
+        actions: { apiWrite: true },
+      };
     });
 
     const result = await executeExtraVariableUpdate({
@@ -799,7 +807,9 @@ describe('executeExtraVariableUpdate', () => {
     });
 
     expect(requestConfiguredTextMock).toHaveBeenCalledTimes(2);
-    expect(requestConfiguredTextMock.mock.calls[1][0].prompt).toContain('必须保持所有 VariableThink 语义、动作类型、变量路径、键名和值不变');
+    expect(requestConfiguredTextMock.mock.calls[1][0].prompt).toContain(
+      '必须保持所有 VariableThink 语义、动作类型、变量路径、键名和值不变',
+    );
     expect(result).toMatchObject({ appended: true, applyStatus: 'success', formatRepairAttempted: true });
     expect(result.rawResponse).toContain('【原始返回（JSON 格式错误）】');
     expect(result.rawResponse).toContain('【格式修复返回】');

@@ -1,237 +1,112 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { runConsequentialDialogue, runOrdinaryDialogue, runPendingWorldSimulation } from '../ai/gateway';
+import { runInteractionDialogue, runOrdinaryDialogue, runPendingWorldSimulation } from '../ai/gateway';
 import { createInitialState, t } from '../content/basePack';
 import { executeAction, makeAction } from '../domain/engine';
-import { deadlineDays, supportCount } from '../domain/selectors';
+import { daysToNextScheduled, pendingPlayerEvent, primaryTitle, supportCount, unreadNotifications } from '../domain/selectors';
 import type { GameState } from '../domain/schema';
 import {
-  addCheckpoint,
-  loadSave,
-  restoreCheckpoint,
-  restoreLatestHistoryBranch,
-  saveState,
-  writeNarrativeExchange,
-  type ChronicleEntry,
-  type SaveCheckpoint,
+  addCheckpoint, loadSave, restoreCheckpoint, restoreLatestHistoryBranch, saveState, writeNarrativeExchange,
+  type ChronicleEntry, type SaveCheckpoint,
 } from '../persistence/save';
+
+export type SelectedObjectKind = 'county'|'character'|'activity'|'title'|'war';
+export type UtilityWindow = 'council'|'factions'|'succession'|'chronicle'|'mail'|'mods'|'settings'|null;
 
 function openingChronicle(): ChronicleEntry[] {
   return [{
-    id: 'opening',
-    date: '1066-09-15',
-    kind: 'system',
-    title: '裂冠前夜',
-    text: '雷恩议事厅的门刚刚合拢。多勒—孔堡旧叛乱集团正在集结降权派系；十四日后，他们将递上最后通牒。你必须离开亲领，任命摄政，赶赴霍埃尔在南特设下的宴会，并从三名摇摆封臣中争取至少两人。',
+    id:'opening', date:'1066-09-15', kind:'system', title:'布列塔尼，1066 年秋',
+    text:'科南二世在雷恩处理公国政务。多勒旧叛乱集团正在组织降权派系，霍埃尔也将在南特设宴——但这只是当前局势之一。你可以赴宴、联姻、重订契约、争取外援、建设领地，或用战争解决问题；历史施加压力，却不替你写好结局。',
   }];
 }
 
-export const useGameStore = defineStore('ck-game', () => {
-  const persisted = loadSave();
-  const state = ref<GameState>(persisted?.state ?? createInitialState());
-  const chronicle = ref<ChronicleEntry[]>(persisted?.chronicle.length ? persisted.chronicle : openingChronicle());
-  const checkpoints = ref<SaveCheckpoint[]>(persisted?.checkpoints ?? []);
-  const busy = ref(false);
-  const streamingText = ref('');
-  const selectedCountyId = ref('rennes');
-  const selectedCharacterId = ref('char_hoel');
-  const rightTab = ref<'people' | 'mail' | 'activity' | 'council' | 'ledger' | 'log' | 'mods' | 'settings'>('people');
-  const mapLayer = ref<'rule' | 'deJure' | 'occupation' | 'intel' | 'people' | 'route'>('rule');
-  const dialogueExpanded = ref(true);
-  const currentSupport = computed(() => supportCount(state.value));
-  const daysLeft = computed(() => deadlineDays(state.value));
-  const player = computed(() => state.value.characters[state.value.playerCharacterId]);
-  const currentLocation = computed(() => state.value.locations[player.value.locationId]);
-  const localCharacterIds = computed(() => Object.values(state.value.characters).filter(character => character.alive && character.locationId === player.value.locationId && character.id !== player.value.id).map(character => character.id));
+export const useGameStore=defineStore('ck-game',()=>{
+  const persisted=loadSave();
+  const state=ref<GameState>(persisted?.state??createInitialState());
+  const chronicle=ref<ChronicleEntry[]>(persisted?.chronicle.length?persisted.chronicle:openingChronicle());
+  const checkpoints=ref<SaveCheckpoint[]>(persisted?.checkpoints??[]);
+  const busy=ref(false);const streamingText=ref('');
+  const selectedKind=ref<SelectedObjectKind>('county');const selectedObjectId=ref('rennes');
+  const mapLayer=ref<'rule'|'deJure'|'occupation'|'intel'|'people'|'armies'|'activities'|'route'>('rule');
+  const utilityWindow=ref<UtilityWindow>(null);const dialogueOpen=ref(false);const activeInteractionId=ref<string|null>(null);
 
-  function persist(): void {
-    const envelope = saveState(state.value, { chronicle: chronicle.value, checkpoints: checkpoints.value });
-    checkpoints.value = envelope.checkpoints;
-  }
+  const player=computed(()=>state.value.characters[state.value.playerCharacterId]);
+  const playerTitle=computed(()=>primaryTitle(state.value,state.value.playerCharacterId));
+  const currentLocation=computed(()=>state.value.locations[player.value.locationId]);
+  const localCharacterIds=computed(()=>Object.values(state.value.characters).filter(character=>character.alive&&character.locationId===player.value.locationId&&character.id!==player.value.id).map(character=>character.id));
+  const activeSituation=computed(()=>Object.values(state.value.situations).find(item=>item.status==='active'||item.status==='war')??null);
+  const currentSupport=computed(()=>supportCount(state.value));
+  const pendingEvent=computed(()=>pendingPlayerEvent(state.value));
+  const alerts=computed(()=>unreadNotifications(state.value));
+  const activeInteraction=computed(()=>activeInteractionId.value?state.value.interactions[activeInteractionId.value]??null:null);
+  const selectedCounty=computed(()=>selectedKind.value==='county'?state.value.counties[selectedObjectId.value]??null:null);
+  const selectedCharacter=computed(()=>selectedKind.value==='character'?state.value.characters[selectedObjectId.value]??null:null);
+  const selectedActivity=computed(()=>selectedKind.value==='activity'?state.value.activities[selectedObjectId.value]??null:null);
 
-  function addEntry(kind: ChronicleEntry['kind'], title: string, text: string, occurredAt = state.value.currentDate, persistAfter = true): void {
-    chronicle.value.push({ id: `${kind}_${Date.now()}_${chronicle.value.length}`, date: occurredAt, kind, title, text });
-    if (chronicle.value.length > 500) chronicle.value.splice(0, chronicle.value.length - 500);
-    if (persistAfter) persist();
-  }
+  function persist(){const envelope=saveState(state.value,{chronicle:chronicle.value,checkpoints:checkpoints.value});checkpoints.value=envelope.checkpoints;}
+  function addEntry(kind:ChronicleEntry['kind'],title:string,text:string,occurredAt=state.value.currentDate,persistAfter=true){chronicle.value.push({id:`${kind}_${Date.now()}_${chronicle.value.length}`,date:occurredAt,kind,title,text});if(chronicle.value.length>500)chronicle.value.splice(0,chronicle.value.length-500);if(persistAfter)persist();}
 
-  function commitAction(actionId: string, targetIds: string[], params: Record<string, unknown> = {}, actorId = state.value.playerCharacterId, sourceId = 'ui.player', sceneId = `scene_${state.value.scenario.sceneCount}`): boolean {
-    const call = makeAction(state.value, actionId, actorId, targetIds, params, sourceId, sceneId);
-    const result = executeAction(state.value, call);
-    if (result.status !== 'committed') {
-      addEntry('error', '行动未生效', result.errors.map(error => error.message).join('；') || '该行动被规则拒绝。');
-      return false;
-    }
-    state.value = result.state;
-    for (const event of result.events) addEntry('event', event.type, summarizeEvent(event.type, event.payload), event.occurredAt, false);
-    persist();
-    return true;
-  }
-
-  function summarizeEvent(type: string, payload: Record<string, unknown>): string {
-    const target = typeof payload.supporterId === 'string' ? t(state.value.characters[payload.supporterId]?.nameKey ?? payload.supporterId) : '';
-    const summaries: Record<string, string> = {
-      'regency.delegated': `已将日常治理、守备命令与代收通信权限交给 ${t(state.value.characters[String(payload.regentId)]?.nameKey ?? String(payload.regentId))}。`,
-      'communication.sent': `信件已交给信使，预计 ${String(payload.deliverAt)} 送达。`,
-      'communication.delivered': '信件已经送达收信人。',
-      'communication.intercepted': '信使失去踪影；派系的眼线可能已经读过这封信。',
-      'communication.refused': '对方没有拆封，原信被送回。',
-      'travel.started': `队伍踏上${payload.routeKind === 'safe' ? '安全长路' : '危险捷径'}，预计 ${String(payload.arriveAt)} 抵达。`,
-      'travel.arrived': '车马穿过城门，出巡队伍已经抵达目的地。',
-      'travel.waypoint_reached': `队伍抵达 ${t(state.value.counties[String(payload.countyId)]?.nameKey ?? String(payload.countyId))} 的途中节点。`,
-      'regency.action_taken': `摄政在授权范围内处理了 ${String(payload.action)}；其资源与合法性影响已经自动提交。`,
-      'politics.support_committed': `${target} 已作出有条件的正式支持承诺。当前有效支持：${String(payload.currentSupport)}/2。`,
-      'politics.promise_broken': '一项承诺逾期未履行，相应支持已被撤回。',
-      'scenario.prologue_succeeded': '两份有效支持令降权派系当场分裂。布列塔尼战役将从这个结果继续。',
-      'scenario.ultimatum_issued': '支持不足。降权派系送来最后通牒：接受降权，或在战场上回答。',
-      'scenario.civil_war_started': '你拒绝降权。派系成员升起旗帜，内战已经建立为可继续的战争状态。',
-      'scenario.authority_conceded': '你在宪章上盖印。公爵权威受损，但战役仍将继续。',
-      'world.major_change_observed': '海峡对岸传来消息：诺曼军已登陆英格兰南岸，结果仍未注定。',
+  function summarizeEvent(type:string,payload:Record<string,unknown>):string{
+    const name=(id:unknown)=>typeof id==='string'?t(state.value.characters[id]?.nameKey??state.value.counties[id]?.nameKey??id):'';
+    const summaries:Record<string,string>={
+      'interaction.opened':`已建立正式互动，渠道：${String(payload.channel)}，基础接受度 ${String(payload.acceptance)}。`,
+      'interaction.accepted':'双方的正式结果已经由规则引擎提交。','interaction.rejected':'对方拒绝了这项提议。','interaction.countered':'对方提出了新的条件，等待你的答复。',
+      'communication.sent':`信使已经出发，预计 ${String(payload.deliverAt)} 送达。`,'communication.delivered':'信件已经送达。','communication.intercepted':'信件遭到截获。','communication.refused':'收信人拒绝拆封。',
+      'travel.started':`队伍启程，预计 ${String(payload.arriveAt)} 抵达。`,'travel.arrived':'队伍已经抵达目的地。','travel.waypoint_reached':`队伍经过 ${name(payload.countyId)}。`,
+      'activity.started':'一项活动已经开始；你可以关注，也可以无视。','activity.phase_changed':`活动进入 ${String(payload.phase)} 阶段。`,
+      'council.appointed':`${name(payload.targetId)}获得议会任命。`,'regency.delegated':`${name(payload.regentId)}被授予摄政权限。`,
+      'economy.project_started':`${name(payload.countyId)}开始建设 ${String(payload.templateId)}。`,'economy.project_completed':`${name(payload.countyId)}的建设已经完成。`,
+      'politics.support_committed':`${name(payload.supporterId)}作出正式支持承诺。`,'politics.contract_modified':'封建契约已经重订。','politics.character_arrested':`${name(payload.targetId)}已被逮捕。`,
+      'faction.member_joined':`${name(payload.memberId)}加入派系。`,'faction.member_left':`${name(payload.memberId)}退出派系。`,
+      'military.war_declared':'战争已经爆发。','situation.ultimatum_issued':'降权派系发出最后通牒。','situation.liberty_resolved':'降权危机已经解除。','situation.civil_war_started':'降权争端转化为派系战争。',
+      'succession.player_changed':`${name(payload.heirId)}继承头衔并成为新的玩家角色。`,'world.norman_landing':'诺曼军在英格兰南岸登陆，胜负仍未决定。',
     };
-    return summaries[type] ?? Object.entries(payload).map(([key, value]) => `${key}: ${String(value)}`).join(' · ');
+    return summaries[type]??Object.entries(payload).slice(0,5).map(([key,value])=>`${key}: ${String(value)}`).join(' · ');
   }
 
-  function selectRegent(characterId: string): void {
-    if (commitAction('regency.delegate', [characterId])) addEntry('system', '摄政已定', '你可以写出试探信，并选择前往南特的路线。');
+  function commitAction(actionId:string,targetIds:string[],params:Record<string,unknown>={},actorId=state.value.playerCharacterId,sourceId='ui.player',sceneId=`scene_${state.value.revision}`):boolean{
+    const result=executeAction(state.value,makeAction(state.value,actionId,actorId,targetIds,params,sourceId,sceneId));
+    if(result.status!=='committed'){addEntry('error','行动未生效',result.errors.map(error=>error.message).join('；')||'该行动被规则拒绝。');return false;}
+    state.value=result.state;for(const event of result.events)addEntry('event',event.type,summarizeEvent(event.type,event.payload),event.occurredAt,false);persist();return true;
   }
 
-  function sendProbeLetter(recipientId: string, body?: string): void {
-    const recipient = state.value.characters[recipientId];
-    commitAction('communication.send_letter', [recipientId], { subject: '关于南特宴会与公国安宁', body: body || `致${t(recipient.nameKey)}：愿我们在南特坦率谈论布列塔尼的安宁与彼此的义务。` });
-  }
+  function selectCounty(id:string){selectedKind.value='county';selectedObjectId.value=id;utilityWindow.value=null;}
+  function selectCharacter(id:string){selectedKind.value='character';selectedObjectId.value=id;utilityWindow.value=null;}
+  function selectActivity(id:string){selectedKind.value='activity';selectedObjectId.value=id;utilityWindow.value=null;}
 
-  function startTravel(routeKind: 'direct' | 'safe'): void {
-    const companions = state.value.regentId === 'char_alan' ? ['char_mael'] : ['char_alan'];
-    if (commitAction('travel.start', ['loc_nantes_castle'], { routeKind, companionIds: companions })) addEntry('system', '出巡开始', routeKind === 'safe' ? '队伍沿瓦讷方向绕行；时间更长，但伏击风险较低。' : '队伍取直道南下；更快，也把自己暴露给派系的耳目。');
-  }
+  async function resolvePendingWorld(){if(!state.value.signals.some(signal=>!signal.consumed))return;const simulation=await runPendingWorldSimulation(state.value);state.value=simulation.state;addEntry('system','西欧局势推演',simulation.plan.summary,state.value.currentDate,false);if(simulation.rejected.length)addEntry('error','世界规则回退',simulation.rejected.join('；'),state.value.currentDate,false);persist();}
+  async function advanceDays(days:number){if(busy.value)return;busy.value=true;try{if(commitAction('time.advance',[],{days}))await resolvePendingWorld();}finally{busy.value=false;}}
+  async function advanceToNext(){await advanceDays(Math.max(1,Math.min(30,daysToNextScheduled(state.value))));}
+  function chooseEvent(eventId:string,choiceId:string){commitAction('event.choose',[eventId],{choiceId});}
+  function readNotification(id:string){commitAction('notification.read',[],{notificationId:id});}
 
-  async function resolvePendingWorld(): Promise<void> {
-    if (!state.value.signals.some(signal => !signal.consumed)) return;
-    const simulation = await runPendingWorldSimulation(state.value);
-    state.value = simulation.state;
-    addEntry('system', '西欧局势推演', simulation.plan.summary, state.value.currentDate, false);
-    if (simulation.rejected.length) addEntry('error', '世界规则回退', simulation.rejected.join('；'), state.value.currentDate, false);
-    persist();
+  function beginInteraction(intentId:string,targetId:string,terms:Record<string,unknown>={}){
+    const before=new Set(Object.keys(state.value.interactions));
+    if(!commitAction('interaction.open',[targetId],{intentId,terms},state.value.playerCharacterId,'ui.interaction',`interaction_${state.value.revision}`))return;
+    activeInteractionId.value=Object.keys(state.value.interactions).find(id=>!before.has(id))??null;dialogueOpen.value=true;selectedKind.value='character';selectedObjectId.value=targetId;
   }
-
-  async function advanceDays(days = 1): Promise<void> {
-    if (!commitAction('time.advance', [], { days })) return;
-    await resolvePendingWorld();
-    if (state.value.currentDate >= state.value.scenario.deadline && state.value.scenario.result === 'pending' && state.value.factions.faction_liberty.status !== 'ultimatum') commitAction('scenario.resolve_deadline', ['faction_liberty']);
+  function openIncomingInteraction(id:string){if(!state.value.interactions[id])return;activeInteractionId.value=id;dialogueOpen.value=true;}
+  function respondInteraction(decision:'accept'|'reject'|'counter',terms:Record<string,unknown>={},message=''){
+    if(!activeInteraction.value)return;commitAction('interaction.resolve',[activeInteraction.value.id],{decision,terms,message});
   }
+  async function talk(text:string){if(!text.trim()||busy.value)return;busy.value=true;streamingText.value='';addEntry('speech',t(player.value.nameKey),text.trim(),state.value.currentDate,false);persist();
+    try{let narration:string;if(activeInteraction.value?.status==='negotiating'){const result=await runInteractionDialogue(state.value,activeInteraction.value.id,text.trim(),value=>streamingText.value=value);state.value=result.state;narration=result.narration;if(result.rejected.length)addEntry('error','互动规则回退',result.rejected.join('；'),state.value.currentDate,false);}else{const speakers=selectedCharacter.value&&selectedCharacter.value.locationId===player.value.locationId?[selectedCharacter.value.id]:localCharacterIds.value.slice(0,3);narration=await runOrdinaryDialogue(state.value,`talk_${state.value.revision}`,player.value.locationId,speakers,text.trim(),value=>streamingText.value=value);}addEntry('speech','对方',narration,state.value.currentDate,false);const envelope=await writeNarrativeExchange(state.value,chronicle.value,text.trim(),narration);checkpoints.value=envelope.checkpoints;}catch(error){addEntry('error','场景导演未响应',error instanceof Error?error.message:String(error));}finally{streamingText.value='';busy.value=false;persist();}}
 
-  async function advanceFeast(): Promise<void> {
-    if (commitAction('activity.advance', [], { consumeTimeslot: 'true' })) await resolvePendingWorld();
-  }
+  function sendLetter(recipientId:string,subject:string,body:string){commitAction('communication.send_letter',[recipientId],{subject,body});}
+  function startTravel(destinationLocationId:string,routeKind:'direct'|'safe'='direct'){commitAction('travel.start',[destinationLocationId],{routeKind,companionIds:[]});}
+  function advanceActivity(activityId:string){commitAction('activity.advance',[],{activityId});}
+  function appointCouncil(positionId:string,characterId:string){commitAction('council.appoint',[characterId],{positionId});}
+  function delegateRegency(characterId:string){commitAction('regency.delegate',[characterId]);}
+  function startProject(countyId:string,templateId:'market'|'watchtower'){commitAction('economy.start_project',[countyId],{templateId});}
+  function arrest(characterId:string){commitAction('politics.arrest',[characterId]);}
+  function declareWar(defenderId:string,countyId:string){commitAction('military.declare_county_claim',[defenderId,countyId]);}
 
-  function bargain(targetId: string, offerKind: string): void {
-    if (commitAction('politics.offer_support_bargain', [targetId], { offerKind })) addEntry('speech', '承诺落印', `${t(state.value.characters[targetId].nameKey)}与你交换了书面承诺。它无需额外确认，但会在条件遭破坏或期限届满时撤回。`);
-  }
+  async function checkpoint(name:string){addEntry('system','检查点已写入酒馆',`${name}（revision ${state.value.revision}）`,state.value.currentDate,false);const envelope=await addCheckpoint(state.value,chronicle.value,name,true);checkpoints.value=envelope.checkpoints;}
+  function restoreNamedCheckpoint(id:string){const restored=restoreCheckpoint(id);if(!restored){addEntry('error','检查点恢复失败','检查点不兼容、不存在或状态哈希校验失败。');return;}state.value=restored.state;chronicle.value=restored.chronicle;checkpoints.value=loadSave()?.checkpoints??[];activeInteractionId.value=null;addEntry('system','已恢复检查点',`战役回到 revision ${state.value.revision}。`);}
+  function reloadFromHost(historyChanged=false){if(busy.value)return;const envelope=historyChanged?restoreLatestHistoryBranch():loadSave();if(envelope){state.value=envelope.state;chronicle.value=envelope.chronicle.length?envelope.chronicle:openingChronicle();checkpoints.value=envelope.checkpoints;}else{state.value=createInitialState();chronicle.value=openingChronicle();checkpoints.value=[];persist();}activeInteractionId.value=null;}
+  function setPulseDays(days:number){state.value.settings.regularWorldPulseDays=Math.max(3,Math.min(30,Math.round(days)));persist();}
+  function setContentPacks(packs:Array<{id:string;version:string}>){state.value.contentPackIds=packs.map(pack=>pack.id);state.value.contentPackVersions=Object.fromEntries(packs.map(pack=>[pack.id,pack.version]));persist();}
+  function resetGame(){state.value=createInitialState(Date.now()>>>0);chronicle.value=openingChronicle();checkpoints.value=[];activeInteractionId.value=null;saveState(state.value,{chronicle:chronicle.value,checkpoints:[],branchAnchor:null});}
 
-  function answerUltimatum(answer: 'concede' | 'resist'): void {
-    commitAction('scenario.answer_ultimatum', ['faction_liberty'], { answer });
-  }
-
-  function triggerSideStory(kind: 'lethal_risk' | 'ambiguous_omen' | 'adult_encounter'): void {
-    const targets = kind === 'adult_encounter' ? ['char_isabeau'] : [];
-    if (!commitAction('scenario.side_story', targets, { kind })) return;
-    const copy = {
-      lethal_risk: '你亲自接受了捷径上早已标明的致命风险；伏击结果已由固定随机种子提交。',
-      ambiguous_omen: '夜里的梦兆已经成为私人记忆，但规则没有确认任何超自然力量。',
-      adult_encounter: '一段只涉及成年人的私下接近开始了；意愿与机会仍由状态机约束。',
-    }[kind];
-    addEntry('system', '可选支线', copy);
-  }
-
-  async function talk(text: string, consequential: boolean): Promise<void> {
-    if (!text.trim() || busy.value) return;
-    busy.value = true;
-    streamingText.value = '';
-    addEntry('speech', '科南二世', text.trim(), state.value.currentDate, false);
-    persist();
-    const sceneId = `dialogue_${state.value.revision}_${Date.now().toString(36)}`;
-    try {
-      let narration = '';
-      if (consequential) {
-        const result = await runConsequentialDialogue(state.value, sceneId, player.value.locationId, localCharacterIds.value, text.trim(), value => {
-          streamingText.value = value;
-        });
-        state.value = result.state;
-        narration = result.narration;
-        addEntry('speech', '在场人物', narration, state.value.currentDate, false);
-        if (result.rejected.length) addEntry('error', '规则回退', result.rejected.join('；'), state.value.currentDate, false);
-      } else {
-        narration = await runOrdinaryDialogue(state.value, sceneId, player.value.locationId, localCharacterIds.value, text.trim(), value => {
-          streamingText.value = value;
-        });
-        addEntry('speech', '在场人物', narration, state.value.currentDate, false);
-      }
-      const envelope = await writeNarrativeExchange(state.value, chronicle.value, text.trim(), narration);
-      checkpoints.value = envelope.checkpoints;
-    } catch (error) {
-      addEntry('error', '场景导演未响应', error instanceof Error ? error.message : String(error));
-    } finally {
-      streamingText.value = '';
-      busy.value = false;
-    }
-  }
-
-  async function checkpoint(name: string): Promise<void> {
-    addEntry('system', '检查点已写入酒馆', `${name}（revision ${state.value.revision}）`, state.value.currentDate, false);
-    const envelope = await addCheckpoint(state.value, chronicle.value, name, true);
-    checkpoints.value = envelope.checkpoints;
-  }
-
-  function restoreNamedCheckpoint(id: string): void {
-    const restored = restoreCheckpoint(id);
-    if (!restored) {
-      addEntry('error', '检查点恢复失败', '检查点不存在，或完整状态哈希校验失败。');
-      return;
-    }
-    state.value = restored.state;
-    chronicle.value = restored.chronicle;
-    const envelope = loadSave();
-    checkpoints.value = envelope?.checkpoints ?? [];
-    addEntry('system', '已恢复检查点', `战役回到 revision ${state.value.revision}。`);
-  }
-
-  function reloadFromHost(historyChanged = false): void {
-    if (busy.value) return;
-    const envelope = historyChanged ? restoreLatestHistoryBranch() : loadSave();
-    if (envelope) {
-      state.value = envelope.state;
-      chronicle.value = envelope.chronicle.length ? envelope.chronicle : openingChronicle();
-      checkpoints.value = envelope.checkpoints;
-      return;
-    }
-    state.value = createInitialState();
-    chronicle.value = openingChronicle();
-    checkpoints.value = [];
-    persist();
-  }
-
-  function setPulseDays(days: number): void {
-    state.value.settings.regularWorldPulseDays = Math.max(3, Math.min(30, Math.round(days)));
-    persist();
-  }
-
-  function setContentPacks(packs: Array<{ id: string; version: string }>): void {
-    state.value.contentPackIds = packs.map(pack => pack.id);
-    state.value.contentPackVersions = Object.fromEntries(packs.map(pack => [pack.id, pack.version]));
-    persist();
-  }
-
-  function resetGame(): void {
-    state.value = createInitialState(Date.now() >>> 0);
-    chronicle.value = openingChronicle();
-    checkpoints.value = [];
-    saveState(state.value, { chronicle: chronicle.value, checkpoints: [], branchAnchor: null });
-  }
-
-  return {
-    state, chronicle, checkpoints, busy, streamingText, selectedCountyId, selectedCharacterId, rightTab, mapLayer, dialogueExpanded,
-    currentSupport, daysLeft, player, currentLocation, localCharacterIds,
-    addEntry, commitAction, selectRegent, sendProbeLetter, startTravel, advanceDays, advanceFeast, bargain, answerUltimatum, triggerSideStory, talk, checkpoint,
-    restoreNamedCheckpoint, reloadFromHost, setPulseDays, setContentPacks, resetGame,
-  };
+  return{state,chronicle,checkpoints,busy,streamingText,selectedKind,selectedObjectId,mapLayer,utilityWindow,dialogueOpen,activeInteractionId,player,playerTitle,currentLocation,localCharacterIds,activeSituation,currentSupport,pendingEvent,alerts,activeInteraction,selectedCounty,selectedCharacter,selectedActivity,addEntry,commitAction,selectCounty,selectCharacter,selectActivity,advanceDays,advanceToNext,chooseEvent,readNotification,beginInteraction,openIncomingInteraction,respondInteraction,talk,sendLetter,startTravel,advanceActivity,appointCouncil,delegateRegency,startProject,arrest,declareWar,checkpoint,restoreNamedCheckpoint,reloadFromHost,setPulseDays,setContentPacks,resetGame};
 });

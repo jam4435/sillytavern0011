@@ -31,6 +31,9 @@ export function ageOnDate(birthDate: string, currentDate: string): number {
 }
 
 export function daysUntilDeadline(state: GameState): number {
-  return Math.max(0, daysBetween(state.currentDate, state.scenario.deadline));
+  const deadlines = Object.values(state.situations)
+    .filter(item => item.status === 'active' && item.deadline)
+    .map(item => item.deadline as string)
+    .sort();
+  return deadlines[0] ? Math.max(0, daysBetween(state.currentDate, deadlines[0])) : 0;
 }
-

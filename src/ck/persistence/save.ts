@@ -1,394 +1,87 @@
 import { z } from 'zod';
-import { t } from '../content/basePack';
-import { GameStateSchema, type GameState } from '../domain/schema';
-import { deadlineDays, supportCount } from '../domain/selectors';
+import { createInitialState, t } from '../content/basePack';
+import { GameStateSchema, LegacyGameStateSchema, type GameState } from '../domain/schema';
+import { deadlineDays, libertySituation, primaryTitle, supportCount } from '../domain/selectors';
 
-export const ChronicleEntrySchema = z
-  .object({
-    id: z.string(),
-    date: z.string(),
-    kind: z.enum(['system', 'speech', 'event', 'error']),
-    title: z.string(),
-    text: z.string(),
-  })
-  .strict();
+export const ChronicleEntrySchema=z.object({id:z.string(),date:z.string(),kind:z.enum(['system','speech','event','error']),title:z.string(),text:z.string()}).strict();
+export type ChronicleEntry=z.infer<typeof ChronicleEntrySchema>;
+const ChronicleSchema=z.array(ChronicleEntrySchema).max(500);
+const BranchAnchorSchema=z.object({messageId:z.number().int().nonnegative(),kind:z.enum(['manual','scene']),checkpointId:z.string(),revision:z.number().int().nonnegative()}).strict();
+const CheckpointSchema=z.object({id:z.string(),name:z.string(),createdAt:z.string(),important:z.boolean(),state:GameStateSchema.nullable(),chronicle:ChronicleSchema,stateHash:z.string(),compatible:z.boolean(),migrationError:z.string().nullable()}).strict();
+const HistorySnapshotSchema=z.object({saveId:z.string(),checkpointId:z.string(),revision:z.number().int().nonnegative(),state:GameStateSchema,chronicle:ChronicleSchema,stateHash:z.string()}).strict();
 
-export type ChronicleEntry = z.infer<typeof ChronicleEntrySchema>;
+export const PublicProjectionSchema=z.object({
+  schemaVersion:z.literal(2),saveId:z.string(),revision:z.number().int().nonnegative(),date:z.string(),segment:z.string(),
+  player:z.object({id:z.string(),name:z.string(),location:z.string(),primaryTitle:z.string().nullable(),titles:z.array(z.string())}).strict(),
+  resources:z.object({gold:z.number(),prestige:z.number(),piety:z.number(),legitimacy:z.number(),stress:z.number(),levies:z.number()}).strict(),
+  politics:z.object({activeSituations:z.number(),libertyStatus:z.string(),factionPower:z.number(),support:z.number(),ultimatumDays:z.number(),activeWars:z.number()}).strict(),
+  pending:z.object({events:z.number(),letters:z.number(),interactions:z.number(),promises:z.number(),notifications:z.number(),worldSignals:z.number()}).strict(),
+}).strict();
+export type PublicProjection=z.infer<typeof PublicProjectionSchema>;
 
-const ChronicleSchema = z.array(ChronicleEntrySchema).max(500);
-const BranchAnchorSchema = z
-  .object({
-    messageId: z.number().int().nonnegative(),
-    kind: z.enum(['manual', 'scene']),
-    checkpointId: z.string(),
-    revision: z.number().int().nonnegative(),
-  })
-  .strict();
+export const SaveEnvelopeSchema=z.object({format:z.literal('ck-lord-rpg-save'),formatVersion:z.literal(3),state:GameStateSchema,chronicle:ChronicleSchema,checkpoints:z.array(CheckpointSchema).max(10),eventHash:z.string(),stateHash:z.string(),branchAnchor:BranchAnchorSchema.nullable()}).strict();
+const LegacyEnvelopeSchema=z.object({format:z.literal('ck-lord-rpg-save'),formatVersion:z.union([z.literal(1),z.literal(2)]),state:z.unknown(),chronicle:z.array(z.unknown()).optional(),checkpoints:z.array(z.unknown()).max(10).default([]),eventHash:z.string(),stateHash:z.string().optional(),branchAnchor:z.unknown().optional()}).passthrough();
+const LegacyCheckpointSchema=z.object({id:z.string(),name:z.string(),createdAt:z.string(),important:z.boolean(),state:z.unknown(),chronicle:z.array(z.unknown()).optional(),stateHash:z.string().optional()}).passthrough();
 
-const CheckpointSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    createdAt: z.string(),
-    important: z.boolean(),
-    state: GameStateSchema,
-    chronicle: ChronicleSchema,
-    stateHash: z.string(),
-  })
-  .strict();
+export type SaveEnvelope=z.infer<typeof SaveEnvelopeSchema>;export type SaveCheckpoint=z.infer<typeof CheckpointSchema>;export type BranchAnchor=z.infer<typeof BranchAnchorSchema>;
+const variableKey='ck_lord_rpg',publicVariableKey='ck_lord_rpg_public';let memoryEnvelope:SaveEnvelope|null=null;
 
-const HistorySnapshotSchema = z
-  .object({
-    saveId: z.string(),
-    checkpointId: z.string(),
-    revision: z.number().int().nonnegative(),
-    state: GameStateSchema,
-    chronicle: ChronicleSchema,
-    stateHash: z.string(),
-  })
-  .strict();
+function hashText(text:string){let hash=2166136261;for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}return(hash>>>0).toString(16).padStart(8,'0');}
+function sortForHash(value:unknown):unknown{if(Array.isArray(value))return value.map(sortForHash);if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value as Record<string,unknown>).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>[key,sortForHash(item)]));return value;}
+function stableStringify(value:unknown){return JSON.stringify(sortForHash(value));}
+export function hashGameState(state:GameState){return hashText(stableStringify(state));}
+function rawEventLog(raw:unknown):unknown[]{if(!raw||typeof raw!=='object')return[];const value=(raw as Record<string,unknown>).eventLog;return Array.isArray(value)?value:[];}
+function hashRawEvents(raw:unknown,stable=true){const compact=rawEventLog(raw).map(item=>{const event=item as Record<string,unknown>;return[event.id,event.revision,event.type,event.payload];});return hashText(stable?stableStringify(compact):JSON.stringify(compact));}
+function hashEventLog(state:GameState){return hashRawEvents(state);}
+function validStateSemantics(state:GameState){const ids=new Set<string>();return state.eventLog.every(item=>{if(item.revision>state.revision||ids.has(item.id))return false;ids.add(item.id);return true;});}
+function hasTavernVariables(){return typeof getVariables==='function'&&typeof updateVariablesWith==='function';}
+function cloneState(state:GameState){return GameStateSchema.parse(JSON.parse(JSON.stringify(state)));}
+function normalizeChronicle(raw:unknown):ChronicleEntry[]{const input=Array.isArray(raw)?raw:[];const valid=input.flatMap(item=>{const parsed=ChronicleEntrySchema.safeParse(item);return parsed.success?[parsed.data]:[];});return ChronicleSchema.parse(valid.slice(-500));}
 
-export const PublicProjectionSchema = z
-  .object({
-    schemaVersion: z.literal(1),
-    saveId: z.string(),
-    revision: z.number().int().nonnegative(),
-    date: z.string(),
-    player: z.object({ id: z.string(), name: z.string(), location: z.string(), titles: z.array(z.string()) }).strict(),
-    resources: z.object({ gold: z.number(), prestige: z.number(), legitimacy: z.number(), stress: z.number(), levies: z.number() }).strict(),
-    politics: z.object({ support: z.number(), requiredSupport: z.number(), factionStatus: z.string(), factionPower: z.number(), ultimatumDays: z.number() }).strict(),
-    activity: z.object({ id: z.string(), phase: z.string(), participantIds: z.array(z.string()) }).nullable(),
-    pending: z.object({ letters: z.number(), promises: z.number(), worldSignals: z.number() }).strict(),
-  })
-  .strict();
-
-export type PublicProjection = z.infer<typeof PublicProjectionSchema>;
-
-export const SaveEnvelopeSchema = z
-  .object({
-    format: z.literal('ck-lord-rpg-save'),
-    formatVersion: z.literal(2),
-    state: GameStateSchema,
-    chronicle: ChronicleSchema,
-    checkpoints: z.array(CheckpointSchema).max(10),
-    eventHash: z.string(),
-    stateHash: z.string(),
-    branchAnchor: BranchAnchorSchema.nullable(),
-  })
-  .strict();
-
-const LegacyCheckpointSchema = z
-  .object({ id: z.string(), name: z.string(), createdAt: z.string(), important: z.boolean(), state: GameStateSchema })
-  .strict();
-const LegacySaveEnvelopeSchema = z
-  .object({
-    format: z.literal('ck-lord-rpg-save'),
-    formatVersion: z.literal(1),
-    state: GameStateSchema,
-    checkpoints: z.array(LegacyCheckpointSchema).max(10),
-    eventHash: z.string(),
-  })
-  .strict();
-
-export type SaveEnvelope = z.infer<typeof SaveEnvelopeSchema>;
-export type SaveCheckpoint = z.infer<typeof CheckpointSchema>;
-export type BranchAnchor = z.infer<typeof BranchAnchorSchema>;
-
-const variableKey = 'ck_lord_rpg';
-const publicVariableKey = 'ck_lord_rpg_public';
-let memoryEnvelope: SaveEnvelope | null = null;
-
-function hashText(text: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
+function genericCharacter(id:string,raw:Record<string,unknown>,base:GameState):GameState['characters'][string]{
+  const locationId=typeof raw.locationId==='string'&&base.locations[raw.locationId]?raw.locationId:'loc_rennes_castle';
+  return {id,nameKey:typeof raw.nameKey==='string'?raw.nameKey:id,originalName:typeof raw.originalName==='string'?raw.originalName:id,birthDate:typeof raw.birthDate==='string'?raw.birthDate:'1030-01-01',deathDate:null,sex:raw.sex==='female'?'female':'male',houseId:typeof raw.houseId==='string'?raw.houseId:`house_${id}`,dynastyId:typeof raw.dynastyId==='string'?raw.dynastyId:`dynasty_${id}`,parentIds:[],childIds:[],spouseIds:[],betrothedIds:[],titleIds:[],liegeId:null,locationId,alive:true,imprisonedById:null,traits:[],attributes:{diplomacy:8,martial:8,stewardship:8,intrigue:8,learning:8,prowess:8},personality:{boldness:0,compassion:0,honor:0},health:5,fertility:.5,stress:0,goals:[],shortTermGoal:null,ambition:null,knowledgeIds:[],memoryIds:[],sourceType:'original'};
 }
 
-function sortForHash(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortForHash);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => [key, sortForHash(item)]));
-  }
-  return value;
+export function migrateGameState(raw:unknown):GameState|null{
+  const current=GameStateSchema.safeParse(raw);if(current.success)return current.data;
+  const legacy=LegacyGameStateSchema.safeParse(raw);if(!legacy.success)return null;
+  const old=legacy.data as Record<string,any>;const base=createInitialState(Number(old.rngState)||10660915);
+  base.saveId=String(old.saveId||base.saveId);base.revision=Number(old.revision)||0;base.rngState=Number(old.rngState)||base.rngState;base.currentDate=String(old.currentDate||base.currentDate);base.clock={date:base.currentDate,segment:'morning'};base.nextRegularPulseAt=String(old.nextRegularPulseAt||addDaysCompat(base.currentDate,base.settings.regularWorldPulseDays));base.worldActionCredit=Number(old.worldActionCredit)||0;base.playerCharacterId=String(old.playerCharacterId||base.playerCharacterId);base.regentId=typeof old.regentId==='string'?old.regentId:null;base.activeTravelId=typeof old.scenario?.activeTravelId==='string'?old.scenario.activeTravelId:null;
+  if(old.settings&&typeof old.settings==='object')base.settings={...base.settings,...old.settings,content:{...base.settings.content,...old.settings.content},models:{...base.settings.models,...old.settings.models}};
+  if(old.characters&&typeof old.characters==='object')for(const[id,value]of Object.entries(old.characters as Record<string,Record<string,unknown>>)){const seed=base.characters[id]??genericCharacter(id,value,base);base.characters[id]={...seed,...value,deathDate:(value.deathDate as string|null|undefined)??seed.deathDate,childIds:(value.childIds as string[]|undefined)??seed.childIds,betrothedIds:(value.betrothedIds as string[]|undefined)??seed.betrothedIds,attributes:{...seed.attributes,...((value.attributes as object|undefined)??{})},personality:{...seed.personality,...((value.personality as object|undefined)??{})},health:Number(value.health??seed.health),fertility:Number(value.fertility??seed.fertility),stress:Number(value.stress??seed.stress),shortTermGoal:(value.shortTermGoal as string|null|undefined)??seed.shortTermGoal,ambition:(value.ambition as string|null|undefined)??seed.ambition,memoryIds:(value.memoryIds as string[]|undefined)??seed.memoryIds} as GameState['characters'][string];}
+  if(old.titles&&typeof old.titles==='object')for(const[id,value]of Object.entries(old.titles as Record<string,Record<string,unknown>>)){const seed=base.titles[id]??{id,nameKey:id,rank:'county' as const,holderId:null,deJureLiegeId:null,deFactoLiegeId:null,countyId:null,successionLaw:'partition' as const};base.titles[id]={...seed,...value,successionLaw:(value.successionLaw as 'partition'|'primogeniture'|undefined)??seed.successionLaw};}
+  if(old.counties&&typeof old.counties==='object')for(const[id,value]of Object.entries(old.counties as Record<string,Record<string,unknown>>)){if(!base.counties[id])continue;base.counties[id]={...base.counties[id],...value,terrain:(value.terrain as any)??base.counties[id].terrain,development:Number(value.development??base.counties[id].development),baseTax:Number(value.baseTax??base.counties[id].baseTax),baseLevies:Number(value.baseLevies??base.counties[id].baseLevies),buildingIds:(value.buildingIds as string[]|undefined)??base.counties[id].buildingIds};}
+  if(old.locations&&typeof old.locations==='object')for(const[id,value]of Object.entries(old.locations as Record<string,any>))base.locations[id]={...base.locations[id],...value};
+  const simpleRecords=['knowledge','relationshipModifiers','promises','supportCommitments','communications','travels','projects','wars','signals','eventLog'] as const;for(const key of simpleRecords)if(old[key]!==undefined)(base as any)[key]=old[key];
+  if(old.factions&&typeof old.factions==='object')for(const[id,value]of Object.entries(old.factions as Record<string,any>)){const seed=base.factions[id]??base.factions.faction_liberty;base.factions[id]={...seed,...value,kind:value.kind??seed.kind,deadline:value.deadline??seed.deadline,createdAt:value.createdAt??'1066-09-01'};}
+  if(old.activities&&typeof old.activities==='object'){for(const[id,value]of Object.entries(old.activities as Record<string,any>)){const targetId=id==='feast_nantes'?'activity_feast_nantes_1066':id;const seed=base.activities[targetId]??{id:targetId,type:'feast',hostId:value.hostId,participantIds:[],invitedIds:[],locationId:value.locationId,phase:'planned',startedAt:base.currentDate,endsAt:null,status:'planned',intent:null,memoryIds:[]};base.activities[targetId]={...seed,...value,id:targetId,invitedIds:value.invitedIds??seed.invitedIds,endsAt:value.endsAt??seed.endsAt,intent:value.intent??seed.intent};}}
+  if(old.resources&&typeof old.resources==='object')base.resources={...base.resources,...old.resources,piety:Number(old.resources.piety??base.resources.piety)};
+  const playerWallet=base.characterResources[base.playerCharacterId];if(playerWallet){playerWallet.gold=base.resources.gold;playerWallet.prestige=base.resources.prestige;playerWallet.piety=base.resources.piety;playerWallet.levies=base.resources.levies;}
+  const scenario=old.scenario as Record<string,any>|undefined;const situation=base.situations.situation_liberty_1066;const result=String(scenario?.result??'pending');situation.deadline=String(scenario?.deadline??situation.deadline);situation.metrics.currentSupport=supportCount(base);situation.metrics.factionPower=base.factions.faction_liberty?.power??67;situation.phase=String(scenario?.phase??'organizing');if(result==='success'){situation.status='resolved';situation.resolution='coalition_split';}else if(result==='conceded'){situation.status='resolved';situation.resolution='authority_conceded';}else if(result==='civil_war'){situation.status='war';situation.resolution='war';}
+  base.contentPackIds=['ck.core','ck.sandbox.brittany1066'];base.contentPackVersions={'ck.core':'2.0.0','ck.sandbox.brittany1066':'2.0.0'};
+  const parsed=GameStateSchema.safeParse(base);return parsed.success?parsed.data:null;
 }
+function addDaysCompat(date:string,days:number){const value=new Date(`${date}T00:00:00Z`);value.setUTCDate(value.getUTCDate()+days);return value.toISOString().slice(0,10);}
 
-function stableStringify(value: unknown): string {
-  return JSON.stringify(sortForHash(value));
-}
+export function createPublicProjection(state:GameState):PublicProjection{const player=state.characters[state.playerCharacterId];const location=state.locations[player.locationId];const faction=state.factions.faction_liberty;const situation=libertySituation(state);return PublicProjectionSchema.parse({schemaVersion:2,saveId:state.saveId,revision:state.revision,date:state.currentDate,segment:state.clock.segment,player:{id:player.id,name:t(player.nameKey),location:t(location?.nameKey??player.locationId),primaryTitle:primaryTitle(state,player.id)?t(primaryTitle(state,player.id)!.nameKey):null,titles:player.titleIds.map(id=>t(state.titles[id]?.nameKey??id))},resources:state.resources,politics:{activeSituations:Object.values(state.situations).filter(item=>item.status==='active').length,libertyStatus:situation?.status??'none',factionPower:faction?.power??0,support:supportCount(state),ultimatumDays:deadlineDays(state),activeWars:Object.values(state.wars).filter(item=>!item.endedAt).length},pending:{events:Object.values(state.pendingEvents).filter(item=>item.status==='pending').length,letters:Object.values(state.communications).filter(item=>item.status==='in_transit').length,interactions:Object.values(state.interactions).filter(item=>['negotiating','awaiting_player','awaiting_target','countered'].includes(item.status)).length,promises:Object.values(state.promises).filter(item=>item.status==='active').length,notifications:Object.values(state.notifications).filter(item=>!item.read).length,worldSignals:state.signals.filter(item=>!item.consumed).length}});}
 
-export function hashGameState(state: GameState): string {
-  return hashText(stableStringify(state));
-}
+export function createEnvelope(state:GameState,options:{chronicle?:ChronicleEntry[];checkpoints?:SaveEnvelope['checkpoints'];branchAnchor?:BranchAnchor|null}={}):SaveEnvelope{return SaveEnvelopeSchema.parse({format:'ck-lord-rpg-save',formatVersion:3,state,chronicle:normalizeChronicle(options.chronicle??[]),checkpoints:(options.checkpoints??[]).slice(-10),eventHash:hashEventLog(state),stateHash:hashGameState(state),branchAnchor:options.branchAnchor??null});}
+function validateEnvelope(envelope:SaveEnvelope){return envelope.eventHash===hashEventLog(envelope.state)&&envelope.stateHash===hashGameState(envelope.state)&&validStateSemantics(envelope.state)&&envelope.checkpoints.every(item=>!item.compatible||Boolean(item.state&&item.stateHash===hashGameState(item.state)));}
 
-function hashEventLog(state: GameState): string {
-  return hashText(stableStringify(state.eventLog.map(event => [event.id, event.revision, event.type, event.payload])));
-}
+function migrateEnvelope(raw:unknown):SaveEnvelope|null{const parsed=LegacyEnvelopeSchema.safeParse(raw);if(!parsed.success)return null;const legacy=parsed.data;if(legacy.formatVersion===2&&legacy.stateHash!==hashText(stableStringify(legacy.state)))return null;if(legacy.formatVersion===2&&legacy.eventHash!==hashRawEvents(legacy.state,true))return null;if(legacy.formatVersion===1&&legacy.eventHash!==hashRawEvents(legacy.state,false))return null;const state=migrateGameState(legacy.state);if(!state)return null;const chronicle=normalizeChronicle(legacy.chronicle);const checkpoints:SaveCheckpoint[]=legacy.checkpoints.map((rawCheckpoint,index)=>{const checkpoint=LegacyCheckpointSchema.safeParse(rawCheckpoint);if(!checkpoint.success)return{id:`incompatible_${index}`,name:`无法迁移的检查点 ${index+1}`,createdAt:new Date(0).toISOString(),important:false,state:null,chronicle:[],stateHash:'',compatible:false,migrationError:'检查点结构无效'};const migrated=migrateGameState(checkpoint.data.state);if(!migrated)return{id:checkpoint.data.id,name:checkpoint.data.name,createdAt:checkpoint.data.createdAt,important:checkpoint.data.important,state:null,chronicle:normalizeChronicle(checkpoint.data.chronicle),stateHash:'',compatible:false,migrationError:'旧状态无法升级到 schemaVersion 2'};return{id:checkpoint.data.id,name:checkpoint.data.name,createdAt:checkpoint.data.createdAt,important:checkpoint.data.important,state:migrated,chronicle:normalizeChronicle(checkpoint.data.chronicle),stateHash:hashGameState(migrated),compatible:true,migrationError:null};});const anchor=BranchAnchorSchema.safeParse(legacy.branchAnchor);return createEnvelope(state,{chronicle,checkpoints,branchAnchor:anchor.success?anchor.data:null});}
 
-function legacyEventHash(state: GameState): string {
-  return hashText(JSON.stringify(state.eventLog.map(event => [event.id, event.revision, event.type, event.payload])));
-}
+function persistMigrated(envelope:SaveEnvelope){memoryEnvelope=envelope;if(hasTavernVariables())updateVariablesWith(vars=>({...vars,[variableKey]:envelope,[publicVariableKey]:createPublicProjection(envelope.state)}),{type:'chat'});}
+export function loadSave():SaveEnvelope|null{const raw=hasTavernVariables()?(getVariables({type:'chat'}) as Record<string,unknown>|null)?.[variableKey]:memoryEnvelope;const parsed=SaveEnvelopeSchema.safeParse(raw);if(parsed.success&&validateEnvelope(parsed.data))return parsed.data;const migrated=migrateEnvelope(raw);if(migrated)persistMigrated(migrated);return migrated;}
+export function saveState(state:GameState,options:{chronicle?:ChronicleEntry[];checkpoints?:SaveEnvelope['checkpoints'];branchAnchor?:BranchAnchor|null}={}):SaveEnvelope{const current=loadSave();const envelope=createEnvelope(state,{chronicle:options.chronicle??current?.chronicle??[],checkpoints:options.checkpoints??current?.checkpoints??[],branchAnchor:options.branchAnchor===undefined?current?.branchAnchor??null:options.branchAnchor});memoryEnvelope=envelope;if(hasTavernVariables())updateVariablesWith(vars=>({...vars,[variableKey]:envelope,[publicVariableKey]:createPublicProjection(state)}),{type:'chat'});return envelope;}
 
-function validStateSemantics(state: GameState): boolean {
-  const eventIds = new Set<string>();
-  return state.eventLog.every(event => {
-    if (event.revision > state.revision || eventIds.has(event.id)) return false;
-    eventIds.add(event.id);
-    return true;
-  });
-}
-
-function hasTavernVariables(): boolean {
-  return typeof getVariables === 'function' && typeof updateVariablesWith === 'function';
-}
-
-function cloneState(state: GameState): GameState {
-  return GameStateSchema.parse(JSON.parse(JSON.stringify(state)));
-}
-
-function normalizeChronicle(chronicle: ChronicleEntry[]): ChronicleEntry[] {
-  return ChronicleSchema.parse(chronicle.slice(-500));
-}
-
-export function createPublicProjection(state: GameState): PublicProjection {
-  const player = state.characters[state.playerCharacterId];
-  const location = state.locations[player.locationId];
-  const faction = state.factions.faction_liberty;
-  const activity = state.activities[state.scenario.feastId];
-  return PublicProjectionSchema.parse({
-    schemaVersion: 1,
-    saveId: state.saveId,
-    revision: state.revision,
-    date: state.currentDate,
-    player: {
-      id: player.id,
-      name: t(player.nameKey),
-      location: t(location?.nameKey ?? player.locationId),
-      titles: player.titleIds.map(id => t(state.titles[id]?.nameKey ?? id)),
-    },
-    resources: state.resources,
-    politics: {
-      support: supportCount(state),
-      requiredSupport: state.scenario.requiredSupport,
-      factionStatus: faction.status,
-      factionPower: faction.power,
-      ultimatumDays: deadlineDays(state),
-    },
-    activity: activity ? { id: activity.id, phase: activity.phase, participantIds: activity.participantIds } : null,
-    pending: {
-      letters: Object.values(state.communications).filter(item => item.status === 'in_transit').length,
-      promises: Object.values(state.promises).filter(item => item.status === 'active').length,
-      worldSignals: state.signals.filter(item => !item.consumed).length,
-    },
-  });
-}
-
-export function createEnvelope(
-  state: GameState,
-  options: {
-    chronicle?: ChronicleEntry[];
-    checkpoints?: SaveEnvelope['checkpoints'];
-    branchAnchor?: BranchAnchor | null;
-  } = {},
-): SaveEnvelope {
-  return SaveEnvelopeSchema.parse({
-    format: 'ck-lord-rpg-save',
-    formatVersion: 2,
-    state,
-    chronicle: normalizeChronicle(options.chronicle ?? []),
-    checkpoints: (options.checkpoints ?? []).slice(-10),
-    eventHash: hashEventLog(state),
-    stateHash: hashGameState(state),
-    branchAnchor: options.branchAnchor ?? null,
-  });
-}
-
-function validateEnvelope(envelope: SaveEnvelope): boolean {
-  return envelope.eventHash === hashEventLog(envelope.state)
-    && envelope.stateHash === hashGameState(envelope.state)
-    && validStateSemantics(envelope.state)
-    && envelope.checkpoints.every(checkpoint => checkpoint.stateHash === hashGameState(checkpoint.state));
-}
-
-function migrateLegacy(raw: unknown): SaveEnvelope | null {
-  const parsed = LegacySaveEnvelopeSchema.safeParse(raw);
-  if (!parsed.success || parsed.data.eventHash !== legacyEventHash(parsed.data.state) || !validStateSemantics(parsed.data.state)) return null;
-  const chronicle: ChronicleEntry[] = [];
-  const checkpoints = parsed.data.checkpoints.map(checkpoint => CheckpointSchema.parse({
-    ...checkpoint,
-    chronicle,
-    stateHash: hashGameState(checkpoint.state),
-  }));
-  return createEnvelope(parsed.data.state, { chronicle, checkpoints });
-}
-
-export function loadSave(): SaveEnvelope | null {
-  const raw = hasTavernVariables() ? (getVariables({ type: 'chat' }) as Record<string, unknown> | null)?.[variableKey] : memoryEnvelope;
-  const parsed = SaveEnvelopeSchema.safeParse(raw);
-  if (parsed.success && validateEnvelope(parsed.data)) return parsed.data;
-  const migrated = migrateLegacy(raw);
-  if (migrated) {
-    memoryEnvelope = migrated;
-    if (hasTavernVariables()) {
-      updateVariablesWith(variables => ({ ...variables, [variableKey]: migrated, [publicVariableKey]: createPublicProjection(migrated.state) }), { type: 'chat' });
-    }
-  }
-  return migrated;
-}
-
-export function saveState(
-  state: GameState,
-  options: {
-    chronicle?: ChronicleEntry[];
-    checkpoints?: SaveEnvelope['checkpoints'];
-    branchAnchor?: BranchAnchor | null;
-  } = {},
-): SaveEnvelope {
-  const current = loadSave();
-  const envelope = createEnvelope(state, {
-    chronicle: options.chronicle ?? current?.chronicle ?? [],
-    checkpoints: options.checkpoints ?? current?.checkpoints ?? [],
-    branchAnchor: options.branchAnchor === undefined ? current?.branchAnchor ?? null : options.branchAnchor,
-  });
-  memoryEnvelope = envelope;
-  if (hasTavernVariables()) {
-    const publicProjection = createPublicProjection(state);
-    updateVariablesWith(variables => ({ ...variables, [variableKey]: envelope, [publicVariableKey]: publicProjection }), { type: 'chat' });
-  }
-  return envelope;
-}
-
-function historySnapshot(checkpoint: SaveCheckpoint) {
-  return HistorySnapshotSchema.parse({
-    saveId: checkpoint.state.saveId,
-    checkpointId: checkpoint.id,
-    revision: checkpoint.state.revision,
-    state: checkpoint.state,
-    chronicle: checkpoint.chronicle,
-    stateHash: checkpoint.stateHash,
-  });
-}
-
-function latestAssistantMessageId(): number | null {
-  if (typeof getChatMessages !== 'function') return null;
-  const messages = getChatMessages(-1, { role: 'assistant' });
-  return messages[0]?.message_id ?? null;
-}
-
-export async function addCheckpoint(state: GameState, chronicle: ChronicleEntry[], name: string, important = false): Promise<SaveEnvelope> {
-  const current = loadSave() ?? createEnvelope(state, { chronicle });
-  const checkpoint = CheckpointSchema.parse({
-    id: `checkpoint_${state.revision}_${Date.now().toString(36)}`,
-    name: name.trim().slice(0, 40) || `修订 ${state.revision}`,
-    createdAt: new Date().toISOString(),
-    important,
-    state: cloneState(state),
-    chronicle: normalizeChronicle(chronicle),
-    stateHash: hashGameState(state),
-  });
-  let envelope = saveState(state, { chronicle, checkpoints: [...current.checkpoints, checkpoint].slice(-10) });
-  if (important && typeof createChatMessages === 'function') {
-    await createChatMessages([{
-      role: 'assistant',
-      message: `【CK 领主 RPG 检查点】${checkpoint.name}\n日期：${state.currentDate} · 修订：${state.revision}`,
-      data: { ckLordRpg: { kind: 'manual', snapshot: historySnapshot(checkpoint) } },
-    }], { refresh: 'none' });
-    const messageId = latestAssistantMessageId();
-    if (messageId !== null) {
-      envelope = saveState(state, {
-        chronicle,
-        checkpoints: envelope.checkpoints,
-        branchAnchor: { messageId, kind: 'manual', checkpointId: checkpoint.id, revision: state.revision },
-      });
-    }
-  }
-  return envelope;
-}
-
-export function restoreCheckpoint(id: string): { state: GameState; chronicle: ChronicleEntry[] } | null {
-  const envelope = loadSave();
-  const checkpoint = envelope?.checkpoints.find(item => item.id === id);
-  if (!checkpoint || checkpoint.stateHash !== hashGameState(checkpoint.state)) return null;
-  const state = cloneState(checkpoint.state);
-  const chronicle = normalizeChronicle(checkpoint.chronicle);
-  saveState(state, { chronicle, checkpoints: envelope?.checkpoints, branchAnchor: null });
-  return { state, chronicle };
-}
-
-export async function writeNarrativeExchange(state: GameState, chronicle: ChronicleEntry[], playerText: string, narration: string): Promise<SaveEnvelope> {
-  if (typeof createChatMessages !== 'function') return saveState(state, { chronicle });
-  const checkpoint = CheckpointSchema.parse({
-    id: `scene_${state.revision}_${Date.now().toString(36)}`,
-    name: `正式场景 · ${state.currentDate}`,
-    createdAt: new Date().toISOString(),
-    important: false,
-    state: cloneState(state),
-    chronicle: normalizeChronicle(chronicle),
-    stateHash: hashGameState(state),
-  });
-  await createChatMessages([
-    { role: 'user', message: playerText, data: { ckLordRpg: { kind: 'scene_input', saveId: state.saveId, revision: state.revision } } },
-    { role: 'assistant', message: narration, data: { ckLordRpg: { kind: 'scene', snapshot: historySnapshot(checkpoint) } } },
-  ], { refresh: 'none' });
-  const messageId = latestAssistantMessageId();
-  return saveState(state, {
-    chronicle,
-    branchAnchor: messageId === null ? undefined : { messageId, kind: 'scene', checkpointId: checkpoint.id, revision: state.revision },
-  });
-}
-
-export function findLatestHistorySnapshot(): { messageId: number; kind: 'manual' | 'scene'; snapshot: z.infer<typeof HistorySnapshotSchema> } | null {
-  if (typeof getChatMessages !== 'function' || typeof getLastMessageId !== 'function') return null;
-  const lastMessageId = getLastMessageId();
-  if (lastMessageId < 0) return null;
-  const messages = getChatMessages(`0-${lastMessageId}`, { role: 'assistant' });
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const raw = messages[index].data?.ckLordRpg;
-    if (!raw || (raw.kind !== 'manual' && raw.kind !== 'scene')) continue;
-    const parsed = HistorySnapshotSchema.safeParse(raw.snapshot);
-    if (parsed.success && parsed.data.stateHash === hashGameState(parsed.data.state)) {
-      return { messageId: messages[index].message_id, kind: raw.kind, snapshot: parsed.data };
-    }
-  }
-  return null;
-}
-
-export function restoreLatestHistoryBranch(): SaveEnvelope | null {
-  const current = loadSave();
-  const history = findLatestHistorySnapshot();
-  if (!current || !current.branchAnchor || !history || current.branchAnchor.messageId === history.messageId) return current;
-  if (history.snapshot.saveId !== current.state.saveId) return current;
-  return saveState(cloneState(history.snapshot.state), {
-    chronicle: history.snapshot.chronicle,
-    checkpoints: current.checkpoints,
-    branchAnchor: {
-      messageId: history.messageId,
-      kind: history.kind,
-      checkpointId: history.snapshot.checkpointId,
-      revision: history.snapshot.revision,
-    },
-  });
-}
-
-export function exportSave(state: GameState, chronicle: ChronicleEntry[] = []): string {
-  return JSON.stringify(saveState(state, { chronicle }), null, 2);
-}
-
-export function importSave(source: string): { ok: true; state: GameState; chronicle: ChronicleEntry[] } | { ok: false; error: string } {
-  try {
-    const raw: unknown = JSON.parse(source);
-    const parsed = SaveEnvelopeSchema.safeParse(raw);
-    const envelope = parsed.success ? parsed.data : migrateLegacy(raw);
-    if (!envelope || !validateEnvelope(envelope)) return { ok: false, error: '存档结构、完整状态哈希或事件链校验失败。' };
-    saveState(envelope.state, { chronicle: envelope.chronicle, checkpoints: envelope.checkpoints, branchAnchor: envelope.branchAnchor });
-    return { ok: true, state: envelope.state, chronicle: envelope.chronicle };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
-  }
-}
-
-export function clearMemorySaveForTests(): void {
-  memoryEnvelope = null;
-}
+function historySnapshot(checkpoint:SaveCheckpoint){if(!checkpoint.state)throw new Error('不兼容检查点不能写入楼层');return HistorySnapshotSchema.parse({saveId:checkpoint.state.saveId,checkpointId:checkpoint.id,revision:checkpoint.state.revision,state:checkpoint.state,chronicle:checkpoint.chronicle,stateHash:checkpoint.stateHash});}
+function latestAssistantMessageId(){if(typeof getChatMessages!=='function')return null;return getChatMessages(-1,{role:'assistant'})[0]?.message_id??null;}
+export async function addCheckpoint(state:GameState,chronicle:ChronicleEntry[],name:string,important=false):Promise<SaveEnvelope>{const current=loadSave()??createEnvelope(state,{chronicle});const checkpoint=CheckpointSchema.parse({id:`checkpoint_${state.revision}_${Date.now().toString(36)}`,name:name.trim().slice(0,40)||`修订 ${state.revision}`,createdAt:new Date().toISOString(),important,state:cloneState(state),chronicle:normalizeChronicle(chronicle),stateHash:hashGameState(state),compatible:true,migrationError:null});let envelope=saveState(state,{chronicle,checkpoints:[...current.checkpoints,checkpoint].slice(-10)});if(important&&typeof createChatMessages==='function'){await createChatMessages([{role:'assistant',message:`【CK 领主 RPG 检查点】${checkpoint.name}\n日期：${state.currentDate} · 修订：${state.revision}`,data:{ckLordRpg:{kind:'manual',snapshot:historySnapshot(checkpoint)}}}],{refresh:'none'});const messageId=latestAssistantMessageId();if(messageId!==null)envelope=saveState(state,{chronicle,checkpoints:envelope.checkpoints,branchAnchor:{messageId,kind:'manual',checkpointId:checkpoint.id,revision:state.revision}});}return envelope;}
+export function restoreCheckpoint(id:string):{state:GameState;chronicle:ChronicleEntry[]}|null{const envelope=loadSave();const checkpoint=envelope?.checkpoints.find(item=>item.id===id);if(!checkpoint?.compatible||!checkpoint.state||checkpoint.stateHash!==hashGameState(checkpoint.state))return null;const state=cloneState(checkpoint.state),chronicle=normalizeChronicle(checkpoint.chronicle);saveState(state,{chronicle,checkpoints:envelope?.checkpoints,branchAnchor:null});return{state,chronicle};}
+export async function writeNarrativeExchange(state:GameState,chronicle:ChronicleEntry[],playerText:string,narration:string):Promise<SaveEnvelope>{if(typeof createChatMessages!=='function')return saveState(state,{chronicle});const checkpoint=CheckpointSchema.parse({id:`scene_${state.revision}_${Date.now().toString(36)}`,name:`正式场景 · ${state.currentDate}`,createdAt:new Date().toISOString(),important:false,state:cloneState(state),chronicle:normalizeChronicle(chronicle),stateHash:hashGameState(state),compatible:true,migrationError:null});await createChatMessages([{role:'user',message:playerText,data:{ckLordRpg:{kind:'scene_input',saveId:state.saveId,revision:state.revision}}},{role:'assistant',message:narration,data:{ckLordRpg:{kind:'scene',snapshot:historySnapshot(checkpoint)}}}],{refresh:'none'});const messageId=latestAssistantMessageId();return saveState(state,{chronicle,branchAnchor:messageId===null?undefined:{messageId,kind:'scene',checkpointId:checkpoint.id,revision:state.revision}});}
+export function findLatestHistorySnapshot():{messageId:number;kind:'manual'|'scene';snapshot:z.infer<typeof HistorySnapshotSchema>}|null{if(typeof getChatMessages!=='function'||typeof getLastMessageId!=='function')return null;const last=getLastMessageId();if(last<0)return null;const messages=getChatMessages(`0-${last}`,{role:'assistant'});for(let i=messages.length-1;i>=0;i--){const raw=messages[i].data?.ckLordRpg;if(!raw||(raw.kind!=='manual'&&raw.kind!=='scene'))continue;const parsed=HistorySnapshotSchema.safeParse(raw.snapshot);if(parsed.success&&parsed.data.stateHash===hashGameState(parsed.data.state))return{messageId:messages[i].message_id,kind:raw.kind,snapshot:parsed.data};}return null;}
+export function restoreLatestHistoryBranch():SaveEnvelope|null{const current=loadSave(),history=findLatestHistorySnapshot();if(!current||!current.branchAnchor||!history||current.branchAnchor.messageId===history.messageId||history.snapshot.saveId!==current.state.saveId)return current;return saveState(cloneState(history.snapshot.state),{chronicle:history.snapshot.chronicle,checkpoints:current.checkpoints,branchAnchor:{messageId:history.messageId,kind:history.kind,checkpointId:history.snapshot.checkpointId,revision:history.snapshot.revision}});}
+export function exportSave(state:GameState,chronicle:ChronicleEntry[]=[]){return JSON.stringify(saveState(state,{chronicle}),null,2);}
+export function importSave(source:string):{ok:true;state:GameState;chronicle:ChronicleEntry[]}|{ok:false;error:string}{try{const raw:unknown=JSON.parse(source);const parsed=SaveEnvelopeSchema.safeParse(raw);const envelope=parsed.success?parsed.data:migrateEnvelope(raw);if(!envelope||!validateEnvelope(envelope))return{ok:false,error:'存档结构、完整状态哈希或事件链校验失败。'};saveState(envelope.state,{chronicle:envelope.chronicle,checkpoints:envelope.checkpoints,branchAnchor:envelope.branchAnchor});return{ok:true,state:envelope.state,chronicle:envelope.chronicle};}catch(error){return{ok:false,error:error instanceof Error?error.message:String(error)};}}
+export function clearMemorySaveForTests(){memoryEnvelope=null;}

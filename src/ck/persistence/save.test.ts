@@ -20,6 +20,9 @@ function advance(state: ReturnType<typeof createInitialState>, days: number) {
   return result.state;
 }
 
+function stable(value:unknown):unknown{if(Array.isArray(value))return value.map(stable);if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value as Record<string,unknown>).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>[key,stable(item)]));return value;}
+function hashText(text:string){let hash=2166136261;for(let index=0;index<text.length;index++){hash^=text.charCodeAt(index);hash=Math.imul(hash,16777619);}return(hash>>>0).toString(16).padStart(8,'0');}
+
 describe('CK 权威存档与酒馆历史桥接', () => {
   let chatVariables: Record<string, unknown>;
   let messages: Array<{ message_id: number; role: 'user' | 'assistant' | 'system'; message: string; data: Record<string, unknown> }>;
@@ -91,5 +94,12 @@ describe('CK 权威存档与酒馆历史桥接', () => {
     const restored = restoreLatestHistoryBranch();
     expect(restored?.state.currentDate).toBe('1066-09-15');
     expect(restored?.branchAnchor?.messageId).toBe(0);
+  });
+
+  it('将 v2 线性序章当前档与检查点逐项迁移为 v3 沙盒',()=>{
+    const oldState:any=JSON.parse(JSON.stringify(createInitialState()));oldState.schemaVersion=1;delete oldState.clock;oldState.currentDate='1066-09-21';oldState.scenario={deadline:'1066-09-29',phase:'feast',result:'pending',activeTravelId:null};
+    const compact=(oldState.eventLog as Array<Record<string,unknown>>).map(event=>[event.id,event.revision,event.type,event.payload]);
+    chatVariables.ck_lord_rpg={format:'ck-lord-rpg-save',formatVersion:2,state:oldState,chronicle:[],checkpoints:[{id:'old_ok',name:'旧宴会档',createdAt:'2026-01-01T00:00:00.000Z',important:true,state:oldState,chronicle:[],stateHash:'legacy'},{id:'old_bad',name:'损坏检查点',createdAt:'2026-01-01T00:00:00.000Z',important:false,state:{bad:true},chronicle:[],stateHash:'bad'}],eventHash:hashText(JSON.stringify(stable(compact))),stateHash:hashText(JSON.stringify(stable(oldState))),branchAnchor:null};
+    const migrated=loadSave();expect(migrated?.formatVersion).toBe(3);expect(migrated?.state.schemaVersion).toBe(2);expect(migrated?.state.currentDate).toBe('1066-09-21');expect(migrated?.state.situations.situation_liberty_1066.phase).toBe('feast');expect(migrated?.checkpoints.find(item=>item.id==='old_ok')?.compatible).toBe(true);expect(migrated?.checkpoints.find(item=>item.id==='old_bad')?.compatible).toBe(false);expect((chatVariables.ck_lord_rpg as {formatVersion:number}).formatVersion).toBe(3);
   });
 });

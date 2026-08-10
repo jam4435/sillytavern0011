@@ -4,7 +4,11 @@ import { z } from 'zod';
 export const ContentEntitySchema = z
   .object({
     id: z.string().regex(/^[a-z0-9_.-]+$/i),
-    kind: z.enum(['event', 'action', 'character', 'county', 'location', 'activity', 'localization']),
+    kind: z.enum([
+      'event', 'event_chain', 'action', 'interaction', 'character', 'house', 'dynasty',
+      'title', 'county', 'location', 'activity', 'situation', 'building', 'law',
+      'external_realm', 'localization',
+    ]),
     operation: z.enum(['add', 'patch', 'replace']).default('add'),
     data: z.record(z.string(), z.unknown()),
   })
@@ -32,28 +36,32 @@ export const corePack: ContentPack = ContentPackSchema.parse({
   format: 'ckpack',
   formatVersion: 1,
   id: 'ck.core',
-  version: '1.0.0',
+  version: '2.0.0',
   name: 'CK 领主 RPG 核心规则',
   namespace: 'ck',
   dependencies: [],
   entities: [],
 });
 
-export const prologuePack: ContentPack = ContentPackSchema.parse({
+export const sandboxPack: ContentPack = ContentPackSchema.parse({
   format: 'ckpack',
   formatVersion: 1,
-  id: 'ck.prologue.brittany1066',
-  version: '1.0.0',
-  name: '裂冠前夜：布列塔尼 1066',
+  id: 'ck.sandbox.brittany1066',
+  version: '2.0.0',
+  name: '布列塔尼—诺曼边区：1066 历史沙盒',
   namespace: 'brittany1066',
-  dependencies: [{ id: 'ck.core', version: '1.0.0' }],
+  dependencies: [{ id: 'ck.core', version: '2.0.0' }],
   loadAfter: ['ck.core'],
   entities: [
-    { id: 'event.council_warning', kind: 'event', data: { trigger: { date: '1066-09-15' }, effects: [{ type: 'scenario.phase', value: 'planning' }] } },
+    { id: 'situation.liberty_crisis_1066', kind: 'situation', data: { deadline: '1066-09-29', resolutions: ['support', 'marriage', 'contract', 'arrest', 'fear', 'alliance', 'concede', 'war'] } },
+    { id: 'activity.feast_nantes_1066', kind: 'activity', data: { type: 'feast', hostId: 'char_hoel', locationId: 'loc_nantes_castle', startedAt: '1066-09-20' } },
     { id: 'event.norman_landing', kind: 'event', data: { trigger: { date: '1066-09-28' }, effects: [{ type: 'world.signal', kind: 'norman_landing' }] } },
-    { id: 'event.ultimatum', kind: 'event', data: { trigger: { date: '1066-09-29' }, effects: [{ type: 'scenario.resolve_deadline' }] } },
+    { id: 'event.ultimatum', kind: 'event_chain', data: { trigger: { date: '1066-09-29', situation: 'situation.liberty_crisis_1066' }, effects: [{ type: 'situation.evaluate' }] } },
   ],
 });
+
+/** @deprecated 兼容既有导入；新代码应使用 sandboxPack。 */
+export const prologuePack = sandboxPack;
 
 export function parseContentPack(source: string): { ok: true; pack: ContentPack } | { ok: false; errors: string[] } {
   try {

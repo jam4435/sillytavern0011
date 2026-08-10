@@ -83,11 +83,14 @@ export function compareWorldTime(left: WorldTimeTuple, right: WorldTimeTuple): n
 export function findEarliestRunningEventEnd(statData: Record<string, unknown>): WorldTimeTuple | null {
   const eventSystem = isRecord(statData.事件系统) ? statData.事件系统 : null;
   const runningEvents = eventSystem && isRecord(eventSystem.进行中事件) ? eventSystem.进行中事件 : null;
-  if (!runningEvents) return null;
+  const participationEvents = isRecord(statData.参与事件) ? statData.参与事件 : null;
+  if (!runningEvents || !participationEvents) return null;
+  const participationNames = new Set(Object.keys(participationEvents).filter(name => !name.startsWith('$')));
+  if (participationNames.size === 0) return null;
 
   let earliest: WorldTimeTuple | null = null;
   for (const [eventName, rawEnd] of Object.entries(runningEvents)) {
-    if (eventName.startsWith('$')) continue;
+    if (!participationNames.has(eventName)) continue;
     const end = isRecord(rawEnd) ? validateWorldTimeSource(rawEnd, true) : null;
     if (!end) continue;
     if (!earliest || compareWorldTime(end, earliest) < 0) earliest = end;
@@ -165,11 +168,7 @@ export function validateWorldTimePatch({
       );
     }
     if (change.action === 'delete') {
-      return createFailure(
-        'delete-required-field',
-        `世界时间必需字段“${field}”不允许删除。`,
-        baseContext,
-      );
+      return createFailure('delete-required-field', `世界时间必需字段“${field}”不允许删除。`, baseContext);
     }
   }
 

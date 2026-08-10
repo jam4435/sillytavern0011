@@ -1458,7 +1458,7 @@ function createWorldTimeRepairPrompt({
 }): string {
   const participationContext = {
     参与事件: statData.参与事件 ?? {},
-    进行中事件: isRecord(statData.事件系统) ? statData.事件系统.进行中事件 ?? {} : {},
+    进行中事件: isRecord(statData.事件系统) ? (statData.事件系统.进行中事件 ?? {}) : {},
   };
   return `你是世界时间语义纠错器。原变量回复的时间声明未通过确定性校验。
 
@@ -1586,9 +1586,7 @@ export async function validateOrRepairWorldTimeDeclarations({
       }
       const forbiddenChanges = repairedState.declaredChanges.filter(change => !isWorldTimePath(change.path));
       if (forbiddenChanges.length > 0) {
-        throw new Error(
-          `纠错返回包含非时间路径：${forbiddenChanges.map(change => change.displayPath).join('、')}`,
-        );
+        throw new Error(`纠错返回包含非时间路径：${forbiddenChanges.map(change => change.displayPath).join('、')}`);
       }
       const pathValidation = validateDeclaredActionPaths(repairedState.declaredChanges);
       if (pathValidation.rejected.length > 0) {
@@ -2006,7 +2004,9 @@ export async function executeExtraVariableUpdate({
       throw new Error(`本回合变量动作块无法完整解析：${declaredState.parseErrors.join('；')}`);
     }
     if (declaredState.omittedDeclaredCount > 0) {
-      throw new Error(`本回合变量声明超过可安全校验的上限，仍有 ${declaredState.omittedDeclaredCount} 条未纳入校验，已停止写入。`);
+      throw new Error(
+        `本回合变量声明超过可安全校验的上限，仍有 ${declaredState.omittedDeclaredCount} 条未纳入校验，已停止写入。`,
+      );
     }
     const validation = await runPhase('validate-variable-actions', () =>
       validateDeclaredActionPaths(declaredState.declaredChanges),
@@ -2028,7 +2028,7 @@ export async function executeExtraVariableUpdate({
       throw new Error(
         `本回合所有变量动作均未通过独立校验：${validation.rejected
           .map(item => `${item.path}（${item.reason}）`)
-        .join('；')}`,
+          .join('；')}`,
       );
     }
     const timeValidation = await runPhase('validate-or-repair-world-time', () =>
@@ -2045,11 +2045,12 @@ export async function executeExtraVariableUpdate({
     const diagnosticRawResponse = formatRepairAttempted
       ? `【原始返回（JSON 格式错误）】\n${rawResponse}\n\n【格式修复返回】\n${effectiveRawResponse}`
       : rawResponse;
-    const rejectionSummary = validation.rejected.length > 0
-      ? `已隔离 ${validation.rejected.length} 条非法动作：${validation.rejected
-          .map(item => `${item.path}（${item.reason}）`)
-          .join('；')}`
-      : '';
+    const rejectionSummary =
+      validation.rejected.length > 0
+        ? `已隔离 ${validation.rejected.length} 条非法动作：${validation.rejected
+            .map(item => `${item.path}（${item.reason}）`)
+            .join('；')}`
+        : '';
     variableTraceLogger.log('[extraVariableUpdate] 变量块提取完成', {
       assistantMessageId,
       actionBlockCount,
@@ -2110,10 +2111,9 @@ export async function executeExtraVariableUpdate({
       appendReadbackText: appendVerification.readbackText,
       appendVerification: appendVerification.verification,
       applyStatus: 'waiting-write-done',
-      applyVerification: [
-        '变量块已追加，正在等待匹配的 ERA 原始写入完成信号。',
-        rejectionSummary,
-      ].filter(Boolean).join('\n'),
+      applyVerification: ['变量块已追加，正在等待匹配的 ERA 原始写入完成信号。', rejectionSummary]
+        .filter(Boolean)
+        .join('\n'),
       rejectedActions: validation.rejected,
       formatRepairAttempted,
       timeRepairAttempted: timeValidation.timeRepairAttempted,
@@ -2151,10 +2151,9 @@ export async function executeExtraVariableUpdate({
       });
       onProgress?.({
         applyStatus: 'verifying',
-        applyVerification: [
-          'ERA 已返回匹配的写入完成信号，正在回读聊天级 stat_data。',
-          rejectionSummary,
-        ].filter(Boolean).join('\n'),
+        applyVerification: ['ERA 已返回匹配的写入完成信号，正在回读聊天级 stat_data。', rejectionSummary]
+          .filter(Boolean)
+          .join('\n'),
       });
     } catch (error) {
       variableTraceLogger.error('[extraVariableUpdate] 等待 ERA 同步失败', {
