@@ -416,15 +416,18 @@ const App: React.FC = () => {
       const nextMatch: MatchState = {
         ...match,
         暂停: { ...match.暂停, [side]: match.暂停[side] - 1 },
-        回合阶段: '死球',
-        回合情境: `${side}队请求暂停，暂停后恢复常规回合`,
+        球员状态: Object.fromEntries(Object.entries(match.球员状态).map(([key, status]) => [key, { ...status, 体力: Math.min(100, status.体力 + (match.阵容[side].场上.includes(key) ? 5 : 3)) }])),
+        回合阶段: '常规回合',
+        待处理情境: { type: 'none' },
+        回合情境: `${side}队请求暂停并完成布置`,
         回合摘要: `${side}队请求暂停（剩余 ${match.暂停[side] - 1} 次）`,
       };
       await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
       setStat(current => ({ ...current, 比赛: nextMatch }));
       await sendTurn(
         `【比赛管理】${side}队已由前端确定性扣除一次暂停，当前剩余${nextMatch.暂停[side]}次。` +
-          `请演出教练布置与球员反应；不得再次修改暂停、比分、时间或球权，结尾仅将比赛.回合阶段改为“常规回合”。`,
+          `请演出教练布置与球员反应；不得修改任何比赛数值。`,
+        { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) },
       );
     },
     [stat, sendTurn],
@@ -452,16 +455,74 @@ const App: React.FC = () => {
         },
         回合情境: `${side}队死球换人：${outKey}下，${inKey}上`,
         回合摘要: `${getPlayer(outKey)?.cn ?? outKey}被${getPlayer(inKey)?.cn ?? inKey}换下`,
+        回合阶段: '常规回合',
+        待处理情境: { type: 'none' },
       };
       await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
       setStat(current => ({ ...current, 比赛: nextMatch }));
       await sendTurn(
         `【比赛管理】前端已完成${side}队换人：${getPlayer(outKey)?.cn ?? outKey}下，${getPlayer(inKey)?.cn ?? inKey}上。` +
-          `请简短演出换人，不得修改阵容、比分、时间或球权，结尾仅将比赛.回合阶段改为“常规回合”。`,
+          `请简短演出换人，不得修改比赛数值。`,
+        { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) },
       );
     },
     [stat, sendTurn],
   );
+
+  const handleFreeThrow = useCallback(async () => {
+    const match = stat.比赛;
+    if (!match || match.待处理情境.type !== 'freeThrow' || busyRef.current) return;
+    const pending = match.待处理情境;
+    const shooter = getPlayer(pending.shooter);
+    const made = Math.floor(Math.random() * 100) + 1 <= (shooter?.attrs.freeThrow ?? 70);
+    const shooterStatus = match.球员状态[pending.shooter] ?? freshStatus();
+    const remaining = pending.remaining - 1;
+    const nextPossession: Side = remaining > 0 ? pending.shootingSide : pending.shootingSide === '主' ? '客' : '主';
+    const nextSpots = {
+      主: match.站位.主.map(spot => ({ ...spot, 持球: false })),
+      客: match.站位.客.map(spot => ({ ...spot, 持球: false })),
+    };
+    if (remaining === 0 && nextSpots[nextPossession][0]) nextSpots[nextPossession][0].持球 = true;
+    const nextMatch: MatchState = {
+      ...match,
+      比分: { ...match.比分, [pending.shootingSide]: match.比分[pending.shootingSide] + (made ? 1 : 0) },
+      球权: nextPossession,
+      投篮时钟: remaining > 0 ? match.投篮时钟 : 24,
+      站位: nextSpots,
+      球员状态: {
+        ...match.球员状态,
+        [pending.shooter]: { ...shooterStatus, 得分: shooterStatus.得分 + (made ? 1 : 0), 罚球出手: shooterStatus.罚球出手 + 1, 罚球命中: shooterStatus.罚球命中 + (made ? 1 : 0) },
+      },
+      回合阶段: remaining > 0 ? '罚球结算' : '常规回合',
+      待处理情境: remaining > 0 ? { ...pending, remaining } : { type: 'none' },
+      回合情境: `${shooter?.cn ?? pending.shooter}罚球${made ? '命中' : '不中'}`,
+      回合摘要: `罚球${made ? '命中' : '不中'}，${remaining > 0 ? `还剩${remaining}罚` : `${nextPossession}队球权`}`,
+    };
+    await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
+    setStat(current => ({ ...current, 比赛: nextMatch }));
+    await sendTurn(`【罚球】前端按${shooter?.cn ?? pending.shooter}的罚球能力完成骰子判定：${made ? '命中' : '不中'}。请简短演出，不修改任何数值。`, { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) });
+  }, [stat, sendTurn]);
+
+  const handleUpgrade = useCallback(async (group: UpgradeGroupKey) => {
+    const career = stat.生涯;
+    if (!career || busyRef.current) return;
+    const nextCareer = upgradeCareer(career, group);
+    if (nextCareer === career) { toastr.warning('成长点不足或已达到潜力上限'); return; }
+    await insertOrAssignVariables({ stat_data: { 生涯: nextCareer } }, { type: 'chat' });
+    setStat(current => ({ ...current, 生涯: nextCareer }));
+    toastr.success(`升级完成，总评 ${nextCareer.能力.overall}`);
+  }, [stat]);
+
+  const handleTrain = useCallback(async () => {
+    const career = stat.生涯;
+    const offCourt = stat.场外;
+    if (!career || !offCourt || busyRef.current) return;
+    const result = trainCareer(career, offCourt);
+    if (!result.trained) { toastr.warning('今天已经完成训练'); return; }
+    await insertOrAssignVariables({ stat_data: { 生涯: result.career, 场外: result.offCourt } }, { type: 'chat' });
+    setStat(current => ({ ...current, 生涯: result.career, 场外: result.offCourt }));
+    await sendTurn('【训练】我完成了今天的专项训练，前端已确定性增加1成长点并推进日期。请简短描写训练内容与教练反馈，不再修改数值。', { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 生涯: result.career, 场外: result.offCourt }) });
+  }, [stat, sendTurn]);
 
   const handleReset = useCallback(() => {
     if (!window.confirm('确定清除这段聊天中的 NBA2K 存档并重新开始吗？此操作不可撤销。')) return;
@@ -497,7 +558,7 @@ const App: React.FC = () => {
     return (
       <div className="nba2k-app state-recovery">
         <div className="recovery-kicker">SAVE DATA REJECTED</div>
-        <h2>存档格式与 NBA2K v2 不兼容</h2>
+        <h2>存档格式与 NBA2K v3 不兼容</h2>
         <p>为防止错误变量让比赛界面崩溃，本次没有载入旧状态。</p>
         <pre>{stat.validationErrors.join('\n')}</pre>
         <button onClick={handleReset}>清除存档并重新开始</button>
@@ -546,6 +607,7 @@ const App: React.FC = () => {
             onChoose={c => void handleAction(c)}
             onTimeout={side => void handleTimeout(side)}
             onSubstitution={choice => void handleSubstitution(choice)}
+            onFreeThrow={() => void handleFreeThrow()}
           />
         </>
       ) : (
@@ -555,6 +617,8 @@ const App: React.FC = () => {
           disabled={busy}
           onAction={t => void sendTurn(t)}
           onStartMatch={() => void handleStartMatch()}
+          onTrain={() => void handleTrain()}
+          onUpgrade={group => void handleUpgrade(group)}
         />
       )}
 
