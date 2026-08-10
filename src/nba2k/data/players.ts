@@ -1,7 +1,7 @@
 // 由 scratchpad-nba2k-data 数据落地生成；来源与推定说明见同目录 README.md
-import type { PlayerData } from '../engine/types';
+import type { LegacyPlayerData } from '../engine/types';
 
-export const PLAYERS: PlayerData[] = [
+export const PLAYERS: LegacyPlayerData[] = [
   {
     "name": "Paul Millsap",
     "cn": "保罗·米尔萨普",

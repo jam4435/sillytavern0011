@@ -11,7 +11,7 @@ export type CareerState = z.infer<typeof careerStateSchema>;
 export type OffCourtState = z.infer<typeof offCourtStateSchema>;
 
 export interface Nba2kStat {
-  版本: 2;
+  版本: 3;
   比赛: MatchState | null;
   生涯: CareerState | null;
   场外: OffCourtState | null;
@@ -20,7 +20,7 @@ export interface Nba2kStat {
 }
 
 const EMPTY_STAT: Nba2kStat = {
-  版本: 2,
+  版本: 3,
   比赛: null,
   生涯: null,
   场外: null,
@@ -73,6 +73,7 @@ export function stripNarrative(message: string): string {
     .replace(/<Variable(Think|Insert|Edit|Delete)>[\s\S]*?<\/Variable\1>/gi, '')
     .replace(/<era_data>\{[\s\S]*?\}<\/era_data>/gi, '')
     .replace(/<行动判定>[\s\S]*?<\/行动判定>/gi, '')
+    .replace(/<NBASettlement>[\s\S]*?<\/NBASettlement>/gi, '')
     .replace(/<options>[\s\S]*?<\/options>/gi, '')
     .trim();
 }

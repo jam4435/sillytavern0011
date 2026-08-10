@@ -1,11 +1,13 @@
 import { PLAYERS } from '../data/players';
 import { TEAMS } from '../data/teams';
 import type { PlayerData, Position, TeamData } from '../engine/types';
+import { adaptLegacyPlayer } from '../engine/playerAdapter';
 
 const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
 
 /** 运行时注册的自定义球员（来自 stat_data.生涯.自定义球员） */
 const customPlayers = new Map<string, PlayerData>();
+const players: PlayerData[] = PLAYERS.map(adaptLegacyPlayer);
 
 export function registerCustomPlayer(p: PlayerData): void {
   customPlayers.set(p.name, p);
@@ -16,13 +18,13 @@ export function getTeam(id: string): TeamData | undefined {
 }
 
 export function getRoster(teamId: string): PlayerData[] {
-  return [...PLAYERS.filter(p => p.team === teamId), ...[...customPlayers.values()].filter(p => p.team === teamId)].sort(
+  return [...players.filter(p => p.team === teamId), ...[...customPlayers.values()].filter(p => p.team === teamId)].sort(
     (a, b) => b.overall - a.overall,
   );
 }
 
 export function getPlayer(key: string): PlayerData | undefined {
-  return customPlayers.get(key) ?? PLAYERS.find(p => p.name === key);
+  return customPlayers.get(key) ?? players.find(p => p.name === key);
 }
 
 /** 按位置挑选首发五人：每个位置取该位置（含副位置）评分最高者，不重复 */
