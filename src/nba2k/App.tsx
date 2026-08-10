@@ -15,12 +15,16 @@ import { buildCustomPlayer } from './utils/customPlayer';
 import { buildTurnPrompt } from './engine/promptBuilder';
 import { buildFormation } from './engine/positioning';
 import { resolveAction } from './engine/resolveAction';
-import type { MatchState, OnCourtStatus, Side, SituationContext } from './engine/types';
+import { settleAssistantResponse } from './engine/settlement';
+import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
+import type { MatchState, OnCourtStatus, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
 import { getPlayer, getRoster, getTeam, pickStarters, registerCustomPlayer, starterEntriesWith } from './utils/rosters';
 import { TEAMS } from './data/teams';
 import type { Nba2kStat } from './utils/statReader';
 import { getLastAssistantNarrative, isInMatch, parseOptions, readStat, stripNarrative } from './utils/statReader';
 import { runTurnTransaction } from './utils/turnTransaction';
+import type { TurnTransactionOptions } from './utils/turnTransaction';
+import { trainCareer, updateCareerDynamics, upgradeCareer } from './utils/careerProgress';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -32,10 +36,35 @@ function freshStatus(): OnCourtStatus {
     盖帽: 0,
     失误: 0,
     犯规: 0,
+    投篮命中: 0,
+    投篮出手: 0,
+    三分命中: 0,
+    三分出手: 0,
+    罚球命中: 0,
+    罚球出手: 0,
+    进攻篮板: 0,
+    防守篮板: 0,
+    上场秒数: 0,
     手感: '平',
     连续命中: 0,
     连续打铁: 0,
   };
+}
+
+const DEFAULT_TACTICS: StructuredTeamTactics = { offense: '基础', defense: '人盯人', pace: '标准', helpIntensity: 50, rebound: '均衡' };
+
+function generatedText(result: string | GenerateToolCallResult): string {
+  return (typeof result === 'string' ? result : result.content).trim();
+}
+
+function badgeModifier(levels: string[]): number {
+  const value = levels.reduce((sum, level) => sum + (level === '金' ? 6 : level === '银' ? 4 : level === '铜' ? 2 : 0), 0);
+  return Math.max(-8, Math.min(8, value));
+}
+
+function stripMatchVariableBlocks(text: string, patch: Record<string, unknown>): string {
+  const narrative = text.replace(/<NBASettlement>[\s\S]*?<\/NBASettlement>/gi, '').replace(/<Variable(Think|Insert|Edit|Delete)>[\s\S]*?<\/Variable\1>/gi, '').trim();
+  return `${narrative}\n<VariableThink>确定性操作由前端完成。</VariableThink>\n<VariableEdit>${JSON.stringify(patch)}</VariableEdit>`;
 }
 
 const App: React.FC = () => {
@@ -80,12 +109,12 @@ const App: React.FC = () => {
 
   /** 发送一回合：user 楼层 + 生成，完成后兜底重读 */
   const sendTurn = useCallback(
-    async (text: string) => {
+    async (text: string, transactionOptions: TurnTransactionOptions = {}) => {
       if (busyRef.current || !text.trim()) return;
       busyRef.current = true;
       setBusy(true);
       try {
-        const result = await runTurnTransaction(text);
+        const result = await runTurnTransaction(text, transactionOptions);
         setNarrative(stripNarrative(result.assistantText));
         setOptions(parseOptions(result.assistantText));
       } catch (e) {
@@ -110,7 +139,7 @@ const App: React.FC = () => {
       await insertOrAssignVariables(
         {
           stat_data: {
-            版本: 2,
+            版本: 3,
             生涯: {
               姓名: r.playerName,
               球队: r.teamId,
@@ -119,7 +148,12 @@ const App: React.FC = () => {
               赛季: '2015-16',
               赛程索引: 1,
               能力: { overall: p?.overall ?? 75, ...p?.attrs },
-              徽章: [],
+              发展: createDevelopment('2K16模式', '均衡', initialGroups('2K16模式', '均衡')),
+              倾向: defaultTendencies(),
+              动态徽章: defaultBadges(),
+              热区: defaultHotZones(),
+              教练信任: 45,
+              球队角色: '首发',
               赛季统计: { 场均得分: 0, 场均篮板: 0, 场均助攻: 0, 出场数: 0 },
               成长点: 0,
             },
@@ -163,7 +197,7 @@ const App: React.FC = () => {
       await insertOrAssignVariables(
         {
           stat_data: {
-            版本: 2,
+            版本: 3,
             生涯: {
               姓名: form.name,
               球队: form.teamId,
@@ -173,7 +207,12 @@ const App: React.FC = () => {
               赛季: '2015-16',
               赛程索引: 1,
               能力: { overall: player.overall, ...player.attrs },
-              徽章: [],
+              发展: createDevelopment(form.mode, form.style, form.groups),
+              倾向: defaultTendencies(),
+              动态徽章: defaultBadges(),
+              热区: defaultHotZones(),
+              教练信任: 30,
+              球队角色: '轮换',
               赛季统计: { 场均得分: 0, 场均篮板: 0, 场均助攻: 0, 出场数: 0 },
               成长点: 0,
             },
@@ -199,7 +238,7 @@ const App: React.FC = () => {
       );
       setStat(readStat());
       await sendTurn(
-        `【开局】我是${form.name}，一名${form.height_cm}cm 的${form.pos}新秀（总评${player.overall}，潜力${player.attrs.potential}），` +
+        `【开局】我是${form.name}，一名${form.height_cm}cm、${form.weight_kg}kg、臂展${form.wingspan_cm}cm 的${form.pos}新秀（${form.mode}，总评${player.overall}，潜力${player.attrs.potential}），` +
           `刚与${team?.cn}签下新秀合同，球衣号码 ${form.number} 号。2015-16 赛季即将开始，首战 ${firstOpponent.cn}。` +
           `请以生涯纪录片口吻开场：选秀夜的回忆、初进更衣室面对老大哥们的场面、教练对我的期待与质疑，最后给出行动选项。`,
       );
@@ -252,9 +291,11 @@ const App: React.FC = () => {
       对阵: { 主队: homeId, 客队: awayId },
       节次: 1,
       剩余秒数: 720,
+      投篮时钟: 24,
       比分: { 主: 0, 客: 0 },
       球权: openingPossession,
-      战术: { 主: '基础', 客: '人盯人' },
+      跳球胜方: openingPossession,
+      战术: { 主: { ...DEFAULT_TACTICS }, 客: { ...DEFAULT_TACTICS } },
       站位,
       本节球队犯规: { 主: 0, 客: 0 },
       暂停: { 主: 7, 客: 7 },
@@ -263,6 +304,7 @@ const App: React.FC = () => {
         客: { 场上: awayOnCourt, 替补: awayBench },
       },
       回合阶段: '常规回合',
+      待处理情境: { type: 'none' },
       回合情境: `${openingPossession}队赢得跳球，常规对位`,
       球员状态,
       回合摘要: `${openingPossession}队赢得跳球`,
@@ -283,13 +325,14 @@ const App: React.FC = () => {
       if (!match || !career) return;
       const mySide: Side = match.对阵.主队 === career.球队 ? '主' : '客';
       const oppSide: Side = mySide === '主' ? '客' : '主';
-
-      const actor = getPlayer(choice.actorKey);
+      // v3 只允许控制主角；忽略任何伪造的 actorKey。
+      const actorKey = career.附身球员;
+      const actor = getPlayer(actorKey);
       if (!actor) return;
       const partner = choice.partnerKey ? (getPlayer(choice.partnerKey) ?? null) : null;
 
       // 对位者：距行动人最近的对方球员
-      const actorSpot = match.站位[mySide]?.find(s => s.球员 === choice.actorKey);
+      const actorSpot = match.站位[mySide]?.find(s => s.球员 === actorKey);
       const oppSpots = match.站位[oppSide] ?? [];
       let defenderKey: string | null = null;
       let nearestDist = Infinity;
@@ -302,13 +345,12 @@ const App: React.FC = () => {
           }
         }
       }
-      if (choice.action === '无球跑动') defenderKey = null;
       const defender = defenderKey ? (getPlayer(defenderKey) ?? null) : null;
       const defenderStatus = defenderKey ? match.球员状态[defenderKey] : undefined;
       const defenders = oppSpots.map(spot => getPlayer(spot.球员)).filter((player): player is NonNullable<typeof player> => Boolean(player));
 
       let partnerDefender = null;
-      if (choice.action === '挡拆' && choice.partnerKey) {
+      if (['挡拆突破', '顺下传球', '外弹传球'].includes(choice.action) && choice.partnerKey) {
         const partnerSpot = match.站位[mySide]?.find(spot => spot.球员 === choice.partnerKey);
         if (partnerSpot) {
           const candidates = oppSpots.filter(spot => spot.球员 !== defenderKey);
@@ -327,21 +369,41 @@ const App: React.FC = () => {
         coverage: nearestDist > 18 ? 'open' : nearestDist < 8 ? 'tight' : 'normal',
         mismatch: match.回合情境.includes('错位'),
         defenderFouls: defenderStatus?.犯规 ?? 0,
+        actorSpot,
+        defenderSpots: oppSpots,
+        teammateSpots: match.站位[mySide],
+        offenseTactic: match.战术[match.球权],
+        defenseTactic: match.战术[match.球权 === '主' ? '客' : '主'],
+        hotZoneModifier: Object.values(career.热区.zones).some(zone => zone.state === '热') ? 4 : Object.values(career.热区.zones).some(zone => zone.state === '冷') ? -4 : 0,
+        badgeModifier: badgeModifier(Object.values(career.动态徽章.badges).map(badge => badge.level)),
       };
 
       const resolution = resolveAction({
         action: choice.action,
         actor,
-        actorStatus: match.球员状态[choice.actorKey] ?? freshStatus(),
+        actorStatus: match.球员状态[actorKey] ?? freshStatus(),
         defender,
         defenders,
         partner,
         partnerDefender,
-        reboundSide: choice.action === '篮板' ? (match.球权 === mySide ? '进攻篮板' : '防守篮板') : undefined,
+        actionSide: mySide,
+        match,
         situation,
       });
 
-      await sendTurn(buildTurnPrompt({ match, resolution }));
+      await sendTurn(buildTurnPrompt({ match, resolution }), {
+        transformAssistant: async raw => {
+          const settled = await settleAssistantResponse(
+            raw,
+            resolution.contract,
+            match,
+            async repairPrompt => generatedText(await generate({ should_stream: false, user_input: repairPrompt })),
+            normalized => ({ 生涯: updateCareerDynamics(career, resolution, normalized) }),
+          );
+          if (settled.validationErrors.length) console.warn('[nba2k] settlement repaired/fallback', settled.validationErrors);
+          return settled.assistantText;
+        },
+      });
     },
     [stat, sendTurn],
   );
