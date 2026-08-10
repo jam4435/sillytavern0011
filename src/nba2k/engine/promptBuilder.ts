@@ -8,7 +8,7 @@ function formatClock(seconds: number): string {
 
 /**
  * 把前端判定结果 + 局势快照拼成随 user 楼层发送的结构化指令。
- * AI 按世界书「输出提示词」契约演出该结果并结算变量，不得改判。
+ * AI 演出并从合同合法分支中提交 NBASettlement；前端落楼前校验并生成 ERA。
  */
 export function buildTurnPrompt(params: {
   match: MatchState;
@@ -29,8 +29,9 @@ export function buildTurnPrompt(params: {
     `攻防分：${resolution.attackScore} vs ${resolution.defenseScore}（基础成功率 ${resolution.baseRate}%）`,
     `情境修正：${modLines}（最终成功线 ${resolution.finalRate}）`,
     `判定等级：${resolution.tier}`,
-    `硬结算边界：${JSON.stringify(resolution.hardResult)}`,
-    '要求：按判定等级演出本回合（解说+场上对话）；比分、球权、阶段、耗时、体力和个人统计必须严格落在硬结算边界内，只能修改 allowedStatePaths；requiredStatUpdates 中 choiceGroup 相同的项目必须且只能选择一项，不得改变判定结果。',
+    `阶段判定：${JSON.stringify(resolution.stages)}`,
+    `结算合同：${JSON.stringify(resolution.contract)}`,
+    '要求：先按判定等级写本回合解说与场上互动，再输出且只输出一份 <NBASettlement>{JSON}</NBASettlement> 提案。contractId 必须一致；branchId 必须取合同 branches.id；耗时、投篮时钟、体力和可选站位必须在合同范围内。不要输出比赛 VariableEdit/Insert/Delete，前端会校验并生成唯一变量块。',
     '</行动判定>',
   ];
 

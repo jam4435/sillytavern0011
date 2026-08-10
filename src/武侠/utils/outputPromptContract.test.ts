@@ -100,8 +100,17 @@ describe('武侠输出提示词契约', () => {
     expect(cotPromptSource).toContain('数十分钟');
     expect(cotPromptSource).toContain('数小时');
     expect(cotPromptSource).toContain('数日');
-    expect(cotPromptSource).toContain('开端只能处于窗口前段');
-    expect(cotPromptSource).toContain('只有最终情节完整收束才到事件结束时间');
+    expect(cotPromptSource).toContain('不是需要逐句演出的清单，也不对应固定回合数');
+    expect(cotPromptSource).toContain('可以只推进一段，也可以连续发生数项发展');
+    expect(cotPromptSource).toContain('因果已经完整时可以直接完成当前事件');
+    expect(cotPromptSource).toContain('回复结束时局势是否发生可辨认的变化');
+    expect(cotPromptSource).toContain('只有气氛、神态、饮酒、寒暄和重复立场而没有改变局势，不算推进');
+    expect(cotPromptSource).toContain('关键揭示、主要冲突或高潮');
+    expect(cotPromptSource).toContain('不是必须按回合均分的篇幅');
+    expect(cotPromptSource).toContain('可以用“酒过数巡”“众人又谈良久”等方式自然压缩');
+    expect(cotPromptSource).not.toContain('尚未发生的最早情节');
+    expect(cotPromptSource).not.toContain('每轮推进一个有意义的原定情节单位');
+    expect(cotPromptSource).not.toContain('不要把完整事件详情一次演完');
     expect(cotPromptSource).not.toContain('按事件进行比例');
 
     expect(variableGuidanceSource).toContain('{"年":整数,"月":整数,"日":整数,"时":整数,"分":整数}');

@@ -8,6 +8,12 @@ export interface TurnTransactionResult {
   era: EraWriteDoneDetail;
 }
 
+export interface TurnTransactionOptions {
+  eraTimeoutMs?: number;
+  /** assistant 落楼前的校验/规范化钩子；可在内部进行一次不落楼的修复生成。 */
+  transformAssistant?: (assistantText: string) => Promise<string>;
+}
+
 function generatedText(result: string | GenerateToolCallResult): string {
   return (typeof result === 'string' ? result : result.content).trim();
 }
@@ -22,7 +28,7 @@ function makeRoundId(): string {
  */
 export async function runTurnTransaction(
   text: string,
-  { eraTimeoutMs = 20_000 }: { eraTimeoutMs?: number } = {},
+  { eraTimeoutMs = 20_000, transformAssistant }: TurnTransactionOptions = {},
 ): Promise<TurnTransactionResult> {
   const chatId = SillyTavern.getCurrentChatId() ?? '';
   const roundId = makeRoundId();
@@ -39,8 +45,10 @@ export async function runTurnTransaction(
     userMessageId = getLastMessageId();
 
     const result = await generate({ should_stream: false });
-    const assistantText = generatedText(result);
-    if (!assistantText) throw new Error('模型返回了空回复。');
+    const rawAssistantText = generatedText(result);
+    if (!rawAssistantText) throw new Error('模型返回了空回复。');
+    const assistantText = transformAssistant ? (await transformAssistant(rawAssistantText)).trim() : rawAssistantText;
+    if (!assistantText) throw new Error('模型回复经校验后为空。');
 
     // 必须在 assistant 落楼前监听，ERA 可能在 createChatMessages 返回前就完成。
     observer = observeEraWriteDone('resync');
