@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ActionType, MatchState, Side } from '../engine/types';
+import type { ActionType, MatchState, Side, StructuredTeamTactics } from '../engine/types';
 import { getPlayer } from '../utils/rosters';
 
 const HOLDER_ACTIONS: ActionType[] = ['定点投篮', '急停投篮', '后撤步', '突破终结', '突破分球', '突破急停', '安全传球', '跨场转移', '挡拆突破', '顺下传球', '外弹传球', '背身单打'];
@@ -13,6 +13,7 @@ export interface ActionPanelProps {
   match: MatchState; mySide: Side; protagonist: string; disabled: boolean;
   onChoose: (choice: ActionChoice) => void; onTimeout?: (side: Side) => void;
   onSubstitution?: (choice: SubstitutionChoice) => void; onFreeThrow?: () => void;
+  onTacticRequest?: (patch: Partial<StructuredTeamTactics>) => void;
 }
 
 const shortName = (key: string) => getPlayer(key)?.cn.split('·').pop() ?? key;
@@ -43,7 +44,7 @@ export function ActionPanel(props: ActionPanelProps) {
   if (match.回合阶段 === '死球') {
     const out = subOut && rotation.场上.includes(subOut) ? subOut : rotation.场上[0];
     const incoming = subIn && rotation.替补.includes(subIn) ? subIn : rotation.替补[0];
-    return <section className="action-panel phase-dead-ball"><div className="ap-heading"><div><span className="ap-phase">DEAD BALL</span><div className="ap-title">死球管理 · {match.回合情境}</div></div>{management}</div>{showSubstitution && <div className="ap-substitution"><div><span>换下</span><div className="ap-actor-row">{rotation.场上.map(key => <button key={key} className={out === key ? 'active ap-actor' : 'ap-actor'} onClick={() => setSubOut(key)}>{shortName(key)}</button>)}</div></div><span>⇄</span><div><span>换上</span><div className="ap-actor-row">{rotation.替补.map(key => <button key={key} className={incoming === key ? 'active ap-actor' : 'ap-actor'} onClick={() => setSubIn(key)}>{shortName(key)}</button>)}</div></div><button className="ap-confirm-sub" disabled={!out || !incoming} onClick={() => { if (out && incoming) props.onSubstitution?.({ side: mySide, outKey: out, inKey: incoming }); setShowSubstitution(false); }}>确认</button></div>}</section>;
+    return <section className="action-panel phase-dead-ball"><div className="ap-heading"><div><span className="ap-phase">DEAD BALL</span><div className="ap-title">死球管理 · {match.回合情境}</div></div>{management}</div><div className="ap-tactic-requests"><span>向教练建议</span><button disabled={props.disabled} onClick={() => props.onTacticRequest?.({ offense: '五外' })}>五外</button><button disabled={props.disabled} onClick={() => props.onTacticRequest?.({ offense: '挡拆' })}>挡拆</button><button disabled={props.disabled} onClick={() => props.onTacticRequest?.({ defense: '换防' })}>换防</button><button disabled={props.disabled} onClick={() => props.onTacticRequest?.({ defense: '二三联防' })}>联防</button></div>{showSubstitution && <div className="ap-substitution"><div><span>换下</span><div className="ap-actor-row">{rotation.场上.map(key => <button key={key} className={out === key ? 'active ap-actor' : 'ap-actor'} onClick={() => setSubOut(key)}>{shortName(key)}</button>)}</div></div><span>⇄</span><div><span>换上</span><div className="ap-actor-row">{rotation.替补.map(key => <button key={key} className={incoming === key ? 'active ap-actor' : 'ap-actor'} onClick={() => setSubIn(key)}>{shortName(key)}</button>)}</div></div><button className="ap-confirm-sub" disabled={!out || !incoming} onClick={() => { if (out && incoming) props.onSubstitution?.({ side: mySide, outKey: out, inKey: incoming }); setShowSubstitution(false); }}>确认</button></div>}</section>;
   }
 
   if (!onCourt) return <section className="action-panel phase-bench"><div className="ap-heading"><div><span className="ap-phase">BENCH</span><div className="ap-title">主角暂未登场</div></div>{management}</div><div className="ap-actions">{(['观察', '模拟一个回合'] as ActionType[]).map(action => <button key={action} disabled={props.disabled} className="ap-action" onClick={() => choose(action)}>{action}</button>)}</div></section>;

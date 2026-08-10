@@ -503,6 +503,24 @@ const App: React.FC = () => {
     await sendTurn(`【罚球】前端按${shooter?.cn ?? pending.shooter}的罚球能力完成骰子判定：${made ? '命中' : '不中'}。请简短演出，不修改任何数值。`, { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) });
   }, [stat, sendTurn]);
 
+  const handleTacticRequest = useCallback(async (patch: Partial<StructuredTeamTactics>) => {
+    const match = stat.比赛;
+    const career = stat.生涯;
+    if (!match || !career || match.回合阶段 !== '死球' || busyRef.current) return;
+    const mySide: Side = match.对阵.主队 === career.球队 ? '主' : '客';
+    const accepted = Math.floor(Math.random() * 100) + 1 <= career.教练信任;
+    const nextMatch: MatchState = {
+      ...match,
+      战术: accepted ? { ...match.战术, [mySide]: { ...match.战术[mySide], ...patch } } : match.战术,
+      回合阶段: '常规回合', 待处理情境: { type: 'none' },
+      回合情境: accepted ? `教练接受主角战术建议：${JSON.stringify(patch)}` : '教练拒绝战术建议并维持原方案',
+      回合摘要: accepted ? '战术调整获批' : '教练维持原战术',
+    };
+    await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
+    setStat(current => ({ ...current, 比赛: nextMatch }));
+    await sendTurn(`【战术建议】我向教练提出${JSON.stringify(patch)}，按教练信任${career.教练信任}进行前端骰子后，结果为${accepted ? '接受' : '拒绝'}。请演出沟通，不修改数值。`, { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) });
+  }, [stat, sendTurn]);
+
   const handleUpgrade = useCallback(async (group: UpgradeGroupKey) => {
     const career = stat.生涯;
     if (!career || busyRef.current) return;
@@ -608,6 +626,7 @@ const App: React.FC = () => {
             onTimeout={side => void handleTimeout(side)}
             onSubstitution={choice => void handleSubstitution(choice)}
             onFreeThrow={() => void handleFreeThrow()}
+            onTacticRequest={patch => void handleTacticRequest(patch)}
           />
         </>
       ) : (
