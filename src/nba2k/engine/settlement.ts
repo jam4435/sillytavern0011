@@ -83,8 +83,8 @@ function switchBallHolder(match: MatchState, possession: Side): MatchState['站�
   return next;
 }
 
-function quarterAdvance(match: MatchState): MatchState {
-  if (match.剩余秒数 > 0) return match;
+export function advancePeriodIfNeeded(match: MatchState): MatchState {
+  if (match.剩余秒数 > 0 || match.回合阶段 === '罚球结算' || match.回合阶段 === '篮板争抢') return match;
   const tied = match.比分.主 === match.比分.客;
   if (match.节次 >= 4 && !tied) return { ...match, 进行中: false, 回合阶段: '死球', 待处理情境: { type: 'deadBall', reason: '比赛结束', inboundSide: match.球权 }, 回合摘要: `比赛结束，主${match.比分.主}:客${match.比分.客}` };
   const nextQuarter = match.节次 + 1;
@@ -114,6 +114,15 @@ export function applySettlement(match: MatchState, settlement: NormalizedSettlem
   for (const delta of branch.statDeltas) {
     const current = statuses[delta.player];
     if (current) statuses[delta.player] = applyStat(current, delta.stat, delta.value);
+  }
+  const attempted = new Set(branch.statDeltas.filter(delta => delta.stat === '投篮出手' && delta.value > 0).map(delta => delta.player));
+  const made = new Set(branch.statDeltas.filter(delta => delta.stat === '投篮命中' && delta.value > 0).map(delta => delta.player));
+  for (const player of attempted) {
+    const current = statuses[player];
+    if (!current) continue;
+    statuses[player] = made.has(player)
+      ? { ...current, 连续打铁: 0, 手感: current.连续命中 >= 2 ? '热' : '平' }
+      : { ...current, 连续命中: 0, 手感: current.连续打铁 >= 2 ? '冷' : '平' };
   }
   const actor = contract.intent.actor;
   if (statuses[actor]) statuses[actor] = { ...statuses[actor], 体力: clamp(statuses[actor].体力 + settlement.staminaDelta.actor, 0, 100) };
@@ -162,7 +171,7 @@ export function applySettlement(match: MatchState, settlement: NormalizedSettlem
       };
     }
   }
-  return quarterAdvance(next);
+  return advancePeriodIfNeeded(next);
 }
 
 export function buildCanonicalAssistant(raw: string, settlement: NormalizedSettlement, nextMatch: MatchState, extraVariables: Record<string, unknown> = {}): string {

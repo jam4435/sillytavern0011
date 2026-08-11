@@ -5,7 +5,8 @@ import { chromium } from 'playwright-core';
 const SELECTORS = {
   input: '[data-wuxia-automation="player-input"]',
   send: '[data-wuxia-automation="send-turn"]',
-  generation: '[data-wuxia-automation="generation-state"]',
+  generation: '[data-wuxia-automation~="generation-state"]',
+  regenerate: '[data-wuxia-automation~="regenerate-last-reply"]',
   latestReply: '[data-wuxia-automation="latest-reply"]',
   openSettings: '[data-wuxia-automation="open-settings"]',
   openDebugTab: '[data-wuxia-automation="open-debug-tab"]',
@@ -25,6 +26,7 @@ function printUsage() {
 
 用法：
   pnpm wuxia:ui -- --turns 5 --action "在客栈向掌柜打听消息"
+  pnpm wuxia:ui -- --regenerate --output wuxia-regenerate-report.json
 
 选项：
   --endpoint <url>       Chrome CDP 地址，默认 http://127.0.0.1:9333
@@ -36,6 +38,7 @@ function printUsage() {
   --output <path>        将完整报告写入 JSON 文件
   --inspect-only         不发送行动，只检查当前 iframe、空闲状态与回复（首次回合不要求调试框）
   --stat-data-snapshot   仅配合 --inspect-only，按需读取变量页的完整聊天级 stat_data
+  --regenerate           只重新生成最新 assistant swipe 一次，不新建 user 楼层
   --stop-generation      仅在页面正在生成时，通过酒馆终止按钮停止当前生成
   --continue-on-error    调试状态为 error 时继续下一轮
   --help                 显示帮助
@@ -70,6 +73,7 @@ function parseArgs(argv) {
     output: '',
     inspectOnly: false,
     statDataSnapshot: false,
+    regenerate: false,
     stopGeneration: false,
     continueOnError: false,
   };
@@ -93,6 +97,10 @@ function parseArgs(argv) {
       options.statDataSnapshot = true;
       continue;
     }
+    if (arg === '--regenerate') {
+      options.regenerate = true;
+      continue;
+    }
     if (arg === '--stop-generation') {
       options.stopGeneration = true;
       continue;
@@ -113,13 +121,28 @@ function parseArgs(argv) {
   if (options.statDataSnapshot && !options.inspectOnly) {
     throw new Error('--stat-data-snapshot 只能与 --inspect-only 一起使用，避免默认逐轮读取完整变量');
   }
-  if (options.stopGeneration && (options.inspectOnly || options.actions.length > 0 || options.turns !== 1)) {
+  if (
+    options.regenerate &&
+    (options.inspectOnly || options.stopGeneration || options.actions.length > 0 || options.turns !== 1)
+  ) {
+    throw new Error('--regenerate 不能与推进、--inspect-only、--stop-generation 或 --turns 一起使用');
+  }
+  if (
+    options.stopGeneration &&
+    (options.inspectOnly || options.regenerate || options.actions.length > 0 || options.turns !== 1)
+  ) {
     throw new Error('--stop-generation 不能与推进、--inspect-only 或 --turns 一起使用');
   }
-  if (!options.inspectOnly && !options.stopGeneration && options.actions.length === 0) {
+  if (!options.inspectOnly && !options.stopGeneration && !options.regenerate && options.actions.length === 0) {
     throw new Error('至少需要一个 --action；若只提供一个，会在每轮重复使用');
   }
-  if (!options.inspectOnly && !options.stopGeneration && options.actions.length !== 1 && options.actions.length !== options.turns) {
+  if (
+    !options.inspectOnly &&
+    !options.stopGeneration &&
+    !options.regenerate &&
+    options.actions.length !== 1 &&
+    options.actions.length !== options.turns
+  ) {
     throw new Error(`--action 数量必须是 1 或与 --turns 相同；当前为 ${options.actions.length}/${options.turns}`);
   }
   return options;
@@ -185,6 +208,7 @@ async function inspectUiReadiness(browser, pageUrl) {
   const generation = await inspectGeneration(browser, pageUrl);
   const input = frame.locator(SELECTORS.input).first();
   const send = frame.locator(SELECTORS.send).first();
+  const regenerate = frame.locator(SELECTORS.regenerate).first();
   const openSettings = frame.locator(SELECTORS.openSettings).first();
 
   await input.waitFor({ state: 'visible', timeout: 10_000 });
@@ -196,10 +220,12 @@ async function inspectUiReadiness(browser, pageUrl) {
     generating: generation.generating,
     inputDisabled: await input.isDisabled(),
     sendDisabled: await send.isDisabled(),
+    regenerateDisabled: (await regenerate.count()) > 0 ? await regenerate.isDisabled() : null,
     automation: {
       playerInput: true,
       sendTurn: true,
       generationState: true,
+      regenerateLastReply: (await regenerate.count()) > 0,
       openSettings: (await openSettings.count()) > 0,
     },
   };
@@ -233,7 +259,10 @@ async function stopCurrentGeneration(browser, pageUrl) {
 
   const { page, frame } = await findGameFrame(browser, pageUrl);
   // 酒馆终止按钮属于宿主聊天页；保留 iframe 回退，兼容将来把控件移入游戏页的布局。
-  const candidates = [page.locator(SELECTORS.stopGenerationIcon).first(), frame.locator(SELECTORS.stopGenerationIcon).first()];
+  const candidates = [
+    page.locator(SELECTORS.stopGenerationIcon).first(),
+    frame.locator(SELECTORS.stopGenerationIcon).first(),
+  ];
   let stopIcon = null;
   for (const candidate of candidates) {
     if (await candidate.isVisible()) {
@@ -395,7 +424,9 @@ async function readStatDataSnapshot(browser, pageUrl) {
             statData: JSON.parse(raw),
           };
         } catch (error) {
-          throw new Error(`变量页返回的 stat_data 不是合法 JSON：${error instanceof Error ? error.message : String(error)}`);
+          throw new Error(
+            `变量页返回的 stat_data 不是合法 JSON：${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
       await sleep(100);
@@ -497,6 +528,71 @@ async function runTurn(browser, options, turnIndex, prompt) {
   return report;
 }
 
+async function runRegeneration(browser, options) {
+  const startedAt = Date.now();
+  log('受控重生成：准备重新生成最新回复');
+
+  await closeModalIfOpen(browser, options.pageUrl);
+  const { page, frame } = await findGameFrame(browser, options.pageUrl);
+  const preflight = await inspectGeneration(browser, options.pageUrl);
+  if (preflight.generating) throw new Error('页面当前正在生成，拒绝重新生成');
+  if ((await frame.locator(SELECTORS.openSettings).count()) === 0) {
+    throw new Error('页面缺少 open-settings DOM 标记，请确认已构建并刷新武侠界面');
+  }
+
+  const visibilityAtStart = await page.evaluate(() => document.visibilityState);
+  const regenerate = frame.locator(SELECTORS.regenerate).first();
+  await regenerate.waitFor({ state: 'visible', timeout: 10_000 });
+  if (await regenerate.isDisabled()) {
+    throw new Error('最新回复当前不可重新生成，可能没有 assistant 楼层或回合仍在锁定');
+  }
+
+  const previousReply = await readLatestReply(browser, options.pageUrl);
+  await regenerate.evaluate(element => {
+    if (!(element instanceof HTMLElement)) throw new Error('重新生成控件不可点击');
+    element.click();
+  });
+
+  const generationStartedAt = Date.now();
+  const startState = await waitForGenerationState(browser, options.pageUrl, true, 15_000);
+  log(`受控重生成：检测到旋转开始，页面状态 ${startState.visibilityState}`);
+  const endState = await waitForGenerationState(browser, options.pageUrl, false, options.timeoutMs);
+  const generationEndedAt = Date.now();
+  log(`受控重生成：检测到旋转结束，等待 ${options.settleMs}ms 稳定窗口`);
+
+  await sleep(options.settleMs);
+  const debug = await readDebugSections(browser, options.pageUrl, '');
+  const reply = await readLatestReply(browser, options.pageUrl);
+  const failedSections = Object.entries(debug)
+    .filter(([, value]) => value.status === 'error')
+    .map(([id]) => id);
+
+  const report = {
+    turn: 1,
+    mode: 'regenerate',
+    prompt: '',
+    previousReply,
+    startedAt: new Date(startedAt).toISOString(),
+    generationStartedAt: new Date(generationStartedAt).toISOString(),
+    generationEndedAt: new Date(generationEndedAt).toISOString(),
+    completedAt: isoTime(),
+    generationMs: generationEndedAt - generationStartedAt,
+    totalMs: Date.now() - startedAt,
+    visibilityAtStart,
+    visibilityAtGenerationEnd: endState.visibilityState,
+    reply,
+    debug,
+    success: failedSections.length === 0,
+    failedSections,
+  };
+
+  log(
+    `受控重生成：${report.success ? '完成' : `失败（${failedSections.join(', ')}）`}，` +
+      `生成 ${report.generationMs}ms，总计 ${report.totalMs}ms`,
+  );
+  return report;
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   log(`连接 Chrome：${options.endpoint}`);
@@ -539,6 +635,19 @@ async function main() {
         reply: await readLatestReply(browser, options.pageUrl),
       };
       report.success = !report.inspect.readiness.generating;
+      return;
+    }
+    if (options.regenerate) {
+      try {
+        const regeneration = await runRegeneration(browser, options);
+        report.turns.push(regeneration);
+        report.success = regeneration.success;
+      } catch (error) {
+        const message = error instanceof Error ? error.stack || error.message : String(error);
+        log(`受控重生成异常：${message}`);
+        report.turns.push({ turn: 1, mode: 'regenerate', prompt: '', success: false, error: message });
+        report.success = false;
+      }
       return;
     }
     for (let index = 0; index < options.turns; index += 1) {

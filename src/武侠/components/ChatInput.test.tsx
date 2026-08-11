@@ -36,4 +36,18 @@ describe('ChatInput history draft', () => {
     expect(onSend).toHaveBeenCalledTimes(1);
     expect(onSend).toHaveBeenCalledWith('先观察四周');
   });
+
+  it('为受控重生成暴露稳定按钮标记并复用真实点击链路', async () => {
+    const onRegenerate = vi.fn(async () => undefined);
+    render(<ChatInput onSend={vi.fn()} onRegenerate={onRegenerate} canRegenerate />);
+
+    const regenerate = screen.getByRole('button', { name: '重新生成上一条回复' });
+    expect(regenerate).toHaveAttribute('data-wuxia-automation', 'generation-state regenerate-last-reply');
+
+    await act(async () => {
+      fireEvent.click(regenerate);
+    });
+
+    expect(onRegenerate).toHaveBeenCalledTimes(1);
+  });
 });

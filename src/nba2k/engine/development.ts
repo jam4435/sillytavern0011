@@ -104,10 +104,10 @@ const STYLE_GROUPS: Record<CreationStyle, UpgradeGroupState> = {
 
 export const FREE_PRESETS: Record<string, UpgradeGroupState> = {
   sharpshooter: { offDribble: 12, finishing: 7, midRange: 13, threePoint: 14, postScoring: 6, agility: 11, strength: 7, rebounding: 6, playmaking: 11, defending: 13 },
-  playmaker: { offDribble: 12, finishing: 8, midRange: 10, threePoint: 9, postScoring: 5, agility: 13, strength: 7, rebounding: 5, playmaking: 14, defending: 17 },
+  playmaker: { offDribble: 12, finishing: 9, midRange: 11, threePoint: 9, postScoring: 5, agility: 13, strength: 8, rebounding: 5, playmaking: 14, defending: 14 },
   slasher: { offDribble: 10, finishing: 14, midRange: 8, threePoint: 6, postScoring: 7, agility: 14, strength: 10, rebounding: 7, playmaking: 11, defending: 13 },
-  three_and_d: { offDribble: 8, finishing: 8, midRange: 9, threePoint: 13, postScoring: 6, agility: 12, strength: 10, rebounding: 8, playmaking: 9, defending: 17 },
-  paint_beast: { offDribble: 4, finishing: 14, midRange: 6, threePoint: 4, postScoring: 13, agility: 8, strength: 14, rebounding: 14, playmaking: 5, defending: 18 },
+  three_and_d: { offDribble: 9, finishing: 9, midRange: 10, threePoint: 13, postScoring: 6, agility: 12, strength: 10, rebounding: 8, playmaking: 9, defending: 14 },
+  paint_beast: { offDribble: 4, finishing: 14, midRange: 8, threePoint: 4, postScoring: 13, agility: 8, strength: 14, rebounding: 14, playmaking: 7, defending: 14 },
   all_round: { ...STYLE_GROUPS.均衡 },
 };
 

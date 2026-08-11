@@ -420,7 +420,9 @@ describe('executeExtraVariableUpdate', () => {
       进行中事件: { '射雕第七回02-测试事件': { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 } },
     };
     requestConfiguredTextMock
-      .mockResolvedValueOnce('<VariableEdit>{"user数据":{"修为":120},"世界信息":{"时间":{"分":10}}}</VariableEdit>')
+      .mockResolvedValueOnce(
+        '<VariableThink>1200年8月15日12时55分 + 5分钟 = 1200年8月15日13时00分</VariableThink>\n<VariableEdit>{"user数据":{"修为":120},"世界信息":{"时间":{"分":0}}}</VariableEdit>',
+      )
       .mockResolvedValueOnce(
         '<VariableThink>1200年8月15日12时55分 + 5分钟 = 1200年8月15日13时00分</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":13,"分":0}}}</VariableEdit>',
       );
@@ -453,14 +455,73 @@ describe('executeExtraVariableUpdate', () => {
     expect(result.appendedBlocks).toContain('"时间": {\n      "年": 1200,');
     expect(result.appendedBlocks).toContain('"时": 13');
     expect(result.appendedBlocks).toContain('"分": 0');
-    expect(result.appendedBlocks).not.toContain('"时间": {\n      "分": 10');
+    expect(result.appendedBlocks).not.toContain('"时间": {\n      "分": 0\n    }');
+  });
+
+  it('时间纠错锁定原模型声明的15分钟，不允许改成10分钟', async () => {
+    const statData = variableSnapshot.stat_data as Record<string, unknown>;
+    (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 0 };
+    statData.事件系统 = {
+      进行中事件: { '射雕第一回01-测试事件': { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 } },
+    };
+    requestConfiguredTextMock
+      .mockResolvedValueOnce(
+        '<VariableThink>酒馆对话耗时约15分钟</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"分":15}}}</VariableEdit>',
+      )
+      .mockResolvedValueOnce(
+        '<VariableThink>1200年8月15日12时0分 + 15分钟 = 1200年8月15日12时15分</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":12,"分":15}}}</VariableEdit>',
+      );
+    emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
+      (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 15 };
+      return { message_id: 28, actions: { apiWrite: true } };
+    });
+
+    const result = await executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '曲三点破真相，众人震惊。',
+    });
+
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(2);
+    const repairPrompt = requestConfiguredTextMock.mock.calls[1]?.[0].prompt as string;
+    expect(repairPrompt).toContain('锁定耗时：15 分钟');
+    expect(repairPrompt).toContain('锁定新时间：{"年":1200,"月":8,"日":15,"时":12,"分":15}');
+    expect(repairPrompt).toContain('禁止根据正文、事件边界或自己的判断重新估算、缩短或延长耗时');
+    expect(result.appendedBlocks).toContain('"分": 15');
+    expect(result.appendedBlocks).not.toContain('"分": 10');
+  });
+
+  it('时间纠错连续返回不同于锁定目标的时间时整批失败', async () => {
+    const statData = variableSnapshot.stat_data as Record<string, unknown>;
+    (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 10 };
+    requestConfiguredTextMock
+      .mockResolvedValueOnce(
+        '<VariableThink>众人离店耗时约20分钟</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"分":30}}}</VariableEdit>',
+      )
+      .mockResolvedValue(
+        '<VariableThink>1200年8月15日12时10分 + 5分钟 = 1200年8月15日12时15分</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":12,"分":15}}}</VariableEdit>',
+      );
+
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '众人离开酒馆。',
+      }),
+    ).rejects.toThrow('纠错返回擅自改变了原声明时间');
+
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(4);
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
   });
 
   it('定向纠错三次都输出非时间路径时整批失败且不落库', async () => {
     const statData = variableSnapshot.stat_data as Record<string, unknown>;
     (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 55 };
     requestConfiguredTextMock
-      .mockResolvedValueOnce('<VariableEdit>{"世界信息":{"时间":{"分":10}}}</VariableEdit>')
+      .mockResolvedValueOnce(
+        '<VariableThink>耗时约15分钟</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"分":10}}}</VariableEdit>',
+      )
       .mockResolvedValue('<VariableEdit>{"user数据":{"修为":999}}</VariableEdit>');
 
     await expect(

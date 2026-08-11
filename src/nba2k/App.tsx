@@ -15,7 +15,7 @@ import { buildCustomPlayer } from './utils/customPlayer';
 import { buildTurnPrompt } from './engine/promptBuilder';
 import { buildFormation } from './engine/positioning';
 import { resolveAction } from './engine/resolveAction';
-import { settleAssistantResponse } from './engine/settlement';
+import { advancePeriodIfNeeded, settleAssistantResponse } from './engine/settlement';
 import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
 import type { MatchState, OnCourtStatus, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
 import { getPlayer, getRoster, getTeam, pickStarters, registerCustomPlayer, starterEntriesWith } from './utils/rosters';
@@ -24,7 +24,7 @@ import type { Nba2kStat } from './utils/statReader';
 import { getLastAssistantNarrative, isInMatch, parseOptions, readStat, stripNarrative } from './utils/statReader';
 import { runTurnTransaction } from './utils/turnTransaction';
 import type { TurnTransactionOptions } from './utils/turnTransaction';
-import { trainCareer, updateCareerDynamics, upgradeCareer } from './utils/careerProgress';
+import { finishCareerGame, trainCareer, updateCareerDynamics, upgradeCareer } from './utils/careerProgress';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -60,6 +60,21 @@ function generatedText(result: string | GenerateToolCallResult): string {
 function badgeModifier(levels: string[]): number {
   const value = levels.reduce((sum, level) => sum + (level === '金' ? 6 : level === '银' ? 4 : level === '铜' ? 2 : 0), 0);
   return Math.max(-8, Math.min(8, value));
+}
+
+function actionBadgeLevels(career: NonNullable<Nba2kStat['生涯']>, action: ActionChoice['action']): string[] {
+  const names = action.includes('投篮') || action === '后撤步' || action === '突破急停' ? ['高难度投篮', '抗干扰', '关键射手']
+    : action.includes('突破') || action === '背身单打' ? ['强力终结', '杂技', '造犯规']
+    : action.includes('传球') || action.includes('挡拆') ? ['十美分', '挡拆大师']
+    : action.includes('篮板') || action === '卡位' ? ['篮板精英', '卡位']
+    : ['外线封锁', '拦截者', '护框', '绕掩护'];
+  return names.map(name => career.动态徽章.badges[name]?.level ?? '未解锁');
+}
+
+function actionHotZone(career: NonNullable<Nba2kStat['生涯']>, action: ActionChoice['action']): number {
+  const zone = action === '定点投篮' ? '三分弧顶' : action === '后撤步' ? '三分右翼' : action === '突破终结' ? '篮下' : action === '背身单打' ? '油漆中' : '中投正面';
+  const state = career.热区.zones[zone]?.state ?? '中性';
+  return state === '热' ? 4 : state === '冷' ? -4 : 0;
 }
 
 function stripMatchVariableBlocks(text: string, patch: Record<string, unknown>): string {
@@ -374,8 +389,8 @@ const App: React.FC = () => {
         teammateSpots: match.站位[mySide],
         offenseTactic: match.战术[match.球权],
         defenseTactic: match.战术[match.球权 === '主' ? '客' : '主'],
-        hotZoneModifier: Object.values(career.热区.zones).some(zone => zone.state === '热') ? 4 : Object.values(career.热区.zones).some(zone => zone.state === '冷') ? -4 : 0,
-        badgeModifier: badgeModifier(Object.values(career.动态徽章.badges).map(badge => badge.level)),
+        hotZoneModifier: actionHotZone(career, choice.action),
+        badgeModifier: badgeModifier(actionBadgeLevels(career, choice.action)),
       };
 
       const resolution = resolveAction({
@@ -398,7 +413,20 @@ const App: React.FC = () => {
             resolution.contract,
             match,
             async repairPrompt => generatedText(await generate({ should_stream: false, user_input: repairPrompt })),
-            normalized => ({ 生涯: updateCareerDynamics(career, resolution, normalized) }),
+            (normalized, nextMatch) => {
+              let nextCareer = updateCareerDynamics(career, resolution, normalized);
+              const patch: Record<string, unknown> = {};
+              if (match.进行中 && !nextMatch.进行中) {
+                nextCareer = finishCareerGame(nextCareer, nextMatch);
+                if (stat.场外) {
+                  const opponents = TEAMS.filter(team => team.id !== nextCareer.球队);
+                  const nextOpponent = opponents[nextCareer.赛程索引 % opponents.length];
+                  const date = new Date(`${stat.场外.日程.日期}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + 2);
+                  patch.场外 = { ...stat.场外, 日程: { 日期: date.toISOString().slice(0, 10), 下一场: `vs ${nextOpponent.id}`, 待办: ['恢复训练', '下一场比赛'] } };
+                }
+              }
+              return { 生涯: nextCareer, ...patch };
+            },
           );
           if (settled.validationErrors.length) console.warn('[nba2k] settlement repaired/fallback', settled.validationErrors);
           return settled.assistantText;
@@ -483,7 +511,7 @@ const App: React.FC = () => {
       客: match.站位.客.map(spot => ({ ...spot, 持球: false })),
     };
     if (remaining === 0 && nextSpots[nextPossession][0]) nextSpots[nextPossession][0].持球 = true;
-    const nextMatch: MatchState = {
+    let nextMatch: MatchState = {
       ...match,
       比分: { ...match.比分, [pending.shootingSide]: match.比分[pending.shootingSide] + (made ? 1 : 0) },
       球权: nextPossession,
@@ -498,6 +526,7 @@ const App: React.FC = () => {
       回合情境: `${shooter?.cn ?? pending.shooter}罚球${made ? '命中' : '不中'}`,
       回合摘要: `罚球${made ? '命中' : '不中'}，${remaining > 0 ? `还剩${remaining}罚` : `${nextPossession}队球权`}`,
     };
+    nextMatch = advancePeriodIfNeeded(nextMatch);
     await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
     setStat(current => ({ ...current, 比赛: nextMatch }));
     await sendTurn(`【罚球】前端按${shooter?.cn ?? pending.shooter}的罚球能力完成骰子判定：${made ? '命中' : '不中'}。请简短演出，不修改任何数值。`, { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) });

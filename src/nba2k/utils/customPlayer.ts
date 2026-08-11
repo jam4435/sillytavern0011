@@ -77,7 +77,7 @@ export function validateCreation(form: CustomPlayerForm): string[] {
 
 export function previewRatings(form: Pick<CustomPlayerForm, 'pos' | 'groups' | 'height_cm' | 'weight_kg' | 'wingspan_cm'>) {
   const base = calibrateRookieRatings(ratingsFromGroups(form.groups, 88), form.pos);
-  return bodyCaps(base, { heightCm: form.height_cm, weightKg: form.weight_kg, wingspanCm: form.wingspan_cm }, form.pos);
+  return calibrateRookieRatings(bodyCaps(base, { heightCm: form.height_cm, weightKg: form.weight_kg, wingspanCm: form.wingspan_cm }, form.pos), form.pos);
 }
 
 export function buildCustomPlayer(form: CustomPlayerForm): PlayerData {

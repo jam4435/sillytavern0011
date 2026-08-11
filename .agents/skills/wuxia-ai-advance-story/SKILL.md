@@ -1,20 +1,30 @@
 ---
 name: wuxia-ai-advance-story
-description: 通过 Playwright/CDP UI runner 推进或检查 SillyTavern 武侠游戏的真实回合，并用渐进式诊断研究固定输入下的事件完成轮数、正文连续性、跨事件接续、变量执行与参与事件结算。用于单轮剧情推进、多轮 UI 回归、事件推进实验、提示词或变量故障定位；默认调用 pnpm wuxia:ui，真实推进会新增聊天楼层并修改当前存档。
+description:
+  通过 Playwright/CDP UI runner 推进、检查或受控重新生成 SillyTavern
+  武侠游戏的真实回合，并用渐进式诊断研究固定输入下的事件完成轮数、正文连续性、跨事件接续、变量执行与参与事件结算。用于单轮剧情推进、多轮
+  UI 回归、事件推进实验、提示词对照重生成、变量故障定位；默认调用 pnpm
+  wuxia:ui，真实推进会新增聊天楼层，受控重生成会新增 swipe，两者都会修改当前存档。
 ---
 
 # 武侠剧情推进与审计
 
-从仓库根目录调用 `pnpm wuxia:ui`。runner 通过 Playwright CDP 连接用户手动启动的专用 Chrome，负责真实发送、等待生成、重新获取 iframe、读取回复与四个调试区。不要复制 runner 源码，也不要用旧 CLI、Relay、iframe RPC 或桥接代替真实发送链。
+从仓库根目录调用 `pnpm wuxia:ui`。runner 通过 Playwright
+CDP 连接用户手动启动的专用 Chrome，负责真实发送、等待生成、重新获取 iframe、读取回复与四个调试区。不要复制 runner 源码，也不要用旧 CLI、Relay、iframe
+RPC 或桥接代替真实发送链。
 
 ## 选择工作流
 
 - 普通推进或检查：遵循本文件；用户未指定轮数时默认一轮。
-- 研究事件完成轮数、固定输入连续推进、跨事件接续、正文偏航或参与事件变量正确性：必须先完整读取 [references/story-progression-audit.md](references/story-progression-audit.md)，再执行。不要为普通单轮任务加载该文件。
+- 研究事件完成轮数、固定输入连续推进、跨事件接续、正文偏航或参与事件变量正确性：必须先完整读取
+  [references/story-progression-audit.md](references/story-progression-audit.md)，再执行。不要为普通单轮任务加载该文件。
+- 研究同一用户输入在不同提示词下的稳定性：仅在用户明确要求重试、重新生成或控制变量实验时，读取同一审计协议并使用
+  `--regenerate`。
 
 ## 开始前
 
-1. 确认专用 Chrome 已开放 CDP，默认地址为 `http://127.0.0.1:9333`，并保持酒馆武侠页面打开；不同地址或页面使用 `--endpoint` 或 `--page-url`。
+1. 确认专用 Chrome 已开放 CDP，默认地址为 `http://127.0.0.1:9333`，并保持酒馆武侠页面打开；不同地址或页面使用
+   `--endpoint` 或 `--page-url`。
 2. 先只读检查：
 
 ```powershell
@@ -30,7 +40,8 @@ pnpm wuxia:ui -- --inspect-only
 pnpm wuxia:ui -- --turns 1 --action "前往客栈打探消息" --output wuxia-ui-report.json
 ```
 
-一个 `--action` 可重复使用，也可为每轮分别传入行动。普通任务按用户指定轮数执行；研究任务必须逐轮发送并逐轮检查，不得一次无监督发送全部轮数。runner 已检查本轮正文输入含当前行动；不要缓存跨轮 Frame 或 iframe 内运行实例。
+一个 `--action`
+可重复使用，也可为每轮分别传入行动。普通任务按用户指定轮数执行；研究任务必须逐轮发送并逐轮检查，不得一次无监督发送全部轮数。runner 已检查本轮正文输入含当前行动；不要缓存跨轮 Frame 或 iframe 内运行实例。
 
 默认使用输出优先的渐进式诊断：
 
@@ -49,6 +60,22 @@ node .agents/skills/wuxia-ai-advance-story/scripts/summarize-ui-report.mjs wuxia
 - `extra`：正文与变量阶段应完成且无 `error`；已有明确持久化验证时，不例行读取整棵变量树。
 - 只在用户明确要求观察错误后的后续表现时使用 `--continue-on-error`；它不是重试机制。
 
+## 受控重新生成
+
+只在用户明确要求重试或控制变量实验时执行：
+
+```powershell
+pnpm wuxia:ui -- --regenerate --output wuxia-regenerate-report.json
+```
+
+`--regenerate`
+真实点击前端“重新生成上一条回复”，每次只生成一个新 swipe；不新建 user 楼层，不改动原用户输入。前端会回滚当前 swipe 的变量、重新生成正文和变量，失败时恢复原 swipe。
+
+- 重生成不是新剧情轮，报告中记为同一轮的新样本，不计入事件完成轮数。
+- 一次只重生成一个样本，立即审计 `main-output`、`variable-output` 和持久化结果；不得无监督批量点击。
+- 不得用于不确定原回合是否已发送的故障重试，也不代替模型请求内建的 HTTP 429 重试。
+- 进行提示词对照时，每次只修改一个提示词变量并推送，保留独立报告；具体对照步骤见审计协议。
+
 ## 按需读取变量
 
 使用只读快照：
@@ -57,14 +84,16 @@ node .agents/skills/wuxia-ai-advance-story/scripts/summarize-ui-report.mjs wuxia
 pnpm wuxia:ui -- --inspect-only --stat-data-snapshot --output wuxia-stat-data-diagnostic.json
 ```
 
-快照来自聊天级 `getVariables({ type: 'chat' }).stat_data`。只读取与当前判断相关的路径，不把整棵变量树载入上下文或倾倒给用户。普通推进仅在变量错误、声明与落地矛盾、调试不足或用户明确要求时读取；研究任务另按审计协议保留基线与事件边界检查点。
+快照来自聊天级
+`getVariables({ type: 'chat' }).stat_data`。只读取与当前判断相关的路径，不把整棵变量树载入上下文或倾倒给用户。普通推进仅在变量错误、声明与落地矛盾、调试不足或用户明确要求时读取；研究任务另按审计协议保留基线与事件边界检查点。
 
 ## 安全与停止
 
 - 页面正在生成、输入框禁用、目标不唯一、找不到游戏 iframe、缺少基础标记或 CDP 不可达时，不发送行动。
-- 未在 15 秒内检测到 `generating: true` 时先执行 `--inspect-only`。若页面空闲、回复未变化且没有生成迹象，可重发同一行动一次；再次失败即停止报告。页面已生成、回复变化、CDP 断开、iframe 换代或读取失败时不得重发。
+- 未在 15 秒内检测到 `generating: true` 时先执行
+  `--inspect-only`。若页面空闲、回复未变化且没有生成迹象，可重发同一行动一次；再次失败即停止报告。页面已生成、回复变化、CDP 断开、iframe 换代或读取失败时不得重发。
 - 普通任务把变量错误作为测试发现并按用户要求处理；研究任务一旦满足审计协议中的明显问题条件，立即停止新增回合并报告，除非用户明确要求错误后继续。
-- 不调用变量写入、删除楼层、`triggerSlash` 或绕过真实发送链的 `generate()`。
+- 不调用变量写入、删除楼层、`triggerSlash` 或绕过真实发送/重生成链的 `generate()`。
 
 ### 卡住的生成
 
@@ -79,4 +108,5 @@ pnpm wuxia:ui -- --inspect-only
 
 ## 旧桥专项诊断
 
-只有明确排查 Relay/桥协议时才使用 `pnpm --silent wuxia status` 或 `pnpm --silent wuxia snapshot`。Relay 离线不阻塞已通过 `--inspect-only` 的 UI runner。
+只有明确排查 Relay/桥协议时才使用 `pnpm --silent wuxia status` 或 `pnpm --silent wuxia snapshot`。Relay 离线不阻塞已通过
+`--inspect-only` 的 UI runner。

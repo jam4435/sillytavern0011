@@ -37,6 +37,19 @@ export type WorldTimeGuardResult =
       nonTimeChanges: VariableDeclaredChange[];
     };
 
+export type WorldTimeCompletionTargetResult =
+  | {
+      ok: true;
+      baseline: WorldTimeTuple;
+      target: WorldTimeTuple;
+      elapsedMinutes: number;
+      source: 'declared-duration' | 'declared-fields';
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
+
 type WorldTimeSource = Partial<Record<WorldTimeField, unknown>> | null | undefined;
 
 const TIME_PATH_PREFIX = ['世界信息', '时间'] as const;
@@ -71,6 +84,127 @@ function validateWorldTimeSource(source: WorldTimeSource, allowMissingMinute: bo
     return null;
   }
   return { 年: year, 月: month, 日: day, 时: hour, 分: minute };
+}
+
+function worldTimeToOrdinalMinutes(time: WorldTimeTuple): number {
+  return (((time.年 * 12 + (time.月 - 1)) * 30 + (time.日 - 1)) * 24 + time.时) * 60 + time.分;
+}
+
+function addWorldTimeMinutes(time: WorldTimeTuple, minutes: number): WorldTimeTuple | null {
+  if (!Number.isInteger(minutes) || minutes <= 0) return null;
+  let remaining = worldTimeToOrdinalMinutes(time) + minutes;
+  const minute = remaining % 60;
+  remaining = Math.floor(remaining / 60);
+  const hour = remaining % 24;
+  remaining = Math.floor(remaining / 24);
+  const day = (remaining % 30) + 1;
+  remaining = Math.floor(remaining / 30);
+  const month = (remaining % 12) + 1;
+  const year = Math.floor(remaining / 12);
+  return validateWorldTimeSource({ 年: year, 月: month, 日: day, 时: hour, 分: minute }, false);
+}
+
+function collectDeclaredElapsedMinutes(thoughts: readonly { text: string }[]): number[] {
+  const durations = new Set<number>();
+  const patterns = [
+    /耗时(?:约|大约)?\s*(?:(\d+)\s*(?:小时|时))?\s*(?:(\d+)\s*分(?:钟)?)?/g,
+    /\+\s*(?:(\d+)\s*(?:小时|时))?\s*(?:(\d+)\s*分(?:钟)?)\s*=/g,
+  ];
+  for (const thought of thoughts) {
+    for (const pattern of patterns) {
+      pattern.lastIndex = 0;
+      for (const match of thought.text.matchAll(pattern)) {
+        const hours = match[1] ? Number(match[1]) : 0;
+        const minutes = match[2] ? Number(match[2]) : 0;
+        const total = hours * 60 + minutes;
+        if (Number.isInteger(total) && total > 0) durations.add(total);
+      }
+    }
+  }
+  return [...durations];
+}
+
+/**
+ * 锁定稀疏时间声明原本表达的目标，只允许后续纠错补全字段，不能重新估算正文耗时。
+ */
+export function resolveWorldTimeCompletionTarget({
+  baseline: rawBaseline,
+  declaredChanges,
+  thoughts,
+  eventEnd: rawEventEnd,
+}: {
+  baseline: WorldTimeSource;
+  declaredChanges: VariableDeclaredChange[];
+  thoughts: readonly { text: string }[];
+  eventEnd?: WorldTimeSource;
+}): WorldTimeCompletionTargetResult {
+  const baseline = validateWorldTimeSource(rawBaseline, true);
+  if (!baseline) return { ok: false, reason: '当前世界时间无效，无法锁定原声明的目标时间。' };
+  const eventEnd = rawEventEnd ? validateWorldTimeSource(rawEventEnd, true) : null;
+  if (rawEventEnd && !eventEnd) return { ok: false, reason: '进行中事件结束边界无效，无法锁定目标时间。' };
+
+  const latestByField = new Map<WorldTimeField, VariableDeclaredChange>();
+  for (const change of declaredChanges.filter(item => isWorldTimePath(item.path))) {
+    if (change.path.length !== 3 || !WORLD_TIME_FIELDS.includes(change.path[2] as WorldTimeField)) {
+      return { ok: false, reason: `时间声明包含不支持的路径 ${change.displayPath}。` };
+    }
+    if (change.action === 'delete') {
+      return { ok: false, reason: `时间必需字段 ${change.displayPath} 不允许删除。` };
+    }
+    latestByField.set(change.path[2] as WorldTimeField, change);
+  }
+  if (latestByField.size === 0) return { ok: false, reason: '原回复没有可用于补全的世界时间叶子。' };
+
+  const overlaySource = { ...baseline } as Record<WorldTimeField, unknown>;
+  for (const [field, change] of latestByField) overlaySource[field] = change.value;
+  const overlay = validateWorldTimeSource(overlaySource, false);
+  if (!overlay) return { ok: false, reason: '原时间叶子包含非整数或越界值，不能通过补全其他字段修复。' };
+
+  const declaredDurations = collectDeclaredElapsedMinutes(thoughts);
+  if (declaredDurations.length > 1) {
+    return { ok: false, reason: `原 VariableThink 声明了互相冲突的耗时：${declaredDurations.join('、')} 分钟。` };
+  }
+
+  let target: WorldTimeTuple;
+  let source: 'declared-duration' | 'declared-fields';
+  if (declaredDurations.length === 1) {
+    const declaredDuration = declaredDurations[0];
+    const durationTarget = addWorldTimeMinutes(baseline, declaredDuration);
+    if (!durationTarget) return { ok: false, reason: '原 VariableThink 声明的耗时无效。' };
+    for (const [field, change] of latestByField) {
+      if (change.value !== durationTarget[field]) {
+        return {
+          ok: false,
+          reason: `原耗时锁定的新时间为 ${formatWorldTime(durationTarget)}，但原叶子“${field}”声明为 ${String(change.value)}，二者冲突。`,
+        };
+      }
+    }
+    target = durationTarget;
+    source = 'declared-duration';
+  } else {
+    if (compareWorldTime(overlay, baseline) <= 0) {
+      return {
+        ok: false,
+        reason: `原稀疏叶子覆盖后得到 ${formatWorldTime(overlay)}，且未声明可解析耗时，无法在不猜测进位的前提下补全。`,
+      };
+    }
+    target = overlay;
+    source = 'declared-fields';
+  }
+
+  if (eventEnd && compareWorldTime(target, eventEnd) > 0) {
+    return {
+      ok: false,
+      reason: `原声明锁定的新时间 ${formatWorldTime(target)} 超过事件结束边界 ${formatWorldTime(eventEnd)}，不能靠改变耗时修复。`,
+    };
+  }
+  return {
+    ok: true,
+    baseline,
+    target,
+    elapsedMinutes: worldTimeToOrdinalMinutes(target) - worldTimeToOrdinalMinutes(baseline),
+    source,
+  };
 }
 
 export function compareWorldTime(left: WorldTimeTuple, right: WorldTimeTuple): number {

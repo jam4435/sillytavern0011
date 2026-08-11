@@ -24,10 +24,13 @@ import {
   type VariableDeclaredChange,
 } from './variableChanges';
 import {
+  compareWorldTime,
   findEarliestRunningEventEnd,
   isWorldTimePath,
+  resolveWorldTimeCompletionTarget,
   validateWorldTimePatch,
   type WorldTimeGuardResult,
+  type WorldTimeTuple,
 } from './worldTimeGuard';
 
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
@@ -1443,6 +1446,8 @@ function getWorldTimeGuardContext(): {
 
 function createWorldTimeRepairPrompt({
   guard,
+  lockedTarget,
+  lockedElapsedMinutes,
   statData,
   latestAssistantBody,
   originalTimeBlocks,
@@ -1450,6 +1455,8 @@ function createWorldTimeRepairPrompt({
   previousResponse,
 }: {
   guard: Extract<WorldTimeGuardResult, { ok: false }>;
+  lockedTarget: WorldTimeTuple;
+  lockedElapsedMinutes: number;
   statData: Record<string, unknown>;
   latestAssistantBody: string;
   originalTimeBlocks: string;
@@ -1468,6 +1475,8 @@ function createWorldTimeRepairPrompt({
 当前完整时间：${JSON.stringify(guard.baseline)}
 非法候选时间：${JSON.stringify(guard.candidate)}
 进行中事件最早结束边界：${JSON.stringify(guard.eventEnd)}
+锁定耗时：${lockedElapsedMinutes} 分钟
+锁定新时间：${JSON.stringify(lockedTarget)}
 
 【最新 assistant 正文】
 ${latestAssistantBody || '（空）'}
@@ -1480,12 +1489,11 @@ ${originalTimeBlocks || '（无可序列化声明）'}
 ${previousFailure ? `\n【上一次纠错仍失败】\n${previousFailure}\n上一次返回：\n${previousResponse}` : ''}
 
 【唯一任务】
-1. 根据最新正文已经发生的可感知耗时，重算新时间；不得猜测或改写正文。
-2. 若正文实际没有需要持久化的耗时，只输出 VariableThink，不输出任何时间动作。
-3. 若需更新，VariableThink 必须简写“旧完整时间 + 耗时 = 新完整时间”，并完整声明年/月/日/时/分五字段。
-4. 新时间必须严格晚于当前时间，不得越过事件结束边界。事件完整收束时可准确等于边界。
-5. 只允许输出 <VariableThink> 以及路径为 世界信息.时间 的 VariableEdit/VariableInsert。不得输出正文、解释、选项或任何其他变量路径。
-6. 时间字段已存在用 Edit；仅旧档缺分时，分用 Insert、其余四字段用 Edit。`;
+1. 原回复声明的耗时和目标时间已经由程序锁定；禁止根据正文、事件边界或自己的判断重新估算、缩短或延长耗时。
+2. 你只能把“锁定新时间”原样补全为年/月/日/时/分五字段；任何字段与锁定值不同都视为纠错失败。
+3. VariableThink 必须简写“旧完整时间 + 锁定耗时 = 锁定新时间”，不得换用其他耗时。
+4. 只允许输出 <VariableThink> 以及路径为 世界信息.时间 的 VariableEdit/VariableInsert。不得输出正文、解释、选项或任何其他变量路径。
+5. 时间字段已存在用 Edit；仅旧档缺分时，分用 Insert、其余四字段用 Edit。`;
 }
 
 export async function validateOrRepairWorldTimeDeclarations({
@@ -1543,6 +1551,16 @@ export async function validateOrRepairWorldTimeDeclarations({
     eventEnd: initialGuard.eventEnd,
   });
 
+  const completionTarget = resolveWorldTimeCompletionTarget({
+    baseline,
+    declaredChanges: initialGuard.timeChanges,
+    thoughts,
+    eventEnd,
+  });
+  if (!completionTarget.ok) {
+    throw new Error(`原时间声明无法在不改变耗时的前提下补全：${completionTarget.reason}`);
+  }
+
   const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
   if (requestSettings.apiMode === 'custom') {
     const validationMessage = validateSummaryApiConfig(requestSettings.apiConfig, { requireModel: true });
@@ -1556,6 +1574,8 @@ export async function validateOrRepairWorldTimeDeclarations({
   const requestRepair = async () => {
     const repairPrompt = createWorldTimeRepairPrompt({
       guard: initialGuard,
+      lockedTarget: completionTarget.target,
+      lockedElapsedMinutes: completionTarget.elapsedMinutes,
       statData,
       latestAssistantBody,
       originalTimeBlocks,
@@ -1602,6 +1622,11 @@ export async function validateOrRepairWorldTimeDeclarations({
         eventEnd,
       });
       if (!repairedGuard.ok) throw new Error(repairedGuard.reason);
+      if (!repairedGuard.candidate || compareWorldTime(repairedGuard.candidate, completionTarget.target) !== 0) {
+        throw new Error(
+          `纠错返回擅自改变了原声明时间：必须为 ${JSON.stringify(completionTarget.target)}，实际为 ${JSON.stringify(repairedGuard.candidate)}。`,
+        );
+      }
       return {
         changes: [...initialGuard.nonTimeChanges, ...repairedGuard.timeChanges],
         thoughts: [...thoughts, ...repairedState.thoughts],

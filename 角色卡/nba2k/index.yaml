@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=https://testingcf.jsdelivr.net/gh/StageDog/tavern_sync/dist/schema/character.zh.json
 头像: 头像
-版本: "0.2.0"
+版本: "0.3.0"
 作者: ""
-备注: "NBA2K16 生涯模拟：球场俯视图前端 + 骰子判定 + AI 叙事"
+备注: "NBA2K16 生涯模拟 v3：43项能力 + 多阶段骰子 + AI边界结算"
 
 第一条消息:
   - 内容: "【开始游戏】\r\n"

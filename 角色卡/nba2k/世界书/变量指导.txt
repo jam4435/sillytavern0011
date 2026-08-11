@@ -1,139 +1,44 @@
-# ERA 变量操作规则（NBA2K16 生涯模拟，状态版本 2）
+# ERA变量规则（NBA2K v3）
 
-## 一、核心原则
+`{{ERA:$ALLDATA}}` 是当前唯一真相。`stat_data.版本` 固定为3。无变化不输出指令；每种指令每条回复最多一个，内部必须是合法JSON。
 
-每次回应都以深度世界书注入的 `{{ERA:$ALLDATA}}` 展开结果为当前真相。只提交本回合实际发生的增量，不得重建整棵 `stat_data`，不得猜测快照中不存在的旧值。
+## 指令语义
 
-1. 无变化则不操作：禁止生成任何 ERA 指令块。
-2. 判定不可篡改：用户消息中 `<行动判定>` 的等级是最终裁决，变量结算必须与之相符。
-3. 正文与变量一致：得分、球权、时间、个人统计、体力和站位必须互相一致。
-4. 路径必须已存在才能 Edit；不存在的字段只能 Insert。Delete 只用于确实要删除的节点。
-5. 每种 ERA 指令在一条回复中至多输出一个块。输出顺序固定为正文、`<options>`、`<VariableThink>`、Insert/Edit/Delete。
-6. `<VariableInsert>/<VariableEdit>/<VariableDelete>` 内只能放一个合法 JSON 对象，不写注释、Markdown 或尾随逗号；`<VariableThink>` 只写简短结算摘要，不写隐式思维链。
+- `VariableInsert` 只用于当前不存在的新对象字段或map节点。
+- 已存在数组必须读取快照、生成完整新数组并用 `VariableEdit` 写回；禁止Insert追加，禁止写数组索引。代言、关系、待办、阵容、站位都适用。
+- `VariableDelete` 只删除已存在对象节点；数组删除仍整体Edit。
+- 比赛动作回合禁止模型输出任何变量指令，前端会从NBASettlement生成唯一规范VariableEdit。
 
-## 二、ERA 指令
+## v3比赛状态
 
-### `<VariableInsert>`：插入不存在的节点
+`比赛`含：进行中、对阵、节次、剩余秒数、投篮时钟、比分、球权、跳球胜方、战术、站位、本节球队犯规、暂停、阵容、回合阶段、待处理情境、回合情境、球员状态、回合摘要。
 
-仅用于当前快照里不存在的对象字段或 map 条目。不能用它向已经存在的数组“追加”。
+战术每方结构：`{offense:'基础|五外|四外一内|挡拆|低位|动态进攻', defense:'人盯人|二三联防|换防|沉退|延误', pace:'慢|标准|快', helpIntensity:0-100, rebound:'优先退防|均衡|冲抢'}`。
 
-```text
-<VariableInsert>
-{
-  "场外.队友好感.新队友英文key": 50
-}
-</VariableInsert>
-```
+球员状态完整字段：体力、得分、篮板、助攻、抢断、盖帽、失误、犯规、投篮命中、投篮出手、三分命中、三分出手、罚球命中、罚球出手、进攻篮板、防守篮板、上场秒数、手感、连续命中、连续打铁。
 
-### `<VariableEdit>`：修改已存在节点
+## v3生涯状态
 
-标量和对象叶子只写变化路径：
+`生涯`含姓名、球队、位置、附身球员、可选自定义球员、赛季、赛程索引、能力、发展、倾向、动态徽章、热区、教练信任、球队角色、赛季统计、成长点。
 
-```text
-<VariableEdit>
-{
-  "比赛.比分.主": 57,
-  "比赛.剩余秒数": 415,
-  "比赛.球权": "客",
-  "比赛.球员状态.Stephen Curry.得分": 21,
-  "比赛.球员状态.Stephen Curry.体力": 79,
-  "比赛.回合摘要": "库里借挡拆命中三分"
-}
-</VariableEdit>
-```
+能力为 `overall` 加以下43项0-99数值：
 
-### 数组 Edit 协议
+- standingLayup, drivingLayup, postFade, postHook, postControl, drawFoul
+- movingClose, standingClose, movingMid, standingMid, movingThree, standingThree, freeThrow
+- ballControl, passVision, passIQ, passAccuracy, offRebound
+- standingDunk, drivingDunk, contactDunk, shotIQ, hands
+- defRebound, block, shotContest, steal, onBallDefenseIQ, lowPostDefenseIQ, reactionTime
+- boxout, lateralQuickness, speed, acceleration, vertical, strength, stamina, hustle, durability
+- offensiveConsistency, defensiveConsistency, composure, potential
 
-ERA 把数组视为一个原子叶子。修改已有数组时，必须读取快照中的旧数组，在内存中完成追加、删除或替换，然后用 `<VariableEdit>` 写回完整新数组；禁止写 `数组.0`、`数组[0]`，也禁止用 Insert 向已有数组追加。
+自定义球员身体仅为 `body:{heightCm,weightKg,wingspanCm}`，兼容字段height_cm必须等于heightCm。
 
-```text
-<VariableEdit>
-{
-  "场外.代言": [
-    { "品牌": "斯伯丁", "年薪": 800000, "要求": "场均12分", "状态": "谈判中" }
-  ],
-  "场外.日程.待办": ["赛前训练", "经纪人会面"]
-}
-</VariableEdit>
-```
+发展含mode、style、10组0-20等级、growthPoints、lastTrainingDate。10组为offDribble、finishing、midRange、threePoint、postScoring、agility、strength、rebounding、playmaking、defending。能力、发展、总评、成长点、倾向、徽章与热区均由前端计算，AI普通场外回复不得修改。
 
-`徽章`、`代言`、`关系`、`日程.待办`、`阵容.<主|客>.场上`、`阵容.<主|客>.替补`、`站位.主`、`站位.客` 都遵守这一协议。
+动态徽章固定24枚，等级为未解锁/铜/银/金；热区固定14区并保存makes/attempts/state；倾向按动作族保存value和samples。
 
-### `<VariableDelete>`：删除已存在节点
+## 场外状态
 
-值写 `{}`。数组内删除元素仍走“完整数组 Edit”，不用 Delete。
+场外含资金、声望、粉丝、经纪人、代言、合同、关系、队友好感、日程。代言和关系新增时，因数组已存在，必须VariableEdit完整新数组。
 
-```text
-<VariableDelete>
-{
-  "场外.队友好感.已离队球员key": {}
-}
-</VariableDelete>
-```
-
-## 三、版本 2 字段总表
-
-### 顶层（stat_data）
-
-- `版本`: 固定数字 `2`，不得删除或改成其他值。
-- `比赛`: 比赛状态。
-- `生涯`: 主角与赛季状态。
-- `场外`: 资金、合同、关系与日程状态。
-
-### 比赛（stat_data.比赛）
-
-- `进行中`: boolean。开赛由前端置 true；终场置 false。
-- `对阵`: `{ 主队: string, 客队: string }`，值为球队 ID。
-- `节次`: 1-4；加时为 5、6……
-- `剩余秒数`: 常规单节从 720 开始，加时从 300 开始。
-- `比分`: `{ 主: number, 客: number }`。
-- `球权`: `'主' | '客'`。
-- `战术`: `{ 主: string, 客: string }`。
-- `本节球队犯规`: `{ 主: number, 客: number }`；每节开始清零。
-- `暂停`: `{ 主: number, 客: number }`；记录双方剩余暂停。
-- `阵容`: `{ 主: { 场上: string[], 替补: string[] }, 客: { 场上: string[], 替补: string[] } }`。两边场上通常各 5 人；换人时同时整体 Edit 场上和替补数组。
-- `回合阶段`: `'常规回合' | '篮板争抢' | '死球'`。未决投篮只进入篮板争抢，不能提前把球权当作已经转换。
-- `回合情境`: string，简短记录待处理情境，例如“库里三分打铁，双方争抢长篮板”或“詹姆斯被犯规，等待两次罚球”。
-- `站位`: `{ 主: CourtSpot[], 客: CourtSpot[] }`；每项 `{ 球员: string, x: 0-100, y: 0-100, 持球?: boolean }`。持球标记全场最多一个，攻守转换或换人后整体 Edit 两边数组。
-- `球员状态.<英文key>`: `{ 体力, 得分, 篮板, 助攻, 抢断, 盖帽, 失误, 犯规, 手感, 连续命中, 连续打铁 }`。
-  - `体力`: 0-100；其余计数均为非负整数。
-  - `手感`: `'热' | '平' | '冷'`。
-  - `连续命中` / `连续打铁`: number；命中时前者 +1、后者归零，投失时反之；连续命中达到 2 为热，连续打铁达到 2 为冷，否则为平。
-- `回合摘要`: string，一句话概括已经结算的回合。
-
-### 生涯（stat_data.生涯）
-
-- `姓名`: string；`球队`: 球队 ID；`位置`: PG/SG/SF/PF/C；`赛季`: string；`附身球员`: 英文球员 key。
-- `自定义球员`: 自建档时存在，结构为完整 PlayerData；带入现役时可不存在。不得在普通剧情中改写其静态身份数据。
-- `赛程索引`: number，赛后 +1。
-- `能力`: 主角能力，必须使用以下完整 keys，值均为 0-99：
-  - `overall`
-  - `insideScoring`, `outsideScoring`, `threePoint`, `midRange`, `freeThrow`
-  - `layup`, `dunk`, `speed`, `ballHandle`, `passing`
-  - `perimeterD`, `interiorD`, `steal`, `block`
-  - `offRebound`, `defRebound`, `stamina`, `strength`, `potential`
-- `徽章`: string[]；修改时整体 Edit。
-- `赛季统计`: `{ 场均得分, 场均篮板, 场均助攻, 出场数 }`。
-- `成长点`: number。
-
-能力只在训练或升级事件中修改；单次训练单项最多 +2，所有能力保持 0-99。
-
-### 场外（stat_data.场外）
-
-- `资金`: number；`声望`: 0-100；`粉丝`: 非负整数。
-- `经纪人`: `{ 姓名, 好感, 等级 } | null`。
-- `代言`: `{ 品牌, 年薪, 要求, 状态 }[]`。
-- `合同`: `{ 球队, 年限, 年薪, 到期赛季 } | null`。
-- `关系`: `{ 姓名, 身份, 好感, 阶段, 事件线 }[]`。
-- `队友好感`: `Record<英文球员key, number>`，范围 0-100。
-- `日程`: `{ 日期: 'YYYY-MM-DD', 下一场: 'vs XXX' | '@ XXX', 待办: string[] }`。
-
-关系阶段门槛：相识→暧昧需好感≥40；暧昧→恋爱需好感≥65且发生告白；恋爱→稳定需好感≥85。单次普通互动变化 -10 至 +8，重大事件最多 ±12。场外每轮推进 1-3 天，不得跳过比赛日。
-
-## 四、结算清单
-
-比赛回合至少更新：剩余秒数、行动者体力、回合摘要，以及本回合实际变化的比分/球权/阶段/情境/个人统计/站位。投篮未决时进入“篮板争抢”，待抢板回合后再确定球权。
-
-赛后：`比赛.进行中=false`、赛程索引 +1、赛季统计重算、成长点结算、日程推进并写好下一场；清除未决回合情境。
-
-场外：推进日期，并同步所有涉及的资金、好感、代言、合同与待办数组。
+场外普通回合只允许修改实际发生的资金、声望、粉丝、经纪人、代言、合同、关系、队友好感和日程。不得改版本、静态球员数据或前端判定字段。

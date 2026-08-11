@@ -44,7 +44,7 @@ function bodyMatchup(actor: PlayerData, defender: PlayerData | null): number {
   );
 }
 
-function situationalModifiers(input: ResolveInput, helpCount: number): { label: string; value: number }[] {
+function situationalModifiers(input: ResolveInput, helpCount: number, helpWeight: number): { label: string; value: number }[] {
   const { actorStatus, situation } = input;
   const mods: { label: string; value: number }[] = [];
   if (actorStatus.体力 < 20) mods.push({ label: '体力透支', value: -12 });
@@ -55,9 +55,19 @@ function situationalModifiers(input: ResolveInput, helpCount: number): { label: 
   if (situation.mismatch) mods.push({ label: '错位', value: 6 });
   if (situation.coverage === 'open') mods.push({ label: '空位', value: 8 });
   if (situation.coverage === 'tight') mods.push({ label: '严防', value: -8 });
-  if (helpCount) mods.push({ label: `协防×${helpCount}`, value: -Math.min(10, helpCount * 3) });
+  if (helpCount) mods.push({ label: `协防×${helpCount}`, value: -Math.min(10, Math.round(helpWeight * 4)) });
   if (situation.offenseTactic?.offense === '五外') mods.push({ label: '五外空间', value: 4 });
   if (situation.defenseTactic?.defense === '二三联防') mods.push({ label: '联防收缩', value: -3 });
+  if (situation.actorSpot && situation.teammateSpots) {
+    const crowding = situation.teammateSpots.filter(spot => spot.球员 !== input.actor.name && Math.hypot(spot.x - situation.actorSpot!.x, spot.y - situation.actorSpot!.y) < 10).length;
+    if (crowding) mods.push({ label: '进攻空间拥挤', value: -Math.min(6, crowding * 2) });
+  }
+  if (ACTION_SPECS[input.action].family === '挡拆') {
+    const scheme = situation.defenseTactic?.defense;
+    if (scheme === '换防') mods.push({ label: '挡拆换防', value: -2 });
+    if (scheme === '沉退' && (input.action === '挡拆突破' || input.action === '顺下传球')) mods.push({ label: '沉退护框', value: -4 });
+    if (scheme === '延误') mods.push({ label: '夹击延误', value: -4 });
+  }
   if (situation.hotZoneModifier) mods.push({ label: '冷热区', value: situation.hotZoneModifier });
   if (situation.badgeModifier) mods.push({ label: '徽章', value: clamp(situation.badgeModifier, -8, 8) });
   if (situation.defenderFouls >= 4) mods.push({ label: '防守犯规危机', value: 4 });
@@ -182,11 +192,15 @@ export function resolveAction(input: ResolveInput): ActionResolution {
   const spec = ACTION_SPECS[input.action];
   const help = nearbyHelp(input);
   const primaryDefense = input.defender ? weightedScore(spec.defense, input.defender.attrs, input.defender.overall, input.defender.body) : (spec.flatDefense ?? 55);
+  const partnerDefense = spec.family === '挡拆' && input.partnerDefender
+    ? weightedScore(spec.defense, input.partnerDefender.attrs, input.partnerDefender.overall, input.partnerDefender.body)
+    : null;
+  const matchupDefense = partnerDefense === null ? primaryDefense : (primaryDefense + partnerDefense) / 2;
   const helpScores = help.players.map(player => weightedScore(spec.defense, player.attrs, player.overall, player.body));
-  const defenseScore = helpScores.length ? primaryDefense * .72 + (helpScores.reduce((a, b) => a + b, 0) / helpScores.length) * .28 : primaryDefense;
+  const defenseScore = helpScores.length ? matchupDefense * .72 + (helpScores.reduce((a, b) => a + b, 0) / helpScores.length) * .28 : matchupDefense;
   let attackScore = weightedScore(spec.attack, input.actor.attrs, input.actor.overall, input.actor.body);
   if (spec.family === '挡拆' && input.partner) attackScore = attackScore * .72 + (input.partner.attrs.strength + input.partner.attrs.passIQ) / 2 * .28;
-  const mods = situationalModifiers(input, help.players.length);
+  const mods = situationalModifiers(input, help.players.length, help.weight);
   const body = bodyMatchup(input.actor, input.defender);
   if (Math.abs(body) >= .5) mods.push({ label: '体型对抗', value: Math.round(body * 10) / 10 });
   const modifierTotal = mods.reduce((sum, item) => sum + item.value, 0);

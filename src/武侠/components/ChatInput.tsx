@@ -154,7 +154,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
         {/* 重新生成按钮 */}
         <button
           className={`chat-regenerate-btn ${isRegenerating ? 'spinning' : ''}`}
-          data-wuxia-automation="generation-state"
+          aria-label="重新生成上一条回复"
+          data-wuxia-automation="generation-state regenerate-last-reply"
           data-wuxia-generating={isRegenerating ? 'true' : 'false'}
           onClick={handleRegenerate}
           disabled={regenerateDisabled}

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { parseDeclaredVariableChanges } from './variableChanges';
-import { findEarliestRunningEventEnd, validateWorldTimePatch, type WorldTimeTuple } from './worldTimeGuard';
+import {
+  findEarliestRunningEventEnd,
+  resolveWorldTimeCompletionTarget,
+  validateWorldTimePatch,
+  type WorldTimeTuple,
+} from './worldTimeGuard';
 
 const baseline: WorldTimeTuple = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 55 };
 
@@ -120,6 +125,62 @@ describe('validateWorldTimePatch', () => {
         eventEnd,
       }),
     ).toMatchObject({ ok: false, code: 'event-end-exceeded' });
+  });
+});
+
+describe('resolveWorldTimeCompletionTarget', () => {
+  it.each([
+    {
+      current: { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 0 },
+      minute: 15,
+      thought: '酒馆对话耗时约15分钟',
+      target: { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 15 },
+    },
+    {
+      current: { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 10 },
+      minute: 30,
+      thought: '众人离店耗时约20分钟',
+      target: { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 30 },
+    },
+    {
+      current: { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 55 },
+      minute: 10,
+      thought: '1200年8月15日12时55分 + 15分钟 = 1200年8月15日13时10分',
+      target: { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 10 },
+    },
+  ] satisfies Array<{
+    current: WorldTimeTuple;
+    minute: number;
+    thought: string;
+    target: WorldTimeTuple;
+  }>)('按原声明耗时锁定目标 $current → $target', ({ current, minute, thought, target }) => {
+    expect(
+      resolveWorldTimeCompletionTarget({
+        baseline: current,
+        declaredChanges: changesFrom({ 世界信息: { 时间: { 分: minute } } }),
+        thoughts: [{ text: thought }],
+      }),
+    ).toMatchObject({ ok: true, target });
+  });
+
+  it('原耗时与时间叶子冲突时拒绝重新估算', () => {
+    expect(
+      resolveWorldTimeCompletionTarget({
+        baseline,
+        declaredChanges: changesFrom({ 世界信息: { 时间: { 分: 10 } } }),
+        thoughts: [{ text: '耗时约5分钟' }],
+      }),
+    ).toMatchObject({ ok: false, reason: expect.stringContaining('二者冲突') });
+  });
+
+  it('跨小时稀疏声明未写耗时时拒绝猜测进位', () => {
+    expect(
+      resolveWorldTimeCompletionTarget({
+        baseline,
+        declaredChanges: changesFrom({ 世界信息: { 时间: { 分: 10 } } }),
+        thoughts: [],
+      }),
+    ).toMatchObject({ ok: false, reason: expect.stringContaining('无法在不猜测进位') });
   });
 });
 

@@ -1,5 +1,5 @@
-import { GROUP_KEYS, badgeLevel, hotZoneState, overallOf, ratingsFromGroups, upgradeCost } from '../engine/development';
-import type { ActionResolution, NormalizedSettlement, UpgradeGroupKey } from '../engine/types';
+import { GROUP_KEYS, badgeLevel, bodyCaps, hotZoneState, overallOf, ratingsFromGroups, upgradeCost } from '../engine/development';
+import type { ActionResolution, MatchState, NormalizedSettlement, UpgradeGroupKey } from '../engine/types';
 import type { CareerState, OffCourtState } from './statReader';
 
 export function upgradeCareer(career: CareerState, group: UpgradeGroupKey): CareerState {
@@ -8,7 +8,8 @@ export function upgradeCareer(career: CareerState, group: UpgradeGroupKey): Care
   const cap = Math.max(14, Math.min(20, 14 + Math.floor((career.能力.potential - 75) / 3)));
   if (level >= cap || career.发展.growthPoints < cost) return career;
   const groups = { ...career.发展.groups, [group]: level + 1 };
-  const attrs = ratingsFromGroups(groups, career.能力.potential);
+  let attrs = ratingsFromGroups(groups, career.能力.potential);
+  if (career.自定义球员) attrs = bodyCaps(attrs, career.自定义球员.body, career.位置);
   return {
     ...career,
     能力: { overall: overallOf(attrs, career.位置), ...attrs },
@@ -81,6 +82,30 @@ export function updateCareerDynamics(career: CareerState, resolution: ActionReso
 
 export function postGameGrowthPoints(performance: number): number {
   return performance < 60 ? 2 : performance < 70 ? 3 : performance < 80 ? 4 : performance < 90 ? 5 : 6;
+}
+
+export function finishCareerGame(career: CareerState, match: MatchState): CareerState {
+  const status = match.球员状态[career.附身球员];
+  if (!status) return career;
+  const performance = Math.round(Math.max(0, Math.min(100,
+    50 + status.得分 * .7 + status.篮板 * 1.2 + status.助攻 * 1.5 + status.抢断 * 2.5 + status.盖帽 * 2.2 - status.失误 * 2 - status.犯规 * .5,
+  )));
+  const reward = postGameGrowthPoints(performance);
+  const previousGames = Number(career.赛季统计.出场数 ?? 0);
+  const average = (key: string, value: number) => ((Number(career.赛季统计[key] ?? 0) * previousGames) + value) / (previousGames + 1);
+  const points = career.发展.growthPoints + reward;
+  return {
+    ...career,
+    赛程索引: career.赛程索引 + 1,
+    发展: { ...career.发展, growthPoints: points }, 成长点: points,
+    赛季统计: {
+      ...career.赛季统计, 出场数: previousGames + 1,
+      场均得分: Math.round(average('场均得分', status.得分) * 10) / 10,
+      场均篮板: Math.round(average('场均篮板', status.篮板) * 10) / 10,
+      场均助攻: Math.round(average('场均助攻', status.助攻) * 10) / 10,
+      上场表现: performance,
+    },
+  };
 }
 
 export function assertDevelopmentGroups(groups: CareerState['发展']['groups']): boolean {

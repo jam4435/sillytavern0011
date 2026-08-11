@@ -1,7 +1,7 @@
 interface:
-  display_name: "武侠剧情推进与审计"
-  short_description: "通过真实酒馆回合推进并审计武侠剧情、事件连续性与变量结算"
-  default_prompt: "使用 $wuxia-ai-advance-story 推进或研究武侠剧情，并按需审计事件连续性与变量结算。"
+  display_name: '武侠剧情推进与审计'
+  short_description: '通过真实酒馆回合或受控重生成审计武侠剧情与变量结算'
+  default_prompt: '使用 $wuxia-ai-advance-story 推进、受控重新生成或研究武侠剧情，并审计事件连续性与变量结算。'
 
 policy:
   allow_implicit_invocation: false

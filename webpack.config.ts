@@ -622,11 +622,12 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
           return callback();
         }
 
-        // CK 领主 RPG 需要既能嵌入酒馆，也能作为独立 HTML 做回归测试。
-        // 仅对该入口及 Pinia 的 Vue 依赖关闭宿主全局外置，避免影响其他既有前端。
+        // CK 领主 RPG 与 NBA2K 需要既能嵌入酒馆，也能作为独立 HTML 做回归测试。
+        // 仅对这些入口所需依赖关闭宿主全局外置，避免影响其他既有前端。
         const normalizedContext = context.replaceAll('\\', '/');
         if (
           (normalizedContext.includes('/src/ck') && ['vue', 'pinia', 'zod', 'json5'].includes(request)) ||
+          (normalizedContext.includes('/src/nba2k') && request === 'zod') ||
           (normalizedContext.includes('/node_modules/.pnpm/pinia@') && request === 'vue')
         ) {
           return callback();
