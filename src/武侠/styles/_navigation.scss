@@ -193,66 +193,10 @@
     flex-shrink: 0;
     width: 3.5rem;
     height: 3.5rem;
-    background: linear-gradient(135deg, rgba(69, 26, 3, 0.18) 0%, rgba(113, 63, 18, 0.12) 50%, rgba(69, 26, 3, 0.18) 100%);
-    border: 1px solid rgba(181, 137, 80, 0.4);
-    border-radius: 50%;
     align-items: center;
     justify-content: center;
     margin-bottom: 1.5rem;
     position: relative;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    animation: logoGlow 3s ease-in-out infinite;
-
-    // 外发光环
-    &::before {
-      content: '';
-      position: absolute;
-      inset: -4px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, transparent 70%);
-      opacity: 0.6;
-      animation: logoRing 3s ease-in-out infinite;
-    }
-
-    // 内部光晕
-    &::after {
-      content: '';
-      position: absolute;
-      inset: 2px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
-      pointer-events: none;
-    }
-
-    &:hover {
-      transform: scale(1.08);
-      border-color: rgba(212, 175, 55, 0.6);
-      box-shadow:
-        0 0 20px rgba(181, 137, 80, 0.4),
-        0 0 40px rgba(212, 175, 55, 0.2);
-    }
-  }
-}
-
-@keyframes logoGlow {
-  0%,
-  100% {
-    box-shadow: 0 0 15px rgba(181, 137, 80, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 25px rgba(181, 137, 80, 0.4);
-  }
-}
-
-@keyframes logoRing {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.3;
   }
 }
 

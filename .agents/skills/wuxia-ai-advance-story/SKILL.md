@@ -23,16 +23,26 @@ RPC 或桥接代替真实发送链。
 
 ## 开始前
 
-1. 确认专用 Chrome 已开放 CDP，默认地址为 `http://127.0.0.1:9333`，并保持酒馆武侠页面打开；不同地址或页面使用
+1. 启动或复用固定的测试专用 Chrome profile。所有测试浏览器必须使用以下参数，默认 CDP 地址为
+   `http://127.0.0.1:9333`：
+
+```powershell
+& "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" `
+  --remote-debugging-port=9333 `
+  --user-data-dir="F:\Develop\AI\sillytavern\.wuxia-chrome-profile"
+```
+
+   该 profile 是测试配置的唯一持久化位置：主题、额外变量模式、API profile 等浏览器端设置会跨重启保留。不得改用临时目录、无 `--user-data-dir` 的 Chrome，或日常 Chrome 的 Default profile；不得删除或清空此目录。仅在用户明确要求时才变更端口或 profile 路径，并同步使用 `--endpoint`。
+2. 确认该 Chrome 已开放 CDP，并保持酒馆武侠页面打开；不同地址或页面使用
    `--endpoint` 或 `--page-url`。
-2. 先只读检查：
+3. 先只读检查：
 
 ```powershell
 pnpm wuxia:ui -- --inspect-only
 ```
 
-3. 确认页面空闲、输入可用、iframe 与基础自动化标记正常。不要为了取得历史调试区而发送行动。
-4. 仅在用户明确要求推进、真实回归，或已授权测试聊天时发送行动。
+4. 确认页面空闲、输入可用、iframe 与基础自动化标记正常。不要为了取得历史调试区而发送行动。
+5. 仅在用户明确要求推进、真实回归，或已授权测试聊天时发送行动。
 
 ## 真实推进
 

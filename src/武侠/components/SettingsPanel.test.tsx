@@ -29,11 +29,33 @@ function renderSettingsPanel(settings: DisplaySettings, onSettingsChange = vi.fn
   return onSettingsChange;
 }
 
+function openSettingsBlock(name: string) {
+  const toggle = screen.getByRole('button', { name });
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(toggle);
+}
+
 describe('SettingsPanel theme controls', () => {
+  it('keeps every collapsible settings block closed by default', () => {
+    renderSettingsPanel(createDefaultDisplaySettings());
+
+    for (const name of ['界面主题', '正文', '背景']) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+    }
+    expect(screen.queryByRole('radio', { name: /水墨/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /额外模型/ }));
+    for (const name of ['API', '自动总结', '额外变量']) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+    }
+    expect(screen.queryByLabelText('只读上下文轮数')).not.toBeInTheDocument();
+  });
+
   it('emits ink-wash settings when the ink theme is selected', () => {
     const settings = createDefaultDisplaySettings();
     const onSettingsChange = renderSettingsPanel(settings);
 
+    openSettingsBlock('界面主题');
     fireEvent.click(screen.getByRole('radio', { name: /水墨/ }));
 
     expect(onSettingsChange).toHaveBeenCalledTimes(1);
@@ -82,6 +104,7 @@ describe('SettingsPanel theme controls', () => {
     };
     const onSettingsChange = renderSettingsPanel(settings);
 
+    openSettingsBlock('界面主题');
     fireEvent.click(screen.getByRole('radio', { name: /黑金/ }));
 
     expect(onSettingsChange).toHaveBeenCalledWith(
@@ -116,6 +139,7 @@ describe('SettingsPanel theme controls', () => {
       },
     };
     const onSettingsChange = renderSettingsPanel(settings);
+    openSettingsBlock('正文');
     const fontColorInput = screen
       .getAllByDisplayValue('#2a2118')
       .find(element => (element as HTMLInputElement).type === 'text');
@@ -138,6 +162,7 @@ describe('SettingsPanel theme controls', () => {
   it('offers the four content-font presets and emits the selected font', () => {
     const settings = createDefaultDisplaySettings();
     const onSettingsChange = renderSettingsPanel(settings);
+    openSettingsBlock('正文');
     const fontSelect = screen.getByLabelText('正文字体');
 
     expect(
@@ -178,6 +203,7 @@ describe('SettingsPanel theme controls', () => {
     const onSettingsChange = renderSettingsPanel(settings);
 
     fireEvent.click(screen.getByRole('button', { name: /额外模型/ }));
+    openSettingsBlock('额外变量');
     fireEvent.change(screen.getByLabelText('只读上下文轮数'), { target: { value: '2' } });
 
     expect(onSettingsChange).toHaveBeenCalledWith({
@@ -194,6 +220,7 @@ describe('SettingsPanel theme controls', () => {
     const onSettingsChange = renderSettingsPanel(settings);
 
     fireEvent.click(screen.getByRole('button', { name: /额外模型/ }));
+    openSettingsBlock('额外变量');
     expect(screen.getByLabelText('忽略的附属标签')).toHaveValue('tucao\ncurrent_event\nprogress');
     expect(screen.getByLabelText('正文开始边界')).toHaveValue('</konatan_planning~>');
 

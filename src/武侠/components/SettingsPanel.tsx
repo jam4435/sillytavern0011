@@ -115,12 +115,12 @@ const AUTO_ADVANCE_MAX_COUNT = 50;
 const SUMMARY_MODEL_LIST_ID = 'wuxia-summary-model-list';
 const API_SELECTION_PRESET_VALUE = 'preset';
 const DEFAULT_OPEN_SETTING_BLOCKS: Record<SettingsCollapsibleId, boolean> = {
-  appearanceTheme: true,
-  appearanceText: true,
-  appearanceBackground: true,
-  extraModelApi: true,
-  extraModelSummary: true,
-  extraModelVariables: true,
+  appearanceTheme: false,
+  appearanceText: false,
+  appearanceBackground: false,
+  extraModelApi: false,
+  extraModelSummary: false,
+  extraModelVariables: false,
 };
 const SUMMARY_API_SOURCES = [
   ['openai', 'OpenAI'],
