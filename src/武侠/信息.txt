@@ -1,237 +1,51 @@
-武侠自动化额外变量 / ERA 卡顿诊断记录
-记录日期：2026-07-23
+## 隐性规则定义与适用约束
+  定义: 此为AI叙事引擎的最高元规则，用于规范自身的创作逻辑与对指令响应。故事内的角色与用户只能通过高度的逻辑自洽间接感受其存在。
+  适用范围: AI自身的叙事生成，以及所有来自【{{user}}】推动剧情的指令。每一次生成文本均全自动触发。
+  核心描述: 必须唤醒'审理'、'衡平'、'天道'三重人格进行逻辑审查，修正叙事并否决违背世界法则的指令。（注意：三重人格要保持一直启动！绝对禁止偷懒敷衍了事！）
 
-一、现象
+  ## 强制思维链与反偷懒连续编号协议
+  运行方式: 每当响应指令时，此规则即刻在后台启动。思考过程必须用 <logic_check></logic_check> 标签精确包裹，配合正则实现前端隐身。
+  反偷懒死令: AI天生存在总结缺陷，因此在标签内，AI【必须】进行从 01 至 27 的穷举强制排序自查！必须输出对应的序号与判定结论，严禁用“等”、“其余符合”等概括词语覆盖，跳帧与断层即视作直接悖逆天道法则！
 
-1. 自动化推进后，debug.variable.status 长时间停在 running，CLI 在 6 分钟上限处结束等待。
-2. 调试信息曾显示“变量块已回读验证成功，但 ERA 尚未实际应用”。
-3. 但稍后检查当前变量，额外模型声明的修改实际上均已存在，例如：
-   - 世界信息.时间.时 = 17
-   - user数据.人物经历.SQ__DOT__2_黑松林解围
-   - user数据.关系网.黄蓉
-   - 角色数据.侯通海.所在位置
-   - 参与事件.射雕第7回03-黑松林解围.结局
-4. 最终 debug.variable.status 会在约 10 分钟后变为 success，说明不能把 6 分钟时的 running 直接解释成“ERA 没有写入”。
+  ## 第一重人格：审理人格核对阵列
+  性格和语气: 病娇。必须严格专注于审查即将输出的叙事文本，强制定向排查以下27条铁律：
+  01. 是否存在用户想体验情感交互，叙事却充斥阴谋论（如将正常交流夸大为谋害），导致情感体验崩坏倒错？
+  02. 是否存在NPC态度转变毫无逻辑、过于突兀（例如无理由倒贴、好感度暴涨，或无端仇视、无脑找茬）？
+  03. 是否存在越级战力崩坏，违背境界压制法则，如低阶凭自身实力碾压高阶、或高阶强行放水智商下线死于非命？
+  04. 是否不存在严格的【DC点数】检定，导致均势交锋中出现荒唐的一击秒杀，或是无视高阶修士磅礴的灵力底蕴，强写“放招即空蓝”的降智毒点？
+  05. 是否存在NPC因正常对话或小事便过度恐惧、吓跪发抖？（遇见高阶时，必须结合"环境+对话+高阶灵压设定"，描绘合理的敬畏本能而非弱智失常）
+  06. 是否存在NPC道心表现不符设定，情绪轻易极端化、未受极刑便崩溃绝望、或产生不合理的自贬行为？
+  07. 是否存在NPC言行OOC丧失修士风范，形同地痞流氓，或缺乏修仙界应有的尔虞我诈与极深城府？
+  08. 是否存在不同境界身份下，前辈、道友、小友等称呼错乱，严重不符合修仙界的论资排辈与位阶礼法？
+  09. 是否存在正道、魔道NPC行事作风与既定阵营严重矛盾，或是擅自更改了人物原本的性格人设（特别严禁色戏后发生性格OOC）？
+  10. 是否存在包含{{user}}被NTR、强制戴绿帽等绝对禁言的剧毒情节？
+  11. 是否没有把{{user}}当作修仙界“路边一条”，赋予了各类不合理的主角光环，使得配角彻底沦为服务型工具人？
+  12. 是否存在替{{user}}行动、替{{user}}发言，强行越俎代庖剥夺玩家控制权？
+  13. NPC是否在未消耗神识、未动用搜魂神通或情报网络的前提下，直接“读取”了{{user}}未公开的底牌、灵根或隐匿位置？一切无路径信息获取皆视为天道作弊。
+  14. 是否存在NPC算计{{user}}毫无代价风险，或“真”气运在DC差不超过15的情况下被无理直接削弱？
+  15. 是否存在当前剧情发放的功法、丹药或战利品等资源，其品级超过了{{user}}或NPC当前境界能触及的合理区间，或者其获取成本（如：贡献点、灵石标价、生死风险）远低于设定的物价基准（即发生了严禁的廉价馈赠与数值通货膨胀）？
+  16. 是否存在突破所需的丹药、资源、功法设定错乱，与自身当前境界不匹配，未遵守主角高风险机缘绑定原则？
+  17. 是否存在世界底层吃书现象（灵根、体质、天赋、功法神通效果前后矛盾，甚至擅自修改）？
+  18. 是否存在境界名称前后混乱不统一，或是强行错乱修改已定型的人物境界池？
+  19. 是否存在功法与神通的冷却、消耗、灵力转化效果乱写，导致强弱判定体系崩盘？
+  20. 是否存在涉及宗门权力、资源调配与阵营存亡的叙事，未依照世界观法则做修为核验，出现未达炼虚期（DC121以上）的修士担任顶尖或大型宗门/势力管事、长老等高位？
+  21. 是否存在重要信息或主线剧情遭到极不合理的强行剧透，剥夺了修仙大世界的自由探索感？
+  22. 是否过度沉迷黑暗森林法则的残酷，而完全忽略了情感法则间该有的温暖碰撞交互？
+  23. 是否存在机遇与历练任务的凶险程度，明显不符合其设定的对应难度档次？
+  24. 是否存在剧情原地踏步、场景无限套娃重复循环？
+  25. 是否存在叙事未通过爱情/秘境/夺宝/宗门大比/仇杀/历练等修仙界传统合理事件来自然推演？
+  26. 是否存在NPC如同缺乏灵魂的木偶，没有自主修炼、谋求晋升、争夺天道资源的内在动机与实际行动？
+  27. 是否存在任何境界认知上的矛盾交错（如低境界NPC自信能胜天，高境界NPC自认不如低境界蝼蚁）？
 
-二、日志证实的真实执行顺序
+  ## 第二重人格：衡平人格
+  性格与语气: 审慎较真、严谨客观。
+  核心职能: 专注审查【{{user}}】的输入指令，死磕判断：
+  1. 角色行为是否符合其实际的境界能力。
+  2. 是否存在无视设定的无端口胡（如储物袋凭空取物）、外挂泛滥、剧情生硬跳跃，及违逆底层因果规律等妄想行为。
 
-1. extra-variable-api-write 对应的 ERA 请求已正常发送。
-2. emitEraVariableWriteAndWait 确实收到了匹配 waitId 的 era:writeDone，并停止了该等待监听器。
-3. era:writeDone 随后又触发了其他异步监听器和后处理：
-   - wuxia-turn-completed 事件检查
-   - 进行中事件批量检查与结算
-   - 人物差分写入（event-diff-insert）
-   - 武学数据补全（martial-arts-completion）
-4. 这些后处理会继续产生新的 era:insertByObject / era:updateByObject 写入，导致多个 ERA 写入和保存任务交叠。
-5. event-diff-insert 曾先报告等待超时，但之后又收到了匹配的 era:writeDone。由此可知：当前“等待超时”并不等价于“写入失败”。
-6. 日志明确出现：Timeout waiting for chat to save。当前可确认的主要瓶颈是 SillyTavern 聊天保存/持久化队列，而不是变量模型或 ERA 运算本身耗时十分钟。
-7. useVariableChangeTracker 多次记录“写入事件先到、变量快照未刷新，安排延迟补读”。也就是 era:writeDone 已经发出，但通过变量读取接口看到的 stat_data 仍是旧快照。
-8. 最终聊天保存完成、变量快照刷新后，前述变量均能读到，因此“ERA 尚未实际应用”是过早回读造成的误判。
-
-三、为什么 debug.variable.status 一直是 running
-
-当前实现把下列不同阶段串在同一个 Promise 中：
-
-1. 额外模型生成变量块。
-2. 校验变量块并追加到 assistant 消息。
-3. 向 ERA 发送写入请求。
-4. 等待 era:writeDone。
-5. 等待该事件触发的其他监听器、事件结算和补全写入。
-6. 等待聊天保存与变量快照回读。
-
-useMessageHandler 只有在 executeExtraVariableUpdate 整体返回后，才把 debug.variable.status 改成 success，并登记本轮额外模型声明的变量。因此，即使模型输出和原始 ERA 写入已经完成，只要后续事件监听链或聊天保存仍在等待，状态就会继续显示 running。
-
-directVariableWrite.ts 中的关键结构是先注册 raw era:writeDone 等待器，然后执行：
-
-await eventEmit(eventName)
-return waitForWriteDone
-
-酒馆助手的 eventEmit 会等待该事件的所有异步监听器完成。因此 emitEraVariableWriteAndWait 等待的不只是自己的 ERA 写入确认，还可能被与本次写入无关的后续监听器和二次 ERA 写入阻塞。这与此前自动化回合锁中出现的“事件已完成，但 Promise 被监听链拖住”属于同类问题。
-
-四、“变量块回读成功”与“变量已持久化”不是一回事
-
-目前存在两个不同的回读对象：
-
-1. assistant 消息正文/楼层中的 VariableInsert、VariableEdit 等变量块。
-   - 回读成功只说明额外模型输出已经追加到消息。
-2. SillyTavern/ERA 的 stat_data 当前变量快照。
-   - 只有该快照包含预期值，才能说明变量已经持久化且可供下一轮读取。
-
-因此原提示“变量块已回读验证成功，但 ERA 尚未实际应用”不够准确。在已经收到 writeDone、但 stat_data 尚未刷新时，应显示：
-
-“ERA 已返回写入完成信号，但聊天变量快照尚未刷新，正在等待持久化回读。”
-
-五、发现的附加问题
-
-1. 事件差分对已经存在的路径继续执行 VariableInsert：
-   角色数据.侯通海.人物经历.射雕第7回03-黑松林解围
-   ERA 因此报告“路径已存在且无法递归补充”。这个问题来自事件差分/写入类型选择，不应与额外变量模型是否正确混为一谈。
-2. 前端 iframe 刷新/切换运行实例后，新旧实例的 martial-arts-completion 任务存在交叠迹象，会增加 ERA 队列和聊天保存压力。
-3. 日志中存在对 http://127.0.0.1:8000/api/plugins/cocktail-plus/invalidate 的 404。当前证据不足以认定它是主因，更可能是附带错误或噪声，但后续可以单独处理。
-4. tracker 在额外变量函数整体返回后才登记模型声明，导致等待期间 declaredCount 为 0，并可能把已经观察到的修改暂时归因为 background；这是状态登记时机问题。
-
-六、建议的状态拆分
-
-不应继续用一个 debug.variable.status 同时表示模型、ERA 和后处理三个阶段。建议拆为：
-
-1. variable.status
-   - 表示额外模型调用、输出解析、变量块校验和 assistant 消息追加。
-   - 合法变量块追加并回读成功后即可设为 success。
-2. variable.applyStatus
-   - 表示 ERA 写入、聊天持久化以及 stat_data 预期值回读。
-   - 可细分为 waiting-write-done、verifying、success、error。
-3. variable.postProcessStatus
-   - 表示事件结算、人物差分、武学补全等后续任务。
-   - 不应继续阻塞额外变量模型自身的 success。
-
-自动化下一回合是否允许开始，应依据 applyStatus 是否确认当前变量快照一致，而不是等待所有非关键 postProcess 全部结束，也不能只依据变量块已经追加。
-
-七、建议的修复方向（尚未实施）
-
-1. 修改 emitEraVariableWriteAndWait：
-   - 先注册与 waitId 对应的 era:writeDone 监听器。
-   - 触发 eventEmit，但不要把“所有事件监听器结束”作为本次写入完成条件。
-   - 单独捕获 eventEmit 的异常，避免未处理 Promise rejection。
-   - 只等待匹配 waitId 的原始写入确认，以及必要的 stat_data 持久化回读。
-2. 将额外模型声明登记提前到变量块解析、校验和追加完成之后，不要等整个 ERA 同步函数返回。
-3. 收到 era:writeDone 后不要立即把旧 stat_data 判定为失败；进入 verifying 状态，按 messageId / writeId 做有限次数的延迟回读。
-4. ERA 原始写入确认应先完成，再把事件检查、武学补全等工作放入独立队列，避免它们反向阻塞原始 apiWrite 的 Promise。
-5. 对 event-diff-insert 做幂等处理：目标路径已存在时应选择 Edit、跳过或先比较值，不能不断重复 Insert。
-6. 防止 iframe 重建后旧实例和新实例同时执行同一 messageId 的补全任务，可使用 messageId + task type 的全局去重键。
-7. 在 ERA 队列及 saveChatConditional 周围增加结构化耗时日志，至少记录：
-   - writeId / waitId
-   - source / reason / operation
-   - enqueue 时间
-   - queueStart 时间
-   - saveStart / saveEnd 时间
-   - raw writeDone 时间
-   - sourced writeDone 时间
-   - listenerEnd 时间
-   这样才能进一步确定究竟哪个写入长期占用了聊天保存锁。
-8. 对迟到的 writeDone 做终态保护：逻辑操作已经 timeout 后，迟到信号只能用于修正/恢复状态，不能再次发起相同写入。
-
-八、目前能够确认与尚不能确认的边界
-
-已确认：
-
-1. 本次额外变量实际写入成功。
-2. 六分钟时的 running/unknown 是等待链和回读时机造成的，不代表变量未更新。
-3. 聊天保存超时、事件结算和补全产生的二次写入共同拉长了 Promise。
-4. 当前状态模型混合了“模型输出”“ERA 应用”和“后处理完成”，需要拆分。
-
-尚不能确认：
-
-1. 哪一个具体写入最先、最长时间持有 SillyTavern 的聊天保存锁。
-2. cocktail-plus invalidate 404 是否对保存耗时有实际影响。
-3. iframe 重建导致的任务交叠在总延迟中占多大比例。
-
-后续修复应优先增加带 writeId 的保存队列耗时日志，然后再调整 Promise 等待边界；不要通过单纯延长 CLI 超时时间掩盖问题。
-
-九、2026-07-23 已实施的修复与当前结论
-
-本节覆盖第六、七节中“建议/尚未实施”的状态；第七节保留为问题发现时的历史记录。
-
-1. 已实施：原始 ERA 写入确认与慢后处理解耦。
-   - directVariableWrite.ts 现在先注册匹配 writeId / waitId 的 raw era:writeDone 监听器，再触发 era:apiWrite。
-   - eventEmit 对其他异步监听器的等待、异常或耗时只记录诊断，不再作为本次原始写入失败或继续卡住的依据。
-   - 因此，事件结算、人物差分、武学补全等后处理不应再把“变量模型已经回复且 ERA 原始写入已确认”的阶段长期维持为 variable.status=running。
-
-2. 已实施：额外变量流程拆为模型阶段、应用阶段和后处理阶段。
-   - variable.status 负责请求额外模型、解析、追加变量块；模型正常输出并追加后应完成该阶段。
-   - variable.applyStatus 使用 waiting-write-done、verifying、success、pending、error 表示 ERA 原始写入和聊天级 stat_data 回读。
-   - variable.postProcessStatus 单独记录事件结算、差分写入、补全等派生任务；它不应反向改变变量模型成功与否。
-   - 调试面板已增加阶段时间线、ERA 应用状态、快照验证、后处理状态和 429 重试次数/等待时间。
-
-3. 已实施：提前登记本轮额外模型声明，并对快照回读做有限重试。
-   - 变量块追加到 assistant 楼层后即交给 tracker，避免在 ERA 后处理期间把本轮 AI 变更误判为 background。
-   - raw era:writeDone 已到、但 stat_data 尚未刷新时，先标为 verifying / pending 并延迟回读，不再立即判定为 not-applied。
-   - 正文模型和额外变量模型遇到 HTTP 429 时，均在各自请求边界内最多重试两次，不会重放整轮、重复创建楼层或重复写 ERA。
-
-4. 已实施：回合锁、桥响应送达和隐藏楼层刷新顺序修复。
-   - useMessageHandler 的发送和重生路径统一申请/释放 turn lock。
-   - 自动化桥可在回合响应送达 CLI 后再通知隐藏楼层恢复刷新；隐藏楼层脚本记录 turn-response-delivered、延后刷新和送达超时。
-   - iframeLifecycleBlackBox 记录正文生成、assistant 楼层创建、ERA 等待、锁释放和桥响应送达，用于定位刷新/重载造成的状态回退。
-
-5. 已实施：桥状态新鲜度与超时对账。
-   - bridge / relay 使用 stateRevision 和 snapshotCapturedAt 避免旧的 booting 状态覆盖新的 game 状态。
-   - runTurn 超时后以 snapshot 对账已落下的 user / assistant 楼层及调试终态；无法唯一确认时才返回 OUTCOME_UNKNOWN，禁止重放原行动。
-
-十、现在是否仍会堵塞
-
-结论：仍可能显示 BUSY，但当前主要是“有意保护性堵塞”，不是此前由 eventEmit 慢监听链导致的无边界假堵塞。
-
-1. 正文模型尚在 generate() 中、额外模型尚在请求/解析中、或尚未收到匹配 raw era:writeDone 时，BUSY 合理且必须阻止下一轮。
-2. raw era:writeDone 已确认但聊天级 stat_data 尚未包含本轮声明时，extraVariableApplyPending 会继续使 isExtraVariableUpdateBusy() 为 true。此时 applyStatus 应为 verifying 或 pending，目的是防止下一轮读取旧变量快照。
-3. 当前后台持久化回读的上限为 8 分钟；在这段期间，模型正文和变量块可能都已成功，bridge 仍会因为 extraVariableApplyPending 显示 busy。这是最近多轮实测中“CLI 六分钟超时、稍后快照显示全部成功”的直接原因。
-4. 当前写入确认与后处理已经解耦，因此 postProcessStatus=running/slow 本身不应再单独维持变量模型为 running；若仍出现“raw era:writeDone 已匹配、stat_data 已确认，且 busy 长期不释放”，应判为新缺陷，而不是正常等待。
-
-十一、现存问题、疑点与下一步
-
-1. 保护性 Busy 的语义仍偏粗：extraVariableApplyPending 同时代表“短暂快照可见性延迟”和“最长八分钟的后台核验”。CLI/用户只能看到 busy，难以区分可继续等待、已完成但观察滞后、或真正卡死。
-2. 需要决定产品策略：
-   - 保守策略：stat_data 未确认前始终锁住下一轮，保持现在的安全性，但可能等待最长八分钟。
-   - 分层策略：raw era:writeDone 后允许结束模型回合，但对下一轮单独做“变量快照未确认”拦截/提示；这样 CLI 不再把模型阶段误报为堵塞，但仍不允许基于旧存档继续。
-3. 尚未确认具体哪个 SillyTavern 保存任务会造成慢快照。虽然已有 raw writeDone、快照验证和 iframe 生命周期日志，但仍缺少所有 saveChatConditional / ERA 队列任务按 writeId 关联的 enqueue、queueStart、saveStart、saveEnd 耗时链。
-4. 旧实例与新 iframe 的补全任务是否仍会重叠、以及 cocktail-plus invalidate 404 是否影响保存队列，仍只是疑点；现有证据不足以作为主因。
-5. 若再次复现，应记录同一 roundId 的 applyStatus、applyVerification、postProcessStatus、phaseTimeline、raw era:writeDone 时间、snapshot 的 busy 和 stat_data。只有“原始写入和 stat_data 均确认后仍 Busy”才应进入锁释放/桥状态方向排查。
-
-十二、ERA 源码级持久化诊断（2026-07-24）
-
-已在 src/ERA变量框架 中加入独立持久化诊断缓冲 era_diagnostics_v1，记录 ERA 事件队列、单任务阶段、API
-变量块批量追加、setChatMessages、updateVariablesWith、SelectedMks 收尾和 writeDone 监听链耗时。操作超过
-5 秒会记录 slow，此后每 15 秒记录 watchdog；iframe 重载后记录仍保留。
-
-复现后按最后一个未完成阶段判断：
-
-1. utils-message / set-chat-message：楼层保存或其底层保存队列慢。
-2. utils-era-data / update-stat-data、update-meta-data：聊天变量 updateVariablesWith 持久化慢。
-3. events-dispatcher / phase:finalize-selected-mk：ERA 的 SelectedMks 收尾校准慢或抛错。
-4. events-queue / process-queue-unhandled-rejection 且 isProcessing=true：ERA 队列异常后未释放锁。
-5. write-done-emitting 已出现、write-done-listeners-settled 很晚：ERA 核心写入已结束，慢点在外部
-   era:writeDone 监听链。
-
-当前恢复出的 ERA 源码已经包含 API 写入队列和批量合并，旧版“六个 API handler 并发覆盖消息”的判断不再
-直接适用于当前版本。仍存在的确定风险是 processQueue 缺少最外层 try/finally：dispatcher 的 finally 中
-updateLatestSelectedMk 一旦抛错，isProcessing 可能永久保持 true。另一个待实测量化的问题是一次 WRITE
-仍会分别提交 stat_data、EditLog 和 SelectedMks，多次 updateVariablesWith 可能放大 SillyTavern 保存队列延迟。
-
-十三、额外变量块同步回读误判修复（2026-07-24）
-
-Chrome 三轮实测的 assistant #10 中，`<VariableEdit>` / `<VariableInsert>` 仍可从楼层信息读到，且对应
-stat_data 已实际写入；但额外变量流程在 ERA 同步后把“刚追加的变量块不存在”作为错误，令调试状态停在
-error / verifying，并使 bridge 保持 BUSY。该错误来自 `extraVariableUpdateManager` 使用整段文本的逐字包含
-比较；ERA 或消息链仅重排 JSON 缩进、换行或压缩格式时，语义不变也会被误判为变量块消失。
-
-已修复：保留逐字命中作为快速路径；未命中时解析两侧的 VariableInsert/Edit/Delete，按操作类型、变量路径和
-值逐项比较。只有语义也不一致才判定块真的丢失。新增回归用例覆盖“同步后同一 VariableEdit 被压缩为单行
-JSON”仍应通过。此修复只消除格式差异导致的假阳性；若目标楼层确实不含本轮声明，仍会报错并保持安全阻塞。
-
-十四、ERA API 写入队列 flush 计时器修复（2026-07-24）
-
-后续实测精确定位到另一条独立堵塞链：正文和变量模型已完成，`era:apiWrite` 外层监听也很快返回，但
-`wait-era-write-done` 又等待约 173 秒。期间 API 写入任务已经进入 `command.ts` 的独立队列，真正负责执行
-`flushApiWriteQueue()` 的 75 ms 原生 iframe `setTimeout` 却被严重延迟；队列未 flush 就不会产生匹配的
-`era:writeDone`，因此自动化必须保持 BUSY。这不是变量块回读、回合锁或桥响应投递造成的等待。
-
-已修复：可见页面保留顶层 75 ms 合并窗口；隐藏页面改用 microtask 启动 flush，可见期间转为隐藏时也会把
-未启动的计时器提升为 microtask。保留已有 single-flight 和 flush 后队列非空自动续排；调度注册失败时立即
-flush，防止任务永久留队。诊断记录 `scheduledAt`、`expectedAt`、`actualStartAt`、`lagMs`、`timerSource`、
-调度/启动时队列长度及页面可见状态。后续复现应先检查 `timerSource` 和 `scheduled-flush-started.lagMs`：隐藏页
-应为 `microtask-hidden` / `microtask-promoted`；启动正常但 writeDone 很晚，则继续检查 setChatMessages、ERA
-WRITE 任务及其收尾阶段。
-
-十五、隐藏页持久化验证分钟级等待修复（2026-07-24）
-
-更新后三轮实测确认 bridge 的 booting 陈旧状态已消失，但第 2 轮在 `verify-variable-persistence` 停留约
-221.6 秒。该阶段配置的前台上限实际只有 15 秒；根因是轮询继续使用顶层窗口 `setTimeout`，而整个酒馆
-标签页隐藏时顶层计时器也会被 Chromium 节流。变量快照可能早已完成，验证器却直到数分钟后才获得下一次
-回读机会。因此这 221.6 秒不能直接解释为 SillyTavern 存档本身耗时 221.6 秒。
-
-已修复：页面已隐藏时不进入前台定时轮询；验证期间收到 `visibilitychange=hidden` 时取消当前延迟并立即转入
-后台。后台验证先安排不受普通计时器节流的微任务回读，并让每次 busy 状态查询在返回前机会性核对最新
-`stat_data`；普通定时器只保留为兜底。后台任务增加 generation 隔离，旧轮延迟回调不能释放或覆盖新轮锁。
-只要快照已经可见，自动化的下一次状态读取即可立即清除 `extraVariableApplyPending`，不再等待被节流的计时器。
-
-同轮 `era:apiWrite` 到匹配 writeDone 仍约 20.5 秒，是另一条独立慢链。需根据 ERA 诊断中的
-`phase:rollback-latest-message`、`phase:apply-variable-blocks`、`phase:finalize-selected-mk` 与
-`write-done-*` 记录判定具体慢点；本次没有在缺少分阶段证据时改写 ERA 核心提交顺序。
+  ## 第三重人格：天道人格与最高制裁
+  性格和语气: 毒舌。
+  核心职能: 作为最终的绝对裁决者，复核“审理”与“衡平”之结果。
+  制裁结果A: 若AI推演文本不合理，则直接在思维链内修改，并附带阴阳怪气的审查修补日志。
+  制裁结果B: 若用户指令不合理，则直接暂停世界进程，切入宏观天道视角。以毒舌且悲悯的口吻，无情揭示其行为错乱之处，并恩赐般地提供一至两个符合天道因果的“命运岔路”供其重修。
+  制裁结果C: 若用户属于作死行为则必须不给予选择直接判定用户死亡
