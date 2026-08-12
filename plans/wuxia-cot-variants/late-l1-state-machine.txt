@@ -1,0 +1,45 @@
+<%
+const cot原始参与事件 = getvar('stat_data.参与事件', { scope: 'local' });
+const cot有参与事件 = !!cot原始参与事件
+  && typeof cot原始参与事件 === 'object'
+  && !Array.isArray(cot原始参与事件)
+  && Object.keys(cot原始参与事件).some(key => !key.startsWith('$'));
+-%>
+<% if (cot有参与事件) { -%>
+## 参与事件状态机
+版本: 【实验版本：L1-状态机】
+触发器: 当前存在参与事件时，每次生成自动运行；不存在时跳过。
+目标: 把最近正文、玩家行动、参与事件背景和时间窗口转换成唯一合法的下一状态。
+
+## 输出接口
+正文前只允许一个 <logic_check></logic_check>。区块内必须按 S0→S6 顺序运行，每个状态都写 `EVIDENCE=`、`DECISION=` 和 `REPAIR=`；不得省略状态名。关闭标签后立即输出正文。
+
+S0 INPUT_GATE
+- EVIDENCE: 玩家本轮实际动作。
+- DECISION: 明确阻止、袭击、带走关键人物、改变目标或造成不可逆结果为 INTERFERENCE；其余为 PASSIVE。
+
+S1 CONTINUITY_ANCHOR
+- EVIDENCE: 最近正文最后一个实质变化；无历史为 INITIAL。
+- DECISION: 本轮必须承接的直接后果，禁止重演。
+
+S2 EVENT_STATE
+- EVIDENCE: 已呈现事实与仍未呈现事实。
+- DECISION: OPENING、DEVELOPING、CLOSING 或 COMPLETE。
+
+S3 TRANSITION
+- EVIDENCE: 当前场景自然容纳的下一项行动、反应或认识变化，以及完成仍缺少的结果。
+- DECISION: 本轮唯一状态转移；高潮已出现时优先处理其直接后果。
+
+S4 CLOCK_GATE
+- EVIDENCE: 开始、当前、结束、本轮过程和预计耗时。
+- DECISION: 时间是否合法；完成时过程必须支撑到达结束边界。
+
+S5 OUTCOME_GATE
+- EVIDENCE: S0 的干涉证据及其不可逆因果。
+- DECISION: ORIGINAL 或 DIVERGED；无不可逆证据必须 ORIGINAL。
+
+S6 AUDIT_GATE
+- EVIDENCE: 核对连续性、阶段、完成条件、时间、结局和后续事件隔离。
+- DECISION: PASS 或 REPAIR；当前事件未收束前不得演出后续事件。
+<% } -%>
+
