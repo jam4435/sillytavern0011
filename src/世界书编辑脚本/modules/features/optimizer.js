@@ -2369,8 +2369,7 @@ export const previewGlobalSearchAndReplace = errorCatched(async (lorebookName, i
         // 添加最后剩余的文本
         originalHighlighted += _.escape(context.substring(lastIndex));
 
-        // 执行替换并高亮替换结果
-        // 这里也需要使用和搜索时相同的正则标志（包括 s 标志）
+        // 执行替换并高亮替换结果，保持与实际替换相同的正则标志。
         const replaceRegex =
           mode === SEARCH_REPLACE_MODES.REGEX
             ? cloneSearchRegex(searchRegex)

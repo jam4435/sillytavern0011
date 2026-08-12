@@ -80,11 +80,7 @@ export function buildGlobalSearchRegex(searchTerm, mode) {
 
   if (mode === SEARCH_REPLACE_MODES.REGEX) new RegExp(pattern);
 
-  try {
-    return new RegExp(pattern, 'gs');
-  } catch {
-    return new RegExp(pattern, 'g');
-  }
+  return new RegExp(pattern, 'gm');
 }
 
 export function replaceGlobalSearchMatches(text, searchRegex, replaceTerm, mode) {

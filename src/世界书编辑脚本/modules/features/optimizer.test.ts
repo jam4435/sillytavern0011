@@ -53,6 +53,15 @@ describe('全局搜索替换扩展模式', () => {
     expect(replaceGlobalSearchMatches('武侠', regex, '$2$1', SEARCH_REPLACE_MODES.REGEX)).toBe('侠武');
   });
 
+  it('正则行锚点只替换匹配行，不吞掉整段正文', () => {
+    const content = ['开头内容', '你是=================等哈就是不放假', '结尾内容'].join('\n');
+    const regex = buildGlobalSearchRegex('^.*={17,}.*$', SEARCH_REPLACE_MODES.REGEX);
+
+    expect(replaceGlobalSearchMatches(content, regex, '---', SEARCH_REPLACE_MODES.REGEX)).toBe(
+      ['开头内容', '---', '结尾内容'].join('\n'),
+    );
+  });
+
   it('扩展查找与正则选项双向互斥', () => {
     initOptimizer();
     const $extended = $('#global-search-use-extended');
