@@ -1513,9 +1513,9 @@ function createLorebookTitleSectionLegacy(lorebookName, isGlobal = false) {
       <div class="batch-toggle-label">操作字段：</div>
       <div class="batch-toggle-checkbox-group">
         <label><input type="checkbox" value="enabled"> 启用状态</label>
-        <label><input type="checkbox" value="strategy.type"> 激活模式</label>
-        <label><input type="checkbox" value="recursion.prevent_outgoing"> 防止递归</label>
-        <label><input type="checkbox" value="recursion.prevent_incoming"> 排除递归</label>
+        <label><input type="checkbox" value="strategy.type"> 激活模式（开=蓝灯，关=绿灯）</label>
+        <label><input type="checkbox" value="recursion.prevent_incoming"> 不可被其他条目递归激活</label>
+        <label><input type="checkbox" value="recursion.prevent_outgoing"> 可递归激活其他条目</label>
       </div>
     </div>
     <button class="batch-toggle-execute-btn" data-action="execute-batch-toggle">执行</button>
@@ -1766,9 +1766,9 @@ export function createLorebookTitleSection(lorebookName, isGlobal = false) {
       <div class="batch-toggle-label">操作字段</div>
       <div class="batch-toggle-checkbox-group">
         <label><input type="checkbox" value="enabled"> 启用</label>
-        <label><input type="checkbox" value="strategy.type"> 模式</label>
-        <label><input type="checkbox" value="recursion.prevent_outgoing"> 外向递归</label>
-        <label><input type="checkbox" value="recursion.prevent_incoming"> 内向递归</label>
+        <label><input type="checkbox" value="strategy.type"> 激活模式（开=蓝灯，关=绿灯）</label>
+        <label><input type="checkbox" value="recursion.prevent_incoming"> 不可被其他条目递归激活</label>
+        <label><input type="checkbox" value="recursion.prevent_outgoing"> 可递归激活其他条目</label>
       </div>
     </div>
     <button class="batch-toggle-execute-btn" data-action="execute-batch-toggle">执行</button>

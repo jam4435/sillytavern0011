@@ -1,0 +1,21 @@
+{
+  "startedAt": "2026-08-12T09:32:04.402Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-skill-restart-preflight-20260812.json",
+    "inspectOnly": true,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": false,
+  "completedAt": "2026-08-12T09:32:19.521Z"
+}

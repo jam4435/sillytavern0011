@@ -553,8 +553,8 @@ async function executeBatchToggle({ $target, lorebookName, isGlobal, parentDoc, 
   const fieldNames = {
     enabled: '启用状态',
     'strategy.type': '激活模式',
-    'recursion.prevent_outgoing': '防止递归',
-    'recursion.prevent_incoming': '排除递归',
+    'recursion.prevent_outgoing': '可递归激活其他条目',
+    'recursion.prevent_incoming': '不可被其他条目递归激活',
   };
   const operationNames = { enable: '全开', disable: '全关', invert: '反转' };
   const fieldList = selectedFields.map(f => fieldNames[f]).join('、');
@@ -574,7 +574,9 @@ async function executeBatchToggle({ $target, lorebookName, isGlobal, parentDoc, 
         updateData = { [field]: true };
       } else if (field === 'strategy.type') {
         updateData = { [field]: 'constant' };
-      } else if (field.startsWith('recursion.')) {
+      } else if (field === 'recursion.prevent_outgoing') {
+        updateData = { [field]: false };
+      } else if (field === 'recursion.prevent_incoming') {
         updateData = { [field]: true };
       }
     } else if (operation === 'disable') {
@@ -582,7 +584,9 @@ async function executeBatchToggle({ $target, lorebookName, isGlobal, parentDoc, 
         updateData = { [field]: false };
       } else if (field === 'strategy.type') {
         updateData = { [field]: 'selective' };
-      } else if (field.startsWith('recursion.')) {
+      } else if (field === 'recursion.prevent_outgoing') {
+        updateData = { [field]: true };
+      } else if (field === 'recursion.prevent_incoming') {
         updateData = { [field]: false };
       }
     }
@@ -624,8 +628,8 @@ async function executeBatchTogglePatched({ $target, lorebookName, isGlobal, pare
   const fieldNames = {
     enabled: '启用状态',
     'strategy.type': '激活模式',
-    'recursion.prevent_outgoing': '防止递归',
-    'recursion.prevent_incoming': '排除递归',
+    'recursion.prevent_outgoing': '可递归激活其他条目',
+    'recursion.prevent_incoming': '不可被其他条目递归激活',
   };
 
   if (selectedFields.length > 0) {
@@ -648,7 +652,9 @@ async function executeBatchTogglePatched({ $target, lorebookName, isGlobal, pare
         updateData = { [field]: true };
       } else if (field === 'strategy.type') {
         updateData = { [field]: 'constant' };
-      } else if (field.startsWith('recursion.')) {
+      } else if (field === 'recursion.prevent_outgoing') {
+        updateData = { [field]: false };
+      } else if (field === 'recursion.prevent_incoming') {
         updateData = { [field]: true };
       }
     } else if (operation === 'disable') {
@@ -656,7 +662,9 @@ async function executeBatchTogglePatched({ $target, lorebookName, isGlobal, pare
         updateData = { [field]: false };
       } else if (field === 'strategy.type') {
         updateData = { [field]: 'selective' };
-      } else if (field.startsWith('recursion.')) {
+      } else if (field === 'recursion.prevent_outgoing') {
+        updateData = { [field]: true };
+      } else if (field === 'recursion.prevent_incoming') {
         updateData = { [field]: false };
       }
     }
