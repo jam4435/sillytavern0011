@@ -1355,6 +1355,7 @@ const App: React.FC = () => {
                   onClick={() => setActivePanel(ActivePanel.SAVE_LOAD)}
                   title="存档与分叉"
                   aria-label="存档与分叉"
+                  data-wuxia-automation="open-history-panel"
                 >
                   <Icons.Variables size={14} />
                 </button>

@@ -16,6 +16,12 @@ const SELECTORS = {
   debugToggle: '[data-wuxia-automation="debug-section-toggle"]',
   debugContent: '[data-wuxia-automation="debug-section-content"]',
   statDataSnapshot: '[data-wuxia-automation="stat-data-snapshot"]',
+  openHistoryPanel: '[data-wuxia-automation="open-history-panel"]',
+  historyPanel: '[data-wuxia-automation="history-panel"]',
+  historyNode: '[data-wuxia-automation="history-node"]',
+  historyStatus: '[data-wuxia-automation="history-status"]',
+  continueHistoryNode: '[data-wuxia-automation="continue-history-node"]',
+  confirmHistoryCheckout: '[data-wuxia-automation="confirm-history-checkout"]',
   stopGenerationIcon: 'i.fa-circle-stop',
 };
 
@@ -27,6 +33,7 @@ function printUsage() {
 用法：
   pnpm wuxia:ui -- --turns 5 --action "在客栈向掌柜打听消息"
   pnpm wuxia:ui -- --regenerate --output wuxia-regenerate-report.json
+  pnpm wuxia:ui -- --restart-from-first-reply --output wuxia-restart-report.json
 
 选项：
   --endpoint <url>       Chrome CDP 地址，默认 http://127.0.0.1:9333
@@ -39,6 +46,8 @@ function printUsage() {
   --inspect-only         不发送行动，只检查当前 iframe、空闲状态与回复（首次回合不要求调试框）
   --stat-data-snapshot   仅配合 --inspect-only，按需读取变量页的完整聊天级 stat_data
   --regenerate           只重新生成最新 assistant swipe 一次，不新建 user 楼层
+  --restart-from-first-reply
+                         通过“存档与分叉”回到当前脉络的首个 assistant 回复，不发送或生成
   --stop-generation      仅在页面正在生成时，通过酒馆终止按钮停止当前生成
   --continue-on-error    调试状态为 error 时继续下一轮
   --help                 显示帮助
@@ -74,6 +83,7 @@ function parseArgs(argv) {
     inspectOnly: false,
     statDataSnapshot: false,
     regenerate: false,
+    restartFromFirstReply: false,
     stopGeneration: false,
     continueOnError: false,
   };
@@ -101,6 +111,10 @@ function parseArgs(argv) {
       options.regenerate = true;
       continue;
     }
+    if (arg === '--restart-from-first-reply') {
+      options.restartFromFirstReply = true;
+      continue;
+    }
     if (arg === '--stop-generation') {
       options.stopGeneration = true;
       continue;
@@ -123,23 +137,48 @@ function parseArgs(argv) {
   }
   if (
     options.regenerate &&
-    (options.inspectOnly || options.stopGeneration || options.actions.length > 0 || options.turns !== 1)
+    (options.inspectOnly ||
+      options.restartFromFirstReply ||
+      options.stopGeneration ||
+      options.actions.length > 0 ||
+      options.turns !== 1)
   ) {
-    throw new Error('--regenerate 不能与推进、--inspect-only、--stop-generation 或 --turns 一起使用');
+    throw new Error(
+      '--regenerate 不能与推进、--restart-from-first-reply、--inspect-only、--stop-generation 或 --turns 一起使用',
+    );
   }
   if (
     options.stopGeneration &&
-    (options.inspectOnly || options.regenerate || options.actions.length > 0 || options.turns !== 1)
+    (options.inspectOnly ||
+      options.regenerate ||
+      options.restartFromFirstReply ||
+      options.actions.length > 0 ||
+      options.turns !== 1)
   ) {
-    throw new Error('--stop-generation 不能与推进、--inspect-only 或 --turns 一起使用');
+    throw new Error(
+      '--stop-generation 不能与推进、--restart-from-first-reply、--inspect-only 或 --turns 一起使用',
+    );
   }
-  if (!options.inspectOnly && !options.stopGeneration && !options.regenerate && options.actions.length === 0) {
+  if (
+    options.restartFromFirstReply &&
+    (options.inspectOnly || options.regenerate || options.stopGeneration || options.actions.length > 0 || options.turns !== 1)
+  ) {
+    throw new Error('--restart-from-first-reply 不能与推进、重生成、终止、--inspect-only 或 --turns 一起使用');
+  }
+  if (
+    !options.inspectOnly &&
+    !options.stopGeneration &&
+    !options.regenerate &&
+    !options.restartFromFirstReply &&
+    options.actions.length === 0
+  ) {
     throw new Error('至少需要一个 --action；若只提供一个，会在每轮重复使用');
   }
   if (
     !options.inspectOnly &&
     !options.stopGeneration &&
     !options.regenerate &&
+    !options.restartFromFirstReply &&
     options.actions.length !== 1 &&
     options.actions.length !== options.turns
   ) {
@@ -399,6 +438,138 @@ async function closeModalIfOpen(browser, pageUrl) {
   return true;
 }
 
+async function waitForHistoryPanelIdle(frame, timeoutMs = 20_000) {
+  const panel = frame.locator(SELECTORS.historyPanel).first();
+  await panel.waitFor({ state: 'visible', timeout: timeoutMs });
+  const status = frame.locator(SELECTORS.historyStatus).first();
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const state = (await status.getAttribute('data-wuxia-history-status').catch(() => null)) || 'loading';
+    const message = ((await status.textContent().catch(() => '')) || '').trim();
+    if (state === 'error') throw new Error(`历史谱牒加载失败：${message || '未知错误'}`);
+    if (state !== 'loading') return { state, message };
+    await sleep(100);
+  }
+  throw new Error(`等待历史谱牒完成扫描超时（${timeoutMs}ms）`);
+}
+
+async function openHistoryPanel(browser, pageUrl) {
+  await closeModalIfOpen(browser, pageUrl);
+  let { frame } = await findGameFrame(browser, pageUrl);
+  const openButton = frame.locator(SELECTORS.openHistoryPanel).first();
+  await openButton.waitFor({ state: 'visible', timeout: 10_000 });
+  await openButton.click();
+  ({ frame } = await findGameFrame(browser, pageUrl));
+  const status = await waitForHistoryPanelIdle(frame);
+
+  const fitView = frame.locator('.react-flow__controls-fitview').first();
+  if (await fitView.isVisible().catch(() => false)) {
+    await fitView.click();
+    await sleep(400);
+  }
+  return { frame, status };
+}
+
+async function readFirstHistoryNode(frame) {
+  const firstNode = frame.locator(`${SELECTORS.historyNode}[data-wuxia-history-depth="0"]`).first();
+  await firstNode.waitFor({ state: 'visible', timeout: 10_000 });
+  return {
+    locator: firstNode,
+    nodeId: (await firstNode.getAttribute('data-wuxia-history-node-id')) || '',
+    preview: ((await firstNode.locator('.history-node-preview').textContent()) || '').trim(),
+    current: (await firstNode.getAttribute('data-wuxia-history-current')) === 'true',
+  };
+}
+
+async function restartFromFirstReply(browser, options) {
+  const startedAt = Date.now();
+  log('历史分叉：准备回到当前脉络的首个回复');
+  const preflight = await inspectGeneration(browser, options.pageUrl);
+  if (preflight.generating) throw new Error('页面当前正在生成，拒绝切换历史分支');
+
+  const opened = await openHistoryPanel(browser, options.pageUrl);
+  const first = await readFirstHistoryNode(opened.frame);
+  const beforeFrameUrl = opened.frame.url();
+  if (first.current) {
+    await closeModalIfOpen(browser, options.pageUrl);
+    return {
+      mode: 'restart-from-first-reply',
+      startedAt: new Date(startedAt).toISOString(),
+      completedAt: isoTime(),
+      alreadyAtFirstReply: true,
+      selectedNodeId: first.nodeId,
+      selectedPreview: first.preview,
+      frameUrlBefore: beforeFrameUrl,
+      frameUrlAfter: beforeFrameUrl,
+      verifiedFirstNodeCurrent: true,
+    };
+  }
+
+  await first.locator.click();
+  const continueButton = opened.frame.locator(SELECTORS.continueHistoryNode).first();
+  await continueButton.waitFor({ state: 'visible', timeout: 10_000 });
+  const action = (await continueButton.getAttribute('data-wuxia-history-action')) || '';
+  if (await continueButton.isDisabled()) {
+    throw new Error(`首个回复节点当前不可继续（动作：${action || '未知'}）`);
+  }
+  await continueButton.click();
+
+  const confirmButton = opened.frame.locator(SELECTORS.confirmHistoryCheckout).first();
+  await confirmButton.waitFor({ state: 'visible', timeout: 10_000 });
+  if (await confirmButton.isDisabled()) throw new Error('“确认继续”当前不可用，历史事务可能仍在进行');
+  await confirmButton.evaluate(element => {
+    if (!(element instanceof HTMLElement)) throw new Error('“确认继续”控件不可点击');
+    element.click();
+  });
+
+  const checkoutDeadline = Date.now() + options.timeoutMs;
+  let frameAfter = null;
+  while (Date.now() < checkoutDeadline) {
+    try {
+      const candidate = await findGameFrame(browser, options.pageUrl, 2_000);
+      if (candidate.frame.url() !== beforeFrameUrl) {
+        const generation = await inspectGeneration(browser, options.pageUrl);
+        const input = candidate.frame.locator(SELECTORS.input).first();
+        if (!generation.generating && (await input.isVisible()) && !(await input.isDisabled())) {
+          frameAfter = candidate.frame;
+          break;
+        }
+      }
+    } catch {
+      // checkout 会切换聊天并重建 iframe；在新实例就绪前继续轮询。
+    }
+    await sleep(200);
+  }
+  if (!frameAfter) throw new Error(`等待历史分叉完成并解锁输入超时（${options.timeoutMs}ms）`);
+
+  await sleep(options.settleMs);
+  const reply = await readLatestReply(browser, options.pageUrl);
+  const verifiedPanel = await openHistoryPanel(browser, options.pageUrl);
+  const verifiedFirst = await readFirstHistoryNode(verifiedPanel.frame);
+  await closeModalIfOpen(browser, options.pageUrl);
+  if (!verifiedFirst.current) {
+    throw new Error('历史分叉完成后，首个回复节点未成为当前节点，拒绝继续提示词测试');
+  }
+
+  return {
+    mode: 'restart-from-first-reply',
+    startedAt: new Date(startedAt).toISOString(),
+    completedAt: isoTime(),
+    alreadyAtFirstReply: false,
+    selectedNodeId: first.nodeId,
+    selectedPreview: first.preview,
+    checkoutAction: action,
+    frameUrlBefore: beforeFrameUrl,
+    frameUrlAfter: frameAfter.url(),
+    verifiedNodeId: verifiedFirst.nodeId,
+    verifiedPreview: verifiedFirst.preview,
+    verifiedFirstNodeCurrent: true,
+    reply,
+    totalMs: Date.now() - startedAt,
+  };
+}
+
 async function readStatDataSnapshot(browser, pageUrl) {
   try {
     await openVariablesPanel(browser, pageUrl);
@@ -635,6 +806,18 @@ async function main() {
         reply: await readLatestReply(browser, options.pageUrl),
       };
       report.success = !report.inspect.readiness.generating;
+      return;
+    }
+    if (options.restartFromFirstReply) {
+      try {
+        report.restart = await restartFromFirstReply(browser, options);
+        report.success = report.restart.verifiedFirstNodeCurrent === true;
+      } catch (error) {
+        const message = error instanceof Error ? error.stack || error.message : String(error);
+        log(`回到首个回复异常：${message}`);
+        report.restart = { mode: 'restart-from-first-reply', success: false, error: message };
+        report.success = false;
+      }
       return;
     }
     if (options.regenerate) {

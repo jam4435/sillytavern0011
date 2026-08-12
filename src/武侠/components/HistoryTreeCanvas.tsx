@@ -78,6 +78,10 @@ function HistoryFlowNodeView({ data, selected }: NodeProps<HistoryFlowNode>) {
           .filter(Boolean)
           .join(' ')}
         style={{ '--branch-color': branchColor } as React.CSSProperties}
+        data-wuxia-automation="history-node"
+        data-wuxia-history-node-id={node.id}
+        data-wuxia-history-depth={depth}
+        data-wuxia-history-current={isCurrent ? 'true' : 'false'}
       >
         <div className="history-node-kicker">
           第 {depth + 1} 回{isInactiveSwipe ? ' · 异文' : ''}

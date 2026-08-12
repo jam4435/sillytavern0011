@@ -86,6 +86,23 @@ pnpm wuxia:ui -- --regenerate --output wuxia-regenerate-report.json
 - 不得用于不确定原回合是否已发送的故障重试，也不代替模型请求内建的 HTTP 429 重试。
 - 进行提示词对照时，每次只修改一个提示词变量并推送，保留独立报告；具体对照步骤见审计协议。
 
+## 从首个回复重新开始
+
+多组提示词需要共享完全相同的开局上下文，或多轮测试已经把当前聊天推进到后续楼层时，先通过武侠前端“存档与分叉”回到当前脉络的第一个 assistant 回复：
+
+```powershell
+pnpm wuxia:ui -- --restart-from-first-reply --output wuxia-restart-first-reply.json
+```
+
+该命令真实执行以下 UI 操作：打开“存档与分叉”，选择当前连通脉络中深度为 0 的首个回复节点，点击“从此处继续”，再点击“确认继续”。它不会删除楼层、覆盖来源聊天、发送 user 行动或调用模型；需要回退时由前端创建原生 branch chat，并等待 checkout journal、ERA full sync、事件派生字段重算与哈希校验完成。只有新 iframe 已就绪、输入解锁且历史树再次确认首节点为当前节点时才报告成功。
+
+- 若当前本来就在首个回复，命令返回 `alreadyAtFirstReply: true`，不创建多余分支。
+- 页面正在生成、历史谱牒加载失败、确认按钮不可用、checkout 超时或最终首节点校验失败时立即停止；不得继续发送或重生成。
+- `--restart-from-first-reply` 是独立操作，不能与 `--regenerate`、`--inspect-only`、`--action`、`--turns` 或 `--stop-generation` 合用。
+- 分叉只恢复聊天与变量上下文，不证明最新世界书已经注入。提示词推送后仍须刷新酒馆测试页；第一个计数样本必须在 `main-input` 命中新版本唯一标记，否则该样本作废。
+
+多提示词实验的推荐顺序：保存基线 → 写入并推送一个完整提示词变体 → 刷新测试页 → `--restart-from-first-reply` → `--inspect-only` → 逐个 `--regenerate` 并立即审计。需要测试该提示词的后续多轮表现时，再从这个已验证的首回复分支逐轮发送行动；下一个变体重新执行上述顺序。
+
 ## 按需读取变量
 
 使用只读快照：

@@ -332,7 +332,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
           : '从此处继续';
 
   return (
-    <div className="save-history">
+    <div className="save-history" data-wuxia-automation="history-panel">
       <header className="history-masthead">
         <div className="history-title-block">
           <div className="history-seal" aria-hidden="true">
@@ -492,6 +492,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
                     <button
                       type="button"
                       className="history-primary-action"
+                      data-wuxia-automation="confirm-history-checkout"
                       disabled={isWorking}
                       onClick={() => void runCheckout(selectedNode)}
                     >
@@ -512,6 +513,8 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
                 <button
                   type="button"
                   className={`history-primary-action ${selectedIsCurrent ? 'current' : ''}`}
+                  data-wuxia-automation="continue-history-node"
+                  data-wuxia-history-action={primaryLabel}
                   disabled={selectedIsCurrent || isWorking || selectedBranchStatus === 'broken'}
                   onClick={handlePrimaryAction}
                 >
@@ -555,7 +558,11 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
         </aside>
       </div>
 
-      <div className={`history-status-line ${workState.type}`}>
+      <div
+        className={`history-status-line ${workState.type}`}
+        data-wuxia-automation="history-status"
+        data-wuxia-history-status={workState.type}
+      >
         {workState.type === 'loading' && <Loader2 className="spin" size={13} />}
         {workState.type === 'error' && <ShieldAlert size={13} />}
         <span>{workState.message}</span>
