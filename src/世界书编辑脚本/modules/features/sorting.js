@@ -1,6 +1,7 @@
 import { LOREBOOK_ENTRY_CLASS, LOREBOOK_SORT_PREF_KEY, LOREBOOK_UI_SORT_KEY } from '../config.js';
 import { lorebookSorts, setLorebookSorts } from '../state.js';
 import { ensureNumericUID, getLocalStorageItem, setLocalStorageItem } from '../utils.js';
+import { POSITION_TYPE_TO_NATIVE, normalizePositionRole } from '../position.js';
 
 // --- UI Drag-and-Drop Sorting ---
 
@@ -137,7 +138,7 @@ async function syncOrderToNativeWorldbook(lorebookName, sortedEntries) {
 }
 
 // 保存 UI 排序顺序到 localStorage
-function saveUISort(lorebookName, sortedIds) {
+export function saveUISort(lorebookName, sortedIds) {
   try {
     // 以世界书名为键保存顺序
     const allSortData = JSON.parse(getLocalStorageItem(LOREBOOK_UI_SORT_KEY) || '{}');
@@ -147,6 +148,176 @@ function saveUISort(lorebookName, sortedIds) {
   } catch (error) {
     console.error('角色世界书: 保存UI排序到本地存储失败', error);
   }
+}
+
+function getUid(entry) {
+  return ensureNumericUID(entry?.uid);
+}
+
+function getPlacementBucket(entry) {
+  const position = entry?.position || {};
+  const type = position.type || 'after_character_definition';
+  if (type !== 'at_depth') {
+    return type;
+  }
+  const depth = Number.isFinite(Number(position.depth)) ? Number(position.depth) : 0;
+  return `${type}:${normalizePositionRole(position.role)}:${depth}`;
+}
+
+function clonePosition(position) {
+  const cloned = _.cloneDeep(position || {});
+  cloned.type = cloned.type || 'after_character_definition';
+  if (cloned.type === 'at_depth') {
+    cloned.role = normalizePositionRole(cloned.role);
+    cloned.depth = Number.isFinite(Number(cloned.depth)) ? Number(cloned.depth) : 0;
+  } else {
+    delete cloned.role;
+  }
+  return cloned;
+}
+
+function getPriorityPositionRank(entry) {
+  const type = entry?.position?.type || 'after_character_definition';
+  return POSITION_TYPE_TO_NATIVE[type] ?? POSITION_TYPE_TO_NATIVE.after_character_definition;
+}
+
+function getAscendingBucketEntries(entries, bucket, sourceUid) {
+  return entries
+    .filter(entry => getPlacementBucket(entry) === bucket && getUid(entry) !== sourceUid)
+    .sort((a, b) => {
+      const orderA = Number(a?.position?.order);
+      const orderB = Number(b?.position?.order);
+      if (Number.isFinite(orderA) && Number.isFinite(orderB) && orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return getUid(a) - getUid(b);
+    });
+}
+
+function hasUsableUniqueOrders(entries) {
+  const seen = new Set();
+  return entries.every(entry => {
+    const order = Number(entry?.position?.order);
+    if (!Number.isInteger(order) || seen.has(order)) return false;
+    seen.add(order);
+    return true;
+  });
+}
+
+function makePriorityPatches(entries, source, target, direction, sortDir) {
+  const sourceUid = getUid(source);
+  const targetUid = getUid(target);
+  const targetPosition = clonePosition(target.position);
+  const targetBucket = getPlacementBucket({ position: targetPosition });
+  const originalBucketEntries = entries.filter(entry => getPlacementBucket(entry) === targetBucket);
+  const bucketEntries = getAscendingBucketEntries(entries, targetBucket, sourceUid);
+  const targetIndex = bucketEntries.findIndex(entry => getUid(entry) === targetUid);
+  if (targetIndex < 0) return null;
+
+  // The bucket is always persisted in ascending order; desc only reverses its display.
+  const insertAfterTarget = (direction === 'down') !== (sortDir === 'desc');
+  const insertionIndex = targetIndex + (insertAfterTarget ? 1 : 0);
+  const nextBucket = [...bucketEntries];
+  const plannedSource = { ...source, position: targetPosition };
+  nextBucket.splice(insertionIndex, 0, plannedSource);
+
+  const needsRenumber = !hasUsableUniqueOrders(originalBucketEntries);
+  const previous = nextBucket[insertionIndex - 1];
+  const following = nextBucket[insertionIndex + 1];
+  const previousOrder = Number(previous?.position?.order);
+  const followingOrder = Number(following?.position?.order);
+  let sourceOrder = null;
+
+  if (!needsRenumber) {
+    if (!previous) {
+      sourceOrder = followingOrder - 10;
+    } else if (!following) {
+      sourceOrder = previousOrder + 10;
+    } else if (followingOrder - previousOrder > 1) {
+      sourceOrder = Math.floor((previousOrder + followingOrder) / 2);
+    }
+  }
+
+  const patches = new Map();
+  if (Number.isInteger(sourceOrder)) {
+    patches.set(sourceUid, { position: { ...targetPosition, order: sourceOrder }, order: sourceOrder });
+  } else {
+    nextBucket.forEach((entry, index) => {
+      const uid = getUid(entry);
+      const order = (index + 1) * 10;
+      patches.set(uid, {
+        position: uid === sourceUid ? { ...targetPosition, order } : { ...clonePosition(entry.position), order },
+        order,
+      });
+    });
+  }
+
+  return { patches, placementBucket: targetBucket };
+}
+
+/**
+ * Build a data-only mobile move operation. The returned patches never mutate entries.
+ */
+export function planEntryMove({
+  entries = [],
+  visibleUids = [],
+  entryUid,
+  direction,
+  sortPreference = {},
+  regionByUid = {},
+  pinnedUids = [],
+  customOrder = [],
+}) {
+  const normalizedDirection = direction === 'down' ? 'down' : 'up';
+  const sortBy = sortPreference.by || 'priority';
+  const sortDir = sortPreference.dir === 'desc' ? 'desc' : 'asc';
+  const sourceUid = ensureNumericUID(entryUid);
+  const pinned = new Set([...pinnedUids].map(ensureNumericUID));
+  if (!['priority', 'custom'].includes(sortBy)) {
+    return { movable: false, reason: '当前排序方式不支持上下移动' };
+  }
+  if (pinned.has(sourceUid)) {
+    return { movable: false, reason: '置顶条目不能通过上下移动调整' };
+  }
+
+  const entryMap = new Map(entries.map(entry => [getUid(entry), entry]));
+  const source = entryMap.get(sourceUid);
+  if (!source) return { movable: false, reason: '找不到要移动的条目' };
+
+  const visible = visibleUids.map(ensureNumericUID).filter(uid => entryMap.has(uid));
+  const sourceIndex = visible.indexOf(sourceUid);
+  const targetUid = visible[sourceIndex + (normalizedDirection === 'up' ? -1 : 1)];
+  if (sourceIndex < 0 || targetUid === undefined) {
+    return { movable: false, reason: normalizedDirection === 'up' ? '已经是当前区域第一项' : '已经是当前区域最后一项' };
+  }
+  const target = entryMap.get(targetUid);
+  if (!target || pinned.has(targetUid)) {
+    return { movable: false, reason: '不能跨越置顶条目边界' };
+  }
+  if ((regionByUid[sourceUid] || '__root__') !== (regionByUid[targetUid] || '__root__')) {
+    return { movable: false, reason: '不能跨文件夹移动条目' };
+  }
+
+  if (sortBy === 'custom') {
+    const allUids = entries.map(getUid);
+    const seen = new Set();
+    const normalizedOrder = [...customOrder, ...allUids]
+      .map(ensureNumericUID)
+      .filter(uid => entryMap.has(uid) && !seen.has(uid) && seen.add(uid));
+    const sourceOrderIndex = normalizedOrder.indexOf(sourceUid);
+    const targetOrderIndex = normalizedOrder.indexOf(targetUid);
+    if (sourceOrderIndex < 0 || targetOrderIndex < 0) return { movable: false, reason: '自定义排序数据无效' };
+    const nextCustomOrder = [...normalizedOrder];
+    nextCustomOrder.splice(sourceOrderIndex, 1);
+    nextCustomOrder.splice(targetOrderIndex, 0, sourceUid);
+    const patches = new Map();
+    nextCustomOrder.forEach((uid, index) => patches.set(uid, { position: { ...clonePosition(entryMap.get(uid).position), order: index }, order: index }));
+    return { movable: true, sourceUid, targetUid, patches, nextCustomOrder };
+  }
+
+  const priorityPlan = makePriorityPatches(entries, source, target, normalizedDirection, sortDir);
+  if (!priorityPlan) return { movable: false, reason: '无法计算新的插入顺序' };
+  return { movable: true, sourceUid, targetUid, ...priorityPlan };
 }
 
 // 从 localStorage 加载保存的排序顺序
@@ -165,6 +336,27 @@ export function loadUISort(lorebookName) {
     console.error('角色世界书: 从本地存储加载UI排序失败', error);
     return null;
   }
+}
+
+export function getEntriesInCustomOrder(entries, customOrder) {
+  const entryMap = new Map((entries || []).map(entry => [getUid(entry), entry]));
+  const ordered = [];
+  (customOrder || []).forEach(uid => {
+    const entry = entryMap.get(ensureNumericUID(uid));
+    if (entry) {
+      ordered.push(entry);
+      entryMap.delete(getUid(entry));
+    }
+  });
+  entryMap.forEach(entry => ordered.push(entry));
+  return ordered;
+}
+
+export function getEntriesForSortPreference(entries, sortPreference = {}, customOrder = null) {
+  const sortBy = sortPreference.by || 'priority';
+  const sortDir = sortPreference.dir === 'desc' ? 'desc' : 'asc';
+  const initial = sortBy === 'custom' ? getEntriesInCustomOrder(entries, customOrder || []) : [...(entries || [])];
+  return getSortedEntries(initial, sortBy, sortDir);
 }
 
 // 应用保存的 UI 排序顺序（重新排列 DOM 元素）
@@ -213,6 +405,7 @@ export function loadSortPreference() {
 
 export function getSortedEntries(entries, sortBy, sortDir) {
   const sorted = [...entries];
+  const requestedSortBy = sortBy;
   const normalizeText = value => {
     if (typeof value === 'string') {
       return value;
@@ -240,29 +433,25 @@ export function getSortedEntries(entries, sortBy, sortDir) {
     // 如果置顶状态相同，则应用次要排序
 
     // '自定义' 排序，保持预先排定的顺序
-    if (sortBy === 'custom') {
+    if (requestedSortBy === 'custom') {
       return 0;
     }
 
     // '优先级' 排序，应用多级比较
-    if (sortBy === 'enabled_priority') {
+    let effectiveSortBy = requestedSortBy;
+    if (effectiveSortBy === 'enabled_priority') {
       const aEnabled = a.enabled !== false;
       const bEnabled = b.enabled !== false;
       if (aEnabled && !bEnabled) return -1;
       if (!aEnabled && bEnabled) return 1;
-      sortBy = 'priority';
+      effectiveSortBy = 'priority';
     }
 
-    if (sortBy === 'priority') {
-      const positionPriority = {
-        before_character_definition: 1,
-        after_character_definition: 2,
-        at_depth: 3,
-      };
+    if (effectiveSortBy === 'priority') {
       const posA = _.get(a, 'position.type', 'after_character_definition');
       const posB = _.get(b, 'position.type', 'after_character_definition');
-      const priorityA = positionPriority[posA] || 99;
-      const priorityB = positionPriority[posB] || 99;
+      const priorityA = getPriorityPositionRank(a);
+      const priorityB = getPriorityPositionRank(b);
 
       let result = priorityA - priorityB;
 
@@ -270,6 +459,12 @@ export function getSortedEntries(entries, sortBy, sortDir) {
         const depthA = _.get(a, 'position.depth', 0);
         const depthB = _.get(b, 'position.depth', 0);
         result = depthB - depthA; // 深度总是降序
+        if (result === 0) {
+          const roleOrder = { system: 0, user: 1, assistant: 2 };
+          result =
+            (roleOrder[normalizePositionRole(_.get(a, 'position.role'))] ?? 0) -
+            (roleOrder[normalizePositionRole(_.get(b, 'position.role'))] ?? 0);
+        }
       }
 
       if (result === 0) {
@@ -285,7 +480,7 @@ export function getSortedEntries(entries, sortBy, sortDir) {
     // 其他简单排序
     else {
       let valA, valB;
-      switch (sortBy) {
+      switch (effectiveSortBy) {
         case 'name':
           valA = normalizeText(a.name).toLowerCase();
           valB = normalizeText(b.name).toLowerCase();

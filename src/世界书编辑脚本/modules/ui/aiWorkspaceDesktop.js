@@ -3714,7 +3714,7 @@ function ensureUnifiedStyles() {
   $('head', parentDoc()).append(`
     <style id="lorebook-ai-workspace-unified-styles">
       #${AI_CONTENT_ID}{overflow:hidden!important;padding:0!important}
-      #${AI_CONTENT_ID} .ai-workspace-list-container{height:100%;min-height:0;overflow:hidden;container-type:inline-size;container-name:ai-workspace}
+      #${AI_CONTENT_ID} .ai-workspace-list-container{height:auto;min-height:0;flex:1 1 0;overflow:hidden;container-type:inline-size;container-name:ai-workspace}
       #${ROOT_ID}.ai-workbench-root{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;color:var(--panel-text-color,#eee);background:var(--ai-surface-muted-color,rgba(0,0,0,.18));font-family:inherit}
       #${ROOT_ID} *{box-sizing:border-box}
       #${ROOT_ID} button,#${ROOT_ID} input,#${ROOT_ID} select,#${ROOT_ID} textarea{font:inherit}
@@ -3736,7 +3736,7 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-icon-button{width:36px;padding:0;flex:0 0 36px}
       #${ROOT_ID} .ai-icon-text-button{padding:6px 10px}
       #${ROOT_ID} .ai-workbench-main{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-gutter:stable}
-      #${ROOT_ID} #ai-workspace-desktop-panel{min-height:100%}
+      #${ROOT_ID} #ai-workspace-desktop-panel{height:auto;min-height:100%;overflow:visible}
       #${ROOT_ID} .ai-workflow-page{min-height:100%;display:flex;flex-direction:column;gap:12px;padding:12px 12px 0}
       #${ROOT_ID} .ai-workflow-progress{position:sticky;top:0;z-index:8;display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--ai-border-color,#555);border-radius:11px;background:color-mix(in srgb,var(--ai-surface-raised-color,#282828) 94%,transparent);backdrop-filter:blur(12px);box-shadow:0 6px 18px var(--ai-shadow-color,rgba(0,0,0,.16))}
       #${ROOT_ID} .ai-stepper{display:flex;align-items:center;min-width:0}

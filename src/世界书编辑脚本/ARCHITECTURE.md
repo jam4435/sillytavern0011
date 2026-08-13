@@ -194,6 +194,8 @@ index.js
 `state.js`
 保存当前条目缓存、筛选/搜索、选择、展开、详情选中项和文件夹折叠状态，便于刷新后恢复局部 UI。条目文件夹没有会话记录时默认折叠，用户本次会话中的展开/折叠操作会覆盖这个默认值。
 
+移动端条目行的上下箭头通过 `entryCommands.js → sorting.js::planEntryMove()` 工作。只支持自定义、优先级和逆优先级：自定义调整完整 UID 排序；优先级模式把条目移动到当前同区可见相邻项的实际位置槽，并更新 `position`/`order`，保证重排后显示顺序与世界书实际注入顺序一致。置顶项、置顶边界、文件夹边界和不支持的排序方式会禁用按钮。一次有效移动只进行一次 `api.js.updateWorldbookEntries()` 写回；普通虚拟列表仅一次 `Clusterize.update()`，文件夹列表只交换受影响的 DOM 行，不重新读取世界书或重建面板。
+
 移动端不会改写
 `lorebook-pc-layout-mode`：其有效布局始终为抽屉式；返回 PC 后恢复此前保存的抽屉式或主从布局。视口跨设备模式时会先同步
 `data-device-mode` / `data-pc-layout-mode`，再重渲染当前标签和对应 AI 工作区。

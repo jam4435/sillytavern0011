@@ -3,12 +3,14 @@
  * 处理条目的展开、编辑、切换状态、选择等操作
  */
 
-import { saveEntryField, toggleEntryEnabled } from '../api.js';
+import { saveEntryField, toggleEntryEnabled, updateWorldbookEntries } from '../api.js';
 import { AI_TAB_ID, DEBUG_MODE } from '../config.js';
 import { applyAiPreview, generateAiPreview } from '../features/aiActions.js';
 import { isDepthPositionValue } from '../position.js';
 import { addPinnedEntry, getAiWorkspaceSettings, removePinnedEntry, setAiWorkspaceSettings } from '../settings.js';
-import { allEntriesData, toggleEntrySelection, virtualScrollers } from '../state.js';
+import { allEntriesData, getFolderMetaSession, getSelectableEntries, lorebookSorts, setAllEntriesData, toggleEntrySelection, virtualScrollers } from '../state.js';
+import { getPinnedEntries } from '../settings.js';
+import { getEntriesForSortPreference, loadUISort, planEntryMove, saveUISort } from '../features/sorting.js';
 import {
   closeAiActionDialog,
   getAiActionDialogState,
@@ -23,7 +25,7 @@ import { showCompareEditor, showContentEditor } from '../ui/contentEditor.js';
 import { isMasterDetailLayout, renderDetailPane, selectDetailEntry, syncMasterRowFromState } from '../ui/detail.js';
 import { showEntryEditor } from '../ui/editor.js';
 import { toggleExpanded } from '../ui/expandManager.js';
-import { updateHeaderCheckboxState, updateVirtualScroll } from '../ui/list.js';
+import { updateHeaderCheckboxState, updateMobileMoveButtons, updateVirtualScroll } from '../ui/list.js';
 import { switchTab } from '../ui/panel.js';
 import { refreshAiWorkspace, resetAiWorkspace } from '../ui/aiWorkspace.js';
 import { ensureNumericUID } from '../utils.js';
@@ -55,6 +57,120 @@ function updateLocalEntryState(lorebookName, numericUid, updater) {
   }
   updater(entry);
   return entry;
+}
+
+const movingLorebooks = new Set();
+
+function buildMoveRegions(lorebookName, entries) {
+  const entryFolderMap = getFolderMetaSession(lorebookName)?.entryFolderMap || {};
+  return Object.fromEntries(
+    entries.map(entry => {
+      const uid = ensureNumericUID(entry.uid);
+      return [uid, entryFolderMap[String(uid)] || '__root__'];
+    }),
+  );
+}
+
+function applyMovePatches(entries, patches) {
+  return entries.map(entry => {
+    const patch = patches.get(ensureNumericUID(entry.uid));
+    if (!patch) return entry;
+    const updated = _.cloneDeep(entry);
+    updated.position = _.cloneDeep(patch.position);
+    updated.order = patch.order;
+    return updated;
+  });
+}
+
+function syncMovedEntryDom(lorebookName, sourceUid, targetUid, direction) {
+  const parentDoc = window.parent.document;
+  const $source = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"] .lorebook-entry-item[data-entry-uid="${sourceUid}"]`, parentDoc);
+  const $target = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"] .lorebook-entry-item[data-entry-uid="${targetUid}"]`, parentDoc);
+  if (!$source.length || !$target.length || $source.parent()[0] !== $target.parent()[0]) return;
+  if (direction === 'up') $source.insertBefore($target);
+  else $source.insertAfter($target);
+
+  [sourceUid, targetUid].forEach(uid => {
+    const entry = (allEntriesData[lorebookName] || []).find(item => ensureNumericUID(item.uid) === uid);
+    const $item = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"] .lorebook-entry-item[data-entry-uid="${uid}"]`, parentDoc);
+    if (!entry || !$item.length) return;
+    const position = entry.position || {};
+    $item.attr('data-order', position.order ?? 0);
+    $item.find('.mini-position-select').val(position.type === 'at_depth' ? `at_depth_as_${position.role || 'system'}` : position.type);
+    $item.find('.depth-input').val(position.depth ?? 0);
+    $item.find('.order-input').val(position.order ?? 0);
+  });
+}
+
+async function moveEntry({ $actionTarget, $item, lorebookName, numericUid, direction }) {
+  if (movingLorebooks.has(lorebookName)) return;
+  const entries = allEntriesData[lorebookName] || [];
+  const sortPreference = lorebookSorts[lorebookName] || { by: 'priority', dir: 'asc' };
+  const visibleUids = getSelectableEntries(lorebookName).map(entry => ensureNumericUID(entry.uid));
+  const pinnedUids = getPinnedEntries(lorebookName);
+  const regionByUid = buildMoveRegions(lorebookName, entries);
+  const customOrder = sortPreference.by === 'custom' ? loadUISort(lorebookName) || entries.map(entry => ensureNumericUID(entry.uid)) : [];
+  const initialPlan = planEntryMove({ entries, visibleUids, entryUid: numericUid, direction, sortPreference, regionByUid, pinnedUids, customOrder });
+  if (!initialPlan.movable) {
+    window.toastr?.info(initialPlan.reason);
+    return;
+  }
+
+  movingLorebooks.add(lorebookName);
+  $actionTarget.prop('disabled', true);
+  let appliedPlan = null;
+  try {
+    const result = await updateWorldbookEntries(lorebookName, nativeEntries => {
+      appliedPlan = planEntryMove({
+        entries: nativeEntries,
+        visibleUids,
+        entryUid: numericUid,
+        direction,
+        sortPreference,
+        regionByUid,
+        pinnedUids,
+        customOrder,
+      });
+      if (!appliedPlan.movable) return nativeEntries;
+      return applyMovePatches(nativeEntries, appliedPlan.patches);
+    });
+    if (!result.success || !appliedPlan?.movable) {
+      throw result.error || new Error(appliedPlan?.reason || '移动条目失败');
+    }
+
+    if (appliedPlan.nextCustomOrder) saveUISort(lorebookName, appliedPlan.nextCustomOrder);
+    const nativeByUid = new Map((result.data || []).map(entry => [ensureNumericUID(entry.uid), entry]));
+    const mergedEntries = entries.map(entry => {
+      const native = nativeByUid.get(ensureNumericUID(entry.uid));
+      return native ? { ...native, pinned: entry.pinned, __pinOrder: entry.__pinOrder } : entry;
+    });
+    const nextEntries = getEntriesForSortPreference(
+      mergedEntries,
+      sortPreference,
+      appliedPlan.nextCustomOrder || (sortPreference.by === 'custom' ? customOrder : []),
+    );
+    setAllEntriesData({ ...allEntriesData, [lorebookName]: nextEntries });
+
+    const hasFolder = Object.values(regionByUid).some(region => region !== '__root__');
+    if (hasFolder) syncMovedEntryDom(lorebookName, appliedPlan.sourceUid, appliedPlan.targetUid, direction);
+    else await updateVirtualScroll(lorebookName);
+    updateMobileMoveButtons(lorebookName);
+  } catch (error) {
+    console.error('角色世界书: 移动条目失败', error);
+    window.toastr?.error(error.message || '移动条目失败');
+  } finally {
+    movingLorebooks.delete(lorebookName);
+    $actionTarget.prop('disabled', false);
+    updateMobileMoveButtons(lorebookName);
+  }
+}
+
+function moveUp(context) {
+  return moveEntry({ ...context, direction: 'up' });
+}
+
+function moveDown(context) {
+  return moveEntry({ ...context, direction: 'down' });
 }
 
 function getDisplayTitleValue(value) {
@@ -511,4 +627,6 @@ registerCommands({
   'toggle-prevent-incoming': togglePreventIncoming,
   'toggle-delay-recursion': toggleDelayRecursion,
   'toggle-pinned': togglePinned,
+  'move-up': moveUp,
+  'move-down': moveDown,
 });

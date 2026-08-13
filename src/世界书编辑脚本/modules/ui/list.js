@@ -39,7 +39,7 @@ import {
 } from './detail.js';
 import { scheduleMasterEntryTokenHydration } from './masterEntryTokens.js';
 
-import { enableDragSort, getSortedEntries, loadUISort } from '../features/sorting.js';
+import { enableDragSort, getEntriesInCustomOrder, getSortedEntries, loadUISort, planEntryMove } from '../features/sorting.js';
 import { getLastTransactionMeta } from '../features/history.js';
 import { measureCollapsedHeight, syncVisibleEntries } from './expandManager.js';
 
@@ -165,6 +165,45 @@ function hasRollbackTransaction(lorebookName) {
 
 function getRenderableEntries(lorebookName) {
   return getSelectableEntries(lorebookName);
+}
+
+function getMoveRegions(lorebookName, entries) {
+  const entryFolderMap = getFolderMetaSession(lorebookName)?.entryFolderMap || {};
+  return Object.fromEntries(
+    (entries || []).map(entry => {
+      const uid = ensureNumericUID(entry.uid);
+      return [uid, entryFolderMap[String(uid)] || '__root__'];
+    }),
+  );
+}
+
+/** Update only the currently mounted mobile arrow buttons; no list rebuild is needed. */
+export function updateMobileMoveButtons(lorebookName) {
+  const parentDoc = window.parent.document;
+  const $wrapper = $(`.lorebook-entries-wrapper[data-lorebook-name="${lorebookName}"]`, parentDoc).first();
+  if (!$wrapper.length) return;
+  const entries = allEntriesData[lorebookName] || [];
+  const sortPreference = lorebookSorts[lorebookName] || { by: 'priority', dir: 'asc' };
+  const visibleUids = getSelectableEntries(lorebookName).map(entry => ensureNumericUID(entry.uid));
+  const customOrder = sortPreference.by === 'custom' ? loadUISort(lorebookName) || entries.map(entry => ensureNumericUID(entry.uid)) : [];
+  const shared = {
+    entries,
+    visibleUids,
+    sortPreference,
+    regionByUid: getMoveRegions(lorebookName, entries),
+    pinnedUids: getPinnedEntries(lorebookName),
+    customOrder,
+  };
+  $wrapper.find('.move-button').each(function () {
+    const $button = $(this);
+    const uid = ensureNumericUID($button.closest('.lorebook-entry-item').attr('data-entry-uid'));
+    const direction = $button.hasClass('move-down-button') ? 'down' : 'up';
+    const capability = planEntryMove({ ...shared, entryUid: uid, direction });
+    $button
+      .prop('disabled', !capability.movable)
+      .attr('aria-disabled', capability.movable ? 'false' : 'true')
+      .attr('title', capability.movable ? (direction === 'up' ? '上移条目' : '下移条目') : capability.reason);
+  });
 }
 
 function getLorebookCharCount(entries) {
@@ -1009,6 +1048,7 @@ export const loadLorebookEntries = errorCatched(async (lorebookName, $container,
     setTimeout(() => {
       updateHeaderCheckboxState(lorebookName, isGlobal);
       updateRollbackButtonState(lorebookName, isGlobal);
+      updateMobileMoveButtons(lorebookName);
     }, 100);
 
     $title.attr('data-loaded', 'true');
@@ -2087,6 +2127,7 @@ export const updateVirtualScroll = errorCatched(async lorebookName => {
     // 6. 更新条目计数
     updateLorebookCountInfo(lorebookName, isGlobal, filteredEntries.length, allEntriesData[lorebookName]);
     updateHeaderCheckboxState(lorebookName, isGlobal);
+    updateMobileMoveButtons(lorebookName);
 
     if (DEBUG_MODE) {
       console.log(`[无感刷新] 成功更新世界书 "${lorebookName}"，共 ${filteredEntries.length} 个条目`);

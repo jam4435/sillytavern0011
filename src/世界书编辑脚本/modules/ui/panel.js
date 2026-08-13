@@ -399,6 +399,7 @@ export function initPanel() {
                     transform: translateX(-50%);
                     width: 95%;
                     max-width: 1100px; /* 增加最大宽度 */
+                    height: 80vh;
                     max-height: 80vh;
                     background-color: var(--panel-bg-color);
                     color: var(--panel-text-color);
@@ -450,6 +451,7 @@ export function initPanel() {
                     #${LOREBOOK_PANEL_ID} {
                         width: 95%;
                         max-width: 480px;
+                        height: 85vh;
                         max-height: 85vh;
                         top: 45px;
                     }
@@ -657,7 +659,8 @@ export function initPanel() {
 
                 /* --- 内容区域 --- */
                 #${LOREBOOK_PANEL_ID} .content-container {
-                    flex-grow: 1;
+                    flex: 1 1 auto;
+                    min-height: 0;
                     display: flex;
                     flex-direction: column;
                     overflow: hidden;
@@ -683,7 +686,8 @@ export function initPanel() {
                     display: none;
                     flex-direction: column;
                     width: 100%;
-                    flex-grow: 1;
+                    flex: 1 1 auto;
+                    min-height: 0;
                     overflow: hidden;
                     padding: 15px;
                     box-sizing: border-box;
@@ -1701,6 +1705,11 @@ export function initPanel() {
                     color: #fff;
                     background-color: #555;
                 }
+
+                .move-button:disabled {
+                    cursor: not-allowed;
+                    opacity: 0.38;
+                }
                 
                 
                 
@@ -2643,6 +2652,7 @@ export function initPanel() {
                     #${LOREBOOK_PANEL_ID} {
                         width: 95%;
                         max-width: 480px;
+                        height: 85vh;
                         max-height: 85vh;
                         top: 45px;
                     }
