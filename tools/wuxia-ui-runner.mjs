@@ -630,6 +630,9 @@ async function restartFromFirstReply(browser, options) {
 
 async function readStatDataSnapshot(browser, pageUrl) {
   try {
+    // “事件记录”等其他弹窗会遮住设置按钮；快照读取必须与历史分叉一样，
+    // 从没有前置弹窗的状态开始。
+    await closeModalIfOpen(browser, pageUrl);
     await openVariablesPanel(browser, pageUrl);
     const deadline = Date.now() + 10_000;
     while (Date.now() < deadline) {

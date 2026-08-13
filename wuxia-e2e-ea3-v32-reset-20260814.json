@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-08-13T17:07:17.930Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 240000,
+    "output": "wuxia-e2e-ea3-v32-reset-20260814.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": true,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": true,
+  "restart": {
+    "mode": "restart-from-first-reply",
+    "startedAt": "2026-08-13T17:07:18.306Z",
+    "completedAt": "2026-08-13T17:07:22.006Z",
+    "alreadyAtFirstReply": true,
+    "selectedNodeId": "history_node_7594335a2e233538",
+    "selectedPreview": "<event_audit> 01｜状态｜裁定=模式A／首次双行｜依据=历史未存在完整两行标签，根据详情：郭杨邀张十五饮酒。 02｜连续｜裁定=只推进村子外围到酒馆附近的范围｜依据=当前只是走进村子。 03｜干涉｜裁定=原定｜依据=只是普通进...",
+    "frameUrlBefore": "blob:http://127.0.0.1:8000/2f060be9-9531-4293-bc61-8098537f8567",
+    "frameUrlAfter": "blob:http://127.0.0.1:8000/2f060be9-9531-4293-bc61-8098537f8567",
+    "verifiedFirstNodeCurrent": true
+  },
+  "completedAt": "2026-08-13T17:07:22.006Z"
+}
