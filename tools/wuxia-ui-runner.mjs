@@ -48,6 +48,7 @@ function printUsage() {
   --regenerate           只重新生成最新 assistant swipe 一次，不新建 user 楼层
   --restart-from-first-reply
                          通过“存档与分叉”回到当前脉络的首个 assistant 回复，不发送或生成
+  --reload-page          重新加载匹配的酒馆页面并等待武侠 iframe 就绪，不发送或生成
   --stop-generation      仅在页面正在生成时，通过酒馆终止按钮停止当前生成
   --continue-on-error    调试状态为 error 时继续下一轮
   --help                 显示帮助
@@ -84,6 +85,7 @@ function parseArgs(argv) {
     statDataSnapshot: false,
     regenerate: false,
     restartFromFirstReply: false,
+    reloadPage: false,
     stopGeneration: false,
     continueOnError: false,
   };
@@ -115,6 +117,10 @@ function parseArgs(argv) {
       options.restartFromFirstReply = true;
       continue;
     }
+    if (arg === '--reload-page') {
+      options.reloadPage = true;
+      continue;
+    }
     if (arg === '--stop-generation') {
       options.stopGeneration = true;
       continue;
@@ -135,10 +141,21 @@ function parseArgs(argv) {
   if (options.statDataSnapshot && !options.inspectOnly) {
     throw new Error('--stat-data-snapshot 只能与 --inspect-only 一起使用，避免默认逐轮读取完整变量');
   }
+  const exclusiveModeCount = [
+    options.inspectOnly,
+    options.stopGeneration,
+    options.regenerate,
+    options.restartFromFirstReply,
+    options.reloadPage,
+  ].filter(Boolean).length;
+  if (exclusiveModeCount > 1) {
+    throw new Error('--inspect-only、--stop-generation、--regenerate、--restart-from-first-reply 与 --reload-page 必须单独使用');
+  }
   if (
     options.regenerate &&
     (options.inspectOnly ||
       options.restartFromFirstReply ||
+      options.reloadPage ||
       options.stopGeneration ||
       options.actions.length > 0 ||
       options.turns !== 1)
@@ -152,6 +169,7 @@ function parseArgs(argv) {
     (options.inspectOnly ||
       options.regenerate ||
       options.restartFromFirstReply ||
+      options.reloadPage ||
       options.actions.length > 0 ||
       options.turns !== 1)
   ) {
@@ -161,7 +179,12 @@ function parseArgs(argv) {
   }
   if (
     options.restartFromFirstReply &&
-    (options.inspectOnly || options.regenerate || options.stopGeneration || options.actions.length > 0 || options.turns !== 1)
+    (options.inspectOnly ||
+      options.regenerate ||
+      options.stopGeneration ||
+      options.reloadPage ||
+      options.actions.length > 0 ||
+      options.turns !== 1)
   ) {
     throw new Error('--restart-from-first-reply 不能与推进、重生成、终止、--inspect-only 或 --turns 一起使用');
   }
@@ -170,6 +193,7 @@ function parseArgs(argv) {
     !options.stopGeneration &&
     !options.regenerate &&
     !options.restartFromFirstReply &&
+    !options.reloadPage &&
     options.actions.length === 0
   ) {
     throw new Error('至少需要一个 --action；若只提供一个，会在每轮重复使用');
@@ -179,6 +203,7 @@ function parseArgs(argv) {
     !options.stopGeneration &&
     !options.regenerate &&
     !options.restartFromFirstReply &&
+    !options.reloadPage &&
     options.actions.length !== 1 &&
     options.actions.length !== options.turns
   ) {
@@ -434,7 +459,8 @@ async function closeModalIfOpen(browser, pageUrl) {
   await closeButton.evaluate(element => {
     if (element instanceof HTMLElement) element.click();
   });
-  await sleep(100);
+  await closeButton.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => undefined);
+  await sleep(250);
   return true;
 }
 
@@ -460,8 +486,36 @@ async function openHistoryPanel(browser, pageUrl) {
   const openButton = frame.locator(SELECTORS.openHistoryPanel).first();
   await openButton.waitFor({ state: 'visible', timeout: 10_000 });
   await openButton.click();
-  ({ frame } = await findGameFrame(browser, pageUrl));
-  const status = await waitForHistoryPanelIdle(frame);
+  await sleep(250);
+  if (!(await frame.locator(SELECTORS.historyPanel).first().isVisible().catch(() => false))) {
+    // 刚关闭其他弹窗时 React 状态提交可能晚于第一次点击；确认关闭后重试一次。
+    await openButton.click();
+  }
+  let status;
+  try {
+    // 保持使用实际点击按钮的 iframe；页面里可能同时残留多个武侠 iframe，
+    // 点击后重新全局扫描会误选到没有打开谱牒的旧 iframe。
+    status = await waitForHistoryPanelIdle(frame);
+  } catch (error) {
+    // 仅在原 iframe 已被历史切换或热更新销毁时重新发现当前 iframe。
+    if (!frame.isDetached()) {
+      const diagnostics = await frame
+        .locator('[data-wuxia-automation]')
+        .evaluateAll(elements =>
+          elements.map(element => ({
+            automation: element.getAttribute('data-wuxia-automation'),
+            visible: !!(element instanceof HTMLElement && (element.offsetWidth || element.offsetHeight)),
+            text: (element.textContent || '').trim().slice(0, 160),
+          })),
+        )
+        .catch(() => []);
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)}\n点击谱牒后的 iframe 诊断：${JSON.stringify(diagnostics)}`,
+      );
+    }
+    ({ frame } = await findGameFrame(browser, pageUrl));
+    status = await waitForHistoryPanelIdle(frame);
+  }
 
   const fitView = frame.locator('.react-flow__controls-fitview').first();
   if (await fitView.isVisible().catch(() => false)) {
@@ -515,13 +569,17 @@ async function restartFromFirstReply(browser, options) {
   }
   await continueButton.click();
 
-  const confirmButton = opened.frame.locator(SELECTORS.confirmHistoryCheckout).first();
-  await confirmButton.waitFor({ state: 'visible', timeout: 10_000 });
-  if (await confirmButton.isDisabled()) throw new Error('“确认继续”当前不可用，历史事务可能仍在进行');
-  await confirmButton.evaluate(element => {
-    if (!(element instanceof HTMLElement)) throw new Error('“确认继续”控件不可点击');
-    element.click();
-  });
+  // “切换到该分支”会直接检出既有叶节点，不显示确认框；创建新分叉和
+  // 切换异文仍须点击“确认继续”。
+  if (action !== '切换到该分支' && action !== '返回主分支') {
+    const confirmButton = opened.frame.locator(SELECTORS.confirmHistoryCheckout).first();
+    await confirmButton.waitFor({ state: 'visible', timeout: 10_000 });
+    if (await confirmButton.isDisabled()) throw new Error('“确认继续”当前不可用，历史事务可能仍在进行');
+    await confirmButton.evaluate(element => {
+      if (!(element instanceof HTMLElement)) throw new Error('“确认继续”控件不可点击');
+      element.click();
+    });
+  }
 
   const checkoutDeadline = Date.now() + options.timeoutMs;
   let frameAfter = null;
@@ -764,6 +822,23 @@ async function runRegeneration(browser, options) {
   return report;
 }
 
+async function reloadGamePage(browser, options) {
+  const before = await findGameFrame(browser, options.pageUrl);
+  const pageUrlBefore = before.page.url();
+  const frameUrlBefore = before.frame.url();
+  await before.page.reload({ waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+  const after = await findGameFrame(browser, options.pageUrl, options.timeoutMs);
+  await sleep(options.settleMs);
+  return {
+    mode: 'reload-page',
+    pageUrlBefore,
+    pageUrlAfter: after.page.url(),
+    frameUrlBefore,
+    frameUrlAfter: after.frame.url(),
+    readiness: await inspectUiReadiness(browser, options.pageUrl),
+  };
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   log(`连接 Chrome：${options.endpoint}`);
@@ -787,6 +862,11 @@ async function main() {
 
   try {
     await findGameFrame(browser, options.pageUrl);
+    if (options.reloadPage) {
+      report.reload = await reloadGamePage(browser, options);
+      report.success = !report.reload.readiness.generating && !report.reload.readiness.inputDisabled;
+      return;
+    }
     if (options.inspectOnly) {
       await sleep(options.settleMs);
       report.inspect = {

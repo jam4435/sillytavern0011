@@ -1,0 +1,44 @@
+{
+  "startedAt": "2026-08-12T15:48:52.390Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-e2e-ea2-v12-run1-reload-20260812.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "reloadPage": true,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": true,
+  "reload": {
+    "mode": "reload-page",
+    "pageUrlBefore": "http://127.0.0.1:8000/",
+    "pageUrlAfter": "http://127.0.0.1:8000/",
+    "frameUrlBefore": "blob:http://127.0.0.1:8000/5c30570e-ecd1-4d7d-9989-b5741484fe6b",
+    "frameUrlAfter": "blob:http://127.0.0.1:8000/843af7c7-4479-4122-9f4a-5224417643e3",
+    "readiness": {
+      "pageUrl": "http://127.0.0.1:8000/",
+      "frameUrl": "blob:http://127.0.0.1:8000/843af7c7-4479-4122-9f4a-5224417643e3",
+      "generating": false,
+      "inputDisabled": false,
+      "sendDisabled": false,
+      "regenerateDisabled": false,
+      "automation": {
+        "playerInput": true,
+        "sendTurn": true,
+        "generationState": true,
+        "regenerateLastReply": true,
+        "openSettings": true
+      }
+    }
+  },
+  "completedAt": "2026-08-12T15:50:14.448Z"
+}

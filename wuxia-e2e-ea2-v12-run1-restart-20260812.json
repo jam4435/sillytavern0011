@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-08-12T15:50:29.430Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-e2e-ea2-v12-run1-restart-20260812.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": true,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": true,
+  "restart": {
+    "mode": "restart-from-first-reply",
+    "startedAt": "2026-08-12T15:50:29.880Z",
+    "completedAt": "2026-08-12T15:50:32.788Z",
+    "alreadyAtFirstReply": true,
+    "selectedNodeId": "history_node_fa79c29ce104f080",
+    "selectedPreview": "<event_audit> 01｜连续性｜裁定=承接玩家进入牛家村的开端｜依据=玩家输入“我走进村子”，此时正好对应事件发生地点所在的牛家村。 02｜玩家干涉｜裁定=无干涉｜依据=玩家仅表现为走进村子，未与关键人物发生冲突或改变事件走向。 ...",
+    "frameUrlBefore": "blob:http://127.0.0.1:8000/843af7c7-4479-4122-9f4a-5224417643e3",
+    "frameUrlAfter": "blob:http://127.0.0.1:8000/843af7c7-4479-4122-9f4a-5224417643e3",
+    "verifiedFirstNodeCurrent": true
+  },
+  "completedAt": "2026-08-12T15:50:32.788Z"
+}

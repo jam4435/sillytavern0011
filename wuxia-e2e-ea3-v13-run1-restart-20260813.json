@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-08-13T06:52:47.949Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-e2e-ea3-v13-run1-restart-20260813.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": true,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": true,
+  "restart": {
+    "mode": "restart-from-first-reply",
+    "startedAt": "2026-08-13T06:52:48.190Z",
+    "completedAt": "2026-08-13T06:52:50.577Z",
+    "alreadyAtFirstReply": true,
+    "selectedNodeId": "history_node_cf30a3aa873c20d0",
+    "selectedPreview": "<event_audit> 01｜连续性｜裁定=承接最新正文时间点｜依据=1200年8月15日11时，说书结束，郭杨邀请张十五去酒馆，墨逸正好此时进入牛家村。 02｜玩家干涉｜裁定=无｜依据=玩家仅输入“我走进村子”，属于普通移动和观察，未...",
+    "frameUrlBefore": "blob:http://127.0.0.1:8000/283f70ba-6e89-4075-b9e7-e40283dfeeb6",
+    "frameUrlAfter": "blob:http://127.0.0.1:8000/283f70ba-6e89-4075-b9e7-e40283dfeeb6",
+    "verifiedFirstNodeCurrent": true
+  },
+  "completedAt": "2026-08-13T06:52:50.577Z"
+}

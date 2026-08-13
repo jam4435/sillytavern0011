@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-08-13T07:47:43.259Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 240000,
+    "output": "wuxia-e2e-ea3-v20-run1-restart-20260813.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": true,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": true,
+  "restart": {
+    "mode": "restart-from-first-reply",
+    "startedAt": "2026-08-13T07:47:43.471Z",
+    "completedAt": "2026-08-13T07:47:45.896Z",
+    "alreadyAtFirstReply": true,
+    "selectedNodeId": "history_node_3bb33183e8b275bf",
+    "selectedPreview": "<event_audit> 01｜状态｜裁定=模式A／首次双行｜依据=参与事件<射雕第一回01-郭杨邀饮说书人>历史中不存在标签，本轮提取行动为：郭杨邀张十五入曲三酒馆｜三人谈论时局愤慨｜曲三点破高宗罪魁 02｜连续｜裁定=本轮只推进前半部...",
+    "frameUrlBefore": "blob:http://127.0.0.1:8000/9fff94dc-87ff-4add-8185-062b8f680059",
+    "frameUrlAfter": "blob:http://127.0.0.1:8000/9fff94dc-87ff-4add-8185-062b8f680059",
+    "verifiedFirstNodeCurrent": true
+  },
+  "completedAt": "2026-08-13T07:47:45.896Z"
+}

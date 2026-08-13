@@ -1,0 +1,30 @@
+{
+  "startedAt": "2026-08-13T07:20:42.517Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-e2e-ea3-v17-run1-first-regenerate-20260813.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": true,
+    "restartFromFirstReply": false,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "mode": "regenerate",
+      "prompt": "",
+      "success": false,
+      "error": "Error: 等待生成状态变为 false 超时（180000ms）；最后状态：{\"generating\":true,\"visibilityState\":\"visible\",\"pageUrl\":\"http://127.0.0.1:8000/\",\"frameUrl\":\"blob:http://127.0.0.1:8000/5fb58971-0124-44c1-89a8-fd5577635bc8\"}\n    at waitForGenerationState (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:312:9)\n    at async runRegeneration (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:788:20)\n    at async main (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:905:30)"
+    }
+  ],
+  "success": false,
+  "completedAt": "2026-08-13T07:23:43.309Z"
+}

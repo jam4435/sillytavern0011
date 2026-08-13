@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-08-13T06:56:11.068Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-e2e-ea3-v14-run1-restart-20260813.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": true,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": true,
+  "restart": {
+    "mode": "restart-from-first-reply",
+    "startedAt": "2026-08-13T06:56:11.275Z",
+    "completedAt": "2026-08-13T06:56:13.667Z",
+    "alreadyAtFirstReply": true,
+    "selectedNodeId": "history_node_73094975c9d5b1a2",
+    "selectedPreview": "<event_audit> 01｜规划来源｜首次拆分 02｜当前行动｜未进行 03｜连续性｜墨逸进入牛家村，正文将自然展现其入村过程并引向曲三酒馆的背景事件。 04｜本轮范围｜推进第一段行动：墨逸入村及村民的自然反应。由于无直接交锋，事件自...",
+    "frameUrlBefore": "blob:http://127.0.0.1:8000/aa686f14-4a20-459f-a8ef-3d1e9c457b7c",
+    "frameUrlAfter": "blob:http://127.0.0.1:8000/aa686f14-4a20-459f-a8ef-3d1e9c457b7c",
+    "verifiedFirstNodeCurrent": true
+  },
+  "completedAt": "2026-08-13T06:56:13.667Z"
+}
