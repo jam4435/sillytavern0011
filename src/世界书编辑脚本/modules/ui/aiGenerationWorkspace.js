@@ -785,7 +785,7 @@ function ensureStyles() {
   if ($(`#${STYLE_ID}`, parentDoc()).length) return;
   $('head', parentDoc()).append(`
     <style id="${STYLE_ID}">
-      #${ROOT_ID}{--gen-ink:var(--panel-text-color,#ece8df);--gen-muted:var(--ai-text-color-secondary,#aaa69f);--gen-paper:color-mix(in srgb,var(--panel-bg-color,#252525) 92%,#b6a572 8%);--gen-line:color-mix(in srgb,var(--panel-border-color,#555) 80%,#b6a572 20%);--gen-accent:var(--panel-accent-color,#9a7ace);height:100%;min-height:0;overflow:hidden;color:var(--gen-ink);display:flex;flex-direction:column;gap:10px;font-family:"Noto Serif SC","Songti SC",serif}
+      #${ROOT_ID}{--gen-ink:var(--panel-text-color,#ece8df);--gen-muted:var(--ai-text-color-secondary,#aaa69f);--gen-paper:color-mix(in srgb,var(--panel-bg-color,#252525) 92%,#b6a572 8%);--gen-line:color-mix(in srgb,var(--panel-border-color,#555) 80%,#b6a572 20%);--gen-accent:var(--panel-accent-color,#9a7ace);height:auto;min-height:100%;overflow:visible;color:var(--gen-ink);display:flex;flex-direction:column;gap:10px;font-family:"Noto Serif SC","Songti SC",serif}
       #${ROOT_ID} button,#${ROOT_ID} input,#${ROOT_ID} select,#${ROOT_ID} textarea{font:inherit}
       #${ROOT_ID} button{cursor:pointer}
       #${ROOT_ID} .gen-eyebrow{text-transform:uppercase;letter-spacing:.16em;font-size:10px;color:var(--gen-muted)}
@@ -807,8 +807,8 @@ function ensureStyles() {
       #${ROOT_ID} .gen-progress .is-active button{color:var(--gen-ink);font-weight:700}
       #${ROOT_ID} .gen-progress .is-active button span{border-color:var(--gen-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--gen-accent) 18%,transparent)}
       #${ROOT_ID} .gen-progress .is-complete button span{background:#4d7b65;border-color:#6fa689;color:#fff}
-      #${ROOT_ID} .gen-work-area{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:minmax(0,1fr);gap:10px;min-height:0;overflow:hidden;flex:1}
-      #${ROOT_ID} .gen-work-area>main{min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:2px}
+      #${ROOT_ID} .gen-work-area{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:auto;gap:10px;min-height:0;overflow:visible;flex:0 0 auto}
+      #${ROOT_ID} .gen-work-area>main{min-width:0;min-height:0;overflow:visible;padding-right:2px}
       #${ROOT_ID} .gen-canvas-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:10px}
       #${ROOT_ID} .gen-sheet{position:relative;border:1px solid var(--gen-line);border-radius:12px;background-color:var(--gen-paper);background-image:linear-gradient(color-mix(in srgb,var(--gen-line) 22%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--gen-line) 15%,transparent) 1px,transparent 1px);background-size:22px 22px;padding:16px;display:flex;flex-direction:column;gap:13px;box-shadow:0 10px 25px rgba(0,0,0,.12)}
       #${ROOT_ID} .gen-sheet>header{display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--gen-line);padding-bottom:11px}
@@ -884,7 +884,7 @@ function ensureStyles() {
       #${ROOT_ID} .gen-finish-sheet{max-width:760px;margin:0 auto;text-align:center;align-items:center}.gen-finish-mark{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:#416d59;color:#fff;font-size:28px}
       #${ROOT_ID} .gen-binding-panel{width:100%;border-top:1px solid var(--gen-line);padding-top:12px}.gen-binding-panel>div{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:8px}
       #${ROOT_ID}.gen-loading{display:grid;place-items:center;align-content:center;height:100%;color:var(--gen-muted)}
-      @media(max-width:1050px){#${ROOT_ID}{overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}#${ROOT_ID} .gen-work-area{grid-template-columns:1fr;grid-template-rows:auto auto;overflow:visible;flex:0 0 auto}#${ROOT_ID} .gen-work-area>main{overflow:visible;padding-right:0}#${ROOT_ID} .gen-conversation{min-height:420px}#${ROOT_ID} .gen-canvas-grid{grid-template-columns:1fr}}
+      @media(max-width:1050px){#${ROOT_ID} .gen-work-area{grid-template-columns:1fr;grid-template-rows:auto auto}#${ROOT_ID} .gen-work-area>main{padding-right:0}#${ROOT_ID} .gen-conversation{min-height:420px}#${ROOT_ID} .gen-canvas-grid{grid-template-columns:1fr}}
       @media(max-width:720px){#${ROOT_ID} .gen-project-bar{align-items:flex-start;flex-direction:column}#${ROOT_ID} .gen-project-actions{width:100%;overflow:auto;flex-wrap:nowrap}#${ROOT_ID} .gen-progress button{font-size:0}.gen-progress button span{font-size:11px}#${ROOT_ID} .gen-field-row,#${ROOT_ID} .gen-entry-review{grid-template-columns:1fr}#${ROOT_ID} .gen-blueprint-row{grid-template-columns:14px 1fr}.gen-node-meta{grid-column:2;justify-content:flex-start!important}#${ROOT_ID} .gen-chat-controls{grid-template-columns:1fr}}
       @media(prefers-reduced-motion:reduce){#${ROOT_ID} *,#${ROOT_ID} *::before,#${ROOT_ID} *::after{transition:none!important;animation:none!important}}
     </style>

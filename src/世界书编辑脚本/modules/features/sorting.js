@@ -56,20 +56,10 @@ async function syncVirtualScrollData(lorebookName, sortedUids, clusterize) {
       return;
     }
 
-    // 创建 UID -> Entry 的映射
-    const entryMap = new Map();
-    entries.forEach(entry => {
-      entryMap.set(String(ensureNumericUID(entry.uid)), entry);
-    });
-
-    // 按新的 UID 顺序重新排列条目
-    const sortedEntries = [];
-    sortedUids.forEach(uid => {
-      const entry = entryMap.get(String(uid));
-      if (entry) {
-        sortedEntries.push(entry);
-      }
-    });
+    // Clusterize 的 DOM 只包含当前区块；必须补回所有未渲染条目，避免拖拽后缓存被截断。
+    const completeOrder = [...sortedUids, ...entries.map(entry => ensureNumericUID(entry.uid))];
+    const sortedEntries = getEntriesInCustomOrder(entries, completeOrder);
+    saveUISort(lorebookName, sortedEntries.map(entry => ensureNumericUID(entry.uid)));
 
     console.log('[拖拽] 重新排列后的条目数:', sortedEntries.length);
 
