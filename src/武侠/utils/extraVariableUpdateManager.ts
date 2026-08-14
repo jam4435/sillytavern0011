@@ -1000,15 +1000,21 @@ function formatVariableContext(
   const writableParticipationEvents = isRecord(projection.参与事件) ? projection.参与事件 : {};
 
   if (isRecord(participationEvents) && Object.keys(writableParticipationEvents).length > 0) {
-    lines.push('', '# 当前事件上下文：方括号是只读背景，JSON中的已有字段按规则有条件可写', '<参与事件>');
+    lines.push('', '# 当前事件上下文：时间、事件详情均为只读；JSON中的已有字段按规则有条件可写', '<参与事件>');
     for (const [eventName, writableSnapshot] of Object.entries(writableParticipationEvents)) {
       const eventValue = isRecord(participationEvents[eventName]) ? participationEvents[eventName] : {};
       const readonlyDescription = String(eventValue.描述 ?? '')
         .replace(/\s+/g, ' ')
         .trim();
+      const timeRangeMatch = readonlyDescription.match(
+        /^((?:\d+年\d+月\d+日\d+时(?:\d+分)?)\s+到\s+(?:\d+年\d+月\d+日\d+时(?:\d+分)?))[，,]\s*([\s\S]+)$/,
+      );
+      const readonlyContextLines = timeRangeMatch
+        ? ['<时间>', timeRangeMatch[1], '</时间>', '<事件详情>', timeRangeMatch[2], '</事件详情>']
+        : ['<事件详情>', readonlyDescription || '无', '</事件详情>'];
       lines.push(
         `<${eventName}>`,
-        `[只读时间、地点与事件背景：${readonlyDescription || '无'}]`,
+        ...readonlyContextLines,
         JSON.stringify(writableSnapshot),
         `</${eventName}>`,
       );

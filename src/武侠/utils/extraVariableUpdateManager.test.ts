@@ -177,7 +177,7 @@ describe('executeExtraVariableUpdate', () => {
         },
         参与事件: {
           '射雕第七回02-测试事件': {
-            描述: '黄蓉正在事件中',
+            描述: '1219年10月20日13时 到 1219年10月20日15时，黄蓉正在事件中',
             update: { 黄蓉: { 好感: 1 } },
             分支标记: { 黄蓉对郭靖变心: 0 },
             $meta: '隐藏',
@@ -1087,7 +1087,8 @@ describe('executeExtraVariableUpdate', () => {
 
     expect(fallbackProjection).toBe(normalProjection);
     expect(fallbackProjection).toContain('<status_current_variables>');
-    expect(fallbackProjection).toContain('[只读时间、地点与事件背景：黄蓉正在事件中]');
+    expect(fallbackProjection).toContain('<时间>\n1219年10月20日13时 到 1219年10月20日15时\n</时间>');
+    expect(fallbackProjection).toContain('<事件详情>\n黄蓉正在事件中\n</事件详情>');
     expect(fallbackProjection).toContain('{"update":{"黄蓉":{"好感":1}},"分支标记":{"黄蓉对郭靖变心":0}}');
     expect(fallbackProjection).toContain('每日修为变化参考:33');
     expect(fallbackProjection).toContain('【参与事件回合变量检查清单】');
