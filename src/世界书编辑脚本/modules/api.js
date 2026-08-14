@@ -28,6 +28,24 @@ const AUTO_UNPIN_POSITION_FIELDS = new Set([
   'order',
 ]);
 
+const worldbookMutationQueues = new Map();
+
+function runSerializedWorldbookMutation(lorebookName, task) {
+  const queueKey = `${lorebookName || ''}`;
+  const previous = worldbookMutationQueues.get(queueKey) || Promise.resolve();
+  const run = previous.then(task, task);
+  const barrier = run.catch(() => undefined);
+
+  worldbookMutationQueues.set(queueKey, barrier);
+  void barrier.then(() => {
+    if (worldbookMutationQueues.get(queueKey) === barrier) {
+      worldbookMutationQueues.delete(queueKey);
+    }
+  });
+
+  return run;
+}
+
 function buildMutationResult(success, changed, error = null, meta = {}, data = null) {
   return { success, changed, error, meta, data };
 }
@@ -235,46 +253,52 @@ export const updateWorldbookEntries = errorCatched(async (lorebookName, mutator,
     return buildMutationResult(false, false, error, { lorebookName });
   }
 
-  const transaction = await createTransactionIfNeeded(lorebookName, options);
-  let previousEntries = [];
-  let nextEntries = [];
-  let changed = false;
+  return runSerializedWorldbookMutation(lorebookName, async () => {
+    const transaction = await createTransactionIfNeeded(lorebookName, options);
+    let previousEntries = [];
+    let nextEntries = [];
+    let changed = false;
 
-  try {
-    await rawUpdateWorldbookWith(lorebookName, entries => {
-      previousEntries = cloneEntriesSnapshot(entries);
-      const mutatedEntries = mutator(entries);
-      nextEntries = cloneEntriesSnapshot(mutatedEntries);
-      changed = hasEntryChanges(previousEntries, nextEntries);
-      return mutatedEntries;
-    });
-
-    if (shouldCommitTransaction(transaction, options, changed)) {
-      await commitMutationTransaction(transaction, {
-        changedCount: nextEntries.length,
+    try {
+      await rawUpdateWorldbookWith(
         lorebookName,
+        entries => {
+          previousEntries = cloneEntriesSnapshot(entries);
+          const mutatedEntries = mutator(entries);
+          nextEntries = cloneEntriesSnapshot(mutatedEntries);
+          changed = hasEntryChanges(previousEntries, nextEntries);
+          return mutatedEntries;
+        },
+        options.render ? { render: options.render } : undefined,
+      );
+
+      if (shouldCommitTransaction(transaction, options, changed)) {
+        await commitMutationTransaction(transaction, {
+          changedCount: nextEntries.length,
+          lorebookName,
+        });
+      }
+
+      return buildMutationResult(
+        true,
+        changed,
+        null,
+        {
+          lorebookName,
+          previousCount: previousEntries.length,
+          nextCount: nextEntries.length,
+          ...(options.transactionMeta || {}),
+        },
+        nextEntries,
+      );
+    } catch (error) {
+      console.error(`角色世界书: 更新世界书 "${lorebookName}" 时出错`, error);
+      return buildMutationResult(false, false, error, {
+        lorebookName,
+        ...(options.transactionMeta || {}),
       });
     }
-
-    return buildMutationResult(
-      true,
-      changed,
-      null,
-      {
-        lorebookName,
-        previousCount: previousEntries.length,
-        nextCount: nextEntries.length,
-        ...(options.transactionMeta || {}),
-      },
-      nextEntries,
-    );
-  } catch (error) {
-    console.error(`角色世界书: 更新世界书 "${lorebookName}" 时出错`, error);
-    return buildMutationResult(false, false, error, {
-      lorebookName,
-      ...(options.transactionMeta || {}),
-    });
-  }
+  });
 }, 'updateWorldbookEntries');
 
 export const createLorebookEntries = errorCatched(async (lorebookName, entriesToCreate, options = {}) => {
@@ -402,46 +426,121 @@ function applyEntryFieldUpdate(entryToUpdate, fieldName, value) {
   }
 }
 
+export const saveEntryFields = errorCatched(async (lorebookName, patches, options = {}) => {
+  if (!lorebookName || !Array.isArray(patches)) {
+    console.error('角色世界书: 调用 saveEntryFields 时缺少必要参数。', { lorebookName, patches });
+    return buildMutationResult(false, false, new Error('缺少世界书名或字段补丁'), { lorebookName });
+  }
+  if (typeof rawUpdateWorldbookWith !== 'function') {
+    const error = new Error('角色世界书: 核心函数 updateWorldbookWith 不可用，无法保存条目。');
+    console.error(error.message);
+    return buildMutationResult(false, false, error, { lorebookName });
+  }
+
+  const deduplicatedPatches = new Map();
+  patches.forEach(patch => {
+    const entryUid = ensureNumericUID(patch?.entryUid);
+    const fieldName = `${patch?.fieldName || ''}`;
+    if (entryUid < 0 || !fieldName) {
+      return;
+    }
+    deduplicatedPatches.set(`${entryUid}\u0000${fieldName}`, {
+      entryUid,
+      fieldName,
+      value: patch.value,
+    });
+  });
+
+  const normalizedPatches = [...deduplicatedPatches.values()];
+  if (normalizedPatches.length === 0) {
+    return buildMutationResult(true, false, null, { lorebookName, changedCount: 0 }, []);
+  }
+
+  return runSerializedWorldbookMutation(lorebookName, async () => {
+    let changed = false;
+    let changedCount = 0;
+    let nextEntries = [];
+    const autoUnpinnedUids = new Set();
+
+    try {
+      const result = await rawUpdateWorldbookWith(
+        lorebookName,
+        entries => {
+          const entryIndexByUid = new Map(
+            entries.map((entry, index) => [ensureNumericUID(entry.uid), index]),
+          );
+          const patchesByUid = new Map();
+
+          normalizedPatches.forEach(patch => {
+            if (!patchesByUid.has(patch.entryUid)) {
+              patchesByUid.set(patch.entryUid, []);
+            }
+            patchesByUid.get(patch.entryUid).push(patch);
+          });
+
+          let updatedEntries = entries;
+          patchesByUid.forEach((entryPatches, entryUid) => {
+            const entryIndex = entryIndexByUid.get(entryUid);
+            if (entryIndex === undefined) {
+              console.error(`角色世界书: 在保存字段时未找到UID为 ${entryUid} 的条目`);
+              return;
+            }
+
+            const originalEntry = entries[entryIndex];
+            const updatedEntry = _.cloneDeep(originalEntry);
+            entryPatches.forEach(({ fieldName, value }) => {
+              applyEntryFieldUpdate(updatedEntry, fieldName, value);
+              if (AUTO_UNPIN_POSITION_FIELDS.has(fieldName)) {
+                updatedEntry.pinned = false;
+                autoUnpinnedUids.add(entryUid);
+              }
+            });
+
+            if (_.isEqual(originalEntry, updatedEntry)) {
+              return;
+            }
+            if (updatedEntries === entries) {
+              updatedEntries = [...entries];
+            }
+            updatedEntries[entryIndex] = updatedEntry;
+            changed = true;
+            changedCount += 1;
+          });
+
+          nextEntries = updatedEntries;
+          return updatedEntries;
+        },
+        { render: options.render || 'debounced' },
+      );
+
+      if (Array.isArray(result)) {
+        nextEntries = result;
+      }
+      if (changed) {
+        autoUnpinnedUids.forEach(entryUid => removePinnedEntry(lorebookName, entryUid));
+      }
+
+      return buildMutationResult(
+        true,
+        changed,
+        null,
+        { lorebookName, changedCount, nextCount: nextEntries.length },
+        nextEntries,
+      );
+    } catch (error) {
+      console.error(`角色世界书: 批量保存世界书 "${lorebookName}" 的字段时出错`, error);
+      return buildMutationResult(false, false, error, { lorebookName, changedCount: 0 });
+    }
+  });
+}, 'saveEntryFields');
+
 export const saveEntryField = errorCatched(async (entryUid, lorebookName, fieldName, value) => {
   if (!lorebookName || fieldName === undefined) {
     console.error(`角色世界书: 调用 saveEntryField 时缺少必要参数。`, { lorebookName, fieldName });
     return false;
   }
-  if (typeof rawUpdateWorldbookWith !== 'function') {
-    const msg = '角色世界书: 核心函数 updateWorldbookWith 不可用，无法保存条目。请确保酒馆助手已更新到最新版本。';
-    console.error(msg);
-    alert(msg); // 这是一个关键功能，直接提示用户
-    return false;
-  }
-
-  const numericUid = ensureNumericUID(entryUid);
-
   try {
-    const result = await updateWorldbookEntries(lorebookName, entries => {
-      const entryIndex = entries.findIndex(e => ensureNumericUID(e.uid) === numericUid);
-      if (entryIndex === -1) {
-        console.error(`角色世界书: 在保存字段 "${fieldName}" 时未找到UID为 ${numericUid} 的条目`);
-        return entries; // 未找到则不修改
-      }
-
-      // 优化：只深拷贝需要修改的条目，并创建一个新的数组引用
-      const updatedEntries = [...entries];
-      const entryToUpdate = _.cloneDeep(updatedEntries[entryIndex]);
-      updatedEntries[entryIndex] = entryToUpdate;
-
-      // 使用 lodash 的 set 方法安全地设置嵌套属性
-      applyEntryFieldUpdate(entryToUpdate, fieldName, value);
-      if (AUTO_UNPIN_POSITION_FIELDS.has(fieldName)) {
-        entryToUpdate.pinned = false;
-      }
-
-      return updatedEntries;
-    });
-
-    if (result.success && AUTO_UNPIN_POSITION_FIELDS.has(fieldName)) {
-      removePinnedEntry(lorebookName, numericUid);
-    }
-
+    const result = await saveEntryFields(lorebookName, [{ entryUid, fieldName, value }]);
     return result.success;
   } catch (error) {
     console.error(`角色世界书: 使用 updateWorldbookWith 保存字段 '${fieldName}' 时出错`, error);

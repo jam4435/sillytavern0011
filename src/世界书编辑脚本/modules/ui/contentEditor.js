@@ -313,9 +313,7 @@ function updateVisibleEntryContent(lorebookName, entryUid, content) {
 
   $(`.detail-editor[data-lorebook-name="${lorebookName}"][data-entry-uid="${uid}"]`, parentDoc).each(function () {
     const isGlobal = $(this).attr('data-is-global') === 'true';
-    import('./detail.js').then(({ renderDetailPane }) => {
-      renderDetailPane(isGlobal, { scrollIntoView: false });
-    });
+    $(parentDoc).trigger('lorebook-detail-refresh', [isGlobal]);
   });
 
   $(

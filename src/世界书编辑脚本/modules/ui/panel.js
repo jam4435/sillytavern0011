@@ -28,6 +28,7 @@ import { getFloatingBubblePositionSetting, setFloatingBubblePositionSetting } fr
 import { errorCatched, isMobile } from '../utils.js';
 import { updateBoundLorebooksList, updateGlobalLorebooksList } from './list.js';
 import { initAiWorkspace, refreshAiWorkspace, resetAiWorkspace } from './aiWorkspace.js';
+import { flushDetailSaves } from './detail.js';
 
 // 切换面板显示状态
 const toggleLorebookPanelLegacy = errorCatched(async () => {
@@ -295,6 +296,7 @@ export const closeLorebookPanel = errorCatched(async () => {
     return;
   }
 
+  await flushDetailSaves();
   lorebookPanelMinimized = false;
   setPanelMinimizedState($panel, false);
   $panel.hide();
@@ -328,6 +330,7 @@ export const toggleLorebookPanel = errorCatched(async () => {
 // 切换标签页
 export const switchTab = errorCatched(async tabId => {
   console.log(`角色世界书: 切换标签页至 ${tabId}`);
+  await flushDetailSaves();
   const parentDoc = window.parent.document;
   const $panel = $(`#${LOREBOOK_PANEL_ID}`, parentDoc);
 

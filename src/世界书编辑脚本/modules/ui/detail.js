@@ -5,7 +5,7 @@ import {
   GLOBAL_DETAIL_CONTAINER_ID,
   LOREBOOK_PANEL_ID,
 } from '../config.js';
-import { saveEntryField } from '../api.js';
+import { saveEntryFields } from '../api.js';
 import {
   addPinnedEntry,
   getPcLayoutModeSetting,
@@ -32,9 +32,9 @@ import {
 } from '../position.js';
 import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
 import { refreshSingleMasterEntryTokenBadge } from './masterEntryTokens.js';
+import { createDetailSaveCoordinator } from './detailSaveCoordinator.js';
 
 const DETAIL_STYLE_ID = 'enhanced-lorebook-detail-styles';
-const DETAIL_SAVE_DELAY = 250;
 const AUTO_UNPIN_POSITION_FIELDS = new Set([
   'position.type',
   'position.role',
@@ -1324,54 +1324,6 @@ function ensureDetailStyles() {
   `);
 }
 
-function executeQueuedSave($field, callback) {
-  $field.removeData('detail-save-timer');
-  $field.removeData('detail-save-callback');
-  const savePromise = Promise.resolve(callback()).then(result => {
-    $field.data('detail-last-save-result', result);
-    return result;
-  });
-
-  $field.data('detail-save-promise', savePromise);
-  savePromise.finally(() => {
-    if ($field.data('detail-save-promise') === savePromise) {
-      $field.removeData('detail-save-promise');
-    }
-  });
-
-  return savePromise;
-}
-
-function queueSave($field, callback, immediate = false) {
-  const existingTimer = $field.data('detail-save-timer');
-  if (existingTimer) {
-    clearTimeout(existingTimer);
-  }
-  $field.data('detail-save-callback', callback);
-
-  if (immediate) {
-    return executeQueuedSave($field, callback);
-  }
-
-  const timer = window.setTimeout(() => {
-    void executeQueuedSave($field, callback);
-  }, DETAIL_SAVE_DELAY);
-
-  $field.data('detail-save-timer', timer);
-}
-
-function flushQueuedSave($field) {
-  const callback = $field.data('detail-save-callback');
-  if (!callback) {
-    return $field.data('detail-save-promise') || Promise.resolve(null);
-  }
-  const timer = $field.data('detail-save-timer');
-  if (timer) {
-    clearTimeout(timer);
-  }
-  return executeQueuedSave($field, callback);
-}
-
 function isDetailContentField($field) {
   return $field.is('.detail-content-textarea') && $field.attr('data-field') === 'content';
 }
@@ -1389,24 +1341,75 @@ function refreshDetailContentTokenBadge($field) {
   refreshSingleMasterEntryTokenBadge(lorebookName, entry, isGlobal);
 }
 
-async function persistDetailField($field, options = {}) {
-  const { refreshTokens = true } = options;
+function readDetailFieldValue($field) {
+  const valueType = $field.attr('data-value-type');
+  if (valueType === 'csv') {
+    return ($field.val() || '')
+      .split(',')
+      .map(item => item.trim())
+      .filter(Boolean);
+  }
+  if (valueType === 'delay') {
+    return $field.is(':checked') ? 1 : null;
+  }
+  if ($field.is(':checkbox')) {
+    return $field.is(':checked');
+  }
+  if ($field.attr('type') === 'number') {
+    const value = Number.parseInt($field.val(), 10);
+    return Number.isFinite(value) ? value : undefined;
+  }
+  return $field.val();
+}
+
+function applySavedDetailPatches(lorebookName, patches) {
+  const affectedEntries = new Map();
+  patches.forEach(patch => {
+    updateEntryStateValue(lorebookName, patch.entryUid, entry => {
+      if (patch.fieldName === 'position.type') {
+        applyPositionSelectionToEntry(entry, patch.value);
+      } else {
+        _.set(entry, patch.fieldName, patch.value);
+      }
+      if (AUTO_UNPIN_POSITION_FIELDS.has(patch.fieldName)) {
+        entry.pinned = false;
+      }
+    });
+    if (AUTO_UNPIN_POSITION_FIELDS.has(patch.fieldName)) {
+      removePinnedEntry(lorebookName, patch.entryUid);
+    }
+    affectedEntries.set(patch.entryUid, patch.isGlobal === true);
+  });
+
+  affectedEntries.forEach((isGlobal, entryUid) => {
+    syncMasterRowFromState(lorebookName, entryUid, isGlobal, { refreshTokens: false });
+  });
+}
+
+const detailSaveCoordinator = createDetailSaveCoordinator({
+  saveBatch: (lorebookName, patches) => saveEntryFields(lorebookName, patches, { render: 'debounced' }),
+  onBatchSuccess: (lorebookName, patches) => {
+    applySavedDetailPatches(lorebookName, patches);
+  },
+  onBatchError: () => {
+    showSaveError('保存失败，修改已保留，将在下次编辑或失焦时重试');
+  },
+});
+
+export function flushDetailSaves(lorebookName) {
+  return lorebookName ? detailSaveCoordinator.flush(lorebookName) : detailSaveCoordinator.flushAll();
+}
+
+function queueDetailFieldSave($field, { immediate = false } = {}) {
   const $editor = $field.closest('.detail-editor');
   const lorebookName = $editor.attr('data-lorebook-name');
   const entryUid = ensureNumericUID($editor.attr('data-entry-uid'));
   const isGlobal = $editor.attr('data-is-global') === 'true';
   const fieldName = $field.attr('data-field');
   const valueType = $field.attr('data-value-type');
-  let value;
+  const value = readDetailFieldValue($field);
 
-  if (valueType === 'csv') {
-    value = ($field.val() || '')
-      .split(',')
-      .map(item => item.trim())
-      .filter(Boolean);
-  } else if (valueType === 'delay') {
-    value = $field.is(':checked') ? 1 : null;
-  } else if (valueType === 'pinned') {
+  if (valueType === 'pinned') {
     const checked = $field.is(':checked');
     updateEntryStateValue(lorebookName, entryUid, entry => {
       entry.pinned = checked;
@@ -1416,39 +1419,21 @@ async function persistDetailField($field, options = {}) {
     } else {
       removePinnedEntry(lorebookName, entryUid);
     }
-    syncMasterRowFromState(lorebookName, entryUid, isGlobal, { refreshTokens });
+    syncMasterRowFromState(lorebookName, entryUid, isGlobal, { refreshTokens: false });
     showSaveSuccess('置顶状态已更新');
-    return true;
-  } else if ($field.is(':checkbox')) {
-    value = $field.is(':checked');
-  } else if ($field.attr('type') === 'number') {
-    value = Number.parseInt($field.val(), 10);
-    if (!Number.isFinite(value)) {
-      return false;
-    }
-  } else {
-    value = $field.val();
+    return Promise.resolve({ success: true, changed: true });
+  }
+  if (value === undefined || !fieldName || entryUid < 0) {
+    return Promise.resolve({ success: false, changed: false });
   }
 
-  const success = await saveEntryField(entryUid, lorebookName, fieldName, value);
-  if (!success) {
-    showSaveError('保存失败，请重试');
-    return false;
-  }
-
-  updateEntryStateValue(lorebookName, entryUid, entry => {
-    if (fieldName === 'position.type') {
-      applyPositionSelectionToEntry(entry, value);
-    } else {
-      _.set(entry, fieldName, value);
-    }
-    if (AUTO_UNPIN_POSITION_FIELDS.has(fieldName)) {
-      entry.pinned = false;
-    }
+  detailSaveCoordinator.schedule({
+    lorebookName,
+    entryUid,
+    fieldName,
+    value,
+    isGlobal,
   });
-  if (AUTO_UNPIN_POSITION_FIELDS.has(fieldName)) {
-    removePinnedEntry(lorebookName, entryUid);
-  }
 
   if (fieldName === 'position.type') {
     const needsDepth = isDepthPositionValue(value);
@@ -1456,9 +1441,10 @@ async function persistDetailField($field, options = {}) {
     $depthField.toggleClass('is-disabled', !needsDepth);
     $depthField.find('input').prop('disabled', !needsDepth);
   }
-
-  syncMasterRowFromState(lorebookName, entryUid, isGlobal, { refreshTokens });
-  return true;
+  if (immediate) {
+    return detailSaveCoordinator.flush(lorebookName);
+  }
+  return Promise.resolve({ success: true, changed: false, queued: true });
 }
 
 function bindResizeEvents() {
@@ -1549,6 +1535,7 @@ export function selectDetailEntry({ lorebookName, entryUid, isGlobal = false }) 
   const tabKey = getTabKey(isGlobal);
   const normalizedUid = ensureNumericUID(entryUid);
 
+  void flushDetailSaves();
   setDetailEntry(tabKey, {
     lorebookName,
     entryUid: normalizedUid,
@@ -1606,6 +1593,7 @@ export function syncPanelLayoutMode() {
     return;
   }
 
+  void flushDetailSaves();
   $panel.attr('data-device-mode', isMobile() ? 'mobile' : 'desktop');
   $panel.attr('data-pc-layout-mode', isMasterDetailLayout() ? 'master-detail' : 'drawer');
   applyPanelSplitWidth(getPcMasterDetailSplitSetting());
@@ -1629,15 +1617,14 @@ export function initDetailView() {
       if (shouldDeferTokenRefresh) {
         $field.data('detail-content-token-dirty', true);
       }
-      queueSave($field, () => {
-        return persistDetailField($field, { refreshTokens: !shouldDeferTokenRefresh });
-      });
+      void queueDetailFieldSave($field);
     })
     .on('blur.detail', '.detail-editor [data-save-mode="debounced"]', async function () {
       const $field = $(this);
       const shouldRefreshTokens = isDetailContentField($field) && $field.data('detail-content-token-dirty') === true;
-      await flushQueuedSave($field);
-      if (shouldRefreshTokens && $field.data('detail-last-save-result') !== false) {
+      const lorebookName = $field.closest('.detail-editor').attr('data-lorebook-name');
+      const result = await flushDetailSaves(lorebookName);
+      if (shouldRefreshTokens && result?.success !== false) {
         refreshDetailContentTokenBadge($field);
       }
       if (isDetailContentField($field)) {
@@ -1646,13 +1633,7 @@ export function initDetailView() {
     })
     .on('change.detail', '.detail-editor [data-save-mode="immediate"]', function () {
       const $field = $(this);
-      queueSave(
-        $field,
-        () => {
-          return persistDetailField($field);
-        },
-        true,
-      );
+      void queueDetailFieldSave($field, { immediate: true });
     })
     .on('focus.detail', '.detail-editor .keywords-input, .detail-editor .secondary-keywords-input', function () {
       const $input = $(this);
@@ -1676,13 +1657,17 @@ export function initDetailView() {
     })
     .on('click.detail', '[data-detail-action="open-content-editor"]', async function () {
       const $editor = $(this).closest('.detail-editor');
+      const lorebookName = $editor.attr('data-lorebook-name');
+      await flushDetailSaves(lorebookName);
       const { showContentEditor } = await import('./contentEditor.js');
-      await showContentEditor($editor.attr('data-lorebook-name'), ensureNumericUID($editor.attr('data-entry-uid')));
+      await showContentEditor(lorebookName, ensureNumericUID($editor.attr('data-entry-uid')));
     })
     .on('click.detail', '[data-detail-action="open-compare-editor"]', async function () {
       const $editor = $(this).closest('.detail-editor');
+      const lorebookName = $editor.attr('data-lorebook-name');
+      await flushDetailSaves(lorebookName);
       const { showCompareEditor } = await import('./contentEditor.js');
-      await showCompareEditor($editor.attr('data-lorebook-name'), ensureNumericUID($editor.attr('data-entry-uid')));
+      await showCompareEditor(lorebookName, ensureNumericUID($editor.attr('data-entry-uid')));
     })
     .on('click.detail', '.lorebook-title-menu-button', function (event) {
       event.stopPropagation();
@@ -1698,5 +1683,15 @@ export function initDetailView() {
     .off('click.detailMenuClose')
     .on('click.detailMenuClose', () => {
       $('.lorebook-title-menu-container', parentDoc).removeClass('is-open');
+    })
+    .off('lorebook-detail-refresh.detail')
+    .on('lorebook-detail-refresh.detail', (_event, isGlobal) => {
+      renderDetailPane(isGlobal, { scrollIntoView: false });
+    });
+
+  $(window)
+    .off('pagehide.detailSave')
+    .on('pagehide.detailSave', () => {
+      void flushDetailSaves();
     });
 }
