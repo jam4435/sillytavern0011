@@ -96,6 +96,8 @@ const DEFAULT_AI_DRAFT = {
     editable: false,
     readonly: false,
   },
+  // 助手对话与修改工作流分别维护提示词，避免在调整 JSON 修改约束时影响助手回复。
+  assistantJailbreakPromptTemplate: DEFAULT_AI_JAILBREAK_PROMPT_TEMPLATE,
 };
 
 const DEFAULT_AI_WORKSPACE_SETTINGS = {
@@ -214,8 +216,9 @@ function normalizeAiDraft(draft = {}, fallback = {}) {
   const selectedSet = new Set(selectedEntryUids);
   const readonlyEntryUids = normalizeUidList(source.readonlyEntryUids).filter(uid => !selectedSet.has(uid));
   const readonlySet = new Set(readonlyEntryUids);
-  const excludedEntryUids = normalizeUidList(source.excludedEntryUids)
-    .filter(uid => !selectedSet.has(uid) && !readonlySet.has(uid));
+  const excludedEntryUids = normalizeUidList(source.excludedEntryUids).filter(
+    uid => !selectedSet.has(uid) && !readonlySet.has(uid),
+  );
 
   return {
     ..._.cloneDeep(DEFAULT_AI_DRAFT),
@@ -241,6 +244,13 @@ function normalizeAiDraft(draft = {}, fallback = {}) {
       editable: source.assistantEntryContext?.editable === true,
       readonly: source.assistantEntryContext?.readonly === true,
     },
+    // 老版本没有助手专用字段时，沿用原有的工作流破限提示词，确保升级后请求语义不变。
+    assistantJailbreakPromptTemplate:
+      typeof source.assistantJailbreakPromptTemplate === 'string'
+        ? source.assistantJailbreakPromptTemplate
+        : typeof source.promptSettings?.jailbreakPromptTemplate === 'string'
+          ? source.promptSettings.jailbreakPromptTemplate
+          : DEFAULT_AI_DRAFT.assistantJailbreakPromptTemplate,
   };
 }
 
@@ -272,6 +282,7 @@ function legacyRootDraft(settings = {}) {
     'referenceMaterial',
     'assistantChatHistory',
     'assistantEntryContext',
+    'assistantJailbreakPromptTemplate',
     'selectedEntryUids',
     'readonlyEntryUids',
     'excludedEntryUids',
@@ -293,14 +304,16 @@ export function normalizeAiWorkspaceSettings(settings = {}) {
   const isLegacyPayload = settings?.schemaVersion !== AI_WORKSPACE_SCHEMA_VERSION;
   const explicitLegacyMode = hasOwn(settings, modifyStrategy);
   const modeDraft = explicitLegacyMode ? settings?.[modifyStrategy] : null;
-  const baseDraft = settings?.schemaVersion === 2
-    ? settings?.draft || {}
-    : isLegacyPayload
-      ? { ...legacyRootDraft(settings), ...(modeDraft || {}) }
-      : settings?.draft || {};
-  const draftInput = !isLegacyPayload && explicitLegacyMode
-    ? { ...settings.draft, ...modeDraft, ...legacyRootDraft(settings) }
-    : baseDraft;
+  const baseDraft =
+    settings?.schemaVersion === 2
+      ? settings?.draft || {}
+      : isLegacyPayload
+        ? { ...legacyRootDraft(settings), ...(modeDraft || {}) }
+        : settings?.draft || {};
+  const draftInput =
+    !isLegacyPayload && explicitLegacyMode
+      ? { ...settings.draft, ...modeDraft, ...legacyRootDraft(settings) }
+      : baseDraft;
 
   const normalized = {
     schemaVersion: AI_WORKSPACE_SCHEMA_VERSION,
@@ -350,6 +363,7 @@ function attachLegacyAiWorkspaceAliases(settings) {
     'referenceMaterial',
     'assistantChatHistory',
     'assistantEntryContext',
+    'assistantJailbreakPromptTemplate',
   ];
 
   const descriptors = {
@@ -370,18 +384,24 @@ function attachLegacyAiWorkspaceAliases(settings) {
     },
     direct: {
       get: () => settings.draft,
-      set: value => { settings.draft = normalizeAiDraft(value, settings.draft); },
+      set: value => {
+        settings.draft = normalizeAiDraft(value, settings.draft);
+      },
     },
     plan: {
       get: () => settings.draft,
-      set: value => { settings.draft = normalizeAiDraft(value, settings.draft); },
+      set: value => {
+        settings.draft = normalizeAiDraft(value, settings.draft);
+      },
     },
   };
 
   draftKeys.forEach(key => {
     descriptors[key] = {
       get: () => settings.draft[key],
-      set: value => { settings.draft = normalizeAiDraft({ ...settings.draft, [key]: value }); },
+      set: value => {
+        settings.draft = normalizeAiDraft({ ...settings.draft, [key]: value });
+      },
     };
   });
   Object.values(descriptors).forEach(descriptor => {
@@ -580,9 +600,7 @@ function saveAllPinnedEntries(data) {
 export function getPinnedEntries(lorebookName) {
   const allPinned = getAllPinnedEntries();
   // 确保即使lorebookName不存在也返回一个空数组
-  return (allPinned[lorebookName] || [])
-    .map(uid => Number.parseInt(`${uid}`, 10))
-    .filter(Number.isFinite);
+  return (allPinned[lorebookName] || []).map(uid => Number.parseInt(`${uid}`, 10)).filter(Number.isFinite);
 }
 
 /**
@@ -603,7 +621,10 @@ export function addPinnedEntry(lorebookName, uid) {
   const pinnedSet = new Set(allPinned[lorebookName]);
   pinnedSet.delete(normalizedUid);
   pinnedSet.add(normalizedUid);
-  allPinned[lorebookName] = [normalizedUid, ...[...pinnedSet].filter(id => Number.parseInt(`${id}`, 10) !== normalizedUid)];
+  allPinned[lorebookName] = [
+    normalizedUid,
+    ...[...pinnedSet].filter(id => Number.parseInt(`${id}`, 10) !== normalizedUid),
+  ];
   saveAllPinnedEntries(allPinned);
 }
 

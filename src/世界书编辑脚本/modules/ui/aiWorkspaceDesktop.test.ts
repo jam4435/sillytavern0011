@@ -137,8 +137,8 @@ describe('AI 助手手机窗语义', () => {
 
     expect(dialog).toBeInstanceOf(HTMLDialogElement);
     expect(dialog?.getAttribute('aria-modal')).toBe('true');
-    expect(tabs).toHaveLength(2);
-    expect(panels).toHaveLength(2);
+    expect(tabs).toHaveLength(3);
+    expect(panels).toHaveLength(3);
     expect(tabs.map(tab => tab.getAttribute('aria-controls'))).toEqual(panels.map(panel => panel.id));
     expect(log).toHaveAttribute('role', 'log');
     expect(log).toHaveAttribute('aria-live', 'polite');
@@ -150,6 +150,9 @@ describe('AI 助手手机窗语义', () => {
     document.body.innerHTML = buildAssistantModalMarkup();
 
     expect(document.querySelector('#ai-workspace-reference-material')).toBeInstanceOf(HTMLTextAreaElement);
+    expect(document.querySelector('#ai-workspace-assistant-jailbreak-prompt-template')).toBeInstanceOf(
+      HTMLTextAreaElement,
+    );
     expect(document.querySelector('#ai-workspace-assistant-send')).toBeInstanceOf(HTMLButtonElement);
     expect(document.querySelector('#ai-workspace-assistant-selection-add')).toBeInstanceOf(HTMLButtonElement);
     expect(document.querySelector('#ai-workspace-assistant-new-reply')).toHaveAttribute('hidden');
@@ -199,6 +202,21 @@ describe('AI 助手手机窗语义', () => {
     expect(block).not.toMatch(/secondary_logic|secondary/);
     expect(prompt).toContain(block);
     expect(prompt).toContain('修改/只读');
+  });
+
+  it('优先使用助手专用破限提示词', () => {
+    const prompt = buildAssistantPrompt(
+      '整理资料',
+      {
+        assistantJailbreakPromptTemplate: '助手破限',
+        promptSettings: { jailbreakPromptTemplate: '修改破限' },
+      },
+      [],
+      {},
+    );
+
+    expect(prompt).toContain('助手破限');
+    expect(prompt).not.toContain('修改破限');
   });
 
   it('没有附带条目时不注入空的世界书上下文块', () => {

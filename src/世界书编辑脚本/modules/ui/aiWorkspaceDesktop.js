@@ -182,6 +182,7 @@ const state = {
   referenceMaterial: '',
   assistantChatHistory: [],
   assistantEntryContext: { editable: false, readonly: false },
+  assistantJailbreakPromptTemplate: '',
   assistantModalTab: 'chat',
   assistantSelectedText: '',
   assistantRenderedCount: 0,
@@ -386,6 +387,10 @@ function hydrateStateFromSettings() {
     editable: saved.assistantEntryContext?.editable === true,
     readonly: saved.assistantEntryContext?.readonly === true,
   };
+  state.assistantJailbreakPromptTemplate =
+    typeof saved.assistantJailbreakPromptTemplate === 'string'
+      ? saved.assistantJailbreakPromptTemplate
+      : saved.promptSettings?.jailbreakPromptTemplate || '';
   const legacyMode = state.currentNav === 'plan' ? saved.plan : saved.direct;
   const task = createModeState(savedDraft, {
     ...fallback,
@@ -471,11 +476,12 @@ function currentContextBudget() {
 function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
   const saved = settings();
   const mirrorMode = state.modes[mirrorModeKey] || state.modes.direct;
-  const modifyStrategy = state.currentNav === 'plan'
-    ? 'plan'
-    : state.currentNav === 'direct'
-      ? 'direct'
-      : saved.modifyStrategy || saved.strategy || 'direct';
+  const modifyStrategy =
+    state.currentNav === 'plan'
+      ? 'plan'
+      : state.currentNav === 'direct'
+        ? 'direct'
+        : saved.modifyStrategy || saved.strategy || 'direct';
   if ($('#ai-workspace-chat-context-count', parentDoc()).length) {
     state.chatContext = currentChatContextSettings();
   }
@@ -498,6 +504,7 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
       referenceMaterial: state.referenceMaterial,
       assistantChatHistory: state.assistantChatHistory,
       assistantEntryContext: { ...state.assistantEntryContext },
+      assistantJailbreakPromptTemplate: state.assistantJailbreakPromptTemplate,
       currentStep: undefined,
       planningResult: undefined,
       previewResult: undefined,
@@ -521,6 +528,7 @@ function persistSettings({ mirrorModeKey = currentModeKey() } = {}) {
     referenceMaterial: state.referenceMaterial,
     assistantChatHistory: state.assistantChatHistory,
     assistantEntryContext: { ...state.assistantEntryContext },
+    assistantJailbreakPromptTemplate: state.assistantJailbreakPromptTemplate,
   });
 }
 
@@ -875,7 +883,7 @@ function trapOverlayFocus(event, overlayElement) {
 }
 
 function switchAssistantTab(tab = 'chat', { focusTab = false } = {}) {
-  const nextTab = tab === 'reference' ? 'reference' : 'chat';
+  const nextTab = ['chat', 'reference', 'prompt'].includes(tab) ? tab : 'chat';
   const previousTab = state.assistantModalTab;
   const previousPanel = $(`.ai-assistant-tab-panel[data-assistant-panel="${previousTab}"]`, parentDoc()).get(0);
   if (previousPanel) state.assistantTabScrollPositions[previousTab] = previousPanel.scrollTop || 0;
@@ -899,6 +907,7 @@ function switchAssistantTab(tab = 'chat', { focusTab = false } = {}) {
 function openAssistantModal(tab = state.assistantModalTab || 'chat') {
   rememberOverlayFocus('assistant');
   renderReferenceMaterial();
+  $('#ai-workspace-assistant-jailbreak-prompt-template', parentDoc()).val(state.assistantJailbreakPromptTemplate);
   renderAssistantHistory();
   switchAssistantTab(tab);
   syncAssistantEntryContextControls();
@@ -911,6 +920,8 @@ function openAssistantModal(tab = state.assistantModalTab || 'chat') {
   setTimeout(() => {
     if (tab === 'reference') {
       $('#ai-workspace-reference-material', parentDoc()).trigger('focus');
+    } else if (tab === 'prompt') {
+      $('#ai-workspace-assistant-jailbreak-prompt-template', parentDoc()).trigger('focus');
     } else if (!state.assistantChatHistory.length) {
       $('.ai-assistant-suggestion', parentDoc()).first().trigger('focus');
     } else {
@@ -2242,9 +2253,11 @@ export function buildAssistantPrompt(
   entryContext = collectAssistantEntryContext(),
 ) {
   const jailbreakPrompt =
-    currentPromptSettings(currentModeKey()).jailbreakPromptTemplate ||
-    saved.promptSettings?.jailbreakPromptTemplate ||
-    '';
+    typeof saved.assistantJailbreakPromptTemplate === 'string'
+      ? saved.assistantJailbreakPromptTemplate
+      : currentPromptSettings(currentModeKey()).jailbreakPromptTemplate ||
+        saved.promptSettings?.jailbreakPromptTemplate ||
+        '';
   const referenceMaterial = (state.referenceMaterial || '').trim();
   const history = (Array.isArray(chatHistory) ? chatHistory : [])
     .map(item => `<${item.role}>${item.content || ''}</${item.role}>`)
@@ -2804,6 +2817,7 @@ export function buildAssistantModalMarkup() {
           <div class="ai-assistant-tabs" role="tablist" aria-label="AI 助手视图">
             <button type="button" id="ai-workspace-assistant-chat-tab" class="ai-assistant-tab is-active" data-assistant-tab="chat" role="tab" aria-selected="true" aria-controls="ai-workspace-assistant-chat-panel" tabindex="0"><i class="fa-regular fa-message"></i><span>聊天</span></button>
             <button type="button" id="ai-workspace-assistant-reference-tab" class="ai-assistant-tab" data-assistant-tab="reference" role="tab" aria-selected="false" aria-controls="ai-workspace-assistant-reference-panel" tabindex="-1"><i class="fa-regular fa-note-sticky"></i><span>资料</span></button>
+            <button type="button" id="ai-workspace-assistant-prompt-tab" class="ai-assistant-tab" data-assistant-tab="prompt" role="tab" aria-selected="false" aria-controls="ai-workspace-assistant-prompt-panel" tabindex="-1"><i class="fa-solid fa-unlock-keyhole"></i><span>提示词</span></button>
           </div>
           <div class="ai-assistant-phone-body">
             <section id="ai-workspace-assistant-chat-panel" class="ai-assistant-tab-panel" data-assistant-panel="chat" role="tabpanel" aria-labelledby="ai-workspace-assistant-chat-tab">
@@ -2845,6 +2859,17 @@ export function buildAssistantModalMarkup() {
                 <textarea id="ai-workspace-reference-material" class="ai-reference-material" placeholder="粘贴设定、百科、剧情摘要、风格约束等补充资料。"></textarea>
               </div>
               <div class="ai-assistant-memo-footer"><span><i class="fa-solid fa-cloud-arrow-up"></i><span id="ai-workspace-assistant-reference-autosave">已自动保存</span></span><span id="ai-workspace-assistant-reference-status">资料为空</span></div>
+            </section>
+            <section id="ai-workspace-assistant-prompt-panel" class="ai-assistant-tab-panel ai-assistant-prompt-panel" data-assistant-panel="prompt" role="tabpanel" aria-labelledby="ai-workspace-assistant-prompt-tab" hidden>
+              <div class="ai-assistant-memo-header">
+                <div><span class="ai-section-kicker">助手专用</span><strong>破限提示词</strong></div>
+                <span>自动保存</span>
+              </div>
+              <div class="ai-field ai-assistant-prompt-field">
+                <label for="ai-workspace-assistant-jailbreak-prompt-template">每次助手对话都会优先注入这段提示词</label>
+                <textarea id="ai-workspace-assistant-jailbreak-prompt-template" class="ai-prompt-template" placeholder="留空则不注入破限提示词。"></textarea>
+              </div>
+              <div class="ai-assistant-memo-footer"><span><i class="fa-solid fa-cloud-arrow-up"></i>仅影响 AI 助手，不影响修改工作流</span><span>已自动保存</span></div>
             </section>
           </div>
         </div>
@@ -3901,7 +3926,7 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-assistant-header-actions{display:flex;align-items:center;gap:3px}
       #${ROOT_ID} .ai-assistant-header-actions .ai-icon-button{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:var(--ai-text-color-secondary,var(--panel-text-color,#bbb))}
       #${ROOT_ID} .ai-assistant-header-actions .ai-icon-button:hover{background:var(--ai-surface-muted-color,rgba(255,255,255,.07));color:var(--panel-text-color,#fff)}
-      #${ROOT_ID} .ai-assistant-tabs{flex:0 0 auto;min-height:48px;padding:5px 7px;display:grid;grid-template-columns:1fr 1fr;gap:5px;border-bottom:1px solid var(--ai-border-color,rgba(255,255,255,.09));background:var(--ai-surface-raised-color,var(--panel-bg-color,#25282b))}
+      #${ROOT_ID} .ai-assistant-tabs{flex:0 0 auto;min-height:48px;padding:5px 7px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;border-bottom:1px solid var(--ai-border-color,rgba(255,255,255,.09));background:var(--ai-surface-raised-color,var(--panel-bg-color,#25282b))}
       #${ROOT_ID} .ai-assistant-tab{min-height:38px;padding:7px 10px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;border-radius:11px;background:transparent;color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:12px;font-weight:680}
       #${ROOT_ID} .ai-assistant-tab.is-active{border-color:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 34%,transparent);background:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 14%,transparent);color:var(--panel-text-color,#fff)}
       #${ROOT_ID} .ai-assistant-phone-body{min-height:0;flex:1 1 auto;display:flex;overflow:hidden;background:var(--ai-surface-color,var(--panel-bg-color,#202224))}
@@ -3951,6 +3976,11 @@ function ensureUnifiedStyles() {
       #${ROOT_ID} .ai-assistant-selection-toolbar{position:absolute;z-index:3;transform:translate(-50%,-100%);padding:4px;border:1px solid var(--ai-border-color,#555);border-radius:11px;background:var(--ai-surface-raised-color,#292c2f);box-shadow:0 8px 24px rgba(0,0,0,.38)}
       #${ROOT_ID} .ai-assistant-selection-toolbar button{min-height:34px;padding:6px 10px;border-radius:8px;background:color-mix(in srgb,var(--panel-accent-color,#9fc8e4) 15%,transparent);font-size:10px;white-space:nowrap}
       #${ROOT_ID} .ai-assistant-reference-panel{overflow:hidden;background:var(--ai-surface-color,var(--panel-bg-color,#202224))}
+      #${ROOT_ID} .ai-assistant-prompt-panel{overflow:auto;padding:14px;background:var(--ai-surface-color,var(--panel-bg-color,#202224))}
+      #${ROOT_ID} .ai-assistant-prompt-panel .ai-assistant-memo-header{margin:-14px -14px 14px}
+      #${ROOT_ID} .ai-assistant-prompt-field{min-height:0;display:flex;flex:1;flex-direction:column;gap:8px}
+      #${ROOT_ID} .ai-assistant-prompt-field label{color:var(--ai-text-color-secondary,var(--panel-text-color,#aaa));font-size:11px;line-height:1.5}
+      #${ROOT_ID} .ai-assistant-prompt-field textarea{min-height:260px;resize:vertical;font-size:12px;line-height:1.55}
       #${ROOT_ID} .ai-assistant-memo-header{flex:0 0 auto;padding:14px 15px 10px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:1px solid var(--ai-border-color,rgba(255,255,255,.09))}
       #${ROOT_ID} .ai-assistant-memo-header>div{display:flex;flex-direction:column;gap:3px}
       #${ROOT_ID} .ai-assistant-memo-header strong{font-size:13px}
@@ -4727,12 +4757,7 @@ function bindEvents() {
     .off('.aiWorkspaceDesktop')
     .on('click.aiWorkspaceDesktop', '.ai-strategy-button', function () {
       const targetMode = normalizeNavMode(($(this).attr('data-ai-strategy') || '').trim());
-      if (
-        !targetMode
-        || targetMode === state.currentNav
-        || state.isGenerating
-        || isAiGenerationWorkspaceBusy()
-      ) {
+      if (!targetMode || targetMode === state.currentNav || state.isGenerating || isAiGenerationWorkspaceBusy()) {
         return;
       }
       if (state.currentNav === 'direct' || state.currentNav === 'plan') {
@@ -5299,6 +5324,10 @@ function bindEvents() {
         persistSettings({ mirrorModeKey: currentModeKey() });
       },
     )
+    .on('input.aiWorkspaceDesktop', '#ai-workspace-assistant-jailbreak-prompt-template', function () {
+      state.assistantJailbreakPromptTemplate = ($(this).val() || '').toString();
+      persistSettings({ mirrorModeKey: currentModeKey() });
+    })
     .on('click.aiWorkspaceDesktop', '#ai-workspace-assistant-send', async () => {
       await handleAssistantSend();
     })

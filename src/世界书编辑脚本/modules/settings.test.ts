@@ -155,6 +155,23 @@ describe('AI 工作区设置 schema v3', () => {
     });
   });
 
+  it('助手破限提示词独立保存，并为旧草稿继承原工作流提示词', () => {
+    const migrated = settingsModule.normalizeAiWorkspaceSettings({
+      schemaVersion: 3,
+      draft: { promptSettings: { jailbreakPromptTemplate: '旧破限提示词' } },
+    });
+    expect(migrated.draft.assistantJailbreakPromptTemplate).toBe('旧破限提示词');
+
+    const normalized = settingsModule.normalizeAiWorkspaceSettings({
+      schemaVersion: 3,
+      draft: {
+        promptSettings: { jailbreakPromptTemplate: '修改工作流提示词' },
+        assistantJailbreakPromptTemplate: '助手专用提示词',
+      },
+    });
+    expect(normalized.draft.assistantJailbreakPromptTemplate).toBe('助手专用提示词');
+  });
+
   it('从 v2 迁移单一修改草稿，并保留生成模式选择与活动项目', () => {
     const normalized = settingsModule.normalizeAiWorkspaceSettings({
       schemaVersion: 2,
