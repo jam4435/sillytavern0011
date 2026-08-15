@@ -1,0 +1,31 @@
+{
+  "startedAt": "2026-08-15T18:26:48.509Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [
+      "合理推进剧情"
+    ],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-audit-turn-14.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": true
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "合理推进剧情",
+      "success": false,
+      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-wuxia-automation=\"debug-section\"][data-wuxia-debug-section=\"main-input\"]').first().locator('[data-wuxia-automation=\"debug-section-toggle\"]')\n    - locator resolved to <div class=\"debug-log-header\" data-wuxia-automation=\"debug-section-toggle\">…</div>\n  - attempting click action\n    - waiting for element to be visible, enabled and stable\n    - element is visible, enabled and stable\n    - scrolling into view if needed\n    - done scrolling\n    - performing click action\n    - click action done\n    - waiting for scheduled navigations to finish\n\n    at readDebugSections (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:695:54)\n    at async runTurn (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:744:17)\n    at async main (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:933:22)"
+    }
+  ],
+  "success": false,
+  "completedAt": "2026-08-15T18:29:31.966Z"
+}
