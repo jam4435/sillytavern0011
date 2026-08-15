@@ -644,7 +644,13 @@ describe('ERA 主线初始化控制', () => {
     vi.mocked(checker.isTimeForEvent).mockReturnValue(false);
     vi.mocked(checker.isEventDiscoverable).mockReturnValue(false);
     vi.mocked(checker.isTimeAfterEventEnd).mockImplementation((_currentTime, endTime) => endTime.日 === 14);
-    vi.mocked(operations.batchEndEvents).mockResolvedValue(true);
+    vi.mocked(operations.batchEndEvents).mockImplementation(async eventNames => {
+      eventNames.forEach(eventName => {
+        delete variables.stat_data.事件系统.进行中事件[eventName];
+        variables.stat_data.事件系统.已完成事件[eventName] = 0;
+      });
+      return true;
+    });
     vi.mocked(operations.applyTimedParticipantEntries).mockClear().mockResolvedValue(undefined);
 
     // @ts-expect-error 测试用模块 query
@@ -655,13 +661,100 @@ describe('ERA 主线初始化控制', () => {
       .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
     gameInitializedListener?.({ timestamp: Date.now() + 100_000 });
 
-    await vi.waitFor(() => expect(operations.applyTimedParticipantEntries).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(operations.applyTimedParticipantEntries).toHaveBeenCalled());
     expect(operations.batchEndEvents).toHaveBeenCalledWith([endedEvent], expect.any(Object));
-    expect(operations.applyTimedParticipantEntries).toHaveBeenCalledWith(
-      [activeEvent],
-      expect.any(Object),
-      variables.stat_data.世界信息.时间,
-      variables,
+    expect(vi.mocked(operations.applyTimedParticipantEntries).mock.calls).toEqual(
+      expect.arrayContaining([
+        [
+          [activeEvent],
+          expect.any(Object),
+          variables.stat_data.世界信息.时间,
+          variables,
+        ],
+      ]),
+    );
+    expect(
+      vi.mocked(operations.applyTimedParticipantEntries).mock.calls.every(([eventNames]) =>
+        eventNames.every(eventName => eventName === activeEvent),
+      ),
+    ).toBe(true);
+  });
+
+  it('当前事件结算后立即复检并启动同地点已到时的下一事件', async () => {
+    const endingEvent = '射雕第一回01-即将结算';
+    const nextEvent = '射雕第一回02-等待接驳';
+    const eventLocation = '大宋/临安府/牛家村';
+    const variables = validVariables();
+    variables.stat_data.世界信息.时间 = { 年: 1200, 月: 8, 日: 15, 时: 20 };
+    variables.stat_data.user数据 = { 所在位置: eventLocation };
+    variables.stat_data.事件系统.未发生事件 = {
+      [nextEvent]: { 类型: '时间', 年: 1200, 月: 8, 日: 15, 时: 20 },
+    };
+    variables.stat_data.事件系统.进行中事件 = {
+      [endingEvent]: { 年: 1200, 月: 8, 日: 15, 时: 19 },
+    };
+    getVariablesMock.mockReturnValue(variables);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const operations = await import('./era-event-operations.js');
+    const scheduler = await import('./era-event-scheduler.js');
+    const definitions = {
+      [endingEvent]: {
+        事件地点: eventLocation,
+        触发条件: { 类型: '时间', 年: 1200, 月: 8, 日: 15, 时: 17 },
+        事件结束时间: { 年: 1200, 月: 8, 日: 15, 时: 19 },
+        事件详情: '旧事件',
+        事件概要: '旧事件结束',
+        参与人物: [],
+        insert: {},
+        update: {},
+        delete: {},
+      },
+      [nextEvent]: {
+        事件地点: eventLocation,
+        触发条件: { 类型: '时间', 年: 1200, 月: 8, 日: 15, 时: 20 },
+        事件结束时间: { 年: 1200, 月: 8, 日: 16, 时: 0 },
+        事件详情: '下一事件',
+        事件概要: '下一事件结束',
+        参与人物: [],
+        insert: {},
+        update: {},
+        delete: {},
+      },
+    };
+
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [endingEvent, nextEvent].map(runtimeKey => ({ runtimeKey, location: eventLocation })),
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue(definitions);
+    vi.mocked(scheduler.getManifestEventCandidateKeys).mockReturnValue([nextEvent]);
+    vi.mocked(checker.isTimeForEvent).mockImplementation((_time, _definition, eventName) => eventName === nextEvent);
+    vi.mocked(checker.isEventDiscoverable).mockReturnValue(false);
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(true);
+    vi.mocked(operations.batchStartEvents).mockClear().mockResolvedValue(undefined);
+    vi.mocked(operations.batchEndEvents).mockClear().mockImplementation(async eventNames => {
+      eventNames.forEach(eventName => {
+        delete variables.stat_data.事件系统.进行中事件[eventName];
+        variables.stat_data.事件系统.已完成事件[eventName] = 0;
+      });
+      return true;
+    });
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?post-event-settlement-recheck-test');
+
+    await vi.waitFor(() => expect(operations.batchStartEvents).toHaveBeenCalledTimes(1));
+    expect(operations.batchEndEvents).toHaveBeenCalledTimes(1);
+    expect(operations.batchEndEvents).toHaveBeenCalledWith([endingEvent], definitions);
+    expect(operations.batchStartEvents).toHaveBeenCalledWith([nextEvent], definitions, {
+      currentTime: variables.stat_data.世界信息.时间,
+      earlyEventNames: [],
+    });
+    expect(vi.mocked(operations.batchEndEvents).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(operations.batchStartEvents).mock.invocationCallOrder[0],
     );
   });
 
@@ -803,6 +896,9 @@ describe('ERA 主线初始化控制', () => {
     vi.mocked(operations.batchEndEvents).mockImplementation(async () => {
       endingObservedAtSettlement = variables.stat_data.参与事件[eventName].结局;
       updateObservedAtSettlement = clone(variables.stat_data.参与事件[eventName].update);
+      delete variables.stat_data.事件系统.进行中事件[eventName];
+      delete variables.stat_data.参与事件[eventName];
+      variables.stat_data.事件系统.已完成事件[eventName] = 1;
       return true;
     });
 

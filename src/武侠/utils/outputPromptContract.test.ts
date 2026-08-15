@@ -127,18 +127,39 @@ describe('武侠输出提示词契约', () => {
     expect(variableGuidanceSource).toContain('禁止越过边界顺带推进下一事件');
     expect(variableGuidanceSource).not.toContain('关键桥段完整结束时，将时间推进到事件描述给出的结束时间');
     expect(variableGuidanceSource).toContain('不得把该事件尚未结束的阶段性对话、观察、行动、冲突或关系变化按回合拆写');
+    expect(variableGuidanceSource).toContain('事件开始时间+(事件结束时间-事件开始时间)*x/y');
+    expect(variableGuidanceSource).not.toContain('事件结束时间-事件结束时间');
   });
 
-  it('cot 根据参与事件是否存在只输出对应的一套思维规则', () => {
+  it('cot 根据参与事件和后续事件线索只输出对应的一套互斥思维规则', () => {
     const render = compilePromptRenderer(cotPromptSource);
-    const active = render({}, path => (path === 'stat_data.参与事件' ? { '射雕第一回01-测试事件': {} } : undefined));
-    const idle = render({}, path => (path === 'stat_data.参与事件' ? {} : undefined));
+    const renderMode = (参与事件: unknown, 后续事件线索: unknown) =>
+      render({}, path => {
+        if (path === 'stat_data.参与事件') return 参与事件;
+        if (path === 'stat_data.后续事件线索') return 后续事件线索;
+        return undefined;
+      });
+    const active = renderMode(
+      { '射雕第一回01-测试事件': {} },
+      { '射雕第一回02-后续事件': '后续线索' },
+    );
+    const bridge = renderMode({}, { '射雕第一回02-后续事件': '后续线索' });
+    const idle = renderMode({}, {});
 
     expect(active).toContain('### 参与事件思维规则');
     expect(active).toContain('“合理推进剧情”');
+    expect(active).not.toContain('### 事件接驳思维规则');
     expect(active).not.toContain('### 无参与事件思维规则');
+
+    expect(bridge).toContain('### 事件接驳思维规则');
+    expect(bridge).toContain('“合理推进剧情”');
+    expect(bridge).not.toContain('### 参与事件思维规则');
+    expect(bridge).not.toContain('### 无参与事件思维规则');
+
     expect(idle).toContain('### 无参与事件思维规则');
+    expect(idle).toContain('“合理推进剧情”');
     expect(idle).not.toContain('### 参与事件思维规则');
+    expect(idle).not.toContain('### 事件接驳思维规则');
   });
 
   it('世界背景提供可复用的写实叙事表现标尺', () => {

@@ -504,7 +504,13 @@
           log(`🔒 回合写入期间禁止结束事件，已延后 ${eventsToEnd.length} 个事件:`, eventsToEnd);
         } else {
           log(`⏹️ 发现 ${eventsToEnd.length} 个事件需要结束:`, eventsToEnd);
-          await batchEndEvents(eventsToEnd, eventDefinitions);
+          const committed = await batchEndEvents(eventsToEnd, eventDefinitions);
+          if (committed) {
+            // 本轮 admission 发生在事件结算之前；同地点的下一事件可能刚因人物占用而被挡住。
+            // 复用 runScheduledCheck 的既有 do/while，在同一个串行任务内回读结算后状态并立即复检。
+            pendingCheckReason ||= 'post-event-settlement';
+            log(`🔁 事件结算已提交，安排尾随复检以接驳后续事件: ${eventsToEnd.join(', ')}`);
+          }
         }
       } else {
         log('没有事件需要结束');
