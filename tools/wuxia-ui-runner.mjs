@@ -560,7 +560,18 @@ async function restartFromFirstReply(browser, options) {
     };
   }
 
-  await first.locator.click();
+  // React Flow 节点可能被平移到画布裁切区或标题栏下方。自动化标记已经
+  // 唯一确认目标后，触发节点自身的 DOM 点击事件，让事件继续冒泡到
+  // React Flow 的 onNodeClick；不要依赖易受布局影响的屏幕坐标命中测试。
+  await first.locator.evaluate(element => {
+    if (!(element instanceof HTMLElement)) throw new Error('首个历史节点不可点击');
+    element.click();
+  });
+  const selectionDeadline = Date.now() + 5_000;
+  while ((await first.locator.getAttribute('data-wuxia-history-selected')) !== 'true') {
+    if (Date.now() >= selectionDeadline) throw new Error('点击首个回复节点后，前端未确认选中状态');
+    await sleep(100);
+  }
   const continueButton = opened.frame.locator(SELECTORS.continueHistoryNode).first();
   await continueButton.waitFor({ state: 'visible', timeout: 10_000 });
   const action = (await continueButton.getAttribute('data-wuxia-history-action')) || '';

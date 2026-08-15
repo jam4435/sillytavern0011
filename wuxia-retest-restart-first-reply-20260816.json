@@ -1,0 +1,27 @@
+{
+  "startedAt": "2026-08-15T16:04:46.313Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-retest-restart-first-reply-20260816.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": true,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": false,
+  "restart": {
+    "mode": "restart-from-first-reply",
+    "success": false,
+    "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-wuxia-automation=\"history-node\"][data-wuxia-history-depth=\"0\"]').first()\n    - locator resolved to <div class=\"history-node path\" data-wuxia-history-depth=\"0\" data-wuxia-history-current=\"false\" data-wuxia-automation=\"history-node\" data-wuxia-history-node-id=\"history_node_021708ef59dbe5ca\">…</div>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - performing click action\n      - <header class=\"history-masthead\">…</header> intercepts pointer events\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - performing click action\n      - <header class=\"history-masthead\">…</header> intercepts pointer events\n    - retrying click action\n      - waiting 100ms\n    39 × waiting for element to be visible, enabled and stable\n       - element is visible, enabled and stable\n       - scrolling into view if needed\n       - done scrolling\n       - performing click action\n       - <header class=\"history-masthead\">…</header> intercepts pointer events\n     - retrying click action\n       - waiting 500ms\n\n    at restartFromFirstReply (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:563:23)\n    at async main (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:896:26)"
+  },
+  "completedAt": "2026-08-15T16:05:21.998Z"
+}

@@ -98,6 +98,8 @@ pnpm wuxia:ui -- --restart-from-first-reply --output wuxia-restart-first-reply.j
 
 该命令真实执行以下 UI 操作：打开“存档与分叉”，选择当前连通脉络中深度为 0 的首个回复节点，点击“从此处继续”，再点击“确认继续”。它不会删除楼层、覆盖来源聊天、发送 user 行动或调用模型；需要回退时由前端创建原生 branch chat，并等待 checkout journal、ERA full sync、事件派生字段重算与哈希校验完成。只有新 iframe 已就绪、输入解锁且历史树再次确认首节点为当前节点时才报告成功。
 
+React Flow 历史节点可能因缩放、平移或画布裁切而被标题栏遮挡。runner 应先用 `data-wuxia-automation="history-node"` 及节点元数据唯一定位，再触发该元素自身的 DOM `click()` 并等待 `data-wuxia-history-selected="true"`；这仍会沿 React Flow `onNodeClick` 和前端 checkout 处理链执行，属于真实 UI 操作。不得直接调用 React 状态 setter、checkout 函数或变量接口；也不要用坐标强制点击代替选中状态验证。
+
 - 若当前本来就在首个回复，命令返回 `alreadyAtFirstReply: true`，不创建多余分支。
 - 页面正在生成、历史谱牒加载失败、确认按钮不可用、checkout 超时或最终首节点校验失败时立即停止；不得继续发送或重生成。
 - `--restart-from-first-reply` 是独立操作，不能与 `--regenerate`、`--inspect-only`、`--action`、`--turns` 或 `--stop-generation` 合用。
