@@ -29,12 +29,13 @@ RPC 或桥接代替真实发送链。
 ```powershell
 & "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" `
   --remote-debugging-port=9333 `
-  --user-data-dir="F:\Develop\AI\sillytavern\.wuxia-chrome-profile"
+  --user-data-dir="F:\Develop\AI\sillytavern\.wuxia-chrome-profile" `
+  "http://127.0.0.1:8000/"
 ```
 
    该 profile 是测试配置的唯一持久化位置：主题、额外变量模式、API profile 等浏览器端设置会跨重启保留。不得改用临时目录、无 `--user-data-dir` 的 Chrome，或日常 Chrome 的 Default profile；不得删除或清空此目录。仅在用户明确要求时才变更端口或 profile 路径，并同步使用 `--endpoint`。
    默认复用并持续保留这个专用 Chrome。测试结束后不要顺手关闭浏览器或终止其后台任务，以免下一组提示词测试重新等待酒馆和武侠 iframe 加载。只有用户明确要求关闭、实例异常必须重启，或本次任务明确声明使用一次性临时浏览器时才终止；保留时在报告中注明 CDP 地址和后台任务 ID（若有）。
-2. 确认该 Chrome 已开放 CDP，并保持酒馆武侠页面打开；不同地址或页面使用
+2. 新启动或重启专用 Chrome 时，必须同时打开酒馆网页 `http://127.0.0.1:8000/`，不要只启动空浏览器、停在新标签页或依赖会话自动恢复。确认该 Chrome 已开放 CDP，并保持酒馆武侠页面打开；不同地址或页面使用
    `--endpoint` 或 `--page-url`。
 3. 先只读检查：
 
