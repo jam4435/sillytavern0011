@@ -35,7 +35,7 @@ describe('manifest event scheduler', () => {
     expect(
       getManifestEventCandidateKeys(
         manifest,
-        { 年: 0, 月: 0, 日: 0, 时: 21 },
+        { 年: 0, 月: 1, 日: 1, 时: 21 },
         {
           事件系统: { 已完成事件: { 已完成: 0 }, 进行中事件: {} },
         },
@@ -55,7 +55,7 @@ describe('manifest event scheduler', () => {
     expect(
       getManifestEventCandidateKeys(
         manifest,
-        { 年: 0, 月: 0, 日: 0, 时: 21 },
+        { 年: 0, 月: 1, 日: 1, 时: 21 },
         {
           事件系统: {
             已完成事件: {},
@@ -115,6 +115,30 @@ describe('relative event rebasing', () => {
     expect(plan.deferredConditions).toEqual({
       事件二: { 类型: '时间', 年: 1200, 月: 8, 日: 10, 时: 12, 分: 25 },
       事件三: { 类型: '时间', 年: 1200, 月: 8, 日: 10, 时: 18, 分: 25 },
+    });
+  });
+
+  it('does not move December events five days backward while preserving their gaps', () => {
+    const decemberDefinitions = {
+      事件三: { 触发条件: { 类型: '时间', 年: 1200, 月: 12, 日: 10, 时: 19 } },
+      事件四: { 触发条件: { 类型: '时间', 年: 1200, 月: 12, 日: 10, 时: 22 } },
+      事件五: { 触发条件: { 类型: '时间', 年: 1200, 月: 12, 日: 11, 时: 3 } },
+    };
+
+    expect(
+      buildRelativeEventRebasePlan(['事件五', '事件四', '事件三'], decemberDefinitions, {
+        年: 1200,
+        月: 12,
+        日: 10,
+        时: 19,
+        分: 0,
+      }),
+    ).toMatchObject({
+      firstEventName: '事件三',
+      deferredConditions: {
+        事件四: { 类型: '时间', 年: 1200, 月: 12, 日: 10, 时: 22, 分: 0 },
+        事件五: { 类型: '时间', 年: 1200, 月: 12, 日: 11, 时: 3, 分: 0 },
+      },
     });
   });
 

@@ -6,6 +6,7 @@
 // next to the script entry (event-data/*). Consumers may override this URL
 // for a CDN or an unpacked development directory.
 import { EVENT_RUNTIME_KEY_VERSION } from '../shared/eventKey.js';
+import { wuxiaCalendarTimeToTotalHours } from '../shared/wuxiaCalendar.js';
 
 const DEFAULT_EVENT_DATA_BASE_URL = './event-data/';
 const MODULE_BASE_URL = new URL(/* webpackIgnore: true */ '.', import.meta.url).href;
@@ -16,7 +17,7 @@ function isPlainObject(value) {
 
 function timeToHours(time) {
   if (!time || typeof time !== 'object') return null;
-  return (Number(time.年 || 0) * 365 + Number(time.月 || 0) * 30 + Number(time.日 || 0)) * 24 + Number(time.时 || 0);
+  return wuxiaCalendarTimeToTotalHours(time);
 }
 
 function normalizeBaseUrl(baseUrl) {

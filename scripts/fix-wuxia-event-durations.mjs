@@ -29,6 +29,7 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { WUXIA_DAYS_PER_YEAR, wuxiaCalendarTimeToTotalHours } from '../src/shared/wuxiaCalendar.js';
 
 const ORDINARY_NAME_RE = /^(.*?)事件条目-第(\d+)回-(\d+)-(.+)\.(?:ya?ml|json)$/u;
 const DEBUT_NAME_RE = /^(.*?)登场事件-第(\d+)回(?:人物)?\.(?:ya?ml|json)$/u;
@@ -48,7 +49,7 @@ export const CONSERVATIVE_MARKER_HOURS = {
   数月: 90 * 24,
   半年: 180 * 24,
   大半年: 210 * 24,
-  一年: 365 * 24,
+  一年: WUXIA_DAYS_PER_YEAR * 24,
 };
 
 function parseArgs(argv) {
@@ -102,7 +103,7 @@ function normalizeTime(value) {
 
 function timeToEpochHours(time) {
   if (time === null) return null;
-  return Date.UTC(time.年, time.月 - 1, time.日, time.时) / 3_600_000;
+  return wuxiaCalendarTimeToTotalHours(time);
 }
 
 function formatTime(time) {
@@ -307,18 +308,30 @@ function validate(ordinary, debuts, anchors, patchedIds) {
     }
   }
 
-  // R6: 运行时历法约束——era-utils/生成器按每月 30 天折算（月*30+日），31 号会与次月 1 号
-  // 同秩甚至倒挂，且破坏真实历法与模型历法的排序一致性。所有时间的日必须 ≤30。
+  // R6: 运行时历法约束——事件系统统一使用 12 月×30 天的 360 天简化历法。
+  // 所有外部年月日均为 1 基下标。
   for (const event of [...ordinary, ...debuts]) {
     for (const [field, value] of [
       ['触发条件', event.patched.trigger],
       ['事件结束时间', event.patched.end],
     ]) {
-      if (value && value.日 > 30) {
+      if (
+        value &&
+        (!Number.isInteger(value.年) ||
+          !Number.isInteger(value.月) ||
+          value.月 < 1 ||
+          value.月 > 12 ||
+          !Number.isInteger(value.日) ||
+          value.日 < 1 ||
+          value.日 > 30 ||
+          !Number.isInteger(value.时) ||
+          value.时 < 0 ||
+          value.时 > 23)
+      ) {
         violations.push({
           rule: 'R6-calendar',
           id: event.id,
-          message: `${field} 的日=${value.日} 超出运行时 30 天/月历法模型`,
+          message: `${field}=${formatTime(value)} 超出 360 天简化历法的合法范围`,
         });
       }
     }

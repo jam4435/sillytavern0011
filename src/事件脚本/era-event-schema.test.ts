@@ -99,6 +99,23 @@ describe('event condition trees', () => {
     expect(invalid.errors.join('\n')).toContain('只能是 0 或 1');
   });
 
+  it.each([
+    { 年: 1200, 月: 0, 日: 10, 时: 18 },
+    { 年: 1200, 月: 13, 日: 10, 时: 18 },
+    { 年: 1200, 月: 12, 日: 0, 时: 18 },
+    { 年: 1200, 月: 12, 日: 31, 时: 18 },
+    { 年: 1200, 月: 12, 日: 10, 时: 24 },
+    { 年: 1200, 月: 12, 日: 10, 时: 18, 分: 60 },
+  ])('rejects out-of-range 360-day calendar time %#', invalidTime => {
+    const invalid = validateAndNormalizeEventDefinition('事件A', {
+      触发条件: { 时间: invalidTime },
+      事件结束时间: now,
+    });
+
+    expect(invalid.valid).toBe(false);
+    expect(invalid.errors.join('\n')).toContain('不是有效时间');
+  });
+
   it('virtually reads defaults only for old unparticipated completions', () => {
     const dependentEvent = { 触发条件: { 变量: '事件分支结果.事件A.变心', 等于: 1 } };
     const definitions = { 事件A: { 分支标记: { 变心: 1 } }, 事件B: dependentEvent };

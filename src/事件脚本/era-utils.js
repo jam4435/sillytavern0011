@@ -11,6 +11,12 @@ import {
   parseCanonicalEventKey,
   stripEventFileSuffix,
 } from '../shared/eventKey.js';
+import {
+  totalDaysToWuxiaCalendarDate,
+  totalMinutesToWuxiaCalendarTime,
+  wuxiaCalendarDateToTotalDays,
+  wuxiaCalendarTimeToTotalMinutes,
+} from '../shared/wuxiaCalendar.js';
 
 export { EVENT_KIND, EVENT_RUNTIME_KEY_VERSION } from '../shared/eventKey.js';
 
@@ -139,13 +145,10 @@ export const debugTable = data => {
 
 // ==================== 时间比较函数 ====================
 export function compareTime(currentTime, targetTime, comparisonType) {
-  // 计算天数
-  const currentDays = (currentTime.年 || 0) * 365 + (currentTime.月 || 0) * 30 + (currentTime.日 || 0);
-  const targetDays = (targetTime.年 || 0) * 365 + (targetTime.月 || 0) * 30 + (targetTime.日 || 0);
-
-  // 计算总分钟数（兼容缺失的"时"、"分"字段，默认为0）
-  const currentTotalMinutes = currentDays * 24 * 60 + (currentTime.时 || 0) * 60 + (currentTime.分 || 0);
-  const targetTotalMinutes = targetDays * 24 * 60 + (targetTime.时 || 0) * 60 + (targetTime.分 || 0);
+  const currentDays = wuxiaCalendarDateToTotalDays(currentTime);
+  const targetDays = wuxiaCalendarDateToTotalDays(targetTime);
+  const currentTotalMinutes = wuxiaCalendarTimeToTotalMinutes(currentTime);
+  const targetTotalMinutes = wuxiaCalendarTimeToTotalMinutes(targetTime);
 
   // 计算天数差值（保持原有逻辑，用于diff模式）
   const diff = currentDays - targetDays;
@@ -267,30 +270,11 @@ export function buildInvalidParticipationDeletePatch(participation) {
 
 // 对一个时间对象进行天数加减，并正确处理跨月、跨年
 export function calculateDateOffset(dateObject, days) {
-  // 将年月日统一转换为总天数进行计算
-  let totalDays = (dateObject.年 || 0) * 365 + (dateObject.月 || 0) * 30 + (dateObject.日 || 0) + days;
-
-  // 计算新的年月日
-  let newYear = Math.floor(totalDays / 365);
-  totalDays %= 365;
-  let newMonth = Math.floor(totalDays / 30);
-  let newDay = totalDays % 30;
-
-  // 处理日期为0的情况
-  if (newDay === 0) {
-    newDay = 30;
-    newMonth -= 1;
-  }
-  if (newMonth === 0) {
-    newMonth = 12;
-    newYear -= 1;
-  }
+  const shiftedDate = totalDaysToWuxiaCalendarDate(wuxiaCalendarDateToTotalDays(dateObject) + Number(days || 0));
 
   // 保留原有的"时"、"分"字段（如果存在）
   const result = {
-    年: newYear,
-    月: newMonth,
-    日: newDay,
+    ...shiftedDate,
   };
 
   if (dateObject.时 !== undefined) {
@@ -305,71 +289,34 @@ export function calculateDateOffset(dateObject, days) {
 
 // 对一个时间对象进行包含日、时、分的时间偏移计算。
 export function calculateTimeOffset(dateObject, duration) {
-  // 将基础时间转换为总分钟数
-  const baseDays = (dateObject.年 || 0) * 365 + (dateObject.月 || 0) * 30 + (dateObject.日 || 0);
-  const totalBaseMinutes = baseDays * 24 * 60 + (dateObject.时 || 0) * 60 + (dateObject.分 || 0);
-
-  // 将持续时间转换为总分钟数
   const durationDays = duration.日 || 0;
   const durationHours = duration.时 || 0;
   const durationMinutes = duration.分 || 0;
   const totalDurationMinutes = durationDays * 24 * 60 + durationHours * 60 + durationMinutes;
-
-  // 计算新的总分钟数
-  const newTotalMinutes = totalBaseMinutes + totalDurationMinutes;
-
-  // 将总分钟数转换回年月日时分格式
-  let remainingMinutes = newTotalMinutes;
-
-  // 计算年
-  let newYear = Math.floor(remainingMinutes / (365 * 24 * 60));
-  remainingMinutes %= 365 * 24 * 60;
-
-  // 计算月
-  let newMonth = Math.floor(remainingMinutes / (30 * 24 * 60));
-  remainingMinutes %= 30 * 24 * 60;
-
-  // 计算日
-  let newDay = Math.floor(remainingMinutes / (24 * 60));
-  remainingMinutes %= 24 * 60;
-
-  // 计算时
-  const newHour = Math.floor(remainingMinutes / 60);
-  const newMinute = remainingMinutes % 60;
-
-  // 处理日期为0的情况
-  if (newDay === 0) {
-    newDay = 30;
-    newMonth -= 1;
-  }
-  if (newMonth === 0) {
-    newMonth = 12;
-    newYear -= 1;
-  }
-
-  // 构建结果对象
+  const shiftedTime = totalMinutesToWuxiaCalendarTime(
+    wuxiaCalendarTimeToTotalMinutes(dateObject) + totalDurationMinutes,
+  );
   const result = {
-    年: newYear,
-    月: newMonth,
-    日: newDay,
-    时: newHour,
+    年: shiftedTime.年,
+    月: shiftedTime.月,
+    日: shiftedTime.日,
+    时: shiftedTime.时,
   };
 
   if (dateObject.分 !== undefined || duration.分 !== undefined) {
-    result.分 = newMinute;
+    result.分 = shiftedTime.分;
   }
 
   return result;
 }
 
-// 将事件系统使用的简化历法时间转换为总小时数。所有持续时长和平移都必须复用此口径。
+// 将事件系统使用的 12 月×30 天简化历法转换为总小时数。所有持续时长和平移都必须复用此口径。
 export function timeToTotalHours(timeObject) {
   return timeToTotalMinutes(timeObject) / 60;
 }
 
 export function timeToTotalMinutes(timeObject) {
-  const totalDays = (timeObject?.年 || 0) * 365 + (timeObject?.月 || 0) * 30 + (timeObject?.日 || 0);
-  return totalDays * 24 * 60 + (timeObject?.时 || 0) * 60 + (timeObject?.分 || 0);
+  return wuxiaCalendarTimeToTotalMinutes(timeObject);
 }
 
 export function getEventDurationHours(eventData) {

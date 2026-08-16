@@ -11,10 +11,22 @@ function cloneJson(value) {
 }
 
 export function isTimeObject(value) {
+  if (!isEventPlainObject(value)) return false;
+  const year = Number(value.年);
+  const month = Number(value.月);
+  const day = Number(value.日);
+  const hour = value.时 === undefined ? 0 : Number(value.时);
+  const minute = value.分 === undefined ? 0 : Number(value.分);
   return (
-    isEventPlainObject(value) &&
-    ['年', '月', '日'].every(key => Number.isFinite(Number(value[key]))) &&
-    (value.时 === undefined || Number.isFinite(Number(value.时)))
+    [year, month, day, hour, minute].every(Number.isInteger) &&
+    month >= 1 &&
+    month <= 12 &&
+    day >= 1 &&
+    day <= 30 &&
+    hour >= 0 &&
+    hour <= 23 &&
+    minute >= 0 &&
+    minute <= 59
   );
 }
 

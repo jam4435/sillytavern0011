@@ -19,11 +19,7 @@ import {
   normalizeFollowupEvents,
   validateAndNormalizeEventDefinition,
 } from '../src/事件脚本/era-event-schema.js';
-import {
-  getLocationScopePath,
-  normalizeLocationPath,
-  parseLocationPath,
-} from '../src/shared/locationPath.js';
+import { getLocationScopePath, normalizeLocationPath, parseLocationPath } from '../src/shared/locationPath.js';
 import {
   EVENT_KIND,
   EVENT_RUNTIME_KEY_VERSION,
@@ -31,6 +27,7 @@ import {
   parseCanonicalEventKey,
   stripEventFileSuffix,
 } from '../src/shared/eventKey.js';
+import { totalHoursToWuxiaCalendarTime, wuxiaCalendarTimeToTotalHours } from '../src/shared/wuxiaCalendar.js';
 
 const root = process.cwd();
 const sourceRoot = path.join(root, '世界书');
@@ -54,7 +51,9 @@ const EVENT_KINDS = Object.freeze({
 const locationTable = parseYaml(fs.readFileSync(locationTablePath, 'utf8'));
 const validLocationScopes = new Set(
   Object.entries(locationTable).flatMap(([area, regions]) =>
-    Object.entries(regions).flatMap(([region, locations]) => locations.map(location => `${area}/${region}/${location}`)),
+    Object.entries(regions).flatMap(([region, locations]) =>
+      locations.map(location => `${area}/${region}/${location}`),
+    ),
   ),
 );
 
@@ -72,25 +71,11 @@ function timeToHours(time) {
   const month = Number(time.月);
   const day = Number(time.日);
   if (![year, month, day].every(Number.isFinite)) return null;
-  return (year * 365 + month * 30 + day) * 24 + Number(time.时 || 0);
+  return wuxiaCalendarTimeToTotalHours(time);
 }
 
 function hoursToTime(hours) {
-  const year = Math.floor(hours / (365 * 24));
-  let remainder = hours % (365 * 24);
-  let month = Math.floor(remainder / (30 * 24));
-  remainder %= 30 * 24;
-  let day = Math.floor(remainder / 24);
-  const hour = remainder % 24;
-  if (day === 0) {
-    day = 30;
-    month -= 1;
-  }
-  if (month === 0) {
-    month = 12;
-    return { 年: year - 1, 月: month, 日: day, 时: hour };
-  }
-  return { 年: year, 月: month, 日: day, 时: hour };
+  return totalHoursToWuxiaCalendarTime(hours);
 }
 
 function normalizeLocation(location) {
@@ -227,7 +212,11 @@ function validateTriggerReferences(value, event, byKey, pathSegments = ['触发�
       }
       continue;
     }
-    if (key === '变量' && typeof child === 'string' && EVENT_STATE_PATH_ROOTS.some(rootKey => child.includes(rootKey))) {
+    if (
+      key === '变量' &&
+      typeof child === 'string' &&
+      EVENT_STATE_PATH_ROOTS.some(rootKey => child.includes(rootKey))
+    ) {
       const referencedKeys = [...byKey.keys()].filter(runtimeKey => child.includes(runtimeKey));
       if (referencedKeys.length !== 1) {
         throw new Error(`事件 ${event.runtimeKey} 的 ${childPath.join('.')} 未唯一引用规范事件键: ${child}`);
@@ -364,8 +353,7 @@ function collectEvents() {
       endHour,
       eventDuration: eventData.事件持续时间 || null,
       durationHours:
-        relativeDurationHours ??
-        (endHour === null || triggerHour === null ? null : Math.max(0, endHour - triggerHour)),
+        relativeDurationHours ?? (endHour === null || triggerHour === null ? null : Math.max(0, endHour - triggerHour)),
       discoveryHour: triggerHour === null ? null : triggerHour - DISCOVERY_HOURS,
       location: normalizeLocation(eventData.事件地点),
       intro: eventData.事件引子 || null,
@@ -427,10 +415,12 @@ function createShards(events) {
 }
 
 function buildCheckpoints(events) {
-  const completedEvents = events.filter(event => !event.conditional && Number.isFinite(event.triggerHour)).sort(
-    (left, right) =>
-      (left.endHour ?? left.triggerHour) - (right.endHour ?? right.triggerHour) || compareEvents(left, right),
-  );
+  const completedEvents = events
+    .filter(event => !event.conditional && Number.isFinite(event.triggerHour))
+    .sort(
+      (left, right) =>
+        (left.endHour ?? left.triggerHour) - (right.endHour ?? right.triggerHour) || compareEvents(left, right),
+    );
   const checkpoints = [];
   const characterState = {};
   let appliedCount = 0;

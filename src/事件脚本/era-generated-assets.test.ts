@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 import { EVENT_RUNTIME_KEY_VERSION, parseCanonicalEventKey } from '../shared/eventKey.js';
+import { wuxiaCalendarTimeToTotalHours } from '../shared/wuxiaCalendar.js';
 
 const assetRoot = path.join(process.cwd(), 'src', '事件脚本', 'generated', 'event-data');
 const manifest = JSON.parse(fs.readFileSync(path.join(assetRoot, 'manifest.json'), 'utf8'));
@@ -23,12 +24,20 @@ describe('generated wuxia event assets', () => {
     for (const event of manifest.events) {
       expect(event.sourceName).toBe(event.runtimeKey);
       expect(parseCanonicalEventKey(event.runtimeKey)).not.toBeNull();
+      if (event.triggerTime) {
+        expect(event.triggerHour).toBe(wuxiaCalendarTimeToTotalHours(event.triggerTime));
+      }
+      if (event.endTime) {
+        expect(event.endHour).toBe(wuxiaCalendarTimeToTotalHours(event.endTime));
+      }
     }
   });
 
   it('materializes character state at each 100-event completion checkpoint', () => {
     for (const checkpoint of manifest.checkpoints) {
       const payload = JSON.parse(fs.readFileSync(path.join(assetRoot, checkpoint.file), 'utf8'));
+      expect(payload.throughHour).toBe(wuxiaCalendarTimeToTotalHours(payload.throughTime));
+      expect(payload.throughHour).toBe(checkpoint.throughHour);
       expect(payload.completedCount % 100).toBe(0);
       expect(payload.manifestRuntimeKeyVersion).toBe(EVENT_RUNTIME_KEY_VERSION);
       expect(payload.completedRuntimeKeys).toHaveLength(payload.completedCount);

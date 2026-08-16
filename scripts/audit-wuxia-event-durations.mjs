@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import YAML from 'yaml';
+import { wuxiaCalendarTimeToTotalHours } from '../src/shared/wuxiaCalendar.js';
 
 const EVENT_NAME_RE = /^(.*?)事件条目-第(\d+)回-(\d+)-(.+)\.(?:ya?ml|json)$/u;
 const OPENING_TIME_MARKER_RE =
@@ -81,7 +82,7 @@ function timeToEpochHours(time) {
   if (time === null) {
     return null;
   }
-  return Date.UTC(time.年, time.月 - 1, time.日, time.时) / 3_600_000;
+  return wuxiaCalendarTimeToTotalHours(time);
 }
 
 function compareEvents(left, right) {

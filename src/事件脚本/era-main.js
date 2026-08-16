@@ -22,6 +22,7 @@
     attachEventMetadata,
     deriveEventRuntimeDescriptor,
   } = await import('./era-utils.js');
+  const { wuxiaCalendarTimeToTotalHours } = await import('../shared/wuxiaCalendar.js');
   const { loadEventDefinitions, loadEventDefinitionsFromWorldbook, loadEventManifest, loadEventCheckpointAtOrBefore } =
     await import('./era-event-loader.js');
   const { isTimeForEvent, isEventDiscoverable, isTimeAfterEventEnd } = await import('./era-event-checker.js');
@@ -95,7 +96,7 @@
 
   const eventTimeToHours = time => {
     if (!time || typeof time !== 'object') return null;
-    return (Number(time.年 || 0) * 365 + Number(time.月 || 0) * 30 + Number(time.日 || 0)) * 24 + Number(time.时 || 0);
+    return wuxiaCalendarTimeToTotalHours(time);
   };
 
   const buildManifestDefinition = entry => {

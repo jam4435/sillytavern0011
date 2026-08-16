@@ -41,6 +41,7 @@ import {
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { isHistoryCheckoutPending } from '../../shared/historyCheckoutJournal';
 import { getLocationScopePath } from '../../shared/locationPath.js';
+import { wuxiaCalendarDateToTotalDays } from '../../shared/wuxiaCalendar.js';
 import { dataLogger } from './logger';
 
 // 使用酒馆的 ChatMessage 类型（与本地 types.ts 中的 ChatMessage 区分）
@@ -1061,9 +1062,9 @@ function formatCalendarRecord(time: CalendarRecord): string {
   return `${time.年 ?? '?'}年${time.月 ?? '?'}月${time.日 ?? '?'}日${time.时 === undefined ? '' : `${time.时}时`}`;
 }
 
-// 与事件脚本 era-utils 一致的简化历法换算：年365天、月30天
+// 与事件脚本一致的 12 月×30 天简化历法换算。
 function toCalendarDays(time: CalendarRecord): number {
-  return (time.年 || 0) * 365 + (time.月 || 0) * 30 + (time.日 || 0);
+  return wuxiaCalendarDateToTotalDays(time);
 }
 
 function formatEventValue(value: unknown): string {
@@ -1120,7 +1121,9 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
   const eventSystem = variables.事件系统 || {};
   const occupancy = eventSystem.人物事件占用 || {};
   const ongoing = eventSystem.进行中事件 || {};
-  const nowDays = worldTime ? worldTime.year * 365 + worldTime.month * 30 + worldTime.day : undefined;
+  const nowDays = worldTime
+    ? wuxiaCalendarDateToTotalDays({ 年: worldTime.year, 月: worldTime.month, 日: worldTime.day })
+    : undefined;
 
   const remainingDaysUntil = (endTime: unknown): number | undefined => {
     if (nowDays === undefined || !isCalendarRecord(endTime)) return undefined;

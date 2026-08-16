@@ -1,4 +1,8 @@
 import type { VariableDeclaredChange } from './variableChanges';
+import {
+  totalMinutesToWuxiaCalendarTime,
+  wuxiaCalendarTimeToTotalMinutes,
+} from '../../shared/wuxiaCalendar.js';
 
 export const WORLD_TIME_FIELDS = ['年', '月', '日', '时', '分'] as const;
 
@@ -87,21 +91,12 @@ function validateWorldTimeSource(source: WorldTimeSource, allowMissingMinute: bo
 }
 
 function worldTimeToOrdinalMinutes(time: WorldTimeTuple): number {
-  return (((time.年 * 12 + (time.月 - 1)) * 30 + (time.日 - 1)) * 24 + time.时) * 60 + time.分;
+  return wuxiaCalendarTimeToTotalMinutes(time);
 }
 
 function addWorldTimeMinutes(time: WorldTimeTuple, minutes: number): WorldTimeTuple | null {
   if (!Number.isInteger(minutes) || minutes <= 0) return null;
-  let remaining = worldTimeToOrdinalMinutes(time) + minutes;
-  const minute = remaining % 60;
-  remaining = Math.floor(remaining / 60);
-  const hour = remaining % 24;
-  remaining = Math.floor(remaining / 24);
-  const day = (remaining % 30) + 1;
-  remaining = Math.floor(remaining / 30);
-  const month = (remaining % 12) + 1;
-  const year = Math.floor(remaining / 12);
-  return validateWorldTimeSource({ 年: year, 月: month, 日: day, 时: hour, 分: minute }, false);
+  return validateWorldTimeSource(totalMinutesToWuxiaCalendarTime(worldTimeToOrdinalMinutes(time) + minutes), false);
 }
 
 function collectDeclaredElapsedMinutes(thoughts: readonly { text: string }[]): number[] {

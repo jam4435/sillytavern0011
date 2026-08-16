@@ -9,7 +9,7 @@ function isPlainObject(value) {
 
 export function eventTimeToHours(time) {
   if (!time || typeof time !== 'object') return null;
-  return (Number(time.年 || 0) * 365 + Number(time.月 || 0) * 30 + Number(time.日 || 0)) * 24 + Number(time.时 || 0);
+  return timeToTotalMinutes(time) / 60;
 }
 
 function upperBound(entries, hour) {

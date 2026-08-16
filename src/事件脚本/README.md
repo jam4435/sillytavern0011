@@ -5,15 +5,17 @@
 ## 模块结构
 
 ```
-src/事件脚本/
-├── index.ts              # 入口文件
-├── era-main.js           # 主脚本，事件循环与监听
-├── era-utils.js          # 工具函数模块
-├── era-event-loader.js   # 事件加载模块
-├── era-event-checker.js  # 事件检查模块
-├── era-turn-queue.js     # 回合串行队列与线索计数规划
-├── era-notifications.js  # 前端通知适配与 toastr 回退桥
-└── era-event-operations.js # 事件操作模块
+src/
+├── shared/wuxiaCalendar.js # 事件、前端与生成器共享的 360 天历法
+└── 事件脚本/
+    ├── index.ts              # 入口文件
+    ├── era-main.js           # 主脚本，事件循环与监听
+    ├── era-utils.js          # 工具函数模块
+    ├── era-event-loader.js   # 事件加载模块
+    ├── era-event-checker.js  # 事件检查模块
+    ├── era-turn-queue.js     # 回合串行队列与线索计数规划
+    ├── era-notifications.js  # 前端通知适配与 toastr 回退桥
+    └── era-event-operations.js # 事件操作模块
 ```
 
 ## 模块说明
@@ -32,6 +34,24 @@ src/事件脚本/
 | `formatDate(timeObj)`                                  | 格式化时间对象为字符串                  |
 | `isDebutEvent(eventName)`                              | 判断是否为登场事件                      |
 | `getEventShortName(eventName)`                         | 提取事件核心名称                        |
+
+## 时间历法契约
+
+事件系统统一使用 **12 月×30 天＝360 天/年** 的简化历法。模块外的 `月`、`日` 均为 1 基下标，合法范围为 `月=1–12`、`日=1–30`；时和分分别使用 `0–23`、`0–59`。统一换算由 `src/shared/wuxiaCalendar.js` 提供：
+
+```text
+总天数 = 年 × 360 + (月 - 1) × 30 + (日 - 1)
+总分钟 = 总天数 × 24 × 60 + 时 × 60 + 分
+```
+
+时间比较、事件时长、提前启动后的实际结束时间、相对事件重排、manifest 索引、checkpoint 选择和前端剩余天数都必须复用这套换算，禁止自行使用 `365 天/年`、`Date.UTC` 或 `月 × 30 + 日`。例如：
+
+```text
+1200/12/10 18:00 + 2 小时  = 1200/12/10 20:00
+1200/12/10 18:00 + 28 小时 = 1200/12/11 22:00
+```
+
+修改历法实现或事件时间后必须重新运行 `pnpm generate:events`，使 manifest、分片与 checkpoint 与运行时一致。修复不会自动改写已有聊天里已经归档的错误日期或错误完成状态；这类聊天需要从未污染节点恢复、定向清理状态，或新建聊天复测。
 
 **配置项 (CONFIG)**:
 
@@ -55,6 +75,8 @@ src/事件脚本/
 生产环境事件数据由 `scripts/generate-wuxia-event-assets.mjs` 从 `世界书/**/*.yaml` 生成到
 `src/事件脚本/generated/event-data/`，构建时会自动执行
 `pnpm generate:events`。事件定义不再在开局时扫描并解析整本角色世界书，而是先读 manifest，再按当前事件窗口、进行中事件和待结算事件加载对应分片；`ERA_EVENT_DATA_PROVIDER=worldbook`（或 localStorage 同名开关）仅用于调试回退。
+
+`scripts/audit-wuxia-event-durations.mjs` 与 `scripts/fix-wuxia-event-durations.mjs` 也使用同一共享历法；离线审计结果与游戏运行时不得采用不同的公历或年长口径。
 
 事件条目命名规则：
 

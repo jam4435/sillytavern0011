@@ -200,7 +200,7 @@ export interface GameEvent {
   location?: string;
   /** 相关时间文本：传闻=事件开始时间，进行中=预计结束时间 */
   timeText?: string;
-  /** 距事件结束剩余天数（按 365/30 简化历法与当前世界时间求差） */
+  /** 距事件结束剩余天数（按 12 月×30 天的 360 天简化历法与当前世界时间求差） */
   remainingDays?: number;
   /** 后续线索剩余可追回合数 */
   remainingTurns?: number;
@@ -216,7 +216,7 @@ export interface ChronicleEntry {
   year?: number;
   /** 完整时间文本 */
   timeText: string;
-  /** 365/30 历法总天数，用于排序 */
+  /** 12 月×30 天简化历法总天数，用于排序 */
   sortDays: number;
   location?: string;
   /** 归档概要：参与事件为实际结局，未参与为原定概要 */
