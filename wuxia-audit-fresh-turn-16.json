@@ -1,0 +1,48 @@
+{
+  "startedAt": "2026-08-17T12:20:34.291Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [
+      "合理推进剧情"
+    ],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "transport": "api",
+    "chatId": "",
+    "output": "wuxia-audit-fresh-turn-16.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": true
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "合理推进剧情",
+      "success": false,
+      "uncertainDispatch": true,
+      "error": "UncertainTurnError: 等待 WuxiaAutomation.runTurn 完成超时（180000ms）；消息可能已经发出，禁止自动重试或继续下一轮\n    at runApiTurn (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:1060:13)\n    at async main (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:1375:22)"
+    }
+  ],
+  "success": false,
+  "target": {
+    "pageUrl": "http://127.0.0.1:8000/",
+    "frameUrl": "blob:http://127.0.0.1:8000/da940f5a-88c1-4fab-84b0-ff439dfa316a",
+    "pageTitle": "SillyTavern",
+    "pageVisibility": "visible",
+    "frameVisible": true,
+    "instanceId": "frontend-2a4a70d6-aa1d-4a78-b333-3f67ec4b22b6",
+    "automationVersion": "1",
+    "chatId": "金庸群侠传 - 2026-08-17@16h37m09s",
+    "ready": true,
+    "page": "game",
+    "busy": false,
+    "selectionSource": "host-visible-iframe"
+  },
+  "completedAt": "2026-08-17T12:23:35.821Z"
+}
