@@ -23,6 +23,7 @@ import {
 } from '../../shared/historyCheckoutJournal';
 import type { GameState, HistoryLocator, HistoryNode } from '../types';
 import {
+  abandonCheckoutRecovery,
   canSwitchSwipeInPlace,
   checkoutNode,
   filterTreeToRelatedComponent,
@@ -206,6 +207,11 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
   );
   const isWorking = workState.type === 'loading' || Boolean(journal);
   const recoveryActionDisabled = workState.type === 'loading';
+  const recoveryFailureText = journal?.failure
+    ? `失败阶段：${journal.failure.stage}；原始异常：${journal.failure.message}`
+    : journal && isHistoryCheckoutJournalExpired(journal)
+      ? '失败阶段未被旧版本记录；恢复窗口已超过 120 秒。'
+      : '';
 
   useEffect(() => {
     setLabelDraft(selectedNode?.label ?? '');
@@ -321,6 +327,22 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
     }
   };
 
+  const handleAbandonRecovery = async () => {
+    setWorkState({ type: 'loading', message: '正在解除未完成的历史恢复锁……' });
+    try {
+      const result = abandonCheckoutRecovery();
+      setJournal(readHistoryCheckoutJournal());
+      await refresh(false);
+      setLastCheckout(null);
+      setWorkState({
+        type: 'success',
+        message: result?.error || '已解除历史恢复锁，现在可以重新选择历史节点。',
+      });
+    } catch (error) {
+      setWorkState({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
   const primaryLabel = selectedIsCurrent
     ? '当前进度'
     : selectedIsMainReturn
@@ -376,7 +398,10 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
       {recoveryAvailable && (
         <div className="history-journal-banner">
           <ShieldAlert size={14} />
-          <span>上次分叉未能完成。新聊天会保留，不会自动删除。</span>
+          <span title={recoveryFailureText || undefined}>
+            上次分叉未能完成。新聊天会保留，不会自动删除。
+            {recoveryFailureText ? ` ${recoveryFailureText}` : ''}
+          </span>
         </div>
       )}
 
@@ -550,6 +575,16 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
                   >
                     <Undo2 size={14} />
                     返回来源聊天
+                  </button>
+                  <button
+                    type="button"
+                    className="history-secondary-action"
+                    disabled={recoveryActionDisabled}
+                    onClick={() => void handleAbandonRecovery()}
+                    title="保留已创建的聊天和分支，只解除本次未完成恢复造成的锁定"
+                  >
+                    <X size={14} />
+                    放弃此次恢复
                   </button>
                 </>
               )}

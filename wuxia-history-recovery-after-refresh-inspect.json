@@ -1,0 +1,24 @@
+{
+  "startedAt": "2026-08-17T04:52:46.337Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 1,
+    "timeoutMs": 180000,
+    "transport": "api",
+    "chatId": "金庸群侠传 - 2026-08-16@16h05m01s",
+    "output": "wuxia-history-recovery-after-refresh-inspect.json",
+    "inspectOnly": true,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": false,
+  "completedAt": "2026-08-17T04:53:01.409Z"
+}

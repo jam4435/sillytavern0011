@@ -22,6 +22,14 @@ export const CheckoutJournalStageSchema = z.enum([
 ]);
 export type CheckoutJournalStage = z.infer<typeof CheckoutJournalStageSchema>;
 
+const CheckoutJournalFailureSchema = z
+  .object({
+    stage: CheckoutJournalStageSchema,
+    message: z.string(),
+    occurredAt: z.number().finite(),
+  })
+  .strict();
+
 const HistoryLocatorSchema = z
   .object({
     chatId: z.string(),
@@ -43,6 +51,7 @@ export const HistoryCheckoutJournalSchema = z
     branchSourceLocator: HistoryLocatorSchema.nullable().optional(),
     draftUserMessageId: z.number().int().nonnegative().nullable().optional(),
     draftMessage: z.string().optional(),
+    failure: CheckoutJournalFailureSchema.optional(),
     sourceHeadNodeId: z.string(),
     sourceChatId: z.string(),
     sourceChatName: z.string(),
@@ -123,7 +132,13 @@ export function updateHistoryCheckoutJournal(
   patch: Partial<
     Pick<
       HistoryCheckoutJournal,
-      'stage' | 'targetLocator' | 'actionKind' | 'branchSourceLocator' | 'draftUserMessageId' | 'draftMessage'
+      | 'stage'
+      | 'targetLocator'
+      | 'actionKind'
+      | 'branchSourceLocator'
+      | 'draftUserMessageId'
+      | 'draftMessage'
+      | 'failure'
     >
   >,
 ): HistoryCheckoutJournal | null {
@@ -230,6 +245,7 @@ export function renewHistoryCheckoutJournal(journal: HistoryCheckoutJournal, now
     ...journal,
     transactionId: `checkout_${now.toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     startedAt: now,
+    failure: undefined,
   });
 }
 

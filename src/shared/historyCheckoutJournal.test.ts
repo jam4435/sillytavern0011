@@ -113,6 +113,24 @@ describe('historyCheckoutJournal', () => {
     expect(readHistoryCheckoutJournal()).toBeNull();
   });
 
+  it('持久化失败阶段与原始异常，并在重试时清除旧失败信息', () => {
+    createHistoryCheckoutJournal({
+      targetNodeId: 'node-a',
+      targetLocator: { chatId: 'chat-a', chatName: 'A', userMessageId: null, assistantMessageId: 0, swipeId: 0 },
+      sourceHeadNodeId: '',
+      sourceChatId: 'chat-a',
+      sourceChatName: 'A',
+    });
+    const failed = updateHistoryCheckoutJournal({
+      stage: 'sync_era',
+      failure: { stage: 'sync_era', message: 'ERA 全量同步超时', occurredAt: 42 },
+    });
+
+    expect(failed?.failure).toEqual({ stage: 'sync_era', message: 'ERA 全量同步超时', occurredAt: 42 });
+    expect(readHistoryCheckoutJournal()?.failure?.message).toBe('ERA 全量同步超时');
+    expect(renewHistoryCheckoutJournal(readHistoryCheckoutJournal()!, 50).failure).toBeUndefined();
+  });
+
   it('拒绝 journal 的额外字段', () => {
     expect(() =>
       HistoryCheckoutJournalSchema.parse({

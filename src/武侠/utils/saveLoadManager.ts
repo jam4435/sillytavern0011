@@ -1331,6 +1331,11 @@ async function executeCheckout(
     const unavailableChat = error instanceof HistoryChatUnavailableError ? error : null;
     const broken = error instanceof HistoryVerificationError || Boolean(unavailableChat);
     const journal = readHistoryCheckoutJournal();
+    if (journal) {
+      updateHistoryCheckoutJournal({
+        failure: { stage: journal.stage, message, occurredAt: Date.now() },
+      });
+    }
     const currentChat = unavailableChat ? null : await readCurrentChatIdentity().catch(() => null);
     const branchId = unavailableChat
       ? branchIdForChat(unavailableChat.chatId)
@@ -1402,6 +1407,10 @@ export async function resumeCheckout(): Promise<HistoryCheckoutResult | null> {
     return returnToCheckoutSource();
   }
   if (isHistoryCheckoutJournalExpired(journal)) {
+    const message = '历史切换恢复窗口已超过 120 秒。';
+    updateHistoryCheckoutJournal({
+      failure: { stage: journal.stage, message, occurredAt: Date.now() },
+    });
     markBranchStatus(branchIdForChat(journal.targetLocator.chatId), 'recovery_failed', {
       chatId: journal.targetLocator.chatId,
       chatName: journal.targetLocator.chatName,
@@ -1414,10 +1423,33 @@ export async function resumeCheckout(): Promise<HistoryCheckoutResult | null> {
         (journal.stage === 'create_branch' || journal.branchSourceLocator ? 'fork_branch' : 'existing_branch'),
       journal.targetNodeId,
       null,
-      '历史切换恢复窗口已超过 120 秒。',
+      message,
     );
   }
   return executeCheckout(journal.targetNodeId, {}, journal);
+}
+
+/** 放弃尚未完成的历史检出；保留已创建的聊天/分支，只解除恢复锁。 */
+export function abandonCheckoutRecovery(): HistoryCheckoutResult | null {
+  const journal = readHistoryCheckoutJournal();
+  if (!journal) return null;
+
+  const actionKind =
+    journal.actionKind ??
+    (journal.stage === 'create_branch' || journal.branchSourceLocator ? 'fork_branch' : 'existing_branch');
+  markBranchStatus(branchIdForChat(journal.targetLocator.chatId), 'recovery_failed', {
+    chatId: journal.targetLocator.chatId,
+    chatName: journal.targetLocator.chatName,
+    originNodeId: journal.targetNodeId,
+  });
+  clearHistoryCheckoutJournal();
+  return makeCheckoutResult(
+    'recovery_failed',
+    actionKind,
+    journal.targetNodeId,
+    null,
+    '已放弃此次历史恢复；已创建的聊天和分支会保留，现在可以重新选择历史节点。',
+  );
 }
 
 export async function retryCheckoutRecovery(): Promise<HistoryCheckoutResult | null> {

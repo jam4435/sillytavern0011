@@ -1143,9 +1143,14 @@
         if (oldestRoundId === undefined) break;
         abortedTurnRoundIds.delete(oldestRoundId);
       }
-      clearPendingTurnEventCheck();
+      const deferredCheck = clearPendingTurnEventCheck();
       pendingTurnCounterKeys = null;
       logWarning(`🔓 回合 ${abortedRoundId} 未发送完成提交，已解除屏障并保留事件等待后续稳定检查`);
+      // 即使变量阶段失败，上一条已落库的世界时间也可能恰好抵达事件边界。
+      // 屏障解除后仍须复检并结算到点事件，不能让“23:00 已到、事件仍进行中”永久卡住后续回合。
+      if (deferredCheck.requested) {
+        scheduleCheckEvents(`turn-finished-without-commit:${deferredCheck.reason || abortedRoundId}`);
+      }
     }
   });
 
