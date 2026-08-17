@@ -1,0 +1,31 @@
+{
+  "startedAt": "2026-08-16T15:37:52.130Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [
+      "合理推进剧情"
+    ],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "output": "wuxia-audit-turn-04-event-02-entry.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "合理推进剧情",
+      "success": false,
+      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-wuxia-automation=\"send-turn\"]').first()\n    - locator resolved to <button title=\"发送 (Enter)\" aria-label=\"发送玩家行动\" class=\"chat-send-btn active\" data-wuxia-automation=\"send-turn\">…</button>\n  - attempting click action\n    - waiting for element to be visible, enabled and stable\n    - element is visible, enabled and stable\n    - scrolling into view if needed\n    - done scrolling\n    - performing click action\n    - click action done\n    - waiting for scheduled navigations to finish\n\n    at runTurn (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:734:14)\n    at async main (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:933:22)"
+    }
+  ],
+  "success": false,
+  "completedAt": "2026-08-16T15:38:23.806Z"
+}

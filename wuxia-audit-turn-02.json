@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-08-15T17:04:55.570Z",
+  "startedAt": "2026-08-16T15:33:24.769Z",
   "options": {
     "endpoint": "http://127.0.0.1:9333",
     "pageUrl": "127.0.0.1:8000",
@@ -23,9 +23,9 @@
       "turn": 1,
       "prompt": "合理推进剧情",
       "success": false,
-      "error": "Error: 等待生成状态变为 false 超时（180000ms）；最后状态：{\"generating\":true,\"visibilityState\":\"visible\",\"pageUrl\":\"http://127.0.0.1:8000/\",\"frameUrl\":\"blob:http://127.0.0.1:8000/73e2e844-99b2-4aab-87c9-4c038e63cd6f\"}\n    at waitForGenerationState (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:312:9)\n    at async runTurn (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:739:20)\n    at async main (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:933:22)"
+      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-wuxia-automation=\"send-turn\"]').first()\n    - locator resolved to <button title=\"发送 (Enter)\" aria-label=\"发送玩家行动\" class=\"chat-send-btn active\" data-wuxia-automation=\"send-turn\">…</button>\n  - attempting click action\n    - waiting for element to be visible, enabled and stable\n    - element is visible, enabled and stable\n    - scrolling into view if needed\n    - done scrolling\n    - performing click action\n\n    at runTurn (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:734:14)\n    at async main (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:933:22)"
     }
   ],
   "success": false,
-  "completedAt": "2026-08-15T17:08:05.480Z"
+  "completedAt": "2026-08-16T15:33:56.103Z"
 }

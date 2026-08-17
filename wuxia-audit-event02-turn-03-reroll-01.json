@@ -1,0 +1,45 @@
+{
+  "startedAt": "2026-08-16T18:03:51.840Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "transport": "api",
+    "chatId": "金庸群侠传 - 2026-08-16@16h05m01s",
+    "output": "wuxia-audit-event02-turn-03-reroll-01.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": true,
+    "restartFromFirstReply": false,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "mode": "regenerate",
+      "prompt": "",
+      "success": false,
+      "error": "Error: 等待生成状态变为 true 超时（15000ms）\n    at waitForGenerationState (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:479:9)\n    at async runRegeneration (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:1117:22)\n    at async main (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:1244:30)"
+    }
+  ],
+  "success": false,
+  "target": {
+    "pageUrl": "http://127.0.0.1:8000/",
+    "frameUrl": "blob:http://127.0.0.1:8000/4b6d7b7e-5645-49f7-83a6-9cd3cebe168b",
+    "pageTitle": "SillyTavern",
+    "pageVisibility": "visible",
+    "frameVisible": true,
+    "instanceId": "frontend-c6a2387d-9e59-482a-ab48-d7ffc035c034",
+    "automationVersion": "1",
+    "chatId": "金庸群侠传 - 2026-08-16@16h05m01s",
+    "ready": true,
+    "page": "game",
+    "busy": false
+  },
+  "completedAt": "2026-08-16T18:04:12.970Z"
+}

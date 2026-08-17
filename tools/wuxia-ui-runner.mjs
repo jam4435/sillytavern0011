@@ -42,6 +42,8 @@ function printUsage() {
   --action <text>        每轮发送的行动；可重复传入，为各轮指定不同文本
   --settle-ms <ms>       旋转结束后的稳定等待，默认 5000
   --timeout-ms <ms>      单轮生成超时，默认 180000
+  --transport <api|dom>  推进方式，默认 api；dom 仅用于输入框/发送按钮冒烟测试
+  --chat-id <id>         明确锁定聊天 ID；多标签页或多 iframe 时建议提供
   --output <path>        将完整报告写入 JSON 文件
   --inspect-only         不发送行动，只检查当前 iframe、空闲状态与回复（首次回合不要求调试框）
   --stat-data-snapshot   仅配合 --inspect-only，按需读取变量页的完整聊天级 stat_data
@@ -80,6 +82,8 @@ function parseArgs(argv) {
     actions: [],
     settleMs: 5_000,
     timeoutMs: 180_000,
+    transport: 'api',
+    chatId: '',
     output: '',
     inspectOnly: false,
     statDataSnapshot: false,
@@ -134,6 +138,10 @@ function parseArgs(argv) {
     else if (arg === '--action') options.actions.push(value);
     else if (arg === '--settle-ms') options.settleMs = parsePositiveInteger(value, arg);
     else if (arg === '--timeout-ms') options.timeoutMs = parsePositiveInteger(value, arg);
+    else if (arg === '--transport') {
+      if (value !== 'api' && value !== 'dom') throw new Error('--transport 只能是 api 或 dom');
+      options.transport = value;
+    } else if (arg === '--chat-id') options.chatId = value;
     else if (arg === '--output') options.output = value;
     else throw new Error(`未知选项：${arg}`);
   }
@@ -149,7 +157,9 @@ function parseArgs(argv) {
     options.reloadPage,
   ].filter(Boolean).length;
   if (exclusiveModeCount > 1) {
-    throw new Error('--inspect-only、--stop-generation、--regenerate、--restart-from-first-reply 与 --reload-page 必须单独使用');
+    throw new Error(
+      '--inspect-only、--stop-generation、--regenerate、--restart-from-first-reply 与 --reload-page 必须单独使用',
+    );
   }
   if (
     options.regenerate &&
@@ -173,9 +183,7 @@ function parseArgs(argv) {
       options.actions.length > 0 ||
       options.turns !== 1)
   ) {
-    throw new Error(
-      '--stop-generation 不能与推进、--restart-from-first-reply、--inspect-only 或 --turns 一起使用',
-    );
+    throw new Error('--stop-generation 不能与推进、--restart-from-first-reply、--inspect-only 或 --turns 一起使用');
   }
   if (
     options.restartFromFirstReply &&
@@ -224,33 +232,240 @@ function log(message) {
   console.log(`[${isoTime()}] ${message}`);
 }
 
-async function findGameFrame(browser, pageUrl, timeoutMs = 15_000) {
+let lockedGameTarget = null;
+
+function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+function publicTarget(target) {
+  return {
+    pageUrl: target.page.url(),
+    frameUrl: target.frame.url(),
+    pageTitle: target.pageTitle,
+    pageVisibility: target.pageVisibility,
+    frameVisible: target.frameVisible,
+    instanceId: target.instanceId,
+    automationVersion: target.automationVersion,
+    chatId: target.chatId,
+    ready: target.snapshot?.ready ?? false,
+    page: target.snapshot?.page ?? '',
+    busy: target.snapshot?.busy ?? null,
+    selectionSource: target.selectionSource || 'probe',
+  };
+}
+
+async function listHostFrameSlots(page, timeoutMs = 750) {
+  return withTimeout(
+    page.evaluate(() =>
+      [...document.querySelectorAll('iframe')].map((element, index) => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return {
+          index,
+          src: element.src,
+          visible:
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            Number(style.opacity || '1') > 0 &&
+            rect.width > 0 &&
+            rect.height > 0,
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          parentMessageId: element.closest('.mes')?.getAttribute('mesid') || '',
+        };
+      }),
+    ),
+    timeoutMs,
+    `读取宿主 iframe 列表超时（${timeoutMs}ms）：${page.url()}`,
+  );
+}
+
+async function probeGameFrame(page, frame, timeoutMs = 500, hostSlot = null) {
+  return withTimeout(
+    (async () => {
+      if (frame.isDetached()) return null;
+
+      const [pageMeta, frameMeta] = await Promise.all([
+        page.evaluate(() => ({ visibility: document.visibilityState, title: document.title })),
+        frame.evaluate(() => {
+          if (!document.querySelector('[data-wuxia-automation="player-input"]')) return null;
+          const api = window.WuxiaAutomation;
+          let snapshot = null;
+          try {
+            snapshot = api?.getSnapshot?.() ?? null;
+          } catch {
+            snapshot = null;
+          }
+          const frameElement = window.frameElement;
+          let visible = true;
+          if (frameElement) {
+            const style = frameElement.ownerDocument.defaultView?.getComputedStyle(frameElement);
+            const rect = frameElement.getBoundingClientRect();
+            visible =
+              style?.display !== 'none' &&
+              style?.visibility !== 'hidden' &&
+              Number(style?.opacity || '1') > 0 &&
+              rect.width > 0 &&
+              rect.height > 0;
+          }
+          return {
+            visible,
+            instanceId: document.documentElement.dataset.wuxiaAutomationInstance || '',
+            automationVersion: document.documentElement.dataset.wuxiaAutomationVersion || '',
+            snapshot: snapshot
+              ? {
+                  ready: snapshot.ready === true,
+                  page: String(snapshot.page || ''),
+                  busy: snapshot.busy === true,
+                  chatId: String(snapshot.chatId || ''),
+                  capturedAt: Number(snapshot.capturedAt || 0),
+                }
+              : null,
+          };
+        }),
+      ]);
+      if (!frameMeta) return null;
+
+      return {
+        page,
+        frame,
+        pageTitle: pageMeta.title,
+        pageVisibility: pageMeta.visibility,
+        frameVisible: frameMeta.visible,
+        instanceId: frameMeta.instanceId,
+        automationVersion: frameMeta.automationVersion,
+        chatId: frameMeta.snapshot?.chatId || '',
+        snapshot: frameMeta.snapshot,
+        selectionSource: hostSlot ? 'host-visible-iframe' : 'fallback-frame-probe',
+        hostSlot,
+      };
+    })(),
+    timeoutMs,
+    `探测 iframe 超时（${timeoutMs}ms）：${frame.url()}`,
+  );
+}
+
+async function validateLockedTarget(target, timeoutMs = 500) {
+  if (!target || target.page.isClosed() || target.frame.isDetached()) return false;
+  try {
+    const refreshed = await probeGameFrame(target.page, target.frame, timeoutMs);
+    if (!refreshed) return false;
+    const valid = refreshed.instanceId === target.instanceId && (!target.chatId || refreshed.chatId === target.chatId);
+    if (valid) Object.assign(target, refreshed);
+    return valid;
+  } catch {
+    return false;
+  }
+}
+
+function chooseGameTarget(candidates, requestedChatId) {
+  let eligible = requestedChatId ? candidates.filter(candidate => candidate.chatId === requestedChatId) : candidates;
+  if (eligible.length === 0) return null;
+
+  const readyGame = eligible.filter(
+    candidate => candidate.snapshot?.ready && candidate.snapshot.page === 'game' && candidate.frameVisible,
+  );
+  if (readyGame.length > 0) eligible = readyGame;
+  else {
+    const visibleFrames = eligible.filter(candidate => candidate.frameVisible);
+    if (visibleFrames.length > 0) eligible = visibleFrames;
+  }
+
+  const visiblePages = eligible.filter(candidate => candidate.pageVisibility === 'visible');
+  if (visiblePages.length > 0) eligible = visiblePages;
+  return eligible.length === 1 ? eligible[0] : { ambiguous: eligible };
+}
+
+function releaseGameFrameLock() {
+  lockedGameTarget = null;
+}
+
+async function findGameFrame(browser, pageUrl, timeoutMs = 15_000, requestedChatId = '') {
+  if (
+    (!requestedChatId || lockedGameTarget?.chatId === requestedChatId) &&
+    (await validateLockedTarget(lockedGameTarget))
+  ) {
+    return lockedGameTarget;
+  }
+
+  const lockedChatId = requestedChatId || lockedGameTarget?.chatId || '';
   const deadline = Date.now() + timeoutMs;
-  let lastPages = [];
+  const lastPages = new Set();
+  let lastCandidates = [];
+  let lastProbeErrors = [];
 
   while (Date.now() < deadline) {
+    const probes = [];
     for (const context of browser.contexts()) {
       for (const page of context.pages()) {
         if (page.isClosed()) continue;
-        lastPages.push(page.url());
+        lastPages.add(page.url());
         if (pageUrl && !page.url().includes(pageUrl)) continue;
-
-        for (const frame of page.frames()) {
-          try {
-            if ((await frame.locator(SELECTORS.input).count()) > 0) {
-              return { page, frame };
-            }
-          } catch {
-            // iframe 正在换代，下一次轮询重新扫描。
-          }
+        let hostSlots = [];
+        try {
+          hostSlots = await listHostFrameSlots(page, Math.min(750, Math.max(1, deadline - Date.now())));
+        } catch (error) {
+          lastProbeErrors.push({
+            pageUrl: page.url(),
+            frameUrl: '',
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+        const visibleSlots = hostSlots.filter(slot => slot.visible && slot.src);
+        const visibleUrls = new Set(visibleSlots.map(slot => slot.src));
+        // 酒馆在热更新或重生成后可能保留旧 blob iframe 的执行上下文；
+        // 它们已不在可见宿主 DOM 中，绝不能与当前游戏候选一起探测。
+        const frames = page.frames();
+        const visibleFrames = frames.filter(frame => visibleUrls.has(frame.url()));
+        const framesToProbe = visibleFrames.length > 0 ? visibleFrames : frames;
+        for (const frame of framesToProbe) {
+          const remaining = Math.max(1, deadline - Date.now());
+          const hostSlot = visibleSlots.find(slot => slot.src === frame.url()) || null;
+          probes.push(
+            probeGameFrame(page, frame, Math.min(hostSlot ? 2_000 : 500, remaining), hostSlot)
+              .then(candidate => ({ candidate, error: null }))
+              .catch(error => ({
+                candidate: null,
+                error: {
+                  pageUrl: page.url(),
+                  frameUrl: frame.url(),
+                  message: error instanceof Error ? error.message : String(error),
+                },
+              })),
+          );
         }
       }
+    }
+
+    const results = await Promise.all(probes);
+    lastCandidates = results.flatMap(result => (result.candidate ? [result.candidate] : []));
+    lastProbeErrors = results.flatMap(result => (result.error ? [result.error] : []));
+    const selected = chooseGameTarget(lastCandidates, lockedChatId);
+    if (selected && !selected.ambiguous) {
+      lockedGameTarget = selected;
+      return selected;
     }
     await sleep(100);
   }
 
-  const pages = [...new Set(lastPages)].join(', ') || '(没有页面)';
-  throw new Error(`找不到武侠游戏 iframe；已检查页面：${pages}`);
+  const candidates = lastCandidates.map(publicTarget);
+  const pages = [...lastPages].join(', ') || '(没有页面)';
+  if (candidates.length > 1) {
+    throw new Error(
+      `武侠游戏 iframe 目标不唯一，拒绝任取第一个；请关闭旧标签页或传入 --chat-id。候选：${JSON.stringify(candidates)}`,
+    );
+  }
+  throw new Error(
+    `找不到武侠游戏 iframe；已检查页面：${pages}；候选：${JSON.stringify(candidates)}；` +
+      `探测错误：${JSON.stringify(lastProbeErrors)}`,
+  );
 }
 
 async function inspectGeneration(browser, pageUrl) {
@@ -312,6 +527,63 @@ async function waitForGenerationState(browser, pageUrl, expected, timeoutMs) {
   throw new Error(
     `等待生成状态变为 ${expected} 超时（${timeoutMs}ms）` +
       (lastState ? `；最后状态：${JSON.stringify(lastState)}` : ''),
+  );
+}
+
+async function readRegenerationFingerprint(browser, pageUrl) {
+  const { frame } = await findGameFrame(browser, pageUrl, 5_000);
+  return frame.evaluate(() => {
+    const snapshot = window.WuxiaAutomation?.getSnapshot?.() || null;
+    const latestAssistant =
+      [...(snapshot?.recentMessages || [])].reverse().find(message => message?.role === 'assistant') || null;
+    const reply = document.querySelector('[data-wuxia-automation="latest-reply"]')?.textContent?.trim() || '';
+    return {
+      reply,
+      busy: snapshot?.busy === true,
+      debugId: String(snapshot?.debug?.id || ''),
+      debugUpdatedAt: Number(snapshot?.debug?.updatedAt || 0),
+      assistantMessageId: String(latestAssistant?.messageId || latestAssistant?.id || ''),
+      assistantSwipeId: String(latestAssistant?.swipeId || latestAssistant?.swipe_id || ''),
+    };
+  });
+}
+
+function describeRegenerationEvidence(before, after) {
+  const evidence = [];
+  if (after.debugId && after.debugId !== before.debugId) evidence.push('debug-id-changed');
+  if (after.debugUpdatedAt > before.debugUpdatedAt) evidence.push('debug-updated');
+  if (after.assistantSwipeId && after.assistantSwipeId !== before.assistantSwipeId)
+    evidence.push('assistant-swipe-changed');
+  if (after.assistantMessageId && after.assistantMessageId !== before.assistantMessageId) {
+    evidence.push('assistant-message-changed');
+  }
+  if (after.reply !== before.reply) evidence.push('reply-changed');
+  return evidence;
+}
+
+async function waitForRegenerationActivity(browser, pageUrl, before, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let lastState = null;
+  let lastFingerprint = before;
+
+  while (Date.now() < deadline) {
+    try {
+      lastState = await inspectGeneration(browser, pageUrl);
+      lastFingerprint = await readRegenerationFingerprint(browser, pageUrl);
+      const evidence = describeRegenerationEvidence(before, lastFingerprint);
+      if (lastState.generating) return { state: lastState, fingerprint: lastFingerprint, evidence, busyObserved: true };
+      // 短回复可能在两次轮询间完成；只要页面记录了新的 swipe/debug/reply，即视为已完成。
+      if (evidence.length > 0) return { state: lastState, fingerprint: lastFingerprint, evidence, busyObserved: false };
+    } catch {
+      // 重生成可能重建 iframe；下一轮会按可见宿主 iframe 重新发现。
+    }
+    await sleep(100);
+  }
+
+  throw new Error(
+    `重生成后未观察到忙碌状态或新回复证据（${timeoutMs}ms）` +
+      (lastState ? `；最后状态：${JSON.stringify(lastState)}` : '') +
+      `；最后指纹：${JSON.stringify(lastFingerprint)}`,
   );
 }
 
@@ -487,7 +759,13 @@ async function openHistoryPanel(browser, pageUrl) {
   await openButton.waitFor({ state: 'visible', timeout: 10_000 });
   await openButton.click();
   await sleep(250);
-  if (!(await frame.locator(SELECTORS.historyPanel).first().isVisible().catch(() => false))) {
+  if (
+    !(await frame
+      .locator(SELECTORS.historyPanel)
+      .first()
+      .isVisible()
+      .catch(() => false))
+  ) {
     // 刚关闭其他弹窗时 React 状态提交可能晚于第一次点击；确认关闭后重试一次。
     await openButton.click();
   }
@@ -591,6 +869,9 @@ async function restartFromFirstReply(browser, options) {
       element.click();
     });
   }
+
+  // 历史检出会主动换聊天/重建 iframe；解除旧实例租约，后续只接受重新发现的实例。
+  releaseGameFrameLock();
 
   const checkoutDeadline = Date.now() + options.timeoutMs;
   let frameAfter = null;
@@ -714,9 +995,137 @@ async function readLatestReply(browser, pageUrl) {
   return ((await frame.locator(SELECTORS.latestReply).first().innerText()) || '').trim();
 }
 
-async function runTurn(browser, options, turnIndex, prompt) {
+class UncertainTurnError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'UncertainTurnError';
+    this.uncertainDispatch = true;
+  }
+}
+
+async function readAutomationSnapshot(target, timeoutMs = 2_000) {
+  return withTimeout(
+    target.frame.evaluate(() => {
+      const api = window.WuxiaAutomation;
+      if (!api?.getSnapshot) throw new Error('当前 iframe 缺少 WuxiaAutomation.getSnapshot()');
+      return api.getSnapshot();
+    }),
+    timeoutMs,
+    `读取自动化快照超时（${timeoutMs}ms）`,
+  );
+}
+
+function debugSectionsFromAutomation(debug) {
+  if (!debug) {
+    return Object.fromEntries(EXPECTED_DEBUG_SECTIONS.map(id => [id, { status: 'unknown', content: '' }]));
+  }
+  return {
+    'main-input': {
+      status: debug.main?.status || 'unknown',
+      content: debug.main?.combinedPrompt || debug.main?.userInput || '',
+    },
+    'main-output': { status: debug.main?.status || 'unknown', content: debug.main?.output || '' },
+    'variable-input': { status: debug.variable?.status || 'unknown', content: debug.variable?.input || '' },
+    'variable-output': { status: debug.variable?.status || 'unknown', content: debug.variable?.output || '' },
+  };
+}
+
+async function runApiTurn(browser, options, turnIndex, prompt) {
   const startedAt = Date.now();
-  log(`第 ${turnIndex}/${options.turns} 轮：准备发送「${prompt}」`);
+  log(`第 ${turnIndex}/${options.turns} 轮：通过 WuxiaAutomation.runTurn 发送「${prompt}」`);
+  await closeModalIfOpen(browser, options.pageUrl);
+  const target = await findGameFrame(browser, options.pageUrl, 15_000, options.chatId);
+  const before = await readAutomationSnapshot(target);
+  if (!before.ready || before.page !== 'game')
+    throw new Error(`自动化实例尚未就绪：${JSON.stringify(publicTarget(target))}`);
+  if (before.busy) throw new Error('页面当前正在生成，拒绝重复发送新行动');
+  if (options.chatId && before.chatId !== options.chatId) {
+    throw new Error(`聊天 ID 不匹配：期望 ${options.chatId}，实际 ${before.chatId}`);
+  }
+  const visibilityAtStart = await target.page.evaluate(() => document.visibilityState);
+
+  let automationReport;
+  try {
+    automationReport = await withTimeout(
+      target.frame.evaluate(async input => {
+        const api = window.WuxiaAutomation;
+        if (!api?.runTurn) throw new Error('当前 iframe 缺少 WuxiaAutomation.runTurn()');
+        return api.runTurn(input);
+      }, prompt),
+      options.timeoutMs,
+      `等待 WuxiaAutomation.runTurn 完成超时（${options.timeoutMs}ms）`,
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('runTurn 完成超时')) {
+      throw new UncertainTurnError(`${error.message}；消息可能已经发出，禁止自动重试或继续下一轮`);
+    }
+    throw error;
+  }
+
+  if (automationReport.input !== prompt) {
+    throw new Error('自动化回合报告的输入与本轮行动不一致，拒绝继续');
+  }
+  if (before.chatId && automationReport.chatId !== before.chatId) {
+    throw new Error(`自动化回合跨越了聊天：${before.chatId} → ${automationReport.chatId}`);
+  }
+
+  await sleep(options.settleMs);
+  let after = null;
+  let targetAtEnd = null;
+  try {
+    targetAtEnd = await findGameFrame(browser, options.pageUrl, 15_000, automationReport.chatId);
+    after = await readAutomationSnapshot(targetAtEnd);
+  } catch (error) {
+    log(
+      `第 ${turnIndex} 轮：业务报告已返回，但回读最终快照失败：${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const debug = debugSectionsFromAutomation(automationReport.debug);
+  const failedSections = Object.entries(debug)
+    .filter(([, value]) => value.status === 'error')
+    .map(([id]) => id);
+  const generationStartedAt = Number(automationReport.startedAt) || startedAt;
+  const generationEndedAt = Number(automationReport.finishedAt) || Date.now();
+  const report = {
+    turn: turnIndex,
+    mode: 'api',
+    prompt,
+    requestId: automationReport.requestId,
+    chatId: automationReport.chatId,
+    userMessageId: automationReport.userMessageId,
+    assistantMessageId: automationReport.assistantMessageId,
+    startedAt: new Date(startedAt).toISOString(),
+    generationStartedAt: new Date(generationStartedAt).toISOString(),
+    generationEndedAt: new Date(generationEndedAt).toISOString(),
+    completedAt: isoTime(),
+    generationMs: generationEndedAt - generationStartedAt,
+    totalMs: Date.now() - startedAt,
+    visibilityAtStart,
+    visibilityAtGenerationEnd: targetAtEnd?.pageVisibility || visibilityAtStart,
+    targetAtStart: publicTarget(target),
+    targetAtEnd: targetAtEnd ? publicTarget(targetAtEnd) : null,
+    reply: after?.maintext || automationReport.rawReply || '',
+    debug,
+    statDataBefore: automationReport.statDataBefore,
+    statDataAfter: automationReport.statDataAfter,
+    variableChanges: automationReport.variableChanges,
+    variableVerification: automationReport.variableVerification,
+    automationError: automationReport.error || '',
+    success: automationReport.ok === true && failedSections.length === 0,
+    failedSections,
+  };
+
+  log(
+    `第 ${turnIndex} 轮：${report.success ? '完成' : `失败（${failedSections.join(', ') || automationReport.error || '业务报告未通过'}）`}，` +
+      `生成 ${report.generationMs}ms，总计 ${report.totalMs}ms`,
+  );
+  return report;
+}
+
+async function runDomTurn(browser, options, turnIndex, prompt) {
+  const startedAt = Date.now();
+  log(`第 ${turnIndex}/${options.turns} 轮：通过 DOM 冒烟发送「${prompt}」`);
 
   await closeModalIfOpen(browser, options.pageUrl);
   const { page, frame } = await findGameFrame(browser, options.pageUrl);
@@ -731,7 +1140,14 @@ async function runTurn(browser, options, turnIndex, prompt) {
   await input.waitFor({ state: 'visible', timeout: 10_000 });
   if (await input.isDisabled()) throw new Error('玩家输入框当前不可用，游戏可能仍在生成或锁定');
   await input.fill(prompt);
-  await send.click();
+  // DOM 模式只验证输入框/按钮接线；用同步 DOM click 避免 Playwright 把
+  // iframe 导航的等待时间误算成按钮点击超时。点击后绝不自动重试。
+  const dispatched = await send.evaluate(element => {
+    if (!(element instanceof HTMLButtonElement) || element.disabled) return false;
+    element.click();
+    return true;
+  });
+  if (!dispatched) throw new Error('发送按钮未接受 DOM 点击');
 
   const generationStartedAt = Date.now();
   const startState = await waitForGenerationState(browser, options.pageUrl, true, 15_000);
@@ -771,6 +1187,12 @@ async function runTurn(browser, options, turnIndex, prompt) {
   return report;
 }
 
+async function runTurn(browser, options, turnIndex, prompt) {
+  return options.transport === 'dom'
+    ? runDomTurn(browser, options, turnIndex, prompt)
+    : runApiTurn(browser, options, turnIndex, prompt);
+}
+
 async function runRegeneration(browser, options) {
   const startedAt = Date.now();
   log('受控重生成：准备重新生成最新回复');
@@ -791,15 +1213,21 @@ async function runRegeneration(browser, options) {
   }
 
   const previousReply = await readLatestReply(browser, options.pageUrl);
+  const fingerprintBefore = await readRegenerationFingerprint(browser, options.pageUrl);
   await regenerate.evaluate(element => {
     if (!(element instanceof HTMLElement)) throw new Error('重新生成控件不可点击');
     element.click();
   });
 
   const generationStartedAt = Date.now();
-  const startState = await waitForGenerationState(browser, options.pageUrl, true, 15_000);
-  log(`受控重生成：检测到旋转开始，页面状态 ${startState.visibilityState}`);
-  const endState = await waitForGenerationState(browser, options.pageUrl, false, options.timeoutMs);
+  const activity = await waitForRegenerationActivity(browser, options.pageUrl, fingerprintBefore, 15_000);
+  let endState = activity.state;
+  if (activity.busyObserved) {
+    log(`受控重生成：检测到旋转开始，页面状态 ${activity.state.visibilityState}`);
+    endState = await waitForGenerationState(browser, options.pageUrl, false, options.timeoutMs);
+  } else {
+    log(`受控重生成：未捕捉到旋转，但已确认 ${activity.evidence.join(', ')}`);
+  }
   const generationEndedAt = Date.now();
   log(`受控重生成：检测到旋转结束，等待 ${options.settleMs}ms 稳定窗口`);
 
@@ -815,6 +1243,12 @@ async function runRegeneration(browser, options) {
     mode: 'regenerate',
     prompt: '',
     previousReply,
+    regenerationDetection: {
+      busyObserved: activity.busyObserved,
+      evidence: activity.evidence,
+      before: fingerprintBefore,
+      observed: activity.fingerprint,
+    },
     startedAt: new Date(startedAt).toISOString(),
     generationStartedAt: new Date(generationStartedAt).toISOString(),
     generationEndedAt: new Date(generationEndedAt).toISOString(),
@@ -875,7 +1309,8 @@ async function main() {
   };
 
   try {
-    await findGameFrame(browser, options.pageUrl);
+    const initialTarget = await findGameFrame(browser, options.pageUrl, 15_000, options.chatId);
+    report.target = publicTarget(initialTarget);
     if (options.reloadPage) {
       report.reload = await reloadGamePage(browser, options);
       report.success = !report.reload.readiness.generating && !report.reload.readiness.inputDisabled;
@@ -888,7 +1323,14 @@ async function main() {
         reply: await readLatestReply(browser, options.pageUrl),
       };
       if (options.statDataSnapshot) {
-        report.inspect.statDataSnapshot = await readStatDataSnapshot(browser, options.pageUrl);
+        const snapshot = await readAutomationSnapshot(initialTarget);
+        report.inspect.statDataSnapshot = {
+          capturedAt: snapshot.capturedAt ? new Date(snapshot.capturedAt).toISOString() : '',
+          statData: snapshot.statData,
+          source: 'WuxiaAutomation.getSnapshot',
+          chatId: snapshot.chatId,
+          instanceId: initialTarget.instanceId,
+        };
       }
       report.success = true;
       return;
@@ -936,8 +1378,10 @@ async function main() {
       } catch (error) {
         const message = error instanceof Error ? error.stack || error.message : String(error);
         log(`第 ${index + 1} 轮异常：${message}`);
-        report.turns.push({ turn: index + 1, prompt, success: false, error: message });
-        if (!options.continueOnError) break;
+        const uncertainDispatch = error?.uncertainDispatch === true;
+        report.turns.push({ turn: index + 1, prompt, success: false, uncertainDispatch, error: message });
+        // 发送结果不确定时绝不继续，避免同一句行动被重复提交。
+        if (uncertainDispatch || !options.continueOnError) break;
       }
     }
     report.success = report.turns.length === options.turns && report.turns.every(turn => turn.success);
