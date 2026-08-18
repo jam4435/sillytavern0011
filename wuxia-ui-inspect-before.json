@@ -1,0 +1,56 @@
+{
+  "startedAt": "2026-08-18T09:59:39.148Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "transport": "api",
+    "chatId": "",
+    "output": "wuxia-ui-inspect-before.json",
+    "inspectOnly": true,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": true,
+  "target": {
+    "pageUrl": "http://127.0.0.1:8000/",
+    "frameUrl": "blob:http://127.0.0.1:8000/c993af28-b9c2-4749-a317-17370d2ab6f5",
+    "pageTitle": "SillyTavern",
+    "pageVisibility": "visible",
+    "frameVisible": true,
+    "instanceId": "frontend-21b22e01-6b3d-4039-acb3-1ef01152e255",
+    "automationVersion": "1",
+    "chatId": "金庸群侠传 - 2026-08-18@17h30m06s",
+    "ready": true,
+    "page": "game",
+    "busy": false,
+    "selectionSource": "host-visible-iframe"
+  },
+  "inspect": {
+    "readiness": {
+      "pageUrl": "http://127.0.0.1:8000/",
+      "frameUrl": "blob:http://127.0.0.1:8000/c993af28-b9c2-4749-a317-17370d2ab6f5",
+      "generating": false,
+      "inputDisabled": false,
+      "sendDisabled": true,
+      "regenerateDisabled": false,
+      "automation": {
+        "playerInput": true,
+        "sendTurn": true,
+        "generationState": true,
+        "regenerateLastReply": true,
+        "openSettings": true
+      }
+    },
+    "reply": "01｜状态｜裁定=进行中｜依据=没有最近事件短标签，根据背景设定，事件正在初始阶段\n02｜连续｜裁定=郭杨等人酒馆论政刚开场｜依据=墨逸刚抵达牛家村，即将进入酒馆\n03｜干涉｜裁定=原定｜依据=用户刚进村，尚未对事件进程产生干涉\n04｜隔离｜裁定=只演当前事件｜依据=专注描写牛家村酒馆内的事件\n\n秋风裹挟着枯叶，在泥土板结的村道上卷起一阵微尘。\n夕阳的余晖已被远山嚼碎，只剩几抹紫红的暗影在天边死死扒着不肯褪去。墨逸踩着满地暮色，步入牛家村。\n他的脸廓生硬得像块未经打磨的顽石，神情透着股生人勿近的冷意。粗壮的双臂随着步伐沉稳摆动，呼吸绵长，脚印在夯实的土路上砸出细微的闷响。\n风里飘来劣质村酿的酸涩气味。\n前方挑着块半旧的破酒幌子，在风中扑棱棱作响。昏黄的油灯光从半掩的板门透出来，伴随着拍桌子的脆响和高谈阔论的声音。\n……\n“那金兵鞑子，欺人太甚！”\n砰！\n粗糙的大手重重砸在油腻的木桌上，震得粗瓷酒碗里的浊酒撒了一桌。\n郭啸天浓眉倒竖，胸口剧烈起伏，眼底燃着怒火。\n“想当年，咱们汉人也是铁骨铮铮，如今却被那帮茹毛饮血的蛮子逼得连口安生饭都吃不上！张先生，你且说说，这大宋的天下，怎么就成了这般模样！”\n坐在他对面的张十五端着酒碗，枯瘦的手指捏着碗沿，长长叹了口气，干瘪的腮帮子抖动了两下。\n“郭兄弟啊……唉！这不是一天两天的祸事。想当年，徽宗、钦宗两位官家，那是满肚子的诗词书画，却独独装不下这江山社稷！后来高宗皇帝南渡，本该厉兵秣马，收复失地，谁成想……”\n张十五压低了嗓音，枯瘦的脸皮皱在一起，眼里闪过惊惧与痛恨。\n“谁成想，出了个秦桧！那奸相一手遮天，残害忠良！满朝文武，硬生生被他杀破了胆！”\n杨铁心坐在郭啸天身侧，抓起酒壶猛灌一口，清秀白净的脸上泛起酒晕，咬牙切齿。\n“秦桧老贼，万死难赎其罪！可怜那些忠心报国的将士，没死在金人的弯刀下，倒冤死在自己人的诏狱里！”\n咯吱——\n破旧的木门被推开，发出干涩的摩擦声。\n冷风夹杂着夜色涌入逼仄的酒馆。\n油灯的火苗剧烈摇晃了一下，将一个高大魁梧的阴影投射在斑驳的墙壁上。\n郭啸天与杨铁心的谈话戛然而止。\n两人几乎同时转头，锐利的目光钉在门口。\n墨逸跨过门槛。\n身量巍然，那股子自然流露的凝实气息，让郭啸天不由自主地绷紧了脊背，握在手里的粗瓷酒碗微微倾斜，酒水在碗边晃荡。\n张十五咽了口唾沫，往墙角缩了缩。\n柜台后。\n曲三正漫不经心地用一块脏抹布擦拭着缺了口的酒坛。听见动静，他连头都没抬，只拿眼角余光扫过门口，手里擦拭的动作连半刻停顿都没有。\n“打尖，还是住店？”\n<射雕第一回01>\n郭杨张激愤论政|曲三旁观冷语|墨逸踏入酒馆\n进行中|未进行|未进行\n\n⭐\n( =ω=)♪ Master，点击查看事件记录\n💭"
+  },
+  "completedAt": "2026-08-18T09:59:44.246Z"
+}
