@@ -1,0 +1,56 @@
+{
+  "startedAt": "2026-08-18T06:10:35.239Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "transport": "api",
+    "chatId": "",
+    "output": "wuxia-inspect-report-continue.json",
+    "inspectOnly": true,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": true,
+  "target": {
+    "pageUrl": "http://127.0.0.1:8000/",
+    "frameUrl": "blob:http://127.0.0.1:8000/3d73e4af-1575-4c7d-925a-1f450458d0ee",
+    "pageTitle": "SillyTavern",
+    "pageVisibility": "visible",
+    "frameVisible": true,
+    "instanceId": "frontend-102263a1-10bd-42a4-9350-304b220f9cc8",
+    "automationVersion": "1",
+    "chatId": "金庸群侠传 - 2026-08-18@14h08m36s",
+    "ready": true,
+    "page": "game",
+    "busy": false,
+    "selectionSource": "host-visible-iframe"
+  },
+  "inspect": {
+    "readiness": {
+      "pageUrl": "http://127.0.0.1:8000/",
+      "frameUrl": "blob:http://127.0.0.1:8000/3d73e4af-1575-4c7d-925a-1f450458d0ee",
+      "generating": false,
+      "inputDisabled": false,
+      "sendDisabled": true,
+      "regenerateDisabled": false,
+      "automation": {
+        "playerInput": true,
+        "sendTurn": true,
+        "generationState": true,
+        "regenerateLastReply": true,
+        "openSettings": true
+      }
+    },
+    "reply": "01｜状态｜裁定=郭杨邀饮初阶｜依据=无历史标签，设定为初次进入牛家村及酒馆前序\n02｜连续｜裁定=进入牛家村走到酒馆外｜依据=墨逸“我走进村子”的指令\n03｜干涉｜裁定=原定｜依据=墨逸仅进入村落，未打断说书\n04｜隔离｜裁定=只演当前事件｜依据=只描写酒馆内正在发生的事件，未推动后续\n\n残阳沥血，将牛家村外的土路涂抹得一片赤红。\n墨逸迈着步子踏入了这座宁静的村落。他身量极高，骨架宽大，一领粗布短打被底下垒块分明的肌肉撑得鼓胀。深邃硬朗的面廓配上毫无波澜的神情，周身隐隐散发着一股风雷蛰伏的沉闷压迫感。村口的几个顽童正玩弄着泥巴，冷不丁瞥见这尊煞神走来，连滚带爬地躲到了枯树后面。\n村里的炊烟缠绕在矮树梢头。墨逸放缓了脚步，那双厚实得泛着油光的铁砂掌套自然垂在腰间，每一步落下，沉重的身躯竟没踩碎一块枯叶，端的是下盘极稳。\n他寻着人语声与酒肉香气，一路走向村头。\n不多时，一间略显破败的小酒店映入眼帘。挑在外头的粗布酒旗被晚风扯得猎猎作响，木板搭就的门扉大大敞开，里头飘散出浑浊的劣酒味与熟牛肉的香气。\n更为引人注目的，是里头传出的阵阵高谈阔论。\n“那叶三姐眼见满门老小被金兵残杀，硬是咬碎银牙，一头撞死在阶石上，鲜血溅了那兀术头领一身！可怜呐，可恨！”\n“放屁！这群金狗，俺若在场，非撕了他们不可！”\n“依我看，还是朝廷那帮软骨头贪生怕死，害苦了百姓！”\n墨逸驻足在酒店几步外。透过昏黄的光线，能瞧见里头摆着两张残破的八仙桌。一张桌前，坐着个瘦削的青衫老者，面前摆着醒木与小羯鼓，正说得唾沫横飞。旁边围坐着两个粗壮汉子，一个浓眉大眼，满脸赤红；另一个白净面皮，眼中满是愤慨。\n柜台后面，一个弓着腰、鬓角带白的老少伙计正拨弄着算盘。他双腿显然有残疾，身旁倚着两根木拐。周遭热血沸腾的国仇家恨，似乎半点没能入他的耳。\n墨逸敛了气息，正欲听个分明。\n那正说到兴头上的青衫老者，忽地把惊堂木一拍，震得桌上的残酒跳了三跳。\n“各位只当那高宗皇帝退位是何缘故？那是被逼的！满朝奸佞，尽是些曲意逢迎之辈，怎能不亡国！”\n“这等奸贼，若教杨某撞见，定要在他们身上戳出十几个透明窟窿！”\n“哥哥说得极是！”\n柜台后那拨弄算盘的跛子伙计忽地手上一顿，抬起眼皮，那双浑浊的眼珠子里掠过一抹锥骨的冷意。\n“害死岳爷爷的，真是秦桧那奸相么？”\n<射雕第一回01>\n初入牛家村|说书人高谈阔论|曲三冷笑揭秘\n已完成|进行中|未进行\n\n⭐\n( =ω=)♪ Master，点击查看事件记录\n💭"
+  },
+  "completedAt": "2026-08-18T06:10:40.364Z"
+}

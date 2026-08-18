@@ -123,8 +123,8 @@ describe('武侠输出提示词契约', () => {
     expect(variableGuidanceSource).not.toContain('例如修改分钟必须写成');
     expect(variableGuidanceSource).toContain('一个回复不等于固定的一小时');
     expect(variableGuidanceSource).toContain('跨城远行、长期养伤、闭关修炼等可经过数日');
-    expect(variableGuidanceSource).toContain('只有完整收束、整个事件确实结束时，才将时间准确推进到事件结束时间');
-    expect(variableGuidanceSource).toContain('禁止越过边界顺带推进下一事件');
+    expect(variableGuidanceSource).toContain('可以跨过事件结束时间；事件结算由事件脚本在时间写入后统一处理');
+    expect(variableGuidanceSource).not.toContain('禁止越过边界顺带推进下一事件');
     expect(variableGuidanceSource).not.toContain('关键桥段完整结束时，将时间推进到事件描述给出的结束时间');
     expect(variableGuidanceSource).toContain('不得把该事件尚未结束的阶段性对话、观察、行动、冲突或关系变化按回合拆写');
     expect(variableGuidanceSource).toContain('事件开始时间+(事件结束时间-事件开始时间)*x/y');

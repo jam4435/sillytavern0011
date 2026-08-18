@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseDeclaredVariableChanges } from './variableChanges';
 import {
-  findEarliestRunningEventEnd,
   resolveWorldTimeCompletionTarget,
   validateWorldTimePatch,
   type WorldTimeTuple,
@@ -112,19 +111,12 @@ describe('validateWorldTimePatch', () => {
     });
   });
 
-  it('阻止越过进行中事件边界，但允许准确落在边界', () => {
-    const eventEnd = { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 };
-    expect(validateWorldTimePatch({ baseline, declaredChanges: fullTime(eventEnd), eventEnd })).toMatchObject({
+  it('允许一次跨越多个事件时段的前进', () => {
+    const skippedTime = { 年: 1200, 月: 8, 日: 17, 时: 13, 分: 1 };
+    expect(validateWorldTimePatch({ baseline, declaredChanges: fullTime(skippedTime) })).toMatchObject({
       ok: true,
-      candidate: eventEnd,
+      candidate: skippedTime,
     });
-    expect(
-      validateWorldTimePatch({
-        baseline,
-        declaredChanges: fullTime({ 年: 1200, 月: 8, 日: 15, 时: 13, 分: 1 }),
-        eventEnd,
-      }),
-    ).toMatchObject({ ok: false, code: 'event-end-exceeded' });
   });
 });
 
@@ -181,33 +173,5 @@ describe('resolveWorldTimeCompletionTarget', () => {
         thoughts: [],
       }),
     ).toMatchObject({ ok: false, reason: expect.stringContaining('无法在不猜测进位') });
-  });
-});
-
-describe('findEarliestRunningEventEnd', () => {
-  it('读取最早的进行中事件结束时间并忽略元数据', () => {
-    expect(
-      findEarliestRunningEventEnd({
-        参与事件: { 先: {}, 后: {} },
-        事件系统: {
-          进行中事件: {
-            后: { 年: 1200, 月: 8, 日: 15, 时: 15 },
-            先: { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 },
-            $meta: { updatable: true },
-          },
-        },
-      }),
-    ).toEqual({ 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 });
-  });
-
-  it('不用未参与的后台进行中事件限制玩家时间', () => {
-    expect(
-      findEarliestRunningEventEnd({
-        参与事件: { 玩家事件: {} },
-        事件系统: {
-          进行中事件: { 后台事件: { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 } },
-        },
-      }),
-    ).toBeNull();
   });
 });

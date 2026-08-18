@@ -11,14 +11,12 @@ export type WorldTimeTuple = Record<WorldTimeField, number>;
 
 export type WorldTimeGuardErrorCode =
   | 'baseline-invalid'
-  | 'event-end-invalid'
   | 'declared-action-invalid'
   | 'unsupported-time-path'
   | 'delete-required-field'
   | 'incomplete-time-update'
   | 'invalid-time-value'
-  | 'time-not-forward'
-  | 'event-end-exceeded';
+  | 'time-not-forward';
 
 export type WorldTimeGuardResult =
   | {
@@ -26,7 +24,6 @@ export type WorldTimeGuardResult =
       hasTimeUpdate: boolean;
       baseline: WorldTimeTuple;
       candidate: WorldTimeTuple | null;
-      eventEnd: WorldTimeTuple | null;
       timeChanges: VariableDeclaredChange[];
       nonTimeChanges: VariableDeclaredChange[];
     }
@@ -36,7 +33,6 @@ export type WorldTimeGuardResult =
       reason: string;
       baseline: WorldTimeTuple | null;
       candidate: WorldTimeTuple | null;
-      eventEnd: WorldTimeTuple | null;
       timeChanges: VariableDeclaredChange[];
       nonTimeChanges: VariableDeclaredChange[];
     };
@@ -126,17 +122,13 @@ export function resolveWorldTimeCompletionTarget({
   baseline: rawBaseline,
   declaredChanges,
   thoughts,
-  eventEnd: rawEventEnd,
 }: {
   baseline: WorldTimeSource;
   declaredChanges: VariableDeclaredChange[];
   thoughts: readonly { text: string }[];
-  eventEnd?: WorldTimeSource;
 }): WorldTimeCompletionTargetResult {
   const baseline = validateWorldTimeSource(rawBaseline, true);
   if (!baseline) return { ok: false, reason: '当前世界时间无效，无法锁定原声明的目标时间。' };
-  const eventEnd = rawEventEnd ? validateWorldTimeSource(rawEventEnd, true) : null;
-  if (rawEventEnd && !eventEnd) return { ok: false, reason: '进行中事件结束边界无效，无法锁定目标时间。' };
 
   const latestByField = new Map<WorldTimeField, VariableDeclaredChange>();
   for (const change of declaredChanges.filter(item => isWorldTimePath(item.path))) {
@@ -187,12 +179,6 @@ export function resolveWorldTimeCompletionTarget({
     source = 'declared-fields';
   }
 
-  if (eventEnd && compareWorldTime(target, eventEnd) > 0) {
-    return {
-      ok: false,
-      reason: `原声明锁定的新时间 ${formatWorldTime(target)} 超过事件结束边界 ${formatWorldTime(eventEnd)}，不能靠改变耗时修复。`,
-    };
-  }
   return {
     ok: true,
     baseline,
@@ -209,31 +195,12 @@ export function compareWorldTime(left: WorldTimeTuple, right: WorldTimeTuple): n
   return 0;
 }
 
-export function findEarliestRunningEventEnd(statData: Record<string, unknown>): WorldTimeTuple | null {
-  const eventSystem = isRecord(statData.事件系统) ? statData.事件系统 : null;
-  const runningEvents = eventSystem && isRecord(eventSystem.进行中事件) ? eventSystem.进行中事件 : null;
-  const participationEvents = isRecord(statData.参与事件) ? statData.参与事件 : null;
-  if (!runningEvents || !participationEvents) return null;
-  const participationNames = new Set(Object.keys(participationEvents).filter(name => !name.startsWith('$')));
-  if (participationNames.size === 0) return null;
-
-  let earliest: WorldTimeTuple | null = null;
-  for (const [eventName, rawEnd] of Object.entries(runningEvents)) {
-    if (!participationNames.has(eventName)) continue;
-    const end = isRecord(rawEnd) ? validateWorldTimeSource(rawEnd, true) : null;
-    if (!end) continue;
-    if (!earliest || compareWorldTime(end, earliest) < 0) earliest = end;
-  }
-  return earliest;
-}
-
 function createFailure(
   code: WorldTimeGuardErrorCode,
   reason: string,
   context: {
     baseline: WorldTimeTuple | null;
     candidate: WorldTimeTuple | null;
-    eventEnd: WorldTimeTuple | null;
     timeChanges: VariableDeclaredChange[];
     nonTimeChanges: VariableDeclaredChange[];
   },
@@ -244,23 +211,17 @@ function createFailure(
 export function validateWorldTimePatch({
   baseline: rawBaseline,
   declaredChanges,
-  eventEnd: rawEventEnd,
 }: {
   baseline: WorldTimeSource;
   declaredChanges: VariableDeclaredChange[];
-  eventEnd?: WorldTimeSource;
 }): WorldTimeGuardResult {
   const timeChanges = declaredChanges.filter(change => isWorldTimePath(change.path));
   const nonTimeChanges = declaredChanges.filter(change => !isWorldTimePath(change.path));
   const baseline = validateWorldTimeSource(rawBaseline, true);
-  const eventEnd = rawEventEnd ? validateWorldTimeSource(rawEventEnd, true) : null;
-  const baseContext = { baseline, candidate: null, eventEnd, timeChanges, nonTimeChanges };
+  const baseContext = { baseline, candidate: null, timeChanges, nonTimeChanges };
 
   if (!baseline) {
     return createFailure('baseline-invalid', '当前世界时间不是合法的年/月/日/时/分结构，已停止写入。', baseContext);
-  }
-  if (rawEventEnd && !eventEnd) {
-    return createFailure('event-end-invalid', '进行中事件的结束时间无效，无法安全校验事件边界。', baseContext);
   }
   if (timeChanges.length === 0) {
     return {
@@ -268,7 +229,6 @@ export function validateWorldTimePatch({
       hasTimeUpdate: false,
       baseline,
       candidate: null,
-      eventEnd,
       timeChanges,
       nonTimeChanges,
     };
@@ -320,20 +280,11 @@ export function validateWorldTimePatch({
       candidateContext,
     );
   }
-  if (eventEnd && compareWorldTime(candidate, eventEnd) > 0) {
-    return createFailure(
-      'event-end-exceeded',
-      `新时间 ${formatWorldTime(candidate)} 超过当前进行中事件的最早结束边界 ${formatWorldTime(eventEnd)}。`,
-      candidateContext,
-    );
-  }
-
   return {
     ok: true,
     hasTimeUpdate: true,
     baseline,
     candidate,
-    eventEnd,
     timeChanges,
     nonTimeChanges,
   };

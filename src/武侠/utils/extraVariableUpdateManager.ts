@@ -25,7 +25,6 @@ import {
 } from './variableChanges';
 import {
   compareWorldTime,
-  findEarliestRunningEventEnd,
   isWorldTimePath,
   resolveWorldTimeCompletionTarget,
   validateWorldTimePatch,
@@ -143,7 +142,7 @@ const NORMAL_TURN_DECISION_CHECKLIST = `【普通回合变量检查清单】
 const PARTICIPATION_TURN_DECISION_CHECKLIST = `【参与事件回合变量检查清单】
 必须在 <VariableThink> 中按编号逐项给出简短结论；没有变化也要写“无”。
 1. 事件与阶段：逐个检查当前参与事件，判断最新正文是否涉及该事件，以及当前处于“未涉及/开端/发展/后段/收束/已完成”中的哪个阶段。事件存在不代表本轮必然推进；不得拆分或自造固定节点。
-2. 时间：只有正文把相关事件推进到更后阶段或明确经过时间时才前推。先核算“旧完整时间 + 正文耗时 = 新完整时间”，再将年/月/日/时/分五字段作为一个原子更新全部写出。阶段与时间必须单调前进；只有完整收束才可准确到达事件结束时间，禁止越过边界顺带推进下一事件。
+2. 时间：只有正文把相关事件推进到更后阶段或明确经过时间时才前推。先核算“旧完整时间 + 正文耗时 = 新完整时间”，再将年/月/日/时/分五字段作为一个原子更新全部写出。阶段与时间必须单调前进；时间可以跨过事件结束时间，事件结算由事件脚本在写入后统一处理。
 3. 地点：user 与相关 NPC 是否实际移动、是否仍在事件活动区？仅在正文明确移动时修改；离开事件地时判断是否对事件结果造成实质偏离。
 4. 修炼与战斗：user 是否进行了修炼、战斗或其他可能产生修为的实际行为？若正文明确产生磨炼、领悟或修为收获，按只读“每日修为变化参考”结合行为时长、强度和成果估算修为；短暂运功、展示武功或仅仅出现战斗不自动增加修为。战斗另行结算明确消耗、伤势和长期后果，user 的变化直接写 user数据。
 5. NPC 变化路由：先检查相关参与事件的 insert/update/delete 是否已有相同人物与业务字段。已有且原定结果未变则不操作；已有但最终结果改变则只修改参与事件快照；快照未覆盖的新长期变化才写角色数据。禁止把事件快照已有结果提前重复写入角色数据。
@@ -1441,13 +1440,12 @@ export type WorldTimeReplyValidationResult = {
 function getWorldTimeGuardContext(): {
   statData: Record<string, unknown>;
   baseline: Record<string, unknown> | null;
-  eventEnd: ReturnType<typeof findEarliestRunningEventEnd>;
 } {
   const statData = readCurrentStatDataSnapshot();
   if (!statData) throw new Error('聊天级 stat_data 暂不可读，无法校验世界时间。');
   const worldInfo = isRecord(statData.世界信息) ? statData.世界信息 : null;
   const baseline = worldInfo && isRecord(worldInfo.时间) ? worldInfo.时间 : null;
-  return { statData, baseline, eventEnd: findEarliestRunningEventEnd(statData) };
+  return { statData, baseline };
 }
 
 function createWorldTimeRepairPrompt({
@@ -1480,7 +1478,6 @@ function createWorldTimeRepairPrompt({
 原因：${guard.reason}
 当前完整时间：${JSON.stringify(guard.baseline)}
 非法候选时间：${JSON.stringify(guard.candidate)}
-进行中事件最早结束边界：${JSON.stringify(guard.eventEnd)}
 锁定耗时：${lockedElapsedMinutes} 分钟
 锁定新时间：${JSON.stringify(lockedTarget)}
 
@@ -1524,8 +1521,8 @@ export async function validateOrRepairWorldTimeDeclarations({
     };
   }
 
-  const { statData, baseline, eventEnd } = getWorldTimeGuardContext();
-  const validatedGuard = validateWorldTimePatch({ baseline, declaredChanges, eventEnd });
+  const { statData, baseline } = getWorldTimeGuardContext();
+  const validatedGuard = validateWorldTimePatch({ baseline, declaredChanges });
   if (validatedGuard.ok && !forcedRepairReason) {
     return {
       changes: declaredChanges,
@@ -1554,14 +1551,12 @@ export async function validateOrRepairWorldTimeDeclarations({
     reason: initialGuard.reason,
     baseline: initialGuard.baseline,
     candidate: initialGuard.candidate,
-    eventEnd: initialGuard.eventEnd,
   });
 
   const completionTarget = resolveWorldTimeCompletionTarget({
     baseline,
     declaredChanges: initialGuard.timeChanges,
     thoughts,
-    eventEnd,
   });
   if (!completionTarget.ok) {
     throw new Error(`原时间声明无法在不改变耗时的前提下补全：${completionTarget.reason}`);
@@ -1625,7 +1620,6 @@ export async function validateOrRepairWorldTimeDeclarations({
       const repairedGuard = validateWorldTimePatch({
         baseline,
         declaredChanges: pathValidation.accepted,
-        eventEnd,
       });
       if (!repairedGuard.ok) throw new Error(repairedGuard.reason);
       if (!repairedGuard.candidate || compareWorldTime(repairedGuard.candidate, completionTarget.target) !== 0) {
