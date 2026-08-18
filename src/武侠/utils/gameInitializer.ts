@@ -465,7 +465,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
       },
       人物经历: {},
       关系网: {},
-      $meta: { necessary: 'all', updatable: true },
+      $meta: { necessary: 'self', updatable: true },
     },
     角色数据: {
       $template: {
