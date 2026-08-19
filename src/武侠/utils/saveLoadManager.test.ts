@@ -6,7 +6,9 @@ import {
   createHistoryCheckoutJournal,
   readHistoryCheckoutJournal,
   updateHistoryCheckoutJournal,
+  writeHistoryCheckoutDraft,
 } from '../../shared/historyCheckoutJournal';
+import { createChatRenameJournal, readChatRenameJournal } from '../../shared/chatRenameJournal';
 import type { HistoryLocator, WuxiaHistoryTreeV2 } from '../types';
 import {
   WUXIA_HISTORY_TREE_V2_KEY,
@@ -16,6 +18,7 @@ import {
   finalizeCurrentTurn,
   getCheckoutRecoveryState,
   loadHistoryTree,
+  migrateHistoryChatIdentity,
   renameNode,
   retryCheckoutRecovery,
   resumeCheckout,
@@ -24,7 +27,10 @@ import {
   setNodePinned,
   filterTreeToRelatedComponent,
   stableHistoryHash,
+  suggestForkChatName,
 } from './saveLoadManager';
+import { getAvatarSelectionStorageKey, getAvatarStorageKey } from './avatarStorage';
+import { getUniqueChatRenameSuggestion, resumePendingChatRename } from './chatRenameManager';
 
 type TestMessage = {
   message_id: number;
@@ -264,6 +270,115 @@ beforeEach(() => {
       actions: { resync: true },
       syncIds: typeof detail?.syncId === 'string' ? [detail.syncId] : [],
     });
+  });
+});
+
+describe('history chat rename helpers', () => {
+  it('自动分支名按实际酒馆聊天列表追加唯一序号', async () => {
+    chats['taken-1'] = { ...currentChat(), id: 'taken-1', name: '根卷 · 第2段' };
+    chats['taken-2'] = { ...currentChat(), id: 'taken-2', name: '根卷 · 第2段 · 2' };
+
+    expect(await getUniqueChatRenameSuggestion('根卷 · 第2段')).toBe('根卷 · 第2段 · 3');
+  });
+
+  it('以根卷名和节点题名/父链段数建议新分叉名称', () => {
+    const tree: WuxiaHistoryTreeV2 = {
+      version: 2,
+      updatedAt: 1,
+      nodes: {
+        root: {
+          id: 'root', parentId: null, locators: [], messageKey: null, label: null, pinned: false, preview: '', location: '', worldTimeText: '', createdAt: 1, verification: null,
+        },
+        child: {
+          id: 'child', parentId: 'root', locators: [], messageKey: null, label: '夜探镖局', pinned: false, preview: '', location: '', worldTimeText: '', createdAt: 2, verification: null,
+        },
+      },
+      branches: {
+        rootBranch: {
+          id: 'rootBranch', chatId: 'root-chat', chatName: '郭靖 · 牛家村', originNodeId: null, headNodeId: 'child', createdAt: 1, status: 'active',
+        },
+      },
+    };
+
+    expect(suggestForkChatName(tree, 'child', '来源聊天')).toBe('郭靖 · 牛家村 · 夜探镖局');
+    tree.nodes.child.label = null;
+    expect(suggestForkChatName(tree, 'child', '来源聊天')).toBe('郭靖 · 牛家村 · 第2段');
+  });
+
+  it('改名后重键分支并迁移全部 locator，重复恢复不会重复数据', () => {
+    const tree: WuxiaHistoryTreeV2 = {
+      version: 2,
+      updatedAt: 1,
+      nodes: {
+        node: {
+          id: 'node', parentId: null, messageKey: null, label: null, pinned: false, preview: '开场', location: '', worldTimeText: '', createdAt: 1, verification: null,
+          locators: [
+            { chatId: 'old-chat', chatName: '旧卷', userMessageId: null, assistantMessageId: 0, swipeId: 0 },
+            { chatId: 'other-chat', chatName: '别卷', userMessageId: null, assistantMessageId: 0, swipeId: 0 },
+          ],
+        },
+      },
+      branches: {
+        oldBranch: {
+          id: 'oldBranch', chatId: 'old-chat', chatName: '旧卷', originNodeId: null, headNodeId: 'node', createdAt: 1, status: 'active',
+        },
+      },
+    };
+    persistTreeDirect(tree);
+
+    const migrated = migrateHistoryChatIdentity({ id: 'old-chat', name: '旧卷' }, { id: 'new-chat', name: '新卷' });
+    expect(migrated.nodes.node.locators).toContainEqual(
+      expect.objectContaining({ chatId: 'new-chat', chatName: '新卷' }),
+    );
+    expect(migrated.nodes.node.locators.some(locator => locator.chatId === 'old-chat')).toBe(false);
+    expect(Object.values(migrated.branches)).toContainEqual(
+      expect.objectContaining({ chatId: 'new-chat', chatName: '新卷' }),
+    );
+
+    const repeated = migrateHistoryChatIdentity({ id: 'old-chat', name: '旧卷' }, { id: 'new-chat', name: '新卷' });
+    expect(repeated.nodes.node.locators).toHaveLength(2);
+    expect(Object.keys(repeated.branches)).toHaveLength(1);
+  });
+
+  it('重载后确认目标聊天才迁移历史、头像缓存和未发送草稿，重复恢复幂等', async () => {
+    currentChat().messages = [{ message_id: 0, role: 'assistant', message: '改名前的开场' }];
+    const scanned = await scanCurrentChat();
+    const customAvatarKey = getAvatarStorageKey('player', 'chat-a');
+    const selectionKey = getAvatarSelectionStorageKey('player', 'chat-a');
+    localStorage.setItem(customAvatarKey, JSON.stringify({ version: 1, imageData: 'data:image/png;base64,AA==', updatedAt: 1 }));
+    localStorage.setItem(selectionKey, JSON.stringify({ version: 1, avatarRef: 'preset:hero', updatedAt: 1 }));
+    writeHistoryCheckoutDraft({ transactionId: 'draft', chatId: 'chat-a', message: '尚未发送的行动', createdAt: 1 });
+    createChatRenameJournal({
+      reason: 'manual',
+      oldChatId: 'chat-a',
+      oldChatName: '聊天 A',
+      requestedName: '郭靖 · 牛家村',
+      reopenHistoryPanel: true,
+    });
+
+    const oldChat = chats['chat-a'];
+    delete chats['chat-a'];
+    chats['renamed-chat'] = { ...oldChat, id: 'renamed-chat', name: '郭靖 · 牛家村' };
+    currentChatId = 'renamed-chat';
+    rawChatViewChatId = null;
+
+    const resumed = await resumePendingChatRename();
+    expect(resumed.status).toBe('committed');
+    expect(readChatRenameJournal()).toBeNull();
+    expect(loadHistoryTree().nodes[scanned.currentNodeId!]?.locators).toContainEqual(
+      expect.objectContaining({ chatId: 'renamed-chat', chatName: '郭靖 · 牛家村' }),
+    );
+    expect(Object.values(loadHistoryTree().branches)).toContainEqual(
+      expect.objectContaining({ chatId: 'renamed-chat', chatName: '郭靖 · 牛家村' }),
+    );
+    expect(localStorage.getItem(getAvatarStorageKey('player', 'renamed-chat'))).not.toBeNull();
+    expect(localStorage.getItem(getAvatarSelectionStorageKey('player', 'renamed-chat'))).not.toBeNull();
+    expect(localStorage.getItem(customAvatarKey)).toBeNull();
+    expect(localStorage.getItem(selectionKey)).toBeNull();
+    expect(JSON.parse(localStorage.getItem(HISTORY_CHECKOUT_DRAFT_KEY)!).chatId).toBe('renamed-chat');
+
+    expect((await resumePendingChatRename()).status).toBe('not_pending');
+    expect(loadHistoryTree().nodes[scanned.currentNodeId!]?.locators).toHaveLength(1);
   });
 });
 
@@ -537,6 +652,7 @@ describe('history checkout', () => {
     expect(result.status).toBe('commit');
     expect(result.actionKind).toBe('fork_branch');
     expect(result.currentChat?.id).toMatch(/^fork-/);
+    expect(result.postCommitChatName).toMatch(/^聊天 A · 第\d+段$/);
     expect(triggerSlashMock).toHaveBeenCalledWith('/branch-create 2');
   });
 

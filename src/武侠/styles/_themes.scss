@@ -1573,6 +1573,121 @@
     }
   }
 
+  // 江湖事簿：水墨主题使用现有宣纸色阶，保留朱砂作为紧急与计数印记。
+  .event-tracker {
+    color: var(--wuxia-ink-text);
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.42), transparent 54%),
+      var(--wuxia-ink-paper);
+    border-color: var(--wuxia-ink-border);
+    box-shadow:
+      0 9px 20px rgba(61, 48, 40, 0.12),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+
+    &::before,
+    &::after {
+      border-color: rgba(139, 26, 26, 0.38);
+    }
+  }
+
+  .event-tracker-heading {
+    border-bottom-color: var(--wuxia-ink-border-soft);
+
+    &:hover {
+      background: rgba(139, 26, 26, 0.05);
+    }
+  }
+
+  .event-tracker-title-mark {
+    color: #fffaf2;
+    background: #4f5141;
+  }
+
+  .event-tracker-title,
+  .event-tracker-entry-title,
+  .event-disclosure-title {
+    color: var(--wuxia-ink-text-strong);
+  }
+
+  .event-tracker-entry,
+  .event-disclosure {
+    background: rgba(255, 252, 247, 0.42);
+    border-color: rgba(61, 48, 40, 0.16);
+    border-left-color: rgba(61, 48, 40, 0.32);
+
+    &.is-expanded {
+      background: rgba(255, 252, 247, 0.72);
+      border-color: rgba(181, 90, 30, 0.34);
+      border-left-color: rgba(181, 90, 30, 0.72);
+    }
+
+    &.is-urgent {
+      border-left-color: rgba(158, 43, 37, 0.82);
+    }
+  }
+
+  .event-tracker-entry-heading:hover,
+  .event-disclosure-heading:hover {
+    background: rgba(139, 26, 26, 0.045);
+  }
+
+  .event-tracker-entry-kicker,
+  .event-disclosure-kicker,
+  .event-tracker-entry-countdown,
+  .event-disclosure-countdown,
+  .event-tracker-footer button {
+    color: #b55a1e;
+  }
+
+  .is-urgent .event-tracker-entry-countdown,
+  .is-urgent .event-disclosure-countdown {
+    color: #9e2b25;
+  }
+
+  .event-tracker-entry-detail,
+  .event-disclosure-detail,
+  .event-disclosure-description {
+    color: var(--wuxia-ink-text-muted);
+  }
+
+  .event-tracker-outcome,
+  .event-disclosure-outcome {
+    background: rgba(255, 252, 247, 0.5);
+    border-left-color: rgba(181, 90, 30, 0.45);
+
+    > strong {
+      color: var(--wuxia-ink-text);
+    }
+  }
+
+  .event-tracker-footer {
+    border-top-color: var(--wuxia-ink-border-soft);
+    color: var(--wuxia-ink-text-muted);
+  }
+
+  .event-tab {
+    color: var(--wuxia-ink-text-muted);
+    background: rgba(255, 252, 247, 0.35);
+    border-color: var(--wuxia-ink-border-soft);
+
+    .event-tab-count {
+      color: var(--wuxia-ink-text-muted);
+      background: rgba(61, 48, 40, 0.1);
+    }
+
+    &:hover,
+    &.active {
+      color: #8b1a1a;
+      background: rgba(139, 26, 26, 0.065);
+      border-color: rgba(139, 26, 26, 0.42);
+    }
+  }
+
+  .event-tracker-count,
+  .event-tab.active .event-tab-count {
+    background: #8b1a1a;
+  }
+
   .map-container {
     background: rgba(216, 206, 189, 0.34);
   }

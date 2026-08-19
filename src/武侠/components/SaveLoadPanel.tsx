@@ -5,6 +5,7 @@ import {
   Loader2,
   MapPin,
   Network,
+  Pencil,
   Pin,
   PinOff,
   RefreshCw,
@@ -36,11 +37,14 @@ import {
   type HistoryCheckoutResult,
   type HistoryTreeViewState,
 } from '../utils/saveLoadManager';
+import { renameCurrentChat } from '../utils/chatRenameManager';
+import ChatRenameDialog from './ChatRenameDialog';
 import { HistoryTreeCanvas } from './HistoryTreeCanvas';
 
 interface SaveLoadPanelProps {
   gameState: GameState;
   onClose: () => void;
+  isBusy?: boolean;
 }
 
 type WorkState = {
@@ -115,7 +119,7 @@ function getNodeBranchStatus(view: HistoryTreeViewState, nodeId: string) {
   return Object.values(view.tree.branches).find(branch => branch.headNodeId === nodeId)?.status ?? null;
 }
 
-const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
+const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false }) => {
   const [view, setView] = useState<HistoryTreeViewState | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [labelDraft, setLabelDraft] = useState('');
@@ -124,6 +128,10 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
   const [journal, setJournal] = useState<HistoryCheckoutJournal | null>(() => readHistoryCheckoutJournal());
   const [lastCheckout, setLastCheckout] = useState<HistoryCheckoutResult | null>(null);
   const [showAllLineages, setShowAllLineages] = useState(false);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [isRenamingChat, setIsRenamingChat] = useState(false);
   const [workState, setWorkState] = useState<WorkState>({
     type: 'loading',
     message: '正在展开江湖谱牒……',
@@ -205,7 +213,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
       lastCheckout?.status === 'recovery_failed' ||
       lastCheckout?.status === 'broken'),
   );
-  const isWorking = workState.type === 'loading' || Boolean(journal);
+  const isWorking = workState.type === 'loading' || Boolean(journal) || isBusy || isRenamingChat;
   const recoveryActionDisabled = workState.type === 'loading';
   const recoveryFailureText = journal?.failure
     ? `失败阶段：${journal.failure.stage}；原始异常：${journal.failure.message}`
@@ -239,6 +247,28 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
     } catch (error) {
       setWorkState({ type: 'error', message: error instanceof Error ? error.message : String(error) });
     }
+  };
+
+  const openChatRenameDialog = () => {
+    if (!view?.currentChat.name || isWorking) return;
+    setRenameDraft(view.currentChat.name);
+    setRenameError(null);
+    setIsRenameDialogOpen(true);
+  };
+
+  const submitChatRename = async () => {
+    if (isRenamingChat) return;
+    setIsRenamingChat(true);
+    setRenameError(null);
+    const result = await renameCurrentChat(renameDraft, { reason: 'manual', reopenHistoryPanel: true });
+    if (result.status !== 'committed') {
+      setRenameError(result.message);
+      setIsRenamingChat(false);
+      return;
+    }
+    setIsRenameDialogOpen(false);
+    setIsRenamingChat(false);
+    await refresh(false);
   };
 
   const handlePin = () => {
@@ -362,7 +392,19 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
           </div>
           <div className="history-heading">
             <h3>江湖行迹谱</h3>
-            <p>{view?.currentChat.name || '正在辨认当前卷册'} · 每个完整回合自动入谱</p>
+            <div className="history-chat-name-row">
+              <p>{view?.currentChat.name || '正在辨认当前卷册'} · 每个完整回合自动入谱</p>
+              <button
+                type="button"
+                className="history-title-edit-btn"
+                disabled={!view?.currentChat.name || isWorking}
+                onClick={openChatRenameDialog}
+                aria-label="重命名当前酒馆聊天存档"
+                title="重命名当前酒馆聊天存档"
+              >
+                <Pencil size={13} />
+              </button>
+            </div>
           </div>
         </div>
         <div className="history-masthead-actions">
@@ -602,6 +644,23 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState }) => {
         {workState.type === 'error' && <ShieldAlert size={13} />}
         <span>{workState.message}</span>
       </div>
+      <ChatRenameDialog
+        isOpen={isRenameDialogOpen}
+        mode="manual"
+        value={renameDraft}
+        error={renameError}
+        isSubmitting={isRenamingChat}
+        onChange={value => {
+          setRenameDraft(value);
+          if (renameError) setRenameError(null);
+        }}
+        onConfirm={() => void submitChatRename()}
+        onClose={() => {
+          if (isRenamingChat) return;
+          setIsRenameDialogOpen(false);
+          setRenameError(null);
+        }}
+      />
     </div>
   );
 };

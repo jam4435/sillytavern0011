@@ -57,12 +57,16 @@ Object.assign(globalThis, {
     })),
     openCharacterChat: vi.fn(async () => undefined),
     openGroupChat: vi.fn(async () => undefined),
+    renameChat: vi.fn(async () => undefined),
   },
 });
 
 afterEach(() => {
   listeners.clear();
-  if (typeof window !== 'undefined') window.sessionStorage.clear();
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+  }
   vi.clearAllTimers();
   vi.useRealTimers();
 });

@@ -160,6 +160,28 @@ export function listAvatarSelectionEntityKeys(chatId: string = getCurrentChatId(
   return [...new Set(entityKeys)];
 }
 
+/**
+ * 聊天文件改名后，头像仍属于同一段游戏。仅移动该聊天命名空间下的自定义头像与选择缓存；
+ * 目标已有值时保留目标，避免恢复事务重复执行时覆盖更新后的选择。
+ */
+export function migrateAvatarChatStorage(oldChatId: string, newChatId: string): void {
+  if (!oldChatId || !newChatId || oldChatId === newChatId || typeof localStorage === 'undefined') return;
+  const sourcePrefixes = [`${STORAGE_PREFIX}:${oldChatId}:`, `${SELECTION_STORAGE_PREFIX}:${oldChatId}:`];
+  const moves: Array<{ from: string; to: string; value: string }> = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    const prefix = sourcePrefixes.find(candidate => key?.startsWith(candidate));
+    if (!key || !prefix) continue;
+    const value = localStorage.getItem(key);
+    if (value === null) continue;
+    moves.push({ from: key, to: key.replace(`:${oldChatId}:`, `:${newChatId}:`), value });
+  }
+  for (const move of moves) {
+    if (localStorage.getItem(move.to) === null) localStorage.setItem(move.to, move.value);
+    localStorage.removeItem(move.from);
+  }
+}
+
 export function imageFileToDataUrl(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) {
     return Promise.reject(new Error('请选择图片文件'));

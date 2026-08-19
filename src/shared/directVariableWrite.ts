@@ -1,5 +1,6 @@
 import { variableTraceLogger } from '../武侠/utils/logger';
 import { recordIframeLifecycleEvent } from '../武侠/utils/iframeLifecycleBlackBox';
+import { isChatRenamePending } from './chatRenameJournal';
 import { isHistoryCheckoutPending } from './historyCheckoutJournal';
 import { scheduleUnthrottledTimeout, type UnthrottledTimerHandle } from './unthrottledTimer';
 
@@ -63,8 +64,12 @@ export interface DirectChatTransactionOptions {
 }
 
 function assertFrontendWriteAllowed(source: DirectVariableWriteSource): void {
-  if (source === 'frontend' && isHistoryCheckoutPending()) {
+  if (source !== 'frontend') return;
+  if (isHistoryCheckoutPending()) {
     throw new Error('历史分叉同步期间已暂停前端派生变量写入。');
+  }
+  if (isChatRenamePending()) {
+    throw new Error('聊天存档改名期间已暂停前端派生变量写入。');
   }
 }
 

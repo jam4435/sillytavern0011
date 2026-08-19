@@ -18,6 +18,7 @@ import {
   HISTORY_CHECKOUT_STATE_EVENT,
   type HistoryCheckoutJournal,
 } from '../../shared/historyCheckoutJournal';
+import { isChatRenamePending } from '../../shared/chatRenameJournal';
 import type {
   GameState,
   HistoryBranch,
@@ -138,6 +139,8 @@ export interface HistoryCheckoutResult {
   currentNodeId: string | null;
   currentBranchId: string | null;
   currentChat: HistoryChatIdentity | null;
+  /** 仅 fork_branch 在检出完全提交后交给独立聊天改名事务的建议名称。 */
+  postCommitChatName: string | null;
   error: string | null;
 }
 
@@ -365,11 +368,90 @@ function persistHistoryTree(tree: WuxiaHistoryTreeV2): WuxiaHistoryTreeV2 {
   return parsed;
 }
 
-async function readCurrentChatIdentity(): Promise<HistoryChatIdentity> {
+export async function readCurrentChatIdentity(): Promise<HistoryChatIdentity> {
   const currentId = String(SillyTavern.getCurrentChatId?.() ?? '').trim();
   const slashName = await triggerSlash('/getchatname').catch(() => '');
   const name = String(slashName ?? '').trim() || currentId;
   return { id: currentId || name, name };
+}
+
+/**
+ * 新分叉总以本脉络的根卷名命名，而不是以嵌套分叉的名字继续叠加。
+ * 这是纯计算；重名消解由聊天改名事务在读取实际酒馆列表后完成。
+ */
+export function suggestForkChatName(
+  tree: WuxiaHistoryTreeV2,
+  nodeId: string,
+  fallbackRootName: string,
+): string {
+  const node = tree.nodes[nodeId];
+  const related = filterTreeToRelatedComponent(tree, nodeId);
+  const rootBranch = Object.values(related.branches)
+    .filter(branch => branch.originNodeId === null && branch.chatName.trim())
+    .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id))[0];
+  const rootName = rootBranch?.chatName.trim() || fallbackRootName.trim() || '未题名卷册';
+  const explicitLabel = node?.label?.trim();
+  if (explicitLabel) return `${rootName} · ${explicitLabel}`;
+
+  let length = 0;
+  let cursor: string | null = nodeId;
+  const seen = new Set<string>();
+  while (cursor && !seen.has(cursor) && tree.nodes[cursor]) {
+    seen.add(cursor);
+    length += 1;
+    cursor = tree.nodes[cursor].parentId;
+  }
+  return `${rootName} · 第${Math.max(1, length)}段`;
+}
+
+/**
+ * SillyTavern 改名会把聊天 ID（文件名）一并更换。历史定位、分支索引均须同一事务迁移；
+ * 对已迁移的数据再调用一次不会产生重复 locator 或第二个 branch。
+ */
+export function migrateHistoryChatIdentity(
+  oldChat: HistoryChatIdentity,
+  newChat: HistoryChatIdentity,
+): WuxiaHistoryTreeV2 {
+  if (!oldChat.id || !newChat.id) return loadHistoryTree();
+  const tree = cloneTree(loadHistoryTree());
+  let changed = false;
+
+  for (const node of Object.values(tree.nodes)) {
+    const nextLocators: HistoryLocator[] = [];
+    for (const locator of node.locators) {
+      const next = locator.chatId === oldChat.id ? { ...locator, chatId: newChat.id, chatName: newChat.name } : locator;
+      if (next !== locator) changed = true;
+      const duplicate = nextLocators.findIndex(item => locatorEquals(item, next));
+      if (duplicate >= 0) {
+        // 改名后的 locator 优先，保证界面不会继续显示旧聊天名。
+        if (next.chatId === newChat.id) nextLocators[duplicate] = next;
+        changed = true;
+      } else {
+        nextLocators.push(next);
+      }
+    }
+    if (nextLocators.length !== node.locators.length || nextLocators.some((item, index) => item !== node.locators[index])) {
+      node.locators = nextLocators;
+    }
+  }
+
+  const oldBranchId = branchIdForChat(oldChat.id);
+  const newBranchId = branchIdForChat(newChat.id);
+  const nextBranches: WuxiaHistoryTreeV2['branches'] = {};
+  for (const [key, branch] of Object.entries(tree.branches)) {
+    if (branch.chatId !== oldChat.id && key !== oldBranchId) {
+      nextBranches[key] = branch;
+      continue;
+    }
+    const migrated = { ...branch, id: newBranchId, chatId: newChat.id, chatName: newChat.name };
+    nextBranches[newBranchId] = migrated;
+    changed = true;
+  }
+  if (changed) {
+    tree.branches = nextBranches;
+    return persistHistoryTree(tree);
+  }
+  return tree;
 }
 
 function readAllHistoryMessages(): TavernHistoryMessage[] {
@@ -1115,6 +1197,7 @@ function makeCheckoutResult(
   nodeId: string,
   state: HistoryTreeViewState | null,
   error: string | null,
+  postCommitChatName: string | null = null,
 ): HistoryCheckoutResult {
   return {
     status,
@@ -1123,6 +1206,7 @@ function makeCheckoutResult(
     currentNodeId: state?.currentNodeId ?? null,
     currentBranchId: state?.currentBranchId ?? null,
     currentChat: state?.currentChat ?? null,
+    postCommitChatName,
     error,
   };
 }
@@ -1208,6 +1292,8 @@ async function executeCheckout(
         sourceHeadNodeId: sourceBranch?.headNodeId ?? '',
         sourceChatId: sourceChat.id,
         sourceChatName: sourceChat.name,
+        postCommitChatName:
+          actionKind === 'fork_branch' ? suggestForkChatName(tree, nodeId, sourceChat.name) : undefined,
       });
     } else if (journal.actionKind) {
       actionKind = journal.actionKind;
@@ -1323,9 +1409,10 @@ async function executeCheckout(
       });
     }
     const resumed = Boolean(existingJournal);
+    const postCommitChatName = actionKind === 'fork_branch' ? (journal.postCommitChatName ?? null) : null;
     clearHistoryCheckoutJournal();
-    notifyHistoryCheckoutCommit(resumed);
-    return makeCheckoutResult('commit', actionKind, nodeId, state, null);
+    notifyHistoryCheckoutCommit(resumed, { postCommitChatName });
+    return makeCheckoutResult('commit', actionKind, nodeId, state, null, postCommitChatName);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const unavailableChat = error instanceof HistoryChatUnavailableError ? error : null;
@@ -1371,6 +1458,15 @@ export async function checkoutNode(
   nodeId: string,
   options: CheckoutHistoryOptions = {},
 ): Promise<HistoryCheckoutResult> {
+  if (isChatRenamePending()) {
+    return makeCheckoutResult(
+      'recovery_failed',
+      'fork_branch',
+      nodeId,
+      null,
+      '聊天存档改名正在完成，暂时不能切换或创建历史分支。',
+    );
+  }
   const unresolved = readHistoryCheckoutJournal();
   if (unresolved) {
     return makeCheckoutResult(

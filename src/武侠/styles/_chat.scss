@@ -467,6 +467,12 @@
   padding-bottom: 0.65rem;
 }
 
+// 聊天正文的承载层。江湖事簿作为 HUD 悬浮于其上，不再占用正文宽度。
+.story-stage {
+  width: 100%;
+  min-width: 0;
+}
+
 .variable-change-dock {
   flex-shrink: 0;
   padding: 0 1.25rem 0.5rem;

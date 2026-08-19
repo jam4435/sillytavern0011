@@ -40,6 +40,7 @@ import {
 } from './martialArtsDatabase';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { isHistoryCheckoutPending } from '../../shared/historyCheckoutJournal';
+import { isChatRenamePending } from '../../shared/chatRenameJournal';
 import { getLocationScopePath } from '../../shared/locationPath.js';
 import { wuxiaCalendarDateToTotalDays } from '../../shared/wuxiaCalendar.js';
 import { dataLogger } from './logger';
@@ -3125,8 +3126,8 @@ function queueCompletionRequest(options: GameDataCompletionOptions): void {
 }
 
 async function runCompletionOnce(fullScan: boolean, scope: GameDataCompletionScope | null): Promise<void> {
-  if (isHistoryCheckoutPending()) {
-    dataLogger.log('[gameDataCompletion] 历史分叉同步中，跳过前端派生变量补全');
+  if (isHistoryCheckoutPending() || isChatRenamePending()) {
+    dataLogger.log('[gameDataCompletion] 历史分叉或聊天改名同步中，跳过前端派生变量补全');
     return;
   }
   if (fullScan) {
@@ -3196,8 +3197,8 @@ export function scheduleGameDataCompletion(
   reason: string = 'manual',
   options: GameDataCompletionOptions = {},
 ): Promise<void> {
-  if (isHistoryCheckoutPending()) {
-    dataLogger.log(`[gameDataCompletion] 历史分叉同步中，忽略调度: ${reason}`);
+  if (isHistoryCheckoutPending() || isChatRenamePending()) {
+    dataLogger.log(`[gameDataCompletion] 历史分叉或聊天改名同步中，忽略调度: ${reason}`);
     return Promise.resolve();
   }
   dataLogger.log(`[gameDataCompletion] 已调度: ${reason}`);

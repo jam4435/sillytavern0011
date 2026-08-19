@@ -51,6 +51,11 @@ export const HistoryCheckoutJournalSchema = z
     branchSourceLocator: HistoryLocatorSchema.nullable().optional(),
     draftUserMessageId: z.number().int().nonnegative().nullable().optional(),
     draftMessage: z.string().optional(),
+    /**
+     * 仅新建分支使用：检出全部提交后，由独立的聊天改名事务采用的建议名称。
+     * 可选字段让 v1 的旧 journal 继续可读。
+     */
+    postCommitChatName: z.string().min(1).optional(),
     failure: CheckoutJournalFailureSchema.optional(),
     sourceHeadNodeId: z.string(),
     sourceChatId: z.string(),
@@ -90,6 +95,7 @@ export function createHistoryCheckoutJournal(
     branchSourceLocator?: HistoryLocator | null;
     draftUserMessageId?: number | null;
     draftMessage?: string;
+    postCommitChatName?: string;
     sourceHeadNodeId: string;
     sourceChatId: string;
     sourceChatName: string;
@@ -138,6 +144,7 @@ export function updateHistoryCheckoutJournal(
       | 'branchSourceLocator'
       | 'draftUserMessageId'
       | 'draftMessage'
+      | 'postCommitChatName'
       | 'failure'
     >
   >,
@@ -223,6 +230,19 @@ export function clearHistoryCheckoutDraft(transactionId?: string): void {
   dispatchDraftState(null);
 }
 
+/** 聊天重命名后，保留尚未发送的分叉续写草稿。重复调用没有副作用。 */
+export function migrateHistoryCheckoutDraftChatId(oldChatId: string, newChatId: string): HistoryCheckoutDraft | null {
+  if (!oldChatId || !newChatId || oldChatId === newChatId) return readHistoryCheckoutDraft();
+  const current = readHistoryCheckoutDraft();
+  if (!current || current.chatId !== oldChatId) return current;
+  return writeHistoryCheckoutDraft({
+    transactionId: current.transactionId,
+    chatId: newChatId,
+    message: current.message,
+    createdAt: current.createdAt,
+  });
+}
+
 export function isHistoryCheckoutJournalExpired(journal: HistoryCheckoutJournal, now = Date.now()): boolean {
   return now > journal.startedAt + HISTORY_CHECKOUT_JOURNAL_TTL_MS;
 }
@@ -249,8 +269,11 @@ export function renewHistoryCheckoutJournal(journal: HistoryCheckoutJournal, now
   });
 }
 
-export function notifyHistoryCheckoutCommit(resumed: boolean): void {
+export function notifyHistoryCheckoutCommit(
+  resumed: boolean,
+  detail: { postCommitChatName?: string | null } = {},
+): void {
   if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(HISTORY_CHECKOUT_COMMIT_EVENT, { detail: { resumed } }));
+    window.dispatchEvent(new CustomEvent(HISTORY_CHECKOUT_COMMIT_EVENT, { detail: { resumed, ...detail } }));
   }
 }

@@ -154,6 +154,29 @@ describe('historyCheckoutJournal', () => {
     ).toThrow();
   });
 
+  it('兼容没有 postCommitChatName 的旧 v1 journal，并为 fork 保留提交后自动命名意图', () => {
+    const oldJournal = {
+      version: 1,
+      transactionId: 'old-v1',
+      stage: 'commit',
+      targetNodeId: 'node',
+      targetLocator: { chatId: 'chat', chatName: 'Chat', userMessageId: null, assistantMessageId: 0, swipeId: 0 },
+      actionKind: 'fork_branch',
+      sourceHeadNodeId: '',
+      sourceChatId: 'source',
+      sourceChatName: 'Source',
+      startedAt: 1,
+    } as const;
+    expect(HistoryCheckoutJournalSchema.parse(oldJournal).postCommitChatName).toBeUndefined();
+
+    const journal = createHistoryCheckoutJournal({
+      ...oldJournal,
+      postCommitChatName: '根卷 · 第2段',
+    });
+    expect(readHistoryCheckoutJournal()?.postCommitChatName).toBe('根卷 · 第2段');
+    expect(journal.postCommitChatName).toBe('根卷 · 第2段');
+  });
+
   it('分支输入草稿按聊天隔离，可跨 iframe 更新并在发送后清理', () => {
     const observed: Array<string | null> = [];
     window.addEventListener(HISTORY_CHECKOUT_DRAFT_EVENT, ((event: CustomEvent<{ message?: string } | null>) => {

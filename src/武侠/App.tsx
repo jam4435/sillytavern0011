@@ -4,10 +4,12 @@ import brandXiakeSealUrl from './assets/icons/jinyong/brand_xiake_seal.svg?url';
 import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
 import ChatInput from './components/ChatInput';
+import ChatRenameDialog from './components/ChatRenameDialog';
 import CommandQueueButton from './components/CommandQueueButton';
 import CommandQueuePopover from './components/CommandQueuePopover';
 import FullscreenButton from './components/FullscreenButton';
 import GameContent from './components/GameContent';
+import EventTracker from './components/EventTracker';
 import EventNotificationStack from './components/EventNotificationStack';
 import { Icons } from './components/Icons';
 import LatestReplyEditorModal, {
@@ -62,6 +64,11 @@ import {
 import { getUserCurrentLocation } from './utils/mapUtils';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
 import { finalizeCurrentTurn, resumeCheckout } from './utils/saveLoadManager';
+import {
+  renameCurrentChat,
+  renameCurrentChatAutomatically,
+  resumePendingChatRename,
+} from './utils/chatRenameManager';
 import { readRecentInputHistory, type InputHistoryEntry } from './utils/inputHistory';
 import {
   applyRegexRules,
@@ -108,6 +115,11 @@ import {
   updateHistoryCheckoutDraftMessage,
   type HistoryCheckoutDraft,
 } from '../shared/historyCheckoutJournal';
+import {
+  CHAT_RENAME_COMMIT_EVENT,
+  CHAT_RENAME_STATE_EVENT,
+  isChatRenamePending,
+} from '../shared/chatRenameJournal';
 
 const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
 const WUXIA_HISTORY_EVENT_STATE_STABLE_EVENT = 'wuxia:history-event-state-stable';
@@ -156,10 +168,17 @@ const App: React.FC = () => {
   const { commands, setTravelCommand, addUseItemCommand, cancelCommand, sendMessageWithCommands } = useCommandQueue();
   const [playerAvatarVersion, setPlayerAvatarVersion] = useState(0);
   const [historyCheckoutPending, setHistoryCheckoutPending] = useState(() => isHistoryCheckoutPending());
+  const [chatRenamePending, setChatRenamePending] = useState(() => isChatRenamePending());
   const [historyInputDraft, setHistoryInputDraft] = useState<HistoryCheckoutDraft | null>(() =>
     readCurrentHistoryDraft(),
   );
   const historyResumeAttemptedRef = useRef(false);
+  const chatRenameResumeAttemptedRef = useRef(false);
+  const [initialChatRename, setInitialChatRename] = useState<{ suggestedName: string } | null>(null);
+  const [initialRenameDraft, setInitialRenameDraft] = useState('');
+  const [initialRenameError, setInitialRenameError] = useState<string | null>(null);
+  const [isInitialRenaming, setIsInitialRenaming] = useState(false);
+  const historyMutationPending = historyCheckoutPending || chatRenamePending;
 
   const playerAvatarSource = useMemo(
     () =>
@@ -250,9 +269,16 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const syncCheckoutLock = () => setHistoryCheckoutPending(isHistoryCheckoutPending());
-    const handleCheckoutCommit = () => {
+    const handleCheckoutCommit = (event: Event) => {
       syncCheckoutLock();
       scheduleGameDataCompletion('history-checkout-commit', { fullScan: true });
+      const postCommitChatName = (event as CustomEvent<{ postCommitChatName?: string | null }>).detail?.postCommitChatName;
+      if (!postCommitChatName) return;
+      void renameCurrentChatAutomatically(postCommitChatName).then(result => {
+        if (result.status !== 'committed') {
+          showError(`新分支已建立，但自动命名未完成：${result.message} 已保留酒馆自动名称。`);
+        }
+      });
     };
     window.addEventListener(HISTORY_CHECKOUT_STATE_EVENT, syncCheckoutLock);
     window.addEventListener(HISTORY_CHECKOUT_COMMIT_EVENT, handleCheckoutCommit);
@@ -265,7 +291,29 @@ const App: React.FC = () => {
       window.removeEventListener('storage', syncCheckoutLock);
       window.clearInterval(timer);
     };
-  }, []);
+  }, [showError]);
+
+  useEffect(() => {
+    const syncRenameLock = () => setChatRenamePending(isChatRenamePending());
+    const handleRenameCommit = (event: Event) => {
+      syncRenameLock();
+      setHistoryInputDraft(readCurrentHistoryDraft());
+      scheduleGameDataCompletion('chat-rename-commit', { fullScan: true });
+      const detail = (event as CustomEvent<{ reopenHistoryPanel?: boolean }>).detail;
+      if (detail?.reopenHistoryPanel) setActivePanel(ActivePanel.SAVE_LOAD);
+    };
+    window.addEventListener(CHAT_RENAME_STATE_EVENT, syncRenameLock);
+    window.addEventListener(CHAT_RENAME_COMMIT_EVENT, handleRenameCommit);
+    window.addEventListener('storage', syncRenameLock);
+    const timer = window.setInterval(syncRenameLock, 1_000);
+    syncRenameLock();
+    return () => {
+      window.removeEventListener(CHAT_RENAME_STATE_EVENT, syncRenameLock);
+      window.removeEventListener(CHAT_RENAME_COMMIT_EVENT, handleRenameCommit);
+      window.removeEventListener('storage', syncRenameLock);
+      window.clearInterval(timer);
+    };
+  }, [setActivePanel]);
 
   useEffect(() => {
     const syncHistoryDraft = () => setHistoryInputDraft(readCurrentHistoryDraft());
@@ -294,9 +342,22 @@ const App: React.FC = () => {
       });
   }, [showError]);
 
+  // 仅在 iframe 新挂载时续接。运行中的改名刚写 journal 时不可立即探测，否则会把尚未调用
+  // SillyTavern.renameChat 的事务误判为失败。
+  useEffect(() => {
+    if (chatRenameResumeAttemptedRef.current || !isChatRenamePending()) return;
+    chatRenameResumeAttemptedRef.current = true;
+    void resumePendingChatRename().then(result => {
+      setChatRenamePending(isChatRenamePending());
+      if (result.status === 'failed' || result.status === 'expired') {
+        showError(result.message);
+      }
+    });
+  }, [showError]);
+
   useEffect(() => {
     const listener = eventOn(WUXIA_HISTORY_EVENT_STATE_STABLE_EVENT, async () => {
-      if (isHistoryCheckoutPending()) return;
+      if (isHistoryCheckoutPending() || isChatRenamePending()) return;
       try {
         const gameData = readGameDataPure();
         const time = gameData?.worldTime;
@@ -344,13 +405,13 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    if (currentPage !== 'game' || isLoading || historyCheckoutPending) {
+    if (currentPage !== 'game' || isLoading || historyMutationPending) {
       setCanRegenerate(false);
       return;
     }
 
     setCanRegenerate(canRegenerateLastAssistantSwipe());
-  }, [currentPage, currentMaintext, currentOptions, historyCheckoutPending, isLoading]);
+  }, [currentPage, currentMaintext, currentOptions, historyMutationPending, isLoading]);
 
   // 检查是否存在存档，如果存在则直接进入游戏
   useEffect(() => {
@@ -525,17 +586,17 @@ const App: React.FC = () => {
   }, [setGameState]);
 
   const canEditLatestReply = useMemo(() => {
-    if (currentPage !== 'game' || isLoading || historyCheckoutPending) return false;
+    if (currentPage !== 'game' || isLoading || historyMutationPending) return false;
     try {
       return Boolean(readLatestAssistantSnapshot());
     } catch {
       return false;
     }
-  }, [currentMaintext, currentOptions, currentPage, historyCheckoutPending, isLoading]);
+  }, [currentMaintext, currentOptions, currentPage, historyMutationPending, isLoading]);
 
   const handleOpenLatestReplyEditor = useCallback(() => {
-    if (isLoading || historyCheckoutPending) {
-      showError('当前回合或历史分叉仍在处理中，暂时不能编辑最新回复。');
+    if (isLoading || historyMutationPending) {
+      showError('当前回合、历史分叉或聊天改名仍在处理中，暂时不能编辑最新回复。');
       return;
     }
     if (getIsExtraVariableUpdating()) {
@@ -553,14 +614,14 @@ const App: React.FC = () => {
     setIsCommandQueueOpen(false);
     setLatestReplySnapshot(snapshot);
     setIsLatestReplyEditorOpen(true);
-  }, [closeModal, historyCheckoutPending, isLoading, showError]);
+  }, [closeModal, historyMutationPending, isLoading, showError]);
 
   const handleReloadLatestReply = useCallback(() => readLatestAssistantSnapshot(), []);
 
   const handleSaveLatestReply = useCallback(
     async (snapshot: LatestAssistantSnapshot, draftText: string): Promise<LatestReplyEditorSaveOutcome> => {
-      if (isLoading || historyCheckoutPending) {
-        throw new Error('当前回合或历史分叉仍在处理中，不能覆写最新回复。');
+      if (isLoading || historyMutationPending) {
+        throw new Error('当前回合、历史分叉或聊天改名仍在处理中，不能覆写最新回复。');
       }
       if (getIsExtraVariableUpdating()) {
         throw new Error('额外变量仍在写入或校验中，请等待完成后再保存。');
@@ -616,7 +677,7 @@ const App: React.FC = () => {
       };
     },
     [
-      historyCheckoutPending,
+      historyMutationPending,
       isLoading,
       refreshGameStateFromVariables,
       setCurrentMaintext,
@@ -692,8 +753,8 @@ const App: React.FC = () => {
 
   const handlePlayerSend = useCallback(
     async (message: string): Promise<string> => {
-      if (historyCheckoutPending) {
-        showError('历史分叉仍在同步中，暂时不能发送新行动。');
+      if (historyMutationPending) {
+        showError('历史分叉或聊天改名仍在同步中，暂时不能发送新行动。');
         return '';
       }
       let rawReply: string;
@@ -713,7 +774,7 @@ const App: React.FC = () => {
     },
     [
       handleSendMessage,
-      historyCheckoutPending,
+      historyMutationPending,
       historyInputDraft,
       refreshGameStateFromVariables,
       refreshRecentInputHistory,
@@ -752,28 +813,28 @@ const App: React.FC = () => {
   );
 
   const handleSafeRegenerate = useCallback(async () => {
-    if (historyCheckoutPending) {
-      showError('历史分叉仍在同步中，暂时不能重新生成。');
+    if (historyMutationPending) {
+      showError('历史分叉或聊天改名仍在同步中，暂时不能重新生成。');
       return;
     }
     await handleRegenerateLastAssistant();
-  }, [handleRegenerateLastAssistant, historyCheckoutPending, showError]);
+  }, [handleRegenerateLastAssistant, historyMutationPending, showError]);
 
   const handleSafeAutoAdvance = useCallback(
     async (message: string) => {
-      if (historyCheckoutPending) {
-        const error = new Error('历史分叉仍在同步中，暂时不能推进新回合。');
+      if (historyMutationPending) {
+        const error = new Error('历史分叉或聊天改名仍在同步中，暂时不能推进新回合。');
         showError(error.message);
         throw error;
       }
       return handleAutoAdvanceTurn(message);
     },
-    [handleAutoAdvanceTurn, historyCheckoutPending, showError],
+    [handleAutoAdvanceTurn, historyMutationPending, showError],
   );
 
   const automationRuntimeRef = useRef<WuxiaAutomationRuntimeState>({
     page: currentPage,
-    busy: isLoading || historyCheckoutPending,
+    busy: isLoading || historyMutationPending,
     maintext: currentMaintext,
     options: currentOptions,
     latestDebugRound,
@@ -785,7 +846,7 @@ const App: React.FC = () => {
   });
   automationRuntimeRef.current = {
     page: currentPage,
-    busy: isLoading || historyCheckoutPending,
+    busy: isLoading || historyMutationPending,
     maintext: currentMaintext,
     options: currentOptions,
     latestDebugRound,
@@ -869,11 +930,11 @@ const App: React.FC = () => {
       version: WUXIA_AUTOMATION_API_VERSION,
       ...identity,
       page: currentPage,
-      busy: isLoading,
+      busy: isLoading || historyMutationPending,
     }).catch(error => {
       gameLogger.warn('[automation] 广播运行状态变化失败:', error);
     });
-  }, [currentPage, isLoading]);
+  }, [currentPage, historyMutationPending, isLoading]);
 
   const handleMapNavClick = useCallback(() => {
     setMapDraftDestination(null);
@@ -981,6 +1042,26 @@ const App: React.FC = () => {
     gameLogger.log('✅ 加载完成，进入游戏');
   }, [clearVariableChanges, setGameState, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
 
+  const continueToOpening = useCallback(() => {
+    setInitialChatRename(null);
+    setInitialRenameError(null);
+    setIsInitialRenaming(false);
+    setCurrentPage('opening');
+  }, [setCurrentPage]);
+
+  const handleInitialChatRename = useCallback(async () => {
+    if (!initialChatRename || isInitialRenaming) return;
+    setIsInitialRenaming(true);
+    setInitialRenameError(null);
+    const result = await renameCurrentChat(initialRenameDraft, { reason: 'initial', reopenHistoryPanel: false });
+    if (result.status !== 'committed') {
+      setInitialRenameError(result.message);
+      setIsInitialRenaming(false);
+      return;
+    }
+    continueToOpening();
+  }, [continueToOpening, initialChatRename, initialRenameDraft, isInitialRenaming]);
+
   // 新游戏设置提交处理
   const handleSetupSubmit = useCallback(
     async (formData: NewGameFormData) => {
@@ -1048,7 +1129,10 @@ const App: React.FC = () => {
           gameLogger.log('✅ 欢迎语已设置到开局输入界面');
           gameLogger.log('欢迎语:', result.content);
 
-          setCurrentPage('opening');
+          const suggestedName = `${formData.name.trim()} · ${formData.locationInfo.location.trim()}`;
+          setInitialRenameDraft(suggestedName);
+          setInitialRenameError(null);
+          setInitialChatRename({ suggestedName });
         } else {
           gameLogger.error('创建开局失败:', result.error);
           showError(`初始化失败：${result.error || '创建开局楼层时出错'}，请重试`);
@@ -1071,12 +1155,16 @@ const App: React.FC = () => {
       setCurrentMaintext,
       setCurrentOptions,
       setSavedGameExists,
-      setCurrentPage,
     ],
   );
 
   const handleOpeningSend = useCallback(
     async (message: string) => {
+      if (historyMutationPending) {
+        const error = new Error('聊天改名或历史分叉仍在处理中，暂时不能开始新行动。');
+        showError(error.message);
+        throw error;
+      }
       await handleSendMessage(message, { rawPlayerInput: message.trim() });
       refreshRecentInputHistory();
 
@@ -1087,7 +1175,15 @@ const App: React.FC = () => {
         setCurrentPage('game');
       }
     },
-    [handleSendMessage, refreshRecentInputHistory, setCurrentMaintext, setCurrentOptions, setCurrentPage],
+    [
+      handleSendMessage,
+      historyMutationPending,
+      refreshRecentInputHistory,
+      setCurrentMaintext,
+      setCurrentOptions,
+      setCurrentPage,
+      showError,
+    ],
   );
 
   const getModalTitle = (panel: ActivePanel) => {
@@ -1171,11 +1267,11 @@ const App: React.FC = () => {
             latestDebugRound={latestDebugRound}
             onClearDebugLogs={clearDebugLogs}
             onAutoAdvanceTurn={handleSafeAutoAdvance}
-            isGenerating={isLoading || historyCheckoutPending}
+            isGenerating={isLoading || historyMutationPending}
           />
         );
       case ActivePanel.SAVE_LOAD:
-        return <SaveLoadPanel gameState={gameState} onClose={closeModal} />;
+        return <SaveLoadPanel gameState={gameState} onClose={closeModal} isBusy={isLoading || historyMutationPending} />;
       default:
         return null;
     }
@@ -1219,6 +1315,20 @@ const App: React.FC = () => {
         {eventNotificationLayer}
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
         <NewGameSetup onSubmit={handleSetupSubmit} onBack={handleSetupBack} isLoading={isLoading} />
+        <ChatRenameDialog
+          isOpen={Boolean(initialChatRename)}
+          mode="initial"
+          value={initialRenameDraft}
+          error={initialRenameError}
+          isSubmitting={isInitialRenaming}
+          onChange={value => {
+            setInitialRenameDraft(value);
+            if (initialRenameError) setInitialRenameError(null);
+          }}
+          onConfirm={() => void handleInitialChatRename()}
+          onKeepCurrent={continueToOpening}
+          onClose={continueToOpening}
+        />
       </>
     );
   }
@@ -1232,7 +1342,7 @@ const App: React.FC = () => {
           welcomeLine={openingWelcomeLine}
           playerName={gameState.stats.name}
           location={gameState.currentLocation}
-          isLoading={isLoading}
+          isLoading={isLoading || historyMutationPending}
           onSend={handleOpeningSend}
         />
       </>
@@ -1417,12 +1527,20 @@ const App: React.FC = () => {
 
             {/* 游戏主体内容区域 */}
             <section className="game-content-wrapper">
-              <GameContent
-                maintext={processedMaintext}
-                options={currentOptions}
-                onSelectOption={handlePlayerSend}
-                settings={displaySettings}
-              />
+              <div className={`story-stage${gameState.events.length > 0 ? ' has-event-tracker' : ''}`}>
+                <EventTracker
+                  events={gameState.events}
+                  currentLocation={gameState.currentLocation}
+                  onTravelTo={handleEventTravelTo}
+                  onOpenAll={() => setActivePanel(ActivePanel.EVENTS)}
+                />
+                <GameContent
+                  maintext={processedMaintext}
+                  options={currentOptions}
+                  onSelectOption={handlePlayerSend}
+                  settings={displaySettings}
+                />
+              </div>
             </section>
 
             <div className="variable-change-dock">
@@ -1470,9 +1588,9 @@ const App: React.FC = () => {
                 </div>
               }
               onRegenerate={handleSafeRegenerate}
-              canRegenerate={canRegenerate && !historyCheckoutPending}
-              isRegenerating={isLoading || historyCheckoutPending}
-              disabled={isLoading || historyCheckoutPending}
+              canRegenerate={canRegenerate && !historyMutationPending}
+              isRegenerating={isLoading || historyMutationPending}
+              disabled={isLoading || historyMutationPending}
               placeholder="书写你的江湖故事..."
             />
           </main>
