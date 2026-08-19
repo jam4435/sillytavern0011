@@ -1,0 +1,48 @@
+{
+  "startedAt": "2026-08-18T15:44:02.867Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [
+      "合理推进剧情"
+    ],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "transport": "api",
+    "chatId": "",
+    "output": "wuxia-reroll-after-rollback-event08-turn-23.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "合理推进剧情",
+      "success": false,
+      "uncertainDispatch": true,
+      "error": "UncertainTurnError: 等待 WuxiaAutomation.runTurn 完成超时（180000ms）；消息可能已经发出，禁止自动重试或继续下一轮\n    at runApiTurn (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:1060:13)\n    at async main (file:///F:/Develop/AI/sillytavern/tools/wuxia-ui-runner.mjs:1375:22)"
+    }
+  ],
+  "success": false,
+  "target": {
+    "pageUrl": "http://127.0.0.1:8000/",
+    "frameUrl": "blob:http://127.0.0.1:8000/64b6f89a-2433-4af9-9692-e57a2e23424e",
+    "pageTitle": "SillyTavern",
+    "pageVisibility": "visible",
+    "frameVisible": true,
+    "instanceId": "frontend-5baa8e68-193c-4221-a33a-669f2ca93dee",
+    "automationVersion": "1",
+    "chatId": "Branch #23 - 2026-08-18@21h17m19s",
+    "ready": true,
+    "page": "game",
+    "busy": false,
+    "selectionSource": "host-visible-iframe"
+  },
+  "completedAt": "2026-08-18T15:47:06.542Z"
+}

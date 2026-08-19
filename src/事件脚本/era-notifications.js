@@ -17,7 +17,7 @@ function createInstanceId() {
 
 function safelyEmit(eventName, detail) {
   try {
-    const result = globalThis.eventEmit?.(eventName, detail);
+    const result = eventEmit(eventName, detail);
     if (result && typeof result.catch === 'function') {
       void result.catch(error => console.warn(`[ERA 通知桥] 发送 ${eventName} 失败。`, error));
     }
@@ -154,13 +154,13 @@ export function initializeEventNotificationBridge() {
   activeBridge = runtime;
 
   try {
-    globalThis.initializeGlobal?.(globalName, api);
+    initializeGlobal(globalName, api);
   } catch (error) {
     console.warn(`[ERA 通知桥] 发布全局接口 ${globalName} 失败。`, error);
   }
 
   try {
-    runtime.discoverListener = globalThis.eventOn?.(WUXIA_EVENT_NOTIFICATION_EVENTS.DISCOVER, () => {
+    runtime.discoverListener = eventOn(WUXIA_EVENT_NOTIFICATION_EVENTS.DISCOVER, () => {
       if (!runtime.disposed) safelyEmit(WUXIA_EVENT_NOTIFICATION_EVENTS.READY, announcement);
     });
   } catch (error) {
