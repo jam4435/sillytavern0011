@@ -28,6 +28,8 @@ describe('useEventNotifications', () => {
   let api: WuxiaEventNotificationApi;
 
   beforeEach(() => {
+    delete document.documentElement.dataset.wuxiaEventNotificationStatus;
+    delete document.documentElement.dataset.wuxiaEventNotificationBridge;
     unregister.mockReset();
     registration = null;
     api = {
@@ -56,6 +58,8 @@ describe('useEventNotifications', () => {
       });
     });
     await waitFor(() => expect(api.registerAdapter).toHaveBeenCalledTimes(1));
+    expect(document.documentElement.dataset.wuxiaEventNotificationStatus).toBe('connected');
+    expect(document.documentElement.dataset.wuxiaEventNotificationBridge).toBe('bridge-1');
 
     act(() => {
       expect(registration?.show(notice)).toBe(true);
@@ -64,6 +68,28 @@ describe('useEventNotifications', () => {
 
     act(() => result.current.dismissNotification(notice.id));
     expect(result.current.notifications).toEqual([]);
+  });
+
+  it('兼容 waitGlobalInitialized 不返回值而只注入动态全局对象', async () => {
+    const globalName = 'WuxiaEventNotification:runtime-bridge';
+    (globalThis as Record<string, unknown>)[globalName] = api;
+    vi.mocked(globalThis.waitGlobalInitialized).mockResolvedValue(undefined as never);
+
+    try {
+      renderHook(() => useEventNotifications());
+      await act(async () => {
+        await eventEmit(WUXIA_EVENT_NOTIFICATION_EVENTS.READY, {
+          version: 1,
+          bridgeId: 'runtime-bridge',
+          globalName,
+          startedAt: 15,
+        });
+      });
+
+      await waitFor(() => expect(api.registerAdapter).toHaveBeenCalledTimes(1));
+    } finally {
+      delete (globalThis as Record<string, unknown>)[globalName];
+    }
   });
 
   it('忽略旧桥迟到通知，且旧桥 disposed 不会注销新桥', async () => {
@@ -126,5 +152,7 @@ describe('useEventNotifications', () => {
     unmount();
     expect(unregister).toHaveBeenCalledTimes(1);
     expect(adapter?.show(notice)).toBe(false);
+    expect(document.documentElement.dataset.wuxiaEventNotificationStatus).toBeUndefined();
+    expect(document.documentElement.dataset.wuxiaEventNotificationBridge).toBeUndefined();
   });
 });

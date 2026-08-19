@@ -59,10 +59,19 @@ export function useEventNotifications(): UseEventNotificationsResult {
 
   useEffect(() => {
     activeRef.current = true;
+    const root = document.documentElement;
     let connectionSequence = 0;
     let latestBridgeStartedAt = Number.NEGATIVE_INFINITY;
     let currentBridgeId: string | null = null;
     let unregisterAdapter: (() => void) | null = null;
+
+    const setConnectionStatus = (status: string, bridgeId?: string) => {
+      root.dataset.wuxiaEventNotificationStatus = status;
+      if (bridgeId) root.dataset.wuxiaEventNotificationBridge = bridgeId;
+      else delete root.dataset.wuxiaEventNotificationBridge;
+    };
+
+    setConnectionStatus('discovering');
 
     const disconnect = () => {
       unregisterAdapter?.();
@@ -84,21 +93,32 @@ export function useEventNotifications(): UseEventNotificationsResult {
 
       latestBridgeStartedAt = detail.startedAt;
       const sequence = ++connectionSequence;
+      setConnectionStatus('connecting', detail.bridgeId);
 
       try {
-        const api = await waitGlobalInitialized<WuxiaEventNotificationApi>(detail.globalName);
+        const initialized = await waitGlobalInitialized<WuxiaEventNotificationApi | undefined>(detail.globalName);
+        const api = initialized ?? (globalThis as Record<string, unknown>)[detail.globalName];
         if (!activeRef.current || sequence !== connectionSequence) return;
-        if (!api || api.version !== WUXIA_EVENT_NOTIFICATION_API_VERSION || typeof api.registerAdapter !== 'function') {
+        if (
+          !api ||
+          typeof api !== 'object' ||
+          (api as WuxiaEventNotificationApi).version !== WUXIA_EVENT_NOTIFICATION_API_VERSION ||
+          typeof (api as WuxiaEventNotificationApi).registerAdapter !== 'function'
+        ) {
+          setConnectionStatus('incompatible', detail.bridgeId);
           return;
         }
 
         disconnect();
         currentBridgeId = detail.bridgeId;
-        unregisterAdapter = api.registerAdapter({
+        unregisterAdapter = (api as WuxiaEventNotificationApi).registerAdapter({
           ...ownerRef.current,
           show: enqueueNotification,
         });
+        setConnectionStatus('connected', detail.bridgeId);
       } catch (error) {
+        if (!activeRef.current || sequence !== connectionSequence) return;
+        setConnectionStatus('error', detail.bridgeId);
         console.warn('[武侠事件通知] 连接事件脚本通知桥失败，事件脚本将使用酒馆弹窗回退。', error);
       }
     };
@@ -123,6 +143,8 @@ export function useEventNotifications(): UseEventNotificationsResult {
       readyListener.stop();
       disposedListener.stop();
       disconnect();
+      delete root.dataset.wuxiaEventNotificationStatus;
+      delete root.dataset.wuxiaEventNotificationBridge;
     };
   }, [enqueueNotification]);
 
