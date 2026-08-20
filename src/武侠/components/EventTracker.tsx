@@ -76,8 +76,9 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
         aria-controls={trackerBodyId}
         onClick={toggleTracker}
       >
-        <span className="event-tracker-title-mark" aria-hidden="true"><Icons.Quest size={17} /></span>
-        <span className="event-tracker-title">江湖事簿</span>
+        <span className="event-tracker-title-brush">
+          <span className="event-tracker-title">江湖事簿</span>
+        </span>
         <span className="event-tracker-count" aria-label={`共有 ${events.length} 件未结事件`}>{events.length}</span>
         <span className="event-tracker-chevron" aria-hidden="true">
           {isCollapsed ? <Icons.ChevronDown size={17} /> : <Icons.ChevronUp size={17} />}

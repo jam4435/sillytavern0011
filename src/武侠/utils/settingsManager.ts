@@ -10,6 +10,7 @@ import inkWashCircleFrameInkUrl from '../wuxia-sprites/circle/circle-frame-ink.p
 import inkWashIconCircleInkUrl from '../wuxia-sprites/icon/icon-circle-ink.png?url';
 import inkWashIconSquareDarkUrl from '../wuxia-sprites/icon/icon-square-dark.png?url';
 import inkWashPanelBarMdUrl from '../wuxia-sprites/panel/panel-bar-md.png?url';
+import inkWashPanelCardLUrl from '../wuxia-sprites/panel/panel-card-l.png?url';
 import inkWashPanelRectLgUrl from '../wuxia-sprites/panel/panel-rect-lg.png?url';
 import inkWashPanelRectXlUrl from '../wuxia-sprites/panel/panel-rect-xl.png?url';
 
@@ -1538,6 +1539,7 @@ export function generateCSSVariables(settings: DisplaySettings): Record<string, 
     '--wuxia-modal-opacity-low': `${modalOpacity.low}`,
     '--wuxia-modal-opacity-high': `${modalOpacity.high}`,
     '--wuxia-ink-bg-image': cssUrl(inkWashBackgroundUrl),
+    '--wuxia-ink-panel-card-l': cssUrl(inkWashPanelCardLUrl),
     '--wuxia-ink-panel-rect-lg': cssUrl(inkWashPanelRectLgUrl),
     '--wuxia-ink-panel-rect-xl': cssUrl(inkWashPanelRectXlUrl),
     '--wuxia-ink-panel-bar-md': cssUrl(inkWashPanelBarMdUrl),

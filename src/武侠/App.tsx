@@ -45,6 +45,7 @@ import {
   useVariableChangeTracker,
 } from './hooks';
 import { readLatestDebugRoundSnapshot } from './hooks/useDebugLogs';
+import { shouldDeferSetupEventNotifications } from './hooks/usePageFlow';
 import { ActivePanel, InventoryItem } from './types';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
@@ -141,6 +142,7 @@ const App: React.FC = () => {
   const {
     currentPage,
     setCurrentPage,
+    resolveInitialPage,
     savedGameExists,
     setSavedGameExists,
     isLoading,
@@ -458,8 +460,11 @@ const App: React.FC = () => {
           initLogger.log('已设置 maintext 和 options');
         }
 
-        setCurrentPage('game');
-        initLogger.log('✅ 已跳转到游戏界面');
+        if (resolveInitialPage('game')) {
+          initLogger.log('✅ 已跳转到游戏界面');
+        } else {
+          initLogger.log('页面已由用户操作接管，跳过首屏游戏页跳转');
+        }
       } else if (sessionState === 'opening') {
         initLogger.log('检测到已初始化但尚未开局的存档，进入开局输入界面');
 
@@ -472,18 +477,25 @@ const App: React.FC = () => {
         setCurrentMaintext('');
         setCurrentOptions([]);
         setOpeningWelcomeLine(getRandomOpeningLine());
-        setCurrentPage('opening');
-        initLogger.log('✅ 已跳转到开局输入界面');
+        if (resolveInitialPage('opening')) {
+          initLogger.log('✅ 已跳转到开局输入界面');
+        } else {
+          initLogger.log('页面已由用户操作接管，跳过首屏开局页跳转');
+        }
       } else {
         initLogger.log('未检测到存档，进入开始界面');
-        setCurrentPage('start');
+        if (resolveInitialPage('start')) {
+          initLogger.log('✅ 已跳转到开始界面');
+        } else {
+          initLogger.log('页面已由用户操作接管，跳过首屏开始页跳转');
+        }
       }
     };
 
     initializeApp().catch(error => {
       initLogger.error('❌ 初始化失败:', error);
     });
-  }, []); // 空依赖数组，只在组件挂载时执行一次。React 的 setState 函数引用是稳定的，不需要放在依赖数组中
+  }, [resolveInitialPage]);
 
   // 初始化并应用设置到 DOM
   useEffect(() => {
@@ -1053,13 +1065,18 @@ const App: React.FC = () => {
     if (!initialChatRename || isInitialRenaming) return;
     setIsInitialRenaming(true);
     setInitialRenameError(null);
-    const result = await renameCurrentChat(initialRenameDraft, { reason: 'initial', reopenHistoryPanel: false });
-    if (result.status !== 'committed') {
-      setInitialRenameError(result.message);
+    try {
+      const result = await renameCurrentChat(initialRenameDraft, { reason: 'initial', reopenHistoryPanel: false });
+      if (result.status !== 'committed') {
+        setInitialRenameError(result.message);
+        setIsInitialRenaming(false);
+        return;
+      }
+      continueToOpening();
+    } catch (error) {
+      setInitialRenameError(`聊天改名失败：${error instanceof Error ? error.message : String(error)}`);
       setIsInitialRenaming(false);
-      return;
     }
-    continueToOpening();
   }, [continueToOpening, initialChatRename, initialRenameDraft, isInitialRenaming]);
 
   // 新游戏设置提交处理
@@ -1278,9 +1295,13 @@ const App: React.FC = () => {
   };
 
   // 根据页面状态渲染不同内容
-  const eventNotificationLayer = (
-    <EventNotificationStack notifications={eventNotifications} onDismiss={dismissEventNotification} />
-  );
+  const eventNotificationLayer = shouldDeferSetupEventNotifications(
+    currentPage,
+    isLoading,
+    initialChatRename !== null,
+  )
+    ? null
+    : <EventNotificationStack notifications={eventNotifications} onDismiss={dismissEventNotification} />;
 
   if (currentPage === 'booting') {
     return (
