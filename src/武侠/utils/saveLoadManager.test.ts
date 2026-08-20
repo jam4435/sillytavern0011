@@ -275,8 +275,8 @@ beforeEach(() => {
 
 describe('history chat rename helpers', () => {
   it('自动分支名按实际酒馆聊天列表追加唯一序号', async () => {
-    chats['taken-1'] = { ...currentChat(), id: 'taken-1', name: '根卷 · 第2段' };
-    chats['taken-2'] = { ...currentChat(), id: 'taken-2', name: '根卷 · 第2段 · 2' };
+    chats['根卷 · 第2段'] = { ...currentChat(), id: '根卷 · 第2段', name: '根卷 · 第2段' };
+    chats['根卷 · 第2段 · 2'] = { ...currentChat(), id: '根卷 · 第2段 · 2', name: '根卷 · 第2段 · 2' };
 
     expect(await getUniqueChatRenameSuggestion('根卷 · 第2段')).toBe('根卷 · 第2段 · 3');
   });
