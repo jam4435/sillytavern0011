@@ -64,12 +64,16 @@ export interface DirectChatTransactionOptions {
 }
 
 function assertFrontendWriteAllowed(source: DirectVariableWriteSource): void {
+  // 酒馆改名会在下一步换掉 iframe / 聊天身份。用户从变量编辑器发起的直接写入和前端派生写入
+  // 都不能落到旧聊天；事件脚本与恢复链由宿主换代自行中止，不在这里伪造失败。
+  if (isChatRenamePending() && source !== 'event-script' && source !== 'restore') {
+    throw new Error(
+      source === 'frontend' ? '聊天存档改名期间已暂停前端派生变量写入。' : '聊天存档改名期间已暂停直接变量写入。',
+    );
+  }
   if (source !== 'frontend') return;
   if (isHistoryCheckoutPending()) {
     throw new Error('历史分叉同步期间已暂停前端派生变量写入。');
-  }
-  if (isChatRenamePending()) {
-    throw new Error('聊天存档改名期间已暂停前端派生变量写入。');
   }
 }
 

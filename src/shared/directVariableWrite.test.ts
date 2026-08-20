@@ -9,11 +9,13 @@ import {
 } from './directVariableWrite';
 import { eventEmitMock, listeners } from '../武侠/test/setup';
 import { clearHistoryCheckoutJournal, createHistoryCheckoutJournal } from './historyCheckoutJournal';
+import { clearChatRenameJournal, createChatRenameJournal } from './chatRenameJournal';
 
 describe('runDirectChatVariableWrite', () => {
   beforeEach(() => {
     eventEmitMock.mockClear();
     clearHistoryCheckoutJournal();
+    clearChatRenameJournal();
   });
 
   it('写入成功后返回原结果并发送项目事件', async () => {
@@ -110,6 +112,31 @@ describe('runDirectChatVariableWrite', () => {
       ),
     ).resolves.toEqual({ ok: true });
     expect(eventWriter).toHaveBeenCalledTimes(1);
+  });
+
+  it('聊天改名 journal 存在时阻止前端和变量编辑器直接写入', async () => {
+    createChatRenameJournal({
+      reason: 'manual',
+      oldChatId: 'chat-a',
+      oldChatName: '旧卷',
+      requestedName: '新卷',
+      reopenHistoryPanel: true,
+    });
+    const writer = vi.fn(async () => ({ ok: true }));
+
+    await expect(
+      runDirectChatVariableWrite(
+        { source: 'frontend', operation: 'update', reason: 'rename-race' },
+        writer,
+      ),
+    ).rejects.toThrow('聊天存档改名期间已暂停前端派生变量写入');
+    await expect(
+      runDirectChatVariableWrite(
+        { source: 'variable-editor', operation: 'update', reason: 'rename-race' },
+        writer,
+      ),
+    ).rejects.toThrow('聊天存档改名期间已暂停直接变量写入');
+    expect(writer).not.toHaveBeenCalled();
   });
 
   it('缺省 refreshHint 保持 full，并支持单次 direct transaction', async () => {
