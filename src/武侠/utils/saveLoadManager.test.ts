@@ -30,7 +30,12 @@ import {
   suggestForkChatName,
 } from './saveLoadManager';
 import { getAvatarSelectionStorageKey, getAvatarStorageKey } from './avatarStorage';
-import { getUniqueChatRenameSuggestion, resumePendingChatRename } from './chatRenameManager';
+import {
+  getUniqueChatRenameSuggestion,
+  renameCurrentChatAutomatically,
+  resumePendingChatRename,
+  validateChatRenameTarget,
+} from './chatRenameManager';
 
 type TestMessage = {
   message_id: number;
@@ -274,11 +279,32 @@ beforeEach(() => {
 });
 
 describe('history chat rename helpers', () => {
+  it('手动命名拒绝空名、非法路径字符与同名', () => {
+    expect(() => validateChatRenameTarget('')).toThrow('请填写存档名称');
+    expect(() => validateChatRenameTarget('天山/少林')).toThrow('路径非法字符');
+    expect(() => validateChatRenameTarget('旧卷', '旧卷')).toThrow('名称相同');
+  });
+
   it('自动分支名按实际酒馆聊天列表追加唯一序号', async () => {
     chats['根卷 · 第2段'] = { ...currentChat(), id: '根卷 · 第2段', name: '根卷 · 第2段' };
     chats['根卷 · 第2段 · 2'] = { ...currentChat(), id: '根卷 · 第2段 · 2', name: '根卷 · 第2段 · 2' };
 
     expect(await getUniqueChatRenameSuggestion('根卷 · 第2段')).toBe('根卷 · 第2段 · 3');
+  });
+
+  it('自动命名会清理节点题名中的路径字符，再交由酒馆改名事务提交', async () => {
+    vi.mocked(SillyTavern.renameChat).mockImplementation(async (_oldName: string, newName: string) => {
+      const current = currentChat();
+      delete chats[currentChatId];
+      chats[newName] = { ...current, id: newName, name: newName };
+      currentChatId = newName;
+      rawChatViewChatId = null;
+    });
+
+    const result = await renameCurrentChatAutomatically('根卷/题名');
+
+    expect(result.status).toBe('committed');
+    expect(vi.mocked(SillyTavern.renameChat)).toHaveBeenCalledWith('聊天 A', '根卷·题名');
   });
 
   it('以根卷名和节点题名/父链段数建议新分叉名称', () => {

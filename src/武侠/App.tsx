@@ -1525,15 +1525,16 @@ const App: React.FC = () => {
               </div>
             </header>
 
+            <EventTracker
+              events={gameState.events}
+              currentLocation={gameState.currentLocation}
+              onTravelTo={handleEventTravelTo}
+              onOpenAll={() => setActivePanel(ActivePanel.EVENTS)}
+            />
+
             {/* 游戏主体内容区域 */}
             <section className="game-content-wrapper">
-              <div className={`story-stage${gameState.events.length > 0 ? ' has-event-tracker' : ''}`}>
-                <EventTracker
-                  events={gameState.events}
-                  currentLocation={gameState.currentLocation}
-                  onTravelTo={handleEventTravelTo}
-                  onOpenAll={() => setActivePanel(ActivePanel.EVENTS)}
-                />
+              <div className="story-stage">
                 <GameContent
                   maintext={processedMaintext}
                   options={currentOptions}

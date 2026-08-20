@@ -99,6 +99,15 @@ export async function getUniqueChatRenameSuggestion(baseName: string): Promise<s
   throw new Error('无法取得唯一的分支存档名称，请稍后重试。');
 }
 
+function makeAutomaticChatRenameTarget(input: string): string {
+  const sanitized = [...input]
+    .map(character => (INVALID_CHAT_NAME.test(character) || character.charCodeAt(0) < 32 ? '·' : character))
+    .join('')
+    .trim()
+    .replace(/[.\s]+$/u, '');
+  return sanitized || '未题名分支';
+}
+
 function renamedIdentityMatches(journal: ChatRenameJournal, current: HistoryChatIdentity): boolean {
   return current.id !== journal.oldChatId && current.name === journal.requestedName;
 }
@@ -211,7 +220,7 @@ export async function renameCurrentChat(
 /** 自动分支只负责建议和提交；失败不会回滚已经验证通过的分叉。 */
 export async function renameCurrentChatAutomatically(baseName: string): Promise<ChatRenameOutcome> {
   try {
-    const targetName = await getUniqueChatRenameSuggestion(baseName);
+    const targetName = await getUniqueChatRenameSuggestion(makeAutomaticChatRenameTarget(baseName));
     return renameCurrentChat(targetName, { reason: 'branch_auto', reopenHistoryPanel: false });
   } catch (error) {
     return { status: 'failed', message: error instanceof Error ? error.message : String(error) };

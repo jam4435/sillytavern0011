@@ -117,6 +117,7 @@
 // =========================================
 
 .main-column {
+  --wuxia-game-header-height: 4.5rem;
   order: 1;
   flex: 1;
   display: flex;
@@ -130,6 +131,10 @@
     order: 2;
     // 桌面端：计算高度减去可能的边距
     height: 100%;
+  }
+
+  @media (max-width: 767px) {
+    --wuxia-game-header-height: 3.75rem;
   }
 }
 
