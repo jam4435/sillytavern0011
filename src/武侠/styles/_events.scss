@@ -703,13 +703,15 @@ button.chronicle-world-toggle:focus-visible {
     left: 0.75rem;
     width: calc(100% - 1.5rem);
 
-    &.is-collapsed {
-      width: min(13.5rem, calc(50% - 0.75rem));
+  &.is-collapsed {
+      // 收起态必须保持横向 HUD 形状，不能让标题被挤成竖排。
+      width: calc(100% - 1.5rem);
     }
   }
 
   .event-tracker-title {
     font-size: 0.9rem;
+    white-space: nowrap;
   }
 
   .event-tracker-body {
