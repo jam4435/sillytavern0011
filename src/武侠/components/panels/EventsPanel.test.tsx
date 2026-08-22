@@ -74,6 +74,23 @@ describe('EventsPanel', () => {
     expect(screen.getByRole('button', { name: /【后续】旧案余波/ })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('removes the duplicated time prefix from the expanded event description', () => {
+    render(
+      <EventsPanel
+        events={[
+          {
+            ...events[0],
+            description: '1200年8月15日17时 到 1200年8月15日19时，酒馆内风雨将起。',
+          },
+        ]}
+        currentLocation="嘉兴城内"
+      />,
+    );
+
+    expect(screen.queryByText('1200年8月15日17时 到 1200年8月15日19时，酒馆内风雨将起。')).not.toBeInTheDocument();
+    expect(screen.getByText('酒馆内风雨将起。')).toBeInTheDocument();
+  });
+
   it("keeps travel behavior and shows the chronicle's personal filter", () => {
     const onTravelTo = vi.fn();
     render(

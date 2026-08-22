@@ -19,19 +19,21 @@ vi.mock('./logger', () => ({
 }));
 
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
-import { getMartialArtData, loadMartialArtsDatabase } from './martialArtsDatabase';
+import { completeMartialArts, getMartialArtData, loadMartialArtsDatabase } from './martialArtsDatabase';
 import {
   __resetVariableReaderTestState,
   autoUpdateMartialArts,
+  getGameVariables,
   normalizeAssistantReplyForPersistence,
   readGameDataSync,
 } from './variableReader';
 
 type JsonRecord = Record<string, unknown>;
 
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 const emitSourcedEraVariableWriteAndWaitMock = vi.mocked(emitSourcedEraVariableWriteAndWait);
+const completeMartialArtsMock = vi.mocked(completeMartialArts);
 const getMartialArtDataMock = vi.mocked(getMartialArtData);
 const loadMartialArtsDatabaseMock = vi.mocked(loadMartialArtsDatabase);
 const getVariablesMock = globalThis.getVariables as ReturnType<typeof vi.fn>;
@@ -61,6 +63,86 @@ describe('normalizeAssistantReplyForPersistence', () => {
 
     expect(normalizeAssistantReplyForPersistence(reply)).toBe(reply);
     expect(normalizeAssistantReplyForPersistence(normalizeAssistantReplyForPersistence(reply))).toBe(reply);
+  });
+});
+
+describe('getGameVariables ERA 展示投影', () => {
+  it('读取合并变量时递归反转义特殊字符占位符', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        角色数据: {
+          郭靖: {
+            功法: {
+              全真剑法: {
+                功法描述: '招式严谨，如__SQUOTE__白虹经天__SQUOTE__。',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const variables = getGameVariables() as Record<string, any>;
+    expect(variables.角色数据.郭靖.功法.全真剑法.功法描述).toBe("招式严谨，如'白虹经天'。");
+  });
+
+  it('侠缘 NPC 投影保留角色数据中的全部功法条目', () => {
+    completeMartialArtsMock.mockImplementation(arts =>
+      Object.fromEntries(
+        Object.entries(arts).map(([name, art]) => [
+          name,
+          {
+            type: art.类型 || '',
+            description: art.功法描述 || '',
+            rank: art.功法品阶 || '',
+            mastery: art.掌握程度 || '',
+            traits: art.特性 || {},
+            unlockedTraits: art.特性 || {},
+            canUpgrade: false,
+            upgradeCost: 0,
+            nextMastery: null,
+          },
+        ]),
+      ),
+    );
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '玩家',
+          性别: '男',
+          境界: '不入流',
+          所在位置: '大宋/临安府',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+          关系网: { 郭靖: '旧识' },
+        },
+        角色数据: {
+          郭靖: {
+            所在位置: '大宋/临安府',
+            功法: {
+              全真剑法: {
+                类型: '剑法',
+                掌握程度: '炉火纯青',
+                功法描述: '如__SQUOTE__白虹经天__SQUOTE__。',
+                功法品阶: '上乘',
+                特性: { 初窥门径: '', 炉火纯青: '格挡成功率提升20%' },
+              },
+              金雁功: {
+                类型: '轻功',
+                掌握程度: '炉火纯青',
+                功法描述: '全真派上乘轻功。',
+                功法品阶: '上乘',
+                特性: { 炉火纯青: '移动时不触发敌人的反击' },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const state = readGameDataSync();
+    const npc = state?.social?.find(item => item.name === '郭靖');
+    expect(npc?.template.martialArts && Object.keys(npc.template.martialArts)).toEqual(['全真剑法', '金雁功']);
+    expect(npc?.template.martialArts?.全真剑法.martialArtsDescription).toBe("如'白虹经天'。");
   });
 });
 
@@ -182,37 +264,41 @@ describe('autoUpdateMartialArts', () => {
     await autoUpdateMartialArts(玩家功法 as never, undefined, { 用户名: '郭靖' });
 
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(2);
-    expect(emitSourcedEraVariableWriteAndWaitMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
-      eventName: 'era:insertByObject',
-      detail: {
-        user数据: {
-          功法: {
-            金雁功: {
-              特性: {
-                略有小成: '凌空借力，纵跃更远。',
+    expect(emitSourcedEraVariableWriteAndWaitMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        eventName: 'era:insertByObject',
+        detail: {
+          user数据: {
+            功法: {
+              金雁功: {
+                特性: {
+                  略有小成: '凌空借力，纵跃更远。',
+                },
               },
             },
           },
         },
-      },
-    }));
-    expect(emitSourcedEraVariableWriteAndWaitMock.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
-      eventName: 'era:updateByObject',
-      detail: {
-        user数据: {
-          功法: {
-            金雁功: {
-              类型: '轻功',
-              功法描述: '一门偏向轻身提纵的轻功。',
-              功法品阶: '上乘',
-              特性: {
-                初窥门径: '身法轻灵，步伐更稳。',
+      }),
+    );
+    expect(emitSourcedEraVariableWriteAndWaitMock.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        eventName: 'era:updateByObject',
+        detail: {
+          user数据: {
+            功法: {
+              金雁功: {
+                类型: '轻功',
+                功法描述: '一门偏向轻身提纵的轻功。',
+                功法品阶: '上乘',
+                特性: {
+                  初窥门径: '身法轻灵，步伐更稳。',
+                },
               },
             },
           },
         },
-      },
-    }));
+      }),
+    );
     expect(currentChatStatData).toEqual({
       user数据: {
         功法: {
@@ -254,34 +340,38 @@ describe('autoUpdateMartialArts', () => {
     await autoUpdateMartialArts(玩家功法 as never, undefined, { 用户名: '郭靖' });
 
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(2);
-    expect(emitSourcedEraVariableWriteAndWaitMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
-      eventName: 'era:insertByObject',
-      detail: {
-        user数据: {
-          功法: {
-            金雁功: {
-              特性: {
-                融会贯通: '身随意动，可借势转折。',
+    expect(emitSourcedEraVariableWriteAndWaitMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        eventName: 'era:insertByObject',
+        detail: {
+          user数据: {
+            功法: {
+              金雁功: {
+                特性: {
+                  融会贯通: '身随意动，可借势转折。',
+                },
               },
             },
           },
         },
-      },
-    }));
-    expect(emitSourcedEraVariableWriteAndWaitMock.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
-      eventName: 'era:updateByObject',
-      detail: {
-        user数据: {
-          功法: {
-            金雁功: {
-              特性: {
-                初窥门径: '身法轻灵，步伐更稳。',
+      }),
+    );
+    expect(emitSourcedEraVariableWriteAndWaitMock.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        eventName: 'era:updateByObject',
+        detail: {
+          user数据: {
+            功法: {
+              金雁功: {
+                特性: {
+                  初窥门径: '身法轻灵，步伐更稳。',
+                },
               },
             },
           },
         },
-      },
-    }));
+      }),
+    );
   });
 
   it('回读验证失败时不会更新缓存，同一功法下次仍会继续尝试', async () => {
@@ -339,23 +429,25 @@ describe('autoUpdateMartialArts', () => {
     await autoUpdateMartialArts(玩家功法 as never, undefined, { 用户名: '郭靖' });
 
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
-    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(expect.objectContaining({
-      eventName: 'era:insertByObject',
-      detail: {
-        user数据: {
-          功法: {
-            金雁功: {
-              类型: '轻功',
-              功法描述: '一门偏向轻身提纵的轻功。',
-              功法品阶: '上乘',
-              特性: {
-                初窥门径: '身法轻灵，步伐更稳。',
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'era:insertByObject',
+        detail: {
+          user数据: {
+            功法: {
+              金雁功: {
+                类型: '轻功',
+                功法描述: '一门偏向轻身提纵的轻功。',
+                功法品阶: '上乘',
+                特性: {
+                  初窥门径: '身法轻灵，步伐更稳。',
+                },
               },
             },
           },
         },
-      },
-    }));
+      }),
+    );
   });
 });
 

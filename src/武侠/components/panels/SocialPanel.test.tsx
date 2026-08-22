@@ -2,11 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NPC } from '../../types';
 import { toCustomAvatarRef } from '../../utils/avatarCatalog';
-import {
-  createAvatarEntityKey,
-  getAvatarStorageKey,
-  saveCustomAvatar,
-} from '../../utils/avatarStorage';
+import { createAvatarEntityKey, getAvatarStorageKey, saveCustomAvatar } from '../../utils/avatarStorage';
 import { setNpcAvatarRef } from '../../utils/avatarState';
 import { SocialPanel } from './SocialPanel';
 
@@ -75,7 +71,9 @@ describe('SocialPanel avatar picker', () => {
     fireEvent.change(input as HTMLInputElement, { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(localStorage.getItem(getAvatarStorageKey(createAvatarEntityKey('npc', '黄蓉')))).toContain('huangrong.png');
+      expect(localStorage.getItem(getAvatarStorageKey(createAvatarEntityKey('npc', '黄蓉')))).toContain(
+        'huangrong.png',
+      );
     });
     expect(setNpcAvatarRefMock).toHaveBeenCalledWith('黄蓉', 'custom:npc:黄蓉');
   });
@@ -106,5 +104,43 @@ describe('SocialPanel avatar picker', () => {
         expect.stringContaining('generated/%E9%BB%84%E8%93%89.jpg'),
       );
     });
+  });
+});
+
+describe('SocialPanel martial-art details', () => {
+  it('逐项展示角色的完整功法，并忽略空特性', () => {
+    const npc = createNpc('郭靖');
+    npc.template = {
+      ...npc.template,
+      martialArts: {
+        全真剑法: {
+          type: '剑法',
+          martialArtsDescription: "招式严谨，如'白虹经天'。",
+          martialArtsRank: '上乘',
+          mastery: '炉火纯青',
+          traits: {
+            初窥门径: '',
+            炉火纯青: '剑法严谨：格挡成功率提升20%',
+          },
+        },
+        金雁功: {
+          type: '轻功',
+          martialArtsDescription: '全真派上乘轻功。',
+          martialArtsRank: '上乘',
+          mastery: '炉火纯青',
+          traits: {
+            炉火纯青: '雁过无痕：移动时不触发敌人的反击',
+          },
+        },
+      },
+    };
+
+    render(<SocialPanel npcs={[npc]} />);
+
+    expect(screen.getByText('全真剑法')).toBeInTheDocument();
+    expect(screen.getByText('金雁功')).toBeInTheDocument();
+    expect(screen.getByText("招式严谨，如'白虹经天'。")).toBeInTheDocument();
+    expect(screen.getByText('剑法严谨：格挡成功率提升20%')).toBeInTheDocument();
+    expect(screen.queryByText('初窥门径')).not.toBeInTheDocument();
   });
 });

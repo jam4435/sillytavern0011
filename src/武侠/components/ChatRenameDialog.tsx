@@ -39,9 +39,11 @@ const ChatRenameDialog: React.FC<ChatRenameDialogProps> = ({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={isSubmitting ? () => undefined : keepCurrent}
+      onClose={isSubmitting || isInitial ? () => undefined : keepCurrent}
       title={isInitial ? '为这一卷江湖命名' : '重命名聊天存档'}
       type={ActivePanel.SAVE_LOAD}
+      showCloseButton={!isInitial}
+      overlayClassName="chat-rename-overlay"
       boxClassName="chat-rename-modal"
       contentClassName="chat-rename-modal-content"
     >

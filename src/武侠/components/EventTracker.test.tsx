@@ -78,6 +78,9 @@ describe('EventTracker', () => {
     fireEvent.click(screen.getByRole('button', { name: '展开江湖事簿' }));
     expect(screen.getByText('另有 1 件待阅')).toBeInTheDocument();
     expect(screen.getByText('风起江南')).toBeInTheDocument();
+    expect(screen.queryByText('镖局的密信催你赶往城外。')).not.toBeInTheDocument();
+    expect(screen.getByText('先赴苏州城外，再寻失踪镖师。')).toBeInTheDocument();
+    expect(screen.getByText('卷入：陆乘风')).toBeInTheDocument();
     expect(screen.getByText('旧案余波')).toBeInTheDocument();
     expect(screen.queryByText('古墓传闻')).not.toBeInTheDocument();
   });

@@ -2,6 +2,7 @@ import React, { useEffect, useId, useMemo, useState } from 'react';
 import { ChronicleEntry, GameEvent } from '../../types';
 import {
   getEventCountdownLabel,
+  getEventDescription,
   getEventSemanticLabel,
   isEventUrgent,
   sortEventsForDisplay,
@@ -62,7 +63,7 @@ const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
 
       {isExpanded && (
         <div className="event-disclosure-detail" id={detailId}>
-          {event.description && <p className="event-disclosure-description">{event.description}</p>}
+          {getEventDescription(event) && <p className="event-disclosure-description">{getEventDescription(event)}</p>}
           {event.details && (
             <div className="event-disclosure-outcome">
               <span>结局走向</span>

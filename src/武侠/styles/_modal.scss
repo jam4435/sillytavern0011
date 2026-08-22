@@ -109,8 +109,21 @@
   }
 }
 
+// The social panel owns two independent scroll regions (roster and detail).
+// Prevent the modal content itself from becoming the scroll container so the
+// roster column can expose its scrollbar and keep the detail column aligned.
+.modal-box.modal-social {
+  .modal-content {
+    overflow: hidden;
+  }
+}
+
 .avatar-preview-overlay {
   z-index: 70;
+}
+
+.chat-rename-overlay {
+  z-index: 200;
 }
 
 .avatar-preview-modal {

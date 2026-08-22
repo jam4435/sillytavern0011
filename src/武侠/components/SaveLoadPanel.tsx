@@ -34,6 +34,7 @@ import {
   returnToCheckoutSource,
   scanCurrentChat,
   setNodePinned,
+  WUXIA_HISTORY_TREE_UPDATED_EVENT,
   type HistoryCheckoutResult,
   type HistoryTreeViewState,
 } from '../utils/saveLoadManager';
@@ -173,6 +174,22 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
 
   useEffect(() => {
     void refresh(true);
+  }, [refresh]);
+
+  useEffect(() => {
+    let refreshTimer: number | undefined;
+    const handleHistoryTreeUpdated = () => {
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = undefined;
+        void refresh(false);
+      }, 80);
+    };
+    window.addEventListener(WUXIA_HISTORY_TREE_UPDATED_EVENT, handleHistoryTreeUpdated);
+    return () => {
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
+      window.removeEventListener(WUXIA_HISTORY_TREE_UPDATED_EVENT, handleHistoryTreeUpdated);
+    };
   }, [refresh]);
 
   // 谱牒默认只展示与当前聊天连通的脉络；其他历史局的节点仍保留在数据里，可用开关查看

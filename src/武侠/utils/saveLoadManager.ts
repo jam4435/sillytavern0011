@@ -35,6 +35,7 @@ import {
 } from './variableReader';
 
 export const WUXIA_HISTORY_TREE_V2_KEY = 'wuxia_history_tree_v2';
+export const WUXIA_HISTORY_TREE_UPDATED_EVENT = 'wuxia:history-tree-updated';
 export const WUXIA_HISTORY_PREPARE_VERIFICATION_EVENT = 'wuxia:history-checkout-prepare-verification';
 export { HISTORY_CHECKOUT_COMMIT_EVENT, HISTORY_CHECKOUT_STATE_EVENT, isHistoryCheckoutPending };
 
@@ -639,7 +640,15 @@ export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = 
     worldTimeText: options.worldTimeText ?? node.worldTimeText,
     verification: readCurrentVerification(),
   };
-  return buildViewState(persistHistoryTree(tree), scanned.currentChat);
+  const state = buildViewState(persistHistoryTree(tree), scanned.currentChat);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent(WUXIA_HISTORY_TREE_UPDATED_EVENT, {
+        detail: { currentNodeId: state.currentNodeId, chatId: state.currentChat.id },
+      }),
+    );
+  }
+  return state;
 }
 
 export function renameNode(nodeId: string, label: string | null): WuxiaHistoryTreeV2 {

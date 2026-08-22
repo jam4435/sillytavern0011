@@ -20,6 +20,7 @@ describe('ChatRenameDialog', () => {
     );
 
     expect(screen.getByDisplayValue('郭靖 · 牛家村')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '关闭为这一卷江湖命名' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '保留当前名称' }));
     expect(keepCurrent).toHaveBeenCalledOnce();
   });
@@ -44,5 +45,23 @@ describe('ChatRenameDialog', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('已有同名聊天存档');
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(confirm).toHaveBeenCalledOnce();
+  });
+
+  it('将开局命名弹窗提升到角色创建页面之上', () => {
+    render(
+      <ChatRenameDialog
+        isOpen
+        mode="initial"
+        value="墨逸 · 牛家村"
+        error={null}
+        isSubmitting={false}
+        onChange={vi.fn()}
+        onConfirm={vi.fn()}
+        onKeepCurrent={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(document.querySelector('.chat-rename-overlay')).toBeInTheDocument();
   });
 });

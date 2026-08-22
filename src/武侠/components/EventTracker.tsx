@@ -111,7 +111,6 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
 
                   {isExpanded && (
                     <div className="event-tracker-entry-detail" id={detailId}>
-                      {event.description && <p>{event.description}</p>}
                       {event.details && (
                         <div className="event-tracker-outcome">
                           <span>结局走向</span>

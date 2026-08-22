@@ -12,6 +12,7 @@ import { createChatRenameJournal, readChatRenameJournal } from '../../shared/cha
 import type { HistoryLocator, WuxiaHistoryTreeV2 } from '../types';
 import {
   WUXIA_HISTORY_TREE_V2_KEY,
+  WUXIA_HISTORY_TREE_UPDATED_EVENT,
   WuxiaHistoryTreeV2Schema,
   checkoutNode,
   configureHistoryEraSyncTiming,
@@ -496,6 +497,21 @@ describe('history tree v2 scanning', () => {
     expect(secondNode.verification).toEqual(firstNode.verification);
     expect(secondNode.location).toBe('牛家村');
     expect(secondNode.worldTimeText).toBe('正午');
+  });
+
+  it('封存回合后通知已打开的存档面板重新读取节点', async () => {
+    const listener = vi.fn();
+    window.addEventListener(WUXIA_HISTORY_TREE_UPDATED_EVENT, listener);
+    currentChat().messages = [{ message_id: 0, role: 'assistant', message: '首回合正文' }];
+
+    const state = await finalizeCurrentTurn({ location: '牛家村', worldTimeText: '正午' });
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener.mock.calls[0][0]).toMatchObject({
+      type: WUXIA_HISTORY_TREE_UPDATED_EVENT,
+      detail: { currentNodeId: state.currentNodeId, chatId: 'chat-a' },
+    });
+    window.removeEventListener(WUXIA_HISTORY_TREE_UPDATED_EVENT, listener);
   });
 
   it('使用 zod 严格校验 v2，完全忽略旧 wuxia_save_tree，并支持 rename/pin', async () => {

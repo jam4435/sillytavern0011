@@ -63,6 +63,7 @@ import {
   getVariablePathKey,
   getVariableTypeLabel,
   getVisibleEntries,
+  getVariableEditorDisplayStatDataFromVariables,
   isVariableRecord,
   type VariableLeafChange,
   type VariablePath,
@@ -639,10 +640,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         }
 
         const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
-        const nextStatData = variables.stat_data;
-        if (!isVariableRecord(nextStatData)) {
+        const rawStatData = variables.stat_data;
+        if (!isVariableRecord(rawStatData)) {
           throw new Error('没有可读取的变量对象');
         }
+
+        const nextStatData = getVariableEditorDisplayStatDataFromVariables(variables);
 
         setVariableBaseStatData(nextStatData);
         setStatData(nextStatData);

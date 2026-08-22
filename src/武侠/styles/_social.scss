@@ -134,6 +134,9 @@
 }
 
 .social-section {
+  // Keep each section at its intrinsic height so long rosters overflow the
+  // roster viewport instead of being shrunk and clipped by `overflow: hidden`.
+  flex: 0 0 auto;
   border: 1px solid rgba(120, 113, 108, 0.18);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 56%), rgba(28, 25, 23, 0.38);
@@ -723,6 +726,19 @@
   font-size: 0.86rem;
   font-weight: 700;
   letter-spacing: 0.1em;
+}
+
+.social-detail-card-head strong {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: inherit;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .social-tag-row {

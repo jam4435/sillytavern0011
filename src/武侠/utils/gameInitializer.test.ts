@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   APPEARANCE_TEMPLATES,
   DEFAULT_ATTRIBUTES,
+  getInitialChatRenameSuggestion,
   STORY_EVENTS,
   generateVariableData,
   getRandomAppearance,
@@ -103,6 +104,38 @@ describe('generateVariableData avatar fields', () => {
 });
 
 describe('opening event time', () => {
+  it('预设事件开局建议名使用事件名，不带路径非法字符', () => {
+    expect(
+      getInitialChatRenameSuggestion({
+        name: '墨逸',
+        locationInfo: {
+          year: 1219,
+          month: 10,
+          day: 20,
+          hour: 13,
+          location: '金国/张家口/张家口镇',
+          eventName: '射雕第七回02-初遇黄蓉',
+        },
+      }),
+    ).toBe('墨逸（射雕第七回02-初遇黄蓉）');
+  });
+
+  it('自定义开局建议名包含时间地点，并把层级分隔符转换为安全字符', () => {
+    const suggestion = getInitialChatRenameSuggestion({
+      name: '墨逸',
+      locationInfo: {
+        year: 1200,
+        month: 8,
+        day: 15,
+        hour: 17,
+        location: '大宋/临安府/牛家村/曲三酒馆',
+      },
+    });
+
+    expect(suggestion).toBe('墨逸（1200年8月15日17时 · 大宋·临安府·牛家村·曲三酒馆）');
+    expect(suggestion).not.toMatch(/[<>:"/\\|?*]/u);
+  });
+
   it('开局事件汇总提供小时并使用所选事件的真实触发小时', () => {
     const selectedEvent = STORY_EVENTS.find(event => event.name === '射雕第七回02-初遇黄蓉');
     expect(selectedEvent).toMatchObject({

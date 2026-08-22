@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AvatarImage from '../AvatarImage';
 import AvatarPreviewModal from '../AvatarPreviewModal';
-import { ActivePanel, type NPC } from '../../types';
+import { ActivePanel, type NPC, type NPCMartialArt } from '../../types';
 import { toCustomAvatarRef, toPresetAvatarRef } from '../../utils/avatarCatalog';
 import {
   clearCustomAvatar,
@@ -148,20 +148,40 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
 
   const selectedNpc = orderedNpcs.find(npc => npc.id === selectedId) || orderedNpcs[0] || null;
   const selectedNpcAvatarRef = selectedNpc
-    ? (Object.hasOwn(optimisticAvatarRefs, selectedNpc.name)
-        ? optimisticAvatarRefs[selectedNpc.name] || undefined
-        : selectedNpc.avatarRef)
+    ? Object.hasOwn(optimisticAvatarRefs, selectedNpc.name)
+      ? optimisticAvatarRefs[selectedNpc.name] || undefined
+      : selectedNpc.avatarRef
     : undefined;
   const selectedRelation = selectedNpc ? getRelationshipMeta(selectedNpc) : null;
-  const traitEntries = selectedNpc ? Object.entries(selectedNpc.template.traits) : [];
+  const martialArtEntries = useMemo<[string, NPCMartialArt][]>(() => {
+    if (!selectedNpc) return [];
+
+    if (selectedNpc.template.martialArts && Object.keys(selectedNpc.template.martialArts).length > 0) {
+      return Object.entries(selectedNpc.template.martialArts);
+    }
+
+    // 兼容旧版 NPC 投影：只有一份扁平 template 时仍显示一张功法卡。
+    return [
+      [
+        '功法根基',
+        {
+          type: selectedNpc.template.type,
+          martialArtsDescription: selectedNpc.template.martialArtsDescription,
+          martialArtsRank: selectedNpc.template.martialArtsRank,
+          mastery: selectedNpc.template.mastery,
+          traits: selectedNpc.template.traits,
+        },
+      ],
+    ];
+  }, [selectedNpc]);
   const selectedAvatarSource = useMemo(
     () =>
       selectedNpc
         ? resolveAvatarSource({
-          entityKey: createAvatarEntityKey('npc', selectedNpc.name),
-          avatarRef: selectedNpcAvatarRef,
-          name: selectedNpc.name,
-        })
+            entityKey: createAvatarEntityKey('npc', selectedNpc.name),
+            avatarRef: selectedNpcAvatarRef,
+            name: selectedNpc.name,
+          })
         : null,
     [avatarVersion, selectedNpc, selectedNpcAvatarRef],
   );
@@ -169,10 +189,10 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
     () =>
       selectedNpc
         ? getAvatarCandidates({
-          entityKey: createAvatarEntityKey('npc', selectedNpc.name),
-          avatarRef: selectedNpcAvatarRef,
-          name: selectedNpc.name,
-        })
+            entityKey: createAvatarEntityKey('npc', selectedNpc.name),
+            avatarRef: selectedNpcAvatarRef,
+            name: selectedNpc.name,
+          })
         : [],
     [avatarVersion, selectedNpc, selectedNpcAvatarRef],
   );
@@ -474,7 +494,9 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                         </button>
                       );
                     })}
-                    <label className={`social-avatar-option upload ${selectedAvatarSource?.source === 'custom' ? 'is-selected' : ''}`}>
+                    <label
+                      className={`social-avatar-option upload ${selectedAvatarSource?.source === 'custom' ? 'is-selected' : ''}`}
+                    >
                       <input
                         ref={avatarUploadInputRef}
                         type="file"
@@ -484,36 +506,48 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                       <span className="social-avatar-upload-mark">+</span>
                       <span>上传</span>
                     </label>
-                    <button type="button" className="social-avatar-clear" onClick={() => handleClearAvatarOverride(selectedNpc)}>
+                    <button
+                      type="button"
+                      className="social-avatar-clear"
+                      onClick={() => handleClearAvatarOverride(selectedNpc)}
+                    >
                       清除本地覆盖
                     </button>
                   </div>
                 </section>
               )}
 
-              <section className="social-detail-card">
-                <div className="social-detail-card-head">
-                  <Icons.Combat size={16} />
-                  <span>功法根基</span>
-                </div>
-                <div className="social-tag-row">
-                  <span className="social-tag">{selectedNpc.template.martialArtsRank || '未知品阶'}</span>
-                  <span className="social-tag muted">{selectedNpc.template.mastery || '未知掌握'}</span>
-                </div>
-                <p className="social-detail-text">
-                  {selectedNpc.template.martialArtsDescription || '尚未探明其武学底细。'}
-                </p>
-                {traitEntries.length > 0 && (
-                  <div className="social-trait-grid">
-                    {traitEntries.map(([trait, desc]) => (
-                      <div className="social-trait-chip" key={trait}>
-                        <span>{trait}</span>
-                        <small>{desc || '尚未详载'}</small>
+              {martialArtEntries.map(([martialArtName, martialArt]) => {
+                const traitEntries = Object.entries(martialArt.traits || {}).filter(
+                  ([, desc]) => typeof desc === 'string' && desc.trim().length > 0,
+                );
+
+                return (
+                  <section className="social-detail-card" key={martialArtName}>
+                    <div className="social-detail-card-head">
+                      <Icons.Combat size={16} />
+                      <span>功法根基</span>
+                      {martialArtName !== '功法根基' && <strong>{martialArtName}</strong>}
+                    </div>
+                    <div className="social-tag-row">
+                      {martialArt.type && <span className="social-tag muted">{martialArt.type}</span>}
+                      <span className="social-tag">{martialArt.martialArtsRank || '未知品阶'}</span>
+                      <span className="social-tag muted">{martialArt.mastery || '未知掌握'}</span>
+                    </div>
+                    <p className="social-detail-text">{martialArt.martialArtsDescription || '尚未探明其武学底细。'}</p>
+                    {traitEntries.length > 0 && (
+                      <div className="social-trait-grid">
+                        {traitEntries.map(([trait, desc]) => (
+                          <div className="social-trait-chip" key={trait}>
+                            <span>{trait}</span>
+                            <small>{desc}</small>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+                    )}
+                  </section>
+                );
+              })}
 
               <div className="social-detail-columns">
                 <section className="social-detail-card compact">

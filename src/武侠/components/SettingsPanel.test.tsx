@@ -372,4 +372,24 @@ describe('SettingsPanel variable groups', () => {
     expect(screen.getByTitle('stat_data.user数据.姓名')).toHaveTextContent('stat_data › user数据 › 姓名');
     expect(screen.getByLabelText('值')).toHaveValue('墨逸');
   });
+
+  it('反转义 ERA 占位符后再显示变量键和值', async () => {
+    getVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: {
+          '别名__DOT__键': '如__SQUOTE__白虹经天__SQUOTE__。',
+        },
+      },
+    });
+
+    await openVariableTab();
+
+    const variableTree = within(screen.getByLabelText('变量浏览'));
+    const decodedKeyNodes = variableTree.getAllByTitle('别名.键');
+    expect(decodedKeyNodes.length).toBeGreaterThan(0);
+    expect(decodedKeyNodes[decodedKeyNodes.length - 1]).toHaveTextContent('别名.键');
+
+    fireEvent.click(decodedKeyNodes[decodedKeyNodes.length - 1]);
+    expect(screen.getByLabelText('值')).toHaveValue('如\'白虹经天\'。');
+  });
 });

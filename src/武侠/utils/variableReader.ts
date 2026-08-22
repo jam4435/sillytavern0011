@@ -38,6 +38,7 @@ import {
   type CompleteMartialArt,
   type SimpleMartialArt,
 } from './martialArtsDatabase';
+import { unescapeEraData } from '../../ERA变量框架/utils/data';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { isHistoryCheckoutPending } from '../../shared/historyCheckoutJournal';
 import { isChatRenamePending } from '../../shared/chatRenameJournal';
@@ -485,7 +486,10 @@ export function getGameVariables(): GameVariables {
     const statData = rawVariables?.stat_data as GameVariables;
     dataLogger.log('[variableReader] stat_data 键:', statData ? Object.keys(statData) : []);
 
-    return statData || {};
+    // getAllVariables 返回的是 ERA 内部快照，字符串和动态键可能仍保留
+    // __DOT__/__DQUOTE__/__SQUOTE__ 等占位符。前端只读投影必须先反转义，
+    // 否则正文会把占位符直接显示出来，包含引号的动态键也无法匹配。
+    return statData ? unescapeEraData(statData) : {};
   } catch (error) {
     dataLogger.error('[variableReader] 获取变量表失败:', error);
     return {};
@@ -1265,16 +1269,27 @@ function getPrimaryIdentityTitle(identities?: Record<string, string>, fallbackTy
 }
 
 function getPrimaryMartialArtTemplate(characterData?: CharacterData, legacyNpc?: LegacySocialNpc): NPC['template'] {
-  const primaryMartialArt = characterData?.功法
-    ? Object.entries(characterData.功法).find(([name]) => !name.startsWith('$'))?.[1]
-    : undefined;
+  const martialArts: NonNullable<NPC['template']['martialArts']> = {};
+  for (const [name, art] of Object.entries(characterData?.功法 || {})) {
+    if (name.startsWith('$')) continue;
+    martialArts[name] = {
+      type: art?.类型 || '',
+      martialArtsDescription: art?.功法描述 || '',
+      martialArtsRank: art?.功法品阶 || '普通',
+      mastery: art?.掌握程度 || '入门',
+      traits: art?.特性 || {},
+    };
+  }
+
+  const primaryMartialArt = Object.values(martialArts)[0];
 
   return {
-    type: getPrimaryIdentityTitle(characterData?.身份, primaryMartialArt?.类型),
-    martialArtsDescription: primaryMartialArt?.功法描述 || legacyNpc?.武功描述 || '',
-    martialArtsRank: primaryMartialArt?.功法品阶 || legacyNpc?.武功品阶 || '普通',
-    mastery: primaryMartialArt?.掌握程度 || legacyNpc?.掌握程度 || '入门',
-    traits: primaryMartialArt?.特性 || legacyNpc?.特性 || {},
+    type: getPrimaryIdentityTitle(characterData?.身份, primaryMartialArt?.type),
+    martialArtsDescription: primaryMartialArt?.martialArtsDescription || legacyNpc?.武功描述 || '',
+    martialArtsRank: primaryMartialArt?.martialArtsRank || legacyNpc?.武功品阶 || '普通',
+    mastery: primaryMartialArt?.mastery || legacyNpc?.掌握程度 || '入门',
+    traits: primaryMartialArt?.traits || legacyNpc?.特性 || {},
+    martialArts: Object.keys(martialArts).length > 0 ? martialArts : undefined,
   };
 }
 

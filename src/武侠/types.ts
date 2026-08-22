@@ -241,10 +241,21 @@ export interface NPC {
     martialArtsRank: string;
     mastery: string;
     traits: Record<string, string>;
+    /** 角色持有的完整功法集合；旧存档可能仅提供上面的首门功法字段。 */
+    martialArts?: Record<string, NPCMartialArt>;
   };
   keyItems: string[];
   biography: string;
   network: string[];
+}
+
+/** 侠缘详情页展示的一门功法（来自角色数据.功法中的完整条目）。 */
+export interface NPCMartialArt {
+  type: string;
+  martialArtsDescription: string;
+  martialArtsRank: string;
+  mastery: string;
+  traits: Record<string, string>;
 }
 
 // 世界时间结构

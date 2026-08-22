@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GameEvent } from '../types';
 import {
+  getEventDescription,
   getEventSemanticLabel,
   getTrackerEvents,
   isEventUrgent,
@@ -16,6 +17,15 @@ const event = (overrides: Partial<GameEvent>): GameEvent => ({
 });
 
 describe('eventPresentation', () => {
+  it('removes the duplicated leading event time field from the event description', () => {
+    expect(
+      getEventDescription(
+        event({ description: '1219年10月20日13时 到 15时，大宋/张家口/大酒店发生相遇。' }),
+      ),
+    ).toBe('大宋/张家口/大酒店发生相遇。');
+    expect(getEventDescription(event({ description: '只保留事件正文。' }))).toBe('只保留事件正文。');
+  });
+
   it('maps existing event semantics to the player-facing labels', () => {
     expect(getEventSemanticLabel(event({ type: 'ACTIVE', category: 'participation' }))).toBe('亲历');
     expect(getEventSemanticLabel(event({ type: 'ACTIVE', category: 'world' }))).toBe('江湖');
@@ -51,4 +61,3 @@ describe('eventPresentation', () => {
     expect(getTrackerEvents(input).map(item => item.id)).toEqual(['personal-a', 'personal-b', 'urgent-world']);
   });
 });
-

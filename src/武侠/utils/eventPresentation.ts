@@ -1,5 +1,7 @@
 import type { GameEvent } from '../types';
 
+const EVENT_TIME_PREFIX_PATTERN = /^\s*(?:时间[：:]\s*)?\d{1,4}年\d{1,2}月\d{1,2}日\d{1,2}时(?:\d{1,2}分)?\s*(?:到|至|[-—–→])\s*(?:(?:\d{1,4}年)?\d{1,2}月\d{1,2}日)?\s*\d{1,2}时(?:\d{1,2}分)?\s*[，,、。:：]\s*/;
+
 export type EventSemanticCategory = 'participation' | 'world' | 'rumor' | 'aftermath';
 
 export const EVENT_SEMANTIC_LABELS: Record<EventSemanticCategory, string> = {
@@ -21,6 +23,10 @@ export function getEventSemanticLabel(event: GameEvent): string {
 
 export function getEventTimeLabel(event: GameEvent): string {
   return event.type === 'RUMOR' ? '事发时间' : '预计结束';
+}
+
+export function getEventDescription(event: GameEvent): string {
+  return event.description.trim().replace(EVENT_TIME_PREFIX_PATTERN, '').trim();
 }
 
 export function getEventCountdownLabel(event: GameEvent): string | null {
@@ -77,4 +83,3 @@ export function sortEventsForDisplay(events: GameEvent[]): GameEvent[] {
 export function getTrackerEvents(events: GameEvent[], limit = 3): GameEvent[] {
   return sortEventsForDisplay(events).slice(0, limit);
 }
-

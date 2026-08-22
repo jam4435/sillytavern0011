@@ -897,6 +897,36 @@
     background: transparent;
   }
 
+  .chat-rename-dialog {
+    color: var(--wuxia-ink-text);
+    background:
+      linear-gradient(125deg, rgba(139, 26, 26, 0.06), transparent 45%),
+      rgba(255, 252, 247, 0.92);
+
+    &__lead {
+      color: var(--wuxia-ink-text-muted);
+    }
+
+    &__field {
+      color: var(--wuxia-ink-text-muted);
+
+      input {
+        color: var(--wuxia-ink-text-strong);
+        border-color: var(--wuxia-ink-border);
+        background: rgba(255, 252, 247, 0.82);
+
+        &:focus {
+          border-color: rgba(139, 26, 26, 0.62);
+          box-shadow: 0 0 0 3px var(--wuxia-ink-focus-ring);
+        }
+      }
+    }
+
+    &__error {
+      color: #8b1a1a;
+    }
+  }
+
   .avatar-preview-stage {
     border-color: rgba(61, 48, 40, 0.12);
     background:
@@ -1690,33 +1720,58 @@
 
   .event-tracker {
     color: var(--wuxia-ink-text);
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(250, 246, 238, 0.04) 48%, rgba(61, 48, 40, 0.05)),
-      var(--wuxia-ink-panel-card-l, none),
-      var(--wuxia-ink-paper);
-    background-position: center;
-    background-size: 100% 100%;
-    border: 0;
+    background: var(--wuxia-ink-paper-strong, var(--wuxia-ink-paper));
+    border: 12px solid transparent;
+    border-image-source: var(--wuxia-ink-panel-rect-lg, none);
+    border-image-slice: 36;
+    border-image-repeat: stretch;
     box-shadow: 0 9px 20px rgba(61, 48, 40, 0.16);
 
     &::before {
-      inset: 0.38rem;
-      border-color: rgba(61, 48, 40, 0.18);
+      display: none;
     }
 
     &::after {
-      inset: 0.52rem;
-      background: linear-gradient(90deg, rgba(255, 255, 255, 0.18), transparent 28%, transparent 72%, rgba(61, 48, 40, 0.04));
+      display: none;
     }
 
     &.is-collapsed {
-      background:
-        linear-gradient(90deg, rgba(255, 255, 255, 0.25), rgba(250, 246, 238, 0.05)),
-        var(--wuxia-ink-panel-bar-md, none),
-        var(--wuxia-ink-paper);
-      background-position: center;
-      background-size: 100% 100%;
-      box-shadow: 0 6px 14px rgba(61, 48, 40, 0.12);
+      width: clamp(12.5rem, 19vw, 15.5rem);
+      height: 2.35rem;
+      min-height: 0;
+      padding-inline: 1.72rem;
+      background-color: var(--wuxia-ink-paper-strong, var(--wuxia-ink-paper));
+      background-image:
+        url('../assets/ui/event-scroll-left.webp'),
+        url('../assets/ui/event-scroll-right.webp'),
+        url('../assets/ui/event-scroll-mid.webp');
+      background-position: left center, right center, center center;
+      background-repeat: no-repeat;
+      background-size: 2.6rem 100%, 2.6rem 100%, calc(100% - 3.3rem) 100%;
+      border: 0;
+      box-shadow: none;
+
+      .event-tracker-heading {
+        min-height: 2.1rem;
+        padding: 0.08rem 0.14rem;
+        gap: 0.24rem;
+      }
+
+      .event-tracker-title {
+        font-size: 0.78rem;
+        letter-spacing: 0.12em;
+      }
+
+      .event-tracker-count {
+        width: 0.92rem;
+        height: 0.92rem;
+        font-size: 0.58rem;
+      }
+
+      .event-tracker-chevron svg {
+        width: 0.86rem;
+        height: 0.86rem;
+      }
     }
   }
 
@@ -1727,8 +1782,11 @@
   }
 
   .event-tracker-title-brush {
-    color: #fffaf2;
-    background: var(--wuxia-ink-brush-bar-md, linear-gradient(90deg, #292823, #5a584e)) center / 100% 100% no-repeat;
+    width: auto;
+    height: auto;
+    padding: 0;
+    color: var(--wuxia-ink-text-strong);
+    background: transparent;
     clip-path: none;
     box-shadow: none;
     filter: none;
@@ -1740,6 +1798,11 @@
 
   .event-tracker-title {
     color: inherit;
+  }
+
+  .event-tracker-heading,
+  .event-tracker-body {
+    padding-inline: 0.56rem;
   }
 
   .event-tracker-count {
@@ -2649,6 +2712,15 @@
 
   .social-detail-hero {
     background: radial-gradient(circle at 12% 20%, rgba(139, 26, 26, 0.12), transparent 30%), rgba(241, 235, 223, 0.72);
+  }
+
+  // 详情卡片位于半透明 modal-content 之上；较低的不透明度会把聊天正文
+  // 透到「功法根基」等卡片中，造成文字重影和内容难以辨识。保持宣纸渐变，
+  // 但提高底色不透明度，确保卡片内容与背景隔离。
+  .social-detail-card {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 56%),
+      rgba(241, 235, 223, 0.94);
   }
 
   .social-portrait {

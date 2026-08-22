@@ -1,4 +1,5 @@
 import { runDirectChatVariableWrite } from '../../shared/directVariableWrite';
+import { escapeEraData, unescapeEraData } from '../../ERA变量框架/utils/data';
 
 export type VariableEditorPathSegment = string | number;
 export type VariableEditorPath = ReadonlyArray<VariableEditorPathSegment>;
@@ -93,6 +94,22 @@ export const getVariableEditorStatDataFromVariables = (variables: unknown): Reco
   }
 
   return isRecord(variables.stat_data) ? variables.stat_data : {};
+};
+
+/**
+ * 返回给变量编辑页展示/编辑的 stat_data 投影。
+ *
+ * ERA 为了让点号、引号等字符可以安全地出现在变量路径中，会把它们
+ * 存成 __DOT__、__DQUOTE__、__SQUOTE__ 等占位符。变量页不是 ERA 的
+ * 输出接口，直接读取 getVariables() 会把这些内部占位符原样显示出来，
+ * 因此在进入编辑器前统一反转义；保存时再由 saveChatVariableLeafChanges
+ * 重新转义写回，避免破坏 ERA 的变量键路径。
+ */
+export const getVariableEditorDisplayStatDataFromVariables = (
+  variables: unknown,
+): Record<string, unknown> => {
+  const rawStatData = getVariableEditorStatDataFromVariables(variables);
+  return unescapeEraData(rawStatData) as Record<string, unknown>;
 };
 
 const cloneVariableValue = <T,>(value: T): T => {
@@ -680,19 +697,24 @@ export const saveChatVariableLeafChanges = async (
       },
       () =>
         updateVariablesWith(currentVariables => {
-          const currentStatData = getVariableEditorStatDataFromVariables(currentVariables);
+          // 编辑器中的路径和值已经过 ERA 反转义；冲突检测也必须在同一
+          // 个显示投影上进行，否则 __SQUOTE__ 等占位符会让每次保存都
+          // 被误判为外部修改。
+          const currentStatData = getVariableEditorDisplayStatDataFromVariables(currentVariables);
           const conflicts = detectVariableLeafConflicts(currentStatData, internalChanges);
           if (conflicts.length > 0) {
             throw new VariableEditorConflictError(conflicts);
           }
 
+          const nextStatData = applyVariableLeafChanges(currentStatData, internalChanges);
           return {
             ...currentVariables,
-            stat_data: applyVariableLeafChanges(currentStatData, internalChanges),
+            // ERA 内部仍需要占位符形式的键和值；只在写回边界重新转义。
+            stat_data: escapeEraData(nextStatData),
           };
         }, { type: 'chat' }),
     );
-    const savedStatData = getVariableEditorStatDataFromVariables(savedVariables);
+    const savedStatData = getVariableEditorDisplayStatDataFromVariables(savedVariables);
 
     return {
       conflicts: [],

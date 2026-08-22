@@ -47,7 +47,12 @@ import {
 import { readLatestDebugRoundSnapshot } from './hooks/useDebugLogs';
 import { shouldDeferSetupEventNotifications } from './hooks/usePageFlow';
 import { ActivePanel, InventoryItem } from './types';
-import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
+import {
+  getInitialChatRenameSuggestion,
+  getRandomOpeningLine,
+  initializeNewGameSession,
+  type NewGameFormData,
+} from './utils/gameInitializer';
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
 import { migrateAvatarState } from './utils/avatarState';
 import { equipInventoryItem, useMedicineItem } from './utils/itemManager';
@@ -1146,7 +1151,7 @@ const App: React.FC = () => {
           gameLogger.log('✅ 欢迎语已设置到开局输入界面');
           gameLogger.log('欢迎语:', result.content);
 
-          const suggestedName = `${formData.name.trim()} · ${formData.locationInfo.location.trim()}`;
+          const suggestedName = getInitialChatRenameSuggestion(formData);
           setInitialRenameDraft(suggestedName);
           setInitialRenameError(null);
           setInitialChatRename({ suggestedName });

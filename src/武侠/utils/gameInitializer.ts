@@ -249,6 +249,23 @@ export interface NewGameFormData {
   customRealm?: RealmLevel;
 }
 
+function sanitizeInitialChatRenamePart(value: string): string {
+    return [...value]
+      .map(character => (/[<>:"/\\|?*]/u.test(character) || character.charCodeAt(0) < 32 ? '·' : character))
+      .join('')
+      .trim()
+      .replace(/[.\s·]+$/u, '');
+}
+
+export function getInitialChatRenameSuggestion(formData: Pick<NewGameFormData, 'name' | 'locationInfo'>): string {
+  const characterName = sanitizeInitialChatRenamePart(formData.name) || '未命名角色';
+  const { locationInfo } = formData;
+  const openingContext = locationInfo.eventName?.trim()
+    || `${locationInfo.year}年${locationInfo.month}月${locationInfo.day}日${locationInfo.hour ?? 11}时 · ${locationInfo.location}`;
+  const safeContext = sanitizeInitialChatRenamePart(openingContext) || '开局';
+  return `${characterName}（${safeContext}）`;
+}
+
 export const DEFAULT_ATTRIBUTES: InitialAttributes = {
   臂力: 6,
   根骨: 6,
