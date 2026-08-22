@@ -6,7 +6,7 @@ import EventTracker, { EVENT_TRACKER_COLLAPSED_STORAGE_KEY } from './EventTracke
 const events: GameEvent[] = [
   {
     id: 'personal',
-    title: '风起江南',
+    title: '射雕第一回03-风起江南',
     type: 'ACTIVE',
     category: 'participation',
     description: '镖局的密信催你赶往城外。',
@@ -17,7 +17,7 @@ const events: GameEvent[] = [
   },
   {
     id: 'world',
-    title: '塞外烽烟',
+    title: '射雕第二回01-塞外烽烟',
     type: 'ACTIVE',
     category: 'world',
     description: '北地军情骤紧。',
@@ -25,14 +25,14 @@ const events: GameEvent[] = [
   },
   {
     id: 'follow-up',
-    title: '旧案余波',
+    title: '射雕第三回02-旧案余波',
     type: 'AFTERMATH',
     description: '客栈掌柜似乎知道内情。',
     remainingTurns: 1,
   },
   {
     id: 'rumor',
-    title: '古墓传闻',
+    title: '射雕第四回01-古墓传闻',
     type: 'RUMOR',
     description: '终南山下有人见到白衣女子。',
   },
@@ -78,6 +78,7 @@ describe('EventTracker', () => {
     fireEvent.click(screen.getByRole('button', { name: '展开江湖事簿' }));
     expect(screen.getByText('另有 1 件待阅')).toBeInTheDocument();
     expect(screen.getByText('风起江南')).toBeInTheDocument();
+    expect(screen.getByText('射雕第一回03')).toBeInTheDocument();
     expect(screen.queryByText('镖局的密信催你赶往城外。')).not.toBeInTheDocument();
     expect(screen.getByText('先赴苏州城外，再寻失踪镖师。')).toBeInTheDocument();
     expect(screen.getByText('卷入：陆乘风')).toBeInTheDocument();
@@ -98,10 +99,10 @@ describe('EventTracker', () => {
     render(<EventTracker events={events} onOpenAll={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: '展开江湖事簿' }));
 
-    expect(screen.getByRole('button', { name: /【亲历】风起江南/ })).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(screen.getByRole('button', { name: /【后续】旧案余波/ }));
-    expect(screen.getByRole('button', { name: /【亲历】风起江南/ })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByRole('button', { name: /【后续】旧案余波/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /风起江南 射雕第一回03/ })).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /旧案余波 射雕第三回02/ }));
+    expect(screen.getByRole('button', { name: /风起江南 射雕第一回03/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /旧案余波 射雕第三回02/ })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('falls back to the collapsed default when stored data is not recognized', () => {

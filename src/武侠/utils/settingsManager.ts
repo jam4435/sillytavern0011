@@ -13,6 +13,9 @@ import inkWashPanelBarMdUrl from '../wuxia-sprites/panel/panel-bar-md.png?url';
 import inkWashPanelCardLUrl from '../wuxia-sprites/panel/panel-card-l.png?url';
 import inkWashPanelRectLgUrl from '../wuxia-sprites/panel/panel-rect-lg.png?url';
 import inkWashPanelRectXlUrl from '../wuxia-sprites/panel/panel-rect-xl.png?url';
+import eventScrollLeftUrl from '../assets/ui/event-scroll-left.webp?url';
+import eventScrollMidUrl from '../assets/ui/event-scroll-mid.webp?url';
+import eventScrollRightUrl from '../assets/ui/event-scroll-right.webp?url';
 
 // =========================================
 // 类型定义
@@ -1547,6 +1550,9 @@ export function generateCSSVariables(settings: DisplaySettings): Record<string, 
     '--wuxia-ink-circle-frame': cssUrl(inkWashCircleFrameInkUrl),
     '--wuxia-ink-icon-circle': cssUrl(inkWashIconCircleInkUrl),
     '--wuxia-ink-icon-square-dark': cssUrl(inkWashIconSquareDarkUrl),
+    '--wuxia-event-scroll-left': cssUrl(eventScrollLeftUrl),
+    '--wuxia-event-scroll-mid': cssUrl(eventScrollMidUrl),
+    '--wuxia-event-scroll-right': cssUrl(eventScrollRightUrl),
   };
 }
 

@@ -3,6 +3,7 @@ import type { GameEvent } from '../types';
 import {
   getEventDescription,
   getEventSemanticLabel,
+  getEventTitleParts,
   getTrackerEvents,
   isEventUrgent,
   sortEventsForDisplay,
@@ -31,6 +32,14 @@ describe('eventPresentation', () => {
     expect(getEventSemanticLabel(event({ type: 'ACTIVE', category: 'world' }))).toBe('江湖');
     expect(getEventSemanticLabel(event({ type: 'RUMOR' }))).toBe('风闻');
     expect(getEventSemanticLabel(event({ type: 'AFTERMATH' }))).toBe('后续');
+  });
+
+  it('puts the event name before its source reference and removes the separator', () => {
+    expect(getEventTitleParts('射雕第一回03-郭杨结识丘处机')).toEqual({
+      name: '郭杨结识丘处机',
+      reference: '射雕第一回03',
+    });
+    expect(getEventTitleParts('无来源事件')).toEqual({ name: '无来源事件' });
   });
 
   it('recognizes urgent countdowns without treating ordinary rumors as urgent', () => {

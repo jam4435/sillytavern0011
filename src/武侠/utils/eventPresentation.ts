@@ -21,6 +21,23 @@ export function getEventSemanticLabel(event: GameEvent): string {
   return EVENT_SEMANTIC_LABELS[getEventSemanticCategory(event)];
 }
 
+export interface EventTitleParts {
+  name: string;
+  reference?: string;
+}
+
+export function getEventTitleParts(title: string): EventTitleParts {
+  const normalizedTitle = title.trim();
+  const separatorIndex = normalizedTitle.indexOf('-');
+  if (separatorIndex <= 0 || separatorIndex >= normalizedTitle.length - 1) {
+    return { name: normalizedTitle };
+  }
+
+  const reference = normalizedTitle.slice(0, separatorIndex).trim();
+  const name = normalizedTitle.slice(separatorIndex + 1).trim();
+  return reference && name ? { name, reference } : { name: normalizedTitle };
+}
+
 export function getEventTimeLabel(event: GameEvent): string {
   return event.type === 'RUMOR' ? '事发时间' : '预计结束';
 }

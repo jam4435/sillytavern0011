@@ -206,7 +206,7 @@
 .event-tracker-entry-heading {
   width: 100%;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: baseline;
   gap: 0.16rem 0.42rem;
   padding: 0.55rem 0.08rem 0.34rem;
@@ -238,6 +238,17 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-tracker-entry-reference,
+.event-disclosure-reference,
+.chronicle-entry-reference {
+  color: var(--stone-500);
+  font-family: var(--font-sans, sans-serif);
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
@@ -361,7 +372,7 @@
 .event-disclosure-heading {
   width: 100%;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: baseline;
   gap: 0.3rem 0.45rem;
   padding: 0.52rem 0.58rem;
@@ -565,7 +576,7 @@
 }
 
 .event-disclosure-heading {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   padding: 0.72rem 0.8rem;
 }
 
@@ -968,9 +979,10 @@ button.chronicle-world-toggle:focus-visible {
 
 @media (max-width: 420px) {
   .event-tracker-entry-heading {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
+  .event-tracker-entry-reference,
   .event-tracker-entry-countdown {
     grid-column: 2;
     margin-top: -0.08rem;

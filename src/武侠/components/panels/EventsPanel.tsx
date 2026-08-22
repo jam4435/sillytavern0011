@@ -4,6 +4,7 @@ import {
   getEventCountdownLabel,
   getEventDescription,
   getEventSemanticLabel,
+  getEventTitleParts,
   isEventUrgent,
   sortEventsForDisplay,
 } from '../../utils/eventPresentation';
@@ -43,18 +44,20 @@ const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
 }) => {
   const detailId = useId().replace(/:/g, '');
   const countdown = getEventCountdownLabel(event);
+  const titleParts = getEventTitleParts(event.title);
 
   return (
     <section className={`event-disclosure ${isExpanded ? 'is-expanded' : ''}${isEventUrgent(event) ? ' is-urgent' : ''}`}>
       <button
         type="button"
         className="event-disclosure-heading"
+        aria-label={`${titleParts.name}${titleParts.reference ? ` ${titleParts.reference}` : ''}（${getEventSemanticLabel(event)}）`}
         aria-expanded={isExpanded}
         aria-controls={detailId}
         onClick={onToggle}
       >
-        <span className="event-disclosure-kicker">【{getEventSemanticLabel(event)}】</span>
-        <span className="event-disclosure-title">{event.title}</span>
+        <span className="event-disclosure-title">{titleParts.name}</span>
+        {titleParts.reference && <span className="event-disclosure-reference">{titleParts.reference}</span>}
         {countdown && <span className="event-disclosure-countdown">{countdown}</span>}
         <span className="event-disclosure-chevron" aria-hidden="true">
           {isExpanded ? <Icons.ChevronUp size={17} /> : <Icons.ChevronDown size={17} />}
@@ -144,6 +147,7 @@ const ChronicleTab: React.FC<ChronicleTabProps> = ({ chronicle }) => {
                 const dayText = entry.year !== undefined ? entry.timeText.replace(`${entry.year}年`, '') : entry.timeText;
                 const statusLabel = entry.outcomeStatus ? CHRONICLE_STATUS_LABEL[entry.outcomeStatus] : undefined;
                 const statusNote = isExpanded && entry.outcomeStatus ? CHRONICLE_STATUS_NOTE[entry.outcomeStatus] : undefined;
+                const titleParts = getEventTitleParts(entry.title);
                 return (
                   <button
                     type="button"
@@ -158,7 +162,8 @@ const ChronicleTab: React.FC<ChronicleTabProps> = ({ chronicle }) => {
                   >
                     <span className="chronicle-entry-head">
                       <span className="chronicle-entry-time">{dayText}</span>
-                      <span className="chronicle-entry-title">{entry.title}</span>
+                      <span className="chronicle-entry-title">{titleParts.name}</span>
+                      {titleParts.reference && <span className="chronicle-entry-reference">{titleParts.reference}</span>}
                       {statusLabel && (
                         <span className={`chronicle-status-seal chronicle-status-seal--${entry.outcomeStatus === '偏离' ? 'diverged' : 'unknown'}`}>
                           {statusLabel}

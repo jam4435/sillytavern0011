@@ -6,7 +6,7 @@ import { EventsPanel } from './EventsPanel';
 const events: GameEvent[] = [
   {
     id: 'personal',
-    title: '风起江南',
+    title: '射雕第一回03-风起江南',
     type: 'ACTIVE',
     category: 'participation',
     description: '镖局的密信催你赶往城外。',
@@ -15,20 +15,20 @@ const events: GameEvent[] = [
   },
   {
     id: 'world',
-    title: '塞外烽烟',
+    title: '射雕第二回01-塞外烽烟',
     type: 'ACTIVE',
     category: 'world',
     description: '北地军情骤紧。',
   },
   {
     id: 'rumor',
-    title: '古墓传闻',
+    title: '射雕第四回01-古墓传闻',
     type: 'RUMOR',
     description: '终南山下有人见到白衣女子。',
   },
   {
     id: 'follow-up',
-    title: '旧案余波',
+    title: '射雕第三回02-旧案余波',
     type: 'AFTERMATH',
     description: '客栈掌柜似乎知道内情。',
     remainingTurns: 1,
@@ -38,7 +38,7 @@ const events: GameEvent[] = [
 const chronicle: ChronicleEntry[] = [
   {
     id: 'personal-history',
-    title: '太湖夜宴',
+    title: '射雕第五回01-太湖夜宴',
     year: 1206,
     timeText: '1206年三月初二',
     sortDays: 1,
@@ -48,7 +48,7 @@ const chronicle: ChronicleEntry[] = [
   },
   {
     id: 'world-history',
-    title: '襄阳战报',
+    title: '射雕第六回01-襄阳战报',
     year: 1205,
     timeText: '1205年十月初八',
     sortDays: 0,
@@ -62,16 +62,16 @@ describe('EventsPanel', () => {
     render(<EventsPanel events={events} chronicle={chronicle} currentLocation="嘉兴城内" />);
 
     expect(screen.getByRole('tab', { name: /当前2/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('button', { name: /【亲历】风起江南/ })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('【江湖】')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /风起江南 射雕第一回03/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('射雕第二回01')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /【江湖】塞外烽烟/ }));
-    expect(screen.getByRole('button', { name: /【亲历】风起江南/ })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByRole('button', { name: /【江湖】塞外烽烟/ })).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /塞外烽烟 射雕第二回01/ }));
+    expect(screen.getByRole('button', { name: /风起江南 射雕第一回03/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /塞外烽烟 射雕第二回01/ })).toHaveAttribute('aria-expanded', 'true');
 
     fireEvent.click(screen.getByRole('tab', { name: /线索2/ }));
     expect(screen.getByRole('tab', { name: /线索2/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('button', { name: /【后续】旧案余波/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /旧案余波 射雕第三回02/ })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('removes the duplicated time prefix from the expanded event description', () => {
@@ -117,7 +117,7 @@ describe('EventsPanel', () => {
     render(<EventsPanel events={[events[2]]} chronicle={chronicle} />);
 
     expect(screen.getByRole('tab', { name: /线索1/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('button', { name: /【风闻】古墓传闻/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /古墓传闻 射雕第四回01/ })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('changes away from an empty active tab after a game-state refresh', () => {

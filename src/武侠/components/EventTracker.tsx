@@ -3,6 +3,7 @@ import type { GameEvent } from '../types';
 import {
   getEventCountdownLabel,
   getEventSemanticLabel,
+  getEventTitleParts,
   getTrackerEvents,
   isEventUrgent,
 } from '../utils/eventPresentation';
@@ -92,6 +93,7 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
               const isExpanded = expandedEventId === event.id;
               const detailId = `${trackerBodyId}-event-${event.id}`;
               const countdown = getEventCountdownLabel(event);
+              const titleParts = getEventTitleParts(event.title);
               return (
                 <section
                   className={`event-tracker-entry ${isExpanded ? 'is-expanded' : ''}${isEventUrgent(event) ? ' is-urgent' : ''}`}
@@ -100,12 +102,13 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
                   <button
                     type="button"
                     className="event-tracker-entry-heading"
+                    aria-label={`${titleParts.name}${titleParts.reference ? ` ${titleParts.reference}` : ''}（${getEventSemanticLabel(event)}）`}
                     aria-expanded={isExpanded}
                     aria-controls={detailId}
                     onClick={() => setExpandedEventId(current => (current === event.id ? null : event.id))}
                   >
-                    <span className="event-tracker-entry-kicker">【{getEventSemanticLabel(event)}】</span>
-                    <span className="event-tracker-entry-title">{event.title}</span>
+                    <span className="event-tracker-entry-title">{titleParts.name}</span>
+                    {titleParts.reference && <span className="event-tracker-entry-reference">{titleParts.reference}</span>}
                     {countdown && <span className="event-tracker-entry-countdown">{countdown}</span>}
                   </button>
 

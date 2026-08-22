@@ -1605,6 +1605,7 @@
 
   // 江湖事簿：水墨主题使用现有宣纸色阶，保留朱砂作为紧急与计数印记。
   .event-tracker {
+    width: clamp(10.5rem, 15vw, 12.5rem);
     color: var(--wuxia-ink-text);
     background:
       linear-gradient(135deg, rgba(255, 255, 255, 0.42), transparent 54%),
@@ -1637,6 +1638,12 @@
   .event-tracker-entry-title,
   .event-disclosure-title {
     color: var(--wuxia-ink-text-strong);
+  }
+
+  .event-tracker-entry-reference,
+  .event-disclosure-reference,
+  .chronicle-entry-reference {
+    color: rgba(91, 80, 72, 0.72);
   }
 
   .event-tracker-entry,
@@ -1736,41 +1743,46 @@
     }
 
     &.is-collapsed {
-      width: clamp(12.5rem, 19vw, 15.5rem);
-      height: 2.35rem;
+      width: clamp(10.5rem, 15vw, 12.5rem);
+      height: 1.55rem;
       min-height: 0;
-      padding-inline: 1.72rem;
-      background-color: var(--wuxia-ink-paper-strong, var(--wuxia-ink-paper));
+      padding-inline: 0.78rem;
+      background: transparent;
       background-image:
-        url('../assets/ui/event-scroll-left.webp'),
-        url('../assets/ui/event-scroll-right.webp'),
-        url('../assets/ui/event-scroll-mid.webp');
+        var(--wuxia-event-scroll-left, none),
+        var(--wuxia-event-scroll-right, none),
+        var(--wuxia-event-scroll-mid, none);
       background-position: left center, right center, center center;
       background-repeat: no-repeat;
-      background-size: 2.6rem 100%, 2.6rem 100%, calc(100% - 3.3rem) 100%;
+      background-size: 1.55rem 100%, 1.55rem 100%, calc(100% - 1.9rem) 100%;
       border: 0;
       box-shadow: none;
 
       .event-tracker-heading {
-        min-height: 2.1rem;
-        padding: 0.08rem 0.14rem;
-        gap: 0.24rem;
+        min-height: 1.38rem;
+        grid-template-columns: auto auto;
+        justify-content: flex-end;
+        padding: 0 0.08rem;
+        gap: 0.2rem;
+      }
+
+      .event-tracker-title-brush {
+        display: none;
       }
 
       .event-tracker-title {
-        font-size: 0.78rem;
-        letter-spacing: 0.12em;
+        display: none;
       }
 
       .event-tracker-count {
-        width: 0.92rem;
-        height: 0.92rem;
-        font-size: 0.58rem;
+        width: 0.7rem;
+        height: 0.7rem;
+        font-size: 0.48rem;
       }
 
       .event-tracker-chevron svg {
-        width: 0.86rem;
-        height: 0.86rem;
+        width: 0.62rem;
+        height: 0.62rem;
       }
     }
   }
@@ -4329,5 +4341,129 @@
     .settings-slider {
       background: linear-gradient(rgba(61, 48, 40, 0.2), rgba(61, 48, 40, 0.2)) center / 100% 4px no-repeat;
     }
+  }
+}
+
+.event-tracker {
+  width: 50%;
+}
+
+.event-tracker.is-collapsed {
+  width: 50%;
+  height: 1.55rem;
+  min-height: 0;
+  padding-inline: 0.78rem;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+
+  &::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    display: block;
+    background-image:
+      var(--wuxia-event-scroll-left, none),
+      var(--wuxia-event-scroll-right, none),
+      var(--wuxia-event-scroll-mid, none);
+    background-position: left center, right center, center center;
+    background-repeat: no-repeat;
+    background-size: 1.55rem 100%, 1.55rem 100%, calc(100% - 1.9rem) 100%;
+    opacity: 0.72;
+    pointer-events: none;
+  }
+
+  &::after {
+    display: none;
+  }
+
+  .event-tracker-heading {
+    min-height: 1.38rem;
+    grid-template-columns: auto auto;
+    justify-content: flex-end;
+    padding: 0 0.08rem;
+    gap: 0.2rem;
+  }
+
+  .event-tracker-title-brush,
+  .event-tracker-title {
+    display: none;
+  }
+
+  .event-tracker-count {
+    width: 0.7rem;
+    height: 0.7rem;
+    font-size: 0.48rem;
+  }
+
+  .event-tracker-chevron svg {
+    width: 0.62rem;
+    height: 0.62rem;
+  }
+}
+
+@media (max-width: $breakpoint-md) {
+  .event-tracker,
+  .event-tracker.is-collapsed {
+    width: calc(100% - 1.5rem);
+  }
+
+  .event-tracker.is-expanded .event-tracker-heading {
+    min-height: 2.7rem;
+    padding: 0.28rem 0.48rem 0.22rem;
+  }
+
+  .event-tracker.is-expanded .event-tracker-title {
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+  }
+
+  .event-tracker.is-expanded .event-tracker-count {
+    width: 1rem;
+    height: 1rem;
+    font-size: 0.54rem;
+  }
+
+  .event-tracker.is-expanded .event-tracker-chevron svg {
+    width: 0.76rem;
+    height: 0.76rem;
+  }
+
+  .event-tracker-body {
+    max-height: 24rem;
+    padding: 0.02rem 0.46rem 0.5rem;
+  }
+
+  .event-tracker-entry-heading {
+    gap: 0.22rem;
+  }
+
+  .event-tracker-entry-kicker {
+    font-size: 0.58rem;
+  }
+
+  .event-tracker-entry-title {
+    font-size: 0.76rem;
+    line-height: 1.25;
+  }
+
+  .event-tracker-entry-countdown {
+    font-size: 0.56rem;
+  }
+
+  .event-tracker-entry-detail {
+    padding-left: 0.46rem;
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  .event-tracker .event-meta-row {
+    gap: 0.08rem 0.38rem;
+    font-size: 0.66rem;
+  }
+
+  .event-tracker-footer {
+    font-size: 0.68rem;
   }
 }
