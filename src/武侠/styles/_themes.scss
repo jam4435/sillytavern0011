@@ -4344,11 +4344,11 @@
   }
 }
 
-.event-tracker {
+.main-column > .event-tracker {
   width: 50%;
 }
 
-.event-tracker.is-collapsed {
+.main-column > .event-tracker.is-collapsed {
   width: 50%;
   height: 1.55rem;
   min-height: 0;
@@ -4369,7 +4369,7 @@
       var(--wuxia-event-scroll-mid, none);
     background-position: left center, right center, center center;
     background-repeat: no-repeat;
-    background-size: 1.55rem 100%, 1.55rem 100%, calc(100% - 1.9rem) 100%;
+    background-size: 1.55rem 100%, 1.55rem 100%, 100% 100%;
     opacity: 0.72;
     pointer-events: none;
   }
@@ -4404,8 +4404,8 @@
 }
 
 @media (max-width: $breakpoint-md) {
-  .event-tracker,
-  .event-tracker.is-collapsed {
+  .main-column > .event-tracker,
+  .main-column > .event-tracker.is-collapsed {
     width: calc(100% - 1.5rem);
   }
 
