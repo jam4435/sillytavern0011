@@ -3,12 +3,13 @@ import { useFullscreen } from '../utils/useFullscreen';
 
 interface FullscreenButtonProps {
   className?: string;
+  showLabel?: boolean;
 }
 
 /**
  * 全屏切换按钮组件
  */
-const FullscreenButton: React.FC<FullscreenButtonProps> = ({ className }) => {
+const FullscreenButton: React.FC<FullscreenButtonProps> = ({ className, showLabel = false }) => {
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   return (
@@ -46,6 +47,7 @@ const FullscreenButton: React.FC<FullscreenButtonProps> = ({ className }) => {
           <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
         </svg>
       )}
+      {showLabel && <span className="fullscreen-btn-label">{isFullscreen ? '退出全屏' : '全屏'}</span>}
     </button>
   );
 };

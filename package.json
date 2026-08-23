@@ -1,6 +1,7 @@
 {
   "scripts": {
     "generate:events": "node scripts/generate-wuxia-event-assets.mjs",
+    "sync:wuxia-debut-times": "node scripts/sync-wuxia-debut-times.mjs",
     "build:dev": "pnpm generate:events && webpack --mode development",
     "build:src:dev": "pnpm generate:events && webpack --mode development --env srcOnly=true",
     "build": "pnpm generate:events && webpack --mode production",

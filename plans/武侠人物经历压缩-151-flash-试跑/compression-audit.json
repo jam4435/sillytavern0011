@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-08-23T08:56:01.037Z",
+  "threshold": 151,
+  "model": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4-flash"
+  },
+  "applied": false,
+  "records": [
+    {
+      "file": "世界书/金庸群侠传1/世界书/神雕第八回02-杨过扮牧童驯牛赴豺狼谷.yaml",
+      "operation": "insert",
+      "character": "杨过",
+      "eventKey": "神雕第八回02-杨过扮牧童驯牛赴豺狼谷",
+      "originalChars": 151
+    }
+  ],
+  "successes": [
+    {
+      "file": "世界书/金庸群侠传1/世界书/神雕第八回02-杨过扮牧童驯牛赴豺狼谷.yaml",
+      "operation": "insert",
+      "character": "杨过",
+      "eventKey": "神雕第八回02-杨过扮牧童驯牛赴豺狼谷",
+      "original": "行三十余里接近豺狼谷时心生一计，要扮成牧童暗中观察姑姑如何对付歹人。潜入农舍换上农家衣服草鞋，以湿土抹脸戴上斗笠，彻底扮成乡下牧童模样。在牛栏中驯服一条七百来斤的暴躁大牯牛——连斩十余掌使其驯服，更试出戳左颈转右戳右颈转左的指挥法门。骑着牯牛穿过密林来到群山壁立的豺狼谷，跃下牛背躺地装睡等候姑姑到来。",
+      "originalChars": 151,
+      "summary": "杨过为暗中观察姑姑如何对付歹人，扮作牧童：换农装草鞋，湿土抹脸戴斗笠，驯服一条七百来斤大牯牛，试出戳颈转左的指挥法，骑牛赴豺狼谷，跃下躺地装睡等候姑姑。",
+      "summaryChars": 76,
+      "attempts": 1
+    }
+  ],
+  "failures": []
+}

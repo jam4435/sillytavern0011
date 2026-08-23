@@ -139,6 +139,11 @@ function readCurrentHistoryDraft(): HistoryCheckoutDraft | null {
   return chatId ? readHistoryCheckoutDraft(chatId) : null;
 }
 
+function getMobileGameTime(gameTime: string): string {
+  const parts = gameTime.trim().split(/\s+/).filter(Boolean);
+  return parts.length > 4 ? parts.slice(0, 4).join('·') : gameTime;
+}
+
 const App: React.FC = () => {
   // 使用自定义 hooks
   const { latestDebugRound, beginDebugRound, patchLatestDebugRound, clearDebugLogs } = useDebugLogs();
@@ -1471,6 +1476,14 @@ const App: React.FC = () => {
               isActive={activePanel === ActivePanel.SETTINGS}
               onClick={() => handleNavClick(ActivePanel.SETTINGS)}
             />
+            <NavButton
+              className="mobile-header-utility"
+              icon={<Icons.Variables />}
+              label="存档"
+              isActive={activePanel === ActivePanel.SAVE_LOAD}
+              onClick={() => handleNavClick(ActivePanel.SAVE_LOAD)}
+            />
+            <FullscreenButton className="mobile-header-utility mobile-nav-fullscreen" showLabel />
           </nav>
 
           {/* Main Content */}
@@ -1479,9 +1492,16 @@ const App: React.FC = () => {
               <div className="location-group">
                 <div className="loc-value">
                   <Icons.Compass className="loc-icon" />
-                  <span className="loc-name">{gameState.currentLocation}</span>
+                  <span className="loc-name" title={gameState.currentLocation}>
+                    {gameState.currentLocation}
+                  </span>
                 </div>
-                <div className="time-value">{gameState.gameTime}</div>
+                <div className="time-value" title={gameState.gameTime} aria-label={gameState.gameTime}>
+                  <span className="time-value-full">{gameState.gameTime}</span>
+                  <span className="time-value-compact" aria-hidden="true">
+                    {getMobileGameTime(gameState.gameTime)}
+                  </span>
+                </div>
               </div>
 
               <div className="header-right">
@@ -1660,16 +1680,22 @@ const NavButton = ({
   icon,
   label,
   automationId,
+  className,
   isActive,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   automationId?: string;
+  className?: string;
   isActive: boolean;
   onClick: () => void;
 }) => (
-  <button onClick={onClick} className={`nav-btn ${isActive ? 'active' : ''}`} data-wuxia-automation={automationId}>
+  <button
+    onClick={onClick}
+    className={`nav-btn ${isActive ? 'active' : ''} ${className || ''}`}
+    data-wuxia-automation={automationId}
+  >
     {isActive && <div className="nav-btn-indicator"></div>}
     <div className="nav-icon-wrapper">{icon}</div>
     <span className="nav-label">{label}</span>
