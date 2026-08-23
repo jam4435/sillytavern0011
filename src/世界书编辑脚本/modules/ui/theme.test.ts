@@ -3,11 +3,12 @@ import _ from 'lodash';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let loadTheme: typeof import('./theme.js').loadTheme;
+let normalizeHexColor: typeof import('./theme.js').normalizeHexColor;
 
 beforeAll(async () => {
   vi.stubGlobal('$', $);
   vi.stubGlobal('_', _);
-  ({ loadTheme } = await import('./theme.js'));
+  ({ loadTheme, normalizeHexColor } = await import('./theme.js'));
 });
 
 beforeEach(() => {
@@ -34,5 +35,18 @@ describe('世界书面板主题可见性', () => {
 
   it('保留默认主题的不透明面板', () => {
     expect(loadTheme('drawer').panelOpacity).toBe(1);
+  });
+});
+
+describe('世界书面板主题颜色输入', () => {
+  it('规范化完整和简写的十六进制颜色值', () => {
+    expect(normalizeHexColor('A1B2C3')).toBe('#a1b2c3');
+    expect(normalizeHexColor('#AbC')).toBe('#aabbcc');
+  });
+
+  it('在输入过程只接受完整的六位颜色值', () => {
+    expect(normalizeHexColor('#abc', { allowShort: false })).toBeNull();
+    expect(normalizeHexColor('#abcdef', { allowShort: false })).toBe('#abcdef');
+    expect(normalizeHexColor('#gggggg')).toBeNull();
   });
 });

@@ -2338,6 +2338,19 @@ export function initPanel() {
                     align-items: center;
                     margin-bottom: 2px;
                 }
+                #theme-settings-modal .theme-color-input-hint {
+                    margin: 0;
+                    color: var(--panel-muted-text-color, var(--modal-text-color, #eeeeee));
+                    font-size: 0.82em;
+                    line-height: 1.45;
+                }
+                #theme-settings-modal .theme-color-control {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    gap: 8px;
+                    min-width: 0;
+                }
                 #theme-settings-modal .theme-hidden {
                     display: none !important;
                 }
@@ -2355,13 +2368,32 @@ export function initPanel() {
                     -webkit-appearance: none !important;
                     -moz-appearance: none !important;
                     appearance: none !important;
-                    width: 120px !important;
+                    width: 52px !important;
                     height: 36px !important;
+                    flex: 0 0 52px;
                     background-color: transparent !important;
                     border: 2px solid var(--panel-border-color) !important;
                     border-radius: 6px !important;
                     cursor: pointer !important;
                     padding: 2px !important;
+                }
+                #theme-settings-modal .theme-color-hex-input {
+                    width: 102px;
+                    min-width: 86px !important;
+                    flex: 0 1 102px !important;
+                    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                    letter-spacing: 0.02em;
+                    text-transform: uppercase;
+                }
+                #theme-settings-modal .theme-color-hex-input-invalid {
+                    border-color: var(--panel-danger-color, #b4232c) !important;
+                }
+                #theme-settings-modal.theme-native-color-input-unsupported .theme-native-color-picker {
+                    display: none !important;
+                }
+                #theme-settings-modal.theme-native-color-input-unsupported .theme-color-hex-input {
+                    flex-basis: 120px !important;
+                    width: 120px;
                 }
                 #theme-settings-modal input[type="text"].form-control {
                     min-width: 0;
@@ -3116,25 +3148,41 @@ export function initPanel() {
                         <button class="close-button" title="关闭" onclick="this.closest('dialog').close()">×</button>
                     </div>
                     <div class="modal-body">
+                        <p id="theme-color-input-hint" class="theme-color-input-hint">可点击色块取色；若浏览器不支持取色器，请在右侧直接输入 <code>#RRGGBB</code>。</p>
                         <div class="form-group">
                             <label for="panel-bg-color-picker">面板背景色</label>
-                            <input type="color" id="panel-bg-color-picker" class="form-control">
+                            <div class="theme-color-control">
+                                <input type="color" id="panel-bg-color-picker" class="form-control theme-native-color-picker">
+                                <input type="text" id="panel-bg-color-picker-hex" class="form-control theme-color-hex-input" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="7" placeholder="#RRGGBB" aria-label="面板背景色，十六进制颜色值">
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="panel-text-color-picker">面板字体颜色</label>
-                            <input type="color" id="panel-text-color-picker" class="form-control">
+                            <div class="theme-color-control">
+                                <input type="color" id="panel-text-color-picker" class="form-control theme-native-color-picker">
+                                <input type="text" id="panel-text-color-picker-hex" class="form-control theme-color-hex-input" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="7" placeholder="#RRGGBB" aria-label="面板字体颜色，十六进制颜色值">
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="panel-accent-color-picker">强调/主题颜色</label>
-                            <input type="color" id="panel-accent-color-picker" class="form-control">
+                            <div class="theme-color-control">
+                                <input type="color" id="panel-accent-color-picker" class="form-control theme-native-color-picker">
+                                <input type="text" id="panel-accent-color-picker-hex" class="form-control theme-color-hex-input" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="7" placeholder="#RRGGBB" aria-label="强调主题颜色，十六进制颜色值">
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="panel-entry-bg-color-picker">条目背景颜色</label>
-                            <input type="color" id="panel-entry-bg-color-picker" class="form-control">
+                            <div class="theme-color-control">
+                                <input type="color" id="panel-entry-bg-color-picker" class="form-control theme-native-color-picker">
+                                <input type="text" id="panel-entry-bg-color-picker-hex" class="form-control theme-color-hex-input" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="7" placeholder="#RRGGBB" aria-label="条目背景颜色，十六进制颜色值">
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="search-input-bg-color-picker">输入栏背景色</label>
-                            <input type="color" id="search-input-bg-color-picker" class="form-control">
+                            <div class="theme-color-control">
+                                <input type="color" id="search-input-bg-color-picker" class="form-control theme-native-color-picker">
+                                <input type="text" id="search-input-bg-color-picker-hex" class="form-control theme-color-hex-input" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="7" placeholder="#RRGGBB" aria-label="输入栏背景色，十六进制颜色值">
+                            </div>
                         </div>
                         <div id="panel-background-image-url-group" class="form-group theme-form-group-stacked">
                             <label for="panel-background-image-url-input">背景图</label>

@@ -22,6 +22,8 @@ const VALID_LAYOUT_MODES = new Set(['drawer', 'master-detail']);
 const MAX_BACKGROUND_IMAGE_DATA_URL_LENGTH = 2 * 1024 * 1024;
 const BACKGROUND_IMAGE_SURFACE_REVEAL_RATIO = 0.45;
 const MIN_PANEL_OPACITY = 0.35;
+const COLOR_HEX_INPUT_SUFFIX = '-hex';
+const HEX_COLOR_PATTERN = /^#?([\da-f]{3}|[\da-f]{6})$/i;
 
 function normalizeLayoutMode(mode) {
   return VALID_LAYOUT_MODES.has(mode) ? mode : DEFAULT_LAYOUT_MODE;
@@ -432,9 +434,40 @@ function getParentDoc() {
   return window.parent.document;
 }
 
+export function normalizeHexColor(value, { allowShort = true } = {}) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const match = value.trim().match(HEX_COLOR_PATTERN);
+  if (!match || (!allowShort && match[1].length !== 6)) {
+    return null;
+  }
+
+  const hex = match[1].toLowerCase();
+  const expandedHex = hex.length === 3 ? [...hex].map(char => `${char}${char}`).join('') : hex;
+  return `#${expandedHex}`;
+}
+
+function getColorHexInputSelector(colorPickerSelector) {
+  return `${colorPickerSelector}${COLOR_HEX_INPUT_SUFFIX}`;
+}
+
+function setModalColorValue(parentDoc, selector, color) {
+  const normalizedColor = normalizeHexColor(color) || '#000000';
+  $(selector, parentDoc).val(normalizedColor);
+  $(getColorHexInputSelector(selector), parentDoc).val(normalizedColor).removeClass('theme-color-hex-input-invalid');
+}
+
 function getModalColorValue(parentDoc, selector, fallback) {
-  const value = $(selector, parentDoc).val();
-  return typeof value === 'string' && value ? value : fallback;
+  const hexInputValue = $(getColorHexInputSelector(selector), parentDoc).val();
+  const colorInputValue = $(selector, parentDoc).val();
+  return (
+    normalizeHexColor(hexInputValue) ||
+    normalizeHexColor(colorInputValue) ||
+    normalizeHexColor(rgbaToHex(fallback)) ||
+    fallback
+  );
 }
 
 function getModalStringValue(parentDoc, selector, fallback = '') {
@@ -455,6 +488,92 @@ function setRangePercent(parentDoc, sliderSelector, labelSelector, value) {
 
 function syncIconColorGroup(parentDoc, isEnabled) {
   $('#icon-bg-color-group', parentDoc).toggleClass('theme-hidden', !isEnabled);
+}
+
+function supportsNativeColorInput(parentDoc) {
+  const input = parentDoc.createElement('input');
+  input.setAttribute('type', 'color');
+  return input.type === 'color';
+}
+
+function ensureThemeColorInputFallbacks($modal) {
+  if (!$modal.length) {
+    return;
+  }
+
+  const parentDoc = $modal[0].ownerDocument;
+  $modal.toggleClass('theme-native-color-input-unsupported', !supportsNativeColorInput(parentDoc));
+
+  $modal.find('input[type="color"]').each(function () {
+    const colorInput = this;
+    if (!colorInput.id) {
+      return;
+    }
+
+    colorInput.classList.add('theme-native-color-picker');
+    let colorControl = colorInput.closest('.theme-color-control');
+    if (!colorControl) {
+      colorControl = parentDoc.createElement('div');
+      colorControl.className = 'theme-color-control';
+      colorInput.parentNode?.insertBefore(colorControl, colorInput);
+      colorControl.appendChild(colorInput);
+    }
+
+    const hexInputId = `${colorInput.id}${COLOR_HEX_INPUT_SUFFIX}`;
+    if (parentDoc.getElementById(hexInputId)) {
+      return;
+    }
+
+    const hexInput = parentDoc.createElement('input');
+    hexInput.type = 'text';
+    hexInput.id = hexInputId;
+    hexInput.className = 'form-control theme-color-hex-input';
+    hexInput.inputMode = 'text';
+    hexInput.autocomplete = 'off';
+    hexInput.autocapitalize = 'characters';
+    hexInput.spellcheck = false;
+    hexInput.maxLength = 7;
+    hexInput.placeholder = '#RRGGBB';
+    hexInput.setAttribute('aria-label', '十六进制颜色值');
+    colorControl.appendChild(hexInput);
+  });
+}
+
+function syncColorHexInputFromPicker(parentDoc, colorPicker) {
+  if (!colorPicker?.id) {
+    return;
+  }
+
+  const normalizedColor = normalizeHexColor(colorPicker.value);
+  if (!normalizedColor) {
+    return;
+  }
+
+  $(`#${colorPicker.id}${COLOR_HEX_INPUT_SUFFIX}`, parentDoc)
+    .val(normalizedColor)
+    .removeClass('theme-color-hex-input-invalid');
+}
+
+function applyColorHexInput(parentDoc, hexInput, { allowShort = false } = {}) {
+  if (!hexInput?.id || !hexInput.id.endsWith(COLOR_HEX_INPUT_SUFFIX)) {
+    return false;
+  }
+
+  const value = hexInput.value;
+  const normalizedColor = normalizeHexColor(value, { allowShort });
+  const isEmpty = value.trim().length === 0;
+  $(hexInput).toggleClass('theme-color-hex-input-invalid', !isEmpty && !normalizedColor);
+  if (!normalizedColor) {
+    return false;
+  }
+
+  const colorInputId = hexInput.id.slice(0, -COLOR_HEX_INPUT_SUFFIX.length);
+  const colorInput = parentDoc.getElementById(colorInputId);
+  if (colorInput) {
+    colorInput.value = normalizedColor;
+  }
+  hexInput.value = normalizedColor;
+  return true;
 }
 
 function readThemeFromModal(layoutMode = getPcLayoutModeSetting()) {
@@ -497,12 +616,12 @@ function readThemeFromModal(layoutMode = getPcLayoutModeSetting()) {
 function fillThemeModal(theme, layoutMode = getPcLayoutModeSetting()) {
   const parentDoc = getParentDoc();
   const inputBgColor = theme.inputBgColor || theme.searchInputBgColor || theme.yamlInputBgColor;
-  $('#panel-bg-color-picker', parentDoc).val(rgbaToHex(theme.bgColor));
-  $('#panel-text-color-picker', parentDoc).val(rgbaToHex(theme.textColor));
-  $('#panel-accent-color-picker', parentDoc).val(rgbaToHex(theme.accentColor));
-  $('#panel-entry-bg-color-picker', parentDoc).val(rgbaToHex(theme.entryBgColor));
-  $('#search-input-bg-color-picker', parentDoc).val(rgbaToHex(inputBgColor));
-  $('#yaml-input-bg-color-picker', parentDoc).val(rgbaToHex(inputBgColor));
+  setModalColorValue(parentDoc, '#panel-bg-color-picker', rgbaToHex(theme.bgColor));
+  setModalColorValue(parentDoc, '#panel-text-color-picker', rgbaToHex(theme.textColor));
+  setModalColorValue(parentDoc, '#panel-accent-color-picker', rgbaToHex(theme.accentColor));
+  setModalColorValue(parentDoc, '#panel-entry-bg-color-picker', rgbaToHex(theme.entryBgColor));
+  setModalColorValue(parentDoc, '#search-input-bg-color-picker', rgbaToHex(inputBgColor));
+  setModalColorValue(parentDoc, '#yaml-input-bg-color-picker', rgbaToHex(inputBgColor));
   $('#panel-background-image-url-input', parentDoc).val(theme.backgroundImageUrl || '');
   setRangePercent(
     parentDoc,
@@ -512,7 +631,7 @@ function fillThemeModal(theme, layoutMode = getPcLayoutModeSetting()) {
   );
   $('#panel-opacity-slider', parentDoc).attr('min', String(Math.round(MIN_PANEL_OPACITY * 100)));
   setRangePercent(parentDoc, '#panel-opacity-slider', '#panel-opacity-value', theme.panelOpacity);
-  $('#panel-icon-bg-color-picker', parentDoc).val(rgbaToHex(theme.iconBgColor));
+  setModalColorValue(parentDoc, '#panel-icon-bg-color-picker', rgbaToHex(theme.iconBgColor));
   $('#topbar-button-toggle', parentDoc).prop('checked', theme.showTopbarButton);
   $('#highlight-active-toggle', parentDoc).prop('checked', getHighlightActiveEntriesSetting());
   $('#show-search-bar-toggle', parentDoc).prop('checked', getShowSearchBarSetting());
@@ -540,6 +659,14 @@ function setSliderLabel($modal, labelSelector, labelText, valueSelector) {
 function ensureThemeModalShape($modal) {
   if (!$modal.length) {
     return;
+  }
+
+  if ($modal.find('#theme-color-input-hint').length === 0) {
+    $modal.find('.modal-body').prepend(`
+      <p id="theme-color-input-hint" class="theme-color-input-hint">
+        可点击色块取色；若浏览器不支持取色器，请在右侧直接输入 <code>#RRGGBB</code>。
+      </p>
+    `);
   }
 
   const $inputBgLabel = $modal.find('label[for="search-input-bg-color-picker"]');
@@ -600,7 +727,10 @@ function ensureThemeModalShape($modal) {
       </div>
       <div id="icon-bg-color-group" class="form-group theme-hidden">
         <label for="panel-icon-bg-color-picker">图标颜色</label>
-        <input type="color" id="panel-icon-bg-color-picker" class="form-control">
+        <div class="theme-color-control">
+          <input type="color" id="panel-icon-bg-color-picker" class="form-control theme-native-color-picker">
+          <input type="text" id="panel-icon-bg-color-picker-hex" class="form-control theme-color-hex-input" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="7" placeholder="#RRGGBB" aria-label="图标颜色，十六进制颜色值">
+        </div>
       </div>
     `;
     const $truncateGroup = $modal.find('#truncate-long-names-toggle-group');
@@ -669,6 +799,8 @@ function ensureThemeModalShape($modal) {
       $modal.find('.modal-body').append(browserSettingsHtml);
     }
   }
+
+  ensureThemeColorInputFallbacks($modal);
 }
 
 async function refreshCurrentTabForLayoutChange() {
@@ -850,9 +982,10 @@ export function initTheme() {
                     <option value="drawer">Drawer</option>
                 </select>
             </div>
-        `;
+    `;
     $modal.find('.modal-body').append(toggleHtml);
   }
+  ensureThemeModalShape($modal);
 
   $panel.on('click', '.theme-settings-button', function () {
     const modalElement = $modal[0];
@@ -909,7 +1042,21 @@ export function initTheme() {
     }
   };
 
-  $modal.on('input', 'input[type="color"], input[type="range"]', handleSettingsChange);
+  $modal.on('input', 'input[type="color"]', function () {
+    syncColorHexInputFromPicker(parentDoc, this);
+    handleSettingsChange();
+  });
+  $modal.on('input', '.theme-color-hex-input', function () {
+    if (applyColorHexInput(parentDoc, this)) {
+      handleSettingsChange();
+    }
+  });
+  $modal.on('change', '.theme-color-hex-input', function () {
+    if (applyColorHexInput(parentDoc, this, { allowShort: true })) {
+      handleSettingsChange();
+    }
+  });
+  $modal.on('input', 'input[type="range"]', handleSettingsChange);
   $modal.on('change', '#panel-background-image-url-input', handleSettingsChange);
   $modal.on('change', '#topbar-button-toggle', handleSettingsChange);
   $modal.on('change', '#truncate-long-names-toggle', handleSettingsChange);
