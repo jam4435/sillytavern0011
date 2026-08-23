@@ -505,21 +505,20 @@ function ensureThemeColorInputFallbacks($modal) {
   $modal.toggleClass('theme-native-color-input-unsupported', !supportsNativeColorInput(parentDoc));
 
   $modal.find('input[type="color"]').each(function () {
-    const colorInput = this;
-    if (!colorInput.id) {
+    if (!this.id) {
       return;
     }
 
-    colorInput.classList.add('theme-native-color-picker');
-    let colorControl = colorInput.closest('.theme-color-control');
+    this.classList.add('theme-native-color-picker');
+    let colorControl = this.closest('.theme-color-control');
     if (!colorControl) {
       colorControl = parentDoc.createElement('div');
       colorControl.className = 'theme-color-control';
-      colorInput.parentNode?.insertBefore(colorControl, colorInput);
-      colorControl.appendChild(colorInput);
+      this.parentNode?.insertBefore(colorControl, this);
+      colorControl.appendChild(this);
     }
 
-    const hexInputId = `${colorInput.id}${COLOR_HEX_INPUT_SUFFIX}`;
+    const hexInputId = `${this.id}${COLOR_HEX_INPUT_SUFFIX}`;
     if (parentDoc.getElementById(hexInputId)) {
       return;
     }
