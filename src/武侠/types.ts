@@ -46,6 +46,92 @@ export interface CurrentAttributes {
   洞察: number;
 }
 
+// 奇经八脉
+export type MeridianId = 'ren' | 'du' | 'chong' | 'dai' | 'yinqiao' | 'yangqiao' | 'yinwei' | 'yangwei';
+export type MeridianStageId = 'opening' | 'circulation' | 'condensation' | 'cycle' | 'confluence';
+export type MeridianNodeId = `${MeridianId}:${MeridianStageId}`;
+export type MeridianViewSide = 'front' | 'back';
+export type MeridianNodeStatus = 'opened' | 'available' | 'locked';
+export type MeridianFinalAttribute = '臂力' | '根骨' | '机敏' | '洞察' | '气血上限' | '内力上限';
+
+export interface MeridianSettlement {
+  类型: '初始属性' | '最终属性';
+  属性: keyof InitialAttributes | MeridianFinalAttribute;
+  增量: number;
+}
+
+export interface MeridianProgressV1 {
+  版本: 1;
+  已通穴位: MeridianNodeId[];
+  关窍结算: Partial<Record<MeridianNodeId, MeridianSettlement>>;
+}
+
+export interface MeridianProgressNormalization {
+  valid: boolean;
+  progress: MeridianProgressV1;
+  error?: string;
+}
+
+export interface MeridianUpgradeQuote {
+  nodeId: MeridianNodeId;
+  canUpgrade: boolean;
+  cost: number;
+  baseCost: number;
+  currentCultivation: number;
+  newCultivation: number;
+  reason?: string;
+  settlement?: MeridianSettlement;
+  rewardLabel: string;
+}
+
+export interface MeridianUpgradeResult {
+  success: boolean;
+  nodeId: MeridianNodeId;
+  cost: number;
+  newCultivation: number;
+  progress: MeridianProgressV1;
+  initialAttributes: InitialAttributes;
+  settlement?: MeridianSettlement;
+  error?: string;
+}
+
+export interface MeridianNodeView {
+  id: MeridianNodeId;
+  meridianId: MeridianId;
+  meridianName: string;
+  name: string;
+  stageIndex: number;
+  stageName: string;
+  view: MeridianViewSide;
+  x: number;
+  y: number;
+  status: MeridianNodeStatus;
+  prerequisiteId?: MeridianNodeId;
+  prerequisiteLabel?: string;
+  rewardLabel: string;
+  quote?: MeridianUpgradeQuote;
+}
+
+export interface MeridianSummary {
+  id: MeridianId;
+  name: string;
+  confluenceName: string;
+  view: MeridianViewSide;
+  completedNodes: number;
+  totalNodes: number;
+  finalAttribute: MeridianFinalAttribute;
+  gateInitialAttribute: keyof InitialAttributes;
+}
+
+export interface MeridianProjection {
+  version: 1;
+  nodes: MeridianNodeView[];
+  meridians: MeridianSummary[];
+  modifiers: Record<MeridianFinalAttribute, number>;
+  corrupted: boolean;
+  error?: string;
+}
+
 // "武功" template structure (基础结构)
 export interface MartialArt {
   type: string; // 类型
@@ -79,6 +165,7 @@ export interface CharacterProfile {
   initialAttributes: InitialAttributes; // 初始属性
   baseAttributes?: CurrentAttributes; // 不含装备/药效的前端计算基准，只用于界面预览
   attributes: CurrentAttributes; // 属性
+  meridians?: MeridianProjection; // 奇经八脉分支进度的只读界面投影
 
   // Note: Inventory is handled via the specific InventoryItem[] in GameState for the UI grid,
   // but conceptually belongs here.
@@ -132,7 +219,9 @@ export interface PermanentAttributeModifierVariableData {
 export type WorldEventVariableData = WorldEventRecord;
 
 export interface FrontendVariableData {
+  奇经八脉?: MeridianProgressV1;
   永久属性修正?: Record<string, PermanentAttributeModifierVariableData>;
+  可发现事件?: Record<string, unknown>;
   事件结局状态?: Record<string, EventOutcomeStatus>;
   事件结算进度?: Record<string, { 分支标记?: Record<string, 0 | 1> }>;
   事件调度状态?: {
@@ -200,6 +289,8 @@ export interface GameEvent {
   location?: string;
   /** 相关时间文本：传闻=事件开始时间，进行中=预计结束时间 */
   timeText?: string;
+  /** 传闻距事件开始的剩余天数（按 12 月×30 天的 360 天简化历法计算） */
+  startsInDays?: number;
   /** 距事件结束剩余天数（按 12 月×30 天的 360 天简化历法与当前世界时间求差） */
   remainingDays?: number;
   /** 后续线索剩余可追回合数 */

@@ -144,6 +144,35 @@ describe('getGameVariables ERA 展示投影', () => {
     expect(npc?.template.martialArts && Object.keys(npc.template.martialArts)).toEqual(['全真剑法', '金雁功']);
     expect(npc?.template.martialArts?.全真剑法.martialArtsDescription).toBe("如'白虹经天'。");
   });
+
+  it('将全域可发现事件投影为带开始倒计时和地点的唯一风闻', () => {
+    const eventName = '射雕第一回03-远方风波';
+    const rumor = '临安府近来暗流涌动。 [1200年8月20日11时/大宋/临安府/牛家村]';
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1200, 月: 8, 日: 15, 时: 11 } },
+        user数据: {
+          用户名: '玩家',
+          性别: '男',
+          境界: '不入流',
+          所在位置: '大理/大理城/城南',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+        },
+        前端变量: { 可发现事件: { [eventName]: rumor } },
+        附近传闻: { [eventName]: rumor },
+      },
+    });
+
+    const state = readGameDataSync();
+    const matchingEvents = state?.events?.filter(event => event.description === '临安府近来暗流涌动。') || [];
+    expect(matchingEvents).toHaveLength(1);
+    expect(matchingEvents[0]).toMatchObject({
+      type: 'RUMOR',
+      location: '大宋/临安府/牛家村',
+      timeText: '1200年8月20日11时',
+      startsInDays: 5,
+    });
+  });
 });
 
 const 金雁功数据库 = {
@@ -700,6 +729,50 @@ describe('readGameDataSync inventory rank field', () => {
         }),
       ]),
     );
+  });
+
+  it('奇经八脉修正进入基础与最终属性投影，旧档缺失时不需要迁移写入', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '黄蓉',
+          性别: '女',
+          境界: '不入流',
+          修为: 100,
+          所在位置: '大宋/临安府',
+          初始属性: { 臂力: 10, 根骨: 20, 机敏: 10, 悟性: 10, 洞察: 10, 风姿: 10, 福缘: 0 },
+        },
+        前端变量: {
+          奇经八脉: {
+            版本: 1,
+            已通穴位: ['ren:opening', 'ren:circulation'],
+            关窍结算: {},
+          },
+        },
+      },
+    });
+
+    const result = readGameDataSync();
+
+    expect(result?.stats?.meridians).toMatchObject({
+      corrupted: false,
+      modifiers: { 内力上限: 6 },
+    });
+    expect(result?.stats?.baseAttributes?.mp).toBe(21);
+    expect(result?.stats?.attributes.mp).toBe(21);
+
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '黄蓉',
+          境界: '不入流',
+          修为: 100,
+          初始属性: { 臂力: 10, 根骨: 20, 机敏: 10, 悟性: 10, 洞察: 10, 风姿: 10, 福缘: 0 },
+        },
+      },
+    });
+    expect(readGameDataSync()?.stats?.meridians).toMatchObject({ corrupted: false, modifiers: { 内力上限: 0 } });
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
   });
 });
 

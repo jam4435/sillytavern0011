@@ -18,7 +18,7 @@ const OpeningScreen: React.FC<OpeningScreenProps> = ({
   onSend,
 }) => {
   return (
-    <div className="opening-screen">
+    <div className="opening-screen" data-wuxia-automation="opening-screen">
       <div className="opening-bg-layer">
         <div className="opening-bg-img"></div>
         <div className="opening-bg-vignette"></div>
@@ -38,11 +38,7 @@ const OpeningScreen: React.FC<OpeningScreenProps> = ({
         </section>
 
         <div className="opening-input-wrap">
-          <ChatInput
-            onSend={onSend}
-            placeholder="例如：我在一个山洞醒来，身边只有半截断剑..."
-            disabled={isLoading}
-          />
+          <ChatInput onSend={onSend} placeholder="例如：我在一个山洞醒来，身边只有半截断剑..." disabled={isLoading} />
         </div>
       </main>
     </div>

@@ -2,7 +2,15 @@ import React, { CSSProperties, useCallback, useEffect, useMemo, useRef, useState
 import AvatarImage from '../AvatarImage';
 import AvatarPreviewModal from '../AvatarPreviewModal';
 import { Icons } from '../Icons';
-import { ActivePanel, CharacterProfile, WorldTime } from '../../types';
+import { MeridianPanel } from '../MeridianPanel';
+import {
+  ActivePanel,
+  CharacterProfile,
+  type MeridianNodeId,
+  type MeridianUpgradeQuote,
+  type MeridianUpgradeResult,
+  WorldTime,
+} from '../../types';
 import {
   getAvatarsByGender,
   getDefaultAvatarRefForGender,
@@ -19,12 +27,8 @@ import {
 } from '../../utils/avatarStorage';
 import { clearPlayerAvatarRef, setPlayerAvatarRef } from '../../utils/avatarState';
 import { gameLogger } from '../../utils/logger';
-import {
-  checkBreakthrough,
-  getBreakthroughTooltip,
-  getRealmColor,
-  performBreakthrough,
-} from '../../utils/realmSystem';
+import { buildMeridianProjection } from '../../utils/meridianSystem';
+import { checkBreakthrough, getBreakthroughTooltip, getRealmColor, performBreakthrough } from '../../utils/realmSystem';
 
 const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
 
@@ -84,6 +88,8 @@ interface CharacterPanelProps {
   worldTime?: WorldTime;
   onBreakthrough?: (result: { success: boolean; newRealm?: string; newCultivation?: number; error?: string }) => void;
   onAvatarUpdated?: () => void;
+  isBusy?: boolean;
+  onUpgradeMeridian?: (nodeId: MeridianNodeId, quote: MeridianUpgradeQuote) => Promise<MeridianUpgradeResult | void>;
 }
 
 export const CharacterPanel: React.FC<CharacterPanelProps> = ({
@@ -91,7 +97,10 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
   worldTime,
   onBreakthrough,
   onAvatarUpdated,
+  isBusy = false,
+  onUpgradeMeridian,
 }) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'meridians'>('overview');
   const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState(false);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [avatarVersion, setAvatarVersion] = useState(0);
@@ -137,11 +146,22 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
       }),
     [activeAvatarRef, avatarVersion, playerGender, stats.name],
   );
+  const meridianProjection = useMemo(
+    () =>
+      stats.meridians ??
+      buildMeridianProjection({
+        progress: undefined,
+        realm: currentRealm,
+        cultivation,
+        initialAttributes: stats.initialAttributes,
+      }),
+    [cultivation, currentRealm, stats.initialAttributes, stats.meridians],
+  );
 
   useEffect(() => {
     if (
-      optimisticAvatarRef !== undefined
-      && (stats.avatarRef === optimisticAvatarRef || (optimisticAvatarRef === null && stats.avatarRef === undefined))
+      optimisticAvatarRef !== undefined &&
+      (stats.avatarRef === optimisticAvatarRef || (optimisticAvatarRef === null && stats.avatarRef === undefined))
     ) {
       setOptimisticAvatarRef(undefined);
     }
@@ -201,11 +221,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
         const succeeded = await commitAvatarRef(toCustomAvatarRef(PLAYER_AVATAR_ENTITY_KEY));
         if (!succeeded) {
           if (previousCustomAvatar) {
-            saveCustomAvatar(
-              PLAYER_AVATAR_ENTITY_KEY,
-              previousCustomAvatar.imageData,
-              previousCustomAvatar.fileName,
-            );
+            saveCustomAvatar(PLAYER_AVATAR_ENTITY_KEY, previousCustomAvatar.imageData, previousCustomAvatar.fileName);
           } else {
             clearCustomAvatar(PLAYER_AVATAR_ENTITY_KEY);
           }
@@ -247,240 +263,288 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
     } else {
       gameLogger.error(`[CharacterPanel] 突破失败: ${result.error}`);
     }
-  }, [breakthroughCheck.reason, breakthroughCost, canBreakthrough, cultivation, currentRealm, nextRealm, onBreakthrough]);
+  }, [
+    breakthroughCheck.reason,
+    breakthroughCost,
+    canBreakthrough,
+    cultivation,
+    currentRealm,
+    nextRealm,
+    onBreakthrough,
+  ]);
 
   return (
     <>
-      <div className="char-layout">
-        <div className="char-left">
-          {avatarSource.src ? (
-            <button
-              type="button"
-              className="portrait-container portrait-container--button"
-              onClick={() => setIsAvatarPreviewOpen(true)}
-              aria-label={`查看${stats.name}头像`}
-            >
-              <AvatarImage
-                src={avatarSource.src}
-                alt={`${stats.name}头像`}
-                className="portrait-img"
-                objectPosition={avatarSource.objectPosition}
-                rasterMode="trim"
-              />
-              <div className="portrait-text-overlay">
-                <h3 className="char-name-display">{stats.name}</h3>
-                {identityEntries.map(([id]) => (
-                  <span key={id} className="char-title-display">
-                    {id}
-                  </span>
-                ))}
-              </div>
-            </button>
-          ) : (
-            <div className="portrait-container">
-              <div className="portrait-fallback">{avatarSource.fallbackInitial}</div>
-              <div className="portrait-text-overlay">
-                <h3 className="char-name-display">{stats.name}</h3>
-                {identityEntries.map(([id]) => (
-                  <span key={id} className="char-title-display">
-                    {id}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="character-avatar-actions">
-            <button
-              type="button"
-              className={`character-avatar-action ${isAvatarPickerOpen ? 'is-active' : ''}`}
-              onClick={() => setIsAvatarPickerOpen(open => !open)}
-              aria-label="设置玩家头像"
-              aria-expanded={isAvatarPickerOpen}
-            >
-              <Icons.Plus size={14} />
-              <span>{isAvatarPickerOpen ? '收起头像' : '换头像'}</span>
-            </button>
-          </div>
-
-          {isAvatarPickerOpen && (
-            <section className="character-avatar-picker" aria-label="玩家头像选择">
-              <div className="character-avatar-picker-head">
-                <span>头像</span>
-                <small>{avatarSource.label}</small>
-              </div>
-              <div className="character-avatar-options">
-                {genderAvatarOptions.map(avatar => {
-                  const avatarRef = toPresetAvatarRef(avatar.id);
-                  const isSelected = selectedAvatarRef === avatarRef;
-
-                  return (
-                    <button
-                      key={avatar.id}
-                      type="button"
-                      className={`character-avatar-option ${isSelected ? 'is-selected' : ''}`}
-                      onClick={() => handleSelectPresetAvatar(avatar.id)}
-                      aria-pressed={isSelected}
-                    >
-                      <AvatarImage
-                        src={avatar.src}
-                        alt={avatar.label}
-                        objectPosition={avatar.objectPosition}
-                        rasterMode="square"
-                      />
-                      <span>{avatar.label}</span>
-                    </button>
-                  );
-                })}
-                <label className={`character-avatar-option upload ${avatarSource.source === 'custom' ? 'is-selected' : ''}`}>
-                  <input
-                    ref={avatarUploadInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarUpload}
-                  />
-                  <span className="character-avatar-upload-mark">+</span>
-                  <span>上传</span>
-                </label>
-                <button type="button" className="character-avatar-clear" onClick={handleClearAvatarOverride}>
-                  清除本地覆盖
-                </button>
-              </div>
-            </section>
-          )}
-
-          <div className="character-side-stack">
-            <div className="character-identity-list">
-              {identityEntries.map(([name, desc]) => (
-                <div key={name} className="character-identity-card">
-                  <div className="character-identity-title">{name}</div>
-                  <div className="character-identity-desc">{desc}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="character-info-list">
-              <div className="info-row character-info-row">
-                <span className="character-info-label">性别</span>
-                <span className="character-info-value">{stats.gender}</span>
-              </div>
-              {age !== null && (
-                <div className="info-row character-info-row">
-                  <span className="character-info-label">年龄</span>
-                  <span className="character-info-value">{age} 岁</span>
-                </div>
-              )}
-              {stats.status && (
-                <div className="info-row character-info-row">
-                  <span className="character-info-label">状态</span>
-                  <span className={`character-info-value ${stats.status.includes('受伤') ? 'is-injured' : ''}`}>
-                    {stats.status}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="character-appearance-note">"{stats.appearance || '待定'}"</div>
-          </div>
+      <div className={`character-panel-shell is-${activeTab}`}>
+        <div className="character-panel-tabs" role="tablist" aria-label="侠客状态页签">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'overview'}
+            className={activeTab === 'overview' ? 'is-active' : ''}
+            onClick={() => setActiveTab('overview')}
+            data-wuxia-automation="character-tab-overview"
+          >
+            <span>人物总览</span>
+            <small>形神 · 境界</small>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'meridians'}
+            className={activeTab === 'meridians' ? 'is-active' : ''}
+            onClick={() => setActiveTab('meridians')}
+            data-wuxia-automation="character-tab-meridians"
+          >
+            <span>奇经八脉</span>
+            <small>内景 · 周天</small>
+          </button>
         </div>
 
-        <div className="char-right">
-          <div className="character-panel-stat-block">
-            <div className="stats-bars-grid">
-              <StatBar
-                label="气血"
-                current={stats.attributes.hpCurrent ?? stats.attributes.hp}
-                max={stats.attributes.hp}
-                color="#7f1d1d"
-              />
-              <StatBar
-                label="内力"
-                current={stats.attributes.mpCurrent ?? stats.attributes.mp}
-                max={stats.attributes.mp}
-                color="#0e7490"
-              />
-              <StatBar label="修为" current={stats.cultivation || 0} max={maxCultivation} color="#78350f" />
-            </div>
-          </div>
-
-          <div className="realm-container character-realm-container" style={realmStyles}>
-            <RealmCorner position="top-left" />
-            <RealmCorner position="top-right" />
-            <RealmCorner position="bottom-left" />
-            <RealmCorner position="bottom-right" />
-
-            <div className="character-realm-header">
-              <div className="character-realm-copy">
-                <div className="character-realm-eyebrow">当前境界</div>
-                <div className="character-realm-line">
-                  <span className="character-realm-name">{currentRealm}</span>
-                  <span className="character-realm-cultivation">
-                    修为 <span className="current">{cultivation}</span>
-                    {nextRealm && <span className="total"> / {breakthroughCost}</span>}
-                  </span>
+        {activeTab === 'overview' ? (
+          <div className="char-layout" role="tabpanel" aria-label="人物总览">
+            <div className="char-left">
+              {avatarSource.src ? (
+                <button
+                  type="button"
+                  className="portrait-container portrait-container--button"
+                  onClick={() => setIsAvatarPreviewOpen(true)}
+                  aria-label={`查看${stats.name}头像`}
+                >
+                  <AvatarImage
+                    src={avatarSource.src}
+                    alt={`${stats.name}头像`}
+                    className="portrait-img"
+                    objectPosition={avatarSource.objectPosition}
+                    rasterMode="trim"
+                  />
+                  <div className="portrait-text-overlay">
+                    <h3 className="char-name-display">{stats.name}</h3>
+                    {identityEntries.map(([id]) => (
+                      <span key={id} className="char-title-display">
+                        {id}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              ) : (
+                <div className="portrait-container">
+                  <div className="portrait-fallback">{avatarSource.fallbackInitial}</div>
+                  <div className="portrait-text-overlay">
+                    <h3 className="char-name-display">{stats.name}</h3>
+                    {identityEntries.map(([id]) => (
+                      <span key={id} className="char-title-display">
+                        {id}
+                      </span>
+                    ))}
+                  </div>
                 </div>
+              )}
+
+              <div className="character-avatar-actions">
+                <button
+                  type="button"
+                  className={`character-avatar-action ${isAvatarPickerOpen ? 'is-active' : ''}`}
+                  onClick={() => setIsAvatarPickerOpen(open => !open)}
+                  aria-label="设置玩家头像"
+                  aria-expanded={isAvatarPickerOpen}
+                >
+                  <Icons.Plus size={14} />
+                  <span>{isAvatarPickerOpen ? '收起头像' : '换头像'}</span>
+                </button>
+              </div>
+
+              {isAvatarPickerOpen && (
+                <section className="character-avatar-picker" aria-label="玩家头像选择">
+                  <div className="character-avatar-picker-head">
+                    <span>头像</span>
+                    <small>{avatarSource.label}</small>
+                  </div>
+                  <div className="character-avatar-options">
+                    {genderAvatarOptions.map(avatar => {
+                      const avatarRef = toPresetAvatarRef(avatar.id);
+                      const isSelected = selectedAvatarRef === avatarRef;
+
+                      return (
+                        <button
+                          key={avatar.id}
+                          type="button"
+                          className={`character-avatar-option ${isSelected ? 'is-selected' : ''}`}
+                          onClick={() => handleSelectPresetAvatar(avatar.id)}
+                          aria-pressed={isSelected}
+                        >
+                          <AvatarImage
+                            src={avatar.src}
+                            alt={avatar.label}
+                            objectPosition={avatar.objectPosition}
+                            rasterMode="square"
+                          />
+                          <span>{avatar.label}</span>
+                        </button>
+                      );
+                    })}
+                    <label
+                      className={`character-avatar-option upload ${avatarSource.source === 'custom' ? 'is-selected' : ''}`}
+                    >
+                      <input ref={avatarUploadInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} />
+                      <span className="character-avatar-upload-mark">+</span>
+                      <span>上传</span>
+                    </label>
+                    <button type="button" className="character-avatar-clear" onClick={handleClearAvatarOverride}>
+                      清除本地覆盖
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              <div className="character-side-stack">
+                <div className="character-identity-list">
+                  {identityEntries.map(([name, desc]) => (
+                    <div key={name} className="character-identity-card">
+                      <div className="character-identity-title">{name}</div>
+                      <div className="character-identity-desc">{desc}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="character-info-list">
+                  <div className="info-row character-info-row">
+                    <span className="character-info-label">性别</span>
+                    <span className="character-info-value">{stats.gender}</span>
+                  </div>
+                  {age !== null && (
+                    <div className="info-row character-info-row">
+                      <span className="character-info-label">年龄</span>
+                      <span className="character-info-value">{age} 岁</span>
+                    </div>
+                  )}
+                  {stats.status && (
+                    <div className="info-row character-info-row">
+                      <span className="character-info-label">状态</span>
+                      <span className={`character-info-value ${stats.status.includes('受伤') ? 'is-injured' : ''}`}>
+                        {stats.status}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="character-appearance-note">"{stats.appearance || '待定'}"</div>
+              </div>
+            </div>
+
+            <div className="char-right">
+              <div className="character-panel-stat-block">
+                <div className="stats-bars-grid">
+                  <StatBar
+                    label="气血"
+                    current={stats.attributes.hpCurrent ?? stats.attributes.hp}
+                    max={stats.attributes.hp}
+                    color="#7f1d1d"
+                  />
+                  <StatBar
+                    label="内力"
+                    current={stats.attributes.mpCurrent ?? stats.attributes.mp}
+                    max={stats.attributes.mp}
+                    color="#0e7490"
+                  />
+                  <StatBar label="修为" current={stats.cultivation || 0} max={maxCultivation} color="#78350f" />
+                </div>
+              </div>
+
+              <div className="realm-container character-realm-container" style={realmStyles}>
+                <RealmCorner position="top-left" />
+                <RealmCorner position="top-right" />
+                <RealmCorner position="bottom-left" />
+                <RealmCorner position="bottom-right" />
+
+                <div className="character-realm-header">
+                  <div className="character-realm-copy">
+                    <div className="character-realm-eyebrow">当前境界</div>
+                    <div className="character-realm-line">
+                      <span className="character-realm-name">{currentRealm}</span>
+                      <span className="character-realm-cultivation">
+                        修为 <span className="current">{cultivation}</span>
+                        {nextRealm && <span className="total"> / {breakthroughCost}</span>}
+                      </span>
+                    </div>
+                    {nextRealm && (
+                      <div className="character-realm-next">
+                        下一境界: <span className="character-realm-next-name">{nextRealm}</span>
+                        {canBreakthrough && <span className="character-realm-ready">可突破</span>}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleBreakthrough}
+                    disabled={!canBreakthrough}
+                    className={`breakthrough-btn ${canBreakthrough ? 'can-break' : ''}`}
+                    title={tooltipText}
+                  >
+                    <span className="breakthrough-btn-glyph">+</span>
+                  </button>
+                </div>
+
                 {nextRealm && (
-                  <div className="character-realm-next">
-                    下一境界: <span className="character-realm-next-name">{nextRealm}</span>
-                    {canBreakthrough && <span className="character-realm-ready">可突破</span>}
+                  <div className="cultivation-progress-bar">
+                    <div className="progress-fill" style={{ width: `${cultivationProgress}%` }}></div>
                   </div>
                 )}
               </div>
-              <button
-                onClick={handleBreakthrough}
-                disabled={!canBreakthrough}
-                className={`breakthrough-btn ${canBreakthrough ? 'can-break' : ''}`}
-                title={tooltipText}
-              >
-                <span className="breakthrough-btn-glyph">+</span>
-              </button>
-            </div>
 
-            {nextRealm && (
-              <div className="cultivation-progress-bar">
-                <div className="progress-fill" style={{ width: `${cultivationProgress}%` }}></div>
+              <div>
+                <h4 className="section-header">
+                  <DiamondBullet /> 根骨天资
+                </h4>
+                <div className="attr-grid">
+                  <Attribute label="臂力" value={stats.attributes.臂力} initial={stats.initialAttributes.臂力} />
+                  <Attribute label="根骨" value={stats.attributes.根骨} initial={stats.initialAttributes.根骨} />
+                  <Attribute label="机敏" value={stats.attributes.机敏} initial={stats.initialAttributes.机敏} />
+                  <Attribute label="洞察" value={stats.attributes.洞察} initial={stats.initialAttributes.洞察} />
+                  <Attribute label="悟性" value={stats.initialAttributes.悟性} />
+                  <Attribute label="风姿" value={stats.initialAttributes.风姿} />
+                  <Attribute label="福缘" value={stats.initialAttributes.福缘} />
+                </div>
               </div>
-            )}
-          </div>
 
-          <div>
-            <h4 className="section-header">
-              <DiamondBullet /> 根骨天资
-            </h4>
-            <div className="attr-grid">
-              <Attribute label="臂力" value={stats.attributes.臂力} initial={stats.initialAttributes.臂力} />
-              <Attribute label="根骨" value={stats.attributes.根骨} initial={stats.initialAttributes.根骨} />
-              <Attribute label="机敏" value={stats.attributes.机敏} initial={stats.initialAttributes.机敏} />
-              <Attribute label="洞察" value={stats.attributes.洞察} initial={stats.initialAttributes.洞察} />
-              <Attribute label="悟性" value={stats.initialAttributes.悟性} />
-              <Attribute label="风姿" value={stats.initialAttributes.风姿} />
-              <Attribute label="福缘" value={stats.initialAttributes.福缘} />
-            </div>
-          </div>
-
-          {networkEntries.length > 0 && (
-            <div className="character-network-section">
-              <h4 className="section-header">
-                <DiamondBullet /> 人情往来
-              </h4>
-              <div className="character-network-list">
-                {networkEntries.map(([person, relation]) => (
-                  <div key={person} className="character-network-chip">
-                    <span className="character-network-name">{person}</span>
-                    <span className="character-network-relation">({relation})</span>
+              {networkEntries.length > 0 && (
+                <div className="character-network-section">
+                  <h4 className="section-header">
+                    <DiamondBullet /> 人情往来
+                  </h4>
+                  <div className="character-network-list">
+                    {networkEntries.map(([person, relation]) => (
+                      <div key={person} className="character-network-chip">
+                        <span className="character-network-name">{person}</span>
+                        <span className="character-network-relation">({relation})</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              )}
+
+              <div className="character-biography-section">
+                <h4 className="section-header">
+                  <DiamondBullet /> 往事如烟
+                </h4>
+                <div className="character-biography">{renderBiography(stats.biography)}</div>
               </div>
             </div>
-          )}
-
-          <div className="character-biography-section">
-            <h4 className="section-header">
-              <DiamondBullet /> 往事如烟
-            </h4>
-            <div className="character-biography">{renderBiography(stats.biography)}</div>
           </div>
-        </div>
+        ) : (
+          <div className="character-meridian-tab" role="tabpanel" aria-label="奇经八脉">
+            <MeridianPanel
+              projection={meridianProjection}
+              cultivation={cultivation}
+              busy={isBusy || !onUpgradeMeridian}
+              onUpgrade={async (nodeId, quote) => {
+                if (!onUpgradeMeridian) {
+                  throw new Error('当前环境未连接经脉写入接口。');
+                }
+                return onUpgradeMeridian(nodeId, quote);
+              }}
+            />
+          </div>
+        )}
       </div>
 
       <AvatarPreviewModal

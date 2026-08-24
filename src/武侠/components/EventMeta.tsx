@@ -14,18 +14,35 @@ interface EventMetaProps {
 
 /** 事件详情中复用的时间、地点、倒计时与人物信息。 */
 export const EventMeta: React.FC<EventMetaProps> = ({ event, currentLocation, onTravelTo }) => {
-  const { timeText, location, remainingDays, involvedCharacters } = event;
+  const { timeText, location, startsInDays, remainingDays, involvedCharacters } = event;
   const canTravel = Boolean(onTravelTo && location && location !== currentLocation);
-  if (!timeText && !location && remainingDays === undefined && !involvedCharacters?.length) return null;
+  if (
+    !timeText &&
+    !location &&
+    startsInDays === undefined &&
+    remainingDays === undefined &&
+    !involvedCharacters?.length
+  ) {
+    return null;
+  }
 
   return (
     <span className="event-meta-row">
+      {startsInDays !== undefined && (
+        <span className={`event-meta-badge event-meta-badge--countdown${startsInDays <= 3 ? ' urgent' : ''}`}>
+          {startsInDays <= 0 ? '今日将起' : `${startsInDays} 日后事发`}
+        </span>
+      )}
       {remainingDays !== undefined && (
         <span className={`event-meta-badge event-meta-badge--countdown${remainingDays <= 3 ? ' urgent' : ''}`}>
           {formatRemainingDays(remainingDays)}
         </span>
       )}
-      {timeText && <span className="event-meta-badge">{getEventTimeLabel(event)} {timeText}</span>}
+      {timeText && (
+        <span className="event-meta-badge">
+          {getEventTimeLabel(event)} {timeText}
+        </span>
+      )}
       {location &&
         (canTravel ? (
           <button
@@ -46,4 +63,3 @@ export const EventMeta: React.FC<EventMetaProps> = ({ event, currentLocation, on
     </span>
   );
 };
-

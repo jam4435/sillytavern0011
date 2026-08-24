@@ -77,6 +77,7 @@ const ChatRenameDialog: React.FC<ChatRenameDialogProps> = ({
           <button
             type="button"
             className="history-primary-action"
+            data-wuxia-automation="confirm-initial-chat-name"
             disabled={isSubmitting || !value.trim()}
             onClick={onConfirm}
           >
@@ -84,7 +85,13 @@ const ChatRenameDialog: React.FC<ChatRenameDialogProps> = ({
             确认命名
           </button>
           {isInitial ? (
-            <button type="button" className="history-secondary-action" disabled={isSubmitting} onClick={keepCurrent}>
+            <button
+              type="button"
+              className="history-secondary-action"
+              data-wuxia-automation="keep-current-chat-name"
+              disabled={isSubmitting}
+              onClick={keepCurrent}
+            >
               保留当前名称
             </button>
           ) : (

@@ -37,7 +37,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ hasSavedGame, onNewGame, on
 
         {/* 菜单按钮 */}
         <div className="splash-menu">
-          <button type="button" className="menu-btn primary" onClick={onNewGame}>
+          <button type="button" className="menu-btn primary" data-wuxia-automation="new-story" onClick={onNewGame}>
             <span className="btn-icon" aria-hidden="true">
               <Icons.Combat size={20} color="currentColor" />
             </span>

@@ -45,6 +45,7 @@ import { isChatRenamePending } from '../../shared/chatRenameJournal';
 import { getLocationScopePath } from '../../shared/locationPath.js';
 import { wuxiaCalendarDateToTotalDays } from '../../shared/wuxiaCalendar.js';
 import { dataLogger } from './logger';
+import { buildMeridianProjection, deriveMeridianModifiers } from './meridianSystem';
 
 // 使用酒馆的 ChatMessage 类型（与本地 types.ts 中的 ChatMessage 区分）
 type TavernChatMessage = {
@@ -872,13 +873,21 @@ function collectPermanentAttributeModifierSources(前端变量?: FrontendVariabl
   });
 }
 
+function collectMeridianAttributeModifierSources(前端变量?: FrontendVariableData): AttributeModifierSource[] {
+  const modifiers = deriveMeridianModifiers(前端变量?.奇经八脉);
+  if (!Object.values(modifiers).some(value => value !== 0)) {
+    return [];
+  }
+  return [{ id: '奇经八脉', kind: '经脉', modifiers }];
+}
+
 function collectActiveAttributeModifiers(
   用户档案?: UserProfile,
   equipmentSlots: EquipmentSlots = parseEquipmentSlots(用户档案?.装备栏),
   statusEffects: ActiveStatusEffect[] = parseStatusEffects(用户档案?.状态效果),
   前端变量?: FrontendVariableData,
 ): AttributeModifierSource[] | undefined {
-  const sources: AttributeModifierSource[] = [];
+  const sources: AttributeModifierSource[] = collectMeridianAttributeModifierSources(前端变量);
   const 包裹 = 用户档案?.包裹;
 
   if (包裹 && typeof 包裹 === 'object') {
@@ -1095,6 +1104,18 @@ function parseRumorMeta(raw: string): { description: string; timeText?: string; 
   return { description: match[1].trim(), timeText: match[2].trim(), location: match[3].trim() };
 }
 
+function parseCalendarText(raw?: string): CalendarRecord | undefined {
+  if (!raw) return undefined;
+  const match = raw.match(/^(\d+)年(\d+)月(\d+)日(?:([0-9]+)时)?/);
+  if (!match) return undefined;
+  return {
+    年: Number(match[1]),
+    月: Number(match[2]),
+    日: Number(match[3]),
+    时: match[4] === undefined ? undefined : Number(match[4]),
+  };
+}
+
 function collectEventOccupancy(
   occupancy: NonNullable<NonNullable<GameVariables['事件系统']>['人物事件占用']>,
   eventName: string,
@@ -1136,11 +1157,35 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
     return remaining >= 0 ? remaining : undefined;
   };
 
+  const daysUntilStart = (timeText?: string): number | undefined => {
+    if (nowDays === undefined) return undefined;
+    const startTime = parseCalendarText(timeText);
+    if (!startTime) return undefined;
+    const remaining = toCalendarDays(startTime) - nowDays;
+    return remaining >= 0 ? remaining : undefined;
+  };
+
+  const previewNames = new Set<string>();
+  for (const [eventName, value] of Object.entries(variables.前端变量?.可发现事件 || {})) {
+    const raw = typeof value === 'string' ? value : formatEventValue(value);
+    if (!raw.trim()) continue;
+    const meta = parseRumorMeta(raw);
+    previewNames.add(eventName);
+    events.push({
+      id: `preview_${eventName}`,
+      title: getDisplayEventName(eventName),
+      type: 'RUMOR',
+      ...meta,
+      startsInDays: daysUntilStart(meta.timeText),
+    });
+  }
+
   for (const [eventName, value] of Object.entries(variables.附近传闻 || {})) {
+    if (previewNames.has(eventName)) continue;
     const raw = typeof value === 'string' ? value : formatEventValue(value);
     if (!raw.trim()) continue;
     events.push({
-      id: `rumor_${events.length}`,
+      id: `rumor_${eventName}`,
       title: getDisplayEventName(eventName),
       type: 'RUMOR',
       ...parseRumorMeta(raw),
@@ -3419,7 +3464,13 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
     dataLogger.log('[variableReader] Step 4d2 - 状态效果:', statusEffects);
     dataLogger.log('[variableReader] Step 4d3 - 属性修正:', activeModifiers);
 
-    const baseAttributes = calculateAllAttributes(initialAttrs, realm, martialArtsForCalc);
+    const meridianModifiers = collectMeridianAttributeModifierSources(variables.前端变量);
+    const baseAttributes = calculateAllAttributes(
+      initialAttrs,
+      realm,
+      martialArtsForCalc,
+      meridianModifiers.length > 0 ? meridianModifiers : undefined,
+    );
     const { combat, resources } = calculateAllAttributes(initialAttrs, realm, martialArtsForCalc, activeModifiers);
 
     dataLogger.log('[variableReader] Step 4e - 计算后的战斗属性:', combat);
@@ -3440,6 +3491,12 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
       initialAttributes: initialAttrs,
       baseAttributes: parseCurrentAttributes(用户档案, baseAttributes.combat, baseAttributes.resources),
       attributes: parseCurrentAttributes(用户档案, combat, resources),
+      meridians: buildMeridianProjection({
+        progress: variables.前端变量?.奇经八脉,
+        realm,
+        cultivation: 用户档案.修为 ?? 0,
+        initialAttributes: initialAttrs,
+      }),
       biography: 用户档案.人物经历 || '',
       network: 用户档案.关系网 || {},
     };

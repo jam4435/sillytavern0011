@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GameEvent } from '../types';
 import {
   getEventDescription,
+  getEventCountdownLabel,
   getEventSemanticLabel,
   getEventTitleParts,
   getTrackerEvents,
@@ -20,9 +21,7 @@ const event = (overrides: Partial<GameEvent>): GameEvent => ({
 describe('eventPresentation', () => {
   it('removes the duplicated leading event time field from the event description', () => {
     expect(
-      getEventDescription(
-        event({ description: '1219年10月20日13时 到 15时，大宋/张家口/大酒店发生相遇。' }),
-      ),
+      getEventDescription(event({ description: '1219年10月20日13时 到 15时，大宋/张家口/大酒店发生相遇。' })),
     ).toBe('大宋/张家口/大酒店发生相遇。');
     expect(getEventDescription(event({ description: '只保留事件正文。' }))).toBe('只保留事件正文。');
   });
@@ -46,7 +45,9 @@ describe('eventPresentation', () => {
     expect(isEventUrgent(event({ type: 'ACTIVE', remainingDays: 3 }))).toBe(true);
     expect(isEventUrgent(event({ type: 'AFTERMATH', remainingTurns: 1 }))).toBe(true);
     expect(isEventUrgent(event({ type: 'ACTIVE', remainingDays: 4 }))).toBe(false);
+    expect(isEventUrgent(event({ type: 'RUMOR', startsInDays: 3 }))).toBe(true);
     expect(isEventUrgent(event({ type: 'RUMOR' }))).toBe(false);
+    expect(getEventCountdownLabel(event({ type: 'RUMOR', startsInDays: 10 }))).toBe('10日后');
   });
 
   it('keeps the agreed tracker priority while preserving order within a tie', () => {

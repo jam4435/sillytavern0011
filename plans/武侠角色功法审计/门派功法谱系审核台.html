@@ -1,0 +1,1731 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>门派功法谱系审核台</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1d1915;
+        --ink-soft: #51473e;
+        --muted: #7c7063;
+        --paper: #eee8db;
+        --paper-high: #fbf8ef;
+        --paper-low: #dfd5c2;
+        --night: #171512;
+        --night-soft: #29241f;
+        --line: #cbbfa9;
+        --line-dark: #9d8c73;
+        --cinnabar: #a4372d;
+        --cinnabar-dark: #76261f;
+        --jade: #2e725c;
+        --amber: #a76d22;
+        --blue: #42677a;
+        --shadow: rgba(45, 35, 25, 0.12);
+        --radius: 8px;
+        --header-height: 112px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        background: #d3c8b6;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 12% 12%, rgba(255, 255, 255, 0.42), transparent 27%),
+          radial-gradient(circle at 88% 34%, rgba(137, 103, 58, 0.08), transparent 30%),
+          repeating-linear-gradient(0deg, rgba(62, 48, 34, 0.025) 0 1px, transparent 1px 5px), var(--paper);
+        font-family: 'FangSong', 'STFangsong', 'Noto Serif SC', 'Source Han Serif SC', serif;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        color: inherit;
+        font: inherit;
+      }
+      button,
+      .file-button,
+      select,
+      input,
+      textarea {
+        border: 1px solid var(--line-dark);
+        border-radius: 6px;
+        background: var(--paper-high);
+      }
+      button,
+      .file-button {
+        min-height: 36px;
+        padding: 7px 12px;
+        cursor: pointer;
+      }
+      button:hover,
+      .file-button:hover {
+        border-color: var(--cinnabar);
+        background: #fffdf7;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible,
+      .file-button:focus-within {
+        outline: 2px solid var(--cinnabar);
+        outline-offset: 2px;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+      .hidden {
+        display: none !important;
+      }
+
+      .masthead {
+        position: sticky;
+        z-index: 30;
+        top: 0;
+        color: #f6efdf;
+        background:
+          linear-gradient(100deg, rgba(164, 55, 45, 0.16), transparent 38%),
+          repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 7px), var(--night);
+        box-shadow: 0 8px 24px rgba(28, 22, 17, 0.25);
+      }
+      .masthead-main,
+      .masthead-progress {
+        width: min(1680px, 100%);
+        margin-inline: auto;
+        padding-inline: 22px;
+      }
+      .masthead-main {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 22px;
+        min-height: 74px;
+        padding-block: 12px 9px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-width: 0;
+      }
+      .seal {
+        display: grid;
+        flex: 0 0 43px;
+        width: 43px;
+        height: 43px;
+        place-items: center;
+        border: 1px solid #d37464;
+        color: #fff3e3;
+        background: var(--cinnabar);
+        box-shadow:
+          inset 0 0 0 3px #8c2f27,
+          0 0 0 1px #5c1d18;
+        font-family: 'STKaiti', 'KaiTi', serif;
+        font-size: 25px;
+        transform: rotate(-2deg);
+      }
+      h1 {
+        margin: 0;
+        font-family: 'STKaiti', 'KaiTi', serif;
+        font-size: 24px;
+        line-height: 1.15;
+        letter-spacing: 0.08em;
+      }
+      .subtitle {
+        margin: 4px 0 0;
+        overflow: hidden;
+        color: #cfc3b1;
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 7px;
+      }
+      .header-actions button,
+      .header-actions .file-button {
+        border-color: #65594c;
+        color: #f4ead8;
+        background: var(--night-soft);
+      }
+      .header-actions button:hover,
+      .header-actions .file-button:hover {
+        border-color: #c39b58;
+        background: #383029;
+      }
+      .file-button input {
+        display: none;
+      }
+      .primary-action {
+        border-color: #b85a4c !important;
+        background: #7f2c25 !important;
+      }
+      .primary-action:hover {
+        background: #96372e !important;
+      }
+
+      .masthead-progress {
+        display: grid;
+        grid-template-columns: minmax(240px, 1fr) repeat(4, minmax(76px, auto));
+        gap: 14px;
+        align-items: center;
+        padding-bottom: 11px;
+      }
+      .progress-group {
+        display: grid;
+        grid-template-columns: minmax(120px, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+      }
+      .progress-track {
+        height: 7px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #4a4239;
+      }
+      .progress-fill {
+        width: 0;
+        height: 100%;
+        background: linear-gradient(90deg, #b9853c, #e0bd70);
+        transition: width 180ms ease;
+      }
+      .progress-label,
+      .counter {
+        color: #cfc5b6;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .counter strong {
+        color: #fff8e9;
+        font-size: 15px;
+      }
+      .counter.accept strong {
+        color: #8fd0b3;
+      }
+      .counter.revise strong {
+        color: #f0c06e;
+      }
+      .counter.reject strong {
+        color: #ef9b8f;
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 252px minmax(0, 1fr);
+        gap: 20px;
+        width: min(1680px, 100%);
+        margin-inline: auto;
+        padding: 20px 22px 64px;
+      }
+      .sect-sidebar {
+        align-self: start;
+        position: sticky;
+        top: calc(var(--header-height) + 18px);
+      }
+      .sidebar-card {
+        overflow: hidden;
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+        background: rgba(249, 246, 237, 0.82);
+        box-shadow: 0 6px 20px var(--shadow);
+      }
+      .sidebar-title {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 14px 14px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .sidebar-title h2 {
+        margin: 0;
+        font-size: 16px;
+        letter-spacing: 0.08em;
+      }
+      .sidebar-title span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .sect-nav {
+        display: grid;
+        padding: 7px;
+      }
+      .sect-nav-button {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 3px 8px;
+        min-height: 53px;
+        padding: 8px 9px;
+        border-color: transparent;
+        text-align: left;
+        background: transparent;
+      }
+      .sect-nav-button:hover {
+        border-color: var(--line);
+        background: rgba(255, 255, 255, 0.55);
+      }
+      .sect-nav-button.active {
+        border-color: #b99d73;
+        background: #ede4d3;
+        box-shadow: inset 3px 0 0 var(--cinnabar);
+      }
+      .sect-nav-name {
+        overflow: hidden;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .sect-nav-count {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .sect-nav-track {
+        grid-column: 1 / -1;
+        height: 3px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #d7cdbb;
+      }
+      .sect-nav-fill {
+        height: 100%;
+        background: var(--jade);
+      }
+      .sidebar-hint {
+        padding: 11px 14px 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .workspace {
+        min-width: 0;
+      }
+      .sect-sheet {
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 14px;
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+        background: rgba(250, 247, 238, 0.88);
+        box-shadow: 0 8px 26px var(--shadow);
+      }
+      .sect-sheet::after {
+        position: absolute;
+        top: -36px;
+        right: -28px;
+        width: 145px;
+        height: 145px;
+        border: 1px solid rgba(164, 55, 45, 0.13);
+        border-radius: 50%;
+        content: '';
+        box-shadow:
+          inset 0 0 0 12px rgba(164, 55, 45, 0.025),
+          inset 0 0 0 13px rgba(164, 55, 45, 0.08);
+        pointer-events: none;
+      }
+      .sect-sheet-main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(310px, 0.46fr);
+        gap: 20px;
+        padding: 22px 22px 17px;
+      }
+      .eyebrow {
+        margin: 0 0 5px;
+        color: var(--cinnabar);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+      }
+      .sect-name-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 9px;
+      }
+      .sect-name {
+        margin: 0;
+        font-family: 'STKaiti', 'KaiTi', serif;
+        font-size: 34px;
+        line-height: 1.05;
+        letter-spacing: 0.06em;
+      }
+      .sect-position {
+        max-width: 760px;
+        margin: 12px 0 0;
+        color: var(--ink-soft);
+      }
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 12px;
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 2px 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink-soft);
+        background: rgba(255, 255, 255, 0.55);
+        font-size: 11px;
+      }
+      .tag.source-original {
+        border-color: rgba(164, 55, 45, 0.45);
+        color: var(--cinnabar-dark);
+        background: rgba(164, 55, 45, 0.07);
+      }
+      .tag.source-known {
+        border-color: rgba(46, 114, 92, 0.42);
+        color: var(--jade);
+        background: rgba(46, 114, 92, 0.07);
+      }
+      .tag.source-pending {
+        border-color: rgba(167, 109, 34, 0.46);
+        color: #855312;
+        background: rgba(167, 109, 34, 0.07);
+      }
+      .sect-review {
+        position: relative;
+        z-index: 1;
+        padding: 13px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #eee7d9;
+      }
+      .review-caption {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .review-caption strong {
+        color: var(--ink);
+        font-size: 13px;
+      }
+      .review-controls {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 5px;
+      }
+      .review-button {
+        min-height: 34px;
+        padding: 5px 6px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .review-button[data-status='通过'].active {
+        border-color: var(--jade);
+        color: #fff;
+        background: var(--jade);
+      }
+      .review-button[data-status='需修改'].active {
+        border-color: var(--amber);
+        color: #fff;
+        background: var(--amber);
+      }
+      .review-button[data-status='驳回'].active {
+        border-color: var(--cinnabar);
+        color: #fff;
+        background: var(--cinnabar);
+      }
+      .review-button[data-status='待审核'].active {
+        border-color: #685f55;
+        color: #fff;
+        background: #685f55;
+      }
+      .review-note {
+        width: 100%;
+        min-height: 66px;
+        margin-top: 8px;
+        padding: 8px 9px;
+        resize: vertical;
+        line-height: 1.45;
+      }
+      .sect-sheet-foot {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        padding: 11px 22px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        background: rgba(224, 214, 197, 0.48);
+        font-size: 12px;
+      }
+      .sect-sheet-foot strong {
+        color: var(--ink-soft);
+      }
+
+      .toolbar {
+        position: sticky;
+        z-index: 20;
+        top: var(--header-height);
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) repeat(4, minmax(115px, 0.48fr)) auto;
+        gap: 8px;
+        margin-bottom: 16px;
+        padding: 11px;
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+        background: rgba(238, 232, 219, 0.96);
+        box-shadow: 0 5px 16px rgba(45, 35, 25, 0.1);
+        backdrop-filter: blur(10px);
+      }
+      .toolbar label {
+        display: grid;
+        gap: 3px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .toolbar input,
+      .toolbar select {
+        width: 100%;
+        min-height: 38px;
+        padding: 7px 9px;
+      }
+      .toolbar-actions {
+        display: flex;
+        align-items: end;
+        gap: 6px;
+      }
+      .toolbar-actions button {
+        white-space: nowrap;
+      }
+      .result-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 0 2px 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .result-line strong {
+        color: var(--ink);
+      }
+
+      .lineage {
+        display: grid;
+        gap: 16px;
+      }
+      .lineage-layer {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 15px;
+        align-items: start;
+      }
+      .layer-marker {
+        position: sticky;
+        top: calc(var(--header-height) + 91px);
+        display: grid;
+        justify-items: center;
+        gap: 7px;
+        padding-top: 4px;
+      }
+      .layer-orb {
+        display: grid;
+        width: 56px;
+        height: 56px;
+        place-items: center;
+        border: 1px solid var(--line-dark);
+        border-radius: 50%;
+        color: #f5ecdc;
+        background: var(--night-soft);
+        box-shadow:
+          inset 0 0 0 4px #373027,
+          0 3px 10px var(--shadow);
+        font-family: 'STKaiti', 'KaiTi', serif;
+        font-size: 18px;
+      }
+      .layer-count {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .layer-cards {
+        position: relative;
+        display: grid;
+        gap: 10px;
+      }
+      .layer-cards::before {
+        position: absolute;
+        top: 0;
+        bottom: -17px;
+        left: -44px;
+        width: 1px;
+        background: var(--line-dark);
+        content: '';
+      }
+      .lineage-layer:last-child .layer-cards::before {
+        bottom: 50%;
+      }
+      .art-card {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(200px, 0.68fr) minmax(260px, 1fr) 254px;
+        gap: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: rgba(251, 248, 239, 0.9);
+        box-shadow: 0 4px 13px rgba(45, 35, 25, 0.08);
+        animation: reveal 260ms ease both;
+      }
+      .art-card::before {
+        position: absolute;
+        top: 27px;
+        left: -38px;
+        width: 38px;
+        height: 1px;
+        background: var(--line-dark);
+        content: '';
+      }
+      .art-card[data-status='通过'] {
+        border-color: rgba(46, 114, 92, 0.62);
+        box-shadow:
+          inset 4px 0 0 var(--jade),
+          0 4px 13px rgba(45, 35, 25, 0.08);
+      }
+      .art-card[data-status='需修改'] {
+        border-color: rgba(167, 109, 34, 0.65);
+        box-shadow:
+          inset 4px 0 0 var(--amber),
+          0 4px 13px rgba(45, 35, 25, 0.08);
+      }
+      .art-card[data-status='驳回'] {
+        border-color: rgba(164, 55, 45, 0.62);
+        box-shadow:
+          inset 4px 0 0 var(--cinnabar),
+          0 4px 13px rgba(45, 35, 25, 0.08);
+      }
+      .art-card[data-flash='true'] {
+        animation: flash 900ms ease;
+      }
+      .art-identity,
+      .art-summary,
+      .art-review {
+        min-width: 0;
+        padding: 15px;
+      }
+      .art-identity,
+      .art-summary {
+        border-right: 1px solid var(--line);
+      }
+      .art-identity {
+        background: rgba(228, 218, 200, 0.48);
+      }
+      .art-title-line {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 9px;
+      }
+      .art-title {
+        margin: 0;
+        font-family: 'STKaiti', 'KaiTi', serif;
+        font-size: 21px;
+        line-height: 1.2;
+      }
+      .node-id {
+        display: block;
+        margin-top: 7px;
+        overflow: hidden;
+        color: var(--muted);
+        font:
+          10px/1.35 Consolas,
+          monospace;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .status-stamp {
+        flex: 0 0 auto;
+        padding: 2px 6px;
+        border: 1px solid currentColor;
+        color: var(--muted);
+        font-size: 10px;
+        transform: rotate(-2deg);
+      }
+      .status-stamp.accept {
+        color: var(--jade);
+      }
+      .status-stamp.revise {
+        color: var(--amber);
+      }
+      .status-stamp.reject {
+        color: var(--cinnabar);
+      }
+      .art-description {
+        margin: 9px 0 0;
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px 15px;
+        margin: 0;
+      }
+      .summary-grid div {
+        min-width: 0;
+      }
+      .summary-grid dt {
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .summary-grid dd {
+        margin: 1px 0 0;
+        overflow-wrap: anywhere;
+        font-size: 13px;
+      }
+      .prerequisites {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 11px;
+      }
+      .prereq-button {
+        min-height: 27px;
+        padding: 3px 7px;
+        border-color: var(--line);
+        color: var(--blue);
+        background: rgba(66, 103, 122, 0.05);
+        font-size: 11px;
+      }
+      .art-review {
+        align-content: start;
+        background: rgba(255, 253, 247, 0.7);
+      }
+      .art-review .review-note {
+        min-height: 54px;
+      }
+      .details-panel {
+        grid-column: 1 / -1;
+        border-top: 1px solid var(--line);
+      }
+      details > summary {
+        padding: 9px 15px;
+        color: var(--ink-soft);
+        background: rgba(224, 214, 197, 0.32);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      details[open] > summary {
+        border-bottom: 1px solid var(--line);
+        color: var(--cinnabar-dark);
+      }
+      .details-content {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        padding: 14px 15px 16px;
+      }
+      .detail-section {
+        min-width: 0;
+      }
+      .detail-section h4 {
+        margin: 0 0 7px;
+        color: var(--cinnabar-dark);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+      .detail-list {
+        display: grid;
+        gap: 5px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: var(--ink-soft);
+        font-size: 12px;
+      }
+      .detail-list li {
+        padding-left: 10px;
+        border-left: 2px solid var(--line);
+        overflow-wrap: anywhere;
+      }
+      .empty-detail {
+        color: var(--muted);
+        font-style: italic;
+      }
+
+      .empty-state {
+        padding: 52px 20px;
+        border: 1px dashed var(--line-dark);
+        border-radius: var(--radius);
+        color: var(--muted);
+        background: rgba(250, 247, 238, 0.6);
+        text-align: center;
+      }
+      .toast {
+        position: fixed;
+        z-index: 80;
+        right: 22px;
+        bottom: 22px;
+        max-width: min(430px, calc(100% - 44px));
+        padding: 11px 15px;
+        border: 1px solid #766656;
+        border-radius: 6px;
+        color: #f8efdf;
+        background: #28221d;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(10px);
+        transition: 160ms ease;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .storage-indicator {
+        position: fixed;
+        z-index: 25;
+        right: 22px;
+        bottom: 18px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      @keyframes reveal {
+        from {
+          opacity: 0;
+          transform: translateY(5px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes flash {
+        0%,
+        100% {
+          background: var(--paper-high);
+        }
+        35% {
+          background: #f4e1a8;
+        }
+      }
+
+      @media (max-width: 1260px) {
+        :root {
+          --header-height: 146px;
+        }
+        .masthead-progress {
+          grid-template-columns: minmax(200px, 1fr) repeat(2, auto);
+        }
+        .counter:nth-of-type(n + 3) {
+          display: none;
+        }
+        .toolbar {
+          grid-template-columns: minmax(210px, 1fr) repeat(2, minmax(120px, 0.5fr)) auto;
+        }
+        .toolbar label:nth-of-type(4),
+        .toolbar label:nth-of-type(5) {
+          display: none;
+        }
+        .art-card {
+          grid-template-columns: minmax(200px, 0.72fr) minmax(240px, 1fr);
+        }
+        .art-summary {
+          border-right: 0;
+        }
+        .art-review {
+          grid-column: 1 / -1;
+          border-top: 1px solid var(--line);
+        }
+        .art-review .review-controls {
+          max-width: 440px;
+        }
+      }
+      @media (max-width: 900px) {
+        :root {
+          --header-height: 177px;
+        }
+        .masthead-main {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 9px;
+        }
+        .header-actions {
+          justify-content: flex-start;
+        }
+        .masthead-progress {
+          grid-template-columns: 1fr auto;
+        }
+        .counter {
+          display: none;
+        }
+        .app-shell {
+          grid-template-columns: 1fr;
+          padding-inline: 12px;
+        }
+        .sect-sidebar {
+          position: static;
+        }
+        .sect-nav {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .sidebar-hint {
+          display: none;
+        }
+        .sect-sheet-main {
+          grid-template-columns: 1fr;
+        }
+        .toolbar {
+          position: static;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .toolbar label:first-child,
+        .toolbar-actions {
+          grid-column: 1 / -1;
+        }
+        .toolbar label:nth-of-type(4),
+        .toolbar label:nth-of-type(5) {
+          display: grid;
+        }
+        .lineage-layer {
+          grid-template-columns: 58px minmax(0, 1fr);
+          gap: 8px;
+        }
+        .layer-marker {
+          position: static;
+        }
+        .layer-orb {
+          width: 46px;
+          height: 46px;
+          font-size: 15px;
+        }
+        .layer-cards::before {
+          left: -32px;
+        }
+        .art-card {
+          grid-template-columns: 1fr;
+        }
+        .art-identity,
+        .art-summary {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .details-content {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 520px) {
+        :root {
+          --header-height: 211px;
+        }
+        .subtitle {
+          white-space: normal;
+        }
+        .header-actions {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          width: 100%;
+        }
+        .header-actions button,
+        .header-actions .file-button {
+          display: grid;
+          place-items: center;
+        }
+        .sect-nav {
+          grid-template-columns: 1fr;
+        }
+        .sect-name {
+          font-size: 28px;
+        }
+        .toolbar {
+          grid-template-columns: 1fr;
+        }
+        .toolbar label:first-child,
+        .toolbar-actions {
+          grid-column: auto;
+        }
+        .toolbar-actions {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .lineage-layer {
+          grid-template-columns: 1fr;
+        }
+        .layer-marker {
+          display: flex;
+          justify-content: flex-start;
+        }
+        .layer-orb {
+          width: auto;
+          height: 35px;
+          padding-inline: 14px;
+          border-radius: 999px;
+        }
+        .layer-cards::before,
+        .art-card::before {
+          display: none;
+        }
+        .review-controls {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media print {
+        .masthead,
+        .sect-sidebar,
+        .toolbar,
+        .art-review,
+        .storage-indicator {
+          display: none !important;
+        }
+        .app-shell {
+          display: block;
+          padding: 0;
+        }
+        .sect-sheet,
+        .art-card {
+          break-inside: avoid;
+          box-shadow: none;
+        }
+        details .details-content {
+          display: grid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="masthead-main">
+        <div class="brand">
+          <div class="seal" aria-hidden="true">审</div>
+          <div>
+            <h1>门派功法谱系审核台</h1>
+            <p class="subtitle">离线单文件 · 源稿生成于 2026-08-23T17:06:52.311Z · 审核台生成于 2026-08-23T18:14:21.686Z</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="primary-action" type="button" id="exportMergedButton">导出已审核谱系</button>
+          <button type="button" id="exportReviewButton">仅导出审核记录</button>
+          <label class="file-button" tabindex="0"
+            >导入进度 / 谱系<input id="importInput" type="file" accept="application/json,.json"
+          /></label>
+          <button type="button" id="clearButton">清空本地进度</button>
+        </div>
+      </div>
+      <div class="masthead-progress">
+        <div class="progress-group">
+          <div class="progress-track"><div class="progress-fill" id="globalProgress"></div></div>
+          <span class="progress-label" id="globalProgressLabel">0 / 0</span>
+        </div>
+        <span class="counter accept">通过 <strong id="acceptedCount">0</strong></span>
+        <span class="counter revise">需修改 <strong id="revisionCount">0</strong></span>
+        <span class="counter reject">驳回 <strong id="rejectedCount">0</strong></span>
+        <span class="counter">待审核 <strong id="pendingCount">0</strong></span>
+      </div>
+    </header>
+
+    <div class="app-shell">
+      <aside class="sect-sidebar">
+        <div class="sidebar-card">
+          <div class="sidebar-title">
+            <h2>门派卷宗</h2>
+            <span id="sectCount">0 派</span>
+          </div>
+          <nav class="sect-nav" id="sectNav" aria-label="选择门派"></nav>
+          <div class="sidebar-hint">进度按传承节点计算。结论和备注会自动暂存在当前浏览器；正式成果请导出 JSON。</div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="sect-sheet" id="sectSheet"></section>
+
+        <section class="toolbar" aria-label="谱系筛选">
+          <label
+            ><span>搜索功法、说明、限制或人物</span
+            ><input id="searchInput" type="search" placeholder="按 / 快速聚焦搜索"
+          /></label>
+          <label
+            ><span>审核状态</span
+            ><select id="statusFilter">
+              <option value="全部">全部</option>
+              <option value="待审核">待审核</option>
+              <option value="通过">通过</option>
+              <option value="需修改">需修改</option>
+              <option value="驳回">驳回</option>
+            </select></label
+          >
+          <label
+            ><span>传承层级</span
+            ><select id="layerFilter">
+              <option value="全部">全部层级</option>
+            </select></label
+          >
+          <label
+            ><span>来源状态</span
+            ><select id="sourceFilter">
+              <option value="全部">全部来源</option>
+            </select></label
+          >
+          <label
+            ><span>分支类型</span
+            ><select id="branchFilter">
+              <option value="全部">全部分支</option>
+            </select></label
+          >
+          <div class="toolbar-actions">
+            <button type="button" id="approveVisibleButton">通过当前结果</button>
+            <button type="button" id="nextPendingButton">下一条待审</button>
+          </div>
+        </section>
+
+        <div class="result-line">
+          <span id="resultSummary">准备载入谱系……</span><button type="button" id="resetFiltersButton">重置筛选</button>
+        </div>
+        <section class="lineage" id="lineage"></section>
+      </main>
+    </div>
+
+    <div class="storage-indicator" id="storageIndicator">本地暂存：初始化</div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script id="lineageData" type="application/json">
+      {"schemaVersion":1,"生成信息":{"事实源":"世界书/金庸群侠传1/世界书","功法库":"src/武侠/data/_合并后功法.json","角色功法总表":"plans/武侠角色功法审计/角色功法总表.json","传承层级顺序":["入门","基础","进阶","核心","镇派"],"功法品阶口径":["粗浅","传家","上乘","镇派","绝世","传说"],"掌握程度口径":["初窥门径","略有小成","融会贯通","炉火纯青","出神入化"],"原创程度口径":["非原创","体系补衍","完全原创"],"生成时间":"2026-08-23T17:06:52.311Z","审核原则":["功法本体与门派传承节点分离，同一功法全局只定义一次","镇派层级与功法品阶不是同一概念","小门派和军旅体系不必虚构超自然神功","所有原创节点均为待审候选，不自动写入功法库"]},"统计":{"门派或体系数":10,"功法本体数":106,"传承节点数":106,"功法库既有数":74,"世界书明确但功法库待新增数":4,"体系补衍数":26,"完全原创数":2},"功法目录":[{"功法ID":"功法::白驼吐纳法","功法":"白驼吐纳法","类型":"内功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"白驼吐纳法","类型":"内功","功法品阶":"粗浅","功法描述":"白驼山门人适应西域环境并为毒功、柔劲拳法打底的基础吐纳法，强调闭气和耐受。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::白驼驭蛇术","功法":"白驼驭蛇术","类型":"外功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"白驼驭蛇术","类型":"外功","功法品阶":"粗浅","功法描述":"通过声息、手势和药物控制毒蛇的基础技艺，本身不是高深武功，但属于白驼山必修专长。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::闭穴功夫","功法":"闭穴功夫","类型":"内功","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"镇派","修炼限制":{"根骨":11,"悟性":10}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=闭穴功夫]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::碧波吐纳诀","功法":"碧波吐纳诀","类型":"内功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"碧波吐纳诀","类型":"内功","功法品阶":"粗浅","功法描述":"依潮汐节律调整呼吸和步伐的桃花岛筑基法，帮助门人建立绵密灵动的运劲习惯。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::碧波掌法","功法":"碧波掌法","类型":"拳掌","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"传家","修炼限制":{"机敏":5}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=碧波掌法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::碧海潮生曲","功法":"碧海潮生曲","类型":"内功","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"镇派","修炼限制":{"悟性":12,"根骨":11,"福缘":9}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=碧海潮生曲]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::草原骑射术","功法":"草原骑射术","类型":"外功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"草原骑射术","类型":"外功","功法品阶":"粗浅","功法描述":"草原武士在马背上保持平衡、判断距离并快速开弓的通用训练，是蒙古军旅武艺的基础。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::斥候踏沙步","功法":"斥候踏沙步","类型":"轻功","功法品阶":"传家","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"斥候踏沙步","类型":"轻功","功法品阶":"传家","功法描述":"草原斥候用于长途奔袭、隐蔽接近和保存体力的实用步法，重耐力胜过腾挪花巧。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::打狗棒法","功法":"打狗棒法","类型":"棍锤","功法品阶":"绝世","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"棍锤","功法品阶":"绝世","修炼限制":{"机敏":15,"悟性":14}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=打狗棒法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::打狗大阵","功法":"打狗大阵","类型":"外功","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"外功","功法品阶":"镇派","修炼限制":{"悟性":10,"根骨":9}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=打狗大阵]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::打狗阵","功法":"打狗阵","类型":"外功","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"外功","功法品阶":"上乘","修炼限制":{"悟性":8}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=打狗阵]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::大风袖","功法":"大风袖","类型":"拳掌","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"传家","修炼限制":{"根骨":7,"机敏":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=大风袖]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::大关门式","功法":"大关门式","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"根骨":7,"臂力":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=大关门式]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::大手印","功法":"大手印","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"臂力":8,"根骨":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=大手印]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::弹指神通","功法":"弹指神通","类型":"指法","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"指法","功法品阶":"镇派","修炼限制":{"洞察":12,"机敏":11,"根骨":10}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=弹指神通]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::地堂刀法","功法":"地堂刀法","类型":"刀法","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"刀法","功法品阶":"传家","修炼限制":{"机敏":6,"臂力":5}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=地堂刀法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::段家剑","功法":"段家剑","类型":"剑法","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"剑法","功法品阶":"传家","修炼限制":{"机敏":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=段家剑]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::飞燕银梭","功法":"飞燕银梭","类型":"暗器","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"暗器","功法品阶":"传家","修炼限制":{"机敏":6,"洞察":5}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=飞燕银梭]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::飞掷金杵","功法":"飞掷金杵","类型":"棍锤","功法品阶":"上乘","功法库状态":"待新增","原创性":{"原创程度":"非原创","是否原创":false,"说明":"世界书人物变量已有明确名称，但功法库尚无独立条目。"},"来源状态":"世界书变量明确","功法库信息":null,"待新增草案":{"功法名称":"飞掷金杵","类型":"棍锤","功法品阶":"上乘","功法描述":"世界书人物变量中已有的重兵器投掷法，以强劲臂力和准确判断完成远距离制敌。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"世界书人物变量","来源文件":"神雕第三十七回01-达尔巴揭穿霍都清理师门.yaml","事件":"神雕第三十七回01-达尔巴揭穿霍都清理师门","字段路径":"insert.达尔巴.功法.飞掷金杵","时间":{"年":1259,"月":10,"日":24,"时":23},"摘要":"达尔巴的功法变量中出现“飞掷金杵”"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::丐帮基础棍法","功法":"丐帮基础棍法","类型":"棍锤","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"丐帮基础棍法","类型":"棍锤","功法品阶":"粗浅","功法描述":"利用竹棒木杖防身的基础棍法，招式直接朴实，为帮众结阵和后续杖法打下根基。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::丐帮吐纳诀","功法":"丐帮吐纳诀","类型":"内功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"丐帮吐纳诀","类型":"内功","功法品阶":"粗浅","功法描述":"丐帮弟子在行乞、赶路与露宿中调息养力的通用法门，取其耐久实用而非精纯深奥。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::古墓吐纳诀","功法":"古墓吐纳诀","类型":"内功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"古墓吐纳诀","类型":"内功","功法品阶":"粗浅","功法描述":"古墓门人静坐守心、调匀呼吸的基础心法，重在收敛情绪并维持细密绵长的内息。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::蛤蟆功","功法":"蛤蟆功","类型":"内功","功法品阶":"绝世","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"绝世","修炼限制":{"根骨":16,"臂力":15}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=蛤蟆功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::虎门手","功法":"虎门手","类型":"拳掌","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"传家","修炼限制":{"臂力":7,"根骨":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=虎门手]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::回马连珠箭","功法":"回马连珠箭","类型":"暗器","功法品阶":"上乘","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"回马连珠箭","类型":"暗器","功法品阶":"上乘","功法描述":"在高速驰马和转向中连续发箭的进阶骑射技，要求骑术、臂力与距离判断同时过关。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::混天功","功法":"混天功","类型":"内功","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"镇派","修炼限制":{"根骨":11,"悟性":10}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=混天功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::坚壁阵","功法":"坚壁阵","类型":"外功","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"外功","功法品阶":"传家","修炼限制":{"根骨":5}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=坚壁阵]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::降龙十八掌","功法":"降龙十八掌","类型":"拳掌","功法品阶":"绝世","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"绝世","修炼限制":{"臂力":16,"根骨":14}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=降龙十八掌]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::金刚杵法","功法":"金刚杵法","类型":"棍锤","功法品阶":"传家","功法库状态":"待新增","原创性":{"原创程度":"非原创","是否原创":false,"说明":"世界书人物变量已有明确名称，但功法库尚无独立条目。"},"来源状态":"世界书变量明确","功法库信息":null,"待新增草案":{"功法名称":"金刚杵法","类型":"棍锤","功法品阶":"传家","功法描述":"世界书人物变量中已有的金刚杵基础运用法，适合以沉重兵器近身攻防。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"世界书人物变量","来源文件":"神雕第四回00-人物登场.yaml","事件":"神雕第四回00-人物登场","字段路径":"insert.达尔巴.功法.金刚杵法","时间":{"年":1239,"月":2,"日":4,"时":8},"摘要":"达尔巴的功法变量中出现“金刚杵法”"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::金关玉锁二十四诀","功法":"金关玉锁二十四诀","类型":"内功","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"上乘","修炼限制":{"根骨":8,"悟性":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=金关玉锁二十四诀]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::金雁功","功法":"金雁功","类型":"轻功","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"轻功","功法品阶":"上乘","修炼限制":{"机敏":8,"根骨":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=金雁功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::绝情谷闭脉玄功","功法":"绝情谷闭脉玄功","类型":"内功","功法品阶":"镇派","功法库状态":"待新增","原创性":{"原创程度":"完全原创","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"绝情谷闭脉玄功","类型":"内功","功法品阶":"镇派","功法描述":"由绝情谷闭穴功夫补衍出的内功总诀，用于封闭经脉、收束气血并配合双刃绝学。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::绝情谷吐纳法","功法":"绝情谷吐纳法","类型":"内功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"绝情谷吐纳法","类型":"内功","功法品阶":"粗浅","功法描述":"绝情谷门人配合谷中清修和兵刃训练使用的基础吐纳法，强调气息内敛和下盘稳定。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::君子淑女剑","功法":"君子淑女剑","类型":"剑法","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"剑法","功法品阶":"上乘","修炼限制":{"机敏":8,"悟性":7,"福缘":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=君子淑女剑]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::空手夺白刃","功法":"空手夺白刃","类型":"拳掌","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"传家","修炼限制":{"机敏":6,"洞察":5}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=空手夺白刃]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::枯荣禅功","功法":"枯荣禅功","类型":"内功","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"上乘","修炼限制":{"悟性":8,"根骨":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=枯荣禅功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::狂风迅雷功","功法":"狂风迅雷功","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"机敏":8,"臂力":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=狂风迅雷功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::兰花拂穴手","功法":"兰花拂穴手","类型":"指法","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"指法","功法品阶":"上乘","修炼限制":{"洞察":8,"机敏":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=兰花拂穴手]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::连环鸳鸯腿","功法":"连环鸳鸯腿","类型":"拳掌","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"传家","修炼限制":{"机敏":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=连环鸳鸯腿]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::莲花落阵","功法":"莲花落阵","类型":"外功","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"外功","功法品阶":"传家","修炼限制":{"洞察":6,"悟性":5}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=莲花落阵]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::莲花掌","功法":"莲花掌","类型":"拳掌","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"传家","修炼限制":{"臂力":5}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=莲花掌]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::灵蛇拳","功法":"灵蛇拳","类型":"拳掌","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"镇派","修炼限制":{"机敏":12,"根骨":10}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=灵蛇拳]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::六脉神剑","功法":"六脉神剑","类型":"指法","功法品阶":"绝世","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"指法","功法品阶":"绝世","修炼限制":{"根骨":14,"洞察":12}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=六脉神剑]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::龙象般若功","功法":"龙象般若功","类型":"内功","功法品阶":"绝世","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"绝世","修炼限制":{"根骨":16,"臂力":15,"悟性":13}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=龙象般若功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::落英剑法","功法":"落英剑法","类型":"剑法","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"剑法","功法品阶":"上乘","修炼限制":{"机敏":8,"洞察":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=落英剑法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::落英神剑掌法","功法":"落英神剑掌法","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"机敏":8,"洞察":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=落英神剑掌法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::马背弯刀术","功法":"马背弯刀术","类型":"刀法","功法品阶":"传家","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"马背弯刀术","类型":"刀法","功法品阶":"传家","功法描述":"适应马匹冲势和单手控缰的弯刀技法，以掠击、回斩和脱离为主要战术。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::美女拳法","功法":"美女拳法","类型":"拳掌","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"传家","修炼限制":{"机敏":6,"风姿":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=美女拳法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::蒙古摔跤","功法":"蒙古摔跤","类型":"拳掌","功法品阶":"粗浅","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"粗浅","修炼限制":{}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=蒙古摔跤]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::密宗伏息法","功法":"密宗伏息法","类型":"内功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"密宗伏息法","类型":"内功","功法品阶":"粗浅","功法描述":"配合诵念和静坐调整呼吸的密宗筑基法，先练耐力与定力，再逐步承受刚猛内功。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::密宗基础手印","功法":"密宗基础手印","类型":"拳掌","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"密宗基础手印","类型":"拳掌","功法品阶":"粗浅","功法描述":"将基础掌力与手印变化结合的入门功夫，用于熟悉运劲路线和近身攻防。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::南帝门下吐纳诀","功法":"南帝门下吐纳诀","类型":"内功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"南帝门下吐纳诀","类型":"内功","功法品阶":"粗浅","功法描述":"一灯门下用来安定心神、调和气息的基础吐纳法，为日后凝聚指力和医治经脉作准备。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::泥鳅功","功法":"泥鳅功","类型":"轻功","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"轻功","功法品阶":"上乘","修炼限制":{"机敏":8,"根骨":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=泥鳅功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::奇门遁甲","功法":"奇门遁甲","类型":"内功","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"镇派","修炼限制":{"悟性":12,"洞察":11}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=奇门遁甲]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::奇门五行阵","功法":"奇门五行阵","类型":"外功","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"外功","功法品阶":"镇派","修炼限制":{"悟性":11,"洞察":10}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=奇门五行阵]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::怯薛合击阵","功法":"怯薛合击阵","类型":"外功","功法品阶":"镇派","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"怯薛合击阵","类型":"外功","功法品阶":"镇派","功法描述":"精锐怯薛以骑步转换、盾矛掩护和轮番冲击构成的合击军阵，强调整体纪律。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::轻功提纵术","功法":"轻功提纵术","类型":"轻功","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"轻功","功法品阶":"上乘","修炼限制":{"机敏":8,"根骨":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=轻功提纵术]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::全真剑法","功法":"全真剑法","类型":"剑法","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"剑法","功法品阶":"上乘","修炼限制":{"机敏":7,"洞察":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=全真剑法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::全真派内功","功法":"全真派内功","类型":"内功","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"镇派","修炼限制":{"根骨":10,"悟性":9}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=全真派内功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::全真入门拳","功法":"全真入门拳","类型":"拳掌","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"全真入门拳","类型":"拳掌","功法品阶":"粗浅","功法描述":"配合全真吐纳法演练的基础拳架，动作端正舒展，用于打牢步法、架势和发力次序。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::全真吐纳法","功法":"全真吐纳法","类型":"内功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"全真吐纳法","类型":"内功","功法品阶":"粗浅","功法描述":"全真门人用来校正呼吸与经脉运行的筑基法，只求气息绵长稳正，不追求短期爆发。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::三花聚顶掌法","功法":"三花聚顶掌法","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"臂力":7,"根骨":8}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=三花聚顶掌法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::三连环","功法":"三连环","类型":"剑法","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"剑法","功法品阶":"上乘","修炼限制":{"机敏":8,"悟性":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=三连环]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::扫叶腿法","功法":"扫叶腿法","类型":"拳掌","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"传家","修炼限制":{"机敏":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=扫叶腿法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::神驼雪山掌","功法":"神驼雪山掌","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"臂力":8,"机敏":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=神驼雪山掌]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::双刃入门式","功法":"双刃入门式","类型":"刀法","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"双刃入门式","类型":"刀法","功法品阶":"粗浅","功法描述":"公孙家刀剑双刃的基础架势，先分别练熟刀剑发力，再训练左右兵刃互换。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::水上飘入门身法","功法":"水上飘入门身法","类型":"轻功","功法品阶":"传家","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"水上飘入门身法","类型":"轻功","功法品阶":"传家","功法描述":"在木桩、浅水和浮板上练习换气借力的基础身法，只求步稳身轻，不等同于上乘水上轻功。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::瞬息千里","功法":"瞬息千里","类型":"轻功","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"轻功","功法品阶":"上乘","修炼限制":{"机敏":8,"根骨":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=瞬息千里]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::桃影步","功法":"桃影步","类型":"轻功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"桃影步","类型":"轻功","功法品阶":"粗浅","功法描述":"借桃林方位练习转折与藏身的基础步法，强调忽进忽退和遮蔽对手视线。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::套马索法","功法":"套马索法","类型":"外功","功法品阶":"传家","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"套马索法","类型":"外功","功法品阶":"传家","功法描述":"由套马技艺转化的长索控制法，可在骑战中缠拿兵器、牵制敌人或拖拽目标。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::天罡北斗阵","功法":"天罡北斗阵","类型":"外功","功法品阶":"绝世","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"外功","功法品阶":"绝世","修炼限制":{"洞察":15,"悟性":14,"根骨":12}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=天罡北斗阵]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::天罗地网势","功法":"天罗地网势","类型":"拳掌","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"传家","修炼限制":{"机敏":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=天罗地网势]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::铁骑合围阵","功法":"铁骑合围阵","类型":"外功","功法品阶":"镇派","功法库状态":"待新增","原创性":{"原创程度":"完全原创","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"铁骑合围阵","类型":"外功","功法品阶":"镇派","功法描述":"将骑射、诱敌、分割和多翼合围融成的统军战法，只适合能够指挥精锐骑军的高级将领。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::铁砂桩功","功法":"铁砂桩功","类型":"外功","功法品阶":"传家","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"铁砂桩功","类型":"外功","功法品阶":"传家","功法描述":"通过站桩、运气和循序击砂锻炼掌骨与腕臂，是修习铁掌功前必须完成的外门基础。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::铁掌功","功法":"铁掌功","类型":"拳掌","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"镇派","修炼限制":{"臂力":11,"根骨":10}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=铁掌功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::铁掌水上飘","功法":"铁掌水上飘","类型":"轻功","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"轻功","功法品阶":"镇派","修炼限制":{"机敏":10,"根骨":10}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=铁掌水上飘]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::铁掌吐纳诀","功法":"铁掌吐纳诀","类型":"内功","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"铁掌吐纳诀","类型":"内功","功法品阶":"粗浅","功法描述":"铁掌帮用于沉肩坠肘、稳固下盘的入门吐纳法，为长期练掌和承受反震打下基础。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::铁筝功夫","功法":"铁筝功夫","类型":"外功","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"外功","功法品阶":"上乘","修炼限制":{"根骨":8,"悟性":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=铁筝功夫]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::铁帚腿法","功法":"铁帚腿法","类型":"拳掌","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"传家","修炼限制":{"机敏":5}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=铁帚腿法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::通臂六合掌","功法":"通臂六合掌","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"臂力":8,"机敏":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=通臂六合掌]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::铜锤手","功法":"铜锤手","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"臂力":8}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=铜锤手]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::透骨打穴法","功法":"透骨打穴法","类型":"指法","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"指法","功法品阶":"上乘","修炼限制":{"洞察":8,"机敏":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=透骨打穴法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::推经转脉","功法":"推经转脉","类型":"内功","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"镇派","修炼限制":{"根骨":11,"悟性":11}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=推经转脉]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::无上大力杵法","功法":"无上大力杵法","类型":"棍锤","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"棍锤","功法品阶":"上乘","修炼限制":{"臂力":8,"根骨":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=无上大力杵法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::五轮大法","功法":"五轮大法","类型":"暗器","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"暗器","功法品阶":"镇派","修炼限制":{"臂力":11,"洞察":10}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=五轮大法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::西藏密宗内功","功法":"西藏密宗内功","类型":"内功","功法品阶":"传家","功法库状态":"待新增","原创性":{"原创程度":"非原创","是否原创":false,"说明":"世界书人物变量已有明确名称，但功法库尚无独立条目。"},"来源状态":"世界书变量明确","功法库信息":null,"待新增草案":{"功法名称":"西藏密宗内功","类型":"内功","功法品阶":"传家","功法描述":"世界书人物变量中已有的密宗内功体系，作为金轮一脉公共内功基础保留。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"世界书人物变量","来源文件":"神雕第四回00-人物登场.yaml","事件":"神雕第四回00-人物登场","字段路径":"insert.霍都.功法.西藏密宗内功","时间":{"年":1239,"月":2,"日":4,"时":8},"摘要":"霍都的功法变量中出现“西藏密宗内功”"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::先天功","功法":"先天功","类型":"内功","功法品阶":"绝世","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"绝世","修炼限制":{"根骨":14,"悟性":13}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=先天功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::逍遥游","功法":"逍遥游","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"机敏":8,"悟性":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=逍遥游]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::旋风扫叶腿","功法":"旋风扫叶腿","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"机敏":8,"臂力":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=旋风扫叶腿]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::一阳基础指诀","功法":"一阳基础指诀","类型":"指法","功法品阶":"传家","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"一阳基础指诀","类型":"指法","功法品阶":"传家","功法描述":"练习认穴、运劲与收发的基础指法，只能点按近身穴位，尚不能施展一阳指的深厚指力。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::一阳书指","功法":"一阳书指","类型":"指法","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"指法","功法品阶":"上乘","修炼限制":{"悟性":8,"洞察":8}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=一阳书指]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::一阳指","功法":"一阳指","类型":"指法","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"指法","功法品阶":"镇派","修炼限制":{"洞察":12,"根骨":11,"悟性":10}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=一阳指]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::阴阳倒乱刃法","功法":"阴阳倒乱刃法","类型":"剑法","功法品阶":"绝世","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"剑法","功法品阶":"绝世","修炼限制":{"机敏":15,"悟性":14}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=阴阳倒乱刃法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::阴阳双刃","功法":"阴阳双刃","类型":"刀法","功法品阶":"上乘","功法库状态":"待新增","原创性":{"原创程度":"非原创","是否原创":false,"说明":"世界书人物变量已有明确名称，但功法库尚无独立条目。"},"来源状态":"世界书变量明确","功法库信息":null,"待新增草案":{"功法名称":"阴阳双刃","类型":"刀法","功法品阶":"上乘","功法描述":"世界书人物变量中已有的公孙家双兵器功夫，以黑剑和锯齿金刀交错变化。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"世界书人物变量","来源文件":"神雕第十七回00-人物登场.yaml","事件":"神雕第十七回00-人物登场","字段路径":"insert.公孙止.功法.阴阳双刃","时间":{"年":1244,"月":10,"日":24,"时":8},"摘要":"公孙止的功法变量中出现“阴阳双刃”"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::银索金铃索法","功法":"银索金铃索法","类型":"暗器","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"暗器","功法品阶":"上乘","修炼限制":{"机敏":8,"洞察":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=银索金铃索法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::渔网阵","功法":"渔网阵","类型":"外功","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"外功","功法品阶":"上乘","修炼限制":{"洞察":7,"机敏":7,"悟性":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=渔网阵]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::玉蜂针","功法":"玉蜂针","类型":"暗器","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"暗器","功法品阶":"传家","修炼限制":{"机敏":7,"洞察":5}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉蜂针]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::玉女剑法","功法":"玉女剑法","类型":"剑法","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"剑法","功法品阶":"上乘","修炼限制":{"机敏":8,"洞察":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉女剑法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::玉女入门剑式","功法":"玉女入门剑式","类型":"剑法","功法品阶":"粗浅","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"玉女入门剑式","类型":"剑法","功法品阶":"粗浅","功法描述":"为玉女剑法准备的基础剑架，要求动作轻灵准确，先练身剑协调而不追求招式威力。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::玉女素心剑法","功法":"玉女素心剑法","类型":"剑法","功法品阶":"绝世","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"剑法","功法品阶":"绝世","修炼限制":{"机敏":15,"洞察":14,"悟性":12}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉女素心剑法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::玉女投梭","功法":"玉女投梭","类型":"轻功","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"轻功","功法品阶":"上乘","修炼限制":{"机敏":7}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉女投梭]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::玉女心经","功法":"玉女心经","类型":"内功","功法品阶":"镇派","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"内功","功法品阶":"镇派","修炼限制":{"悟性":11,"根骨":10}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉女心经]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::玉箫剑法","功法":"玉箫剑法","类型":"剑法","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"剑法","功法品阶":"上乘","修炼限制":{"机敏":8,"悟性":8}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉箫剑法]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::鸳鸯连环腿","功法":"鸳鸯连环腿","类型":"拳掌","功法品阶":"上乘","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"拳掌","功法品阶":"上乘","修炼限制":{"机敏":7,"臂力":6}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=鸳鸯连环腿]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::哲别神射术","功法":"哲别神射术","类型":"暗器","功法品阶":"上乘","功法库状态":"待新增","原创性":{"原创程度":"体系补衍","是否原创":true,"说明":"为补齐现有门派传承层级而设计，名称与效果均须人工审核。"},"来源状态":"体系补衍原创","功法库信息":null,"待新增草案":{"功法名称":"哲别神射术","类型":"暗器","功法品阶":"上乘","功法描述":"依据哲别神箭手身份补衍的个人射术节点，强调远距判断、移动射击与一箭制敌。","修炼限制":{},"状态":"仅审核草案，未写入功法库"},"内容依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}],"审核":{"状态":"待审核","意见":null}},{"功法ID":"功法::指笔功","功法":"指笔功","类型":"指法","功法品阶":"传家","功法库状态":"已收录","原创性":{"原创程度":"非原创","是否原创":false,"说明":"现有功法库已有独立条目。"},"来源状态":"功法库明确","功法库信息":{"类型":"指法","功法品阶":"传家","修炼限制":{"洞察":6,"机敏":5}},"待新增草案":null,"内容依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=指笔功]","时间":null,"摘要":"现有功法库条目"}],"审核":{"状态":"待审核","意见":null}}],"门派列表":[{"门派ID":"全真教","门派":"全真教","门派别名":["全真派","全真门下"],"体系类型":"门派","设计定位":"玄门正宗，以吐纳筑基、剑掌并修和多人阵法为骨架。","人物映射边界":[{"角色":"马钰","关系类型":"掌教或长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"丘处机","关系类型":"掌教或长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"王处一","关系类型":"掌教或长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"刘处玄","关系类型":"掌教或长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"谭处端","关系类型":"掌教或长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"郝大通","关系类型":"掌教或长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"孙不二","关系类型":"掌教或长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"周伯通","关系类型":"师门核心人物","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"崔志方","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"姬清虚","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"鹿清笃","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"皮清玄","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"申志凡","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"宋德方","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"王志明","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"夏志诚","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"尹志平","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"于志可","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"张志素","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"赵志敬","关系类型":"正式门人","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"杨康","关系类型":"短期或个人师承","最高可分配层级":"基础","是否自动分配":false,"说明":"不能视为完整继承全真门派谱系。"},{"角色":"杨过","关系类型":"短期或个人师承","最高可分配层级":"基础","是否自动分配":false,"说明":"不能视为完整继承全真门派谱系。"}],"传承节点":[{"节点ID":"全真教::全真吐纳法","功法ID":"功法::全真吐纳法","功法":"全真吐纳法","传承层级":"入门","分支":"内功","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"全真教::全真入门拳","功法ID":"功法::全真入门拳","功法":"全真入门拳","传承层级":"入门","分支":"拳掌","是否共通":true,"前置节点":[{"节点ID":"全真教::全真吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"全真教::全真剑法","功法ID":"功法::全真剑法","功法":"全真剑法","传承层级":"基础","分支":"剑法","是否共通":true,"前置节点":[{"节点ID":"全真教::全真吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":7,"洞察":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=全真剑法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::空手夺白刃","功法ID":"功法::空手夺白刃","功法":"空手夺白刃","传承层级":"基础","分支":"擒拿","是否共通":true,"前置节点":[{"节点ID":"全真教::全真入门拳","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":6,"洞察":5},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=空手夺白刃]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::虎门手","功法ID":"功法::虎门手","功法":"虎门手","传承层级":"基础","分支":"拳掌","是否共通":true,"前置节点":[{"节点ID":"全真教::全真入门拳","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"臂力":7,"根骨":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=虎门手]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::大关门式","功法ID":"功法::大关门式","功法":"大关门式","传承层级":"进阶","分支":"剑法","是否共通":false,"前置节点":[{"节点ID":"全真教::全真剑法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"根骨":7,"臂力":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=大关门式]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::三连环","功法ID":"功法::三连环","功法":"三连环","传承层级":"进阶","分支":"剑法","是否共通":false,"前置节点":[{"节点ID":"全真教::全真剑法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":8,"悟性":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=三连环]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::金关玉锁二十四诀","功法ID":"功法::金关玉锁二十四诀","功法":"金关玉锁二十四诀","传承层级":"进阶","分支":"内功","是否共通":true,"前置节点":[{"节点ID":"全真教::全真吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"根骨":8,"悟性":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=金关玉锁二十四诀]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::金雁功","功法ID":"功法::金雁功","功法":"金雁功","传承层级":"进阶","分支":"轻功","是否共通":true,"前置节点":[{"节点ID":"全真教::全真吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":8,"根骨":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=金雁功]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::鸳鸯连环腿","功法ID":"功法::鸳鸯连环腿","功法":"鸳鸯连环腿","传承层级":"进阶","分支":"腿法","是否共通":false,"前置节点":[{"节点ID":"全真教::全真入门拳","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":7,"臂力":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=鸳鸯连环腿]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::全真派内功","功法ID":"功法::全真派内功","功法":"全真派内功","传承层级":"核心","分支":"内功","是否共通":false,"前置节点":[{"节点ID":"全真教::金关玉锁二十四诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"亲传","最低境界":"一流","属性门槛":{"根骨":10,"悟性":9},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=全真派内功]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::三花聚顶掌法","功法ID":"功法::三花聚顶掌法","功法":"三花聚顶掌法","传承层级":"核心","分支":"拳掌","是否共通":false,"前置节点":[{"节点ID":"全真教::全真派内功","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"亲传","最低境界":"一流","属性门槛":{"臂力":7,"根骨":8},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=三花聚顶掌法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::先天功","功法ID":"功法::先天功","功法":"先天功","传承层级":"镇派","分支":"内功","是否共通":false,"前置节点":[{"节点ID":"全真教::全真派内功","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"根骨":14,"悟性":13},"指定人物":["王重阳"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=先天功]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"全真教::天罡北斗阵","功法ID":"功法::天罡北斗阵","功法":"天罡北斗阵","传承层级":"镇派","分支":"阵法","是否共通":false,"前置节点":[{"节点ID":"全真教::全真派内功","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"全真教::全真剑法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"洞察":15,"悟性":14,"根骨":12},"指定人物":["马钰","丘处机","王处一","刘处玄","谭处端","郝大通","孙不二"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=天罡北斗阵]","时间":null,"摘要":"现有功法库条目"}]}],"层级完整性":{"已覆盖层级":["入门","基础","进阶","核心","镇派"],"缺失层级":[],"说明":"五级传承均有审核节点。"},"审核":{"状态":"待审核","意见":null}},{"门派ID":"桃花岛","门派":"桃花岛","门派别名":["东邪门下"],"体系类型":"门派","设计定位":"以奇门术数统摄掌、剑、指、腿和音律，重机变与悟性。","人物映射边界":[{"角色":"黄药师","关系类型":"岛主","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"黄蓉","关系类型":"嫡系或亲传","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"陈玄风","关系类型":"嫡系或亲传","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"梅超风","关系类型":"嫡系或亲传","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"冯默风","关系类型":"嫡系或亲传","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"程英","关系类型":"旁支亲传","最高可分配层级":"核心","是否自动分配":true,"说明":"正文明确施展弹指神通，但不据此推定其掌握全部岛主核心绝学。"},{"角色":"傻姑","关系类型":"记名传承","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"郭芙","关系类型":"家学支线","最高可分配层级":"基础","是否自动分配":true,"说明":"亲属关系不等于获得桃花岛核心传承。"},{"角色":"郭襄","关系类型":"家学支线","最高可分配层级":"基础","是否自动分配":true,"说明":"亲属关系不等于获得桃花岛核心传承。"},{"角色":"郭破虏","关系类型":"家学支线","最高可分配层级":"基础","是否自动分配":true,"说明":"亲属关系不等于获得桃花岛核心传承。"},{"角色":"郭靖","关系类型":"婚姻或岛主家属","最高可分配层级":"入门","是否自动分配":false,"说明":"婚姻身份本身不能推出武学继承。"},{"角色":"冯氏","关系类型":"婚姻或岛主家属","最高可分配层级":"入门","是否自动分配":false,"说明":"婚姻身份本身不能推出武学继承。"}],"传承节点":[{"节点ID":"桃花岛::碧波吐纳诀","功法ID":"功法::碧波吐纳诀","功法":"碧波吐纳诀","传承层级":"入门","分支":"内功","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"桃花岛::桃影步","功法ID":"功法::桃影步","功法":"桃影步","传承层级":"入门","分支":"轻功","是否共通":true,"前置节点":[{"节点ID":"桃花岛::碧波吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"桃花岛::落英剑法","功法ID":"功法::落英剑法","功法":"落英剑法","传承层级":"基础","分支":"剑法","是否共通":true,"前置节点":[{"节点ID":"桃花岛::桃影步","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":8,"洞察":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=落英剑法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"桃花岛::碧波掌法","功法ID":"功法::碧波掌法","功法":"碧波掌法","传承层级":"基础","分支":"拳掌","是否共通":true,"前置节点":[{"节点ID":"桃花岛::碧波吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":5},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=碧波掌法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"桃花岛::扫叶腿法","功法ID":"功法::扫叶腿法","功法":"扫叶腿法","传承层级":"基础","分支":"腿法","是否共通":true,"前置节点":[{"节点ID":"桃花岛::桃影步","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=扫叶腿法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"桃花岛::玉箫剑法","功法ID":"功法::玉箫剑法","功法":"玉箫剑法","传承层级":"进阶","分支":"剑法","是否共通":false,"前置节点":[{"节点ID":"桃花岛::落英剑法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":8,"悟性":8},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉箫剑法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"桃花岛::奇门遁甲","功法ID":"功法::奇门遁甲","功法":"奇门遁甲","传承层级":"进阶","分支":"奇术","是否共通":true,"前置节点":[{"节点ID":"桃花岛::桃影步","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"悟性":12,"洞察":11},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=奇门遁甲]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"桃花岛::旋风扫叶腿","功法ID":"功法::旋风扫叶腿","功法":"旋风扫叶腿","传承层级":"进阶","分支":"腿法","是否共通":false,"前置节点":[{"节点ID":"桃花岛::扫叶腿法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":8,"臂力":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=旋风扫叶腿]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"桃花岛::兰花拂穴手","功法ID":"功法::兰花拂穴手","功法":"兰花拂穴手","传承层级":"进阶","分支":"指法","是否共通":false,"前置节点":[{"节点ID":"桃花岛::碧波掌法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"洞察":8,"机敏":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=兰花拂穴手]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"桃花岛::落英神剑掌法","功法ID":"功法::落英神剑掌法","功法":"落英神剑掌法","传承层级":"核心","分支":"拳掌","是否共通":false,"前置节点":[{"节点ID":"桃花岛::碧波掌法","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"桃花岛::奇门遁甲","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"机敏":8,"洞察":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=落英神剑掌法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"桃花岛::奇门五行阵","功法ID":"功法::奇门五行阵","功法":"奇门五行阵","传承层级":"核心","分支":"阵法","是否共通":false,"前置节点":[{"节点ID":"桃花岛::奇门遁甲","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"悟性":11,"洞察":10},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=奇门五行阵]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"桃花岛::弹指神通","功法ID":"功法::弹指神通","功法":"弹指神通","传承层级":"核心","分支":"指法","是否共通":false,"前置节点":[{"节点ID":"桃花岛::兰花拂穴手","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"洞察":12,"机敏":11,"根骨":10},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=弹指神通]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"桃花岛::碧海潮生曲","功法ID":"功法::碧海潮生曲","功法":"碧海潮生曲","传承层级":"镇派","分支":"音律","是否共通":false,"前置节点":[{"节点ID":"桃花岛::碧波吐纳诀","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"桃花岛::奇门遁甲","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"悟性":12,"根骨":11,"福缘":9},"指定人物":["黄药师"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=碧海潮生曲]","时间":null,"摘要":"现有功法库条目"}]}],"层级完整性":{"已覆盖层级":["入门","基础","进阶","核心","镇派"],"缺失层级":[],"说明":"五级传承均有审核节点。"},"审核":{"状态":"待审核","意见":null}},{"门派ID":"古墓派","门派":"古墓派","门派别名":["古墓门下"],"体系类型":"门派","设计定位":"以清静内功、轻灵身法和双剑配合为主，部分叛门支线不纳入公共传承。","人物映射边界":[{"角色":"小龙女","关系类型":"掌门","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"杨过","关系类型":"亲传弟子","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"李莫愁","关系类型":"叛门弟子","最高可分配层级":"进阶","是否自动分配":true,"说明":"叛门个人毒功不视作古墓公共传承。"},{"角色":"洪凌波","关系类型":"支线弟子","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"陆无双","关系类型":"支线弟子","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"孙婆婆","关系类型":"门内侍从","最高可分配层级":"基础","是否自动分配":true,"说明":null}],"传承节点":[{"节点ID":"古墓派::玉女入门剑式","功法ID":"功法::玉女入门剑式","功法":"玉女入门剑式","传承层级":"入门","分支":"剑法","是否共通":true,"前置节点":[{"节点ID":"古墓派::古墓吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"古墓派::古墓吐纳诀","功法ID":"功法::古墓吐纳诀","功法":"古墓吐纳诀","传承层级":"入门","分支":"内功","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"古墓派::玉蜂针","功法ID":"功法::玉蜂针","功法":"玉蜂针","传承层级":"基础","分支":"暗器","是否共通":false,"前置节点":[{"节点ID":"古墓派::玉女入门剑式","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":7,"洞察":5},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉蜂针]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"古墓派::美女拳法","功法ID":"功法::美女拳法","功法":"美女拳法","传承层级":"基础","分支":"拳掌","是否共通":true,"前置节点":[{"节点ID":"古墓派::古墓吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":6,"风姿":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=美女拳法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"古墓派::天罗地网势","功法ID":"功法::天罗地网势","功法":"天罗地网势","传承层级":"基础","分支":"拳掌","是否共通":true,"前置节点":[{"节点ID":"古墓派::古墓吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=天罗地网势]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"古墓派::玉女剑法","功法ID":"功法::玉女剑法","功法":"玉女剑法","传承层级":"进阶","分支":"剑法","是否共通":true,"前置节点":[{"节点ID":"古墓派::玉女入门剑式","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":8,"洞察":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉女剑法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"古墓派::玉女投梭","功法ID":"功法::玉女投梭","功法":"玉女投梭","传承层级":"进阶","分支":"剑法","是否共通":false,"前置节点":[{"节点ID":"古墓派::玉女剑法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉女投梭]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"古墓派::轻功提纵术","功法ID":"功法::轻功提纵术","功法":"轻功提纵术","传承层级":"进阶","分支":"轻功","是否共通":true,"前置节点":[{"节点ID":"古墓派::古墓吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":8,"根骨":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=轻功提纵术]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"古墓派::银索金铃索法","功法ID":"功法::银索金铃索法","功法":"银索金铃索法","传承层级":"进阶","分支":"索法","是否共通":false,"前置节点":[{"节点ID":"古墓派::天罗地网势","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":8,"洞察":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=银索金铃索法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"古墓派::玉女心经","功法ID":"功法::玉女心经","功法":"玉女心经","传承层级":"核心","分支":"内功","是否共通":false,"前置节点":[{"节点ID":"古墓派::古墓吐纳诀","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"古墓派::玉女剑法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"悟性":11,"根骨":10},"指定人物":["小龙女","杨过"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉女心经]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"古墓派::玉女素心剑法","功法ID":"功法::玉女素心剑法","功法":"玉女素心剑法","传承层级":"镇派","分支":"剑法","是否共通":false,"前置节点":[{"节点ID":"古墓派::玉女心经","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"古墓派::玉女剑法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"机敏":15,"洞察":14,"悟性":12},"指定人物":["小龙女","杨过"],"特别条件":["双人合练时须两人心意相通"]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=玉女素心剑法]","时间":null,"摘要":"现有功法库条目"}]}],"层级完整性":{"已覆盖层级":["入门","基础","进阶","核心","镇派"],"缺失层级":[],"说明":"五级传承均有审核节点。"},"审核":{"状态":"待审核","意见":null}},{"门派ID":"丐帮","门派":"丐帮","门派别名":["天下第一大帮"],"体系类型":"门派","设计定位":"普通弟子以实战拳脚和阵法为主，帮主绝学与洪七公个人传承严格限流。","人物映射边界":[{"角色":"洪七公","关系类型":"前帮主","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"黄蓉","关系类型":"继任帮主","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"耶律齐","关系类型":"继任帮主","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"鲁有脚","关系类型":"帮主或核心长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"简长老","关系类型":"长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"梁长老","关系类型":"长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"彭长老","关系类型":"长老","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"陈姓乞丐","关系类型":"正式帮众","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"韩姓乞丐","关系类型":"正式帮众","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"胖丐","关系类型":"正式帮众","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"瘦丐","关系类型":"正式帮众","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"王十三","关系类型":"正式帮众","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"余兆兴","关系类型":"正式帮众","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"小棒头","关系类型":"正式帮众","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"杨康","关系类型":"假帮主或政治拥立","最高可分配层级":"入门","是否自动分配":false,"说明":"假冒或被拥立身份不产生丐帮武学继承权。"}],"传承节点":[{"节点ID":"丐帮::丐帮基础棍法","功法ID":"功法::丐帮基础棍法","功法":"丐帮基础棍法","传承层级":"入门","分支":"棍法","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"丐帮::丐帮吐纳诀","功法ID":"功法::丐帮吐纳诀","功法":"丐帮吐纳诀","传承层级":"入门","分支":"内功","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"丐帮::地堂刀法","功法ID":"功法::地堂刀法","功法":"地堂刀法","传承层级":"基础","分支":"刀法","是否共通":false,"前置节点":[{"节点ID":"丐帮::丐帮基础棍法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":6,"臂力":5},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=地堂刀法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::莲花掌","功法ID":"功法::莲花掌","功法":"莲花掌","传承层级":"基础","分支":"拳掌","是否共通":true,"前置节点":[{"节点ID":"丐帮::丐帮吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"臂力":5},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=莲花掌]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::铁帚腿法","功法ID":"功法::铁帚腿法","功法":"铁帚腿法","传承层级":"基础","分支":"腿法","是否共通":true,"前置节点":[{"节点ID":"丐帮::丐帮吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":5},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=铁帚腿法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::坚壁阵","功法ID":"功法::坚壁阵","功法":"坚壁阵","传承层级":"基础","分支":"阵法","是否共通":true,"前置节点":[{"节点ID":"丐帮::丐帮基础棍法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"根骨":5},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=坚壁阵]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::莲花落阵","功法ID":"功法::莲花落阵","功法":"莲花落阵","传承层级":"基础","分支":"阵法","是否共通":false,"前置节点":[{"节点ID":"丐帮::丐帮基础棍法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"洞察":6,"悟性":5},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=莲花落阵]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::铜锤手","功法ID":"功法::铜锤手","功法":"铜锤手","传承层级":"进阶","分支":"拳掌","是否共通":false,"前置节点":[{"节点ID":"丐帮::莲花掌","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"臂力":8},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=铜锤手]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::逍遥游","功法ID":"功法::逍遥游","功法":"逍遥游","传承层级":"进阶","分支":"拳掌","是否共通":false,"前置节点":[{"节点ID":"丐帮::丐帮吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":8,"悟性":7},"指定人物":["洪七公"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=逍遥游]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::打狗阵","功法ID":"功法::打狗阵","功法":"打狗阵","传承层级":"进阶","分支":"阵法","是否共通":true,"前置节点":[{"节点ID":"丐帮::坚壁阵","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"悟性":8},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=打狗阵]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::混天功","功法ID":"功法::混天功","功法":"混天功","传承层级":"核心","分支":"内功","是否共通":false,"前置节点":[{"节点ID":"丐帮::丐帮吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"根骨":11,"悟性":10},"指定人物":["洪七公","黄蓉"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=混天功]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::打狗大阵","功法ID":"功法::打狗大阵","功法":"打狗大阵","传承层级":"核心","分支":"阵法","是否共通":false,"前置节点":[{"节点ID":"丐帮::打狗阵","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"悟性":10,"根骨":9},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=打狗大阵]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::打狗棒法","功法ID":"功法::打狗棒法","功法":"打狗棒法","传承层级":"镇派","分支":"棍法","是否共通":false,"前置节点":[{"节点ID":"丐帮::丐帮基础棍法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"机敏":15,"悟性":14},"指定人物":["洪七公","黄蓉","鲁有脚","耶律齐"],"特别条件":["仅限历任帮主或明确指定传人"]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=打狗棒法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"丐帮::降龙十八掌","功法ID":"功法::降龙十八掌","功法":"降龙十八掌","传承层级":"镇派","分支":"拳掌","是否共通":false,"前置节点":[{"节点ID":"丐帮::混天功","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"臂力":16,"根骨":14},"指定人物":["洪七公","黄蓉","郭靖"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=降龙十八掌]","时间":null,"摘要":"现有功法库条目"}]}],"层级完整性":{"已覆盖层级":["入门","基础","进阶","核心","镇派"],"缺失层级":[],"说明":"五级传承均有审核节点。"},"审核":{"状态":"待审核","意见":null}},{"门派ID":"铁掌帮","门派":"铁掌帮","门派别名":["铁掌水上飘一系"],"体系类型":"门派","设计定位":"以铁砂练掌、刚猛掌力和水上提纵为主，不另造超越铁掌功的新绝世武学。","人物映射边界":[{"角色":"裘千仞","关系类型":"帮主","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"裘千尺","关系类型":"帮主家传支线","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"乔寨主","关系类型":"帮中寨主","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"沙通天","关系类型":"仅有同名功法变量","最高可分配层级":"入门","是否自动分配":false,"说明":"不能凭“铁掌功”变量反向判定为铁掌帮门人。"}],"传承节点":[{"节点ID":"铁掌帮::铁掌吐纳诀","功法ID":"功法::铁掌吐纳诀","功法":"铁掌吐纳诀","传承层级":"入门","分支":"内功","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"铁掌帮::水上飘入门身法","功法ID":"功法::水上飘入门身法","功法":"水上飘入门身法","传承层级":"基础","分支":"轻功","是否共通":true,"前置节点":[{"节点ID":"铁掌帮::铁掌吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"铁掌帮::铁砂桩功","功法ID":"功法::铁砂桩功","功法":"铁砂桩功","传承层级":"基础","分支":"外功","是否共通":true,"前置节点":[{"节点ID":"铁掌帮::铁掌吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"铁掌帮::通臂六合掌","功法ID":"功法::通臂六合掌","功法":"通臂六合掌","传承层级":"进阶","分支":"拳掌","是否共通":false,"前置节点":[{"节点ID":"铁掌帮::铁砂桩功","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"臂力":8,"机敏":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=通臂六合掌]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"铁掌帮::铁掌水上飘","功法ID":"功法::铁掌水上飘","功法":"铁掌水上飘","传承层级":"核心","分支":"轻功","是否共通":false,"前置节点":[{"节点ID":"铁掌帮::水上飘入门身法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"机敏":10,"根骨":10},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=铁掌水上飘]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"铁掌帮::铁掌功","功法ID":"功法::铁掌功","功法":"铁掌功","传承层级":"镇派","分支":"拳掌","是否共通":false,"前置节点":[{"节点ID":"铁掌帮::铁砂桩功","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"铁掌帮::通臂六合掌","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"臂力":11,"根骨":10},"指定人物":["裘千仞","裘千尺"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=铁掌功]","时间":null,"摘要":"现有功法库条目"}]}],"层级完整性":{"已覆盖层级":["入门","基础","进阶","核心","镇派"],"缺失层级":[],"说明":"五级传承均有审核节点。"},"审核":{"状态":"待审核","意见":null}},{"门派ID":"大理一灯体系","门派":"大理段氏与一灯门下","门派别名":["南帝门下","一灯门下","大理段氏"],"体系类型":"家传与师承","设计定位":"区分段氏皇族、天龙寺和一灯弟子三支；一灯门下以一阳指为最高传承。","人物映射边界":[{"角色":"一灯大师","关系类型":"宗师","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"泗水渔隐","关系类型":"一灯亲传弟子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"樵夫","关系类型":"一灯亲传弟子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"武三通","关系类型":"一灯亲传弟子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"朱子柳","关系类型":"一灯亲传弟子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"武修文","关系类型":"下一代家传支线","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"武敦儒","关系类型":"下一代家传支线","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"天竺僧","关系类型":"友方医僧或皈依弟子","最高可分配层级":"入门","是否自动分配":false,"说明":"友方、医术交流或皈依关系不等于获得段氏完整绝学。"},{"角色":"裘千仞","关系类型":"友方医僧或皈依弟子","最高可分配层级":"入门","是否自动分配":false,"说明":"友方、医术交流或皈依关系不等于获得段氏完整绝学。"}],"传承节点":[{"节点ID":"大理一灯体系::南帝门下吐纳诀","功法ID":"功法::南帝门下吐纳诀","功法":"南帝门下吐纳诀","传承层级":"入门","分支":"一灯门下","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"大理一灯体系::段家剑","功法ID":"功法::段家剑","功法":"段家剑","传承层级":"基础","分支":"段氏家传","是否共通":true,"前置节点":[{"节点ID":"大理一灯体系::南帝门下吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=段家剑]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"大理一灯体系::一阳基础指诀","功法ID":"功法::一阳基础指诀","功法":"一阳基础指诀","传承层级":"基础","分支":"一灯门下","是否共通":true,"前置节点":[{"节点ID":"大理一灯体系::南帝门下吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"大理一灯体系::泥鳅功","功法ID":"功法::泥鳅功","功法":"泥鳅功","传承层级":"进阶","分支":"渔隐支线","是否共通":false,"前置节点":[{"节点ID":"大理一灯体系::南帝门下吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":8,"根骨":7},"指定人物":["泗水渔隐"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=泥鳅功]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"大理一灯体系::一阳书指","功法ID":"功法::一阳书指","功法":"一阳书指","传承层级":"进阶","分支":"朱子柳支线","是否共通":false,"前置节点":[{"节点ID":"大理一灯体系::指笔功","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"悟性":8,"洞察":8},"指定人物":["朱子柳"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=一阳书指]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"大理一灯体系::指笔功","功法ID":"功法::指笔功","功法":"指笔功","传承层级":"进阶","分支":"朱子柳支线","是否共通":false,"前置节点":[{"节点ID":"大理一灯体系::一阳基础指诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"洞察":6,"机敏":5},"指定人物":["朱子柳"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=指笔功]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"大理一灯体系::枯荣禅功","功法ID":"功法::枯荣禅功","功法":"枯荣禅功","传承层级":"核心","分支":"禅功","是否共通":false,"前置节点":[{"节点ID":"大理一灯体系::南帝门下吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"悟性":8,"根骨":7},"指定人物":["一灯大师"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=枯荣禅功]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"大理一灯体系::六脉神剑","功法ID":"功法::六脉神剑","功法":"六脉神剑","传承层级":"镇派","分支":"段氏皇族与天龙寺","是否共通":false,"前置节点":[{"节点ID":"大理一灯体系::一阳指","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"根骨":14,"洞察":12},"指定人物":[],"特别条件":["仅限段氏皇族或天龙寺明确传人；当前角色不自动分配"]},"允许自动分配":false,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=六脉神剑]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"大理一灯体系::一阳指","功法ID":"功法::一阳指","功法":"一阳指","传承层级":"镇派","分支":"一灯门下","是否共通":false,"前置节点":[{"节点ID":"大理一灯体系::一阳基础指诀","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"大理一灯体系::南帝门下吐纳诀","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"洞察":12,"根骨":11,"悟性":10},"指定人物":["一灯大师","泗水渔隐","樵夫","武三通","朱子柳"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=一阳指]","时间":null,"摘要":"现有功法库条目"}]}],"层级完整性":{"已覆盖层级":["入门","基础","进阶","核心","镇派"],"缺失层级":[],"说明":"五级传承均有审核节点。"},"审核":{"状态":"待审核","意见":null}},{"门派ID":"藏传密宗","门派":"藏传密宗·金轮一脉","门派别名":["西藏密宗","金轮一脉"],"体系类型":"门派","设计定位":"以内功、手印、杵法和重兵器为基础，高层按个人专精分流。","人物映射边界":[{"角色":"金轮法王","关系类型":"法王与宗师","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"达尔巴","关系类型":"亲传弟子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"霍都","关系类型":"亲传弟子","最高可分配层级":"核心","是否自动分配":true,"说明":null}],"传承节点":[{"节点ID":"藏传密宗::密宗伏息法","功法ID":"功法::密宗伏息法","功法":"密宗伏息法","传承层级":"入门","分支":"内功","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"藏传密宗::密宗基础手印","功法ID":"功法::密宗基础手印","功法":"密宗基础手印","传承层级":"入门","分支":"手印","是否共通":true,"前置节点":[{"节点ID":"藏传密宗::密宗伏息法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"藏传密宗::金刚杵法","功法ID":"功法::金刚杵法","功法":"金刚杵法","传承层级":"基础","分支":"杵法","是否共通":true,"前置节点":[{"节点ID":"藏传密宗::密宗基础手印","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.9},"归属依据":[{"类型":"世界书人物变量","来源文件":"神雕第四回00-人物登场.yaml","事件":"神雕第四回00-人物登场","字段路径":"insert.达尔巴.功法.金刚杵法","时间":{"年":1239,"月":2,"日":4,"时":8},"摘要":"达尔巴的功法变量中出现“金刚杵法”"}]},{"节点ID":"藏传密宗::西藏密宗内功","功法ID":"功法::西藏密宗内功","功法":"西藏密宗内功","传承层级":"基础","分支":"内功","是否共通":true,"前置节点":[{"节点ID":"藏传密宗::密宗伏息法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.9},"归属依据":[{"类型":"世界书人物变量","来源文件":"神雕第四回00-人物登场.yaml","事件":"神雕第四回00-人物登场","字段路径":"insert.霍都.功法.西藏密宗内功","时间":{"年":1239,"月":2,"日":4,"时":8},"摘要":"霍都的功法变量中出现“西藏密宗内功”"}]},{"节点ID":"藏传密宗::飞掷金杵","功法ID":"功法::飞掷金杵","功法":"飞掷金杵","传承层级":"进阶","分支":"杵法","是否共通":false,"前置节点":[{"节点ID":"藏传密宗::金刚杵法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{},"指定人物":["达尔巴"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.9},"归属依据":[{"类型":"世界书人物变量","来源文件":"神雕第三十七回01-达尔巴揭穿霍都清理师门.yaml","事件":"神雕第三十七回01-达尔巴揭穿霍都清理师门","字段路径":"insert.达尔巴.功法.飞掷金杵","时间":{"年":1259,"月":10,"日":24,"时":23},"摘要":"达尔巴的功法变量中出现“飞掷金杵”"}]},{"节点ID":"藏传密宗::无上大力杵法","功法ID":"功法::无上大力杵法","功法":"无上大力杵法","传承层级":"进阶","分支":"杵法","是否共通":false,"前置节点":[{"节点ID":"藏传密宗::金刚杵法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"臂力":8,"根骨":7},"指定人物":["达尔巴"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=无上大力杵法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"藏传密宗::大风袖","功法ID":"功法::大风袖","功法":"大风袖","传承层级":"进阶","分支":"霍都支线","是否共通":false,"前置节点":[{"节点ID":"藏传密宗::西藏密宗内功","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"根骨":7,"机敏":6},"指定人物":["霍都"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=大风袖]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"藏传密宗::大手印","功法ID":"功法::大手印","功法":"大手印","传承层级":"进阶","分支":"手印","是否共通":true,"前置节点":[{"节点ID":"藏传密宗::密宗基础手印","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"臂力":8,"根骨":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=大手印]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"藏传密宗::狂风迅雷功","功法ID":"功法::狂风迅雷功","功法":"狂风迅雷功","传承层级":"核心","分支":"霍都支线","是否共通":false,"前置节点":[{"节点ID":"藏传密宗::西藏密宗内功","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"机敏":8,"臂力":7},"指定人物":["霍都"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=狂风迅雷功]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"藏传密宗::五轮大法","功法ID":"功法::五轮大法","功法":"五轮大法","传承层级":"核心","分支":"轮法","是否共通":false,"前置节点":[{"节点ID":"藏传密宗::西藏密宗内功","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"臂力":11,"洞察":10},"指定人物":["金轮法王"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=五轮大法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"藏传密宗::推经转脉","功法ID":"功法::推经转脉","功法":"推经转脉","传承层级":"核心","分支":"内功","是否共通":false,"前置节点":[{"节点ID":"藏传密宗::西藏密宗内功","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"根骨":11,"悟性":11},"指定人物":["金轮法王"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=推经转脉]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"藏传密宗::龙象般若功","功法ID":"功法::龙象般若功","功法":"龙象般若功","传承层级":"镇派","分支":"内功","是否共通":false,"前置节点":[{"节点ID":"藏传密宗::西藏密宗内功","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"根骨":16,"臂力":15,"悟性":13},"指定人物":["金轮法王"],"特别条件":["高层密传，不因普通藏僧身份自动获得"]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=龙象般若功]","时间":null,"摘要":"现有功法库条目"}]}],"层级完整性":{"已覆盖层级":["入门","基础","进阶","核心","镇派"],"缺失层级":[],"说明":"五级传承均有审核节点。"},"审核":{"状态":"待审核","意见":null}},{"门派ID":"绝情谷","门派":"绝情谷公孙家传","门派别名":["绝情谷"],"体系类型":"家传与庄门","设计定位":"以闭穴内功、刀剑双刃和多人渔网阵为特色，谷主绝学不向普通谷众普发。","人物映射边界":[{"角色":"公孙止","关系类型":"谷主","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"公孙绿萼","关系类型":"谷主之女与家传支线","最高可分配层级":"基础","是否自动分配":true,"说明":null},{"角色":"樊一翁","关系类型":"大弟子","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"裘千尺","关系类型":"前谷主夫人与跨体系传授者","最高可分配层级":"基础","是否自动分配":false,"说明":"其核心传承来自铁掌帮，不能反向并入公孙家传。"}],"传承节点":[{"节点ID":"绝情谷::绝情谷吐纳法","功法ID":"功法::绝情谷吐纳法","功法":"绝情谷吐纳法","传承层级":"入门","分支":"内功","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"绝情谷::双刃入门式","功法ID":"功法::双刃入门式","功法":"双刃入门式","传承层级":"入门","分支":"双刃","是否共通":true,"前置节点":[{"节点ID":"绝情谷::绝情谷吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"绝情谷::君子淑女剑","功法ID":"功法::君子淑女剑","功法":"君子淑女剑","传承层级":"基础","分支":"兵器","是否共通":false,"前置节点":[{"节点ID":"绝情谷::双刃入门式","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":8,"悟性":7,"福缘":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=君子淑女剑]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"绝情谷::渔网阵","功法ID":"功法::渔网阵","功法":"渔网阵","传承层级":"基础","分支":"阵法","是否共通":true,"前置节点":[{"节点ID":"绝情谷::绝情谷吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"洞察":7,"机敏":7,"悟性":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=渔网阵]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"绝情谷::阴阳双刃","功法ID":"功法::阴阳双刃","功法":"阴阳双刃","传承层级":"进阶","分支":"双刃","是否共通":false,"前置节点":[{"节点ID":"绝情谷::双刃入门式","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{},"指定人物":["公孙止"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.9},"归属依据":[{"类型":"世界书人物变量","来源文件":"神雕第十七回00-人物登场.yaml","事件":"神雕第十七回00-人物登场","字段路径":"insert.公孙止.功法.阴阳双刃","时间":{"年":1244,"月":10,"日":24,"时":8},"摘要":"公孙止的功法变量中出现“阴阳双刃”"}]},{"节点ID":"绝情谷::闭穴功夫","功法ID":"功法::闭穴功夫","功法":"闭穴功夫","传承层级":"核心","分支":"内功","是否共通":false,"前置节点":[{"节点ID":"绝情谷::绝情谷吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"根骨":11,"悟性":10},"指定人物":["公孙止"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=闭穴功夫]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"绝情谷::绝情谷闭脉玄功","功法ID":"功法::绝情谷闭脉玄功","功法":"绝情谷闭脉玄功","传承层级":"核心","分支":"内功","是否共通":false,"前置节点":[{"节点ID":"绝情谷::绝情谷吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{},"指定人物":["公孙止"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"绝情谷::阴阳倒乱刃法","功法ID":"功法::阴阳倒乱刃法","功法":"阴阳倒乱刃法","传承层级":"镇派","分支":"双刃","是否共通":false,"前置节点":[{"节点ID":"绝情谷::阴阳双刃","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"绝情谷::闭穴功夫","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"机敏":15,"悟性":14},"指定人物":["公孙止"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=阴阳倒乱刃法]","时间":null,"摘要":"现有功法库条目"}]}],"层级完整性":{"已覆盖层级":["入门","基础","进阶","核心","镇派"],"缺失层级":[],"说明":"五级传承均有审核节点。"},"审核":{"状态":"待审核","意见":null}},{"门派ID":"白驼山","门派":"白驼山庄","门派别名":["白驼山","西毒一系"],"体系类型":"家传","设计定位":"以西域身法、使毒驭蛇和诡异拳掌为主，蛤蟆功为最高家传。","人物映射边界":[{"角色":"欧阳锋","关系类型":"庄主与宗师","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"欧阳克","关系类型":"少主与家传弟子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"杨康","关系类型":"短期个人传授或义父支线","最高可分配层级":"基础","是否自动分配":false,"说明":"个人传授不等于继承白驼山完整谱系。"},{"角色":"杨过","关系类型":"短期个人传授或义父支线","最高可分配层级":"基础","是否自动分配":false,"说明":"个人传授不等于继承白驼山完整谱系。"}],"传承节点":[{"节点ID":"白驼山::白驼吐纳法","功法ID":"功法::白驼吐纳法","功法":"白驼吐纳法","传承层级":"入门","分支":"内功","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"白驼山::白驼驭蛇术","功法ID":"功法::白驼驭蛇术","功法":"白驼驭蛇术","传承层级":"入门","分支":"驭蛇","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"白驼山::飞燕银梭","功法ID":"功法::飞燕银梭","功法":"飞燕银梭","传承层级":"基础","分支":"暗器","是否共通":true,"前置节点":[{"节点ID":"白驼山::白驼驭蛇术","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":6,"洞察":5},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=飞燕银梭]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"白驼山::神驼雪山掌","功法ID":"功法::神驼雪山掌","功法":"神驼雪山掌","传承层级":"基础","分支":"拳掌","是否共通":true,"前置节点":[{"节点ID":"白驼山::白驼吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"臂力":8,"机敏":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=神驼雪山掌]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"白驼山::连环鸳鸯腿","功法ID":"功法::连环鸳鸯腿","功法":"连环鸳鸯腿","传承层级":"基础","分支":"腿法","是否共通":true,"前置节点":[{"节点ID":"白驼山::白驼吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{"机敏":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=连环鸳鸯腿]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"白驼山::瞬息千里","功法ID":"功法::瞬息千里","功法":"瞬息千里","传承层级":"进阶","分支":"轻功","是否共通":true,"前置节点":[{"节点ID":"白驼山::白驼吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"机敏":8,"根骨":6},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=瞬息千里]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"白驼山::铁筝功夫","功法ID":"功法::铁筝功夫","功法":"铁筝功夫","传承层级":"进阶","分支":"音律","是否共通":false,"前置节点":[{"节点ID":"白驼山::白驼吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"根骨":8,"悟性":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=铁筝功夫]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"白驼山::透骨打穴法","功法ID":"功法::透骨打穴法","功法":"透骨打穴法","传承层级":"进阶","分支":"指法","是否共通":false,"前置节点":[{"节点ID":"白驼山::神驼雪山掌","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{"洞察":8,"机敏":7},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=透骨打穴法]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"白驼山::灵蛇拳","功法ID":"功法::灵蛇拳","功法":"灵蛇拳","传承层级":"核心","分支":"拳掌","是否共通":false,"前置节点":[{"节点ID":"白驼山::白驼驭蛇术","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"白驼山::神驼雪山掌","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"一流","属性门槛":{"机敏":12,"根骨":10},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=灵蛇拳]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"白驼山::蛤蟆功","功法ID":"功法::蛤蟆功","功法":"蛤蟆功","传承层级":"镇派","分支":"内功","是否共通":false,"前置节点":[{"节点ID":"白驼山::白驼吐纳法","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{"根骨":16,"臂力":15},"指定人物":["欧阳锋","欧阳克"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=蛤蟆功]","时间":null,"摘要":"现有功法库条目"}]}],"层级完整性":{"已覆盖层级":["入门","基础","进阶","核心","镇派"],"缺失层级":[],"说明":"五级传承均有审核节点。"},"审核":{"状态":"待审核","意见":null}},{"门派ID":"蒙古军旅","门派":"蒙古军旅武学","门派别名":["草原军旅体系"],"体系类型":"军旅","设计定位":"共享骑射、摔跤、弯刀和军阵，不包装成玄门神功；最高层为统军与精锐合击。","人物映射边界":[{"角色":"铁木真","关系类型":"大汗与统军者","最高可分配层级":"镇派","是否自动分配":true,"说明":null},{"角色":"博尔忽","关系类型":"将领或王子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"博尔术","关系类型":"将领或王子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"赤老温","关系类型":"将领或王子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"木华黎","关系类型":"将领或王子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"察合台","关系类型":"将领或王子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"术赤","关系类型":"将领或王子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"窝阔台","关系类型":"将领或王子","最高可分配层级":"核心","是否自动分配":true,"说明":null},{"角色":"鄂尔多","关系类型":"草原武士或首领","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"忽都虎","关系类型":"草原武士或首领","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"札木合","关系类型":"草原武士或首领","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"哲别","关系类型":"草原武士或首领","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"者勒米","关系类型":"草原武士或首领","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"萨多","关系类型":"草原武士或首领","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"王罕","关系类型":"草原武士或首领","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"桑昆","关系类型":"草原武士或首领","最高可分配层级":"进阶","是否自动分配":true,"说明":null},{"角色":"郭靖","关系类型":"军职经历或蒙古政治身份","最高可分配层级":"基础","是否自动分配":false,"说明":"政治身份或军职经历不等于继承整套蒙古军旅谱系。"},{"角色":"霍都","关系类型":"军职经历或蒙古政治身份","最高可分配层级":"基础","是否自动分配":false,"说明":"政治身份或军职经历不等于继承整套蒙古军旅谱系。"}],"传承节点":[{"节点ID":"蒙古军旅::草原骑射术","功法ID":"功法::草原骑射术","功法":"草原骑射术","传承层级":"入门","分支":"骑射","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"蒙古军旅::蒙古摔跤","功法ID":"功法::蒙古摔跤","功法":"蒙古摔跤","传承层级":"入门","分支":"摔跤","是否共通":true,"前置节点":[],"学习限制":{"最低传承资格":"门内通传","最低境界":"无","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"高","分值":0.95},"归属依据":[{"类型":"功法库","来源文件":"src/武侠/data/_合并后功法.json","事件":null,"字段路径":"功法[功法名称=蒙古摔跤]","时间":null,"摘要":"现有功法库条目"}]},{"节点ID":"蒙古军旅::马背弯刀术","功法ID":"功法::马背弯刀术","功法":"马背弯刀术","传承层级":"基础","分支":"骑战","是否共通":true,"前置节点":[{"节点ID":"蒙古军旅::草原骑射术","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"蒙古军旅::斥候踏沙步","功法ID":"功法::斥候踏沙步","功法":"斥候踏沙步","传承层级":"基础","分支":"身法","是否共通":true,"前置节点":[{"节点ID":"蒙古军旅::草原骑射术","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"蒙古军旅::套马索法","功法ID":"功法::套马索法","功法":"套马索法","传承层级":"基础","分支":"长索","是否共通":true,"前置节点":[{"节点ID":"蒙古军旅::草原骑射术","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"三流","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"蒙古军旅::哲别神射术","功法ID":"功法::哲别神射术","功法":"哲别神射术","传承层级":"进阶","分支":"个人专精","是否共通":false,"前置节点":[{"节点ID":"蒙古军旅::草原骑射术","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{},"指定人物":["哲别"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"蒙古军旅::回马连珠箭","功法ID":"功法::回马连珠箭","功法":"回马连珠箭","传承层级":"进阶","分支":"骑射","是否共通":false,"前置节点":[{"节点ID":"蒙古军旅::草原骑射术","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"门内通传","最低境界":"二流","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"蒙古军旅::怯薛合击阵","功法ID":"功法::怯薛合击阵","功法":"怯薛合击阵","传承层级":"核心","分支":"军阵","是否共通":false,"前置节点":[{"节点ID":"蒙古军旅::马背弯刀术","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"蒙古军旅::草原骑射术","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"精锐或将领","最低境界":"一流","属性门槛":{},"指定人物":[],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]},{"节点ID":"蒙古军旅::铁骑合围阵","功法ID":"功法::铁骑合围阵","功法":"铁骑合围阵","传承层级":"镇派","分支":"统军战法","是否共通":false,"前置节点":[{"节点ID":"蒙古军旅::怯薛合击阵","最低掌握程度":"略有小成","关系":"必修"},{"节点ID":"蒙古军旅::回马连珠箭","最低掌握程度":"略有小成","关系":"必修"}],"学习限制":{"最低传承资格":"掌门、宗师或指定传人","最低境界":"绝顶","属性门槛":{},"指定人物":["铁木真"],"特别条件":[]},"允许自动分配":true,"归属置信度":{"等级":"中","分值":0.65},"归属依据":[{"类型":"体系补衍","来源文件":null,"事件":null,"字段路径":null,"时间":null,"摘要":"用于补齐该体系现有传承层级的原创候选"}]}],"层级完整性":{"已覆盖层级":["入门","基础","进阶","核心","镇派"],"缺失层级":[],"说明":"五级传承均有审核节点。"},"审核":{"状态":"待审核","意见":null}}]}
+    </script>
+    <script>
+      (() => {
+        'use strict';
+
+        const rawData = document.getElementById('lineageData').textContent.trim();
+        if (rawData === '__LINEAGE_' + 'DATA__') {
+          document.getElementById('lineage').innerHTML =
+            '<div class="empty-state">这是生成器模板。请运行 pnpm review:wuxia-sect 后打开生成的审核台。</div>';
+          return;
+        }
+
+        let DATA = JSON.parse(rawData);
+        const STORAGE_KEY = 'wuxia:sect-lineage-review:v1';
+        const LAYERS = DATA.生成信息?.传承层级顺序 || ['入门', '基础', '进阶', '核心', '镇派'];
+        const REVIEW_STATUSES = ['待审核', '通过', '需修改', '驳回'];
+        const STATUS_CLASS = { 待审核: '', 通过: 'accept', 需修改: 'revise', 驳回: 'reject' };
+        const state = {
+          sectId: DATA.门派列表[0]?.门派ID || '',
+          query: '',
+          status: '全部',
+          layer: '全部',
+          source: '全部',
+          branch: '全部',
+          reviews: { nodes: {}, sects: {} },
+          storageAvailable: true,
+        };
+
+        let artById = new Map();
+        let nodeById = new Map();
+        let sectById = new Map();
+        let toastTimer = 0;
+        const elements = {
+          sectNav: document.getElementById('sectNav'),
+          sectSheet: document.getElementById('sectSheet'),
+          lineage: document.getElementById('lineage'),
+          search: document.getElementById('searchInput'),
+          status: document.getElementById('statusFilter'),
+          layer: document.getElementById('layerFilter'),
+          source: document.getElementById('sourceFilter'),
+          branch: document.getElementById('branchFilter'),
+          resultSummary: document.getElementById('resultSummary'),
+          storage: document.getElementById('storageIndicator'),
+          toast: document.getElementById('toast'),
+        };
+
+        const escapeHtml = value =>
+          String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+
+        function rebuildIndexes() {
+          artById = new Map(DATA.功法目录.map(art => [art.功法ID, art]));
+          sectById = new Map(DATA.门派列表.map(sect => [sect.门派ID, sect]));
+          nodeById = new Map(DATA.门派列表.flatMap(sect => sect.传承节点.map(node => [node.节点ID, { node, sect }])));
+          if (!sectById.has(state.sectId)) state.sectId = DATA.门派列表[0]?.门派ID || '';
+        }
+
+        function normalizeReview(review) {
+          const status = REVIEW_STATUSES.includes(review?.状态) ? review.状态 : '待审核';
+          return { 状态: status, 意见: review?.意见 || '', 更新时间: review?.更新时间 || null };
+        }
+
+        function getNodeReview(node) {
+          return normalizeReview(state.reviews.nodes[node.节点ID] || node.审核);
+        }
+
+        function getSectReview(sect) {
+          return normalizeReview(state.reviews.sects[sect.门派ID] || sect.审核);
+        }
+
+        function setReview(kind, id, patch) {
+          const collection = kind === 'node' ? state.reviews.nodes : state.reviews.sects;
+          const source = kind === 'node' ? nodeById.get(id)?.node : sectById.get(id);
+          const current = kind === 'node' ? getNodeReview(source) : getSectReview(source);
+          const next = { ...current, ...patch, 更新时间: new Date().toISOString() };
+          collection[id] = next;
+          saveReviews();
+        }
+
+        function showToast(message) {
+          clearTimeout(toastTimer);
+          elements.toast.textContent = message;
+          elements.toast.classList.add('show');
+          toastTimer = window.setTimeout(() => elements.toast.classList.remove('show'), 2300);
+        }
+
+        function loadReviews() {
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              state.reviews.nodes = parsed?.reviews?.nodes || parsed?.nodes || {};
+              state.reviews.sects = parsed?.reviews?.sects || parsed?.sects || {};
+            }
+            elements.storage.textContent = '本地暂存：已启用';
+          } catch (error) {
+            state.storageAvailable = false;
+            elements.storage.textContent = '本地暂存：不可用，请及时导出';
+          }
+        }
+
+        function saveReviews() {
+          if (!state.storageAvailable) return;
+          try {
+            localStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify({ version: 1, reviews: state.reviews, savedAt: new Date().toISOString() }),
+            );
+            elements.storage.textContent = `本地暂存：${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
+          } catch (error) {
+            state.storageAvailable = false;
+            elements.storage.textContent = '本地暂存：写入失败，请立即导出';
+          }
+        }
+
+        function allNodes() {
+          return DATA.门派列表.flatMap(sect => sect.传承节点);
+        }
+
+        function getCounts(nodes = allNodes()) {
+          const counts = { 待审核: 0, 通过: 0, 需修改: 0, 驳回: 0 };
+          nodes.forEach(node => {
+            counts[getNodeReview(node).状态] += 1;
+          });
+          return counts;
+        }
+
+        function updateGlobalStats() {
+          const nodes = allNodes();
+          const counts = getCounts(nodes);
+          const reviewed = nodes.length - counts.待审核;
+          const percent = nodes.length ? (reviewed / nodes.length) * 100 : 0;
+          document.getElementById('globalProgress').style.width = `${percent}%`;
+          document.getElementById('globalProgressLabel').textContent =
+            `${reviewed} / ${nodes.length} · ${percent.toFixed(0)}%`;
+          document.getElementById('acceptedCount').textContent = counts.通过;
+          document.getElementById('revisionCount').textContent = counts.需修改;
+          document.getElementById('rejectedCount').textContent = counts.驳回;
+          document.getElementById('pendingCount').textContent = counts.待审核;
+        }
+
+        function renderSectNav() {
+          document.getElementById('sectCount').textContent = `${DATA.门派列表.length} 派`;
+          elements.sectNav.innerHTML = DATA.门派列表
+            .map(sect => {
+              const counts = getCounts(sect.传承节点);
+              const reviewed = sect.传承节点.length - counts.待审核;
+              const percent = sect.传承节点.length ? (reviewed / sect.传承节点.length) * 100 : 0;
+              return `<button class="sect-nav-button ${sect.门派ID === state.sectId ? 'active' : ''}" type="button" data-sect-id="${escapeHtml(sect.门派ID)}">
+            <span class="sect-nav-name">${escapeHtml(sect.门派)}</span><span class="sect-nav-count">${reviewed}/${sect.传承节点.length}</span>
+            <span class="sect-nav-track"><span class="sect-nav-fill" style="width:${percent}%"></span></span>
+          </button>`;
+            })
+            .join('');
+        }
+
+        function reviewControls(kind, id, review) {
+          return `<div class="review-controls" role="group" aria-label="审核结论">
+          ${REVIEW_STATUSES.map(status => `<button class="review-button ${review.状态 === status ? 'active' : ''}" type="button" data-review-kind="${kind}" data-review-id="${escapeHtml(id)}" data-status="${status}">${status}</button>`).join('')}
+        </div>`;
+        }
+
+        function renderSectSheet(sect) {
+          const review = getSectReview(sect);
+          const counts = getCounts(sect.传承节点);
+          const covered = sect.层级完整性?.已覆盖层级 || [...new Set(sect.传承节点.map(node => node.传承层级))];
+          const missing = sect.层级完整性?.缺失层级 || LAYERS.filter(layer => !covered.includes(layer));
+          elements.sectSheet.dataset.status = review.状态;
+          elements.sectSheet.innerHTML = `<div class="sect-sheet-main">
+          <div>
+            <p class="eyebrow">${escapeHtml(sect.体系类型 || '门派')} · ${escapeHtml(sect.门派ID)}</p>
+            <div class="sect-name-row"><h2 class="sect-name">${escapeHtml(sect.门派)}</h2><span class="tag">${sect.传承节点.length} 个节点</span></div>
+            <p class="sect-position">${escapeHtml(sect.设计定位 || '暂无设计定位。')}</p>
+            <div class="tag-row">
+              ${(sect.门派别名 || []).map(alias => `<span class="tag">别名 · ${escapeHtml(alias)}</span>`).join('')}
+              ${covered.map(layer => `<span class="tag source-known">已覆盖 · ${escapeHtml(layer)}</span>`).join('')}
+              ${missing.map(layer => `<span class="tag source-pending">缺失 · ${escapeHtml(layer)}</span>`).join('')}
+            </div>
+          </div>
+          <div class="sect-review">
+            <div class="review-caption"><span>整派设计结论</span><strong>${escapeHtml(review.状态)}</strong></div>
+            ${reviewControls('sect', sect.门派ID, review)}
+            <textarea class="review-note" data-note-kind="sect" data-note-id="${escapeHtml(sect.门派ID)}" placeholder="记录门派总体结构、缺层或传承边界问题……">${escapeHtml(review.意见)}</textarea>
+          </div>
+        </div>
+        <div class="sect-sheet-foot">
+          <span>节点进度 <strong>${sect.传承节点.length - counts.待审核}/${sect.传承节点.length}</strong></span>
+          <span>通过 <strong>${counts.通过}</strong></span><span>需修改 <strong>${counts.需修改}</strong></span><span>驳回 <strong>${counts.驳回}</strong></span>
+          <span>人物边界 <strong>${sect.人物映射边界?.length || 0}</strong> 人</span>
+          <span>${escapeHtml(sect.层级完整性?.说明 || '层级完整性待结合节点审核。')}</span>
+        </div>`;
+        }
+
+        function sourceClass(art) {
+          if (art.原创性?.是否原创) return 'source-original';
+          if (art.功法库状态 === '已收录') return 'source-known';
+          return 'source-pending';
+        }
+
+        function stringifyObject(value) {
+          if (!value || typeof value !== 'object' || !Object.keys(value).length) return '无';
+          return Object.entries(value)
+            .map(([key, item]) => `${key} ≥ ${item}`)
+            .join('、');
+        }
+
+        function detailList(items, formatter) {
+          if (!items?.length) return '<li class="empty-detail">无</li>';
+          return items.map(item => `<li>${formatter(item)}</li>`).join('');
+        }
+
+        function nodeSearchText(node, art) {
+          const restriction = node.学习限制 || {};
+          return [
+            node.节点ID,
+            node.功法,
+            node.传承层级,
+            node.分支,
+            art.类型,
+            art.功法品阶,
+            art.来源状态,
+            art.功法库状态,
+            art.原创性?.原创程度,
+            art.原创性?.说明,
+            art.待新增草案?.功法描述,
+            restriction.最低传承资格,
+            restriction.最低境界,
+            JSON.stringify(restriction.属性门槛),
+            ...(restriction.指定人物 || []),
+            ...(restriction.特别条件 || []),
+          ]
+            .join(' ')
+            .toLowerCase();
+        }
+
+        function visibleNodes(sect) {
+          const query = state.query.toLowerCase();
+          return sect.传承节点.filter(node => {
+            const art = artById.get(node.功法ID) || {};
+            const review = getNodeReview(node);
+            return (
+              (!query || nodeSearchText(node, art).includes(query)) &&
+              (state.status === '全部' || review.状态 === state.status) &&
+              (state.layer === '全部' || node.传承层级 === state.layer) &&
+              (state.source === '全部' || art.来源状态 === state.source) &&
+              (state.branch === '全部' || node.分支 === state.branch)
+            );
+          });
+        }
+
+        function renderNodeCard(node, index) {
+          const art = artById.get(node.功法ID) || {};
+          const review = getNodeReview(node);
+          const restriction = node.学习限制 || {};
+          const description = art.待新增草案?.功法描述 || art.原创性?.说明 || art.功法库信息?.功法描述 || '';
+          const prereqs = node.前置节点 || [];
+          const source = art.来源状态 || art.功法库状态 || '未知来源';
+          return `<article class="art-card" data-node-id="${escapeHtml(node.节点ID)}" data-status="${escapeHtml(review.状态)}" style="animation-delay:${Math.min(index * 18, 180)}ms">
+          <div class="art-identity">
+            <div class="art-title-line"><h3 class="art-title">${escapeHtml(node.功法)}</h3><span class="status-stamp ${STATUS_CLASS[review.状态]}">${escapeHtml(review.状态)}</span></div>
+            <div class="tag-row">
+              <span class="tag">${escapeHtml(node.分支)}</span><span class="tag">${escapeHtml(art.类型 || '类型待定')}</span><span class="tag">${escapeHtml(art.功法品阶 || '品阶待定')}</span>
+              <span class="tag ${sourceClass(art)}">${escapeHtml(source)}</span>
+            </div>
+            ${description ? `<p class="art-description">${escapeHtml(description)}</p>` : ''}
+            <span class="node-id" title="${escapeHtml(node.节点ID)}">${escapeHtml(node.节点ID)}</span>
+          </div>
+          <div class="art-summary">
+            <dl class="summary-grid">
+              <div><dt>传承资格</dt><dd>${escapeHtml(restriction.最低传承资格 || '未限定')}</dd></div>
+              <div><dt>最低境界</dt><dd>${escapeHtml(restriction.最低境界 || '无')}</dd></div>
+              <div><dt>属性门槛</dt><dd>${escapeHtml(stringifyObject(restriction.属性门槛))}</dd></div>
+              <div><dt>自动分配</dt><dd>${node.允许自动分配 ? '允许' : '禁止'} · ${node.是否共通 ? '门内共通' : '非共通'}</dd></div>
+              <div><dt>归属置信度</dt><dd>${escapeHtml(node.归属置信度?.等级 || '未知')} · ${escapeHtml(node.归属置信度?.分值 ?? '—')}</dd></div>
+              <div><dt>原创程度</dt><dd>${escapeHtml(art.原创性?.原创程度 || '未知')}</dd></div>
+            </dl>
+            <div class="prerequisites">
+              ${prereqs.length ? prereqs.map(prereq => `<button class="prereq-button" type="button" data-jump-node="${escapeHtml(prereq.节点ID)}">前置 · ${escapeHtml(prereq.节点ID.split('::').at(-1))}（${escapeHtml(prereq.最低掌握程度 || prereq.关系 || '')}）</button>`).join('') : '<span class="tag">无前置</span>'}
+            </div>
+          </div>
+          <div class="art-review">
+            <div class="review-caption"><span>节点与传承关系</span><strong>${escapeHtml(review.状态)}</strong></div>
+            ${reviewControls('node', node.节点ID, review)}
+            <textarea class="review-note" data-note-kind="node" data-note-id="${escapeHtml(node.节点ID)}" placeholder="若需修改，请注明名称、层级、前置或限制……">${escapeHtml(review.意见)}</textarea>
+          </div>
+          <details class="details-panel">
+            <summary>展开证据、限制与功法本体详情</summary>
+            <div class="details-content">
+              <section class="detail-section"><h4>传承限制</h4><ul class="detail-list">
+                <li>指定人物：${escapeHtml((restriction.指定人物 || []).join('、') || '无')}</li>
+                <li>特别条件：${escapeHtml((restriction.特别条件 || []).join('；') || '无')}</li>
+                <li>功法库限制：${escapeHtml(stringifyObject(art.功法库信息?.修炼限制))}</li>
+              </ul></section>
+              <section class="detail-section"><h4>归属依据</h4><ul class="detail-list">${detailList(node.归属依据, evidence => `${escapeHtml(evidence.类型 || '依据')} · ${escapeHtml(evidence.摘要 || '无摘要')}${evidence.来源文件 ? `<br><small>${escapeHtml(evidence.来源文件)}</small>` : ''}`)}</ul></section>
+              <section class="detail-section"><h4>功法本体</h4><ul class="detail-list">
+                <li>ID：${escapeHtml(art.功法ID || node.功法ID)}</li><li>目录状态：${escapeHtml(art.审核?.状态 || '待审核')}</li>
+                <li>来源说明：${escapeHtml(art.原创性?.说明 || '无')}</li>
+                ${art.待新增草案 ? `<li>新增草案：${escapeHtml(art.待新增草案.状态 || '待审核')}</li>` : ''}
+              </ul></section>
+            </div>
+          </details>
+        </article>`;
+        }
+
+        function renderLineage(sect) {
+          const visible = visibleNodes(sect);
+          const grouped = new Map(LAYERS.map(layer => [layer, []]));
+          visible.forEach(node => {
+            if (!grouped.has(node.传承层级)) grouped.set(node.传承层级, []);
+            grouped.get(node.传承层级).push(node);
+          });
+          const layers = [...grouped.entries()].filter(([, nodes]) => nodes.length);
+          elements.resultSummary.innerHTML = `显示 <strong>${visible.length}</strong> / ${sect.传承节点.length} 个节点 · 当前门派 <strong>${escapeHtml(sect.门派)}</strong>`;
+          document.getElementById('approveVisibleButton').disabled = visible.length === 0;
+          if (!layers.length) {
+            elements.lineage.innerHTML =
+              '<div class="empty-state">当前筛选条件下没有传承节点。可重置筛选，或切换其他门派。</div>';
+            return;
+          }
+          let cardIndex = 0;
+          elements.lineage.innerHTML = layers
+            .map(
+              ([layer, nodes]) => `<section class="lineage-layer" data-layer="${escapeHtml(layer)}">
+          <header class="layer-marker"><span class="layer-orb">${escapeHtml(layer)}</span><span class="layer-count">${nodes.length} 门</span></header>
+          <div class="layer-cards">${nodes.map(node => renderNodeCard(node, cardIndex++)).join('')}</div>
+        </section>`,
+            )
+            .join('');
+        }
+
+        function render() {
+          const sect = sectById.get(state.sectId);
+          renderSectNav();
+          updateGlobalStats();
+          if (!sect) {
+            elements.sectSheet.innerHTML = '<div class="empty-state">没有可审核的门派。</div>';
+            elements.lineage.innerHTML = '';
+            return;
+          }
+          renderSectSheet(sect);
+          renderLineage(sect);
+        }
+
+        function fillFilters() {
+          const sources = [...new Set(DATA.功法目录.map(art => art.来源状态).filter(Boolean))].sort((a, b) =>
+            a.localeCompare(b, 'zh-CN'),
+          );
+          const branches = [
+            ...new Set(
+              allNodes()
+                .map(node => node.分支)
+                .filter(Boolean),
+            ),
+          ].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+          elements.layer.innerHTML =
+            '<option value="全部">全部层级</option>' +
+            LAYERS.map(layer => `<option value="${escapeHtml(layer)}">${escapeHtml(layer)}</option>`).join('');
+          elements.source.innerHTML =
+            '<option value="全部">全部来源</option>' +
+            sources.map(source => `<option value="${escapeHtml(source)}">${escapeHtml(source)}</option>`).join('');
+          elements.branch.innerHTML =
+            '<option value="全部">全部分支</option>' +
+            branches.map(branch => `<option value="${escapeHtml(branch)}">${escapeHtml(branch)}</option>`).join('');
+        }
+
+        function applyStatus(kind, id, status) {
+          setReview(kind, id, { 状态: status });
+          render();
+        }
+
+        function currentVisibleNodeIds() {
+          const sect = sectById.get(state.sectId);
+          return sect ? visibleNodes(sect).map(node => node.节点ID) : [];
+        }
+
+        function jumpToNode(nodeId) {
+          const targetMeta = nodeById.get(nodeId);
+          if (!targetMeta) return showToast('未找到此前置节点');
+          if (targetMeta.sect.门派ID !== state.sectId) {
+            state.sectId = targetMeta.sect.门派ID;
+            state.query = '';
+            state.status = '全部';
+            state.layer = '全部';
+            elements.search.value = '';
+            elements.status.value = '全部';
+            elements.layer.value = '全部';
+            render();
+          }
+          requestAnimationFrame(() => {
+            const target = [...document.querySelectorAll('[data-node-id]')].find(
+              card => card.dataset.nodeId === nodeId,
+            );
+            if (!target) return showToast('该节点被当前筛选隐藏');
+            target.dataset.flash = 'true';
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            window.setTimeout(() => delete target.dataset.flash, 1000);
+          });
+        }
+
+        function reviewSummary() {
+          const counts = getCounts();
+          return { 总数: allNodes().length, 已审核: allNodes().length - counts.待审核, ...counts };
+        }
+
+        function activeReviews(collection, sourceItems, idKey, getReview) {
+          return sourceItems
+            .map(item => ({ [idKey]: item[idKey], ...getReview(item) }))
+            .filter(item => item.状态 !== '待审核' || item.意见);
+        }
+
+        function buildReviewExport() {
+          return {
+            schemaVersion: 1,
+            类型: '门派功法谱系审核记录',
+            来源生成时间: DATA.生成信息?.生成时间 || null,
+            导出时间: new Date().toISOString(),
+            审核统计: reviewSummary(),
+            门派审核: activeReviews(state.reviews.sects, DATA.门派列表, '门派ID', getSectReview),
+            节点审核: activeReviews(state.reviews.nodes, allNodes(), '节点ID', getNodeReview),
+          };
+        }
+
+        function buildMergedExport() {
+          const merged = JSON.parse(JSON.stringify(DATA));
+          const mergedSects = new Map(merged.门派列表.map(sect => [sect.门派ID, sect]));
+          for (const sect of mergedSects.values()) {
+            sect.审核 = getSectReview(sectById.get(sect.门派ID));
+            for (const node of sect.传承节点) node.审核 = getNodeReview(nodeById.get(node.节点ID)?.node || node);
+          }
+          merged.生成信息 = {
+            ...merged.生成信息,
+            审核导出时间: new Date().toISOString(),
+            审核口径: '门派审核作用于整派设计；节点审核作用于功法与当前门派的传承关系，不自动改写功法目录审核。',
+          };
+          merged.审核统计 = reviewSummary();
+          return merged;
+        }
+
+        function downloadJson(payload, fileName) {
+          const blob = new Blob([JSON.stringify(payload, null, 2) + '\n'], { type: 'application/json;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = fileName;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          window.setTimeout(() => URL.revokeObjectURL(url), 0);
+        }
+
+        function importReviews(parsed) {
+          if (Array.isArray(parsed.节点审核) || Array.isArray(parsed.门派审核)) {
+            for (const review of parsed.节点审核 || []) {
+              if (nodeById.has(review.节点ID)) state.reviews.nodes[review.节点ID] = normalizeReview(review);
+            }
+            for (const review of parsed.门派审核 || []) {
+              if (sectById.has(review.门派ID)) state.reviews.sects[review.门派ID] = normalizeReview(review);
+            }
+            return '审核记录';
+          }
+          if (Array.isArray(parsed.功法目录) && Array.isArray(parsed.门派列表)) {
+            DATA = parsed;
+            rebuildIndexes();
+            state.reviews = { nodes: {}, sects: {} };
+            for (const sect of DATA.门派列表) {
+              if (sect.审核) state.reviews.sects[sect.门派ID] = normalizeReview(sect.审核);
+              for (const node of sect.传承节点 || []) {
+                if (node.审核) state.reviews.nodes[node.节点ID] = normalizeReview(node.审核);
+              }
+            }
+            fillFilters();
+            return '完整谱系';
+          }
+          if (parsed.reviews?.nodes || parsed.nodes) {
+            state.reviews.nodes = { ...state.reviews.nodes, ...(parsed.reviews?.nodes || parsed.nodes || {}) };
+            state.reviews.sects = { ...state.reviews.sects, ...(parsed.reviews?.sects || parsed.sects || {}) };
+            return '本地进度';
+          }
+          throw new Error('无法识别的审核文件结构');
+        }
+
+        document.addEventListener('click', event => {
+          const sectButton = event.target.closest('[data-sect-id]');
+          if (sectButton) {
+            state.sectId = sectButton.dataset.sectId;
+            render();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+          }
+          const reviewButton = event.target.closest('[data-review-kind]');
+          if (reviewButton) {
+            applyStatus(reviewButton.dataset.reviewKind, reviewButton.dataset.reviewId, reviewButton.dataset.status);
+            return;
+          }
+          const prereqButton = event.target.closest('[data-jump-node]');
+          if (prereqButton) jumpToNode(prereqButton.dataset.jumpNode);
+        });
+
+        document.addEventListener('input', event => {
+          const note = event.target.closest('[data-note-kind]');
+          if (!note) return;
+          const collectionKind = note.dataset.noteKind;
+          setReview(collectionKind, note.dataset.noteId, { 意见: note.value.trim() });
+        });
+
+        elements.search.addEventListener('input', () => {
+          state.query = elements.search.value.trim();
+          renderLineage(sectById.get(state.sectId));
+        });
+        elements.status.addEventListener('change', () => {
+          state.status = elements.status.value;
+          renderLineage(sectById.get(state.sectId));
+        });
+        elements.layer.addEventListener('change', () => {
+          state.layer = elements.layer.value;
+          renderLineage(sectById.get(state.sectId));
+        });
+        elements.source.addEventListener('change', () => {
+          state.source = elements.source.value;
+          renderLineage(sectById.get(state.sectId));
+        });
+        elements.branch.addEventListener('change', () => {
+          state.branch = elements.branch.value;
+          renderLineage(sectById.get(state.sectId));
+        });
+
+        document.getElementById('resetFiltersButton').addEventListener('click', () => {
+          state.query = '';
+          state.status = state.layer = state.source = state.branch = '全部';
+          elements.search.value = '';
+          elements.status.value = elements.layer.value = elements.source.value = elements.branch.value = '全部';
+          renderLineage(sectById.get(state.sectId));
+        });
+
+        document.getElementById('approveVisibleButton').addEventListener('click', () => {
+          const ids = currentVisibleNodeIds();
+          if (!ids.length) return;
+          if (!confirm(`将当前筛选出的 ${ids.length} 个节点全部标记为“通过”？已有结论也会被覆盖。`)) return;
+          const now = new Date().toISOString();
+          ids.forEach(id => {
+            state.reviews.nodes[id] = { ...getNodeReview(nodeById.get(id).node), 状态: '通过', 更新时间: now };
+          });
+          saveReviews();
+          render();
+          showToast(`已通过当前 ${ids.length} 个节点`);
+        });
+
+        document.getElementById('nextPendingButton').addEventListener('click', () => {
+          const sect = sectById.get(state.sectId);
+          let target = sect?.传承节点.find(node => getNodeReview(node).状态 === '待审核');
+          if (!target) {
+            const nextSect = DATA.门派列表.find(item =>
+              item.传承节点.some(node => getNodeReview(node).状态 === '待审核'),
+            );
+            if (!nextSect) return showToast('所有传承节点均已给出结论');
+            state.sectId = nextSect.门派ID;
+            state.query = '';
+            state.status = state.layer = state.source = state.branch = '全部';
+            elements.search.value = '';
+            elements.status.value = elements.layer.value = elements.source.value = elements.branch.value = '全部';
+            target = nextSect.传承节点.find(node => getNodeReview(node).状态 === '待审核');
+            render();
+          } else if (!currentVisibleNodeIds().includes(target.节点ID)) {
+            state.query = '';
+            state.status = state.layer = state.source = state.branch = '全部';
+            elements.search.value = '';
+            elements.status.value = elements.layer.value = elements.source.value = elements.branch.value = '全部';
+            render();
+          }
+          jumpToNode(target.节点ID);
+        });
+
+        document.getElementById('exportMergedButton').addEventListener('click', () => {
+          downloadJson(buildMergedExport(), `门派功法谱系-已审核-${new Date().toISOString().slice(0, 10)}.json`);
+          showToast('已导出含审核结论的完整谱系');
+        });
+        document.getElementById('exportReviewButton').addEventListener('click', () => {
+          downloadJson(buildReviewExport(), `门派功法谱系-审核记录-${new Date().toISOString().slice(0, 10)}.json`);
+          showToast('已导出轻量审核记录');
+        });
+        document.getElementById('importInput').addEventListener('change', async event => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          try {
+            const type = importReviews(JSON.parse(await file.text()));
+            saveReviews();
+            render();
+            showToast(`已导入${type}`);
+          } catch (error) {
+            console.error(error);
+            showToast(`导入失败：${error.message}`);
+          } finally {
+            event.target.value = '';
+          }
+        });
+        document.getElementById('clearButton').addEventListener('click', () => {
+          if (!confirm('确定清空所有本地审核结论和备注吗？此操作不会修改原始 JSON。')) return;
+          state.reviews = { nodes: {}, sects: {} };
+          saveReviews();
+          render();
+          showToast('本地审核进度已清空');
+        });
+
+        document.addEventListener('keydown', event => {
+          if (
+            event.key === '/' &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)
+          ) {
+            event.preventDefault();
+            elements.search.focus();
+          }
+        });
+
+        rebuildIndexes();
+        fillFilters();
+        loadReviews();
+        render();
+      })();
+    </script>
+  </body>
+</html>

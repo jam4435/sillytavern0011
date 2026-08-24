@@ -1,6 +1,7 @@
 import type { GameEvent } from '../types';
 
-const EVENT_TIME_PREFIX_PATTERN = /^\s*(?:时间[：:]\s*)?\d{1,4}年\d{1,2}月\d{1,2}日\d{1,2}时(?:\d{1,2}分)?\s*(?:到|至|[-—–→])\s*(?:(?:\d{1,4}年)?\d{1,2}月\d{1,2}日)?\s*\d{1,2}时(?:\d{1,2}分)?\s*[，,、。:：]\s*/;
+const EVENT_TIME_PREFIX_PATTERN =
+  /^\s*(?:时间[：:]\s*)?\d{1,4}年\d{1,2}月\d{1,2}日\d{1,2}时(?:\d{1,2}分)?\s*(?:到|至|[-—–→])\s*(?:(?:\d{1,4}年)?\d{1,2}月\d{1,2}日)?\s*\d{1,2}时(?:\d{1,2}分)?\s*[，,、。:：]\s*/;
 
 export type EventSemanticCategory = 'participation' | 'world' | 'rumor' | 'aftermath';
 
@@ -47,6 +48,9 @@ export function getEventDescription(event: GameEvent): string {
 }
 
 export function getEventCountdownLabel(event: GameEvent): string | null {
+  if (event.startsInDays !== undefined) {
+    return event.startsInDays <= 0 ? '今日将起' : `${event.startsInDays}日后`;
+  }
   if (event.remainingDays !== undefined) {
     return event.remainingDays <= 0 ? '今日' : `${event.remainingDays}日`;
   }
@@ -58,12 +62,14 @@ export function getEventCountdownLabel(event: GameEvent): string | null {
 
 export function isEventUrgent(event: GameEvent): boolean {
   return Boolean(
-    (event.remainingDays !== undefined && event.remainingDays <= 3)
-    || (event.remainingTurns !== undefined && event.remainingTurns <= 1),
+    (event.startsInDays !== undefined && event.startsInDays <= 3) ||
+    (event.remainingDays !== undefined && event.remainingDays <= 3) ||
+    (event.remainingTurns !== undefined && event.remainingTurns <= 1),
   );
 }
 
 function getCountdownOrder(event: GameEvent): number {
+  if (event.startsInDays !== undefined) return event.startsInDays;
   if (event.remainingDays !== undefined) return event.remainingDays;
   if (event.remainingTurns !== undefined) return event.remainingTurns;
   return Number.POSITIVE_INFINITY;
@@ -73,9 +79,10 @@ function getTrackerPriority(event: GameEvent): number {
   const category = getEventSemanticCategory(event);
   if (category === 'participation') return 0;
   if (isEventUrgent(event)) return 1;
-  if (category === 'aftermath') return 2;
-  if (category === 'world') return 3;
-  return 4;
+  if (category === 'rumor' && event.startsInDays !== undefined) return 2;
+  if (category === 'aftermath') return 3;
+  if (category === 'world') return 4;
+  return 5;
 }
 
 /**

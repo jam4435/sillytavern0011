@@ -75,4 +75,15 @@ describe('CharacterPanel avatar controls', () => {
       expect(screen.getByAltText('郭靖头像')).toHaveAttribute('src', expect.stringContaining('choose_face_b01.png'));
     });
   });
+
+  it('状态页默认显示人物总览，并可切换到占满面板的奇经八脉页', () => {
+    render(<CharacterPanel stats={baseStats} />);
+
+    expect(screen.getByRole('tab', { name: /人物总览/ })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('tab', { name: /奇经八脉/ }));
+
+    expect(screen.getByRole('tab', { name: /奇经八脉/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: '奇经八脉' })).toBeInTheDocument();
+    expect(screen.getByLabelText('奇经八脉铜人图')).toBeInTheDocument();
+  });
 });

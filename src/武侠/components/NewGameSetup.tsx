@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AvatarImage from './AvatarImage';
-import type { CharacterBuild, CharacterTrait, InitialAttributes, OriginCategory, RealmLevel, SetupStep } from '../types';
+import type {
+  CharacterBuild,
+  CharacterTrait,
+  InitialAttributes,
+  OriginCategory,
+  RealmLevel,
+  SetupStep,
+} from '../types';
 import { ATTRIBUTE_DESCRIPTIONS, ATTRIBUTE_NAMES, getTraitType } from '../types';
 import {
   calculateAttributeCost,
@@ -44,7 +51,7 @@ import {
   isDatabaseLoaded,
   loadMartialArtsDatabase,
   type MartialArtData,
-  type MartialArtsRank
+  type MartialArtsRank,
 } from '../utils/martialArtsDatabase';
 import { gameLogger } from '../utils/logger';
 
@@ -52,17 +59,16 @@ import { gameLogger } from '../utils/logger';
  * 从境界字符串中提取大境界名，用于派生 CSS 类名 realm-<大境界>。
  * 兼容 OLD 格式（"三流初期" → "三流"）与裸 "不入流"（无小境界后缀，原样返回）。
  */
-const realmMajor = (realm: string): string =>
-  realm.replace(/(初期|中期|后期|圆满)$/, '');
+const realmMajor = (realm: string): string => realm.replace(/(初期|中期|后期|圆满)$/, '');
 
 // 武功品阶点数消耗（直接选择）- 统一到总点数池
 const RANK_POINT_COST: Record<MartialArtsRank, number> = {
-  '粗浅': 2,
-  '传家': 4,
-  '上乘': 8,
-  '镇派': 12,
-  '绝世': 18,
-  '传说': 30,
+  粗浅: 2,
+  传家: 4,
+  上乘: 8,
+  镇派: 12,
+  绝世: 18,
+  传说: 30,
 };
 
 // 武功混合池抽卡费用（统一费用，随机抽取任意品阶）
@@ -70,9 +76,9 @@ const MARTIAL_ARTS_DRAW_COST = 5; // 花费5点随机抽取武功
 
 // 天赋抽卡费用（统一提高门槛）
 const TRAIT_DRAW_COST = {
-  positive: 5,  // 正面天赋抽卡费用（统一5点）
-  negative: 0,  // 负面天赋抽卡（免费，但必须接受结果）
-  mixed: 3,     // 混合池抽卡费用（随机正面或负面）
+  positive: 5, // 正面天赋抽卡费用（统一5点）
+  negative: 0, // 负面天赋抽卡（免费，但必须接受结果）
+  mixed: 3, // 混合池抽卡费用（随机正面或负面）
 };
 
 interface NewGameSetupProps {
@@ -105,31 +111,31 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   // ============================================
   // 新版7步流程状态
   // ============================================
-  
+
   // 当前步骤 (新版使用 SetupStep 类型)
   const [currentStep, setCurrentStep] = useState<SetupStep>('talent');
-  
+
   // 步骤1: 天资选择
   const [selectedTalentId, setSelectedTalentId] = useState<string>('talented'); // 默认选择良才
   const [savedBuilds, setSavedBuilds] = useState<CharacterBuild[]>([]);
-  
+
   // 步骤2: 属性分配 (新点数系统)
   const [attributes, setAttributes] = useState<InitialAttributes>({ ...DEFAULT_ATTRIBUTES });
-  
+
   // 步骤3: 天赋选择
   const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
   const [drawnTraits, setDrawnTraits] = useState<string[]>([]); // 抽卡获得的天赋（不可取消）
   const [traitDrawCostUsed, setTraitDrawCostUsed] = useState(0); // 天赋抽卡消耗的点数
   const [traitSearchQuery, setTraitSearchQuery] = useState('');
   const [customTraitInput, setCustomTraitInput] = useState('');
-  
+
   // 自定义天赋状态
   const [customTraits, setCustomTraits] = useState<CustomTrait[]>([]);
   const [newCustomTraitName, setNewCustomTraitName] = useState('');
   const [newCustomTraitDesc, setNewCustomTraitDesc] = useState('');
   const [newCustomTraitCost, setNewCustomTraitCost] = useState(0);
   const [showCustomTraitForm, setShowCustomTraitForm] = useState(false);
-  
+
   // 基础信息状态 (后续步骤使用)
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'男' | '女'>('男');
@@ -139,7 +145,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   const [appearance, setAppearance] = useState('');
   const [age, setAge] = useState(18);
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
-  
+
   // 时间地点状态
   const [useEventLocation, setUseEventLocation] = useState(true);
   const [selectedEventId, setSelectedEventId] = useState(STORY_EVENTS[0]?.id || '');
@@ -148,7 +154,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   const [customYear, setCustomYear] = useState(1199);
   const [customMonth, setCustomMonth] = useState(8);
   const [customDay, setCustomDay] = useState(15);
-  
+
   // 步骤4: 武功选择状态
   const [selectedMartialArts, setSelectedMartialArts] = useState<string[]>([]); // 已选武功名称列表
   const [drawnMartialArts, setDrawnMartialArts] = useState<string[]>([]); // 抽卡获得的武功（不可取消）
@@ -158,19 +164,21 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   const [martialArtsFilter, setMartialArtsFilter] = useState<MartialArtsRank | 'all'>('all');
   const [martialArtsSearch, setMartialArtsSearch] = useState('');
   // 注意：武功点数已统一到总点数池，不再使用独立的 martialArtsPoints 状态
-  
+
   // 步骤5: 出身选择状态
   const [selectedOrigin, setSelectedOrigin] = useState<string>(ORIGIN_OPTIONS[0]?.id || '');
   const [customOrigin, setCustomOrigin] = useState('');
   const [customRealm, setCustomRealm] = useState<RealmLevel>('三流圆满'); // 自定义出身的境界选择
   const [originCategoryFilter, setOriginCategoryFilter] = useState<OriginCategory | 'all'>('all'); // 出身类别筛选
-  
+
   // 错误状态
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
+
   // 提示消息状态
-  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
-  
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(
+    null,
+  );
+
   // 显示提示消息
   const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
     setNotification({ type, message });
@@ -245,7 +253,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, avatarRef);
     setSelectedAvatarRef(avatarRef);
   }, []);
-  
+
   // ============================================
   // 加载武功数据库
   // ============================================
@@ -273,19 +281,19 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     };
     loadDatabase();
   }, []);
-  
+
   // ============================================
   // 计算属性
   // ============================================
-  
+
   // 当前选中的天资
   const selectedTalent = useMemo(() => {
     return TALENT_TIERS.find(t => t.id === selectedTalentId);
   }, [selectedTalentId]);
-  
+
   // 总可用点数
   const totalPoints = selectedTalent?.totalPoints ?? 30;
-  
+
   // 计算属性消耗的点数（包含福缘，使用阶梯点数机制）
   const attributePointsUsed = useMemo(() => {
     let total = 0;
@@ -299,7 +307,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     }
     return total;
   }, [attributes]);
-  
+
   // 计算选中武功消耗的点数（统一到总点数池）
   // 注意：抽卡获得的武功不计入品阶cost，因为抽卡费用已经单独记录
   const martialArtsPointsUsed = useMemo(() => {
@@ -316,7 +324,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     }
     return total;
   }, [selectedMartialArts, martialArtsDatabase, drawnMartialArts]);
-  
+
   // 计算选中天赋消耗的点数（包含自定义天赋）
   // 注意：抽卡获得的天赋不计入cost，因为抽卡费用已经包含了天赋的价值
   const traitPointsUsed = useMemo(() => {
@@ -340,10 +348,16 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     }
     return total;
   }, [selectedTraits, customTraits, drawnTraits]);
-  
+
   // 剩余点数（统一点数池：总点数 - 属性消耗 - 天赋消耗 - 武功消耗 - 抽卡消耗）
-  const remainingPoints = totalPoints - attributePointsUsed - traitPointsUsed - martialArtsPointsUsed - traitDrawCostUsed - martialArtsDrawCostUsed;
-  
+  const remainingPoints =
+    totalPoints -
+    attributePointsUsed -
+    traitPointsUsed -
+    martialArtsPointsUsed -
+    traitDrawCostUsed -
+    martialArtsDrawCostUsed;
+
   // 属性触发的天赋
   const attributeTriggeredTraits = useMemo(() => {
     const triggered: CharacterTrait[] = [];
@@ -353,11 +367,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     }
     return triggered;
   }, [attributes]);
-  
+
   // ============================================
   // 存档数据验证函数
   // ============================================
-  
+
   /**
    * 验证 CharacterBuild 对象是否有效
    * 处理旧版存档兼容性
@@ -365,20 +379,20 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   const validateCharacterBuild = useCallback((build: unknown): build is CharacterBuild => {
     if (!build || typeof build !== 'object') return false;
     const b = build as Record<string, unknown>;
-    
+
     // 必需字段检查
     if (typeof b.id !== 'string' || !b.id) return false;
     if (typeof b.name !== 'string') return false;
     if (typeof b.createdAt !== 'number') return false;
     if (typeof b.talentTier !== 'string') return false;
-    
+
     // attributes 检查
     if (!b.attributes || typeof b.attributes !== 'object') return false;
-    
+
     // traits 和 martialArts 应该是数组
     if (!Array.isArray(b.traits)) return false;
     if (!Array.isArray(b.martialArts)) return false;
-    
+
     return true;
   }, []);
 
@@ -389,13 +403,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     try {
       const saved = localStorage.getItem(SAVED_BUILDS_KEY);
       if (!saved) return [];
-      
+
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed)) {
         gameLogger.warn('存档数据格式错误，期望数组');
         return [];
       }
-      
+
       // 过滤有效的存档并补全缺失字段
       const validBuilds = parsed.filter(validateCharacterBuild).map((build: CharacterBuild) => ({
         ...build,
@@ -414,7 +428,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
           age: 18,
         },
       }));
-      
+
       return validBuilds;
     } catch (e) {
       gameLogger.error('加载存档失败:', e);
@@ -422,13 +436,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       return [];
     }
   }, [validateCharacterBuild, showNotification]);
-  
+
   // 加载已保存的角色存档
   useEffect(() => {
     const builds = loadSavedBuilds();
     setSavedBuilds(builds);
   }, [loadSavedBuilds]);
-  
+
   // 加载自定义天赋
   useEffect(() => {
     try {
@@ -443,17 +457,20 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       gameLogger.error('加载自定义天赋失败:', e);
     }
   }, []);
-  
+
   // 保存自定义天赋
-  const saveCustomTraits = useCallback((traits: CustomTrait[]) => {
-    try {
-      localStorage.setItem(CUSTOM_TRAITS_KEY, JSON.stringify(traits));
-    } catch (e) {
-      gameLogger.error('保存自定义天赋失败:', e);
-      showNotification('error', '保存自定义天赋失败');
-    }
-  }, [showNotification]);
-  
+  const saveCustomTraits = useCallback(
+    (traits: CustomTrait[]) => {
+      try {
+        localStorage.setItem(CUSTOM_TRAITS_KEY, JSON.stringify(traits));
+      } catch (e) {
+        gameLogger.error('保存自定义天赋失败:', e);
+        showNotification('error', '保存自定义天赋失败');
+      }
+    },
+    [showNotification],
+  );
+
   // 添加自定义天赋
   const handleAddCustomTrait = useCallback(() => {
     if (!newCustomTraitName.trim()) {
@@ -464,15 +481,16 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       showNotification('error', '请输入天赋描述');
       return;
     }
-    
+
     // 检查天赋名称是否重复
-    const isDuplicate = customTraits.some(t => t.name === newCustomTraitName.trim()) ||
-                        CHARACTER_TRAITS.some(t => t.name === newCustomTraitName.trim());
+    const isDuplicate =
+      customTraits.some(t => t.name === newCustomTraitName.trim()) ||
+      CHARACTER_TRAITS.some(t => t.name === newCustomTraitName.trim());
     if (isDuplicate) {
       showNotification('error', '天赋名称已存在');
       return;
     }
-    
+
     const newTrait: CustomTrait = {
       id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: newCustomTraitName.trim(),
@@ -480,38 +498,41 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       cost: newCustomTraitCost,
       createdAt: Date.now(),
     };
-    
+
     const updatedTraits = [...customTraits, newTrait];
     setCustomTraits(updatedTraits);
     saveCustomTraits(updatedTraits);
-    
+
     // 重置表单
     setNewCustomTraitName('');
     setNewCustomTraitDesc('');
     setNewCustomTraitCost(0);
     setShowCustomTraitForm(false);
-    
+
     showNotification('success', `自定义天赋「${newTrait.name}」已保存`);
   }, [newCustomTraitName, newCustomTraitDesc, newCustomTraitCost, customTraits, saveCustomTraits, showNotification]);
-  
+
   // 删除自定义天赋
-  const handleDeleteCustomTrait = useCallback((traitId: string, traitName: string) => {
-    const confirmMessage = `确定要删除自定义天赋「${traitName}」吗？`;
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-    
-    const updatedTraits = customTraits.filter(t => t.id !== traitId);
-    setCustomTraits(updatedTraits);
-    saveCustomTraits(updatedTraits);
-    
-    // 如果该天赋已被选中，也从选中列表中移除
-    if (selectedTraits.includes(traitName)) {
-      setSelectedTraits(prev => prev.filter(name => name !== traitName));
-    }
-    
-    showNotification('success', `自定义天赋「${traitName}」已删除`);
-  }, [customTraits, saveCustomTraits, selectedTraits, showNotification]);
+  const handleDeleteCustomTrait = useCallback(
+    (traitId: string, traitName: string) => {
+      const confirmMessage = `确定要删除自定义天赋「${traitName}」吗？`;
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+
+      const updatedTraits = customTraits.filter(t => t.id !== traitId);
+      setCustomTraits(updatedTraits);
+      saveCustomTraits(updatedTraits);
+
+      // 如果该天赋已被选中，也从选中列表中移除
+      if (selectedTraits.includes(traitName)) {
+        setSelectedTraits(prev => prev.filter(name => name !== traitName));
+      }
+
+      showNotification('success', `自定义天赋「${traitName}」已删除`);
+    },
+    [customTraits, saveCustomTraits, selectedTraits, showNotification],
+  );
 
   // 获取当前选中的事件（移到存档操作函数之前，以便在 handleSaveBuild 中使用）
   const selectedEvent = useMemo(() => {
@@ -521,7 +542,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   // ============================================
   // 存档操作函数
   // ============================================
-  
+
   /**
    * 保存当前角色配置到存档
    */
@@ -548,19 +569,22 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         traits: [...selectedTraits],
         martialArts: [...selectedMartialArts],
         origin: selectedOrigin === 'custom' ? customOrigin : selectedOrigin,
-        locationInfo: useEventLocation && currentEvent ? {
-          year: currentEvent.year,
-          month: currentEvent.month,
-          day: currentEvent.day,
-          ...(currentEvent.hour !== undefined ? { hour: currentEvent.hour } : {}),
-          location: currentEvent.location,
-          eventName: currentEvent.name,
-        } : {
-          year: customYear,
-          month: customMonth,
-          day: customDay,
-          location: customLocation,
-        },
+        locationInfo:
+          useEventLocation && currentEvent
+            ? {
+                year: currentEvent.year,
+                month: currentEvent.month,
+                day: currentEvent.day,
+                ...(currentEvent.hour !== undefined ? { hour: currentEvent.hour } : {}),
+                location: currentEvent.location,
+                eventName: currentEvent.name,
+              }
+            : {
+                year: customYear,
+                month: customMonth,
+                day: customDay,
+                location: customLocation,
+              },
         characterInfo: {
           name: name.trim(),
           gender,
@@ -579,55 +603,78 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       showNotification('error', '保存存档失败，请检查浏览器存储空间');
     }
   }, [
-    name, selectedTalentId, attributes, selectedTraits, selectedMartialArts,
-    selectedOrigin, customOrigin, useEventLocation, selectedEventId,
-    customYear, customMonth, customDay, customLocation,
-    gender, selectedAvatarRef, appearance, age, savedBuilds, showNotification
+    name,
+    selectedTalentId,
+    attributes,
+    selectedTraits,
+    selectedMartialArts,
+    selectedOrigin,
+    customOrigin,
+    useEventLocation,
+    selectedEventId,
+    customYear,
+    customMonth,
+    customDay,
+    customLocation,
+    gender,
+    selectedAvatarRef,
+    appearance,
+    age,
+    savedBuilds,
+    showNotification,
   ]);
-  
+
   /**
    * 加载指定存档
    */
-  const handleLoadBuild = useCallback((buildToLoad: CharacterBuild) => {
-    // 确认加载
-    const confirmMessage = `确定要加载存档「${buildToLoad.name}」吗？当前未保存的配置将丢失。`;
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-    
-    try {
-      // 恢复天资
-      setSelectedTalentId(buildToLoad.talentTier);
-      
-      // 恢复属性
-      setAttributes({ ...DEFAULT_ATTRIBUTES, ...buildToLoad.attributes });
-      
-      // 恢复天赋
-      setSelectedTraits([...buildToLoad.traits]);
-      
-      // 恢复武功（点数消耗会通过 martialArtsPointsUsed 自动计算）
-      setSelectedMartialArts([...buildToLoad.martialArts]);
-      
-      // 恢复出身
-      if (buildToLoad.origin) {
-        const isPresetOrigin = ORIGIN_OPTIONS.some(o => o.id === buildToLoad.origin);
-        if (isPresetOrigin) {
-          setSelectedOrigin(buildToLoad.origin);
-          setCustomOrigin('');
-        } else {
-          setSelectedOrigin('custom');
-          setCustomOrigin(buildToLoad.origin);
-        }
+  const handleLoadBuild = useCallback(
+    (buildToLoad: CharacterBuild) => {
+      // 确认加载
+      const confirmMessage = `确定要加载存档「${buildToLoad.name}」吗？当前未保存的配置将丢失。`;
+      if (!window.confirm(confirmMessage)) {
+        return;
       }
-      
-      // 恢复时间地点
-      if (buildToLoad.locationInfo) {
-        const loc = buildToLoad.locationInfo;
-        if (loc.eventName) {
-          const event = STORY_EVENTS.find(e => e.name === loc.eventName);
-          if (event) {
-            setUseEventLocation(true);
-            setSelectedEventId(event.id);
+
+      try {
+        // 恢复天资
+        setSelectedTalentId(buildToLoad.talentTier);
+
+        // 恢复属性
+        setAttributes({ ...DEFAULT_ATTRIBUTES, ...buildToLoad.attributes });
+
+        // 恢复天赋
+        setSelectedTraits([...buildToLoad.traits]);
+
+        // 恢复武功（点数消耗会通过 martialArtsPointsUsed 自动计算）
+        setSelectedMartialArts([...buildToLoad.martialArts]);
+
+        // 恢复出身
+        if (buildToLoad.origin) {
+          const isPresetOrigin = ORIGIN_OPTIONS.some(o => o.id === buildToLoad.origin);
+          if (isPresetOrigin) {
+            setSelectedOrigin(buildToLoad.origin);
+            setCustomOrigin('');
+          } else {
+            setSelectedOrigin('custom');
+            setCustomOrigin(buildToLoad.origin);
+          }
+        }
+
+        // 恢复时间地点
+        if (buildToLoad.locationInfo) {
+          const loc = buildToLoad.locationInfo;
+          if (loc.eventName) {
+            const event = STORY_EVENTS.find(e => e.name === loc.eventName);
+            if (event) {
+              setUseEventLocation(true);
+              setSelectedEventId(event.id);
+            } else {
+              setUseEventLocation(false);
+              setCustomYear(loc.year);
+              setCustomMonth(loc.month);
+              setCustomDay(loc.day);
+              setCustomLocation(loc.location);
+            }
           } else {
             setUseEventLocation(false);
             setCustomYear(loc.year);
@@ -635,139 +682,141 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
             setCustomDay(loc.day);
             setCustomLocation(loc.location);
           }
-        } else {
-          setUseEventLocation(false);
-          setCustomYear(loc.year);
-          setCustomMonth(loc.month);
-          setCustomDay(loc.day);
-          setCustomLocation(loc.location);
         }
+
+        // 恢复角色信息
+        if (buildToLoad.characterInfo) {
+          const info = buildToLoad.characterInfo;
+          setName(info.name || '');
+          setGender(info.gender || '男');
+          const nextAvatarRef = info.avatarRef || getDefaultAvatarRefForGender(info.gender || '男');
+          saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, nextAvatarRef);
+          setSelectedAvatarRef(nextAvatarRef);
+          setAppearance(info.appearance || '');
+          setAge(info.age || 18);
+        }
+
+        // 跳转到确认页面
+        setCurrentStep('confirm');
+
+        showNotification('success', `存档「${buildToLoad.name}」加载成功！`);
+      } catch (e) {
+        gameLogger.error('加载存档失败:', e);
+        showNotification('error', '加载存档失败');
       }
-      
-      // 恢复角色信息
-      if (buildToLoad.characterInfo) {
-        const info = buildToLoad.characterInfo;
-        setName(info.name || '');
-        setGender(info.gender || '男');
-        const nextAvatarRef = info.avatarRef || getDefaultAvatarRefForGender(info.gender || '男');
-        saveAvatarSelection(PLAYER_AVATAR_ENTITY_KEY, nextAvatarRef);
-        setSelectedAvatarRef(nextAvatarRef);
-        setAppearance(info.appearance || '');
-        setAge(info.age || 18);
-      }
-      
-      // 跳转到确认页面
-      setCurrentStep('confirm');
-      
-      showNotification('success', `存档「${buildToLoad.name}」加载成功！`);
-    } catch (e) {
-      gameLogger.error('加载存档失败:', e);
-      showNotification('error', '加载存档失败');
-    }
-  }, [martialArtsDatabase, showNotification]);
-  
+    },
+    [martialArtsDatabase, showNotification],
+  );
+
   /**
    * 删除指定存档
    */
-  const handleDeleteBuild = useCallback((buildId: string, buildName: string) => {
-    const confirmMessage = `确定要删除存档「${buildName}」吗？此操作不可撤销。`;
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+  const handleDeleteBuild = useCallback(
+    (buildId: string, buildName: string) => {
+      const confirmMessage = `确定要删除存档「${buildName}」吗？此操作不可撤销。`;
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
 
-    try {
-      const updatedBuilds = savedBuilds.filter(b => b.id !== buildId);
-      localStorage.setItem(SAVED_BUILDS_KEY, JSON.stringify(updatedBuilds));
-      setSavedBuilds(updatedBuilds);
-      showNotification('success', `存档「${buildName}」已删除`);
-    } catch (e) {
-      gameLogger.error('删除存档失败:', e);
-      showNotification('error', '删除存档失败');
-    }
-  }, [savedBuilds, showNotification]);
+      try {
+        const updatedBuilds = savedBuilds.filter(b => b.id !== buildId);
+        localStorage.setItem(SAVED_BUILDS_KEY, JSON.stringify(updatedBuilds));
+        setSavedBuilds(updatedBuilds);
+        showNotification('success', `存档「${buildName}」已删除`);
+      } catch (e) {
+        gameLogger.error('删除存档失败:', e);
+        showNotification('error', '删除存档失败');
+      }
+    },
+    [savedBuilds, showNotification],
+  );
 
   /**
    * 编辑存档备注
    */
-  const handleEditNote = useCallback((buildId: string, currentNote: string) => {
-    const newNote = window.prompt('编辑备注：\n用于区分同名角色，例如：剑客、医师、反派等', currentNote);
+  const handleEditNote = useCallback(
+    (buildId: string, currentNote: string) => {
+      const newNote = window.prompt('编辑备注：\n用于区分同名角色，例如：剑客、医师、反派等', currentNote);
 
-    // 如果用户点击取消，newNote 为 null，则不修改
-    if (newNote === null) {
-      return;
-    }
+      // 如果用户点击取消，newNote 为 null，则不修改
+      if (newNote === null) {
+        return;
+      }
 
-    try {
-      const updatedBuilds = savedBuilds.map(b =>
-        b.id === buildId
-          ? { ...b, note: newNote.trim() || undefined }
-          : b
-      );
-      localStorage.setItem(SAVED_BUILDS_KEY, JSON.stringify(updatedBuilds));
-      setSavedBuilds(updatedBuilds);
-      showNotification('success', '备注已更新');
-    } catch (e) {
-      gameLogger.error('更新备注失败:', e);
-      showNotification('error', '更新备注失败');
-    }
-  }, [savedBuilds, showNotification]);
+      try {
+        const updatedBuilds = savedBuilds.map(b =>
+          b.id === buildId ? { ...b, note: newNote.trim() || undefined } : b,
+        );
+        localStorage.setItem(SAVED_BUILDS_KEY, JSON.stringify(updatedBuilds));
+        setSavedBuilds(updatedBuilds);
+        showNotification('success', '备注已更新');
+      } catch (e) {
+        gameLogger.error('更新备注失败:', e);
+        showNotification('error', '更新备注失败');
+      }
+    },
+    [savedBuilds, showNotification],
+  );
 
   // ============================================
   // 新版属性调整方法（基于点数消耗系统）
   // ============================================
-  
+
   // 直接设置属性值（用于滑块拖动）- 新版基于点数消耗
-  const setAttributeValue = useCallback((key: keyof InitialAttributes, newValue: number) => {
-    setAttributes(prev => {
-      // 根据属性类型确定有效范围
-      let clampedValue: number;
-      if (key === '福缘') {
-        // 福缘的范围是 [-6, 14]
-        clampedValue = Math.max(MIN_LUCK_VALUE, Math.min(MAX_LUCK_VALUE, newValue));
-      } else {
-        // 其他属性的范围是 [0, 20]
-        clampedValue = Math.max(MIN_ATTRIBUTE_VALUE, Math.min(MAX_ATTRIBUTE_VALUE, newValue));
-      }
-      
-      // 计算如果改变这个属性，新的总点数消耗
-      const newAttrs = { ...prev, [key]: clampedValue };
-      let newTotalCost = 0;
-      for (const k of Object.keys(newAttrs) as Array<keyof InitialAttributes>) {
-        if (k === '福缘') {
-          // 福缘：使用福缘专用的阶梯点数计算
-          newTotalCost += calculateLuckAttributeCost(newAttrs[k]);
+  const setAttributeValue = useCallback(
+    (key: keyof InitialAttributes, newValue: number) => {
+      setAttributes(prev => {
+        // 根据属性类型确定有效范围
+        let clampedValue: number;
+        if (key === '福缘') {
+          // 福缘的范围是 [-6, 14]
+          clampedValue = Math.max(MIN_LUCK_VALUE, Math.min(MAX_LUCK_VALUE, newValue));
         } else {
-          newTotalCost += calculateAttributeCost(newAttrs[k]);
+          // 其他属性的范围是 [0, 20]
+          clampedValue = Math.max(MIN_ATTRIBUTE_VALUE, Math.min(MAX_ATTRIBUTE_VALUE, newValue));
         }
-      }
-      
-      // 检查点数是否足够（需要考虑天赋点数消耗）
-      const availableForAttrs = totalPoints - traitPointsUsed;
-      if (newTotalCost > availableForAttrs) {
-        // 如果超出可用点数，不允许增加
-        if (clampedValue > prev[key]) {
-          return prev; // 拒绝增加
+
+        // 计算如果改变这个属性，新的总点数消耗
+        const newAttrs = { ...prev, [key]: clampedValue };
+        let newTotalCost = 0;
+        for (const k of Object.keys(newAttrs) as Array<keyof InitialAttributes>) {
+          if (k === '福缘') {
+            // 福缘：使用福缘专用的阶梯点数计算
+            newTotalCost += calculateLuckAttributeCost(newAttrs[k]);
+          } else {
+            newTotalCost += calculateAttributeCost(newAttrs[k]);
+          }
         }
-      }
-      
-      return newAttrs;
-    });
-  }, [totalPoints, traitPointsUsed]);
+
+        // 检查点数是否足够（需要考虑天赋点数消耗）
+        const availableForAttrs = totalPoints - traitPointsUsed;
+        if (newTotalCost > availableForAttrs) {
+          // 如果超出可用点数，不允许增加
+          if (clampedValue > prev[key]) {
+            return prev; // 拒绝增加
+          }
+        }
+
+        return newAttrs;
+      });
+    },
+    [totalPoints, traitPointsUsed],
+  );
 
   // ============================================
   // 步骤导航逻辑（新版7步流程）
   // ============================================
-  
+
   // 步骤顺序
   const stepOrder: SetupStep[] = ['talent', 'attributes', 'traits', 'martial', 'origin', 'identity', 'confirm'];
-  
+
   // 获取当前步骤索引
   const currentStepIndex = stepOrder.indexOf(currentStep);
-  
+
   // 验证当前步骤是否可以进入下一步
   const validateCurrentStep = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
-    
+
     switch (currentStep) {
       case 'talent':
         // 天资选择：必须选择一个天资
@@ -816,11 +865,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       default:
         break;
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [currentStep, selectedTalentId, remainingPoints, useEventLocation, customLocation, name, appearance, age]);
-  
+
   // 进入下一步
   const handleNextStep = useCallback(() => {
     if (validateCurrentStep()) {
@@ -830,7 +879,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       }
     }
   }, [validateCurrentStep, currentStepIndex, stepOrder]);
-  
+
   // 返回上一步
   const handlePrevStep = useCallback(() => {
     const prevIndex = currentStepIndex - 1;
@@ -838,7 +887,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       setCurrentStep(stepOrder[prevIndex]);
     }
   }, [currentStepIndex, stepOrder]);
-  
+
   // 是否可以进入下一步
   const canProceedToNext = useMemo(() => {
     switch (currentStep) {
@@ -855,15 +904,12 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         return useEventLocation || customLocation.trim().length > 0;
       case 'identity':
         // 必须填写名号、外貌，年龄范围合法
-        return name.trim().length > 0 &&
-               name.length <= 10 &&
-               appearance.trim().length > 0 &&
-               age >= 10 && age <= 100;
+        return name.trim().length > 0 && name.length <= 10 && appearance.trim().length > 0 && age >= 10 && age <= 100;
       default:
         return true;
     }
   }, [currentStep, selectedTalentId, remainingPoints, useEventLocation, customLocation, name, appearance, age]);
-  
+
   // 验证身份信息（用于最终提交前的验证）
   const validateIdentityInfo = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
@@ -897,63 +943,84 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   }, [name, appearance, age, useEventLocation, customLocation, remainingPoints]);
 
   // 提交表单
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // 验证身份信息
-    if (!validateIdentityInfo()) {
-      return;
-    }
-    
-    // 获取时间地点信息
-    let locationInfo: EventLocation;
-    if (useEventLocation && selectedEvent) {
-      locationInfo = {
-        year: selectedEvent.year,
-        month: selectedEvent.month,
-        day: selectedEvent.day,
-        ...(selectedEvent.hour !== undefined ? { hour: selectedEvent.hour } : {}),
-        location: selectedEvent.location,
-        eventName: selectedEvent.name,
-      };
-    } else {
-      locationInfo = {
-        year: customYear,
-        month: customMonth,
-        day: customDay,
-        location: customLocation,
-      };
-    }
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
 
-    // 获取出身信息
-    const origin = selectedOrigin === 'custom' ? customOrigin :
-      ORIGIN_OPTIONS.find(o => o.id === selectedOrigin)?.name || '';
+      // 验证身份信息
+      if (!validateIdentityInfo()) {
+        return;
+      }
 
-    // 获取出身自带的物品和功法
-    const selectedOriginData = ORIGIN_OPTIONS.find(o => o.id === selectedOrigin);
-    const originItems = selectedOriginData?.items;
-    const originMartialArts = selectedOriginData?.martial_arts;
+      // 获取时间地点信息
+      let locationInfo: EventLocation;
+      if (useEventLocation && selectedEvent) {
+        locationInfo = {
+          year: selectedEvent.year,
+          month: selectedEvent.month,
+          day: selectedEvent.day,
+          ...(selectedEvent.hour !== undefined ? { hour: selectedEvent.hour } : {}),
+          location: selectedEvent.location,
+          eventName: selectedEvent.name,
+        };
+      } else {
+        locationInfo = {
+          year: customYear,
+          month: customMonth,
+          day: customDay,
+          location: customLocation,
+        };
+      }
 
-    onSubmit({
-      name: name.trim(),
+      // 获取出身信息
+      const origin =
+        selectedOrigin === 'custom' ? customOrigin : ORIGIN_OPTIONS.find(o => o.id === selectedOrigin)?.name || '';
+
+      // 获取出身自带的物品和功法
+      const selectedOriginData = ORIGIN_OPTIONS.find(o => o.id === selectedOrigin);
+      const originItems = selectedOriginData?.items;
+      const originMartialArts = selectedOriginData?.martial_arts;
+
+      onSubmit({
+        name: name.trim(),
+        gender,
+        avatarRef: selectedAvatarRef,
+        appearance: appearance.trim(),
+        age,
+        locationInfo,
+        initialAttributes: attributes,
+        martialArtId: selectedMartialArts.length > 0 ? selectedMartialArts[0] : '',
+        selectedMartialArts: selectedMartialArts, // 新版：传递所有已选功法名称列表
+        selectedTraits: selectedTraits, // 传递选择的天赋列表
+        origin,
+        originId: selectedOrigin,
+        customRealm: selectedOrigin === 'custom' ? customRealm : undefined,
+        originItems, // 传递出身自带的物品
+        originMartialArts, // 传递出身自带的功法
+      });
+    },
+    [
+      name,
       gender,
-      avatarRef: selectedAvatarRef,
-      appearance: appearance.trim(),
+      selectedAvatarRef,
+      appearance,
       age,
-      locationInfo,
-      initialAttributes: attributes,
-      martialArtId: selectedMartialArts.length > 0 ? selectedMartialArts[0] : '',
-      selectedMartialArts: selectedMartialArts, // 新版：传递所有已选功法名称列表
-      selectedTraits: selectedTraits, // 传递选择的天赋列表
-      origin,
-      originId: selectedOrigin,
-      customRealm: selectedOrigin === 'custom' ? customRealm : undefined,
-      originItems, // 传递出身自带的物品
-      originMartialArts, // 传递出身自带的功法
-    });
-  }, [name, gender, selectedAvatarRef, appearance, age, useEventLocation, selectedEvent,
-      customYear, customMonth, customDay, customLocation, attributes,
-      selectedMartialArts, selectedTraits, selectedOrigin, customOrigin, customRealm, onSubmit, validateIdentityInfo]);
+      useEventLocation,
+      selectedEvent,
+      customYear,
+      customMonth,
+      customDay,
+      customLocation,
+      attributes,
+      selectedMartialArts,
+      selectedTraits,
+      selectedOrigin,
+      customOrigin,
+      customRealm,
+      onSubmit,
+      validateIdentityInfo,
+    ],
+  );
 
   // 随机生成外貌（包含身材描述）
   const randomAppearance = () => {
@@ -972,7 +1039,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   }, [selectedOrigin]);
 
   return (
-    <div className="setup-screen">
+    <div className="setup-screen" data-wuxia-automation="new-game-setup" data-wuxia-setup-step={currentStep}>
       {/* 通知消息 */}
       {notification && (
         <div className={`notification-toast ${notification.type}`}>
@@ -1009,7 +1076,9 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
           <div className={`step-line ${currentStepIndex >= 1 ? 'active' : ''}`} />
         </div>
         {/* 步骤2: 属性 */}
-        <div className={`step-item ${currentStep === 'attributes' ? 'active' : currentStepIndex > 1 ? 'completed' : ''}`}>
+        <div
+          className={`step-item ${currentStep === 'attributes' ? 'active' : currentStepIndex > 1 ? 'completed' : ''}`}
+        >
           <div className="step-number">{currentStepIndex > 1 ? '✓' : '二'}</div>
           <div className="step-label">属性</div>
         </div>
@@ -1058,7 +1127,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
           <span className="title-text">创建侠客</span>
           <span className="title-decoration right">』</span>
         </h2>
-        
+
         <form className="setup-form" onSubmit={handleSubmit}>
           {/* ============================================ */}
           {/* 步骤1: 天资选择 */}
@@ -1070,17 +1139,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <h3 className="section-title">
                   <span className="section-icon">✨</span>
                   选择天资
-                  <span className="points-badge">
-                    可用 {totalPoints} 点
-                  </span>
+                  <span className="points-badge">可用 {totalPoints} 点</span>
                 </h3>
-                <p className="section-desc">
-                  天资决定了你的起始点数，点数越多可分配到属性和天赋的资源就越丰富。
-                </p>
+                <p className="section-desc">天资决定了你的起始点数，点数越多可分配到属性和天赋的资源就越丰富。</p>
                 {errors.talent && <p className="error-text center">{errors.talent}</p>}
 
                 <div className="talent-grid">
-                  {TALENT_TIERS.map((tier) => (
+                  {TALENT_TIERS.map(tier => (
                     <div
                       key={tier.id}
                       className={`talent-card ${selectedTalentId === tier.id ? 'selected' : ''}`}
@@ -1110,12 +1175,16 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     已保存的角色
                     <span className="trait-count">{savedBuilds.length} 个</span>
                   </h3>
-                  <p className="section-desc">
-                    加载已保存的角色配置快速开始游戏，或删除不需要的存档。
-                  </p>
+                  <p className="section-desc">加载已保存的角色配置快速开始游戏，或删除不需要的存档。</p>
                   <div className="saved-builds-list">
-                    {savedBuilds.map((buildItem) => (
-                      <div key={buildItem.id} className="saved-build-item">
+                    {savedBuilds.map(buildItem => (
+                      <div
+                        key={buildItem.id}
+                        className="saved-build-item"
+                        data-wuxia-automation="saved-character-build"
+                        data-wuxia-build-id={buildItem.id}
+                        data-wuxia-build-name={buildItem.name}
+                      >
                         <div className="build-info">
                           <span className="build-name">{buildItem.name}</span>
                           {buildItem.note && (
@@ -1126,14 +1195,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           <span className="build-talent">
                             {TALENT_TIERS.find(t => t.id === buildItem.talentTier)?.name || buildItem.talentTier}
                           </span>
-                          <span className="build-date">
-                            {new Date(buildItem.createdAt).toLocaleDateString()}
-                          </span>
+                          <span className="build-date">{new Date(buildItem.createdAt).toLocaleDateString()}</span>
                         </div>
                         <div className="build-actions">
                           <button
                             type="button"
                             className="load-build-btn"
+                            data-wuxia-automation="load-character-build"
                             onClick={() => handleLoadBuild(buildItem)}
                             title="加载此存档"
                           >
@@ -1167,6 +1235,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="next-btn"
+                  data-wuxia-automation="setup-next-step"
                   onClick={handleNextStep}
                   disabled={isLoading || !canProceedToNext}
                 >
@@ -1188,92 +1257,90 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <h3 className="section-title">
                   <span className="section-icon">⚔️</span>
                   七维属性分配
-                  <span className={`points-badge ${remainingPoints === 0 ? 'complete' : remainingPoints < 0 ? 'error' : ''}`}>
+                  <span
+                    className={`points-badge ${remainingPoints === 0 ? 'complete' : remainingPoints < 0 ? 'error' : ''}`}
+                  >
                     剩余 {remainingPoints} 点
                   </span>
                 </h3>
-                <p className="section-desc">
-                  基础值为6，调高消耗点数，调低可获得点数。极端值会触发对应天赋。
-                </p>
+                <p className="section-desc">基础值为6，调高消耗点数，调低可获得点数。极端值会触发对应天赋。</p>
                 {errors.attributes && <p className="error-text center">{errors.attributes}</p>}
 
                 <div className="attributes-grid new-style">
-                  {(Object.keys(attributes) as Array<keyof InitialAttributes>).filter(key => key !== '福缘').map((key) => {
-                    // 获取当前属性触发的天赋
-                    const triggeredForAttr = attributeTriggeredTraits.filter(t =>
-                      t.attributeThreshold?.attribute === key
-                    );
-                    const attrCost = calculateAttributeCost(attributes[key]);
-                    
-                    return (
-                      <div key={key} className="attribute-card enhanced">
-                        <div className="attr-header">
-                          <span className="attr-name">
-                            {ATTRIBUTE_NAMES[key]}
-                          </span>
-                          <span className="attr-value">{attributes[key]}</span>
-                          <span className={`attr-cost ${attrCost > 0 ? 'positive' : attrCost < 0 ? 'negative' : ''}`}>
-                            {attrCost > 0 ? `+${attrCost}` : attrCost < 0 ? attrCost : '±0'}
-                          </span>
-                        </div>
-                        <p className="attr-desc">
-                          {ATTRIBUTE_DESCRIPTIONS[key]}
-                        </p>
-                        <div className="attr-controls">
-                          <button
-                            type="button"
-                            className="attr-btn minus"
-                            onClick={() => setAttributeValue(key, attributes[key] - 1)}
-                            disabled={attributes[key] <= MIN_ATTRIBUTE_VALUE}
-                          >
-                            −
-                          </button>
-                          <input
-                            type="range"
-                            className="attr-slider"
-                            min={MIN_ATTRIBUTE_VALUE}
-                            max={MAX_ATTRIBUTE_VALUE}
-                            value={attributes[key]}
-                            onChange={(e) => setAttributeValue(key, Number(e.target.value))}
-                            disabled={isLoading}
-                          />
-                          <button
-                            type="button"
-                            className="attr-btn plus"
-                            onClick={() => setAttributeValue(key, attributes[key] + 1)}
-                            disabled={attributes[key] >= MAX_ATTRIBUTE_VALUE}
-                          >
-                            +
-                          </button>
-                        </div>
-                        {/* 显示触发的天赋预览 */}
-                        {triggeredForAttr.length > 0 && (
-                          <div className="triggered-traits-preview">
-                            {triggeredForAttr.map(trait => (
-                              <span
-                                key={trait.name}
-                                className={`trait-tag ${getTraitType(trait) === '正面' ? 'positive' : 'negative'}`}
-                                title={trait.description}
-                              >
-                                {trait.name}
-                              </span>
-                            ))}
+                  {(Object.keys(attributes) as Array<keyof InitialAttributes>)
+                    .filter(key => key !== '福缘')
+                    .map(key => {
+                      // 获取当前属性触发的天赋
+                      const triggeredForAttr = attributeTriggeredTraits.filter(
+                        t => t.attributeThreshold?.attribute === key,
+                      );
+                      const attrCost = calculateAttributeCost(attributes[key]);
+
+                      return (
+                        <div key={key} className="attribute-card enhanced">
+                          <div className="attr-header">
+                            <span className="attr-name">{ATTRIBUTE_NAMES[key]}</span>
+                            <span className="attr-value">{attributes[key]}</span>
+                            <span className={`attr-cost ${attrCost > 0 ? 'positive' : attrCost < 0 ? 'negative' : ''}`}>
+                              {attrCost > 0 ? `+${attrCost}` : attrCost < 0 ? attrCost : '±0'}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          <p className="attr-desc">{ATTRIBUTE_DESCRIPTIONS[key]}</p>
+                          <div className="attr-controls">
+                            <button
+                              type="button"
+                              className="attr-btn minus"
+                              onClick={() => setAttributeValue(key, attributes[key] - 1)}
+                              disabled={attributes[key] <= MIN_ATTRIBUTE_VALUE}
+                            >
+                              −
+                            </button>
+                            <input
+                              type="range"
+                              className="attr-slider"
+                              min={MIN_ATTRIBUTE_VALUE}
+                              max={MAX_ATTRIBUTE_VALUE}
+                              value={attributes[key]}
+                              onChange={e => setAttributeValue(key, Number(e.target.value))}
+                              disabled={isLoading}
+                            />
+                            <button
+                              type="button"
+                              className="attr-btn plus"
+                              onClick={() => setAttributeValue(key, attributes[key] + 1)}
+                              disabled={attributes[key] >= MAX_ATTRIBUTE_VALUE}
+                            >
+                              +
+                            </button>
+                          </div>
+                          {/* 显示触发的天赋预览 */}
+                          {triggeredForAttr.length > 0 && (
+                            <div className="triggered-traits-preview">
+                              {triggeredForAttr.map(trait => (
+                                <span
+                                  key={trait.name}
+                                  className={`trait-tag ${getTraitType(trait) === '正面' ? 'positive' : 'negative'}`}
+                                  title={trait.description}
+                                >
+                                  {trait.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
 
                 {/* 福缘单独一行居中显示，使用和其他属性一样的卡片样式 */}
                 <div className="luck-row">
                   {(() => {
                     // 获取福缘触发的天赋
-                    const triggeredForLuck = attributeTriggeredTraits.filter(t =>
-                      t.attributeThreshold?.attribute === '福缘'
+                    const triggeredForLuck = attributeTriggeredTraits.filter(
+                      t => t.attributeThreshold?.attribute === '福缘',
                     );
                     const luckCost = calculateLuckAttributeCost(attributes.福缘);
-                    
+
                     return (
                       <div className="attribute-card enhanced luck-card">
                         <div className="attr-header">
@@ -1283,9 +1350,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                             {luckCost > 0 ? `+${luckCost}` : luckCost < 0 ? luckCost : '±0'}
                           </span>
                         </div>
-                        <p className="attr-desc">
-                          气运与造化，影响随机事件和奇遇概率
-                        </p>
+                        <p className="attr-desc">气运与造化，影响随机事件和奇遇概率</p>
                         <div className="attr-controls">
                           <button
                             type="button"
@@ -1301,7 +1366,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                             min={MIN_LUCK_VALUE}
                             max={MAX_LUCK_VALUE}
                             value={attributes.福缘}
-                            onChange={(e) => setAttributeValue('福缘', Number(e.target.value))}
+                            onChange={e => setAttributeValue('福缘', Number(e.target.value))}
                             disabled={isLoading}
                           />
                           <button
@@ -1340,12 +1405,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     <span className="section-icon">🔮</span>
                     属性触发天赋预览
                   </h3>
-                  <p className="section-desc">
-                    这些天赋由你的属性值自动触发，无法取消。
-                  </p>
+                  <p className="section-desc">这些天赋由你的属性值自动触发，无法取消。</p>
                   <div className="triggered-traits-list">
                     {attributeTriggeredTraits.map(trait => (
-                      <div key={trait.name} className={`trait-preview-card ${getTraitType(trait) === '正面' ? 'positive' : 'negative'}`}>
+                      <div
+                        key={trait.name}
+                        className={`trait-preview-card ${getTraitType(trait) === '正面' ? 'positive' : 'negative'}`}
+                      >
                         <div className="trait-header">
                           <span className="trait-name">{trait.name}</span>
                         </div>
@@ -1361,6 +1427,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="back-step-btn"
+                  data-wuxia-automation="setup-previous-step"
                   onClick={handlePrevStep}
                   disabled={isLoading}
                 >
@@ -1370,6 +1437,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="next-btn"
+                  data-wuxia-automation="setup-next-step"
                   onClick={handleNextStep}
                   disabled={isLoading || !canProceedToNext}
                 >
@@ -1393,13 +1461,14 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   已获得天赋
                   <span className="trait-count">{attributeTriggeredTraits.length} 个</span>
                 </h3>
-                <p className="section-desc">
-                  这些天赋由你的属性值自动触发，不可取消。
-                </p>
+                <p className="section-desc">这些天赋由你的属性值自动触发，不可取消。</p>
                 {attributeTriggeredTraits.length > 0 ? (
                   <div className="traits-grid locked">
                     {attributeTriggeredTraits.map(trait => (
-                      <div key={trait.name} className={`trait-card locked ${getTraitType(trait) === '正面' ? 'positive' : 'negative'}`}>
+                      <div
+                        key={trait.name}
+                        className={`trait-card locked ${getTraitType(trait) === '正面' ? 'positive' : 'negative'}`}
+                      >
                         <div className="trait-header">
                           <span className="trait-name">{trait.name}</span>
                         </div>
@@ -1425,15 +1494,22 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <p className="section-desc">
                   花费点数随机抽取天赋，正面池必得正面天赋，负面池必得负面天赋（免费但必须接受）。
                 </p>
-                
+
                 <div className="gacha-section trait-gacha">
                   <div className="gacha-pools trait-pools">
                     {/* 正面天赋抽卡 */}
-                    <div className={`gacha-pool positive ${remainingPoints < TRAIT_DRAW_COST.positive ? 'disabled' : ''}`}>
+                    <div
+                      className={`gacha-pool positive ${remainingPoints < TRAIT_DRAW_COST.positive ? 'disabled' : ''}`}
+                    >
                       <div className="pool-header">
                         <span className="pool-rank positive">正面天赋</span>
                         <span className="pool-count">
-                          {CHARACTER_TRAITS.filter(t => !t.attributeThreshold && (t.cost ?? 0) > 0 && !selectedTraits.includes(t.name)).length}种可抽
+                          {
+                            CHARACTER_TRAITS.filter(
+                              t => !t.attributeThreshold && (t.cost ?? 0) > 0 && !selectedTraits.includes(t.name),
+                            ).length
+                          }
+                          种可抽
                         </span>
                       </div>
                       <div className="pool-cost">
@@ -1445,7 +1521,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         disabled={remainingPoints < TRAIT_DRAW_COST.positive}
                         onClick={() => {
                           const availableTraits = CHARACTER_TRAITS.filter(
-                            t => !t.attributeThreshold && (t.cost ?? 0) > 0 && !selectedTraits.includes(t.name)
+                            t => !t.attributeThreshold && (t.cost ?? 0) > 0 && !selectedTraits.includes(t.name),
                           );
                           if (availableTraits.length === 0) {
                             showNotification('info', '没有可抽取的正面天赋了');
@@ -1456,19 +1532,27 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           setSelectedTraits(prev => [...prev, drawnTrait.name]);
                           setDrawnTraits(prev => [...prev, drawnTrait.name]); // 标记为抽卡获得，不可取消
                           setTraitDrawCostUsed(prev => prev + TRAIT_DRAW_COST.positive); // 记录抽卡费用
-                          showNotification('success', `🎉 抽中了「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.positive}点，不可取消）`);
+                          showNotification(
+                            'success',
+                            `🎉 抽中了「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.positive}点，不可取消）`,
+                          );
                         }}
                       >
                         🎲 抽取正面
                       </button>
                     </div>
-                    
+
                     {/* 负面天赋抽卡（免费） */}
                     <div className="gacha-pool negative">
                       <div className="pool-header">
                         <span className="pool-rank negative">负面天赋</span>
                         <span className="pool-count">
-                          {CHARACTER_TRAITS.filter(t => !t.attributeThreshold && (t.cost ?? 0) < 0 && !selectedTraits.includes(t.name)).length}种可抽
+                          {
+                            CHARACTER_TRAITS.filter(
+                              t => !t.attributeThreshold && (t.cost ?? 0) < 0 && !selectedTraits.includes(t.name),
+                            ).length
+                          }
+                          种可抽
                         </span>
                       </div>
                       <div className="pool-cost">
@@ -1479,7 +1563,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         className="gacha-btn negative-btn"
                         onClick={() => {
                           const availableTraits = CHARACTER_TRAITS.filter(
-                            t => !t.attributeThreshold && (t.cost ?? 0) < 0 && !selectedTraits.includes(t.name)
+                            t => !t.attributeThreshold && (t.cost ?? 0) < 0 && !selectedTraits.includes(t.name),
                           );
                           if (availableTraits.length === 0) {
                             showNotification('info', '没有可抽取的负面天赋了');
@@ -1491,19 +1575,26 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           setDrawnTraits(prev => [...prev, drawnTrait.name]); // 标记为抽卡获得，不可取消
                           // 负面天赋抽卡免费，但会获得该天赋的点数返还
                           setTraitDrawCostUsed(prev => prev + (drawnTrait.cost ?? 0)); // 负面天赋cost为负数，所以加上后相当于减去点数
-                          showNotification('info', `抽中了「${drawnTrait.name}」，获得 ${Math.abs(drawnTrait.cost ?? 0)} 点！（不可取消）`);
+                          showNotification(
+                            'info',
+                            `抽中了「${drawnTrait.name}」，获得 ${Math.abs(drawnTrait.cost ?? 0)} 点！（不可取消）`,
+                          );
                         }}
                       >
                         🎲 抽取负面
                       </button>
                     </div>
-                    
+
                     {/* 混合池抽卡 */}
                     <div className={`gacha-pool mixed ${remainingPoints < TRAIT_DRAW_COST.mixed ? 'disabled' : ''}`}>
                       <div className="pool-header">
                         <span className="pool-rank mixed">混合池</span>
                         <span className="pool-count">
-                          {CHARACTER_TRAITS.filter(t => !t.attributeThreshold && !selectedTraits.includes(t.name)).length}种可抽
+                          {
+                            CHARACTER_TRAITS.filter(t => !t.attributeThreshold && !selectedTraits.includes(t.name))
+                              .length
+                          }
+                          种可抽
                         </span>
                       </div>
                       <div className="pool-cost">
@@ -1515,7 +1606,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         disabled={remainingPoints < TRAIT_DRAW_COST.mixed}
                         onClick={() => {
                           const availableTraits = CHARACTER_TRAITS.filter(
-                            t => !t.attributeThreshold && !selectedTraits.includes(t.name)
+                            t => !t.attributeThreshold && !selectedTraits.includes(t.name),
                           );
                           if (availableTraits.length === 0) {
                             showNotification('info', '没有可抽取的天赋了');
@@ -1528,11 +1619,20 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           setTraitDrawCostUsed(prev => prev + TRAIT_DRAW_COST.mixed); // 记录抽卡费用
                           const traitCost = drawnTrait.cost ?? 0;
                           if (traitCost > 0) {
-                            showNotification('success', `🎉 抽中了正面天赋「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.mixed}点，不可取消）`);
+                            showNotification(
+                              'success',
+                              `🎉 抽中了正面天赋「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.mixed}点，不可取消）`,
+                            );
                           } else if (traitCost < 0) {
-                            showNotification('info', `抽中了负面天赋「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.mixed}点，不可取消）`);
+                            showNotification(
+                              'info',
+                              `抽中了负面天赋「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.mixed}点，不可取消）`,
+                            );
                           } else {
-                            showNotification('info', `抽中了中性天赋「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.mixed}点，不可取消）`);
+                            showNotification(
+                              'info',
+                              `抽中了中性天赋「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.mixed}点，不可取消）`,
+                            );
                           }
                         }}
                       >
@@ -1552,9 +1652,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     剩余 {remainingPoints} 点
                   </span>
                 </h3>
-                <p className="section-desc">
-                  正面天赋消耗点数，负面天赋返还点数。直接选择你想要的天赋。
-                </p>
+                <p className="section-desc">正面天赋消耗点数，负面天赋返还点数。直接选择你想要的天赋。</p>
                 {errors.traits && <p className="error-text center">{errors.traits}</p>}
 
                 {/* 搜索和筛选 */}
@@ -1565,7 +1663,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       className="trait-search"
                       placeholder="搜索天赋名称或描述..."
                       value={traitSearchQuery}
-                      onChange={(e) => setTraitSearchQuery(e.target.value)}
+                      onChange={e => setTraitSearchQuery(e.target.value)}
                     />
                     <span className="search-icon">🔍</span>
                   </div>
@@ -1574,13 +1672,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 {/* 天赋列表 - 添加独立滚动容器 */}
                 <div className="traits-scroll-container">
                   <div className="traits-grid selectable">
-                    {CHARACTER_TRAITS
-                      .filter(trait => !trait.attributeThreshold) // 排除属性触发型天赋
+                    {CHARACTER_TRAITS.filter(trait => !trait.attributeThreshold) // 排除属性触发型天赋
                       .filter(trait => {
                         if (!traitSearchQuery) return true;
                         const query = traitSearchQuery.toLowerCase();
-                        return trait.name.toLowerCase().includes(query) ||
-                               trait.description.toLowerCase().includes(query);
+                        return (
+                          trait.name.toLowerCase().includes(query) || trait.description.toLowerCase().includes(query)
+                        );
                       })
                       .map(trait => {
                         const isSelected = selectedTraits.includes(trait.name);
@@ -1588,7 +1686,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         const traitCost = trait.cost ?? 0;
                         const canAfford = traitCost <= 0 || remainingPoints >= traitCost || isSelected;
                         const traitType = getTraitType(trait);
-                        
+
                         return (
                           <div
                             key={trait.name}
@@ -1605,8 +1703,16 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           >
                             <div className="trait-header">
                               <span className="trait-name">{trait.name}</span>
-                              <span className={`trait-cost ${isDrawn ? 'drawn' : traitCost > 0 ? 'cost' : traitCost < 0 ? 'gain' : ''}`}>
-                                {isDrawn ? '已抽取' : traitCost > 0 ? `-${traitCost}` : traitCost < 0 ? `+${Math.abs(traitCost)}` : '0'}
+                              <span
+                                className={`trait-cost ${isDrawn ? 'drawn' : traitCost > 0 ? 'cost' : traitCost < 0 ? 'gain' : ''}`}
+                              >
+                                {isDrawn
+                                  ? '已抽取'
+                                  : traitCost > 0
+                                    ? `-${traitCost}`
+                                    : traitCost < 0
+                                      ? `+${Math.abs(traitCost)}`
+                                      : '0'}
                               </span>
                             </div>
                             <p className="trait-desc">{trait.description}</p>
@@ -1629,10 +1735,8 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   自定义天赋
                   <span className="trait-count">{customTraits.length} 个已保存</span>
                 </h3>
-                <p className="section-desc">
-                  创建自定义天赋，设置名称、描述和点数消耗。正数消耗点数，负数返还点数。
-                </p>
-                
+                <p className="section-desc">创建自定义天赋，设置名称、描述和点数消耗。正数消耗点数，负数返还点数。</p>
+
                 {/* 已保存的自定义天赋列表 */}
                 {customTraits.length > 0 && (
                   <div className="custom-traits-list">
@@ -1642,7 +1746,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         const isSelected = selectedTraits.includes(trait.name);
                         const canAfford = trait.cost <= 0 || remainingPoints >= trait.cost || isSelected;
                         const traitType = trait.cost > 0 ? '正面' : trait.cost < 0 ? '负面' : '中性';
-                        
+
                         return (
                           <div
                             key={trait.id}
@@ -1671,7 +1775,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                             <button
                               type="button"
                               className="delete-custom-trait-btn"
-                              onClick={(e) => {
+                              onClick={e => {
                                 e.stopPropagation();
                                 handleDeleteCustomTrait(trait.id, trait.name);
                               }}
@@ -1685,7 +1789,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     </div>
                   </div>
                 )}
-                
+
                 {/* 添加自定义天赋表单 */}
                 {showCustomTraitForm ? (
                   <div className="custom-trait-form">
@@ -1698,7 +1802,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                             type="text"
                             className="form-input"
                             value={newCustomTraitName}
-                            onChange={(e) => setNewCustomTraitName(e.target.value)}
+                            onChange={e => setNewCustomTraitName(e.target.value)}
                             placeholder="例如：少林弟子"
                             maxLength={10}
                           />
@@ -1719,7 +1823,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                             type="number"
                             className="form-input cost-input"
                             value={newCustomTraitCost}
-                            onChange={(e) => setNewCustomTraitCost(Number(e.target.value))}
+                            onChange={e => setNewCustomTraitCost(Number(e.target.value))}
                           />
                           <button
                             type="button"
@@ -1730,8 +1834,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           </button>
                         </div>
                         <span className="cost-hint">
-                          {newCustomTraitCost > 0 ? `消耗 ${newCustomTraitCost} 点` :
-                           newCustomTraitCost < 0 ? `返还 ${Math.abs(newCustomTraitCost)} 点` : '不消耗点数'}
+                          {newCustomTraitCost > 0
+                            ? `消耗 ${newCustomTraitCost} 点`
+                            : newCustomTraitCost < 0
+                              ? `返还 ${Math.abs(newCustomTraitCost)} 点`
+                              : '不消耗点数'}
                         </span>
                       </div>
                     </div>
@@ -1741,7 +1848,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         <textarea
                           className="form-textarea"
                           value={newCustomTraitDesc}
-                          onChange={(e) => setNewCustomTraitDesc(e.target.value)}
+                          onChange={e => setNewCustomTraitDesc(e.target.value)}
                           placeholder="描述这个天赋的效果和背景..."
                           rows={2}
                         />
@@ -1761,26 +1868,18 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       >
                         取消
                       </button>
-                      <button
-                        type="button"
-                        className="save-trait-btn"
-                        onClick={handleAddCustomTrait}
-                      >
+                      <button type="button" className="save-trait-btn" onClick={handleAddCustomTrait}>
                         保存天赋
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    className="add-custom-trait-btn"
-                    onClick={() => setShowCustomTraitForm(true)}
-                  >
+                  <button type="button" className="add-custom-trait-btn" onClick={() => setShowCustomTraitForm(true)}>
                     <span className="btn-icon">+</span>
                     <span className="btn-text">添加自定义天赋</span>
                   </button>
                 )}
-                
+
                 {/* 旧版自定义天赋描述输入 - 保留用于 AI 解析 */}
                 <div className="custom-trait-input">
                   <h4 className="subsection-title">自由描述（可选）</h4>
@@ -1789,7 +1888,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     <textarea
                       className="form-textarea"
                       value={customTraitInput}
-                      onChange={(e) => setCustomTraitInput(e.target.value)}
+                      onChange={e => setCustomTraitInput(e.target.value)}
                       placeholder="例如：我曾经在少林寺学过三年武功..."
                       rows={2}
                       disabled={isLoading}
@@ -1804,6 +1903,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="back-step-btn"
+                  data-wuxia-automation="setup-previous-step"
                   onClick={handlePrevStep}
                   disabled={isLoading}
                 >
@@ -1813,6 +1913,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="next-btn"
+                  data-wuxia-automation="setup-next-step"
                   onClick={handleNextStep}
                   disabled={isLoading || !canProceedToNext}
                 >
@@ -1838,10 +1939,8 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     剩余 {remainingPoints} 点
                   </span>
                 </h3>
-                <p className="section-desc">
-                  花费点数随机抽取武功，费用比直接选择更低。抽中的武功必须接受！
-                </p>
-                
+                <p className="section-desc">花费点数随机抽取武功，费用比直接选择更低。抽中的武功必须接受！</p>
+
                 <div className="gacha-section">
                   <div className="gacha-pools">
                     {/* 武功混合池抽卡（统一费用，随机抽取任意品阶） */}
@@ -1859,9 +1958,14 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       <button
                         type="button"
                         className="gacha-btn mixed-btn"
-                        disabled={remainingPoints < MARTIAL_ARTS_DRAW_COST || martialArtsDatabase.filter(a => !selectedMartialArts.includes(a.功法名称)).length === 0}
+                        disabled={
+                          remainingPoints < MARTIAL_ARTS_DRAW_COST ||
+                          martialArtsDatabase.filter(a => !selectedMartialArts.includes(a.功法名称)).length === 0
+                        }
                         onClick={() => {
-                          const availableArts = martialArtsDatabase.filter(a => !selectedMartialArts.includes(a.功法名称));
+                          const availableArts = martialArtsDatabase.filter(
+                            a => !selectedMartialArts.includes(a.功法名称),
+                          );
                           if (availableArts.length === 0) {
                             showNotification('info', '没有可抽取的武功了');
                             return;
@@ -1872,7 +1976,10 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           setSelectedMartialArts(prev => [...prev, drawnArt.功法名称]);
                           setDrawnMartialArts(prev => [...prev, drawnArt.功法名称]); // 标记为抽卡获得，不可取消
                           setMartialArtsDrawCostUsed(prev => prev + MARTIAL_ARTS_DRAW_COST); // 记录抽卡费用
-                          showNotification('success', `🎉 抽中了「${drawnArt.功法名称}」（${drawnArt.功法品阶}）！（消耗${MARTIAL_ARTS_DRAW_COST}点，不可取消）`);
+                          showNotification(
+                            'success',
+                            `🎉 抽中了「${drawnArt.功法名称}」（${drawnArt.功法品阶}）！（消耗${MARTIAL_ARTS_DRAW_COST}点，不可取消）`,
+                          );
                         }}
                       >
                         🎲 随机抽取武功
@@ -1891,9 +1998,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     剩余 {remainingPoints} 点
                   </span>
                 </h3>
-                <p className="section-desc">
-                  直接选择武功，费用较高但可以精确选择。
-                </p>
+                <p className="section-desc">直接选择武功，费用较高但可以精确选择。</p>
                 {errors.martial && <p className="error-text center">{errors.martial}</p>}
 
                 {/* 筛选和搜索 */}
@@ -1923,7 +2028,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       className="martial-search"
                       placeholder="搜索武功名称..."
                       value={martialArtsSearch}
-                      onChange={(e) => setMartialArtsSearch(e.target.value)}
+                      onChange={e => setMartialArtsSearch(e.target.value)}
                     />
                     <span className="search-icon">🔍</span>
                   </div>
@@ -1946,7 +2051,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           const isDrawn = drawnMartialArts.includes(art.功法名称); // 是否通过抽卡获得
                           const cost = RANK_POINT_COST[art.功法品阶];
                           const canAfford = remainingPoints >= cost || isSelected;
-                          
+
                           return (
                             <div
                               key={art.功法名称}
@@ -2000,7 +2105,9 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           <span className="martial-name">{artName}</span>
                           <span className={`martial-rank rank-${art?.功法品阶}`}>{art?.功法品阶}</span>
                           {isDrawn ? (
-                            <span className="lock-icon" title="抽卡获得，不可移除">🔒</span>
+                            <span className="lock-icon" title="抽卡获得，不可移除">
+                              🔒
+                            </span>
                           ) : (
                             <button
                               type="button"
@@ -2025,6 +2132,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="back-step-btn"
+                  data-wuxia-automation="setup-previous-step"
                   onClick={handlePrevStep}
                   disabled={isLoading}
                 >
@@ -2034,6 +2142,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="next-btn"
+                  data-wuxia-automation="setup-next-step"
                   onClick={handleNextStep}
                   disabled={isLoading}
                 >
@@ -2061,9 +2170,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     </span>
                   )}
                 </h3>
-                <p className="section-desc">
-                  出身决定了你的初始身份、背景故事和起始境界。不同出身对应不同的武学起点。
-                </p>
+                <p className="section-desc">出身决定了你的初始身份、背景故事和起始境界。不同出身对应不同的武学起点。</p>
                 {errors.origin && <p className="error-text center">{errors.origin}</p>}
 
                 {/* 出身类别筛选 */}
@@ -2090,59 +2197,57 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 {/* 出身列表 - 按类别分组显示 */}
                 <div className="origin-scroll-container">
                   <div className="origin-grid">
-                    {ORIGIN_OPTIONS
-                      .filter(origin => originCategoryFilter === 'all' || origin.category === originCategoryFilter)
-                      .map(origin => (
-                        <div
-                          key={origin.id}
-                          className={`origin-card ${selectedOrigin === origin.id ? 'selected' : ''} category-${origin.category}`}
-                          onClick={() => setSelectedOrigin(origin.id)}
-                        >
-                          <div className="origin-header">
-                            <span className="origin-icon">{origin.icon}</span>
-                            <span className="origin-name">{origin.name}</span>
-                          </div>
-                          <span className={`origin-realm realm-${realmMajor(origin.realm)}`}>
-                            {origin.realm}
-                          </span>
-                          <p className="origin-desc">{origin.description}</p>
-
-                          {/* 显示出身自带的功法 */}
-                          {origin.martial_arts && origin.martial_arts.length > 0 && (
-                            <div className="origin-bonuses">
-                              <div className="bonus-label">🥋 初始功法:</div>
-                              <div className="bonus-items">
-                                {origin.martial_arts.map((art, idx) => (
-                                  <span key={idx} className="bonus-item martial-art">
-                                    {art.name} ({art.mastery})
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 显示出身自带的物品 */}
-                          {origin.items && Object.keys(origin.items).length > 0 && (
-                            <div className="origin-bonuses">
-                              <div className="bonus-label">🎒 初始物品:</div>
-                              <div className="bonus-items">
-                                {Object.entries(origin.items).map(([itemName, itemInfo]) => (
-                                  <span key={itemName} className="bonus-item item">
-                                    {itemName} x{itemInfo.数量}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          <span className="origin-category-tag">{origin.category}</span>
-                          {selectedOrigin === origin.id && (
-                            <div className="selected-indicator">
-                              <span>✓</span>
-                            </div>
-                          )}
+                    {ORIGIN_OPTIONS.filter(
+                      origin => originCategoryFilter === 'all' || origin.category === originCategoryFilter,
+                    ).map(origin => (
+                      <div
+                        key={origin.id}
+                        className={`origin-card ${selectedOrigin === origin.id ? 'selected' : ''} category-${origin.category}`}
+                        onClick={() => setSelectedOrigin(origin.id)}
+                      >
+                        <div className="origin-header">
+                          <span className="origin-icon">{origin.icon}</span>
+                          <span className="origin-name">{origin.name}</span>
                         </div>
-                      ))}
+                        <span className={`origin-realm realm-${realmMajor(origin.realm)}`}>{origin.realm}</span>
+                        <p className="origin-desc">{origin.description}</p>
+
+                        {/* 显示出身自带的功法 */}
+                        {origin.martial_arts && origin.martial_arts.length > 0 && (
+                          <div className="origin-bonuses">
+                            <div className="bonus-label">🥋 初始功法:</div>
+                            <div className="bonus-items">
+                              {origin.martial_arts.map((art, idx) => (
+                                <span key={idx} className="bonus-item martial-art">
+                                  {art.name} ({art.mastery})
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 显示出身自带的物品 */}
+                        {origin.items && Object.keys(origin.items).length > 0 && (
+                          <div className="origin-bonuses">
+                            <div className="bonus-label">🎒 初始物品:</div>
+                            <div className="bonus-items">
+                              {Object.entries(origin.items).map(([itemName, itemInfo]) => (
+                                <span key={itemName} className="bonus-item item">
+                                  {itemName} x{itemInfo.数量}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <span className="origin-category-tag">{origin.category}</span>
+                        {selectedOrigin === origin.id && (
+                          <div className="selected-indicator">
+                            <span>✓</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -2150,7 +2255,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 {selectedOrigin === 'custom' && (
                   <div className="custom-origin-section">
                     <h4 className="subsection-title">自定义出身设置</h4>
-                    
+
                     {/* 自定义境界选择 */}
                     <div className="form-group">
                       <label className="form-label">起始境界</label>
@@ -2167,10 +2272,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         ))}
                       </div>
                       <p className="realm-hint">
-                        当前选择: <strong>{customRealm}</strong> (修为值: {getOriginRealmAndCultivation('custom').cultivation})
+                        当前选择: <strong>{customRealm}</strong> (修为值:{' '}
+                        {getOriginRealmAndCultivation('custom').cultivation})
                       </p>
                     </div>
-                    
+
                     {/* 自定义出身描述 */}
                     <div className="form-group">
                       <label className="form-label">出身背景描述</label>
@@ -2178,7 +2284,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         <textarea
                           className="form-textarea"
                           value={customOrigin}
-                          onChange={(e) => setCustomOrigin(e.target.value)}
+                          onChange={e => setCustomOrigin(e.target.value)}
                           placeholder="描述你的出身背景，例如：曾是某大派的弃徒，因故流落江湖..."
                           rows={3}
                           disabled={isLoading}
@@ -2196,25 +2302,15 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   <span className="section-icon">📍</span>
                   开局时间地点
                 </h3>
-                <p className="section-desc">
-                  选择故事开始的时间和地点。
-                </p>
+                <p className="section-desc">选择故事开始的时间和地点。</p>
 
                 <div className="location-toggle">
                   <label className="toggle-option">
-                    <input
-                      type="radio"
-                      checked={useEventLocation}
-                      onChange={() => setUseEventLocation(true)}
-                    />
+                    <input type="radio" checked={useEventLocation} onChange={() => setUseEventLocation(true)} />
                     <span>选择预设事件</span>
                   </label>
                   <label className="toggle-option">
-                    <input
-                      type="radio"
-                      checked={!useEventLocation}
-                      onChange={() => setUseEventLocation(false)}
-                    />
+                    <input type="radio" checked={!useEventLocation} onChange={() => setUseEventLocation(false)} />
                     <span>自定义时间地点</span>
                   </label>
                 </div>
@@ -2226,50 +2322,59 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       <input
                         type="text"
                         className="event-search"
+                        data-wuxia-automation="opening-event-search"
                         placeholder="搜索事件名称或地点..."
                         value={eventSearchQuery}
-                        onChange={(e) => setEventSearchQuery(e.target.value)}
+                        onChange={e => setEventSearchQuery(e.target.value)}
                       />
                       <span className="search-icon">🔍</span>
                       {eventSearchQuery && (
                         <span className="search-result-count">
-                          找到 {STORY_EVENTS.filter(event => {
-                            const query = eventSearchQuery.toLowerCase();
-                            return event.name.toLowerCase().includes(query) ||
-                                   event.location.toLowerCase().includes(query);
-                          }).length} 个事件
+                          找到{' '}
+                          {
+                            STORY_EVENTS.filter(event => {
+                              const query = eventSearchQuery.toLowerCase();
+                              return (
+                                event.name.toLowerCase().includes(query) || event.location.toLowerCase().includes(query)
+                              );
+                            }).length
+                          }{' '}
+                          个事件
                         </span>
                       )}
                     </div>
                     {/* 事件列表滚动容器 */}
                     <div className="event-scroll-container">
                       <div className="event-select">
-                        {STORY_EVENTS
-                          .filter(event => {
-                            if (!eventSearchQuery) return true;
-                            const query = eventSearchQuery.toLowerCase();
-                            return event.name.toLowerCase().includes(query) ||
-                                   event.location.toLowerCase().includes(query);
-                          })
-                          .map(event => (
-                            <div
-                              key={event.id}
-                              className={`event-card ${selectedEventId === event.id ? 'selected' : ''}`}
-                              onClick={() => setSelectedEventId(event.id)}
-                            >
-                              <span className="event-name">{event.name}</span>
-                              <span className="event-time">
-                                {event.year}年{event.month}月{event.day}日
-                                {event.hour !== undefined ? `${event.hour}时00分` : '11时00分'}
-                              </span>
-                              <span className="event-location">{event.location}</span>
-                              {selectedEventId === event.id && (
-                                <div className="selected-indicator">
-                                  <span>✓</span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                        {STORY_EVENTS.filter(event => {
+                          if (!eventSearchQuery) return true;
+                          const query = eventSearchQuery.toLowerCase();
+                          return (
+                            event.name.toLowerCase().includes(query) || event.location.toLowerCase().includes(query)
+                          );
+                        }).map(event => (
+                          <div
+                            key={event.id}
+                            className={`event-card ${selectedEventId === event.id ? 'selected' : ''}`}
+                            data-wuxia-automation="opening-event"
+                            data-wuxia-event-id={event.id}
+                            data-wuxia-event-name={event.name}
+                            data-wuxia-event-selected={selectedEventId === event.id ? 'true' : 'false'}
+                            onClick={() => setSelectedEventId(event.id)}
+                          >
+                            <span className="event-name">{event.name}</span>
+                            <span className="event-time">
+                              {event.year}年{event.month}月{event.day}日
+                              {event.hour !== undefined ? `${event.hour}时00分` : '11时00分'}
+                            </span>
+                            <span className="event-location">{event.location}</span>
+                            {selectedEventId === event.id && (
+                              <div className="selected-indicator">
+                                <span>✓</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -2282,7 +2387,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           type="number"
                           className="form-input"
                           value={customYear}
-                          onChange={(e) => setCustomYear(Number(e.target.value))}
+                          onChange={e => setCustomYear(Number(e.target.value))}
                           min={1000}
                           max={2000}
                         />
@@ -2293,7 +2398,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           type="number"
                           className="form-input"
                           value={customMonth}
-                          onChange={(e) => setCustomMonth(Number(e.target.value))}
+                          onChange={e => setCustomMonth(Number(e.target.value))}
                           min={1}
                           max={12}
                         />
@@ -2304,7 +2409,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           type="number"
                           className="form-input"
                           value={customDay}
-                          onChange={(e) => setCustomDay(Number(e.target.value))}
+                          onChange={e => setCustomDay(Number(e.target.value))}
                           min={1}
                           max={30}
                         />
@@ -2316,7 +2421,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         type="text"
                         className="form-input"
                         value={customLocation}
-                        onChange={(e) => setCustomLocation(e.target.value)}
+                        onChange={e => setCustomLocation(e.target.value)}
                         placeholder="例如：大宋/临安府/西湖"
                       />
                       {errors.location && <p className="error-text">{errors.location}</p>}
@@ -2330,6 +2435,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="back-step-btn"
+                  data-wuxia-automation="setup-previous-step"
                   onClick={handlePrevStep}
                   disabled={isLoading}
                 >
@@ -2339,6 +2445,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="next-btn"
+                  data-wuxia-automation="setup-next-step"
                   onClick={handleNextStep}
                   disabled={isLoading}
                 >
@@ -2361,9 +2468,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   <span className="section-icon">👤</span>
                   侠客身份
                 </h3>
-                <p className="section-desc">
-                  设置你的侠客名号和基础信息。
-                </p>
+                <p className="section-desc">设置你的侠客名号和基础信息。</p>
 
                 <div className="identity-form">
                   <div className="form-row">
@@ -2374,7 +2479,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           type="text"
                           className="form-input"
                           value={name}
-                          onChange={(e) => setName(e.target.value)}
+                          onChange={e => setName(e.target.value)}
                           placeholder="请输入名号..."
                           maxLength={10}
                         />
@@ -2407,7 +2512,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         type="number"
                         className="form-input"
                         value={age}
-                        onChange={(e) => setAge(Number(e.target.value))}
+                        onChange={e => setAge(Number(e.target.value))}
                         min={10}
                         max={100}
                       />
@@ -2459,13 +2564,10 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           );
                         })}
 
-                        <label className={`setup-avatar-choice upload ${selectedAvatarSource.source === 'custom' ? 'is-selected' : ''}`}>
-                          <input
-                            ref={avatarFileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handleAvatarUpload}
-                          />
+                        <label
+                          className={`setup-avatar-choice upload ${selectedAvatarSource.source === 'custom' ? 'is-selected' : ''}`}
+                        >
+                          <input ref={avatarFileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} />
                           <span className="setup-avatar-upload-mark">+</span>
                           <span>上传头像</span>
                         </label>
@@ -2476,24 +2578,22 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   <div className="form-group">
                     <label className="form-label">
                       外貌描述
-                      <span className="label-hint">（基于风姿{attributes.风姿}、臂力{attributes.臂力}和根骨{attributes.根骨}生成）</span>
+                      <span className="label-hint">
+                        （基于风姿{attributes.风姿}、臂力{attributes.臂力}和根骨{attributes.根骨}生成）
+                      </span>
                     </label>
                     <div className="input-with-btn">
                       <div className="input-wrapper">
                         <textarea
                           className="form-textarea"
                           value={appearance}
-                          onChange={(e) => setAppearance(e.target.value)}
+                          onChange={e => setAppearance(e.target.value)}
                           placeholder="描述你的外貌和身材特征..."
                           rows={3}
                         />
                         <div className="input-glow" />
                       </div>
-                      <button
-                        type="button"
-                        className="random-btn"
-                        onClick={randomAppearance}
-                      >
+                      <button type="button" className="random-btn" onClick={randomAppearance}>
                         🎲 随机
                       </button>
                     </div>
@@ -2507,6 +2607,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="back-step-btn"
+                  data-wuxia-automation="setup-previous-step"
                   onClick={handlePrevStep}
                   disabled={isLoading}
                 >
@@ -2516,6 +2617,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="next-btn"
+                  data-wuxia-automation="setup-next-step"
                   onClick={handleNextStep}
                   disabled={isLoading}
                 >
@@ -2538,9 +2640,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   <span className="section-icon">📋</span>
                   角色预览
                 </h3>
-                <p className="section-desc">
-                  确认你的角色信息，一切准备就绪后踏入江湖！
-                </p>
+                <p className="section-desc">确认你的角色信息，一切准备就绪后踏入江湖！</p>
 
                 <div className="character-preview">
                   {/* 基础信息 */}
@@ -2589,7 +2689,9 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     <h4 className="preview-title">七维属性</h4>
                     <div className="preview-attributes">
                       {(Object.keys(ATTRIBUTE_NAMES) as Array<keyof InitialAttributes>).map(key => (
-                        <span key={key}>{ATTRIBUTE_NAMES[key]} {attributes[key]}</span>
+                        <span key={key}>
+                          {ATTRIBUTE_NAMES[key]} {attributes[key]}
+                        </span>
                       ))}
                     </div>
                   </div>
@@ -2599,14 +2701,20 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     <h4 className="preview-title">天赋 ({attributeTriggeredTraits.length + selectedTraits.length})</h4>
                     <div className="preview-traits">
                       {attributeTriggeredTraits.map(t => (
-                        <span key={t.name} className={`trait-badge ${getTraitType(t) === '正面' ? 'positive' : 'negative'}`}>
+                        <span
+                          key={t.name}
+                          className={`trait-badge ${getTraitType(t) === '正面' ? 'positive' : 'negative'}`}
+                        >
                           {t.name}
                         </span>
                       ))}
                       {selectedTraits.map(traitName => {
                         const trait = CHARACTER_TRAITS.find(t => t.name === traitName);
                         return trait ? (
-                          <span key={traitName} className={`trait-badge ${getTraitType(trait) === '正面' ? 'positive' : 'negative'}`}>
+                          <span
+                            key={traitName}
+                            className={`trait-badge ${getTraitType(trait) === '正面' ? 'positive' : 'negative'}`}
+                          >
                             {trait.name}
                           </span>
                         ) : null;
@@ -2620,7 +2728,9 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     <div className="preview-martial">
                       {selectedMartialArts.length > 0 ? (
                         selectedMartialArts.map(name => (
-                          <span key={name} className="martial-badge">{name}</span>
+                          <span key={name} className="martial-badge">
+                            {name}
+                          </span>
                         ))
                       ) : (
                         <span className="empty-hint">未选择武功</span>
@@ -2640,7 +2750,9 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       </div>
                       <div className="preview-item">
                         <span className="preview-label">起始境界</span>
-                        <span className={`preview-value realm-badge realm-${realmMajor(selectedOrigin === 'custom' ? customRealm : selectedOriginDetails?.realm || '不入流')}`}>
+                        <span
+                          className={`preview-value realm-badge realm-${realmMajor(selectedOrigin === 'custom' ? customRealm : selectedOriginDetails?.realm || '不入流')}`}
+                        >
                           {selectedOrigin === 'custom' ? customRealm : selectedOriginDetails?.realm}
                         </span>
                       </div>
@@ -2682,24 +2794,21 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 <button
                   type="button"
                   className="back-step-btn"
+                  data-wuxia-automation="setup-previous-step"
                   onClick={handlePrevStep}
                   disabled={isLoading}
                 >
                   <span className="btn-arrow">←</span>
                   <span className="btn-text">上一步</span>
                 </button>
-                <button
-                  type="button"
-                  className="save-btn"
-                  onClick={handleSaveBuild}
-                  disabled={isLoading}
-                >
+                <button type="button" className="save-btn" onClick={handleSaveBuild} disabled={isLoading}>
                   <span className="btn-icon">💾</span>
                   <span className="btn-text">保存存档</span>
                 </button>
                 <button
                   type="submit"
                   className="submit-btn"
+                  data-wuxia-automation="submit-new-game"
                   disabled={isLoading || !name.trim()}
                 >
                   <span className="btn-text">{isLoading ? '正在创建...' : '踏入江湖'}</span>

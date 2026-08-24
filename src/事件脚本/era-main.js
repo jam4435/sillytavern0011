@@ -26,7 +26,7 @@
   const { loadEventDefinitions, loadEventDefinitionsFromWorldbook, loadEventManifest, loadEventCheckpointAtOrBefore } =
     await import('./era-event-loader.js');
   const { isTimeForEvent, isEventDiscoverable, isTimeAfterEventEnd } = await import('./era-event-checker.js');
-  const { isPureTimeTrigger } = await import('./era-event-schema.js');
+  const { getSingleConditionTimeAnchor, isPureTimeTrigger } = await import('./era-event-schema.js');
   const {
     initializeEventList,
     batchStartEvents,
@@ -47,7 +47,8 @@
   const { buildFollowupCounterPlan, createSerialTaskQueue } = await import('./era-turn-queue.js');
   const { buildRelativeEventRebasePlan, getManifestEventCandidateKeys, sortUnstartedEventsByTrigger } =
     await import('./era-event-scheduler.js');
-  const { writeDirectAssign, writeEraTransaction } = await import('./era-write-helper.js');
+  const { writeDirectAssign, writeDirectInsert, writeDirectUpdate, writeEraTransaction } =
+    await import('./era-write-helper.js');
   const { initializeEventNotificationBridge, notifyEvent } = await import('./era-notifications.js');
   const { readHistoryCheckoutJournal, isHistoryCheckoutJournalExpired } =
     await import('../shared/historyCheckoutJournal');
@@ -581,6 +582,7 @@
     log(`玩家位置: ${playerLocation}`);
 
     const 附近传闻 = {};
+    const 可发现事件 = {};
     const eventsToJoin = [];
 
     const activeEvents = new Set(进行中列表);
@@ -595,8 +597,16 @@
       const hookText = typeof eventData.事件引子 === 'string' ? eventData.事件引子.trim() : '';
       const rumorScope = getRumorScopeFromEventLocation(eventLocation);
       const alreadyJoined = hasParticipationEntry(最新参与事件, eventName);
+      const isActive = activeEvents.has(eventName);
+      const eventStartTime = getSingleConditionTimeAnchor(eventData.触发条件) || eventData.触发条件;
 
       log(`事件 ${eventName} 地点: ${eventLocation} | 已参与: ${alreadyJoined}`);
+
+      // 进入提前十天弹性窗口的未发生事件会成为全域江湖风闻，供前端事簿展示和导航。
+      // 这里只公开事件引子、开始时间与地点；事件概要和结局仍不向玩家泄露。
+      if (!isActive && hookText && !alreadyJoined && eventLocation) {
+        可发现事件[eventName] = `${hookText} [${formatDate(eventStartTime)}/${eventLocation}]`;
+      }
 
       // 层级式地点匹配
       if (playerLocation && eventLocation) {
@@ -607,16 +617,15 @@
           !alreadyJoined &&
           !isSameLocationScope(eventLocation, playerLocation)
         ) {
-          const time = eventData.触发条件;
           const location = eventData.事件地点;
-          const timeString = formatDate(time);
+          const timeString = formatDate(eventStartTime);
 
           附近传闻[eventName] = `${hookText} [${timeString}/${location}]`;
           log(`发现传闻: ${eventName}`);
         }
 
         // 事件系统只比较前三段严格活动区。
-        if (activeEvents.has(eventName) && isSameLocationScope(eventLocation, playerLocation) && !alreadyJoined) {
+        if (isActive && isSameLocationScope(eventLocation, playerLocation) && !alreadyJoined) {
           logSuccess(`玩家到达事件地点: ${eventName}`);
           eventsToJoin.push(eventName);
         }
@@ -627,15 +636,28 @@
       await playerJoinsEvents(eventsToJoin, eventDefinitions);
     }
 
-    // 循环结束后，检查传闻是否有变化，仅在有变化时写入
+    // 循环结束后刷新本地传闻与前端只读的全域预告；两者语义和提示词可见性保持分离。
     const existingRumors = updatedVariables?.stat_data?.附近传闻 || {};
+    const frontendVariables = updatedVariables?.stat_data?.前端变量 || {};
+    const existingDiscoverableEvents = frontendVariables.可发现事件 || {};
     if (JSON.stringify(existingRumors) !== JSON.stringify(附近传闻)) {
-      logSuccess('附近传闻发生变化，正在更新...');
-      const updatePayload = { 附近传闻: 附近传闻 };
-      await writeDirectAssign(updatePayload, 'update-nearby-rumors');
+      await writeDirectAssign({ 附近传闻 }, 'update-nearby-rumors');
       logSuccess(`✅ 已更新附近传闻，现有 ${Object.keys(附近传闻).length} 条`);
-    } else {
-      log('附近传闻无变化，跳过写入');
+    }
+    if (JSON.stringify(existingDiscoverableEvents) !== JSON.stringify(可发现事件)) {
+      const previewPatch = { 前端变量: { 可发现事件 } };
+      if (Object.prototype.hasOwnProperty.call(frontendVariables, '可发现事件')) {
+        await writeDirectUpdate(previewPatch, 'update-discoverable-events');
+      } else {
+        await writeDirectInsert(previewPatch, 'initialize-discoverable-events');
+      }
+      logSuccess(`✅ 已更新全域事件预告，现有 ${Object.keys(可发现事件).length} 条`);
+    }
+    if (
+      JSON.stringify(existingRumors) === JSON.stringify(附近传闻) &&
+      JSON.stringify(existingDiscoverableEvents) === JSON.stringify(可发现事件)
+    ) {
+      log('事件传闻无变化，跳过写入');
     }
 
     debugGroupEnd();
@@ -768,6 +790,7 @@
       事件分支结果: variables?.stat_data?.事件分支结果 || {},
       后续事件线索: variables?.stat_data?.后续事件线索 || {},
       后续事件线索计数: variables?.stat_data?.后续事件线索计数 || {},
+      可发现事件: variables?.stat_data?.前端变量?.可发现事件 || {},
       角色数据: variables?.stat_data?.角色数据 || {},
     });
   }

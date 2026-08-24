@@ -76,10 +76,10 @@ describe('EventTracker', () => {
 
     expect(screen.getByRole('button', { name: '展开江湖事簿' })).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(screen.getByRole('button', { name: '展开江湖事簿' }));
+    expect(screen.getByText('镖局的密信催你赶往城外。')).toBeInTheDocument();
     expect(screen.getByText('另有 1 件待阅')).toBeInTheDocument();
     expect(screen.getByText('风起江南')).toBeInTheDocument();
     expect(screen.getByText('射雕第一回03')).toBeInTheDocument();
-    expect(screen.queryByText('镖局的密信催你赶往城外。')).not.toBeInTheDocument();
     expect(screen.getByText('先赴苏州城外，再寻失踪镖师。')).toBeInTheDocument();
     expect(screen.getByText('卷入：陆乘风')).toBeInTheDocument();
     expect(screen.getByText('旧案余波')).toBeInTheDocument();
@@ -117,14 +117,7 @@ describe('EventTracker', () => {
   it('opens the full event page and reuses the travel callback', () => {
     const onOpenAll = vi.fn();
     const onTravelTo = vi.fn();
-    render(
-      <EventTracker
-        events={events}
-        currentLocation="嘉兴城内"
-        onOpenAll={onOpenAll}
-        onTravelTo={onTravelTo}
-      />,
-    );
+    render(<EventTracker events={events} currentLocation="嘉兴城内" onOpenAll={onOpenAll} onTravelTo={onTravelTo} />);
 
     fireEvent.click(screen.getByRole('button', { name: '展开江湖事簿' }));
     fireEvent.click(screen.getByRole('button', { name: /苏州城外前往/ }));

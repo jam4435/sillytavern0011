@@ -14,11 +14,7 @@ import type {
   TalentTier,
 } from '../types';
 import { ATTRIBUTE_NAMES } from '../types';
-import {
-  calculateAllAttributes,
-  type InitialAttributes as ChineseInitialAttributes,
-  type MartialArtForCalculation,
-} from './attributeCalculator';
+import { calculateAllAttributes, type MartialArtForCalculation } from './attributeCalculator';
 import { initLogger } from './logger';
 import { clearAvatarSelection, createAvatarEntityKey } from './avatarStorage';
 import { EVENT_RUNTIME_KEY_VERSION } from '../../shared/eventKey.js';
@@ -250,18 +246,19 @@ export interface NewGameFormData {
 }
 
 function sanitizeInitialChatRenamePart(value: string): string {
-    return [...value]
-      .map(character => (/[<>:"/\\|?*]/u.test(character) || character.charCodeAt(0) < 32 ? '·' : character))
-      .join('')
-      .trim()
-      .replace(/[.\s·]+$/u, '');
+  return [...value]
+    .map(character => (/[<>:"/\\|?*]/u.test(character) || character.charCodeAt(0) < 32 ? '·' : character))
+    .join('')
+    .trim()
+    .replace(/[.\s·]+$/u, '');
 }
 
 export function getInitialChatRenameSuggestion(formData: Pick<NewGameFormData, 'name' | 'locationInfo'>): string {
   const characterName = sanitizeInitialChatRenamePart(formData.name) || '未命名角色';
   const { locationInfo } = formData;
-  const openingContext = locationInfo.eventName?.trim()
-    || `${locationInfo.year}年${locationInfo.month}月${locationInfo.day}日${locationInfo.hour ?? 11}时 · ${locationInfo.location}`;
+  const openingContext =
+    locationInfo.eventName?.trim() ||
+    `${locationInfo.year}年${locationInfo.month}月${locationInfo.day}日${locationInfo.hour ?? 11}时 · ${locationInfo.location}`;
   const safeContext = sanitizeInitialChatRenamePart(openingContext) || '开局';
   return `${characterName}（${safeContext}）`;
 }
@@ -371,7 +368,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     cultivation = realmInfo.cultivation;
   }
 
-  const chineseInitialAttrs: ChineseInitialAttributes = {
+  const chineseInitialAttrs: InitialAttributes = {
     臂力: initialAttributes.臂力,
     根骨: initialAttributes.根骨,
     机敏: initialAttributes.机敏,
@@ -406,7 +403,13 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     世界事件: {},
     事件分支结果: {},
     前端变量: {
+      奇经八脉: {
+        版本: 1,
+        已通穴位: [],
+        关窍结算: {},
+      },
       事件结局状态: {},
+      可发现事件: {},
       事件运行时键版本: EVENT_RUNTIME_KEY_VERSION,
       头像: {
         ...(avatarRef ? { 玩家: avatarRef } : {}),

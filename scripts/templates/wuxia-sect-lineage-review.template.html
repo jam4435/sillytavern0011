@@ -1,0 +1,1731 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>门派功法谱系审核台</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1d1915;
+        --ink-soft: #51473e;
+        --muted: #7c7063;
+        --paper: #eee8db;
+        --paper-high: #fbf8ef;
+        --paper-low: #dfd5c2;
+        --night: #171512;
+        --night-soft: #29241f;
+        --line: #cbbfa9;
+        --line-dark: #9d8c73;
+        --cinnabar: #a4372d;
+        --cinnabar-dark: #76261f;
+        --jade: #2e725c;
+        --amber: #a76d22;
+        --blue: #42677a;
+        --shadow: rgba(45, 35, 25, 0.12);
+        --radius: 8px;
+        --header-height: 112px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        background: #d3c8b6;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 12% 12%, rgba(255, 255, 255, 0.42), transparent 27%),
+          radial-gradient(circle at 88% 34%, rgba(137, 103, 58, 0.08), transparent 30%),
+          repeating-linear-gradient(0deg, rgba(62, 48, 34, 0.025) 0 1px, transparent 1px 5px), var(--paper);
+        font-family: 'FangSong', 'STFangsong', 'Noto Serif SC', 'Source Han Serif SC', serif;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        color: inherit;
+        font: inherit;
+      }
+      button,
+      .file-button,
+      select,
+      input,
+      textarea {
+        border: 1px solid var(--line-dark);
+        border-radius: 6px;
+        background: var(--paper-high);
+      }
+      button,
+      .file-button {
+        min-height: 36px;
+        padding: 7px 12px;
+        cursor: pointer;
+      }
+      button:hover,
+      .file-button:hover {
+        border-color: var(--cinnabar);
+        background: #fffdf7;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible,
+      .file-button:focus-within {
+        outline: 2px solid var(--cinnabar);
+        outline-offset: 2px;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+      .hidden {
+        display: none !important;
+      }
+
+      .masthead {
+        position: sticky;
+        z-index: 30;
+        top: 0;
+        color: #f6efdf;
+        background:
+          linear-gradient(100deg, rgba(164, 55, 45, 0.16), transparent 38%),
+          repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 7px), var(--night);
+        box-shadow: 0 8px 24px rgba(28, 22, 17, 0.25);
+      }
+      .masthead-main,
+      .masthead-progress {
+        width: min(1680px, 100%);
+        margin-inline: auto;
+        padding-inline: 22px;
+      }
+      .masthead-main {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 22px;
+        min-height: 74px;
+        padding-block: 12px 9px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-width: 0;
+      }
+      .seal {
+        display: grid;
+        flex: 0 0 43px;
+        width: 43px;
+        height: 43px;
+        place-items: center;
+        border: 1px solid #d37464;
+        color: #fff3e3;
+        background: var(--cinnabar);
+        box-shadow:
+          inset 0 0 0 3px #8c2f27,
+          0 0 0 1px #5c1d18;
+        font-family: 'STKaiti', 'KaiTi', serif;
+        font-size: 25px;
+        transform: rotate(-2deg);
+      }
+      h1 {
+        margin: 0;
+        font-family: 'STKaiti', 'KaiTi', serif;
+        font-size: 24px;
+        line-height: 1.15;
+        letter-spacing: 0.08em;
+      }
+      .subtitle {
+        margin: 4px 0 0;
+        overflow: hidden;
+        color: #cfc3b1;
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 7px;
+      }
+      .header-actions button,
+      .header-actions .file-button {
+        border-color: #65594c;
+        color: #f4ead8;
+        background: var(--night-soft);
+      }
+      .header-actions button:hover,
+      .header-actions .file-button:hover {
+        border-color: #c39b58;
+        background: #383029;
+      }
+      .file-button input {
+        display: none;
+      }
+      .primary-action {
+        border-color: #b85a4c !important;
+        background: #7f2c25 !important;
+      }
+      .primary-action:hover {
+        background: #96372e !important;
+      }
+
+      .masthead-progress {
+        display: grid;
+        grid-template-columns: minmax(240px, 1fr) repeat(4, minmax(76px, auto));
+        gap: 14px;
+        align-items: center;
+        padding-bottom: 11px;
+      }
+      .progress-group {
+        display: grid;
+        grid-template-columns: minmax(120px, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+      }
+      .progress-track {
+        height: 7px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #4a4239;
+      }
+      .progress-fill {
+        width: 0;
+        height: 100%;
+        background: linear-gradient(90deg, #b9853c, #e0bd70);
+        transition: width 180ms ease;
+      }
+      .progress-label,
+      .counter {
+        color: #cfc5b6;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .counter strong {
+        color: #fff8e9;
+        font-size: 15px;
+      }
+      .counter.accept strong {
+        color: #8fd0b3;
+      }
+      .counter.revise strong {
+        color: #f0c06e;
+      }
+      .counter.reject strong {
+        color: #ef9b8f;
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 252px minmax(0, 1fr);
+        gap: 20px;
+        width: min(1680px, 100%);
+        margin-inline: auto;
+        padding: 20px 22px 64px;
+      }
+      .sect-sidebar {
+        align-self: start;
+        position: sticky;
+        top: calc(var(--header-height) + 18px);
+      }
+      .sidebar-card {
+        overflow: hidden;
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+        background: rgba(249, 246, 237, 0.82);
+        box-shadow: 0 6px 20px var(--shadow);
+      }
+      .sidebar-title {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 14px 14px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .sidebar-title h2 {
+        margin: 0;
+        font-size: 16px;
+        letter-spacing: 0.08em;
+      }
+      .sidebar-title span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .sect-nav {
+        display: grid;
+        padding: 7px;
+      }
+      .sect-nav-button {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 3px 8px;
+        min-height: 53px;
+        padding: 8px 9px;
+        border-color: transparent;
+        text-align: left;
+        background: transparent;
+      }
+      .sect-nav-button:hover {
+        border-color: var(--line);
+        background: rgba(255, 255, 255, 0.55);
+      }
+      .sect-nav-button.active {
+        border-color: #b99d73;
+        background: #ede4d3;
+        box-shadow: inset 3px 0 0 var(--cinnabar);
+      }
+      .sect-nav-name {
+        overflow: hidden;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .sect-nav-count {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .sect-nav-track {
+        grid-column: 1 / -1;
+        height: 3px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #d7cdbb;
+      }
+      .sect-nav-fill {
+        height: 100%;
+        background: var(--jade);
+      }
+      .sidebar-hint {
+        padding: 11px 14px 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .workspace {
+        min-width: 0;
+      }
+      .sect-sheet {
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 14px;
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+        background: rgba(250, 247, 238, 0.88);
+        box-shadow: 0 8px 26px var(--shadow);
+      }
+      .sect-sheet::after {
+        position: absolute;
+        top: -36px;
+        right: -28px;
+        width: 145px;
+        height: 145px;
+        border: 1px solid rgba(164, 55, 45, 0.13);
+        border-radius: 50%;
+        content: '';
+        box-shadow:
+          inset 0 0 0 12px rgba(164, 55, 45, 0.025),
+          inset 0 0 0 13px rgba(164, 55, 45, 0.08);
+        pointer-events: none;
+      }
+      .sect-sheet-main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(310px, 0.46fr);
+        gap: 20px;
+        padding: 22px 22px 17px;
+      }
+      .eyebrow {
+        margin: 0 0 5px;
+        color: var(--cinnabar);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+      }
+      .sect-name-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 9px;
+      }
+      .sect-name {
+        margin: 0;
+        font-family: 'STKaiti', 'KaiTi', serif;
+        font-size: 34px;
+        line-height: 1.05;
+        letter-spacing: 0.06em;
+      }
+      .sect-position {
+        max-width: 760px;
+        margin: 12px 0 0;
+        color: var(--ink-soft);
+      }
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 12px;
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 2px 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink-soft);
+        background: rgba(255, 255, 255, 0.55);
+        font-size: 11px;
+      }
+      .tag.source-original {
+        border-color: rgba(164, 55, 45, 0.45);
+        color: var(--cinnabar-dark);
+        background: rgba(164, 55, 45, 0.07);
+      }
+      .tag.source-known {
+        border-color: rgba(46, 114, 92, 0.42);
+        color: var(--jade);
+        background: rgba(46, 114, 92, 0.07);
+      }
+      .tag.source-pending {
+        border-color: rgba(167, 109, 34, 0.46);
+        color: #855312;
+        background: rgba(167, 109, 34, 0.07);
+      }
+      .sect-review {
+        position: relative;
+        z-index: 1;
+        padding: 13px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #eee7d9;
+      }
+      .review-caption {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .review-caption strong {
+        color: var(--ink);
+        font-size: 13px;
+      }
+      .review-controls {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 5px;
+      }
+      .review-button {
+        min-height: 34px;
+        padding: 5px 6px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .review-button[data-status='通过'].active {
+        border-color: var(--jade);
+        color: #fff;
+        background: var(--jade);
+      }
+      .review-button[data-status='需修改'].active {
+        border-color: var(--amber);
+        color: #fff;
+        background: var(--amber);
+      }
+      .review-button[data-status='驳回'].active {
+        border-color: var(--cinnabar);
+        color: #fff;
+        background: var(--cinnabar);
+      }
+      .review-button[data-status='待审核'].active {
+        border-color: #685f55;
+        color: #fff;
+        background: #685f55;
+      }
+      .review-note {
+        width: 100%;
+        min-height: 66px;
+        margin-top: 8px;
+        padding: 8px 9px;
+        resize: vertical;
+        line-height: 1.45;
+      }
+      .sect-sheet-foot {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        padding: 11px 22px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        background: rgba(224, 214, 197, 0.48);
+        font-size: 12px;
+      }
+      .sect-sheet-foot strong {
+        color: var(--ink-soft);
+      }
+
+      .toolbar {
+        position: sticky;
+        z-index: 20;
+        top: var(--header-height);
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) repeat(4, minmax(115px, 0.48fr)) auto;
+        gap: 8px;
+        margin-bottom: 16px;
+        padding: 11px;
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+        background: rgba(238, 232, 219, 0.96);
+        box-shadow: 0 5px 16px rgba(45, 35, 25, 0.1);
+        backdrop-filter: blur(10px);
+      }
+      .toolbar label {
+        display: grid;
+        gap: 3px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .toolbar input,
+      .toolbar select {
+        width: 100%;
+        min-height: 38px;
+        padding: 7px 9px;
+      }
+      .toolbar-actions {
+        display: flex;
+        align-items: end;
+        gap: 6px;
+      }
+      .toolbar-actions button {
+        white-space: nowrap;
+      }
+      .result-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 0 2px 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .result-line strong {
+        color: var(--ink);
+      }
+
+      .lineage {
+        display: grid;
+        gap: 16px;
+      }
+      .lineage-layer {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 15px;
+        align-items: start;
+      }
+      .layer-marker {
+        position: sticky;
+        top: calc(var(--header-height) + 91px);
+        display: grid;
+        justify-items: center;
+        gap: 7px;
+        padding-top: 4px;
+      }
+      .layer-orb {
+        display: grid;
+        width: 56px;
+        height: 56px;
+        place-items: center;
+        border: 1px solid var(--line-dark);
+        border-radius: 50%;
+        color: #f5ecdc;
+        background: var(--night-soft);
+        box-shadow:
+          inset 0 0 0 4px #373027,
+          0 3px 10px var(--shadow);
+        font-family: 'STKaiti', 'KaiTi', serif;
+        font-size: 18px;
+      }
+      .layer-count {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .layer-cards {
+        position: relative;
+        display: grid;
+        gap: 10px;
+      }
+      .layer-cards::before {
+        position: absolute;
+        top: 0;
+        bottom: -17px;
+        left: -44px;
+        width: 1px;
+        background: var(--line-dark);
+        content: '';
+      }
+      .lineage-layer:last-child .layer-cards::before {
+        bottom: 50%;
+      }
+      .art-card {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(200px, 0.68fr) minmax(260px, 1fr) 254px;
+        gap: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: rgba(251, 248, 239, 0.9);
+        box-shadow: 0 4px 13px rgba(45, 35, 25, 0.08);
+        animation: reveal 260ms ease both;
+      }
+      .art-card::before {
+        position: absolute;
+        top: 27px;
+        left: -38px;
+        width: 38px;
+        height: 1px;
+        background: var(--line-dark);
+        content: '';
+      }
+      .art-card[data-status='通过'] {
+        border-color: rgba(46, 114, 92, 0.62);
+        box-shadow:
+          inset 4px 0 0 var(--jade),
+          0 4px 13px rgba(45, 35, 25, 0.08);
+      }
+      .art-card[data-status='需修改'] {
+        border-color: rgba(167, 109, 34, 0.65);
+        box-shadow:
+          inset 4px 0 0 var(--amber),
+          0 4px 13px rgba(45, 35, 25, 0.08);
+      }
+      .art-card[data-status='驳回'] {
+        border-color: rgba(164, 55, 45, 0.62);
+        box-shadow:
+          inset 4px 0 0 var(--cinnabar),
+          0 4px 13px rgba(45, 35, 25, 0.08);
+      }
+      .art-card[data-flash='true'] {
+        animation: flash 900ms ease;
+      }
+      .art-identity,
+      .art-summary,
+      .art-review {
+        min-width: 0;
+        padding: 15px;
+      }
+      .art-identity,
+      .art-summary {
+        border-right: 1px solid var(--line);
+      }
+      .art-identity {
+        background: rgba(228, 218, 200, 0.48);
+      }
+      .art-title-line {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 9px;
+      }
+      .art-title {
+        margin: 0;
+        font-family: 'STKaiti', 'KaiTi', serif;
+        font-size: 21px;
+        line-height: 1.2;
+      }
+      .node-id {
+        display: block;
+        margin-top: 7px;
+        overflow: hidden;
+        color: var(--muted);
+        font:
+          10px/1.35 Consolas,
+          monospace;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .status-stamp {
+        flex: 0 0 auto;
+        padding: 2px 6px;
+        border: 1px solid currentColor;
+        color: var(--muted);
+        font-size: 10px;
+        transform: rotate(-2deg);
+      }
+      .status-stamp.accept {
+        color: var(--jade);
+      }
+      .status-stamp.revise {
+        color: var(--amber);
+      }
+      .status-stamp.reject {
+        color: var(--cinnabar);
+      }
+      .art-description {
+        margin: 9px 0 0;
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px 15px;
+        margin: 0;
+      }
+      .summary-grid div {
+        min-width: 0;
+      }
+      .summary-grid dt {
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .summary-grid dd {
+        margin: 1px 0 0;
+        overflow-wrap: anywhere;
+        font-size: 13px;
+      }
+      .prerequisites {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 11px;
+      }
+      .prereq-button {
+        min-height: 27px;
+        padding: 3px 7px;
+        border-color: var(--line);
+        color: var(--blue);
+        background: rgba(66, 103, 122, 0.05);
+        font-size: 11px;
+      }
+      .art-review {
+        align-content: start;
+        background: rgba(255, 253, 247, 0.7);
+      }
+      .art-review .review-note {
+        min-height: 54px;
+      }
+      .details-panel {
+        grid-column: 1 / -1;
+        border-top: 1px solid var(--line);
+      }
+      details > summary {
+        padding: 9px 15px;
+        color: var(--ink-soft);
+        background: rgba(224, 214, 197, 0.32);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      details[open] > summary {
+        border-bottom: 1px solid var(--line);
+        color: var(--cinnabar-dark);
+      }
+      .details-content {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        padding: 14px 15px 16px;
+      }
+      .detail-section {
+        min-width: 0;
+      }
+      .detail-section h4 {
+        margin: 0 0 7px;
+        color: var(--cinnabar-dark);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+      .detail-list {
+        display: grid;
+        gap: 5px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: var(--ink-soft);
+        font-size: 12px;
+      }
+      .detail-list li {
+        padding-left: 10px;
+        border-left: 2px solid var(--line);
+        overflow-wrap: anywhere;
+      }
+      .empty-detail {
+        color: var(--muted);
+        font-style: italic;
+      }
+
+      .empty-state {
+        padding: 52px 20px;
+        border: 1px dashed var(--line-dark);
+        border-radius: var(--radius);
+        color: var(--muted);
+        background: rgba(250, 247, 238, 0.6);
+        text-align: center;
+      }
+      .toast {
+        position: fixed;
+        z-index: 80;
+        right: 22px;
+        bottom: 22px;
+        max-width: min(430px, calc(100% - 44px));
+        padding: 11px 15px;
+        border: 1px solid #766656;
+        border-radius: 6px;
+        color: #f8efdf;
+        background: #28221d;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(10px);
+        transition: 160ms ease;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .storage-indicator {
+        position: fixed;
+        z-index: 25;
+        right: 22px;
+        bottom: 18px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      @keyframes reveal {
+        from {
+          opacity: 0;
+          transform: translateY(5px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes flash {
+        0%,
+        100% {
+          background: var(--paper-high);
+        }
+        35% {
+          background: #f4e1a8;
+        }
+      }
+
+      @media (max-width: 1260px) {
+        :root {
+          --header-height: 146px;
+        }
+        .masthead-progress {
+          grid-template-columns: minmax(200px, 1fr) repeat(2, auto);
+        }
+        .counter:nth-of-type(n + 3) {
+          display: none;
+        }
+        .toolbar {
+          grid-template-columns: minmax(210px, 1fr) repeat(2, minmax(120px, 0.5fr)) auto;
+        }
+        .toolbar label:nth-of-type(4),
+        .toolbar label:nth-of-type(5) {
+          display: none;
+        }
+        .art-card {
+          grid-template-columns: minmax(200px, 0.72fr) minmax(240px, 1fr);
+        }
+        .art-summary {
+          border-right: 0;
+        }
+        .art-review {
+          grid-column: 1 / -1;
+          border-top: 1px solid var(--line);
+        }
+        .art-review .review-controls {
+          max-width: 440px;
+        }
+      }
+      @media (max-width: 900px) {
+        :root {
+          --header-height: 177px;
+        }
+        .masthead-main {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 9px;
+        }
+        .header-actions {
+          justify-content: flex-start;
+        }
+        .masthead-progress {
+          grid-template-columns: 1fr auto;
+        }
+        .counter {
+          display: none;
+        }
+        .app-shell {
+          grid-template-columns: 1fr;
+          padding-inline: 12px;
+        }
+        .sect-sidebar {
+          position: static;
+        }
+        .sect-nav {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .sidebar-hint {
+          display: none;
+        }
+        .sect-sheet-main {
+          grid-template-columns: 1fr;
+        }
+        .toolbar {
+          position: static;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .toolbar label:first-child,
+        .toolbar-actions {
+          grid-column: 1 / -1;
+        }
+        .toolbar label:nth-of-type(4),
+        .toolbar label:nth-of-type(5) {
+          display: grid;
+        }
+        .lineage-layer {
+          grid-template-columns: 58px minmax(0, 1fr);
+          gap: 8px;
+        }
+        .layer-marker {
+          position: static;
+        }
+        .layer-orb {
+          width: 46px;
+          height: 46px;
+          font-size: 15px;
+        }
+        .layer-cards::before {
+          left: -32px;
+        }
+        .art-card {
+          grid-template-columns: 1fr;
+        }
+        .art-identity,
+        .art-summary {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .details-content {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 520px) {
+        :root {
+          --header-height: 211px;
+        }
+        .subtitle {
+          white-space: normal;
+        }
+        .header-actions {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          width: 100%;
+        }
+        .header-actions button,
+        .header-actions .file-button {
+          display: grid;
+          place-items: center;
+        }
+        .sect-nav {
+          grid-template-columns: 1fr;
+        }
+        .sect-name {
+          font-size: 28px;
+        }
+        .toolbar {
+          grid-template-columns: 1fr;
+        }
+        .toolbar label:first-child,
+        .toolbar-actions {
+          grid-column: auto;
+        }
+        .toolbar-actions {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .lineage-layer {
+          grid-template-columns: 1fr;
+        }
+        .layer-marker {
+          display: flex;
+          justify-content: flex-start;
+        }
+        .layer-orb {
+          width: auto;
+          height: 35px;
+          padding-inline: 14px;
+          border-radius: 999px;
+        }
+        .layer-cards::before,
+        .art-card::before {
+          display: none;
+        }
+        .review-controls {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media print {
+        .masthead,
+        .sect-sidebar,
+        .toolbar,
+        .art-review,
+        .storage-indicator {
+          display: none !important;
+        }
+        .app-shell {
+          display: block;
+          padding: 0;
+        }
+        .sect-sheet,
+        .art-card {
+          break-inside: avoid;
+          box-shadow: none;
+        }
+        details .details-content {
+          display: grid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="masthead-main">
+        <div class="brand">
+          <div class="seal" aria-hidden="true">审</div>
+          <div>
+            <h1>门派功法谱系审核台</h1>
+            <p class="subtitle">离线单文件 · 源稿生成于 __SOURCE_GENERATED_AT__ · 审核台生成于 __GENERATED_AT__</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="primary-action" type="button" id="exportMergedButton">导出已审核谱系</button>
+          <button type="button" id="exportReviewButton">仅导出审核记录</button>
+          <label class="file-button" tabindex="0"
+            >导入进度 / 谱系<input id="importInput" type="file" accept="application/json,.json"
+          /></label>
+          <button type="button" id="clearButton">清空本地进度</button>
+        </div>
+      </div>
+      <div class="masthead-progress">
+        <div class="progress-group">
+          <div class="progress-track"><div class="progress-fill" id="globalProgress"></div></div>
+          <span class="progress-label" id="globalProgressLabel">0 / 0</span>
+        </div>
+        <span class="counter accept">通过 <strong id="acceptedCount">0</strong></span>
+        <span class="counter revise">需修改 <strong id="revisionCount">0</strong></span>
+        <span class="counter reject">驳回 <strong id="rejectedCount">0</strong></span>
+        <span class="counter">待审核 <strong id="pendingCount">0</strong></span>
+      </div>
+    </header>
+
+    <div class="app-shell">
+      <aside class="sect-sidebar">
+        <div class="sidebar-card">
+          <div class="sidebar-title">
+            <h2>门派卷宗</h2>
+            <span id="sectCount">0 派</span>
+          </div>
+          <nav class="sect-nav" id="sectNav" aria-label="选择门派"></nav>
+          <div class="sidebar-hint">进度按传承节点计算。结论和备注会自动暂存在当前浏览器；正式成果请导出 JSON。</div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="sect-sheet" id="sectSheet"></section>
+
+        <section class="toolbar" aria-label="谱系筛选">
+          <label
+            ><span>搜索功法、说明、限制或人物</span
+            ><input id="searchInput" type="search" placeholder="按 / 快速聚焦搜索"
+          /></label>
+          <label
+            ><span>审核状态</span
+            ><select id="statusFilter">
+              <option value="全部">全部</option>
+              <option value="待审核">待审核</option>
+              <option value="通过">通过</option>
+              <option value="需修改">需修改</option>
+              <option value="驳回">驳回</option>
+            </select></label
+          >
+          <label
+            ><span>传承层级</span
+            ><select id="layerFilter">
+              <option value="全部">全部层级</option>
+            </select></label
+          >
+          <label
+            ><span>来源状态</span
+            ><select id="sourceFilter">
+              <option value="全部">全部来源</option>
+            </select></label
+          >
+          <label
+            ><span>分支类型</span
+            ><select id="branchFilter">
+              <option value="全部">全部分支</option>
+            </select></label
+          >
+          <div class="toolbar-actions">
+            <button type="button" id="approveVisibleButton">通过当前结果</button>
+            <button type="button" id="nextPendingButton">下一条待审</button>
+          </div>
+        </section>
+
+        <div class="result-line">
+          <span id="resultSummary">准备载入谱系……</span><button type="button" id="resetFiltersButton">重置筛选</button>
+        </div>
+        <section class="lineage" id="lineage"></section>
+      </main>
+    </div>
+
+    <div class="storage-indicator" id="storageIndicator">本地暂存：初始化</div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script id="lineageData" type="application/json">
+      __LINEAGE_DATA__
+    </script>
+    <script>
+      (() => {
+        'use strict';
+
+        const rawData = document.getElementById('lineageData').textContent.trim();
+        if (rawData === '__LINEAGE_' + 'DATA__') {
+          document.getElementById('lineage').innerHTML =
+            '<div class="empty-state">这是生成器模板。请运行 pnpm review:wuxia-sect 后打开生成的审核台。</div>';
+          return;
+        }
+
+        let DATA = JSON.parse(rawData);
+        const STORAGE_KEY = 'wuxia:sect-lineage-review:v1';
+        const LAYERS = DATA.生成信息?.传承层级顺序 || ['入门', '基础', '进阶', '核心', '镇派'];
+        const REVIEW_STATUSES = ['待审核', '通过', '需修改', '驳回'];
+        const STATUS_CLASS = { 待审核: '', 通过: 'accept', 需修改: 'revise', 驳回: 'reject' };
+        const state = {
+          sectId: DATA.门派列表[0]?.门派ID || '',
+          query: '',
+          status: '全部',
+          layer: '全部',
+          source: '全部',
+          branch: '全部',
+          reviews: { nodes: {}, sects: {} },
+          storageAvailable: true,
+        };
+
+        let artById = new Map();
+        let nodeById = new Map();
+        let sectById = new Map();
+        let toastTimer = 0;
+        const elements = {
+          sectNav: document.getElementById('sectNav'),
+          sectSheet: document.getElementById('sectSheet'),
+          lineage: document.getElementById('lineage'),
+          search: document.getElementById('searchInput'),
+          status: document.getElementById('statusFilter'),
+          layer: document.getElementById('layerFilter'),
+          source: document.getElementById('sourceFilter'),
+          branch: document.getElementById('branchFilter'),
+          resultSummary: document.getElementById('resultSummary'),
+          storage: document.getElementById('storageIndicator'),
+          toast: document.getElementById('toast'),
+        };
+
+        const escapeHtml = value =>
+          String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+
+        function rebuildIndexes() {
+          artById = new Map(DATA.功法目录.map(art => [art.功法ID, art]));
+          sectById = new Map(DATA.门派列表.map(sect => [sect.门派ID, sect]));
+          nodeById = new Map(DATA.门派列表.flatMap(sect => sect.传承节点.map(node => [node.节点ID, { node, sect }])));
+          if (!sectById.has(state.sectId)) state.sectId = DATA.门派列表[0]?.门派ID || '';
+        }
+
+        function normalizeReview(review) {
+          const status = REVIEW_STATUSES.includes(review?.状态) ? review.状态 : '待审核';
+          return { 状态: status, 意见: review?.意见 || '', 更新时间: review?.更新时间 || null };
+        }
+
+        function getNodeReview(node) {
+          return normalizeReview(state.reviews.nodes[node.节点ID] || node.审核);
+        }
+
+        function getSectReview(sect) {
+          return normalizeReview(state.reviews.sects[sect.门派ID] || sect.审核);
+        }
+
+        function setReview(kind, id, patch) {
+          const collection = kind === 'node' ? state.reviews.nodes : state.reviews.sects;
+          const source = kind === 'node' ? nodeById.get(id)?.node : sectById.get(id);
+          const current = kind === 'node' ? getNodeReview(source) : getSectReview(source);
+          const next = { ...current, ...patch, 更新时间: new Date().toISOString() };
+          collection[id] = next;
+          saveReviews();
+        }
+
+        function showToast(message) {
+          clearTimeout(toastTimer);
+          elements.toast.textContent = message;
+          elements.toast.classList.add('show');
+          toastTimer = window.setTimeout(() => elements.toast.classList.remove('show'), 2300);
+        }
+
+        function loadReviews() {
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              state.reviews.nodes = parsed?.reviews?.nodes || parsed?.nodes || {};
+              state.reviews.sects = parsed?.reviews?.sects || parsed?.sects || {};
+            }
+            elements.storage.textContent = '本地暂存：已启用';
+          } catch (error) {
+            state.storageAvailable = false;
+            elements.storage.textContent = '本地暂存：不可用，请及时导出';
+          }
+        }
+
+        function saveReviews() {
+          if (!state.storageAvailable) return;
+          try {
+            localStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify({ version: 1, reviews: state.reviews, savedAt: new Date().toISOString() }),
+            );
+            elements.storage.textContent = `本地暂存：${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
+          } catch (error) {
+            state.storageAvailable = false;
+            elements.storage.textContent = '本地暂存：写入失败，请立即导出';
+          }
+        }
+
+        function allNodes() {
+          return DATA.门派列表.flatMap(sect => sect.传承节点);
+        }
+
+        function getCounts(nodes = allNodes()) {
+          const counts = { 待审核: 0, 通过: 0, 需修改: 0, 驳回: 0 };
+          nodes.forEach(node => {
+            counts[getNodeReview(node).状态] += 1;
+          });
+          return counts;
+        }
+
+        function updateGlobalStats() {
+          const nodes = allNodes();
+          const counts = getCounts(nodes);
+          const reviewed = nodes.length - counts.待审核;
+          const percent = nodes.length ? (reviewed / nodes.length) * 100 : 0;
+          document.getElementById('globalProgress').style.width = `${percent}%`;
+          document.getElementById('globalProgressLabel').textContent =
+            `${reviewed} / ${nodes.length} · ${percent.toFixed(0)}%`;
+          document.getElementById('acceptedCount').textContent = counts.通过;
+          document.getElementById('revisionCount').textContent = counts.需修改;
+          document.getElementById('rejectedCount').textContent = counts.驳回;
+          document.getElementById('pendingCount').textContent = counts.待审核;
+        }
+
+        function renderSectNav() {
+          document.getElementById('sectCount').textContent = `${DATA.门派列表.length} 派`;
+          elements.sectNav.innerHTML = DATA.门派列表
+            .map(sect => {
+              const counts = getCounts(sect.传承节点);
+              const reviewed = sect.传承节点.length - counts.待审核;
+              const percent = sect.传承节点.length ? (reviewed / sect.传承节点.length) * 100 : 0;
+              return `<button class="sect-nav-button ${sect.门派ID === state.sectId ? 'active' : ''}" type="button" data-sect-id="${escapeHtml(sect.门派ID)}">
+            <span class="sect-nav-name">${escapeHtml(sect.门派)}</span><span class="sect-nav-count">${reviewed}/${sect.传承节点.length}</span>
+            <span class="sect-nav-track"><span class="sect-nav-fill" style="width:${percent}%"></span></span>
+          </button>`;
+            })
+            .join('');
+        }
+
+        function reviewControls(kind, id, review) {
+          return `<div class="review-controls" role="group" aria-label="审核结论">
+          ${REVIEW_STATUSES.map(status => `<button class="review-button ${review.状态 === status ? 'active' : ''}" type="button" data-review-kind="${kind}" data-review-id="${escapeHtml(id)}" data-status="${status}">${status}</button>`).join('')}
+        </div>`;
+        }
+
+        function renderSectSheet(sect) {
+          const review = getSectReview(sect);
+          const counts = getCounts(sect.传承节点);
+          const covered = sect.层级完整性?.已覆盖层级 || [...new Set(sect.传承节点.map(node => node.传承层级))];
+          const missing = sect.层级完整性?.缺失层级 || LAYERS.filter(layer => !covered.includes(layer));
+          elements.sectSheet.dataset.status = review.状态;
+          elements.sectSheet.innerHTML = `<div class="sect-sheet-main">
+          <div>
+            <p class="eyebrow">${escapeHtml(sect.体系类型 || '门派')} · ${escapeHtml(sect.门派ID)}</p>
+            <div class="sect-name-row"><h2 class="sect-name">${escapeHtml(sect.门派)}</h2><span class="tag">${sect.传承节点.length} 个节点</span></div>
+            <p class="sect-position">${escapeHtml(sect.设计定位 || '暂无设计定位。')}</p>
+            <div class="tag-row">
+              ${(sect.门派别名 || []).map(alias => `<span class="tag">别名 · ${escapeHtml(alias)}</span>`).join('')}
+              ${covered.map(layer => `<span class="tag source-known">已覆盖 · ${escapeHtml(layer)}</span>`).join('')}
+              ${missing.map(layer => `<span class="tag source-pending">缺失 · ${escapeHtml(layer)}</span>`).join('')}
+            </div>
+          </div>
+          <div class="sect-review">
+            <div class="review-caption"><span>整派设计结论</span><strong>${escapeHtml(review.状态)}</strong></div>
+            ${reviewControls('sect', sect.门派ID, review)}
+            <textarea class="review-note" data-note-kind="sect" data-note-id="${escapeHtml(sect.门派ID)}" placeholder="记录门派总体结构、缺层或传承边界问题……">${escapeHtml(review.意见)}</textarea>
+          </div>
+        </div>
+        <div class="sect-sheet-foot">
+          <span>节点进度 <strong>${sect.传承节点.length - counts.待审核}/${sect.传承节点.length}</strong></span>
+          <span>通过 <strong>${counts.通过}</strong></span><span>需修改 <strong>${counts.需修改}</strong></span><span>驳回 <strong>${counts.驳回}</strong></span>
+          <span>人物边界 <strong>${sect.人物映射边界?.length || 0}</strong> 人</span>
+          <span>${escapeHtml(sect.层级完整性?.说明 || '层级完整性待结合节点审核。')}</span>
+        </div>`;
+        }
+
+        function sourceClass(art) {
+          if (art.原创性?.是否原创) return 'source-original';
+          if (art.功法库状态 === '已收录') return 'source-known';
+          return 'source-pending';
+        }
+
+        function stringifyObject(value) {
+          if (!value || typeof value !== 'object' || !Object.keys(value).length) return '无';
+          return Object.entries(value)
+            .map(([key, item]) => `${key} ≥ ${item}`)
+            .join('、');
+        }
+
+        function detailList(items, formatter) {
+          if (!items?.length) return '<li class="empty-detail">无</li>';
+          return items.map(item => `<li>${formatter(item)}</li>`).join('');
+        }
+
+        function nodeSearchText(node, art) {
+          const restriction = node.学习限制 || {};
+          return [
+            node.节点ID,
+            node.功法,
+            node.传承层级,
+            node.分支,
+            art.类型,
+            art.功法品阶,
+            art.来源状态,
+            art.功法库状态,
+            art.原创性?.原创程度,
+            art.原创性?.说明,
+            art.待新增草案?.功法描述,
+            restriction.最低传承资格,
+            restriction.最低境界,
+            JSON.stringify(restriction.属性门槛),
+            ...(restriction.指定人物 || []),
+            ...(restriction.特别条件 || []),
+          ]
+            .join(' ')
+            .toLowerCase();
+        }
+
+        function visibleNodes(sect) {
+          const query = state.query.toLowerCase();
+          return sect.传承节点.filter(node => {
+            const art = artById.get(node.功法ID) || {};
+            const review = getNodeReview(node);
+            return (
+              (!query || nodeSearchText(node, art).includes(query)) &&
+              (state.status === '全部' || review.状态 === state.status) &&
+              (state.layer === '全部' || node.传承层级 === state.layer) &&
+              (state.source === '全部' || art.来源状态 === state.source) &&
+              (state.branch === '全部' || node.分支 === state.branch)
+            );
+          });
+        }
+
+        function renderNodeCard(node, index) {
+          const art = artById.get(node.功法ID) || {};
+          const review = getNodeReview(node);
+          const restriction = node.学习限制 || {};
+          const description = art.待新增草案?.功法描述 || art.原创性?.说明 || art.功法库信息?.功法描述 || '';
+          const prereqs = node.前置节点 || [];
+          const source = art.来源状态 || art.功法库状态 || '未知来源';
+          return `<article class="art-card" data-node-id="${escapeHtml(node.节点ID)}" data-status="${escapeHtml(review.状态)}" style="animation-delay:${Math.min(index * 18, 180)}ms">
+          <div class="art-identity">
+            <div class="art-title-line"><h3 class="art-title">${escapeHtml(node.功法)}</h3><span class="status-stamp ${STATUS_CLASS[review.状态]}">${escapeHtml(review.状态)}</span></div>
+            <div class="tag-row">
+              <span class="tag">${escapeHtml(node.分支)}</span><span class="tag">${escapeHtml(art.类型 || '类型待定')}</span><span class="tag">${escapeHtml(art.功法品阶 || '品阶待定')}</span>
+              <span class="tag ${sourceClass(art)}">${escapeHtml(source)}</span>
+            </div>
+            ${description ? `<p class="art-description">${escapeHtml(description)}</p>` : ''}
+            <span class="node-id" title="${escapeHtml(node.节点ID)}">${escapeHtml(node.节点ID)}</span>
+          </div>
+          <div class="art-summary">
+            <dl class="summary-grid">
+              <div><dt>传承资格</dt><dd>${escapeHtml(restriction.最低传承资格 || '未限定')}</dd></div>
+              <div><dt>最低境界</dt><dd>${escapeHtml(restriction.最低境界 || '无')}</dd></div>
+              <div><dt>属性门槛</dt><dd>${escapeHtml(stringifyObject(restriction.属性门槛))}</dd></div>
+              <div><dt>自动分配</dt><dd>${node.允许自动分配 ? '允许' : '禁止'} · ${node.是否共通 ? '门内共通' : '非共通'}</dd></div>
+              <div><dt>归属置信度</dt><dd>${escapeHtml(node.归属置信度?.等级 || '未知')} · ${escapeHtml(node.归属置信度?.分值 ?? '—')}</dd></div>
+              <div><dt>原创程度</dt><dd>${escapeHtml(art.原创性?.原创程度 || '未知')}</dd></div>
+            </dl>
+            <div class="prerequisites">
+              ${prereqs.length ? prereqs.map(prereq => `<button class="prereq-button" type="button" data-jump-node="${escapeHtml(prereq.节点ID)}">前置 · ${escapeHtml(prereq.节点ID.split('::').at(-1))}（${escapeHtml(prereq.最低掌握程度 || prereq.关系 || '')}）</button>`).join('') : '<span class="tag">无前置</span>'}
+            </div>
+          </div>
+          <div class="art-review">
+            <div class="review-caption"><span>节点与传承关系</span><strong>${escapeHtml(review.状态)}</strong></div>
+            ${reviewControls('node', node.节点ID, review)}
+            <textarea class="review-note" data-note-kind="node" data-note-id="${escapeHtml(node.节点ID)}" placeholder="若需修改，请注明名称、层级、前置或限制……">${escapeHtml(review.意见)}</textarea>
+          </div>
+          <details class="details-panel">
+            <summary>展开证据、限制与功法本体详情</summary>
+            <div class="details-content">
+              <section class="detail-section"><h4>传承限制</h4><ul class="detail-list">
+                <li>指定人物：${escapeHtml((restriction.指定人物 || []).join('、') || '无')}</li>
+                <li>特别条件：${escapeHtml((restriction.特别条件 || []).join('；') || '无')}</li>
+                <li>功法库限制：${escapeHtml(stringifyObject(art.功法库信息?.修炼限制))}</li>
+              </ul></section>
+              <section class="detail-section"><h4>归属依据</h4><ul class="detail-list">${detailList(node.归属依据, evidence => `${escapeHtml(evidence.类型 || '依据')} · ${escapeHtml(evidence.摘要 || '无摘要')}${evidence.来源文件 ? `<br><small>${escapeHtml(evidence.来源文件)}</small>` : ''}`)}</ul></section>
+              <section class="detail-section"><h4>功法本体</h4><ul class="detail-list">
+                <li>ID：${escapeHtml(art.功法ID || node.功法ID)}</li><li>目录状态：${escapeHtml(art.审核?.状态 || '待审核')}</li>
+                <li>来源说明：${escapeHtml(art.原创性?.说明 || '无')}</li>
+                ${art.待新增草案 ? `<li>新增草案：${escapeHtml(art.待新增草案.状态 || '待审核')}</li>` : ''}
+              </ul></section>
+            </div>
+          </details>
+        </article>`;
+        }
+
+        function renderLineage(sect) {
+          const visible = visibleNodes(sect);
+          const grouped = new Map(LAYERS.map(layer => [layer, []]));
+          visible.forEach(node => {
+            if (!grouped.has(node.传承层级)) grouped.set(node.传承层级, []);
+            grouped.get(node.传承层级).push(node);
+          });
+          const layers = [...grouped.entries()].filter(([, nodes]) => nodes.length);
+          elements.resultSummary.innerHTML = `显示 <strong>${visible.length}</strong> / ${sect.传承节点.length} 个节点 · 当前门派 <strong>${escapeHtml(sect.门派)}</strong>`;
+          document.getElementById('approveVisibleButton').disabled = visible.length === 0;
+          if (!layers.length) {
+            elements.lineage.innerHTML =
+              '<div class="empty-state">当前筛选条件下没有传承节点。可重置筛选，或切换其他门派。</div>';
+            return;
+          }
+          let cardIndex = 0;
+          elements.lineage.innerHTML = layers
+            .map(
+              ([layer, nodes]) => `<section class="lineage-layer" data-layer="${escapeHtml(layer)}">
+          <header class="layer-marker"><span class="layer-orb">${escapeHtml(layer)}</span><span class="layer-count">${nodes.length} 门</span></header>
+          <div class="layer-cards">${nodes.map(node => renderNodeCard(node, cardIndex++)).join('')}</div>
+        </section>`,
+            )
+            .join('');
+        }
+
+        function render() {
+          const sect = sectById.get(state.sectId);
+          renderSectNav();
+          updateGlobalStats();
+          if (!sect) {
+            elements.sectSheet.innerHTML = '<div class="empty-state">没有可审核的门派。</div>';
+            elements.lineage.innerHTML = '';
+            return;
+          }
+          renderSectSheet(sect);
+          renderLineage(sect);
+        }
+
+        function fillFilters() {
+          const sources = [...new Set(DATA.功法目录.map(art => art.来源状态).filter(Boolean))].sort((a, b) =>
+            a.localeCompare(b, 'zh-CN'),
+          );
+          const branches = [
+            ...new Set(
+              allNodes()
+                .map(node => node.分支)
+                .filter(Boolean),
+            ),
+          ].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+          elements.layer.innerHTML =
+            '<option value="全部">全部层级</option>' +
+            LAYERS.map(layer => `<option value="${escapeHtml(layer)}">${escapeHtml(layer)}</option>`).join('');
+          elements.source.innerHTML =
+            '<option value="全部">全部来源</option>' +
+            sources.map(source => `<option value="${escapeHtml(source)}">${escapeHtml(source)}</option>`).join('');
+          elements.branch.innerHTML =
+            '<option value="全部">全部分支</option>' +
+            branches.map(branch => `<option value="${escapeHtml(branch)}">${escapeHtml(branch)}</option>`).join('');
+        }
+
+        function applyStatus(kind, id, status) {
+          setReview(kind, id, { 状态: status });
+          render();
+        }
+
+        function currentVisibleNodeIds() {
+          const sect = sectById.get(state.sectId);
+          return sect ? visibleNodes(sect).map(node => node.节点ID) : [];
+        }
+
+        function jumpToNode(nodeId) {
+          const targetMeta = nodeById.get(nodeId);
+          if (!targetMeta) return showToast('未找到此前置节点');
+          if (targetMeta.sect.门派ID !== state.sectId) {
+            state.sectId = targetMeta.sect.门派ID;
+            state.query = '';
+            state.status = '全部';
+            state.layer = '全部';
+            elements.search.value = '';
+            elements.status.value = '全部';
+            elements.layer.value = '全部';
+            render();
+          }
+          requestAnimationFrame(() => {
+            const target = [...document.querySelectorAll('[data-node-id]')].find(
+              card => card.dataset.nodeId === nodeId,
+            );
+            if (!target) return showToast('该节点被当前筛选隐藏');
+            target.dataset.flash = 'true';
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            window.setTimeout(() => delete target.dataset.flash, 1000);
+          });
+        }
+
+        function reviewSummary() {
+          const counts = getCounts();
+          return { 总数: allNodes().length, 已审核: allNodes().length - counts.待审核, ...counts };
+        }
+
+        function activeReviews(collection, sourceItems, idKey, getReview) {
+          return sourceItems
+            .map(item => ({ [idKey]: item[idKey], ...getReview(item) }))
+            .filter(item => item.状态 !== '待审核' || item.意见);
+        }
+
+        function buildReviewExport() {
+          return {
+            schemaVersion: 1,
+            类型: '门派功法谱系审核记录',
+            来源生成时间: DATA.生成信息?.生成时间 || null,
+            导出时间: new Date().toISOString(),
+            审核统计: reviewSummary(),
+            门派审核: activeReviews(state.reviews.sects, DATA.门派列表, '门派ID', getSectReview),
+            节点审核: activeReviews(state.reviews.nodes, allNodes(), '节点ID', getNodeReview),
+          };
+        }
+
+        function buildMergedExport() {
+          const merged = JSON.parse(JSON.stringify(DATA));
+          const mergedSects = new Map(merged.门派列表.map(sect => [sect.门派ID, sect]));
+          for (const sect of mergedSects.values()) {
+            sect.审核 = getSectReview(sectById.get(sect.门派ID));
+            for (const node of sect.传承节点) node.审核 = getNodeReview(nodeById.get(node.节点ID)?.node || node);
+          }
+          merged.生成信息 = {
+            ...merged.生成信息,
+            审核导出时间: new Date().toISOString(),
+            审核口径: '门派审核作用于整派设计；节点审核作用于功法与当前门派的传承关系，不自动改写功法目录审核。',
+          };
+          merged.审核统计 = reviewSummary();
+          return merged;
+        }
+
+        function downloadJson(payload, fileName) {
+          const blob = new Blob([JSON.stringify(payload, null, 2) + '\n'], { type: 'application/json;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = fileName;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          window.setTimeout(() => URL.revokeObjectURL(url), 0);
+        }
+
+        function importReviews(parsed) {
+          if (Array.isArray(parsed.节点审核) || Array.isArray(parsed.门派审核)) {
+            for (const review of parsed.节点审核 || []) {
+              if (nodeById.has(review.节点ID)) state.reviews.nodes[review.节点ID] = normalizeReview(review);
+            }
+            for (const review of parsed.门派审核 || []) {
+              if (sectById.has(review.门派ID)) state.reviews.sects[review.门派ID] = normalizeReview(review);
+            }
+            return '审核记录';
+          }
+          if (Array.isArray(parsed.功法目录) && Array.isArray(parsed.门派列表)) {
+            DATA = parsed;
+            rebuildIndexes();
+            state.reviews = { nodes: {}, sects: {} };
+            for (const sect of DATA.门派列表) {
+              if (sect.审核) state.reviews.sects[sect.门派ID] = normalizeReview(sect.审核);
+              for (const node of sect.传承节点 || []) {
+                if (node.审核) state.reviews.nodes[node.节点ID] = normalizeReview(node.审核);
+              }
+            }
+            fillFilters();
+            return '完整谱系';
+          }
+          if (parsed.reviews?.nodes || parsed.nodes) {
+            state.reviews.nodes = { ...state.reviews.nodes, ...(parsed.reviews?.nodes || parsed.nodes || {}) };
+            state.reviews.sects = { ...state.reviews.sects, ...(parsed.reviews?.sects || parsed.sects || {}) };
+            return '本地进度';
+          }
+          throw new Error('无法识别的审核文件结构');
+        }
+
+        document.addEventListener('click', event => {
+          const sectButton = event.target.closest('[data-sect-id]');
+          if (sectButton) {
+            state.sectId = sectButton.dataset.sectId;
+            render();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+          }
+          const reviewButton = event.target.closest('[data-review-kind]');
+          if (reviewButton) {
+            applyStatus(reviewButton.dataset.reviewKind, reviewButton.dataset.reviewId, reviewButton.dataset.status);
+            return;
+          }
+          const prereqButton = event.target.closest('[data-jump-node]');
+          if (prereqButton) jumpToNode(prereqButton.dataset.jumpNode);
+        });
+
+        document.addEventListener('input', event => {
+          const note = event.target.closest('[data-note-kind]');
+          if (!note) return;
+          const collectionKind = note.dataset.noteKind;
+          setReview(collectionKind, note.dataset.noteId, { 意见: note.value.trim() });
+        });
+
+        elements.search.addEventListener('input', () => {
+          state.query = elements.search.value.trim();
+          renderLineage(sectById.get(state.sectId));
+        });
+        elements.status.addEventListener('change', () => {
+          state.status = elements.status.value;
+          renderLineage(sectById.get(state.sectId));
+        });
+        elements.layer.addEventListener('change', () => {
+          state.layer = elements.layer.value;
+          renderLineage(sectById.get(state.sectId));
+        });
+        elements.source.addEventListener('change', () => {
+          state.source = elements.source.value;
+          renderLineage(sectById.get(state.sectId));
+        });
+        elements.branch.addEventListener('change', () => {
+          state.branch = elements.branch.value;
+          renderLineage(sectById.get(state.sectId));
+        });
+
+        document.getElementById('resetFiltersButton').addEventListener('click', () => {
+          state.query = '';
+          state.status = state.layer = state.source = state.branch = '全部';
+          elements.search.value = '';
+          elements.status.value = elements.layer.value = elements.source.value = elements.branch.value = '全部';
+          renderLineage(sectById.get(state.sectId));
+        });
+
+        document.getElementById('approveVisibleButton').addEventListener('click', () => {
+          const ids = currentVisibleNodeIds();
+          if (!ids.length) return;
+          if (!confirm(`将当前筛选出的 ${ids.length} 个节点全部标记为“通过”？已有结论也会被覆盖。`)) return;
+          const now = new Date().toISOString();
+          ids.forEach(id => {
+            state.reviews.nodes[id] = { ...getNodeReview(nodeById.get(id).node), 状态: '通过', 更新时间: now };
+          });
+          saveReviews();
+          render();
+          showToast(`已通过当前 ${ids.length} 个节点`);
+        });
+
+        document.getElementById('nextPendingButton').addEventListener('click', () => {
+          const sect = sectById.get(state.sectId);
+          let target = sect?.传承节点.find(node => getNodeReview(node).状态 === '待审核');
+          if (!target) {
+            const nextSect = DATA.门派列表.find(item =>
+              item.传承节点.some(node => getNodeReview(node).状态 === '待审核'),
+            );
+            if (!nextSect) return showToast('所有传承节点均已给出结论');
+            state.sectId = nextSect.门派ID;
+            state.query = '';
+            state.status = state.layer = state.source = state.branch = '全部';
+            elements.search.value = '';
+            elements.status.value = elements.layer.value = elements.source.value = elements.branch.value = '全部';
+            target = nextSect.传承节点.find(node => getNodeReview(node).状态 === '待审核');
+            render();
+          } else if (!currentVisibleNodeIds().includes(target.节点ID)) {
+            state.query = '';
+            state.status = state.layer = state.source = state.branch = '全部';
+            elements.search.value = '';
+            elements.status.value = elements.layer.value = elements.source.value = elements.branch.value = '全部';
+            render();
+          }
+          jumpToNode(target.节点ID);
+        });
+
+        document.getElementById('exportMergedButton').addEventListener('click', () => {
+          downloadJson(buildMergedExport(), `门派功法谱系-已审核-${new Date().toISOString().slice(0, 10)}.json`);
+          showToast('已导出含审核结论的完整谱系');
+        });
+        document.getElementById('exportReviewButton').addEventListener('click', () => {
+          downloadJson(buildReviewExport(), `门派功法谱系-审核记录-${new Date().toISOString().slice(0, 10)}.json`);
+          showToast('已导出轻量审核记录');
+        });
+        document.getElementById('importInput').addEventListener('change', async event => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          try {
+            const type = importReviews(JSON.parse(await file.text()));
+            saveReviews();
+            render();
+            showToast(`已导入${type}`);
+          } catch (error) {
+            console.error(error);
+            showToast(`导入失败：${error.message}`);
+          } finally {
+            event.target.value = '';
+          }
+        });
+        document.getElementById('clearButton').addEventListener('click', () => {
+          if (!confirm('确定清空所有本地审核结论和备注吗？此操作不会修改原始 JSON。')) return;
+          state.reviews = { nodes: {}, sects: {} };
+          saveReviews();
+          render();
+          showToast('本地审核进度已清空');
+        });
+
+        document.addEventListener('keydown', event => {
+          if (
+            event.key === '/' &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)
+          ) {
+            event.preventDefault();
+            elements.search.focus();
+          }
+        });
+
+        rebuildIndexes();
+        fillFilters();
+        loadReviews();
+        render();
+      })();
+    </script>
+  </body>
+</html>

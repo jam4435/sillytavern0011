@@ -52,9 +52,7 @@ describe('frontendDerivedVariables', () => {
         功法品阶: '上乘',
         功法描述: '测试掌法',
         战斗系数: {
-          属性列表: [
-            { 属性: '臂力', 系数: 0.4 },
-          ],
+          属性列表: [{ 属性: '臂力', 系数: 0.4 }],
         },
       },
     ]);
@@ -112,10 +110,12 @@ describe('frontendDerivedVariables', () => {
       },
     });
 
-    expect(table).toBe([
-      '少侠|位置:大宋/临安府/牛家村/村西树林|基础:50|轻功:凌波微步=85;水上漂=64|拳掌:降龙十八掌=140;劈空掌=40',
-      '洪七公|位置:大宋/临安府/牛家村/曲三酒馆|基础:44|拳掌:降龙十八掌=125',
-    ].join('\n'));
+    expect(table).toBe(
+      [
+        '少侠|位置:大宋/临安府/牛家村/村西树林|基础:50|轻功:凌波微步=85;水上漂=64|拳掌:降龙十八掌=140;劈空掌=40',
+        '洪七公|位置:大宋/临安府/牛家村/曲三酒馆|基础:44|拳掌:降龙十八掌=125',
+      ].join('\n'),
+    );
     expect(table).not.toContain('黄蓉');
   });
 
@@ -151,29 +151,33 @@ describe('frontendDerivedVariables', () => {
       },
     ]);
 
-    expect(buildCultivationChangeReferenceFromStatData({
-      user数据: {
-        境界: '三流初期',
-        初始属性: { 悟性: 10 },
-        功法: {
-          九阳神功: { 掌握程度: '融会贯通' },
-          抱元劲: { 掌握程度: '出神入化' },
-          凌波微步: { 掌握程度: '出神入化' },
+    expect(
+      buildCultivationChangeReferenceFromStatData({
+        user数据: {
+          境界: '三流初期',
+          初始属性: { 悟性: 10 },
+          功法: {
+            九阳神功: { 掌握程度: '融会贯通' },
+            抱元劲: { 掌握程度: '出神入化' },
+            凌波微步: { 掌握程度: '出神入化' },
+          },
         },
-      },
-    })).toBe(14);
+      }),
+    ).toBe(14);
   });
 
   it('没有显性内功时使用境界隐含保底生成修为变化参考', () => {
     setMartialArtsDatabase([]);
 
-    expect(buildCultivationChangeReferenceFromStatData({
-      user数据: {
-        境界: '一流初期',
-        初始属性: { 悟性: 10 },
-        功法: {},
-      },
-    })).toBe(40);
+    expect(
+      buildCultivationChangeReferenceFromStatData({
+        user数据: {
+          境界: '一流初期',
+          初始属性: { 悟性: 10 },
+          功法: {},
+        },
+      }),
+    ).toBe(40);
   });
 
   it('玩家战力区会读取装备栏和状态效果的属性修正', () => {
@@ -184,9 +188,7 @@ describe('frontendDerivedVariables', () => {
         功法品阶: '上乘',
         功法描述: '测试掌法',
         战斗系数: {
-          属性列表: [
-            { 属性: '臂力', 系数: 1 },
-          ],
+          属性列表: [{ 属性: '臂力', 系数: 1 }],
         },
       },
     ]);
@@ -234,6 +236,37 @@ describe('frontendDerivedVariables', () => {
     });
 
     expect(table).toBe('少侠|位置:大宋/临安府/牛家村|基础:0|拳掌:劈空掌=18');
+  });
+
+  it('玩家战力区会读取聊天分支中的奇经八脉修正', () => {
+    setMartialArtsDatabase([
+      {
+        功法名称: '劈空掌',
+        类型: '拳掌',
+        功法品阶: '上乘',
+        功法描述: '测试掌法',
+        战斗系数: { 属性列表: [{ 属性: '臂力', 系数: 1 }] },
+      },
+    ]);
+
+    const table = buildCombatPowerZoneFromStatData({
+      user数据: {
+        用户名: '少侠',
+        所在位置: '大宋/临安府/牛家村',
+        境界: '不入流',
+        初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10, 风姿: 10, 福缘: 0 },
+        功法: { 劈空掌: { 掌握程度: '初窥门径' } },
+      },
+      前端变量: {
+        奇经八脉: {
+          版本: 1,
+          已通穴位: ['du:opening', 'du:circulation', 'du:condensation', 'du:cycle'],
+          关窍结算: {},
+        },
+      },
+    });
+
+    expect(table).toBe('少侠|位置:大宋/临安府/牛家村|基础:0|拳掌:劈空掌=11');
   });
 
   it('没有具名功法时按结算后战斗属性提供境界基础招式保底', () => {

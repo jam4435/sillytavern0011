@@ -2,6 +2,7 @@ import React, { useEffect, useId, useMemo, useState } from 'react';
 import type { GameEvent } from '../types';
 import {
   getEventCountdownLabel,
+  getEventDescription,
   getEventSemanticLabel,
   getEventTitleParts,
   getTrackerEvents,
@@ -80,7 +81,9 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
         <span className="event-tracker-title-brush">
           <span className="event-tracker-title">江湖事簿</span>
         </span>
-        <span className="event-tracker-count" aria-label={`共有 ${events.length} 件未结事件`}>{events.length}</span>
+        <span className="event-tracker-count" aria-label={`共有 ${events.length} 件未结事件`}>
+          {events.length}
+        </span>
         <span className="event-tracker-chevron" aria-hidden="true">
           {isCollapsed ? <Icons.ChevronDown size={17} /> : <Icons.ChevronUp size={17} />}
         </span>
@@ -93,6 +96,7 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
               const isExpanded = expandedEventId === event.id;
               const detailId = `${trackerBodyId}-event-${event.id}`;
               const countdown = getEventCountdownLabel(event);
+              const description = getEventDescription(event);
               const titleParts = getEventTitleParts(event.title);
               return (
                 <section
@@ -108,12 +112,15 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
                     onClick={() => setExpandedEventId(current => (current === event.id ? null : event.id))}
                   >
                     <span className="event-tracker-entry-title">{titleParts.name}</span>
-                    {titleParts.reference && <span className="event-tracker-entry-reference">{titleParts.reference}</span>}
+                    {titleParts.reference && (
+                      <span className="event-tracker-entry-reference">{titleParts.reference}</span>
+                    )}
                     {countdown && <span className="event-tracker-entry-countdown">{countdown}</span>}
                   </button>
 
                   {isExpanded && (
                     <div className="event-tracker-entry-detail" id={detailId}>
+                      {description && <p>{description}</p>}
                       {event.details && (
                         <div className="event-tracker-outcome">
                           <span>结局走向</span>

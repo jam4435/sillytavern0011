@@ -29,6 +29,7 @@ export function buildEventRuntimeStateResetPlan(statData) {
       ...currentFrontendVariables,
       事件结局状态: {},
       事件结算进度: {},
+      可发现事件: {},
       事件运行时键版本: EVENT_RUNTIME_KEY_VERSION,
     },
   };
@@ -61,11 +62,12 @@ export async function resetLegacyEventRuntimeState(statData) {
   const verifiedStat = verified?.stat_data || {};
   const resetSucceeded =
     verifiedStat?.前端变量?.事件运行时键版本 === EVENT_RUNTIME_KEY_VERSION &&
-    EVENT_STATE_ROOTS.every(root => isPlainObject(verifiedStat[root]) && Object.keys(verifiedStat[root]).length === 0) &&
+    EVENT_STATE_ROOTS.every(
+      root => isPlainObject(verifiedStat[root]) && Object.keys(verifiedStat[root]).length === 0,
+    ) &&
     EVENT_SYSTEM_BUCKETS.every(
       bucket =>
-        isPlainObject(verifiedStat?.事件系统?.[bucket]) &&
-        Object.keys(verifiedStat.事件系统[bucket]).length === 0,
+        isPlainObject(verifiedStat?.事件系统?.[bucket]) && Object.keys(verifiedStat.事件系统[bucket]).length === 0,
     );
 
   if (resetSucceeded) {

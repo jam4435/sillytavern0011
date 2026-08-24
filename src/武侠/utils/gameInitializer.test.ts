@@ -78,7 +78,12 @@ beforeEach(() => {
 describe('generateVariableData avatar fields', () => {
   it('内置头像只写入前端变量', () => {
     const data = generateVariableData(createFormData('preset:guo_jing_fc2')) as {
-      前端变量: { 头像: { 玩家: string; 人物: Record<string, string> }; 头像版本: number; 事件运行时键版本: number };
+      前端变量: {
+        头像: { 玩家: string; 人物: Record<string, string> };
+        头像版本: number;
+        事件运行时键版本: number;
+        奇经八脉: { 版本: number; 已通穴位: string[]; 关窍结算: Record<string, unknown> };
+      };
       user数据: Record<string, unknown>;
       角色数据: { $template: Record<string, unknown> };
     };
@@ -86,6 +91,7 @@ describe('generateVariableData avatar fields', () => {
     expect(data.前端变量.头像).toEqual({ 玩家: 'preset:guo_jing_fc2', 人物: {} });
     expect(data.前端变量.头像版本).toBe(1);
     expect(data.前端变量.事件运行时键版本).toBe(3);
+    expect(data.前端变量.奇经八脉).toEqual({ 版本: 1, 已通穴位: [], 关窍结算: {} });
     expect(data.user数据).not.toHaveProperty('头像');
     expect(data.角色数据.$template).not.toHaveProperty('头像');
   });

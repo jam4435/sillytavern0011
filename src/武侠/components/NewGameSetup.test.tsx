@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NewGameSetup from './NewGameSetup';
 import { createAvatarEntityKey, getAvatarStorageKey } from '../utils/avatarStorage';
-import { APPEARANCE_TEMPLATES } from '../utils/gameInitializer';
+import { APPEARANCE_TEMPLATES, DEFAULT_ATTRIBUTES, STORY_EVENTS } from '../utils/gameInitializer';
 
 vi.mock('../utils/martialArtsDatabase', () => ({
   getAllMartialArtNames: vi.fn(() => []),
@@ -97,5 +97,68 @@ describe('NewGameSetup appearance generation', () => {
     expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.face.男, 0));
     expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.frame, 0));
     expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.strength, 20));
+  });
+});
+
+describe('NewGameSetup automation markers', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('可按稳定标识加载角色预设、返回开局事件页并选择事件', async () => {
+    const event = STORY_EVENTS[1] ?? STORY_EVENTS[0];
+    localStorage.setItem(
+      'wuxia_character_builds',
+      JSON.stringify([
+        {
+          id: 'build-automation-test',
+          name: '自动化测试角色',
+          createdAt: 1,
+          talentTier: 'talented',
+          attributes: DEFAULT_ATTRIBUTES,
+          traits: [],
+          martialArts: [],
+          origin: '平民百姓',
+          locationInfo: {
+            year: STORY_EVENTS[0].year,
+            month: STORY_EVENTS[0].month,
+            day: STORY_EVENTS[0].day,
+            location: STORY_EVENTS[0].location,
+            eventName: STORY_EVENTS[0].name,
+          },
+          characterInfo: {
+            name: '测试侠客',
+            gender: '男',
+            appearance: '身形挺拔，眉目清朗',
+            age: 18,
+          },
+        },
+      ]),
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderSetup();
+    const setup = await waitFor(() => {
+      const element = document.querySelector('[data-wuxia-automation="new-game-setup"]');
+      expect(element).toHaveAttribute('data-wuxia-setup-step', 'talent');
+      return element as HTMLElement;
+    });
+    const build = document.querySelector('[data-wuxia-automation="saved-character-build"]');
+    expect(build).toHaveAttribute('data-wuxia-build-id', 'build-automation-test');
+    expect(build).toHaveAttribute('data-wuxia-build-name', '自动化测试角色');
+
+    fireEvent.click(within(build as HTMLElement).getByRole('button', { name: '加载' }));
+    await waitFor(() => expect(setup).toHaveAttribute('data-wuxia-setup-step', 'confirm'));
+    fireEvent.click(document.querySelector('[data-wuxia-automation="setup-previous-step"]') as HTMLElement);
+    await waitFor(() => expect(setup).toHaveAttribute('data-wuxia-setup-step', 'identity'));
+    fireEvent.click(document.querySelector('[data-wuxia-automation="setup-previous-step"]') as HTMLElement);
+    await waitFor(() => expect(setup).toHaveAttribute('data-wuxia-setup-step', 'origin'));
+
+    const eventCard = [...document.querySelectorAll('[data-wuxia-automation="opening-event"]')].find(
+      element => element.getAttribute('data-wuxia-event-id') === event.id,
+    );
+    expect(eventCard).toHaveAttribute('data-wuxia-event-name', event.name);
+    fireEvent.click(eventCard as HTMLElement);
+    expect(eventCard).toHaveAttribute('data-wuxia-event-selected', 'true');
   });
 });

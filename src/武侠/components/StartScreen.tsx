@@ -20,6 +20,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
   return (
     <div
       className="start-screen"
+      data-wuxia-automation="start-game"
       onClick={handleStart}
       role="button"
       aria-label="开始游戏"

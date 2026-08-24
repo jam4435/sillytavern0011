@@ -17,6 +17,7 @@ export type EraVariableWriteEventName =
   | 'era:insertByObject'
   | 'era:deleteByObject'
   | 'era:deleteByPath'
+  | 'era:transactionByObject'
   | 'manual_sync';
 
 export interface DirectVariableWriteMetadata {
@@ -42,6 +43,8 @@ export interface EraVariableWriteDoneDetail extends EraVariableWriteMetadata {
   writeId: string;
   message_id?: number;
   actions: Record<string, boolean> | null;
+  transactionId?: string;
+  transactionIds?: string[];
 }
 
 export interface EraVariableWriteRequest extends EraVariableWriteMetadata {
@@ -50,6 +53,8 @@ export interface EraVariableWriteRequest extends EraVariableWriteMetadata {
   timeoutMessage: string;
   expectedMessageId?: number;
   expectedAction?: string;
+  /** 精确匹配自己发起的批事务；同时兼容 writeDone.transactionId 与合并 flush 的 transactionIds。 */
+  expectedTransactionId?: string;
 }
 
 type EraWriteDispatchFailure = {
@@ -86,6 +91,8 @@ const normalizeRefreshHint = (
 export type EraVariableWriteConfirmation = {
   message_id?: number | null;
   actions?: Record<string, unknown>;
+  transactionId?: string;
+  transactionIds?: string[];
 };
 
 type EraWriteDoneLikeDetail = EraVariableWriteConfirmation;
@@ -94,6 +101,8 @@ type EraWriteDoneSummary = {
   rawMessageId: unknown;
   normalizedMessageId?: number;
   actions: Record<string, boolean> | null;
+  transactionId?: string;
+  transactionIds: string[] | null;
   mk?: string;
   consecutiveProcessingCount?: number;
 };
@@ -124,6 +133,22 @@ const normalizeActions = (actions: unknown): Record<string, boolean> | null => {
   return enabledActions.length > 0 ? Object.fromEntries(enabledActions) : null;
 };
 
+const normalizeTransactionId = (transactionId: unknown): string | undefined =>
+  typeof transactionId === 'string' && transactionId.length > 0 ? transactionId : undefined;
+
+const normalizeTransactionIds = (detail: EraWriteDoneLikeDetail): string[] | null => {
+  const transactionIds = Array.isArray(detail.transactionIds)
+    ? detail.transactionIds.flatMap(transactionId => {
+        const normalized = normalizeTransactionId(transactionId);
+        return normalized ? [normalized] : [];
+      })
+    : [];
+  const transactionId = normalizeTransactionId(detail.transactionId);
+  if (transactionId) transactionIds.push(transactionId);
+  const uniqueIds = Array.from(new Set(transactionIds));
+  return uniqueIds.length > 0 ? uniqueIds : null;
+};
+
 const summarizeEraWriteDone = (detail: unknown): EraWriteDoneSummary | { invalidDetail: true; detailType: string } => {
   if (!detail || typeof detail !== 'object' || Array.isArray(detail)) {
     return {
@@ -140,6 +165,8 @@ const summarizeEraWriteDone = (detail: unknown): EraWriteDoneSummary | { invalid
     rawMessageId: writeDone.message_id,
     normalizedMessageId: normalizeMessageId(writeDone.message_id),
     actions: normalizeActions(writeDone.actions),
+    transactionId: normalizeTransactionId(writeDone.transactionId),
+    transactionIds: normalizeTransactionIds(writeDone),
     mk: typeof writeDone.mk === 'string' ? writeDone.mk : undefined,
     consecutiveProcessingCount: Number.isInteger(writeDone.consecutiveProcessingCount)
       ? Number(writeDone.consecutiveProcessingCount)
@@ -151,6 +178,7 @@ const getWriteDoneMismatchReason = (
   detail: unknown,
   expectedMessageId?: number,
   expectedAction?: string,
+  expectedTransactionId?: string,
 ): string | null => {
   if (!detail || typeof detail !== 'object' || Array.isArray(detail)) {
     return `payload 不是对象: ${Array.isArray(detail) ? 'array' : typeof detail}`;
@@ -163,6 +191,12 @@ const getWriteDoneMismatchReason = (
   if (expectedAction && writeDone.actions?.[expectedAction] !== true) {
     return `actions.${expectedAction} !== true: actual=${JSON.stringify(normalizeActions(writeDone.actions))}`;
   }
+  if (expectedTransactionId !== undefined) {
+    const transactionIds = normalizeTransactionIds(writeDone);
+    if (!transactionIds?.includes(expectedTransactionId)) {
+      return `transactionId 不匹配: expected=${expectedTransactionId}, actual=${JSON.stringify(transactionIds)}`;
+    }
+  }
   return null;
 };
 
@@ -170,8 +204,9 @@ const matchesEraWriteDone = (
   detail: unknown,
   expectedMessageId?: number,
   expectedAction?: string,
+  expectedTransactionId?: string,
 ): detail is EraWriteDoneLikeDetail => {
-  return getWriteDoneMismatchReason(detail, expectedMessageId, expectedAction) === null;
+  return getWriteDoneMismatchReason(detail, expectedMessageId, expectedAction, expectedTransactionId) === null;
 };
 
 export async function runDirectChatVariableWrite<TResult>(
@@ -235,6 +270,7 @@ export async function emitEraVariableWriteAndWait({
   timeoutMessage = `ERA ${eventName} 写入完成信号超时`,
   expectedMessageId,
   expectedAction,
+  expectedTransactionId,
 }: EraVariableWriteRequest): Promise<EraVariableWriteConfirmation> {
   assertFrontendWriteAllowed(source);
   const waitId = createVariableWriteId();
@@ -254,6 +290,7 @@ export async function emitEraVariableWriteAndWait({
     attribution,
     expectedMessageId: expectedMessageId ?? null,
     expectedAction: expectedAction ?? null,
+    expectedTransactionId: expectedTransactionId ?? null,
     timeoutMs,
   };
   const recordWaitEvent = (event: string, details: Record<string, unknown> = {}) => {
@@ -312,14 +349,19 @@ export async function emitEraVariableWriteAndWait({
     listener = eventOn('era:writeDone', (writeDoneDetail: unknown) => {
       observedWriteDoneCount += 1;
       lastObservedWriteDone = summarizeEraWriteDone(writeDoneDetail);
-      lastIgnoredReason = getWriteDoneMismatchReason(writeDoneDetail, expectedMessageId, expectedAction);
+      lastIgnoredReason = getWriteDoneMismatchReason(
+        writeDoneDetail,
+        expectedMessageId,
+        expectedAction,
+        expectedTransactionId,
+      );
       recordWaitEvent('era-write-done-observed', {
         observedWriteDoneCount,
         matched: lastIgnoredReason === null,
         ignoredReason: lastIgnoredReason,
         observed: lastObservedWriteDone,
       });
-      if (!matchesEraWriteDone(writeDoneDetail, expectedMessageId, expectedAction)) {
+      if (!matchesEraWriteDone(writeDoneDetail, expectedMessageId, expectedAction, expectedTransactionId)) {
         variableTraceLogger.log('[emitEraVariableWriteAndWait] 忽略不匹配的 era:writeDone', {
           ...waitContext,
           observedWriteDoneCount,
@@ -409,6 +451,8 @@ export async function emitSourcedEraVariableWriteAndWait(
     refreshHint: normalizeRefreshHint(refreshHint),
     message_id: normalizeMessageId(matchedDetail?.message_id),
     actions: normalizeActions(matchedDetail?.actions),
+    transactionId: normalizeTransactionId(matchedDetail?.transactionId),
+    transactionIds: normalizeTransactionIds(matchedDetail) ?? undefined,
   };
 
   try {

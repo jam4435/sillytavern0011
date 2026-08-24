@@ -14,12 +14,17 @@ const initialAttributes: InitialAttributes = {
 
 describe('attributeCalculator', () => {
   it('会把百分比属性修正应用到最终战斗属性和资源属性', () => {
-    const result = calculateAllAttributes(initialAttributes, '不入流', {}, {
-      臂力: 50,
-      根骨: 150,
-      气血: 300,
-      内力: 120,
-    });
+    const result = calculateAllAttributes(
+      initialAttributes,
+      '不入流',
+      {},
+      {
+        臂力: 50,
+        根骨: 150,
+        气血: 300,
+        内力: 120,
+      },
+    );
 
     expect(result.combat).toEqual({
       臂力: 15,
@@ -74,12 +79,21 @@ describe('attributeCalculator', () => {
     expect(result.resources.气血上限).toBe(246);
   });
 
-  it('负数来源不吃正向封顶但最终不低于 0', () => {
+  it('经脉来源不受物品品阶封顶', () => {
     const result = applyAttributeModifiers(
-      { 臂力: 20, 根骨: 20, 机敏: 20, 洞察: 20 },
-      { 气血上限: 20, 内力上限: 20 },
-      [{ id: '毒', kind: '装备', rank: '凡品', modifiers: { 臂力: -200, 气血: -50 } }],
+      { 臂力: 100, 根骨: 100, 机敏: 100, 洞察: 100 },
+      { 气血上限: 200, 内力上限: 200 },
+      [{ id: '经脉', kind: '经脉', modifiers: { 臂力: 12, 内力: 18 } }],
     );
+
+    expect(result.combat.臂力).toBe(112);
+    expect(result.resources.内力上限).toBe(236);
+  });
+
+  it('负数来源不吃正向封顶但最终不低于 0', () => {
+    const result = applyAttributeModifiers({ 臂力: 20, 根骨: 20, 机敏: 20, 洞察: 20 }, { 气血上限: 20, 内力上限: 20 }, [
+      { id: '毒', kind: '装备', rank: '凡品', modifiers: { 臂力: -200, 气血: -50 } },
+    ]);
 
     expect(result.combat.臂力).toBe(0);
     expect(result.resources.气血上限).toBe(10);

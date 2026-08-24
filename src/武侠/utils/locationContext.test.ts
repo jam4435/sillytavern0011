@@ -65,11 +65,7 @@ describe('locationContext', () => {
     expect(context.currentScopePath).toBe('大宋/临安府/牛家村');
     expect(context.currentRegions.map(region => region.path)).toEqual(['大宋/临安府']);
     expect(context.adjacentRegions.map(region => region.path)).toEqual(['大宋/嘉兴府']);
-    expect(context.allowedLocationPaths).toEqual([
-      '大宋/临安府/牛家村',
-      '大宋/临安府/西湖',
-      '大宋/嘉兴府/烟雨楼',
-    ]);
+    expect(context.allowedLocationPaths).toEqual(['大宋/临安府/牛家村', '大宋/临安府/西湖', '大宋/嘉兴府/烟雨楼']);
   });
 
   it('拒绝同名地点缩写，不再猜测所属活动区', () => {
@@ -88,9 +84,7 @@ describe('locationContext', () => {
   });
 
   it('生成可供世界书读取的结构化聊天变量', () => {
-    const value = createDynamicLocationContextVariable(
-      buildDynamicLocationContext(mapData, '大宋/临安府/牛家村', 1),
-    );
+    const value = createDynamicLocationContextVariable(buildDynamicLocationContext(mapData, '大宋/临安府/牛家村', 1));
 
     expect(Object.keys(value)).toEqual(['当前活动区', '普通移动', '事件目标', '地图指定']);
     expect(value.当前活动区).toBe('大宋/临安府/牛家村');
@@ -116,26 +110,34 @@ describe('locationContext', () => {
   });
 
   it('事件占用只授权前三段，传闻、后续线索和地图指令仍可提供完整地点', () => {
-    expect(collectEventTargetPaths({
-      参与事件: { 夜斗: { 描述: '进行中' } },
-      人物事件占用: {
-        曲三: { 事件名: '夜斗', 地点: '大宋/临安府/牛家村/村西树林' },
-        闲人: { 事件名: '别的事件', 地点: '大宋/临安府/临安城/皇宫' },
-      },
-      附近传闻: { 比武招亲: '擂台人声鼎沸 [1219年10月20日13时/金国/中都/擂台]' },
-      后续事件线索: {
-        后续: '(1219年10月21日8时，大宋/嘉兴府/烟雨楼，似乎还会有事情发生)有人等候',
-        错误层级: '(1219年10月21日8时，大宋/嘉兴府/烟雨楼/楼顶，似乎还会有事情发生)不应授权',
-      },
-    })).toEqual([
+    expect(
+      collectEventTargetPaths({
+        参与事件: { 夜斗: { 描述: '进行中' } },
+        事件系统: {
+          人物事件占用: {
+            曲三: { 事件名: '夜斗', 地点: '大宋/临安府/牛家村/村西树林' },
+            闲人: { 事件名: '别的事件', 地点: '大宋/临安府/临安城/皇宫' },
+          },
+        },
+        前端变量: {
+          可发现事件: { 远方风波: '临安府暗流涌动 [1219年10月25日13时/大理/大理城/天龙寺]' },
+        },
+        附近传闻: { 比武招亲: '擂台人声鼎沸 [1219年10月20日13时/金国/中都/擂台]' },
+        后续事件线索: {
+          后续: '(1219年10月21日8时，大宋/嘉兴府/烟雨楼，似乎还会有事情发生)有人等候',
+          错误层级: '(1219年10月21日8时，大宋/嘉兴府/烟雨楼/楼顶，似乎还会有事情发生)不应授权',
+        },
+      }),
+    ).toEqual([
       '大宋/临安府/牛家村',
       '金国/中都/擂台',
+      '大理/大理城/天龙寺',
       '大宋/嘉兴府/烟雨楼',
       '大宋/嘉兴府/烟雨楼/楼顶',
     ]);
-    expect(extractExplicitMapTargetsFromText(
-      '出发\n[地图指令]从大宋/临安府/牛家村移动到大理/大理城/天龙寺',
-    )).toEqual(['大理/大理城/天龙寺']);
+    expect(extractExplicitMapTargetsFromText('出发\n[地图指令]从大宋/临安府/牛家村移动到大理/大理城/天龙寺')).toEqual([
+      '大理/大理城/天龙寺',
+    ]);
   });
 
   it('把最新周围地点写入 stat_data.前端变量，并清理旧顶层与旧世界信息变量', async () => {
@@ -152,10 +154,12 @@ describe('locationContext', () => {
     const updater = updateVariablesWithMock.mock.calls[0][0] as (
       variables: Record<string, unknown>,
     ) => Record<string, unknown>;
-    expect(updater({
-      stat_data: { 世界信息: { 时间: { 年: 1 }, 周围地点: { 相邻三级地点: ['旧值'] } } },
-      地图上下文: { 相邻三级地点: ['旧值'] },
-    })).toEqual({
+    expect(
+      updater({
+        stat_data: { 世界信息: { 时间: { 年: 1 }, 周围地点: { 相邻三级地点: ['旧值'] } } },
+        地图上下文: { 相邻三级地点: ['旧值'] },
+      }),
+    ).toEqual({
       stat_data: {
         前端变量: {
           周围地点: {

@@ -137,8 +137,9 @@ describe('SocialPanel martial-art details', () => {
 
     render(<SocialPanel npcs={[npc]} />);
 
-    expect(screen.getByText('全真剑法')).toBeInTheDocument();
-    expect(screen.getByText('金雁功')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '全真剑法', level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '金雁功', level: 3 })).toBeInTheDocument();
+    expect(screen.queryByText('功法根基')).not.toBeInTheDocument();
     expect(screen.getByText("招式严谨，如'白虹经天'。")).toBeInTheDocument();
     expect(screen.getByText('剑法严谨：格挡成功率提升20%')).toBeInTheDocument();
     expect(screen.queryByText('初窥门径')).not.toBeInTheDocument();

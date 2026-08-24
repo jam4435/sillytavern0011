@@ -12,9 +12,7 @@ import GameContent from './components/GameContent';
 import EventTracker from './components/EventTracker';
 import EventNotificationStack from './components/EventNotificationStack';
 import { Icons } from './components/Icons';
-import LatestReplyEditorModal, {
-  type LatestReplyEditorSaveOutcome,
-} from './components/LatestReplyEditorModal';
+import LatestReplyEditorModal, { type LatestReplyEditorSaveOutcome } from './components/LatestReplyEditorModal';
 import Modal from './components/Modal';
 import NewGameSetup from './components/NewGameSetup';
 import SaveLoadPanel from './components/SaveLoadPanel';
@@ -46,7 +44,7 @@ import {
 } from './hooks';
 import { readLatestDebugRoundSnapshot } from './hooks/useDebugLogs';
 import { shouldDeferSetupEventNotifications } from './hooks/usePageFlow';
-import { ActivePanel, InventoryItem } from './types';
+import { ActivePanel, InventoryItem, type MeridianNodeId, type MeridianUpgradeQuote } from './types';
 import {
   getInitialChatRenameSuggestion,
   getRandomOpeningLine,
@@ -56,12 +54,10 @@ import {
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
 import { migrateAvatarState } from './utils/avatarState';
 import { equipInventoryItem, useMedicineItem } from './utils/itemManager';
+import { upgradeMeridianNode } from './utils/meridianManager';
 import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inventoryAttributePreview';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
-import {
-  applyVariableUpdateModeWorldbookState,
-  getIsExtraVariableUpdating,
-} from './utils/extraVariableUpdateManager';
+import { applyVariableUpdateModeWorldbookState, getIsExtraVariableUpdating } from './utils/extraVariableUpdateManager';
 import {
   readLatestAssistantSnapshot,
   saveLatestAssistantSnapshot,
@@ -70,11 +66,7 @@ import {
 import { getUserCurrentLocation } from './utils/mapUtils';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
 import { finalizeCurrentTurn, resumeCheckout } from './utils/saveLoadManager';
-import {
-  renameCurrentChat,
-  renameCurrentChatAutomatically,
-  resumePendingChatRename,
-} from './utils/chatRenameManager';
+import { renameCurrentChat, renameCurrentChatAutomatically, resumePendingChatRename } from './utils/chatRenameManager';
 import { readRecentInputHistory, type InputHistoryEntry } from './utils/inputHistory';
 import {
   applyRegexRules,
@@ -121,11 +113,7 @@ import {
   updateHistoryCheckoutDraftMessage,
   type HistoryCheckoutDraft,
 } from '../shared/historyCheckoutJournal';
-import {
-  CHAT_RENAME_COMMIT_EVENT,
-  CHAT_RENAME_STATE_EVENT,
-  isChatRenamePending,
-} from '../shared/chatRenameJournal';
+import { CHAT_RENAME_COMMIT_EVENT, CHAT_RENAME_STATE_EVENT, isChatRenamePending } from '../shared/chatRenameJournal';
 
 const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
 const WUXIA_HISTORY_EVENT_STATE_STABLE_EVENT = 'wuxia:history-event-state-stable';
@@ -181,6 +169,7 @@ const App: React.FC = () => {
   const [playerAvatarVersion, setPlayerAvatarVersion] = useState(0);
   const [historyCheckoutPending, setHistoryCheckoutPending] = useState(() => isHistoryCheckoutPending());
   const [chatRenamePending, setChatRenamePending] = useState(() => isChatRenamePending());
+  const [isMeridianUpgradePending, setIsMeridianUpgradePending] = useState(false);
   const [historyInputDraft, setHistoryInputDraft] = useState<HistoryCheckoutDraft | null>(() =>
     readCurrentHistoryDraft(),
   );
@@ -284,7 +273,8 @@ const App: React.FC = () => {
     const handleCheckoutCommit = (event: Event) => {
       syncCheckoutLock();
       scheduleGameDataCompletion('history-checkout-commit', { fullScan: true });
-      const postCommitChatName = (event as CustomEvent<{ postCommitChatName?: string | null }>).detail?.postCommitChatName;
+      const postCommitChatName = (event as CustomEvent<{ postCommitChatName?: string | null }>).detail
+        ?.postCommitChatName;
       if (!postCommitChatName) return;
       void renameCurrentChatAutomatically(postCommitChatName).then(result => {
         if (result.status !== 'committed') {
@@ -675,7 +665,9 @@ const App: React.FC = () => {
         });
       } catch (error) {
         gameLogger.warn('[latest-reply-editor] 回复已保存，但历史预览刷新失败:', error);
-        warnings.push(`历史预览刷新失败，可稍后在存档面板重试：${error instanceof Error ? error.message : String(error)}`);
+        warnings.push(
+          `历史预览刷新失败，可稍后在存档面板重试：${error instanceof Error ? error.message : String(error)}`,
+        );
       }
 
       let committedSnapshot: LatestAssistantSnapshot | null = null;
@@ -689,22 +681,15 @@ const App: React.FC = () => {
         warnings.push('保存后最新楼层发生变化；再次编辑前请重新打开校订窗口。');
       }
       return {
-        snapshot:
-          committedSnapshot ?? {
-            ...snapshot,
-            rawText: result.finalText,
-            messageMirrorText: result.finalText,
-          },
+        snapshot: committedSnapshot ?? {
+          ...snapshot,
+          rawText: result.finalText,
+          messageMirrorText: result.finalText,
+        },
         warning: warnings.length > 0 ? warnings.join('；') : undefined,
       };
     },
-    [
-      historyMutationPending,
-      isLoading,
-      refreshGameStateFromVariables,
-      setCurrentMaintext,
-      setCurrentOptions,
-    ],
+    [historyMutationPending, isLoading, refreshGameStateFromVariables, setCurrentMaintext, setCurrentOptions],
   );
 
   const handleInventoryItemAction = useCallback(
@@ -771,6 +756,29 @@ const App: React.FC = () => {
       refreshGameStateFromVariables,
       showError,
     ],
+  );
+
+  const handleMeridianUpgrade = useCallback(
+    async (nodeId: MeridianNodeId, quote: MeridianUpgradeQuote) => {
+      if (isLoading || historyMutationPending) {
+        throw new Error('生成、聊天改名或历史分叉同步期间暂时不能冲穴。');
+      }
+
+      setIsMeridianUpgradePending(true);
+      try {
+        const result = await upgradeMeridianNode(nodeId, quote);
+        await syncPlayerAttributesFromVariables();
+        refreshGameStateFromVariables();
+        return result;
+      } catch (error) {
+        gameLogger.error('[App] 奇经八脉冲穴失败:', error);
+        showError(`冲穴失败：${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      } finally {
+        setIsMeridianUpgradePending(false);
+      }
+    },
+    [historyMutationPending, isLoading, refreshGameStateFromVariables, showError],
   );
 
   const handlePlayerSend = useCallback(
@@ -1243,6 +1251,8 @@ const App: React.FC = () => {
           <CharacterPanel
             stats={gameState.stats}
             worldTime={gameState.worldTime}
+            isBusy={isLoading || historyMutationPending || isMeridianUpgradePending}
+            onUpgradeMeridian={handleMeridianUpgrade}
             onAvatarUpdated={() => setPlayerAvatarVersion(version => version + 1)}
           />
         );
@@ -1298,7 +1308,9 @@ const App: React.FC = () => {
           />
         );
       case ActivePanel.SAVE_LOAD:
-        return <SaveLoadPanel gameState={gameState} onClose={closeModal} isBusy={isLoading || historyMutationPending} />;
+        return (
+          <SaveLoadPanel gameState={gameState} onClose={closeModal} isBusy={isLoading || historyMutationPending} />
+        );
       default:
         return null;
     }
@@ -1309,9 +1321,9 @@ const App: React.FC = () => {
     currentPage,
     isLoading,
     initialChatRename !== null,
-  )
-    ? null
-    : <EventNotificationStack notifications={eventNotifications} onDismiss={dismissEventNotification} />;
+  ) ? null : (
+    <EventNotificationStack notifications={eventNotifications} onDismiss={dismissEventNotification} />
+  );
 
   if (currentPage === 'booting') {
     return (

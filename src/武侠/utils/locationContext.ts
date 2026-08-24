@@ -1,9 +1,5 @@
 import type { MapData, MapRegion } from '../types';
-import {
-  getLocationScopePath,
-  normalizeLocationPath,
-  parseLocationPath,
-} from '../../shared/locationPath.js';
+import { getLocationScopePath, normalizeLocationPath, parseLocationPath } from '../../shared/locationPath.js';
 import { loadMapData } from './mapLoader';
 import { FRONTEND_VARIABLES_KEY } from './frontendVariableKeys';
 import { isLocationUnlocked } from './mapUtils';
@@ -77,10 +73,11 @@ function resolveCurrentRegions(regions: MapRegionReference[], currentLocation: s
   const parsed = parseLocationPath(currentLocation);
   if (!parsed) return [];
 
-  return regions.filter(region =>
-    parsed.area === region.areaName &&
-    parsed.region === region.regionName &&
-    Object.hasOwn(region.region.地点, parsed.location),
+  return regions.filter(
+    region =>
+      parsed.area === region.areaName &&
+      parsed.region === region.regionName &&
+      Object.hasOwn(region.region.地点, parsed.location),
   );
 }
 
@@ -116,9 +113,7 @@ function resolveAdjacentRegions(
       region,
       distance: Math.min(...currentRegions.map(current => getSquaredDistance(current, region))),
     }))
-    .sort((left, right) =>
-      left.distance - right.distance || left.region.path.localeCompare(right.region.path, 'zh-CN'),
-    )
+    .sort((left, right) => left.distance - right.distance || left.region.path.localeCompare(right.region.path, 'zh-CN'))
     .slice(0, Math.max(0, limit))
     .map(item => item.region);
 }
@@ -146,8 +141,9 @@ export function buildDynamicLocationContext(
   }
 
   const currentRegions = resolvedRegions.map(region => toRegionOption(region, exploredLocations));
-  const adjacentRegions = resolveAdjacentRegions(allRegions, resolvedRegions, adjacentRegionLimit)
-    .map(region => toRegionOption(region, exploredLocations));
+  const adjacentRegions = resolveAdjacentRegions(allRegions, resolvedRegions, adjacentRegionLimit).map(region =>
+    toRegionOption(region, exploredLocations),
+  );
   const allowedLocationPaths = [
     ...currentRegions.flatMap(region => region.locations),
     ...adjacentRegions.flatMap(region => region.locations),
@@ -217,7 +213,12 @@ export async function buildCurrentDynamicLocationContext(): Promise<DynamicLocat
   const exploredLocations = Array.isArray(userData.已探索地点)
     ? userData.已探索地点.filter((value): value is string => typeof value === 'string')
     : [];
-  return buildDynamicLocationContext(mapData, getCurrentPlayerLocation(), DEFAULT_ADJACENT_REGION_LIMIT, exploredLocations);
+  return buildDynamicLocationContext(
+    mapData,
+    getCurrentPlayerLocation(),
+    DEFAULT_ADJACENT_REGION_LIMIT,
+    exploredLocations,
+  );
 }
 
 export async function buildDynamicLocationConstraintPrompt(): Promise<string> {
@@ -244,9 +245,7 @@ export function createDynamicLocationContextVariable(
 }
 
 function normalizeCompleteLocationPaths(paths: string[]): string[] {
-  return [...new Set(paths
-    .map(normalizeLocationPath)
-    .filter(Boolean))];
+  return [...new Set(paths.map(normalizeLocationPath).filter(Boolean))];
 }
 
 export function extractExplicitMapTargetsFromText(text: string): string[] {
@@ -261,9 +260,12 @@ export function extractExplicitMapTargetsFromText(text: string): string[] {
 export function collectEventTargetPaths(statData: Record<string, unknown>): string[] {
   const targets: string[] = [];
   const nearbyRumors = isRecord(statData.附近传闻) ? statData.附近传闻 : {};
+  const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : {};
+  const discoverableEvents = isRecord(frontendVariables.可发现事件) ? frontendVariables.可发现事件 : {};
   const followupClues = isRecord(statData.后续事件线索) ? statData.后续事件线索 : {};
   const participationEvents = isRecord(statData.参与事件) ? statData.参与事件 : {};
-  const participantOccupancy = isRecord(statData.人物事件占用) ? statData.人物事件占用 : {};
+  const eventSystem = isRecord(statData.事件系统) ? statData.事件系统 : {};
+  const participantOccupancy = isRecord(eventSystem.人物事件占用) ? eventSystem.人物事件占用 : {};
   const activeEventNames = new Set(Object.keys(participationEvents));
 
   for (const value of Object.values(participantOccupancy)) {
@@ -274,7 +276,7 @@ export function collectEventTargetPaths(statData: Record<string, unknown>): stri
     }
   }
 
-  for (const value of Object.values(nearbyRumors)) {
+  for (const value of [...Object.values(nearbyRumors), ...Object.values(discoverableEvents)]) {
     if (typeof value !== 'string') continue;
     const match = value.match(/\[[^\]/]+\/(.+)]\s*$/);
     if (match?.[1]) targets.push(match[1]);
@@ -313,11 +315,11 @@ export function updateLocationContextInVariables(
 ): Record<string, unknown> {
   const rootVariables = omitKeys(variables, [LEGACY_LOCATION_CONTEXT_VARIABLE_KEY, LOCATION_CONTEXT_VARIABLE_KEY]);
   const hasStatDataWrapper = isRecord(variables[STAT_DATA_KEY]);
-  const statData = hasStatDataWrapper ? variables[STAT_DATA_KEY] as Record<string, unknown> : rootVariables;
-  const worldInfo = omitKeys(
-    isRecord(statData[WORLD_INFO_KEY]) ? statData[WORLD_INFO_KEY] : {},
-    [LEGACY_LOCATION_CONTEXT_VARIABLE_KEY, LOCATION_CONTEXT_VARIABLE_KEY],
-  );
+  const statData = hasStatDataWrapper ? (variables[STAT_DATA_KEY] as Record<string, unknown>) : rootVariables;
+  const worldInfo = omitKeys(isRecord(statData[WORLD_INFO_KEY]) ? statData[WORLD_INFO_KEY] : {}, [
+    LEGACY_LOCATION_CONTEXT_VARIABLE_KEY,
+    LOCATION_CONTEXT_VARIABLE_KEY,
+  ]);
   const frontendVariables = isRecord(statData[FRONTEND_VARIABLES_KEY]) ? statData[FRONTEND_VARIABLES_KEY] : {};
   const nextStatData = {
     ...statData,

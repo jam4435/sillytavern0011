@@ -163,7 +163,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
     // 兼容旧版 NPC 投影：只有一份扁平 template 时仍显示一张功法卡。
     return [
       [
-        '功法根基',
+        '未载功法',
         {
           type: selectedNpc.template.type,
           martialArtsDescription: selectedNpc.template.martialArtsDescription,
@@ -518,16 +518,18 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
               )}
 
               {martialArtEntries.map(([martialArtName, martialArt]) => {
+                const martialArtTitle = martialArtName.trim() || '未载功法';
                 const traitEntries = Object.entries(martialArt.traits || {}).filter(
                   ([, desc]) => typeof desc === 'string' && desc.trim().length > 0,
                 );
 
                 return (
-                  <section className="social-detail-card" key={martialArtName}>
-                    <div className="social-detail-card-head">
+                  <section className="social-detail-card social-martial-art-card" key={martialArtName}>
+                    <div className="social-detail-card-head social-martial-art-card-head">
                       <Icons.Combat size={16} />
-                      <span>功法根基</span>
-                      {martialArtName !== '功法根基' && <strong>{martialArtName}</strong>}
+                      <h3 className="social-martial-art-title" title={martialArtTitle}>
+                        {martialArtTitle}
+                      </h3>
                     </div>
                     <div className="social-tag-row">
                       {martialArt.type && <span className="social-tag muted">{martialArt.type}</span>}

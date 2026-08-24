@@ -84,7 +84,7 @@ export interface AttributeModifierMap {
   [attribute: string]: number;
 }
 
-export type AttributeModifierKind = '装备' | '回复' | '临时增幅' | '永久增幅' | '未封顶';
+export type AttributeModifierKind = '装备' | '回复' | '临时增幅' | '永久增幅' | '经脉' | '未封顶';
 
 export interface AttributeModifierSource {
   id?: string;
@@ -135,7 +135,7 @@ const RANK_REFERENCE_REALM: Record<string, string> = {
   神品: '绝顶圆满',
 };
 
-const MODIFIER_CAP_PERCENT: Record<Exclude<AttributeModifierKind, '未封顶'>, Record<string, number>> = {
+const MODIFIER_CAP_PERCENT: Record<Exclude<AttributeModifierKind, '未封顶' | '经脉'>, Record<string, number>> = {
   装备: {
     凡品: 5,
     精品: 10,
@@ -278,7 +278,7 @@ function normalizeOrdinaryRank(rank?: string): string | undefined {
 }
 
 function getModifierCapPercent(kind: AttributeModifierKind | undefined, rank?: string): number | undefined {
-  if (!kind || kind === '未封顶') {
+  if (!kind || kind === '未封顶' || kind === '经脉') {
     return undefined;
   }
   const normalizedRank = normalizeOrdinaryRank(rank);
@@ -358,10 +358,7 @@ function toModifierSources(input?: AttributeModifierInput): AttributeModifierSou
   return modifiers ? [{ kind: '未封顶', modifiers }] : [];
 }
 
-function applySourceModifiers<T extends object>(
-  baseValues: T,
-  sources: AttributeModifierSource[],
-): T {
+function applySourceModifiers<T extends object>(baseValues: T, sources: AttributeModifierSource[]): T {
   const baseRecord = baseValues as Record<string, number>;
   const deltas: Record<string, number> = Object.fromEntries(Object.keys(baseRecord).map(attribute => [attribute, 0]));
 

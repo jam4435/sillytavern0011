@@ -1,8 +1,5 @@
 import type { InitialAttributes } from '../types';
-import {
-  getLocationScopePath,
-  normalizeLocationPath,
-} from '../../shared/locationPath.js';
+import { getLocationScopePath, normalizeLocationPath } from '../../shared/locationPath.js';
 import {
   applyAttributeModifiers,
   calculateCombatAttributes,
@@ -34,6 +31,7 @@ import {
   FRONTEND_VARIABLES_KEY,
 } from './frontendVariableKeys';
 import { dataLogger } from './logger';
+import { deriveMeridianModifiers } from './meridianSystem';
 const DEFAULT_RANDOM_NUMBER_COUNT = 5;
 
 const POWER_ZONE_TYPES: MartialArtsType[] = [
@@ -142,7 +140,7 @@ function toSimpleMartialArts(martialArts: CharacterMartialArtRecord | undefined)
       类型: typeof value.类型 === 'string' ? value.类型 : undefined,
       功法描述: typeof value.功法描述 === 'string' ? value.功法描述 : undefined,
       功法品阶: typeof value.功法品阶 === 'string' ? value.功法品阶 : undefined,
-      特性: isRecord(value.特性) ? value.特性 as Record<string, string> : undefined,
+      特性: isRecord(value.特性) ? (value.特性 as Record<string, string>) : undefined,
     };
     return result;
   }, {});
@@ -156,7 +154,7 @@ function normalizeModifierMap(value: unknown): AttributeModifierMap | undefined 
   const entries = Object.entries(value).filter(
     ([attribute, modifier]) => Boolean(attribute) && typeof modifier === 'number' && Number.isFinite(modifier),
   );
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  return entries.length > 0 ? (Object.fromEntries(entries) as AttributeModifierMap) : undefined;
 }
 
 function createModifierSource(
@@ -165,9 +163,7 @@ function createModifierSource(
   rank: unknown,
   modifiers?: AttributeModifierMap,
 ): AttributeModifierSource | null {
-  return modifiers
-    ? { id, kind, rank: typeof rank === 'string' ? rank : undefined, modifiers }
-    : null;
+  return modifiers ? { id, kind, rank: typeof rank === 'string' ? rank : undefined, modifiers } : null;
 }
 
 function collectPlayerAttributeModifiers(
@@ -179,6 +175,11 @@ function collectPlayerAttributeModifiers(
   const equipmentSlots = isRecord(userData.装备栏) ? userData.装备栏 : {};
   const statusEffects = isRecord(userData.状态效果) ? userData.状态效果 : {};
   const permanentModifiers = isRecord(frontendVariables?.永久属性修正) ? frontendVariables.永久属性修正 : {};
+  const meridianModifiers = deriveMeridianModifiers(frontendVariables?.奇经八脉);
+
+  if (Object.values(meridianModifiers).some(value => value !== 0)) {
+    sources.push({ id: '奇经八脉', kind: '经脉', modifiers: meridianModifiers });
+  }
 
   for (const [slot, itemName] of Object.entries(equipmentSlots)) {
     if (slot.startsWith('$') || typeof itemName !== 'string') {
@@ -237,7 +238,7 @@ function collectPlayerAttributeModifiers(
 }
 
 function buildPlayerCharacter(statData: StatDataRecord): CombatCharacter | null {
-  const userData = isRecord(statData.user数据) ? statData.user数据 as PlayerProfile : null;
+  const userData = isRecord(statData.user数据) ? (statData.user数据 as PlayerProfile) : null;
   const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : undefined;
   if (!userData) {
     return null;
@@ -362,22 +363,20 @@ function buildCharacterPowerRow(character: CombatCharacter): string {
     { 气血上限: 0, 内力上限: 0 },
     character.attributeModifiers,
   );
-  const entriesByType = POWER_ZONE_TYPES.reduce<Record<MartialArtsType, MartialArtPowerEntry[]>>((result, type) => {
-    result[type] = [];
-    return result;
-  }, {} as Record<MartialArtsType, MartialArtPowerEntry[]>);
+  const entriesByType = POWER_ZONE_TYPES.reduce<Record<MartialArtsType, MartialArtPowerEntry[]>>(
+    (result, type) => {
+      result[type] = [];
+      return result;
+    },
+    {} as Record<MartialArtsType, MartialArtPowerEntry[]>,
+  );
 
   for (const [name, martialArt] of Object.entries(completedMartialArts)) {
     if (!isKnownPowerZoneType(martialArt.type)) {
       continue;
     }
 
-    const power = calculateMartialArtPower(
-      martialArt,
-      character.initialAttributes,
-      realmCoefficient,
-      combatAttributes,
-    );
+    const power = calculateMartialArtPower(martialArt, character.initialAttributes, realmCoefficient, combatAttributes);
     if (power === null || power <= 0) {
       continue;
     }
@@ -386,8 +385,9 @@ function buildCharacterPowerRow(character: CombatCharacter): string {
   }
 
   const cells = POWER_ZONE_TYPES.flatMap(type => {
-    const entries = entriesByType[type]
-      .sort((left, right) => right.power - left.power || left.name.localeCompare(right.name, 'zh-CN'));
+    const entries = entriesByType[type].sort(
+      (left, right) => right.power - left.power || left.name.localeCompare(right.name, 'zh-CN'),
+    );
     if (entries.length === 0) {
       return [];
     }
@@ -395,7 +395,9 @@ function buildCharacterPowerRow(character: CombatCharacter): string {
   });
 
   const basicTechniquePower = calculateBasicTechniquePower(character.realm, combatAttributes);
-  return [character.displayName, `位置:${character.normalizedLocation}`, `基础:${basicTechniquePower}`, ...cells].join('|');
+  return [character.displayName, `位置:${character.normalizedLocation}`, `基础:${basicTechniquePower}`, ...cells].join(
+    '|',
+  );
 }
 
 function calculateEffectiveCultivationBonus(character: CombatCharacter): number {
@@ -491,9 +493,9 @@ function upsertFrontendVariables(
   updates: Partial<FrontendDerivedVariables>,
 ): Record<string, unknown> {
   const hasStatDataWrapper = isRecord(variables.stat_data);
-  const statData = hasStatDataWrapper ? variables.stat_data as Record<string, unknown> : variables;
+  const statData = hasStatDataWrapper ? (variables.stat_data as Record<string, unknown>) : variables;
   const currentFrontendVariables = isRecord(statData[FRONTEND_VARIABLES_KEY])
-    ? statData[FRONTEND_VARIABLES_KEY] as Record<string, unknown>
+    ? (statData[FRONTEND_VARIABLES_KEY] as Record<string, unknown>)
     : {};
   const nextFrontendVariables = {
     ...currentFrontendVariables,
@@ -515,15 +517,20 @@ function upsertFrontendVariables(
 }
 
 export function buildFrontendRandomNumbers(count = DEFAULT_RANDOM_NUMBER_COUNT): string {
-  return Array.from({ length: Math.max(0, count) }, (_, index) => `随机数${index + 1}: ${Math.floor(Math.random() * 11)}`)
-    .join('\n');
+  return Array.from(
+    { length: Math.max(0, count) },
+    (_, index) => `随机数${index + 1}: ${Math.floor(Math.random() * 11)}`,
+  ).join('\n');
 }
 
 export async function syncFrontendDerivedVariables(
   options: SyncFrontendDerivedVariablesOptions = {},
 ): Promise<FrontendDerivedVariables | null> {
   try {
-    const [dynamicLocationContext] = await Promise.all([buildCurrentDynamicLocationContext(), loadMartialArtsDatabase()]);
+    const [dynamicLocationContext] = await Promise.all([
+      buildCurrentDynamicLocationContext(),
+      loadMartialArtsDatabase(),
+    ]);
     const currentVariables = getVariables({ type: 'chat' }) as Record<string, unknown>;
     const statData = getStatDataRecord(currentVariables);
     const locationContext = createDynamicLocationContextVariable(dynamicLocationContext, {
@@ -534,24 +541,27 @@ export async function syncFrontendDerivedVariables(
     const cultivationReference = buildCultivationChangeReferenceFromStatData(statData);
     const randomNumbers = buildFrontendRandomNumbers();
 
-    updateVariablesWith(current => {
-      const currentVariables = current as Record<string, unknown>;
-      const nextWithLocation = shouldRefreshLocationContext(currentVariables, locationContext)
-        ? updateLocationContextInVariables(currentVariables, locationContext)
-        : currentVariables;
-      const frontendVariables = getFrontendVariablesRecord(nextWithLocation);
-      const updates = {
-        [FRONTEND_RANDOM_NUMBERS_KEY]: randomNumbers,
-      } as Partial<FrontendDerivedVariables>;
-      if (frontendVariables[FRONTEND_BATTLE_ZONE_KEY] !== battleZone) {
-        updates[FRONTEND_BATTLE_ZONE_KEY] = battleZone;
-      }
-      if (frontendVariables[FRONTEND_CULTIVATION_REFERENCE_KEY] !== cultivationReference) {
-        updates[FRONTEND_CULTIVATION_REFERENCE_KEY] = cultivationReference;
-      }
+    updateVariablesWith(
+      current => {
+        const currentVariables = current as Record<string, unknown>;
+        const nextWithLocation = shouldRefreshLocationContext(currentVariables, locationContext)
+          ? updateLocationContextInVariables(currentVariables, locationContext)
+          : currentVariables;
+        const frontendVariables = getFrontendVariablesRecord(nextWithLocation);
+        const updates = {
+          [FRONTEND_RANDOM_NUMBERS_KEY]: randomNumbers,
+        } as Partial<FrontendDerivedVariables>;
+        if (frontendVariables[FRONTEND_BATTLE_ZONE_KEY] !== battleZone) {
+          updates[FRONTEND_BATTLE_ZONE_KEY] = battleZone;
+        }
+        if (frontendVariables[FRONTEND_CULTIVATION_REFERENCE_KEY] !== cultivationReference) {
+          updates[FRONTEND_CULTIVATION_REFERENCE_KEY] = cultivationReference;
+        }
 
-      return upsertFrontendVariables(nextWithLocation, updates);
-    }, { type: 'chat' });
+        return upsertFrontendVariables(nextWithLocation, updates);
+      },
+      { type: 'chat' },
+    );
 
     return {
       周围地点: locationContext,

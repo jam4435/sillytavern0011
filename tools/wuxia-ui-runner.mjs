@@ -22,6 +22,18 @@ const SELECTORS = {
   historyStatus: '[data-wuxia-automation="history-status"]',
   continueHistoryNode: '[data-wuxia-automation="continue-history-node"]',
   confirmHistoryCheckout: '[data-wuxia-automation="confirm-history-checkout"]',
+  startGame: '[data-wuxia-automation="start-game"]',
+  newStory: '[data-wuxia-automation="new-story"]',
+  newGameSetup: '[data-wuxia-automation="new-game-setup"]',
+  savedCharacterBuild: '[data-wuxia-automation="saved-character-build"]',
+  loadCharacterBuild: '[data-wuxia-automation="load-character-build"]',
+  setupPreviousStep: '[data-wuxia-automation="setup-previous-step"]',
+  setupNextStep: '[data-wuxia-automation="setup-next-step"]',
+  openingEventSearch: '[data-wuxia-automation="opening-event-search"]',
+  openingEvent: '[data-wuxia-automation="opening-event"]',
+  submitNewGame: '[data-wuxia-automation="submit-new-game"]',
+  keepCurrentChatName: '[data-wuxia-automation="keep-current-chat-name"]',
+  openingScreen: '[data-wuxia-automation="opening-screen"]',
   stopGenerationIcon: 'i.fa-circle-stop',
 };
 
@@ -34,6 +46,7 @@ function printUsage() {
   pnpm wuxia:ui -- --turns 5 --action "在客栈向掌柜打听消息"
   pnpm wuxia:ui -- --regenerate --output wuxia-regenerate-report.json
   pnpm wuxia:ui -- --restart-from-first-reply --output wuxia-restart-report.json
+  pnpm wuxia:ui -- --start-new-game --character-build "测试角色" --opening-event "郭杨邀饮说书人"
 
 选项：
   --endpoint <url>       Chrome CDP 地址，默认 http://127.0.0.1:9333
@@ -50,6 +63,15 @@ function printUsage() {
   --regenerate           只重新生成最新 assistant swipe 一次，不新建 user 楼层
   --restart-from-first-reply
                          通过“存档与分叉”回到当前脉络的首个 assistant 回复，不发送或生成
+  --start-new-game       从酒馆宿主页进入角色的新聊天，加载角色预设、更换开局事件并发送首个行动
+  --character-name <text>
+                         --start-new-game 的角色卡名称，默认 金庸群侠传
+  --character-build <id-or-name>
+                         要加载的已保存角色预设 ID 或完整名称
+  --opening-event <id-or-name>
+                         要选择的开局事件 ID 或完整名称
+  --opening-action <text>
+                         开局页发送的首个行动，默认 开始
   --reload-page          重新加载匹配的酒馆页面并等待武侠 iframe 就绪，不发送或生成
   --stop-generation      仅在页面正在生成时，通过酒馆终止按钮停止当前生成
   --continue-on-error    调试状态为 error 时继续下一轮
@@ -89,6 +111,11 @@ function parseArgs(argv) {
     statDataSnapshot: false,
     regenerate: false,
     restartFromFirstReply: false,
+    startNewGame: false,
+    characterName: '金庸群侠传',
+    characterBuild: '',
+    openingEvent: '',
+    openingAction: '开始',
     reloadPage: false,
     stopGeneration: false,
     continueOnError: false,
@@ -121,6 +148,10 @@ function parseArgs(argv) {
       options.restartFromFirstReply = true;
       continue;
     }
+    if (arg === '--start-new-game') {
+      options.startNewGame = true;
+      continue;
+    }
     if (arg === '--reload-page') {
       options.reloadPage = true;
       continue;
@@ -142,6 +173,10 @@ function parseArgs(argv) {
       if (value !== 'api' && value !== 'dom') throw new Error('--transport 只能是 api 或 dom');
       options.transport = value;
     } else if (arg === '--chat-id') options.chatId = value;
+    else if (arg === '--character-name') options.characterName = value;
+    else if (arg === '--character-build') options.characterBuild = value;
+    else if (arg === '--opening-event') options.openingEvent = value;
+    else if (arg === '--opening-action') options.openingAction = value;
     else if (arg === '--output') options.output = value;
     else throw new Error(`未知选项：${arg}`);
   }
@@ -154,17 +189,19 @@ function parseArgs(argv) {
     options.stopGeneration,
     options.regenerate,
     options.restartFromFirstReply,
+    options.startNewGame,
     options.reloadPage,
   ].filter(Boolean).length;
   if (exclusiveModeCount > 1) {
     throw new Error(
-      '--inspect-only、--stop-generation、--regenerate、--restart-from-first-reply 与 --reload-page 必须单独使用',
+      '--inspect-only、--stop-generation、--regenerate、--restart-from-first-reply、--start-new-game 与 --reload-page 必须单独使用',
     );
   }
   if (
     options.regenerate &&
     (options.inspectOnly ||
       options.restartFromFirstReply ||
+      options.startNewGame ||
       options.reloadPage ||
       options.stopGeneration ||
       options.actions.length > 0 ||
@@ -179,6 +216,7 @@ function parseArgs(argv) {
     (options.inspectOnly ||
       options.regenerate ||
       options.restartFromFirstReply ||
+      options.startNewGame ||
       options.reloadPage ||
       options.actions.length > 0 ||
       options.turns !== 1)
@@ -189,6 +227,7 @@ function parseArgs(argv) {
     options.restartFromFirstReply &&
     (options.inspectOnly ||
       options.regenerate ||
+      options.startNewGame ||
       options.stopGeneration ||
       options.reloadPage ||
       options.actions.length > 0 ||
@@ -197,10 +236,30 @@ function parseArgs(argv) {
     throw new Error('--restart-from-first-reply 不能与推进、重生成、终止、--inspect-only 或 --turns 一起使用');
   }
   if (
+    options.startNewGame &&
+    (options.inspectOnly ||
+      options.regenerate ||
+      options.stopGeneration ||
+      options.restartFromFirstReply ||
+      options.reloadPage ||
+      options.chatId ||
+      options.actions.length > 0 ||
+      options.turns !== 1)
+  ) {
+    throw new Error('--start-new-game 不能与推进、--chat-id、重生成、终止、重载、检查或 --turns 一起使用');
+  }
+  if (options.startNewGame && !options.characterBuild.trim()) {
+    throw new Error('--start-new-game 必须提供 --character-build');
+  }
+  if (options.startNewGame && !options.openingEvent.trim()) {
+    throw new Error('--start-new-game 必须提供 --opening-event');
+  }
+  if (
     !options.inspectOnly &&
     !options.stopGeneration &&
     !options.regenerate &&
     !options.restartFromFirstReply &&
+    !options.startNewGame &&
     !options.reloadPage &&
     options.actions.length === 0
   ) {
@@ -211,6 +270,7 @@ function parseArgs(argv) {
     !options.stopGeneration &&
     !options.regenerate &&
     !options.restartFromFirstReply &&
+    !options.startNewGame &&
     !options.reloadPage &&
     options.actions.length !== 1 &&
     options.actions.length !== options.turns
@@ -295,8 +355,9 @@ async function probeGameFrame(page, frame, timeoutMs = 500, hostSlot = null) {
       const [pageMeta, frameMeta] = await Promise.all([
         page.evaluate(() => ({ visibility: document.visibilityState, title: document.title })),
         frame.evaluate(() => {
-          if (!document.querySelector('[data-wuxia-automation="player-input"]')) return null;
           const api = window.WuxiaAutomation;
+          const automationVersion = document.documentElement.dataset.wuxiaAutomationVersion || '';
+          if (!automationVersion || !api?.getSnapshot) return null;
           let snapshot = null;
           try {
             snapshot = api?.getSnapshot?.() ?? null;
@@ -318,7 +379,7 @@ async function probeGameFrame(page, frame, timeoutMs = 500, hostSlot = null) {
           return {
             visible,
             instanceId: document.documentElement.dataset.wuxiaAutomationInstance || '',
-            automationVersion: document.documentElement.dataset.wuxiaAutomationVersion || '',
+            automationVersion,
             snapshot: snapshot
               ? {
                   ready: snapshot.ready === true,
@@ -466,6 +527,318 @@ async function findGameFrame(browser, pageUrl, timeoutMs = 15_000, requestedChat
     `找不到武侠游戏 iframe；已检查页面：${pages}；候选：${JSON.stringify(candidates)}；` +
       `探测错误：${JSON.stringify(lastProbeErrors)}`,
   );
+}
+
+async function findHostPage(browser, pageUrl) {
+  const candidates = browser
+    .contexts()
+    .flatMap(context => context.pages())
+    .filter(page => !page.isClosed() && (!pageUrl || page.url().includes(pageUrl)));
+  if (candidates.length === 0) throw new Error(`找不到 URL 包含 ${pageUrl || '(任意)'} 的酒馆页面`);
+  if (candidates.length === 1) return candidates[0];
+
+  const visible = [];
+  for (const page of candidates) {
+    const visibility = await page.evaluate(() => document.visibilityState).catch(() => 'hidden');
+    if (visibility === 'visible') visible.push(page);
+  }
+  if (visible.length === 1) return visible[0];
+  throw new Error(`酒馆页面目标不唯一，拒绝任取第一个：${candidates.map(page => page.url()).join(', ')}`);
+}
+
+async function readSelectedCharacterName(page) {
+  return page.evaluate(() => {
+    const selected = document.querySelector('#rm_print_characters_block .character_select.selected');
+    return (selected?.querySelector('.ch_name')?.textContent || '').trim();
+  });
+}
+
+async function selectCharacterByName(page, characterName) {
+  const drawerButton = page.locator('#rightNavDrawerIcon, #rm_button_selected_ch').first();
+  if (await drawerButton.isVisible().catch(() => false)) {
+    await drawerButton.click().catch(() => undefined);
+    await sleep(250);
+  }
+
+  const selection = await page.evaluate(name => {
+    const cards = [...document.querySelectorAll('#rm_print_characters_block .character_select')];
+    const summaries = cards.map((card, index) => ({
+      index,
+      name: (card.querySelector('.ch_name')?.textContent || '').trim(),
+      title: (card.getAttribute('title') || '').trim(),
+    }));
+    const matches = summaries.filter(item => item.name === name || item.title === `[Character] ${name}`);
+    if (matches.length !== 1) return { clicked: false, matches, summaries };
+    const card = cards[matches[0].index];
+    if (!(card instanceof HTMLElement)) return { clicked: false, matches, summaries };
+    card.click();
+    return { clicked: true, matches, summaries: [] };
+  }, characterName);
+  if (!selection.clicked) {
+    throw new Error(
+      `无法唯一定位角色卡「${characterName}」；匹配 ${selection.matches.length} 个；` +
+        `当前角色：${JSON.stringify(selection.summaries.slice(0, 30))}`,
+    );
+  }
+
+  releaseGameFrameLock();
+  const browser = page.context().browser();
+  if (!browser) throw new Error('无法从酒馆页面取得 Playwright Browser 实例');
+  const deadline = Date.now() + 30_000;
+  let selectedName = '';
+  while (Date.now() < deadline) {
+    selectedName = await readSelectedCharacterName(page).catch(() => '');
+    if (selectedName === characterName) {
+      try {
+        return await findGameFrame(browser, page.url(), 2_000);
+      } catch {
+        // 角色已选中但 loader iframe 尚未就绪。
+      }
+    }
+    await sleep(150);
+  }
+  throw new Error(`点击角色卡后未进入目标聊天：期望「${characterName}」，最后选中「${selectedName || '(空)'}」`);
+}
+
+async function clickHostStartNewChat(page) {
+  const nativeDialog = new Promise(resolve => {
+    const handler = dialog => {
+      clearTimeout(timeout);
+      resolve(dialog);
+    };
+    const timeout = setTimeout(() => {
+      page.off('dialog', handler);
+      resolve(null);
+    }, 1_500);
+    page.once('dialog', handler);
+  });
+
+  const optionsButton = page.locator('#options_button').first();
+  if (await optionsButton.isVisible().catch(() => false)) {
+    await optionsButton.click();
+    await sleep(150);
+  }
+  const newChat = page.locator('#option_start_new_chat, #new_chat').first();
+  if ((await newChat.count()) === 0) {
+    throw new Error('酒馆宿主页缺少新建聊天控件 #option_start_new_chat / #new_chat');
+  }
+  const clicked = await newChat.evaluate(element => {
+    if (!(element instanceof HTMLElement)) return false;
+    element.click();
+    return true;
+  });
+  if (!clicked) throw new Error('酒馆“开始新聊天”控件不可点击');
+
+  const dialog = await nativeDialog;
+  if (dialog) await dialog.accept();
+  const popupOk = page.locator('#dialogue_popup_ok').first();
+  if (await popupOk.isVisible().catch(() => false)) await popupOk.click();
+}
+
+async function waitForPageState(browser, pageUrl, expected, timeoutMs, requestedChatId = '') {
+  const expectedStates = Array.isArray(expected) ? expected : [expected];
+  const deadline = Date.now() + timeoutMs;
+  let last = null;
+  while (Date.now() < deadline) {
+    try {
+      const target = await findGameFrame(browser, pageUrl, 2_000, requestedChatId);
+      const snapshot = await readAutomationSnapshot(target);
+      last = { ...target, snapshot };
+      if (expectedStates.includes(snapshot.page)) return last;
+    } catch {
+      // 宿主切聊天和初始化都会重建 iframe；新实例就绪前继续轮询。
+    }
+    await sleep(150);
+  }
+  throw new Error(
+    `等待武侠页面进入 ${expectedStates.join('/')} 超时（${timeoutMs}ms）` +
+      (last ? `；最后页面：${last.snapshot.page}，聊天：${last.snapshot.chatId}` : ''),
+  );
+}
+
+async function enterFreshCharacterChat(browser, options) {
+  const page = await findHostPage(browser, options.pageUrl);
+  let target = null;
+  try {
+    target = await findGameFrame(browser, options.pageUrl, 2_000);
+  } catch {
+    // 当前尚未进入带武侠 loader 的聊天，下面从角色卡进入。
+  }
+
+  const selectedName = await readSelectedCharacterName(page).catch(() => '');
+  if (!target || selectedName !== options.characterName) {
+    target = await selectCharacterByName(page, options.characterName);
+  }
+  const snapshot = await readAutomationSnapshot(target);
+  if (snapshot.page === 'start') {
+    return { page, target, createdNewChat: false, previousChatId: snapshot.chatId || '' };
+  }
+
+  const previousChatId = snapshot.chatId || '';
+  await clickHostStartNewChat(page);
+  releaseGameFrameLock();
+  const fresh = await waitForPageState(browser, options.pageUrl, 'start', options.timeoutMs);
+  if (previousChatId && fresh.snapshot.chatId === previousChatId) {
+    throw new Error('新建聊天后 chatId 未变化，拒绝在既有存档上重跑开局');
+  }
+  return { page, target: fresh, createdNewChat: true, previousChatId };
+}
+
+async function findUniqueSetupItem(frame, selector, value, idAttribute, nameAttribute, label) {
+  const items = frame.locator(selector);
+  const metadata = await items.evaluateAll(
+    (elements, attributes) =>
+      elements.map((element, index) => ({
+        index,
+        id: element.getAttribute(attributes.idAttribute) || '',
+        name: element.getAttribute(attributes.nameAttribute) || '',
+      })),
+    { idAttribute, nameAttribute },
+  );
+  const matches = metadata.filter(item => item.id === value || item.name === value);
+  if (matches.length !== 1) {
+    throw new Error(`无法唯一定位${label}「${value}」；匹配 ${matches.length} 个；可选项：${JSON.stringify(metadata)}`);
+  }
+  return { locator: items.nth(matches[0].index), ...matches[0] };
+}
+
+async function clickSetupNavigation(browser, options, selector, expectedStep) {
+  const { frame } = await findGameFrame(browser, options.pageUrl);
+  const button = frame.locator(selector).first();
+  await button.waitFor({ state: 'visible', timeout: 10_000 });
+  if (await button.isDisabled()) throw new Error(`开局步骤导航按钮当前不可用：${selector}`);
+  await button.click();
+  await waitForSetupStep(browser, options.pageUrl, expectedStep, 10_000);
+}
+
+async function waitForSetupStep(browser, pageUrl, expectedStep, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let actualStep = '';
+  while (Date.now() < deadline) {
+    try {
+      const { frame } = await findGameFrame(browser, pageUrl, 2_000);
+      const setup = frame.locator(SELECTORS.newGameSetup).first();
+      if (await setup.isVisible().catch(() => false)) {
+        actualStep = (await setup.getAttribute('data-wuxia-setup-step')) || '';
+        if (actualStep === expectedStep) return frame;
+      }
+    } catch {
+      // iframe 换代或 React 正在提交步骤状态。
+    }
+    await sleep(100);
+  }
+  throw new Error(`等待开局步骤 ${expectedStep} 超时（${timeoutMs}ms）；最后步骤：${actualStep || '(未知)'}`);
+}
+
+async function startNewGameFlow(browser, options) {
+  const startedAt = Date.now();
+  log(`完整开局：进入角色「${options.characterName}」的新聊天`);
+  const entered = await enterFreshCharacterChat(browser, options);
+  const initialChatId = entered.target.chatId || entered.target.snapshot?.chatId || '';
+
+  let { frame } = await waitForPageState(browser, options.pageUrl, 'start', options.timeoutMs);
+  await frame.locator(SELECTORS.startGame).first().click();
+  ({ frame } = await waitForPageState(browser, options.pageUrl, 'splash', 10_000));
+  await frame.locator(SELECTORS.newStory).first().click();
+  ({ frame } = await waitForPageState(browser, options.pageUrl, 'setup', 10_000));
+
+  const setup = frame.locator(SELECTORS.newGameSetup).first();
+  await setup.waitFor({ state: 'visible', timeout: 10_000 });
+  if ((await setup.getAttribute('data-wuxia-setup-step')) !== 'talent') {
+    throw new Error('新的故事没有进入角色预设所在的天资页');
+  }
+  const build = await findUniqueSetupItem(
+    frame,
+    SELECTORS.savedCharacterBuild,
+    options.characterBuild,
+    'data-wuxia-build-id',
+    'data-wuxia-build-name',
+    '角色预设',
+  );
+  const confirmation = frame.page().waitForEvent('dialog', { timeout: 10_000 });
+  await build.locator.locator(SELECTORS.loadCharacterBuild).first().click();
+  const buildDialog = await confirmation;
+  if (buildDialog.type() !== 'confirm') throw new Error(`加载角色预设出现了非确认对话框：${buildDialog.type()}`);
+  await buildDialog.accept();
+  await waitForSetupStep(browser, options.pageUrl, 'confirm', 10_000);
+
+  await clickSetupNavigation(browser, options, SELECTORS.setupPreviousStep, 'identity');
+  await clickSetupNavigation(browser, options, SELECTORS.setupPreviousStep, 'origin');
+  ({ frame } = await waitForPageState(browser, options.pageUrl, 'setup', 10_000));
+  const eventSearch = frame.locator(SELECTORS.openingEventSearch).first();
+  await eventSearch.fill(options.openingEvent);
+  const event = await findUniqueSetupItem(
+    frame,
+    SELECTORS.openingEvent,
+    options.openingEvent,
+    'data-wuxia-event-id',
+    'data-wuxia-event-name',
+    '开局事件',
+  );
+  await event.locator.click();
+  const eventSelectionDeadline = Date.now() + 5_000;
+  while ((await event.locator.getAttribute('data-wuxia-event-selected')) !== 'true') {
+    if (Date.now() >= eventSelectionDeadline) throw new Error('点击开局事件后前端未确认选中状态');
+    await sleep(100);
+  }
+
+  await clickSetupNavigation(browser, options, SELECTORS.setupNextStep, 'identity');
+  await clickSetupNavigation(browser, options, SELECTORS.setupNextStep, 'confirm');
+  ({ frame } = await waitForPageState(browser, options.pageUrl, 'setup', 10_000));
+  const submit = frame.locator(SELECTORS.submitNewGame).first();
+  if (await submit.isDisabled()) throw new Error('角色预设或开局事件校验未通过，“踏入江湖”当前不可用');
+  await submit.click();
+
+  const renameDeadline = Date.now() + options.timeoutMs;
+  let keepName = null;
+  while (Date.now() < renameDeadline) {
+    try {
+      ({ frame } = await findGameFrame(browser, options.pageUrl, 2_000));
+      keepName = frame.locator(SELECTORS.keepCurrentChatName).first();
+      if (await keepName.isVisible().catch(() => false)) break;
+    } catch {
+      // 初始化过程中 iframe 可能短暂不可探测。
+    }
+    await sleep(150);
+  }
+  if (!keepName || !(await keepName.isVisible().catch(() => false))) {
+    throw new Error(`等待首次聊天命名窗超时（${options.timeoutMs}ms）`);
+  }
+  await keepName.click();
+
+  ({ frame } = await waitForPageState(browser, options.pageUrl, 'opening', 15_000));
+  await frame.locator(SELECTORS.openingScreen).first().waitFor({ state: 'visible', timeout: 10_000 });
+  const input = frame.locator(SELECTORS.input).first();
+  const send = frame.locator(SELECTORS.send).first();
+  await input.fill(options.openingAction);
+  if (await send.isDisabled()) throw new Error('开局输入已填写，但发送按钮不可用');
+  await send.click();
+  releaseGameFrameLock();
+
+  const finished = await waitForPageState(browser, options.pageUrl, 'game', options.timeoutMs);
+  await sleep(options.settleMs);
+  const finalSnapshot = await readAutomationSnapshot(finished);
+  const debug = debugSectionsFromAutomation(finalSnapshot.debug);
+  const failedSections = Object.entries(debug)
+    .filter(([, value]) => value.status === 'error')
+    .map(([id]) => id);
+  return {
+    mode: 'start-new-game',
+    startedAt: new Date(startedAt).toISOString(),
+    completedAt: isoTime(),
+    totalMs: Date.now() - startedAt,
+    characterName: options.characterName,
+    createdNewChat: entered.createdNewChat,
+    previousChatId: entered.previousChatId,
+    chatId: finalSnapshot.chatId || initialChatId,
+    characterBuild: { requested: options.characterBuild, id: build.id, name: build.name },
+    openingEvent: { requested: options.openingEvent, id: event.id, name: event.name },
+    openingAction: options.openingAction,
+    reply: finalSnapshot.maintext || '',
+    debug,
+    failedSections,
+    success: failedSections.length === 0 && finalSnapshot.page === 'game' && finalSnapshot.busy !== true,
+  };
 }
 
 async function inspectGeneration(browser, pageUrl) {
@@ -1309,6 +1682,18 @@ async function main() {
   };
 
   try {
+    if (options.startNewGame) {
+      try {
+        report.newGame = await startNewGameFlow(browser, options);
+        report.success = report.newGame.success;
+      } catch (error) {
+        const message = error instanceof Error ? error.stack || error.message : String(error);
+        log(`完整开局异常：${message}`);
+        report.newGame = { mode: 'start-new-game', success: false, error: message };
+        report.success = false;
+      }
+      return;
+    }
     const initialTarget = await findGameFrame(browser, options.pageUrl, 15_000, options.chatId);
     report.target = publicTarget(initialTarget);
     if (options.reloadPage) {

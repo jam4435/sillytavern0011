@@ -741,6 +741,48 @@
   white-space: nowrap;
 }
 
+// 功法卡的名称是信息主体，不再以通用的「功法根基」占据标题位置。
+// 用题签式标题和短横线把它与下方的品阶、掌握程度分出清晰层级。
+.social-martial-art-card-head {
+  position: relative;
+  min-height: 1.8rem;
+  gap: 0.55rem;
+  margin-bottom: 0.78rem;
+  padding: 0.05rem 0 0.62rem;
+  border-bottom: 1px solid rgba(250, 204, 21, 0.22);
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 2.5rem;
+    height: 2px;
+    background: currentColor;
+    box-shadow: 0 1px 8px currentColor;
+  }
+
+  svg {
+    flex: 0 0 auto;
+    filter: drop-shadow(0 1px 5px currentColor);
+  }
+}
+
+.social-martial-art-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: inherit;
+  font-family: var(--font-display);
+  font-size: clamp(1.04rem, 1.9vw, 1.22rem);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 8px currentColor;
+  white-space: nowrap;
+}
+
 .social-tag-row {
   display: flex;
   flex-wrap: wrap;

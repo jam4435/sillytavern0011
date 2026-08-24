@@ -125,16 +125,10 @@ describe('runDirectChatVariableWrite', () => {
     const writer = vi.fn(async () => ({ ok: true }));
 
     await expect(
-      runDirectChatVariableWrite(
-        { source: 'frontend', operation: 'update', reason: 'rename-race' },
-        writer,
-      ),
+      runDirectChatVariableWrite({ source: 'frontend', operation: 'update', reason: 'rename-race' }, writer),
     ).rejects.toThrow('聊天存档改名期间已暂停前端派生变量写入');
     await expect(
-      runDirectChatVariableWrite(
-        { source: 'variable-editor', operation: 'update', reason: 'rename-race' },
-        writer,
-      ),
+      runDirectChatVariableWrite({ source: 'variable-editor', operation: 'update', reason: 'rename-race' }, writer),
     ).rejects.toThrow('聊天存档改名期间已暂停直接变量写入');
     expect(writer).not.toHaveBeenCalled();
   });
@@ -213,6 +207,92 @@ describe('runDirectChatVariableWrite', () => {
     expect(result).toEqual({ message_id: 52, actions: { apiWrite: true } });
     expect(executionOrder).toEqual(['era:updateByObject']);
     expect(eventEmitMock.mock.calls.some(([eventName]) => eventName === ERA_VARIABLE_WRITE_DONE_EVENT)).toBe(false);
+  });
+
+  it('批事务等待器忽略其他事务，并匹配合并 flush 的 transactionIds', async () => {
+    eventOn('era:transactionByObject', async () => {
+      const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
+      await Promise.all(
+        writeDoneListeners.map(listener =>
+          listener({
+            message_id: 81,
+            actions: { apiWrite: true },
+            transactionId: 'other-transaction',
+            transactionIds: ['other-transaction'],
+          }),
+        ),
+      );
+      await Promise.all(
+        writeDoneListeners.map(listener =>
+          listener({
+            message_id: 81,
+            actions: { apiWrite: true },
+            transactionIds: ['coalesced-transaction', 'target-transaction'],
+          }),
+        ),
+      );
+    });
+
+    const result = await emitEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'meridian-upgrade',
+      eventName: 'era:transactionByObject',
+      detail: {
+        transactionId: 'target-transaction',
+        operations: [{ type: 'update', payload: { user数据: { 修为: 100 } } }],
+      },
+      expectedMessageId: 81,
+      expectedAction: 'apiWrite',
+      expectedTransactionId: 'target-transaction',
+      timeoutMessage: 'timeout',
+    });
+
+    expect(result).toEqual({
+      message_id: 81,
+      actions: { apiWrite: true },
+      transactionIds: ['coalesced-transaction', 'target-transaction'],
+    });
+  });
+
+  it('带来源事务完成事件保留单事务 transactionId 与规范化 transactionIds', async () => {
+    eventOn('era:transactionByObject', async ({ transactionId }: any) => {
+      const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
+      await Promise.all(
+        writeDoneListeners.map(listener =>
+          listener({
+            message_id: 82,
+            actions: { apiWrite: true },
+            transactionId,
+          }),
+        ),
+      );
+    });
+
+    const result = await emitSourcedEraVariableWriteAndWait({
+      source: 'frontend',
+      operation: 'update',
+      reason: 'single-meridian-upgrade',
+      eventName: 'era:transactionByObject',
+      detail: { transactionId: 'target-transaction', operations: [] },
+      expectedTransactionId: 'target-transaction',
+      timeoutMessage: 'timeout',
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        eventName: 'era:transactionByObject',
+        transactionId: 'target-transaction',
+        transactionIds: ['target-transaction'],
+      }),
+    );
+    expect(eventEmitMock).toHaveBeenCalledWith(
+      ERA_VARIABLE_WRITE_DONE_EVENT,
+      expect.objectContaining({
+        transactionId: 'target-transaction',
+        transactionIds: ['target-transaction'],
+      }),
+    );
   });
 
   it('原始 era:writeDone 已匹配时不等待无关后处理监听器', async () => {
