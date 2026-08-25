@@ -28,7 +28,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File .agents/skills/wuxia-ai-advance-story/scripts/start-wuxia-chrome.ps1
 ```
 
-   启动器先复用已监听的 `9333`；否则通过 `Win32_Process.Create` 创建脱离当前命令任务树的 Chrome，并等待 `/json/version` 可读。它不会注册计划任务、关闭日常 Chrome 或清理 profile。不要用 `cmd start`、普通后台 `&` 或受管理 shell 内的 `Start-Process` 反复尝试；这些方式可能产生空命令窗，或在命令结束时连带终止 Chrome。
+   启动器先确认 `http://127.0.0.1:5500/dist/武侠/index.html` 可读；若不可读，则通过 WMI + `pythonw` 启动 Skill 自带的无控制台 CORS 静态服务器，以仓库根目录提供 `dist`。随后复用已监听的 `9333`；否则通过 `Win32_Process.Create` 创建脱离当前命令任务树的 Chrome，并等待 `/json/version` 可读。新聊天的 loader 固定依赖 5500；旧 iframe 尚在内存中不能证明该依赖正常。启动结果必须同时包含可用的 `staticServer` 与 CDP `endpoint`。它不会注册计划任务、关闭日常 Chrome 或清理 profile。不要用 `cmd start`、普通后台 `&` 或受管理 shell 内的 `Start-Process` 反复尝试；这些方式可能产生空命令窗，或在命令结束时连带终止 Chrome。
 
    用户手动启动时使用相同参数：
 
@@ -39,7 +39,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   "http://127.0.0.1:8000/"
 ```
 
-   该 profile 是测试配置的唯一持久化位置：主题、额外变量模式、API profile 等浏览器端设置会跨重启保留。不得改用临时目录、无 `--user-data-dir` 的 Chrome，或日常 Chrome 的 Default profile；不得删除或清空此目录。仅在用户明确要求时才变更端口或 profile 路径，并同步向启动脚本传入 `-Port`、`-ProfilePath`、`-PageUrl`，向 runner 使用 `--endpoint`、`--page-url`。
+   该 profile 是测试配置的唯一持久化位置：主题、额外变量模式、API profile 等浏览器端设置会跨重启保留。不得改用临时目录、无 `--user-data-dir` 的 Chrome，或日常 Chrome 的 Default profile；不得删除或清空此目录。仅在用户明确要求时才变更端口或 profile 路径，并同步向启动脚本传入 `-Port`、`-ProfilePath`、`-PageUrl`；静态根目录或端口需要变更时传入 `-StaticRoot`、`-StaticPort`；向 runner 使用 `--endpoint`、`--page-url`。
    默认复用并持续保留这个专用 Chrome。测试结束后不要顺手关闭浏览器或终止其后台任务，以免下一组提示词测试重新等待酒馆和武侠 iframe 加载。只有用户明确要求关闭、实例异常必须重启，或本次任务明确声明使用一次性临时浏览器时才终止；保留时在报告中注明 CDP 地址和后台任务 ID（若有）。
 2. 新启动或重启专用 Chrome 时，必须同时打开酒馆网页 `http://127.0.0.1:8000/`，不要只启动空浏览器、停在新标签页或依赖会话自动恢复。确认该 Chrome 已开放 CDP，并保持酒馆武侠页面打开；不同地址或页面使用
    `--endpoint` 或 `--page-url`。

@@ -1,0 +1,30 @@
+{
+  "startedAt": "2026-08-25T10:25:49.658Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 30000,
+    "transport": "api",
+    "chatId": "",
+    "output": "wuxia-new-game-delete-current-resume-inspect-20260825.json",
+    "inspectOnly": true,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "startNewGame": false,
+    "deleteCurrentChat": false,
+    "characterName": "金庸群侠传",
+    "characterBuild": "",
+    "openingEvent": "",
+    "openingAction": "开始",
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": false,
+  "completedAt": "2026-08-25T10:26:04.734Z"
+}
