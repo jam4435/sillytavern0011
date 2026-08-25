@@ -46,7 +46,7 @@ function printUsage() {
   pnpm wuxia:ui -- --turns 5 --action "在客栈向掌柜打听消息"
   pnpm wuxia:ui -- --regenerate --output wuxia-regenerate-report.json
   pnpm wuxia:ui -- --restart-from-first-reply --output wuxia-restart-report.json
-  pnpm wuxia:ui -- --start-new-game --character-build "测试角色" --opening-event "郭杨邀饮说书人"
+  pnpm wuxia:ui -- --start-new-game --delete-current-chat --character-build "测试角色" --opening-event "郭杨邀饮说书人"
 
 选项：
   --endpoint <url>       Chrome CDP 地址，默认 http://127.0.0.1:9333
@@ -64,6 +64,7 @@ function printUsage() {
   --restart-from-first-reply
                          通过“存档与分叉”回到当前脉络的首个 assistant 回复，不发送或生成
   --start-new-game       从酒馆宿主页进入角色的新聊天，加载角色预设、更换开局事件并发送首个行动
+  --delete-current-chat  新建聊天时勾选“同时删除当前聊天文件”；--start-new-game 必须显式提供
   --character-name <text>
                          --start-new-game 的角色卡名称，默认 金庸群侠传
   --character-build <id-or-name>
@@ -112,6 +113,7 @@ function parseArgs(argv) {
     regenerate: false,
     restartFromFirstReply: false,
     startNewGame: false,
+    deleteCurrentChat: false,
     characterName: '金庸群侠传',
     characterBuild: '',
     openingEvent: '',
@@ -150,6 +152,10 @@ function parseArgs(argv) {
     }
     if (arg === '--start-new-game') {
       options.startNewGame = true;
+      continue;
+    }
+    if (arg === '--delete-current-chat') {
+      options.deleteCurrentChat = true;
       continue;
     }
     if (arg === '--reload-page') {
@@ -253,6 +259,12 @@ function parseArgs(argv) {
   }
   if (options.startNewGame && !options.openingEvent.trim()) {
     throw new Error('--start-new-game 必须提供 --opening-event');
+  }
+  if (options.startNewGame && !options.deleteCurrentChat) {
+    throw new Error('--start-new-game 必须显式提供 --delete-current-chat，确认新建聊天时删除当前聊天文件');
+  }
+  if (options.deleteCurrentChat && !options.startNewGame) {
+    throw new Error('--delete-current-chat 只能与 --start-new-game 一起使用');
   }
   if (
     !options.inspectOnly &&
@@ -620,11 +632,30 @@ async function selectCharacterByName(page, characterName) {
   throw new Error(`点击角色卡后未进入目标聊天：期望「${characterName}」，最后选中「${selectedName || '(空)'}」`);
 }
 
-async function clickHostStartNewChat(page) {
-  const existingPopupOk = page.locator('dialog[open] .popup-button-ok').first();
-  if (await existingPopupOk.isVisible().catch(() => false)) {
-    await existingPopupOk.click();
-    return;
+async function acceptHostNewChatPopup(dialog, deleteCurrentChat) {
+  if (deleteCurrentChat) {
+    const deleteCheckbox = dialog.locator('#del_chat_checkbox').first();
+    await deleteCheckbox.waitFor({ state: 'visible', timeout: 10_000 });
+    if (!(await deleteCheckbox.evaluate(element => element instanceof HTMLInputElement && element.checked))) {
+      await dialog.locator('label[for="del_chat_checkbox"]').first().evaluate(element => {
+        if (element instanceof HTMLElement) element.click();
+      });
+    }
+    const checked = await deleteCheckbox.evaluate(element => element instanceof HTMLInputElement && element.checked);
+    if (!checked) throw new Error('未能勾选“同时删除当前聊天文件”，拒绝确认新建聊天');
+  }
+  const popupOk = dialog.locator('.popup-button-ok, #dialogue_popup_ok').first();
+  await popupOk.click();
+}
+
+async function clickHostStartNewChat(page, deleteCurrentChat) {
+  const pendingDialogs = page.locator('dialog[open]').filter({ has: page.locator('#del_chat_checkbox') });
+  while ((await pendingDialogs.count()) > 0) {
+    const pending = pendingDialogs.last();
+    await pending.locator('.popup-button-cancel').first().evaluate(element => {
+      if (element instanceof HTMLElement) element.click();
+    });
+    await sleep(100);
   }
 
   const nativeDialog = new Promise(resolve => {
@@ -662,9 +693,9 @@ async function clickHostStartNewChat(page) {
     await dialog.accept();
     return;
   }
-  const popupOk = page.locator('dialog[open] .popup-button-ok, #dialogue_popup_ok').first();
-  await popupOk.waitFor({ state: 'visible', timeout: 10_000 });
-  await popupOk.click();
+  const popup = page.locator('dialog[open]').filter({ has: page.locator('#del_chat_checkbox') }).last();
+  await popup.waitFor({ state: 'visible', timeout: 10_000 });
+  await acceptHostNewChatPopup(popup, deleteCurrentChat);
 }
 
 async function waitForPageState(browser, pageUrl, expected, timeoutMs, requestedChatId = '') {
@@ -705,11 +736,17 @@ async function enterFreshCharacterChat(browser, options) {
   }
   const snapshot = await readAutomationSnapshot(target);
   if (snapshot.page === 'start') {
-    return { page, target, createdNewChat: false, previousChatId: snapshot.chatId || '' };
+    return {
+      page,
+      target,
+      createdNewChat: false,
+      deletedCurrentChatFile: false,
+      previousChatId: snapshot.chatId || '',
+    };
   }
 
   const previousChatId = snapshot.chatId || '';
-  await clickHostStartNewChat(page);
+  await clickHostStartNewChat(page, options.deleteCurrentChat);
   const chatSwitchDeadline = Date.now() + options.timeoutMs;
   let newChatId = '';
   while (Date.now() < chatSwitchDeadline) {
@@ -729,7 +766,7 @@ async function enterFreshCharacterChat(browser, options) {
   if (previousChatId && fresh.snapshot.chatId === previousChatId) {
     throw new Error('新建聊天后 chatId 未变化，拒绝在既有存档上重跑开局');
   }
-  return { page, target: fresh, createdNewChat: true, previousChatId };
+  return { page, target: fresh, createdNewChat: true, deletedCurrentChatFile: options.deleteCurrentChat, previousChatId };
 }
 
 async function findUniqueSetupItem(frame, selector, value, idAttribute, nameAttribute, label) {
@@ -889,6 +926,7 @@ async function startNewGameFlow(browser, options) {
     totalMs: Date.now() - startedAt,
     characterName: options.characterName,
     createdNewChat: entered.createdNewChat,
+    deletedCurrentChatFile: entered.deletedCurrentChatFile,
     previousChatId: entered.previousChatId,
     chatId: finalSnapshot.chatId || initialChatId,
     characterBuild: { requested: options.characterBuild, id: build.id, name: build.name },

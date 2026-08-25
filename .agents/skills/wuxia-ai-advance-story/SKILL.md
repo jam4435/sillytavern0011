@@ -58,19 +58,20 @@ pnpm wuxia:ui -- --inspect-only
 
 ```powershell
 pnpm wuxia:ui -- --start-new-game `
+  --delete-current-chat `
   --character-build "测试角色" `
   --opening-event "郭杨邀饮说书人" `
   --opening-action "开始" `
   --output wuxia-new-game-report.json
 ```
 
-runner 真实执行：在酒馆宿主页唯一定位角色卡；若当前不是空聊天则点击“开始新聊天”；进入武侠开始页和“新的故事”；加载角色预设并接受确认；从确认页连续返回到“出身/开局时间地点”；选择目标事件；回到确认页提交；在首次聊天命名窗选择“保留当前名称”；最后从开局输入页发送 `--opening-action` 并等待进入游戏页。
+runner 真实执行：在酒馆宿主页唯一定位角色卡；若当前不是空聊天，则在“开始新聊天”确认框勾选“同时删除当前聊天文件”后确认；进入武侠开始页和“新的故事”；加载角色预设并接受确认；从确认页连续返回到“出身/开局时间地点”；选择目标事件；回到确认页提交；在首次聊天命名窗选择“保留当前名称”；最后从开局输入页发送 `--opening-action`，等待模型生成完成并进入游戏页。
 
-- 当前已经是该角色的空聊天时复用它，不额外创建聊天；当前为 `setup/opening/game` 时创建新聊天，绝不在已初始化存档上直接改开局变量。
-- 默认开局行动是“开始”。完整流程会初始化 `stat_data`、创建真实 user/assistant 楼层并调用模型，不是 dry-run。
-- `--start-new-game` 必须提供 `--character-build` 和 `--opening-event`，且不能与 `--chat-id`、推进、检查、重生成、重载、终止或历史回退合用。
+- 当前已经是该角色的空聊天时复用它，不额外创建聊天；当前为 `setup/opening/game` 时创建新聊天并删除被替换的当前聊天文件，绝不在已初始化存档上直接改开局变量。删除前必须取得用户对本次删除的明确授权。
+- 默认开局行动是“开始”。完整流程会初始化 `stat_data`、创建真实 user/assistant 楼层并调用模型，不是 dry-run；只有 assistant 正文非空、四个调试区无错误且页面空闲时才算开局成功，`【开始游戏】` 占位文本或模型 HTTP 错误不能算成功。
+- `--start-new-game` 必须显式提供 `--delete-current-chat`、`--character-build` 和 `--opening-event`，且不能与 `--chat-id`、推进、检查、重生成、重载、终止或历史回退合用。runner 在确认新聊天前必须回读 `#del_chat_checkbox.checked === true`，否则停止。
 - 角色卡、角色预设或事件匹配不唯一，酒馆页面不唯一，新聊天后 `chatId` 未变化，步骤状态不符，初始化或命名窗超时，或首轮未进入 `game` 时立即停止。不得改写 localStorage、React state 或聊天变量来绕过 UI。
-- 报告中的 `createdNewChat`、`chatId`、`characterBuild`、`openingEvent`、`openingAction`、`reply`、`failedSections` 和 `success` 是开局验收依据。失败后先检查报告和当前页面；不得无条件再次执行整套流程，因为初始化或首轮发送可能已经发生。
+- 报告中的 `createdNewChat`、`deletedCurrentChatFile`、`chatId`、`characterBuild`、`openingEvent`、`openingAction`、`reply`、`failedSections` 和 `success` 是开局验收依据。失败后先检查报告和当前页面；不得无条件再次执行整套流程，因为删除、初始化或首轮发送可能已经发生。
 
 ## 真实推进
 

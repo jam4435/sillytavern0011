@@ -1,0 +1,35 @@
+{
+  "startedAt": "2026-08-25T10:20:31.343Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "transport": "api",
+    "chatId": "",
+    "output": "wuxia-new-game-delete-current-e2e-20260825.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "startNewGame": true,
+    "deleteCurrentChat": true,
+    "characterName": "金庸群侠传",
+    "characterBuild": "墨逸",
+    "openingEvent": "射雕第一回02-曲三夜斗禁宫卫",
+    "openingAction": "开始",
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": false,
+  "newGame": {
+    "mode": "start-new-game",
+    "success": false,
+    "error": "locator.setChecked: Clicking the checkbox did not change its state\nCall log:\n  - waiting for locator('dialog[open] #del_chat_checkbox').first()\n    - locator resolved to <input type=\"checkbox\" id=\"del_chat_checkbox\"/>\n  - attempting click action\n    - scrolling into view if needed\n    - done scrolling\n    - forcing action\n    - performing click action\n    - click action done\n    - waiting for scheduled navigations to finish\n    - navigations have finished\n\n    at acceptHostNewChatPopup (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:639:26)\n    at async clickHostStartNewChat (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:649:5)\n    at async enterFreshCharacterChat (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:741:3)\n    at async startNewGameFlow (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:813:19)\n    at async main (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:1777:26)"
+  },
+  "completedAt": "2026-08-25T10:20:31.551Z"
+}
