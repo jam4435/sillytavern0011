@@ -10,6 +10,7 @@ import {
   deriveMeridianModifiers,
   getMeridianBaseCost,
   getMeridianNodeCost,
+  meetsMeridianRealmRequirement,
   normalizeMeridianProgress,
   quoteMeridianUpgrade,
 } from './meridianSystem';
@@ -118,22 +119,47 @@ describe('meridianSystem progress normalization', () => {
 });
 
 describe('meridianSystem upgrade quotes and results', () => {
+  it('requires the player to reach at least 二流 before opening meridian nodes', () => {
+    expect(meetsMeridianRealmRequirement('不入流')).toBe(false);
+    expect(meetsMeridianRealmRequirement('三流圆满')).toBe(false);
+    expect(meetsMeridianRealmRequirement('二流初期')).toBe(true);
+    expect(meetsMeridianRealmRequirement('陆地神仙圆满')).toBe(true);
+
+    const quote = quoteMeridianUpgrade({
+      progress: undefined,
+      nodeId: 'ren:opening',
+      realm: '三流圆满',
+      cultivation: 10_000,
+      initialAttributes: INITIAL,
+    });
+    expect(quote).toMatchObject({ canUpgrade: false, reason: '需先突破到二流，方可冲穴' });
+
+    const projection = buildMeridianProjection({
+      progress: undefined,
+      realm: '三流圆满',
+      cultivation: 10_000,
+      initialAttributes: INITIAL,
+    });
+    expect(projection.nodes.every(node => node.status === 'locked')).toBe(true);
+    expect(projection.nodes[0].quote?.reason).toBe('需先突破到二流，方可冲穴');
+  });
+
   it('allows exact cultivation, blocks insufficient cultivation, prerequisites, and duplicate purchases', () => {
     const exact = quoteMeridianUpgrade({
       progress: undefined,
       nodeId: 'ren:opening',
-      realm: '不入流',
-      cultivation: 40,
+      realm: '二流初期',
+      cultivation: 160,
       initialAttributes: INITIAL,
     });
-    expect(exact).toMatchObject({ canUpgrade: true, cost: 40, newCultivation: 0 });
+    expect(exact).toMatchObject({ canUpgrade: true, cost: 160, newCultivation: 0 });
 
     expect(
       quoteMeridianUpgrade({
         progress: undefined,
         nodeId: 'ren:opening',
-        realm: '不入流',
-        cultivation: 39,
+        realm: '二流初期',
+        cultivation: 159,
         initialAttributes: INITIAL,
       }),
     ).toMatchObject({ canUpgrade: false, reason: '修为不足，还需 1 点修为' });
@@ -142,8 +168,8 @@ describe('meridianSystem upgrade quotes and results', () => {
       quoteMeridianUpgrade({
         progress: undefined,
         nodeId: 'ren:circulation',
-        realm: '不入流',
-        cultivation: 1_000,
+        realm: '二流初期',
+        cultivation: 10_000,
         initialAttributes: INITIAL,
       }).reason,
     ).toContain('需先打通');
@@ -152,8 +178,8 @@ describe('meridianSystem upgrade quotes and results', () => {
       quoteMeridianUpgrade({
         progress: progressThrough('ren', 1),
         nodeId: 'ren:opening',
-        realm: '不入流',
-        cultivation: 1_000,
+        realm: '二流初期',
+        cultivation: 10_000,
         initialAttributes: INITIAL,
       }).reason,
     ).toBe('该穴位已打通');
@@ -173,8 +199,8 @@ describe('meridianSystem upgrade quotes and results', () => {
     const quote = quoteMeridianUpgrade({
       progress: progressThrough(meridianId, 4),
       nodeId: gateId,
-      realm: '不入流',
-      cultivation: 1_000,
+      realm: '二流初期',
+      cultivation: 10_000,
       initialAttributes: INITIAL,
     });
     expect(quote.canUpgrade).toBe(true);
@@ -185,18 +211,18 @@ describe('meridianSystem upgrade quotes and results', () => {
     const result = applyMeridianUpgrade({
       progress: progressThrough('ren', 4),
       nodeId: 'ren:confluence',
-      realm: '不入流',
-      cultivation: 185,
+      realm: '二流初期',
+      cultivation: 740,
       initialAttributes: { ...INITIAL, 根骨: 19 },
     });
-    expect(result).toMatchObject({ success: true, cost: 185, newCultivation: 0 });
+    expect(result).toMatchObject({ success: true, cost: 740, newCultivation: 0 });
     expect(result.initialAttributes.根骨).toBe(20);
     expect(result.progress.关窍结算['ren:confluence']).toEqual({ 类型: '初始属性', 属性: '根骨', 增量: 1 });
 
     const duplicate = applyMeridianUpgrade({
       progress: result.progress,
       nodeId: 'ren:confluence',
-      realm: '不入流',
+      realm: '二流初期',
       cultivation: result.newCultivation,
       initialAttributes: result.initialAttributes,
     });
@@ -208,8 +234,8 @@ describe('meridianSystem upgrade quotes and results', () => {
     const result = applyMeridianUpgrade({
       progress: progressThrough('du', 4),
       nodeId: 'du:confluence',
-      realm: '不入流',
-      cultivation: 185,
+      realm: '二流初期',
+      cultivation: 740,
       initialAttributes: { ...INITIAL, 臂力: 20 },
     });
     expect(result.success).toBe(true);
@@ -222,8 +248,8 @@ describe('meridianSystem upgrade quotes and results', () => {
     const quote = quoteMeridianUpgrade({
       progress: progressThrough('yangwei', 4),
       nodeId: 'yangwei:confluence',
-      realm: '不入流',
-      cultivation: 185,
+      realm: '二流初期',
+      cultivation: 740,
       initialAttributes: { ...INITIAL, 福缘: 14 },
     });
     expect(quote.settlement).toEqual({ 类型: '最终属性', 属性: '气血上限', 增量: 6 });
@@ -250,8 +276,8 @@ describe('meridianSystem modifier and UI projection', () => {
   it('projects opened, available, and locked states with summaries and live quotes', () => {
     const projection = buildMeridianProjection({
       progress: progressThrough('ren', 1),
-      realm: '不入流',
-      cultivation: 100,
+      realm: '二流初期',
+      cultivation: 1_000,
       initialAttributes: INITIAL,
     });
     expect(projection.corrupted).toBe(false);
@@ -259,7 +285,7 @@ describe('meridianSystem modifier and UI projection', () => {
     expect(projection.nodes.find(node => node.id === 'ren:circulation')).toMatchObject({
       status: 'available',
       prerequisiteId: 'ren:opening',
-      quote: { canUpgrade: true, cost: 60 },
+      quote: { canUpgrade: true, cost: 240 },
     });
     expect(projection.nodes.find(node => node.id === 'ren:condensation')).toMatchObject({ status: 'locked' });
     expect(projection.meridians.find(meridian => meridian.id === 'ren')).toMatchObject({

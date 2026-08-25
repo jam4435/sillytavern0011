@@ -1,0 +1,43 @@
+{
+  "startedAt": "2026-08-24T19:00:29.188Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 30000,
+    "transport": "api",
+    "chatId": "",
+    "output": "wuxia-new-chat-reload-20260825.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "startNewGame": false,
+    "characterName": "金庸群侠传",
+    "characterBuild": "",
+    "openingEvent": "",
+    "openingAction": "开始",
+    "reloadPage": true,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": false,
+  "target": {
+    "pageUrl": "http://127.0.0.1:8000/",
+    "frameUrl": "blob:http://127.0.0.1:8000/6cdff09f-f6e2-4031-8147-f3a6021b6756",
+    "pageTitle": "SillyTavern",
+    "pageVisibility": "visible",
+    "frameVisible": true,
+    "instanceId": "frontend-52334257-28c0-44c2-9b93-ff44ac028db9",
+    "automationVersion": "1",
+    "chatId": "金庸群侠传 - 2026-08-25@02h59m32s",
+    "ready": true,
+    "page": "start",
+    "busy": false,
+    "selectionSource": "host-visible-iframe"
+  },
+  "completedAt": "2026-08-24T19:01:00.354Z"
+}

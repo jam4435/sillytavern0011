@@ -4650,15 +4650,11 @@
   }
 
   .meridian-bronze-figure {
-    filter: sepia(0.22) drop-shadow(0 10px 9px rgba(61, 48, 40, 0.18));
+    filter: drop-shadow(0 10px 14px rgba(61, 48, 40, 0.28));
 
-    > circle,
-    > path {
-      stroke: rgba(61, 48, 40, 0.5);
-    }
-
-    .meridian-bronze-detail {
-      stroke: rgba(61, 48, 40, 0.55);
+    .meridian-figure-photo {
+      opacity: 1;
+      filter: contrast(1.1) brightness(1.18);
     }
   }
 

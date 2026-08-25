@@ -1,10 +1,7 @@
 ---
 name: wuxia-ai-advance-story
 description:
-  通过 Playwright/CDP UI runner 推进、检查或受控重新生成 SillyTavern
-  武侠游戏的真实回合，并用渐进式诊断研究固定输入下的事件完成轮数、正文连续性、跨事件接续、变量执行与参与事件结算。用于单轮剧情推进、多轮
-  UI 回归、事件推进实验、提示词对照重生成、变量故障定位；默认调用 pnpm
-  wuxia:ui，真实推进会新增聊天楼层，受控重生成会新增 swipe，两者都会修改当前存档。
+  通过 Playwright/CDP UI runner 从酒馆新聊天完成武侠角色预设与开局事件选择，或推进、检查、受控重新生成真实回合，并用渐进式诊断研究事件完成轮数、正文连续性、跨事件接续、变量执行与参与事件结算。用于更换开局时间或事件、完整开局回归、单轮或多轮剧情推进、提示词对照重生成和变量故障定位；默认调用 pnpm wuxia:ui。完整开局会创建并初始化聊天，真实推进会新增聊天楼层，受控重生成会新增 swipe。
 ---
 
 # 武侠剧情推进与审计
@@ -16,6 +13,7 @@ RPC 或桥接代替真实发送链。
 ## 选择工作流
 
 - 普通推进或检查：遵循本文件；用户未指定轮数时默认一轮。
+- 更换开局时间或事件，或从酒馆页完整测试“进入聊天 → 角色预设 → 开局事件 → 首轮剧情”：使用“完整新开局”工作流。现有 `opening/game` 存档不能返回角色创建页更换事件，必须从新的空聊天开始。
 - 研究事件完成轮数、固定输入连续推进、跨事件接续、正文偏航、参与事件变量正确性或事件时间窗口：必须先完整读取
   [references/story-progression-audit.md](references/story-progression-audit.md)，再执行。不要为普通单轮任务加载该文件。
 - 研究同一用户输入在不同提示词下的稳定性：仅在用户明确要求重试、重新生成或控制变量实验时，读取同一审计协议并使用
@@ -23,8 +21,16 @@ RPC 或桥接代替真实发送链。
 
 ## 开始前
 
-1. 启动或复用固定的测试专用 Chrome profile。所有测试浏览器必须使用以下参数，默认 CDP 地址为
-   `http://127.0.0.1:9333`：
+1. 启动或复用固定的测试专用 Chrome profile。默认 CDP 地址为 `http://127.0.0.1:9333`。在 Codex 等会清理命令子进程的受管理环境中，优先调用 Skill 自带的 WMI 启动器：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .agents/skills/wuxia-ai-advance-story/scripts/start-wuxia-chrome.ps1
+```
+
+   启动器先复用已监听的 `9333`；否则通过 `Win32_Process.Create` 创建脱离当前命令任务树的 Chrome，并等待 `/json/version` 可读。它不会注册计划任务、关闭日常 Chrome 或清理 profile。不要用 `cmd start`、普通后台 `&` 或受管理 shell 内的 `Start-Process` 反复尝试；这些方式可能产生空命令窗，或在命令结束时连带终止 Chrome。
+
+   用户手动启动时使用相同参数：
 
 ```powershell
 & "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" `
@@ -33,7 +39,7 @@ RPC 或桥接代替真实发送链。
   "http://127.0.0.1:8000/"
 ```
 
-   该 profile 是测试配置的唯一持久化位置：主题、额外变量模式、API profile 等浏览器端设置会跨重启保留。不得改用临时目录、无 `--user-data-dir` 的 Chrome，或日常 Chrome 的 Default profile；不得删除或清空此目录。仅在用户明确要求时才变更端口或 profile 路径，并同步使用 `--endpoint`。
+   该 profile 是测试配置的唯一持久化位置：主题、额外变量模式、API profile 等浏览器端设置会跨重启保留。不得改用临时目录、无 `--user-data-dir` 的 Chrome，或日常 Chrome 的 Default profile；不得删除或清空此目录。仅在用户明确要求时才变更端口或 profile 路径，并同步向启动脚本传入 `-Port`、`-ProfilePath`、`-PageUrl`，向 runner 使用 `--endpoint`、`--page-url`。
    默认复用并持续保留这个专用 Chrome。测试结束后不要顺手关闭浏览器或终止其后台任务，以免下一组提示词测试重新等待酒馆和武侠 iframe 加载。只有用户明确要求关闭、实例异常必须重启，或本次任务明确声明使用一次性临时浏览器时才终止；保留时在报告中注明 CDP 地址和后台任务 ID（若有）。
 2. 新启动或重启专用 Chrome 时，必须同时打开酒馆网页 `http://127.0.0.1:8000/`，不要只启动空浏览器、停在新标签页或依赖会话自动恢复。确认该 Chrome 已开放 CDP，并保持酒馆武侠页面打开；不同地址或页面使用
    `--endpoint` 或 `--page-url`。
@@ -45,6 +51,26 @@ pnpm wuxia:ui -- --inspect-only
 
 4. 确认页面空闲、输入可用、iframe 与基础自动化标记正常。研究任务还必须按审计协议区分生成资产的计划窗口与聊天变量中的实际运行时窗口；两者因弹性提前入场或同地点相对平移不同，不单独构成污染或停止条件。不要为了取得历史调试区而发送行动。
 5. 仅在用户明确要求推进、真实回归，或已授权测试聊天时发送行动。
+
+## 完整新开局与更换开局事件
+
+角色预设保存在测试专用 Chrome profile 的 `localStorage`。先确认要加载的预设完整名称或 ID，以及目标事件完整名称或 ID；名称必须唯一。默认角色卡名为“金庸群侠传”，不同卡名使用 `--character-name`。
+
+```powershell
+pnpm wuxia:ui -- --start-new-game `
+  --character-build "测试角色" `
+  --opening-event "郭杨邀饮说书人" `
+  --opening-action "开始" `
+  --output wuxia-new-game-report.json
+```
+
+runner 真实执行：在酒馆宿主页唯一定位角色卡；若当前不是空聊天则点击“开始新聊天”；进入武侠开始页和“新的故事”；加载角色预设并接受确认；从确认页连续返回到“出身/开局时间地点”；选择目标事件；回到确认页提交；在首次聊天命名窗选择“保留当前名称”；最后从开局输入页发送 `--opening-action` 并等待进入游戏页。
+
+- 当前已经是该角色的空聊天时复用它，不额外创建聊天；当前为 `setup/opening/game` 时创建新聊天，绝不在已初始化存档上直接改开局变量。
+- 默认开局行动是“开始”。完整流程会初始化 `stat_data`、创建真实 user/assistant 楼层并调用模型，不是 dry-run。
+- `--start-new-game` 必须提供 `--character-build` 和 `--opening-event`，且不能与 `--chat-id`、推进、检查、重生成、重载、终止或历史回退合用。
+- 角色卡、角色预设或事件匹配不唯一，酒馆页面不唯一，新聊天后 `chatId` 未变化，步骤状态不符，初始化或命名窗超时，或首轮未进入 `game` 时立即停止。不得改写 localStorage、React state 或聊天变量来绕过 UI。
+- 报告中的 `createdNewChat`、`chatId`、`characterBuild`、`openingEvent`、`openingAction`、`reply`、`failedSections` 和 `success` 是开局验收依据。失败后先检查报告和当前页面；不得无条件再次执行整套流程，因为初始化或首轮发送可能已经发生。
 
 ## 真实推进
 

@@ -535,6 +535,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
             <MeridianPanel
               projection={meridianProjection}
               cultivation={cultivation}
+              gender={playerGender}
               busy={isBusy || !onUpgradeMeridian}
               onUpgrade={async (nodeId, quote) => {
                 if (!onUpgradeMeridian) {

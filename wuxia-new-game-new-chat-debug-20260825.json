@@ -1,0 +1,34 @@
+{
+  "startedAt": "2026-08-24T18:58:29.718Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 15000,
+    "transport": "api",
+    "chatId": "",
+    "output": "wuxia-new-game-new-chat-debug-20260825.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "startNewGame": true,
+    "characterName": "金庸群侠传",
+    "characterBuild": "__LIST_ONLY__",
+    "openingEvent": "射雕第一回02-曲三夜斗禁宫卫",
+    "openingAction": "开始",
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": false,
+  "newGame": {
+    "mode": "start-new-game",
+    "success": false,
+    "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('#options_button').first()\n    - locator resolved to <div tabindex=\"0\" id=\"options_button\" class=\"fa-solid fa-bars interactable\"></div>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <dialog open=\"\" class=\"popup popup--animation-fast\" data-id=\"040f4a82-6b3c-4b2e-93b0-002b521cc557\">…</dialog> intercepts pointer events\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <dialog open=\"\" class=\"popup popup--animation-fast\" data-id=\"040f4a82-6b3c-4b2e-93b0-002b521cc557\">…</dialog> intercepts pointer events\n    - retrying click action\n      - waiting 100ms\n    11 × waiting for element to be visible, enabled and stable\n       - element is visible, enabled and stable\n       - scrolling into view if needed\n       - done scrolling\n       - <dialog open=\"\" class=\"popup popup--animation-fast\" data-id=\"040f4a82-6b3c-4b2e-93b0-002b521cc557\">…</dialog> intercepts pointer events\n     - retrying click action\n       - waiting 500ms\n    - waiting for element to be visible, enabled and stable\n\n    at clickHostStartNewChat (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:631:25)\n    at async enterFreshCharacterChat (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:691:3)\n    at async startNewGameFlow (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:749:19)\n    at async main (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:1700:26)"
+  },
+  "completedAt": "2026-08-24T18:59:00.151Z"
+}

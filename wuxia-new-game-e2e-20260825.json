@@ -1,0 +1,34 @@
+{
+  "startedAt": "2026-08-24T19:11:49.273Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 180000,
+    "transport": "api",
+    "chatId": "",
+    "output": "wuxia-new-game-e2e-20260825.json",
+    "inspectOnly": false,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "startNewGame": true,
+    "characterName": "金庸群侠传",
+    "characterBuild": "墨逸",
+    "openingEvent": "射雕第一回02-曲三夜斗禁宫卫",
+    "openingAction": "开始",
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": false,
+  "newGame": {
+    "mode": "start-new-game",
+    "success": false,
+    "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-wuxia-automation=\"saved-character-build\"]').first().locator('[data-wuxia-automation=\"load-character-build\"]').first()\n    - locator resolved to <button type=\"button\" title=\"加载此存档\" class=\"load-build-btn\" data-wuxia-automation=\"load-character-build\">加载</button>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is not stable\n    - retrying click action\n    - waiting 20ms\n    - waiting for element to be visible, enabled and stable\n    - element is not stable\n  - retrying click action\n    - waiting 100ms\n    - waiting for element to be visible, enabled and stable\n    - element is visible, enabled and stable\n    - scrolling into view if needed\n    - done scrolling\n    - performing click action\n\n    at startNewGameFlow (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:807:69)\n    at async main (F:\\Develop\\AI\\sillytavern\\tools\\wuxia-ui-runner.mjs:1735:26)"
+  },
+  "completedAt": "2026-08-24T19:12:22.612Z"
+}

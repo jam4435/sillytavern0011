@@ -12,6 +12,7 @@ import { MeridianBodyDiagram, type MeridianBodyView } from './MeridianBodyDiagra
 export interface MeridianPanelProps {
   projection: MeridianProjection;
   cultivation: number;
+  gender?: '男' | '女' | string;
   busy?: boolean;
   onUpgrade: (nodeId: MeridianNodeId, quote: MeridianUpgradeQuote) => Promise<MeridianUpgradeResult | void>;
 }
@@ -37,7 +38,13 @@ const selectPreferredNode = (nodes: MeridianNodeView[], currentNodeId?: string) 
   nodes.find(node => node.status === 'locked') ??
   nodes[nodes.length - 1];
 
-export const MeridianPanel: React.FC<MeridianPanelProps> = ({ projection, cultivation, busy = false, onUpgrade }) => {
+export const MeridianPanel: React.FC<MeridianPanelProps> = ({
+  projection,
+  cultivation,
+  gender = '男',
+  busy = false,
+  onUpgrade,
+}) => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(() => getDefaultNode(projection.nodes)?.id);
   const [mobileView, setMobileView] = useState<MeridianBodyView>(
     () => getDefaultNode(projection.nodes)?.view ?? 'front',
@@ -222,9 +229,11 @@ export const MeridianPanel: React.FC<MeridianPanelProps> = ({ projection, cultiv
           <div className="meridian-figures">
             <MeridianBodyDiagram
               view="front"
+              gender={gender}
               nodes={frontNodes}
               meridians={frontMeridians}
               selectedNodeId={selectedNode?.id}
+              selectedMeridianId={selectedMeridian?.id}
               disabled={projection.corrupted}
               active={mobileView === 'front'}
               onSelectNode={handleSelectNode}
@@ -232,9 +241,11 @@ export const MeridianPanel: React.FC<MeridianPanelProps> = ({ projection, cultiv
             />
             <MeridianBodyDiagram
               view="back"
+              gender={gender}
               nodes={backNodes}
               meridians={backMeridians}
               selectedNodeId={selectedNode?.id}
+              selectedMeridianId={selectedMeridian?.id}
               disabled={projection.corrupted}
               active={mobileView === 'back'}
               onSelectNode={handleSelectNode}

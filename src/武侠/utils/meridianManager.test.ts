@@ -46,8 +46,8 @@ describe('upgradeMeridianNode', () => {
     variables = {
       stat_data: {
         user数据: {
-          境界: '不入流',
-          修为: 100,
+          境界: '二流初期',
+          修为: 1_000,
           初始属性: structuredClone(initialAttributes),
         },
         前端变量: { 其他字段: { 保留: true } },
@@ -85,7 +85,7 @@ describe('upgradeMeridianNode', () => {
     const result = await upgradeMeridianNode('ren:opening', openingQuote());
 
     expect(result.success).toBe(true);
-    expect(variables.stat_data.user数据.修为).toBe(60);
+    expect(variables.stat_data.user数据.修为).toBe(840);
     expect(variables.stat_data.前端变量.奇经八脉).toEqual(result.progress);
     expect(variables.stat_data.前端变量.其他字段).toEqual({ 保留: true });
     const transactionCalls = eventEmitMock.mock.calls.filter(([eventName]) => eventName === 'era:transactionByObject');
@@ -93,7 +93,7 @@ describe('upgradeMeridianNode', () => {
     expect(transactionCalls[0][1]).toMatchObject({
       transactionId: expect.stringMatching(/^meridian-/),
       operations: [
-        { type: 'update', payload: { user数据: { 修为: 60 } } },
+        { type: 'update', payload: { user数据: { 修为: 840 } } },
         { type: 'insert', payload: { 前端变量: { 奇经八脉: result.progress } } },
       ],
     });
@@ -107,20 +107,28 @@ describe('upgradeMeridianNode', () => {
     const second = upgradeMeridianNode('ren:opening', quote);
     await expect(Promise.all([first, second])).resolves.toHaveLength(2);
 
-    expect(variables.stat_data.user数据.修为).toBe(60);
+    expect(variables.stat_data.user数据.修为).toBe(840);
     expect(eventEmitMock.mock.calls.filter(([eventName]) => eventName === 'era:transactionByObject')).toHaveLength(1);
   });
 
   it('确认后报价变化时取消提交并要求重新确认', async () => {
     const quote = openingQuote();
-    variables.stat_data.user数据.修为 = 99;
+    variables.stat_data.user数据.修为 = 999;
 
     await expect(upgradeMeridianNode('ren:opening', quote)).rejects.toThrow('报价已经变化');
     expect(eventEmitMock.mock.calls.filter(([eventName]) => eventName === 'era:transactionByObject')).toHaveLength(0);
   });
 
+  it('提交前重读境界，低于二流时即使持有旧报价也不写事务', async () => {
+    const quote = openingQuote();
+    variables.stat_data.user数据.境界 = '三流圆满';
+
+    await expect(upgradeMeridianNode('ren:opening', quote)).rejects.toThrow('需先突破到二流');
+    expect(eventEmitMock.mock.calls.filter(([eventName]) => eventName === 'era:transactionByObject')).toHaveLength(0);
+  });
+
   it('关窍在同一事务中同步写入初始属性与实际结算', async () => {
-    variables.stat_data.user数据.修为 = 200;
+    variables.stat_data.user数据.修为 = 800;
     variables.stat_data.前端变量.奇经八脉 = {
       版本: 1,
       已通穴位: ['ren:opening', 'ren:circulation', 'ren:condensation', 'ren:cycle'],
@@ -130,14 +138,14 @@ describe('upgradeMeridianNode', () => {
     const quote = quoteMeridianUpgrade({
       progress: variables.stat_data.前端变量.奇经八脉,
       nodeId: 'ren:confluence',
-      realm: '不入流',
-      cultivation: 200,
+      realm: '二流初期',
+      cultivation: 800,
       initialAttributes,
     });
 
     const result = await upgradeMeridianNode('ren:confluence', quote);
 
-    expect(variables.stat_data.user数据.修为).toBe(15);
+    expect(variables.stat_data.user数据.修为).toBe(60);
     expect(variables.stat_data.user数据.初始属性.根骨).toBe(11);
     expect(variables.stat_data.前端变量.奇经八脉.关窍结算['ren:confluence']).toEqual({
       类型: '初始属性',

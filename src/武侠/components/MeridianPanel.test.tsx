@@ -20,7 +20,7 @@ const buildProjection = (opened: MeridianNodeId[] = []) =>
       ...createEmptyMeridianProgress(),
       已通穴位: opened,
     },
-    realm: '三流圆满',
+    realm: '二流初期',
     cultivation: 10_000,
     initialAttributes,
   });

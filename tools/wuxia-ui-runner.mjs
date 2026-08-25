@@ -548,16 +548,36 @@ async function findHostPage(browser, pageUrl) {
 
 async function readSelectedCharacterName(page) {
   return page.evaluate(() => {
+    const contextName = globalThis.SillyTavern?.getContext?.()?.name2;
+    if (typeof contextName === 'string' && contextName.trim()) return contextName.trim();
     const selected = document.querySelector('#rm_print_characters_block .character_select.selected');
     return (selected?.querySelector('.ch_name')?.textContent || '').trim();
   });
 }
 
+async function readHostChatId(page) {
+  return page.evaluate(() => {
+    const chatId = globalThis.SillyTavern?.getContext?.()?.chatId;
+    return typeof chatId === 'string' ? chatId : '';
+  });
+}
+
 async function selectCharacterByName(page, characterName) {
-  const drawerButton = page.locator('#rightNavDrawerIcon, #rm_button_selected_ch').first();
-  if (await drawerButton.isVisible().catch(() => false)) {
-    await drawerButton.click().catch(() => undefined);
-    await sleep(250);
+  const characterList = page.locator('#rm_characters_block').first();
+  if (!(await characterList.isVisible().catch(() => false))) {
+    const drawerPanel = page.locator('#right-nav-panel').first();
+    if (!(await drawerPanel.isVisible().catch(() => false))) {
+      const drawerButton = page.locator('#rightNavDrawerIcon').first();
+      if (await drawerButton.isVisible().catch(() => false)) {
+        await drawerButton.click();
+        await sleep(250);
+      }
+    }
+    const charactersButton = page.locator('#rm_button_characters').first();
+    if (await charactersButton.isVisible().catch(() => false)) {
+      await charactersButton.click();
+      await characterList.waitFor({ state: 'visible', timeout: 5_000 });
+    }
   }
 
   const selection = await page.evaluate(name => {
@@ -601,6 +621,12 @@ async function selectCharacterByName(page, characterName) {
 }
 
 async function clickHostStartNewChat(page) {
+  const existingPopupOk = page.locator('dialog[open] .popup-button-ok').first();
+  if (await existingPopupOk.isVisible().catch(() => false)) {
+    await existingPopupOk.click();
+    return;
+  }
+
   const nativeDialog = new Promise(resolve => {
     const handler = dialog => {
       clearTimeout(timeout);
@@ -615,7 +641,9 @@ async function clickHostStartNewChat(page) {
 
   const optionsButton = page.locator('#options_button').first();
   if (await optionsButton.isVisible().catch(() => false)) {
-    await optionsButton.click();
+    await optionsButton.evaluate(element => {
+      if (element instanceof HTMLElement) element.click();
+    });
     await sleep(150);
   }
   const newChat = page.locator('#option_start_new_chat, #new_chat').first();
@@ -630,9 +658,13 @@ async function clickHostStartNewChat(page) {
   if (!clicked) throw new Error('酒馆“开始新聊天”控件不可点击');
 
   const dialog = await nativeDialog;
-  if (dialog) await dialog.accept();
-  const popupOk = page.locator('#dialogue_popup_ok').first();
-  if (await popupOk.isVisible().catch(() => false)) await popupOk.click();
+  if (dialog) {
+    await dialog.accept();
+    return;
+  }
+  const popupOk = page.locator('dialog[open] .popup-button-ok, #dialogue_popup_ok').first();
+  await popupOk.waitFor({ state: 'visible', timeout: 10_000 });
+  await popupOk.click();
 }
 
 async function waitForPageState(browser, pageUrl, expected, timeoutMs, requestedChatId = '') {
@@ -666,7 +698,9 @@ async function enterFreshCharacterChat(browser, options) {
   }
 
   const selectedName = await readSelectedCharacterName(page).catch(() => '');
-  if (!target || selectedName !== options.characterName) {
+  const hostChatId = await readHostChatId(page).catch(() => '');
+  const targetBelongsToCurrentChat = Boolean(target && hostChatId && target.chatId === hostChatId);
+  if (!target || (selectedName !== options.characterName && !targetBelongsToCurrentChat)) {
     target = await selectCharacterByName(page, options.characterName);
   }
   const snapshot = await readAutomationSnapshot(target);
@@ -676,8 +710,22 @@ async function enterFreshCharacterChat(browser, options) {
 
   const previousChatId = snapshot.chatId || '';
   await clickHostStartNewChat(page);
+  const chatSwitchDeadline = Date.now() + options.timeoutMs;
+  let newChatId = '';
+  while (Date.now() < chatSwitchDeadline) {
+    newChatId = await readHostChatId(page).catch(() => '');
+    if (newChatId && newChatId !== previousChatId) break;
+    await sleep(150);
+  }
+  if (!newChatId || newChatId === previousChatId) {
+    throw new Error('确认新建聊天后，酒馆 chatId 未变化');
+  }
+
+  // 酒馆切换到空聊天后可能暂时保留上一聊天的 blob iframe。
+  // 刷新宿主页，让 loader 按新的 chatId 重新挂载，再锁定新的武侠实例。
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
   releaseGameFrameLock();
-  const fresh = await waitForPageState(browser, options.pageUrl, 'start', options.timeoutMs);
+  const fresh = await waitForPageState(browser, options.pageUrl, 'start', options.timeoutMs, newChatId);
   if (previousChatId && fresh.snapshot.chatId === previousChatId) {
     throw new Error('新建聊天后 chatId 未变化，拒绝在既有存档上重跑开局');
   }
@@ -755,11 +803,23 @@ async function startNewGameFlow(browser, options) {
     'data-wuxia-build-name',
     '角色预设',
   );
-  const confirmation = frame.page().waitForEvent('dialog', { timeout: 10_000 });
+  let buildDialogType = '';
+  const confirmation = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('等待加载角色预设确认框超时（10000ms）')), 10_000);
+    frame.page().once('dialog', async dialog => {
+      clearTimeout(timeout);
+      buildDialogType = dialog.type();
+      try {
+        await dialog.accept();
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
   await build.locator.locator(SELECTORS.loadCharacterBuild).first().click();
-  const buildDialog = await confirmation;
-  if (buildDialog.type() !== 'confirm') throw new Error(`加载角色预设出现了非确认对话框：${buildDialog.type()}`);
-  await buildDialog.accept();
+  await confirmation;
+  if (buildDialogType !== 'confirm') throw new Error(`加载角色预设出现了非确认对话框：${buildDialogType}`);
   await waitForSetupStep(browser, options.pageUrl, 'confirm', 10_000);
 
   await clickSetupNavigation(browser, options, SELECTORS.setupPreviousStep, 'identity');

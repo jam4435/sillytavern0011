@@ -14,7 +14,7 @@ import type {
   MeridianUpgradeResult,
   MeridianViewSide,
 } from '../types';
-import { getBreakthroughCost, parseRealm } from './realmSystem';
+import { getBreakthroughCost, MAJOR_REALMS, parseRealm } from './realmSystem';
 
 export const MERIDIAN_PROGRESS_VERSION = 1 as const;
 export const MERIDIAN_COST_RATIOS = [0.08, 0.12, 0.18, 0.25, 0.37] as const;
@@ -22,6 +22,9 @@ export const MERIDIAN_ORDINARY_BONUS = 3;
 export const MERIDIAN_GATE_INITIAL_BONUS = 1;
 export const MERIDIAN_GATE_FALLBACK_BONUS = 6;
 export const MAX_REALM_MERIDIAN_BASE_COST = 1_000_000;
+export const MERIDIAN_MINIMUM_REALM = '二流初期';
+
+const MERIDIAN_MINIMUM_MAJOR_INDEX = MAJOR_REALMS.indexOf('二流');
 
 const STAGES: ReadonlyArray<{ id: MeridianStageId; name: string }> = [
   { id: 'opening', name: '启脉' },
@@ -358,6 +361,12 @@ export function getMeridianBaseCost(realm: string): number {
   return breakthroughCost < 0 ? MAX_REALM_MERIDIAN_BASE_COST : breakthroughCost;
 }
 
+/** 奇经八脉须突破至二流后方可修炼。 */
+export function meetsMeridianRealmRequirement(realm: string): boolean {
+  const parsed = parseRealm(realm);
+  return parsed !== null && parsed.majorIndex >= MERIDIAN_MINIMUM_MAJOR_INDEX;
+}
+
 export function getMeridianNodeCost(realm: string, nodeId: MeridianNodeId): number {
   const node = NODE_BY_ID.get(nodeId);
   const baseCost = getMeridianBaseCost(realm);
@@ -435,6 +444,9 @@ export function quoteMeridianUpgrade(input: MeridianUpgradeInput): MeridianUpgra
   }
   if (baseCost <= 0 || cost <= 0) {
     return { ...quote, reason: '无法识别当前境界' };
+  }
+  if (!meetsMeridianRealmRequirement(input.realm)) {
+    return { ...quote, reason: '需先突破到二流，方可冲穴' };
   }
   if (normalization.progress.已通穴位.includes(node.id)) {
     return { ...quote, reason: '该穴位已打通' };
@@ -538,11 +550,12 @@ export function applyMeridianUpgrade(input: MeridianUpgradeInput): MeridianUpgra
 export function buildMeridianProjection(input: MeridianProjectionInput): MeridianProjection {
   const normalization = normalizeMeridianProgress(input.progress);
   const opened = new Set(normalization.progress.已通穴位);
+  const realmEligible = meetsMeridianRealmRequirement(input.realm);
 
   const nodes: MeridianNodeView[] = MERIDIAN_NODES.map(node => {
     const status = opened.has(node.id)
       ? 'opened'
-      : normalization.valid && (!node.prerequisiteId || opened.has(node.prerequisiteId))
+      : normalization.valid && realmEligible && (!node.prerequisiteId || opened.has(node.prerequisiteId))
         ? 'available'
         : 'locked';
     const prerequisite = node.prerequisiteId ? NODE_BY_ID.get(node.prerequisiteId) : undefined;

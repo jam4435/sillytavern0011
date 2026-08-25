@@ -1,0 +1,29 @@
+{
+  "startedAt": "2026-08-24T19:14:02.991Z",
+  "options": {
+    "endpoint": "http://127.0.0.1:9333",
+    "pageUrl": "127.0.0.1:8000",
+    "turns": 1,
+    "actions": [],
+    "settleMs": 5000,
+    "timeoutMs": 30000,
+    "transport": "api",
+    "chatId": "",
+    "output": "wuxia-new-game-restart-inspect-20260825.json",
+    "inspectOnly": true,
+    "statDataSnapshot": false,
+    "regenerate": false,
+    "restartFromFirstReply": false,
+    "startNewGame": false,
+    "characterName": "金庸群侠传",
+    "characterBuild": "",
+    "openingEvent": "",
+    "openingAction": "开始",
+    "reloadPage": false,
+    "stopGeneration": false,
+    "continueOnError": false
+  },
+  "turns": [],
+  "success": false,
+  "completedAt": "2026-08-24T19:14:18.132Z"
+}
