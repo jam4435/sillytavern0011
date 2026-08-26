@@ -14,7 +14,6 @@ export type WorldTimeGuardErrorCode =
   | 'declared-action-invalid'
   | 'unsupported-time-path'
   | 'delete-required-field'
-  | 'incomplete-time-update'
   | 'invalid-time-value'
   | 'time-not-forward';
 
@@ -53,10 +52,6 @@ export type WorldTimeCompletionTargetResult =
 type WorldTimeSource = Partial<Record<WorldTimeField, unknown>> | null | undefined;
 
 const TIME_PATH_PREFIX = ['世界信息', '时间'] as const;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 export function isWorldTimePath(path: readonly (string | number)[]): boolean {
   return path[0] === TIME_PATH_PREFIX[0] && path[1] === TIME_PATH_PREFIX[1];

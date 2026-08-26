@@ -366,7 +366,7 @@ describe('executeExtraVariableUpdate', () => {
     );
   });
 
-  it('额外变量模型 Edit 不存在路径时立即失败且不进入 ERA 写入或后台等待', async () => {
+  it('Edit 不存在路径时交给 ERA 处理，并由写后回读报告未落库', async () => {
     requestConfiguredTextMock.mockResolvedValue(
       '<VariableEdit>{"user数据":{"人物经历":{"酒馆结识郭杨":"与郭杨拼桌共饮。"}}}</VariableEdit>',
     );
@@ -377,15 +377,16 @@ describe('executeExtraVariableUpdate', () => {
         assistantMessageId: 28,
         latestRawReply: '正文内容',
       }),
-    ).rejects.toThrow('本回合所有变量动作均未通过独立校验');
+    ).rejects.toThrow('ERA 已返回写入完成，但变量声明未按原值落库');
 
-    expect(setChatMessagesMock).not.toHaveBeenCalled();
-    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+    expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
     expect(getIsExtraVariableUpdating()).toBe(false);
   });
 
-  it('额外变量模型 Insert 已存在路径时立即失败且不进入 ERA 写入', async () => {
+  it('Insert 已存在路径时交给 ERA 处理，并由写后回读报告未覆盖', async () => {
     requestConfiguredTextMock.mockResolvedValue('<VariableInsert>{"user数据":{"修为":120}}</VariableInsert>');
+    emitSourcedEraVariableWriteAndWaitMock.mockResolvedValue({ message_id: 28, actions: { apiWrite: true } });
 
     await expect(
       executeExtraVariableUpdate({
@@ -393,14 +394,14 @@ describe('executeExtraVariableUpdate', () => {
         assistantMessageId: 28,
         latestRawReply: '正文内容',
       }),
-    ).rejects.toThrow('本回合所有变量动作均未通过独立校验');
+    ).rejects.toThrow('ERA 已返回写入完成，但变量声明未按原值落库');
 
-    expect(setChatMessagesMock).not.toHaveBeenCalled();
-    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+    expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
     expect(getIsExtraVariableUpdating()).toBe(false);
   });
 
-  it('额外变量模型 Delete 不存在路径时立即失败且不进入 ERA 写入', async () => {
+  it('Delete 不存在路径时交给 ERA 幂等跳过', async () => {
     requestConfiguredTextMock.mockResolvedValue(
       '<VariableDelete>{"user数据":{"不存在的临时状态":{}}}</VariableDelete>',
     );
@@ -411,10 +412,10 @@ describe('executeExtraVariableUpdate', () => {
         assistantMessageId: 28,
         latestRawReply: '正文内容',
       }),
-    ).rejects.toThrow('本回合所有变量动作均未通过独立校验');
+    ).resolves.toMatchObject({ applyStatus: 'success' });
 
-    expect(setChatMessagesMock).not.toHaveBeenCalled();
-    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+    expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
     expect(getIsExtraVariableUpdating()).toBe(false);
   });
 
@@ -463,19 +464,15 @@ describe('executeExtraVariableUpdate', () => {
     expect(result.appendedBlocks).not.toContain('"时间": {\n      "分": 0\n    }');
   });
 
-  it('时间纠错锁定原模型声明的15分钟，不允许改成10分钟', async () => {
+  it('稀疏时间声明合并当前时间后向前时直接放行，不要求补全五字段', async () => {
     const statData = variableSnapshot.stat_data as Record<string, unknown>;
     (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 0 };
     statData.事件系统 = {
       进行中事件: { '射雕第一回01-测试事件': { 年: 1200, 月: 8, 日: 15, 时: 13, 分: 0 } },
     };
-    requestConfiguredTextMock
-      .mockResolvedValueOnce(
-        '<VariableThink>酒馆对话耗时约15分钟</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"分":15}}}</VariableEdit>',
-      )
-      .mockResolvedValueOnce(
-        '<VariableThink>1200年8月15日12时0分 + 15分钟 = 1200年8月15日12时15分</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":12,"分":15}}}</VariableEdit>',
-      );
+    requestConfiguredTextMock.mockResolvedValueOnce(
+      '<VariableThink>酒馆对话耗时约15分钟</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"分":15}}}</VariableEdit>',
+    );
     emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
       (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 15 };
       return { message_id: 28, actions: { apiWrite: true } };
@@ -487,21 +484,18 @@ describe('executeExtraVariableUpdate', () => {
       latestRawReply: '曲三点破真相，众人震惊。',
     });
 
-    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(2);
-    const repairPrompt = requestConfiguredTextMock.mock.calls[1]?.[0].prompt as string;
-    expect(repairPrompt).toContain('锁定耗时：15 分钟');
-    expect(repairPrompt).toContain('锁定新时间：{"年":1200,"月":8,"日":15,"时":12,"分":15}');
-    expect(repairPrompt).toContain('禁止根据正文、事件边界或自己的判断重新估算、缩短或延长耗时');
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(1);
+    expect(result.timeRepairAttempted).toBe(false);
     expect(result.appendedBlocks).toContain('"分": 15');
-    expect(result.appendedBlocks).not.toContain('"分": 10');
+    expect(result.appendedBlocks).not.toContain('"年": 1200');
   });
 
   it('时间纠错连续返回不同于锁定目标的时间时整批失败', async () => {
     const statData = variableSnapshot.stat_data as Record<string, unknown>;
-    (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 10 };
+    (statData.世界信息 as Record<string, unknown>).时间 = { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 50 };
     requestConfiguredTextMock
       .mockResolvedValueOnce(
-        '<VariableThink>众人离店耗时约20分钟</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"分":30}}}</VariableEdit>',
+        '<VariableThink>众人离店耗时约20分钟</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"分":10}}}</VariableEdit>',
       )
       .mockResolvedValue(
         '<VariableThink>1200年8月15日12时10分 + 5分钟 = 1200年8月15日12时15分</VariableThink>\n<VariableEdit>{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":12,"分":15}}}</VariableEdit>',
@@ -513,7 +507,7 @@ describe('executeExtraVariableUpdate', () => {
         assistantMessageId: 28,
         latestRawReply: '众人离开酒馆。',
       }),
-    ).rejects.toThrow('纠错返回擅自改变了原声明时间');
+    ).rejects.toThrow('世界时间定向纠错失败，已自动重试 2 次');
 
     expect(requestConfiguredTextMock).toHaveBeenCalledTimes(4);
     expect(setChatMessagesMock).not.toHaveBeenCalled();
@@ -833,32 +827,49 @@ describe('executeExtraVariableUpdate', () => {
     });
   });
 
-  it('同一变量块中单条路径非法时只隔离该条并继续应用其他合法动作', async () => {
+  it('不再按叶子隔离存在性冲突，完整对象交给 ERA 后由回读报告未落库字段', async () => {
     requestConfiguredTextMock.mockResolvedValue(
       '<VariableEdit>{"user数据":{"修为":120,"人物经历":{"不存在的经历":"不应应用"}}}</VariableEdit>',
     );
 
+    await expect(
+      executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '正文内容',
+      }),
+    ).rejects.toThrow('ERA 已返回写入完成，但变量声明未按原值落库');
+
+    expect(assistantMessage.message).toContain('"修为": 120');
+    expect(assistantMessage.message).toContain('"人物经历"');
+    expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('同一新物品的 Insert 保持为一个完整对象，不拆成多个叶子块', async () => {
+    requestConfiguredTextMock.mockResolvedValue(
+      '<VariableInsert>{"user数据":{"包裹":{"牛皮水囊":{"类型":"杂物","品阶":"凡品","物品描述":"盛水用的牛皮囊。","数量":1}}}}</VariableInsert>',
+    );
+    emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
+      const statData = variableSnapshot.stat_data as Record<string, unknown>;
+      const userData = statData.user数据 as Record<string, unknown>;
+      userData.包裹 = {
+        牛皮水囊: { 类型: '杂物', 品阶: '凡品', 物品描述: '盛水用的牛皮囊。', 数量: 1 },
+      };
+      return { message_id: 28, actions: { apiWrite: true } };
+    });
+
     const result = await executeExtraVariableUpdate({
       settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
       assistantMessageId: 28,
-      latestRawReply: '正文内容',
+      latestRawReply: '获得牛皮水囊。',
     });
 
-    expect(result).toMatchObject({
-      appended: true,
-      actionBlockCount: 1,
-      applyStatus: 'success',
-      rejectedActions: [
-        expect.objectContaining({
-          action: 'edit',
-          path: 'stat_data › user数据 › 人物经历 › 不存在的经历',
-        }),
-      ],
-    });
-    expect(result.appendedBlocks).toContain('"修为": 120');
-    expect(result.appendedBlocks).not.toContain('人物经历');
-    expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
-    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
+    expect(result.applyStatus).toBe('success');
+    expect(result.appendedBlocks?.match(/<VariableInsert>/g)).toHaveLength(1);
+    expect(result.appendedBlocks).toContain('"牛皮水囊": {');
+    expect(result.appendedBlocks).toContain('"品阶": "凡品"');
+    expect(result.appendedBlocks).toContain('"数量": 1');
   });
 
   it('JSON 语法修复成功后应用修复结果，路径语义错误不触发格式修复', async () => {
@@ -890,7 +901,7 @@ describe('executeExtraVariableUpdate', () => {
         assistantMessageId: 28,
         latestRawReply: '正文内容',
       }),
-    ).rejects.toThrow('本回合所有变量动作均未通过独立校验');
+    ).rejects.toThrow('ERA 已返回写入完成，但变量声明未按原值落库');
     expect(requestConfiguredTextMock).toHaveBeenCalledTimes(1);
   });
 
@@ -1095,6 +1106,13 @@ describe('executeExtraVariableUpdate', () => {
     expect(fallbackProjection).toContain('<时间>\n1219年10月20日13时 到 1219年10月20日15时\n</时间>');
     expect(fallbackProjection).toContain('<事件详情>\n黄蓉正在事件中\n</事件详情>');
     expect(fallbackProjection).toContain('{"update":{"黄蓉":{"好感":1}},"分支标记":{"黄蓉对郭靖变心":0}}');
+    expect(fallbackProjection).toContain('<后续未发生事件脉络>');
+    expect(fallbackProjection).toContain('<射雕第一回05-包惜弱巧救颜烈>');
+    expect(fallbackProjection).toContain(
+      '"射雕第一回05-包惜弱巧救颜烈": "开始：1200年12月11日3时｜结束：1200年12月12日7时｜地点：大宋/临安府/牛家村/杨家后院｜可能会发生的事件脉络：丘处机虽然杀尽追兵，但一名受伤的金兵颜烈却侥幸未死。"',
+    );
+    expect(fallbackProjection).toContain('</射雕第一回05-包惜弱巧救颜烈>');
+    expect(fallbackProjection).toContain('</后续未发生事件脉络>');
     expect(fallbackProjection).toContain('每日修为变化参考:33');
     expect(fallbackProjection).toContain('【参与事件回合变量检查清单】');
     expect(fallbackProjection).toContain('未涉及/开端/发展/后段/收束/已完成');

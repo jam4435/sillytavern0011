@@ -25,7 +25,18 @@ describe('validateWorldTimePatch', () => {
       baseline,
       declaredChanges: changesFrom({ 世界信息: { 时间: { 分: 10 } } }),
     });
-    expect(result).toMatchObject({ ok: false, code: 'incomplete-time-update' });
+    expect(result).toMatchObject({ ok: false, code: 'time-not-forward' });
+  });
+
+  it('接受与当前完整时间合并后仍向前的稀疏声明', () => {
+    const result = validateWorldTimePatch({
+      baseline: { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 0 },
+      declaredChanges: changesFrom({ 世界信息: { 时间: { 分: 15 } } }),
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      candidate: { 年: 1200, 月: 8, 日: 15, 时: 12, 分: 15 },
+    });
   });
 
   it.each([

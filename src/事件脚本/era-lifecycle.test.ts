@@ -360,7 +360,7 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.后续事件线索计数).toEqual({});
   });
 
-  it('archives the actual window and creates an old-format clue under the target key', async () => {
+  it('archives the actual window and creates a complete unstarted-event timeline under the target key', async () => {
     const definitions = { [sourceName]: eventDefinition, [targetName]: targetDefinition };
 
     await expect(batchEndEvents([sourceName], definitions)).resolves.toBe(true);
@@ -369,9 +369,23 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.事件系统.已完成事件[sourceName]).toBe(0);
     expect(variables.stat_data.事件系统.进行中事件[sourceName]).toBeUndefined();
     expect(variables.stat_data.参与事件[sourceName]).toBeUndefined();
-    expect(variables.stat_data.后续事件线索[targetName]).toContain('江南似有新的风波');
+    expect(variables.stat_data.后续事件线索[targetName]).toBe(
+      '开始：1219年11月1日10时｜结束：1219年11月1日12时｜地点：大宋/金国中都/赵王府｜可能会发生的事件脉络：江南似有新的风波。',
+    );
     expect(variables.stat_data.后续事件线索计数[targetName]).toBe(3);
     expect(variables.stat_data.前端变量.事件结算进度[sourceName]).toBeUndefined();
+  });
+
+  it('uses the rebased runtime start and shifted end in the follow-up timeline', async () => {
+    variables.stat_data.事件系统.未发生事件[targetName] = { 年: 1219, 月: 11, 日: 2, 时: 8 };
+
+    await expect(batchEndEvents([sourceName], { [sourceName]: eventDefinition, [targetName]: targetDefinition })).resolves.toBe(
+      true,
+    );
+
+    expect(variables.stat_data.后续事件线索[targetName]).toBe(
+      '开始：1219年11月2日8时｜结束：1219年11月2日10时｜地点：大宋/金国中都/赵王府｜可能会发生的事件脉络：江南似有新的风波。',
+    );
   });
 
   it('does not enter final settlement when the ERA preparation transaction fails', async () => {

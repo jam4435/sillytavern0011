@@ -283,8 +283,10 @@ export function collectEventTargetPaths(statData: Record<string, unknown>): stri
   }
   for (const value of Object.values(followupClues)) {
     if (typeof value !== 'string') continue;
-    const match = value.match(/^\([^，]+，([^，]+)，似乎还会有事情发生\)/);
-    if (match?.[1]) targets.push(match[1]);
+    const structuredMatch = value.match(/(?:^|｜)地点：([^｜]+)(?:｜|$)/);
+    const legacyMatch = value.match(/^\([^，]+，([^，]+)，似乎还会有事情发生\)/);
+    const location = structuredMatch?.[1] || legacyMatch?.[1];
+    if (location) targets.push(location);
   }
 
   return normalizeCompleteLocationPaths(targets);
