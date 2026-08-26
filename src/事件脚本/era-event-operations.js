@@ -1082,7 +1082,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       Object.assign(占用删除对象, buildOccupancyCleanupPatch(statData?.事件系统?.人物事件占用 || {}, eventName));
     }
 
-    const finalFollowups = buildFollowupPayloads(eventNames, eventDefinitions);
+    const finalFollowups = buildFollowupPayloads(eventNames, eventDefinitions, statData);
     const followupPayload = Object.fromEntries(
       Object.entries(finalFollowups.followupPayload).filter(
         ([key]) => !Object.prototype.hasOwnProperty.call(statData.后续事件线索 || {}, key),
@@ -1226,7 +1226,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
 }
 
 // ==================== 后续事件线索 ====================
-function buildFollowupPayloads(eventNames, eventDefinitions) {
+function buildFollowupPayloads(eventNames, eventDefinitions, statData = {}) {
   const followupPayload = {};
   const followupCountPayload = {};
 
@@ -1237,10 +1237,23 @@ function buildFollowupPayloads(eventNames, eventDefinitions) {
       const targetEventData = eventDefinitions[targetEventKey];
       if (!targetEventData || Object.prototype.hasOwnProperty.call(followupPayload, targetEventKey)) continue;
 
-      const time = getSingleConditionTimeAnchor(targetEventData.触发条件);
+      const plannedStart = getSingleConditionTimeAnchor(targetEventData.触发条件);
+      const runtimeStart = statData?.事件系统?.未发生事件?.[targetEventKey];
+      const hasRuntimeStart =
+        isPlainObject(runtimeStart) &&
+        getSingleConditionTimeAnchor(runtimeStart) &&
+        JSON.stringify(runtimeStart) !== JSON.stringify(plannedStart);
+      const { startTime, endTime } = hasRuntimeStart
+        ? buildActualEventWindow(targetEventData, getSingleConditionTimeAnchor(runtimeStart), true)
+        : buildActualEventWindow(targetEventData, null, false);
       const location = targetEventData.事件地点;
-      const contextParts = [time ? formatDate(time) : '', location, '似乎还会有事情发生'].filter(Boolean);
-      followupPayload[targetEventKey] = `(${contextParts.join('，')})${description}`;
+      const contextParts = [
+        startTime ? `开始：${formatDate(startTime)}` : '',
+        endTime ? `结束：${formatDate(endTime)}` : '',
+        location ? `地点：${location}` : '',
+        `可能会发生的事件脉络：${description}`,
+      ].filter(Boolean);
+      followupPayload[targetEventKey] = contextParts.join('｜');
       followupCountPayload[targetEventKey] = CONFIG.DEFAULT_FOLLOWUP_LIFETIME;
       log(`为事件 ${eventName} 生成后续线索: ${targetEventKey}`);
     }

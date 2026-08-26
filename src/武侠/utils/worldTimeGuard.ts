@@ -247,23 +247,14 @@ export function validateWorldTimePatch({
     latestByField.set(field, change);
   }
 
-  for (const field of WORLD_TIME_FIELDS) {
-    const change = latestByField.get(field);
-    if (!change) {
-      return createFailure(
-        'incomplete-time-update',
-        `世界时间必须原子更新年/月/日/时/分五个字段，当前缺少“${field}”。`,
-        baseContext,
-      );
-    }
+  for (const [field, change] of latestByField) {
     if (change.action === 'delete') {
       return createFailure('delete-required-field', `世界时间必需字段“${field}”不允许删除。`, baseContext);
     }
   }
 
-  const candidateSource = Object.fromEntries(
-    WORLD_TIME_FIELDS.map(field => [field, latestByField.get(field)?.value]),
-  ) as Partial<Record<WorldTimeField, unknown>>;
+  const candidateSource = { ...baseline } as Partial<Record<WorldTimeField, unknown>>;
+  for (const [field, change] of latestByField) candidateSource[field] = change.value;
   const candidate = validateWorldTimeSource(candidateSource, false);
   const candidateContext = { ...baseContext, candidate };
   if (!candidate) {

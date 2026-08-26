@@ -75,6 +75,8 @@ describe('executeExtraVariableUpdate', () => {
   let variableSnapshot: Record<string, unknown>;
 
   beforeEach(() => {
+    requestConfiguredTextMock.mockReset();
+    emitSourcedEraVariableWriteAndWaitMock.mockReset();
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
     assistantMessage = {
       message_id: 28,
@@ -185,7 +187,10 @@ describe('executeExtraVariableUpdate', () => {
         },
         世界事件: { 旧闻: '不应发送' },
         附近传闻: { 传闻: '不应发送' },
-        后续事件线索: { 线索: '不应发送' },
+        后续事件线索: {
+          '射雕第一回05-包惜弱巧救颜烈':
+            '开始：1200年12月11日3时｜结束：1200年12月12日7时｜地点：大宋/临安府/牛家村/杨家后院｜可能会发生的事件脉络：丘处机虽然杀尽追兵，但一名受伤的金兵颜烈却侥幸未死。',
+        },
         前端变量: {
           周围地点: {
             当前活动区: '大宋/临安府/牛家村',

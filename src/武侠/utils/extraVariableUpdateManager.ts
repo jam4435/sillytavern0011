@@ -235,22 +235,20 @@ function hasPath(source: unknown, path: readonly (string | number)[]): boolean {
       current = current[segment];
       continue;
     }
-    if (!isRecord(current) || !Object.prototype.hasOwnProperty.call(current, String(segment))) {
-      return false;
-    }
+    if (!isRecord(current) || !Object.prototype.hasOwnProperty.call(current, String(segment))) return false;
     current = current[String(segment)];
   }
   return true;
 }
 
-function validateDeclaredActionPaths(declaredChanges: VariableDeclaredChange[]): {
+function validateDeclaredLocations(declaredChanges: VariableDeclaredChange[]): {
   accepted: VariableDeclaredChange[];
   rejected: RejectedVariableAction[];
 } {
   if (declaredChanges.length === 0) return { accepted: [], rejected: [] };
   const statData = readCurrentStatDataSnapshot();
   if (!statData) {
-    throw new Error('聊天级 stat_data 暂不可读，无法校验额外变量模型声明的 Insert/Edit/Delete 路径。');
+    throw new Error('聊天级 stat_data 暂不可读，无法校验额外变量模型声明的地点。');
   }
   const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : {};
   const surroundingLocations = isRecord(frontendVariables.周围地点) ? frontendVariables.周围地点 : {};
@@ -269,13 +267,7 @@ function validateDeclaredActionPaths(declaredChanges: VariableDeclaredChange[]):
   const rejected: RejectedVariableAction[] = [];
   for (const change of declaredChanges) {
     let reason = '';
-    if (change.action === 'insert' && hasPath(statData, change.path)) {
-      reason = '目标路径已经存在，必须使用 VariableEdit。';
-    } else if (change.action === 'edit' && !hasPath(statData, change.path)) {
-      reason = '目标路径不存在，必须使用 VariableInsert。';
-    } else if (change.action === 'delete' && !hasPath(statData, change.path)) {
-      reason = '目标路径不存在，VariableDelete 只能删除已有字段。';
-    } else if (change.action !== 'delete' && change.path.at(-1) === '所在位置') {
+    if (change.action !== 'delete' && change.path.at(-1) === '所在位置') {
       const parsed = parseLocationPath(change.value);
       if (!parsed) {
         reason = `地点 ${JSON.stringify(change.value)} 无效；地点必须是三级或四级完整路径。`;
@@ -297,44 +289,38 @@ function validateDeclaredActionPaths(declaredChanges: VariableDeclaredChange[]):
   return { accepted, rejected };
 }
 
-function buildIndependentVariablePatch(path: readonly (string | number)[], value: unknown): unknown {
-  return [...path].reverse().reduce<unknown>((child, segment) => {
-    if (typeof segment === 'number') {
-      const array: unknown[] = [];
-      array[segment] = child;
-      return array;
+function setVariablePatchValue(
+  patch: Record<string, unknown>,
+  path: readonly (string | number)[],
+  value: unknown,
+): void {
+  let current: Record<string, unknown> | unknown[] = patch;
+  path.forEach((segment, index) => {
+    const isLast = index === path.length - 1;
+    if (isLast) {
+      current[segment as never] = value as never;
+      return;
     }
-    return { [segment]: child };
-  }, value);
+    const nextContainer: Record<string, unknown> | unknown[] = typeof path[index + 1] === 'number' ? [] : {};
+    const existing = current[segment as never] as unknown;
+    if (!isRecord(existing) && !Array.isArray(existing)) current[segment as never] = nextContainer as never;
+    current = current[segment as never] as Record<string, unknown> | unknown[];
+  });
 }
 
-function serializeIndependentVariableBlocks(
+function serializeVariableBlocks(
   thoughts: Array<{ text: string }>,
   changes: VariableDeclaredChange[],
 ): string {
   const blocks = thoughts.map(thought => `<VariableThink>\n${thought.text}\n</VariableThink>`);
-  const timeChanges = changes.filter(change => isWorldTimePath(change.path));
-  const nonTimeChanges = changes.filter(change => !isWorldTimePath(change.path));
-  for (const change of nonTimeChanges) {
-    const leafValue = change.action === 'delete' ? {} : change.value;
-    const patch = buildIndependentVariablePatch(change.path, leafValue);
-    blocks.push(`<${change.blockTag}>\n${JSON.stringify(patch, null, 2)}\n</${change.blockTag}>`);
-  }
-  const latestTimeByPath = new Map<string, VariableDeclaredChange>();
-  for (const change of timeChanges) latestTimeByPath.set(JSON.stringify(change.path), change);
-  const timeChangesByTag = new Map<VariableDeclaredChange['blockTag'], VariableDeclaredChange[]>();
-  for (const change of latestTimeByPath.values()) {
-    const grouped = timeChangesByTag.get(change.blockTag) ?? [];
-    grouped.push(change);
-    timeChangesByTag.set(change.blockTag, grouped);
-  }
   for (const blockTag of ['VariableEdit', 'VariableInsert', 'VariableDelete'] as const) {
-    const grouped = timeChangesByTag.get(blockTag);
+    const grouped = changes.filter(change => change.blockTag === blockTag);
     if (!grouped?.length) continue;
-    const timePatch = Object.fromEntries(
-      grouped.map(change => [String(change.path[2]), change.action === 'delete' ? {} : change.value]),
-    );
-    blocks.push(`<${blockTag}>\n${JSON.stringify({ 世界信息: { 时间: timePatch } }, null, 2)}\n</${blockTag}>`);
+    const patch: Record<string, unknown> = {};
+    for (const change of grouped) {
+      setVariablePatchValue(patch, change.path, change.action === 'delete' ? {} : change.value);
+    }
+    blocks.push(`<${blockTag}>\n${JSON.stringify(patch, null, 2)}\n</${blockTag}>`);
   }
   return blocks.join('\n\n').trim();
 }
@@ -984,6 +970,7 @@ function formatDecisionChecklist(hasParticipationEvents: boolean, cultivationRef
 function formatVariableContext(
   projection: Record<string, unknown>,
   participationEvents: unknown,
+  followupClues: unknown,
   cultivationReference: unknown,
 ): string {
   const lines = [
@@ -1019,6 +1006,18 @@ function formatVariableContext(
       );
     }
     lines.push('</参与事件>');
+  }
+
+  if (isRecord(followupClues) && Object.keys(followupClues).length > 0) {
+    lines.push('', '# 后续未发生事件脉络：全部只读，仅用于约束正文耗时和世界时间推进', '<后续未发生事件脉络>');
+    for (const [eventName, clueValue] of Object.entries(followupClues)) {
+      lines.push(
+        `<${eventName}>`,
+        `${JSON.stringify(eventName)}: ${JSON.stringify(String(clueValue ?? ''))}`,
+        `</${eventName}>`,
+      );
+    }
+    lines.push('</后续未发生事件脉络>');
   }
 
   lines.push(
@@ -1090,7 +1089,12 @@ function buildVariableProjectionSnapshot(
   const statData = statDataSource as Record<string, unknown>;
   const projection = buildExtraVariableProjection(variables, latestAssistantBody);
   const frontendVariables = getNestedRecord(statData, '前端变量') || {};
-  const variableContext = formatVariableContext(projection, statData.参与事件, frontendVariables.修为变化参考);
+  const variableContext = formatVariableContext(
+    projection,
+    statData.参与事件,
+    statData.后续事件线索,
+    frontendVariables.修为变化参考,
+  );
   const projectedUserData = isRecord(projection.user数据) ? projection.user数据 : {};
   const locationContext = formatLocationContext(frontendVariables.周围地点, projectedUserData.所在位置);
 
@@ -1516,7 +1520,7 @@ export async function validateOrRepairWorldTimeDeclarations({
     return {
       changes: declaredChanges,
       thoughts,
-      blocksText: serializeIndependentVariableBlocks(thoughts, declaredChanges),
+      blocksText: serializeVariableBlocks(thoughts, declaredChanges),
       timeRepairAttempted: false,
     };
   }
@@ -1527,7 +1531,7 @@ export async function validateOrRepairWorldTimeDeclarations({
     return {
       changes: declaredChanges,
       thoughts,
-      blocksText: serializeIndependentVariableBlocks(thoughts, declaredChanges),
+      blocksText: serializeVariableBlocks(thoughts, declaredChanges),
       timeRepairAttempted: false,
     };
   }
@@ -1538,7 +1542,6 @@ export async function validateOrRepairWorldTimeDeclarations({
         reason: forcedRepairReason,
         baseline: validatedGuard.baseline,
         candidate: validatedGuard.candidate,
-        eventEnd: validatedGuard.eventEnd,
         timeChanges: validatedGuard.timeChanges,
         nonTimeChanges: validatedGuard.nonTimeChanges,
       }
@@ -1567,7 +1570,7 @@ export async function validateOrRepairWorldTimeDeclarations({
     const validationMessage = validateSummaryApiConfig(requestSettings.apiConfig, { requireModel: true });
     if (validationMessage) throw new Error(validationMessage);
   }
-  const originalTimeBlocks = serializeIndependentVariableBlocks([], initialGuard.timeChanges);
+  const originalTimeBlocks = serializeVariableBlocks([], initialGuard.timeChanges);
   let previousFailure = '';
   let previousResponse = '';
   let finalRawResponse = '';
@@ -1609,17 +1612,9 @@ export async function validateOrRepairWorldTimeDeclarations({
       if (forbiddenChanges.length > 0) {
         throw new Error(`纠错返回包含非时间路径：${forbiddenChanges.map(change => change.displayPath).join('、')}`);
       }
-      const pathValidation = validateDeclaredActionPaths(repairedState.declaredChanges);
-      if (pathValidation.rejected.length > 0) {
-        throw new Error(
-          `纠错时间动作的 Insert/Edit 与当前路径不匹配：${pathValidation.rejected
-            .map(item => `${item.path}（${item.reason}）`)
-            .join('；')}`,
-        );
-      }
       const repairedGuard = validateWorldTimePatch({
         baseline,
-        declaredChanges: pathValidation.accepted,
+        declaredChanges: repairedState.declaredChanges,
       });
       if (!repairedGuard.ok) throw new Error(repairedGuard.reason);
       if (!repairedGuard.candidate || compareWorldTime(repairedGuard.candidate, completionTarget.target) !== 0) {
@@ -1649,7 +1644,7 @@ export async function validateOrRepairWorldTimeDeclarations({
       });
     },
   });
-  const blocksText = serializeIndependentVariableBlocks(repaired.thoughts, repaired.changes);
+  const blocksText = serializeVariableBlocks(repaired.thoughts, repaired.changes);
   variableTraceLogger.log('[worldTimeGuard] 定向纠错已通过守卫校验', {
     originalError: initialGuard.reason,
     repairRawResponse: finalRawResponse,
@@ -1678,29 +1673,25 @@ export async function validateOrRepairInlineWorldTimeReply({
   if (declaredState.omittedDeclaredCount > 0) {
     throw new Error(`本回合变量声明超过可安全校验的上限。`);
   }
+  const locationValidation = validateDeclaredLocations(declaredState.declaredChanges);
+  if (locationValidation.rejected.length > 0) {
+    throw new Error(
+      `本回合包含非法地点修改：${locationValidation.rejected
+        .map(item => `${item.path}（${item.reason}）`)
+      .join('；')}`,
+    );
+  }
   const originalTimeChanges = declaredState.declaredChanges.filter(change => isWorldTimePath(change.path));
   if (originalTimeChanges.length === 0) {
     return { replyText: rawReply, timeRepairAttempted: false, blocksText: extracted.blocksText };
   }
 
-  const timePathValidation = validateDeclaredActionPaths(originalTimeChanges);
-  const forcedRepairReason = timePathValidation.rejected.length
-    ? `原时间动作的 Insert/Edit/Delete 与当前路径不匹配：${timePathValidation.rejected
-        .map(item => `${item.path}（${item.reason}）`)
-        .join('；')}`
-    : '';
-  const semanticChanges = [
-    ...declaredState.declaredChanges.filter(change => !isWorldTimePath(change.path)),
-    ...timePathValidation.accepted,
-  ];
-
   const latestAssistantBody = normalizeDisplayedMessageContent(stripEraVariableBlocksForPrompt(rawReply));
   const validated = await validateOrRepairWorldTimeDeclarations({
     settings,
-    declaredChanges: semanticChanges,
+    declaredChanges: declaredState.declaredChanges,
     thoughts: declaredState.thoughts,
     latestAssistantBody,
-    forcedRepairReason,
   });
   if (!validated.timeRepairAttempted) {
     return { replyText: rawReply, timeRepairAttempted: false, blocksText: extracted.blocksText };
@@ -2034,24 +2025,11 @@ export async function executeExtraVariableUpdate({
       );
     }
     const validation = await runPhase('validate-variable-actions', () =>
-      validateDeclaredActionPaths(declaredState.declaredChanges),
+      validateDeclaredLocations(declaredState.declaredChanges),
     );
     if (validation.rejected.length > 0) {
-      variableTraceLogger.warn('[extraVariableUpdate] 已隔离非法变量动作，其余动作继续应用', {
-        assistantMessageId,
-        rejectedActions: validation.rejected,
-      });
-    }
-    const rejectedTimeActions = validation.rejected.filter(item => item.path.startsWith('世界信息.时间'));
-    const forcedTimeRepairReason = rejectedTimeActions.length
-      ? `原时间动作的 Insert/Edit/Delete 与当前路径不匹配：${rejectedTimeActions
-          .map(item => `${item.path}（${item.reason}）`)
-          .join('；')}`
-      : '';
-    const hasDeclaredTimeAction = declaredState.declaredChanges.some(change => isWorldTimePath(change.path));
-    if (declaredState.declaredChanges.length > 0 && validation.accepted.length === 0 && !hasDeclaredTimeAction) {
       throw new Error(
-        `本回合所有变量动作均未通过独立校验：${validation.rejected
+        `本回合包含非法地点修改：${validation.rejected
           .map(item => `${item.path}（${item.reason}）`)
           .join('；')}`,
       );
@@ -2059,10 +2037,9 @@ export async function executeExtraVariableUpdate({
     const timeValidation = await runPhase('validate-or-repair-world-time', () =>
       validateOrRepairWorldTimeDeclarations({
         settings,
-        declaredChanges: validation.accepted,
+        declaredChanges: declaredState.declaredChanges,
         thoughts: declaredState.thoughts,
         latestAssistantBody: normalizeDisplayedMessageContent(stripEraVariableBlocksForPrompt(latestRawReply)),
-        forcedRepairReason: forcedTimeRepairReason,
       }),
     );
     const blocksText = timeValidation.blocksText;
