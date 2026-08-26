@@ -935,8 +935,12 @@ function ensureDetailStyles() {
         gap: 4px;
       }
       #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area .keyword-group label {
+        display: flex;
+        align-items: center;
+        min-height: 17px;
         margin: 0;
         line-height: 1.2;
+        color: var(--panel-text-color);
       }
       #${LOREBOOK_PANEL_ID} .detail-editor .detail-keywords-edit-area.keyword-focused .keyword-group {
         display: none;
@@ -1059,6 +1063,7 @@ function ensureDetailStyles() {
         padding: 5px 8px;
         line-height: 18px;
         box-sizing: border-box;
+        vertical-align: top;
       }
       #${LOREBOOK_PANEL_ID} .detail-field-boolean input[type="checkbox"] {
         width: 18px;

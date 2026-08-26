@@ -3,6 +3,7 @@ import { DEBUG_MODE } from '../config.js';
 import { getPositionLabel as getPositionDisplayLabel } from '../position.js';
 import { allEntriesData, getSelectedEntries } from '../state.js';
 import { ensureNumericUID, errorCatched } from '../utils.js';
+import { appendToThemePortal } from '../ui/themeSurface.js';
 import { batchUpdateEntries } from './batchActions.js';
 import { getRenderableEntriesWithoutFolderMeta } from './folderMeta.js';
 import {
@@ -42,46 +43,46 @@ function ensureLorebookCompareStyles() {
   $('head', parentDoc).append(`
     <style id="${LOREBOOK_COMPARE_STYLE_ID}">
       #${LOREBOOK_COMPARE_MODAL_ID}{display:none;position:fixed;z-index:10006;left:0;top:0;width:100vw;height:100vh;overflow-y:auto;background-color:rgba(0,0,0,.75);backdrop-filter:blur(4px);box-sizing:border-box}
-      #${LOREBOOK_COMPARE_MODAL_ID}-content{background:var(--panel-bg-color,#2a2a2a);color:var(--panel-text-color,#eee);border:1px solid rgba(255,255,255,.15);width:95%;max-width:1360px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);display:flex;flex-direction:column;min-height:calc(100vh - 110px);margin:40px auto;box-sizing:border-box}
-      #${LOREBOOK_COMPARE_MODAL_ID}-header{padding:15px 20px;background:var(--panel-accent-color,#5a3a8e);color:#fff;border-top-left-radius:12px;border-top-right-radius:12px;display:flex;justify-content:space-between;align-items:center}
+      #${LOREBOOK_COMPARE_MODAL_ID}-content{background:var(--panel-bg-color);color:var(--panel-text-color);border:1px solid var(--panel-border-color);width:95%;max-width:1360px;border-radius:12px;box-shadow:0 8px 32px var(--ai-shadow-color);display:flex;flex-direction:column;min-height:calc(100vh - 110px);margin:40px auto;box-sizing:border-box}
+      #${LOREBOOK_COMPARE_MODAL_ID}-header{padding:15px 20px;background:var(--panel-accent-color);color:var(--panel-accent-text-color);border-top-left-radius:12px;border-top-right-radius:12px;display:flex;justify-content:space-between;align-items:center}
       #${LOREBOOK_COMPARE_MODAL_ID}-header h4{margin:0;font-size:1.05em;font-weight:600}
       #${LOREBOOK_COMPARE_MODAL_ID} .close-button{font-size:24px;font-weight:700;cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.1)}
       #${LOREBOOK_COMPARE_MODAL_ID}-body{padding:16px 18px;display:flex;flex-direction:column;gap:14px;flex:1 1 auto}
-      #${LOREBOOK_COMPARE_MODAL_ID}-footer{padding:15px 20px;border-top:1px solid rgba(255,255,255,.1);background:var(--panel-entry-bg-color,rgba(0,0,0,.2));border-bottom-left-radius:12px;border-bottom-right-radius:12px;display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap}
+      #${LOREBOOK_COMPARE_MODAL_ID}-footer{padding:15px 20px;border-top:1px solid var(--panel-border-color);background:var(--panel-entry-bg-color);border-bottom-left-radius:12px;border-bottom-right-radius:12px;display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap}
       #${LOREBOOK_COMPARE_MODAL_ID}-footer button,#${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar button,#${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-actions button{padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-size:.9em}
       #${LOREBOOK_COMPARE_MODAL_ID}-footer button:disabled,#${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar button:disabled,#${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-actions button:disabled{opacity:.45;cursor:not-allowed}
-      #${LOREBOOK_COMPARE_MODAL_ID}-close,#${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar .secondary{background:var(--panel-entry-bg-color,#555);color:#fff}
-      #${LOREBOOK_COMPARE_MODAL_ID}-footer .compare-footer-primary{background:#3f7d5e;color:#fff}
-      #${LOREBOOK_COMPARE_MODAL_ID}-footer .compare-footer-secondary{background:#536071;color:#fff}
-      #${LOREBOOK_COMPARE_MODAL_ID}-footer .compare-footer-danger{background:#8a4f4f;color:#fff}
+      #${LOREBOOK_COMPARE_MODAL_ID}-close,#${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar .secondary{background:var(--panel-surface-raised-color);color:var(--panel-text-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID}-footer .compare-footer-primary{background:var(--panel-success-color);color:var(--panel-accent-text-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID}-footer .compare-footer-secondary{background:var(--panel-surface-raised-color);color:var(--panel-text-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID}-footer .compare-footer-danger{background:var(--panel-danger-color);color:var(--panel-accent-text-color)}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar-actions button{background:rgba(255,255,255,.08);color:#f0f0f0}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar-actions button.active{background:var(--panel-accent-color,#5a3a8e);color:#fff}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-summary{font-size:13px;line-height:1.6;color:rgba(255,255,255,.88)}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-list{border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.02);padding:12px;min-height:180px;max-height:calc(100vh - 280px);overflow-y:auto}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-empty{text-align:center;color:rgba(255,255,255,.75);padding:18px}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-item + .compare-diff-item{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar-actions button{background:var(--panel-surface-muted-color);color:var(--panel-text-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-toolbar-actions button.active{background:var(--panel-accent-color);color:var(--panel-accent-text-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-summary{font-size:13px;line-height:1.6;color:var(--panel-muted-text-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-list{border:1px solid var(--panel-border-color);border-radius:10px;background:var(--panel-surface-muted-color);padding:12px;min-height:180px;max-height:calc(100vh - 280px);overflow-y:auto}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-empty{text-align:center;color:var(--panel-muted-text-color);padding:18px}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-item + .compare-diff-item{margin-top:14px;padding-top:14px;border-top:1px solid var(--panel-border-color)}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-entry-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-entry-title{font-size:15px;font-weight:600;line-height:1.45}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-entry-meta{font-size:12px;opacity:.78;line-height:1.5}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-actions button{background:rgba(255,255,255,.08);color:#f0f0f0}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-block + .compare-diff-block{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-actions button{background:var(--panel-surface-raised-color);color:var(--panel-text-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-block + .compare-diff-block{margin-top:12px;padding-top:12px;border-top:1px solid var(--panel-border-color)}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-label{color:var(--panel-accent-color,#9fc8e4);margin-bottom:6px;font-size:12px}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-panels{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-panel{border-radius:8px;background:rgba(0,0,0,.18);padding:10px;min-width:0}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-panel{border-radius:8px;background:var(--panel-surface-muted-color);padding:10px;min-width:0}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-panel pre{margin:0;white-space:pre-wrap;word-break:break-word;line-height:1.5;font-family:Consolas,Monaco,'Courier New',monospace}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-summary{display:flex;flex-wrap:wrap;gap:4px 8px}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-token{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.05);font-size:12px;line-height:1.5}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-token{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 10px;border-radius:999px;background:var(--panel-surface-raised-color);font-size:12px;line-height:1.5}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-key{color:var(--panel-accent-color,#9fc8e4)}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-before,#${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-segment.is-removed{background:rgba(168,74,74,.28);color:#ffd1d1}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-after,#${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-segment.is-added{background:rgba(58,140,95,.28);color:#c7f3d6}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-before,#${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-segment.is-removed{background:var(--panel-danger-bg-color);color:var(--panel-danger-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-after,#${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-segment.is-added{background:var(--panel-success-bg-color);color:var(--panel-success-color)}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-before,#${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-after{padding:1px 6px;border-radius:6px}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-meta-arrow{opacity:.68}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-full{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:start}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-column{min-width:0;border-radius:8px;background:rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-column-header{padding:2px 8px;border-bottom:1px solid rgba(255,255,255,.08);font-size:11px;line-height:1.2;color:var(--panel-accent-color,#9fc8e4)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-column{min-width:0;border-radius:8px;background:var(--panel-surface-muted-color);overflow:hidden;display:flex;flex-direction:column}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-column-header{padding:2px 8px;border-bottom:1px solid var(--panel-border-color);font-size:11px;line-height:1.2;color:var(--panel-accent-color,#9fc8e4)}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-column-body{display:block!important;max-height:min(360px,50vh)!important;overflow:auto!important;overflow-x:hidden!important;scrollbar-gutter:stable;padding:2px 8px 4px!important;font-family:Consolas,Monaco,'Courier New',monospace;font-size:12px;line-height:1.3;white-space:normal!important;word-break:break-word;text-overflow:clip!important}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-column-body::-webkit-scrollbar{width:10px;height:10px}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-column-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:999px}
@@ -90,10 +91,10 @@ function ensureLorebookCompareStyles() {
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-segment{border-radius:3px;white-space:inherit}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-inline-placeholder{opacity:.45}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-diff-block.compare-diff-block-content{margin-top:6px;padding-top:0;border-top:none}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;line-height:1.5;background:rgba(255,255,255,.08)}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-chip.is-modified{background:rgba(122,90,190,.28);color:#e6dbff}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-chip.is-added{background:rgba(58,140,95,.28);color:#c7f3d6}
-      #${LOREBOOK_COMPARE_MODAL_ID} .compare-chip.is-removed{background:rgba(168,74,74,.28);color:#ffd1d1}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;line-height:1.5;background:var(--panel-surface-raised-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-chip.is-modified{background:var(--panel-selected-bg-color);color:var(--panel-accent-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-chip.is-added{background:var(--panel-success-bg-color);color:var(--panel-success-color)}
+      #${LOREBOOK_COMPARE_MODAL_ID} .compare-chip.is-removed{background:var(--panel-danger-bg-color);color:var(--panel-danger-color)}
       #${LOREBOOK_COMPARE_MODAL_ID} .compare-placeholder{opacity:.72;font-style:italic}
       @media (max-width: 900px){
         #${LOREBOOK_COMPARE_MODAL_ID}-content{width:96%;margin:20px auto;min-height:calc(100vh - 40px)}
@@ -1576,13 +1577,13 @@ export function initOptimizer() {
   ensureLorebookCompareStyles();
 
   const optimizeModalHtml = `
-        <div id="lorebook-optimize-modal" style="display:none; position: fixed; z-index: 10002; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.7); overflow-y: auto; box-sizing: border-box;">
-            <div id="lorebook-optimize-modal-content" style="background-color: #2c2c2c; color: #eee; padding: 0; border: 1px solid #555; width: 90%; max-width: 600px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: calc(100vh - 150px); margin: 80px auto 50px auto; box-sizing: border-box;">
-                <div id="lorebook-optimize-modal-header" style="padding: 10px 15px; background-color: #3a6a8e; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <div id="lorebook-optimize-modal" class="lorebook-themed-modal" style="z-index:10002;">
+            <div id="lorebook-optimize-modal-content" class="lorebook-themed-modal-content lorebook-themed-modal-standard-content" style="max-width:600px;">
+                <div id="lorebook-optimize-modal-header" class="lorebook-themed-modal-header">
                     <h4 id="lorebook-optimize-modal-title">世界书优化工具</h4>
                     <span class="close-button" style="font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
                 </div>
-                <div id="lorebook-optimize-modal-body" style="padding: 15px; display: flex; flex-direction: column; gap: 20px; max-height: 70vh; overflow-y: auto;">
+                <div id="lorebook-optimize-modal-body" class="lorebook-themed-modal-body" style="display:flex; flex-direction:column; gap:20px; max-height:70vh;">
                     <!-- 1. 删除无用格式 -->
                     <div class="optimize-section">
                         <h5>1. 格式清理</h5>
@@ -1630,8 +1631,8 @@ export function initOptimizer() {
                         <p class="description">在 当前打开的世界书 的选中条目中进行搜索和替换。</p>
                         <div class="action-area" style="flex-direction: column; align-items: stretch; gap: 10px;">
                             <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-                                <input type="text" id="global-search-input" placeholder="要搜索的内容..." style="width: 100%; box-sizing: border-box; background-color: #333; color: #eee; border: 1px solid #555; padding: 8px; border-radius: 4px;">
-                                <input type="text" id="global-replace-input" placeholder="替换为..." style="width: 100%; box-sizing: border-box; background-color: #333; color: #eee; border: 1px solid #555; padding: 8px; border-radius: 4px;">
+                                <input type="text" id="global-search-input" placeholder="要搜索的内容...">
+                                <input type="text" id="global-replace-input" placeholder="替换为...">
                             </div>
                             <div class="search-scope-container" style="display: flex; gap: 15px; align-items: center; font-size: 0.9em;">
                                 <strong>搜索范围:</strong>
@@ -1677,55 +1678,55 @@ export function initOptimizer() {
         </div>
     `;
   const reorderModalHtml = `
-           <div id="lorebook-reorder-modal" style="display:none; position: fixed; z-index: 10003; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.7); overflow-y: auto; box-sizing: border-box; justify-content: center; align-items: center;">
-               <div style="background-color: #2c2c2c; color: #eee; padding: 0; border: 1px solid #555; width: 85%; max-width: 320px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; margin: auto; box-sizing: border-box;">
-                   <div style="padding: 12px 15px; background-color: #3a6a8e; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+           <div id="lorebook-reorder-modal" class="lorebook-themed-modal" style="z-index:10003;">
+               <div class="lorebook-themed-modal-content lorebook-themed-modal-standard-content" style="width:85%; max-width:320px; margin:auto;">
+                   <div class="lorebook-themed-modal-header" style="padding:12px 15px;">
                        <h4 style="margin: 0; font-size: 16px;">交互式顺序重排</h4>
                        <span class="close-button" style="font-size: 24px; font-weight: bold; cursor: pointer; line-height: 1;">&times;</span>
                    </div>
-                   <div style="padding: 20px 15px; display: flex; flex-direction: column; gap: 16px;">
+                   <div class="lorebook-themed-modal-body" style="padding:20px 15px; display:flex; flex-direction:column; gap:16px;">
                        <div style="display: flex; justify-content: space-between; align-items: center;">
                            <label for="reorder-start-number" style="font-size: 14px;">起始编号</label>
-                           <input type="number" id="reorder-start-number" value="0" style="width: 80px; background-color: #333; color: #eee; border: 1px solid #555; padding: 6px 8px; border-radius: 4px; box-sizing: border-box;">
+                           <input type="number" id="reorder-start-number" value="0" style="width:80px; padding:6px 8px;">
                        </div>
                        <div style="display: flex; justify-content: space-between; align-items: center;">
                            <label for="reorder-step-number" style="font-size: 14px;">步长 (间隔)</label>
-                           <input type="number" id="reorder-step-number" value="1" style="width: 80px; background-color: #333; color: #eee; border: 1px solid #555; padding: 6px 8px; border-radius: 4px; box-sizing: border-box;">
+                           <input type="number" id="reorder-step-number" value="1" style="width:80px; padding:6px 8px;">
                        </div>
                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px;">
-                           <button class="cancel-reorder-button" style="padding: 8px 16px; background-color: #666; border: none; color: white; cursor: pointer; border-radius: 4px; font-size: 14px;">取消</button>
-                           <button id="confirm-reorder-button" style="padding: 8px 16px; background-color: #5a3a8e; border: none; color: white; cursor: pointer; border-radius: 4px; font-size: 14px;">确认重排</button>
+                           <button class="cancel-reorder-button lorebook-themed-modal-button secondary" style="padding:8px 16px; font-size:14px;">取消</button>
+                           <button id="confirm-reorder-button" class="lorebook-themed-modal-button primary" style="padding:8px 16px; font-size:14px;">确认重排</button>
                        </div>
                    </div>
                </div>
            </div>
        `;
   const searchPreviewModalHtml = `
-           <div id="search-preview-modal" style="display:none; position: fixed; z-index: 10006; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.7); overflow-y: auto; box-sizing: border-box;">
-               <div style="background-color: #2c2c2c; color: #eee; padding: 0; border: 1px solid #555; width: 90%; max-width: 800px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: calc(100vh - 150px); margin: 80px auto 50px auto; box-sizing: border-box;">
-                   <div style="padding: 10px 15px; background-color: #3a6a8e; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+           <div id="search-preview-modal" class="lorebook-themed-modal" style="z-index:10006;">
+               <div class="lorebook-themed-modal-content lorebook-themed-modal-standard-content" style="max-width:800px;">
+                   <div class="lorebook-themed-modal-header">
                        <h4>搜索替换预览</h4>
                        <span class="close-button" style="font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
                    </div>
-                   <div style="padding: 15px; max-height: 70vh; overflow-y: auto;">
+                   <div class="lorebook-themed-modal-body" style="max-height:70vh;">
                        <div id="search-preview-summary"></div>
                        <div id="search-preview-list"></div>
                    </div>
-                   <div style="padding: 10px 15px; text-align: right; border-top: 1px solid #444;">
-                        <button id="cancel-search-replace-button" style="padding: 8px 12px; background-color: #555; border: none; color: white; cursor: pointer; border-radius: 4px; margin-right: 10px;">取消</button>
-                        <button id="confirm-search-replace-button" style="padding: 8px 12px; background-color: #5a3a8e; border: none; color: white; cursor: pointer; border-radius: 4px;">确认替换</button>
+                   <div class="lorebook-themed-modal-footer">
+                        <button id="cancel-search-replace-button" class="lorebook-themed-modal-button secondary" style="margin-right:10px;">取消</button>
+                        <button id="confirm-search-replace-button" class="lorebook-themed-modal-button primary">确认替换</button>
                    </div>
                </div>
            </div>
        `;
   const lorebookCompareModalHtml = `
-           <div id="${LOREBOOK_COMPARE_MODAL_ID}">
-               <div id="${LOREBOOK_COMPARE_MODAL_ID}-content">
-                   <div id="${LOREBOOK_COMPARE_MODAL_ID}-header">
+           <div id="${LOREBOOK_COMPARE_MODAL_ID}" class="lorebook-themed-modal">
+               <div id="${LOREBOOK_COMPARE_MODAL_ID}-content" class="lorebook-themed-modal-content">
+                   <div id="${LOREBOOK_COMPARE_MODAL_ID}-header" class="lorebook-themed-modal-header">
                        <h4>世界书全本比对</h4>
                        <span class="close-button">&times;</span>
                    </div>
-                   <div id="${LOREBOOK_COMPARE_MODAL_ID}-body">
+                   <div id="${LOREBOOK_COMPARE_MODAL_ID}-body" class="lorebook-themed-modal-body">
                        <div class="compare-toolbar">
                            <div id="lorebook-compare-preview-summary" class="compare-summary">选择两本世界书后即可查看全量差异。</div>
                            <div id="lorebook-compare-preview-filters" class="compare-toolbar-actions">
@@ -1738,7 +1739,7 @@ export function initOptimizer() {
                        </div>
                        <div id="lorebook-compare-preview-list" class="compare-diff-list"></div>
                    </div>
-                   <div id="${LOREBOOK_COMPARE_MODAL_ID}-footer">
+                   <div id="${LOREBOOK_COMPARE_MODAL_ID}-footer" class="lorebook-themed-modal-footer">
                        <button id="${LOREBOOK_COMPARE_ADD_BUTTON_ID}" class="compare-footer-primary" data-action="apply-lorebook-compare-added" disabled>批量添加差异条目</button>
                        <button id="${LOREBOOK_COMPARE_DELETE_BUTTON_ID}" class="compare-footer-danger" data-action="apply-lorebook-compare-removed-delete" disabled>批量删除多余条目</button>
                        <button id="${LOREBOOK_COMPARE_OVERWRITE_BUTTON_ID}" class="compare-footer-secondary" data-action="apply-lorebook-compare-content-overwrite" disabled>批量覆盖正文</button>
@@ -1750,11 +1751,10 @@ export function initOptimizer() {
                </div>
            </div>
        `;
-  $('body', parentDoc)
-    .append(optimizeModalHtml)
-    .append(reorderModalHtml)
-    .append(searchPreviewModalHtml)
-    .append(lorebookCompareModalHtml);
+  appendToThemePortal(optimizeModalHtml, parentDoc);
+  appendToThemePortal(reorderModalHtml, parentDoc);
+  appendToThemePortal(searchPreviewModalHtml, parentDoc);
+  appendToThemePortal(lorebookCompareModalHtml, parentDoc);
 
   // 为顺序重排弹窗的关闭按钮添加事件处理
   $('#lorebook-reorder-modal .close-button, #lorebook-reorder-modal .cancel-reorder-button', parentDoc).on(

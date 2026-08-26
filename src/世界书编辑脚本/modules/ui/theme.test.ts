@@ -1,18 +1,27 @@
 import $ from 'jquery';
 import _ from 'lodash';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  appendToThemePortal,
+  buildThemeSurfaceVariables,
+  ensureThemePortal,
+  syncThemeSurfaces,
+  THEME_PORTAL_ID,
+} from './themeSurface.js';
 
 let loadTheme: typeof import('./theme.js').loadTheme;
 let normalizeHexColor: typeof import('./theme.js').normalizeHexColor;
+let buildThemeCssVariables: typeof import('./theme.js').buildThemeCssVariables;
 
 beforeAll(async () => {
   vi.stubGlobal('$', $);
   vi.stubGlobal('_', _);
-  ({ loadTheme, normalizeHexColor } = await import('./theme.js'));
+  ({ buildThemeCssVariables, loadTheme, normalizeHexColor } = await import('./theme.js'));
 });
 
 beforeEach(() => {
   localStorage.clear();
+  document.body.innerHTML = '';
 });
 
 describe('世界书面板主题可见性', () => {
@@ -48,5 +57,82 @@ describe('世界书面板主题颜色输入', () => {
     expect(normalizeHexColor('#abc', { allowShort: false })).toBeNull();
     expect(normalizeHexColor('#abcdef', { allowShort: false })).toBe('#abcdef');
     expect(normalizeHexColor('#gggggg')).toBeNull();
+  });
+});
+
+describe('世界书面板主题 portal', () => {
+  it('幂等创建共享挂载点，并可追加 HTML、DOM 与 jQuery 内容', () => {
+    const portal = ensureThemePortal(document);
+    expect(portal.id).toBe(THEME_PORTAL_ID);
+    expect(portal.classList.contains('lorebook-theme-scope')).toBe(true);
+    expect(ensureThemePortal(document)).toBe(portal);
+
+    appendToThemePortal('<dialog id="html-overlay"></dialog>', document);
+    const domOverlay = document.createElement('div');
+    domOverlay.id = 'dom-overlay';
+    appendToThemePortal(domOverlay, document);
+    appendToThemePortal($('<div id="jquery-overlay"></div>'), document);
+
+    expect(Array.from(portal.children).map(element => element.id)).toEqual([
+      'html-overlay',
+      'dom-overlay',
+      'jquery-overlay',
+    ]);
+  });
+
+  it('让主面板与 portal 共享完整变量和 color-scheme', () => {
+    const panel = document.createElement('div');
+    document.body.appendChild(panel);
+    const variables = buildThemeSurfaceVariables({
+      semanticTokens: { '--panel-border-color': '#345678' },
+      panelBgColor: '#ffffff',
+      textColor: '#111111',
+      accentColor: '#336699',
+      entryBgColor: '#f5f5f5',
+      inputBgColor: '#eeeeee',
+      inputFocusBgColor: '#dddddd',
+      dropdownActiveBgColor: '#cccccc',
+      entryHoverBgColor: '#ededed',
+      selectedBgColor: '#ddeeff',
+      backgroundImage: 'none',
+      backgroundImageOpacity: '0',
+      iconBgColor: '#bbbbbb',
+      iconHoverBgColor: '#aaaaaa',
+      panelAccentTextColor: '#ffffff',
+      lorebookNameWhiteSpace: 'nowrap',
+      lorebookNameTextOverflow: 'ellipsis',
+      lorebookNameOverflowWrap: 'normal',
+      lorebookNameWordBreak: 'normal',
+      lorebookTitleAlignItems: 'center',
+    });
+
+    const portal = syncThemeSurfaces(document, panel, variables, 'light');
+
+    [panel, portal].forEach(surface => {
+      expect(surface.style.getPropertyValue('--panel-bg-color')).toBe('#ffffff');
+      expect(surface.style.getPropertyValue('--panel-text-color')).toBe('#111111');
+      expect(surface.style.getPropertyValue('--modal-bg-color')).toBe('#ffffff');
+      expect(surface.style.getPropertyValue('--modal-text-color')).toBe('#111111');
+      expect(surface.style.getPropertyValue('--yaml-input-bg-color')).toBe('#eeeeee');
+      expect(surface.style.getPropertyValue('--panel-border-color')).toBe('#345678');
+      expect(surface.style.colorScheme).toBe('light');
+    });
+  });
+
+  it('从布局主题生成弹窗可复用的完整 CSS 变量', () => {
+    const variables = buildThemeCssVariables({
+      bgColor: '#ffffff',
+      textColor: '#111111',
+      accentColor: '#336699',
+      entryBgColor: '#f5f5f5',
+      inputBgColor: '#eeeeee',
+      panelOpacity: 1,
+    });
+
+    expect(variables['--panel-bg-color']).toBe('#ffffff');
+    expect(variables['--modal-bg-color']).toBe('#ffffff');
+    expect(variables['--panel-text-color']).toBe('#111111');
+    expect(variables['--panel-input-bg-color']).toBe('#eeeeee');
+    expect(variables['--ai-border-color']).toBeTruthy();
   });
 });

@@ -15,6 +15,7 @@ import { getLocalStorageItem, isMobile, rgbaToHex, setLocalStorageItem, triggerD
 import { refreshAiWorkspace } from './aiWorkspace.js';
 import { syncPanelLayoutMode } from './detail.js';
 import { switchTab, toggleLorebookPanel } from './panel.js';
+import { buildThemeSurfaceVariables, syncThemeSurfaces } from './themeSurface.js';
 
 const THEME_VERSION = 4;
 const DEFAULT_LAYOUT_MODE = 'master-detail';
@@ -307,39 +308,77 @@ function toCssBackgroundImage(imageUrl) {
   return normalizedUrl ? `url(${JSON.stringify(normalizedUrl)})` : 'none';
 }
 
+function buildThemeApplication(theme) {
+  const layoutTheme = normalizeLayoutTheme(
+    theme,
+    getEffectiveThemeLayoutMode() === 'drawer' ? getDefaultDrawerTheme() : getDefaultMasterDetailTheme(),
+  );
+  const sharedTheme = normalizeSharedTheme(theme, getDefaultSharedTheme());
+  const truncateLongNames = sharedTheme.truncateLongNames !== false;
+  const panelBgColor = colorWithOpacity(layoutTheme.bgColor, layoutTheme.panelOpacity);
+  const interiorSurfaceOpacity = getInteriorSurfaceOpacity(layoutTheme);
+  const entryBgColor = colorWithOpacity(layoutTheme.entryBgColor, interiorSurfaceOpacity);
+  const inputBgColor = colorWithOpacity(layoutTheme.inputBgColor, interiorSurfaceOpacity);
+  const inputFocusBgColor = colorWithOpacity(
+    colorMix(layoutTheme.inputBgColor, 82, layoutTheme.accentColor),
+    interiorSurfaceOpacity,
+  );
+  const entryHoverBgColor = colorWithOpacity(
+    colorMix(layoutTheme.entryBgColor, 88, layoutTheme.accentColor),
+    interiorSurfaceOpacity,
+  );
+  const selectedBgColor = colorWithOpacity(
+    colorMix(layoutTheme.entryBgColor, 84, layoutTheme.accentColor),
+    interiorSurfaceOpacity,
+  );
+  const dropdownActiveBgColor = colorWithOpacity(
+    colorMix(layoutTheme.inputBgColor, 70, layoutTheme.accentColor),
+    interiorSurfaceOpacity,
+  );
+  const iconHoverBgColor = colorMix(layoutTheme.iconBgColor, 82, '#ffffff');
+  const semanticThemeTokens = buildSemanticThemeTokens(layoutTheme, interiorSurfaceOpacity);
+  const panelAccentTextColor = isColorDark(layoutTheme.accentColor) ? '#ffffff' : '#1a1a1a';
+  const variables = buildThemeSurfaceVariables({
+    semanticTokens: semanticThemeTokens,
+    panelBgColor,
+    textColor: layoutTheme.textColor,
+    accentColor: layoutTheme.accentColor,
+    entryBgColor,
+    inputBgColor,
+    inputFocusBgColor,
+    dropdownActiveBgColor,
+    entryHoverBgColor,
+    selectedBgColor,
+    backgroundImage: toCssBackgroundImage(layoutTheme.backgroundImageUrl),
+    backgroundImageOpacity: layoutTheme.backgroundImageUrl ? String(layoutTheme.backgroundImageOpacity) : '0',
+    iconBgColor: layoutTheme.iconBgColor,
+    iconHoverBgColor,
+    panelAccentTextColor,
+    lorebookNameWhiteSpace: truncateLongNames ? 'nowrap' : 'normal',
+    lorebookNameTextOverflow: truncateLongNames ? 'ellipsis' : 'clip',
+    lorebookNameOverflowWrap: truncateLongNames ? 'normal' : 'anywhere',
+    lorebookNameWordBreak: truncateLongNames ? 'normal' : 'break-word',
+    lorebookTitleAlignItems: truncateLongNames ? 'center' : 'flex-start',
+  });
+
+  return {
+    variables,
+    layoutTheme,
+    sharedTheme,
+    colorScheme: isColorDark(layoutTheme.bgColor) ? 'dark' : 'light',
+  };
+}
+
+export function buildThemeCssVariables(theme) {
+  return buildThemeApplication(theme).variables;
+}
+
 function applyTheme(theme) {
   try {
-    const layoutTheme = normalizeLayoutTheme(
-      theme,
-      getEffectiveThemeLayoutMode() === 'drawer' ? getDefaultDrawerTheme() : getDefaultMasterDetailTheme(),
-    );
-    const sharedTheme = normalizeSharedTheme(theme, getDefaultSharedTheme());
+    const { variables, sharedTheme, colorScheme } = buildThemeApplication(theme);
     const parentDoc = window.parent.document;
     const $panel = $(`#${LOREBOOK_PANEL_ID}`, parentDoc);
     const truncateLongNames = sharedTheme.truncateLongNames !== false;
-    const panelBgColor = colorWithOpacity(layoutTheme.bgColor, layoutTheme.panelOpacity);
-    const interiorSurfaceOpacity = getInteriorSurfaceOpacity(layoutTheme);
-    const entryBgColor = colorWithOpacity(layoutTheme.entryBgColor, interiorSurfaceOpacity);
-    const inputBgColor = colorWithOpacity(layoutTheme.inputBgColor, interiorSurfaceOpacity);
-    const inputFocusBgColor = colorWithOpacity(
-      colorMix(layoutTheme.inputBgColor, 82, layoutTheme.accentColor),
-      interiorSurfaceOpacity,
-    );
-    const entryHoverBgColor = colorWithOpacity(
-      colorMix(layoutTheme.entryBgColor, 88, layoutTheme.accentColor),
-      interiorSurfaceOpacity,
-    );
-    const selectedBgColor = colorWithOpacity(
-      colorMix(layoutTheme.entryBgColor, 84, layoutTheme.accentColor),
-      interiorSurfaceOpacity,
-    );
-    const dropdownActiveBgColor = colorWithOpacity(
-      colorMix(layoutTheme.inputBgColor, 70, layoutTheme.accentColor),
-      interiorSurfaceOpacity,
-    );
-    const iconHoverBgColor = colorMix(layoutTheme.iconBgColor, 82, '#ffffff');
-    const semanticThemeTokens = buildSemanticThemeTokens(layoutTheme, interiorSurfaceOpacity);
-    const panelAccentTextColor = isColorDark(layoutTheme.accentColor) ? '#ffffff' : '#1a1a1a';
 
     if ($panel.length) {
       $panel.attr('data-unified-icon-buttons', sharedTheme.unifiedIconButtons ? 'true' : 'false');
@@ -348,67 +387,9 @@ function applyTheme(theme) {
         'data-mobile-expand-placement',
         sharedTheme.mobileExpandButtonUnderCheckbox ? 'under-checkbox' : 'inline',
       );
-      $panel.css({
-        ...semanticThemeTokens,
-        '--panel-bg-color': panelBgColor,
-        '--panel-text-color': layoutTheme.textColor,
-        '--panel-accent-color': layoutTheme.accentColor,
-        '--panel-entry-bg-color': entryBgColor,
-        '--panel-input-bg-color': inputBgColor,
-        '--panel-field-bg-color': inputBgColor,
-        '--panel-input-focus-bg-color': inputFocusBgColor,
-        '--panel-field-focus-bg-color': inputFocusBgColor,
-        '--panel-dropdown-bg-color': inputBgColor,
-        '--panel-dropdown-hover-bg-color': layoutTheme.accentColor,
-        '--panel-dropdown-active-bg-color': dropdownActiveBgColor,
-        '--panel-entry-hover-bg-color': entryHoverBgColor,
-        '--panel-selected-bg-color': selectedBgColor,
-        '--panel-md-entry-bg-color': entryBgColor,
-        '--panel-md-entry-current-bg-color': selectedBgColor,
-        '--search-input-bg-color': inputBgColor,
-        '--yaml-input-bg-color': inputBgColor,
-        '--panel-background-image': toCssBackgroundImage(layoutTheme.backgroundImageUrl),
-        '--panel-background-image-opacity': layoutTheme.backgroundImageUrl
-          ? String(layoutTheme.backgroundImageOpacity)
-          : '0',
-        '--panel-surface-opacity': '1',
-        '--panel-icon-bg-color': layoutTheme.iconBgColor,
-        '--panel-icon-hover-bg-color': iconHoverBgColor,
-        '--lorebook-name-white-space': truncateLongNames ? 'nowrap' : 'normal',
-        '--lorebook-name-text-overflow': truncateLongNames ? 'ellipsis' : 'clip',
-        '--lorebook-name-overflow-wrap': truncateLongNames ? 'normal' : 'anywhere',
-        '--lorebook-name-word-break': truncateLongNames ? 'normal' : 'break-word',
-        '--lorebook-title-align-items': truncateLongNames ? 'center' : 'flex-start',
-        '--panel-accent-text-color': panelAccentTextColor,
-      });
     }
 
-    const $modal = $('#theme-settings-modal', parentDoc);
-    if ($modal.length) {
-      $modal.css({
-        ...semanticThemeTokens,
-        '--modal-bg-color': layoutTheme.bgColor,
-        '--modal-text-color': layoutTheme.textColor,
-        '--modal-accent-color': layoutTheme.accentColor,
-        '--panel-input-bg-color': layoutTheme.inputBgColor,
-        '--panel-input-focus-bg-color': inputFocusBgColor,
-        '--panel-icon-bg-color': layoutTheme.iconBgColor,
-        '--panel-icon-hover-bg-color': iconHoverBgColor,
-      });
-    }
-
-    const $importModal = $('#lorebook-import-modal', parentDoc);
-    if ($importModal.length) {
-      $importModal.css({
-        ...semanticThemeTokens,
-        '--yaml-input-bg-color': layoutTheme.inputBgColor,
-        '--panel-input-bg-color': layoutTheme.inputBgColor,
-        '--panel-text-color': layoutTheme.textColor,
-        '--panel-accent-color': layoutTheme.accentColor,
-        '--panel-bg-color': layoutTheme.bgColor,
-        '--panel-entry-bg-color': layoutTheme.entryBgColor,
-      });
-    }
+    syncThemeSurfaces(parentDoc, $panel, variables, colorScheme);
   } catch (error) {
     console.error('角色世界书: applyTheme 函数执行出错', error);
   }

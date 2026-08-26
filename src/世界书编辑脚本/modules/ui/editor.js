@@ -8,6 +8,7 @@ import {
 } from '../position.js';
 import { ensureNumericUID } from '../utils.js';
 import { buildLargeContentPreviewCardHtml, shouldPreviewLargeContent } from './largeContentPreview.js';
+import { appendToThemePortal } from './themeSurface.js';
 
 function renderEditorContentField($form, content) {
   const normalized = content || '';
@@ -21,7 +22,8 @@ function renderEditorContentField($form, content) {
       .html(
         buildLargeContentPreviewCardHtml(normalized, {
           hint: '正文过长，请使用全屏编辑查看和修改。',
-          actionsHtml: '<button type="button" class="large-content-preview-open" data-editor-action="open-content-editor">全屏编辑</button>',
+          actionsHtml:
+            '<button type="button" class="large-content-preview-open" data-editor-action="open-content-editor">全屏编辑</button>',
         }),
       )
       .show();
@@ -200,13 +202,13 @@ export function createEditorPanel() {
 
   console.log('角色世界书: 创建编辑器面板');
   const editorHtml = `
-        <div id="${LOREBOOK_EDITOR_PANEL_ID}" class="lorebook-modal" style="display: none;">
-            <div class="lorebook-modal-content">
-                <div class="modal-header">
+        <div id="${LOREBOOK_EDITOR_PANEL_ID}" class="lorebook-modal lorebook-themed-modal" style="display: none;">
+            <div class="lorebook-modal-content lorebook-themed-modal-content">
+                <div class="modal-header lorebook-themed-modal-header">
                     <h4>编辑世界书条目</h4>
                     <button class="close-button" title="关闭">×</button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body lorebook-themed-modal-body">
                     <div class="loading-spinner">加载中...</div>
                     <form id="entry-edit-form" style="display: none;">
                         <div class="form-group">
@@ -264,8 +266,8 @@ export function createEditorPanel() {
                         <input type="hidden" id="entry-addMemo" name="addMemo" value="off">
                         <input type="hidden" id="entry-useProbability" name="useProbability" value="off">
                         <div class="form-actions">
-                            <button type="submit" class="save-button">保存</button>
-                            <button type="button" class="cancel-button">取消</button>
+                            <button type="submit" class="save-button lorebook-themed-modal-button primary">保存</button>
+                            <button type="button" class="cancel-button lorebook-themed-modal-button secondary">取消</button>
                         </div>
                         <div class="debug-info" style="display:none;"></div>
                     </form>
@@ -273,7 +275,7 @@ export function createEditorPanel() {
             </div>
         </div>
     `;
-  $('body', parentDoc).append(editorHtml);
+  appendToThemePortal(editorHtml, parentDoc);
 
   const constantToggleStyles = `
         <style id="constant-toggle-styles">
@@ -289,7 +291,7 @@ export function createEditorPanel() {
                 justify-content: space-between;
                 width: 60px;
                 font-size: 12px;
-                color: #ccc;
+                color: var(--panel-muted-text-color, #ccc);
                 margin-bottom: 3px;
             }
             .constant-toggle-switch {

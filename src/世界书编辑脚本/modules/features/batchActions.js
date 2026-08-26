@@ -20,10 +20,26 @@ import {
 } from '../state.js';
 import { updateHeaderCheckboxState } from '../ui/list.js';
 import { loadTheme } from '../ui/theme.js';
+import { appendToThemePortal } from '../ui/themeSurface.js';
 import { ensureNumericUID, errorCatched } from '../utils.js';
 import { applyPositionSelectionToEntry, isDepthPositionValue, POSITION_OPTIONS } from '../position.js';
 
 const RESERVED_META_ENTRY_PREFIX = '__WI_META_';
+const BATCH_ACTION_MODAL_STYLE_ID = 'lorebook-batch-action-modal-styles';
+
+function ensureBatchActionModalStyles(parentDoc) {
+  if ($(`#${BATCH_ACTION_MODAL_STYLE_ID}`, parentDoc).length) return;
+  $('head', parentDoc).append(`
+    <style id="${BATCH_ACTION_MODAL_STYLE_ID}">
+      #lorebook-copy-modal, #lorebook-position-modal { display:none; position:fixed; inset:0; z-index:10000; overflow-y:auto; box-sizing:border-box; background:rgba(0,0,0,.7); }
+      #lorebook-copy-modal-content, #lorebook-position-modal-content { width:90%; max-width:450px; margin:80px auto 50px; padding:20px; box-sizing:border-box; border:1px solid var(--panel-border-color); border-radius:8px; background:var(--panel-bg-color); color:var(--panel-text-color); box-shadow:0 5px 15px var(--ai-shadow-color); }
+      .lorebook-copy-options { max-height:200px; overflow-y:auto; border:1px solid var(--panel-border-color); border-radius:4px; background:var(--panel-input-bg-color); }
+      .lorebook-copy-option { padding:8px 12px; cursor:pointer; color:var(--panel-text-color); }
+      .lorebook-copy-option:hover, .lorebook-copy-option.is-selected { background:var(--panel-accent-color); color:var(--panel-accent-text-color); }
+      .lorebook-copy-empty { padding:8px; color:var(--panel-muted-text-color); }
+    </style>
+  `);
+}
 
 function filterReservedMetaEntries(entries) {
   return (entries || []).filter(entry => !(entry?.name || '').startsWith(RESERVED_META_ENTRY_PREFIX));
@@ -69,72 +85,72 @@ export const batchUpdateEntries = errorCatched(async (lorebookName, isGlobal, up
     const result = await updateWorldbookEntries(
       lorebookName,
       entries => {
-      let hasChanges = false;
-      const updatedEntries = entries.map(entry => {
-        if (uidsToUpdate.includes(ensureNumericUID(entry.uid))) {
-          hasChanges = true;
-          modifiedCount++;
-          const updatedEntry = _.cloneDeep(entry);
+        let hasChanges = false;
+        const updatedEntries = entries.map(entry => {
+          if (uidsToUpdate.includes(ensureNumericUID(entry.uid))) {
+            hasChanges = true;
+            modifiedCount++;
+            const updatedEntry = _.cloneDeep(entry);
 
-          if (updateData.invert) {
-            const field = updateData.invert;
-            const currentValue = _.get(updatedEntry, field);
-            let newValue;
+            if (updateData.invert) {
+              const field = updateData.invert;
+              const currentValue = _.get(updatedEntry, field);
+              let newValue;
 
-            // 获取主题设置中的反转按钮模式
-            const theme = loadTheme();
-            const invertMode = theme.invertButtonMode || 'invert';
+              // 获取主题设置中的反转按钮模式
+              const theme = loadTheme();
+              const invertMode = theme.invertButtonMode || 'invert';
 
-            if (
-              field === 'enabled' ||
-              field === 'recursion.prevent_outgoing' ||
-              field === 'recursion.prevent_incoming'
-            ) {
-              if (invertMode === 'invert') {
-                newValue = !currentValue;
-              } else {
-                // 开关模式：统一设置为 true (enabled) 或 false (prevent_*)
-                newValue = field === 'enabled' ? true : false;
+              if (
+                field === 'enabled' ||
+                field === 'recursion.prevent_outgoing' ||
+                field === 'recursion.prevent_incoming'
+              ) {
+                if (invertMode === 'invert') {
+                  newValue = !currentValue;
+                } else {
+                  // 开关模式：统一设置为 true (enabled) 或 false (prevent_*)
+                  newValue = field === 'enabled' ? true : false;
+                }
+              } else if (field === 'strategy.type') {
+                if (invertMode === 'invert') {
+                  newValue = currentValue === 'constant' ? 'selective' : 'constant';
+                } else {
+                  // 开关模式：统一设置为 constant
+                  newValue = 'constant';
+                }
               }
-            } else if (field === 'strategy.type') {
-              if (invertMode === 'invert') {
-                newValue = currentValue === 'constant' ? 'selective' : 'constant';
-              } else {
-                // 开关模式：统一设置为 constant
-                newValue = 'constant';
+
+              if (newValue !== undefined) {
+                _.set(updatedEntry, field, newValue);
+              }
+            } else {
+              for (const key in updateData) {
+                if (key.startsWith('recursion.') && !updatedEntry.recursion) updatedEntry.recursion = {};
+                if (key.startsWith('strategy.') && !updatedEntry.strategy) updatedEntry.strategy = {};
+                if (key.startsWith('position.') && !updatedEntry.position) updatedEntry.position = {};
+
+                const updater = updateData[key];
+                let nextValue;
+                if (typeof updater === 'function') {
+                  const oldValue = _.get(updatedEntry, key);
+                  nextValue = updater(oldValue);
+                } else {
+                  nextValue = updateData[key];
+                }
+
+                if (key === 'position.type') {
+                  applyPositionSelectionToEntry(updatedEntry, nextValue);
+                } else {
+                  _.set(updatedEntry, key, nextValue);
+                }
               }
             }
-
-            if (newValue !== undefined) {
-              _.set(updatedEntry, field, newValue);
-            }
-          } else {
-            for (const key in updateData) {
-              if (key.startsWith('recursion.') && !updatedEntry.recursion) updatedEntry.recursion = {};
-              if (key.startsWith('strategy.') && !updatedEntry.strategy) updatedEntry.strategy = {};
-              if (key.startsWith('position.') && !updatedEntry.position) updatedEntry.position = {};
-
-              const updater = updateData[key];
-              let nextValue;
-              if (typeof updater === 'function') {
-                const oldValue = _.get(updatedEntry, key);
-                nextValue = updater(oldValue);
-              } else {
-                nextValue = updateData[key];
-              }
-
-              if (key === 'position.type') {
-                applyPositionSelectionToEntry(updatedEntry, nextValue);
-              } else {
-                _.set(updatedEntry, key, nextValue);
-              }
-            }
+            return updatedEntry;
           }
-          return updatedEntry;
-        }
-        return entry;
-      });
-      return hasChanges ? updatedEntries : entries;
+          return entry;
+        });
+        return hasChanges ? updatedEntries : entries;
       },
       {
         trackHistory: true,
@@ -196,33 +212,33 @@ export const copySelectedEntries = errorCatched(async (sourceLorebookName, isGlo
   try {
     copyRequest = await new Promise((resolve, reject) => {
       const defaultStrategy = getDefaultCopyConflictStrategy();
+      ensureBatchActionModalStyles(parentDoc);
       const modalHtml = `
-                <div id="lorebook-copy-modal" style="display: none; position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0,0,0,0.7) !important; z-index: 10000 !important; overflow-y: auto !important; box-sizing: border-box !important;">
-                    <div id="lorebook-copy-modal-content" style="background-color: #282828 !important; color: #eee !important; padding: 20px !important; border-radius: 8px !important; width: 90% !important; max-width: 400px !important; margin: 80px auto 50px auto !important; max-height: calc(100vh - 150px) !important; display: flex !important; flex-direction: column !important; box-sizing: border-box !important;">
-                        <h4 style="margin-top: 0;">选择目标世界书</h4>
+                <div id="lorebook-copy-modal" class="lorebook-themed-modal">
+                    <div id="lorebook-copy-modal-content" class="lorebook-themed-modal-content" style="max-width:400px;">
+                        <h4 style="margin-top:0;">选择目标世界书</h4>
                         <p>将 ${selectedUids.length} 个条目复制到:</p>
                         <div style="position: relative; margin-bottom: 10px;">
-                            <input type="text" id="lorebook-search-select" placeholder="点击选择或输入搜索..." 
-                                   style="width: 100%; padding: 8px 30px 8px 8px; background-color: #333; color: #eee; border: 1px solid #555; cursor: pointer; box-sizing: border-box; border-radius: 4px;">
-                            <span id="lorebook-dropdown-arrow" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #aaa;">▼</span>
+                            <input type="text" id="lorebook-search-select" placeholder="点击选择或输入搜索..." style="padding-right:30px; cursor:pointer;">
+                            <span id="lorebook-dropdown-arrow" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--panel-muted-text-color);">▼</span>
                         </div>
-                        <div id="lorebook-options-list" style="display: none; max-height: 200px; overflow-y: auto; background-color: #333; border: 1px solid #555; border-radius: 4px; flex-shrink: 0;">
+                        <div id="lorebook-options-list" class="lorebook-copy-options" style="display:none;">
                         </div>
                         <div style="margin-top: 12px;">
                             <label for="lorebook-copy-strategy" style="display: block; margin-bottom: 6px;">同名冲突时:</label>
-                            <select id="lorebook-copy-strategy" style="width: 100%; padding: 8px; background-color: #333; color: #eee; border: 1px solid #555; border-radius: 4px;">
+                            <select id="lorebook-copy-strategy">
                                 <option value="rename" ${defaultStrategy === 'rename' ? 'selected' : ''}>重命名后复制</option>
                                 <option value="overwrite" ${defaultStrategy === 'overwrite' ? 'selected' : ''}>覆盖已有同名条目</option>
                                 <option value="keep-original" ${defaultStrategy === 'keep-original' ? 'selected' : ''}>保留原名并继续复制</option>
                             </select>
                         </div>
-                        <div id="lorebook-copy-modal-actions" style="margin-top: 15px; text-align: right; flex-shrink: 0;">
-                            <button id="lorebook-copy-cancel-btn" style="padding: 8px 12px; background-color: #555; border: none; color: white; cursor: pointer; margin-right: 10px; border-radius: 4px;">取消</button>
-                            <button id="lorebook-copy-confirm-btn" style="padding: 8px 12px; background-color: #5a3a8e; border: none; color: white; cursor: pointer; border-radius: 4px;">确认复制</button>
+                        <div id="lorebook-copy-modal-actions" style="margin-top:15px; text-align:right;">
+                            <button id="lorebook-copy-cancel-btn" class="lorebook-themed-modal-button secondary" style="margin-right:10px;">取消</button>
+                            <button id="lorebook-copy-confirm-btn" class="lorebook-themed-modal-button primary">确认复制</button>
                         </div>
                     </div>
                 </div>`;
-      $('body', parentDoc).append(modalHtml);
+      appendToThemePortal(modalHtml, parentDoc);
 
       const $searchSelect = $('#lorebook-search-select', parentDoc);
       const $optionsList = $('#lorebook-options-list', parentDoc);
@@ -235,17 +251,14 @@ export const copySelectedEntries = errorCatched(async (sourceLorebookName, isGlo
         const filtered = allLorebooks.filter(name => name.toLowerCase().includes(filterText.toLowerCase()));
 
         if (filtered.length === 0) {
-          $optionsList.html('<div style="padding: 8px; color: #888;">没有匹配的世界书</div>');
+          $optionsList.html('<div class="lorebook-copy-empty">没有匹配的世界书</div>');
           return;
         }
 
         const optionsHtml = filtered
           .map(
             name => `
-          <div class="lorebook-option" data-value="${name}" 
-               style="padding: 8px 12px; cursor: pointer; color: #eee; ${name === selectedValue ? 'background-color: #5a3a8e;' : ''}"
-               onmouseover="this.style.backgroundColor='#444'" 
-               onmouseout="this.style.backgroundColor='${name === selectedValue ? '#5a3a8e' : '#333'}'">
+          <div class="lorebook-option lorebook-copy-option${name === selectedValue ? ' is-selected' : ''}" data-value="${name}">
             ${name}
           </div>
         `,
@@ -457,7 +470,8 @@ export const copySelectedEntries = errorCatched(async (sourceLorebookName, isGlo
     } else {
       const entriesForCreation = entriesToCopy.map(entry => {
         const { uid, ...entryData } = _.cloneDeep(entry);
-        const hasConflict = findConflictingEntriesByName(destinationEntries, entry.name).length > 0 || usedTitles.has(entry.name);
+        const hasConflict =
+          findConflictingEntriesByName(destinationEntries, entry.name).length > 0 || usedTitles.has(entry.name);
 
         if (conflictStrategy === 'rename' && hasConflict) {
           entryData.name = buildRenamedEntryTitle(entry.name, usedTitles);
@@ -554,29 +568,30 @@ export const adjustSelectedEntriesPosition = errorCatched(async (lorebookName, i
   let positionSettings;
   try {
     positionSettings = await new Promise((resolve, reject) => {
+      ensureBatchActionModalStyles(parentDoc);
       const modalHtml = `
-        <div id="lorebook-position-modal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.7); z-index: 10000; overflow-y: auto; box-sizing: border-box;">
-          <div id="lorebook-position-modal-content" style="background-color: #282828; color: #eee; padding: 20px; border-radius: 8px; width: 90%; max-width: 450px; margin: 80px auto 50px auto; max-height: calc(100vh - 150px); overflow-y: auto; box-sizing: border-box;">
+        <div id="lorebook-position-modal" class="lorebook-themed-modal">
+          <div id="lorebook-position-modal-content" class="lorebook-themed-modal-content">
             <h4 style="margin-top: 0;">调整插入位置</h4>
             <p>将 ${selectedUids.length} 个条目的插入位置调整为:</p>
             <div style="margin: 15px 0;">
               <label style="display: block; margin-bottom: 8px;">插入位置类型:</label>
-              <select id="lorebook-position-type-select" style="width: 100%; padding: 8px; background-color: #333; color: #eee; border: 1px solid #555; border-radius: 4px;">
+              <select id="lorebook-position-type-select">
                 ${POSITION_OPTIONS.map(option => `<option value="${option.value}" ${option.value === 'after_character_definition' ? 'selected' : ''}>${option.label}</option>`).join('')}
               </select>
             </div>
             <div id="lorebook-depth-input-wrapper" style="margin: 15px 0; display: none;">
               <label style="display: block; margin-bottom: 8px;">深度值 (0-10):</label>
-              <input type="number" id="lorebook-depth-input" min="0" max="10" value="4" style="width: 100%; padding: 8px; background-color: #333; color: #eee; border: 1px solid #555; border-radius: 4px;">
+              <input type="number" id="lorebook-depth-input" min="0" max="10" value="4">
             </div>
             <div id="lorebook-position-modal-actions" style="margin-top: 15px; text-align: right;">
-              <button id="lorebook-position-cancel-btn" style="padding: 8px 12px; background-color: #555; border: none; color: white; cursor: pointer; margin-right: 10px; border-radius: 4px;">取消</button>
-              <button id="lorebook-position-confirm-btn" style="padding: 8px 12px; background-color: #7a5a9e; border: none; color: white; cursor: pointer; border-radius: 4px;">确认调整</button>
+              <button id="lorebook-position-cancel-btn" class="lorebook-themed-modal-button secondary" style="margin-right:10px;">取消</button>
+              <button id="lorebook-position-confirm-btn" class="lorebook-themed-modal-button primary">确认调整</button>
             </div>
           </div>
         </div>`;
 
-      $('body', parentDoc).append(modalHtml);
+      appendToThemePortal(modalHtml, parentDoc);
 
       const $modal = $('#lorebook-position-modal', parentDoc);
       const $typeSelect = $('#lorebook-position-type-select', parentDoc);
