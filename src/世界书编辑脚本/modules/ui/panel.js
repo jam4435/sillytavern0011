@@ -1906,6 +1906,7 @@ export function initPanel() {
                     z-index: 10000;
                     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
                     margin-top: 5px;
+                    color: var(--panel-text-color, #eee);
                 }
 
                 #${LOREBOOK_PANEL_ID} .batch-toggle-dropdown.floating-batch-dropdown {
@@ -1923,7 +1924,7 @@ export function initPanel() {
                 }
                 
                 #${LOREBOOK_PANEL_ID} .batch-toggle-label {
-                    color: var(--panel-accent-color, #9a7ace);
+                    color: var(--panel-text-color, #eee);
                     font-size: 13px;
                     font-weight: bold;
                     margin-bottom: 8px;
@@ -1940,7 +1941,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .batch-toggle-checkbox-group label {
                     display: flex;
                     align-items: center;
-                    color: #ddd;
+                    color: var(--panel-text-color, #eee);
                     font-size: 12px;
                     cursor: pointer;
                     user-select: none;
@@ -1983,7 +1984,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .filter-dropdown label {
                     display: flex;
                     align-items: center;
-                    color: #ddd;
+                    color: var(--panel-text-color, #eee);
                     font-size: 12px;
                     cursor: pointer;
                     user-select: none;

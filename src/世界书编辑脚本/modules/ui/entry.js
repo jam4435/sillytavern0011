@@ -307,7 +307,7 @@ export function createEntryHtml(entry, lorebookName, isGlobal = false) {
              data-enabled="${isEnabled}"
              data-expanded="${expandedAttr}"
              data-order="${order}">
-            <div class="entry-header" data-action="open-editor">
+            <div class="entry-header">
                 ${headerLayout}
             </div>
             <div class="entry-expand-area" style="${expandAreaStyle}">

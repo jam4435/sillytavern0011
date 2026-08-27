@@ -2,10 +2,33 @@ import _ from 'lodash';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 let mergePinnedGlobalLorebooks: typeof import('./list.js').mergePinnedGlobalLorebooks;
+let createEntryHtml: typeof import('./entry.js').createEntryHtml;
 
 beforeAll(async () => {
   vi.stubGlobal('_', _);
   ({ mergePinnedGlobalLorebooks } = await import('./list.js'));
+  ({ createEntryHtml } = await import('./entry.js'));
+});
+
+describe('抽屉条目交互', () => {
+  it('条目栏空白区不再携带打开传统编辑器的动作', () => {
+    localStorage.setItem('lorebook-pc-layout-mode', 'drawer');
+
+    const html = createEntryHtml(
+      {
+        uid: 1,
+        name: '测试条目',
+        enabled: true,
+        strategy: { type: 'selective', keys: [] },
+        position: { type: 'before_character_definition', order: 0 },
+        content: '',
+      },
+      '测试世界书',
+    );
+
+    expect(html).toContain('class="entry-header"');
+    expect(html).not.toContain('class="entry-header" data-action="open-editor"');
+  });
 });
 
 describe('全局世界书常驻同步', () => {

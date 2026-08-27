@@ -135,4 +135,21 @@ describe('世界书面板主题 portal', () => {
     expect(variables['--panel-input-bg-color']).toBe('#eeeeee');
     expect(variables['--ai-border-color']).toBeTruthy();
   });
+
+  it('面板半透明时仍忠实保留输入框颜色，不与宿主背景混成灰色', () => {
+    const variables = buildThemeCssVariables({
+      bgColor: '#ffffff',
+      textColor: '#111111',
+      accentColor: '#33aadd',
+      entryBgColor: '#ffffff',
+      inputBgColor: '#ffffff',
+      panelOpacity: 0.35,
+    });
+
+    expect(variables['--panel-bg-color']).toContain('color-mix');
+    expect(variables['--panel-input-bg-color']).toBe('#ffffff');
+    expect(variables['--panel-dropdown-bg-color']).toBe('#ffffff');
+    expect(variables['--search-input-bg-color']).toBe('#ffffff');
+    expect(variables['--yaml-input-bg-color']).toBe('#ffffff');
+  });
 });

@@ -7,9 +7,8 @@ import { saveEntryField, toggleEntryEnabled, updateWorldbookEntries } from '../a
 import { AI_TAB_ID, DEBUG_MODE } from '../config.js';
 import { applyAiPreview, generateAiPreview } from '../features/aiActions.js';
 import { isDepthPositionValue } from '../position.js';
-import { addPinnedEntry, getAiWorkspaceSettings, removePinnedEntry, setAiWorkspaceSettings } from '../settings.js';
+import { addPinnedEntry, getAiWorkspaceSettings, getPinnedEntries, removePinnedEntry, setAiWorkspaceSettings } from '../settings.js';
 import { allEntriesData, getFolderMetaSession, getSelectableEntries, lorebookSorts, setAllEntriesData, toggleEntrySelection, virtualScrollers } from '../state.js';
-import { getPinnedEntries } from '../settings.js';
 import { getEntriesForSortPreference, loadUISort, planEntryMove, saveUISort } from '../features/sorting.js';
 import {
   closeAiActionDialog,
@@ -23,7 +22,6 @@ import {
 } from '../ui/aiActionDialog.js';
 import { showCompareEditor, showContentEditor } from '../ui/contentEditor.js';
 import { isMasterDetailLayout, renderDetailPane, selectDetailEntry, syncMasterRowFromState } from '../ui/detail.js';
-import { showEntryEditor } from '../ui/editor.js';
 import { toggleExpanded } from '../ui/expandManager.js';
 import { updateHeaderCheckboxState, updateMobileMoveButtons, updateVirtualScroll } from '../ui/list.js';
 import { switchTab } from '../ui/panel.js';
@@ -34,19 +32,14 @@ import { registerCommands } from './index.js';
 /**
  * 打开条目编辑器
  */
-function openEditor({ event, lorebookName, numericUid, isGlobal }) {
-  if (isMasterDetailLayout()) {
-    selectDetailEntry({
-      lorebookName,
-      entryUid: numericUid,
-      isGlobal,
-    });
-    return;
-  }
+function openEditor({ lorebookName, numericUid, isGlobal }) {
+  if (!isMasterDetailLayout()) return;
 
-  if ($(event.target).hasClass('entry-header')) {
-    showEntryEditor(lorebookName, numericUid, isGlobal);
-  }
+  selectDetailEntry({
+    lorebookName,
+    entryUid: numericUid,
+    isGlobal,
+  });
 }
 
 function updateLocalEntryState(lorebookName, numericUid, updater) {
