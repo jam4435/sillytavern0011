@@ -717,7 +717,7 @@ function ensureDetailStyles() {
         justify-content: center;
         border-radius: 999px;
         border: 1px solid var(--panel-border-color, rgba(255,255,255,0.12));
-        background: var(--panel-input-bg-color, rgba(255,255,255,0.06));
+        background: var(--panel-surface-raised-color, var(--panel-entry-bg-color, rgba(255,255,255,0.06)));
         color: inherit;
         cursor: pointer;
         padding: 0;
@@ -845,7 +845,7 @@ function ensureDetailStyles() {
         min-height: 18px;
         border-radius: 999px;
         border: 1px solid var(--panel-border-color, rgba(255,255,255,0.12));
-        background: var(--panel-input-bg-color, rgba(255,255,255,0.06));
+        background: var(--panel-entry-bg-color, rgba(255,255,255,0.06));
         color: inherit;
         font-size: 0.92em;
         line-height: 1;
@@ -1086,7 +1086,7 @@ function ensureDetailStyles() {
       }
       #${LOREBOOK_PANEL_ID} .detail-inline-button {
         border: 1px solid var(--panel-border-color, rgba(255,255,255,0.12));
-        background: var(--panel-input-bg-color, rgba(255,255,255,0.06));
+        background: var(--panel-surface-raised-color, var(--panel-entry-bg-color, rgba(255,255,255,0.06)));
         color: inherit;
         border-radius: 999px;
         padding: 6px 10px;
@@ -1258,7 +1258,7 @@ function ensureDetailStyles() {
       }
       #${LOREBOOK_PANEL_ID} .lorebook-title-menu-button {
         border: 1px solid var(--panel-border-color, rgba(255,255,255,0.08));
-        background: var(--panel-input-bg-color, rgba(255,255,255,0.05));
+        background: var(--panel-surface-raised-color, var(--panel-entry-bg-color, rgba(255,255,255,0.05)));
         color: inherit;
         border-radius: 8px;
         width: 30px;

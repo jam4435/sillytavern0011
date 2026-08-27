@@ -33,7 +33,7 @@ function ensureBatchActionModalStyles(parentDoc) {
     <style id="${BATCH_ACTION_MODAL_STYLE_ID}">
       #lorebook-copy-modal, #lorebook-position-modal { display:none; position:fixed; inset:0; z-index:10000; overflow-y:auto; box-sizing:border-box; background:rgba(0,0,0,.7); }
       #lorebook-copy-modal-content, #lorebook-position-modal-content { width:90%; max-width:450px; margin:80px auto 50px; padding:20px; box-sizing:border-box; border:1px solid var(--panel-border-color); border-radius:8px; background:var(--panel-bg-color); color:var(--panel-text-color); box-shadow:0 5px 15px var(--ai-shadow-color); }
-      .lorebook-copy-options { max-height:200px; overflow-y:auto; border:1px solid var(--panel-border-color); border-radius:4px; background:var(--panel-input-bg-color); }
+      .lorebook-copy-options { max-height:200px; overflow-y:auto; border:1px solid var(--panel-border-color); border-radius:4px; background:var(--panel-entry-bg-color); }
       .lorebook-copy-option { padding:8px 12px; cursor:pointer; color:var(--panel-text-color); }
       .lorebook-copy-option:hover, .lorebook-copy-option.is-selected { background:var(--panel-accent-color); color:var(--panel-accent-text-color); }
       .lorebook-copy-empty { padding:8px; color:var(--panel-muted-text-color); }

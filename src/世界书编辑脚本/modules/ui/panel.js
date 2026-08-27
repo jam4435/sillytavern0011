@@ -795,8 +795,27 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} select option,
                 #theme-settings-modal select option,
                 #lorebook-copy-modal select option {
-                    background-color: var(--panel-dropdown-bg-color, var(--panel-input-bg-color, #333));
-                    color: var(--panel-text-color, #eee);
+                    background-color: var(--panel-dropdown-bg-color, var(--panel-input-bg-color, #333)) !important;
+                    color: var(--panel-text-color, #eee) !important;
+                }
+                /* 酒馆主题会用 !important 重写原生表单。这里仅覆盖真正可编辑的控件，
+                   避免把 UID、递归控制等信息容器误当成“输入栏”。 */
+                #${LOREBOOK_PANEL_ID} input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+                #${LOREBOOK_PANEL_ID} textarea,
+                #${LOREBOOK_PANEL_ID} select {
+                    background-color: var(--panel-input-bg-color, #333) !important;
+                    color: var(--panel-text-color, #eee) !important;
+                    border-color: var(--panel-border-color, #555) !important;
+                }
+                #${LOREBOOK_PANEL_ID} input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):focus,
+                #${LOREBOOK_PANEL_ID} textarea:focus,
+                #${LOREBOOK_PANEL_ID} select:focus {
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a) !important;
+                    border-color: var(--panel-accent-color, #9a7ace) !important;
+                }
+                #${LOREBOOK_PANEL_ID} input::placeholder,
+                #${LOREBOOK_PANEL_ID} textarea::placeholder {
+                    color: var(--panel-muted-text-color, #aaa) !important;
                 }
                 #${LOREBOOK_PANEL_ID} .tab-content {
                     display: none;
@@ -1158,7 +1177,7 @@ export function initPanel() {
                     text-align: center;
                     font-size: 0.9em;
                     margin: 10px 0;
-                    background-color: var(--panel-input-bg-color, rgba(80, 80, 80, 0.2));
+                    background-color: var(--panel-entry-bg-color, rgba(80, 80, 80, 0.2));
                     border-radius: 4px;
                 }
                 #${LOREBOOK_PANEL_ID} .current-bound-books {
@@ -1173,7 +1192,7 @@ export function initPanel() {
                     margin-left: 10px;
                 }
                 #${LOREBOOK_PANEL_ID} .sort-display-button {
-                    background-color: var(--panel-input-bg-color, #3a3a3a);
+                    background-color: var(--panel-dropdown-bg-color, var(--panel-surface-raised-color, #3a3a3a));
                     border: 1px solid var(--panel-border-color, #555);
                     color: var(--panel-text-color, #ccc);
                     padding: 4px 10px;
@@ -1268,7 +1287,7 @@ export function initPanel() {
                     display: flex;
                     align-items: center;
                     background-color: var(--panel-entry-bg-color);
-                    cursor: pointer;
+                    cursor: default;
                     transition: background-color 0.2s ease;
                     flex-direction: row; /* 确保PC端默认为水平布局 */
                 }
@@ -1295,7 +1314,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .entry-item-title {
                     flex-grow: 1;
                     margin: 0 8px;
-                    background: transparent;
+                    background-color: var(--panel-input-bg-color, #333) !important;
                     border: 1px solid transparent;
                     color: var(--panel-text-color);
                     font-weight: bold;
@@ -1488,7 +1507,7 @@ export function initPanel() {
                     align-items: center;
                     margin-bottom: 10px;
                     padding: 5px;
-                    background-color: var(--panel-input-bg-color, #333);
+                    background-color: var(--panel-entry-bg-color, #333);
                     border-radius: 4px;
                 }
                 #${LOREBOOK_PANEL_ID} .uid-display-area label {
@@ -1520,7 +1539,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .token-counter {
                     font-size: 0.85em;
                     color: #8a5fbd;
-                    background-color: var(--panel-input-bg-color, #333);
+                    background-color: var(--panel-entry-bg-color, #333);
                     padding: 2px 8px;
                     border-radius: 10px;
                     font-weight: bold;
@@ -1547,7 +1566,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .recursion-options-area {
                     margin: 10px 0;
                     padding: 10px;
-                    background-color: var(--panel-input-bg-color, #333);
+                    background-color: var(--panel-entry-bg-color, #333);
                     border-radius: 4px;
                     border: 1px solid var(--panel-border-color, #444);
                 }
@@ -1706,7 +1725,7 @@ export function initPanel() {
                     transform: translateX(18px);
                 }
                 .${LOREBOOK_TOGGLE_SWITCH_CLASS} input:disabled + .toggle-slider {
-                    background-color: var(--panel-input-bg-color, #333);
+                    background-color: var(--panel-entry-bg-color, #333);
                     cursor: not-allowed;
                 }
                 
@@ -2191,7 +2210,7 @@ export function initPanel() {
                     overflow-y: auto;
                 }
                 .lorebook-tag {
-                    background-color: var(--panel-input-bg-color, #444);
+                    background-color: var(--panel-entry-bg-color, #444);
                     color: #ccc;
                     padding: 5px 10px;
                     border-radius: 15px;
@@ -2542,7 +2561,7 @@ export function initPanel() {
                 #theme-settings-modal #panel-background-image-upload-button,
                 #theme-settings-modal #panel-background-image-clear-button {
                     flex: 0 0 auto;
-                    background-color: var(--panel-input-bg-color, #333);
+                    background-color: var(--panel-surface-raised-color, var(--panel-entry-bg-color, #333));
                     color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
                     border: 1px solid var(--panel-border-color, #555);
                     border-radius: 6px;
@@ -2564,7 +2583,7 @@ export function initPanel() {
                     display: inline-flex;
                     align-items: center;
                     gap: 6px;
-                    background-color: var(--panel-input-bg-color, #333);
+                    background-color: var(--panel-surface-raised-color, var(--panel-entry-bg-color, #333));
                     color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
                     border: 1px solid var(--panel-border-color, #555);
                     border-radius: 6px;
