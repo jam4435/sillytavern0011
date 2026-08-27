@@ -21,6 +21,7 @@ import {
   LOREBOOK_MINIMIZE_BUTTON_CLASS,
   LOREBOOK_PANEL_ID,
   LOREBOOK_TOGGLE_SWITCH_CLASS,
+  MOBILE_LAYOUT_BREAKPOINT,
   MOBILE_TOOLTIP_ID,
 } from '../config.js';
 import { clearAllActiveFilters, clearAllExpandedEntries, clearAllFilteredEntries } from '../state.js';
@@ -563,7 +564,7 @@ export function initPanel() {
                     margin: 0 !important;
                 }
 
-                @media (max-width: 768px) {
+                @media (max-width: ${MOBILE_LAYOUT_BREAKPOINT}px) {
                     #${LOREBOOK_PANEL_ID} {
                         width: 95%;
                         max-width: 480px;
@@ -2817,7 +2818,7 @@ export function initPanel() {
                 }
  
                  /* --- 统一的移动端媒体查询 --- */
-                 @media (max-width: 768px) {
+                 @media (max-width: ${MOBILE_LAYOUT_BREAKPOINT}px) {
                      /* 面板 */
                     #${LOREBOOK_PANEL_ID} {
                         width: 95%;

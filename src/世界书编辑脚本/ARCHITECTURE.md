@@ -330,6 +330,13 @@ AI 助手与 API 设置抽屉不共享外壳样式。助手是原生
    主面板与 `#lorebook-theme-portal` 共享同一套 CSS 变量和 `color-scheme`。脚本自有弹窗必须通过 `appendToThemePortal()`
    挂载，不能直接追加到父页面 `body`；这样已打开弹窗和后创建弹窗都会跟随当前布局主题。
 
+   `--panel-input-bg-color` / `--panel-input-focus-bg-color`
+   只表示可编辑表单表面，适用于文本、数字、搜索、下拉和多行输入；checkbox、radio、color、range、file、hidden 以及普通按钮不属于输入表面。UID、token 徽标、递归控制区、标签、列表容器等非编辑元素必须使用
+   `--panel-entry-bg-color`、`--panel-surface-muted-color` 或
+   `--panel-surface-raised-color`，不能借用输入栏变量。父页面中的酒馆主题可能以 `!important`
+   重写原生表单，因此主面板和 portal 应使用各自的主题作用域选择器及必要的样式表级 `!important` 抵抗覆盖，但不写内联
+   `!important`。
+
 5. 世界书隐藏元条目 `folderMeta.js` 用 `__WI_META_FOLDERS__` 条目保存文件夹结构；渲染和 AI 收集时会过滤这些元条目。
 
 ### 5.8 写回与回滚

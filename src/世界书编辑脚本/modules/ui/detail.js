@@ -4,6 +4,7 @@ import {
   GLOBAL_CONTENT_ID,
   GLOBAL_DETAIL_CONTAINER_ID,
   LOREBOOK_PANEL_ID,
+  MOBILE_LAYOUT_BREAKPOINT,
 } from '../config.js';
 import { saveEntryFields } from '../api.js';
 import {
@@ -1311,7 +1312,7 @@ function ensureDetailStyles() {
         border-radius: 8px;
         margin-left: 0;
       }
-      @media (max-width: 768px) {
+      @media (max-width: ${MOBILE_LAYOUT_BREAKPOINT}px) {
         #${LOREBOOK_PANEL_ID} .detail-main-grid,
         #${LOREBOOK_PANEL_ID} .detail-advanced-grid {
           grid-template-columns: 1fr;

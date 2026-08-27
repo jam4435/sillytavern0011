@@ -1,5 +1,5 @@
 // 通用辅助函数
-import { LOREBOOK_ENTRY_CLASS } from './config.js';
+import { LOREBOOK_ENTRY_CLASS, MOBILE_LAYOUT_BREAKPOINT } from './config.js';
 import { getNativePositionRole, getNativePositionType } from './position.js';
 
 const fallbackLocalStorage = new Map();
@@ -183,20 +183,33 @@ export function rgbaToHex(color) {
   return color;
 }
 
-export const isMobile = () => {
-  const screenWidth = screen.width;
-  const screenHeight = screen.height;
+function findUsableViewportWidth(...candidates) {
+  return candidates.find(width => Number.isFinite(width) && width > 0);
+}
 
-  if (screenHeight >= screenWidth) {
-    return true;
+export function getLayoutViewportWidth() {
+  try {
+    const parentWin = window.parent || window;
+    const parentDoc = parentWin.document;
+    const width = findUsableViewportWidth(parentWin.innerWidth, parentDoc.documentElement?.clientWidth);
+    if (width !== undefined) {
+      return width;
+    }
+  } catch {
+    // 跨文档访问异常时降级到脚本自身视口。
   }
 
-  if (screenHeight < 650) {
-    return true;
+  if (typeof window !== 'undefined') {
+    return findUsableViewportWidth(window.innerWidth, window.document?.documentElement?.clientWidth) ?? Infinity;
   }
 
-  return false;
-};
+  return Infinity;
+}
+
+export const isMobileViewportWidth = viewportWidth =>
+  Number.isFinite(viewportWidth) && viewportWidth <= MOBILE_LAYOUT_BREAKPOINT;
+
+export const isMobile = () => isMobileViewportWidth(getLayoutViewportWidth());
 
 // 上下移动条目函数
 export const moveEntryUpDown = errorCatched(async (lorebookName, entryUid, direction) => {
