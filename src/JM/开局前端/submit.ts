@@ -17,10 +17,12 @@ export async function submitSelections(selections: SelectionState) {
     const settings = ensureGenerationSettings(selections);
 
     if (typeof insertOrAssignVariables === 'function' && typeof triggerSlash === 'function') {
-      await applyGenerationSettings(settings);
       await applyHardIdentityRouteSettings(hardIdentityRoute);
       await initializeCurrentCharacterVariable();
       await insertOrAssignVariables({ gender: genderValue, hardIdentityRoute }, { type: 'chat' });
+      // 设置同步最后才会更新正则并安排聊天重载，因此应紧邻发送执行，避免
+      // 重载当前 iframe 时打断路线和变量初始化。
+      await applyGenerationSettings(settings);
       triggerSlash([`/send ${description}`, '/trigger'].join('|'));
       renderFinalMessage({
         title: '档案已发送',

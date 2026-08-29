@@ -15,6 +15,7 @@ const updateWorldbookWithMock = vi.fn(async (_worldbookName: string, updater: Wo
   return worldbook as WorldbookEntry[];
 });
 const getScriptTreesMock = vi.fn((_option: ScriptTreesOptions) => scriptTrees);
+const getTavernRegexesMock = vi.fn((_option: TavernRegexOption) => regexes as TavernRegex[]);
 const updateScriptTreesWithMock = vi.fn(async (updater: (trees: ScriptTree[]) => ScriptTree[]) => {
   scriptTrees = await updater(scriptTrees);
   return scriptTrees;
@@ -140,6 +141,7 @@ describe('开局设置同步', () => {
     Object.assign(globalThis, {
       getCharWorldbookNames: vi.fn(() => ({ primary: null, additional: [] })),
       getScriptTrees: getScriptTreesMock,
+      getTavernRegexes: getTavernRegexesMock,
       getWorldbook: getWorldbookMock,
       updateScriptTreesWith: updateScriptTreesWithMock,
       updateTavernRegexesWith: updateTavernRegexesWithMock,
@@ -161,5 +163,74 @@ describe('开局设置同步', () => {
       changedItems: ['ERA变量框架-1.0.5 -> 开启'],
       missingLabels: [],
     });
+  });
+
+  it('正则状态已经符合设置时不调用会重载聊天的更新接口', async () => {
+    regexes = [
+      { script_name: '变量状态栏', enabled: true },
+      { script_name: '隐藏', enabled: true },
+      { script_name: '隐藏2', enabled: true },
+      { script_name: '图片状态栏', enabled: false },
+      { script_name: '无图片状态栏', enabled: false },
+      { script_name: '选项', enabled: true },
+    ];
+
+    const report = await applyGenerationSettings({
+      enableVariables: true,
+      useTextStatusBar: false,
+      generateOptions: true,
+    });
+
+    expect(updateTavernRegexesWithMock).not.toHaveBeenCalled();
+    expect(report.scopes[0]).toMatchObject({
+      scope: '局部正则',
+      changedItems: [],
+      missingLabels: [],
+    });
+  });
+
+  it('按脚本、世界书、正则的顺序更新，并保持报告展示顺序不变', async () => {
+    const invocationOrder: string[] = [];
+    worldbook = [
+      { name: '变量指导', enabled: false },
+      { name: '输出提示词', enabled: false },
+      { name: '多状态栏', enabled: true },
+      { name: '行动建议', enabled: true },
+    ];
+    regexes = [
+      { script_name: '变量状态栏', enabled: false },
+      { script_name: '隐藏', enabled: false },
+      { script_name: '隐藏2', enabled: false },
+      { script_name: '图片状态栏', enabled: true },
+      { script_name: '无图片状态栏', enabled: false },
+      { script_name: '选项', enabled: true },
+    ];
+    Object.assign(globalThis, {
+      getCharWorldbookNames: getCharWorldbookNamesMock,
+    });
+    updateScriptTreesWithMock.mockImplementationOnce(async updater => {
+      invocationOrder.push('脚本');
+      scriptTrees = await updater(scriptTrees);
+      return scriptTrees;
+    });
+    updateWorldbookWithMock.mockImplementationOnce(async (_worldbookName, updater) => {
+      invocationOrder.push('世界书');
+      worldbook = (await updater(worldbook as WorldbookEntry[])) as TestWorldbookEntry[];
+      return worldbook as WorldbookEntry[];
+    });
+    updateTavernRegexesWithMock.mockImplementationOnce(async updater => {
+      invocationOrder.push('正则');
+      regexes = (await updater(regexes as TavernRegex[])) as Pick<TavernRegex, 'script_name' | 'enabled'>[];
+      return regexes as TavernRegex[];
+    });
+
+    const report = await applyGenerationSettings({
+      enableVariables: true,
+      useTextStatusBar: false,
+      generateOptions: true,
+    });
+
+    expect(invocationOrder).toEqual(['脚本', '世界书', '正则']);
+    expect(report.scopes.map(scope => scope.scope)).toEqual(['局部正则', '局部脚本', '当前角色世界书条目']);
   });
 });

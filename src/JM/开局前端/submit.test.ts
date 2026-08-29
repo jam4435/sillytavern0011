@@ -63,6 +63,15 @@ describe('开局前端提交', () => {
       { type: 'chat' },
     );
     expect(triggerSlashMock).toHaveBeenCalledWith(expect.stringContaining('/send 创建角色：性别男'));
+    expect(vi.mocked(applyHardIdentityRouteSettings).mock.invocationCallOrder[0]).toBeLessThan(
+      insertOrAssignVariablesMock.mock.invocationCallOrder[0],
+    );
+    expect(insertOrAssignVariablesMock.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(applyGenerationSettings).mock.invocationCallOrder[0],
+    );
+    expect(vi.mocked(applyGenerationSettings).mock.invocationCallOrder[0]).toBeLessThan(
+      triggerSlashMock.mock.invocationCallOrder[0],
+    );
   });
 
   it('会写入选择的高难身份路线变量', async () => {

@@ -13,6 +13,7 @@ type NamedRule = {
 type RuntimeApi = {
   getCharWorldbookNames: typeof getCharWorldbookNames;
   getScriptTrees: typeof getScriptTrees;
+  getTavernRegexes: typeof getTavernRegexes;
   getWorldbook: typeof getWorldbook;
   updateScriptTreesWith: typeof updateScriptTreesWith;
   updateTavernRegexesWith: typeof updateTavernRegexesWith;
@@ -25,6 +26,12 @@ type ScriptPatchResult = {
   trees: ScriptTree[];
   matchedKeys: Set<string>;
   hasEnabledManagedDescendant: boolean;
+  changedItems: string[];
+};
+
+type RegexPatchResult = {
+  regexes: TavernRegex[];
+  matchedKeys: Set<string>;
   changedItems: string[];
 };
 
@@ -71,11 +78,12 @@ const HARD_IDENTITY_ROUTE_WORLDBOOK_ENTRY_RULES: NamedRule[] = [
 export async function applyGenerationSettings(settings: GenerationSettings): Promise<GenerationSettingsSyncReport> {
   const api = getRuntimeApi();
 
-  const scopes = [
-    await applyCharacterRegexSettings(api, settings),
-    await applyCharacterScriptSettings(api, settings),
-    await applyCharacterWorldbookSettings(api, settings),
-  ];
+  const scriptScope = await applyCharacterScriptSettings(api, settings);
+  const worldbookScope = await applyCharacterWorldbookSettings(api, settings);
+  // 酒馆助手会在更新正则后重载整个聊天楼层。必须最后执行，避免当前 iframe
+  // 在世界书等异步操作完成前被销毁，导致后续同步和结果弹窗丢失。
+  const regexScope = await applyCharacterRegexSettings(api, settings);
+  const scopes = [regexScope, scriptScope, worldbookScope];
 
   return {
     scopes,
@@ -99,6 +107,7 @@ export async function applyHardIdentityRouteSettings(
 function getRuntimeApi(): RuntimeApi {
   const getCharWorldbookNamesApi = typeof getCharWorldbookNames === 'function' ? getCharWorldbookNames : undefined;
   const getScriptTreesApi = typeof getScriptTrees === 'function' ? getScriptTrees : undefined;
+  const getTavernRegexesApi = typeof getTavernRegexes === 'function' ? getTavernRegexes : undefined;
   const getWorldbookApi = typeof getWorldbook === 'function' ? getWorldbook : undefined;
   const updateScriptTreesWithApi = typeof updateScriptTreesWith === 'function' ? updateScriptTreesWith : undefined;
   const updateTavernRegexesWithApi =
@@ -110,6 +119,9 @@ function getRuntimeApi(): RuntimeApi {
   }
   if (!getScriptTreesApi) {
     throw Error('缺少酒馆助手接口: getScriptTrees');
+  }
+  if (!getTavernRegexesApi) {
+    throw Error('缺少酒馆助手接口: getTavernRegexes');
   }
   if (!getWorldbookApi) {
     throw Error('缺少酒馆助手接口: getWorldbook');
@@ -127,6 +139,7 @@ function getRuntimeApi(): RuntimeApi {
   return {
     getCharWorldbookNames: getCharWorldbookNamesApi,
     getScriptTrees: getScriptTreesApi,
+    getTavernRegexes: getTavernRegexesApi,
     getWorldbook: getWorldbookApi,
     updateScriptTreesWith: updateScriptTreesWithApi,
     updateTavernRegexesWith: updateTavernRegexesWithApi,
@@ -189,36 +202,47 @@ async function applyCharacterRegexSettings(api: RuntimeApi, settings: Generation
     ['textStatusBar', !settings.enableVariables && settings.useTextStatusBar],
     ['optionsRegex', settings.generateOptions],
   ]);
-  const matchedKeys = new Set<string>();
-  const changedItems: string[] = [];
+  const patchResult = patchTavernRegexes(api.getTavernRegexes(CHARACTER_REGEX_OPTION), desiredState);
 
-  await api.updateTavernRegexesWith(
-    regexes =>
-      regexes.map(regex => {
-        const matchedRule = findMatchedRule(regex.script_name, REGEX_RULES);
-        if (!matchedRule) {
-          return regex;
-        }
-
-        matchedKeys.add(matchedRule.key);
-        const nextEnabled = desiredState.get(matchedRule.key);
-        if (typeof nextEnabled !== 'boolean' || regex.enabled === nextEnabled) {
-          return regex;
-        }
-
-        changedItems.push(`${regex.script_name} -> ${nextEnabled ? '开启' : '关闭'}`);
-        return {
-          ...regex,
-          enabled: nextEnabled,
-        };
-      }),
-    CHARACTER_REGEX_OPTION,
-  );
+  // 即使 updater 返回原数组，酒馆助手仍会安排一次全聊天重载。因此只有真正
+  // 存在正则变化时才调用更新接口。
+  if (patchResult.changedItems.length > 0) {
+    await api.updateTavernRegexesWith(() => patchResult.regexes, CHARACTER_REGEX_OPTION);
+  }
 
   return {
     scope,
+    changedItems: patchResult.changedItems,
+    missingLabels: getMissingLabels(REGEX_RULES, patchResult.matchedKeys, getRelevantRegexKeys(settings)),
+  };
+}
+
+function patchTavernRegexes(regexes: TavernRegex[], desiredState: Map<string, boolean>): RegexPatchResult {
+  const matchedKeys = new Set<string>();
+  const changedItems: string[] = [];
+  const nextRegexes = regexes.map(regex => {
+    const matchedRule = findMatchedRule(regex.script_name, REGEX_RULES);
+    if (!matchedRule) {
+      return regex;
+    }
+
+    matchedKeys.add(matchedRule.key);
+    const nextEnabled = desiredState.get(matchedRule.key);
+    if (typeof nextEnabled !== 'boolean' || regex.enabled === nextEnabled) {
+      return regex;
+    }
+
+    changedItems.push(`${regex.script_name} -> ${nextEnabled ? '开启' : '关闭'}`);
+    return {
+      ...regex,
+      enabled: nextEnabled,
+    };
+  });
+
+  return {
+    regexes: nextRegexes,
+    matchedKeys,
     changedItems,
-    missingLabels: getMissingLabels(REGEX_RULES, matchedKeys, getRelevantRegexKeys(settings)),
   };
 }
 
