@@ -12,6 +12,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Local Wuxia automation snapshots and inspection dumps.
+/wuxia-*.json
+
 auto-imports.d.ts
 components.d.ts
 
