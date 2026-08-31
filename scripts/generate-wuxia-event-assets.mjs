@@ -40,7 +40,7 @@ const SHARD_MAX_BYTES = 350 * 1024;
 const CHECKPOINT_INTERVAL = 100;
 const DISCOVERY_HOURS = 10 * 24;
 const STRICT_VALIDATION = process.argv.includes('--strict');
-const NON_EVENT_FOLLOWUP_LABELS = new Set(['全书完', '待定', '无', '后续待续']);
+const NON_EVENT_FOLLOWUP_LABELS = new Set(['全书完', '待定', '无', '后续待续', '全书终局-终章圆满']);
 const EVENT_STATE_PATH_ROOTS = ['事件系统', '世界事件', '参与事件', '事件分支结果', '事件结局状态'];
 
 const EVENT_KINDS = Object.freeze({
