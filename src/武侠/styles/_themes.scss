@@ -387,6 +387,81 @@
     text-shadow: none;
   }
 
+  .wuxia-battle-card {
+    background: linear-gradient(135deg, rgba(245, 239, 229, 0.96) 0%, rgba(236, 228, 216, 0.98) 100%);
+    border-color: rgba(90, 75, 60, 0.35);
+    color: #2c221a;
+    box-shadow: 0 3px 12px rgba(60, 45, 30, 0.15);
+
+    &::before {
+      background: linear-gradient(90deg, transparent, rgba(90, 75, 60, 0.6), transparent);
+    }
+
+    .wuxia-battle-header {
+      border-bottom-color: rgba(90, 75, 60, 0.2);
+    }
+
+    .wuxia-battle-title {
+      color: #3b2a1a;
+      text-shadow: none;
+    }
+
+    .wuxia-battle-stamp {
+      border-color: #a83836;
+      color: #a83836;
+      background: rgba(168, 56, 54, 0.1);
+      text-shadow: none;
+    }
+
+    .wuxia-battle-versus {
+      background: rgba(225, 215, 200, 0.6);
+      border-color: rgba(90, 75, 60, 0.15);
+    }
+
+    .wuxia-fighter-tag {
+      color: #6d5b4d;
+    }
+
+    .wuxia-fighter-content {
+      color: #8b3a1a;
+    }
+
+    .wuxia-fighter.right .wuxia-fighter-content {
+      color: #3a506b;
+    }
+
+    .wuxia-vs-badge {
+      color: #3b2a1a;
+      border-color: rgba(90, 75, 60, 0.35);
+      background: rgba(245, 239, 229, 0.95);
+      box-shadow: 0 1px 4px rgba(60, 45, 30, 0.15);
+    }
+
+    .wuxia-battle-narrative {
+      background: rgba(225, 215, 200, 0.4);
+      border-left-color: #8b3a1a;
+      color: #231a14;
+    }
+
+    .wuxia-battle-details {
+      border-top-color: rgba(90, 75, 60, 0.2);
+      color: #6d5b4d;
+
+      summary {
+        color: #5a4230;
+
+        &:hover {
+          color: #8b3a1a;
+        }
+      }
+    }
+
+    .wuxia-details-content {
+      background: rgba(225, 215, 200, 0.55);
+      color: #3d3025;
+    }
+  }
+
   .maintext-line:hover {
     color: var(--content-font-color);
     text-shadow: none;

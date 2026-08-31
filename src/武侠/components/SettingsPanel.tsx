@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  BUILTIN_LOCAL_REGEX_IDS,
   DEFAULT_SUMMARY_SETTINGS,
   DEFAULT_SUMMARY_TAB_SETTINGS,
   DisplaySettings,
@@ -1182,7 +1183,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       );
 
       const preservedLocalRules = settings.localRegexRules.filter(rule => {
-        if (rule.id === 'era-base-regex') {
+        if (BUILTIN_LOCAL_REGEX_IDS.has(rule.id)) {
           return true;
         }
         if (rule.originScope === 'global') {

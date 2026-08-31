@@ -4,6 +4,19 @@ function getParentDocument() {
   return window.parent.document;
 }
 
+function configureThemePortal(portal) {
+  portal.classList.add('lorebook-theme-scope');
+  portal.dataset.lorebookThemeSurface = 'portal';
+  Object.assign(portal.style, {
+    display: 'block',
+    position: 'fixed',
+    inset: '0',
+    zIndex: '10000',
+    pointerEvents: 'none',
+  });
+  return portal;
+}
+
 /**
  * Return the shared mount point for UI that must live outside the lorebook panel.
  * Theme variables are applied to this element, so every child overlay inherits the
@@ -12,15 +25,12 @@ function getParentDocument() {
 export function ensureThemePortal(parentDoc = getParentDocument()) {
   let portal = parentDoc.getElementById(THEME_PORTAL_ID);
   if (portal) {
-    portal.classList.add('lorebook-theme-scope');
-    return portal;
+    return configureThemePortal(portal);
   }
 
   portal = parentDoc.createElement('div');
   portal.id = THEME_PORTAL_ID;
-  portal.className = 'lorebook-theme-scope';
-  portal.dataset.lorebookThemeSurface = 'portal';
-  portal.style.display = 'contents';
+  configureThemePortal(portal);
   (parentDoc.body || parentDoc.documentElement).appendChild(portal);
   return portal;
 }

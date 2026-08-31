@@ -369,6 +369,7 @@ export function initPanel() {
             <style id="enhanced-lorebook-styles">
                 #${THEME_PORTAL_ID} .lorebook-themed-modal {
                     color: var(--panel-text-color, #eee);
+                    pointer-events: auto;
                 }
                 /* 酒馆主题可能以 !important 指定 label 颜色；portal 弹窗统一使用面板字体色。 */
                 #${THEME_PORTAL_ID} .lorebook-themed-modal label {
@@ -400,6 +401,14 @@ export function initPanel() {
                     border: 1px solid var(--panel-border-color, #555);
                     border-radius: 8px;
                     box-shadow: 0 5px 15px var(--ai-shadow-color, rgba(0, 0, 0, 0.3));
+                }
+                @media (max-width: ${MOBILE_LAYOUT_BREAKPOINT}px) {
+                    #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content {
+                        width: calc(100% - 24px);
+                        max-height: calc(100dvh - 24px);
+                        margin-top: max(12px, env(safe-area-inset-top));
+                        margin-bottom: max(12px, env(safe-area-inset-bottom));
+                    }
                 }
                 #${THEME_PORTAL_ID} .lorebook-themed-modal-header {
                     background: var(--panel-accent-color, #9a7ace);

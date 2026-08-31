@@ -263,6 +263,69 @@ export const ERA_BASE_REGEX_RULE: RegexRule = {
   originScope: 'manual',
 };
 
+/** 过滤审计思维链正则 - 移除 <event_audit> 与 <transition_audit> */
+export const EVENT_AUDIT_REGEX_RULE: RegexRule = {
+  id: 'wuxia-filter-event-audit',
+  pattern: '/<(?:event_audit|transition_audit)>[\\s\\S]*?<\\/(?:event_audit|transition_audit)>/gi',
+  replacement: '',
+  enabled: true,
+  description: '过滤审计思维链',
+  originScope: 'manual',
+};
+
+/** 过滤事件进度短标签正则 - 移除 <射雕第一回04> 等回目因果阶段标签 */
+export const EVENT_STAGE_TAG_REGEX_RULE: RegexRule = {
+  id: 'wuxia-filter-event-stage-tag',
+  pattern: '/<([^\\s>]+第[^\\s>]+回\\d+[^>]*)>[\\s\\S]*?<\\/\\1>/gi',
+  replacement: '',
+  enabled: true,
+  description: '过滤事件进度标签',
+  originScope: 'manual',
+};
+
+/** 战斗判定美化替换模板 */
+export const BATTLE_CHECK_REPLACEMENT_TEMPLATE = `<div class="wuxia-battle-card">
+<div class="wuxia-battle-header">
+<span class="wuxia-battle-title">⚔️ 招式交锋 · 武道对决</span>
+<span class="wuxia-battle-stamp">【 $5 】</span>
+</div>
+<div class="wuxia-battle-versus">
+<div class="wuxia-fighter left"><span class="wuxia-fighter-tag">先手</span><span class="wuxia-fighter-content">$1</span></div>
+<div class="wuxia-vs-badge">VS</div>
+<div class="wuxia-fighter right"><span class="wuxia-fighter-tag">后手</span><span class="wuxia-fighter-content">$2</span></div>
+</div>
+<div class="wuxia-battle-narrative">$6</div>
+<details class="wuxia-battle-details">
+<summary>📜 查阅交手天机与推导过程</summary>
+<div class="wuxia-details-content">
+<div><strong>公式：</strong>$3</div>
+<div style="margin-top:4px;"><strong>算式：</strong>$4</div>
+</div>
+</details>
+</div>`;
+
+/** 战斗判定美化正则 - 将 <战斗判定> 渲染为水墨对决卡片与折叠算式 */
+export const BATTLE_CHECK_REGEX_RULE: RegexRule = {
+  id: 'wuxia-beauty-battle-check',
+  pattern:
+    '/<战斗判定>\\s*先手[：:]\\s*([^\\r\\n]+?)\\s*后手[：:]\\s*([^\\r\\n]+?)\\s*公式[：:]\\s*([\\s\\S]*?)\\s*计算[：:]\\s*([\\s\\S]*?)\\s*结果[：:]\\s*([^\\r\\n]+?)\\s*叙事[：:]\\s*([\\s\\S]*?)\\s*<\\/战斗判定>/gi',
+  replacement: BATTLE_CHECK_REPLACEMENT_TEMPLATE,
+  enabled: true,
+  description: '战斗判定武侠美化',
+  originScope: 'manual',
+};
+
+/** 默认内置全局正则规则列表 */
+export const BUILTIN_LOCAL_REGEX_RULES: RegexRule[] = [
+  ERA_BASE_REGEX_RULE,
+  EVENT_AUDIT_REGEX_RULE,
+  EVENT_STAGE_TAG_REGEX_RULE,
+  BATTLE_CHECK_REGEX_RULE,
+];
+
+/** 默认内置全局正则规则 ID 集合 */
+export const BUILTIN_LOCAL_REGEX_IDS = new Set<string>(BUILTIN_LOCAL_REGEX_RULES.map(rule => rule.id));
+
 /** 默认总结提示词模板 */
 export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你是一个专业的文学编辑。请将以下角色的人物经历进行总结和精炼，保留关键事件和重要信息，去除冗余描述。
 
@@ -510,7 +573,7 @@ function cloneRegexRule(rule: RegexRule): RegexRule {
 
 export function createDefaultRegexSettings(): Pick<DisplaySettings, 'localRegexRules' | 'presetRegexRulesByPreset'> {
   return {
-    localRegexRules: [cloneRegexRule(ERA_BASE_REGEX_RULE)],
+    localRegexRules: BUILTIN_LOCAL_REGEX_RULES.map(cloneRegexRule),
     presetRegexRulesByPreset: {},
   };
 }
@@ -606,21 +669,22 @@ function normalizeRegexRule(rule: Partial<RegexRule> | undefined, fallbackScope:
 function normalizeLocalRegexRules(rules: Partial<RegexRule>[] | undefined): RegexRule[] {
   const normalizedRules = Array.isArray(rules) ? rules.map(rule => normalizeRegexRule(rule, 'manual')) : [];
   const nextRules: RegexRule[] = [];
-  let hasEraBaseRule = false;
+  const existingIds = new Set<string>();
 
   normalizedRules.forEach(rule => {
-    if (rule.id === ERA_BASE_REGEX_RULE.id) {
-      if (hasEraBaseRule) {
-        return;
-      }
-      hasEraBaseRule = true;
+    if (existingIds.has(rule.id)) {
+      return;
     }
+    existingIds.add(rule.id);
     nextRules.push(rule);
   });
 
-  if (!hasEraBaseRule) {
-    nextRules.unshift(cloneRegexRule(ERA_BASE_REGEX_RULE));
-  }
+  // 确保所有内置默认规则均存在（已有规则中缺失的内置规则按序补齐）
+  BUILTIN_LOCAL_REGEX_RULES.forEach(builtinRule => {
+    if (!existingIds.has(builtinRule.id)) {
+      nextRules.push(cloneRegexRule(builtinRule));
+    }
+  });
 
   return nextRules;
 }

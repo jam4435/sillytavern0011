@@ -65,6 +65,11 @@ describe('世界书面板主题 portal', () => {
     const portal = ensureThemePortal(document);
     expect(portal.id).toBe(THEME_PORTAL_ID);
     expect(portal.classList.contains('lorebook-theme-scope')).toBe(true);
+    expect(portal.style.display).toBe('block');
+    expect(portal.style.position).toBe('fixed');
+    expect(portal.style.inset).toBe('0px');
+    expect(portal.style.zIndex).toBe('10000');
+    expect(portal.style.pointerEvents).toBe('none');
     expect(ensureThemePortal(document)).toBe(portal);
 
     appendToThemePortal('<dialog id="html-overlay"></dialog>', document);

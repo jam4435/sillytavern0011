@@ -1,8 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  applyRegexRules,
   applySettingsToDOM,
+  BATTLE_CHECK_REGEX_RULE,
+  BUILTIN_LOCAL_REGEX_RULES,
   CONTENT_FONT_FAMILIES,
   createDefaultDisplaySettings,
+  ERA_BASE_REGEX_RULE,
+  EVENT_AUDIT_REGEX_RULE,
+  EVENT_STAGE_TAG_REGEX_RULE,
+  getRegexRulesForDisplay,
   getThemeAppearanceDefaults,
   loadSettings,
   saveSettings,
@@ -228,5 +235,134 @@ describe('settingsManager ui theme', () => {
     expect(template).toContain('{{variableGuidance}}');
     expect(template).toContain('{{locationContext}}');
     expect(template).not.toContain('最近 5 层正文');
+  });
+
+  describe('default builtin regex rules', () => {
+    it('includes all 4 builtin rules in default display settings', () => {
+      const settings = createDefaultDisplaySettings();
+      expect(settings.localRegexRules.map(r => r.id)).toEqual([
+        'era-base-regex',
+        'wuxia-filter-event-audit',
+        'wuxia-filter-event-stage-tag',
+        'wuxia-beauty-battle-check',
+      ]);
+      expect(BUILTIN_LOCAL_REGEX_RULES).toHaveLength(4);
+    });
+
+    it('migrates legacy local regex settings by appending missing builtin rules', () => {
+      window.localStorage.setItem(
+        'wuxia_display_settings',
+        JSON.stringify({
+          localRegexRules: [
+            {
+              id: 'era-base-regex',
+              pattern: '/<era_data>{.*?}<\\/era_data>/gi',
+              replacement: '',
+              enabled: true,
+              description: 'ERA基础正则',
+              originScope: 'manual',
+            },
+          ],
+        }),
+      );
+
+      const loaded = loadSettings();
+      const ids = loaded.localRegexRules.map(r => r.id);
+      expect(ids).toContain('era-base-regex');
+      expect(ids).toContain('wuxia-filter-event-audit');
+      expect(ids).toContain('wuxia-filter-event-stage-tag');
+      expect(ids).toContain('wuxia-beauty-battle-check');
+    });
+
+    it('filters out <event_audit> and <transition_audit> tags', () => {
+      const input = `<event_audit>
+01｜状态｜裁定=官兵包围至全歼追兵与掩埋现场｜依据=射雕第一回04事件开始，追兵夜袭牛家村
+02｜连续｜裁定=自把酒言欢突闻异响推进至丘处机斩尽追兵、验明身份并为包惜弱诊脉｜依据=承接定名立约，推进至追兵覆灭
+03｜干涉｜裁定=原定｜依据=用户未做偏离干涉，顺应原事件发展
+04｜隔离｜裁定=只演当前事件｜依据=专注完成射雕第一回04，不提前进入完颜洪烈中箭获救等后续
+</event_audit>
+风雪漫天，丘处机长剑出鞘。
+<transition_audit>
+01｜目标｜裁定=跟随线索｜依据=时间地点
+02｜承接｜裁定=余波｜依据=实质变化
+03｜过程｜裁定=赶路｜依据=距离
+04｜止点｜裁定=停在事前｜依据=未演出
+</transition_audit>`;
+
+      const result = applyRegexRules(input, [EVENT_AUDIT_REGEX_RULE]);
+      expect(result.trim()).toBe('风雪漫天，丘处机长剑出鞘。');
+    });
+
+    it('filters out event stage short tags like <射雕第一回04>', () => {
+      const input = `风雪漫天，丘处机长剑出鞘。
+<射雕第一回04>
+追兵合围夜袭|树上反杀全歼|搜证掩埋诊脉
+已完成|已完成|已完成
+</射雕第一回04>`;
+
+      const result = applyRegexRules(input, [EVENT_STAGE_TAG_REGEX_RULE]);
+      expect(result.trim()).toBe('风雪漫天，丘处机长剑出鞘。');
+    });
+
+    it('beautifies <战斗判定> block into wuxia battle card HTML', () => {
+      const input = `<战斗判定>
+先手: 角色A.水上漂=1234
+后手: 角色B.降龙十八掌=5465
+公式: 45 + round(50*(1234-5465)/max(1234,5465)) + 随机数1(7) + 环境因素·在水上逃跑(+10) + 状态因素·被B震慑(-5)
+计算: 45 - 39 + 7 + 10 - 5 = 18
+结果: 失败
+叙事: 角色A未能完全避开掌力，只避开了要害，仍被击退并受伤。
+</战斗判定>`;
+
+      const result = applyRegexRules(input, [BATTLE_CHECK_REGEX_RULE]);
+      expect(result).toContain('class="wuxia-battle-card"');
+      expect(result).toContain('【 失败 】');
+      expect(result).toContain('角色A.水上漂=1234');
+      expect(result).toContain('角色B.降龙十八掌=5465');
+      expect(result).toContain('角色A未能完全避开掌力，只避开了要害，仍被击退并受伤。');
+      expect(result).toContain('45 - 39 + 7 + 10 - 5 = 18');
+      expect(result).toContain('<details class="wuxia-battle-details">');
+      expect(result).not.toContain('<战斗判定>');
+    });
+
+    it('processes full response pipeline cleanly using display regex rules', () => {
+      const settings = createDefaultDisplaySettings();
+      const rules = getRegexRulesForDisplay(settings, 'default');
+
+      const fullAssistantReply = `<event_audit>
+01｜状态｜裁定=官兵包围至全歼追兵与掩埋现场｜依据=射雕第一回04事件开始，追兵夜袭牛家村
+02｜连续｜裁定=自把酒言欢突闻异响推进至丘处机斩尽追兵、验明身份并为包惜弱诊脉｜依据=承接定名立约，推进至追兵覆灭
+03｜干涉｜裁定=原定｜依据=用户未做偏离干涉，顺应原事件发展
+04｜隔离｜裁定=只演当前事件｜依据=专注完成射雕第一回04，不提前进入完颜洪烈中箭获救等后续
+</event_audit>
+风雪之中，数名黑衣追兵围拢而上！
+
+<战斗判定>
+先手: 角色A.水上漂=1234
+后手: 角色B.降龙十八掌=5465
+公式: 45 + round(50*(1234-5465)/max(1234,5465)) + 随机数1(7) + 环境因素·在水上逃跑(+10) + 状态因素·被B震慑(-5)
+计算: 45 - 39 + 7 + 10 - 5 = 18
+结果: 失败
+叙事: 角色A未能完全避开掌力，只避开了要害，仍被击退并受伤。
+</战斗判定>
+
+杨铁心挺枪上前，喝道：“何方贼子！”
+
+<射雕第一回04>
+追兵合围夜袭|树上反杀全歼|搜证掩埋诊脉
+已完成|已完成|已完成
+</射雕第一回04>`;
+
+      const rendered = applyRegexRules(fullAssistantReply, rules);
+
+      expect(rendered).not.toContain('<event_audit>');
+      expect(rendered).not.toContain('01｜状态｜裁定');
+      expect(rendered).not.toContain('<射雕第一回04>');
+      expect(rendered).not.toContain('追兵合围夜袭|树上反杀全歼|搜证掩埋诊脉');
+      expect(rendered).toContain('风雪之中，数名黑衣追兵围拢而上！');
+      expect(rendered).toContain('杨铁心挺枪上前，喝道：“何方贼子！”');
+      expect(rendered).toContain('class="wuxia-battle-card"');
+      expect(rendered).toContain('【 失败 】');
+    });
   });
 });
