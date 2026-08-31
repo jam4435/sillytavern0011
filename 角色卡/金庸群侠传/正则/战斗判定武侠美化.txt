@@ -1,0 +1,19 @@
+<div class="wuxia-battle-card">
+<div class="wuxia-battle-header">
+<span class="wuxia-battle-title">⚔️ 招式交锋 · 武道对决</span>
+<span class="wuxia-battle-stamp">【 $5 】</span>
+</div>
+<div class="wuxia-battle-versus">
+<div class="wuxia-fighter left"><span class="wuxia-fighter-tag">先手</span><span class="wuxia-fighter-content">$1</span></div>
+<div class="wuxia-vs-badge">VS</div>
+<div class="wuxia-fighter right"><span class="wuxia-fighter-tag">后手</span><span class="wuxia-fighter-content">$2</span></div>
+</div>
+<div class="wuxia-battle-narrative">$6</div>
+<details class="wuxia-battle-details">
+<summary>📜 查阅交手天机与推导过程</summary>
+<div class="wuxia-details-content">
+<div><strong>公式：</strong>$3</div>
+<div style="margin-top:4px;"><strong>算式：</strong>$4</div>
+</div>
+</details>
+</div>
