@@ -2,6 +2,7 @@ export const EVENT_KIND = Object.freeze({
   ORDINARY: 'ordinary',
   DEBUT: 'debut',
   GROWTH: 'growth',
+  ENCOUNTER: 'encounter',
 });
 
 export const EVENT_RUNTIME_KEY_VERSION = 3;
@@ -21,6 +22,7 @@ const CHINESE_DIGIT_VALUES = Object.freeze({
 
 const CHINESE_UNIT_VALUES = Object.freeze({ 十: 10, 百: 100, 千: 1000, 万: 10000 });
 const CANONICAL_EVENT_KEY_PATTERN = /^(.+?)第([零一二三四五六七八九十百千万]+)回(\d{2})-(.+)$/;
+const CANONICAL_ENCOUNTER_KEY_PATTERN = /^(?:奇遇事件|奇遇)-(?:([^\s-]+)-)?(.+)$/;
 const EVENT_FILE_SUFFIX_PATTERN = /\.(json|ya?ml|txt)$/i;
 const INVALID_FILE_TITLE_PATTERN = /[<>:"/\\|?*]/;
 
@@ -87,7 +89,31 @@ export function formatChineseNumber(value) {
 export function parseCanonicalEventKey(value) {
   const sourceName = stripEventFileSuffix(value);
   const match = sourceName.match(CANONICAL_EVENT_KEY_PATTERN);
-  if (!match) return null;
+  if (!match) {
+    const encounterMatch = sourceName.match(CANONICAL_ENCOUNTER_KEY_PATTERN);
+    if (!encounterMatch) return null;
+
+    const [, seriesPrefix, title] = encounterMatch;
+    if (
+      !title.trim() ||
+      INVALID_FILE_TITLE_PATTERN.test(title) ||
+      title !== title.trim()
+    ) {
+      return null;
+    }
+
+    const series = seriesPrefix ? `${seriesPrefix.trim()}奇遇` : '奇遇';
+    return {
+      runtimeKey: sourceName,
+      sourceName,
+      kind: EVENT_KIND.ENCOUNTER,
+      series,
+      chapter: '奇遇篇',
+      chapterNumber: 9999,
+      sequence: '00',
+      title,
+    };
+  }
 
   const [, series, chapterText, sequenceText, title] = match;
   const chapterNumber = parseChineseNumber(chapterText);
@@ -131,7 +157,7 @@ export function isCanonicalEventKey(value) {
 export function looksLikeEventEntryName(value) {
   const text = stripEventFileSuffix(value);
   return (
-    /(?:事件条目-|登场事件-|成长条目-)/.test(text) ||
+    /(?:事件条目-|登场事件-|成长条目-|奇遇事件-|奇遇-)/.test(text) ||
     /第[0-9零一二三四五六七八九十百千万]+回/.test(text)
   );
 }

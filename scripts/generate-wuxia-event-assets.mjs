@@ -47,6 +47,7 @@ const EVENT_KINDS = Object.freeze({
   ordinary: EVENT_KIND.ORDINARY,
   debut: EVENT_KIND.DEBUT,
   growth: EVENT_KIND.GROWTH,
+  encounter: EVENT_KIND.ENCOUNTER,
 });
 const locationTable = parseYaml(fs.readFileSync(locationTablePath, 'utf8'));
 const validLocationScopes = new Set(
@@ -113,7 +114,7 @@ function normalizeEventData(runtimeKey, descriptor, data) {
   };
   validateNestedLocations(data);
   if (locationErrors.length > 0) throw new Error(`事件 ${runtimeKey} 地点无效: ${locationErrors.join('；')}`);
-  if (descriptor.kind !== EVENT_KINDS.ordinary) return data;
+  if (descriptor.kind !== EVENT_KINDS.ordinary && descriptor.kind !== EVENT_KINDS.encounter) return data;
   const location = normalizeLocation(data.事件地点);
   const hook = typeof data.事件引子 === 'string' ? data.事件引子.trim() : '';
   const summary = typeof data.事件概要 === 'string' ? data.事件概要.trim() : '';
@@ -152,7 +153,7 @@ function sha256(value) {
 }
 
 function eventSortKey(event) {
-  const chapter = event.chapterNumber;
+  const chapter = event.chapterNumber ?? 9999;
   const sequence = Number(event.sequence || 0);
   return [event.triggerHour ?? Number.MAX_SAFE_INTEGER, event.series, chapter, sequence, event.runtimeKey];
 }

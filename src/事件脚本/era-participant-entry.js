@@ -51,7 +51,7 @@ export function normalizeParticipantEventDefinition(eventName, eventData, { kind
   if (!isPlainObject(shared.data)) return shared;
   eventData = shared.data;
 
-  if (kind !== EVENT_KIND.ORDINARY) {
+  if (kind !== EVENT_KIND.ORDINARY && kind !== EVENT_KIND.ENCOUNTER) {
     return shared;
   }
 

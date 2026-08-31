@@ -76,7 +76,7 @@ export function isDebutEvent(eventData) {
 }
 
 export function isOrdinaryEvent(eventData) {
-  return isEventKind(eventData, EVENT_KIND.ORDINARY);
+  return isEventKind(eventData, EVENT_KIND.ORDINARY) || isEventKind(eventData, EVENT_KIND.ENCOUNTER);
 }
 
 export function normalizeOrdinaryEventReference(reference) {

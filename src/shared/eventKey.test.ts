@@ -32,6 +32,26 @@ describe('canonical wuxia event keys', () => {
     });
     expect(parseCanonicalEventKey('神雕第四十回00-人物登场')?.kind).toBe(EVENT_KIND.DEBUT);
     expect(parseCanonicalEventKey('神雕第十一回00-人物成长-杨过')?.kind).toBe(EVENT_KIND.GROWTH);
+    expect(parseCanonicalEventKey('奇遇事件-神雕-剑冢神雕引路与重剑出土.yaml')).toMatchObject({
+      runtimeKey: '奇遇事件-神雕-剑冢神雕引路与重剑出土',
+      sourceName: '奇遇事件-神雕-剑冢神雕引路与重剑出土',
+      kind: EVENT_KIND.ENCOUNTER,
+      series: '神雕奇遇',
+      chapter: '奇遇篇',
+      chapterNumber: 9999,
+      sequence: '00',
+      title: '剑冢神雕引路与重剑出土',
+    });
+    expect(parseCanonicalEventKey('奇遇-剑冢神雕引路与重剑出土')).toMatchObject({
+      runtimeKey: '奇遇-剑冢神雕引路与重剑出土',
+      sourceName: '奇遇-剑冢神雕引路与重剑出土',
+      kind: EVENT_KIND.ENCOUNTER,
+      series: '奇遇',
+      chapter: '奇遇篇',
+      chapterNumber: 9999,
+      sequence: '00',
+      title: '剑冢神雕引路与重剑出土',
+    });
     expect(EVENT_RUNTIME_KEY_VERSION).toBe(3);
   });
 
