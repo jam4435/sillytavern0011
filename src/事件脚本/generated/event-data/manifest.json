@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "eventRuntimeKeyVersion": 3,
-  "eventCount": 1118,
+  "eventCount": 1136,
   "shardCount": 23,
   "checkpointInterval": 100,
   "events": [
@@ -45533,6 +45533,742 @@
       ],
       "hash": "743023be29a6994a3c804c75d4b989a4c5127873b50c860f7a250e9ae104961d",
       "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-天龙-无量松林捕朱蛤",
+      "sourceName": "奇遇事件-天龙-无量松林捕朱蛤",
+      "kind": "encounter",
+      "series": "天龙奇遇",
+      "chapter": "奇遇篇",
+      "order": 1118,
+      "sequence": 0,
+      "title": "无量松林捕朱蛤",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 3,
+      "discoveryHour": null,
+      "location": "大理/云南/无量山",
+      "intro": "夏日雨后松林中传来沉闷如老牛般的巨大鸣叫，枯叶堆中隐隐泛起一团刺目的血红火光……",
+      "summary": "玩家于烂松林中巧妙避开剧毒白雾捕获万毒之王莽牯朱蛤，并采得伴生朱蛤灵芝，得辟毒神效。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.机敏",
+            "大于等于": 14
+          },
+          {
+            "变量": "user数据.初始属性.福缘",
+            "大于等于": 11
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 3
+      },
+      "hash": "966c6b9938ead746f53c23953e620fc5bbc00f2364f78e103f4894b0d46b3ce4",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-天龙-琅嬛福地拜玉像",
+      "sourceName": "奇遇事件-天龙-琅嬛福地拜玉像",
+      "kind": "encounter",
+      "series": "天龙奇遇",
+      "chapter": "奇遇篇",
+      "order": 1119,
+      "sequence": 0,
+      "title": "琅嬛福地拜玉像",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 4,
+      "discoveryHour": null,
+      "location": "大理/云南/无量山",
+      "intro": "无量山后山万丈绝壁深处水声隆隆，拨开水帘藤蔓，一座出尘绝艳的汉白玉仙子雕像映入眼帘……",
+      "summary": "玩家坠入无量谷底琅嬛福地，拜谒神仙玉像，自破裂蒲团中得残帛，参透凌波微步六十四卦步法。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.悟性",
+            "大于等于": 15
+          },
+          {
+            "变量": "user数据.初始属性.机敏",
+            "大于等于": 13
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 4
+      },
+      "hash": "2644b3fc1152a85baf03570fd2fa21a11c184e74bb2426ce28690461fe509c15",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-天龙-皇宫冰窖调阴阳",
+      "sourceName": "奇遇事件-天龙-皇宫冰窖调阴阳",
+      "kind": "encounter",
+      "series": "天龙奇遇",
+      "chapter": "奇遇篇",
+      "order": 1120,
+      "sequence": 0,
+      "title": "皇宫冰窖调阴阳",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 4,
+      "discoveryHour": null,
+      "location": "西夏/灵州/皇宫",
+      "intro": "西夏皇宫地底深达数丈的巨大冰窖寒气彻骨，万块玄冰之中正是调和阴阳内息的绝佳闭关密境……",
+      "summary": "玩家潜伏地底万块坚冰中运转至阳真气抗衡极寒，阴阳交泰，真气纯度大增，根骨洗髓。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.境界.大境界",
+            "等于": "一流"
+          },
+          {
+            "变量": "user数据.初始属性.根骨",
+            "大于等于": 14
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 4
+      },
+      "hash": "a15f69ea0780684d6f2edcfd2400b23050e7d10077e0bf82bd45047e17230ca3",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-天龙-缥缈玄冰悟折梅",
+      "sourceName": "奇遇事件-天龙-缥缈玄冰悟折梅",
+      "kind": "encounter",
+      "series": "天龙奇遇",
+      "chapter": "奇遇篇",
+      "order": 1121,
+      "sequence": 0,
+      "title": "缥缈玄冰悟折梅",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 4,
+      "discoveryHour": null,
+      "location": "西夏/天山/缥缈峰",
+      "intro": "缥缈峰灵鹫宫后山玄冰深窟之中，光洁如镜的百丈接天石壁上绘满了逍遥派仙女散手图谱……",
+      "summary": "玩家潜入玄冰石窟推演石壁飞仙姿态，参透天山折梅手精微化劲法门，悟性大进。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.悟性",
+            "大于等于": 16
+          },
+          {
+            "变量": "user数据.初始属性.机敏",
+            "大于等于": 14
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 4
+      },
+      "hash": "ea4622c890d7beacaa356caed3e896974d4a36960b41df4143966a9f401276ea",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-天龙-雁门绝壁抚残刻",
+      "sourceName": "奇遇事件-天龙-雁门绝壁抚残刻",
+      "kind": "encounter",
+      "series": "天龙奇遇",
+      "chapter": "奇遇篇",
+      "order": 1122,
+      "sequence": 0,
+      "title": "雁门绝壁抚残刻",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 3,
+      "discoveryHour": null,
+      "location": "大宋/雁门关/关外绝壁",
+      "intro": "雁门关外乱石荒岗苍凉肃杀，陡峭绝壁缝隙深处，隐约留有三十年前断刀狂劈入石三寸的契丹残字……",
+      "summary": "玩家登上雁门关外乱石绝壁抚摩昔年萧远山血战残痕，感受狂霸战意冲击，获古战场杀伐感悟。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.臂力",
+            "大于等于": 13
+          },
+          {
+            "变量": "user数据.初始属性.根骨",
+            "大于等于": 13
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 3
+      },
+      "hash": "2106e1242eb3e4465729d0228c6e7cd23f0efbf172ef54c743b327917f6a1e54",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-天龙-雪海搏熊挖参王",
+      "sourceName": "奇遇事件-天龙-雪海搏熊挖参王",
+      "kind": "encounter",
+      "series": "天龙奇遇",
+      "chapter": "奇遇篇",
+      "order": 1123,
+      "sequence": 0,
+      "title": "雪海搏熊挖参王",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 5,
+      "discoveryHour": null,
+      "location": "金国/长白山/深山密林",
+      "intro": "塞北大雪封山，长白山千丈林海老坑深处，一株系着古旧红绳的七叶野生万年老山参正静卧雪地……",
+      "summary": "玩家在暴雪绝地击退狂暴雪熊守护兽，以鹿骨签掘出万年老山参王，获回天续命神药。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.臂力",
+            "大于等于": 14
+          },
+          {
+            "变量": "user数据.初始属性.根骨",
+            "大于等于": 14
+          },
+          {
+            "变量": "user数据.境界.大境界",
+            "等于": "二流"
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 5
+      },
+      "hash": "7901e777cd4896e38269b972da07c8d24a15ab9071f2d69e9848b8c6818e2e39",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-射雕-牛家废店启密室",
+      "sourceName": "奇遇事件-射雕-牛家废店启密室",
+      "kind": "encounter",
+      "series": "射雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1124,
+      "sequence": 0,
+      "title": "牛家废店启密室",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 3,
+      "discoveryHour": null,
+      "location": "大宋/临安府/牛家村",
+      "intro": "牛家村荒废小酒馆蛛网尘封，厨房残破铁锅下方似乎暗藏着极其精巧的旋转机括……",
+      "summary": "玩家勘破曲三小店灶台暗纽开启密室，获得曲灵风盗出的大内名画古玩与特制精钢刻刀。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.洞察",
+            "大于等于": 13
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 3
+      },
+      "hash": "f376011cccda9ae580ce376ea794b2d5aeaeaa86ab16244e0832c6538944a0d8",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-射雕-王府药房饮蛇血",
+      "sourceName": "奇遇事件-射雕-王府药房饮蛇血",
+      "kind": "encounter",
+      "series": "射雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1125,
+      "sequence": 0,
+      "title": "王府药房饮蛇血",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 3,
+      "discoveryHour": null,
+      "location": "金国/中都/赵王府",
+      "intro": "赵王府幽深药房中药香浓郁，巨竹篓中潜藏着梁子翁饲养二十年的大红异种宝蛇……",
+      "summary": "玩家夜探王府斩杀异种朱砂宝蛇，痛饮蛇血洗髓伐毛，内息激增，得辟毒灵血体魄。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.机敏",
+            "大于等于": 13
+          },
+          {
+            "变量": "user数据.初始属性.根骨",
+            "大于等于": 12
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 3
+      },
+      "hash": "9d2266f12029668dbb12171370c51b71885d546bd4d561f3567928bf14d57579",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-射雕-绝壁斩蛇救雏雕",
+      "sourceName": "奇遇事件-射雕-绝壁斩蛇救雏雕",
+      "kind": "encounter",
+      "series": "射雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1126,
+      "sequence": 0,
+      "title": "绝壁斩蛇救雏雕",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 3,
+      "discoveryHour": null,
+      "location": "蒙古/大漠/悬崖",
+      "intro": "黑风山黑石绝壁危耸入云，崖顶雕巢传来幼雏凄厉啼鸣，一条青花毒蟒正吐信攀爬……",
+      "summary": "玩家攀登数十丈悬崖斩杀毒蟒救护幼雕，获母雕感激并赠予可呼唤飞雕的金雕羽哨。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.臂力",
+            "大于等于": 12
+          },
+          {
+            "变量": "user数据.初始属性.机敏",
+            "大于等于": 12
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 3
+      },
+      "hash": "a8d9ffa07a806517f7da562581b137cac888ac1d924572ff35e5f284bdaa80a1",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-射雕-试剑峰顶听潮生",
+      "sourceName": "奇遇事件-射雕-试剑峰顶听潮生",
+      "kind": "encounter",
+      "series": "射雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1127,
+      "sequence": 0,
+      "title": "试剑峰顶听潮生",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 4,
+      "discoveryHour": null,
+      "location": "海外/桃花岛/试剑峰",
+      "intro": "月圆之夜，桃花岛试剑峰上海风呼啸，石林间回荡着若有若无、牵动心魔的碧海潮生乐律残响……",
+      "summary": "玩家在试剑峰顶抗衡碧海潮生曲乐律余韵，以深厚定力磨砺神识，悟得音律破魔心法残卷。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.悟性",
+            "大于等于": 14
+          },
+          {
+            "变量": "user数据.初始属性.洞察",
+            "大于等于": 13
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 4
+      },
+      "hash": "43f8fd74e166550f4166a264217d36017131a6c0c759853ad8a6b78a059ac544",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-射雕-铁掌绝顶淬掌功",
+      "sourceName": "奇遇事件-射雕-铁掌绝顶淬掌功",
+      "kind": "encounter",
+      "series": "射雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1128,
+      "sequence": 0,
+      "title": "铁掌绝顶淬掌功",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 4,
+      "discoveryHour": null,
+      "location": "大宋/潭州/铁掌山",
+      "intro": "铁掌峰形如五指，中指主峰绝顶骨殖石窟内药香扑鼻，石壁上刻满刚猛凌厉的铁掌发劲口诀……",
+      "summary": "玩家潜入铁掌帮禁地石窟，以封存古药酒淬炼双手筋骨，参悟铁掌功发力奥义。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.臂力",
+            "大于等于": 14
+          },
+          {
+            "变量": "user数据.初始属性.根骨",
+            "大于等于": 13
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 4
+      },
+      "hash": "b58d14d7c1962e1cea765c4d604265c12ac7f9bdc0c65595c45a73061f1bf677",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-射雕-黑沼灵狐悟泥鳅",
+      "sourceName": "奇遇事件-射雕-黑沼灵狐悟泥鳅",
+      "kind": "encounter",
+      "series": "射雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1129,
+      "sequence": 0,
+      "title": "黑沼灵狐悟泥鳅",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 4,
+      "discoveryHour": null,
+      "location": "大宋/川边/黑沼",
+      "intro": "黑沼烂泥深陷、浓雾弥漫，两只九尾灵狐在泥潭枯木间滑跳如飞，踏泥无痕……",
+      "summary": "玩家在黑沼追踪灵狐踏步之法，悟出在湿滑泥泞中借力滑移的奇门轻功‘泥鳅功’。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.机敏",
+            "大于等于": 12
+          },
+          {
+            "变量": "user数据.初始属性.悟性",
+            "大于等于": 13
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 4
+      },
+      "hash": "f22461e928911bc128358dece9429b744566f885ed4c9bd46c01ff446ded6c20",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-神雕-华山雪顶烹蜈蚣",
+      "sourceName": "奇遇事件-神雕-华山雪顶烹蜈蚣",
+      "kind": "encounter",
+      "series": "神雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1130,
+      "sequence": 0,
+      "title": "华山雪顶烹蜈蚣",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 3,
+      "discoveryHour": null,
+      "location": "大宋/华山/华山绝顶",
+      "intro": "华山绝顶风雪漫天，九指神丐洪七公正架起特制油锅，在雪地里烹炸鲜红异种大蜈蚣……",
+      "summary": "玩家在华山雪峰与洪七公对饮烈酒、共享炸蜈蚣美味，得七公外功借力打力散手点拨。",
+      "participants": [
+        "玩家",
+        "洪七公"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.根骨",
+            "大于等于": 11
+          },
+          {
+            "变量": "user数据.包裹.陈年烈酒",
+            "存在": true
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 3
+      },
+      "hash": "98a7832f13a3c21b4786d41ef8b96999334896e29fbe0026e85a8092ed98f5af",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-神雕-山洪巨浪炼重剑",
+      "sourceName": "奇遇事件-神雕-山洪巨浪炼重剑",
+      "kind": "encounter",
+      "series": "神雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1131,
+      "sequence": 0,
+      "title": "山洪巨浪炼重剑",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 4,
+      "discoveryHour": null,
+      "location": "大宋/襄阳城外/独孤剑冢荒谷",
+      "intro": "荒山连降数日暴雨，万斤山洪自断崖轰鸣倾泻，神雕仰天长鸣，将你推向激流中心……",
+      "summary": "玩家手持玄铁重剑在齐胸山洪巨浪中逆流挥劈，借千钧水势顿悟举重若轻的发力玄机，玄铁剑法精进至略有小成。",
+      "participants": [
+        "玩家",
+        "神雕"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "角色数据.神雕.好感",
+            "大于等于": 80
+          },
+          {
+            "变量": "user数据.境界.大境界",
+            "等于": "二流"
+          },
+          {
+            "变量": "user数据.武功.玄铁剑法.掌握程度",
+            "存在": true
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 4
+      },
+      "hash": "19fb1afc194662bb08797c2cd5735dbb4816f05151dc5e160c43dff4c477359e",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-神雕-百花谷中画方圆",
+      "sourceName": "奇遇事件-神雕-百花谷中画方圆",
+      "kind": "encounter",
+      "series": "神雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1132,
+      "sequence": 0,
+      "title": "百花谷中画方圆",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 3,
+      "discoveryHour": null,
+      "location": "大宋/晋南/百花谷",
+      "intro": "百花谷中群蜂飞舞，周伯通在花丛中手舞足蹈，硬拉着你玩‘左右画方圆’的滑稽游戏……",
+      "summary": "玩家因天性质朴纯真，分毫不差画出左右方圆，老顽童大喜过望，倾囊相授左右互搏之术。",
+      "participants": [
+        "玩家",
+        "周伯通"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "角色数据.周伯通.好感",
+            "大于等于": 70
+          },
+          {
+            "变量": "user数据.初始属性.悟性",
+            "小于等于": 9
+          },
+          {
+            "变量": "user数据.初始属性.福缘",
+            "大于等于": 10
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 3
+      },
+      "hash": "82712087514a8c8dc0418fabbc395091f506daee23a086b23fe7aa5962d79965",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-神雕-神雕引路起重剑",
+      "sourceName": "奇遇事件-神雕-神雕引路起重剑",
+      "kind": "encounter",
+      "series": "神雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1133,
+      "sequence": 0,
+      "title": "神雕引路起重剑",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 4,
+      "discoveryHour": null,
+      "location": "大宋/襄阳城外/独孤剑冢荒谷",
+      "intro": "襄阳城外深谷怪石嶙峋，忽闻一声裂帛般的异禽清啸，巨雕振翅衔衣，似欲引你前往一处隐秘古地……",
+      "summary": "玩家在神雕指引下连服菩斯曲蛇胆壮大气血，攀上危崖绝壁开启独孤求败剑冢，获得绝世神兵玄铁重剑与剑法传承。",
+      "participants": [
+        "玩家",
+        "神雕"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "角色数据.神雕.好感",
+            "大于等于": 60
+          },
+          {
+            "变量": "user数据.初始属性.臂力",
+            "大于等于": 14
+          },
+          {
+            "变量": "user数据.初始属性.悟性",
+            "大于等于": 12
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 4
+      },
+      "hash": "62351d8aa22303bd38e448e6526d58331a039f64a035160dfcce57d476c713e9",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-神雕-终南水底悟遗刻",
+      "sourceName": "奇遇事件-神雕-终南水底悟遗刻",
+      "kind": "encounter",
+      "series": "神雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1134,
+      "sequence": 0,
+      "title": "终南水底悟遗刻",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 4,
+      "discoveryHour": null,
+      "location": "大宋/终南山/活死人墓外",
+      "intro": "终南后山碧潭深邃幽冷，水下暗流涌动，隐隐露出一条通往古墓深处的废弃水道……",
+      "summary": "玩家潜入深潭水底暗道进入古墓废弃石室，参详石顶王重阳所刻九阴真经闭气解穴真诀，获益匪浅。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.机敏",
+            "大于等于": 13
+          },
+          {
+            "变量": "user数据.初始属性.悟性",
+            "大于等于": 14
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 4
+      },
+      "hash": "a7e14149e12dc6ef7c1fc9fa19dcf5565442e94b49c36824485bc3b6d4e7383b",
+      "shardId": "shard-0023"
+    },
+    {
+      "runtimeKey": "奇遇事件-神雕-绝情潭底捕白鱼",
+      "sourceName": "奇遇事件-神雕-绝情潭底捕白鱼",
+      "kind": "encounter",
+      "series": "神雕奇遇",
+      "chapter": "奇遇篇",
+      "order": 1135,
+      "sequence": 0,
+      "title": "绝情潭底捕白鱼",
+      "triggerTime": null,
+      "triggerHour": null,
+      "endTime": null,
+      "endHour": null,
+      "durationHours": 4,
+      "discoveryHour": null,
+      "location": "大宋/绝情谷/断肠崖",
+      "intro": "断肠崖下深渊云雾缭绕，谷底极寒潜潭深处，隐约游动着通体透明如玉的冷泉异鱼……",
+      "summary": "玩家探入断肠崖渊底寒潭，捕食灵泉白鱼并采集野生玉蜂浆，阴阳调和，化解体内暗毒。",
+      "participants": [
+        "玩家"
+      ],
+      "triggerCondition": {
+        "全部": [
+          {
+            "变量": "user数据.初始属性.机敏",
+            "大于等于": 14
+          },
+          {
+            "变量": "user数据.初始属性.根骨",
+            "大于等于": 12
+          }
+        ]
+      },
+      "conditional": true,
+      "eventDuration": {
+        "时": 4
+      },
+      "hash": "2d9104b48025884a137c646133fe9a2aec7a1e0ce875f188ebecae0940cbf20a",
+      "shardId": "shard-0023"
     }
   ],
   "shards": [
@@ -45715,10 +46451,10 @@
     {
       "id": "shard-0023",
       "file": "shards/shard-0023.json",
-      "eventCount": 18,
+      "eventCount": 36,
       "firstRuntimeKey": "神雕第三十八回06-黄蓉等赶到绝情谷大战法王黄药师现身法王被擒双雕殉情郭襄获救",
-      "lastRuntimeKey": "神雕第四十回06-潇尹携猿离去杨过辞别众人",
-      "byteLength": 124050
+      "lastRuntimeKey": "奇遇事件-神雕-绝情潭底捕白鱼",
+      "byteLength": 149866
     }
   ],
   "checkpoints": [
@@ -58802,7 +59538,8 @@
         "射雕第二十六回04-郭靖守信拒婚",
         "射雕第三十三回01-山坳解围",
         "射雕第三十三回02-师徒反目",
-        "射雕第三十三回03-解惑疗伤"
+        "射雕第三十三回03-解惑疗伤",
+        "奇遇事件-射雕-牛家废店启密室"
       ],
       "大宋/嘉兴府/嘉兴城": [
         "射雕第二回01-完颜洪烈表露身份",
@@ -58889,7 +59626,9 @@
         "天龙第六回06-褚古二将现身喝破身份",
         "天龙第六回07-褚古二将力战退风波恶",
         "天龙第六回08-二将跪地请罪段誉宽慰",
-        "天龙第六回09-段誉深情表白启程归府"
+        "天龙第六回09-段誉深情表白启程归府",
+        "奇遇事件-天龙-无量松林捕朱蛤",
+        "奇遇事件-天龙-琅嬛福地拜玉像"
       ],
       "大理/云南/万劫谷": [
         "天龙第三回01-段誉入谷寻访空寂瓦房",
@@ -59087,7 +59826,8 @@
         "天龙第四十七回01-雁门群雄含悲引众各自归国",
         "天龙第五十回01-五十年风云如梦全书落幕",
         "天龙第五十回05-萧峰舍身止战长眠雁门绝壁",
-        "天龙第五十回06-雁门风沙吹蚀英雄浩气永存"
+        "天龙第五十回06-雁门风沙吹蚀英雄浩气永存",
+        "奇遇事件-天龙-雁门绝壁抚残刻"
       ],
       "大宋/卫辉府/天宁寺": [
         "天龙第二十回01-智光服毒毁信断绝线索"
@@ -59137,7 +59877,8 @@
       ],
       "金国/长白山/深山密林": [
         "天龙第二十四回01-乔峰携瘫痪阿紫入长白山结庐",
-        "天龙第二十四回02-乔峰运功救治阿紫恪守旧盟"
+        "天龙第二十四回02-乔峰运功救治阿紫恪守旧盟",
+        "奇遇事件-天龙-雪海搏熊挖参王"
       ],
       "金国/长白山/雪原": [
         "天龙第二十四回03-乔峰深山毙猛虎解救女真猎人",
@@ -59262,7 +60003,8 @@
         "天龙第四十五回05-西夏殿前群雄竞聘慕容复争驸马",
         "天龙第四十五回06-虚竹真情道冰洞旧梦与公主相认",
         "天龙第四十五回07-西夏国主下旨赐婚缔结永好同盟",
-        "天龙第四十五回08-西夏招亲落幕四国风云暗伏伏笔"
+        "天龙第四十五回08-西夏招亲落幕四国风云暗伏伏笔",
+        "奇遇事件-天龙-皇宫冰窖调阴阳"
       ],
       "西夏/天山/缥缈峰": [
         "天龙第三十五回05-验看画卷惊悉无崖子至爱真身",
@@ -59279,7 +60021,8 @@
         "天龙第四十九回01-虚竹接任尊主施仁政化酷风",
         "天龙第四十九回02-清露配制圣药疗愈各部伤残",
         "天龙第四十九回03-万仙群魔感德誓死效忠灵鹫",
-        "天龙第四十九回06-绝顶凭吊结义归隐缥缈仙缘"
+        "天龙第四十九回06-绝顶凭吊结义归隐缥缈仙缘",
+        "奇遇事件-天龙-缥缈玄冰悟折梅"
       ],
       "西夏/灵州/城外荒野": [
         "天龙第三十六回04-虚竹中途重逢段誉结伴同行"
@@ -59376,7 +60119,8 @@
         "射雕第六回01-崖顶疑阵",
         "射雕第六回02-密谋除汗",
         "射雕第六回03-智退铁尸",
-        "射雕第六回04-土山之围"
+        "射雕第六回04-土山之围",
+        "奇遇事件-射雕-绝壁斩蛇救雏雕"
       ],
       "蒙古/克烈部/土山": [
         "射雕第六回05-力战四鬼",
@@ -59402,7 +60146,8 @@
         "射雕第十回04-往事如烟",
         "射雕第十回05-冤家聚头",
         "射雕第十一回01-赵王府混战",
-        "射雕第十一回02-杨铁心夫妇殉情"
+        "射雕第十一回02-杨铁心夫妇殉情",
+        "奇遇事件-射雕-王府药房饮蛇血"
       ],
       "大宋/淮南东路/宝应县": [
         "射雕第十二回01-初遇洪七公",
@@ -59546,12 +60291,14 @@
       ],
       "大宋/潭州/铁掌山": [
         "射雕第二十八回03-铁掌峰顶遇险得书",
-        "射雕第二十九回01-黑沼脱险"
+        "射雕第二十九回01-黑沼脱险",
+        "奇遇事件-射雕-铁掌绝顶淬掌功"
       ],
       "大宋/川边/黑沼": [
         "射雕第二十九回02-茅屋斗智",
         "射雕第二十九回03-瑛姑试探",
-        "射雕第二十九回04-锦囊求医"
+        "射雕第二十九回04-锦囊求医",
+        "奇遇事件-射雕-黑沼灵狐悟泥鳅"
       ],
       "大理/云南/桃源": [
         "射雕第二十九回05-智过渔人",
@@ -59629,7 +60376,8 @@
         "神雕第十一回02-欧阳锋洪七公华山拳脚恶斗杨过烤山药劝食",
         "神雕第十一回03-二老连日比武杨过劝退不成反陷内力比拼",
         "神雕第十一回04-二老借杨过口传演武打狗棒法对蛇杖",
-        "神雕第十一回05-天下无狗被破洪七公叹服二老相抱大笑同逝"
+        "神雕第十一回05-天下无狗被破洪七公叹服二老相抱大笑同逝",
+        "奇遇事件-神雕-华山雪顶烹蜈蚣"
       ],
       "大宋/两浙南路/官道": [
         "射雕第四十回05-华筝传书"
@@ -59658,7 +60406,8 @@
         "神雕第一回07-李莫愁血洗陆家庄"
       ],
       "海外/桃花岛/试剑峰": [
-        "神雕第三回03-杨过推石遁走藏匿山中"
+        "神雕第三回03-杨过推石遁走藏匿山中",
+        "奇遇事件-射雕-试剑峰顶听潮生"
       ],
       "海外/桃花岛/桃花岛海岸": [
         "神雕第三回07-杨过蛤蟆功败露愤而投海",
@@ -59707,7 +60456,8 @@
         "神雕第五回01-孙婆婆救杨过入古墓",
         "神雕第五回02-孙婆婆拒交杨过斗全真群道",
         "神雕第六回08-赵尹二道夜斗扰小龙女致重伤",
-        "神雕第六回09-杨过独斗赵尹逼誓护师"
+        "神雕第六回09-杨过独斗赵尹逼誓护师",
+        "奇遇事件-神雕-终南水底悟遗刻"
       ],
       "大宋/终南山/活死人墓": [
         "神雕第五回07-小龙女安葬孙婆婆述生死",
@@ -59999,7 +60749,9 @@
         "神雕第二十三回08-杨过吮毒救人昏迷醒转天竺僧诊断",
         "神雕第二十四回03-小龙女荒谷误会",
         "神雕第二十六回08-杨过荒谷遇神雕发现剑冢",
-        "神雕第二十六回09-杨过山洪中悟重剑剑道"
+        "神雕第二十六回09-杨过山洪中悟重剑剑道",
+        "奇遇事件-神雕-山洪巨浪炼重剑",
+        "奇遇事件-神雕-神雕引路起重剑"
       ],
       "蒙古/襄阳城外/小镇": [
         "神雕第二十四回07-尹赵小镇风波与法王相遇",
@@ -60025,7 +60777,8 @@
         "神雕第三十八回06-黄蓉等赶到绝情谷大战法王黄药师现身法王被擒双雕殉情郭襄获救",
         "神雕第三十八回07-郭襄述谷底情形众人搓绳下谷寻杨过不见黄蓉探潭无果",
         "神雕第三十八回08-金轮法王骗郭襄解穴逃脱挟持郭襄失踪",
-        "神雕第三十九回04-杨过绝情谷底重逢小龙女携手出谷"
+        "神雕第三十九回04-杨过绝情谷底重逢小龙女携手出谷",
+        "奇遇事件-神雕-绝情潭底捕白鱼"
       ],
       "大宋/绝情谷/绝情峰": [
         "神雕第三十二回05-众人分头追赶公孙止李莫愁",
@@ -60056,7 +60809,8 @@
         "神雕第三十四回06-众人和解慈恩逝世瑛姑赠狐"
       ],
       "大宋/晋南/百花谷": [
-        "神雕第三十四回05-杨过周伯通百花谷比武"
+        "神雕第三十四回05-杨过周伯通百花谷比武",
+        "奇遇事件-神雕-百花谷中画方圆"
       ],
       "大宋/晋南/万兽山庄": [
         "神雕第三十五回01-万兽山庄庆功宴",
@@ -60090,8 +60844,27 @@
         "神雕第四十回03-杨龙郭游玉女峰"
       ]
     },
-    "conditional": []
+    "conditional": [
+      "奇遇事件-天龙-无量松林捕朱蛤",
+      "奇遇事件-天龙-琅嬛福地拜玉像",
+      "奇遇事件-天龙-皇宫冰窖调阴阳",
+      "奇遇事件-天龙-缥缈玄冰悟折梅",
+      "奇遇事件-天龙-雁门绝壁抚残刻",
+      "奇遇事件-天龙-雪海搏熊挖参王",
+      "奇遇事件-射雕-牛家废店启密室",
+      "奇遇事件-射雕-王府药房饮蛇血",
+      "奇遇事件-射雕-绝壁斩蛇救雏雕",
+      "奇遇事件-射雕-试剑峰顶听潮生",
+      "奇遇事件-射雕-铁掌绝顶淬掌功",
+      "奇遇事件-射雕-黑沼灵狐悟泥鳅",
+      "奇遇事件-神雕-华山雪顶烹蜈蚣",
+      "奇遇事件-神雕-山洪巨浪炼重剑",
+      "奇遇事件-神雕-百花谷中画方圆",
+      "奇遇事件-神雕-神雕引路起重剑",
+      "奇遇事件-神雕-终南水底悟遗刻",
+      "奇遇事件-神雕-绝情潭底捕白鱼"
+    ]
   },
   "unresolvedReferences": [],
-  "contentHash": "cf3eed365b452f310dfdec79fbecb250f55891c1aab4ecceb2759510ec6a32d1"
+  "contentHash": "8314a16a92adb87854c83b8acab43b8e92c9a9370d09ccb13e885c174213bdf7"
 }
