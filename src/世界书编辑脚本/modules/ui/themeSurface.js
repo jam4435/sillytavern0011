@@ -8,51 +8,24 @@ function configureThemePortal(portal) {
   portal.classList.add('lorebook-theme-scope');
   portal.dataset.lorebookThemeSurface = 'portal';
   Object.assign(portal.style, {
-    display: 'none',
-    position: '',
-    inset: '',
-    zIndex: '',
-    pointerEvents: '',
+    display: 'block',
+    position: 'fixed',
+    inset: '0',
+    zIndex: '10000',
+    pointerEvents: 'none',
   });
   return portal;
 }
 
-function copyThemeVariables(source, target) {
-  for (const propertyName of source.style) {
-    if (propertyName.startsWith('--')) {
-      target.style.setProperty(propertyName, source.style.getPropertyValue(propertyName));
-    }
-  }
-  target.style.colorScheme = source.style.colorScheme;
-}
-
-function configureThemeOverlay(node, portal) {
-  if (node?.nodeType !== 1) {
-    return;
-  }
-  node.classList.add('lorebook-theme-scope');
-  node.dataset.lorebookThemeSurface = 'overlay';
-  copyThemeVariables(portal, node);
-}
-
-function movePortalChildrenToBody(portal, parentDoc) {
-  const mountPoint = parentDoc.body || parentDoc.documentElement;
-  Array.from(portal.childNodes).forEach(node => {
-    configureThemeOverlay(node, portal);
-    mountPoint.appendChild(node);
-  });
-}
-
 /**
- * Return the hidden theme-variable template used by overlays outside the panel.
- * Legacy children are moved to the host body so fixed overlays remain viewport-rooted.
+ * Return the shared mount point for UI that must live outside the lorebook panel.
+ * Theme variables are applied to this element, so every child overlay inherits the
+ * same contract as the main panel.
  */
 export function ensureThemePortal(parentDoc = getParentDocument()) {
   let portal = parentDoc.getElementById(THEME_PORTAL_ID);
   if (portal) {
-    configureThemePortal(portal);
-    movePortalChildrenToBody(portal, parentDoc);
-    return portal;
+    return configureThemePortal(portal);
   }
 
   portal = parentDoc.createElement('div');
@@ -63,36 +36,23 @@ export function ensureThemePortal(parentDoc = getParentDocument()) {
 }
 
 /**
- * Append overlays directly to the host body while applying the shared theme scope.
- * The hidden portal remains only as the current CSS-variable template.
+ * Append jQuery collections, DOM nodes, or HTML strings to the shared theme portal.
  */
 export function appendToThemePortal(content, parentDoc = getParentDocument()) {
   const portal = ensureThemePortal(parentDoc);
-  const mountPoint = parentDoc.body || parentDoc.documentElement;
-
-  const appendNode = node => {
-    if (node?.nodeType === 11) {
-      Array.from(node.childNodes).forEach(child => configureThemeOverlay(child, portal));
-    } else {
-      configureThemeOverlay(node, portal);
-    }
-    mountPoint.appendChild(node);
-  };
 
   if (typeof content === 'string') {
-    const template = parentDoc.createElement('template');
-    template.innerHTML = content;
-    appendNode(template.content);
+    portal.insertAdjacentHTML('beforeend', content);
     return portal;
   }
 
   if (content?.jquery && typeof content.each === 'function') {
-    content.each((_, node) => appendNode(node));
+    content.each((_, node) => portal.appendChild(node));
     return portal;
   }
 
   if (content && typeof content === 'object' && Number.isInteger(content.nodeType)) {
-    appendNode(content);
+    portal.appendChild(content);
     return portal;
   }
 
@@ -178,8 +138,5 @@ export function syncThemeSurfaces(parentDoc, panel, variables, colorScheme) {
   const panelElement = panel?.jquery ? panel[0] : panel;
   applyVariables(panelElement, variables, colorScheme);
   applyVariables(portal, variables, colorScheme);
-  parentDoc.querySelectorAll('[data-lorebook-theme-surface="overlay"]').forEach(overlay => {
-    applyVariables(overlay, variables, colorScheme);
-  });
   return portal;
 }
