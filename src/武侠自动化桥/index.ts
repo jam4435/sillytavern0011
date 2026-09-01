@@ -311,10 +311,10 @@ function startBridge() {
       if (request.method !== WUXIA_METHODS.RUN_TURN || !isRecord(request.params)) {
         throw new BridgeRequestError(WUXIA_ERROR_CODES.INVALID_REQUEST, `桥接脚本不处理方法 ${request.method}。`);
       }
-      if (snapshot.page !== 'game') {
+      if (snapshot.page !== 'game' && snapshot.page !== 'opening') {
         throw new BridgeRequestError(
           WUXIA_ERROR_CODES.AUTOMATION_NOT_READY,
-          `当前页面为 ${snapshot.page}，只有游戏主界面可以推进剧情。`,
+          `当前页面为 ${snapshot.page}，只有游戏主界面或开局界面可以推进剧情。`,
           true,
         );
       }

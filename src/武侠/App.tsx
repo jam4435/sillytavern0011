@@ -800,15 +800,27 @@ const App: React.FC = () => {
       }
       setIsCommandQueueOpen(false);
       refreshGameStateFromVariables();
+      if (currentPage === 'opening') {
+        const lastContent = getLastMessageContent();
+        if (lastContent) {
+          setCurrentMaintext(lastContent);
+          setCurrentOptions(parseOptions(lastContent));
+          setCurrentPage('game');
+        }
+      }
       return rawReply;
     },
     [
+      currentPage,
       handleSendMessage,
       historyMutationPending,
       historyInputDraft,
       refreshGameStateFromVariables,
       refreshRecentInputHistory,
       sendMessageWithCommands,
+      setCurrentMaintext,
+      setCurrentOptions,
+      setCurrentPage,
       showError,
     ],
   );
@@ -863,7 +875,7 @@ const App: React.FC = () => {
   );
 
   const automationRuntimeRef = useRef<WuxiaAutomationRuntimeState>({
-    page: currentPage,
+    page: currentPage === 'opening' ? 'game' : currentPage,
     busy: isLoading || historyMutationPending,
     maintext: currentMaintext,
     options: currentOptions,
@@ -875,7 +887,7 @@ const App: React.FC = () => {
         : WUXIA_TURN_TIMEOUT_MS.STANDARD,
   });
   automationRuntimeRef.current = {
-    page: currentPage,
+    page: currentPage === 'opening' ? 'game' : currentPage,
     busy: isLoading || historyMutationPending,
     maintext: currentMaintext,
     options: currentOptions,
@@ -959,7 +971,7 @@ const App: React.FC = () => {
     void eventEmit(WUXIA_GLOBAL_EVENTS.STATE_CHANGED, {
       version: WUXIA_AUTOMATION_API_VERSION,
       ...identity,
-      page: currentPage,
+      page: currentPage === 'opening' ? 'game' : currentPage,
       busy: isLoading || historyMutationPending,
     }).catch(error => {
       gameLogger.warn('[automation] 广播运行状态变化失败:', error);

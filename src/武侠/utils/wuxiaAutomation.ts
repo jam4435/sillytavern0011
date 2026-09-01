@@ -503,8 +503,8 @@ export function createWuxiaAutomation(dependencies: WuxiaAutomationDependencies)
     if (!input) {
       return fail('玩家行动不能为空。');
     }
-    if (runtimeAtStart.page !== 'game') {
-      return fail(`当前页面为 ${runtimeAtStart.page}，只有进入游戏主界面后才能推进剧情。`);
+    if (runtimeAtStart.page !== 'game' && runtimeAtStart.page !== 'opening') {
+      return fail(`当前页面为 ${runtimeAtStart.page}，只有进入游戏主界面或开局界面后才能推进剧情。`);
     }
     if (runtimeAtStart.busy || activeRequestId !== null) {
       return fail('当前已有生成或自动化回合正在运行。');

@@ -1,6 +1,32 @@
 import { writeFile } from 'node:fs/promises';
 import process from 'node:process';
-import { chromium } from 'playwright-core';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+async function resolveChromium() {
+  try {
+    const mod = await import('playwright-core');
+    return mod.chromium;
+  } catch {
+    const candidatePaths = [
+      'F:/Develop/AI/sillytavern/node_modules/playwright-core/index.mjs',
+      'F:/ai/SillyTavern/node_modules/playwright-core/index.mjs',
+      'F:/Develop/AI/sillytavern/node_modules/playwright-core',
+      'F:/ai/SillyTavern/node_modules/playwright-core',
+    ];
+    for (const cand of candidatePaths) {
+      if (existsSync(cand)) {
+        try {
+          const fileUrl = pathToFileURL(path.resolve(cand)).href;
+          const mod = await import(fileUrl);
+          if (mod?.chromium) return mod.chromium;
+        } catch {}
+      }
+    }
+    throw new Error('未找到 playwright-core 依赖。请确保 F:\Develop\AI\sillytavern 下已安装依赖。');
+  }
+}
 
 const SELECTORS = {
   input: '[data-wuxia-automation="player-input"]',
@@ -1463,7 +1489,9 @@ async function readDebugSections(browser, pageUrl, prompt) {
 
 async function readLatestReply(browser, pageUrl) {
   const { frame } = await findGameFrame(browser, pageUrl);
-  return ((await frame.locator(SELECTORS.latestReply).first().innerText()) || '').trim();
+  const locator = frame.locator(SELECTORS.latestReply).first();
+  if ((await locator.count()) === 0) return "";
+  return ((await locator.innerText({ timeout: 2000 }).catch(() => "")) || "").trim();
 }
 
 class UncertainTurnError extends Error {
@@ -1503,17 +1531,65 @@ function debugSectionsFromAutomation(debug) {
 
 async function runApiTurn(browser, options, turnIndex, prompt) {
   const startedAt = Date.now();
-  log(`第 ${turnIndex}/${options.turns} 轮：通过 WuxiaAutomation.runTurn 发送「${prompt}」`);
+  log(`第 ${turnIndex}/${options.turns} 轮：发送行动「${prompt}」`);
   await closeModalIfOpen(browser, options.pageUrl);
   const target = await findGameFrame(browser, options.pageUrl, 15_000, options.chatId);
   const before = await readAutomationSnapshot(target);
-  if (!before.ready || before.page !== 'game')
+  if (!before.ready || (before.page !== 'game' && before.page !== 'opening'))
     throw new Error(`自动化实例尚未就绪：${JSON.stringify(publicTarget(target))}`);
   if (before.busy) throw new Error('页面当前正在生成，拒绝重复发送新行动');
   if (options.chatId && before.chatId !== options.chatId) {
     throw new Error(`聊天 ID 不匹配：期望 ${options.chatId}，实际 ${before.chatId}`);
   }
   const visibilityAtStart = await target.page.evaluate(() => document.visibilityState);
+
+  if (before.page === 'opening') {
+    log(`第 ${turnIndex} 轮：当前处于开局屏，通过 opening-screen 发送首轮行动「${prompt}」`);
+    const input = target.frame.locator(SELECTORS.input).first();
+    const send = target.frame.locator(SELECTORS.send).first();
+    await input.waitFor({ state: 'visible', timeout: 10_000 });
+    await input.fill(prompt);
+    await send.waitFor({ state: 'visible', timeout: 10_000 });
+    await send.click();
+    releaseGameFrameLock();
+    const finished = await waitForPageState(browser, options.pageUrl, 'game', options.timeoutMs);
+    await sleep(options.settleMs);
+    const finalSnapshot = await readAutomationSnapshot(finished);
+    const debug = debugSectionsFromAutomation(finalSnapshot.debug);
+    const failedSections = Object.entries(debug)
+      .filter(([, value]) => value.status === 'error')
+      .map(([id]) => id);
+    const generationStartedAt = startedAt;
+    const generationEndedAt = Date.now();
+    return {
+      turn: turnIndex,
+      mode: 'opening-dispatch',
+      prompt,
+      requestId: finalSnapshot.requestId || '',
+      chatId: finalSnapshot.chatId || before.chatId,
+      userMessageId: 0,
+      assistantMessageId: 1,
+      startedAt: new Date(startedAt).toISOString(),
+      generationStartedAt: new Date(generationStartedAt).toISOString(),
+      generationEndedAt: new Date(generationEndedAt).toISOString(),
+      completedAt: isoTime(),
+      generationMs: generationEndedAt - generationStartedAt,
+      totalMs: Date.now() - startedAt,
+      visibilityAtStart,
+      visibilityAtGenerationEnd: finished?.pageVisibility || visibilityAtStart,
+      targetAtStart: publicTarget(target),
+      targetAtEnd: publicTarget(finished),
+      reply: finalSnapshot.maintext || '',
+      debug,
+      statDataBefore: null,
+      statDataAfter: finalSnapshot.statData,
+      variableChanges: null,
+      variableVerification: null,
+      automationError: '',
+      success: failedSections.length === 0 && finalSnapshot.page === 'game' && finalSnapshot.busy !== true,
+      failedSections,
+    };
+  }
 
   let automationReport;
   try {
@@ -1763,6 +1839,7 @@ async function main() {
   log(`连接 Chrome：${options.endpoint}`);
   let browser;
   try {
+    const chromium = await resolveChromium();
     browser = await chromium.connectOverCDP(options.endpoint, { timeout: 30_000 });
   } catch (error) {
     const details = error instanceof Error ? error.message : String(error);
