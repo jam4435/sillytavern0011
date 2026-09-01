@@ -371,10 +371,6 @@ export function initPanel() {
                     color: var(--panel-text-color, #eee);
                     pointer-events: auto;
                 }
-                /* 酒馆主题可能以 !important 指定 label 颜色；portal 弹窗统一使用面板字体色。 */
-                .lorebook-theme-scope.lorebook-themed-modal label {
-                    color: var(--panel-text-color, #eee) !important;
-                }
                 .lorebook-theme-scope.lorebook-themed-modal:not(dialog) {
                     display: none;
                     position: fixed;
@@ -482,15 +478,15 @@ export function initPanel() {
                     border-width: 1px;
                     border-radius: 6px;
                     cursor: pointer;
-                    border-color: var(--panel-border-color, #555) !important;
+                    border-color: var(--panel-border-color, #555);
                 }
                 .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-button.primary {
-                    background: var(--panel-accent-color, #9a7ace) !important;
-                    color: var(--panel-accent-text-color, #fff) !important;
+                    background: var(--panel-accent-color, #9a7ace);
+                    color: var(--panel-accent-text-color, #fff);
                 }
                 .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-button.secondary {
-                    background: var(--panel-surface-raised-color, var(--panel-entry-bg-color, #555)) !important;
-                    color: var(--panel-text-color, #eee) !important;
+                    background: var(--panel-surface-raised-color, var(--panel-entry-bg-color, #555));
+                    color: var(--panel-text-color, #eee);
                 }
                 /* --- 面板 --- */
                 #${LOREBOOK_PANEL_ID} {
@@ -812,11 +808,8 @@ export function initPanel() {
                     background-color: var(--panel-dropdown-bg-color, var(--panel-input-bg-color, #333)) !important;
                     color: var(--panel-text-color, #eee) !important;
                 }
-                /* 酒馆主题会用 !important 重写标签和原生表单。这里仅覆盖标签与真正可编辑的控件，
+                /* 酒馆主题会用 !important 重写原生表单。这里仅覆盖真正可编辑的控件，
                    避免把 UID、递归控制等信息容器误当成“输入栏”。 */
-                #${LOREBOOK_PANEL_ID} label {
-                    color: var(--panel-text-color, #eee) !important;
-                }
                 #${LOREBOOK_PANEL_ID} input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
                 #${LOREBOOK_PANEL_ID} textarea,
                 #${LOREBOOK_PANEL_ID} select {
@@ -2587,7 +2580,7 @@ export function initPanel() {
                 }
                 #theme-settings-modal #panel-background-image-upload-button:hover,
                 #theme-settings-modal #panel-background-image-clear-button:hover {
-                    background-color: var(--panel-input-focus-bg-color, #3a3a3a) !important;
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
                 }
                 #theme-settings-modal .theme-browser-settings-actions {
                     display: flex;
@@ -2644,8 +2637,8 @@ export function initPanel() {
                     border-top: 1px solid var(--panel-border-color, #555);
                 }
                 #theme-settings-modal #reset-theme-button {
-                    background-color: var(--modal-accent-color, #9a7ace) !important;
-                    color: var(--modal-text-color, #eeeeee) !important;
+                    background-color: var(--modal-accent-color, #9a7ace);
+                    color: var(--modal-text-color, #eeeeee);
                     border: none;
                     padding: 8px 12px;
                     border-radius: 4px;
