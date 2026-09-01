@@ -4,6 +4,7 @@
     "audit:wuxia-martial-arts": "node scripts/audit-wuxia-character-martial-arts.mjs",
     "review:wuxia-sect": "node scripts/generate-wuxia-sect-review-html.mjs",
     "sync:wuxia-debut-times": "node scripts/sync-wuxia-debut-times.mjs",
+    "sync:worldbook": "node scripts/sync-worldbook-index.mjs",
     "build:dev": "pnpm generate:events && webpack --mode development",
     "build:src:dev": "pnpm generate:events && webpack --mode development --env srcOnly=true",
     "build": "pnpm generate:events && webpack --mode production",
