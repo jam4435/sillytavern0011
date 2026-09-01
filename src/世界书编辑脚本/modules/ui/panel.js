@@ -30,7 +30,7 @@ import { errorCatched, isMobile } from '../utils.js';
 import { updateBoundLorebooksList, updateGlobalLorebooksList } from './list.js';
 import { initAiWorkspace, refreshAiWorkspace, resetAiWorkspace } from './aiWorkspace.js';
 import { flushDetailSaves } from './detail.js';
-import { appendToThemePortal, THEME_PORTAL_ID } from './themeSurface.js';
+import { appendToThemePortal } from './themeSurface.js';
 
 // 切换面板显示状态
 const toggleLorebookPanelLegacy = errorCatched(async () => {
@@ -367,15 +367,15 @@ export function initPanel() {
   if ($('#enhanced-lorebook-styles', parentDoc).length === 0) {
     const panelStyles = `
             <style id="enhanced-lorebook-styles">
-                #${THEME_PORTAL_ID} .lorebook-themed-modal {
+                .lorebook-theme-scope.lorebook-themed-modal {
                     color: var(--panel-text-color, #eee);
                     pointer-events: auto;
                 }
                 /* 酒馆主题可能以 !important 指定 label 颜色；portal 弹窗统一使用面板字体色。 */
-                #${THEME_PORTAL_ID} .lorebook-themed-modal label {
+                .lorebook-theme-scope.lorebook-themed-modal label {
                     color: var(--panel-text-color, #eee) !important;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal:not(dialog) {
+                .lorebook-theme-scope.lorebook-themed-modal:not(dialog) {
                     display: none;
                     position: fixed;
                     inset: 0;
@@ -384,12 +384,12 @@ export function initPanel() {
                     box-sizing: border-box;
                     background: rgba(0, 0, 0, 0.7);
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-content {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-content {
                     background: var(--panel-bg-color, #2a2a2a);
                     color: var(--panel-text-color, #eee);
                     border-color: var(--panel-border-color, #555);
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-standard-content {
                     width: 90%;
                     max-width: 800px;
                     max-height: calc(100vh - 150px);
@@ -403,19 +403,19 @@ export function initPanel() {
                     box-shadow: 0 5px 15px var(--ai-shadow-color, rgba(0, 0, 0, 0.3));
                 }
                 @media (max-width: ${MOBILE_LAYOUT_BREAKPOINT}px) {
-                    #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content {
+                    .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-standard-content {
                         width: calc(100% - 24px);
                         max-height: calc(100dvh - 24px);
                         margin-top: max(12px, env(safe-area-inset-top));
                         margin-bottom: max(12px, env(safe-area-inset-bottom));
                     }
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-header {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-header {
                     background: var(--panel-accent-color, #9a7ace);
                     color: var(--panel-accent-text-color, #fff);
                     border-color: var(--panel-border-color, #555);
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content > .lorebook-themed-modal-header {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-standard-content > .lorebook-themed-modal-header {
                     padding: 10px 15px;
                     display: flex;
                     justify-content: space-between;
@@ -423,50 +423,50 @@ export function initPanel() {
                     border-top-left-radius: 8px;
                     border-top-right-radius: 8px;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content > .lorebook-themed-modal-header h4 {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-standard-content > .lorebook-themed-modal-header h4 {
                     margin: 0;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content > .lorebook-themed-modal-header .close-button {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-standard-content > .lorebook-themed-modal-header .close-button {
                     color: inherit;
                     font-size: 28px;
                     font-weight: bold;
                     line-height: 1;
                     cursor: pointer;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-body {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-body {
                     color: var(--panel-text-color, #eee);
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content > .lorebook-themed-modal-body {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-standard-content > .lorebook-themed-modal-body {
                     padding: 15px;
                     overflow-y: auto;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
-                #${THEME_PORTAL_ID} .lorebook-themed-modal textarea,
-                #${THEME_PORTAL_ID} .lorebook-themed-modal select {
+                .lorebook-theme-scope.lorebook-themed-modal input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
+                .lorebook-theme-scope.lorebook-themed-modal textarea,
+                .lorebook-theme-scope.lorebook-themed-modal select {
                     background-color: var(--panel-input-bg-color, #333) !important;
                     color: var(--panel-text-color, #eee) !important;
                     border-color: var(--panel-border-color, #555) !important;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):focus,
-                #${THEME_PORTAL_ID} .lorebook-themed-modal textarea:focus,
-                #${THEME_PORTAL_ID} .lorebook-themed-modal select:focus {
+                .lorebook-theme-scope.lorebook-themed-modal input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):focus,
+                .lorebook-theme-scope.lorebook-themed-modal textarea:focus,
+                .lorebook-theme-scope.lorebook-themed-modal select:focus {
                     background-color: var(--panel-input-focus-bg-color, #3a3a3a) !important;
                     border-color: var(--panel-accent-color, #9a7ace) !important;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal option {
+                .lorebook-theme-scope.lorebook-themed-modal option {
                     background-color: var(--panel-dropdown-bg-color, #333) !important;
                     color: var(--panel-text-color, #eee) !important;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal input::placeholder,
-                #${THEME_PORTAL_ID} .lorebook-themed-modal textarea::placeholder {
+                .lorebook-theme-scope.lorebook-themed-modal input::placeholder,
+                .lorebook-theme-scope.lorebook-themed-modal textarea::placeholder {
                     color: var(--panel-muted-text-color, #aaa);
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-footer {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-footer {
                     background: var(--panel-entry-bg-color, #333);
                     color: var(--panel-text-color, #eee);
                     border-color: var(--panel-border-color, #555);
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content > .lorebook-themed-modal-footer {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-standard-content > .lorebook-themed-modal-footer {
                     padding: 10px 15px;
                     display: flex;
                     justify-content: flex-end;
@@ -476,7 +476,7 @@ export function initPanel() {
                     border-bottom-left-radius: 8px;
                     border-bottom-right-radius: 8px;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-button {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-button {
                     padding: 8px 12px;
                     border-style: solid;
                     border-width: 1px;
@@ -484,11 +484,11 @@ export function initPanel() {
                     cursor: pointer;
                     border-color: var(--panel-border-color, #555) !important;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-button.primary {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-button.primary {
                     background: var(--panel-accent-color, #9a7ace) !important;
                     color: var(--panel-accent-text-color, #fff) !important;
                 }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-button.secondary {
+                .lorebook-theme-scope.lorebook-themed-modal .lorebook-themed-modal-button.secondary {
                     background: var(--panel-surface-raised-color, var(--panel-entry-bg-color, #555)) !important;
                     color: var(--panel-text-color, #eee) !important;
                 }

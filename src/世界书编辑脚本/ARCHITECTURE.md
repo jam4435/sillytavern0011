@@ -327,8 +327,9 @@ AI 助手与 API 设置抽屉不共享外壳样式。助手是原生
    `schemaVersion: 3` 的修改
    `draft`、`activeMode`、`modifyStrategy`、`activeGenerationProjectId`。v2 自动迁移且不改变既有 direct/plan 草稿；localStorage 不保存生成项目正文。
 
-   主面板与 `#lorebook-theme-portal` 共享同一套 CSS 变量和 `color-scheme`。脚本自有弹窗必须通过 `appendToThemePortal()`
-   挂载，不能直接追加到父页面 `body`；这样已打开弹窗和后创建弹窗都会跟随当前布局主题。
+   主面板、隐藏的 `#lorebook-theme-portal` 变量模板与脚本自有弹窗共享同一套 CSS 变量和 `color-scheme`。弹窗必须通过
+   `appendToThemePortal()` 挂载；该函数会把弹窗作为父页面 `body` 的直接子节点，并为其建立独立主题作用域，避免移动端
+   fixed 弹窗嵌套在 portal 下的绘制问题。已打开弹窗和后创建弹窗都会跟随当前布局主题。
 
    `--panel-input-bg-color` / `--panel-input-focus-bg-color`
    只表示可编辑表单表面，适用于文本、数字、搜索、下拉和多行输入；checkbox、radio、color、range、file、hidden 以及普通按钮不属于输入表面。UID、token 徽标、递归控制区、标签、列表容器等非编辑元素必须使用

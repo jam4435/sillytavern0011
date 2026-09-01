@@ -65,11 +65,11 @@ describe('世界书面板主题 portal', () => {
     const portal = ensureThemePortal(document);
     expect(portal.id).toBe(THEME_PORTAL_ID);
     expect(portal.classList.contains('lorebook-theme-scope')).toBe(true);
-    expect(portal.style.display).toBe('block');
-    expect(portal.style.position).toBe('fixed');
-    expect(portal.style.inset).toBe('0px');
-    expect(portal.style.zIndex).toBe('10000');
-    expect(portal.style.pointerEvents).toBe('none');
+    expect(portal.style.display).toBe('none');
+    expect(portal.style.position).toBe('');
+    expect(portal.style.inset).toBe('');
+    expect(portal.style.zIndex).toBe('');
+    expect(portal.style.pointerEvents).toBe('');
     expect(ensureThemePortal(document)).toBe(portal);
 
     appendToThemePortal('<dialog id="html-overlay"></dialog>', document);
@@ -78,16 +78,36 @@ describe('世界书面板主题 portal', () => {
     appendToThemePortal(domOverlay, document);
     appendToThemePortal($('<div id="jquery-overlay"></div>'), document);
 
-    expect(Array.from(portal.children).map(element => element.id)).toEqual([
-      'html-overlay',
-      'dom-overlay',
-      'jquery-overlay',
-    ]);
+    expect(portal.children).toHaveLength(0);
+    ['html-overlay', 'dom-overlay', 'jquery-overlay'].forEach(id => {
+      const overlay = document.getElementById(id);
+      expect(overlay?.parentElement).toBe(document.body);
+      expect(overlay?.classList.contains('lorebook-theme-scope')).toBe(true);
+      expect(overlay?.dataset.lorebookThemeSurface).toBe('overlay');
+    });
+  });
+
+  it('把旧 portal 中的弹窗迁移为 body 直接子节点', () => {
+    const legacyPortal = document.createElement('div');
+    legacyPortal.id = THEME_PORTAL_ID;
+    legacyPortal.innerHTML = '<div id="legacy-overlay" class="lorebook-themed-modal"></div>';
+    document.body.appendChild(legacyPortal);
+
+    const portal = ensureThemePortal(document);
+    const overlay = document.getElementById('legacy-overlay');
+
+    expect(portal.style.display).toBe('none');
+    expect(portal.children).toHaveLength(0);
+    expect(overlay?.parentElement).toBe(document.body);
+    expect(overlay?.classList.contains('lorebook-theme-scope')).toBe(true);
+    expect(overlay?.dataset.lorebookThemeSurface).toBe('overlay');
   });
 
   it('让主面板与 portal 共享完整变量和 color-scheme', () => {
     const panel = document.createElement('div');
     document.body.appendChild(panel);
+    appendToThemePortal('<div id="themed-overlay"></div>', document);
+    const overlay = document.getElementById('themed-overlay')!;
     const variables = buildThemeSurfaceVariables({
       semanticTokens: { '--panel-border-color': '#345678' },
       panelBgColor: '#ffffff',
@@ -113,7 +133,7 @@ describe('世界书面板主题 portal', () => {
 
     const portal = syncThemeSurfaces(document, panel, variables, 'light');
 
-    [panel, portal].forEach(surface => {
+    [panel, portal, overlay].forEach(surface => {
       expect(surface.style.getPropertyValue('--panel-bg-color')).toBe('#ffffff');
       expect(surface.style.getPropertyValue('--panel-text-color')).toBe('#111111');
       expect(surface.style.getPropertyValue('--modal-bg-color')).toBe('#ffffff');
