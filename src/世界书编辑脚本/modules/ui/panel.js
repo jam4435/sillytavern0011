@@ -2295,7 +2295,7 @@ export function initPanel() {
                     padding: 0;
                     border: 1px solid #555;
                     background-color: transparent; /* 外部容器透明，由内部容器处理背景 */
-                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee)) !important;
                     border-radius: 8px;
                     box-shadow: 0 5px 15px rgba(0,0,0,0.5);
                 }
@@ -2320,7 +2320,7 @@ export function initPanel() {
                 }
                 #theme-settings-modal .modal-header h4 {
                     margin: 0;
-                    color: var(--modal-accent-color, #9a7ace);
+                    color: var(--modal-accent-color, #9a7ace) !important;
                     font-weight: bold;
                     font-size: 1.05em;
                 }
@@ -2340,7 +2340,7 @@ export function initPanel() {
                 }
                 #theme-settings-modal .theme-color-input-hint {
                     margin: 0;
-                    color: var(--panel-muted-text-color, var(--modal-text-color, #eeeeee));
+                    color: var(--panel-muted-text-color, var(--modal-text-color, #eeeeee)) !important;
                     font-size: 0.82em;
                     line-height: 1.45;
                 }
@@ -2360,7 +2360,7 @@ export function initPanel() {
                     gap: 6px;
                 }
                 #theme-settings-modal label {
-                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee)) !important;
                     opacity: 0.9;
                     font-size: 0.95em;
                 }
@@ -2398,17 +2398,17 @@ export function initPanel() {
                 #theme-settings-modal input[type="text"].form-control {
                     min-width: 0;
                     flex: 1 1 auto;
-                    background-color: var(--panel-input-bg-color, #333);
-                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
-                    border: 1px solid var(--panel-border-color, #555);
+                    background-color: var(--panel-input-bg-color, #333) !important;
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee)) !important;
+                    border: 1px solid var(--panel-border-color, #555) !important;
                     border-radius: 6px;
                     padding: 7px 8px;
                     box-sizing: border-box;
                 }
                 #theme-settings-modal input[type="text"].form-control:focus {
                     outline: none;
-                    border-color: var(--modal-accent-color, #9a7ace);
-                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
+                    border-color: var(--modal-accent-color, #9a7ace) !important;
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a) !important;
                 }
                 #theme-settings-modal input[type="range"] {
                     width: 100%;
@@ -2426,16 +2426,16 @@ export function initPanel() {
                 #theme-settings-modal #panel-background-image-upload-button,
                 #theme-settings-modal #panel-background-image-clear-button {
                     flex: 0 0 auto;
-                    background-color: var(--panel-input-bg-color, #333);
-                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
-                    border: 1px solid var(--panel-border-color, #555);
+                    background-color: var(--panel-input-bg-color, #333) !important;
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee)) !important;
+                    border: 1px solid var(--panel-border-color, #555) !important;
                     border-radius: 6px;
                     padding: 7px 10px;
                     cursor: pointer;
                 }
                 #theme-settings-modal #panel-background-image-upload-button:hover,
                 #theme-settings-modal #panel-background-image-clear-button:hover {
-                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a) !important;
                 }
                 #theme-settings-modal .theme-browser-settings-actions {
                     display: flex;
@@ -2448,9 +2448,9 @@ export function initPanel() {
                     display: inline-flex;
                     align-items: center;
                     gap: 6px;
-                    background-color: var(--panel-input-bg-color, #333);
-                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
-                    border: 1px solid var(--panel-border-color, #555);
+                    background-color: var(--panel-input-bg-color, #333) !important;
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee)) !important;
+                    border: 1px solid var(--panel-border-color, #555) !important;
                     border-radius: 6px;
                     padding: 7px 10px;
                     cursor: pointer;
@@ -2458,21 +2458,21 @@ export function initPanel() {
                 }
                 #theme-settings-modal #browser-settings-export-button:hover,
                 #theme-settings-modal #browser-settings-import-button:hover {
-                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a) !important;
                     filter: brightness(1.08);
                 }
                 #theme-settings-modal select.form-control {
                     min-width: 120px;
-                    background-color: var(--panel-input-bg-color, #333);
-                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
-                    border: 1px solid var(--panel-border-color, #555);
+                    background-color: var(--panel-input-bg-color, #333) !important;
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee)) !important;
+                    border: 1px solid var(--panel-border-color, #555) !important;
                     border-radius: 6px;
                     padding: 6px 8px;
                 }
                 #theme-settings-modal select.form-control:focus {
                     outline: none;
-                    border-color: var(--modal-accent-color, #9a7ace);
-                    background-color: var(--panel-input-focus-bg-color, #3a3a3a);
+                    border-color: var(--modal-accent-color, #9a7ace) !important;
+                    background-color: var(--panel-input-focus-bg-color, #3a3a3a) !important;
                 }
                 #theme-settings-modal input[type="color"]::-webkit-color-swatch-wrapper {
                     padding: 0;
@@ -2492,8 +2492,8 @@ export function initPanel() {
                     border-top: 1px solid var(--panel-border-color, #555);
                 }
                 #theme-settings-modal #reset-theme-button {
-                    background-color: var(--modal-accent-color, #9a7ace);
-                    color: var(--modal-text-color, #eeeeee);
+                    background-color: var(--modal-accent-color, #9a7ace) !important;
+                    color: var(--panel-accent-text-color, var(--modal-text-color, #eeeeee)) !important;
                     border: none;
                     padding: 8px 12px;
                     border-radius: 4px;

@@ -3563,8 +3563,8 @@ export function detectGameSessionState(): GameSessionState {
       return 'active';
     }
 
-    dataLogger.log('⚠️ [detectGameSessionState] 无有效剧情，返回 empty 进入启动页');
-    return 'empty';
+    dataLogger.log('ℹ️ [detectGameSessionState] 已初始化角色但无有效剧情，返回 opening 进入开局页');
+    return 'opening';
   } catch (error) {
     dataLogger.error('❌ [detectGameSessionState] 检查会话状态失败:', error);
     return 'empty';

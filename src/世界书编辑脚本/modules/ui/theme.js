@@ -389,11 +389,15 @@ function applyTheme(theme) {
         ...semanticThemeTokens,
         '--modal-bg-color': layoutTheme.bgColor,
         '--modal-text-color': layoutTheme.textColor,
+        '--panel-text-color': layoutTheme.textColor,
+        '--panel-accent-text-color': panelAccentTextColor,
         '--modal-accent-color': layoutTheme.accentColor,
+        '--panel-accent-color': layoutTheme.accentColor,
         '--panel-input-bg-color': layoutTheme.inputBgColor,
         '--panel-input-focus-bg-color': inputFocusBgColor,
         '--panel-icon-bg-color': layoutTheme.iconBgColor,
         '--panel-icon-hover-bg-color': iconHoverBgColor,
+        'color-scheme': isColorDark(layoutTheme.bgColor) ? 'dark' : 'light',
       });
     }
 

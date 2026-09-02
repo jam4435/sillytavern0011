@@ -23,6 +23,7 @@ import { completeMartialArts, getMartialArtData, loadMartialArtsDatabase } from 
 import {
   __resetVariableReaderTestState,
   autoUpdateMartialArts,
+  detectGameSessionState,
   getGameVariables,
   normalizeAssistantReplyForPersistence,
   readGameDataSync,
@@ -883,5 +884,56 @@ describe('readGameDataSync avatar projection', () => {
 
     expect(result?.stats.avatarRef).toBeUndefined();
     expect(result?.social.find(npc => npc.name === '黄蓉')?.avatarRef).toBeUndefined();
+  });
+});
+
+describe('detectGameSessionState', () => {
+  const getChatMessagesMock = globalThis.getChatMessages as ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    getChatMessagesMock.mockReturnValue([]);
+  });
+
+  it('当没有有效 user数据 时返回 empty', () => {
+    getAllVariablesMock.mockReturnValue({});
+
+    expect(detectGameSessionState()).toBe('empty');
+  });
+
+  it('当有已初始化的 user数据 但无正文剧情消息（第0楼之后）时返回 opening', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '墨逸',
+          性别: '男',
+          境界: '三流圆满',
+        },
+      },
+    });
+    // 仅有第 0 楼隐藏消息
+    getChatMessagesMock.mockReturnValue([
+      { message_id: 0, is_hidden: true, mes: '<VariableInsert>...</VariableInsert>' },
+    ]);
+
+    expect(detectGameSessionState()).toBe('opening');
+  });
+
+  it('当有已初始化的 user数据 且有有效 assistant 剧情消息时返回 active', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '墨逸',
+          性别: '男',
+          境界: '三流圆满',
+        },
+      },
+    });
+    getChatMessagesMock.mockReturnValue([
+      { message_id: 0, is_hidden: true, mes: '' },
+      { message_id: 1, role: 'user', mes: '开局' },
+      { message_id: 2, role: 'assistant', mes: '牛家村雪夜，寒风呼啸……' },
+    ]);
+
+    expect(detectGameSessionState()).toBe('active');
   });
 });
