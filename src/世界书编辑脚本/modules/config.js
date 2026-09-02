@@ -10,9 +10,6 @@ export const LOREBOOK_BUTTON_ICON = 'fa-solid fa-book-open';
 export const LOREBOOK_BUTTON_TOOLTIP = '角色世界书';
 export const LOREBOOK_BUTTON_TEXT_IN_MENU = '世界书编辑助手';
 
-// 主面板移动布局的唯一宽度断点。JS 结构选择与 CSS 媒体查询必须共同使用此值。
-export const MOBILE_LAYOUT_BREAKPOINT = 768;
-
 // 标签页相关常量
 export const LOREBOOK_MINIMIZE_BUTTON_CLASS = 'minimize-button';
 export const CHARACTER_TAB_ID = 'character-lorebook-tab';

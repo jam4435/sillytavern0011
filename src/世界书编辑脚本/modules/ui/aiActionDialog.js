@@ -1,5 +1,3 @@
-import { appendToThemePortal } from './themeSurface.js';
-
 const AI_ACTION_MODAL_ID = 'lorebook-ai-action-modal';
 
 function getModal(parentDoc = window.parent.document) {
@@ -34,9 +32,9 @@ export function initAiActionDialog() {
         #${AI_ACTION_MODAL_ID} .ai-action-dialog {
           width: min(920px, calc(100vw - 32px));
           margin: 40px auto;
-          background: var(--panel-bg-color, #242424);
-          color: var(--panel-text-color, #eee);
-          border: 1px solid var(--panel-border-color, #4c4c4c);
+          background: #242424;
+          color: #eee;
+          border: 1px solid #4c4c4c;
           border-radius: 12px;
           box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
           overflow: hidden;
@@ -46,8 +44,7 @@ export function initAiActionDialog() {
           align-items: center;
           justify-content: space-between;
           padding: 14px 18px;
-          background: var(--panel-accent-color, #2f5d73);
-          color: var(--panel-accent-text-color, #fff);
+          background: linear-gradient(135deg, #2f5d73, #214456);
         }
         #${AI_ACTION_MODAL_ID} .ai-action-header h4 {
           margin: 0;
@@ -56,7 +53,7 @@ export function initAiActionDialog() {
         #${AI_ACTION_MODAL_ID} .close-button {
           background: transparent;
           border: 0;
-          color: var(--panel-accent-text-color, #fff);
+          color: #fff;
           font-size: 24px;
           cursor: pointer;
         }
@@ -70,18 +67,18 @@ export function initAiActionDialog() {
         #${AI_ACTION_MODAL_ID} .ai-action-status,
         #${AI_ACTION_MODAL_ID} .ai-action-errors,
         #${AI_ACTION_MODAL_ID} .ai-action-preview {
-          background: var(--panel-surface-muted-color, #2e2e2e);
-          border: 1px solid var(--panel-border-color, #424242);
+          background: #2e2e2e;
+          border: 1px solid #424242;
           border-radius: 8px;
           padding: 12px 14px;
         }
         #${AI_ACTION_MODAL_ID} .ai-action-status {
-          color: var(--panel-muted-text-color, #d8e8f0);
+          color: #d8e8f0;
           min-height: 20px;
         }
         #${AI_ACTION_MODAL_ID} .ai-action-errors {
           display: none;
-          color: var(--panel-danger-color, #ffb4b4);
+          color: #ffb4b4;
         }
         #${AI_ACTION_MODAL_ID} .ai-action-errors.has-errors {
           display: block;
@@ -91,9 +88,9 @@ export function initAiActionDialog() {
           min-height: 120px;
           resize: vertical;
           box-sizing: border-box;
-          background: var(--panel-input-bg-color, #1f1f1f);
-          color: var(--panel-text-color, #f1f1f1);
-          border: 1px solid var(--panel-border-color, #484848);
+          background: #1f1f1f;
+          color: #f1f1f1;
+          border: 1px solid #484848;
           border-radius: 8px;
           padding: 12px;
           line-height: 1.55;
@@ -107,7 +104,7 @@ export function initAiActionDialog() {
         #${AI_ACTION_MODAL_ID} .ai-preview-item + .ai-preview-item {
           margin-top: 12px;
           padding-top: 12px;
-          border-top: 1px solid var(--panel-border-color, #3f3f3f);
+          border-top: 1px solid #3f3f3f;
         }
         #${AI_ACTION_MODAL_ID} .ai-preview-item-title {
           font-weight: 600;
@@ -117,7 +114,7 @@ export function initAiActionDialog() {
           margin-top: 8px;
         }
         #${AI_ACTION_MODAL_ID} .ai-preview-diff-label {
-          color: var(--panel-accent-color, #a8d6ea);
+          color: #a8d6ea;
           margin-bottom: 2px;
         }
         #${AI_ACTION_MODAL_ID} .ai-preview-diff-before,
@@ -126,18 +123,18 @@ export function initAiActionDialog() {
           line-height: 1.45;
         }
         #${AI_ACTION_MODAL_ID} .ai-preview-diff-before {
-          color: var(--panel-muted-text-color, #bfbfbf);
+          color: #bfbfbf;
         }
         #${AI_ACTION_MODAL_ID} .ai-preview-diff-after {
-          color: var(--panel-warning-color, #f7e39b);
+          color: #f7e39b;
         }
         #${AI_ACTION_MODAL_ID} .ai-action-footer {
           display: flex;
           justify-content: flex-end;
           gap: 10px;
           padding: 16px 18px;
-          border-top: 1px solid var(--panel-border-color, #3f3f3f);
-          background: var(--panel-surface-raised-color, #262626);
+          border-top: 1px solid #3f3f3f;
+          background: #262626;
         }
         #${AI_ACTION_MODAL_ID} .ai-action-footer button {
           padding: 9px 14px;
@@ -146,12 +143,12 @@ export function initAiActionDialog() {
           cursor: pointer;
         }
         #${AI_ACTION_MODAL_ID} .ai-action-cancel {
-          background: var(--panel-surface-muted-color, #555);
-          color: var(--panel-text-color, #fff);
+          background: #555;
+          color: #fff;
         }
         #${AI_ACTION_MODAL_ID} .ai-action-primary {
-          background: var(--panel-success-color, #3f7a56);
-          color: var(--panel-accent-text-color, #fff);
+          background: #3f7a56;
+          color: #fff;
         }
         #${AI_ACTION_MODAL_ID} .ai-action-primary[disabled] {
           opacity: 0.6;
@@ -168,13 +165,13 @@ export function initAiActionDialog() {
   }
 
   const modalHtml = `
-    <div id="${AI_ACTION_MODAL_ID}" class="lorebook-themed-modal">
-      <div class="ai-action-dialog lorebook-themed-modal-content">
-        <div class="ai-action-header lorebook-themed-modal-header">
+    <div id="${AI_ACTION_MODAL_ID}">
+      <div class="ai-action-dialog">
+        <div class="ai-action-header">
           <h4>AI 条目改写</h4>
           <button class="close-button" type="button">&times;</button>
         </div>
-        <div class="ai-action-body lorebook-themed-modal-body">
+        <div class="ai-action-body">
           <div class="ai-action-targets"></div>
           <div class="ai-action-instruction">
             <textarea placeholder="输入你的改写要求，例如：压缩内容长度、补充触发关键字、改成更正式的条目风格。"></textarea>
@@ -186,15 +183,15 @@ export function initAiActionDialog() {
             <div class="ai-action-preview-list"></div>
           </div>
         </div>
-        <div class="ai-action-footer lorebook-themed-modal-footer">
-          <button class="ai-action-cancel lorebook-themed-modal-button secondary" type="button">取消</button>
-          <button class="ai-action-primary lorebook-themed-modal-button primary" type="button" data-action="ai-preview-apply" data-phase="preview">生成预览</button>
+        <div class="ai-action-footer">
+          <button class="ai-action-cancel" type="button">取消</button>
+          <button class="ai-action-primary" type="button" data-action="ai-preview-apply" data-phase="preview">生成预览</button>
         </div>
       </div>
     </div>
   `;
 
-  appendToThemePortal(modalHtml, parentDoc);
+  $('body', parentDoc).append(modalHtml);
 
   let $modal = getModal(parentDoc);
   if (!$modal.length) {
@@ -222,7 +219,9 @@ export function openAiActionDialog(dialogContext) {
   const modeLabel = targetCount > 1 ? `批量改写 ${targetCount} 个条目` : '改写当前条目';
 
   $modal.data('ai-context', _.cloneDeep({ ...dialogContext, previewResult: null }));
-  $modal.find('.ai-action-targets').text(`目标世界书：${dialogContext.lorebookName} | 模式：${modeLabel}`);
+  $modal.find('.ai-action-targets').text(
+    `目标世界书：${dialogContext.lorebookName} | 模式：${modeLabel}`,
+  );
   $modal.find('.ai-action-instruction textarea').val(dialogContext.instruction || '');
   $modal.find('.ai-action-status').text('输入指令后点击“生成预览”。');
   $modal.find('.ai-action-errors').removeClass('has-errors').empty();
@@ -265,9 +264,7 @@ export function setAiActionBusy(isBusy, buttonText = '') {
 }
 
 export function setAiActionStatus(message) {
-  getModal()
-    .find('.ai-action-status')
-    .text(message || '');
+  getModal().find('.ai-action-status').text(message || '');
 }
 
 export function renderAiActionPreview(previewResult) {
@@ -309,7 +306,11 @@ export function renderAiActionPreview(previewResult) {
   if (errors.length > 0) {
     $errors
       .addClass('has-errors')
-      .html(errors.map(error => `<div>${_.escape(error.title)}: ${_.escape(error.error)}</div>`).join(''));
+      .html(
+        errors
+          .map(error => `<div>${_.escape(error.title)}: ${_.escape(error.error)}</div>`)
+          .join(''),
+      );
   } else {
     $errors.removeClass('has-errors').empty();
   }

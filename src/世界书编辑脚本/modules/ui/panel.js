@@ -21,7 +21,6 @@ import {
   LOREBOOK_MINIMIZE_BUTTON_CLASS,
   LOREBOOK_PANEL_ID,
   LOREBOOK_TOGGLE_SWITCH_CLASS,
-  MOBILE_LAYOUT_BREAKPOINT,
   MOBILE_TOOLTIP_ID,
 } from '../config.js';
 import { clearAllActiveFilters, clearAllExpandedEntries, clearAllFilteredEntries } from '../state.js';
@@ -30,7 +29,6 @@ import { errorCatched, isMobile } from '../utils.js';
 import { updateBoundLorebooksList, updateGlobalLorebooksList } from './list.js';
 import { initAiWorkspace, refreshAiWorkspace, resetAiWorkspace } from './aiWorkspace.js';
 import { flushDetailSaves } from './detail.js';
-import { appendToThemePortal, THEME_PORTAL_ID } from './themeSurface.js';
 
 // 切换面板显示状态
 const toggleLorebookPanelLegacy = errorCatched(async () => {
@@ -367,127 +365,6 @@ export function initPanel() {
   if ($('#enhanced-lorebook-styles', parentDoc).length === 0) {
     const panelStyles = `
             <style id="enhanced-lorebook-styles">
-                #${THEME_PORTAL_ID} .lorebook-themed-modal {
-                    color: var(--panel-text-color, #eee);
-                    pointer-events: auto;
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal:not(dialog) {
-                    display: none;
-                    position: fixed;
-                    inset: 0;
-                    z-index: 10000;
-                    overflow-y: auto;
-                    box-sizing: border-box;
-                    background: rgba(0, 0, 0, 0.7);
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-content {
-                    background: var(--panel-bg-color, #2a2a2a);
-                    color: var(--panel-text-color, #eee);
-                    border-color: var(--panel-border-color, #555);
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content {
-                    width: 90%;
-                    max-width: 800px;
-                    max-height: calc(100vh - 150px);
-                    margin: 80px auto 50px;
-                    padding: 0;
-                    display: flex;
-                    flex-direction: column;
-                    box-sizing: border-box;
-                    border: 1px solid var(--panel-border-color, #555);
-                    border-radius: 8px;
-                    box-shadow: 0 5px 15px var(--ai-shadow-color, rgba(0, 0, 0, 0.3));
-                }
-                @media (max-width: ${MOBILE_LAYOUT_BREAKPOINT}px) {
-                    #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content {
-                        width: calc(100% - 24px);
-                        max-height: calc(100dvh - 24px);
-                        margin-top: max(12px, env(safe-area-inset-top));
-                        margin-bottom: max(12px, env(safe-area-inset-bottom));
-                    }
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-header {
-                    background: var(--panel-accent-color, #9a7ace);
-                    color: var(--panel-accent-text-color, #fff);
-                    border-color: var(--panel-border-color, #555);
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content > .lorebook-themed-modal-header {
-                    padding: 10px 15px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    border-top-left-radius: 8px;
-                    border-top-right-radius: 8px;
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content > .lorebook-themed-modal-header h4 {
-                    margin: 0;
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content > .lorebook-themed-modal-header .close-button {
-                    color: inherit;
-                    font-size: 28px;
-                    font-weight: bold;
-                    line-height: 1;
-                    cursor: pointer;
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-body {
-                    color: var(--panel-text-color, #eee);
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content > .lorebook-themed-modal-body {
-                    padding: 15px;
-                    overflow-y: auto;
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
-                #${THEME_PORTAL_ID} .lorebook-themed-modal textarea,
-                #${THEME_PORTAL_ID} .lorebook-themed-modal select {
-                    background-color: var(--panel-input-bg-color, #333) !important;
-                    color: var(--panel-text-color, #eee) !important;
-                    border-color: var(--panel-border-color, #555) !important;
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):focus,
-                #${THEME_PORTAL_ID} .lorebook-themed-modal textarea:focus,
-                #${THEME_PORTAL_ID} .lorebook-themed-modal select:focus {
-                    background-color: var(--panel-input-focus-bg-color, #3a3a3a) !important;
-                    border-color: var(--panel-accent-color, #9a7ace) !important;
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal option {
-                    background-color: var(--panel-dropdown-bg-color, #333) !important;
-                    color: var(--panel-text-color, #eee) !important;
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal input::placeholder,
-                #${THEME_PORTAL_ID} .lorebook-themed-modal textarea::placeholder {
-                    color: var(--panel-muted-text-color, #aaa);
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-footer {
-                    background: var(--panel-entry-bg-color, #333);
-                    color: var(--panel-text-color, #eee);
-                    border-color: var(--panel-border-color, #555);
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-standard-content > .lorebook-themed-modal-footer {
-                    padding: 10px 15px;
-                    display: flex;
-                    justify-content: flex-end;
-                    align-items: center;
-                    gap: 10px;
-                    border-top: 1px solid var(--panel-border-color, #555);
-                    border-bottom-left-radius: 8px;
-                    border-bottom-right-radius: 8px;
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-button {
-                    padding: 8px 12px;
-                    border-style: solid;
-                    border-width: 1px;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    border-color: var(--panel-border-color, #555);
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-button.primary {
-                    background: var(--panel-accent-color, #9a7ace);
-                    color: var(--panel-accent-text-color, #fff);
-                }
-                #${THEME_PORTAL_ID} .lorebook-themed-modal-button.secondary {
-                    background: var(--panel-surface-raised-color, var(--panel-entry-bg-color, #555));
-                    color: var(--panel-text-color, #eee);
-                }
                 /* --- 面板 --- */
                 #${LOREBOOK_PANEL_ID} {
                     /* CSS变量定义 */
@@ -573,7 +450,7 @@ export function initPanel() {
                     margin: 0 !important;
                 }
 
-                @media (max-width: ${MOBILE_LAYOUT_BREAKPOINT}px) {
+                @media (max-width: 768px) {
                     #${LOREBOOK_PANEL_ID} {
                         width: 95%;
                         max-width: 480px;
@@ -659,9 +536,9 @@ export function initPanel() {
                 }
                 #${LOREBOOK_PANEL_ID} .large-content-preview-card,
                 #${LOREBOOK_EDITOR_PANEL_ID} .large-content-preview-card {
-                    border: 1px solid var(--panel-border-color, #555);
+                    border: 1px solid #555;
                     border-radius: 8px;
-                    background: var(--panel-surface-muted-color, rgba(0, 0, 0, 0.18));
+                    background: rgba(0, 0, 0, 0.18);
                     padding: 10px 12px;
                     margin-top: 8px;
                 }
@@ -669,7 +546,7 @@ export function initPanel() {
                 #${LOREBOOK_EDITOR_PANEL_ID} .large-content-preview-text {
                     white-space: pre-wrap;
                     word-break: break-word;
-                    color: var(--panel-text-color, #ddd);
+                    color: #ddd;
                     font-size: 0.92em;
                     line-height: 1.45;
                     max-height: 10.5em;
@@ -684,7 +561,7 @@ export function initPanel() {
                   }
                  #${LOREBOOK_PANEL_ID} .large-content-preview-hint,
                  #${LOREBOOK_EDITOR_PANEL_ID} .large-content-preview-hint {
-                      color: var(--panel-muted-text-color, rgba(255, 255, 255, 0.68));
+                      color: rgba(255, 255, 255, 0.68);
                       font-size: 0.84em;
                       line-height: 1.4;
                       margin-right: auto;
@@ -692,16 +569,16 @@ export function initPanel() {
                  #${LOREBOOK_PANEL_ID} .large-content-preview-open,
                  #${LOREBOOK_EDITOR_PANEL_ID} .large-content-preview-open {
                       padding: 4px 10px;
-                    border: 1px solid var(--panel-border-color, #666);
+                    border: 1px solid #666;
                     border-radius: 999px;
-                    background: var(--panel-surface-muted-color, rgba(255, 255, 255, 0.04));
+                    background: rgba(255, 255, 255, 0.04);
                     color: var(--panel-text-color);
                     cursor: pointer;
                     font-size: 0.86em;
                 }
                 #${LOREBOOK_PANEL_ID} .large-content-preview-open:hover,
                 #${LOREBOOK_EDITOR_PANEL_ID} .large-content-preview-open:hover {
-                    background: var(--panel-surface-raised-color, rgba(255, 255, 255, 0.1));
+                    background: rgba(255, 255, 255, 0.1);
                 }
                 #${LOREBOOK_FLOATING_BUBBLE_ID} {
                     display: none;
@@ -805,27 +682,8 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} select option,
                 #theme-settings-modal select option,
                 #lorebook-copy-modal select option {
-                    background-color: var(--panel-dropdown-bg-color, var(--panel-input-bg-color, #333)) !important;
-                    color: var(--panel-text-color, #eee) !important;
-                }
-                /* 酒馆主题会用 !important 重写原生表单。这里仅覆盖真正可编辑的控件，
-                   避免把 UID、递归控制等信息容器误当成“输入栏”。 */
-                #${LOREBOOK_PANEL_ID} input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
-                #${LOREBOOK_PANEL_ID} textarea,
-                #${LOREBOOK_PANEL_ID} select {
-                    background-color: var(--panel-input-bg-color, #333) !important;
-                    color: var(--panel-text-color, #eee) !important;
-                    border-color: var(--panel-border-color, #555) !important;
-                }
-                #${LOREBOOK_PANEL_ID} input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):focus,
-                #${LOREBOOK_PANEL_ID} textarea:focus,
-                #${LOREBOOK_PANEL_ID} select:focus {
-                    background-color: var(--panel-input-focus-bg-color, #3a3a3a) !important;
-                    border-color: var(--panel-accent-color, #9a7ace) !important;
-                }
-                #${LOREBOOK_PANEL_ID} input::placeholder,
-                #${LOREBOOK_PANEL_ID} textarea::placeholder {
-                    color: var(--panel-muted-text-color, #aaa) !important;
+                    background-color: var(--panel-dropdown-bg-color, var(--panel-input-bg-color, #333));
+                    color: var(--panel-text-color, #eee);
                 }
                 #${LOREBOOK_PANEL_ID} .tab-content {
                     display: none;
@@ -1187,7 +1045,7 @@ export function initPanel() {
                     text-align: center;
                     font-size: 0.9em;
                     margin: 10px 0;
-                    background-color: var(--panel-entry-bg-color, rgba(80, 80, 80, 0.2));
+                    background-color: var(--panel-input-bg-color, rgba(80, 80, 80, 0.2));
                     border-radius: 4px;
                 }
                 #${LOREBOOK_PANEL_ID} .current-bound-books {
@@ -1202,7 +1060,7 @@ export function initPanel() {
                     margin-left: 10px;
                 }
                 #${LOREBOOK_PANEL_ID} .sort-display-button {
-                    background-color: var(--panel-dropdown-bg-color, var(--panel-surface-raised-color, #3a3a3a));
+                    background-color: var(--panel-input-bg-color, #3a3a3a);
                     border: 1px solid var(--panel-border-color, #555);
                     color: var(--panel-text-color, #ccc);
                     padding: 4px 10px;
@@ -1297,7 +1155,7 @@ export function initPanel() {
                     display: flex;
                     align-items: center;
                     background-color: var(--panel-entry-bg-color);
-                    cursor: default;
+                    cursor: pointer;
                     transition: background-color 0.2s ease;
                     flex-direction: row; /* 确保PC端默认为水平布局 */
                 }
@@ -1324,7 +1182,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .entry-item-title {
                     flex-grow: 1;
                     margin: 0 8px;
-                    background-color: var(--panel-input-bg-color, #333) !important;
+                    background: transparent;
                     border: 1px solid transparent;
                     color: var(--panel-text-color);
                     font-weight: bold;
@@ -1517,7 +1375,7 @@ export function initPanel() {
                     align-items: center;
                     margin-bottom: 10px;
                     padding: 5px;
-                    background-color: var(--panel-entry-bg-color, #333);
+                    background-color: var(--panel-input-bg-color, #333);
                     border-radius: 4px;
                 }
                 #${LOREBOOK_PANEL_ID} .uid-display-area label {
@@ -1549,7 +1407,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .token-counter {
                     font-size: 0.85em;
                     color: #8a5fbd;
-                    background-color: var(--panel-entry-bg-color, #333);
+                    background-color: var(--panel-input-bg-color, #333);
                     padding: 2px 8px;
                     border-radius: 10px;
                     font-weight: bold;
@@ -1576,7 +1434,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .recursion-options-area {
                     margin: 10px 0;
                     padding: 10px;
-                    background-color: var(--panel-entry-bg-color, #333);
+                    background-color: var(--panel-input-bg-color, #333);
                     border-radius: 4px;
                     border: 1px solid var(--panel-border-color, #444);
                 }
@@ -1669,27 +1527,25 @@ export function initPanel() {
 
                #${LOREBOOK_PANEL_ID} .keyword-group label {
                    margin-bottom: 5px;
-                   min-height: 1.2em;
-                   line-height: 1.2;
                    font-size: 0.9em;
-                   color: var(--panel-muted-text-color, #ccc);
+                   color: #ccc;
                }
 
                #${LOREBOOK_PANEL_ID} .keywords-input,
                #${LOREBOOK_PANEL_ID} .secondary-keywords-input,
                #${LOREBOOK_PANEL_ID} .secondary-keys-logic-select {
                    width: 100%;
-                   height: 34px;
-                   min-height: 34px;
-                   margin: 0;
-                   padding: 7px 8px;
+                   padding: 8px;
                    background-color: var(--panel-input-bg-color, #333);
                    border: 1px solid var(--panel-border-color, #555);
                    border-radius: 4px;
                    color: var(--panel-text-color);
                    font-size: 0.9em;
-                   line-height: 18px;
                    box-sizing: border-box;
+               }
+
+               #${LOREBOOK_PANEL_ID} .secondary-keys-logic-select {
+                   padding: 7px 8px; /* Minor adjustment for select height */
                }
                 
                 /* --- 开关样式 --- */
@@ -1735,7 +1591,7 @@ export function initPanel() {
                     transform: translateX(18px);
                 }
                 .${LOREBOOK_TOGGLE_SWITCH_CLASS} input:disabled + .toggle-slider {
-                    background-color: var(--panel-entry-bg-color, #333);
+                    background-color: var(--panel-input-bg-color, #333);
                     cursor: not-allowed;
                 }
                 
@@ -1935,7 +1791,6 @@ export function initPanel() {
                     z-index: 10000;
                     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
                     margin-top: 5px;
-                    color: var(--panel-text-color, #eee);
                 }
 
                 #${LOREBOOK_PANEL_ID} .batch-toggle-dropdown.floating-batch-dropdown {
@@ -1953,7 +1808,7 @@ export function initPanel() {
                 }
                 
                 #${LOREBOOK_PANEL_ID} .batch-toggle-label {
-                    color: var(--panel-text-color, #eee);
+                    color: var(--panel-accent-color, #9a7ace);
                     font-size: 13px;
                     font-weight: bold;
                     margin-bottom: 8px;
@@ -1970,7 +1825,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .batch-toggle-checkbox-group label {
                     display: flex;
                     align-items: center;
-                    color: var(--panel-text-color, #eee);
+                    color: #ddd;
                     font-size: 12px;
                     cursor: pointer;
                     user-select: none;
@@ -2013,7 +1868,7 @@ export function initPanel() {
                 #${LOREBOOK_PANEL_ID} .filter-dropdown label {
                     display: flex;
                     align-items: center;
-                    color: var(--panel-text-color, #eee);
+                    color: #ddd;
                     font-size: 12px;
                     cursor: pointer;
                     user-select: none;
@@ -2220,7 +2075,7 @@ export function initPanel() {
                     overflow-y: auto;
                 }
                 .lorebook-tag {
-                    background-color: var(--panel-entry-bg-color, #444);
+                    background-color: var(--panel-input-bg-color, #444);
                     color: #ccc;
                     padding: 5px 10px;
                     border-radius: 15px;
@@ -2505,7 +2360,7 @@ export function initPanel() {
                     gap: 6px;
                 }
                 #theme-settings-modal label {
-                    color: var(--panel-text-color, #eeeeee) !important;
+                    color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
                     opacity: 0.9;
                     font-size: 0.95em;
                 }
@@ -2571,7 +2426,7 @@ export function initPanel() {
                 #theme-settings-modal #panel-background-image-upload-button,
                 #theme-settings-modal #panel-background-image-clear-button {
                     flex: 0 0 auto;
-                    background-color: var(--panel-surface-raised-color, var(--panel-entry-bg-color, #333));
+                    background-color: var(--panel-input-bg-color, #333);
                     color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
                     border: 1px solid var(--panel-border-color, #555);
                     border-radius: 6px;
@@ -2593,7 +2448,7 @@ export function initPanel() {
                     display: inline-flex;
                     align-items: center;
                     gap: 6px;
-                    background-color: var(--panel-surface-raised-color, var(--panel-entry-bg-color, #333));
+                    background-color: var(--panel-input-bg-color, #333);
                     color: var(--modal-text-color, var(--panel-text-color, #eeeeee));
                     border: 1px solid var(--panel-border-color, #555);
                     border-radius: 6px;
@@ -2707,10 +2562,10 @@ export function initPanel() {
                     align-items: center;
                 }
                 #lorebook-optimize-modal-content {
-                    background-color: var(--panel-bg-color);
-                    color: var(--panel-text-color);
+                    background-color: #2c2c2c;
+                    color: #eee;
                     padding: 0;
-                    border: 1px solid var(--panel-border-color);
+                    border: 1px solid #555;
                     width: 90%;
                     max-width: 600px; /* 减小最大宽度 */
                     border-radius: 8px;
@@ -2720,8 +2575,8 @@ export function initPanel() {
                 }
                 #lorebook-optimize-modal-header {
                     padding: 10px 15px;
-                    background-color: var(--panel-accent-color);
-                    color: var(--panel-bg-color);
+                    background-color: #3a6a8e;
+                    color: white;
                     border-top-left-radius: 8px;
                     border-top-right-radius: 8px;
                     display: flex;
@@ -2748,12 +2603,12 @@ export function initPanel() {
                     margin-top: 0;
                     margin-bottom: 10px;
                     color: var(--panel-accent-color);
-                    border-bottom: 1px solid var(--panel-border-color);
+                    border-bottom: 1px solid #555;
                     padding-bottom: 5px;
                 }
                 .optimize-section .description {
                     font-size: 0.9em;
-                    color: var(--panel-muted-text-color);
+                    color: #ccc;
                     margin-bottom: 15px;
                 }
                 .optimize-section .action-area {
@@ -2763,9 +2618,9 @@ export function initPanel() {
                 }
                 .optimize-section .action-area button {
                     padding: 8px 12px;
-                    background-color: var(--panel-accent-color);
+                    background-color: #5a3a8e;
                     border: none;
-                    color: var(--panel-bg-color);
+                    color: white;
                     cursor: pointer;
                     border-radius: 4px;
                 }
@@ -2775,9 +2630,9 @@ export function initPanel() {
                 #optimize-cliche-words-textarea {
                     width: 100%;
                     min-height: 80px;
-                    background-color: var(--panel-input-bg-color);
-                    color: var(--panel-text-color);
-                    border: 1px solid var(--panel-border-color);
+                    background-color: #222;
+                    color: #eee;
+                    border: 1px solid #555;
                     border-radius: 4px;
                     resize: vertical;
                     box-sizing: border-box;
@@ -2785,9 +2640,9 @@ export function initPanel() {
                 }
                 #global-search-replace-area input[type="text"] {
                     flex-grow: 1;
-                    background-color: var(--panel-input-bg-color);
-                    color: var(--panel-text-color);
-                    border: 1px solid var(--panel-border-color);
+                    background-color: #222;
+                    color: #eee;
+                    border: 1px solid #555;
                     padding: 8px;
                     border-radius: 4px;
                 }
@@ -2827,7 +2682,7 @@ export function initPanel() {
                 }
  
                  /* --- 统一的移动端媒体查询 --- */
-                 @media (max-width: ${MOBILE_LAYOUT_BREAKPOINT}px) {
+                 @media (max-width: 768px) {
                      /* 面板 */
                     #${LOREBOOK_PANEL_ID} {
                         width: 95%;
@@ -3151,7 +3006,7 @@ export function initPanel() {
                     }
                     #${LOREBOOK_PANEL_ID} .mobile-label {
                         font-size: 0.85em;
-                        color: var(--panel-muted-text-color, #ccc);
+                        color: #ccc;
                         white-space: nowrap;
                     }
 
@@ -3237,7 +3092,7 @@ export function initPanel() {
 
   if ($(`#${LOREBOOK_PANEL_ID}`, parentDoc).length === 0) {
     const panelHtml = `
-            <div id="${LOREBOOK_PANEL_ID}" class="lorebook-theme-scope">
+            <div id="${LOREBOOK_PANEL_ID}">
                 <div class="panel-header">
                     <h4>世界书编辑面板</h4>
                     <button class="theme-settings-button"><i class="fa-solid fa-palette"></i> 主题</button>
@@ -3286,13 +3141,13 @@ export function initPanel() {
     // Re-add the missing theme modal HTML
     if ($('#theme-settings-modal', parentDoc).length === 0) {
       const themeModalHtml = `
-            <dialog id="theme-settings-modal" class="lorebook-themed-modal">
-                <div class="lorebook-modal-content lorebook-themed-modal-content">
-                    <div class="modal-header lorebook-themed-modal-header">
+            <dialog id="theme-settings-modal">
+                <div class="lorebook-modal-content">
+                    <div class="modal-header">
                         <h4>主题颜色设置</h4>
                         <button class="close-button" title="关闭" onclick="this.closest('dialog').close()">×</button>
                     </div>
-                    <div class="modal-body lorebook-themed-modal-body">
+                    <div class="modal-body">
                         <p id="theme-color-input-hint" class="theme-color-input-hint">可点击色块取色；若浏览器不支持取色器，请在右侧直接输入 <code>#RRGGBB</code>。</p>
                         <div class="form-group">
                             <label for="panel-bg-color-picker">面板背景色</label>
@@ -3333,8 +3188,8 @@ export function initPanel() {
                             <label for="panel-background-image-url-input">背景图</label>
                             <div class="theme-background-image-row">
                                 <input type="text" id="panel-background-image-url-input" class="form-control" placeholder="粘贴图片 URL 或上传图片">
-                                <button type="button" id="panel-background-image-upload-button" class="lorebook-themed-modal-button secondary">上传</button>
-                                <button type="button" id="panel-background-image-clear-button" class="lorebook-themed-modal-button secondary">清除</button>
+                                <button type="button" id="panel-background-image-upload-button">上传</button>
+                                <button type="button" id="panel-background-image-clear-button">清除</button>
                                 <input type="file" id="panel-background-image-file-input" accept="image/*">
                             </div>
                         </div>
@@ -3347,13 +3202,13 @@ export function initPanel() {
                             <input type="range" id="panel-opacity-slider" min="35" max="100" step="1">
                         </div>
                         <div class="form-actions">
-                            <button type="button" id="reset-theme-button" class="lorebook-themed-modal-button secondary">恢复当前布局默认颜色</button>
+                            <button type="button" id="reset-theme-button">恢复当前布局默认颜色</button>
                         </div>
                     </div>
                 </div>
             </dialog>
         `;
-      appendToThemePortal(themeModalHtml, parentDoc);
+      $('body', parentDoc).append(themeModalHtml);
     }
   }
 

@@ -76,8 +76,7 @@ src/世界书编辑脚本/
         ├── list.js
         ├── masterEntryTokens.js
         ├── panel.js
-        ├── theme.js
-        └── themeSurface.js
+        └── theme.js
 ```
 
 ## 4. 模块说明
@@ -139,7 +138,7 @@ src/世界书编辑脚本/
 | `panel.js`                 | 主面板骨架、标签页、全局样式、打开/关闭/最小化、悬浮球、AI 页签入口                                              |
 | `list.js`                  | 世界书列表、标题栏、全局选择器、预设、虚拟滚动、主从布局列表、文件夹分组、计数/token 展示、回滚按钮              |
 | `detail.js`                | PC 主从布局右侧详情区、分栏宽度、详情选择恢复、字段延迟保存、布局模式同步                                        |
-| `detailSaveCoordinator.js` | 详情字段的 800ms 防抖、按世界书合并、失败保留与冲刷调度                                                          |
+| `detailSaveCoordinator.js` | 详情字段的 800ms 防抖、按世界书合并、失败保留与冲刷调度                                                         |
 | `entry.js`                 | 条目 HTML 生成，覆盖抽屉、移动端、主从列表行的展示                                                               |
 | `editor.js`                | 传统条目编辑弹窗                                                                                                 |
 | `contentEditor.js`         | 大文本内容编辑器、正文对比编辑器、对比结果跳转编辑                                                               |
@@ -153,8 +152,7 @@ src/世界书编辑脚本/
 | `aiWorkflowState.js`       | AI 工作流纯逻辑层：阶段守卫、派生按钮能力、输入失效矩阵、生成生命周期及条目三态选择                              |
 | `masterEntryTokens.js`     | 主从布局条目 token 徽标计算与刷新                                                                                |
 | `expandManager.js`         | 抽屉/移动端条目展开折叠状态同步                                                                                  |
-| `theme.js`                 | 版本化主题存储、布局主题切换、共享 CSS 变量生成与应用、主题弹窗（原生取色器与 HEX 文本回退）、浏览器设置入口     |
-| `themeSurface.js`          | 创建父页面 `body` 下的共享主题 portal，统一挂载脱离主面板的弹窗，并同步主面板与 portal 的主题变量                |
+| `theme.js`                 | 版本化主题存储、布局主题切换、CSS 变量应用、主题弹窗（原生取色器与 HEX 文本回退）、浏览器设置导入导出入口          |
 
 ## 5. 核心架构
 
@@ -200,10 +198,7 @@ index.js
 `state.js`
 保存当前条目缓存、筛选/搜索、选择、展开、详情选中项和文件夹折叠状态，便于刷新后恢复局部 UI。条目文件夹没有会话记录时默认折叠，用户本次会话中的展开/折叠操作会覆盖这个默认值。
 
-主从布局的详情字段采用“本地 800ms 防抖合并 → `api.js::saveEntryFields()`
-轻量字段更新 → 按世界书串行写回”。同一防抖窗口内对同一本世界书的多个字段只触发一次底层更新，失焦、切换条目、切换布局或关闭面板时立即冲刷；失败补丁会保留到下次编辑或冲刷。酒馆助手底层
-`updateWorldbookWith()`
-仍按整本世界书持久化，但详情热路径只复制实际变化的条目，不执行通用批量更新所需的整本前后快照与深比较。
+主从布局的详情字段采用“本地 800ms 防抖合并 → `api.js::saveEntryFields()` 轻量字段更新 → 按世界书串行写回”。同一防抖窗口内对同一本世界书的多个字段只触发一次底层更新，失焦、切换条目、切换布局或关闭面板时立即冲刷；失败补丁会保留到下次编辑或冲刷。酒馆助手底层 `updateWorldbookWith()` 仍按整本世界书持久化，但详情热路径只复制实际变化的条目，不执行通用批量更新所需的整本前后快照与深比较。
 
 移动端条目行的上下箭头通过 `entryCommands.js → sorting.js::planEntryMove()`
 工作。只支持自定义、优先级和逆优先级：自定义调整完整 UID 排序；优先级模式把条目移动到当前同区可见相邻项的实际位置槽，并更新
@@ -327,16 +322,6 @@ AI 助手与 API 设置抽屉不共享外壳样式。助手是原生
    `schemaVersion: 3` 的修改
    `draft`、`activeMode`、`modifyStrategy`、`activeGenerationProjectId`。v2 自动迁移且不改变既有 direct/plan 草稿；localStorage 不保存生成项目正文。
 
-   主面板与 `#lorebook-theme-portal` 共享同一套 CSS 变量和 `color-scheme`。脚本自有弹窗必须通过 `appendToThemePortal()`
-   挂载，不能直接追加到父页面 `body`；这样已打开弹窗和后创建弹窗都会跟随当前布局主题。
-
-   `--panel-input-bg-color` / `--panel-input-focus-bg-color`
-   只表示可编辑表单表面，适用于文本、数字、搜索、下拉和多行输入；checkbox、radio、color、range、file、hidden 以及普通按钮不属于输入表面。UID、token 徽标、递归控制区、标签、列表容器等非编辑元素必须使用
-   `--panel-entry-bg-color`、`--panel-surface-muted-color` 或
-   `--panel-surface-raised-color`，不能借用输入栏变量。父页面中的酒馆主题可能以 `!important`
-   重写原生表单，因此主面板和 portal 应使用各自的主题作用域选择器及必要的样式表级 `!important` 抵抗覆盖，但不写内联
-   `!important`。
-
 5. 世界书隐藏元条目 `folderMeta.js` 用 `__WI_META_FOLDERS__` 条目保存文件夹结构；渲染和 AI 收集时会过滤这些元条目。
 
 ### 5.8 写回与回滚
@@ -382,7 +367,7 @@ UI 命令或 AI 应用
 | 改批量复制、删除、调序、字段修改       | `features/batchActions.js`、`commands/titleBarCommands.js`、`api.js`                                    |
 | 改文件夹功能                           | `commands/folderCommands.js`、`features/folderMeta.js`、`ui/list.js`、`state.js`                        |
 | 改回滚                                 | `features/history.js`、`commands/titleBarCommands.js`、`ui/list.js`、`api.js`                           |
-| 改主题、弹窗挂载或浏览器设置备份       | `ui/theme.js`、`ui/themeSurface.js`、`features/browserSettingsBackup.js`、`settings.js`                 |
+| 改主题或浏览器设置备份                 | `ui/theme.js`、`features/browserSettingsBackup.js`、`settings.js`、`config.js`                          |
 | 改优化器或世界书对比                   | `features/optimizer.js`、`features/optimizerCompare.js`、`events.js`、`ui/contentEditor.js`             |
 
 ### 6.2 添加新功能
@@ -392,7 +377,7 @@ UI 命令或 AI 应用
 3. 核心业务逻辑优先放进 `features/`
 4. 涉及世界书写回时尽量走 `api.js` 统一封装
 5. 高风险批量操作接入 `trackHistory` 和 `history.js`
-6. 涉及跨会话偏好时写入 `settings.js`；主题计算写入 `theme.js`，脱离主面板的弹窗通过 `themeSurface.js` 挂载
+6. 涉及跨会话偏好时写入 `settings.js`；主题相关写入 `theme.js`
 7. 运行 `pnpm build` 做回归验证
 
 ### 6.3 常见排查方向

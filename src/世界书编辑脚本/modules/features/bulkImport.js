@@ -1,6 +1,5 @@
 import { createLorebookEntries, getWorldbookSafe } from '../api.js';
 import { errorCatched } from '../utils.js';
-import { appendToThemePortal } from '../ui/themeSurface.js';
 import { parseWorldbookYaml, yamlDocumentToWorldbookEntry } from './worldbookYaml.js';
 
 const IMPORT_MODAL_ID = 'lorebook-import-modal';
@@ -91,10 +90,10 @@ export function initBulkImport() {
                     box-sizing: border-box;
                 }
                 #${IMPORT_MODAL_ID}-content {
-                    background: var(--panel-bg-color);
-                    color: var(--panel-text-color);
+                    background: var(--panel-bg-color, #2a2a2a);
+                    color: var(--panel-text-color, #eee);
                     padding: 0;
-                    border: 1px solid var(--panel-border-color);
+                    border: 1px solid rgba(255,255,255,0.15);
                     width: 95%;
                     max-width: 700px;
                     border-radius: 12px;
@@ -107,8 +106,8 @@ export function initBulkImport() {
                 }
                 #${IMPORT_MODAL_ID}-header {
                     padding: 15px 20px;
-                    background: var(--panel-accent-color);
-                    color: var(--panel-accent-text-color);
+                    background: var(--panel-accent-color, #5a3a8e);
+                    color: var(--panel-text-color, white);
                     border-top-left-radius: 12px;
                     border-top-right-radius: 12px;
                     display: flex;
@@ -123,14 +122,14 @@ export function initBulkImport() {
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    color: inherit;
+                    color: var(--panel-text-color, white);
                 }
                 #${IMPORT_MODAL_ID}-header h4::before {
                     content: "📝";
                     font-size: 1.2em;
                 }
                 #${IMPORT_MODAL_ID} .close-button {
-                    color: inherit;
+                    color: var(--panel-text-color, white);
                     font-size: 24px;
                     font-weight: bold;
                     cursor: pointer;
@@ -158,11 +157,11 @@ export function initBulkImport() {
                 #${IMPORT_MODAL_ID}-body > p {
                     margin: 0;
                     font-size: 0.95em;
-                    color: var(--panel-muted-text-color);
+                    color: var(--panel-text-color, #bbb);
                     opacity: 0.8;
                     padding: 10px;
-                    background-color: var(--panel-entry-bg-color);
-                    border-left: 3px solid var(--panel-accent-color);
+                    background-color: var(--panel-entry-bg-color, rgba(0,0,0,0.2));
+                    border-left: 3px solid var(--panel-accent-color, #5a3a8e);
                     border-radius: 4px;
                     line-height: 1.5;
                 }
@@ -170,9 +169,9 @@ export function initBulkImport() {
                     width: 100%;
                     min-height: 300px;
                     flex-grow: 1;
-                    background-color: var(--yaml-input-bg-color);
-                    color: var(--panel-text-color);
-                    border: 2px solid var(--panel-border-color);
+                    background-color: var(--yaml-input-bg-color, #2d2d2d);
+                    color: var(--panel-text-color, #f0f0f0);
+                    border: 2px solid rgba(255,255,255,0.1);
                     border-radius: 8px;
                     resize: vertical;
                     box-sizing: border-box;
@@ -184,19 +183,19 @@ export function initBulkImport() {
                 }
                 #${IMPORT_MODAL_ID}-textarea:focus {
                     outline: none;
-                    border-color: var(--panel-accent-color);
-                    background-color: var(--panel-input-focus-bg-color);
-                    box-shadow: var(--panel-focus-ring);
+                    border-color: var(--panel-accent-color, #7a5abe);
+                    background-color: var(--yaml-input-bg-color, #353535);
+                    box-shadow: 0 0 0 3px color-mix(in srgb, var(--panel-accent-color, #7a5abe) 20%, transparent);
                 }
                 #${IMPORT_MODAL_ID}-textarea::placeholder {
-                    color: var(--panel-muted-text-color);
+                    color: var(--panel-text-color, #777);
                     opacity: 0.4;
                 }
                 #${IMPORT_MODAL_ID}-footer {
                     padding: 15px 20px;
                     text-align: right;
-                    border-top: 1px solid var(--panel-border-color);
-                    background-color: var(--panel-entry-bg-color);
+                    border-top: 1px solid rgba(255,255,255,0.1);
+                    background-color: var(--panel-entry-bg-color, rgba(0,0,0,0.2));
                     border-bottom-left-radius: 12px;
                     border-bottom-right-radius: 12px;
                     display: flex;
@@ -213,8 +212,8 @@ export function initBulkImport() {
                     transition: all 0.2s ease;
                 }
                 #${IMPORT_MODAL_ID}-cancel {
-                    background-color: var(--panel-entry-bg-color);
-                    color: var(--panel-text-color);
+                    background-color: var(--panel-entry-bg-color, #555);
+                    color: var(--panel-text-color, white);
                 }
                 #${IMPORT_MODAL_ID}-cancel:hover {
                     filter: brightness(1.2);
@@ -222,8 +221,8 @@ export function initBulkImport() {
                     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
                 }
                 #${IMPORT_MODAL_ID}-confirm {
-                    background: var(--panel-accent-color);
-                    color: var(--panel-accent-text-color);
+                    background: var(--panel-accent-color, #5a3a8e);
+                    color: var(--panel-text-color, white);
                 }
                 #${IMPORT_MODAL_ID}-confirm:hover:not(:disabled) {
                     filter: brightness(1.15);
@@ -235,11 +234,11 @@ export function initBulkImport() {
                     cursor: not-allowed;
                 }
                 #${IMPORT_MODAL_ID}-error {
-                    color: var(--panel-danger-color);
+                    color: #ff6b6b;
                     font-size: 0.9em;
                     padding: 10px 12px;
-                    background-color: var(--panel-danger-bg-color);
-                    border: 1px solid var(--panel-danger-color);
+                    background-color: rgba(255, 107, 107, 0.1);
+                    border: 1px solid rgba(255, 107, 107, 0.3);
                     border-radius: 6px;
                     display: none;
                     margin-top: 8px;
@@ -256,17 +255,17 @@ export function initBulkImport() {
                     justify-content: space-between;
                     align-items: center;
                     padding: 8px 12px;
-                    background-color: var(--panel-entry-bg-color);
-                    border: 1px solid var(--panel-border-color);
+                    background-color: var(--panel-entry-bg-color, rgba(0,0,0,0.2));
+                    border: 1px solid rgba(255,255,255,0.1);
                     border-radius: 6px;
                     cursor: pointer;
                     transition: all 0.2s ease;
-                    color: var(--panel-muted-text-color);
+                    color: var(--panel-text-color, #bbb);
                     font-size: 0.9em;
                 }
                 .yaml-example-toggle:hover {
-                    background-color: var(--panel-surface-raised-color);
-                    border-color: var(--panel-accent-color);
+                    background-color: var(--panel-entry-bg-color, rgba(0,0,0,0.3));
+                    border-color: var(--panel-accent-color, #5a3a8e);
                 }
                 .yaml-example-toggle .toggle-icon {
                     transition: transform 0.2s ease;
@@ -286,9 +285,9 @@ export function initBulkImport() {
                 .yaml-example-code pre {
                     margin: 0;
                     padding: 12px;
-                    background-color: var(--yaml-input-bg-color);
-                    color: var(--panel-text-color);
-                    border: 2px solid var(--panel-border-color);
+                    background-color: var(--yaml-input-bg-color, #2d2d2d);
+                    color: var(--panel-text-color, #f0f0f0);
+                    border: 2px solid rgba(255,255,255,0.1);
                     border-radius: 6px;
                     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
                     font-size: 0.85em;
@@ -301,8 +300,8 @@ export function initBulkImport() {
                     top: 8px;
                     right: 8px;
                     padding: 6px 12px;
-                    background: var(--panel-accent-color);
-                    color: var(--panel-accent-text-color);
+                    background: var(--panel-accent-color, #5a3a8e);
+                    color: var(--panel-text-color, white);
                     border: none;
                     border-radius: 4px;
                     cursor: pointer;
@@ -315,7 +314,7 @@ export function initBulkImport() {
                     filter: brightness(1.15);
                 }
                 .yaml-copy-btn.copied {
-                    background: var(--panel-success-color);
+                    background: #4caf50;
                 }
             </style>
         `;
@@ -324,13 +323,13 @@ export function initBulkImport() {
 
   if ($(`#${IMPORT_MODAL_ID}`, parentDoc).length === 0) {
     const modalHtml = `
-            <div id="${IMPORT_MODAL_ID}" class="lorebook-themed-modal" style="display: none;">
-                <div id="${IMPORT_MODAL_ID}-content" class="lorebook-themed-modal-content">
-                    <div id="${IMPORT_MODAL_ID}-header" class="lorebook-themed-modal-header">
+            <div id="${IMPORT_MODAL_ID}" style="display: none;">
+                <div id="${IMPORT_MODAL_ID}-content">
+                    <div id="${IMPORT_MODAL_ID}-header">
                         <h4>批量导入条目</h4>
                         <span class="close-button">&times;</span>
                     </div>
-                    <div id="${IMPORT_MODAL_ID}-body" class="lorebook-themed-modal-body">
+                    <div id="${IMPORT_MODAL_ID}-body">
                         <p>将YAML格式的条目文本粘贴到下方 (支持多个条目，用 --- 分隔):</p>
                         <div class="yaml-example-container">
                             <div class="yaml-example-toggle">
@@ -361,14 +360,14 @@ content: '这是第二个条目的内容。'</pre>
                         <textarea id="${IMPORT_MODAL_ID}-textarea" placeholder="在此粘贴YAML格式的条目..."></textarea>
                         <div id="${IMPORT_MODAL_ID}-error"></div>
                     </div>
-                    <div id="${IMPORT_MODAL_ID}-footer" class="lorebook-themed-modal-footer">
-                        <button id="${IMPORT_MODAL_ID}-cancel" class="lorebook-copy-cancel-btn lorebook-themed-modal-button secondary">取消</button>
-                        <button id="${IMPORT_MODAL_ID}-confirm" class="lorebook-copy-confirm-btn lorebook-themed-modal-button primary">确认导入</button>
+                    <div id="${IMPORT_MODAL_ID}-footer">
+                        <button id="${IMPORT_MODAL_ID}-cancel" class="lorebook-copy-cancel-btn">取消</button>
+                        <button id="${IMPORT_MODAL_ID}-confirm" class="lorebook-copy-confirm-btn">确认导入</button>
                     </div>
                 </div>
             </div>
         `;
-    appendToThemePortal(modalHtml, parentDoc);
+    $('body', parentDoc).append(modalHtml);
   }
 
   const $modal = $(`#${IMPORT_MODAL_ID}`, parentDoc);

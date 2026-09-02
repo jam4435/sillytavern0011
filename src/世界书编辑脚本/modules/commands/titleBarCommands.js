@@ -27,7 +27,6 @@ import { refreshAiWorkspace, resetAiWorkspace } from '../ui/aiWorkspace.js';
 import { selectDetailEntry } from '../ui/detail.js';
 import { closeFloatingBatchToggleDropdowns } from '../ui/floatingBatchDropdown.js';
 import { switchTab } from '../ui/panel.js';
-import { appendToThemePortal } from '../ui/themeSurface.js';
 import {
   refreshEntryTogglePresetMenu,
   updateHeaderCheckboxState,
@@ -269,25 +268,25 @@ function ensureRollbackPreviewModal(parentDoc) {
   }
 
   const modalHtml = `
-    <div id="rollback-preview-modal" class="lorebook-themed-modal rollback-preview-modal">
-      <div class="lorebook-themed-modal-content lorebook-themed-modal-standard-content rollback-preview-modal-content">
-        <div class="lorebook-themed-modal-header">
+    <div id="rollback-preview-modal" style="display:none; position: fixed; z-index: 10007; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.7); overflow-y: auto; box-sizing: border-box;">
+      <div style="background-color: #2c2c2c; color: #eee; padding: 0; border: 1px solid #555; width: 90%; max-width: 800px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: calc(100vh - 150px); margin: 80px auto 50px auto; box-sizing: border-box;">
+        <div style="padding: 10px 15px; background-color: #3a6a8e; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
           <h4>回滚预览</h4>
-          <span class="close-button">&times;</span>
+          <span class="close-button" style="font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
         </div>
-        <div class="lorebook-themed-modal-body rollback-preview-modal-body">
+        <div style="padding: 15px; max-height: 70vh; overflow-y: auto;">
           <div id="rollback-preview-summary"></div>
           <div id="rollback-preview-list"></div>
         </div>
-        <div class="lorebook-themed-modal-footer rollback-preview-modal-footer">
-          <button id="cancel-rollback-preview-button" class="lorebook-themed-modal-button secondary">取消</button>
-          <button id="confirm-rollback-preview-button" class="lorebook-themed-modal-button primary">确认回滚</button>
+        <div style="padding: 10px 15px; text-align: right; border-top: 1px solid #444;">
+          <button id="cancel-rollback-preview-button" style="padding: 8px 12px; background-color: #555; border: none; color: white; cursor: pointer; border-radius: 4px; margin-right: 10px;">取消</button>
+          <button id="confirm-rollback-preview-button" style="padding: 8px 12px; background-color: #5a3a8e; border: none; color: white; cursor: pointer; border-radius: 4px;">确认回滚</button>
         </div>
       </div>
     </div>
   `;
 
-  appendToThemePortal(modalHtml, parentDoc);
+  $('body', parentDoc).append(modalHtml);
 }
 
 function renderRollbackPreview(preview, parentDoc) {
@@ -725,9 +724,7 @@ async function executeAiSelection({ $target, lorebookName, parentDoc }) {
     return;
   }
 
-  const selectedCount = await openAiWorkspaceForSelectedEntries(lorebookName, workspaceMode, {
-    preserveSelectionState: true,
-  });
+  const selectedCount = await openAiWorkspaceForSelectedEntries(lorebookName, workspaceMode, { preserveSelectionState: true });
   const label = workspaceMode === 'plan' ? '计划修改' : '直接修改';
   if (selectedCount > 0) {
     window.toastr?.success(`已打开 AI ${label}，并同步 ${selectedCount} 个选中条目`);
@@ -759,7 +756,7 @@ registerCommands({
   'save-entry-toggle-preset': saveEntryTogglePreset,
   'apply-entry-toggle-preset': applyEntryTogglePresetCommand,
   'delete-entry-toggle-preset': deleteEntryTogglePresetCommand,
-  invert: invert,
+  'invert': invert,
   'execute-batch-toggle': executeBatchTogglePatched,
   'execute-ai-selection': executeAiSelection,
   'set-ai-selected-mode': setAiSelectedMode,
