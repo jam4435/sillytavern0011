@@ -75,6 +75,24 @@ alwaysApply: true
 - `util/common.ts`: 前端界面或脚本可能使用的函数
 - `util/mvu.ts`: MVU 角色卡可能使用的函数
 
+## 项目构建与同步机制
+
+### 单模块构建与调试（修改单个插件时必须优先使用）
+
+为避免全量构建全部插件造成算力与时间浪费，修改或调试单个插件时**严禁使用全量构建（`pnpm build` / `pnpm build:src`）**，必须使用单模块构建指令：
+
+- **极速单模块构建**：`pnpm fast:only <模块名>`（如 `pnpm fast:only ck`、`pnpm fast:only 三国`、`pnpm fast:only 武侠`、`pnpm fast:only JM`）
+  - 自动跳过无关前置生成任务（如非武侠模块会自动跳过 `generate:events`），且跳过代码压缩，1~3 秒极速完成。
+- **单模块热监听**：`pnpm watch:only <模块名>`（仅监听目标插件的修改并实时推送到酒馆）。
+- **单模块生产构建**：`pnpm build:only <模块名>`（包含压缩）。
+- **查看可用模块**：运行 `pnpm build:only` 可列出当前所有可用的模块名称。
+
+### 角色卡与世界书同步 (`tavern_sync.mjs`)
+
+- `tavern_sync.yaml` 记录了角色卡、世界书、预设的同步配置。
+- `node tavern_sync.mjs bundle <配置名>`：将本地拆分的正则、脚本、世界书等文件打包生成对应的角色卡 PNG 或世界书 JSON。
+- `node tavern_sync.mjs push <配置名> -f` / `pull`：向酒馆推送或从酒馆拉取最新配置。
+
 ## 特殊导入方式
 
 ### 导入文件内容
