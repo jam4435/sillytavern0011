@@ -14,13 +14,14 @@ const openingEventSummary = JSON.parse(
 describe('generated wuxia event assets', () => {
   it('contains every current event exactly once', () => {
     expect(manifest.eventRuntimeKeyVersion).toBe(EVENT_RUNTIME_KEY_VERSION);
-    expect(manifest.eventCount).toBe(688);
+    expect(manifest.eventCount).toBe(1119);
     expect(manifest.events).toHaveLength(manifest.eventCount);
     expect(new Set(manifest.events.map((event: any) => event.runtimeKey)).size).toBe(manifest.eventCount);
     expect(manifest.shardCount).toBe(manifest.shards.length);
     expect(manifest.checkpoints.length).toBeGreaterThan(0);
-    expect(manifest.events.filter((event: any) => event.kind === 'ordinary')).toHaveLength(630);
-    expect(manifest.events.filter((event: any) => event.kind === 'debut')).toHaveLength(58);
+    expect(manifest.events.filter((event: any) => event.kind === 'ordinary')).toHaveLength(1010);
+    expect(manifest.events.filter((event: any) => event.kind === 'debut')).toHaveLength(91);
+    expect(manifest.events.filter((event: any) => event.kind === 'encounter')).toHaveLength(18);
     for (const event of manifest.events) {
       expect(event.sourceName).toBe(event.runtimeKey);
       expect(parseCanonicalEventKey(event.runtimeKey)).not.toBeNull();

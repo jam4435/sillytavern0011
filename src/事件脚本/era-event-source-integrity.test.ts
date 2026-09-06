@@ -13,14 +13,15 @@ const eventFiles = fs
   .filter(file => parseCanonicalEventKey(file))
   .sort();
 const eventKeys = new Set(eventFiles.map(file => path.basename(file, path.extname(file))));
-const terminalLabels = new Set(['全书完', '待定', '无', '后续待续']);
+const terminalLabels = new Set(['全书完', '待定', '无', '后续待续', '全书终局-终章圆满']);
 
 describe('canonical wuxia event source', () => {
   it('contains the complete canonical catalog', () => {
-    expect(eventFiles).toHaveLength(688);
+    expect(eventFiles).toHaveLength(1119);
     const descriptors = eventFiles.map(file => parseCanonicalEventKey(file));
-    expect(descriptors.filter(descriptor => descriptor?.kind === EVENT_KIND.ORDINARY)).toHaveLength(630);
-    expect(descriptors.filter(descriptor => descriptor?.kind === EVENT_KIND.DEBUT)).toHaveLength(58);
+    expect(descriptors.filter(descriptor => descriptor?.kind === EVENT_KIND.ORDINARY)).toHaveLength(1010);
+    expect(descriptors.filter(descriptor => descriptor?.kind === EVENT_KIND.DEBUT)).toHaveLength(91);
+    expect(descriptors.filter(descriptor => descriptor?.kind === EVENT_KIND.ENCOUNTER)).toHaveLength(18);
   });
 
   it('uses the source event key for every character experience and resolves every follow-up', () => {
@@ -43,15 +44,24 @@ describe('canonical wuxia event source', () => {
     }
   });
 
-  it.each([
-    ['世界书索引', path.join(root, '世界书', '金庸群侠传1', 'index.yaml')],
-    ['角色卡索引', path.join(root, '角色卡', '金庸群侠传', 'index.yaml')],
-  ])('%s keeps 688 names and file paths aligned without changing uid uniqueness', (_label, indexPath) => {
+  it('世界书索引 keeps all names and file paths aligned without changing uid uniqueness', () => {
+    const indexPath = path.join(root, '世界书', '金庸群侠传1', 'index.yaml');
+    const index = parseYaml(fs.readFileSync(indexPath, 'utf8'));
+    const entries = index.条目.filter((entry: any) => parseCanonicalEventKey(entry.名称));
+    expect(entries).toHaveLength(eventFiles.length);
+    expect(new Set(entries.map((entry: any) => entry.uid)).size).toBe(eventFiles.length);
+    expect(new Set(entries.map((entry: any) => entry.名称))).toEqual(eventKeys);
+    for (const entry of entries) {
+      expect(String(entry.文件).split(/[\\/]/).at(-1)).toBe(entry.名称);
+    }
+  });
+
+  it('角色卡索引 keeps 688 names and file paths aligned without changing uid uniqueness', () => {
+    const indexPath = path.join(root, '角色卡', '金庸群侠传', 'index.yaml');
     const index = parseYaml(fs.readFileSync(indexPath, 'utf8'));
     const entries = index.条目.filter((entry: any) => parseCanonicalEventKey(entry.名称));
     expect(entries).toHaveLength(688);
     expect(new Set(entries.map((entry: any) => entry.uid)).size).toBe(688);
-    expect(new Set(entries.map((entry: any) => entry.名称))).toEqual(eventKeys);
     for (const entry of entries) {
       expect(String(entry.文件).split(/[\\/]/).at(-1)).toBe(entry.名称);
     }

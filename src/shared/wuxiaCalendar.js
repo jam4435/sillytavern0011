@@ -54,11 +54,14 @@ export function totalMinutesToWuxiaCalendarTime(totalMinutes) {
 }
 
 export function totalHoursToWuxiaCalendarTime(totalHours) {
-  const normalizedHours = Math.floor(finiteNumber(totalHours));
+  const totalMinutes = Math.round(finiteNumber(totalHours) * WUXIA_MINUTES_PER_HOUR);
+  const minute = totalMinutes % WUXIA_MINUTES_PER_HOUR;
+  const normalizedHours = Math.floor(totalMinutes / WUXIA_MINUTES_PER_HOUR);
   const totalDays = Math.floor(normalizedHours / WUXIA_HOURS_PER_DAY);
   const hourOfDay = normalizedHours - totalDays * WUXIA_HOURS_PER_DAY;
   return {
     ...totalDaysToWuxiaCalendarDate(totalDays),
     时: hourOfDay,
+    ...(minute > 0 ? { 分: minute } : {}),
   };
 }
