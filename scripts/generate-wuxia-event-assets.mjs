@@ -33,7 +33,6 @@ const root = process.cwd();
 const sourceRoot = path.join(root, '世界书');
 const outputRoot = path.join(root, 'src', '事件脚本', 'generated', 'event-data');
 const openingEventSummaryPath = path.join(root, 'src', '武侠', 'data', '事件信息汇总.json');
-const locationTablePath = path.join(root, 'src', '武侠', '射雕神雕地点表.yaml');
 const RUNTIME_KEY_VERSION = EVENT_RUNTIME_KEY_VERSION;
 const SHARD_MAX_EVENTS = 50;
 const SHARD_MAX_BYTES = 350 * 1024;
@@ -49,13 +48,19 @@ const EVENT_KINDS = Object.freeze({
   growth: EVENT_KIND.GROWTH,
   encounter: EVENT_KIND.ENCOUNTER,
 });
-const locationTable = parseYaml(fs.readFileSync(locationTablePath, 'utf8'));
+
+const locationTablePaths = [
+  path.join(root, 'src', '武侠', '武侠地点表.yaml'),
+].filter(fs.existsSync);
 const validLocationScopes = new Set(
-  Object.entries(locationTable).flatMap(([area, regions]) =>
-    Object.entries(regions).flatMap(([region, locations]) =>
-      locations.map(location => `${area}/${region}/${location}`),
-    ),
-  ),
+  locationTablePaths.flatMap(tablePath => {
+    const table = parseYaml(fs.readFileSync(tablePath, 'utf8')) || {};
+    return Object.entries(table).flatMap(([area, regions]) =>
+      Object.entries(regions || {}).flatMap(([region, locations]) =>
+        (locations || []).map(location => `${area}/${region}/${location}`),
+      ),
+    );
+  }),
 );
 
 function stripSuffix(value) {

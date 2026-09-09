@@ -1,4 +1,4 @@
-import locationTable from '../射雕神雕地点表.yaml';
+import locationTable from '../武侠地点表.yaml';
 import { MapData } from '../types';
 import { AREA_COORDINATES, AREA_DESCRIPTIONS, clampMapCoordinate, REGION_COORDINATES } from '../data/mapCoordinates';
 

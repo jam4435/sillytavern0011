@@ -67,6 +67,7 @@ export const REGION_COORDINATES: Record<string, MapCoordinate> = {
   '大宋/岭南': { x: 880, y: 840 },
   '大宋/川边': { x: 756, y: 625 },
   '大宋/开封府': { x: 946, y: 505 },
+  '大宋/无锡': { x: 1045, y: 630 },
   '大宋/无锡府': { x: 1045, y: 630 },
   '大宋/未知地域': { x: 768, y: 512 },
   '大宋/江南东路': { x: 985, y: 632 },
@@ -74,6 +75,9 @@ export const REGION_COORDINATES: Record<string, MapCoordinate> = {
   '大宋/河北西路': { x: 960, y: 440 },
   '大宋/河南': { x: 915, y: 525 },
   '大宋/河南府': { x: 915, y: 525 },
+  '大宋/少室山': { x: 925, y: 518 },
+  '大宋/擂鼓山': { x: 920, y: 550 },
+  '大宋/黄河': { x: 930, y: 490 },
   '大宋/洞庭湖': { x: 878, y: 681 },
   '大宋/淮南东路': { x: 1000, y: 575 },
   '大宋/湖广南路': { x: 855, y: 742 },
@@ -110,11 +114,18 @@ export const REGION_COORDINATES: Record<string, MapCoordinate> = {
   '大宋/潭州': { x: 915, y: 720 },
 
   '大理/云南': { x: 705, y: 735 },
+  '大理/大理城': { x: 710, y: 740 },
+  '大理/点苍山': { x: 695, y: 725 },
+  '大理/无量山': { x: 735, y: 775 },
+  '大理/万劫谷': { x: 720, y: 760 },
 
+  '西域/天山': { x: 380, y: 330 },
   '西域/花剌子模': { x: 205, y: 468 },
 
   '西夏/天山': { x: 380, y: 330 },
   '西夏/灵州': { x: 670, y: 420 },
+  '西夏/凉州': { x: 590, y: 420 },
+  '西夏/甘凉戈壁': { x: 540, y: 405 },
   '西夏/蒙古军营': { x: 640, y: 380 },
   '西夏/贺兰山': { x: 660, y: 390 },
 
@@ -138,6 +149,7 @@ export const REGION_COORDINATES: Record<string, MapCoordinate> = {
 
   '辽国/中京': { x: 1100, y: 320 },
   '辽国/南京': { x: 1025, y: 390 },
+  '辽国/北境': { x: 1120, y: 250 },
 };
 
 export function clampMapCoordinate(coordinate: MapCoordinate): MapCoordinate {

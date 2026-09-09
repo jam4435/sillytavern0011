@@ -18,7 +18,63 @@ export const MARTIAL_ART_ALIAS_TO_CANONICAL = new Map([
   ['落英神剑掌', '落英神剑掌法'],
   ['全真教内功', '全真派内功'],
   ['全真内功', '全真派内功'],
+  ['全真教武功', '全真剑法'],
+  ['全真入门拳法', '全真掌法'],
+  ['全真入门剑法', '全真剑法'],
   ['水上飘轻功', '铁掌水上飘'],
+  ['大关门式', '全真掌法'],
+  ['虎门手', '全真掌法'],
+  ['三连环', '全真剑法'],
+  ['玉女投梭', '玉女剑法'],
+  ['大风袖', '狂风迅雷功'],
+  ['一阳指基础', '段氏基础指法'],
+  ['段氏内功', '大理段氏内功'],
+  ['大理段氏家传武学', '大理段氏内功'],
+  ['大理段氏武功', '大理段氏内功'],
+  ['段家剑法', '段家剑'],
+  ['桃花岛基础武学', '碧波掌法'],
+  ['桃花岛武学', '碧波掌法'],
+  ['玉女心经外功', '玉女心经'],
+  ['玉女心经内功', '玉女心经'],
+  ['玉女心经口诀', '玉女心经'],
+  ['古墓派入门内功', '古墓吐纳诀'],
+  ['古墓派剑法', '玉女剑法'],
+  ['玉女素心剑', '玉女素心剑法'],
+  ['古墓派武功', '美女拳法'],
+  ['古墓派轻功', '捕雀功'],
+  ['古墓派拳法', '美女拳法'],
+  ['古墓派掌法', '天罗地网势'],
+  ['打狗阵法', '打狗阵'],
+  ['叫化棒法', '打狗棒法'],
+  ['打狗棒法实战运用', '打狗棒法'],
+  ['打狗棒法(招式)', '打狗棒法'],
+  ['丐帮杖法', '打狗棒法'],
+  ['丐帮心法', '叫花行气诀'],
+  ['少林七十二绝技', '少林伏魔拳'],
+  ['少林神功', '少林伏魔拳'],
+  ['少林吐纳心法', '童子功'],
+  ['少林内功', '童子功'],
+  ['少林长拳', '罗汉拳'],
+  ['太祖长拳', '罗汉拳'],
+  ['少林龙爪手', '龙爪手'],
+  ['金刚不坏体神功', '金刚不坏神功'],
+  ['金刚不坏体', '金刚不坏神功'],
+  ['慕容氏家传掌法', '参合指'],
+  ['慕容家传剑法', '慕容剑法'],
+  ['慕容氏剑法', '慕容剑法'],
+  ['六脉神剑-少冲剑', '六脉神剑'],
+  ['六脉神剑-少商剑', '六脉神剑'],
+  ['六脉神剑-商阳剑', '六脉神剑'],
+  ['六脉神剑-中冲剑', '六脉神剑'],
+  ['六脉神剑-关冲剑', '六脉神剑'],
+  ['六脉神剑-少泽剑', '六脉神剑'],
+  ['降龙廿八掌', '降龙十八掌'],
+  ['降龙二十八掌', '降龙十八掌'],
+  ['九阴真经(逆)', '九阴假经'],
+  ['逆行经脉之法', '九阴假经'],
+  ['密宗心法', '西藏密宗内功'],
+  ['北冥真气', '北冥神功'],
+  ['逍遥心法', '北冥神功'],
 ]);
 
 const GENERIC_CHARACTER_ALIASES = new Set(['书生', '渔夫', '农夫']);
@@ -95,14 +151,92 @@ export function canonicalMartialArtName(name) {
   return MARTIAL_ART_ALIAS_TO_CANONICAL.get(name) ?? name;
 }
 
-export function normalizeMastery(value) {
-  if (typeof value !== 'string' || !value.trim()) return null;
-  const trimmed = value.trim();
-  const direct = MASTERY_LEVELS.find(level => trimmed === level || trimmed.startsWith(`${level}（`));
-  if (direct) return direct;
-  if (trimmed === '略有所成' || trimmed.startsWith('略有所成（')) return '略有小成';
-  if (trimmed === '略知皮毛' || trimmed.startsWith('略知皮毛（')) return '初窥门径';
+export const NON_MARTIAL_SPECIALTY_NAMES = new Set([
+  '游泳',
+  '驯兽术',
+  '驭兽术',
+  '射艺',
+  '易容术',
+  '变声绝技',
+  '岐黄医道',
+  '本草医道',
+  '金匮针法',
+  '辨药施毒',
+  '星宿毒术',
+  '伏地听声',
+  '腹语术',
+  '武穆遗书阵法',
+  '未知内功',
+]);
+
+export const NON_MARTIAL_EQUIPMENT_NAMES = new Set([
+  '白金丝手套',
+  '白绸带金球兵器',
+  '绸带金球兵器',
+  '君子剑',
+  '淑女剑',
+  '特制铁杖',
+  '青铜杵',
+  '八角铜锤',
+  '判官双笔',
+  '烂银点钢管',
+  '双鞭',
+  '双枪',
+  '虎头双钩',
+  '毒蒺藜',
+  '毒菱',
+  '毒雾',
+  '麻袋秘术',
+]);
+
+export function normalizeMasteryPrefix(prefix) {
+  if (!prefix || typeof prefix !== 'string') return null;
+  const p = prefix.trim();
+  if (MASTERY_LEVELS.includes(p)) return p;
+  if (['略有所成', '小成'].includes(p)) return '略有小成';
+  if (['略知皮毛', '初学', '入门'].includes(p)) return '初窥门径';
+  if (['大成', '纯熟', '精熟'].includes(p)) return '融会贯通';
+  if (['圆满', '精深'].includes(p)) return '炉火纯青';
+  if (['化境', '登峰造极', '通神'].includes(p)) return '出神入化';
   return null;
+}
+
+export function parseMasteryDetails(value) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { 标准掌握程度: null, 掌握程度: null, 掌握程度说明: null, 原始掌握程度: null };
+  }
+  const trimmed = value.trim();
+  let standard = null;
+  let extra = null;
+
+  const parenMatch = trimmed.match(/^([^（(]+)[（(]([\s\S]+)[）)]$/);
+  if (parenMatch) {
+    const prefix = parenMatch[1].trim();
+    extra = parenMatch[2].trim();
+    standard = normalizeMasteryPrefix(prefix);
+  } else {
+    const dashMatch = trimmed.match(/^([^\s—:：]+)[—:：\s]+([\s\S]+)$/);
+    if (dashMatch && normalizeMasteryPrefix(dashMatch[1].trim())) {
+      standard = normalizeMasteryPrefix(dashMatch[1].trim());
+      extra = dashMatch[2].trim();
+    } else {
+      standard = normalizeMasteryPrefix(trimmed);
+      if (!standard) {
+        extra = trimmed;
+      }
+    }
+  }
+
+  return {
+    标准掌握程度: standard,
+    掌握程度: standard,
+    掌握程度说明: extra || null,
+    原始掌握程度: trimmed,
+  };
+}
+
+export function normalizeMastery(value) {
+  return parseMasteryDetails(value).标准掌握程度;
 }
 
 function extractMastery(value) {
@@ -182,16 +316,24 @@ function recordPowerDiff(characterRecord, beforePowers, afterPowers, event, rawC
     const after = afterPowers[rawArtName];
     if (compareJson(before, after)) continue;
     const operation = classifyPowerChange(before, after);
+    const beforeRaw = extractMastery(before);
+    const afterRaw = extractMastery(after);
+    const beforeDetails = parseMasteryDetails(beforeRaw);
+    const afterDetails = parseMasteryDetails(afterRaw);
     const change = {
       功法: canonicalMartialArtName(rawArtName),
       源功法名: rawArtName,
       操作: operation,
       原始操作: event.currentOperation,
       原始角色键: rawCharacterKey,
-      旧掌握程度: extractMastery(before),
-      新掌握程度: extractMastery(after),
-      旧标准掌握程度: normalizeMastery(extractMastery(before)),
-      新标准掌握程度: normalizeMastery(extractMastery(after)),
+      旧掌握程度: beforeDetails.掌握程度,
+      新掌握程度: afterDetails.掌握程度,
+      旧掌握程度说明: beforeDetails.掌握程度说明,
+      新掌握程度说明: afterDetails.掌握程度说明,
+      旧标准掌握程度: beforeDetails.标准掌握程度,
+      新标准掌握程度: afterDetails.标准掌握程度,
+      原始旧掌握程度: beforeRaw,
+      原始新掌握程度: afterRaw,
       旧值: cloneJson(before),
       新值: cloneJson(after),
       ...eventReference(event),
@@ -274,23 +416,32 @@ function currentValuesForArt(characterState, artRecord) {
   return [...artRecord.rawNames]
     .filter(rawName => Object.prototype.hasOwnProperty.call(powers, rawName))
     .sort((a, b) => a.localeCompare(b, 'zh-CN'))
-    .map(rawName => ({
-      变量键: rawName,
-      掌握程度: extractMastery(powers[rawName]),
-      标准掌握程度: normalizeMastery(extractMastery(powers[rawName])),
-      完整变量: cloneJson(powers[rawName]),
-    }));
+    .map(rawName => {
+      const rawMastery = extractMastery(powers[rawName]);
+      const details = parseMasteryDetails(rawMastery);
+      return {
+        变量键: rawName,
+        掌握程度: details.掌握程度,
+        标准掌握程度: details.标准掌握程度,
+        掌握程度说明: details.掌握程度说明,
+        原始掌握程度: rawMastery,
+        完整变量: cloneJson(powers[rawName]),
+      };
+    });
 }
 
 function summarizeArtRecord(characterState, artRecord, databaseNames) {
   const changes = artRecord.changes.map(change => cloneJson(change));
   const currentValues = currentValuesForArt(characterState, artRecord);
+  const isSpecialty = NON_MARTIAL_SPECIALTY_NAMES.has(artRecord.canonical);
+  const isEquipment = NON_MARTIAL_EQUIPMENT_NAMES.has(artRecord.canonical);
   return {
     功法: artRecord.canonical,
     源功法名: [...artRecord.rawNames].sort((a, b) => a.localeCompare(b, 'zh-CN')),
     当前存在: currentValues.length > 0,
     当前变量: currentValues,
-    功法库状态: databaseNames.has(artRecord.canonical) ? '已收录' : '未收录',
+    功法库状态: databaseNames.has(artRecord.canonical) ? '已收录' : isSpecialty ? '生活专长' : isEquipment ? '装备道具' : '未收录',
+    类别: isSpecialty ? '生活与杂学专长' : isEquipment ? '误挂装备或道具' : '战斗功法',
     获得事件: changes.filter(change => change.操作 === '获得'),
     升级或更新事件: changes.filter(change => ['升级', '降级', '更新'].includes(change.操作)),
     删除事件: changes.filter(change => change.操作 === '删除'),
@@ -304,9 +455,12 @@ export function createMartialArtsAuditDocument(materialized, martialArtsDatabase
     .sort((a, b) => a.canonical.localeCompare(b.canonical, 'zh-CN'))
     .map(record => {
       const characterState = materialized.state[record.canonical] || {};
-      const artRecords = [...record.martialArts.values()]
+      const allRecords = [...record.martialArts.values()]
         .sort((a, b) => a.canonical.localeCompare(b.canonical, 'zh-CN'))
         .map(artRecord => summarizeArtRecord(characterState, artRecord, databaseNames));
+      const martialArtRecords = allRecords.filter(item => item.类别 === '战斗功法');
+      const specialtyRecords = allRecords.filter(item => item.类别 === '生活与杂学专长');
+      const equipmentRecords = allRecords.filter(item => item.类别 === '误挂装备或道具');
       const currentPowers = isPlainObject(characterState.功法) ? characterState.功法 : {};
       return {
         角色: record.canonical,
@@ -322,7 +476,9 @@ export function createMartialArtsAuditDocument(materialized, martialArtsDatabase
           重要物品: cloneJson(characterState.重要物品 ?? {}),
         },
         当前原始功法变量: cloneJson(currentPowers),
-        功法记录: artRecords,
+        功法记录: martialArtRecords,
+        生活与杂学专长: specialtyRecords,
+        误挂装备或道具: equipmentRecords,
         功法变更数: record.changes.length,
       };
     });

@@ -8,7 +8,7 @@ import { getLocationScopePath, normalizeLocationPath, parseLocationPath } from '
 
 const root = process.cwd();
 const sourceDirectory = path.join(root, '世界书', '金庸群侠传1', '世界书');
-const mapPath = path.join(root, 'src', '武侠', '射雕神雕地点表.yaml');
+const mapPath = path.join(root, 'src', '武侠', '武侠地点表.yaml');
 const ledgerPath = path.join(root, 'scripts', 'data', 'wuxia-location-migration.json');
 const shouldApply = process.argv.includes('--apply');
 
