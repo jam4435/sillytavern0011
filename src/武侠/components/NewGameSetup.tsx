@@ -26,6 +26,7 @@ import {
   REALM_LEVELS,
   STORY_EVENTS,
   TALENT_TIERS,
+  checkMartialArtTraitRestriction,
   type EventLocation,
   type NewGameFormData,
 } from '../utils/gameInitializer';
@@ -367,6 +368,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     }
     return triggered;
   }, [attributes]);
+
+  // 所有当前生效的天赋名（已选 + 属性触发）
+  const allActiveTraitNames = useMemo(() => {
+    return [...selectedTraits, ...attributeTriggeredTraits.map(t => t.name)];
+  }, [selectedTraits, attributeTriggeredTraits]);
 
   // ============================================
   // 存档数据验证函数
@@ -835,11 +841,31 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         if (remainingPoints < 0) {
           newErrors.traits = '点数不足，请调整天赋选择';
         }
+        // 自动清理与当前天赋冲突的已选武功（例如若在武功步骤选了内功后回退选了经脉尽断）
+        {
+          const conflictingArts = selectedMartialArts.filter(artName => {
+            const artData = martialArtsDatabase.find(a => a.功法名称 === artName) || getMartialArtData(artName);
+            return artData && checkMartialArtTraitRestriction(artData.类型, allActiveTraitNames);
+          });
+          if (conflictingArts.length > 0) {
+            setSelectedMartialArts(prev => prev.filter(a => !conflictingArts.includes(a)));
+            showNotification('warning', `已自动移除与所选天赋冲突的武功：${conflictingArts.join('、')}`);
+          }
+        }
         break;
       case 'martial':
         // 武功选择：剩余点数不能为负
         if (remainingPoints < 0) {
           newErrors.martial = '点数不足，请调整武功选择';
+        }
+        {
+          const forbiddenArts = selectedMartialArts.filter(artName => {
+            const artData = martialArtsDatabase.find(a => a.功法名称 === artName) || getMartialArtData(artName);
+            return artData && checkMartialArtTraitRestriction(artData.类型, allActiveTraitNames);
+          });
+          if (forbiddenArts.length > 0) {
+            newErrors.martial = `以下武功受天赋限制无法选择：${forbiddenArts.join('、')}`;
+          }
         }
         break;
       case 'origin':
@@ -981,6 +1007,12 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       const originItems = selectedOriginData?.items;
       const originMartialArts = selectedOriginData?.martial_arts;
 
+      // 过滤掉任何与当前天赋冲突的武功
+      const safeMartialArts = selectedMartialArts.filter(artName => {
+        const artData = martialArtsDatabase.find(a => a.功法名称 === artName) || getMartialArtData(artName);
+        return !(artData && checkMartialArtTraitRestriction(artData.类型, allActiveTraitNames));
+      });
+
       onSubmit({
         name: name.trim(),
         gender,
@@ -989,8 +1021,8 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         age,
         locationInfo,
         initialAttributes: attributes,
-        martialArtId: selectedMartialArts.length > 0 ? selectedMartialArts[0] : '',
-        selectedMartialArts: selectedMartialArts, // 新版：传递所有已选功法名称列表
+        martialArtId: safeMartialArts.length > 0 ? safeMartialArts[0] : '',
+        selectedMartialArts: safeMartialArts, // 新版：传递所有已选功法名称列表
         selectedTraits: selectedTraits, // 传递选择的天赋列表
         origin,
         originId: selectedOrigin,
@@ -1948,7 +1980,12 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       <div className="pool-header">
                         <span className="pool-rank mixed">混合池</span>
                         <span className="pool-count">
-                          {martialArtsDatabase.filter(a => !selectedMartialArts.includes(a.功法名称)).length}种可抽
+                          {
+                            martialArtsDatabase.filter(
+                              a => !selectedMartialArts.includes(a.功法名称) && !checkMartialArtTraitRestriction(a.类型, allActiveTraitNames),
+                            ).length
+                          }
+                          种可抽
                         </span>
                       </div>
                       <div className="pool-cost">
@@ -1960,11 +1997,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         className="gacha-btn mixed-btn"
                         disabled={
                           remainingPoints < MARTIAL_ARTS_DRAW_COST ||
-                          martialArtsDatabase.filter(a => !selectedMartialArts.includes(a.功法名称)).length === 0
+                          martialArtsDatabase.filter(
+                            a => !selectedMartialArts.includes(a.功法名称) && !checkMartialArtTraitRestriction(a.类型, allActiveTraitNames),
+                          ).length === 0
                         }
                         onClick={() => {
                           const availableArts = martialArtsDatabase.filter(
-                            a => !selectedMartialArts.includes(a.功法名称),
+                            a => !selectedMartialArts.includes(a.功法名称) && !checkMartialArtTraitRestriction(a.类型, allActiveTraitNames),
                           );
                           if (availableArts.length === 0) {
                             showNotification('info', '没有可抽取的武功了');
@@ -2050,14 +2089,20 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           const isSelected = selectedMartialArts.includes(art.功法名称);
                           const isDrawn = drawnMartialArts.includes(art.功法名称); // 是否通过抽卡获得
                           const cost = RANK_POINT_COST[art.功法品阶];
-                          const canAfford = remainingPoints >= cost || isSelected;
+                          const restriction = checkMartialArtTraitRestriction(art.类型, allActiveTraitNames);
+                          const isRestricted = Boolean(restriction);
+                          const canAfford = !isRestricted && (remainingPoints >= cost || isSelected);
 
                           return (
                             <div
                               key={art.功法名称}
-                              className={`martial-card ${isSelected ? 'selected' : ''} ${isDrawn ? 'drawn locked' : ''} rank-${art.功法品阶} ${!canAfford ? 'disabled' : ''}`}
+                              className={`martial-card ${isSelected ? 'selected' : ''} ${isDrawn ? 'drawn locked' : ''} ${isRestricted ? 'restricted disabled' : ''} rank-${art.功法品阶} ${!canAfford && !isSelected ? 'disabled' : ''}`}
                               onClick={() => {
                                 if (isDrawn) return; // 抽卡获得的武功不能取消
+                                if (isRestricted) {
+                                  showNotification('error', `受天赋限制无法选择「${art.功法名称}」：${restriction}`);
+                                  return;
+                                }
                                 if (!canAfford && !isSelected) return;
                                 if (isSelected) {
                                   // 取消选择（点数会通过 martialArtsPointsUsed 自动返还）
@@ -2073,8 +2118,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                                 <span className={`martial-rank rank-${art.功法品阶}`}>{art.功法品阶}</span>
                               </div>
                               <span className="martial-type">{art.类型}</span>
+                              {isRestricted && (
+                                <div className="martial-restricted-tag" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '2px' }}>
+                                  🚫 {restriction}
+                                </div>
+                              )}
                               <p className="martial-desc">{art.功法描述?.slice(0, 50)}...</p>
-                              <span className="martial-cost">{isDrawn ? '已抽取' : `-${cost}点`}</span>
+                              <span className="martial-cost">{isDrawn ? '已抽取' : isRestricted ? '无法修炼' : `-${cost}点`}</span>
                               {isSelected && (
                                 <div className="selected-indicator">
                                   <span>{isDrawn ? '🔒' : '✓'}</span>

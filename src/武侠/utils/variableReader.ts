@@ -46,6 +46,7 @@ import { getLocationScopePath } from '../../shared/locationPath.js';
 import { wuxiaCalendarDateToTotalDays } from '../../shared/wuxiaCalendar.js';
 import { dataLogger } from './logger';
 import { buildMeridianProjection, deriveMeridianModifiers } from './meridianSystem';
+import { getTraitModifierSources } from './traitsDatabase';
 
 // 使用酒馆的 ChatMessage 类型（与本地 types.ts 中的 ChatMessage 区分）
 type TavernChatMessage = {
@@ -116,6 +117,7 @@ interface UserProfile {
   包裹?: Record<string, InventoryItemVariableData>;
   装备栏?: EquipmentSlots;
   状态效果?: Record<string, ActiveStatusEffectVariableData>;
+  天赋?: Record<string, string>;
   人物经历?: Record<string, string> | string;
   关系网?: Record<string, string>;
   $meta?: unknown; // ERA 元数据，忽略
@@ -738,11 +740,12 @@ function parseMartialArts(
     };
   }
 
-  // 使用功法数据库补完
+  // 使用功法数据库补完（传入用户天赋以评估限制与折扣）
   const completedArts: Record<string, CompleteMartialArt> = completeMartialArts(
     simpleMartialArtsData,
     currentCultivation,
     comprehension,
+    用户档案?.天赋,
   );
 
   // 转换为 MartialArt 结构
@@ -758,6 +761,7 @@ function parseMartialArts(
       canUpgrade: completedArt.canUpgrade,
       upgradeCost: completedArt.upgradeCost,
       nextMastery: completedArt.nextMastery,
+      restrictionReason: completedArt.restrictionReason,
     };
   }
 
@@ -805,6 +809,18 @@ function normalizeDurationNumber(value: unknown): number | undefined {
     return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : undefined;
   }
   return undefined;
+}
+
+function parseTraits(天赋?: Record<string, string>): Record<string, string> {
+  if (!天赋 || typeof 天赋 !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(天赋)
+      .filter(([name, desc]) => !name.startsWith('$') && typeof desc === 'string')
+      .map(([name, desc]) => [name.trim(), desc.trim()]),
+  );
 }
 
 function parseEquipmentSlots(装备栏?: EquipmentSlots): EquipmentSlots {
@@ -921,6 +937,10 @@ function collectActiveAttributeModifiers(
   }
 
   sources.push(...collectPermanentAttributeModifierSources(前端变量));
+
+  if (用户档案?.天赋) {
+    sources.push(...getTraitModifierSources(用户档案.天赋));
+  }
 
   return sources.length > 0 ? sources : undefined;
 }
@@ -3465,11 +3485,13 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
     dataLogger.log('[variableReader] Step 4d3 - 属性修正:', activeModifiers);
 
     const meridianModifiers = collectMeridianAttributeModifierSources(variables.前端变量);
+    const traitModifiers = getTraitModifierSources(用户档案.天赋);
+    const baseModifiers = [...meridianModifiers, ...traitModifiers];
     const baseAttributes = calculateAllAttributes(
       initialAttrs,
       realm,
       martialArtsForCalc,
-      meridianModifiers.length > 0 ? meridianModifiers : undefined,
+      baseModifiers.length > 0 ? baseModifiers : undefined,
     );
     const { combat, resources } = calculateAllAttributes(initialAttrs, realm, martialArtsForCalc, activeModifiers);
 
@@ -3488,6 +3510,7 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
       location: 用户档案.所在位置 || '未知位置',
       identities: 用户档案.身份 || {},
       martialArts: martialArts,
+      traits: parseTraits(用户档案.天赋),
       initialAttributes: initialAttrs,
       baseAttributes: parseCurrentAttributes(用户档案, baseAttributes.combat, baseAttributes.resources),
       attributes: parseCurrentAttributes(用户档案, combat, resources),

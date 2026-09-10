@@ -1274,6 +1274,7 @@ const App: React.FC = () => {
             martialArts={gameState.stats.martialArts}
             cultivation={gameState.stats.cultivation}
             comprehension={gameState.stats.initialAttributes?.悟性 ?? 10}
+            traits={gameState.stats.traits}
           />
         );
       case ActivePanel.EVENTS:

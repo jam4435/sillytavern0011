@@ -144,6 +144,7 @@ export interface MartialArt {
   canUpgrade: boolean;
   upgradeCost: number;
   nextMastery: string | null;
+  restrictionReason?: string; // 因天赋或前置条件导致的无法修炼/升级原因
 }
 
 // The main User Profile structure
@@ -161,6 +162,8 @@ export interface CharacterProfile {
   identities: Record<string, string>; // 身份: { Name: Desc }
 
   martialArts: Record<string, MartialArt>; // 武功: { Name: Template }
+
+  traits?: Record<string, string>; // 天赋: { Name: Desc }
 
   initialAttributes: InitialAttributes; // 初始属性
   baseAttributes?: CurrentAttributes; // 不含装备/药效的前端计算基准，只用于界面预览
@@ -514,9 +517,35 @@ export interface TalentTier {
   icon: string;
 }
 
+export interface TraitAttributeModifiers {
+  // 百分比加成/扣减，例如 10 表示 +10%, -20 表示 -20%
+  臂力?: number;
+  根骨?: number;
+  机敏?: number;
+  洞察?: number;
+  气血?: number;
+  内力?: number;
+}
+
+export interface TraitRestrictions {
+  // 禁止学习/升级的功法类型，如 ['内功']
+  forbiddenMartialTypes?: string[];
+  // 无法装备的装备部位等
+  forbiddenEquipSlots?: string[];
+}
+
+export interface TraitDiscounts {
+  // 悟性基准偏移量（如 -2 表示基准悟性要求降 2 点，使折扣更多；+2 则表示基准悟性要求升 2 点）
+  savvyRequirementOffset?: number;
+  // 针对特定功法类型的升级熟练度消耗折扣（如 { '剑法': 0.25 } 表示剑法消耗降低 25%）
+  martialTypeDiscount?: Record<string, number>;
+  // 全局功法升级折扣（如 0.1 表示 10% 折扣）
+  globalUpgradeDiscount?: number;
+}
+
 /**
- * 角色天赋定义（简化版）
- * 只保留核心字段：name、description、cost（可选）、attributeThreshold（可选）
+ * 角色天赋定义
+ * 包含基础叙事字段与结构化机制扩展（属性微调、硬性限制、升级折扣）
  * - 普通天赋：有 cost 字段（正数消耗点数，负数获得点数）
  * - 属性天赋：有 attributeThreshold 字段（由属性值自动触发）
  */
@@ -529,6 +558,9 @@ export interface CharacterTrait {
     minValue?: number; // 触发最小值
     maxValue?: number; // 触发最大值
   };
+  attributeModifiers?: TraitAttributeModifiers;
+  restrictions?: TraitRestrictions;
+  discounts?: TraitDiscounts;
 }
 
 /**

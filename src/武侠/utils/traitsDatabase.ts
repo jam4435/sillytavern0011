@@ -3,13 +3,20 @@
  * 包含所有可选天赋、属性触发天赋及其相关逻辑
  */
 
-import type { CharacterTrait, InitialAttributes } from '../types';
+import type {
+  CharacterTrait,
+  InitialAttributes,
+  TraitAttributeModifiers,
+  TraitRestrictions,
+  TraitDiscounts,
+} from '../types';
+import type { AttributeModifierSource } from './attributeCalculator';
 
 /**
  * 普通天赋常量列表（可选天赋）
  * 包含正面和负面天赋
  */
-export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
+export const CHARACTER_TRAITS: CharacterTrait[] = [
   // ============================================
   // 正面天赋
   // ============================================
@@ -17,16 +24,19 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     name: '体魄强健',
     cost: 2,
     description: '生来体格健壮，比常人更能承受苦累。',
+    attributeModifiers: { 根骨: 10, 气血: 10 },
   },
   {
     name: '触类旁通',
     cost: 5,
     description: '学习能力出众，举一反三。',
+    discounts: { savvyRequirementOffset: -1 },
   },
   {
     name: '目光如炬',
     cost: 5,
     description: '眼力过人，善于观察细节。',
+    attributeModifiers: { 洞察: 15 },
   },
   {
     name: '心灵手巧',
@@ -47,16 +57,19 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     name: '过目不忘',
     cost: 2,
     description: '记忆力超群，看过的东西难以忘记。',
+    discounts: { savvyRequirementOffset: -1 },
   },
   {
     name: '武学奇才',
     cost: 5,
     description: '对武学有着超乎常人的理解力。',
+    discounts: { savvyRequirementOffset: -2 },
   },
   {
     name: '铁骨铮铮',
     cost: 5,
     description: '骨骼异于常人的坚硬。',
+    attributeModifiers: { 根骨: 15, 气血: 15 },
   },
   {
     name: '天生魅力',
@@ -72,11 +85,13 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     name: '九阳之体',
     cost: 18,
     description: '体内阳气充沛，是修炼阳刚武学的绝佳体质。',
+    attributeModifiers: { 内力: 20, 气血: 20 },
   },
   {
     name: '至阴之体',
     cost: 18,
     description: '体质阴寒，适合修炼阴柔武学。',
+    attributeModifiers: { 内力: 20, 机敏: 10 },
   },
 
   // ============================================
@@ -86,6 +101,7 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     name: '剑痴',
     cost: 4,
     description: '对剑有着近乎偏执的痴迷，学习剑法事半功倍，但对其他武学兴致缺缺。',
+    discounts: { martialTypeDiscount: { 剑法: 0.25 } },
   },
   {
     name: '丹心侠骨',
@@ -101,6 +117,7 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     name: '嗜武如命',
     cost: 5,
     description: '将武学视为生命，无时无刻不在钻研，修行或战斗时更容易进入顿悟状态。',
+    discounts: { globalUpgradeDiscount: 0.1 },
   },
   {
     name: '古灵精怪',
@@ -116,11 +133,13 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     name: '动如雷霆',
     cost: 4,
     description: '出手果断，战斗时崇尚主动进攻，抢占先机。',
+    attributeModifiers: { 机敏: 10 },
   },
   {
     name: '静若处子',
     cost: 4,
     description: '心性沉稳，擅长后发制人，于静默中等待最佳时机。',
+    attributeModifiers: { 洞察: 10 },
   },
 
   // ============================================
@@ -193,6 +212,7 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     cost: 5,
     description:
       '大巧不工。你摒弃了繁复花哨的剑招，转而追求绝对的力量与势能。当你使用重型兵器（如玄铁重剑）时，无视对手的招架技巧与兵器锋利度，单纯以浑厚的内力压制，一力降十会。',
+    attributeModifiers: { 臂力: 15 },
   },
   {
     name: '心中有剑',
@@ -249,18 +269,21 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     cost: 7,
     description:
       '你的内力性质至柔至顺，极具韧性。遭到刚猛外力打击时，能自动卸去大半劲力。在比拼内力时，你的回气速度远超常人，往往能生生耗死内力比你深厚的对手。',
+    attributeModifiers: { 内力: 15, 根骨: 10 },
   },
   {
     name: '紫气东来',
     cost: 15,
     description:
       '每日清晨日出之时修炼，你的内功精纯度将获得极大提升。你不仅百病不生，且随着年龄增长，容颜衰老极慢，百岁高龄仍可拥有如婴儿般的红润面色，是修炼“先天功”等绝学的最佳体质。',
+    attributeModifiers: { 内力: 25, 根骨: 15, 气血: 15 },
   },
   {
     name: '四两拨千斤',
     cost: 6,
     description:
       '深谙太极圆转之理。你极擅长在接触瞬间洞悉对手劲力的流向，从而用极小的力气改变对方的攻击轨迹，甚至将对手的攻击反弹回其自身。',
+    attributeModifiers: { 机敏: 10, 洞察: 10 },
   },
   {
     name: '胎息龟蛇',
@@ -299,6 +322,7 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     cost: 5,
     description:
       '天生神力，专修重刀。你的每一刀都势大力沉，普通的兵器与你碰撞极易断裂。面对精妙的招式，你只需一刀斩下，便能凭借绝对的力量破除一切花哨。',
+    attributeModifiers: { 臂力: 15 },
   },
   {
     name: '雪山飞狐',
@@ -397,6 +421,7 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     name: '骨质疏松',
     cost: -5,
     description: '骨骼脆弱，容易受伤。',
+    attributeModifiers: { 根骨: -15, 气血: -15 },
   },
   {
     name: '晕血',
@@ -422,26 +447,34 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     name: '断臂',
     cost: -10,
     description: '失去了一条手臂。',
+    attributeModifiers: { 臂力: -20, 机敏: -20 },
   },
   {
     name: '独眼',
     cost: -8,
     description: '失去了一只眼睛。',
+    attributeModifiers: { 洞察: -25 },
   },
   {
     name: '失聪',
     cost: -8,
     description: '听力丧失。',
+    attributeModifiers: { 洞察: -25 },
   },
   {
     name: '内伤缠身',
     cost: -10,
     description: '体内有难以治愈的内伤。',
+    attributeModifiers: { 气血: -20, 内力: -20 },
   },
   {
     name: '经脉尽断',
     cost: -20,
     description: '全身经脉俱断，无法修炼内功。',
+    attributeModifiers: { 内力: -50 },
+    restrictions: {
+      forbiddenMartialTypes: ['内功'],
+    },
   },
   {
     name: '天下通缉',
@@ -471,105 +504,125 @@ export const CHARACTER_TRAITS: Omit<CharacterTrait, 'id'>[] = [
     name: '肌肉萎缩',
     description: '肌肉严重萎缩，毫无力量可言。',
     attributeThreshold: { attribute: '臂力', minValue: 0, maxValue: 1 }, // 严重负面
+    attributeModifiers: { 臂力: -30 },
   },
   {
     name: '手无缚鸡',
     description: '力气极小，连抓一只鸡的力气都没有。',
     attributeThreshold: { attribute: '臂力', minValue: 2, maxValue: 5 }, // 中等负面
+    attributeModifiers: { 臂力: -15 },
   },
   {
     name: '天生神力',
     description: '天生就有远超常人的力量。',
     attributeThreshold: { attribute: '臂力', minValue: 13, maxValue: 16 }, // 中等正面
+    attributeModifiers: { 臂力: 15 },
   },
   {
     name: '霸王扛鼎',
     description: '力能扛鼎，堪比古之霸王。',
     attributeThreshold: { attribute: '臂力', minValue: 17 }, // 强力正面
+    attributeModifiers: { 臂力: 25 },
   },
   // 根骨 (root) - 范围 [0, 20]
   {
     name: '命若悬丝',
     description: '身体极度虚弱，性命如同悬着的丝线般脆弱。',
     attributeThreshold: { attribute: '根骨', minValue: 0, maxValue: 1 }, // 严重负面
+    attributeModifiers: { 根骨: -30, 气血: -30 },
   },
   {
     name: '经脉淤塞',
     description: '经脉部分堵塞，内息运转不畅。',
     attributeThreshold: { attribute: '根骨', minValue: 2, maxValue: 5 }, // 中等负面
+    attributeModifiers: { 根骨: -15, 内力: -15 },
   },
   {
     name: '龙精虎猛',
     description: '精力旺盛，体魄强健如龙虎。',
     attributeThreshold: { attribute: '根骨', minValue: 13, maxValue: 16 }, // 中等正面
+    attributeModifiers: { 根骨: 15, 气血: 15 },
   },
   {
     name: '武骨天成',
     description: '天生一副适合练武的绝佳根骨。',
     attributeThreshold: { attribute: '根骨', minValue: 17 }, // 强力正面
+    attributeModifiers: { 根骨: 25, 气血: 20, 内力: 10 },
   },
   // 机敏 (agility) - 范围 [0, 20]
   {
     name: '反应迟缓',
     description: '神经反应极度缓慢，难以应对突发状况。',
     attributeThreshold: { attribute: '机敏', minValue: 0, maxValue: 1 }, // 严重负面
+    attributeModifiers: { 机敏: -30 },
   },
   {
     name: '笨手笨脚',
     description: '动作协调性差，显得笨拙。',
     attributeThreshold: { attribute: '机敏', minValue: 2, maxValue: 5 }, // 中等负面
+    attributeModifiers: { 机敏: -15 },
   },
   {
     name: '动若脱兔',
     description: '行动迅捷，像受惊的兔子一样敏捷。',
     attributeThreshold: { attribute: '机敏', minValue: 13, maxValue: 16 }, // 中等正面
+    attributeModifiers: { 机敏: 15 },
   },
   {
     name: '浮光掠影',
     description: '身法快如浮光掠影，常人难以捕捉其踪迹。',
     attributeThreshold: { attribute: '机敏', minValue: 17 }, // 强力正面
+    attributeModifiers: { 机敏: 25 },
   },
   // 洞察 (insight) - 范围 [0, 20]
   {
     name: '五感俱衰',
     description: '视觉、听觉、嗅觉、味觉、触觉全面衰退。',
     attributeThreshold: { attribute: '洞察', minValue: 0, maxValue: 1 }, // 严重负面
+    attributeModifiers: { 洞察: -30 },
   },
   {
     name: '视而不见',
     description: '观察力差，常常忽略眼前的细节。',
     attributeThreshold: { attribute: '洞察', minValue: 2, maxValue: 5 }, // 中等负面
+    attributeModifiers: { 洞察: -15 },
   },
   {
     name: '明察秋毫',
     description: '目光敏锐，能看清秋天鸟兽新换的细毛。',
     attributeThreshold: { attribute: '洞察', minValue: 13, maxValue: 16 }, // 中等正面
+    attributeModifiers: { 洞察: 15 },
   },
   {
     name: '洞若观火',
     description: '对事物的观察和理解如同看火一样透彻。',
     attributeThreshold: { attribute: '洞察', minValue: 17 }, // 强力正面
+    attributeModifiers: { 洞察: 25 },
   },
   // 悟性 (savvy) - 范围 [0, 20]
   {
     name: '浑浑噩噩',
     description: '头脑昏沉，对任何事物都无法理解。',
     attributeThreshold: { attribute: '悟性', minValue: 0, maxValue: 1 }, // 严重负面
+    discounts: { savvyRequirementOffset: 4 },
   },
   {
     name: '榆木脑袋',
     description: '思路僵化，难以开窍，学习新事物很慢。',
     attributeThreshold: { attribute: '悟性', minValue: 2, maxValue: 5 }, // 中等负面
+    discounts: { savvyRequirementOffset: 2 },
   },
   {
     name: '过目不忘',
     description: '记忆力超群，看过一遍就不会忘记。',
     attributeThreshold: { attribute: '悟性', minValue: 13, maxValue: 16 }, // 中等正面
+    discounts: { savvyRequirementOffset: -1 },
   },
   {
     name: '玲珑七窍',
     description: '心思机敏，聪慧异常，通晓事理。',
     attributeThreshold: { attribute: '悟性', minValue: 17 }, // 强力正面
+    discounts: { savvyRequirementOffset: -3 },
   },
   // 风姿 (charisma) - 范围 [0, 20]
   {
@@ -630,4 +683,131 @@ export function getTriggeredTraitsByAttribute(attribute: keyof InitialAttributes
 
     return true;
   }) as CharacterTrait[];
+}
+
+// ============================================
+// 天赋查询与机制推导辅助函数
+// ============================================
+
+const TRAIT_MAP = new Map<string, CharacterTrait>();
+for (const trait of CHARACTER_TRAITS) {
+  TRAIT_MAP.set(trait.name, trait);
+}
+
+/**
+ * 根据天赋名称安全查找预设定义
+ */
+export function getTraitByName(name: string): CharacterTrait | undefined {
+  return TRAIT_MAP.get(name);
+}
+
+/**
+ * 规范化天赋名称数组（支持 Record<string, unknown>、string[] 或 null/undefined）
+ */
+export function normalizeTraitNames(traits?: Record<string, unknown> | string[] | null): string[] {
+  if (!traits) return [];
+  if (Array.isArray(traits)) {
+    return traits.filter(Boolean);
+  }
+  return Object.keys(traits).filter(k => !k.startsWith('$'));
+}
+
+/**
+ * 将用户天赋转换为属性修正源列表，供 attributeCalculator 使用
+ */
+export function getTraitModifierSources(
+  traits?: Record<string, unknown> | string[] | null,
+): AttributeModifierSource[] {
+  const names = normalizeTraitNames(traits);
+  const sources: AttributeModifierSource[] = [];
+
+  for (const name of names) {
+    const def = getTraitByName(name);
+    if (def?.attributeModifiers && Object.keys(def.attributeModifiers).length > 0) {
+      sources.push({
+        id: `天赋:${name}`,
+        kind: '天赋',
+        modifiers: def.attributeModifiers as Record<string, number>,
+      });
+    }
+  }
+
+  return sources;
+}
+
+/**
+ * 汇总计算所有天赋对修炼/学习造成的限制
+ */
+export function getTraitRestrictions(
+  traits?: Record<string, unknown> | string[] | null,
+): TraitRestrictions {
+  const names = normalizeTraitNames(traits);
+  const forbiddenTypes = new Set<string>();
+  const forbiddenSlots = new Set<string>();
+
+  for (const name of names) {
+    const def = getTraitByName(name);
+    if (def?.restrictions) {
+      def.restrictions.forbiddenMartialTypes?.forEach(t => forbiddenTypes.add(t));
+      def.restrictions.forbiddenEquipSlots?.forEach(s => forbiddenSlots.add(s));
+    }
+  }
+
+  return {
+    forbiddenMartialTypes: Array.from(forbiddenTypes),
+    forbiddenEquipSlots: Array.from(forbiddenSlots),
+  };
+}
+
+/**
+ * 检查特定功法类型是否被当前天赋禁止
+ * @returns 若被禁止返回具体原因，否则返回 null
+ */
+export function checkMartialArtTraitRestriction(
+  artType: string,
+  traits?: Record<string, unknown> | string[] | null,
+): string | null {
+  const restrictions = getTraitRestrictions(traits);
+  if (restrictions.forbiddenMartialTypes?.includes(artType)) {
+    if (artType === '内功') {
+      return '全身经脉俱断，无法修炼内功';
+    }
+    return `受天赋限制，无法修炼${artType}`;
+  }
+  return null;
+}
+
+/**
+ * 汇总计算所有天赋对升级消耗产生的折扣与基准偏移
+ */
+export function getTraitDiscounts(
+  traits?: Record<string, unknown> | string[] | null,
+): TraitDiscounts {
+  const names = normalizeTraitNames(traits);
+  let savvyRequirementOffset = 0;
+  const martialTypeDiscount: Record<string, number> = {};
+  let globalUpgradeDiscount = 0;
+
+  for (const name of names) {
+    const def = getTraitByName(name);
+    if (def?.discounts) {
+      if (def.discounts.savvyRequirementOffset) {
+        savvyRequirementOffset += def.discounts.savvyRequirementOffset;
+      }
+      if (def.discounts.martialTypeDiscount) {
+        for (const [type, discount] of Object.entries(def.discounts.martialTypeDiscount)) {
+          martialTypeDiscount[type] = Math.max(martialTypeDiscount[type] ?? 0, discount);
+        }
+      }
+      if (def.discounts.globalUpgradeDiscount) {
+        globalUpgradeDiscount = Math.max(globalUpgradeDiscount, def.discounts.globalUpgradeDiscount);
+      }
+    }
+  }
+
+  return {
+    savvyRequirementOffset,
+    martialTypeDiscount: Object.keys(martialTypeDiscount).length > 0 ? martialTypeDiscount : undefined,
+    globalUpgradeDiscount: globalUpgradeDiscount > 0 ? globalUpgradeDiscount : undefined,
+  };
 }

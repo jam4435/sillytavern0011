@@ -20,8 +20,19 @@ import { clearAvatarSelection, createAvatarEntityKey } from './avatarStorage';
 import { EVENT_RUNTIME_KEY_VERSION } from '../../shared/eventKey.js';
 
 // 从天赋数据库导入天赋相关内容，并重新导出供其他模块使用
-import { CHARACTER_TRAITS, getTriggeredTraitsByAttribute } from './traitsDatabase';
-export { CHARACTER_TRAITS, getTriggeredTraitsByAttribute };
+import {
+  CHARACTER_TRAITS,
+  getTriggeredTraitsByAttribute,
+  getTraitModifierSources,
+  checkMartialArtTraitRestriction,
+} from './traitsDatabase';
+export {
+  CHARACTER_TRAITS,
+  getTriggeredTraitsByAttribute,
+  getTraitModifierSources,
+  checkMartialArtTraitRestriction,
+};
+import { getMartialArtData } from './martialArtsDatabase';
 
 // 从 data 文件夹导入静态数据
 import eventsData from '../data/事件信息汇总.json';
@@ -356,6 +367,16 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     }
   }
 
+  // 校验并过滤因天赋限制无法修炼的功法（如 经脉尽断 无法修炼内功）
+  for (const artName of Object.keys(martialArtsObj)) {
+    const artData = getMartialArtData(artName);
+    const artType = artData?.类型 || martialArtsForCalc[artName]?.type;
+    if (artType && checkMartialArtTraitRestriction(artType, traitsObj)) {
+      delete martialArtsObj[artName];
+      delete martialArtsForCalc[artName];
+    }
+  }
+
   let realm: RealmLevel;
   let cultivation: number;
 
@@ -376,7 +397,13 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     洞察: initialAttributes.洞察,
   };
 
-  const { combat, resources } = calculateAllAttributes(chineseInitialAttrs, realm, martialArtsForCalc);
+  const traitModifiers = getTraitModifierSources(traitsObj);
+  const { combat, resources } = calculateAllAttributes(
+    chineseInitialAttrs,
+    realm,
+    martialArtsForCalc,
+    traitModifiers.length > 0 ? traitModifiers : undefined,
+  );
 
   const variableData = {
     世界信息: {

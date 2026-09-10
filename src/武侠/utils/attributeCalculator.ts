@@ -84,7 +84,7 @@ export interface AttributeModifierMap {
   [attribute: string]: number;
 }
 
-export type AttributeModifierKind = '装备' | '回复' | '临时增幅' | '永久增幅' | '经脉' | '未封顶';
+export type AttributeModifierKind = '装备' | '回复' | '临时增幅' | '永久增幅' | '经脉' | '未封顶' | '天赋';
 
 export interface AttributeModifierSource {
   id?: string;
@@ -135,7 +135,7 @@ const RANK_REFERENCE_REALM: Record<string, string> = {
   神品: '绝顶圆满',
 };
 
-const MODIFIER_CAP_PERCENT: Record<Exclude<AttributeModifierKind, '未封顶' | '经脉'>, Record<string, number>> = {
+const MODIFIER_CAP_PERCENT: Record<Exclude<AttributeModifierKind, '未封顶' | '经脉' | '天赋'>, Record<string, number>> = {
   装备: {
     凡品: 5,
     精品: 10,
@@ -278,7 +278,7 @@ function normalizeOrdinaryRank(rank?: string): string | undefined {
 }
 
 function getModifierCapPercent(kind: AttributeModifierKind | undefined, rank?: string): number | undefined {
-  if (!kind || kind === '未封顶' || kind === '经脉') {
+  if (!kind || kind === '未封顶' || kind === '经脉' || kind === '天赋') {
     return undefined;
   }
   const normalizedRank = normalizeOrdinaryRank(rank);

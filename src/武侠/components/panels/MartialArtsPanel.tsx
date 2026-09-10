@@ -64,6 +64,7 @@ interface MartialArtsPanelProps {
   martialArts: Record<string, MartialArt>;
   cultivation: number;
   comprehension: number;
+  traits?: Record<string, string>;
   onUpgrade?: (result: {
     success: boolean;
     martialArtName: string;
@@ -77,6 +78,7 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
   martialArts,
   cultivation,
   comprehension,
+  traits,
   onUpgrade,
 }) => {
   const [selectedArtName, setSelectedArtName] = useState<string | null>(null);
@@ -121,6 +123,7 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
           cultivation,
           art.rank as MartialArtsRank,
           comprehension,
+          traits,
         );
 
         onUpgrade?.({
@@ -304,7 +307,11 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
             </div>
 
             <footer className="workbench-detail-actions">
-              {selectedArt.nextMastery ? (
+              {selectedArt.restrictionReason ? (
+                <div className="martial-art-blocked-notice" style={{ color: '#f87171', padding: '0.5rem', textAlign: 'center', width: '100%', fontSize: '0.9rem' }}>
+                  ⚠️ {selectedArt.restrictionReason}
+                </div>
+              ) : selectedArt.nextMastery ? (
                 <>
                   <div className="martial-art-upgrade-meta">
                     <div>
