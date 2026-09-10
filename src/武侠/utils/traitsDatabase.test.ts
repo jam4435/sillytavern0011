@@ -62,13 +62,14 @@ describe('traitsDatabase 结构化天赋机制', () => {
     expect(swordCheck).toBeNull();
   });
 
-  it('升级折扣汇总：武学奇才与剑痴正确生效', () => {
+  it('升级折扣汇总：武学奇才与剑痴正确生效并进行乘算复合', () => {
     const traits = ['武学奇才', '剑痴', '嗜武如命'];
     const discounts = getTraitDiscounts(traits);
 
     expect(discounts.savvyRequirementOffset).toBe(-2);
     expect(discounts.martialTypeDiscount?.['剑法']).toBe(0.25);
-    expect(discounts.globalUpgradeDiscount).toBe(0.1);
+    // 武学奇才(15%) 与 嗜武如命(10%) 乘算复合: 1 - (1 - 0.15) * (1 - 0.10) = 0.235
+    expect(discounts.globalUpgradeDiscount).toBe(0.235);
   });
 
   it('属性计算引擎正确应用天赋修正', () => {

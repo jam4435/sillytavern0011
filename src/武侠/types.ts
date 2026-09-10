@@ -543,15 +543,20 @@ export interface TraitDiscounts {
   globalUpgradeDiscount?: number;
 }
 
+export type TraitRank = '粗浅' | '传家' | '上乘' | '镇派' | '绝世' | '传说' | '缺陷';
+export type TraitCategory = '兵刃' | '体质' | '身法' | '内功' | '情爱' | '奇人' | '医毒' | '缺陷';
+
 /**
  * 角色天赋定义
- * 包含基础叙事字段与结构化机制扩展（属性微调、硬性限制、升级折扣）
+ * 包含基础叙事字段与结构化机制扩展（品阶、分类、属性微调、硬性限制、升级折扣、风味提示词）
  * - 普通天赋：有 cost 字段（正数消耗点数，负数获得点数）
  * - 属性天赋：有 attributeThreshold 字段（由属性值自动触发）
  */
 export interface CharacterTrait {
   name: string;
   description: string;
+  rank?: TraitRank;
+  category?: TraitCategory;
   cost?: number; // 正面天赋消耗点数（正数），负面天赋获得点数（负数）。属性天赋无此字段。
   attributeThreshold?: {
     attribute: keyof InitialAttributes;
@@ -561,6 +566,7 @@ export interface CharacterTrait {
   attributeModifiers?: TraitAttributeModifiers;
   restrictions?: TraitRestrictions;
   discounts?: TraitDiscounts;
+  flavorPrompt?: string; // 专供大模型的日常风味与行为因果指引（战力完全折算面板，只在非战力处展现异象）
 }
 
 /**
