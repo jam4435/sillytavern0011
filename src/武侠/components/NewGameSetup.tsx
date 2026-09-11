@@ -72,6 +72,14 @@ const RANK_POINT_COST: Record<MartialArtsRank, number> = {
   传说: 30,
 };
 
+type EventWorkFilter = 'all' | 'tianlong' | 'shediao' | 'shendiao';
+
+interface EventWorkOption {
+  key: EventWorkFilter;
+  label: string;
+  count: number;
+}
+
 // 武功混合池抽卡费用（统一费用，随机抽取任意品阶）
 const MARTIAL_ARTS_DRAW_COST = 5; // 花费5点随机抽取武功
 
@@ -151,6 +159,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   const [useEventLocation, setUseEventLocation] = useState(true);
   const [selectedEventId, setSelectedEventId] = useState(STORY_EVENTS[0]?.id || '');
   const [eventSearchQuery, setEventSearchQuery] = useState(''); // 事件搜索关键词
+  const [eventWorkFilter, setEventWorkFilter] = useState<EventWorkFilter>('all'); // 作品分卷筛选
   const [customLocation, setCustomLocation] = useState('');
   const [customYear, setCustomYear] = useState(1199);
   const [customMonth, setCustomMonth] = useState(8);
@@ -291,6 +300,39 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   const selectedTalent = useMemo(() => {
     return TALENT_TIERS.find(t => t.id === selectedTalentId);
   }, [selectedTalentId]);
+
+  // 作品分卷选项及数量统计
+  const eventWorkOptions = useMemo<EventWorkOption[]>(() => {
+    let tianlongCount = 0;
+    let shediaoCount = 0;
+    let shendiaoCount = 0;
+
+    for (const event of STORY_EVENTS) {
+      if (event.name.startsWith('天龙')) tianlongCount++;
+      else if (event.name.startsWith('射雕')) shediaoCount++;
+      else if (event.name.startsWith('神雕')) shendiaoCount++;
+    }
+
+    return [
+      { key: 'all', label: '全部', count: STORY_EVENTS.length },
+      { key: 'tianlong', label: '天龙八部', count: tianlongCount },
+      { key: 'shediao', label: '射雕英雄传', count: shediaoCount },
+      { key: 'shendiao', label: '神雕侠侣', count: shendiaoCount },
+    ];
+  }, []);
+
+  // 按作品分卷和搜索关键词过滤事件
+  const filteredStoryEvents = useMemo(() => {
+    const query = eventSearchQuery.trim().toLowerCase();
+    return STORY_EVENTS.filter(event => {
+      if (eventWorkFilter === 'tianlong' && !event.name.startsWith('天龙')) return false;
+      if (eventWorkFilter === 'shediao' && !event.name.startsWith('射雕')) return false;
+      if (eventWorkFilter === 'shendiao' && !event.name.startsWith('神雕')) return false;
+
+      if (!query) return true;
+      return event.name.toLowerCase().includes(query) || event.location.toLowerCase().includes(query);
+    });
+  }, [eventSearchQuery, eventWorkFilter]);
 
   // 总可用点数
   const totalPoints = selectedTalent?.totalPoints ?? 30;
@@ -2367,6 +2409,23 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
 
                 {useEventLocation ? (
                   <div className="event-select-section">
+                    {/* 作品分卷筛选 Tab */}
+                    <div className="event-work-filter" role="tablist" aria-label="作品分卷筛选">
+                      {eventWorkOptions.map(tab => (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          role="tab"
+                          className={`event-tab ${eventWorkFilter === tab.key ? 'active' : ''}`}
+                          aria-selected={eventWorkFilter === tab.key}
+                          onClick={() => setEventWorkFilter(tab.key)}
+                        >
+                          <span className="tab-label">{tab.label}</span>
+                          <span className="tab-count">({tab.count})</span>
+                        </button>
+                      ))}
+                    </div>
+
                     {/* 事件搜索框 */}
                     <div className="search-wrapper event-search-wrapper">
                       <input
@@ -2378,58 +2437,52 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         onChange={e => setEventSearchQuery(e.target.value)}
                       />
                       <span className="search-icon">🔍</span>
-                      {eventSearchQuery && (
+                      {(eventSearchQuery || eventWorkFilter !== 'all') && (
                         <span className="search-result-count">
-                          找到{' '}
-                          {
-                            STORY_EVENTS.filter(event => {
-                              const query = eventSearchQuery.toLowerCase();
-                              return (
-                                event.name.toLowerCase().includes(query) || event.location.toLowerCase().includes(query)
-                              );
-                            }).length
-                          }{' '}
-                          个事件
+                          找到 {filteredStoryEvents.length} 个事件
                         </span>
                       )}
                     </div>
                     {/* 事件列表滚动容器 */}
                     <div className="event-scroll-container">
                       <div className="event-select">
-                        {STORY_EVENTS.filter(event => {
-                          if (!eventSearchQuery) return true;
-                          const query = eventSearchQuery.toLowerCase();
-                          return (
-                            event.name.toLowerCase().includes(query) || event.location.toLowerCase().includes(query)
-                          );
-                        }).map(event => (
-                          <div
-                            key={event.id}
-                            className={`event-card ${selectedEventId === event.id ? 'selected' : ''}`}
-                            data-wuxia-automation="opening-event"
-                            data-wuxia-event-id={event.id}
-                            data-wuxia-event-name={event.name}
-                            data-wuxia-event-selected={selectedEventId === event.id ? 'true' : 'false'}
-                            onClick={() => setSelectedEventId(event.id)}
-                          >
-                            <span className="event-name">{event.name}</span>
-                            <span className="event-time">
-                              {event.year}年{event.month}月{event.day}日
-                              {event.hour !== undefined ? `${event.hour}时00分` : '11时00分'}
-                            </span>
-                            <span className="event-location">{event.location}</span>
-                            {selectedEventId === event.id && (
-                              <div className="selected-indicator">
-                                <span>✓</span>
-                              </div>
-                            )}
+                        {filteredStoryEvents.length > 0 ? (
+                          filteredStoryEvents.map(event => (
+                            <div
+                              key={event.id}
+                              className={`event-card ${selectedEventId === event.id ? 'selected' : ''}`}
+                              data-wuxia-automation="opening-event"
+                              data-wuxia-event-id={event.id}
+                              data-wuxia-event-name={event.name}
+                              data-wuxia-event-selected={selectedEventId === event.id ? 'true' : 'false'}
+                              onClick={() => setSelectedEventId(event.id)}
+                            >
+                              <span className="event-name">{event.name}</span>
+                              <span className="event-time">
+                                {event.year}年{event.month}月{event.day}日
+                                {event.hour !== undefined ? `${event.hour}时00分` : '11时00分'}
+                              </span>
+                              <span className="event-location">{event.location}</span>
+                              {selectedEventId === event.id && (
+                                <div className="selected-indicator">
+                                  <span>✓</span>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="empty-event-hint">
+                            未找到匹配的开局事件
                           </div>
-                        ))}
+                        )}
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="custom-location">
+                    <p className="custom-time-hint">
+                      参考时期：天龙约 1092 年 · 射雕约 1200 年 · 神雕约 1238 年
+                    </p>
                     <div className="time-inputs">
                       <div className="form-group">
                         <label className="form-label">年份</label>
@@ -2472,7 +2525,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         className="form-input"
                         value={customLocation}
                         onChange={e => setCustomLocation(e.target.value)}
-                        placeholder="例如：大宋/临安府/西湖"
+                        placeholder="例如：大理/无量山/剑湖宫 或 大宋/临安府/西湖"
                       />
                       {errors.location && <p className="error-text">{errors.location}</p>}
                     </div>

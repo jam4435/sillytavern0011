@@ -160,5 +160,14 @@ describe('NewGameSetup automation markers', () => {
     expect(eventCard).toHaveAttribute('data-wuxia-event-name', event.name);
     fireEvent.click(eventCard as HTMLElement);
     expect(eventCard).toHaveAttribute('data-wuxia-event-selected', 'true');
+
+    // 验证作品分卷筛选 Tab 可以正确过滤事件
+    const shediaoTab = screen.getByRole('tab', { name: /射雕英雄传/ });
+    fireEvent.click(shediaoTab);
+    const visibleCards = document.querySelectorAll('[data-wuxia-automation="opening-event"]');
+    expect(visibleCards.length).toBeGreaterThan(0);
+    for (const card of Array.from(visibleCards).slice(0, 5)) {
+      expect(card.getAttribute('data-wuxia-event-name')).toMatch(/^射雕/);
+    }
   });
 });
