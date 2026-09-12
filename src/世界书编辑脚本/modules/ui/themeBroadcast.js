@@ -5,11 +5,14 @@
  * 同时使用 !important 彻底抵御酒馆原生全局样式对 input/select/textarea 的覆盖。
  */
 
+import { LOREBOOK_FLOATING_BUBBLE_ID, LOREBOOK_PANEL_ID } from '../config.js';
+
 export const THEME_BROADCAST_STYLE_ID = 'lorebook-theme-dynamic-styles';
 
 // 广播目标选择器列表：精准限定在插件自身的面板与弹窗 ID 上，绝不污染酒馆宿主网页
 export const THEME_BROADCAST_SELECTORS = [
-  '#character-lorebook-panel',
+  `#${LOREBOOK_PANEL_ID}`,
+  `#${LOREBOOK_FLOATING_BUBBLE_ID}`,
   '#lorebook-optimize-modal',
   '#theme-settings-modal',
   '#lorebook-import-modal',
@@ -23,13 +26,13 @@ export const THEME_BROADCAST_SELECTORS = [
   '#compare-editor-modal',
   '#ai-action-dialog-modal',
   '#rollback-preview-modal',
-  '#character-lorebook-floating-bubble',
+  '#mobile-tooltip',
   '.lorebook-theme-scope',
 ];
 
 // 需要统一表单控件样式的容器列表
 export const THEME_FORM_CONTAINER_SELECTORS = [
-  '#character-lorebook-panel',
+  `#${LOREBOOK_PANEL_ID}`,
   '#lorebook-optimize-modal',
   '#theme-settings-modal',
   '#lorebook-import-modal',
@@ -80,7 +83,7 @@ export function buildThemeBroadcastCss(
   const placeholdersTextarea = formContainers.map(s => `${s} textarea::placeholder`).join(',\n');
 
   const formControlsRule = `
-/* 表单控件常规态：应用主题设置的输入栏背景色 */
+/* 表单控件常规态：应用主题设置的输入栏背景色，抵抗宿主主题覆盖 */
 ${inputs},
 ${textareas},
 ${selects} {
