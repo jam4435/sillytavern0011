@@ -1630,8 +1630,8 @@ export function initOptimizer() {
                         <p class="description">在 当前打开的世界书 的选中条目中进行搜索和替换。</p>
                         <div class="action-area" style="flex-direction: column; align-items: stretch; gap: 10px;">
                             <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-                                <input type="text" id="global-search-input" placeholder="要搜索的内容..." style="width: 100%; box-sizing: border-box; background-color: #333; color: #eee; border: 1px solid #555; padding: 8px; border-radius: 4px;">
-                                <input type="text" id="global-replace-input" placeholder="替换为..." style="width: 100%; box-sizing: border-box; background-color: #333; color: #eee; border: 1px solid #555; padding: 8px; border-radius: 4px;">
+                                <input type="text" id="global-search-input" placeholder="要搜索的内容..." style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px;">
+                                <input type="text" id="global-replace-input" placeholder="替换为..." style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px;">
                             </div>
                             <div class="search-scope-container" style="display: flex; gap: 15px; align-items: center; font-size: 0.9em;">
                                 <strong>搜索范围:</strong>
@@ -1678,19 +1678,19 @@ export function initOptimizer() {
     `;
   const reorderModalHtml = `
            <div id="lorebook-reorder-modal" style="display:none; position: fixed; z-index: 10003; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.7); overflow-y: auto; box-sizing: border-box; justify-content: center; align-items: center;">
-               <div style="background-color: #2c2c2c; color: #eee; padding: 0; border: 1px solid #555; width: 85%; max-width: 320px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; margin: auto; box-sizing: border-box;">
-                   <div style="padding: 12px 15px; background-color: #3a6a8e; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+               <div style="background-color: var(--panel-bg-color, #2c2c2c); color: var(--panel-text-color, #eee); padding: 0; border: 1px solid var(--panel-border-color, #555); width: 85%; max-width: 320px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; margin: auto; box-sizing: border-box;">
+                   <div style="padding: 12px 15px; background-color: var(--panel-accent-color, #3a6a8e); color: var(--panel-accent-text-color, white); border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
                        <h4 style="margin: 0; font-size: 16px;">交互式顺序重排</h4>
                        <span class="close-button" style="font-size: 24px; font-weight: bold; cursor: pointer; line-height: 1;">&times;</span>
                    </div>
                    <div style="padding: 20px 15px; display: flex; flex-direction: column; gap: 16px;">
                        <div style="display: flex; justify-content: space-between; align-items: center;">
                            <label for="reorder-start-number" style="font-size: 14px;">起始编号</label>
-                           <input type="number" id="reorder-start-number" value="0" style="width: 80px; background-color: #333; color: #eee; border: 1px solid #555; padding: 6px 8px; border-radius: 4px; box-sizing: border-box;">
+                           <input type="number" id="reorder-start-number" value="0" style="width: 80px; padding: 6px 8px; border-radius: 4px; box-sizing: border-box;">
                        </div>
                        <div style="display: flex; justify-content: space-between; align-items: center;">
                            <label for="reorder-step-number" style="font-size: 14px;">步长 (间隔)</label>
-                           <input type="number" id="reorder-step-number" value="1" style="width: 80px; background-color: #333; color: #eee; border: 1px solid #555; padding: 6px 8px; border-radius: 4px; box-sizing: border-box;">
+                           <input type="number" id="reorder-step-number" value="1" style="width: 80px; padding: 6px 8px; border-radius: 4px; box-sizing: border-box;">
                        </div>
                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px;">
                            <button class="cancel-reorder-button" style="padding: 8px 16px; background-color: #666; border: none; color: white; cursor: pointer; border-radius: 4px; font-size: 14px;">取消</button>
@@ -1702,8 +1702,8 @@ export function initOptimizer() {
        `;
   const searchPreviewModalHtml = `
            <div id="search-preview-modal" style="display:none; position: fixed; z-index: 10006; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.7); overflow-y: auto; box-sizing: border-box;">
-               <div style="background-color: #2c2c2c; color: #eee; padding: 0; border: 1px solid #555; width: 90%; max-width: 800px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: calc(100vh - 150px); margin: 80px auto 50px auto; box-sizing: border-box;">
-                   <div style="padding: 10px 15px; background-color: #3a6a8e; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+               <div style="background-color: var(--panel-bg-color, #2c2c2c); color: var(--panel-text-color, #eee); padding: 0; border: 1px solid var(--panel-border-color, #555); width: 90%; max-width: 800px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: calc(100vh - 150px); margin: 80px auto 50px auto; box-sizing: border-box;">
+                   <div style="padding: 10px 15px; background-color: var(--panel-accent-color, #3a6a8e); color: var(--panel-accent-text-color, white); border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
                        <h4>搜索替换预览</h4>
                        <span class="close-button" style="font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
                    </div>

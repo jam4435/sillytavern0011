@@ -321,11 +321,9 @@ function applyTheme(theme) {
     const panelBgColor = colorWithOpacity(layoutTheme.bgColor, layoutTheme.panelOpacity);
     const interiorSurfaceOpacity = getInteriorSurfaceOpacity(layoutTheme);
     const entryBgColor = colorWithOpacity(layoutTheme.entryBgColor, interiorSurfaceOpacity);
-    const inputBgColor = colorWithOpacity(layoutTheme.inputBgColor, interiorSurfaceOpacity);
-    const inputFocusBgColor = colorWithOpacity(
-      colorMix(layoutTheme.inputBgColor, 82, layoutTheme.accentColor),
-      interiorSurfaceOpacity,
-    );
+    // 表单输入表面直接使用用户选择的颜色，不与面板透明度混合，确保在深色或半透明主题下忠实显色
+    const inputBgColor = layoutTheme.inputBgColor;
+    const inputFocusBgColor = colorMix(layoutTheme.inputBgColor, 82, layoutTheme.accentColor);
     const entryHoverBgColor = colorWithOpacity(
       colorMix(layoutTheme.entryBgColor, 88, layoutTheme.accentColor),
       interiorSurfaceOpacity,
@@ -334,10 +332,7 @@ function applyTheme(theme) {
       colorMix(layoutTheme.entryBgColor, 84, layoutTheme.accentColor),
       interiorSurfaceOpacity,
     );
-    const dropdownActiveBgColor = colorWithOpacity(
-      colorMix(layoutTheme.inputBgColor, 70, layoutTheme.accentColor),
-      interiorSurfaceOpacity,
-    );
+    const dropdownActiveBgColor = colorMix(layoutTheme.inputBgColor, 70, layoutTheme.accentColor);
     const iconHoverBgColor = colorMix(layoutTheme.iconBgColor, 82, '#ffffff');
     const semanticThemeTokens = buildSemanticThemeTokens(layoutTheme, interiorSurfaceOpacity);
     const panelAccentTextColor = isColorDark(layoutTheme.accentColor) ? '#ffffff' : '#1a1a1a';

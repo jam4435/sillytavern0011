@@ -43,6 +43,22 @@ describe('themeBroadcast 动态主题广播模块', () => {
     expect(styles[0].textContent).toContain('color-scheme: light;');
   });
 
+  it('正确编译表单控件规则并排除 entry-item-title', () => {
+    const css = buildThemeBroadcastCss(
+      {
+        '--panel-input-bg-color': '#ff0000',
+        '--panel-text-color': '#ffffff',
+      },
+      'dark',
+      ['#test-modal'],
+      ['#test-modal'],
+    );
+
+    expect(css).toContain('#test-modal input:not(.entry-item-title)');
+    expect(css).toContain('background-color: var(--panel-input-bg-color) !important;');
+    expect(css).toContain('background-color: var(--panel-input-focus-bg-color) !important;');
+  });
+
   it('可安全彻底卸载广播样式表', () => {
     syncThemeBroadcast(document, { '--panel-bg-color': '#111' }, 'dark');
     expect(document.getElementById(THEME_BROADCAST_STYLE_ID)).not.toBeNull();
