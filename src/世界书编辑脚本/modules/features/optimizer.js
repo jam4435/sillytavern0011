@@ -1577,8 +1577,8 @@ export function initOptimizer() {
 
   const optimizeModalHtml = `
         <div id="lorebook-optimize-modal" style="display:none; position: fixed; z-index: 10002; left: 0; top: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.7); overflow-y: auto; box-sizing: border-box;">
-            <div id="lorebook-optimize-modal-content" style="background-color: #2c2c2c; color: #eee; padding: 0; border: 1px solid #555; width: 90%; max-width: 600px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: calc(100vh - 150px); margin: 80px auto 50px auto; box-sizing: border-box;">
-                <div id="lorebook-optimize-modal-header" style="padding: 10px 15px; background-color: #3a6a8e; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <div id="lorebook-optimize-modal-content" style="background-color: var(--panel-bg-color, #2c2c2c); color: var(--panel-text-color, #eee); padding: 0; border: 1px solid var(--panel-border-color, #555); width: 90%; max-width: 600px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: calc(100vh - 150px); margin: 80px auto 50px auto; box-sizing: border-box;">
+                <div id="lorebook-optimize-modal-header" style="padding: 10px 15px; background-color: var(--panel-accent-color, #3a6a8e); color: var(--panel-accent-text-color, white); border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
                     <h4 id="lorebook-optimize-modal-title">世界书优化工具</h4>
                     <span class="close-button" style="font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
                 </div>

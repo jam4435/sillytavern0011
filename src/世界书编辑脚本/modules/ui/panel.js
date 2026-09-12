@@ -2562,10 +2562,10 @@ export function initPanel() {
                     align-items: center;
                 }
                 #lorebook-optimize-modal-content {
-                    background-color: #2c2c2c;
-                    color: #eee;
+                    background-color: var(--panel-bg-color, #2c2c2c);
+                    color: var(--panel-text-color, #eee);
                     padding: 0;
-                    border: 1px solid #555;
+                    border: 1px solid var(--panel-border-color, #555);
                     width: 90%;
                     max-width: 600px; /* 减小最大宽度 */
                     border-radius: 8px;
@@ -2575,8 +2575,8 @@ export function initPanel() {
                 }
                 #lorebook-optimize-modal-header {
                     padding: 10px 15px;
-                    background-color: #3a6a8e;
-                    color: white;
+                    background-color: var(--panel-accent-color, #3a6a8e);
+                    color: var(--panel-accent-text-color, white);
                     border-top-left-radius: 8px;
                     border-top-right-radius: 8px;
                     display: flex;
@@ -2603,12 +2603,12 @@ export function initPanel() {
                     margin-top: 0;
                     margin-bottom: 10px;
                     color: var(--panel-accent-color);
-                    border-bottom: 1px solid #555;
+                    border-bottom: 1px solid var(--panel-border-color, #555);
                     padding-bottom: 5px;
                 }
                 .optimize-section .description {
                     font-size: 0.9em;
-                    color: #ccc;
+                    color: var(--panel-muted-text-color, #ccc);
                     margin-bottom: 15px;
                 }
                 .optimize-section .action-area {
@@ -2618,9 +2618,9 @@ export function initPanel() {
                 }
                 .optimize-section .action-area button {
                     padding: 8px 12px;
-                    background-color: #5a3a8e;
+                    background-color: var(--panel-accent-color, #5a3a8e);
                     border: none;
-                    color: white;
+                    color: var(--panel-accent-text-color, white);
                     cursor: pointer;
                     border-radius: 4px;
                 }
@@ -2630,9 +2630,9 @@ export function initPanel() {
                 #optimize-cliche-words-textarea {
                     width: 100%;
                     min-height: 80px;
-                    background-color: #222;
-                    color: #eee;
-                    border: 1px solid #555;
+                    background-color: var(--panel-input-bg-color, #222);
+                    color: var(--panel-text-color, #eee);
+                    border: 1px solid var(--panel-border-color, #555);
                     border-radius: 4px;
                     resize: vertical;
                     box-sizing: border-box;
@@ -2640,9 +2640,9 @@ export function initPanel() {
                 }
                 #global-search-replace-area input[type="text"] {
                     flex-grow: 1;
-                    background-color: #222;
-                    color: #eee;
-                    border: 1px solid #555;
+                    background-color: var(--panel-input-bg-color, #222);
+                    color: var(--panel-text-color, #eee);
+                    border: 1px solid var(--panel-border-color, #555);
                     padding: 8px;
                     border-radius: 4px;
                 }
@@ -3014,6 +3014,11 @@ export function initPanel() {
                     #${LOREBOOK_EDITOR_PANEL_ID} .lorebook-modal-content {
                         width: 95%;
                         max-width: 480px;
+                    }
+                    #lorebook-optimize-modal-content {
+                        width: calc(100% - 24px) !important;
+                        max-height: calc(100dvh - 24px) !important;
+                        margin: max(12px, env(safe-area-inset-top)) auto max(12px, env(safe-area-inset-bottom)) auto !important;
                     }
                     #${LOREBOOK_EDITOR_PANEL_ID} .form-row {
                         flex-direction: column;

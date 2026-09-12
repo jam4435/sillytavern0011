@@ -15,6 +15,7 @@ import { getLocalStorageItem, isMobile, rgbaToHex, setLocalStorageItem, triggerD
 import { refreshAiWorkspace } from './aiWorkspace.js';
 import { syncPanelLayoutMode } from './detail.js';
 import { switchTab, toggleLorebookPanel } from './panel.js';
+import { syncThemeBroadcast } from './themeBroadcast.js';
 
 const THEME_VERSION = 4;
 const DEFAULT_LAYOUT_MODE = 'master-detail';
@@ -413,6 +414,39 @@ function applyTheme(theme) {
         '--panel-entry-bg-color': layoutTheme.entryBgColor,
       });
     }
+
+    // 动态主题广播 (PoC): 向 parentDoc.head 注入/更新主题样式表，广播给所有独立弹窗
+    const themeColorScheme = isColorDark(layoutTheme.bgColor) ? 'dark' : 'light';
+    syncThemeBroadcast(
+      parentDoc,
+      {
+        ...semanticThemeTokens,
+        '--panel-bg-color': panelBgColor,
+        '--panel-text-color': layoutTheme.textColor,
+        '--panel-accent-color': layoutTheme.accentColor,
+        '--panel-entry-bg-color': entryBgColor,
+        '--panel-input-bg-color': inputBgColor,
+        '--panel-field-bg-color': inputBgColor,
+        '--panel-input-focus-bg-color': inputFocusBgColor,
+        '--panel-field-focus-bg-color': inputFocusBgColor,
+        '--panel-dropdown-bg-color': inputBgColor,
+        '--panel-dropdown-hover-bg-color': layoutTheme.accentColor,
+        '--panel-dropdown-active-bg-color': dropdownActiveBgColor,
+        '--panel-entry-hover-bg-color': entryHoverBgColor,
+        '--panel-selected-bg-color': selectedBgColor,
+        '--panel-md-entry-bg-color': entryBgColor,
+        '--panel-md-entry-current-bg-color': selectedBgColor,
+        '--search-input-bg-color': inputBgColor,
+        '--yaml-input-bg-color': inputBgColor,
+        '--panel-icon-bg-color': layoutTheme.iconBgColor,
+        '--panel-icon-hover-bg-color': iconHoverBgColor,
+        '--panel-accent-text-color': panelAccentTextColor,
+        '--modal-bg-color': layoutTheme.bgColor,
+        '--modal-text-color': layoutTheme.textColor,
+        '--modal-accent-color': layoutTheme.accentColor,
+      },
+      themeColorScheme,
+    );
   } catch (error) {
     console.error('角色世界书: applyTheme 函数执行出错', error);
   }
