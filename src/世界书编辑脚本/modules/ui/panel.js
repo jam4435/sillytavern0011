@@ -776,6 +776,21 @@ export function initPanel() {
                     align-items: center;
                     flex-wrap: wrap; /* 允许在小屏幕上换行 */
                 }
+
+                #${LOREBOOK_PANEL_ID}[data-sticky-title-bar="true"] .lorebook-title {
+                    position: sticky;
+                    top: 0;
+                    z-index: 25;
+                    background-color: var(--panel-bg-color, #202020);
+                    margin-top: 0;
+                    padding-top: 6px;
+                    padding-bottom: 6px;
+                    border-top-left-radius: 0;
+                    border-top-right-radius: 0;
+                    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.28);
+                    backdrop-filter: blur(8px);
+                    -webkit-backdrop-filter: blur(8px);
+                }
                 
                 #${LOREBOOK_PANEL_ID} .lorebook-title-text {
                     flex: 1 1 auto;
@@ -2698,6 +2713,11 @@ export function initPanel() {
                         align-items: stretch;
                         gap: 8px;
                         padding-bottom: 10px;
+                    }
+                    #${LOREBOOK_PANEL_ID}[data-sticky-title-bar="true"] .lorebook-title {
+                        top: 0;
+                        padding-top: 8px;
+                        padding-bottom: 8px;
                     }
                     #${LOREBOOK_PANEL_ID} .lorebook-title-info-wrapper {
                         display: flex;

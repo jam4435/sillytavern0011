@@ -74,6 +74,7 @@ function getDefaultSharedTheme() {
     mobileExpandButtonUnderCheckbox: false,
     invertButtonMode: 'invert',
     unifiedIconButtons: false,
+    stickyTitleBar: false,
   };
 }
 
@@ -119,6 +120,7 @@ function normalizeSharedTheme(shared = {}, fallback = getDefaultSharedTheme()) {
     ),
     invertButtonMode: typeof shared.invertButtonMode === 'string' ? shared.invertButtonMode : fallback.invertButtonMode,
     unifiedIconButtons: pickBoolean(shared.unifiedIconButtons, fallback.unifiedIconButtons),
+    stickyTitleBar: pickBoolean(shared.stickyTitleBar, fallback.stickyTitleBar),
   };
 }
 
@@ -344,6 +346,7 @@ function applyTheme(theme) {
         'data-mobile-expand-placement',
         sharedTheme.mobileExpandButtonUnderCheckbox ? 'under-checkbox' : 'inline',
       );
+      $panel.attr('data-sticky-title-bar', sharedTheme.stickyTitleBar ? 'true' : 'false');
       $panel.css({
         ...semanticThemeTokens,
         '--panel-bg-color': panelBgColor,
@@ -642,6 +645,9 @@ function readThemeFromModal(layoutMode = getPcLayoutModeSetting()) {
     unifiedIconButtons: $('#unified-icon-toggle', parentDoc).length
       ? $('#unified-icon-toggle', parentDoc).is(':checked')
       : currentTheme.unifiedIconButtons,
+    stickyTitleBar: $('#sticky-title-bar-toggle', parentDoc).length
+      ? $('#sticky-title-bar-toggle', parentDoc).is(':checked')
+      : currentTheme.stickyTitleBar,
   };
 }
 
@@ -669,6 +675,7 @@ function fillThemeModal(theme, layoutMode = getPcLayoutModeSetting()) {
   $('#show-search-bar-toggle', parentDoc).prop('checked', getShowSearchBarSetting());
   $('#fullscreen-mode-toggle', parentDoc).prop('checked', getFullscreenModeSetting());
   $('#truncate-long-names-toggle', parentDoc).prop('checked', theme.truncateLongNames !== false);
+  $('#sticky-title-bar-toggle', parentDoc).prop('checked', theme.stickyTitleBar === true);
   $('#mobile-expand-under-checkbox-toggle', parentDoc).prop('checked', theme.mobileExpandButtonUnderCheckbox === true);
   $('#unified-icon-toggle', parentDoc).prop('checked', theme.unifiedIconButtons === true);
   $('#pc-layout-mode-select', parentDoc).val(normalizeLayoutMode(layoutMode));
@@ -803,6 +810,29 @@ function ensureThemeModalShape($modal) {
         $pcLayoutGroup.before(mobileExpandToggleHtml);
       } else {
         $modal.find('.modal-body').append(mobileExpandToggleHtml);
+      }
+    }
+  }
+
+  if ($modal.find('#topbar-button-toggle-group').length && $modal.find('#sticky-title-bar-toggle-group').length === 0) {
+    const stickyToggleHtml = `
+      <div id="sticky-title-bar-toggle-group" class="form-group">
+        <label for="sticky-title-bar-toggle">世界书标题栏吸顶</label>
+        <label class="switch">
+          <input type="checkbox" id="sticky-title-bar-toggle">
+          <span class="slider round"></span>
+        </label>
+      </div>
+    `;
+    const $truncateGroup = $modal.find('#truncate-long-names-toggle-group');
+    if ($truncateGroup.length) {
+      $truncateGroup.after(stickyToggleHtml);
+    } else {
+      const $pcLayoutGroup = $modal.find('#pc-layout-mode-group');
+      if ($pcLayoutGroup.length) {
+        $pcLayoutGroup.before(stickyToggleHtml);
+      } else {
+        $modal.find('.modal-body').append(stickyToggleHtml);
       }
     }
   }
@@ -989,6 +1019,13 @@ export function initTheme() {
                    <span class="slider round"></span>
                </label>
            </div>
+           <div id="sticky-title-bar-toggle-group" class="form-group">
+               <label for="sticky-title-bar-toggle">世界书标题栏吸顶</label>
+               <label class="switch">
+                   <input type="checkbox" id="sticky-title-bar-toggle">
+                   <span class="slider round"></span>
+               </label>
+           </div>
            <div id="mobile-expand-under-checkbox-toggle-group" class="form-group">
                <label for="mobile-expand-under-checkbox-toggle">手机端展开箭头下置</label>
                <label class="switch">
@@ -1092,6 +1129,7 @@ export function initTheme() {
   $modal.on('change', '#panel-background-image-url-input', handleSettingsChange);
   $modal.on('change', '#topbar-button-toggle', handleSettingsChange);
   $modal.on('change', '#truncate-long-names-toggle', handleSettingsChange);
+  $modal.on('change', '#sticky-title-bar-toggle', handleSettingsChange);
   $modal.on('change', '#mobile-expand-under-checkbox-toggle', handleSettingsChange);
   $modal.on('change', '#unified-icon-toggle', handleSettingsChange);
 

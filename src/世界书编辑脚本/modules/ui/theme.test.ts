@@ -50,3 +50,39 @@ describe('世界书面板主题颜色输入', () => {
     expect(normalizeHexColor('#gggggg')).toBeNull();
   });
 });
+
+describe('世界书标题栏吸顶设置', () => {
+  it('默认状态下世界书标题栏吸顶关闭', () => {
+    expect(loadTheme('master-detail').stickyTitleBar).toBe(false);
+    expect(loadTheme('drawer').stickyTitleBar).toBe(false);
+  });
+
+  it('正确加载已保存的标题栏吸顶设置', () => {
+    localStorage.setItem(
+      'enhanced-lorebook-theme',
+      JSON.stringify({
+        version: 4,
+        shared: { stickyTitleBar: true },
+        layouts: {},
+      }),
+    );
+    expect(loadTheme('master-detail').stickyTitleBar).toBe(true);
+    expect(loadTheme('drawer').stickyTitleBar).toBe(true);
+  });
+
+  it('旧版本主题缺失该字段时默认回退为关闭', () => {
+    localStorage.setItem(
+      'enhanced-lorebook-theme',
+      JSON.stringify({
+        version: 3,
+        shared: {},
+        layouts: {
+          drawer: {},
+          'master-detail': {},
+        },
+      }),
+    );
+    expect(loadTheme('drawer').stickyTitleBar).toBe(false);
+    expect(loadTheme('master-detail').stickyTitleBar).toBe(false);
+  });
+});

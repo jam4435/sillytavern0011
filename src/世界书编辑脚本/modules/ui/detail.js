@@ -1122,6 +1122,18 @@ function ensureDetailStyles() {
         isolation: isolate;
         overflow: visible;
       }
+      #${LOREBOOK_PANEL_ID}[data-sticky-title-bar="true"] .lorebook-title.is-master-layout {
+        position: sticky;
+        top: 0;
+        z-index: 25;
+        background-color: var(--panel-bg-color, #202020);
+        margin-top: 0;
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.28);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
       #${LOREBOOK_PANEL_ID} .lorebook-title.is-master-layout {
         flex-direction: column;
         align-items: stretch;
