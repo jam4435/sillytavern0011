@@ -178,7 +178,7 @@ let watcher: FSWatcher;
 function runBackgroundNodeScript(args: string[], label: string) {
   try {
     const child = execFile(process.execPath, args, { cwd: import.meta.dirname });
-    child.on('error', error => {
+    (child as any).on('error', (error: any) => {
       console.warn(`\x1b[33m[${label}]\x1b[0m 子进程启动失败，已跳过: ${error.message}`);
     });
   } catch (error: any) {
@@ -250,7 +250,7 @@ function tavern_sync(compiler: webpack.Compiler) {
             .join('\n'),
         );
       });
-      child_process.on('error', error => {
+      (child_process as any).on('error', (error: any) => {
         console.error(`\x1b[31m[tavern_sync]\x1b[0m Error: ${error.message}`);
       });
     }
