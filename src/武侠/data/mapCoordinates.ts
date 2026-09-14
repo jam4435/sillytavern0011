@@ -118,6 +118,8 @@ export const REGION_COORDINATES: Record<string, MapCoordinate> = {
   '大理/万劫谷': { x: 720, y: 760 },
 
   '西域/天山': { x: 380, y: 330 },
+  '西域/白驼山': { x: 440, y: 360 },
+  '西域/星宿海': { x: 505, y: 430 },
   '西域/花剌子模': { x: 205, y: 468 },
 
   '西夏/灵州': { x: 670, y: 420 },

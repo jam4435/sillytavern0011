@@ -147,6 +147,78 @@ export interface MartialArt {
   restrictionReason?: string; // 因天赋或前置条件导致的无法修炼/升级原因
 }
 
+// ==================== 势力与差事任务系统类型 ====================
+export type FactionType = '宗门' | '帮会' | '世家' | '行伍';
+export type FactionStatus = '在籍' | '记名' | '叛门' | string;
+
+export interface UserFactionEntry {
+  体系类型: FactionType;
+  身份: string;
+  师承: string;
+  贡献: number;
+  状态: FactionStatus;
+}
+
+export type UserFactionsMap = Record<string, UserFactionEntry>;
+
+export interface FactionTaskReward {
+  贡献增量?: number;
+  修为增量?: number;
+  获得物品?: Record<string, InventoryItemVariableData>;
+}
+
+export type FactionTaskExecutionStatus = '未到达地点' | '进行中' | '已完成';
+
+export interface FactionTask {
+  所属势力: string;
+  任务详情: string;
+  任务地点: string;
+  任务执行情况: FactionTaskExecutionStatus;
+  任务奖励?: FactionTaskReward;
+}
+
+export type FactionTaskMap = Record<string, FactionTask>;
+
+export interface SectMartialNode {
+  节点ID: string;
+  功法: string;
+  传承层级: '入门' | '基础' | '进阶' | '核心' | '镇派';
+  分支: string;
+  是否共通: boolean;
+  前置节点: Array<{
+    节点ID: string;
+    最低掌握程度: string;
+    关系: string;
+  }>;
+  学习限制: {
+    最低传承资格: string;
+    最低境界: string;
+    属性门槛: Partial<Record<string, number>>;
+    特别条件: string[];
+  };
+}
+
+export interface SectStaticData {
+  门派ID: string;
+  门派名称: string;
+  门派别名: string[];
+  体系类型: FactionType;
+  主峰驻地: string;
+  掌舵人: string[];
+  设计定位: string;
+  特色描述: string;
+  入门门槛: {
+    最低境界: string;
+    属性要求: Partial<Record<string, number>>;
+  };
+  人物映射边界: Array<{
+    角色: string;
+    关系类型: string;
+    最高可分配层级: string;
+  }>;
+  武学传承树: SectMartialNode[];
+}
+
 // The main User Profile structure
 export interface CharacterProfile {
   name: string; // Internal use, though not strictly in JSON, needed for UI
@@ -169,6 +241,9 @@ export interface CharacterProfile {
   baseAttributes?: CurrentAttributes; // 不含装备/药效的前端计算基准，只用于界面预览
   attributes: CurrentAttributes; // 属性
   meridians?: MeridianProjection; // 奇经八脉分支进度的只读界面投影
+
+  // 势力数据 (所属势力映射表)
+  factions?: UserFactionsMap;
 
   // Note: Inventory is handled via the specific InventoryItem[] in GameState for the UI grid,
   // but conceptually belongs here.
@@ -373,12 +448,15 @@ export interface GameState {
   events: GameEvent[];
   chronicle: ChronicleEntry[];
   social: NPC[];
+  tasks?: FactionTaskMap;
+  factions?: UserFactionsMap;
 }
 
 export enum ActivePanel {
   NONE = 'NONE',
   CHARACTER = 'CHARACTER',
   MARTIAL_ARTS = 'MARTIAL_ARTS',
+  FACTION = 'FACTION',
   EVENTS = 'EVENTS',
   INVENTORY = 'INVENTORY',
   MAP = 'MAP',

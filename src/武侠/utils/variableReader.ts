@@ -13,6 +13,12 @@ import type {
   ChronicleEntry,
   CurrentAttributes,
   EquipmentSlots,
+  FactionStatus,
+  FactionTask,
+  FactionTaskExecutionStatus,
+  FactionTaskMap,
+  FactionTaskReward,
+  FactionType,
   FrontendVariableData,
   GameEvent,
   GameState,
@@ -22,6 +28,8 @@ import type {
   InventoryItemVariableData,
   MartialArt,
   NPC,
+  UserFactionEntry,
+  UserFactionsMap,
   WorldEventVariableData,
   WorldTime,
 } from '../types';
@@ -118,6 +126,8 @@ interface UserProfile {
   装备栏?: EquipmentSlots;
   状态效果?: Record<string, ActiveStatusEffectVariableData>;
   天赋?: Record<string, string>;
+  势力?: Record<string, unknown>;
+  宗门?: Record<string, unknown>;
   人物经历?: Record<string, string> | string;
   关系网?: Record<string, string>;
   $meta?: unknown; // ERA 元数据，忽略
@@ -212,6 +222,7 @@ interface GameVariables {
   };
 
   参与事件?: Record<string, unknown>;
+  任务?: Record<string, unknown>;
   事件分支结果?: Record<string, Record<string, 0 | 1>>;
   附近传闻?: Record<string, unknown>;
   后续事件线索?: Record<string, unknown>;
@@ -1519,6 +1530,150 @@ function parseSocial(variables: GameVariables, 用户档案?: UserProfile): NPC[
   }
 
   return result;
+}
+
+/**
+ * 解析玩家所属势力数据，并提供旧档 user数据.宗门 向下兼容映射
+ */
+export function parseFactions(userData?: UserProfile): UserFactionsMap | undefined {
+  if (!userData) return undefined;
+
+  // 1. 优先读取新格式 user数据.势力
+  const raw势力 = userData.势力;
+  if (raw势力 && typeof raw势力 === 'object' && !Array.isArray(raw势力)) {
+    // 兼容可能存在的 "所属势力" 嵌套包装
+    const targetMap = (
+      raw势力.所属势力 && typeof raw势力.所属势力 === 'object' && !Array.isArray(raw势力.所属势力)
+        ? raw势力.所属势力
+        : raw势力
+    ) as Record<string, unknown>;
+
+    const result: UserFactionsMap = {};
+    for (const [factionName, rawEntry] of Object.entries(targetMap)) {
+      if (factionName === '当前主势力' || !rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) {
+        continue;
+      }
+      const entry = rawEntry as Record<string, unknown>;
+      const rawContribution = entry.贡献;
+      let contribution = 0;
+      if (typeof rawContribution === 'number' && Number.isFinite(rawContribution)) {
+        contribution = Math.max(0, Math.floor(rawContribution));
+      } else if (typeof rawContribution === 'string') {
+        const parsed = parseInt(rawContribution.replace(/[^\d-]/g, ''), 10);
+        contribution = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+      }
+
+      result[factionName] = {
+        体系类型: (entry.体系类型 as FactionType) || '宗门',
+        身份: typeof entry.身份 === 'string' && entry.身份 ? entry.身份 : '入门弟子',
+        师承: typeof entry.师承 === 'string' && entry.师承 ? entry.师承 : '本门长辈',
+        贡献: contribution,
+        状态: typeof entry.状态 === 'string' && entry.状态 ? (entry.状态 as FactionStatus) : '在籍',
+      };
+    }
+    if (Object.keys(result).length > 0) {
+      return result;
+    }
+  }
+
+  // 2. 旧档向下兼容：若仅有 user数据.宗门，自动投影为势力映射
+  const raw宗门 = userData.宗门;
+  if (raw宗门 && typeof raw宗门 === 'object' && !Array.isArray(raw宗门)) {
+    const 宗门Obj = raw宗门 as Record<string, unknown>;
+    const 门派名 = (typeof 宗门Obj.当前门派 === 'string' && 宗门Obj.当前门派) || '全真教';
+    const 门派身份 = (typeof 宗门Obj.门派身份 === 'string' && 宗门Obj.门派身份) || '入门弟子';
+    const 师承 = (typeof 宗门Obj.师承 === 'string' && 宗门Obj.师承) || '本门长辈';
+    const rawContribution = 宗门Obj.宗门贡献;
+    let contribution = 0;
+    if (typeof rawContribution === 'number' && Number.isFinite(rawContribution)) {
+      contribution = Math.max(0, Math.floor(rawContribution));
+    }
+
+    return {
+      [门派名]: {
+        体系类型: '宗门',
+        身份: 门派身份,
+        师承,
+        贡献: contribution,
+        状态: '在籍',
+      },
+    };
+  }
+
+  return undefined;
+}
+
+/**
+ * 从顶层变量读取势力差事/历练任务列表
+ */
+export function parseFactionTasks(variables: GameVariables): FactionTaskMap | undefined {
+  const statData = variables.stat_data && typeof variables.stat_data === 'object'
+    ? (variables.stat_data as Record<string, unknown>)
+    : undefined;
+  const rawTasks = variables.任务 || statData?.任务;
+
+  if (!rawTasks || typeof rawTasks !== 'object' || Array.isArray(rawTasks)) {
+    return undefined;
+  }
+
+  const result: FactionTaskMap = {};
+  for (const [taskName, rawTask] of Object.entries(rawTasks as Record<string, unknown>)) {
+    if (!rawTask || typeof rawTask !== 'object' || Array.isArray(rawTask)) continue;
+    const task = rawTask as Record<string, unknown>;
+
+    const 所属势力 = typeof task.所属势力 === 'string' ? task.所属势力 : '';
+    const 任务详情 = typeof task.任务详情 === 'string' ? task.任务详情 : '';
+    const 任务地点 = typeof task.任务地点 === 'string' ? task.任务地点 : '';
+    let 任务执行情况: FactionTaskExecutionStatus = '未到达地点';
+    if (task.任务执行情况 === '进行中' || task.任务执行情况 === '已完成') {
+      任务执行情况 = task.任务执行情况;
+    }
+
+    let 任务奖励: FactionTaskReward | undefined = undefined;
+    if (task.任务奖励 && typeof task.任务奖励 === 'object' && !Array.isArray(task.任务奖励)) {
+      const rawReward = task.任务奖励 as Record<string, unknown>;
+      const reward: FactionTaskReward = {};
+      if (typeof rawReward.贡献增量 === 'number' && Number.isFinite(rawReward.贡献增量)) {
+        reward.贡献增量 = Math.floor(rawReward.贡献增量);
+      }
+      if (typeof rawReward.修为增量 === 'number' && Number.isFinite(rawReward.修为增量)) {
+        reward.修为增量 = Math.floor(rawReward.修为增量);
+      }
+      if (rawReward.获得物品 && typeof rawReward.获得物品 === 'object' && !Array.isArray(rawReward.获得物品)) {
+        reward.获得物品 = rawReward.获得物品 as Record<string, InventoryItemVariableData>;
+      }
+      任务奖励 = reward;
+    }
+
+    result[taskName] = {
+      所属势力: 所属势力 || '江湖门派',
+      任务详情,
+      任务地点,
+      任务执行情况,
+      任务奖励,
+    };
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
+ * 针对历史遗留事件或野外模型回复中出现的 "+3500" 等增量字符串进行安全折算
+ */
+export function sanitizeNumericAttributeDelta(currentValue: number, deltaValue: unknown): number {
+  if (typeof deltaValue === 'number' && Number.isFinite(deltaValue)) {
+    return deltaValue;
+  }
+  if (typeof deltaValue === 'string') {
+    const trimmed = deltaValue.trim();
+    if (trimmed.startsWith('+') || trimmed.startsWith('-')) {
+      const parsed = parseInt(trimmed, 10);
+      if (Number.isFinite(parsed)) {
+        return Math.max(0, currentValue + parsed);
+      }
+    }
+  }
+  return currentValue;
 }
 
 /**
@@ -3522,9 +3677,13 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
       }),
       biography: 用户档案.人物经历 || '',
       network: 用户档案.关系网 || {},
+      factions: parseFactions(用户档案),
     };
 
     dataLogger.log('[variableReader] Step 6 - 最终 stats:', state.stats);
+
+    // 势力数据投影到顶层
+    state.factions = state.stats.factions;
 
     // 背包（从用户档案中的包裹字段读取）
     state.inventory = parseInventory(用户档案);
@@ -3536,6 +3695,9 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
     state.equipment = {};
     state.statusEffects = [];
   }
+
+  // 任务 - 从顶层读取势力差事
+  state.tasks = parseFactionTasks(variables);
 
   // 事件 - 从事件系统读取（避免全量渲染未发生事件）
   state.events = parseEvents(variables, worldTime);

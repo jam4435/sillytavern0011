@@ -19,6 +19,7 @@ import SaveLoadPanel from './components/SaveLoadPanel';
 import {
   CharacterPanel,
   EventsPanel,
+  FactionPanel,
   InventoryPanel,
   MapPanel,
   MartialArtsPanel,
@@ -44,7 +45,8 @@ import {
 } from './hooks';
 import { readLatestDebugRoundSnapshot } from './hooks/useDebugLogs';
 import { shouldDeferSetupEventNotifications } from './hooks/usePageFlow';
-import { ActivePanel, InventoryItem, type MeridianNodeId, type MeridianUpgradeQuote } from './types';
+import { ActivePanel, type FactionTask, InventoryItem, type MeridianNodeId, type MeridianUpgradeQuote } from './types';
+import { claimFactionTaskReward } from './utils/factionManager';
 import {
   getInitialChatRenameSuggestion,
   getRandomOpeningLine,
@@ -1233,12 +1235,29 @@ const App: React.FC = () => {
     ],
   );
 
+  const handleClaimFactionTask = useCallback(
+    async (taskName: string, task: FactionTask) => {
+      const res = await claimFactionTaskReward(taskName, task);
+      if (!res.success) {
+        showError(res.error || '领取差事奖励失败');
+        return;
+      }
+      showSuccess(
+        `交付差事《${taskName}》成功！获得贡献+${res.earnedContribution || 0}，修为+${res.earnedCultivation || 0}`,
+      );
+      refreshGameStateFromVariables();
+    },
+    [refreshGameStateFromVariables, showError, showSuccess],
+  );
+
   const getModalTitle = (panel: ActivePanel) => {
     switch (panel) {
       case ActivePanel.CHARACTER:
         return '侠客状态';
       case ActivePanel.MARTIAL_ARTS:
         return '武学秘籍';
+      case ActivePanel.FACTION:
+        return '江湖势力';
       case ActivePanel.EVENTS:
         return '江湖轶事';
       case ActivePanel.INVENTORY:
@@ -1275,6 +1294,19 @@ const App: React.FC = () => {
             cultivation={gameState.stats.cultivation}
             comprehension={gameState.stats.initialAttributes?.悟性 ?? 10}
             traits={gameState.stats.traits}
+          />
+        );
+      case ActivePanel.FACTION:
+        return (
+          <FactionPanel
+            stats={gameState.stats}
+            currentLocation={gameState.currentLocation}
+            tasks={gameState.tasks}
+            onSendMessage={handlePlayerSend}
+            onClaimTask={handleClaimFactionTask}
+            onNavigateLocation={handleEventTravelTo}
+            onClose={closeModal}
+            isBusy={isLoading || historyMutationPending}
           />
         );
       case ActivePanel.EVENTS:
@@ -1469,6 +1501,12 @@ const App: React.FC = () => {
               label="功法"
               isActive={activePanel === ActivePanel.MARTIAL_ARTS}
               onClick={() => handleNavClick(ActivePanel.MARTIAL_ARTS)}
+            />
+            <NavButton
+              icon={<Icons.Faction />}
+              label="势力"
+              isActive={activePanel === ActivePanel.FACTION}
+              onClick={() => handleNavClick(ActivePanel.FACTION)}
             />
             <NavButton
               icon={<Icons.Inventory />}

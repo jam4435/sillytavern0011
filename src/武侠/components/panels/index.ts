@@ -4,5 +4,7 @@ export { CharacterPanel } from './CharacterPanel';
 export { MartialArtsPanel } from './MartialArtsPanel';
 export { InventoryPanel } from './InventoryPanel';
 export { EventsPanel } from './EventsPanel';
+export { FactionPanel } from './FactionPanel';
+export { SectTaskList } from './SectTaskList';
 export { SocialPanel } from './SocialPanel';
 export { MapPanel } from './MapPanel';

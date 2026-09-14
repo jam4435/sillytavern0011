@@ -33,6 +33,7 @@ export {
   checkMartialArtTraitRestriction,
 };
 import { getMartialArtData } from './martialArtsDatabase';
+import { getSectByName } from './factionManager';
 
 // 从 data 文件夹导入静态数据
 import eventsData from '../data/事件信息汇总.json';
@@ -253,6 +254,7 @@ export interface NewGameFormData {
   originMartialArts?: { name: string; mastery: string }[];
   origin: string;
   originId: string;
+  initialFaction?: string;
   customRealm?: RealmLevel;
 }
 
@@ -306,12 +308,55 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     originMartialArts,
     origin,
     originId,
+    initialFaction,
     customRealm,
   } = formData;
 
   const birthYear = locationInfo.year - age;
   const martialArtsObj: Record<string, unknown> = {};
   const martialArtsForCalc: Record<string, MartialArtForCalculation> = {};
+
+  // 处理初始门派势力
+  const initialFactionsObj: Record<string, unknown> = {};
+  const initialIdentitiesObj: Record<string, string> = {
+    [origin]: '初入江湖的新人',
+  };
+
+  if (initialFaction && initialFaction !== '散修') {
+    const sectMeta = getSectByName(initialFaction);
+    if (sectMeta) {
+      const defaultIdentity =
+        sectMeta.体系类型 === '帮会'
+          ? '一袋弟子'
+          : sectMeta.体系类型 === '世家'
+          ? '记名门客'
+          : sectMeta.体系类型 === '行伍'
+          ? '伍长'
+          : '入门弟子';
+
+      initialFactionsObj[sectMeta.门派名称] = {
+        体系类型: sectMeta.体系类型,
+        身份: defaultIdentity,
+        师承: sectMeta.掌舵人[0] || '本门长辈',
+        贡献: 0,
+        状态: '在籍',
+      };
+      initialIdentitiesObj[sectMeta.门派名称] = defaultIdentity;
+
+      // 赠送本门入门功法
+      const starterNode = sectMeta.武学传承树.find(n => n.传承层级 === '入门');
+      if (starterNode) {
+        martialArtsObj[starterNode.功法] = {
+          掌握程度: '初窥门径',
+        };
+        martialArtsForCalc[starterNode.功法] = {
+          type: '',
+          rank: '粗浅',
+          mastery: '初窥门径',
+        };
+      }
+    }
+  }
 
   const combinedMartialArts = [...(originMartialArts || [])];
   if (selectedMartialArts) {
@@ -427,6 +472,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
       $meta: { necessary: 'self', updatable: true },
     },
     参与事件: {},
+    任务: {},
     世界事件: {},
     事件分支结果: {},
     前端变量: {
@@ -453,9 +499,8 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
       境界: realm,
       修为: cultivation,
       所在位置: locationInfo.location,
-      身份: {
-        [origin]: '初入江湖的新人',
-      },
+      身份: initialIdentitiesObj,
+      ...(Object.keys(initialFactionsObj).length > 0 ? { 势力: initialFactionsObj } : {}),
       功法: {
         $template: {
           类型: '',

@@ -5032,4 +5032,284 @@
       }
     }
   }
+
+  // ===== 势力与宗门系统（水墨宣纸主题适配） =====
+  .faction-panel-wrapper {
+    color: var(--wuxia-ink-text);
+
+    .faction-view-header {
+      border-bottom-color: var(--wuxia-ink-border);
+    }
+
+    .view-tab-btn {
+      background: rgba(245, 238, 225, 0.65);
+      border-color: var(--wuxia-ink-border-soft);
+      color: var(--wuxia-ink-text-muted);
+
+      &:hover:not(:disabled) {
+        background: rgba(235, 226, 210, 0.9);
+        color: var(--wuxia-ink-text-strong);
+      }
+
+      &.active {
+        background: linear-gradient(180deg, #f0e6d4, #dfcfb6);
+        border-color: #8b1a1a;
+        color: #721919;
+        box-shadow: 0 0 8px rgba(139, 26, 26, 0.2);
+      }
+    }
+
+    .sect-chip {
+      background: rgba(240, 232, 218, 0.7);
+      border-color: var(--wuxia-ink-border-soft);
+      color: var(--wuxia-ink-text);
+
+      &.active {
+        background: #8b1a1a;
+        border-color: #6a1414;
+        color: #ffffff;
+      }
+    }
+
+    .sect-banner-card {
+      background:
+        radial-gradient(circle at 10% 20%, rgba(139, 26, 26, 0.04), transparent 25%),
+        linear-gradient(135deg, rgba(248, 243, 233, 0.88), rgba(238, 230, 215, 0.94));
+      border-color: var(--wuxia-ink-border);
+      box-shadow: 0 2px 8px rgba(40, 30, 20, 0.1);
+
+      .sect-emblem-box {
+        background: rgba(255, 252, 245, 0.8);
+        border-color: var(--wuxia-ink-border);
+        color: #8b1a1a;
+      }
+
+      .sect-title {
+        color: #2b1f17;
+      }
+
+      .sect-submeta-row {
+        color: #5c4e42;
+
+        strong {
+          color: #2b1f17;
+        }
+
+        .loc-nav-link {
+          color: #8b1a1a;
+        }
+      }
+
+      .contrib-counter-box,
+      .cult-counter-box {
+        background: rgba(255, 252, 246, 0.85);
+        border-color: var(--wuxia-ink-border-soft);
+
+        .counter-label {
+          color: #6b5c4e;
+        }
+
+        .counter-value {
+          color: #8b1a1a;
+        }
+      }
+    }
+
+    .faction-tree-column,
+    .sect-task-list-container,
+    .world-sects-sidebar,
+    .detail-intro-section,
+    .detail-martial-preview-section {
+      background: rgba(250, 245, 236, 0.78);
+      border-color: var(--wuxia-ink-border-soft);
+
+      .column-title,
+      .section-heading,
+      .task-count-info {
+        color: #2b1f17;
+      }
+
+      .column-hint {
+        color: #7b6d5e;
+      }
+    }
+
+    .tier-level-row {
+      background: rgba(244, 237, 224, 0.55);
+      border-color: var(--wuxia-ink-border-soft);
+
+      .tier-header-badge {
+        background: rgba(235, 225, 208, 0.85);
+        border-color: var(--wuxia-ink-border-soft);
+        color: #3b2c21;
+
+        .tier-count {
+          color: #726252;
+        }
+      }
+    }
+
+    .martial-node-card {
+      background: rgba(255, 251, 244, 0.85);
+      border-color: var(--wuxia-ink-border-soft);
+      color: var(--wuxia-ink-text);
+
+      &:hover {
+        background: #fbf5e9;
+        border-color: #8b1a1a;
+      }
+
+      &.selected {
+        border-color: #8b1a1a;
+        box-shadow: 0 0 8px rgba(139, 26, 26, 0.35);
+      }
+
+      &.status-learned {
+        border-color: #43a047;
+        background: rgba(232, 245, 233, 0.85);
+
+        .node-badge-status {
+          color: #2e7d32;
+        }
+      }
+
+      &.status-available {
+        border-color: #b7791f;
+        background: rgba(254, 243, 199, 0.7);
+
+        .node-badge-status {
+          color: #975a16;
+        }
+      }
+
+      &.status-locked {
+        background: rgba(240, 235, 225, 0.5);
+        opacity: 0.6;
+      }
+
+      .node-art-name {
+        color: #261c14;
+      }
+
+      .node-branch-tag {
+        color: #706152;
+      }
+    }
+
+    .sect-task-card {
+      background: rgba(255, 251, 244, 0.85);
+      border-color: var(--wuxia-ink-border-soft);
+
+      .task-name {
+        color: #2b1f17;
+      }
+
+      .task-detail {
+        color: #55483d;
+      }
+
+      .task-sect-tag {
+        background: rgba(139, 26, 26, 0.08);
+        color: #8b1a1a;
+      }
+
+      &.is-completed {
+        border-color: #43a047;
+        background: rgba(232, 245, 233, 0.8);
+      }
+    }
+
+    .request-task-btn {
+      background: linear-gradient(180deg, #8b1a1a, #6c1414);
+      border-color: #581010;
+      color: #ffffff;
+    }
+
+    .faction-action-btn.primary {
+      background: linear-gradient(180deg, #8b1a1a, #6c1414);
+      border-color: #581010;
+      color: #ffffff;
+    }
+
+    .faction-action-btn.secondary {
+      background: rgba(240, 232, 218, 0.85);
+      border-color: var(--wuxia-ink-border);
+      color: #3b2c21;
+    }
+
+    .node-inspect-drawer {
+      background: rgba(252, 248, 240, 0.98);
+      border-left-color: var(--wuxia-ink-border);
+      box-shadow: -4px 0 16px rgba(40, 30, 20, 0.2);
+
+      .art-name {
+        color: #2b1f17;
+      }
+
+      .drawer-status-box,
+      .drawer-requirements-box,
+      .drawer-cost-box {
+        background: rgba(245, 239, 228, 0.7);
+        border-color: var(--wuxia-ink-border-soft);
+
+        .box-title {
+          color: #2b1f17;
+        }
+      }
+
+      .action-learn-btn {
+        background: linear-gradient(180deg, #8b1a1a, #6c1414);
+        border-color: #581010;
+        color: #ffffff;
+      }
+    }
+
+    .world-sects-sidebar {
+      .filter-btn {
+        background: rgba(242, 234, 220, 0.75);
+        border-color: var(--wuxia-ink-border-soft);
+        color: #5c4d40;
+
+        &.active {
+          background: #8b1a1a;
+          border-color: #6a1414;
+          color: #ffffff;
+        }
+      }
+
+      .sect-summary-card {
+        background: rgba(255, 251, 244, 0.8);
+        border-color: var(--wuxia-ink-border-soft);
+
+        .sect-title {
+          color: #2b1f17;
+        }
+
+        .card-desc {
+          color: #6e5f50;
+        }
+
+        &.active {
+          background: rgba(245, 235, 218, 0.95);
+          border-color: #8b1a1a;
+          box-shadow: 0 0 6px rgba(139, 26, 26, 0.2);
+        }
+      }
+    }
+
+    .detail-top-card {
+      background: linear-gradient(135deg, rgba(248, 242, 232, 0.92), rgba(238, 229, 214, 0.96));
+      border-color: var(--wuxia-ink-border);
+
+      .sect-hero-title {
+        color: #261a12;
+      }
+
+      .join-sect-btn {
+        background: linear-gradient(180deg, #8b1a1a, #6c1414);
+        border-color: #581010;
+        color: #ffffff;
+      }
+    }
+  }
 }

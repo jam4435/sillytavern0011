@@ -26,7 +26,10 @@ import {
   detectGameSessionState,
   getGameVariables,
   normalizeAssistantReplyForPersistence,
+  parseFactions,
+  parseFactionTasks,
   readGameDataSync,
+  sanitizeNumericAttributeDelta,
 } from './variableReader';
 
 type JsonRecord = Record<string, unknown>;
@@ -935,5 +938,83 @@ describe('detectGameSessionState', () => {
     ]);
 
     expect(detectGameSessionState()).toBe('active');
+  });
+
+  describe('势力与任务读取及兼容性', () => {
+    it('应当优先正确解析多势力映射', () => {
+      const factions = parseFactions({
+        势力: {
+          全真教: {
+            体系类型: '宗门',
+            身份: '亲传弟子',
+            师承: '丘处机',
+            贡献: 180,
+            状态: '在籍',
+          },
+          桃花岛: {
+            体系类型: '世家',
+            身份: '记名门客',
+            师承: '黄药师',
+            贡献: 50,
+            状态: '记名',
+          },
+        },
+      });
+
+      expect(factions).toBeDefined();
+      expect(factions?.['全真教']?.身份).toBe('亲传弟子');
+      expect(factions?.['全真教']?.贡献).toBe(180);
+      expect(factions?.['桃花岛']?.体系类型).toBe('世家');
+    });
+
+    it('当旧档中仅有 user数据.宗门 时，应自动向下兼容映射为势力结构', () => {
+      const factions = parseFactions({
+        宗门: {
+          当前门派: '古墓派',
+          门派身份: '亲传弟子',
+          师承: '小龙女',
+          宗门贡献: 300,
+        },
+      });
+
+      expect(factions).toBeDefined();
+      expect(factions?.['古墓派']).toEqual({
+        体系类型: '宗门',
+        身份: '亲传弟子',
+        师承: '小龙女',
+        贡献: 300,
+        状态: '在籍',
+      });
+    });
+
+    it('应当正确解析顶层 stat_data.任务', () => {
+      const tasks = parseFactionTasks({
+        stat_data: {
+          任务: {
+            除狼患: {
+              所属势力: '全真教',
+              任务详情: '剿除山野恶狼',
+              任务地点: '大宋/终南山/豺狼谷',
+              任务执行情况: '未到达地点',
+              任务奖励: {
+                贡献增量: 30,
+                修为增量: 50,
+              },
+            },
+          },
+        },
+      });
+
+      expect(tasks).toBeDefined();
+      expect(tasks?.['除狼患']?.所属势力).toBe('全真教');
+      expect(tasks?.['除狼患']?.任务奖励?.贡献增量).toBe(30);
+    });
+
+    it('应当防御性折算历史 +数字 增量字符串', () => {
+      const baseCultivation = 1000;
+      expect(sanitizeNumericAttributeDelta(baseCultivation, '+3500')).toBe(4500);
+      expect(sanitizeNumericAttributeDelta(baseCultivation, '-200')).toBe(800);
+      expect(sanitizeNumericAttributeDelta(baseCultivation, 500)).toBe(500); // 纯数字直接返回
+    });
   });
 });
