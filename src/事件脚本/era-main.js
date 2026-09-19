@@ -18,6 +18,8 @@
     isDebugEnabled,
     hasParticipationEntry,
     isDebutEvent,
+    isEventKind,
+    EVENT_KIND,
     formatDate,
     attachEventMetadata,
     deriveEventRuntimeDescriptor,
@@ -37,6 +39,7 @@
     applyTimedParticipantEntries,
     persistRelativeEventRebase,
     cleanupFollowupCluesForActiveParticipation,
+    cleanupFrontendEventClueArchiveByState,
     cleanupInvalidParticipationEntries,
   } = await import('./era-event-operations.js');
   const { getRumorScopeFromEventLocation, isLocationWithinRumorScope, normalizeLocationPath } =
@@ -337,10 +340,14 @@
           isPlainObject(triggerCondition) && JSON.stringify(triggerCondition) !== JSON.stringify(eventData?.触发条件);
 
         debugGroupCollapsed(`检查事件: ${eventName}`);
-        if (
+        const isEncounter = isEventKind(eventData, EVENT_KIND.ENCOUNTER);
+        const encounterLocationSatisfied =
+          !isEncounter || isSameLocationScope(playerLocation, eventData?.事件地点);
+        const triggerSatisfied =
           eventData &&
-          isTimeForEvent(currentTime, effectiveEventData, eventName, variables.stat_data, eventDefinitions)
-        ) {
+          isTimeForEvent(currentTime, effectiveEventData, eventName, variables.stat_data, eventDefinitions);
+
+        if (triggerSatisfied && encounterLocationSatisfied) {
           if (isDebutEvent(eventData)) {
             logSuccess(`登场事件 ${eventName} 触发条件满足，将直接完成！`);
             debutEventsToComplete.push(eventName);
@@ -367,7 +374,11 @@
           eventsToExpire.push(eventName);
           log(`条件事件 ${eventName} 已越过绝对窗口，将归档为失效`);
         } else {
-          log(`事件 ${eventName} 触发条件不满足`);
+          if (isEncounter && triggerSatisfied && !encounterLocationSatisfied) {
+            log(`奇遇事件 ${eventName} 属性/条件满足，但玩家不在同一三级地点，拒绝触发`);
+          } else {
+            log(`事件 ${eventName} 触发条件不满足`);
+          }
         }
         debugGroupEnd();
       }
@@ -669,6 +680,7 @@
 
     try {
       await cleanupFollowupCluesForActiveParticipation(eventDefinitions, reason);
+      await cleanupFrontendEventClueArchiveByState(reason);
 
       if (!decrementCounters) {
         debugGroupEnd();
