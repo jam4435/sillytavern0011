@@ -39,6 +39,7 @@
     applyTimedParticipantEntries,
     persistRelativeEventRebase,
     cleanupFollowupCluesForActiveParticipation,
+    cleanupFrontendEventClueArchiveByState,
     cleanupInvalidParticipationEntries,
   } = await import('./era-event-operations.js');
   const { getRumorScopeFromEventLocation, isLocationWithinRumorScope, normalizeLocationPath } =
@@ -679,6 +680,7 @@
 
     try {
       await cleanupFollowupCluesForActiveParticipation(eventDefinitions, reason);
+      await cleanupFrontendEventClueArchiveByState(reason);
 
       if (!decrementCounters) {
         debugGroupEnd();
