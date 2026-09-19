@@ -867,6 +867,9 @@ export function buildPlayerParticipationEntry(eventName, eventData, currentTime,
   return {
     描述: buildPlayerParticipationDescription(eventName, eventData, actualEndTime),
     结局: getEventSummary(eventData),
+    ...(typeof eventData?.事件地点 === 'string' && eventData.事件地点.trim()
+      ? { 地点: eventData.事件地点.trim() }
+      : {}),
     insert: getInitialParticipationActionDiff(eventData, 'insert', eventName),
     update: getInitialParticipationActionDiff(eventData, 'update', eventName),
     delete: getInitialParticipationActionDiff(eventData, 'delete', eventName),
