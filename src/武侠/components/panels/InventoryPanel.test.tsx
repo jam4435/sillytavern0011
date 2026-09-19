@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { CurrentAttributes, InventoryItem } from '../../types';
+import type { CurrentAttributes, InitialAttributes, InventoryItem, MartialArt } from '../../types';
 import { InventoryPanel } from './InventoryPanel';
 
 const baseAttributes: CurrentAttributes = {
@@ -10,6 +10,16 @@ const baseAttributes: CurrentAttributes = {
   根骨: 10,
   机敏: 10,
   洞察: 10,
+};
+
+const initialAttributes: InitialAttributes = {
+  臂力: 10,
+  根骨: 10,
+  机敏: 10,
+  悟性: 10,
+  洞察: 10,
+  风姿: 10,
+  福缘: 10,
 };
 
 const items: InventoryItem[] = [
@@ -67,14 +77,45 @@ describe('InventoryPanel', () => {
     expect(screen.queryByRole('button', { name: '查看九阳神功' })).not.toBeInTheDocument();
   });
 
-  it('点击条目显示详情和资源图标', () => {
-    render(<InventoryPanel items={items} />);
+  it('点击秘籍显示当前属性、要求值和明确缺口', () => {
+    render(<InventoryPanel items={items} initialAttributes={initialAttributes} />);
 
     fireEvent.click(screen.getByRole('button', { name: '查看九阳神功' }));
 
     expect(screen.getByRole('heading', { name: '九阳神功' })).toBeInTheDocument();
     expect(screen.getByAltText('九阳神功图标')).toBeInTheDocument();
-    expect(screen.getByText('悟性 >= 12')).toBeInTheDocument();
+    expect(screen.getByText('悟性 10 / 12（尚缺 2）')).toBeInTheDocument();
+    expect(screen.getByText('悟性不足：当前 10，需要 12，尚缺 2。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '条件未满足' })).toBeDisabled();
+  });
+
+  it('已经习得秘籍时明确显示无需重复参悟', () => {
+    const knownMartialArts: Record<string, MartialArt> = {
+      九阳神功: {
+        type: '内功',
+        description: '至阳至刚的绝世内功。',
+        rank: '绝世',
+        mastery: '初窥门径',
+        traits: {},
+        unlockedTraits: {},
+        canUpgrade: true,
+        upgradeCost: 100,
+        nextMastery: '略有小成',
+      },
+    };
+
+    render(
+      <InventoryPanel
+        items={items}
+        initialAttributes={{ ...initialAttributes, 悟性: 15 }}
+        knownMartialArts={knownMartialArts}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '查看九阳神功' }));
+
+    expect(screen.getByText('已习得《九阳神功》，无需重复参悟。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '已习得' })).toBeDisabled();
   });
 
   it('列表和详情显示按外观推断的细分类', () => {
