@@ -1336,6 +1336,9 @@ const App: React.FC = () => {
             baseAttributes={gameState.stats.baseAttributes}
             attributes={gameState.stats.attributes}
             statusEffects={gameState.statusEffects}
+            initialAttributes={gameState.stats.initialAttributes}
+            traits={gameState.stats.traits}
+            knownMartialArts={gameState.stats.martialArts}
             onItemAction={handleInventoryItemAction}
           />
         );
