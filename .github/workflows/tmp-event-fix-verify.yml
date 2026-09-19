@@ -35,7 +35,18 @@ jobs:
             ./node_modules/.bin/tsc --noEmit > /tmp/base-tsc.log 2>&1 || true
           )
 
-          git diff --name-only origin/main...HEAD             | grep -E '\.(ts|tsx)$'             | sort -u > /tmp/changed-ts-files.txt || true
+          cat > /tmp/changed-ts-files.txt <<'EOF'
+          src/事件脚本/era-event-checker.test.ts
+          src/武侠/App.tsx
+          src/武侠/components/panels/EventsPanel.test.tsx
+          src/武侠/components/panels/EventsPanel.tsx
+          src/武侠/hooks/useCommandQueue.test.tsx
+          src/武侠/hooks/useCommandQueue.ts
+          src/武侠/types.ts
+          src/武侠/utils/eventPresentation.ts
+          src/武侠/utils/variableReader.test.ts
+          src/武侠/utils/variableReader.ts
+          EOF
 
           python - <<'PY'
           import re
