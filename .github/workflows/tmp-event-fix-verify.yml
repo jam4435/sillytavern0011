@@ -1,9 +1,9 @@
 name: Temporary event-fix verification
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/event-encounter-clues
+      - main
 
 jobs:
   verify:
