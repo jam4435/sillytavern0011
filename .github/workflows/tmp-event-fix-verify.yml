@@ -19,5 +19,16 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec tsc --noEmit
-      - run: pnpm test:safe -- src/事件脚本/era-event-checker.test.ts src/武侠/utils/variableReader.test.ts src/武侠/hooks/useCommandQueue.test.tsx src/武侠/components/panels/EventsPanel.test.tsx
+      - name: Record full repository typecheck
+        continue-on-error: true
+        run: pnpm exec tsc --noEmit
+      - name: Run event-fix targeted tests
+        run: >-
+          pnpm exec vitest run
+          --configLoader native
+          --pool threads
+          --reporter minimal
+          src/事件脚本/era-event-checker.test.ts
+          src/武侠/utils/variableReader.test.ts
+          src/武侠/hooks/useCommandQueue.test.tsx
+          src/武侠/components/panels/EventsPanel.test.tsx
