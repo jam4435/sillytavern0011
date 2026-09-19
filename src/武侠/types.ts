@@ -296,10 +296,20 @@ export interface PermanentAttributeModifierVariableData {
 
 export type WorldEventVariableData = WorldEventRecord;
 
+export interface EventClueArchiveEntry {
+  来源事件?: string;
+  线索?: string;
+  开始时间?: { 年?: number; 月?: number; 日?: number; 时?: number; 分?: number };
+  结束时间?: { 年?: number; 月?: number; 日?: number; 时?: number; 分?: number };
+  地点?: string;
+  获得时间?: { 年?: number; 月?: number; 日?: number; 时?: number; 分?: number };
+}
+
 export interface FrontendVariableData {
   奇经八脉?: MeridianProgressV1;
   永久属性修正?: Record<string, PermanentAttributeModifierVariableData>;
   可发现事件?: Record<string, unknown>;
+  事件线索档案?: Record<string, EventClueArchiveEntry>;
   事件结局状态?: Record<string, EventOutcomeStatus>;
   事件结算进度?: Record<string, { 分支标记?: Record<string, 0 | 1> }>;
   事件调度状态?: {
