@@ -403,7 +403,10 @@ export interface NPC {
   relationship: number;
   relationshipLabel?: string;
   category: 'acquaintance' | 'local';
+  /** 人物身份/称谓，与功法类型分离。旧投影缺失时前端可回退 template.type。 */
+  role?: string;
   location?: string;
+  appearance?: string;
   template: {
     type: string;
     martialArtsDescription: string;
