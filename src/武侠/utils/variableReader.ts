@@ -1229,6 +1229,9 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
     const record = value as Record<string, unknown>;
     const outcome = typeof record.结局 === 'string' ? record.结局.trim() : '';
     const endTime = ongoing[eventName];
+    const occupancyMeta = collectEventOccupancy(occupancy, eventName);
+    const persistedLocation =
+      typeof record.地点 === 'string' && record.地点.trim() ? record.地点.trim() : undefined;
     events.push({
       id: `participating_${events.length}`,
       title: getDisplayEventName(eventName),
@@ -1238,7 +1241,8 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
       details: outcome || undefined,
       timeText: isCalendarRecord(endTime) ? formatCalendarRecord(endTime) : undefined,
       remainingDays: remainingDaysUntil(endTime),
-      ...collectEventOccupancy(occupancy, eventName),
+      ...occupancyMeta,
+      location: persistedLocation || occupancyMeta.location,
     });
   }
 
