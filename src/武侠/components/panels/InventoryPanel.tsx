@@ -1,7 +1,8 @@
 import React, { CSSProperties, useMemo, useState } from 'react';
-import type { ActiveStatusEffect, CurrentAttributes, InventoryItem } from '../../types';
+import type { ActiveStatusEffect, CurrentAttributes, InitialAttributes, InventoryItem, MartialArt } from '../../types';
 import { getRankVisual, resolveInventoryIcon } from '../../utils/iconCatalog';
 import { buildItemAttributePreview } from '../../utils/inventoryAttributePreview';
+import { quoteMartialArtStudyEligibility } from '../../utils/martialArtStudyEligibility';
 import { Icons } from '../Icons';
 import { EmptyState } from './EmptyState';
 
@@ -109,6 +110,9 @@ interface InventoryPanelProps {
   baseAttributes?: CurrentAttributes;
   attributes?: CurrentAttributes;
   statusEffects?: ActiveStatusEffect[];
+  initialAttributes?: InitialAttributes;
+  traits?: Record<string, string>;
+  knownMartialArts?: Record<string, MartialArt>;
   onItemAction?: (item: InventoryItem) => void | Promise<void>;
 }
 
@@ -117,6 +121,9 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
   baseAttributes,
   attributes,
   statusEffects = [],
+  initialAttributes,
+  traits,
+  knownMartialArts,
   onItemAction,
 }) => {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -150,6 +157,15 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
     selectedItem && baseAttributes && attributes
       ? buildItemAttributePreview(selectedItem, items, statusEffects, baseAttributes, attributes)
       : [];
+  const selectedSecretEligibility =
+    selectedItem?.type === 'SECRET'
+      ? quoteMartialArtStudyEligibility({
+          item: selectedItem,
+          initialAttributes,
+          traits,
+          knownMartialArts,
+        })
+      : null;
   const selectedActionDisabled =
     isActing || !onItemAction || !selectedItem || (selectedItem.type !== 'EQUIP' && selectedItem.type !== 'ELIXIR');
 
@@ -287,14 +303,39 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
             <div className="workbench-detail-content">
               <p className="workbench-detail-desc">{getItemDisplayDescription(selectedItem)}</p>
 
-              {selectedItemRequirementEntries.length > 0 && (
-                <DetailSection title="参悟条件">
-                  {selectedItemRequirementEntries.map(([attribute, value]) => (
-                    <span key={attribute} className="workbench-chip">
-                      {attribute} &gt;= {value}
-                    </span>
-                  ))}
-                </DetailSection>
+              {selectedItem.type === 'SECRET' && (
+                <>
+                  <DetailSection title="参悟条件">
+                    {selectedSecretEligibility && selectedSecretEligibility.requirementStatuses.length > 0 ? (
+                      selectedSecretEligibility.requirementStatuses.map(status => (
+                        <span key={status.attribute} className="workbench-chip">
+                          {status.attribute} {status.current} / {status.required}
+                          {status.met ? '（已满足）' : `（尚缺 ${status.deficit}）`}
+                        </span>
+                      ))
+                    ) : selectedItemRequirementEntries.length > 0 ? (
+                      selectedItemRequirementEntries.map(([attribute, value]) => (
+                        <span key={attribute} className="workbench-chip">
+                          {attribute} &gt;= {value}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="workbench-chip">无属性门槛</span>
+                    )}
+                  </DetailSection>
+
+                  <DetailSection title="参悟资格">
+                    {selectedSecretEligibility?.canStudy ? (
+                      <span className="workbench-chip">条件已满足</span>
+                    ) : (
+                      (selectedSecretEligibility?.reasons || ['暂无法判断参悟资格']).map(reason => (
+                        <span key={reason} className="workbench-chip">
+                          {reason}
+                        </span>
+                      ))
+                    )}
+                  </DetailSection>
+                </>
               )}
 
               {selectedItem.type === 'EQUIP' &&
@@ -343,9 +384,26 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                 className="wuxia-btn primary"
                 disabled={selectedActionDisabled}
                 onClick={handleSelectedItemAction}
+                title={
+                  selectedItem.type === 'SECRET'
+                    ? selectedSecretEligibility?.alreadyLearned
+                      ? '已习得此功法'
+                      : selectedSecretEligibility && !selectedSecretEligibility.canStudy
+                        ? selectedSecretEligibility.reasons.join('；')
+                        : '当前仅校验秘籍参悟资格，背包秘籍尚未接入直接学习动作'
+                    : undefined
+                }
                 style={{ color: selectedRank.color, borderColor: `${selectedRank.color}60` }}
               >
-                {isActing ? '处理中' : getActionLabel(selectedItem.type)}
+                {isActing
+                  ? '处理中'
+                  : selectedItem.type === 'SECRET'
+                    ? selectedSecretEligibility?.alreadyLearned
+                      ? '已习得'
+                      : selectedSecretEligibility && !selectedSecretEligibility.canStudy
+                        ? '条件未满足'
+                        : getActionLabel(selectedItem.type)
+                    : getActionLabel(selectedItem.type)}
               </button>
             </footer>
           </div>
