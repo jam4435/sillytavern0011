@@ -11,7 +11,10 @@ import {
   getEndTime,
   getEventDurationHours,
   normalizeOrdinaryEventReference,
+  isEventKind,
+  EVENT_KIND,
 } from './era-utils.js';
+import { isSameLocationScope } from '../shared/locationPath.js';
 import {
   evaluateEventCondition,
   getSingleConditionTimeAnchor,
@@ -49,6 +52,13 @@ function buildConditionContext(currentTime, statData, eventDefinitions, sourceEv
         : actual;
     },
   };
+}
+
+export function isEventStartLocationSatisfied(eventData, playerLocation) {
+  if (!isEventKind(eventData, EVENT_KIND.ENCOUNTER)) {
+    return true;
+  }
+  return isSameLocationScope(playerLocation, eventData?.事件地点);
 }
 
 // ==================== 检查时间条件 ====================
