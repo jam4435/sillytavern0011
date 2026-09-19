@@ -1096,6 +1096,11 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
         ([key]) => !Object.prototype.hasOwnProperty.call(statData.后续事件线索计数 || {}, key),
       ),
     );
+    const frontendClueArchivePayload = Object.fromEntries(
+      Object.entries(finalFollowups.frontendClueArchivePayload).filter(
+        ([key]) => !Object.prototype.hasOwnProperty.call(statData.前端变量?.事件线索档案 || {}, key),
+      ),
+    );
     const worldEventPatch = buildWorldEventArchivePatch(eventNames, eventDefinitions, statData);
     const malformedWorldEventDeletes = Object.fromEntries(
       eventNames
@@ -1157,6 +1162,16 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
         },
       });
     }
+    if (Object.keys(frontendClueArchivePayload).length > 0) {
+      settlementOperations.push({
+        type: 'insert',
+        payload: {
+          前端变量: {
+            事件线索档案: frontendClueArchivePayload,
+          },
+        },
+      });
+    }
     settlementOperations.push({
       type: 'delete',
       payload: { 前端变量: { [EVENT_SETTLEMENT_PROGRESS_KEY]: settlementProgressDeletes } },
@@ -1195,7 +1210,12 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
         finalVerifyStat.后续事件线索?.[key] === followupPayload[key] &&
         finalVerifyStat.后续事件线索计数?.[key] === followupCountPayload[key],
     );
-    if (!finalCompletionPersisted || !finalFollowupsPersisted) {
+    const finalFrontendCluesPersisted = Object.keys(frontendClueArchivePayload).every(
+      key =>
+        JSON.stringify(finalVerifyStat.前端变量?.事件线索档案?.[key]) ===
+        JSON.stringify(frontendClueArchivePayload[key]),
+    );
+    if (!finalCompletionPersisted || !finalFollowupsPersisted || !finalFrontendCluesPersisted) {
       throw new Error('事件完成终态单次提交后校验失败');
     }
 
@@ -1232,6 +1252,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
 function buildFollowupPayloads(eventNames, eventDefinitions, statData = {}) {
   const followupPayload = {};
   const followupCountPayload = {};
+  const frontendClueArchivePayload = {};
 
   for (const eventName of eventNames) {
     const eventData = eventDefinitions[eventName];
@@ -1258,11 +1279,63 @@ function buildFollowupPayloads(eventNames, eventDefinitions, statData = {}) {
       ].filter(Boolean);
       followupPayload[targetEventKey] = contextParts.join('｜');
       followupCountPayload[targetEventKey] = CONFIG.DEFAULT_FOLLOWUP_LIFETIME;
+      frontendClueArchivePayload[targetEventKey] = {
+        来源事件: eventName,
+        线索: String(description || '').trim(),
+        ...(startTime ? { 开始时间: cloneJson(startTime) } : {}),
+        ...(endTime ? { 结束时间: cloneJson(endTime) } : {}),
+        ...(location ? { 地点: location } : {}),
+        ...(statData?.世界信息?.时间 ? { 获得时间: cloneJson(statData.世界信息.时间) } : {}),
+      };
       log(`为事件 ${eventName} 生成后续线索: ${targetEventKey}`);
     }
   }
 
-  return { followupPayload, followupCountPayload };
+  return { followupPayload, followupCountPayload, frontendClueArchivePayload };
+}
+
+export async function cleanupFrontendEventClueArchiveByState(reason = 'manual') {
+  debugGroup(`🗂️ 清理已进入终态的前端事件线索: ${reason}`);
+
+  const currentVars = await getVariables({ type: 'chat' });
+  const statData = currentVars?.stat_data || {};
+  const archive = statData?.前端变量?.事件线索档案 || {};
+  if (!isPlainObject(archive) || Object.keys(archive).length === 0) {
+    debugGroupEnd();
+    return 0;
+  }
+
+  const active = statData?.事件系统?.进行中事件 || {};
+  const completed = statData?.事件系统?.已完成事件 || {};
+  const expired = statData?.事件系统?.已失效事件 || {};
+  const keysToDelete = Object.keys(archive).filter(
+    key =>
+      Object.prototype.hasOwnProperty.call(active, key) ||
+      Object.prototype.hasOwnProperty.call(completed, key) ||
+      Object.prototype.hasOwnProperty.call(expired, key),
+  );
+
+  if (keysToDelete.length === 0) {
+    debugGroupEnd();
+    return 0;
+  }
+
+  await writeEraTransaction(
+    [
+      {
+        type: 'delete',
+        payload: {
+          前端变量: {
+            事件线索档案: Object.fromEntries(keysToDelete.map(key => [key, {}])),
+          },
+        },
+      },
+    ],
+    `cleanup-frontend-event-clues-${reason}`,
+  );
+  logSuccess(`✅ 已清理 ${keysToDelete.length} 条失去未来线索意义的前端事件线索`);
+  debugGroupEnd();
+  return keysToDelete.length;
 }
 
 export async function cleanupFollowupCluesForActiveParticipation(eventDefinitions, reason = 'manual') {
