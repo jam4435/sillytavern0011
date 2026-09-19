@@ -40,7 +40,9 @@ export function getEventTitleParts(title: string): EventTitleParts {
 }
 
 export function getEventTimeLabel(event: GameEvent): string {
-  return event.type === 'RUMOR' ? '事发时间' : '预计结束';
+  if (event.type === 'RUMOR') return '事发时间';
+  if (event.type === 'AFTERMATH') return '目标时间';
+  return '预计结束';
 }
 
 export function getEventDescription(event: GameEvent): string {
