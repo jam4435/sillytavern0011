@@ -82,8 +82,12 @@ function getRelationshipMeta(npc: NPC): { label: string; seal: string; modifier:
   };
 }
 
+function getNpcRole(npc: NPC): string {
+  return npc.role?.trim() || npc.template.type?.trim() || '江湖人士';
+}
+
 function getNpcSubtitle(npc: NPC): string {
-  const role = npc.template.type || '江湖人士';
+  const role = getNpcRole(npc);
   return npc.location ? `${role} / ${npc.location}` : role;
 }
 
@@ -442,7 +446,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                   <div className="social-hero-label">{selectedRelation.label}</div>
                   <h3 className="social-hero-name">{selectedNpc.name || '未知人物'}</h3>
                   <div className="social-hero-meta">
-                    <span>{selectedNpc.template.type || '江湖人士'}</span>
+                    <span>{getNpcRole(selectedNpc)}</span>
                     {selectedNpc.location && <span>{selectedNpc.location}</span>}
                     {selectedNpc.category === 'acquaintance' && (
                       <span>关系值 {clampRelationship(selectedNpc.relationship)}</span>
@@ -516,6 +520,14 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                   </div>
                 </section>
               )}
+
+              <section className="social-detail-card">
+                <div className="social-detail-card-head">
+                  <Icons.FileText size={16} />
+                  <span>人物外貌</span>
+                </div>
+                <p className="social-detail-text">{selectedNpc.appearance || '暂无外貌记录。'}</p>
+              </section>
 
               {martialArtEntries.map(([martialArtName, martialArt]) => {
                 const martialArtTitle = martialArtName.trim() || '未载功法';
