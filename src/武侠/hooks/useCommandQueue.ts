@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { PendingCommand, CommandType } from '../types';
+import { PendingCommand, CommandType, GameEvent } from '../types';
 import {
   decrementStatusEffectTurns,
   removePermanentAttributeModifier,
@@ -34,6 +34,34 @@ export function useCommandQueue() {
 
     setCommands(previous => [...previous.filter(item => item.type !== 'TRAVEL'), command]);
     uiLogger.log('[useCommandQueue] 设置地图指令:', command);
+  }, []);
+
+  /** 设置唯一的事件演进指令；新目标会替换旧目标，但不会自动发送。 */
+  const addEventAdvanceCommand = useCallback((event: GameEvent) => {
+    const eventTime = event.timeText?.trim() || '';
+    const eventLocation = event.location?.trim() || '';
+    const eventClue = event.description?.trim() || '';
+    const target = [eventTime, eventLocation, eventClue].filter(Boolean).join(' ');
+    if (!target) {
+      uiLogger.warn('[useCommandQueue] 事件演进指令缺少时间、地点和线索:', event);
+      return;
+    }
+
+    const command: PendingCommand = {
+      id: `event_advance_${Date.now()}_${Math.random()}`,
+      type: 'EVENT_ADVANCE' as CommandType,
+      text: `[事件指令]剧情合理演进到 ${target}`,
+      data: {
+        eventName: event.title,
+        eventTime: eventTime || undefined,
+        eventLocation: eventLocation || undefined,
+        eventClue: eventClue || undefined,
+      },
+      timestamp: Date.now(),
+    };
+
+    setCommands(previous => [...previous.filter(item => item.type !== 'EVENT_ADVANCE'), command]);
+    uiLogger.log('[useCommandQueue] 设置事件演进指令:', command);
   }, []);
 
   /** 添加物品/装备指令，并保存撤销所需数据。 */
@@ -136,6 +164,7 @@ export function useCommandQueue() {
   return {
     commands,
     setTravelCommand,
+    addEventAdvanceCommand,
     addUseItemCommand,
     cancelCommand,
     sendMessageWithCommands,
