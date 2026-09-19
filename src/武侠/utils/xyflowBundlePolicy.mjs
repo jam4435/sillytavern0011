@@ -1,5 +1,11 @@
-const EXACT_LOCAL_DEPENDENCIES = new Set(['classcat', 'zustand', 'use-sync-external-store']);
-const LOCAL_DEPENDENCY_PREFIXES = ['@xyflow/', 'd3-', 'zustand/', 'use-sync-external-store/'];
+const EXACT_LOCAL_DEPENDENCIES = new Set([
+  'classcat',
+  'zustand',
+  'use-sync-external-store',
+  'scheduler',
+  'zod',
+]);
+const LOCAL_DEPENDENCY_PREFIXES = ['@xyflow/', 'd3-', 'zustand/', 'use-sync-external-store/', 'scheduler/'];
 
 /**
  * React Flow and Zustand must be bundled with the application's React instance.

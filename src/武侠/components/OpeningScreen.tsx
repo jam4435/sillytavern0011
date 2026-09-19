@@ -1,6 +1,7 @@
 import React from 'react';
 import ChatInput from './ChatInput';
 import FullscreenButton from './FullscreenButton';
+import { Icons } from './Icons';
 
 interface OpeningScreenProps {
   welcomeLine: string;
@@ -8,6 +9,7 @@ interface OpeningScreenProps {
   location?: string;
   isLoading?: boolean;
   onSend: (message: string) => Promise<void> | void;
+  onOpenSettings?: () => void;
 }
 
 const OpeningScreen: React.FC<OpeningScreenProps> = ({
@@ -16,6 +18,7 @@ const OpeningScreen: React.FC<OpeningScreenProps> = ({
   location,
   isLoading = false,
   onSend,
+  onOpenSettings,
 }) => {
   return (
     <div className="opening-screen" data-wuxia-automation="opening-screen">
@@ -24,7 +27,22 @@ const OpeningScreen: React.FC<OpeningScreenProps> = ({
         <div className="opening-bg-vignette"></div>
       </div>
 
-      <FullscreenButton className="splash-fullscreen-btn" />
+      {/* 右上角工具栏：设置与全屏 */}
+      <div className="screen-top-utilities">
+        {onOpenSettings && (
+          <button
+            type="button"
+            className="screen-utility-btn"
+            onClick={onOpenSettings}
+            title="系统设置"
+            aria-label="系统设置"
+          >
+            <Icons.Settings size={15} />
+            <span>设置</span>
+          </button>
+        )}
+        <FullscreenButton className="screen-utility-btn" />
+      </div>
 
       <main className="opening-content" aria-label="开局输入">
         <header className="opening-header">

@@ -206,14 +206,17 @@ describe('settingsManager ui theme', () => {
 
     expect(template).toContain('{{readonlyContextRounds}}');
     expect(template).toContain('{{narrativeScale}}');
+    expect(template).toContain('{{latestUserBody}}');
     expect(template).toContain('{{latestAssistantBody}}');
     expect(template.indexOf('{{narrativeScale}}')).toBeLessThan(template.indexOf('{{variableGuidance}}'));
-    expect(template.indexOf('{{variableGuidance}}')).toBeLessThan(template.indexOf('{{latestAssistantBody}}'));
+    expect(template.indexOf('{{variableGuidance}}')).toBeLessThan(template.indexOf('{{latestUserBody}}'));
+    expect(template.indexOf('{{latestUserBody}}')).toBeLessThan(template.indexOf('{{latestAssistantBody}}'));
     expect(template.indexOf('{{latestAssistantBody}}')).toBeLessThan(template.indexOf('【最终执行要求】'));
     expect(template).toContain('时间是禁止稀疏更新的原子对象');
     expect(template).toContain('旧完整时间 + 正文耗时 = 新完整时间');
     expect(template).toContain('{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":13,"分":10}}}');
     expect(template).toContain('禁止只写“分:10”');
+    expect(template).toContain('当 user 的行动宣称与 assistant 的实际结果冲突时，以 assistant 正文中的实际结果为准');
   });
 
   it('updates legacy default-template labels without changing custom placeholders', () => {

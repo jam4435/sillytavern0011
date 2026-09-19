@@ -157,10 +157,10 @@ describe('traitsDatabase 结构化天赋机制', () => {
   });
 
   it('属性触发天赋正确根据属性值触发且具有对应属性修正', () => {
-    // 臂力极低（0）触发严重负面「肌肉萎缩」
+    // 臂力极低（0）触发严重负面「形销骨立」
     const lowBrawnTraits = getTriggeredTraitsByAttribute('臂力', 0);
-    expect(lowBrawnTraits.some(t => t.name === '肌肉萎缩')).toBe(true);
-    const atrophy = getTraitByName('肌肉萎缩');
+    expect(lowBrawnTraits.some(t => t.name === '形销骨立')).toBe(true);
+    const atrophy = getTraitByName('形销骨立');
     expect(atrophy?.attributeModifiers?.臂力).toBe(-30);
 
     // 臂力极高（18）触发强力正面「霸王扛鼎」

@@ -6,13 +6,14 @@ interface SplashScreenProps {
   hasSavedGame: boolean;
   onNewGame: () => void;
   onContinue: () => void;
+  onOpenSettings?: () => void;
 }
 
 /**
  * 标题页面组件
  * 显示新游戏/继续游戏选项
  */
-const SplashScreen: React.FC<SplashScreenProps> = ({ hasSavedGame, onNewGame, onContinue }) => {
+const SplashScreen: React.FC<SplashScreenProps> = ({ hasSavedGame, onNewGame, onContinue, onOpenSettings }) => {
   return (
     <div className="splash-screen">
       {/* 背景装饰 */}
@@ -21,8 +22,22 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ hasSavedGame, onNewGame, on
         <div className="splash-bg-overlay"></div>
       </div>
 
-      {/* 全屏按钮 */}
-      <FullscreenButton className="splash-fullscreen-btn" />
+      {/* 右上角工具栏：设置与全屏 */}
+      <div className="screen-top-utilities">
+        {onOpenSettings && (
+          <button
+            type="button"
+            className="screen-utility-btn"
+            onClick={onOpenSettings}
+            title="系统设置"
+            aria-label="系统设置"
+          >
+            <Icons.Settings size={15} />
+            <span>设置</span>
+          </button>
+        )}
+        <FullscreenButton className="screen-utility-btn" />
+      </div>
 
       {/* 主要内容 */}
       <div className="splash-content">

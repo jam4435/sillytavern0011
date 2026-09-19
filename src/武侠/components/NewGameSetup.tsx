@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AvatarImage from './AvatarImage';
+import { getCardBackgroundImage } from './CardOrnaments';
+import FullscreenButton from './FullscreenButton';
+import { Icons } from './Icons';
 import type {
   CharacterBuild,
   CharacterTrait,
@@ -30,6 +33,12 @@ import {
   type EventLocation,
   type NewGameFormData,
 } from '../utils/gameInitializer';
+import {
+  rollDivinationBoard,
+  DIVINATION_BOARD_SIZE,
+  MAX_EQUIPPED_TRAITS,
+  REROLL_POINT_COST,
+} from '../utils/traitsGacha';
 import {
   getAvatarFromRef,
   getAvatarsByGender,
@@ -95,6 +104,7 @@ interface NewGameSetupProps {
   onSubmit: (formData: NewGameFormData) => void;
   onBack: () => void;
   isLoading: boolean;
+  onOpenSettings?: () => void;
 }
 
 // 角色存档 localStorage key
@@ -117,7 +127,7 @@ interface CustomTrait {
  * 开局设置表单组件 - 高端玻璃拟态设计
  * 新版7步流程：天资 -> 属性 -> 天赋 -> 武功 -> 出身 -> 身份 -> 确认
  */
-const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading }) => {
+const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading, onOpenSettings }) => {
   // ============================================
   // 新版7步流程状态
   // ============================================
@@ -132,10 +142,19 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   // 步骤2: 属性分配 (新点数系统)
   const [attributes, setAttributes] = useState<InitialAttributes>({ ...DEFAULT_ATTRIBUTES });
 
-  // 步骤3: 天赋选择
+  // 步骤3: 天赋选择 (以八卦天命洗炼盘为主视图)
+  const [activeTraitTab, setActiveTraitTab] = useState<'divination' | 'manual' | 'custom'>('divination');
+  const [boardTraits, setBoardTraits] = useState<CharacterTrait[]>(() => {
+    const { newBoard } = rollDivinationBoard([], [], 0, []);
+    return newBoard;
+  });
+  const [lockedSlotIndices, setLockedSlotIndices] = useState<number[]>([]);
+  const [freeBlessingUsed, setFreeBlessingUsed] = useState(false);
+  const [pityCount, setPityCount] = useState(0);
+  const [isRerolling, setIsRerolling] = useState(false);
   const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
-  const [drawnTraits, setDrawnTraits] = useState<string[]>([]); // 抽卡获得的天赋（不可取消）
-  const [traitDrawCostUsed, setTraitDrawCostUsed] = useState(0); // 天赋抽卡消耗的点数
+  const [drawnTraits, setDrawnTraits] = useState<string[]>([]); // 标记通过抽卡/洗炼盘获得的天赋
+  const [traitDrawCostUsed, setTraitDrawCostUsed] = useState(0); // 天赋洗炼消耗的点数
   const [traitSearchQuery, setTraitSearchQuery] = useState('');
   const [customTraitInput, setCustomTraitInput] = useState('');
 
@@ -372,20 +391,23 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   }, [selectedMartialArts, martialArtsDatabase, drawnMartialArts]);
 
   // 计算选中天赋消耗的点数（包含自定义天赋）
-  // 注意：抽卡获得的天赋不计入cost，因为抽卡费用已经包含了天赋的价值
+  // 机制：通过抽卡/洗炼盘获得的正面天赋不消耗品阶点数；负面缺陷依然返还点数（提款续命机制）
   const traitPointsUsed = useMemo(() => {
     let total = 0;
     for (const traitName of selectedTraits) {
-      // 抽卡获得的天赋不计入cost（抽卡费用已经包含了天赋的价值）
+      const trait = CHARACTER_TRAITS.find(t => t.name === traitName);
       if (drawnTraits.includes(traitName)) {
+        // 抽卡获得的负面缺陷依然倒贴返还点数给玩家
+        if (trait && (trait.cost ?? 0) < 0) {
+          total += trait.cost;
+        }
         continue;
       }
-      // 先查找预设天赋
-      const trait = CHARACTER_TRAITS.find(t => t.name === traitName);
+      // 自选模式下的预设天赋：正常计算点数消耗/返还
       if (trait && trait.cost !== undefined) {
         total += trait.cost;
       } else {
-        // 再查找自定义天赋
+        // 自定义天赋
         const customTrait = customTraits.find(t => t.name === traitName);
         if (customTrait) {
           total += customTrait.cost;
@@ -583,6 +605,108 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       showNotification('success', `自定义天赋「${traitName}」已删除`);
     },
     [customTraits, saveCustomTraits, selectedTraits, showNotification],
+  );
+
+  // ============================================
+  // 八卦天命洗炼盘操作函数
+  // ============================================
+
+  /**
+   * 重新洗炼全部天赋
+   */
+  const handleRerollDivinationBoard = useCallback(() => {
+    if (isRerolling) return;
+
+    if (!freeBlessingUsed) {
+      setFreeBlessingUsed(true);
+    } else {
+      if (remainingPoints < REROLL_POINT_COST) {
+        showNotification(
+          'error',
+          `点数不足！洗炼需消耗 ${REROLL_POINT_COST} 点，可先在下方选择负面缺陷补充点数！`,
+        );
+        return;
+      }
+      setTraitDrawCostUsed(prev => prev + REROLL_POINT_COST);
+    }
+
+    setIsRerolling(true);
+    setTimeout(() => {
+      const { newBoard, newPityCount } = rollDivinationBoard(
+        [],
+        [],
+        pityCount,
+        selectedTraits,
+      );
+      setBoardTraits(newBoard);
+      setPityCount(newPityCount);
+      setIsRerolling(false);
+      showNotification('success', '✨ 天赋已重新洗炼！');
+    }, 350);
+  }, [
+    isRerolling,
+    freeBlessingUsed,
+    remainingPoints,
+    pityCount,
+    selectedTraits,
+    showNotification,
+  ]);
+
+  /**
+   * 在命盘上装配或卸下某张命牌
+   */
+  const handleToggleEquipFromBoard = useCallback(
+    (trait: CharacterTrait) => {
+      const isAlreadyEquipped = selectedTraits.includes(trait.name);
+
+      if (isAlreadyEquipped) {
+        // 卸下
+        setSelectedTraits(prev => prev.filter(n => n !== trait.name));
+        setDrawnTraits(prev => prev.filter(n => n !== trait.name));
+        showNotification('info', `已从天命卡槽卸下「${trait.name}」`);
+      } else {
+        // 装配前检查卡槽上限
+        if (selectedTraits.length >= MAX_EQUIPPED_TRAITS) {
+          showNotification('warning', `天命卡槽已满（至多佩戴 ${MAX_EQUIPPED_TRAITS} 个天赋）`);
+          return;
+        }
+
+        setSelectedTraits(prev => [...prev, trait.name]);
+        setDrawnTraits(prev => [...prev, trait.name]);
+
+        const traitCost = trait.cost ?? 0;
+        if (traitCost < 0) {
+          showNotification(
+            'success',
+            `已装配负面缺陷「${trait.name}」，成功提款获得 +${Math.abs(traitCost)} 点数！`,
+          );
+        } else {
+          showNotification('success', `✨ 已契结天命「${trait.name}」！`);
+        }
+      }
+    },
+    [selectedTraits, showNotification],
+  );
+
+  /**
+   * 锁定或解锁命盘上的特定卡槽
+   */
+  const handleToggleLockBoardSlot = useCallback((index: number) => {
+    setLockedSlotIndices(prev =>
+      prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index],
+    );
+  }, []);
+
+  /**
+   * 从顶部卡槽直接卸下天赋
+   */
+  const handleUnequipTrait = useCallback(
+    (traitName: string) => {
+      setSelectedTraits(prev => prev.filter(n => n !== traitName));
+      setDrawnTraits(prev => prev.filter(n => n !== traitName));
+      showNotification('info', `已卸下「${traitName}」`);
+    },
+    [showNotification],
   );
 
   // 获取当前选中的事件（移到存档操作函数之前，以便在 handleSaveBuild 中使用）
@@ -1144,6 +1268,23 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         <span className="back-text">返回</span>
       </button>
 
+      {/* 右上角工具栏：设置与全屏 */}
+      <div className="screen-top-utilities">
+        {onOpenSettings && (
+          <button
+            type="button"
+            className="screen-utility-btn"
+            onClick={onOpenSettings}
+            title="系统设置"
+            aria-label="系统设置"
+          >
+            <Icons.Settings size={15} />
+            <span>设置</span>
+          </button>
+        )}
+        <FullscreenButton className="screen-utility-btn" />
+      </div>
+
       {/* 步骤指示器 - 新版7步 */}
       <div className="setup-steps seven-steps">
         {/* 步骤1: 天资 */}
@@ -1529,18 +1670,526 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
           )}
 
           {/* ============================================ */}
-          {/* 步骤3: 天赋选择 */}
+          {/* 步骤3: 天赋选择 (以天赋洗炼为主视图) */}
           {/* ============================================ */}
           {currentStep === 'traits' && (
             <div className="step-content traits-step">
-              {/* 已获得天赋（属性触发，不可取消） */}
+              {/* 模式切换选项卡 */}
+              <div className="destiny-mode-nav">
+                <button
+                  type="button"
+                  className={`mode-tab-btn ${activeTraitTab === 'divination' ? 'active' : ''}`}
+                  onClick={() => setActiveTraitTab('divination')}
+                >
+                  <span className="tab-icon">🎲</span>
+                  <span>天赋洗炼</span>
+                  <span className="recommend-tag">推荐</span>
+                </button>
+                <button
+                  type="button"
+                  className={`mode-tab-btn ${activeTraitTab === 'manual' ? 'active' : ''}`}
+                  onClick={() => setActiveTraitTab('manual')}
+                >
+                  <span className="tab-icon">📋</span>
+                  <span>天赋自选</span>
+                </button>
+                <button
+                  type="button"
+                  className={`mode-tab-btn ${activeTraitTab === 'custom' ? 'active' : ''}`}
+                  onClick={() => setActiveTraitTab('custom')}
+                >
+                  <span className="tab-icon">✏️</span>
+                  <span>自定义天赋</span>
+                </button>
+              </div>
+
+              {/* ================= 模式 1: 天赋洗炼 (默认主视图) ================= */}
+              {activeTraitTab === 'divination' && (
+                <div className="divination-board-section">
+                  <div className="board-header">
+                    <div className="board-title-group">
+                      <span className="bagua-icon">🎲</span>
+                      <h3 className="board-main-title">天赋洗炼盘</h3>
+                    </div>
+                    <div className={`blessing-status-badge ${freeBlessingUsed ? 'paid' : 'free'}`}>
+                      {!freeBlessingUsed ? (
+                        <>✨ 免费洗炼机会：尚存 1 次</>
+                      ) : (
+                        <>
+                          洗炼消耗：
+                          <span className="cost-highlight">{REROLL_POINT_COST} 点 / 次</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 6张洗炼卡牌 */}
+                  <div className="divination-cards-grid">
+                    {boardTraits.map((trait, index) => {
+                      if (!trait) return null;
+                      const isLocked = lockedSlotIndices.includes(index);
+                      const isEquipped = selectedTraits.includes(trait.name);
+                      const rank = trait.rank || '粗浅';
+                      const isNegative = (trait.cost ?? 0) < 0;
+
+                      return (
+                        <div
+                          key={`board-slot-${index}-${trait.name}`}
+                          className={`divination-card rank-${rank} ${isNegative ? 'is-flaw' : ''} ${isEquipped ? 'selected' : ''} ${isRerolling ? 'spinning' : ''}`}
+                          onClick={() => handleToggleEquipFromBoard(trait)}
+                          role="button"
+                          tabIndex={0}
+                          title={isEquipped ? '点击取消选择该天赋' : '点击选择该天赋'}
+                        >
+                          <div className="card-top-bar">
+                            <span className={`rank-seal rank-${rank}`}>
+                              {`【${rank}】`}
+                            </span>
+                            {isEquipped && (
+                              <span className="selected-indicator-badge">✓ 已选</span>
+                            )}
+                          </div>
+
+                          <div className="card-middle-section">
+                            <h4 className="card-title">{trait.name}</h4>
+                            <div className="card-divider title-divider" />
+                            <p className="card-desc">{trait.description}</p>
+                          </div>
+
+                          <div className="card-bottom-section">
+                            <div className="card-divider" />
+                            {/* 属性/折扣/返点标签（放到底部居中展示） */}
+                            <div className="card-badges">
+                              {isNegative && (
+                                <span className="spec-pill refund-pill">
+                                  💰 返还 +{Math.abs(trait.cost ?? 0)} 点
+                                </span>
+                              )}
+                              {trait.attributeModifiers &&
+                                Object.entries(trait.attributeModifiers).map(([attr, val]) => (
+                                  <span
+                                    key={attr}
+                                    className={`spec-pill ${val > 0 ? 'positive-pill' : 'negative-pill'}`}
+                                  >
+                                    {attr} {val > 0 ? `+${val}%` : `${val}%`}
+                                  </span>
+                                ))}
+                              {trait.discounts?.martialTypeDiscount &&
+                                Object.entries(trait.discounts.martialTypeDiscount).map(([mType, disc]) => (
+                                  <span key={mType} className="spec-pill positive-pill">
+                                    {mType}消耗 -{Math.round(disc * 100)}%
+                                  </span>
+                                ))}
+                              {trait.discounts?.globalUpgradeDiscount && (
+                                <span className="spec-pill positive-pill">
+                                  全功法 -{Math.round(trait.discounts.globalUpgradeDiscount * 100)}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* 重新洗炼控制台 */}
+                  <div className="divination-action-bar">
+                    <button
+                      type="button"
+                      className="reroll-cta-btn"
+                      disabled={isRerolling || (freeBlessingUsed && remainingPoints < REROLL_POINT_COST)}
+                      onClick={handleRerollDivinationBoard}
+                    >
+                      <span className="cta-icon">🎲</span>
+                      <span>重新洗炼</span>
+                    </button>
+
+                    <div
+                      className={`action-tip ${freeBlessingUsed && remainingPoints < REROLL_POINT_COST ? 'warning' : ''}`}
+                    >
+                      {!freeBlessingUsed ? (
+                        <>✨ 本次洗炼免费</>
+                      ) : remainingPoints < REROLL_POINT_COST ? (
+                        <>
+                          ⚠️ 点数不足以洗炼（需 {REROLL_POINT_COST} 点）！可先选择负面天赋补充点数。
+                        </>
+                      ) : (
+                        <>
+                          消耗 {REROLL_POINT_COST} 点洗炼全部天赋（当前剩余可用 {remainingPoints} 点）
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ================= 模式 2: 天赋自选 ================= */}
+              {activeTraitTab === 'manual' && (
+                <div className="form-section glass-card">
+                  <h3 className="section-title">
+                    <span className="section-icon">📋</span>
+                    天赋自选
+                    <span className={`points-badge ${remainingPoints >= 0 ? '' : 'error'}`}>
+                      剩余 {remainingPoints} 点
+                    </span>
+                  </h3>
+                  <p className="section-desc">正面天赋消耗点数，负面缺陷返还点数。点击卡片进行选择（最多选择 {MAX_EQUIPPED_TRAITS} 个）。</p>
+                  {errors.traits && <p className="error-text center">{errors.traits}</p>}
+
+                  {/* 搜索和筛选 */}
+                  <div className="trait-filters">
+                    <div className="search-wrapper">
+                      <input
+                        type="text"
+                        className="trait-search"
+                        placeholder="搜索天赋名称或描述..."
+                        value={traitSearchQuery}
+                        onChange={e => setTraitSearchQuery(e.target.value)}
+                      />
+                      <span className="search-icon">🔍</span>
+                    </div>
+                  </div>
+
+                  {/* 天赋列表 */}
+                  <div className="traits-scroll-container">
+                    <div className="traits-grid selectable">
+                      {CHARACTER_TRAITS.filter(trait => !trait.attributeThreshold)
+                        .filter(trait => {
+                          if (!traitSearchQuery) return true;
+                          const query = traitSearchQuery.toLowerCase();
+                          return (
+                            trait.name.toLowerCase().includes(query) ||
+                            trait.description.toLowerCase().includes(query)
+                          );
+                        })
+                        .map(trait => {
+                          const isSelected = selectedTraits.includes(trait.name);
+                          const traitCost = trait.cost ?? 0;
+                          const canAfford =
+                            traitCost <= 0 || remainingPoints >= traitCost || isSelected;
+                          const traitType = getTraitType(trait);
+
+                          return (
+                            <div
+                              key={trait.name}
+                              className={`trait-card selectable ${isSelected ? 'selected' : ''} ${traitType === '正面' ? 'positive' : traitType === '负面' ? 'negative' : 'neutral'} ${!canAfford ? 'disabled' : ''}`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  handleUnequipTrait(trait.name);
+                                } else {
+                                  if (selectedTraits.length >= MAX_EQUIPPED_TRAITS) {
+                                    showNotification(
+                                      'warning',
+                                      `最多只能选择 ${MAX_EQUIPPED_TRAITS} 个天赋`,
+                                    );
+                                    return;
+                                  }
+                                  if (!canAfford) return;
+                                  setSelectedTraits(prev => [...prev, trait.name]);
+                                  if (traitCost < 0) {
+                                    showNotification(
+                                      'success',
+                                      `已选择负面天赋「${trait.name}」，获得 +${Math.abs(traitCost)} 点数！`,
+                                    );
+                                  } else {
+                                    showNotification('success', `已选择天赋「${trait.name}」`);
+                                  }
+                                }
+                              }}
+                            >
+                              <div className="trait-header">
+                                <span className="trait-name">{trait.name}</span>
+                                <span
+                                  className={`trait-cost ${traitCost > 0 ? 'cost' : traitCost < 0 ? 'gain' : ''}`}
+                                >
+                                  {traitCost > 0
+                                    ? `-${traitCost}`
+                                    : traitCost < 0
+                                      ? `+${Math.abs(traitCost)}`
+                                      : '0'}
+                                </span>
+                              </div>
+                              <p className="trait-desc">{trait.description}</p>
+                              {isSelected && (
+                                <div className="selected-indicator">
+                                  <span>✓</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ================= 模式 3: 自定义天赋 ================= */}
+              {activeTraitTab === 'custom' && (
+                <div className="form-section glass-card">
+                  <h3 className="section-title">
+                    <span className="section-icon">✏️</span>
+                    自定义天赋
+                    <span className="trait-count">{customTraits.length} 个已保存</span>
+                  </h3>
+                  <p className="section-desc">创建自定义天赋，设置名称、描述和点数消耗。正数消耗点数，负数返还点数。</p>
+
+                  {customTraits.length > 0 && (
+                    <div className="custom-traits-list">
+                      <h4 className="subsection-title">已保存的自定义天赋</h4>
+                      <div className="traits-grid selectable custom-traits-scroll">
+                        {customTraits.map(trait => {
+                          const isSelected = selectedTraits.includes(trait.name);
+                          const canAfford =
+                            trait.cost <= 0 || remainingPoints >= trait.cost || isSelected;
+                          const traitType =
+                            trait.cost > 0 ? '正面' : trait.cost < 0 ? '负面' : '中性';
+
+                          return (
+                            <div
+                              key={trait.id}
+                              className={`trait-card selectable custom ${isSelected ? 'selected' : ''} ${traitType === '正面' ? 'positive' : traitType === '负面' ? 'negative' : 'neutral'} ${!canAfford ? 'disabled' : ''}`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  handleUnequipTrait(trait.name);
+                                } else {
+                                  if (selectedTraits.length >= MAX_EQUIPPED_TRAITS) {
+                                    showNotification(
+                                      'warning',
+                                      `最多只能选择 ${MAX_EQUIPPED_TRAITS} 个天赋`,
+                                    );
+                                    return;
+                                  }
+                                  if (!canAfford) return;
+                                  setSelectedTraits(prev => [...prev, trait.name]);
+                                }
+                              }}
+                            >
+                              <div className="trait-header">
+                                <span className="trait-name">{trait.name}</span>
+                                <span
+                                  className={`trait-cost ${trait.cost > 0 ? 'cost' : trait.cost < 0 ? 'gain' : ''}`}
+                                >
+                                  {trait.cost > 0
+                                    ? `-${trait.cost}`
+                                    : trait.cost < 0
+                                      ? `+${Math.abs(trait.cost)}`
+                                      : '0'}
+                                </span>
+                              </div>
+                              <p className="trait-desc">{trait.description}</p>
+                              {isSelected && (
+                                <div className="selected-indicator">
+                                  <span>✓</span>
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                className="delete-custom-trait-btn"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleDeleteCustomTrait(trait.id, trait.name);
+                                }}
+                                title="删除此自定义天赋"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 添加自定义天赋表单 */}
+                  {showCustomTraitForm ? (
+                    <div className="custom-trait-form">
+                      <h4 className="subsection-title">添加新天赋</h4>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label className="form-label">天赋名称 *</label>
+                          <div className="input-wrapper">
+                            <input
+                              type="text"
+                              className="form-input"
+                              value={newCustomTraitName}
+                              onChange={e => setNewCustomTraitName(e.target.value)}
+                              placeholder="例如：少林弟子"
+                              maxLength={10}
+                            />
+                            <div className="input-glow" />
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">点数消耗</label>
+                          <div className="cost-input-wrapper">
+                            <button
+                              type="button"
+                              className="cost-btn minus"
+                              onClick={() => setNewCustomTraitCost(prev => prev - 1)}
+                            >
+                              −
+                            </button>
+                            <input
+                              type="number"
+                              className="form-input cost-input"
+                              value={newCustomTraitCost}
+                              onChange={e => setNewCustomTraitCost(Number(e.target.value))}
+                            />
+                            <button
+                              type="button"
+                              className="cost-btn plus"
+                              onClick={() => setNewCustomTraitCost(prev => prev + 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                          <span className="cost-hint">
+                            {newCustomTraitCost > 0
+                              ? `消耗 ${newCustomTraitCost} 点`
+                              : newCustomTraitCost < 0
+                                ? `返还 ${Math.abs(newCustomTraitCost)} 点`
+                                : '不消耗点数'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">天赋描述 *</label>
+                        <div className="input-wrapper">
+                          <textarea
+                            className="form-textarea"
+                            value={newCustomTraitDesc}
+                            onChange={e => setNewCustomTraitDesc(e.target.value)}
+                            placeholder="描述这个天赋的效果和背景..."
+                            rows={2}
+                          />
+                          <div className="input-glow" />
+                        </div>
+                      </div>
+                      <div className="custom-trait-actions">
+                        <button
+                          type="button"
+                          className="cancel-btn"
+                          onClick={() => {
+                            setShowCustomTraitForm(false);
+                            setNewCustomTraitName('');
+                            setNewCustomTraitDesc('');
+                            setNewCustomTraitCost(0);
+                          }}
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          className="save-trait-btn"
+                          onClick={handleAddCustomTrait}
+                        >
+                          保存天赋
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="add-custom-trait-btn"
+                      onClick={() => setShowCustomTraitForm(true)}
+                    >
+                      <span className="btn-icon">+</span>
+                      <span className="btn-text">添加自定义天赋</span>
+                    </button>
+                  )}
+
+                  <div className="custom-trait-input">
+                    <h4 className="subsection-title">自由描述（可选）</h4>
+                    <p className="hint-text">输入额外的天赋描述，AI 会根据描述为你生成相应的效果。</p>
+                    <div className="input-wrapper">
+                      <textarea
+                        className="form-textarea"
+                        value={customTraitInput}
+                        onChange={e => setCustomTraitInput(e.target.value)}
+                        placeholder="例如：我曾经在少林寺学过三年武功..."
+                        rows={2}
+                        disabled={isLoading}
+                      />
+                      <div className="input-glow" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 已选天赋卡槽 (置于主体操作区下方，上限5个) */}
+              <div className="destiny-equipped-section">
+                <div className="equipped-header">
+                  <h4 className="equipped-title">
+                    <span className="title-icon">✓</span>
+                    <span>已选天赋</span>
+                  </h4>
+                  <div className="equipped-counter">
+                    已选：
+                    <span className="count-highlight">{selectedTraits.length}</span> / {MAX_EQUIPPED_TRAITS}
+                  </div>
+                </div>
+
+                <div className="destiny-slots-grid">
+                  {Array.from({ length: MAX_EQUIPPED_TRAITS }).map((_, slotIdx) => {
+                    const traitName = selectedTraits[slotIdx];
+                    if (!traitName) {
+                      return (
+                        <div key={`empty-slot-${slotIdx}`} className="destiny-slot empty">
+                          <span className="slot-hollow-icon">◈</span>
+                          <span>未选择</span>
+                        </div>
+                      );
+                    }
+
+                    const trait =
+                      CHARACTER_TRAITS.find(t => t.name === traitName) ||
+                      customTraits.find(t => t.name === traitName) ||
+                      ({ name: traitName, rank: '粗浅', cost: 0 } as CharacterTrait);
+                    const rank = trait.rank || '粗浅';
+                    const isNegative = (trait.cost ?? 0) < 0;
+
+                    return (
+                      <div
+                        key={`filled-slot-${slotIdx}-${traitName}`}
+                        className={`destiny-slot filled rank-${rank}`}
+                      >
+                        <div className="slot-top">
+                          <span className={`slot-rank-tag rank-${rank}`}>
+                            {rank}
+                          </span>
+                          <button
+                            type="button"
+                            className="unequip-btn"
+                            onClick={() => handleUnequipTrait(traitName)}
+                            title="取消选择"
+                          >
+                            ✕ 取消
+                          </button>
+                        </div>
+                        <div className="slot-name" title={traitName}>
+                          {traitName}
+                        </div>
+                        <div className="slot-bottom">
+                          {isNegative && (
+                            <span className="refund-badge">
+                              +{Math.abs(trait.cost ?? 0)} 点数
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 属性极值触发的先天属性禀赋 (不可取消，不占已选天赋卡槽) */}
               <div className="form-section glass-card">
                 <h3 className="section-title">
                   <span className="section-icon">🔒</span>
-                  已获得天赋
+                  属性触发天赋 (自动生效)
                   <span className="trait-count">{attributeTriggeredTraits.length} 个</span>
                 </h3>
-                <p className="section-desc">这些天赋由你的属性值自动触发，不可取消。</p>
+                <p className="section-desc">这些天赋由你的初始属性极值自然觉醒，终生伴随，不占用已选天赋名额。</p>
                 {attributeTriggeredTraits.length > 0 ? (
                   <div className="traits-grid locked">
                     {attributeTriggeredTraits.map(trait => (
@@ -1561,420 +2210,300 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 )}
               </div>
 
-              {/* 天赋抽卡区域 */}
-              <div className="form-section glass-card">
-                <h3 className="section-title">
-                  <span className="section-icon">🎴</span>
-                  天赋抽取
-                  <span className={`points-badge ${remainingPoints >= 0 ? '' : 'error'}`}>
-                    剩余 {remainingPoints} 点
-                  </span>
-                </h3>
-                <p className="section-desc">
-                  花费点数随机抽取天赋，正面池必得正面天赋，负面池必得负面天赋（免费但必须接受）。
-                </p>
+              {/* ================= 模式 2: 命格全谱 (备用自选列表) ================= */}
+              {activeTraitTab === 'manual' && (
+                <div className="form-section glass-card">
+                  <h3 className="section-title">
+                    <span className="section-icon">📜</span>
+                    命格全谱自选
+                    <span className={`points-badge ${remainingPoints >= 0 ? '' : 'error'}`}>
+                      剩余 {remainingPoints} 点
+                    </span>
+                  </h3>
+                  <p className="section-desc">正面天赋消耗点数，负面缺陷倒贴返还点数。可直接查谱勾选（至多佩戴 {MAX_EQUIPPED_TRAITS} 个）。</p>
+                  {errors.traits && <p className="error-text center">{errors.traits}</p>}
 
-                <div className="gacha-section trait-gacha">
-                  <div className="gacha-pools trait-pools">
-                    {/* 正面天赋抽卡 */}
-                    <div
-                      className={`gacha-pool positive ${remainingPoints < TRAIT_DRAW_COST.positive ? 'disabled' : ''}`}
-                    >
-                      <div className="pool-header">
-                        <span className="pool-rank positive">正面天赋</span>
-                        <span className="pool-count">
-                          {
-                            CHARACTER_TRAITS.filter(
-                              t => !t.attributeThreshold && (t.cost ?? 0) > 0 && !selectedTraits.includes(t.name),
-                            ).length
-                          }
-                          种可抽
-                        </span>
-                      </div>
-                      <div className="pool-cost">
-                        花费 <span className="cost-value">{TRAIT_DRAW_COST.positive}</span> 点
-                      </div>
-                      <button
-                        type="button"
-                        className="gacha-btn positive-btn"
-                        disabled={remainingPoints < TRAIT_DRAW_COST.positive}
-                        onClick={() => {
-                          const availableTraits = CHARACTER_TRAITS.filter(
-                            t => !t.attributeThreshold && (t.cost ?? 0) > 0 && !selectedTraits.includes(t.name),
-                          );
-                          if (availableTraits.length === 0) {
-                            showNotification('info', '没有可抽取的正面天赋了');
-                            return;
-                          }
-                          const randomIndex = Math.floor(Math.random() * availableTraits.length);
-                          const drawnTrait = availableTraits[randomIndex];
-                          setSelectedTraits(prev => [...prev, drawnTrait.name]);
-                          setDrawnTraits(prev => [...prev, drawnTrait.name]); // 标记为抽卡获得，不可取消
-                          setTraitDrawCostUsed(prev => prev + TRAIT_DRAW_COST.positive); // 记录抽卡费用
-                          showNotification(
-                            'success',
-                            `🎉 抽中了「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.positive}点，不可取消）`,
-                          );
-                        }}
-                      >
-                        🎲 抽取正面
-                      </button>
-                    </div>
-
-                    {/* 负面天赋抽卡（免费） */}
-                    <div className="gacha-pool negative">
-                      <div className="pool-header">
-                        <span className="pool-rank negative">负面天赋</span>
-                        <span className="pool-count">
-                          {
-                            CHARACTER_TRAITS.filter(
-                              t => !t.attributeThreshold && (t.cost ?? 0) < 0 && !selectedTraits.includes(t.name),
-                            ).length
-                          }
-                          种可抽
-                        </span>
-                      </div>
-                      <div className="pool-cost">
-                        <span className="free-tag">免费</span> 但必须接受
-                      </div>
-                      <button
-                        type="button"
-                        className="gacha-btn negative-btn"
-                        onClick={() => {
-                          const availableTraits = CHARACTER_TRAITS.filter(
-                            t => !t.attributeThreshold && (t.cost ?? 0) < 0 && !selectedTraits.includes(t.name),
-                          );
-                          if (availableTraits.length === 0) {
-                            showNotification('info', '没有可抽取的负面天赋了');
-                            return;
-                          }
-                          const randomIndex = Math.floor(Math.random() * availableTraits.length);
-                          const drawnTrait = availableTraits[randomIndex];
-                          setSelectedTraits(prev => [...prev, drawnTrait.name]);
-                          setDrawnTraits(prev => [...prev, drawnTrait.name]); // 标记为抽卡获得，不可取消
-                          // 负面天赋抽卡免费，但会获得该天赋的点数返还
-                          setTraitDrawCostUsed(prev => prev + (drawnTrait.cost ?? 0)); // 负面天赋cost为负数，所以加上后相当于减去点数
-                          showNotification(
-                            'info',
-                            `抽中了「${drawnTrait.name}」，获得 ${Math.abs(drawnTrait.cost ?? 0)} 点！（不可取消）`,
-                          );
-                        }}
-                      >
-                        🎲 抽取负面
-                      </button>
-                    </div>
-
-                    {/* 混合池抽卡 */}
-                    <div className={`gacha-pool mixed ${remainingPoints < TRAIT_DRAW_COST.mixed ? 'disabled' : ''}`}>
-                      <div className="pool-header">
-                        <span className="pool-rank mixed">混合池</span>
-                        <span className="pool-count">
-                          {
-                            CHARACTER_TRAITS.filter(t => !t.attributeThreshold && !selectedTraits.includes(t.name))
-                              .length
-                          }
-                          种可抽
-                        </span>
-                      </div>
-                      <div className="pool-cost">
-                        花费 <span className="cost-value">{TRAIT_DRAW_COST.mixed}</span> 点
-                      </div>
-                      <button
-                        type="button"
-                        className="gacha-btn mixed-btn"
-                        disabled={remainingPoints < TRAIT_DRAW_COST.mixed}
-                        onClick={() => {
-                          const availableTraits = CHARACTER_TRAITS.filter(
-                            t => !t.attributeThreshold && !selectedTraits.includes(t.name),
-                          );
-                          if (availableTraits.length === 0) {
-                            showNotification('info', '没有可抽取的天赋了');
-                            return;
-                          }
-                          const randomIndex = Math.floor(Math.random() * availableTraits.length);
-                          const drawnTrait = availableTraits[randomIndex];
-                          setSelectedTraits(prev => [...prev, drawnTrait.name]);
-                          setDrawnTraits(prev => [...prev, drawnTrait.name]); // 标记为抽卡获得，不可取消
-                          setTraitDrawCostUsed(prev => prev + TRAIT_DRAW_COST.mixed); // 记录抽卡费用
-                          const traitCost = drawnTrait.cost ?? 0;
-                          if (traitCost > 0) {
-                            showNotification(
-                              'success',
-                              `🎉 抽中了正面天赋「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.mixed}点，不可取消）`,
-                            );
-                          } else if (traitCost < 0) {
-                            showNotification(
-                              'info',
-                              `抽中了负面天赋「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.mixed}点，不可取消）`,
-                            );
-                          } else {
-                            showNotification(
-                              'info',
-                              `抽中了中性天赋「${drawnTrait.name}」！（消耗${TRAIT_DRAW_COST.mixed}点，不可取消）`,
-                            );
-                          }
-                        }}
-                      >
-                        🎲 随机抽取
-                      </button>
+                  {/* 搜索和筛选 */}
+                  <div className="trait-filters">
+                    <div className="search-wrapper">
+                      <input
+                        type="text"
+                        className="trait-search"
+                        placeholder="搜索天赋名称或描述..."
+                        value={traitSearchQuery}
+                        onChange={e => setTraitSearchQuery(e.target.value)}
+                      />
+                      <span className="search-icon">🔍</span>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* 可选天赋列表 */}
-              <div className="form-section glass-card">
-                <h3 className="section-title">
-                  <span className="section-icon">✨</span>
-                  直接选择
-                  <span className={`points-badge ${remainingPoints >= 0 ? '' : 'error'}`}>
-                    剩余 {remainingPoints} 点
-                  </span>
-                </h3>
-                <p className="section-desc">正面天赋消耗点数，负面天赋返还点数。直接选择你想要的天赋。</p>
-                {errors.traits && <p className="error-text center">{errors.traits}</p>}
+                  {/* 天赋列表 - 添加独立滚动容器 */}
+                  <div className="traits-scroll-container">
+                    <div className="traits-grid selectable">
+                      {CHARACTER_TRAITS.filter(trait => !trait.attributeThreshold)
+                        .filter(trait => {
+                          if (!traitSearchQuery) return true;
+                          const query = traitSearchQuery.toLowerCase();
+                          return (
+                            trait.name.toLowerCase().includes(query) || trait.description.toLowerCase().includes(query)
+                          );
+                        })
+                        .map(trait => {
+                          const isSelected = selectedTraits.includes(trait.name);
+                          const traitCost = trait.cost ?? 0;
+                          const canAfford = traitCost <= 0 || remainingPoints >= traitCost || isSelected;
+                          const traitType = getTraitType(trait);
 
-                {/* 搜索和筛选 */}
-                <div className="trait-filters">
-                  <div className="search-wrapper">
-                    <input
-                      type="text"
-                      className="trait-search"
-                      placeholder="搜索天赋名称或描述..."
-                      value={traitSearchQuery}
-                      onChange={e => setTraitSearchQuery(e.target.value)}
-                    />
-                    <span className="search-icon">🔍</span>
-                  </div>
-                </div>
-
-                {/* 天赋列表 - 添加独立滚动容器 */}
-                <div className="traits-scroll-container">
-                  <div className="traits-grid selectable">
-                    {CHARACTER_TRAITS.filter(trait => !trait.attributeThreshold) // 排除属性触发型天赋
-                      .filter(trait => {
-                        if (!traitSearchQuery) return true;
-                        const query = traitSearchQuery.toLowerCase();
-                        return (
-                          trait.name.toLowerCase().includes(query) || trait.description.toLowerCase().includes(query)
-                        );
-                      })
-                      .map(trait => {
-                        const isSelected = selectedTraits.includes(trait.name);
-                        const isDrawn = drawnTraits.includes(trait.name); // 是否通过抽卡获得
-                        const traitCost = trait.cost ?? 0;
-                        const canAfford = traitCost <= 0 || remainingPoints >= traitCost || isSelected;
-                        const traitType = getTraitType(trait);
-
-                        return (
-                          <div
-                            key={trait.name}
-                            className={`trait-card selectable ${isSelected ? 'selected' : ''} ${isDrawn ? 'drawn locked' : ''} ${traitType === '正面' ? 'positive' : traitType === '负面' ? 'negative' : 'neutral'} ${!canAfford ? 'disabled' : ''}`}
-                            onClick={() => {
-                              if (isDrawn) return; // 抽卡获得的天赋不能取消
-                              if (!canAfford && !isSelected) return;
-                              if (isSelected) {
-                                setSelectedTraits(prev => prev.filter(name => name !== trait.name));
-                              } else {
-                                setSelectedTraits(prev => [...prev, trait.name]);
-                              }
-                            }}
-                          >
-                            <div className="trait-header">
-                              <span className="trait-name">{trait.name}</span>
-                              <span
-                                className={`trait-cost ${isDrawn ? 'drawn' : traitCost > 0 ? 'cost' : traitCost < 0 ? 'gain' : ''}`}
-                              >
-                                {isDrawn
-                                  ? '已抽取'
-                                  : traitCost > 0
+                          return (
+                            <div
+                              key={trait.name}
+                              className={`trait-card selectable ${isSelected ? 'selected' : ''} ${traitType === '正面' ? 'positive' : traitType === '负面' ? 'negative' : 'neutral'} ${!canAfford ? 'disabled' : ''}`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  handleUnequipTrait(trait.name);
+                                } else {
+                                  if (selectedTraits.length >= MAX_EQUIPPED_TRAITS) {
+                                    showNotification('warning', `天命卡槽已满（至多佩戴 ${MAX_EQUIPPED_TRAITS} 个天赋）`);
+                                    return;
+                                  }
+                                  if (!canAfford) return;
+                                  setSelectedTraits(prev => [...prev, trait.name]);
+                                  if (traitCost < 0) {
+                                    showNotification('success', `已装配负面缺陷「${trait.name}」，成功提款 +${Math.abs(traitCost)} 点数！`);
+                                  } else {
+                                    showNotification('success', `已勾选天赋「${trait.name}」`);
+                                  }
+                                }
+                              }}
+                            >
+                              <div className="trait-header">
+                                <span className="trait-name">{trait.name}</span>
+                                <span
+                                  className={`trait-cost ${traitCost > 0 ? 'cost' : traitCost < 0 ? 'gain' : ''}`}
+                                >
+                                  {traitCost > 0
                                     ? `-${traitCost}`
                                     : traitCost < 0
                                       ? `+${Math.abs(traitCost)}`
                                       : '0'}
-                              </span>
-                            </div>
-                            <p className="trait-desc">{trait.description}</p>
-                            {isSelected && (
-                              <div className="selected-indicator">
-                                <span>{isDrawn ? '🔒' : '✓'}</span>
+                                </span>
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              </div>
-
-              {/* 自定义天赋 */}
-              <div className="form-section glass-card">
-                <h3 className="section-title">
-                  <span className="section-icon">✏️</span>
-                  自定义天赋
-                  <span className="trait-count">{customTraits.length} 个已保存</span>
-                </h3>
-                <p className="section-desc">创建自定义天赋，设置名称、描述和点数消耗。正数消耗点数，负数返还点数。</p>
-
-                {/* 已保存的自定义天赋列表 */}
-                {customTraits.length > 0 && (
-                  <div className="custom-traits-list">
-                    <h4 className="subsection-title">已保存的自定义天赋</h4>
-                    <div className="traits-grid selectable custom-traits-scroll">
-                      {customTraits.map(trait => {
-                        const isSelected = selectedTraits.includes(trait.name);
-                        const canAfford = trait.cost <= 0 || remainingPoints >= trait.cost || isSelected;
-                        const traitType = trait.cost > 0 ? '正面' : trait.cost < 0 ? '负面' : '中性';
-
-                        return (
-                          <div
-                            key={trait.id}
-                            className={`trait-card selectable custom ${isSelected ? 'selected' : ''} ${traitType === '正面' ? 'positive' : traitType === '负面' ? 'negative' : 'neutral'} ${!canAfford ? 'disabled' : ''}`}
-                            onClick={() => {
-                              if (!canAfford && !isSelected) return;
-                              if (isSelected) {
-                                setSelectedTraits(prev => prev.filter(name => name !== trait.name));
-                              } else {
-                                setSelectedTraits(prev => [...prev, trait.name]);
-                              }
-                            }}
-                          >
-                            <div className="trait-header">
-                              <span className="trait-name">{trait.name}</span>
-                              <span className={`trait-cost ${trait.cost > 0 ? 'cost' : trait.cost < 0 ? 'gain' : ''}`}>
-                                {trait.cost > 0 ? `-${trait.cost}` : trait.cost < 0 ? `+${Math.abs(trait.cost)}` : '0'}
-                              </span>
+                              <p className="trait-desc">{trait.description}</p>
+                              {isSelected && (
+                                <div className="selected-indicator">
+                                  <span>✓</span>
+                                </div>
+                              )}
                             </div>
-                            <p className="trait-desc">{trait.description}</p>
-                            {isSelected && (
-                              <div className="selected-indicator">
-                                <span>✓</span>
-                              </div>
-                            )}
-                            <button
-                              type="button"
-                              className="delete-custom-trait-btn"
-                              onClick={e => {
-                                e.stopPropagation();
-                                handleDeleteCustomTrait(trait.id, trait.name);
-                              }}
-                              title="删除此自定义天赋"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* 添加自定义天赋表单 */}
-                {showCustomTraitForm ? (
-                  <div className="custom-trait-form">
-                    <h4 className="subsection-title">添加新天赋</h4>
-                    <div className="form-row">
+              {/* ================= 模式 3: 自定义天赋 ================= */}
+              {activeTraitTab === 'custom' && (
+                <div className="form-section glass-card">
+                  <h3 className="section-title">
+                    <span className="section-icon">✏️</span>
+                    自定义天赋
+                    <span className="trait-count">{customTraits.length} 个已保存</span>
+                  </h3>
+                  <p className="section-desc">创建自定义天赋，设置名称、描述和点数消耗。正数消耗点数，负数返还点数。</p>
+
+                  {/* 已保存的自定义天赋列表 */}
+                  {customTraits.length > 0 && (
+                    <div className="custom-traits-list">
+                      <h4 className="subsection-title">已保存的自定义天赋</h4>
+                      <div className="traits-grid selectable custom-traits-scroll">
+                        {customTraits.map(trait => {
+                          const isSelected = selectedTraits.includes(trait.name);
+                          const canAfford = trait.cost <= 0 || remainingPoints >= trait.cost || isSelected;
+                          const traitType = trait.cost > 0 ? '正面' : trait.cost < 0 ? '负面' : '中性';
+
+                          return (
+                            <div
+                              key={trait.id}
+                              className={`trait-card selectable custom ${isSelected ? 'selected' : ''} ${traitType === '正面' ? 'positive' : traitType === '负面' ? 'negative' : 'neutral'} ${!canAfford ? 'disabled' : ''}`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  handleUnequipTrait(trait.name);
+                                } else {
+                                  if (selectedTraits.length >= MAX_EQUIPPED_TRAITS) {
+                                    showNotification('warning', `天命卡槽已满（至多佩戴 ${MAX_EQUIPPED_TRAITS} 个天赋）`);
+                                    return;
+                                  }
+                                  if (!canAfford) return;
+                                  setSelectedTraits(prev => [...prev, trait.name]);
+                                }
+                              }}
+                            >
+                              <div className="trait-header">
+                                <span className="trait-name">{trait.name}</span>
+                                <span className={`trait-cost ${trait.cost > 0 ? 'cost' : trait.cost < 0 ? 'gain' : ''}`}>
+                                  {trait.cost > 0 ? `-${trait.cost}` : trait.cost < 0 ? `+${Math.abs(trait.cost)}` : '0'}
+                                </span>
+                              </div>
+                              <p className="trait-desc">{trait.description}</p>
+                              {isSelected && (
+                                <div className="selected-indicator">
+                                  <span>✓</span>
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                className="delete-custom-trait-btn"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleDeleteCustomTrait(trait.id, trait.name);
+                                }}
+                                title="删除此自定义天赋"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 添加自定义天赋表单 */}
+                  {showCustomTraitForm ? (
+                    <div className="custom-trait-form">
+                      <h4 className="subsection-title">添加新天赋</h4>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label className="form-label">天赋名称 *</label>
+                          <div className="input-wrapper">
+                            <input
+                              type="text"
+                              className="form-input"
+                              value={newCustomTraitName}
+                              onChange={e => setNewCustomTraitName(e.target.value)}
+                              placeholder="例如：少林弟子"
+                              maxLength={10}
+                            />
+                            <div className="input-glow" />
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">点数消耗</label>
+                          <div className="cost-input-wrapper">
+                            <button
+                              type="button"
+                              className="cost-btn minus"
+                              onClick={() => setNewCustomTraitCost(prev => prev - 1)}
+                            >
+                              −
+                            </button>
+                            <input
+                              type="number"
+                              className="form-input cost-input"
+                              value={newCustomTraitCost}
+                              onChange={e => setNewCustomTraitCost(Number(e.target.value))}
+                            />
+                            <button
+                              type="button"
+                              className="cost-btn plus"
+                              onClick={() => setNewCustomTraitCost(prev => prev + 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                          <span className="cost-hint">
+                            {newCustomTraitCost > 0
+                              ? `消耗 ${newCustomTraitCost} 点`
+                              : newCustomTraitCost < 0
+                                ? `返还 ${Math.abs(newCustomTraitCost)} 点`
+                                : '不消耗点数'}
+                          </span>
+                        </div>
+                      </div>
                       <div className="form-group">
-                        <label className="form-label">天赋名称 *</label>
+                        <label className="form-label">天赋描述 *</label>
                         <div className="input-wrapper">
-                          <input
-                            type="text"
-                            className="form-input"
-                            value={newCustomTraitName}
-                            onChange={e => setNewCustomTraitName(e.target.value)}
-                            placeholder="例如：少林弟子"
-                            maxLength={10}
+                          <textarea
+                            className="form-textarea"
+                            value={newCustomTraitDesc}
+                            onChange={e => setNewCustomTraitDesc(e.target.value)}
+                            placeholder="描述这个天赋的效果和背景..."
+                            rows={2}
                           />
                           <div className="input-glow" />
                         </div>
                       </div>
-                      <div className="form-group">
-                        <label className="form-label">点数消耗</label>
-                        <div className="cost-input-wrapper">
-                          <button
-                            type="button"
-                            className="cost-btn minus"
-                            onClick={() => setNewCustomTraitCost(prev => prev - 1)}
-                          >
-                            −
-                          </button>
-                          <input
-                            type="number"
-                            className="form-input cost-input"
-                            value={newCustomTraitCost}
-                            onChange={e => setNewCustomTraitCost(Number(e.target.value))}
-                          />
-                          <button
-                            type="button"
-                            className="cost-btn plus"
-                            onClick={() => setNewCustomTraitCost(prev => prev + 1)}
-                          >
-                            +
-                          </button>
-                        </div>
-                        <span className="cost-hint">
-                          {newCustomTraitCost > 0
-                            ? `消耗 ${newCustomTraitCost} 点`
-                            : newCustomTraitCost < 0
-                              ? `返还 ${Math.abs(newCustomTraitCost)} 点`
-                              : '不消耗点数'}
-                        </span>
+                      <div className="custom-trait-actions">
+                        <button
+                          type="button"
+                          className="cancel-btn"
+                          onClick={() => {
+                            setShowCustomTraitForm(false);
+                            setNewCustomTraitName('');
+                            setNewCustomTraitDesc('');
+                            setNewCustomTraitCost(0);
+                          }}
+                        >
+                          取消
+                        </button>
+                        <button type="button" className="save-trait-btn" onClick={handleAddCustomTrait}>
+                          保存天赋
+                        </button>
                       </div>
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">天赋描述 *</label>
-                      <div className="input-wrapper">
-                        <textarea
-                          className="form-textarea"
-                          value={newCustomTraitDesc}
-                          onChange={e => setNewCustomTraitDesc(e.target.value)}
-                          placeholder="描述这个天赋的效果和背景..."
-                          rows={2}
-                        />
-                        <div className="input-glow" />
-                      </div>
-                    </div>
-                    <div className="custom-trait-actions">
-                      <button
-                        type="button"
-                        className="cancel-btn"
-                        onClick={() => {
-                          setShowCustomTraitForm(false);
-                          setNewCustomTraitName('');
-                          setNewCustomTraitDesc('');
-                          setNewCustomTraitCost(0);
-                        }}
-                      >
-                        取消
-                      </button>
-                      <button type="button" className="save-trait-btn" onClick={handleAddCustomTrait}>
-                        保存天赋
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button type="button" className="add-custom-trait-btn" onClick={() => setShowCustomTraitForm(true)}>
-                    <span className="btn-icon">+</span>
-                    <span className="btn-text">添加自定义天赋</span>
-                  </button>
-                )}
+                  ) : (
+                    <button type="button" className="add-custom-trait-btn" onClick={() => setShowCustomTraitForm(true)}>
+                      <span className="btn-icon">+</span>
+                      <span className="btn-text">添加自定义天赋</span>
+                    </button>
+                  )}
 
-                {/* 旧版自定义天赋描述输入 - 保留用于 AI 解析 */}
-                <div className="custom-trait-input">
-                  <h4 className="subsection-title">自由描述（可选）</h4>
-                  <p className="hint-text">输入额外的天赋描述，AI 会根据描述为你生成相应的效果。</p>
-                  <div className="input-wrapper">
-                    <textarea
-                      className="form-textarea"
-                      value={customTraitInput}
-                      onChange={e => setCustomTraitInput(e.target.value)}
-                      placeholder="例如：我曾经在少林寺学过三年武功..."
-                      rows={2}
-                      disabled={isLoading}
-                    />
-                    <div className="input-glow" />
+                  {/* 旧版自定义天赋描述输入 - 保留用于 AI 解析 */}
+                  <div className="custom-trait-input">
+                    <h4 className="subsection-title">自由描述（可选）</h4>
+                    <p className="hint-text">输入额外的天赋描述，AI 会根据描述为你生成相应的效果。</p>
+                    <div className="input-wrapper">
+                      <textarea
+                        className="form-textarea"
+                        value={customTraitInput}
+                        onChange={e => setCustomTraitInput(e.target.value)}
+                        placeholder="例如：我曾经在少林寺学过三年武功..."
+                        rows={2}
+                        disabled={isLoading}
+                      />
+                      <div className="input-glow" />
+                    </div>
                   </div>
                 </div>
+              )}
+
+              {/* 属性极值触发的先天禀赋 (不可取消，不占天命卡槽) */}
+              <div className="form-section glass-card">
+                <h3 className="section-title">
+                  <span className="section-icon">🔒</span>
+                  先天属性禀赋 (自然觉醒)
+                  <span className="trait-count">{attributeTriggeredTraits.length} 个</span>
+                </h3>
+                <p className="section-desc">这些禀赋由你的初始属性极值自然觉醒，终生伴随，不占用天命灵穴槽位。</p>
+                {attributeTriggeredTraits.length > 0 ? (
+                  <div className="traits-grid locked">
+                    {attributeTriggeredTraits.map(trait => (
+                      <div
+                        key={trait.name}
+                        className={`trait-card locked ${getTraitType(trait) === '正面' ? 'positive' : 'negative'}`}
+                      >
+                        <div className="trait-header">
+                          <span className="trait-name">{trait.name}</span>
+                        </div>
+                        <p className="trait-desc">{trait.description}</p>
+                        <div className="trait-lock-icon">🔒</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-hint">暂无属性触发的天赋</p>
+                )}
               </div>
 
               {/* 导航按钮 */}

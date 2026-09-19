@@ -1243,8 +1243,10 @@ function getRecentBodyMessages(
 ): {
   serialized: string;
   serializedReadonlyContextRounds: string;
-  serializedLatestAssistantBody: string;
+  latestUserBody: string;
+  serializedLatestUserBody: string;
   latestAssistantBody: string;
+  serializedLatestAssistantBody: string;
 } {
   const messages = getChatMessages('0-{{lastMessageId}}', {
     hide_state: 'unhidden',
@@ -1310,19 +1312,32 @@ function getRecentBodyMessages(
     },
   }));
 
+  const latestUserMessage = pendingUser;
+  const latestUserBody = latestUserMessage?.text || '';
+  const latestUserBodyPayload = {
+    messageId: latestUserMessage?.messageId ?? null,
+    content: latestUserBody || '(无可用 user 输入)',
+    role: 'user',
+    isCurrentTurnInput: true,
+  };
+
   const latestAssistantBodyPayload = {
     messageId: targetMessageId,
     content: latestAssistantBody || '(无可用正文)',
-    isOnlyChangeSource: true,
+    role: 'assistant',
+    isCurrentTurnOutcome: true,
   };
 
   return {
+    latestUserBody,
     latestAssistantBody,
     serialized: JSON.stringify({
       readonlyContextRounds: readonlyRounds,
+      latestUserBody: latestUserBodyPayload,
       latestAssistantBody: latestAssistantBodyPayload,
     }),
     serializedReadonlyContextRounds: JSON.stringify(readonlyRounds),
+    serializedLatestUserBody: JSON.stringify(latestUserBodyPayload),
     serializedLatestAssistantBody: JSON.stringify(latestAssistantBodyPayload),
   };
 }
@@ -1332,6 +1347,7 @@ function renderVariablePromptTemplate(
   values: {
     recentBodies: string;
     readonlyContextRounds: string;
+    latestUserBody: string;
     latestAssistantBody: string;
     variableContext: string;
     variableGuidance: string;
@@ -1346,6 +1362,7 @@ function renderVariablePromptTemplate(
   return sourceTemplate
     .replace(/\{\{recentBodies\}\}/g, values.recentBodies)
     .replace(/\{\{readonlyContextRounds\}\}/g, values.readonlyContextRounds)
+    .replace(/\{\{latestUserBody\}\}/g, values.latestUserBody)
     .replace(/\{\{latestAssistantBody\}\}/g, values.latestAssistantBody)
     .replace(/\{\{variableContext\}\}/g, values.variableContext)
     .replace(/\{\{variableGuidance\}\}/g, variableGuidance)
@@ -1378,6 +1395,7 @@ async function buildExtraVariableUpdatePrompt({
   return renderVariablePromptTemplate(settings.variablePromptTemplate, {
     recentBodies: recentBodies.serialized,
     readonlyContextRounds: recentBodies.serializedReadonlyContextRounds,
+    latestUserBody: recentBodies.serializedLatestUserBody,
     latestAssistantBody: recentBodies.serializedLatestAssistantBody,
     variableContext: variableProjection.variableContext,
     variableGuidance,

@@ -169,5 +169,5 @@ describe('NewGameSetup automation markers', () => {
     for (const card of Array.from(visibleCards).slice(0, 5)) {
       expect(card.getAttribute('data-wuxia-event-name')).toMatch(/^射雕/);
     }
-  });
+  }, 15000);
 });

@@ -622,7 +622,7 @@ export interface TraitDiscounts {
 }
 
 export type TraitRank = '粗浅' | '传家' | '上乘' | '镇派' | '绝世' | '传说' | '缺陷';
-export type TraitCategory = '兵刃' | '体质' | '身法' | '内功' | '情爱' | '奇人' | '医毒' | '缺陷';
+export type TraitCategory = '天资' | '体质' | '性情' | '气质' | '专长' | '命格' | '经历' | '缺陷';
 
 /**
  * 角色天赋定义

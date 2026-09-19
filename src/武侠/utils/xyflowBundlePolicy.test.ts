@@ -14,11 +14,13 @@ describe('shouldBundleXyflowDependency', () => {
     'd3-drag',
     'd3-selection',
     'd3-zoom',
+    'scheduler',
+    'zod',
   ])('keeps %s in the local React Flow bundle', request => {
     expect(shouldBundleXyflowDependency(request)).toBe(true);
   });
 
-  it.each(['lodash', 'toastr', 'yaml', 'zod'])('does not change the external policy for %s', request => {
+  it.each(['lodash', 'toastr', 'yaml'])('does not change the external policy for %s', request => {
     expect(shouldBundleXyflowDependency(request)).toBe(false);
   });
 });

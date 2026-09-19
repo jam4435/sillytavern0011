@@ -984,7 +984,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(serialized).not.toContain('黄蓉正在事件中');
   });
 
-  it('默认只发送一轮完整只读上下文，并把最新 assistant 正文标记为唯一变化来源', async () => {
+  it('默认发送一轮完整只读上下文，并将最新 user 输入与最新 assistant 正文结构化放入 payload', async () => {
     requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
 
     await executeExtraVariableUpdate({
@@ -999,19 +999,44 @@ describe('executeExtraVariableUpdate', () => {
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
     const context = JSON.parse(prompt) as {
-      readonlyContextRounds: Array<{ user: { messageId: number }; assistant: { messageId: number } }>;
-      latestAssistantBody: { messageId: number; content: string; isOnlyChangeSource: boolean };
+      readonlyContextRounds: Array<{ user: { messageId: number; content: string }; assistant: { messageId: number; content: string } }>;
+      latestUserBody: { messageId: number; content: string; role: string; isCurrentTurnInput: boolean };
+      latestAssistantBody: { messageId: number; content: string; role: string; isCurrentTurnOutcome: boolean };
     };
     expect(context.readonlyContextRounds).toEqual([
       { user: { messageId: 20, content: '上一轮用户正文' }, assistant: { messageId: 21, content: '上一轮助手正文' } },
     ]);
+    expect(context.latestUserBody).toEqual({
+      messageId: 27,
+      content: '触发本轮的用户输入',
+      role: 'user',
+      isCurrentTurnInput: true,
+    });
     expect(context.latestAssistantBody).toEqual({
       messageId: 28,
       content: '洪七公忽然现身。',
-      isOnlyChangeSource: true,
+      role: 'assistant',
+      isCurrentTurnOutcome: true,
     });
-    expect(prompt).not.toContain('触发本轮的用户输入');
     expect(prompt).not.toContain('更早用户正文');
+  });
+
+  it('支持在自定义提示词模板中分别渲染 {{latestUserBody}} 和 {{latestAssistantBody}}', async () => {
+    requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
+
+    await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+        variablePromptTemplate: 'USER:{{latestUserBody}}\nAI:{{latestAssistantBody}}',
+      },
+      assistantMessageId: 28,
+      latestRawReply: '洪七公忽然现身。',
+    });
+
+    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
+    expect(prompt).toContain('USER:{"messageId":27,"content":"触发本轮的用户输入","role":"user","isCurrentTurnInput":true}');
+    expect(prompt).toContain('AI:{"messageId":28,"content":"洪七公忽然现身。","role":"assistant","isCurrentTurnOutcome":true}');
   });
 
   it('先应用当前酒馆提示词正则，再按额外变量设置精确剥离规划前缀和附属标签', async () => {

@@ -530,6 +530,628 @@
 }
 
 // =========================================
+// 八卦天命洗炼盘（鬼谷八荒式沉浸式主界面）
+// =========================================
+
+.destiny-mode-nav {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0.75rem;
+
+  .mode-tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.25rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    color: var(--stone-400);
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    .tab-icon {
+      font-size: 1.1rem;
+    }
+
+    .recommend-tag {
+      font-size: 0.7rem;
+      padding: 0.1rem 0.4rem;
+      background: rgba(200, 160, 80, 0.25);
+      border: 1px solid rgba(200, 160, 80, 0.5);
+      border-radius: 4px;
+      color: #ffd780;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--stone-200);
+      border-color: rgba(200, 160, 80, 0.3);
+    }
+
+    &.active {
+      background: linear-gradient(135deg, rgba(200, 160, 80, 0.2), rgba(160, 100, 40, 0.15));
+      border-color: rgba(200, 160, 80, 0.6);
+      color: #ffd780;
+      box-shadow: 0 4px 15px rgba(200, 160, 80, 0.15);
+    }
+  }
+}
+
+// 顶部已契天命卡槽
+.destiny-equipped-section {
+  background: radial-gradient(ellipse at top, rgba(30, 26, 20, 0.6), rgba(15, 13, 10, 0.8));
+  border: 1px solid rgba(200, 160, 80, 0.25);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  .equipped-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+
+    .equipped-title {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-serif);
+      font-size: 1.05rem;
+      color: #ffd780;
+      margin: 0;
+
+      .title-icon {
+        font-size: 1.2rem;
+      }
+    }
+
+    .equipped-counter {
+      font-size: 0.85rem;
+      color: var(--stone-400);
+      padding: 0.2rem 0.6rem;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+
+      .count-highlight {
+        color: #ffd780;
+        font-weight: bold;
+      }
+    }
+  }
+
+  .destiny-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.75rem;
+
+    @media (max-width: 900px) {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .destiny-slot {
+    min-height: 85px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 0.6rem 0.75rem;
+    transition: all 0.3s ease;
+
+    &.empty {
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.2);
+      align-items: center;
+      justify-content: center;
+      color: var(--stone-600);
+      font-family: var(--font-serif);
+      font-size: 0.85rem;
+      gap: 0.4rem;
+
+      .slot-hollow-icon {
+        font-size: 1.1rem;
+        opacity: 0.3;
+      }
+    }
+
+    &.filled {
+      background: rgba(20, 18, 15, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+      &.rank-传说 { border-color: rgba(255, 80, 80, 0.6); box-shadow: 0 0 10px rgba(255, 80, 80, 0.2); }
+      &.rank-绝世 { border-color: rgba(255, 200, 60, 0.6); box-shadow: 0 0 10px rgba(255, 200, 60, 0.2); }
+      &.rank-镇派 { border-color: rgba(180, 100, 240, 0.6); box-shadow: 0 0 10px rgba(180, 100, 240, 0.2); }
+      &.rank-上乘 { border-color: rgba(80, 160, 240, 0.6); }
+      &.rank-传家 { border-color: rgba(90, 190, 90, 0.6); }
+      &.rank-粗浅 { border-color: rgba(180, 180, 180, 0.4); }
+      &.rank-缺陷 { border-color: rgba(240, 90, 90, 0.7); background: rgba(30, 15, 15, 0.85); }
+
+      .slot-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        .slot-rank-tag {
+          font-size: 0.7rem;
+          padding: 0.1rem 0.35rem;
+          border-radius: 3px;
+          font-weight: 500;
+
+          &.rank-传说 { color: #ff8080; background: rgba(255, 80, 80, 0.15); }
+          &.rank-绝世 { color: #ffd780; background: rgba(255, 215, 128, 0.15); }
+          &.rank-镇派 { color: #d090ff; background: rgba(180, 100, 240, 0.15); }
+          &.rank-上乘 { color: #80c0ff; background: rgba(80, 160, 240, 0.15); }
+          &.rank-传家 { color: #90ee90; background: rgba(90, 190, 90, 0.15); }
+          &.rank-粗浅 { color: #d0d0d0; background: rgba(180, 180, 180, 0.15); }
+          &.rank-缺陷 { color: #ff9090; background: rgba(240, 90, 90, 0.2); }
+        }
+
+        .unequip-btn {
+          background: transparent;
+          border: none;
+          color: var(--stone-500);
+          font-size: 0.8rem;
+          cursor: pointer;
+          padding: 0.1rem 0.3rem;
+          border-radius: 3px;
+          transition: all 0.2s ease;
+
+          &:hover {
+            color: #ff8080;
+            background: rgba(255, 80, 80, 0.1);
+          }
+        }
+      }
+
+      .slot-name {
+        font-family: var(--font-serif);
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--stone-100);
+        margin: 0.25rem 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .slot-bottom {
+        display: flex;
+        justify-content: flex-end;
+
+        .refund-badge {
+          font-size: 0.72rem;
+          color: #90ee90;
+          font-weight: bold;
+          background: rgba(90, 190, 90, 0.15);
+          padding: 0.05rem 0.3rem;
+          border-radius: 3px;
+        }
+      }
+    }
+  }
+}
+
+// 八卦命盘推演大舞台
+.divination-board-section {
+  background: radial-gradient(circle at center, rgba(28, 24, 18, 0.85) 0%, rgba(12, 10, 8, 0.95) 100%);
+  border: 1px solid rgba(200, 160, 80, 0.3);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 320px;
+    height: 320px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(200, 160, 80, 0.05) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .board-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+
+    .board-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+
+      .bagua-icon {
+        font-size: 1.5rem;
+        filter: drop-shadow(0 0 8px rgba(200, 160, 80, 0.4));
+      }
+
+      .board-main-title {
+        font-family: var(--font-serif);
+        font-size: 1.2rem;
+        color: #ffd780;
+        margin: 0;
+        letter-spacing: 0.05em;
+      }
+    }
+
+    .blessing-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.3rem 0.8rem;
+      border-radius: 14px;
+      font-size: 0.85rem;
+
+      &.free {
+        background: linear-gradient(135deg, rgba(200, 160, 80, 0.25), rgba(120, 90, 40, 0.2));
+        border: 1px solid rgba(200, 160, 80, 0.6);
+        color: #ffe29a;
+        box-shadow: 0 0 12px rgba(200, 160, 80, 0.2);
+      }
+
+      &.paid {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--stone-400);
+
+        .cost-highlight {
+          color: #ffd780;
+          font-weight: bold;
+        }
+      }
+    }
+  }
+
+  // 6张命牌网格（一排3个，共两排，整体进一步缩小精致化）
+  .divination-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+    max-width: 690px;
+    margin: 0 auto 1.4rem auto;
+    width: 100%;
+
+    @media (max-width: 780px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      max-width: 460px;
+    }
+
+    @media (max-width: 480px) {
+      grid-template-columns: minmax(0, 1fr);
+      max-width: 260px;
+    }
+  }
+
+  // 命牌卡面（品阶 -> 标题与判词 -> 底部居中效果标签）
+  .divination-card {
+    position: relative;
+    aspect-ratio: 1 / 1.25;
+    border-radius: 6px;
+    background: linear-gradient(175deg, rgba(30, 26, 22, 0.95) 0%, rgba(18, 15, 12, 0.98) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 4px 16px rgba(0, 0, 0, 0.45);
+    padding: 0.85rem 0.85rem 0.75rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.6);
+    }
+
+    &.spinning {
+      animation: cardSpinFlip 0.5s ease-in-out;
+    }
+
+    // 各品阶边框色彩与环境微光（黑金默认）
+    &.rank-传说 {
+      border-color: rgba(239, 68, 68, 0.65);
+      box-shadow: inset 0 0 16px rgba(239, 68, 68, 0.1), 0 4px 16px rgba(0, 0, 0, 0.5);
+
+      &.selected {
+        border-color: #ef4444;
+        box-shadow: inset 0 0 20px rgba(239, 68, 68, 0.25), 0 0 24px rgba(239, 68, 68, 0.45);
+        transform: translateY(-5px);
+      }
+    }
+
+    &.rank-绝世 {
+      border-color: rgba(245, 158, 11, 0.65);
+      box-shadow: inset 0 0 16px rgba(245, 158, 11, 0.1), 0 4px 16px rgba(0, 0, 0, 0.5);
+
+      &.selected {
+        border-color: #f59e0b;
+        box-shadow: inset 0 0 20px rgba(245, 158, 11, 0.25), 0 0 24px rgba(245, 158, 11, 0.45);
+        transform: translateY(-5px);
+      }
+    }
+
+    &.rank-镇派 {
+      border-color: rgba(168, 85, 247, 0.6);
+      box-shadow: inset 0 0 16px rgba(168, 85, 247, 0.08), 0 4px 16px rgba(0, 0, 0, 0.5);
+
+      &.selected {
+        border-color: #a855f7;
+        box-shadow: inset 0 0 20px rgba(168, 85, 247, 0.22), 0 0 22px rgba(168, 85, 247, 0.4);
+        transform: translateY(-5px);
+      }
+    }
+
+    &.rank-上乘 {
+      border-color: rgba(59, 130, 246, 0.6);
+      box-shadow: inset 0 0 16px rgba(59, 130, 246, 0.08), 0 4px 16px rgba(0, 0, 0, 0.5);
+
+      &.selected {
+        border-color: #3b82f6;
+        box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.22), 0 0 22px rgba(59, 130, 246, 0.4);
+        transform: translateY(-5px);
+      }
+    }
+
+    &.rank-传家 {
+      border-color: rgba(34, 197, 94, 0.55);
+      box-shadow: inset 0 0 14px rgba(34, 197, 94, 0.08), 0 4px 16px rgba(0, 0, 0, 0.5);
+
+      &.selected {
+        border-color: #22c55e;
+        box-shadow: inset 0 0 18px rgba(34, 197, 94, 0.22), 0 0 20px rgba(34, 197, 94, 0.4);
+        transform: translateY(-5px);
+      }
+    }
+
+    &.rank-粗浅 {
+      border-color: rgba(148, 163, 184, 0.45);
+      box-shadow: inset 0 0 12px rgba(148, 163, 184, 0.05), 0 4px 14px rgba(0, 0, 0, 0.45);
+
+      &.selected {
+        border-color: #cbd5e1;
+        box-shadow: inset 0 0 16px rgba(255, 255, 255, 0.15), 0 0 18px rgba(255, 255, 255, 0.35);
+        transform: translateY(-5px);
+      }
+    }
+
+    &.is-flaw,
+    &.rank-缺陷 {
+      border-color: rgba(220, 38, 38, 0.7);
+      box-shadow: inset 0 0 16px rgba(220, 38, 38, 0.12), 0 4px 16px rgba(0, 0, 0, 0.5);
+
+      &.selected {
+        border-color: #dc2626;
+        box-shadow: inset 0 0 20px rgba(220, 38, 38, 0.28), 0 0 24px rgba(220, 38, 38, 0.5);
+        transform: translateY(-5px);
+      }
+    }
+
+    .card-top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.2rem;
+
+      .rank-seal {
+        font-family: var(--font-serif);
+        font-size: 0.72rem;
+        padding: 0.12rem 0.45rem;
+        border-radius: 3px;
+        font-weight: bold;
+        letter-spacing: 0.04em;
+
+        &.rank-传说 { color: #fca5a5; background: rgba(185, 28, 28, 0.25); border: 1px solid rgba(239, 68, 68, 0.4); }
+        &.rank-绝世 { color: #fde047; background: rgba(180, 83, 9, 0.25); border: 1px solid rgba(245, 158, 11, 0.4); }
+        &.rank-镇派 { color: #d8b4fe; background: rgba(126, 34, 206, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); }
+        &.rank-上乘 { color: #93c5fd; background: rgba(29, 78, 216, 0.25); border: 1px solid rgba(59, 130, 246, 0.4); }
+        &.rank-传家 { color: #86efac; background: rgba(21, 128, 61, 0.25); border: 1px solid rgba(34, 197, 94, 0.4); }
+        &.rank-粗浅 { color: #cbd5e1; background: rgba(100, 116, 139, 0.2); border: 1px solid rgba(148, 163, 184, 0.35); }
+        &.rank-缺陷 { color: #fca5a5; background: rgba(153, 27, 27, 0.3); border: 1px solid rgba(220, 38, 38, 0.5); }
+      }
+
+      .selected-indicator-badge {
+        font-family: var(--font-serif);
+        font-size: 0.72rem;
+        font-weight: bold;
+        padding: 0.1rem 0.45rem;
+        border-radius: 3px;
+        background: #16a34a;
+        color: #ffffff;
+        border: 1px solid #4ade80;
+        box-shadow: 0 0 8px rgba(22, 163, 74, 0.6);
+      }
+    }
+
+    // 中部：标题、分隔线与文学描述
+    .card-middle-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 0.1rem;
+      margin-bottom: auto;
+      width: 100%;
+
+      .card-title {
+        font-family: var(--font-serif);
+        font-size: 1.18rem;
+        font-weight: 600;
+        color: #f8fafc;
+        margin: 0 0 0.4rem 0;
+        letter-spacing: 0.08em;
+        line-height: 1.35;
+        text-align: center;
+      }
+
+      .card-divider.title-divider {
+        height: 1px;
+        width: 80%;
+        margin: 0 0 0.45rem 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+      }
+
+      .card-desc {
+        font-size: 0.78rem;
+        line-height: 1.55;
+        color: var(--stone-400);
+        margin: 0;
+        letter-spacing: 0.01em;
+        text-align: center;
+      }
+    }
+
+    // 底部：分割线与加成效果标签（居中排列）
+    .card-bottom-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      margin-top: auto;
+      padding-top: 0.35rem;
+
+      .card-divider {
+        height: 1px;
+        width: 100%;
+        margin: 0 0 0.45rem 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+      }
+
+      .card-badges {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center; // 加成标签居中对齐
+        align-items: center;
+        gap: 0.35rem;
+        min-height: 1.45rem; // 维持稳定的占位高度，确保一排卡牌即使无加成也完全齐平
+
+        .spec-pill {
+          font-family: var(--font-serif);
+          font-size: 0.72rem;
+          padding: 0.12rem 0.45rem;
+          border-radius: 3px;
+          background: rgba(255, 255, 255, 0.06);
+          color: var(--stone-300);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          letter-spacing: 0.02em;
+
+          &.positive-pill {
+            color: #86efac;
+            background: rgba(34, 197, 94, 0.15);
+            border-color: rgba(34, 197, 94, 0.35);
+          }
+
+          &.negative-pill {
+            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.35);
+          }
+
+          &.refund-pill {
+            color: #fef08a;
+            background: rgba(234, 179, 8, 0.2);
+            border-color: rgba(234, 179, 8, 0.45);
+            font-weight: bold;
+          }
+        }
+      }
+    }
+  }
+
+  // 底部控制台
+  .divination-action-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+
+    .reroll-cta-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      padding: 0.85rem 2.5rem;
+      background: linear-gradient(135deg, #c89535 0%, #8c5d18 100%);
+      border: 1.5px solid rgba(255, 215, 128, 0.6);
+      border-radius: 8px;
+      color: #fff;
+      font-family: var(--font-serif);
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(180, 120, 30, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+      &:hover:not(:disabled) {
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 8px 25px rgba(220, 150, 40, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.6);
+      }
+
+      &:active:not(:disabled) {
+        transform: translateY(1px) scale(0.99);
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        background: #3a3225;
+        border-color: rgba(255, 255, 255, 0.1);
+        box-shadow: none;
+      }
+
+      .cta-icon {
+        font-size: 1.3rem;
+      }
+    }
+
+    .action-tip {
+      font-size: 0.85rem;
+      color: var(--stone-400);
+
+      &.warning {
+        color: #ff9090;
+      }
+    }
+  }
+}
+
+@keyframes cardSpinFlip {
+  0% {
+    transform: scale(1) rotateY(0);
+  }
+  50% {
+    transform: scale(0.92) rotateY(90deg);
+    opacity: 0.6;
+    filter: blur(2px);
+  }
+  100% {
+    transform: scale(1) rotateY(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+// =========================================
 // 响应式调整
 // =========================================
 @media (max-width: 768px) {

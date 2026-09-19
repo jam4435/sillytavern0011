@@ -1242,12 +1242,14 @@ const App: React.FC = () => {
         showError(res.error || '领取差事奖励失败');
         return;
       }
-      showSuccess(
-        `交付差事《${taskName}》成功！获得贡献+${res.earnedContribution || 0}，修为+${res.earnedCultivation || 0}`,
-      );
+      if (typeof toastr !== 'undefined' && toastr.success) {
+        toastr.success(
+          `交付差事《${taskName}》成功！获得贡献+${res.earnedContribution || 0}，修为+${res.earnedCultivation || 0}`,
+        );
+      }
       refreshGameStateFromVariables();
     },
-    [refreshGameStateFromVariables, showError, showSuccess],
+    [refreshGameStateFromVariables, showError],
   );
 
   const getModalTitle = (panel: ActivePanel) => {
@@ -1392,7 +1394,20 @@ const App: React.FC = () => {
     return (
       <>
         {eventNotificationLayer}
-        <SplashScreen hasSavedGame={savedGameExists} onNewGame={handleNewGame} onContinue={handleContinue} />
+        <SplashScreen
+          hasSavedGame={savedGameExists}
+          onNewGame={handleNewGame}
+          onContinue={handleContinue}
+          onOpenSettings={() => setActivePanel(ActivePanel.SETTINGS)}
+        />
+        <Modal
+          isOpen={activePanel !== ActivePanel.NONE}
+          onClose={handleModalClose}
+          title={getModalTitle(activePanel)}
+          type={activePanel}
+        >
+          {renderModalContent()}
+        </Modal>
       </>
     );
   }
@@ -1402,7 +1417,20 @@ const App: React.FC = () => {
       <>
         {eventNotificationLayer}
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
-        <NewGameSetup onSubmit={handleSetupSubmit} onBack={handleSetupBack} isLoading={isLoading} />
+        <NewGameSetup
+          onSubmit={handleSetupSubmit}
+          onBack={handleSetupBack}
+          isLoading={isLoading}
+          onOpenSettings={() => setActivePanel(ActivePanel.SETTINGS)}
+        />
+        <Modal
+          isOpen={activePanel !== ActivePanel.NONE}
+          onClose={handleModalClose}
+          title={getModalTitle(activePanel)}
+          type={activePanel}
+        >
+          {renderModalContent()}
+        </Modal>
         <ChatRenameDialog
           isOpen={Boolean(initialChatRename)}
           mode="initial"
@@ -1432,7 +1460,16 @@ const App: React.FC = () => {
           location={gameState.currentLocation}
           isLoading={isLoading || historyMutationPending}
           onSend={handleOpeningSend}
+          onOpenSettings={() => setActivePanel(ActivePanel.SETTINGS)}
         />
+        <Modal
+          isOpen={activePanel !== ActivePanel.NONE}
+          onClose={handleModalClose}
+          title={getModalTitle(activePanel)}
+          type={activePanel}
+        >
+          {renderModalContent()}
+        </Modal>
       </>
     );
   }

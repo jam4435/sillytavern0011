@@ -5,12 +5,13 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 1000;
+  // 保持适度的半透明遮罩背景，即使弹窗不透明度拉满，也不会导致弹窗外的页面变全黑
   background-color: rgba(
     0,
     0,
     0,
-    calc(0.52 * var(--wuxia-modal-opacity-low, 1) + 0.48 * var(--wuxia-modal-opacity-high, 0))
+    calc(0.4 + 0.18 * var(--wuxia-modal-opacity, 1))
   );
   backdrop-filter: blur(5px);
   display: flex;
