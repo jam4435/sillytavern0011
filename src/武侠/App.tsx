@@ -167,7 +167,14 @@ const App: React.FC = () => {
     currentOptions,
     setCurrentOptions,
   } = useGameState();
-  const { commands, setTravelCommand, addUseItemCommand, cancelCommand, sendMessageWithCommands } = useCommandQueue();
+  const {
+    commands,
+    setTravelCommand,
+    addEventAdvanceCommand,
+    addUseItemCommand,
+    cancelCommand,
+    sendMessageWithCommands,
+  } = useCommandQueue();
   const [playerAvatarVersion, setPlayerAvatarVersion] = useState(0);
   const [historyCheckoutPending, setHistoryCheckoutPending] = useState(() => isHistoryCheckoutPending());
   const [chatRenamePending, setChatRenamePending] = useState(() => isChatRenamePending());
@@ -1317,6 +1324,7 @@ const App: React.FC = () => {
             gameTime={gameState.gameTime}
             currentLocation={gameState.currentLocation}
             onTravelTo={handleEventTravelTo}
+            onAdvanceToEvent={addEventAdvanceCommand}
           />
         );
       case ActivePanel.MAP:
