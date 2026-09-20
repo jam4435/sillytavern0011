@@ -326,7 +326,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(result.appended).toBe(true);
     expect(result.actionBlockCount).toBe(1);
     expect(result.finalMessageText).toContain('<VariableEdit>');
-    expect(result.finalMessageText).toMatch(/^正文内容\n\n<VariableEdit>/);
+    expect(result.finalMessageText).toMatch(/^正文内容\n<VariableEdit>/);
     expect(requestConfiguredTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
         prompt: expect.stringContaining('合法严格活动区'),
@@ -462,6 +462,9 @@ describe('executeExtraVariableUpdate', () => {
     expect(result.appendedBlocks).toContain('"时": 13');
     expect(result.appendedBlocks).toContain('"分": 0');
     expect(result.appendedBlocks).not.toContain('"时间": {\n      "分": 0\n    }');
+    expect(result.appendedBlocks).not.toMatch(
+      /<\/Variable(?:Think|Insert|Edit|Delete)>\n\n<Variable(?:Think|Insert|Edit|Delete)>/,
+    );
   });
 
   it('稀疏时间声明合并当前时间后向前时直接放行，不要求补全五字段', async () => {

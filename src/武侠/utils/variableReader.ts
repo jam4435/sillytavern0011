@@ -362,14 +362,18 @@ const FRONTEND_LOADER_HINT_REGEX = /(localhost|127\.0\.0\.1):5500\/dist\/武侠\
 /**
  * 规范即将写入酒馆 assistant 楼层的模型回复。
  *
- * 这里只处理换行与行尾空白，不解析或删除任何正文/变量结构块，确保实际楼层与后续提示词
- * 不会保留模型偶发输出的大段空行。
+ * 正文段落仍允许一个空白行；Variable 控制块之间则强制只保留一个换行，避免这些内部块
+ * 在楼层原文和“校订最新回复”里积累成大片空白。
  */
 export function normalizeAssistantReplyForPersistence(messageContent: string): string {
   if (!messageContent) return '';
   return messageContent
     .replace(/\r\n?/g, '\n')
     .replace(/[ \t]+\n/g, '\n')
+    .replace(
+      /(<\/Variable(?:Think|Insert|Edit|Delete)>)[ \t]*(?:\n[ \t]*)+(?=<Variable(?:Think|Insert|Edit|Delete)>)/g,
+      '$1\n',
+    )
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

@@ -322,7 +322,7 @@ function serializeVariableBlocks(
     }
     blocks.push(`<${blockTag}>\n${JSON.stringify(patch, null, 2)}\n</${blockTag}>`);
   }
-  return blocks.join('\n\n').trim();
+  return blocks.join('\n').trim();
 }
 
 function collapseDeclaredChangesForPersistence(declaredChanges: VariableDeclaredChange[]): VariableDeclaredChange[] {
@@ -1446,7 +1446,7 @@ function extractValidVariableBlocks(rawResponse: string): {
   }
 
   return {
-    blocksText: blocks.join('\n\n').trim(),
+    blocksText: blocks.join('\n').trim(),
     actionBlockCount,
   };
 }
@@ -1715,7 +1715,7 @@ export async function validateOrRepairInlineWorldTimeReply({
     return { replyText: rawReply, timeRepairAttempted: false, blocksText: extracted.blocksText };
   }
   const replyWithoutVariableBlocks = rawReply.replace(ERA_VARIABLE_BLOCK_STRIP_REGEX, '\n').trim();
-  const replyText = [replyWithoutVariableBlocks, validated.blocksText].filter(Boolean).join('\n\n').trim();
+  const replyText = [replyWithoutVariableBlocks, validated.blocksText].filter(Boolean).join('\n').trim();
   return { replyText, timeRepairAttempted: true, blocksText: validated.blocksText };
 }
 
@@ -1736,7 +1736,7 @@ async function appendVariableBlocksToAssistantMessage(
   blocksText: string,
 ): Promise<MessageWriteVerification> {
   const { message: freshMessage, activeText, swipeId } = readAssistantMessageActiveText(messageId);
-  const nextText = `${activeText.trimEnd()}\n\n${blocksText}`.trim();
+  const nextText = `${activeText.trimEnd()}\n${blocksText}`.trim();
   const swipes = Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0 ? [...freshMessage.swipes] : null;
 
   if (swipes) {

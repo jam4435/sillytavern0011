@@ -50,6 +50,43 @@ describe('normalizeAssistantReplyForPersistence', () => {
     expect(normalizeAssistantReplyForPersistence(rawReply)).toBe('<tucao>\n吐槽内容\n</tucao>\n\n正文');
   });
 
+  it('相邻变量块之间只保留一个换行，不影响正文正常段落', () => {
+    const rawReply = [
+      '第一段',
+      '',
+      '第二段',
+      '<VariableThink>',
+      '无变化',
+      '</VariableThink>',
+      '',
+      '',
+      '<VariableEdit>',
+      '{"user数据":{"修为":120}}',
+      '</VariableEdit>',
+      '',
+      '<VariableInsert>',
+      '{"user数据":{"人物经历":{"初遇":"记录"}}}',
+      '</VariableInsert>',
+    ].join('\n');
+
+    expect(normalizeAssistantReplyForPersistence(rawReply)).toBe(
+      [
+        '第一段',
+        '',
+        '第二段',
+        '<VariableThink>',
+        '无变化',
+        '</VariableThink>',
+        '<VariableEdit>',
+        '{"user数据":{"修为":120}}',
+        '</VariableEdit>',
+        '<VariableInsert>',
+        '{"user数据":{"人物经历":{"初遇":"记录"}}}',
+        '</VariableInsert>',
+      ].join('\n'),
+    );
+  });
+
   it('保留正常段落、结构块内容和非行尾缩进', () => {
     const reply = [
       '第一段',
