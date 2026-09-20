@@ -61,6 +61,8 @@ export const HistoryCheckoutJournalSchema = z
     sourceChatId: z.string(),
     sourceChatName: z.string(),
     startedAt: z.number().finite(),
+    /** 最近一次有效阶段推进时间；旧 v1 journal 缺省时回退 startedAt。 */
+    lastTouchedAt: z.number().finite().optional(),
   })
   .strict();
 
@@ -109,6 +111,7 @@ export function createHistoryCheckoutJournal(
     stage: 'navigate_source',
     ...input,
     startedAt: now,
+    lastTouchedAt: now,
   });
   return writeHistoryCheckoutJournal(journal);
 }
@@ -148,10 +151,16 @@ export function updateHistoryCheckoutJournal(
       | 'failure'
     >
   >,
+  options: { touch?: boolean; now?: number } = {},
 ): HistoryCheckoutJournal | null {
   const current = readHistoryCheckoutJournal();
   if (!current) return null;
-  return writeHistoryCheckoutJournal({ ...current, ...patch });
+  const touch = options.touch !== false;
+  return writeHistoryCheckoutJournal({
+    ...current,
+    ...patch,
+    ...(touch ? { lastTouchedAt: options.now ?? Date.now() } : {}),
+  });
 }
 
 export function clearHistoryCheckoutJournal(): void {
@@ -244,7 +253,7 @@ export function migrateHistoryCheckoutDraftChatId(oldChatId: string, newChatId: 
 }
 
 export function isHistoryCheckoutJournalExpired(journal: HistoryCheckoutJournal, now = Date.now()): boolean {
-  return now > journal.startedAt + HISTORY_CHECKOUT_JOURNAL_TTL_MS;
+  return now > (journal.lastTouchedAt ?? journal.startedAt) + HISTORY_CHECKOUT_JOURNAL_TTL_MS;
 }
 
 export function isHistoryCheckoutPending(now = Date.now()): boolean {
@@ -265,6 +274,7 @@ export function renewHistoryCheckoutJournal(journal: HistoryCheckoutJournal, now
     ...journal,
     transactionId: `checkout_${now.toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     startedAt: now,
+    lastTouchedAt: now,
     failure: undefined,
   });
 }

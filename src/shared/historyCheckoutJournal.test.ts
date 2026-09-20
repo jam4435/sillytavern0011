@@ -49,6 +49,7 @@ describe('historyCheckoutJournal', () => {
     );
 
     expect(Object.keys(journal).sort()).toEqual([
+      'lastTouchedAt',
       'sourceChatId',
       'sourceChatName',
       'sourceHeadNodeId',
@@ -63,6 +64,7 @@ describe('historyCheckoutJournal', () => {
       journal,
     );
     expect(isHistoryCheckoutPending(now + HISTORY_CHECKOUT_JOURNAL_TTL_MS)).toBe(true);
+    expect(journal.lastTouchedAt).toBe(now);
     expect(isHistoryCheckoutJournalExpired(journal, now + HISTORY_CHECKOUT_JOURNAL_TTL_MS + 1)).toBe(true);
     expect(isHistoryCheckoutPending(now + HISTORY_CHECKOUT_JOURNAL_TTL_MS + 1)).toBe(false);
 
@@ -72,6 +74,31 @@ describe('historyCheckoutJournal', () => {
     expect(Object.hasOwn(journal, 'returnIntent')).toBe(false);
     clearHistoryCheckoutJournal();
     expect(readHistoryCheckoutReturnIntent()).toBeNull();
+  });
+
+  it('阶段推进会刷新恢复心跳，超时按最后一次有效进展计算', () => {
+    const journal = createHistoryCheckoutJournal(
+      {
+        targetNodeId: 'node-a',
+        targetLocator: {
+          chatId: 'chat-a',
+          chatName: 'A',
+          userMessageId: null,
+          assistantMessageId: 0,
+          swipeId: 0,
+        },
+        sourceHeadNodeId: '',
+        sourceChatId: 'chat-a',
+        sourceChatName: 'A',
+      },
+      1_000,
+    );
+
+    const progressed = updateHistoryCheckoutJournal({ stage: 'sync_era' }, { now: 61_000 })!;
+    expect(progressed.startedAt).toBe(journal.startedAt);
+    expect(progressed.lastTouchedAt).toBe(61_000);
+    expect(isHistoryCheckoutJournalExpired(progressed, 121_001)).toBe(false);
+    expect(isHistoryCheckoutJournalExpired(progressed, 181_001)).toBe(true);
   });
 
   it('写入、续期、提交和清理会派发同 iframe 状态事件', () => {

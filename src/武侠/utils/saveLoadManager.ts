@@ -1477,7 +1477,7 @@ export async function checkoutNode(
     );
   }
   const unresolved = readHistoryCheckoutJournal();
-  if (unresolved) {
+  if (unresolved && !isHistoryCheckoutJournalExpired(unresolved)) {
     return makeCheckoutResult(
       'recovery_failed',
       unresolved.actionKind ??
@@ -1486,6 +1486,10 @@ export async function checkoutNode(
       null,
       '已有未完成的历史分叉。请先选择“重试恢复”或“返回来源聊天”，不能叠加创建另一条分叉。',
     );
+  }
+  if (unresolved) {
+    // 过期 journal 只代表旧事务已经失去恢复锁资格，不应继续阻止用户重新“从此处继续”。
+    clearHistoryCheckoutJournal();
   }
   return executeCheckout(nodeId, options, null);
 }
@@ -1513,9 +1517,12 @@ export async function resumeCheckout(): Promise<HistoryCheckoutResult | null> {
   }
   if (isHistoryCheckoutJournalExpired(journal)) {
     const message = '历史切换恢复窗口已超过 120 秒。';
-    updateHistoryCheckoutJournal({
-      failure: { stage: journal.stage, message, occurredAt: Date.now() },
-    });
+    updateHistoryCheckoutJournal(
+      {
+        failure: { stage: journal.stage, message, occurredAt: Date.now() },
+      },
+      { touch: false },
+    );
     markBranchStatus(branchIdForChat(journal.targetLocator.chatId), 'recovery_failed', {
       chatId: journal.targetLocator.chatId,
       chatName: journal.targetLocator.chatName,

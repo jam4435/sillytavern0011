@@ -151,7 +151,12 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
       setWorkState({ type: 'loading', message: resume ? '正在续接未完成的分叉……' : '正在校准历史路径……' });
       try {
         let recovered: HistoryCheckoutResult | null = null;
-        if (resume) recovered = await resumeCheckout();
+        if (resume) {
+          const pendingJournal = readHistoryCheckoutJournal();
+          if (pendingJournal && !isHistoryCheckoutJournalExpired(pendingJournal)) {
+            recovered = await resumeCheckout();
+          }
+        }
         const next = await scanCurrentChat(scanOptions);
         setView(next);
         setSelectedNodeId(current => (current && next.tree.nodes[current] ? current : next.currentNodeId));
@@ -230,7 +235,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
       lastCheckout?.status === 'recovery_failed' ||
       lastCheckout?.status === 'broken'),
   );
-  const isWorking = workState.type === 'loading' || Boolean(journal) || isBusy || isRenamingChat;
+  const isWorking = workState.type === 'loading' || checkoutPending || isBusy || isRenamingChat;
   const recoveryActionDisabled = workState.type === 'loading';
   const recoveryFailureText = journal?.failure
     ? `失败阶段：${journal.failure.stage}；原始异常：${journal.failure.message}`
