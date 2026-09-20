@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GameEvent } from '../types';
 import {
+  buildEventClueCommand,
   getEventDescription,
   getEventCountdownLabel,
   getEventSemanticLabel,
@@ -39,6 +40,27 @@ describe('eventPresentation', () => {
       reference: '射雕第一回03',
     });
     expect(getEventTitleParts('无来源事件')).toEqual({ name: '无来源事件' });
+  });
+
+  it('builds the exact follow-up event command from clue time, location, and title', () => {
+    expect(
+      buildEventClueCommand(
+        event({
+          title: '射雕第三回02-旧案余波',
+          type: 'AFTERMATH',
+          timeText: '1200年8月20日17时',
+          location: '大宋/临安府/牛家村',
+        }),
+      ),
+    ).toBe(
+      '[事件指令]剧情合理演进到 1200年8月20日17时 大宋/临安府/牛家村 射雕第三回02-旧案余波事件线索',
+    );
+  });
+
+  it('omits missing time or location instead of inserting placeholder text', () => {
+    expect(buildEventClueCommand(event({ title: '古墓传闻', type: 'RUMOR' }))).toBe(
+      '[事件指令]剧情合理演进到 古墓传闻事件线索',
+    );
   });
 
   it('recognizes urgent countdowns without treating ordinary rumors as urgent', () => {
