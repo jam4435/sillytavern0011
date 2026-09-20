@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import type { DisplaySettings } from '../utils/settingsManager';
 import { Icons } from './Icons';
 import { uiLogger } from '../utils/logger';
@@ -12,6 +12,8 @@ interface GameContentProps {
   onSelectOption?: (option: string) => void;
   /** 显示设置 */
   settings?: DisplaySettings;
+  /** 新 assistant/swipe 提交键；变化时把新回复顶部滚入视野。 */
+  scrollCommitKey?: string | null;
 }
 
 /**
@@ -66,7 +68,28 @@ function restoreStyleBlocks(html: string, styleBlocks: string[]): string {
  *
  * 武侠风格优化版
  */
-const GameContent: React.FC<GameContentProps> = ({ maintext, options, onSelectOption, settings }) => {
+const GameContent: React.FC<GameContentProps> = ({
+  maintext,
+  options,
+  onSelectOption,
+  settings,
+  scrollCommitKey,
+}) => {
+  const latestReplyRef = useRef<HTMLDivElement | null>(null);
+  const lastScrolledCommitKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!scrollCommitKey || lastScrolledCommitKeyRef.current === scrollCommitKey) {
+      return;
+    }
+
+    lastScrolledCommitKeyRef.current = scrollCommitKey;
+    latestReplyRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+      inline: 'nearest',
+    });
+  }, [scrollCommitKey]);
   // 调试日志 - 组件渲染
   uiLogger.log('');
   uiLogger.log('🎨 [GameContent] 组件渲染');
@@ -182,7 +205,11 @@ const GameContent: React.FC<GameContentProps> = ({ maintext, options, onSelectOp
       {/* 主文本区域（完整显示，支持 HTML 渲染） */}
       {maintext && (
         <div className="maintext-container">
-          <div className="maintext-content" data-wuxia-automation="latest-reply">
+          <div
+            ref={latestReplyRef}
+            className="maintext-content"
+            data-wuxia-automation="latest-reply"
+          >
             {renderedContent}
           </div>
         </div>
