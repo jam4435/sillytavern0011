@@ -267,14 +267,18 @@ export const ORIGIN_OPTIONS: OriginOption[] = originOptionsData as OriginOption[
 type OriginFactionPreset = {
   faction: string;
   identity: string;
+  factionType?: '宗门' | '帮会' | '世家' | '行伍';
 };
 
 const ORIGIN_FACTION_PRESETS: Readonly<Record<string, OriginFactionPreset>> = {
-  shaolin_lay: { faction: '少林派', identity: '俗家弟子' },
-  lingjiu_patrol_attendant: { faction: '逍遥派', identity: '灵鹫宫巡山使女' },
-  gaibang_outer: { faction: '丐帮', identity: '一袋外堂弟子' },
-  dali_royal_branch: { faction: '大理段氏与一灯门下', identity: '段氏偏支' },
-  yanziwu_retainer: { faction: '姑苏慕容氏', identity: '家臣子弟' },
+  shaolin_lay: { faction: '少林派', identity: '俗家弟子', factionType: '宗门' },
+  lingjiu_patrol_attendant: { faction: '逍遥派', identity: '灵鹫宫巡山使女', factionType: '宗门' },
+  emei_named: { faction: '峨眉派', identity: '记名弟子', factionType: '宗门' },
+  gaibang_outer: { faction: '丐帮', identity: '一袋外堂弟子', factionType: '帮会' },
+  huashan_sword_servant: { faction: '华山派', identity: '剑仆', factionType: '宗门' },
+  tangmen_poison_apprentice: { faction: '唐门', identity: '外姓药童', factionType: '宗门' },
+  dali_royal_branch: { faction: '大理段氏与一灯门下', identity: '段氏偏支', factionType: '世家' },
+  yanziwu_retainer: { faction: '姑苏慕容氏', identity: '家臣子弟', factionType: '世家' },
 };
 
 export function getOriginById(originId: string): OriginOption | undefined {
@@ -403,6 +407,17 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
           mastery: '初窥门径',
         };
       }
+    } else if ((!initialFaction || initialFaction === '散修') && originFactionPreset) {
+      // 一些开局门派（如峨眉、华山、唐门）尚未进入完整势力静态库，
+      // 仍应保留真实的门派归属，不能因为缺少图谱数据而把角色降级成散修。
+      initialFactionsObj[originFactionPreset.faction] = {
+        体系类型: originFactionPreset.factionType || '宗门',
+        身份: originFactionPreset.identity,
+        师承: '本门长辈',
+        贡献: 0,
+        状态: '在籍',
+      };
+      initialIdentitiesObj[originFactionPreset.faction] = originFactionPreset.identity;
     }
   }
 
