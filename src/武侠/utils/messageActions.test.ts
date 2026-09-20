@@ -188,6 +188,7 @@ describe('regenerateLastAssistantSwipe', () => {
     }));
     expect(globals.generate).toHaveBeenCalledWith(expect.not.objectContaining({ injects: expect.anything() }));
     expect(result.assistantMessageId).toBe(2);
+    expect(result.assistantSwipeId).toBe(1);
     expect(result.rawReply).toBe('新正文');
   });
 

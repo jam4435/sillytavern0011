@@ -216,6 +216,10 @@ const App: React.FC = () => {
   const [isLatestReplyEditorOpen, setIsLatestReplyEditorOpen] = useState(false);
   const [latestReplySnapshot, setLatestReplySnapshot] = useState<LatestAssistantSnapshot | null>(null);
   const [mapDraftDestination, setMapDraftDestination] = useState<string | null>(null);
+  const [assistantDisplayCommitKey, setAssistantDisplayCommitKey] = useState<string | null>(null);
+  const handleAssistantDisplayCommit = useCallback((assistantMessageId: number, assistantSwipeId: number) => {
+    setAssistantDisplayCommitKey(`${assistantMessageId}:${assistantSwipeId}`);
+  }, []);
   const {
     variableChanges,
     handleVariableTurnStart,
@@ -248,6 +252,7 @@ const App: React.FC = () => {
     onVariableAssistantReply: handleVariableAssistantReply,
     onVariableExtraDeclaredBlocks: handleVariableExtraDeclaredBlocks,
     onVariableAiWriteTarget: markVariableApiWriteAsAi,
+    onAssistantDisplayCommit: handleAssistantDisplayCommit,
   });
 
   const refreshRecentInputHistory = useCallback(() => {
@@ -1714,6 +1719,7 @@ const App: React.FC = () => {
                   options={currentOptions}
                   onSelectOption={handlePlayerSend}
                   settings={displaySettings}
+                  scrollCommitKey={assistantDisplayCommitKey}
                 />
               </div>
             </section>
