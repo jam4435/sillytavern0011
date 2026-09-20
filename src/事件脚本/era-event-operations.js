@@ -1017,7 +1017,7 @@ async function prepareSettlementSnapshots(eventNames, eventDefinitions, statData
 }
 
 // ==================== 批量结束事件并应用差分 ====================
-export async function batchEndEvents(eventNames, eventDefinitions) {
+export async function batchEndEvents(eventNames, eventDefinitions, options = {}) {
   if (eventNames.length === 0) return true;
 
   debugGroup(`⏹️ 批量结算事件 (${eventNames.length}个)`);
@@ -1035,6 +1035,7 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     };
     const 已完成事件对象 = {};
     const 进行中删除对象 = {};
+    const 未发生删除对象 = {};
     const 参与删除对象 = {};
     const 占用删除对象 = {};
     const participationByEvent = {};
@@ -1080,6 +1081,9 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
 
       已完成事件对象[eventName] = playerParticipated ? 1 : 0;
       进行中删除对象[eventName] = {};
+      if (options.deleteUnstarted) {
+        未发生删除对象[eventName] = {};
+      }
       if (playerParticipated) {
         Object.assign(参与删除对象, buildParticipationDeletePatch(参与事件, eventName));
       }
@@ -1145,6 +1149,12 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       { type: 'insert', payload: { 事件系统: { 已完成事件: 已完成事件对象 } } },
       { type: 'delete', payload: { 事件系统: { 进行中事件: 进行中删除对象 } } },
     );
+    if (Object.keys(未发生删除对象).length > 0) {
+      settlementOperations.push({
+        type: 'delete',
+        payload: { 事件系统: { 未发生事件: 未发生删除对象 } },
+      });
+    }
     if (Object.keys(参与删除对象).length > 0) {
       settlementOperations.push({ type: 'delete', payload: { 参与事件: 参与删除对象 } });
     }
@@ -1195,6 +1205,8 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
       return (
         Object.prototype.hasOwnProperty.call(finalVerifyStat.事件系统?.已完成事件 || {}, eventName) &&
         !Object.prototype.hasOwnProperty.call(finalVerifyStat.事件系统?.进行中事件 || {}, eventName) &&
+        (!options.deleteUnstarted ||
+          !Object.prototype.hasOwnProperty.call(finalVerifyStat.事件系统?.未发生事件 || {}, eventName)) &&
         !hasParticipationEntry(finalVerifyStat.参与事件, eventName) &&
         !Object.prototype.hasOwnProperty.call(
           finalVerifyStat.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {},
@@ -1221,24 +1233,26 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
     }
 
     logSuccess(`批量结算完成 ${eventNames.length} 个事件（单次 ERA 事务）:`, eventNames);
-    if (eventNames.length <= 5) {
-      eventNames.forEach(name =>
+    if (!options.silent) {
+      if (eventNames.length <= 5) {
+        eventNames.forEach(name =>
+          notifyEvent({
+            kind: 'event-completed',
+            level: 'success',
+            message: `✅ 事件完成: ${name}`,
+            eventNames: [name],
+            durationMs: 2000,
+          }),
+        );
+      } else {
         notifyEvent({
           kind: 'event-completed',
           level: 'success',
-          message: `✅ 事件完成: ${name}`,
-          eventNames: [name],
-          durationMs: 2000,
-        }),
-      );
-    } else {
-      notifyEvent({
-        kind: 'event-completed',
-        level: 'success',
-        message: `✅ ${eventNames.length} 个事件已完成`,
-        eventNames,
-        durationMs: 3000,
-      });
+          message: `✅ ${eventNames.length} 个事件已完成`,
+          eventNames,
+          durationMs: 3000,
+        });
+      }
     }
     return true;
   } catch (error) {
