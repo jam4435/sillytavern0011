@@ -231,6 +231,49 @@ describe('getGameVariables ERA 展示投影', () => {
     expect(state?.events?.some(event => event.type === 'AFTERMATH' && event.title.includes('锦囊求医'))).toBe(false);
   });
 
+  it('玩家参与中的奇遇会完整投影描述、结局、时间和地点，而不是只剩事件名', () => {
+    const eventName = '奇遇事件-射雕-王府药房饮蛇血';
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1219, 月: 3, 日: 10, 时: 17 } },
+        user数据: {
+          用户名: '玩家',
+          性别: '男',
+          境界: '不入流',
+          所在位置: '金国/中都/赵王府',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+        },
+        事件系统: {
+          未发生事件: {},
+          进行中事件: {
+            [eventName]: { 年: 1219, 月: 3, 日: 10, 时: 19 },
+          },
+          已完成事件: {},
+          已失效事件: {},
+        },
+        参与事件: {
+          [eventName]: {
+            描述: '1219年3月10日17时 到 1219年3月10日19时，药房深处腥气扑鼻，巨蛇盘踞药架之间。',
+            结局: '蛇血机缘尚未定局。',
+            地点: '金国/中都/赵王府/药房',
+          },
+        },
+      },
+    });
+
+    const state = readGameDataSync();
+    const event = state?.events?.find(item => item.category === 'participation');
+
+    expect(event).toMatchObject({
+      type: 'ACTIVE',
+      category: 'participation',
+      description: '1219年3月10日17时 到 1219年3月10日19时，药房深处腥气扑鼻，巨蛇盘踞药架之间。',
+      details: '蛇血机缘尚未定局。',
+      timeText: '1219年3月10日19时',
+      location: '金国/中都/赵王府/药房',
+    });
+  });
+
   it('将全域可发现事件投影为带开始倒计时和地点的唯一风闻', () => {
     const eventName = '射雕第一回03-远方风波';
     const rumor = '临安府近来暗流涌动。 [1200年8月20日11时/大宋/临安府/牛家村]';
