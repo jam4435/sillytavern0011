@@ -931,6 +931,12 @@ export interface EquipmentRollbackData {
   equipmentSlotExisted: boolean;
 }
 
+export interface MartialArtLearnRollbackData {
+  artName: string;
+  itemName: string;
+  originalItem: InventoryItemVariableData;
+}
+
 /**
  * 待发送指令
  */
@@ -952,6 +958,7 @@ export interface PendingCommand {
     permanentModifierId?: string;
     resourceDeltas?: ResourceDeltaMap;
     equipmentRollback?: EquipmentRollbackData;
+    martialArtLearnRollback?: MartialArtLearnRollbackData;
   };
   timestamp: number;
 }

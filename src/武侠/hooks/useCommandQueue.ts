@@ -14,6 +14,7 @@ import {
   undoResourceDeltas,
 } from '../utils/itemManager';
 import { uiLogger } from '../utils/logger';
+import { undoLearnMartialArtFromSecret } from '../utils/martialArtSecretManager';
 import { syncPlayerAttributesFromVariables } from '../utils/variableReader';
 
 export function useCommandQueue() {
@@ -91,7 +92,9 @@ export function useCommandQueue() {
       }
 
       if (command.type === 'USE_ITEM' && command.data.itemName) {
-        if (command.data.equipmentRollback) {
+        if (command.data.martialArtLearnRollback) {
+          await undoLearnMartialArtFromSecret(command.data.martialArtLearnRollback);
+        } else if (command.data.equipmentRollback) {
           await restoreEquipmentState(command.data.equipmentRollback);
         } else if (command.data.originalItem) {
           await restoreItemCount(command.data.itemName, command.data.originalItem);
