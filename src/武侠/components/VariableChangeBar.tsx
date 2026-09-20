@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   formatVariableDetailValue,
+  stableStringify,
   type VariableActualChange,
   type VariableAiComparison,
   type VariableChangeAction,
@@ -96,6 +97,212 @@ const summarizeActualChange = (change: VariableActualChange) => ({
   batchId: change.batchId,
   assistantMessageId: change.assistantMessageId ?? null,
 });
+
+type TimeField = '年' | '月' | '日' | '时' | '分';
+
+type AiLogicalItem =
+  | { kind: 'comparison'; id: string; comparison: VariableAiComparison }
+  | {
+    kind: 'time';
+    id: string;
+    action: VariableChangeAction;
+    status: VariableComparisonStatus;
+    hasFinalMismatch: boolean;
+    beforePreview: string;
+    afterPreview: string;
+    expectedPreview: string;
+  };
+
+type BackgroundLogicalItem =
+  | { kind: 'change'; id: string; change: VariableActualChange }
+  | {
+    kind: 'time';
+    id: string;
+    action: VariableChangeAction;
+    producer: VariableChangeProducer;
+    beforePreview: string;
+    afterPreview: string;
+    title: string;
+  };
+
+const TIME_FIELDS: TimeField[] = ['年', '月', '日', '时', '分'];
+
+const getTimeField = (path: Array<string | number>): TimeField | undefined => {
+  if (path.length !== 3 || path[0] !== '世界信息' || path[1] !== '时间') {
+    return undefined;
+  }
+  const field = String(path[2]) as TimeField;
+  return TIME_FIELDS.includes(field) ? field : undefined;
+};
+
+const formatTimeValueMap = (values: Map<TimeField, unknown>): string => {
+  const parts = TIME_FIELDS.flatMap(field => {
+    const value = values.get(field);
+    if (value === undefined) {
+      return [];
+    }
+    if (field === '分' && typeof value === 'number') {
+      return [`${String(value).padStart(2, '0')}分`];
+    }
+    return [`${String(value)}${field}`];
+  });
+  return parts.length > 0 ? parts.join('') : '未定义';
+};
+
+const getGroupAction = (actions: VariableChangeAction[]): VariableChangeAction => {
+  if (actions.length > 0 && actions.every(action => action === 'insert')) {
+    return 'insert';
+  }
+  if (actions.length > 0 && actions.every(action => action === 'delete')) {
+    return 'delete';
+  }
+  return 'edit';
+};
+
+const getAiTimeStatus = (comparisons: VariableAiComparison[]): VariableComparisonStatus => {
+  if (comparisons.some(comparison => comparison.status === 'diverged')) {
+    return 'diverged';
+  }
+  if (comparisons.some(comparison => comparison.status === 'not-applied')) {
+    return 'not-applied';
+  }
+  if (comparisons.some(comparison => comparison.status === 'applied')) {
+    return 'applied';
+  }
+  return 'no-op';
+};
+
+const hasComparisonFinalMismatch = (comparison: VariableAiComparison): boolean =>
+  comparison.status === 'applied'
+  && stableStringify(comparison.expectedValue) !== stableStringify(comparison.finalValue);
+
+const isAiException = (comparison: VariableAiComparison): boolean =>
+  comparison.status === 'not-applied'
+  || comparison.status === 'diverged'
+  || hasComparisonFinalMismatch(comparison);
+
+const createAiTimeItem = (comparisons: VariableAiComparison[]): AiLogicalItem | null => {
+  if (comparisons.length === 0) {
+    return null;
+  }
+
+  const baseline = new Map<TimeField, unknown>();
+  const expected = new Map<TimeField, unknown>();
+  const final = new Map<TimeField, unknown>();
+  for (const comparison of comparisons) {
+    const field = getTimeField(comparison.path);
+    if (!field) {
+      continue;
+    }
+    baseline.set(field, comparison.baselineValue);
+    expected.set(field, comparison.expectedValue);
+    final.set(field, comparison.finalValue);
+  }
+
+  const status = getAiTimeStatus(comparisons);
+  if (status === 'no-op') {
+    return null;
+  }
+
+  return {
+    kind: 'time',
+    id: 'logical:ai-time',
+    action: getGroupAction(comparisons.map(comparison => comparison.action)),
+    status,
+    hasFinalMismatch: comparisons.some(hasComparisonFinalMismatch),
+    beforePreview: formatTimeValueMap(baseline),
+    afterPreview: formatTimeValueMap(final),
+    expectedPreview: formatTimeValueMap(expected),
+  };
+};
+
+const buildAiLogicalItems = (comparisons: VariableAiComparison[]): AiLogicalItem[] => {
+  const declared = comparisons.filter(comparison => Boolean(comparison.declaredChange));
+  const timeComparisons = declared.filter(comparison => getTimeField(comparison.path));
+  const timeItem = createAiTimeItem(timeComparisons);
+  let timeEmitted = false;
+  const result: AiLogicalItem[] = [];
+
+  for (const comparison of declared) {
+    if (getTimeField(comparison.path)) {
+      if (!timeEmitted && timeItem) {
+        result.push(timeItem);
+        timeEmitted = true;
+      }
+      continue;
+    }
+    if (comparison.status === 'no-op') {
+      continue;
+    }
+    result.push({
+      kind: 'comparison',
+      id: comparison.id,
+      comparison,
+    });
+  }
+  return result;
+};
+
+const buildBackgroundLogicalItems = (changes: VariableActualChange[]): BackgroundLogicalItem[] => {
+  const timeChanges = changes
+    .filter(change => getTimeField(change.path))
+    .sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id));
+
+  let timeItem: BackgroundLogicalItem | null = null;
+  if (timeChanges.length > 0) {
+    const before = new Map<TimeField, unknown>();
+    const after = new Map<TimeField, unknown>();
+    for (const change of timeChanges) {
+      const field = getTimeField(change.path);
+      if (!field) {
+        continue;
+      }
+      if (!before.has(field)) {
+        before.set(field, change.beforeValue);
+      }
+      after.set(field, change.afterValue);
+    }
+    const latest = timeChanges[timeChanges.length - 1];
+    const uniqueReasons = Array.from(new Set(
+      timeChanges.map(change => change.reason).filter((reason): reason is string => Boolean(reason)),
+    ));
+    timeItem = {
+      kind: 'time',
+      id: 'logical:background-time',
+      action: getGroupAction(timeChanges.map(change => change.action)),
+      producer: latest.producer,
+      beforePreview: formatTimeValueMap(before),
+      afterPreview: formatTimeValueMap(after),
+      title: uniqueReasons.join(' · ') || getProducerMeta(latest.producer).label,
+    };
+  }
+
+  let timeEmitted = false;
+  const result: BackgroundLogicalItem[] = [];
+  for (const change of changes) {
+    if (getTimeField(change.path)) {
+      if (!timeEmitted && timeItem) {
+        result.push(timeItem);
+        timeEmitted = true;
+      }
+      continue;
+    }
+    result.push({ kind: 'change', id: change.id, change });
+  }
+  return result;
+};
+
+const getAiItemExceptionCount = (items: AiLogicalItem[]): number =>
+  items.filter(item =>
+    item.kind === 'time'
+      ? item.status === 'not-applied' || item.status === 'diverged' || item.hasFinalMismatch
+      : isAiException(item.comparison),
+  ).length;
+
+const getLogicalCountText = (count: number, omittedCount: number, exceptionCount = 0): string => {
+  const countText = `${count}项${omittedCount > 0 ? '+' : ''}`;
+  return exceptionCount > 0 ? `${countText} · ${exceptionCount}异常` : countText;
+};
 
 const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
   const [expandedSegment, setExpandedSegment] = useState<ExpandedSegment | null>(null);
