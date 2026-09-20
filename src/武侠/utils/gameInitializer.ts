@@ -264,6 +264,19 @@ export const MARTIAL_ARTS_OPTIONS: MartialArtOption[] = martialArtsOptionsData a
 
 export const ORIGIN_OPTIONS: OriginOption[] = originOptionsData as OriginOption[];
 
+type OriginFactionPreset = {
+  faction: string;
+  identity: string;
+};
+
+const ORIGIN_FACTION_PRESETS: Readonly<Record<string, OriginFactionPreset>> = {
+  shaolin_lay: { faction: '少林派', identity: '俗家弟子' },
+  lingjiu_patrol_attendant: { faction: '逍遥派', identity: '灵鹫宫巡山使女' },
+  gaibang_outer: { faction: '丐帮', identity: '一袋外堂弟子' },
+  dali_royal_branch: { faction: '大理段氏与一灯门下', identity: '段氏偏支' },
+  yanziwu_retainer: { faction: '姑苏慕容氏', identity: '家臣子弟' },
+};
+
 export function getOriginById(originId: string): OriginOption | undefined {
   return ORIGIN_OPTIONS.find(o => o.id === originId);
 }
@@ -344,23 +357,30 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
   const martialArtsObj: Record<string, unknown> = {};
   const martialArtsForCalc: Record<string, MartialArtForCalculation> = {};
 
-  // 处理初始门派势力
+  // 处理初始门派势力。创建页不再单独选择宗门，因此优先由出身自动推导；
+  // initialFaction 仅保留给旧存档/外部调用兼容。
   const initialFactionsObj: Record<string, unknown> = {};
   const initialIdentitiesObj: Record<string, string> = {
     [origin]: '初入江湖的新人',
   };
+  const originFactionPreset = ORIGIN_FACTION_PRESETS[originId];
+  const resolvedInitialFaction =
+    initialFaction && initialFaction !== '散修' ? initialFaction : originFactionPreset?.faction;
 
-  if (initialFaction && initialFaction !== '散修') {
-    const sectMeta = getSectByName(initialFaction);
+  if (resolvedInitialFaction) {
+    const sectMeta = getSectByName(resolvedInitialFaction);
     if (sectMeta) {
+      const useOriginIdentity =
+        (!initialFaction || initialFaction === '散修') && originFactionPreset?.faction === sectMeta.门派名称;
       const defaultIdentity =
-        sectMeta.体系类型 === '帮会'
+        (useOriginIdentity && originFactionPreset?.identity) ||
+        (sectMeta.体系类型 === '帮会'
           ? '一袋弟子'
           : sectMeta.体系类型 === '世家'
           ? '记名门客'
           : sectMeta.体系类型 === '行伍'
           ? '伍长'
-          : '入门弟子';
+          : '入门弟子');
 
       initialFactionsObj[sectMeta.门派名称] = {
         体系类型: sectMeta.体系类型,
