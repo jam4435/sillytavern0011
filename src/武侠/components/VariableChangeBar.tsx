@@ -33,8 +33,6 @@ const COMPARE_STATUS_LABELS: Record<VariableComparisonStatus, string> = {
   'api-only': 'API写入',
 };
 
-const getTotalCount = (count: number, omittedCount: number): number => count + omittedCount;
-
 const PRODUCER_META: Record<VariableChangeProducer, { label: string; tone: SourceTone }> = {
   era: { label: 'ERA/API', tone: 'era' },
   'event-script': { label: '事件脚本', tone: 'event-script' },
@@ -510,8 +508,12 @@ interface AiComparisonRowProps {
 }
 
 const AiComparisonRow: React.FC<AiComparisonRowProps> = ({ comparison }) => {
-  const declared = comparison.declaredChange;
   const observed = comparison.observedChange;
+  const beforeValue = observed?.beforeValue ?? comparison.baselineValue;
+  const beforePreview = observed?.beforePreview ?? comparison.baselinePreview;
+  const finalMismatch = hasComparisonFinalMismatch(comparison);
+  const exception = isAiException(comparison);
+  const statusLabel = finalMismatch ? '后续已变化' : COMPARE_STATUS_LABELS[comparison.status];
 
   return (
     <div className="variable-change-row declared">
@@ -519,38 +521,84 @@ const AiComparisonRow: React.FC<AiComparisonRowProps> = ({ comparison }) => {
         <span className={`variable-change-action ${comparison.action}`}>{ACTION_LABELS[comparison.action]}</span>
         <span className="variable-change-path" title={comparison.copyPath}>{comparison.displayPath}</span>
         <span className={`variable-change-compare-status ${comparison.status}`}>
-          {COMPARE_STATUS_LABELS[comparison.status]}
+          {statusLabel}
         </span>
       </div>
 
       <div className="variable-change-row-body variable-change-row-body-ai">
-        <div className="variable-change-stack">
-          <span className="variable-change-caption">{declared ? 'AI 声明' : 'API 目标'}</span>
-          <span className="variable-change-value new" title={formatVariableDetailValue(comparison.expectedValue)}>
-            {comparison.expectedPreview}
-          </span>
-        </div>
-
-        {observed ? (
+        {comparison.status === 'not-applied' ? (
           <div className="variable-change-stack">
-            <span className="variable-change-caption">
-              实际写入 · {getProducerMeta(observed.producer).label}
+            <span className="variable-change-caption">当前值</span>
+            <span className="variable-change-value new" title={formatVariableDetailValue(comparison.finalValue)}>
+              {comparison.finalPreview}
             </span>
+          </div>
+        ) : (
+          <div className="variable-change-stack">
+            <span className="variable-change-caption">实际变化</span>
             <div className="variable-change-row-body diff">
-              <span className="variable-change-value old" title={formatVariableDetailValue(observed.beforeValue)}>
-                {observed.beforePreview}
+              <span className="variable-change-value old" title={formatVariableDetailValue(beforeValue)}>
+                {beforePreview}
               </span>
               <span className="variable-change-arrow">→</span>
-              <span className="variable-change-value new" title={formatVariableDetailValue(observed.afterValue)}>
-                {observed.afterPreview}
+              <span className="variable-change-value new" title={formatVariableDetailValue(comparison.finalValue)}>
+                {comparison.finalPreview}
               </span>
             </div>
           </div>
-        ) : (
+        )}
+
+        {exception && (
           <div className="variable-change-note">
-            {comparison.status === 'no-op'
-              ? `发送前已经是目标值：${comparison.baselinePreview}`
-              : `最终值：${comparison.finalPreview}`}
+            AI 声明：{comparison.expectedPreview}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+interface AiTimeRowProps {
+  item: Extract<AiLogicalItem, { kind: 'time' }>;
+}
+
+const AiTimeRow: React.FC<AiTimeRowProps> = ({ item }) => {
+  const exception =
+    item.status === 'not-applied'
+    || item.status === 'diverged'
+    || item.hasFinalMismatch;
+  const statusLabel = item.hasFinalMismatch ? '后续已变化' : COMPARE_STATUS_LABELS[item.status];
+
+  return (
+    <div className="variable-change-row declared">
+      <div className="variable-change-row-head variable-change-row-head-ai">
+        <span className={`variable-change-action ${item.action}`}>{ACTION_LABELS[item.action]}</span>
+        <span className="variable-change-path" title="stat_data.世界信息.时间">时间</span>
+        <span className={`variable-change-compare-status ${item.status}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <div className="variable-change-row-body variable-change-row-body-ai">
+        {item.status === 'not-applied' ? (
+          <div className="variable-change-stack">
+            <span className="variable-change-caption">当前值</span>
+            <span className="variable-change-value new">{item.afterPreview}</span>
+          </div>
+        ) : (
+          <div className="variable-change-stack">
+            <span className="variable-change-caption">实际变化</span>
+            <div className="variable-change-row-body diff">
+              <span className="variable-change-value old">{item.beforePreview}</span>
+              <span className="variable-change-arrow">→</span>
+              <span className="variable-change-value new">{item.afterPreview}</span>
+            </div>
+          </div>
+        )}
+
+        {exception && (
+          <div className="variable-change-note">
+            AI 声明：{item.expectedPreview}
           </div>
         )}
       </div>
@@ -584,6 +632,33 @@ const ActualChangeRow: React.FC<ActualChangeRowProps> = ({ change }) => {
         <span className="variable-change-value new" title={formatVariableDetailValue(change.afterValue)}>
           {change.afterPreview}
         </span>
+      </div>
+    </div>
+  );
+};
+
+interface BackgroundTimeRowProps {
+  item: Extract<BackgroundLogicalItem, { kind: 'time' }>;
+}
+
+const BackgroundTimeRow: React.FC<BackgroundTimeRowProps> = ({ item }) => {
+  const source = getProducerMeta(item.producer);
+  return (
+    <div className="variable-change-row actual">
+      <div className="variable-change-row-head">
+        <span className={`variable-change-action ${item.action}`}>{ACTION_LABELS[item.action]}</span>
+        <span className="variable-change-path" title="stat_data.世界信息.时间">时间</span>
+        <span
+          className={`variable-change-source-badge ${source.tone}`}
+          title={item.title}
+        >
+          {source.label}
+        </span>
+      </div>
+      <div className="variable-change-row-body diff">
+        <span className="variable-change-value old">{item.beforePreview}</span>
+        <span className="variable-change-arrow">→</span>
+        <span className="variable-change-value new">{item.afterPreview}</span>
       </div>
     </div>
   );
