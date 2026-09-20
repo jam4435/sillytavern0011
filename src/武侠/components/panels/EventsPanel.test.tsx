@@ -31,6 +31,8 @@ const events: GameEvent[] = [
     title: '射雕第三回02-旧案余波',
     type: 'AFTERMATH',
     description: '客栈掌柜似乎知道内情。',
+    timeText: '1200年8月20日17时',
+    location: '大宋/临安府/牛家村',
     remainingTurns: 1,
   },
 ];
@@ -111,6 +113,30 @@ describe('EventsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '显示天下事（1）' }));
     expect(screen.getByText('襄阳战报')).toBeInTheDocument();
+  });
+
+  it('offers clue progression action only for clue events and returns the selected event', () => {
+    const onAdvanceClue = vi.fn();
+    render(
+      <EventsPanel
+        events={events}
+        chronicle={chronicle}
+        currentLocation="嘉兴城内"
+        onAdvanceClue={onAdvanceClue}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: '演进到此线索' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /线索2/ }));
+    expect(screen.getByRole('button', { name: '演进到此线索' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '演进到此线索' }));
+    expect(onAdvanceClue).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'follow-up',
+      title: '射雕第三回02-旧案余波',
+      type: 'AFTERMATH',
+    }));
   });
 
   it('defaults to the first nonempty tab when no current event exists', () => {
