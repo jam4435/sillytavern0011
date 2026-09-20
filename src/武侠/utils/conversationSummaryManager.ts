@@ -143,12 +143,63 @@ async function setSummaryEntryEnabled(enabled:boolean):Promise<boolean>{
   return true;
 }
 
-async function applyOwnRegexes(enabled:boolean,recentReplies:number):Promise<void>{
-  const desired=enabled?buildConversationSummaryRegexes(recentReplies):[];
+type ComparableTavernRegex = Omit<TavernRegex, 'scope'>;
+
+function toComparableRegex(regex: TavernRegex): ComparableTavernRegex {
+  return {
+    id: regex.id,
+    script_name: regex.script_name,
+    enabled: regex.enabled,
+    find_regex: regex.find_regex,
+    replace_string: regex.replace_string,
+    trim_strings: [...regex.trim_strings],
+    source: { ...regex.source },
+    destination: { ...regex.destination },
+    run_on_edit: regex.run_on_edit,
+    min_depth: regex.min_depth,
+    max_depth: regex.max_depth,
+  };
+}
+
+export function areConversationSummaryRegexesEquivalent(
+  currentOwnRegexes: TavernRegex[],
+  desiredRegexes: TavernRegex[],
+): boolean {
+  if (currentOwnRegexes.length !== desiredRegexes.length) return false;
+
+  return currentOwnRegexes.every((regex, index) => {
+    const desired = desiredRegexes[index];
+    if (!desired) return false;
+    return JSON.stringify(toComparableRegex(regex)) === JSON.stringify(toComparableRegex(desired));
+  });
+}
+
+/**
+ * 同步卡内摘要正则。
+ *
+ * updateTavernRegexesWith() 会让 SillyTavern 重新载入聊天消息，因此这里必须先只读比较。
+ * 当前自有规则已经等于目标状态时，绝不能为了“初始化校验”再写一次角色正则；
+ * 否则固定宿主 iframe 会形成 mount → 正则重载 → unmount → mount 的自激循环。
+ */
+export async function syncConversationSummaryRegexes(
+  enabled: boolean,
+  recentReplies: number,
+): Promise<boolean> {
+  const option: TavernRegexOption = { type: 'character', name: 'current' };
+  const desired = enabled ? buildConversationSummaryRegexes(recentReplies) : [];
+  const current = getTavernRegexes(option);
+  const currentOwn = current.filter(regex => OWN_REGEX_IDS.has(regex.id));
+
+  if (areConversationSummaryRegexesEquivalent(currentOwn, desired)) {
+    dataLogger.log('[conversationSummary] 摘要正则已是目标状态，跳过角色正则写入。');
+    return false;
+  }
+
   await updateTavernRegexesWith(
-    regexes=>[...regexes.filter(regex=>!OWN_REGEX_IDS.has(regex.id)),...desired],
-    {type:'character',name:'current'},
+    regexes => [...regexes.filter(regex => !OWN_REGEX_IDS.has(regex.id)), ...desired],
+    option,
   );
+  return true;
 }
 
 function getSendingMessageText(message: SillyTavern.SendingMessage): string {
@@ -228,12 +279,13 @@ export async function applyConversationSummaryModeState(
 ):Promise<string>{
   const cardMode=mode==='card';
   const entryChanged=await setSummaryEntryEnabled(cardMode);
-  await applyOwnRegexes(cardMode,recentReplies);
+  const regexChanged=await syncConversationSummaryRegexes(cardMode,recentReplies);
   activeConversationSummaryMode=mode;
   if(mode==='card'){
-    return entryChanged
-      ? `已启用并同步「${CONVERSATION_SUMMARY_ENTRY_NAME}」，最近 ${clampRecentReplies(recentReplies)} 条回复保留全文，更早回复仅保留逐轮摘要；已归档摘要会在最终提示词阶段裁掉。`
-      : `「${CONVERSATION_SUMMARY_ENTRY_NAME}」已启用；卡内摘要过滤已同步。`;
+    if (entryChanged || regexChanged) {
+      return `已同步「${CONVERSATION_SUMMARY_ENTRY_NAME}」与卡内摘要过滤；最近 ${clampRecentReplies(recentReplies)} 条回复保留全文，更早回复仅保留逐轮摘要。`;
+    }
+    return `「${CONVERSATION_SUMMARY_ENTRY_NAME}」与卡内摘要过滤已是目标状态，本次初始化未改写角色正则。`;
   }
   if(mode==='preset') return '已禁用卡内摘要指令与卡内过滤，改由当前预设自己的 XML 摘要与过滤逻辑负责。';
   return '已禁用卡内摘要指令与卡内过滤。';
