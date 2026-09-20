@@ -108,6 +108,45 @@ describe('generateVariableData avatar fields', () => {
   });
 });
 
+describe('generateVariableData origin faction linkage', () => {
+  it('门派出身会自动写入对应势力与身份，无需创建页单独选择宗门', () => {
+    const data = generateVariableData({
+      ...createFormData(),
+      origin: '少林俗家弟子',
+      originId: 'shaolin_lay',
+    }) as {
+      user数据: {
+        身份: Record<string, string>;
+        势力?: Record<string, { 身份: string; 状态: string }>;
+      };
+    };
+
+    expect(data.user数据.身份['少林派']).toBe('俗家弟子');
+    expect(data.user数据.势力?.['少林派']).toMatchObject({
+      身份: '俗家弟子',
+      状态: '在籍',
+    });
+  });
+
+  it('旧调用显式传 initialFaction 时仍优先使用显式势力', () => {
+    const data = generateVariableData({
+      ...createFormData(),
+      origin: '少林俗家弟子',
+      originId: 'shaolin_lay',
+      initialFaction: '丐帮',
+    }) as {
+      user数据: {
+        身份: Record<string, string>;
+        势力?: Record<string, { 身份: string }>;
+      };
+    };
+
+    expect(data.user数据.势力?.['丐帮']).toBeDefined();
+    expect(data.user数据.身份['丐帮']).toBe('一袋弟子');
+    expect(data.user数据.势力?.['少林派']).toBeUndefined();
+  });
+});
+
 describe('opening event time', () => {
   it('开局事件汇总提供小时并使用所选事件的真实触发小时', () => {
     const selectedEvent = STORY_EVENTS.find(event => event.name === '射雕第七回02-初遇黄蓉');
