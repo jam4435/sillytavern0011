@@ -194,6 +194,9 @@ export async function learnMartialArtFromSecret(itemName: string): Promise<Learn
  * 撤销尚未发送的“秘籍参悟”指令：删除刚学会的功法并恢复原秘籍。
  */
 export async function undoLearnMartialArtFromSecret(rollback: MartialArtLearnRollbackData): Promise<void> {
+  const variables = await getVariables({ type: 'chat' });
+  const currentUserData = (variables?.stat_data?.user数据 || {}) as SecretUserData;
+  const itemStillExists = Boolean(currentUserData.包裹?.[rollback.itemName]);
   const transactionId = createTransactionId('secret-learn-rollback');
   await emitSourcedEraVariableWriteAndWait({
     source: 'frontend',
@@ -216,7 +219,7 @@ export async function undoLearnMartialArtFromSecret(rollback: MartialArtLearnRol
           },
         },
         {
-          type: 'insert',
+          type: itemStillExists ? 'update' : 'insert',
           payload: {
             user数据: {
               包裹: {
