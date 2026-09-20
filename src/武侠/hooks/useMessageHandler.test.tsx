@@ -244,7 +244,6 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(executeExtraVariableUpdateMock).not.toHaveBeenCalled();
     expect(globals.generate).toHaveBeenCalledWith({ should_stream: true });
     expect(options.onVariableExtraDeclaredBlocks).not.toHaveBeenCalled();
-    expect(options.onAssistantDisplayCommit).toHaveBeenCalledWith(9, 1);
     expect(options.patchLatestDebugRound).toHaveBeenCalledWith({
       variable: expect.objectContaining({
         trigger: 'send',
@@ -693,6 +692,7 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(prepareExtraVariableUpdateTurnMock).not.toHaveBeenCalled();
     expect(executeExtraVariableUpdateMock).not.toHaveBeenCalled();
     expect(options.onVariableExtraDeclaredBlocks).not.toHaveBeenCalled();
+    expect(options.onAssistantDisplayCommit).toHaveBeenCalledWith(9, 1);
     expect(options.patchLatestDebugRound).toHaveBeenCalledWith({
       variable: expect.objectContaining({
         trigger: 'regenerate',
