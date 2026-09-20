@@ -13,12 +13,14 @@ import {
 } from '../utils/variableReader';
 import { eventLogger, getRuntimeDebugInfo, variableTraceLogger } from '../utils/logger';
 
+export type MessageBoundaryReason = 'received' | 'swiped' | 'updated' | 'chat-changed';
+
 interface UseEventListenersOptions {
   updateGameState: (data: Partial<GameState>) => void;
   setCurrentMaintext: (text: string) => void;
   setCurrentOptions: (options: string[]) => void;
   onMessageSent?: (messageId: number) => void;
-  onMessageBoundary?: (messageId?: number) => void;
+  onMessageBoundary?: (messageId?: number, reason?: MessageBoundaryReason) => void;
   onChatChanged?: () => void;
   onEraWriteDone?: (detail: unknown) => void;
   onDirectVariableWriteDone?: (detail: unknown) => void;
@@ -147,7 +149,10 @@ export function useEventListeners({
       }, 0);
     };
 
-    const handleMessageUpdate = (eventData?: unknown) => {
+    const handleMessageUpdate = (
+      eventData: unknown,
+      boundaryReason: MessageBoundaryReason,
+    ) => {
       eventLogger.log('收到消息更新事件:', eventData);
       variableTraceLogger.log('[useEventListeners] 收到消息边界事件', {
         eventData,
@@ -171,7 +176,7 @@ export function useEventListeners({
       }
 
       const messageId = Number.isInteger(eventData) ? Number(eventData) : undefined;
-      onMessageBoundary?.(messageId);
+      onMessageBoundary?.(messageId, boundaryReason);
     };
 
     const handleWriteDone = (detail?: unknown) => {
@@ -224,11 +229,14 @@ export function useEventListeners({
       onMessageSent?.(messageId);
     });
     eventLogger.log('注册 MESSAGE_RECEIVED 监听器...');
-    const messageReceivedListener = eventOn(tavern_events.MESSAGE_RECEIVED, handleMessageUpdate);
+    const messageReceivedListener = eventOn(tavern_events.MESSAGE_RECEIVED, eventData =>
+      handleMessageUpdate(eventData, 'received'));
     eventLogger.log('注册 MESSAGE_SWIPED 监听器...');
-    const messageSwipedListener = eventOn(tavern_events.MESSAGE_SWIPED, handleMessageUpdate);
+    const messageSwipedListener = eventOn(tavern_events.MESSAGE_SWIPED, eventData =>
+      handleMessageUpdate(eventData, 'swiped'));
     eventLogger.log('注册 MESSAGE_UPDATED 监听器...');
-    const messageUpdatedListener = eventOn(tavern_events.MESSAGE_UPDATED, handleMessageUpdate);
+    const messageUpdatedListener = eventOn(tavern_events.MESSAGE_UPDATED, eventData =>
+      handleMessageUpdate(eventData, 'updated'));
     eventLogger.log('注册 CHAT_CHANGED 监听器...');
     const chatChangedListener = eventOn(tavern_events.CHAT_CHANGED, eventData => {
       const previousChatId = lastKnownChatIdRef.current;
@@ -251,7 +259,7 @@ export function useEventListeners({
         eventLogger.log(`[CHAT_CHANGED] 聊天未切换，保留当前回合追踪: ${previousChatId}`);
       }
 
-      handleMessageUpdate(eventData);
+      handleMessageUpdate(eventData, 'chat-changed');
     });
     eventLogger.log('注册 era:writeDone 监听器...');
     const writeDoneListener = eventOn('era:writeDone', handleWriteDone);
