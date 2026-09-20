@@ -17,7 +17,7 @@ interface EventsPanelProps {
   gameTime?: string;
   currentLocation?: string;
   onTravelTo?: (location: string) => void;
-  onAdvanceToEvent?: (event: GameEvent) => void;
+  onAdvanceClue?: (event: GameEvent) => void;
 }
 
 type EventTab = 'current' | 'clues' | 'chronicle';
@@ -34,7 +34,7 @@ interface EventDisclosureRowProps {
   onToggle: () => void;
   currentLocation?: string;
   onTravelTo?: (location: string) => void;
-  onAdvanceToEvent?: (event: GameEvent) => void;
+  onAdvanceClue?: (event: GameEvent) => void;
 }
 
 const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
@@ -43,7 +43,7 @@ const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
   onToggle,
   currentLocation,
   onTravelTo,
-  onAdvanceToEvent,
+  onAdvanceClue,
 }) => {
   const detailId = useId().replace(/:/g, '');
   const countdown = getEventCountdownLabel(event);
@@ -77,14 +77,16 @@ const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
             </div>
           )}
           <EventMeta event={event} currentLocation={currentLocation} onTravelTo={onTravelTo} />
-          {event.type === 'AFTERMATH' && onAdvanceToEvent && (
-            <button
-              type="button"
-              className="event-meta-badge event-meta-badge--travel"
-              onClick={() => onAdvanceToEvent(event)}
-            >
-              演进至此事件 ›
-            </button>
+          {event.type !== 'ACTIVE' && onAdvanceClue && (
+            <div className="event-clue-command-row">
+              <button
+                type="button"
+                className="event-clue-command-btn"
+                onClick={() => onAdvanceClue(event)}
+              >
+                演进到此线索
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -202,7 +204,7 @@ export const EventsPanel: React.FC<EventsPanelProps> = ({
   gameTime,
   currentLocation,
   onTravelTo,
-  onAdvanceToEvent,
+  onAdvanceClue,
 }) => {
   const currentEvents = useMemo(() => sortEventsForDisplay(events.filter(event => event.type === 'ACTIVE')), [events]);
   const clueEvents = useMemo(
@@ -256,7 +258,7 @@ export const EventsPanel: React.FC<EventsPanelProps> = ({
                 onToggle={() => setExpandedEventId(current => (current === event.id ? null : event.id))}
                 currentLocation={currentLocation}
                 onTravelTo={onTravelTo}
-                onAdvanceToEvent={onAdvanceToEvent}
+                onAdvanceClue={onAdvanceClue}
               />
             ))}
           </div>

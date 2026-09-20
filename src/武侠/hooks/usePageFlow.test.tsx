@@ -36,9 +36,9 @@ describe('usePageFlow', () => {
 });
 
 describe('shouldDeferSetupEventNotifications', () => {
-  it('在角色创建或初始命名期间延后事件通知，进入开局后恢复显示', () => {
-    expect(shouldDeferSetupEventNotifications('setup', true, false)).toBe(true);
-    expect(shouldDeferSetupEventNotifications('setup', false, true)).toBe(true);
-    expect(shouldDeferSetupEventNotifications('opening', false, false)).toBe(false);
+  it('只在角色创建加载期间延后事件通知，创建完成后无需等待初始命名', () => {
+    expect(shouldDeferSetupEventNotifications('setup', true)).toBe(true);
+    expect(shouldDeferSetupEventNotifications('setup', false)).toBe(false);
+    expect(shouldDeferSetupEventNotifications('opening', false)).toBe(false);
   });
 });

@@ -77,6 +77,40 @@ describe('debugRoundView', () => {
     expect(getDebugStageStatusLabel('skipped')).toBe('已跳过');
   });
 
+  it('额外变量输出只展示变量模型与校验信息，不泄露楼层正文全文', () => {
+    const debugRound = createDebugRound();
+    debugRound.variable = {
+      ...debugRound.variable,
+      status: 'error',
+      trigger: 'send',
+      modeSnapshot: 'extra',
+      output: '<VariableThink>只需更新修为</VariableThink>',
+      appendedBlocks: '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>',
+      appendVerification: '写入后通过',
+      syncVerification: '同步后通过',
+      applyStatus: 'success',
+      applyVerification: '修为=120',
+      appendReadbackText: '这是完整剧情正文，不应出现在额外变量输出\n<VariableEdit>{}</VariableEdit>',
+      syncReadbackText: '这是 ERA 同步后的完整剧情正文，也不应展示',
+      finalMessageText: '最终楼层完整正文绝不能展示',
+      error: '测试错误',
+    };
+
+    const output = buildVariableOutputDebugContent(debugRound);
+    expect(output).toContain('【原始返回】');
+    expect(output).toContain('【合法变量块】');
+    expect(output).toContain('【写入后回读验证】');
+    expect(output).toContain('【ERA 楼层同步后回读验证】');
+    expect(output).toContain('【变量快照验证】');
+    expect(output).toContain('【错误】');
+    expect(output).not.toContain('这是完整剧情正文');
+    expect(output).not.toContain('这是 ERA 同步后的完整剧情正文');
+    expect(output).not.toContain('最终楼层完整正文绝不能展示');
+    expect(output).not.toContain('【写入后回读文本】');
+    expect(output).not.toContain('【ERA 同步后回读文本】');
+    expect(output).not.toContain('【最终楼层文本】');
+  });
+
   it('正文和额外变量调试都展示 429 重试次数与最近等待', () => {
     const debugRound = createDebugRound();
     debugRound.main.retry429Count = 2;
