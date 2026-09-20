@@ -390,6 +390,73 @@ describe('useVariableChangeTracker', () => {
     expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
   });
 
+  it('额外变量 sourced AI 可以把先到的 raw ERA 后台批次提升为 AI', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableExtraDeclaredBlocks(declaredReply, 2);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'extra-variable-api-write',
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'era',
+        origin: 'background',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.aiReply.comparisons).toEqual([
+      expect.objectContaining({
+        status: 'not-applied',
+        expectedValue: 120,
+        finalValue: 120,
+      }),
+    ]);
+
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'extra-source-ai-1',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        message_id: 2,
+        actions: { apiWrite: true },
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'frontend',
+        origin: 'ai',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
+    expect(result.current.variableChanges?.aiReply.comparisons).toEqual([
+      expect.objectContaining({
+        status: 'applied',
+        expectedValue: 120,
+        finalValue: 120,
+      }),
+    ]);
+  });
+
   it('显式后台 ERA 来源可以把已归入 AI 的批次纠正回后台', () => {
     const { result } = renderHook(() => useVariableChangeTracker());
 
