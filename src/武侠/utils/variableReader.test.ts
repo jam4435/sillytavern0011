@@ -258,6 +258,125 @@ describe('getGameVariables ERA 展示投影', () => {
     expect(npc?.template.martialArts?.降龙十八掌.type).toBe('掌法');
   });
 
+  it('兼容旧聊天关系网中的数字关系值，不让状态、功法、行囊和侠缘整体读取失败', () => {
+    completeMartialArtsMock.mockImplementation(arts =>
+      Object.fromEntries(
+        Object.entries(arts).map(([name, art]) => [
+          name,
+          {
+            type: art.类型 || '',
+            description: art.功法描述 || '',
+            rank: art.功法品阶 || '',
+            mastery: art.掌握程度 || '',
+            traits: art.特性 || {},
+            unlockedTraits: art.特性 || {},
+            canUpgrade: false,
+            upgradeCost: 0,
+            nextMastery: null,
+          },
+        ]),
+      ),
+    );
+    getMartialArtDataMock.mockReturnValue(null);
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1219, 月: 3, 日: 12, 时: 10 } },
+        user数据: {
+          用户名: '墨逸',
+          性别: '男',
+          出生年份: 1181,
+          境界: '二流中期',
+          修为: 3987,
+          所在位置: '大宋/嘉兴府/嘉兴城/北行马车车厢',
+          初始属性: { 臂力: 17, 根骨: 17, 机敏: 6, 悟性: 6, 洞察: 6, 风姿: 6, 福缘: 0 },
+          功法: {
+            九阳神功: {
+              类型: '内功',
+              功法描述: '九阳真气浑厚无比。',
+              功法品阶: '绝世',
+              掌握程度: '初窥门径',
+              特性: { 初窥门径: '' },
+            },
+          },
+          包裹: {
+            碎银子: {
+              类型: '杂物',
+              品阶: '凡品',
+              物品描述: '可用于市井花费。',
+              数量: 1,
+            },
+          },
+          关系网: {
+            韩小莹: 68,
+          },
+        },
+        角色数据: {
+          韩小莹: {
+            性别: '女',
+            所在位置: '大宋/嘉兴府/嘉兴城/北行马车车厢',
+          },
+        },
+      },
+    });
+
+    const state = readGameDataSync();
+
+    expect(state?.stats).toMatchObject({
+      name: '墨逸',
+      birthYear: 1181,
+      realm: '二流中期',
+      cultivation: 3987,
+    });
+    expect(Object.keys(state?.stats?.martialArts || {})).toContain('九阳神功');
+    expect(state?.inventory?.map(item => item.name)).toContain('碎银子');
+
+    const npc = state?.social?.find(item => item.name === '韩小莹');
+    expect(npc).toMatchObject({
+      name: '韩小莹',
+      relationship: 68,
+      category: 'acquaintance',
+    });
+    expect(npc?.relationshipLabel).toBeUndefined();
+  });
+
+  it('侠缘投影遇到畸形旧角色数据时只降级侠缘，保留其他已解析页面数据', () => {
+    getMartialArtDataMock.mockReturnValue(null);
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '墨逸',
+          性别: '男',
+          境界: '二流中期',
+          修为: 3987,
+          初始属性: { 臂力: 17, 根骨: 17, 机敏: 6, 悟性: 6, 洞察: 6, 风姿: 6, 福缘: 0 },
+          包裹: {
+            碎银子: {
+              类型: '杂物',
+              品阶: '凡品',
+              物品描述: '可用于市井花费。',
+              数量: 1,
+            },
+          },
+          关系网: {
+            韩小莹: 68,
+          },
+        },
+        角色数据: {
+          韩小莹: {
+            外貌: 123,
+          },
+        },
+      },
+    });
+
+    const state = readGameDataSync();
+
+    expect(state?.stats?.realm).toBe('二流中期');
+    expect(state?.stats?.cultivation).toBe(3987);
+    expect(state?.inventory?.map(item => item.name)).toContain('碎银子');
+    expect(state?.social).toEqual([]);
+  });
+
   it('优先把前端事件线索档案投影为长期线索，并与三回合 AI 线索去重', () => {
     const eventName = '射雕第二十九回04-锦囊求医';
     getAllVariablesMock.mockReturnValue({

@@ -68,6 +68,8 @@ type TavernChatMessage = {
   extra: Record<string, unknown>;
 };
 
+type RelationshipNetworkValue = string | number;
+
 /**
  * 用户档案结构类型定义
  * 实际变量存储在 user数据.[用户名] 下
@@ -130,7 +132,7 @@ interface UserProfile {
   势力?: Record<string, unknown>;
   宗门?: Record<string, unknown>;
   人物经历?: Record<string, string> | string;
-  关系网?: Record<string, string>;
+  关系网?: Record<string, RelationshipNetworkValue>;
   $meta?: unknown; // ERA 元数据，忽略
 }
 
@@ -176,7 +178,7 @@ interface CharacterData {
   >;
   重要物品?: Record<string, unknown>;
   人物经历?: Record<string, string> | string;
-  关系网?: Record<string, string>;
+  关系网?: Record<string, RelationshipNetworkValue>;
   $meta?: unknown;
 }
 
@@ -1381,7 +1383,7 @@ function formatBiographySummary(biography?: Record<string, string> | string): st
     .join('\n');
 }
 
-function formatNetworkSummary(network?: Record<string, string> | string[]): string[] {
+function formatNetworkSummary(network?: Record<string, RelationshipNetworkValue> | string[]): string[] {
   if (!network) return [];
   if (Array.isArray(network)) {
     return network.filter(Boolean);
@@ -1390,6 +1392,33 @@ function formatNetworkSummary(network?: Record<string, string> | string[]): stri
   return Object.entries(network)
     .filter(([name]) => Boolean(name) && !name.startsWith('$'))
     .map(([name, relation]) => (relation ? `${name}（${relation}）` : name));
+}
+
+function normalizeRelationshipNetworkValue(value: RelationshipNetworkValue | undefined): {
+  relationship?: number;
+  relationshipLabel?: string;
+} {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? { relationship: value } : {};
+  }
+
+  if (typeof value !== 'string') {
+    return {};
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return {};
+  }
+
+  if (/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(trimmed)) {
+    const numericValue = Number(trimmed);
+    if (Number.isFinite(numericValue)) {
+      return { relationship: numericValue };
+    }
+  }
+
+  return { relationshipLabel: trimmed };
 }
 
 function getPrimaryIdentityTitle(identities?: Record<string, string>, fallbackType?: string): string {
@@ -1442,17 +1471,18 @@ function createCharacterNpc(
   characterData: CharacterData,
   category: NPC['category'],
   avatarRef?: string,
-  relationshipLabel?: string,
+  relationshipValue?: RelationshipNetworkValue,
   legacyNpc?: LegacySocialNpc,
 ): NPC {
   const network = formatNetworkSummary(characterData.关系网);
+  const normalizedRelationship = normalizeRelationshipNetworkValue(relationshipValue);
 
   return {
     id: `npc:${category}:${name}`,
     name,
     avatarRef,
-    relationship: legacyNpc?.关系值 ?? 0,
-    relationshipLabel: relationshipLabel?.trim() || undefined,
+    relationship: normalizedRelationship.relationship ?? legacyNpc?.关系值 ?? 0,
+    relationshipLabel: normalizedRelationship.relationshipLabel,
     category,
     role: getPrimaryIdentityTitle(characterData.身份),
     location: characterData.所在位置 || undefined,
@@ -1464,15 +1494,20 @@ function createCharacterNpc(
   };
 }
 
-function createLegacySocialNpc(legacyNpc: LegacySocialNpc, category: NPC['category'], relationshipLabel?: string): NPC {
+function createLegacySocialNpc(
+  legacyNpc: LegacySocialNpc,
+  category: NPC['category'],
+  relationshipValue?: RelationshipNetworkValue,
+): NPC {
   const name = legacyNpc.姓名?.trim() || '未知人物';
+  const normalizedRelationship = normalizeRelationshipNetworkValue(relationshipValue);
 
   return {
     id: `npc:${category}:${name}`,
     name,
     avatarRef: undefined,
-    relationship: legacyNpc.关系值 ?? 0,
-    relationshipLabel: relationshipLabel?.trim() || undefined,
+    relationship: normalizedRelationship.relationship ?? legacyNpc.关系值 ?? 0,
+    relationshipLabel: normalizedRelationship.relationshipLabel,
     category,
     role: '江湖人士',
     template: {
@@ -1488,13 +1523,19 @@ function createLegacySocialNpc(legacyNpc: LegacySocialNpc, category: NPC['catego
   };
 }
 
-function createPlaceholderNpc(name: string, category: NPC['category'], relationshipLabel?: string): NPC {
+function createPlaceholderNpc(
+  name: string,
+  category: NPC['category'],
+  relationshipValue?: RelationshipNetworkValue,
+): NPC {
+  const normalizedRelationship = normalizeRelationshipNetworkValue(relationshipValue);
+
   return {
     id: `npc:${category}:${name}`,
     name,
     avatarRef: undefined,
-    relationship: 0,
-    relationshipLabel: relationshipLabel?.trim() || undefined,
+    relationship: normalizedRelationship.relationship ?? 0,
+    relationshipLabel: normalizedRelationship.relationshipLabel,
     category,
     role: '江湖人士',
     template: {
@@ -1545,18 +1586,18 @@ function parseSocial(variables: GameVariables, 用户档案?: UserProfile): NPC[
       continue;
     }
 
-    const relationshipLabel = relationshipNetwork[rawName];
+    const relationshipValue = relationshipNetwork[rawName];
     const characterRecord = characterRecords[name];
     const legacyNpc = legacyByName.get(name);
 
     if (isCharacterDataRecord(characterRecord)) {
       result.push(
-        createCharacterNpc(name, characterRecord, 'acquaintance', avatarRefs[name], relationshipLabel, legacyNpc),
+        createCharacterNpc(name, characterRecord, 'acquaintance', avatarRefs[name], relationshipValue, legacyNpc),
       );
     } else if (legacyNpc) {
-      result.push(createLegacySocialNpc(legacyNpc, 'acquaintance', relationshipLabel));
+      result.push(createLegacySocialNpc(legacyNpc, 'acquaintance', relationshipValue));
     } else {
-      result.push(createPlaceholderNpc(name, 'acquaintance', relationshipLabel));
+      result.push(createPlaceholderNpc(name, 'acquaintance', relationshipValue));
     }
 
     seenNames.add(name);
@@ -3763,8 +3804,13 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
   state.events = parseEvents(variables, worldTime);
   state.chronicle = parseChronicle(variables);
 
-  // 社交
-  state.social = parseSocial(variables, 用户档案);
+  // 社交：旧档或异常角色数据不应拖垮已经成功解析的状态/功法/行囊。
+  try {
+    state.social = parseSocial(variables, 用户档案);
+  } catch (error) {
+    dataLogger.error('[variableReader] 侠缘投影失败，保留其他已解析游戏状态:', error);
+    state.social = [];
+  }
 
   return state;
 }

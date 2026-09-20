@@ -28,22 +28,23 @@ export const DEFAULT_GAME_STATE: GameState = {
     identities: {},
     martialArts: {},
     initialAttributes: {
-      brawn: 10,
-      root: 10,
-      agility: 10,
-      savvy: 10,
-      insight: 10,
-      charisma: 10,
-      luck: 10
+      臂力: 10,
+      根骨: 10,
+      机敏: 10,
+      悟性: 10,
+      洞察: 10,
+      风姿: 10,
+      福缘: 0
     },
     attributes: {
       hp: 100,
       mp: 50,
-      brawn: 10,
-      root: 10,
-      agility: 10,
-      savvy: 10,
-      insight: 10
+      hpCurrent: 100,
+      mpCurrent: 50,
+      臂力: 10,
+      根骨: 10,
+      机敏: 10,
+      洞察: 10
     },
     biography: '',
     network: {}

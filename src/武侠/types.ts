@@ -249,7 +249,7 @@ export interface CharacterProfile {
   // but conceptually belongs here.
 
   biography: Record<string, string> | string; // 人物经历 (Can be text or map)
-  network: Record<string, string>; // 关系网
+  network: Record<string, string | number>; // 关系网（兼容关系标签与旧数字关系值）
 
   已探索地点?: string[]; // 已探索的地点列表（用于地图系统）
 }
