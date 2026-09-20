@@ -56,24 +56,20 @@ export function getEventCountdownLabel(event: GameEvent): string | null {
   if (event.remainingDays !== undefined) {
     return event.remainingDays <= 0 ? '今日' : `${event.remainingDays}日`;
   }
-  if (event.remainingTurns !== undefined) {
-    return `余${event.remainingTurns}回`;
-  }
+  // remainingTurns 仅用于兼容旧存档的后续线索清理寿命，不再作为玩家可见倒计时。
   return null;
 }
 
 export function isEventUrgent(event: GameEvent): boolean {
   return Boolean(
     (event.startsInDays !== undefined && event.startsInDays <= 3) ||
-    (event.remainingDays !== undefined && event.remainingDays <= 3) ||
-    (event.remainingTurns !== undefined && event.remainingTurns <= 1),
+    (event.remainingDays !== undefined && event.remainingDays <= 3),
   );
 }
 
 function getCountdownOrder(event: GameEvent): number {
   if (event.startsInDays !== undefined) return event.startsInDays;
   if (event.remainingDays !== undefined) return event.remainingDays;
-  if (event.remainingTurns !== undefined) return event.remainingTurns;
   return Number.POSITIVE_INFINITY;
 }
 

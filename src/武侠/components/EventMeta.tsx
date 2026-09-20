@@ -1,4 +1,5 @@
 import React from 'react';
+import { isSameLocationScope } from '../../shared/locationPath.js';
 import type { GameEvent } from '../types';
 import { getEventTimeLabel } from '../utils/eventPresentation';
 
@@ -15,7 +16,7 @@ interface EventMetaProps {
 /** 事件详情中复用的时间、地点、倒计时与人物信息。 */
 export const EventMeta: React.FC<EventMetaProps> = ({ event, currentLocation, onTravelTo }) => {
   const { timeText, location, startsInDays, remainingDays, involvedCharacters } = event;
-  const canTravel = Boolean(onTravelTo && location && location !== currentLocation);
+  const canTravel = Boolean(onTravelTo && location && !isSameLocationScope(location, currentLocation));
   if (
     !timeText &&
     !location &&

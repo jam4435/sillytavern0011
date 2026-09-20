@@ -19,6 +19,7 @@ import {
   calculateTimeOffset,
   getEventDurationHours,
   formatDate,
+  compareTime,
   debugGroup,
   debugGroupCollapsed,
   debugGroupEnd,
@@ -1249,10 +1250,14 @@ export async function batchEndEvents(eventNames, eventDefinitions) {
 }
 
 // ==================== 后续事件线索 ====================
-function buildFollowupPayloads(eventNames, eventDefinitions, statData = {}) {
+export function buildFollowupPayloads(eventNames, eventDefinitions, statData = {}) {
   const followupPayload = {};
   const followupCountPayload = {};
   const frontendClueArchivePayload = {};
+  const currentTime = statData?.世界信息?.时间;
+  const activeEvents = statData?.事件系统?.进行中事件 || {};
+  const completedEvents = statData?.事件系统?.已完成事件 || {};
+  const expiredEvents = statData?.事件系统?.已失效事件 || {};
 
   for (const eventName of eventNames) {
     const eventData = eventDefinitions[eventName];
@@ -1261,15 +1266,31 @@ function buildFollowupPayloads(eventNames, eventDefinitions, statData = {}) {
       const targetEventData = eventDefinitions[targetEventKey];
       if (!targetEventData || Object.prototype.hasOwnProperty.call(followupPayload, targetEventKey)) continue;
 
+      // 历史追赶结算时，不再把已经到期/结束的中间节点重新塞回事件卷轴。
+      // 只为仍处于未来的后续事件保留线索；已进入进行中/完成/失效终态的目标也不再重复建档。
+      if (
+        Object.prototype.hasOwnProperty.call(activeEvents, targetEventKey) ||
+        Object.prototype.hasOwnProperty.call(completedEvents, targetEventKey) ||
+        Object.prototype.hasOwnProperty.call(expiredEvents, targetEventKey)
+      ) {
+        continue;
+      }
+
       const plannedStart = getSingleConditionTimeAnchor(targetEventData.触发条件);
       const runtimeStart = statData?.事件系统?.未发生事件?.[targetEventKey];
+      const runtimeAnchor = isPlainObject(runtimeStart) ? getSingleConditionTimeAnchor(runtimeStart) : null;
       const hasRuntimeStart =
-        isPlainObject(runtimeStart) &&
-        getSingleConditionTimeAnchor(runtimeStart) &&
+        runtimeAnchor &&
         JSON.stringify(runtimeStart) !== JSON.stringify(plannedStart);
       const { startTime, endTime } = hasRuntimeStart
-        ? buildActualEventWindow(targetEventData, getSingleConditionTimeAnchor(runtimeStart), true)
+        ? buildActualEventWindow(targetEventData, runtimeAnchor, true)
         : buildActualEventWindow(targetEventData, null, false);
+
+      if (currentTime && startTime && compareTime(currentTime, startTime, '>=')) {
+        log(`跳过已过时的后续线索: ${eventName} -> ${targetEventKey}`);
+        continue;
+      }
+
       const location = targetEventData.事件地点;
       const contextParts = [
         startTime ? `开始：${formatDate(startTime)}` : '',
@@ -1285,7 +1306,7 @@ function buildFollowupPayloads(eventNames, eventDefinitions, statData = {}) {
         ...(startTime ? { 开始时间: cloneJson(startTime) } : {}),
         ...(endTime ? { 结束时间: cloneJson(endTime) } : {}),
         ...(location ? { 地点: location } : {}),
-        ...(statData?.世界信息?.时间 ? { 获得时间: cloneJson(statData.世界信息.时间) } : {}),
+        ...(currentTime ? { 获得时间: cloneJson(currentTime) } : {}),
       };
       log(`为事件 ${eventName} 生成后续线索: ${targetEventKey}`);
     }
