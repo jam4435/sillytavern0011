@@ -1,4 +1,4 @@
-import type { InitialAttributes, InventoryItem, MartialArt } from '../types';
+import type { InitialAttributes, InventoryItem } from '../types';
 import { checkMartialArtPrerequisites } from './martialArtsDatabase';
 
 const INITIAL_ATTRIBUTE_KEYS = ['臂力', '根骨', '机敏', '悟性', '洞察', '风姿', '福缘'] as const;
@@ -24,7 +24,7 @@ interface QuoteMartialArtStudyInput {
   item: InventoryItem;
   initialAttributes?: InitialAttributes;
   traits?: Record<string, string>;
-  knownMartialArts?: Record<string, MartialArt>;
+  knownMartialArts?: Record<string, unknown>;
 }
 
 function isInitialAttributeKey(value: string): value is MartialArtStudyAttribute {
