@@ -127,7 +127,7 @@ describe('martialArtSecretManager', () => {
   it('有多本秘籍时只扣减数量，不删除条目', async () => {
     const userData = structuredClone(baseUserData);
     userData.包裹.九阳神功.数量 = 2;
-    vi.mocked(globalThis.getVariables).mockResolvedValue({ stat_data: { user数据 } });
+    vi.mocked(globalThis.getVariables).mockResolvedValue({ stat_data: { user数据: userData } });
 
     const result = await learnMartialArtFromSecret('九阳神功');
 
@@ -155,7 +155,7 @@ describe('martialArtSecretManager', () => {
   it('执行时会重新校验，属性不足则不发事务', async () => {
     const userData = structuredClone(baseUserData);
     userData.初始属性.悟性 = 8;
-    vi.mocked(globalThis.getVariables).mockResolvedValue({ stat_data: { user数据 } });
+    vi.mocked(globalThis.getVariables).mockResolvedValue({ stat_data: { user数据: userData } });
 
     const result = await learnMartialArtFromSecret('九阳神功');
 
@@ -167,7 +167,7 @@ describe('martialArtSecretManager', () => {
   it('执行时发现已经习得则不重复写入', async () => {
     const userData = structuredClone(baseUserData) as typeof baseUserData & { 功法: Record<string, unknown> };
     userData.功法 = { 九阳神功: { 掌握程度: '初窥门径' } };
-    vi.mocked(globalThis.getVariables).mockResolvedValue({ stat_data: { user数据 } });
+    vi.mocked(globalThis.getVariables).mockResolvedValue({ stat_data: { user数据: userData } });
 
     const result = await learnMartialArtFromSecret('九阳神功');
 
