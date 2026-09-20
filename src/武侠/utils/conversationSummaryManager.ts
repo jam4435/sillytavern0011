@@ -5,6 +5,8 @@ export const CONVERSATION_SUMMARY_ENTRY_NAME = '对话摘要指令';
 export const CONVERSATION_SUMMARY_TAG = 'summary';
 export const DEFAULT_CONVERSATION_SUMMARY_RECENT_REPLIES = 5;
 
+let activeConversationSummaryMode: ConversationSummaryMode = 'off';
+
 const OWN_REGEX_IDS = new Set([
   'wuxia-card-summary-display-hide',
   'wuxia-card-summary-recent-hide',
@@ -24,7 +26,21 @@ export const CONVERSATION_SUMMARY_ENTRY_CONTENT = `<对话摘要协议>
 - 不编造正文没有发生的事实；不输出思维过程。
 - <summary> 必须是独立 XML 块，不能嵌进其他 XML 标签。
 - inline 变量模式下顺序为：正文 → <summary> → VariableThink/VariableInsert/Edit/Delete；extra 变量模式下 <summary> 位于正文末尾。
-</对话摘要协议>`;
+</对话摘要协议>
+
+<%
+const 章节摘要 = getvar('stat_data.叙事记忆.章节摘要', { scope: 'local' });
+if (章节摘要 && typeof 章节摘要 === 'object' && Object.keys(章节摘要).length > 0) {
+-%>
+<长期叙事记忆>
+以下是已经从更早逐轮摘要中一次性归档出的长期剧情记忆；它们是旧正文的替代上下文，不要把同一历史再次当作新发生的事件。
+<% for (const [章节键, 章节] of Object.entries(章节摘要)) {
+  if (!章节 || typeof 章节 !== 'object' || typeof 章节.摘要 !== 'string' || !章节.摘要.trim()) continue;
+-%>
+[<%- 章节键 %>｜楼层 <%- 章节.起始楼层 %>-<%- 章节.结束楼层 %>] <%- 章节.摘要 %>
+<% } -%>
+</长期叙事记忆>
+<% } -%>`;
 
 function clampRecentReplies(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_CONVERSATION_SUMMARY_RECENT_REPLIES;
@@ -115,9 +131,14 @@ async function ensureSummaryEntryExists(): Promise<{ worldbookName: string; entr
 
 async function setSummaryEntryEnabled(enabled:boolean):Promise<boolean>{
   const location=enabled?await ensureSummaryEntryExists():await findSummaryEntry();
-  if(!location||location.entry.enabled===enabled)return false;
+  if(!location)return false;
+  const needsContentSync=enabled && location.entry.content !== CONVERSATION_SUMMARY_ENTRY_CONTENT;
+  if(location.entry.enabled===enabled && !needsContentSync)return false;
+
   await updateWorldbookWith(location.worldbookName,worldbook=>worldbook.map(entry=>
-    entry.uid===location.entry.uid&&entry.name===CONVERSATION_SUMMARY_ENTRY_NAME?{...entry,enabled}:entry
+    entry.uid===location.entry.uid&&entry.name===CONVERSATION_SUMMARY_ENTRY_NAME
+      ? {...entry,enabled,...(enabled?{content:CONVERSATION_SUMMARY_ENTRY_CONTENT}:{})}
+      : entry
   ),{render:'debounced'});
   return true;
 }
@@ -130,16 +151,86 @@ async function applyOwnRegexes(enabled:boolean,recentReplies:number):Promise<voi
   );
 }
 
+function getSendingMessageText(message: SillyTavern.SendingMessage): string {
+  if (typeof message.content === 'string') return message.content;
+  if (!Array.isArray(message.content)) return '';
+  return message.content
+    .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+    .map(part => part.text)
+    .join('\n');
+}
+
+function readArchivedSummaryCount(): number {
+  try {
+    const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+    const statData = variables?.stat_data as Record<string, unknown> | undefined;
+    const memory = statData?.叙事记忆 as Record<string, unknown> | undefined;
+    const count = Number(memory?.已归档摘要数);
+    return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function filterArchivedSummariesFromPrompt(
+  chat: SillyTavern.SendingMessage[],
+  archivedSummaryCount: number,
+): number {
+  let remaining = Math.max(0, Math.floor(archivedSummaryCount));
+  if (remaining === 0) return 0;
+
+  const removeIndices = new Set<number>();
+  for (let index = 0; index < chat.length && remaining > 0; index += 1) {
+    const message = chat[index];
+    if (message.role !== 'assistant' || !/<summary>[\s\S]*?<\/summary>/i.test(getSendingMessageText(message))) {
+      continue;
+    }
+
+    removeIndices.add(index);
+    for (let previous = index - 1; previous >= 0; previous -= 1) {
+      if (removeIndices.has(previous)) continue;
+      if (chat[previous].role === 'user') {
+        removeIndices.add(previous);
+        break;
+      }
+      if (chat[previous].role === 'assistant' || chat[previous].role === 'system') {
+        break;
+      }
+    }
+    remaining -= 1;
+  }
+
+  if (removeIndices.size === 0) return 0;
+  const kept = chat.filter((_, index) => !removeIndices.has(index));
+  const removed = chat.length - kept.length;
+  chat.splice(0, chat.length, ...kept);
+  return removed;
+}
+
+export function installConversationSummaryPromptFilter(): () => void {
+  const subscription = eventOn(tavern_events.CHAT_COMPLETION_PROMPT_READY, eventData => {
+    if (activeConversationSummaryMode !== 'card' || eventData.dryRun) return;
+    const archivedSummaryCount = readArchivedSummaryCount();
+    if (archivedSummaryCount <= 0) return;
+    const removed = filterArchivedSummariesFromPrompt(eventData.chat, archivedSummaryCount);
+    if (removed > 0) {
+      dataLogger.log(`[conversationSummary] 已从本次最终提示词裁掉 ${removed} 条已归档旧消息。`);
+    }
+  });
+  return () => subscription.stop();
+}
+
 export async function applyConversationSummaryModeState(
   mode:ConversationSummaryMode,
   recentReplies=DEFAULT_CONVERSATION_SUMMARY_RECENT_REPLIES,
 ):Promise<string>{
+  activeConversationSummaryMode=mode;
   const cardMode=mode==='card';
   const entryChanged=await setSummaryEntryEnabled(cardMode);
   await applyOwnRegexes(cardMode,recentReplies);
   if(mode==='card'){
     return entryChanged
-      ? `已启用「${CONVERSATION_SUMMARY_ENTRY_NAME}」，并启用最近 ${clampRecentReplies(recentReplies)} 条回复全文 / 更早仅摘要的卡内过滤。`
+      ? `已启用并同步「${CONVERSATION_SUMMARY_ENTRY_NAME}」，最近 ${clampRecentReplies(recentReplies)} 条回复保留全文，更早回复仅保留逐轮摘要；已归档摘要会在最终提示词阶段裁掉。`
       : `「${CONVERSATION_SUMMARY_ENTRY_NAME}」已启用；卡内摘要过滤已同步。`;
   }
   if(mode==='preset') return '已禁用卡内摘要指令与卡内过滤，改由当前预设自己的 XML 摘要与过滤逻辑负责。';

@@ -10,3 +10,17 @@
 - <summary> 必须是独立 XML 块，不能嵌进其他 XML 标签。
 - inline 变量模式下顺序为：正文 → <summary> → VariableThink/VariableInsert/Edit/Delete；extra 变量模式下 <summary> 位于正文末尾。
 </对话摘要协议>
+
+<%
+const 章节摘要 = getvar('stat_data.叙事记忆.章节摘要', { scope: 'local' });
+if (章节摘要 && typeof 章节摘要 === 'object' && Object.keys(章节摘要).length > 0) {
+-%>
+<长期叙事记忆>
+以下是已经从更早逐轮摘要中一次性归档出的长期剧情记忆；它们是旧正文的替代上下文，不要把同一历史再次当作新发生的事件。
+<% for (const [章节键, 章节] of Object.entries(章节摘要)) {
+  if (!章节 || typeof 章节 !== 'object' || typeof 章节.摘要 !== 'string' || !章节.摘要.trim()) continue;
+-%>
+[<%- 章节键 %>｜楼层 <%- 章节.起始楼层 %>-<%- 章节.结束楼层 %>] <%- 章节.摘要 %>
+<% } -%>
+</长期叙事记忆>
+<% } -%>

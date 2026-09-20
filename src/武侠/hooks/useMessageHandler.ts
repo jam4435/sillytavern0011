@@ -31,6 +31,7 @@ import { runWith429Retry } from '../utils/rateLimitRetry';
 import { MAX_AUTO_ADVANCE_FAILURE_RETRIES, runWithAutoAdvanceFailureRetry } from '../utils/autoAdvanceRetry';
 import { finalizeCurrentTurn } from '../utils/saveLoadManager';
 import { WUXIA_INPUT_HISTORY_DATA_KEY } from '../utils/inputHistory';
+import { maybeArchiveConversationSummaries } from '../utils/narrativeMemoryManager';
 import type { LatestDebugRoundPatch } from './useDebugLogs';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -878,6 +879,21 @@ export function useMessageHandler({
 
           messageLogger.log('✅ [步骤 5] 前端状态已更新');
           messageLogger.log('注意: React 状态更新是异步的，新值将在下次渲染时生效');
+
+          if (summarySettings.conversationArchiveEnabled && summarySettings.conversationSummaryMode === 'card') {
+            try {
+              const archiveResult = await maybeArchiveConversationSummaries({
+                settings: summarySettings,
+                latestAssistantMessageId: assistantMessage.message_id,
+              });
+              if (archiveResult.archived) {
+                messageLogger.log('🗃️ 长期叙事记忆归档完成:', archiveResult);
+              }
+            } catch (error) {
+              // 长期摘要属于可选的上下文压缩，不得让一次归档失败反向判定正文回合失败。
+              messageLogger.warn('长期叙事记忆归档失败，本回合正文与变量仍保留:', error);
+            }
+          }
 
           // 回合成功完成（文本已生成、助手楼层已写入、extra 模式下 ERA 写入已确认）
           // → 通知事件脚本扣减线索倒计时（替代 MESSAGE_SENT 的发送即扣）。

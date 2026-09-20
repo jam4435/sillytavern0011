@@ -2094,6 +2094,48 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <span className="settings-hint-inline">按 assistant 回复数计算；默认 5 条。</span>
                 </div>
               </div>
+              <div className="settings-row">
+                <label className="settings-label">长期章节归档</label>
+                <div className="settings-control">
+                  <label className="settings-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={settings.summarySettings.conversationArchiveEnabled}
+                      onChange={e => updateSummarySetting('conversationArchiveEnabled', e.target.checked)}
+                      disabled={settings.summarySettings.conversationSummaryMode !== 'card'}
+                    />
+                    <span>用额外模型把更早逐轮摘要按批次压成章节记忆</span>
+                  </label>
+                  <span className="settings-hint-inline">
+                    仅卡内摘要模式生效；默认关闭。章节摘要写入当前聊天 stat_data，不修改历史楼层原文。
+                  </span>
+                </div>
+              </div>
+
+              <div className="settings-row">
+                <label className="settings-label">每章摘要数</label>
+                <div className="settings-control">
+                  <input
+                    type="number"
+                    min="5"
+                    max="50"
+                    value={settings.summarySettings.conversationArchiveBatchSize}
+                    onChange={e =>
+                      updateSummarySetting(
+                        'conversationArchiveBatchSize',
+                        Math.max(5, Math.min(50, parseInt(e.target.value) || 10)),
+                      )
+                    }
+                    className="settings-number-input"
+                    disabled={
+                      settings.summarySettings.conversationSummaryMode !== 'card' ||
+                      !settings.summarySettings.conversationArchiveEnabled
+                    }
+                  />
+                  <span className="settings-hint-inline">默认 10 条旧摘要压成一条章节记忆；最近全文窗口永不参与归档。</span>
+                </div>
+              </div>
+
               {conversationSummaryModeStatus && <div className="settings-hint">{conversationSummaryModeStatus}</div>}
             </SettingsCollapsibleBlock>
 

@@ -186,6 +186,8 @@ describe('settingsManager ui theme', () => {
     const defaults = createDefaultDisplaySettings().summarySettings;
     expect(defaults.conversationSummaryMode).toBe('off');
     expect(defaults.conversationSummaryRecentReplies).toBe(5);
+    expect(defaults.conversationArchiveEnabled).toBe(false);
+    expect(defaults.conversationArchiveBatchSize).toBe(10);
 
     window.localStorage.setItem(
       'wuxia_display_settings',
@@ -193,12 +195,16 @@ describe('settingsManager ui theme', () => {
         summarySettings: {
           conversationSummaryMode: 'card',
           conversationSummaryRecentReplies: 8,
+          conversationArchiveEnabled: true,
+          conversationArchiveBatchSize: 12,
         },
       }),
     );
     const loaded = loadSettings().summarySettings;
     expect(loaded.conversationSummaryMode).toBe('card');
     expect(loaded.conversationSummaryRecentReplies).toBe(8);
+    expect(loaded.conversationArchiveEnabled).toBe(true);
+    expect(loaded.conversationArchiveBatchSize).toBe(12);
 
     window.localStorage.setItem(
       'wuxia_display_settings',
@@ -206,12 +212,14 @@ describe('settingsManager ui theme', () => {
         summarySettings: {
           conversationSummaryMode: 'invalid',
           conversationSummaryRecentReplies: 999,
+          conversationArchiveBatchSize: 1,
         },
       }),
     );
     const invalid = loadSettings().summarySettings;
     expect(invalid.conversationSummaryMode).toBe('off');
     expect(invalid.conversationSummaryRecentReplies).toBe(20);
+    expect(invalid.conversationArchiveBatchSize).toBe(5);
   });
 
   it('defaults and persists the extra-variable body cleaning rules', () => {

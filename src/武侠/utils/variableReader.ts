@@ -398,8 +398,16 @@ function stripFrontendLoaderArtifacts(messageContent: string): string {
     .trim();
 }
 
+function stripConversationSummaryBlock(messageContent: string): string {
+  if (!messageContent) return '';
+  return messageContent
+    .replace(/<summary>[\s\S]*?<\/summary>/gi, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export function normalizeDisplayedMessageContent(messageContent: string): string {
-  return stripFrontendLoaderArtifacts(stripEraVariableBlocks(messageContent));
+  return stripFrontendLoaderArtifacts(stripConversationSummaryBlock(stripEraVariableBlocks(messageContent)));
 }
 
 function resolveAssistantMessageRawContent(message: TavernChatMessage): string {

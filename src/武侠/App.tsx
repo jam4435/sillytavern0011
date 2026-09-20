@@ -55,7 +55,10 @@ import { upgradeMeridianNode } from './utils/meridianManager';
 import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inventoryAttributePreview';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
 import { applyVariableUpdateModeWorldbookState, getIsExtraVariableUpdating } from './utils/extraVariableUpdateManager';
-import { applyConversationSummaryModeState } from './utils/conversationSummaryManager';
+import {
+  applyConversationSummaryModeState,
+  installConversationSummaryPromptFilter,
+} from './utils/conversationSummaryManager';
 import {
   readLatestAssistantSnapshot,
   saveLatestAssistantSnapshot,
@@ -530,6 +533,8 @@ const App: React.FC = () => {
       }
     })();
   }, []);
+
+  useEffect(() => installConversationSummaryPromptFilter(), []);
 
   useEffect(() => {
     if (typeof window === 'undefined') {

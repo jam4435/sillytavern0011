@@ -110,6 +110,10 @@ export interface SummarySettings {
   conversationSummaryMode: ConversationSummaryMode;
   /** 卡内摘要模式保留完整正文的最近 assistant 回复数 */
   conversationSummaryRecentReplies: number;
+  /** 是否把旧逐轮摘要自动压缩为长期章节摘要 */
+  conversationArchiveEnabled: boolean;
+  /** 每个长期章节摘要包含的旧逐轮摘要数量 */
+  conversationArchiveBatchSize: number;
   /** 已保存的额外模型 API */
   apiProfiles: SummaryApiProfile[];
   /** 自动总结使用的 API */
@@ -550,6 +554,8 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   stream: false,
   conversationSummaryMode: 'off',
   conversationSummaryRecentReplies: 5,
+  conversationArchiveEnabled: false,
+  conversationArchiveBatchSize: 10,
   apiProfiles: [],
   summaryApiSelection: PRESET_SUMMARY_API_SELECTION,
   variableApiSelection: PRESET_SUMMARY_API_SELECTION,
@@ -960,6 +966,15 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       Number.isFinite(summarySettings.conversationSummaryRecentReplies)
         ? Math.max(1, Math.min(20, Math.floor(summarySettings.conversationSummaryRecentReplies)))
         : defaults.conversationSummaryRecentReplies,
+    conversationArchiveEnabled:
+      typeof summarySettings.conversationArchiveEnabled === 'boolean'
+        ? summarySettings.conversationArchiveEnabled
+        : defaults.conversationArchiveEnabled,
+    conversationArchiveBatchSize:
+      typeof summarySettings.conversationArchiveBatchSize === 'number' &&
+      Number.isFinite(summarySettings.conversationArchiveBatchSize)
+        ? Math.max(5, Math.min(50, Math.floor(summarySettings.conversationArchiveBatchSize)))
+        : defaults.conversationArchiveBatchSize,
     apiProfiles: apiProfiles.map(cloneSummaryApiProfile),
     summaryApiSelection: normalizeSummaryApiSelection(summarySettings.summaryApiSelection, profileIds, legacySelection),
     variableApiSelection: normalizeSummaryApiSelection(
