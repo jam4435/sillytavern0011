@@ -81,6 +81,48 @@ describe('useCommandQueue', () => {
     });
   });
 
+  it('事件线索指令会随下一条玩家消息发送', async () => {
+    const { result } = renderHook(() => useCommandQueue());
+    const send = vi.fn(async () => undefined);
+
+    act(() => {
+      result.current.setEventCommand(
+        'follow-up',
+        '[事件指令]剧情合理演进到 1200年8月20日17时 大宋/临安府/牛家村 射雕第三回02-旧案余波事件线索',
+      );
+    });
+
+    await act(async () => {
+      await result.current.sendMessageWithCommands('继续调查', send);
+    });
+
+    expect(send).toHaveBeenCalledWith(
+      '继续调查\n[事件指令]剧情合理演进到 1200年8月20日17时 大宋/临安府/牛家村 射雕第三回02-旧案余波事件线索',
+      { rawPlayerInput: '继续调查' },
+    );
+    expect(result.current.commands).toEqual([]);
+  });
+
+  it('新的事件线索会替换旧 EVENT 指令，但不会覆盖地图指令', () => {
+    const { result } = renderHook(() => useCommandQueue());
+
+    act(() => {
+      result.current.setTravelCommand('大宋/嘉兴府/烟雨楼', '大宋/临安府/牛家村');
+      result.current.setEventCommand('old-event', '[事件指令]旧线索');
+      result.current.setEventCommand('new-event', '[事件指令]新线索');
+    });
+
+    expect(result.current.commands).toHaveLength(2);
+    expect(result.current.commands.filter(command => command.type === 'EVENT')).toEqual([
+      expect.objectContaining({
+        type: 'EVENT',
+        text: '[事件指令]新线索',
+        data: { eventId: 'new-event' },
+      }),
+    ]);
+    expect(result.current.commands.some(command => command.type === 'TRAVEL')).toBe(true);
+  });
+
   it('玩家消息发送失败时不会递减状态效果', async () => {
     const { result } = renderHook(() => useCommandQueue());
     const send = vi.fn(async () => {
