@@ -51,6 +51,7 @@ vi.mock('./era-event-operations.js', () => ({
   persistRelativeEventRebase: vi.fn(),
   areEventPredecessorsCompleted: vi.fn(() => true),
   cleanupFollowupCluesForActiveParticipation: vi.fn(),
+  cleanupFrontendEventClueArchiveByState: vi.fn(),
   cleanupInvalidParticipationEntries: cleanupInvalidParticipationEntriesMock,
 }));
 
