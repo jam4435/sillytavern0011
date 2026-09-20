@@ -975,6 +975,87 @@ export function useVariableChangeTracker() {
     });
   }, [mutateSummary]);
 
+  const replaceActiveAssistantReply = useCallback((
+    rawReply: string,
+    assistantMessageId: number | undefined,
+    reason: 'assistant-swipe' | 'latest-reply-editor',
+    deferCapture = false,
+  ) => {
+    const activeTurn = activeTurnRef.current;
+    if (!activeTurn) {
+      return;
+    }
+
+    const turnId = activeTurn.turnId;
+    activeTurn.assistantReplyLocked = true;
+    activeTurn.assistantDeclaredReply = rawReply;
+    activeTurn.extraDeclaredBlocks = '';
+    activeTurn.lastStatData = activeTurn.baselineStatData;
+    activeTurn.batchSequence = 0;
+    if (assistantMessageId !== undefined) {
+      activeTurn.assistantMessageId = assistantMessageId;
+      activeTurn.aiWriteTargetIds = [assistantMessageId];
+    } else {
+      activeTurn.aiWriteTargetIds = [];
+    }
+
+    mutateSummary(summary => rebuildSummary({
+      ...summary,
+      status: activeTurn.baselineStatData ? 'reply-recorded' : 'error',
+      thoughts: [],
+      parseErrors: [],
+      topLevelGroups: [],
+      aiReply: {
+        declaredChanges: [],
+        observedChanges: [],
+        comparisons: [],
+        omittedDeclaredCount: 0,
+        omittedObservedCount: 0,
+        omittedComparisonCount: 0,
+      },
+      background: {
+        observedChanges: [],
+        omittedObservedCount: 0,
+      },
+      batches: [],
+      declaredChanges: [],
+      actualChanges: [],
+      omittedDeclaredCount: 0,
+      omittedActualCount: 0,
+    }, activeTurn));
+
+    if (rawReply.trim()) {
+      refreshDeclaredChanges('assistant-reply', rawReply, assistantMessageId);
+    }
+
+    const captureReplacement = () => {
+      const currentTurn = activeTurnRef.current;
+      if (!currentTurn || currentTurn.turnId !== turnId) {
+        return;
+      }
+      captureCurrentSnapshot({
+        origin: 'ai',
+        producer: 'message-boundary',
+        reason,
+        assistantMessageId,
+        aiOnlyDeclaredMatches: true,
+      });
+    };
+
+    if (deferCapture) {
+      window.setTimeout(captureReplacement, STALE_WRITE_DONE_RETRY_DELAY_MS);
+    } else {
+      captureReplacement();
+    }
+  }, [captureCurrentSnapshot, mutateSummary, refreshDeclaredChanges]);
+
+  const handleVariableAssistantRevision = useCallback((
+    rawReply: string,
+    assistantMessageId?: number,
+  ) => {
+    replaceActiveAssistantReply(rawReply, assistantMessageId, 'latest-reply-editor');
+  }, [replaceActiveAssistantReply]);
+
   const handleVariableTurnStart = useCallback(() => {
     startTurn();
   }, [startTurn]);
@@ -1256,7 +1337,10 @@ export function useVariableChangeTracker() {
     refreshDeclaredChanges('extra-blocks', blocksText, assistantMessageId);
   }, [refreshDeclaredChanges]);
 
-  const handleVariableMessageBoundary = useCallback((messageId?: number) => {
+  const handleVariableMessageBoundary = useCallback((
+    messageId?: number,
+    options?: { replaceAssistantReply?: boolean },
+  ) => {
     const activeTurn = activeTurnRef.current;
     if (!activeTurn) {
       return;
@@ -1274,8 +1358,20 @@ export function useVariableChangeTracker() {
       resolvedMessageId: resolved.messageId ?? null,
       finalMessageId: finalMessage.messageId ?? null,
       assistantReplyLocked: activeTurn.assistantReplyLocked,
+      replaceAssistantReply: options?.replaceAssistantReply === true,
       finalMessageLength: finalMessage.content.length,
     });
+
+    if (options?.replaceAssistantReply && finalMessage.content.trim()) {
+      replaceActiveAssistantReply(
+        finalMessage.content,
+        finalMessage.messageId,
+        'assistant-swipe',
+        true,
+      );
+      return;
+    }
+
     if (finalMessage.messageId !== undefined) {
       activeTurn.assistantMessageId = finalMessage.messageId;
     }
@@ -1287,7 +1383,7 @@ export function useVariableChangeTracker() {
       producer: 'message-boundary',
       assistantMessageId: finalMessage.messageId,
     });
-  }, [captureSignal, refreshDeclaredChanges]);
+  }, [captureSignal, refreshDeclaredChanges, replaceActiveAssistantReply]);
 
   const handleEraWriteDone = useCallback((unknownDetail?: unknown) => {
     const detail = isRecord(unknownDetail) ? unknownDetail as WriteDoneLikeDetail : undefined;
@@ -1331,6 +1427,7 @@ export function useVariableChangeTracker() {
     handleVariableTurnStart,
     handleGlobalMessageSent,
     handleVariableAssistantReply,
+    handleVariableAssistantRevision,
     handleVariableExtraDeclaredBlocks,
     handleVariableMessageBoundary,
     handleEraWriteDone,
