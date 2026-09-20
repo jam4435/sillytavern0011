@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { isSameLocationScope } from '../../../shared/locationPath.js';
 import type {
   CharacterProfile,
   FactionTask,
@@ -87,10 +88,10 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
     return allSects.filter(s => s.体系类型 === categoryFilter);
   }, [allSects, categoryFilter]);
 
-  // 判定是否身处当前查看势力的主峰驻地
+  // 地点判定统一按前三层范围比较；第四层叙事场景不应阻止驻地交互。
   const isAtSectBase = useMemo(() => {
     if (!currentSectData) return false;
-    return currentLocation.trim() === currentSectData.主峰驻地.trim();
+    return isSameLocationScope(currentLocation, currentSectData.主峰驻地);
   }, [currentLocation, currentSectData]);
 
   // 按层级分组武学传承树节点
@@ -558,12 +559,18 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
                     <button
                       type="button"
                       className={`join-sect-btn ${isAtSectBase ? 'at-base' : ''}`}
-                      disabled={isBusy || isActionPending}
-                      onClick={() => handleJoinFaction(currentSectData)}
+                      disabled={isBusy || isActionPending || (!isAtSectBase && !onNavigateLocation)}
+                      onClick={() => {
+                        if (!isAtSectBase) {
+                          onNavigateLocation?.(currentSectData.主峰驻地);
+                          return;
+                        }
+                        void handleJoinFaction(currentSectData);
+                      }}
                       title={
                         isAtSectBase
                           ? '身处驻地，可向前辈行礼拜入'
-                          : `当前身处「${currentLocation}」，需前往「${currentSectData.主峰驻地}」方可正式拜入门下`
+                          : `当前身处「${currentLocation}」，先前往「${currentSectData.主峰驻地}」后方可正式拜入门下`
                       }
                     >
                       {isAtSectBase ? '拜入门派 / 投身麾下' : '前往山门拜师'}
