@@ -26,7 +26,7 @@
  */
 
 import { LOGS_PATH, SEL_PATH } from '../utils/constants';
-import { readMessageKey } from './key/mk';
+import { readMessageKey, readMessageKeyFromContent } from './key/mk';
 import { findLastAiMessage } from '../utils/message';
 import { rollbackByMk } from './rollback';
 import { getEraData, updateEraMetaData } from '../utils/era_data';
@@ -65,6 +65,90 @@ const checkEditLogsAreEmpty = (mks: (string | null)[]): boolean => {
   }
   return true; // 所有 log 都为空
 };
+
+/**
+ * 收集当前聊天中仍可访问的全部 MK。
+ * 除当前 SelectedMks 外，还保留每条消息所有非当前 swipe 的 MK，避免把真正的备选回复日志误判为垃圾。
+ */
+export function collectReachableMessageKeys(
+  messages: any[],
+  selectedMks: (string | null | undefined)[] = [],
+): Set<string> {
+  const reachable = new Set<string>();
+
+  selectedMks.forEach(mk => {
+    if (typeof mk === 'string' && mk) {
+      reachable.add(mk);
+    }
+  });
+
+  for (const message of Array.isArray(messages) ? messages : []) {
+    const activeMk = readMessageKey(message);
+    if (activeMk) {
+      reachable.add(activeMk);
+    }
+
+    if (Array.isArray(message?.swipes)) {
+      for (const swipeText of message.swipes) {
+        const swipeMk = readMessageKeyFromContent(swipeText);
+        if (swipeMk) {
+          reachable.add(swipeMk);
+        }
+      }
+    }
+
+    // 兼容某些宿主返回 mes/message 与 swipes 不完全同步的结构。
+    const mesMk = readMessageKeyFromContent(message?.mes);
+    const messageMk = readMessageKeyFromContent(message?.message);
+    if (mesMk) reachable.add(mesMk);
+    if (messageMk) reachable.add(messageMk);
+  }
+
+  return reachable;
+}
+
+/**
+ * 从元数据中删除已经不属于任何当前消息、任何备用 swipe、也不在 SelectedMks 中的 EditLog。
+ * 返回被删除的 MK，便于调试和测试。
+ */
+export function pruneUnreachableEditLogs(
+  meta: any,
+  messages: any[],
+  selectedMks: (string | null | undefined)[] = [],
+): string[] {
+  const editLogs = _.get(meta, LOGS_PATH);
+  if (!editLogs || typeof editLogs !== 'object' || Array.isArray(editLogs)) {
+    return [];
+  }
+
+  const reachable = collectReachableMessageKeys(messages, selectedMks);
+  const removed: string[] = [];
+  for (const mk of Object.keys(editLogs)) {
+    if (!reachable.has(mk)) {
+      delete editLogs[mk];
+      removed.push(mk);
+    }
+  }
+  return removed;
+}
+
+async function updateSelectedMksAndPruneEditLogs(
+  messages: any[],
+  selectedMks: (string | null)[],
+): Promise<void> {
+  let removedMks: string[] = [];
+  await updateEraMetaData(meta => {
+    _.set(meta, SEL_PATH, selectedMks);
+    removedMks = pruneUnreachableEditLogs(meta, messages, selectedMks);
+    return meta;
+  });
+  if (removedMks.length > 0) {
+    logger.log(
+      'resyncStateOnHistoryChange',
+      `已清理 ${removedMks.length} 个不可达 EditLog: [${removedMks.join(', ')}]`,
+    );
+  }
+}
 
 /**
  * 当聊天记录发生变化（删除、切换分支）时，重新同步状态的核心函数
@@ -145,11 +229,8 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
       for (let i = 0; i < allMessages.length; i++) {
         newSelectedMks[i] = getMkFromMsg(allMessages[i]);
       }
-      await updateEraMetaData(meta => {
-        _.set(meta, SEL_PATH, newSelectedMks);
-        return meta;
-      });
-      logger.log('resyncStateOnHistoryChange', '快速同步完成，仅修正 SelectedMks 数组。');
+      await updateSelectedMksAndPruneEditLogs(allMessages, newSelectedMks);
+      logger.log('resyncStateOnHistoryChange', '快速同步完成，已修正 SelectedMks 并清理不可达 EditLog。');
       return;
     }
   }
@@ -170,9 +251,10 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
     }
     if (firstRecalcId === -1) {
       logger.log('resyncStateOnHistoryChange', '所有MK均匹配，无需重算。');
+      // 即使主干没有变化，也可安全清理已经不属于任何消息/备用 swipe 的历史孤儿日志。
+      await updateSelectedMksAndPruneEditLogs(allMessages, oldSelectedMks);
       // N.B. 在当前架构下，MK 已被直接写入消息内容，与内容强绑定。
       // 因此，任何导致内容变化的操作（如 swipe）也必然会导致 MK 的变化。
-      // 这意味着，如果 MK 序列完全匹配，那么内容也必然完全匹配，无需进行任何重算或保险性检查。
       return; // 直接返回，终止同步。
     } else {
       logger.log('resyncStateOnHistoryChange', `找到最早的不匹配点于 message_id=${firstRecalcId}。将从该点开始重算。`);
@@ -214,11 +296,8 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
   }
   logger.log('resyncStateOnHistoryChange', '顺序重算完成。');
 
-  // 5. 更新 SelectedMks 数组
-  await updateEraMetaData(meta => {
-    _.set(meta, SEL_PATH, newSelectedMks);
-    return meta;
-  });
+  // 5. 更新 SelectedMks，并在同步成功后只清理真正不可达的 EditLog。
+  await updateSelectedMksAndPruneEditLogs(allMessages, newSelectedMks);
   logger.log('resyncStateOnHistoryChange', '状态同步完成。');
 
   // ==================================================================

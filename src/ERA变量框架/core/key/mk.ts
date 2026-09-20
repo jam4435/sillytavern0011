@@ -85,6 +85,14 @@ function parseEraData(messageContent: string | null | undefined): EraData | null
 // ==================================================================
 
 /**
+ * 从任意一段消息文本中读取 MK。
+ * 用于需要扫描非当前 swipe 的场景；不会修改消息，也不会创建新 MK。
+ */
+export function readMessageKeyFromContent(messageContent: string | null | undefined): string {
+  return parseEraData(messageContent)?.['era-message-key'] || '';
+}
+
+/**
  * **【读取 MK】** 从一个消息对象中只读地提取其消息密钥（MK）。
  * 这个函数经过特别优化，以应对滑动（swipe）等场景下消息对象结构不一致的问题。
  * 它会全面检查消息的 `mes`、`message` 以及 `swipes` 数组中的每一个元素，直到找到第一个有效的 MK 为止。
@@ -97,7 +105,7 @@ export function readMessageKey(msg: any): string {
   // 核心逻辑：始终且仅根据 getMessageContent 的结果来解析 MK。
   const content = getMessageContent(msg);
 
-  const mk = parseEraData(content)?.['era-message-key'] || '';
+  const mk = readMessageKeyFromContent(content);
 
   // 移除遍历其他 swipes 的错误逻辑。如果当前激活的内容没有 MK，就必须返回空字符串，
   // 以强制 ensureMessageKey 生成新的 MK。

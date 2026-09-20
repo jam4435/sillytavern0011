@@ -133,8 +133,9 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
           'ApplyVarChangeForMessage',
           `准备为 MK=${MK} (MsgID=${messageId}) 写入 EditLog:\n${JSON.stringify(newArr, null, 2)}`,
         );
-        // 将本轮生成的日志数组，以当前消息的 MK 为键，存入 `EditLogs` 对象。
-        _.set(meta, [LOGS_PATH, MK], JSON.stringify(newArr));
+        // 直接保存原生数组，避免在聊天 JSON 中再次把整段日志转义成 JSON 字符串。
+        // parseEditLog 同时兼容旧字符串格式，因此无需强制迁移旧存档。
+        _.set(meta, [LOGS_PATH, MK], _.cloneDeep(newArr));
         /*
          * N.B. 此函数不再负责更新 SelectedMks 数组。
          * 更新 SelectedMks 的职责已移交至上层调用者 (resyncStateOnHistoryChange 或 ApplyVarChange)，

@@ -107,10 +107,17 @@ export async function applyEditAtLevel(
     }
 
     const cleaned = sanitizeArrays(valNew); // 清理新值
+    const currentValue = _.get(statData, subPath);
 
-    // b. 记录编辑意图
-    // 即使新旧值相同，也记录 EditLog，以完整反映作者的编辑意图。
-    // 这对于调试和历史追溯非常有用。
+    // b. 跳过真正的无状态变化写入。
+    // 时间变量仍可由模型完整声明“年/月/日/时/分”五字段，但 ERA 只为实际变化的字段生成日志。
+    // 比较当前 stat_data 而不是历史 valOld，可正确处理同一消息内对同一路径的连续编辑。
+    if (_.isEqual(currentValue, cleaned)) {
+      logger.debug('applyEditAtLevel', `VariableEdit 无实际变化，跳过 EditLog -> ${subPath}`);
+      intraMessageState.set(subPath, _.cloneDeep(cleaned));
+      continue;
+    }
+
     _.set(statData, subPath, cleaned);
     editLog.push({
       op: 'update',
