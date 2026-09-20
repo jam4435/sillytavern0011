@@ -122,6 +122,58 @@ describe('FactionPanel Component', () => {
     });
   });
 
+  it('第四层场景仍按前三层判定为身处门派驻地', async () => {
+    const rogueStats: CharacterProfile = {
+      ...mockStats,
+      factions: undefined,
+      identities: {},
+    };
+    const handleSendMessage = vi.fn(async () => '');
+    const handleClaimTask = vi.fn(async () => {});
+    const handleNavigateLocation = vi.fn();
+
+    render(
+      <FactionPanel
+        stats={rogueStats}
+        currentLocation="大宋/终南山/重阳宫/三清殿"
+        tasks={{}}
+        onSendMessage={handleSendMessage}
+        onClaimTask={handleClaimTask}
+        onNavigateLocation={handleNavigateLocation}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '拜入门派 / 投身麾下' }));
+    await waitFor(() => expect(handleSendMessage).toHaveBeenCalledTimes(1));
+    expect(handleNavigateLocation).not.toHaveBeenCalled();
+  });
+
+  it('不在驻地时只创建导航，不会远程直接拜师', () => {
+    const rogueStats: CharacterProfile = {
+      ...mockStats,
+      factions: undefined,
+      identities: {},
+    };
+    const handleSendMessage = vi.fn(async () => '');
+    const handleClaimTask = vi.fn(async () => {});
+    const handleNavigateLocation = vi.fn();
+
+    render(
+      <FactionPanel
+        stats={rogueStats}
+        currentLocation="大宋/临安府/牛家村"
+        tasks={{}}
+        onSendMessage={handleSendMessage}
+        onClaimTask={handleClaimTask}
+        onNavigateLocation={handleNavigateLocation}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '前往山门拜师' }));
+    expect(handleNavigateLocation).toHaveBeenCalledWith('大宋/终南山/重阳宫');
+    expect(handleSendMessage).not.toHaveBeenCalled();
+  });
+
   it('散修玩家默认展示【天下势力鉴赏】视图', () => {
     const rogueStats: CharacterProfile = {
       ...mockStats,
