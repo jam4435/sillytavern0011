@@ -77,6 +77,7 @@ interface UseMessageHandlerOptions {
   onVariableAssistantReply?: (rawReply: string, assistantMessageId?: number) => void;
   onVariableExtraDeclaredBlocks?: (blocksText: string, assistantMessageId?: number) => void;
   onVariableAiWriteTarget?: (assistantMessageId: number) => void;
+  onAssistantDisplayCommit?: (assistantMessageId: number, assistantSwipeId: number) => void;
 }
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
@@ -360,6 +361,7 @@ export function useMessageHandler({
   onVariableAssistantReply,
   onVariableExtraDeclaredBlocks,
   onVariableAiWriteTarget,
+  onAssistantDisplayCommit,
 }: UseMessageHandlerOptions) {
   const refreshAssistantStateFromFinalText = useCallback(
     (finalText: string) => {
@@ -779,6 +781,9 @@ export function useMessageHandler({
 
           setCurrentMaintext(maintext);
           setCurrentOptions(replyOptions);
+          if (assistantMessage?.message_id !== undefined) {
+            onAssistantDisplayCommit?.(assistantMessage.message_id, assistantMessage.swipe_id ?? 0);
+          }
 
           patchLatestDebugRound({
             main: {
@@ -983,6 +988,7 @@ export function useMessageHandler({
       onVariableTurnStart,
       onVariableAssistantReply,
       onVariableAiWriteTarget,
+      onAssistantDisplayCommit,
       refreshAssistantStateFromFinalText,
     ],
   );
@@ -1098,6 +1104,7 @@ export function useMessageHandler({
       });
       setCurrentMaintext(result.maintext);
       setCurrentOptions(result.options);
+      onAssistantDisplayCommit?.(result.assistantMessageId, result.assistantSwipeId);
 
       let committedVariableBlocks = result.rawReply;
       if (extraVariableDecision.shouldRunExtra) {
