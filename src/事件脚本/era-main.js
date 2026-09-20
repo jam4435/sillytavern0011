@@ -329,6 +329,7 @@
       const eventsToStart = [];
       const earlyEventsToStart = [];
       const debutEventsToComplete = [];
+      const historicalEventsToComplete = [];
       const eventsToExpire = [];
 
       for (const eventName of 未发生列表) {
@@ -344,7 +345,17 @@
           eventData &&
           isTimeForEvent(currentTime, effectiveEventData, eventName, variables.stat_data, eventDefinitions);
 
-        if (triggerSatisfied && locationSatisfied) {
+        if (
+          eventData &&
+          !isDebutEvent(eventData) &&
+          !hasRuntimeTriggerOverride &&
+          isPureTimeTrigger(eventData.触发条件) &&
+          eventData.事件结束时间 &&
+          isTimeAfterEventEnd(currentTime, eventData.事件结束时间)
+        ) {
+          historicalEventsToComplete.push(eventName);
+          log(`历史纯时间事件 ${eventName} 已完整错过窗口，将直接补做历史结算，不进入进行中状态`);
+        } else if (triggerSatisfied && locationSatisfied) {
           if (isDebutEvent(eventData)) {
             logSuccess(`登场事件 ${eventName} 触发条件满足，将直接完成！`);
             debutEventsToComplete.push(eventName);
@@ -380,13 +391,23 @@
         debugGroupEnd();
       }
 
-      const definitionsToHydrate = [...new Set([...eventsToStart, ...earlyEventsToStart, ...debutEventsToComplete])];
+      const definitionsToHydrate = [
+        ...new Set([...eventsToStart, ...earlyEventsToStart, ...debutEventsToComplete, ...historicalEventsToComplete]),
+      ];
       if (definitionsToHydrate.length > 0 && eventManifest) {
         Object.assign(eventDefinitions, await loadEventDefinitions(definitionsToHydrate));
       }
 
       if (eventsToExpire.length > 0) {
         await batchExpireEvents(eventsToExpire, eventDefinitions);
+      }
+
+      if (historicalEventsToComplete.length > 0) {
+        log(`📚 发现 ${historicalEventsToComplete.length} 个已错过完整时间窗的历史事件，直接补做终态结算:`, historicalEventsToComplete);
+        await batchEndEvents(historicalEventsToComplete, eventDefinitions, {
+          deleteUnstarted: true,
+          silent: true,
+        });
       }
 
       // 同一三级地点在同一检查周期命中的事件只启动最早一个。其余事件不进入
