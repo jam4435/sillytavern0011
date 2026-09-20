@@ -41,6 +41,32 @@ function firstTemplateFor(
   return matches[0].templates[0];
 }
 
+describe('NewGameSetup trait and identity structure', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('属性触发特质只展示一处', () => {
+    renderSetup();
+    fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
+    fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
+
+    const autoTraitSections = Array.from(document.querySelectorAll('.traits-step .section-title')).filter(element =>
+      element.textContent?.includes('属性触发天赋'),
+    );
+    expect(autoTraitSections).toHaveLength(1);
+    expect(screen.queryByText('先天属性禀赋 (自然觉醒)')).not.toBeInTheDocument();
+  });
+
+  it('身份步骤不再提供独立宗门选择', () => {
+    renderSetup();
+    goToIdentityStep();
+
+    expect(screen.queryByText('拜入宗门与势力')).not.toBeInTheDocument();
+    expect(screen.queryByText('江湖散修')).not.toBeInTheDocument();
+  });
+});
+
 describe('NewGameSetup avatar selection', () => {
   beforeEach(() => {
     localStorage.clear();
