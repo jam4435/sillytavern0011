@@ -208,6 +208,7 @@ const App: React.FC = () => {
     handleVariableTurnStart,
     handleGlobalMessageSent,
     handleVariableAssistantReply,
+    handleVariableAssistantRevision,
     handleVariableExtraDeclaredBlocks,
     handleVariableMessageBoundary,
     handleEraWriteDone,
@@ -243,8 +244,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleAppMessageBoundary = useCallback(
-    (messageId?: number) => {
-      handleVariableMessageBoundary(messageId);
+    (
+      messageId?: number,
+      reason?: 'received' | 'swiped' | 'updated' | 'chat-changed',
+    ) => {
+      handleVariableMessageBoundary(messageId, {
+        replaceAssistantReply: reason === 'swiped',
+      });
       refreshRecentInputHistory();
     },
     [handleVariableMessageBoundary, refreshRecentInputHistory],
@@ -638,6 +644,7 @@ const App: React.FC = () => {
       }
 
       const result = await saveLatestAssistantSnapshot(snapshot, draftText);
+      handleVariableAssistantRevision(result.finalText, snapshot.messageId);
       const warnings: string[] = [];
       try {
         const displayText = normalizeDisplayedMessageContent(result.finalText) || result.finalText;
@@ -687,7 +694,14 @@ const App: React.FC = () => {
         warning: warnings.length > 0 ? warnings.join('；') : undefined,
       };
     },
-    [historyMutationPending, isLoading, refreshGameStateFromVariables, setCurrentMaintext, setCurrentOptions],
+    [
+      handleVariableAssistantRevision,
+      historyMutationPending,
+      isLoading,
+      refreshGameStateFromVariables,
+      setCurrentMaintext,
+      setCurrentOptions,
+    ],
   );
 
   const handleInventoryItemAction = useCallback(
