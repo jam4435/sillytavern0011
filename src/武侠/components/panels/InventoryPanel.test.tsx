@@ -89,6 +89,25 @@ describe('InventoryPanel', () => {
     expect(screen.getByRole('button', { name: '条件未满足' })).toBeDisabled();
   });
 
+  it('条件满足时参悟按钮可执行真实 item action', async () => {
+    const onItemAction = vi.fn(async () => undefined);
+    render(
+      <InventoryPanel
+        items={items}
+        initialAttributes={{ ...initialAttributes, 悟性: 15 }}
+        onItemAction={onItemAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '查看九阳神功' }));
+    expect(screen.getByText('条件已满足')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '参悟' }));
+    await waitFor(() => {
+      expect(onItemAction).toHaveBeenCalledWith(expect.objectContaining({ name: '九阳神功', type: 'SECRET' }));
+    });
+  });
+
   it('已经习得秘籍时明确显示无需重复参悟', () => {
     const knownMartialArts: Record<string, MartialArt> = {
       九阳神功: {
