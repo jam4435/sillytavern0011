@@ -149,6 +149,88 @@ describe('getGameVariables ERA 展示投影', () => {
     expect(npc?.template.martialArts?.全真剑法.martialArtsDescription).toBe("如'白虹经天'。");
   });
 
+  it('优先把前端事件线索档案投影为长期线索，并与三回合 AI 线索去重', () => {
+    const eventName = '射雕第二十九回04-锦囊求医';
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1220, 月: 12, 日: 20, 时: 10 } },
+        user数据: {
+          用户名: '玩家',
+          性别: '男',
+          境界: '不入流',
+          所在位置: '大宋/川边/黑沼',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+        },
+        事件系统: {
+          未发生事件: { [eventName]: {} },
+          进行中事件: {},
+          已完成事件: {},
+          已失效事件: {},
+        },
+        前端变量: {
+          事件线索档案: {
+            [eventName]: {
+              来源事件: '射雕第二十九回03-瑛姑试探',
+              线索: '瑛姑似乎愿意为黄蓉指一条生路。',
+              开始时间: { 年: 1220, 月: 12, 日: 22, 时: 10 },
+              结束时间: { 年: 1220, 月: 12, 日: 22, 时: 12 },
+              地点: '大宋/川边/黑沼',
+            },
+          },
+        },
+        后续事件线索: {
+          [eventName]: '开始：1220年12月22日10时｜地点：大宋/川边/黑沼｜可能会发生的事件脉络：旧短期线索',
+        },
+        后续事件线索计数: { [eventName]: 1 },
+      },
+    });
+
+    const state = readGameDataSync();
+    const matchingEvents = state?.events?.filter(event => event.title.includes('锦囊求医')) || [];
+    expect(matchingEvents).toHaveLength(1);
+    expect(matchingEvents[0]).toMatchObject({
+      type: 'AFTERMATH',
+      description: '瑛姑似乎愿意为黄蓉指一条生路。',
+      location: '大宋/川边/黑沼',
+      timeText: '1220年12月22日10时',
+      startsInDays: 2,
+    });
+    expect(matchingEvents[0].remainingTurns).toBeUndefined();
+  });
+
+  it('目标事件已经进入进行中时立即隐藏长期线索', () => {
+    const eventName = '射雕第二十九回04-锦囊求医';
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1220, 月: 12, 日: 22, 时: 10 } },
+        user数据: {
+          用户名: '玩家',
+          性别: '男',
+          境界: '不入流',
+          所在位置: '大宋/川边/黑沼',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+        },
+        事件系统: {
+          进行中事件: { [eventName]: { 年: 1220, 月: 12, 日: 22, 时: 12 } },
+          已完成事件: {},
+          已失效事件: {},
+        },
+        前端变量: {
+          事件线索档案: {
+            [eventName]: {
+              线索: '这条线索不应再出现在未来线索栏。',
+              开始时间: { 年: 1220, 月: 12, 日: 22, 时: 10 },
+              地点: '大宋/川边/黑沼',
+            },
+          },
+        },
+      },
+    });
+
+    const state = readGameDataSync();
+    expect(state?.events?.some(event => event.type === 'AFTERMATH' && event.title.includes('锦囊求医'))).toBe(false);
+  });
+
   it('将全域可发现事件投影为带开始倒计时和地点的唯一风闻', () => {
     const eventName = '射雕第一回03-远方风波';
     const rumor = '临安府近来暗流涌动。 [1200年8月20日11时/大宋/临安府/牛家村]';

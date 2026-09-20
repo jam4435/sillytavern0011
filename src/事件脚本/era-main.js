@@ -18,8 +18,6 @@
     isDebugEnabled,
     hasParticipationEntry,
     isDebutEvent,
-    isEventKind,
-    EVENT_KIND,
     formatDate,
     attachEventMetadata,
     deriveEventRuntimeDescriptor,
@@ -27,7 +25,8 @@
   const { wuxiaCalendarTimeToTotalHours } = await import('../shared/wuxiaCalendar.js');
   const { loadEventDefinitions, loadEventDefinitionsFromWorldbook, loadEventManifest, loadEventCheckpointAtOrBefore } =
     await import('./era-event-loader.js');
-  const { isTimeForEvent, isEventDiscoverable, isTimeAfterEventEnd } = await import('./era-event-checker.js');
+  const { isTimeForEvent, isEventDiscoverable, isTimeAfterEventEnd, isEventStartLocationSatisfied } =
+    await import('./era-event-checker.js');
   const { getSingleConditionTimeAnchor, isPureTimeTrigger } = await import('./era-event-schema.js');
   const {
     initializeEventList,
@@ -340,14 +339,12 @@
           isPlainObject(triggerCondition) && JSON.stringify(triggerCondition) !== JSON.stringify(eventData?.触发条件);
 
         debugGroupCollapsed(`检查事件: ${eventName}`);
-        const isEncounter = isEventKind(eventData, EVENT_KIND.ENCOUNTER);
-        const encounterLocationSatisfied =
-          !isEncounter || isSameLocationScope(playerLocation, eventData?.事件地点);
+        const locationSatisfied = isEventStartLocationSatisfied(eventData, playerLocation);
         const triggerSatisfied =
           eventData &&
           isTimeForEvent(currentTime, effectiveEventData, eventName, variables.stat_data, eventDefinitions);
 
-        if (triggerSatisfied && encounterLocationSatisfied) {
+        if (triggerSatisfied && locationSatisfied) {
           if (isDebutEvent(eventData)) {
             logSuccess(`登场事件 ${eventName} 触发条件满足，将直接完成！`);
             debutEventsToComplete.push(eventName);
@@ -374,7 +371,7 @@
           eventsToExpire.push(eventName);
           log(`条件事件 ${eventName} 已越过绝对窗口，将归档为失效`);
         } else {
-          if (isEncounter && triggerSatisfied && !encounterLocationSatisfied) {
+          if (triggerSatisfied && !locationSatisfied) {
             log(`奇遇事件 ${eventName} 属性/条件满足，但玩家不在同一三级地点，拒绝触发`);
           } else {
             log(`事件 ${eventName} 触发条件不满足`);

@@ -113,6 +113,23 @@ describe('EventsPanel', () => {
     expect(screen.getByText('襄阳战报')).toBeInTheDocument();
   });
 
+  it('后续线索可通过按钮请求演进至目标事件', () => {
+    const onAdvanceToEvent = vi.fn();
+    const followupEvent: GameEvent = {
+      id: 'follow-up-target',
+      title: '射雕第二十九回04-锦囊求医',
+      type: 'AFTERMATH',
+      description: '瑛姑似乎愿意为黄蓉指一条生路。',
+      timeText: '1220年12月22日10时',
+      location: '大宋/川边/黑沼',
+    };
+
+    render(<EventsPanel events={[followupEvent]} onAdvanceToEvent={onAdvanceToEvent} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '演进至此事件 ›' }));
+    expect(onAdvanceToEvent).toHaveBeenCalledWith(followupEvent);
+  });
+
   it('defaults to the first nonempty tab when no current event exists', () => {
     render(<EventsPanel events={[events[2]]} chronicle={chronicle} />);
 

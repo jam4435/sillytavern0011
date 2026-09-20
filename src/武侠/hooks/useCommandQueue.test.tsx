@@ -81,6 +81,42 @@ describe('useCommandQueue', () => {
     });
   });
 
+  it('事件演进指令会带上目标时间、地点和已知线索并随下一条消息发送', async () => {
+    const { result } = renderHook(() => useCommandQueue());
+    const send = vi.fn(async () => undefined);
+
+    act(() => {
+      result.current.addEventAdvanceCommand({
+        id: 'followup-test',
+        title: '射雕第二十九回04-锦囊求医',
+        type: 'AFTERMATH',
+        description: '瑛姑似乎愿意为黄蓉指一条生路。',
+        timeText: '1220年12月22日10时',
+        location: '大宋/川边/黑沼',
+      });
+    });
+
+    expect(result.current.commands).toHaveLength(1);
+    expect(result.current.commands[0]).toMatchObject({
+      type: 'EVENT_ADVANCE',
+      data: {
+        eventName: '射雕第二十九回04-锦囊求医',
+        eventTime: '1220年12月22日10时',
+        eventLocation: '大宋/川边/黑沼',
+        eventClue: '瑛姑似乎愿意为黄蓉指一条生路。',
+      },
+    });
+
+    await act(async () => {
+      await result.current.sendMessageWithCommands('继续', send);
+    });
+
+    expect(send).toHaveBeenCalledWith(
+      '继续\n[事件指令]剧情合理演进到 1220年12月22日10时 大宋/川边/黑沼 瑛姑似乎愿意为黄蓉指一条生路。',
+      { rawPlayerInput: '继续' },
+    );
+  });
+
   it('玩家消息发送失败时不会递减状态效果', async () => {
     const { result } = renderHook(() => useCommandQueue());
     const send = vi.fn(async () => {
