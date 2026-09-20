@@ -36,6 +36,22 @@ export function useCommandQueue() {
     uiLogger.log('[useCommandQueue] 设置地图指令:', command);
   }, []);
 
+  /** 设置唯一的事件演进指令；新线索会替换旧线索，避免一次发送多个目标事件。 */
+  const setEventCommand = useCallback((eventId: string, commandText: string) => {
+    const command: PendingCommand = {
+      id: `event_${Date.now()}_${Math.random()}`,
+      type: 'EVENT' as CommandType,
+      text: commandText,
+      data: {
+        eventId,
+      },
+      timestamp: Date.now(),
+    };
+
+    setCommands(previous => [...previous.filter(item => item.type !== 'EVENT'), command]);
+    uiLogger.log('[useCommandQueue] 设置事件演进指令:', command);
+  }, []);
+
   /** 添加物品/装备指令，并保存撤销所需数据。 */
   const addUseItemCommand = useCallback((commandText: string, data: PendingCommand['data']) => {
     const command: PendingCommand = {
@@ -136,6 +152,7 @@ export function useCommandQueue() {
   return {
     commands,
     setTravelCommand,
+    setEventCommand,
     addUseItemCommand,
     cancelCommand,
     sendMessageWithCommands,
