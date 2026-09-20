@@ -40,6 +40,7 @@ export interface RegenerateResult {
   options: string[];
   gameData: Partial<GameState> | null;
   assistantMessageId: number;
+  assistantSwipeId: number;
   userInput: string;
   combinedPrompt: string;
   rawReply: string;
@@ -424,6 +425,7 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
       options: parseOptions(maintext),
       gameData: readGameDataPure(),
       assistantMessageId: context.assistantMessage.message_id,
+      assistantSwipeId: transaction.regenerateSwipeId,
       userInput: getActiveMessageText(context.userMessage),
       combinedPrompt,
       rawReply: rawResultText,
