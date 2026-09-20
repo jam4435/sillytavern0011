@@ -43,11 +43,12 @@ describe('eventPresentation', () => {
 
   it('recognizes urgent countdowns without treating ordinary rumors as urgent', () => {
     expect(isEventUrgent(event({ type: 'ACTIVE', remainingDays: 3 }))).toBe(true);
-    expect(isEventUrgent(event({ type: 'AFTERMATH', remainingTurns: 1 }))).toBe(true);
+    expect(isEventUrgent(event({ type: 'AFTERMATH', remainingTurns: 1 }))).toBe(false);
     expect(isEventUrgent(event({ type: 'ACTIVE', remainingDays: 4 }))).toBe(false);
     expect(isEventUrgent(event({ type: 'RUMOR', startsInDays: 3 }))).toBe(true);
     expect(isEventUrgent(event({ type: 'RUMOR' }))).toBe(false);
     expect(getEventCountdownLabel(event({ type: 'RUMOR', startsInDays: 10 }))).toBe('10日后');
+    expect(getEventCountdownLabel(event({ type: 'AFTERMATH', remainingTurns: 1 }))).toBeNull();
   });
 
   it('keeps the agreed tracker priority while preserving order within a tie', () => {
