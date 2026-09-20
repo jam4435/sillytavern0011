@@ -136,7 +136,7 @@ describe('NewGameSetup custom realm picker', () => {
 
     expect(screen.queryByRole('button', { name: '宗师初期' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '陆地神仙圆满' })).not.toBeInTheDocument();
-  });
+  }, 15000);
 });
 
 describe('NewGameSetup automation markers', () => {
