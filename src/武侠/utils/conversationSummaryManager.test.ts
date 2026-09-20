@@ -18,6 +18,7 @@ describe('conversationSummaryManager', () => {
     const chat = [
       { role: 'system' as const, content: '设定' },
       { role: 'user' as const, content: '旧用户1' },
+      { role: 'system' as const, content: '夹在对话之间的深度世界书' },
       { role: 'assistant' as const, content: '<summary>旧摘要1</summary>' },
       { role: 'user' as const, content: '旧用户2' },
       { role: 'assistant' as const, content: '<summary>旧摘要2</summary>' },
@@ -26,6 +27,7 @@ describe('conversationSummaryManager', () => {
     expect(filterArchivedSummariesFromPrompt(chat, 2)).toBe(4);
     expect(chat).toEqual([
       { role: 'system', content: '设定' },
+      { role: 'system', content: '夹在对话之间的深度世界书' },
       { role: 'user', content: '当前用户' },
     ]);
   });

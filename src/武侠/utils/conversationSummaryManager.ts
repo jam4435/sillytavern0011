@@ -193,9 +193,11 @@ export function filterArchivedSummariesFromPrompt(
         removeIndices.add(previous);
         break;
       }
-      if (chat[previous].role === 'assistant' || chat[previous].role === 'system') {
+      if (chat[previous].role === 'assistant') {
         break;
       }
+      // 世界书/深度条目可能以 system 消息夹在一组 user→assistant 之间；继续向前找配对 user。
+      // tool/system 本身不属于需要删除的历史对话楼层。
     }
     remaining -= 1;
   }
@@ -224,10 +226,10 @@ export async function applyConversationSummaryModeState(
   mode:ConversationSummaryMode,
   recentReplies=DEFAULT_CONVERSATION_SUMMARY_RECENT_REPLIES,
 ):Promise<string>{
-  activeConversationSummaryMode=mode;
   const cardMode=mode==='card';
   const entryChanged=await setSummaryEntryEnabled(cardMode);
   await applyOwnRegexes(cardMode,recentReplies);
+  activeConversationSummaryMode=mode;
   if(mode==='card'){
     return entryChanged
       ? `已启用并同步「${CONVERSATION_SUMMARY_ENTRY_NAME}」，最近 ${clampRecentReplies(recentReplies)} 条回复保留全文，更早回复仅保留逐轮摘要；已归档摘要会在最终提示词阶段裁掉。`
