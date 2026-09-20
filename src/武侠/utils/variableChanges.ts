@@ -158,6 +158,7 @@ export interface VariableChangeSummary {
 
 const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
 const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/gi;
+const VARIABLE_BLOCK_TAGS = ['VariableThink', 'VariableInsert', 'VariableEdit', 'VariableDelete'] as const;
 export const MAX_STORED_VARIABLE_CHANGES = 100;
 
 const ACTION_BY_BLOCK_TAG: Record<'VariableInsert' | 'VariableEdit' | 'VariableDelete', VariableChangeAction> = {
@@ -241,7 +242,7 @@ const getVisibleEntries = (value: unknown): Array<[string | number, unknown]> =>
 };
 
 const getVariablePathId = (path: VariablePath): string =>
-  path.map(segment => String(segment)).join('.');
+  JSON.stringify(path);
 
 const getVariableBlockId = (
   source: VariableChangeSource,
@@ -498,6 +499,16 @@ export function parseDeclaredVariableChanges(rawReply: string): ParsedDeclaredVa
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       parseErrors.push(`${blockTag} JSON 解析失败：${message}`);
+    }
+  }
+
+  for (const blockTag of VARIABLE_BLOCK_TAGS) {
+    const openCount = rawReply.match(new RegExp(`<${blockTag}>`, 'gi'))?.length ?? 0;
+    const closeCount = rawReply.match(new RegExp(`<\\/${blockTag}>`, 'gi'))?.length ?? 0;
+    if (openCount > closeCount) {
+      parseErrors.push(`${blockTag} 有 ${openCount - closeCount} 个标签未闭合。`);
+    } else if (closeCount > openCount) {
+      parseErrors.push(`${blockTag} 有 ${closeCount - openCount} 个多余闭合标签。`);
     }
   }
 
@@ -828,7 +839,7 @@ export function createBucketedObservedVariableChanges(
   };
 }
 
-const aggregateObservedAiChanges = (changes: VariableActualChange[]): Map<string, VariableActualChange> => {
+const aggregateObservedChanges = (changes: VariableActualChange[]): Map<string, VariableActualChange> => {
   const result = new Map<string, VariableActualChange>();
   const sortedChanges = [...changes].sort((left, right) => {
     if (left.timestamp !== right.timestamp) {
@@ -861,17 +872,20 @@ export function buildAiComparisons({
   observedChanges,
   baselineStatData,
   currentStatData,
+  backgroundObservedChanges = [],
 }: {
   declaredChanges: VariableDeclaredChange[];
   observedChanges: VariableActualChange[];
   baselineStatData: Record<string, unknown> | null;
   currentStatData: Record<string, unknown> | null;
+  backgroundObservedChanges?: VariableActualChange[];
 }): VariableAiComparisonResult {
   const comparisons: VariableAiComparison[] = [];
   const normalizedBaselineStatData = baselineStatData ? extractStatData(baselineStatData) : null;
   const normalizedCurrentStatData = currentStatData ? extractStatData(currentStatData) : null;
   const declaredByPath = new Map<string, VariableDeclaredChange>();
-  const aggregatedObserved = aggregateObservedAiChanges(observedChanges);
+  const aggregatedObserved = aggregateObservedChanges(observedChanges);
+  const aggregatedBackgroundObserved = aggregateObservedChanges(backgroundObservedChanges);
 
   for (const declaredChange of declaredChanges) {
     declaredByPath.set(getVariablePathId(declaredChange.path), declaredChange);
@@ -885,7 +899,8 @@ export function buildAiComparisons({
   for (const pathKey of pathKeys) {
     const declaredChange = declaredByPath.get(pathKey);
     const observedChange = aggregatedObserved.get(pathKey);
-    const path = declaredChange?.path ?? observedChange?.path ?? [];
+    const backgroundObservedChange = aggregatedBackgroundObserved.get(pathKey);
+    const path = declaredChange?.path ?? observedChange?.path ?? backgroundObservedChange?.path ?? [];
     const baselineValue = normalizedBaselineStatData ? getValueAtPath(normalizedBaselineStatData, path) : undefined;
     const expectedValue = declaredChange
       ? declaredChange.action === 'delete'
@@ -909,10 +924,11 @@ export function buildAiComparisons({
         ? areValuesEqual(observedChange.afterValue, expectedValue)
         : false;
       const finalMatchesExpected = areValuesEqual(finalValue, expectedValue);
+      const canUseFinalSnapshotFallback = !observedChange && !backgroundObservedChange;
 
       if (baselineMatchesExpected && !observedChange) {
         status = 'no-op';
-      } else if (observedMatchesExpected || finalMatchesExpected) {
+      } else if (observedMatchesExpected || (finalMatchesExpected && canUseFinalSnapshotFallback)) {
         status = 'applied';
       } else if (observedChange) {
         status = 'diverged';
