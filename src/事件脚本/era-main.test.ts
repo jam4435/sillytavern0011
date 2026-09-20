@@ -37,6 +37,7 @@ vi.mock('./era-event-checker.js', () => ({
   isTimeForEvent: vi.fn(() => false),
   isEventDiscoverable: vi.fn(() => false),
   isTimeAfterEventEnd: vi.fn(() => false),
+  isEventStartLocationSatisfied: vi.fn(() => true),
 }));
 
 vi.mock('./era-event-operations.js', () => ({
