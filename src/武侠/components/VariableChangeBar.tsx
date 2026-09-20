@@ -354,18 +354,19 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
     return null;
   }
 
-  const declaredTotal = getTotalCount(
-    summary.aiReply.declaredChanges.length,
+  const aiLogicalItems = buildAiLogicalItems(summary.aiReply.comparisons);
+  const aiExceptionCount = getAiItemExceptionCount(aiLogicalItems);
+  const backgroundLogicalItems = buildBackgroundLogicalItems(summary.background.observedChanges);
+  const aiCountText = getLogicalCountText(
+    aiLogicalItems.length,
     summary.aiReply.omittedDeclaredCount,
+    aiExceptionCount,
   );
-  const aiAppliedTotal = summary.aiReply.comparisons.filter(
-    comparison => Boolean(comparison.declaredChange) && comparison.status === 'applied',
-  ).length;
-  const backgroundTotal = getTotalCount(
-    summary.background.observedChanges.length,
+  const backgroundCountText = getLogicalCountText(
+    backgroundLogicalItems.length,
     summary.background.omittedObservedCount,
   );
-  const aiReplyComparisons = summary.aiReply.comparisons.filter(
+  const hasAiDeclarations = summary.aiReply.comparisons.some(
     comparison => Boolean(comparison.declaredChange),
   );
 
@@ -389,7 +390,7 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
           aria-expanded={expandedSegment === 'ai'}
         >
           <span className="variable-change-segment-label">AI回复</span>
-          <span className="variable-change-segment-count">声{declaredTotal}/实{aiAppliedTotal}</span>
+          <span className="variable-change-segment-count">{aiCountText}</span>
         </button>
 
         <button
@@ -399,7 +400,7 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
           aria-expanded={expandedSegment === 'background'}
         >
           <span className="variable-change-segment-label">后台变更</span>
-          <span className="variable-change-segment-count">{backgroundTotal}</span>
+          <span className="variable-change-segment-count">{backgroundCountText}</span>
         </button>
 
         <button
@@ -420,24 +421,27 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
               <section className="variable-change-section">
                 <div className="variable-change-section-heading">
                   <span>AI回复变量</span>
-                  <span>声{declaredTotal} / 实{aiAppliedTotal}</span>
+                  <span>{aiCountText}</span>
                 </div>
-                {aiReplyComparisons.length > 0 ? (
+                {aiLogicalItems.length > 0 ? (
                   <div className="variable-change-list">
-                    {aiReplyComparisons.map(comparison => (
-                      <AiComparisonRow
-                        key={comparison.id}
-                        comparison={comparison}
-                      />
-                    ))}
+                    {aiLogicalItems.map(item =>
+                      item.kind === 'time'
+                        ? <AiTimeRow key={item.id} item={item} />
+                        : <AiComparisonRow key={item.id} comparison={item.comparison} />,
+                    )}
                     {summary.aiReply.omittedDeclaredCount > 0 && (
                       <div className="variable-change-omitted">
-                        另有 {summary.aiReply.omittedDeclaredCount} 条 AI 声明未显示
+                        另有 {summary.aiReply.omittedDeclaredCount} 条底层 AI 声明未显示
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="variable-change-empty">本轮未捕获 AI 变量声明或写入。</div>
+                  <div className="variable-change-empty">
+                    {hasAiDeclarations
+                      ? '本轮 AI 声明均未产生净变化。'
+                      : '本轮未捕获 AI 变量声明或写入。'}
+                  </div>
                 )}
               </section>
 
@@ -475,16 +479,18 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
             <section className="variable-change-section">
               <div className="variable-change-section-heading">
                 <span>后台变更变量</span>
-                <span>{backgroundTotal}</span>
+                <span>{backgroundCountText}</span>
               </div>
-              {summary.background.observedChanges.length > 0 ? (
+              {backgroundLogicalItems.length > 0 ? (
                 <div className="variable-change-list">
-                  {summary.background.observedChanges.map(change => (
-                    <ActualChangeRow key={change.id} change={change} />
-                  ))}
+                  {backgroundLogicalItems.map(item =>
+                    item.kind === 'time'
+                      ? <BackgroundTimeRow key={item.id} item={item} />
+                      : <ActualChangeRow key={item.id} change={item.change} />,
+                  )}
                   {summary.background.omittedObservedCount > 0 && (
                     <div className="variable-change-omitted">
-                      另有 {summary.background.omittedObservedCount} 条后台变更未显示
+                      另有 {summary.background.omittedObservedCount} 条底层后台变更未显示
                     </div>
                   )}
                 </div>
