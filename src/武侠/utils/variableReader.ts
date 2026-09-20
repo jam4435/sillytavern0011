@@ -50,7 +50,7 @@ import { unescapeEraData } from '../../ERA变量框架/utils/data';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { isHistoryCheckoutPending } from '../../shared/historyCheckoutJournal';
 import { isChatRenamePending } from '../../shared/chatRenameJournal';
-import { getLocationScopePath } from '../../shared/locationPath.js';
+import { getLocationScopePath, isSameLocationScope } from '../../shared/locationPath.js';
 import { wuxiaCalendarDateToTotalDays } from '../../shared/wuxiaCalendar.js';
 import { dataLogger } from './logger';
 import { buildMeridianProjection, deriveMeridianModifiers } from './meridianSystem';
@@ -1399,7 +1399,7 @@ function getPrimaryMartialArtTemplate(characterData?: CharacterData, legacyNpc?:
   const primaryMartialArt = Object.values(martialArts)[0];
 
   return {
-    type: getPrimaryIdentityTitle(characterData?.身份, primaryMartialArt?.type),
+    type: primaryMartialArt?.type || '',
     martialArtsDescription: primaryMartialArt?.martialArtsDescription || legacyNpc?.武功描述 || '',
     martialArtsRank: primaryMartialArt?.martialArtsRank || legacyNpc?.武功品阶 || '普通',
     mastery: primaryMartialArt?.mastery || legacyNpc?.掌握程度 || '入门',
@@ -1437,7 +1437,9 @@ function createCharacterNpc(
     relationship: legacyNpc?.关系值 ?? 0,
     relationshipLabel: relationshipLabel?.trim() || undefined,
     category,
+    role: getPrimaryIdentityTitle(characterData.身份),
     location: characterData.所在位置 || undefined,
+    appearance: characterData.外貌?.trim() || undefined,
     template: getPrimaryMartialArtTemplate(characterData, legacyNpc),
     keyItems: getCharacterKeyItems(characterData, legacyNpc),
     biography: formatBiographySummary(characterData.人物经历) || legacyNpc?.人物经历 || '',
@@ -1455,8 +1457,9 @@ function createLegacySocialNpc(legacyNpc: LegacySocialNpc, category: NPC['catego
     relationship: legacyNpc.关系值 ?? 0,
     relationshipLabel: relationshipLabel?.trim() || undefined,
     category,
+    role: '江湖人士',
     template: {
-      type: '江湖人士',
+      type: '',
       martialArtsDescription: legacyNpc.武功描述 || '',
       martialArtsRank: legacyNpc.武功品阶 || '普通',
       mastery: legacyNpc.掌握程度 || '入门',
@@ -1476,8 +1479,9 @@ function createPlaceholderNpc(name: string, category: NPC['category'], relations
     relationship: 0,
     relationshipLabel: relationshipLabel?.trim() || undefined,
     category,
+    role: '江湖人士',
     template: {
-      type: '江湖人士',
+      type: '',
       martialArtsDescription: '',
       martialArtsRank: '未知',
       mastery: '未知',
@@ -1558,7 +1562,7 @@ function parseSocial(variables: GameVariables, 用户档案?: UserProfile): NPC[
       continue;
     }
 
-    if (characterRecord.所在位置?.trim() !== currentLocation) {
+    if (!isSameLocationScope(characterRecord.所在位置, currentLocation)) {
       continue;
     }
 

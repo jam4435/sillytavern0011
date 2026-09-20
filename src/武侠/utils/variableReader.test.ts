@@ -149,6 +149,78 @@ describe('getGameVariables ERA 展示投影', () => {
     expect(npc?.template.martialArts?.全真剑法.martialArtsDescription).toBe("如'白虹经天'。");
   });
 
+  it('侠缘“同处一地”只比较前三层地点，第四级场景不同仍归为 local', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '玩家',
+          性别: '男',
+          境界: '不入流',
+          所在位置: '大宋/临安府/牛家村/郭家旧宅',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+          关系网: {},
+        },
+        角色数据: {
+          穆念慈: {
+            所在位置: '大宋/临安府/牛家村/村口',
+          },
+          黄药师: {
+            所在位置: '大宋/嘉兴府/烟雨楼',
+          },
+        },
+      },
+    });
+
+    const state = readGameDataSync();
+    const localNames = state?.social?.filter(item => item.category === 'local').map(item => item.name) || [];
+    expect(localNames).toContain('穆念慈');
+    expect(localNames).not.toContain('黄药师');
+  });
+
+  it('侠缘投影分离人物身份与功法类型，并保留角色外貌', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        user数据: {
+          用户名: '玩家',
+          性别: '男',
+          境界: '不入流',
+          所在位置: '大宋/临安府/牛家村',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+          关系网: { 郭靖: '旧识' },
+        },
+        角色数据: {
+          郭靖: {
+            外貌: '浓眉大眼，神情敦厚。',
+            所在位置: '大宋/临安府/牛家村',
+            身份: {
+              丐帮帮主: '执掌丐帮',
+            },
+            功法: {
+              降龙十八掌: {
+                类型: '掌法',
+                掌握程度: '炉火纯青',
+                功法描述: '刚猛无俦。',
+                功法品阶: '镇派',
+                特性: { 炉火纯青: '掌力雄浑' },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const state = readGameDataSync();
+    const npc = state?.social?.find(item => item.name === '郭靖');
+    expect(npc).toMatchObject({
+      role: '丐帮帮主',
+      appearance: '浓眉大眼，神情敦厚。',
+      template: {
+        type: '掌法',
+      },
+    });
+    expect(npc?.template.martialArts?.降龙十八掌.type).toBe('掌法');
+  });
+
   it('优先把前端事件线索档案投影为长期线索，并与三回合 AI 线索去重', () => {
     const eventName = '射雕第二十九回04-锦囊求医';
     getAllVariablesMock.mockReturnValue({

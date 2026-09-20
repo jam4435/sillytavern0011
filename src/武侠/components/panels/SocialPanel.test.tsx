@@ -107,6 +107,35 @@ describe('SocialPanel avatar picker', () => {
   });
 });
 
+describe('SocialPanel role and appearance', () => {
+  it('人物身份独立显示，功法类型仍保留在武学卡，并展示外貌', () => {
+    const npc = createNpc('郭靖');
+    npc.role = '丐帮帮主';
+    npc.appearance = '浓眉大眼，神情敦厚。';
+    npc.template = {
+      ...npc.template,
+      type: '掌法',
+      martialArtsDescription: '刚猛无俦。',
+    };
+
+    render(<SocialPanel npcs={[npc]} />);
+
+    expect(screen.getAllByText('丐帮帮主').length).toBeGreaterThan(0);
+    expect(screen.getByText('人物外貌')).toBeInTheDocument();
+    expect(screen.getByText('浓眉大眼，神情敦厚。')).toBeInTheDocument();
+    expect(screen.getByText('掌法')).toBeInTheDocument();
+  });
+
+  it('旧 NPC 没有 role 时仍回退 template.type 作为人物称谓', () => {
+    const npc = createNpc('黄蓉');
+    npc.template.type = '桃花岛门人';
+
+    render(<SocialPanel npcs={[npc]} />);
+
+    expect(screen.getAllByText('桃花岛门人').length).toBeGreaterThan(0);
+  });
+});
+
 describe('SocialPanel martial-art details', () => {
   it('逐项展示角色的完整功法，并忽略空特性', () => {
     const npc = createNpc('郭靖');
