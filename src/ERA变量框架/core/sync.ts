@@ -111,6 +111,47 @@ export function collectReachableMessageKeys(
  * 从元数据中删除已经不属于任何当前消息、任何备用 swipe、也不在 SelectedMks 中的 EditLog。
  * 返回被删除的 MK，便于调试和测试。
  */
+export type EditLogCompactionResult = {
+  convertedLogs: number;
+  removedNoopUpdates: number;
+};
+
+/**
+ * 将旧版字符串 EditLog 无损迁移成原生数组，并移除没有任何状态效果的 update(old === new)。
+ * 这是存储层迁移，不改变有效的回滚语义。
+ */
+export function compactEditLogsInMeta(meta: any): EditLogCompactionResult {
+  const editLogs = _.get(meta, LOGS_PATH);
+  if (!editLogs || typeof editLogs !== 'object' || Array.isArray(editLogs)) {
+    return { convertedLogs: 0, removedNoopUpdates: 0 };
+  }
+
+  let convertedLogs = 0;
+  let removedNoopUpdates = 0;
+
+  for (const mk of Object.keys(editLogs)) {
+    const raw = editLogs[mk];
+    const parsed = parseEditLog(raw);
+    const compacted = parsed.filter(entry => {
+      const isNoopUpdate =
+        String(entry?.op || '').toLowerCase() === 'update' &&
+        _.isEqual(entry?.value_old, entry?.value_new);
+      if (isNoopUpdate) {
+        removedNoopUpdates += 1;
+        return false;
+      }
+      return true;
+    });
+
+    if (!Array.isArray(raw) || compacted.length !== parsed.length) {
+      editLogs[mk] = _.cloneDeep(compacted);
+      convertedLogs += 1;
+    }
+  }
+
+  return { convertedLogs, removedNoopUpdates };
+}
+
 export function pruneUnreachableEditLogs(
   meta: any,
   messages: any[],
@@ -137,11 +178,19 @@ async function updateSelectedMksAndPruneEditLogs(
   selectedMks: (string | null)[],
 ): Promise<void> {
   let removedMks: string[] = [];
+  let compaction: EditLogCompactionResult = { convertedLogs: 0, removedNoopUpdates: 0 };
   await updateEraMetaData(meta => {
     _.set(meta, SEL_PATH, selectedMks);
+    compaction = compactEditLogsInMeta(meta);
     removedMks = pruneUnreachableEditLogs(meta, messages, selectedMks);
     return meta;
   });
+  if (compaction.convertedLogs > 0 || compaction.removedNoopUpdates > 0) {
+    logger.log(
+      'resyncStateOnHistoryChange',
+      `EditLog 存储压缩完成：迁移/改写 ${compaction.convertedLogs} 条 MK 日志，移除 ${compaction.removedNoopUpdates} 条 no-op update。`,
+    );
+  }
   if (removedMks.length > 0) {
     logger.log(
       'resyncStateOnHistoryChange',
