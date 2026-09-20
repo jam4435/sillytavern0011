@@ -70,6 +70,7 @@ type CaptureMetadata = {
   actions?: VariableWriteActions | null;
   assistantMessageId?: number;
   aiOnlyDeclaredMatches?: boolean;
+  allowAiDemotion?: boolean;
 };
 
 type VariableWriteSignal =
@@ -114,6 +115,7 @@ const summarizeMetadata = (metadata: CaptureMetadata) => ({
   actions: summarizeActions(metadata.actions),
   assistantMessageId: metadata.assistantMessageId ?? null,
   aiOnlyDeclaredMatches: metadata.aiOnlyDeclaredMatches === true,
+  allowAiDemotion: metadata.allowAiDemotion === true,
 });
 
 const summarizeObservedChange = (change: VariableActualChange) => ({
@@ -249,8 +251,12 @@ const persistVariableTurn = (
 
 const getActiveMessageContent = (message: ChatMessageWithSwipes): string => {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
-  const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
-  return message.message || message.mes || swipes[swipeIndex] || swipes[0] || '';
+  if (swipes.length > 0) {
+    const requestedSwipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
+    const safeSwipeIndex = Math.max(0, Math.min(requestedSwipeIndex, swipes.length - 1));
+    return swipes[safeSwipeIndex] ?? '';
+  }
+  return message.message || message.mes || '';
 };
 
 const readAssistantMessageContentById = (messageId: number): { messageId?: number; content: string } => {
@@ -352,6 +358,7 @@ const rebuildSummary = (
     observedChanges: summary.aiReply.observedChanges,
     baselineStatData: activeTurn.baselineStatData,
     currentStatData: activeTurn.lastStatData,
+    backgroundObservedChanges: summary.background.observedChanges,
   });
   const allObservedChanges = combineObservedChanges(summary);
 
@@ -396,11 +403,17 @@ const canPromoteBatchToAi = (
   && isBoundaryProducer(batch.producer);
 
 const canDemoteBatchToBackground = (
-  batch: Pick<VariableObservedBatch, 'origin'>,
+  batch: Pick<VariableObservedBatch, 'origin' | 'assistantMessageId'>,
   metadata: CaptureMetadata,
 ): boolean =>
-  metadata.origin === 'background'
-  && batch.origin === 'ai';
+  metadata.allowAiDemotion === true
+  && metadata.origin === 'background'
+  && batch.origin === 'ai'
+  && (
+    batch.assistantMessageId === undefined
+    || metadata.assistantMessageId === undefined
+    || batch.assistantMessageId === metadata.assistantMessageId
+  );
 
 const isDirectVariableWriteSource = (value: unknown): value is DirectVariableWriteSource =>
   value === 'event-script'
@@ -415,19 +428,10 @@ const createEmptyParsedDeclaredState = (): ParsedDeclaredState => ({
   omittedDeclaredCount: 0,
 });
 
-const getDeclaredChangeDedupKey = (change: VariableDeclaredChange): string =>
-  [
-    change.action,
-    change.copyPath,
-    change.blockTag,
-    stableStringify(change.value),
-  ].join('|');
-
 const mergeParsedDeclaredStates = (...parsedList: ParsedDeclaredState[]): ParsedDeclaredState => {
-  const declaredChanges: VariableDeclaredChange[] = [];
+  const latestDeclaredByPath = new Map<string, VariableDeclaredChange>();
   const thoughts: VariableThoughtEntry[] = [];
   const parseErrors: string[] = [];
-  const seenDeclaredKeys = new Set<string>();
   let omittedDeclaredCount = 0;
 
   for (const parsed of parsedList) {
@@ -436,19 +440,17 @@ const mergeParsedDeclaredStates = (...parsedList: ParsedDeclaredState[]): Parsed
     omittedDeclaredCount += parsed.omittedDeclaredCount;
 
     for (const change of parsed.declaredChanges) {
-      const dedupKey = getDeclaredChangeDedupKey(change);
-      if (seenDeclaredKeys.has(dedupKey)) {
-        continue;
-      }
-
-      seenDeclaredKeys.add(dedupKey);
-      if (declaredChanges.length < MAX_STORED_VARIABLE_CHANGES) {
-        declaredChanges.push(change);
-      } else {
-        omittedDeclaredCount += 1;
-      }
+      const pathKey = JSON.stringify(change.path);
+      // 同一路径在一轮内多次声明时，以最后一次声明作为最终意图。
+      // 删除后重新 set 可让展示顺序跟随最终声明出现的位置。
+      latestDeclaredByPath.delete(pathKey);
+      latestDeclaredByPath.set(pathKey, change);
     }
   }
+
+  const allFinalDeclarations = Array.from(latestDeclaredByPath.values());
+  const declaredChanges = allFinalDeclarations.slice(0, MAX_STORED_VARIABLE_CHANGES);
+  omittedDeclaredCount += Math.max(0, allFinalDeclarations.length - declaredChanges.length);
 
   return {
     declaredChanges,
@@ -1171,6 +1173,7 @@ export function useVariableChangeTracker() {
       actions,
       assistantMessageId,
       aiOnlyDeclaredMatches: isAiWrite,
+      allowAiDemotion: signal.kind === 'sourced-era' && sourcedAttribution === 'background',
     });
 
     const afterCaptureSnapshotHash = activeTurn.lastStatData
