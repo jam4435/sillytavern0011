@@ -1,0 +1,29 @@
+name: Temporary sourced ERA AI promotion verification
+
+on:
+  push:
+    branches:
+      - fix/sourced-era-ai-promotion-20260921
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Variable attribution tests
+        run: >
+          pnpm exec vitest run --configLoader native --pool threads --reporter minimal
+          src/武侠/hooks/useVariableChangeTracker.test.tsx
+          src/武侠/components/VariableChangeBar.test.tsx
+          src/武侠/utils/variableChanges.test.ts
+      - name: Source build
+        run: pnpm build:src:fast
