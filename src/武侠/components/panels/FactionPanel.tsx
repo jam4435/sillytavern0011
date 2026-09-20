@@ -75,8 +75,10 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
 
   // 当前查看的势力静态数据
   const currentSectData: SectStaticData | undefined = useMemo(() => {
-    return getSectByName(selectedSectName) || allSects[0];
-  }, [selectedSectName, allSects]);
+    const matched = getSectByName(selectedSectName);
+    if (matched) return matched;
+    return viewMode === 'all-factions' ? allSects[0] : undefined;
+  }, [selectedSectName, allSects, viewMode]);
 
   // 当前玩家在该势力的归属信息（若已加入）
   const currentFactionMembership: UserFactionEntry | undefined = playerFactions[selectedSectName];
@@ -252,7 +254,13 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
           <button
             type="button"
             className={`view-tab-btn ${viewMode === 'my-faction' ? 'active' : ''}`}
-            onClick={() => setViewMode('my-faction')}
+            onClick={() => {
+              setViewMode('my-faction');
+              if (!playerFactions[selectedSectName]) {
+                setSelectedSectName(joinedSectNames[0] || '');
+                setInspectingNode(null);
+              }
+            }}
             disabled={!hasJoinedAny}
             title={!hasJoinedAny ? '暂未加入任何势力（当前为散修）' : '查看已加入的势力'}
           >
@@ -262,7 +270,13 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
           <button
             type="button"
             className={`view-tab-btn ${viewMode === 'all-factions' ? 'active' : ''}`}
-            onClick={() => setViewMode('all-factions')}
+            onClick={() => {
+              setViewMode('all-factions');
+              if (!getSectByName(selectedSectName)) {
+                setSelectedSectName(allSects[0]?.门派名称 || '');
+                setInspectingNode(null);
+              }
+            }}
           >
             <Icons.Faction size={16} className="tab-icon" />
             <span>天下势力鉴赏</span>
@@ -472,6 +486,61 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
               <Icons.Close size={16} />
               <span>破门叛离</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {viewMode === 'my-faction' && !currentSectData && currentFactionMembership && (
+        <div className="faction-my-view">
+          <div className="sect-banner-card">
+            <div className="banner-left">
+              <div className="sect-emblem-box">
+                <Icons.Faction size={36} className="emblem-icon" />
+                <span className={`sect-type-pill ${currentFactionMembership.体系类型}`}>
+                  {currentFactionMembership.体系类型}
+                </span>
+              </div>
+              <div className="sect-meta-box">
+                <div className="sect-name-row">
+                  <h3 className="sect-title">{selectedSectName}</h3>
+                  <span className="sect-status-tag">{currentFactionMembership.状态 || '在籍'}</span>
+                </div>
+                <div className="sect-submeta-row">
+                  <span className="meta-item">
+                    <strong>身份称谓：</strong>
+                    {currentFactionMembership.身份 || '门人'}
+                  </span>
+                  <span className="meta-item">
+                    <strong>授业恩师：</strong>
+                    {currentFactionMembership.师承 || '本门长辈'}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="banner-right">
+              <div className="contrib-counter-box">
+                <span className="counter-label">门派贡献</span>
+                <span className="counter-value">{currentFactionMembership.贡献 ?? 0}</span>
+              </div>
+              <div className="cult-counter-box">
+                <span className="counter-label">当前修为</span>
+                <span className="counter-value">{stats.cultivation}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="faction-main-split">
+            <div className="faction-tree-column">
+              <div className="column-title-bar">
+                <h4 className="column-title">
+                  <Icons.Faction size={16} className="title-icon" />
+                  势力资料尚未收录
+                </h4>
+              </div>
+              <p className="column-hint">
+                该出身的门派归属与身份已保留；当前静态势力库尚未提供完整驻地、传承武学树与差事资料。
+              </p>
+            </div>
           </div>
         </div>
       )}
