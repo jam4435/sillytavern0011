@@ -394,7 +394,7 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                       ? '已习得此功法'
                       : selectedSecretEligibility && !selectedSecretEligibility.canStudy
                         ? selectedSecretEligibility.reasons.join('；')
-                        : '当前仅校验秘籍参悟资格，背包秘籍尚未接入直接学习动作'
+                        : '条件已满足，点击参悟并习得此功法'
                     : undefined
                 }
                 style={{ color: selectedRank.color, borderColor: `${selectedRank.color}60` }}
