@@ -174,6 +174,36 @@ describe('FactionPanel Component', () => {
     expect(handleSendMessage).not.toHaveBeenCalled();
   });
 
+  it('未收录静态谱系的门派仍显示真实归属，不回退成其他门派', () => {
+    const emeiStats: CharacterProfile = {
+      ...mockStats,
+      identities: { 峨眉派: '记名弟子' },
+      factions: {
+        峨眉派: {
+          体系类型: '宗门',
+          身份: '记名弟子',
+          师承: '本门长辈',
+          贡献: 0,
+          状态: '在籍',
+        },
+      },
+    };
+
+    render(
+      <FactionPanel
+        stats={emeiStats}
+        currentLocation="大宋/临安府/西湖"
+        tasks={{}}
+        onSendMessage={vi.fn(async () => '')}
+        onClaimTask={vi.fn(async () => {})}
+      />,
+    );
+
+    expect(screen.getByText('峨眉派', { selector: '.sect-title' })).toBeInTheDocument();
+    expect(screen.getByText('势力资料尚未收录')).toBeInTheDocument();
+    expect(screen.queryByText('全真教', { selector: '.sect-title' })).not.toBeInTheDocument();
+  });
+
   it('散修玩家默认展示【天下势力鉴赏】视图', () => {
     const rogueStats: CharacterProfile = {
       ...mockStats,
