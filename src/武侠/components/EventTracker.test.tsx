@@ -114,6 +114,31 @@ describe('EventTracker', () => {
     expect(screen.getByRole('button', { name: '展开江湖事簿' })).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('treats different narrative scenes under the same three-level location as already arrived', () => {
+    const onTravelTo = vi.fn();
+    const scopedEvent: GameEvent = {
+      id: 'same-scope',
+      title: '射雕第二回02-醉仙楼风波',
+      type: 'RUMOR',
+      description: '楼中风波将起。',
+      location: '大宋/嘉兴府/嘉兴城/醉仙楼',
+    };
+
+    render(
+      <EventTracker
+        events={[scopedEvent]}
+        currentLocation="大宋/嘉兴府/嘉兴城/客栈后院"
+        onOpenAll={vi.fn()}
+        onTravelTo={onTravelTo}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '展开江湖事簿' }));
+    expect(screen.getByText('大宋/嘉兴府/嘉兴城/醉仙楼')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /醉仙楼前往/ })).not.toBeInTheDocument();
+    expect(onTravelTo).not.toHaveBeenCalled();
+  });
+
   it('opens the full event page and reuses the travel callback', () => {
     const onOpenAll = vi.fn();
     const onTravelTo = vi.fn();
