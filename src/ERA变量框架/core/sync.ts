@@ -1,5 +1,7 @@
 'use strict';
 
+import _ from 'lodash';
+
 /**
  * @file 状态同步核心
  * @description 本文件中的 `resyncStateOnHistoryChange` 是 ERA 变量框架最核心的函数之一。
