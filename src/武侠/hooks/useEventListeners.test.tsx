@@ -136,12 +136,33 @@ describe('useEventListeners', () => {
       await emitMockEvent(String(tavern_events.MESSAGE_RECEIVED), 12);
       vi.advanceTimersByTime(1);
     });
-    expect(onMessageBoundary).toHaveBeenCalledWith(12);
+    expect(onMessageBoundary).toHaveBeenCalledWith(12, 'received');
     expect(scheduleGameDataCompletionMock).toHaveBeenCalledWith('message-boundary', { fullScan: true });
     expect(readGameDataPureMock).toHaveBeenCalled();
     expect(updateGameState).toHaveBeenCalledWith({ stats: { cultivation: 100 } });
     expect(setCurrentMaintext).toHaveBeenCalledWith('正文\n[A]选项');
     expect(setCurrentOptions).toHaveBeenCalledWith(['选项']);
+  });
+
+  it('消息边界会区分 swipe 与普通更新来源', async () => {
+    const onMessageBoundary = vi.fn();
+
+    renderHook(() =>
+      useEventListeners({
+        updateGameState: vi.fn(),
+        setCurrentMaintext: vi.fn(),
+        setCurrentOptions: vi.fn(),
+        onMessageBoundary,
+      }),
+    );
+
+    await act(async () => {
+      await emitMockEvent(String(tavern_events.MESSAGE_SWIPED), 21);
+      await emitMockEvent(String(tavern_events.MESSAGE_UPDATED), 21);
+    });
+
+    expect(onMessageBoundary).toHaveBeenNthCalledWith(1, 21, 'swiped');
+    expect(onMessageBoundary).toHaveBeenNthCalledWith(2, 21, 'updated');
   });
 
   it('纯事件状态直接写入只刷新投影，不触发 fullScan', async () => {
