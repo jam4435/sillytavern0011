@@ -269,6 +269,24 @@ describe('getRandomAppearance', () => {
     expect(appearance.includes('，却')).toBe(shouldContrast);
   });
 
+  it('强可见特质会覆盖或追加随机外貌，避免与伤残设定冲突', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const attributes = appearanceAttributes(16, 10, 10);
+
+    const oneEye = getRandomAppearance('男', attributes, ['独眼']);
+    expect(oneEye).toContain('一目已失');
+    expect(oneEye).toContain('眼罩');
+    expect(oneEye).not.toContain(findAppearanceRange(APPEARANCE_TEMPLATES.face.男, 16).templates[0]);
+
+    const blind = getRandomAppearance('男', attributes, ['独眼', '天生目盲（盲侠）']);
+    expect(blind).toContain('双目失明');
+    expect(blind).not.toContain('一目已失');
+
+    const combined = getRandomAppearance('男', attributes, ['断臂', '太监']);
+    expect(combined).toContain('一侧手臂已失');
+    expect(combined).toContain('面上少见须髯');
+  });
+
   it('随机数位于首尾时会分别选择三个模板池的首项和末项', () => {
     const attributes = appearanceAttributes(6, 6, 6);
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
