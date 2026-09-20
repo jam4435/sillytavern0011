@@ -9,6 +9,7 @@ import {
   undoResourceDeltas,
 } from '../utils/itemManager';
 import { syncPlayerAttributesFromVariables } from '../utils/variableReader';
+import { undoLearnMartialArtFromSecret } from '../utils/martialArtSecretManager';
 import { useCommandQueue } from './useCommandQueue';
 
 vi.mock('../utils/itemManager', () => ({
@@ -18,6 +19,10 @@ vi.mock('../utils/itemManager', () => ({
   restoreEquipmentState: vi.fn(),
   restoreItemCount: vi.fn(),
   undoResourceDeltas: vi.fn(),
+}));
+
+vi.mock('../utils/martialArtSecretManager', () => ({
+  undoLearnMartialArtFromSecret: vi.fn(),
 }));
 
 vi.mock('../utils/logger', () => ({
@@ -39,6 +44,7 @@ const restoreEquipmentStateMock = vi.mocked(restoreEquipmentState);
 const restoreItemCountMock = vi.mocked(restoreItemCount);
 const undoResourceDeltasMock = vi.mocked(undoResourceDeltas);
 const syncPlayerAttributesMock = vi.mocked(syncPlayerAttributesFromVariables);
+const undoLearnMartialArtFromSecretMock = vi.mocked(undoLearnMartialArtFromSecret);
 
 describe('useCommandQueue', () => {
   beforeEach(() => {
@@ -49,6 +55,7 @@ describe('useCommandQueue', () => {
     restoreItemCountMock.mockReset();
     undoResourceDeltasMock.mockReset();
     syncPlayerAttributesMock.mockReset();
+    undoLearnMartialArtFromSecretMock.mockReset();
   });
 
   it('玩家消息发送成功后会递减状态效果', async () => {
@@ -144,6 +151,37 @@ describe('useCommandQueue', () => {
     expect(removeStatusEffectMock).toHaveBeenCalledWith('effect-1');
     expect(removePermanentAttributeModifierMock).toHaveBeenCalledWith('perm-1');
     expect(undoResourceDeltasMock).toHaveBeenCalledWith({ 气血: 3 });
+    expect(syncPlayerAttributesMock).toHaveBeenCalledTimes(1);
+    expect(result.current.commands).toEqual([]);
+  });
+
+  it('取消秘籍参悟指令会撤销功法并恢复秘籍', async () => {
+    const { result } = renderHook(() => useCommandQueue());
+    const rollback = {
+      artName: '九阳神功',
+      itemName: '九阳神功',
+      originalItem: {
+        类型: '秘籍',
+        品阶: '绝世',
+        物品描述: '秘籍。',
+        数量: 1,
+      },
+    };
+
+    act(() => {
+      result.current.addUseItemCommand('参悟秘籍《九阳神功》', {
+        itemName: '九阳神功',
+        martialArtLearnRollback: rollback,
+      });
+    });
+
+    const commandId = result.current.commands[0].id;
+    await act(async () => {
+      await result.current.cancelCommand(commandId);
+    });
+
+    expect(undoLearnMartialArtFromSecretMock).toHaveBeenCalledWith(rollback);
+    expect(restoreItemCountMock).not.toHaveBeenCalled();
     expect(syncPlayerAttributesMock).toHaveBeenCalledTimes(1);
     expect(result.current.commands).toEqual([]);
   });
