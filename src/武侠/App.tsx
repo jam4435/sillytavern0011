@@ -4,7 +4,6 @@ import brandXiakeSealUrl from './assets/icons/jinyong/brand_xiake_seal.svg?url';
 import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
 import ChatInput from './components/ChatInput';
-import ChatRenameDialog from './components/ChatRenameDialog';
 import CommandQueueButton from './components/CommandQueueButton';
 import CommandQueuePopover from './components/CommandQueuePopover';
 import FullscreenButton from './components/FullscreenButton';
@@ -47,12 +46,7 @@ import { readLatestDebugRoundSnapshot } from './hooks/useDebugLogs';
 import { shouldDeferSetupEventNotifications } from './hooks/usePageFlow';
 import { ActivePanel, type FactionTask, InventoryItem, type MeridianNodeId, type MeridianUpgradeQuote } from './types';
 import { claimFactionTaskReward } from './utils/factionManager';
-import {
-  getInitialChatRenameSuggestion,
-  getRandomOpeningLine,
-  initializeNewGameSession,
-  type NewGameFormData,
-} from './utils/gameInitializer';
+import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
 import { migrateAvatarState } from './utils/avatarState';
 import { equipInventoryItem, useMedicineItem } from './utils/itemManager';
@@ -68,7 +62,7 @@ import {
 import { getUserCurrentLocation } from './utils/mapUtils';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
 import { finalizeCurrentTurn, resumeCheckout } from './utils/saveLoadManager';
-import { renameCurrentChat, renameCurrentChatAutomatically, resumePendingChatRename } from './utils/chatRenameManager';
+import { renameCurrentChatAutomatically, resumePendingChatRename } from './utils/chatRenameManager';
 import { readRecentInputHistory, type InputHistoryEntry } from './utils/inputHistory';
 import {
   applyRegexRules,
@@ -177,10 +171,6 @@ const App: React.FC = () => {
   );
   const historyResumeAttemptedRef = useRef(false);
   const chatRenameResumeAttemptedRef = useRef(false);
-  const [initialChatRename, setInitialChatRename] = useState<{ suggestedName: string } | null>(null);
-  const [initialRenameDraft, setInitialRenameDraft] = useState('');
-  const [initialRenameError, setInitialRenameError] = useState<string | null>(null);
-  const [isInitialRenaming, setIsInitialRenaming] = useState(false);
   const historyMutationPending = historyCheckoutPending || chatRenamePending;
 
   const playerAvatarSource = useMemo(
@@ -1086,31 +1076,6 @@ const App: React.FC = () => {
     gameLogger.log('✅ 加载完成，进入游戏');
   }, [clearVariableChanges, setGameState, setCurrentMaintext, setCurrentOptions, setCurrentPage]);
 
-  const continueToOpening = useCallback(() => {
-    setInitialChatRename(null);
-    setInitialRenameError(null);
-    setIsInitialRenaming(false);
-    setCurrentPage('opening');
-  }, [setCurrentPage]);
-
-  const handleInitialChatRename = useCallback(async () => {
-    if (!initialChatRename || isInitialRenaming) return;
-    setIsInitialRenaming(true);
-    setInitialRenameError(null);
-    try {
-      const result = await renameCurrentChat(initialRenameDraft, { reason: 'initial', reopenHistoryPanel: false });
-      if (result.status !== 'committed') {
-        setInitialRenameError(result.message);
-        setIsInitialRenaming(false);
-        return;
-      }
-      continueToOpening();
-    } catch (error) {
-      setInitialRenameError(`聊天改名失败：${error instanceof Error ? error.message : String(error)}`);
-      setIsInitialRenaming(false);
-    }
-  }, [continueToOpening, initialChatRename, initialRenameDraft, isInitialRenaming]);
-
   // 新游戏设置提交处理
   const handleSetupSubmit = useCallback(
     async (formData: NewGameFormData) => {
@@ -1178,10 +1143,7 @@ const App: React.FC = () => {
           gameLogger.log('✅ 欢迎语已设置到开局输入界面');
           gameLogger.log('欢迎语:', result.content);
 
-          const suggestedName = getInitialChatRenameSuggestion(formData);
-          setInitialRenameDraft(suggestedName);
-          setInitialRenameError(null);
-          setInitialChatRename({ suggestedName });
+          setCurrentPage('opening');
         } else {
           gameLogger.error('创建开局失败:', result.error);
           showError(`初始化失败：${result.error || '创建开局楼层时出错'}，请重试`);
@@ -1204,6 +1166,7 @@ const App: React.FC = () => {
       setCurrentMaintext,
       setCurrentOptions,
       setSavedGameExists,
+      setCurrentPage,
     ],
   );
 
@@ -1364,11 +1327,7 @@ const App: React.FC = () => {
   };
 
   // 根据页面状态渲染不同内容
-  const eventNotificationLayer = shouldDeferSetupEventNotifications(
-    currentPage,
-    isLoading,
-    initialChatRename !== null,
-  ) ? null : (
+  const eventNotificationLayer = shouldDeferSetupEventNotifications(currentPage, isLoading) ? null : (
     <EventNotificationStack notifications={eventNotifications} onDismiss={dismissEventNotification} />
   );
 
@@ -1431,20 +1390,6 @@ const App: React.FC = () => {
         >
           {renderModalContent()}
         </Modal>
-        <ChatRenameDialog
-          isOpen={Boolean(initialChatRename)}
-          mode="initial"
-          value={initialRenameDraft}
-          error={initialRenameError}
-          isSubmitting={isInitialRenaming}
-          onChange={value => {
-            setInitialRenameDraft(value);
-            if (initialRenameError) setInitialRenameError(null);
-          }}
-          onConfirm={() => void handleInitialChatRename()}
-          onKeepCurrent={continueToOpening}
-          onClose={continueToOpening}
-        />
       </>
     );
   }
