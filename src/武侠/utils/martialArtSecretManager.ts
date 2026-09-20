@@ -66,7 +66,7 @@ function buildSecretInventoryItem(itemName: string, rawItem: InventoryItemVariab
     martialArtInfo: {
       description: dbData.功法描述,
       rank: dbData.功法品阶,
-      requirements: dbData.修炼限制,
+      requirements: dbData.修炼限制 ? { ...dbData.修炼限制 } : undefined,
     },
   };
 }
