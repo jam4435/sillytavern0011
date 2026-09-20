@@ -219,6 +219,14 @@ describe('settingsManager ui theme', () => {
     expect(template).toContain('当 user 的行动宣称与 assistant 的实际结果冲突时，以 assistant 正文中的实际结果为准');
   });
 
+  it('keeps biography compression focused on old chunks and game-time dates', () => {
+    const template = createDefaultDisplaySettings().summarySettings.promptTemplate;
+    expect(template).toContain('只总结下面提供的旧条目');
+    expect(template).toContain('(1200.11.26)');
+    expect(template).toContain('不得把现实日期写入结果');
+    expect(template).toContain('1～3 句');
+  });
+
   it('updates legacy default-template labels without changing custom placeholders', () => {
     window.localStorage.setItem(
       'wuxia_display_settings',

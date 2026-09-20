@@ -31,7 +31,7 @@ export interface SummaryTriggerResult {
   /** 是否应该触发总结 */
   shouldTrigger: boolean;
   /** 触发原因 */
-  triggerReason: 'pending_queue' | 'total_entries' | 'none';
+  triggerReason: 'per_character' | 'pending_queue' | 'total_entries' | 'none';
   /** 待总结的角色列表 */
   pendingCharacters: PendingCharacterSummary[];
   /** 所有角色的总经历条目数 */
@@ -71,9 +71,134 @@ let pendingQueue: PendingCharacterSummary[] = [];
 /** 是否正在执行总结 */
 let isSummarizing = false;
 
+export const BIOGRAPHY_RECENT_ENTRIES_TO_KEEP = 5;
+export const BIOGRAPHY_COMPRESSION_BATCH_SIZE = 10;
+const LEGACY_SUMMARY_META_KEY = '【总结】';
+const COMPRESSED_BIOGRAPHY_KEY_RE = /^阶段经历(\d+)$/;
+const GAME_DATE_PREFIX_RE =
+  /^\((\d{3,4})\.(\d{1,2})\.(\d{1,2})(?:\s*[~～-]\s*(\d{3,4})\.(\d{1,2})\.(\d{1,2}))?\)\s*/;
+
+export interface BiographyCompressionPlan {
+  originalBiography: Record<string, string>;
+  sourceEntries: Record<string, string>;
+  sourceKeys: string[];
+  summaryKey: string;
+}
+
+interface ParsedBiographyDate {
+  text: string;
+  sortValue: number;
+}
+
 // =========================================
 // 工具函数
 // =========================================
+
+export function isCompressedBiographyKey(key: string): boolean {
+  return COMPRESSED_BIOGRAPHY_KEY_RE.test(key);
+}
+
+function isCountedBiographyKey(key: string): boolean {
+  return !key.startsWith('$') && key !== LEGACY_SUMMARY_META_KEY && !isCompressedBiographyKey(key);
+}
+
+function parseBiographyDatePrefix(value: string): ParsedBiographyDate[] {
+  const match = String(value || '').match(GAME_DATE_PREFIX_RE);
+  if (!match) return [];
+
+  const toDate = (year: string, month: string, day: string): ParsedBiographyDate => {
+    const y = Number(year);
+    const m = Number(month);
+    const d = Number(day);
+    return { text: `${y}.${m}.${d}`, sortValue: y * 10000 + m * 100 + d };
+  };
+
+  const dates = [toDate(match[1], match[2], match[3])];
+  if (match[4] && match[5] && match[6]) {
+    dates.push(toDate(match[4], match[5], match[6]));
+  }
+  return dates;
+}
+
+function getBiographyDateRangePrefix(entries: Record<string, string>): string {
+  const dates = Object.values(entries).flatMap(parseBiographyDatePrefix);
+  if (dates.length === 0) return '(旧记录时间不详)';
+
+  dates.sort((left, right) => left.sortValue - right.sortValue);
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  return first.sortValue === last.sortValue ? `(${first.text})` : `(${first.text}~${last.text})`;
+}
+
+function getNextSummaryKey(biography: Record<string, string>): string {
+  const highest = Object.keys(biography).reduce((max, key) => {
+    const match = key.match(COMPRESSED_BIOGRAPHY_KEY_RE);
+    return match ? Math.max(max, Number(match[1]) || 0) : max;
+  }, 0);
+  return `阶段经历${highest + 1}`;
+}
+
+export function buildBiographyCompressionPlan(
+  biography: Record<string, string> | string | undefined,
+): BiographyCompressionPlan | null {
+  const originalBiography = normalizeBiography(biography);
+  const candidates = Object.entries(originalBiography).filter(([key]) => isCountedBiographyKey(key));
+  const compressibleCount = candidates.length - BIOGRAPHY_RECENT_ENTRIES_TO_KEEP;
+  if (compressibleCount < 2) return null;
+
+  const sourceEntries = Object.fromEntries(
+    candidates.slice(0, Math.min(BIOGRAPHY_COMPRESSION_BATCH_SIZE, compressibleCount)),
+  );
+
+  return {
+    originalBiography,
+    sourceEntries,
+    sourceKeys: Object.keys(sourceEntries),
+    summaryKey: getNextSummaryKey(originalBiography),
+  };
+}
+
+export function buildBiographyStageSummaryValue(
+  summaryContent: string,
+  sourceEntries: Record<string, string>,
+): string {
+  const cleanSummary = summaryContent
+    .split('\n')
+    .map(line => line.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '').trim())
+    .filter(Boolean)
+    .join('；')
+    .replace(/；+/g, '；')
+    .trim();
+
+  if (!cleanSummary) throw new Error('人物经历总结为空');
+  return `${getBiographyDateRangePrefix(sourceEntries)} ${cleanSummary}`;
+}
+
+export function mergeBiographyCompression(
+  plan: BiographyCompressionPlan,
+  summaryValue: string,
+): Record<string, string> {
+  const sourceKeys = new Set(plan.sourceKeys);
+  const result: Record<string, string> = {};
+  let inserted = false;
+
+  for (const [key, value] of Object.entries(plan.originalBiography)) {
+    if (key === LEGACY_SUMMARY_META_KEY) continue;
+
+    if (sourceKeys.has(key)) {
+      if (!inserted) {
+        result[plan.summaryKey] = summaryValue;
+        inserted = true;
+      }
+      continue;
+    }
+
+    result[key] = value;
+  }
+
+  if (!inserted) result[plan.summaryKey] = summaryValue;
+  return result;
+}
 
 /**
  * 计算人物经历的条目数
@@ -88,8 +213,8 @@ export function getBiographyEntryCount(biography: Record<string, string> | strin
     return biography.split('\n').filter(line => line.trim()).length;
   }
 
-  // 如果是对象，计算键的数量（排除 $template 等特殊键）
-  return Object.keys(biography).filter(key => !key.startsWith('$')).length;
+  // 阶段经历已经压缩过，不再计入原始经历阈值，避免摘要反复触发摘要。
+  return Object.keys(biography).filter(isCountedBiographyKey).length;
 }
 
 /**
@@ -154,8 +279,8 @@ export function checkSummaryTrigger(thresholds: SummaryThresholds): SummaryTrigg
   };
 
   try {
-    // 获取游戏变量
-    const rawVariables = getAllVariables() as Record<string, unknown>;
+    // 人物经历属于聊天持久状态，检测统一读取聊天级 stat_data 真相源。
+    const rawVariables = getVariables({ type: 'chat' }) as Record<string, unknown>;
     const statData = rawVariables?.stat_data as Record<string, unknown>;
 
     if (!statData) {
@@ -206,15 +331,19 @@ export function checkSummaryTrigger(thresholds: SummaryThresholds): SummaryTrigg
       }
     }
 
-    // 3. 判断是否触发总结
+    // 3. 单角色达到阈值即可触发；队列/总量阈值只影响批量触发原因。
     if (result.pendingCharacters.length >= thresholds.pendingQueueThreshold) {
       result.shouldTrigger = true;
       result.triggerReason = 'pending_queue';
-      dataLogger.log(`[summaryManager] 待处理角色数达到阈值: ${result.pendingCharacters.length} >= ${thresholds.pendingQueueThreshold}`);
-    } else if (result.totalEntries >= thresholds.totalEntriesThreshold) {
+      dataLogger.log(`[summaryManager] 待处理角色数达到批量阈值: ${result.pendingCharacters.length} >= ${thresholds.pendingQueueThreshold}`);
+    } else if (result.pendingCharacters.length > 0 && result.totalEntries >= thresholds.totalEntriesThreshold) {
       result.shouldTrigger = true;
       result.triggerReason = 'total_entries';
-      dataLogger.log(`[summaryManager] 总条目数达到阈值: ${result.totalEntries} >= ${thresholds.totalEntriesThreshold}`);
+      dataLogger.log(`[summaryManager] 总原始经历达到批量阈值: ${result.totalEntries} >= ${thresholds.totalEntriesThreshold}`);
+    } else if (result.pendingCharacters.length > 0) {
+      result.shouldTrigger = true;
+      result.triggerReason = 'per_character';
+      dataLogger.log('[summaryManager] 单角色达到阈值，立即触发分块压缩');
     }
 
     dataLogger.log('[summaryManager] 检测结果:', {
@@ -287,29 +416,19 @@ function parseSummaryResponse(response: string): string {
   return response.trim();
 }
 
-/**
- * 将总结结果转换为人物经历格式
- *
- * @param summaryContent 总结内容
- * @returns 格式化后的人物经历对象
- */
-function formatSummaryToBiography(summaryContent: string): Record<string, string> {
-  const lines = summaryContent.split('\n').filter(line => line.trim());
-  const result: Record<string, string> = {};
+function readCurrentCharacterBiography(characterId: string): Record<string, string> {
+  const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+  const statData = variables?.stat_data as Record<string, unknown> | undefined;
+  if (!statData) return {};
 
-  // 添加总结标记
-  result['【总结】'] = `以下为AI总结的精炼经历（${new Date().toLocaleDateString('zh-CN')}）`;
+  if (characterId === 'user') {
+    const userData = statData.user数据 as CharacterDataForSummary | undefined;
+    return normalizeBiography(userData?.人物经历);
+  }
 
-  // 将每行作为一个条目
-  lines.forEach((line, index) => {
-    // 去除可能的列表标记（如 - 或 数字.）
-    const cleanLine = line.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '').trim();
-    if (cleanLine) {
-      result[`经历${index + 1}`] = cleanLine;
-    }
-  });
-
-  return result;
+  const characterName = characterId.replace('character:', '');
+  const characters = statData.角色数据 as Record<string, CharacterDataForSummary> | undefined;
+  return normalizeBiography(characters?.[characterName]?.人物经历);
 }
 
 /**
@@ -333,8 +452,23 @@ export async function executeSummary(
   };
 
   try {
-    // 1. 构建提示词
-    const prompt = formatPromptForCharacter(settings.promptTemplate, character);
+    const latestBiography = readCurrentCharacterBiography(character.characterId);
+    result.originalCount = getBiographyEntryCount(latestBiography);
+    const compressionPlan = buildBiographyCompressionPlan(latestBiography);
+    if (!compressionPlan) {
+      result.success = true;
+      dataLogger.log(`[summaryManager] 角色 ${character.displayName} 没有足够旧经历可分块压缩，跳过`);
+      return result;
+    }
+
+    const sourceCharacter: PendingCharacterSummary = {
+      ...character,
+      entriesCount: Object.keys(compressionPlan.sourceEntries).length,
+      biography: compressionPlan.sourceEntries,
+    };
+
+    // 1. 只总结最旧的一批；近期经历和既有阶段经历不再次改写。
+    const prompt = formatPromptForCharacter(settings.promptTemplate, sourceCharacter);
     dataLogger.log(`[summaryManager] 构建的提示词长度: ${prompt.length}`);
 
     // 2. 调用总结 API
@@ -351,8 +485,9 @@ export async function executeSummary(
     const summaryContent = parseSummaryResponse(response);
     result.summaryContent = summaryContent;
 
-    // 4. 将总结写回变量表
-    const newBiography = formatSummaryToBiography(summaryContent);
+    // 4. 只把本批旧经历替换为一个带游戏时间范围的阶段经历。
+    const summaryValue = buildBiographyStageSummaryValue(summaryContent, compressionPlan.sourceEntries);
+    const newBiography = mergeBiographyCompression(compressionPlan, summaryValue);
 
     // 构建更新数据
     const updateData: Record<string, unknown> = {};

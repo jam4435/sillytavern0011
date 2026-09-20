@@ -327,15 +327,21 @@ export const BUILTIN_LOCAL_REGEX_RULES: RegexRule[] = [
 export const BUILTIN_LOCAL_REGEX_IDS = new Set<string>(BUILTIN_LOCAL_REGEX_RULES.map(rule => rule.id));
 
 /** 默认总结提示词模板 */
-export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你是一个专业的文学编辑。请将以下角色的人物经历进行总结和精炼，保留关键事件和重要信息，去除冗余描述。
+export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责压缩《金庸群侠传》角色的旧人物经历片段。只总结下面提供的旧条目，不改写近期经历，也不要补写未提供的事实。
 
 角色名称：{{characterName}}
-当前经历条目：
+待压缩的旧经历：
 {{biographyEntries}}
 
-请输出精炼后的经历总结，格式为：
+强制要求：
+1. 保留会长期影响人物身份、关系、立场、伤病、生死、师承、重要物品或重大事件认知的事实。
+2. 普通聊天、短时情绪、连续场景动作等无长期意义的细节可以合并或删除。
+3. 输入值开头形如 (1200.11.26) 的内容是游戏内日期。不得把现实日期写入结果，不得猜测缺失日期，不得改变明确日期先后。
+4. 只输出一段精炼的阶段经历，尽量控制在 1～3 句；不要生成新的“经历1/经历2”键。
+
+输出格式：
 <summary>
-[总结内容，按时间顺序，每个关键事件一行]
+[阶段经历内容]
 </summary>`;
 
 const LEGACY_DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传》ERA 变量更新模型。你只负责根据最新 assistant 正文更新已经提供的 ERA 变量，不续写剧情。

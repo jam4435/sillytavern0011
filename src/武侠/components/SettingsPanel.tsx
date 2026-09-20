@@ -2164,7 +2164,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               isOpen={openSettingBlocks.extraModelSummary}
               onToggle={toggleSettingBlock}
             >
-              <p className="settings-description compact">当角色的人物经历条目过多时，调用额外模型进行总结精炼。</p>
+              <p className="settings-description compact">当角色的原始人物经历过多时，只压缩最旧一批并保留近期经历；阶段经历不会反复参与下一轮压缩。</p>
 
               <div className="settings-row">
                 <label className="settings-label">使用 API</label>
@@ -2233,7 +2233,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       onChange={e => updateThreshold('perCharacterEntriesThreshold', parseInt(e.target.value) || 10)}
                       className="settings-number-input"
                     />
-                    <span className="settings-hint-inline">超过此条目数的角色加入待处理队列</span>
+                    <span className="settings-hint-inline">达到此原始条目数即可压缩该角色最旧经历；近期经历会保留</span>
                   </div>
                 </div>
 
@@ -2248,7 +2248,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       onChange={e => updateThreshold('pendingQueueThreshold', parseInt(e.target.value) || 5)}
                       className="settings-number-input"
                     />
-                    <span className="settings-hint-inline">队列中角色数达到此值时触发总结</span>
+                    <span className="settings-hint-inline">达到此数时标记为批量触发；不会阻塞单角色独立触发</span>
                   </div>
                 </div>
 
@@ -2263,7 +2263,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       onChange={e => updateThreshold('totalEntriesThreshold', parseInt(e.target.value) || 50)}
                       className="settings-number-input"
                     />
-                    <span className="settings-hint-inline">所有角色总条目数达到此值时触发总结</span>
+                    <span className="settings-hint-inline">总原始经历达到此值时标记为批量触发；不会阻塞单角色独立触发</span>
                   </div>
                 </div>
               </div>
