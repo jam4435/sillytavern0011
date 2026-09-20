@@ -294,7 +294,7 @@ describe('settingsManager ui theme', () => {
     const thinkingRule = {
       id: 'thinking',
       pattern: '/<thinking>[\\s\\S]*?<\\/thinking>/gi',
-      replacement: '<details>  describe('default builtin regex rules', () => {</details>',
+      replacement: '<details>美化后的思维链</details>',
       enabled: true,
       description: '折叠思维链',
       originScope: 'preset' as const,
