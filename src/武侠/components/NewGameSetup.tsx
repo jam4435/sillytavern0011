@@ -64,7 +64,6 @@ import {
   type MartialArtsRank,
 } from '../utils/martialArtsDatabase';
 import { gameLogger } from '../utils/logger';
-import { getAllSects } from '../utils/factionManager';
 
 /**
  * 从境界字符串中提取大境界名，用于派生 CSS 类名 realm-<大境界>。
@@ -175,8 +174,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   );
   const [appearance, setAppearance] = useState('');
   const [age, setAge] = useState(18);
-  const [selectedFaction, setSelectedFaction] = useState<string>('散修');
-  const allSects = useMemo(() => getAllSects(), []);
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // 时间地点状态
@@ -1197,7 +1194,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         selectedTraits: selectedTraits, // 传递选择的天赋列表
         origin,
         originId: selectedOrigin,
-        initialFaction: selectedFaction === '散修' ? undefined : selectedFaction,
         customRealm: selectedOrigin === 'custom' ? customRealm : undefined,
         originItems, // 传递出身自带的物品
         originMartialArts, // 传递出身自带的功法
@@ -1218,7 +1214,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       attributes,
       selectedMartialArts,
       selectedTraits,
-      selectedFaction,
       selectedOrigin,
       customOrigin,
       customRealm,
@@ -2484,34 +2479,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 </div>
               )}
 
-              {/* 属性极值触发的先天禀赋 (不可取消，不占天命卡槽) */}
-              <div className="form-section glass-card">
-                <h3 className="section-title">
-                  <span className="section-icon">🔒</span>
-                  先天属性禀赋 (自然觉醒)
-                  <span className="trait-count">{attributeTriggeredTraits.length} 个</span>
-                </h3>
-                <p className="section-desc">这些禀赋由你的初始属性极值自然觉醒，终生伴随，不占用天命灵穴槽位。</p>
-                {attributeTriggeredTraits.length > 0 ? (
-                  <div className="traits-grid locked">
-                    {attributeTriggeredTraits.map(trait => (
-                      <div
-                        key={trait.name}
-                        className={`trait-card locked ${getTraitType(trait) === '正面' ? 'positive' : 'negative'}`}
-                      >
-                        <div className="trait-header">
-                          <span className="trait-name">{trait.name}</span>
-                        </div>
-                        <p className="trait-desc">{trait.description}</p>
-                        <div className="trait-lock-icon">🔒</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="empty-hint">暂无属性触发的天赋</p>
-                )}
-              </div>
-
               {/* 导航按钮 */}
               <div className="form-actions dual">
                 <button
@@ -3273,48 +3240,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 </div>
               </div>
 
-              {/* 所属宗门与势力选择 */}
-              <div className="form-section glass-card">
-                <h3 className="section-title">
-                  <span className="section-icon">🏛️</span>
-                  拜入宗门与势力
-                </h3>
-                <p className="section-desc">
-                  选择开局投身的门派或世家（赠送该门派入门功法），亦可选择江湖散修无拘游历。
-                </p>
-
-                <div className="faction-select-grid">
-                  <button
-                    type="button"
-                    className={`faction-choice-card ${selectedFaction === '散修' ? 'active' : ''}`}
-                    onClick={() => setSelectedFaction('散修')}
-                  >
-                    <div className="faction-choice-header">
-                      <span className="faction-choice-name">江湖散修</span>
-                      <span className="faction-choice-badge free">自由身</span>
-                    </div>
-                    <div className="faction-choice-desc">无拘无束，独行江湖，靠自身机缘探索天下绝学。</div>
-                  </button>
-                  {allSects.map(sect => {
-                    const isSelected = selectedFaction === sect.门派名称;
-                    return (
-                      <button
-                        key={sect.门派ID}
-                        type="button"
-                        className={`faction-choice-card ${isSelected ? 'active' : ''}`}
-                        onClick={() => setSelectedFaction(sect.门派名称)}
-                      >
-                        <div className="faction-choice-header">
-                          <span className="faction-choice-name">{sect.门派名称}</span>
-                          <span className={`faction-choice-badge ${sect.体系类型}`}>{sect.体系类型}</span>
-                        </div>
-                        <div className="faction-choice-desc">{sect.设计定位}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* 导航按钮 */}
               <div className="form-actions dual">
                 <button
@@ -3393,10 +3318,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       <div className="preview-item">
                         <span className="preview-label">天资</span>
                         <span className="preview-value">{selectedTalent?.name}</span>
-                      </div>
-                      <div className="preview-item">
-                        <span className="preview-label">所属门派</span>
-                        <span className="preview-value">{selectedFaction}</span>
                       </div>
                     </div>
                   </div>
