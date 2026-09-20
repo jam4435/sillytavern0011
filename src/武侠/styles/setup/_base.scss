@@ -43,31 +43,19 @@
     radial-gradient(1px 1px at 60% 30%, rgba(255, 220, 150, 0.25) 0%, transparent 100%),
     radial-gradient(1px 1px at 80% 70%, rgba(255, 210, 130, 0.2) 0%, transparent 100%),
     radial-gradient(1px 1px at 50% 80%, rgba(255, 200, 100, 0.15) 0%, transparent 100%);
-  animation: particleFloat 20s ease-in-out infinite;
+  // 不再对整张 viewport 合成层做 transform 动画。
+  // Chromium 在 backdrop-filter 叠加场景下会将其切成 GPU tiles，部分显卡会出现横向方块闪烁。
 }
 
 .setup-bg-ink {
   position: absolute;
   inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  opacity: 0.03;
-  mix-blend-mode: overlay;
-}
-
-@keyframes particleFloat {
-  0%,
-  100% {
-    transform: translateY(0) translateX(0);
-  }
-  25% {
-    transform: translateY(-10px) translateX(5px);
-  }
-  50% {
-    transform: translateY(-5px) translateX(-5px);
-  }
-  75% {
-    transform: translateY(-15px) translateX(3px);
-  }
+  // 旧实现使用全屏 SVG feTurbulence + mix-blend-mode，会持续触发昂贵的栅格合成。
+  // 用静态水墨晕染替代，保留层次感同时避免 GPU tile artifact。
+  background:
+    radial-gradient(ellipse 58% 30% at 22% 72%, rgba(190, 150, 90, 0.035) 0%, transparent 72%),
+    radial-gradient(ellipse 48% 26% at 80% 28%, rgba(255, 225, 170, 0.025) 0%, transparent 74%);
+  opacity: 1;
 }
 
 // =========================================
