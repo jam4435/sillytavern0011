@@ -1,0 +1,77 @@
+name: Temporary F cleanup verification
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compare TypeScript diagnostics against main
+        shell: bash
+        run: |
+          set -uo pipefail
+          pnpm exec tsc --noEmit > /tmp/head-tsc.log 2>&1 || true
+          git fetch origin main:refs/remotes/origin/main
+          git worktree add /tmp/f-base origin/main
+          ln -s "$PWD/node_modules" /tmp/f-base/node_modules
+          (
+            cd /tmp/f-base
+            ./node_modules/.bin/tsc --noEmit > /tmp/base-tsc.log 2>&1 || true
+          )
+          cat > /tmp/changed-ts-files.txt <<'EOF'
+          src/武侠/App.tsx
+          src/武侠/hooks/usePageFlow.test.tsx
+          src/武侠/hooks/usePageFlow.ts
+          src/武侠/utils/debugRoundView.test.ts
+          src/武侠/utils/debugRoundView.ts
+          src/武侠/utils/gameInitializer.test.ts
+          src/武侠/utils/gameInitializer.ts
+          EOF
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          changed=set(Path('/tmp/changed-ts-files.txt').read_text(encoding='utf-8').splitlines())
+          p=re.compile(r'^(.*)\((\d+),(\d+)\): error (TS\d+): (.*)$')
+          def d(path):
+              out=set()
+              for raw in Path(path).read_text(encoding='utf-8',errors='replace').splitlines():
+                  m=p.match(raw)
+                  if not m: continue
+                  filename,_l,_c,code,msg=m.groups()
+                  filename=filename.replace('\\','/')
+                  if filename in changed: out.add((filename,code,msg))
+              return out
+          base=d('/tmp/base-tsc.log'); head=d('/tmp/head-tsc.log'); added=sorted(head-base)
+          print(f'Changed TS/TSX files: {len(changed)}')
+          print(f'Baseline diagnostics in changed files: {len(base)}')
+          print(f'Head diagnostics in changed files: {len(head)}')
+          if added:
+              print('New TypeScript diagnostics introduced by F:')
+              for x in added: print(' :: '.join(x))
+              raise SystemExit(1)
+          print('No new TypeScript diagnostics in changed TS/TSX files.')
+          PY
+      - name: Run F targeted tests
+        run: >-
+          pnpm exec vitest run
+          --configLoader native
+          --pool threads
+          --reporter minimal
+          src/武侠/utils/gameInitializer.test.ts
+          src/武侠/hooks/usePageFlow.test.tsx
+          src/武侠/utils/debugRoundView.test.ts
