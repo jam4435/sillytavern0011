@@ -1,5 +1,6 @@
 import { LocateFixed, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isSameLocationScope } from '../../shared/locationPath.js';
 import { DISPLAY_AREA_MARKERS, MAP_HEIGHT, MAP_WIDTH } from '../data/mapCoordinates';
 import { MapArea, MapCoordinate, MapData, MapRegion } from '../types';
 import { getRemoteMapUrl } from '../utils/avatarRemote';
@@ -419,17 +420,14 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   };
 
   const isRegionExplored = (areaName: string, regionName: string, region: MapRegion): boolean =>
-    Object.entries(region.地点).some(
-      ([locationName, location]) =>
-        exploredLocations.includes(`${areaName}/${regionName}/${locationName}`) || location.初始探索,
-    );
+    Object.entries(region.地点).some(([locationName, location]) => {
+      const locationPath = `${areaName}/${regionName}/${locationName}`;
+      return exploredLocations.some(explored => isSameLocationScope(explored, locationPath)) || location.初始探索;
+    });
 
   const isCurrentRegion = (areaName: string, regionName: string, region: MapRegion): boolean =>
-    currentLocation === `${areaName}/${regionName}` ||
-    currentLocation.endsWith(regionName) ||
-    Object.keys(region.地点).some(
-      locationName =>
-        currentLocation === `${areaName}/${regionName}/${locationName}` || currentLocation.endsWith(locationName),
+    Object.keys(region.地点).some(locationName =>
+      isSameLocationScope(currentLocation, `${areaName}/${regionName}/${locationName}`),
     );
 
   return (
