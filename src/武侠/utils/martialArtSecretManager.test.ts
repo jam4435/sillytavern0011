@@ -181,7 +181,16 @@ describe('martialArtSecretManager', () => {
     expect(emitWriteMock).not.toHaveBeenCalled();
   });
 
-  it('撤销参悟会同一事务删除功法并恢复完整秘籍快照', async () => {
+  it('撤销最后一本秘籍的参悟会删除功法并重新插入完整秘籍快照', async () => {
+    vi.mocked(globalThis.getVariables).mockResolvedValue({
+      stat_data: {
+        user数据: {
+          包裹: {},
+          功法: { 九阳神功: { 掌握程度: '初窥门径' } },
+        },
+      },
+    });
+
     await undoLearnMartialArtFromSecret({
       artName: '九阳神功',
       itemName: '九阳神功',
@@ -226,6 +235,54 @@ describe('martialArtSecretManager', () => {
             },
           ],
         },
+      }),
+    );
+  });
+
+  it('撤销多本秘籍的参悟时更新现存条目恢复原数量', async () => {
+    vi.mocked(globalThis.getVariables).mockResolvedValue({
+      stat_data: {
+        user数据: {
+          包裹: {
+            九阳神功: { 类型: '秘籍', 品阶: '绝世', 物品描述: '秘籍。', 数量: 1 },
+          },
+          功法: { 九阳神功: { 掌握程度: '初窥门径' } },
+        },
+      },
+    });
+
+    await undoLearnMartialArtFromSecret({
+      artName: '九阳神功',
+      itemName: '九阳神功',
+      originalItem: {
+        类型: '秘籍',
+        品阶: '绝世',
+        物品描述: '秘籍。',
+        数量: 2,
+      },
+    });
+
+    expect(emitWriteMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          operations: expect.arrayContaining([
+            {
+              type: 'update',
+              payload: {
+                user数据: {
+                  包裹: {
+                    九阳神功: {
+                      类型: '秘籍',
+                      品阶: '绝世',
+                      物品描述: '秘籍。',
+                      数量: 2,
+                    },
+                  },
+                },
+              },
+            },
+          ]),
+        }),
       }),
     );
   });
