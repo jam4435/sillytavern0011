@@ -2167,7 +2167,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </button>
               </div>
               <p className="settings-hint">
-                安全保护：单条规则若一次会删除 80% 以上回复或清空整条回复，将自动跳过。正则内容变化后旧确认不会自动套用到新规则。历史清理不会刷新楼层 iframe。
+                安全保护：普通规则若一次会删除 80% 以上回复或清空整条回复，将自动跳过；完整 <thinking> 块可例外超过 80%，但仍不会把整条回复清空。正则内容变化后旧确认不会自动套用到新规则。历史清理不会刷新楼层 iframe。
               </p>
             </div>
           </div>

@@ -318,7 +318,14 @@ describe('settingsManager ui theme', () => {
       expect(result).toContain('世界信息.时间｜当前存在｜正文无变化｜无操作');
     });
 
-    it('refuses a selected regex that would erase almost the whole reply', () => {
+    it('allows complete thinking blocks above the 80% threshold while keeping a short body', () => {
+      const input = '<thinking>长思维链长思维链长思维链长思维链长思维链</thinking>正文';
+      const signature = getRegexRuleContentSignature(thinkingRule);
+
+      expect(stripSelectedPresetRegexMatches(input, [thinkingRule], [signature])).toBe('正文');
+    });
+
+    it('still refuses a selected non-thinking regex that would erase almost the whole reply', () => {
       const wholeReplyRule = {
         ...thinkingRule,
         id: 'whole',
