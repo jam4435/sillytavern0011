@@ -44,7 +44,7 @@ import {
 } from './hooks';
 import { readLatestDebugRoundSnapshot } from './hooks/useDebugLogs';
 import { shouldDeferSetupEventNotifications } from './hooks/usePageFlow';
-import { ActivePanel, type FactionTask, InventoryItem, type MeridianNodeId, type MeridianUpgradeQuote } from './types';
+import { ActivePanel, type FactionTask, type GameEvent, InventoryItem, type MeridianNodeId, type MeridianUpgradeQuote } from './types';
 import { claimFactionTaskReward } from './utils/factionManager';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
@@ -60,6 +60,7 @@ import {
   type LatestAssistantSnapshot,
 } from './utils/latestAssistantEditor';
 import { getUserCurrentLocation } from './utils/mapUtils';
+import { buildEventClueCommand } from './utils/eventPresentation';
 import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
 import { finalizeCurrentTurn, resumeCheckout } from './utils/saveLoadManager';
 import { renameCurrentChatAutomatically, resumePendingChatRename } from './utils/chatRenameManager';
@@ -161,7 +162,8 @@ const App: React.FC = () => {
     currentOptions,
     setCurrentOptions,
   } = useGameState();
-  const { commands, setTravelCommand, addUseItemCommand, cancelCommand, sendMessageWithCommands } = useCommandQueue();
+  const { commands, setTravelCommand, setEventCommand, addUseItemCommand, cancelCommand, sendMessageWithCommands } =
+    useCommandQueue();
   const [playerAvatarVersion, setPlayerAvatarVersion] = useState(0);
   const [historyCheckoutPending, setHistoryCheckoutPending] = useState(() => isHistoryCheckoutPending());
   const [chatRenamePending, setChatRenamePending] = useState(() => isChatRenamePending());
@@ -995,6 +997,14 @@ const App: React.FC = () => {
     [closeModal, gameState.currentLocation, setTravelCommand],
   );
 
+  const handleAdvanceEventClue = useCallback(
+    (event: GameEvent) => {
+      setEventCommand(event.id, buildEventClueCommand(event));
+      closeModal();
+    },
+    [closeModal, setEventCommand],
+  );
+
   // 应用正则替换到主文本
   const processedMaintext = useMemo(() => {
     if (!currentMaintext || activeRegexRules.length === 0) {
@@ -1282,6 +1292,7 @@ const App: React.FC = () => {
             gameTime={gameState.gameTime}
             currentLocation={gameState.currentLocation}
             onTravelTo={handleEventTravelTo}
+            onAdvanceClue={handleAdvanceEventClue}
           />
         );
       case ActivePanel.MAP:
