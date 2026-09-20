@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { normalizeLocationPath } from '../../shared/locationPath.js';
 import AvatarImage from './AvatarImage';
 import { getCardBackgroundImage } from './CardOrnaments';
 import FullscreenButton from './FullscreenButton';
@@ -1037,9 +1038,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         }
         break;
       case 'origin':
-        // 出身选择：如果选择自定义时间地点，必须填写地点
-        if (!useEventLocation && !customLocation.trim()) {
-          newErrors.location = '请输入所在地点';
+        // 自定义地点必须进入统一的三级地点体系，可选第四层叙事场景。
+        if (!useEventLocation) {
+          if (!customLocation.trim()) {
+            newErrors.location = '请输入所在地点';
+          } else if (!normalizeLocationPath(customLocation)) {
+            newErrors.location = '地点需为三级或四级路径，例如：大宋/临安府/西湖 或 大宋/临安府/西湖/断桥';
+          }
         }
         break;
       case 'identity':
@@ -1122,8 +1127,12 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       newErrors.age = '年龄应在10-100之间';
     }
 
-    if (!useEventLocation && !customLocation.trim()) {
-      newErrors.location = '请输入所在地点';
+    if (!useEventLocation) {
+      if (!customLocation.trim()) {
+        newErrors.location = '请输入所在地点';
+      } else if (!normalizeLocationPath(customLocation)) {
+        newErrors.location = '地点需为三级或四级路径，例如：大宋/临安府/西湖 或 大宋/临安府/西湖/断桥';
+      }
     }
 
     // 新版点数系统：检查剩余点数是否为负数即可
@@ -1162,7 +1171,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
           year: customYear,
           month: customMonth,
           day: customDay,
-          location: customLocation,
+          location: normalizeLocationPath(customLocation) || customLocation.trim(),
         };
       }
 
