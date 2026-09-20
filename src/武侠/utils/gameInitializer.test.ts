@@ -128,6 +128,26 @@ describe('generateVariableData origin faction linkage', () => {
     });
   });
 
+  it('静态势力库尚未收录的明确门派出身也保留所属势力', () => {
+    const data = generateVariableData({
+      ...createFormData(),
+      origin: '峨眉记名弟子',
+      originId: 'emei_named',
+    }) as {
+      user数据: {
+        身份: Record<string, string>;
+        势力?: Record<string, { 体系类型: string; 身份: string; 状态: string }>;
+      };
+    };
+
+    expect(data.user数据.身份['峨眉派']).toBe('记名弟子');
+    expect(data.user数据.势力?.['峨眉派']).toMatchObject({
+      体系类型: '宗门',
+      身份: '记名弟子',
+      状态: '在籍',
+    });
+  });
+
   it('旧调用显式传 initialFaction 时仍优先使用显式势力', () => {
     const data = generateVariableData({
       ...createFormData(),
