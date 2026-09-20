@@ -56,6 +56,7 @@ import {
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
 import { migrateAvatarState } from './utils/avatarState';
 import { equipInventoryItem, useMedicineItem } from './utils/itemManager';
+import { learnMartialArtFromSecret } from './utils/martialArtSecretManager';
 import { upgradeMeridianNode } from './utils/meridianManager';
 import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inventoryAttributePreview';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
@@ -721,6 +722,22 @@ const App: React.FC = () => {
             await syncPlayerAttributesFromVariables();
             refreshGameStateFromVariables();
           }
+          return;
+        }
+
+        if (item.type === 'SECRET') {
+          const result = await learnMartialArtFromSecret(item.name);
+          if (!result.success || !result.commandText || !result.rollback) {
+            showError(result.error || `参悟《${item.name}》失败`);
+            return;
+          }
+
+          addUseItemCommand(result.commandText, {
+            itemName: result.itemName,
+            martialArtLearnRollback: result.rollback,
+          });
+          await syncPlayerAttributesFromVariables();
+          refreshGameStateFromVariables();
           return;
         }
 
