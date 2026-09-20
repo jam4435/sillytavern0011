@@ -107,10 +107,6 @@ export function collectReachableMessageKeys(
   return reachable;
 }
 
-/**
- * 从元数据中删除已经不属于任何当前消息、任何备用 swipe、也不在 SelectedMks 中的 EditLog。
- * 返回被删除的 MK，便于调试和测试。
- */
 export type EditLogCompactionResult = {
   convertedLogs: number;
   removedNoopUpdates: number;
@@ -132,6 +128,19 @@ export function compactEditLogsInMeta(meta: any): EditLogCompactionResult {
   for (const mk of Object.keys(editLogs)) {
     const raw = editLogs[mk];
     const parsed = parseEditLog(raw);
+
+    // 对旧字符串先做独立合法性确认。解析失败的损坏数据保持原样，避免“压缩”意外变成数据修复/清空。
+    if (typeof raw === 'string') {
+      const normalized = raw.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, '');
+      try {
+        if (!Array.isArray(JSON.parse(normalized))) {
+          continue;
+        }
+      } catch {
+        continue;
+      }
+    }
+
     const compacted = parsed.filter(entry => {
       const isNoopUpdate =
         String(entry?.op || '').toLowerCase() === 'update' &&
@@ -152,6 +161,10 @@ export function compactEditLogsInMeta(meta: any): EditLogCompactionResult {
   return { convertedLogs, removedNoopUpdates };
 }
 
+/**
+ * 从元数据中删除已经不属于任何当前消息、任何备用 swipe、也不在 SelectedMks 中的 EditLog。
+ * 返回被删除的 MK，便于调试和测试。
+ */
 export function pruneUnreachableEditLogs(
   meta: any,
   messages: any[],

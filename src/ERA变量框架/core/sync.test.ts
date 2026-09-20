@@ -28,6 +28,20 @@ describe('ERA EditLog storage compaction', () => {
     ]);
     expect(meta.EditLogs.mk2).toEqual([{ op: 'delete', path: '角色数据.乙', value_old: { 姓名: '乙' } }]);
   });
+
+  it('leaves malformed legacy strings untouched instead of replacing them with an empty log', () => {
+    const meta = {
+      EditLogs: {
+        broken: '[{"op":"update"',
+      },
+    };
+
+    expect(compactEditLogsInMeta(meta)).toEqual({
+      convertedLogs: 0,
+      removedNoopUpdates: 0,
+    });
+    expect(meta.EditLogs.broken).toBe('[{"op":"update"');
+  });
 });
 
 describe('ERA EditLog reachability cleanup', () => {
