@@ -11,6 +11,13 @@ const commands: PendingCommand[] = [
     data: { location: '大宋/嘉兴府/烟雨楼' },
     timestamp: 1,
   },
+  {
+    id: 'event-1',
+    type: 'EVENT',
+    text: '[事件指令]剧情合理演进到 旧案余波事件线索',
+    data: { eventId: 'follow-up' },
+    timestamp: 2,
+  },
 ];
 
 describe('CommandQueuePopover', () => {
@@ -34,8 +41,9 @@ describe('CommandQueuePopover', () => {
     );
 
     const pendingSection = screen.getByRole('region', { name: '待发送指令' });
-    expect(within(pendingSection).getByText('1')).toBeInTheDocument();
+    expect(within(pendingSection).getByText('2')).toBeInTheDocument();
     expect(screen.getByText('[地图指令]前往烟雨楼')).toBeInTheDocument();
+    expect(screen.getByText('[事件指令]剧情合理演进到 旧案余波事件线索')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /填入输入栏/ })).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('button', { name: '填入输入栏：先观察四周' }));
