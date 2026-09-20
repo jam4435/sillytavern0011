@@ -479,6 +479,196 @@ describe('useVariableChangeTracker', () => {
     ]);
   });
 
+  it('普通消息边界不会把已确认的 AI 批次降级成后台', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'era-api-write',
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toHaveLength(1);
+
+    act(() => {
+      result.current.handleVariableMessageBoundary(2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        origin: 'ai',
+        producer: 'era',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
+  });
+
+  it('后台写入碰巧达到 AI 目标值时比较仍标记为未落地', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+    act(() => {
+      result.current.handleDirectVariableWriteDone({
+        version: 1,
+        writeId: 'background-target-match',
+        source: 'event-script',
+        operation: 'update',
+        reason: 'event-script-write',
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.comparisons).toEqual([
+      expect.objectContaining({
+        status: 'not-applied',
+        expectedValue: 120,
+        finalValue: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.background.observedChanges).toHaveLength(1);
+  });
+
+  it('同一路径多次声明只保留最后一次作为最终意图', () => {
+    const repeatedReply = [
+      '<VariableEdit>{"user数据":{"修为":110}}</VariableEdit>',
+      '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>',
+    ].join('\n');
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(repeatedReply, 2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.declaredChanges).toEqual([
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+        value: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.aiReply.comparisons).toHaveLength(1);
+  });
+
+  it('切换 swipe 后以 active swipe 为准并清掉旧 swipe 的声明与差分', async () => {
+    const swipeReply = '<VariableEdit>{"user数据":{"修为":90}}</VariableEdit>';
+    let activeSwipe = 0;
+    getChatMessagesMock.mockImplementation((messageId?: unknown) => {
+      if (messageId === 2 || messageId === '0-{{lastMessageId}}') {
+        return [{
+          message_id: 2,
+          message: declaredReply,
+          swipes: [declaredReply, swipeReply],
+          swipe_id: activeSwipe,
+        }];
+      }
+      return [];
+    });
+
+    const { result } = renderHook(() => useVariableChangeTracker());
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'era-api-write',
+      });
+    });
+    expect(result.current.variableChanges?.aiReply.observedChanges[0]).toEqual(
+      expect.objectContaining({ afterValue: 120 }),
+    );
+
+    activeSwipe = 1;
+    currentStatData = { user数据: { 修为: 90 } };
+    act(() => {
+      result.current.handleVariableMessageBoundary(2, { replaceAssistantReply: true });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(40);
+      await Promise.resolve();
+    });
+
+    expect(result.current.variableChanges?.aiReply.declaredChanges).toEqual([
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+        value: 90,
+      }),
+    ]);
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        beforeValue: 100,
+        afterValue: 90,
+      }),
+    ]);
+    expect(result.current.variableChanges?.aiReply.observedChanges).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ afterValue: 120 })]),
+    );
+  });
+
+  it('校订最新回复后会重建声明与净变化，不沿用保存前的声明', () => {
+    const revisedReply = '<VariableEdit>{"user数据":{"修为":80}}</VariableEdit>';
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+      result.current.markVariableApiWriteAsAi(2);
+    });
+    currentStatData = { user数据: { 修为: 120 } };
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'era-api-write',
+      });
+    });
+
+    currentStatData = { user数据: { 修为: 80 } };
+    act(() => {
+      result.current.handleVariableAssistantRevision(revisedReply, 2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.declaredChanges).toEqual([
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+        value: 80,
+      }),
+    ]);
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        beforeValue: 100,
+        afterValue: 80,
+      }),
+    ]);
+    expect(result.current.variableChanges?.aiReply.comparisons[0]).toEqual(
+      expect.objectContaining({
+        status: 'applied',
+        expectedValue: 80,
+        finalValue: 80,
+      }),
+    );
+  });
+
   it('主回复声明已记录后，消息边界不会再用最终 assistant 原文覆盖它', () => {
     getChatMessagesMock.mockImplementation((messageId?: unknown) => {
       if (messageId === 2 || messageId === '0-{{lastMessageId}}') {
