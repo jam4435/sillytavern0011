@@ -562,8 +562,11 @@
   }
 
   &.active .event-tab-count {
-    background: #9e2b25;
-    color: #fff7e5;
+    background: #c65a52;
+    color: #fffdf7;
+    border: 1px solid rgba(255, 246, 232, 0.45);
+    box-shadow: 0 0 0 1px rgba(98, 28, 24, 0.08);
+    font-weight: 800;
   }
 }
 

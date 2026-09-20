@@ -121,6 +121,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
   const tooltipText = getBreakthroughTooltip(currentRealm, cultivation);
   const nextRealmColor = nextRealm ? getRealmColor(nextRealm) : realmColor;
   const identityEntries = Object.entries(stats.identities);
+  const portraitIdentityEntries = identityEntries.filter(([, description]) => description !== '初入江湖的新人');
   const networkEntries = stats.network ? Object.entries(stats.network) : [];
   const playerGender = stats.gender === '女' ? '女' : '男';
   const genderAvatarOptions = useMemo(() => getAvatarsByGender(playerGender), [playerGender]);
@@ -320,7 +321,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
                   />
                   <div className="portrait-text-overlay">
                     <h3 className="char-name-display">{stats.name}</h3>
-                    {identityEntries.map(([id]) => (
+                    {portraitIdentityEntries.map(([id]) => (
                       <span key={id} className="char-title-display">
                         {id}
                       </span>
@@ -332,7 +333,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
                   <div className="portrait-fallback">{avatarSource.fallbackInitial}</div>
                   <div className="portrait-text-overlay">
                     <h3 className="char-name-display">{stats.name}</h3>
-                    {identityEntries.map(([id]) => (
+                    {portraitIdentityEntries.map(([id]) => (
                       <span key={id} className="char-title-display">
                         {id}
                       </span>

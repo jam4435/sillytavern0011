@@ -5622,3 +5622,91 @@
     }
   }
 }
+
+
+/* G audit: 补齐势力页在水墨宣纸主题下未覆盖的暗色主题残留。 */
+[data-ui-theme='ink-wash'] .faction-panel-wrapper {
+  .selector-label,
+  .meta-item,
+  .column-hint,
+  .task-detail,
+  .intro-text,
+  .leaders-label,
+  .branch-label,
+  .status-label,
+  .req-item,
+  .cost-item,
+  .not-member-tip,
+  .modal-desc,
+  .member-mark {
+    color: #5b4b3e;
+  }
+
+  .sect-name-row,
+  .tier-name,
+  .drawer-title-group,
+  .detail-header-left,
+  .sect-leaders-row,
+  .column-title-bar,
+  .faction-bottom-actions-bar {
+    color: #2b1f17;
+  }
+
+  .sect-status-tag,
+  .badge-tag,
+  .tier-pill,
+  .leader-pill,
+  .branch-label {
+    background: rgba(225, 213, 194, 0.78);
+    border-color: rgba(91, 72, 55, 0.28);
+    color: #4a392d;
+  }
+
+  .category-filter-bar,
+  .faction-bottom-actions-bar,
+  .drawer-footer {
+    background: rgba(248, 242, 232, 0.88);
+    border-color: var(--wuxia-ink-border-soft);
+  }
+
+  .quick-loc-btn,
+  .drawer-close-btn {
+    background: rgba(239, 230, 214, 0.88);
+    border-color: var(--wuxia-ink-border);
+    color: #49382d;
+
+    &:hover,
+    &:focus-visible {
+      background: #e6d8c2;
+      border-color: #8b1a1a;
+      color: #711818;
+    }
+  }
+
+  .faction-action-error-bar {
+    background: rgba(151, 43, 37, 0.09);
+    border-color: rgba(139, 26, 26, 0.32);
+    color: #7b211d;
+
+    button {
+      color: #7b211d;
+    }
+  }
+
+  .faction-confirm-modal {
+    background: #f7efe2;
+    border-color: var(--wuxia-ink-border);
+    color: #2b1f17;
+    box-shadow: 0 12px 34px rgba(57, 42, 30, 0.24);
+  }
+
+  .req-item.pass {
+    color: #32653a;
+  }
+
+  .confirm-betray-btn {
+    background: #8b1a1a;
+    border-color: #681313;
+    color: #fffdf7;
+  }
+}

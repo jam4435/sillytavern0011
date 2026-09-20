@@ -144,20 +144,66 @@ function getAppearanceRangeIndex(ranges: AppearanceRangeTemplate[], value: numbe
   return index >= 0 ? index : 2;
 }
 
-export function getRandomAppearance(gender: '男' | '女', attributes: AppearanceAttributes): string {
+function getTraitAwareFaceOverride(
+  traitNames: ReadonlySet<string>,
+  attributes: AppearanceAttributes,
+): string | null {
+  const charismaTone =
+    attributes.风姿 >= 13
+      ? '余下的面部轮廓仍显清朗出众'
+      : attributes.风姿 <= 5
+        ? '伤残令神色更显阴沉凶厉'
+        : '神情沉静警觉，面容轮廓端正';
+
+  if (traitNames.has('天生目盲（盲侠）')) {
+    return `双目失明，以素布覆眼，${charismaTone}`;
+  }
+
+  if (traitNames.has('独眼')) {
+    return `一目已失，以深色眼罩覆住伤眼，余下一眼警觉有神，${charismaTone}`;
+  }
+
+  return null;
+}
+
+function getVisibleTraitAppearanceFragments(traitNames: ReadonlySet<string>): string[] {
+  const fragments: string[] = [];
+
+  if (traitNames.has('断臂')) {
+    fragments.push('一侧手臂已失，空袖自然垂落，举止与持物皆以单臂完成');
+  }
+
+  if (['太监', '天阉', '宦官'].some(name => traitNames.has(name))) {
+    fragments.push('面上少见须髯，喉结不显，声线较常人偏细');
+  }
+
+  return fragments;
+}
+
+export function getRandomAppearance(
+  gender: '男' | '女',
+  attributes: AppearanceAttributes,
+  traitNames: string[] = [],
+): string {
   const faceRange = findAppearanceRange(APPEARANCE_TEMPLATES.face[gender], attributes.风姿);
   const frameRange = findAppearanceRange(APPEARANCE_TEMPLATES.frame, attributes.根骨);
   const strengthRange = findAppearanceRange(APPEARANCE_TEMPLATES.strength, attributes.臂力);
 
-  const face = pickAppearanceFragment(faceRange, gender === '男' ? '五官端正，神情平和' : '眉目端正，神情平和');
+  const traitNameSet = new Set(traitNames.filter(Boolean));
+  const traitFace = getTraitAwareFaceOverride(traitNameSet, attributes);
+  const face =
+    traitFace ||
+    pickAppearanceFragment(faceRange, gender === '男' ? '五官端正，神情平和' : '眉目端正，神情平和');
   const frame = pickAppearanceFragment(frameRange, '骨架匀称，气息平稳');
   const strength = pickAppearanceFragment(strengthRange, '四肢松紧适中，举止自然');
 
   const frameIndex = getAppearanceRangeIndex(APPEARANCE_TEMPLATES.frame, attributes.根骨);
   const strengthIndex = getAppearanceRangeIndex(APPEARANCE_TEMPLATES.strength, attributes.臂力);
   const bodyConnector = Math.abs(frameIndex - strengthIndex) >= 2 ? '，却' : '，';
+  const visibleTraitFragments = getVisibleTraitAppearanceFragments(traitNameSet);
+  const traitSuffix = visibleTraitFragments.length > 0 ? `；${visibleTraitFragments.join('；')}` : '';
 
-  return `${face}；${frame}${bodyConnector}${strength}。`;
+  return `${face}；${frame}${bodyConnector}${strength}${traitSuffix}。`;
 }
 
 export interface EventLocation {

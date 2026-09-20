@@ -71,6 +71,8 @@ import { getAllSects } from '../utils/factionManager';
  * 兼容 OLD 格式（"三流初期" → "三流"）与裸 "不入流"（无小境界后缀，原样返回）。
  */
 const realmMajor = (realm: string): string => realm.replace(/(初期|中期|后期|圆满)$/, '');
+const REALM_MAJOR_OPTIONS = Array.from(new Set(REALM_LEVELS.map(realm => realmMajor(realm))));
+const getRealmStageLabel = (realm: string): string => realm.replace(realmMajor(realm), '') || '本境';
 
 // 武功品阶点数消耗（直接选择）- 统一到总点数池
 const RANK_POINT_COST: Record<MartialArtsRank, number> = {
@@ -1228,11 +1230,15 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   // 随机生成外貌（包含身材描述）
   const randomAppearance = () => {
     setAppearance(
-      getRandomAppearance(gender, {
-        风姿: attributes.风姿,
-        臂力: attributes.臂力,
-        根骨: attributes.根骨,
-      }),
+      getRandomAppearance(
+        gender,
+        {
+          风姿: attributes.风姿,
+          臂力: attributes.臂力,
+          根骨: attributes.根骨,
+        },
+        allActiveTraitNames,
+      ),
     );
   };
 
@@ -2885,21 +2891,49 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     {/* 自定义境界选择 */}
                     <div className="form-group">
                       <label className="form-label">起始境界</label>
-                      <div className="realm-select-grid">
-                        {REALM_LEVELS.map(realm => (
-                          <button
-                            key={realm}
-                            type="button"
-                            className={`realm-option ${customRealm === realm ? 'selected' : ''} realm-${realmMajor(realm)}`}
-                            onClick={() => setCustomRealm(realm)}
-                          >
-                            {realm}
-                          </button>
-                        ))}
+                      <div className="realm-tier-picker">
+                        <div className="realm-major-grid" role="group" aria-label="选择大境界">
+                          {REALM_MAJOR_OPTIONS.map(major => {
+                            const isSelected = realmMajor(customRealm) === major;
+                            return (
+                              <button
+                                key={major}
+                                type="button"
+                                className={`realm-major-option ${isSelected ? 'selected' : ''} realm-${major}`}
+                                aria-pressed={isSelected}
+                                onClick={() => {
+                                  const sameMajorStages = REALM_LEVELS.filter(realm => realmMajor(realm) === major);
+                                  const currentStageLabel = getRealmStageLabel(customRealm);
+                                  const sameStage = sameMajorStages.find(
+                                    realm => getRealmStageLabel(realm) === currentStageLabel,
+                                  );
+                                  setCustomRealm((sameStage || sameMajorStages[0]) as RealmLevel);
+                                }}
+                              >
+                                {major}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {REALM_LEVELS.filter(realm => realmMajor(realm) === realmMajor(customRealm)).length > 1 && (
+                          <div className="realm-stage-grid" role="group" aria-label="选择境界阶段">
+                            {REALM_LEVELS.filter(realm => realmMajor(realm) === realmMajor(customRealm)).map(realm => (
+                              <button
+                                key={realm}
+                                type="button"
+                                className={`realm-stage-option ${customRealm === realm ? 'selected' : ''}`}
+                                aria-pressed={customRealm === realm}
+                                onClick={() => setCustomRealm(realm)}
+                              >
+                                {getRealmStageLabel(realm)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <p className="realm-hint">
-                        当前选择: <strong>{customRealm}</strong> (修为值:{' '}
-                        {getOriginRealmAndCultivation('custom').cultivation})
+                        当前选择: <strong>{customRealm}</strong> (修为值: {REALM_CULTIVATION_MAP[customRealm] ?? 0})
                       </p>
                     </div>
 

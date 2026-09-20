@@ -15,10 +15,15 @@ function renderSetup() {
   render(<NewGameSetup onSubmit={vi.fn()} onBack={vi.fn()} isLoading={false} />);
 }
 
-function goToIdentityStep() {
-  for (let index = 0; index < 5; index += 1) {
+function goToOriginStep() {
+  for (let index = 0; index < 4; index += 1) {
     fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
   }
+}
+
+function goToIdentityStep() {
+  goToOriginStep();
+  fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
 }
 
 function setAttributeSlider(attribute: '臂力' | '根骨' | '风姿', value: number) {
@@ -97,6 +102,40 @@ describe('NewGameSetup appearance generation', () => {
     expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.face.男, 0));
     expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.frame, 0));
     expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.strength, 20));
+  });
+});
+
+describe('NewGameSetup custom realm picker', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('自定义出身只先列大境界，再选择当前大境界的小阶段', () => {
+    renderSetup();
+    goToOriginStep();
+
+    fireEvent.click(screen.getByText('自定义出身', { selector: '.origin-name' }));
+
+    const majorGroup = screen.getByRole('group', { name: '选择大境界' });
+    expect(within(majorGroup).getAllByRole('button')).toHaveLength(7);
+    expect(within(majorGroup).getByRole('button', { name: '三流' })).toHaveAttribute('aria-pressed', 'true');
+
+    const stageGroup = screen.getByRole('group', { name: '选择境界阶段' });
+    expect(within(stageGroup).getAllByRole('button')).toHaveLength(4);
+    expect(within(stageGroup).getByRole('button', { name: '圆满' })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(within(majorGroup).getByRole('button', { name: '宗师' }));
+    const realmHint = document.querySelector('.realm-hint');
+    expect(realmHint).toHaveTextContent('宗师圆满');
+    expect(realmHint).toHaveTextContent('4200');
+
+    const updatedStageGroup = screen.getByRole('group', { name: '选择境界阶段' });
+    fireEvent.click(within(updatedStageGroup).getByRole('button', { name: '后期' }));
+    expect(realmHint).toHaveTextContent('宗师后期');
+    expect(realmHint).toHaveTextContent('3800');
+
+    expect(screen.queryByRole('button', { name: '宗师初期' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '陆地神仙圆满' })).not.toBeInTheDocument();
   });
 });
 
