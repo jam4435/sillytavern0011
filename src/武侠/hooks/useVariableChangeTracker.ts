@@ -70,6 +70,7 @@ type CaptureMetadata = {
   actions?: VariableWriteActions | null;
   assistantMessageId?: number;
   aiOnlyDeclaredMatches?: boolean;
+  allowAiPromotion?: boolean;
   allowAiDemotion?: boolean;
 };
 
@@ -116,6 +117,7 @@ const summarizeMetadata = (metadata: CaptureMetadata) => ({
   actions: summarizeActions(metadata.actions),
   assistantMessageId: metadata.assistantMessageId ?? null,
   aiOnlyDeclaredMatches: metadata.aiOnlyDeclaredMatches === true,
+  allowAiPromotion: metadata.allowAiPromotion === true,
   allowAiDemotion: metadata.allowAiDemotion === true,
 });
 
@@ -396,12 +398,20 @@ const isBoundaryProducer = (producer: VariableChangeProducer): boolean =>
   producer === 'message-boundary';
 
 const canPromoteBatchToAi = (
-  batch: Pick<VariableObservedBatch, 'origin' | 'producer'>,
+  batch: Pick<VariableObservedBatch, 'origin' | 'producer' | 'assistantMessageId'>,
   metadata: CaptureMetadata,
 ): boolean =>
   metadata.origin === 'ai'
   && batch.origin !== 'ai'
-  && isBoundaryProducer(batch.producer);
+  && (
+    isBoundaryProducer(batch.producer)
+    || metadata.allowAiPromotion === true
+  )
+  && (
+    batch.assistantMessageId === undefined
+    || metadata.assistantMessageId === undefined
+    || batch.assistantMessageId === metadata.assistantMessageId
+  );
 
 const canDemoteBatchToBackground = (
   batch: Pick<VariableObservedBatch, 'origin' | 'assistantMessageId'>,
@@ -1255,6 +1265,7 @@ export function useVariableChangeTracker() {
       actions,
       assistantMessageId,
       aiOnlyDeclaredMatches: isAiWrite,
+      allowAiPromotion: signal.kind === 'sourced-era' && sourcedAttribution === 'ai',
       allowAiDemotion: signal.kind === 'sourced-era' && sourcedAttribution === 'background',
     });
 
