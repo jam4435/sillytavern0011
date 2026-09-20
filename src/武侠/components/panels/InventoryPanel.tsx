@@ -167,7 +167,11 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
         })
       : null;
   const selectedActionDisabled =
-    isActing || !onItemAction || !selectedItem || (selectedItem.type !== 'EQUIP' && selectedItem.type !== 'ELIXIR');
+    isActing ||
+    !onItemAction ||
+    !selectedItem ||
+    !['EQUIP', 'ELIXIR', 'SECRET'].includes(selectedItem.type) ||
+    (selectedItem.type === 'SECRET' && !selectedSecretEligibility?.canStudy);
 
   const handleSelectItem = (item: InventoryItem) => {
     setSelectedItemId(item.id);
