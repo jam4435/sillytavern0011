@@ -131,6 +131,35 @@ describe('NewGameSetup appearance generation', () => {
   });
 });
 
+describe('NewGameSetup custom location validation', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('自定义开局地点必须是三级或四级路径，支持统一分隔符规范化', () => {
+    renderSetup();
+    goToOriginStep();
+
+    fireEvent.click(screen.getByRole('radio', { name: '自定义时间地点' }));
+    const locationInput = screen.getByPlaceholderText('例如：大理/无量山/剑湖宫 或 大宋/临安府/西湖');
+
+    fireEvent.change(locationInput, { target: { value: '牛家村' } });
+    fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
+    expect(screen.getByText(/地点需为三级或四级路径/)).toBeInTheDocument();
+    expect(document.querySelector('[data-wuxia-automation="new-game-setup"]')).toHaveAttribute(
+      'data-wuxia-setup-step',
+      'origin',
+    );
+
+    fireEvent.change(locationInput, { target: { value: '大宋>临安府>西湖' } });
+    fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
+    expect(document.querySelector('[data-wuxia-automation="new-game-setup"]')).toHaveAttribute(
+      'data-wuxia-setup-step',
+      'identity',
+    );
+  });
+});
+
 describe('NewGameSetup custom realm picker', () => {
   beforeEach(() => {
     localStorage.clear();
