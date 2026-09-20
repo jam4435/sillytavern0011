@@ -915,7 +915,7 @@ export interface MapData {
 /**
  * 待发送指令类型
  */
-export type CommandType = 'TRAVEL' | 'USE_ITEM' | 'EVENT';
+export type CommandType = 'TRAVEL' | 'USE_ITEM';
 
 export interface ResourceDeltaMap {
   气血?: number;
@@ -947,7 +947,6 @@ export interface PendingCommand {
   data: {
     location?: string;
     origin?: string;
-    eventId?: string;
     itemName?: string;
     originalCount?: number; // 用于撤销物品使用
     originalItem?: InventoryItemVariableData;

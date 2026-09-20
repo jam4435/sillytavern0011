@@ -49,14 +49,6 @@ export function getEventDescription(event: GameEvent): string {
   return event.description.trim().replace(EVENT_TIME_PREFIX_PATTERN, '').trim();
 }
 
-export function buildEventClueCommand(event: GameEvent): string {
-  const timeText = event.timeText?.trim();
-  const location = event.location?.trim();
-  const eventTitle = event.title.trim() || '后续事件';
-  const targetParts = [timeText, location, `${eventTitle}事件线索`].filter(Boolean);
-  return `[事件指令]剧情合理演进到 ${targetParts.join(' ')}`;
-}
-
 export function getEventCountdownLabel(event: GameEvent): string | null {
   if (event.startsInDays !== undefined) {
     return event.startsInDays <= 0 ? '今日将起' : `${event.startsInDays}日后`;
