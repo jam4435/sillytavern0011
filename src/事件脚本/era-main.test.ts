@@ -863,7 +863,7 @@ describe('ERA 主线初始化控制', () => {
     vi.mocked(scheduler.getManifestEventCandidateKeys).mockReturnValue([nextEvent]);
     vi.mocked(checker.isTimeForEvent).mockImplementation((_time, _definition, eventName) => eventName === nextEvent);
     vi.mocked(checker.isEventDiscoverable).mockReturnValue(false);
-    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(true);
+    vi.mocked(checker.isTimeAfterEventEnd).mockImplementation((_currentTime, endTime) => endTime.日 === 15);
     vi.mocked(operations.batchStartEvents).mockClear().mockResolvedValue(undefined);
     vi.mocked(operations.batchEndEvents)
       .mockClear()
