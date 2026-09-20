@@ -17,6 +17,7 @@ interface EventsPanelProps {
   gameTime?: string;
   currentLocation?: string;
   onTravelTo?: (location: string) => void;
+  onAdvanceClue?: (event: GameEvent) => void;
 }
 
 type EventTab = 'current' | 'clues' | 'chronicle';
@@ -33,6 +34,7 @@ interface EventDisclosureRowProps {
   onToggle: () => void;
   currentLocation?: string;
   onTravelTo?: (location: string) => void;
+  onAdvanceClue?: (event: GameEvent) => void;
 }
 
 const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
@@ -41,6 +43,7 @@ const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
   onToggle,
   currentLocation,
   onTravelTo,
+  onAdvanceClue,
 }) => {
   const detailId = useId().replace(/:/g, '');
   const countdown = getEventCountdownLabel(event);
@@ -74,6 +77,17 @@ const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
             </div>
           )}
           <EventMeta event={event} currentLocation={currentLocation} onTravelTo={onTravelTo} />
+          {event.type !== 'ACTIVE' && onAdvanceClue && (
+            <div className="event-clue-command-row">
+              <button
+                type="button"
+                className="event-clue-command-btn"
+                onClick={() => onAdvanceClue(event)}
+              >
+                演进到此线索
+              </button>
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -190,6 +204,7 @@ export const EventsPanel: React.FC<EventsPanelProps> = ({
   gameTime,
   currentLocation,
   onTravelTo,
+  onAdvanceClue,
 }) => {
   const currentEvents = useMemo(() => sortEventsForDisplay(events.filter(event => event.type === 'ACTIVE')), [events]);
   const clueEvents = useMemo(
@@ -243,6 +258,7 @@ export const EventsPanel: React.FC<EventsPanelProps> = ({
                 onToggle={() => setExpandedEventId(current => (current === event.id ? null : event.id))}
                 currentLocation={currentLocation}
                 onTravelTo={onTravelTo}
+                onAdvanceClue={onAdvanceClue}
               />
             ))}
           </div>
