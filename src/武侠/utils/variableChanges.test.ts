@@ -31,6 +31,15 @@ describe('parseDeclaredVariableChanges', () => {
     ]);
   });
 
+  it('未闭合的变量标签会明确报告解析错误', () => {
+    const parsed = parseDeclaredVariableChanges(
+      '<VariableEdit>{"user数据":{"修为":120}}',
+    );
+
+    expect(parsed.declaredChanges).toEqual([]);
+    expect(parsed.parseErrors).toContain('VariableEdit 有 1 个标签未闭合。');
+  });
+
   it('区分空块和非法 JSON', () => {
     const parsed = parseDeclaredVariableChanges(`
       <VariableInsert></VariableInsert>
@@ -182,6 +191,54 @@ describe('buildAiComparisons', () => {
       baselineStatData: { user数据: { 修为: 120 } },
       currentStatData: { user数据: { 修为: 120 } },
     }).comparisons[0].status).toBe('no-op');
+  });
+
+  it('后台碰巧写成 AI 目标值时不会冒充 AI 已落地', () => {
+    const backgroundChanges = createObservedVariableChanges(
+      { user数据: { 修为: 100 } },
+      { user数据: { 修为: 120 } },
+      {
+        origin: 'background',
+        producer: 'event-script',
+        timestamp: 1000,
+        batchId: 'background-1',
+      },
+    ).observedChanges;
+
+    const comparison = buildAiComparisons({
+      declaredChanges: declared,
+      observedChanges: [],
+      backgroundObservedChanges: backgroundChanges,
+      baselineStatData: { user数据: { 修为: 100 } },
+      currentStatData: { user数据: { 修为: 120 } },
+    }).comparisons[0];
+
+    expect(comparison.status).toBe('not-applied');
+  });
+
+  it('路径 ID 不会把带点号的键与嵌套路径混为一谈', () => {
+    const collisionDeclarations = parseDeclaredVariableChanges(
+      '<VariableEdit>{"a.b":{"c":1},"a":{"b.c":2}}</VariableEdit>',
+    ).declaredChanges;
+
+    const comparisons = buildAiComparisons({
+      declaredChanges: collisionDeclarations,
+      observedChanges: [],
+      baselineStatData: {},
+      currentStatData: {
+        'a.b': { c: 1 },
+        a: { 'b.c': 2 },
+      },
+    }).comparisons;
+
+    expect(comparisons).toHaveLength(2);
+    expect(comparisons.map(item => item.path)).toEqual(
+      expect.arrayContaining([
+        ['a.b', 'c'],
+        ['a', 'b.c'],
+      ]),
+    );
+    expect(comparisons.every(item => item.status === 'applied')).toBe(true);
   });
 
   it('用最终快照兜底识别已落地的世界时间声明', () => {
