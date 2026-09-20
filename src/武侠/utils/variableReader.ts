@@ -53,6 +53,7 @@ import { isChatRenamePending } from '../../shared/chatRenameJournal';
 import { getLocationScopePath, isSameLocationScope } from '../../shared/locationPath.js';
 import { wuxiaCalendarDateToTotalDays } from '../../shared/wuxiaCalendar.js';
 import { dataLogger } from './logger';
+import { applyCurrentPresetStorageCleanup } from './settingsManager';
 import { buildMeridianProjection, deriveMeridianModifiers } from './meridianSystem';
 import { getTraitModifierSources } from './traitsDatabase';
 
@@ -367,13 +368,17 @@ const FRONTEND_LOADER_HINT_REGEX = /(localhost|127\.0\.0\.1):5500\/dist\/武侠\
  */
 export function normalizeAssistantReplyForPersistence(messageContent: string): string {
   if (!messageContent) return '';
-  return messageContent
+  const normalized = messageContent
     .replace(/\r\n?/g, '\n')
     .replace(/[ \t]+\n/g, '\n')
     .replace(
       /(<\/Variable(?:Think|Insert|Edit|Delete)>)[ \t]*(?:\n[ \t]*)+(?=<Variable(?:Think|Insert|Edit|Delete)>)/g,
       '$1\n',
     )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return applyCurrentPresetStorageCleanup(normalized)
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

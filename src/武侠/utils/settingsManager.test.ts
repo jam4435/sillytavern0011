@@ -9,10 +9,12 @@ import {
   ERA_BASE_REGEX_RULE,
   EVENT_AUDIT_REGEX_RULE,
   EVENT_STAGE_TAG_REGEX_RULE,
+  getRegexRuleContentSignature,
   getRegexRulesForDisplay,
   getThemeAppearanceDefaults,
   loadSettings,
   saveSettings,
+  stripSelectedPresetRegexMatches,
 } from './settingsManager';
 
 describe('settingsManager ui theme', () => {
@@ -286,6 +288,63 @@ describe('settingsManager ui theme', () => {
     expect(template).toContain('{{variableGuidance}}');
     expect(template).toContain('{{locationContext}}');
     expect(template).not.toContain('最近 5 层正文');
+  });
+
+  describe('preset storage cleanup', () => {
+    const thinkingRule = {
+      id: 'thinking',
+      pattern: '/<thinking>[\\s\\S]*?<\\/thinking>/gi',
+      replacement: '<details>  describe('default builtin regex rules', () => {</details>',
+      enabled: true,
+      description: '折叠思维链',
+      originScope: 'preset' as const,
+    };
+
+    it('removes only player-confirmed preset matches while preserving ERA diagnostic blocks', () => {
+      const input = [
+        '<thinking>预设思维链</thinking>',
+        '正文仍然保留。',
+        '<VariableThink>',
+        '世界信息.时间｜当前存在｜正文无变化｜无操作',
+        '</VariableThink>',
+      ].join('\n\n');
+      const signature = getRegexRuleContentSignature(thinkingRule);
+
+      const result = stripSelectedPresetRegexMatches(input, [thinkingRule], [signature]);
+
+      expect(result).not.toContain('<thinking>');
+      expect(result).toContain('正文仍然保留。');
+      expect(result).toContain('<VariableThink>');
+      expect(result).toContain('世界信息.时间｜当前存在｜正文无变化｜无操作');
+    });
+
+    it('refuses a selected regex that would erase almost the whole reply', () => {
+      const wholeReplyRule = {
+        ...thinkingRule,
+        id: 'whole',
+        pattern: '/[\\s\\S]+/g',
+        description: '整楼替换',
+      };
+      const input = '正文第一段\n\n正文第二段';
+      const signature = getRegexRuleContentSignature(wholeReplyRule);
+
+      expect(stripSelectedPresetRegexMatches(input, [wholeReplyRule], [signature])).toBe(input);
+    });
+
+    it('normalizes persisted cleanup signatures by preset', () => {
+      window.localStorage.setItem(
+        'wuxia_display_settings',
+        JSON.stringify({
+          presetStorageExcludedRegexSignaturesByPreset: {
+            '  测试预设  ': [' sig-a ', 'sig-a', '', 123],
+          },
+        }),
+      );
+
+      expect(loadSettings().presetStorageExcludedRegexSignaturesByPreset).toEqual({
+        测试预设: ['sig-a'],
+      });
+    });
   });
 
   describe('default builtin regex rules', () => {

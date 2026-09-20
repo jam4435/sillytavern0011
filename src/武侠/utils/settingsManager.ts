@@ -135,6 +135,7 @@ export interface SummarySettings {
 }
 
 export type RegexRulesByPreset = Record<string, RegexRule[]>;
+export type PresetStorageExcludedRegexSignaturesByPreset = Record<string, string[]>;
 
 export interface RegexRuleDebugSummary {
   id: string;
@@ -223,6 +224,8 @@ export interface DisplaySettings {
   // 正则替换规则
   localRegexRules: RegexRule[];
   presetRegexRulesByPreset: RegexRulesByPreset;
+  /** 当前预设中已由玩家确认可从长期聊天存档剥离的正则内容签名 */
+  presetStorageExcludedRegexSignaturesByPreset: PresetStorageExcludedRegexSignaturesByPreset;
 
   // 自动总结设置
   summarySettings: SummarySettings;
@@ -600,10 +603,14 @@ function cloneRegexRule(rule: RegexRule): RegexRule {
   return { ...rule };
 }
 
-export function createDefaultRegexSettings(): Pick<DisplaySettings, 'localRegexRules' | 'presetRegexRulesByPreset'> {
+export function createDefaultRegexSettings(): Pick<
+  DisplaySettings,
+  'localRegexRules' | 'presetRegexRulesByPreset' | 'presetStorageExcludedRegexSignaturesByPreset'
+> {
   return {
     localRegexRules: BUILTIN_LOCAL_REGEX_RULES.map(cloneRegexRule),
     presetRegexRulesByPreset: {},
+    presetStorageExcludedRegexSignaturesByPreset: {},
   };
 }
 
@@ -814,6 +821,36 @@ function normalizePresetRegexRulesByPreset(
     presetRegexRulesByPreset: nextPresetRegexRulesByPreset,
     extractedGlobalRules,
   };
+}
+
+function normalizePresetStorageExcludedRegexSignaturesByPreset(
+  value: unknown,
+): PresetStorageExcludedRegexSignaturesByPreset {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<PresetStorageExcludedRegexSignaturesByPreset>(
+    (result, [presetName, signatures]) => {
+      const normalizedPresetName = presetName.trim();
+      if (!normalizedPresetName || !Array.isArray(signatures)) {
+        return result;
+      }
+      const normalizedSignatures = Array.from(
+        new Set(
+          signatures
+            .filter((signature): signature is string => typeof signature === 'string')
+            .map(signature => signature.trim())
+            .filter(Boolean),
+        ),
+      );
+      if (normalizedSignatures.length > 0) {
+        result[normalizedPresetName] = normalizedSignatures;
+      }
+      return result;
+    },
+    {},
+  );
 }
 
 function removePresetRulesDuplicatedWithGlobalRules(
@@ -1268,6 +1305,9 @@ export function loadSettings(): DisplaySettings {
         presetRegexRuleState.presetRegexRulesByPreset,
         importedGlobalRegexRules,
       ),
+      presetStorageExcludedRegexSignaturesByPreset: normalizePresetStorageExcludedRegexSignaturesByPreset(
+        parsed.presetStorageExcludedRegexSignaturesByPreset,
+      ),
       summarySettings: normalizeSummarySettings(parsed.summarySettings),
     };
   } catch (error) {
@@ -1325,6 +1365,54 @@ export function getCurrentPresetRegexRules(settings: DisplaySettings, currentPre
     return [];
   }
   return settings.presetRegexRulesByPreset[normalizedPresetName] || [];
+}
+
+/**
+ * 当前预设里可作为“附加块存档过滤”候选的酒馆正则。
+ * 只读取当前预设、已启用、作用于 AI 输出与格式显示的规则；角色卡自己的正则不参与。
+ */
+export function getPresetStorageCleanupCandidates(): RegexRule[] {
+  return importPresetTavernRegexes();
+}
+
+export function isPresetStorageCleanupRuleSelected(
+  settings: DisplaySettings,
+  presetName: string,
+  rule: Pick<RegexRule, 'description' | 'pattern' | 'replacement'>,
+): boolean {
+  const normalizedPresetName = presetName.trim();
+  if (!normalizedPresetName) {
+    return false;
+  }
+  const signature = getRegexRuleContentSignature(rule);
+  return (settings.presetStorageExcludedRegexSignaturesByPreset[normalizedPresetName] || []).includes(signature);
+}
+
+export function setPresetStorageCleanupRuleSelected(
+  settings: DisplaySettings,
+  presetName: string,
+  rule: Pick<RegexRule, 'description' | 'pattern' | 'replacement'>,
+  selected: boolean,
+): DisplaySettings {
+  const normalizedPresetName = presetName.trim();
+  if (!normalizedPresetName) {
+    return settings;
+  }
+
+  const signature = getRegexRuleContentSignature(rule);
+  const previous = settings.presetStorageExcludedRegexSignaturesByPreset[normalizedPresetName] || [];
+  const next = selected ? Array.from(new Set([...previous, signature])) : previous.filter(item => item !== signature);
+  const nextByPreset = { ...settings.presetStorageExcludedRegexSignaturesByPreset };
+  if (next.length > 0) {
+    nextByPreset[normalizedPresetName] = next;
+  } else {
+    delete nextByPreset[normalizedPresetName];
+  }
+
+  return {
+    ...settings,
+    presetStorageExcludedRegexSignaturesByPreset: nextByPreset,
+  };
 }
 
 /**
@@ -1566,6 +1654,120 @@ function getCachedRegex(pattern: string, flags: string): RegExp {
  * 支持用户在 pattern 中使用 /pattern/flags 格式指定标志
  * 例如: /(<think>.*?<\/think>)/gs 会使用 gs 标志
  */
+const PERSISTENCE_PROTECTED_BLOCK_REGEX =
+  /<(VariableThink|VariableInsert|VariableEdit|VariableDelete|summary|era_data)\b[^>]*>[\s\S]*?<\/\1>/gi;
+
+type TextRange = { start: number; end: number };
+
+function getPersistenceProtectedRanges(text: string): TextRange[] {
+  const ranges: TextRange[] = [];
+  PERSISTENCE_PROTECTED_BLOCK_REGEX.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = PERSISTENCE_PROTECTED_BLOCK_REGEX.exec(text)) !== null) {
+    ranges.push({ start: match.index, end: match.index + match[0].length });
+    if (match[0].length === 0) {
+      PERSISTENCE_PROTECTED_BLOCK_REGEX.lastIndex += 1;
+    }
+  }
+  return ranges;
+}
+
+function overlapsProtectedRange(start: number, end: number, protectedRanges: TextRange[]): boolean {
+  return protectedRanges.some(range => start < range.end && end > range.start);
+}
+
+/**
+ * 删除玩家已确认的“预设附加块”原文。
+ *
+ * 注意：这里不是执行预设的 replacement，而是把该正则匹配到的原始区间从长期聊天存档中剥离。
+ * VariableThink/Insert/Edit/Delete、summary、era_data 永远受保护。
+ * 若单条规则一次会删掉 80% 以上文本或把整条回复删空，则视为疑似正文/整楼匹配并拒绝执行。
+ */
+export function stripSelectedPresetRegexMatches(
+  text: string,
+  rules: RegexRule[],
+  selectedSignatures: string[],
+): string {
+  if (!text || selectedSignatures.length === 0 || rules.length === 0) {
+    return text;
+  }
+
+  const selected = new Set(selectedSignatures);
+  let result = text;
+
+  for (const rule of rules) {
+    if (!rule.enabled || !rule.pattern || !selected.has(getRegexRuleContentSignature(rule))) {
+      continue;
+    }
+
+    try {
+      const { pattern, flags } = parseRegexString(rule.pattern);
+      const regex = getCachedRegex(pattern, flags);
+      const protectedRanges = getPersistenceProtectedRanges(result);
+      const removals: TextRange[] = [];
+      let match: RegExpExecArray | null;
+
+      while ((match = regex.exec(result)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+        if (end > start && !overlapsProtectedRange(start, end, protectedRanges)) {
+          removals.push({ start, end });
+        }
+        if (match[0].length === 0) {
+          regex.lastIndex += 1;
+        }
+      }
+
+      const removedLength = removals.reduce((sum, range) => sum + (range.end - range.start), 0);
+      if (removedLength === 0) {
+        continue;
+      }
+      if (removedLength / Math.max(1, result.length) >= 0.8) {
+        dataLogger.warn(
+          `预设存档过滤已跳过疑似整楼规则「${rule.description || rule.pattern}」：将删除 ${Math.round(
+            (removedLength / Math.max(1, result.length)) * 100,
+          )}% 原文。`,
+        );
+        continue;
+      }
+
+      let next = result;
+      [...removals]
+        .sort((a, b) => b.start - a.start)
+        .forEach(range => {
+          next = `${next.slice(0, range.start)}\n${next.slice(range.end)}`;
+        });
+
+      if (result.trim() && !next.trim()) {
+        dataLogger.warn(`预设存档过滤已跳过会清空整条回复的规则「${rule.description || rule.pattern}」。`);
+        continue;
+      }
+      result = next;
+    } catch (error) {
+      dataLogger.warn(`预设存档过滤规则 "${rule.pattern}" 无效:`, error);
+    }
+  }
+
+  return result.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * 使用当前加载预设中玩家已经确认的规则，清理即将写入聊天的 assistant 文本。
+ * 原始模型输出仍由调试链路单独保留；这里只处理长期聊天正文。
+ */
+export function applyCurrentPresetStorageCleanup(text: string): string {
+  const presetName = getLoadedPresetNameSafe();
+  if (!text || !presetName) {
+    return text;
+  }
+  const settings = loadSettings();
+  const selectedSignatures = settings.presetStorageExcludedRegexSignaturesByPreset[presetName] || [];
+  if (selectedSignatures.length === 0) {
+    return text;
+  }
+  return stripSelectedPresetRegexMatches(text, getPresetStorageCleanupCandidates(), selectedSignatures);
+}
+
 export function applyRegexRules(text: string, rules: RegexRule[]): string {
   let result = text;
   for (const rule of rules) {

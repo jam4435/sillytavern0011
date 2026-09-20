@@ -22,11 +22,14 @@ import {
   getCurrentPresetRegexRules,
   logRegexDebugSnapshot,
   getRegexRuleContentSignature,
+  getPresetStorageCleanupCandidates,
   imageToBase64,
   importGlobalTavernRegexes,
   importPresetTavernRegexes,
+  isPresetStorageCleanupRuleSelected,
   scheduleRegexDebugDump,
   setPresetRegexRulesForPreset,
+  setPresetStorageCleanupRuleSelected,
   switchDisplayTheme,
   updateThemeAppearanceSetting,
   validateRegex,
@@ -458,6 +461,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const normalizedCurrentPresetName = currentPresetName.trim();
   const hasCurrentPreset = normalizedCurrentPresetName.length > 0;
   const currentPresetRegexRules = getCurrentPresetRegexRules(settings, normalizedCurrentPresetName);
+  const presetStorageCleanupCandidates = hasCurrentPreset ? getPresetStorageCleanupCandidates() : [];
   const visibleVariableScopeEntries = statData ? getVisibleVariableScopeEntries(statData) : [];
   const firstAvailableVariableGroup = VARIABLE_GROUPS.find(group =>
     visibleVariableScopeEntries.some(([key]) => group.scopeKeys.includes(String(key))),
@@ -1268,6 +1272,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     alert(`已覆盖导入 ${importedRules.length} 条酒馆正则规则到预设「${normalizedCurrentPresetName}」`);
   }, [hasCurrentPreset, normalizedCurrentPresetName, settings, updateCurrentPresetRules]);
 
+  const togglePresetStorageCleanupRule = useCallback(
+    (rule: RegexRule) => {
+      if (!hasCurrentPreset) {
+        return;
+      }
+      const selected = isPresetStorageCleanupRuleSelected(settings, normalizedCurrentPresetName, rule);
+      onSettingsChange(
+        setPresetStorageCleanupRuleSelected(settings, normalizedCurrentPresetName, rule, !selected),
+      );
+    },
+    [hasCurrentPreset, normalizedCurrentPresetName, onSettingsChange, settings],
+  );
+
   // =========================================
   // 自动总结相关回调
   // =========================================
@@ -2047,6 +2064,56 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <span>覆盖导入当前预设规则</span>
                 </button>
               </div>
+            </div>
+
+            <div className="regex-scope-section">
+              <div className="regex-section-header">
+                <div>
+                  <h5 className="regex-section-title">预设附加块存档过滤</h5>
+                  <p className="regex-section-caption">
+                    自动读取当前预设中“已启用 + AI 输出 + 格式显示”的正则。勾选后只删除该正则命中的原始附加块，不执行美化替换；VariableThink / VariableEdit 等 ERA 块、summary 与 era_data 始终保留。
+                  </p>
+                </div>
+                {hasCurrentPreset && <span className="regex-section-meta">需玩家确认</span>}
+              </div>
+
+              {presetStorageCleanupCandidates.length === 0 ? (
+                <div className="regex-empty">
+                  <Icons.Scroll size={32} />
+                  <p>{hasCurrentPreset ? '当前预设没有可识别的 AI 输出显示正则' : '加载预设后可识别附加块规则'}</p>
+                </div>
+              ) : (
+                presetStorageCleanupCandidates.map(rule => {
+                  const signature = getRegexRuleContentSignature(rule);
+                  const selected = isPresetStorageCleanupRuleSelected(
+                    settings,
+                    normalizedCurrentPresetName,
+                    rule,
+                  );
+                  return (
+                    <div className="settings-row" key={signature}>
+                      <label className="settings-label">{rule.description || '未命名预设正则'}</label>
+                      <div className="settings-control">
+                        <label className="settings-checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => togglePresetStorageCleanupRule(rule)}
+                          />
+                          <span>从长期聊天存档剥离此规则命中的原文</span>
+                        </label>
+                        <span className="settings-hint-inline" title={rule.pattern}>
+                          {rule.replacement.trim() ? '替换/美化型' : '隐藏型'} · {rule.pattern}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+
+              <p className="settings-hint">
+                安全保护：单条规则若一次会删除 80% 以上回复或清空整条回复，将自动跳过。正则内容变化后旧确认不会自动套用到新规则。
+              </p>
             </div>
           </div>
         )}
