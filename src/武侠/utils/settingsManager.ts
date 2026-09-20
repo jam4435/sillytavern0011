@@ -1698,12 +1698,18 @@ function overlapsProtectedRange(start: number, end: number, protectedRanges: Tex
   return protectedRanges.some(range => start < range.end && end > range.start);
 }
 
+function isCompleteThinkingBlock(text: string): boolean {
+  return /^\s*<thinking\b[^>]*>[\s\S]*<\/thinking>\s*$/i.test(text);
+}
+
 /**
  * 删除玩家已确认的“预设附加块”原文。
  *
  * 注意：这里不是执行预设的 replacement，而是把该正则匹配到的原始区间从长期聊天存档中剥离。
  * VariableThink/Insert/Edit/Delete、summary、era_data 永远受保护。
- * 若单条规则一次会删掉 80% 以上文本或把整条回复删空，则视为疑似正文/整楼匹配并拒绝执行。
+ * 一般规则若一次会删掉 80% 以上文本或把整条回复删空，则视为疑似正文/整楼匹配并拒绝执行。
+ * 完整的 <thinking>...</thinking> 匹配是 80% 占比保护的唯一例外，因为它明确不是正文；
+ * 但即使是 thinking，也不允许把整条 assistant 回复清成空字符串。
  */
 export function stripSelectedPresetRegexMatches(
   text: string,
@@ -1727,6 +1733,7 @@ export function stripSelectedPresetRegexMatches(
       const regex = getCachedRegex(pattern, flags);
       const protectedRanges = getPersistenceProtectedRanges(result);
       const removals: TextRange[] = [];
+      let allRemovalsAreThinkingBlocks = true;
       let match: RegExpExecArray | null;
 
       while ((match = regex.exec(result)) !== null) {
@@ -1734,6 +1741,9 @@ export function stripSelectedPresetRegexMatches(
         const end = start + match[0].length;
         if (end > start && !overlapsProtectedRange(start, end, protectedRanges)) {
           removals.push({ start, end });
+          if (!isCompleteThinkingBlock(match[0])) {
+            allRemovalsAreThinkingBlocks = false;
+          }
         }
         if (match[0].length === 0) {
           regex.lastIndex += 1;
@@ -1744,7 +1754,7 @@ export function stripSelectedPresetRegexMatches(
       if (removedLength === 0) {
         continue;
       }
-      if (removedLength / Math.max(1, result.length) >= 0.8) {
+      if (removedLength / Math.max(1, result.length) >= 0.8 && !allRemovalsAreThinkingBlocks) {
         dataLogger.warn(
           `预设存档过滤已跳过疑似整楼规则「${rule.description || rule.pattern}」：将删除 ${Math.round(
             (removedLength / Math.max(1, result.length)) * 100,

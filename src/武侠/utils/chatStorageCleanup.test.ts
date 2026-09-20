@@ -43,7 +43,7 @@ describe('cleanChatMessagePresetBlocks', () => {
     expect(result.removedCharacters).toBeGreaterThan(0);
   });
 
-  it('keeps the 80% whole-reply safety guard for suspicious preset regex matches', () => {
+  it('allows a complete thinking block to exceed the 80% safety threshold', () => {
     const result = cleanChatMessagePresetBlocks(
       {
         message_id: 9,
@@ -54,6 +54,36 @@ describe('cleanChatMessagePresetBlocks', () => {
       },
       [rule],
       selected,
+    );
+
+    expect(result.patch).toEqual({
+      message_id: 9,
+      message: '短正文',
+      swipe_id: 0,
+      swipes: ['短正文'],
+    });
+  });
+
+  it('still refuses a non-thinking rule that would remove 80% or more', () => {
+    const broadRule: RegexRule = {
+      ...rule,
+      id: 'broad',
+      pattern: '/附加块很长很长很长很长很长很长很长很长很长/g',
+      description: '非 thinking 大块',
+    };
+    const broadSelected = [getRegexRuleContentSignature(broadRule)];
+    const message = '附加块很长很长很长很长很长很长很长很长很长正文';
+
+    const result = cleanChatMessagePresetBlocks(
+      {
+        message_id: 10,
+        role: 'assistant',
+        message,
+        swipes: [message],
+        swipe_id: 0,
+      },
+      [broadRule],
+      broadSelected,
     );
 
     expect(result.patch).toBeNull();
