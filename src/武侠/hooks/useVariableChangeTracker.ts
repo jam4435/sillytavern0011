@@ -56,7 +56,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 13;
+  version: 14;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -82,7 +82,7 @@ type VariableWriteSignal =
 type DeclaredSourceKind = 'assistant-reply' | 'extra-blocks';
 type ParsedDeclaredState = ReturnType<typeof parseDeclaredVariableChanges>;
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v13';
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v14';
 const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v1',
   'wuxia.variableChangeTurn.v2',
@@ -96,6 +96,7 @@ const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v10',
   'wuxia.variableChangeTurn.v11',
   'wuxia.variableChangeTurn.v12',
+  'wuxia.variableChangeTurn.v13',
 ];
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
 const STALE_WRITE_DONE_RETRY_DELAY_MS = 40;
@@ -210,7 +211,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 13 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== 14 || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -237,7 +238,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 13,
+      version: 14,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
