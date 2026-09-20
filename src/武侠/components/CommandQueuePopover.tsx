@@ -3,7 +3,7 @@
  * 显示待发送指令和当前聊天最近发送记录
  */
 
-import { CornerUpLeft, FlaskConical, History, MapPinned, X } from 'lucide-react';
+import { CornerUpLeft, FlaskConical, History, MapPinned, ScrollText, X } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import { PendingCommand } from '../types';
 import type { InputHistoryEntry } from '../utils/inputHistory';
@@ -65,7 +65,13 @@ const CommandQueuePopover: React.FC<CommandQueuePopoverProps> = ({
                 <div key={command.id} className="command-card">
                   <div className="command-content">
                     <div className="command-type-icon">
-                      {command.type === 'TRAVEL' ? <MapPinned size={17} /> : <FlaskConical size={17} />}
+                      {command.type === 'TRAVEL' ? (
+                        <MapPinned size={17} />
+                      ) : command.type === 'EVENT' ? (
+                        <ScrollText size={17} />
+                      ) : (
+                        <FlaskConical size={17} />
+                      )}
                     </div>
                     <div className="command-text">{command.text}</div>
                   </div>
