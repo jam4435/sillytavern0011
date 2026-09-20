@@ -182,6 +182,38 @@ describe('settingsManager ui theme', () => {
     expect(loadSettings().summarySettings.variableContextRounds).toBe(1);
   });
 
+  it('defaults and migrates conversation summary mode safely', () => {
+    const defaults = createDefaultDisplaySettings().summarySettings;
+    expect(defaults.conversationSummaryMode).toBe('off');
+    expect(defaults.conversationSummaryRecentReplies).toBe(5);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({
+        summarySettings: {
+          conversationSummaryMode: 'card',
+          conversationSummaryRecentReplies: 8,
+        },
+      }),
+    );
+    const loaded = loadSettings().summarySettings;
+    expect(loaded.conversationSummaryMode).toBe('card');
+    expect(loaded.conversationSummaryRecentReplies).toBe(8);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({
+        summarySettings: {
+          conversationSummaryMode: 'invalid',
+          conversationSummaryRecentReplies: 999,
+        },
+      }),
+    );
+    const invalid = loadSettings().summarySettings;
+    expect(invalid.conversationSummaryMode).toBe('off');
+    expect(invalid.conversationSummaryRecentReplies).toBe(20);
+  });
+
   it('defaults and persists the extra-variable body cleaning rules', () => {
     const defaults = createDefaultDisplaySettings().summarySettings;
     expect(defaults.variablePromptExcludedTags).toBe('tucao\ncurrent_event\nprogress');

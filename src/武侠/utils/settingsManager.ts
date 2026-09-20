@@ -70,6 +70,9 @@ export type SummaryApiSelection = { type: 'preset' } | { type: 'profile'; profil
 /** 变量更新模式：正文伴随或额外模型 */
 export type SummaryVariableUpdateMode = 'inline' | 'extra';
 
+/** 对话摘要来源 */
+export type ConversationSummaryMode = 'card' | 'preset' | 'off';
+
 /** 额外变量更新读取的前序完整对话轮数 */
 export type VariableContextRounds = 1 | 2;
 
@@ -103,6 +106,10 @@ export interface SummarySettings {
   variableUpdateMode: SummaryVariableUpdateMode;
   /** 是否启用流式生成 */
   stream: boolean;
+  /** 对话摘要来源：卡内指令 / 兼容玩家预设 / 完全关闭 */
+  conversationSummaryMode: ConversationSummaryMode;
+  /** 卡内摘要模式保留完整正文的最近 assistant 回复数 */
+  conversationSummaryRecentReplies: number;
   /** 已保存的额外模型 API */
   apiProfiles: SummaryApiProfile[];
   /** 自动总结使用的 API */
@@ -541,6 +548,8 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   enabled: false,
   variableUpdateMode: 'inline',
   stream: false,
+  conversationSummaryMode: 'off',
+  conversationSummaryRecentReplies: 5,
   apiProfiles: [],
   summaryApiSelection: PRESET_SUMMARY_API_SELECTION,
   variableApiSelection: PRESET_SUMMARY_API_SELECTION,
@@ -940,6 +949,17 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
         ? summarySettings.variableUpdateMode
         : defaults.variableUpdateMode,
     stream: typeof summarySettings.stream === 'boolean' ? summarySettings.stream : defaults.stream,
+    conversationSummaryMode:
+      summarySettings.conversationSummaryMode === 'card' ||
+      summarySettings.conversationSummaryMode === 'preset' ||
+      summarySettings.conversationSummaryMode === 'off'
+        ? summarySettings.conversationSummaryMode
+        : defaults.conversationSummaryMode,
+    conversationSummaryRecentReplies:
+      typeof summarySettings.conversationSummaryRecentReplies === 'number' &&
+      Number.isFinite(summarySettings.conversationSummaryRecentReplies)
+        ? Math.max(1, Math.min(20, Math.floor(summarySettings.conversationSummaryRecentReplies)))
+        : defaults.conversationSummaryRecentReplies,
     apiProfiles: apiProfiles.map(cloneSummaryApiProfile),
     summaryApiSelection: normalizeSummaryApiSelection(summarySettings.summaryApiSelection, profileIds, legacySelection),
     variableApiSelection: normalizeSummaryApiSelection(

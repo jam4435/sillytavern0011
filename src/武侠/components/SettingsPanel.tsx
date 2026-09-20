@@ -12,6 +12,7 @@ import {
   SummaryApiProfile,
   SummaryApiSelection,
   SummaryVariableUpdateMode,
+  ConversationSummaryMode,
   SummaryThresholds,
   DEFAULT_SUMMARY_API_CONFIG,
   CONTENT_FONT_FAMILIES,
@@ -43,6 +44,7 @@ import {
 } from '../utils/debugRoundView';
 import { loadSummaryModelList, validateSummaryApiConfig } from '../utils/summaryApiClient';
 import { applyVariableUpdateModeWorldbookState } from '../utils/extraVariableUpdateManager';
+import { applyConversationSummaryModeState } from '../utils/conversationSummaryManager';
 import {
   checkSummaryTrigger,
   triggerManualSummary,
@@ -88,6 +90,7 @@ type SettingsCollapsibleId =
   | 'appearanceTheme'
   | 'appearanceText'
   | 'appearanceBackground'
+  | 'conversationSummary'
   | 'extraModelApi'
   | 'extraModelSummary'
   | 'extraModelVariables';
@@ -120,6 +123,7 @@ const DEFAULT_OPEN_SETTING_BLOCKS: Record<SettingsCollapsibleId, boolean> = {
   appearanceTheme: false,
   appearanceText: false,
   appearanceBackground: false,
+  conversationSummary: false,
   extraModelApi: false,
   extraModelSummary: false,
   extraModelVariables: false,
@@ -409,6 +413,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isSummaryModelLoading, setIsSummaryModelLoading] = useState(false);
   const [summaryVariableModeStatus, setSummaryVariableModeStatus] = useState('');
   const [isSummaryVariableModeUpdating, setIsSummaryVariableModeUpdating] = useState(false);
+  const [conversationSummaryModeStatus, setConversationSummaryModeStatus] = useState('');
+  const [isConversationSummaryModeUpdating, setIsConversationSummaryModeUpdating] = useState(false);
   const [editingApiProfileId, setEditingApiProfileId] = useState<string | null>(
     () => settings.summarySettings.apiProfiles[0]?.id || null,
   );
@@ -1450,6 +1456,43 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     [onSettingsChange, settings],
   );
 
+  const updateConversationSummaryMode = useCallback(
+    async (mode: ConversationSummaryMode) => {
+      if (settings.summarySettings.conversationSummaryMode === mode || isConversationSummaryModeUpdating) return;
+      setIsConversationSummaryModeUpdating(true);
+      setConversationSummaryModeStatus('正在同步摘要世界书与上下文过滤...');
+      try {
+        const status=await applyConversationSummaryModeState(mode,settings.summarySettings.conversationSummaryRecentReplies);
+        updateSummarySetting('conversationSummaryMode',mode);
+        setConversationSummaryModeStatus(status);
+      } catch(error) {
+        setConversationSummaryModeStatus(`切换失败：${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        setIsConversationSummaryModeUpdating(false);
+      }
+    },
+    [isConversationSummaryModeUpdating,settings.summarySettings.conversationSummaryMode,settings.summarySettings.conversationSummaryRecentReplies,updateSummarySetting],
+  );
+
+  const updateConversationSummaryRecentReplies = useCallback(
+    async (value:number) => {
+      const nextValue=Math.max(1,Math.min(20,Math.floor(value||5)));
+      if(nextValue===settings.summarySettings.conversationSummaryRecentReplies)return;
+      setIsConversationSummaryModeUpdating(true);
+      try {
+        if(settings.summarySettings.conversationSummaryMode==='card'){
+          setConversationSummaryModeStatus(await applyConversationSummaryModeState('card',nextValue));
+        }
+        updateSummarySetting('conversationSummaryRecentReplies',nextValue);
+      } catch(error) {
+        setConversationSummaryModeStatus(`更新失败：${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        setIsConversationSummaryModeUpdating(false);
+      }
+    },
+    [settings.summarySettings.conversationSummaryMode,settings.summarySettings.conversationSummaryRecentReplies,updateSummarySetting],
+  );
+
   const updateVariableUpdateMode = useCallback(
     async (mode: SummaryVariableUpdateMode) => {
       if (settings.summarySettings.variableUpdateMode === mode || isSummaryVariableModeUpdating) {
@@ -2011,6 +2054,49 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 额外模型设置 */}
         {activeTab === 'summary' && (
           <div className="settings-section summary-section">
+            <SettingsCollapsibleBlock
+              id="conversationSummary"
+              title="对话摘要"
+              isOpen={openSettingBlocks.conversationSummary}
+              onToggle={toggleSettingBlock}
+            >
+              <p className="settings-description compact">
+                控制逐回复摘要由角色卡、玩家预设还是完全关闭。卡内模式默认保留最近 5 条 assistant 回复全文，更早回复只向模型保留 XML 摘要。
+              </p>
+              <div className="settings-row">
+                <label className="settings-label">摘要来源</label>
+                <div className="settings-control">
+                  <select
+                    value={settings.summarySettings.conversationSummaryMode}
+                    onChange={e => void updateConversationSummaryMode(e.target.value as ConversationSummaryMode)}
+                    className="settings-select"
+                    disabled={isConversationSummaryModeUpdating}
+                  >
+                    <option value="card">卡内摘要</option>
+                    <option value="preset">兼容预设 XML 摘要</option>
+                    <option value="off">关闭摘要</option>
+                  </select>
+                  <span className="settings-hint-inline">卡内会启用“对话摘要指令”；预设模式不干涉玩家预设。</span>
+                </div>
+              </div>
+              <div className="settings-row">
+                <label className="settings-label">保留完整回复</label>
+                <div className="settings-control">
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={settings.summarySettings.conversationSummaryRecentReplies}
+                    onChange={e => void updateConversationSummaryRecentReplies(parseInt(e.target.value) || 5)}
+                    className="settings-number-input"
+                    disabled={isConversationSummaryModeUpdating || settings.summarySettings.conversationSummaryMode !== 'card'}
+                  />
+                  <span className="settings-hint-inline">按 assistant 回复数计算；默认 5 条。</span>
+                </div>
+              </div>
+              {conversationSummaryModeStatus && <div className="settings-hint">{conversationSummaryModeStatus}</div>}
+            </SettingsCollapsibleBlock>
+
             <SettingsCollapsibleBlock
               id="extraModelApi"
               title="API"

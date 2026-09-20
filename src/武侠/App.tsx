@@ -55,6 +55,7 @@ import { upgradeMeridianNode } from './utils/meridianManager';
 import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inventoryAttributePreview';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
 import { applyVariableUpdateModeWorldbookState, getIsExtraVariableUpdating } from './utils/extraVariableUpdateManager';
+import { applyConversationSummaryModeState } from './utils/conversationSummaryManager';
 import {
   readLatestAssistantSnapshot,
   saveLatestAssistantSnapshot,
@@ -188,6 +189,10 @@ const App: React.FC = () => {
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
   const initialVariableUpdateModeRef = useRef(displaySettings.summarySettings.variableUpdateMode);
+  const initialConversationSummaryRef = useRef({
+    mode: displaySettings.summarySettings.conversationSummaryMode,
+    recentReplies: displaySettings.summarySettings.conversationSummaryRecentReplies,
+  });
   const [currentPresetName, setCurrentPresetName] = useState(() => getLoadedPresetNameSafe());
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
@@ -507,9 +512,23 @@ const App: React.FC = () => {
   }, [displaySettings]);
 
   useEffect(() => {
-    void applyVariableUpdateModeWorldbookState(initialVariableUpdateModeRef.current)
-      .then(status => initLogger.log(`[变量更新模式] 初始化校验完成：${status}`))
-      .catch(error => initLogger.error('[变量更新模式] 初始化校验世界书状态失败:', error));
+    void (async () => {
+      try {
+        const variableStatus=await applyVariableUpdateModeWorldbookState(initialVariableUpdateModeRef.current);
+        initLogger.log(`[变量更新模式] 初始化校验完成：${variableStatus}`);
+      } catch(error) {
+        initLogger.error('[变量更新模式] 初始化校验世界书状态失败:',error);
+      }
+      try {
+        const summaryStatus=await applyConversationSummaryModeState(
+          initialConversationSummaryRef.current.mode,
+          initialConversationSummaryRef.current.recentReplies,
+        );
+        initLogger.log(`[对话摘要模式] 初始化校验完成：${summaryStatus}`);
+      } catch(error) {
+        initLogger.error('[对话摘要模式] 初始化校验失败:',error);
+      }
+    })();
   }, []);
 
   useEffect(() => {
