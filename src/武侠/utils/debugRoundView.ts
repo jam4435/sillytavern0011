@@ -172,15 +172,16 @@ export function buildVariableOutputDebugContent(debugRound: LatestDebugRound): s
   ];
   const rawResponse = normalizeDebugText(variable.output);
   const appendedBlocks = normalizeDebugText(variable.appendedBlocks);
-  const appendReadbackText = normalizeDebugText(variable.appendReadbackText);
-  const syncReadbackText = normalizeDebugText(variable.syncReadbackText);
-  const finalMessageText = normalizeDebugText(variable.finalMessageText);
   const hasDecisionOnlyContext = Boolean(variable.trigger || variable.modeSnapshot || variable.skipReason);
   const hasActualVariableOutput = Boolean(
-    rawResponse || appendedBlocks || appendReadbackText || syncReadbackText || finalMessageText,
+    rawResponse ||
+      appendedBlocks ||
+      variable.appendVerification ||
+      variable.syncVerification ||
+      variable.applyVerification ||
+      variable.applyError ||
+      variable.error,
   );
-  const isError = variable.status === 'error' || Boolean(variable.error);
-
   if (!hasActualVariableOutput && hasDecisionOnlyContext) {
     sections.push(...buildVariableDecisionLines(debugRound));
     if (variable.skipReason) {
@@ -209,18 +210,6 @@ export function buildVariableOutputDebugContent(debugRound: LatestDebugRound): s
   if (variable.postProcessStatus !== 'idle' || variable.postProcessError) {
     sections.push('【后处理状态】', getDebugStageStatusLabel(variable.postProcessStatus));
     if (variable.postProcessError) sections.push(variable.postProcessError);
-  }
-
-  if (isError || (appendReadbackText && appendReadbackText !== syncReadbackText)) {
-    sections.push('', '【写入后回读文本】', variable.appendReadbackText || '(未回读)');
-  }
-
-  if (isError || (syncReadbackText && syncReadbackText !== finalMessageText)) {
-    sections.push('', '【ERA 同步后回读文本】', variable.syncReadbackText || '(未同步或未回读)');
-  }
-
-  if (isError && finalMessageText) {
-    sections.push('', '【最终楼层文本】', variable.finalMessageText);
   }
 
   if (variable.error) {
