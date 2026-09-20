@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterProfile } from '../../types';
 import { setPlayerAvatarRef } from '../../utils/avatarState';
@@ -74,6 +74,26 @@ describe('CharacterPanel avatar controls', () => {
     await waitFor(() => {
       expect(screen.getByAltText('郭靖头像')).toHaveAttribute('src', expect.stringContaining('choose_face_b01.png'));
     });
+  });
+
+  it('头像叠层不再显示出身身份，但身份卡仍保留完整信息', () => {
+    const stats: CharacterProfile = {
+      ...baseStats,
+      identities: {
+        牛家村农户: '初入江湖的新人',
+        丐帮: '一袋弟子',
+      },
+    };
+
+    render(<CharacterPanel stats={stats} />);
+
+    const portraitOverlay = document.querySelector('.portrait-text-overlay');
+    expect(portraitOverlay).toBeTruthy();
+    expect(within(portraitOverlay as HTMLElement).queryByText('牛家村农户')).not.toBeInTheDocument();
+    expect(within(portraitOverlay as HTMLElement).getByText('丐帮')).toBeInTheDocument();
+
+    expect(screen.getByText('牛家村农户', { selector: '.character-identity-title' })).toBeInTheDocument();
+    expect(screen.getByText('丐帮', { selector: '.character-identity-title' })).toBeInTheDocument();
   });
 
   it('状态页默认显示人物总览，并可切换到占满面板的奇经八脉页', () => {
