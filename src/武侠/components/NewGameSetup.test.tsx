@@ -125,13 +125,14 @@ describe('NewGameSetup custom realm picker', () => {
     expect(within(stageGroup).getByRole('button', { name: '圆满' })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(within(majorGroup).getByRole('button', { name: '宗师' }));
-    expect(screen.getByText('当前选择:').parentElement).toHaveTextContent('宗师圆满');
-    expect(screen.getByText('当前选择:').parentElement).toHaveTextContent('4200');
+    const realmHint = document.querySelector('.realm-hint');
+    expect(realmHint).toHaveTextContent('宗师圆满');
+    expect(realmHint).toHaveTextContent('4200');
 
     const updatedStageGroup = screen.getByRole('group', { name: '选择境界阶段' });
     fireEvent.click(within(updatedStageGroup).getByRole('button', { name: '后期' }));
-    expect(screen.getByText('当前选择:').parentElement).toHaveTextContent('宗师后期');
-    expect(screen.getByText('当前选择:').parentElement).toHaveTextContent('3800');
+    expect(realmHint).toHaveTextContent('宗师后期');
+    expect(realmHint).toHaveTextContent('3800');
 
     expect(screen.queryByRole('button', { name: '宗师初期' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '陆地神仙圆满' })).not.toBeInTheDocument();
