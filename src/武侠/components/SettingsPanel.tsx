@@ -47,6 +47,7 @@ import {
 } from '../utils/debugRoundView';
 import { loadSummaryModelList, validateSummaryApiConfig } from '../utils/summaryApiClient';
 import { applyVariableUpdateModeWorldbookState } from '../utils/extraVariableUpdateManager';
+import { cleanupCurrentChatPresetBlocks } from '../utils/chatStorageCleanup';
 import { applyConversationSummaryModeState } from '../utils/conversationSummaryManager';
 import {
   checkSummaryTrigger,
@@ -418,6 +419,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isSummaryVariableModeUpdating, setIsSummaryVariableModeUpdating] = useState(false);
   const [conversationSummaryModeStatus, setConversationSummaryModeStatus] = useState('');
   const [isConversationSummaryModeUpdating, setIsConversationSummaryModeUpdating] = useState(false);
+  const [isPresetStorageCleanupRunning, setIsPresetStorageCleanupRunning] = useState(false);
   const [editingApiProfileId, setEditingApiProfileId] = useState<string | null>(
     () => settings.summarySettings.apiProfiles[0]?.id || null,
   );
@@ -1285,6 +1287,48 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     [hasCurrentPreset, normalizedCurrentPresetName, onSettingsChange, settings],
   );
 
+  const handleCleanupCurrentChatPresetBlocks = useCallback(async () => {
+    if (!hasCurrentPreset || isPresetStorageCleanupRunning) {
+      return;
+    }
+    const selectedCount = presetStorageCleanupCandidates.filter(rule =>
+      isPresetStorageCleanupRuleSelected(settings, normalizedCurrentPresetName, rule),
+    ).length;
+    if (selectedCount === 0) {
+      alert('请先勾选至少一条要从长期聊天存档剥离的预设正则。');
+      return;
+    }
+    const confirmed = window.confirm(
+      `将按当前勾选的 ${selectedCount} 条预设正则清理当前聊天的所有 assistant 楼层和历史 swipe。\n\nVariableThink / VariableEdit / summary / era_data 等受保护块不会删除。是否继续？`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsPresetStorageCleanupRunning(true);
+    try {
+      const result = await cleanupCurrentChatPresetBlocks(settings, normalizedCurrentPresetName);
+      if (result.skippedBecauseNoSelection) {
+        alert('没有可执行的已确认预设清理规则。');
+        return;
+      }
+      alert(
+        `当前聊天清理完成：\n• 改写楼层：${result.updatedMessages}\n• 改写 swipe：${result.updatedSwipes}\n• 减少字符：${result.removedCharacters.toLocaleString()}`,
+      );
+    } catch (error) {
+      uiLogger.error('[SettingsPanel] 清理当前聊天预设附加块失败', error);
+      alert(`清理失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsPresetStorageCleanupRunning(false);
+    }
+  }, [
+    hasCurrentPreset,
+    isPresetStorageCleanupRunning,
+    normalizedCurrentPresetName,
+    presetStorageCleanupCandidates,
+    settings,
+  ]);
+
   // =========================================
   // 自动总结相关回调
   // =========================================
@@ -2111,8 +2155,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 })
               )}
 
+              <div className="regex-buttons-group">
+                <button
+                  type="button"
+                  className="settings-import-btn"
+                  onClick={handleCleanupCurrentChatPresetBlocks}
+                  disabled={!hasCurrentPreset || isPresetStorageCleanupRunning}
+                >
+                  <Icons.Scroll size={14} />
+                  <span>{isPresetStorageCleanupRunning ? '正在清理当前聊天...' : '按勾选规则清理当前聊天'}</span>
+                </button>
+              </div>
               <p className="settings-hint">
-                安全保护：单条规则若一次会删除 80% 以上回复或清空整条回复，将自动跳过。正则内容变化后旧确认不会自动套用到新规则。
+                安全保护：单条规则若一次会删除 80% 以上回复或清空整条回复，将自动跳过。正则内容变化后旧确认不会自动套用到新规则。历史清理不会刷新楼层 iframe。
               </p>
             </div>
           </div>

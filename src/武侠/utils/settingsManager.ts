@@ -1372,7 +1372,29 @@ export function getCurrentPresetRegexRules(settings: DisplaySettings, currentPre
  * 只读取当前预设、已启用、作用于 AI 输出与格式显示的规则；角色卡自己的正则不参与。
  */
 export function getPresetStorageCleanupCandidates(): RegexRule[] {
-  return importPresetTavernRegexes();
+  try {
+    return getRawPresetRegexesFromInUsePreset()
+      .filter(
+        regex =>
+          regex.enabled &&
+          regex.source.ai_output === true &&
+          regex.destination.display === true &&
+          regex.script_name !== '游戏页面' &&
+          (regex.min_depth === null || regex.min_depth <= 0) &&
+          (regex.max_depth === null || regex.max_depth >= 0),
+      )
+      .map(regex => ({
+        id: regex.id || generateId(),
+        pattern: regex.find_regex,
+        replacement: regex.replace_string,
+        enabled: true,
+        description: regex.script_name,
+        originScope: 'preset' as const,
+      }));
+  } catch (error) {
+    dataLogger.error('读取预设附加块清理候选失败:', error);
+    return [];
+  }
 }
 
 export function isPresetStorageCleanupRuleSelected(
