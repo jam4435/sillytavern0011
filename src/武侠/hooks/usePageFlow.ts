@@ -1,12 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { PageState } from '../types';
 
-export function shouldDeferSetupEventNotifications(
-  currentPage: PageState,
-  isLoading: boolean,
-  isInitialRenamePending: boolean,
-): boolean {
-  return currentPage === 'setup' && (isLoading || isInitialRenamePending);
+export function shouldDeferSetupEventNotifications(currentPage: PageState, isLoading: boolean): boolean {
+  return currentPage === 'setup' && isLoading;
 }
 
 export function usePageFlow() {
