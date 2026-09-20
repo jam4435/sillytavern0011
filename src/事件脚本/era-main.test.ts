@@ -672,6 +672,74 @@ describe('ERA 主线初始化控制', () => {
     expect(operations.playerJoinsEvents).toHaveBeenCalledWith([eventName], expect.any(Object));
   });
 
+  it('纯时间事件若开始和结束都已过去则直接历史结算，不先启动再结束', async () => {
+    const eventName = '射雕测试事件-完全错过时间窗';
+    const eventLocation = '大宋/嘉兴府/牛家村';
+    const variables = validVariables();
+    variables.stat_data.世界信息.时间 = { 年: 1200, 月: 8, 日: 20, 时: 12 };
+    variables.stat_data.user数据 = { 所在位置: eventLocation };
+    variables.stat_data.事件系统.未发生事件 = {
+      [eventName]: { 类型: '时间', 年: 1200, 月: 8, 日: 10, 时: 10 },
+    };
+    getVariablesMock.mockReturnValue(variables);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const operations = await import('./era-event-operations.js');
+    const scheduler = await import('./era-event-scheduler.js');
+    const definition = {
+      事件地点: eventLocation,
+      触发条件: { 类型: '时间', 年: 1200, 月: 8, 日: 10, 时: 10 },
+      事件结束时间: { 年: 1200, 月: 8, 日: 11, 时: 10 },
+      事件详情: '已经完全错过的历史事件',
+      事件概要: '历史结算',
+      参与人物: [],
+      insert: {},
+      update: {},
+      delete: {},
+    };
+
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [{ runtimeKey: eventName, location: eventLocation, triggerHour: 1, endHour: 2 }],
+      indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue({ [eventName]: definition });
+    vi.mocked(scheduler.getManifestEventCandidateKeys).mockReturnValue([eventName]);
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(true);
+    vi.mocked(checker.isEventDiscoverable).mockReturnValue(false);
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(true);
+    vi.mocked(operations.batchStartEvents).mockClear();
+    vi.mocked(operations.batchExpireEvents).mockClear();
+    vi.mocked(operations.batchEndEvents)
+      .mockClear()
+      .mockImplementation(async (eventNames, _definitions, options) => {
+        expect(options).toEqual({ deleteUnstarted: true, silent: true });
+        eventNames.forEach(name => {
+          delete variables.stat_data.事件系统.未发生事件[name];
+          variables.stat_data.事件系统.已完成事件[name] = 0;
+        });
+        return true;
+      });
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?fully-expired-time-event-direct-settlement-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const gameInitializedListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'GameInitialized')
+      .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
+    gameInitializedListener?.({ timestamp: Date.now() + 100_000 });
+
+    await vi.waitFor(() => expect(operations.batchEndEvents).toHaveBeenCalledTimes(1));
+    expect(operations.batchEndEvents).toHaveBeenCalledWith(
+      [eventName],
+      expect.objectContaining({ [eventName]: definition }),
+      { deleteUnstarted: true, silent: true },
+    );
+    expect(operations.batchStartEvents).not.toHaveBeenCalled();
+    expect(operations.batchExpireEvents).not.toHaveBeenCalled();
+  });
+
   it('定时人物入场只处理本轮尚未结束的事件', async () => {
     const activeEvent = '射雕测试事件-仍在进行';
     const endedEvent = '射雕测试事件-已经结束';
