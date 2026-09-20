@@ -61,6 +61,9 @@ type RegenerateSwipeTransaction = {
   messageId: number;
   previousSwipeId: number;
   regenerateSwipeId: number;
+  previousSwipeText: string;
+  previousSwipeData: Record<string, unknown>;
+  previousSwipeInfo: Record<string, unknown>;
 };
 
 const ERA_DATA_BLOCK_REGEX = /\s*<era_data>[\s\S]*?<\/era_data>\s*/gi;
@@ -238,13 +241,18 @@ async function beginRegenerateSwipe(messageId: number): Promise<RegenerateSwipeT
     Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0
       ? [...freshMessage.swipes]
       : [activeText || freshMessage.message || ''];
-  const previousSwipeId = getSafeSwipeIndex(freshMessage, swipes);
-  const regenerateSwipeId = swipes.length;
-  const placeholderText = stripEraDataBlocks(normalizeDisplayedMessageContent(activeText)) || '正在重新生成...';
-  swipes.push(placeholderText);
-
+  const regenerateSwipeId = getSafeSwipeIndex(freshMessage, swipes);
+  const previousSwipeId = regenerateSwipeId;
+  const previousSwipeText = swipes[regenerateSwipeId] || activeText || freshMessage.message || '';
   const swipesData = normalizeArray(freshMessage.swipes_data, swipes.length, () => ({}));
   const swipesInfo = normalizeArray(freshMessage.swipes_info, swipes.length, () => ({}));
+  const previousSwipeData = { ...(swipesData[regenerateSwipeId] || {}) };
+  const previousSwipeInfo = { ...(swipesInfo[regenerateSwipeId] || {}) };
+  const placeholderText = stripEraDataBlocks(normalizeDisplayedMessageContent(activeText)) || '正在重新生成...';
+
+  // 武侠前端的“重新生成”是重 roll，而不是创建长期备选：
+  // 直接原位覆盖当前 swipe。其它由玩家手动创建的 swipe 保持不动。
+  swipes[regenerateSwipeId] = placeholderText;
   swipesData[regenerateSwipeId] = {};
   swipesInfo[regenerateSwipeId] = {
     send_date: Date.now(),
@@ -255,6 +263,8 @@ async function beginRegenerateSwipe(messageId: number): Promise<RegenerateSwipeT
     [
       {
         message_id: messageId,
+        message: placeholderText,
+        swipe_id: regenerateSwipeId,
         swipes,
         swipes_data: swipesData,
         swipes_info: swipesInfo,
@@ -262,24 +272,15 @@ async function beginRegenerateSwipe(messageId: number): Promise<RegenerateSwipeT
     ],
     { refresh: 'none' },
   );
-  assertSwipeExists(messageId, regenerateSwipeId, '写入占位 swipe 后');
-
-  await setChatMessages(
-    [
-      {
-        message_id: messageId,
-        swipe_id: regenerateSwipeId,
-      },
-    ],
-    { refresh: 'none' },
-  );
-  assertActiveSwipe(messageId, regenerateSwipeId, '切换到占位 swipe 后');
-  await ensureMessageFieldMatches(messageId, placeholderText);
+  assertActiveSwipe(messageId, regenerateSwipeId, '原位写入重新生成占位内容后');
 
   return {
     messageId,
     previousSwipeId,
     regenerateSwipeId,
+    previousSwipeText,
+    previousSwipeData,
+    previousSwipeInfo,
   };
 }
 
@@ -309,6 +310,8 @@ async function writeGeneratedSwipe(transaction: RegenerateSwipeTransaction, resu
     [
       {
         message_id: transaction.messageId,
+        message: nextText,
+        swipe_id: transaction.regenerateSwipeId,
         swipes,
         swipes_data: swipesData,
         swipes_info: swipesInfo,
@@ -329,11 +332,27 @@ async function writeGeneratedSwipe(transaction: RegenerateSwipeTransaction, resu
 }
 
 async function restorePreviousSwipe(transaction: RegenerateSwipeTransaction): Promise<void> {
+  const freshMessage = readMessageWithSwipes(transaction.messageId);
+  const swipes =
+    Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0
+      ? [...freshMessage.swipes]
+      : [transaction.previousSwipeText];
+  const swipesData = normalizeArray(freshMessage.swipes_data, swipes.length, () => ({}));
+  const swipesInfo = normalizeArray(freshMessage.swipes_info, swipes.length, () => ({}));
+
+  swipes[transaction.regenerateSwipeId] = transaction.previousSwipeText;
+  swipesData[transaction.regenerateSwipeId] = { ...transaction.previousSwipeData };
+  swipesInfo[transaction.regenerateSwipeId] = { ...transaction.previousSwipeInfo };
+
   await setChatMessages(
     [
       {
         message_id: transaction.messageId,
+        message: transaction.previousSwipeText,
         swipe_id: transaction.previousSwipeId,
+        swipes,
+        swipes_data: swipesData,
+        swipes_info: swipesInfo,
       },
     ],
     { refresh: 'none' },
@@ -341,11 +360,11 @@ async function restorePreviousSwipe(transaction: RegenerateSwipeTransaction): Pr
   const restoredMessage = assertActiveSwipe(
     transaction.messageId,
     transaction.previousSwipeId,
-    '恢复旧 swipe 后',
+    '恢复重 roll 前当前 swipe 后',
   );
   await ensureMessageFieldMatches(transaction.messageId, getActiveMessageText(restoredMessage));
   await emitEraEventAndWait('manual_sync', {
-    timeoutMessage: '重新生成失败后已切回原 swipe，但 ERA 没有确认变量恢复。',
+    timeoutMessage: '重新生成失败后已恢复原 swipe，但 ERA 没有确认变量恢复。',
     expectedMessageId: transaction.messageId,
     expectedAction: 'resync',
   });

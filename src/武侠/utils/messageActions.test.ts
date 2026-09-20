@@ -119,7 +119,7 @@ describe('regenerateLastAssistantSwipe', () => {
     getLastMessageContentMock.mockImplementation(() => getActiveMessageText(messages[1]));
   });
 
-  it('重新生成时先只写聊天数据，成功后再等待 ERA，同步前不刷新宿主楼层', async () => {
+  it('重新生成原位替换当前 swipe，成功后不保留旧重 roll 内容', async () => {
     const result = await regenerateLastAssistantSwipe();
 
     expect(globals.setChatMessages).toHaveBeenNthCalledWith(
@@ -127,10 +127,9 @@ describe('regenerateLastAssistantSwipe', () => {
       [
         expect.objectContaining({
           message_id: 2,
-          swipes: expect.arrayContaining([
-            '旧正文\n\n<era_data>{"mk":"old"}</era_data>',
-            '旧正文',
-          ]),
+          message: '旧正文',
+          swipe_id: 0,
+          swipes: ['旧正文'],
         }),
       ],
       { refresh: 'none' },
@@ -140,44 +139,15 @@ describe('regenerateLastAssistantSwipe', () => {
       [
         expect.objectContaining({
           message_id: 2,
-          swipe_id: 1,
+          message: '新正文',
+          swipe_id: 0,
+          swipes: ['新正文'],
         }),
       ],
       { refresh: 'none' },
     );
-    expect(globals.setChatMessages).toHaveBeenNthCalledWith(
-      3,
-      [
-        expect.objectContaining({
-          message_id: 2,
-          message: '旧正文',
-        }),
-      ],
-      { refresh: 'none' },
-    );
-    expect(globals.setChatMessages).toHaveBeenNthCalledWith(
-      4,
-      [
-        expect.objectContaining({
-          message_id: 2,
-          swipes: expect.arrayContaining([
-            '旧正文\n\n<era_data>{"mk":"old"}</era_data>',
-            expect.stringContaining('新正文'),
-          ]),
-        }),
-      ],
-      { refresh: 'none' },
-    );
-    expect(globals.setChatMessages).toHaveBeenNthCalledWith(
-      5,
-      [
-        expect.objectContaining({
-          message_id: 2,
-          message: expect.stringContaining('新正文'),
-        }),
-      ],
-      { refresh: 'none' },
-    );
+    expect(messages[1].swipes).toEqual(['新正文']);
+    expect(messages[1].message).toBe('新正文');
     expect(emitEraEventAndWaitMock).toHaveBeenNthCalledWith(1, 'manual_sync', expect.objectContaining({
       expectedMessageId: 2,
       expectedAction: 'resync',
@@ -188,11 +158,11 @@ describe('regenerateLastAssistantSwipe', () => {
     }));
     expect(globals.generate).toHaveBeenCalledWith(expect.not.objectContaining({ injects: expect.anything() }));
     expect(result.assistantMessageId).toBe(2);
-    expect(result.assistantSwipeId).toBe(1);
+    expect(result.assistantSwipeId).toBe(0);
     expect(result.rawReply).toBe('新正文');
   });
 
-  it('重新生成遇到两次 429 后只提交一个新 swipe', async () => {
+  it('重新生成遇到两次 429 后仍只原位提交一个 swipe', async () => {
     globals.generate = vi.fn()
       .mockRejectedValueOnce({ status: 429, retryAfterMs: 0 })
       .mockRejectedValueOnce({ cause: { statusCode: 429 }, retryAfterMs: 0 })
@@ -201,8 +171,8 @@ describe('regenerateLastAssistantSwipe', () => {
     const result = await regenerateLastAssistantSwipe();
 
     expect(globals.generate).toHaveBeenCalledTimes(3);
-    expect(messages[1].swipes).toHaveLength(2);
-    expect(messages[1].swipes?.filter(text => text.includes('限流后新正文'))).toHaveLength(1);
+    expect(messages[1].swipes).toHaveLength(1);
+    expect(messages[1].swipes?.[0]).toContain('限流后新正文');
     expect(emitEraEventAndWaitMock).toHaveBeenCalledTimes(2);
     expect(result.rawReply).toBe('限流后新正文');
   });
@@ -214,12 +184,39 @@ describe('regenerateLastAssistantSwipe', () => {
 
     const result = await regenerateLastAssistantSwipe();
 
-    expect(messages[1].swipes?.[0]).toBe('旧正文\n\n<era_data>{"mk":"old"}</era_data>');
-    expect(messages[1].swipes?.[1]).toBe(persistedReply);
+    expect(messages[1].swipes).toHaveLength(1);
+    expect(messages[1].swipes?.[0]).toBe(persistedReply);
     expect(messages[1].message).toBe(persistedReply);
     expect(messages[1].message).not.toMatch(/\n{3,}/);
     expect(messages[1].message).not.toMatch(/\n$/);
     expect(result.rawReply).toBe(rawReply);
+  });
+
+  it('已有手动备选时只替换当前 swipe，不删除其它备选', async () => {
+    messages[1] = {
+      ...messages[1],
+      message: '备选B\n\n<era_data>{"mk":"b"}</era_data>',
+      swipes: [
+        '备选A\n\n<era_data>{"mk":"a"}</era_data>',
+        '备选B\n\n<era_data>{"mk":"b"}</era_data>',
+        '备选C\n\n<era_data>{"mk":"c"}</era_data>',
+      ],
+      swipes_data: [{ a: 1 }, { b: 1 }, { c: 1 }],
+      swipes_info: [{ type: 'manual' }, { type: 'manual' }, { type: 'manual' }],
+      swipe_id: 1,
+    };
+    globals.generate = vi.fn(async () => '重 roll 后的B');
+
+    const result = await regenerateLastAssistantSwipe();
+
+    expect(messages[1].swipes).toEqual([
+      '备选A\n\n<era_data>{"mk":"a"}</era_data>',
+      '重 roll 后的B',
+      '备选C\n\n<era_data>{"mk":"c"}</era_data>',
+    ]);
+    expect(messages[1].swipe_id).toBe(1);
+    expect(messages[1].message).toBe('重 roll 后的B');
+    expect(result.assistantSwipeId).toBe(1);
   });
 
   it('重新生成连续三次 429 后恢复原 swipe', async () => {
@@ -229,6 +226,7 @@ describe('regenerateLastAssistantSwipe', () => {
 
     expect(globals.generate).toHaveBeenCalledTimes(3);
     expect(messages[1].swipe_id).toBe(0);
+    expect(messages[1].swipes).toEqual(['旧正文\n\n<era_data>{"mk":"old"}</era_data>']);
     expect(messages[1].message).toBe('旧正文\n\n<era_data>{"mk":"old"}</era_data>');
     expect(emitEraEventAndWaitMock).not.toHaveBeenCalledWith('era:apiWrite', expect.anything());
   });
