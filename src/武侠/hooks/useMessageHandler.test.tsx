@@ -140,6 +140,7 @@ const createHookOptions = (summarySettings: ReturnType<typeof createSummarySetti
   onVariableAssistantReply: vi.fn(),
   onVariableExtraDeclaredBlocks: vi.fn(),
   onVariableAiWriteTarget: vi.fn(),
+  onAssistantDisplayCommit: vi.fn(),
 });
 
 describe('useMessageHandler extra-variable decision', () => {
@@ -243,6 +244,7 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(executeExtraVariableUpdateMock).not.toHaveBeenCalled();
     expect(globals.generate).toHaveBeenCalledWith({ should_stream: true });
     expect(options.onVariableExtraDeclaredBlocks).not.toHaveBeenCalled();
+    expect(options.onAssistantDisplayCommit).toHaveBeenCalledWith(9, 1);
     expect(options.patchLatestDebugRound).toHaveBeenCalledWith({
       variable: expect.objectContaining({
         trigger: 'send',
@@ -267,6 +269,17 @@ describe('useMessageHandler extra-variable decision', () => {
       chatId: expect.any(String),
       roundId: 'debug-round-id',
     });
+  });
+
+  it('新 assistant 楼层显示提交后上报 message/swipe 身份', async () => {
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('测试自动滚动提交');
+    });
+
+    expect(options.onAssistantDisplayCommit).toHaveBeenCalledWith(2, 0);
   });
 
   it('真实玩家发送只把未拼接指令的原始输入写入 user 楼层元数据', async () => {
@@ -665,6 +678,7 @@ describe('useMessageHandler extra-variable decision', () => {
       options: ['选项'],
       gameData: null,
       assistantMessageId: 9,
+      assistantSwipeId: 1,
       userInput: '上一条用户输入',
       combinedPrompt: '组合提示词',
       rawReply: '重新生成正文',
@@ -707,6 +721,7 @@ describe('useMessageHandler extra-variable decision', () => {
       options: ['选项'],
       gameData: null,
       assistantMessageId: 12,
+      assistantSwipeId: 2,
       userInput: '上一条用户输入',
       combinedPrompt: '组合提示词',
       rawReply: '重新生成正文',
