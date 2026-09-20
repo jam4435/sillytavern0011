@@ -14,6 +14,11 @@ vi.mock('./logger', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+  dataLogger: {
+    log: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 
 const emitWriteMock = vi.mocked(emitSourcedEraVariableWriteAndWait);
