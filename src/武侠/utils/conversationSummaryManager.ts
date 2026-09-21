@@ -42,7 +42,8 @@ if (章节摘要 && typeof 章节摘要 === 'object' && Object.keys(章节摘要
 -%>
 <长期叙事记忆>
 以下是已经从更早逐轮摘要中一次性归档出的长期剧情记忆；它们是旧正文的替代上下文，不要把同一历史再次当作新发生的事件。
-<% for (const [章节键, 章节] of Object.entries(章节摘要)) {
+<% const 排序章节 = Object.entries(章节摘要).sort((左, 右) => Number(左?.[1]?.起始楼层 || 0) - Number(右?.[1]?.起始楼层 || 0));
+for (const [章节键, 章节] of 排序章节) {
   if (!章节 || typeof 章节 !== 'object' || typeof 章节.摘要 !== 'string' || !章节.摘要.trim()) continue;
 -%>
 [<%- 章节键 %>｜楼层 <%- 章节.起始楼层 %>-<%- 章节.结束楼层 %>] <%- 章节.摘要 %>
