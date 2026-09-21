@@ -1521,7 +1521,7 @@ function findWholeXmlBlockDescription(patternBody: string): string | null {
   if (/\(\?(?:<=|<!|=|!)/.test(patternBody)) return null;
 
   const body = stripRegexEdgeAnchors(patternBody);
-  const tagTokenPattern = String.raw`(?:[A-Za-z][\\w:-]*|\\(\\?:[A-Za-z][\\w:-]*(?:\\|[A-Za-z][\\w:-]*)+\\))`;
+  const tagTokenPattern = '(?:[A-Za-z][\\w:-]*|\\(\\?:[A-Za-z][\\w:-]*(?:\\|[A-Za-z][\\w:-]*)+\\))';
   const opening = new RegExp(`<(${tagTokenPattern})[^>]*>`).exec(body);
   if (!opening) return null;
 
@@ -1990,8 +1990,8 @@ function overlapsProtectedRange(start: number, end: number, protectedRanges: Tex
  * 注意：这里不是执行预设的 replacement，而是把该正则匹配到的原始区间从持久化文本或最终 AI 上下文中剥离。
  * VariableThink/Insert/Edit/Delete、summary、era_data 以及兼容预设模式下配置的摘要标签永远受保护。
  * 一般规则若一次会删掉 80% 以上文本或把整条回复删空，则视为疑似正文/整楼匹配并拒绝执行。
- * 完整的 <thinking>...</thinking> 匹配是 80% 占比保护的唯一例外，因为它明确不是正文；
- * 但即使是 thinking，也不允许把整条 assistant 回复清成空字符串。
+ * 只有分析器确认的“完整独立标签块”或“思维链边界块”可以越过 80% 占比保护；
+ * 即便如此，也绝不允许把整条 assistant 回复清成空字符串。
  */
 export function stripSelectedPresetRegexMatches(
   text: string,
