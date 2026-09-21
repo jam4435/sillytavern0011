@@ -51,6 +51,17 @@ export interface VariableActualChange {
   assistantMessageId?: number;
 }
 
+/**
+ * 统一 writer 对外上报的最小实际 diff。它只描述“这一次写入自己改了什么”，
+ * 不携带 UI 展示字段、来源或批次信息；这些元数据由 tracker 在记账时补齐。
+ */
+export interface VariableSnapshotDiffChange {
+  action: VariableChangeAction;
+  path: VariablePath;
+  beforeValue: unknown;
+  afterValue: unknown;
+}
+
 export interface VariableObservedBatch {
   batchId: string;
   origin: VariableChangeOrigin;
@@ -650,6 +661,27 @@ function visitObservedDiffs(
 
     visitObservedDiffs(beforeChild, afterChild, [...path, key], visit);
   }
+}
+
+/**
+ * 计算两个 stat_data 快照之间的叶子级实际差异，不做数量截断。
+ * 主要供统一变量 writer 在自己的事务边界内生成 source event payload。
+ */
+export function createVariableSnapshotDiff(
+  previousStatData: Record<string, unknown> | null,
+  nextStatData: Record<string, unknown> | null,
+): VariableSnapshotDiffChange[] {
+  if (!previousStatData || !nextStatData) return [];
+  const changes: VariableSnapshotDiffChange[] = [];
+  visitObservedDiffs(previousStatData, nextStatData, [], candidate => {
+    changes.push({
+      action: candidate.action,
+      path: candidate.path,
+      beforeValue: candidate.beforeValue,
+      afterValue: candidate.afterValue,
+    });
+  });
+  return changes;
 }
 
 function collectObservedDiffs(
