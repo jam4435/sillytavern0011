@@ -23,6 +23,7 @@ import {
   logRegexDebugSnapshot,
   getRegexRuleContentSignature,
   getPresetStorageCleanupCandidates,
+  getPresetStorageCleanupRecommendation,
   imageToBase64,
   importGlobalTavernRegexes,
   importPresetTavernRegexes,
@@ -49,6 +50,7 @@ import { loadSummaryModelList, validateSummaryApiConfig } from '../utils/summary
 import { applyVariableUpdateModeWorldbookState } from '../utils/extraVariableUpdateManager';
 import { cleanupCurrentChatPresetBlocks } from '../utils/chatStorageCleanup';
 import { applyConversationSummaryModeState } from '../utils/conversationSummaryManager';
+import { backfillHistoricalConversationMemory } from '../utils/narrativeMemoryManager';
 import {
   checkSummaryTrigger,
   triggerManualSummary,
@@ -424,6 +426,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [conversationSummaryModeStatus, setConversationSummaryModeStatus] = useState('');
   const [isConversationSummaryModeUpdating, setIsConversationSummaryModeUpdating] = useState(false);
   const [isPresetStorageCleanupRunning, setIsPresetStorageCleanupRunning] = useState(false);
+  const [isHistoricalConversationBackfillRunning, setIsHistoricalConversationBackfillRunning] = useState(false);
+  const [historicalConversationBackfillStatus, setHistoricalConversationBackfillStatus] = useState('');
   const [editingApiProfileId, setEditingApiProfileId] = useState<string | null>(
     () => settings.summarySettings.apiProfiles[0]?.id || null,
   );
@@ -468,6 +472,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const hasCurrentPreset = normalizedCurrentPresetName.length > 0;
   const currentPresetRegexRules = getCurrentPresetRegexRules(settings, normalizedCurrentPresetName);
   const presetStorageCleanupCandidates = hasCurrentPreset ? getPresetStorageCleanupCandidates() : [];
+  const presetStorageCleanupRecommendedCount = presetStorageCleanupCandidates.filter(
+    rule => getPresetStorageCleanupRecommendation(rule).kind === 'recommended',
+  ).length;
   const visibleVariableScopeEntries = statData ? getVisibleVariableScopeEntries(statData) : [];
   const firstAvailableVariableGroup = VARIABLE_GROUPS.find(group =>
     visibleVariableScopeEntries.some(([key]) => group.scopeKeys.includes(String(key))),
@@ -1291,6 +1298,30 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     [hasCurrentPreset, normalizedCurrentPresetName, onSettingsChange, settings],
   );
 
+  const handleAutoSelectPresetStorageCleanupRules = useCallback(() => {
+    if (!hasCurrentPreset) return;
+    const recommendedRules = presetStorageCleanupCandidates.filter(
+      rule => getPresetStorageCleanupRecommendation(rule).kind === 'recommended',
+    );
+    if (recommendedRules.length === 0) {
+      alert('当前预设没有识别出可独立安全删除的 XML 区块。整楼提取、summary、ERA/变量块和纯美化规则不会自动勾选。');
+      return;
+    }
+
+    const nextSettings = recommendedRules.reduce(
+      (currentSettings, rule) =>
+        setPresetStorageCleanupRuleSelected(currentSettings, normalizedCurrentPresetName, rule, true),
+      settings,
+    );
+    onSettingsChange(nextSettings);
+  }, [
+    hasCurrentPreset,
+    normalizedCurrentPresetName,
+    onSettingsChange,
+    presetStorageCleanupCandidates,
+    settings,
+  ]);
+
   const handleCleanupCurrentChatPresetBlocks = useCallback(async () => {
     if (!hasCurrentPreset || isPresetStorageCleanupRunning) {
       return;
@@ -1557,6 +1588,60 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     },
     [settings.summarySettings.conversationSummaryMode,settings.summarySettings.conversationSummaryRecentReplies,updateSummarySetting],
   );
+
+  const handleHistoricalConversationBackfill = useCallback(async () => {
+    if (isHistoricalConversationBackfillRunning) return;
+
+    const confirmed = window.confirm(
+      '这会读取当前聊天较早的 user + assistant 楼层，用额外总结模型按批次生成长期章节记忆。\n\n历史楼层与 swipe 原文不会被改写；完成后会启用“卡内摘要”，让被章节记忆覆盖的旧对话退出后续 prompt。是否继续？',
+    );
+    if (!confirmed) return;
+
+    setIsHistoricalConversationBackfillRunning(true);
+    setHistoricalConversationBackfillStatus('正在扫描尚未被章节记忆覆盖的旧聊天...');
+    try {
+      const result = await backfillHistoricalConversationMemory({
+        settings: settings.summarySettings,
+        onProgress: progress => {
+          setHistoricalConversationBackfillStatus(
+            `正在回溯压缩：${progress.completedChapters}/${progress.totalChapters} 章 · ${progress.processedTurns}/${progress.totalTurns} 轮`,
+          );
+        },
+      });
+
+      if (!result.archived) {
+        setHistoricalConversationBackfillStatus('没有需要回溯的旧聊天：现有章节记忆已覆盖可压缩范围，或聊天仍处于最近完整回复窗口内。');
+        return;
+      }
+
+      let modeStatus = '';
+      if (settings.summarySettings.conversationSummaryMode !== 'card') {
+        setHistoricalConversationBackfillStatus(
+          `已生成 ${result.chapterCount} 章，正在启用卡内摘要与 prompt 裁剪...`,
+        );
+        modeStatus = await applyConversationSummaryModeState(
+          'card',
+          settings.summarySettings.conversationSummaryRecentReplies,
+        );
+        updateSummarySetting('conversationSummaryMode', 'card');
+      }
+
+      setHistoricalConversationBackfillStatus(
+        `回溯完成：${result.turnCount} 轮旧聊天 → ${result.chapterCount} 个章节记忆；历史楼层原文未修改。${modeStatus ? ` ${modeStatus}` : ''}`,
+      );
+    } catch (error) {
+      uiLogger.error('[SettingsPanel] 旧聊天回溯压缩失败', error);
+      setHistoricalConversationBackfillStatus(
+        `回溯失败：${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      setIsHistoricalConversationBackfillRunning(false);
+    }
+  }, [
+    isHistoricalConversationBackfillRunning,
+    settings.summarySettings,
+    updateSummarySetting,
+  ]);
 
   const updateVariableUpdateMode = useCallback(
     async (mode: SummaryVariableUpdateMode) => {
@@ -2117,10 +2202,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <div>
                   <h5 className="regex-section-title">无用模块过滤</h5>
                   <p className="regex-section-caption">
-                    勾选当前预设中的显示正则后，只删除其命中的原始模块，不执行美化替换。之后会自动同时过滤新回复长期存档与每次发送给 AI 的最终上下文。
+                    会从当前预设显示正则中自动提取成对 XML 区块；安全区块可一键勾选。原始混合/美化正则仍保留给你手动判断。
                   </p>
                 </div>
-                {hasCurrentPreset && <span className="regex-section-meta">双重过滤</span>}
+                {hasCurrentPreset && (
+                  <span className="regex-section-meta">自动建议 {presetStorageCleanupRecommendedCount}</span>
+                )}
               </div>
 
               {presetStorageCleanupCandidates.length === 0 ? (
@@ -2136,10 +2223,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       normalizedCurrentPresetName,
                       rule,
                     );
+                    const recommendation = getPresetStorageCleanupRecommendation(rule);
                     return (
                       <label
-                        className={`preset-module-filter-rule ${selected ? 'selected' : ''}`}
+                        className={`preset-module-filter-rule ${selected ? 'selected' : ''} ${recommendation.kind}`}
                         key={signature}
+                        title={recommendation.reason}
                       >
                         <input
                           type="checkbox"
@@ -2149,8 +2238,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         <span className="preset-module-filter-main">
                           <span className="preset-module-filter-title-row">
                             <strong>{rule.description || '未命名预设正则'}</strong>
-                            <span className="preset-module-filter-kind">
-                              {rule.replacement.trim() ? '替换/美化型' : '隐藏型'}
+                            <span className={`preset-module-filter-kind ${recommendation.kind}`}>
+                              {recommendation.kind === 'recommended'
+                                ? '建议过滤'
+                                : recommendation.kind === 'unsafe'
+                                  ? '保护/谨慎'
+                                  : rule.replacement.trim()
+                                    ? '替换/美化型'
+                                    : '手动判断'}
                             </span>
                           </span>
                           <code className="preset-module-filter-pattern" title={rule.pattern}>
@@ -2167,6 +2262,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <div className="regex-buttons-group">
                   <button
                     type="button"
+                    className="settings-action-btn"
+                    onClick={handleAutoSelectPresetStorageCleanupRules}
+                    disabled={!hasCurrentPreset || presetStorageCleanupRecommendedCount === 0}
+                  >
+                    <Icons.Debug size={14} />
+                    <span>自动识别并勾选 {presetStorageCleanupRecommendedCount || ''}</span>
+                  </button>
+                  <button
+                    type="button"
                     className="settings-import-btn"
                     onClick={handleCleanupCurrentChatPresetBlocks}
                     disabled={!hasCurrentPreset || isPresetStorageCleanupRunning}
@@ -2176,7 +2280,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </button>
                 </div>
                 <p className="settings-hint">
-                  持续过滤无需手动清理；这个按钮只用于旧楼层回填。VariableThink / VariableEdit / summary / era_data 与配置的预设摘要标签受保护；疑似正文或会清空整条回复的规则会自动跳过。
+                  “自动识别”只勾选从正则中拆出的完整 XML 区块。像整楼提取 <summary>、Variable/ERA 区块或疑似正文规则会标为保护/谨慎，不会自动删除。持续过滤无需手动清理；“回溯清理”只处理旧楼层。
                 </p>
               </div>
             </div>
@@ -2274,6 +2378,27 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </div>
               )}
 
+              <div className="summary-backfill-panel">
+                <div className="summary-archive-header">
+                  <div>
+                    <h5>旧聊天回溯压缩</h5>
+                    <p>用于“以前没开摘要、现在上下文已经很长”的聊天。只补章节记忆，不重写历史楼层或 swipe。</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="settings-action-btn primary"
+                    onClick={() => void handleHistoricalConversationBackfill()}
+                    disabled={isHistoricalConversationBackfillRunning || isConversationSummaryModeUpdating}
+                  >
+                    <Icons.Scroll size={15} />
+                    <span>{isHistoricalConversationBackfillRunning ? '回溯压缩中...' : '回溯压缩旧聊天'}</span>
+                  </button>
+                </div>
+                {historicalConversationBackfillStatus && (
+                  <div className="summary-mode-status">{historicalConversationBackfillStatus}</div>
+                )}
+              </div>
+
               {settings.summarySettings.conversationSummaryMode === 'card' && (
                 <div className="summary-archive-panel">
                   <div className="summary-archive-header">
@@ -2330,6 +2455,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               title="API"
               isOpen={openSettingBlocks.extraModelApi}
               onToggle={toggleSettingBlock}
+              className="extra-model-collapsible"
             >
               <p className="settings-hint">
                 在这里保存可复用的额外模型 API；自动总结和额外变量可以在各自分组中分别选择使用哪一个。
@@ -2477,6 +2603,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               title="自动总结"
               isOpen={openSettingBlocks.extraModelSummary}
               onToggle={toggleSettingBlock}
+              className="extra-model-collapsible"
             >
               <p className="settings-description compact">当角色的原始人物经历过多时，只压缩最旧一批并保留近期经历；阶段经历不会反复参与下一轮压缩。</p>
 
@@ -2693,6 +2820,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               title="额外变量"
               isOpen={openSettingBlocks.extraModelVariables}
               onToggle={toggleSettingBlock}
+              className="extra-model-collapsible"
             >
               <div className="settings-row">
                 <label className="settings-label">使用 API</label>
