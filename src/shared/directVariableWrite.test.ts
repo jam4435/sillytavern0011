@@ -313,6 +313,9 @@ describe('runDirectChatVariableWrite', () => {
         transactionIds: ['target-transaction'],
       }),
     );
+    expect(
+      eventEmitMock.mock.calls.filter(([eventName]) => eventName === ERA_VARIABLE_WRITE_DONE_EVENT),
+    ).toHaveLength(1);
   });
 
   it('原始 era:writeDone 已匹配时不等待无关后处理监听器', async () => {
