@@ -94,6 +94,8 @@ type SettingsCollapsibleId =
   | 'appearanceTheme'
   | 'appearanceText'
   | 'appearanceBackground'
+  | 'regexGlobal'
+  | 'regexPreset'
   | 'conversationSummary'
   | 'extraModelApi'
   | 'extraModelSummary'
@@ -127,6 +129,8 @@ const DEFAULT_OPEN_SETTING_BLOCKS: Record<SettingsCollapsibleId, boolean> = {
   appearanceTheme: false,
   appearanceText: false,
   appearanceBackground: false,
+  regexGlobal: false,
+  regexPreset: false,
   conversationSummary: false,
   extraModelApi: false,
   extraModelSummary: false,
@@ -1295,11 +1299,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       isPresetStorageCleanupRuleSelected(settings, normalizedCurrentPresetName, rule),
     ).length;
     if (selectedCount === 0) {
-      alert('请先勾选至少一条要从长期聊天存档剥离的预设正则。');
+      alert('请先勾选至少一条要过滤的无用模块规则。');
       return;
     }
     const confirmed = window.confirm(
-      `将按当前勾选的 ${selectedCount} 条预设正则清理当前聊天的所有 assistant 楼层和历史 swipe。\n\nVariableThink / VariableEdit / summary / era_data 等受保护块不会删除。是否继续？`,
+      `将按当前勾选的 ${selectedCount} 条无用模块规则回溯清理当前聊天的所有 assistant 楼层和历史 swipe。\n\nVariableThink / VariableEdit / summary / era_data，以及你配置的预设摘要标签都会受保护。是否继续？`,
     );
     if (!confirmed) {
       return;
@@ -1316,7 +1320,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         `当前聊天清理完成：\n• 改写楼层：${result.updatedMessages}\n• 改写 swipe：${result.updatedSwipes}\n• 减少字符：${result.removedCharacters.toLocaleString()}`,
       );
     } catch (error) {
-      uiLogger.error('[SettingsPanel] 清理当前聊天预设附加块失败', error);
+      uiLogger.error('[SettingsPanel] 清理当前聊天无用模块失败', error);
       alert(`清理失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsPresetStorageCleanupRunning(false);
@@ -2025,18 +2029,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="settings-section">
             <p className="settings-description">正文显示时按固定顺序执行：ERA 基础规则、当前预设规则、其它全局规则。</p>
 
-            <div className="regex-scope-section">
-              <div className="regex-section-header">
-                <div>
-                  <h5 className="regex-section-title">全局共享规则</h5>
-                  <p className="regex-section-caption">手动添加的规则对所有预设共用。</p>
-                </div>
-              </div>
-
+            <SettingsCollapsibleBlock
+              id="regexGlobal"
+              title={`全局共享规则 · ${settings.localRegexRules.length}`}
+              isOpen={openSettingBlocks.regexGlobal}
+              onToggle={toggleSettingBlock}
+              className="regex-scope-collapsible"
+            >
+              <p className="regex-section-caption">手动添加或从酒馆全局导入；对所有预设共用。</p>
               <div className="regex-rules-list">
                 {settings.localRegexRules.length === 0 ? (
-                  <div className="regex-empty">
-                    <Icons.Scroll size={32} />
+                  <div className="regex-empty compact">
                     <p>暂无全局共享规则</p>
                   </div>
                 ) : (
@@ -2052,7 +2055,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   ))
                 )}
               </div>
-
               <div className="regex-buttons-group">
                 <button className="settings-add-btn" onClick={addLocalRegexRule}>
                   <span className="add-icon">+</span>
@@ -2063,25 +2065,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <span>覆盖导入全局正则</span>
                 </button>
               </div>
-            </div>
+            </SettingsCollapsibleBlock>
 
-            <div className="regex-scope-section">
-              <div className="regex-section-header">
-                <div>
-                  <h5 className="regex-section-title">当前预设规则</h5>
-                  <p className="regex-section-caption">
-                    {hasCurrentPreset
-                      ? `当前预设：${normalizedCurrentPresetName}。导入时会覆盖这一桶规则。`
-                      : '未检测到当前预设，仅可查看和编辑全局共享规则。'}
-                  </p>
-                </div>
+            <SettingsCollapsibleBlock
+              id="regexPreset"
+              title={`当前预设规则 · ${currentPresetRegexRules.length}`}
+              isOpen={openSettingBlocks.regexPreset}
+              onToggle={toggleSettingBlock}
+              className="regex-scope-collapsible"
+            >
+              <div className="regex-section-header compact">
+                <p className="regex-section-caption">
+                  {hasCurrentPreset
+                    ? `当前：${normalizedCurrentPresetName}。导入会覆盖这一预设桶。`
+                    : '未检测到当前预设。'}
+                </p>
                 {hasCurrentPreset && <span className="regex-section-meta">{normalizedCurrentPresetName}</span>}
               </div>
-
               <div className="regex-rules-list">
                 {currentPresetRegexRules.length === 0 ? (
-                  <div className="regex-empty">
-                    <Icons.Scroll size={32} />
+                  <div className="regex-empty compact">
                     <p>{hasCurrentPreset ? '当前预设暂无导入规则' : '暂无可用预设规则'}</p>
                   </div>
                 ) : (
@@ -2097,7 +2100,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   ))
                 )}
               </div>
-
               <div className="regex-buttons-group">
                 <button
                   className="settings-import-btn"
@@ -2108,67 +2110,75 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <span>覆盖导入当前预设规则</span>
                 </button>
               </div>
-            </div>
+            </SettingsCollapsibleBlock>
 
-            <div className="regex-scope-section">
+            <div className="regex-scope-section module-filter-section">
               <div className="regex-section-header">
                 <div>
-                  <h5 className="regex-section-title">预设附加块存档过滤</h5>
+                  <h5 className="regex-section-title">无用模块过滤</h5>
                   <p className="regex-section-caption">
-                    自动读取当前预设中“已启用 + AI 输出 + 格式显示”的正则。勾选后只删除该正则命中的原始附加块，不执行美化替换；VariableThink / VariableEdit 等 ERA 块、summary 与 era_data 始终保留。
+                    勾选当前预设中的显示正则后，只删除其命中的原始模块，不执行美化替换。之后会自动同时过滤新回复长期存档与每次发送给 AI 的最终上下文。
                   </p>
                 </div>
-                {hasCurrentPreset && <span className="regex-section-meta">需玩家确认</span>}
+                {hasCurrentPreset && <span className="regex-section-meta">双重过滤</span>}
               </div>
 
               {presetStorageCleanupCandidates.length === 0 ? (
-                <div className="regex-empty">
-                  <Icons.Scroll size={32} />
-                  <p>{hasCurrentPreset ? '当前预设没有可识别的 AI 输出显示正则' : '加载预设后可识别附加块规则'}</p>
+                <div className="regex-empty compact">
+                  <p>{hasCurrentPreset ? '当前预设没有可识别的 AI 输出显示正则' : '加载预设后可识别模块规则'}</p>
                 </div>
               ) : (
-                presetStorageCleanupCandidates.map(rule => {
-                  const signature = getRegexRuleContentSignature(rule);
-                  const selected = isPresetStorageCleanupRuleSelected(
-                    settings,
-                    normalizedCurrentPresetName,
-                    rule,
-                  );
-                  return (
-                    <div className="settings-row" key={signature}>
-                      <label className="settings-label">{rule.description || '未命名预设正则'}</label>
-                      <div className="settings-control">
-                        <label className="settings-checkbox-label">
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => togglePresetStorageCleanupRule(rule)}
-                          />
-                          <span>从长期聊天存档剥离此规则命中的原文</span>
-                        </label>
-                        <span className="settings-hint-inline" title={rule.pattern}>
-                          {rule.replacement.trim() ? '替换/美化型' : '隐藏型'} · {rule.pattern}
+                <div className="preset-module-filter-list">
+                  {presetStorageCleanupCandidates.map(rule => {
+                    const signature = getRegexRuleContentSignature(rule);
+                    const selected = isPresetStorageCleanupRuleSelected(
+                      settings,
+                      normalizedCurrentPresetName,
+                      rule,
+                    );
+                    return (
+                      <label
+                        className={`preset-module-filter-rule ${selected ? 'selected' : ''}`}
+                        key={signature}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => togglePresetStorageCleanupRule(rule)}
+                        />
+                        <span className="preset-module-filter-main">
+                          <span className="preset-module-filter-title-row">
+                            <strong>{rule.description || '未命名预设正则'}</strong>
+                            <span className="preset-module-filter-kind">
+                              {rule.replacement.trim() ? '替换/美化型' : '隐藏型'}
+                            </span>
+                          </span>
+                          <code className="preset-module-filter-pattern" title={rule.pattern}>
+                            {rule.pattern}
+                          </code>
                         </span>
-                      </div>
-                    </div>
-                  );
-                })
+                      </label>
+                    );
+                  })}
+                </div>
               )}
 
-              <div className="regex-buttons-group">
-                <button
-                  type="button"
-                  className="settings-import-btn"
-                  onClick={handleCleanupCurrentChatPresetBlocks}
-                  disabled={!hasCurrentPreset || isPresetStorageCleanupRunning}
-                >
-                  <Icons.Scroll size={14} />
-                  <span>{isPresetStorageCleanupRunning ? '正在清理当前聊天...' : '按勾选规则清理当前聊天'}</span>
-                </button>
+              <div className="module-filter-footer">
+                <div className="regex-buttons-group">
+                  <button
+                    type="button"
+                    className="settings-import-btn"
+                    onClick={handleCleanupCurrentChatPresetBlocks}
+                    disabled={!hasCurrentPreset || isPresetStorageCleanupRunning}
+                  >
+                    <Icons.Scroll size={14} />
+                    <span>{isPresetStorageCleanupRunning ? '正在清理历史...' : '回溯清理当前聊天历史'}</span>
+                  </button>
+                </div>
+                <p className="settings-hint">
+                  持续过滤无需手动清理；这个按钮只用于旧楼层回填。VariableThink / VariableEdit / summary / era_data 与配置的预设摘要标签受保护；疑似正文或会清空整条回复的规则会自动跳过。
+                </p>
               </div>
-              <p className="settings-hint">
-                安全保护：普通规则若一次会删除 80% 以上回复或清空整条回复，将自动跳过；完整 {'<thinking>'} 块可例外超过 80%，但仍不会把整条回复清空。正则内容变化后旧确认不会自动套用到新规则。历史清理不会刷新楼层 iframe。
-              </p>
             </div>
           </div>
         )}
@@ -2183,82 +2193,136 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onToggle={toggleSettingBlock}
             >
               <p className="settings-description compact">
-                控制逐回复摘要由角色卡、玩家预设还是完全关闭。卡内模式默认保留最近 5 条 assistant 回复全文，更早回复只向模型保留 XML 摘要。
+                先选择摘要由谁生成，再配置武侠卡如何压缩发送上下文。生成职责与上下文裁剪分开，避免卡内规则和玩家预设互相争抢。
               </p>
-              <div className="settings-row">
-                <label className="settings-label">摘要来源</label>
-                <div className="settings-control">
-                  <select
-                    value={settings.summarySettings.conversationSummaryMode}
-                    onChange={e => void updateConversationSummaryMode(e.target.value as ConversationSummaryMode)}
-                    className="settings-select"
+
+              <div className="summary-mode-grid" role="group" aria-label="对话摘要来源">
+                {([
+                  ['card', '卡内摘要', '启用角色卡“对话摘要指令”，统一使用 <summary>。'],
+                  ['preset', '兼容预设', '摘要由玩家预设生成；武侠卡只识别你填写的 XML 标签并压缩上下文。'],
+                  ['off', '关闭', '不生成也不按逐轮摘要压缩聊天上下文。'],
+                ] as const).map(([mode, title, description]) => (
+                  <button
+                    type="button"
+                    key={mode}
+                    className={`summary-mode-card ${
+                      settings.summarySettings.conversationSummaryMode === mode ? 'active' : ''
+                    }`}
+                    onClick={() => void updateConversationSummaryMode(mode)}
                     disabled={isConversationSummaryModeUpdating}
                   >
-                    <option value="card">卡内摘要</option>
-                    <option value="preset">兼容预设 XML 摘要</option>
-                    <option value="off">关闭摘要</option>
-                  </select>
-                  <span className="settings-hint-inline">卡内会启用“对话摘要指令”；预设模式不干涉玩家预设。</span>
-                </div>
-              </div>
-              <div className="settings-row">
-                <label className="settings-label">保留完整回复</label>
-                <div className="settings-control">
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={settings.summarySettings.conversationSummaryRecentReplies}
-                    onChange={e => void updateConversationSummaryRecentReplies(parseInt(e.target.value) || 5)}
-                    className="settings-number-input"
-                    disabled={isConversationSummaryModeUpdating || settings.summarySettings.conversationSummaryMode !== 'card'}
-                  />
-                  <span className="settings-hint-inline">按 assistant 回复数计算；默认 5 条。</span>
-                </div>
-              </div>
-              <div className="settings-row">
-                <label className="settings-label">长期章节归档</label>
-                <div className="settings-control">
-                  <label className="settings-checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.summarySettings.conversationArchiveEnabled}
-                      onChange={e => updateSummarySetting('conversationArchiveEnabled', e.target.checked)}
-                      disabled={settings.summarySettings.conversationSummaryMode !== 'card'}
-                    />
-                    <span>用额外模型把更早逐轮摘要按批次压成章节记忆</span>
-                  </label>
-                  <span className="settings-hint-inline">
-                    仅卡内摘要模式生效；默认关闭。章节摘要写入当前聊天 stat_data，不修改历史楼层原文。
-                  </span>
-                </div>
+                    <span className="summary-mode-title">{title}</span>
+                    <span className="summary-mode-description">{description}</span>
+                  </button>
+                ))}
               </div>
 
-              <div className="settings-row">
-                <label className="settings-label">每章摘要数</label>
-                <div className="settings-control">
-                  <input
-                    type="number"
-                    min="5"
-                    max="50"
-                    value={settings.summarySettings.conversationArchiveBatchSize}
-                    onChange={e =>
-                      updateSummarySetting(
-                        'conversationArchiveBatchSize',
-                        Math.max(5, Math.min(50, parseInt(e.target.value) || 10)),
-                      )
-                    }
-                    className="settings-number-input"
-                    disabled={
-                      settings.summarySettings.conversationSummaryMode !== 'card' ||
-                      !settings.summarySettings.conversationArchiveEnabled
-                    }
-                  />
-                  <span className="settings-hint-inline">默认 10 条旧摘要压成一条章节记忆；最近全文窗口永不参与归档。</span>
-                </div>
-              </div>
+              {settings.summarySettings.conversationSummaryMode !== 'off' && (
+                <div className="summary-context-panel">
+                  <div className="summary-context-heading">
+                    <div>
+                      <h5>上下文压缩</h5>
+                      <p>
+                        最近回复保留正文；更早的已摘要 assistant 回复仅保留摘要，并去掉它对应的旧 user 输入。
+                      </p>
+                    </div>
+                  </div>
 
-              {conversationSummaryModeStatus && <div className="settings-hint">{conversationSummaryModeStatus}</div>}
+                  {settings.summarySettings.conversationSummaryMode === 'preset' && (
+                    <div className="summary-compact-field">
+                      <label htmlFor="conversation-summary-preset-tag">预设摘要 XML 标签</label>
+                      <div className="summary-tag-input-row">
+                        <input
+                          id="conversation-summary-preset-tag"
+                          type="text"
+                          value={settings.summarySettings.conversationSummaryPresetTag}
+                          onChange={e => updateSummarySetting('conversationSummaryPresetTag', e.target.value)}
+                          className="settings-text-input summary-tag-input"
+                          placeholder="summary 或 <summary>"
+                          spellCheck={false}
+                        />
+                        <span className="summary-tag-preview">
+                          {'<'}
+                          {settings.summarySettings.conversationSummaryPresetTag
+                            .replace(/^<\s*\/?\s*|\s*>$/g, '')
+                            .trim() || 'summary'}
+                          {'>'}
+                        </span>
+                      </div>
+                      <span className="settings-hint-inline">
+                        可填 summary、{'<summary>'}、memory 等。这里不会要求预设生成摘要，只告诉武侠卡“哪一块才是摘要”。
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="summary-compact-field">
+                    <label htmlFor="conversation-summary-recent-replies">最近完整 assistant 回复</label>
+                    <div className="summary-number-row">
+                      <input
+                        id="conversation-summary-recent-replies"
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={settings.summarySettings.conversationSummaryRecentReplies}
+                        onChange={e => void updateConversationSummaryRecentReplies(parseInt(e.target.value) || 5)}
+                        className="settings-number-input"
+                        disabled={isConversationSummaryModeUpdating}
+                      />
+                      <span className="settings-hint-inline">默认 5 条；卡内与预设兼容模式都使用这个窗口。</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {settings.summarySettings.conversationSummaryMode === 'card' && (
+                <div className="summary-archive-panel">
+                  <div className="summary-archive-header">
+                    <div>
+                      <h5>长期章节归档</h5>
+                      <p>把更早逐轮摘要再压成章节记忆；只写 stat_data，不改历史楼层原文。</p>
+                    </div>
+                    <label className="summary-archive-toggle">
+                      <input
+                        type="checkbox"
+                        checked={settings.summarySettings.conversationArchiveEnabled}
+                        onChange={e => updateSummarySetting('conversationArchiveEnabled', e.target.checked)}
+                      />
+                      <span>{settings.summarySettings.conversationArchiveEnabled ? '已启用' : '未启用'}</span>
+                    </label>
+                  </div>
+
+                  {settings.summarySettings.conversationArchiveEnabled && (
+                    <div className="summary-compact-field">
+                      <label htmlFor="conversation-summary-archive-size">每章摘要数</label>
+                      <div className="summary-number-row">
+                        <input
+                          id="conversation-summary-archive-size"
+                          type="number"
+                          min="5"
+                          max="50"
+                          value={settings.summarySettings.conversationArchiveBatchSize}
+                          onChange={e =>
+                            updateSummarySetting(
+                              'conversationArchiveBatchSize',
+                              Math.max(5, Math.min(50, parseInt(e.target.value) || 10)),
+                            )
+                          }
+                          className="settings-number-input"
+                        />
+                        <span className="settings-hint-inline">默认 10 条；最近完整回复窗口不参与章节归档。</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {settings.summarySettings.conversationSummaryMode === 'off' && (
+                <div className="summary-mode-note">逐轮摘要压缩已关闭；无用模块过滤仍可独立过滤发送给 AI 的上下文。</div>
+              )}
+
+              {conversationSummaryModeStatus && (
+                <div className="summary-mode-status">{conversationSummaryModeStatus}</div>
+              )}
             </SettingsCollapsibleBlock>
 
             <SettingsCollapsibleBlock

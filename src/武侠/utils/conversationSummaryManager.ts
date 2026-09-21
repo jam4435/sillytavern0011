@@ -1,5 +1,13 @@
 import { dataLogger } from './logger';
-import type { ConversationSummaryMode } from './settingsManager';
+import {
+  getLoadedPresetNameSafe,
+  getPresetStorageCleanupCandidates,
+  getRegexRuleContentSignature,
+  loadSettings,
+  normalizeConversationSummaryTag,
+  stripSelectedPresetRegexMatches,
+  type ConversationSummaryMode,
+} from './settingsManager';
 
 export const CONVERSATION_SUMMARY_ENTRY_NAME = '对话摘要指令';
 export const CONVERSATION_SUMMARY_TAG = 'summary';
@@ -211,6 +219,142 @@ function getSendingMessageText(message: SillyTavern.SendingMessage): string {
     .join('\n');
 }
 
+function setSendingMessageText(message: SillyTavern.SendingMessage, text: string): void {
+  if (typeof message.content === 'string') {
+    message.content = text;
+    return;
+  }
+  if (!Array.isArray(message.content)) return;
+
+  let replaced = false;
+  message.content = message.content.map(part => {
+    if (part.type !== 'text') return part;
+    if (replaced) return { ...part, text: '' };
+    replaced = true;
+    return { ...part, text };
+  });
+}
+
+function escapeSummaryTagForRegex(value: string): string {
+  return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+function createSummaryTagRegex(tagValue: string, global = true): RegExp {
+  const tagName = normalizeConversationSummaryTag(tagValue);
+  const escapedTag = escapeSummaryTagForRegex(tagName);
+  return new RegExp('<' + escapedTag + '\\b[^>]*>[\\s\\S]*?<\\/' + escapedTag + '>', global ? 'gi' : 'i');
+}
+
+function removeSummaryTagBlocks(text: string, tagValue: string): string {
+  return text.replace(createSummaryTagRegex(tagValue, true), '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function extractSummaryTagBlock(text: string, tagValue: string): string | null {
+  const match = text.match(createSummaryTagRegex(tagValue, false));
+  return match?.[0]?.trim() || null;
+}
+
+/**
+ * 兼容玩家预设摘要：不负责要求模型生成摘要，只识别玩家填写的 XML 标签并压缩最终 prompt。
+ * 最近 N 条 assistant 回复保留正文（去掉重复摘要块）；更早的已摘要回复仅保留摘要，并移除配对 user。
+ * 未找到摘要标签的旧回复保持原样，避免因为预设偶发漏摘要而丢失上下文。
+ */
+export function filterPresetSummaryContextFromPrompt(
+  chat: SillyTavern.SendingMessage[],
+  recentReplies: number,
+  presetTag: string,
+): number {
+  const keepReplies = clampRecentReplies(recentReplies);
+  const assistantIndices = chat
+    .map((message, index) => (message.role === 'assistant' ? index : -1))
+    .filter(index => index >= 0);
+  const recentAssistantIndices = new Set(assistantIndices.slice(-keepReplies));
+  const removeUserIndices = new Set<number>();
+  let changed = 0;
+
+  for (const index of assistantIndices) {
+    const message = chat[index];
+    const text = getSendingMessageText(message);
+    if (!text) continue;
+
+    if (recentAssistantIndices.has(index)) {
+      const withoutSummary = removeSummaryTagBlocks(text, presetTag);
+      if (withoutSummary && withoutSummary !== text) {
+        setSendingMessageText(message, withoutSummary);
+        changed += 1;
+      }
+      continue;
+    }
+
+    const summaryBlock = extractSummaryTagBlock(text, presetTag);
+    if (!summaryBlock) continue;
+
+    if (text.trim() !== summaryBlock) {
+      setSendingMessageText(message, summaryBlock);
+      changed += 1;
+    }
+
+    for (let previous = index - 1; previous >= 0; previous -= 1) {
+      if (removeUserIndices.has(previous)) continue;
+      if (chat[previous].role === 'user') {
+        removeUserIndices.add(previous);
+        break;
+      }
+      if (chat[previous].role === 'assistant') {
+        break;
+      }
+    }
+  }
+
+  if (removeUserIndices.size > 0) {
+    const kept = chat.filter((_, index) => !removeUserIndices.has(index));
+    chat.splice(0, chat.length, ...kept);
+    changed += removeUserIndices.size;
+  }
+
+  return changed;
+}
+
+/**
+ * 把玩家在“无用模块过滤”里勾选的预设显示正则，同步应用到本次最终 AI 上下文。
+ * 这是非持久化过滤：不会改历史楼层，只修改即将发送的 prompt。
+ */
+export function filterSelectedPresetModulesFromPrompt(chat: SillyTavern.SendingMessage[]): number {
+  const presetName = getLoadedPresetNameSafe();
+  if (!presetName) return 0;
+
+  const settings = loadSettings();
+  const selectedSignatures = settings.presetStorageExcludedRegexSignaturesByPreset[presetName] || [];
+  if (selectedSignatures.length === 0) return 0;
+
+  const rules = getPresetStorageCleanupCandidates().filter(rule =>
+    selectedSignatures.includes(getRegexRuleContentSignature(rule)),
+  );
+  if (rules.length === 0) return 0;
+
+  let changed = 0;
+  for (const message of chat) {
+    if (message.role !== 'assistant') continue;
+    const text = getSendingMessageText(message);
+    if (!text) continue;
+    const protectedSummaryTag =
+      settings.summarySettings.conversationSummaryMode === 'preset'
+        ? settings.summarySettings.conversationSummaryPresetTag
+        : 'summary';
+    const filtered = stripSelectedPresetRegexMatches(
+      text,
+      rules,
+      selectedSignatures,
+      protectedSummaryTag,
+    );
+    if (filtered !== text) {
+      setSendingMessageText(message, filtered);
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
 function readArchivedSummaryCount(): number {
   try {
     const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
@@ -262,7 +406,26 @@ export function filterArchivedSummariesFromPrompt(
 
 export function installConversationSummaryPromptFilter(): () => void {
   const subscription = eventOn(tavern_events.CHAT_COMPLETION_PROMPT_READY, eventData => {
-    if (activeConversationSummaryMode !== 'card' || eventData.dryRun) return;
+    const filteredModules = filterSelectedPresetModulesFromPrompt(eventData.chat);
+    if (filteredModules > 0) {
+      dataLogger.log(`[conversationFilter] 已从本次最终提示词过滤 ${filteredModules} 条 assistant 消息中的无用模块。`);
+    }
+
+    const settings = loadSettings();
+    const mode = settings.summarySettings.conversationSummaryMode || activeConversationSummaryMode;
+    if (mode === 'preset') {
+      const changed = filterPresetSummaryContextFromPrompt(
+        eventData.chat,
+        settings.summarySettings.conversationSummaryRecentReplies,
+        settings.summarySettings.conversationSummaryPresetTag,
+      );
+      if (changed > 0) {
+        dataLogger.log(`[conversationSummary] 预设摘要兼容过滤调整了 ${changed} 条最终提示词消息。`);
+      }
+      return;
+    }
+
+    if (mode !== 'card') return;
     const archivedSummaryCount = readArchivedSummaryCount();
     if (archivedSummaryCount <= 0) return;
     const removed = filterArchivedSummariesFromPrompt(eventData.chat, archivedSummaryCount);
@@ -287,6 +450,8 @@ export async function applyConversationSummaryModeState(
     }
     return `「${CONVERSATION_SUMMARY_ENTRY_NAME}」与卡内摘要过滤已是目标状态，本次初始化未改写角色正则。`;
   }
-  if(mode==='preset') return '已禁用卡内摘要指令与卡内过滤，改由当前预设自己的 XML 摘要与过滤逻辑负责。';
+  if(mode==='preset') {
+    return '已禁用卡内摘要指令；由当前预设生成摘要，最终上下文按下方配置的 XML 标签执行兼容压缩。';
+  }
   return '已禁用卡内摘要指令与卡内过滤。';
 }

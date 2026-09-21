@@ -188,6 +188,7 @@ describe('settingsManager ui theme', () => {
     const defaults = createDefaultDisplaySettings().summarySettings;
     expect(defaults.conversationSummaryMode).toBe('off');
     expect(defaults.conversationSummaryRecentReplies).toBe(5);
+    expect(defaults.conversationSummaryPresetTag).toBe('summary');
     expect(defaults.conversationArchiveEnabled).toBe(false);
     expect(defaults.conversationArchiveBatchSize).toBe(10);
 
@@ -197,6 +198,7 @@ describe('settingsManager ui theme', () => {
         summarySettings: {
           conversationSummaryMode: 'card',
           conversationSummaryRecentReplies: 8,
+          conversationSummaryPresetTag: '<memory>',
           conversationArchiveEnabled: true,
           conversationArchiveBatchSize: 12,
         },
@@ -205,6 +207,7 @@ describe('settingsManager ui theme', () => {
     const loaded = loadSettings().summarySettings;
     expect(loaded.conversationSummaryMode).toBe('card');
     expect(loaded.conversationSummaryRecentReplies).toBe(8);
+    expect(loaded.conversationSummaryPresetTag).toBe('<memory>');
     expect(loaded.conversationArchiveEnabled).toBe(true);
     expect(loaded.conversationArchiveBatchSize).toBe(12);
 
@@ -323,6 +326,31 @@ describe('settingsManager ui theme', () => {
       const signature = getRegexRuleContentSignature(thinkingRule);
 
       expect(stripSelectedPresetRegexMatches(input, [thinkingRule], [signature])).toBe('正文');
+    });
+
+    it('also treats a complete <think> block as safely removable above the 80% threshold', () => {
+      const thinkRule = {
+        ...thinkingRule,
+        id: 'think-short-tag',
+        pattern: '/<think>[\\s\\S]*?<\\/think>/gi',
+      };
+      const input = '<think>长思维链长思维链长思维链长思维链长思维链</think>正文';
+      const signature = getRegexRuleContentSignature(thinkRule);
+
+      expect(stripSelectedPresetRegexMatches(input, [thinkRule], [signature])).toBe('正文');
+    });
+
+    it('protects the configured preset summary XML block from module filtering', () => {
+      const summaryRule = {
+        ...thinkingRule,
+        id: 'memory',
+        pattern: '/<memory>[\\s\\S]*?<\\/memory>/gi',
+        description: '摘要显示美化',
+      };
+      const input = '足够长的正文内容，用于确认不是安全阈值阻止删除。\n<memory>必须保留的摘要</memory>';
+      const signature = getRegexRuleContentSignature(summaryRule);
+
+      expect(stripSelectedPresetRegexMatches(input, [summaryRule], [signature], '<memory>')).toBe(input);
     });
 
     it('still refuses a selected non-thinking regex that would erase almost the whole reply', () => {

@@ -1,5 +1,6 @@
 import {
   DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
+  applyCurrentPresetModuleFilter,
   type SummarySettings,
   type SummaryVariableUpdateMode,
 } from './settingsManager';
@@ -602,10 +603,11 @@ function normalizeBodyMessageForPrompt(
   depth: number,
   settings: SummarySettings,
 ): string {
+  const moduleFiltered = role === 'assistant' ? applyCurrentPresetModuleFilter(rawText) : rawText;
   const withoutAssistantPrefix =
     role === 'assistant'
-      ? stripAssistantPrefixThroughLastMarker(rawText, settings.variablePromptBodyStartMarkers)
-      : rawText;
+      ? stripAssistantPrefixThroughLastMarker(moduleFiltered, settings.variablePromptBodyStartMarkers)
+      : moduleFiltered;
   const tavernRegexed = applyTavernPromptRegex(withoutAssistantPrefix, role, depth);
   const withoutConfiguredBlocks =
     role === 'assistant'
