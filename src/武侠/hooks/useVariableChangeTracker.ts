@@ -553,6 +553,133 @@ export function useVariableChangeTracker() {
     ));
   }, [commitSummary]);
 
+  const reconcileDeclaredBackgroundChangesToAi = useCallback((
+    metadata: CaptureMetadata,
+  ): boolean => {
+    const activeTurn = activeTurnRef.current;
+    const current = variableChangesRef.current;
+    if (
+      !activeTurn
+      || !current
+      || metadata.origin !== 'ai'
+      || metadata.allowAiPromotion !== true
+      || current.aiReply.declaredChanges.length === 0
+    ) {
+      return false;
+    }
+
+    const isCompatibleAssistantMessage = (change: VariableActualChange): boolean =>
+      change.assistantMessageId === undefined
+      || metadata.assistantMessageId === undefined
+      || change.assistantMessageId === metadata.assistantMessageId;
+    const isPromotableProducer = (producer: VariableChangeProducer): boolean =>
+      producer === 'era'
+      || producer === 'message-boundary'
+      || producer === 'frontend';
+
+    const promotable = current.background.observedChanges.filter(change =>
+      isPromotableProducer(change.producer)
+      && isCompatibleAssistantMessage(change)
+      && matchesAnyDeclaredChange(current.aiReply.declaredChanges, change));
+
+    if (promotable.length === 0) {
+      return false;
+    }
+
+    const promotableIds = new Set(promotable.map(change => change.id));
+    const promotedCountByBatch = new Map<string, number>();
+    for (const change of promotable) {
+      promotedCountByBatch.set(
+        change.batchId,
+        (promotedCountByBatch.get(change.batchId) ?? 0) + 1,
+      );
+    }
+
+    variableTraceLogger.log('[useVariableChangeTracker] sourced AI 跨批次对账后台差分', {
+      turnId: activeTurn.turnId,
+      metadata: summarizeMetadata(metadata),
+      promotedCount: promotable.length,
+      promoted: promotable.map(summarizeObservedChange),
+    });
+
+    mutateSummary(summary => {
+      const existingAiSignatures = new Set(
+        summary.aiReply.observedChanges.map(change =>
+          [getPathKey(change), stableStringify(change.beforeValue), stableStringify(change.afterValue)].join('|')),
+      );
+      const promotedAiChanges = promotable.flatMap((change, index) => {
+        const signature = [
+          getPathKey(change),
+          stableStringify(change.beforeValue),
+          stableStringify(change.afterValue),
+        ].join('|');
+        if (existingAiSignatures.has(signature)) {
+          return [];
+        }
+        existingAiSignatures.add(signature);
+        return [{
+          ...change,
+          id: `${change.source}:${change.action}:${getPathKey(change)}:${change.batchId}:ai-authoritative:${index}`,
+          batchId: `${change.batchId}:ai-authoritative`,
+          origin: 'ai' as const,
+          producer: metadata.producer,
+          actions: metadata.actions ?? change.actions,
+          reason: metadata.reason,
+          assistantMessageId: metadata.assistantMessageId ?? change.assistantMessageId,
+        }];
+      });
+
+      const aiAppend = appendLimited(
+        summary.aiReply.observedChanges,
+        promotedAiChanges,
+      );
+      const remainingBackground = summary.background.observedChanges
+        .filter(change => !promotableIds.has(change.id));
+
+      const nextBatches = summary.batches.flatMap(batch => {
+        const promotedCount = promotedCountByBatch.get(batch.batchId) ?? 0;
+        if (promotedCount === 0) {
+          return [batch];
+        }
+
+        const remainingCount = Math.max(0, batch.changeCount - promotedCount);
+        const replacement: VariableObservedBatch[] = [];
+        if (remainingCount > 0) {
+          replacement.push({
+            ...batch,
+            changeCount: remainingCount,
+          });
+        }
+        replacement.push({
+          ...batch,
+          batchId: `${batch.batchId}:ai-authoritative`,
+          origin: 'ai',
+          producer: metadata.producer,
+          actions: metadata.actions ?? batch.actions,
+          reason: metadata.reason,
+          assistantMessageId: metadata.assistantMessageId ?? batch.assistantMessageId,
+          changeCount: promotedCount,
+        });
+        return replacement;
+      });
+
+      return rebuildSummary({
+        ...summary,
+        aiReply: {
+          ...summary.aiReply,
+          observedChanges: aiAppend.values,
+          omittedObservedCount: summary.aiReply.omittedObservedCount + aiAppend.omitted,
+        },
+        background: {
+          ...summary.background,
+          observedChanges: remainingBackground,
+        },
+        batches: nextBatches,
+      }, activeTurn);
+    });
+    return true;
+  }, [mutateSummary]);
+
   const upgradeMatchingBatch = useCallback((
     nextSnapshotHash: string,
     metadata: CaptureMetadata,
@@ -561,6 +688,10 @@ export function useVariableChangeTracker() {
     const current = variableChangesRef.current;
     if (!activeTurn || !current) {
       return false;
+    }
+
+    if (reconcileDeclaredBackgroundChangesToAi(metadata)) {
+      return true;
     }
 
     const matchingBatches = [...current.batches]
@@ -766,7 +897,7 @@ export function useVariableChangeTracker() {
       return rebuildSummary(nextSummary, activeTurn);
     });
     return true;
-  }, [mutateSummary]);
+  }, [mutateSummary, reconcileDeclaredBackgroundChangesToAi]);
 
   const captureResolvedSnapshot = useCallback((
     nextStatData: Record<string, unknown> | null,
