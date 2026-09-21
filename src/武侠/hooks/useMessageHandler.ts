@@ -1177,7 +1177,7 @@ export function useMessageHandler({
             }),
           });
           showError(`重新生成已完成，但额外变量更新失败：${errorMessage}`);
-          return;
+          return true;
         }
       }
 
@@ -1190,7 +1190,7 @@ export function useMessageHandler({
         const errorMessage = getErrorMessage(error);
         messageLogger.error('重新生成后的变量提交确认失败:', error);
         showError(`重新生成已完成，但变量提交确认失败：${errorMessage}`);
-        return;
+        return true;
       }
 
       // 回合成功完成（重新生成成功，助手楼层新 swipe 已写入、ERA 已确认）
