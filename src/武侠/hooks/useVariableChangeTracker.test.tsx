@@ -342,4 +342,34 @@ describe('useVariableChangeTracker block/source model', () => {
       }),
     ]);
   });
+
+  it('回合 settled 后的准备性 direct 写入不会污染上一回变量条', () => {
+    currentAssistantText = '纯正文';
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply('纯正文', 2);
+      result.current.handleVariableTurnSettled(2);
+    });
+
+    currentStatData = {
+      user数据: { 修为: 100 },
+      前端变量: { 随机数: '随机数1: 9' },
+    };
+
+    act(() => {
+      result.current.handleDirectVariableWriteDone({
+        version: 1,
+        writeId: 'late-prep',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'frontend-derived-variable-sync',
+      });
+    });
+
+    expect(result.current.variableChanges?.status).toBe('settled');
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
+  });
+
 });
