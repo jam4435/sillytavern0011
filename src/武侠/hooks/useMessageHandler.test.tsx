@@ -670,6 +670,63 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(options.showError).toHaveBeenCalledWith('正文已生成，但额外变量更新失败：extra failed');
   });
 
+  it('regenerate 只在旧 swipe 回滚后的 pre-write 边界启动变量追踪', async () => {
+    const order: string[] = [];
+    const options = createHookOptions(createSummarySettings('inline'));
+    options.onVariableTurnStart.mockImplementation(() => {
+      order.push('tracker-start');
+    });
+    options.onVariableAiWriteTarget.mockImplementation(() => {
+      order.push('target');
+    });
+    options.onVariableAssistantReply.mockImplementation(() => {
+      order.push('reply');
+    });
+
+    regenerateLastAssistantSwipeMock.mockImplementation(async callbacks => {
+      order.push('resolve-target');
+      callbacks.onTargetAssistantResolved?.(9);
+      expect(options.onVariableTurnStart).not.toHaveBeenCalled();
+      expect(options.onVariableAiWriteTarget).not.toHaveBeenCalled();
+      expect(options.onVariableAssistantReply).not.toHaveBeenCalled();
+
+      // 真实实现会在 manual_sync 回滚、前端派生同步、新正文生成之后，
+      // 但在 writeGeneratedSwipe / era:apiWrite 之前触发这个回调。
+      order.push('pre-write');
+      callbacks.onGeneratedReplyReady?.('重新生成正文', 9);
+      order.push('commit-new-swipe');
+
+      return {
+        maintext: '重新生成正文',
+        options: ['选项'],
+        gameData: null,
+        assistantMessageId: 9,
+        assistantSwipeId: 1,
+        userInput: '上一条用户输入',
+        combinedPrompt: '组合提示词',
+        rawReply: '重新生成正文',
+      };
+    });
+
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleRegenerateLastAssistant();
+    });
+
+    expect(order).toEqual([
+      'resolve-target',
+      'pre-write',
+      'tracker-start',
+      'target',
+      'reply',
+      'commit-new-swipe',
+    ]);
+    expect(options.onVariableTurnStart).toHaveBeenCalledTimes(1);
+    expect(options.onVariableAiWriteTarget).toHaveBeenCalledWith(9);
+    expect(options.onVariableAssistantReply).toHaveBeenCalledWith('重新生成正文', 9);
+  });
+
   it('regenerate + inline 会显式标记 skipped，且不会触发额外变量链路', async () => {
     const options = createHookOptions(createSummarySettings('inline'));
     regenerateLastAssistantSwipeMock.mockResolvedValue({
