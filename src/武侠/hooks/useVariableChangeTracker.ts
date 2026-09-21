@@ -473,7 +473,7 @@ export function useVariableChangeTracker() {
   const captureBackgroundWrite = useCallback((metadata: BackgroundWriteMetadata) => {
     const activeTurn = activeTurnRef.current;
     const current = variableChangesRef.current;
-    if (!activeTurn || !current) return;
+    if (!activeTurn || !current || activeTurn.settled) return;
 
     const nextStatData = readCurrentStatDataSnapshot();
     if (!nextStatData) {
@@ -535,7 +535,7 @@ export function useVariableChangeTracker() {
 
   const checkpointAiWrite = useCallback((assistantMessageId?: number) => {
     const activeTurn = activeTurnRef.current;
-    if (!activeTurn) return;
+    if (!activeTurn || activeTurn.settled) return;
     if (assistantMessageId !== undefined) activeTurn.assistantMessageId = assistantMessageId;
     const snapshot = readCurrentStatDataSnapshot();
     if (snapshot) {
