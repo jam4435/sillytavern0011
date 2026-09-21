@@ -3762,12 +3762,15 @@
 
 .variable-change-row-body-ai {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0.7rem;
+  // AI 实际变化和异常说明都按整行铺开，避免长人物经历被挤在半栏里导致卡片异常增高。
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.55rem;
+  width: 100%;
 }
 
 .variable-change-stack {
   min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
