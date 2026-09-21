@@ -1383,158 +1383,269 @@ const PRESET_STORAGE_PROTECTED_TAGS = new Set([
   'variabledelete',
 ]);
 
-function normalizeRegexPatternForTagScan(pattern: string): string {
-  return pattern.replace(/\\([<>/])/g, '$1');
-}
-
-function escapeRegexLiteral(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * 从“显示正则”中提取可以独立删除的完整 XML 区块。
- *
- * 这里刻意只接受“同一静态标签同时出现开始与结束标签”的情形；
- * 例如整楼提取 <summary> 的正则会被保护，而只在 lookbehind 里出现的 <details>
- * 不会被误认为应该删除的模块。
- */
-export function extractPresetStorageCleanupTags(pattern: string): string[] {
-  const normalized = normalizeRegexPatternForTagScan(pattern);
-  const lower = normalized.toLowerCase();
-  const tags = new Map<string, string>();
-
-  for (const match of normalized.matchAll(/<\s*([A-Za-z][\w:-]*)\b/g)) {
-    const tag = match[1];
-    const tagLower = tag.toLowerCase();
-    if (PRESET_STORAGE_PROTECTED_TAGS.has(tagLower)) continue;
-    const closePattern = new RegExp(`<\\s*\\/\\s*${escapeRegexLiteral(tag)}\\b`, 'i');
-    if (closePattern.test(normalized)) {
-      tags.set(tagLower, tag);
-    }
-  }
-
-  const hasThinkingPair =
-    (lower.includes('<(?:think|thinking)') && lower.includes('</(?:think|thinking)')) ||
-    (lower.includes('<(?:thinking|think)') && lower.includes('</(?:thinking|think)'));
-  if (hasThinkingPair) {
-    tags.set('think', 'think');
-    tags.set('thinking', 'thinking');
-  }
-
-  return [...tags.values()];
-}
-
-function createExtractedPresetStorageCleanupRule(tag: string, sourceName: string): RegexRule {
-  const escapedTag = escapeRegexLiteral(tag);
-  return {
-    id: `wuxia-auto-module-${tag.toLowerCase()}`,
-    pattern: `/<${escapedTag}\\b[^>]*\\/\\s*>|<${escapedTag}\\b[^>]*>[\\s\\S]*?<\\/${escapedTag}\\s*>\\s*/gi`,
-    replacement: '',
-    enabled: true,
-    description: `自动识别区块 · <${tag}> · 来源：${sourceName || '未命名预设正则'}`,
-    originScope: 'preset',
-  };
-}
-
-function getRegexBodyForSafetyCheck(pattern: string): string {
-  const compact = pattern.replace(/\s+/g, '');
-  if (!compact.startsWith('/')) return compact;
-  const lastSlash = compact.lastIndexOf('/');
-  return lastSlash > 0 ? compact.slice(1, lastSlash) : compact.slice(1);
-}
-
-function looksLikeWholeMessageExtractor(pattern: string): boolean {
-  const body = getRegexBodyForSafetyCheck(pattern).replace(/^\^/, '').replace(/\$/, '');
-  const startsWide =
-    body.startsWith('[\\s\\S]*') ||
-    body.startsWith('[\\s\\S]*?') ||
-    body.startsWith('.*') ||
-    body.startsWith('.*?');
-  const endsWide =
-    body.endsWith('[\\s\\S]*') ||
-    body.endsWith('[\\s\\S]*?') ||
-    body.endsWith('.*') ||
-    body.endsWith('.*?');
-  return startsWide && endsWide;
-}
-
 export type PresetStorageCleanupRecommendation = {
   kind: 'recommended' | 'manual' | 'unsafe';
   reason: string;
+  /** 设置页展示“这个原正则实际会命中哪一段”，不另造更宽的删除正则。 */
+  matchDescription: string;
+  /** 明确是独立模块/思维链边界时，允许其超过通用 80% 删除占比保护。 */
+  allowLargeMatch: boolean;
 };
+
+function normalizeRegexPatternForCleanupAnalysis(pattern: string): string {
+  try {
+    return parseRegexString(pattern).pattern.replace(/\\([<>/])/g, '$1').trim();
+  } catch {
+    return pattern.replace(/\\([<>/])/g, '$1').trim();
+  }
+}
+
+function stripRegexEdgeAnchors(patternBody: string): string {
+  return patternBody.replace(/^\^/, '').replace(/\$$/, '').trim();
+}
+
+function startsWithWideMatcher(patternBody: string): boolean {
+  const body = patternBody.replace(/^\^/, '').trim();
+  return (
+    body.startsWith('[\\s\\S]*?') ||
+    body.startsWith('[\\s\\S]*') ||
+    body.startsWith('[\\s\\S]+?') ||
+    body.startsWith('[\\s\\S]+') ||
+    body.startsWith('.*?') ||
+    body.startsWith('.*') ||
+    body.startsWith('.+?') ||
+    body.startsWith('.+')
+  );
+}
+
+function endsWithWideMatcher(patternBody: string): boolean {
+  const body = patternBody.replace(/\$$/, '').trim();
+  return (
+    body.endsWith('[\\s\\S]*?') ||
+    body.endsWith('[\\s\\S]*') ||
+    body.endsWith('[\\s\\S]+?') ||
+    body.endsWith('[\\s\\S]+') ||
+    body.endsWith('.*?') ||
+    body.endsWith('.*') ||
+    body.endsWith('.+?') ||
+    body.endsWith('.+')
+  );
+}
+
+function containsWideMatcher(patternBody: string): boolean {
+  return /\[\\s\\S\][*+]|\.\*|\.\+/.test(patternBody);
+}
+
+function hasTopLevelRegexAlternation(patternBody: string): boolean {
+  let depth = 0;
+  let inCharacterClass = false;
+  let escaped = false;
+
+  for (const char of patternBody) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (inCharacterClass) {
+      if (char === ']') inCharacterClass = false;
+      continue;
+    }
+    if (char === '[') {
+      inCharacterClass = true;
+      continue;
+    }
+    if (char === '(') {
+      depth += 1;
+      continue;
+    }
+    if (char === ')') {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (char === '|' && depth === 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function looksLikeWholeMessageExtractor(pattern: string): boolean {
+  const body = stripRegexEdgeAnchors(normalizeRegexPatternForCleanupAnalysis(pattern)).replace(/\s+/g, '');
+  if (
+    body === '[\\s\\S]*' ||
+    body === '[\\s\\S]*?' ||
+    body === '[\\s\\S]+' ||
+    body === '[\\s\\S]+?' ||
+    body === '.*' ||
+    body === '.*?' ||
+    body === '.+' ||
+    body === '.+?'
+  ) {
+    return true;
+  }
+  return startsWithWideMatcher(body) && endsWithWideMatcher(body);
+}
+
+function findProtectedCleanupTag(patternBody: string): string | undefined {
+  const lower = patternBody.toLowerCase();
+  return [...PRESET_STORAGE_PROTECTED_TAGS].find(
+    tag =>
+      lower.includes(`<${tag}`) ||
+      lower.includes(`</${tag}`) ||
+      (tag.startsWith('variable') && lower.includes(tag)),
+  );
+}
+
+function hasThinkingCleanupHint(
+  rule: Pick<RegexRule, 'description' | 'pattern'>,
+  patternBody: string,
+): boolean {
+  return /思维|思考|推理|think|thinking|reasoning|chain[\s_-]*of[\s_-]*thought|\bcot\b/i.test(
+    `${rule.description || ''}\n${patternBody}`,
+  );
+}
+
+function formatRegexTagToken(token: string): string {
+  if (token.startsWith('(?:') && token.endsWith(')')) {
+    return token.slice(3, -1);
+  }
+  return token;
+}
+
+function findWholeXmlBlockDescription(patternBody: string): string | null {
+  // lookaround 里的标签只是边界条件，并不属于真实 match；不能据此扩成整个 XML 块。
+  if (/\(\?(?:<=|<!|=|!)/.test(patternBody)) return null;
+
+  const body = stripRegexEdgeAnchors(patternBody);
+  const tagTokenPattern = '(?:[A-Za-z][\\w:-]*|\\(\\?:[A-Za-z][\\w:-]*(?:\\|[A-Za-z][\\w:-]*)+\\))';
+  const opening = new RegExp(`<(${tagTokenPattern})[^>]*>`).exec(body);
+  if (!opening) return null;
+
+  const token = opening[1];
+  const closingText = `</${token}>`;
+  const closingIndex = body.indexOf(closingText, opening.index + opening[0].length);
+  if (closingIndex < 0) return null;
+
+  const before = body.slice(0, opening.index);
+  const middle = body.slice(opening.index + opening[0].length, closingIndex);
+  const after = body.slice(closingIndex + closingText.length);
+  // 如果开/关标签只是两个并列 branch，或标签之外还有“任意正文”匹配，都不能扩成完整 XML 块。
+  if (hasTopLevelRegexAlternation(middle) || containsWideMatcher(before) || containsWideMatcher(after)) {
+    return null;
+  }
+
+  const displayToken = formatRegexTagToken(token);
+  return `完整标签块：<${displayToken}> … </${displayToken}>`;
+}
 
 export function getPresetStorageCleanupRecommendation(
   rule: Pick<RegexRule, 'description' | 'pattern' | 'replacement'>,
 ): PresetStorageCleanupRecommendation {
-  if (rule.description?.startsWith('自动识别区块 ·')) {
-    return { kind: 'recommended', reason: '从预设显示正则中提取出的完整 XML 区块，可独立安全删除。' };
-  }
-
-  const normalized = normalizeRegexPatternForTagScan(rule.pattern).toLowerCase();
-  const protectedTag = [...PRESET_STORAGE_PROTECTED_TAGS].find(
-    tag =>
-      normalized.includes(`<${tag}`) ||
-      normalized.includes(`</${tag}`) ||
-      (tag.startsWith('variable') && normalized.includes(tag)),
-  );
+  const body = normalizeRegexPatternForCleanupAnalysis(rule.pattern);
+  const protectedTag = findProtectedCleanupTag(body);
   if (protectedTag) {
-    return { kind: 'unsafe', reason: `命中受保护区块 <${protectedTag}>，不会自动作为删除规则。` };
+    return {
+      kind: 'unsafe',
+      reason: `命中受保护区块 <${protectedTag}>，不会把它作为可自动删除模块。`,
+      matchDescription: `受保护范围：<${protectedTag}> 相关内容`,
+      allowLargeMatch: false,
+    };
   }
 
   if (looksLikeWholeMessageExtractor(rule.pattern)) {
     return {
       kind: 'unsafe',
-      reason: '该正则看起来会从开头匹配到结尾，常用于“提取保留内容”，不能把整个命中区间当成无用模块删除。',
+      reason: '原正则本身会覆盖整条或近似整条回复，清理时不能把整个 match 当成无用模块删除。',
+      matchDescription: '疑似整条回复 / 整楼提取范围',
+      allowLargeMatch: false,
+    };
+  }
+
+  const xmlBlockDescription = findWholeXmlBlockDescription(body);
+  if (xmlBlockDescription) {
+    return {
+      kind: 'recommended',
+      reason: '原正则本身已经精确匹配一个完整标签块；清理时直接删除原 match，不改写也不扩张边界。',
+      matchDescription: xmlBlockDescription,
+      allowLargeMatch: true,
+    };
+  }
+
+  const leadingWide = startsWithWideMatcher(body);
+  const trailingWide = endsWithWideMatcher(body);
+  const thinkingHint = hasThinkingCleanupHint(rule, body);
+
+  if (leadingWide && !trailingWide) {
+    return {
+      kind: thinkingHint ? 'recommended' : 'manual',
+      reason: thinkingHint
+        ? '识别为“思维链正文 + 结束标记”型规则；原正则命中的前缀整体就是可选清理块。'
+        : '原正则匹配“回复开头到某个结束边界”的前缀块，但无法确认它一定不是正文，保留人工判断。',
+      matchDescription: thinkingHint
+        ? '思维链前缀块：从回复开头到结束标记（含标记）'
+        : '前缀块：从回复开头到原正则结束边界（含边界）',
+      allowLargeMatch: thinkingHint,
+    };
+  }
+
+  if (!leadingWide && trailingWide) {
+    return {
+      kind: thinkingHint ? 'recommended' : 'manual',
+      reason: thinkingHint
+        ? '识别为“开始标记 + 后续思维链”型规则；原正则命中的后缀整体就是可选清理块。'
+        : '原正则匹配“某个开始边界到回复末尾”的后缀块，但无法确认它一定不是正文，保留人工判断。',
+      matchDescription: thinkingHint
+        ? '思维链后缀块：从开始标记到回复末尾（含标记）'
+        : '后缀块：从原正则开始边界到回复末尾',
+      allowLargeMatch: thinkingHint,
     };
   }
 
   return {
     kind: 'manual',
     reason: rule.replacement.trim()
-      ? '这是替换/美化型显示规则，是否删除原始命中内容需要人工确认。'
-      : '没有足够结构证据证明它只命中独立模块，保留人工选择。',
+      ? '该规则会替换/美化自己的 match；清理时只会删除这个原始 match，不执行 replacement，请人工确认是否属于无用模块。'
+      : '原正则有明确 match，但无法可靠判断其语义是否属于无用模块，请人工确认。',
+    matchDescription: '原正则实际命中的区间（清理时整段删除，不执行 replacement）',
+    allowLargeMatch: false,
   };
 }
 
 /**
  * 当前预设里可作为“无用模块过滤”候选的酒馆正则。
- * 除原始显示正则外，还会从正则中提取成对 XML 标签生成“区块级”候选，
- * 这样混合正则里的 disclaimer / Reference_Example / Interleaving / thinking 等
- * 可以单独过滤，而不用把整条混合规则照搬成破坏性删除。
+ *
+ * 候选严格保留原正则自己的 match 边界，不再通过“看见开始/结束标签”另造更宽的删除正则。
+ * 因此复杂兼容写法（例如 <(?:think|thinking)>...</(?:think|thinking)>）仍作为一个真实匹配块；
+ * “任意前文 + 思维链结束标记”也保留原 match，并只在推荐层做语义分类。
  */
 export function getPresetStorageCleanupCandidates(): RegexRule[] {
   try {
-    const rawRegexes = getRawPresetRegexesFromInUsePreset().filter(
-      regex =>
-        regex.enabled &&
-        regex.source.ai_output === true &&
-        regex.destination.display === true &&
-        regex.script_name !== '游戏页面' &&
-        (regex.min_depth === null || regex.min_depth <= 0) &&
-        (regex.max_depth === null || regex.max_depth >= 0),
-    );
-
-    const directRules: RegexRule[] = rawRegexes.map(regex => ({
-      id: regex.id || generateId(),
-      pattern: regex.find_regex,
-      replacement: regex.replace_string,
-      enabled: true,
-      description: regex.script_name,
-      originScope: 'preset' as const,
-    }));
-    const extractedRules = rawRegexes.flatMap(regex =>
-      extractPresetStorageCleanupTags(regex.find_regex).map(tag =>
-        createExtractedPresetStorageCleanupRule(tag, regex.script_name),
-      ),
-    );
-
-    const seen = new Set<string>();
-    return [...extractedRules, ...directRules].filter(rule => {
-      const signature = getRegexRuleContentSignature(rule);
-      if (seen.has(signature)) return false;
-      seen.add(signature);
-      return true;
-    });
+    return getRawPresetRegexesFromInUsePreset()
+      .filter(
+        regex =>
+          regex.enabled &&
+          regex.source.ai_output === true &&
+          regex.destination.display === true &&
+          regex.script_name !== '游戏页面' &&
+          (regex.min_depth === null || regex.min_depth <= 0) &&
+          (regex.max_depth === null || regex.max_depth >= 0),
+      )
+      .map(regex => ({
+        id: regex.id || generateId(),
+        pattern: regex.find_regex,
+        replacement: regex.replace_string,
+        enabled: true,
+        description: regex.script_name,
+        originScope: 'preset' as const,
+      }))
+      .filter((rule, index, rules) => {
+        const signature = getRegexRuleContentSignature(rule);
+        return rules.findIndex(candidate => getRegexRuleContentSignature(candidate) === signature) === index;
+      });
   } catch (error) {
     dataLogger.error('读取无用模块过滤候选失败:', error);
     return [];
@@ -1873,18 +1984,14 @@ function overlapsProtectedRange(start: number, end: number, protectedRanges: Tex
   return protectedRanges.some(range => start < range.end && end > range.start);
 }
 
-function isCompleteThinkingBlock(text: string): boolean {
-  return /^\s*<(think|thinking)\b[^>]*>[\s\S]*<\/\1>\s*$/i.test(text);
-}
-
 /**
  * 删除玩家已确认的“无用模块”原文。
  *
  * 注意：这里不是执行预设的 replacement，而是把该正则匹配到的原始区间从持久化文本或最终 AI 上下文中剥离。
  * VariableThink/Insert/Edit/Delete、summary、era_data 以及兼容预设模式下配置的摘要标签永远受保护。
  * 一般规则若一次会删掉 80% 以上文本或把整条回复删空，则视为疑似正文/整楼匹配并拒绝执行。
- * 完整的 <thinking>...</thinking> 匹配是 80% 占比保护的唯一例外，因为它明确不是正文；
- * 但即使是 thinking，也不允许把整条 assistant 回复清成空字符串。
+ * 只有分析器确认的“完整独立标签块”或“思维链边界块”可以越过 80% 占比保护；
+ * 即便如此，也绝不允许把整条 assistant 回复清成空字符串。
  */
 export function stripSelectedPresetRegexMatches(
   text: string,
@@ -1909,7 +2016,7 @@ export function stripSelectedPresetRegexMatches(
       const regex = getCachedRegex(pattern, flags);
       const protectedRanges = getPersistenceProtectedRanges(result, protectedSummaryTag);
       const removals: TextRange[] = [];
-      let allRemovalsAreThinkingBlocks = true;
+      const recommendation = getPresetStorageCleanupRecommendation(rule);
       let match: RegExpExecArray | null;
 
       while ((match = regex.exec(result)) !== null) {
@@ -1917,9 +2024,6 @@ export function stripSelectedPresetRegexMatches(
         const end = start + match[0].length;
         if (end > start && !overlapsProtectedRange(start, end, protectedRanges)) {
           removals.push({ start, end });
-          if (!isCompleteThinkingBlock(match[0])) {
-            allRemovalsAreThinkingBlocks = false;
-          }
         }
         if (match[0].length === 0) {
           regex.lastIndex += 1;
@@ -1930,7 +2034,10 @@ export function stripSelectedPresetRegexMatches(
       if (removedLength === 0) {
         continue;
       }
-      if (removedLength / Math.max(1, result.length) >= 0.8 && !allRemovalsAreThinkingBlocks) {
+      if (
+        removedLength / Math.max(1, result.length) >= 0.8 &&
+        !(recommendation.kind === 'recommended' && recommendation.allowLargeMatch)
+      ) {
         dataLogger.warn(
           `无用模块过滤已跳过疑似整楼规则「${rule.description || rule.pattern}」：将删除 ${Math.round(
             (removedLength / Math.max(1, result.length)) * 100,

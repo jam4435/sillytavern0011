@@ -54,9 +54,6 @@ export function cleanChatMessagePresetBlocks(
     );
     const nextMessage = nextSwipes[activeIndex] ?? message.message ?? '';
     const currentMessage = message.message ?? '';
-    if (nextMessage !== currentMessage) {
-      removedCharacters += Math.max(0, currentMessage.length - nextMessage.length);
-    }
 
     if (updatedSwipes === 0 && nextMessage === currentMessage) {
       return { patch: null, updatedSwipes: 0, removedCharacters: 0 };

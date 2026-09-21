@@ -4,6 +4,7 @@ import {
   applyConversationSummaryModeState,
   buildConversationSummaryRegexes,
   filterArchivedSummariesFromPrompt,
+  filterHistoricalBackfillTurnsFromPrompt,
   filterPresetSummaryContextFromPrompt,
   filterSelectedPresetModulesFromPrompt,
   syncConversationSummaryRegexes,
@@ -194,6 +195,39 @@ describe('conversationSummaryManager', () => {
     expect(chat[0]).toEqual({ role: 'user', content: '旧用户' });
     expect(chat[1]).toEqual({ role: 'assistant', content: '预设本轮漏掉了摘要标签' });
     expect(chat.at(-1)).toEqual({ role: 'assistant', content: '当前正文' });
+  });
+
+  it('removes only the exact historical-backfill turns while preserving prefixed few-shot dialogue', () => {
+    const history = [
+      { message_id: 1, role: 'user' as const },
+      { message_id: 2, role: 'assistant' as const },
+      { message_id: 3, role: 'user' as const },
+      { message_id: 4, role: 'assistant' as const },
+      { message_id: 5, role: 'user' as const },
+      { message_id: 6, role: 'assistant' as const },
+    ];
+    const chat = [
+      { role: 'user' as const, content: 'few-shot user' },
+      { role: 'assistant' as const, content: 'few-shot assistant' },
+      { role: 'system' as const, content: '设定' },
+      { role: 'user' as const, content: '' },
+      { role: 'assistant' as const, content: '' },
+      { role: 'system' as const, content: '深度世界书' },
+      { role: 'user' as const, content: '' },
+      { role: 'assistant' as const, content: '' },
+      { role: 'user' as const, content: '当前用户' },
+      { role: 'assistant' as const, content: '当前正文' },
+    ];
+
+    expect(filterHistoricalBackfillTurnsFromPrompt(chat, history, [2, 4])).toBe(4);
+    expect(chat).toEqual([
+      { role: 'user', content: 'few-shot user' },
+      { role: 'assistant', content: 'few-shot assistant' },
+      { role: 'system', content: '设定' },
+      { role: 'system', content: '深度世界书' },
+      { role: 'user', content: '当前用户' },
+      { role: 'assistant', content: '当前正文' },
+    ]);
   });
 
   it('removes already archived summary messages and their paired user messages from the final prompt', () => {

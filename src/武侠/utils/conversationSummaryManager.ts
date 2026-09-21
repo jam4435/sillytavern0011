@@ -356,16 +356,160 @@ export function filterSelectedPresetModulesFromPrompt(chat: SillyTavern.SendingM
   return changed;
 }
 
-function readArchivedSummaryCount(): number {
+type PromptHistoryMessage = {
+  message_id: number;
+  role: 'system' | 'assistant' | 'user';
+  is_hidden?: boolean;
+};
+
+type HistoricalBackfillChapter = {
+  起始楼层?: unknown;
+  结束楼层?: unknown;
+  源摘要数?: unknown;
+  来源?: unknown;
+  源楼层?: unknown;
+};
+
+type ArchivedConversationCoverage = {
+  archivedSummaryCount: number;
+  historicalBackfillSummaryCount: number;
+  historicalAssistantMessageIds: number[];
+  history: PromptHistoryMessage[];
+};
+
+function readArchivedConversationCoverage(): ArchivedConversationCoverage {
   try {
     const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
     const statData = variables?.stat_data as Record<string, unknown> | undefined;
     const memory = statData?.叙事记忆 as Record<string, unknown> | undefined;
-    const count = Number(memory?.已归档摘要数);
-    return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+    const chapters =
+      memory?.章节摘要 && typeof memory.章节摘要 === 'object' && !Array.isArray(memory.章节摘要)
+        ? (memory.章节摘要 as Record<string, HistoricalBackfillChapter>)
+        : {};
+    const history = (getChatMessages('0-{{lastMessageId}}', {
+      role: 'all',
+      hide_state: 'unhidden',
+      include_swipes: true,
+    }) as PromptHistoryMessage[])
+      .filter(message => Number.isInteger(message.message_id))
+      .sort((left, right) => left.message_id - right.message_id);
+    const assistantMessageIds = history
+      .filter(message => message.role === 'assistant')
+      .map(message => message.message_id);
+
+    const historicalIds = new Set<number>();
+    let historicalBackfillSummaryCount = 0;
+
+    for (const chapter of Object.values(chapters)) {
+      if (chapter?.来源 !== '历史回溯') continue;
+
+      const sourceSummaryCount = Number(chapter.源摘要数);
+      if (Number.isFinite(sourceSummaryCount) && sourceSummaryCount > 0) {
+        historicalBackfillSummaryCount += Math.floor(sourceSummaryCount);
+      }
+
+      const exactFloors = Array.isArray(chapter.源楼层)
+        ? chapter.源楼层.filter((value): value is number => Number.isInteger(value))
+        : [];
+      if (exactFloors.length > 0) {
+        exactFloors.forEach(messageId => historicalIds.add(messageId));
+        continue;
+      }
+
+      // 兼容今天早先已经生成、还没有“源楼层”字段的历史回溯章节。
+      const start = Number(chapter.起始楼层);
+      const end = Number(chapter.结束楼层);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+      const lower = Math.min(start, end);
+      const upper = Math.max(start, end);
+      assistantMessageIds
+        .filter(messageId => messageId >= lower && messageId <= upper)
+        .forEach(messageId => historicalIds.add(messageId));
+    }
+
+    const storedCount = Number(memory?.已归档摘要数);
+    const archivedSummaryCount = Number.isFinite(storedCount) && storedCount > 0 ? Math.floor(storedCount) : 0;
+
+    return {
+      archivedSummaryCount,
+      historicalBackfillSummaryCount,
+      historicalAssistantMessageIds: [...historicalIds].sort((left, right) => left - right),
+      history,
+    };
   } catch {
-    return 0;
+    return {
+      archivedSummaryCount: 0,
+      historicalBackfillSummaryCount: 0,
+      historicalAssistantMessageIds: [],
+      history: [],
+    };
   }
+}
+
+/**
+ * 根据真实聊天楼层顺序，把“历史回溯”章节精确覆盖的 user → assistant 对从最终 prompt 删除。
+ *
+ * SendingMessage 本身没有 message_id，因此从 prompt 尾部反向对齐真实聊天的 user/assistant 顺序；
+ * 前置 few-shot / system 注入不会挤偏映射。实际删除仍只针对章节记录过的 assistant 楼层及其配对 user。
+ */
+export function filterHistoricalBackfillTurnsFromPrompt(
+  chat: SillyTavern.SendingMessage[],
+  history: PromptHistoryMessage[],
+  coveredAssistantMessageIds: number[],
+): number {
+  if (coveredAssistantMessageIds.length === 0 || history.length === 0 || chat.length === 0) return 0;
+
+  const dialogueHistory = history
+    .filter(message => message.role === 'user' || message.role === 'assistant')
+    .sort((left, right) => left.message_id - right.message_id);
+  const promptDialogueIndices = chat
+    .map((message, index) => (message.role === 'user' || message.role === 'assistant' ? index : -1))
+    .filter(index => index >= 0);
+
+  const promptIndexByMessageId = new Map<number, number>();
+  let promptCursor = promptDialogueIndices.length - 1;
+  for (let historyCursor = dialogueHistory.length - 1; historyCursor >= 0 && promptCursor >= 0; historyCursor -= 1) {
+    const historyMessage = dialogueHistory[historyCursor];
+    while (
+      promptCursor >= 0 &&
+      chat[promptDialogueIndices[promptCursor]].role !== historyMessage.role
+    ) {
+      promptCursor -= 1;
+    }
+    if (promptCursor < 0) break;
+    promptIndexByMessageId.set(historyMessage.message_id, promptDialogueIndices[promptCursor]);
+    promptCursor -= 1;
+  }
+
+  const covered = new Set(coveredAssistantMessageIds);
+  const removeIndices = new Set<number>();
+  for (let index = 0; index < dialogueHistory.length; index += 1) {
+    const assistant = dialogueHistory[index];
+    if (assistant.role !== 'assistant' || !covered.has(assistant.message_id)) continue;
+
+    const assistantPromptIndex = promptIndexByMessageId.get(assistant.message_id);
+    if (assistantPromptIndex !== undefined) {
+      removeIndices.add(assistantPromptIndex);
+    }
+
+    for (let previousIndex = index - 1; previousIndex >= 0; previousIndex -= 1) {
+      const previous = dialogueHistory[previousIndex];
+      if (previous.role === 'assistant') break;
+      if (previous.role === 'user') {
+        const userPromptIndex = promptIndexByMessageId.get(previous.message_id);
+        if (userPromptIndex !== undefined) {
+          removeIndices.add(userPromptIndex);
+        }
+        break;
+      }
+    }
+  }
+
+  if (removeIndices.size === 0) return 0;
+  const kept = chat.filter((_, index) => !removeIndices.has(index));
+  const removed = chat.length - kept.length;
+  chat.splice(0, chat.length, ...kept);
+  return removed;
 }
 
 export function filterArchivedSummariesFromPrompt(
@@ -427,11 +571,28 @@ export function installConversationSummaryPromptFilter(): () => void {
     }
 
     if (mode !== 'card') return;
-    const archivedSummaryCount = readArchivedSummaryCount();
+
+    const coverage = readArchivedConversationCoverage();
+    const backfillRemoved = filterHistoricalBackfillTurnsFromPrompt(
+      eventData.chat,
+      coverage.history,
+      coverage.historicalAssistantMessageIds,
+    );
+    if (backfillRemoved > 0) {
+      dataLogger.log(
+        `[conversationSummary] 已按历史回溯章节覆盖楼层从最终提示词裁掉 ${backfillRemoved} 条旧消息。`,
+      );
+    }
+
+    // 历史回溯章节里的“源摘要数”已经随整个 user→assistant 对一起裁掉，不能再按旧摘要计数重复删除。
+    const archivedSummaryCount = Math.max(
+      0,
+      coverage.archivedSummaryCount - coverage.historicalBackfillSummaryCount,
+    );
     if (archivedSummaryCount <= 0) return;
     const removed = filterArchivedSummariesFromPrompt(eventData.chat, archivedSummaryCount);
     if (removed > 0) {
-      dataLogger.log(`[conversationSummary] 已从本次最终提示词裁掉 ${removed} 条已归档旧消息。`);
+      dataLogger.log(`[conversationSummary] 已从本次最终提示词裁掉 ${removed} 条已归档逐轮摘要消息。`);
     }
   });
   return () => subscription.stop();
