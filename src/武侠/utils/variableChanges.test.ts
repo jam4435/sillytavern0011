@@ -193,7 +193,7 @@ describe('buildAiComparisons', () => {
     }).comparisons[0].status).toBe('no-op');
   });
 
-  it('后台碰巧写成 AI 目标值时不会冒充 AI 已落地', () => {
+  it('最终快照等于 AI 声明时判定为已落地，不再依赖中间来源归因', () => {
     const backgroundChanges = createObservedVariableChanges(
       { user数据: { 修为: 100 } },
       { user数据: { 修为: 120 } },
@@ -213,7 +213,7 @@ describe('buildAiComparisons', () => {
       currentStatData: { user数据: { 修为: 120 } },
     }).comparisons[0];
 
-    expect(comparison.status).toBe('not-applied');
+    expect(comparison.status).toBe('applied');
   });
 
   it('路径 ID 不会把带点号的键与嵌套路径混为一谈', () => {
