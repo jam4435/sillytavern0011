@@ -1,3 +1,4 @@
+import { writeDirectChatTransaction } from '../../shared/directVariableWrite';
 import type { InitialAttributes } from '../types';
 import { getLocationScopePath, normalizeLocationPath } from '../../shared/locationPath.js';
 import {
@@ -541,7 +542,7 @@ export async function syncFrontendDerivedVariables(
     const cultivationReference = buildCultivationChangeReferenceFromStatData(statData);
     const randomNumbers = buildFrontendRandomNumbers();
 
-    updateVariablesWith(
+    await writeDirectChatTransaction(
       current => {
         const currentVariables = current as Record<string, unknown>;
         const nextWithLocation = shouldRefreshLocationContext(currentVariables, locationContext)
@@ -560,7 +561,12 @@ export async function syncFrontendDerivedVariables(
 
         return upsertFrontendVariables(nextWithLocation, updates);
       },
-      { type: 'chat' },
+      'frontend-derived-variable-sync',
+      {
+        source: 'frontend',
+        operation: 'update',
+        refreshHint: 'character-data',
+      },
     );
 
     return {
