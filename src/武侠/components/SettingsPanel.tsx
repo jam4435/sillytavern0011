@@ -1304,7 +1304,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       rule => getPresetStorageCleanupRecommendation(rule).kind === 'recommended',
     );
     if (recommendedRules.length === 0) {
-      alert('当前预设没有识别出可独立安全删除的 XML 区块。整楼提取、summary、ERA/变量块和纯美化规则不会自动勾选。');
+      alert('当前预设没有识别出边界明确、可自动建议的模块块。整楼提取、summary、ERA/变量块和语义不明确的规则不会自动勾选。');
       return;
     }
 
@@ -2248,8 +2248,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                     : '手动判断'}
                             </span>
                           </span>
-                          <code className="preset-module-filter-pattern" title={rule.pattern}>
-                            {rule.pattern}
+                          <code className="preset-module-filter-pattern" title={`原正则：${rule.pattern}`}>
+                            {recommendation.matchDescription}
                           </code>
                         </span>
                       </label>
@@ -2280,7 +2280,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </button>
                 </div>
                 <p className="settings-hint">
-                  “自动识别”只勾选从正则中拆出的完整 XML 区块。像整楼提取 {'<summary>'}、Variable/ERA 区块或疑似正文规则会标为保护/谨慎，不会自动删除。持续过滤无需手动清理；“回溯清理”只处理旧楼层。
+                  “自动识别”现在按原正则自己的实际命中范围判断：完整标签块、思维链结束标记前缀等边界明确的模块可自动建议；不会再因为看见一对标签就另造更宽的删除正则。整楼提取、{'<summary>'}、Variable/ERA 区块或语义不明确的规则仍会保护或留给人工判断。持续过滤无需手动清理；“回溯清理”只处理旧楼层。
                 </p>
               </div>
             </div>
