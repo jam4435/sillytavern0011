@@ -49,6 +49,11 @@ export interface RegenerateResult {
 export interface RegenerateOptions {
   onCombinedPrompt?: (prompt: string) => void;
   onTargetAssistantResolved?: (assistantMessageId: number) => void;
+  /**
+   * 旧 swipe 已由 manual_sync 回滚、前端派生变量已同步，且新正文已经生成，
+   * 但新 swipe 尚未写回/触发 ERA apiWrite。变量追踪应在这个边界建立基线。
+   */
+  onGeneratedReplyReady?: (replyText: string, assistantMessageId: number) => void;
 }
 
 type RegenerateContext = {
@@ -430,6 +435,10 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
     if (!resultText?.trim()) {
       throw new Error('重新生成失败：AI 回复为空。');
     }
+
+    // 变量追踪的正确起点：旧 swipe 已回滚、派生变量已同步，新正文已确定，
+    // 但新 swipe 尚未写回，因此此刻的 stat_data 正好是“新回复写入前基线”。
+    options.onGeneratedReplyReady?.(resultText, context.assistantMessage.message_id);
 
     await writeGeneratedSwipe(transaction, resultText);
     await emitEraEventAndWait('era:apiWrite', {
