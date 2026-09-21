@@ -672,7 +672,7 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(options.showError).toHaveBeenCalledWith('正文已生成，但额外变量更新失败：extra failed');
   });
 
-  it('regenerate 在旧 swipe 回滚后的 pre-write 边界启动 tracker，并在事件结算后 settled', async () => {
+  it('regenerate 在旧 swipe 回滚后启动 tracker，随后登记 AI 声明，并在事件结算后 settled', async () => {
     const order: string[] = [];
     const options = createHookOptions(createSummarySettings('inline'));
     options.onVariableTurnStart.mockImplementation(() => {
@@ -693,7 +693,11 @@ describe('useMessageHandler extra-variable decision', () => {
       callbacks.onTargetAssistantResolved?.(9);
       expect(options.onVariableTurnStart).not.toHaveBeenCalled();
 
-      order.push('pre-write');
+      order.push('rollback-complete');
+      callbacks.onVariableBaselineReady?.(9);
+      order.push('frontend-derived-sync');
+
+      order.push('generated-reply-ready');
       callbacks.onGeneratedReplyReady?.('重新生成正文', 9);
       order.push('commit-new-swipe');
 
@@ -717,9 +721,11 @@ describe('useMessageHandler extra-variable decision', () => {
 
     expect(order).toEqual([
       'resolve-target',
-      'pre-write',
+      'rollback-complete',
       'tracker-start',
       'target',
+      'frontend-derived-sync',
+      'generated-reply-ready',
       'reply-declared',
       'commit-new-swipe',
       'reply-checkpoint',
