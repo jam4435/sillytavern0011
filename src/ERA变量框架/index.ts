@@ -16,6 +16,7 @@
 
 import { EVENT_GROUPS } from './events/merger';
 import { pushToQueue } from './events/queue';
+import { consumeInternalMessageUpdatedEvent } from '../shared/internalMessageUpdateGuard';
 
 // 导入查询模块, 以注册 {{ERA:...}} 宏
 import './api/macro/parser';

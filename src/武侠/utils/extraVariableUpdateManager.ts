@@ -5,6 +5,7 @@ import {
   type SummaryVariableUpdateMode,
 } from './settingsManager';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
+import { beginInternalMessageUpdate, finishInternalMessageUpdate } from '../../shared/internalMessageUpdateGuard';
 import {
   getLocationScopePath,
   isSameLocationScope,
@@ -1741,33 +1742,38 @@ async function appendVariableBlocksToAssistantMessage(
   const nextText = `${activeText.trimEnd()}\n${blocksText}`.trim();
   const swipes = Array.isArray(freshMessage.swipes) && freshMessage.swipes.length > 0 ? [...freshMessage.swipes] : null;
 
-  if (swipes) {
-    swipes[swipeId] = nextText;
-    const swipesData = normalizeArray(freshMessage.swipes_data, swipes.length, () => ({}));
-    const swipesInfo = normalizeArray(freshMessage.swipes_info, swipes.length, () => ({}));
-    await setChatMessages(
-      [
-        {
-          message_id: messageId,
-          message: nextText,
-          swipe_id: swipeId,
-          swipes,
-          swipes_data: swipesData,
-          swipes_info: swipesInfo,
-        },
-      ],
-      { refresh: 'none' },
-    );
-  } else {
-    await setChatMessages(
-      [
-        {
-          message_id: messageId,
-          message: nextText,
-        },
-      ],
-      { refresh: 'none' },
-    );
+  const internalUpdateToken = beginInternalMessageUpdate(messageId);
+  try {
+    if (swipes) {
+      swipes[swipeId] = nextText;
+      const swipesData = normalizeArray(freshMessage.swipes_data, swipes.length, () => ({}));
+      const swipesInfo = normalizeArray(freshMessage.swipes_info, swipes.length, () => ({}));
+      await setChatMessages(
+        [
+          {
+            message_id: messageId,
+            message: nextText,
+            swipe_id: swipeId,
+            swipes,
+            swipes_data: swipesData,
+            swipes_info: swipesInfo,
+          },
+        ],
+        { refresh: 'none' },
+      );
+    } else {
+      await setChatMessages(
+        [
+          {
+            message_id: messageId,
+            message: nextText,
+          },
+        ],
+        { refresh: 'none' },
+      );
+    }
+  } finally {
+    finishInternalMessageUpdate(internalUpdateToken);
   }
 
   const readback = readAssistantMessageActiveText(messageId);

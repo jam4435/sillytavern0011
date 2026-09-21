@@ -624,6 +624,7 @@ describe('useMessageHandler extra-variable decision', () => {
       appendVerification: '写入后通过',
       syncReadbackText: '同步后回读',
       syncVerification: '同步后通过',
+      applyStatus: 'success',
     });
 
     const { result } = renderHook(() => useMessageHandler(options));
@@ -657,6 +658,8 @@ describe('useMessageHandler extra-variable decision', () => {
       '<VariableEdit>\n{\n  "user数据": {\n    "修为": 120\n  }\n}\n</VariableEdit>',
       2,
     );
+    expect(options.onVariableAiWriteTarget).toHaveBeenCalledTimes(2);
+    expect(options.onVariableAiWriteTarget).toHaveBeenLastCalledWith(2);
   });
 
   it('send + extra 合法返回 0 个动作时仍登记空的额外变量模型声明', async () => {
@@ -823,6 +826,7 @@ describe('useMessageHandler extra-variable decision', () => {
       appendVerification: '写入后通过',
       syncReadbackText: '同步后回读',
       syncVerification: '同步后通过',
+      applyStatus: 'success',
     });
 
     const { result } = renderHook(() => useMessageHandler(options));
@@ -847,6 +851,7 @@ describe('useMessageHandler extra-variable decision', () => {
       '<VariableEdit>{"user数据":{"修为":130}}</VariableEdit>',
       12,
     );
+    expect(options.onVariableAiWriteTarget).toHaveBeenLastCalledWith(12);
     expect(globals.eventEmit).not.toHaveBeenCalledWith('wuxia:sync-latest-message-shell', expect.anything());
   });
 

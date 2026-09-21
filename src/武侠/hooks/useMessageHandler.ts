@@ -491,6 +491,14 @@ export function useMessageHandler({
         extraDeclarationsRegistered = true;
         onVariableExtraDeclaredBlocks?.(extraUpdateResult.appendedBlocks || '', assistantMessageId);
       }
+
+      // executeExtraVariableUpdate 只有在 ERA writeDone + stat_data 最终回读验证都成功后才返回。
+      // 此时再做一次 AI 目标确认，让 tracker 从“最终已验证快照”收账，避免早到的
+      // writeDone / frontend 派生同步把真实 AI 变化暂记为后台后留下假「未落地」。
+      if (extraUpdateResult.appended && extraUpdateResult.applyStatus === 'success') {
+        onVariableAiWriteTarget?.(assistantMessageId);
+      }
+
       patchLatestDebugRound({
         variable: createExtraVariableDecisionPatch(decision, {
           status: 'success',
@@ -515,7 +523,7 @@ export function useMessageHandler({
 
       return extraUpdateResult;
     },
-    [onVariableExtraDeclaredBlocks, patchLatestDebugRound, showLoading, summarySettings],
+    [onVariableAiWriteTarget, onVariableExtraDeclaredBlocks, patchLatestDebugRound, showLoading, summarySettings],
   );
 
   const handleSendMessage = useCallback(

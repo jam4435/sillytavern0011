@@ -9,6 +9,7 @@
 import { ERA_DATA_REGEX } from './constants';
 import { recordEraDiagnosticError, startEraDiagnosticWatchdog } from './diagnostics';
 import { Logger } from './log';
+import { beginInternalMessageUpdate, finishInternalMessageUpdate } from '../../shared/internalMessageUpdateGuard';
 
 const log = new Logger('utils-message');
 
@@ -159,6 +160,7 @@ export async function updateMessageContent(message: any, newContent: string, dia
       refresh: 'none',
     },
   });
+  const internalUpdateToken = beginInternalMessageUpdate(message.message_id);
   try {
     await setChatMessages([updatePayload], { refresh: 'none' });
     finishWatchdog('success');
@@ -169,5 +171,7 @@ export async function updateMessageContent(message: any, newContent: string, dia
       contentLength: newContent.length,
     }, diagnosticId);
     throw error;
+  } finally {
+    finishInternalMessageUpdate(internalUpdateToken);
   }
 }
