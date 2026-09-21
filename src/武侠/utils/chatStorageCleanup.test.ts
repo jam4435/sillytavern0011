@@ -40,7 +40,9 @@ describe('cleanChatMessagePresetBlocks', () => {
       ],
     });
     expect(result.updatedSwipes).toBe(2);
-    expect(result.removedCharacters).toBeGreaterThan(0);
+    expect(result.removedCharacters).toBe(
+      '<thinking>A</thinking>'.length + '<thinking>B</thinking>'.length,
+    );
   });
 
   it('allows a complete thinking block to exceed the 80% safety threshold', () => {
