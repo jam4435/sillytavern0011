@@ -265,6 +265,7 @@ export async function emitEraVariableWriteAndWait({
   reason,
   eventName,
   attribution = 'background',
+  refreshHint,
   detail,
   timeoutMs = 10000,
   timeoutMessage = `ERA ${eventName} 写入完成信号超时`,
