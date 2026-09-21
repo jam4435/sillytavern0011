@@ -1096,7 +1096,6 @@ export function useMessageHandler({
     try {
       turnLockRequestStarted = true;
       await acquireWuxiaTurnLock(debugRoundId, turnChatId);
-      onVariableTurnStart?.();
       extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
       const result = await regenerateLastAssistantSwipe({
         onCombinedPrompt: prompt => {
@@ -1104,11 +1103,16 @@ export function useMessageHandler({
         },
         onTargetAssistantResolved: assistantMessageId => {
           targetAssistantMessageId = assistantMessageId;
+        },
+        onGeneratedReplyReady: (replyText, assistantMessageId) => {
+          // 旧 swipe 已回滚且新回复尚未写入：此刻建立本轮唯一正确的变量基线。
+          // 目标楼层与声明也在 ERA apiWrite 前登记，避免把真实 AI 写入先算成后台。
+          onVariableTurnStart?.();
           onVariableAiWriteTarget?.(assistantMessageId);
+          onVariableAssistantReply?.(replyText, assistantMessageId);
         },
       });
       targetAssistantMessageId = result.assistantMessageId;
-      onVariableAssistantReply?.(result.rawReply, result.assistantMessageId);
       patchLatestDebugRound({
         main: {
           userInput: result.userInput || '重新生成最新回复',
