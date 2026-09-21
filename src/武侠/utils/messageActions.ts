@@ -49,6 +49,11 @@ export interface RegenerateResult {
 export interface RegenerateOptions {
   onCombinedPrompt?: (prompt: string) => void;
   onTargetAssistantResolved?: (assistantMessageId: number) => void;
+  /**
+   * 旧 swipe 已经回滚、重新生成前派生变量已同步、新正文已生成，
+   * 但新 swipe 尚未写回。变量 tracker 应在这个边界建立新回合 baseline。
+   */
+  onGeneratedReplyReady?: (replyText: string, assistantMessageId: number) => void;
 }
 
 type RegenerateContext = {
@@ -430,6 +435,8 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
     if (!resultText?.trim()) {
       throw new Error('重新生成失败：AI 回复为空。');
     }
+
+    options.onGeneratedReplyReady?.(resultText, context.assistantMessage.message_id);
 
     await writeGeneratedSwipe(transaction, resultText);
     await emitEraEventAndWait('era:apiWrite', {
