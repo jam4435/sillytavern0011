@@ -7,6 +7,7 @@ import type {
 import {
   buildAiComparisons,
   collectVariableTopLevelGroups,
+  createBucketedObservedVariableChanges,
   createEmptyVariableChangeSummary,
   createObservedVariableChanges,
   formatVariablePreview,
@@ -356,7 +357,7 @@ const buildSummary = (
 ): VariableChangeSummary => {
   const parsedAi = parseAiDeclaredState(activeTurn);
   const aiPathKeys = new Set(parsedAi.declaredChanges.map(change => getPathKey(change.path)));
-  const overallDiff = createObservedVariableChanges(
+  const bucketedFinalDiff = createBucketedObservedVariableChanges(
     activeTurn.baselineStatData,
     currentStatData,
     {
@@ -367,18 +368,17 @@ const buildSummary = (
       reason: 'ai-final-snapshot',
       assistantMessageId: activeTurn.assistantMessageId,
     },
+    candidate => aiPathKeys.has(getPathKey(candidate.path)) ? 'ai' : 'background',
   );
-  const aiObserved = overallDiff.observedChanges
-    .filter(change => aiPathKeys.has(getPathKey(change.path)))
-    .map((change, index) => ({
-      ...change,
-      id: `ai-final:${activeTurn.turnId}:${getPathKey(change.path)}:${index}`,
-      origin: 'ai' as const,
-      producer: 'era' as const,
-      batchId: `${activeTurn.turnId}:ai-final`,
-      reason: 'ai-final-snapshot',
-      assistantMessageId: activeTurn.assistantMessageId,
-    }));
+  const aiObserved = bucketedFinalDiff.ai.observedChanges.map((change, index) => ({
+    ...change,
+    id: `ai-final:${activeTurn.turnId}:${getPathKey(change.path)}:${index}`,
+    origin: 'ai' as const,
+    producer: 'era' as const,
+    batchId: `${activeTurn.turnId}:ai-final`,
+    reason: 'ai-final-snapshot',
+    assistantMessageId: activeTurn.assistantMessageId,
+  }));
 
   const comparisonResult = buildAiComparisons({
     declaredChanges: parsedAi.declaredChanges,
@@ -401,7 +401,7 @@ const buildSummary = (
       observedChanges: aiObserved,
       comparisons: comparisonResult.comparisons,
       omittedDeclaredCount: parsedAi.omittedDeclaredCount,
-      omittedObservedCount: overallDiff.omittedObservedCount,
+      omittedObservedCount: bucketedFinalDiff.ai.omittedObservedCount,
       omittedComparisonCount: comparisonResult.omittedComparisonCount,
     },
     declaredChanges: parsedAi.declaredChanges,
@@ -589,7 +589,6 @@ export function useVariableChangeTracker() {
     );
 
     const backgroundChanges = [...current.background.observedChanges];
-    const representedPaths = new Set(backgroundChanges.map(change => getPathKey(change.path)));
 
     // 最终楼层中排除 AI 变量模型返回块后剩余的变量块，按定义属于后台变量块。
     // 正常情况下它们已由统一来源事件记录；这里仅补齐未经过包装层的漏网写入。
@@ -597,14 +596,18 @@ export function useVariableChangeTracker() {
       const pathKey = getPathKey(declaration.path);
       const expectedValue = declaration.action === 'delete' ? undefined : declaration.value;
       const finalValue = getValueAtPath(finalStatData, declaration.path);
-      const hasExactRecordedWrite = backgroundChanges.some(change =>
-        getPathKey(change.path) === pathKey && valuesEqual(change.afterValue, expectedValue));
-      if (hasExactRecordedWrite || !valuesEqual(finalValue, expectedValue)) continue;
+      const latestRecorded = [...backgroundChanges]
+        .reverse()
+        .find(change => getPathKey(change.path) === pathKey);
+      if (latestRecorded && valuesEqual(latestRecorded.afterValue, expectedValue)) continue;
+      if (!valuesEqual(finalValue, expectedValue)) continue;
 
       const aiDeclaration = aiByPath.get(pathKey);
-      const beforeValue = aiDeclaration
-        ? (aiDeclaration.action === 'delete' ? undefined : aiDeclaration.value)
-        : getValueAtPath(activeTurn.baselineStatData, declaration.path);
+      const beforeValue = latestRecorded
+        ? latestRecorded.afterValue
+        : aiDeclaration
+          ? (aiDeclaration.action === 'delete' ? undefined : aiDeclaration.value)
+          : getValueAtPath(activeTurn.baselineStatData, declaration.path);
       if (valuesEqual(beforeValue, finalValue)) continue;
 
       const batchId = `${activeTurn.turnId}:background-block-fallback`;
@@ -620,7 +623,6 @@ export function useVariableChangeTracker() {
         assistantMessageId: activeTurn.assistantMessageId,
         index: backgroundChanges.length + 1,
       }));
-      representedPaths.add(pathKey);
     }
 
     // direct write / 外部脚本若没有经过包装层，也不能因为“没有变量块”而从变更条消失。
@@ -652,7 +654,6 @@ export function useVariableChangeTracker() {
         assistantMessageId: activeTurn.assistantMessageId,
         index: backgroundChanges.length + 1,
       }));
-      representedPaths.add(pathKey);
     }
 
     const backgroundLimited = backgroundChanges.slice(0, MAX_STORED_VARIABLE_CHANGES);
