@@ -289,6 +289,50 @@ export async function writeDirectChatTransaction(
   );
 }
 
+export async function emitConfirmedEraVariableWriteDone({
+  source,
+  operation,
+  reason,
+  eventName,
+  attribution = 'background',
+  refreshHint,
+  confirmation,
+  beforeStatData,
+  afterStatData,
+}: EraVariableWriteMetadata & {
+  confirmation?: EraVariableWriteConfirmation | null;
+  beforeStatData: Record<string, unknown> | null;
+  afterStatData: Record<string, unknown> | null;
+}): Promise<EraVariableWriteDoneDetail> {
+  const eventDetail: EraVariableWriteDoneDetail = {
+    version: 1,
+    writeId: createVariableWriteId(),
+    source,
+    operation,
+    reason,
+    eventName,
+    attribution,
+    refreshHint: normalizeRefreshHint(refreshHint),
+    message_id: normalizeMessageId(confirmation?.message_id),
+    actions: normalizeActions(confirmation?.actions),
+    transactionId: normalizeTransactionId(confirmation?.transactionId),
+    transactionIds: confirmation ? normalizeTransactionIds(confirmation) ?? undefined : undefined,
+    changes: createVariableSnapshotDiff(beforeStatData, afterStatData),
+  };
+
+  variableTraceLogger.log('[emitConfirmedEraVariableWriteDone] ERA 写入已确认，发送唯一带来源完成事件', eventDetail);
+  try {
+    await eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
+  } catch (error) {
+    // 业务写入已经确认。来源通知失败只能影响观测，不能把真实写入反向判成失败。
+    variableTraceLogger.error('[emitConfirmedEraVariableWriteDone] 带来源完成事件监听链异常', {
+      ...eventDetail,
+      error,
+    });
+  }
+  return eventDetail;
+}
+
 /**
  * 注册完成监听器后再发出 ERA 事件，并等待与 message/action 匹配的 writeDone。
  *
@@ -469,34 +513,17 @@ export async function emitEraVariableWriteAndWait({
   const matchedDetail = await waitForWriteDone;
   // 只在匹配到“自己”的 writeDone 后取 after；tracker 不再用共享全局区间猜 source。
   const afterStatData = readCurrentStatDataSnapshot();
-  const eventDetail: EraVariableWriteDoneDetail = {
-    version: 1,
-    writeId: createVariableWriteId(),
+  return emitConfirmedEraVariableWriteDone({
     source,
     operation,
     reason,
     eventName,
     attribution,
-    refreshHint: normalizeRefreshHint(refreshHint),
-    message_id: normalizeMessageId(matchedDetail?.message_id),
-    actions: normalizeActions(matchedDetail?.actions),
-    transactionId: normalizeTransactionId(matchedDetail?.transactionId),
-    transactionIds: normalizeTransactionIds(matchedDetail) ?? undefined,
-    changes: createVariableSnapshotDiff(beforeStatData, afterStatData),
-  };
-
-  variableTraceLogger.log('[emitEraVariableWriteAndWait] ERA 写入已确认，发送唯一带来源完成事件', eventDetail);
-  try {
-    await eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
-  } catch (error) {
-    // 原始 era:writeDone 已经证明变量写入成功。来源通知属于观测元数据，
-    // 监听器失败不能反向否定已完成的业务写入。
-    variableTraceLogger.error('[emitEraVariableWriteAndWait] 带来源完成事件监听链异常', {
-      ...eventDetail,
-      error,
-    });
-  }
-  return eventDetail;
+    refreshHint,
+    confirmation: matchedDetail,
+    beforeStatData,
+    afterStatData,
+  });
 }
 
 /**
