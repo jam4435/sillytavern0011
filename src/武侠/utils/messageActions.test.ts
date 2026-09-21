@@ -162,13 +162,18 @@ describe('regenerateLastAssistantSwipe', () => {
     expect(result.rawReply).toBe('新正文');
   });
 
-  it('重新生成 tracker baseline 回调位于旧 swipe 回滚之后、新 swipe 写入之前', async () => {
+  it('重新生成 tracker baseline 位于旧 swipe 回滚后，并早于新回复写入', async () => {
+    const onVariableBaselineReady = vi.fn();
     const onGeneratedReplyReady = vi.fn();
 
-    await regenerateLastAssistantSwipe({ onGeneratedReplyReady });
+    await regenerateLastAssistantSwipe({ onVariableBaselineReady, onGeneratedReplyReady });
 
+    expect(onVariableBaselineReady).toHaveBeenCalledWith(2);
     expect(onGeneratedReplyReady).toHaveBeenCalledWith('新正文', 2);
     expect(emitEraEventAndWaitMock.mock.invocationCallOrder[0]).toBeLessThan(
+      onVariableBaselineReady.mock.invocationCallOrder[0],
+    );
+    expect(onVariableBaselineReady.mock.invocationCallOrder[0]).toBeLessThan(
       onGeneratedReplyReady.mock.invocationCallOrder[0],
     );
     expect(onGeneratedReplyReady.mock.invocationCallOrder[0]).toBeLessThan(
