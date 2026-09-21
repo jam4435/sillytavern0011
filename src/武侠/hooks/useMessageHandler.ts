@@ -78,6 +78,7 @@ interface UseMessageHandlerOptions {
   onVariableAssistantReply?: (rawReply: string, assistantMessageId?: number) => void;
   onVariableExtraDeclaredBlocks?: (blocksText: string, assistantMessageId?: number) => void;
   onVariableAiWriteTarget?: (assistantMessageId: number) => void;
+  onVariableTurnSettled?: (assistantMessageId?: number) => void;
   onAssistantDisplayCommit?: (assistantMessageId: number, assistantSwipeId: number) => void;
 }
 
@@ -362,6 +363,7 @@ export function useMessageHandler({
   onVariableAssistantReply,
   onVariableExtraDeclaredBlocks,
   onVariableAiWriteTarget,
+  onVariableTurnSettled,
   onAssistantDisplayCommit,
 }: UseMessageHandlerOptions) {
   const refreshAssistantStateFromFinalText = useCallback(
@@ -910,6 +912,7 @@ export function useMessageHandler({
               messageLogger.error('回合已完成，但自动历史节点封存失败:', error);
               showError(`回合已完成，但自动历史节点封存失败：${getErrorMessage(error)}`);
             }
+            onVariableTurnSettled?.(completedMessageId);
           }
 
           dismissToast();
@@ -1004,6 +1007,7 @@ export function useMessageHandler({
       onVariableTurnStart,
       onVariableAssistantReply,
       onVariableAiWriteTarget,
+      onVariableTurnSettled,
       onAssistantDisplayCommit,
       refreshAssistantStateFromFinalText,
     ],
@@ -1096,7 +1100,6 @@ export function useMessageHandler({
     try {
       turnLockRequestStarted = true;
       await acquireWuxiaTurnLock(debugRoundId, turnChatId);
-      onVariableTurnStart?.();
       extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
       const result = await regenerateLastAssistantSwipe({
         onCombinedPrompt: prompt => {
@@ -1104,10 +1107,17 @@ export function useMessageHandler({
         },
         onTargetAssistantResolved: assistantMessageId => {
           targetAssistantMessageId = assistantMessageId;
+        },
+        onGeneratedReplyReady: (replyText, assistantMessageId) => {
+          // 旧 swipe 已回滚、派生变量已同步，新 swipe 尚未写入。
+          // 此刻才建立重新生成回合 baseline，内部回滚不会进入“后台变更”。
+          onVariableTurnStart?.();
           onVariableAiWriteTarget?.(assistantMessageId);
+          onVariableAssistantReply?.(replyText);
         },
       });
       targetAssistantMessageId = result.assistantMessageId;
+      // 新 swipe / inline ERA 已完成后再推进 AI checkpoint。
       onVariableAssistantReply?.(result.rawReply, result.assistantMessageId);
       patchLatestDebugRound({
         main: {
@@ -1187,6 +1197,7 @@ export function useMessageHandler({
           messageLogger.error('重新生成已完成，但自动历史节点封存失败:', error);
           showError(`重新生成已完成，但自动历史节点封存失败：${getErrorMessage(error)}`);
         }
+        onVariableTurnSettled?.(targetAssistantMessageId);
       }
 
       dismissToast();
@@ -1234,6 +1245,7 @@ export function useMessageHandler({
     onVariableTurnStart,
     onVariableAssistantReply,
     onVariableAiWriteTarget,
+    onVariableTurnSettled,
   ]);
 
   return {
