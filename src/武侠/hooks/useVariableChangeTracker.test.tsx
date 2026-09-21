@@ -233,6 +233,185 @@ describe('useVariableChangeTracker', () => {
     ]);
   });
 
+  it('声明晚于 resync 到达时会立即认领已发生的 AI 差分', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      // assistant 楼层已经确认，但 extra 变量声明还没有登记。
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    currentStatData = {
+      user数据: { 修为: 120 },
+      前端变量: { 随机数: 'old' },
+    };
+
+    act(() => {
+      // 追加变量块触发的 resync 先把修为变化观察成后台。
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { resync: true },
+        reason: 'append-extra-blocks-resync',
+      });
+    });
+
+    expect(result.current.variableChanges?.background.observedChanges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['user数据', '修为'],
+          beforeValue: 100,
+          afterValue: 120,
+        }),
+      ]),
+    );
+
+    act(() => {
+      result.current.handleVariableExtraDeclaredBlocks(declaredReply, 2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+        origin: 'ai',
+        producer: 'frontend',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(
+      result.current.variableChanges?.background.observedChanges
+        .some(change => change.path.join('.') === 'user数据.修为'),
+    ).toBe(false);
+    expect(result.current.variableChanges?.aiReply.comparisons).toEqual([
+      expect.objectContaining({
+        status: 'applied',
+        expectedValue: 120,
+        finalValue: 120,
+      }),
+    ]);
+  });
+
+  it('sourced AI 到达时即使快照又前进，也会先跨批次认领旧 AI 差分', () => {
+    currentStatData = {
+      user数据: { 修为: 100 },
+      前端变量: { 随机数: 'old' },
+    };
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+    });
+
+    currentStatData = {
+      user数据: { 修为: 120 },
+      前端变量: { 随机数: 'old' },
+    };
+
+    act(() => {
+      // 目标尚未登记，因此先暂记为后台。
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { resync: true },
+        reason: 'early-resync',
+      });
+    });
+
+    // 在 sourced AI 通知到达前，又发生一笔无关前端变化，但 tracker 尚未捕获。
+    currentStatData = {
+      user数据: { 修为: 120 },
+      前端变量: { 随机数: 'new' },
+    };
+
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'late-ai-after-new-snapshot',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        message_id: 2,
+        actions: { apiWrite: true },
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+        origin: 'ai',
+        producer: 'frontend',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['前端变量', '随机数'],
+          beforeValue: 'old',
+          afterValue: 'new',
+        }),
+      ]),
+    );
+    expect(result.current.variableChanges?.aiReply.comparisons[0]).toEqual(
+      expect.objectContaining({
+        status: 'applied',
+        expectedValue: 120,
+        finalValue: 120,
+      }),
+    );
+  });
+
+  it('无 messageId 的 sourced background 不会把已确认 AI 批次降级成后台', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(declaredReply, 2);
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'era-api-write',
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toHaveLength(1);
+
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'unrelated-background-without-message',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'summary-write',
+        eventName: 'era:updateByObject',
+        attribution: 'background',
+        actions: { apiWrite: true },
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        origin: 'ai',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
+    expect(result.current.variableChanges?.aiReply.comparisons[0]).toEqual(
+      expect.objectContaining({ status: 'applied' }),
+    );
+  });
+
   it('重复通知和相同快照不会重复计数', () => {
     const { result } = renderHook(() => useVariableChangeTracker());
 
