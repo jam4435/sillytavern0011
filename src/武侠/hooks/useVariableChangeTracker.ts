@@ -25,7 +25,6 @@ import {
   type VariableChangeSummary,
   type VariableDeclaredChange,
   type VariablePath,
-  type VariableThoughtEntry,
   type VariableWriteActions,
 } from '../utils/variableChanges';
 import { variableTraceLogger } from '../utils/logger';
