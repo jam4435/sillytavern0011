@@ -3,6 +3,7 @@ import {
   createVariableSnapshotDiff,
   readCurrentStatDataSnapshot,
   readStatDataSnapshotFromUnknown,
+  type VariablePath,
   type VariableSnapshotDiffChange,
 } from '../武侠/utils/variableChanges';
 import { recordIframeLifecycleEvent } from '../武侠/utils/iframeLifecycleBlackBox';
@@ -144,6 +145,119 @@ const normalizeActions = (actions: unknown): Record<string, boolean> | null => {
     .filter(([, enabled]) => enabled === true)
     .sort(([left], [right]) => left.localeCompare(right));
   return enabledActions.length > 0 ? Object.fromEntries(enabledActions) : null;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const normalizeStatDataPath = (path: VariablePath): VariablePath =>
+  path[0] === 'stat_data' ? path.slice(1) : path;
+
+const collectEraPatchScopePaths = (
+  value: unknown,
+  path: VariablePath,
+  result: VariablePath[],
+): void => {
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      if (path.length > 0) result.push(normalizeStatDataPath(path));
+      return;
+    }
+    value.forEach((child, index) => collectEraPatchScopePaths(child, [...path, index], result));
+    return;
+  }
+
+  if (isRecord(value)) {
+    const entries = Object.entries(value);
+    if (entries.length === 0) {
+      if (path.length > 0) result.push(normalizeStatDataPath(path));
+      return;
+    }
+    for (const [key, child] of entries) {
+      collectEraPatchScopePaths(child, [...path, key], result);
+    }
+    return;
+  }
+
+  if (path.length > 0) result.push(normalizeStatDataPath(path));
+};
+
+const parseSimpleEraPath = (value: unknown): VariablePath | null => {
+  if (Array.isArray(value) && value.every(segment => typeof segment === 'string' || typeof segment === 'number')) {
+    return normalizeStatDataPath(value as VariablePath);
+  }
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const normalized = value
+    .trim()
+    .replace(/^stat_data\.?/, '')
+    .replace(/\[["']([^"'\]]+)["']\]/g, '.$1')
+    .replace(/\[(\d+)\]/g, '.$1');
+  const segments = normalized
+    .split('.')
+    .map(segment => segment.trim())
+    .filter(Boolean)
+    .map(segment => (/^\d+$/.test(segment) ? Number(segment) : segment));
+  return segments.length > 0 ? segments : null;
+};
+
+const getEraDiffScopePaths = (
+  eventName: EraVariableWriteEventName,
+  detail: unknown,
+): VariablePath[] | null => {
+  const result: VariablePath[] = [];
+
+  if (eventName === 'era:transactionByObject' && isRecord(detail) && Array.isArray(detail.operations)) {
+    for (const operation of detail.operations) {
+      if (!isRecord(operation)) continue;
+      collectEraPatchScopePaths(operation.payload, [], result);
+    }
+  } else if (
+    eventName === 'era:updateByObject'
+    || eventName === 'era:insertByObject'
+    || eventName === 'era:deleteByObject'
+  ) {
+    collectEraPatchScopePaths(detail, [], result);
+  } else if (eventName === 'era:deleteByPath') {
+    if (isRecord(detail)) {
+      const candidates = Array.isArray(detail.paths) ? detail.paths : [detail.path];
+      for (const candidate of candidates) {
+        const parsed = parseSimpleEraPath(candidate);
+        if (parsed) result.push(parsed);
+      }
+    } else {
+      const parsed = parseSimpleEraPath(detail);
+      if (parsed) result.push(parsed);
+    }
+  }
+
+  if (result.length === 0) return null;
+  const seen = new Set<string>();
+  return result.filter(path => {
+    const key = JSON.stringify(path);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const pathsOverlap = (left: VariablePath, right: VariablePath): boolean => {
+  const length = Math.min(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+};
+
+const createEraScopedVariableSnapshotDiff = (
+  eventName: EraVariableWriteEventName,
+  detail: unknown,
+  beforeStatData: Record<string, unknown> | null,
+  afterStatData: Record<string, unknown> | null,
+): VariableSnapshotDiffChange[] => {
+  const allChanges = createVariableSnapshotDiff(beforeStatData, afterStatData);
+  const scopePaths = getEraDiffScopePaths(eventName, detail);
+  if (!scopePaths) return allChanges;
+  return allChanges.filter(change => scopePaths.some(scopePath => pathsOverlap(change.path, scopePath)));
 };
 
 const normalizeTransactionId = (transactionId: unknown): string | undefined =>
@@ -297,10 +411,12 @@ export async function emitConfirmedEraVariableWriteDone({
   attribution = 'background',
   refreshHint,
   confirmation,
+  detail,
   beforeStatData,
   afterStatData,
 }: EraVariableWriteMetadata & {
   confirmation?: EraVariableWriteConfirmation | null;
+  detail?: unknown;
   beforeStatData: Record<string, unknown> | null;
   afterStatData: Record<string, unknown> | null;
 }): Promise<EraVariableWriteDoneDetail> {
@@ -317,7 +433,9 @@ export async function emitConfirmedEraVariableWriteDone({
     actions: normalizeActions(confirmation?.actions),
     transactionId: normalizeTransactionId(confirmation?.transactionId),
     transactionIds: confirmation ? normalizeTransactionIds(confirmation) ?? undefined : undefined,
-    changes: createVariableSnapshotDiff(beforeStatData, afterStatData),
+    // ERA 等待窗口内可能同时发生 AI / 其他后台写入。只保留本次 ERA 请求声明要碰的路径，
+    // 避免把并发的时间、人物经历等误归到当前 source。
+    changes: createEraScopedVariableSnapshotDiff(eventName, detail, beforeStatData, afterStatData),
   };
 
   variableTraceLogger.log('[emitConfirmedEraVariableWriteDone] ERA 写入已确认，发送唯一带来源完成事件', eventDetail);
@@ -521,6 +639,7 @@ export async function emitEraVariableWriteAndWait({
     attribution,
     refreshHint,
     confirmation: matchedDetail,
+    detail,
     beforeStatData,
     afterStatData,
   });
