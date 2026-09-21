@@ -241,6 +241,7 @@ describe('useMessageHandler extra-variable decision', () => {
       await result.current.handleSendMessage('测试发送');
     });
 
+    expect(options.onVariableTurnStart).toHaveBeenCalledWith('inline');
     expect(prepareExtraVariableUpdateTurnMock).not.toHaveBeenCalled();
     expect(executeExtraVariableUpdateMock).not.toHaveBeenCalled();
     expect(globals.generate).toHaveBeenCalledWith({ should_stream: true });
@@ -632,6 +633,7 @@ describe('useMessageHandler extra-variable decision', () => {
     });
 
     expect(order.slice(0, 2)).toEqual(['begin', 'prepare']);
+    expect(options.onVariableTurnStart).toHaveBeenCalledWith('extra');
     expect(prepareExtraVariableUpdateTurnMock).toHaveBeenCalledTimes(1);
     expect(executeExtraVariableUpdateMock).toHaveBeenCalledTimes(1);
     expect(options.patchLatestDebugRound).toHaveBeenCalledWith({
@@ -655,6 +657,25 @@ describe('useMessageHandler extra-variable decision', () => {
       '<VariableEdit>\n{\n  "user数据": {\n    "修为": 120\n  }\n}\n</VariableEdit>',
       2,
     );
+  });
+
+  it('send + extra 合法返回 0 个动作时仍登记空的额外变量模型声明', async () => {
+    const options = createHookOptions(createSummarySettings('extra'));
+    executeExtraVariableUpdateMock.mockResolvedValue({
+      appended: false,
+      actionBlockCount: 0,
+      prompt: '额外提示词',
+      rawResponse: '无需修改变量',
+    });
+
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleSendMessage('测试发送');
+    });
+
+    expect(options.onVariableTurnStart).toHaveBeenCalledWith('extra');
+    expect(options.onVariableExtraDeclaredBlocks).toHaveBeenCalledWith('', 2);
   });
 
   it('send + extra 失败时不会上报额外变量声明块', async () => {
@@ -695,6 +716,7 @@ describe('useMessageHandler extra-variable decision', () => {
 
       order.push('rollback-complete');
       callbacks.onVariableBaselineReady?.(9);
+      expect(options.onVariableTurnStart).toHaveBeenCalledWith('inline');
       order.push('frontend-derived-sync');
 
       order.push('generated-reply-ready');
