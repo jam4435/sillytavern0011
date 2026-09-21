@@ -844,16 +844,12 @@ export function useVariableChangeTracker() {
   }, [commitSummary]);
 
   useEffect(() => {
-    if (!restored) return;
+    if (!restored || restored.activeTurn.settled) return;
     const timer = window.setTimeout(() => {
-      if (restored.activeTurn.settled) {
-        settleTurn(restored.summary.assistantMessageId);
-      } else {
-        refreshCurrentSummary();
-      }
+      refreshCurrentSummary();
     }, 100);
     return () => window.clearTimeout(timer);
-  }, [refreshCurrentSummary, restored, settleTurn]);
+  }, [refreshCurrentSummary, restored]);
 
   return {
     variableChanges,
