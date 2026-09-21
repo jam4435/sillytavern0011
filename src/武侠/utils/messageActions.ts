@@ -50,9 +50,11 @@ export interface RegenerateOptions {
   onCombinedPrompt?: (prompt: string) => void;
   onTargetAssistantResolved?: (assistantMessageId: number) => void;
   /**
-   * 旧 swipe 已经回滚、重新生成前派生变量已同步、新正文已生成，
-   * 但新 swipe 尚未写回。变量 tracker 应在这个边界建立新回合 baseline。
+   * 旧 swipe 已由 manual_sync 完成回滚，但重新生成前的前端派生变量尚未同步。
+   * tracker 在这里建立 baseline：排除旧回复回滚，同时仍能记录随后真实发生的前端后台修改。
    */
+  onVariableBaselineReady?: (assistantMessageId: number) => void;
+  /** 新正文已生成，但新 swipe 尚未写回；此时登记本轮 AI 变量块。 */
   onGeneratedReplyReady?: (replyText: string, assistantMessageId: number) => void;
 }
 
@@ -397,6 +399,7 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
       expectedMessageId: context.assistantMessage.message_id,
       expectedAction: 'resync',
     });
+    options.onVariableBaselineReady?.(context.assistantMessage.message_id);
     await syncFrontendDerivedVariables({
       explicitMapTargets: extractExplicitMapTargetsFromText(getActiveMessageText(context.userMessage)),
     });
