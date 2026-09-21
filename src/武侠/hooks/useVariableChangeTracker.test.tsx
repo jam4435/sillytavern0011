@@ -457,6 +457,114 @@ describe('useVariableChangeTracker', () => {
     ]);
   });
 
+  it('sourced AI 会跨多个后台批次认领匹配声明，保留无关后台变化', () => {
+    const mixedDeclaredReply = [
+      '<VariableEdit>{"世界信息":{"时间":{"年":1201,"月":4,"日":2,"时":13,"分":5}},"user数据":{"关系网":{"韩小莹":69}}}</VariableEdit>',
+      '<VariableInsert>{"user数据":{"人物经历":{"射雕第二回03-车厢寻凉":"记录"}}}</VariableInsert>',
+    ].join('\n');
+
+    currentStatData = {
+      世界信息: { 时间: { 年: 1201, 月: 4, 日: 2, 时: 13, 分: 0 } },
+      前端变量: { 随机数: '1,7,8,7,6' },
+      user数据: {
+        关系网: { 韩小莹: 68 },
+        人物经历: {},
+      },
+    };
+
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableExtraDeclaredBlocks(mixedDeclaredReply, 2);
+    });
+
+    // 第一批：消息边界先观察到随机数和关系网变化，都会暂记为后台。
+    currentStatData = {
+      世界信息: { 时间: { 年: 1201, 月: 4, 日: 2, 时: 13, 分: 0 } },
+      前端变量: { 随机数: '3,7,9,5,3' },
+      user数据: {
+        关系网: { 韩小莹: 69 },
+        人物经历: {},
+      },
+    };
+    act(() => {
+      result.current.handleVariableMessageBoundary(2);
+    });
+
+    // 第二批：raw ERA 又观察到时间与人物经历写入，仍先记作后台。
+    currentStatData = {
+      世界信息: { 时间: { 年: 1201, 月: 4, 日: 2, 时: 13, 分: 5 } },
+      前端变量: { 随机数: '3,7,9,5,3' },
+      user数据: {
+        关系网: { 韩小莹: 69 },
+        人物经历: { '射雕第二回03-车厢寻凉': '记录' },
+      },
+    };
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { apiWrite: true },
+        reason: 'extra-variable-api-write',
+      });
+    });
+
+    expect(result.current.variableChanges?.background.observedChanges).toHaveLength(4);
+
+    // 最终 sourced AI 信号必须跨批次把所有与声明吻合的差分认领回来。
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'extra-source-ai-mixed',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        message_id: 2,
+        actions: { apiWrite: true },
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['user数据', '关系网', '韩小莹'],
+          origin: 'ai',
+          producer: 'frontend',
+          beforeValue: 68,
+          afterValue: 69,
+        }),
+        expect.objectContaining({
+          path: ['世界信息', '时间', '分'],
+          origin: 'ai',
+          producer: 'frontend',
+          beforeValue: 0,
+          afterValue: 5,
+        }),
+        expect.objectContaining({
+          path: ['user数据', '人物经历', '射雕第二回03-车厢寻凉'],
+          origin: 'ai',
+          producer: 'frontend',
+          beforeValue: undefined,
+          afterValue: '记录',
+        }),
+      ]),
+    );
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        path: ['前端变量', '随机数'],
+        beforeValue: '1,7,8,7,6',
+        afterValue: '3,7,9,5,3',
+      }),
+    ]);
+    expect(
+      result.current.variableChanges?.aiReply.comparisons
+        .filter(item => item.declaredChange)
+        .every(item => item.status === 'applied' || item.status === 'no-op'),
+    ).toBe(true);
+  });
+
   it('显式后台 ERA 来源可以把已归入 AI 的批次纠正回后台', () => {
     const { result } = renderHook(() => useVariableChangeTracker());
 
