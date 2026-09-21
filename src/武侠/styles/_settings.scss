@@ -1454,6 +1454,27 @@
   background: rgba($stone-700, 0.35);
   color: $stone-500;
   font-size: 0.68rem;
+
+  &.recommended {
+    border: 1px solid rgba($green-500, 0.28);
+    background: rgba($green-500, 0.08);
+    color: $green-500;
+  }
+
+  &.unsafe {
+    border: 1px solid rgba($red-500, 0.22);
+    background: rgba($red-500, 0.055);
+    color: rgba($red-500, 0.88);
+  }
+}
+
+.preset-module-filter-rule.recommended:not(.selected) {
+  border-color: rgba($green-500, 0.18);
+}
+
+.preset-module-filter-rule.unsafe:not(.selected) {
+  border-style: dashed;
+  opacity: 0.78;
 }
 
 .preset-module-filter-pattern {
@@ -1548,7 +1569,8 @@
 }
 
 .summary-context-panel,
-.summary-archive-panel {
+.summary-archive-panel,
+.summary-backfill-panel {
   display: flex;
   flex-direction: column;
   gap: 0.72rem;
@@ -1931,6 +1953,84 @@
   border: 1px solid $stone-800;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.16);
+}
+
+// 额外模型三组与正则页保持同一套紧凑密度：一级折叠，展开后减少空白与重复留白。
+.extra-model-collapsible {
+  .settings-collapsible-header {
+    padding: 0.58rem 0.75rem;
+    font-size: 0.88rem;
+  }
+
+  .settings-collapsible-body {
+    gap: 0.52rem;
+    padding: 0.65rem;
+  }
+
+  .settings-row {
+    gap: 0.65rem;
+    padding: 0.48rem 0;
+  }
+
+  .settings-control {
+    gap: 0.5rem;
+  }
+
+  .settings-description,
+  .settings-hint {
+    margin-top: 0;
+    margin-bottom: 0.35rem;
+  }
+
+  .summary-subsection {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+  }
+
+  .summary-subsection-title {
+    margin-bottom: 0.55rem;
+  }
+
+  .summary-api-profile-toolbar,
+  .summary-api-actions {
+    gap: 0.42rem;
+    margin-top: 0.35rem;
+  }
+
+  .summary-api-profile-toolbar {
+    margin-bottom: 0.35rem;
+  }
+
+  .summary-api-fields {
+    gap: 0;
+    margin-top: 0.35rem;
+    padding: 0.6rem 0.7rem;
+  }
+
+  .summary-api-mode-group {
+    gap: 0.4rem;
+    margin: 0.15rem 0;
+  }
+
+  .summary-api-toolbar {
+    margin-top: 0.25rem;
+  }
+
+  .settings-action-btn,
+  .settings-reset-template-btn {
+    min-height: 32px;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.8rem;
+  }
+
+  .settings-textarea {
+    min-height: 72px;
+    padding: 0.5rem 0.65rem;
+  }
+
+  .variable-prompt-template-input {
+    min-height: 180px;
+  }
 }
 
 .variable-prompt-template-input {
