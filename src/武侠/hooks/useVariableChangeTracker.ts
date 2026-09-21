@@ -23,7 +23,6 @@ import {
   type VariableChangeProducer,
   type VariableChangeSummary,
   type VariableDeclaredChange,
-  type VariableObservedBatch,
   type VariablePath,
   type VariableThoughtEntry,
   type VariableWriteActions,
@@ -629,16 +628,30 @@ export function useVariableChangeTracker() {
     const aiPathKeys = new Set(parsedAi.declaredChanges.map(change => getPathKey(change.path)));
     for (const change of overallFinalDiff.observedChanges) {
       const pathKey = getPathKey(change.path);
-      if (aiPathKeys.has(pathKey) || representedPaths.has(pathKey)) continue;
-      backgroundChanges.push({
-        ...change,
-        id: `unattributed-final:${activeTurn.turnId}:${pathKey}`,
+      if (aiPathKeys.has(pathKey)) continue;
+
+      const latestRecorded = [...backgroundChanges]
+        .reverse()
+        .find(candidate => getPathKey(candidate.path) === pathKey);
+      if (latestRecorded && valuesEqual(latestRecorded.afterValue, change.afterValue)) {
+        continue;
+      }
+
+      const beforeValue = latestRecorded ? latestRecorded.afterValue : change.beforeValue;
+      if (valuesEqual(beforeValue, change.afterValue)) continue;
+
+      backgroundChanges.push(makeObservedChange({
+        path: change.path,
+        beforeValue,
+        afterValue: change.afterValue,
         origin: 'background',
         producer: 'message-boundary',
+        timestamp: Date.now(),
         batchId: `${activeTurn.turnId}:unattributed-final`,
         reason: 'unattributed-final-diff',
         assistantMessageId: activeTurn.assistantMessageId,
-      });
+        index: backgroundChanges.length + 1,
+      }));
       representedPaths.add(pathKey);
     }
 
