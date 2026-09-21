@@ -222,6 +222,7 @@ const App: React.FC = () => {
     handleEraWriteDone,
     handleDirectVariableWriteDone,
     handleEraVariableWriteDone,
+    handleVariableTurnSettled,
     markVariableApiWriteAsAi,
     clearVariableChanges,
   } = useVariableChangeTracker();
@@ -244,6 +245,7 @@ const App: React.FC = () => {
     onVariableAssistantReply: handleVariableAssistantReply,
     onVariableExtraDeclaredBlocks: handleVariableExtraDeclaredBlocks,
     onVariableAiWriteTarget: markVariableApiWriteAsAi,
+    onVariableTurnSettled: handleVariableTurnSettled,
     onAssistantDisplayCommit: handleAssistantDisplayCommit,
   });
 
