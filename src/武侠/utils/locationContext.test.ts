@@ -18,6 +18,7 @@ import {
 const loadMapDataMock = vi.mocked(loadMapData);
 const getVariablesMock = globalThis.getVariables as ReturnType<typeof vi.fn>;
 const updateVariablesWithMock = globalThis.updateVariablesWith as ReturnType<typeof vi.fn>;
+const eventEmitMock = globalThis.eventEmit as ReturnType<typeof vi.fn>;
 
 function createRegion(x: number, y: number, locationNames: string[]): MapRegion {
   return {
@@ -153,6 +154,14 @@ describe('locationContext', () => {
 
     expect(value?.普通移动).toContain('大宋/临安府/牛家村');
     expect(updateVariablesWithMock).toHaveBeenCalledWith(expect.any(Function), { type: 'chat' });
+    expect(eventEmitMock).toHaveBeenCalledWith(
+      'wuxia:directVariableWriteDone',
+      expect.objectContaining({
+        source: 'frontend',
+        operation: 'update',
+        reason: 'location-context-sync',
+      }),
+    );
     const updater = updateVariablesWithMock.mock.calls[0][0] as (
       variables: Record<string, unknown>,
     ) => Record<string, unknown>;
