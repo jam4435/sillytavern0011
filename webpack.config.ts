@@ -291,7 +291,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
             },
           },
         }
-      : postcss_loader;
+      : 'postcss-loader';
 
     return {
       name: configurationName,
