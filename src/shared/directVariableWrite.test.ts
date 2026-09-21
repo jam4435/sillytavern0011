@@ -195,8 +195,21 @@ describe('runDirectChatVariableWrite', () => {
   it('底层 ERA 等待器先监听后 emit，并统一发送 sourced 完成事件', async () => {
     const executionOrder: string[] = [];
     vi.mocked(globalThis.getVariables)
-      .mockImplementationOnce(() => ({ stat_data: { user数据: { 修为: 100 } } }))
-      .mockImplementationOnce(() => ({ stat_data: { user数据: { 修为: 110 } } }));
+      .mockImplementationOnce(() => ({
+        stat_data: {
+          user数据: { 修为: 100 },
+          世界信息: { 时间: { 分: 40 } },
+          角色数据: { 郭靖: { 状态: '进行中' } },
+        },
+      }))
+      .mockImplementationOnce(() => ({
+        stat_data: {
+          // 模拟 ERA 等待窗口里同时发生了无关的 AI 修改：这些变化不能被归到当前 event-script source。
+          user数据: { 修为: 110 },
+          世界信息: { 时间: { 分: 55 } },
+          角色数据: { 郭靖: { 状态: '已完成' } },
+        },
+      }));
 
     eventOn('era:updateByObject', async () => {
       executionOrder.push('era:updateByObject');
@@ -241,9 +254,9 @@ describe('runDirectChatVariableWrite', () => {
         changes: [
           expect.objectContaining({
             action: 'edit',
-            path: ['user数据', '修为'],
-            beforeValue: 100,
-            afterValue: 110,
+            path: ['角色数据', '郭靖', '状态'],
+            beforeValue: '进行中',
+            afterValue: '已完成',
           }),
         ],
       }),
