@@ -74,7 +74,7 @@ interface UseMessageHandlerOptions {
   currentMaintext: string;
   currentOptions: string[];
   summarySettings: SummarySettings;
-  onVariableTurnStart?: () => void;
+  onVariableTurnStart?: (variableUpdateMode: SummarySettings['variableUpdateMode']) => void;
   onVariableAssistantReply?: (rawReply: string, assistantMessageId?: number) => void;
   onVariableExtraDeclaredBlocks?: (blocksText: string, assistantMessageId?: number) => void;
   onVariableAiWriteTarget?: (assistantMessageId: number) => void;
@@ -486,12 +486,10 @@ export function useMessageHandler({
         actionBlockCount: extraUpdateResult.actionBlockCount,
         appended: extraUpdateResult.appended,
       });
-      if (
-        !extraDeclarationsRegistered &&
-        typeof extraUpdateResult.appendedBlocks === 'string' &&
-        extraUpdateResult.appendedBlocks.trim()
-      ) {
-        onVariableExtraDeclaredBlocks?.(extraUpdateResult.appendedBlocks, assistantMessageId);
+      if (!extraDeclarationsRegistered) {
+        // extra 模式由本轮 modeSnapshot 决定；即使模型合法返回 0 个动作，也明确登记“空 AI 声明”。
+        extraDeclarationsRegistered = true;
+        onVariableExtraDeclaredBlocks?.(extraUpdateResult.appendedBlocks || '', assistantMessageId);
       }
       patchLatestDebugRound({
         variable: createExtraVariableDecisionPatch(decision, {
@@ -548,7 +546,7 @@ export function useMessageHandler({
         await acquireWuxiaTurnLock(debugRoundId, turnChatId);
         extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
         const beforeSendLastMessageId = getLatestMessageId();
-        onVariableTurnStart?.();
+        onVariableTurnStart?.(extraVariableDecision.modeSnapshot);
 
         // ========== 步骤 1: 创建用户消息楼层 ==========
         messageLogger.log('');
@@ -1111,7 +1109,7 @@ export function useMessageHandler({
         onVariableBaselineReady: assistantMessageId => {
           // 旧 swipe 已回滚，但随机数/战力区/周围地点等重新生成前派生写入尚未发生。
           // 从这里建立 baseline，既排除旧回复回滚，又保留本轮所有真实后台修改。
-          onVariableTurnStart?.();
+          onVariableTurnStart?.(extraVariableDecision.modeSnapshot);
           onVariableAiWriteTarget?.(assistantMessageId);
         },
         onGeneratedReplyReady: replyText => {
