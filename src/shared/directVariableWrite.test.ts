@@ -273,6 +273,21 @@ describe('runDirectChatVariableWrite', () => {
   });
 
   it('批事务等待器忽略其他事务，并匹配合并 flush 的 transactionIds', async () => {
+    vi.mocked(globalThis.getVariables)
+      .mockImplementationOnce(() => ({
+        stat_data: {
+          user数据: { 修为: 90 },
+          角色数据: { 韩小莹: { 人物经历: { 旧事: '旧' } } },
+        },
+      }))
+      .mockImplementationOnce(() => ({
+        stat_data: {
+          user数据: { 修为: 100 },
+          // 模拟同一等待窗口里 AI 还写入了人物经历；事务 sourced diff 不应吸收它。
+          角色数据: { 韩小莹: { 人物经历: { 旧事: '新' } } },
+        },
+      }));
+
     eventOn('era:transactionByObject', async () => {
       const writeDoneListeners = [...(listeners.get('era:writeDone') ?? [])];
       await Promise.all(
@@ -318,6 +333,13 @@ describe('runDirectChatVariableWrite', () => {
         message_id: 81,
         actions: { apiWrite: true },
         transactionIds: ['coalesced-transaction', 'target-transaction'],
+        changes: [
+          expect.objectContaining({
+            path: ['user数据', '修为'],
+            beforeValue: 90,
+            afterValue: 100,
+          }),
+        ],
       }),
     );
   });
