@@ -1,5 +1,9 @@
 import { log, logWarning } from './era-utils.js';
-import { emitEraVariableWriteAndWait, writeDirectChatTransaction } from '../shared/directVariableWrite';
+import {
+  emitConfirmedEraVariableWriteDone,
+  emitEraVariableWriteAndWait,
+  writeDirectChatTransaction,
+} from '../shared/directVariableWrite';
 
 const RECENT_SIGNATURE_TTL_MS = 3000;
 const pendingSignatures = new Set();
@@ -494,6 +498,7 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
   }
 
   const currentVariables = await getVariables({ type: 'chat' });
+  const beforeStatData = cloneJson(currentVariables?.stat_data || {});
   const { expectedStat, effectiveOperations } = buildTransactionExpectation(currentVariables, normalizedOperations);
   if (effectiveOperations.length === 0) {
     log(`跳过无有效变更的 ERA 事务: ${reason}`);
@@ -520,13 +525,24 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
 
   markPending(signature);
   try {
-    await waitForTransactionWriteDone(
+    const writeDoneDetail = await waitForTransactionWriteDone(
       transactionId,
       transactionSignature,
       detail,
       options.timeoutMs ?? 10000,
       options.timeoutMessage ?? `ERA 事务写入完成信号超时: ${reason}`,
     );
+    const finalVariables = await getVariables({ type: 'chat' });
+    await emitConfirmedEraVariableWriteDone({
+      source: 'event-script',
+      operation: 'replace',
+      reason,
+      eventName: 'era:transactionByObject',
+      refreshHint: 'event-state',
+      confirmation: writeDoneDetail,
+      beforeStatData,
+      afterStatData: cloneJson(finalVariables?.stat_data || {}),
+    });
     markDone(signature);
     log(`ERA 事务写入完成: ${reason}`);
     return true;
@@ -549,6 +565,20 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
     }
 
     if (reread.persisted) {
+      await emitConfirmedEraVariableWriteDone({
+        source: 'event-script',
+        operation: 'replace',
+        reason,
+        eventName: 'era:transactionByObject',
+        refreshHint: 'event-state',
+        confirmation: {
+          message_id: reread.latestMessage?.message_id ?? reread.latestMessage?.messageId ?? undefined,
+          transactionId,
+          transactionIds: [transactionId],
+        },
+        beforeStatData,
+        afterStatData: cloneJson(reread.latestVariables?.stat_data || {}),
+      });
       markDone(signature);
       return true;
     }
