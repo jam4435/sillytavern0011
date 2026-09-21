@@ -616,7 +616,7 @@ export function useVariableChangeTracker() {
         beforeValue,
         afterValue: finalValue,
         origin: 'background',
-        producer: 'era',
+        producer: 'unknown',
         timestamp: Date.now(),
         batchId,
         reason: 'assistant-background-block',
@@ -647,7 +647,7 @@ export function useVariableChangeTracker() {
         beforeValue,
         afterValue: change.afterValue,
         origin: 'background',
-        producer: 'message-boundary',
+        producer: 'unknown',
         timestamp: Date.now(),
         batchId: `${activeTurn.turnId}:unattributed-final`,
         reason: 'unattributed-final-diff',
@@ -799,7 +799,7 @@ export function useVariableChangeTracker() {
       ? unknownDetail as unknown as DirectVariableWriteDoneDetail
       : undefined;
     captureBackgroundWrite({
-      producer: isDirectVariableWriteSource(detail?.source) ? detail.source : 'frontend',
+      producer: isDirectVariableWriteSource(detail?.source) ? detail.source : 'unknown',
       reason: typeof detail?.reason === 'string' && detail.reason.trim()
         ? detail.reason.trim()
         : 'direct-variable-write',
@@ -824,7 +824,7 @@ export function useVariableChangeTracker() {
     }
 
     captureBackgroundWrite({
-      producer: isDirectVariableWriteSource(detail?.source) ? detail.source : 'frontend',
+      producer: isDirectVariableWriteSource(detail?.source) ? detail.source : 'era',
       reason: typeof detail?.reason === 'string' && detail.reason.trim()
         ? detail.reason.trim()
         : 'era-variable-write',
