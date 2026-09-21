@@ -414,6 +414,118 @@ describe('useVariableChangeTracker', () => {
     );
   });
 
+  it('时间、NPC状态、人物经历都已写入时不会显示为未落地异常', () => {
+    const threeDeclaredReply = [
+      '<VariableEdit>{"世界信息":{"时间":{"分":20}}}</VariableEdit>',
+      '<VariableEdit>{"角色数据":{"韩小莹":{"状态":"正常"}}}</VariableEdit>',
+      '<VariableInsert>{"user数据":{"人物经历":{"射雕第二回03-十里铺小憩":"在十里铺茶棚外停驻时小憩。"}}}</VariableInsert>',
+    ].join('\n');
+
+    currentStatData = {
+      世界信息: { 时间: { 年: 1201, 月: 4, 日: 2, 时: 15, 分: 0 } },
+      角色数据: { 韩小莹: { 状态: '疲惫' } },
+      user数据: { 人物经历: {} },
+      前端变量: {
+        随机数消息补偿: '随机数1: 5',
+        战力区消息补偿: '旧战力区',
+      },
+    };
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    // 变量实际已经成功写入，但声明稍后才随着 extra blocks 登记。
+    currentStatData = {
+      世界信息: { 时间: { 年: 1201, 月: 4, 日: 2, 时: 15, 分: 20 } },
+      角色数据: { 韩小莹: { 状态: '正常' } },
+      user数据: {
+        人物经历: {
+          '射雕第二回03-十里铺小憩': '在十里铺茶棚外停驻时小憩。',
+        },
+      },
+      前端变量: {
+        随机数消息补偿: '随机数1: 5',
+        战力区消息补偿: '旧战力区',
+      },
+    };
+
+    act(() => {
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { resync: true },
+        reason: 'append-extra-blocks-resync',
+      });
+    });
+
+    // resync 先到时，这三项允许暂存在后台。
+    expect(result.current.variableChanges?.background.observedChanges).toHaveLength(3);
+
+    act(() => {
+      result.current.handleVariableExtraDeclaredBlocks(threeDeclaredReply, 2);
+    });
+
+    // 声明登记后应立即认领成 AI，不再成为 not-applied 的依据。
+    expect(result.current.variableChanges?.aiReply.observedChanges).toHaveLength(3);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
+    expect(
+      result.current.variableChanges?.aiReply.comparisons
+        .filter(comparison => comparison.declaredChange)
+        .map(comparison => comparison.status),
+    ).toEqual(['applied', 'applied', 'applied']);
+
+    // 后续随机数/战力区是真后台变化，不能反过来把已确认 AI 批次降级。
+    currentStatData = {
+      世界信息: { 时间: { 年: 1201, 月: 4, 日: 2, 时: 15, 分: 20 } },
+      角色数据: { 韩小莹: { 状态: '正常' } },
+      user数据: {
+        人物经历: {
+          '射雕第二回03-十里铺小憩': '在十里铺茶棚外停驻时小憩。',
+        },
+      },
+      前端变量: {
+        随机数消息补偿: '随机数1: 10',
+        战力区消息补偿: '新战力区',
+      },
+    };
+
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'frontend-compensation',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'frontend-derived-variable-sync',
+        eventName: 'era:updateByObject',
+        attribution: 'background',
+        actions: { apiWrite: true },
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toHaveLength(3);
+    expect(
+      result.current.variableChanges?.aiReply.comparisons
+        .filter(comparison => comparison.declaredChange)
+        .some(comparison => comparison.status === 'not-applied' || comparison.status === 'diverged'),
+    ).toBe(false);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['前端变量', '随机数消息补偿'],
+          beforeValue: '随机数1: 5',
+          afterValue: '随机数1: 10',
+        }),
+        expect.objectContaining({
+          path: ['前端变量', '战力区消息补偿'],
+          beforeValue: '旧战力区',
+          afterValue: '新战力区',
+        }),
+      ]),
+    );
+  });
+
   it('重复通知和相同快照不会重复计数', () => {
     const { result } = renderHook(() => useVariableChangeTracker());
 
