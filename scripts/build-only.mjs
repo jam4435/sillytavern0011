@@ -11,6 +11,70 @@ const rootDir = path.resolve(__dirname, '..');
 const IGNORED_ENTRY_DIRECTORIES = new Set([path.normalize('src/顶部工具栏插件')]);
 const IGNORED_ENTRY_ROOT_DIRECTORIES = new Set([path.normalize('示例')]);
 
+const EVENT_SOURCE_DIRECTORY = path.join(rootDir, '世界书');
+const EVENT_DATA_DIRECTORY = path.join(rootDir, 'src', '事件脚本', 'generated', 'event-data');
+const EVENT_SUMMARY_PATH = path.join(rootDir, 'src', '武侠', 'data', '事件信息汇总.json');
+const EVENT_GENERATOR_INPUTS = [
+  path.join(rootDir, 'scripts', 'generate-wuxia-event-assets.mjs'),
+  path.join(rootDir, 'scripts', 'lib', 'wuxia-event-summary.mjs'),
+  path.join(rootDir, 'src', '事件脚本', 'era-event-schema.js'),
+  path.join(rootDir, 'src', 'shared', 'locationPath.js'),
+  path.join(rootDir, 'src', 'shared', 'eventKey.js'),
+  path.join(rootDir, 'src', 'shared', 'wuxiaCalendar.js'),
+  path.join(rootDir, 'src', '武侠', '武侠地点表.yaml'),
+];
+
+function collect_files(directory, predicate) {
+  if (!fs.existsSync(directory)) return [];
+  const result = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) result.push(...collect_files(entryPath, predicate));
+    else if (entry.isFile() && predicate(entryPath)) result.push(entryPath);
+  }
+  return result;
+}
+
+function read_event_output_paths() {
+  const manifestPath = path.join(EVENT_DATA_DIRECTORY, 'manifest.json');
+  if (!fs.existsSync(manifestPath) || !fs.existsSync(EVENT_SUMMARY_PATH)) return null;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const referenced = [
+      ...(Array.isArray(manifest.shards) ? manifest.shards.map(item => item?.file) : []),
+      ...(Array.isArray(manifest.checkpoints) ? manifest.checkpoints.map(item => item?.file) : []),
+    ]
+      .filter(file => typeof file === 'string' && file.length > 0)
+      .map(file => path.join(EVENT_DATA_DIRECTORY, file));
+    const outputs = [manifestPath, EVENT_SUMMARY_PATH, ...referenced];
+    return outputs.every(fs.existsSync) ? outputs : null;
+  } catch {
+    return null;
+  }
+}
+
+function get_event_asset_state() {
+  const outputs = read_event_output_paths();
+  if (!outputs) return { needsGeneration: true, reason: '生成产物缺失或 manifest 不完整' };
+
+  const missingInput = EVENT_GENERATOR_INPUTS.find(file => !fs.existsSync(file));
+  if (missingInput) {
+    return {
+      needsGeneration: true,
+      reason: `生成器依赖缺失: ${path.relative(rootDir, missingInput)}`,
+    };
+  }
+
+  const worldbookYamlFiles = collect_files(EVENT_SOURCE_DIRECTORY, file => /\.ya?ml$/i.test(file));
+  const inputs = [...EVENT_GENERATOR_INPUTS, ...worldbookYamlFiles];
+  const newestInput = Math.max(...inputs.map(file => fs.statSync(file).mtimeMs));
+  const oldestOutput = Math.min(...outputs.map(file => fs.statSync(file).mtimeMs));
+  if (oldestOutput < newestInput) {
+    return { needsGeneration: true, reason: '事件 YAML / 地点表 / 生成器代码有更新' };
+  }
+  return { needsGeneration: false, reason: '事件生成输入未变化' };
+}
+
 function common_path(lhs, rhs) {
   const lhs_parts = path.normalize(lhs).split(path.sep);
   const rhs_parts = path.normalize(rhs).split(path.sep);
@@ -189,26 +253,29 @@ function main() {
     console.log(`  - \x1b[32m${e.configName}\x1b[0m (${e.script})`);
   }
 
-  // Check if events generation is needed
-  const needsEvents = uniqueMatched.some(
-    e => e.script.includes('武侠') || e.script.includes('事件脚本')
-  );
-  const eventDataDir = path.join(rootDir, 'src', '事件脚本', 'generated', 'event-data');
-  const eventDataMissing = !fs.existsSync(eventDataDir);
+  // Check if events generation is needed. Only Wuxia / event-script targets depend on it.
+  const needsEvents = uniqueMatched.some(e => e.script.includes('武侠') || e.script.includes('事件脚本'));
 
-  if (needsEvents || eventDataMissing) {
-    console.log('\x1b[36m[build:only]\x1b[0m 正在生成事件资产 (generate:events)...');
-    try {
-      execFileSync(process.execPath, [path.join(rootDir, 'scripts', 'generate-wuxia-event-assets.mjs')], {
-        cwd: rootDir,
-        stdio: 'inherit',
-      });
-    } catch (err) {
-      console.error('\x1b[31m[build:only]\x1b[0m generate:events 执行失败');
-      process.exit(1);
+  if (needsEvents) {
+    const eventAssetState = get_event_asset_state();
+    if (eventAssetState.needsGeneration) {
+      console.log(
+        `\x1b[36m[build:only]\x1b[0m 正在生成事件资产 (generate:events)：${eventAssetState.reason}...`,
+      );
+      try {
+        execFileSync(process.execPath, [path.join(rootDir, 'scripts', 'generate-wuxia-event-assets.mjs')], {
+          cwd: rootDir,
+          stdio: 'inherit',
+        });
+      } catch (err) {
+        console.error('\x1b[31m[build:only]\x1b[0m generate:events 执行失败');
+        process.exit(1);
+      }
+    } else {
+      console.log(`\x1b[36m[build:only]\x1b[0m 跳过 generate:events（${eventAssetState.reason}）`);
     }
   } else {
-    console.log('\x1b[36m[build:only]\x1b[0m 跳过 generate:events（当前构建目标不需要）');
+    console.log('\x1b[36m[build:only]\x1b[0m 跳过 generate:events（当前构建目标不依赖事件资产）');
   }
 
   // Build webpack command arguments
