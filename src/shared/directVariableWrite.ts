@@ -256,8 +256,8 @@ export async function writeDirectChatTransaction(
 /**
  * 注册完成监听器后再发出 ERA 事件，并等待与 message/action 匹配的 writeDone。
  *
- * 该底层入口只等待原始 era:writeDone，不会再发送 sourced 完成事件。事件脚本的
- * writeEraCommand 应使用此入口，避免 raw + sourced 两个事件让前端执行两次全量扫描。
+ * 该底层入口等待原始 era:writeDone 后，统一发送一次带 source/reason 的项目完成事件。
+ * 所有 ERA 调用方都应通过此入口声明来源，tracker 不再消费 raw writeDone 做业务归因。
  */
 export async function emitEraVariableWriteAndWait({
   source,
@@ -444,7 +444,16 @@ export async function emitEraVariableWriteAndWait({
   };
 
   variableTraceLogger.log('[emitEraVariableWriteAndWait] ERA 写入已确认，发送唯一带来源完成事件', eventDetail);
-  await eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
+  try {
+    await eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
+  } catch (error) {
+    // 原始 era:writeDone 已经证明变量写入成功。来源通知属于观测元数据，
+    // 监听器失败不能反向否定已完成的业务写入。
+    variableTraceLogger.error('[emitEraVariableWriteAndWait] 带来源完成事件监听链异常', {
+      ...eventDetail,
+      error,
+    });
+  }
   return eventDetail;
 }
 
