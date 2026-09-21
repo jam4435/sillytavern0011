@@ -28,13 +28,18 @@ import {
   type VariableWriteActions,
 } from '../utils/variableChanges';
 import { variableTraceLogger } from '../utils/logger';
+import type { SummaryVariableUpdateMode } from '../utils/settingsManager';
 
 type ActiveVariableTurn = {
   turnId: number;
+  /** 本轮开始时冻结的变量更新模式；不能在 settle 时重新读取设置页。 */
+  variableUpdateMode: SummaryVariableUpdateMode;
   baselineStatData: Record<string, unknown> | null;
+  /** AI 变量写入真实完成后的观测快照，仅用于最终楼层 fallback，不等同于 AI 声明值。 */
+  aiCheckpointStatData: Record<string, unknown> | null;
   /**
-   * 最近一次“来源已知”的写入完成后 stat_data。
-   * raw era:writeDone 不再推进这个快照，避免先看到无来源事件、再事后改归因。
+   * 最近一次已观测到的 stat_data，仅用于刷新当前摘要与异常 fallback。
+   * source 归因改由每个 writer 事件自带的 changes 决定，不再依赖这个共享区间。
    */
   lastObservedStatData: Record<string, unknown> | null;
   userMessageId?: number;
@@ -55,7 +60,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 16;
+  version: 17;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -67,10 +72,12 @@ type BackgroundWriteMetadata = {
   reason: string;
   actions?: VariableWriteActions | null;
   assistantMessageId?: number;
+  /** 新 sourced event 直接携带本次 writer 自己的实际 diff；缺失时才兼容旧快照推断。 */
+  changes?: DirectVariableWriteDoneDetail['changes'];
 };
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v16';
-const LEGACY_STORAGE_KEYS = Array.from({ length: 15 }, (_, index) => `wuxia.variableChangeTurn.v${index + 1}`);
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v17';
+const LEGACY_STORAGE_KEYS = Array.from({ length: 16 }, (_, index) => `wuxia.variableChangeTurn.v${index + 1}`);
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -126,7 +133,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       stored.chatId !== 'unknown'
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
-    if (stored.version !== 16 || expired || differentChat) {
+    if (stored.version !== 17 || expired || differentChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -148,7 +155,7 @@ const persistVariableTurn = (
   }
   try {
     const stored: StoredVariableTurn = {
-      version: 16,
+      version: 17,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -286,9 +293,9 @@ const appendLimited = <T,>(existing: T[], additions: T[]): { values: T[]; omitte
 };
 
 const parseAiDeclaredState = (activeTurn: ActiveVariableTurn): ParsedDeclaredVariableChanges => {
-  // extra 模式下，额外变量模型才是本轮“变量模型”；正文模型只负责正文。
-  // inline 模式没有 extra blocks，此时正文模型变量块就是 AI 声明。
-  if (activeTurn.extraDeclaredBlocks.trim()) {
+  // AI 身份只由“本轮冻结的变量模式”决定，不能用 extra 是否返回非空块来反推模式。
+  // extra 合法返回 0 个动作时，AI 声明就是空集合；正文中的意外变量块仍属于最终楼层剩余块。
+  if (activeTurn.variableUpdateMode === 'extra') {
     return parseDeclaredVariableChanges(activeTurn.extraDeclaredBlocks);
   }
   return parseDeclaredVariableChanges(activeTurn.assistantDeclaredReply);
@@ -414,13 +421,18 @@ export function useVariableChangeTracker() {
     persistVariableTurn(activeTurnRef.current, summary);
   }, []);
 
-  const startTurn = useCallback((userMessageId?: number) => {
+  const startTurn = useCallback((
+    userMessageId?: number,
+    variableUpdateMode: SummaryVariableUpdateMode = 'inline',
+  ) => {
     const turnId = nextTurnIdRef.current + 1;
     nextTurnIdRef.current = turnId;
     const baselineStatData = readCurrentStatDataSnapshot();
     const activeTurn: ActiveVariableTurn = {
       turnId,
+      variableUpdateMode,
       baselineStatData,
+      aiCheckpointStatData: null,
       lastObservedStatData: baselineStatData,
       userMessageId,
       assistantDeclaredReply: '',
@@ -436,6 +448,7 @@ export function useVariableChangeTracker() {
     variableTraceLogger.log('[useVariableChangeTracker] 开始回合：保存唯一 baseline', {
       turnId,
       userMessageId: userMessageId ?? null,
+      variableUpdateMode,
       baselineReadable: Boolean(baselineStatData),
     });
     commitSummary(summary);
@@ -454,56 +467,89 @@ export function useVariableChangeTracker() {
     const current = variableChangesRef.current;
     if (!activeTurn || !current || activeTurn.settled) return;
 
-    const nextStatData = readCurrentStatDataSnapshot();
-    if (!nextStatData) {
-      variableTraceLogger.error('[useVariableChangeTracker] 后台写入完成但 stat_data 不可读', metadata);
-      commitSummary({ ...current, status: 'error', updatedAt: Date.now() });
-      return;
-    }
-
     activeTurn.batchSequence += 1;
     const batchId = `${activeTurn.turnId}:background:${activeTurn.batchSequence}`;
-    const result = createObservedVariableChanges(
-      activeTurn.lastObservedStatData ?? activeTurn.baselineStatData,
-      nextStatData,
-      {
-        origin: 'background',
-        producer: metadata.producer,
-        timestamp: Date.now(),
-        batchId,
-        actions: metadata.actions,
-        reason: metadata.reason,
-        assistantMessageId: metadata.assistantMessageId,
-      },
-    );
-    activeTurn.lastObservedStatData = nextStatData;
+    const timestamp = Date.now();
+    const nextStatData = readCurrentStatDataSnapshot();
 
-    if (result.observedChanges.length === 0) {
-      variableTraceLogger.log('[useVariableChangeTracker] 来源已知的后台写入未产生实际差分', {
-        turnId: activeTurn.turnId,
-        producer: metadata.producer,
-        reason: metadata.reason,
-      });
+    let observedChanges: VariableActualChange[] = [];
+    let omittedObservedCount = 0;
+    let batch = null;
+
+    if (Array.isArray(metadata.changes)) {
+      // 主链：source event 直接携带“本次 writer 自己”的实际 diff。
+      // 其他 writer 即使已改变全局 stat_data，也不会被错误吸收到当前 source。
+      observedChanges = metadata.changes.slice(0, MAX_STORED_VARIABLE_CHANGES).map((change, index) =>
+        makeObservedChange({
+          path: change.path,
+          beforeValue: change.beforeValue,
+          afterValue: change.afterValue,
+          origin: 'background',
+          producer: metadata.producer,
+          timestamp,
+          batchId,
+          actions: metadata.actions,
+          reason: metadata.reason,
+          assistantMessageId: metadata.assistantMessageId,
+          index: index + 1,
+        }),
+      );
+      omittedObservedCount = Math.max(0, metadata.changes.length - observedChanges.length);
+    } else {
+      // 仅兼容旧来源事件：没有 changes 字段时才退回共享快照区间推断。
+      if (!nextStatData) {
+        variableTraceLogger.error('[useVariableChangeTracker] 后台写入完成但 stat_data 不可读', metadata);
+        commitSummary({ ...current, status: 'error', updatedAt: Date.now() });
+        return;
+      }
+      const result = createObservedVariableChanges(
+        activeTurn.lastObservedStatData ?? activeTurn.baselineStatData,
+        nextStatData,
+        {
+          origin: 'background',
+          producer: metadata.producer,
+          timestamp,
+          batchId,
+          actions: metadata.actions,
+          reason: metadata.reason,
+          assistantMessageId: metadata.assistantMessageId,
+        },
+      );
+      observedChanges = result.observedChanges;
+      omittedObservedCount = result.omittedObservedCount;
+      batch = result.batch;
+    }
+
+    if (nextStatData) {
+      activeTurn.lastObservedStatData = nextStatData;
+    }
+
+    if (observedChanges.length === 0) {
       refreshCurrentSummary();
       return;
     }
 
-    const backgroundAppend = appendLimited(current.background.observedChanges, result.observedChanges);
-    const batches = result.batch ? [...current.batches, result.batch].slice(-MAX_STORED_VARIABLE_CHANGES) : current.batches;
+    const backgroundAppend = appendLimited(current.background.observedChanges, observedChanges);
+    const batches = batch ? [...current.batches, batch].slice(-MAX_STORED_VARIABLE_CHANGES) : current.batches;
+    const summaryStatData = nextStatData ?? activeTurn.lastObservedStatData ?? activeTurn.baselineStatData;
     const nextSummary = buildSummary({
       ...current,
       background: {
         observedChanges: backgroundAppend.values,
-        omittedObservedCount: current.background.omittedObservedCount + backgroundAppend.omitted,
+        omittedObservedCount:
+          current.background.omittedObservedCount
+          + omittedObservedCount
+          + backgroundAppend.omitted,
       },
       batches,
-    }, activeTurn, nextStatData);
+    }, activeTurn, summaryStatData);
 
     variableTraceLogger.log('[useVariableChangeTracker] 记录来源已知的后台实际修改', {
       turnId: activeTurn.turnId,
       producer: metadata.producer,
       reason: metadata.reason,
-      changes: result.observedChanges.map(change => ({
+      writerOwnedDiff: Array.isArray(metadata.changes),
+      changes: observedChanges.map(change => ({
         path: change.displayPath,
         before: change.beforePreview,
         after: change.afterPreview,
@@ -518,7 +564,8 @@ export function useVariableChangeTracker() {
     if (assistantMessageId !== undefined) activeTurn.assistantMessageId = assistantMessageId;
     const snapshot = readCurrentStatDataSnapshot();
     if (snapshot) {
-      // AI 写入只推进“后台下一笔写入”的起点；AI 实际结果统一由 baseline -> final 计算。
+      // 保存真实观测到的 AI 写入后状态，供异常楼层 fallback 使用；绝不拿 AI 声明值冒充实际 before。
+      activeTurn.aiCheckpointStatData = snapshot;
       activeTurn.lastObservedStatData = snapshot;
     }
     refreshCurrentSummary('reply-recorded');
@@ -547,7 +594,6 @@ export function useVariableChangeTracker() {
     }
 
     const parsedAi = parseAiDeclaredState(activeTurn);
-    const aiByPath = new Map(parsedAi.declaredChanges.map(change => [getPathKey(change.path), change]));
     const finalParsed = parseDeclaredVariableChanges(finalMessage.content);
     const backgroundBlockDeclarations = subtractAiDeclarations(
       finalParsed.declaredChanges,
@@ -581,12 +627,12 @@ export function useVariableChangeTracker() {
       if (latestRecorded && valuesEqual(latestRecorded.afterValue, expectedValue)) continue;
       if (!valuesEqual(finalValue, expectedValue)) continue;
 
-      const aiDeclaration = aiByPath.get(pathKey);
       const beforeValue = latestRecorded
         ? latestRecorded.afterValue
-        : aiDeclaration
-          ? (aiDeclaration.action === 'delete' ? undefined : aiDeclaration.value)
-          : getValueAtPath(activeTurn.baselineStatData, declaration.path);
+        : getValueAtPath(
+            activeTurn.aiCheckpointStatData ?? activeTurn.baselineStatData,
+            declaration.path,
+          );
       if (valuesEqual(beforeValue, finalValue)) continue;
 
       const batchId = `${activeTurn.turnId}:background-block-fallback`;
@@ -663,8 +709,8 @@ export function useVariableChangeTracker() {
     commitSummary(nextSummary);
   }, [commitSummary]);
 
-  const handleVariableTurnStart = useCallback(() => {
-    startTurn();
+  const handleVariableTurnStart = useCallback((variableUpdateMode: SummaryVariableUpdateMode = 'inline') => {
+    startTurn(undefined, variableUpdateMode);
   }, [startTurn]);
 
   const handleGlobalMessageSent = useCallback((messageId: number) => {
@@ -677,7 +723,7 @@ export function useVariableChangeTracker() {
       return;
     }
     if (activeTurn?.userMessageId === normalized) return;
-    startTurn(normalized);
+    startTurn(normalized, 'inline');
   }, [refreshCurrentSummary, startTurn]);
 
   const markVariableApiWriteAsAi = useCallback((assistantMessageId: number) => {
@@ -739,6 +785,7 @@ export function useVariableChangeTracker() {
     if (!activeTurn) return;
     activeTurn.assistantDeclaredReply = rawReply;
     activeTurn.extraDeclaredBlocks = '';
+    activeTurn.variableUpdateMode = 'inline';
     if (assistantMessageId !== undefined) activeTurn.assistantMessageId = assistantMessageId;
     checkpointAiWrite(assistantMessageId);
     settleTurn(assistantMessageId);
@@ -783,6 +830,7 @@ export function useVariableChangeTracker() {
         ? detail.reason.trim()
         : 'direct-variable-write',
       actions: null,
+      changes: Array.isArray(detail?.changes) ? detail.changes : undefined,
     });
   }, [captureBackgroundWrite]);
 
@@ -809,6 +857,7 @@ export function useVariableChangeTracker() {
         : 'era-variable-write',
       actions: normalizeWriteActions(detail?.actions),
       assistantMessageId,
+      changes: Array.isArray(detail?.changes) ? detail.changes : undefined,
     });
   }, [captureBackgroundWrite, checkpointAiWrite]);
 
