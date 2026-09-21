@@ -162,6 +162,23 @@ describe('regenerateLastAssistantSwipe', () => {
     expect(result.rawReply).toBe('新正文');
   });
 
+  it('变量追踪基线回调发生在旧 swipe 回滚完成后、新 swipe 写入前', async () => {
+    const onGeneratedReplyReady = vi.fn();
+
+    await regenerateLastAssistantSwipe({ onGeneratedReplyReady });
+
+    expect(onGeneratedReplyReady).toHaveBeenCalledWith('新正文', 2);
+    expect(emitEraEventAndWaitMock.mock.invocationCallOrder[0]).toBeLessThan(
+      onGeneratedReplyReady.mock.invocationCallOrder[0],
+    );
+    expect(onGeneratedReplyReady.mock.invocationCallOrder[0]).toBeLessThan(
+      globals.setChatMessages.mock.invocationCallOrder[1],
+    );
+    expect(onGeneratedReplyReady.mock.invocationCallOrder[0]).toBeLessThan(
+      emitEraEventAndWaitMock.mock.invocationCallOrder[1],
+    );
+  });
+
   it('重新生成遇到两次 429 后仍只原位提交一个 swipe', async () => {
     globals.generate = vi.fn()
       .mockRejectedValueOnce({ status: 429, retryAfterMs: 0 })
