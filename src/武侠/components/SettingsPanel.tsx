@@ -2280,7 +2280,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </button>
                 </div>
                 <p className="settings-hint">
-                  “自动识别”只勾选从正则中拆出的完整 XML 区块。像整楼提取 <summary>、Variable/ERA 区块或疑似正文规则会标为保护/谨慎，不会自动删除。持续过滤无需手动清理；“回溯清理”只处理旧楼层。
+                  “自动识别”只勾选从正则中拆出的完整 XML 区块。像整楼提取 {'<summary>'}、Variable/ERA 区块或疑似正文规则会标为保护/谨慎，不会自动删除。持续过滤无需手动清理；“回溯清理”只处理旧楼层。
                 </p>
               </div>
             </div>
