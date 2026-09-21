@@ -1,5 +1,5 @@
 import { log, logWarning } from './era-utils.js';
-import { emitEraVariableWriteAndWait, runDirectChatVariableWrite } from '../shared/directVariableWrite';
+import { emitEraVariableWriteAndWait, writeDirectChatTransaction } from '../shared/directVariableWrite';
 
 const RECENT_SIGNATURE_TTL_MS = 3000;
 const pendingSignatures = new Set();
@@ -582,25 +582,21 @@ export async function writeDirectChatVariables(action, payload, reason = 'direct
 
   markPending(signature);
   try {
-    await runDirectChatVariableWrite(
+    await writeDirectChatTransaction(
+      variables => {
+        const nextVariables = variables || {};
+        if (!isPlainObject(nextVariables.stat_data)) {
+          nextVariables.stat_data = {};
+        }
+        applyPatchToStat(nextVariables.stat_data, action, effectivePatch);
+        return nextVariables;
+      },
+      reason,
       {
         source: 'event-script',
         operation: action,
-        reason,
         refreshHint: 'event-state',
       },
-      () =>
-        updateVariablesWith(
-          variables => {
-            const nextVariables = variables || {};
-            if (!isPlainObject(nextVariables.stat_data)) {
-              nextVariables.stat_data = {};
-            }
-            applyPatchToStat(nextVariables.stat_data, action, effectivePatch);
-            return nextVariables;
-          },
-          { type: 'chat' },
-        ),
     );
 
     log(`直接写入完成: ${reason}`);
