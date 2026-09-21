@@ -270,6 +270,41 @@ function env_flag_enabled(env: WebpackEnv | undefined, key: string) {
   return value === true || value === 'true' || value === '1';
 }
 
+function fast_build_timing(compiler: webpack.Compiler) {
+  let compileStartedAt = 0;
+  let modulesFinishedAt = 0;
+  let sealedAt = 0;
+  let emitStartedAt = 0;
+  let emitFinishedAt = 0;
+
+  compiler.hooks.compile.tap('fast_build_timing', () => {
+    compileStartedAt = Date.now();
+  });
+  compiler.hooks.compilation.tap('fast_build_timing', compilation => {
+    compilation.hooks.finishModules.tap('fast_build_timing', () => {
+      modulesFinishedAt = Date.now();
+    });
+    compilation.hooks.afterSeal.tap('fast_build_timing', () => {
+      sealedAt = Date.now();
+    });
+  });
+  compiler.hooks.emit.tap('fast_build_timing', () => {
+    emitStartedAt = Date.now();
+  });
+  compiler.hooks.afterEmit.tap('fast_build_timing', () => {
+    emitFinishedAt = Date.now();
+  });
+  compiler.hooks.done.tap('fast_build_timing', () => {
+    const moduleMs = modulesFinishedAt && compileStartedAt ? modulesFinishedAt - compileStartedAt : 0;
+    const sealMs = sealedAt && modulesFinishedAt ? sealedAt - modulesFinishedAt : 0;
+    const emitMs = emitFinishedAt && emitStartedAt ? emitFinishedAt - emitStartedAt : 0;
+    const totalMs = compileStartedAt ? Date.now() - compileStartedAt : 0;
+    console.info(
+      `\x1b[36m[fast-build]\x1b[0m modules: ${moduleMs}ms | seal/optimize: ${sealMs}ms | emit: ${emitMs}ms | webpack total: ${totalMs}ms`,
+    );
+  });
+}
+
 function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: any) => webpack.Configuration {
   const should_obfuscate = fs
     .readFileSync(path.join(import.meta.dirname, entry.script), 'utf-8')
@@ -282,6 +317,16 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
     const is_fast_wuxia_build =
       is_fast_build &&
       path.normalize(entry.script).startsWith(`${path.normalize('src/武侠')}${path.sep}`);
+    const postcss_loader = is_fast_wuxia_build
+      ? {
+          loader: 'postcss-loader',
+          options: {
+            postcssOptions: {
+              plugins: [require('autoprefixer')],
+            },
+          },
+        }
+      : 'postcss-loader';
 
     return {
       name: configurationName,
@@ -359,14 +404,14 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
               },
               {
                 test: /\.(sa|sc)ss$/,
-                use: ['postcss-loader', 'sass-loader'],
+                use: [postcss_loader, 'sass-loader'],
                 resourceQuery: /raw/,
                 type: 'asset/source',
                 exclude: /node_modules/,
               },
               {
                 test: /\.css$/,
-                use: ['postcss-loader'],
+                use: [postcss_loader],
                 resourceQuery: /raw/,
                 type: 'asset/source',
                 exclude: /node_modules/,
@@ -393,14 +438,14 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
               },
               {
                 test: /\.(sa|sc)ss$/,
-                use: ['postcss-loader', 'sass-loader'],
+                use: [postcss_loader, 'sass-loader'],
                 resourceQuery: /url/,
                 type: 'asset/inline',
                 exclude: /node_modules/,
               },
               {
                 test: /\.css$/,
-                use: ['postcss-loader'],
+                use: [postcss_loader],
                 resourceQuery: /url/,
                 type: 'asset/inline',
                 exclude: /node_modules/,
@@ -462,7 +507,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                       use: [
                         { loader: 'vue-style-loader', options: { ssrId: true } },
                         { loader: 'css-loader', options: { url: false } },
-                        'postcss-loader',
+                        postcss_loader,
                         'sass-loader',
                       ],
                       exclude: /node_modules/,
@@ -472,7 +517,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                       use: [
                         { loader: 'vue-style-loader', options: { ssrId: true } },
                         { loader: 'css-loader', options: { url: false } },
-                        'postcss-loader',
+                        postcss_loader,
                       ],
                       exclude: /node_modules/,
                     },
@@ -481,14 +526,14 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                       use: [
                         'style-loader',
                         { loader: 'css-loader', options: { url: false } },
-                        'postcss-loader',
+                        postcss_loader,
                         'sass-loader',
                       ],
                       exclude: /node_modules/,
                     },
                     {
                       test: /\.css$/,
-                      use: ['style-loader', { loader: 'css-loader', options: { url: false } }, 'postcss-loader'],
+                      use: ['style-loader', { loader: 'css-loader', options: { url: false } }, postcss_loader],
                       exclude: /node_modules/,
                     },
                   ] as any[])
@@ -498,7 +543,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                       use: [
                         MiniCssExtractPlugin.loader,
                         { loader: 'css-loader', options: { url: false } },
-                        'postcss-loader',
+                        postcss_loader,
                         'sass-loader',
                       ],
                       exclude: /node_modules/,
@@ -508,7 +553,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                       use: [
                         MiniCssExtractPlugin.loader,
                         { loader: 'css-loader', options: { url: false } },
-                        'postcss-loader',
+                        postcss_loader,
                       ],
                       exclude: /node_modules/,
                     },
@@ -548,6 +593,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
       )
         .concat(
           { apply: watch_tavern_helper },
+          ...(is_fast_wuxia_build ? [{ apply: fast_build_timing }] : []),
           ...(is_fast_wuxia_build ? [] : [{ apply: schema_dump }]),
           ...(env_flag_enabled(env, 'srcOnly') ? [] : [{ apply: tavern_sync }]),
           ...(is_event_script_entry(entry.script) ? [new EventDataAssetPlugin()] : []),
@@ -613,26 +659,45 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                     },
                   }),
             ],
-        splitChunks: {
-          chunks: 'async',
-          minSize: 20000,
-          minChunks: 1,
-          maxAsyncRequests: 30,
-          maxInitialRequests: 30,
-          cacheGroups: {
-            vendor: {
-              name: 'vendor',
-              test: /[\\/]node_modules[\\/]/,
-              priority: -10,
-            },
-            default: {
-              name: 'default',
-              minChunks: 2,
-              priority: -20,
-              reuseExistingChunk: true,
-            },
-          },
-        },
+        ...(is_fast_wuxia_build
+          ? {
+              // 高频本地调试保留 production mode/运行时，但关闭不会影响业务 API
+              // 契约、却会在每次构建重跑的生产打包优化。
+              concatenateModules: false,
+              flagIncludedChunks: false,
+              innerGraph: false,
+              mangleExports: false,
+              mergeDuplicateChunks: false,
+              providedExports: false,
+              realContentHash: false,
+              removeAvailableModules: false,
+              removeEmptyChunks: false,
+              sideEffects: false,
+              splitChunks: false,
+              usedExports: false,
+            }
+          : {
+              splitChunks: {
+                chunks: 'async',
+                minSize: 20000,
+                minChunks: 1,
+                maxAsyncRequests: 30,
+                maxInitialRequests: 30,
+                cacheGroups: {
+                  vendor: {
+                    name: 'vendor',
+                    test: /[\\/]node_modules[\\/]/,
+                    priority: -10,
+                  },
+                  default: {
+                    name: 'default',
+                    minChunks: 2,
+                    priority: -20,
+                    reuseExistingChunk: true,
+                  },
+                },
+              },
+            }),
       },
       externals: ({ context, request }, callback) => {
         if (!context || !request) {
