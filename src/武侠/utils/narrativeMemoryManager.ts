@@ -28,6 +28,8 @@ export type NarrativeChapterRecord = {
   摘要: string;
   来源?: '逐轮摘要' | '历史回溯';
   源轮数?: number;
+  /** 历史回溯章节精确覆盖的 assistant 楼层；避免只靠起止区间误删中间未参与回溯的楼层。 */
+  源楼层?: number[];
 };
 
 export type ConversationArchiveItem = {
@@ -478,6 +480,7 @@ export async function backfillHistoricalConversationMemory({
         源摘要数: batch.filter(turn => turn.sourceHadSummary).length,
         来源: '历史回溯',
         源轮数: batch.length,
+        源楼层: batch.map(turn => turn.assistantMessageId),
         摘要: summary,
       };
       completedTurns += batch.length;
