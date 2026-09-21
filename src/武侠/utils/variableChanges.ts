@@ -885,7 +885,9 @@ export function buildAiComparisons({
   const normalizedCurrentStatData = currentStatData ? extractStatData(currentStatData) : null;
   const declaredByPath = new Map<string, VariableDeclaredChange>();
   const aggregatedObserved = aggregateObservedChanges(observedChanges);
-  const aggregatedBackgroundObserved = aggregateObservedChanges(backgroundObservedChanges);
+  // backgroundObservedChanges 仍保留在函数签名中，供调用方兼容；AI 是否落地不再依赖
+  // 中间写入归因，而只看回合基线、AI 声明和最终聊天级 stat_data。
+  void backgroundObservedChanges;
 
   for (const declaredChange of declaredChanges) {
     declaredByPath.set(getVariablePathId(declaredChange.path), declaredChange);
@@ -899,8 +901,7 @@ export function buildAiComparisons({
   for (const pathKey of pathKeys) {
     const declaredChange = declaredByPath.get(pathKey);
     const observedChange = aggregatedObserved.get(pathKey);
-    const backgroundObservedChange = aggregatedBackgroundObserved.get(pathKey);
-    const path = declaredChange?.path ?? observedChange?.path ?? backgroundObservedChange?.path ?? [];
+    const path = declaredChange?.path ?? observedChange?.path ?? [];
     const baselineValue = normalizedBaselineStatData ? getValueAtPath(normalizedBaselineStatData, path) : undefined;
     const expectedValue = declaredChange
       ? declaredChange.action === 'delete'
@@ -920,20 +921,17 @@ export function buildAiComparisons({
     } else {
       action = declaredChange?.action ?? observedChange?.action ?? 'edit';
       const baselineMatchesExpected = areValuesEqual(baselineValue, expectedValue);
-      const observedMatchesExpected = observedChange
-        ? areValuesEqual(observedChange.afterValue, expectedValue)
-        : false;
       const finalMatchesExpected = areValuesEqual(finalValue, expectedValue);
-      const canUseFinalSnapshotFallback = !observedChange && !backgroundObservedChange;
+      const finalMatchesBaseline = areValuesEqual(finalValue, baselineValue);
 
-      if (baselineMatchesExpected && !observedChange) {
+      if (baselineMatchesExpected && finalMatchesExpected) {
         status = 'no-op';
-      } else if (observedMatchesExpected || (finalMatchesExpected && canUseFinalSnapshotFallback)) {
+      } else if (finalMatchesExpected) {
         status = 'applied';
-      } else if (observedChange) {
-        status = 'diverged';
-      } else {
+      } else if (finalMatchesBaseline) {
         status = 'not-applied';
+      } else {
+        status = 'diverged';
       }
     }
 
