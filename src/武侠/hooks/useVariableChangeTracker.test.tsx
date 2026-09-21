@@ -180,6 +180,59 @@ describe('useVariableChangeTracker', () => {
     expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
   });
 
+  it('raw ERA 在 assistant 目标确认前先到时，会把匹配声明的 ERA 批次回提为 AI', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      // 实际 inline 时序：先拿到正文声明，但 assistant 楼层 ID 此时尚未解析出来。
+      result.current.handleVariableAssistantReply(declaredReply);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+
+    act(() => {
+      // createChatMessages 触发 ERA resync，writeDone 会早于 onVariableAiWriteTarget。
+      result.current.handleEraWriteDone({
+        message_id: 2,
+        actions: { resync: true },
+        reason: 'inline-assistant-resync',
+      });
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'era',
+        origin: 'background',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+
+    act(() => {
+      // 楼层创建完成后才确认它就是本轮 AI 写入目标。
+      result.current.markVariableApiWriteAsAi(2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
+      expect.objectContaining({
+        producer: 'message-boundary',
+        origin: 'ai',
+        beforeValue: 100,
+        afterValue: 120,
+      }),
+    ]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
+    expect(result.current.variableChanges?.aiReply.comparisons).toEqual([
+      expect.objectContaining({
+        status: 'applied',
+        expectedValue: 120,
+        finalValue: 120,
+      }),
+    ]);
+  });
+
   it('重复通知和相同快照不会重复计数', () => {
     const { result } = renderHook(() => useVariableChangeTracker());
 
