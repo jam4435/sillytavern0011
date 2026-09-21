@@ -271,7 +271,7 @@ export async function emitEraVariableWriteAndWait({
   expectedMessageId,
   expectedAction,
   expectedTransactionId,
-}: EraVariableWriteRequest): Promise<EraVariableWriteConfirmation> {
+}: EraVariableWriteRequest): Promise<EraVariableWriteDoneDetail> {
   assertFrontendWriteAllowed(source);
   const waitId = createVariableWriteId();
   const startedAt = Date.now();
@@ -427,19 +427,7 @@ export async function emitEraVariableWriteAndWait({
     });
   }
 
-  return waitForWriteDone;
-}
-
-/**
- * ERA 写入等待器的带来源包装。需要让 UI/追踪器知道写入来源时使用此入口；它复用
- * emitEraVariableWriteAndWait 的先监听后 emit 及精确匹配逻辑。
- */
-export async function emitSourcedEraVariableWriteAndWait(
-  request: EraVariableWriteRequest,
-): Promise<EraVariableWriteDoneDetail> {
-  const { source, operation, reason, eventName, attribution = 'background', refreshHint } = request;
-  const matchedDetail = await emitEraVariableWriteAndWait(request);
-
+  const matchedDetail = await waitForWriteDone;
   const eventDetail: EraVariableWriteDoneDetail = {
     version: 1,
     writeId: createVariableWriteId(),
@@ -455,23 +443,19 @@ export async function emitSourcedEraVariableWriteAndWait(
     transactionIds: normalizeTransactionIds(matchedDetail) ?? undefined,
   };
 
-  try {
-    const notification = eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
-    void notification.then(
-      () =>
-        variableTraceLogger.log('[emitSourcedEraVariableWriteAndWait] 带来源 ERA 完成通知监听链已结束', eventDetail),
-      error =>
-        variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 带来源 ERA 完成通知监听链异常', {
-          ...eventDetail,
-          error,
-        }),
-    );
-  } catch (error) {
-    variableTraceLogger.error('[emitSourcedEraVariableWriteAndWait] 发送带来源 ERA 完成通知时同步异常', {
-      ...eventDetail,
-      error,
-    });
-  }
-
+  variableTraceLogger.log('[emitEraVariableWriteAndWait] ERA 写入已确认，发送唯一带来源完成事件', eventDetail);
+  await eventEmit(ERA_VARIABLE_WRITE_DONE_EVENT, eventDetail);
   return eventDetail;
+}
+
+/**
+ * ERA 写入等待器的带来源包装。需要让 UI/追踪器知道写入来源时使用此入口；它复用
+ * emitEraVariableWriteAndWait 的先监听后 emit 及精确匹配逻辑。
+ */
+export async function emitSourcedEraVariableWriteAndWait(
+  request: EraVariableWriteRequest,
+): Promise<EraVariableWriteDoneDetail> {
+  // 兼容旧调用名。来源通知已经由底层统一入口发送，禁止再次补发，
+  // 从而保证每次 ERA 写入只有一个带来源完成事件。
+  return emitEraVariableWriteAndWait(request);
 }
