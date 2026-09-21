@@ -540,6 +540,7 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
       eventName: 'era:transactionByObject',
       refreshHint: 'event-state',
       confirmation: writeDoneDetail,
+      detail,
       beforeStatData,
       afterStatData: cloneJson(finalVariables?.stat_data || {}),
     });
@@ -576,6 +577,7 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
           transactionId,
           transactionIds: [transactionId],
         },
+        detail,
         beforeStatData,
         afterStatData: cloneJson(reread.latestVariables?.stat_data || {}),
       });
