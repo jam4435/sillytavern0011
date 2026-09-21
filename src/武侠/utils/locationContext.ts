@@ -1,3 +1,4 @@
+import { writeDirectChatTransaction } from '../../shared/directVariableWrite';
 import type { MapData, MapRegion } from '../types';
 import { getLocationScopePath, normalizeLocationPath, parseLocationPath } from '../../shared/locationPath.js';
 import { loadMapData } from './mapLoader';
@@ -364,9 +365,14 @@ export async function syncDynamicLocationContextVariable(
       return value;
     }
 
-    updateVariablesWith(
+    await writeDirectChatTransaction(
       currentVariables => updateLocationContextInVariables(currentVariables as Record<string, unknown>, value),
-      { type: 'chat' },
+      'location-context-sync',
+      {
+        source: 'frontend',
+        operation: 'update',
+        refreshHint: 'character-data',
+      },
     );
     return value;
   } catch (error) {
