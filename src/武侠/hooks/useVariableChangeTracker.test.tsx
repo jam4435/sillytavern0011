@@ -402,6 +402,8 @@ describe('useVariableChangeTracker', () => {
     expect(result.current.variableChanges?.aiReply.observedChanges).toEqual([
       expect.objectContaining({
         origin: 'ai',
+        producer: 'era',
+        reason: 'era-api-write',
         beforeValue: 100,
         afterValue: 120,
       }),
