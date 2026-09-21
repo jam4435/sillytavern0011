@@ -282,6 +282,16 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
     const is_fast_wuxia_build =
       is_fast_build &&
       path.normalize(entry.script).startsWith(`${path.normalize('src/武侠')}${path.sep}`);
+    const postcss_loader = is_fast_wuxia_build
+      ? {
+          loader: 'postcss-loader',
+          options: {
+            postcssOptions: {
+              plugins: [require('autoprefixer')],
+            },
+          },
+        }
+      : postcss_loader;
 
     return {
       name: configurationName,
@@ -359,14 +369,14 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
               },
               {
                 test: /\.(sa|sc)ss$/,
-                use: ['postcss-loader', 'sass-loader'],
+                use: [postcss_loader, 'sass-loader'],
                 resourceQuery: /raw/,
                 type: 'asset/source',
                 exclude: /node_modules/,
               },
               {
                 test: /\.css$/,
-                use: ['postcss-loader'],
+                use: [postcss_loader],
                 resourceQuery: /raw/,
                 type: 'asset/source',
                 exclude: /node_modules/,
@@ -393,14 +403,14 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
               },
               {
                 test: /\.(sa|sc)ss$/,
-                use: ['postcss-loader', 'sass-loader'],
+                use: [postcss_loader, 'sass-loader'],
                 resourceQuery: /url/,
                 type: 'asset/inline',
                 exclude: /node_modules/,
               },
               {
                 test: /\.css$/,
-                use: ['postcss-loader'],
+                use: [postcss_loader],
                 resourceQuery: /url/,
                 type: 'asset/inline',
                 exclude: /node_modules/,
@@ -462,7 +472,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                       use: [
                         { loader: 'vue-style-loader', options: { ssrId: true } },
                         { loader: 'css-loader', options: { url: false } },
-                        'postcss-loader',
+                        postcss_loader,
                         'sass-loader',
                       ],
                       exclude: /node_modules/,
@@ -472,7 +482,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                       use: [
                         { loader: 'vue-style-loader', options: { ssrId: true } },
                         { loader: 'css-loader', options: { url: false } },
-                        'postcss-loader',
+                        postcss_loader,
                       ],
                       exclude: /node_modules/,
                     },
@@ -481,14 +491,14 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                       use: [
                         'style-loader',
                         { loader: 'css-loader', options: { url: false } },
-                        'postcss-loader',
+                        postcss_loader,
                         'sass-loader',
                       ],
                       exclude: /node_modules/,
                     },
                     {
                       test: /\.css$/,
-                      use: ['style-loader', { loader: 'css-loader', options: { url: false } }, 'postcss-loader'],
+                      use: ['style-loader', { loader: 'css-loader', options: { url: false } }, postcss_loader],
                       exclude: /node_modules/,
                     },
                   ] as any[])
@@ -498,7 +508,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                       use: [
                         MiniCssExtractPlugin.loader,
                         { loader: 'css-loader', options: { url: false } },
-                        'postcss-loader',
+                        postcss_loader,
                         'sass-loader',
                       ],
                       exclude: /node_modules/,
@@ -508,7 +518,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                       use: [
                         MiniCssExtractPlugin.loader,
                         { loader: 'css-loader', options: { url: false } },
-                        'postcss-loader',
+                        postcss_loader,
                       ],
                       exclude: /node_modules/,
                     },
@@ -613,26 +623,45 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
                     },
                   }),
             ],
-        splitChunks: {
-          chunks: 'async',
-          minSize: 20000,
-          minChunks: 1,
-          maxAsyncRequests: 30,
-          maxInitialRequests: 30,
-          cacheGroups: {
-            vendor: {
-              name: 'vendor',
-              test: /[\\/]node_modules[\\/]/,
-              priority: -10,
-            },
-            default: {
-              name: 'default',
-              minChunks: 2,
-              priority: -20,
-              reuseExistingChunk: true,
-            },
-          },
-        },
+        // fast:only 武侠用于高频本地调试。保持 production mode/运行时，但关闭
+        // production 下最耗时、且不会改变业务 API 契约的打包优化。
+        ...(is_fast_wuxia_build
+          ? {
+              concatenateModules: false,
+              flagIncludedChunks: false,
+              innerGraph: false,
+              mangleExports: false,
+              mergeDuplicateChunks: false,
+              providedExports: false,
+              realContentHash: false,
+              removeAvailableModules: false,
+              removeEmptyChunks: false,
+              sideEffects: false,
+              splitChunks: false,
+              usedExports: false,
+            }
+          : {
+              splitChunks: {
+                chunks: 'async',
+                minSize: 20000,
+                minChunks: 1,
+                maxAsyncRequests: 30,
+                maxInitialRequests: 30,
+                cacheGroups: {
+                  vendor: {
+                    name: 'vendor',
+                    test: /[\\/]node_modules[\\/]/,
+                    priority: -10,
+                  },
+                  default: {
+                    name: 'default',
+                    minChunks: 2,
+                    priority: -20,
+                    reuseExistingChunk: true,
+                  },
+                },
+              },
+            }),
       },
       externals: ({ context, request }, callback) => {
         if (!context || !request) {
