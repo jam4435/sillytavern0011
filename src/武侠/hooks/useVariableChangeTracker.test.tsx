@@ -372,4 +372,53 @@ describe('useVariableChangeTracker block/source model', () => {
     expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
   });
 
+
+  it('extra 模式只认额外变量模型块为 AI，正文中意外变量块按最终剩余块处理', () => {
+    const accidentalMainBlock = '<VariableEdit>{"user数据":{"修为":130}}</VariableEdit>';
+    currentAssistantText = `正文\n${accidentalMainBlock}\n${extraAiBlock}`;
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(accidentalMainBlock, 2);
+      result.current.handleVariableExtraDeclaredBlocks(extraAiBlock, 2);
+    });
+
+    currentStatData = {
+      user数据: {
+        修为: 130,
+        属性: { 根骨: 70 },
+      },
+    };
+
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'extra-ai-only',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        message_id: 2,
+        actions: { apiWrite: true },
+      });
+      result.current.handleVariableTurnSettled(2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.declaredChanges).toEqual([
+      expect.objectContaining({ path: ['user数据', '属性', '根骨'], value: 70 }),
+    ]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['user数据', '修为'],
+          producer: 'unknown',
+          reason: 'assistant-background-block',
+          afterValue: 130,
+        }),
+      ]),
+    );
+  });
+
 });
