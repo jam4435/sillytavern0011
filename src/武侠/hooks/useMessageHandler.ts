@@ -1086,13 +1086,14 @@ export function useMessageHandler({
     [handleSendMessage, patchLatestDebugRound, showError],
   );
 
-  const handleRegenerateLastAssistant = useCallback(async (): Promise<void> => {
+  const handleRegenerateLastAssistant = useCallback(async (replacementUserInput?: string): Promise<void> => {
+    const isEditingPreviousInput = typeof replacementUserInput === 'string';
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    messageLogger.log('🔁 开始重新生成最新回复');
+    messageLogger.log(isEditingPreviousInput ? '🔁 修改上一轮输入并重新生成最新回复' : '🔁 开始重新生成最新回复');
 
     setIsLoading(true);
-    showLoading('正在重新生成回复...');
-    const debugRoundId = beginDebugRound('重新生成最新回复');
+    showLoading(isEditingPreviousInput ? '正在按修改后的上一轮输入重新生成...' : '正在重新生成回复...');
+    const debugRoundId = beginDebugRound(isEditingPreviousInput ? '修改上一轮输入并重新生成' : '重新生成最新回复');
     const extraVariableDecision = createExtraVariableRunDecision('regenerate', summarySettings);
     patchLatestDebugRound({
       variable: createInitialExtraVariableDecisionPatch(extraVariableDecision),
@@ -1108,6 +1109,7 @@ export function useMessageHandler({
       await acquireWuxiaTurnLock(debugRoundId, turnChatId);
       extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
       const result = await regenerateLastAssistantSwipe({
+        replacementUserInput,
         onCombinedPrompt: prompt => {
           patchLatestDebugRound({ main: { combinedPrompt: prompt } });
         },
