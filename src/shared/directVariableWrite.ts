@@ -37,8 +37,11 @@ export interface DirectVariableWriteMetadata {
 export interface DirectVariableWriteDoneDetail extends DirectVariableWriteMetadata {
   version: 1;
   writeId: string;
-  /** 本次 writer 自己实际产生的 stat_data 差异；空数组表示成功但没有状态变化。 */
-  changes: VariableSnapshotDiffChange[];
+  /**
+   * 本次 writer 自己实际产生的 stat_data 差异；空数组表示成功但没有状态变化。
+   * 旧/通用 wrapper 若无法在事务边界内提供精确 diff，则省略该字段，让 tracker 走兼容 fallback。
+   */
+  changes?: VariableSnapshotDiffChange[];
 }
 
 export interface EraVariableWriteMetadata extends DirectVariableWriteMetadata {
@@ -233,7 +236,7 @@ export async function runDirectChatVariableWrite<TResult>(
     operation: metadata.operation,
     reason: metadata.reason,
     refreshHint: normalizeRefreshHint(metadata.refreshHint),
-    changes: readOwnChanges?.() ?? [],
+    ...(readOwnChanges ? { changes: readOwnChanges() } : {}),
   };
 
   variableTraceLogger.log('[runDirectChatVariableWrite] 直接变量写入已完成，准备发送来源事件', eventDetail);
