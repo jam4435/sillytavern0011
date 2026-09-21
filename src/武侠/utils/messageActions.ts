@@ -522,7 +522,7 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
     });
     options.onVariableBaselineReady?.(context.assistantMessage.message_id);
     await syncFrontendDerivedVariables({
-      explicitMapTargets: extractExplicitMapTargetsFromText(getActiveMessageText(context.userMessage)),
+      explicitMapTargets: extractExplicitMapTargetsFromText(getActiveMessageText(promptContext.userMessage)),
     });
 
     const combinedPromptCapture = captureNextCombinedPromptForDebug(prompt => {
