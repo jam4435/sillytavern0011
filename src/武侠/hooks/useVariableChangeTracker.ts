@@ -805,6 +805,7 @@ export function useVariableChangeTracker() {
     if (options?.replaceAssistantReply && resolved.content.trim()) {
       activeTurn.assistantDeclaredReply = resolved.content;
       activeTurn.extraDeclaredBlocks = '';
+      activeTurn.variableUpdateMode = 'inline';
       checkpointAiWrite(resolved.messageId);
       settleTurn(resolved.messageId);
       return;
