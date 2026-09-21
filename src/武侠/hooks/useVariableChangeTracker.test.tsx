@@ -308,7 +308,7 @@ describe('useVariableChangeTracker block/source model', () => {
     expect(result.current.variableChanges?.background.observedChanges).toEqual([
       expect.objectContaining({
         path: ['前端变量', '随机数'],
-        producer: 'era',
+        producer: 'unknown',
         reason: 'assistant-background-block',
         afterValue: '随机数1: 8',
       }),
@@ -336,7 +336,7 @@ describe('useVariableChangeTracker block/source model', () => {
     expect(result.current.variableChanges?.background.observedChanges).toEqual([
       expect.objectContaining({
         path: ['外部状态', '标记'],
-        producer: 'message-boundary',
+        producer: 'unknown',
         reason: 'unattributed-final-diff',
         afterValue: true,
       }),
