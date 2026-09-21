@@ -140,6 +140,7 @@ const createHookOptions = (summarySettings: ReturnType<typeof createSummarySetti
   onVariableAssistantReply: vi.fn(),
   onVariableExtraDeclaredBlocks: vi.fn(),
   onVariableAiWriteTarget: vi.fn(),
+  onVariableTurnSettled: vi.fn(),
   onAssistantDisplayCommit: vi.fn(),
 });
 
@@ -268,6 +269,7 @@ describe('useMessageHandler extra-variable decision', () => {
       chatId: expect.any(String),
       roundId: 'debug-round-id',
     });
+    expect(options.onVariableTurnSettled).toHaveBeenCalledWith(2);
   });
 
   it('新 assistant 楼层显示提交后上报 message/swipe 身份', async () => {
@@ -668,6 +670,62 @@ describe('useMessageHandler extra-variable decision', () => {
 
     expect(options.onVariableExtraDeclaredBlocks).not.toHaveBeenCalled();
     expect(options.showError).toHaveBeenCalledWith('正文已生成，但额外变量更新失败：extra failed');
+  });
+
+  it('regenerate 在旧 swipe 回滚后的 pre-write 边界启动 tracker，并在事件结算后 settled', async () => {
+    const order: string[] = [];
+    const options = createHookOptions(createSummarySettings('inline'));
+    options.onVariableTurnStart.mockImplementation(() => {
+      order.push('tracker-start');
+    });
+    options.onVariableAiWriteTarget.mockImplementation(() => {
+      order.push('target');
+    });
+    options.onVariableAssistantReply.mockImplementation((_reply, messageId) => {
+      order.push(messageId === undefined ? 'reply-declared' : 'reply-checkpoint');
+    });
+    options.onVariableTurnSettled.mockImplementation(() => {
+      order.push('settled');
+    });
+
+    regenerateLastAssistantSwipeMock.mockImplementation(async callbacks => {
+      order.push('resolve-target');
+      callbacks.onTargetAssistantResolved?.(9);
+      expect(options.onVariableTurnStart).not.toHaveBeenCalled();
+
+      order.push('pre-write');
+      callbacks.onGeneratedReplyReady?.('重新生成正文', 9);
+      order.push('commit-new-swipe');
+
+      return {
+        maintext: '重新生成正文',
+        options: ['选项'],
+        gameData: null,
+        assistantMessageId: 9,
+        assistantSwipeId: 1,
+        userInput: '上一条用户输入',
+        combinedPrompt: '组合提示词',
+        rawReply: '重新生成正文',
+      };
+    });
+
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    await act(async () => {
+      await result.current.handleRegenerateLastAssistant();
+    });
+
+    expect(order).toEqual([
+      'resolve-target',
+      'pre-write',
+      'tracker-start',
+      'target',
+      'reply-declared',
+      'commit-new-swipe',
+      'reply-checkpoint',
+      'settled',
+    ]);
+    expect(options.onVariableTurnSettled).toHaveBeenCalledWith(9);
   });
 
   it('regenerate + inline 会显式标记 skipped，且不会触发额外变量链路', async () => {
