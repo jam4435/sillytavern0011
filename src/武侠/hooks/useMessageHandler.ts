@@ -1108,11 +1108,14 @@ export function useMessageHandler({
         onTargetAssistantResolved: assistantMessageId => {
           targetAssistantMessageId = assistantMessageId;
         },
-        onGeneratedReplyReady: (replyText, assistantMessageId) => {
-          // 旧 swipe 已回滚、派生变量已同步，新 swipe 尚未写入。
-          // 此刻才建立重新生成回合 baseline，内部回滚不会进入“后台变更”。
+        onVariableBaselineReady: assistantMessageId => {
+          // 旧 swipe 已回滚，但随机数/战力区/周围地点等重新生成前派生写入尚未发生。
+          // 从这里建立 baseline，既排除旧回复回滚，又保留本轮所有真实后台修改。
           onVariableTurnStart?.();
           onVariableAiWriteTarget?.(assistantMessageId);
+        },
+        onGeneratedReplyReady: replyText => {
+          // 新正文已生成但尚未写回；在 ERA 应用新 swipe 前登记 AI 变量声明。
           onVariableAssistantReply?.(replyText);
         },
       });
