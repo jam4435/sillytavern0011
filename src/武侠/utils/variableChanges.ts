@@ -6,7 +6,8 @@ export type VariableChangeOrigin = 'ai' | 'background';
 export type VariableChangeProducer =
   | DirectVariableWriteSource
   | 'era'
-  | 'message-boundary';
+  | 'message-boundary'
+  | 'unknown';
 export type VariableChangeSource = 'ai-declared' | 'observed-diff';
 export type VariableComparisonStatus = 'applied' | 'not-applied' | 'diverged' | 'no-op' | 'api-only';
 export type VariableChangeStatus = 'tracking' | 'reply-recorded' | 'settled' | 'error';
