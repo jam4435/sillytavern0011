@@ -40,6 +40,7 @@ const PRODUCER_META: Record<VariableChangeProducer, { label: string; tone: Sourc
   frontend: { label: '游戏前端', tone: 'frontend' },
   restore: { label: '状态恢复', tone: 'restore' },
   'message-boundary': { label: '消息补偿', tone: 'message-boundary' },
+  unknown: { label: '未知来源', tone: 'unknown' },
 };
 
 const getProducerMeta = (producer: VariableChangeProducer): { label: string; tone: SourceTone } =>
