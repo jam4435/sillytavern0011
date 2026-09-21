@@ -275,12 +275,29 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
     .readFileSync(path.join(import.meta.dirname, entry.script), 'utf-8')
     .includes('@obfuscate');
   const script_filepath = path.parse(entry.script);
+  const configurationName = `${script_filepath.dir}-${script_filepath.name}`.replaceAll(/[\\/]/g, '-');
 
   return (env, argv) => {
     const is_fast_build = env_flag_enabled(env, 'fast');
+    const is_fast_wuxia_build =
+      is_fast_build &&
+      path.normalize(entry.script).startsWith(`${path.normalize('src/武侠')}${path.sep}`);
 
     return {
-      name: `${script_filepath.dir}-${script_filepath.name}`.replaceAll(/[\\/]/g, '-'),
+      name: configurationName,
+      cache: {
+        type: 'filesystem',
+        name: `${configurationName}-${argv.mode}-${is_fast_build ? 'fast' : 'standard'}`,
+        cacheDirectory: path.join(import.meta.dirname, 'node_modules', '.cache', 'webpack'),
+        buildDependencies: {
+          config: [
+            import.meta.filename,
+            path.join(import.meta.dirname, 'package.json'),
+            path.join(import.meta.dirname, 'pnpm-lock.yaml'),
+            path.join(import.meta.dirname, 'tsconfig.json'),
+          ],
+        },
+      },
       experiments: {
         outputModule: true,
       },
@@ -517,7 +534,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
               template: path.join(import.meta.dirname, entry.html),
               filename: path.parse(entry.html).base,
               scriptLoading: 'module',
-              cache: false,
+              cache: is_fast_wuxia_build,
               hash: false,
             }),
             new HtmlInlineScriptWebpackPlugin(),
@@ -531,12 +548,12 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
       )
         .concat(
           { apply: watch_tavern_helper },
-          { apply: schema_dump },
+          ...(is_fast_wuxia_build ? [] : [{ apply: schema_dump }]),
           ...(env_flag_enabled(env, 'srcOnly') ? [] : [{ apply: tavern_sync }]),
           ...(is_event_script_entry(entry.script) ? [new EventDataAssetPlugin()] : []),
           new VueLoaderPlugin(),
           unpluginAutoImport({
-            dts: true,
+            dts: !is_fast_wuxia_build,
             dtsMode: 'overwrite',
             imports: [
               'vue',
@@ -549,7 +566,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
             ],
           }),
           unpluginVueComponents({
-            dts: true,
+            dts: !is_fast_wuxia_build,
             syncMode: 'overwrite',
             // globs: ['src/panel/component/*.vue'],
             resolvers: [VueUseComponentsResolver(), VueUseDirectiveResolver()],
