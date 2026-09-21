@@ -56,7 +56,7 @@ type ChatMessageWithSwipes = {
 };
 
 type StoredVariableTurn = {
-  version: 15;
+  version: 16;
   chatId: string;
   savedAt: number;
   activeTurn: ActiveVariableTurn;
@@ -83,7 +83,7 @@ type VariableWriteSignal =
 type DeclaredSourceKind = 'assistant-reply' | 'extra-blocks';
 type ParsedDeclaredState = ReturnType<typeof parseDeclaredVariableChanges>;
 
-const STORAGE_KEY = 'wuxia.variableChangeTurn.v15';
+const STORAGE_KEY = 'wuxia.variableChangeTurn.v16';
 const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v1',
   'wuxia.variableChangeTurn.v2',
@@ -99,6 +99,7 @@ const LEGACY_STORAGE_KEYS = [
   'wuxia.variableChangeTurn.v12',
   'wuxia.variableChangeTurn.v13',
   'wuxia.variableChangeTurn.v14',
+  'wuxia.variableChangeTurn.v15',
 ];
 const STORED_TURN_TTL_MS = 30 * 60 * 1000;
 const STALE_WRITE_DONE_RETRY_DELAY_MS = 40;
@@ -214,7 +215,7 @@ const readStoredVariableTurn = (): StoredVariableTurn | null => {
       && currentChatId !== 'unknown'
       && stored.chatId !== currentChatId;
 
-    if (stored.version !== 15 || isExpired || isDifferentKnownChat) {
+    if (stored.version !== 16 || isExpired || isDifferentKnownChat) {
       window.sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -241,7 +242,7 @@ const persistVariableTurn = (
 
   try {
     const stored: StoredVariableTurn = {
-      version: 15,
+      version: 16,
       chatId: getCurrentChatStorageId(),
       savedAt: Date.now(),
       activeTurn,
@@ -421,11 +422,12 @@ const canDemoteBatchToBackground = (
   metadata.allowAiDemotion === true
   && metadata.origin === 'background'
   && batch.origin === 'ai'
-  && (
-    batch.assistantMessageId === undefined
-    || metadata.assistantMessageId === undefined
-    || batch.assistantMessageId === metadata.assistantMessageId
-  );
+  // sourced background 通知只能纠正“同一个 assistant 楼层”的 raw ERA 误归因。
+  // 任一侧缺少 messageId 都不能仅凭相同快照去降级，否则后续无关 frontend
+  // 写入会把已经确认的 AI 批次整批改成后台。
+  && metadata.assistantMessageId !== undefined
+  && batch.assistantMessageId !== undefined
+  && batch.assistantMessageId === metadata.assistantMessageId;
 
 const isDirectVariableWriteSource = (value: unknown): value is DirectVariableWriteSource =>
   value === 'event-script'
@@ -691,7 +693,11 @@ export function useVariableChangeTracker() {
       return false;
     }
 
-    if (reconcileDeclaredBackgroundChangesToAi(metadata)) {
+    if (
+      metadata.origin === 'ai'
+      && metadata.allowAiPromotion === true
+      && reconcileDeclaredBackgroundChangesToAi(metadata)
+    ) {
       return true;
     }
 
@@ -923,6 +929,14 @@ export function useVariableChangeTracker() {
     const previousSnapshotHash = activeTurn.lastStatData
       ? getSnapshotHash(activeTurn.lastStatData)
       : null;
+
+    // 权威 AI 来源到达时，先认领此前因为时序问题暂记为后台的声明匹配差分。
+    // 这个对账与“当前快照是否又前进了一步”无关；否则中间任何随机数、战力区、
+    // 事件脚本等变化都会让历史 AI 差分永远留在后台。
+    if (metadata.origin === 'ai' && metadata.allowAiPromotion === true) {
+      reconcileDeclaredBackgroundChangesToAi(metadata);
+    }
+
     if (previousSnapshotHash === nextSnapshotHash) {
       variableTraceLogger.log('[useVariableChangeTracker] 快照未变化，尝试复用已有批次', {
         turnId: activeTurn.turnId,
@@ -1116,7 +1130,25 @@ export function useVariableChangeTracker() {
       };
       return rebuildSummary(nextSummary, activeTurn);
     });
-  }, [mutateSummary]);
+
+    // extra 模式下，setChatMessages 追加变量块本身可能先触发 ERA resync，
+    // 此时差分已经被观察到，但声明刚刚才登记。若该 assistant 已被确认是本轮
+    // AI 写入目标，立即按“路径 + 最终值”精确认领既有 era/message-boundary/frontend 差分。
+    if (
+      assistantMessageId !== undefined
+      && activeTurn.aiWriteTargetIds.includes(assistantMessageId)
+      && merged.declaredChanges.length > 0
+    ) {
+      reconcileDeclaredBackgroundChangesToAi({
+        origin: 'ai',
+        producer: source === 'extra-blocks' ? 'frontend' : 'message-boundary',
+        reason: source === 'extra-blocks' ? 'declared-extra-blocks-reconcile' : 'declared-assistant-reconcile',
+        assistantMessageId,
+        aiOnlyDeclaredMatches: true,
+        allowAiPromotion: true,
+      });
+    }
+  }, [mutateSummary, reconcileDeclaredBackgroundChangesToAi]);
 
   const replaceActiveAssistantReply = useCallback((
     rawReply: string,
