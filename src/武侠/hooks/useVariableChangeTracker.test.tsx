@@ -115,6 +115,56 @@ describe('useVariableChangeTracker block/source model', () => {
     ]);
   });
 
+  it('sourced event 只记录本次 writer 自己的 diff，不吸收同时存在的其他全局变化', () => {
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+    });
+
+    currentStatData = { user数据: { 修为: 120 } };
+    act(() => {
+      result.current.handleVariableAssistantReply(inlineAiBlock, 2);
+    });
+
+    currentStatData = {
+      user数据: { 修为: 115 },
+      外部状态: { 标记: true },
+    };
+
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'event-own-diff',
+        source: 'event-script',
+        operation: 'update',
+        reason: 'event-cost',
+        eventName: 'era:updateByObject',
+        attribution: 'background',
+        message_id: 2,
+        actions: { apiWrite: true },
+        changes: [
+          {
+            action: 'edit',
+            path: ['user数据', '修为'],
+            beforeValue: 120,
+            afterValue: 115,
+          },
+        ],
+      });
+    });
+
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+        producer: 'event-script',
+        reason: 'event-cost',
+        beforeValue: 120,
+        afterValue: 115,
+      }),
+    ]);
+  });
+
   it('direct write 即使没有 assistant 变量块，也作为后台实际修改展示', () => {
     currentAssistantText = '纯正文';
     const { result } = renderHook(() => useVariableChangeTracker());
@@ -153,6 +203,7 @@ describe('useVariableChangeTracker block/source model', () => {
     const { result } = renderHook(() => useVariableChangeTracker());
 
     act(() => {
+      result.current.handleVariableTurnStart('extra');
       result.current.handleGlobalMessageSent(1);
       result.current.handleVariableAssistantReply('正文', 2);
       result.current.handleVariableExtraDeclaredBlocks(extraAiBlock, 2);
@@ -177,6 +228,14 @@ describe('useVariableChangeTracker block/source model', () => {
         attribution: 'ai',
         message_id: 2,
         actions: { apiWrite: true },
+        changes: [
+          {
+            action: 'edit',
+            path: ['user数据', '修为'],
+            beforeValue: 120,
+            afterValue: 115,
+          },
+        ],
       });
       result.current.handleVariableTurnSettled(2);
     });
@@ -287,6 +346,33 @@ describe('useVariableChangeTracker block/source model', () => {
     ]);
   });
 
+  it('最终楼层 fallback 使用真实 AI checkpoint，而不是把 AI 声明值伪装成实际 before', () => {
+    currentAssistantText = `${inlineAiBlock}\n${backgroundSamePathBlock}`;
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      // AI 声明修为 120，但当前 stat_data 仍是 baseline=100，模拟 AI 声明没有实际落地。
+      result.current.handleVariableAssistantReply(inlineAiBlock, 2);
+    });
+
+    currentStatData = { user数据: { 修为: 115 } };
+
+    act(() => {
+      result.current.handleVariableTurnSettled(2);
+    });
+
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+        producer: 'unknown',
+        reason: 'assistant-background-block',
+        beforeValue: 100,
+        afterValue: 115,
+      }),
+    ]);
+  });
+
   it('未经过来源包装但确实存在于最终楼层的剩余变量块，会以 ERA fallback 补入后台', () => {
     currentAssistantText = backgroundBlock;
     const { result } = renderHook(() => useVariableChangeTracker());
@@ -373,12 +459,43 @@ describe('useVariableChangeTracker block/source model', () => {
   });
 
 
+  it('extra 模式即使变量模型返回 0 个动作，也不会退回把正文变量块认成 AI', () => {
+    const accidentalMainBlock = '<VariableEdit>{"user数据":{"修为":130}}</VariableEdit>';
+    currentAssistantText = accidentalMainBlock;
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleVariableTurnStart('extra');
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply(accidentalMainBlock, 2);
+      result.current.handleVariableExtraDeclaredBlocks('', 2);
+    });
+
+    currentStatData = { user数据: { 修为: 130 } };
+
+    act(() => {
+      result.current.handleVariableTurnSettled(2);
+    });
+
+    expect(result.current.variableChanges?.aiReply.declaredChanges).toEqual([]);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        path: ['user数据', '修为'],
+        producer: 'unknown',
+        reason: 'assistant-background-block',
+        beforeValue: 100,
+        afterValue: 130,
+      }),
+    ]);
+  });
+
   it('extra 模式只认额外变量模型块为 AI，正文中意外变量块按最终剩余块处理', () => {
     const accidentalMainBlock = '<VariableEdit>{"user数据":{"修为":130}}</VariableEdit>';
     currentAssistantText = `正文\n${accidentalMainBlock}\n${extraAiBlock}`;
     const { result } = renderHook(() => useVariableChangeTracker());
 
     act(() => {
+      result.current.handleVariableTurnStart('extra');
       result.current.handleGlobalMessageSent(1);
       result.current.handleVariableAssistantReply(accidentalMainBlock, 2);
       result.current.handleVariableExtraDeclaredBlocks(extraAiBlock, 2);
