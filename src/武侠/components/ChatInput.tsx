@@ -7,9 +7,10 @@ interface ChatInputProps {
   prefill?: { key: string; message: string } | null;
   onMessageChange?: (message: string) => void;
   extraActions?: React.ReactNode;
-  onRegenerate?: () => void | Promise<void>;
+  onRegenerate?: (replacementUserInput?: string) => void | Promise<boolean | void>;
   canRegenerate?: boolean;
   isRegenerating?: boolean;
+  regenerateDraftMode?: boolean;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -26,6 +27,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   onRegenerate,
   canRegenerate = false,
   isRegenerating = false,
+  regenerateDraftMode = false,
   placeholder = '书写你的江湖故事...',
   disabled = false,
 }) => {
@@ -34,7 +36,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputDisabled = disabled || isSubmitting;
-  const regenerateDisabled = disabled || isSubmitting || isRegenerating || !canRegenerate || !onRegenerate;
+  const regenerateDisabled =
+    disabled ||
+    isSubmitting ||
+    isRegenerating ||
+    !canRegenerate ||
+    !onRegenerate ||
+    (regenerateDraftMode && !message.trim());
   const prefillKey = prefill?.key ?? null;
   const prefillMessage = prefill?.message ?? '';
 
@@ -109,7 +117,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
     setIsSubmitting(true);
     try {
-      await onRegenerate();
+      const result = await onRegenerate(regenerateDraftMode ? message.trim() : undefined);
+      if (result === true && regenerateDraftMode) {
+        setMessage('');
+        onMessageChange?.('');
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+        }
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -154,12 +169,18 @@ const ChatInput: React.FC<ChatInputProps> = ({
         {/* 重新生成按钮 */}
         <button
           className={`chat-regenerate-btn ${isRegenerating ? 'spinning' : ''}`}
-          aria-label="重新生成上一条回复"
+          aria-label={regenerateDraftMode ? '使用修改后的上一轮输入重新生成' : '重新生成上一条回复'}
           data-wuxia-automation="generation-state regenerate-last-reply"
           data-wuxia-generating={isRegenerating ? 'true' : 'false'}
           onClick={handleRegenerate}
           disabled={regenerateDisabled}
-          title={canRegenerate ? '重新生成上一条回复' : '暂无可重新生成的回复'}
+          title={
+            regenerateDraftMode
+              ? '使用输入框中修改后的上一轮内容重新生成'
+              : canRegenerate
+                ? '重新生成上一条回复'
+                : '暂无可重新生成的回复'
+          }
         >
           <RotateCcw size={18} />
         </button>
