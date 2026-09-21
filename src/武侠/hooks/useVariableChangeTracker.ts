@@ -429,6 +429,24 @@ const canDemoteBatchToBackground = (
   && batch.assistantMessageId !== undefined
   && batch.assistantMessageId === metadata.assistantMessageId;
 
+const canRefineBatchMetadata = (
+  batch: Pick<VariableObservedBatch, 'origin' | 'assistantMessageId'>,
+  metadata: CaptureMetadata,
+): boolean => {
+  if (batch.origin !== metadata.origin) {
+    return false;
+  }
+
+  if (metadata.assistantMessageId !== undefined) {
+    return batch.assistantMessageId === undefined
+      || batch.assistantMessageId === metadata.assistantMessageId;
+  }
+
+  // 没有 messageId 的通知只允许细化同样没有绑定 assistant 的批次。
+  // 禁止拿一个无身份的后台通知去改写已绑定 AI 楼层的批次元数据。
+  return batch.assistantMessageId === undefined;
+};
+
 const isDirectVariableWriteSource = (value: unknown): value is DirectVariableWriteSource =>
   value === 'event-script'
   || value === 'variable-editor'
@@ -707,7 +725,7 @@ export function useVariableChangeTracker() {
     const batch = matchingBatches.find(candidate =>
       canPromoteBatchToAi(candidate, metadata)
       || canDemoteBatchToBackground(candidate, metadata))
-      ?? matchingBatches[0];
+      ?? matchingBatches.find(candidate => canRefineBatchMetadata(candidate, metadata));
     if (!batch) {
       variableTraceLogger.warn('[useVariableChangeTracker] 快照未变化，但没有找到可升级的批次', {
         turnId: activeTurn.turnId,
@@ -1064,7 +1082,7 @@ export function useVariableChangeTracker() {
       };
       return rebuildSummary(nextSummary, activeTurn);
     });
-  }, [mutateSummary, upgradeMatchingBatch]);
+  }, [mutateSummary, reconcileDeclaredBackgroundChangesToAi, upgradeMatchingBatch]);
 
   const captureCurrentSnapshot = useCallback((metadata: CaptureMetadata) => {
     captureResolvedSnapshot(readCurrentStatDataSnapshot(), metadata);
