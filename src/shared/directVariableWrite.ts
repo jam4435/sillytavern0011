@@ -1,4 +1,10 @@
 import { variableTraceLogger } from '../武侠/utils/logger';
+import {
+  createVariableSnapshotDiff,
+  readCurrentStatDataSnapshot,
+  readStatDataSnapshotFromUnknown,
+  type VariableSnapshotDiffChange,
+} from '../武侠/utils/variableChanges';
 import { recordIframeLifecycleEvent } from '../武侠/utils/iframeLifecycleBlackBox';
 import { isChatRenamePending } from './chatRenameJournal';
 import { isHistoryCheckoutPending } from './historyCheckoutJournal';
@@ -31,6 +37,8 @@ export interface DirectVariableWriteMetadata {
 export interface DirectVariableWriteDoneDetail extends DirectVariableWriteMetadata {
   version: 1;
   writeId: string;
+  /** 本次 writer 自己实际产生的 stat_data 差异；空数组表示成功但没有状态变化。 */
+  changes: VariableSnapshotDiffChange[];
 }
 
 export interface EraVariableWriteMetadata extends DirectVariableWriteMetadata {
@@ -45,6 +53,8 @@ export interface EraVariableWriteDoneDetail extends EraVariableWriteMetadata {
   actions: Record<string, boolean> | null;
   transactionId?: string;
   transactionIds?: string[];
+  /** 从发出本次 ERA 写入到匹配自己的 writeDone 后观察到的实际 stat_data 差异。 */
+  changes: VariableSnapshotDiffChange[];
 }
 
 export interface EraVariableWriteRequest extends EraVariableWriteMetadata {
@@ -212,6 +222,7 @@ const matchesEraWriteDone = (
 export async function runDirectChatVariableWrite<TResult>(
   metadata: DirectVariableWriteMetadata,
   writer: () => TResult | Promise<TResult>,
+  readOwnChanges?: () => VariableSnapshotDiffChange[],
 ): Promise<TResult> {
   assertFrontendWriteAllowed(metadata.source);
   const result = await writer();
@@ -222,10 +233,19 @@ export async function runDirectChatVariableWrite<TResult>(
     operation: metadata.operation,
     reason: metadata.reason,
     refreshHint: normalizeRefreshHint(metadata.refreshHint),
+    changes: readOwnChanges?.() ?? [],
   };
 
   variableTraceLogger.log('[runDirectChatVariableWrite] 直接变量写入已完成，准备发送来源事件', eventDetail);
-  await eventEmit(DIRECT_VARIABLE_WRITE_DONE_EVENT, eventDetail);
+  try {
+    await eventEmit(DIRECT_VARIABLE_WRITE_DONE_EVENT, eventDetail);
+  } catch (error) {
+    // 业务写入已经完成。来源通知属于观测元数据，监听器异常不能把成功写入反向变成失败。
+    variableTraceLogger.error('[runDirectChatVariableWrite] 带来源完成事件监听链异常', {
+      ...eventDetail,
+      error,
+    });
+  }
 
   return result;
 }
@@ -242,6 +262,7 @@ export async function writeDirectChatTransaction(
   reason = 'direct-chat-transaction',
   options: DirectChatTransactionOptions = {},
 ): Promise<Record<string, unknown>> {
+  let ownChanges: VariableSnapshotDiffChange[] = [];
   return runDirectChatVariableWrite(
     {
       source: options.source ?? 'event-script',
@@ -249,7 +270,19 @@ export async function writeDirectChatTransaction(
       reason,
       refreshHint: options.refreshHint,
     },
-    () => updateVariablesWith(updater, { type: 'chat' }) as Record<string, unknown>,
+    () =>
+      updateVariablesWith(
+        variables => {
+          // before 必须在 updater 运行前复制；大量现有 updater 会直接原地修改 variables。
+          const beforeStatData = readStatDataSnapshotFromUnknown(variables);
+          const nextVariables = updater(variables);
+          const afterStatData = readStatDataSnapshotFromUnknown(nextVariables);
+          ownChanges = createVariableSnapshotDiff(beforeStatData, afterStatData);
+          return nextVariables;
+        },
+        { type: 'chat' },
+      ) as Record<string, unknown>,
+    () => ownChanges,
   );
 }
 
@@ -274,6 +307,8 @@ export async function emitEraVariableWriteAndWait({
   expectedTransactionId,
 }: EraVariableWriteRequest): Promise<EraVariableWriteDoneDetail> {
   assertFrontendWriteAllowed(source);
+  // ERA 的真正修改发生在外部监听器中，因此在发出事件前建立本次 writer 的 before。
+  const beforeStatData = readCurrentStatDataSnapshot();
   const waitId = createVariableWriteId();
   const startedAt = Date.now();
   let timer: UnthrottledTimerHandle | null = null;
@@ -429,6 +464,8 @@ export async function emitEraVariableWriteAndWait({
   }
 
   const matchedDetail = await waitForWriteDone;
+  // 只在匹配到“自己”的 writeDone 后取 after；tracker 不再用共享全局区间猜 source。
+  const afterStatData = readCurrentStatDataSnapshot();
   const eventDetail: EraVariableWriteDoneDetail = {
     version: 1,
     writeId: createVariableWriteId(),
@@ -442,6 +479,7 @@ export async function emitEraVariableWriteAndWait({
     actions: normalizeActions(matchedDetail?.actions),
     transactionId: normalizeTransactionId(matchedDetail?.transactionId),
     transactionIds: normalizeTransactionIds(matchedDetail) ?? undefined,
+    changes: createVariableSnapshotDiff(beforeStatData, afterStatData),
   };
 
   variableTraceLogger.log('[emitEraVariableWriteAndWait] ERA 写入已确认，发送唯一带来源完成事件', eventDetail);
