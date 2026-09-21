@@ -279,6 +279,9 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
 
   return (env, argv) => {
     const is_fast_build = env_flag_enabled(env, 'fast');
+    const is_fast_wuxia_build =
+      is_fast_build &&
+      path.normalize(entry.script).startsWith(`${path.normalize('src/武侠')}${path.sep}`);
 
     return {
       name: configurationName,
@@ -290,6 +293,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
           config: [
             import.meta.filename,
             path.join(import.meta.dirname, 'package.json'),
+            path.join(import.meta.dirname, 'pnpm-lock.yaml'),
             path.join(import.meta.dirname, 'tsconfig.json'),
           ],
         },
@@ -530,7 +534,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
               template: path.join(import.meta.dirname, entry.html),
               filename: path.parse(entry.html).base,
               scriptLoading: 'module',
-              cache: is_fast_build,
+              cache: is_fast_wuxia_build,
               hash: false,
             }),
             new HtmlInlineScriptWebpackPlugin(),
@@ -544,12 +548,12 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
       )
         .concat(
           { apply: watch_tavern_helper },
-          ...(is_fast_build ? [] : [{ apply: schema_dump }]),
+          ...(is_fast_wuxia_build ? [] : [{ apply: schema_dump }]),
           ...(env_flag_enabled(env, 'srcOnly') ? [] : [{ apply: tavern_sync }]),
           ...(is_event_script_entry(entry.script) ? [new EventDataAssetPlugin()] : []),
           new VueLoaderPlugin(),
           unpluginAutoImport({
-            dts: !is_fast_build,
+            dts: !is_fast_wuxia_build,
             dtsMode: 'overwrite',
             imports: [
               'vue',
@@ -562,7 +566,7 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
             ],
           }),
           unpluginVueComponents({
-            dts: !is_fast_build,
+            dts: !is_fast_wuxia_build,
             syncMode: 'overwrite',
             // globs: ['src/panel/component/*.vue'],
             resolvers: [VueUseComponentsResolver(), VueUseDirectiveResolver()],
