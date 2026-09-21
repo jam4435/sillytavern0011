@@ -169,7 +169,7 @@ describe('runDirectChatVariableWrite', () => {
     );
   });
 
-  it('底层 ERA 等待器先监听后 emit，且不发送 sourced 完成事件', async () => {
+  it('底层 ERA 等待器先监听后 emit，并统一发送 sourced 完成事件', async () => {
     const executionOrder: string[] = [];
 
     eventOn('era:updateByObject', async () => {
@@ -204,9 +204,25 @@ describe('runDirectChatVariableWrite', () => {
       timeoutMessage: 'timeout',
     });
 
-    expect(result).toEqual({ message_id: 52, actions: { apiWrite: true } });
+    expect(result).toEqual(
+      expect.objectContaining({
+        source: 'event-script',
+        reason: 'event-diff-update',
+        eventName: 'era:updateByObject',
+        attribution: 'background',
+        message_id: 52,
+        actions: { apiWrite: true },
+      }),
+    );
     expect(executionOrder).toEqual(['era:updateByObject']);
-    expect(eventEmitMock.mock.calls.some(([eventName]) => eventName === ERA_VARIABLE_WRITE_DONE_EVENT)).toBe(false);
+    expect(eventEmitMock).toHaveBeenCalledWith(
+      ERA_VARIABLE_WRITE_DONE_EVENT,
+      expect.objectContaining({
+        source: 'event-script',
+        reason: 'event-diff-update',
+        message_id: 52,
+      }),
+    );
   });
 
   it('批事务等待器忽略其他事务，并匹配合并 flush 的 transactionIds', async () => {
@@ -248,11 +264,15 @@ describe('runDirectChatVariableWrite', () => {
       timeoutMessage: 'timeout',
     });
 
-    expect(result).toEqual({
-      message_id: 81,
-      actions: { apiWrite: true },
-      transactionIds: ['coalesced-transaction', 'target-transaction'],
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        source: 'frontend',
+        reason: 'meridian-upgrade',
+        message_id: 81,
+        actions: { apiWrite: true },
+        transactionIds: ['coalesced-transaction', 'target-transaction'],
+      }),
+    );
   });
 
   it('带来源事务完成事件保留单事务 transactionId 与规范化 transactionIds', async () => {
@@ -331,7 +351,14 @@ describe('runDirectChatVariableWrite', () => {
     try {
       await new Promise<void>(resolve => setTimeout(resolve, 0));
       expect(settled).toBe(true);
-      await expect(resultPromise).resolves.toEqual({ message_id: 77, actions: { apiWrite: true } });
+      await expect(resultPromise).resolves.toEqual(
+        expect.objectContaining({
+          source: 'frontend',
+          reason: 'extra-variable-api-write',
+          message_id: 77,
+          actions: { apiWrite: true },
+        }),
+      );
     } finally {
       releasePostProcess?.();
     }
