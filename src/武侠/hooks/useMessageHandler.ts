@@ -1086,7 +1086,7 @@ export function useMessageHandler({
     [handleSendMessage, patchLatestDebugRound, showError],
   );
 
-  const handleRegenerateLastAssistant = useCallback(async (replacementUserInput?: string): Promise<void> => {
+  const handleRegenerateLastAssistant = useCallback(async (replacementUserInput?: string): Promise<boolean | void> => {
     const isEditingPreviousInput = typeof replacementUserInput === 'string';
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     messageLogger.log(isEditingPreviousInput ? '🔁 修改上一轮输入并重新生成最新回复' : '🔁 开始重新生成最新回复');
@@ -1212,6 +1212,7 @@ export function useMessageHandler({
       }
 
       dismissToast();
+      return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       messageLogger.error('重新生成失败:', error);
@@ -1223,6 +1224,7 @@ export function useMessageHandler({
         },
       });
       showError(`重新生成失败：${errorMessage}`);
+      return false;
     } finally {
       extraVariableUpdateReservation?.release();
       setIsLoading(false);
