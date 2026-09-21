@@ -286,34 +286,14 @@ const appendLimited = <T,>(existing: T[], additions: T[]): { values: T[]; omitte
   };
 };
 
-const mergeParsedDeclaredStates = (...parsedList: ParsedDeclaredVariableChanges[]): ParsedDeclaredVariableChanges => {
-  const latestByPath = new Map<string, VariableDeclaredChange>();
-  const thoughts: VariableThoughtEntry[] = [];
-  const parseErrors: string[] = [];
-  let omittedDeclaredCount = 0;
-
-  for (const parsed of parsedList) {
-    thoughts.push(...parsed.thoughts);
-    parseErrors.push(...parsed.parseErrors);
-    omittedDeclaredCount += parsed.omittedDeclaredCount;
-    for (const change of parsed.declaredChanges) {
-      const key = getPathKey(change.path);
-      latestByPath.delete(key);
-      latestByPath.set(key, change);
-    }
+const parseAiDeclaredState = (activeTurn: ActiveVariableTurn): ParsedDeclaredVariableChanges => {
+  // extra 模式下，额外变量模型才是本轮“变量模型”；正文模型只负责正文。
+  // inline 模式没有 extra blocks，此时正文模型变量块就是 AI 声明。
+  if (activeTurn.extraDeclaredBlocks.trim()) {
+    return parseDeclaredVariableChanges(activeTurn.extraDeclaredBlocks);
   }
-
-  const all = [...latestByPath.values()];
-  const declaredChanges = all.slice(0, MAX_STORED_VARIABLE_CHANGES);
-  omittedDeclaredCount += Math.max(0, all.length - declaredChanges.length);
-  return { declaredChanges, thoughts, parseErrors, omittedDeclaredCount };
+  return parseDeclaredVariableChanges(activeTurn.assistantDeclaredReply);
 };
-
-const parseAiDeclaredState = (activeTurn: ActiveVariableTurn): ParsedDeclaredVariableChanges =>
-  mergeParsedDeclaredStates(
-    parseDeclaredVariableChanges(activeTurn.assistantDeclaredReply),
-    parseDeclaredVariableChanges(activeTurn.extraDeclaredBlocks),
-  );
 
 const declaredSignature = (change: VariableDeclaredChange): string =>
   stableStringify({
