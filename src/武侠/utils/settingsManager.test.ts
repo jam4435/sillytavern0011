@@ -9,6 +9,7 @@ import {
   ERA_BASE_REGEX_RULE,
   EVENT_AUDIT_REGEX_RULE,
   EVENT_STAGE_TAG_REGEX_RULE,
+  getPresetStorageCleanupRecommendation,
   getRegexRuleContentSignature,
   getRegexRulesForDisplay,
   getThemeAppearanceDefaults,
@@ -338,6 +339,70 @@ describe('settingsManager ui theme', () => {
       const signature = getRegexRuleContentSignature(thinkRule);
 
       expect(stripSelectedPresetRegexMatches(input, [thinkRule], [signature])).toBe('正文');
+    });
+
+    it('keeps a compatibility think/thinking regex as the exact matched XML block', () => {
+      const compatibilityRule = {
+        ...thinkingRule,
+        id: 'thinking-compatible',
+        pattern: '/\\<(?:think|thinking)>([\\s\\S]*?)\\<\\/(?:think|thinking)>/gi',
+      };
+      const recommendation = getPresetStorageCleanupRecommendation(compatibilityRule);
+      const signature = getRegexRuleContentSignature(compatibilityRule);
+
+      expect(recommendation).toMatchObject({
+        kind: 'recommended',
+        allowLargeMatch: true,
+      });
+      expect(recommendation.matchDescription).toContain('<think|thinking>');
+      expect(
+        stripSelectedPresetRegexMatches(
+          '<thinking>很长很长很长很长很长很长很长很长的思维内容</thinking>正文',
+          [compatibilityRule],
+          [signature],
+        ),
+      ).toBe('正文');
+    });
+
+    it('recognizes a thinking prefix ending at a special marker without inventing a wider regex', () => {
+      const markerRule = {
+        ...thinkingRule,
+        id: 'thinking-end-marker',
+        pattern: '/^[\\s\\S]*?【思维链结束】/i',
+        replacement: '',
+        description: '思维链特殊结束标记',
+      };
+      const recommendation = getPresetStorageCleanupRecommendation(markerRule);
+      const signature = getRegexRuleContentSignature(markerRule);
+
+      expect(recommendation).toMatchObject({
+        kind: 'recommended',
+        matchDescription: '思维链前缀块：从回复开头到结束标记（含标记）',
+        allowLargeMatch: true,
+      });
+      expect(
+        stripSelectedPresetRegexMatches(
+          '很长很长很长很长很长很长很长很长的无标签思维链【思维链结束】正文',
+          [markerRule],
+          [signature],
+        ),
+      ).toBe('正文');
+    });
+
+    it('does not reinterpret separate opening/closing-tag alternatives as a whole XML block', () => {
+      const tagOnlyRule = {
+        ...thinkingRule,
+        id: 'tag-only',
+        pattern: '/<Interleaving>\\n?|<\\/Interleaving>/g',
+        replacement: '',
+        description: '标签剥离',
+      };
+
+      expect(getPresetStorageCleanupRecommendation(tagOnlyRule)).toMatchObject({
+        kind: 'manual',
+        allowLargeMatch: false,
+        matchDescription: '原正则实际命中的区间（清理时整段删除，不执行 replacement）',
+      });
     });
 
     it('protects the configured preset summary XML block from module filtering', () => {
