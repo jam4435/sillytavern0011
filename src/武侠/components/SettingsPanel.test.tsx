@@ -198,6 +198,44 @@ describe('SettingsPanel theme controls', () => {
     );
   });
 
+  it('keeps global and current-preset regex groups collapsed by default', () => {
+    renderSettingsPanel(createDefaultDisplaySettings());
+
+    fireEvent.click(screen.getByRole('button', { name: '正则替换' }));
+    expect(screen.getByRole('button', { name: /全局共享规则 · 0/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /当前预设规则 · 0/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('添加全局规则')).not.toBeInTheDocument();
+  });
+
+  it('lets preset-summary mode configure the XML tag used for context compression', () => {
+    const defaults = createDefaultDisplaySettings();
+    const settings = {
+      ...defaults,
+      summarySettings: {
+        ...defaults.summarySettings,
+        conversationSummaryMode: 'preset' as const,
+        conversationSummaryPresetTag: 'summary',
+      },
+    };
+    const onSettingsChange = renderSettingsPanel(settings);
+
+    fireEvent.click(screen.getByRole('button', { name: '额外模型' }));
+    openSettingsBlock('对话摘要');
+
+    const tagInput = screen.getByLabelText('预设摘要 XML 标签');
+    expect(tagInput).toHaveValue('summary');
+    expect(screen.getByLabelText('最近完整 assistant 回复')).toBeEnabled();
+
+    fireEvent.change(tagInput, { target: { value: '<memory>' } });
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      ...settings,
+      summarySettings: {
+        ...settings.summarySettings,
+        conversationSummaryPresetTag: '<memory>',
+      },
+    });
+  });
+
   it('updates only the extra-variable readonly context round count', () => {
     const settings = createDefaultDisplaySettings();
     const onSettingsChange = renderSettingsPanel(settings);

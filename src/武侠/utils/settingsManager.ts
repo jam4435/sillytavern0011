@@ -108,8 +108,10 @@ export interface SummarySettings {
   stream: boolean;
   /** 对话摘要来源：卡内指令 / 兼容玩家预设 / 完全关闭 */
   conversationSummaryMode: ConversationSummaryMode;
-  /** 卡内摘要模式保留完整正文的最近 assistant 回复数 */
+  /** 卡内/预设摘要模式保留完整正文的最近 assistant 回复数 */
   conversationSummaryRecentReplies: number;
+  /** 兼容预设摘要时用于识别逐轮摘要的 XML 标签名 */
+  conversationSummaryPresetTag: string;
   /** 是否把旧逐轮摘要自动压缩为长期章节摘要 */
   conversationArchiveEnabled: boolean;
   /** 每个长期章节摘要包含的旧逐轮摘要数量 */
@@ -224,7 +226,7 @@ export interface DisplaySettings {
   // 正则替换规则
   localRegexRules: RegexRule[];
   presetRegexRulesByPreset: RegexRulesByPreset;
-  /** 当前预设中已由玩家确认可从长期聊天存档剥离的正则内容签名 */
+  /** 当前预设中已由玩家确认启用“无用模块过滤”的正则内容签名（字段名保留用于兼容旧设置） */
   presetStorageExcludedRegexSignaturesByPreset: PresetStorageExcludedRegexSignaturesByPreset;
 
   // 自动总结设置
@@ -557,6 +559,7 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   stream: false,
   conversationSummaryMode: 'off',
   conversationSummaryRecentReplies: 5,
+  conversationSummaryPresetTag: 'summary',
   conversationArchiveEnabled: false,
   conversationArchiveBatchSize: 10,
   apiProfiles: [],
@@ -1003,6 +1006,10 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       Number.isFinite(summarySettings.conversationSummaryRecentReplies)
         ? Math.max(1, Math.min(20, Math.floor(summarySettings.conversationSummaryRecentReplies)))
         : defaults.conversationSummaryRecentReplies,
+    conversationSummaryPresetTag:
+      typeof summarySettings.conversationSummaryPresetTag === 'string' && summarySettings.conversationSummaryPresetTag.trim()
+        ? summarySettings.conversationSummaryPresetTag.trim()
+        : defaults.conversationSummaryPresetTag,
     conversationArchiveEnabled:
       typeof summarySettings.conversationArchiveEnabled === 'boolean'
         ? summarySettings.conversationArchiveEnabled
@@ -1368,7 +1375,7 @@ export function getCurrentPresetRegexRules(settings: DisplaySettings, currentPre
 }
 
 /**
- * 当前预设里可作为“附加块存档过滤”候选的酒馆正则。
+ * 当前预设里可作为“无用模块过滤”候选的酒馆正则。
  * 只读取当前预设、已启用、作用于 AI 输出与格式显示的规则；角色卡自己的正则不参与。
  */
 export function getPresetStorageCleanupCandidates(): RegexRule[] {
@@ -1392,7 +1399,7 @@ export function getPresetStorageCleanupCandidates(): RegexRule[] {
         originScope: 'preset' as const,
       }));
   } catch (error) {
-    dataLogger.error('读取预设附加块清理候选失败:', error);
+    dataLogger.error('读取无用模块过滤候选失败:', error);
     return [];
   }
 }
@@ -1681,7 +1688,23 @@ const PERSISTENCE_PROTECTED_BLOCK_REGEX =
 
 type TextRange = { start: number; end: number };
 
-function getPersistenceProtectedRanges(text: string): TextRange[] {
+function escapeRegExpText(value: string): string {
+  return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+/**
+ * 允许设置里填写 summary、<summary> 或 </summary> 这类形式。
+ * 返回值只保留 XML 标签名；无法识别时回退为 summary。
+ */
+export function normalizeConversationSummaryTag(value: string): string {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return 'summary';
+  const bracketed = trimmed.match(/^<\s*\/?\s*([^\s/>]+)/);
+  const candidate = (bracketed?.[1] || trimmed).replace(/^\/+|\/+$/g, '').trim();
+  return candidate && !/[<>\s/]/.test(candidate) ? candidate : 'summary';
+}
+
+function getPersistenceProtectedRanges(text: string, protectedSummaryTag = 'summary'): TextRange[] {
   const ranges: TextRange[] = [];
   PERSISTENCE_PROTECTED_BLOCK_REGEX.lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -1689,6 +1712,21 @@ function getPersistenceProtectedRanges(text: string): TextRange[] {
     ranges.push({ start: match.index, end: match.index + match[0].length });
     if (match[0].length === 0) {
       PERSISTENCE_PROTECTED_BLOCK_REGEX.lastIndex += 1;
+    }
+  }
+
+  const normalizedTag = normalizeConversationSummaryTag(protectedSummaryTag);
+  if (normalizedTag.toLowerCase() !== 'summary') {
+    const escapedTag = escapeRegExpText(normalizedTag);
+    const dynamicSummaryRegex = new RegExp(
+      '<' + escapedTag + '\\b[^>]*>[\\s\\S]*?<\\/' + escapedTag + '>',
+      'gi',
+    );
+    while ((match = dynamicSummaryRegex.exec(text)) !== null) {
+      ranges.push({ start: match.index, end: match.index + match[0].length });
+      if (match[0].length === 0) {
+        dynamicSummaryRegex.lastIndex += 1;
+      }
     }
   }
   return ranges;
@@ -1699,14 +1737,14 @@ function overlapsProtectedRange(start: number, end: number, protectedRanges: Tex
 }
 
 function isCompleteThinkingBlock(text: string): boolean {
-  return /^\s*<thinking\b[^>]*>[\s\S]*<\/thinking>\s*$/i.test(text);
+  return /^\s*<(think|thinking)\b[^>]*>[\s\S]*<\/\1>\s*$/i.test(text);
 }
 
 /**
- * 删除玩家已确认的“预设附加块”原文。
+ * 删除玩家已确认的“无用模块”原文。
  *
- * 注意：这里不是执行预设的 replacement，而是把该正则匹配到的原始区间从长期聊天存档中剥离。
- * VariableThink/Insert/Edit/Delete、summary、era_data 永远受保护。
+ * 注意：这里不是执行预设的 replacement，而是把该正则匹配到的原始区间从持久化文本或最终 AI 上下文中剥离。
+ * VariableThink/Insert/Edit/Delete、summary、era_data 以及兼容预设模式下配置的摘要标签永远受保护。
  * 一般规则若一次会删掉 80% 以上文本或把整条回复删空，则视为疑似正文/整楼匹配并拒绝执行。
  * 完整的 <thinking>...</thinking> 匹配是 80% 占比保护的唯一例外，因为它明确不是正文；
  * 但即使是 thinking，也不允许把整条 assistant 回复清成空字符串。
@@ -1715,6 +1753,7 @@ export function stripSelectedPresetRegexMatches(
   text: string,
   rules: RegexRule[],
   selectedSignatures: string[],
+  protectedSummaryTag = 'summary',
 ): string {
   if (!text || selectedSignatures.length === 0 || rules.length === 0) {
     return text;
@@ -1731,7 +1770,7 @@ export function stripSelectedPresetRegexMatches(
     try {
       const { pattern, flags } = parseRegexString(rule.pattern);
       const regex = getCachedRegex(pattern, flags);
-      const protectedRanges = getPersistenceProtectedRanges(result);
+      const protectedRanges = getPersistenceProtectedRanges(result, protectedSummaryTag);
       const removals: TextRange[] = [];
       let allRemovalsAreThinkingBlocks = true;
       let match: RegExpExecArray | null;
@@ -1756,7 +1795,7 @@ export function stripSelectedPresetRegexMatches(
       }
       if (removedLength / Math.max(1, result.length) >= 0.8 && !allRemovalsAreThinkingBlocks) {
         dataLogger.warn(
-          `预设存档过滤已跳过疑似整楼规则「${rule.description || rule.pattern}」：将删除 ${Math.round(
+          `无用模块过滤已跳过疑似整楼规则「${rule.description || rule.pattern}」：将删除 ${Math.round(
             (removedLength / Math.max(1, result.length)) * 100,
           )}% 原文。`,
         );
@@ -1771,12 +1810,12 @@ export function stripSelectedPresetRegexMatches(
         });
 
       if (result.trim() && !next.trim()) {
-        dataLogger.warn(`预设存档过滤已跳过会清空整条回复的规则「${rule.description || rule.pattern}」。`);
+        dataLogger.warn(`无用模块过滤已跳过会清空整条回复的规则「${rule.description || rule.pattern}」。`);
         continue;
       }
       result = next;
     } catch (error) {
-      dataLogger.warn(`预设存档过滤规则 "${rule.pattern}" 无效:`, error);
+      dataLogger.warn(`无用模块过滤规则 "${rule.pattern}" 无效:`, error);
     }
   }
 
@@ -1787,7 +1826,7 @@ export function stripSelectedPresetRegexMatches(
  * 使用当前加载预设中玩家已经确认的规则，清理即将写入聊天的 assistant 文本。
  * 原始模型输出仍由调试链路单独保留；这里只处理长期聊天正文。
  */
-export function applyCurrentPresetStorageCleanup(text: string): string {
+export function applyCurrentPresetModuleFilter(text: string): string {
   const presetName = getLoadedPresetNameSafe();
   if (!text || !presetName) {
     return text;
@@ -1797,8 +1836,20 @@ export function applyCurrentPresetStorageCleanup(text: string): string {
   if (selectedSignatures.length === 0) {
     return text;
   }
-  return stripSelectedPresetRegexMatches(text, getPresetStorageCleanupCandidates(), selectedSignatures);
+  const protectedSummaryTag =
+    settings.summarySettings.conversationSummaryMode === 'preset'
+      ? settings.summarySettings.conversationSummaryPresetTag
+      : 'summary';
+  return stripSelectedPresetRegexMatches(
+    text,
+    getPresetStorageCleanupCandidates(),
+    selectedSignatures,
+    protectedSummaryTag,
+  );
 }
+
+/** @deprecated 兼容旧调用名；实际过滤同时服务于长期存档与发送给 AI 的上下文。 */
+export const applyCurrentPresetStorageCleanup = applyCurrentPresetModuleFilter;
 
 export function applyRegexRules(text: string, rules: RegexRule[]): string {
   let result = text;

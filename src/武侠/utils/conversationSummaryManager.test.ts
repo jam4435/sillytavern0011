@@ -4,8 +4,11 @@ import {
   applyConversationSummaryModeState,
   buildConversationSummaryRegexes,
   filterArchivedSummariesFromPrompt,
+  filterPresetSummaryContextFromPrompt,
+  filterSelectedPresetModulesFromPrompt,
   syncConversationSummaryRegexes,
 } from './conversationSummaryManager';
+import { getRegexRuleContentSignature } from './settingsManager';
 
 describe('conversationSummaryManager', () => {
   afterEach(() => {
@@ -102,6 +105,95 @@ describe('conversationSummaryManager', () => {
     expect(status).toContain('本次初始化未改写角色正则');
     expect(updateWorldbook).not.toHaveBeenCalled();
     expect(updateRegex).not.toHaveBeenCalled();
+  });
+
+  it('filters player-confirmed useless preset modules from the final chat-completion prompt', () => {
+    const pattern = '/<think>[\\s\\S]*?<\\/think>/gi';
+    const replacement = '<details>折叠</details>';
+    const description = '思维链折叠';
+    const signature = getRegexRuleContentSignature({
+      pattern,
+      replacement,
+      description,
+    });
+
+    vi.stubGlobal('getLoadedPresetName', vi.fn(() => '测试预设'));
+    vi.stubGlobal(
+      'getPreset',
+      vi.fn(() => ({
+        extensions: {
+          regex_scripts: [
+            {
+              id: 'thinking',
+              script_name: description,
+              enabled: true,
+              find_regex: pattern,
+              replace_string: replacement,
+              trim_strings: [],
+              source: { user_input: false, ai_output: true, slash_command: false, world_info: false, reasoning: false },
+              destination: { display: true, prompt: false },
+              run_on_edit: true,
+              min_depth: null,
+              max_depth: null,
+            },
+          ],
+        },
+      })),
+    );
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({
+        presetStorageExcludedRegexSignaturesByPreset: {
+          测试预设: [signature],
+        },
+      }),
+    );
+
+    const chat = [
+      { role: 'system' as const, content: '设定' },
+      { role: 'assistant' as const, content: '<think>不应再发送的旧思维链</think>正文保留' },
+    ];
+
+    expect(filterSelectedPresetModulesFromPrompt(chat)).toBe(1);
+    expect(chat[1].content).toBe('正文保留');
+    window.localStorage.clear();
+  });
+
+  it('uses the configured preset XML tag to keep recent body text and compress older rounds', () => {
+    const chat = [
+      { role: 'system' as const, content: '设定' },
+      { role: 'user' as const, content: '旧用户1' },
+      { role: 'assistant' as const, content: '旧正文1\n<memory>旧摘要1</memory>' },
+      { role: 'user' as const, content: '旧用户2' },
+      { role: 'system' as const, content: '深度世界书' },
+      { role: 'assistant' as const, content: '旧正文2\n<memory>旧摘要2</memory>' },
+      { role: 'user' as const, content: '当前用户' },
+      { role: 'assistant' as const, content: '当前正文\n<memory>当前摘要</memory>' },
+    ];
+
+    expect(filterPresetSummaryContextFromPrompt(chat, 1, '<memory>')).toBe(5);
+    expect(chat).toEqual([
+      { role: 'system', content: '设定' },
+      { role: 'assistant', content: '<memory>旧摘要1</memory>' },
+      { role: 'system', content: '深度世界书' },
+      { role: 'assistant', content: '<memory>旧摘要2</memory>' },
+      { role: 'user', content: '当前用户' },
+      { role: 'assistant', content: '当前正文' },
+    ]);
+  });
+
+  it('does not delete an old preset round when that assistant reply has no configured summary tag', () => {
+    const chat = [
+      { role: 'user' as const, content: '旧用户' },
+      { role: 'assistant' as const, content: '预设本轮漏掉了摘要标签' },
+      { role: 'user' as const, content: '当前用户' },
+      { role: 'assistant' as const, content: '当前正文<memory>当前摘要</memory>' },
+    ];
+
+    filterPresetSummaryContextFromPrompt(chat, 1, 'memory');
+    expect(chat[0]).toEqual({ role: 'user', content: '旧用户' });
+    expect(chat[1]).toEqual({ role: 'assistant', content: '预设本轮漏掉了摘要标签' });
+    expect(chat.at(-1)).toEqual({ role: 'assistant', content: '当前正文' });
   });
 
   it('removes already archived summary messages and their paired user messages from the final prompt', () => {

@@ -53,7 +53,7 @@ import { isChatRenamePending } from '../../shared/chatRenameJournal';
 import { getLocationScopePath, isSameLocationScope } from '../../shared/locationPath.js';
 import { wuxiaCalendarDateToTotalDays } from '../../shared/wuxiaCalendar.js';
 import { dataLogger } from './logger';
-import { applyCurrentPresetStorageCleanup } from './settingsManager';
+import { applyCurrentPresetModuleFilter } from './settingsManager';
 import { buildMeridianProjection, deriveMeridianModifiers } from './meridianSystem';
 import { getTraitModifierSources } from './traitsDatabase';
 
@@ -380,7 +380,7 @@ export function normalizeAssistantReplyForPersistence(messageContent: string): s
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  return applyCurrentPresetStorageCleanup(normalized)
+  return applyCurrentPresetModuleFilter(normalized)
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

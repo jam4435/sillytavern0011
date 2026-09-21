@@ -28,6 +28,7 @@ export function cleanChatMessagePresetBlocks(
   message: ChatMessageForCleanup,
   rules: ReturnType<typeof getPresetStorageCleanupCandidates>,
   selectedSignatures: string[],
+  protectedSummaryTag = 'summary',
 ): { patch: Partial<ChatMessageForCleanup> | null; updatedSwipes: number; removedCharacters: number } {
   if (message.role !== 'assistant') {
     return { patch: null, updatedSwipes: 0, removedCharacters: 0 };
@@ -39,7 +40,7 @@ export function cleanChatMessagePresetBlocks(
 
   if (Array.isArray(message.swipes) && message.swipes.length > 0) {
     const nextSwipes = message.swipes.map(text => {
-      const next = stripSelectedPresetRegexMatches(text, rules, selectedSignatures);
+      const next = stripSelectedPresetRegexMatches(text, rules, selectedSignatures, protectedSummaryTag);
       if (next !== text) {
         updatedSwipes += 1;
         removedCharacters += Math.max(0, text.length - next.length);
@@ -68,7 +69,7 @@ export function cleanChatMessagePresetBlocks(
   }
 
   const currentMessage = message.message ?? '';
-  const nextMessage = stripSelectedPresetRegexMatches(currentMessage, rules, selectedSignatures);
+  const nextMessage = stripSelectedPresetRegexMatches(currentMessage, rules, selectedSignatures, protectedSummaryTag);
   if (nextMessage === currentMessage) {
     return { patch: null, updatedSwipes: 0, removedCharacters: 0 };
   }
@@ -79,7 +80,7 @@ export function cleanChatMessagePresetBlocks(
 
 /**
  * 对当前聊天做一次显式的、玩家确认后的历史瘦身。
- * 只应用当前预设中已勾选的附加块规则；不会删除 VariableThink/ERA/summary 等受保护块。
+ * 只应用当前预设中已勾选的“无用模块过滤”规则；不会删除 VariableThink/ERA/summary 或配置的预设摘要标签等受保护块。
  */
 export async function cleanupCurrentChatPresetBlocks(
   settings: DisplaySettings,
@@ -119,7 +120,14 @@ export async function cleanupCurrentChatPresetBlocks(
   let removedCharacters = 0;
 
   for (const message of messages) {
-    const cleaned = cleanChatMessagePresetBlocks(message, candidateRules, selectedSignatures);
+    const cleaned = cleanChatMessagePresetBlocks(
+      message,
+      candidateRules,
+      selectedSignatures,
+      settings.summarySettings.conversationSummaryMode === 'preset'
+        ? settings.summarySettings.conversationSummaryPresetTag
+        : 'summary',
+    );
     if (!cleaned.patch) {
       continue;
     }
