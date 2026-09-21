@@ -57,7 +57,7 @@ export interface EraVariableWriteDoneDetail extends EraVariableWriteMetadata {
   actions: Record<string, boolean> | null;
   transactionId?: string;
   transactionIds?: string[];
-  /** 从发出本次 ERA 写入到匹配自己的 writeDone 后观察到的实际 stat_data 差异。 */
+  /** 本次 ERA 请求目标路径上的实际 stat_data 差异；已排除同一等待窗口里的无关并发写入。 */
   changes: VariableSnapshotDiffChange[];
 }
 
