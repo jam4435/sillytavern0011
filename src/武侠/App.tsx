@@ -1766,7 +1766,7 @@ const App: React.FC = () => {
                   </div>
                   <button
                     type="button"
-                    className={`latest-reply-trigger ${isRegenerateInputEditMode ? 'is-active' : ''}`}
+                    className={`latest-reply-trigger regenerate-input-edit-trigger ${isRegenerateInputEditMode ? 'is-active' : ''}`}
                     onClick={handlePrepareRegenerateInputEdit}
                     disabled={!canRegenerate || historyMutationPending || isLoading}
                     title={
