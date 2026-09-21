@@ -53,6 +53,21 @@ describe('runDirectChatVariableWrite', () => {
     expect(executionOrder).toEqual(['writer', 'event']);
   });
 
+  it('直接写入已经成功时，来源事件监听器失败不会反向把业务写入判成失败', async () => {
+    eventEmitMock.mockRejectedValueOnce(new Error('observer failed'));
+
+    await expect(
+      runDirectChatVariableWrite(
+        {
+          source: 'variable-editor',
+          operation: 'update',
+          reason: 'observer-failure-after-write',
+        },
+        async () => ({ ok: true }),
+      ),
+    ).resolves.toEqual({ ok: true });
+  });
+
   it('写入失败时不发送完成事件', async () => {
     const error = new Error('write failed');
 
@@ -165,12 +180,23 @@ describe('runDirectChatVariableWrite', () => {
       expect.objectContaining({
         reason: 'single-transaction',
         refreshHint: 'event-state',
+        changes: [
+          expect.objectContaining({
+            action: 'insert',
+            path: ['eventState'],
+            beforeValue: undefined,
+            afterValue: true,
+          }),
+        ],
       }),
     );
   });
 
   it('底层 ERA 等待器先监听后 emit，并统一发送 sourced 完成事件', async () => {
     const executionOrder: string[] = [];
+    vi.mocked(globalThis.getVariables)
+      .mockImplementationOnce(() => ({ stat_data: { user数据: { 修为: 100 } } }))
+      .mockImplementationOnce(() => ({ stat_data: { user数据: { 修为: 110 } } }));
 
     eventOn('era:updateByObject', async () => {
       executionOrder.push('era:updateByObject');
@@ -212,6 +238,14 @@ describe('runDirectChatVariableWrite', () => {
         attribution: 'background',
         message_id: 52,
         actions: { apiWrite: true },
+        changes: [
+          expect.objectContaining({
+            action: 'edit',
+            path: ['user数据', '修为'],
+            beforeValue: 100,
+            afterValue: 110,
+          }),
+        ],
       }),
     );
     expect(executionOrder).toEqual(['era:updateByObject']);
