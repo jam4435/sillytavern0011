@@ -1374,30 +1374,167 @@ export function getCurrentPresetRegexRules(settings: DisplaySettings, currentPre
   return settings.presetRegexRulesByPreset[normalizedPresetName] || [];
 }
 
+const PRESET_STORAGE_PROTECTED_TAGS = new Set([
+  'summary',
+  'era_data',
+  'variablethink',
+  'variableinsert',
+  'variableedit',
+  'variabledelete',
+]);
+
+function normalizeRegexPatternForTagScan(pattern: string): string {
+  return pattern.replace(/\\([<>/])/g, '$1');
+}
+
+function escapeRegexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * 从“显示正则”中提取可以独立删除的完整 XML 区块。
+ *
+ * 这里刻意只接受“同一静态标签同时出现开始与结束标签”的情形；
+ * 例如整楼提取 <summary> 的正则会被保护，而只在 lookbehind 里出现的 <details>
+ * 不会被误认为应该删除的模块。
+ */
+export function extractPresetStorageCleanupTags(pattern: string): string[] {
+  const normalized = normalizeRegexPatternForTagScan(pattern);
+  const lower = normalized.toLowerCase();
+  const tags = new Map<string, string>();
+
+  for (const match of normalized.matchAll(/<\s*([A-Za-z][\w:-]*)\b/g)) {
+    const tag = match[1];
+    const tagLower = tag.toLowerCase();
+    if (PRESET_STORAGE_PROTECTED_TAGS.has(tagLower)) continue;
+    const closePattern = new RegExp(`<\\s*\\/\\s*${escapeRegexLiteral(tag)}\\b`, 'i');
+    if (closePattern.test(normalized)) {
+      tags.set(tagLower, tag);
+    }
+  }
+
+  const hasThinkingPair =
+    (lower.includes('<(?:think|thinking)') && lower.includes('</(?:think|thinking)')) ||
+    (lower.includes('<(?:thinking|think)') && lower.includes('</(?:thinking|think)'));
+  if (hasThinkingPair) {
+    tags.set('think', 'think');
+    tags.set('thinking', 'thinking');
+  }
+
+  return [...tags.values()];
+}
+
+function createExtractedPresetStorageCleanupRule(tag: string, sourceName: string): RegexRule {
+  const escapedTag = escapeRegexLiteral(tag);
+  return {
+    id: `wuxia-auto-module-${tag.toLowerCase()}`,
+    pattern: `/<${escapedTag}\\b[^>]*\\/\\s*>|<${escapedTag}\\b[^>]*>[\\s\\S]*?<\\/${escapedTag}\\s*>\\s*/gi`,
+    replacement: '',
+    enabled: true,
+    description: `自动识别区块 · <${tag}> · 来源：${sourceName || '未命名预设正则'}`,
+    originScope: 'preset',
+  };
+}
+
+function getRegexBodyForSafetyCheck(pattern: string): string {
+  const compact = pattern.replace(/\s+/g, '');
+  if (!compact.startsWith('/')) return compact;
+  const lastSlash = compact.lastIndexOf('/');
+  return lastSlash > 0 ? compact.slice(1, lastSlash) : compact.slice(1);
+}
+
+function looksLikeWholeMessageExtractor(pattern: string): boolean {
+  const body = getRegexBodyForSafetyCheck(pattern).replace(/^\^/, '').replace(/\$/, '');
+  const startsWide =
+    body.startsWith('[\\s\\S]*') ||
+    body.startsWith('[\\s\\S]*?') ||
+    body.startsWith('.*') ||
+    body.startsWith('.*?');
+  const endsWide =
+    body.endsWith('[\\s\\S]*') ||
+    body.endsWith('[\\s\\S]*?') ||
+    body.endsWith('.*') ||
+    body.endsWith('.*?');
+  return startsWide && endsWide;
+}
+
+export type PresetStorageCleanupRecommendation = {
+  kind: 'recommended' | 'manual' | 'unsafe';
+  reason: string;
+};
+
+export function getPresetStorageCleanupRecommendation(
+  rule: Pick<RegexRule, 'description' | 'pattern' | 'replacement'>,
+): PresetStorageCleanupRecommendation {
+  if (rule.description?.startsWith('自动识别区块 ·')) {
+    return { kind: 'recommended', reason: '从预设显示正则中提取出的完整 XML 区块，可独立安全删除。' };
+  }
+
+  const normalized = normalizeRegexPatternForTagScan(rule.pattern).toLowerCase();
+  const protectedTag = [...PRESET_STORAGE_PROTECTED_TAGS].find(
+    tag =>
+      normalized.includes(`<${tag}`) ||
+      normalized.includes(`</${tag}`) ||
+      (tag.startsWith('variable') && normalized.includes(tag)),
+  );
+  if (protectedTag) {
+    return { kind: 'unsafe', reason: `命中受保护区块 <${protectedTag}>，不会自动作为删除规则。` };
+  }
+
+  if (looksLikeWholeMessageExtractor(rule.pattern)) {
+    return {
+      kind: 'unsafe',
+      reason: '该正则看起来会从开头匹配到结尾，常用于“提取保留内容”，不能把整个命中区间当成无用模块删除。',
+    };
+  }
+
+  return {
+    kind: 'manual',
+    reason: rule.replacement.trim()
+      ? '这是替换/美化型显示规则，是否删除原始命中内容需要人工确认。'
+      : '没有足够结构证据证明它只命中独立模块，保留人工选择。',
+  };
+}
+
 /**
  * 当前预设里可作为“无用模块过滤”候选的酒馆正则。
- * 只读取当前预设、已启用、作用于 AI 输出与格式显示的规则；角色卡自己的正则不参与。
+ * 除原始显示正则外，还会从正则中提取成对 XML 标签生成“区块级”候选，
+ * 这样混合正则里的 disclaimer / Reference_Example / Interleaving / thinking 等
+ * 可以单独过滤，而不用把整条混合规则照搬成破坏性删除。
  */
 export function getPresetStorageCleanupCandidates(): RegexRule[] {
   try {
-    return getRawPresetRegexesFromInUsePreset()
-      .filter(
-        regex =>
-          regex.enabled &&
-          regex.source.ai_output === true &&
-          regex.destination.display === true &&
-          regex.script_name !== '游戏页面' &&
-          (regex.min_depth === null || regex.min_depth <= 0) &&
-          (regex.max_depth === null || regex.max_depth >= 0),
-      )
-      .map(regex => ({
-        id: regex.id || generateId(),
-        pattern: regex.find_regex,
-        replacement: regex.replace_string,
-        enabled: true,
-        description: regex.script_name,
-        originScope: 'preset' as const,
-      }));
+    const rawRegexes = getRawPresetRegexesFromInUsePreset().filter(
+      regex =>
+        regex.enabled &&
+        regex.source.ai_output === true &&
+        regex.destination.display === true &&
+        regex.script_name !== '游戏页面' &&
+        (regex.min_depth === null || regex.min_depth <= 0) &&
+        (regex.max_depth === null || regex.max_depth >= 0),
+    );
+
+    const directRules: RegexRule[] = rawRegexes.map(regex => ({
+      id: regex.id || generateId(),
+      pattern: regex.find_regex,
+      replacement: regex.replace_string,
+      enabled: true,
+      description: regex.script_name,
+      originScope: 'preset' as const,
+    }));
+    const extractedRules = rawRegexes.flatMap(regex =>
+      extractPresetStorageCleanupTags(regex.find_regex).map(tag =>
+        createExtractedPresetStorageCleanupRule(tag, regex.script_name),
+      ),
+    );
+
+    const seen = new Set<string>();
+    return [...extractedRules, ...directRules].filter(rule => {
+      const signature = getRegexRuleContentSignature(rule);
+      if (seen.has(signature)) return false;
+      seen.add(signature);
+      return true;
+    });
   } catch (error) {
     dataLogger.error('读取无用模块过滤候选失败:', error);
     return [];

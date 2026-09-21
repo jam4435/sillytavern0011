@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FilePenLine } from 'lucide-react';
+import { FilePenLine, MessageSquarePen } from 'lucide-react';
 import brandXiakeSealUrl from './assets/icons/jinyong/brand_xiake_seal.svg?url';
 import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
@@ -65,7 +65,7 @@ import {
   type LatestAssistantSnapshot,
 } from './utils/latestAssistantEditor';
 import { getUserCurrentLocation } from './utils/mapUtils';
-import { canRegenerateLastAssistantSwipe } from './utils/messageActions';
+import { canRegenerateLastAssistantSwipe, getLastRegenerateUserInput } from './utils/messageActions';
 import { finalizeCurrentTurn, resumeCheckout } from './utils/saveLoadManager';
 import { renameCurrentChatAutomatically, resumePendingChatRename } from './utils/chatRenameManager';
 import { readRecentInputHistory, type InputHistoryEntry } from './utils/inputHistory';
@@ -199,6 +199,7 @@ const App: React.FC = () => {
   const [currentPresetName, setCurrentPresetName] = useState(() => getLoadedPresetNameSafe());
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
+  const [isRegenerateInputEditMode, setIsRegenerateInputEditMode] = useState(false);
   const [isCommandQueueOpen, setIsCommandQueueOpen] = useState(false);
   const [recentInputHistory, setRecentInputHistory] = useState<InputHistoryEntry[]>(() => readRecentInputHistory());
   const [inputPrefill, setInputPrefill] = useState<{ key: string; message: string } | null>(null);
@@ -846,6 +847,7 @@ const App: React.FC = () => {
         rawReply = await sendMessageWithCommands(message, handleSendMessage);
       } finally {
         setInputPrefill(null);
+        setIsRegenerateInputEditMode(false);
       }
       refreshRecentInputHistory();
       if (historyInputDraft) {
@@ -890,6 +892,7 @@ const App: React.FC = () => {
 
   const handleInputHistorySelect = useCallback(
     (entry: InputHistoryEntry) => {
+      setIsRegenerateInputEditMode(false);
       inputPrefillSequenceRef.current += 1;
       setInputPrefill({
         key: `input-history-${entry.messageId}-${inputPrefillSequenceRef.current}`,
@@ -908,13 +911,42 @@ const App: React.FC = () => {
     [historyInputDraft],
   );
 
-  const handleSafeRegenerate = useCallback(async () => {
-    if (historyMutationPending) {
-      showError('历史分叉或聊天改名仍在同步中，暂时不能重新生成。');
+  const handlePrepareRegenerateInputEdit = useCallback(() => {
+    if (historyMutationPending || isLoading) {
+      showError('当前回合或历史同步仍在处理中，暂时不能修改上一轮输入。');
       return;
     }
-    await handleRegenerateLastAssistant();
-  }, [handleRegenerateLastAssistant, historyMutationPending, showError]);
+    const previousInput = getLastRegenerateUserInput();
+    if (!previousInput) {
+      showError('当前没有可修改并重新生成的上一轮玩家输入。');
+      return;
+    }
+
+    inputPrefillSequenceRef.current += 1;
+    setInputPrefill({
+      key: `regenerate-input-${inputPrefillSequenceRef.current}`,
+      message: previousInput,
+    });
+    setIsRegenerateInputEditMode(true);
+    setIsCommandQueueOpen(false);
+  }, [historyMutationPending, isLoading, showError]);
+
+  const handleSafeRegenerate = useCallback(
+    async (replacementUserInput?: string): Promise<boolean | void> => {
+      if (historyMutationPending) {
+        showError('历史分叉或聊天改名仍在同步中，暂时不能重新生成。');
+        return false;
+      }
+      const success = await handleRegenerateLastAssistant(replacementUserInput);
+      if (success === true) {
+        refreshRecentInputHistory();
+        setIsRegenerateInputEditMode(false);
+        setInputPrefill(null);
+      }
+      return success;
+    },
+    [handleRegenerateLastAssistant, historyMutationPending, refreshRecentInputHistory, showError],
+  );
 
   const handleSafeAutoAdvance = useCallback(
     async (message: string) => {
@@ -1734,6 +1766,21 @@ const App: React.FC = () => {
                   </div>
                   <button
                     type="button"
+                    className={`latest-reply-trigger regenerate-input-edit-trigger ${isRegenerateInputEditMode ? 'is-active' : ''}`}
+                    onClick={handlePrepareRegenerateInputEdit}
+                    disabled={!canRegenerate || historyMutationPending || isLoading}
+                    title={
+                      isRegenerateInputEditMode
+                        ? '正在修改上一轮玩家输入；编辑完成后点击右侧重新生成'
+                        : '把上一轮玩家输入带回输入框，修改后重新生成'
+                    }
+                    aria-label="修改上一轮输入并重新生成"
+                    data-wuxia-automation="edit-last-user-before-regenerate"
+                  >
+                    <MessageSquarePen size={19} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
                     className="latest-reply-trigger"
                     onClick={handleOpenLatestReplyEditor}
                     disabled={!canEditLatestReply}
@@ -1748,8 +1795,9 @@ const App: React.FC = () => {
               onRegenerate={handleSafeRegenerate}
               canRegenerate={canRegenerate && !historyMutationPending}
               isRegenerating={isLoading || historyMutationPending}
+              regenerateDraftMode={isRegenerateInputEditMode}
               disabled={isLoading || historyMutationPending}
-              placeholder="书写你的江湖故事..."
+              placeholder={isRegenerateInputEditMode ? '修改上一轮输入后，点击右侧重新生成...' : '书写你的江湖故事...'}
             />
           </main>
         </div>

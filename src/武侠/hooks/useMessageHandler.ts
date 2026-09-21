@@ -1086,13 +1086,14 @@ export function useMessageHandler({
     [handleSendMessage, patchLatestDebugRound, showError],
   );
 
-  const handleRegenerateLastAssistant = useCallback(async (): Promise<void> => {
+  const handleRegenerateLastAssistant = useCallback(async (replacementUserInput?: string): Promise<boolean | void> => {
+    const isEditingPreviousInput = typeof replacementUserInput === 'string';
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    messageLogger.log('🔁 开始重新生成最新回复');
+    messageLogger.log(isEditingPreviousInput ? '🔁 修改上一轮输入并重新生成最新回复' : '🔁 开始重新生成最新回复');
 
     setIsLoading(true);
-    showLoading('正在重新生成回复...');
-    const debugRoundId = beginDebugRound('重新生成最新回复');
+    showLoading(isEditingPreviousInput ? '正在按修改后的上一轮输入重新生成...' : '正在重新生成回复...');
+    const debugRoundId = beginDebugRound(isEditingPreviousInput ? '修改上一轮输入并重新生成' : '重新生成最新回复');
     const extraVariableDecision = createExtraVariableRunDecision('regenerate', summarySettings);
     patchLatestDebugRound({
       variable: createInitialExtraVariableDecisionPatch(extraVariableDecision),
@@ -1108,6 +1109,7 @@ export function useMessageHandler({
       await acquireWuxiaTurnLock(debugRoundId, turnChatId);
       extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
       const result = await regenerateLastAssistantSwipe({
+        replacementUserInput,
         onCombinedPrompt: prompt => {
           patchLatestDebugRound({ main: { combinedPrompt: prompt } });
         },
@@ -1175,7 +1177,7 @@ export function useMessageHandler({
             }),
           });
           showError(`重新生成已完成，但额外变量更新失败：${errorMessage}`);
-          return;
+          return true;
         }
       }
 
@@ -1188,7 +1190,7 @@ export function useMessageHandler({
         const errorMessage = getErrorMessage(error);
         messageLogger.error('重新生成后的变量提交确认失败:', error);
         showError(`重新生成已完成，但变量提交确认失败：${errorMessage}`);
-        return;
+        return true;
       }
 
       // 回合成功完成（重新生成成功，助手楼层新 swipe 已写入、ERA 已确认）
@@ -1210,6 +1212,7 @@ export function useMessageHandler({
       }
 
       dismissToast();
+      return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       messageLogger.error('重新生成失败:', error);
@@ -1221,6 +1224,7 @@ export function useMessageHandler({
         },
       });
       showError(`重新生成失败：${errorMessage}`);
+      return false;
     } finally {
       extraVariableUpdateReservation?.release();
       setIsLoading(false);
