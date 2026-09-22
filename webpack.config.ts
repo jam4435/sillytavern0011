@@ -576,10 +576,12 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
         ? [new MiniCssExtractPlugin()]
         : [
             new HtmlWebpackPlugin({
-              template: path.join(import.meta.dirname, entry.html),
+              ...(is_fast_wuxia_build
+                ? { templateContent: fs.readFileSync(path.join(import.meta.dirname, entry.html), 'utf8') }
+                : { template: path.join(import.meta.dirname, entry.html) }),
               filename: path.parse(entry.html).base,
               scriptLoading: 'module',
-              cache: is_fast_wuxia_build,
+              cache: false,
               hash: false,
             }),
             new HtmlInlineScriptWebpackPlugin(),
@@ -664,14 +666,10 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
               // 高频本地调试保留 production mode/运行时，但关闭不会影响业务 API
               // 契约、却会在每次构建重跑的生产打包优化。
               concatenateModules: false,
-              flagIncludedChunks: false,
               innerGraph: false,
               mangleExports: false,
-              mergeDuplicateChunks: false,
               providedExports: false,
               realContentHash: false,
-              removeAvailableModules: false,
-              removeEmptyChunks: false,
               sideEffects: false,
               splitChunks: false,
               usedExports: false,
