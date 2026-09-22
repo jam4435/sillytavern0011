@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FilePenLine, MessageSquarePen } from 'lucide-react';
+import { FilePenLine, SquarePen } from 'lucide-react';
 import brandXiakeSealUrl from './assets/icons/jinyong/brand_xiake_seal.svg?url';
 import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
@@ -1777,7 +1777,7 @@ const App: React.FC = () => {
                     aria-label="修改上一轮输入并重新生成"
                     data-wuxia-automation="edit-last-user-before-regenerate"
                   >
-                    <MessageSquarePen size={19} aria-hidden="true" />
+                    <SquarePen size={19} aria-hidden="true" />
                   </button>
                   <button
                     type="button"
