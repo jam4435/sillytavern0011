@@ -1187,7 +1187,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       case 'appearance':
         return '重置外观';
       case 'regex':
-        return '重置全局并清空当前预设';
+        return '重置正则';
       case 'summary':
         return '重置 AI 与记忆';
       case 'variables':
