@@ -22,15 +22,13 @@ import {
   getCurrentPresetRegexRules,
   logRegexDebugSnapshot,
   getRegexRuleContentSignature,
-  getPresetStorageCleanupCandidates,
-  getPresetStorageCleanupRecommendation,
+  getPresetXmlModuleCandidates,
   imageToBase64,
   importGlobalTavernRegexes,
   importPresetTavernRegexes,
-  isPresetStorageCleanupRuleSelected,
+  normalizePresetXmlModuleInput,
   scheduleRegexDebugDump,
   setPresetRegexRulesForPreset,
-  setPresetStorageCleanupRuleSelected,
   switchDisplayTheme,
   updateThemeAppearanceSetting,
   validateRegex,
@@ -48,7 +46,6 @@ import {
 } from '../utils/debugRoundView';
 import { loadSummaryModelList, validateSummaryApiConfig } from '../utils/summaryApiClient';
 import { applyVariableUpdateModeWorldbookState } from '../utils/extraVariableUpdateManager';
-import { cleanupCurrentChatPresetBlocks } from '../utils/chatStorageCleanup';
 import { applyConversationSummaryModeState } from '../utils/conversationSummaryManager';
 import { backfillHistoricalConversationMemory } from '../utils/narrativeMemoryManager';
 import {
@@ -98,6 +95,7 @@ type SettingsCollapsibleId =
   | 'appearanceBackground'
   | 'regexGlobal'
   | 'regexPreset'
+  | 'moduleFilter'
   | 'conversationSummary'
   | 'extraModelApi'
   | 'extraModelSummary'
@@ -127,12 +125,21 @@ const DEFAULT_AUTO_ADVANCE_PROMPT = '合理地继续推进剧情';
 const AUTO_ADVANCE_MAX_COUNT = 50;
 const SUMMARY_MODEL_LIST_ID = 'wuxia-summary-model-list';
 const API_SELECTION_PRESET_VALUE = 'preset';
+const PROTECTED_MODULE_FILTER_TAGS = new Set([
+  'summary',
+  'era_data',
+  'variablethink',
+  'variableinsert',
+  'variableedit',
+  'variabledelete',
+]);
 const DEFAULT_OPEN_SETTING_BLOCKS: Record<SettingsCollapsibleId, boolean> = {
   appearanceTheme: false,
   appearanceText: false,
   appearanceBackground: false,
   regexGlobal: false,
   regexPreset: false,
+  moduleFilter: false,
   conversationSummary: false,
   extraModelApi: false,
   extraModelSummary: false,
@@ -357,6 +364,7 @@ interface SettingsCollapsibleBlockProps {
   onToggle: (id: SettingsCollapsibleId) => void;
   children: React.ReactNode;
   className?: string;
+  headerAction?: React.ReactNode;
 }
 
 const SettingsCollapsibleBlock: React.FC<SettingsCollapsibleBlockProps> = ({
@@ -366,24 +374,30 @@ const SettingsCollapsibleBlock: React.FC<SettingsCollapsibleBlockProps> = ({
   onToggle,
   children,
   className = '',
+  headerAction,
 }) => {
   const bodyId = `settings-collapsible-${id}`;
 
   return (
     <section className={`settings-collapsible-block ${isOpen ? 'open' : 'collapsed'} ${className}`.trim()}>
-      <button
-        type="button"
-        className="settings-collapsible-header"
-        aria-expanded={isOpen}
-        aria-controls={bodyId}
-        onClick={() => onToggle(id)}
-      >
-        <span className="settings-collapsible-title">
-          <span className="diamond-bullet"></span>
-          <span>{title}</span>
-        </span>
-        {isOpen ? <Icons.ChevronDown size={18} /> : <Icons.ChevronUp size={18} />}
-      </button>
+      <div className="settings-collapsible-header">
+        <button
+          type="button"
+          className="settings-collapsible-trigger"
+          aria-expanded={isOpen}
+          aria-controls={bodyId}
+          onClick={() => onToggle(id)}
+        >
+          <span className="settings-collapsible-title">
+            <span className="diamond-bullet"></span>
+            <span>{title}</span>
+          </span>
+          <span className="settings-collapsible-chevron">
+            {isOpen ? <Icons.ChevronDown size={18} /> : <Icons.ChevronUp size={18} />}
+          </span>
+        </button>
+        {headerAction && <div className="settings-collapsible-header-action">{headerAction}</div>}
+      </div>
 
       {isOpen && (
         <div className="settings-collapsible-body" id={bodyId}>
@@ -425,7 +439,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isSummaryVariableModeUpdating, setIsSummaryVariableModeUpdating] = useState(false);
   const [conversationSummaryModeStatus, setConversationSummaryModeStatus] = useState('');
   const [isConversationSummaryModeUpdating, setIsConversationSummaryModeUpdating] = useState(false);
-  const [isPresetStorageCleanupRunning, setIsPresetStorageCleanupRunning] = useState(false);
+  const [customXmlModuleInput, setCustomXmlModuleInput] = useState('');
+  const [customXmlModuleStatus, setCustomXmlModuleStatus] = useState('');
   const [isHistoricalConversationBackfillRunning, setIsHistoricalConversationBackfillRunning] = useState(false);
   const [historicalConversationBackfillStatus, setHistoricalConversationBackfillStatus] = useState('');
   const [editingApiProfileId, setEditingApiProfileId] = useState<string | null>(
@@ -471,10 +486,48 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const normalizedCurrentPresetName = currentPresetName.trim();
   const hasCurrentPreset = normalizedCurrentPresetName.length > 0;
   const currentPresetRegexRules = getCurrentPresetRegexRules(settings, normalizedCurrentPresetName);
-  const presetStorageCleanupCandidates = hasCurrentPreset ? getPresetStorageCleanupCandidates() : [];
-  const presetStorageCleanupRecommendedCount = presetStorageCleanupCandidates.filter(
-    rule => getPresetStorageCleanupRecommendation(rule).kind === 'recommended',
-  ).length;
+  const presetXmlModuleCandidates = hasCurrentPreset ? getPresetXmlModuleCandidates() : [];
+  const configuredSummaryTag =
+    settings.summarySettings.conversationSummaryMode === 'preset'
+      ? normalizePresetXmlModuleInput(settings.summarySettings.conversationSummaryPresetTag) || 'summary'
+      : 'summary';
+  const visiblePresetXmlModuleCandidates = presetXmlModuleCandidates.filter(
+    candidate => !PROTECTED_MODULE_FILTER_TAGS.has(candidate.tag) && candidate.tag !== configuredSummaryTag,
+  );
+  const customXmlModules = hasCurrentPreset
+    ? settings.presetModuleFilterCustomTagsByPreset[normalizedCurrentPresetName] || []
+    : [];
+  const availableXmlModules = Array.from(
+    new Set(
+      [...visiblePresetXmlModuleCandidates.map(candidate => candidate.tag), ...customXmlModules].filter(
+        tag => !PROTECTED_MODULE_FILTER_TAGS.has(tag) && tag !== configuredSummaryTag,
+      ),
+    ),
+  ).sort((left, right) => left.localeCompare(right, 'en'));
+  const legacySelectedModuleSignatures = new Set(
+    hasCurrentPreset
+      ? settings.presetStorageExcludedRegexSignaturesByPreset[normalizedCurrentPresetName] || []
+      : [],
+  );
+  const hasExplicitSelectedXmlModules =
+    hasCurrentPreset &&
+    Object.prototype.hasOwnProperty.call(
+      settings.presetModuleFilterSelectedTagsByPreset,
+      normalizedCurrentPresetName,
+    );
+  const selectedXmlModules = hasExplicitSelectedXmlModules
+    ? settings.presetModuleFilterSelectedTagsByPreset[normalizedCurrentPresetName] || []
+    : visiblePresetXmlModuleCandidates
+        .filter(candidate =>
+          candidate.sourceSignatures.some(signature => legacySelectedModuleSignatures.has(signature)),
+        )
+        .map(candidate => candidate.tag);
+  const selectedXmlModuleSet = new Set(selectedXmlModules);
+  const moduleFilterEnabled =
+    hasCurrentPreset &&
+    (Object.prototype.hasOwnProperty.call(settings.presetModuleFilterEnabledByPreset, normalizedCurrentPresetName)
+      ? settings.presetModuleFilterEnabledByPreset[normalizedCurrentPresetName]
+      : legacySelectedModuleSignatures.size > 0);
   const visibleVariableScopeEntries = statData ? getVisibleVariableScopeEntries(statData) : [];
   const firstAvailableVariableGroup = VARIABLE_GROUPS.find(group =>
     visibleVariableScopeEntries.some(([key]) => group.scopeKeys.includes(String(key))),
@@ -1105,7 +1158,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       case 'regex':
         return '重置全局并清空当前预设';
       case 'summary':
-        return '重置额外模型';
+        return '重置 AI 与记忆';
       case 'variables':
         return '重新读取变量';
       case 'advance':
@@ -1285,84 +1338,104 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     alert(`已覆盖导入 ${importedRules.length} 条酒馆正则规则到预设「${normalizedCurrentPresetName}」`);
   }, [hasCurrentPreset, normalizedCurrentPresetName, settings, updateCurrentPresetRules]);
 
-  const togglePresetStorageCleanupRule = useCallback(
-    (rule: RegexRule) => {
-      if (!hasCurrentPreset) {
-        return;
+  const togglePresetModuleFilterEnabled = useCallback(() => {
+    if (!hasCurrentPreset) return;
+    onSettingsChange({
+      ...settings,
+      presetModuleFilterEnabledByPreset: {
+        ...settings.presetModuleFilterEnabledByPreset,
+        [normalizedCurrentPresetName]: !moduleFilterEnabled,
+      },
+    });
+  }, [hasCurrentPreset, moduleFilterEnabled, normalizedCurrentPresetName, onSettingsChange, settings]);
+
+  const togglePresetXmlModule = useCallback(
+    (tag: string) => {
+      if (!hasCurrentPreset) return;
+      const nextSelected = new Set(selectedXmlModules);
+      if (nextSelected.has(tag)) {
+        nextSelected.delete(tag);
+      } else {
+        nextSelected.add(tag);
       }
-      const selected = isPresetStorageCleanupRuleSelected(settings, normalizedCurrentPresetName, rule);
-      onSettingsChange(
-        setPresetStorageCleanupRuleSelected(settings, normalizedCurrentPresetName, rule, !selected),
-      );
+      onSettingsChange({
+        ...settings,
+        presetModuleFilterSelectedTagsByPreset: {
+          ...settings.presetModuleFilterSelectedTagsByPreset,
+          [normalizedCurrentPresetName]: [...nextSelected].sort((left, right) => left.localeCompare(right, 'en')),
+        },
+      });
     },
-    [hasCurrentPreset, normalizedCurrentPresetName, onSettingsChange, settings],
+    [hasCurrentPreset, normalizedCurrentPresetName, onSettingsChange, selectedXmlModules, settings],
   );
 
-  const handleAutoSelectPresetStorageCleanupRules = useCallback(() => {
-    if (!hasCurrentPreset) return;
-    const recommendedRules = presetStorageCleanupCandidates.filter(
-      rule => getPresetStorageCleanupRecommendation(rule).kind === 'recommended',
-    );
-    if (recommendedRules.length === 0) {
-      alert('当前预设没有识别出边界明确、可自动建议的模块块。整楼提取、summary、ERA/变量块和语义不明确的规则不会自动勾选。');
+  const handleAddCustomXmlModule = useCallback(() => {
+    if (!hasCurrentPreset) {
+      setCustomXmlModuleStatus('当前没有加载中的预设。');
       return;
     }
 
-    const nextSettings = recommendedRules.reduce(
-      (currentSettings, rule) =>
-        setPresetStorageCleanupRuleSelected(currentSettings, normalizedCurrentPresetName, rule, true),
-      settings,
+    const tag = normalizePresetXmlModuleInput(customXmlModuleInput);
+    if (!tag) {
+      setCustomXmlModuleStatus('请输入标签名，例如 thinking 或 <thinking>。');
+      return;
+    }
+    if (PROTECTED_MODULE_FILTER_TAGS.has(tag) || tag === configuredSummaryTag) {
+      setCustomXmlModuleStatus(`<${tag}> 属于受保护模块，不能加入过滤列表。`);
+      return;
+    }
+    if (availableXmlModules.includes(tag)) {
+      setCustomXmlModuleStatus(`<${tag}> 已在列表中。`);
+      return;
+    }
+
+    const nextCustomModules = [...customXmlModules, tag].sort((left, right) => left.localeCompare(right, 'en'));
+    const nextSelected = Array.from(new Set([...selectedXmlModules, tag])).sort((left, right) =>
+      left.localeCompare(right, 'en'),
     );
-    onSettingsChange(nextSettings);
+    onSettingsChange({
+      ...settings,
+      presetModuleFilterCustomTagsByPreset: {
+        ...settings.presetModuleFilterCustomTagsByPreset,
+        [normalizedCurrentPresetName]: nextCustomModules,
+      },
+      presetModuleFilterSelectedTagsByPreset: {
+        ...settings.presetModuleFilterSelectedTagsByPreset,
+        [normalizedCurrentPresetName]: nextSelected,
+      },
+    });
+    setCustomXmlModuleInput('');
+    setCustomXmlModuleStatus('');
   }, [
+    availableXmlModules,
+    configuredSummaryTag,
+    customXmlModuleInput,
+    customXmlModules,
     hasCurrentPreset,
     normalizedCurrentPresetName,
     onSettingsChange,
-    presetStorageCleanupCandidates,
+    selectedXmlModules,
     settings,
   ]);
 
-  const handleCleanupCurrentChatPresetBlocks = useCallback(async () => {
-    if (!hasCurrentPreset || isPresetStorageCleanupRunning) {
-      return;
-    }
-    const selectedCount = presetStorageCleanupCandidates.filter(rule =>
-      isPresetStorageCleanupRuleSelected(settings, normalizedCurrentPresetName, rule),
-    ).length;
-    if (selectedCount === 0) {
-      alert('请先勾选至少一条要过滤的无用模块规则。');
-      return;
-    }
-    const confirmed = window.confirm(
-      `将按当前勾选的 ${selectedCount} 条无用模块规则回溯清理当前聊天的所有 assistant 楼层和历史 swipe。\n\nVariableThink / VariableEdit / summary / era_data，以及你配置的预设摘要标签都会受保护。是否继续？`,
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    setIsPresetStorageCleanupRunning(true);
-    try {
-      const result = await cleanupCurrentChatPresetBlocks(settings, normalizedCurrentPresetName);
-      if (result.skippedBecauseNoSelection) {
-        alert('没有可执行的已确认预设清理规则。');
-        return;
-      }
-      alert(
-        `当前聊天清理完成：\n• 改写楼层：${result.updatedMessages}\n• 改写 swipe：${result.updatedSwipes}\n• 减少字符：${result.removedCharacters.toLocaleString()}`,
-      );
-    } catch (error) {
-      uiLogger.error('[SettingsPanel] 清理当前聊天无用模块失败', error);
-      alert(`清理失败：${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setIsPresetStorageCleanupRunning(false);
-    }
-  }, [
-    hasCurrentPreset,
-    isPresetStorageCleanupRunning,
-    normalizedCurrentPresetName,
-    presetStorageCleanupCandidates,
-    settings,
-  ]);
+  const handleRemoveCustomXmlModule = useCallback(
+    (tag: string) => {
+      if (!hasCurrentPreset) return;
+      onSettingsChange({
+        ...settings,
+        presetModuleFilterCustomTagsByPreset: {
+          ...settings.presetModuleFilterCustomTagsByPreset,
+          [normalizedCurrentPresetName]: customXmlModules.filter(item => item !== tag),
+        },
+        presetModuleFilterSelectedTagsByPreset: {
+          ...settings.presetModuleFilterSelectedTagsByPreset,
+          [normalizedCurrentPresetName]: selectedXmlModules.filter(item => item !== tag),
+        },
+      });
+      setCustomXmlModuleStatus('');
+    },
+    [customXmlModules, hasCurrentPreset, normalizedCurrentPresetName, onSettingsChange, selectedXmlModules, settings],
+  );
 
   // =========================================
   // 自动总结相关回调
@@ -1816,8 +1889,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             onClick={() => setActiveTab('summary')}
           >
             <Icons.Scroll size={16} />
-            <span className="settings-tab-label" data-short-label="模型">
-              额外模型
+            <span className="settings-tab-label" data-short-label="AI">
+              AI 与记忆
             </span>
           </button>
           <button
@@ -2116,16 +2189,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
             <SettingsCollapsibleBlock
               id="regexGlobal"
-              title={`全局共享规则 · ${settings.localRegexRules.length}`}
+              title={`全局正则 · ${settings.localRegexRules.length}`}
               isOpen={openSettingBlocks.regexGlobal}
               onToggle={toggleSettingBlock}
-              className="regex-scope-collapsible"
+              className="settings-compact-collapsible"
             >
               <p className="regex-section-caption">手动添加或从酒馆全局导入；对所有预设共用。</p>
               <div className="regex-rules-list">
                 {settings.localRegexRules.length === 0 ? (
                   <div className="regex-empty compact">
-                    <p>暂无全局共享规则</p>
+                    <p>暂无全局正则</p>
                   </div>
                 ) : (
                   settings.localRegexRules.map((rule, index) => (
@@ -2154,10 +2227,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
             <SettingsCollapsibleBlock
               id="regexPreset"
-              title={`当前预设规则 · ${currentPresetRegexRules.length}`}
+              title={`当前预设正则 · ${currentPresetRegexRules.length}`}
               isOpen={openSettingBlocks.regexPreset}
               onToggle={toggleSettingBlock}
-              className="regex-scope-collapsible"
+              className="settings-compact-collapsible"
             >
               <div className="regex-section-header compact">
                 <p className="regex-section-caption">
@@ -2197,97 +2270,108 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </SettingsCollapsibleBlock>
 
-            <div className="regex-scope-section module-filter-section">
-              <div className="regex-section-header">
-                <div>
-                  <h5 className="regex-section-title">无用模块过滤</h5>
-                  <p className="regex-section-caption">
-                    会从当前预设显示正则中自动提取成对 XML 区块；安全区块可一键勾选。原始混合/美化正则仍保留给你手动判断。
-                  </p>
-                </div>
-                {hasCurrentPreset && (
-                  <span className="regex-section-meta">自动建议 {presetStorageCleanupRecommendedCount}</span>
-                )}
-              </div>
+            <SettingsCollapsibleBlock
+              id="moduleFilter"
+              title="无用模块过滤"
+              isOpen={openSettingBlocks.moduleFilter}
+              onToggle={toggleSettingBlock}
+              className="settings-compact-collapsible module-filter-collapsible"
+              headerAction={
+                <button
+                  type="button"
+                  className={`regex-toggle-btn module-filter-master-toggle ${moduleFilterEnabled ? 'active' : ''}`}
+                  onClick={togglePresetModuleFilterEnabled}
+                  disabled={!hasCurrentPreset}
+                  aria-label="无用模块过滤开关"
+                  aria-pressed={moduleFilterEnabled}
+                  title={moduleFilterEnabled ? '点击关闭无用模块过滤' : '点击开启无用模块过滤'}
+                >
+                  {moduleFilterEnabled ? <Icons.ToggleRight size={20} /> : <Icons.ToggleLeft size={20} />}
+                </button>
+              }
+            >
+              <p className="regex-section-caption">
+                自动读取当前预设正则中可识别的成对 XML 模块；这里只展示标签名，不显示原正则。受保护的摘要、ERA 与变量模块不会进入列表。
+              </p>
 
-              {presetStorageCleanupCandidates.length === 0 ? (
+              {availableXmlModules.length === 0 ? (
                 <div className="regex-empty compact">
-                  <p>{hasCurrentPreset ? '当前预设没有可识别的 AI 输出显示正则' : '加载预设后可识别模块规则'}</p>
+                  <p>{hasCurrentPreset ? '当前预设没有识别出可过滤的 XML 模块' : '加载预设后可识别 XML 模块'}</p>
                 </div>
               ) : (
-                <div className="preset-module-filter-list">
-                  {presetStorageCleanupCandidates.map(rule => {
-                    const signature = getRegexRuleContentSignature(rule);
-                    const selected = isPresetStorageCleanupRuleSelected(
-                      settings,
-                      normalizedCurrentPresetName,
-                      rule,
-                    );
-                    const recommendation = getPresetStorageCleanupRecommendation(rule);
+                <div className="module-filter-grid">
+                  {availableXmlModules.map(tag => {
+                    const selected = selectedXmlModuleSet.has(tag);
+                    const isCustom = customXmlModules.includes(tag);
                     return (
-                      <label
-                        className={`preset-module-filter-rule ${selected ? 'selected' : ''} ${recommendation.kind}`}
-                        key={signature}
-                        title={recommendation.reason}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() => togglePresetStorageCleanupRule(rule)}
-                        />
-                        <span className="preset-module-filter-main">
-                          <span className="preset-module-filter-title-row">
-                            <strong>{rule.description || '未命名预设正则'}</strong>
-                            <span className={`preset-module-filter-kind ${recommendation.kind}`}>
-                              {recommendation.kind === 'recommended'
-                                ? '建议过滤'
-                                : recommendation.kind === 'unsafe'
-                                  ? '保护/谨慎'
-                                  : rule.replacement.trim()
-                                    ? '替换/美化型'
-                                    : '手动判断'}
-                            </span>
-                          </span>
-                          <code className="preset-module-filter-pattern" title={`原正则：${rule.pattern}`}>
-                            {recommendation.matchDescription}
-                          </code>
-                        </span>
-                      </label>
+                      <div className={`module-filter-chip ${selected ? 'selected' : ''}`} key={tag}>
+                        <label className="module-filter-chip-label" title={`<${tag}> … </${tag}>`}>
+                          <code>{`<${tag}> … </${tag}>`}</code>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => togglePresetXmlModule(tag)}
+                            aria-label={`过滤 <${tag}> 模块`}
+                          />
+                        </label>
+                        {isCustom && (
+                          <button
+                            type="button"
+                            className="module-filter-chip-remove"
+                            onClick={() => handleRemoveCustomXmlModule(tag)}
+                            title={`删除自定义 <${tag}> 模块`}
+                            aria-label={`删除自定义 <${tag}> 模块`}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
               )}
 
-              <div className="module-filter-footer">
-                <div className="regex-buttons-group">
+              <div className="module-filter-custom">
+                <label className="settings-label" htmlFor="custom-xml-module-input">
+                  自定义 XML 模块
+                </label>
+                <div className="module-filter-custom-row">
+                  <input
+                    id="custom-xml-module-input"
+                    type="text"
+                    value={customXmlModuleInput}
+                    onChange={event => {
+                      setCustomXmlModuleInput(event.target.value);
+                      setCustomXmlModuleStatus('');
+                    }}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        handleAddCustomXmlModule();
+                      }
+                    }}
+                    className="settings-text-input"
+                    placeholder="例如：thinking 或 <thinking>"
+                    spellCheck={false}
+                    disabled={!hasCurrentPreset}
+                  />
                   <button
                     type="button"
                     className="settings-action-btn"
-                    onClick={handleAutoSelectPresetStorageCleanupRules}
-                    disabled={!hasCurrentPreset || presetStorageCleanupRecommendedCount === 0}
+                    onClick={handleAddCustomXmlModule}
+                    disabled={!hasCurrentPreset || !customXmlModuleInput.trim()}
                   >
-                    <Icons.Debug size={14} />
-                    <span>自动识别并勾选 {presetStorageCleanupRecommendedCount || ''}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="settings-import-btn"
-                    onClick={handleCleanupCurrentChatPresetBlocks}
-                    disabled={!hasCurrentPreset || isPresetStorageCleanupRunning}
-                  >
-                    <Icons.Scroll size={14} />
-                    <span>{isPresetStorageCleanupRunning ? '正在清理历史...' : '回溯清理当前聊天历史'}</span>
+                    <Icons.Plus size={14} />
+                    <span>加入</span>
                   </button>
                 </div>
-                <p className="settings-hint">
-                  “自动识别”现在按原正则自己的实际命中范围判断：完整标签块、思维链结束标记前缀等边界明确的模块可自动建议；不会再因为看见一对标签就另造更宽的删除正则。整楼提取、{'<summary>'}、Variable/ERA 区块或语义不明确的规则仍会保护或留给人工判断。持续过滤无需手动清理；“回溯清理”只处理旧楼层。
-                </p>
+                {customXmlModuleStatus && <p className="module-filter-custom-status">{customXmlModuleStatus}</p>}
               </div>
-            </div>
+            </SettingsCollapsibleBlock>
           </div>
         )}
 
-        {/* 额外模型设置 */}
+        {/* AI 与记忆设置 */}
         {activeTab === 'summary' && (
           <div className="settings-section summary-section">
             <SettingsCollapsibleBlock
@@ -2295,6 +2379,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               title="对话摘要"
               isOpen={openSettingBlocks.conversationSummary}
               onToggle={toggleSettingBlock}
+              className="settings-compact-collapsible"
             >
               <p className="settings-description compact">
                 先选择摘要由谁生成，再配置武侠卡如何压缩发送上下文。生成职责与上下文裁剪分开，避免卡内规则和玩家预设互相争抢。
@@ -2455,7 +2540,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               title="API"
               isOpen={openSettingBlocks.extraModelApi}
               onToggle={toggleSettingBlock}
-              className="extra-model-collapsible"
+              className="settings-compact-collapsible"
             >
               <p className="settings-hint">
                 在这里保存可复用的额外模型 API；自动总结和额外变量可以在各自分组中分别选择使用哪一个。
@@ -2603,7 +2688,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               title="自动总结"
               isOpen={openSettingBlocks.extraModelSummary}
               onToggle={toggleSettingBlock}
-              className="extra-model-collapsible"
+              className="settings-compact-collapsible"
             >
               <p className="settings-description compact">当角色的原始人物经历过多时，只压缩最旧一批并保留近期经历；阶段经历不会反复参与下一轮压缩。</p>
 
@@ -2820,7 +2905,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               title="额外变量"
               isOpen={openSettingBlocks.extraModelVariables}
               onToggle={toggleSettingBlock}
-              className="extra-model-collapsible"
+              className="settings-compact-collapsible"
             >
               <div className="settings-row">
                 <label className="settings-label">使用 API</label>
