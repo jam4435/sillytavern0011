@@ -138,6 +138,13 @@ export interface SummarySettings {
 
 export type RegexRulesByPreset = Record<string, RegexRule[]>;
 export type PresetStorageExcludedRegexSignaturesByPreset = Record<string, string[]>;
+export type PresetModuleFilterEnabledByPreset = Record<string, boolean>;
+export type PresetModuleFilterTagsByPreset = Record<string, string[]>;
+
+export interface PresetXmlModuleCandidate {
+  tag: string;
+  sourceSignatures: string[];
+}
 
 export interface RegexRuleDebugSummary {
   id: string;
@@ -226,8 +233,14 @@ export interface DisplaySettings {
   // 正则替换规则
   localRegexRules: RegexRule[];
   presetRegexRulesByPreset: RegexRulesByPreset;
-  /** 当前预设中已由玩家确认启用“无用模块过滤”的正则内容签名（字段名保留用于兼容旧设置） */
+  /** 旧版“按正则签名过滤”选择，保留用于迁移现有设置。 */
   presetStorageExcludedRegexSignaturesByPreset: PresetStorageExcludedRegexSignaturesByPreset;
+  /** 每个预设的无用 XML 模块过滤总开关。 */
+  presetModuleFilterEnabledByPreset: PresetModuleFilterEnabledByPreset;
+  /** 每个预设勾选中的 XML 模块标签名。 */
+  presetModuleFilterSelectedTagsByPreset: PresetModuleFilterTagsByPreset;
+  /** 每个预设手动添加的 XML 模块标签名。 */
+  presetModuleFilterCustomTagsByPreset: PresetModuleFilterTagsByPreset;
 
   // 自动总结设置
   summarySettings: SummarySettings;
@@ -608,12 +621,20 @@ function cloneRegexRule(rule: RegexRule): RegexRule {
 
 export function createDefaultRegexSettings(): Pick<
   DisplaySettings,
-  'localRegexRules' | 'presetRegexRulesByPreset' | 'presetStorageExcludedRegexSignaturesByPreset'
+  | 'localRegexRules'
+  | 'presetRegexRulesByPreset'
+  | 'presetStorageExcludedRegexSignaturesByPreset'
+  | 'presetModuleFilterEnabledByPreset'
+  | 'presetModuleFilterSelectedTagsByPreset'
+  | 'presetModuleFilterCustomTagsByPreset'
 > {
   return {
     localRegexRules: BUILTIN_LOCAL_REGEX_RULES.map(cloneRegexRule),
     presetRegexRulesByPreset: {},
     presetStorageExcludedRegexSignaturesByPreset: {},
+    presetModuleFilterEnabledByPreset: {},
+    presetModuleFilterSelectedTagsByPreset: {},
+    presetModuleFilterCustomTagsByPreset: {},
   };
 }
 
@@ -850,6 +871,61 @@ function normalizePresetStorageExcludedRegexSignaturesByPreset(
       if (normalizedSignatures.length > 0) {
         result[normalizedPresetName] = normalizedSignatures;
       }
+      return result;
+    },
+    {},
+  );
+}
+
+function normalizePresetModuleFilterEnabledByPreset(value: unknown): PresetModuleFilterEnabledByPreset {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<PresetModuleFilterEnabledByPreset>(
+    (result, [presetName, enabled]) => {
+      const normalizedPresetName = presetName.trim();
+      if (normalizedPresetName && typeof enabled === 'boolean') {
+        result[normalizedPresetName] = enabled;
+      }
+      return result;
+    },
+    {},
+  );
+}
+
+function normalizeXmlModuleTagName(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const pairedMatch = /^<\s*([A-Za-z][\w:.-]*)\b[^>]*>[\s\S]*<\s*\/\s*\1\s*>$/.exec(trimmed);
+  const openingMatch = /^<\s*([A-Za-z][\w:.-]*)\b[^>]*\/?\s*>$/.exec(trimmed);
+  const rawTag = pairedMatch?.[1] || openingMatch?.[1] || trimmed.replace(/^\/+/, '');
+  return /^[A-Za-z][\w:.-]*$/.test(rawTag) ? rawTag.toLowerCase() : null;
+}
+
+function normalizePresetModuleFilterTagsByPreset(value: unknown): PresetModuleFilterTagsByPreset {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<PresetModuleFilterTagsByPreset>(
+    (result, [presetName, tags]) => {
+      const normalizedPresetName = presetName.trim();
+      if (!normalizedPresetName || !Array.isArray(tags)) {
+        return result;
+      }
+
+      const normalizedTags = Array.from(
+        new Set(
+          tags
+            .filter((tag): tag is string => typeof tag === 'string')
+            .map(tag => normalizeXmlModuleTagName(tag))
+            .filter((tag): tag is string => Boolean(tag)),
+        ),
+      );
+      // 空数组也保留，用于区分“明确全部取消勾选”和“尚未从旧设置迁移”。
+      result[normalizedPresetName] = normalizedTags;
       return result;
     },
     {},
@@ -1315,6 +1391,15 @@ export function loadSettings(): DisplaySettings {
       presetStorageExcludedRegexSignaturesByPreset: normalizePresetStorageExcludedRegexSignaturesByPreset(
         parsed.presetStorageExcludedRegexSignaturesByPreset,
       ),
+      presetModuleFilterEnabledByPreset: normalizePresetModuleFilterEnabledByPreset(
+        parsed.presetModuleFilterEnabledByPreset,
+      ),
+      presetModuleFilterSelectedTagsByPreset: normalizePresetModuleFilterTagsByPreset(
+        parsed.presetModuleFilterSelectedTagsByPreset,
+      ),
+      presetModuleFilterCustomTagsByPreset: normalizePresetModuleFilterTagsByPreset(
+        parsed.presetModuleFilterCustomTagsByPreset,
+      ),
       summarySettings: normalizeSummarySettings(parsed.summarySettings),
     };
   } catch (error) {
@@ -1622,6 +1707,62 @@ export function getPresetStorageCleanupRecommendation(
  * 因此复杂兼容写法（例如 <(?:think|thinking)>...</(?:think|thinking)>）仍作为一个真实匹配块；
  * “任意前文 + 思维链结束标记”也保留原 match，并只在推荐层做语义分类。
  */
+function extractXmlModuleTagsFromPattern(pattern: string): string[] {
+  const body = normalizeRegexPatternForCleanupAnalysis(pattern);
+  const tags = new Set<string>();
+
+  const simpleOpening = /<([A-Za-z][\w:.-]*)\b[^>]*>/g;
+  let simpleMatch: RegExpExecArray | null;
+  while ((simpleMatch = simpleOpening.exec(body)) !== null) {
+    const tag = simpleMatch[1].toLowerCase();
+    if (PRESET_STORAGE_PROTECTED_TAGS.has(tag)) continue;
+    const closing = new RegExp(`<\\/\\s*${tag}\\s*>`, 'i');
+    if (closing.test(body)) {
+      tags.add(tag);
+    }
+  }
+
+  const alternationOpening = /<\(\?:([A-Za-z][\w:.-]*(?:\|[A-Za-z][\w:.-]*)+)\)[^>]*>/g;
+  let alternationMatch: RegExpExecArray | null;
+  while ((alternationMatch = alternationOpening.exec(body)) !== null) {
+    const alternatives = alternationMatch[1]
+      .split('|')
+      .map(tag => tag.toLowerCase())
+      .filter(tag => !PRESET_STORAGE_PROTECTED_TAGS.has(tag));
+    if (alternatives.length === 0) continue;
+    const token = `(?:${alternationMatch[1]})`;
+    if (!body.includes(`</${token}>`)) continue;
+    alternatives.forEach(tag => tags.add(tag));
+  }
+
+  return [...tags];
+}
+
+/**
+ * 从当前加载预设的显示正则中提取“完整 XML 模块”候选。
+ * UI 只展示标签名，不暴露底层原正则。
+ */
+export function getPresetXmlModuleCandidates(): PresetXmlModuleCandidate[] {
+  const candidates = new Map<string, Set<string>>();
+
+  getPresetStorageCleanupCandidates().forEach(rule => {
+    const signature = getRegexRuleContentSignature(rule);
+    extractXmlModuleTagsFromPattern(rule.pattern).forEach(tag => {
+      const signatures = candidates.get(tag) || new Set<string>();
+      signatures.add(signature);
+      candidates.set(tag, signatures);
+    });
+  });
+
+  return [...candidates.entries()]
+    .map(([tag, signatures]) => ({ tag, sourceSignatures: [...signatures] }))
+    .sort((left, right) => left.tag.localeCompare(right.tag, 'en'));
+}
+
+export function normalizePresetXmlModuleInput(input: string): string | null {
+  return normalizeXmlModuleTagName(input);
+}
+
 export function getPresetStorageCleanupCandidates(): RegexRule[] {
   try {
     return getRawPresetRegexesFromInUsePreset()
@@ -2066,7 +2207,8 @@ export function stripSelectedPresetRegexMatches(
   return result.replace(/\n{3,}/g, '\n\n').trim();
 }
 
-/**
+function escapeRegexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\/**
  * 使用当前加载预设中玩家已经确认的规则，清理即将写入聊天的 assistant 文本。
  * 原始模型输出仍由调试链路单独保留；这里只处理长期聊天正文。
  */
@@ -2090,6 +2232,96 @@ export function applyCurrentPresetModuleFilter(text: string): string {
     selectedSignatures,
     protectedSummaryTag,
   );
+}
+');
+}
+
+export function stripSelectedXmlModules(
+  text: string,
+  selectedTags: string[],
+  protectedSummaryTag: string = 'summary',
+): string {
+  if (!text || selectedTags.length === 0) return text;
+
+  const normalizedProtectedTag = normalizeXmlModuleTagName(protectedSummaryTag) || 'summary';
+  const protectedTags = new Set([...PRESET_STORAGE_PROTECTED_TAGS, normalizedProtectedTag]);
+  let result = text;
+
+  for (const rawTag of selectedTags) {
+    const tag = normalizeXmlModuleTagName(rawTag);
+    if (!tag || protectedTags.has(tag)) continue;
+
+    const escapedTag = escapeRegexLiteral(tag);
+    const blockRegex = new RegExp(
+      `<${escapedTag}\\b[^>]*>[\\s\\S]*?<\\/\\s*${escapedTag}\\s*>|<${escapedTag}\\b[^>]*/\\s*>`,
+      'gi',
+    );
+    const next = result.replace(blockRegex, match => (match.trim() ? '\n' : ''));
+    if (result.trim() && !next.trim()) {
+      dataLogger.warn(`无用模块过滤已跳过会清空整条回复的 XML 模块 <${tag}>。`);
+      continue;
+    }
+    result = next;
+  }
+
+  return result.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function getLegacySelectedXmlTags(
+  settings: DisplaySettings,
+  presetName: string,
+  candidates: PresetXmlModuleCandidate[],
+): string[] {
+  const legacySignatures = new Set(settings.presetStorageExcludedRegexSignaturesByPreset[presetName] || []);
+  if (legacySignatures.size === 0) return [];
+
+  return candidates
+    .filter(candidate => candidate.sourceSignatures.some(signature => legacySignatures.has(signature)))
+    .map(candidate => candidate.tag);
+}
+
+/**
+ * 使用当前预设中玩家勾选的 XML 模块清理 assistant 文本。
+ * 旧版“按正则签名”选择只作为迁移 fallback；新设置不会再暴露或依赖原正则。
+ */
+export function applyCurrentPresetModuleFilter(text: string): string {
+  const presetName = getLoadedPresetNameSafe();
+  if (!text || !presetName) {
+    return text;
+  }
+
+  const settings = loadSettings();
+  const candidates = getPresetXmlModuleCandidates();
+  const hasExplicitEnabled = Object.prototype.hasOwnProperty.call(
+    settings.presetModuleFilterEnabledByPreset,
+    presetName,
+  );
+  const legacyHasSelection = (settings.presetStorageExcludedRegexSignaturesByPreset[presetName] || []).length > 0;
+  const enabled = hasExplicitEnabled
+    ? settings.presetModuleFilterEnabledByPreset[presetName]
+    : legacyHasSelection;
+
+  if (!enabled) {
+    return text;
+  }
+
+  const hasExplicitTags = Object.prototype.hasOwnProperty.call(
+    settings.presetModuleFilterSelectedTagsByPreset,
+    presetName,
+  );
+  const selectedTags = hasExplicitTags
+    ? settings.presetModuleFilterSelectedTagsByPreset[presetName]
+    : getLegacySelectedXmlTags(settings, presetName, candidates);
+
+  if (!selectedTags || selectedTags.length === 0) {
+    return text;
+  }
+
+  const protectedSummaryTag =
+    settings.summarySettings.conversationSummaryMode === 'preset'
+      ? settings.summarySettings.conversationSummaryPresetTag
+      : 'summary';
+  return stripSelectedXmlModules(text, selectedTags, protectedSummaryTag);
 }
 
 /** @deprecated 兼容旧调用名；实际过滤同时服务于长期存档与发送给 AI 的上下文。 */
