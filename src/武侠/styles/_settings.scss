@@ -175,14 +175,23 @@
 .settings-collapsible-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
   width: 100%;
-  padding: 0.85rem 1rem;
-  border: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.055);
   background: transparent;
   color: $stone-300;
+}
+
+.settings-collapsible-trigger {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
   font-family: $font-serif;
   font-size: 0.94rem;
   cursor: pointer;
@@ -195,10 +204,17 @@
     background: rgba(255, 255, 255, 0.03);
     color: $amber-600;
   }
+}
 
-  .icon-wrap {
-    flex-shrink: 0;
-  }
+.settings-collapsible-chevron,
+.settings-collapsible-header-action {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.settings-collapsible-header-action {
+  padding-right: 0.7rem;
 }
 
 .settings-collapsible-block.collapsed .settings-collapsible-header {
@@ -651,7 +667,7 @@
 }
 
 @media (max-width: $breakpoint-md) {
-  .settings-collapsible-header {
+  .settings-collapsible-trigger {
     padding: 0.8rem 0.85rem;
   }
 
@@ -1311,9 +1327,9 @@
 }
 
 
-// 紧凑正则分组：一级分组折叠，单条规则再按需展开。
-.regex-scope-collapsible {
-  .settings-collapsible-header {
+// 设置页一级分组统一使用紧凑折叠密度。
+.settings-compact-collapsible {
+  .settings-collapsible-trigger {
     padding: 0.58rem 0.75rem;
     font-size: 0.88rem;
   }
@@ -1380,30 +1396,35 @@
   align-items: center;
 }
 
-.module-filter-section {
-  margin-top: 0.35rem;
-  padding: 0.85rem;
-  border: 1px solid $stone-800;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.018);
+.module-filter-collapsible {
+  .settings-collapsible-body {
+    gap: 0.65rem;
+  }
 }
 
-.preset-module-filter-list {
-  display: flex;
-  flex-direction: column;
+.module-filter-master-toggle {
+  padding: 0.18rem;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+}
+
+.module-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0.42rem;
 }
 
-.preset-module-filter-rule {
+.module-filter-chip {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 0.6rem;
-  padding: 0.58rem 0.65rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.12);
-  cursor: pointer;
   transition:
     border-color $transition-fast,
     background $transition-fast;
@@ -1414,95 +1435,78 @@
   }
 
   &.selected {
-    border-color: rgba($amber-600, 0.42);
-    background: rgba($amber-600, 0.055);
-  }
-
-  > input {
-    margin-top: 0.18rem;
+    border-color: rgba($amber-600, 0.36);
+    background: rgba($amber-600, 0.05);
   }
 }
 
-.preset-module-filter-main {
+.module-filter-chip-label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.32rem;
-}
+  padding: 0.48rem 0.58rem;
+  cursor: pointer;
 
-.preset-module-filter-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-
-  strong {
+  code {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: $stone-300;
-    font-size: 0.84rem;
-    font-weight: 500;
-  }
-}
-
-.preset-module-filter-kind {
-  flex-shrink: 0;
-  padding: 0.12rem 0.4rem;
-  border-radius: 999px;
-  background: rgba($stone-700, 0.35);
-  color: $stone-500;
-  font-size: 0.68rem;
-
-  &.recommended {
-    border: 1px solid rgba($green-500, 0.28);
-    background: rgba($green-500, 0.08);
-    color: $green-500;
+    color: $stone-400;
+    font-family: monospace;
+    font-size: 0.74rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
 
-  &.unsafe {
-    border: 1px solid rgba($red-500, 0.22);
-    background: rgba($red-500, 0.055);
-    color: rgba($red-500, 0.88);
-  }
-}
-
-.preset-module-filter-rule.recommended:not(.selected) {
-  border-color: rgba($green-500, 0.18);
-}
-
-.preset-module-filter-rule.unsafe:not(.selected) {
-  border-style: dashed;
-  opacity: 0.78;
-}
-
-.preset-module-filter-pattern {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: $stone-500;
-  font-family: monospace;
-  font-size: 0.73rem;
-  line-height: 1.4;
-}
-
-.module-filter-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-  margin-top: 0.1rem;
-
-  .regex-buttons-group {
+  input {
     flex-shrink: 0;
-  }
-
-  .settings-hint {
     margin: 0;
   }
+}
+
+.module-filter-chip-remove {
+  align-self: stretch;
+  min-width: 28px;
+  padding: 0 0.45rem;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.055);
+  background: transparent;
+  color: $stone-600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition:
+    color $transition-fast,
+    background $transition-fast;
+
+  &:hover {
+    color: $red-500;
+    background: rgba($red-500, 0.06);
+  }
+}
+
+.module-filter-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.2rem;
+}
+
+.module-filter-custom-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: stretch;
+
+  .settings-action-btn {
+    white-space: nowrap;
+  }
+}
+
+.module-filter-custom-status {
+  margin: 0;
+  color: $stone-500;
+  font-size: 0.73rem;
+  line-height: 1.4;
 }
 
 // =========================================
@@ -1955,13 +1959,8 @@
   background: rgba(0, 0, 0, 0.16);
 }
 
-// 额外模型三组与正则页保持同一套紧凑密度：一级折叠，展开后减少空白与重复留白。
-.extra-model-collapsible {
-  .settings-collapsible-header {
-    padding: 0.58rem 0.75rem;
-    font-size: 0.88rem;
-  }
-
+// AI 与记忆各组与正则页共用同一套紧凑密度。
+.settings-compact-collapsible {
   .settings-collapsible-body {
     gap: 0.52rem;
     padding: 0.65rem;
@@ -3421,26 +3420,14 @@
     gap: 0.5rem;
   }
 
-  .module-filter-footer,
   .summary-context-heading,
   .summary-archive-header {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .preset-module-filter-title-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.25rem;
-
-    strong {
-      white-space: normal;
-    }
-  }
-
-  .preset-module-filter-pattern {
-    white-space: normal;
-    overflow-wrap: anywhere;
+  .module-filter-custom-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .summary-mode-grid {

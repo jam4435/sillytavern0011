@@ -16,10 +16,14 @@ const variableEditorCapability: VariableEditorCapability = {
 
 const getVariablesMock = vi.mocked(globalThis.getVariables);
 
-function renderSettingsPanel(settings: DisplaySettings, onSettingsChange = vi.fn()) {
+function renderSettingsPanel(
+  settings: DisplaySettings,
+  onSettingsChange = vi.fn(),
+  currentPresetName = '',
+) {
   render(
     <SettingsPanel
-      currentPresetName=""
+      currentPresetName={currentPresetName}
       settings={settings}
       onSettingsChange={onSettingsChange}
       variableEditorCapability={variableEditorCapability}
@@ -44,8 +48,8 @@ describe('SettingsPanel theme controls', () => {
     }
     expect(screen.queryByRole('radio', { name: /水墨/ })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /额外模型/ }));
-    for (const name of ['API', '自动总结', '额外变量']) {
+    fireEvent.click(screen.getByRole('button', { name: /AI 与记忆/ }));
+    for (const name of ['对话摘要', 'API', '自动总结', '额外变量']) {
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
     }
     expect(screen.queryByLabelText('只读上下文轮数')).not.toBeInTheDocument();
@@ -202,9 +206,39 @@ describe('SettingsPanel theme controls', () => {
     renderSettingsPanel(createDefaultDisplaySettings());
 
     fireEvent.click(screen.getByRole('button', { name: '正则替换' }));
-    expect(screen.getByRole('button', { name: /全局共享规则 · 0/ })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByRole('button', { name: /当前预设规则 · 0/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /全局正则 · 0/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /当前预设正则 · 0/ })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('添加全局规则')).not.toBeInTheDocument();
+  });
+
+  it('stores the module-filter master switch and custom XML modules by preset', () => {
+    const settings = createDefaultDisplaySettings();
+    const onSettingsChange = renderSettingsPanel(settings, vi.fn(), '测试预设');
+
+    fireEvent.click(screen.getByRole('button', { name: '正则替换' }));
+    fireEvent.click(screen.getByRole('button', { name: '无用模块过滤开关' }));
+
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      ...settings,
+      presetModuleFilterEnabledByPreset: {
+        测试预设: true,
+      },
+    });
+
+    onSettingsChange.mockClear();
+    openSettingsBlock('无用模块过滤');
+    fireEvent.change(screen.getByLabelText('自定义 XML 模块'), { target: { value: '<thinking>' } });
+    fireEvent.click(screen.getByRole('button', { name: '加入' }));
+
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      ...settings,
+      presetModuleFilterCustomTagsByPreset: {
+        测试预设: ['thinking'],
+      },
+      presetModuleFilterSelectedTagsByPreset: {
+        测试预设: ['thinking'],
+      },
+    });
   });
 
   it('lets preset-summary mode configure the XML tag used for context compression', () => {
@@ -219,7 +253,7 @@ describe('SettingsPanel theme controls', () => {
     };
     const onSettingsChange = renderSettingsPanel(settings);
 
-    fireEvent.click(screen.getByRole('button', { name: '额外模型' }));
+    fireEvent.click(screen.getByRole('button', { name: 'AI 与记忆' }));
     openSettingsBlock('对话摘要');
 
     const tagInput = screen.getByLabelText('预设摘要 XML 标签');
@@ -240,7 +274,7 @@ describe('SettingsPanel theme controls', () => {
     const settings = createDefaultDisplaySettings();
     const onSettingsChange = renderSettingsPanel(settings);
 
-    fireEvent.click(screen.getByRole('button', { name: /额外模型/ }));
+    fireEvent.click(screen.getByRole('button', { name: /AI 与记忆/ }));
     openSettingsBlock('额外变量');
     fireEvent.change(screen.getByLabelText('只读上下文轮数'), { target: { value: '2' } });
 
@@ -257,7 +291,7 @@ describe('SettingsPanel theme controls', () => {
     const settings = createDefaultDisplaySettings();
     const onSettingsChange = renderSettingsPanel(settings);
 
-    fireEvent.click(screen.getByRole('button', { name: /额外模型/ }));
+    fireEvent.click(screen.getByRole('button', { name: /AI 与记忆/ }));
     openSettingsBlock('额外变量');
     expect(screen.getByLabelText('忽略的附属标签')).toHaveValue('tucao\ncurrent_event\nprogress');
     expect(screen.getByLabelText('正文开始边界')).toHaveValue('</konatan_planning~>');

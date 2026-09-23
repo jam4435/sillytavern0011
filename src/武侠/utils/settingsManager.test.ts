@@ -14,8 +14,10 @@ import {
   getRegexRulesForDisplay,
   getThemeAppearanceDefaults,
   loadSettings,
+  normalizePresetXmlModuleInput,
   saveSettings,
   stripSelectedPresetRegexMatches,
+  stripSelectedXmlModules,
 } from './settingsManager';
 
 describe('settingsManager ui theme', () => {
@@ -444,6 +446,53 @@ describe('settingsManager ui theme', () => {
       expect(loadSettings().presetStorageExcludedRegexSignaturesByPreset).toEqual({
         测试预设: ['sig-a'],
       });
+    });
+
+    it('normalizes XML module input and persists the new per-preset module filter state', () => {
+      expect(normalizePresetXmlModuleInput('thinking')).toBe('thinking');
+      expect(normalizePresetXmlModuleInput('<Thinking>')).toBe('thinking');
+      expect(normalizePresetXmlModuleInput('<memory>...</memory>')).toBe('memory');
+      expect(normalizePresetXmlModuleInput('<not valid')).toBeNull();
+
+      window.localStorage.setItem(
+        'wuxia_display_settings',
+        JSON.stringify({
+          presetModuleFilterEnabledByPreset: {
+            '  测试预设  ': true,
+          },
+          presetModuleFilterSelectedTagsByPreset: {
+            '  测试预设  ': [' Thinking ', '<tucao>', 'thinking', 123],
+          },
+          presetModuleFilterCustomTagsByPreset: {
+            '  测试预设  ': ['Memory', '<aside>'],
+          },
+        }),
+      );
+
+      const loaded = loadSettings();
+      expect(loaded.presetModuleFilterEnabledByPreset).toEqual({ 测试预设: true });
+      expect(loaded.presetModuleFilterSelectedTagsByPreset).toEqual({
+        测试预设: ['thinking', 'tucao'],
+      });
+      expect(loaded.presetModuleFilterCustomTagsByPreset).toEqual({
+        测试预设: ['memory', 'aside'],
+      });
+    });
+
+    it('removes selected XML modules while protecting summary and ERA blocks', () => {
+      const input = [
+        '<thinking>内部思考</thinking>',
+        '正文',
+        '<summary>保留摘要</summary>',
+        '<era_data>{"ok":true}</era_data>',
+      ].join('\n');
+
+      const result = stripSelectedXmlModules(input, ['thinking', 'summary', 'era_data']);
+
+      expect(result).not.toContain('<thinking>');
+      expect(result).toContain('正文');
+      expect(result).toContain('<summary>保留摘要</summary>');
+      expect(result).toContain('<era_data>{"ok":true}</era_data>');
     });
   });
 
