@@ -1109,14 +1109,45 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       case 'regex':
         {
           const defaultRegexSettings = createDefaultRegexSettings();
-          const regexResetSettings = {
+          const regexResetSettings: DisplaySettings = {
             ...settings,
             localRegexRules: defaultRegexSettings.localRegexRules,
           };
+
+          if (!hasCurrentPreset) {
+            onSettingsChange(regexResetSettings);
+            break;
+          }
+
+          const presetStorageExcludedRegexSignaturesByPreset = {
+            ...regexResetSettings.presetStorageExcludedRegexSignaturesByPreset,
+          };
+          const presetModuleFilterEnabledByPreset = {
+            ...regexResetSettings.presetModuleFilterEnabledByPreset,
+          };
+          const presetModuleFilterSelectedTagsByPreset = {
+            ...regexResetSettings.presetModuleFilterSelectedTagsByPreset,
+          };
+          const presetModuleFilterCustomTagsByPreset = {
+            ...regexResetSettings.presetModuleFilterCustomTagsByPreset,
+          };
+          delete presetStorageExcludedRegexSignaturesByPreset[normalizedCurrentPresetName];
+          delete presetModuleFilterEnabledByPreset[normalizedCurrentPresetName];
+          delete presetModuleFilterSelectedTagsByPreset[normalizedCurrentPresetName];
+          delete presetModuleFilterCustomTagsByPreset[normalizedCurrentPresetName];
+
           onSettingsChange(
-            hasCurrentPreset
-              ? setPresetRegexRulesForPreset(regexResetSettings, normalizedCurrentPresetName, [])
-              : regexResetSettings,
+            setPresetRegexRulesForPreset(
+              {
+                ...regexResetSettings,
+                presetStorageExcludedRegexSignaturesByPreset,
+                presetModuleFilterEnabledByPreset,
+                presetModuleFilterSelectedTagsByPreset,
+                presetModuleFilterCustomTagsByPreset,
+              },
+              normalizedCurrentPresetName,
+              [],
+            ),
           );
         }
         break;
