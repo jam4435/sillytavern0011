@@ -1511,7 +1511,6 @@
 
 // =========================================
 // 自动总结设置
-
 // =========================================
 
 .summary-section {
@@ -3421,26 +3420,14 @@
     gap: 0.5rem;
   }
 
-  .module-filter-footer,
   .summary-context-heading,
   .summary-archive-header {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .preset-module-filter-title-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.25rem;
-
-    strong {
-      white-space: normal;
-    }
-  }
-
-  .preset-module-filter-pattern {
-    white-space: normal;
-    overflow-wrap: anywhere;
+  .module-filter-custom-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .summary-mode-grid {
