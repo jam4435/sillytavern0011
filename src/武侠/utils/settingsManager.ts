@@ -2208,34 +2208,8 @@ export function stripSelectedPresetRegexMatches(
 }
 
 function escapeRegexLiteral(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\/**
- * 使用当前加载预设中玩家已经确认的规则，清理即将写入聊天的 assistant 文本。
- * 原始模型输出仍由调试链路单独保留；这里只处理长期聊天正文。
- */
-export function applyCurrentPresetModuleFilter(text: string): string {
-  const presetName = getLoadedPresetNameSafe();
-  if (!text || !presetName) {
-    return text;
-  }
-  const settings = loadSettings();
-  const selectedSignatures = settings.presetStorageExcludedRegexSignaturesByPreset[presetName] || [];
-  if (selectedSignatures.length === 0) {
-    return text;
-  }
-  const protectedSummaryTag =
-    settings.summarySettings.conversationSummaryMode === 'preset'
-      ? settings.summarySettings.conversationSummaryPresetTag
-      : 'summary';
-  return stripSelectedPresetRegexMatches(
-    text,
-    getPresetStorageCleanupCandidates(),
-    selectedSignatures,
-    protectedSummaryTag,
-  );
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
-');
-}
-
 export function stripSelectedXmlModules(
   text: string,
   selectedTags: string[],
