@@ -1700,13 +1700,7 @@ export function getPresetStorageCleanupRecommendation(
   };
 }
 
-/**
- * 当前预设里可作为“无用模块过滤”候选的酒馆正则。
- *
- * 候选严格保留原正则自己的 match 边界，不再通过“看见开始/结束标签”另造更宽的删除正则。
- * 因此复杂兼容写法（例如 <(?:think|thinking)>...</(?:think|thinking)>）仍作为一个真实匹配块；
- * “任意前文 + 思维链结束标记”也保留原 match，并只在推荐层做语义分类。
- */
+/** 从显示正则中提取明确出现的成对 XML 标签名。 */
 function extractXmlModuleTagsFromPattern(pattern: string): string[] {
   const body = normalizeRegexPatternForCleanupAnalysis(pattern);
   const tags = new Set<string>();
@@ -1763,6 +1757,10 @@ export function normalizePresetXmlModuleInput(input: string): string | null {
   return normalizeXmlModuleTagName(input);
 }
 
+/**
+ * 当前预设里可作为旧版“按正则签名过滤”迁移来源的酒馆正则。
+ * 新 UI 不展示这些原正则，只用它们识别 XML 标签并迁移旧选择。
+ */
 export function getPresetStorageCleanupCandidates(): RegexRule[] {
   try {
     return getRawPresetRegexesFromInUsePreset()
@@ -2210,6 +2208,7 @@ export function stripSelectedPresetRegexMatches(
 function escapeRegexLiteral(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
 export function stripSelectedXmlModules(
   text: string,
   selectedTags: string[],
