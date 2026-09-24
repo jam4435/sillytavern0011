@@ -1,4 +1,5 @@
 import type { DirectVariableWriteSource } from '../../shared/directVariableWrite';
+import { isFrontendDerivedCachePath } from './frontendVariableKeys';
 
 export type VariablePath = Array<string | number>;
 export type VariableChangeAction = 'insert' | 'edit' | 'delete';
@@ -701,6 +702,9 @@ function collectObservedDiffs(
   },
 ): void {
   visitObservedDiffs(beforeValue, afterValue, path, candidate => {
+    if (isFrontendDerivedCachePath(candidate.path)) {
+      return;
+    }
     pushObservedChange(
       result,
       counters,
@@ -825,6 +829,9 @@ export function createBucketedObservedVariableChanges(
   let totalObservedCount = 0;
 
   visitObservedDiffs(previousStatData, nextStatData, [], candidate => {
+    if (isFrontendDerivedCachePath(candidate.path)) {
+      return;
+    }
     totalObservedCount += 1;
     const origin = classify(candidate);
     const bucket = buckets[origin];
