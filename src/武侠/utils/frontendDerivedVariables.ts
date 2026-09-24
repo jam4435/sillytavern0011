@@ -29,14 +29,12 @@ import {
 import {
   FRONTEND_BATTLE_ZONE_KEY,
   FRONTEND_CULTIVATION_REFERENCE_KEY,
+  FRONTEND_LEGACY_RANDOM_NUMBERS_KEY,
   FRONTEND_LOCATION_LORE_KEY,
-  FRONTEND_RANDOM_NUMBERS_KEY,
   FRONTEND_VARIABLES_KEY,
 } from './frontendVariableKeys';
 import { dataLogger } from './logger';
 import { deriveMeridianModifiers } from './meridianSystem';
-const DEFAULT_RANDOM_NUMBER_COUNT = 5;
-
 const POWER_ZONE_TYPES: MartialArtsType[] = [
   '内功',
   '外功',
@@ -98,7 +96,6 @@ type FrontendDerivedVariables = {
   周围地点: DynamicLocationContextVariable;
   当前地点信息: CurrentLocationLoreVariable | null;
   战力区: string;
-  随机数: string;
   修为变化参考: number;
 };
 
@@ -503,16 +500,19 @@ function shouldRefreshLocationContext(
 function upsertFrontendVariables(
   variables: Record<string, unknown>,
   updates: Partial<FrontendDerivedVariables>,
+  removeKeys: string[] = [],
 ): Record<string, unknown> {
   const hasStatDataWrapper = isRecord(variables.stat_data);
   const statData = hasStatDataWrapper ? (variables.stat_data as Record<string, unknown>) : variables;
   const currentFrontendVariables = isRecord(statData[FRONTEND_VARIABLES_KEY])
     ? (statData[FRONTEND_VARIABLES_KEY] as Record<string, unknown>)
     : {};
-  const nextFrontendVariables = {
-    ...currentFrontendVariables,
-    ...updates,
-  };
+  const nextFrontendVariables = Object.fromEntries(
+    Object.entries({
+      ...currentFrontendVariables,
+      ...updates,
+    }).filter(([key]) => !removeKeys.includes(key)),
+  );
   const nextStatData = {
     ...statData,
     [FRONTEND_VARIABLES_KEY]: nextFrontendVariables,
@@ -526,13 +526,6 @@ function upsertFrontendVariables(
   }
 
   return nextStatData;
-}
-
-export function buildFrontendRandomNumbers(count = DEFAULT_RANDOM_NUMBER_COUNT): string {
-  return Array.from(
-    { length: Math.max(0, count) },
-    (_, index) => `随机数${index + 1}: ${Math.floor(Math.random() * 11)}`,
-  ).join('\n');
 }
 
 export async function syncFrontendDerivedVariables(
@@ -552,7 +545,6 @@ export async function syncFrontendDerivedVariables(
     const locationLore = buildCurrentLocationLoreFromStatData(statData);
     const battleZone = buildCombatPowerZoneFromStatData(statData);
     const cultivationReference = buildCultivationChangeReferenceFromStatData(statData);
-    const randomNumbers = buildFrontendRandomNumbers();
 
     await writeDirectChatTransaction(
       current => {
@@ -561,9 +553,7 @@ export async function syncFrontendDerivedVariables(
           ? updateLocationContextInVariables(currentVariables, locationContext)
           : currentVariables;
         const frontendVariables = getFrontendVariablesRecord(nextWithLocation);
-        const updates = {
-          [FRONTEND_RANDOM_NUMBERS_KEY]: randomNumbers,
-        } as Partial<FrontendDerivedVariables>;
+        const updates = {} as Partial<FrontendDerivedVariables>;
         const currentLocationLore = frontendVariables[FRONTEND_LOCATION_LORE_KEY] ?? null;
         if (JSON.stringify(currentLocationLore) !== JSON.stringify(locationLore)) {
           updates[FRONTEND_LOCATION_LORE_KEY] = locationLore;
@@ -575,7 +565,11 @@ export async function syncFrontendDerivedVariables(
           updates[FRONTEND_CULTIVATION_REFERENCE_KEY] = cultivationReference;
         }
 
-        return upsertFrontendVariables(nextWithLocation, updates);
+        return upsertFrontendVariables(
+          nextWithLocation,
+          updates,
+          [FRONTEND_LEGACY_RANDOM_NUMBERS_KEY],
+        );
       },
       'frontend-derived-variable-sync',
       {
@@ -589,7 +583,6 @@ export async function syncFrontendDerivedVariables(
       周围地点: locationContext,
       当前地点信息: locationLore,
       战力区: battleZone,
-      随机数: randomNumbers,
       修为变化参考: cultivationReference,
     };
   } catch (error) {
