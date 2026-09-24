@@ -3,6 +3,7 @@ import { setMartialArtsDatabase } from './martialArtsDatabase';
 import {
   buildCombatPowerZoneFromStatData,
   buildCultivationChangeReferenceFromStatData,
+  buildCurrentLocationLoreFromStatData,
   buildFrontendRandomNumbers,
 } from './frontendDerivedVariables';
 
@@ -117,6 +118,28 @@ describe('frontendDerivedVariables', () => {
       ].join('\n'),
     );
     expect(table).not.toContain('黄蓉');
+  });
+
+  it('按严格三级活动区派生重要地点背景，第四级变化不改变命中', () => {
+    const lore = buildCurrentLocationLoreFromStatData({
+      user数据: {
+        所在位置: '大宋/终南山/重阳宫/三清殿',
+      },
+    });
+
+    expect(lore?.严格活动区).toBe('大宋/终南山/重阳宫');
+    expect(lore?.主要势力).toBe('全真教');
+    expect(lore?.简介).toContain('全真教祖庭');
+  });
+
+  it('未收录的重要地点返回 null，不残留其他地点背景', () => {
+    expect(
+      buildCurrentLocationLoreFromStatData({
+        user数据: {
+          所在位置: '大宋/临安府/牛家村/曲三酒馆',
+        },
+      }),
+    ).toBeNull();
   });
 
   it('按固定格式生成五个随机数字符串', () => {
