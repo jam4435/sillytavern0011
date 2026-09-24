@@ -227,6 +227,26 @@ describe('buildAiComparisons', () => {
     }).comparisons[0].status).toBe('no-op');
   });
 
+  it('AI 声明写派生缓存时标记为只读越权，即使最终值相同也不视为正常落地', () => {
+    const derivedDeclared = parseDeclaredVariableChanges(
+      '<VariableEdit>{"前端变量":{"战力区":"hacked"}}</VariableEdit>',
+    ).declaredChanges;
+
+    const result = buildAiComparisons({
+      declaredChanges: derivedDeclared,
+      observedChanges: [],
+      baselineStatData: { 前端变量: { 战力区: 'old' } },
+      currentStatData: { 前端变量: { 战力区: 'hacked' } },
+    }).comparisons[0];
+
+    expect(result).toEqual(expect.objectContaining({
+      path: ['前端变量', '战力区'],
+      status: 'read-only',
+      expectedValue: 'hacked',
+      finalValue: 'hacked',
+    }));
+  });
+
   it('最终快照等于 AI 声明时判定为已落地，不再依赖中间来源归因', () => {
     const backgroundChanges = createObservedVariableChanges(
       { user数据: { 修为: 100 } },
