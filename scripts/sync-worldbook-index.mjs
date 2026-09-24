@@ -31,6 +31,7 @@ const WORLD_BOOK_DIR = path.join(rootDir, '世界书', WORLD_BOOK_NAME);
 const ENTRIES_DIR = path.join(WORLD_BOOK_DIR, '世界书');
 const INDEX_YAML_PATH = path.join(WORLD_BOOK_DIR, 'index.yaml');
 const OUTPUT_JSON_PATH = path.join(rootDir, '世界书', `${WORLD_BOOK_NAME}.json`);
+const FACTION_PREFIX = '势力-';
 
 // 4 个分类文件夹定义
 const FOLDER_DEFS = [
@@ -139,7 +140,7 @@ export function syncWorldbook() {
   for (const fileName of allDirFiles) {
     if (!fileName.endsWith('.yaml')) continue;
     const baseName = fileName.replace(/\.yaml$/, '');
-    if (baseName === '世界背景') continue; // 世界背景保留纯文本/YAML
+    if (baseName === '世界背景' || baseName.startsWith(FACTION_PREFIX)) continue; // 静态 lore 保留原文本
 
     const filePath = path.join(ENTRIES_DIR, fileName);
     const rawContent = fs.readFileSync(filePath, 'utf-8').trim();
@@ -162,6 +163,7 @@ export function syncWorldbook() {
   // 2. 读取现有 index.yaml
   let existingIndex = { 条目: [] };
   const existingUidsByName = new Map();
+  const existingEntriesByName = new Map();
   const existingUidSet = new Set();
   let folderMetaUid = 90282;
 
@@ -169,6 +171,7 @@ export function syncWorldbook() {
     const rawIndex = fs.readFileSync(INDEX_YAML_PATH, 'utf-8');
     existingIndex = parseYaml(rawIndex) || { 条目: [] };
     for (const item of existingIndex.条目 || []) {
+      existingEntriesByName.set(item.名称, item);
       if (item.名称 === '__WI_META_FOLDERS__') {
         folderMetaUid = item.uid || folderMetaUid;
       }
@@ -182,12 +185,19 @@ export function syncWorldbook() {
   // 3. 构建全部条目清单
   const fileBaseNames = new Set(allDirFiles.map(f => f.replace(/\.(yaml|json|txt)$/, '')));
   const addedEntries = [];
+  const validFactionNames = [];
   const validEventNames = [];
 
   for (const baseName of fileBaseNames) {
     if (ALL_SYSTEM_NAMES.has(baseName)) continue;
+    if (baseName.startsWith(FACTION_PREFIX)) {
+      validFactionNames.push(baseName);
+      continue;
+    }
     validEventNames.push(baseName);
   }
+
+  validFactionNames.sort((a, b) => a.localeCompare(b, 'zh-CN'));
 
   // 排序事件条目：射雕 -> 神雕 -> 天龙 -> 奇遇
   validEventNames.sort((a, b) => {
@@ -225,7 +235,35 @@ export function syncWorldbook() {
     });
   }
 
-  // 3.2 普通与奇遇事件条目
+  // 3.2 势力静态 lore：保留现有绿灯关键词与扫描深度
+  for (const name of validFactionNames) {
+    let uid = existingUidsByName.get(name);
+    if (!uid) {
+      uid = generateUniqueUid(name, existingUidSet);
+      addedEntries.push({ name, uid });
+    }
+    existingUidSet.add(uid);
+
+    const existing = existingEntriesByName.get(name);
+    const defaultFactionName = name.slice(FACTION_PREFIX.length);
+    const existingStrategy = existing?.激活策略;
+    const strategy = existingStrategy?.类型 === '绿灯'
+      ? existingStrategy
+      : { 类型: '绿灯', 关键字: [defaultFactionName], 扫描深度: 3 };
+
+    finalEntries.push({
+      名称: name,
+      uid,
+      启用: existing?.启用 ?? true,
+      激活策略: strategy,
+      插入位置: existing?.插入位置 || { 类型: '角色定义之前', 顺序: 20 },
+      激活概率: existing?.激活概率 ?? 100,
+      递归: existing?.递归 || { 不可被其他条目激活: true, 不可激活其他条目: true },
+      文件: `世界书\\${name}`,
+    });
+  }
+
+  // 3.3 普通与奇遇事件条目
   for (const name of validEventNames) {
     let uid = existingUidsByName.get(name);
     if (!uid) {
@@ -253,7 +291,7 @@ export function syncWorldbook() {
     });
   }
 
-  // 3.3 后置系统条目
+  // 3.4 后置系统条目
   for (const name of SYSTEM_BOTTOM_NAMES) {
     if (name === '__WI_META_FOLDERS__') {
       const folderMetaContent = JSON.stringify({
@@ -292,7 +330,15 @@ export function syncWorldbook() {
   const yamlHeader = `# yaml-language-server: $schema=https://testingcf.jsdelivr.net/gh/StageDog/tavern_sync/dist/schema/worldbook.zh.json\n锚点: {}\n\n条目:\n`;
   const entriesYaml = finalEntries
     .map(entry => {
-      let block = `  - 名称: ${entry.名称}\n    uid: ${entry.uid}\n    启用: ${entry.启用}\n    激活策略:\n      类型: ${entry.激活策略.类型}\n    插入位置:\n      类型: ${entry.插入位置.类型}\n`;
+      let block = `  - 名称: ${entry.名称}\n    uid: ${entry.uid}\n    启用: ${entry.启用}\n    激活策略:\n      类型: ${entry.激活策略.类型}\n`;
+      if (Array.isArray(entry.激活策略.关键字) && entry.激活策略.关键字.length > 0) {
+        block += `      关键字:\n${entry.激活策略.关键字.map(keyword => `        - ${keyword}`).join('\\n')}\n`;
+      }
+      if (entry.激活策略.次要关键字) {
+        block += `      次要关键字: ${stringifyYaml(entry.激活策略.次要关键字).trim().replace(/\\n/g, '\\n        ')}\n`;
+      }
+      if (entry.激活策略.扫描深度 !== undefined) block += `      扫描深度: ${entry.激活策略.扫描深度}\n`;
+      block += `    插入位置:\n      类型: ${entry.插入位置.类型}\n`;
       if (entry.插入位置.角色) block += `      角色: ${entry.插入位置.角色}\n`;
       if (entry.插入位置.深度 !== undefined) block += `      深度: ${entry.插入位置.深度}\n`;
       if (entry.插入位置.顺序 !== undefined) block += `      顺序: ${entry.插入位置.顺序}\n`;
