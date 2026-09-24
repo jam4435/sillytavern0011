@@ -166,6 +166,25 @@ describe('VariableChangeBar', () => {
     expect(screen.getByText('值不一致')).toBeInTheDocument();
   });
 
+  it('AI 修改派生缓存时显示只读越权并计入异常', () => {
+    const comparison = createComparison({
+      path: ['前端变量', '战力区'],
+      baselineValue: 'old',
+      expectedValue: 'hacked',
+      finalValue: 'hacked',
+      status: 'read-only',
+    });
+
+    render(<VariableChangeBar summary={createSummary({ comparisons: [comparison] })} />);
+
+    const aiButton = screen.getByRole('button', { name: /AI回复/ });
+    expect(aiButton).toHaveTextContent('1项 · 1异常');
+
+    fireEvent.click(aiButton);
+    expect(screen.getByText('只读越权')).toBeInTheDocument();
+    expect(screen.getByText('stat_data › 前端变量 › 战力区')).toBeInTheDocument();
+  });
+
   it('no-op 声明默认不单列', () => {
     const comparison = createComparison({
       path: ['user数据', '修为'],
