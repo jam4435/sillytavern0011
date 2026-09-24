@@ -1,4 +1,4 @@
-import { getRemoteAvatarUrl } from './avatarRemote';
+import { getGeneratedNpcAvatarUrl, getRemoteAvatarUrl } from './avatarRemote';
 import { GENERATED_NPC_AVATAR_ASSETS } from './generatedAvatarCatalog';
 
 const aQingFc2Url = getRemoteAvatarUrl('jinyong', 'a_qing_fc2.png');
@@ -307,10 +307,20 @@ export function findAvatarsByName(name?: string): AvatarCatalogEntry[] {
     return [];
   }
 
-  const normalizedName = normalizeAvatarName(name);
-  return NPC_AVATAR_CATALOG.filter(avatar =>
+  const label = name.trim();
+  const normalizedName = normalizeAvatarName(label);
+  const generatedAvatar = createNpcAvatar(
+    `generated_v2_${normalizedName}`,
+    label,
+    // NPC portraits are selected by name; gender only controls player presets.
+    '男',
+    getGeneratedNpcAvatarUrl(label),
+    [label],
+  );
+  const legacyMatches = NPC_AVATAR_CATALOG.filter(avatar =>
     avatar.aliases.some(alias => normalizeAvatarName(alias) === normalizedName),
   );
+  return [generatedAvatar, ...legacyMatches];
 }
 
 export function getAvatarFallbackInitial(name?: string): string {

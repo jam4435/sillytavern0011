@@ -18,8 +18,13 @@ describe('avatarCatalog', () => {
   });
 
   it('按姓名和别名精确匹配头像', () => {
-    expect(findAvatarsByName('令狐沖').map(avatar => avatar.id)).toEqual(['linghu_chong_fc2', 'linghu_chong_alt']);
+    expect(findAvatarsByName('令狐沖').map(avatar => avatar.id)).toEqual([
+      'generated_v2_令狐沖',
+      'linghu_chong_fc2',
+      'linghu_chong_alt',
+    ]);
     expect(findAvatarsByName('小龙女').map(avatar => avatar.id)).toEqual([
+      'generated_v2_小龙女',
       'generated_小龙女',
       'xiao_longnv_fc2',
       'xiao_longnv_alt',
@@ -28,6 +33,7 @@ describe('avatarCatalog', () => {
 
   it('同一人物可返回多个头像候选', () => {
     expect(findAvatarsByName('黃蓉').map(avatar => avatar.id)).toEqual([
+      'generated_v2_黃蓉',
       'generated_黄蓉',
       'huang_rong_fc2',
       'huang_rong_fc3',
