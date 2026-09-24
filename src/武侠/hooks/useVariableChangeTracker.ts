@@ -28,6 +28,7 @@ import {
   type VariableWriteActions,
 } from '../utils/variableChanges';
 import { variableTraceLogger } from '../utils/logger';
+import { isFrontendDerivedCachePath } from '../utils/frontendVariableKeys';
 import type { SummaryVariableUpdateMode } from '../utils/settingsManager';
 
 type ActiveVariableTurn = {
@@ -479,7 +480,8 @@ export function useVariableChangeTracker() {
     if (Array.isArray(metadata.changes)) {
       // 主链：source event 直接携带“本次 writer 自己”的实际 diff。
       // 其他 writer 即使已改变全局 stat_data，也不会被错误吸收到当前 source。
-      observedChanges = metadata.changes.slice(0, MAX_STORED_VARIABLE_CHANGES).map((change, index) =>
+      const visibleChanges = metadata.changes.filter(change => !isFrontendDerivedCachePath(change.path));
+      observedChanges = visibleChanges.slice(0, MAX_STORED_VARIABLE_CHANGES).map((change, index) =>
         makeObservedChange({
           path: change.path,
           beforeValue: change.beforeValue,
@@ -494,7 +496,7 @@ export function useVariableChangeTracker() {
           index: index + 1,
         }),
       );
-      omittedObservedCount = Math.max(0, metadata.changes.length - observedChanges.length);
+      omittedObservedCount = Math.max(0, visibleChanges.length - observedChanges.length);
     } else {
       // 仅兼容旧来源事件：没有 changes 字段时才退回共享快照区间推断。
       if (!nextStatData) {
