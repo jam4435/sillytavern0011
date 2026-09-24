@@ -189,6 +189,18 @@ if (附近传闻 && Object.keys(附近传闻).length > 0) {
 <% } -%>
 
 <%
+const 当前地点信息 = getvar('stat_data.前端变量.当前地点信息', { scope: 'local' });
+if (当前地点信息 && typeof 当前地点信息 === 'object' && !Array.isArray(当前地点信息)) {
+-%>
+# 当前地点背景（只读；由 user数据.所在位置实时派生）
+<当前地点信息>
+<%- toStrictJson(当前地点信息) %>
+</当前地点信息>
+这里描述的是当前严格三级活动区的稳定场所常识，不代表当前人物一定在场，也不得覆盖世界事件造成的动态变化。
+
+<% } -%>
+
+<%
 const 原始周围地点 = getvar('stat_data.前端变量.周围地点', { scope: 'local' });
 const 周围地点 = 原始周围地点 && typeof 原始周围地点 === 'object' && !Array.isArray(原始周围地点)
   ? 原始周围地点
