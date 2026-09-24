@@ -1185,7 +1185,12 @@ function normalizeThemeAppearanceSettings(
     backgroundOpacity: getNumberSetting(appearance?.backgroundOpacity, fallback.backgroundOpacity),
     backgroundImage: getNullableStringSetting(appearance?.backgroundImage, fallback.backgroundImage),
     backgroundBlur: getNumberSetting(appearance?.backgroundBlur, fallback.backgroundBlur),
-    chromeOpacity: normalizeThemeOpacitySetting(theme, 'chromeOpacity', appearance?.chromeOpacity, fallback.chromeOpacity),
+    chromeOpacity: normalizeThemeOpacitySetting(
+      theme,
+      'chromeOpacity',
+      appearance?.chromeOpacity,
+      fallback.chromeOpacity,
+    ),
     modalOpacity: normalizeThemeOpacitySetting(theme, 'modalOpacity', appearance?.modalOpacity, fallback.modalOpacity),
   });
 }
