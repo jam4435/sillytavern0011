@@ -4,7 +4,7 @@ import { useVariableChangeTracker } from './useVariableChangeTracker';
 
 const inlineAiBlock = '<VariableEdit>{"user数据":{"修为":120}}</VariableEdit>';
 const extraAiBlock = '<VariableEdit>{"user数据":{"属性":{"根骨":70}}}</VariableEdit>';
-const backgroundBlock = '<VariableEdit>{"前端变量":{"随机数":"随机数1: 8"}}</VariableEdit>';
+const backgroundBlock = '<VariableEdit>{"外部状态":{"标记":true}}</VariableEdit>';
 const backgroundSamePathBlock = '<VariableEdit>{"user数据":{"修为":115}}</VariableEdit>';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -165,6 +165,62 @@ describe('useVariableChangeTracker block/source model', () => {
     ]);
   });
 
+  it('来源明确的纯派生缓存不会进入后台变量条，真实变量仍保留', () => {
+    currentAssistantText = '纯正文';
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply('纯正文', 2);
+    });
+
+    currentStatData = {
+      user数据: { 修为: 100, 银两: 50 },
+      前端变量: {
+        战力区: 'new-zone',
+        当前地点信息: { 严格活动区: '大宋/终南山/重阳宫' },
+      },
+    };
+
+    act(() => {
+      result.current.handleDirectVariableWriteDone({
+        version: 1,
+        writeId: 'derived-and-real',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'frontend-derived-variable-sync',
+        changes: [
+          {
+            action: 'insert',
+            path: ['前端变量', '战力区'],
+            beforeValue: undefined,
+            afterValue: 'new-zone',
+          },
+          {
+            action: 'insert',
+            path: ['前端变量', '当前地点信息', '严格活动区'],
+            beforeValue: undefined,
+            afterValue: '大宋/终南山/重阳宫',
+          },
+          {
+            action: 'insert',
+            path: ['user数据', '银两'],
+            beforeValue: undefined,
+            afterValue: 50,
+          },
+        ],
+      });
+    });
+
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([
+      expect.objectContaining({
+        path: ['user数据', '银两'],
+        producer: 'frontend',
+        afterValue: 50,
+      }),
+    ]);
+  });
+
   it('direct write 即使没有 assistant 变量块，也作为后台实际修改展示', () => {
     currentAssistantText = '纯正文';
     const { result } = renderHook(() => useVariableChangeTracker());
@@ -267,7 +323,7 @@ describe('useVariableChangeTracker block/source model', () => {
     currentAssistantText = `${inlineAiBlock}\n${backgroundBlock}`;
     currentStatData = {
       user数据: { 修为: 120 },
-      前端变量: { 随机数: '随机数1: 8' },
+      外部状态: { 标记: true },
     };
 
     act(() => {
@@ -290,7 +346,7 @@ describe('useVariableChangeTracker block/source model', () => {
     );
     expect(result.current.variableChanges?.background.observedChanges).toEqual([
       expect.objectContaining({
-        path: ['前端变量', '随机数'],
+        path: ['外部状态', '标记'],
         producer: 'event-script',
         reason: 'turn-event-settlement',
       }),
@@ -396,9 +452,34 @@ describe('useVariableChangeTracker block/source model', () => {
         path: ['前端变量', '随机数'],
         producer: 'unknown',
         reason: 'assistant-background-block',
-        afterValue: '随机数1: 8',
+        afterValue: true,
       }),
     ]);
+  });
+
+  it('最终快照中的纯派生缓存变化也不会作为未知后台兜底', () => {
+    currentAssistantText = '纯正文';
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply('纯正文', 2);
+    });
+
+    currentStatData = {
+      user数据: { 修为: 100 },
+      前端变量: {
+        战力区: 'new-zone',
+        修为变化参考: 42,
+      },
+    };
+
+    act(() => {
+      result.current.handleVariableTurnSettled(2);
+    });
+
+    expect(result.current.variableChanges?.background.observedChanges).toEqual([]);
+    expect(result.current.variableChanges?.actualChanges).toEqual([]);
   });
 
   it('未经过包装且没有楼层变量块的最终实际变化，也不会丢失，会作为未知后台兜底', () => {
