@@ -772,7 +772,7 @@
   transition: all $transition-normal;
 
   &:hover {
-    border-color: var(--ui-text-muted);
+    border-color: var(--ui-border-strong);
   }
 
   &.disabled {
@@ -1139,7 +1139,7 @@
   transition: all $transition-normal;
 
   &:hover {
-    border-color: var(--ui-text-muted);
+    border-color: var(--ui-border-strong);
   }
 
   &.user {
@@ -1437,7 +1437,7 @@
     background $transition-fast;
 
   &:hover {
-    border-color: var(--ui-text-muted);
+    border-color: var(--ui-border-strong);
     background: rgba(255, 255, 255, 0.025);
   }
 
@@ -1552,7 +1552,7 @@
     color $transition-fast;
 
   &:hover:not(:disabled) {
-    border-color: var(--ui-text-muted);
+    border-color: var(--ui-border-strong);
     background: rgba(255, 255, 255, 0.035);
   }
 
@@ -1690,7 +1690,7 @@
   border-radius: 4px;
 
   &:hover {
-    border-color: var(--ui-text-muted);
+    border-color: var(--ui-border-strong);
     color: $stone-400;
   }
 
@@ -1858,7 +1858,7 @@
   border-radius: 4px;
 
   &:hover:not(:disabled) {
-    border-color: var(--ui-text-muted);
+    border-color: var(--ui-border-strong);
     color: $stone-300;
     background: rgba(255, 255, 255, 0.03);
   }
@@ -1922,7 +1922,7 @@
   }
 
   &:hover {
-    border-color: var(--ui-text-muted);
+    border-color: var(--ui-border-strong);
     color: $stone-300;
   }
 
