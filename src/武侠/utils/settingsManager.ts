@@ -517,14 +517,28 @@ export const THEME_APPEARANCE_DEFAULTS: Record<WuxiaUiTheme, ThemeAppearanceDefa
     backgroundColor: '#0c0a09',
     backgroundOpacity: 0.85,
     backgroundBlur: 0,
-    chromeOpacity: 0.58,
-    modalOpacity: 0.72,
+    chromeOpacity: 0.7,
+    modalOpacity: 0.84,
   },
   'ink-wash': {
     fontColor: '#1a1410',
     backgroundColor: '#e8e2d6',
     backgroundOpacity: 0.72,
     backgroundBlur: 0,
+    chromeOpacity: 0.58,
+    modalOpacity: 0.76,
+  },
+};
+
+const LEGACY_THEME_OPACITY_DEFAULTS: Record<
+  WuxiaUiTheme,
+  Pick<ThemeAppearanceDefaults, 'chromeOpacity' | 'modalOpacity'>
+> = {
+  'dark-gold': {
+    chromeOpacity: 0.58,
+    modalOpacity: 0.72,
+  },
+  'ink-wash': {
     chromeOpacity: 0.42,
     modalOpacity: 0.58,
   },
@@ -1147,6 +1161,19 @@ export function getThemeAppearanceDefaults(theme: WuxiaUiTheme): ThemeAppearance
   return THEME_APPEARANCE_DEFAULTS[theme];
 }
 
+function normalizeThemeOpacitySetting(
+  theme: WuxiaUiTheme,
+  key: 'chromeOpacity' | 'modalOpacity',
+  value: unknown,
+  fallback: number,
+): number {
+  const normalized = getNumberSetting(value, fallback);
+  const legacyDefault = LEGACY_THEME_OPACITY_DEFAULTS[theme][key];
+
+  // 只迁移旧版本恰好保存下来的默认值；玩家自定义过的透明度保持原样。
+  return Math.abs(normalized - legacyDefault) < 0.0001 ? THEME_APPEARANCE_DEFAULTS[theme][key] : normalized;
+}
+
 function normalizeThemeAppearanceSettings(
   theme: WuxiaUiTheme,
   appearance: Partial<ThemeAppearanceSettings> | undefined,
@@ -1158,8 +1185,8 @@ function normalizeThemeAppearanceSettings(
     backgroundOpacity: getNumberSetting(appearance?.backgroundOpacity, fallback.backgroundOpacity),
     backgroundImage: getNullableStringSetting(appearance?.backgroundImage, fallback.backgroundImage),
     backgroundBlur: getNumberSetting(appearance?.backgroundBlur, fallback.backgroundBlur),
-    chromeOpacity: getNumberSetting(appearance?.chromeOpacity, fallback.chromeOpacity),
-    modalOpacity: getNumberSetting(appearance?.modalOpacity, fallback.modalOpacity),
+    chromeOpacity: normalizeThemeOpacitySetting(theme, 'chromeOpacity', appearance?.chromeOpacity, fallback.chromeOpacity),
+    modalOpacity: normalizeThemeOpacitySetting(theme, 'modalOpacity', appearance?.modalOpacity, fallback.modalOpacity),
   });
 }
 
@@ -1182,8 +1209,8 @@ function buildLegacyThemeAppearance(
     backgroundOpacity: getNumberSetting(parsed.backgroundOpacity, fallback.backgroundOpacity),
     backgroundImage: getNullableStringSetting(parsed.backgroundImage, fallback.backgroundImage),
     backgroundBlur: getNumberSetting(parsed.backgroundBlur, fallback.backgroundBlur),
-    chromeOpacity: getNumberSetting(parsed.chromeOpacity, fallback.chromeOpacity),
-    modalOpacity: getNumberSetting(parsed.modalOpacity, fallback.modalOpacity),
+    chromeOpacity: normalizeThemeOpacitySetting(theme, 'chromeOpacity', parsed.chromeOpacity, fallback.chromeOpacity),
+    modalOpacity: normalizeThemeOpacitySetting(theme, 'modalOpacity', parsed.modalOpacity, fallback.modalOpacity),
   });
 }
 
