@@ -83,6 +83,40 @@ describe('createObservedVariableChanges', () => {
     }));
   });
 
+  it('过滤纯派生前端缓存，但保留前端变量中的真实持久状态', () => {
+    const result = createObservedVariableChanges(
+      {
+        前端变量: {
+          战力区: 'old',
+          当前地点信息: { 严格活动区: '大宋/临安府/牛家村' },
+          奇经八脉: { 版本: 1, 已通穴位: [] },
+        },
+      },
+      {
+        前端变量: {
+          战力区: 'new',
+          当前地点信息: { 严格活动区: '大宋/终南山/重阳宫' },
+          奇经八脉: { 版本: 1, 已通穴位: ['du:opening'] },
+        },
+      },
+      {
+        origin: 'background',
+        producer: 'frontend',
+        timestamp: 1000,
+        batchId: 'derived-filter',
+      },
+    );
+
+    expect(result.observedChanges).toEqual([
+      expect.objectContaining({
+        path: ['前端变量', '奇经八脉', '已通穴位', 0],
+        afterValue: 'du:opening',
+      }),
+    ]);
+    expect(result.totalObservedCount).toBe(1);
+    expect(result.batch).toEqual(expect.objectContaining({ changeCount: 1 }));
+  });
+
   it('相同快照不产生差分', () => {
     const result = createObservedVariableChanges(
       { user数据: { 修为: 100 } },
