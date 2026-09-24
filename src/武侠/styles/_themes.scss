@@ -26,6 +26,16 @@
   --wuxia-ink-border: rgba(61, 48, 40, 0.34);
   --wuxia-ink-border-soft: rgba(61, 48, 40, 0.22);
   --wuxia-ink-focus-ring: rgba(139, 26, 26, 0.14);
+  --ui-text-primary: var(--wuxia-ink-text-strong);
+  --ui-text-secondary: var(--wuxia-ink-text);
+  --ui-text-muted: var(--wuxia-ink-text-muted);
+  --ui-text-disabled: #7a6e62;
+  --ui-border: rgba(61, 48, 40, 0.24);
+  --ui-border-strong: rgba(61, 48, 40, 0.38);
+  --ui-surface-subtle: rgba(255, 252, 247, 0.48);
+  --ui-surface-hover: rgba(255, 252, 247, 0.72);
+  --ui-accent: #8b1a1a;
+  --ui-accent-soft: rgba(139, 26, 26, 0.1);
   // 近白文字色也需反转，避免新增输入框出现纸底白字
   --stone-100: #1a1410;
   --stone-50: #1a1410;
@@ -205,9 +215,9 @@
   .nav-sidebar {
     background: linear-gradient(
       180deg,
-      rgba(241, 235, 223, calc(0.42 * var(--wuxia-chrome-opacity-low, 1) + 0.58 * var(--wuxia-chrome-opacity-high, 0)))
+      rgba(241, 235, 223, calc(0.56 * var(--wuxia-chrome-opacity-low, 1) + 0.44 * var(--wuxia-chrome-opacity-high, 0)))
         0%,
-      rgba(218, 207, 188, calc(0.24 * var(--wuxia-chrome-opacity-low, 1) + 0.76 * var(--wuxia-chrome-opacity-high, 0)))
+      rgba(218, 207, 188, calc(0.40 * var(--wuxia-chrome-opacity-low, 1) + 0.60 * var(--wuxia-chrome-opacity-high, 0)))
         100%
     );
     border-right-color: rgba(61, 48, 40, 0.2);
@@ -238,7 +248,7 @@
       241,
       235,
       223,
-      calc(0.3 * var(--wuxia-chrome-opacity-low, 1) + 0.7 * var(--wuxia-chrome-opacity-high, 0))
+      calc(0.46 * var(--wuxia-chrome-opacity-low, 1) + 0.54 * var(--wuxia-chrome-opacity-high, 0))
     );
     border-color: rgba(61, 48, 40, 0.28);
     color: #3d3028;
@@ -323,9 +333,9 @@
   .game-header {
     background: linear-gradient(
       180deg,
-      rgba(241, 235, 223, calc(0.32 * var(--wuxia-chrome-opacity-low, 1) + 0.68 * var(--wuxia-chrome-opacity-high, 0)))
+      rgba(241, 235, 223, calc(0.46 * var(--wuxia-chrome-opacity-low, 1) + 0.54 * var(--wuxia-chrome-opacity-high, 0)))
         0%,
-      rgba(218, 207, 188, calc(0.16 * var(--wuxia-chrome-opacity-low, 1) + 0.84 * var(--wuxia-chrome-opacity-high, 0)))
+      rgba(218, 207, 188, calc(0.32 * var(--wuxia-chrome-opacity-low, 1) + 0.68 * var(--wuxia-chrome-opacity-high, 0)))
         100%
     );
     border-bottom-color: rgba(61, 48, 40, 0.18);
@@ -550,9 +560,9 @@
     background: linear-gradient(
       to bottom,
       rgba(232, 226, 214, 0) 0%,
-      rgba(232, 226, 214, calc(0.12 * var(--wuxia-chrome-opacity-low, 1) + 0.88 * var(--wuxia-chrome-opacity-high, 0)))
+      rgba(232, 226, 214, calc(0.24 * var(--wuxia-chrome-opacity-low, 1) + 0.76 * var(--wuxia-chrome-opacity-high, 0)))
         36%,
-      rgba(218, 207, 188, calc(0.18 * var(--wuxia-chrome-opacity-low, 1) + 0.82 * var(--wuxia-chrome-opacity-high, 0)))
+      rgba(218, 207, 188, calc(0.30 * var(--wuxia-chrome-opacity-low, 1) + 0.70 * var(--wuxia-chrome-opacity-high, 0)))
         100%
     );
   }
@@ -562,7 +572,7 @@
       241,
       235,
       223,
-      calc(0.18 * var(--wuxia-chrome-opacity-low, 1) + 0.82 * var(--wuxia-chrome-opacity-high, 0))
+      calc(0.32 * var(--wuxia-chrome-opacity-low, 1) + 0.68 * var(--wuxia-chrome-opacity-high, 0))
     );
     border: 12px solid transparent;
     border-image-source: var(--wuxia-ink-panel-bar-md);
@@ -948,7 +958,7 @@
       241,
       235,
       223,
-      calc(0.58 * var(--wuxia-modal-opacity-low, 1) + 0.42 * var(--wuxia-modal-opacity-high, 0))
+      calc(0.76 * var(--wuxia-modal-opacity-low, 1) + 0.24 * var(--wuxia-modal-opacity-high, 0))
     );
     border: 24px solid transparent;
     border-image-source: var(--wuxia-ink-panel-rect-xl);
@@ -963,7 +973,7 @@
       241,
       235,
       223,
-      calc(0.34 * var(--wuxia-modal-opacity-low, 1) + 0.66 * var(--wuxia-modal-opacity-high, 0))
+      calc(0.52 * var(--wuxia-modal-opacity-low, 1) + 0.48 * var(--wuxia-modal-opacity-high, 0))
     );
     border-bottom-color: rgba(61, 48, 40, 0.16);
   }
