@@ -1,5 +1,6 @@
 import { writeDirectChatTransaction } from '../../shared/directVariableWrite';
 import type { InitialAttributes } from '../types';
+import { buildCurrentLocationLoreVariable, type CurrentLocationLoreVariable } from '../data/locationLore';
 import { getLocationScopePath, normalizeLocationPath } from '../../shared/locationPath.js';
 import {
   applyAttributeModifiers,
@@ -28,6 +29,7 @@ import {
 import {
   FRONTEND_BATTLE_ZONE_KEY,
   FRONTEND_CULTIVATION_REFERENCE_KEY,
+  FRONTEND_LOCATION_LORE_KEY,
   FRONTEND_RANDOM_NUMBERS_KEY,
   FRONTEND_VARIABLES_KEY,
 } from './frontendVariableKeys';
@@ -94,6 +96,7 @@ type StatDataRecord = Record<string, unknown>;
 
 type FrontendDerivedVariables = {
   周围地点: DynamicLocationContextVariable;
+  当前地点信息: CurrentLocationLoreVariable | null;
   战力区: string;
   随机数: string;
   修为变化参考: number;
@@ -435,6 +438,14 @@ export function buildCultivationChangeReferenceFromStatData(statData: StatDataRe
   return Math.round(Math.log2(getRealmCoefficient(player.realm) + 1) * effectiveCultivationBonus);
 }
 
+export function buildCurrentLocationLoreFromStatData(
+  statData: StatDataRecord,
+): CurrentLocationLoreVariable | null {
+  const userData = isRecord(statData.user数据) ? (statData.user数据 as PlayerProfile) : null;
+  const location = typeof userData?.所在位置 === 'string' ? userData.所在位置 : '';
+  return buildCurrentLocationLoreVariable(location);
+}
+
 export function buildCombatPowerZoneFromStatData(statData: StatDataRecord): string {
   const player = buildPlayerCharacter(statData);
   const playerScope = getLocationScopePath(player?.normalizedLocation || '');
@@ -538,6 +549,7 @@ export async function syncFrontendDerivedVariables(
       eventTargetPaths: collectEventTargetPaths(statData),
       explicitMapTargets: options.explicitMapTargets,
     });
+    const locationLore = buildCurrentLocationLoreFromStatData(statData);
     const battleZone = buildCombatPowerZoneFromStatData(statData);
     const cultivationReference = buildCultivationChangeReferenceFromStatData(statData);
     const randomNumbers = buildFrontendRandomNumbers();
@@ -552,6 +564,10 @@ export async function syncFrontendDerivedVariables(
         const updates = {
           [FRONTEND_RANDOM_NUMBERS_KEY]: randomNumbers,
         } as Partial<FrontendDerivedVariables>;
+        const currentLocationLore = frontendVariables[FRONTEND_LOCATION_LORE_KEY] ?? null;
+        if (JSON.stringify(currentLocationLore) !== JSON.stringify(locationLore)) {
+          updates[FRONTEND_LOCATION_LORE_KEY] = locationLore;
+        }
         if (frontendVariables[FRONTEND_BATTLE_ZONE_KEY] !== battleZone) {
           updates[FRONTEND_BATTLE_ZONE_KEY] = battleZone;
         }
@@ -571,6 +587,7 @@ export async function syncFrontendDerivedVariables(
 
     return {
       周围地点: locationContext,
+      当前地点信息: locationLore,
       战力区: battleZone,
       随机数: randomNumbers,
       修为变化参考: cultivationReference,
