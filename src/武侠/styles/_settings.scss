@@ -22,7 +22,7 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--ui-border);
   margin-bottom: 1.5rem;
   // 标签栏是主导航，长内容滚动时保持可见
   position: sticky;
@@ -38,24 +38,25 @@
   gap: 0.5rem;
   padding: 0.75rem 1rem;
   background: transparent;
-  border: 1px solid $stone-700;
-  color: $stone-400;
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-secondary);
   font-family: $font-serif;
   font-size: 0.9rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all $transition-normal;
   position: relative;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.03);
-    border-color: $stone-600;
-    color: $stone-300;
+    background: var(--ui-surface-hover);
+    border-color: var(--ui-border-strong);
+    color: var(--ui-text-primary);
   }
 
   &.active {
-    background: rgba($amber-600, 0.1);
-    border-color: $amber-600;
-    color: $amber-600;
+    background: var(--ui-accent-soft);
+    border-color: var(--ui-accent);
+    color: var(--ui-accent);
 
     &::after {
       content: '';
@@ -64,12 +65,12 @@
       left: 0;
       right: 0;
       height: 2px;
-      background: $amber-600;
+      background: var(--ui-accent);
     }
   }
 
   svg {
-    opacity: 0.7;
+    opacity: 0.9;
   }
 }
 
@@ -156,19 +157,19 @@
 
 .settings-collapsible-block {
   overflow: hidden;
-  border: 1px solid $stone-800;
+  border: 1px solid var(--ui-border);
   border-radius: 4px;
-  background: linear-gradient(135deg, rgba($amber-600, 0.045), transparent 42%), rgba(255, 255, 255, 0.02);
+  background: linear-gradient(135deg, rgba($amber-600, 0.055), transparent 42%), var(--ui-surface-subtle);
   transition:
     border-color $transition-normal,
     background $transition-normal;
 
   &.open {
-    border-color: rgba($stone-700, 0.82);
+    border-color: var(--ui-border-strong);
   }
 
   &.collapsed {
-    background: rgba(255, 255, 255, 0.014);
+    background: var(--ui-surface-subtle);
   }
 }
 
@@ -176,7 +177,7 @@
   display: flex;
   align-items: center;
   width: 100%;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  border-bottom: 1px solid var(--ui-border);
   background: transparent;
   color: $stone-300;
 }
@@ -194,6 +195,7 @@
   color: inherit;
   font-family: $font-serif;
   font-size: 0.94rem;
+  font-weight: 500;
   cursor: pointer;
   transition:
     background $transition-normal,
@@ -201,8 +203,8 @@
   text-align: left;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.03);
-    color: $amber-600;
+    background: var(--ui-surface-hover);
+    color: var(--ui-accent);
   }
 }
 
@@ -259,8 +261,8 @@
   gap: 0.5rem;
   margin: 0 0 0.5rem 0;
   font-size: 1rem;
-  color: $stone-200;
-  font-weight: normal;
+  color: var(--ui-text-primary);
+  font-weight: 600;
   font-family: $font-serif;
 
   .diamond-bullet {
@@ -275,8 +277,9 @@
 .settings-description {
   margin: 0 0 1rem 0;
   font-size: 0.85rem;
-  color: $stone-500;
-  line-height: 1.5;
+  color: var(--ui-text-muted);
+  font-weight: 500;
+  line-height: 1.55;
 
   &.compact {
     margin-bottom: 0;
@@ -293,7 +296,7 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.75rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--ui-border);
 
   &:last-child {
     border-bottom: none;
@@ -308,7 +311,8 @@
 
 .settings-label {
   font-size: 0.9rem;
-  color: $stone-400;
+  color: var(--ui-text-secondary);
+  font-weight: 500;
   min-width: 80px;
   flex-shrink: 0;
 }
@@ -495,7 +499,9 @@
 .settings-hint {
   margin: 0;
   font-size: 0.75rem;
-  color: $stone-600;
+  color: var(--ui-text-muted);
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 // =========================================
@@ -512,7 +518,8 @@
 
 .preview-label {
   font-size: 0.75rem;
-  color: $stone-600;
+  color: var(--ui-text-muted);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin-bottom: 0.75rem;
@@ -621,7 +628,7 @@
 }
 
 .theme-choice-desc {
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.78rem;
   line-height: 1.35;
 }
@@ -727,7 +734,7 @@
 .regex-section-caption {
   margin: 0;
   font-size: 0.82rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   line-height: 1.5;
 }
 
@@ -749,7 +756,7 @@
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  color: $stone-600;
+  color: var(--ui-text-muted);
   gap: 0.75rem;
 
   p {
@@ -765,14 +772,14 @@
   transition: all $transition-normal;
 
   &:hover {
-    border-color: $stone-700;
+    border-color: var(--ui-text-muted);
   }
 
   &.disabled {
     opacity: 0.5;
 
     .regex-rule-header {
-      color: $stone-600;
+      color: var(--ui-text-muted);
     }
   }
 }
@@ -815,7 +822,7 @@
 .regex-toggle-btn {
   background: none;
   border: none;
-  color: $stone-600; // 默认关闭状态颜色
+  color: var(--ui-text-muted); // 默认关闭状态颜色
   cursor: pointer;
   padding: 0.25rem;
   display: flex;
@@ -841,7 +848,7 @@
 
 .regex-rule-index {
   font-size: 0.8rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   white-space: nowrap;
 }
 
@@ -887,7 +894,7 @@
 .regex-expand-btn {
   background: none;
   border: none;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   padding: 0.25rem 0.5rem;
   cursor: pointer;
   display: flex;
@@ -905,7 +912,7 @@
 .regex-delete-btn {
   background: none;
   border: none;
-  color: $stone-600;
+  color: var(--ui-text-muted);
   cursor: pointer;
   padding: 0.25rem;
   display: flex;
@@ -934,7 +941,7 @@
 
   label {
     font-size: 0.75rem;
-    color: $stone-500;
+    color: var(--ui-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -951,7 +958,7 @@
   font-size: 0.85rem;
 
   &::placeholder {
-    color: $stone-600;
+    color: var(--ui-text-muted);
   }
 
   &:focus {
@@ -995,7 +1002,7 @@
   padding: 0.75rem;
   background: transparent;
   border: 1px dashed $stone-700;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.9rem;
   cursor: pointer;
   transition: all $transition-normal;
@@ -1054,7 +1061,7 @@
     opacity: 0.45;
     background: rgba($stone-700, 0.12);
     border-color: rgba($stone-700, 0.35);
-    color: $stone-500;
+    color: var(--ui-text-muted);
   }
 }
 
@@ -1079,7 +1086,7 @@
   padding: 0.5rem 1rem;
   background: transparent;
   border: 1px solid $stone-700;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.85rem;
   cursor: pointer;
   transition: all $transition-normal;
@@ -1110,7 +1117,7 @@
   align-items: center;
   justify-content: center;
   padding: 3rem 2rem;
-  color: $stone-600;
+  color: var(--ui-text-muted);
   gap: 0.75rem;
   text-align: center;
 
@@ -1121,7 +1128,7 @@
 
   .debug-hint {
     font-size: 0.8rem;
-    color: $stone-700;
+    color: var(--ui-text-muted);
   }
 }
 
@@ -1132,7 +1139,7 @@
   transition: all $transition-normal;
 
   &:hover {
-    border-color: $stone-700;
+    border-color: var(--ui-text-muted);
   }
 
   &.user {
@@ -1188,14 +1195,14 @@
 
 .debug-log-time {
   font-size: 0.75rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-family: monospace;
   white-space: nowrap;
 }
 
 .debug-log-length {
   font-size: 0.75rem;
-  color: $stone-600;
+  color: var(--ui-text-muted);
   white-space: nowrap;
 }
 
@@ -1203,7 +1210,7 @@
   padding: 0.12rem 0.4rem;
   border: 1px solid $stone-700;
   border-radius: 999px;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.7rem;
   line-height: 1.2;
   white-space: nowrap;
@@ -1233,7 +1240,7 @@
 .debug-expand-btn {
   background: none;
   border: none;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   padding: 0.25rem 0.5rem;
   cursor: pointer;
   display: flex;
@@ -1252,7 +1259,7 @@
   padding: 0.5rem 0.75rem;
   padding-top: 0;
   font-size: 0.8rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1322,7 +1329,7 @@
   padding: 0.75rem;
   margin-top: 0.5rem;
   font-size: 0.8rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -1430,7 +1437,7 @@
     background $transition-fast;
 
   &:hover {
-    border-color: $stone-700;
+    border-color: var(--ui-text-muted);
     background: rgba(255, 255, 255, 0.025);
   }
 
@@ -1471,7 +1478,7 @@
   border: 0;
   border-left: 1px solid rgba(255, 255, 255, 0.055);
   background: transparent;
-  color: $stone-600;
+  color: var(--ui-text-muted);
   font-size: 1rem;
   cursor: pointer;
   transition:
@@ -1504,7 +1511,7 @@
 
 .module-filter-custom-status {
   margin: 0;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.73rem;
   line-height: 1.4;
 }
@@ -1536,7 +1543,7 @@
   border: 1px solid $stone-800;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.018);
-  color: $stone-500;
+  color: var(--ui-text-muted);
   text-align: left;
   cursor: pointer;
   transition:
@@ -1545,7 +1552,7 @@
     color $transition-fast;
 
   &:hover:not(:disabled) {
-    border-color: $stone-700;
+    border-color: var(--ui-text-muted);
     background: rgba(255, 255, 255, 0.035);
   }
 
@@ -1601,7 +1608,7 @@
 
   p {
     margin: 0;
-    color: $stone-500;
+    color: var(--ui-text-muted);
     font-size: 0.75rem;
     line-height: 1.45;
   }
@@ -1661,7 +1668,7 @@
   padding: 0.58rem 0.7rem;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.025);
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.77rem;
   line-height: 1.45;
 }
@@ -1677,13 +1684,13 @@
   padding: 0.5rem 1rem;
   background: transparent;
   border: 1px solid $stone-700;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   cursor: pointer;
   transition: all $transition-normal;
   border-radius: 4px;
 
   &:hover {
-    border-color: $stone-600;
+    border-color: var(--ui-text-muted);
     color: $stone-400;
   }
 
@@ -1724,7 +1731,7 @@
   font-size: 0.85rem;
 
   &::placeholder {
-    color: $stone-600;
+    color: var(--ui-text-muted);
   }
 
   &:focus {
@@ -1784,7 +1791,7 @@
 // 行内提示
 .settings-hint-inline {
   font-size: 0.75rem;
-  color: $stone-600;
+  color: var(--ui-text-muted);
   margin-left: 0.5rem;
 }
 
@@ -1803,7 +1810,7 @@
   resize: vertical;
 
   &::placeholder {
-    color: $stone-600;
+    color: var(--ui-text-muted);
   }
 
   &:focus {
@@ -1818,7 +1825,7 @@
   padding: 0.4rem 0.75rem;
   background: transparent;
   border: 1px solid $stone-700;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.8rem;
   cursor: pointer;
   transition: all $transition-normal;
@@ -1851,7 +1858,7 @@
   border-radius: 4px;
 
   &:hover:not(:disabled) {
-    border-color: $stone-600;
+    border-color: var(--ui-text-muted);
     color: $stone-300;
     background: rgba(255, 255, 255, 0.03);
   }
@@ -1900,7 +1907,7 @@
   border: 1px solid $stone-800;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.02);
-  color: $stone-500;
+  color: var(--ui-text-muted);
   cursor: pointer;
   transition: all $transition-normal;
 
@@ -1915,7 +1922,7 @@
   }
 
   &:hover {
-    border-color: $stone-700;
+    border-color: var(--ui-text-muted);
     color: $stone-300;
   }
 
@@ -2315,7 +2322,7 @@
 }
 
 .auto-advance-status-meta {
-  color: $stone-500;
+  color: var(--ui-text-muted);
   white-space: nowrap;
 }
 
@@ -2335,7 +2342,7 @@
 
   p {
     margin: 0;
-    color: $stone-500;
+    color: var(--ui-text-muted);
     font-size: 0.82rem;
     line-height: 1.5;
   }
@@ -2356,7 +2363,7 @@
   gap: 0.75rem;
   border: 1px dashed $stone-800;
   border-radius: 4px;
-  color: $stone-600;
+  color: var(--ui-text-muted);
 
   p {
     margin: 0;
@@ -2441,7 +2448,7 @@
 .auto-advance-result-length {
   min-width: 0;
   overflow: hidden;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2449,7 +2456,7 @@
 
 .auto-advance-result-preview {
   padding: 0 0.75rem 0.75rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-family: monospace;
   font-size: 0.78rem;
   line-height: 1.5;
@@ -2470,7 +2477,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.76rem;
 
   span {
@@ -2487,7 +2494,7 @@
 
 .auto-advance-result-block-title {
   margin-bottom: 0.35rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.74rem;
 }
 
@@ -2683,7 +2690,7 @@
 }
 
 .variables-character-count {
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.78rem;
 }
 
@@ -2695,7 +2702,7 @@
 
 .variables-field-label {
   font-size: 0.75rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
 }
 
 .variables-search-field {
@@ -2713,7 +2720,7 @@
   background: rgba($stone-900, 0.82);
   border: 1px solid $stone-700;
   border-radius: 4px;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   transition:
     border-color $transition-fast,
     background $transition-fast;
@@ -2826,7 +2833,7 @@
   transition: all $transition-fast;
 
   span:last-child {
-    color: $stone-500;
+    color: var(--ui-text-muted);
     font-size: 0.72rem;
     white-space: nowrap;
   }
@@ -2856,7 +2863,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.4rem 0.65rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.72rem;
 }
 
@@ -2867,7 +2874,7 @@
   justify-content: center;
   gap: 0.75rem;
   min-height: 260px;
-  color: $stone-600;
+  color: var(--ui-text-muted);
 
   p {
     margin: 0;
@@ -2931,7 +2938,7 @@
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   cursor: pointer;
   transition: all $transition-fast;
 
@@ -2959,7 +2966,7 @@
   padding: 0.18rem 0.4rem;
   border: 1px solid $stone-800;
   border-radius: 4px;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.72rem;
   white-space: nowrap;
   background: rgba(0, 0, 0, 0.18);
@@ -2968,7 +2975,7 @@
 .variable-node-preview {
   grid-area: preview;
   min-width: 0;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.76rem;
   line-height: 1.45;
   overflow: hidden;
@@ -2979,7 +2986,7 @@
 }
 
 .variable-node.branch > .variable-node-row .variable-node-preview {
-  color: $stone-600;
+  color: var(--ui-text-muted);
 }
 
 .variable-search-mark {
@@ -2993,7 +3000,7 @@
   min-height: 34px;
   display: flex;
   align-items: center;
-  color: $stone-700;
+  color: var(--ui-text-muted);
   font-size: 0.8rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.035);
 }
@@ -3018,7 +3025,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    color: $stone-600;
+    color: var(--ui-text-muted);
     text-align: center;
 
     p {
@@ -3061,7 +3068,7 @@
   border: 1px solid $stone-700;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.16);
-  color: $stone-500;
+  color: var(--ui-text-muted);
   cursor: pointer;
   transition: all $transition-fast;
 
@@ -3082,7 +3089,7 @@
   border: 1px solid $stone-700;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.16);
-  color: $stone-500;
+  color: var(--ui-text-muted);
   cursor: pointer;
   transition: all $transition-fast;
 
@@ -3117,7 +3124,7 @@
     border: 1px solid $stone-800;
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.18);
-    color: $stone-500;
+    color: var(--ui-text-muted);
     font-size: 0.72rem;
   }
 }
@@ -3128,7 +3135,7 @@
 
 .variable-detail-note {
   margin: 0.55rem 0 0;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.76rem;
   line-height: 1.5;
 }
@@ -3136,7 +3143,7 @@
 .variable-detail-field-label {
   display: block;
   margin-bottom: 0.35rem;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-size: 0.75rem;
 }
 
@@ -3175,7 +3182,7 @@
 
   &:disabled {
     cursor: not-allowed;
-    color: $stone-500;
+    color: var(--ui-text-muted);
     background: rgba($stone-900, 0.45);
   }
 }
@@ -3197,7 +3204,7 @@
   border: 1px solid $stone-700;
   border-radius: 4px;
   background: transparent;
-  color: $stone-500;
+  color: var(--ui-text-muted);
   font-family: monospace;
   font-size: 0.78rem;
   cursor: pointer;
@@ -3229,7 +3236,7 @@
 
 .variable-null-value,
 .variable-unknown-value {
-  color: $stone-600;
+  color: var(--ui-text-muted);
   font-family: monospace;
   font-size: 0.78rem;
 }
@@ -3239,7 +3246,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
-  color: $stone-600;
+  color: var(--ui-text-muted);
   font-size: 0.78rem;
 
   .dirty {
@@ -3456,4 +3463,25 @@
   .variables-scope-chip {
     min-height: 2.5rem;
   }
+}
+
+
+// =========================================
+// Readability baseline - 小字号信息保持清晰，不再依赖低对比度灰色
+// =========================================
+.settings-description,
+.settings-hint,
+.settings-hint-inline,
+.preview-label,
+.regex-rule-index,
+.regex-section-caption,
+.debug-log-time,
+.debug-log-length,
+.debug-log-status,
+.module-filter-custom-status,
+.summary-mode-description,
+.auto-advance-status-meta,
+.auto-advance-result-length,
+.auto-advance-result-meta {
+  font-weight: 500;
 }
