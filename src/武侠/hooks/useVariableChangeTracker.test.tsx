@@ -440,7 +440,7 @@ describe('useVariableChangeTracker block/source model', () => {
 
     currentStatData = {
       user数据: { 修为: 100 },
-      前端变量: { 随机数: '随机数1: 8' },
+      外部状态: { 标记: true },
     };
 
     act(() => {
@@ -449,7 +449,7 @@ describe('useVariableChangeTracker block/source model', () => {
 
     expect(result.current.variableChanges?.background.observedChanges).toEqual([
       expect.objectContaining({
-        path: ['前端变量', '随机数'],
+        path: ['外部状态', '标记'],
         producer: 'unknown',
         reason: 'assistant-background-block',
         afterValue: true,
@@ -522,7 +522,7 @@ describe('useVariableChangeTracker block/source model', () => {
 
     currentStatData = {
       user数据: { 修为: 100 },
-      前端变量: { 随机数: '随机数1: 9' },
+      前端变量: { 战力区: 'late-zone' },
     };
 
     act(() => {
