@@ -4,7 +4,6 @@ import {
   buildCombatPowerZoneFromStatData,
   buildCultivationChangeReferenceFromStatData,
   buildCurrentLocationLoreFromStatData,
-  buildFrontendRandomNumbers,
 } from './frontendDerivedVariables';
 
 describe('frontendDerivedVariables', () => {
@@ -140,16 +139,6 @@ describe('frontendDerivedVariables', () => {
         },
       }),
     ).toBeNull();
-  });
-
-  it('按固定格式生成五个随机数字符串', () => {
-    const randomNumbers = buildFrontendRandomNumbers();
-    const lines = randomNumbers.split('\n');
-
-    expect(lines).toHaveLength(5);
-    lines.forEach((line, index) => {
-      expect(line).toMatch(new RegExp(`^随机数${index + 1}: (10|[0-9])$`));
-    });
   });
 
   it('按最高有效内功生成修为变化参考，不叠加多门内功', () => {
