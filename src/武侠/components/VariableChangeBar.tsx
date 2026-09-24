@@ -31,6 +31,7 @@ const COMPARE_STATUS_LABELS: Record<VariableComparisonStatus, string> = {
   diverged: '值不一致',
   'no-op': '无净变化',
   'api-only': 'API写入',
+  'read-only': '只读越权',
 };
 
 const PRODUCER_META: Record<VariableChangeProducer, { label: string; tone: SourceTone }> = {
@@ -178,6 +179,7 @@ const hasComparisonFinalMismatch = (comparison: VariableAiComparison): boolean =
 const isAiException = (comparison: VariableAiComparison): boolean =>
   comparison.status === 'not-applied'
   || comparison.status === 'diverged'
+  || comparison.status === 'read-only'
   || hasComparisonFinalMismatch(comparison);
 
 const createAiTimeItem = (comparisons: VariableAiComparison[]): AiLogicalItem | null => {
