@@ -171,7 +171,7 @@
   small {
     min-width: 0;
     overflow: hidden;
-    color: rgba(168, 162, 158, 0.76);
+    color: var(--ui-text-muted);
     font-size: 0.72rem;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2472,7 +2472,7 @@
 
 .workbench-item-meta {
   overflow: hidden;
-  color: rgba(168, 162, 158, 0.78);
+  color: var(--ui-text-muted);
   font-size: 0.72rem;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -2508,7 +2508,7 @@
 
 .workbench-item-count,
 .workbench-ready-dot {
-  color: rgba(168, 162, 158, 0.72);
+  color: var(--ui-text-muted);
   font-size: 0.68rem;
   white-space: nowrap;
 }
@@ -2525,7 +2525,7 @@
   justify-content: center;
   border: 1px dashed rgba(120, 113, 108, 0.22);
   border-radius: 8px;
-  color: rgba(168, 162, 158, 0.72);
+  color: var(--ui-text-muted);
   font-family: var(--font-serif);
   text-align: center;
 }
@@ -2726,12 +2726,12 @@
   }
 
   &.locked {
-    color: rgba(120, 113, 108, 0.82);
+    color: var(--ui-text-muted);
   }
 }
 
 .workbench-muted {
-  color: rgba(168, 162, 158, 0.76);
+  color: var(--ui-text-muted);
   font-size: 0.86rem;
 }
 
@@ -2932,7 +2932,7 @@
 }
 
 .placeholder-text {
-  color: rgba(168, 162, 158, 0.5);
+  color: var(--ui-text-muted);
   font-style: italic;
   font-family: var(--font-serif);
   font-size: 1rem;
@@ -3012,7 +3012,7 @@
   gap: 1rem;
   padding: 2rem 1rem;
   text-align: center;
-  color: rgba(168, 162, 158, 0.72);
+  color: var(--ui-text-muted);
 }
 
 .empty-state-emblem {
@@ -3474,7 +3474,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  color: rgba(168, 162, 158, 0.76);
+  color: var(--ui-text-muted);
   padding: 0;
 
 }
@@ -3562,7 +3562,7 @@
 .variable-change-empty,
 .variable-change-omitted,
 .variable-change-error {
-  color: rgba(168, 162, 158, 0.76);
+  color: var(--ui-text-muted);
   font-size: 0.76rem;
   line-height: 1.6;
 }
@@ -3778,7 +3778,7 @@
 }
 
 .variable-change-caption {
-  color: rgba(168, 162, 158, 0.7);
+  color: var(--ui-text-muted);
   font-size: 0.68rem;
   letter-spacing: 0.02em;
 }
@@ -3829,7 +3829,7 @@
   padding: 0.5rem 0.55rem;
   border: 1px dashed rgba(120, 113, 108, 0.2);
   border-radius: 6px;
-  color: rgba(168, 162, 158, 0.76);
+  color: var(--ui-text-muted);
   background: rgba(255, 255, 255, 0.018);
   line-height: 1.55;
 }
