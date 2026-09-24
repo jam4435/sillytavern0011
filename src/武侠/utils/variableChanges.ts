@@ -10,7 +10,7 @@ export type VariableChangeProducer =
   | 'message-boundary'
   | 'unknown';
 export type VariableChangeSource = 'ai-declared' | 'observed-diff';
-export type VariableComparisonStatus = 'applied' | 'not-applied' | 'diverged' | 'no-op' | 'api-only';
+export type VariableComparisonStatus = 'applied' | 'not-applied' | 'diverged' | 'no-op' | 'api-only' | 'read-only';
 export type VariableChangeStatus = 'tracking' | 'reply-recorded' | 'settled' | 'error';
 export type VariableWriteActions = Record<string, boolean>;
 
@@ -955,7 +955,10 @@ export function buildAiComparisons({
     let status: VariableComparisonStatus;
     let action: VariableChangeAction;
 
-    if (!declaredChange && observedChange) {
+    if (declaredChange && isFrontendDerivedCachePath(path)) {
+      status = 'read-only';
+      action = declaredChange.action;
+    } else if (!declaredChange && observedChange) {
       status = 'api-only';
       action = observedChange.action;
     } else {
