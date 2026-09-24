@@ -332,10 +332,10 @@ export function syncWorldbook() {
     .map(entry => {
       let block = `  - 名称: ${entry.名称}\n    uid: ${entry.uid}\n    启用: ${entry.启用}\n    激活策略:\n      类型: ${entry.激活策略.类型}\n`;
       if (Array.isArray(entry.激活策略.关键字) && entry.激活策略.关键字.length > 0) {
-        block += `      关键字:\n${entry.激活策略.关键字.map(keyword => `        - ${keyword}`).join('\\n')}\n`;
+        block += `      关键字:\n${entry.激活策略.关键字.map(keyword => `        - ${keyword}`).join('\n')}\n`;
       }
       if (entry.激活策略.次要关键字) {
-        block += `      次要关键字: ${stringifyYaml(entry.激活策略.次要关键字).trim().replace(/\\n/g, '\\n        ')}\n`;
+        block += `      次要关键字: ${stringifyYaml(entry.激活策略.次要关键字).trim().replace(/\n/g, '\n        ')}\n`;
       }
       if (entry.激活策略.扫描深度 !== undefined) block += `      扫描深度: ${entry.激活策略.扫描深度}\n`;
       block += `    插入位置:\n      类型: ${entry.插入位置.类型}\n`;
