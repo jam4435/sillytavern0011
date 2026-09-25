@@ -56,16 +56,25 @@
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-pinia": "^0.4.2",
     "eslint-plugin-vue": "^10.11.1",
+<<<<<<< HEAD
     "eslint-webpack-plugin": "^5.0.3",
     "globals": "^16.5.0",
+=======
+    "eslint-webpack-plugin": "^6.0.0",
+    "globals": "^17.12.0",
+>>>>>>> f447e54f4effc7980891d89ab7e9b3c9aa02737e
     "html-inline-css-loader": "^0.2.1",
     "html-inline-css-webpack-plugin": "^1.11.2",
     "html-inline-script-webpack-plugin": "^3.2.1",
     "html-loader": "^5.1.0",
     "html-webpack-inline-svg-plugin": "^2.3.0",
     "html-webpack-plugin": "^5.6.8",
+<<<<<<< HEAD
     "javascript-obfuscator": "^4.2.2",
     "jsdom": "^29.1.1",
+=======
+    "javascript-obfuscator": "^5.8.0",
+>>>>>>> f447e54f4effc7980891d89ab7e9b3c9aa02737e
     "mini-css-extract-plugin": "^2.10.2",
     "playwright-core": "^1.63.0",
     "postcss": "^8.5.28",
@@ -78,7 +87,11 @@
     "remark-html": "^16.0.1",
     "remark-loader": "^6.0.0",
     "sass": "^1.105.0",
+<<<<<<< HEAD
     "sass-loader": "^16.0.8",
+=======
+    "sass-loader": "^17.0.1",
+>>>>>>> f447e54f4effc7980891d89ab7e9b3c9aa02737e
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "style-loader": "^4.0.0",
@@ -88,12 +101,20 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths-webpack-plugin": "^4.2.0",
     "tslib": "^2.8.1",
+<<<<<<< HEAD
     "type-fest": "^4.41.0",
     "typescript": "6.0.0-dev.20250807",
     "typescript-eslint": "^8.70.1",
     "unplugin-auto-import": "^20.3.0",
     "unplugin-vue-components": "^29.2.0",
     "vitest": "^4.1.11",
+=======
+    "type-fest": "^5.10.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "unplugin-auto-import": "^21.1.0",
+    "unplugin-vue-components": "^32.1.0",
+>>>>>>> f447e54f4effc7980891d89ab7e9b3c9aa02737e
     "vue-eslint-parser": "^10.4.1",
     "vue-loader": "^17.4.2",
     "vue-style-loader": "^4.1.3",
