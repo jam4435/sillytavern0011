@@ -821,7 +821,11 @@ export function installConversationSummaryPromptFilter(): () => void {
       }
     }
 
-    captureConversationSummaryPromptTrace(eventData.chat, settings, coverage, initialPromptRefs);
+    // 延后到本轮同步 CHAT_COMPLETION_PROMPT_READY 监听器全部执行后再取快照，
+    // 尽量反映真正提交给模型前的最终上下文，而不是只看本监听器刚处理完的中间态。
+    queueMicrotask(() => {
+      captureConversationSummaryPromptTrace(eventData.chat, settings, coverage, initialPromptRefs);
+    });
   });
   return () => subscription.stop();
 }
