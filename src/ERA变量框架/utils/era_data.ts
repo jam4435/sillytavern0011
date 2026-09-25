@@ -5,12 +5,73 @@
 'use strict';
 
 import _ from 'lodash';
-import { CHAT_SCOPE, META_DATA_PATH, STAT_DATA_PATH } from './constants';
+import { CHAT_SCOPE, LOGS_PATH, META_DATA_PATH, STAT_DATA_PATH } from './constants';
+import { unescapeLegacyEraEditLogValues, unescapeLegacyEraStringValues } from './data';
 import {
   getActiveEraDiagnosticTask,
   recordEraDiagnosticError,
   startEraDiagnosticWatchdog,
 } from './diagnostics';
+
+export const ERA_STRING_VALUE_ENCODING_VERSION = 2;
+const ERA_STRING_VALUE_ENCODING_VERSION_PATH = 'StringValueEncodingVersion';
+
+function getStringValueEncodingVersion(meta: any): number {
+  const raw = _.get(meta, ERA_STRING_VALUE_ENCODING_VERSION_PATH, 1);
+  const version = Number(raw);
+  return Number.isFinite(version) ? version : 1;
+}
+
+/**
+ * 将旧版 ERA 对字符串值的 __DOT__/__DQUOTE__/__SQUOTE__ 编码一次性还原。
+ * 对象键和 EditLog.path 继续保持 ERA 内部路径编码，避免破坏 Lodash 路径语义。
+ */
+export function migrateLegacyEraStringValueStorageInPlace(chatVars: any): boolean {
+  if (!chatVars || typeof chatVars !== 'object') return false;
+
+  const meta = _.get(chatVars, META_DATA_PATH, {});
+  if (getStringValueEncodingVersion(meta) >= ERA_STRING_VALUE_ENCODING_VERSION) {
+    return false;
+  }
+
+  const stat = _.get(chatVars, STAT_DATA_PATH);
+  if (stat !== undefined) {
+    _.set(chatVars, STAT_DATA_PATH, unescapeLegacyEraStringValues(stat));
+  }
+
+  const editLogs = _.get(meta, LOGS_PATH);
+  if (_.isPlainObject(editLogs)) {
+    for (const mk of Object.keys(editLogs)) {
+      editLogs[mk] = unescapeLegacyEraEditLogValues(editLogs[mk]);
+    }
+  }
+
+  _.set(meta, ERA_STRING_VALUE_ENCODING_VERSION_PATH, ERA_STRING_VALUE_ENCODING_VERSION);
+  _.set(chatVars, META_DATA_PATH, meta);
+  return true;
+}
+
+/**
+ * 当前聊天加载时执行一次迁移；版本号保存在 ERAMetaData 中，因此每个聊天独立且幂等。
+ */
+export async function ensureEraStringValueEncodingV2(): Promise<boolean> {
+  const current = getVariables(CHAT_SCOPE) || {};
+  // APP_READY 可能早于聊天变量装载完成；空对象不能提前写 v2 标记，否则可能跳过真正旧存档的迁移。
+  if (!_.has(current, META_DATA_PATH) && !_.has(current, STAT_DATA_PATH)) {
+    return false;
+  }
+  const currentMeta = _.get(current, META_DATA_PATH, {});
+  if (getStringValueEncodingVersion(currentMeta) >= ERA_STRING_VALUE_ENCODING_VERSION) {
+    return false;
+  }
+
+  let migrated = false;
+  await updateVariablesWith(v => {
+    migrated = migrateLegacyEraStringValueStorageInPlace(v);
+    return v;
+  }, CHAT_SCOPE);
+  return migrated;
+}
 
 /**
  * 递归地从对象中移除所有以 `$` 开头的字段（如 `$meta`, `$template`）。
@@ -74,6 +135,7 @@ export async function updateEraStatData(updater: (currentStatData: any) => any |
   });
   try {
     await updateVariablesWith(async v => {
+      migrateLegacyEraStringValueStorageInPlace(v);
       const currentStat = _.get(v, STAT_DATA_PATH, {});
       const newStat = await updater(currentStat);
       _.set(v, STAT_DATA_PATH, newStat);
@@ -103,6 +165,7 @@ export async function updateEraMetaData(updater: (currentMetaData: any) => any |
   });
   try {
     await updateVariablesWith(async v => {
+      migrateLegacyEraStringValueStorageInPlace(v);
       const currentMeta = _.get(v, META_DATA_PATH, {});
       const newMeta = await updater(currentMeta);
       _.set(v, META_DATA_PATH, newMeta);

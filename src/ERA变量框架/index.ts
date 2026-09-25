@@ -17,6 +17,7 @@
 import { EVENT_GROUPS } from './events/merger';
 import { pushToQueue } from './events/queue';
 import { consumeInternalMessageUpdatedEvent } from '../shared/internalMessageUpdateGuard';
+import { ensureEraStringValueEncodingV2 } from './utils/era_data';
 
 // 导入查询模块, 以注册 {{ERA:...}} 宏
 import './api/macro/parser';
@@ -41,9 +42,26 @@ const eventsToListen = [
 // 遍历事件列表，为每个事件注册一个回调函数。
 // 这个回调函数是所有事件的统一入口。
 eventsToListen.forEach(ev => {
+  // 当前聊天首次加载或切换聊天时，先完成旧字符串值编码迁移，再进入正常 ERA 队列。
+  if (ev === tavern_events.APP_READY || ev === tavern_events.CHAT_CHANGED) {
+    eventOn(ev, (detail: any) => {
+      void ensureEraStringValueEncodingV2()
+        .catch(error => console.error('[ERA] 字符串值编码迁移失败，将继续正常事件处理。', error))
+        .finally(() => pushToQueue(ev, detail));
+    });
+    return;
+  }
+
   // `eventOn` 是酒馆助手提供的全局函数，用于注册事件监听。
   // 当事件 `ev` 触发时，回调函数被调用，并将事件类型 `ev` 和事件详情 `detail` 推入队列。
   eventOn(ev, (detail: any) => pushToQueue(ev, detail));
+});
+
+// 某些宿主恢复 iframe 时 APP_READY 可能已经发生；DOM ready 后再做一次幂等兜底。
+$(() => {
+  void ensureEraStringValueEncodingV2().catch(error =>
+    console.error('[ERA] 启动时字符串值编码迁移失败。', error),
+  );
 });
 
 // 为酒馆助手脚本界面中的手动按钮注册监听器。
