@@ -658,7 +658,6 @@ export function installConversationSummaryPromptFilter(): () => void {
   return () => subscription.stop();
 }
 
-export async function applyConversationSummaryModeState
 export async function applyConversationSummaryModeState(
   mode:ConversationSummaryMode,
   recentReplies=DEFAULT_CONVERSATION_SUMMARY_RECENT_REPLIES,
@@ -679,5 +678,4 @@ export async function applyConversationSummaryModeState(
     return `${memoryStatus}已禁用卡内摘要指令；由当前预设生成摘要，章节记忆仍由记忆区独立注入并接管已归档旧对话。`;
   }
   return `${memoryStatus}已禁用卡内摘要指令与逐轮摘要过滤；已生成的长期章节记忆仍由记忆区独立注入。`;
-}
 }
