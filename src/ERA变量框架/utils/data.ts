@@ -18,9 +18,10 @@ const escapeRegex = new RegExp(Object.keys(ESCAPE_MAP).map(_.escapeRegExp).join(
 const unescapeRegex = new RegExp(Object.values(ESCAPE_MAP).map(_.escapeRegExp).join('|'), 'g');
 
 /**
- * 递归地转义对象或数组中所有字符串值和键的特殊字符。
- * @param data - 要处理的数据。
- * @returns - 转义后的数据。
+ * 递归地转义对象或数组中的对象键。
+ *
+ * ERA 使用 Lodash 点路径访问 stat_data，因此对象键中的点号、单双引号需要保护；
+ * 普通字符串值不是路径的一部分，必须原样保存，避免日期、版本号、域名等内容泄漏为 __DOT__ 等内部编码。
  */
 export function escapeEraData<T>(data: T): T {
   if (Array.isArray(data)) {
@@ -36,16 +37,13 @@ export function escapeEraData<T>(data: T): T {
     }
     return newObj as any;
   }
-  if (typeof data === 'string') {
-    return data.replace(escapeRegex, match => ESCAPE_MAP[match]) as any;
-  }
   return data;
 }
 
 /**
- * 递归地反转义对象或数组中所有字符串值和键的特殊字符。
- * @param data - 要处理的数据。
- * @returns - 反转义后的数据。
+ * 递归地反转义对象或数组中的对象键。
+ *
+ * 字符串值保持原样。这样字面量 "__DOT__" 不会被错误解释为 "."，并与新的写入语义保持对称。
  */
 export function unescapeEraData<T>(data: T): T {
   if (Array.isArray(data)) {
@@ -61,10 +59,64 @@ export function unescapeEraData<T>(data: T): T {
     }
     return newObj as any;
   }
+  return data;
+}
+
+/**
+ * 只用于一次性兼容迁移：反转义旧 ERA 版本曾写入到“字符串值”中的内部编码，但保留对象键原样。
+ */
+export function unescapeLegacyEraStringValues<T>(data: T): T {
+  if (Array.isArray(data)) {
+    return data.map(item => unescapeLegacyEraStringValues(item)) as any;
+  }
+  if (_.isPlainObject(data)) {
+    const newObj: { [key: string]: any } = {};
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        newObj[key] = unescapeLegacyEraStringValues((data as any)[key]);
+      }
+    }
+    return newObj as any;
+  }
   if (typeof data === 'string') {
     return data.replace(unescapeRegex, match => UNESCAPE_MAP[match]) as any;
   }
   return data;
+}
+
+function migrateLegacyEditLogEntry(entry: any): any {
+  if (!_.isPlainObject(entry)) return entry;
+  const next = _.cloneDeep(entry);
+  if (Object.prototype.hasOwnProperty.call(next, 'value_old')) {
+    next.value_old = unescapeLegacyEraStringValues(next.value_old);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, 'value_new')) {
+    next.value_new = unescapeLegacyEraStringValues(next.value_new);
+  }
+  return next;
+}
+
+/**
+ * 迁移 EditLog 中真正属于变量值的 value_old/value_new；path 仍是 ERA 内部路径，不能反转义。
+ */
+export function unescapeLegacyEraEditLogValues(raw: any): any {
+  if (Array.isArray(raw)) {
+    return raw.map(migrateLegacyEditLogEntry);
+  }
+  if (_.isPlainObject(raw)) {
+    return migrateLegacyEditLogEntry(raw);
+  }
+  if (typeof raw === 'string') {
+    const normalized = raw.replace(/^\s*\x60{3}(?:json)?\s*|\s*\x60{3}\s*$/g, '');
+    try {
+      const parsed = JSON.parse(normalized);
+      if (!Array.isArray(parsed)) return raw;
+      return JSON.stringify(parsed.map(migrateLegacyEditLogEntry));
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
 }
 
 /**
