@@ -53,11 +53,13 @@ describe('GameContent assistant reply autoscroll', () => {
     );
 
     const edit = screen.getByRole('button', { name: '编辑最新 AI 回复' });
+    const sticky = edit.closest('.maintext-edit-sticky');
     const container = edit.closest('.maintext-container');
     expect(edit).toHaveAttribute('data-wuxia-automation', 'open-latest-reply-editor');
     expect(edit).toHaveAttribute('data-wuxia-editable', 'true');
+    expect(sticky).not.toBeNull();
     expect(container).not.toBeNull();
-    expect(edit.parentElement).toBe(container);
+    expect(sticky?.parentElement).toBe(container);
     expect(edit.closest('.maintext-content')).toBeNull();
 
     fireEvent.click(edit);

@@ -191,11 +191,19 @@
   flex: 0 0 auto;
 }
 
-.maintext-edit-trigger {
-  position: absolute;
+.maintext-edit-sticky {
+  position: sticky;
   top: 0.7rem;
-  right: 0.75rem;
-  z-index: 30;
+  z-index: 40;
+  height: 0;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.maintext-edit-trigger {
+  position: relative;
+  z-index: 1;
   width: 30px;
   height: 30px;
   margin: 0;
@@ -313,9 +321,11 @@
     justify-self: end;
   }
 
-  .maintext-edit-trigger {
+  .maintext-edit-sticky {
     top: 0.5rem;
-    right: 0.5rem;
+  }
+
+  .maintext-edit-trigger {
     opacity: 0.76;
   }
 }

@@ -213,21 +213,23 @@ const GameContent: React.FC<GameContentProps> = ({
       {maintext && (
         <div className="maintext-container">
           {onEditLatestReply && (
-            <button
-              type="button"
-              className={`maintext-edit-trigger ${canEditLatestReply ? '' : 'is-unavailable'}`}
-              onClick={event => {
-                event.preventDefault();
-                event.stopPropagation();
-                onEditLatestReply();
-              }}
-              title={canEditLatestReply ? '查看并编辑最新 AI 回复原文' : '当前回复暂不可编辑，点击查看原因'}
-              aria-label="编辑最新 AI 回复"
-              data-wuxia-automation="open-latest-reply-editor"
-              data-wuxia-editable={canEditLatestReply ? 'true' : 'false'}
-            >
-              <FilePenLine size={16} aria-hidden="true" />
-            </button>
+            <div className="maintext-edit-sticky">
+              <button
+                type="button"
+                className={`maintext-edit-trigger ${canEditLatestReply ? '' : 'is-unavailable'}`}
+                onClick={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onEditLatestReply();
+                }}
+                title={canEditLatestReply ? '查看并编辑最新 AI 回复原文' : '当前回复暂不可编辑，点击查看原因'}
+                aria-label="编辑最新 AI 回复"
+                data-wuxia-automation="open-latest-reply-editor"
+                data-wuxia-editable={canEditLatestReply ? 'true' : 'false'}
+              >
+                <FilePenLine size={16} aria-hidden="true" />
+              </button>
+            </div>
           )}
           <div
             ref={latestReplyRef}
