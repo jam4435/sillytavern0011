@@ -1,3 +1,4 @@
+import { FilePenLine } from 'lucide-react';
 import React, { useEffect, useMemo, useRef } from 'react';
 import type { DisplaySettings } from '../utils/settingsManager';
 import { Icons } from './Icons';
@@ -14,6 +15,10 @@ interface GameContentProps {
   settings?: DisplaySettings;
   /** 新 assistant/swipe 提交键；变化时把新回复顶部滚入视野。 */
   scrollCommitKey?: string | null;
+  /** 打开最新 AI 回复原文编辑器。 */
+  onEditLatestReply?: () => void;
+  /** 当前最新回复是否允许编辑。 */
+  canEditLatestReply?: boolean;
 }
 
 /**
@@ -74,6 +79,8 @@ const GameContent: React.FC<GameContentProps> = ({
   onSelectOption,
   settings,
   scrollCommitKey,
+  onEditLatestReply,
+  canEditLatestReply = false,
 }) => {
   const latestReplyRef = useRef<HTMLDivElement | null>(null);
   const lastScrolledCommitKeyRef = useRef<string | null>(null);
@@ -210,6 +217,19 @@ const GameContent: React.FC<GameContentProps> = ({
             className="maintext-content"
             data-wuxia-automation="latest-reply"
           >
+            {onEditLatestReply && (
+              <button
+                type="button"
+                className="maintext-edit-trigger"
+                onClick={onEditLatestReply}
+                disabled={!canEditLatestReply}
+                title={canEditLatestReply ? '查看并编辑最新 AI 回复原文' : '当前没有可编辑的最新 AI 回复'}
+                aria-label="编辑最新 AI 回复"
+                data-wuxia-automation="open-latest-reply-editor"
+              >
+                <FilePenLine size={16} aria-hidden="true" />
+              </button>
+            )}
             {renderedContent}
           </div>
         </div>

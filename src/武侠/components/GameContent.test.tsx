@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GameContent from './GameContent';
 
@@ -39,5 +39,22 @@ describe('GameContent assistant reply autoscroll', () => {
 
     rerender(<GameContent maintext="重新生成正文" options={[]} scrollCommitKey="12:1" />);
     expect(scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+
+  it('把最新 AI 回复编辑入口放在正文自身而不是输入栏', () => {
+    const onEditLatestReply = vi.fn();
+    render(
+      <GameContent
+        maintext="正文"
+        options={[]}
+        onEditLatestReply={onEditLatestReply}
+        canEditLatestReply
+      />,
+    );
+
+    const edit = screen.getByRole('button', { name: '编辑最新 AI 回复' });
+    expect(edit).toHaveAttribute('data-wuxia-automation', 'open-latest-reply-editor');
+    fireEvent.click(edit);
+    expect(onEditLatestReply).toHaveBeenCalledTimes(1);
   });
 });
