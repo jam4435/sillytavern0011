@@ -84,16 +84,15 @@ function getActiveMessageText(message: ChatMessageWithSwipes): string {
 }
 
 function escapeSummaryTagForRegex(value: string): string {
-  return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\export function extractTurnSummary(text: string): string {
-  return text.match(SUMMARY_BLOCK_REGEX)?.[1]?.trim() || '';
-}
-');
+  return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
 export function extractTurnSummary(text: string, summaryTag = 'summary'): string {
   const tagName = normalizeConversationSummaryTag(summaryTag);
   const escapedTag = escapeSummaryTagForRegex(tagName);
-  return text.match(new RegExp('<' + escapedTag + '\\b[^>]*>([\\s\\S]*?)<\\/' + escapedTag + '>', 'i'))?.[1]?.trim() || '';
+  return text.match(
+    new RegExp('<' + escapedTag + '\\b[^>]*>([\\s\\S]*?)<\\/' + escapedTag + '>', 'i'),
+  )?.[1]?.trim() || '';
 }
 
 export function selectConversationArchiveBatch(
