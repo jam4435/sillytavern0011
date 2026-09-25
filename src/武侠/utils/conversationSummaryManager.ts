@@ -52,7 +52,6 @@ if (章节摘要 && typeof 章节摘要 === 'object' && Object.keys(章节摘要
 </长期叙事记忆>
 <% } -%>`;
 
-function clampRecentReplies
 function clampRecentReplies(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_CONVERSATION_SUMMARY_RECENT_REPLIES;
   return Math.max(1, Math.min(20, Math.floor(value)));
@@ -315,6 +314,13 @@ function extractSummaryTagBlock(text: string, tagValue: string): string | null {
   return match?.[0]?.trim() || null;
 }
 
+function extractSummaryTagContent(text: string, tagValue: string): string {
+  const tagName = normalizeConversationSummaryTag(tagValue);
+  const escapedTag = escapeSummaryTagForRegex(tagName);
+  const match = text.match(new RegExp('<' + escapedTag + '\\b[^>]*>([\\s\\S]*?)<\\/' + escapedTag + '>', 'i'));
+  return match?.[1]?.trim() || '';
+}
+
 /**
  * 兼容玩家预设摘要：不负责要求模型生成摘要，只识别玩家填写的 XML 标签并压缩最终 prompt。
  * 最近 N 条 assistant 回复保留正文（去掉重复摘要块）；更早的已摘要回复仅保留摘要，并移除配对 user。
@@ -420,7 +426,45 @@ type PromptHistoryMessage = {
   message_id: number;
   role: 'system' | 'assistant' | 'user';
   is_hidden?: boolean;
+  message?: string;
+  swipes?: string[];
+  swipe_id?: number;
 };
+
+export type ConversationSummaryPromptState =
+  | 'full'
+  | 'summary_only'
+  | 'chapter_memory'
+  | 'empty'
+  | 'not_in_prompt';
+
+export interface ConversationSummaryPromptTraceItem {
+  messageId: number;
+  hasSummary: boolean;
+  summary: string;
+  contextState: ConversationSummaryPromptState;
+  contextPreview: string;
+}
+
+export interface ConversationSummaryPromptTraceSnapshot {
+  capturedAt: number;
+  mode: ConversationSummaryMode;
+  summaryTag: string;
+  recentReplies: number;
+  items: ConversationSummaryPromptTraceItem[];
+}
+
+export const CONVERSATION_SUMMARY_TRACE_EVENT = 'wuxia:conversationSummaryTraceUpdated';
+
+let latestConversationSummaryPromptTrace: ConversationSummaryPromptTraceSnapshot | null = null;
+
+export function getLatestConversationSummaryPromptTrace(): ConversationSummaryPromptTraceSnapshot | null {
+  if (!latestConversationSummaryPromptTrace) return null;
+  return {
+    ...latestConversationSummaryPromptTrace,
+    items: latestConversationSummaryPromptTrace.items.map(item => ({ ...item })),
+  };
+}
 
 type HistoricalBackfillChapter = {
   起始楼层?: unknown;
@@ -506,6 +550,120 @@ function readArchivedConversationCoverage(): ArchivedConversationCoverage {
   }
 }
 
+
+function getActiveHistoryMessageText(message: PromptHistoryMessage): string {
+  const swipes = Array.isArray(message.swipes) ? message.swipes : [];
+  if (swipes.length > 0) {
+    const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
+    const safeSwipeIndex = Math.max(0, Math.min(swipeIndex, swipes.length - 1));
+    return swipes[safeSwipeIndex] || message.message || '';
+  }
+  return message.message || '';
+}
+
+function alignPromptMessagesToHistory(
+  chat: SillyTavern.SendingMessage[],
+  history: PromptHistoryMessage[],
+): Map<number, SillyTavern.SendingMessage> {
+  const dialogueHistory = history
+    .filter(message => message.role === 'user' || message.role === 'assistant')
+    .sort((left, right) => left.message_id - right.message_id);
+  const promptDialogue = chat.filter(message => message.role === 'user' || message.role === 'assistant');
+  const result = new Map<number, SillyTavern.SendingMessage>();
+
+  let promptCursor = promptDialogue.length - 1;
+  for (let historyCursor = dialogueHistory.length - 1; historyCursor >= 0 && promptCursor >= 0; historyCursor -= 1) {
+    const historyMessage = dialogueHistory[historyCursor];
+    while (promptCursor >= 0 && promptDialogue[promptCursor].role !== historyMessage.role) {
+      promptCursor -= 1;
+    }
+    if (promptCursor < 0) break;
+    result.set(historyMessage.message_id, promptDialogue[promptCursor]);
+    promptCursor -= 1;
+  }
+  return result;
+}
+
+function collectChapterCoveredAssistantIds(
+  coverage: ArchivedConversationCoverage,
+  summaryTag: string,
+): Set<number> {
+  const covered = new Set(coverage.historicalAssistantMessageIds);
+  let remaining = Math.max(0, coverage.archivedSummaryCount - coverage.historicalBackfillSummaryCount);
+  if (remaining <= 0) return covered;
+
+  for (const message of coverage.history) {
+    if (remaining <= 0) break;
+    if (message.role !== 'assistant' || covered.has(message.message_id)) continue;
+    const rawText = getActiveHistoryMessageText(message);
+    if (!extractSummaryTagContent(rawText, summaryTag) && !extractSummaryTagContent(rawText, 'summary')) continue;
+    covered.add(message.message_id);
+    remaining -= 1;
+  }
+  return covered;
+}
+
+function captureConversationSummaryPromptTrace(
+  chat: SillyTavern.SendingMessage[],
+  settings: ReturnType<typeof loadSettings>,
+  coverage: ArchivedConversationCoverage,
+  initialPromptRefs: Map<number, SillyTavern.SendingMessage>,
+): void {
+  const mode = settings.summarySettings.conversationSummaryMode || activeConversationSummaryMode;
+  const summaryTag =
+    mode === 'preset'
+      ? normalizeConversationSummaryTag(settings.summarySettings.conversationSummaryPresetTag)
+      : CONVERSATION_SUMMARY_TAG;
+  const chapterCoveredIds = collectChapterCoveredAssistantIds(coverage, summaryTag);
+  const finalPromptMessages = new Set(chat);
+
+  const items = coverage.history
+    .filter(message => message.role === 'assistant')
+    .map(message => {
+      const rawText = getActiveHistoryMessageText(message);
+      const summary = extractSummaryTagContent(rawText, summaryTag);
+      const promptMessage = initialPromptRefs.get(message.message_id);
+      let contextState: ConversationSummaryPromptState = 'not_in_prompt';
+      let contextPreview = '';
+
+      if (chapterCoveredIds.has(message.message_id)) {
+        contextState = 'chapter_memory';
+      } else if (promptMessage && finalPromptMessages.has(promptMessage)) {
+        const finalText = getSendingMessageText(promptMessage).trim();
+        contextPreview = finalText.slice(0, 260);
+        if (!finalText) {
+          contextState = 'empty';
+        } else {
+          const summaryBlock = extractSummaryTagBlock(finalText, summaryTag);
+          const withoutSummary = removeSummaryTagBlocks(finalText, summaryTag);
+          contextState = summaryBlock && !withoutSummary ? 'summary_only' : 'full';
+        }
+      }
+
+      return {
+        messageId: message.message_id,
+        hasSummary: Boolean(summary),
+        summary,
+        contextState,
+        contextPreview,
+      };
+    });
+
+  latestConversationSummaryPromptTrace = {
+    capturedAt: Date.now(),
+    mode,
+    summaryTag,
+    recentReplies: clampRecentReplies(settings.summarySettings.conversationSummaryRecentReplies),
+    items,
+  };
+
+  try {
+    window.dispatchEvent(new CustomEvent(CONVERSATION_SUMMARY_TRACE_EVENT));
+  } catch {
+    // 非浏览器环境下忽略通知；快照本身仍可读取。
+  }
+}
+
 /**
  * 根据真实聊天楼层顺序，把“历史回溯”章节精确覆盖的 user → assistant 对从最终 prompt 删除。
  *
@@ -575,6 +733,7 @@ export function filterHistoricalBackfillTurnsFromPrompt(
 export function filterArchivedSummariesFromPrompt(
   chat: SillyTavern.SendingMessage[],
   archivedSummaryCount: number,
+  summaryTag = CONVERSATION_SUMMARY_TAG,
 ): number {
   let remaining = Math.max(0, Math.floor(archivedSummaryCount));
   if (remaining === 0) return 0;
@@ -582,7 +741,7 @@ export function filterArchivedSummariesFromPrompt(
   const removeIndices = new Set<number>();
   for (let index = 0; index < chat.length && remaining > 0; index += 1) {
     const message = chat[index];
-    if (message.role !== 'assistant' || !/<summary>[\s\S]*?<\/summary>/i.test(getSendingMessageText(message))) {
+    if (message.role !== 'assistant' || !extractSummaryTagBlock(getSendingMessageText(message), summaryTag)) {
       continue;
     }
 
@@ -611,16 +770,21 @@ export function filterArchivedSummariesFromPrompt(
 
 export function installConversationSummaryPromptFilter(): () => void {
   const subscription = eventOn(tavern_events.CHAT_COMPLETION_PROMPT_READY, eventData => {
+    const settings = loadSettings();
+    const mode = settings.summarySettings.conversationSummaryMode || activeConversationSummaryMode;
+    const summaryTag =
+      mode === 'preset'
+        ? normalizeConversationSummaryTag(settings.summarySettings.conversationSummaryPresetTag)
+        : CONVERSATION_SUMMARY_TAG;
+    const coverage = readArchivedConversationCoverage();
+    const initialPromptRefs = alignPromptMessagesToHistory(eventData.chat, coverage.history);
+
     const filteredModules = filterSelectedPresetModulesFromPrompt(eventData.chat);
     if (filteredModules > 0) {
       dataLogger.log(`[conversationFilter] 已从本次最终提示词过滤 ${filteredModules} 条 assistant 消息中的无用模块。`);
     }
 
-    const settings = loadSettings();
-    const mode = settings.summarySettings.conversationSummaryMode || activeConversationSummaryMode;
-
     // 长期章节记忆与逐轮摘要来源解耦：只要旧楼层已经被章节记忆覆盖，就始终从最终 prompt 移除。
-    const coverage = readArchivedConversationCoverage();
     const backfillRemoved = filterHistoricalBackfillTurnsFromPrompt(
       eventData.chat,
       coverage.history,
@@ -638,7 +802,7 @@ export function installConversationSummaryPromptFilter(): () => void {
       coverage.archivedSummaryCount - coverage.historicalBackfillSummaryCount,
     );
     if (archivedSummaryCount > 0) {
-      const removed = filterArchivedSummariesFromPrompt(eventData.chat, archivedSummaryCount);
+      const removed = filterArchivedSummariesFromPrompt(eventData.chat, archivedSummaryCount, summaryTag);
       if (removed > 0) {
         dataLogger.log(`[conversationSummary] 已从本次最终提示词裁掉 ${removed} 条已归档逐轮摘要消息。`);
       }
@@ -654,6 +818,8 @@ export function installConversationSummaryPromptFilter(): () => void {
         dataLogger.log(`[conversationSummary] 预设摘要兼容过滤调整了 ${changed} 条最终提示词消息。`);
       }
     }
+
+    captureConversationSummaryPromptTrace(eventData.chat, settings, coverage, initialPromptRefs);
   });
   return () => subscription.stop();
 }
