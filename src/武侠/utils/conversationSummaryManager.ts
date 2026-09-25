@@ -34,23 +34,25 @@ export const CONVERSATION_SUMMARY_ENTRY_CONTENT = `<对话摘要协议>
 - 不编造正文没有发生的事实；不输出思维过程。
 - <summary> 必须是独立 XML 块，不能嵌进其他 XML 标签。
 - inline 变量模式下顺序为：正文 → <summary> → VariableThink/VariableInsert/Edit/Delete；extra 变量模式下 <summary> 位于正文末尾。
-</对话摘要协议>
+</对话摘要协议>`;
 
-<%
+export const CONVERSATION_MEMORY_ENTRY_NAME = '记忆区';
+export const CONVERSATION_MEMORY_ENTRY_CONTENT = `<%
 const 章节摘要 = getvar('stat_data.叙事记忆.章节摘要', { scope: 'local' });
 if (章节摘要 && typeof 章节摘要 === 'object' && Object.keys(章节摘要).length > 0) {
+  const 排序章节 = Object.values(章节摘要)
+    .filter(章节 => 章节 && typeof 章节 === 'object' && typeof 章节.摘要 === 'string' && 章节.摘要.trim())
+    .sort((左, 右) => Number(左?.起始楼层 || 0) - Number(右?.起始楼层 || 0));
 -%>
 <长期叙事记忆>
-以下是已经从更早逐轮摘要中一次性归档出的长期剧情记忆；它们是旧正文的替代上下文，不要把同一历史再次当作新发生的事件。
-<% const 排序章节 = Object.entries(章节摘要).sort((左, 右) => Number(左?.[1]?.起始楼层 || 0) - Number(右?.[1]?.起始楼层 || 0));
-for (const [章节键, 章节] of 排序章节) {
-  if (!章节 || typeof 章节 !== 'object' || typeof 章节.摘要 !== 'string' || !章节.摘要.trim()) continue;
--%>
-[<%- 章节键 %>｜楼层 <%- 章节.起始楼层 %>-<%- 章节.结束楼层 %>] <%- 章节.摘要 %>
+以下内容是更早剧情压缩后的长期记忆，按真实先后顺序排列。它们用于替代已经退出上下文的旧原文，不要把其中事件当作本轮新发生。
+<% for (const 章节 of 排序章节) { -%>
+<%- 章节.摘要.trim() %>
 <% } -%>
 </长期叙事记忆>
 <% } -%>`;
 
+function clampRecentReplies
 function clampRecentReplies(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_CONVERSATION_SUMMARY_RECENT_REPLIES;
   return Math.max(1, Math.min(20, Math.floor(value)));
@@ -147,6 +149,64 @@ async function setSummaryEntryEnabled(enabled:boolean):Promise<boolean>{
   await updateWorldbookWith(location.worldbookName,worldbook=>worldbook.map(entry=>
     entry.uid===location.entry.uid&&entry.name===CONVERSATION_SUMMARY_ENTRY_NAME
       ? {...entry,enabled,...(enabled?{content:CONVERSATION_SUMMARY_ENTRY_CONTENT}:{})}
+      : entry
+  ),{render:'debounced'});
+  return true;
+}
+
+async function findMemoryEntry(): Promise<{ worldbookName: string; entry: WorldbookEntry } | null> {
+  for (const worldbookName of getCurrentCharacterWorldbookNames()) {
+    try {
+      const worldbook = await getWorldbook(worldbookName);
+      const entry = worldbook.find(item => item.name === CONVERSATION_MEMORY_ENTRY_NAME);
+      if (entry) return { worldbookName, entry };
+    } catch (error) {
+      dataLogger.warn(`读取世界书「${worldbookName}」失败:`, error);
+    }
+  }
+  return null;
+}
+
+async function ensureMemoryEntryEnabled(): Promise<boolean> {
+  let location = await findMemoryEntry();
+  if (!location) {
+    const worldbookName = getCurrentCharacterWorldbookNames()[0];
+    if (!worldbookName) throw new Error('当前角色没有可写入的世界书，无法创建记忆区。');
+    const created = await createWorldbookEntries(worldbookName,[{
+      name: CONVERSATION_MEMORY_ENTRY_NAME,
+      enabled: true,
+      strategy:{ type:'constant', keys:[], keys_secondary:{logic:'and_any',keys:[]}, scan_depth:'same_as_global' },
+      position:{ type:'at_depth', role:'system', depth:999, order:0 },
+      content: CONVERSATION_MEMORY_ENTRY_CONTENT,
+      probability:100,
+      recursion:{ prevent_incoming:false, prevent_outgoing:false, delay_until:null },
+      effect:{ sticky:null, cooldown:null, delay:null },
+    }],{render:'debounced'});
+    const entry=created.new_entries.find(item=>item.name===CONVERSATION_MEMORY_ENTRY_NAME);
+    if(!entry) throw new Error('创建记忆区世界书条目后无法读回该条目。');
+    location={worldbookName,entry};
+  }
+
+  const position = location.entry.position;
+  const needsPositionSync =
+    position?.type !== 'at_depth'
+    || position?.role !== 'system'
+    || Number(position?.depth) !== 999
+    || Number(position?.order) !== 0;
+  const needsSync =
+    !location.entry.enabled
+    || location.entry.content !== CONVERSATION_MEMORY_ENTRY_CONTENT
+    || needsPositionSync;
+  if (!needsSync) return false;
+
+  await updateWorldbookWith(location.worldbookName,worldbook=>worldbook.map(entry=>
+    entry.uid===location.entry.uid&&entry.name===CONVERSATION_MEMORY_ENTRY_NAME
+      ? {
+          ...entry,
+          enabled:true,
+          content:CONVERSATION_MEMORY_ENTRY_CONTENT,
+          position:{ type:'at_depth', role:'system', depth:999, order:0 },
+        }
       : entry
   ),{render:'debounced'});
   return true;
@@ -558,20 +618,8 @@ export function installConversationSummaryPromptFilter(): () => void {
 
     const settings = loadSettings();
     const mode = settings.summarySettings.conversationSummaryMode || activeConversationSummaryMode;
-    if (mode === 'preset') {
-      const changed = filterPresetSummaryContextFromPrompt(
-        eventData.chat,
-        settings.summarySettings.conversationSummaryRecentReplies,
-        settings.summarySettings.conversationSummaryPresetTag,
-      );
-      if (changed > 0) {
-        dataLogger.log(`[conversationSummary] 预设摘要兼容过滤调整了 ${changed} 条最终提示词消息。`);
-      }
-      return;
-    }
 
-    if (mode !== 'card') return;
-
+    // 长期章节记忆与逐轮摘要来源解耦：只要旧楼层已经被章节记忆覆盖，就始终从最终 prompt 移除。
     const coverage = readArchivedConversationCoverage();
     const backfillRemoved = filterHistoricalBackfillTurnsFromPrompt(
       eventData.chat,
@@ -584,36 +632,52 @@ export function installConversationSummaryPromptFilter(): () => void {
       );
     }
 
-    // 历史回溯章节里的“源摘要数”已经随整个 user→assistant 对一起裁掉，不能再按旧摘要计数重复删除。
+    // 已归档成章节的逐轮摘要也属于长期记忆覆盖范围，不随 card/preset/off 切换而重新回到 prompt。
     const archivedSummaryCount = Math.max(
       0,
       coverage.archivedSummaryCount - coverage.historicalBackfillSummaryCount,
     );
-    if (archivedSummaryCount <= 0) return;
-    const removed = filterArchivedSummariesFromPrompt(eventData.chat, archivedSummaryCount);
-    if (removed > 0) {
-      dataLogger.log(`[conversationSummary] 已从本次最终提示词裁掉 ${removed} 条已归档逐轮摘要消息。`);
+    if (archivedSummaryCount > 0) {
+      const removed = filterArchivedSummariesFromPrompt(eventData.chat, archivedSummaryCount);
+      if (removed > 0) {
+        dataLogger.log(`[conversationSummary] 已从本次最终提示词裁掉 ${removed} 条已归档逐轮摘要消息。`);
+      }
+    }
+
+    if (mode === 'preset') {
+      const changed = filterPresetSummaryContextFromPrompt(
+        eventData.chat,
+        settings.summarySettings.conversationSummaryRecentReplies,
+        settings.summarySettings.conversationSummaryPresetTag,
+      );
+      if (changed > 0) {
+        dataLogger.log(`[conversationSummary] 预设摘要兼容过滤调整了 ${changed} 条最终提示词消息。`);
+      }
     }
   });
   return () => subscription.stop();
 }
 
+export async function applyConversationSummaryModeState
 export async function applyConversationSummaryModeState(
   mode:ConversationSummaryMode,
   recentReplies=DEFAULT_CONVERSATION_SUMMARY_RECENT_REPLIES,
 ):Promise<string>{
+  const memoryChanged=await ensureMemoryEntryEnabled();
   const cardMode=mode==='card';
   const entryChanged=await setSummaryEntryEnabled(cardMode);
   const regexChanged=await syncConversationSummaryRegexes(cardMode,recentReplies);
   activeConversationSummaryMode=mode;
+  const memoryStatus=memoryChanged?'记忆区已同步；':'';
   if(mode==='card'){
-    if (entryChanged || regexChanged) {
-      return `已同步「${CONVERSATION_SUMMARY_ENTRY_NAME}」与卡内摘要过滤；最近 ${clampRecentReplies(recentReplies)} 条回复保留全文，更早回复仅保留逐轮摘要。`;
+    if (entryChanged || regexChanged || memoryChanged) {
+      return `${memoryStatus}已同步「${CONVERSATION_SUMMARY_ENTRY_NAME}」与卡内摘要过滤；最近 ${clampRecentReplies(recentReplies)} 条回复保留全文，更早回复仅保留逐轮摘要。`;
     }
-    return `「${CONVERSATION_SUMMARY_ENTRY_NAME}」与卡内摘要过滤已是目标状态，本次初始化未改写角色正则。`;
+    return `「${CONVERSATION_SUMMARY_ENTRY_NAME}」、记忆区与卡内摘要过滤已是目标状态，本次初始化未改写角色正则。`;
   }
   if(mode==='preset') {
-    return '已禁用卡内摘要指令；由当前预设生成摘要，最终上下文按下方配置的 XML 标签执行兼容压缩。';
+    return `${memoryStatus}已禁用卡内摘要指令；由当前预设生成摘要，章节记忆仍由记忆区独立注入并接管已归档旧对话。`;
   }
-  return '已禁用卡内摘要指令与卡内过滤。';
+  return `${memoryStatus}已禁用卡内摘要指令与逐轮摘要过滤；已生成的长期章节记忆仍由记忆区独立注入。`;
+}
 }
