@@ -192,38 +192,53 @@
 }
 
 .maintext-edit-trigger {
-  float: right;
+  position: absolute;
+  top: 0.7rem;
+  right: 0.75rem;
+  z-index: 30;
   width: 30px;
   height: 30px;
-  margin: -0.2rem -0.25rem 0.35rem 0.7rem;
+  margin: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(181, 137, 80, 0.18);
   border-radius: 7px;
   color: var(--stone-500);
-  background: rgba(28, 25, 23, 0.26);
+  background: rgba(28, 25, 23, 0.42);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
   cursor: pointer;
+  pointer-events: auto;
   opacity: 0.38;
-  transition: 0.18s ease;
+  transition:
+    opacity 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
 
-  &:hover:not(:disabled),
+  &:hover,
   &:focus-visible {
     outline: none;
     opacity: 1;
     color: #f0d494;
     border-color: rgba(212, 175, 55, 0.42);
-    background: rgba(133, 77, 14, 0.16);
+    background: rgba(133, 77, 14, 0.24);
+    transform: translateY(-1px);
   }
 
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.18;
+  &.is-unavailable {
+    opacity: 0.28;
+  }
+
+  &.is-unavailable:hover,
+  &.is-unavailable:focus-visible {
+    opacity: 0.82;
   }
 }
 
 .maintext-container:hover .maintext-edit-trigger {
-  opacity: 0.72;
+  opacity: 0.76;
 }
 
 @media (max-width: 768px) {
@@ -299,7 +314,9 @@
   }
 
   .maintext-edit-trigger {
-    opacity: 0.72;
+    top: 0.5rem;
+    right: 0.5rem;
+    opacity: 0.76;
   }
 }
 
@@ -309,7 +326,7 @@
     border-color: rgba(61, 48, 40, 0.14);
     background: rgba(255, 250, 244, 0.56);
 
-    &:hover:not(:disabled),
+    &:hover,
     &:focus-visible {
       color: #7f2119;
       border-color: rgba(139, 26, 26, 0.28);

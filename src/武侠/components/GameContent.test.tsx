@@ -41,7 +41,7 @@ describe('GameContent assistant reply autoscroll', () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(2);
   });
 
-  it('把最新 AI 回复编辑入口放在正文自身而不是输入栏', () => {
+  it('把最新 AI 回复编辑入口悬浮在正文容器上，而不是塞进正文内容流', () => {
     const onEditLatestReply = vi.fn();
     render(
       <GameContent
@@ -53,7 +53,32 @@ describe('GameContent assistant reply autoscroll', () => {
     );
 
     const edit = screen.getByRole('button', { name: '编辑最新 AI 回复' });
+    const container = edit.closest('.maintext-container');
     expect(edit).toHaveAttribute('data-wuxia-automation', 'open-latest-reply-editor');
+    expect(edit).toHaveAttribute('data-wuxia-editable', 'true');
+    expect(container).not.toBeNull();
+    expect(edit.parentElement).toBe(container);
+    expect(edit.closest('.maintext-content')).toBeNull();
+
+    fireEvent.click(edit);
+    expect(onEditLatestReply).toHaveBeenCalledTimes(1);
+  });
+
+  it('即使当前状态暂不可编辑，铅笔入口也保持可点击并交给上层显示原因', () => {
+    const onEditLatestReply = vi.fn();
+    render(
+      <GameContent
+        maintext="正文"
+        options={[]}
+        onEditLatestReply={onEditLatestReply}
+        canEditLatestReply={false}
+      />,
+    );
+
+    const edit = screen.getByRole('button', { name: '编辑最新 AI 回复' });
+    expect(edit).not.toBeDisabled();
+    expect(edit).toHaveAttribute('data-wuxia-editable', 'false');
+
     fireEvent.click(edit);
     expect(onEditLatestReply).toHaveBeenCalledTimes(1);
   });
