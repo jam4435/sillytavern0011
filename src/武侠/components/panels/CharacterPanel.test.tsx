@@ -47,6 +47,18 @@ const baseStats: CharacterProfile = {
 };
 
 describe('CharacterPanel avatar controls', () => {
+  it('根骨天资以属性谱展示当前值与根基差额', () => {
+    render(<CharacterPanel stats={baseStats} />);
+
+    const sheet = screen.getByLabelText('根骨天资属性');
+    expect(within(sheet).getByText('臂力')).toBeInTheDocument();
+    expect(within(sheet).getByText('80')).toBeInTheDocument();
+    expect(within(sheet).getByText('根基 8')).toBeInTheDocument();
+    expect(within(sheet).getByText('+72')).toBeInTheDocument();
+    expect(sheet.querySelectorAll('.character-attribute-cell')).toHaveLength(7);
+    expect(sheet.querySelector('.character-attribute-card')).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     localStorage.clear();
     setPlayerAvatarRefMock.mockClear();

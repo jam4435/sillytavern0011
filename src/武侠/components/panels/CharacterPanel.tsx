@@ -49,15 +49,26 @@ const StatBar = ({ label, current, max, color }: { label: string; current: numbe
   );
 };
 
-const Attribute = ({ label, value, initial }: { label: string; value: number; initial?: number }) => (
-  <div className="attr-item character-attribute-card">
-    <div className="character-attribute-head">
+const Attribute = ({ label, value, initial }: { label: string; value: number; initial?: number }) => {
+  const delta = initial !== undefined ? value - initial : 0;
+  const hasAdjustment = initial !== undefined && delta !== 0;
+
+  return (
+    <div className="character-attribute-cell">
       <span className="character-attribute-label">{label}</span>
       <span className="character-attribute-value">{value}</span>
+      {hasAdjustment && (
+        <div className="character-attribute-initial character-attribute-meta">
+          <span className="character-attribute-base">根基 {initial}</span>
+          <span className={`character-attribute-delta ${delta > 0 ? 'is-positive' : 'is-negative'}`}>
+            {delta > 0 ? '+' : ''}
+            {delta}
+          </span>
+        </div>
+      )}
     </div>
-    {initial !== undefined && initial !== value && <div className="character-attribute-initial">初始: {initial}</div>}
-  </div>
-);
+  );
+};
 
 const RealmCorner = ({ position }: { position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' }) => (
   <div className={`realm-corner ${position}`}></div>
@@ -492,11 +503,11 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
                 )}
               </div>
 
-              <div>
+              <div className="character-attributes-section">
                 <h4 className="section-header">
                   <DiamondBullet /> 根骨天资
                 </h4>
-                <div className="attr-grid">
+                <div className="character-attributes-sheet" aria-label="根骨天资属性">
                   <Attribute label="臂力" value={stats.attributes.臂力} initial={stats.initialAttributes.臂力} />
                   <Attribute label="根骨" value={stats.attributes.根骨} initial={stats.initialAttributes.根骨} />
                   <Attribute label="机敏" value={stats.attributes.机敏} initial={stats.initialAttributes.机敏} />
