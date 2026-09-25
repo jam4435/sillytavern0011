@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FilePenLine, SquarePen } from 'lucide-react';
 import brandXiakeSealUrl from './assets/icons/jinyong/brand_xiake_seal.svg?url';
 import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
@@ -931,6 +930,11 @@ const App: React.FC = () => {
     setIsCommandQueueOpen(false);
   }, [historyMutationPending, isLoading, showError]);
 
+  const handleCancelRegenerateInputEdit = useCallback(() => {
+    setIsRegenerateInputEditMode(false);
+    setInputPrefill(null);
+  }, []);
+
   const handleSafeRegenerate = useCallback(
     async (replacementUserInput?: string): Promise<boolean | void> => {
       if (historyMutationPending) {
@@ -1729,6 +1733,8 @@ const App: React.FC = () => {
                   onSelectOption={handlePlayerSend}
                   settings={displaySettings}
                   scrollCommitKey={assistantDisplayCommitKey}
+                  onEditLatestReply={handleOpenLatestReplyEditor}
+                  canEditLatestReply={canEditLatestReply}
                 />
               </div>
             </section>
@@ -1764,35 +1770,11 @@ const App: React.FC = () => {
                       />
                     )}
                   </div>
-                  <button
-                    type="button"
-                    className={`latest-reply-trigger regenerate-input-edit-trigger ${isRegenerateInputEditMode ? 'is-active' : ''}`}
-                    onClick={handlePrepareRegenerateInputEdit}
-                    disabled={!canRegenerate || historyMutationPending || isLoading}
-                    title={
-                      isRegenerateInputEditMode
-                        ? '正在修改上一轮玩家输入；编辑完成后点击右侧重新生成'
-                        : '把上一轮玩家输入带回输入框，修改后重新生成'
-                    }
-                    aria-label="修改上一轮输入并重新生成"
-                    data-wuxia-automation="edit-last-user-before-regenerate"
-                  >
-                    <SquarePen size={19} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="latest-reply-trigger"
-                    onClick={handleOpenLatestReplyEditor}
-                    disabled={!canEditLatestReply}
-                    title={canEditLatestReply ? '查看并编辑最新 AI 回复原文' : '当前没有可编辑的最新 AI 回复'}
-                    aria-label="编辑最新 AI 回复"
-                    data-wuxia-automation="open-latest-reply-editor"
-                  >
-                    <FilePenLine size={19} aria-hidden="true" />
-                  </button>
                 </div>
               }
               onRegenerate={handleSafeRegenerate}
+              onEditRegenerateInput={handlePrepareRegenerateInputEdit}
+              onCancelRegenerateDraft={handleCancelRegenerateInputEdit}
               canRegenerate={canRegenerate && !historyMutationPending}
               isRegenerating={isLoading || historyMutationPending}
               regenerateDraftMode={isRegenerateInputEditMode}

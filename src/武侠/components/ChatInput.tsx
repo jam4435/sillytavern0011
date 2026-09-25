@@ -1,4 +1,4 @@
-import { RotateCcw } from 'lucide-react';
+import { ChevronDown, RotateCcw, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { uiLogger } from '../utils/logger';
 
@@ -8,6 +8,8 @@ interface ChatInputProps {
   onMessageChange?: (message: string) => void;
   extraActions?: React.ReactNode;
   onRegenerate?: (replacementUserInput?: string) => void | Promise<boolean | void>;
+  onEditRegenerateInput?: () => void;
+  onCancelRegenerateDraft?: () => void;
   canRegenerate?: boolean;
   isRegenerating?: boolean;
   regenerateDraftMode?: boolean;
@@ -17,7 +19,7 @@ interface ChatInputProps {
 
 /**
  * 武侠风格聊天输入组件
- * 带有精美的玻璃拟态效果和微交互动画
+ * 普通模式负责新回合发送；修改上一轮输入时切换为单一“重新生成”提交模式。
  */
 const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
@@ -25,6 +27,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   onMessageChange,
   extraActions,
   onRegenerate,
+  onEditRegenerateInput,
+  onCancelRegenerateDraft,
   canRegenerate = false,
   isRegenerating = false,
   regenerateDraftMode = false,
@@ -34,6 +38,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [message, setMessage] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRegenerateMenuOpen, setIsRegenerateMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputDisabled = disabled || isSubmitting;
   const regenerateDisabled =
@@ -68,10 +73,24 @@ const ChatInput: React.FC<ChatInputProps> = ({
     textareaRef.current?.focus();
   }, [inputDisabled, prefillKey]);
 
+  useEffect(() => {
+    if (regenerateDraftMode || !canRegenerate || disabled) {
+      setIsRegenerateMenuOpen(false);
+    }
+  }, [canRegenerate, disabled, regenerateDraftMode]);
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
     onMessageChange?.(e.target.value);
     adjustHeight();
+  };
+
+  const clearInput = () => {
+    setMessage('');
+    onMessageChange?.('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
   };
 
   const handleSend = async () => {
@@ -86,10 +105,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
       uiLogger.log('✅ [ChatInput.handleSend] 条件满足，调用 onSend()');
       const trimmedMessage = message.trim();
       uiLogger.log('   发送内容:', trimmedMessage);
-      setMessage('');
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+      clearInput();
       uiLogger.log('   输入框已清空');
       setIsSubmitting(true);
       try {
@@ -103,35 +119,61 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   const handleRegenerate = async () => {
     if (regenerateDisabled || !onRegenerate) {
       return;
     }
 
+    setIsRegenerateMenuOpen(false);
     setIsSubmitting(true);
     try {
       const result = await onRegenerate(regenerateDraftMode ? message.trim() : undefined);
       if (result === true && regenerateDraftMode) {
-        setMessage('');
-        onMessageChange?.('');
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-        }
+        clearInput();
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handlePrimaryAction = async () => {
+    if (regenerateDraftMode) {
+      await handleRegenerate();
+      return;
+    }
+    await handleSend();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void handlePrimaryAction();
+    }
+  };
+
+  const handlePrepareRegenerateInput = () => {
+    setIsRegenerateMenuOpen(false);
+    onEditRegenerateInput?.();
+  };
+
+  const handleCancelRegenerateDraft = () => {
+    clearInput();
+    setIsRegenerateMenuOpen(false);
+    onCancelRegenerateDraft?.();
+  };
+
+  const handleRegenerateGroupBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsRegenerateMenuOpen(false);
+    }
+  };
+
+  const primaryDisabled = regenerateDraftMode ? regenerateDisabled : inputDisabled || !message.trim();
+
   return (
-    <div className={`chat-input-wrapper ${isFocused ? 'focused' : ''}`}>
+    <div
+      className={`chat-input-wrapper ${isFocused ? 'focused' : ''} ${regenerateDraftMode ? 'regenerate-draft-mode' : ''}`}
+    >
       {/* 装饰性顶部边框 */}
       <div className="chat-input-top-border"></div>
 
@@ -144,7 +186,22 @@ const ChatInput: React.FC<ChatInputProps> = ({
         </div>
 
         {/* 输入区域 */}
-        <div className="chat-input-field-wrapper">
+        <div className={`chat-input-field-wrapper ${regenerateDraftMode ? 'has-mode-badge' : ''}`}>
+          {regenerateDraftMode && (
+            <div className="chat-input-mode-badge">
+              <span>正在修改上一轮输入</span>
+              <button
+                type="button"
+                className="chat-input-mode-cancel"
+                onClick={handleCancelRegenerateDraft}
+                disabled={inputDisabled}
+                aria-label="取消修改上一轮输入"
+                title="取消并返回普通输入"
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             className="chat-input-field"
@@ -164,48 +221,76 @@ const ChatInput: React.FC<ChatInputProps> = ({
           {message.length > 0 && <span className="chat-input-count">{message.length}</span>}
         </div>
 
-        {extraActions}
+        {!regenerateDraftMode && extraActions}
 
-        {/* 重新生成按钮 */}
-        <button
-          className={`chat-regenerate-btn ${isRegenerating ? 'spinning' : ''}`}
-          aria-label={regenerateDraftMode ? '使用修改后的上一轮输入重新生成' : '重新生成上一条回复'}
-          data-wuxia-automation="generation-state regenerate-last-reply"
-          data-wuxia-generating={isRegenerating ? 'true' : 'false'}
-          onClick={handleRegenerate}
-          disabled={regenerateDisabled}
-          title={
-            regenerateDraftMode
-              ? '使用输入框中修改后的上一轮内容重新生成'
-              : canRegenerate
-                ? '重新生成上一条回复'
-                : '暂无可重新生成的回复'
-          }
-        >
-          <RotateCcw size={18} />
-        </button>
+        {/* 普通模式：直接重生 + 紧凑的“修改上一轮输入”二级入口 */}
+        {!regenerateDraftMode && (
+          <div className="chat-regenerate-group" onBlur={handleRegenerateGroupBlur}>
+            <button
+              className={`chat-regenerate-btn chat-regenerate-main ${isRegenerating ? 'spinning' : ''}`}
+              aria-label="重新生成上一条回复"
+              data-wuxia-automation="generation-state regenerate-last-reply"
+              data-wuxia-generating={isRegenerating ? 'true' : 'false'}
+              onClick={handleRegenerate}
+              disabled={regenerateDisabled}
+              title={canRegenerate ? '重新生成上一条回复' : '暂无可重新生成的回复'}
+              type="button"
+            >
+              <RotateCcw size={18} />
+            </button>
+            {onEditRegenerateInput && (
+              <button
+                className="chat-regenerate-btn chat-regenerate-menu-btn"
+                type="button"
+                aria-label="重新生成选项"
+                aria-haspopup="menu"
+                aria-expanded={isRegenerateMenuOpen}
+                onClick={() => setIsRegenerateMenuOpen(open => !open)}
+                disabled={regenerateDisabled}
+                title="更多重新生成方式"
+              >
+                <ChevronDown size={13} aria-hidden="true" />
+              </button>
+            )}
+            {isRegenerateMenuOpen && onEditRegenerateInput && (
+              <div className="chat-regenerate-menu" role="menu">
+                <button type="button" role="menuitem" onClick={handlePrepareRegenerateInput}>
+                  修改上一轮输入后重新生成
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* 发送按钮 */}
+        {/* 主操作：普通模式发送；修改上一轮输入时直接变为重新生成 */}
         <button
-          className={`chat-send-btn ${message.trim() ? 'active' : ''}`}
-          aria-label="发送玩家行动"
-          data-wuxia-automation="send-turn"
-          onClick={handleSend}
-          disabled={inputDisabled || !message.trim()}
-          title="发送 (Enter)"
+          className={`chat-send-btn ${message.trim() ? 'active' : ''} ${regenerateDraftMode ? 'regenerate-mode' : ''} ${isRegenerating ? 'spinning' : ''}`}
+          aria-label={regenerateDraftMode ? '使用修改后的上一轮输入重新生成' : '发送玩家行动'}
+          data-wuxia-automation={regenerateDraftMode ? 'generation-state regenerate-last-reply' : 'send-turn'}
+          onClick={handlePrimaryAction}
+          disabled={primaryDisabled}
+          title={regenerateDraftMode ? '使用修改内容重新生成 (Enter)' : '发送 (Enter)'}
+          type="button"
         >
           <div className="send-btn-bg"></div>
-          <svg
-            className="send-btn-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M5 12h14M12 5l7 7-7 7" />
-          </svg>
+          {regenerateDraftMode ? (
+            <>
+              <RotateCcw className="send-btn-icon" size={19} aria-hidden="true" />
+              <span className="send-btn-label">重新生成</span>
+            </>
+          ) : (
+            <svg
+              className="send-btn-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          )}
         </button>
 
         {/* 右侧装饰 */}

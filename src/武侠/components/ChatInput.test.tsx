@@ -37,9 +37,17 @@ describe('ChatInput history draft', () => {
     expect(onSend).toHaveBeenCalledWith('先观察四周');
   });
 
-  it('为受控重生成暴露稳定按钮标记并复用真实点击链路', async () => {
+  it('普通模式保留一键重新生成，并把修改上一轮输入收进二级入口', async () => {
     const onRegenerate = vi.fn(async () => undefined);
-    render(<ChatInput onSend={vi.fn()} onRegenerate={onRegenerate} canRegenerate />);
+    const onEditRegenerateInput = vi.fn();
+    render(
+      <ChatInput
+        onSend={vi.fn()}
+        onRegenerate={onRegenerate}
+        onEditRegenerateInput={onEditRegenerateInput}
+        canRegenerate
+      />,
+    );
 
     const regenerate = screen.getByRole('button', { name: '重新生成上一条回复' });
     expect(regenerate).toHaveAttribute('data-wuxia-automation', 'generation-state regenerate-last-reply');
@@ -47,7 +55,83 @@ describe('ChatInput history draft', () => {
     await act(async () => {
       fireEvent.click(regenerate);
     });
+    expect(onRegenerate).toHaveBeenCalledTimes(1);
+    expect(onRegenerate).toHaveBeenCalledWith(undefined);
+
+    fireEvent.click(screen.getByRole('button', { name: '重新生成选项' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '修改上一轮输入后重新生成' }));
+    expect(onEditRegenerateInput).toHaveBeenCalledTimes(1);
+  });
+
+  it('修改上一轮输入模式下 Enter 直接重新生成而不会误发新消息', async () => {
+    const onSend = vi.fn();
+    const onRegenerate = vi.fn(async () => true);
+    render(
+      <ChatInput
+        onSend={onSend}
+        onRegenerate={onRegenerate}
+        canRegenerate
+        regenerateDraftMode
+        prefill={{ key: 'regen-1', message: '原来的行动' }}
+      />,
+    );
+
+    const input = screen.getByRole('textbox', { name: '玩家行动' });
+    fireEvent.change(input, { target: { value: '  修改后的行动  ' } });
+
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
+      await Promise.resolve();
+    });
 
     expect(onRegenerate).toHaveBeenCalledTimes(1);
+    expect(onRegenerate).toHaveBeenCalledWith('修改后的行动');
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('修改上一轮输入模式下右侧唯一主按钮就是重新生成', async () => {
+    const onSend = vi.fn();
+    const onRegenerate = vi.fn(async () => true);
+    render(
+      <ChatInput
+        onSend={onSend}
+        onRegenerate={onRegenerate}
+        canRegenerate
+        regenerateDraftMode
+        prefill={{ key: 'regen-2', message: '改成走水路' }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: '重新生成上一条回复' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '发送玩家行动' })).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '使用修改后的上一轮输入重新生成' }));
+    });
+
+    expect(onRegenerate).toHaveBeenCalledWith('改成走水路');
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('允许显式取消修改上一轮输入模式', () => {
+    const onCancelRegenerateDraft = vi.fn();
+    const onMessageChange = vi.fn();
+    render(
+      <ChatInput
+        onSend={vi.fn()}
+        onRegenerate={vi.fn()}
+        onCancelRegenerateDraft={onCancelRegenerateDraft}
+        onMessageChange={onMessageChange}
+        canRegenerate
+        regenerateDraftMode
+        prefill={{ key: 'regen-3', message: '上一轮行动' }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '取消修改上一轮输入' }));
+
+    expect(onCancelRegenerateDraft).toHaveBeenCalledTimes(1);
+    expect(onMessageChange).toHaveBeenLastCalledWith('');
+    expect(screen.getByRole('textbox', { name: '玩家行动' })).toHaveValue('');
   });
 });
