@@ -170,7 +170,10 @@ async function ensureMemoryEntryEnabled(): Promise<boolean> {
   let location = await findMemoryEntry();
   if (!location) {
     const worldbookName = getCurrentCharacterWorldbookNames()[0];
-    if (!worldbookName) throw new Error('当前角色没有可写入的世界书，无法创建记忆区。');
+    if (!worldbookName) {
+      dataLogger.warn('[conversationSummary] 当前角色没有可写入的世界书，跳过记忆区同步。');
+      return false;
+    }
     const created = await createWorldbookEntries(worldbookName,[{
       name: CONVERSATION_MEMORY_ENTRY_NAME,
       enabled: true,
