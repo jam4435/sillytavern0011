@@ -1,7 +1,7 @@
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { dataLogger } from './logger';
 import { requestConfiguredText, resolveConfiguredTextSettings } from './summaryApiClient';
-import { applyCurrentPresetModuleFilter, type SummarySettings } from './settingsManager';
+import { applyCurrentPresetModuleFilter, normalizeConversationSummaryTag, type SummarySettings } from './settingsManager';
 import { normalizeDisplayedMessageContent } from './variableReader';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -67,7 +67,6 @@ type HistoricalConversationTurn = {
   sourceHadSummary: boolean;
 };
 
-const SUMMARY_BLOCK_REGEX = /<summary>([\s\S]*?)<\/summary>/i;
 let archiveBusy = false;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -84,8 +83,17 @@ function getActiveMessageText(message: ChatMessageWithSwipes): string {
   return message.message || '';
 }
 
-export function extractTurnSummary(text: string): string {
+function escapeSummaryTagForRegex(value: string): string {
+  return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\export function extractTurnSummary(text: string): string {
   return text.match(SUMMARY_BLOCK_REGEX)?.[1]?.trim() || '';
+}
+');
+}
+
+export function extractTurnSummary(text: string, summaryTag = 'summary'): string {
+  const tagName = normalizeConversationSummaryTag(summaryTag);
+  const escapedTag = escapeSummaryTagForRegex(tagName);
+  return text.match(new RegExp('<' + escapedTag + '\\b[^>]*>([\\s\\S]*?)<\\/' + escapedTag + '>', 'i'))?.[1]?.trim() || '';
 }
 
 export function selectConversationArchiveBatch(
@@ -94,7 +102,8 @@ export function selectConversationArchiveBatch(
     archivedThroughMessageId,
     recentReplies,
     batchSize,
-  }: { archivedThroughMessageId: number; recentReplies: number; batchSize: number },
+    summaryTag = 'summary',
+  }: { archivedThroughMessageId: number; recentReplies: number; batchSize: number; summaryTag?: string },
 ): ConversationArchiveItem[] {
   const assistantMessages = messages
     .filter(message => message.role === 'assistant' && Number.isInteger(message.message_id))
@@ -104,7 +113,7 @@ export function selectConversationArchiveBatch(
 
   return assistantMessages
     .filter(message => message.message_id > archivedThroughMessageId && !protectedIds.has(message.message_id))
-    .map(message => ({ messageId: message.message_id, summary: extractTurnSummary(getActiveMessageText(message)) }))
+    .map(message => ({ messageId: message.message_id, summary: extractTurnSummary(getActiveMessageText(message), summaryTag) }))
     .filter(item => item.summary.length > 0)
     .slice(0, Math.max(1, Math.floor(batchSize)));
 }
@@ -249,6 +258,7 @@ function selectHistoricalConversationTurns(
   messages: ChatMessageWithSwipes[],
   memory: NarrativeMemoryState,
   recentReplies: number,
+  summaryTag: string,
 ): HistoricalConversationTurn[] {
   const ordered = [...messages]
     .filter(message => !message.is_hidden && Number.isInteger(message.message_id))
@@ -284,7 +294,7 @@ function selectHistoricalConversationTurns(
     if (!user) continue;
 
     const rawAssistant = getActiveMessageText(assistant);
-    const turnSummary = extractTurnSummary(rawAssistant);
+    const turnSummary = extractTurnSummary(rawAssistant, summaryTag);
     const assistantText = turnSummary
       ? turnSummary
       : normalizeDisplayedMessageContent(applyCurrentPresetModuleFilter(rawAssistant));
@@ -409,7 +419,7 @@ async function isHistoricalBackfillPersisted(
  * 给“以前没有开启逐轮摘要”的当前聊天补长期章节记忆。
  *
  * 关键约束：只写 stat_data.叙事记忆，不改任何历史 user / assistant / swipe 原文。
- * 卡内摘要模式随后会在最终 prompt 阶段裁掉这些旧原文，并由长期章节记忆接替。
+ * 最终 prompt 阶段会独立裁掉这些旧原文，并由“记忆区”中的长期章节记忆接替。
  */
 export async function backfillHistoricalConversationMemory({
   settings,
@@ -433,10 +443,15 @@ export async function backfillHistoricalConversationMemory({
     }
 
     const { statData, memory } = readCurrentState();
+    const summaryTag =
+      settings.conversationSummaryMode === 'preset'
+        ? settings.conversationSummaryPresetTag
+        : 'summary';
     const turns = selectHistoricalConversationTurns(
       messages,
       memory,
       settings.conversationSummaryRecentReplies,
+      summaryTag,
     );
     if (turns.length === 0) {
       return {
@@ -561,7 +576,7 @@ export async function maybeArchiveConversationSummaries({
   if (
     archiveBusy ||
     !settings.conversationArchiveEnabled ||
-    settings.conversationSummaryMode !== 'card'
+    settings.conversationSummaryMode === 'off'
   ) {
     return { archived: false };
   }
@@ -570,10 +585,15 @@ export async function maybeArchiveConversationSummaries({
   try {
     const { statData, memory } = readCurrentState();
     const batchSize = Math.max(5, Math.min(50, Math.floor(settings.conversationArchiveBatchSize || 10)));
+    const summaryTag =
+      settings.conversationSummaryMode === 'preset'
+        ? settings.conversationSummaryPresetTag
+        : 'summary';
     const batch = selectConversationArchiveBatch(readChatMessages(), {
       archivedThroughMessageId: Number(memory.已归档至楼层) || -1,
       recentReplies: settings.conversationSummaryRecentReplies,
       batchSize,
+      summaryTag,
     });
     if (batch.length < batchSize) return { archived: false };
 
