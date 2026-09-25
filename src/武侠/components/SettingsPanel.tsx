@@ -2583,87 +2583,52 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onToggle={toggleSettingBlock}
               className="settings-compact-collapsible"
             >
-              <p className="settings-description compact">
-                选择摘要来源；下方只保留影响上下文压缩的必要参数。
-              </p>
-
-              <div className="summary-mode-grid" role="group" aria-label="对话摘要来源">
-                {([
-                  ['card', '卡内摘要', '启用角色卡“对话摘要指令”，统一使用 <summary>。'],
-                  ['preset', '兼容预设', '摘要由玩家预设生成；武侠卡只识别你填写的 XML 标签并压缩上下文。'],
-                  ['off', '关闭', '不生成也不按逐轮摘要压缩聊天上下文。'],
-                ] as const).map(([mode, title, description]) => (
-                  <button
-                    type="button"
-                    key={mode}
-                    className={`summary-mode-card ${
-                      settings.summarySettings.conversationSummaryMode === mode ? 'active' : ''
-                    }`}
-                    onClick={() => void updateConversationSummaryMode(mode)}
-                    disabled={isConversationSummaryModeUpdating}
-                    aria-pressed={settings.summarySettings.conversationSummaryMode === mode}
-                    title={description}
-                  >
-                    <span className="summary-mode-title">{title}</span>
-                    <span className="summary-mode-description">{description}</span>
-                  </button>
-                ))}
+              <div className="summary-inline-field">
+                <label htmlFor="conversation-summary-mode">摘要来源</label>
+                <select
+                  id="conversation-summary-mode"
+                  value={settings.summarySettings.conversationSummaryMode}
+                  onChange={e => void updateConversationSummaryMode(e.target.value as ConversationSummaryMode)}
+                  className="settings-select summary-inline-select"
+                  disabled={isConversationSummaryModeUpdating}
+                  title="卡内摘要由角色卡生成；兼容预设只读取预设已有摘要；关闭则不做逐轮摘要压缩。"
+                >
+                  <option value="card">卡内摘要</option>
+                  <option value="preset">兼容预设</option>
+                  <option value="off">关闭</option>
+                </select>
               </div>
 
+              {settings.summarySettings.conversationSummaryMode === 'preset' && (
+                <div className="summary-inline-field">
+                  <label htmlFor="conversation-summary-preset-tag">预设摘要 XML 标签</label>
+                  <input
+                    id="conversation-summary-preset-tag"
+                    type="text"
+                    value={settings.summarySettings.conversationSummaryPresetTag}
+                    onChange={e => updateSummarySetting('conversationSummaryPresetTag', e.target.value)}
+                    className="settings-text-input summary-inline-text-input"
+                    placeholder="summary"
+                    spellCheck={false}
+                    title="填写标签名即可，例如 summary、memory 或 <summary>。"
+                  />
+                </div>
+              )}
+
               {settings.summarySettings.conversationSummaryMode !== 'off' && (
-                <div className="summary-context-panel">
-                  <div className="summary-context-heading">
-                    <div>
-                      <h5>上下文压缩</h5>
-                      <p>
-                        最近回复保留正文；更早的已摘要 assistant 回复仅保留摘要，并去掉它对应的旧 user 输入。
-                      </p>
-                    </div>
-                  </div>
-
-                  {settings.summarySettings.conversationSummaryMode === 'preset' && (
-                    <div className="summary-compact-field">
-                      <label htmlFor="conversation-summary-preset-tag">预设摘要 XML 标签</label>
-                      <div className="summary-tag-input-row">
-                        <input
-                          id="conversation-summary-preset-tag"
-                          type="text"
-                          value={settings.summarySettings.conversationSummaryPresetTag}
-                          onChange={e => updateSummarySetting('conversationSummaryPresetTag', e.target.value)}
-                          className="settings-text-input summary-tag-input"
-                          placeholder="summary 或 <summary>"
-                          spellCheck={false}
-                        />
-                        <span className="summary-tag-preview">
-                          {'<'}
-                          {settings.summarySettings.conversationSummaryPresetTag
-                            .replace(/^<\s*\/?\s*|\s*>$/g, '')
-                            .trim() || 'summary'}
-                          {'>'}
-                        </span>
-                      </div>
-                      <span className="settings-hint-inline">
-                        可填 summary、{'<summary>'}、memory 等。这里不会要求预设生成摘要，只告诉武侠卡“哪一块才是摘要”。
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="summary-compact-field">
-                    <label htmlFor="conversation-summary-recent-replies">最近完整 assistant 回复</label>
-                    <div className="summary-number-row">
-                      <input
-                        id="conversation-summary-recent-replies"
-                        type="number"
-                        min="1"
-                        max="20"
-                        value={settings.summarySettings.conversationSummaryRecentReplies}
-                        onChange={e => void updateConversationSummaryRecentReplies(parseInt(e.target.value) || 5)}
-                        className="settings-number-input"
-                        disabled={isConversationSummaryModeUpdating}
-                      />
-                      <span className="settings-hint-inline">默认 5 条；卡内与预设兼容模式都使用这个窗口。</span>
-                    </div>
-                  </div>
+                <div className="summary-inline-field">
+                  <label htmlFor="conversation-summary-recent-replies">最近完整 assistant 回复</label>
+                  <input
+                    id="conversation-summary-recent-replies"
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={settings.summarySettings.conversationSummaryRecentReplies}
+                    onChange={e => void updateConversationSummaryRecentReplies(parseInt(e.target.value) || 5)}
+                    className="settings-number-input summary-inline-number"
+                    disabled={isConversationSummaryModeUpdating}
+                    title="最近这些 assistant 回复保留正文；更早的已摘要回复才进入摘要压缩。"
+                  />
                 </div>
               )}
 
@@ -2688,12 +2653,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 )}
               </div>
 
-              {settings.summarySettings.conversationSummaryMode === 'card' && (
+              {settings.summarySettings.conversationSummaryMode !== 'off' && (
                 <div className="summary-archive-panel">
                   <div className="summary-archive-header">
                     <div>
                       <h5>长期章节归档</h5>
-                      <p>把更早逐轮摘要再压成章节记忆；只写 stat_data，不改历史楼层原文。</p>
+                      <p>把更早逐轮摘要继续压成章节记忆；卡内摘要与兼容预设都可使用。</p>
                     </div>
                     <label className="summary-archive-toggle">
                       <input
@@ -2706,32 +2671,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </div>
 
                   {settings.summarySettings.conversationArchiveEnabled && (
-                    <div className="summary-compact-field">
+                    <div className="summary-inline-field">
                       <label htmlFor="conversation-summary-archive-size">每章摘要数</label>
-                      <div className="summary-number-row">
-                        <input
-                          id="conversation-summary-archive-size"
-                          type="number"
-                          min="5"
-                          max="50"
-                          value={settings.summarySettings.conversationArchiveBatchSize}
-                          onChange={e =>
-                            updateSummarySetting(
-                              'conversationArchiveBatchSize',
-                              Math.max(5, Math.min(50, parseInt(e.target.value) || 10)),
-                            )
-                          }
-                          className="settings-number-input"
-                        />
-                        <span className="settings-hint-inline">默认 10 条；最近完整回复窗口不参与章节归档。</span>
-                      </div>
+                      <input
+                        id="conversation-summary-archive-size"
+                        type="number"
+                        min="5"
+                        max="50"
+                        value={settings.summarySettings.conversationArchiveBatchSize}
+                        onChange={e =>
+                          updateSummarySetting(
+                            'conversationArchiveBatchSize',
+                            Math.max(5, Math.min(50, parseInt(e.target.value) || 10)),
+                          )
+                        }
+                        className="settings-number-input summary-inline-number"
+                        title="每累计这么多条较旧逐轮摘要，就压成一个长期章节。"
+                      />
                     </div>
                   )}
                 </div>
               )}
 
               {settings.summarySettings.conversationSummaryMode === 'off' && (
-                <div className="summary-mode-note">逐轮摘要压缩已关闭；无用模块过滤仍可独立过滤发送给 AI 的上下文。</div>
+                <div className="summary-mode-note">
+                  逐轮摘要压缩已关闭；已经生成的长期章节记忆仍由“记忆区”独立接管对应旧对话。
+                </div>
               )}
 
               {conversationSummaryModeStatus && (
