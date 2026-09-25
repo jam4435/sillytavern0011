@@ -2584,7 +2584,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               className="settings-compact-collapsible"
             >
               <div className="summary-inline-field">
-                <label htmlFor="conversation-summary-mode">摘要来源</label>
+                <label htmlFor="conversation-summary-mode">选择摘要来源</label>
                 <select
                   id="conversation-summary-mode"
                   value={settings.summarySettings.conversationSummaryMode}
