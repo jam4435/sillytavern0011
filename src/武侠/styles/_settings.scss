@@ -1685,18 +1685,18 @@
   }
 }
 
-.summary-inline-select {
+.settings-select.summary-inline-select {
   width: 150px;
   min-width: 150px;
 }
 
-.summary-inline-text-input {
+.settings-text-input.summary-inline-text-input {
   width: 170px;
   min-width: 0;
-  flex: none;
+  flex: 0 0 170px;
 }
 
-.summary-inline-number {
+.settings-number-input.summary-inline-number {
   width: 68px;
   min-width: 68px;
 }
@@ -1731,7 +1731,7 @@
   }
 }
 
-.summary-trace-refresh {
+.settings-action-btn.summary-trace-refresh {
   flex-shrink: 0;
   padding: 0.38rem 0.58rem;
   font-size: 0.76rem;
