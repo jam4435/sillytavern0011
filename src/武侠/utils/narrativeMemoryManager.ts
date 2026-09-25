@@ -611,6 +611,8 @@ export async function maybeArchiveConversationSummaries({
       起始楼层: batch[0].messageId,
       结束楼层: batch[batch.length - 1].messageId,
       源摘要数: batch.length,
+      来源: '逐轮摘要',
+      源楼层: batch.map(item => item.messageId),
       摘要: summary,
     };
     const nextArchivedCount = Math.max(0, Number(memory.已归档摘要数) || 0) + batch.length;
