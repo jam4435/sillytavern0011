@@ -56,6 +56,10 @@ export function migrateLegacyEraStringValueStorageInPlace(chatVars: any): boolea
  */
 export async function ensureEraStringValueEncodingV2(): Promise<boolean> {
   const current = getVariables(CHAT_SCOPE) || {};
+  // APP_READY 可能早于聊天变量装载完成；空对象不能提前写 v2 标记，否则可能跳过真正旧存档的迁移。
+  if (!_.has(current, META_DATA_PATH) && !_.has(current, STAT_DATA_PATH)) {
+    return false;
+  }
   const currentMeta = _.get(current, META_DATA_PATH, {});
   if (getStringValueEncodingVersion(currentMeta) >= ERA_STRING_VALUE_ENCODING_VERSION) {
     return false;
