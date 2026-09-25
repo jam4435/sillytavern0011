@@ -609,7 +609,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
                         className="quick-loc-btn"
                         onClick={() => onNavigateLocation(currentSectData.主峰驻地)}
                       >
-                        [地图查看]
+                        查看地图
                       </button>
                     )}
                   </div>
