@@ -1697,7 +1697,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     if (isHistoricalConversationBackfillRunning) return;
 
     const confirmed = window.confirm(
-      '这会读取当前聊天较早的 user + assistant 楼层，用额外总结模型按批次生成长期章节记忆。\n\n历史楼层与 swipe 原文不会被改写；完成后会启用“卡内摘要”，让被章节记忆覆盖的旧对话退出后续 prompt。是否继续？',
+      '这会读取当前聊天较早的 user + assistant 楼层，用额外总结模型按批次生成长期章节记忆。\n\n历史楼层与 swipe 原文不会被改写；完成后会保持当前摘要来源，由“记忆区”接管被章节记忆覆盖的旧对话。是否继续？',
     );
     if (!confirmed) return;
 
@@ -1718,20 +1718,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         return;
       }
 
-      let modeStatus = '';
-      if (settings.summarySettings.conversationSummaryMode !== 'card') {
-        setHistoricalConversationBackfillStatus(
-          `已生成 ${result.chapterCount} 章，正在启用卡内摘要与 prompt 裁剪...`,
-        );
-        modeStatus = await applyConversationSummaryModeState(
-          'card',
-          settings.summarySettings.conversationSummaryRecentReplies,
-        );
-        updateSummarySetting('conversationSummaryMode', 'card');
-      }
+      setHistoricalConversationBackfillStatus(
+        `已生成 ${result.chapterCount} 章，正在同步记忆区与 prompt 裁剪...`,
+      );
+      const modeStatus = await applyConversationSummaryModeState(
+        settings.summarySettings.conversationSummaryMode,
+        settings.summarySettings.conversationSummaryRecentReplies,
+      );
 
       setHistoricalConversationBackfillStatus(
-        `回溯完成：${result.turnCount} 轮旧聊天 → ${result.chapterCount} 个章节记忆；历史楼层原文未修改。${modeStatus ? ` ${modeStatus}` : ''}`,
+        `回溯完成：${result.turnCount} 轮旧聊天 → ${result.chapterCount} 个章节记忆；历史楼层原文未修改，摘要来源保持不变。${modeStatus ? ` ${modeStatus}` : ''}`,
       );
     } catch (error) {
       uiLogger.error('[SettingsPanel] 旧聊天回溯压缩失败', error);
@@ -1744,7 +1740,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [
     isHistoricalConversationBackfillRunning,
     settings.summarySettings,
-    updateSummarySetting,
   ]);
 
   const updateVariableUpdateMode = useCallback(
