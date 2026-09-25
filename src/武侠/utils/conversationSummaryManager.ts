@@ -479,8 +479,8 @@ type HistoricalBackfillChapter = {
 
 type ArchivedConversationCoverage = {
   archivedSummaryCount: number;
-  historicalBackfillSummaryCount: number;
-  historicalAssistantMessageIds: number[];
+  chapterCoveredSummaryCount: number;
+  chapterCoveredAssistantMessageIds: number[];
   history: PromptHistoryMessage[];
 };
 
@@ -504,26 +504,25 @@ function readArchivedConversationCoverage(): ArchivedConversationCoverage {
       .filter(message => message.role === 'assistant')
       .map(message => message.message_id);
 
-    const historicalIds = new Set<number>();
-    let historicalBackfillSummaryCount = 0;
+    const chapterCoveredIds = new Set<number>();
+    let chapterCoveredSummaryCount = 0;
 
     for (const chapter of Object.values(chapters)) {
-      if (chapter?.来源 !== '历史回溯') continue;
-
-      const sourceSummaryCount = Number(chapter.源摘要数);
-      if (Number.isFinite(sourceSummaryCount) && sourceSummaryCount > 0) {
-        historicalBackfillSummaryCount += Math.floor(sourceSummaryCount);
-      }
-
-      const exactFloors = Array.isArray(chapter.源楼层)
+      const sourceSummaryCount = Number(chapter?.源摘要数);
+      const normalizedSourceSummaryCount =
+        Number.isFinite(sourceSummaryCount) && sourceSummaryCount > 0 ? Math.floor(sourceSummaryCount) : 0;
+      const exactFloors = Array.isArray(chapter?.源楼层)
         ? chapter.源楼层.filter((value): value is number => Number.isInteger(value))
         : [];
+
       if (exactFloors.length > 0) {
-        exactFloors.forEach(messageId => historicalIds.add(messageId));
+        exactFloors.forEach(messageId => chapterCoveredIds.add(messageId));
+        chapterCoveredSummaryCount += normalizedSourceSummaryCount;
         continue;
       }
 
-      // 兼容今天早先已经生成、还没有“源楼层”字段的历史回溯章节。
+      // 兼容早先已经生成、还没有“源楼层”字段的历史回溯章节。
+      if (chapter?.来源 !== '历史回溯') continue;
       const start = Number(chapter.起始楼层);
       const end = Number(chapter.结束楼层);
       if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
@@ -531,7 +530,8 @@ function readArchivedConversationCoverage(): ArchivedConversationCoverage {
       const upper = Math.max(start, end);
       assistantMessageIds
         .filter(messageId => messageId >= lower && messageId <= upper)
-        .forEach(messageId => historicalIds.add(messageId));
+        .forEach(messageId => chapterCoveredIds.add(messageId));
+      chapterCoveredSummaryCount += normalizedSourceSummaryCount;
     }
 
     const storedCount = Number(memory?.已归档摘要数);
@@ -539,20 +539,19 @@ function readArchivedConversationCoverage(): ArchivedConversationCoverage {
 
     return {
       archivedSummaryCount,
-      historicalBackfillSummaryCount,
-      historicalAssistantMessageIds: [...historicalIds].sort((left, right) => left - right),
+      chapterCoveredSummaryCount,
+      chapterCoveredAssistantMessageIds: [...chapterCoveredIds].sort((left, right) => left - right),
       history,
     };
   } catch {
     return {
       archivedSummaryCount: 0,
-      historicalBackfillSummaryCount: 0,
-      historicalAssistantMessageIds: [],
+      chapterCoveredSummaryCount: 0,
+      chapterCoveredAssistantMessageIds: [],
       history: [],
     };
   }
 }
-
 
 function getActiveHistoryMessageText(message: PromptHistoryMessage): string {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
@@ -591,8 +590,8 @@ function collectChapterCoveredAssistantIds(
   coverage: ArchivedConversationCoverage,
   summaryTag: string,
 ): Set<number> {
-  const covered = new Set(coverage.historicalAssistantMessageIds);
-  let remaining = Math.max(0, coverage.archivedSummaryCount - coverage.historicalBackfillSummaryCount);
+  const covered = new Set(coverage.chapterCoveredAssistantMessageIds);
+  let remaining = Math.max(0, coverage.archivedSummaryCount - coverage.chapterCoveredSummaryCount);
   if (remaining <= 0) return covered;
 
   for (const message of coverage.history) {
@@ -791,7 +790,7 @@ export function installConversationSummaryPromptFilter(): () => void {
     const backfillRemoved = filterHistoricalBackfillTurnsFromPrompt(
       eventData.chat,
       coverage.history,
-      coverage.historicalAssistantMessageIds,
+      coverage.chapterCoveredAssistantMessageIds,
     );
     if (backfillRemoved > 0) {
       dataLogger.log(
@@ -802,7 +801,7 @@ export function installConversationSummaryPromptFilter(): () => void {
     // 已归档成章节的逐轮摘要也属于长期记忆覆盖范围，不随 card/preset/off 切换而重新回到 prompt。
     const archivedSummaryCount = Math.max(
       0,
-      coverage.archivedSummaryCount - coverage.historicalBackfillSummaryCount,
+      coverage.archivedSummaryCount - coverage.chapterCoveredSummaryCount,
     );
     if (archivedSummaryCount > 0) {
       const removed = filterArchivedSummariesFromPrompt(eventData.chat, archivedSummaryCount, summaryTag);
