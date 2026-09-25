@@ -2413,7 +2413,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               className="settings-compact-collapsible"
             >
               <p className="settings-description compact">
-                先选择摘要由谁生成，再配置武侠卡如何压缩发送上下文。生成职责与上下文裁剪分开，避免卡内规则和玩家预设互相争抢。
+                选择摘要来源；下方只保留影响上下文压缩的必要参数。
               </p>
 
               <div className="summary-mode-grid" role="group" aria-label="对话摘要来源">
@@ -2430,6 +2430,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     }`}
                     onClick={() => void updateConversationSummaryMode(mode)}
                     disabled={isConversationSummaryModeUpdating}
+                    aria-pressed={settings.summarySettings.conversationSummaryMode === mode}
+                    title={description}
                   >
                     <span className="summary-mode-title">{title}</span>
                     <span className="summary-mode-description">{description}</span>
