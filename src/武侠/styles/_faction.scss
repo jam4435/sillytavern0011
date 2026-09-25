@@ -1213,3 +1213,213 @@
     }
   }
 }
+
+
+// ===== Faction world-view visual polish =====
+.faction-world-view {
+  .world-sects-sidebar {
+    background: linear-gradient(180deg, rgba(24, 20, 17, 0.76), rgba(18, 15, 13, 0.62));
+    border-color: rgba(180, 154, 126, 0.2);
+
+    .category-filter-bar .filter-btn {
+      background: transparent;
+      border-color: rgba(184, 163, 140, 0.18);
+      color: #aa9d8d;
+
+      &:hover {
+        border-color: rgba(170, 92, 72, 0.42);
+        color: #d8cbbd;
+      }
+
+      &.active {
+        background: rgba(131, 52, 42, 0.2);
+        border-color: rgba(168, 76, 62, 0.62);
+        color: #e4c0b7;
+        box-shadow: inset 0 -2px 0 rgba(168, 76, 62, 0.48);
+      }
+    }
+
+    .sect-summary-card {
+      background: rgba(29, 25, 21, 0.5);
+      border-color: rgba(184, 163, 140, 0.14);
+      border-radius: 3px;
+      box-shadow: none;
+
+      &:hover {
+        background: rgba(42, 35, 29, 0.66);
+        border-color: rgba(170, 92, 72, 0.34);
+      }
+
+      &.active {
+        background: linear-gradient(90deg, rgba(122, 49, 40, 0.17), rgba(42, 34, 28, 0.72));
+        border-color: rgba(168, 76, 62, 0.52);
+        box-shadow: inset 3px 0 0 #9f4a3c;
+      }
+
+      .sect-title {
+        color: #e8ddd0;
+      }
+
+      .type-tag {
+        padding: 0.08rem 0.42rem;
+        background: rgba(143, 64, 51, 0.15);
+        border: 1px solid rgba(177, 92, 75, 0.28);
+        border-radius: 999px;
+        color: #d7a295;
+        letter-spacing: 0.04em;
+
+        &.帮会 {
+          background: rgba(78, 111, 99, 0.15);
+          border-color: rgba(112, 151, 135, 0.26);
+          color: #a9c0b6;
+        }
+
+        &.世家 {
+          background: rgba(104, 82, 65, 0.22);
+          border-color: rgba(158, 128, 99, 0.28);
+          color: #c7b092;
+        }
+
+        &.行伍 {
+          background: rgba(78, 89, 101, 0.22);
+          border-color: rgba(120, 137, 153, 0.28);
+          color: #b1bec9;
+        }
+      }
+
+      .card-desc {
+        color: #9f9385;
+      }
+
+      .member-mark {
+        color: #9fc7a4;
+      }
+    }
+  }
+
+  .world-sect-detail-main {
+    gap: 0.72rem;
+
+    .detail-top-card {
+      position: relative;
+      align-items: flex-start;
+      padding: 1rem 1.15rem 1rem 1.3rem;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(157, 70, 57, 0.08), transparent 32%),
+        linear-gradient(135deg, rgba(35, 29, 24, 0.78), rgba(22, 18, 15, 0.88));
+      border: 1px solid rgba(184, 163, 140, 0.18);
+      border-left: 3px solid #9f4a3c;
+      border-radius: 3px;
+      box-shadow: 0 7px 18px rgba(0, 0, 0, 0.16);
+
+      .sect-hero-title {
+        margin-bottom: 0.4rem;
+        color: #eee4d8;
+        font-size: 1.42rem;
+        letter-spacing: 0.08em;
+      }
+
+      .sect-tags-row {
+        flex-wrap: wrap;
+        gap: 0.42rem;
+      }
+
+      .badge-tag {
+        padding: 0.14rem 0.46rem;
+        background: rgba(144, 62, 50, 0.14);
+        border: 1px solid rgba(174, 82, 67, 0.3);
+        border-radius: 999px;
+        color: #d7a295;
+        font-size: 0.74rem;
+
+        &.location {
+          background: rgba(255, 255, 255, 0.025);
+          border-color: rgba(184, 163, 140, 0.2);
+          color: #b9aea0;
+        }
+      }
+
+      .quick-loc-btn {
+        padding: 0.1rem 0;
+        border-bottom: 1px solid rgba(185, 103, 86, 0.34);
+        color: #c98d7e;
+        font-size: 0.76rem;
+        text-decoration: none;
+
+        &:hover {
+          color: #e2b3a8;
+          border-bottom-color: rgba(210, 132, 113, 0.7);
+        }
+      }
+
+      .enter-my-sect-btn {
+        background: rgba(255, 255, 255, 0.035);
+        border-color: rgba(184, 163, 140, 0.26);
+        color: #ddd0c0;
+
+        &:hover {
+          background: rgba(143, 64, 51, 0.14);
+          border-color: rgba(174, 82, 67, 0.42);
+        }
+      }
+
+      .join-sect-btn {
+        background: linear-gradient(180deg, #83372d, #5f2721);
+        border-color: rgba(185, 93, 77, 0.72);
+        color: #f4e3dd;
+
+        &.at-base {
+          box-shadow: 0 0 0 2px rgba(151, 63, 51, 0.12);
+        }
+      }
+    }
+
+    .detail-intro-section,
+    .detail-martial-preview-section {
+      padding: 0.82rem 1rem;
+      background: rgba(27, 23, 20, 0.43);
+      border: 0;
+      border-top: 1px solid rgba(184, 163, 140, 0.14);
+      border-bottom: 1px solid rgba(184, 163, 140, 0.12);
+      border-radius: 2px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.012);
+
+      .section-heading {
+        position: relative;
+        margin-bottom: 0.58rem;
+        padding: 0 0 0.34rem 0.72rem;
+        border-bottom: 1px solid rgba(184, 163, 140, 0.12);
+        color: #ded3c6;
+        font-size: 0.93rem;
+        letter-spacing: 0.04em;
+
+        &::before {
+          content: '';
+          position: absolute;
+          top: 0.18rem;
+          left: 0;
+          width: 3px;
+          height: 0.82rem;
+          background: #9f4a3c;
+          border-radius: 1px;
+        }
+      }
+
+      .intro-text {
+        color: #b9ada0;
+      }
+
+      .sect-leaders-row {
+        color: #8f8377;
+
+        .leader-pill {
+          padding: 0.08rem 0.42rem;
+          background: transparent;
+          border-color: rgba(184, 163, 140, 0.2);
+          border-radius: 999px;
+          color: #c9bcad;
+        }
+      }
+    }
+  }
+}
