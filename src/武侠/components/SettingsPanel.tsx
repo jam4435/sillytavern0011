@@ -2702,6 +2702,84 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               {conversationSummaryModeStatus && (
                 <div className="summary-mode-status">{conversationSummaryModeStatus}</div>
               )}
+
+              <div className="summary-trace-panel">
+                <div className="summary-trace-header">
+                  <div>
+                    <h5>上下文摘要情况</h5>
+                    <p>记录最近一次真正进入模型前、完成武侠卡过滤后的上下文。</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="settings-action-btn summary-trace-refresh"
+                    onClick={refreshConversationSummaryTrace}
+                  >
+                    <Icons.Refresh size={14} />
+                    <span>刷新</span>
+                  </button>
+                </div>
+
+                {!conversationSummaryTrace ? (
+                  <div className="summary-trace-empty">
+                    暂无记录。发送或重新生成一次消息后，这里会显示每个 assistant 楼层的摘要与最终上下文状态。
+                  </div>
+                ) : (
+                  <>
+                    <div className="summary-trace-meta">
+                      <span>{new Date(conversationSummaryTrace.capturedAt).toLocaleTimeString('zh-CN')}</span>
+                      <span>
+                        {conversationSummaryTrace.mode === 'card'
+                          ? '卡内摘要'
+                          : conversationSummaryTrace.mode === 'preset'
+                            ? '兼容预设'
+                            : '关闭'}
+                      </span>
+                      <span>{'<' + conversationSummaryTrace.summaryTag + '>'}</span>
+                      <span>最近 {conversationSummaryTrace.recentReplies} 条完整回复</span>
+                    </div>
+
+                    <div className="summary-trace-list">
+                      {[...conversationSummaryTrace.items]
+                        .slice(-30)
+                        .reverse()
+                        .map(item => (
+                          <details className="summary-trace-item" key={item.messageId}>
+                            <summary>
+                              <span className="summary-trace-floor">Assistant #{item.messageId}</span>
+                              <span className={'summary-trace-badge ' + (item.hasSummary ? 'ok' : 'missing')}>
+                                {item.hasSummary ? '有摘要' : '无摘要'}
+                              </span>
+                              <span className={'summary-trace-badge state-' + item.contextState}>
+                                {SUMMARY_CONTEXT_STATE_LABELS[item.contextState]}
+                              </span>
+                            </summary>
+                            <div className="summary-trace-detail">
+                              <div>
+                                <strong>摘要</strong>
+                                <p>{item.summary || '未检测到摘要内容。'}</p>
+                              </div>
+                              <div>
+                                <strong>最终上下文</strong>
+                                <p>
+                                  {item.contextState === 'chapter_memory'
+                                    ? '该层原始 user + assistant 已从最终 prompt 移除，由“记忆区”的长期章节摘要接管。'
+                                    : item.contextState === 'summary_only'
+                                      ? '该层原文已被屏蔽，最终 prompt 只保留摘要。'
+                                      : item.contextState === 'full'
+                                        ? '该层仍以正文形式进入最终 prompt。'
+                                        : item.contextState === 'empty'
+                                          ? '该 assistant 消息仍占位，但发送内容为空。'
+                                          : '该层没有进入本次最终 prompt；可能位于模型上下文窗口之外，或被其他过滤流程移除。'}
+                                </p>
+                                {item.contextPreview && <pre>{item.contextPreview}</pre>}
+                              </div>
+                            </div>
+                          </details>
+                        ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </SettingsCollapsibleBlock>
 
             <SettingsCollapsibleBlock
