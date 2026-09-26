@@ -52,7 +52,7 @@ export interface RegenerateRequestOptions {
   replacementUserInput?: string;
   /**
    * 可选：向上一轮 assistant active swipe 的正文尾部追加普通文本，再按原 user 输入重生最新回复。
-   * 追加内容会插在 Variable*/era_data 系统尾块之前；失败时恢复上一轮 assistant 原文。
+   * 追加内容会插在 Variable 系列与 era_data 系统尾块之前；失败时恢复上一轮 assistant 原文。
    */
   previousAssistantAppendText?: string;
 }
