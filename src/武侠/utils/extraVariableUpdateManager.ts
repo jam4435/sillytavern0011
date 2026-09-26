@@ -1926,7 +1926,7 @@ export async function executeExtraVariableUpdate({
       variableUpdateMode: settings.variableUpdateMode,
       latestRawReplyLength: latestRawReply.length,
     });
-    await runPhase('disable-variable-guidance', () => ensureVariableGuidanceEnabled(false));
+    await runPhase('disable-variable-update-rules', () => ensureVariableUpdateEntriesEnabled(false));
     const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
     const prompt = await runPhase('build-variable-prompt', () =>
       buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply }),
