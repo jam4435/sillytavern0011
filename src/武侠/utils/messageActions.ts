@@ -204,16 +204,33 @@ function splitTrailingEraDataBlocks(text: string): { editableText: string; suffi
   };
 }
 
+function stripEraDataBlocksForEditing(text: string): string {
+  ERA_DATA_BLOCK_REGEX.lastIndex = 0;
+  return text
+    .replace(ERA_DATA_BLOCK_REGEX, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function getPreservedUserEraDataSuffix(text: string): string {
+  const trailing = splitTrailingEraDataBlocks(text).suffix;
+  if (trailing) return trailing;
+
+  ERA_DATA_BLOCK_REGEX.lastIndex = 0;
+  const blocks = Array.from(text.matchAll(ERA_DATA_BLOCK_REGEX), match => match[0]);
+  return blocks.length > 0 ? `\n\n${blocks.join('\n\n')}` : '';
+}
+
 function getEditableRegenerateUserInput(message: ChatMessageWithSwipes): string {
   const fullMessage = getActiveMessageText(message);
   const historyData = message.data?.[WUXIA_INPUT_HISTORY_DATA_KEY];
   if (historyData && typeof historyData === 'object' && !Array.isArray(historyData)) {
     const rawText = (historyData as { text?: unknown }).text;
     if (typeof rawText === 'string' && rawText.trim()) {
-      return splitTrailingEraDataBlocks(rawText).editableText;
+      return stripEraDataBlocksForEditing(rawText);
     }
   }
-  return splitTrailingEraDataBlocks(fullMessage).editableText;
+  return stripEraDataBlocksForEditing(fullMessage);
 }
 
 export function getLastRegenerateUserInput(): string | null {
@@ -230,7 +247,7 @@ async function beginRegenerateUserInputReplacement(
   userMessage: ChatMessageWithSwipes,
   replacementUserInput: string,
 ): Promise<RegenerateUserInputTransaction> {
-  const nextRawInput = splitTrailingEraDataBlocks(replacementUserInput).editableText.trim();
+  const nextRawInput = stripEraDataBlocksForEditing(replacementUserInput);
   if (!nextRawInput) {
     throw new Error('修改后的上一轮玩家输入不能为空。');
   }
@@ -244,11 +261,12 @@ async function beginRegenerateUserInputReplacement(
       ? (historyData as { text?: unknown }).text
       : undefined;
   const previousEditableInput =
-    typeof previousRawInput === 'string' ? splitTrailingEraDataBlocks(previousRawInput).editableText : '';
+    typeof previousRawInput === 'string' ? stripEraDataBlocksForEditing(previousRawInput) : '';
+  const trailingSuffix = splitTrailingEraDataBlocks(previousMessage).suffix;
   const preservedSuffix =
     previousEditableInput && previousMessage.startsWith(previousEditableInput)
       ? previousMessage.slice(previousEditableInput.length)
-      : splitTrailingEraDataBlocks(previousMessage).suffix;
+      : trailingSuffix || getPreservedUserEraDataSuffix(previousMessage);
   const nextMessage = `${nextRawInput}${preservedSuffix}`;
   const nextData: Record<string, unknown> = {
     ...previousData,
