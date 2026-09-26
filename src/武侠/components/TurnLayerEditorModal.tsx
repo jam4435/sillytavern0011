@@ -33,6 +33,8 @@ type EditorNotice =
   | { tone: 'idle'; message: '' }
   | { tone: 'success' | 'warning' | 'error'; message: string };
 
+type EditTarget = 'assistant' | 'user';
+
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
@@ -46,16 +48,18 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
   const [userDraftText, setUserDraftText] = useState(snapshot?.userRawText ?? '');
   const [assistantDraftText, setAssistantDraftText] = useState(snapshot?.assistant.rawText ?? '');
   const [jumpValue, setJumpValue] = useState(snapshot ? String(snapshot.assistant.messageId) : '');
+  const [editTarget, setEditTarget] = useState<EditTarget>('assistant');
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<EditorNotice>({ tone: 'idle', message: '' });
-  const assistantTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const applySnapshot = useCallback((next: EditableTurnSnapshot | null) => {
     setBaseSnapshot(next);
     setUserDraftText(next?.userRawText ?? '');
     setAssistantDraftText(next?.assistant.rawText ?? '');
     setJumpValue(next ? String(next.assistant.messageId) : '');
-    window.requestAnimationFrame(() => assistantTextareaRef.current?.focus());
+    if (next?.userMessageId == null) setEditTarget('assistant');
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
   }, []);
 
   useEffect(() => {
@@ -78,13 +82,16 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
 
   const locatorText = useMemo(() => {
     if (!baseSnapshot) return '没有可浏览的 AI 楼层';
-    const userPart = baseSnapshot.userMessageId === null ? '无配对 User' : `User #${baseSnapshot.userMessageId}`;
     const swipeCount = Math.max(0, baseSnapshot.assistant.metadata.swipeCount);
-    const swipePart = swipeCount > 0
-      ? `回复分支 ${baseSnapshot.assistant.swipeId + 1}/${swipeCount}`
-      : '单一回复';
-    return `${userPart} → AI #${baseSnapshot.assistant.messageId} · ${swipePart}`;
+    return swipeCount > 0
+      ? `AI 楼层 #${baseSnapshot.assistant.messageId} · 回复分支 ${baseSnapshot.assistant.swipeId + 1}/${swipeCount}`
+      : `AI 楼层 #${baseSnapshot.assistant.messageId} · 单一回复`;
   }, [baseSnapshot]);
+
+  const currentDraft = editTarget === 'assistant' ? assistantDraftText : userDraftText;
+  const currentLabel = editTarget === 'assistant'
+    ? `AI 输出 #${baseSnapshot?.assistant.messageId ?? ''}`
+    : `User 输入 #${baseSnapshot?.userMessageId ?? ''}`;
 
   const requestClose = useCallback(() => {
     if (isSaving) return;
@@ -128,6 +135,11 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
     navigateTo(messageId);
   };
 
+  const handleReload = () => {
+    if (!baseSnapshot) return;
+    navigateTo(baseSnapshot.assistant.messageId);
+  };
+
   const handleSave = async () => {
     if (!baseSnapshot || !canSave) return;
     setIsSaving(true);
@@ -137,7 +149,7 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
       applySnapshot(outcome.snapshot);
       setNotice({
         tone: outcome.warning ? 'warning' : 'success',
-        message: outcome.warning ? `楼层已保存；${outcome.warning}` : 'User 与 AI 楼层内容已保存。',
+        message: outcome.warning ? `楼层已保存；${outcome.warning}` : '当前回合内容已保存。',
       });
     } catch (error) {
       setNotice({ tone: 'error', message: getErrorMessage(error) });
@@ -150,25 +162,14 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={requestClose}
-      title="浏览 / 校订聊天楼层"
+      title="校订聊天楼层"
       type={ActivePanel.SETTINGS}
       overlayClassName="latest-reply-overlay"
       boxClassName="latest-reply-modal"
       contentClassName="latest-reply-modal-content"
       showPaperTexture={false}
     >
-      <div className="latest-reply-editor turn-layer-editor">
-        <div className="latest-reply-ledger">
-          <div className="latest-reply-locator">
-            <FilePenLine size={16} aria-hidden="true" />
-            <span>{locatorText}</span>
-          </div>
-          <div className="latest-reply-guardrail">
-            <ShieldCheck size={15} aria-hidden="true" />
-            <span>可修改配对 User 输入与 AI active swipe；AI 的 &lt;era_data&gt; 不可改，变量动作变更会触发 ERA 重算。</span>
-          </div>
-        </div>
-
+      <div className="latest-reply-editor">
         <div className="turn-layer-navigation">
           <button
             type="button"
@@ -179,7 +180,9 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
             <ChevronLeft size={16} aria-hidden="true" />
             <span>上一回合</span>
           </button>
+
           <div className="turn-layer-jump">
+            <span className="turn-layer-current">{baseSnapshot ? `AI #${baseSnapshot.assistant.messageId}` : '无楼层'}</span>
             <input
               value={jumpValue}
               onChange={event => setJumpValue(event.target.value)}
@@ -195,6 +198,7 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
               跳转
             </button>
           </div>
+
           <button
             type="button"
             className="latest-reply-action secondary"
@@ -206,35 +210,62 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
           </button>
         </div>
 
-        <div className="turn-layer-edit-grid">
-          <section className="turn-layer-edit-pane">
-            <div className="turn-layer-edit-heading">
-              User 输入 {baseSnapshot?.userMessageId != null ? `#${baseSnapshot.userMessageId}` : ''}
-            </div>
-            <textarea
-              className="latest-reply-textarea"
-              aria-label="当前回合 User 输入"
-              value={userDraftText}
-              onChange={event => setUserDraftText(event.target.value)}
-              disabled={!baseSnapshot || baseSnapshot.userMessageId === null || isSaving}
-              spellCheck={false}
-            />
-          </section>
-
-          <section className="turn-layer-edit-pane">
-            <div className="turn-layer-edit-heading">AI 输出 #{baseSnapshot?.assistant.messageId ?? ''}</div>
-            <textarea
-              ref={assistantTextareaRef}
-              className="latest-reply-textarea"
-              aria-label="当前回合 AI 输出"
-              data-wuxia-automation="turn-layer-assistant-editor"
-              value={assistantDraftText}
-              onChange={event => setAssistantDraftText(event.target.value)}
-              disabled={!baseSnapshot || isSaving}
-              spellCheck={false}
-            />
-          </section>
+        <div className="latest-reply-ledger">
+          <div className="latest-reply-locator">
+            <FilePenLine size={16} aria-hidden="true" />
+            <span>{locatorText}</span>
+          </div>
+          <div className="latest-reply-guardrail">
+            <ShieldCheck size={15} aria-hidden="true" />
+            <span>AI 的 &lt;era_data&gt; 必须原样保留；变量动作改动会触发 ERA 重算。</span>
+          </div>
         </div>
+
+        <div className="turn-layer-target-tabs" role="tablist" aria-label="选择编辑内容">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editTarget === 'assistant'}
+            className={`turn-layer-target-tab ${editTarget === 'assistant' ? 'is-active' : ''}`}
+            onClick={() => {
+              setEditTarget('assistant');
+              window.requestAnimationFrame(() => textareaRef.current?.focus());
+            }}
+          >
+            AI 输出
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editTarget === 'user'}
+            className={`turn-layer-target-tab ${editTarget === 'user' ? 'is-active' : ''}`}
+            onClick={() => {
+              setEditTarget('user');
+              window.requestAnimationFrame(() => textareaRef.current?.focus());
+            }}
+            disabled={baseSnapshot?.userMessageId == null}
+          >
+            User 输入
+          </button>
+        </div>
+
+        <label className="latest-reply-textarea-label" htmlFor="turn-layer-raw-text">
+          {currentLabel}
+        </label>
+        <textarea
+          ref={textareaRef}
+          id="turn-layer-raw-text"
+          className="latest-reply-textarea"
+          aria-label={currentLabel}
+          data-wuxia-automation="turn-layer-editor"
+          value={currentDraft}
+          onChange={event => {
+            if (editTarget === 'assistant') setAssistantDraftText(event.target.value);
+            else setUserDraftText(event.target.value);
+          }}
+          disabled={!baseSnapshot || isSaving || (editTarget === 'user' && baseSnapshot.userMessageId == null)}
+          spellCheck={false}
+        />
 
         <div className="latest-reply-footer">
           <div className={`latest-reply-notice is-${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>
@@ -247,12 +278,7 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
           </div>
 
           <div className="latest-reply-actions">
-            <button
-              type="button"
-              className="latest-reply-action secondary"
-              onClick={() => navigateTo(baseSnapshot?.assistant.messageId)}
-              disabled={isSaving}
-            >
+            <button type="button" className="latest-reply-action secondary" onClick={handleReload} disabled={isSaving}>
               <RefreshCw size={16} aria-hidden="true" />
               <span>重新读取</span>
             </button>
@@ -264,7 +290,7 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
               data-wuxia-automation="save-turn-layer"
             >
               <Save size={16} aria-hidden="true" />
-              <span>{isSaving ? '写入中…' : '保存本回合'}</span>
+              <span>{isSaving ? '写入中…' : '保存修改'}</span>
             </button>
           </div>
         </div>
