@@ -3769,10 +3769,22 @@
 }
 
 @media (max-width: 420px) {
+  .variables-section {
+    gap: 0.65rem;
+  }
+
   .variables-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
+    gap: 0.55rem;
+    padding: 0.55rem;
+  }
+
+  .variables-toolbar-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
   }
 
   .variables-toolbar .settings-action-btn,
@@ -3782,19 +3794,75 @@
     min-width: 0;
   }
 
+  .variables-field {
+    gap: 0.25rem;
+  }
+
+  .variables-field-label {
+    font-size: 0.7rem;
+  }
+
+  .variables-search-box {
+    min-height: 2.35rem;
+    padding: 0 0.55rem;
+  }
+
+  .variables-search-input {
+    padding-top: 0.42rem;
+    padding-bottom: 0.42rem;
+    font-size: 0.8rem;
+  }
+
   .variables-toolbar-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .variables-toolbar-actions .settings-action-btn {
+    min-height: 2.25rem;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.35rem;
+    font-size: 0.78rem;
+  }
+
+  .variables-toolbar-actions .settings-action-btn svg {
+    width: 14px;
+    height: 14px;
   }
 
   .variables-toolbar-meta {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.65rem;
+    min-height: 0;
   }
 
   .variables-mode-switch {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .variables-mode-btn {
+    min-height: 2.1rem;
+    padding: 0.3rem 0.65rem;
+  }
+
+  .variables-value-toggle {
+    min-width: 0;
+    min-height: 2.1rem;
+    gap: 0.35rem;
+    white-space: nowrap;
+  }
+
+  .variables-capability {
+    min-height: 2.1rem;
+    font-size: 0.72rem;
+  }
+
+  .variables-navigation {
+    padding-top: 0;
   }
 
   .variables-group-strip {
@@ -3806,44 +3874,92 @@
 
   .variables-group-chip {
     min-width: 0;
-    padding-left: 0.35rem;
-    padding-right: 0.35rem;
+    min-height: 2.1rem;
+    padding: 0.42rem 0.25rem 0.36rem;
+    font-size: 0.78rem;
   }
 
   .variables-tree {
-    min-height: 260px;
-    border: none;
-    background: transparent;
+    min-height: 240px;
+    border: 1px solid rgba($stone-800, 0.72);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.08);
+  }
+
+  .variables-browser-pane {
+    gap: 0;
   }
 
   .variable-node {
-    margin-bottom: 0.45rem;
+    margin: 0;
   }
 
   .variable-node-row {
-    grid-template-columns: 22px minmax(0, 1fr);
+    grid-template-columns: 18px minmax(0, 1fr) max-content;
     grid-template-areas:
-      'toggle key'
-      'type type'
-      'preview preview';
-    padding: 0.7rem !important;
-    border: 1px solid rgba(255, 255, 255, 0.055);
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.02);
+      'toggle key type'
+      'toggle preview preview';
+    gap: 0.12rem 0.4rem;
+    min-height: 2.55rem;
+    padding: 0.38rem 0.5rem !important;
+    border: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .variable-node.selected > .variable-node-row {
+    background: linear-gradient(90deg, rgba($amber-600, 0.09), transparent 72%);
+  }
+
+  .variable-node-toggle,
+  .variable-node-toggle-spacer {
+    width: 18px;
+    height: 18px;
+  }
+
+  .variable-node-toggle svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .variable-node-key {
+    align-self: center;
+    font-size: 0.8rem;
+    line-height: 1.25;
   }
 
   .variable-node-type {
-    justify-self: start;
+    align-self: center;
+    justify-self: end;
+    padding: 0.1rem 0.32rem;
+    border-color: rgba($stone-700, 0.7);
+    font-size: 0.64rem;
+    line-height: 1.2;
+  }
+
+  .variable-node-preview {
+    font-size: 0.68rem;
+    line-height: 1.25;
+    -webkit-line-clamp: 1;
+  }
+
+  .variable-node.branch > .variable-node-row .variable-node-preview {
+    display: none;
   }
 
   .variable-node-children {
-    margin-left: 0.55rem;
-    padding-left: 0.45rem;
-    border-left: 1px solid rgba($amber-600, 0.16);
+    margin-left: 0.45rem;
+    padding-left: 0.35rem;
+    border-left: 1px solid rgba($amber-600, 0.14);
+  }
+
+  .variable-node-empty {
+    display: none;
   }
 
   .variable-detail-panel {
-    padding: 0.75rem;
+    padding: 0.65rem;
   }
 
   .variable-detail-code {
@@ -3953,7 +4069,7 @@
 
   .variables-mode-btn,
   .variables-scope-chip {
-    min-height: 2.5rem;
+    min-height: 2.2rem;
   }
 }
 
