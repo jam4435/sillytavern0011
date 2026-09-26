@@ -431,3 +431,272 @@ export async function saveLatestAssistantSnapshot(
   const result: LatestAssistantSaveResult = { snapshot, finalText, variableActionsChanged };
   return result;
 }
+
+
+export interface EditableTurnSnapshot {
+  readonly chatId: string;
+  readonly assistant: LatestAssistantSnapshot;
+  readonly userMessageId: number | null;
+  readonly userSwipeId: number;
+  readonly userRawText: string;
+  readonly userMessageMirrorText: string;
+  readonly userHasSwipes: boolean;
+  readonly previousAssistantMessageId: number | null;
+  readonly nextAssistantMessageId: number | null;
+}
+
+export interface EditableTurnSaveResult {
+  readonly snapshot: EditableTurnSnapshot;
+  readonly assistantFinalText: string;
+  readonly userFinalText: string;
+  readonly assistantChanged: boolean;
+  readonly userChanged: boolean;
+  readonly variableActionsChanged: boolean;
+}
+
+function isEditableAssistantMessage(message: AssistantMessageWithSwipes | undefined): message is AssistantMessageWithSwipes {
+  return isValidLatestAssistant(message);
+}
+
+function getEditableAssistantMessages(messages: AssistantMessageWithSwipes[] = readVisibleMessages()): AssistantMessageWithSwipes[] {
+  return messages.filter(isEditableAssistantMessage).sort((left, right) => left.message_id - right.message_id);
+}
+
+function resolveAssistantForRequestedLayer(
+  messages: AssistantMessageWithSwipes[],
+  assistantMessages: AssistantMessageWithSwipes[],
+  requestedMessageId?: number,
+): AssistantMessageWithSwipes | null {
+  if (assistantMessages.length === 0) return null;
+  if (!Number.isInteger(requestedMessageId)) return assistantMessages[assistantMessages.length - 1];
+
+  const exact = messages.find(message => message.message_id === requestedMessageId);
+  if (isEditableAssistantMessage(exact)) return exact;
+
+  if (exact?.role === 'user') {
+    const nextAssistant = assistantMessages.find(message => message.message_id > exact.message_id);
+    return nextAssistant || null;
+  }
+
+  return null;
+}
+
+function findPairedUserMessage(
+  messages: AssistantMessageWithSwipes[],
+  assistantMessageId: number,
+): AssistantMessageWithSwipes | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.message_id >= assistantMessageId) continue;
+    if (message.role === 'assistant') break;
+    if (message.role === 'user' && message.is_hidden !== true) return message;
+  }
+  return null;
+}
+
+/**
+ * Read any editable story turn. Passing an assistant floor selects it directly;
+ * passing its paired user floor selects the following assistant turn.
+ */
+export function readEditableTurnSnapshot(requestedMessageId?: number): EditableTurnSnapshot | null {
+  const messages = readVisibleMessages().filter(message => message.is_hidden !== true);
+  const assistantMessages = getEditableAssistantMessages(messages);
+  const assistantMessage = resolveAssistantForRequestedLayer(messages, assistantMessages, requestedMessageId);
+  if (!assistantMessage) return null;
+
+  const assistantIndex = assistantMessages.findIndex(message => message.message_id === assistantMessage.message_id);
+  const userMessage = findPairedUserMessage(messages, assistantMessage.message_id);
+  const userSwipes = Array.isArray(userMessage?.swipes) ? userMessage.swipes : [];
+  const userSwipeId = userMessage ? getSafeSwipeId(userMessage) : 0;
+
+  return {
+    chatId: readCurrentChatId(),
+    assistant: snapshotFromMessage(assistantMessage),
+    userMessageId: userMessage?.message_id ?? null,
+    userSwipeId,
+    userRawText: userMessage ? getActiveRawText(userMessage) : '',
+    userMessageMirrorText: userMessage?.message || '',
+    userHasSwipes: userSwipes.length > 0,
+    previousAssistantMessageId: assistantIndex > 0 ? assistantMessages[assistantIndex - 1].message_id : null,
+    nextAssistantMessageId:
+      assistantIndex >= 0 && assistantIndex < assistantMessages.length - 1
+        ? assistantMessages[assistantIndex + 1].message_id
+        : null,
+  };
+}
+
+function requireEditableTurnCurrent(snapshot: EditableTurnSnapshot): {
+  assistant: AssistantMessageWithSwipes;
+  user: AssistantMessageWithSwipes | null;
+} {
+  if (readCurrentChatId() !== snapshot.chatId) {
+    throw new LatestAssistantEditorConflictError('聊天已切换，不能覆盖另一段对话的历史楼层。');
+  }
+
+  const assistant = readMessageById(snapshot.assistant.messageId);
+  if (
+    assistant.role !== 'assistant'
+    || getSafeSwipeId(assistant) !== snapshot.assistant.swipeId
+    || getActiveRawText(assistant) !== snapshot.assistant.rawText
+    || (assistant.message || '') !== snapshot.assistant.messageMirrorText
+  ) {
+    throw new LatestAssistantEditorConflictError(
+      `AI 楼层 #${snapshot.assistant.messageId} 在编辑期间已经变化，请重新读取后再保存。`,
+    );
+  }
+
+  let user: AssistantMessageWithSwipes | null = null;
+  if (snapshot.userMessageId !== null) {
+    user = readMessageById(snapshot.userMessageId);
+    if (
+      user.role !== 'user'
+      || getSafeSwipeId(user) !== snapshot.userSwipeId
+      || getActiveRawText(user) !== snapshot.userRawText
+      || (user.message || '') !== snapshot.userMessageMirrorText
+    ) {
+      throw new LatestAssistantEditorConflictError(
+        `User 楼层 #${snapshot.userMessageId} 在编辑期间已经变化，请重新读取后再保存。`,
+      );
+    }
+  }
+
+  return { assistant, user };
+}
+
+async function rollbackUserMessage(snapshot: EditableTurnSnapshot, expectedDraft: string): Promise<void> {
+  if (snapshot.userMessageId === null) return;
+  const user = readMessageById(snapshot.userMessageId);
+  if (getSafeSwipeId(user) !== snapshot.userSwipeId || getActiveRawText(user) !== expectedDraft) {
+    throw new Error(`User 楼层 #${snapshot.userMessageId} 已变化，不能自动回滚。`);
+  }
+  await writeRawText(user, snapshot.userRawText, snapshot.userMessageMirrorText);
+  assertWrittenText(
+    snapshot.userMessageId,
+    snapshot.userSwipeId,
+    snapshot.userRawText,
+    snapshot.userMessageMirrorText,
+  );
+}
+
+async function rollbackAssistantMessage(
+  snapshot: EditableTurnSnapshot,
+  expectedDraft: string,
+  variableActionsChanged: boolean,
+  timeoutMs?: number,
+): Promise<void> {
+  const assistant = readMessageById(snapshot.assistant.messageId);
+  if (
+    getSafeSwipeId(assistant) !== snapshot.assistant.swipeId
+    || getActiveRawText(assistant) !== expectedDraft
+  ) {
+    throw new Error(`AI 楼层 #${snapshot.assistant.messageId} 已变化，不能自动回滚。`);
+  }
+  await writeRawText(
+    assistant,
+    snapshot.assistant.rawText,
+    snapshot.assistant.messageMirrorText,
+  );
+  assertWrittenText(
+    snapshot.assistant.messageId,
+    snapshot.assistant.swipeId,
+    snapshot.assistant.rawText,
+    snapshot.assistant.messageMirrorText,
+  );
+  if (variableActionsChanged) {
+    await emitEraEventAndWait('manual_sync', {
+      timeoutMs,
+      timeoutMessage: '历史 AI 回复回滚后，ERA 没有确认变量恢复。',
+      expectedMessageId: snapshot.assistant.messageId,
+      expectedAction: 'resync',
+    });
+  }
+}
+
+/**
+ * Save the paired user input and assistant active swipe for any historical turn.
+ * Assistant <era_data> remains protected; changing Variable* blocks triggers ERA full sync.
+ */
+export async function saveEditableTurnSnapshot(
+  snapshot: EditableTurnSnapshot,
+  userDraftText: string,
+  assistantDraftText: string,
+  options: LatestAssistantSaveOptions = {},
+): Promise<EditableTurnSaveResult> {
+  if (!assistantDraftText.trim()) {
+    throw new Error('AI 回复不能为空。');
+  }
+  if (snapshot.userMessageId !== null && !userDraftText.trim()) {
+    throw new Error('User 输入不能为空。');
+  }
+
+  await flushPendingGameDataCompletion('before-history-turn-edit');
+  const current = requireEditableTurnCurrent(snapshot);
+  assertEraDataUnchanged(snapshot.assistant.rawText, assistantDraftText);
+
+  const beforeVariableSignature = getVariableActionSignature(snapshot.assistant.rawText);
+  const afterVariableSignature = getVariableActionSignature(assistantDraftText);
+  const variableActionsChanged = beforeVariableSignature !== afterVariableSignature;
+  const userChanged = snapshot.userMessageId !== null && userDraftText !== snapshot.userRawText;
+  const assistantChanged = assistantDraftText !== snapshot.assistant.rawText;
+
+  let userWritten = false;
+  let assistantWritten = false;
+
+  try {
+    if (userChanged && current.user) {
+      await writeRawText(current.user, userDraftText);
+      assertWrittenText(snapshot.userMessageId!, snapshot.userSwipeId, userDraftText);
+      userWritten = true;
+    }
+
+    if (assistantChanged) {
+      await writeDraftWithRecovery(current.assistant, snapshot.assistant, assistantDraftText);
+      assistantWritten = true;
+    }
+
+    if (assistantChanged && variableActionsChanged) {
+      await emitEraEventAndWait('manual_sync', {
+        timeoutMs: options.eraSyncTimeoutMs,
+        timeoutMessage: '历史 AI 回复已写入，但 ERA 没有确认变量同步。',
+        expectedMessageId: snapshot.assistant.messageId,
+        expectedAction: 'resync',
+      });
+    }
+  } catch (error) {
+    const rollbackErrors: string[] = [];
+    if (assistantWritten) {
+      try {
+        await rollbackAssistantMessage(snapshot, assistantDraftText, variableActionsChanged, options.eraSyncTimeoutMs);
+      } catch (rollbackError) {
+        rollbackErrors.push(`AI 回滚失败：${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+      }
+    }
+    if (userWritten) {
+      try {
+        await rollbackUserMessage(snapshot, userDraftText);
+      } catch (rollbackError) {
+        rollbackErrors.push(`User 回滚失败：${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+      }
+    }
+    const baseMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      rollbackErrors.length > 0
+        ? `${baseMessage}；且自动恢复未完全成功：${rollbackErrors.join('；')}`
+        : `${baseMessage}；已恢复保存前内容。`,
+    );
+  }
+
+  const committed = readEditableTurnSnapshot(snapshot.assistant.messageId);
+  if (!committed) {
+    throw new Error('楼层已保存，但保存后无法重新读取该回合。');
+  }
+
+  return {
+    snapshot: committed,
+    assistantFinalText: committed.assistant.rawText,
+    userFinalText: committed.userRawText,
+    assistantChanged,
+    userChanged,
+    variableActionsChanged,
+  };
+}
