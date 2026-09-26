@@ -6,6 +6,7 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  titleMeta?: React.ReactNode;
   type: ActivePanel;
   children: React.ReactNode;
   overlayClassName?: string;
@@ -19,6 +20,7 @@ const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   title,
+  titleMeta,
   type,
   children,
   overlayClassName = '',
@@ -37,6 +39,7 @@ const Modal: React.FC<ModalProps> = ({
           <div className="modal-title-group">
             <div className="title-bar"></div>
             <h2 className="modal-title">{title}</h2>
+            {titleMeta ? <span className="modal-title-meta">{titleMeta}</span> : null}
           </div>
           {showCloseButton && (
             <button
