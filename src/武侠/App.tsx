@@ -1889,7 +1889,7 @@ const App: React.FC = () => {
                   ? '修改上一轮输入后，点击右侧重新生成...'
                   : regenerateDraftMode === 'assistant-append'
                     ? '输入要追加到上一轮 AI 输出的信息...'
-                    : '书写你的江湖故事...'
+                    : ''
               }
             />
             </div>
