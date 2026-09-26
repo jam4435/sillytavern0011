@@ -10,7 +10,7 @@ import GameContent from './components/GameContent';
 import EventTracker from './components/EventTracker';
 import EventNotificationStack from './components/EventNotificationStack';
 import { Icons } from './components/Icons';
-import LatestReplyEditorModal, { type LatestReplyEditorSaveOutcome } from './components/LatestReplyEditorModal';
+import TurnLayerEditorModal, { type TurnLayerEditorSaveOutcome } from './components/TurnLayerEditorModal';
 import Modal from './components/Modal';
 import NewGameSetup from './components/NewGameSetup';
 import SaveLoadPanel from './components/SaveLoadPanel';
@@ -59,9 +59,10 @@ import {
   installConversationSummaryPromptFilter,
 } from './utils/conversationSummaryManager';
 import {
+  readEditableTurnSnapshot,
   readLatestAssistantSnapshot,
-  saveLatestAssistantSnapshot,
-  type LatestAssistantSnapshot,
+  saveEditableTurnSnapshot,
+  type EditableTurnSnapshot,
 } from './utils/latestAssistantEditor';
 import { getUserCurrentLocation } from './utils/mapUtils';
 import {
@@ -214,11 +215,17 @@ const App: React.FC = () => {
   const inputPrefillSequenceRef = useRef(0);
   const [isPlayerAvatarPreviewOpen, setIsPlayerAvatarPreviewOpen] = useState(false);
   const [isLatestReplyEditorOpen, setIsLatestReplyEditorOpen] = useState(false);
-  const [latestReplySnapshot, setLatestReplySnapshot] = useState<LatestAssistantSnapshot | null>(null);
+  const [displayedTurnSnapshot, setDisplayedTurnSnapshot] = useState<EditableTurnSnapshot | null>(null);
   const [mapDraftDestination, setMapDraftDestination] = useState<string | null>(null);
   const [assistantDisplayCommitKey, setAssistantDisplayCommitKey] = useState<string | null>(null);
   const handleAssistantDisplayCommit = useCallback((assistantMessageId: number, assistantSwipeId: number) => {
     setAssistantDisplayCommitKey(`${assistantMessageId}:${assistantSwipeId}`);
+    try {
+      setDisplayedTurnSnapshot(readEditableTurnSnapshot(assistantMessageId));
+    } catch (error) {
+      gameLogger.warn('[turn-layer] 新回复已提交，但楼层导航快照刷新失败:', error);
+      setDisplayedTurnSnapshot(null);
+    }
   }, []);
   const {
     variableChanges,
@@ -280,7 +287,7 @@ const App: React.FC = () => {
     setInputPrefill(null);
     setIsCommandQueueOpen(false);
     setIsLatestReplyEditorOpen(false);
-    setLatestReplySnapshot(null);
+    setDisplayedTurnSnapshot(null);
     refreshRecentInputHistory();
   }, [clearVariableChanges, refreshRecentInputHistory]);
 
@@ -636,96 +643,137 @@ const App: React.FC = () => {
     }
   }, [setGameState]);
 
+  const showTurnSnapshot = useCallback(
+    (snapshot: EditableTurnSnapshot) => {
+      const displayText = normalizeDisplayedMessageContent(snapshot.assistant.rawText) || snapshot.assistant.rawText;
+      setDisplayedTurnSnapshot(snapshot);
+      setCurrentMaintext(displayText);
+      setCurrentOptions(parseOptions(snapshot.assistant.rawText));
+    },
+    [setCurrentMaintext, setCurrentOptions],
+  );
+
+  useEffect(() => {
+    if (currentPage !== 'game' || displayedTurnSnapshot) return;
+    try {
+      const latest = readEditableTurnSnapshot();
+      if (latest) {
+        setDisplayedTurnSnapshot(latest);
+      }
+    } catch (error) {
+      gameLogger.warn('[turn-layer] 初始化当前楼层导航失败:', error);
+    }
+  }, [currentMaintext, currentPage, displayedTurnSnapshot]);
+
   const canEditLatestReply = useMemo(() => {
     if (currentPage !== 'game' || isLoading || historyMutationPending) return false;
     try {
-      return Boolean(readLatestAssistantSnapshot());
+      return Boolean(readEditableTurnSnapshot(displayedTurnSnapshot?.assistant.messageId));
     } catch {
       return false;
     }
-  }, [currentMaintext, currentOptions, currentPage, historyMutationPending, isLoading]);
+  }, [currentMaintext, currentOptions, currentPage, displayedTurnSnapshot, historyMutationPending, isLoading]);
+
+  const handleNavigateStoryLayer = useCallback(
+    (messageId?: number): EditableTurnSnapshot | null => {
+      try {
+        const snapshot = readEditableTurnSnapshot(messageId);
+        if (!snapshot) {
+          showError('找不到这个可浏览回合。可以输入该回合的 User 楼层号或 AI 楼层号。');
+          return null;
+        }
+        showTurnSnapshot(snapshot);
+        return snapshot;
+      } catch (error) {
+        showError(`读取聊天楼层失败：${error instanceof Error ? error.message : String(error)}`);
+        return null;
+      }
+    },
+    [showError, showTurnSnapshot],
+  );
 
   const handleOpenLatestReplyEditor = useCallback(() => {
     if (isLoading || historyMutationPending) {
-      showError('当前回合、历史分叉或聊天改名仍在处理中，暂时不能编辑最新回复。');
+      showError('当前回合、历史分叉或聊天改名仍在处理中，暂时不能编辑聊天楼层。');
       return;
     }
     if (getIsExtraVariableUpdating()) {
-      showError('额外变量仍在写入或校验中，请稍后再编辑最新回复。');
+      showError('额外变量仍在写入或校验中，请稍后再编辑聊天楼层。');
       return;
     }
 
-    const snapshot = readLatestAssistantSnapshot();
+    const snapshot = readEditableTurnSnapshot(displayedTurnSnapshot?.assistant.messageId);
     if (!snapshot) {
-      showError('当前最后一条消息不是可编辑的有效 AI 回复。');
+      showError('当前没有可编辑的 User/AI 回合。');
       return;
     }
 
     closeModal();
     setIsCommandQueueOpen(false);
-    setLatestReplySnapshot(snapshot);
+    showTurnSnapshot(snapshot);
     setIsLatestReplyEditorOpen(true);
-  }, [closeModal, historyMutationPending, isLoading, showError]);
-
-  const handleReloadLatestReply = useCallback(() => readLatestAssistantSnapshot(), []);
+  }, [
+    closeModal,
+    displayedTurnSnapshot,
+    historyMutationPending,
+    isLoading,
+    showError,
+    showTurnSnapshot,
+  ]);
 
   const handleSaveLatestReply = useCallback(
-    async (snapshot: LatestAssistantSnapshot, draftText: string): Promise<LatestReplyEditorSaveOutcome> => {
+    async (
+      snapshot: EditableTurnSnapshot,
+      userDraftText: string,
+      assistantDraftText: string,
+    ): Promise<TurnLayerEditorSaveOutcome> => {
       if (isLoading || historyMutationPending) {
-        throw new Error('当前回合、历史分叉或聊天改名仍在处理中，不能覆写最新回复。');
+        throw new Error('当前回合、历史分叉或聊天改名仍在处理中，不能覆写聊天楼层。');
       }
       if (getIsExtraVariableUpdating()) {
         throw new Error('额外变量仍在写入或校验中，请等待完成后再保存。');
       }
 
-      const result = await saveLatestAssistantSnapshot(snapshot, draftText);
-      handleVariableAssistantRevision(result.finalText, snapshot.messageId);
+      const latestBeforeSave = readLatestAssistantSnapshot();
+      const isLatestAssistant = latestBeforeSave?.messageId === snapshot.assistant.messageId;
+      const result = await saveEditableTurnSnapshot(snapshot, userDraftText, assistantDraftText);
       const warnings: string[] = [];
+
+      if (result.assistantChanged && isLatestAssistant) {
+        handleVariableAssistantRevision(result.assistantFinalText, snapshot.assistant.messageId);
+      }
+      if (result.variableActionsChanged) {
+        refreshGameStateFromVariables();
+      }
+
       try {
-        const displayText = normalizeDisplayedMessageContent(result.finalText) || result.finalText;
-        setCurrentMaintext(displayText);
-        setCurrentOptions(parseOptions(result.finalText));
-        if (result.variableActionsChanged) {
-          refreshGameStateFromVariables();
+        showTurnSnapshot(result.snapshot);
+      } catch (error) {
+        gameLogger.warn('[turn-layer] 楼层已保存，但主界面投影刷新失败:', error);
+        warnings.push(`主界面刷新失败：${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      if (isLatestAssistant) {
+        try {
+          const latestGameData = readGameDataPure();
+          await finalizeCurrentTurn({
+            location: latestGameData?.currentLocation || latestGameData?.stats?.location || '',
+            worldTimeText:
+              latestGameData?.gameTime ||
+              (latestGameData?.worldTime
+                ? `${latestGameData.worldTime.年}年${latestGameData.worldTime.月}月${latestGameData.worldTime.日}日 ${String(latestGameData.worldTime.时).padStart(2, '0')}:${String(latestGameData.worldTime.分).padStart(2, '0')}`
+                : ''),
+          });
+        } catch (error) {
+          gameLogger.warn('[turn-layer] 最新回复已保存，但历史预览刷新失败:', error);
+          warnings.push(
+            `历史预览刷新失败，可稍后在存档面板重试：${error instanceof Error ? error.message : String(error)}`,
+          );
         }
-      } catch (error) {
-        gameLogger.warn('[latest-reply-editor] 回复已保存，但主界面投影刷新失败:', error);
-        warnings.push(`主界面刷新失败，可重新打开前端恢复：${error instanceof Error ? error.message : String(error)}`);
       }
 
-      try {
-        const latestGameData = readGameDataPure();
-        await finalizeCurrentTurn({
-          location: latestGameData?.currentLocation || latestGameData?.stats?.location || '',
-          worldTimeText:
-            latestGameData?.gameTime ||
-            (latestGameData?.worldTime
-              ? `${latestGameData.worldTime.年}年${latestGameData.worldTime.月}月${latestGameData.worldTime.日}日 ${String(latestGameData.worldTime.时).padStart(2, '0')}:${String(latestGameData.worldTime.分).padStart(2, '0')}`
-              : ''),
-        });
-      } catch (error) {
-        gameLogger.warn('[latest-reply-editor] 回复已保存，但历史预览刷新失败:', error);
-        warnings.push(
-          `历史预览刷新失败，可稍后在存档面板重试：${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-
-      let committedSnapshot: LatestAssistantSnapshot | null = null;
-      try {
-        committedSnapshot = readLatestAssistantSnapshot();
-      } catch (error) {
-        gameLogger.warn('[latest-reply-editor] 回复已保存，但回读最新快照失败:', error);
-        warnings.push(`最新楼层回读失败：${error instanceof Error ? error.message : String(error)}`);
-      }
-      if (!committedSnapshot) {
-        warnings.push('保存后最新楼层发生变化；再次编辑前请重新打开校订窗口。');
-      }
       return {
-        snapshot: committedSnapshot ?? {
-          ...snapshot,
-          rawText: result.finalText,
-          messageMirrorText: result.finalText,
-        },
+        snapshot: result.snapshot,
         warning: warnings.length > 0 ? warnings.join('；') : undefined,
       };
     },
@@ -734,8 +782,7 @@ const App: React.FC = () => {
       historyMutationPending,
       isLoading,
       refreshGameStateFromVariables,
-      setCurrentMaintext,
-      setCurrentOptions,
+      showTurnSnapshot,
     ],
   );
 
@@ -1778,6 +1825,15 @@ const App: React.FC = () => {
                   scrollCommitKey={assistantDisplayCommitKey}
                   onEditLatestReply={handleOpenLatestReplyEditor}
                   canEditLatestReply={canEditLatestReply}
+                  currentLayerId={displayedTurnSnapshot?.assistant.messageId ?? null}
+                  previousLayerId={displayedTurnSnapshot?.previousAssistantMessageId ?? null}
+                  nextLayerId={displayedTurnSnapshot?.nextAssistantMessageId ?? null}
+                  onNavigateLayer={messageId => {
+                    handleNavigateStoryLayer(messageId);
+                  }}
+                  onJumpLayer={messageId => {
+                    handleNavigateStoryLayer(messageId);
+                  }}
                 />
               </div>
             </section>
@@ -1853,14 +1909,13 @@ const App: React.FC = () => {
           type={ActivePanel.CHARACTER}
           objectPosition={playerAvatarSource.objectPosition}
         />
-        <LatestReplyEditorModal
+        <TurnLayerEditorModal
           isOpen={isLatestReplyEditorOpen}
-          snapshot={latestReplySnapshot}
+          snapshot={displayedTurnSnapshot}
           onClose={() => {
             setIsLatestReplyEditorOpen(false);
-            setLatestReplySnapshot(null);
           }}
-          onReload={handleReloadLatestReply}
+          onNavigate={handleNavigateStoryLayer}
           onSave={handleSaveLatestReply}
         />
       </div>
