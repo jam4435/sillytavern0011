@@ -172,7 +172,14 @@ const App: React.FC = () => {
     currentOptions,
     setCurrentOptions,
   } = useGameState();
-  const { commands, setTravelCommand, addUseItemCommand, cancelCommand, sendMessageWithCommands } = useCommandQueue();
+  const {
+    commands,
+    setTravelCommand,
+    addUseItemCommand,
+    addMartialArtUpgradeCommand,
+    cancelCommand,
+    sendMessageWithCommands,
+  } = useCommandQueue();
   const [playerAvatarVersion, setPlayerAvatarVersion] = useState(0);
   const [historyCheckoutPending, setHistoryCheckoutPending] = useState(() => isHistoryCheckoutPending());
   const [chatRenamePending, setChatRenamePending] = useState(() => isChatRenamePending());
@@ -869,6 +876,44 @@ const App: React.FC = () => {
     ],
   );
 
+  const handleMartialArtUpgradeResult = useCallback(
+    (result: {
+      success: boolean;
+      martialArtName: string;
+      previousMastery?: string;
+      newMastery?: string;
+      spentCultivation?: number;
+      newCultivation?: number;
+      error?: string;
+    }) => {
+      if (!result.success) {
+        showError(`功法精进失败：${result.error || '变量写入未完成'}`);
+        refreshGameStateFromVariables();
+        return;
+      }
+
+      const previousMastery = result.previousMastery || '当前境界';
+      const newMastery = result.newMastery || '下一境界';
+      const spentText =
+        typeof result.spentCultivation === 'number' ? `消耗${result.spentCultivation}点修为，` : '';
+      addMartialArtUpgradeCommand(
+        `[功法指令]User${spentText}将《${result.martialArtName}》从「${previousMastery}」精进至「${newMastery}」。`,
+        {
+          martialArtName: result.martialArtName,
+          previousMastery,
+          newMastery,
+          spentCultivation: result.spentCultivation,
+        },
+      );
+
+      if (typeof toastr !== 'undefined' && toastr.success) {
+        toastr.success(`《${result.martialArtName}》已精进至${newMastery}`);
+      }
+      refreshGameStateFromVariables();
+    },
+    [addMartialArtUpgradeCommand, refreshGameStateFromVariables, showError],
+  );
+
   const handleMeridianUpgrade = useCallback(
     async (nodeId: MeridianNodeId, quote: MeridianUpgradeQuote) => {
       if (isLoading || historyMutationPending) {
@@ -1448,6 +1493,7 @@ const App: React.FC = () => {
             cultivation={gameState.stats.cultivation}
             comprehension={gameState.stats.initialAttributes?.悟性 ?? 10}
             traits={gameState.stats.traits}
+            onUpgrade={handleMartialArtUpgradeResult}
           />
         );
       case ActivePanel.FACTION:
