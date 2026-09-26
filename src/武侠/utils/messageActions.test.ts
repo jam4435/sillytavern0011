@@ -29,6 +29,7 @@ import { emitEraEventAndWait } from './eraWriteWait';
 import { getLastMessageContent } from './variableReader';
 import {
   canAppendPreviousAssistantForRegenerate,
+  getLastRegenerateAssistantAppendText,
   getLastRegenerateUserInput,
   regenerateLastAssistantSwipe,
 } from './messageActions';
@@ -270,6 +271,41 @@ describe('regenerateLastAssistantSwipe', () => {
     });
   });
 
+  it('输入历史元数据意外带有 era_data 时，修改上一轮输入仍只暴露玩家正文', () => {
+    messages[0] = {
+      message_id: 1,
+      role: 'user',
+      message: '玩家真实输入\n\n<era_data>{"user":"meta"}</era_data>',
+      data: {
+        wuxiaInputHistoryV1: {
+          text: '玩家真实输入\n\n<era_data>{"user":"meta"}</era_data>',
+        },
+      },
+    };
+
+    expect(getLastRegenerateUserInput()).toBe('玩家真实输入');
+  });
+
+  it('提交修改上一轮输入时会剥离误混入草稿的 era_data，并继续保留原楼层系统尾段', async () => {
+    messages[0] = {
+      message_id: 1,
+      role: 'user',
+      message: '原玩家输入\n\n<era_data>{"user":"original"}</era_data>',
+      data: {
+        wuxiaInputHistoryV1: {
+          text: '原玩家输入',
+        },
+      },
+    };
+
+    await regenerateLastAssistantSwipe({
+      replacementUserInput: '修改后的玩家输入\n\n<era_data>{"user":"should-not-be-editable"}</era_data>',
+    });
+
+    expect(messages[0].message).toBe('修改后的玩家输入\n\n<era_data>{"user":"original"}</era_data>');
+    expect(messages[0].data?.wuxiaInputHistoryV1).toEqual({ text: '修改后的玩家输入' });
+  });
+
   it('可把补充文本插到上一轮 AI 的 Variable/era_data 系统尾块之前再重新生成', async () => {
     messages = [
       {
@@ -311,6 +347,36 @@ describe('regenerateLastAssistantSwipe', () => {
       '上一轮正文\n\n补充：上一轮其实还发生了这件事。\n\n<VariableEdit>',
     );
     expect(messages[2].message).toBe('根据补充信息生成的新回复');
+  });
+
+  it('再次编辑上一轮 AI 追加段时会回填旧追加，并用新内容替换而不是继续叠加', async () => {
+    const previousAssistant =
+      '上一轮正文\n\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\n\n<era_data>{"mk":"previous"}</era_data>';
+    messages = [
+      { message_id: 1, role: 'assistant', message: previousAssistant, swipes: [previousAssistant], swipe_id: 0 },
+      { message_id: 2, role: 'user', message: '继续追问' },
+      {
+        message_id: 3,
+        role: 'assistant',
+        message: '当前旧回复\n\n<era_data>{"mk":"current"}</era_data>',
+        swipes: ['当前旧回复\n\n<era_data>{"mk":"current"}</era_data>'],
+        swipe_id: 0,
+      },
+    ];
+
+    globals.generate = vi.fn(async () => '第一次重新生成');
+    await regenerateLastAssistantSwipe({ previousAssistantAppendText: '补充A：第一次追加。' });
+
+    expect(getLastRegenerateAssistantAppendText()).toBe('补充A：第一次追加。');
+    expect(messages[0].message).toContain('补充A：第一次追加。');
+
+    globals.generate = vi.fn(async () => '第二次重新生成');
+    await regenerateLastAssistantSwipe({ previousAssistantAppendText: '补充B：修改后的追加。' });
+
+    expect(getLastRegenerateAssistantAppendText()).toBe('补充B：修改后的追加。');
+    expect(messages[0].message).toContain('补充B：修改后的追加。');
+    expect(messages[0].message).not.toContain('补充A：第一次追加。');
+    expect(messages[0].message.match(/补充B：修改后的追加。/g)).toHaveLength(1);
   });
 
   it('追加上一轮 AI 输出时 message 镜像短暂未同步不会误判失败，并会主动补写镜像', async () => {
