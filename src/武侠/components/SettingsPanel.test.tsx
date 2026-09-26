@@ -359,6 +359,22 @@ describe('SettingsPanel variable groups', () => {
     expect(within(screen.getByLabelText('人物列表')).getByRole('button', { name: /黄蓉/ })).toBeInTheDocument();
   });
 
+  it('uses a compact search-mode row with value toggle and edit status', async () => {
+    await openVariableTab();
+
+    const searchModeTabs = within(screen.getByRole('tablist', { name: '变量搜索模式' }));
+    expect(searchModeTabs.getByRole('tab', { name: '当前类别' })).toHaveAttribute('aria-selected', 'true');
+    expect(searchModeTabs.getByRole('tab', { name: '全局路径' })).toHaveAttribute('aria-selected', 'false');
+
+    const valueToggle = screen.getByRole('checkbox', { name: '搜索变量值' });
+    expect(valueToggle).not.toBeChecked();
+    fireEvent.click(valueToggle);
+    expect(valueToggle).toBeChecked();
+
+    expect(screen.getByText('可编辑')).toBeInTheDocument();
+    expect(screen.queryByText('叶子值可编辑')).not.toBeInTheDocument();
+  });
+
   it('searches across every real root in the current category', async () => {
     await openVariableTab();
 
