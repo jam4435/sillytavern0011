@@ -286,6 +286,21 @@ describe('regenerateLastAssistantSwipe', () => {
     expect(getLastRegenerateUserInput()).toBe('玩家真实输入');
   });
 
+  it('重新生成编辑器会隐藏不在末尾的 era_data，而不是只处理系统尾段', () => {
+    messages[0] = {
+      message_id: 1,
+      role: 'user',
+      message: '玩家真实输入\n<era_data>{"user":"meta"}</era_data>\n补充正文',
+      data: {
+        wuxiaInputHistoryV1: {
+          text: '玩家真实输入\n<era_data>{"user":"meta"}</era_data>\n补充正文',
+        },
+      },
+    };
+
+    expect(getLastRegenerateUserInput()).toBe('玩家真实输入\n\n补充正文');
+  });
+
   it('提交修改上一轮输入时会剥离误混入草稿与旧元数据的 era_data，并继续保留原楼层系统尾段', async () => {
     messages[0] = {
       message_id: 1,
