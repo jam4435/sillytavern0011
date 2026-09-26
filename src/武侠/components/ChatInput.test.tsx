@@ -156,6 +156,41 @@ describe('ChatInput history draft', () => {
     });
   });
 
+  it('重新进入编辑态时可一次回填玩家输入与上一轮 AI 追加段，并在标签间保留修改', () => {
+    const onRegenerateDraftModeChange = vi.fn();
+    const draftPrefill = {
+      key: 'regen-edit-existing-append',
+      drafts: {
+        'user-input': '上一轮玩家输入',
+        'assistant-append': '上一轮已经追加的说明',
+      },
+    } as const;
+    const props = {
+      onSend: vi.fn(),
+      onRegenerate: vi.fn(),
+      onRegenerateDraftModeChange,
+      canRegenerate: true,
+      regenerateDraftPrefill: draftPrefill,
+    };
+    const { rerender } = render(<ChatInput {...props} regenerateDraftMode="user-input" />);
+
+    const input = screen.getByRole('textbox', { name: '玩家行动' });
+    expect(input).toHaveValue('上一轮玩家输入');
+
+    fireEvent.click(screen.getByRole('button', { name: '追加上一轮输出' }));
+    rerender(<ChatInput {...props} regenerateDraftMode="assistant-append" />);
+    expect(input).toHaveValue('上一轮已经追加的说明');
+
+    fireEvent.change(input, { target: { value: '修改后的追加说明' } });
+    fireEvent.click(screen.getByRole('button', { name: '修改上一轮输入' }));
+    rerender(<ChatInput {...props} regenerateDraftMode="user-input" />);
+    expect(input).toHaveValue('上一轮玩家输入');
+
+    fireEvent.click(screen.getByRole('button', { name: '追加上一轮输出' }));
+    rerender(<ChatInput {...props} regenerateDraftMode="assistant-append" />);
+    expect(input).toHaveValue('修改后的追加说明');
+  });
+
   it('编辑态共用独立退出按钮', () => {
     const onCancelRegenerateDraft = vi.fn();
     render(
