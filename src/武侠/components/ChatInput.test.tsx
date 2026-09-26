@@ -71,7 +71,7 @@ describe('ChatInput history draft', () => {
         onSend={onSend}
         onRegenerate={onRegenerate}
         canRegenerate
-        regenerateDraftMode
+        regenerateDraftMode="user-input"
         prefill={{ key: 'regen-1', message: '原来的行动' }}
       />,
     );
@@ -85,7 +85,7 @@ describe('ChatInput history draft', () => {
     });
 
     expect(onRegenerate).toHaveBeenCalledTimes(1);
-    expect(onRegenerate).toHaveBeenCalledWith('修改后的行动');
+    expect(onRegenerate).toHaveBeenCalledWith({ mode: 'user-input', text: '修改后的行动' });
     expect(onSend).not.toHaveBeenCalled();
   });
 
@@ -97,7 +97,7 @@ describe('ChatInput history draft', () => {
         onSend={onSend}
         onRegenerate={onRegenerate}
         canRegenerate
-        regenerateDraftMode
+        regenerateDraftMode="user-input"
         prefill={{ key: 'regen-2', message: '改成走水路' }}
       />,
     );
@@ -109,8 +109,32 @@ describe('ChatInput history draft', () => {
       fireEvent.click(screen.getByRole('button', { name: '使用修改后的上一轮输入重新生成' }));
     });
 
-    expect(onRegenerate).toHaveBeenCalledWith('改成走水路');
+    expect(onRegenerate).toHaveBeenCalledWith({ mode: 'user-input', text: '改成走水路' });
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('编辑态可在修改输入与追加上一轮输出之间切换，并共用独立退出按钮', () => {
+    const onRegenerateDraftModeChange = vi.fn();
+    const onCancelRegenerateDraft = vi.fn();
+    render(
+      <ChatInput
+        onSend={vi.fn()}
+        onRegenerate={vi.fn()}
+        onRegenerateDraftModeChange={onRegenerateDraftModeChange}
+        onCancelRegenerateDraft={onCancelRegenerateDraft}
+        canRegenerate
+        regenerateDraftMode="user-input"
+        prefill={{ key: 'regen-switch', message: '上一轮行动' }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '修改上一轮输入' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: '追加上一轮输出' }));
+    expect(onRegenerateDraftModeChange).toHaveBeenCalledWith('assistant-append');
+    expect(screen.getByRole('textbox', { name: '玩家行动' })).toHaveValue('');
+
+    fireEvent.click(screen.getByRole('button', { name: '退出重新生成编辑模式' }));
+    expect(onCancelRegenerateDraft).toHaveBeenCalledTimes(1);
   });
 
   it('允许显式取消修改上一轮输入模式', () => {
@@ -123,12 +147,12 @@ describe('ChatInput history draft', () => {
         onCancelRegenerateDraft={onCancelRegenerateDraft}
         onMessageChange={onMessageChange}
         canRegenerate
-        regenerateDraftMode
+        regenerateDraftMode="user-input"
         prefill={{ key: 'regen-3', message: '上一轮行动' }}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '取消修改上一轮输入' }));
+    fireEvent.click(screen.getByRole('button', { name: '退出重新生成编辑模式' }));
 
     expect(onCancelRegenerateDraft).toHaveBeenCalledTimes(1);
     expect(onMessageChange).toHaveBeenLastCalledWith('');
