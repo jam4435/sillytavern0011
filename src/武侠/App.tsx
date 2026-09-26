@@ -1,3 +1,4 @@
+import { FilePenLine } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import brandXiakeSealUrl from './assets/icons/jinyong/brand_xiake_seal.svg?url';
 import AvatarImage from './components/AvatarImage';
@@ -1743,6 +1744,17 @@ const App: React.FC = () => {
               <div className="header-right">
                 <button
                   type="button"
+                  className={`header-action-btn mobile-turn-edit-btn ${canEditLatestReply ? '' : 'is-unavailable'}`}
+                  onClick={handleOpenLatestReplyEditor}
+                  title={canEditLatestReply ? '编辑当前显示回合的 User 输入与 AI 输出' : '当前回复暂不可编辑，点击查看原因'}
+                  aria-label="编辑当前聊天回合"
+                  data-wuxia-automation="open-latest-reply-editor-mobile"
+                  data-wuxia-editable={canEditLatestReply ? 'true' : 'false'}
+                >
+                  <FilePenLine size={16} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
                   className={`header-action-btn ${activePanel === ActivePanel.SAVE_LOAD ? 'active' : ''}`}
                   onClick={() => setActivePanel(ActivePanel.SAVE_LOAD)}
                   title="存档与分叉"
@@ -1829,12 +1841,13 @@ const App: React.FC = () => {
               </div>
             </section>
 
-            <div className="variable-change-dock">
-              <VariableChangeBar summary={variableChanges || null} />
-            </div>
+            <div className="bottom-action-dock">
+              <div className="variable-change-dock">
+                <VariableChangeBar summary={variableChanges || null} />
+              </div>
 
-            {/* 底部聊天输入区域 */}
-            <ChatInput
+              {/* 底部聊天输入区域 */}
+              <ChatInput
               onSend={handlePlayerSend}
               prefill={
                 inputPrefill ??
@@ -1879,6 +1892,7 @@ const App: React.FC = () => {
                     : '书写你的江湖故事...'
               }
             />
+            </div>
           </main>
         </div>
 

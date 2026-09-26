@@ -340,6 +340,11 @@
 }
 
 @media (max-width: 768px) {
+  // 手机端编辑入口移入游戏 Header，避免 sticky 铅笔与江湖事簿 HUD 抢占同一层。
+  .maintext-edit-sticky {
+    display: none;
+  }
+
   .latest-reply-modal {
     width: 100%;
     max-width: none;
@@ -404,34 +409,47 @@
 }
 
 @media (max-width: 520px) {
+  // 普通输入态恢复为一行：输入框 | 指令 | 重生 | 发送。
   .chat-input-container {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 40px 54px 40px;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
 
     .chat-input-field-wrapper {
-      grid-column: 1 / -1;
+      flex: 1 1 auto;
+      min-width: 0;
     }
   }
 
   .chat-extra-actions {
-    display: contents;
+    display: flex;
+    flex: 0 0 auto;
   }
 
-  .command-queue-anchor {
-    grid-column: 2;
+  .command-queue-btn,
+  .chat-send-btn,
+  .chat-regenerate-btn {
+    height: 38px;
+  }
+
+  .command-queue-btn,
+  .chat-send-btn {
+    width: 38px;
   }
 
   .chat-regenerate-group {
-    grid-column: 3;
+    .chat-regenerate-main {
+      width: 32px;
+    }
+
+    .chat-regenerate-menu-btn {
+      width: 18px;
+    }
   }
 
-  .chat-send-btn {
-    grid-column: 4;
-  }
-
-  .regenerate-draft-mode .chat-send-btn {
-    grid-column: 3 / 5;
-    justify-self: end;
+  .chat-input-field {
+    min-height: 38px;
+    padding: 0.5rem 2.2rem 0.5rem 0.7rem;
   }
 
   .maintext-edit-sticky {

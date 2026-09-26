@@ -3479,7 +3479,9 @@
   }
 
   @media (max-width: 768px) {
-    margin: -0.35rem 0 1.15rem;
+    margin: 0;
+    border-radius: 8px 8px 5px 5px;
+    box-shadow: none;
   }
 }
 
@@ -3496,9 +3498,9 @@
 
   @media (max-width: 768px) {
     grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
-    gap: 0.3rem;
-    min-height: 38px;
-    padding: 0.45rem 0.5rem 0.45rem 0.8rem;
+    gap: 0.22rem;
+    min-height: 30px;
+    padding: 0.18rem 0.32rem 0.18rem 0.55rem;
   }
 }
 
@@ -3575,9 +3577,10 @@
   }
 
   @media (max-width: 768px) {
-    gap: 0.3rem;
-    min-height: 1.8rem;
-    padding: 0.3rem 0.4rem;
+    gap: 0.2rem;
+    min-height: 1.5rem;
+    padding: 0.16rem 0.3rem;
+    border-radius: 5px;
   }
 }
 
@@ -3607,6 +3610,28 @@
   color: rgba(168, 162, 158, 0.76);
   padding: 0;
 
+  @media (max-width: 768px) {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 5px;
+  }
+}
+
+@media (max-width: 768px) {
+  .variable-change-title {
+    gap: 0.28rem;
+    font-size: 0.74rem;
+
+    svg {
+      width: 13px;
+      height: 13px;
+    }
+  }
+
+  .variable-change-segment-label,
+  .variable-change-segment-count {
+    font-size: 0.68rem;
+  }
 }
 
 // 摘要始终保持单行，并按信息优先级逐级收起，避免窄容器内文字互相覆盖。

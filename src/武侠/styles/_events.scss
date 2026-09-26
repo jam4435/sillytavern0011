@@ -896,8 +896,32 @@ button.chronicle-world-toggle:focus-visible {
     max-height: calc(100% - var(--wuxia-game-header-height) - 7.25rem);
 
     &.is-collapsed {
-      // 收起态必须保持横向 HUD 形状，不能让标题被挤成竖排。
-      width: calc(100% - 1.5rem);
+      // 手机收起态只保留紧凑标签，不再横跨几乎整个正文。
+      width: clamp(9.5rem, 42vw, 10.5rem);
+      max-height: none;
+
+      .event-tracker-heading {
+        min-height: 2.35rem;
+        padding: 0.22rem 0.42rem;
+        gap: 0.24rem;
+      }
+
+      .event-tracker-title-brush {
+        width: auto;
+        height: 1.75rem;
+        padding-inline: 0.62rem 0.72rem;
+      }
+
+      .event-tracker-title {
+        font-size: 0.8rem;
+        letter-spacing: 0.1em;
+      }
+
+      .event-tracker-count {
+        width: 1.05rem;
+        height: 1.05rem;
+        font-size: 0.62rem;
+      }
     }
   }
 

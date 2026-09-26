@@ -165,6 +165,10 @@
   }
 }
 
+.mobile-turn-edit-btn {
+  display: none;
+}
+
 // =========================================
 // Fullscreen Button - 全屏按钮（缩小版）
 // =========================================
@@ -427,6 +431,14 @@
     gap: 0.375rem;
   }
 
+  .mobile-turn-edit-btn {
+    display: inline-flex;
+
+    &.is-unavailable {
+      opacity: 0.46;
+    }
+  }
+
   // 玩家名称与境界可从状态面板查看；手机顶栏优先保障时间、地点可读。
   .player-info {
     display: none;
@@ -456,6 +468,15 @@
   .header-action-btn,
   .header-fullscreen-btn-small {
     display: none;
+  }
+
+  // 极窄屏仍保留“编辑当前回合”；存档与全屏已在侧边抽屉中有替代入口。
+  .header-action-btn.mobile-turn-edit-btn {
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
   }
 
   .avatar-small {
