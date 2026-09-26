@@ -64,17 +64,27 @@ const items: InventoryItem[] = [
 ];
 
 describe('InventoryPanel', () => {
-  it('可按类别和品阶筛选物品', () => {
-    render(<InventoryPanel items={items} />);
+  it('10件及以下隐藏筛选，超过10件只显示类型筛选', () => {
+    const { rerender } = render(<InventoryPanel items={items} />);
+
+    expect(screen.queryByLabelText('物品类别筛选')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('物品品阶筛选')).not.toBeInTheDocument();
+
+    const manyItems: InventoryItem[] = Array.from({ length: 11 }, (_, index) => ({
+      ...items[index % items.length],
+      id: `item_many_${index + 1}`,
+      name: `测试物品${index + 1}`,
+      type: index === 10 ? 'ELIXIR' : 'EQUIP',
+    }));
+
+    rerender(<InventoryPanel items={manyItems} />);
+
+    expect(screen.getByLabelText('物品类别筛选')).toBeInTheDocument();
+    expect(screen.queryByLabelText('物品品阶筛选')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '药品' }));
-    expect(screen.getByRole('button', { name: '查看大还丹' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '查看玄铁剑' })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getAllByRole('button', { name: '全部' })[0]);
-    fireEvent.click(screen.getByRole('button', { name: '绝品' }));
-    expect(screen.getByRole('button', { name: '查看大还丹' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '查看九阳神功' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看测试物品11' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '查看测试物品1' })).not.toBeInTheDocument();
   });
 
   it('点击秘籍显示当前属性、要求值和明确缺口', () => {
