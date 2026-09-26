@@ -96,7 +96,13 @@ type RegenerateAssistantAppendTransaction = {
   swipeId: number;
   previousSwipeText: string;
   previousMessageMirror: string;
+  previousData: Record<string, unknown>;
   appendedSwipeText: string;
+};
+
+type RegenerateAssistantAppendMetadata = {
+  baseText: string;
+  appendText: string;
 };
 
 const ERA_DATA_BLOCK_REGEX = /\s*<era_data>[\s\S]*?<\/era_data>\s*/gi;
@@ -105,6 +111,7 @@ const ASSISTANT_SYSTEM_BLOCK_REGEX =
   /<era_data>[\s\S]*?<\/era_data>|<VariableThink>[\s\S]*?<\/VariableThink>|<VariableInsert>[\s\S]*?<\/VariableInsert>|<VariableEdit>[\s\S]*?<\/VariableEdit>|<VariableDelete>[\s\S]*?<\/VariableDelete>/gi;
 const RESERVED_ASSISTANT_APPEND_TAG_REGEX =
   /<\/?(?:era_data|Variable(?:Think|Insert|Edit|Delete))\b/i;
+const WUXIA_REGENERATE_APPEND_DATA_KEY = 'wuxiaRegenerateAppendV1';
 
 function getActiveMessageText(message: ChatMessageWithSwipes): string {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
@@ -203,7 +210,7 @@ function getEditableRegenerateUserInput(message: ChatMessageWithSwipes): string 
   if (historyData && typeof historyData === 'object' && !Array.isArray(historyData)) {
     const rawText = (historyData as { text?: unknown }).text;
     if (typeof rawText === 'string' && rawText.trim()) {
-      return rawText.trim();
+      return splitTrailingEraDataBlocks(rawText).editableText;
     }
   }
   return splitTrailingEraDataBlocks(fullMessage).editableText;
@@ -223,7 +230,7 @@ async function beginRegenerateUserInputReplacement(
   userMessage: ChatMessageWithSwipes,
   replacementUserInput: string,
 ): Promise<RegenerateUserInputTransaction> {
-  const nextRawInput = replacementUserInput.trim();
+  const nextRawInput = splitTrailingEraDataBlocks(replacementUserInput).editableText.trim();
   if (!nextRawInput) {
     throw new Error('修改后的上一轮玩家输入不能为空。');
   }
@@ -326,6 +333,53 @@ function buildAssistantTextWithAppend(previousText: string, appendText: string):
   return systemTail ? `${nextBody}\n\n${systemTail}` : nextBody;
 }
 
+function getRegenerateAssistantAppendMap(data: Record<string, unknown> | undefined): Record<string, unknown> {
+  const raw = data?.[WUXIA_REGENERATE_APPEND_DATA_KEY];
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+}
+
+function getStoredRegenerateAssistantAppend(
+  message: ChatMessageWithSwipes,
+  swipeId: number,
+): RegenerateAssistantAppendMetadata | null {
+  const raw = getRegenerateAssistantAppendMap(message.data)[String(swipeId)];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null;
+  }
+
+  const baseText = (raw as { baseText?: unknown }).baseText;
+  const appendText = (raw as { appendText?: unknown }).appendText;
+  if (typeof baseText !== 'string' || typeof appendText !== 'string' || !appendText.trim()) {
+    return null;
+  }
+
+  try {
+    if (buildAssistantTextWithAppend(baseText, appendText) !== getActiveMessageText(message)) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
+  return { baseText, appendText };
+}
+
+export function getLastRegenerateAssistantAppendText(): string | null {
+  try {
+    const context = getRegenerateContext();
+    if (!context?.previousAssistantMessage) {
+      return null;
+    }
+
+    const freshMessage = readMessageWithSwipes(context.previousAssistantMessage.message_id);
+    const swipes = Array.isArray(freshMessage.swipes) ? freshMessage.swipes : [];
+    const swipeId = getSafeSwipeIndex(freshMessage, swipes);
+    return getStoredRegenerateAssistantAppend(freshMessage, swipeId)?.appendText ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function beginRegenerateAssistantAppend(
   assistantMessage: ChatMessageWithSwipes,
   appendText: string,
@@ -335,7 +389,22 @@ async function beginRegenerateAssistantAppend(
   const swipeId = getSafeSwipeIndex(freshMessage, swipes);
   const previousSwipeText = getActiveMessageText(freshMessage);
   const previousMessageMirror = freshMessage.message || '';
-  const appendedSwipeText = buildAssistantTextWithAppend(previousSwipeText, appendText);
+  const previousData = { ...(freshMessage.data || {}) };
+  const storedAppend = getStoredRegenerateAssistantAppend(freshMessage, swipeId);
+  const baseText = storedAppend?.baseText ?? previousSwipeText;
+  const normalizedAppend = appendText.trim();
+  const appendedSwipeText = buildAssistantTextWithAppend(baseText, normalizedAppend);
+  const appendMap = {
+    ...getRegenerateAssistantAppendMap(previousData),
+    [String(swipeId)]: {
+      baseText,
+      appendText: normalizedAppend,
+    } satisfies RegenerateAssistantAppendMetadata,
+  };
+  const nextData = {
+    ...previousData,
+    [WUXIA_REGENERATE_APPEND_DATA_KEY]: appendMap,
+  };
 
   if (swipes.length > 0) {
     swipes[swipeId] = appendedSwipeText;
@@ -344,6 +413,7 @@ async function beginRegenerateAssistantAppend(
         {
           message_id: freshMessage.message_id,
           message: appendedSwipeText,
+          data: nextData,
           swipe_id: swipeId,
           swipes,
         },
@@ -352,7 +422,7 @@ async function beginRegenerateAssistantAppend(
     );
   } else {
     await setChatMessages(
-      [{ message_id: freshMessage.message_id, message: appendedSwipeText }],
+      [{ message_id: freshMessage.message_id, message: appendedSwipeText, data: nextData }],
       { refresh: 'none' },
     );
   }
@@ -401,6 +471,7 @@ async function beginRegenerateAssistantAppend(
     swipeId,
     previousSwipeText,
     previousMessageMirror,
+    previousData,
     appendedSwipeText,
   };
 }
@@ -419,6 +490,7 @@ async function restoreRegenerateAssistantAppend(transaction: RegenerateAssistant
         {
           message_id: transaction.messageId,
           message: transaction.previousMessageMirror,
+          data: transaction.previousData,
           swipe_id: transaction.swipeId,
           swipes,
         },
@@ -427,7 +499,13 @@ async function restoreRegenerateAssistantAppend(transaction: RegenerateAssistant
     );
   } else {
     await setChatMessages(
-      [{ message_id: transaction.messageId, message: transaction.previousMessageMirror }],
+      [
+        {
+          message_id: transaction.messageId,
+          message: transaction.previousMessageMirror,
+          data: transaction.previousData,
+        },
+      ],
       { refresh: 'none' },
     );
   }
