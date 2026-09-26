@@ -1323,24 +1323,23 @@ describe('detectGameSessionState', () => {
       expect(factions?.['桃花岛']?.体系类型).toBe('世家');
     });
 
-    it('当旧档中仅有 user数据.宗门 时，应自动向下兼容映射为势力结构', () => {
+    it('不再接受旧的主势力/所属势力包装结构', () => {
       const factions = parseFactions({
-        宗门: {
-          当前门派: '古墓派',
-          门派身份: '亲传弟子',
-          师承: '小龙女',
-          宗门贡献: 300,
+        势力: {
+          当前主势力: '全真教',
+          所属势力: {
+            全真教: {
+              体系类型: '宗门',
+              身份: '亲传弟子',
+              师承: '丘处机',
+              贡献: 300,
+              状态: '在籍',
+            },
+          },
         },
       });
 
-      expect(factions).toBeDefined();
-      expect(factions?.['古墓派']).toEqual({
-        体系类型: '宗门',
-        身份: '亲传弟子',
-        师承: '小龙女',
-        贡献: 300,
-        状态: '在籍',
-      });
+      expect(factions).toBeUndefined();
     });
 
     it('应当正确解析顶层 stat_data.任务', () => {
