@@ -921,28 +921,30 @@ const App: React.FC = () => {
         return;
       }
 
-      let prefillMessage = '';
-      if (mode === 'user-input') {
+      if (mode === 'assistant-append' && !canAppendPreviousAssistantForRegenerate()) {
+        showError('当前没有可追加信息的上一轮 AI 输出。');
+        return;
+      }
+
+      // 首次进入编辑态时只预填一次上一轮真实玩家输入。
+      // 两个标签之间切换时草稿由 ChatInput 本地分别保留，避免覆盖另一侧已经编辑的内容。
+      if (regenerateDraftMode === null) {
         const previousInput = getLastRegenerateUserInput();
         if (!previousInput) {
           showError('当前没有可修改并重新生成的上一轮玩家输入。');
           return;
         }
-        prefillMessage = previousInput;
-      } else if (!canAppendPreviousAssistantForRegenerate()) {
-        showError('当前没有可追加信息的上一轮 AI 输出。');
-        return;
+        inputPrefillSequenceRef.current += 1;
+        setInputPrefill({
+          key: `regenerate-editor-${inputPrefillSequenceRef.current}`,
+          message: previousInput,
+        });
       }
 
-      inputPrefillSequenceRef.current += 1;
-      setInputPrefill({
-        key: `regenerate-${mode}-${inputPrefillSequenceRef.current}`,
-        message: prefillMessage,
-      });
       setRegenerateDraftMode(mode);
       setIsCommandQueueOpen(false);
     },
-    [historyMutationPending, isLoading, showError],
+    [historyMutationPending, isLoading, regenerateDraftMode, showError],
   );
 
   const handlePrepareRegenerateInputEdit = useCallback(
@@ -962,12 +964,12 @@ const App: React.FC = () => {
         return false;
       }
 
-      const request =
-        draft?.mode === 'user-input'
-          ? { replacementUserInput: draft.text }
-          : draft?.mode === 'assistant-append'
-            ? { previousAssistantAppendText: draft.text }
-            : {};
+      const request = draft
+        ? {
+            replacementUserInput: draft.replacementUserInput,
+            previousAssistantAppendText: draft.previousAssistantAppendText,
+          }
+        : {};
       const success = await handleRegenerateLastAssistant(request);
       if (success === true) {
         refreshRecentInputHistory();
