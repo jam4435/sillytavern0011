@@ -111,6 +111,14 @@ describe('武侠输出提示词契约', () => {
     expect(variableTemplateSource).not.toContain('| 宗门 | object |');
     expect(variableTemplateSource).toContain('新增一门功法时，应按完整功法结构建立');
     expect(variableTemplateSource).toContain('若数据库不存在该功法，则变量中生成的完整结构继续作为该功法的完整信息来源');
+    expect(variableTemplateSource).toContain('user数据.势力.【势力名】');
+    expect(variableTemplateSource).toContain('势力名直接作为 Key 的扁平结构');
+    expect(variableTemplateSource).toContain('不设置“主势力”');
+    expect(variableTemplateSource).toContain('## 六、任务');
+    expect(variableTemplateSource).toContain('普通变量 AI **只允许修改 `任务执行情况`**');
+    expect(variableTemplateSource).toContain('完整任务只能由**势力系统生成差事的专用提示词**创建');
+    expect(variableTemplateSource).toContain('| 所属势力 | string | 只读 |');
+    expect(variableTemplateSource).toContain('| 任务执行情况 | string | 仅修改已有 |');
     expect(variableTemplateSource).toContain('### 新人物完整对象');
   });
 
