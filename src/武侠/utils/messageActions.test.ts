@@ -315,15 +315,15 @@ describe('regenerateLastAssistantSwipe', () => {
 
   it('追加上一轮 AI 输出时 message 镜像短暂未同步不会误判失败，并会主动补写镜像', async () => {
     const previousAssistant =
-      '上一轮正文\\n\\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\\n\\n<era_data>{"mk":"previous"}</era_data>';
+      '上一轮正文\n\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\n\n<era_data>{"mk":"previous"}</era_data>';
     messages = [
       { message_id: 1, role: 'assistant', message: previousAssistant, swipes: [previousAssistant], swipe_id: 0 },
       { message_id: 2, role: 'user', message: '继续追问' },
       {
         message_id: 3,
         role: 'assistant',
-        message: '当前旧回复\\n\\n<era_data>{"mk":"current"}</era_data>',
-        swipes: ['当前旧回复\\n\\n<era_data>{"mk":"current"}</era_data>'],
+        message: '当前旧回复\n\n<era_data>{"mk":"current"}</era_data>',
+        swipes: ['当前旧回复\n\n<era_data>{"mk":"current"}</era_data>'],
         swipe_id: 0,
       },
     ];
