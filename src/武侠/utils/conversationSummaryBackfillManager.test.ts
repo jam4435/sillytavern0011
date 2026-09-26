@@ -59,6 +59,25 @@ describe('conversationSummaryBackfillManager', () => {
     expect(parsed.missingMessageIds).toEqual([193]);
   });
 
+  it('rejects duplicate message ids instead of accepting an ambiguous floor result', () => {
+    const parsed = parseSmallSummaryBatchResponse(
+      JSON.stringify({
+        summaries: [
+          { message_id: 191, summary: '第一个版本。' },
+          { message_id: 191, summary: '互相冲突的第二个版本。' },
+          { message_id: 193, summary: '另一层正常的小总结。' },
+        ],
+      }),
+      [191, 193],
+      'summary',
+    );
+
+    expect(parsed.summaries).toEqual([{ messageId: 193, summary: '另一层正常的小总结。' }]);
+    expect(parsed.rejected).toEqual([
+      { messageId: 191, error: '模型对同一楼层返回了重复小总结。' },
+    ]);
+  });
+
   it('rejects truncated JSON so no floor can be mistaken for a completed summary', () => {
     expect(() =>
       parseSmallSummaryBatchResponse(
