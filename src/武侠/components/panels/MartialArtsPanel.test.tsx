@@ -42,17 +42,32 @@ const martialArts: Record<string, MartialArt> = {
 };
 
 describe('MartialArtsPanel', () => {
-  it('可按类型和品阶筛选功法', () => {
-    render(<MartialArtsPanel martialArts={martialArts} cultivation={200} comprehension={10} />);
+  it('10门及以下隐藏筛选，超过10门只显示品阶筛选', () => {
+    const { rerender } = render(
+      <MartialArtsPanel martialArts={martialArts} cultivation={200} comprehension={10} />,
+    );
 
-    fireEvent.click(screen.getByRole('button', { name: '刀法' }));
-    expect(screen.getByRole('button', { name: '查看胡家刀法' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '查看九阳神功' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('功法品阶筛选')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('功法类型筛选')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: '全部' })[0]);
-    fireEvent.click(screen.getByRole('button', { name: '绝世' }));
-    expect(screen.getByRole('button', { name: '查看九阳神功' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '查看胡家刀法' })).not.toBeInTheDocument();
+    const manyMartialArts = Object.fromEntries(
+      Array.from({ length: 11 }, (_, index) => [
+        `测试功法${index + 1}`,
+        {
+          ...martialArts.九阳神功,
+          rank: index === 10 ? '上乘' : '绝世',
+        },
+      ]),
+    ) as Record<string, MartialArt>;
+
+    rerender(<MartialArtsPanel martialArts={manyMartialArts} cultivation={200} comprehension={10} />);
+
+    expect(screen.getByLabelText('功法品阶筛选')).toBeInTheDocument();
+    expect(screen.queryByLabelText('功法类型筛选')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '上乘' }));
+    expect(screen.getByRole('button', { name: '查看测试功法11' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '查看测试功法1' })).not.toBeInTheDocument();
   });
 
   it('点击功法显示详情和特性', () => {
