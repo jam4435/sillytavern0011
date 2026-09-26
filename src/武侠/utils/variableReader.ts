@@ -130,7 +130,6 @@ interface UserProfile {
   状态效果?: Record<string, ActiveStatusEffectVariableData>;
   天赋?: Record<string, string>;
   势力?: Record<string, unknown>;
-  宗门?: Record<string, unknown>;
   人物经历?: Record<string, string> | string;
   关系网?: Record<string, RelationshipNetworkValue>;
   $meta?: unknown; // ERA 元数据，忽略
@@ -1634,24 +1633,16 @@ function parseSocial(variables: GameVariables, 用户档案?: UserProfile): NPC[
 }
 
 /**
- * 解析玩家所属势力数据，并提供旧档 user数据.宗门 向下兼容映射
+ * 解析玩家所属势力数据。运行时只接受 user数据.势力 的扁平映射结构。
  */
 export function parseFactions(userData?: UserProfile): UserFactionsMap | undefined {
   if (!userData) return undefined;
 
-  // 1. 优先读取新格式 user数据.势力
   const raw势力 = userData.势力;
   if (raw势力 && typeof raw势力 === 'object' && !Array.isArray(raw势力)) {
-    // 兼容可能存在的 "所属势力" 嵌套包装
-    const targetMap = (
-      raw势力.所属势力 && typeof raw势力.所属势力 === 'object' && !Array.isArray(raw势力.所属势力)
-        ? raw势力.所属势力
-        : raw势力
-    ) as Record<string, unknown>;
-
     const result: UserFactionsMap = {};
-    for (const [factionName, rawEntry] of Object.entries(targetMap)) {
-      if (factionName === '当前主势力' || !rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) {
+    for (const [factionName, rawEntry] of Object.entries(raw势力 as Record<string, unknown>)) {
+      if (!rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) {
         continue;
       }
       const entry = rawEntry as Record<string, unknown>;
@@ -1677,29 +1668,6 @@ export function parseFactions(userData?: UserProfile): UserFactionsMap | undefin
     }
   }
 
-  // 2. 旧档向下兼容：若仅有 user数据.宗门，自动投影为势力映射
-  const raw宗门 = userData.宗门;
-  if (raw宗门 && typeof raw宗门 === 'object' && !Array.isArray(raw宗门)) {
-    const 宗门Obj = raw宗门 as Record<string, unknown>;
-    const 门派名 = (typeof 宗门Obj.当前门派 === 'string' && 宗门Obj.当前门派) || '全真教';
-    const 门派身份 = (typeof 宗门Obj.门派身份 === 'string' && 宗门Obj.门派身份) || '入门弟子';
-    const 师承 = (typeof 宗门Obj.师承 === 'string' && 宗门Obj.师承) || '本门长辈';
-    const rawContribution = 宗门Obj.宗门贡献;
-    let contribution = 0;
-    if (typeof rawContribution === 'number' && Number.isFinite(rawContribution)) {
-      contribution = Math.max(0, Math.floor(rawContribution));
-    }
-
-    return {
-      [门派名]: {
-        体系类型: '宗门',
-        身份: 门派身份,
-        师承,
-        贡献: contribution,
-        状态: '在籍',
-      },
-    };
-  }
 
   return undefined;
 }
