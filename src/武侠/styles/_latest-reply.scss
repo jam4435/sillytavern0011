@@ -183,118 +183,55 @@
   }
 }
 
-.turn-layer-edit-grid {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.35fr);
-  overflow: hidden;
-}
-
-.turn-layer-edit-pane {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-
-  & + & {
-    border-left: 1px solid rgba(181, 137, 80, 0.18);
-  }
-
-  .latest-reply-textarea {
-    flex: 1 1 auto;
-  }
-}
-
-.turn-layer-edit-heading {
+.turn-layer-current {
   flex: 0 0 auto;
-  padding: 0.55rem 0.85rem;
-  border-bottom: 1px solid rgba(181, 137, 80, 0.14);
   color: #d8b273;
-  background: rgba(29, 24, 20, 0.62);
   font-family: var(--font-wenkai);
   font-size: 0.8rem;
-  letter-spacing: 0.035em;
-}
-
-.maintext-layer-toolbar {
-  position: sticky;
-  top: 0.55rem;
-  z-index: 38;
-  width: fit-content;
-  max-width: calc(100% - 3rem);
-  margin: 0 auto 0.65rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.38rem;
-  padding: 0.28rem 0.4rem;
-  border: 1px solid rgba(181, 137, 80, 0.18);
-  border-radius: 8px;
-  background: rgba(18, 15, 13, 0.72);
-  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.14);
-  backdrop-filter: blur(7px);
-}
-
-.maintext-layer-current {
-  padding: 0 0.35rem;
-  color: #d9b778;
-  font-family: var(--font-wenkai);
-  font-size: 0.75rem;
   white-space: nowrap;
 }
 
-.maintext-layer-button {
-  min-width: 28px;
-  height: 28px;
-  padding: 0 0.35rem;
-  display: inline-flex;
+.turn-layer-target-tabs {
+  flex: 0 0 auto;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(181, 137, 80, 0.16);
-  border-radius: 6px;
-  color: var(--stone-400);
-  background: rgba(255, 255, 255, 0.035);
-  cursor: pointer;
+  gap: 0;
+  padding: 0.55rem 1rem 0;
+  background: rgba(12, 10, 9, 0.48);
+}
 
-  &.text {
-    min-width: 42px;
-    font-size: 0.72rem;
+.turn-layer-target-tab {
+  min-width: 7rem;
+  padding: 0.58rem 0.95rem;
+  border: 1px solid rgba(181, 137, 80, 0.18);
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+  color: var(--stone-400);
+  background: rgba(255, 255, 255, 0.025);
+  font-family: var(--font-wenkai);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: 0.18s ease;
+
+  & + & {
+    margin-left: 0.35rem;
   }
 
-  &:hover:not(:disabled),
-  &:focus-visible:not(:disabled) {
-    outline: none;
+  &:hover:not(:disabled) {
     color: #f0d494;
-    border-color: rgba(212, 175, 55, 0.42);
+    border-color: rgba(212, 175, 55, 0.36);
+    background: rgba(181, 137, 80, 0.09);
+  }
+
+  &.is-active {
+    color: #fff0cf;
+    border-color: rgba(212, 175, 55, 0.46);
     background: rgba(133, 77, 14, 0.2);
   }
 
   &:disabled {
-    opacity: 0.3;
+    opacity: 0.35;
     cursor: not-allowed;
-  }
-}
-
-.maintext-layer-jump {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-
-  input {
-    width: 4.4rem;
-    height: 28px;
-    padding: 0 0.45rem;
-    border: 1px solid rgba(181, 137, 80, 0.16);
-    border-radius: 6px;
-    outline: none;
-    color: var(--stone-300);
-    background: rgba(8, 7, 6, 0.36);
-    font-size: 0.72rem;
-
-    &:focus {
-      border-color: rgba(212, 175, 55, 0.42);
-    }
   }
 }
 
@@ -344,10 +281,12 @@
 
 .maintext-edit-sticky {
   position: sticky;
-  top: 0.7rem;
+  top: 0.25rem;
   z-index: 40;
-  height: 0;
+  height: 34px;
+  margin: -0.15rem 0 0.2rem;
   display: flex;
+  align-items: flex-start;
   justify-content: flex-end;
   pointer-events: none;
 }
@@ -437,14 +376,9 @@
     border-top: 1px solid rgba(181, 137, 80, 0.18);
   }
 
-  .maintext-layer-toolbar {
-    max-width: calc(100% - 0.75rem);
-    margin-bottom: 0.5rem;
-  }
+  
 
-  .maintext-layer-current {
-    display: none;
-  }
+  
 
   .latest-reply-textarea {
     padding: 0.9rem 0.85rem 1.2rem;
@@ -584,10 +518,7 @@
   }
 
   .turn-layer-navigation,
-  .maintext-layer-toolbar {
-    border-color: rgba(61, 48, 40, 0.18);
-    background: rgba(247, 241, 229, 0.9);
-  }
+  
 
   .turn-layer-jump input,
   .maintext-layer-jump input {
@@ -597,9 +528,7 @@
   }
 
   .turn-layer-edit-heading,
-  .maintext-layer-current {
-    color: #7f2119;
-  }
+  
 
   .latest-reply-footer {
     border-top-color: rgba(61, 48, 40, 0.18);
