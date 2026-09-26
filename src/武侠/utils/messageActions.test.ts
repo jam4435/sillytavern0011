@@ -27,7 +27,11 @@ vi.mock('./locationContext', () => ({
 
 import { emitEraEventAndWait } from './eraWriteWait';
 import { getLastMessageContent } from './variableReader';
-import { regenerateLastAssistantSwipe } from './messageActions';
+import {
+  canAppendPreviousAssistantForRegenerate,
+  getLastRegenerateUserInput,
+  regenerateLastAssistantSwipe,
+} from './messageActions';
 
 type ChatRole = 'system' | 'assistant' | 'user';
 
@@ -35,6 +39,7 @@ type MockChatMessage = {
   message_id: number;
   role: ChatRole;
   message: string;
+  data?: Record<string, unknown>;
   swipes?: string[];
   swipes_data?: Record<string, unknown>[];
   swipes_info?: Record<string, unknown>[];
@@ -116,7 +121,10 @@ describe('regenerateLastAssistantSwipe', () => {
       return clone(messages);
     });
 
-    getLastMessageContentMock.mockImplementation(() => getActiveMessageText(messages[1]));
+    getLastMessageContentMock.mockImplementation(() => {
+      const latestAssistant = [...messages].reverse().find(message => message.role === 'assistant');
+      return latestAssistant ? getActiveMessageText(latestAssistant) : '';
+    });
   });
 
   it('重新生成原位替换当前 swipe，成功后不保留旧重 roll 内容', async () => {
@@ -239,6 +247,91 @@ describe('regenerateLastAssistantSwipe', () => {
     expect(messages[1].swipe_id).toBe(1);
     expect(messages[1].message).toBe('重 roll 后的B');
     expect(result.assistantSwipeId).toBe(1);
+  });
+
+  it('旧 user 楼层没有输入历史元数据时，编辑值隐藏 era_data 且写回仍保留原系统尾段', async () => {
+    messages[0] = {
+      message_id: 1,
+      role: 'user',
+      message: '原玩家输入\n\n<era_data>{"user":"meta"}</era_data>',
+    };
+
+    expect(getLastRegenerateUserInput()).toBe('原玩家输入');
+
+    await regenerateLastAssistantSwipe({ replacementUserInput: '修改后的玩家输入' });
+
+    expect(messages[0].message).toBe('修改后的玩家输入\n\n<era_data>{"user":"meta"}</era_data>');
+    const generateCall = vi.mocked(globals.generate).mock.calls[0]?.[0] as {
+      overrides?: { chat_history?: { prompts?: Array<{ role: string; content: string }> } };
+    };
+    expect(generateCall.overrides?.chat_history?.prompts?.at(-1)).toEqual({
+      role: 'user',
+      content: '修改后的玩家输入\n\n<era_data>{"user":"meta"}</era_data>',
+    });
+  });
+
+  it('可把补充文本插到上一轮 AI 的 Variable/era_data 系统尾块之前再重新生成', async () => {
+    messages = [
+      {
+        message_id: 1,
+        role: 'assistant',
+        message:
+          '上一轮正文\n\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\n\n<era_data>{"mk":"previous"}</era_data>',
+        swipes: [
+          '上一轮正文\n\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\n\n<era_data>{"mk":"previous"}</era_data>',
+        ],
+        swipe_id: 0,
+      },
+      {
+        message_id: 2,
+        role: 'user',
+        message: '继续追问',
+      },
+      {
+        message_id: 3,
+        role: 'assistant',
+        message: '当前旧回复\n\n<era_data>{"mk":"current"}</era_data>',
+        swipes: ['当前旧回复\n\n<era_data>{"mk":"current"}</era_data>'],
+        swipe_id: 0,
+      },
+    ];
+
+    expect(canAppendPreviousAssistantForRegenerate()).toBe(true);
+    globals.generate = vi.fn(async () => '根据补充信息生成的新回复');
+
+    await regenerateLastAssistantSwipe({ previousAssistantAppendText: '补充：上一轮其实还发生了这件事。' });
+
+    expect(messages[0].message).toBe(
+      '上一轮正文\n\n补充：上一轮其实还发生了这件事。\n\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\n\n<era_data>{"mk":"previous"}</era_data>',
+    );
+    const generateCall = vi.mocked(globals.generate).mock.calls[0]?.[0] as {
+      overrides?: { chat_history?: { prompts?: Array<{ role: string; content: string }> } };
+    };
+    expect(generateCall.overrides?.chat_history?.prompts?.[0]?.content).toContain(
+      '上一轮正文\n\n补充：上一轮其实还发生了这件事。\n\n<VariableEdit>',
+    );
+    expect(messages[2].message).toBe('根据补充信息生成的新回复');
+  });
+
+  it('追加上一轮 AI 输出后若重新生成失败，会同时恢复上一轮输出与当前回复', async () => {
+    const previousAssistant =
+      '上一轮正文\n\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\n\n<era_data>{"mk":"previous"}</era_data>';
+    const currentAssistant = '当前旧回复\n\n<era_data>{"mk":"current"}</era_data>';
+    messages = [
+      { message_id: 1, role: 'assistant', message: previousAssistant, swipes: [previousAssistant], swipe_id: 0 },
+      { message_id: 2, role: 'user', message: '继续追问' },
+      { message_id: 3, role: 'assistant', message: currentAssistant, swipes: [currentAssistant], swipe_id: 0 },
+    ];
+    globals.generate = vi.fn().mockRejectedValue(new Error('生成失败'));
+
+    await expect(
+      regenerateLastAssistantSwipe({ previousAssistantAppendText: '临时补充信息' }),
+    ).rejects.toThrow('生成失败');
+
+    expect(messages[0].message).toBe(previousAssistant);
+    expect(messages[0].swipes?.[0]).toBe(previousAssistant);
+    expect(messages[2].message).toBe(currentAssistant);
+    expect(messages[2].swipes?.[0]).toBe(currentAssistant);
   });
 
   it('重新生成连续三次 429 后恢复原 swipe', async () => {
