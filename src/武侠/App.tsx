@@ -1825,15 +1825,6 @@ const App: React.FC = () => {
                   scrollCommitKey={assistantDisplayCommitKey}
                   onEditLatestReply={handleOpenLatestReplyEditor}
                   canEditLatestReply={canEditLatestReply}
-                  currentLayerId={displayedTurnSnapshot?.assistant.messageId ?? null}
-                  previousLayerId={displayedTurnSnapshot?.previousAssistantMessageId ?? null}
-                  nextLayerId={displayedTurnSnapshot?.nextAssistantMessageId ?? null}
-                  onNavigateLayer={messageId => {
-                    handleNavigateStoryLayer(messageId);
-                  }}
-                  onJumpLayer={messageId => {
-                    handleNavigateStoryLayer(messageId);
-                  }}
                 />
               </div>
             </section>
