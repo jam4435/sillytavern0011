@@ -96,6 +96,12 @@ describe('executeExtraVariableUpdate', () => {
       },
       {
         uid: 2,
+        name: '变量模板',
+        enabled: true,
+        content: '<变量模板>变量模板测试内容</变量模板>',
+      },
+      {
+        uid: 3,
         name: '世界背景',
         enabled: true,
         content: '<世界信息>宏观背景\n<叙事表现标尺>传说：基本失传，不得操纵时间空间。</叙事表现标尺>\n</世界信息>',
@@ -274,29 +280,37 @@ describe('executeExtraVariableUpdate', () => {
     });
   });
 
-  it('inline 模式强制启用变量指导，即使它原本处于禁用状态', async () => {
+  it('inline 模式同时启用变量模板与变量指导', async () => {
     worldbookEntries[0].enabled = false;
+    worldbookEntries[1].enabled = false;
 
     const status = await applyVariableUpdateModeWorldbookState('inline');
 
     expect(worldbookEntries[0].enabled).toBe(true);
+    expect(worldbookEntries[1].enabled).toBe(true);
     expect(status).toContain('已启用');
-    expect(globalScope.updateWorldbookWith).toHaveBeenCalledTimes(1);
+    expect(status).toContain('变量模板');
+    expect(status).toContain('变量指导');
+    expect(globalScope.updateWorldbookWith).toHaveBeenCalledTimes(2);
   });
 
-  it('extra 模式强制禁用变量指导，即使它原本处于启用状态', async () => {
+  it('extra 模式同时禁用变量模板与变量指导，避免正文模型重复收到变量规则', async () => {
     const status = await applyVariableUpdateModeWorldbookState('extra');
 
     expect(worldbookEntries[0].enabled).toBe(false);
+    expect(worldbookEntries[1].enabled).toBe(false);
     expect(status).toContain('已禁用');
-    expect(globalScope.updateWorldbookWith).toHaveBeenCalledTimes(1);
+    expect(status).toContain('变量模板');
+    expect(status).toContain('变量指导');
+    expect(globalScope.updateWorldbookWith).toHaveBeenCalledTimes(2);
   });
 
-  it('模式与变量指导状态已经一致时不重复写世界书', async () => {
+  it('模式与变量模板、变量指导状态已经一致时不重复写世界书', async () => {
     const status = await applyVariableUpdateModeWorldbookState('inline');
 
     expect(worldbookEntries[0].enabled).toBe(true);
-    expect(status).toContain('已经是启用状态');
+    expect(worldbookEntries[1].enabled).toBe(true);
+    expect(status).toContain('已经全部是启用状态');
     expect(globalScope.updateWorldbookWith).not.toHaveBeenCalled();
   });
 
@@ -334,8 +348,10 @@ describe('executeExtraVariableUpdate', () => {
     );
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
     expect(prompt).toContain('传说：基本失传，不得操纵时间空间。');
+    expect(prompt).toContain('变量模板测试内容');
     expect(prompt).not.toContain('宏观背景');
-    expect(prompt.indexOf('传说：基本失传')).toBeLessThan(prompt.indexOf('仅输出合法变量块'));
+    expect(prompt.indexOf('传说：基本失传')).toBeLessThan(prompt.indexOf('变量模板测试内容'));
+    expect(prompt.indexOf('变量模板测试内容')).toBeLessThan(prompt.indexOf('仅输出合法变量块'));
     expect(prompt.indexOf('仅输出合法变量块')).toBeLessThan(prompt.indexOf('"content":"正文内容"'));
     expect(prompt.indexOf('"content":"正文内容"')).toBeLessThan(prompt.indexOf('【最终执行要求】'));
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(
@@ -958,6 +974,7 @@ describe('executeExtraVariableUpdate', () => {
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
     expect(prompt).toContain('传说：基本失传，不得操纵时间空间。');
+    expect(prompt).toContain('变量模板测试内容');
     expect(prompt).toContain('仅输出合法变量块');
     expect(prompt).not.toContain('宏观背景');
   });

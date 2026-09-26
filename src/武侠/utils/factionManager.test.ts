@@ -126,6 +126,9 @@ describe('factionManager', () => {
     expect(msg).toContain('<VariableInsert>');
     expect(msg).toContain('"全真教"');
     expect(msg).toContain('"体系类型": "宗门"');
+    expect(msg).toContain('"贡献": 0');
+    expect(msg).not.toContain('"当前主势力"');
+    expect(msg).not.toContain('"所属势力": {');
     expect(msg).toContain('</VariableInsert>');
   });
 

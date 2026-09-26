@@ -415,6 +415,9 @@ export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传
 【叙事表现标尺】
 {{narrativeScale}}
 
+【ERA 变量结构与权限模板】
+{{variableTemplate}}
+
 【ERA 变量领域规则】
 {{variableGuidance}}
 
