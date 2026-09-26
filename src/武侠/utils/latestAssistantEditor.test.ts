@@ -95,15 +95,16 @@ describe('latestAssistantEditor', () => {
     expect(readLatestAssistantSnapshot()).toBeNull();
   });
 
-  it('双写 active swipe 与 message，保留其他 swipe metadata，且不刷新 iframe', async () => {
+  it('只写 active swipe，保留历史 message 镜像与其他 swipe metadata，且不刷新 iframe', async () => {
     const snapshot = readLatestAssistantSnapshot()!;
     const draft = '新 active\n<era_data>{"mk":"stable"}</era_data>';
     const result = await saveLatestAssistantSnapshot(snapshot, draft);
 
     expect(globals.setChatMessages).toHaveBeenCalledWith(
-      [expect.objectContaining({ message_id: 2, message: draft, swipe_id: 1, swipes: ['旧 swipe', draft] })],
+      [{ message_id: 2, swipe_id: 1, swipes: ['旧 swipe', draft] }],
       { refresh: 'none' },
     );
+    expect(messages[1].message).toBe('陈旧宿主正文');
     expect(messages[1].swipes_data).toEqual([{ page: 0 }, { page: 1 }]);
     expect(messages[1].swipes_info).toEqual([{ type: 'old' }, { type: 'active' }]);
     expect(result).toMatchObject({ finalText: draft, variableActionsChanged: false });
@@ -121,14 +122,14 @@ describe('latestAssistantEditor', () => {
     expect(globals.setChatMessages).not.toHaveBeenCalled();
   });
 
-  it('即使 active swipe 未变，message mirror 变化也拒绝覆盖', async () => {
+  it('含 swipe 时忽略兼容 message 镜像变化，以 active swipe 为权威', async () => {
     const snapshot = readLatestAssistantSnapshot()!;
     messages[1].message = '外部修正的镜像字段';
+    const draft = '新 active\n<era_data>{"mk":"stable"}</era_data>';
 
-    await expect(saveLatestAssistantSnapshot(snapshot, snapshot.rawText)).rejects.toBeInstanceOf(
-      LatestAssistantEditorConflictError,
-    );
-    expect(globals.setChatMessages).not.toHaveBeenCalled();
+    await expect(saveLatestAssistantSnapshot(snapshot, draft)).resolves.toMatchObject({ finalText: draft });
+    expect(messages[1].message).toBe('外部修正的镜像字段');
+    expect(messages[1].swipes?.[1]).toBe(draft);
   });
 
   it('保护 era_data 字节内容，并拒绝不完整或非法变量动作块', async () => {
@@ -160,11 +161,10 @@ describe('latestAssistantEditor', () => {
     expect(result.finalText).toBe('新正文');
   });
 
-  it('写入 API 报错但草稿已完整落盘时恢复原 active swipe 和原 message 镜像', async () => {
+  it('写入 API 报错但 active swipe 已完整落盘时恢复原 active swipe，并保留 message 镜像', async () => {
     const snapshot = readLatestAssistantSnapshot()!;
     const draft = '写入后抛错的草稿\n<era_data>{"mk":"stable"}</era_data>';
     globals.setChatMessages.mockImplementationOnce(async () => {
-      messages[1].message = draft;
       messages[1].swipes![1] = draft;
       throw new Error('transport failed after commit');
     });
@@ -174,18 +174,15 @@ describe('latestAssistantEditor', () => {
     expect(messages[1].swipes?.[1]).toBe(snapshot.rawText);
   });
 
-  it('写入只完成一半时报告状态不确定，不冒险覆盖', async () => {
+  it('仅兼容 message 镜像变化而 active swipe 未动时，不误判成部分写入', async () => {
     const snapshot = readLatestAssistantSnapshot()!;
     const draft = '部分写入的草稿\n<era_data>{"mk":"stable"}</era_data>';
     globals.setChatMessages.mockImplementationOnce(async () => {
       messages[1].message = draft;
-      throw new Error('partial write');
+      throw new Error('transport failed before swipe commit');
     });
 
-    await expect(saveLatestAssistantSnapshot(snapshot, draft)).rejects.toBeInstanceOf(
-      LatestAssistantRollbackUncertainError,
-    );
-    expect(messages[1].message).toBe(draft);
+    await expect(saveLatestAssistantSnapshot(snapshot, draft)).rejects.toThrow('transport failed before swipe commit');
     expect(messages[1].swipes?.[1]).toBe(snapshot.rawText);
   });
 
