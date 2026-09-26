@@ -19,21 +19,28 @@ function item(messageId: number, hasSummary: boolean): SmallSummaryBackfillItem 
 }
 
 describe('conversationSummaryBackfillManager', () => {
-  it('builds fixed consecutive assistant batches while keeping already-summarized floors as context', () => {
+  it('builds continuous five-to-ten floor batches while keeping already-summarized floors as context', () => {
     const items = [191, 193, 195, 197, 199, 201, 203, 205, 207].map((id, index) =>
       item(id, index === 2 || index === 4),
     );
 
     const batches = buildSmallSummaryBackfillBatches(items, 8);
-    expect(batches).toHaveLength(2);
-    expect(batches[0].messageIds).toEqual([191, 193, 195, 197, 199, 201, 203, 205]);
+    expect(batches).toHaveLength(1);
+    expect(batches[0].messageIds).toEqual([191, 193, 195, 197, 199, 201, 203, 205, 207]);
     expect(batches[0].items.filter(entry => entry.hasSummary).map(entry => entry.messageId)).toEqual([195, 199]);
-    expect(batches[1].messageIds).toEqual([207]);
 
     const prompt = buildSmallSummaryBackfillPrompt(batches[0], 'summary');
     expect(prompt).toContain('"message_id": 195');
     expect(prompt).toContain('"needs_summary": false');
     expect(prompt).toContain('"existing_summary": "已有摘要195"');
+  });
+
+  it('rebalances a short tail so every normal batch stays between five and ten floors', () => {
+    const twelve = Array.from({ length: 12 }, (_, index) => item(101 + index * 2, false));
+    const batches = buildSmallSummaryBackfillBatches(twelve, 8);
+
+    expect(batches.map(batch => batch.items.length)).toEqual([7, 5]);
+    expect(batches.flatMap(batch => batch.messageIds)).toEqual(twelve.map(entry => entry.messageId));
   });
 
   it('accepts valid partial JSON and reports omitted floors as missing instead of success', () => {
