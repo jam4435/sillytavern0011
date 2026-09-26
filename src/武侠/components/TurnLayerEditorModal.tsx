@@ -209,7 +209,7 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
         <div className="turn-layer-edit-grid">
           <section className="turn-layer-edit-pane">
             <div className="turn-layer-edit-heading">
-              User 输入 {baseSnapshot?.userMessageId !== null ? `#${baseSnapshot?.userMessageId ?? ''}` : ''}
+              User 输入 {baseSnapshot?.userMessageId != null ? `#${baseSnapshot.userMessageId}` : ''}
             </div>
             <textarea
               className="latest-reply-textarea"
