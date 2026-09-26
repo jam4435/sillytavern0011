@@ -12,6 +12,10 @@ export interface RegenerateDraftSubmission {
 interface ChatInputProps {
   onSend: (message: string) => void | Promise<unknown>;
   prefill?: { key: string; message: string } | null;
+  regenerateDraftPrefill?: {
+    key: string;
+    drafts: Record<RegenerateDraftMode, string>;
+  } | null;
   onMessageChange?: (message: string) => void;
   extraActions?: React.ReactNode;
   onRegenerate?: (draft?: RegenerateDraftSubmission) => void | Promise<boolean | void>;
@@ -32,6 +36,7 @@ interface ChatInputProps {
 const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
   prefill = null,
+  regenerateDraftPrefill = null,
   onMessageChange,
   extraActions,
   onRegenerate,
@@ -72,6 +77,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
     (Boolean(regenerateDraftMode) && !hasRegenerateDraftContent);
   const prefillKey = prefill?.key ?? null;
   const prefillMessage = prefill?.message ?? '';
+  const regenerateDraftPrefillKey = regenerateDraftPrefill?.key ?? null;
+  const regenerateDraftPrefillValues = regenerateDraftPrefill?.drafts ?? null;
 
   // 自动调整文本框高度
   const adjustHeight = useCallback(() => {
@@ -95,6 +102,20 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const frame = window.requestAnimationFrame(adjustHeight);
     return () => window.cancelAnimationFrame(frame);
   }, [adjustHeight, prefillKey, prefillMessage]);
+
+  useEffect(() => {
+    if (!regenerateDraftPrefillKey || !regenerateDraftPrefillValues) return;
+    const nextDrafts: Record<RegenerateDraftMode, string> = {
+      'user-input': regenerateDraftPrefillValues['user-input'] || '',
+      'assistant-append': regenerateDraftPrefillValues['assistant-append'] || '',
+    };
+    setRegenerateDrafts(nextDrafts);
+    if (regenerateDraftMode) {
+      setMessage(nextDrafts[regenerateDraftMode]);
+    }
+    const frame = window.requestAnimationFrame(adjustHeight);
+    return () => window.cancelAnimationFrame(frame);
+  }, [adjustHeight, regenerateDraftPrefillKey]);
 
   useEffect(() => {
     if (!prefillKey || inputDisabled) return;
