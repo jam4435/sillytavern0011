@@ -10,34 +10,7 @@ import {
 import { Icons } from '../Icons';
 import { EmptyState } from './EmptyState';
 
-type MartialTypeFilter =
-  | 'ALL'
-  | '内功'
-  | '外功'
-  | '轻功'
-  | '剑法'
-  | '刀法'
-  | '拳掌'
-  | '指法'
-  | '暗器'
-  | '枪戟'
-  | '棍锤';
-
 type MartialRankFilter = 'ALL' | '粗浅' | '传家' | '上乘' | '镇派' | '绝世' | '传说';
-
-const TYPE_FILTERS: Array<{ key: MartialTypeFilter; label: string }> = [
-  { key: 'ALL', label: '全部' },
-  { key: '内功', label: '内功' },
-  { key: '外功', label: '外功' },
-  { key: '轻功', label: '轻功' },
-  { key: '剑法', label: '剑法' },
-  { key: '刀法', label: '刀法' },
-  { key: '拳掌', label: '拳掌' },
-  { key: '指法', label: '指法' },
-  { key: '暗器', label: '暗器' },
-  { key: '枪戟', label: '枪戟' },
-  { key: '棍锤', label: '棍锤' },
-];
 
 const RANK_FILTERS: Array<{ key: MartialRankFilter; label: string }> = [
   { key: 'ALL', label: '全部' },
@@ -82,20 +55,16 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
   onUpgrade,
 }) => {
   const [selectedArtName, setSelectedArtName] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useState<MartialTypeFilter>('ALL');
   const [rankFilter, setRankFilter] = useState<MartialRankFilter>('ALL');
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [upgradingArt, setUpgradingArt] = useState<string | null>(null);
 
   const artEntries = useMemo(() => Object.entries(martialArts), [martialArts]);
+  const shouldShowFilters = artEntries.length > 10;
   const filteredArts = useMemo(
     () =>
-      artEntries.filter(([, art]) => {
-        const typeMatched = typeFilter === 'ALL' || art.type === typeFilter;
-        const rankMatched = rankFilter === 'ALL' || art.rank === rankFilter;
-        return typeMatched && rankMatched;
-      }),
-    [artEntries, rankFilter, typeFilter],
+      artEntries.filter(([, art]) => !shouldShowFilters || rankFilter === 'ALL' || art.rank === rankFilter),
+    [artEntries, rankFilter, shouldShowFilters],
   );
 
   const selectedEntry = filteredArts.find(([name]) => name === selectedArtName) ?? filteredArts[0] ?? null;
@@ -165,36 +134,24 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
   return (
     <div className={`martial-art-panel workbench-panel ${isDetailOpen ? 'detail-open' : ''}`}>
       <section className="workbench-list-pane" aria-label="功法列表">
-        <div className="workbench-filter-block">
-          <div className="workbench-filter-row" aria-label="功法类型筛选">
-            {TYPE_FILTERS.map(filter => (
-              <button
-                key={filter.key}
-                className={`workbench-filter-chip ${typeFilter === filter.key ? 'active' : ''}`}
-                onClick={() => {
-                  setTypeFilter(filter.key);
-                  setIsDetailOpen(false);
-                }}
-              >
-                {filter.label}
-              </button>
-            ))}
+        {shouldShowFilters && (
+          <div className="workbench-filter-block">
+            <div className="workbench-filter-row" aria-label="功法品阶筛选">
+              {RANK_FILTERS.map(filter => (
+                <button
+                  key={filter.key}
+                  className={`workbench-filter-chip compact ${rankFilter === filter.key ? 'active' : ''}`}
+                  onClick={() => {
+                    setRankFilter(filter.key);
+                    setIsDetailOpen(false);
+                  }}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="workbench-filter-row" aria-label="功法品阶筛选">
-            {RANK_FILTERS.map(filter => (
-              <button
-                key={filter.key}
-                className={`workbench-filter-chip compact ${rankFilter === filter.key ? 'active' : ''}`}
-                onClick={() => {
-                  setRankFilter(filter.key);
-                  setIsDetailOpen(false);
-                }}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
 
         {filteredArts.length > 0 ? (
           <div className="workbench-list" role="list">
