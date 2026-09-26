@@ -346,6 +346,15 @@ function createAutoAdvancePlainText(rawReply: string): string {
     .trim();
 }
 
+const EXTRA_VARIABLE_MIN_VISIBLE_BODY_LENGTH = 300;
+
+function getVisibleAssistantBodyLength(rawReply: string): number {
+  const body = createAutoAdvancePlainText(rawReply)
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, '');
+  return Array.from(body).length;
+}
+
 export function useMessageHandler({
   setIsLoading,
   showLoading,
@@ -412,6 +421,32 @@ export function useMessageHandler({
       retryAutoAdvanceFailures?: boolean;
     }) => {
       if (!decision.shouldRunExtra) {
+        return null;
+      }
+
+      const visibleBodyLength = getVisibleAssistantBodyLength(latestRawReply);
+      if (visibleBodyLength < EXTRA_VARIABLE_MIN_VISIBLE_BODY_LENGTH) {
+        const skipReason = `正文可见内容仅 ${visibleBodyLength} 字，少于 ${EXTRA_VARIABLE_MIN_VISIBLE_BODY_LENGTH} 字，跳过额外变量 AI。`;
+        variableTraceLogger.log(`[useMessageHandler] ${logLabel}跳过`, {
+          assistantMessageId,
+          visibleBodyLength,
+          threshold: EXTRA_VARIABLE_MIN_VISIBLE_BODY_LENGTH,
+        });
+        onVariableExtraDeclaredBlocks?.('', assistantMessageId);
+        patchLatestDebugRound({
+          variable: createExtraVariableDecisionPatch(decision, {
+            status: 'skipped',
+            skipReason,
+            startedAt: Date.now(),
+            finishedAt: Date.now(),
+            error: '',
+            applyStatus: 'idle',
+            applyError: '',
+            applyVerification: '',
+            postProcessStatus: 'idle',
+            postProcessError: '',
+          }),
+        });
         return null;
       }
 
