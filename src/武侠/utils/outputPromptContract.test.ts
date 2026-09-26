@@ -9,6 +9,8 @@ const cotPromptPath = resolve(process.cwd(), '世界书/金庸群侠传1/世界�
 const cotPromptSource = readFileSync(cotPromptPath, 'utf8');
 const variableGuidancePath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/变量指导.txt');
 const variableGuidanceSource = readFileSync(variableGuidancePath, 'utf8');
+const variableTemplatePath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/变量模板.txt');
+const variableTemplateSource = readFileSync(variableTemplatePath, 'utf8');
 const worldBackgroundPath = resolve(process.cwd(), '世界书/金庸群侠传1/世界书/世界背景.yaml');
 const worldBackgroundSource = readFileSync(worldBackgroundPath, 'utf8');
 
@@ -86,7 +88,10 @@ describe('武侠输出提示词契约', () => {
     expect(promptSource).toContain('{ 分支标记: 事件.分支标记 }');
     expect(variableGuidanceSource).toContain('`事件分支结果`是系统结算归档，始终只读');
     expect(variableGuidanceSource).toContain('`后续事件`只表示既有事件之间的关联和可能出现的线索');
-    expect(promptSource).toContain('当前没有可用的合法严格活动区，本轮禁止修改任何 `所在位置`');
+    expect(promptSource).toContain('[合法严格活动区]');
+    expect(promptSource).not.toContain('[写入规则]');
+    expect(promptSource).not.toContain('当前没有可用的合法严格活动区，本轮禁止修改任何 `所在位置`');
+    expect(promptSource).toContain('同一前三段只表示处于同一严格活动区，不表示人物已经面对面同场');
     expect(promptSource).toContain('同一前三段不代表人物已经面对面同场');
     expect(variableGuidanceSource).toContain('第四级不参加白名单匹配');
     expect(variableGuidanceSource).toContain('`前端变量.奇经八脉` 与由关窍产生的 `user数据.初始属性` 变化只读');
@@ -94,6 +99,19 @@ describe('武侠输出提示词契约', () => {
     expect(worldHistoryPromptSource).toContain(
       'selectWorldEventsForPrompt(worldEvents, outcomeStatuses, limit = 16, priorityLimit = 8)',
     );
+  });
+
+  it('变量模板覆盖世界时间、关系网与前端状态效果权限', () => {
+    expect(variableTemplateSource).toContain('`世界信息.时间`');
+    expect(variableTemplateSource).toContain('"分": 10');
+    expect(variableTemplateSource).toContain('修改时间时必须一次写入完整五字段');
+    expect(variableTemplateSource).toContain('关系网固定使用“人物名 → 关系值”的扁平结构');
+    expect(variableTemplateSource).toContain('同一个人物当前只保存一个字符串或一个数字');
+    expect(variableTemplateSource).toContain('| 状态效果 | object | 只读 |');
+    expect(variableTemplateSource).not.toContain('| 宗门 | object |');
+    expect(variableTemplateSource).toContain('新增一门功法时，应按完整功法结构建立');
+    expect(variableTemplateSource).toContain('若数据库不存在该功法，则变量中生成的完整结构继续作为该功法的完整信息来源');
+    expect(variableTemplateSource).toContain('### 新人物完整对象');
   });
 
   it('约束分钟时间、实际耗时和事件节点时间一致性', () => {
