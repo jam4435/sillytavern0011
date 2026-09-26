@@ -95,10 +95,89 @@ const VARIABLE_BLOCK_START_REGEX = /<(?:Variable(?:Think|Insert|Edit|Delete)|era
 const REFUSAL_SUMMARY_REGEX =
   /^(?:(?:抱歉|对不起|很抱歉)[，,\s]*(?:我)?(?:无法|不能)|I(?:'m| am) sorry\b|I can(?:not|'t)\b)/i;
 
+const WORKBENCH_STORAGE_PREFIX = 'wuxia_small_summary_backfill_workbench_v1:';
+
 let backfillBusy = false;
 let latestSnapshot: SmallSummaryBackfillSnapshot | null = null;
+let hydratedChatKey: string | null = null;
 const lastAttempts = new Map<number, SmallSummaryBackfillAttempt>();
 let latestBatchLogs: SmallSummaryBackfillBatchLog[] = [];
+
+function getWorkbenchChatKey(): string {
+  try {
+    const chatId =
+      typeof SillyTavern?.getCurrentChatId === 'function'
+        ? SillyTavern.getCurrentChatId()
+        : SillyTavern?.chatId;
+    return typeof chatId === 'string' && chatId.trim() ? chatId.trim() : 'unknown-chat';
+  } catch {
+    return 'unknown-chat';
+  }
+}
+
+function getWorkbenchStorageKey(chatKey = getWorkbenchChatKey()): string {
+  return WORKBENCH_STORAGE_PREFIX + chatKey;
+}
+
+function persistWorkbenchState(): void {
+  try {
+    const payload = {
+      attempts: [...lastAttempts.entries()],
+      batchLogs: latestBatchLogs,
+    };
+    sessionStorage.setItem(getWorkbenchStorageKey(), JSON.stringify(payload));
+  } catch {
+    // 工作台日志属于辅助诊断；浏览器禁止 sessionStorage 时不影响补完本身。
+  }
+}
+
+function ensureWorkbenchStateHydrated(): void {
+  const chatKey = getWorkbenchChatKey();
+  if (hydratedChatKey === chatKey) return;
+
+  hydratedChatKey = chatKey;
+  latestSnapshot = null;
+  lastAttempts.clear();
+  latestBatchLogs = [];
+
+  try {
+    const raw = sessionStorage.getItem(getWorkbenchStorageKey(chatKey));
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as {
+      attempts?: Array<[number, SmallSummaryBackfillAttempt]>;
+      batchLogs?: SmallSummaryBackfillBatchLog[];
+    };
+
+    if (Array.isArray(parsed.attempts)) {
+      for (const entry of parsed.attempts) {
+        if (!Array.isArray(entry) || !Number.isInteger(entry[0])) continue;
+        const attempt = entry[1];
+        if (!attempt || (attempt.status !== 'success' && attempt.status !== 'error')) continue;
+        lastAttempts.set(entry[0], { ...attempt });
+      }
+    }
+
+    if (Array.isArray(parsed.batchLogs)) {
+      latestBatchLogs = parsed.batchLogs
+        .filter(log => log && typeof log.id === 'string')
+        .map(log =>
+          log.status === 'running'
+            ? {
+                ...log,
+                status: 'error' as const,
+                finishedAt: log.finishedAt || Date.now(),
+                failedMessageIds: [...log.requestedMessageIds],
+                error: log.error || '前端在该批次处理中发生重载，无法确认模型返回；请重新扫描并重试缺失楼层。',
+              }
+            : { ...log },
+        )
+        .slice(-24);
+    }
+  } catch {
+    lastAttempts.clear();
+    latestBatchLogs = [];
+  }
+}
 
 function clampBatchSize(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_SMALL_SUMMARY_BACKFILL_BATCH_SIZE;
@@ -199,6 +278,7 @@ function dispatchSnapshot(snapshot: SmallSummaryBackfillSnapshot): SmallSummaryB
 }
 
 export function getLatestSmallSummaryBackfillSnapshot(): SmallSummaryBackfillSnapshot | null {
+  ensureWorkbenchStateHydrated();
   if (!latestSnapshot) return null;
   return {
     ...latestSnapshot,
@@ -216,6 +296,7 @@ export function getLatestSmallSummaryBackfillSnapshot(): SmallSummaryBackfillSna
 }
 
 export function scanSmallSummaryBackfill(settings: SummarySettings): SmallSummaryBackfillSnapshot {
+  ensureWorkbenchStateHydrated();
   const summaryTag = getConfiguredSmallSummaryTag(settings);
   const items = readEligibleAssistantMessages()
     .map(message => {
@@ -443,7 +524,12 @@ async function writeSmallSummaries(
 ): Promise<{ succeeded: number[]; failed: Array<{ messageId: number; error: string }> }> {
   if (summaries.length === 0) return { succeeded: [], failed: [] };
 
-  const patches: Array<Record<string, unknown>> = [];
+  const patches: Array<{
+    message_id: number;
+    message: string;
+    swipe_id?: number;
+    swipes?: string[];
+  }> = [];
   const expected = new Map<number, string>();
 
   for (const item of summaries) {
@@ -522,10 +608,12 @@ function recordAttempt(
     batchId,
     ...(error ? { error } : {}),
   });
+  persistWorkbenchState();
 }
 
 function appendBatchLog(log: SmallSummaryBackfillBatchLog): void {
   latestBatchLogs = [...latestBatchLogs, log].slice(-24);
+  persistWorkbenchState();
 }
 
 export async function backfillMissingSmallSummaries({
@@ -645,6 +733,7 @@ export async function backfillMissingSmallSummaries({
       } finally {
         log.finishedAt = Date.now();
         latestBatchLogs = latestBatchLogs.map(item => (item.id === log.id ? { ...log } : item));
+        persistWorkbenchState();
       }
 
       const snapshot = scanSmallSummaryBackfill(settings);
