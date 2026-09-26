@@ -7,7 +7,6 @@ import { Icons } from '../Icons';
 import { EmptyState } from './EmptyState';
 
 type InventoryTypeFilter = 'ALL' | InventoryItem['type'];
-type InventoryRankFilter = 'ALL' | 'WHITE' | 'GREEN' | 'BLUE' | 'PURPLE' | 'GOLD' | 'RED';
 
 const TYPE_FILTERS: Array<{ key: InventoryTypeFilter; label: string }> = [
   { key: 'ALL', label: '全部' },
@@ -15,16 +14,6 @@ const TYPE_FILTERS: Array<{ key: InventoryTypeFilter; label: string }> = [
   { key: 'SECRET', label: '秘籍' },
   { key: 'ELIXIR', label: '药品' },
   { key: 'MISC', label: '杂物' },
-];
-
-const RANK_FILTERS: Array<{ key: InventoryRankFilter; label: string }> = [
-  { key: 'ALL', label: '全部' },
-  { key: 'WHITE', label: '凡品' },
-  { key: 'GREEN', label: '精品' },
-  { key: 'BLUE', label: '珍品' },
-  { key: 'PURPLE', label: '极品' },
-  { key: 'GOLD', label: '绝品' },
-  { key: 'RED', label: '神品' },
 ];
 
 const getActionLabel = (type: InventoryItem['type']) => {
@@ -128,18 +117,13 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
 }) => {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<InventoryTypeFilter>('ALL');
-  const [rankFilter, setRankFilter] = useState<InventoryRankFilter>('ALL');
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isActing, setIsActing] = useState(false);
 
+  const shouldShowFilters = items.length > 10;
   const filteredItems = useMemo(
-    () =>
-      items.filter(item => {
-        const typeMatched = typeFilter === 'ALL' || item.type === typeFilter;
-        const rankMatched = rankFilter === 'ALL' || item.rank === rankFilter;
-        return typeMatched && rankMatched;
-      }),
-    [items, rankFilter, typeFilter],
+    () => items.filter(item => !shouldShowFilters || typeFilter === 'ALL' || item.type === typeFilter),
+    [items, shouldShowFilters, typeFilter],
   );
 
   const selectedItem = filteredItems.find(item => item.id === selectedItemId) ?? filteredItems[0] ?? null;
@@ -199,36 +183,24 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
   return (
     <div className={`inventory-workbench ${isDetailOpen ? 'detail-open' : ''}`}>
       <section className="workbench-list-pane" aria-label="行囊列表">
-        <div className="workbench-filter-block">
-          <div className="workbench-filter-row" aria-label="物品类别筛选">
-            {TYPE_FILTERS.map(filter => (
-              <button
-                key={filter.key}
-                className={`workbench-filter-chip ${typeFilter === filter.key ? 'active' : ''}`}
-                onClick={() => {
-                  setTypeFilter(filter.key);
-                  setIsDetailOpen(false);
-                }}
-              >
-                {filter.label}
-              </button>
-            ))}
+        {shouldShowFilters && (
+          <div className="workbench-filter-block">
+            <div className="workbench-filter-row" aria-label="物品类别筛选">
+              {TYPE_FILTERS.map(filter => (
+                <button
+                  key={filter.key}
+                  className={`workbench-filter-chip ${typeFilter === filter.key ? 'active' : ''}`}
+                  onClick={() => {
+                    setTypeFilter(filter.key);
+                    setIsDetailOpen(false);
+                  }}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="workbench-filter-row" aria-label="物品品阶筛选">
-            {RANK_FILTERS.map(filter => (
-              <button
-                key={filter.key}
-                className={`workbench-filter-chip compact ${rankFilter === filter.key ? 'active' : ''}`}
-                onClick={() => {
-                  setRankFilter(filter.key);
-                  setIsDetailOpen(false);
-                }}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
 
         {filteredItems.length > 0 ? (
           <div className="workbench-list" role="list">
