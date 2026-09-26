@@ -11,7 +11,7 @@ import {
   readGameDataPure,
 } from '../utils/variableReader';
 import { messageLogger, variableTraceLogger } from '../utils/logger';
-import { regenerateLastAssistantSwipe } from '../utils/messageActions';
+import { regenerateLastAssistantSwipe, type RegenerateRequestOptions } from '../utils/messageActions';
 import { captureNextCombinedPromptForDebug } from '../utils/promptDebug';
 import { syncFrontendDerivedVariables } from '../utils/frontendDerivedVariables';
 import { extractExplicitMapTargetsFromText } from '../utils/locationContext';
@@ -1086,14 +1086,28 @@ export function useMessageHandler({
     [handleSendMessage, patchLatestDebugRound, showError],
   );
 
-  const handleRegenerateLastAssistant = useCallback(async (replacementUserInput?: string): Promise<boolean | void> => {
-    const isEditingPreviousInput = typeof replacementUserInput === 'string';
+  const handleRegenerateLastAssistant = useCallback(async (
+    request: RegenerateRequestOptions = {},
+  ): Promise<boolean | void> => {
+    const isEditingPreviousInput = typeof request.replacementUserInput === 'string';
+    const isAppendingPreviousAssistant = typeof request.previousAssistantAppendText === 'string';
+    const actionLabel = isEditingPreviousInput
+      ? '修改上一轮输入并重新生成'
+      : isAppendingPreviousAssistant
+        ? '追加上一轮 AI 输出并重新生成'
+        : '重新生成最新回复';
     messageLogger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    messageLogger.log(isEditingPreviousInput ? '🔁 修改上一轮输入并重新生成最新回复' : '🔁 开始重新生成最新回复');
+    messageLogger.log(`🔁 ${actionLabel}`);
 
     setIsLoading(true);
-    showLoading(isEditingPreviousInput ? '正在按修改后的上一轮输入重新生成...' : '正在重新生成回复...');
-    const debugRoundId = beginDebugRound(isEditingPreviousInput ? '修改上一轮输入并重新生成' : '重新生成最新回复');
+    showLoading(
+      isEditingPreviousInput
+        ? '正在按修改后的上一轮输入重新生成...'
+        : isAppendingPreviousAssistant
+          ? '正在追加上一轮输出并重新生成...'
+          : '正在重新生成回复...',
+    );
+    const debugRoundId = beginDebugRound(actionLabel);
     const extraVariableDecision = createExtraVariableRunDecision('regenerate', summarySettings);
     patchLatestDebugRound({
       variable: createInitialExtraVariableDecisionPatch(extraVariableDecision),
@@ -1109,7 +1123,7 @@ export function useMessageHandler({
       await acquireWuxiaTurnLock(debugRoundId, turnChatId);
       extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
       const result = await regenerateLastAssistantSwipe({
-        replacementUserInput,
+        ...request,
         onCombinedPrompt: prompt => {
           patchLatestDebugRound({ main: { combinedPrompt: prompt } });
         },
