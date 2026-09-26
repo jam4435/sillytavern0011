@@ -94,7 +94,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
     const frame = window.requestAnimationFrame(adjustHeight);
     return () => window.cancelAnimationFrame(frame);
-  }, [adjustHeight, prefillKey, prefillMessage, regenerateDraftMode]);
+  }, [adjustHeight, prefillKey, prefillMessage]);
 
   useEffect(() => {
     if (!prefillKey || inputDisabled) return;
