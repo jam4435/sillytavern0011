@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import brandXiakeSealUrl from './assets/icons/jinyong/brand_xiake_seal.svg?url';
 import AvatarImage from './components/AvatarImage';
 import AvatarPreviewModal from './components/AvatarPreviewModal';
-import ChatInput from './components/ChatInput';
+import ChatInput, { type RegenerateDraftMode, type RegenerateDraftSubmission } from './components/ChatInput';
 import CommandQueueButton from './components/CommandQueueButton';
 import CommandQueuePopover from './components/CommandQueuePopover';
 import FullscreenButton from './components/FullscreenButton';
@@ -64,7 +64,11 @@ import {
   type LatestAssistantSnapshot,
 } from './utils/latestAssistantEditor';
 import { getUserCurrentLocation } from './utils/mapUtils';
-import { canRegenerateLastAssistantSwipe, getLastRegenerateUserInput } from './utils/messageActions';
+import {
+  canAppendPreviousAssistantForRegenerate,
+  canRegenerateLastAssistantSwipe,
+  getLastRegenerateUserInput,
+} from './utils/messageActions';
 import { finalizeCurrentTurn, resumeCheckout } from './utils/saveLoadManager';
 import { renameCurrentChatAutomatically, resumePendingChatRename } from './utils/chatRenameManager';
 import { readRecentInputHistory, type InputHistoryEntry } from './utils/inputHistory';
@@ -198,7 +202,7 @@ const App: React.FC = () => {
   const [currentPresetName, setCurrentPresetName] = useState(() => getLoadedPresetNameSafe());
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
-  const [isRegenerateInputEditMode, setIsRegenerateInputEditMode] = useState(false);
+  const [regenerateDraftMode, setRegenerateDraftMode] = useState<RegenerateDraftMode | null>(null);
   const [isCommandQueueOpen, setIsCommandQueueOpen] = useState(false);
   const [recentInputHistory, setRecentInputHistory] = useState<InputHistoryEntry[]>(() => readRecentInputHistory());
   const [inputPrefill, setInputPrefill] = useState<{ key: string; message: string } | null>(null);
@@ -846,7 +850,7 @@ const App: React.FC = () => {
         rawReply = await sendMessageWithCommands(message, handleSendMessage);
       } finally {
         setInputPrefill(null);
-        setIsRegenerateInputEditMode(false);
+        setRegenerateDraftMode(null);
       }
       refreshRecentInputHistory();
       if (historyInputDraft) {
@@ -891,7 +895,7 @@ const App: React.FC = () => {
 
   const handleInputHistorySelect = useCallback(
     (entry: InputHistoryEntry) => {
-      setIsRegenerateInputEditMode(false);
+      setRegenerateDraftMode(null);
       inputPrefillSequenceRef.current += 1;
       setInputPrefill({
         key: `input-history-${entry.messageId}-${inputPrefillSequenceRef.current}`,
@@ -910,41 +914,64 @@ const App: React.FC = () => {
     [historyInputDraft],
   );
 
-  const handlePrepareRegenerateInputEdit = useCallback(() => {
-    if (historyMutationPending || isLoading) {
-      showError('当前回合或历史同步仍在处理中，暂时不能修改上一轮输入。');
-      return;
-    }
-    const previousInput = getLastRegenerateUserInput();
-    if (!previousInput) {
-      showError('当前没有可修改并重新生成的上一轮玩家输入。');
-      return;
-    }
+  const handlePrepareRegenerateDraftMode = useCallback(
+    (mode: RegenerateDraftMode) => {
+      if (historyMutationPending || isLoading) {
+        showError('当前回合或历史同步仍在处理中，暂时不能进入重新生成编辑模式。');
+        return;
+      }
 
-    inputPrefillSequenceRef.current += 1;
-    setInputPrefill({
-      key: `regenerate-input-${inputPrefillSequenceRef.current}`,
-      message: previousInput,
-    });
-    setIsRegenerateInputEditMode(true);
-    setIsCommandQueueOpen(false);
-  }, [historyMutationPending, isLoading, showError]);
+      let prefillMessage = '';
+      if (mode === 'user-input') {
+        const previousInput = getLastRegenerateUserInput();
+        if (!previousInput) {
+          showError('当前没有可修改并重新生成的上一轮玩家输入。');
+          return;
+        }
+        prefillMessage = previousInput;
+      } else if (!canAppendPreviousAssistantForRegenerate()) {
+        showError('当前没有可追加信息的上一轮 AI 输出。');
+        return;
+      }
+
+      inputPrefillSequenceRef.current += 1;
+      setInputPrefill({
+        key: `regenerate-${mode}-${inputPrefillSequenceRef.current}`,
+        message: prefillMessage,
+      });
+      setRegenerateDraftMode(mode);
+      setIsCommandQueueOpen(false);
+    },
+    [historyMutationPending, isLoading, showError],
+  );
+
+  const handlePrepareRegenerateInputEdit = useCallback(
+    () => handlePrepareRegenerateDraftMode('user-input'),
+    [handlePrepareRegenerateDraftMode],
+  );
 
   const handleCancelRegenerateInputEdit = useCallback(() => {
-    setIsRegenerateInputEditMode(false);
+    setRegenerateDraftMode(null);
     setInputPrefill(null);
   }, []);
 
   const handleSafeRegenerate = useCallback(
-    async (replacementUserInput?: string): Promise<boolean | void> => {
+    async (draft?: RegenerateDraftSubmission): Promise<boolean | void> => {
       if (historyMutationPending) {
         showError('历史分叉或聊天改名仍在同步中，暂时不能重新生成。');
         return false;
       }
-      const success = await handleRegenerateLastAssistant(replacementUserInput);
+
+      const request =
+        draft?.mode === 'user-input'
+          ? { replacementUserInput: draft.text }
+          : draft?.mode === 'assistant-append'
+            ? { previousAssistantAppendText: draft.text }
+            : {};
+      const success = await handleRegenerateLastAssistant(request);
       if (success === true) {
         refreshRecentInputHistory();
-        setIsRegenerateInputEditMode(false);
+        setRegenerateDraftMode(null);
         setInputPrefill(null);
       }
       return success;
@@ -1774,12 +1801,19 @@ const App: React.FC = () => {
               }
               onRegenerate={handleSafeRegenerate}
               onEditRegenerateInput={handlePrepareRegenerateInputEdit}
+              onRegenerateDraftModeChange={handlePrepareRegenerateDraftMode}
               onCancelRegenerateDraft={handleCancelRegenerateInputEdit}
               canRegenerate={canRegenerate && !historyMutationPending}
               isRegenerating={isLoading || historyMutationPending}
-              regenerateDraftMode={isRegenerateInputEditMode}
+              regenerateDraftMode={regenerateDraftMode}
               disabled={isLoading || historyMutationPending}
-              placeholder={isRegenerateInputEditMode ? '修改上一轮输入后，点击右侧重新生成...' : '书写你的江湖故事...'}
+              placeholder={
+                regenerateDraftMode === 'user-input'
+                  ? '修改上一轮输入后，点击右侧重新生成...'
+                  : regenerateDraftMode === 'assistant-append'
+                    ? '输入要追加到上一轮 AI 输出的信息...'
+                    : '书写你的江湖故事...'
+              }
             />
           </main>
         </div>
