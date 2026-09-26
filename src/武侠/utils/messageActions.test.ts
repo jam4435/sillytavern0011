@@ -313,6 +313,63 @@ describe('regenerateLastAssistantSwipe', () => {
     expect(messages[2].message).toBe('根据补充信息生成的新回复');
   });
 
+  it('追加上一轮 AI 输出时 message 镜像短暂未同步不会误判失败，并会主动补写镜像', async () => {
+    const previousAssistant =
+      '上一轮正文\\n\\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\\n\\n<era_data>{"mk":"previous"}</era_data>';
+    messages = [
+      { message_id: 1, role: 'assistant', message: previousAssistant, swipes: [previousAssistant], swipe_id: 0 },
+      { message_id: 2, role: 'user', message: '继续追问' },
+      {
+        message_id: 3,
+        role: 'assistant',
+        message: '当前旧回复\\n\\n<era_data>{"mk":"current"}</era_data>',
+        swipes: ['当前旧回复\\n\\n<era_data>{"mk":"current"}</era_data>'],
+        swipe_id: 0,
+      },
+    ];
+    globals.generate = vi.fn(async () => '镜像修复后的新回复');
+
+    const normalSetChatMessages = globals.setChatMessages;
+    let delayedMirrorOnce = true;
+    globals.setChatMessages = vi.fn(async (nextMessages: Array<Partial<MockChatMessage>>) => {
+      const appendPatch = nextMessages.find(
+        patch =>
+          patch.message_id === 1 &&
+          Array.isArray(patch.swipes) &&
+          typeof patch.message === 'string' &&
+          patch.message.includes('补充：镜像延迟测试'),
+      );
+
+      if (delayedMirrorOnce && appendPatch) {
+        delayedMirrorOnce = false;
+        const expectedMirror = appendPatch.message;
+        await normalSetChatMessages(
+          nextMessages.map(patch =>
+            patch === appendPatch
+              ? {
+                  ...patch,
+                  message: previousAssistant,
+                }
+              : patch,
+          ),
+        );
+        expect(messages[0].swipes?.[0]).toBe(expectedMirror);
+        expect(messages[0].message).toBe(previousAssistant);
+        return;
+      }
+
+      await normalSetChatMessages(nextMessages);
+    });
+
+    await expect(
+      regenerateLastAssistantSwipe({ previousAssistantAppendText: '补充：镜像延迟测试' }),
+    ).resolves.toEqual(expect.objectContaining({ rawReply: '镜像修复后的新回复' }));
+
+    expect(messages[0].swipes?.[0]).toContain('补充：镜像延迟测试');
+    expect(messages[0].message).toBe(messages[0].swipes?.[0]);
+    expect(messages[2].message).toBe('镜像修复后的新回复');
+  });
+
   it('可同时修改上一轮 user 并追加上一轮 assistant，再用两项修改后的历史重新生成', async () => {
     const previousAssistant =
       '上一轮正文\n\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\n\n<era_data>{"mk":"previous"}</era_data>';
