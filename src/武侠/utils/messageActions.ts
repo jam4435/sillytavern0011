@@ -357,13 +357,43 @@ async function beginRegenerateAssistantAppend(
     );
   }
 
-  const written = readMessageWithSwipes(freshMessage.message_id);
-  if (
-    getSafeSwipeIndex(written, Array.isArray(written.swipes) ? written.swipes : []) !== swipeId ||
-    getActiveMessageText(written) !== appendedSwipeText ||
-    written.message !== appendedSwipeText
-  ) {
-    throw new Error('追加上一轮 AI 输出后回读失败，已中止重新生成。');
+  let written = readMessageWithSwipes(freshMessage.message_id);
+  let writtenSwipes = Array.isArray(written.swipes) ? written.swipes : [];
+  let actualSwipeId = getSafeSwipeIndex(written, writtenSwipes);
+  let activeTextMatches = getActiveMessageText(written) === appendedSwipeText;
+
+  // setChatMessages(refresh:none) 提交后，SillyTavern 的聊天镜像可能短暂晚于 swipe 数据稳定。
+  // active swipe 才是本事务的主校验源；仅在 active swipe 尚未稳定时做有限回读，避免瞬时竞态误判失败。
+  for (let attempt = 1; attempt < 3 && (actualSwipeId !== swipeId || !activeTextMatches); attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 30));
+    written = readMessageWithSwipes(freshMessage.message_id);
+    writtenSwipes = Array.isArray(written.swipes) ? written.swipes : [];
+    actualSwipeId = getSafeSwipeIndex(written, writtenSwipes);
+    activeTextMatches = getActiveMessageText(written) === appendedSwipeText;
+  }
+
+  if (actualSwipeId !== swipeId || !activeTextMatches) {
+    throw new Error(
+      `追加上一轮 AI 输出后回读失败，已中止重新生成：目标 swipe #${swipeId}，实际 #${actualSwipeId}；` +
+        `activeTextMatch=${activeTextMatches}；messageMirrorMatch=${written.message === appendedSwipeText}。`,
+    );
+  }
+
+  // message 只是 active swipe 的显示镜像。它若暂时不同步，主动补写一次但不反向否定已确认的 swipe 写入。
+  if (written.message !== appendedSwipeText) {
+    messageLogger.warn('[messageActions] 追加上一轮 AI 输出后 message 镜像暂未同步，尝试补写', {
+      messageId: freshMessage.message_id,
+      swipeId,
+    });
+    await ensureMessageFieldMatches(freshMessage.message_id, appendedSwipeText);
+
+    const repaired = readMessageWithSwipes(freshMessage.message_id);
+    if (repaired.message !== appendedSwipeText) {
+      messageLogger.warn('[messageActions] 追加上一轮 AI 输出的 active swipe 已确认，但 message 镜像仍未同步', {
+        messageId: freshMessage.message_id,
+        swipeId,
+      });
+    }
   }
 
   return {
@@ -402,12 +432,36 @@ async function restoreRegenerateAssistantAppend(transaction: RegenerateAssistant
     );
   }
 
-  const restored = readMessageWithSwipes(transaction.messageId);
-  if (
-    getActiveMessageText(restored) !== transaction.previousSwipeText ||
-    restored.message !== transaction.previousMessageMirror
+  let restored = readMessageWithSwipes(transaction.messageId);
+  let restoredSwipes = Array.isArray(restored.swipes) ? restored.swipes : [];
+  let restoredSwipeId = getSafeSwipeIndex(restored, restoredSwipes);
+  let restoredActiveTextMatches = getActiveMessageText(restored) === transaction.previousSwipeText;
+
+  for (
+    let attempt = 1;
+    attempt < 3 && (restoredSwipeId !== transaction.swipeId || !restoredActiveTextMatches);
+    attempt += 1
   ) {
-    throw new Error('重新生成失败后，上一轮 AI 输出恢复失败。');
+    await new Promise(resolve => setTimeout(resolve, 30));
+    restored = readMessageWithSwipes(transaction.messageId);
+    restoredSwipes = Array.isArray(restored.swipes) ? restored.swipes : [];
+    restoredSwipeId = getSafeSwipeIndex(restored, restoredSwipes);
+    restoredActiveTextMatches = getActiveMessageText(restored) === transaction.previousSwipeText;
+  }
+
+  if (restoredSwipeId !== transaction.swipeId || !restoredActiveTextMatches) {
+    throw new Error(
+      `重新生成失败后，上一轮 AI 输出恢复失败：目标 swipe #${transaction.swipeId}，实际 #${restoredSwipeId}；` +
+        `activeTextMatch=${restoredActiveTextMatches}。`,
+    );
+  }
+
+  if (restored.message !== transaction.previousMessageMirror) {
+    messageLogger.warn('[messageActions] 恢复上一轮 AI 输出后 message 镜像暂未同步，尝试补写', {
+      messageId: transaction.messageId,
+      swipeId: transaction.swipeId,
+    });
+    await ensureMessageFieldMatches(transaction.messageId, transaction.previousMessageMirror);
   }
 }
 
