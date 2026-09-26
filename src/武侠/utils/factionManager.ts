@@ -204,7 +204,7 @@ export async function learnFactionMartialArt(options: {
   const userData = statData.user数据 || {};
 
   const currentCultivation = typeof userData.修为 === 'number' ? userData.修为 : 0;
-  const currentFactions = (userData.势力?.所属势力 || userData.势力 || {}) as Record<string, any>;
+  const currentFactions = (userData.势力 || {}) as Record<string, any>;
   const currentFaction = currentFactions[sectName];
   const currentContribution = typeof currentFaction?.贡献 === 'number' ? currentFaction.贡献 : 0;
 
@@ -304,7 +304,7 @@ export async function claimFactionTaskReward(
   const userData = statData.user数据 || {};
 
   const currentCultivation = typeof userData.修为 === 'number' ? userData.修为 : 0;
-  const currentFactions = (userData.势力?.所属势力 || userData.势力 || {}) as Record<string, any>;
+  const currentFactions = (userData.势力 || {}) as Record<string, any>;
   const currentFaction = currentFactions[task.所属势力];
   const currentContribution = typeof currentFaction?.贡献 === 'number' ? currentFaction.贡献 : 0;
 
