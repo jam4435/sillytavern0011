@@ -1,7 +1,6 @@
 import {
   ChevronLeft,
   ChevronRight,
-  FilePenLine,
   RefreshCw,
   Save,
   ShieldCheck,
@@ -35,7 +34,32 @@ type EditorNotice =
 
 type EditTarget = 'assistant' | 'user';
 
+const ERA_DATA_BLOCK_REGEX = /<era_data>[\s\S]*?<\/era_data>/gi;
+const TRAILING_ERA_DATA_BLOCKS_REGEX = /(?:\s*<era_data>[\s\S]*?<\/era_data>\s*)+$/i;
+
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+function getEditorVisibleText(rawText: string): string {
+  ERA_DATA_BLOCK_REGEX.lastIndex = 0;
+  return rawText.replace(ERA_DATA_BLOCK_REGEX, '').replace(/\n{3,}/g, '\n\n').trimEnd();
+}
+
+function restoreHiddenEraData(originalRawText: string, visibleText: string): string {
+  ERA_DATA_BLOCK_REGEX.lastIndex = 0;
+  const blocks = Array.from(originalRawText.matchAll(ERA_DATA_BLOCK_REGEX), match => match[0]);
+  if (blocks.length === 0) return visibleText;
+
+  const trailing = originalRawText.match(TRAILING_ERA_DATA_BLOCKS_REGEX)?.[0] ?? '';
+  if (trailing) {
+    ERA_DATA_BLOCK_REGEX.lastIndex = 0;
+    const trailingBlockCount = Array.from(trailing.matchAll(ERA_DATA_BLOCK_REGEX)).length;
+    if (trailingBlockCount === blocks.length) {
+      return `${visibleText.trimEnd()}${trailing}`;
+    }
+  }
+
+  return `${visibleText.trimEnd()}\n${blocks.join('\n')}`;
+}
 
 const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
   isOpen,
@@ -45,8 +69,8 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
   onSave,
 }) => {
   const [baseSnapshot, setBaseSnapshot] = useState<EditableTurnSnapshot | null>(snapshot);
-  const [userDraftText, setUserDraftText] = useState(snapshot?.userRawText ?? '');
-  const [assistantDraftText, setAssistantDraftText] = useState(snapshot?.assistant.rawText ?? '');
+  const [userDraftText, setUserDraftText] = useState(() => getEditorVisibleText(snapshot?.userRawText ?? ''));
+  const [assistantDraftText, setAssistantDraftText] = useState(() => getEditorVisibleText(snapshot?.assistant.rawText ?? ''));
   const [jumpValue, setJumpValue] = useState(snapshot ? String(snapshot.assistant.messageId) : '');
   const [editTarget, setEditTarget] = useState<EditTarget>('assistant');
   const [isSaving, setIsSaving] = useState(false);
@@ -55,8 +79,8 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
 
   const applySnapshot = useCallback((next: EditableTurnSnapshot | null) => {
     setBaseSnapshot(next);
-    setUserDraftText(next?.userRawText ?? '');
-    setAssistantDraftText(next?.assistant.rawText ?? '');
+    setUserDraftText(getEditorVisibleText(next?.userRawText ?? ''));
+    setAssistantDraftText(getEditorVisibleText(next?.assistant.rawText ?? ''));
     setJumpValue(next ? String(next.assistant.messageId) : '');
     if (next?.userMessageId == null) setEditTarget('assistant');
     window.requestAnimationFrame(() => textareaRef.current?.focus());
@@ -64,13 +88,23 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
+    setEditTarget('assistant');
     applySnapshot(snapshot);
     setNotice({ tone: 'idle', message: '' });
   }, [applySnapshot, isOpen, snapshot]);
 
+  const baseUserVisibleText = useMemo(
+    () => getEditorVisibleText(baseSnapshot?.userRawText ?? ''),
+    [baseSnapshot],
+  );
+  const baseAssistantVisibleText = useMemo(
+    () => getEditorVisibleText(baseSnapshot?.assistant.rawText ?? ''),
+    [baseSnapshot],
+  );
+
   const isDirty = Boolean(
     baseSnapshot
-      && (userDraftText !== baseSnapshot.userRawText || assistantDraftText !== baseSnapshot.assistant.rawText),
+      && (userDraftText !== baseUserVisibleText || assistantDraftText !== baseAssistantVisibleText),
   );
   const canSave = Boolean(
     baseSnapshot
@@ -145,7 +179,9 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
     setIsSaving(true);
     setNotice({ tone: 'idle', message: '' });
     try {
-      const outcome = await onSave(baseSnapshot, userDraftText, assistantDraftText);
+      const userRawText = restoreHiddenEraData(baseSnapshot.userRawText, userDraftText);
+      const assistantRawText = restoreHiddenEraData(baseSnapshot.assistant.rawText, assistantDraftText);
+      const outcome = await onSave(baseSnapshot, userRawText, assistantRawText);
       applySnapshot(outcome.snapshot);
       setNotice({
         tone: outcome.warning ? 'warning' : 'success',
@@ -163,6 +199,7 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
       isOpen={isOpen}
       onClose={requestClose}
       title="校订聊天楼层"
+      titleMeta={locatorText}
       type={ActivePanel.SETTINGS}
       overlayClassName="latest-reply-overlay"
       boxClassName="latest-reply-modal"
@@ -210,30 +247,7 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
           </button>
         </div>
 
-        <div className="latest-reply-ledger">
-          <div className="latest-reply-locator">
-            <FilePenLine size={16} aria-hidden="true" />
-            <span>{locatorText}</span>
-          </div>
-          <div className="latest-reply-guardrail">
-            <ShieldCheck size={15} aria-hidden="true" />
-            <span>AI 的 &lt;era_data&gt; 必须原样保留；变量动作改动会触发 ERA 重算。</span>
-          </div>
-        </div>
-
         <div className="turn-layer-target-tabs" role="tablist" aria-label="选择编辑内容">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={editTarget === 'assistant'}
-            className={`turn-layer-target-tab ${editTarget === 'assistant' ? 'is-active' : ''}`}
-            onClick={() => {
-              setEditTarget('assistant');
-              window.requestAnimationFrame(() => textareaRef.current?.focus());
-            }}
-          >
-            AI 输出
-          </button>
           <button
             type="button"
             role="tab"
@@ -246,6 +260,18 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
             disabled={baseSnapshot?.userMessageId == null}
           >
             User 输入
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editTarget === 'assistant'}
+            className={`turn-layer-target-tab ${editTarget === 'assistant' ? 'is-active' : ''}`}
+            onClick={() => {
+              setEditTarget('assistant');
+              window.requestAnimationFrame(() => textareaRef.current?.focus());
+            }}
+          >
+            AI 输出
           </button>
         </div>
 
