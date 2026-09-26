@@ -94,9 +94,55 @@ export interface CompleteMartialArt {
 /** 功法升级结果 */
 export interface UpgradeResult {
   success: boolean;
+  previousMastery?: MasteryLevel;
   newMastery?: MasteryLevel;
+  spentCultivation?: number;
   newCultivation?: number;
   error?: string;
+}
+
+type MartialArtsStatData = {
+  user数据?: {
+    修为?: unknown;
+    功法?: Record<string, { 掌握程度?: unknown }>;
+  };
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function readLatestMartialArtsStatData(): Promise<MartialArtsStatData> {
+  const variables = await getVariables({ type: 'chat' });
+  return isRecord(variables?.stat_data) ? (variables.stat_data as MartialArtsStatData) : {};
+}
+
+function createMartialArtUpgradeTransactionId(): string {
+  try {
+    if (typeof crypto?.randomUUID === 'function') {
+      return `martial-art-upgrade-${crypto.randomUUID()}`;
+    }
+  } catch {
+    // 事务 ID 只用于精确认领本次 ERA 完成信号；时间戳兜底即可。
+  }
+  return `martial-art-upgrade-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function assertMartialArtUpgradePersisted(
+  statData: MartialArtsStatData,
+  martialArtName: string,
+  expectedMastery: MasteryLevel,
+  expectedCultivation: number,
+): void {
+  const actualCultivation = statData.user数据?.修为;
+  if (actualCultivation !== expectedCultivation) {
+    throw new Error('功法精进写后校验失败：修为扣除结果未落库。');
+  }
+
+  const actualMastery = statData.user数据?.功法?.[martialArtName]?.掌握程度;
+  if (actualMastery !== expectedMastery) {
+    throw new Error(`功法精进写后校验失败：《${martialArtName}》掌握程度未落库。`);
+  }
 }
 
 // ============================================
@@ -567,65 +613,126 @@ export async function upgradeMartialArt(
     }
   }
 
-  // 计算升级消耗（传入功法类型与天赋折扣）
-  const cost = calculateUpgradeCost(rank, currentMastery, comprehension, martialType, traits);
-
-  if (cost < 0) {
-    return {
-      success: false,
-      error: '此功法已达出神入化之境，无法再精进',
-    };
-  }
-
-  if (currentCultivation < cost) {
-    return {
-      success: false,
-      error: `修为不足，还需 ${cost - currentCultivation} 点修为`,
-    };
-  }
-
-  const nextMastery = getNextMastery(currentMastery);
-  if (!nextMastery) {
-    return {
-      success: false,
-      error: '无法获取下一掌握程度',
-    };
-  }
-
   try {
-    const newCultivation = currentCultivation - cost;
+    // 点击按钮后重新读取持久化真相源，避免拿过期 React 投影扣错修为或重复精进。
+    const latestStatData = await readLatestMartialArtsStatData();
+    const persistedCultivation = latestStatData.user数据?.修为;
+    const persistedMastery = latestStatData.user数据?.功法?.[martialArtName]?.掌握程度;
+
+    if (typeof persistedCultivation !== 'number' || !Number.isFinite(persistedCultivation)) {
+      return {
+        success: false,
+        error: '当前存档中的修为数据无效，无法精进功法。',
+      };
+    }
+
+    if (typeof persistedMastery !== 'string' || !MASTERY_LEVELS.includes(persistedMastery as MasteryLevel)) {
+      return {
+        success: false,
+        error: `当前存档中找不到《${martialArtName}》的有效掌握程度，无法精进。`,
+      };
+    }
+
+    const actualMastery = persistedMastery as MasteryLevel;
+    if (actualMastery !== currentMastery || persistedCultivation !== currentCultivation) {
+      return {
+        success: false,
+        error: '功法或修为状态已经变化，请刷新后重新确认精进。',
+      };
+    }
+
+    // 计算升级消耗（传入功法类型与天赋折扣）
+    const cost = calculateUpgradeCost(rank, actualMastery, comprehension, martialType, traits);
+    if (cost < 0) {
+      return {
+        success: false,
+        error: '此功法已达出神入化之境，无法再精进',
+      };
+    }
+
+    if (persistedCultivation < cost) {
+      return {
+        success: false,
+        error: `修为不足，还需 ${cost - persistedCultivation} 点修为`,
+      };
+    }
+
+    const nextMastery = getNextMastery(actualMastery);
+    if (!nextMastery) {
+      return {
+        success: false,
+        error: '无法获取下一掌握程度',
+      };
+    }
+
+    const newCultivation = persistedCultivation - cost;
+    const transactionId = createMartialArtUpgradeTransactionId();
     const updatePayload = {
-      stat_data: {
-        user数据: {
-          修为: newCultivation,
-          功法: {
-            [martialArtName]: {
-              掌握程度: nextMastery,
-            },
+      user数据: {
+        修为: newCultivation,
+        功法: {
+          [martialArtName]: {
+            掌握程度: nextMastery,
           },
         },
       },
     };
 
-    await emitSourcedEraVariableWriteAndWait({
-      source: 'frontend',
-      operation: 'update',
-      reason: 'martial-art-level-up',
-      eventName: 'era:updateByObject',
-      attribution: 'background',
-      detail: updatePayload,
-      timeoutMs: 20000,
-      timeoutMessage: `功法「${martialArtName}」精进请求已发出，但 ERA 没有确认 apiWrite 写入完成。`,
-      expectedAction: 'apiWrite',
-    });
+    try {
+      await emitSourcedEraVariableWriteAndWait({
+        source: 'frontend',
+        operation: 'update',
+        reason: 'martial-art-level-up',
+        refreshHint: 'character-data',
+        eventName: 'era:transactionByObject',
+        attribution: 'background',
+        detail: {
+          transactionId,
+          operations: [{ type: 'update', payload: updatePayload }],
+        },
+        timeoutMs: 20000,
+        timeoutMessage: `功法「${martialArtName}」精进事务已发出，但 ERA 没有确认 apiWrite 写入完成。`,
+        expectedAction: 'apiWrite',
+        expectedTransactionId: transactionId,
+      });
+    } catch (error) {
+      // 完成信号丢失时先对账；若实际上已经落库，则按成功处理，避免用户重复点击再次扣除。
+      try {
+        await eventEmit('manual_sync');
+      } catch (syncError) {
+        dataLogger.warn('[martialArtsDatabase] 功法精进结果未知，manual_sync 失败:', syncError);
+      }
+
+      try {
+        assertMartialArtUpgradePersisted(
+          await readLatestMartialArtsStatData(),
+          martialArtName,
+          nextMastery,
+          newCultivation,
+        );
+      } catch {
+        throw new Error('功法精进结果暂时未知，已刷新存档进行对账；为避免重复扣除，本次不会自动重试。', {
+          cause: error,
+        });
+      }
+    }
+
+    assertMartialArtUpgradePersisted(
+      await readLatestMartialArtsStatData(),
+      martialArtName,
+      nextMastery,
+      newCultivation,
+    );
 
     dataLogger.log(
-      `[martialArtsDatabase] 功法升级成功: ${martialArtName} ${currentMastery} -> ${nextMastery}, 消耗修为: ${cost}`,
+      `[martialArtsDatabase] 功法升级成功: ${martialArtName} ${actualMastery} -> ${nextMastery}, 消耗修为: ${cost}`,
     );
 
     return {
       success: true,
+      previousMastery: actualMastery,
       newMastery: nextMastery,
+      spentCultivation: cost,
       newCultivation,
     };
   } catch (error) {
