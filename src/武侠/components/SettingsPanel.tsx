@@ -670,6 +670,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const smallSummaryFailedCount = smallSummaryItems.filter(
     item => !item.hasSummary && item.lastAttempt?.status === 'error',
   ).length;
+  const latestSmallSummaryBackfillSuccessAt = smallSummaryItems.reduce(
+    (latest, item) =>
+      item.lastAttempt?.status === 'success' ? Math.max(latest, item.lastAttempt.attemptedAt) : latest,
+    0,
+  );
+  const isConversationSummaryTraceStale = Boolean(
+    conversationSummaryTrace &&
+      latestSmallSummaryBackfillSuccessAt > 0 &&
+      conversationSummaryTrace.capturedAt < latestSmallSummaryBackfillSuccessAt,
+  );
   const conversationSummaryTraceByMessageId = new Map(
     (conversationSummaryTrace?.items || []).map(item => [item.messageId, item]),
   );
@@ -2773,6 +2783,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </span>
                     <span>{'<' + conversationSummaryTrace.summaryTag + '>'}</span>
                     <span>最近 {conversationSummaryTrace.recentReplies} 条保留正文</span>
+                    {isConversationSummaryTraceStale && (
+                      <span className="stale">快照早于最近补完 · 下次送模后更新</span>
+                    )}
                   </div>
                 )}
 
@@ -2834,9 +2847,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                             <div>
                               <strong>最终上下文</strong>
                               <p>
-                                {!traceItem
-                                  ? '当前没有该楼层的最终 prompt 快照；发送或重新生成一次后可查看。'
-                                  : traceItem.contextState === 'chapter_memory'
+                                {isConversationSummaryTraceStale && item.lastAttempt?.status === 'success'
+                                  ? '该楼的小总结刚完成补写；当前最终 prompt 状态仍是补完前快照，发送或重新生成一次后才会更新。'
+                                  : !traceItem
+                                    ? '当前没有该楼层的最终 prompt 快照；发送或重新生成一次后可查看。'
+                                    : traceItem.contextState === 'chapter_memory'
                                     ? '该层已由大总结/长期记忆接管，不再发送原始 user + assistant。'
                                     : traceItem.contextState === 'summary_only'
                                       ? '该层原文已屏蔽，最终 prompt 只保留小总结。'
