@@ -67,6 +67,7 @@ import { getUserCurrentLocation } from './utils/mapUtils';
 import {
   canAppendPreviousAssistantForRegenerate,
   canRegenerateLastAssistantSwipe,
+  getLastRegenerateAssistantAppendText,
   getLastRegenerateUserInput,
 } from './utils/messageActions';
 import { finalizeCurrentTurn, resumeCheckout } from './utils/saveLoadManager';
@@ -203,6 +204,10 @@ const App: React.FC = () => {
   const [openingWelcomeLine, setOpeningWelcomeLine] = useState(() => getRandomOpeningLine());
   const [canRegenerate, setCanRegenerate] = useState(false);
   const [regenerateDraftMode, setRegenerateDraftMode] = useState<RegenerateDraftMode | null>(null);
+  const [regenerateDraftPrefill, setRegenerateDraftPrefill] = useState<{
+    key: string;
+    drafts: Record<RegenerateDraftMode, string>;
+  } | null>(null);
   const [isCommandQueueOpen, setIsCommandQueueOpen] = useState(false);
   const [recentInputHistory, setRecentInputHistory] = useState<InputHistoryEntry[]>(() => readRecentInputHistory());
   const [inputPrefill, setInputPrefill] = useState<{ key: string; message: string } | null>(null);
@@ -851,6 +856,7 @@ const App: React.FC = () => {
       } finally {
         setInputPrefill(null);
         setRegenerateDraftMode(null);
+        setRegenerateDraftPrefill(null);
       }
       refreshRecentInputHistory();
       if (historyInputDraft) {
@@ -896,6 +902,7 @@ const App: React.FC = () => {
   const handleInputHistorySelect = useCallback(
     (entry: InputHistoryEntry) => {
       setRegenerateDraftMode(null);
+      setRegenerateDraftPrefill(null);
       inputPrefillSequenceRef.current += 1;
       setInputPrefill({
         key: `input-history-${entry.messageId}-${inputPrefillSequenceRef.current}`,
@@ -926,18 +933,23 @@ const App: React.FC = () => {
         return;
       }
 
-      // 首次进入编辑态时只预填一次上一轮真实玩家输入。
-      // 两个标签之间切换时草稿由 ChatInput 本地分别保留，避免覆盖另一侧已经编辑的内容。
+      // 首次进入编辑态时一次性读取两侧的持久草稿：
+      // 玩家输入只保留可编辑正文；上一轮 AI 追加段若已存在则回填，后续标签切换完全由 ChatInput 本地保留。
       if (regenerateDraftMode === null) {
         const previousInput = getLastRegenerateUserInput();
         if (!previousInput) {
           showError('当前没有可修改并重新生成的上一轮玩家输入。');
           return;
         }
+        const previousAssistantAppend = getLastRegenerateAssistantAppendText() || '';
         inputPrefillSequenceRef.current += 1;
-        setInputPrefill({
+        setInputPrefill(null);
+        setRegenerateDraftPrefill({
           key: `regenerate-editor-${inputPrefillSequenceRef.current}`,
-          message: previousInput,
+          drafts: {
+            'user-input': previousInput,
+            'assistant-append': previousAssistantAppend,
+          },
         });
       }
 
@@ -954,6 +966,7 @@ const App: React.FC = () => {
 
   const handleCancelRegenerateInputEdit = useCallback(() => {
     setRegenerateDraftMode(null);
+    setRegenerateDraftPrefill(null);
     setInputPrefill(null);
   }, []);
 
@@ -974,6 +987,7 @@ const App: React.FC = () => {
       if (success === true) {
         refreshRecentInputHistory();
         setRegenerateDraftMode(null);
+        setRegenerateDraftPrefill(null);
         setInputPrefill(null);
       }
       return success;
@@ -1808,6 +1822,7 @@ const App: React.FC = () => {
               canRegenerate={canRegenerate && !historyMutationPending}
               isRegenerating={isLoading || historyMutationPending}
               regenerateDraftMode={regenerateDraftMode}
+              regenerateDraftPrefill={regenerateDraftPrefill}
               disabled={isLoading || historyMutationPending}
               placeholder={
                 regenerateDraftMode === 'user-input'
