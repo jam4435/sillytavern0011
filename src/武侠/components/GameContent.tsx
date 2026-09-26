@@ -1,5 +1,5 @@
-import { FilePenLine } from 'lucide-react';
-import React, { useEffect, useMemo, useRef } from 'react';
+import { ChevronLeft, ChevronRight, FilePenLine } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { DisplaySettings } from '../utils/settingsManager';
 import { Icons } from './Icons';
 import { uiLogger } from '../utils/logger';
@@ -17,8 +17,18 @@ interface GameContentProps {
   scrollCommitKey?: string | null;
   /** 打开最新 AI 回复原文编辑器。 */
   onEditLatestReply?: () => void;
-  /** 当前最新回复是否允许编辑。 */
+  /** 当前楼层是否允许编辑。 */
   canEditLatestReply?: boolean;
+  /** 当前正在显示的 AI 楼层号。 */
+  currentLayerId?: number | null;
+  /** 上一可浏览 AI 楼层号。 */
+  previousLayerId?: number | null;
+  /** 下一可浏览 AI 楼层号。 */
+  nextLayerId?: number | null;
+  /** 切换到指定 AI 楼层。 */
+  onNavigateLayer?: (messageId: number) => void;
+  /** 输入任意 User/AI 楼层号跳转。 */
+  onJumpLayer?: (messageId: number) => void;
 }
 
 /**
@@ -81,8 +91,14 @@ const GameContent: React.FC<GameContentProps> = ({
   scrollCommitKey,
   onEditLatestReply,
   canEditLatestReply = false,
+  currentLayerId = null,
+  previousLayerId = null,
+  nextLayerId = null,
+  onNavigateLayer,
+  onJumpLayer,
 }) => {
   const latestReplyRef = useRef<HTMLDivElement | null>(null);
+  const [layerJumpValue, setLayerJumpValue] = useState('');
   const lastScrolledCommitKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -212,6 +228,55 @@ const GameContent: React.FC<GameContentProps> = ({
       {/* 主文本区域（完整显示，支持 HTML 渲染） */}
       {maintext && (
         <div className="maintext-container">
+          {(onNavigateLayer || onJumpLayer) && currentLayerId !== null && (
+            <div className="maintext-layer-toolbar">
+              <button
+                type="button"
+                className="maintext-layer-button"
+                onClick={() => previousLayerId !== null && onNavigateLayer?.(previousLayerId)}
+                disabled={previousLayerId === null}
+                title="上一回合"
+                aria-label="上一回合"
+              >
+                <ChevronLeft size={15} aria-hidden="true" />
+              </button>
+              <span className="maintext-layer-current">AI #{currentLayerId}</span>
+              <div className="maintext-layer-jump">
+                <input
+                  value={layerJumpValue}
+                  onChange={event => setLayerJumpValue(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key !== 'Enter') return;
+                    const id = Number(layerJumpValue.trim());
+                    if (Number.isInteger(id) && id >= 0) onJumpLayer?.(id);
+                  }}
+                  placeholder="楼层"
+                  inputMode="numeric"
+                  aria-label="跳转聊天楼层"
+                />
+                <button
+                  type="button"
+                  className="maintext-layer-button text"
+                  onClick={() => {
+                    const id = Number(layerJumpValue.trim());
+                    if (Number.isInteger(id) && id >= 0) onJumpLayer?.(id);
+                  }}
+                >
+                  跳转
+                </button>
+              </div>
+              <button
+                type="button"
+                className="maintext-layer-button"
+                onClick={() => nextLayerId !== null && onNavigateLayer?.(nextLayerId)}
+                disabled={nextLayerId === null}
+                title="下一回合"
+                aria-label="下一回合"
+              >
+                <ChevronRight size={15} aria-hidden="true" />
+              </button>
+            </div>
+          )}
           {onEditLatestReply && (
             <div className="maintext-edit-sticky">
               <button
@@ -222,8 +287,8 @@ const GameContent: React.FC<GameContentProps> = ({
                   event.stopPropagation();
                   onEditLatestReply();
                 }}
-                title={canEditLatestReply ? '查看并编辑最新 AI 回复原文' : '当前回复暂不可编辑，点击查看原因'}
-                aria-label="编辑最新 AI 回复"
+                title={canEditLatestReply ? '编辑当前显示回合的 User 输入与 AI 输出' : '当前回复暂不可编辑，点击查看原因'}
+                aria-label="编辑当前聊天回合"
                 data-wuxia-automation="open-latest-reply-editor"
                 data-wuxia-editable={canEditLatestReply ? 'true' : 'false'}
               >
