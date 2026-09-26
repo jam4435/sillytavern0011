@@ -313,6 +313,46 @@ describe('regenerateLastAssistantSwipe', () => {
     expect(messages[2].message).toBe('根据补充信息生成的新回复');
   });
 
+  it('可同时修改上一轮 user 并追加上一轮 assistant，再用两项修改后的历史重新生成', async () => {
+    const previousAssistant =
+      '上一轮正文\n\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\n\n<era_data>{"mk":"previous"}</era_data>';
+    messages = [
+      { message_id: 1, role: 'assistant', message: previousAssistant, swipes: [previousAssistant], swipe_id: 0 },
+      {
+        message_id: 2,
+        role: 'user',
+        message: '原玩家输入\n\n<era_data>{"user":"meta"}</era_data>',
+      },
+      {
+        message_id: 3,
+        role: 'assistant',
+        message: '当前旧回复\n\n<era_data>{"mk":"current"}</era_data>',
+        swipes: ['当前旧回复\n\n<era_data>{"mk":"current"}</era_data>'],
+        swipe_id: 0,
+      },
+    ];
+    globals.generate = vi.fn(async () => '同时修改后的新回复');
+
+    await regenerateLastAssistantSwipe({
+      replacementUserInput: '修改后的玩家输入',
+      previousAssistantAppendText: '补充：上一轮还有隐藏信息。',
+    });
+
+    expect(messages[0].message).toContain('上一轮正文\n\n补充：上一轮还有隐藏信息。\n\n<VariableEdit>');
+    expect(messages[1].message).toBe('修改后的玩家输入\n\n<era_data>{"user":"meta"}</era_data>');
+
+    const generateCall = vi.mocked(globals.generate).mock.calls[0]?.[0] as {
+      overrides?: { chat_history?: { prompts?: Array<{ role: string; content: string }> } };
+    };
+    const prompts = generateCall.overrides?.chat_history?.prompts ?? [];
+    expect(prompts[0]?.content).toContain('补充：上一轮还有隐藏信息。');
+    expect(prompts.at(-1)).toEqual({
+      role: 'user',
+      content: '修改后的玩家输入\n\n<era_data>{"user":"meta"}</era_data>',
+    });
+    expect(messages[2].message).toBe('同时修改后的新回复');
+  });
+
   it('追加上一轮 AI 输出后若重新生成失败，会同时恢复上一轮输出与当前回复', async () => {
     const previousAssistant =
       '上一轮正文\n\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\n\n<era_data>{"mk":"previous"}</era_data>';

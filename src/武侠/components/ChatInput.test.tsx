@@ -85,7 +85,10 @@ describe('ChatInput history draft', () => {
     });
 
     expect(onRegenerate).toHaveBeenCalledTimes(1);
-    expect(onRegenerate).toHaveBeenCalledWith({ mode: 'user-input', text: '修改后的行动' });
+    expect(onRegenerate).toHaveBeenCalledWith({
+      replacementUserInput: '修改后的行动',
+      previousAssistantAppendText: undefined,
+    });
     expect(onSend).not.toHaveBeenCalled();
   });
 
@@ -109,29 +112,62 @@ describe('ChatInput history draft', () => {
       fireEvent.click(screen.getByRole('button', { name: '使用修改后的上一轮输入重新生成' }));
     });
 
-    expect(onRegenerate).toHaveBeenCalledWith({ mode: 'user-input', text: '改成走水路' });
+    expect(onRegenerate).toHaveBeenCalledWith({
+      replacementUserInput: '改成走水路',
+      previousAssistantAppendText: undefined,
+    });
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('编辑态可在修改输入与追加上一轮输出之间切换，并共用独立退出按钮', () => {
+  it('两个编辑标签分别保留草稿，并可一次同时提交', async () => {
     const onRegenerateDraftModeChange = vi.fn();
+    const onRegenerate = vi.fn(async () => true);
+    const props = {
+      onSend: vi.fn(),
+      onRegenerate,
+      onRegenerateDraftModeChange,
+      canRegenerate: true,
+      prefill: { key: 'regen-switch', message: '上一轮行动' },
+    };
+    const { rerender } = render(<ChatInput {...props} regenerateDraftMode="user-input" />);
+
+    const input = screen.getByRole('textbox', { name: '玩家行动' });
+    fireEvent.change(input, { target: { value: '修改后的上一轮行动' } });
+
+    fireEvent.click(screen.getByRole('button', { name: '追加上一轮输出' }));
+    expect(onRegenerateDraftModeChange).toHaveBeenLastCalledWith('assistant-append');
+    expect(input).toHaveValue('');
+
+    rerender(<ChatInput {...props} regenerateDraftMode="assistant-append" />);
+    fireEvent.change(input, { target: { value: '补充：上一轮还有一件事' } });
+
+    fireEvent.click(screen.getByRole('button', { name: '修改上一轮输入' }));
+    expect(onRegenerateDraftModeChange).toHaveBeenLastCalledWith('user-input');
+    expect(input).toHaveValue('修改后的上一轮行动');
+
+    rerender(<ChatInput {...props} regenerateDraftMode="user-input" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '使用修改后的上一轮输入重新生成' }));
+    });
+
+    expect(onRegenerate).toHaveBeenCalledWith({
+      replacementUserInput: '修改后的上一轮行动',
+      previousAssistantAppendText: '补充：上一轮还有一件事',
+    });
+  });
+
+  it('编辑态共用独立退出按钮', () => {
     const onCancelRegenerateDraft = vi.fn();
     render(
       <ChatInput
         onSend={vi.fn()}
         onRegenerate={vi.fn()}
-        onRegenerateDraftModeChange={onRegenerateDraftModeChange}
         onCancelRegenerateDraft={onCancelRegenerateDraft}
         canRegenerate
         regenerateDraftMode="user-input"
-        prefill={{ key: 'regen-switch', message: '上一轮行动' }}
+        prefill={{ key: 'regen-exit', message: '上一轮行动' }}
       />,
     );
-
-    expect(screen.getByRole('button', { name: '修改上一轮输入' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getByRole('button', { name: '追加上一轮输出' }));
-    expect(onRegenerateDraftModeChange).toHaveBeenCalledWith('assistant-append');
-    expect(screen.getByRole('textbox', { name: '玩家行动' })).toHaveValue('');
 
     fireEvent.click(screen.getByRole('button', { name: '退出重新生成编辑模式' }));
     expect(onCancelRegenerateDraft).toHaveBeenCalledTimes(1);
@@ -155,7 +191,7 @@ describe('ChatInput history draft', () => {
     fireEvent.click(screen.getByRole('button', { name: '退出重新生成编辑模式' }));
 
     expect(onCancelRegenerateDraft).toHaveBeenCalledTimes(1);
-    expect(onMessageChange).toHaveBeenLastCalledWith('');
+    expect(onMessageChange).not.toHaveBeenCalled();
     expect(screen.getByRole('textbox', { name: '玩家行动' })).toHaveValue('');
   });
 });

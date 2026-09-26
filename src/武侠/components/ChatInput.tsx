@@ -5,8 +5,8 @@ import { uiLogger } from '../utils/logger';
 export type RegenerateDraftMode = 'user-input' | 'assistant-append';
 
 export interface RegenerateDraftSubmission {
-  mode: RegenerateDraftMode;
-  text: string;
+  replacementUserInput?: string;
+  previousAssistantAppendText?: string;
 }
 
 interface ChatInputProps {
@@ -48,15 +48,28 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [isFocused, setIsFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegenerateMenuOpen, setIsRegenerateMenuOpen] = useState(false);
+  const [regenerateDrafts, setRegenerateDrafts] = useState<Record<RegenerateDraftMode, string>>({
+    'user-input': '',
+    'assistant-append': '',
+  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputDisabled = disabled || isSubmitting;
+  const effectiveRegenerateDrafts =
+    regenerateDraftMode === 'user-input'
+      ? { ...regenerateDrafts, 'user-input': message }
+      : regenerateDraftMode === 'assistant-append'
+        ? { ...regenerateDrafts, 'assistant-append': message }
+        : regenerateDrafts;
+  const hasRegenerateDraftContent =
+    Boolean(effectiveRegenerateDrafts['user-input'].trim()) ||
+    Boolean(effectiveRegenerateDrafts['assistant-append'].trim());
   const regenerateDisabled =
     disabled ||
     isSubmitting ||
     isRegenerating ||
     !canRegenerate ||
     !onRegenerate ||
-    (regenerateDraftMode && !message.trim());
+    (Boolean(regenerateDraftMode) && !hasRegenerateDraftContent);
   const prefillKey = prefill?.key ?? null;
   const prefillMessage = prefill?.message ?? '';
 
@@ -73,6 +86,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
   useEffect(() => {
     if (!prefillKey) return;
     setMessage(prefillMessage);
+    if (regenerateDraftMode) {
+      setRegenerateDrafts(previous => ({
+        ...previous,
+        [regenerateDraftMode]: prefillMessage,
+      }));
+    }
     const frame = window.requestAnimationFrame(adjustHeight);
     return () => window.cancelAnimationFrame(frame);
   }, [adjustHeight, prefillKey, prefillMessage]);
@@ -89,14 +108,22 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }, [canRegenerate, disabled, regenerateDraftMode]);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
-    onMessageChange?.(e.target.value);
+    const nextMessage = e.target.value;
+    setMessage(nextMessage);
+    if (regenerateDraftMode) {
+      setRegenerateDrafts(previous => ({
+        ...previous,
+        [regenerateDraftMode]: nextMessage,
+      }));
+    } else {
+      onMessageChange?.(nextMessage);
+    }
     adjustHeight();
   };
 
-  const clearInput = () => {
+  const clearInput = (notify = true) => {
     setMessage('');
-    onMessageChange?.('');
+    if (notify) onMessageChange?.('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -137,10 +164,16 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setIsSubmitting(true);
     try {
       const result = await onRegenerate(
-        regenerateDraftMode ? { mode: regenerateDraftMode, text: message.trim() } : undefined,
+        regenerateDraftMode
+          ? {
+              replacementUserInput: effectiveRegenerateDrafts['user-input'].trim() || undefined,
+              previousAssistantAppendText: effectiveRegenerateDrafts['assistant-append'].trim() || undefined,
+            }
+          : undefined,
       );
       if (result === true && regenerateDraftMode) {
-        clearInput();
+        clearInput(false);
+        setRegenerateDrafts({ 'user-input': '', 'assistant-append': '' });
       }
     } finally {
       setIsSubmitting(false);
@@ -169,12 +202,20 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   const handleRegenerateDraftModeChange = (mode: RegenerateDraftMode) => {
     if (mode === regenerateDraftMode || inputDisabled) return;
-    clearInput();
+    if (regenerateDraftMode) {
+      setRegenerateDrafts(previous => ({
+        ...previous,
+        [regenerateDraftMode]: message,
+      }));
+    }
+    setMessage(regenerateDrafts[mode]);
     onRegenerateDraftModeChange?.(mode);
+    window.requestAnimationFrame(adjustHeight);
   };
 
   const handleCancelRegenerateDraft = () => {
-    clearInput();
+    clearInput(false);
+    setRegenerateDrafts({ 'user-input': '', 'assistant-append': '' });
     setIsRegenerateMenuOpen(false);
     onCancelRegenerateDraft?.();
   };

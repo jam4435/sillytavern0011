@@ -655,13 +655,6 @@ async function restorePreviousSwipe(transaction: RegenerateSwipeTransaction): Pr
 }
 
 export async function regenerateLastAssistantSwipe(options: RegenerateOptions = {}): Promise<RegenerateResult> {
-  if (
-    typeof options.replacementUserInput === 'string' &&
-    typeof options.previousAssistantAppendText === 'string'
-  ) {
-    throw new Error('一次重新生成只能修改上一轮输入或追加上一轮 AI 输出，不能同时执行两种编辑。');
-  }
-
   const context = getRegenerateContext();
   if (!context) {
     throw new Error('当前没有可重新生成的最新回复。');
