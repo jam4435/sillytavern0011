@@ -208,11 +208,10 @@ export function getLatestSmallSummaryBackfillSnapshot(): SmallSummaryBackfillSna
     })),
     batchLogs: latestSnapshot.batchLogs.map(log => ({
       ...log,
-      messageIds: undefined,
       requestedMessageIds: [...log.requestedMessageIds],
       succeededMessageIds: [...log.succeededMessageIds],
       failedMessageIds: [...log.failedMessageIds],
-    })) as SmallSummaryBackfillBatchLog[],
+    })),
   };
 }
 
@@ -254,12 +253,26 @@ export function buildSmallSummaryBackfillBatches(
   batchSize: number,
   targetMessageId?: number,
 ): SmallSummaryBackfillBatch[] {
-  const size = clampBatchSize(batchSize);
+  const preferredSize = clampBatchSize(batchSize);
   const chunks: SmallSummaryBackfillBatch[] = [];
+  let index = 0;
 
-  for (let index = 0; index < items.length; index += size) {
+  while (index < items.length) {
+    const remaining = items.length - index;
+    let size = Math.min(preferredSize, remaining);
+
+    // 正常历史聊天中每次请求都保持 5～10 个连续 Assistant 楼层。
+    // 如果按首选大小切分会留下不足 5 层的尾批，就把若干楼层留给尾批。
+    if (remaining > MAX_BATCH_SIZE && remaining - size > 0 && remaining - size < MIN_BATCH_SIZE) {
+      size = Math.max(MIN_BATCH_SIZE, remaining - MIN_BATCH_SIZE);
+    } else if (remaining <= MAX_BATCH_SIZE) {
+      size = remaining;
+    }
+
     const chunkItems = items.slice(index, index + size);
+    index += size;
     if (chunkItems.length === 0 || !chunkItems.some(item => !item.hasSummary)) continue;
+
     const first = chunkItems[0].messageId;
     const last = chunkItems[chunkItems.length - 1].messageId;
     chunks.push({
@@ -269,6 +282,8 @@ export function buildSmallSummaryBackfillBatches(
     });
   }
 
+  // 极短聊天本身不足 5 个 Assistant 时无法满足 5 层下限，此时只形成唯一短批；
+  // 这是唯一允许少于 5 层的情况，避免为了凑数读取不存在的楼层。
   if (targetMessageId === undefined) return chunks;
   return chunks.filter(batch => batch.messageIds.includes(targetMessageId));
 }
@@ -563,7 +578,7 @@ export async function backfillMissingSmallSummaries({
         failedMessageIds: [],
       };
       appendBatchLog(log);
-      dispatchSnapshot(scanSmallSummaryBackfill(settings));
+      scanSmallSummaryBackfill(settings);
 
       let rawResponse = '';
       try {
