@@ -47,9 +47,17 @@ export interface RegenerateResult {
   rawReply: string;
 }
 
-export interface RegenerateOptions {
+export interface RegenerateRequestOptions {
   /** 可选：把上一轮真实玩家输入替换为此文本后再重生；失败时会恢复旧 user 楼层。 */
   replacementUserInput?: string;
+  /**
+   * 可选：向上一轮 assistant active swipe 的正文尾部追加普通文本，再按原 user 输入重生最新回复。
+   * 追加内容会插在 Variable*/era_data 系统尾块之前；失败时恢复上一轮 assistant 原文。
+   */
+  previousAssistantAppendText?: string;
+}
+
+export interface RegenerateOptions extends RegenerateRequestOptions {
   onCombinedPrompt?: (prompt: string) => void;
   onTargetAssistantResolved?: (assistantMessageId: number) => void;
   /**
@@ -64,6 +72,7 @@ export interface RegenerateOptions {
 type RegenerateContext = {
   assistantMessage: ChatMessageWithSwipes;
   userMessage: ChatMessageWithSwipes;
+  previousAssistantMessage: ChatMessageWithSwipes | null;
   allMessages: ChatMessageWithSwipes[];
 };
 
@@ -82,7 +91,20 @@ type RegenerateUserInputTransaction = {
   previousData: Record<string, unknown>;
 };
 
+type RegenerateAssistantAppendTransaction = {
+  messageId: number;
+  swipeId: number;
+  previousSwipeText: string;
+  previousMessageMirror: string;
+  appendedSwipeText: string;
+};
+
 const ERA_DATA_BLOCK_REGEX = /\s*<era_data>[\s\S]*?<\/era_data>\s*/gi;
+const TRAILING_ERA_DATA_BLOCKS_REGEX = /(?:\s*<era_data>[\s\S]*?<\/era_data>\s*)+$/i;
+const ASSISTANT_SYSTEM_BLOCK_REGEX =
+  /<era_data>[\s\S]*?<\/era_data>|<VariableThink>[\s\S]*?<\/VariableThink>|<VariableInsert>[\s\S]*?<\/VariableInsert>|<VariableEdit>[\s\S]*?<\/VariableEdit>|<VariableDelete>[\s\S]*?<\/VariableDelete>/gi;
+const RESERVED_ASSISTANT_APPEND_TAG_REGEX =
+  /<\/?(?:era_data|Variable(?:Think|Insert|Edit|Delete))\b/i;
 
 function getActiveMessageText(message: ChatMessageWithSwipes): string {
   const swipes = Array.isArray(message.swipes) ? message.swipes : [];
@@ -125,9 +147,22 @@ function getRegenerateContext(): RegenerateContext | null {
       return null;
     }
 
+    let previousAssistantMessage: ChatMessageWithSwipes | null = null;
+    for (let cursor = index - 2; cursor >= 0; cursor -= 1) {
+      const earlier = allMessages[cursor];
+      if (earlier.role === 'user') {
+        break;
+      }
+      if (isUsableAssistant(earlier)) {
+        previousAssistantMessage = earlier;
+        break;
+      }
+    }
+
     return {
       assistantMessage: candidate,
       userMessage: previous,
+      previousAssistantMessage,
       allMessages,
     };
   }
@@ -143,6 +178,25 @@ export function canRegenerateLastAssistantSwipe(): boolean {
   }
 }
 
+export function canAppendPreviousAssistantForRegenerate(): boolean {
+  try {
+    return Boolean(getRegenerateContext()?.previousAssistantMessage);
+  } catch {
+    return false;
+  }
+}
+
+function splitTrailingEraDataBlocks(text: string): { editableText: string; suffix: string } {
+  const match = text.match(TRAILING_ERA_DATA_BLOCKS_REGEX);
+  if (!match || match.index === undefined) {
+    return { editableText: text.trim(), suffix: '' };
+  }
+  return {
+    editableText: text.slice(0, match.index).trim(),
+    suffix: match[0],
+  };
+}
+
 function getEditableRegenerateUserInput(message: ChatMessageWithSwipes): string {
   const fullMessage = getActiveMessageText(message);
   const historyData = message.data?.[WUXIA_INPUT_HISTORY_DATA_KEY];
@@ -152,7 +206,7 @@ function getEditableRegenerateUserInput(message: ChatMessageWithSwipes): string 
       return rawText.trim();
     }
   }
-  return fullMessage.trim();
+  return splitTrailingEraDataBlocks(fullMessage).editableText;
 }
 
 export function getLastRegenerateUserInput(): string | null {
@@ -178,27 +232,24 @@ async function beginRegenerateUserInputReplacement(
   const previousMessage = getActiveMessageText(freshMessage);
   const previousData = { ...(freshMessage.data || {}) };
   const historyData = previousData[WUXIA_INPUT_HISTORY_DATA_KEY];
-  let nextMessage = nextRawInput;
-  let nextData: Record<string, unknown> = {
+  const previousRawInput =
+    historyData && typeof historyData === 'object' && !Array.isArray(historyData)
+      ? (historyData as { text?: unknown }).text
+      : undefined;
+  const preservedSuffix =
+    typeof previousRawInput === 'string' && previousRawInput && previousMessage.startsWith(previousRawInput)
+      ? previousMessage.slice(previousRawInput.length)
+      : splitTrailingEraDataBlocks(previousMessage).suffix;
+  const nextMessage = `${nextRawInput}${preservedSuffix}`;
+  const nextData: Record<string, unknown> = {
     ...previousData,
-    [WUXIA_INPUT_HISTORY_DATA_KEY]: { text: nextRawInput },
+    [WUXIA_INPUT_HISTORY_DATA_KEY]: {
+      ...(historyData && typeof historyData === 'object' && !Array.isArray(historyData)
+        ? (historyData as Record<string, unknown>)
+        : {}),
+      text: nextRawInput,
+    },
   };
-
-  if (historyData && typeof historyData === 'object' && !Array.isArray(historyData)) {
-    const previousRawInput = (historyData as { text?: unknown }).text;
-    const preservedSuffix =
-      typeof previousRawInput === 'string' && previousRawInput && previousMessage.startsWith(previousRawInput)
-        ? previousMessage.slice(previousRawInput.length)
-        : '';
-    nextMessage = `${nextRawInput}${preservedSuffix}`;
-    nextData = {
-      ...previousData,
-      [WUXIA_INPUT_HISTORY_DATA_KEY]: {
-        ...(historyData as Record<string, unknown>),
-        text: nextRawInput,
-      },
-    };
-  }
 
   await setChatMessages(
     [
@@ -237,6 +288,126 @@ async function restoreRegenerateUserInput(transaction: RegenerateUserInputTransa
   const restored = readMessageWithSwipes(transaction.messageId);
   if (getActiveMessageText(restored) !== transaction.previousMessage) {
     throw new Error('重新生成失败后，上一轮玩家输入恢复失败。');
+  }
+}
+
+function findTrailingAssistantSystemBlockStart(text: string): number {
+  ASSISTANT_SYSTEM_BLOCK_REGEX.lastIndex = 0;
+  const matches = Array.from(text.matchAll(ASSISTANT_SYSTEM_BLOCK_REGEX));
+  let tailStart = text.length;
+
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches[index];
+    const matchIndex = match.index ?? -1;
+    if (matchIndex < 0) continue;
+    const matchEnd = matchIndex + match[0].length;
+    if (text.slice(matchEnd, tailStart).trim()) {
+      break;
+    }
+    tailStart = matchIndex;
+  }
+
+  return tailStart;
+}
+
+function buildAssistantTextWithAppend(previousText: string, appendText: string): string {
+  const normalizedAppend = appendText.trim();
+  if (!normalizedAppend) {
+    throw new Error('追加到上一轮 AI 输出的信息不能为空。');
+  }
+  if (RESERVED_ASSISTANT_APPEND_TAG_REGEX.test(normalizedAppend)) {
+    throw new Error('追加信息不能包含 era_data 或 Variable* 系统标签。');
+  }
+
+  const tailStart = findTrailingAssistantSystemBlockStart(previousText);
+  const body = previousText.slice(0, tailStart).trimEnd();
+  const systemTail = previousText.slice(tailStart).trimStart();
+  const nextBody = body ? `${body}\n\n${normalizedAppend}` : normalizedAppend;
+  return systemTail ? `${nextBody}\n\n${systemTail}` : nextBody;
+}
+
+async function beginRegenerateAssistantAppend(
+  assistantMessage: ChatMessageWithSwipes,
+  appendText: string,
+): Promise<RegenerateAssistantAppendTransaction> {
+  const freshMessage = readMessageWithSwipes(assistantMessage.message_id);
+  const swipes = Array.isArray(freshMessage.swipes) ? [...freshMessage.swipes] : [];
+  const swipeId = getSafeSwipeIndex(freshMessage, swipes);
+  const previousSwipeText = getActiveMessageText(freshMessage);
+  const previousMessageMirror = freshMessage.message || '';
+  const appendedSwipeText = buildAssistantTextWithAppend(previousSwipeText, appendText);
+
+  if (swipes.length > 0) {
+    swipes[swipeId] = appendedSwipeText;
+    await setChatMessages(
+      [
+        {
+          message_id: freshMessage.message_id,
+          message: appendedSwipeText,
+          swipe_id: swipeId,
+          swipes,
+        },
+      ],
+      { refresh: 'none' },
+    );
+  } else {
+    await setChatMessages(
+      [{ message_id: freshMessage.message_id, message: appendedSwipeText }],
+      { refresh: 'none' },
+    );
+  }
+
+  const written = readMessageWithSwipes(freshMessage.message_id);
+  if (
+    getSafeSwipeIndex(written, Array.isArray(written.swipes) ? written.swipes : []) !== swipeId ||
+    getActiveMessageText(written) !== appendedSwipeText ||
+    written.message !== appendedSwipeText
+  ) {
+    throw new Error('追加上一轮 AI 输出后回读失败，已中止重新生成。');
+  }
+
+  return {
+    messageId: freshMessage.message_id,
+    swipeId,
+    previousSwipeText,
+    previousMessageMirror,
+    appendedSwipeText,
+  };
+}
+
+async function restoreRegenerateAssistantAppend(transaction: RegenerateAssistantAppendTransaction): Promise<void> {
+  const freshMessage = readMessageWithSwipes(transaction.messageId);
+  const swipes = Array.isArray(freshMessage.swipes) ? [...freshMessage.swipes] : [];
+
+  if (swipes.length > 0) {
+    if (transaction.swipeId >= swipes.length) {
+      throw new Error('恢复上一轮 AI 输出失败：目标 swipe 已不存在。');
+    }
+    swipes[transaction.swipeId] = transaction.previousSwipeText;
+    await setChatMessages(
+      [
+        {
+          message_id: transaction.messageId,
+          message: transaction.previousMessageMirror,
+          swipe_id: transaction.swipeId,
+          swipes,
+        },
+      ],
+      { refresh: 'none' },
+    );
+  } else {
+    await setChatMessages(
+      [{ message_id: transaction.messageId, message: transaction.previousMessageMirror }],
+      { refresh: 'none' },
+    );
+  }
+
+  const restored = readMessageWithSwipes(transaction.messageId);
+  if (
+    getActiveMessageText(restored) !== transaction.previousSwipeText ||
+    restored.message !== transaction.previousMessageMirror
+  ) {
+    throw new Error('重新生成失败后，上一轮 AI 输出恢复失败。');
   }
 }
 
@@ -484,6 +655,13 @@ async function restorePreviousSwipe(transaction: RegenerateSwipeTransaction): Pr
 }
 
 export async function regenerateLastAssistantSwipe(options: RegenerateOptions = {}): Promise<RegenerateResult> {
+  if (
+    typeof options.replacementUserInput === 'string' &&
+    typeof options.previousAssistantAppendText === 'string'
+  ) {
+    throw new Error('一次重新生成只能修改上一轮输入或追加上一轮 AI 输出，不能同时执行两种编辑。');
+  }
+
   const context = getRegenerateContext();
   if (!context) {
     throw new Error('当前没有可重新生成的最新回复。');
@@ -494,6 +672,7 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
   let combinedPrompt = '';
   let transaction: RegenerateSwipeTransaction | null = null;
   let userInputTransaction: RegenerateUserInputTransaction | null = null;
+  let assistantAppendTransaction: RegenerateAssistantAppendTransaction | null = null;
   try {
     await flushPendingGameDataCompletion('before-regenerate');
 
@@ -501,6 +680,16 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
       userInputTransaction = await beginRegenerateUserInputReplacement(
         context.userMessage,
         options.replacementUserInput,
+      );
+    }
+
+    if (typeof options.previousAssistantAppendText === 'string') {
+      if (!context.previousAssistantMessage) {
+        throw new Error('当前没有可追加信息的上一轮 AI 输出。');
+      }
+      assistantAppendTransaction = await beginRegenerateAssistantAppend(
+        context.previousAssistantMessage,
+        options.previousAssistantAppendText,
       );
     }
 
@@ -583,11 +772,19 @@ export async function regenerateLastAssistantSwipe(options: RegenerateOptions = 
   } catch (error) {
     const restoreErrors: string[] = [];
 
-    // manual_sync 恢复 assistant 变量前，先把 user 楼层恢复成原输入，
-    // 这样回滚时看到的仍是原来的完整回合。
+    // manual_sync 恢复最新 assistant 变量前，先把被编辑的历史楼层恢复原样，
+    // 这样最终的旧 swipe 回滚看到的仍是原来的完整回合。
     if (userInputTransaction) {
       try {
         await restoreRegenerateUserInput(userInputTransaction);
+      } catch (restoreError) {
+        restoreErrors.push(restoreError instanceof Error ? restoreError.message : String(restoreError));
+      }
+    }
+
+    if (assistantAppendTransaction) {
+      try {
+        await restoreRegenerateAssistantAppend(assistantAppendTransaction);
       } catch (restoreError) {
         restoreErrors.push(restoreError instanceof Error ? restoreError.message : String(restoreError));
       }
