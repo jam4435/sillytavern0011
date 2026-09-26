@@ -2,17 +2,25 @@ import { ChevronDown, RotateCcw, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { uiLogger } from '../utils/logger';
 
+export type RegenerateDraftMode = 'user-input' | 'assistant-append';
+
+export interface RegenerateDraftSubmission {
+  mode: RegenerateDraftMode;
+  text: string;
+}
+
 interface ChatInputProps {
   onSend: (message: string) => void | Promise<unknown>;
   prefill?: { key: string; message: string } | null;
   onMessageChange?: (message: string) => void;
   extraActions?: React.ReactNode;
-  onRegenerate?: (replacementUserInput?: string) => void | Promise<boolean | void>;
+  onRegenerate?: (draft?: RegenerateDraftSubmission) => void | Promise<boolean | void>;
   onEditRegenerateInput?: () => void;
+  onRegenerateDraftModeChange?: (mode: RegenerateDraftMode) => void;
   onCancelRegenerateDraft?: () => void;
   canRegenerate?: boolean;
   isRegenerating?: boolean;
-  regenerateDraftMode?: boolean;
+  regenerateDraftMode?: RegenerateDraftMode | null;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -28,10 +36,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
   extraActions,
   onRegenerate,
   onEditRegenerateInput,
+  onRegenerateDraftModeChange,
   onCancelRegenerateDraft,
   canRegenerate = false,
   isRegenerating = false,
-  regenerateDraftMode = false,
+  regenerateDraftMode = null,
   placeholder = '书写你的江湖故事...',
   disabled = false,
 }) => {
@@ -127,7 +136,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setIsRegenerateMenuOpen(false);
     setIsSubmitting(true);
     try {
-      const result = await onRegenerate(regenerateDraftMode ? message.trim() : undefined);
+      const result = await onRegenerate(
+        regenerateDraftMode ? { mode: regenerateDraftMode, text: message.trim() } : undefined,
+      );
       if (result === true && regenerateDraftMode) {
         clearInput();
       }
@@ -154,6 +165,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const handlePrepareRegenerateInput = () => {
     setIsRegenerateMenuOpen(false);
     onEditRegenerateInput?.();
+  };
+
+  const handleRegenerateDraftModeChange = (mode: RegenerateDraftMode) => {
+    if (mode === regenerateDraftMode || inputDisabled) return;
+    clearInput();
+    onRegenerateDraftModeChange?.(mode);
   };
 
   const handleCancelRegenerateDraft = () => {
@@ -188,15 +205,32 @@ const ChatInput: React.FC<ChatInputProps> = ({
         {/* 输入区域 */}
         <div className={`chat-input-field-wrapper ${regenerateDraftMode ? 'has-mode-badge' : ''}`}>
           {regenerateDraftMode && (
-            <div className="chat-input-mode-badge">
-              <span>正在修改上一轮输入</span>
+            <div className="chat-input-mode-switcher" role="group" aria-label="重新生成编辑模式">
+              <button
+                type="button"
+                className={`chat-input-mode-tab ${regenerateDraftMode === 'user-input' ? 'active' : ''}`}
+                onClick={() => handleRegenerateDraftModeChange('user-input')}
+                disabled={inputDisabled}
+                aria-pressed={regenerateDraftMode === 'user-input'}
+              >
+                修改上一轮输入
+              </button>
+              <button
+                type="button"
+                className={`chat-input-mode-tab ${regenerateDraftMode === 'assistant-append' ? 'active' : ''}`}
+                onClick={() => handleRegenerateDraftModeChange('assistant-append')}
+                disabled={inputDisabled}
+                aria-pressed={regenerateDraftMode === 'assistant-append'}
+              >
+                追加上一轮输出
+              </button>
               <button
                 type="button"
                 className="chat-input-mode-cancel"
                 onClick={handleCancelRegenerateDraft}
                 disabled={inputDisabled}
-                aria-label="取消修改上一轮输入"
-                title="取消并返回普通输入"
+                aria-label="退出重新生成编辑模式"
+                title="退出并返回普通输入"
               >
                 <X size={14} aria-hidden="true" />
               </button>
@@ -265,11 +299,23 @@ const ChatInput: React.FC<ChatInputProps> = ({
         {/* 主操作：普通模式发送；修改上一轮输入时直接变为重新生成 */}
         <button
           className={`chat-send-btn ${message.trim() ? 'active' : ''} ${regenerateDraftMode ? 'regenerate-mode' : ''} ${isRegenerating ? 'spinning' : ''}`}
-          aria-label={regenerateDraftMode ? '使用修改后的上一轮输入重新生成' : '发送玩家行动'}
+          aria-label={
+            regenerateDraftMode === 'user-input'
+              ? '使用修改后的上一轮输入重新生成'
+              : regenerateDraftMode === 'assistant-append'
+                ? '追加信息到上一轮输出并重新生成'
+                : '发送玩家行动'
+          }
           data-wuxia-automation={regenerateDraftMode ? 'generation-state regenerate-last-reply' : 'send-turn'}
           onClick={handlePrimaryAction}
           disabled={primaryDisabled}
-          title={regenerateDraftMode ? '使用修改内容重新生成 (Enter)' : '发送 (Enter)'}
+          title={
+            regenerateDraftMode === 'user-input'
+              ? '使用修改内容重新生成 (Enter)'
+              : regenerateDraftMode === 'assistant-append'
+                ? '追加信息并重新生成 (Enter)'
+                : '发送 (Enter)'
+          }
           type="button"
         >
           <div className="send-btn-bg"></div>
