@@ -105,10 +105,11 @@ let latestBatchLogs: SmallSummaryBackfillBatchLog[] = [];
 
 function getWorkbenchChatKey(): string {
   try {
+    if (typeof SillyTavern === 'undefined') return 'unknown-chat';
     const chatId =
-      typeof SillyTavern?.getCurrentChatId === 'function'
+      typeof SillyTavern.getCurrentChatId === 'function'
         ? SillyTavern.getCurrentChatId()
-        : SillyTavern?.chatId;
+        : SillyTavern.chatId;
     return typeof chatId === 'string' && chatId.trim() ? chatId.trim() : 'unknown-chat';
   } catch {
     return 'unknown-chat';
@@ -158,20 +159,33 @@ function ensureWorkbenchStateHydrated(): void {
     }
 
     if (Array.isArray(parsed.batchLogs)) {
+      let convertedRunningLog = false;
       latestBatchLogs = parsed.batchLogs
         .filter(log => log && typeof log.id === 'string')
-        .map(log =>
-          log.status === 'running'
-            ? {
-                ...log,
-                status: 'error' as const,
-                finishedAt: log.finishedAt || Date.now(),
-                failedMessageIds: [...log.requestedMessageIds],
-                error: log.error || '前端在该批次处理中发生重载，无法确认模型返回；请重新扫描并重试缺失楼层。',
-              }
-            : { ...log },
-        )
+        .map(log => {
+          if (log.status !== 'running') return { ...log };
+          convertedRunningLog = true;
+          const error = log.error || '前端在该批次处理中发生重载，无法确认模型返回；请重新扫描并重试缺失楼层。';
+          for (const messageId of log.requestedMessageIds) {
+            if (!lastAttempts.has(messageId)) {
+              lastAttempts.set(messageId, {
+                status: 'error',
+                attemptedAt: Date.now(),
+                batchId: log.id,
+                error,
+              });
+            }
+          }
+          return {
+            ...log,
+            status: 'error' as const,
+            finishedAt: log.finishedAt || Date.now(),
+            failedMessageIds: [...log.requestedMessageIds],
+            error,
+          };
+        })
         .slice(-24);
+      if (convertedRunningLog) persistWorkbenchState();
     }
   } catch {
     lastAttempts.clear();
@@ -451,17 +465,23 @@ export function parseSmallSummaryBatchResponse(
   const requested = new Set(requestedMessageIds);
   const accepted = new Map<number, string>();
   const rejected: Array<{ messageId: number; error: string }> = [];
+  const seenResponseIds = new Set<number>();
+  const duplicateIds = new Set<number>();
 
   for (const rawItem of rawSummaries) {
     if (!rawItem || typeof rawItem !== 'object' || Array.isArray(rawItem)) continue;
     const item = rawItem as { message_id?: unknown; summary?: unknown };
     const messageId = Number(item.message_id);
     if (!Number.isInteger(messageId) || !requested.has(messageId)) continue;
-    if (accepted.has(messageId)) {
-      rejected.push({ messageId, error: '模型对同一楼层返回了重复小总结。' });
+    if (seenResponseIds.has(messageId)) {
+      if (!duplicateIds.has(messageId)) {
+        rejected.push({ messageId, error: '模型对同一楼层返回了重复小总结。' });
+        duplicateIds.add(messageId);
+      }
       accepted.delete(messageId);
       continue;
     }
+    seenResponseIds.add(messageId);
     if (typeof item.summary !== 'string') {
       rejected.push({ messageId, error: '模型返回的小总结不是字符串。' });
       continue;
@@ -473,7 +493,9 @@ export function parseSmallSummaryBatchResponse(
       rejected.push({ messageId, error: validationError });
       continue;
     }
-    accepted.set(messageId, summary);
+    if (!duplicateIds.has(messageId)) {
+      accepted.set(messageId, summary);
+    }
   }
 
   const rejectedIds = new Set(rejected.map(item => item.messageId));
