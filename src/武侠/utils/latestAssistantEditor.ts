@@ -178,7 +178,7 @@ function requireCurrentSnapshot(snapshot: LatestAssistantSnapshot): AssistantMes
     current.messageId !== snapshot.messageId
     || current.swipeId !== snapshot.swipeId
     || current.rawText !== snapshot.rawText
-    || current.messageMirrorText !== snapshot.messageMirrorText
+    || (!snapshot.hasSwipes && current.messageMirrorText !== snapshot.messageMirrorText)
     || current.hasSwipes !== snapshot.hasSwipes
   ) {
     throw new LatestAssistantEditorConflictError('最新回复在编辑期间已经变化，请重新载入后再保存。');
@@ -249,11 +249,12 @@ function writeRawText(
 
   const swipeId = getSafeSwipeId(message);
   swipes[swipeId] = text;
+  // 对含 swipe 的楼层，active swipe 才是正文真相源。历史楼层的兼容 message 镜像
+  // 可能不会随 setChatMessages 同步，强行同时覆写/校验它会把成功的 swipe 编辑误判成部分写入。
   return setChatMessages(
     [
       {
         message_id: message.message_id,
-        message: messageMirrorText,
         swipe_id: swipeId,
         swipes,
       },
@@ -280,12 +281,13 @@ function assertWrittenText(
   messageMirrorText: string = text,
 ): AssistantMessageWithSwipes {
   const readback = readMessageById(messageId);
+  const hasSwipes = Array.isArray(readback.swipes) && readback.swipes.length > 0;
   if (
     getSafeSwipeId(readback) !== swipeId
     || getActiveRawText(readback) !== text
-    || readback.message !== messageMirrorText
+    || (!hasSwipes && readback.message !== messageMirrorText)
   ) {
-    throw new Error(`最新回复 #${messageId} 写入后回读不一致。`);
+    throw new Error(`回复 #${messageId} 写入后回读不一致。`);
   }
   return readback;
 }
@@ -294,9 +296,10 @@ function canSafelyRollback(snapshot: LatestAssistantSnapshot, expectedDraft: str
   if (readCurrentChatId() !== snapshot.chatId) return null;
   try {
     const message = readMessageById(snapshot.messageId);
+    const hasSwipes = Array.isArray(message.swipes) && message.swipes.length > 0;
     return getSafeSwipeId(message) === snapshot.swipeId
       && getActiveRawText(message) === expectedDraft
-      && message.message === expectedDraft
+      && (hasSwipes || message.message === expectedDraft)
       ? message
       : null;
   } catch {
@@ -308,7 +311,7 @@ function isOriginalSnapshotState(message: AssistantMessageWithSwipes, snapshot: 
   const hasSwipes = Array.isArray(message.swipes) && message.swipes.length > 0;
   return getSafeSwipeId(message) === snapshot.swipeId
     && getActiveRawText(message) === snapshot.rawText
-    && (message.message || '') === snapshot.messageMirrorText
+    && (hasSwipes || (message.message || '') === snapshot.messageMirrorText)
     && hasSwipes === snapshot.hasSwipes;
 }
 
@@ -538,7 +541,7 @@ function requireEditableTurnCurrent(snapshot: EditableTurnSnapshot): {
     assistant.role !== 'assistant'
     || getSafeSwipeId(assistant) !== snapshot.assistant.swipeId
     || getActiveRawText(assistant) !== snapshot.assistant.rawText
-    || (assistant.message || '') !== snapshot.assistant.messageMirrorText
+    || (!snapshot.assistant.hasSwipes && (assistant.message || '') !== snapshot.assistant.messageMirrorText)
   ) {
     throw new LatestAssistantEditorConflictError(
       `AI 楼层 #${snapshot.assistant.messageId} 在编辑期间已经变化，请重新读取后再保存。`,
@@ -552,7 +555,7 @@ function requireEditableTurnCurrent(snapshot: EditableTurnSnapshot): {
       user.role !== 'user'
       || getSafeSwipeId(user) !== snapshot.userSwipeId
       || getActiveRawText(user) !== snapshot.userRawText
-      || (user.message || '') !== snapshot.userMessageMirrorText
+      || (!snapshot.userHasSwipes && (user.message || '') !== snapshot.userMessageMirrorText)
     ) {
       throw new LatestAssistantEditorConflictError(
         `User 楼层 #${snapshot.userMessageId} 在编辑期间已经变化，请重新读取后再保存。`,
