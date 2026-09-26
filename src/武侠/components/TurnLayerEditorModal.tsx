@@ -174,7 +174,7 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
             type="button"
             className="latest-reply-action secondary"
             onClick={() => navigateTo(baseSnapshot?.previousAssistantMessageId ?? undefined)}
-            disabled={!baseSnapshot?.previousAssistantMessageId || isSaving}
+            disabled={baseSnapshot?.previousAssistantMessageId == null || isSaving}
           >
             <ChevronLeft size={16} aria-hidden="true" />
             <span>上一回合</span>
@@ -199,7 +199,7 @@ const TurnLayerEditorModal: React.FC<TurnLayerEditorModalProps> = ({
             type="button"
             className="latest-reply-action secondary"
             onClick={() => navigateTo(baseSnapshot?.nextAssistantMessageId ?? undefined)}
-            disabled={!baseSnapshot?.nextAssistantMessageId || isSaving}
+            disabled={baseSnapshot?.nextAssistantMessageId == null || isSaving}
           >
             <span>下一回合</span>
             <ChevronRight size={16} aria-hidden="true" />
