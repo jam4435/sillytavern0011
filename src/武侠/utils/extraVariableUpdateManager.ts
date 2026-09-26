@@ -34,7 +34,9 @@ import {
   type WorldTimeTuple,
 } from './worldTimeGuard';
 
+const VARIABLE_TEMPLATE_ENTRY_NAME = '变量模板';
 const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
+const VARIABLE_UPDATE_ENTRY_NAMES = [VARIABLE_TEMPLATE_ENTRY_NAME, VARIABLE_GUIDANCE_ENTRY_NAME] as const;
 const WORLD_BACKGROUND_ENTRY_NAME = '世界背景';
 const NARRATIVE_SCALE_START_MARKER = '<叙事表现标尺>';
 const NARRATIVE_SCALE_END_MARKER = '</叙事表现标尺>';
@@ -706,10 +708,10 @@ async function setWorldbookEntryEnabled(
   return matchedBy;
 }
 
-async function ensureVariableGuidanceEnabled(enabled: boolean): Promise<boolean> {
-  const location = await findWorldbookEntryByExactName(VARIABLE_GUIDANCE_ENTRY_NAME);
+async function ensureVariableWorldbookEntryEnabled(entryName: string, enabled: boolean): Promise<boolean> {
+  const location = await findWorldbookEntryByExactName(entryName);
   if (!location) {
-    throw new Error(`未找到当前角色世界书中的精确条目「${VARIABLE_GUIDANCE_ENTRY_NAME}」。`);
+    throw new Error(`未找到当前角色世界书中的精确条目「${entryName}」。`);
   }
 
   if (location.entry.enabled === enabled) {
@@ -729,13 +731,25 @@ async function ensureVariableGuidanceEnabled(enabled: boolean): Promise<boolean>
   return true;
 }
 
+async function ensureVariableUpdateEntriesEnabled(enabled: boolean): Promise<string[]> {
+  const changedEntries: string[] = [];
+  // 同一世界书的更新必须串行，避免两个 updateWorldbookWith 并发覆盖彼此。
+  for (const entryName of VARIABLE_UPDATE_ENTRY_NAMES) {
+    if (await ensureVariableWorldbookEntryEnabled(entryName, enabled)) {
+      changedEntries.push(entryName);
+    }
+  }
+  return changedEntries;
+}
+
 export async function applyVariableUpdateModeWorldbookState(mode: SummaryVariableUpdateMode): Promise<string> {
   const enabled = mode === 'inline';
-  const changed = await ensureVariableGuidanceEnabled(enabled);
+  const changedEntries = await ensureVariableUpdateEntriesEnabled(enabled);
   const stateLabel = enabled ? '启用' : '禁用';
-  return changed
-    ? `已${stateLabel}当前角色世界书中的「${VARIABLE_GUIDANCE_ENTRY_NAME}」。`
-    : `当前角色世界书中的「${VARIABLE_GUIDANCE_ENTRY_NAME}」已经是${stateLabel}状态。`;
+  const entryLabel = VARIABLE_UPDATE_ENTRY_NAMES.map(name => `「${name}」`).join('、');
+  return changedEntries.length > 0
+    ? `已${stateLabel}当前角色世界书中的${entryLabel}。`
+    : `当前角色世界书中的${entryLabel}已经全部是${stateLabel}状态。`;
 }
 
 function reserveExtraVariableUpdate(): ExtraVariableUpdateReservation {
@@ -773,7 +787,7 @@ export async function prepareExtraVariableUpdateTurn(
         throw new Error(validationMessage);
       }
     }
-    await ensureVariableGuidanceEnabled(false);
+    await ensureVariableUpdateEntriesEnabled(false);
     return reservation;
   } catch (error) {
     reservation.release();
@@ -1072,12 +1086,7 @@ function formatLocationContext(surroundingLocations: unknown, currentLocation: u
     lines.push(`[${groupName}]${paths.length === 0 ? '（无）' : ''}`, ...paths.map(path => `- ${path}`));
   }
   lines.push(
-    '[写入规则]',
-    allowedScopes.size === 0
-      ? '当前没有可用的合法严格活动区，本轮禁止修改任何“所在位置”。'
-      : '任何“所在位置”的前三段必须逐字等于上方合法严格活动区；可以保留三级，也可以追加一个不含“/”的第四级具体场景。',
-    '第四级不参加白名单匹配；只有正文确实发生局部移动时才修改，未移动时不得改写同义词，同一场景优先复用已有名称。',
-    '事件目标的第四级是推荐初始场景而非强制字面值；同一前三段只表示处于同一事件活动区，不表示人物已经面对面同场。',
+    '同一前三段只表示处于同一严格活动区，不表示人物已经面对面同场。',
     '</可用地点>',
   );
   return lines.join('\n');
@@ -1353,21 +1362,28 @@ function renderVariablePromptTemplate(
     latestUserBody: string;
     latestAssistantBody: string;
     variableContext: string;
+    variableTemplate: string;
     variableGuidance: string;
     locationContext: string;
     narrativeScale: string;
   },
 ): string {
   const sourceTemplate = template.trim() ? template : DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE;
-  const variableGuidance = sourceTemplate.includes('{{narrativeScale}}')
+  const hasVariableTemplatePlaceholder = sourceTemplate.includes('{{variableTemplate}}');
+  const baseVariableGuidance = sourceTemplate.includes('{{narrativeScale}}')
     ? values.variableGuidance
     : `【叙事表现标尺】\n${values.narrativeScale}\n\n【ERA 变量领域规则】\n${values.variableGuidance}`;
+  // 兼容旧的自定义模板：若只有 {{variableGuidance}}，把变量模板一并注入该占位符。
+  const variableGuidance = hasVariableTemplatePlaceholder
+    ? baseVariableGuidance
+    : `【ERA 变量结构与权限模板】\n${values.variableTemplate}\n\n${baseVariableGuidance}`;
   return sourceTemplate
     .replace(/\{\{recentBodies\}\}/g, values.recentBodies)
     .replace(/\{\{readonlyContextRounds\}\}/g, values.readonlyContextRounds)
     .replace(/\{\{latestUserBody\}\}/g, values.latestUserBody)
     .replace(/\{\{latestAssistantBody\}\}/g, values.latestAssistantBody)
     .replace(/\{\{variableContext\}\}/g, values.variableContext)
+    .replace(/\{\{variableTemplate\}\}/g, values.variableTemplate)
     .replace(/\{\{variableGuidance\}\}/g, variableGuidance)
     .replace(/\{\{locationContext\}\}/g, values.locationContext)
     .replace(/\{\{narrativeScale\}\}/g, values.narrativeScale);
@@ -1382,7 +1398,8 @@ async function buildExtraVariableUpdatePrompt({
   assistantMessageId: number;
   latestRawReply: string;
 }): Promise<string> {
-  const [variableGuidance, worldBackground] = await Promise.all([
+  const [variableTemplate, variableGuidance, worldBackground] = await Promise.all([
+    readWorldbookEntryContent(VARIABLE_TEMPLATE_ENTRY_NAME),
     readWorldbookEntryContent(VARIABLE_GUIDANCE_ENTRY_NAME),
     readWorldbookEntryContent(WORLD_BACKGROUND_ENTRY_NAME),
   ]);
@@ -1401,6 +1418,7 @@ async function buildExtraVariableUpdatePrompt({
     latestUserBody: recentBodies.serializedLatestUserBody,
     latestAssistantBody: recentBodies.serializedLatestAssistantBody,
     variableContext: variableProjection.variableContext,
+    variableTemplate,
     variableGuidance,
     locationContext: variableProjection.locationContext,
     narrativeScale,
