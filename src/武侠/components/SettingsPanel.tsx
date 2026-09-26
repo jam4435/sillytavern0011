@@ -3373,7 +3373,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       onChange={handleVariableSearchChange}
                       placeholder={
                         variableSearchMode === 'global'
-                          ? '字段名、完整路径，或开启包含值后搜索正文'
+                          ? '字段名、完整路径，或开启搜索变量值后搜索正文'
                           : resolvedActiveVariableGroup === 'character'
                             ? '当前人物的字段名或路径'
                             : '当前类别全部变量的字段名或路径'
@@ -3431,16 +3431,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  className={`variables-mode-btn ${variableIncludeValueSearch ? 'active' : ''}`}
-                  onClick={handleToggleVariableValueSearch}
-                >
-                  包含值
-                </button>
+                <label className="variables-value-toggle">
+                  <input
+                    type="checkbox"
+                    checked={variableIncludeValueSearch}
+                    onChange={handleToggleVariableValueSearch}
+                  />
+                  <span>搜索变量值</span>
+                </label>
 
                 <div className={`variables-capability ${canEditVariables ? 'editable' : 'readonly'}`}>
-                  {canEditVariables ? '叶子值可编辑' : '当前仅可查看'}
+                  <span className="variables-capability-dot" aria-hidden="true" />
+                  <span>{canEditVariables ? '可编辑' : '只读'}</span>
                 </div>
               </div>
 
