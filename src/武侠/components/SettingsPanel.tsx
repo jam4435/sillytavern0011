@@ -53,7 +53,13 @@ import {
   type ConversationSummaryPromptState,
   type ConversationSummaryPromptTraceSnapshot,
 } from '../utils/conversationSummaryManager';
-import { backfillHistoricalConversationMemory } from '../utils/narrativeMemoryManager';
+import {
+  SMALL_SUMMARY_BACKFILL_EVENT,
+  backfillMissingSmallSummaries,
+  getLatestSmallSummaryBackfillSnapshot,
+  scanSmallSummaryBackfill,
+  type SmallSummaryBackfillSnapshot,
+} from '../utils/conversationSummaryBackfillManager';
 import {
   checkSummaryTrigger,
   triggerManualSummary,
@@ -165,7 +171,7 @@ const SUMMARY_API_SOURCES = [
 const SUMMARY_CONTEXT_STATE_LABELS: Record<ConversationSummaryPromptState, string> = {
   full: '保留原文',
   summary_only: '仅保留摘要',
-  chapter_memory: '章节记忆接管',
+  chapter_memory: '大总结接管',
   empty: '已清空',
   not_in_prompt: '未进入本次上下文',
 };
@@ -455,8 +461,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isConversationSummaryModeUpdating, setIsConversationSummaryModeUpdating] = useState(false);
   const [customXmlModuleInput, setCustomXmlModuleInput] = useState('');
   const [customXmlModuleStatus, setCustomXmlModuleStatus] = useState('');
-  const [isHistoricalConversationBackfillRunning, setIsHistoricalConversationBackfillRunning] = useState(false);
-  const [historicalConversationBackfillStatus, setHistoricalConversationBackfillStatus] = useState('');
+  const [isSmallSummaryBackfillRunning, setIsSmallSummaryBackfillRunning] = useState(false);
+  const [smallSummaryBackfillStatus, setSmallSummaryBackfillStatus] = useState('');
+  const [smallSummaryBackfillSnapshot, setSmallSummaryBackfillSnapshot] =
+    useState<SmallSummaryBackfillSnapshot | null>(() => getLatestSmallSummaryBackfillSnapshot());
   const [conversationSummaryTrace, setConversationSummaryTrace] =
     useState<ConversationSummaryPromptTraceSnapshot | null>(() => getLatestConversationSummaryPromptTrace());
   const [editingApiProfileId, setEditingApiProfileId] = useState<string | null>(
@@ -471,6 +479,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setConversationSummaryTrace(getLatestConversationSummaryPromptTrace());
   }, []);
 
+  const syncSmallSummaryBackfillSnapshot = useCallback(() => {
+    setSmallSummaryBackfillSnapshot(getLatestSmallSummaryBackfillSnapshot());
+  }, []);
+
+  const refreshSmallSummaryBackfillWorkbench = useCallback(() => {
+    try {
+      setSmallSummaryBackfillSnapshot(scanSmallSummaryBackfill(settings.summarySettings));
+    } catch (error) {
+      setSmallSummaryBackfillStatus(`扫描失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [settings.summarySettings]);
+
   useEffect(() => {
     refreshConversationSummaryTrace();
     window.addEventListener(CONVERSATION_SUMMARY_TRACE_EVENT, refreshConversationSummaryTrace);
@@ -478,6 +498,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       window.removeEventListener(CONVERSATION_SUMMARY_TRACE_EVENT, refreshConversationSummaryTrace);
     };
   }, [refreshConversationSummaryTrace]);
+
+  useEffect(() => {
+    refreshSmallSummaryBackfillWorkbench();
+    window.addEventListener(SMALL_SUMMARY_BACKFILL_EVENT, syncSmallSummaryBackfillSnapshot);
+    return () => {
+      window.removeEventListener(SMALL_SUMMARY_BACKFILL_EVENT, syncSmallSummaryBackfillSnapshot);
+    };
+  }, [refreshSmallSummaryBackfillWorkbench, syncSmallSummaryBackfillSnapshot]);
 
   // 变量编辑相关状态
   const [variableBaseStatData, setVariableBaseStatData] = useState<Record<string, unknown> | null>(null);
@@ -635,6 +663,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const summaryApiValidationMessage = hasApiDraftContent
     ? validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true })
     : '';
+  const smallSummaryItems = smallSummaryBackfillSnapshot?.items || [];
+  const smallSummaryTotalCount = smallSummaryItems.length;
+  const smallSummaryPresentCount = smallSummaryItems.filter(item => item.hasSummary).length;
+  const smallSummaryMissingCount = smallSummaryItems.filter(item => !item.hasSummary).length;
+  const smallSummaryFailedCount = smallSummaryItems.filter(
+    item => !item.hasSummary && item.lastAttempt?.status === 'error',
+  ).length;
+  const latestSmallSummaryBackfillSuccessAt = smallSummaryItems.reduce(
+    (latest, item) =>
+      item.lastAttempt?.status === 'success' ? Math.max(latest, item.lastAttempt.attemptedAt) : latest,
+    0,
+  );
+  const isConversationSummaryTraceStale = Boolean(
+    conversationSummaryTrace &&
+      latestSmallSummaryBackfillSuccessAt > 0 &&
+      conversationSummaryTrace.capturedAt < latestSmallSummaryBackfillSuccessAt,
+  );
+  const conversationSummaryTraceByMessageId = new Map(
+    (conversationSummaryTrace?.items || []).map(item => [item.messageId, item]),
+  );
 
   const toggleSettingBlock = useCallback((id: SettingsCollapsibleId) => {
     setOpenSettingBlocks(previousBlocks => ({
@@ -1721,54 +1769,80 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     [settings.summarySettings.conversationSummaryMode,settings.summarySettings.conversationSummaryRecentReplies,updateSummarySetting],
   );
 
-  const handleHistoricalConversationBackfill = useCallback(async () => {
-    if (isHistoricalConversationBackfillRunning) return;
+  const handleSmallSummaryBackfill = useCallback(
+    async (targetMessageId?: number) => {
+      if (isSmallSummaryBackfillRunning) return;
 
-    const confirmed = window.confirm(
-      '这会读取当前聊天较早的 user + assistant 楼层，用额外总结模型按批次生成长期章节记忆。\n\n历史楼层与 swipe 原文不会被改写；完成后会保持当前摘要来源，由“记忆区”接管被章节记忆覆盖的旧对话。是否继续？',
-    );
-    if (!confirmed) return;
-
-    setIsHistoricalConversationBackfillRunning(true);
-    setHistoricalConversationBackfillStatus('正在扫描尚未被章节记忆覆盖的旧聊天...');
-    try {
-      const result = await backfillHistoricalConversationMemory({
-        settings: settings.summarySettings,
-        onProgress: progress => {
-          setHistoricalConversationBackfillStatus(
-            `正在回溯压缩：${progress.completedChapters}/${progress.totalChapters} 章 · ${progress.processedTurns}/${progress.totalTurns} 轮`,
-          );
-        },
-      });
-
-      if (!result.archived) {
-        setHistoricalConversationBackfillStatus('没有需要回溯的旧聊天：现有章节记忆已覆盖可压缩范围，或聊天仍处于最近完整回复窗口内。');
+      let snapshot: SmallSummaryBackfillSnapshot;
+      try {
+        snapshot = scanSmallSummaryBackfill(settings.summarySettings);
+        setSmallSummaryBackfillSnapshot(snapshot);
+      } catch (error) {
+        setSmallSummaryBackfillStatus(`扫描失败：${error instanceof Error ? error.message : String(error)}`);
         return;
       }
 
-      setHistoricalConversationBackfillStatus(
-        `已生成 ${result.chapterCount} 章，正在同步记忆区与 prompt 裁剪...`,
-      );
-      const modeStatus = await applyConversationSummaryModeState(
-        settings.summarySettings.conversationSummaryMode,
-        settings.summarySettings.conversationSummaryRecentReplies,
-      );
+      const targetMissing = targetMessageId === undefined
+        ? snapshot.items.filter(item => !item.hasSummary)
+        : snapshot.items.filter(item => item.messageId === targetMessageId && !item.hasSummary);
+      if (targetMissing.length === 0) {
+        setSmallSummaryBackfillStatus(
+          targetMessageId === undefined ? '当前可识别的 Assistant 楼层都已经有小总结。' : `Assistant #${targetMessageId} 已经有小总结，无需重试。`,
+        );
+        return;
+      }
 
-      setHistoricalConversationBackfillStatus(
-        `回溯完成：${result.turnCount} 轮旧聊天 → ${result.chapterCount} 个章节记忆；历史楼层原文未修改，摘要来源保持不变。${modeStatus ? ` ${modeStatus}` : ''}`,
+      if (targetMessageId === undefined) {
+        const confirmed = window.confirm(
+          `将扫描并补齐当前聊天中缺少小总结的 Assistant 楼层。\n\n每批读取 ${settings.summarySettings.conversationSummaryBackfillBatchSize} 个连续 Assistant 楼层；已有小总结的楼只作为上下文，不会改写。补完只修改当前 active swipe，并在写后重新验证。\n\n当前缺少 ${snapshot.items.filter(item => !item.hasSummary).length} 层，是否继续？`,
+        );
+        if (!confirmed) return;
+      }
+
+      setIsSmallSummaryBackfillRunning(true);
+      setSmallSummaryBackfillStatus(
+        targetMessageId === undefined
+          ? '正在补齐缺失小总结...'
+          : `正在重试 Assistant #${targetMessageId} 所在的连续批次...`,
       );
-    } catch (error) {
-      uiLogger.error('[SettingsPanel] 旧聊天回溯压缩失败', error);
-      setHistoricalConversationBackfillStatus(
-        `回溯失败：${error instanceof Error ? error.message : String(error)}`,
-      );
-    } finally {
-      setIsHistoricalConversationBackfillRunning(false);
-    }
-  }, [
-    isHistoricalConversationBackfillRunning,
-    settings.summarySettings,
-  ]);
+      try {
+        const result = await backfillMissingSmallSummaries({
+          settings: settings.summarySettings,
+          ...(targetMessageId !== undefined ? { targetMessageId } : {}),
+          onProgress: progress => {
+            setSmallSummaryBackfillSnapshot(progress.snapshot);
+            const missing = progress.snapshot.items.filter(item => !item.hasSummary).length;
+            setSmallSummaryBackfillStatus(
+              `小总结补完：批次 ${progress.completedBatches}/${progress.totalBatches} · 当前仍缺 ${missing} 层`,
+            );
+          },
+        });
+        setSmallSummaryBackfillSnapshot(result.snapshot);
+        if (result.totalBatches === 0) {
+          setSmallSummaryBackfillStatus('没有需要补完的小总结。');
+        } else if (result.failedMessageIds.length === 0) {
+          setSmallSummaryBackfillStatus(
+            `补完完成：成功写回并验证 ${result.succeededMessageIds.length} 层；当前没有本轮失败楼层。`,
+          );
+        } else {
+          setSmallSummaryBackfillStatus(
+            `补完完成：成功 ${result.succeededMessageIds.length} 层，仍有 ${result.failedMessageIds.length} 层失败或未返回。失败原因已记录在工作台。`,
+          );
+        }
+      } catch (error) {
+        uiLogger.error('[SettingsPanel] 小总结补完失败', error);
+        setSmallSummaryBackfillStatus(`补完失败：${error instanceof Error ? error.message : String(error)}`);
+        refreshSmallSummaryBackfillWorkbench();
+      } finally {
+        setIsSmallSummaryBackfillRunning(false);
+      }
+    },
+    [
+      isSmallSummaryBackfillRunning,
+      refreshSmallSummaryBackfillWorkbench,
+      settings.summarySettings,
+    ],
+  );
 
   const updateVariableUpdateMode = useCallback(
     async (mode: SummaryVariableUpdateMode) => {
@@ -2634,24 +2708,201 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </div>
               )}
 
-              <div className="summary-backfill-panel">
-                <div className="summary-archive-header">
+              <div className="summary-backfill-workbench">
+                <div className="summary-backfill-workbench-header">
                   <div>
-                    <h5>旧聊天回溯压缩</h5>
-                    <p>用于“以前没开摘要、现在上下文已经很长”的聊天。只补章节记忆，不重写历史楼层或 swipe。</p>
+                    <h5>小总结补完工作台</h5>
+                    <p>
+                      扫描当前 active swipe 的逐层小总结；补完时每批读取连续 Assistant 楼层，已有小总结只作为上下文。
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    className="settings-action-btn primary"
-                    onClick={() => void handleHistoricalConversationBackfill()}
-                    disabled={isHistoricalConversationBackfillRunning || isConversationSummaryModeUpdating}
-                  >
-                    <Icons.Scroll size={15} />
-                    <span>{isHistoricalConversationBackfillRunning ? '回溯压缩中...' : '回溯压缩旧聊天'}</span>
-                  </button>
+                  <div className="summary-backfill-workbench-actions">
+                    <button
+                      type="button"
+                      className="settings-action-btn summary-trace-refresh"
+                      onClick={() => {
+                        refreshSmallSummaryBackfillWorkbench();
+                        refreshConversationSummaryTrace();
+                      }}
+                      disabled={isSmallSummaryBackfillRunning}
+                    >
+                      <Icons.Refresh size={14} />
+                      <span>扫描</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="settings-action-btn primary"
+                      onClick={() => void handleSmallSummaryBackfill()}
+                      disabled={isSmallSummaryBackfillRunning || isConversationSummaryModeUpdating}
+                    >
+                      <Icons.Scroll size={15} />
+                      <span>{isSmallSummaryBackfillRunning ? '补完中...' : '补完缺失小总结'}</span>
+                    </button>
+                  </div>
                 </div>
-                {historicalConversationBackfillStatus && (
-                  <div className="summary-mode-status">{historicalConversationBackfillStatus}</div>
+
+                <div className="summary-inline-field summary-backfill-batch-size">
+                  <label htmlFor="conversation-summary-backfill-size">每批连续 Assistant 楼层</label>
+                  <input
+                    id="conversation-summary-backfill-size"
+                    type="number"
+                    min="5"
+                    max="10"
+                    value={settings.summarySettings.conversationSummaryBackfillBatchSize}
+                    onChange={e =>
+                      updateSummarySetting(
+                        'conversationSummaryBackfillBatchSize',
+                        Math.max(5, Math.min(10, parseInt(e.target.value) || 8)),
+                      )
+                    }
+                    className="settings-number-input summary-inline-number"
+                    disabled={isSmallSummaryBackfillRunning}
+                    title="按 Assistant 顺序固定切成连续批次；已有小总结的楼也会进入输入作为上下文，但不会重新生成。"
+                  />
+                </div>
+
+                <div className="summary-backfill-stats">
+                  <span>Assistant {smallSummaryTotalCount}</span>
+                  <span className="ok">已有 {smallSummaryPresentCount}</span>
+                  <span className={smallSummaryMissingCount > 0 ? 'missing' : 'ok'}>缺失 {smallSummaryMissingCount}</span>
+                  <span className={smallSummaryFailedCount > 0 ? 'error' : ''}>失败 {smallSummaryFailedCount}</span>
+                  <span>{smallSummaryBackfillSnapshot ? `扫描 ${new Date(smallSummaryBackfillSnapshot.scannedAt).toLocaleTimeString('zh-CN')}` : '尚未扫描'}</span>
+                </div>
+
+                {smallSummaryBackfillStatus && (
+                  <div className="summary-mode-status">{smallSummaryBackfillStatus}</div>
+                )}
+
+                {conversationSummaryTrace && (
+                  <div className="summary-trace-meta summary-backfill-context-meta">
+                    <span>最终上下文快照 {new Date(conversationSummaryTrace.capturedAt).toLocaleTimeString('zh-CN')}</span>
+                    <span>
+                      {conversationSummaryTrace.mode === 'card'
+                        ? '卡内摘要'
+                        : conversationSummaryTrace.mode === 'preset'
+                          ? '兼容预设'
+                          : '关闭'}
+                    </span>
+                    <span>{'<' + conversationSummaryTrace.summaryTag + '>'}</span>
+                    <span>最近 {conversationSummaryTrace.recentReplies} 条保留正文</span>
+                    {isConversationSummaryTraceStale && (
+                      <span className="stale">快照早于最近补完 · 下次送模后更新</span>
+                    )}
+                  </div>
+                )}
+
+                {!smallSummaryBackfillSnapshot ? (
+                  <div className="summary-trace-empty">尚未扫描当前聊天。</div>
+                ) : smallSummaryItems.length === 0 ? (
+                  <div className="summary-trace-empty">当前聊天没有可识别的正常 Assistant 正文楼层。</div>
+                ) : (
+                  <div className="summary-trace-list summary-backfill-list">
+                    {[...smallSummaryItems].reverse().map(item => {
+                      const traceItem = conversationSummaryTraceByMessageId.get(item.messageId);
+                      const failed = !item.hasSummary && item.lastAttempt?.status === 'error';
+                      const recentlyCompleted = item.hasSummary && item.lastAttempt?.status === 'success';
+                      const summaryLabel = item.hasSummary
+                        ? recentlyCompleted
+                          ? '补完成功'
+                          : '已有小总结'
+                        : failed
+                          ? '补完失败'
+                          : '缺少小总结';
+                      const summaryClass = item.hasSummary ? 'ok' : failed ? 'error' : 'missing';
+
+                      return (
+                        <details className="summary-trace-item" key={item.messageId}>
+                          <summary>
+                            <span className="summary-trace-floor">Assistant #{item.messageId}</span>
+                            <span className={'summary-trace-badge ' + summaryClass}>{summaryLabel}</span>
+                            {traceItem && (
+                              <span className={'summary-trace-badge state-' + traceItem.contextState}>
+                                {SUMMARY_CONTEXT_STATE_LABELS[traceItem.contextState]}
+                              </span>
+                            )}
+                          </summary>
+                          <div className="summary-trace-detail">
+                            <div>
+                              <strong>小总结</strong>
+                              <p>{item.summary || '当前 active swipe 未检测到可用小总结。'}</p>
+                              {item.summaryTag && (
+                                <span className="summary-backfill-tag">{'<' + item.summaryTag + '>'}</span>
+                              )}
+                            </div>
+
+                            {item.lastAttempt?.status === 'error' && !item.hasSummary && (
+                              <div className="summary-backfill-error">
+                                <strong>最近补完失败</strong>
+                                <p>{item.lastAttempt.error || '该楼层没有成功写回小总结。'}</p>
+                                <button
+                                  type="button"
+                                  className="settings-action-btn"
+                                  disabled={isSmallSummaryBackfillRunning}
+                                  onClick={() => void handleSmallSummaryBackfill(item.messageId)}
+                                >
+                                  <Icons.Refresh size={14} />
+                                  <span>重试所在连续批次</span>
+                                </button>
+                              </div>
+                            )}
+
+                            <div>
+                              <strong>最终上下文</strong>
+                              <p>
+                                {isConversationSummaryTraceStale && item.lastAttempt?.status === 'success'
+                                  ? '该楼的小总结刚完成补写；当前最终 prompt 状态仍是补完前快照，发送或重新生成一次后才会更新。'
+                                  : !traceItem
+                                    ? '当前没有该楼层的最终 prompt 快照；发送或重新生成一次后可查看。'
+                                    : traceItem.contextState === 'chapter_memory'
+                                    ? '该层已由大总结/长期记忆接管，不再发送原始 user + assistant。'
+                                    : traceItem.contextState === 'summary_only'
+                                      ? '该层原文已屏蔽，最终 prompt 只保留小总结。'
+                                      : traceItem.contextState === 'full'
+                                        ? '该层仍以正文形式进入最终 prompt。'
+                                        : traceItem.contextState === 'empty'
+                                          ? '该 assistant 消息仍占位，但发送内容为空。'
+                                          : '该层没有进入最近一次最终 prompt；可能在模型上下文窗口之外或被其它过滤流程移除。'}
+                              </p>
+                            </div>
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {smallSummaryBackfillSnapshot && smallSummaryBackfillSnapshot.batchLogs.length > 0 && (
+                  <details className="summary-backfill-batch-history">
+                    <summary>最近补完批次记录（{smallSummaryBackfillSnapshot.batchLogs.length}）</summary>
+                    <div className="summary-backfill-batch-log-list">
+                      {[...smallSummaryBackfillSnapshot.batchLogs]
+                        .reverse()
+                        .slice(0, 12)
+                        .map(log => (
+                          <div className={'summary-backfill-batch-log ' + log.status} key={log.id}>
+                            <div>
+                              <strong>#{log.firstMessageId}～#{log.lastMessageId}</strong>
+                              <span>
+                                {log.status === 'success'
+                                  ? '成功'
+                                  : log.status === 'partial'
+                                    ? '部分成功'
+                                    : log.status === 'running'
+                                      ? '处理中'
+                                      : '失败'}
+                              </span>
+                            </div>
+                            <p>
+                              请求 {log.requestedMessageIds.length} 层 · 成功 {log.succeededMessageIds.length} · 失败/漏返回 {log.failedMessageIds.length}
+                            </p>
+                            {log.error && <p className="summary-backfill-batch-error">{log.error}</p>}
+                            {log.responsePreview && log.status !== 'success' && (
+                              <pre>{log.responsePreview}</pre>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  </details>
                 )}
               </div>
 
@@ -2659,8 +2910,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <div className="summary-archive-panel">
                   <div className="summary-archive-header">
                     <div>
-                      <h5>长期章节归档</h5>
-                      <p>把更早逐轮摘要继续压成章节记忆；卡内摘要与兼容预设都可使用。</p>
+                      <h5>大总结（章节归档）</h5>
+                      <p>把更早的小总结继续合并成章节记忆；与上方“小总结补完”完全分开。</p>
                     </div>
                     <label className="summary-archive-toggle">
                       <input
@@ -2674,7 +2925,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
                   {settings.summarySettings.conversationArchiveEnabled && (
                     <div className="summary-inline-field">
-                      <label htmlFor="conversation-summary-archive-size">每章摘要数</label>
+                      <label htmlFor="conversation-summary-archive-size">每次大总结包含的小总结数</label>
                       <input
                         id="conversation-summary-archive-size"
                         type="number"
@@ -2688,7 +2939,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                           )
                         }
                         className="settings-number-input summary-inline-number"
-                        title="每累计这么多条较旧逐轮摘要，就压成一个长期章节。"
+                        title="每累计这么多条较旧小总结，就合并成一个长期章节记忆。"
                       />
                     </div>
                   )}
@@ -2697,7 +2948,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               {settings.summarySettings.conversationSummaryMode === 'off' && (
                 <div className="summary-mode-note">
-                  逐轮摘要压缩已关闭；已经生成的长期章节记忆仍由“记忆区”独立接管对应旧对话。
+                  逐轮小总结的 prompt 压缩已关闭；手动“小总结补完”仍可执行，已经生成的大总结仍由“记忆区”独立接管。
                 </div>
               )}
 
@@ -2705,83 +2956,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <div className="summary-mode-status">{conversationSummaryModeStatus}</div>
               )}
 
-              <div className="summary-trace-panel">
-                <div className="summary-trace-header">
-                  <div>
-                    <h5>上下文摘要情况</h5>
-                    <p>记录最近一次真正进入模型前、完成武侠卡过滤后的上下文。</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="settings-action-btn summary-trace-refresh"
-                    onClick={refreshConversationSummaryTrace}
-                  >
-                    <Icons.Refresh size={14} />
-                    <span>刷新</span>
-                  </button>
-                </div>
-
-                {!conversationSummaryTrace ? (
-                  <div className="summary-trace-empty">
-                    暂无记录。发送或重新生成一次消息后，这里会显示每个 assistant 楼层的摘要与最终上下文状态。
-                  </div>
-                ) : (
-                  <>
-                    <div className="summary-trace-meta">
-                      <span>{new Date(conversationSummaryTrace.capturedAt).toLocaleTimeString('zh-CN')}</span>
-                      <span>
-                        {conversationSummaryTrace.mode === 'card'
-                          ? '卡内摘要'
-                          : conversationSummaryTrace.mode === 'preset'
-                            ? '兼容预设'
-                            : '关闭'}
-                      </span>
-                      <span>{'<' + conversationSummaryTrace.summaryTag + '>'}</span>
-                      <span>最近 {conversationSummaryTrace.recentReplies} 条完整回复</span>
-                    </div>
-
-                    <div className="summary-trace-list">
-                      {[...conversationSummaryTrace.items]
-                        .slice(-30)
-                        .reverse()
-                        .map(item => (
-                          <details className="summary-trace-item" key={item.messageId}>
-                            <summary>
-                              <span className="summary-trace-floor">Assistant #{item.messageId}</span>
-                              <span className={'summary-trace-badge ' + (item.hasSummary ? 'ok' : 'missing')}>
-                                {item.hasSummary ? '有摘要' : '无摘要'}
-                              </span>
-                              <span className={'summary-trace-badge state-' + item.contextState}>
-                                {SUMMARY_CONTEXT_STATE_LABELS[item.contextState]}
-                              </span>
-                            </summary>
-                            <div className="summary-trace-detail">
-                              <div>
-                                <strong>摘要</strong>
-                                <p>{item.summary || '未检测到摘要内容。'}</p>
-                              </div>
-                              <div>
-                                <strong>最终上下文</strong>
-                                <p>
-                                  {item.contextState === 'chapter_memory'
-                                    ? '该层原始 user + assistant 已从最终 prompt 移除，由“记忆区”的长期章节摘要接管。'
-                                    : item.contextState === 'summary_only'
-                                      ? '该层原文已被屏蔽，最终 prompt 只保留摘要。'
-                                      : item.contextState === 'full'
-                                        ? '该层仍以正文形式进入最终 prompt。'
-                                        : item.contextState === 'empty'
-                                          ? '该 assistant 消息仍占位，但发送内容为空。'
-                                          : '该层没有进入本次最终 prompt；可能位于模型上下文窗口之外，或被其他过滤流程移除。'}
-                                </p>
-                                {item.contextPreview && <pre>{item.contextPreview}</pre>}
-                              </div>
-                            </div>
-                          </details>
-                        ))}
-                    </div>
-                  </>
-                )}
-              </div>
             </SettingsCollapsibleBlock>
 
             <SettingsCollapsibleBlock

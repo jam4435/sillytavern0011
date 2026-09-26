@@ -112,6 +112,8 @@ export interface SummarySettings {
   conversationSummaryRecentReplies: number;
   /** 兼容预设摘要时用于识别逐轮摘要的 XML 标签名 */
   conversationSummaryPresetTag: string;
+  /** 小总结补完每批连续读取的 assistant 楼层数（5～10） */
+  conversationSummaryBackfillBatchSize: number;
   /** 是否把旧逐轮摘要自动压缩为长期章节摘要 */
   conversationArchiveEnabled: boolean;
   /** 每个长期章节摘要包含的旧逐轮摘要数量 */
@@ -576,6 +578,7 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   conversationSummaryMode: 'off',
   conversationSummaryRecentReplies: 5,
   conversationSummaryPresetTag: 'summary',
+  conversationSummaryBackfillBatchSize: 8,
   conversationArchiveEnabled: false,
   conversationArchiveBatchSize: 10,
   apiProfiles: [],
@@ -1089,6 +1092,11 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       typeof summarySettings.conversationSummaryPresetTag === 'string' && summarySettings.conversationSummaryPresetTag.trim()
         ? summarySettings.conversationSummaryPresetTag.trim()
         : defaults.conversationSummaryPresetTag,
+    conversationSummaryBackfillBatchSize:
+      typeof summarySettings.conversationSummaryBackfillBatchSize === 'number' &&
+      Number.isFinite(summarySettings.conversationSummaryBackfillBatchSize)
+        ? Math.max(5, Math.min(10, Math.floor(summarySettings.conversationSummaryBackfillBatchSize)))
+        : defaults.conversationSummaryBackfillBatchSize,
     conversationArchiveEnabled:
       typeof summarySettings.conversationArchiveEnabled === 'boolean'
         ? summarySettings.conversationArchiveEnabled

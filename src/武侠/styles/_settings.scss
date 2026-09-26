@@ -1574,7 +1574,8 @@
 
 .summary-context-panel,
 .summary-archive-panel,
-.summary-backfill-panel {
+.summary-backfill-panel,
+.summary-backfill-workbench {
   display: flex;
   flex-direction: column;
   gap: 0.72rem;
@@ -1585,7 +1586,8 @@
 }
 
 .summary-context-heading,
-.summary-archive-header {
+.summary-archive-header,
+.summary-backfill-workbench-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1709,6 +1711,167 @@
   border-top: 1px solid rgba(255, 255, 255, 0.055);
 }
 
+.summary-backfill-workbench {
+  gap: 0.62rem;
+}
+
+.summary-backfill-workbench-header {
+  .summary-backfill-workbench-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+.summary-backfill-batch-size {
+  padding-top: 0.15rem;
+}
+
+.summary-backfill-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+
+  span {
+    padding: 0.18rem 0.46rem;
+    border: 1px solid rgba($stone-700, 0.62);
+    border-radius: 999px;
+    color: $stone-500;
+    font-size: 0.69rem;
+    line-height: 1.3;
+
+    &.ok {
+      border-color: rgba($green-500, 0.36);
+      color: $green-500;
+    }
+
+    &.missing {
+      border-color: rgba($amber-600, 0.34);
+      color: $amber-600;
+    }
+
+    &.error {
+      border-color: rgba($red-500, 0.46);
+      color: $red-500;
+    }
+  }
+}
+
+.summary-backfill-context-meta {
+  padding-top: 0.05rem;
+}
+
+.summary-backfill-list {
+  max-height: 420px;
+}
+
+.summary-backfill-tag {
+  display: inline-flex;
+  margin-top: 0.35rem;
+  padding: 0.12rem 0.34rem;
+  border: 1px solid rgba($stone-700, 0.65);
+  border-radius: 999px;
+  color: $stone-600;
+  font-family: monospace;
+  font-size: 0.66rem;
+}
+
+.summary-backfill-error {
+  padding: 0.5rem;
+  border: 1px solid rgba($red-500, 0.28);
+  border-radius: 4px;
+  background: rgba($red-500, 0.045);
+
+  > .settings-action-btn {
+    margin-top: 0.45rem;
+    padding: 0.38rem 0.58rem;
+    font-size: 0.72rem;
+  }
+}
+
+.summary-backfill-batch-history {
+  border-top: 1px solid rgba(255, 255, 255, 0.045);
+  padding-top: 0.48rem;
+
+  > summary {
+    color: $stone-500;
+    font-size: 0.73rem;
+    cursor: pointer;
+  }
+}
+
+.summary-backfill-batch-log-list {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.summary-backfill-batch-log {
+  padding: 0.48rem 0.55rem;
+  border: 1px solid rgba($stone-800, 0.88);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.08);
+
+  > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  strong {
+    color: $stone-400;
+    font-family: monospace;
+    font-size: 0.72rem;
+    font-weight: normal;
+  }
+
+  span,
+  p {
+    color: $stone-600;
+    font-size: 0.7rem;
+  }
+
+  p {
+    margin: 0.28rem 0 0;
+    line-height: 1.4;
+  }
+
+  &.success {
+    border-color: rgba($green-500, 0.24);
+  }
+
+  &.partial {
+    border-color: rgba($amber-600, 0.3);
+  }
+
+  &.error {
+    border-color: rgba($red-500, 0.34);
+  }
+
+  .summary-backfill-batch-error {
+    color: $red-500;
+  }
+
+  pre {
+    max-height: 150px;
+    overflow: auto;
+    margin: 0.4rem 0 0;
+    padding: 0.42rem 0.48rem;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.16);
+    color: $stone-500;
+    font-family: monospace;
+    font-size: 0.68rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
 .summary-trace-header {
   display: flex;
   align-items: flex-start;
@@ -1818,6 +1981,11 @@
     color: $stone-600;
   }
 
+  &.error {
+    border-color: rgba($red-500, 0.52);
+    color: $red-500;
+  }
+
   &.state-chapter_memory {
     border-color: rgba($amber-600, 0.48);
     color: $amber-600;
@@ -1863,6 +2031,15 @@
 @media (max-width: $breakpoint-md) {
   .summary-inline-field {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .summary-backfill-workbench-header {
+    flex-direction: column;
+
+    .summary-backfill-workbench-actions {
+      width: 100%;
+      justify-content: flex-start;
+    }
   }
 
   .summary-trace-item > summary {

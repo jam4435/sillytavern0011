@@ -5796,6 +5796,7 @@
     .summary-mode-title,
     .summary-context-heading h5,
     .summary-archive-header h5,
+    .summary-backfill-workbench-header h5,
     .summary-compact-field > label {
       color: var(--wuxia-ink-text-strong);
     }
@@ -5803,6 +5804,7 @@
     .summary-context-panel,
     .summary-archive-panel,
     .summary-backfill-panel,
+    .summary-backfill-workbench,
     .summary-compact-field {
       border-color: var(--wuxia-ink-border-soft);
       background: transparent;
@@ -5822,6 +5824,41 @@
     .summary-mode-status {
       background: rgba(255, 252, 247, 0.52);
       color: var(--wuxia-ink-text);
+    }
+
+    .summary-backfill-workbench-header p,
+    .summary-backfill-batch-log p,
+    .summary-backfill-batch-log span,
+    .summary-backfill-batch-history > summary,
+    .summary-trace-detail p,
+    .summary-trace-meta span,
+    .summary-backfill-stats span {
+      color: var(--wuxia-ink-text-muted);
+    }
+
+    .summary-backfill-stats span,
+    .summary-trace-meta span,
+    .summary-backfill-tag,
+    .summary-trace-badge {
+      background: rgba(255, 252, 247, 0.58);
+      border-color: var(--wuxia-ink-border-soft);
+    }
+
+    .summary-trace-item,
+    .summary-backfill-batch-log {
+      background: rgba(255, 252, 247, 0.5);
+      border-color: var(--wuxia-ink-border-soft);
+    }
+
+    .summary-trace-floor,
+    .summary-trace-detail strong,
+    .summary-backfill-batch-log strong {
+      color: var(--wuxia-ink-text-strong);
+    }
+
+    .summary-backfill-error {
+      background: rgba(139, 26, 26, 0.045);
+      border-color: rgba(139, 26, 26, 0.22);
     }
 
     .summary-mode-status {
