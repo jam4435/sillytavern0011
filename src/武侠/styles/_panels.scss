@@ -3635,7 +3635,7 @@
 }
 
 // 摘要始终保持单行，并按信息优先级逐级收起，避免窄容器内文字互相覆盖。
-@container variable-change-bar (max-width: 380px) {
+@container variable-change-bar (max-width: 330px) {
   .variable-change-segment-count {
     display: none;
   }
