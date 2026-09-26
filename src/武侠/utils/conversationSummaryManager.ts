@@ -34,19 +34,20 @@ export const CONVERSATION_SUMMARY_ENTRY_CONTENT = `<对话摘要协议>
 - 不编造正文没有发生的事实；不输出思维过程。
 - <summary> 必须是独立 XML 块，不能嵌进其他 XML 标签。
 - inline 变量模式下顺序为：正文 → <summary> → VariableThink/VariableInsert/Edit/Delete；extra 变量模式下 <summary> 位于正文末尾。
-</对话摘要协议>
+</对话摘要协议>`;
 
-<%
+export const CONVERSATION_MEMORY_ENTRY_NAME = '记忆区';
+export const CONVERSATION_MEMORY_ENTRY_CONTENT = `<%
 const 章节摘要 = getvar('stat_data.叙事记忆.章节摘要', { scope: 'local' });
 if (章节摘要 && typeof 章节摘要 === 'object' && Object.keys(章节摘要).length > 0) {
+  const 排序章节 = Object.values(章节摘要)
+    .filter(章节 => 章节 && typeof 章节 === 'object' && typeof 章节.摘要 === 'string' && 章节.摘要.trim())
+    .sort((左, 右) => Number(左?.起始楼层 || 0) - Number(右?.起始楼层 || 0));
 -%>
 <长期叙事记忆>
-以下是已经从更早逐轮摘要中一次性归档出的长期剧情记忆；它们是旧正文的替代上下文，不要把同一历史再次当作新发生的事件。
-<% const 排序章节 = Object.entries(章节摘要).sort((左, 右) => Number(左?.[1]?.起始楼层 || 0) - Number(右?.[1]?.起始楼层 || 0));
-for (const [章节键, 章节] of 排序章节) {
-  if (!章节 || typeof 章节 !== 'object' || typeof 章节.摘要 !== 'string' || !章节.摘要.trim()) continue;
--%>
-[<%- 章节键 %>｜楼层 <%- 章节.起始楼层 %>-<%- 章节.结束楼层 %>] <%- 章节.摘要 %>
+以下内容是更早剧情压缩后的长期记忆，按真实先后顺序排列。它们用于替代已经退出上下文的旧原文，不要把其中事件当作本轮新发生。
+<% for (const 章节 of 排序章节) { -%>
+<%- 章节.摘要.trim() %>
 <% } -%>
 </长期叙事记忆>
 <% } -%>`;
@@ -147,6 +148,67 @@ async function setSummaryEntryEnabled(enabled:boolean):Promise<boolean>{
   await updateWorldbookWith(location.worldbookName,worldbook=>worldbook.map(entry=>
     entry.uid===location.entry.uid&&entry.name===CONVERSATION_SUMMARY_ENTRY_NAME
       ? {...entry,enabled,...(enabled?{content:CONVERSATION_SUMMARY_ENTRY_CONTENT}:{})}
+      : entry
+  ),{render:'debounced'});
+  return true;
+}
+
+async function findMemoryEntry(): Promise<{ worldbookName: string; entry: WorldbookEntry } | null> {
+  for (const worldbookName of getCurrentCharacterWorldbookNames()) {
+    try {
+      const worldbook = await getWorldbook(worldbookName);
+      const entry = worldbook.find(item => item.name === CONVERSATION_MEMORY_ENTRY_NAME);
+      if (entry) return { worldbookName, entry };
+    } catch (error) {
+      dataLogger.warn(`读取世界书「${worldbookName}」失败:`, error);
+    }
+  }
+  return null;
+}
+
+async function ensureMemoryEntryEnabled(): Promise<boolean> {
+  let location = await findMemoryEntry();
+  if (!location) {
+    const worldbookName = getCurrentCharacterWorldbookNames()[0];
+    if (!worldbookName) {
+      dataLogger.warn('[conversationSummary] 当前角色没有可写入的世界书，跳过记忆区同步。');
+      return false;
+    }
+    const created = await createWorldbookEntries(worldbookName,[{
+      name: CONVERSATION_MEMORY_ENTRY_NAME,
+      enabled: true,
+      strategy:{ type:'constant', keys:[], keys_secondary:{logic:'and_any',keys:[]}, scan_depth:'same_as_global' },
+      position:{ type:'at_depth', role:'system', depth:999, order:0 },
+      content: CONVERSATION_MEMORY_ENTRY_CONTENT,
+      probability:100,
+      recursion:{ prevent_incoming:false, prevent_outgoing:false, delay_until:null },
+      effect:{ sticky:null, cooldown:null, delay:null },
+    }],{render:'debounced'});
+    const entry=created.new_entries.find(item=>item.name===CONVERSATION_MEMORY_ENTRY_NAME);
+    if(!entry) throw new Error('创建记忆区世界书条目后无法读回该条目。');
+    location={worldbookName,entry};
+  }
+
+  const position = location.entry.position;
+  const needsPositionSync =
+    position?.type !== 'at_depth'
+    || position?.role !== 'system'
+    || Number(position?.depth) !== 999
+    || Number(position?.order) !== 0;
+  const needsSync =
+    !location.entry.enabled
+    || location.entry.content !== CONVERSATION_MEMORY_ENTRY_CONTENT
+    || needsPositionSync;
+  if (!needsSync) return false;
+
+  await updateWorldbookWith(location.worldbookName,worldbook=>worldbook.map(entry=>
+    entry.uid===location.entry.uid&&entry.name===CONVERSATION_MEMORY_ENTRY_NAME
+      ? {
+          ...entry,
+          enabled:true,
+          content:CONVERSATION_MEMORY_ENTRY_CONTENT,
+          position:{ type:'at_depth', role:'system', depth:999, order:0 },
+        }
       : entry
   ),{render:'debounced'});
   return true;
@@ -255,6 +317,13 @@ function extractSummaryTagBlock(text: string, tagValue: string): string | null {
   return match?.[0]?.trim() || null;
 }
 
+function extractSummaryTagContent(text: string, tagValue: string): string {
+  const tagName = normalizeConversationSummaryTag(tagValue);
+  const escapedTag = escapeSummaryTagForRegex(tagName);
+  const match = text.match(new RegExp('<' + escapedTag + '\\b[^>]*>([\\s\\S]*?)<\\/' + escapedTag + '>', 'i'));
+  return match?.[1]?.trim() || '';
+}
+
 /**
  * 兼容玩家预设摘要：不负责要求模型生成摘要，只识别玩家填写的 XML 标签并压缩最终 prompt。
  * 最近 N 条 assistant 回复保留正文（去掉重复摘要块）；更早的已摘要回复仅保留摘要，并移除配对 user。
@@ -360,7 +429,45 @@ type PromptHistoryMessage = {
   message_id: number;
   role: 'system' | 'assistant' | 'user';
   is_hidden?: boolean;
+  message?: string;
+  swipes?: string[];
+  swipe_id?: number;
 };
+
+export type ConversationSummaryPromptState =
+  | 'full'
+  | 'summary_only'
+  | 'chapter_memory'
+  | 'empty'
+  | 'not_in_prompt';
+
+export interface ConversationSummaryPromptTraceItem {
+  messageId: number;
+  hasSummary: boolean;
+  summary: string;
+  contextState: ConversationSummaryPromptState;
+  contextPreview: string;
+}
+
+export interface ConversationSummaryPromptTraceSnapshot {
+  capturedAt: number;
+  mode: ConversationSummaryMode;
+  summaryTag: string;
+  recentReplies: number;
+  items: ConversationSummaryPromptTraceItem[];
+}
+
+export const CONVERSATION_SUMMARY_TRACE_EVENT = 'wuxia:conversationSummaryTraceUpdated';
+
+let latestConversationSummaryPromptTrace: ConversationSummaryPromptTraceSnapshot | null = null;
+
+export function getLatestConversationSummaryPromptTrace(): ConversationSummaryPromptTraceSnapshot | null {
+  if (!latestConversationSummaryPromptTrace) return null;
+  return {
+    ...latestConversationSummaryPromptTrace,
+    items: latestConversationSummaryPromptTrace.items.map(item => ({ ...item })),
+  };
+}
 
 type HistoricalBackfillChapter = {
   起始楼层?: unknown;
@@ -372,8 +479,8 @@ type HistoricalBackfillChapter = {
 
 type ArchivedConversationCoverage = {
   archivedSummaryCount: number;
-  historicalBackfillSummaryCount: number;
-  historicalAssistantMessageIds: number[];
+  chapterCoveredSummaryCount: number;
+  chapterCoveredAssistantMessageIds: number[];
   history: PromptHistoryMessage[];
 };
 
@@ -397,26 +504,25 @@ function readArchivedConversationCoverage(): ArchivedConversationCoverage {
       .filter(message => message.role === 'assistant')
       .map(message => message.message_id);
 
-    const historicalIds = new Set<number>();
-    let historicalBackfillSummaryCount = 0;
+    const chapterCoveredIds = new Set<number>();
+    let chapterCoveredSummaryCount = 0;
 
     for (const chapter of Object.values(chapters)) {
-      if (chapter?.来源 !== '历史回溯') continue;
-
-      const sourceSummaryCount = Number(chapter.源摘要数);
-      if (Number.isFinite(sourceSummaryCount) && sourceSummaryCount > 0) {
-        historicalBackfillSummaryCount += Math.floor(sourceSummaryCount);
-      }
-
-      const exactFloors = Array.isArray(chapter.源楼层)
+      const sourceSummaryCount = Number(chapter?.源摘要数);
+      const normalizedSourceSummaryCount =
+        Number.isFinite(sourceSummaryCount) && sourceSummaryCount > 0 ? Math.floor(sourceSummaryCount) : 0;
+      const exactFloors = Array.isArray(chapter?.源楼层)
         ? chapter.源楼层.filter((value): value is number => Number.isInteger(value))
         : [];
+
       if (exactFloors.length > 0) {
-        exactFloors.forEach(messageId => historicalIds.add(messageId));
+        exactFloors.forEach(messageId => chapterCoveredIds.add(messageId));
+        chapterCoveredSummaryCount += normalizedSourceSummaryCount;
         continue;
       }
 
-      // 兼容今天早先已经生成、还没有“源楼层”字段的历史回溯章节。
+      // 兼容早先已经生成、还没有“源楼层”字段的历史回溯章节。
+      if (chapter?.来源 !== '历史回溯') continue;
       const start = Number(chapter.起始楼层);
       const end = Number(chapter.结束楼层);
       if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
@@ -424,7 +530,8 @@ function readArchivedConversationCoverage(): ArchivedConversationCoverage {
       const upper = Math.max(start, end);
       assistantMessageIds
         .filter(messageId => messageId >= lower && messageId <= upper)
-        .forEach(messageId => historicalIds.add(messageId));
+        .forEach(messageId => chapterCoveredIds.add(messageId));
+      chapterCoveredSummaryCount += normalizedSourceSummaryCount;
     }
 
     const storedCount = Number(memory?.已归档摘要数);
@@ -432,17 +539,130 @@ function readArchivedConversationCoverage(): ArchivedConversationCoverage {
 
     return {
       archivedSummaryCount,
-      historicalBackfillSummaryCount,
-      historicalAssistantMessageIds: [...historicalIds].sort((left, right) => left - right),
+      chapterCoveredSummaryCount,
+      chapterCoveredAssistantMessageIds: [...chapterCoveredIds].sort((left, right) => left - right),
       history,
     };
   } catch {
     return {
       archivedSummaryCount: 0,
-      historicalBackfillSummaryCount: 0,
-      historicalAssistantMessageIds: [],
+      chapterCoveredSummaryCount: 0,
+      chapterCoveredAssistantMessageIds: [],
       history: [],
     };
+  }
+}
+
+function getActiveHistoryMessageText(message: PromptHistoryMessage): string {
+  const swipes = Array.isArray(message.swipes) ? message.swipes : [];
+  if (swipes.length > 0) {
+    const swipeIndex = Number.isInteger(message.swipe_id) ? Number(message.swipe_id) : 0;
+    const safeSwipeIndex = Math.max(0, Math.min(swipeIndex, swipes.length - 1));
+    return swipes[safeSwipeIndex] || message.message || '';
+  }
+  return message.message || '';
+}
+
+function alignPromptMessagesToHistory(
+  chat: SillyTavern.SendingMessage[],
+  history: PromptHistoryMessage[],
+): Map<number, SillyTavern.SendingMessage> {
+  const dialogueHistory = history
+    .filter(message => message.role === 'user' || message.role === 'assistant')
+    .sort((left, right) => left.message_id - right.message_id);
+  const promptDialogue = chat.filter(message => message.role === 'user' || message.role === 'assistant');
+  const result = new Map<number, SillyTavern.SendingMessage>();
+
+  let promptCursor = promptDialogue.length - 1;
+  for (let historyCursor = dialogueHistory.length - 1; historyCursor >= 0 && promptCursor >= 0; historyCursor -= 1) {
+    const historyMessage = dialogueHistory[historyCursor];
+    while (promptCursor >= 0 && promptDialogue[promptCursor].role !== historyMessage.role) {
+      promptCursor -= 1;
+    }
+    if (promptCursor < 0) break;
+    result.set(historyMessage.message_id, promptDialogue[promptCursor]);
+    promptCursor -= 1;
+  }
+  return result;
+}
+
+function collectChapterCoveredAssistantIds(
+  coverage: ArchivedConversationCoverage,
+  summaryTag: string,
+): Set<number> {
+  const covered = new Set(coverage.chapterCoveredAssistantMessageIds);
+  let remaining = Math.max(0, coverage.archivedSummaryCount - coverage.chapterCoveredSummaryCount);
+  if (remaining <= 0) return covered;
+
+  for (const message of coverage.history) {
+    if (remaining <= 0) break;
+    if (message.role !== 'assistant' || covered.has(message.message_id)) continue;
+    const rawText = getActiveHistoryMessageText(message);
+    if (!extractSummaryTagContent(rawText, summaryTag) && !extractSummaryTagContent(rawText, 'summary')) continue;
+    covered.add(message.message_id);
+    remaining -= 1;
+  }
+  return covered;
+}
+
+function captureConversationSummaryPromptTrace(
+  chat: SillyTavern.SendingMessage[],
+  settings: ReturnType<typeof loadSettings>,
+  coverage: ArchivedConversationCoverage,
+  initialPromptRefs: Map<number, SillyTavern.SendingMessage>,
+): void {
+  const mode = settings.summarySettings.conversationSummaryMode || activeConversationSummaryMode;
+  const summaryTag =
+    mode === 'preset'
+      ? normalizeConversationSummaryTag(settings.summarySettings.conversationSummaryPresetTag)
+      : CONVERSATION_SUMMARY_TAG;
+  const chapterCoveredIds = collectChapterCoveredAssistantIds(coverage, summaryTag);
+  const finalPromptMessages = new Set(chat);
+
+  const items = coverage.history
+    .filter(message => message.role === 'assistant')
+    .map(message => {
+      const rawText = getActiveHistoryMessageText(message);
+      const summary = extractSummaryTagContent(rawText, summaryTag);
+      const promptMessage = initialPromptRefs.get(message.message_id);
+      let contextState: ConversationSummaryPromptState = 'not_in_prompt';
+      let contextPreview = '';
+
+      if (chapterCoveredIds.has(message.message_id)) {
+        contextState = 'chapter_memory';
+      } else if (promptMessage && finalPromptMessages.has(promptMessage)) {
+        const finalText = getSendingMessageText(promptMessage).trim();
+        contextPreview = finalText.slice(0, 260);
+        if (!finalText) {
+          contextState = 'empty';
+        } else {
+          const summaryBlock = extractSummaryTagBlock(finalText, summaryTag);
+          const withoutSummary = removeSummaryTagBlocks(finalText, summaryTag);
+          contextState = summaryBlock && !withoutSummary ? 'summary_only' : 'full';
+        }
+      }
+
+      return {
+        messageId: message.message_id,
+        hasSummary: Boolean(summary),
+        summary,
+        contextState,
+        contextPreview,
+      };
+    });
+
+  latestConversationSummaryPromptTrace = {
+    capturedAt: Date.now(),
+    mode,
+    summaryTag,
+    recentReplies: clampRecentReplies(settings.summarySettings.conversationSummaryRecentReplies),
+    items,
+  };
+
+  try {
+    window.dispatchEvent(new CustomEvent(CONVERSATION_SUMMARY_TRACE_EVENT));
+  } catch {
+    // 非浏览器环境下忽略通知；快照本身仍可读取。
   }
 }
 
@@ -515,6 +735,7 @@ export function filterHistoricalBackfillTurnsFromPrompt(
 export function filterArchivedSummariesFromPrompt(
   chat: SillyTavern.SendingMessage[],
   archivedSummaryCount: number,
+  summaryTag = CONVERSATION_SUMMARY_TAG,
 ): number {
   let remaining = Math.max(0, Math.floor(archivedSummaryCount));
   if (remaining === 0) return 0;
@@ -522,7 +743,7 @@ export function filterArchivedSummariesFromPrompt(
   const removeIndices = new Set<number>();
   for (let index = 0; index < chat.length && remaining > 0; index += 1) {
     const message = chat[index];
-    if (message.role !== 'assistant' || !/<summary>[\s\S]*?<\/summary>/i.test(getSendingMessageText(message))) {
+    if (message.role !== 'assistant' || !extractSummaryTagBlock(getSendingMessageText(message), summaryTag)) {
       continue;
     }
 
@@ -551,13 +772,44 @@ export function filterArchivedSummariesFromPrompt(
 
 export function installConversationSummaryPromptFilter(): () => void {
   const subscription = eventOn(tavern_events.CHAT_COMPLETION_PROMPT_READY, eventData => {
+    const settings = loadSettings();
+    const mode = settings.summarySettings.conversationSummaryMode || activeConversationSummaryMode;
+    const summaryTag =
+      mode === 'preset'
+        ? normalizeConversationSummaryTag(settings.summarySettings.conversationSummaryPresetTag)
+        : CONVERSATION_SUMMARY_TAG;
+    const coverage = readArchivedConversationCoverage();
+    const initialPromptRefs = alignPromptMessagesToHistory(eventData.chat, coverage.history);
+
     const filteredModules = filterSelectedPresetModulesFromPrompt(eventData.chat);
     if (filteredModules > 0) {
       dataLogger.log(`[conversationFilter] 已从本次最终提示词过滤 ${filteredModules} 条 assistant 消息中的无用模块。`);
     }
 
-    const settings = loadSettings();
-    const mode = settings.summarySettings.conversationSummaryMode || activeConversationSummaryMode;
+    // 长期章节记忆与逐轮摘要来源解耦：只要旧楼层已经被章节记忆覆盖，就始终从最终 prompt 移除。
+    const backfillRemoved = filterHistoricalBackfillTurnsFromPrompt(
+      eventData.chat,
+      coverage.history,
+      coverage.chapterCoveredAssistantMessageIds,
+    );
+    if (backfillRemoved > 0) {
+      dataLogger.log(
+        `[conversationSummary] 已按历史回溯章节覆盖楼层从最终提示词裁掉 ${backfillRemoved} 条旧消息。`,
+      );
+    }
+
+    // 已归档成章节的逐轮摘要也属于长期记忆覆盖范围，不随 card/preset/off 切换而重新回到 prompt。
+    const archivedSummaryCount = Math.max(
+      0,
+      coverage.archivedSummaryCount - coverage.chapterCoveredSummaryCount,
+    );
+    if (archivedSummaryCount > 0) {
+      const removed = filterArchivedSummariesFromPrompt(eventData.chat, archivedSummaryCount, summaryTag);
+      if (removed > 0) {
+        dataLogger.log(`[conversationSummary] 已从本次最终提示词裁掉 ${removed} 条已归档逐轮摘要消息。`);
+      }
+    }
+
     if (mode === 'preset') {
       const changed = filterPresetSummaryContextFromPrompt(
         eventData.chat,
@@ -567,33 +819,13 @@ export function installConversationSummaryPromptFilter(): () => void {
       if (changed > 0) {
         dataLogger.log(`[conversationSummary] 预设摘要兼容过滤调整了 ${changed} 条最终提示词消息。`);
       }
-      return;
     }
 
-    if (mode !== 'card') return;
-
-    const coverage = readArchivedConversationCoverage();
-    const backfillRemoved = filterHistoricalBackfillTurnsFromPrompt(
-      eventData.chat,
-      coverage.history,
-      coverage.historicalAssistantMessageIds,
-    );
-    if (backfillRemoved > 0) {
-      dataLogger.log(
-        `[conversationSummary] 已按历史回溯章节覆盖楼层从最终提示词裁掉 ${backfillRemoved} 条旧消息。`,
-      );
-    }
-
-    // 历史回溯章节里的“源摘要数”已经随整个 user→assistant 对一起裁掉，不能再按旧摘要计数重复删除。
-    const archivedSummaryCount = Math.max(
-      0,
-      coverage.archivedSummaryCount - coverage.historicalBackfillSummaryCount,
-    );
-    if (archivedSummaryCount <= 0) return;
-    const removed = filterArchivedSummariesFromPrompt(eventData.chat, archivedSummaryCount);
-    if (removed > 0) {
-      dataLogger.log(`[conversationSummary] 已从本次最终提示词裁掉 ${removed} 条已归档逐轮摘要消息。`);
-    }
+    // 延后到本轮同步 CHAT_COMPLETION_PROMPT_READY 监听器全部执行后再取快照，
+    // 尽量反映真正提交给模型前的最终上下文，而不是只看本监听器刚处理完的中间态。
+    queueMicrotask(() => {
+      captureConversationSummaryPromptTrace(eventData.chat, settings, coverage, initialPromptRefs);
+    });
   });
   return () => subscription.stop();
 }
@@ -602,18 +834,20 @@ export async function applyConversationSummaryModeState(
   mode:ConversationSummaryMode,
   recentReplies=DEFAULT_CONVERSATION_SUMMARY_RECENT_REPLIES,
 ):Promise<string>{
+  const memoryChanged=await ensureMemoryEntryEnabled();
   const cardMode=mode==='card';
   const entryChanged=await setSummaryEntryEnabled(cardMode);
   const regexChanged=await syncConversationSummaryRegexes(cardMode,recentReplies);
   activeConversationSummaryMode=mode;
+  const memoryStatus=memoryChanged?'记忆区已同步；':'';
   if(mode==='card'){
-    if (entryChanged || regexChanged) {
-      return `已同步「${CONVERSATION_SUMMARY_ENTRY_NAME}」与卡内摘要过滤；最近 ${clampRecentReplies(recentReplies)} 条回复保留全文，更早回复仅保留逐轮摘要。`;
+    if (entryChanged || regexChanged || memoryChanged) {
+      return `${memoryStatus}已同步「${CONVERSATION_SUMMARY_ENTRY_NAME}」与卡内摘要过滤；最近 ${clampRecentReplies(recentReplies)} 条回复保留全文，更早回复仅保留逐轮摘要。`;
     }
-    return `「${CONVERSATION_SUMMARY_ENTRY_NAME}」与卡内摘要过滤已是目标状态，本次初始化未改写角色正则。`;
+    return `「${CONVERSATION_SUMMARY_ENTRY_NAME}」、记忆区与卡内摘要过滤已是目标状态，本次初始化未改写角色正则。`;
   }
   if(mode==='preset') {
-    return '已禁用卡内摘要指令；由当前预设生成摘要，最终上下文按下方配置的 XML 标签执行兼容压缩。';
+    return `${memoryStatus}已禁用卡内摘要指令；由当前预设生成摘要，章节记忆仍由记忆区独立注入并接管已归档旧对话。`;
   }
-  return '已禁用卡内摘要指令与卡内过滤。';
+  return `${memoryStatus}已禁用卡内摘要指令与逐轮摘要过滤；已生成的长期章节记忆仍由记忆区独立注入。`;
 }

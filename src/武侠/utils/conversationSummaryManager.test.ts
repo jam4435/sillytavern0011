@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  CONVERSATION_MEMORY_ENTRY_CONTENT,
   CONVERSATION_SUMMARY_ENTRY_CONTENT,
   applyConversationSummaryModeState,
   buildConversationSummaryRegexes,
@@ -95,6 +96,13 @@ describe('conversationSummaryManager', () => {
           name: '对话摘要指令',
           enabled: true,
           content: CONVERSATION_SUMMARY_ENTRY_CONTENT,
+        },
+        {
+          uid: 2,
+          name: '记忆区',
+          enabled: true,
+          content: CONVERSATION_MEMORY_ENTRY_CONTENT,
+          position: { type: 'at_depth', role: 'system', depth: 999, order: 0 },
         },
       ]),
     );
@@ -246,5 +254,21 @@ describe('conversationSummaryManager', () => {
       { role: 'system', content: '夹在对话之间的深度世界书' },
       { role: 'user', content: '当前用户' },
     ]);
+  });
+
+  it('removes archived preset summaries using the configured XML tag', () => {
+    const chat = [
+      { role: 'user' as const, content: '旧用户' },
+      { role: 'assistant' as const, content: '<memory>旧摘要</memory>' },
+      { role: 'user' as const, content: '当前用户' },
+    ];
+    expect(filterArchivedSummariesFromPrompt(chat, 1, 'memory')).toBe(2);
+    expect(chat).toEqual([{ role: 'user', content: '当前用户' }]);
+  });
+
+  it('keeps the memory worldbook payload free of chapter labels and floor metadata', () => {
+    expect(CONVERSATION_MEMORY_ENTRY_CONTENT).toContain('章节.摘要.trim()');
+    expect(CONVERSATION_MEMORY_ENTRY_CONTENT).not.toContain('章节键');
+    expect(CONVERSATION_MEMORY_ENTRY_CONTENT).not.toContain('楼层 <%-');
   });
 });

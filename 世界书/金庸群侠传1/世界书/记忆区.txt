@@ -1,0 +1,14 @@
+<%
+const 章节摘要 = getvar('stat_data.叙事记忆.章节摘要', { scope: 'local' });
+if (章节摘要 && typeof 章节摘要 === 'object' && Object.keys(章节摘要).length > 0) {
+  const 排序章节 = Object.values(章节摘要)
+    .filter(章节 => 章节 && typeof 章节 === 'object' && typeof 章节.摘要 === 'string' && 章节.摘要.trim())
+    .sort((左, 右) => Number(左?.起始楼层 || 0) - Number(右?.起始楼层 || 0));
+-%>
+<长期叙事记忆>
+以下内容是更早剧情压缩后的长期记忆，按真实先后顺序排列。它们用于替代已经退出上下文的旧原文，不要把其中事件当作本轮新发生。
+<% for (const 章节 of 排序章节) { -%>
+<%- 章节.摘要.trim() %>
+<% } -%>
+</长期叙事记忆>
+<% } -%>
