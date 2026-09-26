@@ -1423,3 +1423,372 @@
     }
   }
 }
+
+
+// =========================================================
+// 手机端势力页：从桌面双栏改为单列工作流
+// =========================================================
+@media (max-width: $breakpoint-md) {
+  .faction-panel-wrapper {
+    height: 100%;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
+    overscroll-behavior: contain;
+  }
+
+  .faction-view-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.65rem;
+  }
+
+  .faction-view-tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .view-tab-btn {
+    min-width: 0;
+    min-height: 2.45rem;
+    justify-content: center;
+    padding: 0.45rem 0.35rem;
+    font-size: 0.82rem;
+  }
+
+  .my-sects-selector {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    .selector-label {
+      font-size: 0.76rem;
+    }
+
+    .sect-chips-list {
+      width: 100%;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+  }
+
+  .faction-my-view,
+  .faction-world-view {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .faction-my-view {
+    gap: 0.65rem;
+  }
+
+  .sect-banner-card {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.72rem;
+    padding: 0.75rem 0.8rem;
+
+    .banner-left {
+      min-width: 0;
+      align-items: flex-start;
+      gap: 0.7rem;
+    }
+
+    .sect-emblem-box {
+      flex: 0 0 auto;
+      padding: 0.45rem;
+
+      svg {
+        width: 28px;
+        height: 28px;
+      }
+    }
+
+    .sect-meta-box {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .sect-name-row {
+      flex-wrap: wrap;
+      gap: 0.35rem 0.5rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .sect-title {
+      font-size: 1.18rem;
+    }
+
+    .sect-submeta-row {
+      gap: 0.35rem 0.7rem;
+      font-size: 0.78rem;
+      line-height: 1.45;
+    }
+
+    .banner-right {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+
+    .contrib-counter-box,
+    .cult-counter-box {
+      min-width: 0;
+      align-items: flex-start;
+      padding: 0.45rem 0.6rem;
+
+      .counter-value {
+        font-size: 1.12rem;
+      }
+    }
+  }
+
+  .faction-main-split {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 0.65rem;
+    overflow: visible;
+  }
+
+  .faction-tree-column,
+  .faction-tasks-column,
+  .sect-task-list-container {
+    min-width: 0;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .faction-tree-column {
+    padding: 0.7rem;
+
+    .column-title-bar {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.18rem;
+      margin-bottom: 0.6rem;
+
+      .column-hint {
+        font-size: 0.7rem;
+        line-height: 1.4;
+      }
+    }
+  }
+
+  .tier-levels-container {
+    gap: 0.55rem;
+  }
+
+  .tier-level-row {
+    gap: 0.5rem;
+    padding: 0.48rem;
+
+    .tier-header-badge {
+      width: 2.7rem;
+      min-width: 2.7rem;
+      padding: 0.3rem 0.12rem;
+      font-size: 0.78rem;
+    }
+
+    .tier-nodes-list {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.42rem;
+    }
+  }
+
+  .martial-node-card {
+    width: 100%;
+    min-width: 0;
+    padding: 0.48rem 0.52rem;
+
+    .node-art-name {
+      font-size: 0.8rem;
+    }
+  }
+
+  .faction-tasks-column {
+    width: 100%;
+  }
+
+  .sect-task-list-container {
+    height: auto;
+    padding: 0.7rem;
+
+    .task-list-header {
+      gap: 0.5rem;
+
+      .request-task-btn {
+        flex-shrink: 0;
+        padding: 0.35rem 0.55rem;
+        font-size: 0.76rem;
+      }
+    }
+
+    .task-cards-list {
+      overflow: visible;
+      gap: 0.6rem;
+    }
+  }
+
+  .sect-task-card {
+    padding: 0.65rem 0.7rem;
+
+    .task-card-header,
+    .task-meta-row {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .task-status-badge {
+      align-self: flex-start;
+    }
+  }
+
+  .faction-bottom-actions-bar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.42rem;
+    padding-top: 0.55rem;
+
+    .faction-action-btn {
+      min-width: 0;
+      min-height: 2.4rem;
+      justify-content: center;
+      gap: 0.3rem;
+      padding: 0.45rem 0.25rem;
+      font-size: 0.78rem;
+    }
+  }
+
+  .faction-world-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+
+  .world-sects-sidebar {
+    padding: 0.6rem;
+    overflow: visible;
+
+    .category-filter-bar {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.25rem;
+      margin-bottom: 0.5rem;
+
+      .filter-btn {
+        min-width: 0;
+        padding: 0.34rem 0.12rem;
+        font-size: 0.7rem;
+      }
+    }
+
+    .sects-card-list {
+      flex: 0 0 auto;
+      flex-direction: row;
+      gap: 0.5rem;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 0.18rem;
+      scroll-snap-type: x proximity;
+      scrollbar-width: thin;
+    }
+
+    .sect-summary-card {
+      flex: 0 0 min(72vw, 14.5rem);
+      min-width: 0;
+      padding: 0.55rem 0.6rem;
+      scroll-snap-align: start;
+    }
+  }
+
+  .world-sect-detail-main {
+    gap: 0.65rem;
+    overflow: visible;
+    padding-right: 0;
+
+    .detail-top-card {
+      align-items: stretch;
+      flex-direction: column;
+      gap: 0.65rem;
+      padding: 0.8rem 0.9rem;
+
+      .sect-hero-title {
+        font-size: 1.22rem;
+      }
+
+      .sect-tags-row {
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+
+      .detail-header-right {
+        width: 100%;
+      }
+
+      .enter-my-sect-btn,
+      .join-sect-btn {
+        width: 100%;
+        min-height: 2.4rem;
+      }
+    }
+
+    .detail-intro-section,
+    .detail-martial-preview-section {
+      padding: 0.7rem 0.75rem;
+
+      .sect-leaders-row {
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+    }
+  }
+
+  .node-inspect-drawer {
+    width: 100%;
+    border-left: 0;
+    border-top: 1px solid rgba(212, 175, 55, 0.35);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+
+    .drawer-header,
+    .drawer-body,
+    .drawer-footer {
+      padding: 0.75rem;
+    }
+  }
+
+  .faction-confirm-modal {
+    width: calc(100% - 1.25rem);
+    max-width: 420px;
+    padding: 1rem;
+
+    .modal-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+
+      button {
+        min-width: 0;
+      }
+    }
+  }
+}
+
+@media (max-width: 420px) {
+  .faction-bottom-actions-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    .faction-action-btn.danger {
+      grid-column: 1 / -1;
+    }
+  }
+}

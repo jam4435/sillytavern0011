@@ -436,7 +436,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                       src={selectedAvatarSource.src}
                       alt={`${selectedNpc.name}头像`}
                       objectPosition={selectedAvatarSource.objectPosition}
-                      rasterMode="square"
+                      rasterMode="trim"
                     />
                   ) : (
                     <span>{selectedAvatarSource?.fallbackInitial || selectedNpc.name.charAt(0) || '侠'}</span>

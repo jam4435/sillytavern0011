@@ -956,36 +956,55 @@
   }
 
   .social-detail-hero {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0.72rem;
     min-height: 0;
-    padding: 1rem;
+    padding: 0.8rem;
   }
 
-  // 印章绝对定位在右上角，文案区须让位避免重叠
+  // 手机端让头像占据详情头部左半边，关系与操作集中在右半边。
   .social-hero-copy {
-    padding-right: 3.2rem;
+    align-self: center;
+    padding-right: 2.1rem;
   }
 
   .social-portrait {
-    width: 4.3rem;
+    width: 100%;
+    max-width: none;
+    aspect-ratio: 4 / 5;
+    border-radius: 6px;
 
     span {
-      font-size: 1.8rem;
+      font-size: 2rem;
     }
   }
 
   .social-hero-name {
-    font-size: 1.55rem;
+    font-size: 1.4rem;
+  }
+
+  .social-hero-meta {
+    gap: 0.3rem;
+    margin-top: 0.5rem;
+
+    span {
+      padding-inline: 0.38rem;
+      font-size: 0.68rem;
+    }
+  }
+
+  .social-hero-actions {
+    margin-top: 0.6rem;
   }
 
   .social-hero-seal {
     position: absolute;
-    top: 0.8rem;
-    right: 0.8rem;
-    width: 2.35rem;
-    height: 2.35rem;
-    font-size: 1rem;
+    top: 0.62rem;
+    right: 0.62rem;
+    width: 1.85rem;
+    height: 1.85rem;
+    font-size: 0.8rem;
   }
 
   .social-detail-columns,
