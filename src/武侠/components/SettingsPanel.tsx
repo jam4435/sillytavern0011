@@ -1777,7 +1777,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       }
 
       setIsSummaryVariableModeUpdating(true);
-      setSummaryVariableModeStatus(mode === 'extra' ? '正在禁用变量指导条目...' : '正在启用变量指导条目...');
+      setSummaryVariableModeStatus(
+        mode === 'extra' ? '正在禁用变量模板与变量指导条目...' : '正在启用变量模板与变量指导条目...',
+      );
 
       try {
         const status = await applyVariableUpdateModeWorldbookState(mode);
