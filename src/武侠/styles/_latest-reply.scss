@@ -361,24 +361,24 @@
   .turn-layer-jump {
     gap: 0.3rem;
 
+    .turn-layer-current {
+      display: none;
+    }
+
     input {
       height: 36px;
+      width: min(9rem, 100%);
     }
   }
 
-  .turn-layer-edit-grid {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(10rem, 0.75fr) minmax(14rem, 1.25fr);
+  .turn-layer-target-tabs {
+    padding: 0.45rem 0.75rem 0;
   }
 
-  .turn-layer-edit-pane + .turn-layer-edit-pane {
-    border-left: 0;
-    border-top: 1px solid rgba(181, 137, 80, 0.18);
+  .turn-layer-target-tab {
+    flex: 1 1 0;
+    min-width: 0;
   }
-
-  
-
-  
 
   .latest-reply-textarea {
     padding: 0.9rem 0.85rem 1.2rem;
@@ -400,11 +400,6 @@
 
   .latest-reply-action {
     width: 100%;
-  }
-
-  .latest-reply-trigger {
-    width: 40px;
-    height: 40px;
   }
 }
 
@@ -440,11 +435,27 @@
   }
 
   .maintext-edit-sticky {
-    top: 0.5rem;
+    top: 0.15rem;
+    height: 34px;
+    margin-top: -0.1rem;
   }
 
   .maintext-edit-trigger {
     opacity: 0.76;
+  }
+
+  .turn-layer-navigation {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+
+    .latest-reply-action {
+      min-width: 36px;
+      padding-left: 0.45rem;
+      padding-right: 0.45rem;
+
+      span {
+        display: none;
+      }
+    }
   }
 }
 
@@ -497,7 +508,8 @@
     background: linear-gradient(90deg, rgba(139, 26, 26, 0.07), rgba(255, 252, 247, 0.42));
   }
 
-  .latest-reply-locator {
+  .latest-reply-locator,
+  .turn-layer-current {
     color: #7f2119;
   }
 
@@ -517,18 +529,32 @@
     }
   }
 
-  .turn-layer-navigation,
-  
+  .turn-layer-navigation {
+    border-color: rgba(61, 48, 40, 0.18);
+    background: rgba(247, 241, 229, 0.9);
+  }
 
-  .turn-layer-jump input,
-  .maintext-layer-jump input {
+  .turn-layer-jump input {
     color: #2c241f;
     border-color: rgba(61, 48, 40, 0.18);
     background: rgba(255, 252, 247, 0.78);
   }
 
-  .turn-layer-edit-heading,
-  
+  .turn-layer-target-tabs {
+    background: rgba(241, 235, 223, 0.72);
+  }
+
+  .turn-layer-target-tab {
+    color: #5b5048;
+    border-color: rgba(61, 48, 40, 0.18);
+    background: rgba(255, 252, 247, 0.46);
+
+    &.is-active {
+      color: #7f2119;
+      border-color: rgba(139, 26, 26, 0.3);
+      background: rgba(139, 26, 26, 0.06);
+    }
+  }
 
   .latest-reply-footer {
     border-top-color: rgba(61, 48, 40, 0.18);
