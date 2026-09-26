@@ -243,9 +243,11 @@ async function beginRegenerateUserInputReplacement(
     historyData && typeof historyData === 'object' && !Array.isArray(historyData)
       ? (historyData as { text?: unknown }).text
       : undefined;
+  const previousEditableInput =
+    typeof previousRawInput === 'string' ? splitTrailingEraDataBlocks(previousRawInput).editableText : '';
   const preservedSuffix =
-    typeof previousRawInput === 'string' && previousRawInput && previousMessage.startsWith(previousRawInput)
-      ? previousMessage.slice(previousRawInput.length)
+    previousEditableInput && previousMessage.startsWith(previousEditableInput)
+      ? previousMessage.slice(previousEditableInput.length)
       : splitTrailingEraDataBlocks(previousMessage).suffix;
   const nextMessage = `${nextRawInput}${preservedSuffix}`;
   const nextData: Record<string, unknown> = {
