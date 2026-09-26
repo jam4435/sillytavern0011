@@ -286,14 +286,14 @@ describe('regenerateLastAssistantSwipe', () => {
     expect(getLastRegenerateUserInput()).toBe('玩家真实输入');
   });
 
-  it('提交修改上一轮输入时会剥离误混入草稿的 era_data，并继续保留原楼层系统尾段', async () => {
+  it('提交修改上一轮输入时会剥离误混入草稿与旧元数据的 era_data，并继续保留原楼层系统尾段', async () => {
     messages[0] = {
       message_id: 1,
       role: 'user',
       message: '原玩家输入\n\n<era_data>{"user":"original"}</era_data>',
       data: {
         wuxiaInputHistoryV1: {
-          text: '原玩家输入',
+          text: '原玩家输入\n\n<era_data>{"user":"original"}</era_data>',
         },
       },
     };
