@@ -136,7 +136,7 @@ export function buildMainInputDebugContent(debugRound: LatestDebugRound): string
   ];
   const combinedPrompt = normalizeDebugText(debugRound.main.combinedPrompt);
 
-  sections.push('【合并提示词】');
+  sections.push('【最终送模提示词】');
   sections.push(combinedPrompt || '(未捕获到合并提示词)');
 
   if (debugRound.main.error) {
