@@ -376,8 +376,8 @@ export function getMeridianNodeCost(realm: string, nodeId: MeridianNodeId): numb
   return Math.ceil(baseCost * MERIDIAN_COST_RATIOS[node.stageIndex]);
 }
 
-export function getInitialAttributeCap(attribute: keyof InitialAttributes): number {
-  return attribute === '福缘' ? 14 : 20;
+export function getInitialAttributeCap(_attribute: keyof InitialAttributes): number {
+  return 20;
 }
 
 function getGateSettlement(meridian: MeridianDefinition, initialAttributes: InitialAttributes): MeridianSettlement {

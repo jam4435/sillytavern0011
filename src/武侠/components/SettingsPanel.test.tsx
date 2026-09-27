@@ -287,6 +287,44 @@ describe('SettingsPanel theme controls', () => {
     });
   });
 
+  it('warns about a customized legacy variable prompt and replaces it only after explicit update', () => {
+    const defaults = createDefaultDisplaySettings();
+    const customizedLegacyTemplate = [
+      '任务是核对最新 assistant 正文已经发生的持久变化；不得续写剧情。',
+      '【前序只读完整轮次】',
+      '{{readonlyContextRounds}}',
+      '{{variableContext}}',
+      '【本轮唯一变化来源】',
+      '{{latestAssistantBody}}',
+      '1. 只有上方 latestAssistantBody 是本轮变化来源；前序对话只用于理解上下文。',
+      '【我的自定义规则】不要覆盖。',
+    ].join('\n');
+    const settings = {
+      ...defaults,
+      summarySettings: {
+        ...defaults.summarySettings,
+        variablePromptTemplate: customizedLegacyTemplate,
+      },
+    };
+    const onSettingsChange = renderSettingsPanel(settings);
+
+    fireEvent.click(screen.getByRole('button', { name: /AI 与记忆/ }));
+    openSettingsBlock('额外变量');
+
+    expect(screen.getByText(/检测到当前变量提示词是修改过的旧版模板/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('请输入额外变量更新提示词模板...')).toHaveValue(customizedLegacyTemplate);
+
+    fireEvent.click(screen.getByRole('button', { name: '更新为新版模板' }));
+
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      ...settings,
+      summarySettings: {
+        ...settings.summarySettings,
+        variablePromptTemplate: defaults.summarySettings.variablePromptTemplate,
+      },
+    });
+  });
+
   it('loads the precise body cleaning rules in the extra-variable settings group', () => {
     const settings = createDefaultDisplaySettings();
     const onSettingsChange = renderSettingsPanel(settings);

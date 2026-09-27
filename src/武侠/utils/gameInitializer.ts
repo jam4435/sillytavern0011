@@ -61,17 +61,17 @@ export const ATTRIBUTE_POINT_COSTS: AttributePointCost[] =
   attributePointCostsData.attributePointCosts as AttributePointCost[];
 
 /**
- * 福缘属性点数消耗表
+ * 福缘已与其余六维统一为 0～20 刻度。
+ * 保留 LUCK_* 导出仅用于旧调用兼容，实际与普通属性共用同一套点数规则。
  */
-export const LUCK_ATTRIBUTE_POINT_COSTS: AttributePointCost[] =
-  attributePointCostsData.luckAttributePointCosts as AttributePointCost[];
+export const LUCK_ATTRIBUTE_POINT_COSTS: AttributePointCost[] = ATTRIBUTE_POINT_COSTS;
 
 export function getAttributePointCost(value: number): AttributePointCost | undefined {
   return ATTRIBUTE_POINT_COSTS.find(cost => value >= cost.min && value <= cost.max);
 }
 
 export function getLuckAttributePointCost(value: number): AttributePointCost | undefined {
-  return LUCK_ATTRIBUTE_POINT_COSTS.find(cost => value >= cost.min && value <= cost.max);
+  return getAttributePointCost(value);
 }
 
 export function calculateAttributeCost(targetValue: number): number {
@@ -99,27 +99,7 @@ export function calculateAttributeCost(targetValue: number): number {
 }
 
 export function calculateLuckAttributeCost(targetValue: number): number {
-  const baseValue = 0;
-  if (targetValue === baseValue) return 0;
-
-  let totalCost = 0;
-  const direction = targetValue > baseValue ? 1 : -1;
-  let currentValue = baseValue;
-
-  while (currentValue !== targetValue) {
-    const nextValue = currentValue + direction;
-    const costRule = getLuckAttributePointCost(nextValue);
-    if (costRule) {
-      if (direction > 0) {
-        totalCost += costRule.costPerPoint;
-      } else {
-        totalCost -= costRule.pointsGained;
-      }
-    }
-    currentValue = nextValue;
-  }
-
-  return totalCost;
+  return calculateAttributeCost(targetValue);
 }
 
 export const APPEARANCE_TEMPLATES: AppearanceTemplateData = appearanceTemplatesData as AppearanceTemplateData;
@@ -328,14 +308,15 @@ export const DEFAULT_ATTRIBUTES: InitialAttributes = {
   悟性: 6,
   洞察: 6,
   风姿: 6,
-  福缘: 0,
+  福缘: 6,
 };
 
-export const TOTAL_ATTRIBUTE_POINTS = 62;
+export const TOTAL_ATTRIBUTE_POINTS = 68;
 export const MAX_ATTRIBUTE_VALUE = 20;
 export const MIN_ATTRIBUTE_VALUE = 0;
-export const MAX_LUCK_VALUE = 14;
-export const MIN_LUCK_VALUE = -6;
+export const MAX_LUCK_VALUE = MAX_ATTRIBUTE_VALUE;
+export const MIN_LUCK_VALUE = MIN_ATTRIBUTE_VALUE;
+export const INITIAL_ATTRIBUTE_SCALE_VERSION = 2;
 
 export function generateVariableData(formData: NewGameFormData): Record<string, unknown> {
   const {
@@ -539,6 +520,7 @@ export function generateVariableData(formData: NewGameFormData): Record<string, 
     世界事件: {},
     事件分支结果: {},
     前端变量: {
+      福缘刻度版本: INITIAL_ATTRIBUTE_SCALE_VERSION,
       奇经八脉: {
         版本: 1,
         已通穴位: [],
@@ -742,7 +724,7 @@ export function validateAttributes(attributes: InitialAttributes): { valid: bool
   }
 
   for (const [key, value] of Object.entries(attributes)) {
-    if (key !== '福缘' && value < MIN_ATTRIBUTE_VALUE) {
+    if (value < MIN_ATTRIBUTE_VALUE) {
       return {
         valid: false,
         message: `${ATTRIBUTE_NAMES[key as keyof InitialAttributes]} 不能低于 ${MIN_ATTRIBUTE_VALUE}`,

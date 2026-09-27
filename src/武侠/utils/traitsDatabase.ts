@@ -1044,7 +1044,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
     rank: '缺陷',
     category: '命格',
     description: '命中带煞，刑克因果；同行亲近之人更容易遭逢坎坷波折。',
-    attributeThreshold: { attribute: '福缘', minValue: -6, maxValue: -5 },
+    attributeThreshold: { attribute: '福缘', minValue: 0, maxValue: 1 },
     flavorPrompt: '以关系波折与不祥巧合体现低福缘，不得强制亲友死亡或持续制造无法回避的灾难。',
   },
   {
@@ -1052,7 +1052,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
     rank: '缺陷',
     category: '命格',
     description: '运道欠佳，日常更容易遇上小麻烦、错失与不凑巧，但不会无视现实因果制造必然灾祸。',
-    attributeThreshold: { attribute: '福缘', minValue: -4, maxValue: -1 },
+    attributeThreshold: { attribute: '福缘', minValue: 2, maxValue: 5 },
     flavorPrompt: '可增加合理的小倒霉和错失，不得凭空制造违反因果的致命事故。',
   },
   {
@@ -1060,7 +1060,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
     rank: '传家',
     category: '命格',
     description: '气运亨通，在合理范围内更容易遇上顺心巧合、长者照拂或转机。',
-    attributeThreshold: { attribute: '福缘', minValue: 7, maxValue: 10 },
+    attributeThreshold: { attribute: '福缘', minValue: 13, maxValue: 16 },
     flavorPrompt: '可在合理范围内增加巧合、善意与转机，不得凭空免死或越级化险。',
   },
   {
@@ -1068,7 +1068,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
     rank: '镇派',
     category: '命格',
     description: '气运盛极，更容易被卷入天下大势、绝世机缘与时代风云之中。',
-    attributeThreshold: { attribute: '福缘', minValue: 11 },
+    attributeThreshold: { attribute: '福缘', minValue: 17 },
     flavorPrompt: '可让角色更容易接触重大人物、机缘与时代事件，但不得赋予“主角必胜”或凭空逆转死局的权限。',
   },
 ];

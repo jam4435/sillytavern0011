@@ -15,16 +15,14 @@ import type {
 import { ATTRIBUTE_DESCRIPTIONS, ATTRIBUTE_NAMES, getTraitType } from '../types';
 import {
   calculateAttributeCost,
-  calculateLuckAttributeCost,
   CHARACTER_TRAITS,
   DEFAULT_ATTRIBUTES,
   getRandomAppearance,
   getOriginRealmAndCultivation,
   getTriggeredTraitsByAttribute,
   MAX_ATTRIBUTE_VALUE,
-  MAX_LUCK_VALUE,
+  INITIAL_ATTRIBUTE_SCALE_VERSION,
   MIN_ATTRIBUTE_VALUE,
-  MIN_LUCK_VALUE,
   ORIGIN_OPTIONS,
   REALM_CULTIVATION_MAP,
   REALM_LEVELS,
@@ -359,16 +357,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   // 总可用点数
   const totalPoints = selectedTalent?.totalPoints ?? 30;
 
-  // 计算属性消耗的点数（包含福缘，使用阶梯点数机制）
+  // 七维统一使用 0～20 刻度、基础值 6 和同一套阶梯点数机制。
   const attributePointsUsed = useMemo(() => {
     let total = 0;
     for (const key of Object.keys(attributes) as Array<keyof InitialAttributes>) {
-      if (key === '福缘') {
-        // 福缘：使用福缘专用的阶梯点数计算（范围 [-6, 14]，基础值 0）
-        total += calculateLuckAttributeCost(attributes[key]);
-      } else {
-        total += calculateAttributeCost(attributes[key]);
-      }
+      total += calculateAttributeCost(attributes[key]);
     }
     return total;
   }, [attributes]);
@@ -483,25 +476,40 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         return [];
       }
 
-      // 过滤有效的存档并补全缺失字段
-      const validBuilds = parsed.filter(validateCharacterBuild).map((build: CharacterBuild) => ({
-        ...build,
-        // 补全可能缺失的字段
-        origin: build.origin || '',
-        locationInfo: build.locationInfo || {
-          year: 1199,
-          month: 8,
-          day: 15,
-          location: '江湖',
-        },
-        characterInfo: build.characterInfo || {
-          name: build.name,
-          gender: '男' as const,
-          appearance: '',
-          age: 18,
-        },
-      }));
+      // 过滤有效的存档并补全缺失字段；旧版角色配置的福缘使用 -6～14，
+      // v2 将其一次性 +6 映射到统一的 0～20 刻度。
+      const validBuilds = parsed.filter(validateCharacterBuild).map((build: CharacterBuild) => {
+        const legacyLuck = Number(build.attributes?.福缘);
+        const shouldMigrateLuck = build.attributeScaleVersion !== INITIAL_ATTRIBUTE_SCALE_VERSION;
+        const attributes = {
+          ...build.attributes,
+          ...(shouldMigrateLuck && Number.isFinite(legacyLuck)
+            ? { 福缘: Math.max(MIN_ATTRIBUTE_VALUE, Math.min(MAX_ATTRIBUTE_VALUE, legacyLuck + 6)) }
+            : {}),
+        };
 
+        return {
+          ...build,
+          attributeScaleVersion: INITIAL_ATTRIBUTE_SCALE_VERSION,
+          attributes,
+          // 补全可能缺失的字段
+          origin: build.origin || '',
+          locationInfo: build.locationInfo || {
+            year: 1199,
+            month: 8,
+            day: 15,
+            location: '江湖',
+          },
+          characterInfo: build.characterInfo || {
+            name: build.name,
+            gender: '男' as const,
+            appearance: '',
+            age: 18,
+          },
+        };
+      });
+
+      localStorage.setItem(SAVED_BUILDS_KEY, JSON.stringify(validBuilds));
       return validBuilds;
     } catch (e) {
       gameLogger.error('加载存档失败:', e);
@@ -739,6 +747,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         name: name.trim() || `未命名角色_${new Date().toLocaleDateString()}`,
         note: note.trim() || undefined, // 保存备注，空字符串则不保存
         createdAt: Date.now(),
+        attributeScaleVersion: INITIAL_ATTRIBUTE_SCALE_VERSION,
         talentTier: selectedTalentId,
         attributes: { ...attributes },
         traits: [...selectedTraits],
@@ -941,26 +950,13 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   const setAttributeValue = useCallback(
     (key: keyof InitialAttributes, newValue: number) => {
       setAttributes(prev => {
-        // 根据属性类型确定有效范围
-        let clampedValue: number;
-        if (key === '福缘') {
-          // 福缘的范围是 [-6, 14]
-          clampedValue = Math.max(MIN_LUCK_VALUE, Math.min(MAX_LUCK_VALUE, newValue));
-        } else {
-          // 其他属性的范围是 [0, 20]
-          clampedValue = Math.max(MIN_ATTRIBUTE_VALUE, Math.min(MAX_ATTRIBUTE_VALUE, newValue));
-        }
+        const clampedValue = Math.max(MIN_ATTRIBUTE_VALUE, Math.min(MAX_ATTRIBUTE_VALUE, newValue));
 
         // 计算如果改变这个属性，新的总点数消耗
         const newAttrs = { ...prev, [key]: clampedValue };
         let newTotalCost = 0;
         for (const k of Object.keys(newAttrs) as Array<keyof InitialAttributes>) {
-          if (k === '福缘') {
-            // 福缘：使用福缘专用的阶梯点数计算
-            newTotalCost += calculateLuckAttributeCost(newAttrs[k]);
-          } else {
-            newTotalCost += calculateAttributeCost(newAttrs[k]);
-          }
+          newTotalCost += calculateAttributeCost(newAttrs[k]);
         }
 
         // 检查点数是否足够（需要考虑天赋点数消耗）
@@ -1562,14 +1558,14 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     })}
                 </div>
 
-                {/* 福缘单独一行居中显示，使用和其他属性一样的卡片样式 */}
+                {/* 福缘单独一行居中显示，但数值刻度与其他六维完全一致 */}
                 <div className="luck-row">
                   {(() => {
                     // 获取福缘触发的天赋
                     const triggeredForLuck = attributeTriggeredTraits.filter(
                       t => t.attributeThreshold?.attribute === '福缘',
                     );
-                    const luckCost = calculateLuckAttributeCost(attributes.福缘);
+                    const luckCost = calculateAttributeCost(attributes.福缘);
 
                     return (
                       <div className="attribute-card enhanced luck-card">
@@ -1586,15 +1582,15 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                             type="button"
                             className="attr-btn minus"
                             onClick={() => setAttributeValue('福缘', attributes.福缘 - 1)}
-                            disabled={attributes.福缘 <= MIN_LUCK_VALUE}
+                            disabled={attributes.福缘 <= MIN_ATTRIBUTE_VALUE}
                           >
                             −
                           </button>
                           <input
                             type="range"
                             className="attr-slider"
-                            min={MIN_LUCK_VALUE}
-                            max={MAX_LUCK_VALUE}
+                            min={MIN_ATTRIBUTE_VALUE}
+                            max={MAX_ATTRIBUTE_VALUE}
                             value={attributes.福缘}
                             onChange={e => setAttributeValue('福缘', Number(e.target.value))}
                             disabled={isLoading}
@@ -1603,7 +1599,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                             type="button"
                             className="attr-btn plus"
                             onClick={() => setAttributeValue('福缘', attributes.福缘 + 1)}
-                            disabled={attributes.福缘 >= MAX_LUCK_VALUE}
+                            disabled={attributes.福缘 >= MAX_ATTRIBUTE_VALUE}
                           >
                             +
                           </button>

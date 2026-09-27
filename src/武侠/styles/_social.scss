@@ -416,12 +416,12 @@
 
 .social-detail-hero {
   position: relative;
-  min-height: 8.8rem;
+  min-height: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.2rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.72rem;
+  padding: 0.8rem;
   overflow: hidden;
 
   &::before {
@@ -443,18 +443,17 @@
 }
 
 .social-portrait {
-  width: 5.7rem;
-  aspect-ratio: 1;
+  width: 100%;
+  max-width: none;
+  aspect-ratio: 4 / 5;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   padding: 0;
   border: 1px solid rgba(181, 137, 80, 0.32);
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 38% 28%, rgba(250, 204, 21, 0.18), transparent 36%),
-    linear-gradient(145deg, rgba(127, 29, 29, 0.28), rgba(12, 10, 9, 0.74));
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.015);
   color: rgba(254, 243, 199, 0.96);
   font-family: var(--font-serif);
   cursor: zoom-in;
@@ -475,21 +474,33 @@
       0 16px 28px rgba(0, 0, 0, 0.32);
   }
 
+  &.is-empty,
+  &:disabled {
+    border-color: rgba(181, 137, 80, 0.24);
+    background: transparent;
+    cursor: default;
+    opacity: 0.72;
+    box-shadow: none;
+  }
+
+  &.is-empty:hover,
+  &:disabled:hover {
+    transform: none;
+    border-color: rgba(181, 137, 80, 0.24);
+    box-shadow: none;
+  }
+
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
-
-  span {
-    font-family: var(--font-display);
-    font-size: 2.3rem;
-    line-height: 1;
-  }
 }
 
 .social-hero-copy {
   min-width: 0;
+  align-self: center;
+  padding-right: 2.1rem;
 }
 
 .social-hero-label {
@@ -510,7 +521,7 @@
   margin: 0.35rem 0 0;
   color: rgba(250, 250, 249, 0.96);
   font-family: var(--font-display);
-  font-size: 2rem;
+  font-size: 1.4rem;
   font-weight: 400;
   letter-spacing: 0.12em;
   line-height: 1.1;
@@ -520,19 +531,19 @@
 .social-hero-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.65rem;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
 
   span {
     min-height: 1.45rem;
     display: inline-flex;
     align-items: center;
-    padding: 0.12rem 0.5rem;
+    padding: 0.12rem 0.38rem;
     border: 1px solid rgba(181, 137, 80, 0.18);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.035);
     color: rgba(214, 211, 209, 0.78);
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     line-height: 1.1;
   }
 }
@@ -541,7 +552,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin-top: 0.8rem;
+  margin-top: 0.6rem;
 }
 
 .social-hero-action {
@@ -578,9 +589,12 @@
 }
 
 .social-hero-seal {
-  width: 3rem;
-  height: 3rem;
-  font-size: 1.35rem;
+  position: absolute;
+  top: 0.62rem;
+  right: 0.62rem;
+  width: 1.85rem;
+  height: 1.85rem;
+  font-size: 0.8rem;
 }
 
 .social-avatar-picker {
@@ -989,58 +1003,6 @@
     font-family: var(--font-serif);
     font-size: 0.78rem;
     cursor: pointer;
-  }
-
-  .social-detail-hero {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: stretch;
-    gap: 0.72rem;
-    min-height: 0;
-    padding: 0.8rem;
-  }
-
-  // 手机端让头像占据详情头部左半边，关系与操作集中在右半边。
-  .social-hero-copy {
-    align-self: center;
-    padding-right: 2.1rem;
-  }
-
-  .social-portrait {
-    width: 100%;
-    max-width: none;
-    aspect-ratio: 4 / 5;
-    border-radius: 6px;
-
-    span {
-      font-size: 2rem;
-    }
-  }
-
-  .social-hero-name {
-    font-size: 1.4rem;
-  }
-
-  .social-hero-meta {
-    gap: 0.3rem;
-    margin-top: 0.5rem;
-
-    span {
-      padding-inline: 0.38rem;
-      font-size: 0.68rem;
-    }
-  }
-
-  .social-hero-actions {
-    margin-top: 0.6rem;
-  }
-
-  .social-hero-seal {
-    position: absolute;
-    top: 0.62rem;
-    right: 0.62rem;
-    width: 1.85rem;
-    height: 1.85rem;
-    font-size: 0.8rem;
   }
 
   .social-detail-columns,

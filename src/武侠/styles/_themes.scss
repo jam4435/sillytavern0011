@@ -593,51 +593,6 @@
     background: linear-gradient(to right, transparent, rgba(61, 48, 40, 0.28), transparent);
   }
 
-  @media (max-width: 520px) {
-    // themes.scss 最后加载：在这里重新确认手机底部 dock 的紧凑尺寸，
-    // 避免水墨主题的 12px 卷轴边框把输入区再次撑高。
-    .bottom-action-dock .chat-input-wrapper {
-      background: transparent;
-    }
-
-    .bottom-action-dock .chat-input-container {
-      margin-top: 0.16rem;
-      padding: 0.1rem 0.16rem;
-      gap: 0.24rem;
-      border: 1px solid rgba(61, 48, 40, 0.2);
-      border-image: none;
-      border-radius: 6px;
-      background: rgba(241, 235, 223, 0.58);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.24),
-        0 1px 4px rgba(61, 48, 40, 0.04);
-    }
-
-    .bottom-action-dock .chat-input-field {
-      min-height: 34px;
-      padding: 0.32rem 1.9rem 0.32rem 0.58rem;
-      line-height: 1.25;
-    }
-
-    .bottom-action-dock .command-queue-btn,
-    .bottom-action-dock .chat-send-btn,
-    .bottom-action-dock .chat-regenerate-btn {
-      height: 34px;
-    }
-
-    .bottom-action-dock .command-queue-btn,
-    .bottom-action-dock .chat-send-btn {
-      width: 34px;
-    }
-
-    .bottom-action-dock .chat-regenerate-group .chat-regenerate-main {
-      width: 28px;
-    }
-
-    .bottom-action-dock .chat-regenerate-group .chat-regenerate-menu-btn {
-      width: 16px;
-    }
-  }
 
   .chat-input-field {
     background: rgba(255, 250, 244, 0.18);

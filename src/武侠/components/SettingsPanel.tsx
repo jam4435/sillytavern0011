@@ -28,6 +28,7 @@ import {
   importPresetTavernRegexes,
   normalizePresetXmlModuleInput,
   scheduleRegexDebugDump,
+  shouldOfferVariablePromptTemplateUpdate,
   setPresetRegexRulesForPreset,
   switchDisplayTheme,
   updateThemeAppearanceSetting,
@@ -3309,6 +3310,24 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">变量提示词模板</h5>
+                {shouldOfferVariablePromptTemplateUpdate(settings.summarySettings.variablePromptTemplate) && (
+                  <div className="summary-api-status warning">
+                    <div>
+                      检测到当前变量提示词是修改过的旧版模板。新版模板已加入本轮 User 输入等结构更新；为避免覆盖你的自定义内容，当前模板没有自动修改。
+                    </div>
+                    <div className="summary-actions">
+                      <button
+                        type="button"
+                        className="settings-action-btn primary"
+                        onClick={() =>
+                          updateSummarySetting('variablePromptTemplate', DEFAULT_SUMMARY_SETTINGS.variablePromptTemplate)
+                        }
+                      >
+                        更新为新版模板
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <p className="settings-hint">
                   可用变量：{'{{readonlyContextRounds}}'}、{'{{latestUserBody}}'}、{'{{latestAssistantBody}}'}、
                   {'{{variableContext}}'}、{'{{narrativeScale}}'}、{'{{variableGuidance}}'}、{'{{locationContext}}'}；

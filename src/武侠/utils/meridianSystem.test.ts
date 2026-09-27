@@ -244,13 +244,13 @@ describe('meridianSystem upgrade quotes and results', () => {
     expect(deriveMeridianModifiers(result.progress).臂力).toBe(18);
   });
 
-  it('uses the special 14 point 福缘 cap', () => {
+  it('uses the unified 20 point 福缘 cap', () => {
     const quote = quoteMeridianUpgrade({
       progress: progressThrough('yangwei', 4),
       nodeId: 'yangwei:confluence',
       realm: '二流初期',
       cultivation: 740,
-      initialAttributes: { ...INITIAL, 福缘: 14 },
+      initialAttributes: { ...INITIAL, 福缘: 20 },
     });
     expect(quote.settlement).toEqual({ 类型: '最终属性', 属性: '气血上限', 增量: 6 });
   });

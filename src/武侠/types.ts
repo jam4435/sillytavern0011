@@ -306,6 +306,7 @@ export interface EventClueArchiveEntry {
 }
 
 export interface FrontendVariableData {
+  福缘刻度版本?: number;
   奇经八脉?: MeridianProgressV1;
   永久属性修正?: Record<string, PermanentAttributeModifierVariableData>;
   可发现事件?: Record<string, unknown>;
@@ -769,6 +770,7 @@ export interface CharacterBuild {
   name: string;
   note?: string; // 备注信息，用于区分同名角色
   createdAt: number;
+  attributeScaleVersion?: number; // v2 起七维统一 0～20；缺失视为旧版福缘 -6～14
   talentTier: string;
   attributes: InitialAttributes;
   traits: string[]; // 天赋ID列表

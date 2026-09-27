@@ -49,6 +49,7 @@ import { claimFactionTaskReward } from './utils/factionManager';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
 import { migrateAvatarState } from './utils/avatarState';
+import { migratePlayerLuckScale } from './utils/luckScaleMigration';
 import { equipInventoryItem, useMedicineItem } from './utils/itemManager';
 import { learnMartialArtFromSecret } from './utils/martialArtSecretManager';
 import { upgradeMeridianNode } from './utils/meridianManager';
@@ -468,6 +469,15 @@ const App: React.FC = () => {
       await loadMartialArtsDatabase();
 
       if (sessionState !== 'empty') {
+        try {
+          const luckMigration = await migratePlayerLuckScale();
+          if (luckMigration.migrated) {
+            initLogger.log('[attributes] 旧版福缘刻度已迁移到 0～20', luckMigration);
+          }
+        } catch (error) {
+          initLogger.error('[attributes] 福缘刻度迁移失败，本次保留旧数据以便重试', error);
+        }
+
         try {
           const migration = await migrateAvatarState();
           if (migration.migrated) {

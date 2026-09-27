@@ -11,6 +11,7 @@ interface AvatarImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement
   objectPosition?: string;
   fit?: React.CSSProperties['objectFit'];
   rasterMode?: AvatarRasterMode;
+  emptyOnError?: boolean;
 }
 
 export const AvatarImage: React.FC<AvatarImageProps> = ({
@@ -19,6 +20,7 @@ export const AvatarImage: React.FC<AvatarImageProps> = ({
   objectPosition,
   fit = 'cover',
   rasterMode = 'square',
+  emptyOnError = false,
   style,
   onError,
   loading = 'lazy',
@@ -59,6 +61,10 @@ export const AvatarImage: React.FC<AvatarImageProps> = ({
     }),
     [fit, objectPosition, style, usingRasterizedSource],
   );
+
+  if (hasLoadError && emptyOnError) {
+    return null;
+  }
 
   return (
     <img
