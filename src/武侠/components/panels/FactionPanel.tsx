@@ -95,6 +95,12 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
     if (!currentSectData) return false;
     return isSameLocationScope(currentLocation, currentSectData.主峰驻地);
   }, [currentLocation, currentSectData]);
+  const sectBaseLabel = useMemo(() => {
+    const path = currentSectData?.主峰驻地?.trim();
+    if (!path) return '势力驻地';
+    const segments = path.split('/').map(segment => segment.trim()).filter(Boolean);
+    return segments[segments.length - 1] || path;
+  }, [currentSectData]);
 
   // 按层级分组武学传承树节点
   const martialNodesByTier = useMemo(() => {
@@ -624,25 +630,25 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
                     >
                       进入门派主页
                     </button>
+                  ) : isAtSectBase ? (
+                    <button
+                      type="button"
+                      className="join-sect-btn at-base"
+                      disabled={isBusy || isActionPending}
+                      onClick={() => void handleJoinFaction(currentSectData)}
+                      title="身处驻地，可向前辈行礼拜入"
+                    >
+                      拜入门派 / 投身麾下
+                    </button>
                   ) : (
                     <button
                       type="button"
-                      className={`join-sect-btn ${isAtSectBase ? 'at-base' : ''}`}
-                      disabled={isBusy || isActionPending || (!isAtSectBase && !onNavigateLocation)}
-                      onClick={() => {
-                        if (!isAtSectBase) {
-                          onNavigateLocation?.(currentSectData.主峰驻地);
-                          return;
-                        }
-                        void handleJoinFaction(currentSectData);
-                      }}
-                      title={
-                        isAtSectBase
-                          ? '身处驻地，可向前辈行礼拜入'
-                          : `当前身处「${currentLocation}」，先前往「${currentSectData.主峰驻地}」后方可正式拜入门下`
-                      }
+                      className="travel-sect-btn"
+                      disabled={isBusy || isActionPending || !onNavigateLocation}
+                      onClick={() => onNavigateLocation?.(currentSectData.主峰驻地)}
+                      title={`当前身处「${currentLocation}」，前往「${currentSectData.主峰驻地}」`}
                     >
-                      {isAtSectBase ? '拜入门派 / 投身麾下' : '前往山门拜师'}
+                      前往{sectBaseLabel}
                     </button>
                   )}
                 </div>

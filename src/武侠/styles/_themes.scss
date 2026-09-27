@@ -359,6 +359,15 @@
     background: transparent;
   }
 
+  // 正文水墨框更贴近内容区边缘，减少四周留白，尤其压缩底部空档。
+  .game-content-wrapper {
+    padding-bottom: 0.22rem;
+  }
+
+  .game-content {
+    padding: 0.72rem 0.95rem 0.82rem;
+  }
+
   .maintext-container,
   .glass-card,
   .save-ledger,
@@ -379,11 +388,15 @@
   }
 
   .maintext-container {
+    box-sizing: border-box;
+    max-width: 100%;
+    margin-bottom: 0.55rem;
     border: 22px solid transparent;
     border-image-source: var(--wuxia-ink-panel-rect-lg);
     border-image-slice: 42 fill;
     border-image-repeat: stretch;
-    padding: 1.2rem 1.45rem;
+    padding: 1.05rem 1.25rem;
+    background-clip: padding-box;
 
     &::before,
     &::after {
@@ -2938,7 +2951,23 @@
   }
 
   .social-martial-art-card-head {
-    border-bottom-color: rgba(139, 26, 26, 0.24);
+    color: #8b1a1a;
+  }
+
+  .social-martial-art-title {
+    color: var(--wuxia-ink-text-strong);
+    text-shadow: none;
+  }
+
+  .social-martial-art-entry {
+    border-top-color: rgba(61, 48, 40, 0.14);
+  }
+
+  .social-tag.social-rank-tag {
+    border-color: color-mix(in srgb, var(--social-rank-color, #7a6e62) 60%, #5b5048 18%);
+    background: color-mix(in srgb, var(--social-rank-color, #7a6e62) 10%, rgba(255, 252, 247, 0.9));
+    color: color-mix(in srgb, var(--social-rank-color, #7a6e62) 66%, #3d3028);
+    box-shadow: none;
   }
 
   .social-portrait {
@@ -4814,9 +4843,19 @@
 
 @media (max-width: $breakpoint-md) {
   [data-ui-theme='ink-wash'] {
+    .game-content-wrapper {
+      padding-bottom: 0.12rem;
+    }
+
+    .game-content {
+      padding: 0.46rem 0.5rem 0.54rem;
+    }
+
     .maintext-container {
+      margin-bottom: 0.38rem;
       border-width: 16px;
-      padding: 0.95rem 1rem;
+      padding: 0.78rem 0.84rem;
+      background-clip: padding-box;
     }
 
     .modal-box {
@@ -5742,6 +5781,12 @@
         border-color: #581010;
         color: #ffffff;
       }
+
+      .travel-sect-btn {
+        background: rgba(255, 252, 247, 0.68);
+        border-color: var(--wuxia-ink-border);
+        color: var(--wuxia-ink-text);
+      }
     }
   }
 }
@@ -6069,6 +6114,12 @@
           background: linear-gradient(180deg, #8b1a1a, #6c1414);
           border-color: #581010;
           color: #ffffff;
+        }
+
+        .travel-sect-btn {
+          background: rgba(255, 252, 247, 0.68);
+          border-color: var(--wuxia-ink-border);
+          color: var(--wuxia-ink-text);
         }
       }
 

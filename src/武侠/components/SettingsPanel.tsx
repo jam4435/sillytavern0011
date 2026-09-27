@@ -2011,7 +2011,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           >
             <Icons.Scroll size={16} />
             <span className="settings-tab-label" data-short-label="正则">
-              正则替换
+              正则
             </span>
           </button>
           <button

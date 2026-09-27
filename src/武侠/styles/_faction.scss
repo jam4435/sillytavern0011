@@ -899,7 +899,8 @@
     }
 
     .enter-my-sect-btn,
-    .join-sect-btn {
+    .join-sect-btn,
+    .travel-sect-btn {
       padding: 0.55rem 1.2rem;
       border-radius: 4px;
       font-family: var(--font-serif);
@@ -925,6 +926,23 @@
 
       &.at-base {
         box-shadow: 0 0 12px rgba(212, 175, 55, 0.45);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+
+    .travel-sect-btn {
+      background: rgba(35, 30, 24, 0.8);
+      border: 1px solid rgba(212, 175, 55, 0.38);
+      color: #d8cca8;
+
+      &:hover:not(:disabled) {
+        background: rgba(55, 46, 36, 0.9);
+        border-color: rgba(212, 175, 55, 0.62);
+        color: #f7e7b4;
       }
 
       &:disabled {
@@ -1372,6 +1390,18 @@
           box-shadow: 0 0 0 2px rgba(151, 63, 51, 0.12);
         }
       }
+
+      .travel-sect-btn {
+        background: rgba(255, 255, 255, 0.035);
+        border-color: rgba(184, 163, 140, 0.26);
+        color: #ddd0c0;
+
+        &:hover:not(:disabled) {
+          background: rgba(143, 64, 51, 0.14);
+          border-color: rgba(174, 82, 67, 0.42);
+          color: #f1ddd7;
+        }
+      }
     }
 
     .detail-intro-section,
@@ -1736,7 +1766,8 @@
       }
 
       .enter-my-sect-btn,
-      .join-sect-btn {
+      .join-sect-btn,
+      .travel-sect-btn {
         width: 100%;
         min-height: 2.4rem;
       }
