@@ -417,6 +417,8 @@ export interface NPC {
   role?: string;
   location?: string;
   appearance?: string;
+  /** 人物性格，来源于角色数据.性格。 */
+  personality?: string;
   template: {
     type: string;
     martialArtsDescription: string;

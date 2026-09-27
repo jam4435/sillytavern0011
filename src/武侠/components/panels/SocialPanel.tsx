@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import AvatarImage from '../AvatarImage';
 import AvatarPreviewModal from '../AvatarPreviewModal';
 import { ActivePanel, type NPC, type NPCMartialArt } from '../../types';
@@ -13,6 +13,7 @@ import {
   saveCustomAvatar,
 } from '../../utils/avatarStorage';
 import { clearNpcAvatarRef, setNpcAvatarRef } from '../../utils/avatarState';
+import { getRankVisual } from '../../utils/iconCatalog';
 import { Icons } from '../Icons';
 import { EmptyState } from './EmptyState';
 
@@ -521,47 +522,74 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                 </section>
               )}
 
-              <section className="social-detail-card">
-                <div className="social-detail-card-head">
-                  <Icons.FileText size={16} />
-                  <span>人物外貌</span>
+              <div className="social-detail-columns social-profile-columns">
+                <section className="social-detail-card">
+                  <div className="social-detail-card-head">
+                    <Icons.FileText size={16} />
+                    <span>人物外貌</span>
+                  </div>
+                  <p className="social-detail-text">{selectedNpc.appearance || '暂无外貌记录。'}</p>
+                </section>
+
+                <section className="social-detail-card">
+                  <div className="social-detail-card-head">
+                    <Icons.Character size={16} />
+                    <span>人物性格</span>
+                  </div>
+                  <p className="social-detail-text">{selectedNpc.personality || '暂无性格记录。'}</p>
+                </section>
+              </div>
+
+              <section className="social-detail-card social-martial-list-card">
+                <div className="social-detail-card-head social-martial-list-head">
+                  <Icons.Combat size={16} />
+                  <span>所习武学</span>
+                  <strong>{martialArtEntries.length} 门</strong>
                 </div>
-                <p className="social-detail-text">{selectedNpc.appearance || '暂无外貌记录。'}</p>
-              </section>
+                <div className="social-martial-list">
+                  {martialArtEntries.map(([martialArtName, martialArt]) => {
+                    const martialArtTitle = martialArtName.trim() || '未载功法';
+                    const rankLabel = martialArt.martialArtsRank || '未知品阶';
+                    const rankVisual = getRankVisual(rankLabel, 'martial');
+                    const rankStyle = {
+                      '--social-rank-color': rankVisual.color,
+                      '--social-rank-glow': rankVisual.glow,
+                    } as CSSProperties;
+                    const traitEntries = Object.entries(martialArt.traits || {}).filter(
+                      ([, desc]) => typeof desc === 'string' && desc.trim().length > 0,
+                    );
 
-              {martialArtEntries.map(([martialArtName, martialArt]) => {
-                const martialArtTitle = martialArtName.trim() || '未载功法';
-                const traitEntries = Object.entries(martialArt.traits || {}).filter(
-                  ([, desc]) => typeof desc === 'string' && desc.trim().length > 0,
-                );
-
-                return (
-                  <section className="social-detail-card social-martial-art-card" key={martialArtName}>
-                    <div className="social-detail-card-head social-martial-art-card-head">
-                      <Icons.Combat size={16} />
-                      <h3 className="social-martial-art-title" title={martialArtTitle}>
-                        {martialArtTitle}
-                      </h3>
-                    </div>
-                    <div className="social-tag-row">
-                      {martialArt.type && <span className="social-tag muted">{martialArt.type}</span>}
-                      <span className="social-tag">{martialArt.martialArtsRank || '未知品阶'}</span>
-                      <span className="social-tag muted">{martialArt.mastery || '未知掌握'}</span>
-                    </div>
-                    <p className="social-detail-text">{martialArt.martialArtsDescription || '尚未探明其武学底细。'}</p>
-                    {traitEntries.length > 0 && (
-                      <div className="social-trait-grid">
-                        {traitEntries.map(([trait, desc]) => (
-                          <div className="social-trait-chip" key={trait}>
-                            <span>{trait}</span>
-                            <small>{desc}</small>
+                    return (
+                      <article className="social-martial-art-entry" key={martialArtName}>
+                        <div className="social-martial-art-card-head">
+                          <Icons.Combat size={15} />
+                          <h3 className="social-martial-art-title" title={martialArtTitle}>
+                            {martialArtTitle}
+                          </h3>
+                        </div>
+                        <div className="social-tag-row social-martial-meta">
+                          <span className="social-tag social-rank-tag" style={rankStyle}>{rankLabel}</span>
+                          {martialArt.type && <span className="social-tag muted">{martialArt.type}</span>}
+                          <span className="social-tag muted">{martialArt.mastery || '未知掌握'}</span>
+                        </div>
+                        <p className="social-detail-text social-martial-art-desc">
+                          {martialArt.martialArtsDescription || '尚未探明其武学底细。'}
+                        </p>
+                        {traitEntries.length > 0 && (
+                          <div className="social-trait-grid social-martial-traits">
+                            {traitEntries.map(([trait, desc]) => (
+                              <div className="social-trait-chip" key={trait}>
+                                <span>{trait}</span>
+                                <small>{desc}</small>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                );
-              })}
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
 
               <div className="social-detail-columns">
                 <section className="social-detail-card compact">

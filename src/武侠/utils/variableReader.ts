@@ -233,6 +233,7 @@ interface GameVariables {
   // 社交/NPC
   侠缘?: Array<{
     姓名?: string;
+    性格?: string;
     关系值?: number;
     武功描述?: string;
     武功品阶?: string;
@@ -1486,6 +1487,7 @@ function createCharacterNpc(
     role: getPrimaryIdentityTitle(characterData.身份),
     location: characterData.所在位置 || undefined,
     appearance: characterData.外貌?.trim() || undefined,
+    personality: characterData.性格?.trim() || legacyNpc?.性格?.trim() || undefined,
     template: getPrimaryMartialArtTemplate(characterData, legacyNpc),
     keyItems: getCharacterKeyItems(characterData, legacyNpc),
     biography: formatBiographySummary(characterData.人物经历) || legacyNpc?.人物经历 || '',
@@ -1509,6 +1511,7 @@ function createLegacySocialNpc(
     relationshipLabel: normalizedRelationship.relationshipLabel,
     category,
     role: '江湖人士',
+    personality: legacyNpc.性格?.trim() || undefined,
     template: {
       type: '',
       martialArtsDescription: legacyNpc.武功描述 || '',
