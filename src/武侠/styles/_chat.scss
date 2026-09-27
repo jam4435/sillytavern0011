@@ -223,6 +223,11 @@
   transition: all 0.3s ease;
   backdrop-filter: blur(12px);
 
+  @media (min-width: 769px) {
+    padding: 0.32rem 0.7rem 0.38rem;
+    gap: 0.45rem;
+  }
+
   @media (max-width: 768px) {
     margin: 0 0.75rem;
     padding: 0.55rem 0.8rem 0.7rem;
@@ -371,6 +376,12 @@
   overflow-y: auto;
   transition: all 0.25s ease;
 
+  @media (min-width: 769px) {
+    min-height: 36px;
+    padding: 0.42rem 2.35rem 0.42rem 0.75rem;
+    line-height: 1.3;
+  }
+
   // iOS Safari 在字号 <16px 时聚焦会自动缩放整页
   @media (max-width: 767px) {
     font-size: 16px;
@@ -508,6 +519,11 @@
     animation: spin 1s linear infinite;
   }
 
+  @media (min-width: 769px) {
+    width: 36px;
+    height: 36px;
+  }
+
   @media (max-width: 768px) {
     width: 40px;
     height: 40px;
@@ -616,6 +632,16 @@
 
     .send-btn-icon {
       color: rgba(168, 162, 158, 0.3);
+    }
+  }
+
+  @media (min-width: 769px) {
+    width: 36px;
+    height: 36px;
+
+    .send-btn-icon {
+      width: 18px;
+      height: 18px;
     }
   }
 
@@ -744,6 +770,11 @@
     border-color: rgba(212, 175, 55, 0.6);
     box-shadow: 0 0 12px rgba(181, 137, 80, 0.3);
     color: var(--stone-200);
+  }
+
+  @media (min-width: 769px) {
+    width: 36px;
+    height: 36px;
   }
 
   @media (max-width: 768px) {
