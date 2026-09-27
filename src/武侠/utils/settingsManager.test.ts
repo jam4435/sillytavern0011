@@ -16,6 +16,7 @@ import {
   loadSettings,
   normalizePresetXmlModuleInput,
   saveSettings,
+  shouldOfferVariablePromptTemplateUpdate,
   stripSelectedPresetRegexMatches,
   stripSelectedXmlModules,
 } from './settingsManager';
@@ -332,7 +333,58 @@ describe('settingsManager ui theme', () => {
     expect(template).toContain('{{latestAssistantBody}}');
   });
 
-  it('does not migrate a custom assistant-only variable prompt just because it lacks latestUserBody', () => {
+  it('preserves a customized 2026-08-27 assistant-only template and offers an update instead of overwriting it', () => {
+    const customizedLegacyTemplate = `你是《金庸群侠传》ERA 变量更新模型。
+任务是核对最新 assistant 正文已经发生的持久变化；不得续写剧情。
+
+【前序只读完整轮次】
+{{readonlyContextRounds}}
+
+【当前变量上下文；JSON 是真实可写快照，方括号内容只读】
+{{variableContext}}
+
+【本轮唯一变化来源】
+{{latestAssistantBody}}
+
+【我的自定义规则】
+优先保留我自己的变量判定补充。
+
+【最终执行要求】
+1. 只有上方 latestAssistantBody 是本轮变化来源；前序对话只用于理解上下文。`;
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({
+        summarySettings: {
+          variablePromptTemplate: customizedLegacyTemplate,
+        },
+      }),
+    );
+
+    const template = loadSettings().summarySettings.variablePromptTemplate;
+    expect(template).toBe(customizedLegacyTemplate);
+    expect(shouldOfferVariablePromptTemplateUpdate(template)).toBe(true);
+  });
+
+  it('preserves customized recentBodies-era templates verbatim and offers an update', () => {
+    const customizedLegacyTemplate =
+      '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】\n{{recentBodies}}\n【当前变量上下文，来自输出提示词渲染结果或等价快照】\n{{variableContext}}\n{{variableGuidance}}\n{{locationContext}}\n【我的自定义规则】\n不要覆盖这一段。';
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({
+        summarySettings: {
+          variablePromptTemplate: customizedLegacyTemplate,
+        },
+      }),
+    );
+
+    const template = loadSettings().summarySettings.variablePromptTemplate;
+    expect(template).toBe(customizedLegacyTemplate);
+    expect(shouldOfferVariablePromptTemplateUpdate(template)).toBe(true);
+  });
+
+  it('does not flag an unrelated custom variable prompt merely because it omits latestUserBody', () => {
     const customTemplate =
       'CUSTOM VARIABLE PROMPT\\n{{readonlyContextRounds}}\\n{{latestAssistantBody}}\\n{{variableContext}}';
 
@@ -345,28 +397,9 @@ describe('settingsManager ui theme', () => {
       }),
     );
 
-    expect(loadSettings().summarySettings.variablePromptTemplate).toBe(customTemplate);
-  });
-
-  it('updates legacy default-template labels without changing custom placeholders', () => {
-    window.localStorage.setItem(
-      'wuxia_display_settings',
-      JSON.stringify({
-        summarySettings: {
-          variablePromptTemplate:
-            '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】\n{{recentBodies}}\n【当前变量上下文，来自输出提示词渲染结果或等价快照】\n{{variableContext}}\n{{variableGuidance}}\n{{locationContext}}',
-        },
-      }),
-    );
-
     const template = loadSettings().summarySettings.variablePromptTemplate;
-    expect(template).toContain('最新 assistant 正文是唯一变化来源');
-    expect(template).toContain('专用严格 JSON 投影');
-    expect(template).toContain('{{recentBodies}}');
-    expect(template).toContain('{{variableContext}}');
-    expect(template).toContain('{{variableGuidance}}');
-    expect(template).toContain('{{locationContext}}');
-    expect(template).not.toContain('最近 5 层正文');
+    expect(template).toBe(customTemplate);
+    expect(shouldOfferVariablePromptTemplateUpdate(template)).toBe(false);
   });
 
   describe('preset storage cleanup', () => {
