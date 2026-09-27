@@ -453,6 +453,12 @@
     line-height: 1.25;
   }
 
+  // 仅手机普通输入态隐藏引导文案；PC 及重新生成编辑态继续保留提示。
+  .chat-input-wrapper:not(.regenerate-draft-mode) .chat-input-field::placeholder {
+    color: transparent;
+    opacity: 0;
+  }
+
   .maintext-edit-sticky {
     top: 0.15rem;
     height: 34px;
