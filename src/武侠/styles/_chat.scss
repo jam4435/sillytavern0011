@@ -663,7 +663,9 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  padding-bottom: 0.65rem;
+  // 底部操作区悬浮在滚动层之上；按其实际高度留出可滚动余量，避免末尾正文被遮挡。
+  padding-bottom: calc(0.65rem + var(--wuxia-bottom-action-dock-height, 0px));
+  scroll-padding-bottom: calc(0.65rem + var(--wuxia-bottom-action-dock-height, 0px));
 }
 
 // 聊天正文的承载层。江湖事簿作为 HUD 悬浮于其上，不再占用正文宽度。
@@ -673,7 +675,11 @@
 }
 
 .bottom-action-dock {
-  flex-shrink: 0;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
   min-width: 0;
   display: flex;
   flex-direction: column;
