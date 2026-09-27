@@ -499,6 +499,57 @@ export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = `你是《金庸群侠传
 export const DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS = ['tucao', 'current_event', 'progress'].join('\n');
 export const DEFAULT_VARIABLE_PROMPT_BODY_START_MARKERS = '</konatan_planning~>';
 
+const LEGACY_RECENT_BODIES_VARIABLE_PROMPT_MARKERS = [
+  '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】',
+  '【正文上下文；最新 assistant 正文是唯一变化来源，前序完整轮次只读】',
+  '【当前变量上下文，来自输出提示词渲染结果或等价快照】',
+  '只有 latestAssistantBody 是本轮变化来源',
+] as const;
+
+const LEGACY_ASSISTANT_ONLY_VARIABLE_PROMPT_MARKERS = [
+  '任务是核对最新 assistant 正文已经发生的持久变化；不得续写剧情。',
+  '【前序只读完整轮次】',
+  '【本轮唯一变化来源】',
+  '只有上方 latestAssistantBody 是本轮变化来源',
+] as const;
+
+/**
+ * 判断一个自定义变量提示词是否明显沿用了旧版官方模板结构。
+ * 旧默认原样保存时会在 loadSettings 中静默迁移；这里只用于识别“改过旧默认”的情况，
+ * 以便 UI 提示新版模板可用，而不是自动覆盖用户修改。
+ */
+export function shouldOfferVariablePromptTemplateUpdate(template: string): boolean {
+  const source = template.trim();
+  if (
+    !source ||
+    source === DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE ||
+    source === LEGACY_DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE ||
+    source === LEGACY_ASSISTANT_ONLY_VARIABLE_UPDATE_PROMPT_TEMPLATE ||
+    source.includes('{{latestUserBody}}')
+  ) {
+    return false;
+  }
+
+  const legacyRecentBodiesMarkerCount = LEGACY_RECENT_BODIES_VARIABLE_PROMPT_MARKERS.filter(marker =>
+    source.includes(marker),
+  ).length;
+  const looksLikeRecentBodiesLegacy =
+    source.includes('{{recentBodies}}') &&
+    source.includes('{{variableContext}}') &&
+    legacyRecentBodiesMarkerCount >= 2;
+
+  const legacyAssistantOnlyMarkerCount = LEGACY_ASSISTANT_ONLY_VARIABLE_PROMPT_MARKERS.filter(marker =>
+    source.includes(marker),
+  ).length;
+  const looksLikeAssistantOnlyLegacy =
+    source.includes('{{readonlyContextRounds}}') &&
+    source.includes('{{latestAssistantBody}}') &&
+    source.includes('{{variableContext}}') &&
+    legacyAssistantOnlyMarkerCount >= 2;
+
+  return looksLikeRecentBodiesLegacy || looksLikeAssistantOnlyLegacy;
+}
+
 function migrateVariablePromptTemplate(template: string): string {
   if (
     template === LEGACY_DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE ||
@@ -507,12 +558,7 @@ function migrateVariablePromptTemplate(template: string): string {
     return DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE;
   }
 
-  return template
-    .replace(
-      '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】',
-      '【正文上下文；最新 assistant 正文是唯一变化来源，前序完整轮次只读】',
-    )
-    .replace('【当前变量上下文，来自输出提示词渲染结果或等价快照】', '【当前变量上下文；专用严格 JSON 投影】');
+  return template;
 }
 
 export const DEFAULT_SUMMARY_API_CONFIG: SummaryApiConfig = {
