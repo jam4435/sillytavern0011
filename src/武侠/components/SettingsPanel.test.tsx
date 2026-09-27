@@ -205,7 +205,7 @@ describe('SettingsPanel theme controls', () => {
   it('keeps global and current-preset regex groups collapsed by default', () => {
     renderSettingsPanel(createDefaultDisplaySettings());
 
-    fireEvent.click(screen.getByRole('button', { name: '正则替换' }));
+    fireEvent.click(screen.getByRole('button', { name: '正则' }));
     expect(screen.getByRole('button', { name: /全局正则 · 0/ })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('button', { name: /当前预设正则 · 0/ })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('添加全局规则')).not.toBeInTheDocument();
@@ -215,7 +215,7 @@ describe('SettingsPanel theme controls', () => {
     const settings = createDefaultDisplaySettings();
     const onSettingsChange = renderSettingsPanel(settings, vi.fn(), '测试预设');
 
-    fireEvent.click(screen.getByRole('button', { name: '正则替换' }));
+    fireEvent.click(screen.getByRole('button', { name: '正则' }));
     fireEvent.click(screen.getByRole('button', { name: '无用模块过滤开关' }));
 
     expect(onSettingsChange).toHaveBeenCalledWith({

@@ -169,7 +169,8 @@ describe('FactionPanel Component', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '前往山门拜师' }));
+    expect(screen.queryByRole('button', { name: '拜入门派 / 投身麾下' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '前往重阳宫' }));
     expect(handleNavigateLocation).toHaveBeenCalledWith('大宋/终南山/重阳宫');
     expect(handleSendMessage).not.toHaveBeenCalled();
   });

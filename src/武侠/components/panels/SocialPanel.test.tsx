@@ -108,10 +108,11 @@ describe('SocialPanel avatar picker', () => {
 });
 
 describe('SocialPanel role and appearance', () => {
-  it('人物身份独立显示，功法类型仍保留在武学卡，并展示外貌', () => {
+  it('人物身份独立显示，功法类型仍保留在武学卡，并展示外貌与性格', () => {
     const npc = createNpc('郭靖');
     npc.role = '丐帮帮主';
     npc.appearance = '浓眉大眼，神情敦厚。';
+    npc.personality = '忠厚朴实，重信守诺。';
     npc.template = {
       ...npc.template,
       type: '掌法',
@@ -123,6 +124,8 @@ describe('SocialPanel role and appearance', () => {
     expect(screen.getAllByText('丐帮帮主').length).toBeGreaterThan(0);
     expect(screen.getByText('人物外貌')).toBeInTheDocument();
     expect(screen.getByText('浓眉大眼，神情敦厚。')).toBeInTheDocument();
+    expect(screen.getByText('人物性格')).toBeInTheDocument();
+    expect(screen.getByText('忠厚朴实，重信守诺。')).toBeInTheDocument();
     expect(screen.getByText('掌法')).toBeInTheDocument();
   });
 
@@ -169,6 +172,8 @@ describe('SocialPanel martial-art details', () => {
     expect(screen.getByRole('heading', { name: '全真剑法', level: 3 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '金雁功', level: 3 })).toBeInTheDocument();
     expect(screen.queryByText('功法根基')).not.toBeInTheDocument();
+    expect(screen.getByText('所习武学')).toBeInTheDocument();
+    expect(screen.getAllByText('上乘')).toHaveLength(2);
     expect(screen.getByText("招式严谨，如'白虹经天'。")).toBeInTheDocument();
     expect(screen.getByText('剑法严谨：格挡成功率提升20%')).toBeInTheDocument();
     expect(screen.queryByText('初窥门径')).not.toBeInTheDocument();
