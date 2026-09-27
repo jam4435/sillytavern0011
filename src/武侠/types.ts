@@ -915,7 +915,7 @@ export interface MapData {
 /**
  * 待发送指令类型
  */
-export type CommandType = 'TRAVEL' | 'USE_ITEM';
+export type CommandType = 'TRAVEL' | 'USE_ITEM' | 'MARTIAL_ART_UPGRADE';
 
 export interface ResourceDeltaMap {
   气血?: number;
@@ -955,6 +955,10 @@ export interface PendingCommand {
     resourceDeltas?: ResourceDeltaMap;
     equipmentRollback?: EquipmentRollbackData;
     martialArtLearnRollback?: MartialArtLearnRollbackData;
+    martialArtName?: string;
+    previousMastery?: string;
+    newMastery?: string;
+    spentCultivation?: number;
   };
   timestamp: number;
 }

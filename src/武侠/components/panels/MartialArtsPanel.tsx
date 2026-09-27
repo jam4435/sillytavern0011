@@ -41,7 +41,9 @@ interface MartialArtsPanelProps {
   onUpgrade?: (result: {
     success: boolean;
     martialArtName: string;
+    previousMastery?: string;
     newMastery?: string;
+    spentCultivation?: number;
     newCultivation?: number;
     error?: string;
   }) => void;
@@ -98,7 +100,9 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
         onUpgrade?.({
           success: result.success,
           martialArtName: artName,
+          previousMastery: result.previousMastery,
           newMastery: result.newMastery,
+          spentCultivation: result.spentCultivation,
           newCultivation: result.newCultivation,
           error: result.error,
         });
@@ -119,7 +123,7 @@ export const MartialArtsPanel: React.FC<MartialArtsPanelProps> = ({
         setUpgradingArt(null);
       }
     },
-    [comprehension, cultivation, onUpgrade, upgradingArt],
+    [comprehension, cultivation, onUpgrade, traits, upgradingArt],
   );
 
   const handleSelectArt = (name: string) => {

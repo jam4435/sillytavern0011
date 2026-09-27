@@ -51,6 +51,20 @@ export function useCommandQueue() {
     uiLogger.log('[useCommandQueue] 添加使用物品指令:', command);
   }, []);
 
+  /** 添加功法精进后的叙事指令；取消只移除提示，不回滚已结算的数值。 */
+  const addMartialArtUpgradeCommand = useCallback((commandText: string, data: PendingCommand['data']) => {
+    const command: PendingCommand = {
+      id: `martial_art_upgrade_${Date.now()}_${Math.random()}`,
+      type: 'MARTIAL_ART_UPGRADE' as CommandType,
+      text: commandText,
+      data,
+      timestamp: Date.now(),
+    };
+
+    setCommands(prev => [...prev, command]);
+    uiLogger.log('[useCommandQueue] 添加功法精进指令:', command);
+  }, []);
+
   /**
    * 取消指令
    * @param commandId 指令ID
@@ -140,6 +154,7 @@ export function useCommandQueue() {
     commands,
     setTravelCommand,
     addUseItemCommand,
+    addMartialArtUpgradeCommand,
     cancelCommand,
     sendMessageWithCommands,
     clearQueue,

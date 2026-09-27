@@ -120,6 +120,43 @@ describe('useCommandQueue', () => {
     expect(result.current.commands).toHaveLength(1);
   });
 
+  it('功法精进指令会进入队列，取消时只移除叙事提示而不触发数值回滚', async () => {
+    const { result } = renderHook(() => useCommandQueue());
+
+    act(() => {
+      result.current.addMartialArtUpgradeCommand(
+        '[功法指令]User消耗6000点修为，将《九阳神功》从「初窥门径」精进至「略有小成」。',
+        {
+          martialArtName: '九阳神功',
+          previousMastery: '初窥门径',
+          newMastery: '略有小成',
+          spentCultivation: 6000,
+        },
+      );
+    });
+
+    expect(result.current.commands).toHaveLength(1);
+    expect(result.current.commands[0]).toMatchObject({
+      type: 'MARTIAL_ART_UPGRADE',
+      data: {
+        martialArtName: '九阳神功',
+        previousMastery: '初窥门径',
+        newMastery: '略有小成',
+        spentCultivation: 6000,
+      },
+    });
+
+    const commandId = result.current.commands[0].id;
+    await act(async () => {
+      await result.current.cancelCommand(commandId);
+    });
+
+    expect(result.current.commands).toEqual([]);
+    expect(restoreItemCountMock).not.toHaveBeenCalled();
+    expect(undoLearnMartialArtFromSecretMock).not.toHaveBeenCalled();
+    expect(syncPlayerAttributesMock).not.toHaveBeenCalled();
+  });
+
   it('取消药品指令会恢复完整物品快照并删除对应副作用', async () => {
     const { result } = renderHook(() => useCommandQueue());
     const originalItem = {
