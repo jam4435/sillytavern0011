@@ -428,19 +428,19 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
               <header className="social-detail-hero">
                 <button
                   type="button"
-                  className="social-portrait"
+                  className={`social-portrait ${selectedAvatarSource?.src ? '' : 'is-empty'}`}
                   onClick={() => selectedAvatarSource?.src && setIsAvatarPreviewOpen(true)}
                   aria-label={`查看${selectedNpc.name || '人物'}头像`}
+                  disabled={!selectedAvatarSource?.src}
                 >
-                  {selectedAvatarSource?.src ? (
+                  {selectedAvatarSource?.src && (
                     <AvatarImage
                       src={selectedAvatarSource.src}
                       alt={`${selectedNpc.name}头像`}
                       objectPosition={selectedAvatarSource.objectPosition}
                       rasterMode="trim"
+                      emptyOnError
                     />
-                  ) : (
-                    <span>{selectedAvatarSource?.fallbackInitial || selectedNpc.name.charAt(0) || '侠'}</span>
                   )}
                 </button>
                 <div className="social-hero-copy">
