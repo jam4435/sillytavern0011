@@ -64,7 +64,7 @@ export function formatPromptMessagesForDebug(messages: SillyTavern.SendingMessag
 }
 
 export function captureNextCombinedPromptForDebug(onPrompt: (prompt: string) => void): PromptCaptureListener | null {
-  if (typeof eventOn !== 'function' || typeof tavern_events === 'undefined') {
+  if (typeof eventMakeLast !== 'function' || typeof tavern_events === 'undefined') {
     return null;
   }
 
@@ -81,10 +81,6 @@ export function captureNextCombinedPromptForDebug(onPrompt: (prompt: string) => 
   // 只在“最终请求参数”事件的最后阶段抓取，确保 Prompt Template / EJS 等扩展
   // 已经完成对请求正文的异步改写。不要再监听 EJS 前的合并提示词事件，
   // 否则调试页会把模板源码误当成模型实际收到的输入。
-  if (typeof eventMakeLast !== 'function') {
-    return null;
-  }
-
   if (tavern_events.GENERATE_AFTER_DATA) {
     listeners.push(
       eventMakeLast(tavern_events.GENERATE_AFTER_DATA, (generateData, dryRun) => {
