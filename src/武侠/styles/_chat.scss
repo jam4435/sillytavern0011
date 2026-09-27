@@ -694,48 +694,24 @@
 }
 
 @media (max-width: 768px) {
+  // 手机端不再给变量条 + 输入栏套深色总底板，恢复输入栏原本的独立视觉。
   .bottom-action-dock {
-    padding: 0.28rem 0.55rem calc(0.42rem + env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid rgba(139, 90, 43, 0.16);
-    background: linear-gradient(
-      to bottom,
-      rgba(20, 16, 14, 0.5),
-      rgba(12, 10, 9, 0.7)
-    );
-    backdrop-filter: blur(14px);
+    padding: 0;
+    border-top: 0;
+    background: transparent;
+    backdrop-filter: none;
 
     .variable-change-dock {
-      padding: 0;
+      padding: 0 0.85rem 0.45rem;
     }
 
     .variable-change-bar {
       margin: 0;
-      box-shadow: none;
 
       &.expanded {
         max-height: min(320px, 40vh);
         overflow-y: auto;
       }
-    }
-
-    .chat-input-wrapper {
-      padding: 0;
-      background: transparent;
-    }
-
-    .chat-input-top-border {
-      display: none;
-    }
-
-    .chat-input-container {
-      max-width: none;
-      margin: 0.28rem 0 0;
-      padding: 0.32rem 0.4rem;
-      gap: 0.35rem;
-      border-radius: 8px;
-      background: rgba(28, 25, 23, 0.28);
-      box-shadow: none;
-      backdrop-filter: none;
     }
   }
 }

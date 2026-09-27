@@ -409,51 +409,38 @@
 }
 
 @media (max-width: 520px) {
-  // 普通输入态恢复为一行：输入框 | 指令 | 重生 | 发送。
+  // 回退手机输入栏：恢复原来的两行布局，避免压缩后水墨边框失真。
   .chat-input-container {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 40px 54px 40px;
 
     .chat-input-field-wrapper {
-      flex: 1 1 auto;
-      min-width: 0;
+      grid-column: 1 / -1;
     }
   }
 
   .chat-extra-actions {
-    display: flex;
-    flex: 0 0 auto;
+    display: contents;
   }
 
-  .command-queue-btn,
-  .chat-send-btn,
-  .chat-regenerate-btn {
-    height: 34px;
-  }
-
-  .command-queue-btn,
-  .chat-send-btn {
-    width: 34px;
+  .command-queue-anchor {
+    grid-column: 2;
   }
 
   .chat-regenerate-group {
-    .chat-regenerate-main {
-      width: 28px;
-    }
-
-    .chat-regenerate-menu-btn {
-      width: 16px;
-    }
+    grid-column: 3;
   }
 
-  .chat-input-field {
-    min-height: 34px;
-    padding: 0.32rem 1.9rem 0.32rem 0.58rem;
-    line-height: 1.25;
+  .chat-send-btn {
+    grid-column: 4;
   }
 
-  // 仅手机普通输入态隐藏引导文案；PC 及重新生成编辑态继续保留提示。
+  .regenerate-draft-mode .chat-send-btn {
+    grid-column: 3 / 5;
+    justify-self: end;
+  }
+
+  // 仅手机普通输入态隐藏引导文案；PC 与重新生成编辑态继续显示。
   .chat-input-wrapper:not(.regenerate-draft-mode) .chat-input-field::placeholder {
     color: transparent;
     opacity: 0;
