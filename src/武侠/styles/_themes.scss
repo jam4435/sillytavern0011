@@ -359,15 +359,6 @@
     background: transparent;
   }
 
-  // 正文水墨框更贴近内容区边缘，减少四周留白，尤其压缩底部空档。
-  .game-content-wrapper {
-    padding-bottom: 0.22rem;
-  }
-
-  .game-content {
-    padding: 0.72rem 0.95rem 0.82rem;
-  }
-
   .maintext-container,
   .glass-card,
   .save-ledger,
@@ -388,15 +379,11 @@
   }
 
   .maintext-container {
-    box-sizing: border-box;
-    max-width: 100%;
-    margin-bottom: 0.55rem;
     border: 22px solid transparent;
     border-image-source: var(--wuxia-ink-panel-rect-lg);
     border-image-slice: 42 fill;
     border-image-repeat: stretch;
-    padding: 1.05rem 1.25rem;
-    background-clip: padding-box;
+    padding: 1.2rem 1.45rem;
 
     &::before,
     &::after {
@@ -4843,19 +4830,9 @@
 
 @media (max-width: $breakpoint-md) {
   [data-ui-theme='ink-wash'] {
-    .game-content-wrapper {
-      padding-bottom: 0.12rem;
-    }
-
-    .game-content {
-      padding: 0.46rem 0.5rem 0.54rem;
-    }
-
     .maintext-container {
-      margin-bottom: 0.38rem;
       border-width: 16px;
-      padding: 0.78rem 0.84rem;
-      background-clip: padding-box;
+      padding: 0.95rem 1rem;
     }
 
     .modal-box {
