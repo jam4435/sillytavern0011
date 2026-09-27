@@ -60,6 +60,15 @@ describe('SocialPanel avatar picker', () => {
     expect(screen.getByRole('heading', { name: '黄蓉头像' })).toBeInTheDocument();
   });
 
+  it('没有可用头像时显示半透明空框而不是姓名首字占位', () => {
+    render(<SocialPanel npcs={[createNpc('无图侠客')]} />);
+
+    const portrait = screen.getByRole('button', { name: '查看无图侠客头像' });
+    expect(portrait).toHaveClass('is-empty');
+    expect(portrait).toBeDisabled();
+    expect(portrait).toBeEmptyDOMElement();
+  });
+
   it('上传自定义头像后本地覆盖优先', async () => {
     render(<SocialPanel npcs={[createNpc()]} />);
     fireEvent.click(screen.getByRole('button', { name: '设置黄蓉头像' }));
