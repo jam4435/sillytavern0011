@@ -1917,9 +1917,11 @@
   .event-tracker {
     color: var(--wuxia-ink-text);
     background: var(--wuxia-ink-paper-strong, var(--wuxia-ink-paper));
-    border: 0;
-    border-image: none;
-    box-shadow: 0 9px 20px rgba(61, 48, 40, 0.12);
+    border: 12px solid transparent;
+    border-image-source: var(--wuxia-ink-panel-rect-lg, none);
+    border-image-slice: 36;
+    border-image-repeat: stretch;
+    box-shadow: 0 9px 20px rgba(61, 48, 40, 0.16);
 
     &::before {
       display: none;
@@ -4906,6 +4908,9 @@
     z-index: 0;
     inset: 0;
     display: block;
+    border: 0;
+    outline: 0;
+    box-shadow: none;
     background-image:
       var(--wuxia-event-scroll-left, none),
       var(--wuxia-event-scroll-right, none),
