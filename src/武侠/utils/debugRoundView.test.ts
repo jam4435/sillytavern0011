@@ -118,6 +118,7 @@ describe('debugRoundView', () => {
     debugRound.variable.retry429Count = 1;
     debugRound.variable.retry429LastDelayMs = 1_000;
 
+    expect(buildMainInputDebugContent(debugRound)).toContain('【最终送模提示词】');
     expect(buildMainInputDebugContent(debugRound)).toContain('已重试：2 次');
     expect(buildMainInputDebugContent(debugRound)).toContain('最近等待：2000ms');
     expect(buildVariableOutputDebugContent(debugRound)).toContain('已重试：1 次');
