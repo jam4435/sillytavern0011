@@ -92,10 +92,9 @@ export function captureNextCombinedPromptForDebug(onPrompt: (prompt: string) => 
           return;
         }
 
+        const rawPrompt = generateData?.prompt as unknown;
         const finalPrompt =
-          typeof generateData?.prompt === 'string'
-            ? generateData.prompt.trim()
-            : formatPromptMessagesForDebug(generateData?.prompt);
+          typeof rawPrompt === 'string' ? rawPrompt.trim() : formatPromptMessagesForDebug(rawPrompt);
         handlePrompt(finalPrompt);
       }),
     );
