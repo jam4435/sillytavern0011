@@ -222,11 +222,44 @@ const App: React.FC = () => {
   const [recentInputHistory, setRecentInputHistory] = useState<InputHistoryEntry[]>(() => readRecentInputHistory());
   const [inputPrefill, setInputPrefill] = useState<{ key: string; message: string } | null>(null);
   const inputPrefillSequenceRef = useRef(0);
+  const bottomActionDockRef = useRef<HTMLDivElement | null>(null);
   const [isPlayerAvatarPreviewOpen, setIsPlayerAvatarPreviewOpen] = useState(false);
   const [isLatestReplyEditorOpen, setIsLatestReplyEditorOpen] = useState(false);
   const [displayedTurnSnapshot, setDisplayedTurnSnapshot] = useState<EditableTurnSnapshot | null>(null);
   const [mapDraftDestination, setMapDraftDestination] = useState<string | null>(null);
   const [assistantDisplayCommitKey, setAssistantDisplayCommitKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const dock = bottomActionDockRef.current;
+    const mainColumn = dock?.closest('.main-column') as HTMLElement | null;
+    if (!dock || !mainColumn) {
+      return;
+    }
+
+    const syncDockHeight = () => {
+      const height = Math.max(0, Math.ceil(dock.getBoundingClientRect().height));
+      mainColumn.style.setProperty('--wuxia-bottom-action-dock-height', `${height}px`);
+    };
+
+    syncDockHeight();
+
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(syncDockHeight);
+    resizeObserver?.observe(dock);
+
+    if (!resizeObserver) {
+      window.addEventListener('resize', syncDockHeight);
+    }
+
+    return () => {
+      resizeObserver?.disconnect();
+      if (!resizeObserver) {
+        window.removeEventListener('resize', syncDockHeight);
+      }
+      mainColumn.style.removeProperty('--wuxia-bottom-action-dock-height');
+    };
+  }, [currentPage]);
+
   const handleAssistantDisplayCommit = useCallback((assistantMessageId: number, assistantSwipeId: number) => {
     setAssistantDisplayCommitKey(`${assistantMessageId}:${assistantSwipeId}`);
     try {
@@ -1897,7 +1930,7 @@ const App: React.FC = () => {
               </div>
             </section>
 
-            <div className="bottom-action-dock">
+            <div ref={bottomActionDockRef} className="bottom-action-dock">
               <div className="variable-change-dock">
                 <VariableChangeBar summary={variableChanges || null} />
               </div>
