@@ -12,16 +12,7 @@
  * - 分类：天资 | 体质 | 性情 | 气质 | 命格 | 缺陷（彻底移除“经历”与“专长”）。
  */
 
-import type {
-  CharacterTrait,
-  InitialAttributes,
-  TraitAttributeModifiers,
-  TraitRestrictions,
-  TraitDiscounts,
-  TraitRank,
-  TraitCategory,
-} from '../types';
-import type { AttributeModifierSource } from './attributeCalculator';
+import type { CharacterTrait } from '../types';
 
 const COMBAT_RULE_PROMPT =
   '该特质的战力与属性数值已完全折算进属性面板中，战斗胜负严格以面板与境界为准；只可在非战力的日常言行、风味描写与江湖交互中展现特异异象与角色个性。';
