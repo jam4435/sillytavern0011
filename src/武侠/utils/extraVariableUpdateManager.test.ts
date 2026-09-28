@@ -22,7 +22,6 @@ vi.mock('./variableReader', () => ({
 
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import {
-  applyVariableUpdateModeWorldbookState,
   buildExtraVariableProjection,
   ensureTurnVariableBlocksCommitted,
   executeExtraVariableUpdate,
@@ -280,40 +279,6 @@ describe('executeExtraVariableUpdate', () => {
     });
   });
 
-  it('inline 模式同时启用变量模板与变量指导', async () => {
-    worldbookEntries[0].enabled = false;
-    worldbookEntries[1].enabled = false;
-
-    const status = await applyVariableUpdateModeWorldbookState('inline');
-
-    expect(worldbookEntries[0].enabled).toBe(true);
-    expect(worldbookEntries[1].enabled).toBe(true);
-    expect(status).toContain('已启用');
-    expect(status).toContain('变量模板');
-    expect(status).toContain('变量指导');
-    expect(globalScope.updateWorldbookWith).toHaveBeenCalledTimes(2);
-  });
-
-  it('extra 模式同时禁用变量模板与变量指导，避免正文模型重复收到变量规则', async () => {
-    const status = await applyVariableUpdateModeWorldbookState('extra');
-
-    expect(worldbookEntries[0].enabled).toBe(false);
-    expect(worldbookEntries[1].enabled).toBe(false);
-    expect(status).toContain('已禁用');
-    expect(status).toContain('变量模板');
-    expect(status).toContain('变量指导');
-    expect(globalScope.updateWorldbookWith).toHaveBeenCalledTimes(2);
-  });
-
-  it('模式与变量模板、变量指导状态已经一致时不重复写世界书', async () => {
-    const status = await applyVariableUpdateModeWorldbookState('inline');
-
-    expect(worldbookEntries[0].enabled).toBe(true);
-    expect(worldbookEntries[1].enabled).toBe(true);
-    expect(status).toContain('已经全部是启用状态');
-    expect(globalScope.updateWorldbookWith).not.toHaveBeenCalled();
-  });
-
   it('追加变量块时使用 refresh:none，并以严格目标参数等待 ERA 完成', async () => {
     const onProgress = vi.fn();
     const settings = {
@@ -348,12 +313,13 @@ describe('executeExtraVariableUpdate', () => {
     );
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
     expect(prompt).toContain('传说：基本失传，不得操纵时间空间。');
-    expect(prompt).toContain('变量模板测试内容');
+    expect(prompt).toContain('<变量模板>');
+    expect(prompt).toContain('# ERA 变量更新规则');
     expect(prompt).not.toContain('宏观背景');
-    expect(prompt.indexOf('传说：基本失传')).toBeLessThan(prompt.indexOf('变量模板测试内容'));
-    expect(prompt.indexOf('变量模板测试内容')).toBeLessThan(prompt.indexOf('仅输出合法变量块'));
-    expect(prompt.indexOf('仅输出合法变量块')).toBeLessThan(prompt.indexOf('"content":"正文内容"'));
-    expect(prompt.indexOf('"content":"正文内容"')).toBeLessThan(prompt.indexOf('【最终执行要求】'));
+    expect(prompt.indexOf('"content":"正文内容"')).toBeLessThan(prompt.indexOf('传说：基本失传'));
+    expect(prompt.indexOf('传说：基本失传')).toBeLessThan(prompt.indexOf('<变量模板>'));
+    expect(prompt.indexOf('<变量模板>')).toBeLessThan(prompt.indexOf('# ERA 变量更新规则'));
+    expect(prompt.indexOf('# ERA 变量更新规则')).toBeLessThan(prompt.indexOf('【最终执行要求】'));
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(
       expect.objectContaining({
         source: 'frontend',
@@ -961,11 +927,10 @@ describe('executeExtraVariableUpdate', () => {
     );
   });
 
-  it('旧自定义模板只使用 variableGuidance 时仍复用世界背景中的表现标尺', async () => {
+  it('自定义主提示词可直接只渲染变量指导，不隐式追加其他模板', async () => {
     await executeExtraVariableUpdate({
       settings: {
         ...DEFAULT_SUMMARY_SETTINGS,
-        variableUpdateMode: 'extra',
         variablePromptTemplate: '{{variableGuidance}}',
       },
       assistantMessageId: 28,
@@ -973,9 +938,9 @@ describe('executeExtraVariableUpdate', () => {
     });
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
-    expect(prompt).toContain('传说：基本失传，不得操纵时间空间。');
-    expect(prompt).toContain('变量模板测试内容');
-    expect(prompt).toContain('仅输出合法变量块');
+    expect(prompt).toContain('# ERA 变量更新规则');
+    expect(prompt).not.toContain('传说：基本失传，不得操纵时间空间。');
+    expect(prompt).not.toContain('<变量模板>');
     expect(prompt).not.toContain('宏观背景');
   });
 
