@@ -265,21 +265,13 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
-    name: '紫气东来',
+    name: '道门灵胎',
     rank: '传说',
     category: '体质',
     cost: 30,
     description: '先天道门灵胎，每日清晨吞吐朝霞紫气，百脉温润无瑕，内息纯阳浩然。',
     attributeModifiers: { 内力: 30, 根骨: 20, 气血: 20 },
     flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-  {
-    name: '尝药辨草',
-    rank: '粗浅',
-    category: '天资',
-    cost: 3,
-    description: '略识百草药性，采集山野药材时偶能辨识良药，对医理有天然灵性。',
-    flavorPrompt: '见草木便下意识掐闻辨味，口尝药性习以为常。',
   },
   {
     name: '药王转世',
@@ -300,7 +292,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '见毒物面不改色，寻常蒙汗药砒霜入腹毫无波澜。',
   },
   {
-    name: '万毒归宗',
+    name: '万毒之体',
     rank: '镇派',
     category: '体质',
     cost: 18,
