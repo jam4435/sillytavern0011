@@ -669,6 +669,32 @@
   }
 }
 
+.martial-fate-pending-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.14rem;
+}
+
+.abandon-martial-fate-btn {
+  flex-shrink: 0;
+  padding: 0.42rem 0.68rem;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--stone-400);
+  font-family: var(--font-serif);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.075);
+    border-color: rgba(200, 160, 80, 0.28);
+    color: #ead39a;
+  }
+}
+
 .martial-fate-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -742,6 +768,17 @@
   justify-content: space-between;
   gap: 0.5rem;
 
+  .martial-rank {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.16rem 0.46rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.045);
+    font-size: 0.68rem;
+    line-height: 1.2;
+  }
+
   .martial-type {
     margin: 0;
     color: var(--stone-500);
@@ -813,6 +850,18 @@
     color: var(--wuxia-setup-cinnabar);
   }
 
+  .abandon-martial-fate-btn {
+    background: rgba(255, 252, 247, 0.52);
+    border-color: var(--wuxia-setup-border);
+    color: var(--wuxia-setup-ink-soft);
+
+    &:hover {
+      background: rgba(255, 252, 247, 0.88);
+      border-color: rgba(139, 26, 26, 0.34);
+      color: var(--wuxia-setup-cinnabar);
+    }
+  }
+
   .seek-martial-fate-btn,
   .accept-martial-fate-btn {
     background: linear-gradient(135deg, #982525, #731919);
@@ -868,6 +917,7 @@
     flex-direction: column;
   }
 
+  .abandon-martial-fate-btn,
   .seek-martial-fate-btn {
     width: 100%;
     justify-content: center;
