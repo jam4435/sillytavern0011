@@ -769,6 +769,29 @@ export interface OriginOption {
 }
 
 /**
+ * 角色创建方案的完整结算状态。
+ *
+ * 这不是已进入江湖后的游戏存档快照，而是为了让创建方案在重新加载后仍能按原结算口径继续编辑：
+ * - 保留天赋洗炼所得、已支付洗炼点数和当前命盘；
+ * - 保留武缘所得与已支付的固定寻访点数；
+ * - 保留自定义出身的具体境界。
+ */
+export interface CharacterBuildCreationState {
+  version: 1;
+  drawnTraits: string[];
+  traitDrawCostUsed: number;
+  divination: {
+    boardTraits: CharacterTrait[];
+    lockedSlotIndices: number[];
+    freeBlessingUsed: boolean;
+    pityCount: number;
+  };
+  drawnMartialArts: string[];
+  martialArtsDrawCostUsed: number;
+  customRealm?: RealmLevel;
+}
+
+/**
  * 开局存档数据
  */
 export interface CharacterBuild {
@@ -781,6 +804,7 @@ export interface CharacterBuild {
   attributes: InitialAttributes;
   traits: string[]; // 天赋ID列表
   martialArts: string[]; // 武功名称列表
+  creationState?: CharacterBuildCreationState; // v1 起保存完整创建页结算状态；缺失视为旧方案
   origin: string;
   locationInfo: {
     year: number;
