@@ -5,12 +5,18 @@
  * - 品阶与花费：
  *   粗浅(白): 3点 | 传家(绿): 8点 | 上乘(蓝): 14点 | 镇派(紫): 18点 | 绝世(金): 24点 | 传说(红): 30点
  *   缺陷(负面): 轻度 -3点 | 中度 -6点 | 重度/断门 -10点 | 绝灭 -20点
- * - 分类：天资 | 体质 | 性情 | 气质 | 命格 | 缺陷 （彻底移除“经历”与“专长”）
+ * - 分类：天资 | 体质 | 性情 | 气质 | 命格 | 缺陷 （彻底移除“经历”与“专长”，所有特质均严格归入此六类）
  * - 核心设计原则：
  *   1. 拒绝为了凑数强塞属性与特质，很多风味/人际特质纯靠 Prompt 驱动即可，无需生硬堆砌属性。
  *   2. 风格化加成：身体轻灵/厚重直接辐射到对应风格的武学，而非狭隘限制单一兵刃。
- *   3. 经典趣味特质合理古雅化与提炼（魏武遗风、移花接木、债多不压身、恋爱脑、纯路人等）。
- *   4. 【断根绝阳】作为-10点负面缺陷，通过属性小调整与严谨的 Prompt 引导大模型限制情缘与纯阳童子功。
+ *   3. 牛头人/情缘特质归类与逻辑修正：
+ *      - 容貌魅力归入【气质】（天生尤物、倾国倾城）
+ *      - 行事心性归入【性情】（红颜知己、移花接木、夺妻之恨、太上忘情）
+ *      - 际遇因果归入【命格】（苦主命格、吃软饭、魏武遗风）
+ *      - 特殊练功体质归入【体质】（绿帽神功：伴侣与他人在一起时修炼速度翻十倍）
+ *   4. 奇人娱乐天赋品阶合理化（纯路人、乌鸦嘴归为粗浅3点，避免虚高）。
+ *   5. 全面剔除现代医学词汇（骨质疏松 -> 酥骨宿疾，肌肉萎缩 -> 形销骨立，反应迟缓 -> 神思木讷，视而不见 -> 目不辨微）。
+ *   6. 【断根绝阳】作为-10点负面缺陷，通过属性小调整与严谨的 Prompt 引导大模型限制情缘与纯阳童子功。
  */
 
 import type {
@@ -265,13 +271,21 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
-    name: '道门灵胎',
+    name: '紫气东来',
     rank: '传说',
     category: '体质',
     cost: 30,
     description: '先天道门灵胎，每日清晨吞吐朝霞紫气，百脉温润无瑕，内息纯阳浩然。',
     attributeModifiers: { 内力: 30, 根骨: 20, 气血: 20 },
     flavorPrompt: COMBAT_RULE_PROMPT,
+  },
+  {
+    name: '尝药辨草',
+    rank: '粗浅',
+    category: '天资',
+    cost: 3,
+    description: '略识百草药性，采集山野药材时偶能辨识良药，对医理有天然灵性。',
+    flavorPrompt: '见草木便下意识掐闻辨味，口尝药性习以为常。',
   },
   {
     name: '药王转世',
@@ -292,7 +306,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '见毒物面不改色，寻常蒙汗药砒霜入腹毫无波澜。',
   },
   {
-    name: '万毒之体',
+    name: '万毒归宗',
     rank: '镇派',
     category: '体质',
     cost: 18,
@@ -311,16 +325,8 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
   },
 
   // ============================================
-  // 3. 情爱风月与人际魅力
+  // 3. 人际情缘、因果魅力与心性（自然归入 气质/性情/命格/体质）
   // ============================================
-  {
-    name: '暗送秋波',
-    rank: '粗浅',
-    category: '气质',
-    cost: 3,
-    description: '眉目含情，善解人意，面对有婚约或心仪之异性时更易拉近私下关系。',
-    flavorPrompt: '面对有伴侣的异性交谈时常带自然撩拨，言语得体不易引起戒心。',
-  },
   {
     name: '眉清目秀',
     rank: '粗浅',
@@ -328,30 +334,6 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     cost: 3,
     description: '长相干净讨喜，初见之时容易获得江湖长辈与市井豪客的好感照拂。',
     flavorPrompt: '相貌清秀端正，日常问路打听消息时NPC态度亲和耐烦。',
-  },
-  {
-    name: '红颜知己',
-    rank: '传家',
-    category: '性情',
-    cost: 8,
-    description: '极擅倾听异性在伴侣面前无法启齿的委屈，善于在他人情感裂隙中获得深厚信任。',
-    flavorPrompt: '异性极易视其为知心良友，倾诉夫妻隔阂，剧情中极擅充当感情倾诉对象。',
-  },
-  {
-    name: '移花接木',
-    rank: '传家',
-    category: '性情',
-    cost: 8,
-    description: '抚养仇人或伴侣与他人之子毫无芥蒂，后代极具孝心成材，受江湖敬仰。',
-    flavorPrompt: '胸襟开阔不拘小节，剧情中常以仁义宽厚长辈形象为人称道。',
-  },
-  {
-    name: '情殇砺志',
-    rank: '传家',
-    category: '命格',
-    cost: 8,
-    description: '命中注定情路多舛，伴侣易生变故或离去；然而痛失所爱时化悲痛为苦修动力，修为进境神速。',
-    flavorPrompt: '遭遇情感背叛或生离死别时心境剧震，化悲痛为苦修动力，剧情中更显坚毅苍凉。',
   },
   {
     name: '天生尤物',
@@ -362,12 +344,28 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '容貌气质出众，异性NPC与之对视常有恍惚，非深仇大恨极难痛下杀手。',
   },
   {
-    name: '暗解芳心',
-    rank: '上乘',
-    category: '天资',
-    cost: 14,
-    description: '极通男女幽微情愫，擅在看似坚固的姻缘中察觉裂痕，言辞信物往往能在关键时刻动摇佳人心意。',
-    flavorPrompt: '剧情中擅长在关键时刻以言辞信物打动已有婚约之人，使其当众生悔或移情。',
+    name: '倾国倾城',
+    rank: '绝世',
+    category: '气质',
+    cost: 24,
+    description: '祸水级绝世容姿，一举一动足以牵动数大宗门恩怨，群雄争相折腰。',
+    flavorPrompt: '风华绝代倾国倾城，江湖豪杰、正邪掌门常为其一颦一笑而大动干戈。',
+  },
+  {
+    name: '红颜知己',
+    rank: '传家',
+    category: '性情',
+    cost: 8,
+    description: '极擅倾听异性在伴侣面前无法启齿的委屈，善于在他人情感裂隙中获得深厚信任与依赖。',
+    flavorPrompt: '异性极易视其为知心良友，倾诉夫妻隔阂，剧情中极擅充当感情倾诉与情感慰藉对象。',
+  },
+  {
+    name: '移花接木',
+    rank: '传家',
+    category: '性情',
+    cost: 8,
+    description: '命带绿云，极易遭遇枕边人背叛，却心甘情愿替他人养育子女，抚养后代毫无芥蒂。',
+    flavorPrompt: '极易在剧情中遭遇伴侣背叛并替他人抚育子嗣，且对待非亲生骨肉毫无芥蒂、视若己出。',
   },
   {
     name: '夺妻之恨',
@@ -379,31 +377,6 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '刻骨仇恨铭刻于心，面对仇敌或轻薄之徒时杀伐果断，言语冰冷绝情。',
   },
   {
-    name: '红颜庇佑',
-    rank: '上乘',
-    category: '气质',
-    cost: 14,
-    description: '风姿仪态极易引动高阶异性强者的照拂庇护之意，危难关头常有绝顶高手挺身相助。',
-    flavorPrompt: '面对强敌时善于示弱借势，高阶异性NPC极易产生护犊关爱之意。',
-  },
-  {
-    name: '魏武遗风',
-    rank: '镇派',
-    category: '性情',
-    cost: 18,
-    description: '对已有家室之异性吸引力奇高，言谈举止反常地常被其伴侣视为至交好友与通家之好。',
-    flavorPrompt: '在人妇或名花有主者面前魅力非凡，且其原配常常视其为生死兄弟、毫无芥蒂。',
-  },
-  {
-    name: '绿帽神功',
-    rank: '镇派',
-    category: '性情',
-    cost: 18,
-    description: '世人的冷嘲热讽与奇耻大辱反倒成为磨砺心性的沃土，逆境中内息反常地越挫越坚。',
-    attributeModifiers: { 内力: 20, 气血: 15 },
-    flavorPrompt: '唾面自干心若枯井，任凭江湖流言蜚语中伤，神色自若波澜不惊。',
-  },
-  {
     name: '太上忘情',
     rank: '绝世',
     category: '性情',
@@ -413,12 +386,37 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '情至极处反归于淡漠，清冷超然，举手投足无半点凡尘情欲纠缠。',
   },
   {
-    name: '倾覆天下',
-    rank: '绝世',
-    category: '气质',
-    cost: 24,
-    description: '祸水级绝色容姿，一举一动足以牵动数大宗门恩怨，群雄争相折腰。',
-    flavorPrompt: '风华绝代倾国倾城，江湖豪杰、正邪掌门常为其一颦一笑而大动干戈。',
+    name: '苦主命格',
+    rank: '传家',
+    category: '命格',
+    cost: 8,
+    description: '命中注定多遇绿帽情劫，伴侣极易红杏出墙或被他人所夺；然而戴绿帽与失所爱时修行速度成倍暴增。',
+    flavorPrompt: '命带苦主绿帽因果，伴侣极易背着主角私通或移情别恋；伴侣背叛后主角心境剧震，化绿帽屈辱为苦修动力。',
+  },
+  {
+    name: '吃软饭',
+    rank: '上乘',
+    category: '命格',
+    cost: 14,
+    description: '命中多逢女贵人庇护，极易引动高境界异性强者的照拂宠溺，危难关头往往有绝顶高手挺身相助。',
+    flavorPrompt: '命格自带软饭气运，极受高阶异性NPC青睐照顾，遇险时常有强者出面护短替其摆平。',
+  },
+  {
+    name: '魏武遗风',
+    rank: '镇派',
+    category: '命格',
+    cost: 18,
+    description: '命中自带曹贼机缘，对已有家室之异性吸引力奇高，且言谈举止反常地常被其夫婿伴侣视为生死兄弟与莫逆之交。',
+    flavorPrompt: '在人妇或名花有主者面前魅力非凡，且其原配伴侣往往对其信任有加、引为知己通家之好。',
+  },
+  {
+    name: '绿帽神功',
+    rank: '镇派',
+    category: '体质',
+    cost: 18,
+    description: '异种玄异体质。心念与道侣紧密相连，当心爱之人与其他男性亲密或在一起时，体内真气逆流激荡，修炼速度翻十倍！',
+    attributeModifiers: { 内力: 20, 气血: 15 },
+    flavorPrompt: '心念感知到爱人与其他男性苟合或在一起时，不仅心境毫无崩溃，周身真气反倒如江河奔涌，修炼进境一日千里（提升十倍）。',
   },
 
   // ============================================
@@ -449,6 +447,22 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '路见不平一身浩然正气，宁折不弯，侠名远播。',
   },
   {
+    name: '纯路人',
+    rank: '粗浅',
+    category: '气质',
+    cost: 3,
+    description: '气韵平淡如微尘，走入人群或脱战数日后，寻常江湖人极易将其容貌忘得精光。',
+    flavorPrompt: '五官平淡如水，走入人群瞬息无踪，NPC转头便记不清其具体样貌。',
+  },
+  {
+    name: '乌鸦嘴',
+    rank: '粗浅',
+    category: '命格',
+    cost: 3,
+    description: '言语仿佛受无形天道反向牵引，好的不灵坏的灵，一旦把话说得太满，后续往往离奇遭重逆转。',
+    flavorPrompt: '日常聊天立下定论或笃定预测时往往离奇逆转生祸，同伴对其开口提心吊胆，堪称因果律反转。',
+  },
+  {
     name: '扫地僧',
     rank: '传家',
     category: '性情',
@@ -470,8 +484,8 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     rank: '传家',
     category: '性情',
     cost: 8,
-    description: '曾造杀戮而心生忏悔皈依正道，眉宇自带度人之意，一身煞气转化为精纯定力。',
-    flavorPrompt: '浪子回头金不换，眉宇间常带自省与度人之意。',
+    description: '曾造杀戮而心生忏悔皈依正道，眉宇自带度人之意，深谙苦海无边回头是岸。',
+    flavorPrompt: '曾造杀业后大彻大悟，眉宇间常带自省与度人之意，面对仇家怨怼时坦然受之，反常能以德报怨感化顽敌。',
   },
   {
     name: '枯木蛰伏',
@@ -480,22 +494,6 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     cost: 14,
     description: '极擅借助环境收敛生息，耐性如铁，可为达成目的在恶劣环境下潜伏数日静候良机。',
     flavorPrompt: '耐性极佳气息如枯木，隐匿潜行时极难被旁人察觉动静。',
-  },
-  {
-    name: '纯路人',
-    rank: '上乘',
-    category: '气质',
-    cost: 14,
-    description: '气韵平淡如微尘，走入人群或脱战数日后，寻常江湖人极易将其容貌忘得精光。',
-    flavorPrompt: '五官平淡如水，走入人群瞬息无踪，NPC转头便记不清其具体样貌。',
-  },
-  {
-    name: '言谶成非',
-    rank: '上乘',
-    category: '命格',
-    cost: 14,
-    description: '言语仿佛受无形天道反向牵引，一旦笃定断言某事，后续往往出现出人意料的离奇反转。',
-    flavorPrompt: '日常聊天立下定论往往离奇逆转，惹得周围同伴提心吊胆。',
   },
   {
     name: '债多不压身',
@@ -570,7 +568,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '入夜后双眼完全无法视物，夜间作战犹如盲打，寸步难行极易遭暗袭。',
   },
   {
-    name: '骨质疏松',
+    name: '酥骨宿疾',
     rank: '缺陷',
     category: '缺陷',
     cost: -6,
@@ -637,7 +635,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '病骨支离面如金纸，久战必气血翻江倒海，帕掩唇角尽是殷红鲜血。',
   },
   {
-    name: '天生目盲（盲侠）',
+    name: '天生目盲',
     rank: '缺陷',
     category: '缺陷',
     cost: -10,
@@ -677,10 +675,10 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
   // ============================================
   // 臂力
   {
-    name: '肌肉萎缩',
+    name: '形销骨立',
     rank: '缺陷',
     category: '缺陷',
-    description: '天生四肢羸弱干瘪，肌肉严重萎缩，提拎寻常重物皆觉力不从心。',
+    description: '天生四肢羸弱干瘪，气力尽失，提拎寻常重物皆觉力不从心。',
     attributeThreshold: { attribute: '臂力', minValue: 0, maxValue: 1 },
     attributeModifiers: { 臂力: -30 },
     flavorPrompt: COMBAT_RULE_PROMPT,
@@ -753,10 +751,10 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
 
   // 机敏
   {
-    name: '反应迟缓',
+    name: '神思木讷',
     rank: '缺陷',
     category: '缺陷',
-    description: '神思木讷，四肢动作迟滞，遇突发变故往往不及抽身规避。',
+    description: '身心滞涩，神思木讷，四肢动作迟滞，遇突发变故往往不及抽身规避。',
     attributeThreshold: { attribute: '机敏', minValue: 0, maxValue: 1 },
     attributeModifiers: { 机敏: -30 },
     flavorPrompt: COMBAT_RULE_PROMPT,
@@ -800,7 +798,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
-    name: '视而不见',
+    name: '目不辨微',
     rank: '缺陷',
     category: '缺陷',
     description: '粗心大意，极易忽略眼皮底下的微小破绽与线索。',
