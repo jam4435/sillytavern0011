@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NewGameSetup from './NewGameSetup';
 import { createAvatarEntityKey, getAvatarStorageKey } from '../utils/avatarStorage';
-import { APPEARANCE_TEMPLATES, DEFAULT_ATTRIBUTES, STORY_EVENTS } from '../utils/gameInitializer';
+import { APPEARANCE_TEMPLATES, DEFAULT_ATTRIBUTES, STORY_EVENTS, TALENT_TIERS } from '../utils/gameInitializer';
 
 vi.mock('../utils/martialArtsDatabase', () => {
   const arts = [
@@ -220,6 +220,88 @@ describe('NewGameSetup martial fate', () => {
     expect(document.querySelectorAll('[data-wuxia-automation="martial-fate-candidate"]')).toHaveLength(0);
     expect(Number(document.querySelector('.martial-selection-points strong')?.textContent)).toBe(pointsAfterSecondSeek);
   });
+});
+
+describe('NewGameSetup saved creation settlement', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+  });
+
+  it('加载完整创建方案后保留武缘/洗炼结算，并可逐步返回继续修改', async () => {
+    localStorage.setItem(
+      'wuxia_character_builds',
+      JSON.stringify([
+        {
+          id: 'build-full-settlement',
+          name: '完整结算方案',
+          createdAt: 1,
+          attributeScaleVersion: 2,
+          talentTier: 'talented',
+          attributes: DEFAULT_ATTRIBUTES,
+          traits: [],
+          martialArts: ['测试刀法'],
+          creationState: {
+            version: 1,
+            drawnTraits: [],
+            traitDrawCostUsed: 0,
+            divination: {
+              boardTraits: [],
+              lockedSlotIndices: [1],
+              freeBlessingUsed: true,
+              pityCount: 2,
+            },
+            drawnMartialArts: ['测试刀法'],
+            martialArtsDrawCostUsed: 5,
+            customRealm: '宗师后期',
+          },
+          origin: '自定义出身测试',
+          locationInfo: {
+            year: 1200,
+            month: 1,
+            day: 1,
+            location: '大宋/临安府/西湖',
+          },
+          characterInfo: {
+            name: '可编辑侠客',
+            gender: '男',
+            appearance: '身形挺拔，眉目清朗',
+            age: 18,
+          },
+        },
+      ]),
+    );
+
+    renderSetup();
+    const setup = document.querySelector('[data-wuxia-automation="new-game-setup"]') as HTMLElement;
+    const build = await waitFor(() => {
+      const element = document.querySelector('[data-wuxia-automation="saved-character-build"]');
+      expect(element).toBeTruthy();
+      return element as HTMLElement;
+    });
+
+    fireEvent.click(within(build).getByRole('button', { name: '加载' }));
+    await waitFor(() => expect(setup).toHaveAttribute('data-wuxia-setup-step', 'confirm'));
+
+    fireEvent.click(document.querySelector('[data-wuxia-automation="setup-previous-step"]') as HTMLElement);
+    expect(setup).toHaveAttribute('data-wuxia-setup-step', 'identity');
+
+    fireEvent.click(document.querySelector('[data-wuxia-automation="setup-previous-step"]') as HTMLElement);
+    expect(setup).toHaveAttribute('data-wuxia-setup-step', 'origin');
+    expect((screen.getByLabelText('小境界') as HTMLSelectElement).value).toBe('宗师后期');
+
+    fireEvent.click(document.querySelector('[data-wuxia-automation="setup-previous-step"]') as HTMLElement);
+    expect(setup).toHaveAttribute('data-wuxia-setup-step', 'martial');
+    expect(screen.getByText('武缘所得')).toBeInTheDocument();
+
+    const totalPoints = TALENT_TIERS.find(tier => tier.id === 'talented')?.totalPoints ?? 30;
+    expect(Number(document.querySelector('.martial-selection-points strong')?.textContent)).toBe(totalPoints - 5);
+
+    fireEvent.click(document.querySelector('[data-wuxia-automation="setup-previous-step"]') as HTMLElement);
+    expect(setup).toHaveAttribute('data-wuxia-setup-step', 'traits');
+    expect(screen.getByText(/洗炼消耗：/)).toBeInTheDocument();
+    expect(screen.queryByText(/免费洗炼机会：尚存 1 次/)).not.toBeInTheDocument();
+  }, 15000);
 });
 
 describe('NewGameSetup custom location selection', () => {
