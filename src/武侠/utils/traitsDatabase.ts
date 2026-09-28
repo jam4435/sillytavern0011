@@ -89,7 +89,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '刀口舐血',
     rank: '粗浅',
-    category: '经历',
+    category: '天资',
     cost: 3,
     description: '曾在草莽绿林中以刀讨生活，熟悉短兵械斗与凶险场面，对刀法有扎实的实战底子。',
     discounts: { martialTypeDiscount: { 刀法: 0.1 } },
@@ -126,7 +126,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '血债累累',
     rank: '镇派',
-    category: '经历',
+    category: '性情',
     cost: 18,
     description: '曾亲手斩杀诸多仇敌，见惯了血雨腥风；这段经历深刻烙印在心性中，亦留下令人闻风丧胆的凶名。',
     flavorPrompt: '见惯血腥与死亡，谈及杀戮时比常人平静；旁人是否畏惧取决于其身份、名声和具体情境。',
@@ -136,7 +136,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '关山戎马',
     rank: '粗浅',
-    category: '经历',
+    category: '天资',
     cost: 3,
     description: '曾在行伍军阵中历练，深谙队列攻防、长兵击刺与阵前厮杀之术，长兵底子极扎实。',
     discounts: { martialTypeDiscount: { 枪戟: 0.1 } },
@@ -188,7 +188,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '飞石穿杨',
     rank: '粗浅',
-    category: '专长',
+    category: '天资',
     cost: 3,
     description: '指腕机巧灵活，指劲拿捏妙至颠毫，随手飞石掷叶便能百步穿杨。',
     discounts: { martialTypeDiscount: { 暗器: 0.1 } },
@@ -197,7 +197,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '袖中藏锋',
     rank: '上乘',
-    category: '专长',
+    category: '天资',
     cost: 14,
     description: '十指如兰花弄影，精通细微机括藏纳与拆解，于袖箭、飞针等隐蔽暗器上手极快。',
     attributeModifiers: { 洞察: 10 },
@@ -208,7 +208,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '草上飞',
     rank: '粗浅',
-    category: '专长',
+    category: '天资',
     cost: 3,
     description: '下盘轻快灵巧，折转腾挪极具天分，跋山涉水或穿街过巷如履平地。',
     discounts: { martialTypeDiscount: { 轻功: 0.1 } },
@@ -406,7 +406,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '洞察情隙',
     rank: '上乘',
-    category: '专长',
+    category: '天资',
     cost: 14,
     description: '深谙男女幽微心绪，善于在言笑掩映间察觉旁人情意裂痕与未解执念。',
     flavorPrompt: '善于捕捉他人言语闪烁与情愫动摇之处，顺势切入；但不得强行左右NPC伦常决定。',
@@ -414,7 +414,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '情殇血仇',
     rank: '上乘',
-    category: '经历',
+    category: '性情',
     cost: 14,
     description: '曾因至亲挚爱惨遭变故结下刻骨仇怨，这段旧恨至今仍影响其心境与决断。',
     attributeModifiers: { 臂力: 15 },
@@ -500,7 +500,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '浪子回头',
     rank: '传家',
-    category: '经历',
+    category: '性情',
     cost: 8,
     description: '曾造下杀业或长期身处黑道，后来因重大变故悔悟收手；旧怨、旧识与过去的名声仍可能追来。',
     flavorPrompt: '浪子回头金不换，眉宇间常带自省与度人之意。',
@@ -556,7 +556,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '债台高筑',
     rank: '镇派',
-    category: '经历',
+    category: '命格',
     cost: 18,
     description: '欠下巨额银两，并因此形成复杂的债主与江湖关系网；有人催逼，有人盯梢，也有人不愿让这笔债彻底烂掉。',
     flavorPrompt: '债务关系是既有背景，不代表债主一定保护角色；债主会依自身利益采取催债、威胁、合作等合理行为。',
@@ -573,7 +573,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '残身绝念',
     rank: '绝世',
-    category: '经历',
+    category: '体质',
     cost: 24,
     description: '曾受宫刑腐刑或自绝尘欲，六根清净无碍，身形阴柔诡谲，心念冷酷如霜；具体武学仍由所修功法决定。',
     attributeModifiers: { 机敏: 30 },
@@ -586,7 +586,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '心灵手巧',
     rank: '粗浅',
-    category: '专长',
+    category: '天资',
     cost: 3,
     description: '十指纤细灵活，擅长开锁、拆装机括与细致手工。',
     flavorPrompt: '手脚麻利细密，善于拨弄细小机括与暗锁。',
@@ -594,7 +594,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '识草尝百',
     rank: '粗浅',
-    category: '专长',
+    category: '天资',
     cost: 3,
     description: '略识百草药性，采集山野药材时偶能辨识良药。',
     flavorPrompt: '见草木便下意识掐闻辨味，口尝药性习以为常。',
@@ -647,7 +647,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '百毒淬体',
     rank: '镇派',
-    category: '经历',
+    category: '体质',
     cost: 18,
     description: '常年以毒物淬炼肉身，筋脉已对多种毒性产生适应，周身隐带药石异香；具体毒功威力仍取决于所修功法。',
     attributeModifiers: { 气血: 15, 内力: 15 },
@@ -656,7 +656,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '蛊王共生',
     rank: '绝世',
-    category: '经历',
+    category: '体质',
     cost: 24,
     description: '曾纳南疆罕见蛊王入体共生，蛊脉相连，亦可能成为触发江湖奇遇的重要线索。',
     attributeModifiers: { 气血: 20, 根骨: 15 },
@@ -731,7 +731,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '独眼',
     rank: '缺陷',
-    category: '经历',
+    category: '缺陷',
     cost: -10,
     description: '因昔日伤病或激斗失去一只眼睛，视野纵深大受局限，极难防备视线盲区。',
     attributeModifiers: { 洞察: -25 },
@@ -740,7 +740,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '失聪',
     rank: '缺陷',
-    category: '经历',
+    category: '缺陷',
     cost: -10,
     description: '过去因重创或意外永久失去听力，只能更多依靠目光、口型与身周风动感知局势。',
     attributeModifiers: { 洞察: -25 },
@@ -749,7 +749,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '断臂',
     rank: '缺陷',
-    category: '经历',
+    category: '缺陷',
     cost: -10,
     description: '曾因重伤、酷刑或变故痛失一臂，起居与御敌之法皆受大挫，再难双持或使副手兵刃。',
     attributeModifiers: { 臂力: -20, 机敏: -20 },
@@ -761,7 +761,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '天下通缉',
     rank: '缺陷',
-    category: '经历',
+    category: '缺陷',
     cost: -10,
     description: '因过往重罪遭官府海捕文书或仇家重金悬赏，身份一旦走漏便会引来盘查与追剿。',
     flavorPrompt: '追捕强度取决于悬赏、地域、身份暴露程度与势力触达范围，不应无条件做到天下处处即时围剿。',
@@ -769,7 +769,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '内伤缠身',
     rank: '缺陷',
-    category: '经历',
+    category: '缺陷',
     cost: -10,
     description: '曾遭重击留下顽固暗伤，剧烈运功或久战时极易牵动旧患，气血与内息上限长期受损。',
     attributeModifiers: { 气血: -20, 内力: -20 },
@@ -801,7 +801,7 @@ export const CHARACTER_TRAITS: CharacterTrait[] = [
   {
     name: '经脉尽断',
     rank: '缺陷',
-    category: '经历',
+    category: '缺陷',
     cost: -20,
     description: '曾遭遇毁灭性的重创致使周天大脉尽断，无法纳气归元，彻底与内功无缘。',
     attributeModifiers: { 内力: -50 },
