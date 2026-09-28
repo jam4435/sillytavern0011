@@ -1148,6 +1148,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
           });
           if (conflictingArts.length > 0) {
             setSelectedMartialArts(prev => prev.filter(a => !conflictingArts.includes(a)));
+            setDrawnMartialArts(prev => prev.filter(a => !conflictingArts.includes(a)));
             showNotification('warning', `已自动移除与所选天赋冲突的武功：${conflictingArts.join('、')}`);
           }
         }
