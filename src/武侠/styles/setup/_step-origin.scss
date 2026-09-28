@@ -300,6 +300,24 @@
   min-width: 0;
 }
 
+.custom-realm-selectors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.custom-realm-select {
+  min-width: 0;
+}
+
+.compact-field-label {
+  display: block;
+  margin-bottom: 0.34rem;
+  color: var(--stone-500);
+  font-family: var(--font-serif);
+  font-size: 0.72rem;
+}
+
 .custom-origin-story .form-textarea {
   min-height: 7.1rem;
 }
@@ -841,7 +859,8 @@
   .custom-opening-intro > span,
   .location-cascade-title small,
   .realm-hint,
-  .opening-location-preview span {
+  .opening-location-preview span,
+  .compact-field-label {
     color: var(--wuxia-setup-muted);
   }
 
