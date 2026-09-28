@@ -55,7 +55,7 @@ import { learnMartialArtFromSecret } from './utils/martialArtSecretManager';
 import { upgradeMeridianNode } from './utils/meridianManager';
 import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inventoryAttributePreview';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
-import { applyVariableUpdateModeWorldbookState, getIsExtraVariableUpdating } from './utils/extraVariableUpdateManager';
+import { getIsExtraVariableUpdating } from './utils/extraVariableUpdateManager';
 import {
   applyConversationSummaryModeState,
   installConversationSummaryPromptFilter,
@@ -205,7 +205,6 @@ const App: React.FC = () => {
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
-  const initialVariableUpdateModeRef = useRef(displaySettings.summarySettings.variableUpdateMode);
   const initialConversationSummaryRef = useRef({
     mode: displaySettings.summarySettings.conversationSummaryMode,
     recentReplies: displaySettings.summarySettings.conversationSummaryRecentReplies,
@@ -585,12 +584,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     void (async () => {
-      try {
-        const variableStatus=await applyVariableUpdateModeWorldbookState(initialVariableUpdateModeRef.current);
-        initLogger.log(`[变量更新模式] 初始化校验完成：${variableStatus}`);
-      } catch(error) {
-        initLogger.error('[变量更新模式] 初始化校验世界书状态失败:',error);
-      }
       try {
         const summaryStatus=await applyConversationSummaryModeState(
           initialConversationSummaryRef.current.mode,
@@ -1150,10 +1143,7 @@ const App: React.FC = () => {
     options: currentOptions,
     latestDebugRound,
     variableChanges,
-    turnTimeoutMs:
-      displaySettings.summarySettings.variableUpdateMode === 'extra'
-        ? WUXIA_TURN_TIMEOUT_MS.EXTENDED
-        : WUXIA_TURN_TIMEOUT_MS.STANDARD,
+    turnTimeoutMs: WUXIA_TURN_TIMEOUT_MS.EXTENDED,
   });
   automationRuntimeRef.current = {
     page: currentPage === 'opening' ? 'game' : currentPage,
@@ -1162,10 +1152,7 @@ const App: React.FC = () => {
     options: currentOptions,
     latestDebugRound,
     variableChanges,
-    turnTimeoutMs:
-      displaySettings.summarySettings.variableUpdateMode === 'extra'
-        ? WUXIA_TURN_TIMEOUT_MS.EXTENDED
-        : WUXIA_TURN_TIMEOUT_MS.STANDARD,
+    turnTimeoutMs: WUXIA_TURN_TIMEOUT_MS.EXTENDED,
   };
 
   const automationPlayerTurnRef = useRef(handlePlayerSend);
