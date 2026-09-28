@@ -2,8 +2,13 @@ import {
   DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
   applyCurrentPresetModuleFilter,
   type SummarySettings,
-  type SummaryVariableUpdateMode,
 } from './settingsManager';
+import {
+  VARIABLE_PROMPT_SLOT_META,
+  renderVariableInputTemplate,
+  type VariablePromptSlotName,
+  type VariablePromptSlots,
+} from './variablePromptTemplateEngine';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { beginInternalMessageUpdate, finishInternalMessageUpdate } from '../../shared/internalMessageUpdateGuard';
 import {
@@ -34,9 +39,6 @@ import {
   type WorldTimeTuple,
 } from './worldTimeGuard';
 
-const VARIABLE_TEMPLATE_ENTRY_NAME = '变量模板';
-const VARIABLE_GUIDANCE_ENTRY_NAME = '变量指导';
-const VARIABLE_UPDATE_ENTRY_NAMES = [VARIABLE_TEMPLATE_ENTRY_NAME, VARIABLE_GUIDANCE_ENTRY_NAME] as const;
 const WORLD_BACKGROUND_ENTRY_NAME = '世界背景';
 const NARRATIVE_SCALE_START_MARKER = '<叙事表现标尺>';
 const NARRATIVE_SCALE_END_MARKER = '</叙事表现标尺>';
@@ -675,83 +677,6 @@ async function findWorldbookEntryByExactName(entryName: string): Promise<Worldbo
   return null;
 }
 
-async function setWorldbookEntryEnabled(
-  worldbookName: string,
-  uid: number,
-  entryName: string,
-  enabled: boolean,
-): Promise<'uid' | 'name' | null> {
-  let matchedBy: 'uid' | 'name' | null = null;
-  await updateWorldbookWith(
-    worldbookName,
-    worldbook => {
-      const uidMatch = worldbook.find(entry => entry.uid === uid && entry.name === entryName);
-      const nameMatches = uidMatch ? [] : worldbook.filter(entry => entry.name === entryName);
-      if (!uidMatch && nameMatches.length > 1) {
-        throw new Error(`世界书「${worldbookName}」中存在多个同名条目「${entryName}」，无法安全修改。`);
-      }
-
-      const target = uidMatch || nameMatches[0];
-      if (!target) {
-        return worldbook;
-      }
-      matchedBy = uidMatch ? 'uid' : 'name';
-      return worldbook.map(entry => {
-        if (entry.uid !== target.uid) {
-          return entry;
-        }
-        return { ...entry, enabled };
-      });
-    },
-    { render: 'debounced' },
-  );
-  return matchedBy;
-}
-
-async function ensureVariableWorldbookEntryEnabled(entryName: string, enabled: boolean): Promise<boolean> {
-  const location = await findWorldbookEntryByExactName(entryName);
-  if (!location) {
-    throw new Error(`未找到当前角色世界书中的精确条目「${entryName}」。`);
-  }
-
-  if (location.entry.enabled === enabled) {
-    return false;
-  }
-
-  const matchedBy = await setWorldbookEntryEnabled(
-    location.worldbookName,
-    location.entry.uid,
-    location.entry.name,
-    enabled,
-  );
-  if (!matchedBy) {
-    throw new Error(`无法在世界书「${location.worldbookName}」中找到「${location.entry.name}」条目。`);
-  }
-
-  return true;
-}
-
-async function ensureVariableUpdateEntriesEnabled(enabled: boolean): Promise<string[]> {
-  const changedEntries: string[] = [];
-  // 同一世界书的更新必须串行，避免两个 updateWorldbookWith 并发覆盖彼此。
-  for (const entryName of VARIABLE_UPDATE_ENTRY_NAMES) {
-    if (await ensureVariableWorldbookEntryEnabled(entryName, enabled)) {
-      changedEntries.push(entryName);
-    }
-  }
-  return changedEntries;
-}
-
-export async function applyVariableUpdateModeWorldbookState(mode: SummaryVariableUpdateMode): Promise<string> {
-  const enabled = mode === 'inline';
-  const changedEntries = await ensureVariableUpdateEntriesEnabled(enabled);
-  const stateLabel = enabled ? '启用' : '禁用';
-  const entryLabel = VARIABLE_UPDATE_ENTRY_NAMES.map(name => `「${name}」`).join('、');
-  return changedEntries.length > 0
-    ? `已${stateLabel}当前角色世界书中的${entryLabel}。`
-    : `当前角色世界书中的${entryLabel}已经全部是${stateLabel}状态。`;
-}
-
 function reserveExtraVariableUpdate(): ExtraVariableUpdateReservation {
   if (getIsExtraVariableUpdating()) {
     throw new Error('已有额外变量更新正在执行，请等待当前回合完成。');
@@ -773,11 +698,7 @@ function reserveExtraVariableUpdate(): ExtraVariableUpdateReservation {
 
 export async function prepareExtraVariableUpdateTurn(
   settings: SummarySettings,
-): Promise<ExtraVariableUpdateReservation | null> {
-  if (settings.variableUpdateMode !== 'extra') {
-    return null;
-  }
-
+): Promise<ExtraVariableUpdateReservation> {
   const reservation = reserveExtraVariableUpdate();
   try {
     const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
@@ -787,7 +708,6 @@ export async function prepareExtraVariableUpdateTurn(
         throw new Error(validationMessage);
       }
     }
-    await ensureVariableUpdateEntriesEnabled(false);
     return reservation;
   } catch (error) {
     reservation.release();
@@ -984,69 +904,76 @@ function formatDecisionChecklist(hasParticipationEvents: boolean, cultivationRef
   ].join('\n');
 }
 
+function formatParticipationEventsContext(
+  projection: Record<string, unknown>,
+  participationEvents: unknown,
+): string {
+  const writableParticipationEvents = isRecord(projection.参与事件) ? projection.参与事件 : {};
+  if (!isRecord(participationEvents) || Object.keys(writableParticipationEvents).length === 0) {
+    return '';
+  }
+
+  const lines = ['<参与事件>'];
+  for (const [eventName, writableSnapshot] of Object.entries(writableParticipationEvents)) {
+    const eventValue = isRecord(participationEvents[eventName]) ? participationEvents[eventName] : {};
+    const readonlyDescription = String(eventValue.描述 ?? '').replace(/\s+/g, ' ').trim();
+    const timeRangeMatch = readonlyDescription.match(
+      /^((?:\d+年\d+月\d+日\d+时(?:\d+分)?)\s+到\s+(?:\d+年\d+月\d+日\d+时(?:\d+分)?))[，,]\s*([\s\S]+)$/,
+    );
+    const readonlyContextLines = timeRangeMatch
+      ? ['<时间>', timeRangeMatch[1], '</时间>', '<事件详情>', timeRangeMatch[2], '</事件详情>']
+      : ['<事件详情>', readonlyDescription || '无', '</事件详情>'];
+    lines.push(
+      `<${eventName}>`,
+      ...readonlyContextLines,
+      JSON.stringify(writableSnapshot),
+      `</${eventName}>`,
+    );
+  }
+  lines.push('</参与事件>');
+  return lines.join('\n');
+}
+
+function formatFollowupCluesContext(followupClues: unknown): string {
+  if (!isRecord(followupClues) || Object.keys(followupClues).length === 0) {
+    return '';
+  }
+  const lines = ['<后续未发生事件脉络>'];
+  for (const [eventName, clueValue] of Object.entries(followupClues)) {
+    lines.push(
+      `<${eventName}>`,
+      `${JSON.stringify(eventName)}: ${JSON.stringify(String(clueValue ?? ''))}`,
+      `</${eventName}>`,
+    );
+  }
+  lines.push('</后续未发生事件脉络>');
+  return lines.join('\n');
+}
+
 function formatVariableContext(
   projection: Record<string, unknown>,
   participationEvents: unknown,
   followupClues: unknown,
   cultivationReference: unknown,
 ): string {
+  const participationContext = formatParticipationEventsContext(projection, participationEvents);
+  const followupContext = formatFollowupCluesContext(followupClues);
+  const relevantCharacters = isRecord(projection.角色数据) && Object.keys(projection.角色数据).length > 0
+    ? JSON.stringify(projection.角色数据)
+    : '';
   const lines = [
     '<variable>',
     '<status_current_variables>',
-    '# 当前状态：以下 JSON 使用真实变量键名',
-    '# 当前世界信息',
     `世界信息:${JSON.stringify(projection.世界信息 ?? {})}`,
-    '',
-    '# user数据',
     `user数据:${JSON.stringify(projection.user数据 ?? {})}`,
-  ];
-  const writableParticipationEvents = isRecord(projection.参与事件) ? projection.参与事件 : {};
-
-  if (isRecord(participationEvents) && Object.keys(writableParticipationEvents).length > 0) {
-    lines.push('', '# 当前事件上下文：时间、事件详情均为只读；JSON中的已有字段按规则有条件可写', '<参与事件>');
-    for (const [eventName, writableSnapshot] of Object.entries(writableParticipationEvents)) {
-      const eventValue = isRecord(participationEvents[eventName]) ? participationEvents[eventName] : {};
-      const readonlyDescription = String(eventValue.描述 ?? '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      const timeRangeMatch = readonlyDescription.match(
-        /^((?:\d+年\d+月\d+日\d+时(?:\d+分)?)\s+到\s+(?:\d+年\d+月\d+日\d+时(?:\d+分)?))[，,]\s*([\s\S]+)$/,
-      );
-      const readonlyContextLines = timeRangeMatch
-        ? ['<时间>', timeRangeMatch[1], '</时间>', '<事件详情>', timeRangeMatch[2], '</事件详情>']
-        : ['<事件详情>', readonlyDescription || '无', '</事件详情>'];
-      lines.push(
-        `<${eventName}>`,
-        ...readonlyContextLines,
-        JSON.stringify(writableSnapshot),
-        `</${eventName}>`,
-      );
-    }
-    lines.push('</参与事件>');
-  }
-
-  if (isRecord(followupClues) && Object.keys(followupClues).length > 0) {
-    lines.push('', '# 后续未发生事件脉络：全部只读，仅用于约束正文耗时和世界时间推进', '<后续未发生事件脉络>');
-    for (const [eventName, clueValue] of Object.entries(followupClues)) {
-      lines.push(
-        `<${eventName}>`,
-        `${JSON.stringify(eventName)}: ${JSON.stringify(String(clueValue ?? ''))}`,
-        `</${eventName}>`,
-      );
-    }
-    lines.push('</后续未发生事件脉络>');
-  }
-
-  lines.push(
-    '',
-    '# 相关角色（同一严格活动区、参与事件或最新正文提及；完整所在位置用于判断具体同场）',
-    `角色数据:${JSON.stringify(projection.角色数据 ?? {})}`,
+    participationContext,
+    followupContext,
+    relevantCharacters ? `角色数据:${relevantCharacters}` : '',
     '</status_current_variables>',
-    '',
-    formatDecisionChecklist(Object.keys(writableParticipationEvents).length > 0, cultivationReference),
+    formatDecisionChecklist(Boolean(participationContext), cultivationReference),
     '</variable>',
-  );
-  return lines.join('\n');
+  ];
+  return lines.filter(Boolean).join('\n');
 }
 
 function uniqueFullLocationPaths(value: unknown): string[] {
@@ -1095,7 +1022,14 @@ function formatLocationContext(surroundingLocations: unknown, currentLocation: u
 function buildVariableProjectionSnapshot(
   assistantMessageId: number,
   latestAssistantBody: string,
-): { projection: Record<string, unknown>; variableContext: string; locationContext: string } {
+): {
+  projection: Record<string, unknown>;
+  variableContext: string;
+  locationContext: string;
+  participationEvents: unknown;
+  followupClues: unknown;
+  cultivationReference: unknown;
+} {
   const variables = readAllVariablesSnapshot(assistantMessageId);
   const statDataSource = isRecord(variables.stat_data) ? variables.stat_data : variables;
   const statData = statDataSource as Record<string, unknown>;
@@ -1114,6 +1048,9 @@ function buildVariableProjectionSnapshot(
     projection,
     variableContext,
     locationContext,
+    participationEvents: statData.参与事件,
+    followupClues: statData.后续事件线索,
+    cultivationReference: frontendVariables.修为变化参考,
   };
 }
 
@@ -1354,6 +1291,45 @@ function getRecentBodyMessages(
   };
 }
 
+function buildVariablePromptSlots(
+  recentBodies: ReturnType<typeof getRecentBodyMessages>,
+  variableProjection: ReturnType<typeof buildVariableProjectionSnapshot>,
+): VariablePromptSlots {
+  const relevantCharacters =
+    isRecord(variableProjection.projection.角色数据) &&
+    Object.keys(variableProjection.projection.角色数据).length > 0
+      ? JSON.stringify(variableProjection.projection.角色数据)
+      : '';
+  const cultivationReference =
+    typeof variableProjection.cultivationReference === 'number' &&
+    Number.isFinite(variableProjection.cultivationReference)
+      ? [
+          `每日修为变化参考:${variableProjection.cultivationReference}`,
+          '该值以每日专心修炼为基准，仅供结合行为时长、强度和成果估算 user数据.修为变化；本身始终只读且不得作为写入目标。',
+        ].join('\n')
+      : '';
+  const participationEvents = formatParticipationEventsContext(
+    variableProjection.projection,
+    variableProjection.participationEvents,
+  );
+
+  return {
+    readonlyContextRounds: recentBodies.serializedReadonlyContextRounds,
+    latestUserBody: recentBodies.serializedLatestUserBody,
+    latestAssistantBody: recentBodies.serializedLatestAssistantBody,
+    worldContext: JSON.stringify(variableProjection.projection.世界信息 ?? {}),
+    playerContext: JSON.stringify(variableProjection.projection.user数据 ?? {}),
+    participationEvents,
+    followupClues: formatFollowupCluesContext(variableProjection.followupClues),
+    relevantCharacters,
+    locationContext: variableProjection.locationContext,
+    cultivationReference,
+    decisionChecklist: participationEvents
+      ? PARTICIPATION_TURN_DECISION_CHECKLIST
+      : NORMAL_TURN_DECISION_CHECKLIST,
+  };
+}
+
 function renderVariablePromptTemplate(
   template: string,
   values: {
@@ -1362,6 +1338,7 @@ function renderVariablePromptTemplate(
     latestUserBody: string;
     latestAssistantBody: string;
     variableContext: string;
+    variableInputContext: string;
     variableTemplate: string;
     variableGuidance: string;
     locationContext: string;
@@ -1369,22 +1346,15 @@ function renderVariablePromptTemplate(
   },
 ): string {
   const sourceTemplate = template.trim() ? template : DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE;
-  const hasVariableTemplatePlaceholder = sourceTemplate.includes('{{variableTemplate}}');
-  const baseVariableGuidance = sourceTemplate.includes('{{narrativeScale}}')
-    ? values.variableGuidance
-    : `【叙事表现标尺】\n${values.narrativeScale}\n\n【ERA 变量领域规则】\n${values.variableGuidance}`;
-  // 兼容旧的自定义模板：若只有 {{variableGuidance}}，把变量模板一并注入该占位符。
-  const variableGuidance = hasVariableTemplatePlaceholder
-    ? baseVariableGuidance
-    : `【ERA 变量结构与权限模板】\n${values.variableTemplate}\n\n${baseVariableGuidance}`;
   return sourceTemplate
     .replace(/\{\{recentBodies\}\}/g, values.recentBodies)
     .replace(/\{\{readonlyContextRounds\}\}/g, values.readonlyContextRounds)
     .replace(/\{\{latestUserBody\}\}/g, values.latestUserBody)
     .replace(/\{\{latestAssistantBody\}\}/g, values.latestAssistantBody)
     .replace(/\{\{variableContext\}\}/g, values.variableContext)
+    .replace(/\{\{variableInputContext\}\}/g, values.variableInputContext)
     .replace(/\{\{variableTemplate\}\}/g, values.variableTemplate)
-    .replace(/\{\{variableGuidance\}\}/g, variableGuidance)
+    .replace(/\{\{variableGuidance\}\}/g, values.variableGuidance)
     .replace(/\{\{locationContext\}\}/g, values.locationContext)
     .replace(/\{\{narrativeScale\}\}/g, values.narrativeScale);
 }
@@ -1398,11 +1368,7 @@ async function buildExtraVariableUpdatePrompt({
   assistantMessageId: number;
   latestRawReply: string;
 }): Promise<string> {
-  const [variableTemplate, variableGuidance, worldBackground] = await Promise.all([
-    readWorldbookEntryContent(VARIABLE_TEMPLATE_ENTRY_NAME),
-    readWorldbookEntryContent(VARIABLE_GUIDANCE_ENTRY_NAME),
-    readWorldbookEntryContent(WORLD_BACKGROUND_ENTRY_NAME),
-  ]);
+  const worldBackground = await readWorldbookEntryContent(WORLD_BACKGROUND_ENTRY_NAME);
   const narrativeScale = extractNarrativeScale(worldBackground);
   const recentBodies = getRecentBodyMessages(
     assistantMessageId,
@@ -1411,6 +1377,8 @@ async function buildExtraVariableUpdatePrompt({
     settings,
   );
   const variableProjection = buildVariableProjectionSnapshot(assistantMessageId, recentBodies.latestAssistantBody);
+  const slots = buildVariablePromptSlots(recentBodies, variableProjection);
+  const variableInputContext = renderVariableInputTemplate(settings.variableInputTemplate, slots);
 
   return renderVariablePromptTemplate(settings.variablePromptTemplate, {
     recentBodies: recentBodies.serialized,
@@ -1418,11 +1386,66 @@ async function buildExtraVariableUpdatePrompt({
     latestUserBody: recentBodies.serializedLatestUserBody,
     latestAssistantBody: recentBodies.serializedLatestAssistantBody,
     variableContext: variableProjection.variableContext,
-    variableTemplate,
-    variableGuidance,
+    variableInputContext,
+    variableTemplate: settings.variableStructureTemplate,
+    variableGuidance: settings.variableGuidanceTemplate,
     locationContext: variableProjection.locationContext,
     narrativeScale,
   });
+}
+
+export type VariablePromptInspectionSnapshot = {
+  assistantMessageId?: number;
+  renderedInput: string;
+  items: Array<{
+    name: VariablePromptSlotName;
+    label: string;
+    description: string;
+    source: string;
+    emptyBehavior: string;
+    value: string;
+    active: boolean;
+  }>;
+  error?: string;
+};
+
+export function inspectVariablePromptSlots(settings: SummarySettings): VariablePromptInspectionSnapshot {
+  try {
+    const messages = getChatMessages('0-{{lastMessageId}}', {
+      hide_state: 'unhidden',
+      include_swipes: true,
+    }) as ChatMessageWithSwipes[];
+    const target = [...messages]
+      .reverse()
+      .find(message => message.role === 'assistant' && !isFrontendLoaderOnlyMessage(getActiveMessageText(message)));
+    if (!target) {
+      return {
+        renderedInput: '',
+        items: VARIABLE_PROMPT_SLOT_META.map(meta => ({ ...meta, value: '', active: false })),
+        error: '当前聊天没有可用于预览的 assistant 正文。',
+      };
+    }
+
+    const rawReply = getActiveMessageText(target);
+    const recentBodies = getRecentBodyMessages(target.message_id, rawReply, settings.variableContextRounds, settings);
+    const variableProjection = buildVariableProjectionSnapshot(target.message_id, recentBodies.latestAssistantBody);
+    const slots = buildVariablePromptSlots(recentBodies, variableProjection);
+    return {
+      assistantMessageId: target.message_id,
+      renderedInput: renderVariableInputTemplate(settings.variableInputTemplate, slots),
+      items: VARIABLE_PROMPT_SLOT_META.map(meta => ({
+        ...meta,
+        value: slots[meta.name],
+        active: Boolean(slots[meta.name].trim()),
+      })),
+    };
+  } catch (error) {
+    return {
+      renderedInput: '',
+      items: VARIABLE_PROMPT_SLOT_META.map(meta => ({ ...meta, value: '', active: false })),
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function extractValidVariableBlocks(rawResponse: string): {
@@ -1923,10 +1946,9 @@ export async function executeExtraVariableUpdate({
   try {
     variableTraceLogger.log('[extraVariableUpdate] 开始执行额外变量更新', {
       assistantMessageId,
-      variableUpdateMode: settings.variableUpdateMode,
+      variableUpdateMode: 'extra',
       latestRawReplyLength: latestRawReply.length,
     });
-    await runPhase('disable-variable-update-rules', () => ensureVariableUpdateEntriesEnabled(false));
     const requestSettings = resolveConfiguredTextSettings(settings, 'variable');
     const prompt = await runPhase('build-variable-prompt', () =>
       buildExtraVariableUpdatePrompt({ settings, assistantMessageId, latestRawReply }),
