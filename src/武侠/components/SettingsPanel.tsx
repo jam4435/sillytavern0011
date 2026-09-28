@@ -528,6 +528,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [activeVariableGroup, setActiveVariableGroup] = useState<VariableGroupId | null>(null);
   const [selectedCharacterName, setSelectedCharacterName] = useState<string | null>(null);
   const [characterSearch, setCharacterSearch] = useState('');
+  const [isCharacterPickerOpen, setIsCharacterPickerOpen] = useState(false);
   const [variableSearch, setVariableSearch] = useState('');
   const [variableSearchMode, setVariableSearchMode] = useState<VariableSearchMode>('scope');
   const [variableIncludeValueSearch, setVariableIncludeValueSearch] = useState(false);
@@ -536,6 +537,21 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [automationStatDataSnapshotJson, setAutomationStatDataSnapshotJson] = useState('');
   const [automationStatDataSnapshotError, setAutomationStatDataSnapshotError] = useState('');
   const [automationStatDataSnapshotCapturedAt, setAutomationStatDataSnapshotCapturedAt] = useState('');
+
+  useEffect(() => {
+    if (!isCharacterPickerOpen) {
+      return undefined;
+    }
+
+    const handleCharacterPickerKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsCharacterPickerOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleCharacterPickerKeyDown);
+    return () => window.removeEventListener('keydown', handleCharacterPickerKeyDown);
+  }, [isCharacterPickerOpen]);
 
   // 自动推进相关状态
   const [autoAdvancePrompt, setAutoAdvancePrompt] = useState(DEFAULT_AUTO_ADVANCE_PROMPT);
@@ -606,24 +622,29 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const searchableStatData = Object.fromEntries(visibleVariableScopeEntries);
   const characterScopeEntry = activeVariableGroupScopeEntries.find(([key]) => String(key) === '角色数据') ?? null;
   const characterScopeValue = characterScopeEntry?.[1];
-  const roleVariableEntries =
+  const allRoleVariableEntries =
     resolvedActiveVariableGroup === 'character' && isVariableRecord(characterScopeValue)
       ? getVisibleEntries(characterScopeValue)
           .filter(([key]) => typeof key === 'string')
           .map(([key, value]) => ({
             name: String(key),
             value,
-            score: getVariableMatchScore(String(key), normalizedCharacterSearch),
           }))
-          .filter(entry => !normalizedCharacterSearch || entry.score < 3)
-          .sort((left, right) => left.score - right.score || left.name.localeCompare(right.name, 'zh-CN'))
+          .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'))
       : [];
+  const roleVariableEntries = allRoleVariableEntries
+    .map(entry => ({
+      ...entry,
+      score: getVariableMatchScore(entry.name, normalizedCharacterSearch),
+    }))
+    .filter(entry => !normalizedCharacterSearch || entry.score < 3)
+    .sort((left, right) => left.score - right.score || left.name.localeCompare(right.name, 'zh-CN'));
   const resolvedSelectedCharacterName =
-    selectedCharacterName && roleVariableEntries.some(entry => entry.name === selectedCharacterName)
+    selectedCharacterName && allRoleVariableEntries.some(entry => entry.name === selectedCharacterName)
       ? selectedCharacterName
-      : (roleVariableEntries[0]?.name ?? null);
+      : (allRoleVariableEntries[0]?.name ?? null);
   const selectedCharacterEntry = resolvedSelectedCharacterName
-    ? (roleVariableEntries.find(entry => entry.name === resolvedSelectedCharacterName) ?? null)
+    ? (allRoleVariableEntries.find(entry => entry.name === resolvedSelectedCharacterName) ?? null)
     : null;
   const variableBrowserRoots: Array<{ path: VariablePath; value: unknown }> =
     resolvedActiveVariableGroup === 'character' && resolvedSelectedCharacterName && selectedCharacterEntry
@@ -860,6 +881,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         setActiveVariableGroup(groupId);
         setVariableSearchMode('scope');
         setExpandedVariablePaths(new Set());
+        setIsCharacterPickerOpen(false);
 
         if (groupId === 'character' && isVariableRecord(scopeValue)) {
           const firstCharacterEntry = getVisibleEntries(scopeValue)[0];
@@ -880,6 +902,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleCharacterSelect = useCallback((characterName: string) => {
     setSelectedCharacterName(characterName);
     setSelectedVariablePath(['角色数据', characterName]);
+    setIsCharacterPickerOpen(false);
   }, []);
 
   const handleGlobalResultSelect = useCallback((result: VariableSearchResult) => {
@@ -3553,20 +3576,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               )}
 
               {variableSearchMode === 'scope' && resolvedActiveVariableGroup === 'character' && (
-                <div className="variables-character-toolbar">
-                  <div className="variables-search-box">
-                    <Icons.Search size={16} />
-                    <input
-                      aria-label="人物名搜索"
-                      type="text"
-                      value={characterSearch}
-                      onChange={handleCharacterSearchChange}
-                      placeholder="先按人物名定位"
-                      className="settings-text-input variables-search-input"
-                    />
-                  </div>
-                  <span className="variables-character-count">{roleVariableEntries.length} 人</span>
-                </div>
+                <button
+                  type="button"
+                  className="variables-character-current"
+                  onClick={() => setIsCharacterPickerOpen(true)}
+                  disabled={allRoleVariableEntries.length === 0}
+                  aria-haspopup="dialog"
+                  aria-expanded={isCharacterPickerOpen}
+                >
+                  <span className="variables-character-current-label">当前人物</span>
+                  <strong>{resolvedSelectedCharacterName ?? '暂无人物'}</strong>
+                  <span className="variables-character-current-count">{allRoleVariableEntries.length} 人</span>
+                  <Icons.ChevronDown size={16} />
+                </button>
               )}
             </div>
 
@@ -3613,27 +3635,48 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </div>
                   )
                 ) : (
-                  <div className="variables-browser-pane">
+                  <div
+                    className={`variables-browser-pane ${
+                      resolvedActiveVariableGroup === 'character' ? 'character-browser-pane' : ''
+                    }`}
+                  >
                     {resolvedActiveVariableGroup === 'character' && (
-                      <div className="variables-character-list" aria-label="人物列表">
-                        {roleVariableEntries.length > 0 ? (
-                          roleVariableEntries.map(entry => (
-                            <button
-                              key={entry.name}
-                              type="button"
-                              className={`variables-character-item ${resolvedSelectedCharacterName === entry.name ? 'active' : ''}`}
-                              onClick={() => handleCharacterSelect(entry.name)}
-                            >
-                              <span>{renderHighlightedText(entry.name, normalizedCharacterSearch)}</span>
-                              <span>{getVariableTypeLabel(entry.value)}</span>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="variables-empty variables-empty-inline">
-                            <p>没有匹配的人物</p>
-                          </div>
-                        )}
-                      </div>
+                      <aside className="variables-character-sidebar" aria-label="人物导航">
+                        <div className="variables-character-sidebar-head">
+                          <span>人物</span>
+                          <span>{allRoleVariableEntries.length}</span>
+                        </div>
+                        <div className="variables-search-box variables-character-search-box">
+                          <Icons.Search size={15} />
+                          <input
+                            aria-label="搜索人物名"
+                            type="text"
+                            value={characterSearch}
+                            onChange={handleCharacterSearchChange}
+                            placeholder="搜索人物名"
+                            className="settings-text-input variables-search-input"
+                          />
+                        </div>
+                        <div className="variables-character-list" aria-label="人物列表">
+                          {roleVariableEntries.length > 0 ? (
+                            roleVariableEntries.map(entry => (
+                              <button
+                                key={entry.name}
+                                type="button"
+                                className={`variables-character-item ${resolvedSelectedCharacterName === entry.name ? 'active' : ''}`}
+                                onClick={() => handleCharacterSelect(entry.name)}
+                              >
+                                <span>{renderHighlightedText(entry.name, normalizedCharacterSearch)}</span>
+                                <span>{getVariableTypeLabel(entry.value)}</span>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="variables-empty variables-empty-inline">
+                              <p>没有匹配的人物</p>
+                            </div>
+                          )}
+                        </div>
+                      </aside>
                     )}
 
                     <div className="variables-scope-tree">
@@ -3683,6 +3726,75 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 onBack={closeVariableDetail}
               />
             </div>
+
+            {variableSearchMode === 'scope' &&
+              resolvedActiveVariableGroup === 'character' &&
+              isCharacterPickerOpen && (
+                <div className="variables-character-picker" role="presentation">
+                  <button
+                    type="button"
+                    className="variables-character-picker-backdrop"
+                    aria-label="关闭人物选择"
+                    onClick={() => setIsCharacterPickerOpen(false)}
+                  />
+                  <section
+                    className="variables-character-picker-sheet"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="选择人物"
+                  >
+                    <div className="variables-character-picker-header">
+                      <div>
+                        <strong>选择人物</strong>
+                        <span>{allRoleVariableEntries.length} 人</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="variables-character-picker-close"
+                        onClick={() => setIsCharacterPickerOpen(false)}
+                        aria-label="关闭人物选择"
+                      >
+                        <Icons.Close size={18} />
+                      </button>
+                    </div>
+                    <div className="variables-search-box variables-character-picker-search">
+                      <Icons.Search size={16} />
+                      <input
+                        aria-label="搜索人物名"
+                        type="text"
+                        value={characterSearch}
+                        onChange={handleCharacterSearchChange}
+                        placeholder="搜索人物名"
+                        className="settings-text-input variables-search-input"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="variables-character-picker-list" role="listbox" aria-label="人物列表">
+                      {roleVariableEntries.length > 0 ? (
+                        roleVariableEntries.map(entry => (
+                          <button
+                            key={entry.name}
+                            type="button"
+                            role="option"
+                            aria-selected={resolvedSelectedCharacterName === entry.name}
+                            className={`variables-character-picker-item ${
+                              resolvedSelectedCharacterName === entry.name ? 'active' : ''
+                            }`}
+                            onClick={() => handleCharacterSelect(entry.name)}
+                          >
+                            <span>{renderHighlightedText(entry.name, normalizedCharacterSearch)}</span>
+                            {resolvedSelectedCharacterName === entry.name && <span>当前</span>}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="variables-empty variables-empty-inline">
+                          <p>没有匹配的人物</p>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                </div>
+              )}
 
             {(hasVariableChanges || !canEditVariables) && (
               <div className="variables-editor-meta">
