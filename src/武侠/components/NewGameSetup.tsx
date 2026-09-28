@@ -130,8 +130,18 @@ const DEFAULT_CUSTOM_LOCATION_SELECTION = (() => {
 const buildCustomLocationPath = ({ area, region, place }: CustomLocationSelection): string =>
   [area, region, place].filter(Boolean).join('/');
 
-// 武功混合池抽卡费用（统一费用，随机抽取任意品阶）
-const MARTIAL_ARTS_DRAW_COST = 5; // 花费5点随机抽取武功
+// 武缘寻访固定消耗：一次支付 5 点，随机显现最多 3 门候选，三择一。
+const MARTIAL_ARTS_DRAW_COST = 5;
+const MARTIAL_FATE_CHOICE_COUNT = 3;
+
+const drawMartialFateCandidates = (arts: MartialArtData[]): MartialArtData[] => {
+  const pool = [...arts];
+  for (let index = pool.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [pool[index], pool[swapIndex]] = [pool[swapIndex], pool[index]];
+  }
+  return pool.slice(0, Math.min(MARTIAL_FATE_CHOICE_COUNT, pool.length));
+};
 
 // 天赋抽卡费用（统一提高门槛）
 const TRAIT_DRAW_COST = {
@@ -245,8 +255,9 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
 
   // 步骤4: 武功选择状态
   const [selectedMartialArts, setSelectedMartialArts] = useState<string[]>([]); // 已选武功名称列表
-  const [drawnMartialArts, setDrawnMartialArts] = useState<string[]>([]); // 抽卡获得的武功（不可取消）
-  const [martialArtsDrawCostUsed, setMartialArtsDrawCostUsed] = useState(0); // 武功抽卡消耗的点数
+  const [drawnMartialArts, setDrawnMartialArts] = useState<string[]>([]); // 武缘获得的武功（不可取消）
+  const [martialFateCandidates, setMartialFateCandidates] = useState<string[]>([]); // 已付费、等待三择一的武缘候选
+  const [martialArtsDrawCostUsed, setMartialArtsDrawCostUsed] = useState(0); // 武缘寻访累计消耗
   const [martialArtsDatabase, setMartialArtsDatabase] = useState<MartialArtData[]>([]); // 功法数据库
   const [martialArtsLoading, setMartialArtsLoading] = useState(false);
   const [martialArtsFilter, setMartialArtsFilter] = useState<MartialArtsRank | 'all'>('all');
@@ -491,6 +502,71 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   const allActiveTraitNames = useMemo(() => {
     return [...selectedTraits, ...attributeTriggeredTraits.map(t => t.name)];
   }, [selectedTraits, attributeTriggeredTraits]);
+
+  const availableMartialFateArts = useMemo(
+    () =>
+      martialArtsDatabase.filter(
+        art =>
+          !selectedMartialArts.includes(art.功法名称) &&
+          !checkMartialArtTraitRestriction(art.类型, allActiveTraitNames),
+      ),
+    [allActiveTraitNames, martialArtsDatabase, selectedMartialArts],
+  );
+
+  const martialFateCandidateArts = useMemo(
+    () =>
+      martialFateCandidates
+        .map(name => martialArtsDatabase.find(art => art.功法名称 === name))
+        .filter((art): art is MartialArtData => Boolean(art)),
+    [martialArtsDatabase, martialFateCandidates],
+  );
+
+  const handleSeekMartialFate = useCallback(() => {
+    if (martialFateCandidates.length > 0) {
+      showNotification('info', '当前武缘尚未择定，请先从候选中选择一门武功');
+      return;
+    }
+    if (remainingPoints < MARTIAL_ARTS_DRAW_COST) {
+      showNotification('warning', '点数不足，寻访武缘需要 ' + MARTIAL_ARTS_DRAW_COST + ' 点');
+      return;
+    }
+    if (availableMartialFateArts.length === 0) {
+      showNotification('info', '当前没有可寻访的武功');
+      return;
+    }
+
+    const candidates = drawMartialFateCandidates(availableMartialFateArts);
+    setMartialFateCandidates(candidates.map(art => art.功法名称));
+    setMartialArtsDrawCostUsed(prev => prev + MARTIAL_ARTS_DRAW_COST);
+    showNotification(
+      'success',
+      '武缘已现，已消耗 ' + MARTIAL_ARTS_DRAW_COST + ' 点；请从 ' + candidates.length + ' 门武功中择一承下',
+    );
+  }, [availableMartialFateArts, martialFateCandidates.length, remainingPoints, showNotification]);
+
+  const handleAcceptMartialFate = useCallback(
+    (artName: string) => {
+      if (!martialFateCandidates.includes(artName)) return;
+
+      const art = martialArtsDatabase.find(item => item.功法名称 === artName);
+      if (!art) {
+        showNotification('error', '这门武功的数据已经失效，请重新进入武功页');
+        return;
+      }
+
+      const restriction = checkMartialArtTraitRestriction(art.类型, allActiveTraitNames);
+      if (restriction) {
+        showNotification('error', '受天赋限制无法承下「' + artName + '」：' + restriction);
+        return;
+      }
+
+      setSelectedMartialArts(prev => (prev.includes(artName) ? prev : [...prev, artName]));
+      setDrawnMartialArts(prev => (prev.includes(artName) ? prev : [...prev, artName]));
+      setMartialFateCandidates([]);
+      showNotification('success', '已承下武缘「' + artName + '」，该武功已锁定且不再追加品阶点数');
+    },
+    [allActiveTraitNames, martialArtsDatabase, martialFateCandidates, showNotification],
+  );
 
   // ============================================
   // 存档数据验证函数
@@ -1077,9 +1153,12 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         }
         break;
       case 'martial':
-        // 武功选择：剩余点数不能为负
+        // 武功选择：剩余点数不能为负；已经支付的武缘必须完成三择一。
         if (remainingPoints < 0) {
           newErrors.martial = '点数不足，请调整武功选择';
+        }
+        if (martialFateCandidates.length > 0) {
+          newErrors.martial = '当前武缘尚未择定，请先从候选中选择一门武功';
         }
         {
           const forbiddenArts = selectedMartialArts.filter(artName => {
@@ -1121,7 +1200,21 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [currentStep, selectedTalentId, remainingPoints, useEventLocation, customLocation, name, appearance, age]);
+  }, [
+    age,
+    allActiveTraitNames,
+    appearance,
+    currentStep,
+    customLocation,
+    martialArtsDatabase,
+    martialFateCandidates.length,
+    name,
+    remainingPoints,
+    selectedMartialArts,
+    selectedTalentId,
+    showNotification,
+    useEventLocation,
+  ]);
 
   // 进入下一步
   const handleNextStep = useCallback(() => {
@@ -1135,11 +1228,16 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
 
   // 返回上一步
   const handlePrevStep = useCallback(() => {
+    if (currentStep === 'martial' && martialFateCandidates.length > 0) {
+      showNotification('warning', '当前武缘已经消耗 5 点，请先从候选中择定一门武功');
+      return;
+    }
+
     const prevIndex = currentStepIndex - 1;
     if (prevIndex >= 0) {
       setCurrentStep(stepOrder[prevIndex]);
     }
-  }, [currentStepIndex, stepOrder]);
+  }, [currentStep, currentStepIndex, martialFateCandidates.length, showNotification, stepOrder]);
 
   // 是否可以进入下一步
   const canProceedToNext = useMemo(() => {
@@ -1151,7 +1249,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       case 'traits':
         return remainingPoints >= 0;
       case 'martial':
-        return remainingPoints >= 0;
+        return remainingPoints >= 0 && martialFateCandidates.length === 0;
       case 'origin':
         // 如果选择自定义时间地点，必须填写地点
         return useEventLocation || customLocation.trim().length > 0;
@@ -1161,7 +1259,17 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       default:
         return true;
     }
-  }, [currentStep, selectedTalentId, remainingPoints, useEventLocation, customLocation, name, appearance, age]);
+  }, [
+    age,
+    appearance,
+    currentStep,
+    customLocation,
+    martialFateCandidates.length,
+    name,
+    remainingPoints,
+    selectedTalentId,
+    useEventLocation,
+  ]);
 
   // 验证身份信息（用于最终提交前的验证）
   const validateIdentityInfo = useCallback((): boolean => {
@@ -2482,90 +2590,136 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
           {/* ============================================ */}
           {currentStep === 'martial' && (
             <div className="step-content martial-step">
-              {/* 抽卡区域 */}
-              <div className="form-section glass-card">
-                <h3 className="section-title">
-                  <span className="section-icon">🎴</span>
-                  武功抽取
-                  <span className={`points-badge ${remainingPoints >= 0 ? '' : 'error'}`}>
-                    剩余 {remainingPoints} 点
-                  </span>
-                </h3>
-                <p className="section-desc">花费点数随机抽取武功，费用比直接选择更低。抽中的武功必须接受！</p>
-
-                <div className="gacha-section">
-                  <div className="gacha-pools">
-                    {/* 武功混合池抽卡（统一费用，随机抽取任意品阶） */}
-                    <div className={`gacha-pool mixed ${remainingPoints < MARTIAL_ARTS_DRAW_COST ? 'disabled' : ''}`}>
-                      <div className="pool-header">
-                        <span className="pool-rank mixed">混合池</span>
-                        <span className="pool-count">
-                          {
-                            martialArtsDatabase.filter(
-                              a => !selectedMartialArts.includes(a.功法名称) && !checkMartialArtTraitRestriction(a.类型, allActiveTraitNames),
-                            ).length
-                          }
-                          种可抽
-                        </span>
-                      </div>
-                      <div className="pool-cost">
-                        花费 <span className="cost-value">{MARTIAL_ARTS_DRAW_COST}</span> 点
-                      </div>
-                      <p className="pool-desc">随机抽取任意品阶武功，抽中后不可取消！</p>
-                      <button
-                        type="button"
-                        className="gacha-btn mixed-btn"
-                        disabled={
-                          remainingPoints < MARTIAL_ARTS_DRAW_COST ||
-                          martialArtsDatabase.filter(
-                            a => !selectedMartialArts.includes(a.功法名称) && !checkMartialArtTraitRestriction(a.类型, allActiveTraitNames),
-                          ).length === 0
-                        }
-                        onClick={() => {
-                          const availableArts = martialArtsDatabase.filter(
-                            a => !selectedMartialArts.includes(a.功法名称) && !checkMartialArtTraitRestriction(a.类型, allActiveTraitNames),
-                          );
-                          if (availableArts.length === 0) {
-                            showNotification('info', '没有可抽取的武功了');
-                            return;
-                          }
-                          // 随机抽取
-                          const randomIndex = Math.floor(Math.random() * availableArts.length);
-                          const drawnArt = availableArts[randomIndex];
-                          setSelectedMartialArts(prev => [...prev, drawnArt.功法名称]);
-                          setDrawnMartialArts(prev => [...prev, drawnArt.功法名称]); // 标记为抽卡获得，不可取消
-                          setMartialArtsDrawCostUsed(prev => prev + MARTIAL_ARTS_DRAW_COST); // 记录抽卡费用
-                          showNotification(
-                            'success',
-                            `🎉 抽中了「${drawnArt.功法名称}」（${drawnArt.功法品阶}）！（消耗${MARTIAL_ARTS_DRAW_COST}点，不可取消）`,
-                          );
-                        }}
-                      >
-                        🎲 随机抽取武功
-                      </button>
-                    </div>
-                  </div>
+              <div className="martial-selection-summary">
+                <div className="martial-selection-heading">
+                  <span className="martial-selection-kicker">已习武学</span>
+                  <strong>{selectedMartialArts.length} 门</strong>
+                </div>
+                <div className="selected-martial-list compact">
+                  {selectedMartialArts.length > 0 ? (
+                    selectedMartialArts.map(artName => {
+                      const art = martialArtsDatabase.find(item => item.功法名称 === artName);
+                      const isDrawn = drawnMartialArts.includes(artName);
+                      return (
+                        <div key={artName} className={'selected-martial-item ' + (isDrawn ? 'drawn locked' : '')}>
+                          <span className="martial-name">{artName}</span>
+                          {art?.功法品阶 && (
+                            <span className={'martial-rank rank-' + art.功法品阶}>{art.功法品阶}</span>
+                          )}
+                          {isDrawn ? (
+                            <span className="lock-icon" title="武缘获得，不可移除">🔒</span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="remove-btn"
+                              aria-label={'移除' + artName}
+                              onClick={() => setSelectedMartialArts(prev => prev.filter(name => name !== artName))}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <span className="martial-selection-empty">尚未习得武功</span>
+                  )}
+                </div>
+                <div className={'martial-selection-points ' + (remainingPoints < 0 ? 'error' : '')}>
+                  <span>剩余</span>
+                  <strong>{remainingPoints}</strong>
+                  <span>点</span>
                 </div>
               </div>
 
-              {/* 武功选择卡片 */}
+              <div className="form-section glass-card martial-fate-section">
+                <div className="martial-fate-header">
+                  <div>
+                    <span className="martial-fate-kicker">江湖机缘</span>
+                    <h3 className="section-title">
+                      <span className="section-icon">🎴</span>
+                      武缘三择一
+                    </h3>
+                  </div>
+                  <span className="martial-fate-cost">固定 {MARTIAL_ARTS_DRAW_COST} 点 / 次</span>
+                </div>
+                <p className="section-desc">
+                  每次寻访固定消耗 {MARTIAL_ARTS_DRAW_COST} 点，随机显现最多 {MARTIAL_FATE_CHOICE_COUNT} 门武功。
+                  从中择一承下；选中的武功会锁定，不再追加品阶点数。
+                </p>
+
+                {martialFateCandidateArts.length > 0 ? (
+                  <>
+                    <div className="martial-fate-pending">
+                      <span>本次武缘已支付 {MARTIAL_ARTS_DRAW_COST} 点</span>
+                      <strong>三者择一，择定后其余武功散去</strong>
+                    </div>
+                    <div className="martial-fate-grid">
+                      {martialFateCandidateArts.map(art => (
+                        <article
+                          key={art.功法名称}
+                          className={'martial-fate-card rank-' + art.功法品阶}
+                          data-wuxia-automation="martial-fate-candidate"
+                          data-wuxia-martial-name={art.功法名称}
+                        >
+                          <div className="martial-fate-card-top">
+                            <span className={'martial-rank rank-' + art.功法品阶}>{art.功法品阶}</span>
+                            <span className="martial-type">{art.类型}</span>
+                          </div>
+                          <h4>{art.功法名称}</h4>
+                          <p>{art.功法描述 || '江湖传承，招式与心法尚待亲身参悟。'}</p>
+                          <button
+                            type="button"
+                            className="accept-martial-fate-btn"
+                            onClick={() => handleAcceptMartialFate(art.功法名称)}
+                          >
+                            承此武缘
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="martial-fate-call">
+                    <div className="martial-fate-call-copy">
+                      <strong>寻访一次，显现三门武功</strong>
+                      <span>
+                        当前可寻访 {availableMartialFateArts.length} 门 · 费用固定 {MARTIAL_ARTS_DRAW_COST} 点
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="seek-martial-fate-btn"
+                      disabled={
+                        martialArtsLoading ||
+                        remainingPoints < MARTIAL_ARTS_DRAW_COST ||
+                        availableMartialFateArts.length === 0
+                      }
+                      onClick={handleSeekMartialFate}
+                    >
+                      <span>寻访武缘</span>
+                      <b>-{MARTIAL_ARTS_DRAW_COST} 点</b>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="form-section glass-card">
                 <h3 className="section-title">
                   <span className="section-icon">⚔️</span>
-                  直接选择
-                  <span className={`points-badge ${remainingPoints >= 0 ? '' : 'error'}`}>
+                  按谱择学
+                  <span className={'points-badge ' + (remainingPoints >= 0 ? '' : 'error')}>
                     剩余 {remainingPoints} 点
                   </span>
                 </h3>
-                <p className="section-desc">直接选择武功，费用较高但可以精确选择。</p>
+                <p className="section-desc">知道自己想学什么时，可直接按谱选择；按武功品阶正常消耗点数，也可以随时取消返还。</p>
                 {errors.martial && <p className="error-text center">{errors.martial}</p>}
 
-                {/* 筛选和搜索 */}
                 <div className="martial-filters">
                   <div className="filter-tabs">
                     <button
                       type="button"
-                      className={`filter-tab ${martialArtsFilter === 'all' ? 'active' : ''}`}
+                      className={'filter-tab ' + (martialArtsFilter === 'all' ? 'active' : '')}
                       onClick={() => setMartialArtsFilter('all')}
                     >
                       全部
@@ -2574,7 +2728,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       <button
                         key={rank}
                         type="button"
-                        className={`filter-tab ${martialArtsFilter === rank ? 'active' : ''}`}
+                        className={'filter-tab ' + (martialArtsFilter === rank ? 'active' : '')}
                         onClick={() => setMartialArtsFilter(rank)}
                       >
                         {rank} ({RANK_POINT_COST[rank]}点)
@@ -2593,7 +2747,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   </div>
                 </div>
 
-                {/* 武功列表 - 添加独立滚动容器 */}
                 {martialArtsLoading ? (
                   <div className="loading-hint">正在加载武功数据库...</div>
                 ) : (
@@ -2607,7 +2760,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         })
                         .map(art => {
                           const isSelected = selectedMartialArts.includes(art.功法名称);
-                          const isDrawn = drawnMartialArts.includes(art.功法名称); // 是否通过抽卡获得
+                          const isDrawn = drawnMartialArts.includes(art.功法名称);
                           const cost = RANK_POINT_COST[art.功法品阶];
                           const restriction = checkMartialArtTraitRestriction(art.类型, allActiveTraitNames);
                           const isRestricted = Boolean(restriction);
@@ -2616,35 +2769,39 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                           return (
                             <div
                               key={art.功法名称}
-                              className={`martial-card ${isSelected ? 'selected' : ''} ${isDrawn ? 'drawn locked' : ''} ${isRestricted ? 'restricted disabled' : ''} rank-${art.功法品阶} ${!canAfford && !isSelected ? 'disabled' : ''}`}
+                              className={
+                                'martial-card ' +
+                                (isSelected ? 'selected ' : '') +
+                                (isDrawn ? 'drawn locked ' : '') +
+                                (isRestricted ? 'restricted disabled ' : '') +
+                                'rank-' +
+                                art.功法品阶 +
+                                (!canAfford && !isSelected ? ' disabled' : '')
+                              }
                               onClick={() => {
-                                if (isDrawn) return; // 抽卡获得的武功不能取消
+                                if (isDrawn) return;
                                 if (isRestricted) {
-                                  showNotification('error', `受天赋限制无法选择「${art.功法名称}」：${restriction}`);
+                                  showNotification('error', '受天赋限制无法选择「' + art.功法名称 + '」：' + restriction);
                                   return;
                                 }
                                 if (!canAfford && !isSelected) return;
                                 if (isSelected) {
-                                  // 取消选择（点数会通过 martialArtsPointsUsed 自动返还）
-                                  setSelectedMartialArts(prev => prev.filter(n => n !== art.功法名称));
+                                  setSelectedMartialArts(prev => prev.filter(name => name !== art.功法名称));
                                 } else {
-                                  // 选择武功（点数会通过 martialArtsPointsUsed 自动扣除）
                                   setSelectedMartialArts(prev => [...prev, art.功法名称]);
                                 }
                               }}
                             >
                               <div className="martial-header">
                                 <span className="martial-name">{art.功法名称}</span>
-                                <span className={`martial-rank rank-${art.功法品阶}`}>{art.功法品阶}</span>
+                                <span className={'martial-rank rank-' + art.功法品阶}>{art.功法品阶}</span>
                               </div>
                               <span className="martial-type">{art.类型}</span>
-                              {isRestricted && (
-                                <div className="martial-restricted-tag" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '2px' }}>
-                                  🚫 {restriction}
-                                </div>
-                              )}
+                              {isRestricted && <div className="martial-restricted-tag">🚫 {restriction}</div>}
                               <p className="martial-desc">{art.功法描述?.slice(0, 50)}...</p>
-                              <span className="martial-cost">{isDrawn ? '已抽取' : isRestricted ? '无法修炼' : `-${cost}点`}</span>
+                              <span className="martial-cost">
+                                {isDrawn ? '武缘所得' : isRestricted ? '无法修炼' : '-' + cost + '点'}
+                              </span>
                               {isSelected && (
                                 <div className="selected-indicator">
                                   <span>{isDrawn ? '🔒' : '✓'}</span>
@@ -2658,53 +2815,14 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 )}
               </div>
 
-              {/* 已选武功 */}
-              {selectedMartialArts.length > 0 && (
-                <div className="form-section glass-card">
-                  <h3 className="section-title">
-                    <span className="section-icon">📜</span>
-                    已选武功
-                    <span className="trait-count">{selectedMartialArts.length} 项</span>
-                  </h3>
-                  <div className="selected-martial-list">
-                    {selectedMartialArts.map(artName => {
-                      const art = martialArtsDatabase.find(a => a.功法名称 === artName);
-                      const isDrawn = drawnMartialArts.includes(artName); // 是否通过抽卡获得
-                      return (
-                        <div key={artName} className={`selected-martial-item ${isDrawn ? 'drawn locked' : ''}`}>
-                          <span className="martial-name">{artName}</span>
-                          <span className={`martial-rank rank-${art?.功法品阶}`}>{art?.功法品阶}</span>
-                          {isDrawn ? (
-                            <span className="lock-icon" title="抽卡获得，不可移除">
-                              🔒
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              className="remove-btn"
-                              onClick={() => {
-                                // 移除武功（点数会通过 martialArtsPointsUsed 自动返还）
-                                setSelectedMartialArts(prev => prev.filter(n => n !== artName));
-                              }}
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* 导航按钮 */}
               <div className="form-actions dual">
                 <button
                   type="button"
                   className="back-step-btn"
                   data-wuxia-automation="setup-previous-step"
                   onClick={handlePrevStep}
-                  disabled={isLoading}
+                  disabled={isLoading || martialFateCandidates.length > 0}
+                  title={martialFateCandidates.length > 0 ? '请先择定当前武缘' : undefined}
                 >
                   <span className="btn-arrow">←</span>
                   <span className="btn-text">上一步</span>
@@ -2714,9 +2832,10 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   className="next-btn"
                   data-wuxia-automation="setup-next-step"
                   onClick={handleNextStep}
-                  disabled={isLoading}
+                  disabled={isLoading || !canProceedToNext}
+                  title={martialFateCandidates.length > 0 ? '请先择定当前武缘' : undefined}
                 >
-                  <span className="btn-text">下一步</span>
+                  <span className="btn-text">{martialFateCandidates.length > 0 ? '请先择定武缘' : '下一步'}</span>
                   <span className="btn-arrow">→</span>
                   <div className="btn-glow" />
                 </button>
