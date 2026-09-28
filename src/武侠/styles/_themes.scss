@@ -3790,11 +3790,49 @@
     border-color: rgba(139, 26, 26, 0.3);
   }
 
-  // 品阶徽章的霓虹字色在纸底上不可读，统一为墨色底+墨字，品阶区分交给卡片左侧色条
-  .setup-screen .martial-rank[class*='rank-'],
-  .setup-screen .pool-rank[class*='rank-'] {
-    background: rgba(61, 48, 40, 0.1);
+  // 水墨纸底上的品阶徽章使用轻描边胶囊，不再压一块明显的灰色方底。
+  .setup-screen .martial-rank[class*='rank-'] {
+    background: rgba(255, 252, 247, 0.38);
+    border: 1px solid rgba(61, 48, 40, 0.2);
+    border-radius: 999px;
     color: var(--wuxia-setup-ink-soft);
+    box-shadow: none;
+
+    &.rank-粗浅 {
+      border-color: rgba(91, 80, 72, 0.3);
+      color: #5b5048;
+    }
+
+    &.rank-传家 {
+      border-color: rgba(59, 106, 67, 0.34);
+      color: #3b6a43;
+    }
+
+    &.rank-上乘 {
+      border-color: rgba(70, 94, 122, 0.34);
+      color: #465e7a;
+    }
+
+    &.rank-镇派 {
+      border-color: rgba(103, 72, 112, 0.34);
+      color: #674870;
+    }
+
+    &.rank-绝世 {
+      border-color: rgba(151, 105, 28, 0.38);
+      color: #97691c;
+    }
+
+    &.rank-传说 {
+      border-color: rgba(139, 26, 26, 0.4);
+      color: var(--wuxia-setup-cinnabar);
+    }
+  }
+
+  .setup-screen .pool-rank[class*='rank-'] {
+    background: rgba(139, 26, 26, 0.055);
+    border-color: rgba(139, 26, 26, 0.2);
+    color: var(--wuxia-setup-cinnabar);
   }
 
   .setup-screen .input-glow {
