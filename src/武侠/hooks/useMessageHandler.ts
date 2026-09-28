@@ -20,7 +20,6 @@ import {
   ensureTurnVariableBlocksCommitted,
   executeExtraVariableUpdate,
   prepareExtraVariableUpdateTurn,
-  validateOrRepairInlineWorldTimeReply,
   type ExtraVariableUpdateProgress,
   type ExtraVariableUpdateReservation,
 } from '../utils/extraVariableUpdateManager';
@@ -706,19 +705,6 @@ export function useMessageHandler({
         }
         const rawResultText = typeof result === 'string' ? result : result.content;
         let resultText = normalizeAssistantReplyForPersistence(rawResultText);
-        if (resultText && extraVariableDecision.modeSnapshot === 'inline') {
-          const timeValidation = await validateOrRepairInlineWorldTimeReply({
-            settings: summarySettings,
-            rawReply: resultText,
-          });
-          resultText = timeValidation.replyText;
-          if (timeValidation.timeRepairAttempted) {
-            messageLogger.warn('[useMessageHandler] inline 世界时间已在建立 assistant 楼层前定向纠错');
-            variableTraceLogger.warn('[useMessageHandler] inline 时间块已通过定向纠错替换', {
-              repairedBlocks: timeValidation.blocksText,
-            });
-          }
-        }
         const generateEndTime = Date.now();
         recordIframeLifecycleEvent('wuxia-frontend', 'turn-main-generation-returned', {
           roundId: debugRoundId,
