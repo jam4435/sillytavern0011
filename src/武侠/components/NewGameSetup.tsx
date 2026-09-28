@@ -894,6 +894,20 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         attributes: { ...attributes },
         traits: [...selectedTraits],
         martialArts: [...selectedMartialArts],
+        creationState: {
+          version: 1,
+          drawnTraits: [...drawnTraits],
+          traitDrawCostUsed,
+          divination: {
+            boardTraits: boardTraits.map(trait => ({ ...trait })),
+            lockedSlotIndices: [...lockedSlotIndices],
+            freeBlessingUsed,
+            pityCount,
+          },
+          drawnMartialArts: [...drawnMartialArts],
+          martialArtsDrawCostUsed,
+          customRealm,
+        },
         origin: selectedOrigin === 'custom' ? customOrigin : selectedOrigin,
         locationInfo:
           useEventLocation && currentEvent
@@ -934,6 +948,15 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     attributes,
     selectedTraits,
     selectedMartialArts,
+    drawnTraits,
+    traitDrawCostUsed,
+    boardTraits,
+    lockedSlotIndices,
+    freeBlessingUsed,
+    pityCount,
+    drawnMartialArts,
+    martialArtsDrawCostUsed,
+    customRealm,
     selectedOrigin,
     customOrigin,
     useEventLocation,
@@ -968,11 +991,53 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         // 恢复属性
         setAttributes({ ...DEFAULT_ATTRIBUTES, ...buildToLoad.attributes });
 
-        // 恢复天赋
+        // 恢复天赋与完整洗炼结算状态。创建方案加载后仍可退回天赋页继续修改，
+        // 因此不能只恢复最终已选项，否则会重置免费洗炼、保底与已支付点数。
         setSelectedTraits([...buildToLoad.traits]);
+        const savedCreationState = buildToLoad.creationState?.version === 1 ? buildToLoad.creationState : undefined;
+        setDrawnTraits(
+          (savedCreationState?.drawnTraits || []).filter(traitName => buildToLoad.traits.includes(traitName)),
+        );
+        setTraitDrawCostUsed(
+          Number.isFinite(savedCreationState?.traitDrawCostUsed)
+            ? Math.max(0, Number(savedCreationState?.traitDrawCostUsed))
+            : 0,
+        );
+        setIsRerolling(false);
+        if (savedCreationState?.divination?.boardTraits?.length === DIVINATION_BOARD_SIZE) {
+          setBoardTraits(savedCreationState.divination.boardTraits.map(trait => ({ ...trait })));
+        } else {
+          const { newBoard } = rollDivinationBoard([], [], 0, buildToLoad.traits);
+          setBoardTraits(newBoard);
+        }
+        setLockedSlotIndices(
+          (savedCreationState?.divination?.lockedSlotIndices || []).filter(
+            index => Number.isInteger(index) && index >= 0 && index < DIVINATION_BOARD_SIZE,
+          ),
+        );
+        setFreeBlessingUsed(Boolean(savedCreationState?.divination?.freeBlessingUsed));
+        setPityCount(
+          Number.isFinite(savedCreationState?.divination?.pityCount)
+            ? Math.max(0, Math.floor(Number(savedCreationState?.divination?.pityCount)))
+            : 0,
+        );
 
-        // 恢复武功（点数消耗会通过 martialArtsPointsUsed 自动计算）
+        // 恢复武功与武缘结算来源。已经付过的武缘费用继续按固定费用结算，
+        // 武缘所得也继续保持锁定；加载方案不会把它误算成按谱择学。
         setSelectedMartialArts([...buildToLoad.martialArts]);
+        setDrawnMartialArts(
+          (savedCreationState?.drawnMartialArts || []).filter(artName => buildToLoad.martialArts.includes(artName)),
+        );
+        setMartialArtsDrawCostUsed(
+          Number.isFinite(savedCreationState?.martialArtsDrawCostUsed)
+            ? Math.max(0, Number(savedCreationState?.martialArtsDrawCostUsed))
+            : 0,
+        );
+        setMartialFateCandidates([]);
+
+        // 自定义出身的境界也属于创建方案的一部分；即使加载后退回出身页继续修改，也应从原值开始。
+        const savedCustomRealm = savedCreationState?.customRealm;
+        setCustomRealm(savedCustomRealm && REALM_LEVELS.includes(savedCustomRealm) ? savedCustomRealm : '三流圆满');
 
         // 恢复出身
         if (buildToLoad.origin) {
@@ -3627,6 +3692,21 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 </div>
               </div>
 
+              {remainingPoints < 0 && (
+                <p className="error-text center" role="alert">
+                  当前创建方案按现行规则点数不足，还需要 {Math.abs(remainingPoints)} 点；可点击“上一步”返回修改。
+                </p>
+              )}
+              {remainingPoints >= 0 && Object.keys(errors).length > 0 && (
+                <div className="confirm-validation-errors" role="alert">
+                  {Object.entries(errors).map(([key, message]) => (
+                    <p key={key} className="error-text center">
+                      {message}
+                    </p>
+                  ))}
+                </div>
+              )}
+
               {/* 操作按钮 */}
               <div className="form-actions triple">
                 <button
@@ -3647,7 +3727,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   type="submit"
                   className="submit-btn"
                   data-wuxia-automation="submit-new-game"
-                  disabled={isLoading || !name.trim()}
+                  disabled={isLoading || !name.trim() || remainingPoints < 0}
                 >
                   <span className="btn-text">{isLoading ? '正在创建...' : '踏入江湖'}</span>
                   <span className="btn-icon">⚔️</span>
