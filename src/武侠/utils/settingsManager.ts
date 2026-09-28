@@ -108,7 +108,7 @@ export interface PendingCharacterSummary {
 export interface SummarySettings {
   /** 是否启用自动总结 */
   enabled: boolean;
-  /** 变量更新模式：正文伴随或额外模型 */
+  /** 固定为独立额外变量模型；保留字段仅作为运行时状态标识。 */
   variableUpdateMode: SummaryVariableUpdateMode;
   /** 是否启用流式生成 */
   stream: boolean;
