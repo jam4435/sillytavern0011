@@ -4,15 +4,30 @@ import NewGameSetup from './NewGameSetup';
 import { createAvatarEntityKey, getAvatarStorageKey } from '../utils/avatarStorage';
 import { APPEARANCE_TEMPLATES, DEFAULT_ATTRIBUTES, STORY_EVENTS } from '../utils/gameInitializer';
 
-vi.mock('../utils/martialArtsDatabase', () => ({
-  getAllMartialArtNames: vi.fn(() => []),
-  getMartialArtData: vi.fn(() => null),
-  isDatabaseLoaded: vi.fn(() => true),
-  loadMartialArtsDatabase: vi.fn(async () => true),
-}));
+vi.mock('../utils/martialArtsDatabase', () => {
+  const arts = [
+    { 功法名称: '测试拳法', 功法品阶: '粗浅', 类型: '拳掌', 功法描述: '拳路朴实，适合初学者。' },
+    { 功法名称: '测试剑法', 功法品阶: '传家', 类型: '剑法', 功法描述: '剑势轻灵，讲究进退有度。' },
+    { 功法名称: '测试轻功', 功法品阶: '上乘', 类型: '轻功', 功法描述: '提气纵跃，身法迅捷。' },
+    { 功法名称: '测试刀法', 功法品阶: '镇派', 类型: '刀法', 功法描述: '刀势雄浑，重在一往无前。' },
+  ];
+
+  return {
+    getAllMartialArtNames: vi.fn(() => arts.map(art => art.功法名称)),
+    getMartialArtData: vi.fn((name: string) => arts.find(art => art.功法名称 === name) || null),
+    isDatabaseLoaded: vi.fn(() => true),
+    loadMartialArtsDatabase: vi.fn(async () => true),
+  };
+});
 
 function renderSetup() {
   render(<NewGameSetup onSubmit={vi.fn()} onBack={vi.fn()} isLoading={false} />);
+}
+
+function goToMartialStep() {
+  for (let index = 0; index < 3; index += 1) {
+    fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
+  }
 }
 
 function goToOriginStep() {
@@ -141,6 +156,47 @@ describe('NewGameSetup appearance generation', () => {
     expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.face.男, 0));
     expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.frame, 0));
     expect(appearanceValue).toContain(firstTemplateFor(APPEARANCE_TEMPLATES.strength, 20));
+  });
+});
+
+describe('NewGameSetup martial fate', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  it('固定消耗5点生成三门武缘，必须三择一后才能离开武功页', async () => {
+    renderSetup();
+    goToMartialStep();
+
+    const seekButton = await screen.findByRole('button', { name: /寻访武缘/ });
+    await waitFor(() => expect(seekButton).not.toBeDisabled());
+
+    expect(seekButton).toHaveTextContent('-5 点');
+    expect(document.querySelector('.martial-selection-points')).toHaveTextContent('30');
+
+    fireEvent.click(seekButton);
+
+    const candidates = document.querySelectorAll('[data-wuxia-automation="martial-fate-candidate"]');
+    expect(candidates).toHaveLength(3);
+    expect(new Set(Array.from(candidates).map(card => card.getAttribute('data-wuxia-martial-name'))).size).toBe(3);
+    expect(document.querySelector('.martial-selection-points')).toHaveTextContent('25');
+
+    const previousButton = document.querySelector('[data-wuxia-automation="setup-previous-step"]') as HTMLButtonElement;
+    const nextButton = document.querySelector('[data-wuxia-automation="setup-next-step"]') as HTMLButtonElement;
+    expect(previousButton).toBeDisabled();
+    expect(nextButton).toBeDisabled();
+    expect(nextButton).toHaveTextContent('请先择定武缘');
+
+    const acceptButtons = screen.getAllByRole('button', { name: '承此武缘' });
+    fireEvent.click(acceptButtons[0]);
+
+    expect(document.querySelectorAll('[data-wuxia-automation="martial-fate-candidate"]')).toHaveLength(0);
+    expect(document.querySelector('.martial-selection-heading')).toHaveTextContent('1 门');
+    expect(document.querySelector('.martial-selection-points')).toHaveTextContent('25');
+    expect(previousButton).not.toBeDisabled();
+    expect(nextButton).not.toBeDisabled();
+    expect(screen.getByText('武缘所得')).toBeInTheDocument();
   });
 });
 
