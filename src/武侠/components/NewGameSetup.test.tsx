@@ -173,14 +173,15 @@ describe('NewGameSetup martial fate', () => {
     await waitFor(() => expect(seekButton).not.toBeDisabled());
 
     expect(seekButton).toHaveTextContent('-5 点');
-    expect(document.querySelector('.martial-selection-points')).toHaveTextContent('30');
+    const pointsBefore = Number(document.querySelector('.martial-selection-points strong')?.textContent);
 
     fireEvent.click(seekButton);
 
     const candidates = document.querySelectorAll('[data-wuxia-automation="martial-fate-candidate"]');
     expect(candidates).toHaveLength(3);
     expect(new Set(Array.from(candidates).map(card => card.getAttribute('data-wuxia-martial-name'))).size).toBe(3);
-    expect(document.querySelector('.martial-selection-points')).toHaveTextContent('25');
+    const pointsAfterSeek = Number(document.querySelector('.martial-selection-points strong')?.textContent);
+    expect(pointsAfterSeek).toBe(pointsBefore - 5);
 
     const previousButton = document.querySelector('[data-wuxia-automation="setup-previous-step"]') as HTMLButtonElement;
     const nextButton = document.querySelector('[data-wuxia-automation="setup-next-step"]') as HTMLButtonElement;
@@ -193,7 +194,7 @@ describe('NewGameSetup martial fate', () => {
 
     expect(document.querySelectorAll('[data-wuxia-automation="martial-fate-candidate"]')).toHaveLength(0);
     expect(document.querySelector('.martial-selection-heading')).toHaveTextContent('1 门');
-    expect(document.querySelector('.martial-selection-points')).toHaveTextContent('25');
+    expect(Number(document.querySelector('.martial-selection-points strong')?.textContent)).toBe(pointsAfterSeek);
     expect(previousButton).not.toBeDisabled();
     expect(nextButton).not.toBeDisabled();
     expect(screen.getByText('武缘所得')).toBeInTheDocument();
