@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeLocationPath } from '../../shared/locationPath.js';
+import locationTable from '../武侠地点表.yaml';
 import AvatarImage from './AvatarImage';
 import { getCardBackgroundImage } from './CardOrnaments';
 import FullscreenButton from './FullscreenButton';
@@ -69,8 +70,6 @@ import { gameLogger } from '../utils/logger';
  * 兼容 OLD 格式（"三流初期" → "三流"）与裸 "不入流"（无小境界后缀，原样返回）。
  */
 const realmMajor = (realm: string): string => realm.replace(/(初期|中期|后期|圆满)$/, '');
-const REALM_MAJOR_OPTIONS = Array.from(new Set(REALM_LEVELS.map(realm => realmMajor(realm))));
-const getRealmStageLabel = (realm: string): string => realm.replace(realmMajor(realm), '') || '本境';
 
 // 武功品阶点数消耗（直接选择）- 统一到总点数池
 const RANK_POINT_COST: Record<MartialArtsRank, number> = {
@@ -89,6 +88,47 @@ interface EventWorkOption {
   label: string;
   count: number;
 }
+
+type LocationTable = Record<string, Record<string, string[]>>;
+
+interface CustomLocationSelection {
+  area: string;
+  region: string;
+  place: string;
+}
+
+const LOCATION_TABLE = locationTable as LocationTable;
+const LOCATION_AREA_OPTIONS = Object.keys(LOCATION_TABLE);
+
+const getFirstLocationSelection = (): CustomLocationSelection => {
+  const area = LOCATION_AREA_OPTIONS[0] ?? '';
+  const region = area ? Object.keys(LOCATION_TABLE[area] ?? {})[0] ?? '' : '';
+  const place = area && region ? LOCATION_TABLE[area]?.[region]?.[0] ?? '' : '';
+  return { area, region, place };
+};
+
+const FIRST_LOCATION_SELECTION = getFirstLocationSelection();
+
+const resolveCustomLocationSelection = (location: string): CustomLocationSelection => {
+  const normalized = normalizeLocationPath(location);
+  const [area = '', region = '', place = ''] = normalized ? normalized.split('/') : [];
+
+  if (area && region && place && LOCATION_TABLE[area]?.[region]?.includes(place)) {
+    return { area, region, place };
+  }
+
+  return FIRST_LOCATION_SELECTION;
+};
+
+const DEFAULT_CUSTOM_LOCATION_SELECTION = (() => {
+  const preferred = resolveCustomLocationSelection('大宋/临安府/西湖');
+  return preferred.area === '大宋' && preferred.region === '临安府' && preferred.place === '西湖'
+    ? preferred
+    : FIRST_LOCATION_SELECTION;
+})();
+
+const buildCustomLocationPath = ({ area, region, place }: CustomLocationSelection): string =>
+  [area, region, place].filter(Boolean).join('/');
 
 // 武功混合池抽卡费用（统一费用，随机抽取任意品阶）
 const MARTIAL_ARTS_DRAW_COST = 5; // 花费5点随机抽取武功
@@ -180,10 +220,28 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
   const [selectedEventId, setSelectedEventId] = useState(STORY_EVENTS[0]?.id || '');
   const [eventSearchQuery, setEventSearchQuery] = useState(''); // 事件搜索关键词
   const [eventWorkFilter, setEventWorkFilter] = useState<EventWorkFilter>('all'); // 作品分卷筛选
-  const [customLocation, setCustomLocation] = useState('');
+  const [customArea, setCustomArea] = useState(DEFAULT_CUSTOM_LOCATION_SELECTION.area);
+  const [customRegion, setCustomRegion] = useState(DEFAULT_CUSTOM_LOCATION_SELECTION.region);
+  const [customPlace, setCustomPlace] = useState(DEFAULT_CUSTOM_LOCATION_SELECTION.place);
   const [customYear, setCustomYear] = useState(1199);
   const [customMonth, setCustomMonth] = useState(8);
   const [customDay, setCustomDay] = useState(15);
+
+  const customRegionOptions = useMemo(() => Object.keys(LOCATION_TABLE[customArea] ?? {}), [customArea]);
+  const customPlaceOptions = useMemo(
+    () => LOCATION_TABLE[customArea]?.[customRegion] ?? [],
+    [customArea, customRegion],
+  );
+  const customLocation = useMemo(
+    () => buildCustomLocationPath({ area: customArea, region: customRegion, place: customPlace }),
+    [customArea, customRegion, customPlace],
+  );
+  const applyCustomLocationSelection = useCallback((location: string) => {
+    const next = resolveCustomLocationSelection(location);
+    setCustomArea(next.area);
+    setCustomRegion(next.region);
+    setCustomPlace(next.place);
+  }, []);
 
   // 步骤4: 武功选择状态
   const [selectedMartialArts, setSelectedMartialArts] = useState<string[]>([]); // 已选武功名称列表
@@ -857,14 +915,14 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
               setCustomYear(loc.year);
               setCustomMonth(loc.month);
               setCustomDay(loc.day);
-              setCustomLocation(loc.location);
+              applyCustomLocationSelection(loc.location);
             }
           } else {
             setUseEventLocation(false);
             setCustomYear(loc.year);
             setCustomMonth(loc.month);
             setCustomDay(loc.day);
-            setCustomLocation(loc.location);
+            applyCustomLocationSelection(loc.location);
           }
         }
 
@@ -889,7 +947,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         showNotification('error', '加载存档失败');
       }
     },
-    [martialArtsDatabase, showNotification],
+    [applyCustomLocationSelection, martialArtsDatabase, showNotification],
   );
 
   /**
@@ -2216,98 +2274,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 )}
               </div>
 
-              {/* ================= 模式 2: 命格全谱 (备用自选列表) ================= */}
-              {activeTraitTab === 'manual' && (
-                <div className="form-section glass-card">
-                  <h3 className="section-title">
-                    <span className="section-icon">📜</span>
-                    命格全谱自选
-                    <span className={`points-badge ${remainingPoints >= 0 ? '' : 'error'}`}>
-                      剩余 {remainingPoints} 点
-                    </span>
-                  </h3>
-                  <p className="section-desc">正面天赋消耗点数，负面缺陷倒贴返还点数。可直接查谱勾选（至多佩戴 {MAX_EQUIPPED_TRAITS} 个）。</p>
-                  {errors.traits && <p className="error-text center">{errors.traits}</p>}
-
-                  {/* 搜索和筛选 */}
-                  <div className="trait-filters">
-                    <div className="search-wrapper">
-                      <input
-                        type="text"
-                        className="trait-search"
-                        placeholder="搜索天赋名称或描述..."
-                        value={traitSearchQuery}
-                        onChange={e => setTraitSearchQuery(e.target.value)}
-                      />
-                      <span className="search-icon">🔍</span>
-                    </div>
-                  </div>
-
-                  {/* 天赋列表 - 添加独立滚动容器 */}
-                  <div className="traits-scroll-container">
-                    <div className="traits-grid selectable">
-                      {CHARACTER_TRAITS.filter(trait => !trait.attributeThreshold)
-                        .filter(trait => {
-                          if (!traitSearchQuery) return true;
-                          const query = traitSearchQuery.toLowerCase();
-                          return (
-                            trait.name.toLowerCase().includes(query) || trait.description.toLowerCase().includes(query)
-                          );
-                        })
-                        .map(trait => {
-                          const isSelected = selectedTraits.includes(trait.name);
-                          const traitCost = trait.cost ?? 0;
-                          const canAfford = traitCost <= 0 || remainingPoints >= traitCost || isSelected;
-                          const traitType = getTraitType(trait);
-
-                          return (
-                            <div
-                              key={trait.name}
-                              className={`trait-card selectable ${isSelected ? 'selected' : ''} ${traitType === '正面' ? 'positive' : traitType === '负面' ? 'negative' : 'neutral'} ${!canAfford ? 'disabled' : ''}`}
-                              onClick={() => {
-                                if (isSelected) {
-                                  handleUnequipTrait(trait.name);
-                                } else {
-                                  if (selectedTraits.length >= MAX_EQUIPPED_TRAITS) {
-                                    showNotification('warning', `天命卡槽已满（至多佩戴 ${MAX_EQUIPPED_TRAITS} 个天赋）`);
-                                    return;
-                                  }
-                                  if (!canAfford) return;
-                                  setSelectedTraits(prev => [...prev, trait.name]);
-                                  if (traitCost < 0) {
-                                    showNotification('success', `已装配负面缺陷「${trait.name}」，成功提款 +${Math.abs(traitCost)} 点数！`);
-                                  } else {
-                                    showNotification('success', `已勾选天赋「${trait.name}」`);
-                                  }
-                                }
-                              }}
-                            >
-                              <div className="trait-header">
-                                <span className="trait-name">{trait.name}</span>
-                                <span
-                                  className={`trait-cost ${traitCost > 0 ? 'cost' : traitCost < 0 ? 'gain' : ''}`}
-                                >
-                                  {traitCost > 0
-                                    ? `-${traitCost}`
-                                    : traitCost < 0
-                                      ? `+${Math.abs(traitCost)}`
-                                      : '0'}
-                                </span>
-                              </div>
-                              <p className="trait-desc">{trait.description}</p>
-                              {isSelected && (
-                                <div className="selected-indicator">
-                                  <span>✓</span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* ================= 模式 3: 自定义天赋 ================= */}
               {activeTraitTab === 'custom' && (
                 <div className="form-section glass-card">
@@ -2858,59 +2824,43 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 {/* 自定义出身 */}
                 {selectedOrigin === 'custom' && (
                   <div className="custom-origin-section">
-                    <h4 className="subsection-title">自定义出身设置</h4>
+                    <div className="custom-origin-heading">
+                      <div>
+                        <span className="custom-origin-kicker">自定义身份</span>
+                        <h4 className="subsection-title">自定义出身设置</h4>
+                        <p>只保留开局真正需要填写的身份背景与境界，不再把所有境界铺满页面。</p>
+                      </div>
+                      <span className={`custom-origin-realm-badge realm-${realmMajor(customRealm)}`}>{customRealm}</span>
+                    </div>
+                    <div className="custom-origin-fields">
 
                     {/* 自定义境界选择 */}
-                    <div className="form-group">
-                      <label className="form-label">起始境界</label>
-                      <div className="realm-tier-picker">
-                        <div className="realm-major-grid" role="group" aria-label="选择大境界">
-                          {REALM_MAJOR_OPTIONS.map(major => {
-                            const isSelected = realmMajor(customRealm) === major;
-                            return (
-                              <button
-                                key={major}
-                                type="button"
-                                className={`realm-major-option ${isSelected ? 'selected' : ''} realm-${major}`}
-                                aria-pressed={isSelected}
-                                onClick={() => {
-                                  const sameMajorStages = REALM_LEVELS.filter(realm => realmMajor(realm) === major);
-                                  const currentStageLabel = getRealmStageLabel(customRealm);
-                                  const sameStage = sameMajorStages.find(
-                                    realm => getRealmStageLabel(realm) === currentStageLabel,
-                                  );
-                                  setCustomRealm((sameStage || sameMajorStages[0]) as RealmLevel);
-                                }}
-                              >
-                                {major}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {REALM_LEVELS.filter(realm => realmMajor(realm) === realmMajor(customRealm)).length > 1 && (
-                          <div className="realm-stage-grid" role="group" aria-label="选择境界阶段">
-                            {REALM_LEVELS.filter(realm => realmMajor(realm) === realmMajor(customRealm)).map(realm => (
-                              <button
-                                key={realm}
-                                type="button"
-                                className={`realm-stage-option ${customRealm === realm ? 'selected' : ''}`}
-                                aria-pressed={customRealm === realm}
-                                onClick={() => setCustomRealm(realm)}
-                              >
-                                {getRealmStageLabel(realm)}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                    <div className="form-group custom-origin-field">
+                      <label className="form-label" htmlFor="custom-origin-realm">起始境界</label>
+                      <div className="select-wrapper">
+                        <select
+                          id="custom-origin-realm"
+                          className="setup-select"
+                          aria-label="起始境界"
+                          value={customRealm}
+                          onChange={e => setCustomRealm(e.target.value as RealmLevel)}
+                          disabled={isLoading}
+                        >
+                          {REALM_LEVELS.map(realm => (
+                            <option key={realm} value={realm}>
+                              {realm}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="select-chevron" aria-hidden="true">⌄</span>
                       </div>
                       <p className="realm-hint">
-                        当前选择: <strong>{customRealm}</strong> (修为值: {REALM_CULTIVATION_MAP[customRealm] ?? 0})
+                        起始修为 <strong>{REALM_CULTIVATION_MAP[customRealm] ?? 0}</strong>
                       </p>
                     </div>
 
                     {/* 自定义出身描述 */}
-                    <div className="form-group">
+                    <div className="form-group custom-origin-field custom-origin-story">
                       <label className="form-label">出身背景描述</label>
                       <div className="input-wrapper">
                         <textarea
@@ -2924,6 +2874,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         <div className="input-glow" />
                       </div>
                     </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2936,15 +2887,31 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 </h3>
                 <p className="section-desc">选择故事开始的时间和地点。</p>
 
-                <div className="location-toggle">
-                  <label className="toggle-option">
-                    <input type="radio" checked={useEventLocation} onChange={() => setUseEventLocation(true)} />
-                    <span>选择预设事件</span>
-                  </label>
-                  <label className="toggle-option">
-                    <input type="radio" checked={!useEventLocation} onChange={() => setUseEventLocation(false)} />
-                    <span>自定义时间地点</span>
-                  </label>
+                <div className="opening-mode-switch" role="group" aria-label="开局方式">
+                  <button
+                    type="button"
+                    className={`opening-mode-option ${useEventLocation ? 'active' : ''}`}
+                    aria-pressed={useEventLocation}
+                    onClick={() => setUseEventLocation(true)}
+                  >
+                    <span className="opening-mode-icon">卷</span>
+                    <span className="opening-mode-copy">
+                      <strong>预设事件</strong>
+                      <small>从既有江湖事件切入</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`opening-mode-option ${!useEventLocation ? 'active' : ''}`}
+                    aria-pressed={!useEventLocation}
+                    onClick={() => setUseEventLocation(false)}
+                  >
+                    <span className="opening-mode-icon">定</span>
+                    <span className="opening-mode-copy">
+                      <strong>自定义时间地点</strong>
+                      <small>自定年月日与三级地点</small>
+                    </span>
+                  </button>
                 </div>
 
                 {useEventLocation ? (
@@ -3019,14 +2986,20 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                     </div>
                   </div>
                 ) : (
-                  <div className="custom-location">
-                    <p className="custom-time-hint">
-                      参考时期：天龙约 1092 年 · 射雕约 1200 年 · 神雕约 1238 年
-                    </p>
-                    <div className="time-inputs">
+                  <div className="custom-opening-editor">
+                    <div className="custom-opening-intro">
+                      <div>
+                        <span className="custom-opening-kicker">自定开局</span>
+                        <strong>时间与地点</strong>
+                      </div>
+                      <span>天龙约 1092 · 射雕约 1200 · 神雕约 1238</span>
+                    </div>
+
+                    <div className="opening-time-grid">
                       <div className="form-group">
-                        <label className="form-label">年份</label>
+                        <label className="form-label" htmlFor="opening-year">年份</label>
                         <input
+                          id="opening-year"
                           type="number"
                           className="form-input"
                           value={customYear}
@@ -3036,8 +3009,9 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         />
                       </div>
                       <div className="form-group">
-                        <label className="form-label">月份</label>
+                        <label className="form-label" htmlFor="opening-month">月份</label>
                         <input
+                          id="opening-month"
                           type="number"
                           className="form-input"
                           value={customMonth}
@@ -3047,8 +3021,9 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         />
                       </div>
                       <div className="form-group">
-                        <label className="form-label">日期</label>
+                        <label className="form-label" htmlFor="opening-day">日期</label>
                         <input
+                          id="opening-day"
                           type="number"
                           className="form-input"
                           value={customDay}
@@ -3058,17 +3033,84 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                         />
                       </div>
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">地点</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={customLocation}
-                        onChange={e => setCustomLocation(e.target.value)}
-                        placeholder="例如：大理/无量山/剑湖宫 或 大宋/临安府/西湖"
-                      />
-                      {errors.location && <p className="error-text">{errors.location}</p>}
+
+                    <div className="location-cascade">
+                      <div className="location-cascade-title">
+                        <span>三级地点</span>
+                        <small>地点来自《武侠地点表》，不再允许自由输入前三段。</small>
+                      </div>
+                      <div className="location-cascade-grid">
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="opening-area">一级大域</label>
+                          <div className="select-wrapper">
+                            <select
+                              id="opening-area"
+                              className="setup-select"
+                              aria-label="一级大域"
+                              value={customArea}
+                              onChange={e => {
+                                const area = e.target.value;
+                                const regions = Object.keys(LOCATION_TABLE[area] ?? {});
+                                const region = regions[0] ?? '';
+                                const place = region ? LOCATION_TABLE[area]?.[region]?.[0] ?? '' : '';
+                                setCustomArea(area);
+                                setCustomRegion(region);
+                                setCustomPlace(place);
+                              }}
+                            >
+                              {LOCATION_AREA_OPTIONS.map(area => (
+                                <option key={area} value={area}>{area}</option>
+                              ))}
+                            </select>
+                            <span className="select-chevron" aria-hidden="true">⌄</span>
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="opening-region">二级区域</label>
+                          <div className="select-wrapper">
+                            <select
+                              id="opening-region"
+                              className="setup-select"
+                              aria-label="二级区域"
+                              value={customRegion}
+                              onChange={e => {
+                                const region = e.target.value;
+                                setCustomRegion(region);
+                                setCustomPlace(LOCATION_TABLE[customArea]?.[region]?.[0] ?? '');
+                              }}
+                            >
+                              {customRegionOptions.map(region => (
+                                <option key={region} value={region}>{region}</option>
+                              ))}
+                            </select>
+                            <span className="select-chevron" aria-hidden="true">⌄</span>
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="opening-place">三级地点</label>
+                          <div className="select-wrapper">
+                            <select
+                              id="opening-place"
+                              className="setup-select"
+                              aria-label="三级地点"
+                              value={customPlace}
+                              onChange={e => setCustomPlace(e.target.value)}
+                            >
+                              {customPlaceOptions.map(place => (
+                                <option key={place} value={place}>{place}</option>
+                              ))}
+                            </select>
+                            <span className="select-chevron" aria-hidden="true">⌄</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
+
+                    <div className="opening-location-preview">
+                      <span>开局地点</span>
+                      <strong>{customLocation}</strong>
+                    </div>
+                    {errors.location && <p className="error-text">{errors.location}</p>}
                   </div>
                 )}
               </div>
