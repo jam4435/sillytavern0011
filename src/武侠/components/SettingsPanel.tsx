@@ -11,7 +11,6 @@ import {
   SummaryApiConfig,
   SummaryApiProfile,
   SummaryApiSelection,
-  SummaryVariableUpdateMode,
   ConversationSummaryMode,
   SummaryThresholds,
   DEFAULT_SUMMARY_API_CONFIG,
@@ -28,7 +27,6 @@ import {
   importPresetTavernRegexes,
   normalizePresetXmlModuleInput,
   scheduleRegexDebugDump,
-  shouldOfferVariablePromptTemplateUpdate,
   setPresetRegexRulesForPreset,
   switchDisplayTheme,
   updateThemeAppearanceSetting,
@@ -46,7 +44,14 @@ import {
   shouldShowVariableDebug,
 } from '../utils/debugRoundView';
 import { loadSummaryModelList, validateSummaryApiConfig } from '../utils/summaryApiClient';
-import { applyVariableUpdateModeWorldbookState } from '../utils/extraVariableUpdateManager';
+import {
+  inspectVariablePromptSlots,
+  type VariablePromptInspectionSnapshot,
+} from '../utils/extraVariableUpdateManager';
+import {
+  VARIABLE_PROMPT_SLOT_META,
+  type VariablePromptSlotName,
+} from '../utils/variablePromptTemplateEngine';
 import {
   CONVERSATION_SUMMARY_TRACE_EVENT,
   applyConversationSummaryModeState,
@@ -456,8 +461,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [summaryModelOptions, setSummaryModelOptions] = useState<string[]>([]);
   const [summaryModelStatus, setSummaryModelStatus] = useState('');
   const [isSummaryModelLoading, setIsSummaryModelLoading] = useState(false);
-  const [summaryVariableModeStatus, setSummaryVariableModeStatus] = useState('');
-  const [isSummaryVariableModeUpdating, setIsSummaryVariableModeUpdating] = useState(false);
+  const [variablePromptInspection, setVariablePromptInspection] =
+    useState<VariablePromptInspectionSnapshot | null>(null);
+  const [selectedVariablePromptSlot, setSelectedVariablePromptSlot] =
+    useState<VariablePromptSlotName | null>(null);
   const [conversationSummaryModeStatus, setConversationSummaryModeStatus] = useState('');
   const [isConversationSummaryModeUpdating, setIsConversationSummaryModeUpdating] = useState(false);
   const [customXmlModuleInput, setCustomXmlModuleInput] = useState('');
@@ -1845,30 +1852,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     ],
   );
 
-  const updateVariableUpdateMode = useCallback(
-    async (mode: SummaryVariableUpdateMode) => {
-      if (settings.summarySettings.variableUpdateMode === mode || isSummaryVariableModeUpdating) {
-        return;
-      }
-
-      setIsSummaryVariableModeUpdating(true);
-      setSummaryVariableModeStatus(
-        mode === 'extra' ? '正在禁用变量模板与变量指导条目...' : '正在启用变量模板与变量指导条目...',
-      );
-
-      try {
-        const status = await applyVariableUpdateModeWorldbookState(mode);
-        updateSummarySetting('variableUpdateMode', mode);
-        setSummaryVariableModeStatus(status);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setSummaryVariableModeStatus(`切换失败：${message}`);
-      } finally {
-        setIsSummaryVariableModeUpdating(false);
-      }
+  const handleInspectVariablePromptSlot = useCallback(
+    (slotName: VariablePromptSlotName) => {
+      const snapshot = inspectVariablePromptSlots(settings.summarySettings);
+      setVariablePromptInspection(snapshot);
+      setSelectedVariablePromptSlot(slotName);
     },
-    [isSummaryVariableModeUpdating, settings.summarySettings.variableUpdateMode, updateSummarySetting],
+    [settings.summarySettings],
   );
+
+  const selectedVariablePromptSlotDetail =
+    selectedVariablePromptSlot === null
+      ? null
+      : variablePromptInspection?.items.find(item => item.name === selectedVariablePromptSlot) ?? null;
 
   const handleLoadSummaryModels = useCallback(async () => {
     setIsSummaryModelLoading(true);
@@ -3208,35 +3204,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </div>
               </div>
 
-              <div className="summary-api-mode-group" role="radiogroup" aria-label="变量更新模式">
-                <label
-                  className={`summary-api-mode ${settings.summarySettings.variableUpdateMode !== 'extra' ? 'active' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="summary-variable-update-mode"
-                    checked={settings.summarySettings.variableUpdateMode !== 'extra'}
-                    disabled={isSummaryVariableModeUpdating}
-                    onChange={() => void updateVariableUpdateMode('inline')}
-                  />
-                  <span>正文伴随的变量更新</span>
-                </label>
-                <label
-                  className={`summary-api-mode ${settings.summarySettings.variableUpdateMode === 'extra' ? 'active' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="summary-variable-update-mode"
-                    checked={settings.summarySettings.variableUpdateMode === 'extra'}
-                    disabled={isSummaryVariableModeUpdating}
-                    onChange={() => void updateVariableUpdateMode('extra')}
-                  />
-                  <span>额外进行变量更新</span>
-                </label>
-              </div>
-
               <p className="settings-hint">
-                额外更新会禁用当前角色世界书的「变量指导」条目，正文输出后使用上方选择的 API 单独生成变量块。
+                变量更新固定使用独立额外模型：正文模型只负责剧情；正文显示后再由这里选择的 API 检查并写入持久变量。
               </p>
 
               <div className="settings-row">
@@ -3309,36 +3278,96 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
 
               <div className="summary-subsection">
-                <h5 className="summary-subsection-title">变量提示词模板</h5>
-                {shouldOfferVariablePromptTemplateUpdate(settings.summarySettings.variablePromptTemplate) && (
-                  <div className="summary-api-status warning">
-                    <div>
-                      检测到当前变量提示词是修改过的旧版模板。新版模板已加入本轮 User 输入等结构更新；为避免覆盖你的自定义内容，当前模板没有自动修改。
+                <h5 className="summary-subsection-title">变量输入模板</h5>
+                <p className="settings-hint">
+                  这里只控制上下文怎么排列，不负责计算数据。支持 {'{{slot}}'} 与独占一行的
+                  {' @if slot '} / {' @endif '}；条件在 slot 非空时成立。
+                </p>
+                <div className="variable-prompt-slot-list">
+                  {VARIABLE_PROMPT_SLOT_META.map(slot => (
+                    <button
+                      key={slot.name}
+                      type="button"
+                      className={`variable-prompt-slot-chip ${selectedVariablePromptSlot === slot.name ? 'active' : ''}`}
+                      onClick={() => handleInspectVariablePromptSlot(slot.name)}
+                      title={`查看 {{${slot.name}}} 当前实际内容`}
+                    >
+                      { `{{${slot.name}}}` }
+                    </button>
+                  ))}
+                </div>
+                {selectedVariablePromptSlotDetail && (
+                  <div className="variable-prompt-slot-inspector">
+                    <div className="variable-prompt-slot-inspector-title">
+                      { `{{${selectedVariablePromptSlotDetail.name}}}` } · {selectedVariablePromptSlotDetail.label}
                     </div>
-                    <div className="summary-actions">
-                      <button
-                        type="button"
-                        className="settings-action-btn primary"
-                        onClick={() =>
-                          updateSummarySetting('variablePromptTemplate', DEFAULT_SUMMARY_SETTINGS.variablePromptTemplate)
-                        }
-                      >
-                        更新为新版模板
-                      </button>
+                    <div className="variable-prompt-slot-inspector-grid">
+                      <div><strong>含义</strong><span>{selectedVariablePromptSlotDetail.description}</span></div>
+                      <div><strong>来源</strong><span>{selectedVariablePromptSlotDetail.source}</span></div>
+                      <div><strong>空值</strong><span>{selectedVariablePromptSlotDetail.emptyBehavior}</span></div>
+                      <div>
+                        <strong>当前条件</strong>
+                        <span>{selectedVariablePromptSlotDetail.active ? '有内容；@if 条件成立' : '为空；@if 条件不成立'}</span>
+                      </div>
                     </div>
+                    {variablePromptInspection?.error && (
+                      <div className="summary-api-status warning">{variablePromptInspection.error}</div>
+                    )}
+                    <div className="variable-prompt-slot-preview-label">当前实际展开值</div>
+                    <pre className="variable-prompt-slot-preview">
+                      {selectedVariablePromptSlotDetail.value || '（空）'}
+                    </pre>
                   </div>
                 )}
+                <textarea
+                  value={settings.summarySettings.variableInputTemplate}
+                  onChange={e => updateSummarySetting('variableInputTemplate', e.target.value)}
+                  placeholder="请输入变量上下文伪代码模板..."
+                  className="settings-textarea variable-prompt-template-input"
+                  rows={16}
+                />
+                <div className="summary-actions">
+                  <button
+                    type="button"
+                    className="settings-action-btn"
+                    onClick={() => {
+                      const snapshot = inspectVariablePromptSlots(settings.summarySettings);
+                      setVariablePromptInspection(snapshot);
+                      if (!selectedVariablePromptSlot) {
+                        setSelectedVariablePromptSlot(VARIABLE_PROMPT_SLOT_META[0].name);
+                      }
+                    }}
+                  >
+                    预览当前完整输入
+                  </button>
+                  <button
+                    className="settings-reset-template-btn"
+                    onClick={() =>
+                      updateSummarySetting('variableInputTemplate', DEFAULT_SUMMARY_SETTINGS.variableInputTemplate)
+                    }
+                  >
+                    恢复默认输入模板
+                  </button>
+                </div>
+                {variablePromptInspection && !selectedVariablePromptSlot && (
+                  <pre className="variable-prompt-slot-preview">
+                    {variablePromptInspection.renderedInput || variablePromptInspection.error || '（空）'}
+                  </pre>
+                )}
+              </div>
+
+              <div className="summary-subsection">
+                <h5 className="summary-subsection-title">变量模型主提示词</h5>
                 <p className="settings-hint">
-                  可用变量：{'{{readonlyContextRounds}}'}、{'{{latestUserBody}}'}、{'{{latestAssistantBody}}'}、
-                  {'{{variableContext}}'}、{'{{narrativeScale}}'}、{'{{variableGuidance}}'}、{'{{locationContext}}'}；
-                  {'{{recentBodies}}'} 保留用于兼容旧模板。
+                  可用：{'{{variableInputContext}}'}、{'{{narrativeScale}}'}、{'{{variableTemplate}}'}、
+                  {'{{variableGuidance}}'}。前者由上面的变量输入模板渲染。
                 </p>
                 <textarea
                   value={settings.summarySettings.variablePromptTemplate}
                   onChange={e => updateSummarySetting('variablePromptTemplate', e.target.value)}
-                  placeholder="请输入额外变量更新提示词模板..."
+                  placeholder="请输入额外变量模型主提示词..."
                   className="settings-textarea variable-prompt-template-input"
-                  rows={12}
+                  rows={14}
                 />
                 <button
                   className="settings-reset-template-btn"
@@ -3346,17 +3375,50 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     updateSummarySetting('variablePromptTemplate', DEFAULT_SUMMARY_SETTINGS.variablePromptTemplate)
                   }
                 >
-                  恢复默认模板
+                  恢复默认主提示词
                 </button>
               </div>
 
-              {summaryVariableModeStatus && (
-                <div
-                  className={`summary-api-status ${summaryVariableModeStatus.startsWith('切换失败') ? 'warning' : 'info'}`}
+              <div className="summary-subsection">
+                <h5 className="summary-subsection-title">变量结构模板</h5>
+                <p className="settings-hint">原世界书「变量模板」内容。现在直接由额外变量模型设置维护。</p>
+                <textarea
+                  value={settings.summarySettings.variableStructureTemplate}
+                  onChange={e => updateSummarySetting('variableStructureTemplate', e.target.value)}
+                  placeholder="请输入变量结构与权限模板..."
+                  className="settings-textarea variable-prompt-template-input"
+                  rows={16}
+                />
+                <button
+                  className="settings-reset-template-btn"
+                  onClick={() =>
+                    updateSummarySetting('variableStructureTemplate', DEFAULT_SUMMARY_SETTINGS.variableStructureTemplate)
+                  }
                 >
-                  {summaryVariableModeStatus}
-                </div>
-              )}
+                  恢复默认变量结构
+                </button>
+              </div>
+
+              <div className="summary-subsection">
+                <h5 className="summary-subsection-title">变量更新规则</h5>
+                <p className="settings-hint">原世界书「变量指导」内容。只服务额外变量模型。</p>
+                <textarea
+                  value={settings.summarySettings.variableGuidanceTemplate}
+                  onChange={e => updateSummarySetting('variableGuidanceTemplate', e.target.value)}
+                  placeholder="请输入变量更新规则..."
+                  className="settings-textarea variable-prompt-template-input"
+                  rows={16}
+                />
+                <button
+                  className="settings-reset-template-btn"
+                  onClick={() =>
+                    updateSummarySetting('variableGuidanceTemplate', DEFAULT_SUMMARY_SETTINGS.variableGuidanceTemplate)
+                  }
+                >
+                  恢复默认变量规则
+                </button>
+              </div>
+
             </SettingsCollapsibleBlock>
           </div>
         )}
