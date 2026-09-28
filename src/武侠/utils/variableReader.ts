@@ -1737,7 +1737,12 @@ export function parseFactionTasks(variables: GameVariables): FactionTaskMap | un
  * 每个势力下的任务对象与正式 stat_data.任务 使用完全相同的 FactionTask 结构。
  */
 export function parseAvailableFactionTasks(variables: GameVariables): FactionTaskPoolMap | undefined {
-  const rawPools = variables.前端变量?.可选任务;
+  const statData = variables.stat_data && typeof variables.stat_data === 'object'
+    ? (variables.stat_data as Record<string, unknown>)
+    : undefined;
+  const frontendVariables = variables.前端变量
+    || (statData?.前端变量 as FrontendVariableData | undefined);
+  const rawPools = frontendVariables?.可选任务;
   if (!rawPools || typeof rawPools !== 'object' || Array.isArray(rawPools)) {
     return undefined;
   }
