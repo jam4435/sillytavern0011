@@ -294,12 +294,8 @@ const appendLimited = <T,>(existing: T[], additions: T[]): { values: T[]; omitte
 };
 
 const parseAiDeclaredState = (activeTurn: ActiveVariableTurn): ParsedDeclaredVariableChanges => {
-  // AI 身份只由“本轮冻结的变量模式”决定，不能用 extra 是否返回非空块来反推模式。
-  // extra 合法返回 0 个动作时，AI 声明就是空集合；正文中的意外变量块仍属于最终楼层剩余块。
-  if (activeTurn.variableUpdateMode === 'extra') {
-    return parseDeclaredVariableChanges(activeTurn.extraDeclaredBlocks);
-  }
-  return parseDeclaredVariableChanges(activeTurn.assistantDeclaredReply);
+  // AI 变量声明只认独立额外变量模型；正文模型中的 Variable* 块永远不作为 AI 变量声明来源。
+  return parseDeclaredVariableChanges(activeTurn.extraDeclaredBlocks);
 };
 
 const declaredSignature = (change: VariableDeclaredChange): string =>
@@ -424,7 +420,7 @@ export function useVariableChangeTracker() {
 
   const startTurn = useCallback((
     userMessageId?: number,
-    variableUpdateMode: SummaryVariableUpdateMode = 'inline',
+    variableUpdateMode: SummaryVariableUpdateMode = 'extra',
   ) => {
     const turnId = nextTurnIdRef.current + 1;
     nextTurnIdRef.current = turnId;
@@ -711,7 +707,7 @@ export function useVariableChangeTracker() {
     commitSummary(nextSummary);
   }, [commitSummary]);
 
-  const handleVariableTurnStart = useCallback((variableUpdateMode: SummaryVariableUpdateMode = 'inline') => {
+  const handleVariableTurnStart = useCallback((variableUpdateMode: SummaryVariableUpdateMode = 'extra') => {
     startTurn(undefined, variableUpdateMode);
   }, [startTurn]);
 
@@ -725,7 +721,7 @@ export function useVariableChangeTracker() {
       return;
     }
     if (activeTurn?.userMessageId === normalized) return;
-    startTurn(normalized, 'inline');
+    startTurn(normalized, 'extra');
   }, [refreshCurrentSummary, startTurn]);
 
   const markVariableApiWriteAsAi = useCallback((assistantMessageId: number) => {
@@ -749,10 +745,9 @@ export function useVariableChangeTracker() {
     if (assistantMessageId !== undefined) {
       activeTurn.assistantMessageId = assistantMessageId;
     }
-    variableTraceLogger.log('[useVariableChangeTracker] 登记正文模型变量块', {
+    variableTraceLogger.log('[useVariableChangeTracker] 登记正文楼层（不作为变量声明来源）', {
       turnId: activeTurn.turnId,
       assistantMessageId: assistantMessageId ?? null,
-      declarationCount: parseDeclaredVariableChanges(rawReply).declaredChanges.length,
     });
 
     // 带 assistant id 的回调发生在 inline ERA 写入确认之后，用它作为后台后续写入的起点。
@@ -787,7 +782,7 @@ export function useVariableChangeTracker() {
     if (!activeTurn) return;
     activeTurn.assistantDeclaredReply = rawReply;
     activeTurn.extraDeclaredBlocks = '';
-    activeTurn.variableUpdateMode = 'inline';
+    activeTurn.variableUpdateMode = 'extra';
     if (assistantMessageId !== undefined) activeTurn.assistantMessageId = assistantMessageId;
     checkpointAiWrite(assistantMessageId);
     settleTurn(assistantMessageId);
