@@ -3333,9 +3333,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     onClick={() => {
                       const snapshot = inspectVariablePromptSlots(settings.summarySettings);
                       setVariablePromptInspection(snapshot);
-                      if (!selectedVariablePromptSlot) {
-                        setSelectedVariablePromptSlot(VARIABLE_PROMPT_SLOT_META[0].name);
-                      }
+                      setSelectedVariablePromptSlot(null);
                     }}
                   >
                     预览当前完整输入
