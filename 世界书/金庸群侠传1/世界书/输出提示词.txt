@@ -1,4 +1,3 @@
-<当前状态>
 <%
 function sanitizePromptValue(value) {
   if (Array.isArray(value)) return value.map(item => sanitizePromptValue(item));
@@ -9,9 +8,41 @@ function sanitizePromptValue(value) {
       .map(([key, child]) => [key, sanitizePromptValue(child)]),
   );
 }
-function toStrictJson(value) {
-  const result = JSON.stringify(sanitizePromptValue(value));
-  return result === undefined ? 'null' : result;
+function compactPromptScalar(value) {
+  if (value === null || value === undefined) return '无';
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  const text = String(value).replace(/\s+/g, ' ').trim();
+  return text || '无';
+}
+function compactPromptKey(value) {
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/:/g, '：') || '未命名';
+}
+function toPromptYaml(value, indent = 0) {
+  const sanitized = sanitizePromptValue(value);
+  const pad = ' '.repeat(indent);
+  if (Array.isArray(sanitized)) {
+    if (sanitized.length === 0) return pad + '[]';
+    return sanitized.map(item => {
+      if (item && typeof item === 'object') {
+        const nested = toPromptYaml(item, indent + 2);
+        return pad + '-\n' + nested;
+      }
+      return pad + '- ' + compactPromptScalar(item);
+    }).join('\n');
+  }
+  if (!sanitized || typeof sanitized !== 'object') return pad + compactPromptScalar(sanitized);
+  const entries = Object.entries(sanitized);
+  if (entries.length === 0) return pad + '{}';
+  return entries.map(([key, child]) => {
+    const safeKey = compactPromptKey(key);
+    if (child && typeof child === 'object') {
+      return pad + safeKey + ':\n' + toPromptYaml(child, indent + 2);
+    }
+    return pad + safeKey + ': ' + compactPromptScalar(child);
+  }).join('\n');
 }
 function getAptitudeLevel(value) {
   const num = Number(value);
@@ -66,7 +97,9 @@ function uniqueFullLocationPaths(value) {
 }
 -%>
 
-<世界信息>{{ERA:世界信息}}</世界信息>
+<世界信息>
+<%- toPromptYaml(variables.stat_data.世界信息 ?? {}) %>
+</世界信息>
 
 <%
 const p = variables.stat_data.user数据;
@@ -81,12 +114,20 @@ if (p && worldTime) {
   const attrs = describeInitialAttributes(p.初始属性);
   const talents = describeTalents(p.天赋);
 -%>
-<玩家><%- toStrictJson(userData) %></玩家>
-<% if (attrs) { -%><玩家资质><%- attrs %></玩家资质><% } -%>
-<% if (talents) { -%><玩家天赋><%- talents %></玩家天赋><% } -%>
-<叙事约束>资质与天赋通过人物表现自然体现，不在正文直白报数值。</叙事约束>
+<玩家>
+<%- toPromptYaml(userData) %>
+<% if (attrs) { -%>
+资质: <%- attrs %>
+<% } -%>
+<% if (talents) { -%>
+天赋: <%- talents %>
+<% } -%>
+叙事约束: 资质与天赋通过人物表现自然体现，不在正文直白报数值。
+</玩家>
 <% } else { -%>
-<上下文错误>玩家数据或世界时间加载失败</上下文错误>
+<上下文错误>
+玩家数据或世界时间加载失败
+</上下文错误>
 <% } -%>
 
 <%
@@ -102,10 +143,11 @@ if (Object.keys(participation).length > 0) {
   const detail = String(event.描述 ?? '').replace(/\s+/g, ' ').trim();
   const outcome = typeof event.结局 === 'string' ? event.结局.trim() : '';
 -%>
-<<%- eventName %>>
-<详情><%- detail || '无' %></详情>
-<% if (outcome) { -%><当前结局><%- outcome %></当前结局><% } -%>
-</<%- eventName %>>
+<%- compactPromptKey(eventName) %>:
+  详情: <%- detail || '无' %>
+<% if (outcome) { -%>
+  当前结局: <%- outcome %>
+<% } -%>
 <% } -%>
 </参与事件>
 <% } -%>
@@ -114,7 +156,9 @@ if (Object.keys(participation).length > 0) {
 const followupClues = getvar('stat_data.后续事件线索', { scope: 'local' });
 if (followupClues && typeof followupClues === 'object' && Object.keys(followupClues).length > 0) {
 -%>
-<后续事件线索><%- toStrictJson(followupClues) %></后续事件线索>
+<后续事件线索>
+<%- toPromptYaml(followupClues) %>
+</后续事件线索>
 <% } -%>
 
 <%
@@ -122,7 +166,8 @@ const nearbyRumors = getvar('stat_data.附近传闻', { scope: 'local' });
 if (nearbyRumors && typeof nearbyRumors === 'object' && Object.keys(nearbyRumors).length > 0) {
 -%>
 <附近传闻>
-<% for (const rumor of Object.values(nearbyRumors)) { -%><传闻><%- formatNearbyRumorForPrompt(rumor) %></传闻>
+<% for (const rumor of Object.values(nearbyRumors)) { -%>
+- <%- formatNearbyRumorForPrompt(rumor) %>
 <% } -%>
 </附近传闻>
 <% } -%>
@@ -131,7 +176,9 @@ if (nearbyRumors && typeof nearbyRumors === 'object' && Object.keys(nearbyRumors
 const currentLocationInfo = getvar('stat_data.前端变量.当前地点信息', { scope: 'local' });
 if (currentLocationInfo && typeof currentLocationInfo === 'object' && !Array.isArray(currentLocationInfo)) {
 -%>
-<当前地点信息><%- toStrictJson(currentLocationInfo) %></当前地点信息>
+<当前地点信息>
+<%- toPromptYaml(currentLocationInfo) %>
+</当前地点信息>
 <% } -%>
 
 <%
@@ -152,13 +199,13 @@ const allowedScopes = [...new Set([
 ].filter(Boolean))];
 -%>
 <可用地点>
-<当前><%- currentFullLocation || '无效' %></当前>
-<严格活动区><%- currentScope || '无效' %></严格活动区>
-<合法活动区><%- allowedScopes.join('|') || '无' %></合法活动区>
-<普通移动><%- locationGroups.普通移动.join('|') || '无' %></普通移动>
-<事件目标><%- locationGroups.事件目标.join('|') || '无' %></事件目标>
-<地图指定><%- locationGroups.地图指定.join('|') || '无' %></地图指定>
-<规则>路径=一级/二级/三级[/四级]；前三段相同仅表示同一严格活动区，不代表人物面对面同场。</规则>
+当前: <%- currentFullLocation || '无效' %>
+严格活动区: <%- currentScope || '无效' %>
+合法活动区: <%- allowedScopes.join('|') || '无' %>
+普通移动: <%- locationGroups.普通移动.join('|') || '无' %>
+事件目标: <%- locationGroups.事件目标.join('|') || '无' %>
+地图指定: <%- locationGroups.地图指定.join('|') || '无' %>
+规则: 路径=一级/二级/三级[/四级]；前三段相同仅表示同一严格活动区，不代表人物面对面同场。
 </可用地点>
 
 <%
@@ -179,7 +226,7 @@ if (playerLocation && allCharacters) {
 }
 if (Object.keys(presentCharacters).length > 0) {
 -%>
-<角色数据><%- toStrictJson(presentCharacters) %></角色数据>
+<角色数据>
+<%- toPromptYaml(presentCharacters) %>
+</角色数据>
 <% } -%>
-
-</当前状态>
