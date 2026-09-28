@@ -165,7 +165,7 @@ describe('NewGameSetup martial fate', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
   });
 
-  it('固定消耗5点生成三门武缘，必须三择一后才能离开武功页', async () => {
+  it('固定消耗5点生成三门武缘，不选择也可以继续下一步', async () => {
     renderSetup();
     goToMartialStep();
 
@@ -185,19 +185,40 @@ describe('NewGameSetup martial fate', () => {
 
     const previousButton = document.querySelector('[data-wuxia-automation="setup-previous-step"]') as HTMLButtonElement;
     const nextButton = document.querySelector('[data-wuxia-automation="setup-next-step"]') as HTMLButtonElement;
-    expect(previousButton).toBeDisabled();
-    expect(nextButton).toBeDisabled();
-    expect(nextButton).toHaveTextContent('请先择定武缘');
-
-    const acceptButtons = screen.getAllByRole('button', { name: '承此武缘' });
-    fireEvent.click(acceptButtons[0]);
-
-    expect(document.querySelectorAll('[data-wuxia-automation="martial-fate-candidate"]')).toHaveLength(0);
-    expect(document.querySelector('.martial-selection-heading')).toHaveTextContent('1 门');
-    expect(Number(document.querySelector('.martial-selection-points strong')?.textContent)).toBe(pointsAfterSeek);
     expect(previousButton).not.toBeDisabled();
     expect(nextButton).not.toBeDisabled();
+    expect(nextButton).toHaveTextContent('下一步');
+
+    fireEvent.click(nextButton);
+    expect(document.querySelector('[data-wuxia-automation="new-game-setup"]')).toHaveAttribute(
+      'data-wuxia-setup-step',
+      'origin',
+    );
+  });
+
+  it('承下武缘不追加品阶点数，放弃武缘也不会退回已消耗的5点', async () => {
+    renderSetup();
+    goToMartialStep();
+
+    const seekButton = await screen.findByRole('button', { name: /寻访武缘/ });
+    await waitFor(() => expect(seekButton).not.toBeDisabled());
+
+    fireEvent.click(seekButton);
+    const pointsAfterFirstSeek = Number(document.querySelector('.martial-selection-points strong')?.textContent);
+    fireEvent.click(screen.getAllByRole('button', { name: '承此武缘' })[0]);
+
+    expect(document.querySelector('.martial-selection-heading')).toHaveTextContent('1 门');
+    expect(Number(document.querySelector('.martial-selection-points strong')?.textContent)).toBe(pointsAfterFirstSeek);
     expect(screen.getByText('武缘所得')).toBeInTheDocument();
+
+    const nextSeekButton = screen.getByRole('button', { name: /寻访武缘/ });
+    fireEvent.click(nextSeekButton);
+    const pointsAfterSecondSeek = Number(document.querySelector('.martial-selection-points strong')?.textContent);
+    expect(pointsAfterSecondSeek).toBe(pointsAfterFirstSeek - 5);
+
+    fireEvent.click(screen.getByRole('button', { name: '放弃本次武缘' }));
+    expect(document.querySelectorAll('[data-wuxia-automation="martial-fate-candidate"]')).toHaveLength(0);
+    expect(Number(document.querySelector('.martial-selection-points strong')?.textContent)).toBe(pointsAfterSecondSeek);
   });
 });
 
@@ -240,21 +261,28 @@ describe('NewGameSetup custom realm picker', () => {
     localStorage.clear();
   });
 
-  it('自定义出身的起始境界使用单一选择栏，不再铺开全部境界按钮', () => {
+  it('自定义出身将大境界与小境界拆成两个紧凑选择栏', () => {
     renderSetup();
     goToOriginStep();
 
     fireEvent.click(screen.getByText('自定义出身', { selector: '.origin-name' }));
 
-    const realmSelect = screen.getByLabelText('起始境界') as HTMLSelectElement;
-    expect(realmSelect.value).toBe('三流圆满');
+    const majorSelect = screen.getByLabelText('大境界') as HTMLSelectElement;
+    const stageSelect = screen.getByLabelText('小境界') as HTMLSelectElement;
+    expect(majorSelect.value).toBe('三流');
+    expect(stageSelect.value).toBe('三流圆满');
 
-    fireEvent.change(realmSelect, { target: { value: '宗师后期' } });
-    expect(realmSelect.value).toBe('宗师后期');
+    fireEvent.change(majorSelect, { target: { value: '宗师' } });
+    expect(majorSelect.value).toBe('宗师');
+    expect((screen.getByLabelText('小境界') as HTMLSelectElement).value).toBe('宗师圆满');
+    expect(document.querySelector('.realm-hint')).toHaveTextContent('4200');
+
+    fireEvent.change(screen.getByLabelText('小境界'), { target: { value: '宗师后期' } });
+    expect((screen.getByLabelText('小境界') as HTMLSelectElement).value).toBe('宗师后期');
+    expect(document.querySelector('.realm-hint')).toHaveTextContent('宗师后期');
     expect(document.querySelector('.realm-hint')).toHaveTextContent('3800');
 
-    expect(screen.queryByRole('group', { name: '选择大境界' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: '选择境界阶段' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('起始境界')).not.toBeInTheDocument();
   }, 15000);
 });
 
