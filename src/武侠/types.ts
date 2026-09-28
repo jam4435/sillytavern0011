@@ -646,7 +646,7 @@ export interface TraitDiscounts {
 }
 
 export type TraitRank = '粗浅' | '传家' | '上乘' | '镇派' | '绝世' | '传说' | '缺陷';
-export type TraitCategory = '天资' | '体质' | '性情' | '气质' | '专长' | '命格' | '经历' | '缺陷';
+export type TraitCategory = '天资' | '体质' | '性情' | '气质' | '命格' | '缺陷';
 
 /**
  * 角色天赋定义
@@ -684,9 +684,9 @@ export function getTraitType(trait: CharacterTrait): '正面' | '负面' | '中�
 
 /**
  * 属性天赋类别
- * - 天残 (C): 属性值为 0
- * - 愚钝 (D): 属性值为 1-4
- * - 天才 (A): 属性值为 12-16
+ * - 天残 (C): 属性值为 0-1
+ * - 愚钝 (D): 属性值为 2-5
+ * - 天才 (A): 属性值为 13-16
  * - 妖孽 (B): 属性值为 17-20
  */
 export type AttributeTraitCategory = '天残' | '愚钝' | '天才' | '妖孽';
